@@ -1,0 +1,14 @@
+{
+  "name": "msharing0008",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Drum MIDI -> Video app. Root package.json exists so Cloudflare Workers Builds (which installs/deploys from the repo root) can find wrangler.",
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0",
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "typescript": "^5.4.0"
+  }
+}

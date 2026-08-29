@@ -1,0 +1,13 @@
+name = "drum-midi-asset-worker"
+main = "cloudflare-worker/src/index.ts"
+compatibility_date = "2026-08-01"
+
+# Binds the "msharing0008" R2 bucket as env.DRUM_ASSETS inside the Worker.
+[[r2_buckets]]
+binding = "DRUM_ASSETS"
+bucket_name = "msharing0008"
+
+# Restrict this to your actual Cloudflare Pages frontend URL before going to
+# production -- "*" is open for now while there's no frontend deployed yet.
+[vars]
+ALLOWED_ORIGINS = "*"
