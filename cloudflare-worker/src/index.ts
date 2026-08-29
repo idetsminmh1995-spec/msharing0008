@@ -9,24 +9,26 @@
 // - The frontend should only ever load the assets for the currently
 //   selected Drum Set + aspect ratio, never everything at once.
 //
-// R2 key layout (see project README):
-//   drum-sets/{DrumSetName}/{aspect}/Bg/background.png
-//   drum-sets/{DrumSetName}/{aspect}/R{note}.png
-//   drum-sets/{DrumSetName}/{aspect}/L{note}.png
+// R2 key layout actually used (matches what's uploaded in the bucket):
+//   drums/{drumSetName}/{aspect}/Drum Bg.png
+//   drums/{drumSetName}/{aspect}/R{note}.png
+//   drums/{drumSetName}/{aspect}/L{note}.png
 //
-// Aspect ratios are stored with their natural names ("16:9", "9:16", "1:1")
-// but ":" is awkward in URL paths, so the public API uses "16x9" / "9x16" /
-// "1x1" and this Worker maps between the two internally.
+// `aspect` is one of "16x9", "9x16", "1x1" -- used as-is, both as the R2
+// folder name and the public URL segment (no colon, so no URL-encoding
+// headaches). The background file is named "Drum Bg.png" (with a space)
+// and lives directly in the aspect folder, not in a separate subfolder.
 //
 // Endpoints:
 //   GET /api/drum-sets
-//     -> ["Drum1", "Drum2", ...]  (discovered from R2, not hardcoded)
+//     -> { "drumSets": ["drum1", "drum2", ...] }  (discovered from R2)
 //
 //   GET /api/drum-sets/:drumSet/:aspect/manifest
-//     -> { drumSet, aspect, hasBackground, files: ["R38.png", "L38.png", ...] }
+//     -> { drumSet, aspect, hasBackground, backgroundFile, files: [...] }
 //
 //   GET /assets/:drumSet/:aspect/*filePath
-//     -> streams the actual PNG bytes from R2 (e.g. .../Bg/background.png)
+//     -> streams the actual PNG bytes from R2, e.g.
+//        /assets/drum1/16x9/Drum%20Bg.png  or  /assets/drum1/16x9/R38.png
 
 export interface Env {
   DRUM_ASSETS: R2Bucket;
@@ -35,11 +37,9 @@ export interface Env {
   ALLOWED_ORIGINS?: string;
 }
 
-const ASPECT_URL_TO_KEY: Record<string, string> = {
-  '16x9': '16:9',
-  '9x16': '9:16',
-  '1x1': '1:1',
-};
+const R2_PREFIX = 'drums/';
+const BACKGROUND_FILENAME = 'Drum Bg.png';
+const VALID_ASPECTS = new Set(['16x9', '9x16', '1x1']);
 
 function corsHeaders(request: Request, env: Env): HeadersInit {
   const allowed = (env.ALLOWED_ORIGINS ?? '*').split(',').map((s) => s.trim());
@@ -64,14 +64,14 @@ function errorResponse(message: string, status: number, headers: HeadersInit): R
   return json({ error: message }, status, headers);
 }
 
-/** Discover distinct Drum Set names under drum-sets/ using R2's delimiter listing. */
+/** Discover distinct Drum Set names under drums/ using R2's delimiter listing. */
 async function listDrumSets(bucket: R2Bucket): Promise<string[]> {
   const names = new Set<string>();
   let cursor: string | undefined;
   do {
-    const result = await bucket.list({ prefix: 'drum-sets/', delimiter: '/', cursor });
+    const result = await bucket.list({ prefix: R2_PREFIX, delimiter: '/', cursor });
     for (const prefix of result.delimitedPrefixes) {
-      // prefix looks like "drum-sets/Drum1/" -> extract "Drum1"
+      // prefix looks like "drums/drum1/" -> extract "drum1"
       const parts = prefix.split('/').filter(Boolean);
       if (parts.length >= 2) names.add(parts[1]);
     }
@@ -81,8 +81,8 @@ async function listDrumSets(bucket: R2Bucket): Promise<string[]> {
 }
 
 /** List asset filenames for a given drum set + aspect ratio. */
-async function listManifest(bucket: R2Bucket, drumSet: string, aspectKey: string) {
-  const prefix = `drum-sets/${drumSet}/${aspectKey}/`;
+async function listManifest(bucket: R2Bucket, drumSet: string, aspect: string) {
+  const prefix = `${R2_PREFIX}${drumSet}/${aspect}/`;
   const files: string[] = [];
   let hasBackground = false;
   let cursor: string | undefined;
@@ -90,10 +90,10 @@ async function listManifest(bucket: R2Bucket, drumSet: string, aspectKey: string
     const result = await bucket.list({ prefix, cursor });
     for (const obj of result.objects) {
       const relative = obj.key.slice(prefix.length);
-      if (!relative) continue;
-      if (relative === 'Bg/background.png') {
+      if (!relative || relative.endsWith('/')) continue;
+      if (relative === BACKGROUND_FILENAME) {
         hasBackground = true;
-      } else if (!relative.endsWith('/')) {
+      } else {
         files.push(relative);
       }
     }
@@ -114,7 +114,9 @@ export default {
     }
 
     const url = new URL(request.url);
-    const segments = url.pathname.split('/').filter(Boolean);
+    // Decode each segment individually so filenames with spaces (e.g.
+    // "Drum Bg.png" -> "Drum%20Bg.png" in the URL) resolve correctly.
+    const segments = url.pathname.split('/').filter(Boolean).map((s) => decodeURIComponent(s));
 
     try {
       // GET /api/drum-sets
@@ -130,36 +132,42 @@ export default {
         segments.length === 5 &&
         segments[4] === 'manifest'
       ) {
-        const [, , drumSet, aspectUrl] = segments;
-        const aspectKey = ASPECT_URL_TO_KEY[aspectUrl];
-        if (!aspectKey) {
+        const [, , drumSet, aspect] = segments;
+        if (!VALID_ASPECTS.has(aspect)) {
           return errorResponse(
-            `Unknown aspect ratio "${aspectUrl}". Expected one of: ${Object.keys(ASPECT_URL_TO_KEY).join(', ')}.`,
+            `Unknown aspect ratio "${aspect}". Expected one of: ${[...VALID_ASPECTS].join(', ')}.`,
             400,
             headers
           );
         }
-        const manifest = await listManifest(env.DRUM_ASSETS, drumSet, aspectKey);
+        const manifest = await listManifest(env.DRUM_ASSETS, drumSet, aspect);
         if (!manifest.hasBackground && manifest.files.length === 0) {
-          return errorResponse(`Drum set "${drumSet}" (${aspectUrl}) not found or has no assets.`, 404, headers);
+          return errorResponse(`Drum set "${drumSet}" (${aspect}) not found or has no assets.`, 404, headers);
         }
-        return json({ drumSet, aspect: aspectUrl, ...manifest }, 200, headers);
+        return json(
+          {
+            drumSet,
+            aspect,
+            hasBackground: manifest.hasBackground,
+            backgroundFile: manifest.hasBackground ? BACKGROUND_FILENAME : null,
+            files: manifest.files,
+          },
+          200,
+          headers
+        );
       }
 
       // GET /assets/:drumSet/:aspect/*filePath
       if (segments[0] === 'assets' && segments.length >= 4) {
-        const [, drumSet, aspectUrl, ...rest] = segments;
-        const aspectKey = ASPECT_URL_TO_KEY[aspectUrl];
-        if (!aspectKey) {
-          return errorResponse(`Unknown aspect ratio "${aspectUrl}".`, 400, headers);
+        const [, drumSet, aspect, ...rest] = segments;
+        if (!VALID_ASPECTS.has(aspect)) {
+          return errorResponse(`Unknown aspect ratio "${aspect}".`, 400, headers);
         }
         const filePath = rest.join('/');
-        // Basic path-traversal guard, even though split('/').filter(Boolean) already
-        // strips empty segments (which would otherwise allow "..").
         if (filePath.includes('..')) {
           return errorResponse('Invalid asset path.', 400, headers);
         }
-        const key = `drum-sets/${drumSet}/${aspectKey}/${filePath}`;
+        const key = `${R2_PREFIX}${drumSet}/${aspect}/${filePath}`;
         const object = await env.DRUM_ASSETS.get(key);
         if (!object) {
           return errorResponse(`Asset not found: ${filePath}`, 404, headers);
