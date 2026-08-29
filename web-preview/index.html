@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Drum MIDI Timeline Preview</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #171a23;
+    --panel-2: #1f2330;
+    --border: #2a2f3d;
+    --text: #e8e9ee;
+    --text-dim: #8b90a3;
+    --accent: #ff6b4a;
+    --hand-r: #4ac8ff;
+    --hand-l: #ff4a9e;
+    --ok: #4aff9e;
+    --err: #ff4a5e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 20px;
+  }
+  .app { max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .subtitle { color: var(--text-dim); font-size: 13px; margin-bottom: 20px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  button, input[type="file"]::file-selector-button, select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled), select:hover { border-color: var(--accent); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #1a0e0a; font-weight: 600; }
+  input[type="file"] { color: var(--text-dim); font-size: 13px; }
+  input[type="range"] { flex: 1; min-width: 160px; accent-color: var(--accent); }
+  .meta-row { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; font-size: 12px; color: var(--text-dim); }
+  .meta-row b { color: var(--text); }
+  .beat-display {
+    margin-top: 14px;
+    font-size: 22px;
+    letter-spacing: 4px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dim);
+    min-height: 28px;
+  }
+  .beat-display .active { color: var(--accent); font-weight: 700; }
+  select.subdiv { font-size: 12px; padding: 4px 8px; }
+
+  .pads {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+  }
+  .pad {
+    background: var(--panel-2);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 8px;
+    text-align: center;
+    transition: transform 0.08s ease, background 0.08s ease, border-color 0.08s ease;
+  }
+  .pad .label { font-size: 12px; color: var(--text-dim); }
+  .pad .note-num { font-size: 10px; color: var(--text-dim); opacity: 0.6; }
+  .pad.hit-r { border-color: var(--hand-r); background: color-mix(in srgb, var(--hand-r) 25%, var(--panel-2)); transform: scale(1.05); }
+  .pad.hit-l { border-color: var(--hand-l); background: color-mix(in srgb, var(--hand-l) 25%, var(--panel-2)); transform: scale(1.05); }
+  .pad .hand-tag { display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 700; opacity: 0; }
+  .pad.hit-r .hand-tag { opacity: 1; color: var(--hand-r); }
+  .pad.hit-l .hand-tag { opacity: 1; color: var(--hand-l); }
+
+  .log-box {
+    max-height: 220px;
+    overflow-y: auto;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .log-row { display: flex; gap: 10px; padding: 2px 6px; border-radius: 4px; color: var(--text-dim); }
+  .log-row .t { width: 60px; color: var(--text-dim); }
+  .log-row .n { width: 90px; }
+  .log-row .h-r { color: var(--hand-r); }
+  .log-row .h-l { color: var(--hand-l); }
+  .log-row.current { background: var(--panel-2); color: var(--text); }
+
+  .error-box {
+    background: rgba(255,74,94,0.12);
+    border: 1px solid var(--err);
+    color: var(--err);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 14px;
+  }
+  .hidden { display: none !important; }
+  .hint { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+  code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Drum MIDI → Timeline Preview</h1>
+  <div class="subtitle">MIDI parser + R/L animation timeline, running live in your browser. No drum PNG assets yet — pads stand in for them.</div>
+
+  <div id="errorBox" class="error-box hidden"></div>
+
+  <div class="panel">
+    <div class="row">
+      <input type="file" id="midiFile" accept=".mid,.midi" />
+      <button id="loadDemoBtn" class="primary">Load Demo Pattern</button>
+    </div>
+    <div class="hint">Upload a real <code>.mid</code>/<code>.midi</code> file — it runs through an actual hand-written binary MIDI parser (no external library). "Load Demo Pattern" skips the file and drops in a hardcoded test timeline for a quick look.</div>
+
+    <div class="meta-row" id="metaRow">
+      <span>BPM: <b id="bpmVal">–</b></span>
+      <span>Time sig: <b id="tsVal">–</b></span>
+      <span>Duration: <b id="durVal">–</b></span>
+      <span>Notes: <b id="noteCountVal">–</b></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <button id="playBtn" disabled>▶ Play</button>
+      <button id="pauseBtn" disabled>⏸ Pause</button>
+      <input type="range" id="seekBar" min="0" max="1000" value="0" disabled />
+      <span id="timeVal" style="font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-dim);">0.00s / 0.00s</span>
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <span style="font-size:12px; color:var(--text-dim);">Timing display:</span>
+      <select id="subdivSelect" class="subdiv">
+        <option value="quarter">Quarter (1 2 3 4)</option>
+        <option value="eighth">Eighth (1 & 2 &)</option>
+        <option value="sixteenth">Sixteenth (1 e & a)</option>
+      </select>
+    </div>
+    <div class="beat-display" id="beatDisplay">–</div>
+  </div>
+
+  <div class="panel">
+    <div class="pads" id="pads"></div>
+  </div>
+
+  <div class="panel">
+    <div style="font-size:13px; margin-bottom:8px; color: var(--text-dim);">Timeline events (auto-scrolls during playback)</div>
+    <div class="log-box" id="eventLog"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ===================================================================
+  // Constants
+  // ===================================================================
+  const MAX_MIDI_DURATION_SECONDS = 10 * 60; // spec: 10-minute cap
+  const HIT_VISUAL_DURATION = 0.15; // seconds a pad stays "lit" — configurable per spec
+
+  const GM_DRUM_NAMES = {
+    35: 'Kick (Ac.)', 36: 'Kick', 37: 'Side Stick', 38: 'Snare',
+    39: 'Hand Clap', 40: 'Snare (El.)', 41: 'Low Tom', 42: 'Closed Hi-Hat',
+    43: 'High Tom', 44: 'Pedal Hi-Hat', 45: 'Low-Mid Tom', 46: 'Open Hi-Hat',
+    47: 'Low-Mid Tom 2', 48: 'Hi-Mid Tom', 49: 'Crash', 50: 'High Tom 2',
+    51: 'Ride', 52: 'China Cymbal', 53: 'Ride Bell', 54: 'Tambourine',
+    55: 'Splash', 57: 'Crash 2', 59: 'Ride 2',
+  };
+  function noteLabel(n) { return GM_DRUM_NAMES[n] || ('Note ' + n); }
+
+  // ===================================================================
+  // Errors (mirrors the Node module's error classes)
+  // ===================================================================
+  class MidiParseError extends Error {
+    constructor(message) { super(message); this.name = 'MidiParseError'; }
+  }
+  class MidiTooLongError extends MidiParseError {
+    constructor(durationSeconds, maxSeconds) {
+      super(`MIDI duration (${durationSeconds.toFixed(1)}s) exceeds the maximum supported duration (${maxSeconds}s).`);
+      this.name = 'MidiTooLongError';
+    }
+  }
+
+  // ===================================================================
+  // Binary MIDI (SMF) parser — hand-written, no external library.
+  // Supports format 0/1, running status, note on/off, tempo + time
+  // signature meta events. SMPTE time-division files are rejected with
+  // a clear error (rare for drum-pattern MIDI, out of scope for now).
+  // ===================================================================
+  function parseMidiArrayBuffer(arrayBuffer) {
+    const view = new DataView(arrayBuffer);
+    let pos = 0;
+
+    function readStr(len) {
+      let s = '';
+      for (let i = 0; i < len; i++) s += String.fromCharCode(view.getUint8(pos + i));
+      pos += len;
+      return s;
+    }
+    function readUint32() { const v = view.getUint32(pos); pos += 4; return v; }
+    function readUint16() { const v = view.getUint16(pos); pos += 2; return v; }
+    function readUint8() { const v = view.getUint8(pos); pos += 1; return v; }
+    function readVLQ() {
+      let value = 0, byte;
+      do {
+        byte = readUint8();
+        value = (value << 7) | (byte & 0x7f);
+      } while (byte & 0x80);
+      return value;
+    }
+
+    if (arrayBuffer.byteLength < 14) {
+      throw new MidiParseError('File is too small to be a valid MIDI file.');
+    }
+
+    let headerId;
+    try { headerId = readStr(4); } catch (e) { throw new MidiParseError('Could not read MIDI header.'); }
+    if (headerId !== 'MThd') {
+      throw new MidiParseError('Not a valid MIDI file (missing MThd header). It may be corrupted or the wrong file type.');
+    }
+    const headerLen = readUint32();
+    const format = readUint16();
+    const numTracks = readUint16();
+    const division = readUint16();
+    if (division & 0x8000) {
+      throw new MidiParseError('SMPTE time-division MIDI files are not supported — only ticks-per-quarter-note files.');
+    }
+    const ppq = division;
+    pos += Math.max(0, headerLen - 6);
+
+    const rawEvents = [];
+    try {
+      for (let t = 0; t < numTracks; t++) {
+        const chunkId = readStr(4);
+        const chunkLen = readUint32();
+        const chunkEnd = pos + chunkLen;
+        if (chunkId !== 'MTrk') { pos = chunkEnd; continue; }
+
+        let tick = 0;
+        let runningStatus = null;
+        while (pos < chunkEnd) {
+          const delta = readVLQ();
+          tick += delta;
+          let statusByte = readUint8();
+          if (statusByte < 0x80) {
+            pos -= 1; // this byte is data, not status — reuse running status
+            statusByte = runningStatus;
+            if (statusByte == null) throw new MidiParseError('Corrupted MIDI: running status used before any status byte was set.');
+          } else {
+            runningStatus = statusByte;
+          }
+          const eventType = statusByte & 0xf0;
+          const channel = statusByte & 0x0f;
+
+          if (statusByte === 0xff) {
+            const metaType = readUint8();
+            const len = readVLQ();
+            const dataStart = pos;
+            if (metaType === 0x51 && len === 3) {
+              const usPerQuarter = (readUint8() << 16) | (readUint8() << 8) | readUint8();
+              rawEvents.push({ tick, type: 'tempo', usPerQuarter });
+            } else if (metaType === 0x58 && len >= 2) {
+              const numerator = readUint8();
+              const denomPower = readUint8();
+              rawEvents.push({ tick, type: 'timeSignature', numerator, denominator: Math.pow(2, denomPower) });
+            }
+            pos = dataStart + len; // always resync, regardless of which branch ran
+          } else if (statusByte === 0xf0 || statusByte === 0xf7) {
+            const len = readVLQ();
+            pos += len;
+          } else if (eventType === 0x80) {
+            const note = readUint8(); readUint8();
+            rawEvents.push({ tick, type: 'noteOff', note, channel });
+          } else if (eventType === 0x90) {
+            const note = readUint8();
+            const velocity = readUint8();
+            rawEvents.push(velocity === 0
+              ? { tick, type: 'noteOff', note, channel }
+              : { tick, type: 'noteOn', note, velocity, channel });
+          } else if (eventType === 0xa0 || eventType === 0xb0 || eventType === 0xe0) {
+            pos += 2;
+          } else if (eventType === 0xc0 || eventType === 0xd0) {
+            pos += 1;
+          } else {
+            throw new MidiParseError(`Corrupted or unsupported MIDI event (0x${statusByte.toString(16)}) in track ${t}.`);
+          }
+        }
+      }
+    } catch (err) {
+      if (err instanceof MidiParseError) throw err;
+      throw new MidiParseError('Unexpected error while parsing MIDI bytes — the file is likely corrupted.');
+    }
+
+    if (!rawEvents.some((e) => e.type === 'noteOn')) {
+      throw new MidiParseError('This MIDI file contains no notes.');
+    }
+
+    // Tempo segments: {tick, time, bpm}, used to convert ticks <-> seconds
+    // and (later) ticks <-> beats for the timing-display overlay.
+    let tempoEvents = rawEvents.filter((e) => e.type === 'tempo').sort((a, b) => a.tick - b.tick);
+    if (tempoEvents.length === 0 || tempoEvents[0].tick > 0) {
+      tempoEvents = [{ tick: 0, usPerQuarter: 500000 }, ...tempoEvents]; // default 120bpm
+    }
+    const tempoChanges = [];
+    {
+      let cumTime = 0;
+      for (let i = 0; i < tempoEvents.length; i++) {
+        const ev = tempoEvents[i];
+        if (i > 0) {
+          const prev = tempoEvents[i - 1];
+          cumTime += (ev.tick - prev.tick) * (prev.usPerQuarter / 1e6) / ppq;
+        }
+        tempoChanges.push({ tick: ev.tick, time: cumTime, bpm: 60000000 / ev.usPerQuarter });
+      }
+    }
+    function ticksToSeconds(tick) {
+      let seg = tempoChanges[0];
+      for (const s of tempoChanges) { if (s.tick <= tick) seg = s; else break; }
+      return seg.time + (tick - seg.tick) * (60 / seg.bpm) / ppq;
+    }
+
+    let tsEvents = rawEvents.filter((e) => e.type === 'timeSignature').sort((a, b) => a.tick - b.tick);
+    if (tsEvents.length === 0 || tsEvents[0].tick > 0) {
+      tsEvents = [{ tick: 0, numerator: 4, denominator: 4 }, ...tsEvents]; // fall back to 4/4 only if file has none
+    }
+    const timeSignatures = tsEvents.map((e) => ({
+      tick: e.tick, time: ticksToSeconds(e.tick), numerator: e.numerator, denominator: e.denominator,
+    }));
+
+    // Pair note-on/note-off per (channel,note) with a queue, tolerating
+    // unmatched events gracefully instead of crashing (spec section 21).
+    const queues = new Map();
+    const notes = [];
+    const noteEvents = rawEvents.filter((e) => e.type === 'noteOn' || e.type === 'noteOff').sort((a, b) => a.tick - b.tick);
+    for (const ev of noteEvents) {
+      const key = ev.channel * 1000 + ev.note;
+      if (ev.type === 'noteOn') {
+        if (!queues.has(key)) queues.set(key, []);
+        queues.get(key).push({ tick: ev.tick, velocity: ev.velocity });
+      } else if (queues.has(key) && queues.get(key).length > 0) {
+        const on = queues.get(key).shift();
+        const onTime = ticksToSeconds(on.tick);
+        const offTime = ticksToSeconds(ev.tick);
+        notes.push({ midiNote: ev.note, time: onTime, duration: Math.max(0, offTime - onTime), velocity: on.velocity / 127 });
+      }
+      // stray note-off with no matching note-on: ignored gracefully
+    }
+    for (const [key, q] of queues) {
+      for (const on of q) {
+        notes.push({ midiNote: key % 1000, time: ticksToSeconds(on.tick), duration: 0.1, velocity: on.velocity / 127 });
+      }
+    }
+    notes.sort((a, b) => a.time - b.time);
+
+    const lastTick = Math.max(0, ...rawEvents.map((e) => e.tick));
+    const durationSeconds = ticksToSeconds(lastTick);
+    if (durationSeconds > MAX_MIDI_DURATION_SECONDS) {
+      throw new MidiTooLongError(durationSeconds, MAX_MIDI_DURATION_SECONDS);
+    }
+
+    return { notes, tempoChanges, timeSignatures, durationSeconds, ppq };
+  }
+
+  // ===================================================================
+  // Timeline builder — identical logic to the Node module: R/L
+  // alternation tracked independently per MIDI note number.
+  // ===================================================================
+  function buildAnimationTimeline(notes) {
+    const lastHandByNote = new Map();
+    return [...notes].sort((a, b) => a.time - b.time).map((note) => {
+      const prev = lastHandByNote.get(note.midiNote);
+      const hand = prev === 'R' ? 'L' : 'R';
+      lastHandByNote.set(note.midiNote, hand);
+      return { time: note.time, midiNote: note.midiNote, hand, velocity: note.velocity, duration: note.duration };
+    });
+  }
+
+  // ===================================================================
+  // Hardcoded demo pattern (bypasses file parsing entirely) — same
+  // musical pattern used to validate the Node module: 3/4 time, a
+  // tempo change 100->140bpm, and simultaneous kick/snare + hi-hat hits.
+  // ===================================================================
+  function loadDemoParsedMidi() {
+    const notes = [
+      { midiNote: 36, time: 0.000, duration: 0.10, velocity: 0.90 },
+      { midiNote: 42, time: 0.000, duration: 0.05, velocity: 0.60 },
+      { midiNote: 42, time: 0.600, duration: 0.05, velocity: 0.50 },
+      { midiNote: 38, time: 1.200, duration: 0.10, velocity: 0.85 },
+      { midiNote: 42, time: 1.200, duration: 0.05, velocity: 0.60 },
+      { midiNote: 36, time: 1.800, duration: 0.10, velocity: 0.95 },
+      { midiNote: 42, time: 1.800, duration: 0.05, velocity: 0.55 },
+      { midiNote: 42, time: 2.400, duration: 0.05, velocity: 0.50 },
+      { midiNote: 38, time: 3.000, duration: 0.10, velocity: 0.90 },
+      { midiNote: 42, time: 3.000, duration: 0.05, velocity: 0.60 },
+      { midiNote: 36, time: 3.600, duration: 0.10, velocity: 0.90 },
+      { midiNote: 42, time: 3.600, duration: 0.05, velocity: 0.60 },
+      { midiNote: 38, time: 4.029, duration: 0.10, velocity: 0.85 },
+      { midiNote: 42, time: 4.029, duration: 0.05, velocity: 0.55 },
+      { midiNote: 42, time: 4.457, duration: 0.05, velocity: 0.50 },
+    ];
+    return {
+      notes,
+      tempoChanges: [
+        { tick: 0, time: 0, bpm: 100 },
+        { tick: 2880, time: 3.6, bpm: 140 },
+      ],
+      timeSignatures: [{ tick: 0, time: 0, numerator: 3, denominator: 4 }],
+      durationSeconds: 4.457 + 0.1,
+      ppq: 480,
+    };
+  }
+
+  // ===================================================================
+  // App state + DOM wiring
+  // ===================================================================
+  const els = {
+    midiFile: document.getElementById('midiFile'),
+    loadDemoBtn: document.getElementById('loadDemoBtn'),
+    playBtn: document.getElementById('playBtn'),
+    pauseBtn: document.getElementById('pauseBtn'),
+    seekBar: document.getElementById('seekBar'),
+    timeVal: document.getElementById('timeVal'),
+    bpmVal: document.getElementById('bpmVal'),
+    tsVal: document.getElementById('tsVal'),
+    durVal: document.getElementById('durVal'),
+    noteCountVal: document.getElementById('noteCountVal'),
+    pads: document.getElementById('pads'),
+    eventLog: document.getElementById('eventLog'),
+    errorBox: document.getElementById('errorBox'),
+    beatDisplay: document.getElementById('beatDisplay'),
+    subdivSelect: document.getElementById('subdivSelect'),
+  };
+
+  let parsedMidi = null;
+  let timeline = [];
+  let isPlaying = false;
+  let playStartPerf = 0;
+  let currentTime = 0;
+  let nextEventIndex = 0;
+  let rafId = null;
+
+  function showError(message) {
+    els.errorBox.textContent = message;
+    els.errorBox.classList.remove('hidden');
+  }
+  function clearError() {
+    els.errorBox.classList.add('hidden');
+    els.errorBox.textContent = '';
+  }
+
+  function loadParsed(pm) {
+    clearError();
+    pause();
+    parsedMidi = pm;
+    timeline = buildAnimationTimeline(pm.notes);
+    currentTime = 0;
+    nextEventIndex = 0;
+
+    els.bpmVal.textContent = pm.tempoChanges.map((t) => t.bpm.toFixed(0)).join(' → ');
+    els.tsVal.textContent = pm.timeSignatures.map((s) => `${s.numerator}/${s.denominator}`).join(', ');
+    els.durVal.textContent = pm.durationSeconds.toFixed(2) + 's';
+    els.noteCountVal.textContent = pm.notes.length;
+
+    els.seekBar.max = Math.round(pm.durationSeconds * 1000);
+    els.seekBar.value = 0;
+    els.seekBar.disabled = false;
+    els.playBtn.disabled = false;
+    els.pauseBtn.disabled = false;
+
+    buildPads();
+    renderEventLog();
+    updateTimeDisplay();
+    updateBeatDisplay();
+  }
+
+  function buildPads() {
+    const distinctNotes = [...new Set(parsedMidi.notes.map((n) => n.midiNote))].sort((a, b) => a - b);
+    els.pads.innerHTML = '';
+    for (const note of distinctNotes) {
+      const pad = document.createElement('div');
+      pad.className = 'pad';
+      pad.dataset.note = note;
+      pad.innerHTML = `<div class="label">${noteLabel(note)}</div><div class="note-num">#${note}</div><div class="hand-tag">–</div>`;
+      els.pads.appendChild(pad);
+    }
+  }
+
+  function renderEventLog() {
+    els.eventLog.innerHTML = timeline
+      .map((e, i) => {
+        const handClass = e.hand === 'R' ? 'h-r' : 'h-l';
+        const asset = `${e.hand}${e.midiNote}.png`;
+        return `<div class="log-row" data-idx="${i}"><span class="t">${e.time.toFixed(3)}s</span><span class="n">${noteLabel(e.midiNote)}</span><span class="${handClass}">${e.hand}</span><span style="color:var(--text-dim)">${asset}</span></div>`;
+      })
+      .join('');
+  }
+
+  function fireHit(ev) {
+    const pad = els.pads.querySelector(`[data-note="${ev.midiNote}"]`);
+    if (pad) {
+      const cls = ev.hand === 'R' ? 'hit-r' : 'hit-l';
+      pad.classList.add(cls);
+      pad.querySelector('.hand-tag').textContent = ev.hand;
+      setTimeout(() => pad.classList.remove(cls), HIT_VISUAL_DURATION * 1000);
+    }
+  }
+
+  function highlightLogAt(index) {
+    const prevActive = els.eventLog.querySelector('.log-row.current');
+    if (prevActive) prevActive.classList.remove('current');
+    const row = els.eventLog.querySelector(`[data-idx="${index}"]`);
+    if (row) {
+      row.classList.add('current');
+      row.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function triggerEventsUpTo(t) {
+    let lastIdx = -1;
+    while (nextEventIndex < timeline.length && timeline[nextEventIndex].time <= t) {
+      fireHit(timeline[nextEventIndex]);
+      lastIdx = nextEventIndex;
+      nextEventIndex++;
+    }
+    if (lastIdx >= 0) highlightLogAt(lastIdx);
+  }
+
+  function updateTimeDisplay() {
+    els.timeVal.textContent = `${currentTime.toFixed(2)}s / ${parsedMidi.durationSeconds.toFixed(2)}s`;
+    els.seekBar.value = Math.round(currentTime * 1000);
+  }
+
+  function getActiveTempo(t) {
+    let seg = parsedMidi.tempoChanges[0];
+    for (const s of parsedMidi.tempoChanges) { if (s.time <= t) seg = s; else break; }
+    return seg;
+  }
+  function getActiveTimeSig(t) {
+    let seg = parsedMidi.timeSignatures[0];
+    for (const s of parsedMidi.timeSignatures) { if (s.time <= t) seg = s; else break; }
+    return seg;
+  }
+  function secondsToBeats(t) {
+    const seg = getActiveTempo(t);
+    return seg.tick / parsedMidi.ppq + (t - seg.time) * seg.bpm / 60;
+  }
+
+  function updateBeatDisplay() {
+    if (!parsedMidi) return;
+    const ts = getActiveTimeSig(currentTime);
+    const totalBeats = secondsToBeats(currentTime);
+    const beatsAtTsStart = ts.tick / parsedMidi.ppq;
+    let posInMeasure = (totalBeats - beatsAtTsStart) % ts.numerator;
+    if (posInMeasure < 0) posInMeasure += ts.numerator;
+    const beatIndex = Math.floor(posInMeasure); // 0-based
+    const fracWithinBeat = posInMeasure - beatIndex;
+
+    const mode = els.subdivSelect.value;
+    const subdivLabels = mode === 'quarter' ? [''] : mode === 'eighth' ? ['', '&'] : ['', 'e', '&', 'a'];
+    const activeSlot = Math.min(subdivLabels.length - 1, Math.floor(fracWithinBeat * subdivLabels.length));
+
+    let parts = [];
+    for (let b = 0; b < ts.numerator; b++) {
+      for (let s = 0; s < subdivLabels.length; s++) {
+        const label = s === 0 ? String(b + 1) : subdivLabels[s];
+        const isActive = b === beatIndex && s === activeSlot;
+        parts.push(isActive ? `<span class="active">${label}</span>` : label);
+      }
+    }
+    els.beatDisplay.innerHTML = parts.join(' ');
+  }
+
+  function play() {
+    if (isPlaying || !parsedMidi) return;
+    isPlaying = true;
+    playStartPerf = performance.now() - currentTime * 1000;
+    rafId = requestAnimationFrame(loop);
+  }
+  function pause() {
+    isPlaying = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+  function loop() {
+    if (!isPlaying) return;
+    currentTime = (performance.now() - playStartPerf) / 1000;
+    if (currentTime >= parsedMidi.durationSeconds) {
+      currentTime = parsedMidi.durationSeconds;
+      triggerEventsUpTo(currentTime);
+      updateTimeDisplay();
+      updateBeatDisplay();
+      pause();
+      return;
+    }
+    triggerEventsUpTo(currentTime);
+    updateTimeDisplay();
+    updateBeatDisplay();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  els.playBtn.addEventListener('click', play);
+  els.pauseBtn.addEventListener('click', pause);
+  els.seekBar.addEventListener('input', () => {
+    currentTime = Number(els.seekBar.value) / 1000;
+    nextEventIndex = timeline.findIndex((e) => e.time > currentTime);
+    if (nextEventIndex === -1) nextEventIndex = timeline.length;
+    if (isPlaying) playStartPerf = performance.now() - currentTime * 1000;
+    updateTimeDisplay();
+    updateBeatDisplay();
+    const prevActive = els.eventLog.querySelector('.log-row.current');
+    if (prevActive) prevActive.classList.remove('current');
+  });
+  els.subdivSelect.addEventListener('change', updateBeatDisplay);
+
+  els.loadDemoBtn.addEventListener('click', () => loadParsed(loadDemoParsedMidi()));
+
+  els.midiFile.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const buffer = await file.arrayBuffer();
+      const parsed = parseMidiArrayBuffer(buffer);
+      loadParsed(parsed);
+    } catch (err) {
+      showError(err.message || String(err));
+    }
+  });
+})();
+</script>
+</body>
+</html>
