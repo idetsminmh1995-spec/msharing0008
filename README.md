@@ -25,6 +25,14 @@ npm run demo
 
 See `midi-parser-module/README.md` for details.
 
+## `/cloudflare-worker`
+
+A thin Cloudflare Worker that proxies the `msharing0008` R2 bucket — the
+frontend will call this instead of talking to R2 directly. Discovers Drum
+Sets dynamically (no hardcoded names) and serves manifest + asset endpoints.
+See `cloudflare-worker/README.md` for the R2 folder layout it expects and
+deploy instructions.
+
 ## `/web-preview`
 
 A single-file, dependency-free HTML app (`index.html`) that runs the same
@@ -42,8 +50,9 @@ once the Cloudflare R2 drum sets are ready).
 - [x] R/L hand alternation timeline (per-note independent state)
 - [x] Simultaneous-note handling
 - [x] Browser-based interactive preview (placeholder pads)
-- [ ] Real pre-designed drum PNG assets + Cloudflare R2 integration
-- [ ] Cloudflare Worker for R2 asset discovery/proxying
+- [x] Cloudflare R2 bucket created (`msharing0008`)
+- [x] Cloudflare Worker for R2 asset discovery/proxying (not yet deployed)
+- [ ] Real pre-designed drum PNG assets uploaded to R2
 - [ ] Canvas-based preview using real drum set assets
 - [ ] WebCodecs (+ ffmpeg.wasm fallback) final video rendering
 - [ ] SoundFont-based audio synthesis for the final MP4
