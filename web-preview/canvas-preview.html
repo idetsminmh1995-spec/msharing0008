@@ -515,7 +515,7 @@
     // Single current label, shown large and centered -- not the whole row.
     const boxSize = Math.round(Math.min(w, h) * 0.16);
     const margin = Math.round(boxSize * 0.25);
-    const cx = w - boxSize / 2 - margin, cy = boxSize / 2 + margin;
+    const cx = w - boxSize / 2 - margin, cy = h * 0.46; // lower into the visible drum-image area, not the empty top space
     targetCtx.save();
     targetCtx.fillStyle = 'rgba(0,0,0,0.5)';
     targetCtx.beginPath();
