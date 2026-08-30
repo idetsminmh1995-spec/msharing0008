@@ -111,6 +111,18 @@
   </div>
 
   <div class="panel">
+    <div class="row">
+      <button id="generateBtn" class="primary" disabled>⬇ Generate &amp; Download MP4</button>
+      <span id="renderStatus" style="font-size:12px; color: var(--text-dim);"></span>
+    </div>
+    <div id="renderProgressWrap" class="hidden" style="margin-top:10px; background: var(--panel-2); border-radius: 6px; overflow: hidden; height: 8px;">
+      <div id="renderProgressBar" style="height:100%; width:0%; background: var(--accent); transition: width 0.1s linear;"></div>
+    </div>
+    <div id="downloadWrap" class="hidden" style="margin-top:10px;"></div>
+    <div class="hint" style="margin-top:8px;">V1: video only, no audio yet (audio synthesis is a planned fast-follow). Requires a browser with WebCodecs support (current Chrome/Edge). No ffmpeg.wasm fallback in this build yet — unsupported browsers get a clear error instead of a silent failure.</div>
+  </div>
+
+  <div class="panel">
     <div style="font-size:13px; margin-bottom:8px; color: var(--text-dim);">Timeline events</div>
     <div class="log-box" id="eventLog"></div>
   </div>
@@ -278,6 +290,9 @@
     bpmVal: document.getElementById('bpmVal'), tsVal: document.getElementById('tsVal'),
     durVal: document.getElementById('durVal'), noteCountVal: document.getElementById('noteCountVal'),
     canvas: document.getElementById('canvas'), eventLog: document.getElementById('eventLog'),
+    generateBtn: document.getElementById('generateBtn'), renderStatus: document.getElementById('renderStatus'),
+    renderProgressWrap: document.getElementById('renderProgressWrap'), renderProgressBar: document.getElementById('renderProgressBar'),
+    downloadWrap: document.getElementById('downloadWrap'),
   };
   const ctx = els.canvas.getContext('2d');
   const ASPECT_SIZES = { '16x9': [1280, 720], '9x16': [720, 1280], '1x1': [900, 900] };
@@ -375,6 +390,7 @@
 
       els.midiFile.disabled = false;
       els.loadDemoBtn.disabled = false;
+      updateGenerateAvailability();
     } catch (err) {
       setStatus('err', `Failed to load assets: ${err.message}`);
     } finally {
@@ -415,6 +431,11 @@
     renderEventLog();
     updateTimeDisplay();
     drawFrame();
+    updateGenerateAvailability();
+  }
+
+  function updateGenerateAvailability() {
+    els.generateBtn.disabled = !(parsedMidi && currentDrumSet);
   }
 
   els.loadDemoBtn.addEventListener('click', () => loadParsed(loadDemoParsedMidi()));
@@ -511,6 +532,137 @@
     if (isPlaying) playStartPerf = performance.now() - currentTime * 1000;
     updateTimeDisplay(); drawFrame();
     const prev = els.eventLog.querySelector('.log-row.current'); if (prev) prev.classList.remove('current');
+  });
+
+  // ===================================================================
+  // Final video rendering — deterministic, frame-by-frame, using
+  // WebCodecs (VideoEncoder) + mp4-muxer for the MP4 container.
+  //
+  // This is separate from the real-time preview above (spec section 15):
+  // instead of driving frames off wall-clock time via requestAnimationFrame,
+  // it steps through fixed timestamps (0, 1/fps, 2/fps, ...) so the output
+  // always reproduces exactly what the timeline says, regardless of the
+  // machine's rendering speed.
+  // ===================================================================
+  const RENDER_FPS = 30;
+
+  function computeActiveHitsAt(t) {
+    // Same rule as the live preview: a hit is "on screen" for
+    // HIT_VISUAL_DURATION seconds after it fires.
+    const active = [];
+    for (const ev of timeline) {
+      if (ev.time <= t && t < ev.time + HIT_VISUAL_DURATION) {
+        active.push({ midiNote: ev.midiNote, hand: ev.hand });
+      }
+    }
+    return active;
+  }
+
+  function renderFrameAt(renderCtx, w, h, t) {
+    renderCtx.fillStyle = '#000'; renderCtx.fillRect(0, 0, w, h);
+    if (backgroundImg && backgroundImg.complete && backgroundImg.naturalWidth) {
+      renderCtx.drawImage(backgroundImg, 0, 0, w, h);
+    }
+    for (const hit of computeActiveHitsAt(t)) {
+      const assetSet = noteAssets.get(hit.midiNote);
+      const img = assetSet ? assetSet[hit.hand] : null;
+      if (img && img.complete && img.naturalWidth) {
+        renderCtx.drawImage(img, 0, 0, w, h);
+      }
+    }
+  }
+
+  els.generateBtn.addEventListener('click', async () => {
+    if (!parsedMidi || !currentDrumSet) return;
+
+    if (typeof VideoEncoder === 'undefined') {
+      els.renderStatus.textContent = 'This browser does not support WebCodecs (VideoEncoder). Try current Chrome or Edge. (ffmpeg.wasm fallback not implemented in this build yet.)';
+      els.renderStatus.style.color = 'var(--err)';
+      return;
+    }
+
+    els.generateBtn.disabled = true;
+    els.downloadWrap.classList.add('hidden');
+    els.renderProgressWrap.classList.remove('hidden');
+    els.renderStatus.style.color = 'var(--text-dim)';
+    els.renderStatus.textContent = 'Loading encoder…';
+
+    try {
+      const { Muxer, ArrayBufferTarget } = await import('https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.mjs');
+
+      const w = els.canvas.width, h = els.canvas.height;
+      const totalFrames = Math.max(1, Math.ceil(parsedMidi.durationSeconds * RENDER_FPS));
+
+      const renderCanvas = document.createElement('canvas');
+      renderCanvas.width = w; renderCanvas.height = h;
+      const renderCtx = renderCanvas.getContext('2d');
+
+      const muxer = new Muxer({
+        target: new ArrayBufferTarget(),
+        video: { codec: 'avc', width: w, height: h },
+        fastStart: 'in-memory',
+      });
+
+      const encoderErrors = [];
+      const videoEncoder = new VideoEncoder({
+        output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+        error: (e) => encoderErrors.push(e),
+      });
+      videoEncoder.configure({
+        codec: 'avc1.42001f', // H.264 baseline — broadly compatible
+        width: w,
+        height: h,
+        bitrate: 4_000_000,
+        framerate: RENDER_FPS,
+      });
+
+      els.renderStatus.textContent = `Rendering frame 0 / ${totalFrames}…`;
+
+      for (let i = 0; i < totalFrames; i++) {
+        const t = i / RENDER_FPS;
+        renderFrameAt(renderCtx, w, h, t);
+
+        const frame = new VideoFrame(renderCanvas, { timestamp: Math.round((i / RENDER_FPS) * 1e6) });
+        videoEncoder.encode(frame, { keyFrame: i % (RENDER_FPS * 2) === 0 });
+        frame.close();
+
+        if (encoderErrors.length) throw encoderErrors[0];
+
+        if (i % 5 === 0 || i === totalFrames - 1) {
+          const pct = Math.round(((i + 1) / totalFrames) * 100);
+          els.renderProgressBar.style.width = pct + '%';
+          els.renderStatus.textContent = `Rendering frame ${i + 1} / ${totalFrames} (${pct}%)…`;
+          // Let the UI repaint between frames instead of blocking the whole time.
+          await new Promise((r) => setTimeout(r, 0));
+        }
+      }
+
+      els.renderStatus.textContent = 'Finalizing MP4…';
+      await videoEncoder.flush();
+      muxer.finalize();
+
+      const { buffer } = muxer.target;
+      const blob = new Blob([buffer], { type: 'video/mp4' });
+      const url = URL.createObjectURL(blob);
+
+      els.downloadWrap.innerHTML = '';
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${currentDrumSet}-${currentAspect}-drum-video.mp4`;
+      link.textContent = `⬇ Download ${link.download} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`;
+      link.style.color = 'var(--ok)';
+      link.style.fontWeight = '600';
+      els.downloadWrap.appendChild(link);
+      els.downloadWrap.classList.remove('hidden');
+
+      els.renderStatus.style.color = 'var(--ok)';
+      els.renderStatus.textContent = `Done — ${totalFrames} frames rendered at ${RENDER_FPS}fps.`;
+    } catch (err) {
+      els.renderStatus.style.color = 'var(--err)';
+      els.renderStatus.textContent = 'Render failed: ' + (err && err.message ? err.message : String(err));
+    } finally {
+      els.generateBtn.disabled = false;
+    }
   });
 
   // Initial blank frame
