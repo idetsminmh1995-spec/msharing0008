@@ -53,20 +53,13 @@
 <body>
 <div class="app">
   <h1>Drum MIDI → Canvas Preview (real assets)</h1>
-  <div class="subtitle">Loads background + R/L hand PNGs live from the Cloudflare Worker / R2 and composites them on a canvas, synced to the MIDI timeline.</div>
+  <div class="subtitle">Pick a drum set and aspect ratio, then upload a MIDI file to preview and export your drum performance video.</div>
 
   <div class="panel">
-    <div class="field" style="margin-bottom:10px;">
-      <label>Worker base URL</label>
-      <div class="row">
-        <input type="text" id="workerUrl" value="https://msharing0008.idetsminmh1995.workers.dev" />
-        <button id="connectBtn" class="primary">Connect</button>
-      </div>
-    </div>
     <div class="row">
       <div class="field">
         <label>Drum set</label>
-        <select id="drumSetSelect" disabled><option>–</option></select>
+        <select id="drumSetSelect" disabled><option>Loading…</option></select>
       </div>
       <div class="field">
         <label>Aspect ratio</label>
@@ -75,10 +68,6 @@
           <option value="9x16">9:16</option>
           <option value="1x1">1:1</option>
         </select>
-      </div>
-      <div class="field">
-        <label>&nbsp;</label>
-        <button id="loadAssetsBtn" disabled>Load Assets</button>
       </div>
     </div>
     <div id="connectionStatus" class="status loading hidden"></div>
@@ -280,9 +269,8 @@
   // DOM + app state
   // ===================================================================
   const els = {
-    workerUrl: document.getElementById('workerUrl'), connectBtn: document.getElementById('connectBtn'),
     drumSetSelect: document.getElementById('drumSetSelect'), aspectSelect: document.getElementById('aspectSelect'),
-    loadAssetsBtn: document.getElementById('loadAssetsBtn'), connectionStatus: document.getElementById('connectionStatus'),
+    connectionStatus: document.getElementById('connectionStatus'),
     assetChips: document.getElementById('assetChips'),
     midiFile: document.getElementById('midiFile'), loadDemoBtn: document.getElementById('loadDemoBtn'),
     playBtn: document.getElementById('playBtn'), pauseBtn: document.getElementById('pauseBtn'),
@@ -297,7 +285,10 @@
   const ctx = els.canvas.getContext('2d');
   const ASPECT_SIZES = { '16x9': [1280, 720], '9x16': [720, 1280], '1x1': [900, 900] };
 
-  let workerBase = '';
+  // Hardcoded for this deployment -- end users never see or configure this,
+  // they just pick a drum set/aspect and upload a MIDI file.
+  const WORKER_BASE = 'https://msharing0008.idetsminmh1995.workers.dev';
+
   let currentDrumSet = null, currentAspect = '16x9';
   let backgroundImg = null;
   let noteAssets = new Map(); // midiNote -> { R: HTMLImageElement|null, L: HTMLImageElement|null }
@@ -313,11 +304,10 @@
     els.connectionStatus.classList.remove('hidden');
   }
 
-  els.connectBtn.addEventListener('click', async () => {
-    workerBase = els.workerUrl.value.trim().replace(/\/$/, '');
+  async function connectToWorker() {
     setStatus('loading', 'Connecting…');
     try {
-      const res = await fetch(`${workerBase}/api/drum-sets`);
+      const res = await fetch(`${WORKER_BASE}/api/drum-sets`);
       if (!res.ok) throw new Error(`Worker responded ${res.status}`);
       const data = await res.json();
       const sets = data.drumSets || [];
@@ -326,14 +316,19 @@
         : '<option value="">(no drum sets found)</option>';
       els.drumSetSelect.disabled = sets.length === 0;
       els.aspectSelect.disabled = sets.length === 0;
-      els.loadAssetsBtn.disabled = sets.length === 0;
-      setStatus('ok', `Connected. Found ${sets.length} drum set(s): ${sets.join(', ') || '(none)'}`);
+      if (sets.length === 0) {
+        setStatus('err', 'Connected, but no drum sets are available yet in R2.');
+        return;
+      }
+      setStatus('ok', `Ready. ${sets.length} drum set(s) available.`);
+      await loadAssets(); // auto-load the first drum set + default aspect immediately
     } catch (err) {
-      setStatus('err', `Could not reach Worker: ${err.message}`);
+      setStatus('err', `Could not reach the asset server: ${err.message}. Please try again shortly.`);
     }
-  });
+  }
 
-  els.loadAssetsBtn.addEventListener('click', loadAssets);
+  els.drumSetSelect.addEventListener('change', loadAssets);
+  els.aspectSelect.addEventListener('change', loadAssets);
 
   async function loadAssets() {
     currentDrumSet = els.drumSetSelect.value;
@@ -344,9 +339,9 @@
     els.canvas.width = w; els.canvas.height = h;
 
     setStatus('loading', `Loading manifest for ${currentDrumSet} (${currentAspect})…`);
-    els.loadAssetsBtn.disabled = true;
+    
     try {
-      const res = await fetch(`${workerBase}/api/drum-sets/${encodeURIComponent(currentDrumSet)}/${currentAspect}/manifest`);
+      const res = await fetch(`${WORKER_BASE}/api/drum-sets/${encodeURIComponent(currentDrumSet)}/${currentAspect}/manifest`);
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Worker responded ${res.status}`);
       const manifest = await res.json();
 
@@ -358,10 +353,11 @@
 
       if (manifest.hasBackground && manifest.backgroundFile) {
         backgroundImg = new Image();
+        backgroundImg.crossOrigin = 'anonymous'; // required so the canvas isn't "tainted" -- otherwise VideoFrame/MP4 export fails
         loadPromises.push(new Promise((resolve) => {
           backgroundImg.onload = resolve;
           backgroundImg.onerror = resolve; // graceful — missing bg won't crash the app
-          backgroundImg.src = `${workerBase}/assets/${currentDrumSet}/${currentAspect}/${encodeURIComponent(manifest.backgroundFile)}`;
+          backgroundImg.src = `${WORKER_BASE}/assets/${currentDrumSet}/${currentAspect}/${encodeURIComponent(manifest.backgroundFile)}`;
         }));
       } else {
         backgroundImg = null;
@@ -376,9 +372,10 @@
         if (!noteAssets.has(note)) noteAssets.set(note, { R: null, L: null });
         availableNoteSet.add(note);
         const img = new Image();
+        img.crossOrigin = 'anonymous'; // same reason as background — avoid a tainted canvas
         loadPromises.push(new Promise((resolve) => {
           img.onload = resolve; img.onerror = resolve;
-          img.src = `${workerBase}/assets/${currentDrumSet}/${currentAspect}/${encodeURIComponent(file)}`;
+          img.src = `${WORKER_BASE}/assets/${currentDrumSet}/${currentAspect}/${encodeURIComponent(file)}`;
         }));
         noteAssets.get(note)[hand] = img;
       }
@@ -394,7 +391,7 @@
     } catch (err) {
       setStatus('err', `Failed to load assets: ${err.message}`);
     } finally {
-      els.loadAssetsBtn.disabled = false;
+      
     }
   }
 
@@ -667,6 +664,10 @@
 
   // Initial blank frame
   drawFrame();
+
+  // Auto-connect on load -- end users only see drum set/aspect pickers and
+  // the MIDI upload field, never a "Connect" step.
+  connectToWorker();
 })();
 </script>
 </body>
