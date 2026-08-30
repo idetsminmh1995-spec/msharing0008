@@ -1,3 +1,74 @@
+// cloudflare-worker/src/index.ts
+//
+// Serves the full Drum MIDI -> Video app from ONE Worker/domain:
+//   - GET /                                serves the frontend app (HTML/JS)
+//   - GET /api/drum-sets                   lists drum sets discovered in R2
+//   - GET /api/drum-sets/:name/:aspect/manifest   lists that set's assets
+//   - GET /assets/:name/:aspect/*file      streams the actual PNG from R2
+//
+// The frontend never talks to R2 directly -- it only calls this Worker
+// (using relative URLs, since it's now served from the same origin).
+//
+// R2 key layout actually used:
+//   drums/{drumSetName}/{aspect}/Drum Bg.png
+//   drums/{drumSetName}/{aspect}/R{note}.png
+//   drums/{drumSetName}/{aspect}/L{note}.png
+// `aspect` is one of "16x9", "9x16", "1x1".
+const R2_PREFIX = 'drums/';
+const BACKGROUND_FILENAME = 'Drum Bg.png';
+const VALID_ASPECTS = new Set(['16x9', '9x16', '1x1']);
+function corsHeaders(request, env) {
+    const allowed = (env.ALLOWED_ORIGINS ?? '*').split(',').map((s) => s.trim());
+    const origin = request.headers.get('Origin') ?? '';
+    const allowOrigin = allowed.includes('*') ? '*' : allowed.includes(origin) ? origin : allowed[0] ?? '*';
+    return {
+        'Access-Control-Allow-Origin': allowOrigin,
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Max-Age': '86400',
+    };
+}
+function json(data, status, headers) {
+    return new Response(JSON.stringify(data, null, 2), { status, headers: { ...headers, 'Content-Type': 'application/json' } });
+}
+function errorResponse(message, status, headers) {
+    return json({ error: message }, status, headers);
+}
+async function listDrumSets(bucket) {
+    const names = new Set();
+    let cursor;
+    do {
+        const result = await bucket.list({ prefix: R2_PREFIX, delimiter: '/', cursor });
+        for (const prefix of result.delimitedPrefixes) {
+            const parts = prefix.split('/').filter(Boolean);
+            if (parts.length >= 2)
+                names.add(parts[1]);
+        }
+        cursor = result.truncated ? result.cursor : undefined;
+    } while (cursor);
+    return [...names].sort();
+}
+async function listManifest(bucket, drumSet, aspect) {
+    const prefix = `${R2_PREFIX}${drumSet}/${aspect}/`;
+    const files = [];
+    let hasBackground = false;
+    let cursor;
+    do {
+        const result = await bucket.list({ prefix, cursor });
+        for (const obj of result.objects) {
+            const relative = obj.key.slice(prefix.length);
+            if (!relative || relative.endsWith('/'))
+                continue;
+            if (relative === BACKGROUND_FILENAME)
+                hasBackground = true;
+            else
+                files.push(relative);
+        }
+        cursor = result.truncated ? result.cursor : undefined;
+    } while (cursor);
+    return { hasBackground, files: files.sort() };
+}
+const APP_HTML = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -138,7 +209,7 @@
   // ===================================================================
   class MidiParseError extends Error { constructor(m) { super(m); this.name = 'MidiParseError'; } }
   class MidiTooLongError extends MidiParseError {
-    constructor(d, max) { super(`MIDI duration (${d.toFixed(1)}s) exceeds the maximum supported duration (${max}s).`); this.name = 'MidiTooLongError'; }
+    constructor(d, max) { super(\`MIDI duration (\${d.toFixed(1)}s) exceeds the maximum supported duration (\${max}s).\`); this.name = 'MidiTooLongError'; }
   }
 
   function parseMidiArrayBuffer(arrayBuffer) {
@@ -185,11 +256,6 @@
             } else if (metaType === 0x58 && len >= 2) {
               const numerator = readUint8(); const denomPower = readUint8();
               rawEvents.push({ tick, type: 'timeSignature', numerator, denominator: Math.pow(2, denomPower) });
-            } else if (metaType === 0x2f) {
-              // End of Track -- captures the file's real length even when
-              // there's trailing silence after the last note (spec: preserve
-              // the original MIDI timing/duration exactly).
-              rawEvents.push({ tick, type: 'trackEnd' });
             }
             pos = dataStart + len;
           } else if (statusByte === 0xf0 || statusByte === 0xf7) { const len = readVLQ(); pos += len; }
@@ -199,7 +265,7 @@
             rawEvents.push(velocity === 0 ? { tick, type: 'noteOff', note, channel } : { tick, type: 'noteOn', note, velocity, channel });
           } else if (eventType === 0xa0 || eventType === 0xb0 || eventType === 0xe0) pos += 2;
           else if (eventType === 0xc0 || eventType === 0xd0) pos += 1;
-          else throw new MidiParseError(`Corrupted or unsupported MIDI event (0x${statusByte.toString(16)}) in track ${t}.`);
+          else throw new MidiParseError(\`Corrupted or unsupported MIDI event (0x\${statusByte.toString(16)}) in track \${t}.\`);
         }
       }
     } catch (err) {
@@ -292,7 +358,7 @@
 
   // Hardcoded for this deployment -- end users never see or configure this,
   // they just pick a drum set/aspect and upload a MIDI file.
-  const WORKER_BASE = 'https://msharing0008.idetsminmh1995.workers.dev';
+  const WORKER_BASE = '';
 
   let currentDrumSet = null, currentAspect = '16x9';
   let backgroundImg = null;
@@ -312,12 +378,12 @@
   async function connectToWorker() {
     setStatus('loading', 'Connecting…');
     try {
-      const res = await fetch(`${WORKER_BASE}/api/drum-sets`);
-      if (!res.ok) throw new Error(`Worker responded ${res.status}`);
+      const res = await fetch(\`\${WORKER_BASE}/api/drum-sets\`);
+      if (!res.ok) throw new Error(\`Worker responded \${res.status}\`);
       const data = await res.json();
       const sets = data.drumSets || [];
       els.drumSetSelect.innerHTML = sets.length
-        ? sets.map((s) => `<option value="${s}">${s}</option>`).join('')
+        ? sets.map((s) => \`<option value="\${s}">\${s}</option>\`).join('')
         : '<option value="">(no drum sets found)</option>';
       els.drumSetSelect.disabled = sets.length === 0;
       els.aspectSelect.disabled = sets.length === 0;
@@ -325,10 +391,10 @@
         setStatus('err', 'Connected, but no drum sets are available yet in R2.');
         return;
       }
-      setStatus('ok', `Ready. ${sets.length} drum set(s) available.`);
+      setStatus('ok', \`Ready. \${sets.length} drum set(s) available.\`);
       await loadAssets(); // auto-load the first drum set + default aspect immediately
     } catch (err) {
-      setStatus('err', `Could not reach the asset server: ${err.message}. Please try again shortly.`);
+      setStatus('err', \`Could not reach the asset server: \${err.message}. Please try again shortly.\`);
     }
   }
 
@@ -343,11 +409,11 @@
     const [w, h] = ASPECT_SIZES[currentAspect] || [1280, 720];
     els.canvas.width = w; els.canvas.height = h;
 
-    setStatus('loading', `Loading manifest for ${currentDrumSet} (${currentAspect})…`);
+    setStatus('loading', \`Loading manifest for \${currentDrumSet} (\${currentAspect})…\`);
     
     try {
-      const res = await fetch(`${WORKER_BASE}/api/drum-sets/${encodeURIComponent(currentDrumSet)}/${currentAspect}/manifest`);
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Worker responded ${res.status}`);
+      const res = await fetch(\`\${WORKER_BASE}/api/drum-sets/\${encodeURIComponent(currentDrumSet)}/\${currentAspect}/manifest\`);
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || \`Worker responded \${res.status}\`);
       const manifest = await res.json();
 
       // Only load what's needed for this drum set + aspect (spec section 14) —
@@ -362,13 +428,13 @@
         loadPromises.push(new Promise((resolve) => {
           backgroundImg.onload = resolve;
           backgroundImg.onerror = resolve; // graceful — missing bg won't crash the app
-          backgroundImg.src = `${WORKER_BASE}/assets/${currentDrumSet}/${currentAspect}/${encodeURIComponent(manifest.backgroundFile)}`;
+          backgroundImg.src = \`\${WORKER_BASE}/assets/\${currentDrumSet}/\${currentAspect}/\${encodeURIComponent(manifest.backgroundFile)}\`;
         }));
       } else {
         backgroundImg = null;
       }
 
-      const filePattern = /^([RL])(\d+)\.png$/i;
+      const filePattern = /^([RL])(\\d+)\\.png$/i;
       for (const file of manifest.files || []) {
         const m = file.match(filePattern);
         if (!m) continue; // ignore anything that doesn't match the naming convention
@@ -380,13 +446,13 @@
         img.crossOrigin = 'anonymous'; // same reason as background — avoid a tainted canvas
         loadPromises.push(new Promise((resolve) => {
           img.onload = resolve; img.onerror = resolve;
-          img.src = `${WORKER_BASE}/assets/${currentDrumSet}/${currentAspect}/${encodeURIComponent(file)}`;
+          img.src = \`\${WORKER_BASE}/assets/\${currentDrumSet}/\${currentAspect}/\${encodeURIComponent(file)}\`;
         }));
         noteAssets.get(note)[hand] = img;
       }
 
       await Promise.all(loadPromises);
-      setStatus('ok', `Loaded ${currentDrumSet} (${currentAspect}) — background: ${manifest.hasBackground ? 'yes' : 'no'}, note assets: ${[...availableNoteSet].sort((a,b)=>a-b).join(', ') || 'none'}.`);
+      setStatus('ok', \`Loaded \${currentDrumSet} (\${currentAspect}) — background: \${manifest.hasBackground ? 'yes' : 'no'}, note assets: \${[...availableNoteSet].sort((a,b)=>a-b).join(', ') || 'none'}.\`);
       renderAssetChips();
       drawFrame();
 
@@ -394,7 +460,7 @@
       els.loadDemoBtn.disabled = false;
       updateGenerateAvailability();
     } catch (err) {
-      setStatus('err', `Failed to load assets: ${err.message}`);
+      setStatus('err', \`Failed to load assets: \${err.message}\`);
     } finally {
       
     }
@@ -406,7 +472,7 @@
     els.assetChips.innerHTML = notesInMidi
       .map((n) => {
         const have = availableNoteSet.has(n);
-        return `<span class="chip ${have ? 'have' : 'missing'}">${noteLabel(n)} (#${n}) ${have ? '✓' : '✗ no asset'}</span>`;
+        return \`<span class="chip \${have ? 'have' : 'missing'}">\${noteLabel(n)} (#\${n}) \${have ? '✓' : '✗ no asset'}</span>\`;
       })
       .join('');
   }
@@ -421,7 +487,7 @@
     currentTime = 0; nextEventIndex = 0; activeHits = [];
 
     els.bpmVal.textContent = pm.tempoChanges.map((t) => t.bpm.toFixed(0)).join(' → ');
-    els.tsVal.textContent = pm.timeSignatures.map((s) => `${s.numerator}/${s.denominator}`).join(', ');
+    els.tsVal.textContent = pm.timeSignatures.map((s) => \`\${s.numerator}/\${s.denominator}\`).join(', ');
     els.durVal.textContent = pm.durationSeconds.toFixed(2) + 's';
     els.noteCountVal.textContent = pm.notes.length;
 
@@ -456,12 +522,12 @@
     els.eventLog.innerHTML = timeline.map((e, i) => {
       const handClass = e.hand === 'R' ? 'h-r' : 'h-l';
       const missing = !availableNoteSet.has(e.midiNote);
-      return `<div class="log-row" data-idx="${i}"><span class="t">${e.time.toFixed(3)}s</span><span class="n">${noteLabel(e.midiNote)}</span><span class="${handClass}">${e.hand}</span>${missing ? '<span class="missing-tag">no asset</span>' : ''}</div>`;
+      return \`<div class="log-row" data-idx="\${i}"><span class="t">\${e.time.toFixed(3)}s</span><span class="n">\${noteLabel(e.midiNote)}</span><span class="\${handClass}">\${e.hand}</span>\${missing ? '<span class="missing-tag">no asset</span>' : ''}</div>\`;
     }).join('');
   }
   function highlightLogAt(index) {
     const prev = els.eventLog.querySelector('.log-row.current'); if (prev) prev.classList.remove('current');
-    const row = els.eventLog.querySelector(`[data-idx="${index}"]`);
+    const row = els.eventLog.querySelector(\`[data-idx="\${index}"]\`);
     if (row) { row.classList.add('current'); row.scrollIntoView({ block: 'nearest' }); }
   }
 
@@ -499,7 +565,7 @@
   function pruneActiveHits(t) { activeHits = activeHits.filter((h) => h.until > t); }
 
   function updateTimeDisplay() {
-    els.timeVal.textContent = `${currentTime.toFixed(2)}s / ${parsedMidi.durationSeconds.toFixed(2)}s`;
+    els.timeVal.textContent = \`\${currentTime.toFixed(2)}s / \${parsedMidi.durationSeconds.toFixed(2)}s\`;
     els.seekBar.value = Math.round(currentTime * 1000);
   }
 
@@ -618,7 +684,7 @@
         framerate: RENDER_FPS,
       });
 
-      els.renderStatus.textContent = `Rendering frame 0 / ${totalFrames}…`;
+      els.renderStatus.textContent = \`Rendering frame 0 / \${totalFrames}…\`;
 
       for (let i = 0; i < totalFrames; i++) {
         const t = i / RENDER_FPS;
@@ -633,7 +699,7 @@
         if (i % 5 === 0 || i === totalFrames - 1) {
           const pct = Math.round(((i + 1) / totalFrames) * 100);
           els.renderProgressBar.style.width = pct + '%';
-          els.renderStatus.textContent = `Rendering frame ${i + 1} / ${totalFrames} (${pct}%)…`;
+          els.renderStatus.textContent = \`Rendering frame \${i + 1} / \${totalFrames} (\${pct}%)…\`;
           // Let the UI repaint between frames instead of blocking the whole time.
           await new Promise((r) => setTimeout(r, 0));
         }
@@ -650,15 +716,15 @@
       els.downloadWrap.innerHTML = '';
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${currentDrumSet}-${currentAspect}-drum-video.mp4`;
-      link.textContent = `⬇ Download ${link.download} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`;
+      link.download = \`\${currentDrumSet}-\${currentAspect}-drum-video.mp4\`;
+      link.textContent = \`⬇ Download \${link.download} (\${(blob.size / 1024 / 1024).toFixed(2)} MB)\`;
       link.style.color = 'var(--ok)';
       link.style.fontWeight = '600';
       els.downloadWrap.appendChild(link);
       els.downloadWrap.classList.remove('hidden');
 
       els.renderStatus.style.color = 'var(--ok)';
-      els.renderStatus.textContent = `Done — ${totalFrames} frames rendered at ${RENDER_FPS}fps.`;
+      els.renderStatus.textContent = \`Done — \${totalFrames} frames rendered at \${RENDER_FPS}fps.\`;
     } catch (err) {
       els.renderStatus.style.color = 'var(--err)';
       els.renderStatus.textContent = 'Render failed: ' + (err && err.message ? err.message : String(err));
@@ -677,3 +743,64 @@
 </script>
 </body>
 </html>
+`;
+export default {
+    async fetch(request, env) {
+        const headers = corsHeaders(request, env);
+        if (request.method === 'OPTIONS') {
+            return new Response(null, { status: 204, headers });
+        }
+        const url = new URL(request.url);
+        const segments = url.pathname.split('/').filter(Boolean).map((s) => decodeURIComponent(s));
+        // Serve the frontend app at the root.
+        if (request.method === 'GET' && segments.length === 0) {
+            return new Response(APP_HTML, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+        }
+        if (request.method !== 'GET') {
+            return errorResponse('Only GET requests are supported.', 405, headers);
+        }
+        try {
+            if (segments[0] === 'api' && segments[1] === 'drum-sets' && segments.length === 2) {
+                const drumSets = await listDrumSets(env.DRUM_ASSETS);
+                return json({ drumSets }, 200, headers);
+            }
+            if (segments[0] === 'api' && segments[1] === 'drum-sets' && segments.length === 5 && segments[4] === 'manifest') {
+                const [, , drumSet, aspect] = segments;
+                if (!VALID_ASPECTS.has(aspect)) {
+                    return errorResponse(`Unknown aspect ratio "${aspect}". Expected one of: ${[...VALID_ASPECTS].join(', ')}.`, 400, headers);
+                }
+                const manifest = await listManifest(env.DRUM_ASSETS, drumSet, aspect);
+                if (!manifest.hasBackground && manifest.files.length === 0) {
+                    return errorResponse(`Drum set "${drumSet}" (${aspect}) not found or has no assets.`, 404, headers);
+                }
+                return json({ drumSet, aspect, hasBackground: manifest.hasBackground, backgroundFile: manifest.hasBackground ? BACKGROUND_FILENAME : null, files: manifest.files }, 200, headers);
+            }
+            if (segments[0] === 'assets' && segments.length >= 4) {
+                const [, drumSet, aspect, ...rest] = segments;
+                if (!VALID_ASPECTS.has(aspect)) {
+                    return errorResponse(`Unknown aspect ratio "${aspect}".`, 400, headers);
+                }
+                const filePath = rest.join('/');
+                if (filePath.includes('..')) {
+                    return errorResponse('Invalid asset path.', 400, headers);
+                }
+                const key = `${R2_PREFIX}${drumSet}/${aspect}/${filePath}`;
+                const object = await env.DRUM_ASSETS.get(key);
+                if (!object) {
+                    return errorResponse(`Asset not found: ${filePath}`, 404, headers);
+                }
+                const respHeaders = new Headers(headers);
+                object.writeHttpMetadata(respHeaders);
+                respHeaders.set('Content-Type', object.httpMetadata?.contentType ?? 'image/png');
+                respHeaders.set('Cache-Control', 'public, max-age=86400, immutable');
+                respHeaders.set('ETag', object.httpEtag);
+                return new Response(object.body, { status: 200, headers: respHeaders });
+            }
+            return errorResponse('Not found.', 404, headers);
+        }
+        catch (err) {
+            console.error('Worker error:', err);
+            return errorResponse('Internal error while accessing R2.', 500, headers);
+        }
+    },
+};
