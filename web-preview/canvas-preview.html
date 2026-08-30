@@ -78,6 +78,14 @@
     <div class="row">
       <input type="file" id="midiFile" accept=".mid,.midi" disabled />
       <button id="loadDemoBtn" disabled>Load Demo Pattern</button>
+      <div class="field">
+        <label>Timing display</label>
+        <select id="subdivSelect">
+          <option value="quarter">1 2 3 4</option>
+          <option value="eighth">1 & 2 & 3 & 4 &</option>
+          <option value="sixteenth">1 e & a 2 e & a ...</option>
+        </select>
+      </div>
     </div>
     <div class="meta-row" id="metaRow">
       <span>BPM: <b id="bpmVal">–</b></span>
@@ -286,6 +294,7 @@
     generateBtn: document.getElementById('generateBtn'), renderStatus: document.getElementById('renderStatus'),
     renderProgressWrap: document.getElementById('renderProgressWrap'), renderProgressBar: document.getElementById('renderProgressBar'),
     downloadWrap: document.getElementById('downloadWrap'),
+    subdivSelect: document.getElementById('subdivSelect'),
   };
   const ctx = els.canvas.getContext('2d');
   const ASPECT_SIZES = { '16x9': [1280, 720], '9x16': [720, 1280], '1x1': [900, 900] };
@@ -441,6 +450,7 @@
   }
 
   els.loadDemoBtn.addEventListener('click', () => loadParsed(loadDemoParsedMidi()));
+  els.subdivSelect.addEventListener('change', () => { if (parsedMidi) drawFrame(); });
   els.midiFile.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -492,23 +502,29 @@
     const beatsAtTsStart = ts.tick / parsedMidi.ppq;
     let posInMeasure = (totalBeats - beatsAtTsStart) % ts.numerator;
     if (posInMeasure < 0) posInMeasure += ts.numerator;
-    const activeBeatIndex = Math.floor(posInMeasure); // 0-based
+    const beatIndex = Math.floor(posInMeasure); // 0-based
+    const fracWithinBeat = posInMeasure - beatIndex;
 
-    const barHeight = Math.round(h * 0.09);
-    const barY = h - barHeight;
+    // Subdivision syllables per beat, selected by the "Timing display" dropdown.
+    // Index 0 is always the beat number itself; the rest are the "&"/"e"/"a" syllables.
+    const mode = els.subdivSelect ? els.subdivSelect.value : 'quarter';
+    const subdivLabels = mode === 'quarter' ? [''] : mode === 'eighth' ? ['', '&'] : ['', 'e', '&', 'a'];
+    const subSlot = Math.min(subdivLabels.length - 1, Math.floor(fracWithinBeat * subdivLabels.length));
+    const label = subSlot === 0 ? String(beatIndex + 1) : subdivLabels[subSlot];
+
+    // Single current label, shown large and centered -- not the whole row.
+    const boxSize = Math.round(Math.min(w, h) * 0.16);
+    const cx = w / 2, cy = boxSize * 0.9;
     targetCtx.save();
-    targetCtx.fillStyle = 'rgba(0,0,0,0.55)';
-    targetCtx.fillRect(0, barY, w, barHeight);
-
-    const slotW = w / ts.numerator;
+    targetCtx.fillStyle = 'rgba(0,0,0,0.5)';
+    targetCtx.beginPath();
+    targetCtx.arc(cx, cy, boxSize / 2, 0, Math.PI * 2);
+    targetCtx.fill();
     targetCtx.textAlign = 'center';
     targetCtx.textBaseline = 'middle';
-    for (let i = 0; i < ts.numerator; i++) {
-      const isActive = i === activeBeatIndex;
-      targetCtx.font = (isActive ? 'bold ' : '') + Math.round(barHeight * (isActive ? 0.55 : 0.4)) + 'px sans-serif';
-      targetCtx.fillStyle = isActive ? '#ff6b4a' : 'rgba(255,255,255,0.55)';
-      targetCtx.fillText(String(i + 1), slotW * i + slotW / 2, barY + barHeight / 2);
-    }
+    targetCtx.font = 'bold ' + Math.round(boxSize * 0.55) + 'px sans-serif';
+    targetCtx.fillStyle = '#ff6b4a';
+    targetCtx.fillText(label, cx, cy);
     targetCtx.restore();
   }
 
