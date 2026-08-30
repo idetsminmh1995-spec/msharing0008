@@ -116,7 +116,7 @@
       <div id="renderProgressBar" style="height:100%; width:0%; background: var(--accent); transition: width 0.1s linear;"></div>
     </div>
     <div id="downloadWrap" class="hidden" style="margin-top:10px;"></div>
-    <div class="hint" style="margin-top:8px;">V1: video only, no audio yet (audio synthesis is a planned fast-follow). Requires a browser with WebCodecs support (current Chrome/Edge). No ffmpeg.wasm fallback in this build yet — unsupported browsers get a clear error instead of a silent failure.</div>
+    <div class="hint" style="margin-top:8px;">Includes synthesized drum audio (General MIDI soundfont) and a 10s tail after the last note. Requires a browser with WebCodecs support (current Chrome/Edge). No ffmpeg.wasm fallback in this build yet — unsupported browsers get a clear error instead of a silent failure.</div>
   </div>
 
   <div class="panel">
@@ -615,6 +615,38 @@
   const RENDER_FPS = 30;
   const RENDER_TAIL_SECONDS = 10; // extra buffer after the last note, per requirement
 
+  function loadScriptOnce(src) {
+    return new Promise((resolve, reject) => {
+      if (window.Soundfont) { resolve(); return; }
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('Failed to load ' + src));
+      document.head.appendChild(s);
+    });
+  }
+
+  // Synthesizes the MIDI's drum notes into an AudioBuffer using a General
+  // MIDI soundfont's "percussion" instrument, rendered via OfflineAudioContext
+  // (fast, deterministic — not real-time playback). Returns null (rather than
+  // throwing) on any failure so the caller can fall back to a video-only export.
+  async function renderAudioBuffer(renderDurationSeconds) {
+    if (typeof OfflineAudioContext === 'undefined') return null;
+    try {
+      await loadScriptOnce('https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js');
+      const sampleRate = 44100;
+      const offlineCtx = new OfflineAudioContext(2, Math.ceil(renderDurationSeconds * sampleRate), sampleRate);
+      const instrument = await window.Soundfont.instrument(offlineCtx, 'percussion');
+      for (const note of parsedMidi.notes) {
+        instrument.play(note.midiNote, note.time, { gain: Math.max(0.15, Math.min(1, note.velocity)) });
+      }
+      return await offlineCtx.startRendering();
+    } catch (err) {
+      console.warn('Audio synthesis failed, exporting video-only:', err);
+      return null;
+    }
+  }
+
   function computeActiveHitsAt(t) {
     // Same rule as the live preview: a hit is "on screen" for
     // HIT_VISUAL_DURATION seconds after it fires.
@@ -668,9 +700,14 @@
       renderCanvas.width = w; renderCanvas.height = h;
       const renderCtx = renderCanvas.getContext('2d');
 
+      els.renderStatus.textContent = 'Synthesizing audio…';
+      const audioBuffer = await renderAudioBuffer(renderDurationSeconds);
+      const audioSupported = !!(audioBuffer && typeof AudioEncoder !== 'undefined');
+
       const muxer = new Muxer({
         target: new ArrayBufferTarget(),
         video: { codec: 'avc', width: w, height: h },
+        audio: audioSupported ? { codec: 'aac', sampleRate: audioBuffer.sampleRate, numberOfChannels: audioBuffer.numberOfChannels } : undefined,
         fastStart: 'in-memory',
       });
 
@@ -686,6 +723,42 @@
         bitrate: 4_000_000,
         framerate: RENDER_FPS,
       });
+
+      if (audioSupported) {
+        els.renderStatus.textContent = 'Encoding audio…';
+        const audioEncoder = new AudioEncoder({
+          output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+          error: (e) => encoderErrors.push(e),
+        });
+        audioEncoder.configure({
+          codec: 'mp4a.40.2', // AAC-LC
+          sampleRate: audioBuffer.sampleRate,
+          numberOfChannels: audioBuffer.numberOfChannels,
+          bitrate: 128_000,
+        });
+
+        const frameSize = 1024;
+        const nCh = audioBuffer.numberOfChannels;
+        const channelData = [];
+        for (let ch = 0; ch < nCh; ch++) channelData.push(audioBuffer.getChannelData(ch));
+        for (let offset = 0; offset < audioBuffer.length; offset += frameSize) {
+          const count = Math.min(frameSize, audioBuffer.length - offset);
+          const planar = new Float32Array(count * nCh);
+          for (let ch = 0; ch < nCh; ch++) planar.set(channelData[ch].subarray(offset, offset + count), ch * count);
+          const audioData = new AudioData({
+            format: 'f32-planar',
+            sampleRate: audioBuffer.sampleRate,
+            numberOfFrames: count,
+            numberOfChannels: nCh,
+            timestamp: Math.round((offset / audioBuffer.sampleRate) * 1e6),
+            data: planar,
+          });
+          audioEncoder.encode(audioData);
+          audioData.close();
+        }
+        if (encoderErrors.length) throw encoderErrors[0];
+        await audioEncoder.flush();
+      }
 
       els.renderStatus.textContent = `Rendering frame 0 / ${totalFrames}…`;
 
@@ -727,7 +800,7 @@
       els.downloadWrap.classList.remove('hidden');
 
       els.renderStatus.style.color = 'var(--ok)';
-      els.renderStatus.textContent = `Done — ${totalFrames} frames rendered at ${RENDER_FPS}fps.`;
+      els.renderStatus.textContent = `Done — ${totalFrames} frames rendered at ${RENDER_FPS}fps${audioSupported ? ' with audio' : ' (video only — audio unavailable in this browser)'}.`;
     } catch (err) {
       els.renderStatus.style.color = 'var(--err)';
       els.renderStatus.textContent = 'Render failed: ' + (err && err.message ? err.message : String(err));
