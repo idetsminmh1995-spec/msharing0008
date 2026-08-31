@@ -139,6 +139,10 @@
 
   const MAX_MIDI_DURATION_SECONDS = 10 * 60;
   const HIT_VISUAL_DURATION = 0.15; // seconds a hit stays composited — configurable per spec
+  // Foot-only drum notes (pedal hi-hat click, kick) have no hand strike at
+  // all -- only an "L" asset exists (foot pedal), never alternates to "R".
+  // Confirmed set: 35 (kick), 44 (pedal hi-hat).
+  const FOOT_ONLY_NOTES = new Set([35, 44]);
 
   const GM_DRUM_NAMES = {
     35: 'Kick (Ac.)', 36: 'Kick', 37: 'Side Stick', 38: 'Snare', 39: 'Hand Clap',
@@ -259,9 +263,14 @@
   function buildAnimationTimeline(notes) {
     const lastHandByNote = new Map();
     return [...notes].sort((a, b) => a.time - b.time).map((note) => {
-      const prev = lastHandByNote.get(note.midiNote);
-      const hand = prev === 'R' ? 'L' : 'R';
-      lastHandByNote.set(note.midiNote, hand);
+      let hand;
+      if (FOOT_ONLY_NOTES.has(note.midiNote)) {
+        hand = 'L'; // foot pedal — no hand alternation, always the single "L" asset
+      } else {
+        const prev = lastHandByNote.get(note.midiNote);
+        hand = prev === 'R' ? 'L' : 'R';
+        lastHandByNote.set(note.midiNote, hand);
+      }
       return { time: note.time, midiNote: note.midiNote, hand, velocity: note.velocity, duration: note.duration };
     });
   }
@@ -468,6 +477,10 @@
     }
   }
 
+  // Foot-only drum notes (pedal hi-hat click, kick) have no hand strike at
+  // all -- by design, only the "L" asset exists and no "R" counterpart is
+  // expected. Confirmed set: 35 (kick), 44 (pedal hi-hat).
+
   function renderAssetChips() {
     if (!parsedMidi) { els.assetChips.innerHTML = ''; return; }
     const notesInMidi = [...new Set(parsedMidi.notes.map((n) => n.midiNote))].sort((a, b) => a - b);
@@ -476,8 +489,12 @@
         const assets = noteAssets.get(n);
         const hasR = !!(assets && assets.R);
         const hasL = !!(assets && assets.L);
+        const footOnly = FOOT_ONLY_NOTES.has(n);
         let cls, label;
-        if (hasR && hasL) { cls = 'have'; label = '✓ R+L'; }
+        if (footOnly) {
+          cls = hasL ? 'have' : 'missing';
+          label = hasL ? '✓ foot (L)' : '✗ no asset';
+        } else if (hasR && hasL) { cls = 'have'; label = '✓ R+L'; }
         else if (hasR || hasL) { cls = 'partial'; label = hasR ? '⚠ R only (no L)' : '⚠ L only (no R)'; }
         else { cls = 'missing'; label = '✗ no asset'; }
         return `<span class="chip ${cls}">${noteLabel(n)} (#${n}) ${label}</span>`;
