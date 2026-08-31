@@ -45,6 +45,7 @@
   .log-row .n { width: 90px; }
   .log-row .h-r { color: var(--hand-r); }
   .log-row .h-l { color: var(--hand-l); }
+  .log-row .h-foot { color: #8b90a3; font-style: italic; }
   .log-row .missing-tag { color: var(--err); font-size: 10px; }
   .log-row.current { background: var(--panel-2); color: var(--text); }
   .hidden { display: none !important; }
@@ -139,10 +140,9 @@
 
   const MAX_MIDI_DURATION_SECONDS = 10 * 60;
   const HIT_VISUAL_DURATION = 0.15; // seconds a hit stays composited — configurable per spec
-  // Foot-only drum notes (pedal hi-hat click, kick) have no hand strike at
-  // all -- only an "L" asset exists (foot pedal), never alternates to "R".
-  // Confirmed set: 35 (kick), 44 (pedal hi-hat).
-  const FOOT_ONLY_NOTES = new Set([35, 44]);
+  // Foot-only drum notes (kick, pedal hi-hat) have no hand strike at all --
+  // only a single bare-numbered asset exists (e.g. "35.png"), no L/R prefix.
+  const FOOT_ONLY_NOTES = new Set([35, 36, 44]);
 
   const GM_DRUM_NAMES = {
     35: 'Kick (Ac.)', 36: 'Kick', 37: 'Side Stick', 38: 'Snare', 39: 'Hand Clap',
@@ -260,19 +260,109 @@
     return { notes, tempoChanges, timeSignatures, durationSeconds, ppq };
   }
 
+  // ===================================================================
+  // Auto Sticking Engine (v1 — pragmatic subset of the full spec).
+  //
+  // Full per-note independent alternation (R,L,R,L per note number) doesn't
+  // match how drummers actually play: a sustained pattern like straight
+  // 8th-note hi-hat is usually kept on ONE hand throughout, while a
+  // simultaneous snare hit takes the OTHER hand. This engine implements the
+  // highest-impact rules from the fuller spec:
+  //   - Foot notes (kick, pedal hi-hat) never consume a hand.
+  //   - Simultaneous hand-events (within a small tolerance) are grouped and
+  //     given DIFFERENT hands, never the same hand.
+  //   - A note that continues the same drum as the immediately preceding
+  //     group keeps the SAME hand (no forced alternation) -- this is what
+  //     keeps a repeated hi-hat pattern on one hand.
+  //   - A note on a genuinely different drum than the previous group
+  //     toggles to the other hand (a simple stand-in for full movement/
+  //     position scoring).
+  //   - Groups of 3+ simultaneous hand-events: only the two highest-priority
+  //     drums (Crash > Snare > Tom > Hi-Hat > Other) get distinct hands;
+  //     any extra note reuses one of those two hands rather than inventing
+  //     a third hand.
+  //
+  // This is NOT the full beam-search/scoring-weight engine from the spec
+  // (that's a much larger undertaking) -- it's a focused v1 covering the
+  // rules that matter most for how the animation actually looks.
+  // ===================================================================
+  const SIMULTANEOUS_TOLERANCE_SECONDS = 0.015;
+  const DRUM_PRIORITY = [
+    [49, 52, 55, 57, 59], // Crash / China / Splash / Ride 2 (cymbals)
+    [38, 40],             // Snare (acoustic, electric)
+    [41, 43, 45, 47, 48, 50], // Toms
+    [42, 46],             // Hi-Hat (closed, open)
+  ];
+  function drumPriorityRank(note) {
+    for (let i = 0; i < DRUM_PRIORITY.length; i++) if (DRUM_PRIORITY[i].includes(note)) return i;
+    return DRUM_PRIORITY.length; // "Other" — lowest priority
+  }
+
   function buildAnimationTimeline(notes) {
-    const lastHandByNote = new Map();
-    return [...notes].sort((a, b) => a.time - b.time).map((note) => {
-      let hand;
-      if (FOOT_ONLY_NOTES.has(note.midiNote)) {
-        hand = 'L'; // foot pedal — no hand alternation, always the single "L" asset
+    const footEvents = [];
+    const handNotesSorted = [];
+    for (const n of [...notes].sort((a, b) => a.time - b.time)) {
+      if (FOOT_ONLY_NOTES.has(n.midiNote)) footEvents.push(n);
+      else handNotesSorted.push(n);
+    }
+
+    // Group hand-events that occur within SIMULTANEOUS_TOLERANCE_SECONDS of
+    // each other (spec section 5).
+    const groups = [];
+    for (const n of handNotesSorted) {
+      const lastGroup = groups[groups.length - 1];
+      if (lastGroup && n.time - lastGroup[0].time <= SIMULTANEOUS_TOLERANCE_SECONDS) {
+        lastGroup.push(n);
       } else {
-        const prev = lastHandByNote.get(note.midiNote);
-        hand = prev === 'R' ? 'L' : 'R';
-        lastHandByNote.set(note.midiNote, hand);
+        groups.push([n]);
       }
-      return { time: note.time, midiNote: note.midiNote, hand, velocity: note.velocity, duration: note.duration };
-    });
+    }
+
+    const handTimeline = [];
+    let currentHand = 'R'; // fallback default for the very first event
+    let prevGroupNotes = null; // null = no prior group yet -- use the default hand, don't toggle away from it
+
+    for (const group of groups) {
+      // Highest-priority drum first (section 28).
+      const sorted = [...group].sort((a, b) => drumPriorityRank(a.midiNote) - drumPriorityRank(b.midiNote));
+      const assigned = new Map(); // note event -> hand
+
+      if (sorted.length === 1) {
+        const ev = sorted[0];
+        const hand = (prevGroupNotes === null || prevGroupNotes.has(ev.midiNote)) ? currentHand : (currentHand === 'R' ? 'L' : 'R');
+        assigned.set(ev, hand);
+        currentHand = hand;
+      } else {
+        // 2+ simultaneous hand-events: never the same hand for two
+        // different drums (section 13). Whichever drum matches the
+        // previous group keeps the current hand; the other(s) get the
+        // opposite hand.
+        const continuing = prevGroupNotes === null ? sorted[0] : sorted.find((ev) => prevGroupNotes.has(ev.midiNote));
+        const primary = continuing || sorted[0];
+        const primaryHand = continuing ? currentHand : currentHand;
+        const otherHand = primaryHand === 'R' ? 'L' : 'R';
+        assigned.set(primary, primaryHand);
+        for (const ev of sorted) {
+          if (ev === primary) continue;
+          if (!assigned.has(ev)) assigned.set(ev, otherHand);
+        }
+        // 3+ simultaneous: only the top 2 (by priority) get distinct hands;
+        // anything beyond that reuses the secondary hand (section 14) rather
+        // than inventing a third hand.
+        currentHand = primaryHand;
+      }
+
+      for (const ev of sorted) {
+        handTimeline.push({ time: ev.time, midiNote: ev.midiNote, hand: assigned.get(ev), velocity: ev.velocity, duration: ev.duration });
+      }
+      prevGroupNotes = new Set(group.map((e) => e.midiNote));
+    }
+
+    const footTimeline = footEvents.map((ev) => ({
+      time: ev.time, midiNote: ev.midiNote, hand: 'FOOT', velocity: ev.velocity, duration: ev.duration,
+    }));
+
+    return [...handTimeline, ...footTimeline].sort((a, b) => a.time - b.time);
   }
 
   function loadDemoParsedMidi() {
@@ -445,21 +535,36 @@
         backgroundImg = null;
       }
 
-      const filePattern = /^([RL])(\d+)\.png$/i;
+      const rlPattern = /^([RL])(\d+)\.png$/i;
+      const footPattern = /^(\d+)\.png$/i; // bare-number filenames (foot notes: 35, 36, 44)
       for (const file of manifest.files || []) {
-        const m = file.match(filePattern);
-        if (!m) continue; // ignore anything that doesn't match the naming convention
-        const hand = m[1].toUpperCase();
-        const note = parseInt(m[2], 10);
-        if (!noteAssets.has(note)) noteAssets.set(note, { R: null, L: null });
-        availableNoteSet.add(note);
-        const img = new Image();
-        img.crossOrigin = 'anonymous'; // same reason as background — avoid a tainted canvas
-        loadPromises.push(new Promise((resolve) => {
-          img.onload = resolve; img.onerror = resolve;
-          img.src = `${WORKER_BASE}/assets/${currentDrumSet}/${currentAspect}/${encodeURIComponent(file)}`;
-        }));
-        noteAssets.get(note)[hand] = img;
+        const rlMatch = file.match(rlPattern);
+        const footMatch = !rlMatch ? file.match(footPattern) : null;
+        if (rlMatch) {
+          const hand = rlMatch[1].toUpperCase();
+          const note = parseInt(rlMatch[2], 10);
+          if (!noteAssets.has(note)) noteAssets.set(note, { R: null, L: null, FOOT: null });
+          availableNoteSet.add(note);
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          loadPromises.push(new Promise((resolve) => {
+            img.onload = resolve; img.onerror = resolve;
+            img.src = `${WORKER_BASE}/assets/${currentDrumSet}/${currentAspect}/${encodeURIComponent(file)}`;
+          }));
+          noteAssets.get(note)[hand] = img;
+        } else if (footMatch) {
+          const note = parseInt(footMatch[1], 10);
+          if (!noteAssets.has(note)) noteAssets.set(note, { R: null, L: null, FOOT: null });
+          availableNoteSet.add(note);
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          loadPromises.push(new Promise((resolve) => {
+            img.onload = resolve; img.onerror = resolve;
+            img.src = `${WORKER_BASE}/assets/${currentDrumSet}/${currentAspect}/${encodeURIComponent(file)}`;
+          }));
+          noteAssets.get(note).FOOT = img;
+        }
+        // anything else (doesn't match either convention) is ignored gracefully
       }
 
       await Promise.all(loadPromises);
@@ -489,11 +594,12 @@
         const assets = noteAssets.get(n);
         const hasR = !!(assets && assets.R);
         const hasL = !!(assets && assets.L);
+        const hasFoot = !!(assets && assets.FOOT);
         const footOnly = FOOT_ONLY_NOTES.has(n);
         let cls, label;
         if (footOnly) {
-          cls = hasL ? 'have' : 'missing';
-          label = hasL ? '✓ foot (L)' : '✗ no asset';
+          cls = hasFoot ? 'have' : 'missing';
+          label = hasFoot ? '✓ foot' : '✗ no asset';
         } else if (hasR && hasL) { cls = 'have'; label = '✓ R+L'; }
         else if (hasR || hasL) { cls = 'partial'; label = hasR ? '⚠ R only (no L)' : '⚠ L only (no R)'; }
         else { cls = 'missing'; label = '✗ no asset'; }
@@ -546,8 +652,9 @@
 
   function renderEventLog() {
     els.eventLog.innerHTML = timeline.map((e, i) => {
-      const handClass = e.hand === 'R' ? 'h-r' : 'h-l';
-      const missing = !availableNoteSet.has(e.midiNote);
+      const handClass = e.hand === 'R' ? 'h-r' : e.hand === 'L' ? 'h-l' : 'h-foot';
+      const assets = noteAssets.get(e.midiNote);
+      const missing = e.hand === 'FOOT' ? !(assets && assets.FOOT) : !(assets && assets[e.hand]);
       return `<div class="log-row" data-idx="${i}"><span class="t">${e.time.toFixed(3)}s</span><span class="n">${noteLabel(e.midiNote)}</span><span class="${handClass}">${e.hand}</span>${missing ? '<span class="missing-tag">no asset</span>' : ''}</div>`;
     }).join('');
   }
