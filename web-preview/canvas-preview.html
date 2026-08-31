@@ -37,6 +37,7 @@
   .asset-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .chip { font-size: 11px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim); }
   .chip.have { border-color: var(--ok); color: var(--ok); }
+  .chip.partial { border-color: #ffb84a; color: #ffb84a; }
   .chip.missing { border-color: var(--err); color: var(--err); opacity: 0.7; }
   .log-box { max-height: 180px; overflow-y: auto; font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 12px; line-height: 1.7; }
   .log-row { display: flex; gap: 10px; padding: 2px 6px; border-radius: 4px; color: var(--text-dim); }
@@ -472,8 +473,14 @@
     const notesInMidi = [...new Set(parsedMidi.notes.map((n) => n.midiNote))].sort((a, b) => a - b);
     els.assetChips.innerHTML = notesInMidi
       .map((n) => {
-        const have = availableNoteSet.has(n);
-        return `<span class="chip ${have ? 'have' : 'missing'}">${noteLabel(n)} (#${n}) ${have ? '✓' : '✗ no asset'}</span>`;
+        const assets = noteAssets.get(n);
+        const hasR = !!(assets && assets.R);
+        const hasL = !!(assets && assets.L);
+        let cls, label;
+        if (hasR && hasL) { cls = 'have'; label = '✓ R+L'; }
+        else if (hasR || hasL) { cls = 'partial'; label = hasR ? '⚠ R only (no L)' : '⚠ L only (no R)'; }
+        else { cls = 'missing'; label = '✗ no asset'; }
+        return `<span class="chip ${cls}">${noteLabel(n)} (#${n}) ${label}</span>`;
       })
       .join('');
   }
@@ -552,16 +559,26 @@
     const seg = getActiveTempoSeg(t);
     return seg.tick / parsedMidi.ppq + (t - seg.time) * seg.bpm / 60;
   }
+  // Current absolute tick position at time t (inverse of tempo-based ticksToSeconds).
+  function currentTickAt(t) {
+    const seg = getActiveTempoSeg(t);
+    const elapsedTicks = (t - seg.time) * seg.bpm / 60 * parsedMidi.ppq;
+    return seg.tick + elapsedTicks;
+  }
 
   function drawTimingOverlay(targetCtx, w, h, t) {
     if (!parsedMidi) return;
     const ts = getActiveTimeSig(t);
-    const totalBeats = secondsToBeats(t);
-    const beatsAtTsStart = ts.tick / parsedMidi.ppq;
-    let posInMeasure = (totalBeats - beatsAtTsStart) % ts.numerator;
-    if (posInMeasure < 0) posInMeasure += ts.numerator;
-    const beatIndex = Math.floor(posInMeasure); // 0-based
-    const fracWithinBeat = posInMeasure - beatIndex;
+    // Work directly in tick-space so the beat unit correctly matches the time
+    // signature's denominator (e.g. 6/8 counts in eighth notes, not quarter
+    // notes) -- fixes wrong beat counts on compound/other-than-/4 meters.
+    const ticksPerBeat = (parsedMidi.ppq * 4) / ts.denominator;
+    const ticksPerMeasure = ticksPerBeat * ts.numerator;
+    const tick = currentTickAt(t);
+    let tickInMeasure = (tick - ts.tick) % ticksPerMeasure;
+    if (tickInMeasure < 0) tickInMeasure += ticksPerMeasure;
+    const beatIndex = Math.floor(tickInMeasure / ticksPerBeat); // 0-based
+    const fracWithinBeat = (tickInMeasure % ticksPerBeat) / ticksPerBeat;
 
     // Subdivision syllables per beat, selected by the "Timing display" dropdown.
     // Index 0 is always the beat number itself; the rest are the "&"/"e"/"a" syllables.
@@ -582,7 +599,7 @@
     targetCtx.textAlign = 'center';
     targetCtx.textBaseline = 'middle';
     targetCtx.font = 'bold ' + Math.round(boxSize * 0.55) + 'px sans-serif';
-    targetCtx.fillStyle = '#ff6b4a';
+    targetCtx.fillStyle = '#ff0000';
     targetCtx.fillText(label, cx, cy);
     targetCtx.restore();
   }
