@@ -46,6 +46,7 @@
   .log-row .h-r { color: var(--hand-r); }
   .log-row .h-l { color: var(--hand-l); }
   .log-row .h-foot { color: #8b90a3; font-style: italic; }
+  .log-row .reason-tag { color: var(--text-dim); font-size: 10px; opacity: 0.65; }
   .log-row .missing-tag { color: var(--err); font-size: 10px; }
   .log-row.current { background: var(--panel-2); color: var(--text); }
   .hidden { display: none !important; }
@@ -287,6 +288,8 @@
   // rules that matter most for how the animation actually looks.
   // ===================================================================
   const SIMULTANEOUS_TOLERANCE_SECONDS = 0.015;
+  const DUPLICATE_TOLERANCE_SECONDS = 0.005; // spec section 44
+  const PHRASE_GAP_SECONDS = 1.5; // spec sections 29-30
   const DRUM_PRIORITY = [
     [49, 52, 55, 57, 59], // Crash / China / Splash / Ride 2 (cymbals)
     [38, 40],             // Snare (acoustic, electric)
@@ -298,10 +301,26 @@
     return DRUM_PRIORITY.length; // "Other" — lowest priority
   }
 
+  // Merge duplicate hits of the SAME note within DUPLICATE_TOLERANCE_SECONDS
+  // (spec section 44) -- prevents one real hit turning into two animations.
+  function mergeDuplicateNotes(notes) {
+    const sorted = [...notes].sort((a, b) => a.time - b.time || a.midiNote - b.midiNote);
+    const merged = [];
+    for (const n of sorted) {
+      const last = merged[merged.length - 1];
+      if (last && last.midiNote === n.midiNote && n.time - last.time <= DUPLICATE_TOLERANCE_SECONDS) {
+        continue; // drop the duplicate, keep the first occurrence
+      }
+      merged.push(n);
+    }
+    return merged;
+  }
+
   function buildAnimationTimeline(notes) {
+    const deduped = mergeDuplicateNotes(notes);
     const footEvents = [];
     const handNotesSorted = [];
-    for (const n of [...notes].sort((a, b) => a.time - b.time)) {
+    for (const n of deduped) {
       if (FOOT_ONLY_NOTES.has(n.midiNote)) footEvents.push(n);
       else handNotesSorted.push(n);
     }
@@ -321,45 +340,57 @@
     const handTimeline = [];
     let currentHand = 'R'; // fallback default for the very first event
     let prevGroupNotes = null; // null = no prior group yet -- use the default hand, don't toggle away from it
+    let prevGroupTime = null;
 
     for (const group of groups) {
+      // Phrase boundary / timing-gap reset (spec sections 29-30): a long
+      // silence since the last hand hit means don't blindly continue the
+      // old hand state -- treat this like a fresh start.
+      const gapReset = prevGroupTime !== null && group[0].time - prevGroupTime > PHRASE_GAP_SECONDS;
+      const effectivePrevGroupNotes = gapReset ? null : prevGroupNotes;
+
       // Highest-priority drum first (section 28).
       const sorted = [...group].sort((a, b) => drumPriorityRank(a.midiNote) - drumPriorityRank(b.midiNote));
-      const assigned = new Map(); // note event -> hand
+      const assigned = new Map(); // note event -> { hand, reason, confidence }
 
       if (sorted.length === 1) {
         const ev = sorted[0];
-        const hand = (prevGroupNotes === null || prevGroupNotes.has(ev.midiNote)) ? currentHand : (currentHand === 'R' ? 'L' : 'R');
-        assigned.set(ev, hand);
+        const continuing = effectivePrevGroupNotes === null || effectivePrevGroupNotes.has(ev.midiNote);
+        const hand = continuing ? currentHand : (currentHand === 'R' ? 'L' : 'R');
+        const reason = gapReset ? 'phrase-reset' : continuing ? 'continuation' : 'toggle';
+        const confidence = gapReset ? 0.55 : continuing ? 0.85 : 0.65;
+        assigned.set(ev, { hand, reason, confidence });
         currentHand = hand;
       } else {
         // 2+ simultaneous hand-events: never the same hand for two
         // different drums (section 13). Whichever drum matches the
         // previous group keeps the current hand; the other(s) get the
         // opposite hand.
-        const continuing = prevGroupNotes === null ? sorted[0] : sorted.find((ev) => prevGroupNotes.has(ev.midiNote));
+        const continuing = effectivePrevGroupNotes === null ? sorted[0] : sorted.find((ev) => effectivePrevGroupNotes.has(ev.midiNote));
         const primary = continuing || sorted[0];
-        const primaryHand = continuing ? currentHand : currentHand;
+        const primaryHand = currentHand;
         const otherHand = primaryHand === 'R' ? 'L' : 'R';
-        assigned.set(primary, primaryHand);
+        assigned.set(primary, { hand: primaryHand, reason: 'simultaneous-primary', confidence: 0.9 });
         for (const ev of sorted) {
           if (ev === primary) continue;
-          if (!assigned.has(ev)) assigned.set(ev, otherHand);
+          // 3+ simultaneous: only the top 2 (by priority) get distinct hands;
+          // anything beyond that reuses the secondary hand (section 14)
+          // rather than inventing a third hand.
+          if (!assigned.has(ev)) assigned.set(ev, { hand: otherHand, reason: assigned.size === 1 ? 'simultaneous-secondary' : 'simultaneous-merged', confidence: assigned.size === 1 ? 0.9 : 0.5 });
         }
-        // 3+ simultaneous: only the top 2 (by priority) get distinct hands;
-        // anything beyond that reuses the secondary hand (section 14) rather
-        // than inventing a third hand.
         currentHand = primaryHand;
       }
 
       for (const ev of sorted) {
-        handTimeline.push({ time: ev.time, midiNote: ev.midiNote, hand: assigned.get(ev), velocity: ev.velocity, duration: ev.duration });
+        const { hand, reason, confidence } = assigned.get(ev);
+        handTimeline.push({ time: ev.time, midiNote: ev.midiNote, hand, velocity: ev.velocity, duration: ev.duration, reason, confidence });
       }
       prevGroupNotes = new Set(group.map((e) => e.midiNote));
+      prevGroupTime = group[0].time;
     }
 
     const footTimeline = footEvents.map((ev) => ({
-      time: ev.time, midiNote: ev.midiNote, hand: 'FOOT', velocity: ev.velocity, duration: ev.duration,
+      time: ev.time, midiNote: ev.midiNote, hand: 'FOOT', velocity: ev.velocity, duration: ev.duration, reason: 'foot', confidence: 1.0,
     }));
 
     return [...handTimeline, ...footTimeline].sort((a, b) => a.time - b.time);
@@ -655,7 +686,8 @@
       const handClass = e.hand === 'R' ? 'h-r' : e.hand === 'L' ? 'h-l' : 'h-foot';
       const assets = noteAssets.get(e.midiNote);
       const missing = e.hand === 'FOOT' ? !(assets && assets.FOOT) : !(assets && assets[e.hand]);
-      return `<div class="log-row" data-idx="${i}"><span class="t">${e.time.toFixed(3)}s</span><span class="n">${noteLabel(e.midiNote)}</span><span class="${handClass}">${e.hand}</span>${missing ? '<span class="missing-tag">no asset</span>' : ''}</div>`;
+      const debugTag = `<span class="reason-tag" title="confidence ${(e.confidence ?? 0).toFixed(2)}">${e.reason || ''} · ${((e.confidence ?? 0) * 100).toFixed(0)}%</span>`;
+      return `<div class="log-row" data-idx="${i}"><span class="t">${e.time.toFixed(3)}s</span><span class="n">${noteLabel(e.midiNote)}</span><span class="${handClass}">${e.hand}</span>${debugTag}${missing ? '<span class="missing-tag">no asset</span>' : ''}</div>`;
     }).join('');
   }
   function highlightLogAt(index) {
