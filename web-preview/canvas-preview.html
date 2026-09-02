@@ -144,6 +144,22 @@
   // Foot-only drum notes (kick, pedal hi-hat) have no hand strike at all --
   // only a single bare-numbered asset exists (e.g. "35.png"), no L/R prefix.
   const FOOT_ONLY_NOTES = new Set([35, 36, 44]);
+  // Asset fallback map: when a drum set's R2 folder is missing a note's own
+  // asset, substitute the nearest-sounding note's asset instead. Extend this
+  // per drum set's actual gaps as they're confirmed (kept as one flat map
+  // for now since it's simple to extend one line at a time).
+  const FALLBACK_NOTE_MAP = { 35: 36 }; // drum1: no left-foot kick -> use right-foot kick
+
+  function resolveAssetForEvent(midiNote, hand) {
+    const direct = noteAssets.get(midiNote);
+    if (direct && direct[hand]) return { img: direct[hand], viaFallback: false };
+    const fallbackNote = FALLBACK_NOTE_MAP[midiNote];
+    if (fallbackNote != null) {
+      const fb = noteAssets.get(fallbackNote);
+      if (fb && fb[hand]) return { img: fb[hand], viaFallback: true };
+    }
+    return { img: null, viaFallback: false };
+  }
 
   const GM_DRUM_NAMES = {
     35: 'Kick (Ac.)', 36: 'Kick', 37: 'Side Stick', 38: 'Snare', 39: 'Hand Clap',
@@ -622,18 +638,20 @@
     const notesInMidi = [...new Set(parsedMidi.notes.map((n) => n.midiNote))].sort((a, b) => a - b);
     els.assetChips.innerHTML = notesInMidi
       .map((n) => {
-        const assets = noteAssets.get(n);
-        const hasR = !!(assets && assets.R);
-        const hasL = !!(assets && assets.L);
-        const hasFoot = !!(assets && assets.FOOT);
         const footOnly = FOOT_ONLY_NOTES.has(n);
+        const footResolved = footOnly && resolveAssetForEvent(n, 'FOOT');
+        const rResolved = !footOnly && resolveAssetForEvent(n, 'R');
+        const lResolved = !footOnly && resolveAssetForEvent(n, 'L');
         let cls, label;
         if (footOnly) {
-          cls = hasFoot ? 'have' : 'missing';
-          label = hasFoot ? '✓ foot' : '✗ no asset';
-        } else if (hasR && hasL) { cls = 'have'; label = '✓ R+L'; }
-        else if (hasR || hasL) { cls = 'partial'; label = hasR ? '⚠ R only (no L)' : '⚠ L only (no R)'; }
-        else { cls = 'missing'; label = '✗ no asset'; }
+          cls = footResolved.img ? 'have' : 'missing';
+          label = footResolved.img ? (footResolved.viaFallback ? '✓ foot (fallback)' : '✓ foot') : '✗ no asset';
+        } else if (rResolved.img && lResolved.img) {
+          cls = 'have';
+          label = (rResolved.viaFallback || lResolved.viaFallback) ? '✓ R+L (fallback)' : '✓ R+L';
+        } else if (rResolved.img || lResolved.img) {
+          cls = 'partial'; label = rResolved.img ? '⚠ R only (no L)' : '⚠ L only (no R)';
+        } else { cls = 'missing'; label = '✗ no asset'; }
         return `<span class="chip ${cls}">${noteLabel(n)} (#${n}) ${label}</span>`;
       })
       .join('');
@@ -684,10 +702,11 @@
   function renderEventLog() {
     els.eventLog.innerHTML = timeline.map((e, i) => {
       const handClass = e.hand === 'R' ? 'h-r' : e.hand === 'L' ? 'h-l' : 'h-foot';
-      const assets = noteAssets.get(e.midiNote);
-      const missing = e.hand === 'FOOT' ? !(assets && assets.FOOT) : !(assets && assets[e.hand]);
+      const resolved = resolveAssetForEvent(e.midiNote, e.hand);
+      const missing = !resolved.img;
+      const fallbackTag = resolved.viaFallback ? '<span class="reason-tag">(fallback)</span>' : '';
       const debugTag = `<span class="reason-tag" title="confidence ${(e.confidence ?? 0).toFixed(2)}">${e.reason || ''} · ${((e.confidence ?? 0) * 100).toFixed(0)}%</span>`;
-      return `<div class="log-row" data-idx="${i}"><span class="t">${e.time.toFixed(3)}s</span><span class="n">${noteLabel(e.midiNote)}</span><span class="${handClass}">${e.hand}</span>${debugTag}${missing ? '<span class="missing-tag">no asset</span>' : ''}</div>`;
+      return `<div class="log-row" data-idx="${i}"><span class="t">${e.time.toFixed(3)}s</span><span class="n">${noteLabel(e.midiNote)}</span><span class="${handClass}">${e.hand}</span>${fallbackTag}${debugTag}${missing ? '<span class="missing-tag">no asset</span>' : ''}</div>`;
     }).join('');
   }
   function highlightLogAt(index) {
@@ -773,8 +792,7 @@
       ctx.drawImage(backgroundImg, 0, 0, w, h);
     }
     for (const hit of activeHits) {
-      const assetSet = noteAssets.get(hit.midiNote);
-      const img = assetSet ? assetSet[hit.hand] : null;
+      const { img } = resolveAssetForEvent(hit.midiNote, hit.hand);
       if (img && img.complete && img.naturalWidth) {
         ctx.drawImage(img, 0, 0, w, h);
       }
@@ -897,8 +915,7 @@
       renderCtx.drawImage(backgroundImg, 0, 0, w, h);
     }
     for (const hit of computeActiveHitsAt(t)) {
-      const assetSet = noteAssets.get(hit.midiNote);
-      const img = assetSet ? assetSet[hit.hand] : null;
+      const { img } = resolveAssetForEvent(hit.midiNote, hit.hand);
       if (img && img.complete && img.naturalWidth) {
         renderCtx.drawImage(img, 0, 0, w, h);
       }
