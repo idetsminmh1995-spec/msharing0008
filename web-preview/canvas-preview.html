@@ -148,7 +148,14 @@
   // asset, substitute the nearest-sounding note's asset instead. Extend this
   // per drum set's actual gaps as they're confirmed (kept as one flat map
   // for now since it's simple to extend one line at a time).
-  const FALLBACK_NOTE_MAP = { 35: 36 }; // drum1: no left-foot kick -> use right-foot kick
+  const FALLBACK_NOTE_MAP = {
+    35: 36, // drum1 & drum2: no left-foot kick -> use right-foot kick
+    43: 45, // drum2: no low tom -> nearest available tom
+    50: 48, // drum2: no high tom -> nearest available tom
+    52: 49, // drum2: no china -> nearest available crash-family cymbal
+    55: 49, // drum2: no splash -> nearest available crash-family cymbal
+    57: 49, // drum2: no crash2 -> the other available crash
+  };
 
   function resolveAssetForEvent(midiNote, hand) {
     const direct = noteAssets.get(midiNote);
