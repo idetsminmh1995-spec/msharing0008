@@ -97,6 +97,13 @@
       </div>
     </div>
     <div id="audioStatus" class="status hidden" style="margin-top:8px;"></div>
+    <div class="row" style="margin-top:8px;">
+      <div class="field">
+        <label>Notation (MusicXML/.mxl/.xml — optional, shown in the background's empty space)</label>
+        <input type="file" id="notationFile" accept=".musicxml,.mxl,.xml" />
+      </div>
+    </div>
+    <div id="notationStatus" class="status hidden" style="margin-top:8px;"></div>
     <div class="meta-row" id="metaRow">
       <span>BPM: <b id="bpmVal">–</b></span>
       <span>Time sig: <b id="tsVal">–</b></span>
@@ -109,6 +116,10 @@
     <div class="canvas-wrap">
       <canvas id="canvas" width="1280" height="720"></canvas>
     </div>
+    <!-- alphaTab renders here off-screen (html5/canvas engine) -- we grab its
+         internal canvas and composite it into the black area of our own
+         canvas above, rather than showing this container directly. -->
+    <div id="notationContainer" style="position:absolute; left:-99999px; top:-99999px; width:900px;"></div>
     <div class="row" style="margin-top:12px;">
       <button id="playBtn" disabled>▶ Play</button>
       <button id="pauseBtn" disabled>⏸ Pause</button>
@@ -527,6 +538,135 @@
     }
   });
 
+  // ===================================================================
+  // Notation Engine (alphaTab) -- optional MusicXML/.mxl display in the
+  // background image's empty top space. Loaded from the user's own
+  // GitHub-hosted build (notation-engine/alphatab/), not the public CDN,
+  // since custom modifications are expected there over time.
+  // ===================================================================
+  const ALPHATAB_BASE = 'https://cdn.jsdelivr.net/gh/idetsminmh1995-spec/msharing0008@main/notation-engine/alphatab/dist';
+  // Fraction of the canvas this notation occupies -- matches the empty
+  // black space above the drum kit photo (tuned earlier for the timing badge).
+  const NOTATION_AREA_FRAC = { x: 0.03, y: 0.02, w: 0.94, h: 0.36 };
+
+  let alphaTabApi = null;
+  let notationLoaded = false;
+  let notationSourceCanvas = null; // the <canvas> alphaTab itself renders into
+
+  function loadScriptTag(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('Failed to load ' + src));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function ensureAlphaTabApi() {
+    if (alphaTabApi) return alphaTabApi;
+    if (typeof window.alphaTab === 'undefined') {
+      await loadScriptTag(`${ALPHATAB_BASE}/alphaTab.min.js`);
+    }
+    const container = document.getElementById('notationContainer');
+    alphaTabApi = new window.alphaTab.AlphaTabApi(container, {
+      core: {
+        engine: 'html5', // renders to an internal <canvas> we can drawImage() from
+        fontDirectory: `${ALPHATAB_BASE}/font/`,
+        useWorkers: false,
+      },
+      display: {
+        layoutMode: 'page', // system-by-system; can switch to 'horizontal' later
+        staveProfile: 'default',
+      },
+      player: {
+        enablePlayer: true, // needed for tickPosition/timePosition to work at all
+        enableCursor: true,
+        soundFont: null, // we never actually play audio through alphaTab
+      },
+    });
+    return alphaTabApi;
+  }
+
+  async function loadNotationFile(arrayBuffer) {
+    const api = await ensureAlphaTabApi();
+    await new Promise((resolve, reject) => {
+      const onLoaded = () => { api.scoreLoaded.off(onLoaded); api.error.off(onError); resolve(); };
+      const onError = (err) => { api.scoreLoaded.off(onLoaded); api.error.off(onError); reject(err); };
+      api.scoreLoaded.on(onLoaded);
+      api.error.on(onError);
+      api.load(arrayBuffer);
+    });
+    // Wait for the first render to complete so we have a canvas to read from.
+    await new Promise((resolve) => {
+      const onRendered = () => { api.renderFinished.off(onRendered); resolve(); };
+      api.renderFinished.on(onRendered);
+    });
+    notationSourceCanvas = document.querySelector('#notationContainer canvas');
+    notationLoaded = !!notationSourceCanvas;
+  }
+
+  // Moves alphaTab's playback cursor to time t (seconds) and waits for the
+  // resulting re-render, so the caller can safely read the canvas right
+  // after. Used by both live preview (best-effort) and the frame-exact
+  // final video export (fully awaited).
+  function setNotationTime(t, { waitForRender } = { waitForRender: false }) {
+    if (!alphaTabApi || !notationLoaded) return Promise.resolve();
+    const ms = Math.max(0, t * 1000);
+    if (!waitForRender) {
+      alphaTabApi.timePosition = ms;
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      let done = false;
+      const onRendered = () => {
+        if (done) return;
+        done = true;
+        alphaTabApi.renderFinished.off(onRendered);
+        resolve();
+      };
+      alphaTabApi.renderFinished.on(onRendered);
+      alphaTabApi.timePosition = ms;
+      // Safety timeout: if the position didn't actually change (already
+      // there), renderFinished may not fire again -- don't hang forever.
+      setTimeout(() => { if (!done) { done = true; alphaTabApi.renderFinished.off(onRendered); resolve(); } }, 150);
+    });
+  }
+
+  function drawNotationInto(targetCtx, w, h) {
+    if (!notationLoaded || !notationSourceCanvas) return;
+    const areaX = w * NOTATION_AREA_FRAC.x, areaY = h * NOTATION_AREA_FRAC.y;
+    const areaW = w * NOTATION_AREA_FRAC.w, areaH = h * NOTATION_AREA_FRAC.h;
+    const srcW = notationSourceCanvas.width, srcH = notationSourceCanvas.height;
+    if (!srcW || !srcH) return;
+    // Fit the rendered notation into the area, preserving aspect ratio,
+    // anchored to the top so the first stave is always visible.
+    const scale = Math.min(areaW / srcW, areaH / srcH);
+    const drawW = srcW * scale, drawH = srcH * scale;
+    targetCtx.drawImage(notationSourceCanvas, areaX, areaY, drawW, drawH);
+  }
+
+  els.notationFile = document.getElementById('notationFile');
+  els.notationStatus = document.getElementById('notationStatus');
+  els.notationFile.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    els.notationStatus.className = 'status loading';
+    els.notationStatus.textContent = 'Loading notation engine…';
+    els.notationStatus.classList.remove('hidden');
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      await loadNotationFile(arrayBuffer);
+      els.notationStatus.className = 'status ok';
+      els.notationStatus.textContent = `Loaded "${file.name}". Will scroll/highlight in sync with playback.`;
+      if (parsedMidi) drawFrame();
+    } catch (err) {
+      notationLoaded = false;
+      els.notationStatus.className = 'status err';
+      els.notationStatus.textContent = 'Could not load this notation file: ' + (err.message || err);
+    }
+  });
+
   function setStatus(kind, message) {
     els.connectionStatus.className = 'status ' + kind;
     els.connectionStatus.textContent = message;
@@ -808,6 +948,10 @@
       }
     }
     if (parsedMidi) drawTimingOverlay(ctx, w, h, currentTime);
+    if (notationLoaded) {
+      setNotationTime(currentTime, { waitForRender: false }); // best-effort for live preview
+      drawNotationInto(ctx, w, h);
+    }
   }
 
   function triggerEventsUpTo(t) {
@@ -919,7 +1063,7 @@
     return active;
   }
 
-  function renderFrameAt(renderCtx, w, h, t) {
+  async function renderFrameAt(renderCtx, w, h, t) {
     renderCtx.fillStyle = '#000'; renderCtx.fillRect(0, 0, w, h);
     if (backgroundImg && backgroundImg.complete && backgroundImg.naturalWidth) {
       renderCtx.drawImage(backgroundImg, 0, 0, w, h);
@@ -931,6 +1075,10 @@
       }
     }
     drawTimingOverlay(renderCtx, w, h, Math.min(t, parsedMidi.durationSeconds));
+    if (notationLoaded) {
+      await setNotationTime(Math.min(t, parsedMidi.durationSeconds), { waitForRender: true });
+      drawNotationInto(renderCtx, w, h);
+    }
   }
 
   els.generateBtn.addEventListener('click', async () => {
@@ -1029,7 +1177,7 @@
 
       for (let i = 0; i < totalFrames; i++) {
         const t = i / RENDER_FPS;
-        renderFrameAt(renderCtx, w, h, t);
+        await renderFrameAt(renderCtx, w, h, t);
 
         const frame = new VideoFrame(renderCanvas, { timestamp: Math.round((i / RENDER_FPS) * 1e6) });
         videoEncoder.encode(frame, { keyFrame: i % (RENDER_FPS * 2) === 0 });
