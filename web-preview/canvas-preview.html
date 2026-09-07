@@ -568,41 +568,62 @@
     if (typeof window.alphaTab === 'undefined') {
       await loadScriptTag(`${ALPHATAB_BASE}/alphaTab.min.js`);
     }
+    if (typeof window.alphaTab === 'undefined' || !window.alphaTab.AlphaTabApi) {
+      throw new Error('alphaTab library loaded but window.alphaTab.AlphaTabApi is missing -- check the browser console for a script error.');
+    }
     const container = document.getElementById('notationContainer');
-    alphaTabApi = new window.alphaTab.AlphaTabApi(container, {
-      core: {
-        engine: 'html5', // renders to an internal <canvas> we can drawImage() from
-        fontDirectory: `${ALPHATAB_BASE}/font/`,
-        useWorkers: false,
-      },
-      display: {
-        layoutMode: 'page', // system-by-system; can switch to 'horizontal' later
-        staveProfile: 'default',
-      },
-      player: {
-        enablePlayer: true, // needed for tickPosition/timePosition to work at all
-        enableCursor: true,
-        soundFont: null, // we never actually play audio through alphaTab
-      },
-    });
+    try {
+      alphaTabApi = new window.alphaTab.AlphaTabApi(container, {
+        core: {
+          engine: 'html5', // renders to an internal <canvas> we can drawImage() from
+          fontDirectory: `${ALPHATAB_BASE}/font/`,
+          useWorkers: false,
+        },
+        display: {
+          layoutMode: 'horizontal', // continuous scrolling row, matches the fixed-width notation area
+          staveProfile: 'default',
+        },
+        player: {
+          enablePlayer: true, // needed for tickPosition/timePosition to work at all
+          enableCursor: true,
+        },
+      });
+    } catch (err) {
+      console.error('alphaTab: AlphaTabApi construction failed:', err);
+      throw new Error('Failed to construct AlphaTabApi: ' + (err && err.message ? err.message : err));
+    }
+    alphaTabApi.error.on((err) => console.error('alphaTab: internal error event:', err));
+    if (alphaTabApi.soundFontLoadFailed) {
+      alphaTabApi.soundFontLoadFailed.on((err) => console.warn('alphaTab: soundfont load failed (expected, we do not supply one; should not block rendering):', err));
+    }
     return alphaTabApi;
   }
 
   async function loadNotationFile(arrayBuffer) {
     const api = await ensureAlphaTabApi();
+    console.log('alphaTab: API ready, loading score…');
     await new Promise((resolve, reject) => {
-      const onLoaded = () => { api.scoreLoaded.off(onLoaded); api.error.off(onError); resolve(); };
-      const onError = (err) => { api.scoreLoaded.off(onLoaded); api.error.off(onError); reject(err); };
+      const onLoaded = (score) => { api.scoreLoaded.off(onLoaded); api.error.off(onError); console.log('alphaTab: scoreLoaded', score); resolve(); };
+      const onError = (err) => { api.scoreLoaded.off(onLoaded); api.error.off(onError); console.error('alphaTab: error while loading score:', err); reject(err instanceof Error ? err : new Error(String(err && err.message ? err.message : err))); };
       api.scoreLoaded.on(onLoaded);
       api.error.on(onError);
-      api.load(arrayBuffer);
+      try {
+        api.load(arrayBuffer);
+      } catch (err) {
+        console.error('alphaTab: api.load() threw synchronously:', err);
+        onError(err);
+      }
     });
     // Wait for the first render to complete so we have a canvas to read from.
+    console.log('alphaTab: score loaded, waiting for first render…');
     await new Promise((resolve) => {
-      const onRendered = () => { api.renderFinished.off(onRendered); resolve(); };
+      const onRendered = () => { api.renderFinished.off(onRendered); console.log('alphaTab: renderFinished'); resolve(); };
       api.renderFinished.on(onRendered);
+      // Safety timeout in case renderFinished never fires for some reason.
+      setTimeout(() => { api.renderFinished.off(onRendered); console.warn('alphaTab: renderFinished timeout -- proceeding anyway'); resolve(); }, 3000);
     });
     notationSourceCanvas = document.querySelector('#notationContainer canvas');
+    console.log('alphaTab: notationSourceCanvas =', notationSourceCanvas, notationSourceCanvas ? `${notationSourceCanvas.width}x${notationSourceCanvas.height}` : '');
     notationLoaded = !!notationSourceCanvas;
   }
 
