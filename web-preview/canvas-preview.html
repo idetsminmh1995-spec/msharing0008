@@ -669,7 +669,9 @@
   const CACHE_BUST = `v=${Date.now()}`;
   function bust(url) { return url + (url.includes('?') ? '&' : '?') + CACHE_BUST; }
 
-  const ALPHATAB_BASE = 'https://cdn.jsdelivr.net/gh/idetsminmh1995-spec/msharing0008@main/notation-engine/alphatab/dist';
+  // Self-hosted via our own Worker + R2 (no external CDN dependency at all --
+  // avoids jsdelivr/GitHub caching or availability issues entirely).
+  const ALPHATAB_BASE = `${WORKER_BASE}/assets/shared/NotationEngine`;
   // Fraction of the canvas this notation occupies -- matches the empty
   // black space above the drum kit photo (tuned earlier for the timing badge).
   const NOTATION_AREA_FRAC = { x: 0.03, y: 0.15, w: 0.94, h: 0.20 };
@@ -691,7 +693,7 @@
   async function ensureAlphaTabApi() {
     if (alphaTabApi) return alphaTabApi;
     if (typeof window.alphaTab === 'undefined') {
-      await loadScriptTag(`${ALPHATAB_BASE}/alphaTab.min.js`);
+      await loadScriptTag(bust(`${ALPHATAB_BASE}/alphaTab.min.js`));
     }
     if (typeof window.alphaTab === 'undefined' || !window.alphaTab.AlphaTabApi) {
       throw new Error('alphaTab library loaded but window.alphaTab.AlphaTabApi is missing -- check the browser console for a script error.');
