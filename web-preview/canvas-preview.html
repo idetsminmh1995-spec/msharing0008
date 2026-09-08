@@ -1159,7 +1159,7 @@
       const fontPx1 = Math.round(headerH * (title1.fontSize / 110));
       targetCtx.font = `600 ${fontPx1}px sans-serif`;
       targetCtx.fillStyle = title1.color;
-      targetCtx.fillText(title1.text, pad, headerH * 0.35);
+      targetCtx.fillText(title1.text, pad + w * 0.08, headerH * 0.35); // leave room for the logo baked into the background image
       targetCtx.restore();
     }
     if (title2.text) {
