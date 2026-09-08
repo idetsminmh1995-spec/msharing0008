@@ -1,47 +1,54 @@
 # Notation Engine (alphaTab)
 
-Pre-built browser bundle of [alphaTab](https://github.com/coderline/alphaTab) —
-used to render music notation (from MusicXML/MEI) inside the Drum MIDI →
-Video app. This is built from the user's own copy of the alphaTab source
-(develop branch), not the public npm/CDN release, so custom modifications
-can be made here and rebuilt.
+Full source + pre-built browser bundle of [alphaTab](https://github.com/CoderLine/alphaTab)
+(pulled directly from the official GitHub repo, `main` branch) — used to
+render music notation (from MusicXML/MEI) inside the Drum MIDI → Video app.
 
-## What's in here
+This is the COMPLETE alphaTab JS/TS package source (not just a dist build),
+so custom modifications can be made directly here and rebuilt, per request.
+Removed: `node_modules/` (reinstall via npm) and `test-data/` (large audio
+fixtures used only by alphaTab's own internal test suite — irrelevant here
+and ~53MB, not worth keeping).
+
+## Layout
 
 ```
-alphatab/dist/
-  alphaTab.min.js    -- UMD browser bundle (load this via <script>)
-  alphaTab.min.mjs   -- ESM bundle (alternative import style)
-  alphaTab.d.ts       -- TypeScript type definitions (reference only)
-  font/               -- Bravura music notation font (required for rendering)
+notation-engine/
+  alphatab/            -- the actual JS/TS package (github.com/CoderLine/alphaTab, packages/alphatab)
+    src/                -- TypeScript source -- edit this for custom changes
+    dist/               -- pre-built browser bundle (what the app actually loads)
+      alphaTab.min.js    -- UMD bundle, loaded via <script>
+      alphaTab.min.mjs   -- ESM bundle
+      font/               -- Bravura music notation font (required for rendering)
+      soundfont/          -- alphaTab's own soundfont (NOT used by this app --
+                             we use our own audio pipeline instead)
+    test/               -- alphaTab's own unit tests (kept for reference; not run here)
+    package.json, tsconfig.json, vite.config.ts, etc. -- build config
+  transpiler/           -- sibling build-tool package alphaTab's build depends on
 ```
 
-The built-in soundfont was intentionally left out — this app uses its own
-audio pipeline (user-uploaded audio, with GM soundfont synthesis as a
-fallback), not alphaTab's playback engine.
+The app loads `notation-engine/alphatab/dist/alphaTab.min.js` directly from
+this repo via jsdelivr's GitHub file serving
+(`cdn.jsdelivr.net/gh/idetsminmh1995-spec/msharing0008@main/notation-engine/alphatab/dist/...`),
+so rebuilding and pushing a new `dist/` here is all that's needed to update
+what the live app uses -- no other changes required.
 
-## How this was built
+## Rebuilding after making changes
 
-From the full alphaTab monorepo source (`alphaTab-develop.zip`):
+From a full clone of this project (needs `notation-engine/alphatab` +
+`notation-engine/transpiler` + a root `package.json` declaring both as npm
+workspaces -- or just re-clone the official repo fresh, apply your changes,
+and rebuild there):
 
 ```bash
-cd alphaTab-develop
-npm install                                  # installs the whole monorepo
-npm run build --workspace=packages/alphatab  # builds packages/alphatab/dist/
+npm install                                   # installs the whole workspace
+npm run build --workspace=packages/alphatab   # builds packages/alphatab/dist/
 ```
 
-Note: the build's version-stamping script shells out to `git rev-parse
-HEAD`, so the source tree needs to be a git repo (even an empty one) for
-the build to succeed — run `git init && git add -A && git commit -m "x" --allow-empty`
-first if building from a plain zip extraction rather than a git clone.
+Note: the build's version-stamping step shells out to `git rev-parse HEAD`,
+so the source tree needs to be a real git repo (even an empty one) for the
+build to succeed -- if working from a plain folder (not a git clone), run
+`git init && git add -A && git commit -m "x" --allow-empty` first.
 
-## Making custom changes
-
-1. Edit the TypeScript source under `packages/alphatab/src/` in the full
-   alphaTab source tree.
-2. Re-run the build command above.
-3. Copy the new `dist/alphaTab.min.js` (+ `.min.mjs`, `font/` if changed)
-   into this folder, replacing the old ones.
-4. Commit and push — the app loads this file directly from this repo via
-   jsdelivr's GitHub file serving, so no other changes are needed for the
-   new build to go live.
+After building, copy the new `dist/` here (replacing the old one), commit,
+and push.

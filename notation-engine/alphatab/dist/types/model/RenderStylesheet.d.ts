@@ -1,0 +1,222 @@
+import type { NumberedStaffConfig, ScoreStaffConfig, SlashStaffConfig, TabStaffConfig } from "./StaffConfigs";
+/**
+ * Lists the different modes on how the brackets/braces are drawn and extended.
+ * @public
+ */
+export declare enum BracketExtendMode {
+    /**
+     * Do not draw brackets
+     */
+    NoBrackets = 0,
+    /**
+     * Groups staves into bracket (or braces for grand staff).
+     */
+    GroupStaves = 1,
+    /**
+     * Groups similar instruments in multi-track rendering into brackets.
+     * The braces of tracks with grand-staffs break any brackets.
+     * Similar instruments means actually the same "midi program". No custom grouping is currently done.
+     */
+    GroupSimilarInstruments = 2
+}
+/**
+ * Lists the different policies on how to display the track names.
+ * @public
+ */
+export declare enum TrackNamePolicy {
+    /**
+     * Track names are hidden everywhere.
+     */
+    Hidden = 0,
+    /**
+     * Track names are displayed on the first system.
+     */
+    FirstSystem = 1,
+    /**
+     * Track names are displayed on all systems.
+     */
+    AllSystems = 2
+}
+/**
+ * Lists the different modes what text to display for track names.
+ * @public
+ */
+export declare enum TrackNameMode {
+    /**
+     * Full track names are displayed {@link Track.name}
+     */
+    FullName = 0,
+    /**
+     * Short Track names (abbreviations) are displayed {@link Track.shortName}
+     */
+    ShortName = 1
+}
+/**
+ * Lists the different orientations modes how to render the track names.
+ * @public
+ */
+export declare enum TrackNameOrientation {
+    /**
+     * Text is shown horizontally (left-to-right)
+     */
+    Horizontal = 0,
+    /**
+     * Vertically rotated (bottom-to-top)
+     */
+    Vertical = 1
+}
+/**
+ * Lists the different places where string tuning information is displayed.
+ * @public
+ */
+export declare enum TuningDisplayMode {
+    /**
+     * Tuning information is displayed above the score.
+     */
+    Score = 0,
+    /**
+     * Tuning note names are displayed beside the corresponding tab staff lines.
+     */
+    Staff = 1
+}
+/**
+ * How bar numbers are displayed
+ * @public
+ */
+export declare enum BarNumberDisplay {
+    /**
+     * Show bar numbers on all bars.
+     */
+    AllBars = 0,
+    /**
+     * Show bar numbers on the first bar of every system.
+     */
+    FirstOfSystem = 1,
+    /**
+     * Hide all bar numbers
+     */
+    Hide = 2
+}
+/**
+ * This class represents the rendering stylesheet.
+ * It contains settings which control the display of the score when rendered.
+ * @json
+ * @json_strict
+ * @public
+ */
+export declare class RenderStylesheet {
+    /**
+     * Whether dynamics are hidden.
+     */
+    hideDynamics: boolean;
+    /**
+     * The mode in which brackets and braces are drawn.
+     */
+    bracketExtendMode: BracketExtendMode;
+    /**
+     * Whether to draw the // sign to separate systems.
+     */
+    useSystemSignSeparator: boolean;
+    /**
+     * Whether to show the tuning.
+     */
+    globalDisplayTuning: boolean;
+    /**
+     * The place where tuning information is displayed.
+     */
+    tuningDisplayMode: TuningDisplayMode;
+    /**
+     * Whether to show the tuning.(per-track)
+     */
+    perTrackDisplayTuning: Map<number, boolean> | null;
+    /**
+     * Whether to show the chord diagrams on top.
+     */
+    globalDisplayChordDiagramsOnTop: boolean;
+    /**
+     * Whether to show the chord diagrams on top. (per-track)
+     */
+    perTrackChordDiagramsOnTop: Map<number, boolean> | null;
+    /**
+     * Whether to show the chord diagrams in score.
+     */
+    globalDisplayChordDiagramsInScore: boolean;
+    /**
+     * The policy where to show track names when a single track is rendered.
+     */
+    singleTrackTrackNamePolicy: TrackNamePolicy;
+    /**
+     * The policy where to show track names when a multiple tracks are rendered.
+     */
+    multiTrackTrackNamePolicy: TrackNamePolicy;
+    /**
+     * The mode what text to display for the track name on the first system
+     */
+    firstSystemTrackNameMode: TrackNameMode;
+    /**
+     * The mode what text to display for the track name on the first system
+     */
+    otherSystemsTrackNameMode: TrackNameMode;
+    /**
+     * The orientation of the the track names on the first system
+     */
+    firstSystemTrackNameOrientation: TrackNameOrientation;
+    /**
+     * The orientation of the the track names on other systems
+     */
+    otherSystemsTrackNameOrientation: TrackNameOrientation;
+    /**
+     * If multi track: Whether to render multiple subsequent empty (or rest-only) bars together as multi-bar rest.
+     */
+    multiTrackMultiBarRest: boolean;
+    /**
+     * If single track: Whether to render multiple subsequent empty (or rest-only) bars together as multi-bar rest.
+     */
+    perTrackMultiBarRest: Set<number> | null;
+    /**
+     * Whether barlines should be drawn across staves within the same system.
+     */
+    extendBarLines: boolean;
+    /**
+     * Whether to hide empty staves.
+     */
+    hideEmptyStaves: boolean;
+    /**
+     * Whether to also hide empty staves in the first system.
+     * @remarks
+     * Only has an effect when activating {@link hideEmptyStaves}.
+     */
+    hideEmptyStavesInFirstSystem: boolean;
+    /**
+     * Whether to show brackets and braces across single staves.
+     * @remarks
+     * This allows a more consistent view for identifying staves when using
+     * {@link hideEmptyStaves}
+     */
+    showSingleStaffBrackets: boolean;
+    /**
+     * How bar numbers should be displayed score-wide.
+     * @deprecated Use {@link scoreConfig}, {@link tabConfig},
+     * {@link slashConfig}, or {@link numberedConfig} `.barNumber` for
+     * per-staff-type control. The setter broadcasts to all four
+     * staff-type entries.
+     */
+    get barNumberDisplay(): BarNumberDisplay;
+    set barNumberDisplay(value: BarNumberDisplay);
+    /**
+     * Score-wide display configuration for the standard-notation staff.
+     */
+    scoreConfig: ScoreStaffConfig;
+    /**
+     * Score-wide display configuration for the tablature staff.
+     */
+    tabConfig: TabStaffConfig;
+    /**
+     * Score-wide display configuration for the slash staff.
+     */
+    slashConfig: SlashStaffConfig;
+    /**
+     * Score-wide display configuration for the numbered (jianpu) staff.
+     */
+    numberedConfig: NumberedStaffConfig;
+}
