@@ -3,43 +3,78 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Drum MIDI Canvas Preview — Real Assets</title>
+<title>Drum MIDI → Video</title>
 <style>
   :root {
-    --bg: #0f1117; --panel: #171a23; --panel-2: #1f2330; --border: #2a2f3d;
-    --text: #e8e9ee; --text-dim: #8b90a3; --accent: #ff6b4a;
+    --bg: #0b1220; --panel: #121a2e; --panel-2: #1a2540; --border: #2a3654;
+    --text: #e8ecf5; --text-dim: #8a94ad; --accent: #f0b90b; --accent-dim: #8a6c0a;
     --hand-r: #4ac8ff; --hand-l: #ff4a9e; --ok: #4aff9e; --err: #ff4a5e;
   }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 20px; }
-  .app { max-width: 900px; margin: 0 auto; }
-  h1 { font-size: 18px; margin: 0 0 4px; }
-  .subtitle { color: var(--text-dim); font-size: 13px; margin-bottom: 20px; }
-  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .app-grid { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: 420px 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .app-grid { grid-template-columns: 1fr; } }
+
+  .section { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .section h3 { margin: 0 0 12px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .section h3 .num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #1a1400; font-size: 12px; font-weight: 700; }
+
+  .upload-row { display: flex; gap: 10px; }
+  .upload-card { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; color: var(--text); font-size: 12px; transition: border-color 0.15s; }
+  .upload-card:hover { border-color: var(--accent); }
+  .upload-card.loaded { border-color: var(--ok); }
+  .upload-card .icon { font-size: 22px; }
+  .upload-card .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+  .upload-card.loaded .status-dot { background: var(--ok); }
+
   .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-  button, input, select { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 13px; }
-  button { cursor: pointer; }
-  button:hover:not(:disabled), select:hover { border-color: var(--accent); }
-  button:disabled { opacity: 0.4; cursor: not-allowed; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #1a0e0a; font-weight: 600; }
-  input[type="text"] { flex: 1; min-width: 220px; font-family: ui-monospace, monospace; font-size: 12px; }
-  input[type="range"] { flex: 1; min-width: 160px; accent-color: var(--accent); }
-  label { font-size: 12px; color: var(--text-dim); }
-  .field { display: flex; flex-direction: column; gap: 4px; }
-  .meta-row { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; font-size: 12px; color: var(--text-dim); }
-  .meta-row b { color: var(--text); }
-  .canvas-wrap { display: flex; justify-content: center; background: #000; border-radius: 10px; overflow: hidden; }
-  canvas { max-width: 100%; height: auto; display: block; }
+  .field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+  label { font-size: 11px; color: var(--text-dim); }
+  input[type="text"], select {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; font-size: 13px; width: 100%;
+  }
+  input[type="color"] { width: 40px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2); }
+  .radio-group { display: flex; gap: 14px; }
+  .radio-group label { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 13px; cursor: pointer; }
+  .radio-group input { accent-color: var(--accent); }
+  .hint { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+
+  button.primary-btn {
+    width: 100%; background: var(--accent); border: none; color: #1a1400; font-weight: 700;
+    font-size: 15px; padding: 14px; border-radius: 10px; cursor: pointer; margin-top: 4px;
+  }
+  button.primary-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.primary-btn:hover:not(:disabled) { background: #ffcf3f; }
+  button.secondary-btn { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  button.secondary-btn:hover:not(:disabled) { border-color: var(--accent); }
+  button.secondary-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
   .status { font-size: 12px; padding: 8px 12px; border-radius: 8px; margin-top: 10px; }
   .status.ok { background: rgba(74,255,158,0.1); border: 1px solid var(--ok); color: var(--ok); }
   .status.err { background: rgba(255,74,94,0.12); border: 1px solid var(--err); color: var(--err); }
   .status.loading { background: rgba(139,144,163,0.12); border: 1px solid var(--border); color: var(--text-dim); }
+  .hidden { display: none !important; }
+
+  .preview-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .preview-panel h3 { margin: 0 0 12px; font-size: 14px; }
+  .canvas-wrap { display: flex; justify-content: center; background: #000; border-radius: 10px; overflow: hidden; }
+  canvas { max-width: 100%; height: auto; display: block; }
+  .player-bar { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .player-bar button.icon-btn { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-size: 14px; }
+  .player-bar button.icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .player-bar input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .player-bar .time { font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .meta-row { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: 11px; color: var(--text-dim); }
+  .meta-row b { color: var(--text); }
   .asset-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .chip { font-size: 11px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim); }
   .chip.have { border-color: var(--ok); color: var(--ok); }
   .chip.partial { border-color: #ffb84a; color: #ffb84a; }
   .chip.missing { border-color: var(--err); color: var(--err); opacity: 0.7; }
-  .log-box { max-height: 180px; overflow-y: auto; font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 12px; line-height: 1.7; }
+
+  .log-box { max-height: 200px; overflow-y: auto; font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 11px; line-height: 1.7; margin-top: 14px; }
   .log-row { display: flex; gap: 10px; padding: 2px 6px; border-radius: 4px; color: var(--text-dim); }
   .log-row .t { width: 60px; }
   .log-row .n { width: 90px; }
@@ -49,106 +84,188 @@
   .log-row .reason-tag { color: var(--text-dim); font-size: 10px; opacity: 0.65; }
   .log-row .missing-tag { color: var(--err); font-size: 10px; }
   .log-row.current { background: var(--panel-2); color: var(--text); }
-  .hidden { display: none !important; }
-  code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+  .render-progress-wrap { margin-top: 10px; background: var(--panel-2); border-radius: 6px; overflow: hidden; height: 8px; }
+  .render-progress-bar { height: 100%; width: 0%; background: var(--accent); transition: width 0.1s linear; }
+  #downloadWrap a { color: var(--ok); font-weight: 600; text-decoration: none; }
 </style>
 </head>
 <body>
-<div class="app">
-  <h1>Drum MIDI → Canvas Preview (real assets)</h1>
-  <div class="subtitle">Pick a drum set and aspect ratio, then upload a MIDI file to preview and export your drum performance video.</div>
+<div class="app-grid">
 
-  <div class="panel">
-    <div class="row">
-      <div class="field">
-        <label>Drum set</label>
-        <select id="drumSetSelect" disabled><option>Loading…</option></select>
-      </div>
-      <div class="field">
-        <label>Aspect ratio</label>
-        <select id="aspectSelect" disabled>
-          <option value="16x9">16:9</option>
-          <option value="9x16">9:16</option>
-          <option value="1x1">1:1</option>
-        </select>
-      </div>
-    </div>
-    <div id="connectionStatus" class="status loading hidden"></div>
-    <div id="assetChips" class="asset-chips"></div>
-  </div>
+  <!-- LEFT COLUMN: controls -->
+  <div class="left-col">
 
-  <div class="panel">
-    <div class="row">
-      <input type="file" id="midiFile" accept=".mid,.midi" disabled />
-      <button id="loadDemoBtn" disabled>Load Demo Pattern</button>
-      <div class="field">
-        <label>Timing display</label>
-        <select id="subdivSelect">
-          <option value="quarter">1 2 3 4</option>
-          <option value="eighth">1 & 2 & 3 & 4 &</option>
-          <option value="sixteenth">1 e & a 2 e & a ...</option>
-        </select>
+    <div class="section">
+      <h3><span class="num">1</span> Upload File</h3>
+      <div class="upload-row">
+        <label class="upload-card" id="notationCard" for="notationFile">
+          <span class="icon">🎼</span><span>MusicXML</span><span class="status-dot"></span>
+        </label>
+        <label class="upload-card" id="midiCard" for="midiFile">
+          <span class="icon">🎵</span><span>MIDI</span><span class="status-dot"></span>
+        </label>
+        <label class="upload-card" id="audioCard" for="audioFile">
+          <span class="icon">🔊</span><span>Audio</span><span class="status-dot"></span>
+        </label>
       </div>
+      <input type="file" id="notationFile" accept=".musicxml,.mxl,.xml" class="hidden" />
+      <input type="file" id="midiFile" accept=".mid,.midi" class="hidden" disabled />
+      <input type="file" id="audioFile" accept=".mp3,.wav,.m4a,audio/*" class="hidden" />
+      <button id="loadDemoBtn" class="secondary-btn" style="margin-top:10px; width:100%;" disabled>Load Demo Pattern (no files needed)</button>
+      <div id="notationStatus" class="status hidden"></div>
+      <div id="audioStatus" class="status hidden"></div>
     </div>
-    <div class="row" style="margin-top:8px;">
-      <div class="field">
-        <label>Audio (MP3/WAV — must be time-aligned with the MIDI, starting at 0:00)</label>
-        <input type="file" id="audioFile" accept=".mp3,.wav,.m4a,audio/*" />
-      </div>
-    </div>
-    <div id="audioStatus" class="status hidden" style="margin-top:8px;"></div>
-    <div class="row" style="margin-top:8px;">
-      <div class="field">
-        <label>Notation (MusicXML/.mxl/.xml — optional, shown in the background's empty space)</label>
-        <input type="file" id="notationFile" accept=".musicxml,.mxl,.xml" />
-      </div>
-    </div>
-    <div id="notationStatus" class="status hidden" style="margin-top:8px;"></div>
-    <div class="meta-row" id="metaRow">
-      <span>BPM: <b id="bpmVal">–</b></span>
-      <span>Time sig: <b id="tsVal">–</b></span>
-      <span>Duration: <b id="durVal">–</b></span>
-      <span>Notes: <b id="noteCountVal">–</b></span>
-    </div>
-  </div>
 
-  <div class="panel">
-    <div class="canvas-wrap">
-      <canvas id="canvas" width="1280" height="720"></canvas>
+    <div class="section">
+      <h3><span class="num">2</span> Title 1</h3>
+      <div class="row">
+        <div class="field" style="flex:2;"><label>Text</label><input type="text" id="title1Text" placeholder="Your Title 1" /></div>
+        <div class="field"><label>Font Size</label><select id="title1FontSize"><option>48</option><option selected>72</option><option>96</option></select></div>
+        <div class="field" style="flex:0 0 auto;"><label>Color</label><input type="color" id="title1Color" value="#f0b90b" /></div>
+      </div>
     </div>
-    <!-- alphaTab renders here off-screen (html5/canvas engine) -- we grab its
-         internal canvas and composite it into the black area of our own
-         canvas above, rather than showing this container directly. -->
-    <div id="notationContainer" style="position:absolute; left:-99999px; top:-99999px; width:900px;"></div>
-    <div class="row" style="margin-top:12px;">
-      <button id="playBtn" disabled>▶ Play</button>
-      <button id="pauseBtn" disabled>⏸ Pause</button>
-      <input type="range" id="seekBar" min="0" max="1000" value="0" disabled />
-      <span id="timeVal" style="font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-dim);">0.00s / 0.00s</span>
-    </div>
-  </div>
 
-  <div class="panel">
-    <div class="row">
-      <button id="generateBtn" class="primary" disabled>⬇ Generate &amp; Download MP4</button>
-      <span id="renderStatus" style="font-size:12px; color: var(--text-dim);"></span>
+    <div class="section">
+      <h3><span class="num">3</span> Title 2</h3>
+      <div class="row">
+        <div class="field" style="flex:2;"><label>Text</label><input type="text" id="title2Text" placeholder="Your Title 2" /></div>
+        <div class="field"><label>Font Size</label><select id="title2FontSize"><option>36</option><option selected>48</option><option>72</option></select></div>
+        <div class="field" style="flex:0 0 auto;"><label>Color</label><input type="color" id="title2Color" value="#ffffff" /></div>
+      </div>
     </div>
-    <div id="renderProgressWrap" class="hidden" style="margin-top:10px; background: var(--panel-2); border-radius: 6px; overflow: hidden; height: 8px;">
-      <div id="renderProgressBar" style="height:100%; width:0%; background: var(--accent); transition: width 0.1s linear;"></div>
+
+    <div class="section">
+      <h3><span class="num">4</span> Drum Kit</h3>
+      <select id="drumSetSelect" disabled><option>Loading…</option></select>
+      <select id="aspectSelect" class="hidden">
+        <option value="16x9">16:9</option><option value="9x16">9:16</option><option value="1x1">1:1</option>
+      </select>
+      <div id="connectionStatus" class="status hidden" style="margin-top:8px;"></div>
+      <div id="assetChips" class="asset-chips"></div>
     </div>
+
+    <div class="section">
+      <h3><span class="num">5</span> Counts</h3>
+      <select id="countsSelect">
+        <option value="1" selected>1</option>
+        <option value="2">2</option>
+        <option value="4">4</option>
+        <option value="none">None</option>
+      </select>
+      <div class="hint">Count-in beats shown before playback starts.</div>
+    </div>
+
+    <div class="section">
+      <h3><span class="num">6</span> Video Color</h3>
+      <div class="radio-group">
+        <label><input type="radio" name="videoColor" value="black" checked /> Black</label>
+        <label><input type="radio" name="videoColor" value="white" /> White</label>
+      </div>
+      <div class="hint">(Black → sheet music in white / White → sheet music in black)</div>
+    </div>
+
+    <div class="section">
+      <h3><span class="num">7</span> Video Ratio</h3>
+      <div class="radio-group" id="videoRatioGroup">
+        <label><input type="radio" name="videoRatio" value="16x9" checked /> 16:9</label>
+        <label><input type="radio" name="videoRatio" value="9x16" /> 9:16</label>
+        <label><input type="radio" name="videoRatio" value="1x1" /> 1:1</label>
+      </div>
+    </div>
+
+    <button id="generateBtn" class="primary-btn" disabled>▶ Generate Video</button>
+    <div id="renderStatus" style="font-size:12px; color: var(--text-dim); margin-top:8px;"></div>
+    <div id="renderProgressWrap" class="render-progress-wrap hidden"><div id="renderProgressBar" class="render-progress-bar"></div></div>
     <div id="downloadWrap" class="hidden" style="margin-top:10px;"></div>
-    <div class="hint" style="margin-top:8px;">Includes synthesized drum audio (General MIDI soundfont) and a 10s tail after the last note. Requires a browser with WebCodecs support (current Chrome/Edge). No ffmpeg.wasm fallback in this build yet — unsupported browsers get a clear error instead of a silent failure.</div>
+
   </div>
 
-  <div class="panel">
-    <div style="font-size:13px; margin-bottom:8px; color: var(--text-dim);">Timeline events</div>
-    <div class="log-box" id="eventLog"></div>
+  <!-- RIGHT COLUMN: preview -->
+  <div class="right-col">
+    <div class="preview-panel">
+      <h3>👁 Preview</h3>
+      <div class="canvas-wrap">
+        <canvas id="canvas" width="1280" height="720"></canvas>
+      </div>
+      <div class="player-bar">
+        <button id="playBtn" class="icon-btn" disabled>▶</button>
+        <button id="pauseBtn" class="icon-btn" disabled>⏸</button>
+        <input type="range" id="seekBar" min="0" max="1000" value="0" disabled />
+        <span id="timeVal" class="time">0.00s / 0.00s</span>
+      </div>
+      <div class="meta-row" id="metaRow">
+        <span>BPM: <b id="bpmVal">–</b></span>
+        <span>Time sig: <b id="tsVal">–</b></span>
+        <span>Duration: <b id="durVal">–</b></span>
+        <span>Notes: <b id="noteCountVal">–</b></span>
+      </div>
+    </div>
+
+    <div class="section" style="margin-top:14px;">
+      <div style="font-size:13px; margin-bottom:8px; color: var(--text-dim);">Timeline events</div>
+      <div class="log-box" id="eventLog"></div>
+    </div>
   </div>
+
+  <!-- alphaTab renders here off-screen -->
+  <div id="notationContainer" style="position:absolute; left:-99999px; top:-99999px; width:900px;"></div>
+</div>
+
+<div class="field" id="subdivFieldWrap" style="max-width:420px; margin: 14px auto 0;">
+  <label>Timing display</label>
+  <select id="subdivSelect">
+    <option value="quarter">1 2 3 4</option>
+    <option value="eighth">1 & 2 & 3 & 4 &</option>
+    <option value="sixteenth">1 e & a 2 e & a ...</option>
+  </select>
 </div>
 
 <script>
+
 (function () {
   'use strict';
+
+  // ===================================================================
+  // New UI wiring: upload-card visual state, and syncing the visible
+  // aspect-ratio radio buttons with the underlying <select id="aspectSelect">
+  // that the rest of the app's logic already reads from.
+  // ===================================================================
+  function markUploadCardLoaded(cardId, loaded) {
+    const card = document.getElementById(cardId);
+    if (card) card.classList.toggle('loaded', !!loaded);
+  }
+  document.getElementById('midiFile').addEventListener('change', (e) => markUploadCardLoaded('midiCard', e.target.files.length > 0));
+  document.getElementById('audioFile').addEventListener('change', (e) => markUploadCardLoaded('audioCard', e.target.files.length > 0));
+  document.getElementById('notationFile').addEventListener('change', (e) => markUploadCardLoaded('notationCard', e.target.files.length > 0));
+
+  const aspectSelectEl = document.getElementById('aspectSelect');
+  document.querySelectorAll('#videoRatioGroup input[name="videoRatio"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      aspectSelectEl.value = radio.value;
+      aspectSelectEl.dispatchEvent(new Event('change'));
+    });
+  });
+
+  // Title / Counts / Video Color state -- captured now, rendering effects
+  // (drawing the titles on canvas, count-in bars, sheet-color inversion)
+  // are a follow-up step once the design for each is confirmed.
+  const titleAndDisplaySettings = {
+    title1: { text: '', fontSize: 72, color: '#f0b90b' },
+    title2: { text: '', fontSize: 48, color: '#ffffff' },
+    counts: '1',
+    videoColor: 'black',
+  };
+  function bindTextInput(id, obj, key) { document.getElementById(id).addEventListener('input', (e) => { obj[key] = e.target.value; }); }
+  bindTextInput('title1Text', titleAndDisplaySettings.title1, 'text');
+  bindTextInput('title2Text', titleAndDisplaySettings.title2, 'text');
+  document.getElementById('title1FontSize').addEventListener('change', (e) => { titleAndDisplaySettings.title1.fontSize = Number(e.target.value); });
+  document.getElementById('title2FontSize').addEventListener('change', (e) => { titleAndDisplaySettings.title2.fontSize = Number(e.target.value); });
+  document.getElementById('title1Color').addEventListener('input', (e) => { titleAndDisplaySettings.title1.color = e.target.value; });
+  document.getElementById('title2Color').addEventListener('input', (e) => { titleAndDisplaySettings.title2.color = e.target.value; });
+  document.getElementById('countsSelect').addEventListener('change', (e) => { titleAndDisplaySettings.counts = e.target.value; });
+  document.querySelectorAll('input[name="videoColor"]').forEach((r) => r.addEventListener('change', () => { if (r.checked) titleAndDisplaySettings.videoColor = r.value; }));
 
   const MAX_MIDI_DURATION_SECONDS = 10 * 60;
   const HIT_VISUAL_DURATION = 0.15; // seconds a hit stays composited — configurable per spec
@@ -1250,6 +1367,7 @@
   // the MIDI upload field, never a "Connect" step.
   connectToWorker();
 })();
+
 </script>
 </body>
 </html>
