@@ -186,6 +186,7 @@
     <button id="generateBtn" class="primary-btn" disabled>▶ Generate Video</button>
     <div id="renderStatus" style="font-size:12px; color: var(--text-dim); margin-top:8px;"></div>
     <div id="renderProgressWrap" class="render-progress-wrap hidden"><div id="renderProgressBar" class="render-progress-bar"></div></div>
+    <a id="downloadBtn" class="primary-btn hidden" style="display:block; text-align:center; text-decoration:none; margin-top:8px;">⬇ Download Video</a>
     <div id="downloadWrap" class="hidden" style="margin-top:10px;"></div>
 
   </div>
@@ -665,7 +666,7 @@
   const ALPHATAB_BASE = 'https://cdn.jsdelivr.net/gh/idetsminmh1995-spec/msharing0008@main/notation-engine/alphatab/dist';
   // Fraction of the canvas this notation occupies -- matches the empty
   // black space above the drum kit photo (tuned earlier for the timing badge).
-  const NOTATION_AREA_FRAC = { x: 0.03, y: 0.18, w: 0.94, h: 0.20 };
+  const NOTATION_AREA_FRAC = { x: 0.03, y: 0.15, w: 0.94, h: 0.20 };
 
   let alphaTabApi = null;
   let notationLoaded = false;
@@ -981,7 +982,7 @@
     const loads = [];
     for (let i = 1; i <= countInBeatCount; i++) {
       const filename = `${prefix}${i}.wav`;
-      const url = `${WORKER_BASE}/assets/shared/${encodeURIComponent('Counts vocal')}/${filename}`;
+      const url = `${WORKER_BASE}/assets/shared/${encodeURIComponent('Voices')}/${filename}`;
       loads.push(
         fetch(url)
           .then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.arrayBuffer(); })
@@ -992,7 +993,7 @@
     countInClips = await Promise.all(loads);
     if (failedFiles.length === countInBeatCount) {
       statusEl.className = 'status err';
-      statusEl.textContent = `Could not load any count-in clips from R2 (tried: ${failedFiles.join(', ')}). Check that "Counts vocal/${prefix}1.wav" etc. exist in the bucket.`;
+      statusEl.textContent = `Could not load any count-in clips from R2 (tried: ${failedFiles.join(', ')}). Check that "Voices/${prefix}1.wav" etc. exist in the bucket.`;
     } else if (failedFiles.length > 0) {
       statusEl.className = 'status err';
       statusEl.textContent = `Missing: ${failedFiles.join(', ')} — the rest loaded fine.`;
@@ -1137,52 +1138,32 @@
   // Matches the confirmed mockup layout, drawn inside the background's
   // empty top strip, above the notation area.
   // ===================================================================
-  let logoImg = null, logoLoadAttempted = false;
-  function ensureLogoLoaded() {
-    if (logoLoadAttempted) return;
-    logoLoadAttempted = true;
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => { logoImg = img; };
-    img.onerror = () => { console.warn('Header: could not load logo asset.'); };
-    img.src = `${WORKER_BASE}/assets/shared/${encodeURIComponent('Logo')}/${encodeURIComponent('Drum Logo.png')}`;
-  }
-
   function drawHeaderRow(targetCtx, w, h, t) {
-    ensureLogoLoaded();
-    const headerH = h * 0.16;
+    const headerH = h * 0.13;
     const pad = w * 0.02;
 
-    // Logo + Title 1 + Title 2 (left, inline on one baseline)
-    let textX = pad;
-    if (logoImg && logoImg.complete && logoImg.naturalWidth) {
-      const logoSize = headerH * 0.85;
-      const logoAspect = logoImg.naturalWidth / logoImg.naturalHeight;
-      const logoW = logoSize * logoAspect, logoH = logoSize;
-      targetCtx.drawImage(logoImg, pad, (headerH - logoH) / 2, logoW, logoH);
-      textX = pad + logoW + pad * 0.6;
-    }
+    // Title 1 (top line) + Title 2 (smaller subtitle line directly below,
+    // centered) -- no logo (removed per user request; not using an R2 logo asset).
     const title1 = titleAndDisplaySettings.title1;
     const title2 = titleAndDisplaySettings.title2;
     if (title1.text) {
       targetCtx.save();
       targetCtx.textAlign = 'left';
       targetCtx.textBaseline = 'middle';
-      const fontPx1 = Math.round(headerH * (title1.fontSize / 90));
+      const fontPx1 = Math.round(headerH * (title1.fontSize / 110));
       targetCtx.font = `600 ${fontPx1}px sans-serif`;
       targetCtx.fillStyle = title1.color;
-      targetCtx.fillText(title1.text, textX, headerH * 0.5);
-      textX += targetCtx.measureText(title1.text + ' ').width;
+      targetCtx.fillText(title1.text, pad, headerH * 0.35);
       targetCtx.restore();
     }
     if (title2.text) {
       targetCtx.save();
-      targetCtx.textAlign = 'left';
+      targetCtx.textAlign = 'center';
       targetCtx.textBaseline = 'middle';
-      const fontPx2 = Math.round(headerH * (title2.fontSize / 90));
+      const fontPx2 = Math.round(headerH * (title2.fontSize / 110));
       targetCtx.font = `600 ${fontPx2}px sans-serif`;
       targetCtx.fillStyle = title2.color;
-      targetCtx.fillText(title2.text, textX, headerH * 0.5);
+      targetCtx.fillText(title2.text, w / 2, headerH * 0.78);
       targetCtx.restore();
     }
 
@@ -1196,11 +1177,11 @@
         { title: 'BPM', value: Math.round(bpm).toString() },
         { title: 'Count', value: countLabel },
       ];
-      const boxW = w * 0.11, boxH = headerH * 0.58, gap = w * 0.015;
-      const labelGap = headerH * 0.16;
+      const boxW = w * 0.08, boxH = headerH * 0.4, gap = w * 0.012;
+      const labelGap = headerH * 0.14;
       let bx = w - pad - boxW;
       for (let i = boxes.length - 1; i >= 0; i--) {
-        const by = headerH * 0.40;
+        const by = headerH * 0.42;
         targetCtx.save();
         targetCtx.strokeStyle = '#ff0000';
         targetCtx.lineWidth = Math.max(2, boxH * 0.07);
@@ -1215,10 +1196,10 @@
 
         targetCtx.textAlign = 'center';
         targetCtx.fillStyle = titleAndDisplaySettings.videoColor === 'white' ? '#000' : '#fff';
-        targetCtx.font = `${Math.round(boxH * 0.34)}px sans-serif`;
+        targetCtx.font = `${Math.round(boxH * 0.32)}px sans-serif`;
         targetCtx.textBaseline = 'bottom';
         targetCtx.fillText(boxes[i].title, bx + boxW / 2, by - labelGap * 0.15);
-        targetCtx.font = `bold ${Math.round(boxH * 0.6)}px sans-serif`;
+        targetCtx.font = `bold ${Math.round(boxH * 0.56)}px sans-serif`;
         targetCtx.textBaseline = 'middle';
         targetCtx.fillText(boxes[i].value, bx + boxW / 2, by + boxH / 2 + boxH * 0.04);
         targetCtx.restore();
@@ -1422,6 +1403,7 @@
 
     els.generateBtn.disabled = true;
     els.downloadWrap.classList.add('hidden');
+    document.getElementById('downloadBtn').classList.add('hidden');
     els.renderProgressWrap.classList.remove('hidden');
     els.renderStatus.style.color = 'var(--text-dim)';
     els.renderStatus.textContent = 'Loading encoder…';
@@ -1560,15 +1542,14 @@
       const blob = new Blob([buffer], { type: 'video/mp4' });
       const url = URL.createObjectURL(blob);
 
+      const filename = `${currentDrumSet}-${currentAspect}-drum-video.mp4`;
       els.downloadWrap.innerHTML = '';
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${currentDrumSet}-${currentAspect}-drum-video.mp4`;
-      link.textContent = `⬇ Download ${link.download} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`;
-      link.style.color = 'var(--ok)';
-      link.style.fontWeight = '600';
-      els.downloadWrap.appendChild(link);
-      els.downloadWrap.classList.remove('hidden');
+      els.downloadWrap.classList.add('hidden');
+      const downloadBtn = document.getElementById('downloadBtn');
+      downloadBtn.href = url;
+      downloadBtn.download = filename;
+      downloadBtn.textContent = `⬇ Download Video (${(blob.size / 1024 / 1024).toFixed(2)} MB)`;
+      downloadBtn.classList.remove('hidden');
 
       els.renderStatus.style.color = 'var(--ok)';
       els.renderStatus.textContent = `Done — ${totalFrames} frames rendered at ${RENDER_FPS}fps${audioSupported ? ' with audio' : ' (video only — audio unavailable in this browser)'}.`;
