@@ -146,7 +146,17 @@
     </div>
 
     <div class="section">
-      <h3><span class="num">5</span> Counts</h3>
+      <h3><span class="num">5</span> Counts Vocal</h3>
+      <select id="countsVocalSelect">
+        <option value="none" selected>None</option>
+        <option value="numbers">Style A (1, 2, 3, 4…)</option>
+        <option value="m-numbers">Style B (M1, M2, M3, M4…)</option>
+      </select>
+      <div class="hint">Spoken count-in audio, played before the video starts.</div>
+    </div>
+
+    <div class="section">
+      <h3><span class="num">6</span> Counts</h3>
       <select id="countsSelect">
         <option value="1" selected>1</option>
         <option value="2">2</option>
@@ -157,7 +167,7 @@
     </div>
 
     <div class="section">
-      <h3><span class="num">6</span> Video Color</h3>
+      <h3><span class="num">7</span> Video Color</h3>
       <div class="radio-group">
         <label><input type="radio" name="videoColor" value="black" checked /> Black</label>
         <label><input type="radio" name="videoColor" value="white" /> White</label>
@@ -166,7 +176,7 @@
     </div>
 
     <div class="section">
-      <h3><span class="num">7</span> Video Ratio</h3>
+      <h3><span class="num">8</span> Video Ratio</h3>
       <div class="radio-group" id="videoRatioGroup">
         <label><input type="radio" name="videoRatio" value="16x9" checked /> 16:9</label>
         <label><input type="radio" name="videoRatio" value="9x16" /> 9:16</label>
@@ -255,6 +265,7 @@
     title1: { text: '', fontSize: 72, color: '#f0b90b' },
     title2: { text: '', fontSize: 48, color: '#ffffff' },
     counts: '1',
+    countsVocal: 'none',
     videoColor: 'black',
   };
   function bindTextInput(id, obj, key) { document.getElementById(id).addEventListener('input', (e) => { obj[key] = e.target.value; }); }
@@ -265,6 +276,7 @@
   document.getElementById('title1Color').addEventListener('input', (e) => { titleAndDisplaySettings.title1.color = e.target.value; });
   document.getElementById('title2Color').addEventListener('input', (e) => { titleAndDisplaySettings.title2.color = e.target.value; });
   document.getElementById('countsSelect').addEventListener('change', (e) => { titleAndDisplaySettings.counts = e.target.value; });
+  document.getElementById('countsVocalSelect').addEventListener('change', (e) => { titleAndDisplaySettings.countsVocal = e.target.value; });
   document.querySelectorAll('input[name="videoColor"]').forEach((r) => r.addEventListener('change', () => { if (r.checked) titleAndDisplaySettings.videoColor = r.value; }));
 
   const MAX_MIDI_DURATION_SECONDS = 10 * 60;
