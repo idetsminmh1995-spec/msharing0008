@@ -671,7 +671,7 @@
 
   // Self-hosted via our own Worker + R2 (no external CDN dependency at all --
   // avoids jsdelivr/GitHub caching or availability issues entirely).
-  const ALPHATAB_BASE = `${WORKER_BASE}/assets/shared/NotationEngine`;
+  const ALPHATAB_BASE = `${WORKER_BASE}/assets/shared/${encodeURIComponent('Notation Engine')}`;
   // Fraction of the canvas this notation occupies -- matches the empty
   // black space above the drum kit photo (tuned earlier for the timing badge).
   const NOTATION_AREA_FRAC = { x: 0.03, y: 0.15, w: 0.94, h: 0.20 };
