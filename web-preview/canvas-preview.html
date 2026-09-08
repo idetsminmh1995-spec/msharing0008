@@ -152,6 +152,7 @@
         <option value="m-numbers">Style B (M1, M2, M3, M4…)</option>
       </select>
       <div class="hint">Spoken count-in audio, played before the video starts.</div>
+      <div id="countsVocalStatus" class="status hidden" style="margin-top:8px;"></div>
     </div>
 
     <div class="section">
@@ -664,7 +665,7 @@
   const ALPHATAB_BASE = 'https://cdn.jsdelivr.net/gh/idetsminmh1995-spec/msharing0008@main/notation-engine/alphatab/dist';
   // Fraction of the canvas this notation occupies -- matches the empty
   // black space above the drum kit photo (tuned earlier for the timing badge).
-  const NOTATION_AREA_FRAC = { x: 0.03, y: 0.12, w: 0.94, h: 0.26 };
+  const NOTATION_AREA_FRAC = { x: 0.03, y: 0.18, w: 0.94, h: 0.20 };
 
   let alphaTabApi = null;
   let notationLoaded = false;
@@ -972,19 +973,33 @@
   async function loadCountInClips() {
     countInClips = [];
     if (titleAndDisplaySettings.countsVocal === 'none' || countInBeatCount === 0) return;
+    const statusEl = document.getElementById('countsVocalStatus');
+    statusEl.className = 'status loading'; statusEl.textContent = 'Loading count-in audio…'; statusEl.classList.remove('hidden');
     const prefix = titleAndDisplaySettings.countsVocal === 'm-numbers' ? 'M' : '';
     const ctx = getAudioCtx();
+    const failedFiles = [];
     const loads = [];
     for (let i = 1; i <= countInBeatCount; i++) {
-      const url = `${WORKER_BASE}/assets/shared/${encodeURIComponent('Counts vocal')}/${prefix}${i}.wav`;
+      const filename = `${prefix}${i}.wav`;
+      const url = `${WORKER_BASE}/assets/shared/${encodeURIComponent('Counts vocal')}/${filename}`;
       loads.push(
         fetch(url)
           .then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.arrayBuffer(); })
           .then((buf) => ctx.decodeAudioData(buf))
-          .catch((err) => { console.warn(`Counts Vocal: could not load ${prefix}${i}.wav:`, err); return null; })
+          .catch((err) => { failedFiles.push(filename); console.warn(`Counts Vocal: could not load ${filename}:`, err); return null; })
       );
     }
     countInClips = await Promise.all(loads);
+    if (failedFiles.length === countInBeatCount) {
+      statusEl.className = 'status err';
+      statusEl.textContent = `Could not load any count-in clips from R2 (tried: ${failedFiles.join(', ')}). Check that "Counts vocal/${prefix}1.wav" etc. exist in the bucket.`;
+    } else if (failedFiles.length > 0) {
+      statusEl.className = 'status err';
+      statusEl.textContent = `Missing: ${failedFiles.join(', ')} — the rest loaded fine.`;
+    } else {
+      statusEl.className = 'status ok';
+      statusEl.textContent = `Loaded ${countInBeatCount} count-in clip(s) (${prefix || 'plain'} style).`;
+    }
   }
 
   document.getElementById('countsVocalSelect').addEventListener('change', async (e) => {
@@ -1135,25 +1150,39 @@
 
   function drawHeaderRow(targetCtx, w, h, t) {
     ensureLogoLoaded();
-    const headerH = h * 0.10;
+    const headerH = h * 0.16;
     const pad = w * 0.02;
 
-    // Logo + Title 1 (left)
+    // Logo + Title 1 + Title 2 (left, inline on one baseline)
     let textX = pad;
     if (logoImg && logoImg.complete && logoImg.naturalWidth) {
-      const logoSize = headerH * 0.8;
-      targetCtx.drawImage(logoImg, pad, headerH * 0.1, logoSize, logoSize);
-      textX = pad + logoSize + pad * 0.6;
+      const logoSize = headerH * 0.85;
+      const logoAspect = logoImg.naturalWidth / logoImg.naturalHeight;
+      const logoW = logoSize * logoAspect, logoH = logoSize;
+      targetCtx.drawImage(logoImg, pad, (headerH - logoH) / 2, logoW, logoH);
+      textX = pad + logoW + pad * 0.6;
     }
     const title1 = titleAndDisplaySettings.title1;
+    const title2 = titleAndDisplaySettings.title2;
     if (title1.text) {
       targetCtx.save();
       targetCtx.textAlign = 'left';
       targetCtx.textBaseline = 'middle';
-      const fontPx = Math.round(headerH * (title1.fontSize / 96)); // fontSize is an authoring value (e.g. 72) scaled to the header height
-      targetCtx.font = `600 ${fontPx}px sans-serif`;
+      const fontPx1 = Math.round(headerH * (title1.fontSize / 90));
+      targetCtx.font = `600 ${fontPx1}px sans-serif`;
       targetCtx.fillStyle = title1.color;
       targetCtx.fillText(title1.text, textX, headerH * 0.5);
+      textX += targetCtx.measureText(title1.text + ' ').width;
+      targetCtx.restore();
+    }
+    if (title2.text) {
+      targetCtx.save();
+      targetCtx.textAlign = 'left';
+      targetCtx.textBaseline = 'middle';
+      const fontPx2 = Math.round(headerH * (title2.fontSize / 90));
+      targetCtx.font = `600 ${fontPx2}px sans-serif`;
+      targetCtx.fillStyle = title2.color;
+      targetCtx.fillText(title2.text, textX, headerH * 0.5);
       targetCtx.restore();
     }
 
@@ -1167,15 +1196,16 @@
         { title: 'BPM', value: Math.round(bpm).toString() },
         { title: 'Count', value: countLabel },
       ];
-      const boxW = w * 0.09, boxH = headerH * 0.62, gap = w * 0.015;
+      const boxW = w * 0.11, boxH = headerH * 0.58, gap = w * 0.015;
+      const labelGap = headerH * 0.16;
       let bx = w - pad - boxW;
       for (let i = boxes.length - 1; i >= 0; i--) {
-        const by = headerH * 0.32;
+        const by = headerH * 0.40;
         targetCtx.save();
         targetCtx.strokeStyle = '#ff0000';
-        targetCtx.lineWidth = Math.max(2, boxH * 0.06);
+        targetCtx.lineWidth = Math.max(2, boxH * 0.07);
         targetCtx.beginPath();
-        const r = boxH * 0.18;
+        const r = boxH * 0.2;
         targetCtx.moveTo(bx + r, by);
         targetCtx.arcTo(bx + boxW, by, bx + boxW, by + boxH, r);
         targetCtx.arcTo(bx + boxW, by + boxH, bx, by + boxH, r);
@@ -1185,12 +1215,12 @@
 
         targetCtx.textAlign = 'center';
         targetCtx.fillStyle = titleAndDisplaySettings.videoColor === 'white' ? '#000' : '#fff';
-        targetCtx.font = `${Math.round(boxH * 0.22)}px sans-serif`;
-        targetCtx.textBaseline = 'top';
-        targetCtx.fillText(boxes[i].title, bx + boxW / 2, by - boxH * 0.34);
-        targetCtx.font = `bold ${Math.round(boxH * 0.42)}px sans-serif`;
+        targetCtx.font = `${Math.round(boxH * 0.34)}px sans-serif`;
+        targetCtx.textBaseline = 'bottom';
+        targetCtx.fillText(boxes[i].title, bx + boxW / 2, by - labelGap * 0.15);
+        targetCtx.font = `bold ${Math.round(boxH * 0.6)}px sans-serif`;
         targetCtx.textBaseline = 'middle';
-        targetCtx.fillText(boxes[i].value, bx + boxW / 2, by + boxH / 2 + boxH * 0.05);
+        targetCtx.fillText(boxes[i].value, bx + boxW / 2, by + boxH / 2 + boxH * 0.04);
         targetCtx.restore();
 
         bx -= boxW + gap;
