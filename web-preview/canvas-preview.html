@@ -148,8 +148,7 @@
     <div class="section">
       <h3><span class="num">5</span> Counts Vocal</h3>
       <select id="countsVocalSelect">
-        <option value="none" selected>None</option>
-        <option value="numbers">Style A (1, 2, 3, 4…)</option>
+        <option value="numbers" selected>Style A (1, 2, 3, 4…)</option>
         <option value="m-numbers">Style B (M1, M2, M3, M4…)</option>
       </select>
       <div class="hint">Spoken count-in audio, played before the video starts.</div>
@@ -157,13 +156,12 @@
 
     <div class="section">
       <h3><span class="num">6</span> Counts</h3>
-      <select id="countsSelect">
-        <option value="1" selected>1</option>
-        <option value="2">2</option>
-        <option value="4">4</option>
-        <option value="none">None</option>
+      <select id="subdivSelect">
+        <option value="quarter">1</option>
+        <option value="eighth">1&</option>
+        <option value="sixteenth">1e&a</option>
       </select>
-      <div class="hint">Count-in beats shown before playback starts.</div>
+      <div class="hint">Beat display style shown in the video's Count box.</div>
     </div>
 
     <div class="section">
@@ -222,15 +220,6 @@
   <div id="notationContainer" style="position:absolute; left:-99999px; top:-99999px; width:900px;"></div>
 </div>
 
-<div class="field" id="subdivFieldWrap" style="max-width:420px; margin: 14px auto 0;">
-  <label>Timing display</label>
-  <select id="subdivSelect">
-    <option value="quarter">1 2 3 4</option>
-    <option value="eighth">1 & 2 & 3 & 4 &</option>
-    <option value="sixteenth">1 e & a 2 e & a ...</option>
-  </select>
-</div>
-
 <script>
 
 (function () {
@@ -265,7 +254,7 @@
     title1: { text: '', fontSize: 72, color: '#f0b90b' },
     title2: { text: '', fontSize: 48, color: '#ffffff' },
     counts: '1',
-    countsVocal: 'none',
+    countsVocal: 'numbers',
     videoColor: 'black',
   };
   function bindTextInput(id, obj, key) { document.getElementById(id).addEventListener('input', (e) => { obj[key] = e.target.value; }); }
@@ -275,7 +264,6 @@
   document.getElementById('title2FontSize').addEventListener('change', (e) => { titleAndDisplaySettings.title2.fontSize = Number(e.target.value); });
   document.getElementById('title1Color').addEventListener('input', (e) => { titleAndDisplaySettings.title1.color = e.target.value; });
   document.getElementById('title2Color').addEventListener('input', (e) => { titleAndDisplaySettings.title2.color = e.target.value; });
-  document.getElementById('countsSelect').addEventListener('change', (e) => { titleAndDisplaySettings.counts = e.target.value; });
   document.getElementById('countsVocalSelect').addEventListener('change', (e) => { titleAndDisplaySettings.countsVocal = e.target.value; });
   document.querySelectorAll('input[name="videoColor"]').forEach((r) => r.addEventListener('change', () => { if (r.checked) titleAndDisplaySettings.videoColor = r.value; }));
 
@@ -676,7 +664,7 @@
   const ALPHATAB_BASE = 'https://cdn.jsdelivr.net/gh/idetsminmh1995-spec/msharing0008@main/notation-engine/alphatab/dist';
   // Fraction of the canvas this notation occupies -- matches the empty
   // black space above the drum kit photo (tuned earlier for the timing badge).
-  const NOTATION_AREA_FRAC = { x: 0.03, y: 0.02, w: 0.94, h: 0.36 };
+  const NOTATION_AREA_FRAC = { x: 0.03, y: 0.12, w: 0.94, h: 0.26 };
 
   let alphaTabApi = null;
   let notationLoaded = false;
@@ -1107,8 +1095,8 @@
     return seg.tick + elapsedTicks;
   }
 
-  function drawTimingOverlay(targetCtx, w, h, t) {
-    if (!parsedMidi) return;
+  function computeCurrentBeatLabel(t) {
+    if (!parsedMidi) return { label: '–', ts: null };
     const ts = getActiveTimeSig(t);
     // Work directly in tick-space so the beat unit correctly matches the time
     // signature's denominator (e.g. 6/8 counts in eighth notes, not quarter
@@ -1121,28 +1109,93 @@
     const beatIndex = Math.floor(tickInMeasure / ticksPerBeat); // 0-based
     const fracWithinBeat = (tickInMeasure % ticksPerBeat) / ticksPerBeat;
 
-    // Subdivision syllables per beat, selected by the "Timing display" dropdown.
-    // Index 0 is always the beat number itself; the rest are the "&"/"e"/"a" syllables.
+    // Subdivision syllables per beat, selected by the "Counts" dropdown.
     const mode = els.subdivSelect ? els.subdivSelect.value : 'quarter';
     const subdivLabels = mode === 'quarter' ? [''] : mode === 'eighth' ? ['', '&'] : ['', 'e', '&', 'a'];
     const subSlot = Math.min(subdivLabels.length - 1, Math.floor(fracWithinBeat * subdivLabels.length));
     const label = subSlot === 0 ? String(beatIndex + 1) : subdivLabels[subSlot];
+    return { label, ts };
+  }
 
-    // Single current label, shown large and centered -- not the whole row.
-    const boxSize = Math.round(Math.min(w, h) * 0.16);
-    const margin = Math.round(boxSize * 0.25);
-    const cx = w - boxSize / 2 - margin, cy = h * 0.50; // lower into the visible drum-image area, not the empty top space
-    targetCtx.save();
-    targetCtx.fillStyle = 'rgba(0,0,0,0.5)';
-    targetCtx.beginPath();
-    targetCtx.arc(cx, cy, boxSize / 2, 0, Math.PI * 2);
-    targetCtx.fill();
-    targetCtx.textAlign = 'center';
-    targetCtx.textBaseline = 'middle';
-    targetCtx.font = 'bold ' + Math.round(boxSize * 0.55) + 'px sans-serif';
-    targetCtx.fillStyle = '#ff0000';
-    targetCtx.fillText(label, cx, cy);
-    targetCtx.restore();
+  // ===================================================================
+  // Header row: Logo + Title 1 (left), TIME / BPM / Count boxes (right).
+  // Matches the confirmed mockup layout, drawn inside the background's
+  // empty top strip, above the notation area.
+  // ===================================================================
+  let logoImg = null, logoLoadAttempted = false;
+  function ensureLogoLoaded() {
+    if (logoLoadAttempted) return;
+    logoLoadAttempted = true;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => { logoImg = img; };
+    img.onerror = () => { console.warn('Header: could not load logo asset.'); };
+    img.src = `${WORKER_BASE}/assets/shared/${encodeURIComponent('Logo')}/${encodeURIComponent('Drum Logo.png')}`;
+  }
+
+  function drawHeaderRow(targetCtx, w, h, t) {
+    ensureLogoLoaded();
+    const headerH = h * 0.10;
+    const pad = w * 0.02;
+
+    // Logo + Title 1 (left)
+    let textX = pad;
+    if (logoImg && logoImg.complete && logoImg.naturalWidth) {
+      const logoSize = headerH * 0.8;
+      targetCtx.drawImage(logoImg, pad, headerH * 0.1, logoSize, logoSize);
+      textX = pad + logoSize + pad * 0.6;
+    }
+    const title1 = titleAndDisplaySettings.title1;
+    if (title1.text) {
+      targetCtx.save();
+      targetCtx.textAlign = 'left';
+      targetCtx.textBaseline = 'middle';
+      const fontPx = Math.round(headerH * (title1.fontSize / 96)); // fontSize is an authoring value (e.g. 72) scaled to the header height
+      targetCtx.font = `600 ${fontPx}px sans-serif`;
+      targetCtx.fillStyle = title1.color;
+      targetCtx.fillText(title1.text, textX, headerH * 0.5);
+      targetCtx.restore();
+    }
+
+    // TIME / BPM / Count boxes (right)
+    if (parsedMidi) {
+      const ts = getActiveTimeSig(t);
+      const bpm = getActiveTempoSeg(t).bpm;
+      const { label: countLabel } = computeCurrentBeatLabel(t);
+      const boxes = [
+        { title: 'TIME', value: `${ts.numerator}/${ts.denominator}` },
+        { title: 'BPM', value: Math.round(bpm).toString() },
+        { title: 'Count', value: countLabel },
+      ];
+      const boxW = w * 0.09, boxH = headerH * 0.62, gap = w * 0.015;
+      let bx = w - pad - boxW;
+      for (let i = boxes.length - 1; i >= 0; i--) {
+        const by = headerH * 0.32;
+        targetCtx.save();
+        targetCtx.strokeStyle = '#ff0000';
+        targetCtx.lineWidth = Math.max(2, boxH * 0.06);
+        targetCtx.beginPath();
+        const r = boxH * 0.18;
+        targetCtx.moveTo(bx + r, by);
+        targetCtx.arcTo(bx + boxW, by, bx + boxW, by + boxH, r);
+        targetCtx.arcTo(bx + boxW, by + boxH, bx, by + boxH, r);
+        targetCtx.arcTo(bx, by + boxH, bx, by, r);
+        targetCtx.arcTo(bx, by, bx + boxW, by, r);
+        targetCtx.stroke();
+
+        targetCtx.textAlign = 'center';
+        targetCtx.fillStyle = titleAndDisplaySettings.videoColor === 'white' ? '#000' : '#fff';
+        targetCtx.font = `${Math.round(boxH * 0.22)}px sans-serif`;
+        targetCtx.textBaseline = 'top';
+        targetCtx.fillText(boxes[i].title, bx + boxW / 2, by - boxH * 0.34);
+        targetCtx.font = `bold ${Math.round(boxH * 0.42)}px sans-serif`;
+        targetCtx.textBaseline = 'middle';
+        targetCtx.fillText(boxes[i].value, bx + boxW / 2, by + boxH / 2 + boxH * 0.05);
+        targetCtx.restore();
+
+        bx -= boxW + gap;
+      }
+    }
   }
 
   // ===================================================================
@@ -1163,7 +1216,7 @@
         ctx.drawImage(img, 0, 0, w, h);
       }
     }
-    if (parsedMidi) drawTimingOverlay(ctx, w, h, currentTime);
+    drawHeaderRow(ctx, w, h, Math.max(0, currentTime));
     if (notationLoaded) {
       setNotationTime(currentTime, { waitForRender: false }); // best-effort for live preview
       drawNotationInto(ctx, w, h);
@@ -1300,6 +1353,7 @@
     if (backgroundImg && backgroundImg.complete && backgroundImg.naturalWidth) {
       renderCtx.drawImage(backgroundImg, 0, 0, w, h);
     }
+    drawHeaderRow(renderCtx, w, h, 0);
     const beatIndex = Math.min(countInBeatCount - 1, Math.floor(realT / countInSecPerBeat));
     renderCtx.save();
     renderCtx.textAlign = 'center'; renderCtx.textBaseline = 'middle';
@@ -1320,7 +1374,7 @@
         renderCtx.drawImage(img, 0, 0, w, h);
       }
     }
-    drawTimingOverlay(renderCtx, w, h, Math.min(t, parsedMidi.durationSeconds));
+    drawHeaderRow(renderCtx, w, h, Math.min(t, parsedMidi.durationSeconds));
     if (notationLoaded) {
       await setNotationTime(Math.min(t, parsedMidi.durationSeconds), { waitForRender: true });
       drawNotationInto(renderCtx, w, h);
