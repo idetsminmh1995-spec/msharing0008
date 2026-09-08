@@ -960,11 +960,77 @@
   // ===================================================================
   // MIDI loading
   // ===================================================================
+  // ===================================================================
+  // Counts Vocal -- spoken count-in ("1,2,3,4" or "M1,M2,M3,M4") played
+  // for one full measure (matching the MIDI's own tempo/time-signature at
+  // t=0) before the actual content starts. Implemented as a pre-roll: the
+  // main timeline/audio/notation logic is completely unchanged and still
+  // starts its own internal clock at 0 -- only the moment we actually kick
+  // that clock off gets delayed by the count-in duration.
+  // ===================================================================
+  let countInBeatCount = 0;       // N -- beats in the initial measure
+  let countInSecPerBeat = 0;
+  let countInOffsetSeconds = 0;   // N * secPerBeat, 0 if vocal count is "none"
+  let countInClips = [];          // decoded AudioBuffers, index 0 = beat 1
+
+  function computeCountInTiming(pm) {
+    const ts = pm.timeSignatures[0];
+    const bpm = pm.tempoChanges[0].bpm;
+    countInBeatCount = ts ? ts.numerator : 4;
+    countInSecPerBeat = 60 / bpm;
+    countInOffsetSeconds = titleAndDisplaySettings.countsVocal === 'none' ? 0 : countInBeatCount * countInSecPerBeat;
+  }
+
+  async function loadCountInClips() {
+    countInClips = [];
+    if (titleAndDisplaySettings.countsVocal === 'none' || countInBeatCount === 0) return;
+    const prefix = titleAndDisplaySettings.countsVocal === 'm-numbers' ? 'M' : '';
+    const ctx = getAudioCtx();
+    const loads = [];
+    for (let i = 1; i <= countInBeatCount; i++) {
+      const url = `${WORKER_BASE}/assets/shared/${encodeURIComponent('Counts vocal')}/${prefix}${i}.wav`;
+      loads.push(
+        fetch(url)
+          .then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.arrayBuffer(); })
+          .then((buf) => ctx.decodeAudioData(buf))
+          .catch((err) => { console.warn(`Counts Vocal: could not load ${prefix}${i}.wav:`, err); return null; })
+      );
+    }
+    countInClips = await Promise.all(loads);
+  }
+
+  document.getElementById('countsVocalSelect').addEventListener('change', async (e) => {
+    titleAndDisplaySettings.countsVocal = e.target.value;
+    if (parsedMidi) {
+      computeCountInTiming(parsedMidi);
+      await loadCountInClips();
+      updateTimeDisplay();
+    }
+  });
+
+  // Plays each loaded count-in clip at its correct beat offset from "now"
+  // (real AudioContext time), for the live preview only.
+  function playCountInVocals() {
+    if (!countInClips.length) return;
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    const startAt = ctx.currentTime;
+    countInClips.forEach((clip, i) => {
+      if (!clip) return;
+      const src = ctx.createBufferSource();
+      src.buffer = clip;
+      src.connect(ctx.destination);
+      src.start(startAt + i * countInSecPerBeat);
+    });
+  }
+
   function loadParsed(pm) {
     isPlaying = false; if (rafId) cancelAnimationFrame(rafId); rafId = null;
     parsedMidi = pm;
     timeline = buildAnimationTimeline(pm.notes);
     currentTime = 0; nextEventIndex = 0; activeHits = [];
+    computeCountInTiming(pm);
+    loadCountInClips(); // fire-and-forget; play() checks countInClips.length when it actually starts
 
     els.bpmVal.textContent = pm.tempoChanges.map((t) => t.bpm.toFixed(0)).join(' → ');
     els.tsVal.textContent = pm.timeSignatures.map((s) => `${s.numerator}/${s.denominator}`).join(', ');
@@ -1118,15 +1184,29 @@
   function pruneActiveHits(t) { activeHits = activeHits.filter((h) => h.until > t); }
 
   function updateTimeDisplay() {
-    els.timeVal.textContent = `${currentTime.toFixed(2)}s / ${parsedMidi.durationSeconds.toFixed(2)}s`;
-    els.seekBar.value = Math.round(currentTime * 1000);
+    if (currentTime < 0) {
+      const beatNum = Math.min(countInBeatCount, Math.floor(-currentTime / countInSecPerBeat) + 1);
+      els.timeVal.textContent = `Count-in ${beatNum}/${countInBeatCount}…`;
+    } else {
+      els.timeVal.textContent = `${currentTime.toFixed(2)}s / ${parsedMidi.durationSeconds.toFixed(2)}s`;
+    }
+    els.seekBar.value = Math.max(0, Math.round(currentTime * 1000));
   }
 
   function play() {
     if (isPlaying || !parsedMidi) return;
     isPlaying = true;
-    playStartPerf = performance.now() - currentTime * 1000;
-    startAudioPlayback(currentTime);
+    // Count-in pre-roll: only applies when starting fresh from the very
+    // beginning -- seeking into the middle and pressing play skips it,
+    // same as a real drummer never re-counts-in mid-song.
+    const preRoll = (currentTime === 0 && countInOffsetSeconds > 0) ? countInOffsetSeconds : 0;
+    if (preRoll > 0) playCountInVocals();
+    playStartPerf = performance.now() + preRoll * 1000 - currentTime * 1000;
+    if (preRoll > 0) {
+      setTimeout(() => { if (isPlaying) startAudioPlayback(currentTime); }, preRoll * 1000);
+    } else {
+      startAudioPlayback(currentTime);
+    }
     rafId = requestAnimationFrame(loop);
   }
   function pause() { isPlaying = false; if (rafId) cancelAnimationFrame(rafId); rafId = null; stopAudioPlayback(); }
@@ -1213,6 +1293,22 @@
     return active;
   }
 
+  // Background + big centered beat number, shown during the count-in
+  // pre-roll before the actual content starts (deterministic, for export).
+  function renderCountInFrameAt(renderCtx, w, h, realT) {
+    renderCtx.fillStyle = '#000'; renderCtx.fillRect(0, 0, w, h);
+    if (backgroundImg && backgroundImg.complete && backgroundImg.naturalWidth) {
+      renderCtx.drawImage(backgroundImg, 0, 0, w, h);
+    }
+    const beatIndex = Math.min(countInBeatCount - 1, Math.floor(realT / countInSecPerBeat));
+    renderCtx.save();
+    renderCtx.textAlign = 'center'; renderCtx.textBaseline = 'middle';
+    renderCtx.font = 'bold ' + Math.round(h * 0.22) + 'px sans-serif';
+    renderCtx.fillStyle = '#ff0000';
+    renderCtx.fillText(String(beatIndex + 1), w / 2, h / 2);
+    renderCtx.restore();
+  }
+
   async function renderFrameAt(renderCtx, w, h, t) {
     renderCtx.fillStyle = '#000'; renderCtx.fillRect(0, 0, w, h);
     if (backgroundImg && backgroundImg.complete && backgroundImg.naturalWidth) {
@@ -1252,7 +1348,7 @@
       const w = els.canvas.width, h = els.canvas.height;
       const audioSourceDuration = userAudioBuffer ? userAudioBuffer.duration : 0;
       const renderDurationSeconds = Math.max(parsedMidi.durationSeconds, audioSourceDuration) + RENDER_TAIL_SECONDS;
-      const totalFrames = Math.max(1, Math.ceil(renderDurationSeconds * RENDER_FPS));
+      const totalFrames = Math.max(1, Math.ceil((countInOffsetSeconds + renderDurationSeconds) * RENDER_FPS));
 
       const renderCanvas = document.createElement('canvas');
       renderCanvas.width = w; renderCanvas.height = h;
@@ -1264,6 +1360,30 @@
       } else {
         els.renderStatus.textContent = 'No audio uploaded — synthesizing from soundfont…';
         audioBuffer = await renderAudioBuffer(renderDurationSeconds);
+      }
+
+      // Prepend the count-in vocal clips (if any) to the audio track, so
+      // the spoken "1,2,3,4" lines up with the silent/background lead-in
+      // frames rendered below.
+      if (countInOffsetSeconds > 0 && audioBuffer && countInClips.some((c) => c)) {
+        const sampleRate = audioBuffer.sampleRate;
+        const nCh = audioBuffer.numberOfChannels;
+        const countInSamples = Math.round(countInOffsetSeconds * sampleRate);
+        const combined = new AudioBuffer({ numberOfChannels: nCh, length: countInSamples + audioBuffer.length, sampleRate });
+        countInClips.forEach((clip, i) => {
+          if (!clip) return;
+          const startSample = Math.round(i * countInSecPerBeat * sampleRate);
+          for (let ch = 0; ch < nCh; ch++) {
+            const src = clip.getChannelData(Math.min(ch, clip.numberOfChannels - 1));
+            const dst = combined.getChannelData(ch);
+            const len = Math.min(src.length, dst.length - startSample);
+            for (let s = 0; s < len; s++) dst[startSample + s] += src[s];
+          }
+        });
+        for (let ch = 0; ch < nCh; ch++) {
+          combined.getChannelData(ch).set(audioBuffer.getChannelData(ch), countInSamples);
+        }
+        audioBuffer = combined;
       }
       const audioSupported = !!(audioBuffer && typeof AudioEncoder !== 'undefined');
 
@@ -1326,8 +1446,12 @@
       els.renderStatus.textContent = `Rendering frame 0 / ${totalFrames}…`;
 
       for (let i = 0; i < totalFrames; i++) {
-        const t = i / RENDER_FPS;
-        await renderFrameAt(renderCtx, w, h, t);
+        const realT = i / RENDER_FPS;
+        if (realT < countInOffsetSeconds) {
+          renderCountInFrameAt(renderCtx, w, h, realT);
+        } else {
+          await renderFrameAt(renderCtx, w, h, realT - countInOffsetSeconds);
+        }
 
         const frame = new VideoFrame(renderCanvas, { timestamp: Math.round((i / RENDER_FPS) * 1e6) });
         videoEncoder.encode(frame, { keyFrame: i % (RENDER_FPS * 2) === 0 });
