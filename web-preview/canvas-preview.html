@@ -663,6 +663,12 @@
   // GitHub-hosted build (notation-engine/alphatab/), not the public CDN,
   // since custom modifications are expected there over time.
   // ===================================================================
+  // Cache-busting suffix for R2 asset URLs -- guarantees a fresh fetch every
+  // page load regardless of any previously-cached response for the same
+  // path (e.g. after replacing a drum kit's background PNG in R2).
+  const CACHE_BUST = `v=${Date.now()}`;
+  function bust(url) { return url + (url.includes('?') ? '&' : '?') + CACHE_BUST; }
+
   const ALPHATAB_BASE = 'https://cdn.jsdelivr.net/gh/idetsminmh1995-spec/msharing0008@main/notation-engine/alphatab/dist';
   // Fraction of the canvas this notation occupies -- matches the empty
   // black space above the drum kit photo (tuned earlier for the timing badge).
@@ -866,7 +872,7 @@
         loadPromises.push(new Promise((resolve) => {
           backgroundImg.onload = resolve;
           backgroundImg.onerror = resolve; // graceful — missing bg won't crash the app
-          backgroundImg.src = `${WORKER_BASE}/assets/${currentDrumSet}/${currentAspect}/${encodeURIComponent(manifest.backgroundFile)}`;
+          backgroundImg.src = bust(`${WORKER_BASE}/assets/${currentDrumSet}/${currentAspect}/${encodeURIComponent(manifest.backgroundFile)}`);
         }));
       } else {
         backgroundImg = null;
@@ -886,7 +892,7 @@
           img.crossOrigin = 'anonymous';
           loadPromises.push(new Promise((resolve) => {
             img.onload = resolve; img.onerror = resolve;
-            img.src = `${WORKER_BASE}/assets/${currentDrumSet}/${currentAspect}/${encodeURIComponent(file)}`;
+            img.src = bust(`${WORKER_BASE}/assets/${currentDrumSet}/${currentAspect}/${encodeURIComponent(file)}`);
           }));
           noteAssets.get(note)[hand] = img;
         } else if (footMatch) {
@@ -897,7 +903,7 @@
           img.crossOrigin = 'anonymous';
           loadPromises.push(new Promise((resolve) => {
             img.onload = resolve; img.onerror = resolve;
-            img.src = `${WORKER_BASE}/assets/${currentDrumSet}/${currentAspect}/${encodeURIComponent(file)}`;
+            img.src = bust(`${WORKER_BASE}/assets/${currentDrumSet}/${currentAspect}/${encodeURIComponent(file)}`);
           }));
           noteAssets.get(note).FOOT = img;
         }
@@ -982,7 +988,7 @@
     const loads = [];
     for (let i = 1; i <= countInBeatCount; i++) {
       const filename = `${prefix}${i}.wav`;
-      const url = `${WORKER_BASE}/assets/shared/${encodeURIComponent('Voices')}/${filename}`;
+      const url = bust(`${WORKER_BASE}/assets/shared/${encodeURIComponent('Voices')}/${filename}`);
       loads.push(
         fetch(url)
           .then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.arrayBuffer(); })
