@@ -744,12 +744,20 @@
     // Wait for the first render to complete so we have a canvas to read from.
     console.log('alphaTab: score loaded, waiting for first render…');
     await new Promise((resolve) => {
-      const onRendered = () => { api.renderFinished.off(onRendered); console.log('alphaTab: renderFinished'); resolve(); };
+      let done = false;
+      const onRendered = () => { if (done) return; done = true; api.renderFinished.off(onRendered); console.log('alphaTab: renderFinished'); resolve(); };
       api.renderFinished.on(onRendered);
       // Safety timeout in case renderFinished never fires for some reason.
-      setTimeout(() => { api.renderFinished.off(onRendered); console.warn('alphaTab: renderFinished timeout -- proceeding anyway'); resolve(); }, 3000);
+      setTimeout(() => { if (done) return; done = true; api.renderFinished.off(onRendered); console.warn('alphaTab: renderFinished timeout -- proceeding anyway'); resolve(); }, 3000);
     });
-    notationSourceCanvas = document.querySelector('#notationContainer canvas');
+    // The canvas(es) alphaTab renders into get appended into the container
+    // slightly AFTER the renderFinished event fires (next microtask/frame),
+    // so poll briefly rather than querying just once.
+    for (let attempt = 0; attempt < 10; attempt++) {
+      notationSourceCanvas = document.querySelector('#notationContainer canvas');
+      if (notationSourceCanvas) break;
+      await new Promise((r) => requestAnimationFrame(r));
+    }
     console.log('alphaTab: notationSourceCanvas =', notationSourceCanvas, notationSourceCanvas ? `${notationSourceCanvas.width}x${notationSourceCanvas.height}` : '');
     notationLoaded = !!notationSourceCanvas;
   }
