@@ -1230,6 +1230,8 @@
     }
 
     noteOnsetTicksSorted = [...new Set([0, ...onsetTicks, ...syntheticTicks])].sort((a, b) => a - b);
+    console.log('Notation scroll: built', noteOnsetTicksSorted.length, 'onset ticks. First 20:', noteOnsetTicksSorted.slice(0, 20));
+    console.log('Notation scroll: ppq =', parsedMidi.ppq, 'timeSignatures =', JSON.stringify(parsedMidi.timeSignatures), 'first real onsetTicks (first 10) =', onsetTicks.slice(0, 10));
   }
 
   function quantizedFracAt(t) {
