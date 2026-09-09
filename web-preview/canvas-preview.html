@@ -808,10 +808,14 @@
     const measureWidth = 220;
     const totalWidth = Math.max(400, parsed.measures.length * measureWidth + 40);
     const height = 200;
-    const renderer = new VF.Renderer(container, VF.Renderer.Backends.CANVAS);
+    // VexFlow's CANVAS backend requires an actual <canvas> element, not the
+    // wrapping <div> -- create one explicitly and hand that to the Renderer.
+    const canvasEl = document.createElement('canvas');
+    container.appendChild(canvasEl);
+    const renderer = new VF.Renderer(canvasEl, VF.Renderer.Backends.CANVAS);
     renderer.resize(totalWidth, height);
     const context = renderer.getContext();
-    vfCanvas = container.querySelector('canvas');
+    vfCanvas = canvasEl;
 
     let x = 10;
     parsed.measures.forEach((measure, mIdx) => {
