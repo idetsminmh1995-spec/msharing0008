@@ -737,7 +737,7 @@
           layoutMode: 'horizontal', // single continuous row -- required for a fixed cursor with notation scrolling past it (the target design), now driven by the REAL synced cursor position instead of a linear-time guess
           staveProfile: 'default',
           resources: notationColorResources(),
-          scale: 3.0, // higher raw resolution -- wrapper is CSS-small but content renders at native canvas resolution
+          scale: 1.0, // lowered from 3.0 -- suspect the whole-piece canvas was hitting a max-width limit for long pieces, truncating content partway through
         },
         player: {
           playerMode: 'EnabledExternalMedia', // official mechanism for syncing alphaTab's cursor to an externally-driven timeline (our own MIDI playback clock) -- see alphatab.net/docs/guides/audio-video-sync
