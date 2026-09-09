@@ -218,7 +218,9 @@
     </div>
   </div>
 
-  <!-- alphaTab renders here off-screen -->
+  <!-- alphaTab renders here off-screen (kept within actual viewport bounds
+       via opacity:0 so IntersectionObserver-based lazy rendering still fires) -->
+  <div id="notationContainer" style="position:fixed; left:0; top:0; width:900px; opacity:0; pointer-events:none; z-index:-1;"></div>
 
 </div>
 
@@ -578,6 +580,7 @@
   const els = {
     drumSetSelect: document.getElementById('drumSetSelect'), aspectSelect: document.getElementById('aspectSelect'),
     connectionStatus: document.getElementById('connectionStatus'),
+    notationFile: document.getElementById('notationFile'), notationStatus: document.getElementById('notationStatus'),
     assetChips: document.getElementById('assetChips'),
     midiFile: document.getElementById('midiFile'), loadDemoBtn: document.getElementById('loadDemoBtn'),
     playBtn: document.getElementById('playBtn'), pauseBtn: document.getElementById('pauseBtn'),
@@ -654,6 +657,186 @@
       userAudioBuffer = null;
       els.audioStatus.className = 'status err';
       els.audioStatus.textContent = 'Could not decode this audio file: ' + (err.message || err);
+    }
+  });
+
+  // ===================================================================
+  // Notation Engine (alphaTab) -- self-hosted from this same GitHub Pages
+  // repo (notation-engine/alphatab/dist/), same-origin, no R2/Worker
+  // involvement. Sync/timing is handled entirely by alphaTab itself (fed
+  // via api.timePosition); our code's job is only to crop + position its
+  // already-correct rendered output into the video frame -- not to
+  // recompute timing/sync ourselves.
+  // ===================================================================
+  const ALPHATAB_BASE = '../notation-engine/alphatab/dist';
+  const NOTATION_AREA_FRAC = { x: 0.03, y: 0.13, w: 0.94, h: 0.38 };
+
+  let alphaTabApi = null;
+  let notationLoaded = false;
+  let notationSourceCanvas = null;
+
+  function loadScriptTag(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('Failed to load ' + src));
+      document.head.appendChild(s);
+    });
+  }
+
+  // alphaTab defaults to black notation (for a white page) -- invisible on
+  // our black video background otherwise. Linked to Video Color.
+  function notationColorResources() {
+    const dark = titleAndDisplaySettings.videoColor === 'white';
+    const ink = dark ? '#000000' : '#ffffff';
+    const faint = dark ? '#00000064' : '#ffffff64';
+    return {
+      mainGlyphColor: ink,
+      secondaryGlyphColor: faint,
+      scoreInfoColor: ink,
+      staffLineColor: dark ? '#666666' : '#aaaaaa',
+      barSeparatorColor: dark ? '#222222' : '#dddddd',
+      barNumberColor: '#c80000',
+    };
+  }
+
+  async function ensureAlphaTabApi() {
+    if (alphaTabApi) return alphaTabApi;
+    if (typeof window.alphaTab === 'undefined') {
+      await loadScriptTag(`${ALPHATAB_BASE}/alphaTab.min.js`);
+    }
+    if (typeof window.alphaTab === 'undefined' || !window.alphaTab.AlphaTabApi) {
+      throw new Error('alphaTab library loaded but window.alphaTab.AlphaTabApi is missing.');
+    }
+    const container = document.getElementById('notationContainer');
+    try {
+      alphaTabApi = new window.alphaTab.AlphaTabApi(container, {
+        core: {
+          engine: 'html5', // renders to an internal <canvas> we can drawImage() from
+          fontDirectory: `${ALPHATAB_BASE}/font/`,
+          useWorkers: false,
+          enableLazyLoading: false, // container is kept off-view (opacity:0), so visibility-based lazy rendering would never fire
+        },
+        display: {
+          layoutMode: 'horizontal', // continuous scrolling row
+          staveProfile: 'default',
+          resources: notationColorResources(),
+          scale: 3.0, // higher raw resolution for a sharp crop+upscale in drawNotationInto
+        },
+        player: {
+          enablePlayer: true, // needed for timePosition/cursor to work at all
+          enableCursor: true,
+        },
+      });
+    } catch (err) {
+      console.error('alphaTab: AlphaTabApi construction failed:', err);
+      throw new Error('Failed to construct AlphaTabApi: ' + (err && err.message ? err.message : err));
+    }
+    alphaTabApi.error.on((err) => console.error('alphaTab: internal error event:', err));
+    return alphaTabApi;
+  }
+
+  async function loadNotationFile(arrayBuffer) {
+    const api = await ensureAlphaTabApi();
+    await new Promise((resolve, reject) => {
+      const onLoaded = () => { api.scoreLoaded.off(onLoaded); api.error.off(onError); resolve(); };
+      const onError = (err) => { api.scoreLoaded.off(onLoaded); api.error.off(onError); reject(err instanceof Error ? err : new Error(String(err && err.message ? err.message : err))); };
+      api.scoreLoaded.on(onLoaded);
+      api.error.on(onError);
+      try { api.load(arrayBuffer); } catch (err) { onError(err); }
+    });
+    // Wait for the first render so we have a canvas to read from -- the
+    // actual <canvas> gets appended into the container slightly AFTER
+    // renderFinished fires (next frame), so poll briefly.
+    await new Promise((resolve) => {
+      let done = false;
+      const onRendered = () => { if (done) return; done = true; api.renderFinished.off(onRendered); resolve(); };
+      api.renderFinished.on(onRendered);
+      setTimeout(() => { if (done) return; done = true; api.renderFinished.off(onRendered); resolve(); }, 3000);
+    });
+    for (let attempt = 0; attempt < 10; attempt++) {
+      notationSourceCanvas = document.querySelector('#notationContainer canvas');
+      if (notationSourceCanvas) break;
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    notationLoaded = !!notationSourceCanvas;
+  }
+
+  function setNotationTime(t, { waitForRender } = { waitForRender: false }) {
+    if (!alphaTabApi || !notationLoaded) return Promise.resolve();
+    const ms = Math.max(0, t * 1000);
+    if (!waitForRender) { alphaTabApi.timePosition = ms; return Promise.resolve(); }
+    return new Promise((resolve) => {
+      let done = false;
+      const onRendered = () => { if (done) return; done = true; alphaTabApi.renderFinished.off(onRendered); resolve(); };
+      alphaTabApi.renderFinished.on(onRendered);
+      alphaTabApi.timePosition = ms;
+      setTimeout(() => { if (done) return; done = true; alphaTabApi.renderFinished.off(onRendered); resolve(); }, 150);
+    });
+  }
+
+  // Reads alphaTab's OWN cursor element position (proven correct against
+  // the official alphaTab playground) -- we use its real position directly
+  // instead of recomputing sync/timing ourselves.
+  function getCursorFracFromAlphaTab() {
+    const cursorEl = document.querySelector('#notationContainer .at-cursor-bar');
+    if (!cursorEl || !notationSourceCanvas) return null;
+    const cursorRect = cursorEl.getBoundingClientRect();
+    const canvasRect = notationSourceCanvas.getBoundingClientRect();
+    if (!canvasRect.width || !notationSourceCanvas.width) return null;
+    const xOnScreen = cursorRect.left - canvasRect.left;
+    const xInCanvasPixels = xOnScreen * (notationSourceCanvas.width / canvasRect.width);
+    return Math.max(0, Math.min(1, xInCanvasPixels / notationSourceCanvas.width));
+  }
+
+  function drawNotationInto(targetCtx, w, h) {
+    if (!notationLoaded || !notationSourceCanvas) return;
+    const areaX = w * NOTATION_AREA_FRAC.x, areaY = h * NOTATION_AREA_FRAC.y;
+    const areaW = w * NOTATION_AREA_FRAC.w, areaH = h * NOTATION_AREA_FRAC.h;
+    const srcW = notationSourceCanvas.width, srcH = notationSourceCanvas.height;
+    if (!srcW || !srcH) return;
+
+    const frac = getCursorFracFromAlphaTab() ?? 0;
+    const targetAspect = areaW / areaH;
+    let windowW = srcH * targetAspect;
+    windowW = Math.min(srcW, Math.max(40, windowW));
+    const CURSOR_X_FRAC = 0.12; // fixed on-screen cursor position -- notes scroll through it, tuned via feedback
+    let srcX = frac * srcW - windowW * CURSOR_X_FRAC;
+    srcX = Math.max(0, Math.min(srcW - windowW, srcX));
+    targetCtx.drawImage(notationSourceCanvas, srcX, 0, windowW, srcH, areaX, areaY, areaW, areaH);
+
+    // Red playback cursor -- alphaTab's cursor DOM elements aren't part of
+    // the captured canvas, so draw our own marker, fixed in place.
+    const cursorX = areaX + CURSOR_X_FRAC * areaW;
+    const topInset = areaH * 0.2; // trims the top ~1/5, tuned via feedback
+    const bottomInset = -areaH * 0.08;
+    targetCtx.save();
+    targetCtx.strokeStyle = '#ff0000';
+    targetCtx.lineWidth = Math.max(3, w * 0.005);
+    targetCtx.beginPath();
+    targetCtx.moveTo(cursorX, areaY + topInset);
+    targetCtx.lineTo(cursorX, areaY + areaH - bottomInset);
+    targetCtx.stroke();
+    targetCtx.restore();
+  }
+
+  els.notationFile.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    els.notationStatus.className = 'status loading';
+    els.notationStatus.textContent = 'Loading notation engine…';
+    els.notationStatus.classList.remove('hidden');
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      await loadNotationFile(arrayBuffer);
+      els.notationStatus.className = 'status ok';
+      els.notationStatus.textContent = `Loaded "${file.name}". Will scroll/highlight in sync with playback.`;
+      if (parsedMidi) drawFrame();
+    } catch (err) {
+      notationLoaded = false;
+      els.notationStatus.className = 'status err';
+      els.notationStatus.textContent = 'Could not load this notation file: ' + (err.message || err);
     }
   });
 
@@ -1080,6 +1263,10 @@
       }
     }
     drawHeaderRow(ctx, w, h, Math.max(0, currentTime));
+    if (notationLoaded) {
+      setNotationTime(currentTime, { waitForRender: false }); // best-effort for live preview
+      drawNotationInto(ctx, w, h);
+    }
   }
 
   function triggerEventsUpTo(t) {
@@ -1213,6 +1400,10 @@
       renderCtx.drawImage(backgroundImg, 0, 0, w, h);
     }
     drawHeaderRow(renderCtx, w, h, 0);
+    if (notationLoaded) {
+      await setNotationTime(0, { waitForRender: true });
+      drawNotationInto(renderCtx, w, h);
+    }
     const beatIndex = Math.min(countInBeatCount - 1, Math.floor(realT / countInSecPerBeat));
     renderCtx.save();
     renderCtx.textAlign = 'center'; renderCtx.textBaseline = 'middle';
@@ -1234,6 +1425,10 @@
       }
     }
     drawHeaderRow(renderCtx, w, h, Math.min(t, parsedMidi.durationSeconds));
+    if (notationLoaded) {
+      await setNotationTime(Math.min(t, parsedMidi.durationSeconds), { waitForRender: true });
+      drawNotationInto(renderCtx, w, h);
+    }
   }
 
   els.generateBtn.addEventListener('click', async () => {
