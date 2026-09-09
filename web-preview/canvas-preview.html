@@ -827,6 +827,30 @@
     const frac = totalDuration > 0 ? Math.max(0, Math.min(1, (currentT || 0) / totalDuration)) : 0;
     const srcX = Math.max(0, Math.min(srcW - visibleSrcW, frac * (srcW - visibleSrcW)));
     targetCtx.drawImage(notationSourceCanvas, srcX, 0, visibleSrcW, srcH, areaX, areaY, visibleSrcW * scale, areaH);
+
+    // Draw alphaTab's REAL cursor position (read from its own DOM element,
+    // which is correctly kept in sync via the official External Media
+    // mechanism) -- this is not our own guess, it's alphaTab's actual answer
+    // to "where is playback right now".
+    const cursorEl = document.querySelector('#notationScrollWrapper .at-cursor-beat')
+      || document.querySelector('#notationScrollWrapper .at-cursor-bar');
+    if (cursorEl) {
+      const canvasRect = notationSourceCanvas.getBoundingClientRect();
+      if (canvasRect.width) {
+        const pxRatio = notationSourceCanvas.width / canvasRect.width;
+        const cursorRect = cursorEl.getBoundingClientRect();
+        const cursorXInSrc = (cursorRect.left - canvasRect.left) * pxRatio;
+        const cursorWInSrc = Math.max(1, cursorRect.width * pxRatio);
+        const drawX = areaX + (cursorXInSrc - srcX) * scale;
+        const drawW = Math.max(2, cursorWInSrc * scale);
+        if (drawX >= areaX - drawW && drawX <= areaX + areaW) {
+          targetCtx.save();
+          targetCtx.fillStyle = '#ff0000';
+          targetCtx.fillRect(drawX, areaY, drawW, areaH);
+          targetCtx.restore();
+        }
+      }
+    }
   }
 
   els.notationFile.addEventListener('change', async (e) => {
