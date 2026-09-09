@@ -219,7 +219,7 @@
   </div>
 
   <!-- alphaTab renders here off-screen -->
-  <div id="notationContainer" style="position:absolute; left:-99999px; top:-99999px; width:900px;"></div>
+  <div id="notationContainer" style="position:fixed; left:0; top:0; width:900px; opacity:0; pointer-events:none; z-index:-1;"></div>
 </div>
 
 <script>
@@ -705,6 +705,7 @@
           engine: 'html5', // renders to an internal <canvas> we can drawImage() from
           fontDirectory: `${ALPHATAB_BASE}/`, // font files are flat alongside alphaTab.min.js in R2, no font/ subfolder
           useWorkers: false,
+          enableLazyLoading: false, // container is kept off-view (opacity:0) for internal rendering only -- lazy/visibility-based rendering would never fire in that case
         },
         display: {
           layoutMode: 'horizontal', // continuous scrolling row, matches the fixed-width notation area
