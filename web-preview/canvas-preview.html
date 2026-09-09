@@ -690,6 +690,23 @@
     });
   }
 
+  // alphaTab's default palette assumes a white page (black notes, gray staff
+  // lines) -- on our black video background that's nearly invisible, so flip
+  // it to match whichever Video Color the user picked.
+  function notationColorResources() {
+    const dark = titleAndDisplaySettings.videoColor === 'white'; // notation should be dark-on-light
+    const ink = dark ? '#000000' : '#ffffff';
+    const faint = dark ? '#00000064' : '#ffffff64';
+    return {
+      mainGlyphColor: ink,
+      secondaryGlyphColor: faint,
+      scoreInfoColor: ink,
+      staffLineColor: dark ? '#666666' : '#aaaaaa',
+      barSeparatorColor: dark ? '#222222' : '#dddddd',
+      barNumberColor: '#c80000', // keep bar numbers red regardless, matches the mockup
+    };
+  }
+
   async function ensureAlphaTabApi() {
     if (alphaTabApi) return alphaTabApi;
     if (typeof window.alphaTab === 'undefined') {
@@ -710,6 +727,7 @@
         display: {
           layoutMode: 'horizontal', // continuous scrolling row, matches the fixed-width notation area
           staveProfile: 'default',
+          resources: notationColorResources(), // alphaTab defaults to black notation (for a white page) -- invisible on our black video background otherwise
         },
         player: {
           enablePlayer: true, // needed for tickPosition/timePosition to work at all
