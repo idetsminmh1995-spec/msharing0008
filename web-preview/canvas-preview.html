@@ -817,6 +817,15 @@
     const areaW = w * NOTATION_AREA_FRAC.w, areaH = h * NOTATION_AREA_FRAC.h;
     const srcW = notationSourceCanvas.width, srcH = notationSourceCanvas.height;
     if (!srcW || !srcH) return;
+
+    // Hard-clip everything below to the notation area's own rectangle --
+    // nothing (image or cursor) can ever render outside it or spill onto
+    // the rest of the video, regardless of any position/size math below.
+    targetCtx.save();
+    targetCtx.beginPath();
+    targetCtx.rect(areaX, areaY, areaW, areaH);
+    targetCtx.clip();
+
     // TEMP for sync verification only: scale by HEIGHT (so notes are big
     // enough to see) and pan across the whole-piece canvas linearly with
     // time, just so something visibly moves as MIDI plays -- this is NOT
@@ -844,13 +853,12 @@
         const drawX = areaX + (cursorXInSrc - srcX) * scale;
         const drawW = Math.max(2, cursorWInSrc * scale);
         if (drawX >= areaX - drawW && drawX <= areaX + areaW) {
-          targetCtx.save();
           targetCtx.fillStyle = '#ff0000';
           targetCtx.fillRect(drawX, areaY, drawW, areaH);
-          targetCtx.restore();
         }
       }
     }
+    targetCtx.restore(); // lifts the clip
   }
 
   els.notationFile.addEventListener('change', async (e) => {
