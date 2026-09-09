@@ -827,10 +827,10 @@
     // it around the current playback position, matching the WINDOW's own
     // aspect ratio to the target area's aspect ratio -- this fills the area
     // completely on both axes with no empty letterboxing and no squashing.
-    // NOTE: assumes roughly even horizontal spacing per second, which is an
-    // approximation on pieces with big tempo changes -- fine for now.
-    const totalDuration = parsedMidi ? parsedMidi.durationSeconds : 0;
-    const frac = totalDuration > 0 ? Math.min(1, Math.max(0, (currentT || 0) / totalDuration)) : 0;
+    // Position is tick-quantized (see quantizedFracAt) -- jumps exactly once
+    // per subdivision, landing precisely on each beat, instead of scrolling
+    // continuously.
+    const frac = quantizedFracAt(currentT || 0);
     const targetAspect = areaW / areaH;
     let windowW = srcH * targetAspect;
     windowW = Math.min(srcW, Math.max(40, windowW));
@@ -1181,6 +1181,24 @@
     const seg = getActiveTempoSeg(t);
     const elapsedTicks = (t - seg.time) * seg.bpm / 60 * parsedMidi.ppq;
     return seg.tick + elapsedTicks;
+  }
+
+  // Quantized tick-based scroll position -- snaps to the current subdivision
+  // slot (matching the "Counts" display mode: quarter/eighth/sixteenth) so
+  // the notation/cursor jump exactly once per subdivision instead of
+  // scrolling continuously, and stay tick-accurate (not just time-accurate)
+  // so they land exactly on the beat regardless of tempo changes.
+  function quantizedFracAt(t) {
+    if (!parsedMidi) return 0;
+    const ts = getActiveTimeSig(t);
+    const ticksPerBeat = (parsedMidi.ppq * 4) / ts.denominator;
+    const mode = els.subdivSelect ? els.subdivSelect.value : 'quarter';
+    const subN = mode === 'quarter' ? 1 : mode === 'eighth' ? 2 : 4;
+    const ticksPerSubdiv = ticksPerBeat / subN;
+    const tick = currentTickAt(t);
+    const quantizedTick = Math.floor(tick / ticksPerSubdiv) * ticksPerSubdiv;
+    const totalTicks = currentTickAt(parsedMidi.durationSeconds);
+    return totalTicks > 0 ? Math.min(1, Math.max(0, quantizedTick / totalTicks)) : 0;
   }
 
   function computeCurrentBeatLabel(t) {
