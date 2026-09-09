@@ -198,6 +198,10 @@
       <div class="canvas-wrap">
         <canvas id="canvas" width="1280" height="720"></canvas>
       </div>
+      <!-- Notation Engine 2 (VexFlow) renders here, VISIBLE for now so we can
+           confirm the MusicXML parsing itself is correct before wiring
+           compositing/cursor sync into the main canvas above. -->
+      <div id="notationContainer2" style="background:#fff; margin-top:10px; overflow-x:auto; border-radius:8px;"></div>
       <div class="player-bar">
         <button id="playBtn" class="icon-btn" disabled>▶</button>
         <button id="pauseBtn" class="icon-btn" disabled>⏸</button>
@@ -659,6 +663,159 @@
       userAudioBuffer = null;
       els.audioStatus.className = 'status err';
       els.audioStatus.textContent = 'Could not decode this audio file: ' + (err.message || err);
+    }
+  });
+
+  // ===================================================================
+  // Notation Engine 2 (VexFlow) -- MusicXML parsing + rendering built from
+  // scratch (VexFlow has no built-in importer, unlike alphaTab). This first
+  // pass: parse notes/rests/percussion noteheads per measure, render each
+  // measure's stave sequentially into one wide canvas. No cursor/scroll sync
+  // yet -- that's the next step once rendering itself is confirmed correct.
+  // ===================================================================
+  const VEXFLOW_BASE = '../notation-engine-2/vexflow/build/cjs';
+  let vexflowLoaded = false;
+  let vfCanvas = null; // the canvas VexFlow drew into, for later compositing
+
+  function loadScriptTag(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('Failed to load ' + src));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function ensureVexFlowLoaded() {
+    if (vexflowLoaded) return;
+    if (typeof window.Vex === 'undefined' && typeof window.VexFlow === 'undefined') {
+      await loadScriptTag(`${VEXFLOW_BASE}/vexflow.js`);
+    }
+    if (typeof window.Vex === 'undefined' && typeof window.VexFlow === 'undefined') {
+      throw new Error('VexFlow script loaded but window.Vex/VexFlow global is missing.');
+    }
+    vexflowLoaded = true;
+  }
+
+  // MusicXML duration-type ("quarter","eighth",...) -> VexFlow duration string.
+  const XML_TYPE_TO_VEX_DURATION = {
+    whole: 'w', half: 'h', quarter: 'q', eighth: '8',
+    '16th': '16', '32nd': '32', '64th': '64',
+  };
+  // Percussion display-step -> a rough treble-clef line position. Real
+  // MusicXML percussion maps step+octave to a specific staff line; this is
+  // an approximation covering the common 5-line drum staff positions.
+  const STEP_OCTAVE_TO_VEX_KEY = {
+    'F/5': 'g/5', 'E/5': 'f/5', 'D/5': 'e/5', 'C/5': 'd/5',
+    'B/4': 'c/5', 'A/4': 'b/4', 'G/4': 'a/4', 'F/4': 'g/4', 'E/4': 'f/4',
+  };
+
+  function parseMusicXML(xmlText) {
+    const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+    if (doc.querySelector('parsererror')) {
+      throw new Error('Could not parse this file as XML -- is it a valid MusicXML file?');
+    }
+    const firstPart = doc.querySelector('part');
+    if (!firstPart) throw new Error('No <part> element found -- is this a valid MusicXML file?');
+    let divisions = 1;
+    const measures = [];
+    for (const measureEl of firstPart.querySelectorAll('measure')) {
+      const divisionsEl = measureEl.querySelector('attributes > divisions');
+      if (divisionsEl) divisions = Number(divisionsEl.textContent);
+      const timeNumEl = measureEl.querySelector('attributes > time > beats');
+      const timeDenEl = measureEl.querySelector('attributes > time > beat-type');
+      const notes = [];
+      for (const noteEl of measureEl.querySelectorAll('note')) {
+        const isRest = !!noteEl.querySelector('rest');
+        const durationEl = noteEl.querySelector('duration');
+        const typeEl = noteEl.querySelector('type');
+        const noteheadEl = noteEl.querySelector('notehead');
+        const isChordContinuation = !!noteEl.querySelector('chord'); // same tick as previous note -- skip for now (MVP: single-voice, no chords)
+        if (isChordContinuation) continue;
+        const durationTicks = durationEl ? Number(durationEl.textContent) : divisions;
+        const vexDuration = (typeEl && XML_TYPE_TO_VEX_DURATION[typeEl.textContent]) || 'q';
+        let vexKey = 'b/4'; // default line if we can't map the percussion position
+        if (!isRest) {
+          const stepEl = noteEl.querySelector('unpitched > display-step');
+          const octaveEl = noteEl.querySelector('unpitched > display-octave');
+          if (stepEl && octaveEl) {
+            const lookupKey = `${stepEl.textContent}/${octaveEl.textContent}`;
+            vexKey = STEP_OCTAVE_TO_VEX_KEY[lookupKey] || vexKey;
+          }
+        }
+        const noteheadShape = noteheadEl && noteheadEl.textContent === 'x' ? 'x2' : null;
+        notes.push({
+          isRest, vexDuration, vexKey, noteheadShape,
+          durationTicks, durationQuarters: durationTicks / divisions,
+        });
+      }
+      measures.push({
+        timeNumerator: timeNumEl ? Number(timeNumEl.textContent) : (measures.length ? measures[measures.length - 1].timeNumerator : 4),
+        timeDenominator: timeDenEl ? Number(timeDenEl.textContent) : (measures.length ? measures[measures.length - 1].timeDenominator : 4),
+        notes,
+      });
+    }
+    return { divisions, measures };
+  }
+
+  function renderMusicXMLWithVexFlow(parsed, container) {
+    const VF = window.Vex ? window.Vex.Flow : window.VexFlow;
+    container.innerHTML = '';
+    const measureWidth = 220;
+    const totalWidth = Math.max(400, parsed.measures.length * measureWidth + 40);
+    const height = 200;
+    const renderer = new VF.Renderer(container, VF.Renderer.Backends.CANVAS);
+    renderer.resize(totalWidth, height);
+    const context = renderer.getContext();
+    vfCanvas = container.querySelector('canvas');
+
+    let x = 10;
+    parsed.measures.forEach((measure, mIdx) => {
+      const stave = new VF.Stave(x, 20, measureWidth);
+      if (mIdx === 0) {
+        stave.addClef('percussion');
+        stave.addTimeSignature(`${measure.timeNumerator}/${measure.timeDenominator}`);
+      }
+      stave.setContext(context).draw();
+
+      const vfNotes = measure.notes.map((n) => {
+        if (n.isRest) {
+          return new VF.StaveNote({ keys: ['b/4'], duration: n.vexDuration + 'r' });
+        }
+        const key = n.noteheadShape ? `${n.vexKey}/${n.noteheadShape}` : n.vexKey;
+        return new VF.StaveNote({ keys: [key], duration: n.vexDuration });
+      });
+      if (vfNotes.length > 0) {
+        const voice = new VF.Voice({ num_beats: measure.timeNumerator, beat_value: measure.timeDenominator });
+        voice.setStrict(false); // MVP: don't hard-fail on measures that don't add up exactly yet
+        voice.addTickables(vfNotes);
+        new VF.Formatter().joinVoices([voice]).format([voice], measureWidth - 20);
+        voice.draw(context, stave);
+      }
+      x += measureWidth;
+    });
+  }
+
+  els.notationFile.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    els.notationStatus.className = 'status loading';
+    els.notationStatus.textContent = 'Parsing MusicXML…';
+    els.notationStatus.classList.remove('hidden');
+    try {
+      await ensureVexFlowLoaded();
+      const text = await file.text();
+      const parsed = parseMusicXML(text);
+      const container = document.getElementById('notationContainer2');
+      renderMusicXMLWithVexFlow(parsed, container);
+      els.notationStatus.className = 'status ok';
+      els.notationStatus.textContent = `Loaded "${file.name}" — ${parsed.measures.length} measures parsed and rendered.`;
+      console.log('Notation Engine 2: parsed', parsed);
+    } catch (err) {
+      console.error('Notation Engine 2 error:', err);
+      els.notationStatus.className = 'status err';
+      els.notationStatus.textContent = 'Could not load this notation file: ' + (err.message || err);
     }
   });
 
