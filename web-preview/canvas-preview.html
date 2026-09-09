@@ -837,7 +837,7 @@
     // Fixed cursor position within the area (not computed/relative) -- the
     // window is positioned so "now" always sits exactly here, notes scroll
     // through it rather than the cursor moving across the notation.
-    const CURSOR_X_FRAC = 0.04;
+    const CURSOR_X_FRAC = 0.08;
     let srcX = frac * srcW - windowW * CURSOR_X_FRAC;
     srcX = Math.max(0, Math.min(srcW - windowW, srcX));
     targetCtx.drawImage(notationSourceCanvas, srcX, 0, windowW, srcH, areaX, areaY, areaW, areaH);
