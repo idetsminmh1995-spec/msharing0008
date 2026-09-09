@@ -1105,6 +1105,7 @@
     parsedMidi = pm;
     timeline = buildAnimationTimeline(pm.notes);
     currentTime = 0; nextEventIndex = 0; activeHits = [];
+    noteOnsetTicksSorted = null; // rebuilt lazily on next quantizedFracAt call for this file
     computeCountInTiming(pm);
     loadCountInClips(); // fire-and-forget; play() checks countInClips.length when it actually starts
 
@@ -1183,22 +1184,65 @@
     return seg.tick + elapsedTicks;
   }
 
-  // Quantized tick-based scroll position -- snaps to the current subdivision
-  // slot (matching the "Counts" display mode: quarter/eighth/sixteenth) so
-  // the notation/cursor jump exactly once per subdivision instead of
-  // scrolling continuously, and stay tick-accurate (not just time-accurate)
-  // so they land exactly on the beat regardless of tempo changes.
+  // Quantized scroll/cursor position -- snaps to where the actual notes are
+  // in the MIDI (grouped the same way the sticking engine treats simultaneous
+  // hits: notes within SIMULTANEOUS_TOLERANCE_SECONDS count as one onset, so
+  // e.g. Hi-Hat+Snare together on beat 1 is one jump, not two). Measures with
+  // no notes at all fall back to a steady quarter-note pulse so empty bars
+  // still scroll smoothly. The "Counts" dropdown only controls the displayed
+  // beat/subdivision LABEL (see computeCurrentBeatLabel) -- it no longer
+  // drives the scroll grid itself.
+  let noteOnsetTicksSorted = null;
+
+  function buildNoteOnsetTicks() {
+    noteOnsetTicksSorted = [];
+    if (!parsedMidi || !parsedMidi.notes.length) return;
+    const notes = [...parsedMidi.notes].sort((a, b) => a.time - b.time);
+    const onsetTimes = [];
+    let group = null;
+    for (const n of notes) {
+      if (group && n.time - group.time <= SIMULTANEOUS_TOLERANCE_SECONDS) continue; // same onset as the group's first note
+      group = n;
+      onsetTimes.push(n.time);
+    }
+    const onsetTicks = onsetTimes.map((t) => currentTickAt(t));
+
+    // Fill in empty measures with a default quarter-note pulse (1,2,3,4 at
+    // the file's tempo) so bars with no notes still scroll.
+    const totalTicks = currentTickAt(parsedMidi.durationSeconds);
+    const timeSigs = parsedMidi.timeSignatures;
+    const syntheticTicks = [];
+    for (let i = 0; i < timeSigs.length; i++) {
+      const ts = timeSigs[i];
+      const segStartTick = ts.tick;
+      const segEndTick = i + 1 < timeSigs.length ? timeSigs[i + 1].tick : totalTicks;
+      const ticksPerBeat = (parsedMidi.ppq * 4) / ts.denominator;
+      const ticksPerMeasure = ticksPerBeat * ts.numerator;
+      for (let mStart = segStartTick; mStart < segEndTick; mStart += ticksPerMeasure) {
+        const mEnd = Math.min(segEndTick, mStart + ticksPerMeasure);
+        const hasNote = onsetTicks.some((tk) => tk >= mStart && tk < mEnd);
+        if (!hasNote) {
+          for (let b = mStart; b < mEnd; b += ticksPerBeat) syntheticTicks.push(b);
+        }
+      }
+    }
+
+    noteOnsetTicksSorted = [...new Set([0, ...onsetTicks, ...syntheticTicks])].sort((a, b) => a - b);
+  }
+
   function quantizedFracAt(t) {
     if (!parsedMidi) return 0;
-    const ts = getActiveTimeSig(t);
-    const ticksPerBeat = (parsedMidi.ppq * 4) / ts.denominator;
-    const mode = els.subdivSelect ? els.subdivSelect.value : 'quarter';
-    const subN = mode === 'quarter' ? 1 : mode === 'eighth' ? 2 : 4;
-    const ticksPerSubdiv = ticksPerBeat / subN;
-    const tick = currentTickAt(t);
-    const quantizedTick = Math.floor(tick / ticksPerSubdiv) * ticksPerSubdiv;
+    if (!noteOnsetTicksSorted) buildNoteOnsetTicks();
     const totalTicks = currentTickAt(parsedMidi.durationSeconds);
-    return totalTicks > 0 ? Math.min(1, Math.max(0, quantizedTick / totalTicks)) : 0;
+    if (!noteOnsetTicksSorted.length || totalTicks <= 0) return 0;
+    const tick = currentTickAt(t);
+    if (tick <= noteOnsetTicksSorted[0]) return 0;
+    let lo = 0, hi = noteOnsetTicksSorted.length - 1;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (noteOnsetTicksSorted[mid] <= tick) lo = mid; else hi = mid - 1;
+    }
+    return Math.min(1, Math.max(0, noteOnsetTicksSorted[lo] / totalTicks));
   }
 
   function computeCurrentBeatLabel(t) {
