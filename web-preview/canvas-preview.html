@@ -671,7 +671,10 @@
 
   // Self-hosted via our own Worker + R2 (no external CDN dependency at all --
   // avoids jsdelivr/GitHub caching or availability issues entirely).
-  const ALPHATAB_BASE = `${WORKER_BASE}/assets/shared/${encodeURIComponent('Notation Engine')}`;
+  // Served directly from this same GitHub Pages site (repo's notation-engine/
+  // folder), not R2/Worker or any external CDN -- simplest, no cross-origin
+  // or cache-header complications since it's just another file in our repo.
+  const ALPHATAB_BASE = '../notation-engine/alphatab/dist';
   // Fraction of the canvas this notation occupies -- matches the empty
   // black space above the drum kit photo (tuned earlier for the timing badge).
   const NOTATION_AREA_FRAC = { x: 0.03, y: 0.13, w: 0.94, h: 0.38 };
@@ -720,7 +723,7 @@
       alphaTabApi = new window.alphaTab.AlphaTabApi(container, {
         core: {
           engine: 'html5', // renders to an internal <canvas> we can drawImage() from
-          fontDirectory: `${ALPHATAB_BASE}/`, // font files are flat alongside alphaTab.min.js in R2, no font/ subfolder
+          fontDirectory: `${ALPHATAB_BASE}/font/`, // this GitHub-hosted build keeps font/ as its own subfolder
           useWorkers: false,
           enableLazyLoading: false, // container is kept off-view (opacity:0) for internal rendering only -- lazy/visibility-based rendering would never fire in that case
         },
