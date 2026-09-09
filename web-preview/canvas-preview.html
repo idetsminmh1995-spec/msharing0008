@@ -1499,6 +1499,12 @@
       renderCtx.drawImage(backgroundImg, 0, 0, w, h);
     }
     drawHeaderRow(renderCtx, w, h, 0);
+    if (notationLoaded) {
+      // Notation sits at its very start (frac 0, cursor at the fixed
+      // position) throughout the whole count-in -- it should already be in
+      // place, not pop in once the vocal count finishes.
+      drawNotationInto(renderCtx, w, h, 0);
+    }
     const beatIndex = Math.min(countInBeatCount - 1, Math.floor(realT / countInSecPerBeat));
     renderCtx.save();
     renderCtx.textAlign = 'center'; renderCtx.textBaseline = 'middle';
