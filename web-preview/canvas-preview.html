@@ -740,7 +740,7 @@
           scale: 3.0, // higher raw resolution -- wrapper is CSS-small but content renders at native canvas resolution
         },
         player: {
-          enablePlayer: true, // needed for timePosition/cursor to work at all
+          playerMode: 'EnabledExternalMedia', // official mechanism for syncing alphaTab's cursor to an externally-driven timeline (our own MIDI playback clock) -- see alphatab.net/docs/guides/audio-video-sync
           enableCursor: true,
         },
       });
@@ -749,6 +749,23 @@
       throw new Error('Failed to construct AlphaTabApi: ' + (err && err.message ? err.message : err));
     }
     alphaTabApi.error.on((err) => console.error('alphaTab: internal error event:', err));
+    // We drive our own audio/timeline entirely -- this handler just answers
+    // alphaTab's questions about it (duration/rate/volume) and receives
+    // seek/play/pause notifications we can ignore, per the official
+    // IExternalMediaHandler pattern.
+    const externalMediaHandler = {
+      _playbackRate: 1,
+      _masterVolume: 1,
+      get backingTrackDuration() { return (parsedMidi ? parsedMidi.durationSeconds : 0) * 1000; },
+      get playbackRate() { return this._playbackRate; },
+      set playbackRate(v) { this._playbackRate = v; },
+      get masterVolume() { return this._masterVolume; },
+      set masterVolume(v) { this._masterVolume = v; },
+      seekTo(_time) { /* no-op -- we are the master timeline, not alphaTab */ },
+      play() {},
+      pause() {},
+    };
+    alphaTabApi.player.output.handler = externalMediaHandler;
     return alphaTabApi;
   }
 
@@ -781,12 +798,15 @@
   function setNotationTime(t, { waitForRender } = { waitForRender: false }) {
     if (!alphaTabApi || !notationLoaded) return Promise.resolve();
     const ms = Math.max(0, t * 1000);
-    if (!waitForRender) { alphaTabApi.timePosition = ms; return Promise.resolve(); }
+    // Official sync mechanism (alphatab.net/docs/guides/audio-video-sync)
+    // for an externally-driven timeline -- tells alphaTab where "playback"
+    // currently is, which drives its own cursor/scroll correctly.
+    if (!waitForRender) { alphaTabApi.player.output.updatePosition(ms); return Promise.resolve(); }
     return new Promise((resolve) => {
       let done = false;
       const onRendered = () => { if (done) return; done = true; alphaTabApi.renderFinished.off(onRendered); resolve(); };
       alphaTabApi.renderFinished.on(onRendered);
-      alphaTabApi.timePosition = ms;
+      alphaTabApi.player.output.updatePosition(ms);
       setTimeout(() => { if (done) return; done = true; alphaTabApi.renderFinished.off(onRendered); resolve(); }, 150);
     });
   }
