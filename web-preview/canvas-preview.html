@@ -680,7 +680,7 @@
   // recompute timing/sync ourselves.
   // ===================================================================
   const ALPHATAB_BASE = '../notation-engine/alphatab/dist';
-  const NOTATION_AREA_FRAC = { x: 0.02, y: 0.02, w: 0.96, h: 0.96 }; // TEMP: made huge just to visually verify MIDI/notation sync -- will shrink back once sync is confirmed
+  const NOTATION_AREA_FRAC = { x: 0.05, y: 0.05, w: 0.9, h: 0.5 }; // TEMP: still bigger than final size, for sync verification -- was overflowing at 0.96
 
   let alphaTabApi = null;
   let notationLoaded = false;
