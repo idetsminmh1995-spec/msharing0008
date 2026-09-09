@@ -734,10 +734,7 @@
           enableLazyLoading: false, // container is kept off-view (opacity:0), so visibility-based lazy rendering would never fire
         },
         display: {
-          // layoutMode intentionally left at alphaTab's own default (Page,
-          // wraps into multiple lines) -- matches the official playground's
-          // behavior exactly, rather than the 'horizontal' single-row mode
-          // we were forcing, which made our cursor-position logic diverge.
+          layoutMode: 'horizontal', // single continuous row -- required for a fixed cursor with notation scrolling past it (the target design), now driven by the REAL synced cursor position instead of a linear-time guess
           staveProfile: 'default',
           resources: notationColorResources(),
           scale: 3.0, // higher raw resolution -- wrapper is CSS-small but content renders at native canvas resolution
@@ -829,44 +826,37 @@
     targetCtx.rect(areaX, areaY, areaW, areaH);
     targetCtx.clip();
 
-    // Default layout (Page) wraps into multiple lines stacked VERTICALLY,
-    // matching the official playground -- so the panning axis is Y (which
-    // line is currently visible), not X. Scale by WIDTH (fill the area's
-    // width) and pan vertically, still linear-with-time for now (temporary,
-    // just for sync verification).
-    const scale = areaW / srcW;
-    const visibleSrcH = Math.min(srcH, areaH / scale);
-    const totalDuration = parsedMidi ? parsedMidi.durationSeconds : 0;
-    const frac = totalDuration > 0 ? Math.max(0, Math.min(1, (currentT || 0) / totalDuration)) : 0;
-    const srcY = Math.max(0, Math.min(srcH - visibleSrcH, frac * (srcH - visibleSrcH)));
-    targetCtx.drawImage(notationSourceCanvas, 0, srcY, srcW, visibleSrcH, areaX, areaY, areaW, visibleSrcH * scale);
-
-    // Draw alphaTab's REAL cursor position (read from its own DOM element,
-    // which is correctly kept in sync via the official External Media
-    // mechanism) -- this is not our own guess, it's alphaTab's actual answer
-    // to "where is playback right now". Y-axis now, matching the vertical
-    // pan above.
+    // TARGET DESIGN: cursor stays FIXED at CURSOR_X_FRAC of the area's
+    // width; notation scrolls past it instead. Driven by alphaTab's REAL
+    // cursor position (from the official External Media sync), not a
+    // linear-time guess, so it stays accurate even with tempo changes.
+    const scale = areaH / srcH;
+    const visibleSrcW = Math.min(srcW, areaW / scale);
+    const CURSOR_X_FRAC = 0.15;
     const cursorEl = document.querySelector('#notationScrollWrapper .at-cursor-beat')
       || document.querySelector('#notationScrollWrapper .at-cursor-bar');
+    let cursorXInSrc = null;
     if (cursorEl) {
       const canvasRect = notationSourceCanvas.getBoundingClientRect();
-      if (canvasRect.height) {
-        const pxRatio = notationSourceCanvas.height / canvasRect.height;
+      if (canvasRect.width) {
+        const pxRatio = notationSourceCanvas.width / canvasRect.width;
         const cursorRect = cursorEl.getBoundingClientRect();
-        const cursorXInSrc = (cursorRect.left - canvasRect.left) * pxRatio;
-        const cursorYInSrc = (cursorRect.top - canvasRect.top) * pxRatio;
-        const cursorWInSrc = Math.max(1, cursorRect.width * pxRatio);
-        const cursorHInSrc = Math.max(1, cursorRect.height * pxRatio);
-        const drawX = areaX + cursorXInSrc * scale;
-        const drawY = areaY + (cursorYInSrc - srcY) * scale;
-        const drawW = Math.max(2, cursorWInSrc * scale);
-        const drawH = Math.max(2, cursorHInSrc * scale);
-        if (drawY >= areaY - drawH && drawY <= areaY + areaH) {
-          targetCtx.fillStyle = '#ff0000';
-          targetCtx.fillRect(drawX, drawY, drawW, drawH);
-        }
+        cursorXInSrc = (cursorRect.left - canvasRect.left) * pxRatio;
       }
     }
+    // srcX is chosen so that the real cursor position lands exactly at
+    // CURSOR_X_FRAC of the visible window -- if the cursor can't be found
+    // yet (e.g. score just loaded), fall back to showing the very start.
+    const srcX = cursorXInSrc !== null
+      ? Math.max(0, Math.min(srcW - visibleSrcW, cursorXInSrc - visibleSrcW * CURSOR_X_FRAC))
+      : 0;
+    targetCtx.drawImage(notationSourceCanvas, srcX, 0, visibleSrcW, srcH, areaX, areaY, visibleSrcW * scale, areaH);
+
+    // Fixed cursor marker -- always drawn at the same spot; the notation
+    // image above is what moves.
+    const cursorX = areaX + CURSOR_X_FRAC * areaW;
+    targetCtx.fillStyle = '#ff0000';
+    targetCtx.fillRect(cursorX, areaY, Math.max(2, w * 0.004), areaH);
     targetCtx.restore(); // lifts the clip
   }
 
