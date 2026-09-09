@@ -1197,7 +1197,7 @@
 
   function buildNoteOnsetTicks() {
     noteOnsetTicksSorted = [];
-    if (!parsedMidi || !parsedMidi.notes.length) return;
+    if (!parsedMidi) return;
     const notes = [...parsedMidi.notes].sort((a, b) => a.time - b.time);
     const onsetTimes = [];
     let group = null;
@@ -1208,8 +1208,12 @@
     }
     const onsetTicks = onsetTimes.map((t) => currentTickAt(t));
 
-    // Fill in empty measures with a default quarter-note pulse (1,2,3,4 at
-    // the file's tempo) so bars with no notes still scroll.
+    // Guarantee at least one jump per BEAT everywhere in the piece (not just
+    // in fully-empty bars) -- if a beat itself has no note onset, still add
+    // its boundary as a fallback point, so the cursor never sits frozen
+    // through a whole bar just because beat 1 happened to be a rest. Real
+    // onsets still add the extra in-between jumps (the "&", "e", "a" etc.)
+    // wherever notes actually fall off the quarter grid.
     const totalTicks = currentTickAt(parsedMidi.durationSeconds);
     const timeSigs = parsedMidi.timeSignatures;
     const syntheticTicks = [];
@@ -1218,13 +1222,10 @@
       const segStartTick = ts.tick;
       const segEndTick = i + 1 < timeSigs.length ? timeSigs[i + 1].tick : totalTicks;
       const ticksPerBeat = (parsedMidi.ppq * 4) / ts.denominator;
-      const ticksPerMeasure = ticksPerBeat * ts.numerator;
-      for (let mStart = segStartTick; mStart < segEndTick; mStart += ticksPerMeasure) {
-        const mEnd = Math.min(segEndTick, mStart + ticksPerMeasure);
-        const hasNote = onsetTicks.some((tk) => tk >= mStart && tk < mEnd);
-        if (!hasNote) {
-          for (let b = mStart; b < mEnd; b += ticksPerBeat) syntheticTicks.push(b);
-        }
+      for (let b = segStartTick; b < segEndTick; b += ticksPerBeat) {
+        const beatEnd = Math.min(segEndTick, b + ticksPerBeat);
+        const hasOnsetThisBeat = onsetTicks.some((tk) => tk >= b && tk < beatEnd);
+        if (!hasOnsetThisBeat) syntheticTicks.push(b);
       }
     }
 
