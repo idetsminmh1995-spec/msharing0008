@@ -711,6 +711,49 @@
     'B/4': 'c/5', 'A/4': 'b/4', 'G/4': 'a/4', 'F/4': 'g/4', 'E/4': 'f/4',
   };
 
+  // .mxl files are ZIP-compressed MusicXML containers (not plain XML text).
+  // Minimal in-browser ZIP reader (local file headers only, using the
+  // browser's built-in DecompressionStream for the deflate entries) so we
+  // don't need an external ZIP library dependency.
+  async function extractMusicXMLFromMxl(arrayBuffer) {
+    const bytes = new Uint8Array(arrayBuffer);
+    const dv = new DataView(arrayBuffer);
+    let offset = 0;
+    let bestEntryText = null;
+    while (offset + 4 <= bytes.length && dv.getUint32(offset, true) === 0x04034b50) {
+      const compressionMethod = dv.getUint16(offset + 8, true);
+      const compressedSize = dv.getUint32(offset + 18, true);
+      const uncompressedSize = dv.getUint32(offset + 22, true);
+      const nameLength = dv.getUint16(offset + 26, true);
+      const extraLength = dv.getUint16(offset + 28, true);
+      const nameStart = offset + 30;
+      const name = new TextDecoder().decode(bytes.slice(nameStart, nameStart + nameLength));
+      const dataStart = nameStart + nameLength + extraLength;
+      const dataEnd = dataStart + compressedSize;
+      const isScoreXml = name.toLowerCase().endsWith('.xml') && !name.toLowerCase().includes('meta-inf');
+      if (isScoreXml) {
+        const compressedChunk = bytes.slice(dataStart, dataEnd);
+        let xmlBytes;
+        if (compressionMethod === 0) {
+          xmlBytes = compressedChunk; // stored, no compression
+        } else if (compressionMethod === 8) {
+          const ds = new DecompressionStream('deflate-raw');
+          const stream = new Blob([compressedChunk]).stream().pipeThrough(ds);
+          xmlBytes = new Uint8Array(await new Response(stream).arrayBuffer());
+        } else {
+          throw new Error(`Unsupported .mxl compression method (${compressionMethod}) for entry "${name}".`);
+        }
+        bestEntryText = new TextDecoder('utf-8').decode(xmlBytes);
+        break; // first real score entry found -- good enough for our files
+      }
+      offset = dataEnd;
+    }
+    if (bestEntryText === null) {
+      throw new Error('Could not find a MusicXML entry inside this .mxl file.');
+    }
+    return bestEntryText;
+  }
+
   function parseMusicXML(xmlText) {
     const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
     if (doc.querySelector('parsererror')) {
@@ -805,7 +848,13 @@
     els.notationStatus.classList.remove('hidden');
     try {
       await ensureVexFlowLoaded();
-      const text = await file.text();
+      let text;
+      if (file.name.toLowerCase().endsWith('.mxl')) {
+        const arrayBuffer = await file.arrayBuffer();
+        text = await extractMusicXMLFromMxl(arrayBuffer);
+      } else {
+        text = await file.text();
+      }
       const parsed = parseMusicXML(text);
       const container = document.getElementById('notationContainer2');
       renderMusicXMLWithVexFlow(parsed, container);
