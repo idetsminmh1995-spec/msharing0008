@@ -847,7 +847,7 @@
     // so draw our own, fixed in place (shorter and thicker than a full-height
     // hairline, per feedback). Top and bottom extension tuned independently.
     const cursorX = areaX + CURSOR_X_FRAC * areaW;
-    const topInset = -areaH * 0.03; // less tall on top than before, per feedback
+    const topInset = 0; // starts exactly at the area's own top -- no extension above it
     const bottomInset = -areaH * 0.08;
     targetCtx.save();
     targetCtx.strokeStyle = '#ff0000';
