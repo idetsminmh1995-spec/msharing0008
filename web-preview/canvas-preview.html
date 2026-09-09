@@ -837,7 +837,7 @@
     // Fixed cursor position within the area (not computed/relative) -- the
     // window is positioned so "now" always sits exactly here, notes scroll
     // through it rather than the cursor moving across the notation.
-    const CURSOR_X_FRAC = 0.08;
+    const CURSOR_X_FRAC = 0.04;
     let srcX = frac * srcW - windowW * CURSOR_X_FRAC;
     srcX = Math.max(0, Math.min(srcW - windowW, srcX));
     targetCtx.drawImage(notationSourceCanvas, srcX, 0, windowW, srcH, areaX, areaY, areaW, areaH);
@@ -845,15 +845,16 @@
     // Red playback cursor -- alphaTab's own cursor elements (.at-cursor-bar)
     // are separate DOM overlays, not part of the canvas we captured above,
     // so draw our own, fixed in place (shorter and thicker than a full-height
-    // hairline, per feedback).
+    // hairline, per feedback). Top and bottom extension tuned independently.
     const cursorX = areaX + CURSOR_X_FRAC * areaW;
-    const cursorInset = -areaH * 0.08; // negative -- taller than the notation area itself, extending slightly past it
+    const topInset = -areaH * 0.03; // less tall on top than before, per feedback
+    const bottomInset = -areaH * 0.08;
     targetCtx.save();
     targetCtx.strokeStyle = '#ff0000';
     targetCtx.lineWidth = Math.max(3, w * 0.005);
     targetCtx.beginPath();
-    targetCtx.moveTo(cursorX, areaY + cursorInset);
-    targetCtx.lineTo(cursorX, areaY + areaH - cursorInset);
+    targetCtx.moveTo(cursorX, areaY + topInset);
+    targetCtx.lineTo(cursorX, areaY + areaH - bottomInset);
     targetCtx.stroke();
     targetCtx.restore();
   }
