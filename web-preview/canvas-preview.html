@@ -224,7 +224,7 @@
        at this wrapper) does real, readable-via-scrollLeft clipping, instead
        of trying to scroll the whole page (its default target). -->
   <div id="notationContainer" style="position:fixed; left:0; top:0; opacity:0; pointer-events:none; z-index:-1;">
-    <div id="notationScrollWrapper" style="width:1203px; height:274px; overflow:hidden; position:relative;"></div>
+    <div id="notationScrollWrapper" style="width:1203px; position:relative;"></div>
   </div>
 
 </div>
@@ -734,7 +734,10 @@
           enableLazyLoading: false, // container is kept off-view (opacity:0), so visibility-based lazy rendering would never fire
         },
         display: {
-          layoutMode: 'horizontal', // continuous scrolling row
+          // layoutMode intentionally left at alphaTab's own default (Page,
+          // wraps into multiple lines) -- matches the official playground's
+          // behavior exactly, rather than the 'horizontal' single-row mode
+          // we were forcing, which made our cursor-position logic diverge.
           staveProfile: 'default',
           resources: notationColorResources(),
           scale: 3.0, // higher raw resolution -- wrapper is CSS-small but content renders at native canvas resolution
@@ -826,35 +829,41 @@
     targetCtx.rect(areaX, areaY, areaW, areaH);
     targetCtx.clip();
 
-    // TEMP for sync verification only: scale by HEIGHT (so notes are big
-    // enough to see) and pan across the whole-piece canvas linearly with
-    // time, just so something visibly moves as MIDI plays -- this is NOT
-    // the final cursor/scroll design, only enough to confirm sync exists.
-    const scale = areaH / srcH;
-    const visibleSrcW = Math.min(srcW, areaW / scale);
+    // Default layout (Page) wraps into multiple lines stacked VERTICALLY,
+    // matching the official playground -- so the panning axis is Y (which
+    // line is currently visible), not X. Scale by WIDTH (fill the area's
+    // width) and pan vertically, still linear-with-time for now (temporary,
+    // just for sync verification).
+    const scale = areaW / srcW;
+    const visibleSrcH = Math.min(srcH, areaH / scale);
     const totalDuration = parsedMidi ? parsedMidi.durationSeconds : 0;
     const frac = totalDuration > 0 ? Math.max(0, Math.min(1, (currentT || 0) / totalDuration)) : 0;
-    const srcX = Math.max(0, Math.min(srcW - visibleSrcW, frac * (srcW - visibleSrcW)));
-    targetCtx.drawImage(notationSourceCanvas, srcX, 0, visibleSrcW, srcH, areaX, areaY, visibleSrcW * scale, areaH);
+    const srcY = Math.max(0, Math.min(srcH - visibleSrcH, frac * (srcH - visibleSrcH)));
+    targetCtx.drawImage(notationSourceCanvas, 0, srcY, srcW, visibleSrcH, areaX, areaY, areaW, visibleSrcH * scale);
 
     // Draw alphaTab's REAL cursor position (read from its own DOM element,
     // which is correctly kept in sync via the official External Media
     // mechanism) -- this is not our own guess, it's alphaTab's actual answer
-    // to "where is playback right now".
+    // to "where is playback right now". Y-axis now, matching the vertical
+    // pan above.
     const cursorEl = document.querySelector('#notationScrollWrapper .at-cursor-beat')
       || document.querySelector('#notationScrollWrapper .at-cursor-bar');
     if (cursorEl) {
       const canvasRect = notationSourceCanvas.getBoundingClientRect();
-      if (canvasRect.width) {
-        const pxRatio = notationSourceCanvas.width / canvasRect.width;
+      if (canvasRect.height) {
+        const pxRatio = notationSourceCanvas.height / canvasRect.height;
         const cursorRect = cursorEl.getBoundingClientRect();
         const cursorXInSrc = (cursorRect.left - canvasRect.left) * pxRatio;
+        const cursorYInSrc = (cursorRect.top - canvasRect.top) * pxRatio;
         const cursorWInSrc = Math.max(1, cursorRect.width * pxRatio);
-        const drawX = areaX + (cursorXInSrc - srcX) * scale;
+        const cursorHInSrc = Math.max(1, cursorRect.height * pxRatio);
+        const drawX = areaX + cursorXInSrc * scale;
+        const drawY = areaY + (cursorYInSrc - srcY) * scale;
         const drawW = Math.max(2, cursorWInSrc * scale);
-        if (drawX >= areaX - drawW && drawX <= areaX + areaW) {
+        const drawH = Math.max(2, cursorHInSrc * scale);
+        if (drawY >= areaY - drawH && drawY <= areaY + areaH) {
           targetCtx.fillStyle = '#ff0000';
-          targetCtx.fillRect(drawX, areaY, drawW, areaH);
+          targetCtx.fillRect(drawX, drawY, drawW, drawH);
         }
       }
     }
