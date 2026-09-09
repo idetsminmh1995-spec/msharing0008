@@ -831,7 +831,7 @@
     // approximation on pieces with big tempo changes -- fine for now.
     const totalDuration = parsedMidi ? parsedMidi.durationSeconds : 0;
     const frac = totalDuration > 0 ? Math.min(1, Math.max(0, (currentT || 0) / totalDuration)) : 0;
-    const windowFrac = 0.16; // fraction of the total notation width visible at once
+    const windowFrac = 0.07; // fraction of the total notation width visible at once (smaller = bigger/fewer notes on screen)
     const windowW = Math.max(1, srcW * windowFrac);
     let srcX = frac * srcW - windowW * 0.2; // keep "now" a little in from the left edge of the window
     srcX = Math.max(0, Math.min(srcW - windowW, srcX));
