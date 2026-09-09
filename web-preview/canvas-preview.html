@@ -816,6 +816,21 @@
     });
   }
 
+  // Reads alphaTab's OWN cursor element position (it already tracks time
+  // correctly -- proven against the official alphaTab playground) instead
+  // of us recomputing sync/timing ourselves. Our code's job is only to crop
+  // and position that already-correct output into the video frame.
+  function getCursorFracFromAlphaTab() {
+    const cursorEl = document.querySelector('#notationContainer .at-cursor-bar');
+    if (!cursorEl || !notationSourceCanvas) return null;
+    const cursorRect = cursorEl.getBoundingClientRect();
+    const canvasRect = notationSourceCanvas.getBoundingClientRect();
+    if (!canvasRect.width || !notationSourceCanvas.width) return null;
+    const xOnScreen = cursorRect.left - canvasRect.left;
+    const xInCanvasPixels = xOnScreen * (notationSourceCanvas.width / canvasRect.width);
+    return Math.max(0, Math.min(1, xInCanvasPixels / notationSourceCanvas.width));
+  }
+
   function drawNotationInto(targetCtx, w, h, currentT) {
     if (!notationLoaded || !notationSourceCanvas) return;
     const areaX = w * NOTATION_AREA_FRAC.x, areaY = h * NOTATION_AREA_FRAC.y;
@@ -830,7 +845,8 @@
     // Position is tick-quantized (see quantizedFracAt) -- jumps exactly once
     // per subdivision, landing precisely on each beat, instead of scrolling
     // continuously.
-    const frac = quantizedFracAt(currentT || 0);
+    const cursorFrac = getCursorFracFromAlphaTab();
+    const frac = cursorFrac !== null ? cursorFrac : quantizedFracAt(currentT || 0); // fall back to our own calc only if alphaTab's cursor element isn't found
     const targetAspect = areaW / areaH;
     let windowW = srcH * targetAspect;
     windowW = Math.min(srcW, Math.max(40, windowW));
@@ -1497,7 +1513,7 @@
 
   // Background + big centered beat number, shown during the count-in
   // pre-roll before the actual content starts (deterministic, for export).
-  function renderCountInFrameAt(renderCtx, w, h, realT) {
+  async function renderCountInFrameAt(renderCtx, w, h, realT) {
     renderCtx.fillStyle = '#000'; renderCtx.fillRect(0, 0, w, h);
     if (backgroundImg && backgroundImg.complete && backgroundImg.naturalWidth) {
       renderCtx.drawImage(backgroundImg, 0, 0, w, h);
@@ -1507,6 +1523,7 @@
       // Notation sits at its very start (frac 0, cursor at the fixed
       // position) throughout the whole count-in -- it should already be in
       // place, not pop in once the vocal count finishes.
+      await setNotationTime(0, { waitForRender: true });
       drawNotationInto(renderCtx, w, h, 0);
     }
     const beatIndex = Math.min(countInBeatCount - 1, Math.floor(realT / countInSecPerBeat));
@@ -1658,7 +1675,7 @@
       for (let i = 0; i < totalFrames; i++) {
         const realT = i / RENDER_FPS;
         if (realT < countInOffsetSeconds) {
-          renderCountInFrameAt(renderCtx, w, h, realT);
+          await renderCountInFrameAt(renderCtx, w, h, realT);
         } else {
           await renderFrameAt(renderCtx, w, h, realT - countInOffsetSeconds);
         }
