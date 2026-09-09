@@ -847,6 +847,10 @@
     // srcX is chosen so that the real cursor position lands exactly at
     // CURSOR_X_FRAC of the visible window -- if the cursor can't be found
     // yet (e.g. score just loaded), fall back to showing the very start.
+    if (window.__notationDebugLastLog === undefined || performance.now() - window.__notationDebugLastLog > 1000) {
+      window.__notationDebugLastLog = performance.now();
+      console.log('Notation debug:', { currentT, cursorFound: !!cursorEl, cursorXInSrc, srcW, visibleSrcW });
+    }
     const srcX = cursorXInSrc !== null
       ? Math.max(0, Math.min(srcW - visibleSrcW, cursorXInSrc - visibleSrcW * CURSOR_X_FRAC))
       : 0;
