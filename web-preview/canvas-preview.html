@@ -837,6 +837,22 @@
     let srcX = frac * srcW - windowW * 0.2; // keep "now" a little in from the left edge of the window
     srcX = Math.max(0, Math.min(srcW - windowW, srcX));
     targetCtx.drawImage(notationSourceCanvas, srcX, 0, windowW, srcH, areaX, areaY, areaW, areaH);
+
+    // Red playback cursor -- alphaTab's own cursor elements (.at-cursor-bar)
+    // are separate DOM overlays, not part of the canvas we captured above,
+    // so draw our own based on where "now" falls within the visible crop
+    // window (matches the same linear time-to-pixel approximation used for
+    // the crop itself). Active for the whole piece, starting at note 1.
+    const cursorRelX = (frac * srcW - srcX) / windowW; // 0..1 position within the window
+    const cursorX = areaX + Math.max(0, Math.min(1, cursorRelX)) * areaW;
+    targetCtx.save();
+    targetCtx.strokeStyle = '#ff0000';
+    targetCtx.lineWidth = Math.max(2, w * 0.0025);
+    targetCtx.beginPath();
+    targetCtx.moveTo(cursorX, areaY);
+    targetCtx.lineTo(cursorX, areaY + areaH);
+    targetCtx.stroke();
+    targetCtx.restore();
   }
 
   els.notationFile = document.getElementById('notationFile');
