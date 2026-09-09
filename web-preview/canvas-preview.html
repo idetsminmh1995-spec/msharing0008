@@ -720,12 +720,11 @@
     if (typeof window.alphaTab === 'undefined' || !window.alphaTab.AlphaTabApi) {
       throw new Error('alphaTab library loaded but window.alphaTab.AlphaTabApi is missing.');
     }
-    // alphaTab renders INTO the scroll wrapper (fixed size + overflow:hidden)
-    // so its own default horizontal auto-scroll (kept entirely stock, no
-    // custom scroll/cursor handlers) does real, clippable scrolling we can
-    // read back via wrapper.scrollLeft -- not a DOM-position-diffing hack.
+    // Everything left at alphaTab's own stock defaults for now (scroll,
+    // cursor) -- per feedback, priority right now is just getting MIDI/XML
+    // sync correct with the simplest possible setup; positioning/cursor
+    // customization comes back later once that's solid.
     const wrapper = document.getElementById('notationScrollWrapper');
-    const CURSOR_PIXELS_FROM_LEFT = wrapper.clientWidth * 0.12; // fixed cursor position, tune via feedback
     try {
       alphaTabApi = new window.alphaTab.AlphaTabApi(wrapper, {
         core: {
@@ -743,8 +742,6 @@
         player: {
           enablePlayer: true, // needed for timePosition/cursor to work at all
           enableCursor: true,
-          scrollElement: '#notationScrollWrapper', // default target is document.body -- point it at our own wrapper instead
-          scrollOffsetX: -CURSOR_PIXELS_FROM_LEFT, // alphaTab's stock horizontal scroll keeps the cursor this many px from the wrapper's left edge
         },
       });
     } catch (err) {
@@ -800,32 +797,14 @@
     const areaW = w * NOTATION_AREA_FRAC.w, areaH = h * NOTATION_AREA_FRAC.h;
     const srcW = notationSourceCanvas.width, srcH = notationSourceCanvas.height;
     if (!srcW || !srcH) return;
-
-    // alphaTab's own default scroll handler already keeps the current beat
-    // at a fixed offset within the wrapper (via player.scrollOffsetX) -- we
-    // just read its real scrollLeft (a plain, reliable DOM property) to know
-    // which slice of the full-piece canvas is "currently visible", instead
-    // of recomputing position ourselves.
-    const wrapper = document.getElementById('notationScrollWrapper');
-    const pxRatio = srcH / wrapper.clientHeight; // CSS px -> canvas-internal px (accounts for the `scale` setting)
-    const srcXFromScroll = wrapper.scrollLeft * pxRatio;
-    const windowW = wrapper.clientWidth * pxRatio;
-    const srcX = Math.max(0, Math.min(Math.max(0, srcW - windowW), srcXFromScroll));
-    targetCtx.drawImage(notationSourceCanvas, srcX, 0, Math.min(windowW, srcW - srcX), srcH, areaX, areaY, areaW, areaH);
-
-    // Simple fixed playback-position marker (alphaTab's own cursor DOM
-    // elements aren't part of the captured canvas, so draw our own here --
-    // position matches the same fixed offset used for scrollOffsetX above).
-    const cursorFrac = 0.12;
-    const cursorX = areaX + cursorFrac * areaW;
-    targetCtx.save();
-    targetCtx.strokeStyle = '#ff0000';
-    targetCtx.lineWidth = Math.max(3, w * 0.005);
-    targetCtx.beginPath();
-    targetCtx.moveTo(cursorX, areaY + areaH * 0.2);
-    targetCtx.lineTo(cursorX, areaY + areaH * 1.08);
-    targetCtx.stroke();
-    targetCtx.restore();
+    // Simplest possible draw for now, per feedback -- just show whatever
+    // alphaTab's own stock/default rendering currently looks like, scaled to
+    // fit the area, no cropping or custom cursor drawing. Priority right
+    // now is confirming MIDI/XML timing sync itself works; positioning and
+    // cursor design are a later step.
+    const scale = Math.min(areaW / srcW, areaH / srcH);
+    const drawW = srcW * scale, drawH = srcH * scale;
+    targetCtx.drawImage(notationSourceCanvas, areaX, areaY, drawW, drawH);
   }
 
   els.notationFile.addEventListener('change', async (e) => {
