@@ -834,23 +834,26 @@
     const targetAspect = areaW / areaH;
     let windowW = srcH * targetAspect;
     windowW = Math.min(srcW, Math.max(40, windowW));
-    let srcX = frac * srcW - windowW * 0.2; // keep "now" a little in from the left edge of the window
+    // Fixed cursor position within the area (not computed/relative) -- the
+    // window is positioned so "now" always sits exactly here, notes scroll
+    // through it rather than the cursor moving across the notation.
+    const CURSOR_X_FRAC = 0.2;
+    let srcX = frac * srcW - windowW * CURSOR_X_FRAC;
     srcX = Math.max(0, Math.min(srcW - windowW, srcX));
     targetCtx.drawImage(notationSourceCanvas, srcX, 0, windowW, srcH, areaX, areaY, areaW, areaH);
 
     // Red playback cursor -- alphaTab's own cursor elements (.at-cursor-bar)
     // are separate DOM overlays, not part of the canvas we captured above,
-    // so draw our own based on where "now" falls within the visible crop
-    // window (matches the same linear time-to-pixel approximation used for
-    // the crop itself). Active for the whole piece, starting at note 1.
-    const cursorRelX = (frac * srcW - srcX) / windowW; // 0..1 position within the window
-    const cursorX = areaX + Math.max(0, Math.min(1, cursorRelX)) * areaW;
+    // so draw our own, fixed in place (shorter and thicker than a full-height
+    // hairline, per feedback).
+    const cursorX = areaX + CURSOR_X_FRAC * areaW;
+    const cursorInset = areaH * 0.15; // shorter than the full area height
     targetCtx.save();
     targetCtx.strokeStyle = '#ff0000';
-    targetCtx.lineWidth = Math.max(2, w * 0.0025);
+    targetCtx.lineWidth = Math.max(3, w * 0.005);
     targetCtx.beginPath();
-    targetCtx.moveTo(cursorX, areaY);
-    targetCtx.lineTo(cursorX, areaY + areaH);
+    targetCtx.moveTo(cursorX, areaY + cursorInset);
+    targetCtx.lineTo(cursorX, areaY + areaH - cursorInset);
     targetCtx.stroke();
     targetCtx.restore();
   }
