@@ -191,8 +191,8 @@
 	*/
 	var VersionInfo = class VersionInfo {
 		static version = "1.9.0";
-		static date = "2026-09-09T06:44:53.229Z";
-		static commit = "04a27bea2eaa5e29e8cbfc7c97c4b7895f241a7d";
+		static date = "2026-09-09T08:52:29.943Z";
+		static commit = "c9c365113b67372e7d599a6bb757ddc9a7731648";
 		static print(print) {
 			print(`alphaTab ${VersionInfo.version}`);
 			print(`commit: ${VersionInfo.commit}`);
