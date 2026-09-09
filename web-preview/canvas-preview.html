@@ -703,7 +703,7 @@
       alphaTabApi = new window.alphaTab.AlphaTabApi(container, {
         core: {
           engine: 'html5', // renders to an internal <canvas> we can drawImage() from
-          fontDirectory: `${ALPHATAB_BASE}/font/`,
+          fontDirectory: `${ALPHATAB_BASE}/`, // font files are flat alongside alphaTab.min.js in R2, no font/ subfolder
           useWorkers: false,
         },
         display: {
