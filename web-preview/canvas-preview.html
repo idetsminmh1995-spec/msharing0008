@@ -835,9 +835,11 @@
     const windowW = Math.max(1, srcW * windowFrac);
     let srcX = frac * srcW - windowW * 0.2; // keep "now" a little in from the left edge of the window
     srcX = Math.max(0, Math.min(srcW - windowW, srcX));
-    const scale = areaH / srcH; // fill the area's height; width is cropped to the window instead of squeezed
-    const destW = Math.min(areaW, windowW * scale);
-    targetCtx.drawImage(notationSourceCanvas, srcX, 0, windowW, srcH, areaX, areaY, destW, areaH);
+    // Fill the area's WIDTH (matches the mockup -- notation spans the full
+    // width), letting height follow proportionally and centering vertically.
+    const scale = areaW / windowW;
+    const destH = Math.min(areaH, srcH * scale);
+    targetCtx.drawImage(notationSourceCanvas, srcX, 0, windowW, srcH, areaX, areaY + (areaH - destH) / 2, areaW, destH);
   }
 
   els.notationFile = document.getElementById('notationFile');
