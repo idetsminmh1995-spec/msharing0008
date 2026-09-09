@@ -1,5 +1,5 @@
 /*!
-* alphaTab v1.9.0 (develop, build 0)
+* alphaTab v1.9.0 (master, build 0)
 *
 * Copyright © 2026, Daniel Kuschny and Contributors, All rights reserved.
 *
@@ -191,8 +191,8 @@
 	*/
 	var VersionInfo = class VersionInfo {
 		static version = "1.9.0";
-		static date = "2026-09-08T23:20:01.711Z";
-		static commit = "b6c4d9d3f223a3be04dfed5b438e2a4c7a2203c4";
+		static date = "2026-09-09T06:44:53.229Z";
+		static commit = "04a27bea2eaa5e29e8cbfc7c97c4b7895f241a7d";
 		static print(print) {
 			print(`alphaTab ${VersionInfo.version}`);
 			print(`commit: ${VersionInfo.commit}`);
