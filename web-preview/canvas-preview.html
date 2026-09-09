@@ -600,6 +600,12 @@
   // they just pick a drum set/aspect and upload a MIDI file.
   const WORKER_BASE = 'https://msharing0008.idetsminmh1995.workers.dev';
 
+  // Cache-busting suffix for R2 asset URLs -- guarantees a fresh fetch every
+  // page load regardless of any previously-cached response for the same
+  // path (e.g. after replacing a drum kit's background PNG in R2).
+  const CACHE_BUST = `v=${Date.now()}`;
+  function bust(url) { return url + (url.includes('?') ? '&' : '?') + CACHE_BUST; }
+
   let currentDrumSet = null, currentAspect = '16x9';
   let backgroundImg = null;
   let noteAssets = new Map(); // midiNote -> { R: HTMLImageElement|null, L: HTMLImageElement|null }
