@@ -680,7 +680,7 @@
   // recompute timing/sync ourselves.
   // ===================================================================
   const ALPHATAB_BASE = '../notation-engine/alphatab/dist';
-  const NOTATION_AREA_FRAC = { x: 0.05, y: 0.05, w: 0.9, h: 0.5 }; // TEMP: still bigger than final size, for sync verification -- was overflowing at 0.96
+  const NOTATION_AREA_FRAC = { x: 0.05, y: 0.15, w: 0.9, h: 0.25 }; // TEMP: sits safely below the header row now (was overlapping it, looked like overflow) -- still bigger than final size, for sync verification
 
   let alphaTabApi = null;
   let notationLoaded = false;
