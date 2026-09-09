@@ -759,6 +759,13 @@
       await new Promise((r) => requestAnimationFrame(r));
     }
     console.log('alphaTab: notationSourceCanvas =', notationSourceCanvas, notationSourceCanvas ? `${notationSourceCanvas.width}x${notationSourceCanvas.height}` : '');
+    if (!notationSourceCanvas) {
+      const container = document.getElementById('notationContainer');
+      console.log('alphaTab: DEBUG container.children.length =', container.children.length);
+      console.log('alphaTab: DEBUG container.innerHTML (first 2000 chars) =', container.innerHTML.slice(0, 2000));
+      console.log('alphaTab: DEBUG container rect =', container.getBoundingClientRect());
+      console.log('alphaTab: DEBUG settings.core.engine =', api.settings.core.engine);
+    }
     notationLoaded = !!notationSourceCanvas;
   }
 
