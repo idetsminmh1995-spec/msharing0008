@@ -885,7 +885,37 @@
     return { divisions, measures };
   }
 
+  // Overrides each note's vexKey (staff position) by cross-referencing it
+  // against the actual MIDI note events, rather than trusting the
+  // MusicXML's own <instrument>/<midi-instrument> linkage (which many
+  // simpler MusicXML exports omit entirely, silently falling back to the
+  // much less precise display-step/octave approximation instead). The MIDI
+  // file is the one, always-reliable source of real GM note numbers already
+  // used everywhere else in this app -- for each MusicXML note, find the
+  // MIDI note event closest to it in time (converted from the note's
+  // quarter-position via the same tempo map) and use that event's real
+  // midiNote number.
+  function resolveVexKeysFromMidi(parsed) {
+    if (!parsedMidi || !parsedMidi.notes || parsedMidi.notes.length === 0) return;
+    const midiNotes = parsedMidi.notes;
+    parsed.measures.forEach((measure) => {
+      measure.notes.forEach((n) => {
+        if (n.isRest) return;
+        const approxTime = quarterToSeconds(n.startQuarter);
+        let best = null, bestDist = Infinity;
+        for (const mn of midiNotes) {
+          const d = Math.abs(mn.time - approxTime);
+          if (d < bestDist) { bestDist = d; best = mn; }
+        }
+        if (best && MIDI_NOTE_TO_VEX_KEY[best.midiNote]) {
+          n.vexKey = MIDI_NOTE_TO_VEX_KEY[best.midiNote];
+        }
+      });
+    });
+  }
+
   function renderMusicXMLWithVexFlow(parsed, container) {
+    resolveVexKeysFromMidi(parsed);
     const VF = window.Vex ? window.Vex.Flow : window.VexFlow;
     container.innerHTML = '';
     const measureWidth = 220;
@@ -1386,6 +1416,14 @@
     let seg = parsedMidi.tempoChanges[0];
     for (const s of parsedMidi.tempoChanges) { if (s.tick <= tick) seg = s; else break; }
     return seg;
+  }
+  // Inverse of secondsToBeats() -- converts a quarter-note position back to
+  // seconds, via the MIDI's own tempo map. Used to cross-reference a
+  // MusicXML note against the actual MIDI note event at that position (see
+  // resolveVexKeysFromMidi below).
+  function quarterToSeconds(quarterPos) {
+    const seg = getActiveTempoSegByQuarter(quarterPos);
+    return seg.time + (quarterPos - seg.tick / parsedMidi.ppq) * 60 / seg.bpm;
   }
   function getActiveTimeSig(t) {
     let seg = parsedMidi.timeSignatures[0];
