@@ -1079,13 +1079,18 @@
       // than merging simultaneous hits into one chord with an ambiguous
       // single stem direction.
       const buildKeys = (entries) => entries.map((e) => (e.noteheadShape ? `${e.vexKey}/${e.noteheadShape}` : e.vexKey));
-      const restNote = (dur) => new VF.StaveNote({ keys: ['b/4'], duration: dur + 'r' });
+      // Rests default to the middle line ('b/4') regardless of which voice
+      // they're in -- with two voices sharing a stave that means a hand
+      // rest and a foot rest at the same instant land on top of each other
+      // (and can collide with the other voice's actual notes too). Keeping
+      // each voice's rests near ITS OWN register instead avoids that.
+      const restNote = (dur, key) => new VF.StaveNote({ keys: [key], duration: dur + 'r' });
       const handNotes = [];
       const footNotes = [];
       measure.notes.forEach((n) => {
         if (n.isRest) {
-          handNotes.push(restNote(n.vexDuration));
-          footNotes.push(restNote(n.vexDuration));
+          handNotes.push(restNote(n.vexDuration, 'a/4'));
+          footNotes.push(restNote(n.vexDuration, 'd/4'));
           return;
         }
         const handEntries = n.entries.filter((e) => !FOOT_MIDI_NOTES.has(e.midiNote));
@@ -1093,12 +1098,12 @@
         handNotes.push(
           handEntries.length > 0
             ? new VF.StaveNote({ keys: buildKeys(handEntries), duration: n.vexDuration, stemDirection: VF.Stem.UP })
-            : restNote(n.vexDuration)
+            : restNote(n.vexDuration, 'a/4')
         );
         footNotes.push(
           footEntries.length > 0
             ? new VF.StaveNote({ keys: buildKeys(footEntries), duration: n.vexDuration, stemDirection: VF.Stem.DOWN })
-            : restNote(n.vexDuration)
+            : restNote(n.vexDuration, 'd/4')
         );
       });
       if (handNotes.length > 0) {
@@ -1118,8 +1123,12 @@
         // filtered out) -- it uses them to correctly break a beam group at
         // a gap; removing them made two notes separated by a rest look
         // adjacent and get incorrectly beamed together.
-        const handBeams = VF.Beam.generateBeams(handNotes);
-        const footBeams = VF.Beam.generateBeams(footNotes);
+        // groups: [4/8] beams a full half-note's worth of 8th notes
+        // together (e.g. 4 in a row), matching the reference image's
+        // style, rather than the default 2/8 (pairs only, which reads as
+        // short disconnected hooks rather than one clear beam).
+        const handBeams = VF.Beam.generateBeams(handNotes, { groups: [new VF.Fraction(4, 8)] });
+        const footBeams = VF.Beam.generateBeams(footNotes, { groups: [new VF.Fraction(4, 8)] });
         new VF.Formatter().joinVoices([handVoice, footVoice]).format([handVoice, footVoice], measureWidth - 20);
         handVoice.draw(context, stave);
         footVoice.draw(context, stave);
