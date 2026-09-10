@@ -1,1 +1,0 @@
-input.ts:4:1: Unsupported type alias declaration, found TupleType

@@ -1,1 +1,0 @@
-input.ts:14:23: keyof T type operator is not supported. See SYNTAX.md for the workaround.

@@ -1,1 +1,0 @@
-input.ts:6:9: Labeled statement is not supported

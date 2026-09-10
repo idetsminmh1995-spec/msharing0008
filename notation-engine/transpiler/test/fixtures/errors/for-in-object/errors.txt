@@ -1,1 +1,0 @@
-input.ts:7:9: for...in statement is not supported. See SYNTAX.md for the workaround.
