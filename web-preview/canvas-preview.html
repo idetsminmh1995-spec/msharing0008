@@ -790,6 +790,21 @@
     return bestEntryText;
   }
 
+  // Converts a quarter-note duration into the nearest standard VexFlow
+  // duration string. Used when merging multiple voices into shared time
+  // slots below, where a slot's duration is however long it is until the
+  // next event (from any voice), not necessarily matching any single
+  // voice's own note-type tag.
+  function quartersToVexDuration(q) {
+    const candidates = [[4, 'w'], [2, 'h'], [1, 'q'], [0.5, '8'], [0.25, '16'], [0.125, '32'], [0.0625, '64']];
+    let best = 'q', bestDiff = Infinity;
+    for (const [val, sym] of candidates) {
+      const diff = Math.abs(val - q);
+      if (diff < bestDiff) { bestDiff = diff; best = sym; }
+    }
+    return best;
+  }
+
   function parseMusicXML(xmlText) {
     const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
     if (doc.querySelector('parsererror')) {
@@ -799,13 +814,13 @@
     if (!firstPart) throw new Error('No <part> element found -- is this a valid MusicXML file?');
 
     // Map each <score-part>'s instrument id -> its actual GM percussion note
-    // number, via <midi-instrument><midi-unpitched>. This is the reliable
-    // source of "which drum sound this is" -- far more precise than the
-    // <unpitched><display-step>/<display-octave> position, which is just an
-    // approximate visual placement and doesn't distinguish e.g. note 35 vs
-    // 36 (both kicks, different staff positions in this app's own legend).
-    // MusicXML's midi-unpitched is 1-128 (1-based); subtract 1 to match the
-    // GM note numbers (0-127) used everywhere else in this app.
+    // number, via <midi-instrument><midi-unpitched>. Many simpler MusicXML
+    // exports omit this entirely though -- resolveVexKeysFromMidi() (called
+    // at render time, via the shared flatRawNotes list below) is the more
+    // reliable fallback for those, cross-referencing against the actual
+    // MIDI file instead. MusicXML's midi-unpitched is 1-128 (1-based);
+    // subtract 1 to match the GM note numbers (0-127) used everywhere else
+    // in this app.
     const instrumentMidiMap = {}; // instrument id -> GM note number
     doc.querySelectorAll('midi-instrument').forEach((mi) => {
       const id = mi.getAttribute('id');
@@ -815,74 +830,110 @@
 
     let divisions = 1;
     const measures = [];
-    // Running position, in quarter notes from the start of the piece -- this is
-    // the same unit as MIDI beats (tick / ppq), so it's what lets us later line
-    // up a VexFlow note with a point on the MIDI-driven playback clock via
-    // secondsToBeats(t), without needing any tempo info from the MusicXML itself.
-    let cumulativeQuarters = 0;
+    // Chronological, flat list of every real (non-rest) note across the
+    // whole piece -- { entry, startQuarter }, where entry is the SAME
+    // object embedded in measures[].notes[].entries below, so mutating one
+    // mutates both. Lets resolveVexKeysFromMidi() walk the piece once,
+    // instead of re-descending into every measure's chord groups.
+    const flatRawNotes = [];
+    let measureStartTick = 0; // this measure's start, in ticks from the piece's start
+
     for (const measureEl of firstPart.querySelectorAll('measure')) {
       const divisionsEl = measureEl.querySelector('attributes > divisions');
       if (divisionsEl) divisions = Number(divisionsEl.textContent);
       const timeNumEl = measureEl.querySelector('attributes > time > beats');
       const timeDenEl = measureEl.querySelector('attributes > time > beat-type');
-      const notes = [];
-      for (const noteEl of measureEl.querySelectorAll('note')) {
-        // Drum notation frequently uses multiple XML <voice>s in one measure
-        // (e.g. a hi-hat rhythm as voice 1, kick/snare as voice 2, interleaved
-        // with <backup> to rewind the tick position between them). Summing
-        // every voice's notes sequentially -- as if they all happened one
-        // after another -- inflates the cumulative quarter-note count well
-        // past the measure's real length, which is exactly what makes the
-        // cursor run ahead of the actual playback. Only voice 1 (or an
-        // unlabeled voice, for simple single-voice files) is used for timing
-        // and rendering -- other voices are skipped for now.
-        const voiceEl = noteEl.querySelector('voice');
-        if (voiceEl && voiceEl.textContent !== '1') continue;
-        const isRest = !!noteEl.querySelector('rest');
-        const durationEl = noteEl.querySelector('duration');
-        const typeEl = noteEl.querySelector('type');
-        const noteheadEl = noteEl.querySelector('notehead');
-        const isChordContinuation = !!noteEl.querySelector('chord'); // same tick as previous note -- skip for now (MVP: single-voice, no chords)
-        if (isChordContinuation) continue;
-        const durationTicks = durationEl ? Number(durationEl.textContent) : divisions;
-        const vexDuration = (typeEl && XML_TYPE_TO_VEX_DURATION[typeEl.textContent]) || 'q';
-        let vexKey = 'b/4'; // default line if we can't map the percussion position
-        if (!isRest) {
-          // Prefer the actual GM note number (via <instrument id> ->
-          // instrumentMidiMap) and this app's own staff-position legend --
-          // far more precise than the XML's own display-step/octave, which
-          // is just an approximate visual placement. Falls back to that
-          // approximation only when the note has no resolvable instrument.
-          const instrEl = noteEl.querySelector('instrument');
-          const instrId = instrEl ? instrEl.getAttribute('id') : null;
-          const midiNote = instrId && instrId in instrumentMidiMap ? instrumentMidiMap[instrId] : null;
-          if (midiNote !== null && MIDI_NOTE_TO_VEX_KEY[midiNote]) {
-            vexKey = MIDI_NOTE_TO_VEX_KEY[midiNote];
-          } else {
-            const stepEl = noteEl.querySelector('unpitched > display-step');
-            const octaveEl = noteEl.querySelector('unpitched > display-octave');
-            if (stepEl && octaveEl) {
-              const lookupKey = `${stepEl.textContent}/${octaveEl.textContent}`;
-              vexKey = STEP_OCTAVE_TO_VEX_KEY[lookupKey] || vexKey;
+      const timeNumerator = timeNumEl ? Number(timeNumEl.textContent) : (measures.length ? measures[measures.length - 1].timeNumerator : 4);
+      const timeDenominator = timeDenEl ? Number(timeDenEl.textContent) : (measures.length ? measures[measures.length - 1].timeDenominator : 4);
+      const measureLengthTicks = divisions * timeNumerator * (4 / timeDenominator);
+
+      // Walk this measure's direct children in document order, tracking a
+      // running tick position shared across every XML <voice> -- <backup>
+      // rewinds it (typically right after a first voice, e.g. a hi-hat
+      // rhythm, so a second voice, e.g. kick/snare, can restart from the
+      // measure's beginning), <forward> advances it without a note, and
+      // each note (except chord-continuations, which share their anchor
+      // note's position) advances it by its own duration. This is what
+      // lets multiple simultaneous voices merge correctly instead of
+      // either being summed sequentially (inflating the total length --
+      // the earlier "cursor runs ahead" bug) or dropped entirely by
+      // filtering to one voice (which was silently discarding notes like
+      // the kick, on its own voice).
+      let runningTick = 0;
+      let lastNonChordTick = 0;
+      const rawNotesThisMeasure = []; // { tick, durationTicks, isRest, vexKey, noteheadShape, instrumentMidiNote }
+
+      for (const child of measureEl.children) {
+        const tag = child.tagName;
+        if (tag === 'note') {
+          const isChordContinuation = !!child.querySelector('chord');
+          const tick = isChordContinuation ? lastNonChordTick : runningTick;
+          const isRest = !!child.querySelector('rest');
+          const durationEl = child.querySelector('duration');
+          const durationTicks = durationEl ? Number(durationEl.textContent) : divisions;
+          let vexKey = 'b/4'; // default line if we can't map the percussion position
+          let noteheadShape = null;
+          let instrumentMidiNote = null;
+          if (!isRest) {
+            const noteheadEl = child.querySelector('notehead');
+            noteheadShape = noteheadEl && noteheadEl.textContent === 'x' ? 'x2' : null;
+            const instrEl = child.querySelector('instrument');
+            const instrId = instrEl ? instrEl.getAttribute('id') : null;
+            instrumentMidiNote = instrId && instrId in instrumentMidiMap ? instrumentMidiMap[instrId] : null;
+            if (instrumentMidiNote !== null && MIDI_NOTE_TO_VEX_KEY[instrumentMidiNote]) {
+              vexKey = MIDI_NOTE_TO_VEX_KEY[instrumentMidiNote];
+            } else {
+              const stepEl = child.querySelector('unpitched > display-step');
+              const octaveEl = child.querySelector('unpitched > display-octave');
+              if (stepEl && octaveEl) {
+                const lookupKey = `${stepEl.textContent}/${octaveEl.textContent}`;
+                vexKey = STEP_OCTAVE_TO_VEX_KEY[lookupKey] || vexKey;
+              }
             }
           }
+          rawNotesThisMeasure.push({ tick, durationTicks, isRest, vexKey, noteheadShape, instrumentMidiNote });
+          if (!isChordContinuation) {
+            lastNonChordTick = tick;
+            runningTick += durationTicks;
+          }
+        } else if (tag === 'backup') {
+          const d = Number(child.querySelector('duration')?.textContent || 0);
+          runningTick -= d;
+        } else if (tag === 'forward') {
+          const d = Number(child.querySelector('duration')?.textContent || 0);
+          runningTick += d;
         }
-        const noteheadShape = noteheadEl && noteheadEl.textContent === 'x' ? 'x2' : null;
-        const durationQuarters = durationTicks / divisions;
-        notes.push({
-          isRest, vexDuration, vexKey, noteheadShape,
-          durationTicks, durationQuarters,
-          startQuarter: cumulativeQuarters,
-        });
-        cumulativeQuarters += durationQuarters;
       }
-      measures.push({
-        timeNumerator: timeNumEl ? Number(timeNumEl.textContent) : (measures.length ? measures[measures.length - 1].timeNumerator : 4),
-        timeDenominator: timeDenEl ? Number(timeDenEl.textContent) : (measures.length ? measures[measures.length - 1].timeDenominator : 4),
-        notes,
+
+      // Group simultaneous notes (identical tick, from any voice) into
+      // chord slots, at the finest time-grid formed by the union of every
+      // voice's note starts -- this is what lets e.g. a kick (voice 2) and
+      // a hi-hat (voice 1) struck together render as one stacked chord
+      // instead of two separate side-by-side noteheads, or one silently
+      // dropping the other.
+      const distinctTicks = [...new Set(rawNotesThisMeasure.map((rn) => rn.tick))].sort((a, b) => a - b);
+      const notes = [];
+      distinctTicks.forEach((tick, gi) => {
+        const slotEnd = gi + 1 < distinctTicks.length ? distinctTicks[gi + 1] : measureLengthTicks;
+        const slotTicks = Math.max(1, slotEnd - tick);
+        const atThisTick = rawNotesThisMeasure.filter((rn) => rn.tick === tick);
+        const realNotes = atThisTick.filter((rn) => !rn.isRest);
+        const durationQuarters = slotTicks / divisions;
+        const vexDuration = quartersToVexDuration(durationQuarters);
+        const startQuarter = (measureStartTick + tick) / divisions;
+        if (realNotes.length === 0) {
+          notes.push({ isRest: true, vexDuration, entries: [], durationTicks: slotTicks, durationQuarters, startQuarter });
+        } else {
+          const entries = realNotes.map((rn) => ({ vexKey: rn.vexKey, noteheadShape: rn.noteheadShape, midiNote: rn.instrumentMidiNote }));
+          notes.push({ isRest: false, vexDuration, entries, durationTicks: slotTicks, durationQuarters, startQuarter });
+          entries.forEach((entry) => flatRawNotes.push({ entry, startQuarter }));
+        }
       });
+
+      measures.push({ timeNumerator, timeDenominator, notes });
+      measureStartTick += measureLengthTicks;
     }
-    return { divisions, measures };
+    return { divisions, measures, flatRawNotes };
   }
 
   // Overrides each note's vexKey (staff position) by cross-referencing it
@@ -891,27 +942,31 @@
   // simpler MusicXML exports omit entirely, silently falling back to the
   // much less precise display-step/octave approximation instead). The MIDI
   // file is the one, always-reliable source of real GM note numbers already
-  // used everywhere else in this app -- for each MusicXML note, find the
-  // MIDI note event closest to it in time (converted from the note's
-  // quarter-position via the same tempo map) and use that event's real
-  // midiNote number.
+  // used everywhere else in this app. When the note counts match exactly
+  // (the common case), a straight index-for-index alignment is used --
+  // both lists are already in chronological order, and this avoids any
+  // ambiguity from time-window matching when several hits cluster close
+  // together. Otherwise falls back to nearest-in-time matching per note.
   function resolveVexKeysFromMidi(parsed) {
     if (!parsedMidi || !parsedMidi.notes || parsedMidi.notes.length === 0) return;
-    const midiNotes = parsedMidi.notes;
-    parsed.measures.forEach((measure) => {
-      measure.notes.forEach((n) => {
-        if (n.isRest) return;
-        const approxTime = quarterToSeconds(n.startQuarter);
+    const midiNotes = parsedMidi.notes; // already time-ascending (see parseMidiArrayBuffer)
+    const flat = parsed.flatRawNotes;
+    if (flat.length === midiNotes.length) {
+      flat.forEach((item, i) => {
+        const gmNote = midiNotes[i].midiNote;
+        if (MIDI_NOTE_TO_VEX_KEY[gmNote]) item.entry.vexKey = MIDI_NOTE_TO_VEX_KEY[gmNote];
+      });
+    } else {
+      flat.forEach((item) => {
+        const approxTime = quarterToSeconds(item.startQuarter);
         let best = null, bestDist = Infinity;
         for (const mn of midiNotes) {
           const d = Math.abs(mn.time - approxTime);
           if (d < bestDist) { bestDist = d; best = mn; }
         }
-        if (best && MIDI_NOTE_TO_VEX_KEY[best.midiNote]) {
-          n.vexKey = MIDI_NOTE_TO_VEX_KEY[best.midiNote];
-        }
+        if (best && MIDI_NOTE_TO_VEX_KEY[best.midiNote]) item.entry.vexKey = MIDI_NOTE_TO_VEX_KEY[best.midiNote];
       });
-    });
+    }
   }
 
   function renderMusicXMLWithVexFlow(parsed, container) {
@@ -998,8 +1053,12 @@
         if (n.isRest) {
           return new VF.StaveNote({ keys: ['b/4'], duration: n.vexDuration + 'r' });
         }
-        const key = n.noteheadShape ? `${n.vexKey}/${n.noteheadShape}` : n.vexKey;
-        return new VF.StaveNote({ keys: [key], duration: n.vexDuration });
+        // entries.length > 1 means multiple voices struck at the same
+        // instant (e.g. kick + hi-hat together) -- rendered as one stacked
+        // chord (multiple keys on a single StaveNote) rather than two
+        // separate side-by-side noteheads.
+        const keys = n.entries.map((e) => (e.noteheadShape ? `${e.vexKey}/${e.noteheadShape}` : e.vexKey));
+        return new VF.StaveNote({ keys, duration: n.vexDuration });
       });
       if (vfNotes.length > 0) {
         const voice = new VF.Voice({ num_beats: measure.timeNumerator, beat_value: measure.timeDenominator });
