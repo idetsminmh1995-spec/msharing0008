@@ -24,6 +24,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-10-clef-engine.md`](./phase-10-clef-engine.md) | Phase 10 clef engine (treble/bass/alto/tenor/soprano/8va/8vb/percussion/tab, `staffPositionForPitch`) |
 | [`phase-11-key-signature-engine.md`](./phase-11-key-signature-engine.md) | Phase 11 key signature engine (circle-of-fifths positions per clef, cancellation naturals; tenor/soprano a documented gap) |
 | [`phase-12-time-signature-engine.md`](./phase-12-time-signature-engine.md) | Phase 12 time signature engine (numeric/common/cut/additive meters, real digit-width spacing) |
+| [`phase-13-barline-engine.md`](./phase-13-barline-engine.md) | Phase 13 barline engine (all 7 barline types, bar-number display logic) |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

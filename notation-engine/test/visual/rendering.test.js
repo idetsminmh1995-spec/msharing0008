@@ -181,4 +181,50 @@ describe('visual regression (Phase 8)', () => {
     );
     matchSnapshot('time-signature-variants', doc, SNAPSHOT_DIR);
   });
+
+  test('Phase 13: every barline type + a bar number render identically to the saved snapshot', () => {
+    const metrics = {
+      thinThickness: NE.getEngravingDefault('thinBarlineThickness'),
+      thickThickness: NE.getEngravingDefault('thickBarlineThickness'),
+      separation: NE.getEngravingDefault('barlineSeparation'),
+      dotWidth: 0.4,
+      dashLength: NE.getEngravingDefault('dashedBarlineDashLength'),
+      gapLength: NE.getEngravingDefault('dashedBarlineGapLength'),
+    };
+    const types = ['single', 'double', 'final', 'repeatBegin', 'repeatEnd', 'repeatBoth', 'dashed'];
+    const staffBottomY = 4;
+    const parts = [
+      NE.renderStaff(NE.computeStaffGeometry(5), {
+        x: 0,
+        y: staffBottomY,
+        width: 40,
+        color: '#000000',
+        lineThickness: NE.getEngravingDefault('staffLineThickness'),
+      }),
+    ];
+    let x = 2;
+    types.forEach((type) => {
+      const g = NE.computeBarlineGeometry(type, metrics);
+      parts.push(
+        NE.renderBarline(g, { x, staffBottomY, height: 4, color: '#000000', fontFamily: 'Bravura' }),
+      );
+      x += g.width + 3;
+    });
+    parts.push(
+      NE.renderBarNumber(12, {
+        x: 2,
+        staffBottomY,
+        offsetAboveStaff: 1,
+        staffHeight: 4,
+        color: '#000000',
+        fontFamily: 'serif',
+        fontSize: 2,
+      }),
+    );
+    const doc = NE.createSvgDocument(
+      { viewBoxWidth: x + 2, viewBoxHeight: 10, pxPerStaffSpace: 20, backgroundColor: '#ffffff' },
+      parts,
+    );
+    matchSnapshot('barline-all-types', doc, SNAPSHOT_DIR);
+  });
 });
