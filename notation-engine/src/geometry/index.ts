@@ -1,2 +1,3 @@
 export * from './staff.js';
 export * from './clef.js';
+export * from './key-signature.js';

@@ -113,4 +113,41 @@ describe('visual regression (Phase 8)', () => {
     );
     matchSnapshot('clef-engine-all-clefs', doc, SNAPSHOT_DIR);
   });
+
+  test('Phase 11: D major (2 sharps) key signature on treble and bass staves render identically to the saved snapshot', () => {
+    const rowHeight = 6;
+    const rows = [
+      { clef: NE.TREBLE_CLEF, clefName: 'treble' },
+      { clef: NE.BASS_CLEF, clefName: 'bass' },
+    ];
+    const parts = [];
+    rows.forEach((row, i) => {
+      const bottomY = i * rowHeight + 4;
+      parts.push(
+        NE.renderStaff(NE.computeStaffGeometry(5), {
+          x: 0,
+          y: bottomY,
+          width: 20,
+          color: '#000000',
+          lineThickness: NE.getEngravingDefault('staffLineThickness'),
+        }),
+      );
+      parts.push(NE.renderClef(row.clef, { x: 0.5, y: bottomY, color: '#000000', fontFamily: 'Bravura' }));
+      const accidentals = NE.keySignatureAccidentals(2, row.clefName); // D major: F# C#
+      parts.push(
+        NE.renderKeySignature(accidentals, {
+          x: 3,
+          spacing: 1,
+          staffBottomY: bottomY,
+          color: '#000000',
+          fontFamily: 'Bravura',
+        }),
+      );
+    });
+    const doc = NE.createSvgDocument(
+      { viewBoxWidth: 20, viewBoxHeight: rowHeight * rows.length, pxPerStaffSpace: 20, backgroundColor: '#ffffff' },
+      parts,
+    );
+    matchSnapshot('key-signature-d-major', doc, SNAPSHOT_DIR);
+  });
 });
