@@ -1,5 +1,6 @@
 export * from './pitch.js';
 export * from './duration.js';
+export * from './duration-math.js';
 export * from './note.js';
 export * from './rest.js';
 export * from './chord.js';

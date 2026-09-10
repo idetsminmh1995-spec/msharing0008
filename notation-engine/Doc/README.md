@@ -14,6 +14,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-01-folder-structure.md`](./phase-01-folder-structure.md) | Phase 1 folder skeleton (`src/`, `test/`, `docs/`) |
 | [`phase-02-toolchain.md`](./phase-02-toolchain.md) | Phase 2 toolchain (TypeScript, esbuild, ESLint, Prettier) |
 | [`phase-03-core-data-model.md`](./phase-03-core-data-model.md) | Phase 3 core data model (`Pitch`, `Note`, `Chord`, `Voice`, `Measure`, `Part`, `Score`) |
+| [`phase-04-duration-tick-math.md`](./phase-04-duration-tick-math.md) | Phase 4 duration/tick math (dots, tuplets, divisions conversion) |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file
