@@ -682,6 +682,7 @@
   let vfCanvas = null; // the canvas VexFlow drew into, for later compositing
   let vexNoteEntries = []; // sorted [{ quarterPos, pixelX }] across the whole piece, for cursor lookup
   let notationVexLoaded = false;
+  let lastParsedMusicXML = null; // kept so notation can be re-rendered if the MIDI loads/changes afterward (tempo markings depend on it)
   // The VexFlow canvas is drawn at a fixed, generously-tall height so stems
   // and ledger lines never get clipped -- but most of that height is empty
   // space around the actual staff. vexContentTop/vexContentHeight mark the
@@ -1061,6 +1062,7 @@
         text = await file.text();
       }
       const parsed = parseMusicXML(text);
+      lastParsedMusicXML = parsed;
       const container = document.getElementById('notationContainer2');
       renderMusicXMLWithVexFlow(parsed, container);
       notationVexLoaded = true;
@@ -1305,6 +1307,16 @@
     currentTime = 0; nextEventIndex = 0; activeHits = [];
     computeCountInTiming(pm);
     loadCountInClips(); // fire-and-forget; play() checks countInClips.length when it actually starts
+
+    // Re-render the notation if it was already loaded -- tempo markings are
+    // looked up from parsedMidi's own tempo map, so if the MIDI loads (or is
+    // replaced) after the MusicXML, this is what makes them appear/update
+    // instead of silently staying blank.
+    if (lastParsedMusicXML) {
+      const container = document.getElementById('notationContainer2');
+      renderMusicXMLWithVexFlow(lastParsedMusicXML, container);
+      notationVexLoaded = true;
+    }
 
     els.bpmVal.textContent = pm.tempoChanges.map((t) => t.bpm.toFixed(0)).join(' → ');
     els.tsVal.textContent = pm.timeSignatures.map((s) => `${s.numerator}/${s.denominator}`).join(', ');
