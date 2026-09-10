@@ -1064,14 +1064,22 @@
         const voice = new VF.Voice({ num_beats: measure.timeNumerator, beat_value: measure.timeDenominator });
         voice.setStrict(false); // MVP: don't hard-fail on measures that don't add up exactly yet
         voice.addTickables(vfNotes);
+        // Beam eighth/16th notes into standard beat-grouped beams (e.g. the
+        // hi-hat's 8th-note pattern) -- without this, every note shorter
+        // than a quarter renders with its own individual flag instead of
+        // grouped beams, which is the main visual gap vs. normal drum
+        // notation. Must be created before Formatter.format() below, but
+        // drawn only after voice.draw() (needs the notes' final positions).
+        const beams = VF.Beam.generateBeams(vfNotes.filter((n) => !n.isRest()));
         new VF.Formatter().joinVoices([voice]).format([voice], measureWidth - 20);
         voice.draw(context, stave);
+        beams.forEach((beam) => beam.setContext(context).draw());
         // getAbsoluteX() is only meaningful once the note has a stave (set by
         // voice.draw() above) and has been formatted -- read it now, right
         // after drawing, so the lookup table matches exactly what's on screen.
         vfNotes.forEach((vfNote, i) => {
           noteEntries.push({ quarterPos: measure.notes[i].startQuarter, pixelX: vfNote.getAbsoluteX() });
-          trackBBox(vfNote); // notes/stems can extend well above/below the staff itself
+          trackBBox(vfNote); // notes/stems can extend well above/below the staff itself -- already covers each beamed note's stem up to the beam attachment point
         });
       }
       x += measureWidth;
