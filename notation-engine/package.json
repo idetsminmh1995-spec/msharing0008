@@ -1,0 +1,26 @@
+{
+  "name": "notation-engine",
+  "version": "0.0.0",
+  "private": true,
+  "description": "General-purpose TypeScript + SVG music notation engine -- works for any instrument, any MusicXML source.",
+  "type": "module",
+  "main": "dist/notation-engine.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --outfile=dist/notation-engine.js --format=iife --global-name=NotationEngine --sourcemap",
+    "typecheck": "tsc --noEmit",
+    "declarations": "tsc --emitDeclarationOnly",
+    "lint": "eslint src",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "verify": "npm run typecheck && npm run lint && npm run format:check && npm run build"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "esbuild": "0.28.2",
+    "eslint": "10.10.0",
+    "@typescript-eslint/parser": "8.70.0",
+    "@typescript-eslint/eslint-plugin": "8.70.0",
+    "prettier": "3.9.6"
+  }
+}
