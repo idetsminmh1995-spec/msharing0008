@@ -735,6 +735,12 @@
   // in more entries below: Line1=e/4, Space1=f/4, Line2=g/4, Space2=a/4,
   // Line3=b/4, Space3=c/5, Line4=d/5, Space4=e/5, Line5=f/5, above the staff:
   // g/5, a/5, ...; below the staff: d/4, c/4, b/3, ...
+  // Matches this app's own hand/foot asset convention used elsewhere
+  // (R{n}.png/L{n}.png for hand hits, bare-numbered files for foot-only
+  // hits like kick/hi-hat-pedal) -- used to split notation into two
+  // proper voices (hands: stem-up, beamed on top; feet: stem-down),
+  // instead of merging simultaneous hits into one ambiguous-stem chord.
+  const FOOT_MIDI_NOTES = new Set([35, 36, 44]);
   const MIDI_NOTE_TO_VEX_KEY = {
     35: 'e/4', // Kick (double pedal) -- Line 1
     36: 'f/4', // Kick (primary) -- Space 1, between Line 1 and Line 2
@@ -1067,38 +1073,68 @@
       // gets cropped out.
       contentMinY = Math.min(contentMinY, stave.getYForTopText(showsTempo ? 1 : 0) - 15);
 
-      const vfNotes = measure.notes.map((n) => {
+      // Two separate voices sharing one stave -- hands (hi-hat/snare/toms/
+      // cymbals) always stem-up and beamed on top; feet (kick, hi-hat
+      // pedal) always stem-down -- matching standard drum notation, rather
+      // than merging simultaneous hits into one chord with an ambiguous
+      // single stem direction.
+      const buildKeys = (entries) => entries.map((e) => (e.noteheadShape ? `${e.vexKey}/${e.noteheadShape}` : e.vexKey));
+      const restNote = (dur) => new VF.StaveNote({ keys: ['b/4'], duration: dur + 'r' });
+      const handNotes = [];
+      const footNotes = [];
+      measure.notes.forEach((n) => {
         if (n.isRest) {
-          return new VF.StaveNote({ keys: ['b/4'], duration: n.vexDuration + 'r' });
+          handNotes.push(restNote(n.vexDuration));
+          footNotes.push(restNote(n.vexDuration));
+          return;
         }
-        // entries.length > 1 means multiple voices struck at the same
-        // instant (e.g. kick + hi-hat together) -- rendered as one stacked
-        // chord (multiple keys on a single StaveNote) rather than two
-        // separate side-by-side noteheads.
-        const keys = n.entries.map((e) => (e.noteheadShape ? `${e.vexKey}/${e.noteheadShape}` : e.vexKey));
-        return new VF.StaveNote({ keys, duration: n.vexDuration });
+        const handEntries = n.entries.filter((e) => !FOOT_MIDI_NOTES.has(e.midiNote));
+        const footEntries = n.entries.filter((e) => FOOT_MIDI_NOTES.has(e.midiNote));
+        handNotes.push(
+          handEntries.length > 0
+            ? new VF.StaveNote({ keys: buildKeys(handEntries), duration: n.vexDuration, stemDirection: VF.Stem.UP })
+            : restNote(n.vexDuration)
+        );
+        footNotes.push(
+          footEntries.length > 0
+            ? new VF.StaveNote({ keys: buildKeys(footEntries), duration: n.vexDuration, stemDirection: VF.Stem.DOWN })
+            : restNote(n.vexDuration)
+        );
       });
-      if (vfNotes.length > 0) {
-        const voice = new VF.Voice({ num_beats: measure.timeNumerator, beat_value: measure.timeDenominator });
-        voice.setStrict(false); // MVP: don't hard-fail on measures that don't add up exactly yet
-        voice.addTickables(vfNotes);
+      if (handNotes.length > 0) {
+        const handVoice = new VF.Voice({ num_beats: measure.timeNumerator, beat_value: measure.timeDenominator });
+        handVoice.setStrict(false); // MVP: don't hard-fail on measures that don't add up exactly yet
+        handVoice.addTickables(handNotes);
+        const footVoice = new VF.Voice({ num_beats: measure.timeNumerator, beat_value: measure.timeDenominator });
+        footVoice.setStrict(false);
+        footVoice.addTickables(footNotes);
         // Beam eighth/16th notes into standard beat-grouped beams (e.g. the
         // hi-hat's 8th-note pattern) -- without this, every note shorter
         // than a quarter renders with its own individual flag instead of
         // grouped beams, which is the main visual gap vs. normal drum
         // notation. Must be created before Formatter.format() below, but
         // drawn only after voice.draw() (needs the notes' final positions).
-        const beams = VF.Beam.generateBeams(vfNotes.filter((n) => !n.isRest()));
-        new VF.Formatter().joinVoices([voice]).format([voice], measureWidth - 20);
-        voice.draw(context, stave);
-        beams.forEach((beam) => beam.setContext(context).draw());
+        // Rests must stay IN the array passed to generateBeams (not
+        // filtered out) -- it uses them to correctly break a beam group at
+        // a gap; removing them made two notes separated by a rest look
+        // adjacent and get incorrectly beamed together.
+        const handBeams = VF.Beam.generateBeams(handNotes);
+        const footBeams = VF.Beam.generateBeams(footNotes);
+        new VF.Formatter().joinVoices([handVoice, footVoice]).format([handVoice, footVoice], measureWidth - 20);
+        handVoice.draw(context, stave);
+        footVoice.draw(context, stave);
+        handBeams.forEach((beam) => beam.setContext(context).draw());
+        footBeams.forEach((beam) => beam.setContext(context).draw());
         // getAbsoluteX() is only meaningful once the note has a stave (set by
         // voice.draw() above) and has been formatted -- read it now, right
         // after drawing, so the lookup table matches exactly what's on screen.
-        vfNotes.forEach((vfNote, i) => {
+        // Uses the hand voice (typically the steadier/denser rhythm) as the
+        // cursor/pan position reference.
+        handNotes.forEach((vfNote, i) => {
           noteEntries.push({ quarterPos: measure.notes[i].startQuarter, pixelX: vfNote.getAbsoluteX() });
           trackBBox(vfNote); // notes/stems can extend well above/below the staff itself -- already covers each beamed note's stem up to the beam attachment point
         });
+        footNotes.forEach((vfNote) => trackBBox(vfNote));
       }
       x += measureWidth;
     });
