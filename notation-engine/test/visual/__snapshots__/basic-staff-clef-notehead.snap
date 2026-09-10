@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="160" viewBox="0 0 20 8">
+<rect x="0" y="0" width="20" height="8" fill="#ffffff" />
+<g>
+<line x1="0" y1="0" x2="20" y2="0" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="1" x2="20" y2="1" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="2" x2="20" y2="2" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="3" x2="20" y2="3" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="4" x2="20" y2="4" stroke="#000000" stroke-width="0.13" />
+<text x="0.5" y="4" font-family="Bravura" font-size="4" fill="#000000"></text>
+<text x="5" y="2" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="6.18" y1="1.832" x2="6.18" y2="-1.668" stroke="#000000" stroke-width="0.12" />
+</g>
+</svg>
