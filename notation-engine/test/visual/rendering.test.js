@@ -78,4 +78,39 @@ describe('visual regression (Phase 8)', () => {
     );
     matchSnapshot('staff-line-count-variants', doc, SNAPSHOT_DIR);
   });
+
+  test('Phase 10: treble, bass, alto, and percussion clefs on their own staves render identically to the saved snapshot', () => {
+    const rowHeight = 6;
+    const rows = [
+      { clef: NE.TREBLE_CLEF, note: ['G', 4] },
+      { clef: NE.BASS_CLEF, note: ['F', 3] },
+      { clef: NE.ALTO_CLEF, note: ['C', 4] },
+      { clef: NE.PERCUSSION_CLEF, note: null },
+    ];
+    const parts = [];
+    rows.forEach((row, i) => {
+      const bottomY = i * rowHeight + 4;
+      parts.push(
+        NE.renderStaff(NE.computeStaffGeometry(5), {
+          x: 0,
+          y: bottomY,
+          width: 20,
+          color: '#000000',
+          lineThickness: NE.getEngravingDefault('staffLineThickness'),
+        }),
+      );
+      parts.push(NE.renderClef(row.clef, { x: 0.5, y: bottomY, color: '#000000', fontFamily: 'Bravura' }));
+      if (row.note) {
+        const [step, octave] = row.note;
+        const noteY = bottomY + NE.staffPositionForPitch(row.clef, step, octave);
+        const notehead = NE.getGlyph('noteheadBlack');
+        parts.push(NE.svgGlyphText(6, noteY, notehead.char, 'Bravura', { fill: '#000000' }));
+      }
+    });
+    const doc = NE.createSvgDocument(
+      { viewBoxWidth: 20, viewBoxHeight: rowHeight * rows.length, pxPerStaffSpace: 20, backgroundColor: '#ffffff' },
+      parts,
+    );
+    matchSnapshot('clef-engine-all-clefs', doc, SNAPSHOT_DIR);
+  });
 });
