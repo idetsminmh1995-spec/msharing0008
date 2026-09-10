@@ -17,6 +17,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-04-duration-tick-math.md`](./phase-04-duration-tick-math.md) | Phase 4 duration/tick math (dots, tuplets, divisions conversion) |
 | [`phase-05-smufl-glyph-table.md`](./phase-05-smufl-glyph-table.md) | Phase 5 SMuFL glyph table (real Bravura data, `getGlyph`/engraving defaults) |
 | [`phase-06-svg-primitives.md`](./phase-06-svg-primitives.md) | Phase 6 SVG primitives layer (line/path/rect/text/group, staff-space coordinates) |
+| [`phase-07-config-schema.md`](./phase-07-config-schema.md) | Phase 7 config schema (`EngineConfig`, `resolveConfig`, 7 reserved sections) |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

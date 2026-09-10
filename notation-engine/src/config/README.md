@@ -6,6 +6,6 @@ layout mode, cursor mode, notehead mapping, beam style, bar-number display,
 key-signature style, W x H resize.
 
 See PLAN.md Phase 7 (this is where it's defined) and Phase 48 (where every
-section gets filled in/unified).
-
-Nothing here yet -- Phase 1 is folder structure only.
+section gets filled in/unified), and `../../Doc/phase-07-config-schema.md`
+for the full record. Main entry points: `resolveConfig`, `DEFAULT_CONFIG`,
+`EngineConfig` in `config.ts`.
