@@ -1106,6 +1106,18 @@
             : restNote(n.vexDuration, 'd/4')
         );
       });
+      // Temporary debug logging to trace exactly what duration/keys/stems
+      // each hand note ends up with -- open the browser console during a
+      // live test and look for these lines, to pin down where the
+      // hi-hat's missing stems/beams are actually coming from.
+      console.log(`Notation Engine 2 debug: measure ${mIdx + 1} hand notes:`, measure.notes.map((n, i) => ({
+        isRest: n.isRest,
+        vexDuration: n.vexDuration,
+        durationQuarters: n.durationQuarters,
+        handKeys: n.isRest ? null : n.entries.filter((e) => !FOOT_MIDI_NOTES.has(e.midiNote)).map((e) => e.vexKey),
+        builtDuration: handNotes[i] && handNotes[i].getDuration ? handNotes[i].getDuration() : null,
+        builtHasStem: handNotes[i] && handNotes[i].hasStem ? handNotes[i].hasStem() : null,
+      })));
       if (handNotes.length > 0) {
         const handVoice = new VF.Voice({ num_beats: measure.timeNumerator, beat_value: measure.timeDenominator });
         handVoice.setStrict(false); // MVP: don't hard-fail on measures that don't add up exactly yet
