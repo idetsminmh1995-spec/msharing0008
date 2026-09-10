@@ -202,6 +202,11 @@
            confirm the MusicXML parsing itself is correct before wiring
            compositing/cursor sync into the main canvas above. -->
       <div id="notationContainer2" style="background:#fff; margin-top:10px; overflow-x:auto; border-radius:8px;"></div>
+      <!-- The NEW from-scratch Notation Engine (TypeScript+SVG, notation-engine/
+           folder) -- still just Phase 9 (staff lines only, no notes/clef yet).
+           Wired here so every MusicXML upload proves the connection works,
+           without touching the existing VexFlow-based Notation Engine 2 above. -->
+      <div id="notationEngineContainer" style="background:#fff; margin-top:10px; overflow-x:auto; border-radius:8px;"></div>
       <div class="player-bar">
         <button id="playBtn" class="icon-btn" disabled>▶</button>
         <button id="pauseBtn" class="icon-btn" disabled>⏸</button>
@@ -224,6 +229,8 @@
 
 </div>
 
+<!-- New from-scratch Notation Engine (Phase 9 quick-demo: staff lines only). -->
+<script src="../notation-engine/quick-demo/staff.js"></script>
 <script>
 
 (function () {
@@ -1251,6 +1258,18 @@
       const container = document.getElementById('notationContainer2');
       renderMusicXMLWithVexFlow(parsed, container);
       notationVexLoaded = true;
+
+      // New from-scratch Notation Engine (Phase 9 quick-demo): render just
+      // the 5-line staff to prove the file-upload -> new-engine connection
+      // works. Width picked to roughly span one measure's worth of the
+      // XML that was just uploaded; nothing else (notes/clef/etc.) yet.
+      const newEngineContainer = document.getElementById('notationEngineContainer');
+      newEngineContainer.innerHTML = renderStaffAsStandaloneSVG(
+        { x: 20, y: 30, width: 900, lineSpacing: 10, lineThickness: 1.2, color: '#000000' },
+        940,
+        100
+      );
+
       els.notationStatus.className = 'status ok';
       els.notationStatus.textContent = `Loaded "${file.name}" — ${parsed.measures.length} measures parsed and rendered.`;
       console.log('Notation Engine 2: parsed', parsed);

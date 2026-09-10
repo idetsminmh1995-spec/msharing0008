@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Notation Engine — Staff Line Quick Demo</title>
+<style>
+  body { background: #f0f0f0; font-family: sans-serif; padding: 40px; }
+  #container { background: #ffffff; display: inline-block; }
+</style>
+</head>
+<body>
+  <h3>Notation Engine — Staff Line Quick Demo (Phase 9 preview)</h3>
+  <div id="container"></div>
+  <script src="staff.js"></script>
+  <script>
+    var svg = renderStaffAsStandaloneSVG(
+      { x: 20, y: 30, width: 500, lineSpacing: 10, lineThickness: 1.2, color: '#000000' },
+      540,
+      100
+    );
+    document.getElementById('container').innerHTML = svg;
+  </script>
+</body>
+</html>
