@@ -7,6 +7,15 @@ the phase/feature it covers, so this folder stays a running record of the
 whole engine's build history, not just the plan (`../PLAN.md`) for what's
 *intended*.
 
+## Where the specification lives
+
+- **[`../MASTER_PLAN.md`](../MASTER_PLAN.md)** — the **authoritative**
+  architecture and specification. Read this before writing any code.
+- `../PLAN.md` — the v1 roadmap, superseded, kept as historical reference.
+- **This folder** — the per-phase build record: what was actually written,
+  how to change it, how to revert it. `MASTER_PLAN.md` is the source of truth
+  for *intent*; these files are the source of truth for *what exists*.
+
 ## Index
 
 | Doc file | Covers |
