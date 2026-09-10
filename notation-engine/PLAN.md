@@ -40,6 +40,30 @@ proven working in this project), lint/format rules, package.json scripts.
 pitched vs unpitched; percussion is just a `Note` whose `Pitch` maps through an
 "unpitched display" table instead of a clef-derived staff position.
 
+**Phase 3b — Full cross-instrument note fidelity (hard requirement)**: the
+engine must correctly write back out **every note** from **any** instrument's
+MusicXML — Drum XML, Piano XML, Vocal XML, or any other instrument — with
+nothing dropped, misplaced, or silently approximated, **regardless of how
+many staff lines that instrument's XML uses** (5-line standard, 1-line
+percussion, 6-line tab, or anything else). Concretely, this means:
+- **Drum XML** → every unpitched note (kick, snare, hi-hat, cymbals, toms)
+  renders on its correct line/space with its correct notehead shape (Phase
+  17/38), even on a reduced-line-count drum staff.
+- **Piano XML** → every note across both hands renders correctly on the
+  treble+bass grand staff (Phase 15), including notes that cross between
+  the two staves, chords, and multi-voice passages (Phase 31/32).
+- **Vocal XML** → every sung note renders correctly with its matching lyric
+  syllable underneath (Phase 33), including ties/slurs across syllables.
+- **Any other instrument** (strings, brass, guitar tab, etc.) → the same
+  pitch/duration/voice logic from Phase 3/4 applies uniformly; nothing in
+  the core data model or renderer may special-case "drums" vs "piano" vs
+  "vocals" as separate code paths — they are all just configurations of
+  the same general engine (clef choice, notehead mapping, staff line count,
+  lyrics on/off).
+This requirement gates Phase 39 (the end-to-end XML pipeline test), which
+must include real Drum, Piano, and Vocal MusicXML fixtures specifically to
+verify this, not just one instrument type.
+
 **Phase 4 — Duration/tick math**: divisions, ticks, tuplet ratios, dotted-note
 expansion, tie-across-barline handling. Pure functions, unit-tested against known
 MusicXML tick values.
@@ -214,8 +238,10 @@ general engine, not a separate code path.
 
 **Phase 39 — "XML in → full notation out" pipeline test**: one function,
 `renderFromMusicXML(xmlText, config) → SVG`, exercised against a battery of
-real-world sample files (solo piano, string quartet, drum kit, guitar tab)
-covering every feature from Groups B–E end to end.
+real-world sample files (solo piano, string quartet, drum kit, guitar tab,
+and a vocal/lyrics score) covering every feature from Groups B–E end to end,
+and specifically verifying the Phase 3b cross-instrument fidelity requirement
+(drum, piano, and vocal XML each render every note correctly).
 
 **Phase 39b — Cross-software MusicXML compatibility (hard requirement)**: the
 parser must correctly render a MusicXML file **no matter which software
