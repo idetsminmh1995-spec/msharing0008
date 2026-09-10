@@ -723,13 +723,23 @@
     whole: 'w', half: 'h', quarter: 'q', eighth: '8',
     '16th': '16', '32nd': '32', '64th': '64',
   };
+  // Standard treble-clef 5-line staff reference (bottom to top), for filling
+  // in more entries below: Line1=e/4, Space1=f/4, Line2=g/4, Space2=a/4,
+  // Line3=b/4, Space3=c/5, Line4=d/5, Space4=e/5, Line5=f/5, above the staff:
+  // g/5, a/5, ...; below the staff: d/4, c/4, b/3, ...
+  const MIDI_NOTE_TO_VEX_KEY = {
+    35: 'e/4', // Kick (double pedal) -- Line 1
+    36: 'f/4', // Kick (primary) -- Space 1, between Line 1 and Line 2
+    // TODO: remaining kit notes (37,38,40,42,43,44,45,46,47,48,49,50,51,52,53,55,57,91,92,93)
+  };
   // Percussion display-step -> a rough treble-clef line position. Real
   // MusicXML percussion maps step+octave to a specific staff line; this is
   // an approximation covering the common 5-line drum staff positions. Each
   // input step/octave maps one diatonic step up (matches the existing
   // convention below) -- extended a bit further in both directions to
   // reduce how often an unmapped pitch silently falls back to the default
-  // line.
+  // line. Only used as a fallback when a note's GM number isn't resolvable
+  // (see MIDI_NOTE_TO_VEX_KEY above, which is preferred).
   const STEP_OCTAVE_TO_VEX_KEY = {
     'G/5': 'a/5', 'F/5': 'g/5', 'E/5': 'f/5', 'D/5': 'e/5', 'C/5': 'd/5',
     'B/4': 'c/5', 'A/4': 'b/4', 'G/4': 'a/4', 'F/4': 'g/4', 'E/4': 'f/4', 'D/4': 'e/4', 'C/4': 'd/4',
@@ -786,6 +796,22 @@
     }
     const firstPart = doc.querySelector('part');
     if (!firstPart) throw new Error('No <part> element found -- is this a valid MusicXML file?');
+
+    // Map each <score-part>'s instrument id -> its actual GM percussion note
+    // number, via <midi-instrument><midi-unpitched>. This is the reliable
+    // source of "which drum sound this is" -- far more precise than the
+    // <unpitched><display-step>/<display-octave> position, which is just an
+    // approximate visual placement and doesn't distinguish e.g. note 35 vs
+    // 36 (both kicks, different staff positions in this app's own legend).
+    // MusicXML's midi-unpitched is 1-128 (1-based); subtract 1 to match the
+    // GM note numbers (0-127) used everywhere else in this app.
+    const instrumentMidiMap = {}; // instrument id -> GM note number
+    doc.querySelectorAll('midi-instrument').forEach((mi) => {
+      const id = mi.getAttribute('id');
+      const muEl = mi.querySelector('midi-unpitched');
+      if (id && muEl) instrumentMidiMap[id] = Number(muEl.textContent) - 1;
+    });
+
     let divisions = 1;
     const measures = [];
     // Running position, in quarter notes from the start of the piece -- this is
@@ -821,11 +847,23 @@
         const vexDuration = (typeEl && XML_TYPE_TO_VEX_DURATION[typeEl.textContent]) || 'q';
         let vexKey = 'b/4'; // default line if we can't map the percussion position
         if (!isRest) {
-          const stepEl = noteEl.querySelector('unpitched > display-step');
-          const octaveEl = noteEl.querySelector('unpitched > display-octave');
-          if (stepEl && octaveEl) {
-            const lookupKey = `${stepEl.textContent}/${octaveEl.textContent}`;
-            vexKey = STEP_OCTAVE_TO_VEX_KEY[lookupKey] || vexKey;
+          // Prefer the actual GM note number (via <instrument id> ->
+          // instrumentMidiMap) and this app's own staff-position legend --
+          // far more precise than the XML's own display-step/octave, which
+          // is just an approximate visual placement. Falls back to that
+          // approximation only when the note has no resolvable instrument.
+          const instrEl = noteEl.querySelector('instrument');
+          const instrId = instrEl ? instrEl.getAttribute('id') : null;
+          const midiNote = instrId && instrId in instrumentMidiMap ? instrumentMidiMap[instrId] : null;
+          if (midiNote !== null && MIDI_NOTE_TO_VEX_KEY[midiNote]) {
+            vexKey = MIDI_NOTE_TO_VEX_KEY[midiNote];
+          } else {
+            const stepEl = noteEl.querySelector('unpitched > display-step');
+            const octaveEl = noteEl.querySelector('unpitched > display-octave');
+            if (stepEl && octaveEl) {
+              const lookupKey = `${stepEl.textContent}/${octaveEl.textContent}`;
+              vexKey = STEP_OCTAVE_TO_VEX_KEY[lookupKey] || vexKey;
+            }
           }
         }
         const noteheadShape = noteheadEl && noteheadEl.textContent === 'x' ? 'x2' : null;
@@ -886,6 +924,7 @@
     }
 
     let x = 10;
+    let lastShownBpm = null; // only mark tempo where it actually changes, like real sheet music
     parsed.measures.forEach((measure, mIdx) => {
       const stave = new VF.Stave(x, 20, measureWidth);
       stave.setMeasure(mIdx + 1); // shows a measure number above the stave, matching the reference design
@@ -893,12 +932,27 @@
         stave.addClef('percussion');
         stave.addTimeSignature(`${measure.timeNumerator}/${measure.timeDenominator}`);
       }
+      // Tempo marking ("♩ = 120"), placed at the point in the piece where it
+      // applies -- looked up via the MIDI's own tempo map (never the
+      // MusicXML's), so it always matches what's actually playing. Only
+      // drawn where the BPM changes from the previous measure (always shown
+      // on measure 1).
+      let showsTempo = false;
+      if (parsedMidi && measure.notes.length > 0) {
+        const bpm = Math.round(getActiveTempoSegByQuarter(measure.notes[0].startQuarter).bpm);
+        if (bpm !== lastShownBpm) {
+          stave.setTempo({ duration: 'q', bpm }, 0);
+          lastShownBpm = bpm;
+          showsTempo = true;
+        }
+      }
       stave.setContext(context).draw();
       trackBBox(stave);
       // Stave.getBoundingBox() doesn't account for the measure-number text
-      // drawn above the stave (setMeasure() above) -- extend the tracked
-      // top manually so it doesn't get cropped out.
-      contentMinY = Math.min(contentMinY, stave.getYForTopText(0) - 15);
+      // (setMeasure() above) or the tempo marking (one text-line further up
+      // still, when shown) -- extend the tracked top manually so neither
+      // gets cropped out.
+      contentMinY = Math.min(contentMinY, stave.getYForTopText(showsTempo ? 1 : 0) - 15);
 
       const vfNotes = measure.notes.map((n) => {
         if (n.isRest) {
@@ -1304,6 +1358,16 @@
   function getActiveTempoSeg(t) {
     let seg = parsedMidi.tempoChanges[0];
     for (const s of parsedMidi.tempoChanges) { if (s.time <= t) seg = s; else break; }
+    return seg;
+  }
+  // Same idea as getActiveTempoSeg, but looked up by quarter-note position
+  // instead of by time -- used to place tempo markings directly on the
+  // notation (which is indexed by quarter position, not time) at the point
+  // in the piece where each one applies.
+  function getActiveTempoSegByQuarter(quarterPos) {
+    const tick = quarterPos * parsedMidi.ppq;
+    let seg = parsedMidi.tempoChanges[0];
+    for (const s of parsedMidi.tempoChanges) { if (s.tick <= tick) seg = s; else break; }
     return seg;
   }
   function getActiveTimeSig(t) {
