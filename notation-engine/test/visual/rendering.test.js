@@ -150,4 +150,35 @@ describe('visual regression (Phase 8)', () => {
     );
     matchSnapshot('key-signature-d-major', doc, SNAPSHOT_DIR);
   });
+
+  test('Phase 12: common-time symbol, plain 7/8, and additive 3+2+2/8 time signatures render identically to the saved snapshot', () => {
+    const rowHeight = 6;
+    const sigs = [
+      NE.timeSignature(4, 4, { symbol: 'common' }),
+      NE.timeSignature(7, 8),
+      NE.timeSignature(7, 8, { numeratorDisplay: '3+2+2' }),
+    ];
+    const parts = [];
+    sigs.forEach((sig, i) => {
+      const bottomY = i * rowHeight + 4;
+      parts.push(
+        NE.renderStaff(NE.computeStaffGeometry(5), {
+          x: 0,
+          y: bottomY,
+          width: 20,
+          color: '#000000',
+          lineThickness: NE.getEngravingDefault('staffLineThickness'),
+        }),
+      );
+      parts.push(NE.renderClef(NE.TREBLE_CLEF, { x: 0.5, y: bottomY, color: '#000000', fontFamily: 'Bravura' }));
+      parts.push(
+        NE.renderTimeSignature(sig, { x: 3, staffBottomY: bottomY, color: '#000000', fontFamily: 'Bravura' }),
+      );
+    });
+    const doc = NE.createSvgDocument(
+      { viewBoxWidth: 20, viewBoxHeight: rowHeight * sigs.length, pxPerStaffSpace: 20, backgroundColor: '#ffffff' },
+      parts,
+    );
+    matchSnapshot('time-signature-variants', doc, SNAPSHOT_DIR);
+  });
 });
