@@ -1,0 +1,377 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <!-- 
+      Copyright (c) 2023-present VexFlow contributors: https://github.com/vexflow/vexflow/graphs/contributors
+      MIT License
+      
+      @author Ron B. Yeh
+    
+      Open this file locally in your browser.
+      This inspector uses the FontFace API to load OTF files directly.
+      Click a glyph to log some information to the console.
+    -->
+    <style>
+      body {
+        color: #ccc;
+        background-color: #222;
+        margin: 20px 20px 100px 20px;
+        font:
+          16px system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          Roboto,
+          Ubuntu,
+          'Helvetica Neue',
+          Arial,
+          sans-serif;
+      }
+
+      .choose-font {
+        text-align: center;
+        margin-bottom: 10px;
+      }
+
+      .choose-font button {
+        background-color: rgba(0, 0, 0, 0);
+        cursor: pointer;
+        border: 0px;
+        color: #8ac4f8;
+        font:
+          20px system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          Roboto,
+          Ubuntu,
+          'Helvetica Neue',
+          Arial,
+          sans-serif;
+        padding: 8px 10px;
+      }
+
+      .choose-font button:active {
+        background-color: rgba(0, 45, 80, 0.6);
+      }
+
+      .item {
+        color: #111;
+        background-color: #f3f3f3;
+        min-width: 100px;
+        float: left;
+        display: table;
+        margin: 10px;
+        padding: 0px;
+        line-height: 3.2;
+        font-size: 60px;
+        text-align: center;
+        cursor: pointer;
+      }
+
+      .item:hover {
+        background-color: #d0eeff;
+        color: #000;
+      }
+
+      #info {
+        float: left;
+        margin-left: 10px;
+      }
+
+      #curr-glyph-info {
+        position: fixed;
+        background-color: rgba(20, 20, 20, 0.8);
+        padding: 8px;
+        display: none;
+      }
+
+      .clear {
+        clear: both;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="choose-font"></div>
+    <div id="info">&nbsp;</div>
+    <div id="curr-glyph-info"></div>
+    <div class="clear">&nbsp;</div>
+    <div id="container"></div>
+    <div class="clear">&nbsp;</div>
+    <!-- opentype.js is only used for the glyph names for non-SMuFL fonts. It is not required for showing the glyphs. -->
+    <script src="../../../node_modules/opentype.js/dist/opentype.js"></script>
+    <script type="module">
+      // A helper function for loading external JS files.
+      // Normally we would use `await fetch(...)` or `await import(...)`,
+      // but that requires us to launch a web server to test this page.
+      // It's more fun to open the HTML file directly / locally in a browser. :-)
+      function loadScript(url) {
+        return new Promise((resolve, reject) => {
+          let script = document.createElement('script');
+          script.onload = resolve;
+          script.onerror = reject;
+          script.src = url;
+          document.getElementsByTagName('head')[0].appendChild(script);
+        });
+      }
+
+      // We can derive the OTF file path automatically from the font name.
+      const musicFonts = [
+        'Bravura',
+        'Bravura Text',
+        'Finale Ash',
+        'Finale Broadway',
+        'Finale Jazz',
+        'Finale Maestro',
+        'Gonville',
+        'Gootville',
+        'Gootville Text',
+        'Leipzig',
+        'Leland',
+        'Leland Text',
+        'MuseJazz',
+        'Petaluma',
+        'Petaluma Text',
+        'Sebastian',
+        'Sebastian Text',
+      ];
+
+      // If the value is null, the folder/filename.otf are the same as the lower-cased font name.
+      // Other OTF files have custom names, so we map them to the font names.
+      const textFonts = {
+        Academico: null,
+        Edwin: 'edwin-roman',
+        'Finale Ash Text': null,
+        'Finale Broadway Text': null,
+        'Finale Jazz Text': null,
+        'Finale Maestro Text': 'finalemaestrotext-regular',
+        'MuseJazz Text': null,
+        Nepomuk: 'nepomuk-regular',
+        'Petaluma Script': null,
+        'Roboto Slab': 'robotoslab-regular-400',
+      };
+
+      function addButtons() {
+        // Add buttons at the top.
+        let buttonsHTML = '<div style="font-variant: small-caps">Music Fonts</div>';
+        for (const fontName of musicFonts) {
+          const fontNameNoSpaces = fontName.replace(/\s/g, '');
+          buttonsHTML += `<button id="btn_${fontNameNoSpaces}" onclick="setFont(event, '${fontName}');">${fontName}</button>`;
+        }
+        buttonsHTML += '<br /><br />' + '<div style="font-variant: small-caps">Text Fonts</div>';
+        for (const fontName in textFonts) {
+          const fontNameNoSpaces = fontName.replace(/\s/g, '');
+          buttonsHTML += `<button id="btn_${fontNameNoSpaces}" onclick="setFont(event, '${fontName}');">${fontName}</button>`;
+        }
+        document.querySelector('.choose-font').innerHTML = buttonsHTML;
+      }
+
+      // Some state for this page.
+      let currentFont = '';
+      let numGlyphs = 0;
+
+      // Which glyphs should we show?
+      let SMuFLGlyphNamesToShow, TextFontCodePointsToShow;
+
+      async function determineWhichGlyphsToShow() {
+        SMuFLGlyphNamesToShow = {};
+        // await import(...) requires a local server like `npx serve`.
+        // await import('../config/valid_codes.js');
+        // So let's do something much more complicated & hacky.
+
+        // This is a hack to allow us to import a Node JS module. :-)
+        window.module = {};
+        await loadScript('../config/valid_codes.js'); // assigns window.module.exports
+        SMuFLGlyphNamesToShow = window.module.exports; // extract the exported object.
+        delete window.module;
+
+        // Code Point Range from 0x21 to 0x7E.
+        TextFontCodePointsToShow = [[0x21, 0x7e]];
+      }
+
+      async function loadSMuFLGlyphInfo() {
+        // Each item is an array with:
+        // - glyph name from the SMuFL specification: https://w3c.github.io/smufl/latest/tables/clefs.html
+        // - unicode code point for SMuFL fonts (Bravura and Petaluma).
+        // - unicode code point for Gonville font. This is null if the glyph is not available in the Gonville font.
+
+        // The Fetch API requires a local server like `npx serve`.
+        // const response = await fetch('../config/glyphnames.json');
+        // const SMuFLGlyphInfo = await response.json();
+        //
+        // Instead, let's use loadScript(url) to allow this page to work when opened locally in a browser.
+        await loadScript('../config/glyphnames.js'); // assigns global `SMuFLGlyphInfo`
+      }
+
+      // Load the fonts using the FontFace API.
+      async function loadFonts() {
+        const fontPath = '../../../node_modules/@vexflow-fonts/';
+
+        // Derive the OTF file path from the font name.
+        musicFonts.forEach(async (musicFontName) => {
+          console.log(musicFontName);
+          const lowerCaseNoSpaces = musicFontName.toLowerCase().replace(/\s/g, '');
+          const fontFace = new FontFace(musicFontName, `url(${fontPath + lowerCaseNoSpaces}/${lowerCaseNoSpaces}.otf)`);
+          await fontFace.load();
+          document.fonts.add(fontFace);
+        });
+
+        // Text font OTFs may have special file names, so we read them from the textFonts mapping.
+        for (const textFontName in textFonts) {
+          console.log(textFontName);
+          const lowerCaseNoSpaces = textFontName.toLowerCase().replace(/\s/g, '');
+          const folderName = lowerCaseNoSpaces + '/';
+          const fileName = textFonts[textFontName] ?? lowerCaseNoSpaces;
+          const fontFace = new FontFace(textFontName, `url(${fontPath + folderName + fileName}.otf)`);
+          await fontFace.load();
+          document.fonts.add(fontFace);
+        }
+      }
+
+      // Draw a tooltip showing some information below the mouse pointer.
+      function getMouseMoveHandler(glyphInfo) {
+        return (event) => {
+          const infoBox = document.getElementById('curr-glyph-info');
+          if (glyphInfo.glyphName === '') {
+            infoBox.style.display = 'none';
+          } else {
+            infoBox.style.display = '';
+            const unicodeStringValue = '\\u' + glyphInfo.codePointHexString.substring(2);
+            infoBox.innerText =
+              glyphInfo.glyphName +
+              ' | ' +
+              glyphInfo.codePointHexString +
+              ' or "' +
+              unicodeStringValue +
+              '" | ' +
+              glyphInfo.description;
+            console.log(infoBox.innerText);
+            infoBox.style.left = event.clientX - 40 + 'px';
+            infoBox.style.top = event.clientY + 40 + 'px';
+          }
+        };
+      }
+
+      // Hide the tooltip if we are moving over something other than a glyph box (with class 'item').
+      document.addEventListener('mousemove', (event) => {
+        if (!event.target.classList.contains('item')) {
+          const infoBox = document.getElementById('curr-glyph-info');
+          infoBox.style.display = 'none';
+        }
+      });
+
+      function addItem(glyphInfo) {
+        const item = document.createElement('div');
+        item.classList.add('item');
+        item.innerText = String.fromCodePoint(glyphInfo.codePointValue);
+        item.addEventListener('click', () => console.log(glyphInfo));
+        item.addEventListener('mousemove', getMouseMoveHandler(glyphInfo));
+        container.appendChild(item);
+        numGlyphs++;
+      }
+
+      function addItemsForCodePoints(codePoints) {
+        for (const o of codePoints) {
+          if (Array.isArray(o)) {
+            // Code Point Range
+            const from = o[0];
+            const to = o[1];
+            for (let codePointValue = from; codePointValue <= to; codePointValue++) {
+              const codePointHexString = '0x' + codePointValue.toString(16);
+              const glyphInfo = { codePointHexString, codePointValue, glyphName: '', description: '' };
+              addItem(glyphInfo);
+            }
+          } else {
+            // o is an object of the form { name: 'brackettips.up', cp: 0xe10d }
+            const codePointValue = o.cp;
+            const codePointHexString = '0x' + codePointValue.toString(16);
+            const glyphName = o.name;
+            const glyphInfo = { codePointHexString, codePointValue, glyphName, description: '' };
+            addItem(glyphInfo);
+          }
+        }
+      }
+
+      // Render all SMUFL glyphs.
+      function addItemsForSMuFLGlyphs() {
+        for (const glyphName in SMuFLGlyphNamesToShow) {
+          const glyphInfo = SMuFLGlyphInfo[glyphName];
+          if (!glyphInfo) {
+            // Skip `vexAccidentalMicrotonal1` and other glyph names that do not exist in SMuFL.
+            console.log('Skipping ' + glyphName);
+            continue;
+          }
+
+          const codePointHexString = glyphInfo.codepoint.replace('U+', '0x');
+          const codePointValue = parseInt(codePointHexString);
+          glyphInfo.codePointHexString = codePointHexString;
+          glyphInfo.codePointValue = codePointValue;
+          glyphInfo.glyphName = glyphName;
+
+          addItem(glyphInfo);
+        }
+      }
+
+      function updateGlyphTable() {
+        const container = document.getElementById('container');
+        // Clear the container.
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+
+        // Reset the glyph count.
+        numGlyphs = 0;
+
+        if (currentFont in textFonts) {
+          // Render ASCII glyphs for text fonts (e.g., 0x21 to 0x7E).
+          addItemsForCodePoints(TextFontCodePointsToShow);
+        } else {
+          addItemsForSMuFLGlyphs();
+        }
+
+        const numGlyphsRenderedInfo =
+          'Rendered ' +
+          numGlyphs +
+          ' <b>' +
+          currentFont +
+          '</b> glyphs. Click a glyph to log information to the developer console.';
+        console.log(numGlyphsRenderedInfo);
+        document.getElementById('info').innerHTML = numGlyphsRenderedInfo;
+      }
+
+      function setFont(event, fontName) {
+        localStorage.setItem('font', fontName);
+        currentFont = fontName;
+        container.style.fontFamily = fontName;
+        document.querySelectorAll('button').forEach((button) => {
+          button.style.color = '';
+          button.style.backgroundColor = '';
+        });
+
+        // Highlight the selected font's button.
+        const buttonID = 'btn_' + fontName.replace(/\s/g, '');
+        const buttonStyle = document.getElementById(buttonID).style;
+        buttonStyle.color = '#222';
+        buttonStyle.backgroundColor = '#34568B';
+
+        updateGlyphTable();
+      }
+
+      window.setFont = setFont;
+      addButtons();
+      await determineWhichGlyphsToShow();
+      await loadSMuFLGlyphInfo();
+      await loadFonts();
+
+      const previouslySavedFont = localStorage.getItem('font');
+      if (previouslySavedFont) {
+        // Restore the font from a previous session.
+        setFont(null, previouslySavedFont);
+      } else {
+        // Choose 'Bravura' when you're visiting this page for the first time.
+        setFont(null, 'Bravura');
+      }
+    </script>
+  </body>
+</html>
