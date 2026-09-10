@@ -19,6 +19,8 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-06-svg-primitives.md`](./phase-06-svg-primitives.md) | Phase 6 SVG primitives layer (line/path/rect/text/group, staff-space coordinates) |
 | [`phase-07-config-schema.md`](./phase-07-config-schema.md) | Phase 7 config schema (`EngineConfig`, `resolveConfig`, 7 reserved sections) |
 | [`phase-08-testing-harness.md`](./phase-08-testing-harness.md) | Phase 8 testing harness (`node --test`, snapshot compare, Phase 3-7 tests formalized) |
+| [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Standalone pre-Phase-1 quick-demo staff renderer (superseded by real Phase 9 below, but still wired into the drum-video app) |
+| [`phase-09-staff-stave-rendering.md`](./phase-09-staff-stave-rendering.md) | Real Phase 9: staff geometry + rendering in `src/geometry`/`src/render`, 1-6 line support |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

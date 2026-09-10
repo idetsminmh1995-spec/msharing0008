@@ -49,4 +49,33 @@ describe('visual regression (Phase 8)', () => {
     // with UPDATE_SNAPSHOTS=1 to accept an intentional change.
     matchSnapshot('basic-staff-clef-notehead', doc, SNAPSHOT_DIR);
   });
+
+  test('Phase 9: 1-line, 5-line, and 6-line staves side by side render identically to the saved snapshot', () => {
+    const oneLine = NE.renderStaff(NE.computeStaffGeometry(1), {
+      x: 0,
+      y: 0,
+      width: 20,
+      color: '#000000',
+      lineThickness: NE.getEngravingDefault('staffLineThickness'),
+    });
+    const fiveLine = NE.renderStaff(NE.computeStaffGeometry(5), {
+      x: 0,
+      y: 6,
+      width: 20,
+      color: '#000000',
+      lineThickness: NE.getEngravingDefault('staffLineThickness'),
+    });
+    const sixLine = NE.renderStaff(NE.computeStaffGeometry(6), {
+      x: 0,
+      y: 15,
+      width: 20,
+      color: '#000000',
+      lineThickness: NE.getEngravingDefault('staffLineThickness'),
+    });
+    const doc = NE.createSvgDocument(
+      { viewBoxWidth: 20, viewBoxHeight: 16, pxPerStaffSpace: 20, backgroundColor: '#ffffff' },
+      [oneLine, fiveLine, sixLine],
+    );
+    matchSnapshot('staff-line-count-variants', doc, SNAPSHOT_DIR);
+  });
 });
