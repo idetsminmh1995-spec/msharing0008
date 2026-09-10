@@ -198,14 +198,10 @@
       <div class="canvas-wrap">
         <canvas id="canvas" width="1280" height="720"></canvas>
       </div>
-      <!-- Notation Engine 2 (VexFlow) renders here, VISIBLE for now so we can
-           confirm the MusicXML parsing itself is correct before wiring
-           compositing/cursor sync into the main canvas above. -->
-      <div id="notationContainer2" style="background:#fff; margin-top:10px; overflow-x:auto; border-radius:8px;"></div>
-      <!-- The NEW from-scratch Notation Engine (TypeScript+SVG, notation-engine/
+      <!-- The Notation Engine (TypeScript+SVG, from-scratch, notation-engine/
            folder) -- still just Phase 9 (staff lines only, no notes/clef yet).
-           Wired here so every MusicXML upload proves the connection works,
-           without touching the existing VexFlow-based Notation Engine 2 above. -->
+           The old VexFlow-based "Notation Engine 2" has been removed entirely;
+           this is now the only notation renderer in the app. -->
       <div id="notationEngineContainer" style="background:#fff; margin-top:10px; overflow-x:auto; border-radius:8px;"></div>
       <div class="player-bar">
         <button id="playBtn" class="icon-btn" disabled>▶</button>
@@ -673,596 +669,23 @@
     }
   });
 
-  // ===================================================================
-  // Notation Engine 2 (VexFlow) -- MusicXML parsing + rendering built from
-  // scratch (VexFlow has no built-in importer, unlike alphaTab). Parses
-  // notes/rests/percussion noteheads per measure and renders each measure's
-  // stave sequentially into one wide canvas, then composites a cropped,
-  // panned window of that canvas -- with a fixed-position cursor -- into the
-  // actual video frame. Timing is driven entirely by the MIDI's own tempo
-  // map (via the existing secondsToBeats()) rather than any tempo info from
-  // the MusicXML itself, so it can never drift out of sync with the drum
-  // animation/audio, which use that same clock.
-  // ===================================================================
-  const VEXFLOW_BASE = '../notation-engine/vexflow/build/cjs';
-  let vexflowLoaded = false;
-  let vfCanvas = null; // the canvas VexFlow drew into, for later compositing
-  let vexNoteEntries = []; // sorted [{ quarterPos, pixelX }] across the whole piece, for cursor lookup
-  let notationVexLoaded = false;
-  let lastParsedMusicXML = null; // kept so notation can be re-rendered if the MIDI loads/changes afterward (tempo markings depend on it)
-  // The VexFlow canvas is drawn at a fixed, generously-tall height so stems
-  // and ledger lines never get clipped -- but most of that height is empty
-  // space around the actual staff. vexContentTop/vexContentHeight mark the
-  // real vertical extent of the drawn notation (staff + note bounding
-  // boxes, with a small margin), so compositing can crop to just that band
-  // instead of the whole canvas -- letting the notes appear much larger in
-  // the video without needing a bigger source canvas or any clipping risk.
-  let vexContentTop = 0;
-  let vexContentHeight = 200;
-  // Where a "||:...:||" repeat spans, in quarter-note position -- lets
-  // drawNotationInto() wrap the notation back to the repeat's start once
-  // real playback (which actually plays the repeated section more than
-  // once) goes past what this single copy in the XML covers, instead of
-  // just freezing at the last mapped note.
-  let vexRepeatBeginQuarter = null;
-  let vexRepeatEndQuarter = null;
-  // Notation area geometry: the notation image is panned so playback
-  // position sits at CURSOR_X_FRAC of the area's width (no cursor line
-  // drawn -- just the panning).
-  const NOTATION_AREA_FRAC = { x: 0.03, y: 0.13, w: 0.94, h: 0.48 };
-  const CURSOR_X_FRAC = 0.15;
-
-  function loadScriptTag(src) {
-    return new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = src;
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error('Failed to load ' + src));
-      document.head.appendChild(s);
-    });
-  }
-
-  async function ensureVexFlowLoaded() {
-    if (vexflowLoaded) return;
-    if (typeof window.Vex === 'undefined' && typeof window.VexFlow === 'undefined') {
-      await loadScriptTag(`${VEXFLOW_BASE}/vexflow.js`);
-    }
-    if (typeof window.Vex === 'undefined' && typeof window.VexFlow === 'undefined') {
-      throw new Error('VexFlow script loaded but window.Vex/VexFlow global is missing.');
-    }
-    vexflowLoaded = true;
-  }
-
-  // MusicXML duration-type ("quarter","eighth",...) -> VexFlow duration string.
-  const XML_TYPE_TO_VEX_DURATION = {
-    whole: 'w', half: 'h', quarter: 'q', eighth: '8',
-    '16th': '16', '32nd': '32', '64th': '64',
-  };
-  // Standard treble-clef 5-line staff reference (bottom to top), for filling
-  // in more entries below: Line1=e/4, Space1=f/4, Line2=g/4, Space2=a/4,
-  // Line3=b/4, Space3=c/5, Line4=d/5, Space4=e/5, Line5=f/5, above the staff:
-  // g/5, a/5, ...; below the staff: d/4, c/4, b/3, ...
-  // Matches this app's own hand/foot asset convention used elsewhere
-  // (R{n}.png/L{n}.png for hand hits, bare-numbered files for foot-only
-  // hits like kick/hi-hat-pedal) -- used to split notation into two
-  // proper voices (hands: stem-up, beamed on top; feet: stem-down),
-  // instead of merging simultaneous hits into one ambiguous-stem chord.
-  const FOOT_MIDI_NOTES = new Set([35, 36, 44]);
-  const MIDI_NOTE_TO_VEX_KEY = {
-    35: 'e/4', // Kick (double pedal) -- Line 1
-    36: 'f/4', // Kick (primary) -- Space 1, between Line 1 and Line 2
-    // TODO: remaining kit notes (37,38,40,42,43,44,45,46,47,48,49,50,51,52,53,55,57,91,92,93)
-  };
-  // Percussion display-step -> a rough treble-clef line position. Real
-  // MusicXML percussion maps step+octave to a specific staff line; this is
-  // an approximation covering the common 5-line drum staff positions. Each
-  // input step/octave maps one diatonic step up (matches the existing
-  // convention below) -- extended a bit further in both directions to
-  // reduce how often an unmapped pitch silently falls back to the default
-  // line. Only used as a fallback when a note's GM number isn't resolvable
-  // (see MIDI_NOTE_TO_VEX_KEY above, which is preferred).
-  const STEP_OCTAVE_TO_VEX_KEY = {
-    'G/5': 'a/5', 'F/5': 'g/5', 'E/5': 'f/5', 'D/5': 'e/5', 'C/5': 'd/5',
-    'B/4': 'c/5', 'A/4': 'b/4', 'G/4': 'a/4', 'F/4': 'g/4', 'E/4': 'f/4', 'D/4': 'e/4', 'C/4': 'd/4',
-    'B/3': 'c/4',
-  };
-
-  // .mxl files are ZIP-compressed MusicXML containers (not plain XML text).
-  // Minimal in-browser ZIP reader (local file headers only, using the
-  // browser's built-in DecompressionStream for the deflate entries) so we
-  // don't need an external ZIP library dependency.
-  async function extractMusicXMLFromMxl(arrayBuffer) {
-    const bytes = new Uint8Array(arrayBuffer);
-    const dv = new DataView(arrayBuffer);
-    let offset = 0;
-    let bestEntryText = null;
-    while (offset + 4 <= bytes.length && dv.getUint32(offset, true) === 0x04034b50) {
-      const compressionMethod = dv.getUint16(offset + 8, true);
-      const compressedSize = dv.getUint32(offset + 18, true);
-      const uncompressedSize = dv.getUint32(offset + 22, true);
-      const nameLength = dv.getUint16(offset + 26, true);
-      const extraLength = dv.getUint16(offset + 28, true);
-      const nameStart = offset + 30;
-      const name = new TextDecoder().decode(bytes.slice(nameStart, nameStart + nameLength));
-      const dataStart = nameStart + nameLength + extraLength;
-      const dataEnd = dataStart + compressedSize;
-      const isScoreXml = name.toLowerCase().endsWith('.xml') && !name.toLowerCase().includes('meta-inf');
-      if (isScoreXml) {
-        const compressedChunk = bytes.slice(dataStart, dataEnd);
-        let xmlBytes;
-        if (compressionMethod === 0) {
-          xmlBytes = compressedChunk; // stored, no compression
-        } else if (compressionMethod === 8) {
-          const ds = new DecompressionStream('deflate-raw');
-          const stream = new Blob([compressedChunk]).stream().pipeThrough(ds);
-          xmlBytes = new Uint8Array(await new Response(stream).arrayBuffer());
-        } else {
-          throw new Error(`Unsupported .mxl compression method (${compressionMethod}) for entry "${name}".`);
-        }
-        bestEntryText = new TextDecoder('utf-8').decode(xmlBytes);
-        break; // first real score entry found -- good enough for our files
-      }
-      offset = dataEnd;
-    }
-    if (bestEntryText === null) {
-      throw new Error('Could not find a MusicXML entry inside this .mxl file.');
-    }
-    return bestEntryText;
-  }
-
-  // Converts a quarter-note duration into the nearest standard VexFlow
-  // duration string. Used when merging multiple voices into shared time
-  // slots below, where a slot's duration is however long it is until the
-  // next event (from any voice), not necessarily matching any single
-  // voice's own note-type tag.
-  function quartersToVexDuration(q) {
-    const candidates = [[4, 'w'], [2, 'h'], [1, 'q'], [0.5, '8'], [0.25, '16'], [0.125, '32'], [0.0625, '64']];
-    let best = 'q', bestDiff = Infinity;
-    for (const [val, sym] of candidates) {
-      const diff = Math.abs(val - q);
-      if (diff < bestDiff) { bestDiff = diff; best = sym; }
-    }
-    return best;
-  }
-
-  function parseMusicXML(xmlText) {
-    const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
-    if (doc.querySelector('parsererror')) {
-      throw new Error('Could not parse this file as XML -- is it a valid MusicXML file?');
-    }
-    const firstPart = doc.querySelector('part');
-    if (!firstPart) throw new Error('No <part> element found -- is this a valid MusicXML file?');
-
-    // Map each <score-part>'s instrument id -> its actual GM percussion note
-    // number, via <midi-instrument><midi-unpitched>. Many simpler MusicXML
-    // exports omit this entirely though -- resolveVexKeysFromMidi() (called
-    // at render time, via the shared flatRawNotes list below) is the more
-    // reliable fallback for those, cross-referencing against the actual
-    // MIDI file instead. MusicXML's midi-unpitched is 1-128 (1-based);
-    // subtract 1 to match the GM note numbers (0-127) used everywhere else
-    // in this app.
-    const instrumentMidiMap = {}; // instrument id -> GM note number
-    doc.querySelectorAll('midi-instrument').forEach((mi) => {
-      const id = mi.getAttribute('id');
-      const muEl = mi.querySelector('midi-unpitched');
-      if (id && muEl) instrumentMidiMap[id] = Number(muEl.textContent) - 1;
-    });
-
-    let divisions = 1;
-    const measures = [];
-    // Chronological, flat list of every real (non-rest) note across the
-    // whole piece -- { entry, startQuarter }, where entry is the SAME
-    // object embedded in measures[].notes[].entries below, so mutating one
-    // mutates both. Lets resolveVexKeysFromMidi() walk the piece once,
-    // instead of re-descending into every measure's chord groups.
-    const flatRawNotes = [];
-    let measureStartTick = 0; // this measure's start, in ticks from the piece's start
-    let repeatBeginQuarter = null; // quarter-position where a "||:" repeat begins, if any
-    let repeatEndQuarter = null; // quarter-position right after the measure a ":||" repeat-end sits in
-
-    for (const measureEl of firstPart.querySelectorAll('measure')) {
-      const divisionsEl = measureEl.querySelector('attributes > divisions');
-      if (divisionsEl) divisions = Number(divisionsEl.textContent);
-      const timeNumEl = measureEl.querySelector('attributes > time > beats');
-      const timeDenEl = measureEl.querySelector('attributes > time > beat-type');
-      const timeNumerator = timeNumEl ? Number(timeNumEl.textContent) : (measures.length ? measures[measures.length - 1].timeNumerator : 4);
-      const timeDenominator = timeDenEl ? Number(timeDenEl.textContent) : (measures.length ? measures[measures.length - 1].timeDenominator : 4);
-      const measureLengthTicks = divisions * timeNumerator * (4 / timeDenominator);
-
-      // Walk this measure's direct children in document order, tracking a
-      // running tick position shared across every XML <voice> -- <backup>
-      // rewinds it (typically right after a first voice, e.g. a hi-hat
-      // rhythm, so a second voice, e.g. kick/snare, can restart from the
-      // measure's beginning), <forward> advances it without a note, and
-      // each note (except chord-continuations, which share their anchor
-      // note's position) advances it by its own duration. This is what
-      // lets multiple simultaneous voices merge correctly instead of
-      // either being summed sequentially (inflating the total length --
-      // the earlier "cursor runs ahead" bug) or dropped entirely by
-      // filtering to one voice (which was silently discarding notes like
-      // the kick, on its own voice).
-      let runningTick = 0;
-      let lastNonChordTick = 0;
-      const rawNotesThisMeasure = []; // { tick, durationTicks, isRest, vexKey, noteheadShape, instrumentMidiNote }
-
-      for (const child of measureEl.children) {
-        const tag = child.tagName;
-        if (tag === 'note') {
-          const isChordContinuation = !!child.querySelector('chord');
-          const tick = isChordContinuation ? lastNonChordTick : runningTick;
-          const isRest = !!child.querySelector('rest');
-          const durationEl = child.querySelector('duration');
-          const durationTicks = durationEl ? Number(durationEl.textContent) : divisions;
-          let vexKey = 'b/4'; // default line if we can't map the percussion position
-          let noteheadShape = null;
-          let instrumentMidiNote = null;
-          if (!isRest) {
-            const noteheadEl = child.querySelector('notehead');
-            noteheadShape = noteheadEl && noteheadEl.textContent === 'x' ? 'x2' : null;
-            const instrEl = child.querySelector('instrument');
-            const instrId = instrEl ? instrEl.getAttribute('id') : null;
-            instrumentMidiNote = instrId && instrId in instrumentMidiMap ? instrumentMidiMap[instrId] : null;
-            if (instrumentMidiNote !== null && MIDI_NOTE_TO_VEX_KEY[instrumentMidiNote]) {
-              vexKey = MIDI_NOTE_TO_VEX_KEY[instrumentMidiNote];
-            } else {
-              const stepEl = child.querySelector('unpitched > display-step');
-              const octaveEl = child.querySelector('unpitched > display-octave');
-              if (stepEl && octaveEl) {
-                const lookupKey = `${stepEl.textContent}/${octaveEl.textContent}`;
-                vexKey = STEP_OCTAVE_TO_VEX_KEY[lookupKey] || vexKey;
-              }
-            }
-          }
-          rawNotesThisMeasure.push({ tick, durationTicks, isRest, vexKey, noteheadShape, instrumentMidiNote });
-          if (!isChordContinuation) {
-            lastNonChordTick = tick;
-            runningTick += durationTicks;
-          }
-        } else if (tag === 'backup') {
-          const d = Number(child.querySelector('duration')?.textContent || 0);
-          runningTick -= d;
-        } else if (tag === 'forward') {
-          const d = Number(child.querySelector('duration')?.textContent || 0);
-          runningTick += d;
-        }
-      }
-
-      // Group simultaneous notes (identical tick, from any voice) into
-      // chord slots, at the finest time-grid formed by the union of every
-      // voice's note starts -- this is what lets e.g. a kick (voice 2) and
-      // a hi-hat (voice 1) struck together render as one stacked chord
-      // instead of two separate side-by-side noteheads, or one silently
-      // dropping the other.
-      const distinctTicks = [...new Set(rawNotesThisMeasure.map((rn) => rn.tick))].sort((a, b) => a - b);
-      const notes = [];
-      distinctTicks.forEach((tick, gi) => {
-        const slotEnd = gi + 1 < distinctTicks.length ? distinctTicks[gi + 1] : measureLengthTicks;
-        const slotTicks = Math.max(1, slotEnd - tick);
-        const atThisTick = rawNotesThisMeasure.filter((rn) => rn.tick === tick);
-        const realNotes = atThisTick.filter((rn) => !rn.isRest);
-        const durationQuarters = slotTicks / divisions;
-        const vexDuration = quartersToVexDuration(durationQuarters);
-        const startQuarter = (measureStartTick + tick) / divisions;
-        if (realNotes.length === 0) {
-          notes.push({ isRest: true, vexDuration, entries: [], durationTicks: slotTicks, durationQuarters, startQuarter });
-        } else {
-          const entries = realNotes.map((rn) => ({ vexKey: rn.vexKey, noteheadShape: rn.noteheadShape, midiNote: rn.instrumentMidiNote }));
-          notes.push({ isRest: false, vexDuration, entries, durationTicks: slotTicks, durationQuarters, startQuarter });
-          entries.forEach((entry) => flatRawNotes.push({ entry, startQuarter }));
-        }
-      });
-
-      // Repeat barlines ("||:" / ":||") -- VexFlow supports these natively
-      // (Barline.type.REPEAT_BEGIN/REPEAT_END), just needs the MusicXML's
-      // own <barline> elements read and applied to the stave.
-      const barlineRepeatBegin = !!measureEl.querySelector('barline[location="left"] repeat[direction="forward"]');
-      const barlineRepeatEnd = !!measureEl.querySelector('barline[location="right"] repeat[direction="backward"]');
-      if (barlineRepeatBegin && repeatBeginQuarter === null) repeatBeginQuarter = measureStartTick / divisions;
-      if (barlineRepeatEnd) repeatEndQuarter = (measureStartTick + measureLengthTicks) / divisions;
-      measures.push({ timeNumerator, timeDenominator, notes, barlineRepeatBegin, barlineRepeatEnd });
-      measureStartTick += measureLengthTicks;
-    }
-    return { divisions, measures, flatRawNotes, repeatBeginQuarter, repeatEndQuarter };
-  }
-
-  // Overrides each note's vexKey (staff position) by cross-referencing it
-  // against the actual MIDI note events, rather than trusting the
-  // MusicXML's own <instrument>/<midi-instrument> linkage (which many
-  // simpler MusicXML exports omit entirely, silently falling back to the
-  // much less precise display-step/octave approximation instead). The MIDI
-  // file is the one, always-reliable source of real GM note numbers already
-  // used everywhere else in this app. When the note counts match exactly
-  // (the common case), a straight index-for-index alignment is used --
-  // both lists are already in chronological order, and this avoids any
-  // ambiguity from time-window matching when several hits cluster close
-  // together. Otherwise falls back to nearest-in-time matching per note.
-  function resolveVexKeysFromMidi(parsed) {
-    if (!parsedMidi || !parsedMidi.notes || parsedMidi.notes.length === 0) return;
-    const midiNotes = parsedMidi.notes; // already time-ascending (see parseMidiArrayBuffer)
-    const flat = parsed.flatRawNotes;
-    if (flat.length === midiNotes.length) {
-      flat.forEach((item, i) => {
-        const gmNote = midiNotes[i].midiNote;
-        if (MIDI_NOTE_TO_VEX_KEY[gmNote]) item.entry.vexKey = MIDI_NOTE_TO_VEX_KEY[gmNote];
-      });
-    } else {
-      flat.forEach((item) => {
-        const approxTime = quarterToSeconds(item.startQuarter);
-        let best = null, bestDist = Infinity;
-        for (const mn of midiNotes) {
-          const d = Math.abs(mn.time - approxTime);
-          if (d < bestDist) { bestDist = d; best = mn; }
-        }
-        if (best && MIDI_NOTE_TO_VEX_KEY[best.midiNote]) item.entry.vexKey = MIDI_NOTE_TO_VEX_KEY[best.midiNote];
-      });
-    }
-  }
-
-  function renderMusicXMLWithVexFlow(parsed, container) {
-    resolveVexKeysFromMidi(parsed);
-    const VF = window.Vex ? window.Vex.Flow : window.VexFlow;
-    container.innerHTML = '';
-    const measureWidth = 220;
-    const totalWidth = Math.max(400, parsed.measures.length * measureWidth + 40);
-    const height = 200;
-    // VexFlow's CANVAS backend requires an actual <canvas> element, not the
-    // wrapping <div> -- create one explicitly and hand that to the Renderer.
-    const canvasEl = document.createElement('canvas');
-    container.appendChild(canvasEl);
-    const renderer = new VF.Renderer(canvasEl, VF.Renderer.Backends.CANVAS);
-    // renderer.resize() doesn't forward a devicePixelRatio override, and
-    // defaults to window.devicePixelRatio (2 or 3 on most modern screens) --
-    // that scales up the canvas's actual pixel dimensions (vfCanvas.width/
-    // height) well beyond the "logical" totalWidth/height used everywhere
-    // else (stave positions, bounding-box tracking, drawImage source rects
-    // below), silently breaking all of that math. Forcing it to 1 here
-    // keeps everything in one consistent pixel space. Call this directly on
-    // the context (not renderer.resize(), which doesn't accept the third
-    // argument).
-    const context = renderer.getContext();
-    context.resize(totalWidth, height, 1);
-    vfCanvas = canvasEl;
-
-    // The CANVAS backend never paints a background -- the underlying
-    // <canvas> stays fully transparent except for the ink itself, and that
-    // ink defaults to plain black (the browser canvas default). That's fine
-    // for the debug strip below (its div has a white CSS background), but
-    // when this canvas gets drawImage()'d into the black video frame later,
-    // black-on-transparent is invisible. Set the ink color to match Video
-    // Color instead (matches how the rest of the app flips colors for it),
-    // and tint the debug strip's own background to stay legible either way.
-    const inkColor = titleAndDisplaySettings.videoColor === 'white' ? '#000000' : '#ffffff';
-    container.style.background = inkColor === '#ffffff' ? '#111111' : '#ffffff';
-    context.setFillStyle(inkColor).setStrokeStyle(inkColor);
-
-    const noteEntries = []; // { quarterPos, pixelX }, built up across every measure
-    let contentMinY = Infinity, contentMaxY = -Infinity;
-    function trackBBox(el) {
-      try {
-        const bbox = el.getBoundingBox();
-        if (bbox) {
-          contentMinY = Math.min(contentMinY, bbox.getY());
-          contentMaxY = Math.max(contentMaxY, bbox.getY() + bbox.getH());
-        }
-      } catch (e) { /* bounding box not available for this element yet -- skip it */ }
-    }
-
-    let x = 10;
-    let lastShownBpm = null; // only mark tempo where it actually changes, like real sheet music
-    parsed.measures.forEach((measure, mIdx) => {
-      const stave = new VF.Stave(x, 20, measureWidth);
-      stave.setMeasure(mIdx + 1); // shows a measure number above the stave, matching the reference design
-      if (mIdx === 0) {
-        stave.addClef('percussion');
-        stave.addTimeSignature(`${measure.timeNumerator}/${measure.timeDenominator}`);
-      }
-      if (measure.barlineRepeatBegin) stave.setBegBarType(VF.Barline.type.REPEAT_BEGIN);
-      if (measure.barlineRepeatEnd) stave.setEndBarType(VF.Barline.type.REPEAT_END);
-      // Tempo marking ("♩ = 120"), placed at the point in the piece where it
-      // applies -- looked up via the MIDI's own tempo map (never the
-      // MusicXML's), so it always matches what's actually playing. Only
-      // drawn where the BPM changes from the previous measure (always shown
-      // on measure 1).
-      let showsTempo = false;
-      if (parsedMidi && measure.notes.length > 0) {
-        const bpm = Math.round(getActiveTempoSegByQuarter(measure.notes[0].startQuarter).bpm);
-        if (bpm !== lastShownBpm) {
-          stave.setTempo({ duration: 'q', bpm }, 0);
-          lastShownBpm = bpm;
-          showsTempo = true;
-        }
-      }
-      stave.setContext(context).draw();
-      trackBBox(stave);
-      // Stave.getBoundingBox() doesn't account for the measure-number text
-      // (setMeasure() above) or the tempo marking (one text-line further up
-      // still, when shown) -- extend the tracked top manually so neither
-      // gets cropped out.
-      contentMinY = Math.min(contentMinY, stave.getYForTopText(showsTempo ? 1 : 0) - 15);
-
-      // Two separate voices sharing one stave -- hands (hi-hat/snare/toms/
-      // cymbals) always stem-up and beamed on top; feet (kick, hi-hat
-      // pedal) always stem-down -- matching standard drum notation, rather
-      // than merging simultaneous hits into one chord with an ambiguous
-      // single stem direction.
-      const buildKeys = (entries) => entries.map((e) => (e.noteheadShape ? `${e.vexKey}/${e.noteheadShape}` : e.vexKey));
-      // Rests default to the middle line ('b/4') regardless of which voice
-      // they're in -- with two voices sharing a stave that means a hand
-      // rest and a foot rest at the same instant land on top of each other
-      // (and can collide with the other voice's actual notes too). Keeping
-      // each voice's rests near ITS OWN register instead avoids that.
-      const restNote = (dur, key) => new VF.StaveNote({ keys: [key], duration: dur + 'r' });
-      const handNotes = [];
-      const footNotes = [];
-      measure.notes.forEach((n) => {
-        if (n.isRest) {
-          handNotes.push(restNote(n.vexDuration, 'a/4'));
-          footNotes.push(restNote(n.vexDuration, 'd/4'));
-          return;
-        }
-        const handEntries = n.entries.filter((e) => !FOOT_MIDI_NOTES.has(e.midiNote));
-        const footEntries = n.entries.filter((e) => FOOT_MIDI_NOTES.has(e.midiNote));
-        handNotes.push(
-          handEntries.length > 0
-            ? new VF.StaveNote({ keys: buildKeys(handEntries), duration: n.vexDuration, stemDirection: VF.Stem.UP })
-            : restNote(n.vexDuration, 'a/4')
-        );
-        footNotes.push(
-          footEntries.length > 0
-            ? new VF.StaveNote({ keys: buildKeys(footEntries), duration: n.vexDuration, stemDirection: VF.Stem.DOWN })
-            : restNote(n.vexDuration, 'd/4')
-        );
-      });
-      // Temporary debug logging to trace exactly what duration/keys/stems
-      // each hand note ends up with -- open the browser console during a
-      // live test and look for these lines, to pin down where the
-      // hi-hat's missing stems/beams are actually coming from.
-      console.log(`Notation Engine 2 debug: measure ${mIdx + 1} hand notes:`, measure.notes.map((n, i) => ({
-        isRest: n.isRest,
-        vexDuration: n.vexDuration,
-        durationQuarters: n.durationQuarters,
-        handKeys: n.isRest ? null : n.entries.filter((e) => !FOOT_MIDI_NOTES.has(e.midiNote)).map((e) => e.vexKey),
-        builtDuration: handNotes[i] && handNotes[i].getDuration ? handNotes[i].getDuration() : null,
-        builtHasStem: handNotes[i] && handNotes[i].hasStem ? handNotes[i].hasStem() : null,
-      })));
-      if (handNotes.length > 0) {
-        const handVoice = new VF.Voice({ num_beats: measure.timeNumerator, beat_value: measure.timeDenominator });
-        handVoice.setStrict(false); // MVP: don't hard-fail on measures that don't add up exactly yet
-        handVoice.addTickables(handNotes);
-        const footVoice = new VF.Voice({ num_beats: measure.timeNumerator, beat_value: measure.timeDenominator });
-        footVoice.setStrict(false);
-        footVoice.addTickables(footNotes);
-        // Beam eighth/16th notes into standard beat-grouped beams (e.g. the
-        // hi-hat's 8th-note pattern) -- without this, every note shorter
-        // than a quarter renders with its own individual flag instead of
-        // grouped beams, which is the main visual gap vs. normal drum
-        // notation. Must be created before Formatter.format() below, but
-        // drawn only after voice.draw() (needs the notes' final positions).
-        // Rests must stay IN the array passed to generateBeams (not
-        // filtered out) -- it uses them to correctly break a beam group at
-        // a gap; removing them made two notes separated by a rest look
-        // adjacent and get incorrectly beamed together.
-        // groups: [4/8] beams a full half-note's worth of 8th notes
-        // together (e.g. 4 in a row), matching the reference image's
-        // style, rather than the default 2/8 (pairs only, which reads as
-        // short disconnected hooks rather than one clear beam).
-        const handBeams = VF.Beam.generateBeams(handNotes, { groups: [new VF.Fraction(4, 8)] });
-        const footBeams = VF.Beam.generateBeams(footNotes, { groups: [new VF.Fraction(4, 8)] });
-        new VF.Formatter().joinVoices([handVoice, footVoice]).format([handVoice, footVoice], measureWidth - 20);
-        handVoice.draw(context, stave);
-        footVoice.draw(context, stave);
-        handBeams.forEach((beam) => beam.setContext(context).draw());
-        footBeams.forEach((beam) => beam.setContext(context).draw());
-        // getAbsoluteX() is only meaningful once the note has a stave (set by
-        // voice.draw() above) and has been formatted -- read it now, right
-        // after drawing, so the lookup table matches exactly what's on screen.
-        // Uses the hand voice (typically the steadier/denser rhythm) as the
-        // cursor/pan position reference.
-        handNotes.forEach((vfNote, i) => {
-          noteEntries.push({ quarterPos: measure.notes[i].startQuarter, pixelX: vfNote.getAbsoluteX() });
-          trackBBox(vfNote); // notes/stems can extend well above/below the staff itself -- already covers each beamed note's stem up to the beam attachment point
-        });
-        footNotes.forEach((vfNote) => trackBBox(vfNote));
-      }
-      x += measureWidth;
-    });
-
-    vexNoteEntries = noteEntries;
-    vexRepeatBeginQuarter = parsed.repeatBeginQuarter;
-    vexRepeatEndQuarter = parsed.repeatEndQuarter;
-    // Crop compositing to the actual drawn content (with a little padding),
-    // not the whole (much taller, mostly-empty) source canvas -- this is
-    // what lets the notation appear large in the video without clipping.
-    const PAD = 10;
-    if (contentMinY === Infinity) { contentMinY = 0; contentMaxY = height; }
-    vexContentTop = Math.max(0, contentMinY - PAD);
-    vexContentHeight = Math.min(height - vexContentTop, (contentMaxY - contentMinY) + PAD * 2);
-  }
-
-  // Interpolates a pixel-X position (in vfCanvas's coordinate space) for an
-  // arbitrary quarter-note position, by linearly interpolating between the
-  // two surrounding notes in vexNoteEntries. Clamps to the first/last note
-  // outside the piece's range.
-  function pixelXForQuarterPos(quarterPos) {
-    const entries = vexNoteEntries;
-    if (entries.length === 0) return 0;
-    if (quarterPos <= entries[0].quarterPos) return entries[0].pixelX;
-    if (quarterPos >= entries[entries.length - 1].quarterPos) return entries[entries.length - 1].pixelX;
-    for (let i = 0; i < entries.length - 1; i++) {
-      const a = entries[i], b = entries[i + 1];
-      if (quarterPos >= a.quarterPos && quarterPos <= b.quarterPos) {
-        const span = b.quarterPos - a.quarterPos;
-        const frac = span > 0 ? (quarterPos - a.quarterPos) / span : 0;
-        return a.pixelX + frac * (b.pixelX - a.pixelX);
-      }
-    }
-    return entries[entries.length - 1].pixelX; // unreachable given the checks above, but a safe fallback
-  }
-
-  // Composites a cropped, panned window of vfCanvas into the video frame --
-  // panned so playback position sits at CURSOR_X_FRAC of the notation
-  // area's width (no cursor line drawn, just the panning). currentT is in
-  // the same clock as everything else (seconds from the MIDI's own
-  // timeline) -- converted to a quarter-note position via the existing
-  // secondsToBeats(), so this can never drift from the drum animation/audio.
-  function drawNotationInto(targetCtx, w, h, currentT) {
-    if (!notationVexLoaded || !vfCanvas || vexNoteEntries.length === 0) return;
-    const areaX = w * NOTATION_AREA_FRAC.x, areaY = h * NOTATION_AREA_FRAC.y;
-    const areaW = w * NOTATION_AREA_FRAC.w, areaH = h * NOTATION_AREA_FRAC.h;
-    const srcW = vfCanvas.width;
-    const srcTop = vexContentTop, srcH = vexContentHeight; // tight band around the actual notation, not the whole (mostly-empty) canvas
-    if (!srcW || !srcH) return;
-
-    targetCtx.save();
-    targetCtx.beginPath();
-    targetCtx.rect(areaX, areaY, areaW, areaH);
-    targetCtx.clip();
-
-    const scale = areaH / srcH;
-    const visibleSrcW = Math.min(srcW, areaW / scale);
-    let quarterPos = parsedMidi ? secondsToBeats(currentT) : 0;
-    // Real playback plays a "||:...:||" repeated section more than once,
-    // but the XML only encodes it a single time -- once quarterPos runs
-    // past what that single copy covers, wrap it back to the repeat's
-    // start instead of freezing the pan at the last mapped note.
-    if (vexRepeatBeginQuarter != null && vexRepeatEndQuarter != null && quarterPos > vexRepeatEndQuarter) {
-      const span = vexRepeatEndQuarter - vexRepeatBeginQuarter;
-      if (span > 0) {
-        const overshoot = quarterPos - vexRepeatEndQuarter;
-        quarterPos = vexRepeatBeginQuarter + (overshoot % span);
-      }
-    }
-    const cursorXInSrc = pixelXForQuarterPos(quarterPos);
-    const srcX = Math.max(0, Math.min(srcW - visibleSrcW, cursorXInSrc - visibleSrcW * CURSOR_X_FRAC));
-    targetCtx.drawImage(vfCanvas, srcX, srcTop, visibleSrcW, srcH, areaX, areaY, visibleSrcW * scale, areaH);
-    targetCtx.restore(); // lifts the clip
-  }
 
   els.notationFile.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     els.notationStatus.className = 'status loading';
-    els.notationStatus.textContent = 'Parsing MusicXML…';
+    els.notationStatus.textContent = 'Loading…';
     els.notationStatus.classList.remove('hidden');
     try {
-      await ensureVexFlowLoaded();
-      let text;
       if (file.name.toLowerCase().endsWith('.mxl')) {
-        const arrayBuffer = await file.arrayBuffer();
-        text = await extractMusicXMLFromMxl(arrayBuffer);
-      } else {
-        text = await file.text();
+        throw new Error('.mxl (compressed MusicXML) is not supported yet by the new Notation Engine.');
       }
-      const parsed = parseMusicXML(text);
-      lastParsedMusicXML = parsed;
-      const container = document.getElementById('notationContainer2');
-      renderMusicXMLWithVexFlow(parsed, container);
-      notationVexLoaded = true;
+      await file.text(); // just confirms the file is readable -- the new engine doesn't parse XML content yet
 
       // New from-scratch Notation Engine (Phase 9 quick-demo): render just
       // the 5-line staff to prove the file-upload -> new-engine connection
-      // works. Width picked to roughly span one measure's worth of the
-      // XML that was just uploaded; nothing else (notes/clef/etc.) yet.
+      // works. No note/clef/duration parsing yet -- that's further ahead
+      // in the plan (Phase 36+).
       const newEngineContainer = document.getElementById('notationEngineContainer');
       newEngineContainer.innerHTML = renderStaffAsStandaloneSVG(
         { x: 20, y: 30, width: 900, lineSpacing: 10, lineThickness: 1.2, color: '#000000' },
@@ -1271,12 +694,9 @@
       );
 
       els.notationStatus.className = 'status ok';
-      els.notationStatus.textContent = `Loaded "${file.name}" — ${parsed.measures.length} measures parsed and rendered.`;
-      console.log('Notation Engine 2: parsed', parsed);
-      if (parsedMidi) drawFrame();
+      els.notationStatus.textContent = `Loaded "${file.name}" — staff lines rendered (Phase 9 only, notes not implemented yet).`;
     } catch (err) {
-      console.error('Notation Engine 2 error:', err);
-      notationVexLoaded = false;
+      console.error('Notation Engine error:', err);
       els.notationStatus.className = 'status err';
       els.notationStatus.textContent = 'Could not load this notation file: ' + (err.message || err);
     }
@@ -1512,16 +932,6 @@
     computeCountInTiming(pm);
     loadCountInClips(); // fire-and-forget; play() checks countInClips.length when it actually starts
 
-    // Re-render the notation if it was already loaded -- tempo markings are
-    // looked up from parsedMidi's own tempo map, so if the MIDI loads (or is
-    // replaced) after the MusicXML, this is what makes them appear/update
-    // instead of silently staying blank.
-    if (lastParsedMusicXML) {
-      const container = document.getElementById('notationContainer2');
-      renderMusicXMLWithVexFlow(lastParsedMusicXML, container);
-      notationVexLoaded = true;
-    }
-
     els.bpmVal.textContent = pm.tempoChanges.map((t) => t.bpm.toFixed(0)).join(' → ');
     els.tsVal.textContent = pm.timeSignatures.map((s) => `${s.numerator}/${s.denominator}`).join(', ');
     els.durVal.textContent = pm.durationSeconds.toFixed(2) + 's';
@@ -1592,9 +1002,7 @@
     return seg;
   }
   // Inverse of secondsToBeats() -- converts a quarter-note position back to
-  // seconds, via the MIDI's own tempo map. Used to cross-reference a
-  // MusicXML note against the actual MIDI note event at that position (see
-  // resolveVexKeysFromMidi below).
+  // seconds, via the MIDI's own tempo map.
   function quarterToSeconds(quarterPos) {
     const seg = getActiveTempoSegByQuarter(quarterPos);
     return seg.time + (quarterPos - seg.tick / parsedMidi.ppq) * 60 / seg.bpm;
@@ -1733,7 +1141,6 @@
       }
     }
     drawHeaderRow(ctx, w, h, Math.max(0, currentTime));
-    drawNotationInto(ctx, w, h, Math.max(0, currentTime));
   }
 
   function triggerEventsUpTo(t) {
@@ -1867,7 +1274,6 @@
       renderCtx.drawImage(backgroundImg, 0, 0, w, h);
     }
     drawHeaderRow(renderCtx, w, h, 0);
-    drawNotationInto(renderCtx, w, h, 0);
     const beatIndex = Math.min(countInBeatCount - 1, Math.floor(realT / countInSecPerBeat));
     renderCtx.save();
     renderCtx.textAlign = 'center'; renderCtx.textBaseline = 'middle';
@@ -1889,7 +1295,6 @@
       }
     }
     drawHeaderRow(renderCtx, w, h, Math.min(t, parsedMidi.durationSeconds));
-    drawNotationInto(renderCtx, w, h, Math.min(t, parsedMidi.durationSeconds));
   }
 
   els.generateBtn.addEventListener('click', async () => {
