@@ -1,0 +1,327 @@
+# Notation Engine — Full Build Plan (Phase 1 → Phase 50)
+
+**Stack:** TypeScript + SVG (no VexFlow/AlphaTab dependency — everything hand-built)
+**Scope:** General-purpose music notation engine — works for ANY instrument (piano,
+guitar, drum kit, orchestral parts, etc.), not just drums.
+**Status:** Planning only. No code written yet. Nothing in this plan starts until
+explicitly approved step-by-step.
+
+---
+
+## GROUP A — Foundation (Phase 1–8)
+
+**Phase 1 — Repo & folder structure**
+`notation-engine/` အောက်မှာ:
+```
+notation-engine/
+  src/
+    core/          <- data model (Score, Part, Measure, Voice, Note, Duration)
+    parser/        <- MusicXML (and later MIDI) → core model
+    geometry/      <- staff/glyph/beam math, pure functions, no SVG
+    render/         <- SVG DOM building from geometry
+    layout/        <- horizontal-scroll engine + paginated engine
+    cursor/        <- cursor state machine + sync modes
+    theme/         <- colors, fonts, sizes, all overridable tokens
+    config/         <- the single JSON/TS config schema for every user-facing setting
+    glyphs/         <- SMuFL glyph table + font metadata loader
+    export/         <- SVG/PNG/PDF export
+    plugins/        <- extension points (custom noteheads, custom instruments)
+  test/
+    fixtures/      <- sample MusicXML files (piano, guitar, drum, orchestral)
+    visual/         <- snapshot/visual-regression tests
+  docs/
+  PLAN.md          <- this file
+```
+**Phase 2 — Toolchain**: TypeScript config (strict mode), bundler (esbuild, already
+proven working in this project), lint/format rules, package.json scripts.
+
+**Phase 3 — Core data model v1**: `Pitch`, `Duration`, `Note`, `Rest`, `Chord`,
+`Voice`, `Measure`, `Part`, `Score` — instrument-agnostic. A "Note" never assumes
+pitched vs unpitched; percussion is just a `Note` whose `Pitch` maps through an
+"unpitched display" table instead of a clef-derived staff position.
+
+**Phase 4 — Duration/tick math**: divisions, ticks, tuplet ratios, dotted-note
+expansion, tie-across-barline handling. Pure functions, unit-tested against known
+MusicXML tick values.
+
+**Phase 5 — SMuFL glyph table**: load Bravura (or any SMuFL font) metadata JSON;
+expose `getGlyph(name)` returning codepoint + engraving-default metrics (stem
+thickness, notehead anchor points) — this is the single source of truth other
+phases read from, instead of hardcoding magic numbers.
+
+**Phase 6 — SVG primitives layer**: thin wrapper for `<path>`, `<text>`,
+`<g>`, `<line>` with a consistent coordinate system (staff-space units, not
+pixels) so every later phase draws in the same units and one global scale
+factor changes the whole rendering.
+
+**Phase 7 — Config schema (the customization backbone)**: a single typed config
+object that every phase 8+ feature reads from — nothing is hardcoded anywhere
+else. Sections already stubbed for: colors, layout mode, cursor mode, notehead
+mapping, beam style, bar-number display, key-signature style. Every later phase
+just fills in its own section.
+
+**Phase 8 — Testing harness**: headless SVG render → pixel/DOM snapshot compare
+(same technique already validated in the earlier VexFlow debugging session),
+so every phase from here has a regression safety net.
+
+---
+
+## GROUP B — Staff, Clef & Key (Phase 9–15)
+
+**Phase 9 — Stave/staff line rendering**: 1–6 line staves (5-line standard, but
+1-line/single-line and 6-line tab supported from day one since config-driven).
+
+**Phase 10 — Clef engine**: treble, bass, alto, tenor, soprano, percussion,
+tab, octave-shifted (8va/8vb) clefs. Clef determines the pitch↔line mapping
+function for pitched staves; percussion clef uses the separate unpitched-display
+table instead.
+
+**Phase 11 — Key signature engine**: circle-of-fifths accidental ordering,
+correct vertical position of each sharp/flat per clef (this differs per clef —
+treble vs bass vs alto all place the same key differently), key signature
+**style options**: standard sharps/flats glyphs vs. custom placement overrides,
+cancellation naturals when key changes mid-piece.
+
+**Phase 12 — Time signature engine**: numeric (4/4, 7/8...), common/cut time
+symbols, compound/irregular signatures, mid-piece time signature changes.
+
+**Phase 13 — Barline & measure engine**: single, double, final, repeat-begin,
+repeat-end, repeat-both, dashed. **Bar/measure numbering options** (config-driven):
+off / every bar / every N bars / only at system start — each with position
+(above stave) and font style configurable.
+
+**Phase 14 — Ledger lines**: automatic above/below-staff ledger line generation
+for any clef, any pitch, driven purely by staff-position math from Phase 10.
+
+**Phase 15 — Multi-stave / grand staff**: piano-style linked staves (treble+bass
+joined by a brace), and multi-part scores (one staff per instrument) sharing one
+horizontal timeline — needed for "works for all instruments," not just single-staff
+drum kit.
+
+---
+
+## GROUP C — Notes, Noteheads & Rests (Phase 16–22)
+
+**Phase 16 — Notehead shape library**: round (default), x, diamond, triangle,
+square, slash, circle-x, plus-shape — all as SMuFL glyph lookups, not custom
+paths, so they stay font-consistent.
+
+**Phase 17 — Notehead-shape mapping system (the "စိတ်ကြိုက်ပြင်" requirement)**:
+a config table mapping *(instrument, pitch-or-MIDI-note) → notehead shape*.
+Fully user-editable at runtime — e.g. remap kick=round, snare=round,
+hi-hat=x, cymbal=x, or any pitched-instrument override (e.g. muted-note = x
+notehead on guitar). This generalizes what the drum project needed into a
+reusable engine feature.
+
+**Phase 18 — Note color system**: per-note, per-voice, per-instrument, or
+per-notehead-shape color overrides via the theme config; also supports a
+single global "ink color" default (for the black/white-video use case from
+the earlier drum project) that any per-note override can still take precedence
+over.
+
+**Phase 19 — Stem engine**: direction rules (auto by staff position, or forced
+up/down per voice — needed for multi-voice-on-one-staff like the drum hand/foot
+split), stem length rules, stemlets for rests inside beams.
+
+**Phase 20 — Flag engine**: individual note flags (8th/16th/32nd/64th) for
+unbeamed notes, direction-aware (flips with stem direction).
+
+**Phase 21 — Rest engine**: all rest durations, correct vertical placement per
+clef/voice, rest-collision avoidance between multiple voices on one staff.
+
+**Phase 22 — Accidental engine**: sharp/flat/natural/double placement, correct
+horizontal stacking when multiple accidentals collide in a chord, courtesy
+accidentals, micro-tonal glyphs (SMuFL has codepoints for these already via
+Phase 5).
+
+---
+
+## GROUP D — Beams, Ties, Tuplets & Modifiers (Phase 23–30)
+
+**Phase 23 — Beam grouping algorithm**: duration-based auto-grouping (by time
+signature beat structure), manual group-size override, secondary breaks.
+
+**Phase 24 — Beam geometry & style ("မျဥ်းစောင်း/မျဥ်းဖျောင့်" requirement)**:
+this is its own phase specifically because the user wants it switchable:
+- **Straight/slanted beam** (standard engraving default — angled to follow the
+  melodic contour, clamped to a max slope)
+- **Flat/horizontal beam** (no slope — common in simplified/rhythm notation
+  and some drum charts)
+- **Curved beam** (a bezier-based custom style) as a third selectable option
+All three share the same underlying note-position data; only the line-drawing
+function switches based on `config.beamStyle`.
+
+**Phase 25 — Cross-staff beaming**: beams spanning two staves (grand staff /
+multi-voice), needed for full piano-repertoire support.
+
+**Phase 26 — Tie engine**: curved tie rendering between same-pitch notes across
+beats/barlines, direction (above/below) auto-selection based on stem direction.
+
+**Phase 27 — Slur engine**: phrasing slurs across multiple notes, independent
+curve-shape config from ties (since slurs typically span further and need a
+flatter arc).
+
+**Phase 28 — Tuplet engine**: bracket + ratio-number rendering (triplets,
+quintuplets, any N:M ratio), nested tuplets.
+
+**Phase 29 — Articulations & ornaments**: staccato, accent, tenuto, marcato,
+trill, turn, mordent, fermata — all SMuFL-glyph driven, position auto-computed
+relative to notehead/stem.
+
+**Phase 30 — Dynamics & expression text**: pp–ff glyphs, hairpins
+(crescendo/decrescendo), tempo markings, rehearsal marks, text directives.
+
+---
+
+## GROUP E — Multi-Voice, Lyrics & Chords (Phase 31–35)
+
+**Phase 31 — Multi-voice-per-staff engine**: N independent voices sharing one
+stave (generalizes the drum hand/foot split into an N-voice system for any
+instrument — e.g. SATB choir on one staff, or piano LH/RH split voices).
+
+**Phase 32 — Voice collision/formatting**: automatic horizontal offset when two
+voices' noteheads collide, rest-position separation per voice (the fix already
+proven necessary in the drum prototype, now built as a first-class engine
+feature instead of a patch).
+
+**Phase 33 — Lyrics engine**: syllable-per-note text, hyphen/underscore
+continuation lines, multiple verses stacked.
+
+**Phase 34 — Chord symbol engine**: text-based chord symbols above the staff
+(C, Dm7, G7/B...) with configurable font/position, independent of the
+notehead-chord (stacked-pitches) rendering from Phase 3/16.
+
+**Phase 35 — Grace notes**: small-size grace notes/groups (acciaccatura,
+appoggiatura) attached to a main note, with slur-to-main-note auto-drawn.
+
+---
+
+## GROUP F — XML Import Pipeline (Phase 36–40)
+
+**Phase 36 — MusicXML parser v1**: pitches, durations, voices, ties, backup/
+forward (multi-voice tick tracking — already solved once in the drum prototype,
+now generalized), divisions, measures.
+
+**Phase 37 — MusicXML parser v2**: key signatures, time signatures, clefs
+(including mid-piece changes), barlines/repeats, tempo, dynamics, articulations,
+lyrics, chord symbols — i.e. every notation feature from Groups B–E gets its
+matching XML importer.
+
+**Phase 38 — Unpitched/percussion XML handling**: `<unpitched>`,
+`<midi-instrument>`, `<notehead>` elements → feeds directly into the Phase 17
+notehead-mapping system, so percussion is just one configuration of the
+general engine, not a separate code path.
+
+**Phase 39 — "XML in → full notation out" pipeline test**: one function,
+`renderFromMusicXML(xmlText, config) → SVG`, exercised against a battery of
+real-world sample files (solo piano, string quartet, drum kit, guitar tab)
+covering every feature from Groups B–E end to end.
+
+**Phase 39b — Cross-software MusicXML compatibility (hard requirement)**: the
+parser must correctly render a MusicXML file **no matter which software
+exported it** — MuseScore, Sibelius, Finale, Dorico, Guitar Pro, and any DAW's
+export are all valid MusicXML but each vendor emits slightly different
+element ordering, optional-field usage, and quirks (e.g. some omit
+`<divisions>` per part instead of once globally, some encode ties as
+`<tied>` notations only, others also duplicate via `<tie>` start/stop, some
+put `<backup>/<forward>` differently for multi-voice). Build a compatibility
+test suite with real sample exports from each of the above programs (not just
+hand-written test fixtures) and treat any of them failing to render correctly
+as a bug in our parser, never as "that software's fault." This phase gates
+Phase 40.
+
+**Phase 40 — Import error handling & partial-render fallback**: malformed/
+incomplete XML should still render whatever can be understood rather than
+failing the whole page, with clear diagnostics logged.
+
+---
+
+## GROUP G — Layout Engine (Phase 41–44)
+
+**Phase 41 — Horizontal continuous-scroll layout**: single long system, no page
+breaks — the mode already used in the drum-video project (pan-based).
+
+**Phase 42 — Paginated layout**: notation reflows into fixed-size pages
+(A4/Letter/custom) with system breaks and margins, matching how MuseScore/
+Guitar Pro print output looks — user picks `config.layoutMode: 'scroll' |
+'page'`.
+
+**Phase 43 — Formatter/spacing algorithm**: horizontal note-spacing
+proportional to duration (with a configurable spacing curve), justification
+to fill system width, minimum-padding rules between accidentals/noteheads/
+articulations so nothing overlaps.
+
+**Phase 44 — Responsive re-layout / arbitrary W×H resize (hard requirement)**:
+the whole rendered notation must be resizable to **any width and height**
+on demand — not just a few preset zoom levels — without re-parsing the XML.
+Concretely: `engine.resize(width, height)` re-flows systems, re-wraps
+measures, and re-scales glyphs/staff-space to fit the new box, for both the
+scroll layout (Phase 41) and the page layout (Phase 42). This is needed for:
+the video-export use case (arbitrary frame sizes — 16:9, 9:16, custom), an
+embeddable web widget (container size unknown ahead of time), and print
+output at different paper sizes. Re-layout must be fast enough to run on
+every resize event, not just once at load.
+
+---
+
+## GROUP H — Cursor System (Phase 45–47)
+
+**Phase 45 — Cursor data model**: a time-position (quarter-note position or
+seconds, convertible via tempo map) independent of layout — the cursor concept
+is decoupled from rendering so it works under both scroll and page layouts.
+
+**Phase 46 — Sync mode A: "Cursor moves, notation stays still"**: a vertical
+line/marker sweeps across a fixed, fully-rendered notation view (like a
+karaoke bouncing ball) — good for page layout / print-style display.
+
+**Phase 47 — Sync mode B: "Notation moves, cursor stays still"**: the notation
+pans/scrolls underneath a fixed cursor reference point (the mode already built
+for the drum video project) — good for scroll layout / narrow video frames.
+Both modes are selected via `config.cursorMode: 'cursorMoves' | 'notationMoves'`
+and share the same underlying time→pixel-position mapping function from
+Phase 45, so switching modes is a config change, not a rewrite.
+
+---
+
+## GROUP I — Theming, Customization & Export (Phase 48–50)
+
+**Phase 48 — Full theming API (hard requirement: color is always changeable)**:
+every visual token exposed through one config object — ink/background color,
+per-element color overrides (Phase 18: per-note, per-voice, per-instrument,
+per-notehead-shape, and one global override-everything ink color), font
+family/size for text elements, staff-line thickness, glyph size scale, beam
+style (Phase 24), notehead mapping (Phase 17), bar-number display (Phase 13),
+key-signature style (Phase 11), layout mode (Phase 42), cursor mode (Phase 47),
+and W×H resize (Phase 44) — i.e. this phase is where every
+"စိတ်ကြိုက်ပြင်ဆင်" requirement from earlier phases gets unified into one
+documented, typed settings object rather than scattered flags. Color changes
+and resize calls must both be runnable live on an already-rendered score
+(re-theme / re-flow in place) — neither requires re-parsing the source XML.
+
+**Phase 49 — Export engine**: SVG-to-PNG rasterization (for video-frame
+compositing, matching the drum project's needs), direct SVG export, and PDF
+export (multi-page, using the Phase 42 paginated layout).
+
+**Phase 50 — Plugin/extension points & documentation**: a stable public API
+so custom notehead glyphs, custom instruments, or custom render passes (e.g.
+a new beam style beyond straight/flat/curved) can be added without touching
+engine internals; full API reference docs generated from TypeScript types.
+
+---
+
+## Notes on sequencing
+
+- Groups A→D must be built roughly in order (each depends on the data model
+  and glyph table from Group A).
+- Group E (multi-voice/lyrics/chords) can start once Group C is stable.
+- Group F (XML import) intentionally comes *after* Groups B–E exist, so the
+  parser has real rendering features to map onto — importing into an engine
+  that can't yet draw a tuplet would just mean re-doing the importer later.
+- Groups G (layout) and H (cursor) are independent of each other and can be
+  built in parallel once Group F's pipeline exists to feed them real scores.
+- Group I is deliberately last: it's the phase that *exposes* all the
+  configurability the earlier phases already built in, rather than adding new
+  rendering features.
+
+**Nothing above is implemented yet.** This is the full roadmap only, per your
+instruction. Tell me which phase to start with.
