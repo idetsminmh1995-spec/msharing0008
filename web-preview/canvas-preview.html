@@ -692,6 +692,13 @@
   // the video without needing a bigger source canvas or any clipping risk.
   let vexContentTop = 0;
   let vexContentHeight = 200;
+  // Where a "||:...:||" repeat spans, in quarter-note position -- lets
+  // drawNotationInto() wrap the notation back to the repeat's start once
+  // real playback (which actually plays the repeated section more than
+  // once) goes past what this single copy in the XML covers, instead of
+  // just freezing at the last mapped note.
+  let vexRepeatBeginQuarter = null;
+  let vexRepeatEndQuarter = null;
   // Notation area geometry: the notation image is panned so playback
   // position sits at CURSOR_X_FRAC of the area's width (no cursor line
   // drawn -- just the panning).
@@ -837,6 +844,8 @@
     // instead of re-descending into every measure's chord groups.
     const flatRawNotes = [];
     let measureStartTick = 0; // this measure's start, in ticks from the piece's start
+    let repeatBeginQuarter = null; // quarter-position where a "||:" repeat begins, if any
+    let repeatEndQuarter = null; // quarter-position right after the measure a ":||" repeat-end sits in
 
     for (const measureEl of firstPart.querySelectorAll('measure')) {
       const divisionsEl = measureEl.querySelector('attributes > divisions');
@@ -935,10 +944,12 @@
       // own <barline> elements read and applied to the stave.
       const barlineRepeatBegin = !!measureEl.querySelector('barline[location="left"] repeat[direction="forward"]');
       const barlineRepeatEnd = !!measureEl.querySelector('barline[location="right"] repeat[direction="backward"]');
+      if (barlineRepeatBegin && repeatBeginQuarter === null) repeatBeginQuarter = measureStartTick / divisions;
+      if (barlineRepeatEnd) repeatEndQuarter = (measureStartTick + measureLengthTicks) / divisions;
       measures.push({ timeNumerator, timeDenominator, notes, barlineRepeatBegin, barlineRepeatEnd });
       measureStartTick += measureLengthTicks;
     }
-    return { divisions, measures, flatRawNotes };
+    return { divisions, measures, flatRawNotes, repeatBeginQuarter, repeatEndQuarter };
   }
 
   // Overrides each note's vexKey (staff position) by cross-referencing it
@@ -1093,6 +1104,8 @@
     });
 
     vexNoteEntries = noteEntries;
+    vexRepeatBeginQuarter = parsed.repeatBeginQuarter;
+    vexRepeatEndQuarter = parsed.repeatEndQuarter;
     // Crop compositing to the actual drawn content (with a little padding),
     // not the whole (much taller, mostly-empty) source canvas -- this is
     // what lets the notation appear large in the video without clipping.
@@ -1143,7 +1156,18 @@
 
     const scale = areaH / srcH;
     const visibleSrcW = Math.min(srcW, areaW / scale);
-    const quarterPos = parsedMidi ? secondsToBeats(currentT) : 0;
+    let quarterPos = parsedMidi ? secondsToBeats(currentT) : 0;
+    // Real playback plays a "||:...:||" repeated section more than once,
+    // but the XML only encodes it a single time -- once quarterPos runs
+    // past what that single copy covers, wrap it back to the repeat's
+    // start instead of freezing the pan at the last mapped note.
+    if (vexRepeatBeginQuarter != null && vexRepeatEndQuarter != null && quarterPos > vexRepeatEndQuarter) {
+      const span = vexRepeatEndQuarter - vexRepeatBeginQuarter;
+      if (span > 0) {
+        const overshoot = quarterPos - vexRepeatEndQuarter;
+        quarterPos = vexRepeatBeginQuarter + (overshoot % span);
+      }
+    }
     const cursorXInSrc = pixelXForQuarterPos(quarterPos);
     const srcX = Math.max(0, Math.min(srcW - visibleSrcW, cursorXInSrc - visibleSrcW * CURSOR_X_FRAC));
     targetCtx.drawImage(vfCanvas, srcX, srcTop, visibleSrcW, srcH, areaX, areaY, visibleSrcW * scale, areaH);
