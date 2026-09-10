@@ -694,7 +694,7 @@
   // Same geometry/approach as the earlier alphaTab-based notation area:
   // fixed cursor at CURSOR_X_FRAC of the area's width, notation image pans
   // underneath it.
-  const NOTATION_AREA_FRAC = { x: 0.05, y: 0.13, w: 0.9, h: 0.32 };
+  const NOTATION_AREA_FRAC = { x: 0.05, y: 0.13, w: 0.9, h: 0.4 };
   const CURSOR_X_FRAC = 0.15;
 
   function loadScriptTag(src) {
@@ -725,10 +725,15 @@
   };
   // Percussion display-step -> a rough treble-clef line position. Real
   // MusicXML percussion maps step+octave to a specific staff line; this is
-  // an approximation covering the common 5-line drum staff positions.
+  // an approximation covering the common 5-line drum staff positions. Each
+  // input step/octave maps one diatonic step up (matches the existing
+  // convention below) -- extended a bit further in both directions to
+  // reduce how often an unmapped pitch silently falls back to the default
+  // line.
   const STEP_OCTAVE_TO_VEX_KEY = {
-    'F/5': 'g/5', 'E/5': 'f/5', 'D/5': 'e/5', 'C/5': 'd/5',
-    'B/4': 'c/5', 'A/4': 'b/4', 'G/4': 'a/4', 'F/4': 'g/4', 'E/4': 'f/4',
+    'G/5': 'a/5', 'F/5': 'g/5', 'E/5': 'f/5', 'D/5': 'e/5', 'C/5': 'd/5',
+    'B/4': 'c/5', 'A/4': 'b/4', 'G/4': 'a/4', 'F/4': 'g/4', 'E/4': 'f/4', 'D/4': 'e/4', 'C/4': 'd/4',
+    'B/3': 'c/4',
   };
 
   // .mxl files are ZIP-compressed MusicXML containers (not plain XML text).
@@ -872,12 +877,17 @@
     let x = 10;
     parsed.measures.forEach((measure, mIdx) => {
       const stave = new VF.Stave(x, 20, measureWidth);
+      stave.setMeasure(mIdx + 1); // shows a measure number above the stave, matching the reference design
       if (mIdx === 0) {
         stave.addClef('percussion');
         stave.addTimeSignature(`${measure.timeNumerator}/${measure.timeDenominator}`);
       }
       stave.setContext(context).draw();
       trackBBox(stave);
+      // Stave.getBoundingBox() doesn't account for the measure-number text
+      // drawn above the stave (setMeasure() above) -- extend the tracked
+      // top manually so it doesn't get cropped out.
+      contentMinY = Math.min(contentMinY, stave.getYForTopText(0) - 15);
 
       const vfNotes = measure.notes.map((n) => {
         if (n.isRest) {
