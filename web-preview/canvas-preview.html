@@ -836,6 +836,18 @@
     const context = renderer.getContext();
     vfCanvas = canvasEl;
 
+    // The CANVAS backend never paints a background -- the underlying
+    // <canvas> stays fully transparent except for the ink itself, and that
+    // ink defaults to plain black (the browser canvas default). That's fine
+    // for the debug strip below (its div has a white CSS background), but
+    // when this canvas gets drawImage()'d into the black video frame later,
+    // black-on-transparent is invisible. Set the ink color to match Video
+    // Color instead (matches how the rest of the app flips colors for it),
+    // and tint the debug strip's own background to stay legible either way.
+    const inkColor = titleAndDisplaySettings.videoColor === 'white' ? '#000000' : '#ffffff';
+    container.style.background = inkColor === '#ffffff' ? '#111111' : '#ffffff';
+    context.setFillStyle(inkColor).setStrokeStyle(inkColor);
+
     const noteEntries = []; // { quarterPos, pixelX }, built up across every measure
 
     let x = 10;
