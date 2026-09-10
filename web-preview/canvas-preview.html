@@ -691,9 +691,9 @@
   // the video without needing a bigger source canvas or any clipping risk.
   let vexContentTop = 0;
   let vexContentHeight = 200;
-  // Same geometry/approach as the earlier alphaTab-based notation area:
-  // fixed cursor at CURSOR_X_FRAC of the area's width, notation image pans
-  // underneath it.
+  // Notation area geometry: the notation image is panned so playback
+  // position sits at CURSOR_X_FRAC of the area's width (no cursor line
+  // drawn -- just the panning).
   const NOTATION_AREA_FRAC = { x: 0.03, y: 0.13, w: 0.94, h: 0.48 };
   const CURSOR_X_FRAC = 0.15;
 
@@ -895,8 +895,17 @@
     const canvasEl = document.createElement('canvas');
     container.appendChild(canvasEl);
     const renderer = new VF.Renderer(canvasEl, VF.Renderer.Backends.CANVAS);
-    renderer.resize(totalWidth, height);
+    // renderer.resize() doesn't forward a devicePixelRatio override, and
+    // defaults to window.devicePixelRatio (2 or 3 on most modern screens) --
+    // that scales up the canvas's actual pixel dimensions (vfCanvas.width/
+    // height) well beyond the "logical" totalWidth/height used everywhere
+    // else (stave positions, bounding-box tracking, drawImage source rects
+    // below), silently breaking all of that math. Forcing it to 1 here
+    // keeps everything in one consistent pixel space. Call this directly on
+    // the context (not renderer.resize(), which doesn't accept the third
+    // argument).
     const context = renderer.getContext();
+    context.resize(totalWidth, height, 1);
     vfCanvas = canvasEl;
 
     // The CANVAS backend never paints a background -- the underlying
@@ -1008,12 +1017,12 @@
     return entries[entries.length - 1].pixelX; // unreachable given the checks above, but a safe fallback
   }
 
-  // Composites a cropped, panned window of vfCanvas into the video frame,
-  // with the cursor fixed at CURSOR_X_FRAC of the notation area's width.
-  // currentT is in the same clock as everything else (seconds from the
-  // MIDI's own timeline) -- converted to a quarter-note position via the
-  // existing secondsToBeats(), so this can never drift from the drum
-  // animation/audio.
+  // Composites a cropped, panned window of vfCanvas into the video frame --
+  // panned so playback position sits at CURSOR_X_FRAC of the notation
+  // area's width (no cursor line drawn, just the panning). currentT is in
+  // the same clock as everything else (seconds from the MIDI's own
+  // timeline) -- converted to a quarter-note position via the existing
+  // secondsToBeats(), so this can never drift from the drum animation/audio.
   function drawNotationInto(targetCtx, w, h, currentT) {
     if (!notationVexLoaded || !vfCanvas || vexNoteEntries.length === 0) return;
     const areaX = w * NOTATION_AREA_FRAC.x, areaY = h * NOTATION_AREA_FRAC.y;
@@ -1033,10 +1042,6 @@
     const cursorXInSrc = pixelXForQuarterPos(quarterPos);
     const srcX = Math.max(0, Math.min(srcW - visibleSrcW, cursorXInSrc - visibleSrcW * CURSOR_X_FRAC));
     targetCtx.drawImage(vfCanvas, srcX, srcTop, visibleSrcW, srcH, areaX, areaY, visibleSrcW * scale, areaH);
-
-    const cursorX = areaX + CURSOR_X_FRAC * areaW;
-    targetCtx.fillStyle = '#ff0000';
-    targetCtx.fillRect(cursorX, areaY, Math.max(2, w * 0.004), areaH);
     targetCtx.restore(); // lifts the clip
   }
 
