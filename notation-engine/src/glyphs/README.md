@@ -5,6 +5,5 @@ font). Single source of truth for glyph codepoints and engraving-default
 metrics (stem thickness, notehead anchor points) -- other modules read from
 here instead of hardcoding magic numbers.
 
-See PLAN.md Phase 5.
-
-Nothing here yet -- Phase 1 is folder structure only.
+See PLAN.md Phase 5 and `../../Doc/phase-05-smufl-glyph-table.md` for the
+full record. Main entry point: `getGlyph(name)` in `glyph-table.ts`.
