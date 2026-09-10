@@ -930,7 +930,12 @@
         }
       });
 
-      measures.push({ timeNumerator, timeDenominator, notes });
+      // Repeat barlines ("||:" / ":||") -- VexFlow supports these natively
+      // (Barline.type.REPEAT_BEGIN/REPEAT_END), just needs the MusicXML's
+      // own <barline> elements read and applied to the stave.
+      const barlineRepeatBegin = !!measureEl.querySelector('barline[location="left"] repeat[direction="forward"]');
+      const barlineRepeatEnd = !!measureEl.querySelector('barline[location="right"] repeat[direction="backward"]');
+      measures.push({ timeNumerator, timeDenominator, notes, barlineRepeatBegin, barlineRepeatEnd });
       measureStartTick += measureLengthTicks;
     }
     return { divisions, measures, flatRawNotes };
@@ -1027,6 +1032,8 @@
         stave.addClef('percussion');
         stave.addTimeSignature(`${measure.timeNumerator}/${measure.timeDenominator}`);
       }
+      if (measure.barlineRepeatBegin) stave.setBegBarType(VF.Barline.type.REPEAT_BEGIN);
+      if (measure.barlineRepeatEnd) stave.setEndBarType(VF.Barline.type.REPEAT_END);
       // Tempo marking ("♩ = 120"), placed at the point in the piece where it
       // applies -- looked up via the MIDI's own tempo map (never the
       // MusicXML's), so it always matches what's actually playing. Only
