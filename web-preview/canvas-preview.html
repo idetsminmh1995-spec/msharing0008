@@ -694,7 +694,7 @@
   // Same geometry/approach as the earlier alphaTab-based notation area:
   // fixed cursor at CURSOR_X_FRAC of the area's width, notation image pans
   // underneath it.
-  const NOTATION_AREA_FRAC = { x: 0.05, y: 0.13, w: 0.9, h: 0.4 };
+  const NOTATION_AREA_FRAC = { x: 0.03, y: 0.13, w: 0.94, h: 0.48 };
   const CURSOR_X_FRAC = 0.15;
 
   function loadScriptTag(src) {
@@ -800,6 +800,17 @@
       const timeDenEl = measureEl.querySelector('attributes > time > beat-type');
       const notes = [];
       for (const noteEl of measureEl.querySelectorAll('note')) {
+        // Drum notation frequently uses multiple XML <voice>s in one measure
+        // (e.g. a hi-hat rhythm as voice 1, kick/snare as voice 2, interleaved
+        // with <backup> to rewind the tick position between them). Summing
+        // every voice's notes sequentially -- as if they all happened one
+        // after another -- inflates the cumulative quarter-note count well
+        // past the measure's real length, which is exactly what makes the
+        // cursor run ahead of the actual playback. Only voice 1 (or an
+        // unlabeled voice, for simple single-voice files) is used for timing
+        // and rendering -- other voices are skipped for now.
+        const voiceEl = noteEl.querySelector('voice');
+        if (voiceEl && voiceEl.textContent !== '1') continue;
         const isRest = !!noteEl.querySelector('rest');
         const durationEl = noteEl.querySelector('duration');
         const typeEl = noteEl.querySelector('type');
