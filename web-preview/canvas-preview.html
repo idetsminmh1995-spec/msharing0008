@@ -682,6 +682,15 @@
   let vfCanvas = null; // the canvas VexFlow drew into, for later compositing
   let vexNoteEntries = []; // sorted [{ quarterPos, pixelX }] across the whole piece, for cursor lookup
   let notationVexLoaded = false;
+  // The VexFlow canvas is drawn at a fixed, generously-tall height so stems
+  // and ledger lines never get clipped -- but most of that height is empty
+  // space around the actual staff. vexContentTop/vexContentHeight mark the
+  // real vertical extent of the drawn notation (staff + note bounding
+  // boxes, with a small margin), so compositing can crop to just that band
+  // instead of the whole canvas -- letting the notes appear much larger in
+  // the video without needing a bigger source canvas or any clipping risk.
+  let vexContentTop = 0;
+  let vexContentHeight = 200;
   // Same geometry/approach as the earlier alphaTab-based notation area:
   // fixed cursor at CURSOR_X_FRAC of the area's width, notation image pans
   // underneath it.
@@ -849,6 +858,16 @@
     context.setFillStyle(inkColor).setStrokeStyle(inkColor);
 
     const noteEntries = []; // { quarterPos, pixelX }, built up across every measure
+    let contentMinY = Infinity, contentMaxY = -Infinity;
+    function trackBBox(el) {
+      try {
+        const bbox = el.getBoundingBox();
+        if (bbox) {
+          contentMinY = Math.min(contentMinY, bbox.getY());
+          contentMaxY = Math.max(contentMaxY, bbox.getY() + bbox.getH());
+        }
+      } catch (e) { /* bounding box not available for this element yet -- skip it */ }
+    }
 
     let x = 10;
     parsed.measures.forEach((measure, mIdx) => {
@@ -858,6 +877,7 @@
         stave.addTimeSignature(`${measure.timeNumerator}/${measure.timeDenominator}`);
       }
       stave.setContext(context).draw();
+      trackBBox(stave);
 
       const vfNotes = measure.notes.map((n) => {
         if (n.isRest) {
@@ -877,12 +897,20 @@
         // after drawing, so the lookup table matches exactly what's on screen.
         vfNotes.forEach((vfNote, i) => {
           noteEntries.push({ quarterPos: measure.notes[i].startQuarter, pixelX: vfNote.getAbsoluteX() });
+          trackBBox(vfNote); // notes/stems can extend well above/below the staff itself
         });
       }
       x += measureWidth;
     });
 
     vexNoteEntries = noteEntries;
+    // Crop compositing to the actual drawn content (with a little padding),
+    // not the whole (much taller, mostly-empty) source canvas -- this is
+    // what lets the notation appear large in the video without clipping.
+    const PAD = 10;
+    if (contentMinY === Infinity) { contentMinY = 0; contentMaxY = height; }
+    vexContentTop = Math.max(0, contentMinY - PAD);
+    vexContentHeight = Math.min(height - vexContentTop, (contentMaxY - contentMinY) + PAD * 2);
   }
 
   // Interpolates a pixel-X position (in vfCanvas's coordinate space) for an
@@ -915,7 +943,8 @@
     if (!notationVexLoaded || !vfCanvas || vexNoteEntries.length === 0) return;
     const areaX = w * NOTATION_AREA_FRAC.x, areaY = h * NOTATION_AREA_FRAC.y;
     const areaW = w * NOTATION_AREA_FRAC.w, areaH = h * NOTATION_AREA_FRAC.h;
-    const srcW = vfCanvas.width, srcH = vfCanvas.height;
+    const srcW = vfCanvas.width;
+    const srcTop = vexContentTop, srcH = vexContentHeight; // tight band around the actual notation, not the whole (mostly-empty) canvas
     if (!srcW || !srcH) return;
 
     targetCtx.save();
@@ -928,7 +957,7 @@
     const quarterPos = parsedMidi ? secondsToBeats(currentT) : 0;
     const cursorXInSrc = pixelXForQuarterPos(quarterPos);
     const srcX = Math.max(0, Math.min(srcW - visibleSrcW, cursorXInSrc - visibleSrcW * CURSOR_X_FRAC));
-    targetCtx.drawImage(vfCanvas, srcX, 0, visibleSrcW, srcH, areaX, areaY, visibleSrcW * scale, areaH);
+    targetCtx.drawImage(vfCanvas, srcX, srcTop, visibleSrcW, srcH, areaX, areaY, visibleSrcW * scale, areaH);
 
     const cursorX = areaX + CURSOR_X_FRAC * areaW;
     targetCtx.fillStyle = '#ff0000';
