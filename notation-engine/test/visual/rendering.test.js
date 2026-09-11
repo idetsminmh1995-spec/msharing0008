@@ -270,4 +270,41 @@ describe('visual regression (Phase 8)', () => {
     );
     matchSnapshot('ledger-line-middle-c', doc, SNAPSHOT_DIR);
   });
+
+  test('Phase 15: notehead shape selection (default, config override, explicit XML override) render identically to the saved snapshot', () => {
+    const bottomY = 4;
+    const parts = [
+      NE.renderStaff(NE.computeStaffGeometry(5), {
+        x: 0,
+        y: bottomY,
+        width: 20,
+        color: '#000000',
+        lineThickness: NE.getEngravingDefault('staffLineThickness'),
+      }),
+      NE.renderClef(NE.PERCUSSION_CLEF, { x: 0.5, y: bottomY, color: '#000000', fontFamily: 'Bravura' }),
+    ];
+    // Three drum voices on the same staff: a kick (plain duration default),
+    // a hi-hat (config override -> X notehead), and a note with an explicit
+    // XML <notehead>diamond</notehead> overriding everything.
+    const notes = [
+      { pitch: NE.unpitchedPitch('F', 4), x: 3, overridesByKey: {} },
+      { pitch: NE.unpitchedPitch('G', 5), x: 6, overridesByKey: { G5: 'x' } },
+      { pitch: NE.unpitchedPitch('A', 4), x: 9, overridesByKey: { A4: 'x' }, explicitNotehead: 'diamond' },
+    ];
+    notes.forEach((n) => {
+      const glyphName = NE.selectNoteheadGlyphName({
+        pitch: n.pitch,
+        durationType: 'quarter',
+        overridesByKey: n.overridesByKey,
+        explicitNotehead: n.explicitNotehead,
+      });
+      const y = bottomY + NE.staffPositionForPitch(NE.PERCUSSION_CLEF, n.pitch.displayStep, n.pitch.displayOctave);
+      parts.push(NE.renderNotehead(glyphName, { x: n.x, y, color: '#000000', fontFamily: 'Bravura' }));
+    });
+    const doc = NE.createSvgDocument(
+      { viewBoxWidth: 20, viewBoxHeight: 8, pxPerStaffSpace: 20, backgroundColor: '#ffffff' },
+      parts,
+    );
+    matchSnapshot('notehead-selection-variants', doc, SNAPSHOT_DIR);
+  });
 });
