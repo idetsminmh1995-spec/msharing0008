@@ -1,3 +1,5 @@
+import { getGlyph, type GlyphInfo } from '../glyphs/glyph-table.js';
+
 /**
  * A time signature. `numerator`/`denominator` are the actual numeric
  * meaning (e.g. 7/8 -> numerator:7, denominator:8) -- always used for
@@ -75,4 +77,42 @@ export function numeratorText(sig: TimeSignature): string {
 /** The exact text to render for the denominator -- always the plain number (additive/irregular display only ever applies to the numerator). */
 export function denominatorText(sig: TimeSignature): string {
   return String(sig.denominator);
+}
+
+// ---- Measurement (PLAN.md §4.1: measuring is geometry's job, not the renderer's) ----
+
+/** Maps a single character ('0'-'9' or '+') from a time-signature display string to its SMuFL glyph name. */
+export function glyphNameForTimeSigChar(ch: string): string {
+  if (ch === '+') return 'timeSigPlus';
+  return `timeSig${ch}`;
+}
+
+/** Looks up the glyph for one time-signature character, throwing if it isn't a real SMuFL glyph. */
+export function glyphForTimeSigChar(ch: string): GlyphInfo {
+  const name = glyphNameForTimeSigChar(ch);
+  const glyph = getGlyph(name);
+  if (glyph === undefined) {
+    throw new Error(`No glyph found for time signature character "${ch}" (glyph name "${name}")`);
+  }
+  return glyph;
+}
+
+/** Advance width (staff-space units) of one time-signature character, from its real glyph bounding box. */
+export function charAdvance(ch: string): number {
+  const bbox = glyphForTimeSigChar(ch).bBox;
+  return bbox !== undefined ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
+}
+
+/**
+ * Total width (staff-space units) a display string (e.g. "12", "3+2+2")
+ * would take, using each character's real glyph bounding-box width. Bravura's
+ * time-signature digits are NOT uniform width ("1" is 1.176 units, "0"/"4"
+ * are 1.72), so this cannot be a per-character constant.
+ */
+export function textWidth(text: string): number {
+  let total = 0;
+  for (const ch of text) {
+    total += charAdvance(ch);
+  }
+  return total;
 }

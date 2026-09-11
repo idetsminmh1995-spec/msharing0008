@@ -25,12 +25,22 @@ centering with real, unequal glyph widths).
   denominator display is never overridden -- additive notation only ever
   applies to the numerator in real notation).
 
-**`src/render/time-signature.ts`**:
+**`src/geometry/time-signature.ts` (measurement)**:
 - **`textWidth(text)`** — total width (staff-space units) of a display
   string, using each character's REAL glyph bounding-box width from Phase
   5's `getGlyph` (digits are NOT uniform width in Bravura -- "1" is
   1.176 units, "0"/"4" are 1.72 -- so this couldn't be a fixed per-
-  character constant).
+  character constant). Alongside it: `charAdvance(ch)`,
+  `glyphForTimeSigChar(ch)`, `glyphNameForTimeSigChar(ch)`.
+
+  *(These four originally lived in `src/render/time-signature.ts`. They were
+  moved here during the v2 plan audit: they are pure measurement with no SVG
+  output, which `PLAN.md` §5's "geometry computes, render draws" rule puts in
+  `geometry/`. The renderer now calls them instead of duplicating the
+  bounding-box arithmetic. `textWidth`'s public export name is unchanged, the
+  rendered output is byte-identical, and all 89 tests still pass.)*
+
+**`src/render/time-signature.ts`**:
 - **`renderTimeSignature(sig, options)`** — for a plain numeric signature:
   draws the numerator centered on the staff's upper half (y=-3) and
   denominator on the lower half (y=-1), each character positioned

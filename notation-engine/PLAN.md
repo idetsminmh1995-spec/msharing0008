@@ -191,14 +191,34 @@ renderer does not implement fret numbers), mensural/early notation, jianpu.
                    └───────────┘              └────────────────┘
 ```
 
-**Every arrow is one-directional.** No module reaches backwards. Specifically:
+**Every arrow is one-directional.** No module reaches backwards. The exact
+permitted dependencies — verified against the code, not aspirational:
+
+| Module | May import from | Never imports |
+|---|---|---|
+| `core/` | (nothing) | everything else |
+| `glyphs/` | (nothing) | everything else |
+| `config/` | (nothing) | everything else |
+| `geometry/` | `core/`, `glyphs/`, `config/` | `render/`, `layout/`, `parser/` |
+| `render/` | `geometry/`, `glyphs/`, `config/` | `core/` directly, `layout/`, `parser/` |
+| `layout/` | `core/`, `geometry/`, `config/` | `render/` |
+| `parser/` | `core/` | everything else |
+
+In words:
 
 - `core/` knows nothing about geometry, layout, SVG, or file formats.
-- `geometry/` knows about `core/` and `glyphs/`; it never emits SVG.
-- `render/` knows about `geometry/`; it never computes musical logic.
+- `geometry/` computes positions and sizes; it **never emits SVG**. It reads
+  glyph metrics (bounding boxes, anchors) from `glyphs/` because measurement
+  is geometry's job, not the renderer's.
+- `render/` turns geometry's output into SVG strings; it **never computes
+  musical logic**. It reads `glyphs/` too, but only for the glyph *character*
+  to place in a `<text>` element — never to decide a position.
 - `layout/` orchestrates geometry into positioned systems; it never emits SVG
   directly — it produces positions that `render/` draws.
 - `parser/` produces `core/` objects and nothing else.
+
+`config/` is a leaf that anything may read, which is what makes it usable as
+the single customisation backbone (§8) without creating cycles.
 
 This is testable at the boundary: `geometry/` functions are pure and unit
 testable with no DOM; `render/` functions are string-producing and

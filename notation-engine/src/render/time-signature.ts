@@ -1,32 +1,13 @@
-import { denominatorText, numeratorText, type TimeSignature } from '../geometry/time-signature.js';
-import { getGlyph, type GlyphInfo } from '../glyphs/glyph-table.js';
+import {
+  charAdvance,
+  denominatorText,
+  glyphForTimeSigChar,
+  numeratorText,
+  textWidth,
+  type TimeSignature,
+} from '../geometry/time-signature.js';
+import { getGlyph } from '../glyphs/glyph-table.js';
 import { svgGlyphText } from './svg-primitives.js';
-
-/** Maps a single character ('0'-'9' or '+') from a time-signature display string to its SMuFL glyph name. */
-function glyphNameForChar(ch: string): string {
-  if (ch === '+') return 'timeSigPlus';
-  return `timeSig${ch}`;
-}
-
-function glyphFor(ch: string): GlyphInfo {
-  const name = glyphNameForChar(ch);
-  const glyph = getGlyph(name);
-  if (glyph === undefined) {
-    throw new Error(`No glyph found for time signature character "${ch}" (glyph name "${name}")`);
-  }
-  return glyph;
-}
-
-/** Total width (staff-space units) a display string (e.g. "12", "3+2+2") would take, using each character's real glyph bounding-box width. */
-export function textWidth(text: string): number {
-  let total = 0;
-  for (const ch of text) {
-    const glyph = glyphFor(ch);
-    const bbox = glyph.bBox;
-    total += bbox !== undefined ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
-  }
-  return total;
-}
 
 /** Draws a display string's characters left to right, each immediately after the previous one's real width, starting at `x`. Returns the markup only -- see textWidth() to know how much horizontal space it used. */
 function renderDigitString(
@@ -39,10 +20,9 @@ function renderDigitString(
   const parts: string[] = [];
   let cursor = x;
   for (const ch of text) {
-    const glyph = glyphFor(ch);
+    const glyph = glyphForTimeSigChar(ch);
     parts.push(svgGlyphText(cursor, y, glyph.char, fontFamily, { fill: color }));
-    const bbox = glyph.bBox;
-    cursor += bbox !== undefined ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
+    cursor += charAdvance(ch);
   }
   return parts.join('\n');
 }

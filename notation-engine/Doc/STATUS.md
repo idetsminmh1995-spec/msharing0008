@@ -142,6 +142,27 @@ left rather than guessed at — each is documented at the point it was found.
   Phase 12 can *draw* `3+2+2`, but nothing reads it from a file yet; that
   arrives with the parser (Phase 20/35).
 
+### Audited against the v2 plan — findings and resolution
+
+The built phases were re-audited against `PLAN.md` v2 (not against v1, which
+they were written to). Two mismatches were found and **both are now fixed**;
+everything else in Phases 1–13 complies as-is.
+
+| Finding | Resolution |
+|---|---|
+| `PLAN.md` §4.1's dependency list said "geometry knows core and glyphs; render knows geometry". Reality: `geometry → {core, glyphs, config}` and `render → {geometry, glyphs}`. Both actual shapes are *correct* — measuring needs glyph metrics, and rendering needs the glyph character — the plan's list was simply out of date | **Plan fixed.** §4.1 now carries an exact per-module dependency table, verified against the code, plus the reasoning for why both modules legitimately read `glyphs/` |
+| `textWidth()` and its glyph-lookup helpers lived in `render/time-signature.ts`, but they are pure measurement with no SVG output — which §5's "geometry computes, render draws" rule puts in `geometry/` | **Code fixed.** Moved to `geometry/time-signature.ts` as `textWidth`, `charAdvance`, `glyphForTimeSigChar`, `glyphNameForTimeSigChar`; the renderer now consumes them instead of duplicating the bbox arithmetic. Public API unchanged for `textWidth`; snapshots byte-identical, 89/89 still pass |
+
+Verified clean in the same audit: no module branches on instrument type
+(§4.3); no output-affecting iteration over unordered maps, so determinism
+(§4.4) holds; the `core/` data structures match §6.1 exactly; the staff-space
+coordinate convention and the `SMUFL_STAFF_SPACES_PER_EM = 4` constant match
+§4.2; every `geometry/X.ts` has its matching `render/X.ts` per §5.
+
+Not a defect: `EngineConfig`'s `[TODO]` sections from §8.2 (`spacing`,
+`staves`, `page`, `fonts`, `drums`, `debug`) are absent by design — §8.2 says
+each lands with its own module.
+
 ---
 
 ## D. Outside the engine (not part of any phase number)
