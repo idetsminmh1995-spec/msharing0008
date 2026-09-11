@@ -11,6 +11,9 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 
 - **[`../PLAN.md`](../PLAN.md)** — the **authoritative** architecture and
   specification (v2). Read this before writing any code.
+- **[`./STATUS.md`](./STATUS.md)** — what is built vs not built right now,
+  with the remaining phases numbered. Start here to pick the next piece of
+  work.
 - [`./PLAN-v1-historical.md`](./PLAN-v1-historical.md) — the v1 roadmap,
   superseded, kept here as a read-only historical reference.
 - **This folder** — the per-phase build record: what was actually written,
