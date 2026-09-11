@@ -655,8 +655,10 @@ conventional value; make it a config field). Thickness =
 
 **Error conditions.** None; a note inside the staff yields an empty list.
 **Tests.** Middle C in treble → exactly one ledger line below at y=+1.
-A4 in bass → one above. C4 in alto → none. A note 3 ledger lines up → 3
-segments at consecutive integers.
+**Middle C (C4) in bass → exactly one ledger line above at y=−5** (the
+classic fact that middle C sits one ledger line above the bass staff and one
+below the treble staff — symmetric with the first test case). C4 in alto →
+none. A note 3 ledger lines up → 3 segments at consecutive integers.
 
 ### 9.7 Noteheads `[TODO]`
 

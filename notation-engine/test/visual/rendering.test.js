@@ -227,4 +227,47 @@ describe('visual regression (Phase 8)', () => {
     );
     matchSnapshot('barline-all-types', doc, SNAPSHOT_DIR);
   });
+
+  test('Phase 14: middle C with a ledger line on both treble and bass staves render identically to the saved snapshot', () => {
+    const rowHeight = 6;
+    const rows = [
+      { clef: NE.TREBLE_CLEF, clefName: 'treble' },
+      { clef: NE.BASS_CLEF, clefName: 'bass' },
+    ];
+    const noteheadWidth = 1.18; // approx real noteheadBlack glyph width
+    const parts = [];
+    rows.forEach((row, i) => {
+      const bottomY = i * rowHeight + 4;
+      parts.push(
+        NE.renderStaff(NE.computeStaffGeometry(5), {
+          x: 0,
+          y: bottomY,
+          width: 20,
+          color: '#000000',
+          lineThickness: NE.getEngravingDefault('staffLineThickness'),
+        }),
+      );
+      parts.push(NE.renderClef(row.clef, { x: 0.5, y: bottomY, color: '#000000', fontFamily: 'Bravura' }));
+      const position = NE.staffPositionForPitch(row.clef, 'C', 4);
+      const noteX = 6;
+      const ledgerLines = NE.computeLedgerLines(position, 5);
+      parts.push(
+        NE.renderLedgerLines(ledgerLines, {
+          x: noteX,
+          noteheadWidth,
+          staffBottomY: bottomY,
+          extension: NE.getEngravingDefault('legerLineExtension'),
+          thickness: NE.getEngravingDefault('legerLineThickness'),
+          color: '#000000',
+        }),
+      );
+      const notehead = NE.getGlyph('noteheadBlack');
+      parts.push(NE.svgGlyphText(noteX, bottomY + position, notehead.char, 'Bravura', { fill: '#000000' }));
+    });
+    const doc = NE.createSvgDocument(
+      { viewBoxWidth: 20, viewBoxHeight: rowHeight * rows.length, pxPerStaffSpace: 20, backgroundColor: '#ffffff' },
+      parts,
+    );
+    matchSnapshot('ledger-line-middle-c', doc, SNAPSHOT_DIR);
+  });
 });
