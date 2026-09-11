@@ -1,9 +1,12 @@
-# src/cursor
+# src/cursor — SUPERSEDED, empty on purpose
 
-The cursor state machine and both sync modes: "cursor moves, notation stays
-still" and "notation moves, cursor stays still" -- switchable via config,
-sharing one time->pixel-position mapping function.
+This folder is a leftover Phase-1 placeholder. **No code belongs here.**
 
-See PLAN.md Group H (Phase 45-47).
+`MASTER_PLAN.md` v2 replaced the "cursor" module with a broader
+**`playback/`** module (§17): a position API plus an event stream that a host
+application drives a cursor, an animation, or a video renderer from. The two
+cursor sync modes v1 planned as separate phases are now one module with a
+`mode` option (§2.4).
 
-Nothing here yet -- Phase 1 is folder structure only.
+Build that work in `src/playback/`, not here. This folder and its README can
+be deleted once `playback/` exists.

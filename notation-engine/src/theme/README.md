@@ -1,9 +1,12 @@
-# src/theme
+# src/theme — SUPERSEDED, empty on purpose
 
-Colors, fonts, sizes -- every visual token, all overridable. Backs the
-Phase 48 theming API (colors always changeable is a hard requirement) and
-Phase 18 (note color system) and Phase 24 (beam style).
+This folder is a leftover Phase-1 placeholder. **No code belongs here.**
 
-See PLAN.md Phase 18, 24, 48.
+`MASTER_PLAN.md` v2 folded theming into the single typed **`config/`** module
+(§8) rather than keeping a second parallel system: colours, fonts, sizes,
+notehead mapping, beam style, bar-number display and every other visual token
+all live in `EngineConfig`. A separate `theme/` module would have been a
+duplicate system with an unclear boundary against `config/`.
 
-Nothing here yet -- Phase 1 is folder structure only.
+Extend `src/config/config.ts`, not here. This folder and its README can be
+deleted at any time.

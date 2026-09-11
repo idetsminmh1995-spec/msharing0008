@@ -1,9 +1,11 @@
-# src/plugins
+# src/plugins — DEFERRED, empty on purpose
 
-Public extension points -- custom notehead glyphs, custom instruments,
-custom render passes (e.g. a new beam style) -- without touching engine
-internals.
+This folder is a leftover Phase-1 placeholder. **No code belongs here yet.**
 
-See PLAN.md Phase 50.
+`MASTER_PLAN.md` v2 deferred the plugin/extension-point system (§2.4): no
+concrete extension use case exists yet, and designing a plugin API before
+knowing what plugins are for produces the wrong API. The module boundaries in
+§4 already allow new features to be added without touching engine internals.
 
-Nothing here yet -- Phase 1 is folder structure only.
+If a real extension need appears, specify it in `MASTER_PLAN.md` first, then
+build it here.

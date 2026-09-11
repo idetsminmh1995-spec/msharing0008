@@ -277,6 +277,15 @@ the render file turns that data into SVG strings. Neither does the other's
 job. `[BUILT — this pattern is already followed by staff, clef, key-signature,
 time-signature, and barline]`
 
+**Three folders exist on disk but are deliberately absent from the list
+above:** `src/cursor/`, `src/theme/` and `src/plugins/` are leftover Phase-1
+placeholders, each containing only a README. v2 superseded all three —
+`cursor/` became the broader `playback/` module (§17), `theme/` was folded
+into `config/` (§8) rather than kept as a duplicate system, and `plugins/`
+was deferred (§2.4). Their READMEs say so and point at the replacement. They
+hold no code and can be deleted; they are noted here only so that finding
+them on disk doesn't read as a contradiction of this section.
+
 ---
 
 ## 6. Module: `core/` — Internal Notation Data Model `[BUILT]`
