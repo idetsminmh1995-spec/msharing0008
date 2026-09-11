@@ -9,10 +9,10 @@ commit that added this file.
 
 ---
 
-## A. DONE — Phases 1–18 ✅
+## A. DONE — Phases 1–19 ✅ (Stage 2 complete)
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 141/141 across them.
+`npm run verify` passes 159/159 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -34,20 +34,16 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 16 | Stems | `resolveStemDirection` (forced > XML > automatic), anchor-attached `renderStem` | [`phase-16`](./phase-16-stems.md) |
 | 17 | Flags | `needsFlag` (unbeamed-only), direction-aware `flagGlyphName`/`renderFlag` | [`phase-17`](./phase-17-flags.md) |
 | 18 | Rests | `defaultRestY` (whole/half special-cased), `restY` with per-voice offset | [`phase-18`](./phase-18-rests.md) |
+| 19 | Accidentals | draw-or-not state machine, `assignAccidentalColumns` stacking | [`phase-19`](./phase-19-accidentals.md) |
 
 **Public API today:** 70 exports from `dist/notation-engine.js`.
 
 ---
 
-## B. NOT DONE — Phases 19–54
+## B. NOT DONE — Phases 20–54
 
 Nothing below exists in `src/` yet. Each line links to the `PLAN.md` section
 that specifies it.
-
-### Stage 2 — Minimum note rendering
-| # | Phase | Spec |
-|---|---|---|
-| **19** | Accidentals (draw-or-not state machine + stacking) | §9.11 |
 
 ### Stage 3 — First vertical slice ← the milestone that de-risks everything after it
 | # | Phase | Spec |
@@ -146,7 +142,7 @@ left rather than guessed at — each is documented at the point it was found.
 
 The built phases were re-audited against `PLAN.md` v2 (not against v1, which
 they were written to). Two mismatches were found and **both are now fixed**;
-everything else in Phases 1–18 complies as-is.
+everything else in Phases 1–19 complies as-is.
 
 | Finding | Resolution |
 |---|---|

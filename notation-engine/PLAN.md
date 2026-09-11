@@ -727,7 +727,7 @@ Glyphs `restWhole` … `rest1024th`, plus `restHBar` for multi-measure rests.
   land on the same y — a bug already encountered and fixed once in the
   prototype, now a first-class rule.
 
-### 9.11 Accidentals `[TODO]`
+### 9.11 Accidentals `[BUILT]`
 
 Glyphs `accidentalFlat`, `accidentalNatural`, `accidentalSharp`,
 `accidentalDoubleSharp`, `accidentalDoubleFlat`.
@@ -1489,7 +1489,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 12 | Time signatures (numeric/common/cut/additive) | ✅ |
 | 13 | Barlines (7 types) + bar-number logic | ✅ |
 
-### Stage 2 — Minimum notes (§9.6–§9.11) `[IN PROGRESS — 14–18 of 19]`
+### Stage 2 — Minimum notes (§9.6–§9.11) `[COMPLETE]`
 
 | Phase | What | Status |
 |---|---|---|
@@ -1498,7 +1498,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 16 | Stems (incl. per-voice forced direction) | ✅ |
 | 17 | Flags | ✅ |
 | 18 | Rests (incl. whole/half special placement) | ✅ |
-| 19 | Accidentals (incl. the draw-or-not state machine and stacking) | |
+| 19 | Accidentals (incl. the draw-or-not state machine and stacking) | ✅ |
 
 ### Stage 3 — **First vertical slice** ← the key correction from v1 (§2.2)
 

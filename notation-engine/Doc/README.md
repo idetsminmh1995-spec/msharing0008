@@ -43,6 +43,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-16-stems.md`](./phase-16-stems.md) | Phase 16 stems (forced/XML/automatic direction, anchor-attached length) |
 | [`phase-17-flags.md`](./phase-17-flags.md) | Phase 17 flags (unbeamed-only rule, direction-aware glyph selection) |
 | [`phase-18-rests.md`](./phase-18-rests.md) | Phase 18 rests (whole/half special-case placement, per-voice offset) |
+| [`phase-19-accidentals.md`](./phase-19-accidentals.md) | Phase 19 accidentals (draw-or-not state machine, chord stacking) |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

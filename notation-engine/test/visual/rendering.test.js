@@ -458,4 +458,61 @@ describe('visual regression (Phase 8)', () => {
     );
     matchSnapshot('rest-variants', doc, SNAPSHOT_DIR);
   });
+
+  test('Phase 19: a key-contradicting accidental plus a 3-note chord stacking render identically to the saved snapshot', () => {
+    const bottomY = 4;
+    const numLines = 5;
+    const parts = [
+      NE.renderStaff(NE.computeStaffGeometry(numLines), {
+        x: 0,
+        y: bottomY,
+        width: 24,
+        color: '#000000',
+        lineThickness: NE.getEngravingDefault('staffLineThickness'),
+      }),
+      NE.renderClef(NE.TREBLE_CLEF, { x: 0.5, y: bottomY, color: '#000000', fontFamily: 'Bravura' }),
+    ];
+    const notehead = NE.getGlyph('noteheadBlack');
+    const accWidth = (alter) => {
+      const g = NE.getGlyph(NE.accidentalGlyphName(alter));
+      return g.bBox.bBoxNE[0] - g.bBox.bBoxSW[0];
+    };
+
+    // In D major (F#/C# implied), an F NATURAL contradicts the key and
+    // needs a drawn accidental -- confirmed via the state machine, not
+    // just drawn unconditionally.
+    let state = NE.createAccidentalState(2);
+    const noteX1 = 4;
+    const y1 = bottomY + NE.staffPositionForPitch(NE.TREBLE_CLEF, 'F', 5);
+    const decision = NE.evaluateAccidental(state, 'F', 5, 0);
+    parts.push(NE.renderNotehead('noteheadBlack', { x: noteX1, y: y1, color: '#000000', fontFamily: 'Bravura' }));
+    if (decision.shouldDraw) {
+      const glyphName = NE.accidentalGlyphName(0);
+      const x = NE.accidentalX(noteX1, accWidth(0), 0);
+      parts.push(NE.renderAccidental(glyphName, { x, y: y1, color: '#000000', fontFamily: 'Bravura' }));
+    }
+
+    // A 3-note chord with close accidentals needing 3 separate columns.
+    const chordX = 14;
+    const chordPitches = [
+      ['C', 5, -1], // Cb5
+      ['B', 4, 0], // B natural (close to Cb5)
+      ['A', 4, 1], // A#4 (close to B4)
+    ];
+    const chordYs = chordPitches.map(([step, octave]) => bottomY + NE.staffPositionForPitch(NE.TREBLE_CLEF, step, octave));
+    const placements = NE.assignAccidentalColumns(chordYs.map((y) => y - bottomY));
+    chordPitches.forEach(([, , alter], i) => {
+      const y = chordYs[i];
+      parts.push(NE.renderNotehead('noteheadBlack', { x: chordX, y, color: '#000000', fontFamily: 'Bravura' }));
+      const glyphName = NE.accidentalGlyphName(alter);
+      const x = NE.accidentalX(chordX, accWidth(alter), placements[i].column);
+      parts.push(NE.renderAccidental(glyphName, { x, y, color: '#000000', fontFamily: 'Bravura' }));
+    });
+
+    const doc = NE.createSvgDocument(
+      { viewBoxWidth: 24, viewBoxHeight: 8, pxPerStaffSpace: 20, backgroundColor: '#ffffff' },
+      parts,
+    );
+    matchSnapshot('accidental-variants', doc, SNAPSHOT_DIR);
+  });
 });

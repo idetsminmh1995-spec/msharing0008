@@ -8,3 +8,5 @@ export * from './notehead.js';
 export * from './stem.js';
 export * from './flag.js';
 export * from './rest.js';
+export * from './accidental-state.js';
+export * from './accidental.js';
