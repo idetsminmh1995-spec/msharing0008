@@ -418,4 +418,44 @@ describe('visual regression (Phase 8)', () => {
     );
     matchSnapshot('flag-variants', doc, SNAPSHOT_DIR);
   });
+
+  test('Phase 18: whole/half/quarter rests plus a per-voice-offset collision fix render identically to the saved snapshot', () => {
+    const bottomY = 4;
+    const numLines = 5;
+    const parts = [
+      NE.renderStaff(NE.computeStaffGeometry(numLines), {
+        x: 0,
+        y: bottomY,
+        width: 20,
+        color: '#000000',
+        lineThickness: NE.getEngravingDefault('staffLineThickness'),
+      }),
+      NE.renderClef(NE.TREBLE_CLEF, { x: 0.5, y: bottomY, color: '#000000', fontFamily: 'Bravura' }),
+    ];
+
+    function drawRest(x, durationType, voiceOffset) {
+      const y = bottomY + NE.restY(durationType, numLines, voiceOffset);
+      parts.push(NE.renderRest(NE.restGlyphName(durationType), { x, y, color: '#000000', fontFamily: 'Bravura' }));
+    }
+
+    // The three named cases: whole (hangs from the 4th line, one above
+    // middle), half (sits at the middle line), quarter (also the middle
+    // line, plain default).
+    drawRest(3, 'whole', 0);
+    drawRest(6, 'half', 0);
+    drawRest(9, 'quarter', 0);
+
+    // The multi-voice collision fix: two quarter rests at the SAME
+    // instant in different voices, offset apart instead of both landing
+    // on the shared middle line (the exact bug hit once in the
+    // pre-Phase-1 prototype).
+    drawRest(13, 'quarter', 1);
+    drawRest(13, 'quarter', -1);
+
+    const doc = NE.createSvgDocument(
+      { viewBoxWidth: 20, viewBoxHeight: 8, pxPerStaffSpace: 20, backgroundColor: '#ffffff' },
+      parts,
+    );
+    matchSnapshot('rest-variants', doc, SNAPSHOT_DIR);
+  });
 });

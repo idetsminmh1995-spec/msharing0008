@@ -715,7 +715,7 @@ Only for **unbeamed** notes of 8th or shorter. Glyph is direction-aware:
 Positioned at the stem's free end. A note that is part of a beam group (§12)
 must not draw a flag.
 
-### 9.10 Rests `[TODO]`
+### 9.10 Rests `[BUILT]`
 
 Glyphs `restWhole` … `rest1024th`, plus `restHBar` for multi-measure rests.
 
@@ -1489,7 +1489,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 12 | Time signatures (numeric/common/cut/additive) | ✅ |
 | 13 | Barlines (7 types) + bar-number logic | ✅ |
 
-### Stage 2 — Minimum notes (§9.6–§9.11) `[IN PROGRESS — 14–17 of 19]`
+### Stage 2 — Minimum notes (§9.6–§9.11) `[IN PROGRESS — 14–18 of 19]`
 
 | Phase | What | Status |
 |---|---|---|
@@ -1497,7 +1497,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 15 | Noteheads + the mapping system | ✅ |
 | 16 | Stems (incl. per-voice forced direction) | ✅ |
 | 17 | Flags | ✅ |
-| 18 | Rests (incl. whole/half special placement) | |
+| 18 | Rests (incl. whole/half special placement) | ✅ |
 | 19 | Accidentals (incl. the draw-or-not state machine and stacking) | |
 
 ### Stage 3 — **First vertical slice** ← the key correction from v1 (§2.2)

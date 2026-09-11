@@ -8,3 +8,4 @@ export * from './ledger-line.js';
 export * from './notehead.js';
 export * from './stem.js';
 export * from './flag.js';
+export * from './rest.js';
