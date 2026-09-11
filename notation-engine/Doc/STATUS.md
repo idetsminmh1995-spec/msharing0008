@@ -9,10 +9,10 @@ commit that added this file.
 
 ---
 
-## A. DONE — Phases 1–19 ✅ (Stage 2 complete)
+## A. DONE — Phases 1–20 ✅ (Stage 2 complete; Stage 3 in progress)
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 159/159 across them.
+`npm run verify` passes 170/170 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -35,12 +35,13 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 17 | Flags | `needsFlag` (unbeamed-only), direction-aware `flagGlyphName`/`renderFlag` | [`phase-17`](./phase-17-flags.md) |
 | 18 | Rests | `defaultRestY` (whole/half special-cased), `restY` with per-voice offset | [`phase-18`](./phase-18-rests.md) |
 | 19 | Accidentals | draw-or-not state machine, `assignAccidentalColumns` stacking | [`phase-19`](./phase-19-accidentals.md) |
+| 20 | MusicXML parser v1 | `parseMusicXml` (traversal, chord grouping, diagnostics), real fixture tests | [`phase-20`](./phase-20-musicxml-parser-v1.md) |
 
 **Public API today:** 70 exports from `dist/notation-engine.js`.
 
 ---
 
-## B. NOT DONE — Phases 20–54
+## B. NOT DONE — Phases 21–54
 
 Nothing below exists in `src/` yet. Each line links to the `PLAN.md` section
 that specifies it.
@@ -48,7 +49,6 @@ that specifies it.
 ### Stage 3 — First vertical slice ← the milestone that de-risks everything after it
 | # | Phase | Spec |
 |---|---|---|
-| **20** | MusicXML parser v1 — enough for a single-voice score | §10.3 |
 | **21** | Naive single-system layout + `renderFromMusicXML()` end to end | §16 |
 | **22** | **Milestone: a real `.musicxml` file renders correctly** | §20 |
 

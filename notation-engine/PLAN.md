@@ -750,7 +750,7 @@ one (that is what courtesy accidentals are).
 
 ---
 
-## 10. Module: `parser/musicxml/` — MusicXML Parser `[TODO]`
+## 10. Module: `parser/musicxml/` — MusicXML Parser `[IN PROGRESS — v1 built (Phase 20); .mxl/score-timewise/v2 elements are Phase 35-36]`
 
 **Responsibility.** Turn any valid MusicXML document into a `Score` (§6),
 plus a `ScoreAttributes` side-table of per-measure clef/key/time/barline
@@ -762,7 +762,7 @@ information. Never renders anything.
 **Dependencies.** `core/` only. Uses `DOMParser` in the browser; tests inject
 a parser so Node can run them.
 
-### 10.1 Traversal model (the part that is easy to get wrong)
+### 10.1 Traversal model (the part that is easy to get wrong) `[BUILT]`
 
 A `<measure>`'s children must be walked **in document order**, maintaining a
 running tick cursor:
@@ -791,7 +791,7 @@ the parser must read that pointer rather than assuming a filename.
 rather than writing one. This is not a notation dependency and does not
 violate §1's independence requirement.
 
-### 10.3 Elements parsed — v1 (the vertical slice)
+### 10.3 Elements parsed — v1 (the vertical slice) `[BUILT]`
 
 `<score-partwise>`, `<part-list>`/`<score-part>`, `<part>`, `<measure>`,
 `<attributes>` (`<divisions>`, `<key><fifths>`, `<time>`, `<clef>`),
@@ -826,7 +826,7 @@ The rarely-used alternative document order. Convert to partwise on load
 (a mechanical transposition of the measure/part nesting) so the rest of the
 parser sees only one shape.
 
-### 10.7 Error conditions and partial rendering
+### 10.7 Error conditions and partial rendering `[BUILT for v1's element set]`
 
 The parser **never throws on malformed input**. It records a `Diagnostic`
 and continues:
@@ -1500,13 +1500,13 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 18 | Rests (incl. whole/half special placement) | ✅ |
 | 19 | Accidentals (incl. the draw-or-not state machine and stacking) | ✅ |
 
-### Stage 3 — **First vertical slice** ← the key correction from v1 (§2.2)
+### Stage 3 — **First vertical slice** ← the key correction from v1 (§2.2) `[IN PROGRESS — 20 of 22]`
 
-| Phase | What |
-|---|---|
-| 20 | MusicXML parser v1 (§10.3) — enough for a single-voice score |
-| 21 | Naive single-system layout + `renderFromMusicXML()` end to end |
-| 22 | **Milestone: a real simple `.musicxml` file renders correctly.** Everything after this point is validated against real files from day one |
+| Phase | What | Status |
+|---|---|---|
+| 20 | MusicXML parser v1 (§10.3) — enough for a single-voice score | ✅ |
+| 21 | Naive single-system layout + `renderFromMusicXML()` end to end | |
+| 22 | **Milestone: a real simple `.musicxml` file renders correctly.** Everything after this point is validated against real files from day one | |
 
 ### Stage 4 — Rhythm and structure
 

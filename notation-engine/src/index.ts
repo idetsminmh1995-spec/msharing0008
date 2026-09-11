@@ -11,3 +11,4 @@ export * from './glyphs/index.js';
 export * from './geometry/index.js';
 export * from './render/index.js';
 export * from './config/index.js';
+export * from './parser/index.js';
