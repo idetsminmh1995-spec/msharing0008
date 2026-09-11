@@ -21,7 +21,14 @@ export function computeLedgerLines(position: number, numLines: number): readonly
   if (!Number.isInteger(numLines) || numLines < 1) {
     throw new Error(`numLines must be a positive integer, got ${numLines}`);
   }
-  const topLine = -(numLines - 1);
+  // `0 - (numLines - 1)` rather than `-(numLines - 1)`: at numLines=1
+  // that's `-(0)`, JavaScript's -0. Doesn't currently escape into any
+  // returned value here (only used in a comparison and as a subtraction
+  // base, both of which normalize away from -0), but kept consistent
+  // with the same fix in Phase 9's computeStaffGeometry and Phase 16's
+  // middleLineY rather than leaving a third differently-styled instance
+  // of the identical shape.
+  const topLine = 0 - (numLines - 1);
   const lines: LedgerLine[] = [];
 
   if (position > 0) {

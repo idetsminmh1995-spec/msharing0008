@@ -633,7 +633,7 @@ from real Bravura metrics. Dot direction is semantic, not decorative:
 four display modes. `isSystemStart` is supplied by the caller because only the
 layout engine knows where systems break.
 
-### 9.6 Ledger lines `[TODO]`
+### 9.6 Ledger lines `[BUILT]`
 
 **Responsibility.** Draw short line segments for notes beyond the staff.
 
@@ -660,7 +660,7 @@ classic fact that middle C sits one ledger line above the bass staff and one
 below the treble staff — symmetric with the first test case). C4 in alto →
 none. A note 3 ledger lines up → 3 segments at consecutive integers.
 
-### 9.7 Noteheads `[TODO]`
+### 9.7 Noteheads `[BUILT]`
 
 **Responsibility.** Map a note to its notehead glyph, and draw it.
 
@@ -684,7 +684,7 @@ without two different mapping systems.
 overriding it; a config override overriding *that*; an unknown key falling
 back cleanly.
 
-### 9.8 Stems `[TODO]`
+### 9.8 Stems `[BUILT]`
 
 **Direction rules,** in priority order:
 1. explicit per-voice forced direction from config or from the parser
@@ -708,7 +708,7 @@ corner. `[Bravura provides these for 590 glyphs]`
 direction overriding automatic; anchor-derived x matching the glyph metadata;
 a chord's direction decided by its outermost note.
 
-### 9.9 Flags `[TODO]`
+### 9.9 Flags `[BUILT]`
 
 Only for **unbeamed** notes of 8th or shorter. Glyph is direction-aware:
 `flag8thUp` / `flag8thDown`, `flag16thUp/Down`, … through 1024th.
@@ -1489,16 +1489,16 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 12 | Time signatures (numeric/common/cut/additive) | ✅ |
 | 13 | Barlines (7 types) + bar-number logic | ✅ |
 
-### Stage 2 — Minimum notes (§9.6–§9.11)
+### Stage 2 — Minimum notes (§9.6–§9.11) `[IN PROGRESS — 14–17 of 19]`
 
-| Phase | What |
-|---|---|
-| 14 | Ledger lines |
-| 15 | Noteheads + the mapping system |
-| 16 | Stems (incl. per-voice forced direction) |
-| 17 | Flags |
-| 18 | Rests (incl. whole/half special placement) |
-| 19 | Accidentals (incl. the draw-or-not state machine and stacking) |
+| Phase | What | Status |
+|---|---|---|
+| 14 | Ledger lines | ✅ |
+| 15 | Noteheads + the mapping system | ✅ |
+| 16 | Stems (incl. per-voice forced direction) | ✅ |
+| 17 | Flags | ✅ |
+| 18 | Rests (incl. whole/half special placement) | |
+| 19 | Accidentals (incl. the draw-or-not state machine and stacking) | |
 
 ### Stage 3 — **First vertical slice** ← the key correction from v1 (§2.2)
 

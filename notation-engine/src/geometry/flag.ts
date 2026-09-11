@@ -1,6 +1,11 @@
 import type { DurationType } from '../core/duration.js';
 import type { StemDirection } from './stem.js';
 
+// Re-exported so render/flag.ts can get this type via geometry/ rather
+// than importing core/ directly, per PLAN.md §4.1's dependency table
+// (render never imports core directly -- geometry is the intermediary).
+export type { DurationType };
+
 /**
  * The SMuFL flag-glyph suffix for each duration type that HAS a flag
  * (eighth note and shorter only -- whole/half/quarter never do). Every

@@ -1,6 +1,5 @@
-import type { DurationType } from '../core/duration.js';
 import type { StemDirection } from '../geometry/stem.js';
-import { flagGlyphName } from '../geometry/flag.js';
+import { flagGlyphName, type DurationType } from '../geometry/flag.js';
 import { getGlyph } from '../glyphs/glyph-table.js';
 import { svgGlyphText } from './svg-primitives.js';
 

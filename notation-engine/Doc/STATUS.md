@@ -163,6 +163,22 @@ Not a defect: `EngineConfig`'s `[TODO]` sections from §8.2 (`spacing`,
 `staves`, `page`, `fonts`, `drums`, `debug`) are absent by design — §8.2 says
 each lands with its own module.
 
+### Second audit round, after Phases 14–17
+
+Re-ran the same audit after Phases 14–17 landed. Three more findings, all
+fixed immediately:
+
+| Finding | Resolution |
+|---|---|
+| `render/flag.ts` imported `DurationType` directly from `core/duration.js` (type-only, zero runtime cost, but still a `render → core` edge the §4.1 table added last round explicitly forbids) | **Code fixed.** `geometry/flag.ts` now re-exports `DurationType`; `render/flag.ts` imports it from there instead. Same non-conflicting-re-export situation as Phase 13's `BarNumberDisplay` |
+| `geometry/ledger-line.ts`'s `topLine = -(numLines - 1)` has the exact shape of the two already-fixed −0 bugs (Phase 9, Phase 16). At `numLines=1` it evaluates to −0. It doesn't currently escape into any returned value (only used in a comparison and as a subtraction base, both of which normalize away from −0), so it isn't a live defect — but left as a third differently-styled instance of an identical, already-recognized shape | **Code fixed** for consistency with the other two, before it could become a real bug under some future refactor |
+| `PLAN.md` §9.6–§9.9 still said `[TODO]` and Stage 2's roadmap table had no status column, even though Phases 14–17 were done | **Plan fixed.** All four marked `[BUILT]`; Stage 2 gained a `[IN PROGRESS — 14–17 of 19]` header and a Status column with ✅ on the four done rows, matching Stage 0/1's own pattern exactly |
+
+Also reconfirmed clean in this round: the full `§4.1` dependency table now
+holds with zero exceptions (`render` imports only `{geometry, glyphs}`);
+every `geometry/X.ts` from Phases 14–17 has its matching `render/X.ts`; no
+new instrument branching or unordered-iteration-affecting-output crept in.
+
 ---
 
 ## D. Outside the engine (not part of any phase number)
