@@ -4,7 +4,7 @@ Pure functions only -- no SVG, no DOM. Staff-position math, glyph metrics,
 beam-slope calculation, spacing/formatting math. Everything here is
 unit-testable without rendering anything.
 
-See PLAN.md Groups B-D (Phase 9-30) -- each of those features' *geometry*
+See PLAN.md §9 -- each notation element's *geometry*
 lives here; the matching *drawing* lives in src/render.
 
 `staff.ts` (Phase 9): `computeStaffGeometry(numLines)` -- staff line

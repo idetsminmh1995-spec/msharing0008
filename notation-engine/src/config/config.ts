@@ -1,5 +1,5 @@
 /**
- * The engine's single config object. PLAN.md Phase 48 is where every one
+ * The engine's single config object. PLAN.md §8 is where every one
  * of these sections eventually gets fully fleshed out (once the phase it
  * belongs to actually exists) and unified into the documented theming API
  * -- this file is where each section's SLOT gets reserved up front, so no

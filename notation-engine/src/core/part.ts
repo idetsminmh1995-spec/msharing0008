@@ -3,7 +3,7 @@ import type { Measure } from './measure.js';
 /**
  * One instrument/staff-group across the whole piece -- e.g. "Piano," "Drum
  * Set," "Soprano." Deliberately has NO isDrum/isVocal/isPiano flag or any
- * other instrument-specific field (PLAN.md Phase 3b hard requirement): a
+ * other instrument-specific field (PLAN.md §4.3, an architectural invariant): a
  * Part is exactly the same shape no matter which instrument it represents.
  * What differs between a drum part and a piano part lives entirely in the
  * Notes' Pitch (pitched vs unpitched, see pitch.ts) and, in later phases,

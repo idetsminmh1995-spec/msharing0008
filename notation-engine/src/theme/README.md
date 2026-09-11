@@ -2,7 +2,7 @@
 
 This folder is a leftover Phase-1 placeholder. **No code belongs here.**
 
-`MASTER_PLAN.md` v2 folded theming into the single typed **`config/`** module
+`PLAN.md` v2 folded theming into the single typed **`config/`** module
 (§8) rather than keeping a second parallel system: colours, fonts, sizes,
 notehead mapping, beam style, bar-number display and every other visual token
 all live in `EngineConfig`. A separate `theme/` module would have been a
