@@ -41,6 +41,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-14-ledger-lines.md`](./phase-14-ledger-lines.md) | Phase 14 ledger lines (any clef/line-count, real Bravura extension) |
 | [`phase-15-noteheads.md`](./phase-15-noteheads.md) | Phase 15 notehead selection (XML > config > duration default, unified drum/pitched key) |
 | [`phase-16-stems.md`](./phase-16-stems.md) | Phase 16 stems (forced/XML/automatic direction, anchor-attached length) |
+| [`phase-17-flags.md`](./phase-17-flags.md) | Phase 17 flags (unbeamed-only rule, direction-aware glyph selection) |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

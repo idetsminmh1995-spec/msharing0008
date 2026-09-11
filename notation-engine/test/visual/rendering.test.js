@@ -356,4 +356,66 @@ describe('visual regression (Phase 8)', () => {
     );
     matchSnapshot('stem-direction-variants', doc, SNAPSHOT_DIR);
   });
+
+  test('Phase 17: an unbeamed eighth-note flag (up and down) plus a beam-suppressed note render identically to the saved snapshot', () => {
+    const bottomY = 4;
+    const numLines = 5;
+    const parts = [
+      NE.renderStaff(NE.computeStaffGeometry(numLines), {
+        x: 0,
+        y: bottomY,
+        width: 20,
+        color: '#000000',
+        lineThickness: NE.getEngravingDefault('staffLineThickness'),
+      }),
+      NE.renderClef(NE.TREBLE_CLEF, { x: 0.5, y: bottomY, color: '#000000', fontFamily: 'Bravura' }),
+    ];
+    const stemThickness = NE.getEngravingDefault('stemThickness');
+
+    function drawNote(x, position, durationType, isBeamed) {
+      const y = bottomY + position;
+      parts.push(NE.renderNotehead('noteheadBlack', { x, y, color: '#000000', fontFamily: 'Bravura' }));
+      const direction = NE.automaticStemDirection(position, NE.middleLineY(numLines));
+      const length = NE.computeStemLength(position, NE.middleLineY(numLines));
+      parts.push(
+        NE.renderStem({
+          noteheadGlyphName: 'noteheadBlack',
+          noteX: x,
+          noteY: y,
+          direction,
+          length,
+          thickness: stemThickness,
+          color: '#000000',
+        }),
+      );
+      if (NE.needsFlag(durationType, isBeamed)) {
+        const anchor = NE.getGlyph('noteheadBlack').anchors[direction === 'up' ? 'stemUpSE' : 'stemDownNW'];
+        const stemX = x + anchor[0];
+        const attachY = y - anchor[1];
+        const endY = direction === 'up' ? attachY - length : attachY + length;
+        parts.push(
+          NE.renderFlag(durationType, {
+            x: stemX,
+            y: endY,
+            direction,
+            color: '#000000',
+            fontFamily: 'Bravura',
+          }),
+        );
+      }
+    }
+
+    // Unbeamed eighth note high in the staff (down stem) -> gets a flag.
+    drawNote(4, -4, 'eighth', false);
+    // Unbeamed eighth note low in the staff (up stem) -> gets a flag.
+    drawNote(8, 0, 'eighth', false);
+    // Same duration, but beamed -> no flag drawn at all.
+    drawNote(12, -4, 'eighth', true);
+
+    const doc = NE.createSvgDocument(
+      { viewBoxWidth: 20, viewBoxHeight: 10, pxPerStaffSpace: 20, backgroundColor: '#ffffff' },
+      parts,
+    );
+    matchSnapshot('flag-variants', doc, SNAPSHOT_DIR);
+  });
 });
