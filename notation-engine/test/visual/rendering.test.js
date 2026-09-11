@@ -307,4 +307,53 @@ describe('visual regression (Phase 8)', () => {
     );
     matchSnapshot('notehead-selection-variants', doc, SNAPSHOT_DIR);
   });
+
+  test('Phase 16: automatic up/down stems plus a forced-direction drum pair render identically to the saved snapshot', () => {
+    const bottomY = 4;
+    const numLines = 5;
+    const parts = [
+      NE.renderStaff(NE.computeStaffGeometry(numLines), {
+        x: 0,
+        y: bottomY,
+        width: 20,
+        color: '#000000',
+        lineThickness: NE.getEngravingDefault('staffLineThickness'),
+      }),
+      NE.renderClef(NE.TREBLE_CLEF, { x: 0.5, y: bottomY, color: '#000000', fontFamily: 'Bravura' }),
+    ];
+    const notehead = NE.getGlyph('noteheadBlack');
+    const stemThickness = NE.getEngravingDefault('stemThickness');
+
+    function drawNote(x, position, direction) {
+      const y = bottomY + position;
+      parts.push(NE.renderNotehead('noteheadBlack', { x, y, color: '#000000', fontFamily: 'Bravura' }));
+      const length = NE.computeStemLength(position, NE.middleLineY(numLines));
+      parts.push(
+        NE.renderStem({
+          noteheadGlyphName: 'noteheadBlack',
+          noteX: x,
+          noteY: y,
+          direction,
+          length,
+          thickness: stemThickness,
+          color: '#000000',
+        }),
+      );
+    }
+
+    // Automatic: top-line note (above middle) -> down; bottom-line note (below middle) -> up.
+    drawNote(4, -4, NE.automaticStemDirection(-4, NE.middleLineY(numLines)));
+    drawNote(7, 0, NE.automaticStemDirection(0, NE.middleLineY(numLines)));
+    // Forced direction pair, matching the drum hand/foot split: same
+    // position, opposite forced directions regardless of what automatic
+    // would have chosen.
+    drawNote(11, -1, NE.resolveStemDirection({ positions: [-1], numLines, forcedDirection: 'up' }));
+    drawNote(14, -1, NE.resolveStemDirection({ positions: [-1], numLines, forcedDirection: 'down' }));
+
+    const doc = NE.createSvgDocument(
+      { viewBoxWidth: 20, viewBoxHeight: 10, pxPerStaffSpace: 20, backgroundColor: '#ffffff' },
+      parts,
+    );
+    matchSnapshot('stem-direction-variants', doc, SNAPSHOT_DIR);
+  });
 });

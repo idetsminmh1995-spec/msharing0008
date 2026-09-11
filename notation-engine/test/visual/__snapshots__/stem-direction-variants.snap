@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200" viewBox="0 0 20 10">
+<rect x="0" y="0" width="20" height="10" fill="#ffffff" />
+<g>
+<line x1="0" y1="4" x2="20" y2="4" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="3" x2="20" y2="3" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="2" x2="20" y2="2" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="1" x2="20" y2="1" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="0" x2="20" y2="0" stroke="#000000" stroke-width="0.13" />
+</g>
+<text x="0.5" y="4" font-family="Bravura" font-size="4" fill="#000000"></text>
+<text x="4" y="0" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="4" y1="0.168" x2="4" y2="3.668" stroke="#000000" stroke-width="0.12" />
+<text x="7" y="4" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="8.18" y1="3.832" x2="8.18" y2="0.33199999999999985" stroke="#000000" stroke-width="0.12" />
+<text x="11" y="3" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="12.18" y1="2.832" x2="12.18" y2="-0.6680000000000001" stroke="#000000" stroke-width="0.12" />
+<text x="14" y="3" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="14" y1="3.168" x2="14" y2="6.668" stroke="#000000" stroke-width="0.12" />
+</svg>

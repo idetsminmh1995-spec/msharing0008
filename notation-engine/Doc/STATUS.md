@@ -9,10 +9,10 @@ commit that added this file.
 
 ---
 
-## A. DONE — Phases 1–15 ✅
+## A. DONE — Phases 1–16 ✅
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 112/112 across them.
+`npm run verify` passes 124/124 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -31,12 +31,13 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 13 | Barlines | all 7 types, `shouldShowBarNumber`, `renderBarline`, `renderBarNumber` | [`phase-13`](./phase-13-barline-engine.md) |
 | 14 | Ledger lines | `computeLedgerLines` (any line count), real Bravura extension/thickness | [`phase-14`](./phase-14-ledger-lines.md) |
 | 15 | Noteheads + mapping | `selectNoteheadGlyphName` (XML > config > duration default), unified pitched/unpitched key | [`phase-15`](./phase-15-noteheads.md) |
+| 16 | Stems | `resolveStemDirection` (forced > XML > automatic), anchor-attached `renderStem` | [`phase-16`](./phase-16-stems.md) |
 
 **Public API today:** 70 exports from `dist/notation-engine.js`.
 
 ---
 
-## B. NOT DONE — Phases 16–54
+## B. NOT DONE — Phases 17–54
 
 Nothing below exists in `src/` yet. Each line links to the `PLAN.md` section
 that specifies it.
@@ -44,7 +45,6 @@ that specifies it.
 ### Stage 2 — Minimum note rendering
 | # | Phase | Spec |
 |---|---|---|
-| **16** | Stems (incl. per-voice forced direction) | §9.8 |
 | **17** | Flags | §9.9 |
 | **18** | Rests (incl. whole/half special placement) | §9.10 |
 | **19** | Accidentals (draw-or-not state machine + stacking) | §9.11 |
@@ -146,7 +146,7 @@ left rather than guessed at — each is documented at the point it was found.
 
 The built phases were re-audited against `PLAN.md` v2 (not against v1, which
 they were written to). Two mismatches were found and **both are now fixed**;
-everything else in Phases 1–15 complies as-is.
+everything else in Phases 1–16 complies as-is.
 
 | Finding | Resolution |
 |---|---|
