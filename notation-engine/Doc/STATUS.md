@@ -9,7 +9,7 @@ commit that added this file.
 
 ---
 
-## A. DONE — Phases 1–21 ✅ (Stage 2 complete; Stage 3 in progress)
+## A. DONE — Phases 1–22 ✅ (Stage 2 & Stage 3 complete)
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 `npm run verify` passes 190/190 across them.
@@ -37,20 +37,16 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 19 | Accidentals | draw-or-not state machine, `assignAccidentalColumns` stacking | [`phase-19`](./phase-19-accidentals.md) |
 | 20 | MusicXML parser v1 | `parseMusicXml` (traversal, chord grouping, diagnostics), real fixture tests | [`phase-20`](./phase-20-musicxml-parser-v1.md) |
 | 21 | Naive layout + `renderFromMusicXml` | Fixed-width measures, full Phase 9-19 pipeline wired end to end | [`phase-21`](./phase-21-render-from-musicxml.md) |
+| 22 | Milestone checkpoint | Closed on Phase 21's evidence -- see the evidence table | [`phase-22`](./phase-22-milestone-vertical-slice.md) |
 
 **Public API today:** 70 exports from `dist/notation-engine.js`.
 
 ---
 
-## B. NOT DONE — Phases 22–54
+## B. NOT DONE — Phases 23–54
 
 Nothing below exists in `src/` yet. Each line links to the `PLAN.md` section
 that specifies it.
-
-### Stage 3 — First vertical slice ← the milestone that de-risks everything after it
-| # | Phase | Spec |
-|---|---|---|
-| **22** | **Milestone: a real `.musicxml` file renders correctly** | §20 |
 
 ### Stage 4 — Rhythm and structure
 | # | Phase | Spec |

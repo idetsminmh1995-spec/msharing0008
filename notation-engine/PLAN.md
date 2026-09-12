@@ -1500,13 +1500,13 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 18 | Rests (incl. whole/half special placement) | ✅ |
 | 19 | Accidentals (incl. the draw-or-not state machine and stacking) | ✅ |
 
-### Stage 3 — **First vertical slice** ← the key correction from v1 (§2.2) `[IN PROGRESS — 21 of 22]`
+### Stage 3 — **First vertical slice** ← the key correction from v1 (§2.2) `[COMPLETE]`
 
 | Phase | What | Status |
 |---|---|---|
 | 20 | MusicXML parser v1 (§10.3) — enough for a single-voice score | ✅ |
 | 21 | Naive single-system layout + `renderFromMusicXML()` end to end | ✅ |
-| 22 | **Milestone: a real simple `.musicxml` file renders correctly.** Everything after this point is validated against real files from day one | |
+| 22 | **Milestone: a real simple `.musicxml` file renders correctly.** Everything after this point is validated against real files from day one | ✅ |
 
 ### Stage 4 — Rhythm and structure
 
