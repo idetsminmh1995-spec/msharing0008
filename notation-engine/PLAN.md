@@ -1574,17 +1574,17 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 21 | Naive single-system layout + `renderFromMusicXML()` end to end | ✅ |
 | 22 | **Milestone: a real simple `.musicxml` file renders correctly.** Everything after this point is validated against real files from day one | ✅ |
 
-### Stage 4 — Rhythm and structure
+### Stage 4 — Rhythm and structure `[IN PROGRESS — 23 of 29]`
 
-| Phase | What |
-|---|---|
-| 23 | Beam grouping (by time-signature beat structure, with override) |
-| 24 | Beam geometry + the three styles (straight / flat / curved) |
-| 25 | Multi-voice per staff + voice collision and rest separation |
-| 26 | Ties |
-| 27 | Slurs |
-| 28 | Tuplets |
-| 29 | Grand staff / multi-part systems |
+| Phase | What | Status |
+|---|---|---|
+| 23 | Beam grouping (by time-signature beat structure, with override) | ✅ |
+| 24 | Beam geometry + the three styles (straight / flat / curved) | |
+| 25 | Multi-voice per staff + voice collision and rest separation | |
+| 26 | Ties | |
+| 27 | Slurs | |
+| 28 | Tuplets | |
+| 29 | Grand staff / multi-part systems | |
 
 ### Stage 5 — Expression
 

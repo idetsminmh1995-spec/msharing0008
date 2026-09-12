@@ -10,3 +10,4 @@ export * from './flag.js';
 export * from './rest.js';
 export * from './accidental-state.js';
 export * from './accidental.js';
+export * from './beam.js';

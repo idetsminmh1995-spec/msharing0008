@@ -9,10 +9,10 @@ commit that added this file.
 
 ---
 
-## A. DONE — Phases 1–22 ✅ (Stage 2 & Stage 3 complete)
+## A. DONE — Phases 1–23 ✅ (Stage 2 & Stage 3 complete; Stage 4 in progress)
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 190/190 across them.
+`npm run verify` passes 200/200 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -38,12 +38,13 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 20 | MusicXML parser v1 | `parseMusicXml` (traversal, chord grouping, diagnostics), real fixture tests | [`phase-20`](./phase-20-musicxml-parser-v1.md) |
 | 21 | Naive layout + `renderFromMusicXml` | Fixed-width measures, full Phase 9-19 pipeline wired end to end | [`phase-21`](./phase-21-render-from-musicxml.md) |
 | 22 | Milestone checkpoint | Closed on Phase 21's evidence -- see the evidence table | [`phase-22`](./phase-22-milestone-vertical-slice.md) |
+| 23 | Beam grouping | `groupBeams` (simple/compound meter, override), wrote the missing §9.12 spec first | [`phase-23`](./phase-23-beam-grouping.md) |
 
 **Public API today:** 70 exports from `dist/notation-engine.js`.
 
 ---
 
-## B. NOT DONE — Phases 23–54
+## B. NOT DONE — Phases 24–54
 
 Nothing below exists in `src/` yet. Each line links to the `PLAN.md` section
 that specifies it.
