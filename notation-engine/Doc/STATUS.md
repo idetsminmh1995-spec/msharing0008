@@ -12,7 +12,7 @@ commit that added this file.
 ## A. DONE — Phases 1–20 ✅ (Stage 2 complete; Stage 3 in progress)
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 170/170 across them.
+`npm run verify` passes 182/182 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|

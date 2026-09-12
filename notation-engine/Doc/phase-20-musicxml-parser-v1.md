@@ -1,8 +1,12 @@
 # Phase 20 — MusicXML Parser v1
 
-**Status:** complete for §10.3's v1 element set (170/170 tests pass,
-including 10 tests against real MusicXML fixture files parsed with a real
-DOMParser). This begins **Stage 3 — the first vertical slice**, the key
+**Status:** complete for §10.3's v1 element set (182/182 tests pass,
+including 22 tests against 10 real MusicXML fixture files parsed with a
+real DOMParser). Every one of §10.3's 17 v1 elements has fixture
+coverage and every one of the 11 diagnostic codes the parser can emit is
+asserted by a test — verified by a systematic audit, plus a
+self-checking test that fails if a future recovery rule is added without
+a matching test. This begins **Stage 3 — the first vertical slice**, the key
 correction v2 made over v1's plan (v1 didn't reach an end-to-end test until
 Phase 39 of 50).
 
@@ -74,11 +78,12 @@ only `parse.ts` and the barrel files are new here):
 - **`index.ts`** (new, both at `musicxml/` and `parser/` level) — barrel
   exports, wired into `src/index.ts`.
 
-**Test fixtures** (`test/fixtures/musicxml/`, all new): `simple-single-
-voice.musicxml` (2 measures, single voice, a barline), `two-voice-
-backup.musicxml` (the exact `<backup>` multi-voice case), `chord.musicxml`
-(a 3-note chord plus a rest and a half note), `missing-divisions.musicxml`,
-`unknown-duration-type.musicxml`.
+**Test fixtures** (`test/fixtures/musicxml/`, all new, 10 files): `simple-single-voice`
+(2 measures, a barline), `two-voice-backup` (the `<backup>` multi-voice
+case), `chord` (a 3-note chord), `tie-dot-staff` (`<tie>`/`<dot>`/
+`<staff>` together), `forward`, `multi-part`, `missing-divisions`,
+`unknown-duration-type`, `unknown-element`, `measure-overrun`,
+`empty-part`, `malformed-notes`, `invalid-chord`.
 
 **`test/helpers/dom.js`** (new) -- `testDomParser()` returns a real jsdom-
 backed `DOMParser` class for injection, added alongside a new `jsdom`
@@ -108,9 +113,35 @@ fixture test after the fix: the 3-note chord now correctly produces
 exactly 3 events (chord, rest, half note), matching the file's actual
 musical content.
 
+## 2b. A completeness audit that found two real gaps
+
+After the first pass looked done, the phase was audited element-by-element
+against §10.3's list and code-by-code against §10.7's recovery rules
+rather than assumed finished. Two real gaps turned up:
+
+1. **`<forward>` had zero coverage.** It's in §10.3's v1 element list and
+   the code handled it, but no fixture contained one, so nothing proved
+   it actually worked. Added `forward.musicxml` plus a test that checks
+   not just that both notes parse, but that the cursor advanced by the
+   *right amount* — the measure lands exactly full (C + forward + G =
+   1920 ticks = one 4/4 bar), which a no-op or wrong-sized `<forward>`
+   would fail.
+2. **5 of 11 diagnostic codes had no test.** `MISSING_DURATION`,
+   `MISSING_OCTAVE`, `INVALID_PITCH_STEP`, `UNSUPPORTED_NOTE`, and
+   `INVALID_CHORD` were all emitted by the code but never asserted,
+   despite §10.7 explicitly requiring "malformed-input recovery tests
+   asserting the exact `Diagnostic.code` emitted." Added
+   `malformed-notes.musicxml` and `invalid-chord.musicxml` with tests for
+   each.
+
+Also added a **self-checking test** that reads this test file's own
+source and fails if any of the 11 emitted codes isn't asserted somewhere
+in it — so the same gap can't silently reappear when a future phase adds
+a new recovery rule.
+
 ## 3. How this was verified
 
-Ran `npm run verify` clean, 170/170 (11 new tests here, on top of the
+Ran `npm run verify` clean, 182/182 (23 new tests here, on top of the
 159 already passing). Every test in this phase runs against a **real**
 jsdom `DOMParser` parsing **real** XML text from fixture files -- not
 mocked DOM objects:

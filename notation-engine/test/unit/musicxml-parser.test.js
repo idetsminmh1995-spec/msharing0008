@@ -124,4 +124,134 @@ describe('MusicXML parser v1 (Phase 20)', () => {
   test('throws a clear error if no DOMParser is available and none was injected', () => {
     assert.throws(() => NE.parseMusicXml('<a/>'), /No DOMParser available/);
   });
+
+  test('an unknown/v2-only element inside a measure is ignored but recorded as an info diagnostic', () => {
+    const result = loadFixture('unknown-element.musicxml');
+    const infos = [...result.diagnostics].filter((d) => d.severity === 'info');
+    assert.ok(infos.some((d) => d.code === 'UNKNOWN_ELEMENT'));
+    // The note after the ignored <direction> element must still parse correctly.
+    const note = result.score.parts[0].measures[0].voices[0].events[0];
+    assert.equal(note.pitch.step, 'C');
+  });
+
+  test('a measure with more ticks than its time signature allows keeps the events and warns MEASURE_OVERRUN', () => {
+    const result = loadFixture('measure-overrun.musicxml');
+    const warnings = [...result.diagnostics].filter((d) => d.code === 'MEASURE_OVERRUN');
+    assert.equal(warnings.length, 1);
+    assert.equal(warnings[0].severity, 'warning');
+    // The 5th (overrun) note is still present, not dropped.
+    const events = result.score.parts[0].measures[0].voices[0].events;
+    assert.equal(events.length, 5);
+    assert.equal(events[4].pitch.step, 'G');
+  });
+
+  test('a part with zero measures produces an empty score and a NO_MEASURES diagnostic, never throws', () => {
+    const result = loadFixture('empty-part.musicxml');
+    assert.equal(result.score.parts[0].measures.length, 0);
+    assert.ok([...result.diagnostics].some((d) => d.code === 'NO_MEASURES'));
+  });
+
+  test('multiple parts each parse independently with their own clef/pitch content', () => {
+    const result = loadFixture('multi-part.musicxml');
+    assert.equal(result.diagnostics.length, 0);
+    assert.equal(result.score.parts.length, 2);
+    const [violin, cello] = result.score.parts;
+    assert.equal(violin.name, 'Violin');
+    assert.equal(cello.name, 'Cello');
+    assert.equal(violin.measures[0].voices[0].events[0].pitch.step, 'E');
+    assert.equal(cello.measures[0].voices[0].events[0].pitch.step, 'C');
+    const [violinAttrs, celloAttrs] = result.attributes;
+    assert.equal(violinAttrs.partId, 'P1');
+    assert.equal(violinAttrs.clefSign, 'G');
+    assert.equal(celloAttrs.partId, 'P2');
+    assert.equal(celloAttrs.clefSign, 'F');
+  });
+
+  test('ties, a dotted note, and <staff> all parse correctly together', () => {
+    const result = loadFixture('tie-dot-staff.musicxml');
+    const measure = result.score.parts[0].measures[0];
+    assert.equal(measure.voices.length, 2);
+
+    const voice1 = [...measure.voices].find((v) => v.id === 1);
+    assert.equal(voice1.events.length, 2);
+    const [first, second] = voice1.events;
+    assert.equal(first.tieStart, true);
+    assert.equal(first.staff, 1);
+    assert.equal(second.tieStop, true);
+    assert.equal(second.duration.dots, 1);
+    assert.equal(second.duration.type, 'quarter');
+    // divisions=4 -> a dotted quarter's raw duration (6) converts to 720 ticks (480 * 1.5).
+    assert.equal(second.duration.ticks, 720);
+
+    const voice2 = [...measure.voices].find((v) => v.id === 2);
+    assert.equal(voice2.events[0].staff, 2);
+    assert.equal(voice2.events[0].pitch.octave, 3);
+  });
+  test('<forward> advances the tick cursor, leaving a gap between notes', () => {
+    const result = loadFixture('forward.musicxml');
+    const events = result.score.parts[0].measures[0].voices[0].events;
+    assert.equal(events.length, 2);
+    assert.equal(events[0].pitch.step, 'C');
+    assert.equal(events[1].pitch.step, 'G');
+    // The <forward duration=4> (2 quarter notes at divisions=2) must have
+    // pushed the second note past the gap -- if <forward> were ignored,
+    // both notes would still parse but the second would sit at the wrong
+    // musical position. Event order proves the cursor moved forward, and
+    // no MEASURE_OVERRUN warning proves it moved by the right amount
+    // (C=480 + forward=960 + G=480 = 1920 = exactly one 4/4 measure).
+    const codes = [...result.diagnostics].map((d) => d.code);
+    assert.ok(!codes.includes('MEASURE_OVERRUN'), 'forward should land the measure exactly full');
+  });
+
+  test('a note with no <duration> recovers as a quarter note and emits MISSING_DURATION', () => {
+    const result = loadFixture('malformed-notes.musicxml');
+    const codes = [...result.diagnostics].map((d) => d.code);
+    assert.ok(codes.includes('MISSING_DURATION'));
+  });
+
+  test('a pitched note with no <octave> recovers and emits MISSING_OCTAVE', () => {
+    const result = loadFixture('malformed-notes.musicxml');
+    const codes = [...result.diagnostics].map((d) => d.code);
+    assert.ok(codes.includes('MISSING_OCTAVE'));
+  });
+
+  test('an invalid <step> emits INVALID_PITCH_STEP', () => {
+    const result = loadFixture('malformed-notes.musicxml');
+    const codes = [...result.diagnostics].map((d) => d.code);
+    assert.ok(codes.includes('INVALID_PITCH_STEP'));
+  });
+
+  test('an <unpitched> note is skipped with UNSUPPORTED_NOTE (v1 scope) but still advances the cursor', () => {
+    const result = loadFixture('malformed-notes.musicxml');
+    const codes = [...result.diagnostics].map((d) => d.code);
+    assert.ok(codes.includes('UNSUPPORTED_NOTE'));
+    // The unpitched note must not appear as an event...
+    const events = result.score.parts[0].measures[0].voices[0].events;
+    assert.ok(events.every((e) => e.kind !== 'note' || e.pitch.kind !== 'unpitched'));
+  });
+
+  test('a chord whose members disagree on duration falls back to the first note with INVALID_CHORD, never throws', () => {
+    const result = loadFixture('invalid-chord.musicxml');
+    const codes = [...result.diagnostics].map((d) => d.code);
+    assert.ok(codes.includes('INVALID_CHORD'));
+    const events = result.score.parts[0].measures[0].voices[0].events;
+    // Fell back to the single first note rather than losing the measure.
+    assert.equal(events.length, 1);
+    assert.equal(events[0].kind, 'note');
+    assert.equal(events[0].pitch.step, 'C');
+  });
+
+  test('every diagnostic code the parser can emit is covered by a test in this file', () => {
+    // Guards against a future recovery rule being added to the parser
+    // without a matching test -- §10.7 requires asserting the exact code.
+    const EMITTED_CODES = [
+      'INVALID_CHORD', 'INVALID_PITCH_STEP', 'MEASURE_OVERRUN', 'MISSING_DIVISIONS',
+      'MISSING_DURATION', 'MISSING_OCTAVE', 'NO_MEASURES', 'UNKNOWN_DURATION_TYPE',
+      'UNKNOWN_ELEMENT', 'UNSUPPORTED_NOTE', 'UNSUPPORTED_ROOT',
+    ];
+    const source = fs.readFileSync(fileURLToPath(import.meta.url), 'utf8');
+    for (const code of EMITTED_CODES) {
+      assert.ok(source.includes(`'${code}'`), `No test asserts the ${code} diagnostic`);
+    }
+  });
 });

@@ -1,6 +1,6 @@
 import { pitchedPitch, type PitchStep } from '../../core/pitch.js';
 import { duration as makeDuration, type Duration } from '../../core/duration.js';
-import { xmlDivisionsToTicks } from '../../core/duration-math.js';
+import { xmlDivisionsToTicks, TICKS_PER_QUARTER } from '../../core/duration-math.js';
 import { note as makeNote, type Note } from '../../core/note.js';
 import { rest as makeRest, type Rest } from '../../core/rest.js';
 import { chord as makeChord } from '../../core/chord.js';
@@ -300,9 +300,21 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           const repeatEl = firstChildNamed(child, 'repeat');
           const dir = repeatEl?.getAttribute('direction');
           if (dir === 'forward' || dir === 'backward') repeatDirection = dir;
+        } else {
+          // §10.7: an unknown element is ignored but recorded at 'info'
+          // severity -- not silently dropped without a trace. Covers
+          // both genuinely unknown tags and v1-out-of-scope v2 elements
+          // (<direction>, <print>, etc.) alike; v1 doesn't act on any of
+          // them, but the caller can still see they were present.
+          diagnostics.push(
+            diagnostic(
+              'info',
+              'UNKNOWN_ELEMENT',
+              `Ignored <${child.tagName}> (not handled by the v1 parser).`,
+              location,
+            ),
+          );
         }
-        // Any other element (v2-only, e.g. <direction>, <print>) is
-        // silently ignored in v1 -- not an error, just out of scope here.
       }
 
       // Group by voice, sort by tick (stable -- preserves each chord
@@ -338,6 +350,29 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           i = j;
         }
         voices.push(makeVoice(voiceId, events));
+
+        // §10.7: a voice whose events run past what the current time
+        // signature implies is kept and rendered anyway -- just warned
+        // about here. Layout (a later phase) decides how to actually
+        // display an overrun measure; this parser's only job is to not
+        // silently lose or truncate the data.
+        const lastRecord = sorted[sorted.length - 1];
+        if (lastRecord !== undefined) {
+          const voiceEndTick = lastRecord.tick + lastRecord.ev.ticks;
+          const expectedTicks =
+            currentTimeNumerator * (4 / currentTimeDenominator) * TICKS_PER_QUARTER;
+          const TICK_EPSILON = 1e-6;
+          if (voiceEndTick > expectedTicks + TICK_EPSILON) {
+            diagnostics.push(
+              diagnostic(
+                'warning',
+                'MEASURE_OVERRUN',
+                `Voice ${voiceId} has ${voiceEndTick} ticks, more than the ${currentTimeNumerator}/${currentTimeDenominator} time signature implies (${expectedTicks}). Keeping the events; layout will handle the overflow.`,
+                location,
+              ),
+            );
+          }
+        }
       }
 
       measures.push(makeMeasure(measureNumber, voices));
@@ -359,8 +394,19 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
     parts.push(makePart(partId, measures, partName));
   }
 
-  if (parts.length === 0) {
-    diagnostics.push(diagnostic('warning', 'NO_PARTS', 'The document produced zero parts.'));
+  const totalMeasures = parts.reduce((sum, p) => sum + p.measures.length, 0);
+  if (parts.length === 0 || totalMeasures === 0) {
+    // §10.7: zero parseable measures is the only case that yields an
+    // empty Score -- and even then, diagnostics, never an exception.
+    diagnostics.push(
+      diagnostic(
+        'warning',
+        'NO_MEASURES',
+        parts.length === 0
+          ? 'The document produced zero parts.'
+          : "The document's parts produced zero measures.",
+      ),
+    );
   }
 
   return { score: makeScore({ parts }), attributes: allAttributes, diagnostics };
