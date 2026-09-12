@@ -712,7 +712,7 @@ a chord's direction decided by its outermost note.
 
 Only for **unbeamed** notes of 8th or shorter. Glyph is direction-aware:
 `flag8thUp` / `flag8thDown`, `flag16thUp/Down`, … through 1024th.
-Positioned at the stem's free end. A note that is part of a beam group (§12)
+Positioned at the stem's free end. A note that is part of a beam group (§9.12)
 must not draw a flag.
 
 ### 9.10 Rests `[BUILT]`
@@ -747,6 +747,72 @@ barline.
 MusicXML complication: a file may supply an explicit `<accidental>` element,
 which must be honoured even when our own state machine would not have drawn
 one (that is what courtesy accidentals are).
+
+### 9.12 Beam grouping `[TODO]`
+
+**Responsibility.** Decide which consecutive eighth-or-shorter notes within a
+measure share one beam, and which stand alone with an individual flag
+(§9.9). Grouping only — the beam's actual line geometry (straight/flat/
+curved) is a separate concern, §9.13.
+
+**Which notes are even eligible.** Only notes of eighth duration or shorter
+(the exact same set §9.9 would otherwise give an individual flag). A rest
+**breaks** a run of beamable notes rather than being absorbed into the
+group — real notation sometimes beams across a rest, but that's a debated
+house-style nuance; breaking at a rest is simpler, matches most software's
+default, and is what this phase does. A lone eligible note (nothing
+beamable adjacent to it within the same beat) never forms a group of one —
+it keeps its individual flag.
+
+**The grouping rule itself** (verified against multiple independent
+sources — Wikipedia's "Beam (music)", MyMusicTheory, Musicnotes, and an
+OpenLearn music-theory unit all agree on this, not just one source):
+
+- **Simple meter** (any time signature whose denominator is a power of 2
+  and isn't the compound case below): the "beat" is one note of the
+  denominator's value (e.g. a quarter note in 4/4, a half note in 2/2). A
+  beam group is bounded by beat edges — the accumulated tick position
+  entering a new beat always starts a new group; a beam never spans two
+  beats by default.
+- **Compound meter** (denominator = 8, numerator divisible by 3, and
+  numerator > 3 — i.e. 6/8, 9/8, 12/8): the "beat" is a dotted quarter (3
+  eighth-notes' worth), so the default group size is 3 eighth-notes (or the
+  equivalent in finer subdivisions), not 1.
+- **Override:** the caller may supply an explicit group size (in ticks) to
+  replace the computed beat length — this is what makes the common
+  real-world convention of grouping 4 eighth notes together in 4/4 (rather
+  than the textbook-strict groups of 2) possible, and is why this phase's
+  plan entry says "with override," not just "by beat."
+
+**Known limitation, not a gap:** irregular/additive meters (e.g. 5/8 as
+2+3, or MusicXML's `<beats>3+2+2</beats>` from Phase 12) need per-group
+boundaries that don't reduce to one fixed beat length — out of scope for
+this phase; the fallback (treat the whole measure as simple-meter beat math
+using the numeric total) will produce a plausible but not necessarily
+idiomatic grouping for such meters until a future phase adds real additive-
+meter support.
+
+**Input.** A voice's ordered events (with reconstructed start-ticks, the
+same technique Phase 21's `eventStartTicks` already uses) plus the
+measure's time signature. **Output.** A list of groups, each a list of
+event indices sharing one beam (only groups of 2+; a solitary eligible note
+isn't included in the output at all, since "not grouped" is exactly what an
+individual flag already handles).
+
+**Tests.** 4/4 with 8 plain eighth notes and no override → four groups of 2
+(strict beat-based); the same input with a 4-eighth-note override → two
+groups of 4; 6/8 with 6 eighth notes → two groups of 3 (compound meter); a
+rest in the middle of a beat's worth of eighths → breaks into two smaller
+groups, neither merged across the rest; a single eligible eighth note
+surrounded by rests → produces no group at all (stays flagged).
+
+### 9.13 Beam geometry `[TODO — Phase 24]`
+
+The three styles from `config.beam.style` (straight/flat/curved) drawing the
+actual beam line(s) for a group `9.12` produced, including secondary beams
+for 16th-or-shorter notes and cross-beat slope clamping. Not specified
+further here yet — written up properly when Phase 24 starts, following the
+same verify-before-implementing approach as every other subsection above.
 
 ---
 

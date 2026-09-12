@@ -51,8 +51,8 @@ that specifies it.
 ### Stage 4 — Rhythm and structure
 | # | Phase | Spec |
 |---|---|---|
-| **23** | Beam grouping (by beat structure, with override) | §9 |
-| **24** | Beam geometry + 3 styles (straight / flat / curved) | §9 |
+| **23** | Beam grouping (by beat structure, with override) | §9.12 |
+| **24** | Beam geometry + 3 styles (straight / flat / curved) | §9.13 |
 | **25** | Multi-voice per staff + voice collision / rest separation | §15 |
 | **26** | Ties | §9 |
 | **27** | Slurs | §9 |
