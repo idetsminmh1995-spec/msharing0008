@@ -48,6 +48,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-21-render-from-musicxml.md`](./phase-21-render-from-musicxml.md) | Phase 21 renderFromMusicXml (naive layout, first vertical slice) |
 | [`phase-22-milestone-vertical-slice.md`](./phase-22-milestone-vertical-slice.md) | Phase 22 milestone checkpoint (closed on Phase 21's evidence; Stage 3 complete) |
 | [`phase-23-beam-grouping.md`](./phase-23-beam-grouping.md) | Phase 23 beam grouping (wrote the missing §9.12 spec first, then implemented it) |
+| [`phase-24-beam-geometry.md`](./phase-24-beam-geometry.md) | Phase 24 beam geometry (3 styles, slope clamping; fixed a real beam-overlap bug) |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

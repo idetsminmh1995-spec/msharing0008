@@ -806,13 +806,82 @@ rest in the middle of a beat's worth of eighths → breaks into two smaller
 groups, neither merged across the rest; a single eligible eighth note
 surrounded by rests → produces no group at all (stays flagged).
 
-### 9.13 Beam geometry `[TODO — Phase 24]`
+### 9.13 Beam geometry `[BUILT]`
 
-The three styles from `config.beam.style` (straight/flat/curved) drawing the
-actual beam line(s) for a group `9.12` produced, including secondary beams
-for 16th-or-shorter notes and cross-beat slope clamping. Not specified
-further here yet — written up properly when Phase 24 starts, following the
-same verify-before-implementing approach as every other subsection above.
+**Responsibility.** For a group `9.12` produced, compute where the beam
+line(s) sit and how each note's stem must extend to reach them. Drawing
+itself lives in `render/beam.ts`; this section is the geometry only.
+
+**No single universal beam-slope rule exists** — every source consulted
+agrees on that explicitly (a MuseScore forum thread: "you have to abandon a
+notion of 'a' universal standard... there are many standards - or house
+styles"). Two independent sources gave concrete numeric ranges that agree
+with each other: Dorico's own development blog states its beam slant ranges
+from 0.25 staff-spaces (a second) up to 1.5 staff-spaces (a seventh or
+larger); a general engraving summary independently cites "up to 0.5
+stave-spaces for short beams and 1.25–1.75 stave-spaces for larger
+intervals." This engine picks **one moderate, explicit value — a maximum
+of 1.0 staff-space of total vertical change across a beam** — sitting
+within that whole cited range rather than trying to reproduce any one
+publisher's exact curve; refining this to a proper interval-dependent
+table is a reasonable future refinement, not required for a first
+implementation.
+
+**Unbeamed stem length cross-check:** the same engraving summary states
+unbeamed stems are "always the span of an octave (3.5sp), pretty much
+without exception" — this independently confirms §9.8's `DEFAULT_STEM_LENGTH
+= 3.5` was the right value, found from a completely different source than
+the one originally used for §9.8.
+
+**Algorithm:**
+- **Direction** for the whole group: reuse §9.8's `chordStemDirection`
+  logic across every note position in the group (same "furthest from the
+  middle line wins" rule — a beam group is not musically different from a
+  chord for this specific purpose, just spread across time instead of
+  simultaneous).
+- **`flat` style:** both ends of the beam sit at the SAME Y — whichever
+  natural (unbeamed, 3.5sp) stem-tip position is most extreme in the
+  stem's own direction across the whole group. Every note's stem then only
+  ever *extends*, never shortens below its natural length.
+- **`straight` style:** the beam's two ends start at the first and last
+  note's own natural stem-tip Y, then the difference between them is
+  clamped to the ±1.0sp maximum above (keeping the first note's endpoint
+  fixed, scaling only the far end) — simple, and sufficient without a
+  full per-interval lookup table.
+- **`curved` style:** identical start/end geometry to `straight` — this is
+  a rendering choice (a bezier arc instead of a straight line between the
+  same two points), not a distinct engraving convention; no source
+  describes "curved beams" as a real notational practice, so this style
+  exists purely as a config-selectable visual variant this engine offers,
+  not something requiring further verification.
+- **Secondary beams** (16th-and-shorter): the number of parallel beam
+  lines equals the number of flags an unbeamed note of that duration
+  would have (1 for eighth, 2 for 16th, ... 8 for 1024th — the same count
+  §9.9's flag glyphs already use). Each additional line stacks **toward
+  the notehead** from the primary beam. **Spacing is `beamThickness +
+  beamSpacing` (0.5 + 0.25 = 0.75sp), not `beamSpacing` alone** — the
+  SMuFL spec defines `beamSpacing` as "the distance between the inner edge
+  of the primary and outer edge of subsequent secondary beams," i.e. the
+  *gap* between two beams, so successive beam *centres* are a full
+  thickness further apart than that. MuseScore 4's own engraving notes
+  independently confirm 0.75sp as the correct "regular" beam distance.
+  Both constants come from `bravura_metadata.json` directly, not guessed.
+  **Known simplification:** a group mixing durations (e.g. an eighth
+  followed by two 16ths) uses one uniform beam-line count for the whole
+  group rather than a shorter secondary beam spanning only the
+  finer-duration subset — real sub-beaming for mixed-duration groups is a
+  documented future refinement, not implemented here.
+
+**Tests.** A flat-direction group's beam has zero slope and both ends at
+the extreme natural stem tip; a straight group with a small interval
+keeps its natural (unclamped) slope; a straight group with a large
+interval gets its slope clamped to exactly 1.0sp; a 16th-note group gets
+exactly 2 parallel beam lines whose centres are 0.75sp apart (thickness +
+spacing, per the note above — asserting on 0.25 here would encode the very
+bug this section warns about); a curved group's
+endpoints exactly match what the equivalent straight group would produce.
+
+---
 
 ---
 
@@ -1574,12 +1643,12 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 21 | Naive single-system layout + `renderFromMusicXML()` end to end | ✅ |
 | 22 | **Milestone: a real simple `.musicxml` file renders correctly.** Everything after this point is validated against real files from day one | ✅ |
 
-### Stage 4 — Rhythm and structure `[IN PROGRESS — 23 of 29]`
+### Stage 4 — Rhythm and structure `[IN PROGRESS — 23-24 of 29]`
 
 | Phase | What | Status |
 |---|---|---|
 | 23 | Beam grouping (by time-signature beat structure, with override) | ✅ |
-| 24 | Beam geometry + the three styles (straight / flat / curved) | |
+| 24 | Beam geometry + the three styles (straight / flat / curved) | ✅ |
 | 25 | Multi-voice per staff + voice collision and rest separation | |
 | 26 | Ties | |
 | 27 | Slurs | |

@@ -62,7 +62,14 @@ export function resolveStemDirection(input: StemDirectionInput): StemDirection {
   return chordStemDirection(input.positions, middleLineY(input.numLines));
 }
 
-const DEFAULT_STEM_LENGTH = 3.5;
+/**
+ * Exported (not just module-private) because Phase 24's beam geometry
+ * needs this exact "natural, unbeamed" length as its own reference point
+ * -- beam endpoints are computed from where each note's stem would end
+ * WITHOUT the far-note middle-line-reaching extension computeStemLength
+ * below applies, per §9.13.
+ */
+export const DEFAULT_STEM_LENGTH = 3.5;
 const MIN_STEM_LENGTH = 2.5;
 
 /**

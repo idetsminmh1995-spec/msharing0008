@@ -9,10 +9,10 @@ commit that added this file.
 
 ---
 
-## A. DONE — Phases 1–23 ✅ (Stage 2 & Stage 3 complete; Stage 4 in progress)
+## A. DONE — Phases 1–24 ✅ (Stage 2 & Stage 3 complete; Stage 4 in progress)
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 200/200 across them.
+`npm run verify` passes 213/213 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -39,12 +39,13 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 21 | Naive layout + `renderFromMusicXml` | Fixed-width measures, full Phase 9-19 pipeline wired end to end | [`phase-21`](./phase-21-render-from-musicxml.md) |
 | 22 | Milestone checkpoint | Closed on Phase 21's evidence -- see the evidence table | [`phase-22`](./phase-22-milestone-vertical-slice.md) |
 | 23 | Beam grouping | `groupBeams` (simple/compound meter, override), wrote the missing §9.12 spec first | [`phase-23`](./phase-23-beam-grouping.md) |
+| 24 | Beam geometry | `computeBeamShape` (straight/flat/curved, 1.0sp clamp), wired end to end; fixed a beam-overlap bug | [`phase-24`](./phase-24-beam-geometry.md) |
 
 **Public API today:** 70 exports from `dist/notation-engine.js`.
 
 ---
 
-## B. NOT DONE — Phases 24–54
+## B. NOT DONE — Phases 25–54
 
 Nothing below exists in `src/` yet. Each line links to the `PLAN.md` section
 that specifies it.
@@ -53,7 +54,6 @@ that specifies it.
 | # | Phase | Spec |
 |---|---|---|
 | **23** | Beam grouping (by beat structure, with override) | §9.12 |
-| **24** | Beam geometry + 3 styles (straight / flat / curved) | §9.13 |
 | **25** | Multi-voice per staff + voice collision / rest separation | §15 |
 | **26** | Ties | §9 |
 | **27** | Slurs | §9 |

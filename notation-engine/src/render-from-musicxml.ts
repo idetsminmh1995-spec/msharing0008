@@ -13,15 +13,21 @@ import {
   accidentalX,
   assignAccidentalColumns,
   automaticStemDirection,
+  beamDirection,
+  beamYAtX,
   chordStemDirection,
   computeBarlineGeometry,
+  computeBeamShape,
   computeLedgerLines,
   computeStemLength,
   createAccidentalState,
   evaluateAccidental,
+  beamedEventIndices,
+  groupBeams,
   keySignatureAccidentals,
   middleLineY,
   needsFlag,
+  numBeamLines,
   resetMeasure,
   restGlyphName,
   restY,
@@ -31,6 +37,7 @@ import {
   computeStaffGeometry,
   type AccidentalState,
   type BarlineType,
+  type BeamStyle as BeamStyleOption,
 } from './geometry/index.js';
 import type { Diagnostic, MeasureAttributes } from './parser/index.js';
 import { parseMusicXml, type ParseMusicXmlOptions } from './parser/index.js';
@@ -39,6 +46,7 @@ import {
   createSvgDocument,
   renderAccidental,
   renderBarline,
+  renderBeam,
   renderClef,
   renderFlag,
   renderKeySignature,
@@ -63,6 +71,12 @@ const MEASURE_WIDTH = 24;
 const LEDGER_EXTENSION_FALLBACK = 0.4;
 const LEDGER_THICKNESS_FALLBACK = 0.16;
 const STEM_THICKNESS_FALLBACK = 0.12;
+const BEAM_THICKNESS_FALLBACK = 0.5;
+const BEAM_SPACING_FALLBACK = 0.25;
+/** The natural (unbeamed) stem length a beam group's shape starts from, matching Phase 16's own default. */
+const DEFAULT_UNBEAMED_STEM_LENGTH = 3.5;
+/** Hardcoded pending Phase 50's full config wiring -- same pattern as INK_COLOR/FONT_FAMILY above (Phase 21's documented limitation, not new to this phase). */
+const DEFAULT_BEAM_STYLE: BeamStyleOption = 'straight';
 
 export type RenderFromMusicXmlOptions = ParseMusicXmlOptions;
 
@@ -124,6 +138,71 @@ interface RenderCtx {
   readonly measureBottomY: number;
 }
 
+/** Draws a note's accidental (if needed)/notehead/ledger-lines only -- no stem, no flag. Shared by both the plain (unbeamed) path and the beam-group path, which differ only in how the stem/flag (or beam) gets drawn afterward. */
+function renderNoteheadPart(
+  note: Note,
+  x: number,
+  ctx: RenderCtx,
+  accidentalState: AccidentalState,
+): { svg: string; position: number; noteheadGlyph: string; newAccidentalState: AccidentalState } {
+  if (note.pitch.kind !== 'pitched') {
+    // v1's parser never actually produces an unpitched Note (see the
+    // matching guard in renderNoteOrRest) -- defensive type narrowing.
+    return {
+      svg: '',
+      position: 0,
+      noteheadGlyph: 'noteheadBlack',
+      newAccidentalState: accidentalState,
+    };
+  }
+
+  const parts: string[] = [];
+  const position = staffPositionForPitch(ctx.clefDef, note.pitch.step, note.pitch.octave);
+  const y = ctx.measureBottomY + position;
+
+  const decision = evaluateAccidental(
+    accidentalState,
+    note.pitch.step,
+    note.pitch.octave,
+    note.pitch.alter,
+  );
+  const state = decision.newState;
+  if (decision.shouldDraw) {
+    const glyphName = accidentalGlyphName(note.pitch.alter);
+    const width = glyphWidthOf(glyphName);
+    parts.push(
+      renderAccidental(glyphName, {
+        x: accidentalX(x, width, 0),
+        y,
+        color: INK_COLOR,
+        fontFamily: FONT_FAMILY,
+      }),
+    );
+  }
+
+  const noteheadGlyph = selectNoteheadGlyphName({
+    pitch: note.pitch,
+    durationType: note.duration.type,
+  });
+  parts.push(renderNotehead(noteheadGlyph, { x, y, color: INK_COLOR, fontFamily: FONT_FAMILY }));
+
+  const ledgerLines = computeLedgerLines(position, STAFF_LINES);
+  if (ledgerLines.length > 0) {
+    parts.push(
+      renderLedgerLines(ledgerLines, {
+        x,
+        noteheadWidth: noteheadWidth(noteheadGlyph),
+        staffBottomY: ctx.measureBottomY,
+        extension: getEngravingDefault('legerLineExtension') ?? LEDGER_EXTENSION_FALLBACK,
+        thickness: getEngravingDefault('legerLineThickness') ?? LEDGER_THICKNESS_FALLBACK,
+        color: INK_COLOR,
+      }),
+    );
+  }
+
+  return { svg: parts.join('\n'), position, noteheadGlyph, newAccidentalState: state };
+}
+
 function renderNoteOrRest(
   ev: Note | Rest,
   x: number,
@@ -149,53 +228,16 @@ function renderNoteOrRest(
   }
 
   const parts: string[] = [];
-  const position = staffPositionForPitch(ctx.clefDef, ev.pitch.step, ev.pitch.octave);
-  const y = ctx.measureBottomY + position;
-  let state = accidentalState;
-
-  {
-    const decision = evaluateAccidental(state, ev.pitch.step, ev.pitch.octave, ev.pitch.alter);
-    state = decision.newState;
-    if (decision.shouldDraw) {
-      const glyphName = accidentalGlyphName(ev.pitch.alter);
-      const width = glyphWidthOf(glyphName);
-      parts.push(
-        renderAccidental(glyphName, {
-          x: accidentalX(x, width, 0),
-          y,
-          color: INK_COLOR,
-          fontFamily: FONT_FAMILY,
-        }),
-      );
-    }
-  }
-
-  const noteheadGlyph = selectNoteheadGlyphName({
-    pitch: ev.pitch,
-    durationType: ev.duration.type,
-  });
-  parts.push(renderNotehead(noteheadGlyph, { x, y, color: INK_COLOR, fontFamily: FONT_FAMILY }));
-
-  const ledgerLines = computeLedgerLines(position, STAFF_LINES);
-  if (ledgerLines.length > 0) {
-    parts.push(
-      renderLedgerLines(ledgerLines, {
-        x,
-        noteheadWidth: noteheadWidth(noteheadGlyph),
-        staffBottomY: ctx.measureBottomY,
-        extension: getEngravingDefault('legerLineExtension') ?? LEDGER_EXTENSION_FALLBACK,
-        thickness: getEngravingDefault('legerLineThickness') ?? LEDGER_THICKNESS_FALLBACK,
-        color: INK_COLOR,
-      }),
-    );
-  }
+  const head = renderNoteheadPart(ev, x, ctx, accidentalState);
+  parts.push(head.svg);
+  const y = ctx.measureBottomY + head.position;
 
   if (ev.duration.type !== 'whole') {
-    const direction = automaticStemDirection(position, middleLineY(STAFF_LINES));
-    const length = computeStemLength(position, middleLineY(STAFF_LINES));
+    const direction = automaticStemDirection(head.position, middleLineY(STAFF_LINES));
+    const length = computeStemLength(head.position, middleLineY(STAFF_LINES));
     parts.push(
       renderStem({
-        noteheadGlyphName: noteheadGlyph,
+        noteheadGlyphName: head.noteheadGlyph,
         noteX: x,
         noteY: y,
         direction,
@@ -206,7 +248,7 @@ function renderNoteOrRest(
     );
     if (needsFlag(ev.duration.type, false)) {
       const anchorName = direction === 'up' ? 'stemUpSE' : 'stemDownNW';
-      const anchor = getGlyph(noteheadGlyph)?.anchors?.[anchorName];
+      const anchor = getGlyph(head.noteheadGlyph)?.anchors?.[anchorName];
       if (anchor !== undefined) {
         const stemX = x + anchor[0];
         const attachY = y - anchor[1];
@@ -223,6 +265,98 @@ function renderNoteOrRest(
       }
     }
   }
+
+  return { svg: parts.join('\n'), newAccidentalState: head.newAccidentalState };
+}
+
+/**
+ * Draws a full beam group (Phase 23's grouping + Phase 24's shape):
+ * every member note's accidental/notehead/ledger-lines (via
+ * `renderNoteheadPart`, no individual stem/flag), then one shared beam
+ * whose slope/style comes from `computeBeamShape`, with each note's own
+ * stem individually adjusted to reach that beam at its own X
+ * (`beamYAtX`) rather than using its natural unbeamed length.
+ */
+function renderBeamGroup(
+  notes: readonly Note[],
+  xs: readonly number[],
+  ctx: RenderCtx,
+  accidentalState: AccidentalState,
+  beamStyle: BeamStyleOption,
+): { svg: string; newAccidentalState: AccidentalState } {
+  const parts: string[] = [];
+  let state = accidentalState;
+  const positions: number[] = [];
+  const noteheadGlyphs: string[] = [];
+
+  notes.forEach((note, i) => {
+    const x = xs[i];
+    if (x === undefined) return;
+    const head = renderNoteheadPart(note, x, ctx, state);
+    parts.push(head.svg);
+    state = head.newAccidentalState;
+    positions.push(head.position);
+    noteheadGlyphs.push(head.noteheadGlyph);
+  });
+
+  const middle = middleLineY(STAFF_LINES);
+  const direction = beamDirection(positions, middle);
+  const naturalLength = Math.max(
+    DEFAULT_UNBEAMED_STEM_LENGTH,
+    ...positions.map((p) => computeStemLength(p, middle)),
+  );
+  const shape = computeBeamShape(positions, [...xs], direction, beamStyle, naturalLength);
+
+  notes.forEach((_note, i) => {
+    const x = xs[i];
+    const position = positions[i];
+    const noteheadGlyph = noteheadGlyphs[i];
+    if (x === undefined || position === undefined || noteheadGlyph === undefined) return;
+    const y = ctx.measureBottomY + position;
+    const beamY = ctx.measureBottomY + beamYAtX(shape, x);
+    const anchorName = direction === 'up' ? 'stemUpSE' : 'stemDownNW';
+    const anchor = getGlyph(noteheadGlyph)?.anchors?.[anchorName];
+    if (anchor === undefined) return;
+    parts.push(
+      renderStem({
+        noteheadGlyphName: noteheadGlyph,
+        noteX: x,
+        noteY: y,
+        direction,
+        // renderStem draws from the notehead anchor a fixed `length` in
+        // `direction` -- passing the exact distance to the beam's own Y
+        // makes the stem tip land precisely on the (possibly sloped) beam.
+        length: Math.abs(beamY - (y - anchor[1])),
+        thickness: getEngravingDefault('stemThickness') ?? STEM_THICKNESS_FALLBACK,
+        color: INK_COLOR,
+      }),
+    );
+  });
+
+  // §9.13's documented simplification: line count is the MAX across every
+  // note in the group (whichever duration needs the most beam lines --
+  // the finest subdivision present), not just the first note's own
+  // duration. A group like [eighth, 16th, 16th] needs 2 lines throughout,
+  // not 1.
+  const lineCount = Math.max(1, ...notes.map((n) => numBeamLines(n.duration.type)));
+  // `shape`'s Y values are in staff-position-RELATIVE units (matching
+  // `positions`, which came straight from staffPositionForPitch with no
+  // offset) -- renderBeam draws in absolute SVG space, so the beam's own
+  // line(s) need measureBottomY added too, the same way each note's stem
+  // endpoint already does a few lines above.
+  const offsetShape = {
+    ...shape,
+    startY: shape.startY + ctx.measureBottomY,
+    endY: shape.endY + ctx.measureBottomY,
+  };
+  parts.push(
+    renderBeam(offsetShape, {
+      lineCount,
+      thickness: getEngravingDefault('beamThickness') ?? BEAM_THICKNESS_FALLBACK,
+      spacing: getEngravingDefault('beamSpacing') ?? BEAM_SPACING_FALLBACK,
+      color: INK_COLOR,
+    }),
+  );
 
   return { svg: parts.join('\n'), newAccidentalState: state };
 }
@@ -465,10 +599,55 @@ export function renderFromMusicXml(
       for (const voice of measure.voices) {
         const starts = eventStartTicks(voice.events);
         const total = totalTicks(voice.events) || 1;
-        voice.events.forEach((event, idx) => {
+        const eventXs = voice.events.map((_, idx) => {
           const startTick = starts[idx] ?? 0;
-          const eventX = noteAreaX + (startTick / total) * noteAreaWidth;
+          return noteAreaX + (startTick / total) * noteAreaWidth;
+        });
+
+        // Phase 23 grouping: treat a rest OR a chord as breaking a beamable
+        // run (chords sharing a beam aren't supported by renderBeamGroup
+        // yet, which only draws individual noteheads -- documented scope
+        // limit, not silently wrong).
+        const beamableEvents = voice.events.map((event) => ({
+          durationType: event.duration.type,
+          isRest: event.kind !== 'note',
+        }));
+        const groups = groupBeams(
+          beamableEvents,
+          starts,
+          attrs.timeNumerator,
+          attrs.timeDenominator,
+        );
+        const beamedIndices = beamedEventIndices(groups);
+        const groupByFirstIndex = new Map<number, (typeof groups)[number]>();
+        for (const group of groups) {
+          const firstIndex = group.eventIndices[0];
+          if (firstIndex !== undefined) groupByFirstIndex.set(firstIndex, group);
+        }
+
+        voice.events.forEach((event, idx) => {
           if (accidentalState === undefined) return;
+          const eventX = eventXs[idx] ?? 0;
+
+          if (beamedIndices.has(idx)) {
+            const group = groupByFirstIndex.get(idx);
+            if (group === undefined) return; // a non-first member of an already-rendered group
+            const groupNotes = group.eventIndices
+              .map((i) => voice.events[i])
+              .filter((e): e is Note => e !== undefined && e.kind === 'note');
+            const groupXs = group.eventIndices.map((i) => eventXs[i] ?? 0);
+            const { svg, newAccidentalState } = renderBeamGroup(
+              groupNotes,
+              groupXs,
+              ctx,
+              accidentalState,
+              DEFAULT_BEAM_STYLE,
+            );
+            svgParts.push(svg);
+            accidentalState = newAccidentalState;
+            return;
+          }
+
           if (event.kind === 'chord') {
             const { svg, newAccidentalState } = renderChord(event, eventX, ctx, accidentalState);
             svgParts.push(svg);

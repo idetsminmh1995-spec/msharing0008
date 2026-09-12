@@ -526,4 +526,13 @@ describe('visual regression (Phase 8)', () => {
     const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
     matchSnapshot('render-from-musicxml-simple', svg, SNAPSHOT_DIR);
   });
+
+  test('Phase 24: a real beamed-eighths fixture renders identically to the saved snapshot (beams drawn, flags suppressed)', () => {
+    const xml = fs.readFileSync(
+      path.join(__dirname, '..', 'fixtures', 'musicxml', 'beamed-eighths.musicxml'),
+      'utf8',
+    );
+    const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
+    matchSnapshot('render-from-musicxml-beamed', svg, SNAPSHOT_DIR);
+  });
 });
