@@ -12,7 +12,7 @@
      from steinbergmedia/bravura (tag bravura-1.380). */
   @font-face {
     font-family: 'Bravura';
-    src: url('../notation-engine/dist/fonts/Bravura.woff2') format('woff2');
+    src: url('../notation-engine/dist/fonts/Bravura.woff2?v=1') format('woff2');
     font-display: block;
   }
   :root {
@@ -240,7 +240,35 @@
 <!-- The Notation Engine's built bundle (committed to the repo -- GitHub Pages
      has no build step; see notation-engine/.gitignore). Exposes the global
      `NotationEngine`, including renderFromMusicXml(). -->
-<script src="../notation-engine/dist/notation-engine.js"></script>
+<script src="../notation-engine/dist/notation-engine.js?v=1"></script>
+<script>
+  // Self-diagnosis: if the browser served a stale cached page, or the bundle
+  // failed to load at all, the notation panel would silently show nothing and
+  // look identical to "the engine rendered an empty score." Say which it is,
+  // loudly, at load time rather than leaving it to be guessed at.
+  (function () {
+    if (typeof NotationEngine === 'undefined') {
+      console.error(
+        '[Notation Engine] FAILED TO LOAD. The <script> tag did not define the ' +
+        'NotationEngine global -- check that notation-engine/dist/notation-engine.js ' +
+        'is reachable (404?) from this page.'
+      );
+      return;
+    }
+    console.info(
+      '[Notation Engine] loaded OK. renderFromMusicXml:',
+      typeof NotationEngine.renderFromMusicXml,
+      '| exports:', Object.keys(NotationEngine).length
+    );
+    if (typeof NotationEngine.renderFromMusicXml !== 'function') {
+      console.error(
+        '[Notation Engine] STALE BUILD: the bundle loaded but has no ' +
+        'renderFromMusicXml(). This is an old cached copy -- hard-refresh ' +
+        '(Ctrl/Cmd+Shift+R) or clear the site data.'
+      );
+    }
+  })();
+</script>
 <script>
 
 (function () {
@@ -704,11 +732,12 @@
       const newEngineContainer = document.getElementById('notationEngineContainer');
       newEngineContainer.innerHTML = result.svg;
 
-      // Surface parse/render diagnostics instead of silently dropping them:
-      // errors and warnings are worth telling the user about, info-level
-      // notes are not.
+      // Count what actually got drawn. "0 noteheads" and "the engine wasn't
+      // called at all" look identical on screen, so report the number
+      // explicitly rather than just saying "rendered".
+      const noteheadCount = (result.svg.match(/<text/g) || []).length;
       const notable = result.diagnostics.filter((d) => d.severity !== 'info');
-      const measureCount = (result.svg.match(/<g>/g) || []).length;
+
       if (notable.length > 0) {
         els.notationStatus.className = 'status err';
         els.notationStatus.textContent =
@@ -716,9 +745,16 @@
           notable.slice(0, 3).map((d) => d.code).join(', ') +
           (notable.length > 3 ? '…' : '') + ' — see the browser console for detail.';
         console.warn('Notation Engine diagnostics:', result.diagnostics);
+      } else if (noteheadCount === 0) {
+        els.notationStatus.className = 'status err';
+        els.notationStatus.textContent =
+          `Loaded "${file.name}" but drew 0 symbols — the file parsed with no ` +
+          `errors yet produced nothing. See the console for the parsed result.`;
+        console.warn('Notation Engine: rendered SVG contains no glyphs.', result);
       } else {
         els.notationStatus.className = 'status ok';
-        els.notationStatus.textContent = `Loaded "${file.name}" — notation rendered.`;
+        els.notationStatus.textContent =
+          `Loaded "${file.name}" — ${noteheadCount} symbols rendered.`;
       }
       if (result.diagnostics.length > 0) {
         console.info('Notation Engine diagnostics:', result.diagnostics);
