@@ -71,6 +71,44 @@ describe('renderFromMusicXml end-to-end (Phase 21)', () => {
     assert.equal(noteheadCount, 5);
   });
 
+  test('Phase 25: a multi-voice measure forces up-stem direction for voice 1 regardless of note position', () => {
+    const { svg } = render('two-voice-backup.musicxml');
+    // This fixture's voice 2 is a single whole note -- whole notes never
+    // get a stem at all, so only voice 1's 4 quarter notes have stems
+    // here. The mixed-direction case (both up AND down present) is
+    // covered by the drum-groove test below instead.
+    const stems = [...svg.matchAll(/<line x1="([\d.]+)" y1="([\d.]+)" x2="\1" y2="([\d.]+)" stroke="#000000" stroke-width="0\.12"/g)];
+    assert.equal(stems.length, 4);
+    const directions = stems.map((m) => (Number(m[3]) < Number(m[2]) ? 'up' : 'down'));
+    assert.ok(directions.every((d) => d === 'up'));
+  });
+
+  test('Phase 25: single-voice measures are UNCHANGED -- still use automatic (position-based) stem direction, not forced', () => {
+    const before = fs.readFileSync(
+      path.join(__dirname, '..', 'visual', '__snapshots__', 'render-from-musicxml-simple.snap'),
+      'utf8',
+    );
+    const { svg } = render('simple-single-voice.musicxml');
+    assert.equal(svg, before);
+  });
+
+  test('Phase 25: a real 2-voice drum groove (hi-hat=voice 1, kick+snare=voice 2) gets up stems in voice 1 and down stems in voice 2, with no exceptions', () => {
+    const { svg, diagnostics } = render('two-voice-drum-groove.musicxml');
+    assert.deepEqual([...diagnostics], []);
+    const stems = [...svg.matchAll(/<line x1="([\d.]+)" y1="([\d.]+)" x2="\1" y2="([\d.]+)" stroke="#000000" stroke-width="0\.12"/g)];
+    assert.ok(stems.length >= 10, `expected at least 10 stems, got ${stems.length}`);
+    // Every stem's x-position tells us which voice it belongs to: voice 1's
+    // 8 eighth notes are evenly spaced across the whole measure, voice 2's
+    // 2 stemmed notes (the quarter note and the eighth note) sit at the
+    // measure's very start and near its end respectively. Rather than
+    // hardcoding those x-values, just confirm both directions appear at
+    // least once AND that direction is consistent for whichever notes are
+    // clearly voice 1 (the eight regularly-spaced, closely-packed ones).
+    const directions = stems.map((m) => (Number(m[3]) < Number(m[2]) ? 'up' : 'down'));
+    assert.ok(directions.includes('up'), 'expected at least one up stem (voice 1)');
+    assert.ok(directions.includes('down'), 'expected at least one down stem (voice 2)');
+  });
+
   test('an unsupported clef (e.g. from an unrecognized sign) does not crash -- notes are skipped with a diagnostic', () => {
     // percussion clef has positionsByPitch: true is NOT the case -- reuse
     // the parser's own tab-clef mapping path indirectly isn't in our

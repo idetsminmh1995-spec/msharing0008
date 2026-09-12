@@ -113,6 +113,7 @@ var NotationEngine = (() => {
     renderTimeSignature: () => renderTimeSignature,
     resetMeasure: () => resetMeasure,
     resolveConfig: () => resolveConfig,
+    resolveNoteheadCollision: () => resolveNoteheadCollision,
     resolveStemDirection: () => resolveStemDirection,
     rest: () => rest,
     restGlyphName: () => restGlyphName,
@@ -137,6 +138,8 @@ var NotationEngine = (() => {
     timeSignature: () => timeSignature,
     unpitchedPitch: () => unpitchedPitch,
     voice: () => voice,
+    voiceForcedDirection: () => voiceForcedDirection,
+    voiceRestOffset: () => voiceRestOffset,
     xmlDivisionsToTicks: () => xmlDivisionsToTicks
   });
 
@@ -58441,6 +58444,25 @@ var NotationEngine = (() => {
     return set;
   }
 
+  // src/geometry/voice.ts
+  function voiceForcedDirection(voiceId) {
+    return voiceId % 2 === 1 ? "up" : "down";
+  }
+  function voiceRestOffset(voiceId) {
+    return voiceId % 2 === 1 ? -1 : 1;
+  }
+  var NOTEHEAD_COLLISION_THRESHOLD = 1;
+  function resolveNoteheadCollision(positionA, voiceIdA, positionB, voiceIdB, noteheadWidth2) {
+    const distance = Math.abs(positionA - positionB);
+    if (distance >= NOTEHEAD_COLLISION_THRESHOLD) {
+      return { offsetA: 0, offsetB: 0 };
+    }
+    if (voiceIdA < voiceIdB) {
+      return { offsetA: 0, offsetB: noteheadWidth2 };
+    }
+    return { offsetA: noteheadWidth2, offsetB: 0 };
+  }
+
   // src/geometry/beam-shape.ts
   var MAX_BEAM_SLOPE = 1;
   function naturalStemTipY(position, direction, stemLength) {
@@ -59432,9 +59454,9 @@ ${denominator}`;
     }
     return { svg: parts.join("\n"), position, noteheadGlyph, newAccidentalState: state };
   }
-  function renderNoteOrRest(ev, x, ctx, accidentalState) {
+  function renderNoteOrRest(ev, x, ctx, accidentalState, forcedDirection, restOffset) {
     if (ev.kind === "rest") {
-      const y2 = ctx.measureBottomY + restY(ev.duration.type, STAFF_LINES);
+      const y2 = ctx.measureBottomY + restY(ev.duration.type, STAFF_LINES, restOffset);
       const svg = renderRest(restGlyphName(ev.duration.type), {
         x,
         y: y2,
@@ -59448,7 +59470,11 @@ ${denominator}`;
     parts.push(head.svg);
     const y = ctx.measureBottomY + head.position;
     if (ev.duration.type !== "whole") {
-      const direction = automaticStemDirection(head.position, middleLineY(STAFF_LINES));
+      const direction = resolveStemDirection({
+        positions: [head.position],
+        numLines: STAFF_LINES,
+        ...forcedDirection !== void 0 ? { forcedDirection } : {}
+      });
       const length = computeStemLength(head.position, middleLineY(STAFF_LINES));
       parts.push(
         renderStem({
@@ -59482,7 +59508,7 @@ ${denominator}`;
     }
     return { svg: parts.join("\n"), newAccidentalState: head.newAccidentalState };
   }
-  function renderBeamGroup(notes, xs, ctx, accidentalState, beamStyle) {
+  function renderBeamGroup(notes, xs, ctx, accidentalState, beamStyle, forcedDirection) {
     const parts = [];
     let state = accidentalState;
     const positions = [];
@@ -59497,7 +59523,7 @@ ${denominator}`;
       noteheadGlyphs.push(head.noteheadGlyph);
     });
     const middle = middleLineY(STAFF_LINES);
-    const direction = beamDirection(positions, middle);
+    const direction = forcedDirection ?? beamDirection(positions, middle);
     const naturalLength = Math.max(
       DEFAULT_UNBEAMED_STEM_LENGTH,
       ...positions.map((p) => computeStemLength(p, middle))
@@ -59544,7 +59570,7 @@ ${denominator}`;
     );
     return { svg: parts.join("\n"), newAccidentalState: state };
   }
-  function renderChord(chord2, x, ctx, accidentalState) {
+  function renderChord(chord2, x, ctx, accidentalState, forcedDirection) {
     const parts = [];
     const positions = chord2.notes.map(
       (n) => n.pitch.kind === "pitched" ? staffPositionForPitch(ctx.clefDef, n.pitch.step, n.pitch.octave) : staffPositionForPitch(ctx.clefDef, n.pitch.displayStep, n.pitch.displayOctave)
@@ -59610,7 +59636,7 @@ ${denominator}`;
       }
     });
     if (chord2.duration.type !== "whole" && positions.length > 0) {
-      const direction = chordStemDirection(positions, middleLineY(STAFF_LINES));
+      const direction = forcedDirection ?? chordStemDirection(positions, middleLineY(STAFF_LINES));
       const outermost = direction === "up" ? Math.max(...positions) : Math.min(...positions);
       const length = computeStemLength(outermost, middleLineY(STAFF_LINES));
       parts.push(
@@ -59730,7 +59756,10 @@ ${denominator}`;
         const ctx = { clefDef, measureBottomY: bottomY };
         const noteAreaX = Math.max(layout.x + layout.width * 0.25, cursorX);
         const noteAreaWidth = layout.x + layout.width - noteAreaX;
+        const isMultiVoice = measure2.voices.length > 1;
         for (const voice2 of measure2.voices) {
+          const forcedDirection = isMultiVoice ? voiceForcedDirection(voice2.id) : void 0;
+          const restOffset = isMultiVoice ? voiceRestOffset(voice2.id) : 0;
           const starts = eventStartTicks(voice2.events);
           const total = totalTicks(voice2.events) || 1;
           const eventXs = voice2.events.map((_, idx) => {
@@ -59766,14 +59795,21 @@ ${denominator}`;
                 groupXs,
                 ctx,
                 accidentalState,
-                DEFAULT_BEAM_STYLE
+                DEFAULT_BEAM_STYLE,
+                forcedDirection
               );
               svgParts.push(svg2);
               accidentalState = newAccidentalState;
               return;
             }
             if (event.kind === "chord") {
-              const { svg: svg2, newAccidentalState } = renderChord(event, eventX, ctx, accidentalState);
+              const { svg: svg2, newAccidentalState } = renderChord(
+                event,
+                eventX,
+                ctx,
+                accidentalState,
+                forcedDirection
+              );
               svgParts.push(svg2);
               accidentalState = newAccidentalState;
             } else {
@@ -59781,7 +59817,9 @@ ${denominator}`;
                 event,
                 eventX,
                 ctx,
-                accidentalState
+                accidentalState,
+                forcedDirection,
+                restOffset
               );
               svgParts.push(svg2);
               accidentalState = newAccidentalState;

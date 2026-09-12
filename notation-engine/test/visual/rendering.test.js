@@ -535,4 +535,13 @@ describe('visual regression (Phase 8)', () => {
     const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
     matchSnapshot('render-from-musicxml-beamed', svg, SNAPSHOT_DIR);
   });
+
+  test('Phase 25: a real 2-voice drum groove renders identically to the saved snapshot (hi-hat up, kick/snare down)', () => {
+    const xml = fs.readFileSync(
+      path.join(__dirname, '..', 'fixtures', 'musicxml', 'two-voice-drum-groove.musicxml'),
+      'utf8',
+    );
+    const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
+    matchSnapshot('render-from-musicxml-two-voice-drum', svg, SNAPSHOT_DIR);
+  });
 });

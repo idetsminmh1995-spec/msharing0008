@@ -9,10 +9,10 @@ import {
   TENOR_CLEF,
   TREBLE_CLEF,
   type ClefDefinition,
+  type StemDirection,
   accidentalGlyphName,
   accidentalX,
   assignAccidentalColumns,
-  automaticStemDirection,
   beamDirection,
   beamYAtX,
   chordStemDirection,
@@ -28,6 +28,9 @@ import {
   middleLineY,
   needsFlag,
   numBeamLines,
+  resolveStemDirection,
+  voiceForcedDirection,
+  voiceRestOffset,
   resetMeasure,
   restGlyphName,
   restY,
@@ -209,9 +212,11 @@ function renderNoteOrRest(
   x: number,
   ctx: RenderCtx,
   accidentalState: AccidentalState,
+  forcedDirection: StemDirection | undefined,
+  restOffset: number,
 ): { svg: string; newAccidentalState: AccidentalState } {
   if (ev.kind === 'rest') {
-    const y = ctx.measureBottomY + restY(ev.duration.type, STAFF_LINES);
+    const y = ctx.measureBottomY + restY(ev.duration.type, STAFF_LINES, restOffset);
     const svg = renderRest(restGlyphName(ev.duration.type), {
       x,
       y,
@@ -227,7 +232,14 @@ function renderNoteOrRest(
   const y = ctx.measureBottomY + head.position;
 
   if (ev.duration.type !== 'whole') {
-    const direction = automaticStemDirection(head.position, middleLineY(STAFF_LINES));
+    // §9.14: voice-forced direction (when multiple voices share the staff)
+    // wins over automatic placement -- "upper up, lower down, always" --
+    // reusing Phase 16's own priority chain rather than hand-rolling it.
+    const direction = resolveStemDirection({
+      positions: [head.position],
+      numLines: STAFF_LINES,
+      ...(forcedDirection !== undefined ? { forcedDirection } : {}),
+    });
     const length = computeStemLength(head.position, middleLineY(STAFF_LINES));
     parts.push(
       renderStem({
@@ -277,6 +289,7 @@ function renderBeamGroup(
   ctx: RenderCtx,
   accidentalState: AccidentalState,
   beamStyle: BeamStyleOption,
+  forcedDirection: StemDirection | undefined,
 ): { svg: string; newAccidentalState: AccidentalState } {
   const parts: string[] = [];
   let state = accidentalState;
@@ -294,7 +307,7 @@ function renderBeamGroup(
   });
 
   const middle = middleLineY(STAFF_LINES);
-  const direction = beamDirection(positions, middle);
+  const direction = forcedDirection ?? beamDirection(positions, middle);
   const naturalLength = Math.max(
     DEFAULT_UNBEAMED_STEM_LENGTH,
     ...positions.map((p) => computeStemLength(p, middle)),
@@ -360,6 +373,7 @@ function renderChord(
   x: number,
   ctx: RenderCtx,
   accidentalState: AccidentalState,
+  forcedDirection: StemDirection | undefined,
 ): { svg: string; newAccidentalState: AccidentalState } {
   const parts: string[] = [];
   // Chord members may be pitched OR unpitched (a drum chart legitimately
@@ -436,7 +450,7 @@ function renderChord(
   });
 
   if (chord.duration.type !== 'whole' && positions.length > 0) {
-    const direction = chordStemDirection(positions, middleLineY(STAFF_LINES));
+    const direction = forcedDirection ?? chordStemDirection(positions, middleLineY(STAFF_LINES));
     const outermost = direction === 'up' ? Math.max(...positions) : Math.min(...positions);
     const length = computeStemLength(outermost, middleLineY(STAFF_LINES));
     parts.push(
@@ -588,8 +602,15 @@ export function renderFromMusicXml(
       const ctx: RenderCtx = { clefDef, measureBottomY: bottomY };
       const noteAreaX = Math.max(layout.x + layout.width * 0.25, cursorX);
       const noteAreaWidth = layout.x + layout.width - noteAreaX;
+      // §9.14: forced stem direction only applies once a staff genuinely
+      // has multiple voices sharing it -- a single voice keeps ordinary
+      // automatic direction (renderNoteOrRest/renderChord/renderBeamGroup
+      // all fall back to automatic when this is undefined).
+      const isMultiVoice = measure.voices.length > 1;
 
       for (const voice of measure.voices) {
+        const forcedDirection = isMultiVoice ? voiceForcedDirection(voice.id) : undefined;
+        const restOffset = isMultiVoice ? voiceRestOffset(voice.id) : 0;
         const starts = eventStartTicks(voice.events);
         const total = totalTicks(voice.events) || 1;
         const eventXs = voice.events.map((_, idx) => {
@@ -635,6 +656,7 @@ export function renderFromMusicXml(
               ctx,
               accidentalState,
               DEFAULT_BEAM_STYLE,
+              forcedDirection,
             );
             svgParts.push(svg);
             accidentalState = newAccidentalState;
@@ -642,7 +664,13 @@ export function renderFromMusicXml(
           }
 
           if (event.kind === 'chord') {
-            const { svg, newAccidentalState } = renderChord(event, eventX, ctx, accidentalState);
+            const { svg, newAccidentalState } = renderChord(
+              event,
+              eventX,
+              ctx,
+              accidentalState,
+              forcedDirection,
+            );
             svgParts.push(svg);
             accidentalState = newAccidentalState;
           } else {
@@ -651,6 +679,8 @@ export function renderFromMusicXml(
               eventX,
               ctx,
               accidentalState,
+              forcedDirection,
+              restOffset,
             );
             svgParts.push(svg);
             accidentalState = newAccidentalState;

@@ -883,6 +883,70 @@ endpoints exactly match what the equivalent straight group would produce.
 
 ---
 
+### 9.14 Multi-voice per staff `[PARTIAL — stem direction + rest separation built and wired; notehead-collision offsetting has geometry but is not yet wired into renderFromMusicXml]`
+
+**Responsibility.** When two (or more) voices share one staff — the drum
+hand/foot split, a piano's LH/RH split-voice passages, an SATB pair — decide
+each voice's forced stem direction, separate their rests vertically, and
+offset colliding noteheads horizontally so two voices never render as an
+ambiguous smear. `§15.3` explicitly defers this exact work here ("multi-voice
+notehead offsetting ... handled by their own module") rather than to the
+skyline; this is that module.
+
+**Stem direction is universal and non-negotiable**, confirmed independently
+across MuseScore's handbook, LilyPond's reference manual, and two general
+notation-pedagogy sources, all stating the identical rule with no
+disagreement: the **odd-numbered voice(s) always get up stems, the
+even-numbered voice(s) always get down stems** — "upper up, lower down,
+always," regardless of any individual note's own position relative to the
+middle line. This is exactly Phase 16's existing `forcedDirection` parameter
+on `resolveStemDirection` — never wired to anything until now. `voiceId % 2
+=== 1 → 'up'`, else `'down'`.
+
+**Rest separation** reuses Phase 18's existing `restY(...,
+voiceOffset)` — this section only needed to decide the offset *value*: the
+odd (upper) voice's rests shift toward the top of the staff, the even
+(lower) voice's shift toward the bottom, so with both voices otherwise
+defaulting to the shared middle line (Phase 18's own default), they land a
+full 2 staff-spaces apart rather than stacking. This is a chosen, sensible
+value inside what every source describes only qualitatively ("moved to
+avoid collisions"), the same kind of choice Phase 24 made for its slope cap
+where no source gave one exact number.
+
+**Notehead collision.** Confirmed by an independent source (Clairnote,
+citing LilyPond's own collision engine) that the standard threshold is
+notes **one vertical staff position apart** (i.e. adjacent line-to-space,
+0.5sp in this engine's units) or closer — below that distance, two voices'
+noteheads visually overlap and one must be pushed aside. This section's
+rule: at the same tick, if two different voices' notes are within
+`1.0sp` of each other (a full staff-space, chosen slightly more generous
+than the bare minimum so near-misses aren't left looking cramped), the
+higher-numbered voice's notehead (and its own ledger lines / accidental,
+which move with it) shifts right by one notehead-width; otherwise neither
+moves.
+
+**Interfaces.**
+```ts
+voiceForcedDirection(voiceId): StemDirection
+voiceRestOffset(voiceId): number
+resolveNoteheadCollision(positionA, voiceIdA, positionB, voiceIdB, noteheadWidth):
+  { offsetA: number; offsetB: number }
+```
+
+**Tests.** Voices 1/2/3/4 map to up/down/up/down; two voices' rests land a
+full 2sp apart when both would otherwise default to the middle line; two
+notes 0.5sp apart (adjacent) trigger an offset, two notes 2sp apart do not;
+the higher-voice-number note is the one that moves, never the lower; a
+unison (identical position) between two voices also triggers the offset
+(covered by the "within 1.0sp" rule, since a 0-distance is certainly within
+it).
+
+**Known limitation.** Only pairwise voice comparison is specified (the
+common 2-voice case); a genuine 3-or-4-voice pile-up on one staff, where a
+middle voice's notehead is squeezed from both sides, needs a more general
+column-assignment algorithm (the same shape as Phase 19's accidental
+stacking) — noted as future work, not implemented here.
+
 ---
 
 ## 10. Module: `parser/musicxml/` — MusicXML Parser `[IN PROGRESS — v1 built (Phase 20); .mxl/score-timewise/v2 elements are Phase 35-36]`
@@ -1652,13 +1716,13 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 21 | Naive single-system layout + `renderFromMusicXML()` end to end | ✅ |
 | 22 | **Milestone: a real simple `.musicxml` file renders correctly.** Everything after this point is validated against real files from day one | ✅ |
 
-### Stage 4 — Rhythm and structure `[IN PROGRESS — 23-24 of 29]`
+### Stage 4 — Rhythm and structure `[IN PROGRESS — 23-25 of 29]`
 
 | Phase | What | Status |
 |---|---|---|
 | 23 | Beam grouping (by time-signature beat structure, with override) | ✅ |
 | 24 | Beam geometry + the three styles (straight / flat / curved) | ✅ |
-| 25 | Multi-voice per staff + voice collision and rest separation | |
+| 25 | Multi-voice per staff + voice collision and rest separation | ✅ (core); notehead-offset wiring pending |
 | 26 | Ties | |
 | 27 | Slurs | |
 | 28 | Tuplets | |
