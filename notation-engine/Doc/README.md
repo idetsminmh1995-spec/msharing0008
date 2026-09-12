@@ -45,6 +45,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-18-rests.md`](./phase-18-rests.md) | Phase 18 rests (whole/half special-case placement, per-voice offset) |
 | [`phase-19-accidentals.md`](./phase-19-accidentals.md) | Phase 19 accidentals (draw-or-not state machine, chord stacking) |
 | [`phase-20-musicxml-parser-v1.md`](./phase-20-musicxml-parser-v1.md) | Phase 20 MusicXML parser v1 (traversal model, chord-tick bug fix) |
+| [`phase-21-render-from-musicxml.md`](./phase-21-render-from-musicxml.md) | Phase 21 renderFromMusicXml (naive layout, first vertical slice) |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

@@ -1,8 +1,10 @@
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { test, describe } from 'node:test';
 import { loadEngine } from '../helpers/load-engine.js';
 import { matchSnapshot } from '../helpers/snapshot.js';
+import { testDomParser } from '../helpers/dom.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -514,5 +516,14 @@ describe('visual regression (Phase 8)', () => {
       parts,
     );
     matchSnapshot('accidental-variants', doc, SNAPSHOT_DIR);
+  });
+
+  test('Phase 21: renderFromMusicXml against the real simple-single-voice fixture renders identically to the saved snapshot', () => {
+    const xml = fs.readFileSync(
+      path.join(__dirname, '..', 'fixtures', 'musicxml', 'simple-single-voice.musicxml'),
+      'utf8',
+    );
+    const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
+    matchSnapshot('render-from-musicxml-simple', svg, SNAPSHOT_DIR);
   });
 });
