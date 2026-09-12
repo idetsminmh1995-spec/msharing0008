@@ -221,13 +221,17 @@ describe('MusicXML parser v1 (Phase 20)', () => {
     assert.ok(codes.includes('INVALID_PITCH_STEP'));
   });
 
-  test('an <unpitched> note is skipped with UNSUPPORTED_NOTE (v1 scope) but still advances the cursor', () => {
+  test('an <unpitched> note now parses into a real unpitched Note (percussion support)', () => {
     const result = loadFixture('malformed-notes.musicxml');
     const codes = [...result.diagnostics].map((d) => d.code);
-    assert.ok(codes.includes('UNSUPPORTED_NOTE'));
-    // The unpitched note must not appear as an event...
+    // No longer skipped -- UNSUPPORTED_NOTE is now reserved for a <note>
+    // that is neither <pitch>, <unpitched>, nor <rest>.
+    assert.ok(!codes.includes('UNSUPPORTED_NOTE'));
     const events = result.score.parts[0].measures[0].voices[0].events;
-    assert.ok(events.every((e) => e.kind !== 'note' || e.pitch.kind !== 'unpitched'));
+    const unpitched = events.filter((e) => e.kind === 'note' && e.pitch.kind === 'unpitched');
+    assert.equal(unpitched.length, 1);
+    assert.equal(unpitched[0].pitch.displayStep, 'E');
+    assert.equal(unpitched[0].pitch.displayOctave, 4);
   });
 
   test('a chord whose members disagree on duration falls back to the first note with INVALID_CHORD, never throws', () => {

@@ -1,3 +1,12 @@
 node_modules/
-dist/
 *.log
+
+# dist/notation-engine.js is intentionally COMMITTED, not ignored: the
+# drum-video web app is served as static files from GitHub Pages, which has
+# no build step, so the browser can only load the engine if the built bundle
+# is in the repo. Rebuild with `npm run build` and commit the result
+# alongside any src/ change.
+#
+# The sourcemap stays out -- it is 2x the bundle's own size and only helps
+# local debugging, where `npm run build` regenerates it anyway.
+dist/*.map

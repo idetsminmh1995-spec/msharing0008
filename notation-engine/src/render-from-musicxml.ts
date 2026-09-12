@@ -145,39 +145,40 @@ function renderNoteheadPart(
   ctx: RenderCtx,
   accidentalState: AccidentalState,
 ): { svg: string; position: number; noteheadGlyph: string; newAccidentalState: AccidentalState } {
-  if (note.pitch.kind !== 'pitched') {
-    // v1's parser never actually produces an unpitched Note (see the
-    // matching guard in renderNoteOrRest) -- defensive type narrowing.
-    return {
-      svg: '',
-      position: 0,
-      noteheadGlyph: 'noteheadBlack',
-      newAccidentalState: accidentalState,
-    };
-  }
-
   const parts: string[] = [];
-  const position = staffPositionForPitch(ctx.clefDef, note.pitch.step, note.pitch.octave);
+
+  // Percussion: <unpitched>'s display-step/display-octave ARE a staff
+  // position, so they go through the same staffPositionForPitch as a real
+  // pitch -- but an unpitched note can never carry an accidental (there's
+  // no pitch to alter), so the whole accidental branch is skipped rather
+  // than special-cased inside it.
+  const isUnpitched = note.pitch.kind === 'unpitched';
+  const step = isUnpitched ? note.pitch.displayStep : note.pitch.step;
+  const octave = isUnpitched ? note.pitch.displayOctave : note.pitch.octave;
+  const position = staffPositionForPitch(ctx.clefDef, step, octave);
   const y = ctx.measureBottomY + position;
 
-  const decision = evaluateAccidental(
-    accidentalState,
-    note.pitch.step,
-    note.pitch.octave,
-    note.pitch.alter,
-  );
-  const state = decision.newState;
-  if (decision.shouldDraw) {
-    const glyphName = accidentalGlyphName(note.pitch.alter);
-    const width = glyphWidthOf(glyphName);
-    parts.push(
-      renderAccidental(glyphName, {
-        x: accidentalX(x, width, 0),
-        y,
-        color: INK_COLOR,
-        fontFamily: FONT_FAMILY,
-      }),
+  let state = accidentalState;
+  if (note.pitch.kind === 'pitched') {
+    const decision = evaluateAccidental(
+      accidentalState,
+      note.pitch.step,
+      note.pitch.octave,
+      note.pitch.alter,
     );
+    state = decision.newState;
+    if (decision.shouldDraw) {
+      const glyphName = accidentalGlyphName(note.pitch.alter);
+      const width = glyphWidthOf(glyphName);
+      parts.push(
+        renderAccidental(glyphName, {
+          x: accidentalX(x, width, 0),
+          y,
+          color: INK_COLOR,
+          fontFamily: FONT_FAMILY,
+        }),
+      );
+    }
   }
 
   const noteheadGlyph = selectNoteheadGlyphName({
@@ -218,13 +219,6 @@ function renderNoteOrRest(
       fontFamily: FONT_FAMILY,
     });
     return { svg, newAccidentalState: accidentalState };
-  }
-
-  if (ev.pitch.kind !== 'pitched') {
-    // v1's parser never actually produces an unpitched Note (Phase 20
-    // skips <unpitched> entirely, per §10.4/§10.5 being v2 scope) -- this
-    // is a defensive type-narrowing branch, not an expected runtime path.
-    return { svg: '', newAccidentalState: accidentalState };
   }
 
   const parts: string[] = [];
@@ -368,15 +362,14 @@ function renderChord(
   accidentalState: AccidentalState,
 ): { svg: string; newAccidentalState: AccidentalState } {
   const parts: string[] = [];
-  // v1's parser never produces unpitched Notes (see renderNoteOrRest's
-  // comment above) -- chord members are assumed pitched; a mixed/unpitched
-  // chord member falls back to position 0 rather than throwing, since a
-  // rendering function should never throw on data it merely finds
-  // surprising (§18.4).
+  // Chord members may be pitched OR unpitched (a drum chart legitimately
+  // writes e.g. kick+hi-hat as a simultaneous group). Both go through the
+  // same staffPositionForPitch -- an unpitched note's display-step/octave
+  // IS its staff position. Only pitched members can carry an accidental.
   const positions = chord.notes.map((n) =>
     n.pitch.kind === 'pitched'
       ? staffPositionForPitch(ctx.clefDef, n.pitch.step, n.pitch.octave)
-      : 0,
+      : staffPositionForPitch(ctx.clefDef, n.pitch.displayStep, n.pitch.displayOctave),
   );
 
   let state = accidentalState;

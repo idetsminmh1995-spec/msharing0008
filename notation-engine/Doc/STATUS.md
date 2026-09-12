@@ -1,6 +1,8 @@
 # Build Status — what is done, what is not
 
 **Purpose:** one page answering "what's actually built?" and "what's next?".
+§A–§E track the numbered phases; **§F tracks the follow-ups raised by the
+A+B+C corrective work** (making notes actually visible in the web app).
 Numbering is **`PLAN.md` §22's phase numbering** — deliberately not a second
 numbering system. Say a number from §B below and that's the phase to build.
 
@@ -197,3 +199,27 @@ new instrument branching or unordered-iteration-affecting-output crept in.
 4. Write `Doc/phase-NN-*.md` (what was written / how to modify / how to
    revert).
 5. Commit, push, and move that row from §B to §A here.
+
+---
+
+## F. Raised by the A+B+C work — not yet done
+
+The A+B+C corrective work (see
+[`abc-make-notes-visible.md`](./abc-make-notes-visible.md)) made notes
+**appear** in the web app. It did not make everything about them
+**correct**. These are the specific follow-ups it raised, in the order
+they'd sensibly be tackled:
+
+| # | Item | Why it matters | Belongs to |
+|---|---|---|---|
+| **F1** | **Drum notehead shapes are wrong.** A hi-hat/cymbal renders as a round notehead instead of an ✕. | The most visible remaining defect on a real drum chart. The hard part is already done — the parser now captures each note's `instrumentId`, and Phase 15's `selectNoteheadGlyphName` already supports per-note shape overrides. What's missing is the table connecting the two. | Phase 35 (percussion), or a small standalone item |
+| **F2** | **No drum instrument → staff-position mapping.** Positions come straight from the file's own `<display-step>`/`<display-octave>`. | Fine for a well-formed file, but a file that omits them (or uses a different convention) has nothing to fall back on. Needs the GM percussion table. | Phase 41 (drum mapping) |
+| **F3** | **`.mxl` (zipped MusicXML) still rejected.** The app shows a clear error rather than opening it. | Many programs export `.mxl` by default, so a user's first file may well be one. | Phase 36 |
+| **F4** | **No visual/browser-level test.** Every test asserts on SVG markup, which is exactly why the missing-font blocker (#4 in the A+B+C doc) went unnoticed for so long. | A markup-only suite structurally cannot catch "the glyphs are correct but nothing can draw them." | Stage 10 (Phase 53), or sooner if another font-class bug appears |
+| **F5** | **`quick-demo/` is now dead code.** Referenced by nothing since the rewiring. | Harmless, but it's the last thing still claiming to be "the notation renderer" to a casual reader. | Trivial cleanup, any time |
+| **F6** | **The app's notation is still decorative.** It renders below the video canvas; it is not composited into the exported frames, and there's no cursor/playback sync. | This is what the drum-video project actually needs the engine *for*. | Stage 8 + Stage 9 (Phases 43–49) |
+
+**None of these are regressions** — F1/F2/F3 are documented scope
+boundaries from Phases 20/35/36, F6 is simply later-stage work not yet
+reached. They're listed here so "what's left to make the app actually
+good?" has a written answer rather than living in memory.

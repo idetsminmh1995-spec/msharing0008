@@ -943,7 +943,7 @@ violate §1's independence requirement.
 `<print>` (system/page breaks), `<sound tempo>`, `<midi-instrument>`
 (`<midi-unpitched>`, `<midi-channel>`).
 
-### 10.5 Percussion handling
+### 10.5 Percussion handling `[PARTIAL — parsing built by the A+B+C work; the mapping pieces below are Phase 35/41]`
 
 Per the spec text quoted in §9.2: `<unpitched>` with `<display-step>` +
 `<display-octave>` positions as if treble clef. **If those children are
@@ -954,6 +954,15 @@ number, which becomes the notehead-mapping key (§9.7) and the drum-mapping key
 
 Note: MusicXML's `<midi-unpitched>` is **1-based** while GM note numbers are
 0-based — subtract 1. This is a classic off-by-one; assert it in tests.
+
+**Built so far:** `<unpitched>` is parsed into a real unpitched `Note`
+(display-step/display-octave → staff position), and each note's
+`<instrument id="...">` is captured. **Not yet built:** the
+`<midi-instrument>`/`<midi-unpitched>` lookup that turns that id into a GM
+note number, and therefore the notehead-shape mapping (§9.7) — so a hi-hat
+currently draws a round notehead instead of an ✕. The absent-display-step
+fallback to the middle line is also not implemented (a diagnostic is emitted
+instead). See `Doc/STATUS.md` §F1/§F2.
 
 ### 10.6 `<score-timewise>`
 

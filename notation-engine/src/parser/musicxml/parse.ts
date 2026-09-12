@@ -1,4 +1,4 @@
-import { pitchedPitch, type PitchStep } from '../../core/pitch.js';
+import { pitchedPitch, unpitchedPitch, type PitchStep } from '../../core/pitch.js';
 import { duration as makeDuration, type Duration } from '../../core/duration.js';
 import { xmlDivisionsToTicks, TICKS_PER_QUARTER } from '../../core/duration-math.js';
 import { note as makeNote, type Note } from '../../core/note.js';
@@ -77,8 +77,14 @@ function buildSingle(ev: ParsedNoteEvent): Note | Rest {
       ...(ev.staff !== undefined ? { staff: ev.staff } : {}),
     });
   }
+  // Percussion (<unpitched>) and pitched notes use the SAME Note type --
+  // they differ only in which kind of Pitch they carry, exactly as Phase
+  // 3's §4.3 invariant requires. No isDrum flag anywhere.
+  const pitch = ev.isUnpitched
+    ? unpitchedPitch(ev.step, ev.octave)
+    : pitchedPitch(ev.step, ev.alter ?? 0, ev.octave);
   return makeNote({
-    pitch: pitchedPitch(ev.step, ev.alter ?? 0, ev.octave),
+    pitch,
     duration: buildDuration(ev),
     voice: ev.voice,
     ...(ev.staff !== undefined ? { staff: ev.staff } : {}),
@@ -274,7 +280,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
               diagnostic(
                 'info',
                 'UNSUPPORTED_NOTE',
-                'Skipped an <unpitched> note (percussion support is a later phase).',
+                'Skipped a <note> that is neither <pitch>, <unpitched>, nor <rest>.',
                 location,
               ),
             );
