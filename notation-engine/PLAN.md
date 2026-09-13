@@ -1660,7 +1660,7 @@ exact `Diagnostic.code` emitted.
 
 ---
 
-## 11. Module: `parser/midi/` — Standard MIDI File Parser `[TODO]`
+## 11. Module: `parser/midi/` — Standard MIDI File Parser `[BUILT -- see Doc/phase-39-midi-parser.md]`
 
 *This module does not exist in v1 of the plan at all — see §2.1.*
 
@@ -2328,14 +2328,14 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 37 | Cross-software compatibility corpus and fixes (§10.8) | ✅ (representative fixtures; no real program access) |
 | 38 | Diagnostics and partial-render hardening (§10.7) | ✅ (fixed 2 real crash bugs) |
 
-### Stage 7 — MIDI and timing ← entirely absent from v1 (§2.1)
+### Stage 7 — MIDI and timing ← entirely absent from v1 (§2.1) `[IN PROGRESS — 39 of 42]`
 
-| Phase | What |
-|---|---|
-| 39 | Standard MIDI File parser (§11) |
-| 40 | Timing engine: tempo map, tick↔seconds, measure/beat (§12) |
-| 41 | Drum mapping table + GM defaults (§13.3) |
-| 42 | MIDI↔MusicXML alignment (§13.1–§13.2) |
+| Phase | What | Status |
+|---|---|---|
+| 39 | Standard MIDI File parser (§11) | ✅ |
+| 40 | Timing engine: tempo map, tick↔seconds, measure/beat (§12) | |
+| 41 | Drum mapping table + GM defaults (§13.3) | |
+| 42 | MIDI↔MusicXML alignment (§13.1–§13.2) | |
 
 ### Stage 8 — Real layout
 

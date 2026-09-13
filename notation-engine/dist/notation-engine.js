@@ -23,6 +23,7 @@ var NotationEngine = (() => {
   __export(index_exports, {
     ALTO_CLEF: () => ALTO_CLEF,
     BASS_CLEF: () => BASS_CLEF,
+    ByteReader: () => ByteReader,
     DEFAULT_CONFIG: () => DEFAULT_CONFIG,
     DEFAULT_STEM_LENGTH: () => DEFAULT_STEM_LENGTH,
     ENGINE_VERSION: () => ENGINE_VERSION,
@@ -104,6 +105,7 @@ var NotationEngine = (() => {
     lyricSide: () => lyricSide,
     measure: () => measure,
     middleLineY: () => middleLineY,
+    midiDiagnostic: () => midiDiagnostic,
     multiMeasureRestGlyphName: () => multiMeasureRestGlyphName,
     musicXmlNoteheadToShape: () => musicXmlNoteheadToShape,
     naiveMeasureLayout: () => naiveMeasureLayout,
@@ -116,10 +118,12 @@ var NotationEngine = (() => {
     numBeamLines: () => numBeamLines,
     numeratorText: () => numeratorText,
     ornamentGlyphName: () => ornamentGlyphName,
+    parseMidiFile: () => parseMidiFile,
     parseMidiInstrumentMap: () => parseMidiInstrumentMap,
     parseMusicXml: () => parseMusicXml,
     part: () => part,
     pitchedPitch: () => pitchedPitch,
+    readVariableLengthQuantity: () => readVariableLengthQuantity,
     rehearsalMarkSide: () => rehearsalMarkSide,
     renderAccidental: () => renderAccidental,
     renderBarNumber: () => renderBarNumber,
@@ -60280,6 +60284,362 @@ ${denominator}`;
       return { xmlText: void 0, diagnostics };
     }
     return { xmlText: strFromU8(scoreBytes), diagnostics };
+  }
+
+  // src/parser/midi/diagnostic.ts
+  function midiDiagnostic(severity, code, message, location) {
+    return location === void 0 ? { severity, code, message } : { severity, code, message, location };
+  }
+
+  // src/parser/midi/byte-reader.ts
+  var ByteReader = class {
+    constructor(bytes, position = 0) {
+      this.bytes = bytes;
+      this.position = position;
+    }
+    get length() {
+      return this.bytes.length;
+    }
+    get remaining() {
+      return this.bytes.length - this.position;
+    }
+    atEnd() {
+      return this.position >= this.bytes.length;
+    }
+    /** Reads `count` bytes without advancing -- for magic-byte checks that shouldn't consume the stream before validating it. */
+    peekBytes(count) {
+      if (this.remaining < count) return void 0;
+      return this.bytes.subarray(this.position, this.position + count);
+    }
+    readUint8() {
+      if (this.remaining < 1) return void 0;
+      const value = this.bytes[this.position];
+      this.position += 1;
+      return value;
+    }
+    readUint16BE() {
+      if (this.remaining < 2) return void 0;
+      const hi = this.bytes[this.position];
+      const lo = this.bytes[this.position + 1];
+      this.position += 2;
+      return (hi ?? 0) << 8 | (lo ?? 0);
+    }
+    readUint32BE() {
+      if (this.remaining < 4) return void 0;
+      const b0 = this.bytes[this.position];
+      const b1 = this.bytes[this.position + 1];
+      const b22 = this.bytes[this.position + 2];
+      const b3 = this.bytes[this.position + 3];
+      this.position += 4;
+      return ((b0 ?? 0) << 24 | (b1 ?? 0) << 16 | (b22 ?? 0) << 8 | (b3 ?? 0)) >>> 0;
+    }
+    /** Reads `count` raw bytes and advances past them -- e.g. a chunk's magic bytes, or a meta event's declared-length payload. */
+    readBytes(count) {
+      if (this.remaining < count) return void 0;
+      const slice = this.bytes.subarray(this.position, this.position + count);
+      this.position += count;
+      return slice;
+    }
+    /** Reads `count` bytes as a plain ASCII string -- for chunk magic ("MThd"/"MTrk"). */
+    readAscii(count) {
+      const slice = this.readBytes(count);
+      if (slice === void 0) return void 0;
+      let s = "";
+      for (const b of slice) s += String.fromCharCode(b);
+      return s;
+    }
+    /** Advances past `count` bytes without returning them -- for skipping an unknown meta event by its declared length (§11.2's error-conditions rule: length must be respected, never assumed). */
+    skip(count) {
+      if (this.remaining < count) return false;
+      this.position += count;
+      return true;
+    }
+  };
+
+  // src/parser/midi/vlq.ts
+  function readVariableLengthQuantity(reader) {
+    let value = 0;
+    for (let i2 = 0; i2 < 4; i2++) {
+      const byte = reader.readUint8();
+      if (byte === void 0) return void 0;
+      value = value << 7 | byte & 127;
+      if ((byte & 128) === 0) return value >>> 0;
+    }
+    return void 0;
+  }
+
+  // src/parser/midi/parse.ts
+  var TICKS_PER_QUARTER2 = 480;
+  function parseMidiFile(bytes) {
+    const diagnostics = [];
+    const reader = new ByteReader(bytes);
+    const headerMagic = reader.readAscii(4);
+    if (headerMagic !== "MThd") {
+      diagnostics.push(
+        midiDiagnostic(
+          "error",
+          "BAD_HEADER_MAGIC",
+          `Expected "MThd" header chunk, got "${headerMagic ?? "nothing"}".`
+        )
+      );
+      return { midiFile: void 0, diagnostics };
+    }
+    const headerLength = reader.readUint32BE();
+    const format = reader.readUint16BE();
+    const trackCount = reader.readUint16BE();
+    const division = reader.readUint16BE();
+    if (headerLength === void 0 || format === void 0 || trackCount === void 0 || division === void 0) {
+      diagnostics.push(
+        midiDiagnostic("error", "TRUNCATED_HEADER", "MThd header chunk is truncated.")
+      );
+      return { midiFile: void 0, diagnostics };
+    }
+    if ((division & 32768) !== 0) {
+      diagnostics.push(
+        midiDiagnostic(
+          "error",
+          "SMPTE_DIVISION_UNSUPPORTED",
+          "SMPTE-frame-based timing division is not supported."
+        )
+      );
+      return { midiFile: void 0, diagnostics };
+    }
+    const ppq = division;
+    if (format === 2) {
+      diagnostics.push(
+        midiDiagnostic(
+          "error",
+          "FORMAT_2_UNSUPPORTED",
+          "Format 2 (independent multi-song) files are not supported."
+        )
+      );
+      return { midiFile: void 0, diagnostics };
+    }
+    if (format !== 0 && format !== 1) {
+      diagnostics.push(
+        midiDiagnostic("error", "UNKNOWN_FORMAT", `Unrecognized MIDI file format ${format}.`)
+      );
+      return { midiFile: void 0, diagnostics };
+    }
+    const headerBytesReadSoFar = 6;
+    if (headerLength > headerBytesReadSoFar) {
+      reader.skip(headerLength - headerBytesReadSoFar);
+    }
+    const tracks = [];
+    const allTempoEvents = [];
+    const allTimeSignatureEvents = [];
+    const allKeySignatureEvents = [];
+    for (let trackIndex = 0; trackIndex < trackCount; trackIndex++) {
+      const trackMagic = reader.readAscii(4);
+      const trackLength = reader.readUint32BE();
+      if (trackMagic !== "MTrk" || trackLength === void 0) {
+        diagnostics.push(
+          midiDiagnostic(
+            "error",
+            "BAD_TRACK_MAGIC",
+            `Expected "MTrk" for track ${trackIndex}, got "${trackMagic ?? "nothing"}".`,
+            { trackIndex }
+          )
+        );
+        break;
+      }
+      const trackEnd = reader.position + trackLength;
+      const { notes, meta } = parseTrackEvents(reader, trackEnd, trackIndex, diagnostics);
+      tracks.push({ notes: notes.map((n) => normalizeNote(n, ppq)) });
+      allTempoEvents.push(...meta.tempoEvents.map((e) => normalizeTempoEvent(e, ppq)));
+      allTimeSignatureEvents.push(
+        ...meta.timeSignatureEvents.map((e) => normalizeTimeSignatureEvent(e, ppq))
+      );
+      allKeySignatureEvents.push(
+        ...meta.keySignatureEvents.map((e) => normalizeKeySignatureEvent(e, ppq))
+      );
+    }
+    const midiFile = {
+      format,
+      ppq,
+      tracks,
+      tempoEvents: allTempoEvents,
+      timeSignatureEvents: allTimeSignatureEvents,
+      keySignatureEvents: allKeySignatureEvents
+    };
+    return { midiFile, diagnostics };
+  }
+  function normalizeTick(rawTick, ppq) {
+    return rawTick * TICKS_PER_QUARTER2 / ppq;
+  }
+  function normalizeNote(note2, ppq) {
+    return {
+      tick: normalizeTick(note2.rawTick, ppq),
+      durationTicks: normalizeTick(note2.rawDurationTicks, ppq),
+      channel: note2.channel,
+      noteNumber: note2.noteNumber,
+      velocity: note2.velocity
+    };
+  }
+  function normalizeTempoEvent(event, ppq) {
+    return {
+      tick: normalizeTick(event.tick, ppq),
+      microsecondsPerQuarter: event.microsecondsPerQuarter
+    };
+  }
+  function normalizeTimeSignatureEvent(event, ppq) {
+    return {
+      tick: normalizeTick(event.tick, ppq),
+      numerator: event.numerator,
+      denominator: event.denominator
+    };
+  }
+  function normalizeKeySignatureEvent(event, ppq) {
+    return {
+      tick: normalizeTick(event.tick, ppq),
+      sharpsFlats: event.sharpsFlats,
+      isMinor: event.isMinor
+    };
+  }
+  function parseTrackEvents(reader, trackEnd, trackIndex, diagnostics) {
+    const notes = [];
+    const meta = { tempoEvents: [], timeSignatureEvents: [], keySignatureEvents: [] };
+    const active = /* @__PURE__ */ new Map();
+    let rawTick = 0;
+    let runningStatus;
+    while (reader.position < trackEnd && !reader.atEnd()) {
+      const delta = readVariableLengthQuantity(reader);
+      if (delta === void 0) {
+        diagnostics.push(
+          midiDiagnostic(
+            "warning",
+            "TRUNCATED_TRACK",
+            `Track ${trackIndex} ends mid-event (bad delta-time); keeping events parsed so far.`,
+            { trackIndex }
+          )
+        );
+        break;
+      }
+      rawTick += delta;
+      const peeked = reader.peekBytes(1);
+      if (peeked === void 0) break;
+      let statusByte = peeked[0];
+      if (statusByte !== void 0 && (statusByte & 128) !== 0) {
+        reader.readUint8();
+        runningStatus = statusByte;
+      } else {
+        statusByte = runningStatus;
+      }
+      if (statusByte === void 0) {
+        diagnostics.push(
+          midiDiagnostic(
+            "warning",
+            "TRUNCATED_TRACK",
+            `Track ${trackIndex}: a data byte appeared before any status byte.`,
+            { trackIndex }
+          )
+        );
+        break;
+      }
+      if (statusByte === 255) {
+        const ok = parseMetaEvent(reader, rawTick, trackIndex, meta, diagnostics);
+        if (!ok) break;
+        continue;
+      }
+      if (statusByte === 240 || statusByte === 247) {
+        const sysexLength = readVariableLengthQuantity(reader);
+        if (sysexLength === void 0 || !reader.skip(sysexLength)) {
+          diagnostics.push(
+            midiDiagnostic(
+              "warning",
+              "TRUNCATED_TRACK",
+              `Track ${trackIndex}: truncated SysEx event.`,
+              {
+                trackIndex
+              }
+            )
+          );
+          break;
+        }
+        continue;
+      }
+      const highNibble = statusByte & 240;
+      const channel = statusByte & 15;
+      const dataByteCount = highNibble === 192 || highNibble === 208 ? 1 : 2;
+      const data0 = reader.readUint8();
+      const data1 = dataByteCount === 2 ? reader.readUint8() : 0;
+      if (data0 === void 0 || data1 === void 0) {
+        diagnostics.push(
+          midiDiagnostic(
+            "warning",
+            "TRUNCATED_TRACK",
+            `Track ${trackIndex}: truncated channel-voice event.`,
+            {
+              trackIndex
+            }
+          )
+        );
+        break;
+      }
+      if (highNibble === 144 || highNibble === 128) {
+        const isRealNoteOn = highNibble === 144 && data1 > 0;
+        const key = `${channel}:${data0}`;
+        if (isRealNoteOn) {
+          active.set(key, { rawTick, channel, noteNumber: data0, velocity: data1 });
+        } else {
+          const start = active.get(key);
+          if (start !== void 0) {
+            notes.push({
+              rawTick: start.rawTick,
+              rawDurationTicks: rawTick - start.rawTick,
+              channel: start.channel,
+              noteNumber: start.noteNumber,
+              velocity: start.velocity
+            });
+            active.delete(key);
+          }
+        }
+      }
+    }
+    return { notes, meta };
+  }
+  function parseMetaEvent(reader, rawTick, trackIndex, meta, diagnostics) {
+    const metaType = reader.readUint8();
+    const length = readVariableLengthQuantity(reader);
+    if (metaType === void 0 || length === void 0) {
+      diagnostics.push(
+        midiDiagnostic(
+          "warning",
+          "TRUNCATED_TRACK",
+          `Track ${trackIndex}: truncated meta event header.`,
+          {
+            trackIndex
+          }
+        )
+      );
+      return false;
+    }
+    const payload = reader.readBytes(length);
+    if (payload === void 0) {
+      diagnostics.push(
+        midiDiagnostic(
+          "warning",
+          "TRUNCATED_TRACK",
+          `Track ${trackIndex}: meta event declares length ${length} but the track ends first.`,
+          { trackIndex }
+        )
+      );
+      return false;
+    }
+    if (metaType === 81 && length === 3) {
+      const microsecondsPerQuarter = (payload[0] ?? 0) << 16 | (payload[1] ?? 0) << 8 | (payload[2] ?? 0);
+      meta.tempoEvents.push({ tick: rawTick, microsecondsPerQuarter });
+    } else if (metaType === 88 && length === 4) {
+      const numerator = payload[0] ?? 4;
+      const dd = payload[1] ?? 2;
+      meta.timeSignatureEvents.push({ tick: rawTick, numerator, denominator: 2 ** dd });
+    } else if (metaType === 89 && length === 2) {
+      const rawSf = payload[0] ?? 0;
+      const sharpsFlats = rawSf > 127 ? rawSf - 256 : rawSf;
+      const isMinor = (payload[1] ?? 0) === 1;
+      meta.keySignatureEvents.push({ tick: rawTick, sharpsFlats, isMinor });
+    }
+    return true;
   }
 
   // src/layout/naive.ts
