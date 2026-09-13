@@ -58,7 +58,9 @@ var NotationEngine = (() => {
     computeBarlineGeometry: () => computeBarlineGeometry,
     computeBeamShape: () => computeBeamShape,
     computeBraceShape: () => computeBraceShape,
+    computeExtenderLine: () => computeExtenderLine,
     computeHairpinShape: () => computeHairpinShape,
+    computeHyphenX: () => computeHyphenX,
     computeLedgerLines: () => computeLedgerLines,
     computeSlurShape: () => computeSlurShape,
     computeStaffGeometry: () => computeStaffGeometry,
@@ -92,6 +94,9 @@ var NotationEngine = (() => {
     isPitched: () => isPitched,
     isUnpitched: () => isUnpitched,
     keySignatureAccidentals: () => keySignatureAccidentals,
+    lyricElisionGlyphName: () => lyricElisionGlyphName,
+    lyricHyphenGlyphName: () => lyricHyphenGlyphName,
+    lyricSide: () => lyricSide,
     measure: () => measure,
     middleLineY: () => middleLineY,
     multiMeasureRestGlyphName: () => multiMeasureRestGlyphName,
@@ -117,6 +122,7 @@ var NotationEngine = (() => {
     renderBrace: () => renderBrace,
     renderCancellationNaturals: () => renderCancellationNaturals,
     renderClef: () => renderClef,
+    renderExtenderLine: () => renderExtenderLine,
     renderFlag: () => renderFlag,
     renderFromMusicXml: () => renderFromMusicXml,
     renderHairpin: () => renderHairpin,
@@ -58603,6 +58609,23 @@ var NotationEngine = (() => {
     return "above";
   }
 
+  // src/geometry/lyric.ts
+  function lyricSide() {
+    return "below";
+  }
+  function lyricHyphenGlyphName() {
+    return "lyricsHyphenBaseline";
+  }
+  function lyricElisionGlyphName() {
+    return "lyricsElision";
+  }
+  function computeHyphenX(syllableAEndX, syllableBStartX) {
+    return (syllableAEndX + syllableBStartX) / 2;
+  }
+  function computeExtenderLine(startX, endX, y) {
+    return { startX, endX, y };
+  }
+
   // src/geometry/beam-shape.ts
   var MAX_BEAM_SLOPE = 1;
   function naturalStemTipY(position, direction, stemLength) {
@@ -59047,6 +59070,14 @@ ${denominator}`;
       svgLine(narrowX, shape.y, wideX, shape.y - shape.spread, attrs),
       svgLine(narrowX, shape.y, wideX, shape.y + shape.spread, attrs)
     ].join("\n");
+  }
+
+  // src/render/lyric.ts
+  function renderExtenderLine(shape, options) {
+    return svgLine(shape.startX, shape.y, shape.endX, shape.y, {
+      stroke: options.color,
+      "stroke-width": options.thickness
+    });
   }
 
   // src/config/config.ts

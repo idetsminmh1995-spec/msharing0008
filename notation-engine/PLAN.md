@@ -1360,6 +1360,65 @@ marks needed.
 
 ---
 
+### 9.22 Lyrics `[PARTIAL -- placement/hyphen/elision/extender-line built, syllable text deferred, see Doc/phase-32-lyrics.md]`
+
+**Responsibility.** Syllables of sung text aligned under the notes they
+belong to, plus the punctuation that connects them (hyphens for a word
+split across notes, extender lines for a melisma). `<lyric>` is v2
+parser scope (§10.4); this section is the geometry.
+
+**Placement**: below the staff, universally, confirmed by Noteflight's
+own published lyric-writing conventions with no exception noted for the
+common case (the vocal-dynamics-above exception `§9.21` already stated
+is a *different* mark moving to accommodate lyrics, not lyrics
+themselves moving).
+
+**The punctuation has real SMuFL glyphs, checked before assuming
+otherwise**: `lyricsHyphenBaseline` (the centered dash between syllables
+of the same word) and `lyricsElision` (joining two syllables under one
+note) both exist as real, drawable glyphs — **not** something this
+section needs to draw as raw geometry the way Phase 31's hairpins turned
+out to need. The **extender line** (a melisma continuing past a word's
+last syllable) genuinely is drawn geometry, using Bravura's real
+`lyricLineThickness` (0.16sp) — confirmed by checking, the same
+reasoning already applied to hairpins, ties, and slurs.
+
+**The syllable text itself is the one real, larger gap, stated plainly
+rather than faked**: checked `glyphnames.json` and confirmed Bravura
+contains **no general Latin-alphabet letter glyphs at all** — it is
+purely a music-symbol font. Rendering actual lyric words ("Hal-le-lu-
+jah") needs a genuine text font plus real character-advance-width
+metrics for that font, neither of which this engine has. `config.fonts`
+already reserved `textFont`/`lyricFont` fields (Phase 7) precisely
+because this need was anticipated from the very start of the plan — this
+phase doesn't invent the gap, it's the first phase to actually need to
+cross it, and doesn't fake crossing it with a placeholder.
+
+**Interfaces.**
+```ts
+lyricSide(): 'below'
+computeHyphenX(syllableAEndX, syllableBStartX): number   // centered between them
+computeExtenderLine(startX, endX, y): ExtenderLineShape
+renderExtenderLine(shape, options): string
+```
+
+**Tests.** `lyricSide` is always `'below'`; a hyphen's computed X sits
+exactly midway between two given syllable endpoints; an extender line's
+endpoints pass through unchanged; the hyphen and elision glyph names both
+resolve to real glyphs via the existing `renderMark` (no new rendering
+function needed for those two, matching how Phase 31's dynamics reused
+Phase 30's `renderMark` rather than duplicating it).
+
+**Known limitation.** No actual syllable text rendering (the words
+themselves) — needs a general text font and character-metrics system
+this engine doesn't have, the same class of gap `§9.21` already
+identified for tempo/rehearsal marks. No multi-verse stacking (a
+well-known real feature — MuseScore/LilyPond both support several lyric
+rows per staff) — out of scope until syllable text itself exists to
+stack.
+
+---
+
 ## 10. Module: `parser/musicxml/` — MusicXML Parser `[IN PROGRESS — v1 built (Phase 20); .mxl/score-timewise/v2 elements are Phase 35-36]`
 
 **Responsibility.** Turn any valid MusicXML document into a `Score` (§6),
@@ -2139,13 +2198,13 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 28 | Tuplets | ✅ (geometry); wiring pending v2 parser |
 | 29 | Grand staff / multi-part systems | ✅ (geometry/layout); render-loop wiring pending |
 
-### Stage 5 — Expression `[IN PROGRESS — 30-31 of 34]`
+### Stage 5 — Expression `[IN PROGRESS — 30-32 of 34]`
 
 | Phase | What | Status |
 |---|---|---|
 | 30 | Articulations and ornaments | ✅ (geometry); wiring pending v2 parser |
 | 31 | Dynamics, hairpins, tempo marks, rehearsal marks | ✅ (dynamics/hairpins); tempo/rehearsal placement-only |
-| 32 | Lyrics | |
+| 32 | Lyrics | ✅ (punctuation/placement); syllable text deferred |
 | 33 | Chord symbols | |
 | 34 | Grace notes | |
 
