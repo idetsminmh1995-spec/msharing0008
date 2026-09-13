@@ -60,6 +60,7 @@ var NotationEngine = (() => {
     computeStaffGeometry: () => computeStaffGeometry,
     computeStemLength: () => computeStemLength,
     computeTieShape: () => computeTieShape,
+    computeTupletBracketShape: () => computeTupletBracketShape,
     createAccidentalState: () => createAccidentalState,
     createSvgDocument: () => createSvgDocument,
     defaultRestY: () => defaultRestY,
@@ -115,6 +116,8 @@ var NotationEngine = (() => {
     renderStem: () => renderStem,
     renderTie: () => renderTie,
     renderTimeSignature: () => renderTimeSignature,
+    renderTupletBracket: () => renderTupletBracket,
+    renderTupletNumber: () => renderTupletNumber,
     resetMeasure: () => resetMeasure,
     resolveConfig: () => resolveConfig,
     resolveNoteheadCollision: () => resolveNoteheadCollision,
@@ -142,6 +145,9 @@ var NotationEngine = (() => {
     ticksWithDots: () => ticksWithDots,
     tieSide: () => tieSide,
     timeSignature: () => timeSignature,
+    tupletBracketNeeded: () => tupletBracketNeeded,
+    tupletDigitGlyphName: () => tupletDigitGlyphName,
+    tupletSide: () => tupletSide,
     unpitchedPitch: () => unpitchedPitch,
     voice: () => voice,
     voiceForcedDirection: () => voiceForcedDirection,
@@ -58491,6 +58497,24 @@ var NotationEngine = (() => {
     return { startX, endX, y, side, bulgeHeight: SLUR_BULGE_HEIGHT };
   }
 
+  // src/geometry/tuplet.ts
+  function tupletBracketNeeded(allMembersBeamed) {
+    return !allMembersBeamed;
+  }
+  function tupletSide(stemDirection) {
+    return stemDirection === "up" ? "above" : "below";
+  }
+  function tupletDigitGlyphName(digit) {
+    if (!Number.isInteger(digit) || digit < 0 || digit > 9) {
+      throw new Error(`tupletDigitGlyphName only supports a single digit 0-9, got ${digit}.`);
+    }
+    return `tuplet${digit}`;
+  }
+  var HOOK_LENGTH = 0.5;
+  function computeTupletBracketShape(startX, endX, y, side) {
+    return { startX, endX, y, side, hookLength: HOOK_LENGTH };
+  }
+
   // src/geometry/beam-shape.ts
   var MAX_BEAM_SLOPE = 1;
   function naturalStemTipY(position, direction, stemLength) {
@@ -58881,6 +58905,25 @@ ${denominator}`;
     const outerY = shape.y + towardBulge * (shape.bulgeHeight + options.midpointThickness / 2);
     const d = `M ${shape.startX} ${shape.y} Q ${midX} ${innerY} ${shape.endX} ${shape.y} Q ${midX} ${outerY} ${shape.startX} ${shape.y} Z`;
     return svgPath(d, { fill: options.color, stroke: "none" });
+  }
+
+  // src/render/tuplet.ts
+  function renderTupletBracket(shape, options) {
+    const towardNotes = shape.side === "above" ? 1 : -1;
+    const hookEndY = shape.y + towardNotes * shape.hookLength;
+    const attrs = { stroke: options.color, "stroke-width": options.thickness };
+    return [
+      svgLine(shape.startX, shape.y, shape.endX, shape.y, attrs),
+      svgLine(shape.startX, shape.y, shape.startX, hookEndY, attrs),
+      svgLine(shape.endX, shape.y, shape.endX, hookEndY, attrs)
+    ].join("\n");
+  }
+  function renderTupletNumber(glyphName, x, y, options) {
+    const glyph = getGlyph(glyphName);
+    if (glyph === void 0) {
+      throw new Error(`No glyph found for tuplet number "${glyphName}"`);
+    }
+    return svgGlyphText(x, y, glyph.char, options.fontFamily, { fill: options.color });
   }
 
   // src/config/config.ts

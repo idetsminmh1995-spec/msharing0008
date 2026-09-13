@@ -11,10 +11,10 @@ commit that added this file.
 
 ---
 
-## A. DONE — Phases 1–27 ✅ (Stage 2 & Stage 3 complete; Stage 4 in progress)
+## A. DONE — Phases 1–28 ✅ (Stage 2 & Stage 3 complete; Stage 4 in progress)
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 247/247 across them.
+`npm run verify` passes 259/259 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -45,12 +45,13 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 25 | Multi-voice per staff | Forced stem direction + rest separation, wired end to end (fixes the reported hand/foot bug); notehead-offset geometry built but not yet wired | [`phase-25`](./phase-25-multi-voice.md) |
 | 26 | Ties | Tapered lens shape (Bezier), side-opposite-stem rule, wired end to end (same-voice/same-measure/non-beamed/non-chord) | [`phase-26`](./phase-26-ties.md) |
 | 27 | Slurs | Whole-span side rule (`slurSide`), same Bezier primitive as ties; geometry built, not wired (parsing is v2 scope) | [`phase-27`](./phase-27-slurs.md) |
+| 28 | Tuplets | `tupletBracketNeeded`, stem-side placement (opposite ties/slurs); geometry built, not wired (parsing is v2 scope) | [`phase-28`](./phase-28-tuplets.md) |
 
 **Public API today:** 70 exports from `dist/notation-engine.js`.
 
 ---
 
-## B. NOT DONE — Phases 28–54
+## B. NOT DONE — Phases 29–54
 
 Nothing below exists in `src/` yet. Each line links to the `PLAN.md` section
 that specifies it.
@@ -62,7 +63,7 @@ that specifies it.
 | **25** | Multi-voice per staff + voice collision / rest separation | §9.14 |
 | **26** | Ties | §9.15 |
 | **27** | Slurs | §9.16 |
-| **28** | Tuplets | §9 |
+| **28** | Tuplets | §9.17 |
 | **29** | Grand staff / multi-part systems | §16 |
 
 ### Stage 5 — Expression

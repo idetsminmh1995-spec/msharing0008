@@ -1069,6 +1069,70 @@ notehead-collision offsetting.
 
 ---
 
+### 9.17 Tuplets `[BUILT for geometry/rendering -- not wired, see Doc/phase-28-tuplets.md]`
+
+**Responsibility.** The bracket + number marking an irregular grouping
+(a triplet, quintuplet, etc.) — the tick MATH already exists (Phase 4's
+`applyTuplet`, `Duration.tuplet`); this section is purely the visual
+marking.
+
+**Whether to draw a bracket at all is confirmed by MuseScore's own
+documented default** ("Automatic ... hides the bracket for beamed notes
+and shows the bracket if the tuplet includes unbeamed notes or rests"):
+if every note in the tuplet group is already joined by one beam (§9.13),
+the beam itself visually shows the grouping and a separate bracket line
+is redundant — draw the number only. If the group contains any unbeamed
+note or a rest, draw the bracket (the group has no beam to show its own
+extent, so the bracket is the only thing that does).
+
+**Side is confirmed by Dorico's own published conventions, and is
+notably NOT the same rule as ties/slurs**: "tuplet brackets and tuplet
+numbers/ratios are generally placed on the **stem side** of notes" — same
+side as the stem direction (up-stem group → bracket above; down-stem
+group → below), the opposite relationship from a tie or slur (which sit
+opposite the stem). A vocal-staff-specific override (always above, to
+clear the lyrics) is real convention but out of scope here — this engine
+has no lyric-collision awareness yet.
+
+**The number uses real, dedicated SMuFL digit glyphs, NOT time-signature
+digits** — confirmed by checking `glyphnames.json` before assuming
+otherwise: `tuplet0`–`tuplet9` are their own separate glyph set from
+`timeSigN`, plus a `tupletColon` for ratio notation. Real bracket
+thickness comes from Bravura's own `tupletBracketThickness` = 0.16sp.
+
+**Number format**: shows only the actual-notes count (e.g. `3` for a
+triplet) — the overwhelmingly common case, since nearly every real tuplet
+uses its "obvious" ratio (3 in the time of 2, 5 in the time of 4, etc.).
+Full ratio display (`3:2`) for a genuinely non-standard ratio is real
+notation practice but out of scope here, stated rather than silently
+assumed unnecessary.
+
+**Interfaces.**
+```ts
+tupletBracketNeeded(allMembersBeamed): boolean
+tupletSide(stemDirection): 'above' | 'below'
+tupletDigitGlyphName(digit): string        // single digit 0-9 only, see limitation
+computeTupletBracketShape(startX, endX, y, side): TupletBracketShape
+renderTupletBracket(shape, options): string
+renderTupletNumber(digit, x, y, options): string
+```
+
+**Tests.** A fully-beamed group needs no bracket; a group with one
+unbeamed note or a rest needs one; an up-stem group's bracket/number goes
+above, a down-stem group's goes below (confirming this is the OPPOSITE
+relationship from `§9.15`/`§9.16`'s tie/slur rule, not accidentally the
+same); every digit 0–9 resolves to its own real glyph, distinct from the
+corresponding `timeSigN` glyph.
+
+**Known limitation.** Only single-digit `actualNotes` counts (0–9) are
+supported — a 10-or-more-note tuplet (rare in practice) would need
+multi-digit layout the same way Phase 12's time-signature numerals
+handle multi-digit numerators, not implemented here. Full ratio
+(`actual:normal`) display for non-standard ratios is not implemented,
+per the number-format note above.
+
+---
+
 ## 10. Module: `parser/musicxml/` — MusicXML Parser `[IN PROGRESS — v1 built (Phase 20); .mxl/score-timewise/v2 elements are Phase 35-36]`
 
 **Responsibility.** Turn any valid MusicXML document into a `Score` (§6),
@@ -1836,7 +1900,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 21 | Naive single-system layout + `renderFromMusicXML()` end to end | ✅ |
 | 22 | **Milestone: a real simple `.musicxml` file renders correctly.** Everything after this point is validated against real files from day one | ✅ |
 
-### Stage 4 — Rhythm and structure `[IN PROGRESS — 23-27 of 29]`
+### Stage 4 — Rhythm and structure `[IN PROGRESS — 23-28 of 29]`
 
 | Phase | What | Status |
 |---|---|---|
@@ -1845,7 +1909,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 25 | Multi-voice per staff + voice collision and rest separation | ✅ (core); notehead-offset wiring pending |
 | 26 | Ties | ✅ (common case); cross-barline/beam/chord ties pending |
 | 27 | Slurs | ✅ (geometry); wiring pending v2 parser |
-| 28 | Tuplets | |
+| 28 | Tuplets | ✅ (geometry); wiring pending v2 parser |
 | 29 | Grand staff / multi-part systems | |
 
 ### Stage 5 — Expression
