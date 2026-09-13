@@ -1578,7 +1578,7 @@ violate §1's independence requirement.
 `<note>` (`<pitch>`, `<rest>`, `<duration>`, `<type>`, `<dot>`, `<voice>`,
 `<staff>`, `<chord>`, `<tie>`), `<backup>`, `<forward>`, `<barline>`.
 
-### 10.4 Elements parsed — v2 (full)
+### 10.4 Elements parsed — v2 (full) `[PARTIAL -- Tier 1 built by Phase 35 (midi-instrument, notehead, grace, time-modification, stem, accidental); Tier 2/3 remain -- notations sub-elements, direction sub-elements, lyric, harmony, print, sound tempo, beam. See Doc/phase-35-musicxml-parser-v2.md]`
 
 `<unpitched>`, `<instrument>`, `<notehead>`, `<time-modification>`
 (tuplets), `<notations>` (`<tied>`, `<slur>`, `<tuplet>`, `<articulations>`,
@@ -2319,14 +2319,14 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 33 | Chord symbols | ✅ (accidentals/qualities/placement); root letter deferred |
 | 34 | Grace notes | ✅ |
 
-### Stage 6 — Full import
+### Stage 6 — Full import `[IN PROGRESS — 35 of 38]`
 
-| Phase | What |
-|---|---|
-| 35 | MusicXML parser v2 (§10.4) — every element the renderer now supports |
-| 36 | `.mxl` support + `<score-timewise>` conversion |
-| 37 | Cross-software compatibility corpus and fixes (§10.8) |
-| 38 | Diagnostics and partial-render hardening (§10.7) |
+| Phase | What | Status |
+|---|---|---|
+| 35 | MusicXML parser v2 (§10.4) — every element the renderer now supports | ✅ (Tier 1); Tier 2/3 remain |
+| 36 | `.mxl` support + `<score-timewise>` conversion | |
+| 37 | Cross-software compatibility corpus and fixes (§10.8) | |
+| 38 | Diagnostics and partial-render hardening (§10.7) | |
 
 ### Stage 7 — MIDI and timing ← entirely absent from v1 (§2.1)
 

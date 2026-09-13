@@ -553,4 +553,13 @@ describe('visual regression (Phase 8)', () => {
     const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
     matchSnapshot('render-from-musicxml-tied-note', svg, SNAPSHOT_DIR);
   });
+
+  test('Phase 35: a real v2-elements fixture (explicit notehead, grace notes, triplet, explicit stem, courtesy accidental) renders identically to the saved snapshot', () => {
+    const xml = fs.readFileSync(
+      path.join(__dirname, '..', 'fixtures', 'musicxml', 'v2-elements.musicxml'),
+      'utf8',
+    );
+    const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
+    matchSnapshot('render-from-musicxml-v2-elements', svg, SNAPSHOT_DIR);
+  });
 });

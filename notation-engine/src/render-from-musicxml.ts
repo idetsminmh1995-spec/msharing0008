@@ -18,6 +18,7 @@ import {
   chordStemDirection,
   computeBarlineGeometry,
   computeBeamShape,
+  graceNoteGlyphName,
   computeLedgerLines,
   computeStemLength,
   createAccidentalState,
@@ -56,6 +57,7 @@ import {
   renderFlag,
   renderKeySignature,
   renderLedgerLines,
+  renderMark,
   renderNotehead,
   renderRest,
   renderStaff,
@@ -172,6 +174,7 @@ function renderNoteheadPart(
       note.pitch.step,
       note.pitch.octave,
       note.pitch.alter,
+      note.hasExplicitAccidental ?? false,
     );
     state = decision.newState;
     if (decision.shouldDraw) {
@@ -191,6 +194,7 @@ function renderNoteheadPart(
   const noteheadGlyph = selectNoteheadGlyphName({
     pitch: note.pitch,
     durationType: note.duration.type,
+    ...(note.explicitNotehead !== undefined ? { explicitNotehead: note.explicitNotehead } : {}),
   });
   parts.push(renderNotehead(noteheadGlyph, { x, y, color: INK_COLOR, fontFamily: FONT_FAMILY }));
 
@@ -235,6 +239,62 @@ function renderNoteOrRest(
     return { svg, newAccidentalState: accidentalState };
   }
 
+  if (ev.isGrace) {
+    // A grace note draws as ONE precomposed glyph (Phase 34) -- notehead,
+    // stem, and flag are baked into the font's own design, not assembled
+    // from this engine's separate notehead/stem/flag pieces the way an
+    // ordinary note is. Its accidental (if any) still goes through the
+    // normal state machine, since a grace note's own pitch can still need
+    // one drawn.
+    const isUnpitchedGrace = ev.pitch.kind === 'unpitched';
+    const graceStep = isUnpitchedGrace ? ev.pitch.displayStep : ev.pitch.step;
+    const graceOctave = isUnpitchedGrace ? ev.pitch.displayOctave : ev.pitch.octave;
+    const gracePosition = staffPositionForPitch(ctx.clefDef, graceStep, graceOctave);
+    const graceY = ctx.measureBottomY + gracePosition;
+    const parts: string[] = [];
+    let state = accidentalState;
+    if (ev.pitch.kind === 'pitched') {
+      const decision = evaluateAccidental(
+        accidentalState,
+        ev.pitch.step,
+        ev.pitch.octave,
+        ev.pitch.alter,
+        ev.hasExplicitAccidental ?? false,
+      );
+      state = decision.newState;
+      if (decision.shouldDraw) {
+        const glyphName = accidentalGlyphName(ev.pitch.alter);
+        const width = glyphWidthOf(glyphName);
+        parts.push(
+          renderAccidental(glyphName, {
+            x: accidentalX(x, width, 0),
+            y: graceY,
+            color: INK_COLOR,
+            fontFamily: FONT_FAMILY,
+          }),
+        );
+      }
+    }
+    const graceDirection = resolveStemDirection({
+      positions: [gracePosition],
+      numLines: STAFF_LINES,
+      ...(forcedDirection !== undefined ? { forcedDirection } : {}),
+      ...(ev.explicitStemDirection !== undefined
+        ? { explicitDirection: ev.explicitStemDirection }
+        : {}),
+    });
+    const kind = ev.graceSlash ? 'acciaccatura' : 'appoggiatura';
+    parts.push(
+      renderMark(graceNoteGlyphName(kind, graceDirection), {
+        x,
+        y: graceY,
+        color: INK_COLOR,
+        fontFamily: FONT_FAMILY,
+      }),
+    );
+    return { svg: parts.join('\n'), newAccidentalState: state };
+  }
+
   const parts: string[] = [];
   const head = renderNoteheadPart(ev, x, ctx, accidentalState);
   parts.push(head.svg);
@@ -250,6 +310,9 @@ function renderNoteOrRest(
     positions: [head.position],
     numLines: STAFF_LINES,
     ...(forcedDirection !== undefined ? { forcedDirection } : {}),
+    ...(ev.explicitStemDirection !== undefined
+      ? { explicitDirection: ev.explicitStemDirection }
+      : {}),
   });
 
   if (ev.duration.type !== 'whole') {
@@ -642,13 +705,20 @@ export function renderFromMusicXml(
           return noteAreaX + (startTick / total) * noteAreaWidth;
         });
 
-        // Phase 23 grouping: treat a rest OR a chord as breaking a beamable
-        // run (chords sharing a beam aren't supported by renderBeamGroup
-        // yet, which only draws individual noteheads -- documented scope
-        // limit, not silently wrong).
+        // Phase 23 grouping: treat a rest, a chord, OR a grace note as
+        // breaking a beamable run. Chords aren't supported by
+        // renderBeamGroup yet (documented scope limit). Grace notes draw
+        // as one precomposed Phase 34 glyph with the flag/stem already
+        // baked in -- they must never be swept into an ordinary beam
+        // group alongside real notes, which is exactly what happened
+        // before this check existed: a real MusicXML fixture with two
+        // grace notes immediately preceding a beamed triplet produced a
+        // single 5-note beam group (2 grace + 3 real), silently drawing
+        // the grace notes as if they were ordinary noteheads and never
+        // reaching the grace-note rendering branch below at all.
         const beamableEvents = voice.events.map((event) => ({
           durationType: event.duration.type,
-          isRest: event.kind !== 'note',
+          isRest: event.kind !== 'note' || event.isGrace === true,
         }));
         const groups = groupBeams(
           beamableEvents,
@@ -667,7 +737,14 @@ export function renderFromMusicXml(
           if (accidentalState === undefined) return;
           const eventX = eventXs[idx] ?? 0;
 
-          if (beamedIndices.has(idx)) {
+          // Defense in depth: grace notes are already excluded from
+          // `beamableEvents` above, so `beamedIndices` should never
+          // contain one -- but route them to their own path
+          // unconditionally regardless, rather than relying solely on
+          // that upstream exclusion holding forever.
+          const isGraceNote = event.kind === 'note' && event.isGrace === true;
+
+          if (!isGraceNote && beamedIndices.has(idx)) {
             const group = groupByFirstIndex.get(idx);
             if (group === undefined) return; // a non-first member of an already-rendered group
             const groupNotes = group.eventIndices

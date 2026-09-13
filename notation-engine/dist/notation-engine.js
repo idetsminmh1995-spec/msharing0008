@@ -115,6 +115,7 @@ var NotationEngine = (() => {
     numBeamLines: () => numBeamLines,
     numeratorText: () => numeratorText,
     ornamentGlyphName: () => ornamentGlyphName,
+    parseMidiInstrumentMap: () => parseMidiInstrumentMap,
     parseMusicXml: () => parseMusicXml,
     part: () => part,
     pitchedPitch: () => pitchedPitch,
@@ -59264,9 +59265,12 @@ ${denominator}`;
     const isUnsupported = !isRest && pitchEl === void 0 && unpitchedEl === void 0;
     const voice2 = intOf(firstChildNamed(noteEl, "voice")) ?? 1;
     const staff = intOf(firstChildNamed(noteEl, "staff"));
+    const isGrace = firstChildNamed(noteEl, "grace") !== void 0;
     const rawDuration = intOf(firstChildNamed(noteEl, "duration"));
     let ticks;
-    if (rawDuration === void 0) {
+    if (isGrace) {
+      ticks = 0;
+    } else if (rawDuration === void 0) {
       diagnostics.push(
         diagnostic(
           "warning",
@@ -59301,6 +59305,15 @@ ${denominator}`;
     const tieEls = childrenNamed(noteEl, "tie");
     const tieStart = tieEls.some((el) => el.getAttribute("type") === "start");
     const tieStop = tieEls.some((el) => el.getAttribute("type") === "stop");
+    const explicitNotehead = textOf(firstChildNamed(noteEl, "notehead"));
+    const graceEl = firstChildNamed(noteEl, "grace");
+    const graceSlash = graceEl?.getAttribute("slash") === "yes";
+    const timeModEl = firstChildNamed(noteEl, "time-modification");
+    const tupletActualNotes = timeModEl !== void 0 ? intOf(firstChildNamed(timeModEl, "actual-notes")) : void 0;
+    const tupletNormalNotes = timeModEl !== void 0 ? intOf(firstChildNamed(timeModEl, "normal-notes")) : void 0;
+    const rawStemText = textOf(firstChildNamed(noteEl, "stem"));
+    const explicitStemDirection = rawStemText === "up" || rawStemText === "down" ? rawStemText : void 0;
+    const hasExplicitAccidental = firstChildNamed(noteEl, "accidental") !== void 0;
     let step;
     let alter;
     let octave;
@@ -59369,9 +59382,29 @@ ${denominator}`;
       ...alter !== void 0 ? { alter } : {},
       ...octave !== void 0 ? { octave } : {},
       isUnpitched: isUnpitched2,
-      ...instrumentId !== void 0 ? { instrumentId } : {}
+      ...instrumentId !== void 0 ? { instrumentId } : {},
+      ...explicitNotehead !== void 0 ? { explicitNotehead } : {},
+      isGrace,
+      graceSlash,
+      ...tupletActualNotes !== void 0 ? { tupletActualNotes } : {},
+      ...tupletNormalNotes !== void 0 ? { tupletNormalNotes } : {},
+      ...explicitStemDirection !== void 0 ? { explicitStemDirection } : {},
+      hasExplicitAccidental
     };
     return { event, diagnostics };
+  }
+
+  // src/parser/musicxml/instrument.ts
+  function parseMidiInstrumentMap(scorePartEl) {
+    const map = /* @__PURE__ */ new Map();
+    for (const midiInstrumentEl of childrenNamed(scorePartEl, "midi-instrument")) {
+      const id = midiInstrumentEl.getAttribute("id");
+      const rawUnpitched = intOf(firstChildNamed(midiInstrumentEl, "midi-unpitched"));
+      if (id !== null && rawUnpitched !== void 0) {
+        map.set(id, rawUnpitched - 1);
+      }
+    }
+    return map;
   }
 
   // src/parser/musicxml/parse.ts
@@ -59382,7 +59415,8 @@ ${denominator}`;
   var DEFAULT_CLEF_SIGN = "G";
   var DEFAULT_CLEF_LINE = 2;
   function buildDuration(ev) {
-    return duration(ev.durationType, ev.dots, ev.ticks);
+    const tuplet = ev.tupletActualNotes !== void 0 && ev.tupletNormalNotes !== void 0 ? { actualNotes: ev.tupletActualNotes, normalNotes: ev.tupletNormalNotes } : void 0;
+    return duration(ev.durationType, ev.dots, ev.ticks, tuplet);
   }
   function buildSingle(ev) {
     if (ev.isRest || ev.step === void 0 || ev.octave === void 0) {
@@ -59399,7 +59433,11 @@ ${denominator}`;
       voice: ev.voice,
       ...ev.staff !== void 0 ? { staff: ev.staff } : {},
       ...ev.tieStart ? { tieStart: true } : {},
-      ...ev.tieStop ? { tieStop: true } : {}
+      ...ev.tieStop ? { tieStop: true } : {},
+      ...ev.explicitNotehead !== void 0 ? { explicitNotehead: ev.explicitNotehead } : {},
+      ...ev.isGrace ? { isGrace: true, graceSlash: ev.graceSlash } : {},
+      ...ev.explicitStemDirection !== void 0 ? { explicitStemDirection: ev.explicitStemDirection } : {},
+      ...ev.hasExplicitAccidental ? { hasExplicitAccidental: true } : {}
     });
   }
   function buildEvent(group, location, diagnostics) {
@@ -59459,15 +59497,24 @@ ${denominator}`;
           `Expected <score-partwise>, got "${root?.tagName ?? "nothing"}" (score-timewise is a later phase).`
         )
       );
-      return { score: score({ parts: [] }), attributes: [], diagnostics };
+      return {
+        score: score({ parts: [] }),
+        attributes: [],
+        diagnostics,
+        midiInstrumentsByPart: /* @__PURE__ */ new Map()
+      };
     }
     const partListEl = firstChildNamed(root, "part-list");
     const partNames = /* @__PURE__ */ new Map();
+    const midiInstrumentMaps = /* @__PURE__ */ new Map();
     if (partListEl !== void 0) {
       for (const scorePartEl of childrenNamed(partListEl, "score-part")) {
         const id = attrOf(scorePartEl, "id");
         const name = textOf(firstChildNamed(scorePartEl, "part-name"));
-        if (id !== void 0) partNames.set(id, name ?? id);
+        if (id !== void 0) {
+          partNames.set(id, name ?? id);
+          midiInstrumentMaps.set(id, parseMidiInstrumentMap(scorePartEl));
+        }
       }
     }
     const parts = [];
@@ -59636,7 +59683,12 @@ ${denominator}`;
         )
       );
     }
-    return { score: score({ parts }), attributes: allAttributes, diagnostics };
+    return {
+      score: score({ parts }),
+      attributes: allAttributes,
+      diagnostics,
+      midiInstrumentsByPart: midiInstrumentMaps
+    };
   }
 
   // src/layout/naive.ts
@@ -59730,7 +59782,8 @@ ${denominator}`;
         accidentalState,
         note2.pitch.step,
         note2.pitch.octave,
-        note2.pitch.alter
+        note2.pitch.alter,
+        note2.hasExplicitAccidental ?? false
       );
       state = decision.newState;
       if (decision.shouldDraw) {
@@ -59748,7 +59801,8 @@ ${denominator}`;
     }
     const noteheadGlyph = selectNoteheadGlyphName({
       pitch: note2.pitch,
-      durationType: note2.duration.type
+      durationType: note2.duration.type,
+      ...note2.explicitNotehead !== void 0 ? { explicitNotehead: note2.explicitNotehead } : {}
     });
     parts.push(renderNotehead(noteheadGlyph, { x, y, color: INK_COLOR, fontFamily: FONT_FAMILY }));
     const ledgerLines = computeLedgerLines(position, STAFF_LINES);
@@ -59777,6 +59831,53 @@ ${denominator}`;
       });
       return { svg, newAccidentalState: accidentalState };
     }
+    if (ev.isGrace) {
+      const isUnpitchedGrace = ev.pitch.kind === "unpitched";
+      const graceStep = isUnpitchedGrace ? ev.pitch.displayStep : ev.pitch.step;
+      const graceOctave = isUnpitchedGrace ? ev.pitch.displayOctave : ev.pitch.octave;
+      const gracePosition = staffPositionForPitch(ctx.clefDef, graceStep, graceOctave);
+      const graceY = ctx.measureBottomY + gracePosition;
+      const parts2 = [];
+      let state = accidentalState;
+      if (ev.pitch.kind === "pitched") {
+        const decision = evaluateAccidental(
+          accidentalState,
+          ev.pitch.step,
+          ev.pitch.octave,
+          ev.pitch.alter,
+          ev.hasExplicitAccidental ?? false
+        );
+        state = decision.newState;
+        if (decision.shouldDraw) {
+          const glyphName = accidentalGlyphName(ev.pitch.alter);
+          const width = glyphWidthOf(glyphName);
+          parts2.push(
+            renderAccidental(glyphName, {
+              x: accidentalX(x, width, 0),
+              y: graceY,
+              color: INK_COLOR,
+              fontFamily: FONT_FAMILY
+            })
+          );
+        }
+      }
+      const graceDirection = resolveStemDirection({
+        positions: [gracePosition],
+        numLines: STAFF_LINES,
+        ...forcedDirection !== void 0 ? { forcedDirection } : {},
+        ...ev.explicitStemDirection !== void 0 ? { explicitDirection: ev.explicitStemDirection } : {}
+      });
+      const kind = ev.graceSlash ? "acciaccatura" : "appoggiatura";
+      parts2.push(
+        renderMark(graceNoteGlyphName(kind, graceDirection), {
+          x,
+          y: graceY,
+          color: INK_COLOR,
+          fontFamily: FONT_FAMILY
+        })
+      );
+      return { svg: parts2.join("\n"), newAccidentalState: state };
+    }
     const parts = [];
     const head = renderNoteheadPart(ev, x, ctx, accidentalState);
     parts.push(head.svg);
@@ -59784,7 +59885,8 @@ ${denominator}`;
     const direction = resolveStemDirection({
       positions: [head.position],
       numLines: STAFF_LINES,
-      ...forcedDirection !== void 0 ? { forcedDirection } : {}
+      ...forcedDirection !== void 0 ? { forcedDirection } : {},
+      ...ev.explicitStemDirection !== void 0 ? { explicitDirection: ev.explicitStemDirection } : {}
     });
     if (ev.duration.type !== "whole") {
       const length = computeStemLength(head.position, middleLineY(STAFF_LINES));
@@ -60085,7 +60187,7 @@ ${denominator}`;
           });
           const beamableEvents = voice2.events.map((event) => ({
             durationType: event.duration.type,
-            isRest: event.kind !== "note"
+            isRest: event.kind !== "note" || event.isGrace === true
           }));
           const groups = groupBeams(
             beamableEvents,
@@ -60102,7 +60204,8 @@ ${denominator}`;
           voice2.events.forEach((event, idx) => {
             if (accidentalState === void 0) return;
             const eventX = eventXs[idx] ?? 0;
-            if (beamedIndices.has(idx)) {
+            const isGraceNote = event.kind === "note" && event.isGrace === true;
+            if (!isGraceNote && beamedIndices.has(idx)) {
               const group = groupByFirstIndex.get(idx);
               if (group === void 0) return;
               const groupNotes = group.eventIndices.map((i2) => voice2.events[i2]).filter((e) => e !== void 0 && e.kind === "note");

@@ -26,6 +26,16 @@ export interface Note {
   readonly staff?: number;
   readonly tieStart?: boolean;
   readonly tieStop?: boolean;
+  /** Phase 35/§10.4: an explicit <notehead> override from the file (e.g. "x", "diamond") -- Phase 15's selectNoteheadGlyphName's highest-priority tier. */
+  readonly explicitNotehead?: string;
+  /** Phase 35/§10.4: true if this note is a <grace/> note. */
+  readonly isGrace?: boolean;
+  /** Phase 35/§10.4: the grace note's slash attribute -- true for an acciaccatura, false for an appoggiatura. Meaningless unless isGrace is true. */
+  readonly graceSlash?: boolean;
+  /** Phase 35/§10.4: an explicit <stem> direction from the file -- Phase 16's resolveStemDirection explicitDirection tier. */
+  readonly explicitStemDirection?: 'up' | 'down';
+  /** Phase 35/§10.4: an explicit <accidental> element's presence -- Phase 19's evaluateAccidental hasExplicitAccidental (courtesy-accidental) parameter. */
+  readonly hasExplicitAccidental?: boolean;
 }
 
 export interface NoteInit {
@@ -35,6 +45,11 @@ export interface NoteInit {
   staff?: number;
   tieStart?: boolean;
   tieStop?: boolean;
+  explicitNotehead?: string;
+  isGrace?: boolean;
+  graceSlash?: boolean;
+  explicitStemDirection?: 'up' | 'down';
+  hasExplicitAccidental?: boolean;
 }
 
 export function note(init: NoteInit): Note {

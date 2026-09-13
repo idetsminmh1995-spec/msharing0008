@@ -11,10 +11,10 @@ after Phase 29 (end of Stage 4).
 
 ---
 
-## A. DONE — Phases 1–34 ✅ (Stage 2, 3, 4 & 5 complete)
+## A. DONE — Phases 1–35 ✅ (Stage 2, 3, 4 & 5 complete; Stage 6 in progress)
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 300/300 across them.
+`npm run verify` passes 312/312 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -52,12 +52,13 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 32 | Lyrics | Real hyphen/elision glyphs + extender line built; syllable text rendering deferred (needs a text-font system) | [`phase-32`](./phase-32-lyrics.md) |
 | 33 | Chord symbols | Real `csym` accidental + 5 quality glyphs built; root letter/bass note deferred (needs a text-font system) | [`phase-33`](./phase-33-chord-symbols.md) |
 | 34 | Grace notes | Real precomposed acciaccatura/appoggiatura glyphs (no text-font gap this time) | [`phase-34`](./phase-34-grace-notes.md) |
+| 35 | MusicXML parser v2 (Tier 1) | midi-instrument/notehead/grace/tuplet-ratio/stem/accidental parsed + wired; 2 real bugs found+fixed | [`phase-35`](./phase-35-musicxml-parser-v2.md) |
 
 **Public API today:** 137 exports from `dist/notation-engine.js`.
 
 ---
 
-## B. NOT DONE — Phases 35–54
+## B. NOT DONE — Phases 36–54
 
 Nothing below exists in `src/` yet. Each line links to the `PLAN.md` section
 that specifies it.
@@ -69,7 +70,6 @@ that specifies it.
 ### Stage 6 — Full import
 | # | Phase | Spec |
 |---|---|---|
-| **35** | MusicXML parser v2 — every element the renderer supports | §10.4 |
 | **36** | `.mxl` (zipped) support + `<score-timewise>` conversion | §10.5 |
 | **37** | Cross-software compatibility corpus and fixes | §10.8 |
 | **38** | Diagnostics and partial-render hardening | §10.7 |

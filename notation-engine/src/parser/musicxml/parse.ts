@@ -13,6 +13,7 @@ import { diagnostic, type Diagnostic, type DiagnosticLocation } from './diagnost
 import { parseAttributesElement } from './attributes.js';
 import { parseNoteElement, type ParsedNoteEvent } from './note.js';
 import { attrOf, childrenNamed, firstChildNamed, intOf, textOf } from './dom-helpers.js';
+import { parseMidiInstrumentMap } from './instrument.js';
 
 const DEFAULT_DIVISIONS = 1;
 const DEFAULT_FIFTHS = 0;
@@ -47,6 +48,19 @@ export interface ParseResult {
   readonly score: Score;
   readonly attributes: readonly MeasureAttributes[];
   readonly diagnostics: readonly Diagnostic[];
+  /**
+   * Phase 35/§10.4's `<midi-instrument>` data: per-part, a map from each
+   * `<instrument id="...">` a `<note>` can reference to its GM
+   * percussion note number (already corrected for MusicXML's 1-based
+   * vs. GM's 0-based numbering -- see `instrument.ts`). Exposed as its
+   * own side-table, the same shape as `attributes`, rather than added to
+   * the core `Score`/`Note` types -- this is exactly the kind of "extra
+   * fact a renderer might want, that Phase 3 deliberately keeps out of
+   * the musical data model" `MeasureAttributes` already exists for.
+   * Phase 41's own GM-note-to-notehead-shape default table is what
+   * actually consumes this; this phase only makes the mapping available.
+   */
+  readonly midiInstrumentsByPart: ReadonlyMap<string, ReadonlyMap<string, number>>;
 }
 
 /** Minimal shape of what a DOMParser needs to provide -- lets tests inject jsdom's (or any other) implementation, per §10's "tests inject a parser so Node can run them." */
@@ -66,7 +80,11 @@ interface TickRecord {
 }
 
 function buildDuration(ev: ParsedNoteEvent): Duration {
-  return makeDuration(ev.durationType, ev.dots, ev.ticks);
+  const tuplet =
+    ev.tupletActualNotes !== undefined && ev.tupletNormalNotes !== undefined
+      ? { actualNotes: ev.tupletActualNotes, normalNotes: ev.tupletNormalNotes }
+      : undefined;
+  return makeDuration(ev.durationType, ev.dots, ev.ticks, tuplet);
 }
 
 function buildSingle(ev: ParsedNoteEvent): Note | Rest {
@@ -90,6 +108,12 @@ function buildSingle(ev: ParsedNoteEvent): Note | Rest {
     ...(ev.staff !== undefined ? { staff: ev.staff } : {}),
     ...(ev.tieStart ? { tieStart: true } : {}),
     ...(ev.tieStop ? { tieStop: true } : {}),
+    ...(ev.explicitNotehead !== undefined ? { explicitNotehead: ev.explicitNotehead } : {}),
+    ...(ev.isGrace ? { isGrace: true, graceSlash: ev.graceSlash } : {}),
+    ...(ev.explicitStemDirection !== undefined
+      ? { explicitStemDirection: ev.explicitStemDirection }
+      : {}),
+    ...(ev.hasExplicitAccidental ? { hasExplicitAccidental: true } : {}),
   });
 }
 
@@ -192,16 +216,25 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
         `Expected <score-partwise>, got "${root?.tagName ?? 'nothing'}" (score-timewise is a later phase).`,
       ),
     );
-    return { score: makeScore({ parts: [] }), attributes: [], diagnostics };
+    return {
+      score: makeScore({ parts: [] }),
+      attributes: [],
+      diagnostics,
+      midiInstrumentsByPart: new Map(),
+    };
   }
 
   const partListEl = firstChildNamed(root, 'part-list');
   const partNames = new Map<string, string>();
+  const midiInstrumentMaps = new Map<string, ReadonlyMap<string, number>>();
   if (partListEl !== undefined) {
     for (const scorePartEl of childrenNamed(partListEl, 'score-part')) {
       const id = attrOf(scorePartEl, 'id');
       const name = textOf(firstChildNamed(scorePartEl, 'part-name'));
-      if (id !== undefined) partNames.set(id, name ?? id);
+      if (id !== undefined) {
+        partNames.set(id, name ?? id);
+        midiInstrumentMaps.set(id, parseMidiInstrumentMap(scorePartEl));
+      }
     }
   }
 
@@ -415,5 +448,10 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
     );
   }
 
-  return { score: makeScore({ parts }), attributes: allAttributes, diagnostics };
+  return {
+    score: makeScore({ parts }),
+    attributes: allAttributes,
+    diagnostics,
+    midiInstrumentsByPart: midiInstrumentMaps,
+  };
 }

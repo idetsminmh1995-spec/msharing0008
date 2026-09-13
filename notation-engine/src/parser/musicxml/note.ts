@@ -48,6 +48,18 @@ export interface ParsedNoteEvent {
   readonly isUnpitched: boolean;
   /** The <instrument id="..."> this note references, if any -- how a drum file distinguishes kick from snare from hi-hat. */
   readonly instrumentId?: string;
+  /** §10.4/Phase 35: an explicit <notehead> override (e.g. "x", "diamond") -- feeds Phase 15's selectNoteheadGlyphName as its highest-priority tier. */
+  readonly explicitNotehead?: string;
+  /** §10.4/Phase 35: <grace/> presence and its slash attribute -- true for an acciaccatura (slash="yes"), false for an appoggiatura. */
+  readonly isGrace: boolean;
+  readonly graceSlash: boolean;
+  /** §10.4/Phase 35: <time-modification>'s actual-notes/normal-notes -- feeds Phase 4's applyTuplet and Phase 3's Duration.tuplet field. */
+  readonly tupletActualNotes?: number;
+  readonly tupletNormalNotes?: number;
+  /** §10.4/Phase 35: an explicit <stem> element ('up'|'down') -- feeds Phase 16's resolveStemDirection explicitDirection tier. MusicXML's 'double'/'none' values are not directional and are left unset. */
+  readonly explicitStemDirection?: 'up' | 'down';
+  /** §10.4/Phase 35: an explicit <accidental> element's presence -- feeds Phase 19's evaluateAccidental hasExplicitAccidental (courtesy-accidental) parameter. */
+  readonly hasExplicitAccidental: boolean;
 }
 
 /**
@@ -77,9 +89,20 @@ export function parseNoteElement(
   const voice = intOf(firstChildNamed(noteEl, 'voice')) ?? 1;
   const staff = intOf(firstChildNamed(noteEl, 'staff'));
 
+  // <grace/> notes must be checked before duration parsing: by MusicXML's
+  // own design they legitimately have NO <duration> at all (they borrow
+  // time from the adjacent main note rather than occupying any of their
+  // own), so an absent <duration> here is normal, not an error -- treating
+  // it as MISSING_DURATION would both warn spuriously and, worse, give
+  // the grace note a full quarter note's worth of ticks, incorrectly
+  // advancing the shared tick cursor as if it were a real rhythmic event.
+  const isGrace = firstChildNamed(noteEl, 'grace') !== undefined;
+
   const rawDuration = intOf(firstChildNamed(noteEl, 'duration'));
   let ticks: number;
-  if (rawDuration === undefined) {
+  if (isGrace) {
+    ticks = 0;
+  } else if (rawDuration === undefined) {
     diagnostics.push(
       diagnostic(
         'warning',
@@ -116,6 +139,21 @@ export function parseNoteElement(
   const tieEls = childrenNamed(noteEl, 'tie');
   const tieStart = tieEls.some((el) => el.getAttribute('type') === 'start');
   const tieStop = tieEls.some((el) => el.getAttribute('type') === 'stop');
+
+  // §10.4/Phase 35 additions -- each a direct child of <note>, independent
+  // of whether the note is pitched/unpitched/a rest.
+  const explicitNotehead = textOf(firstChildNamed(noteEl, 'notehead'));
+  const graceEl = firstChildNamed(noteEl, 'grace');
+  const graceSlash = graceEl?.getAttribute('slash') === 'yes';
+  const timeModEl = firstChildNamed(noteEl, 'time-modification');
+  const tupletActualNotes =
+    timeModEl !== undefined ? intOf(firstChildNamed(timeModEl, 'actual-notes')) : undefined;
+  const tupletNormalNotes =
+    timeModEl !== undefined ? intOf(firstChildNamed(timeModEl, 'normal-notes')) : undefined;
+  const rawStemText = textOf(firstChildNamed(noteEl, 'stem'));
+  const explicitStemDirection =
+    rawStemText === 'up' || rawStemText === 'down' ? rawStemText : undefined;
+  const hasExplicitAccidental = firstChildNamed(noteEl, 'accidental') !== undefined;
 
   let step: PitchStep | undefined;
   let alter: number | undefined;
@@ -195,6 +233,13 @@ export function parseNoteElement(
     ...(octave !== undefined ? { octave } : {}),
     isUnpitched,
     ...(instrumentId !== undefined ? { instrumentId } : {}),
+    ...(explicitNotehead !== undefined ? { explicitNotehead } : {}),
+    isGrace,
+    graceSlash,
+    ...(tupletActualNotes !== undefined ? { tupletActualNotes } : {}),
+    ...(tupletNormalNotes !== undefined ? { tupletNormalNotes } : {}),
+    ...(explicitStemDirection !== undefined ? { explicitStemDirection } : {}),
+    hasExplicitAccidental,
   };
 
   return { event, diagnostics };
