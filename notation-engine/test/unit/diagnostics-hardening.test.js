@@ -11,20 +11,23 @@ const SRC_DIRS = [
   path.join(__dirname, '..', '..', 'src', 'parser', 'musicxml'),
   path.join(__dirname, '..', '..', 'src', 'parser', 'midi'),
   path.join(__dirname, '..', '..', 'src', 'timing'),
+  path.join(__dirname, '..', '..', 'src', 'drums'),
 ];
 const TEST_UNIT_DIR = __dirname;
 
 const NE = loadEngine();
 const domParser = testDomParser();
 
-/** Every stable diagnostic code any parser or module can emit, discovered by scanning the actual source rather than maintained as a hand-written list -- a future recovery rule can't quietly ship without this test noticing it has no code, and (via the coverage test below) no assertion either. Covers diagnostic(...) (MusicXML), midiDiagnostic(...) (MIDI), and timingDiagnostic(...) (timing) call shapes, since they're deliberately independent functions. */
+/** Every stable diagnostic code any parser or module can emit, discovered by scanning the actual source rather than maintained as a hand-written list -- a future recovery rule can't quietly ship without this test noticing it has no code, and (via the coverage test below) no assertion either. Covers diagnostic(...) (MusicXML), midiDiagnostic(...) (MIDI), timingDiagnostic(...) (timing), and drumDiagnostic(...) (drums) call shapes, since they're deliberately independent functions. */
 function discoverEmittedCodes() {
   const codes = new Set();
   for (const dir of SRC_DIRS) {
     for (const name of fs.readdirSync(dir)) {
       if (!name.endsWith('.ts')) continue;
       const content = fs.readFileSync(path.join(dir, name), 'utf8');
-      for (const m of content.matchAll(/\b(?:diagnostic|midiDiagnostic|timingDiagnostic)\(\s*'\w+'\s*,\s*'([A-Z_0-9]+)'/g)) {
+      for (const m of content.matchAll(
+        /\b(?:diagnostic|midiDiagnostic|timingDiagnostic|drumDiagnostic)\(\s*'\w+'\s*,\s*'([A-Z_0-9]+)'/g,
+      )) {
         codes.add(m[1]);
       }
     }
@@ -33,7 +36,7 @@ function discoverEmittedCodes() {
 }
 
 describe('diagnostics and partial-render hardening (Phase 38, §10.7)', () => {
-  test('every diagnostic code any parser or the timing module can emit is asserted SOMEWHERE across the whole test suite', () => {
+  test('every diagnostic code any parser or module (MusicXML, MIDI, timing, drums) can emit is asserted SOMEWHERE across the whole test suite', () => {
     const codes = discoverEmittedCodes();
     assert.ok(codes.length > 0, 'the scan itself found nothing -- likely a regex/path problem, not real coverage');
 

@@ -26,6 +26,8 @@ export interface Note {
   readonly staff?: number;
   readonly tieStart?: boolean;
   readonly tieStop?: boolean;
+  /** Phase 35/§10.4: the <instrument id="..."> this note references, if any -- how a drum file distinguishes kick from snare from hi-hat, and (Phase 41) the key into a part's own GM note mapping. */
+  readonly instrumentId?: string;
   /** Phase 35/§10.4: an explicit <notehead> override from the file (e.g. "x", "diamond") -- Phase 15's selectNoteheadGlyphName's highest-priority tier. */
   readonly explicitNotehead?: string;
   /** Phase 35/§10.4: true if this note is a <grace/> note. */
@@ -46,6 +48,7 @@ export interface NoteInit {
   tieStart?: boolean;
   tieStop?: boolean;
   explicitNotehead?: string;
+  instrumentId?: string;
   isGrace?: boolean;
   graceSlash?: boolean;
   explicitStemDirection?: 'up' | 'down';

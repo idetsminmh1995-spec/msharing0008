@@ -86,6 +86,37 @@ export interface KeySignatureConfig {
   readonly style: KeySignatureStyle;
 }
 
+// ---- drum mapping (Phase 41) ----
+
+/**
+ * §13.3: every field of the default GM percussion table
+ * (`DEFAULT_DRUM_MAPPING_TABLE`, in `drums/drum-map.ts`) is overridable
+ * here, keyed by GM MIDI note number -- "the default table is a
+ * starting point, not a constraint: house styles differ on which line a
+ * tom sits on, and the user must be able to change it." A partial entry
+ * overrides only the fields it names for that note; fields it omits
+ * keep the default table's own value for that entry.
+ *
+ * This shape is defined structurally here rather than importing
+ * `DrumMapEntry` from `drums/` -- §4.1's dependency table is explicit
+ * that `config/` may import from nothing else in the codebase.
+ * `drums/`'s own `DrumMapEntry` is written to match this structurally,
+ * so the two remain freely combinable wherever a caller (e.g.
+ * `render-from-musicxml.ts`) merges a default table with these
+ * overrides, without either module depending on the other.
+ */
+export interface DrumMapEntryOverride {
+  readonly name?: string;
+  readonly staffPosition?: number;
+  readonly noteheadShape?: string;
+  readonly stemDirection?: 'up' | 'down';
+  readonly articulation?: string;
+}
+
+export interface DrumsConfig {
+  readonly mapping?: Readonly<Record<number, DrumMapEntryOverride>>;
+}
+
 // ---- the whole thing ----
 
 export interface EngineConfig {
@@ -96,6 +127,7 @@ export interface EngineConfig {
   readonly beam: BeamConfig;
   readonly barNumbers: BarNumberConfig;
   readonly keySignature: KeySignatureConfig;
+  readonly drums: DrumsConfig;
 }
 
 /** Same shape as EngineConfig, but every section and every field within it is optional -- what callers pass to resolveConfig(). */
@@ -107,6 +139,7 @@ export interface PartialEngineConfig {
   readonly beam?: Partial<BeamConfig>;
   readonly barNumbers?: Partial<BarNumberConfig>;
   readonly keySignature?: Partial<KeySignatureConfig>;
+  readonly drums?: Partial<DrumsConfig>;
 }
 
 /**
@@ -140,6 +173,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
   keySignature: {
     style: 'standard',
   },
+  drums: {},
 };
 
 /**
@@ -159,5 +193,6 @@ export function resolveConfig(overrides?: PartialEngineConfig): EngineConfig {
     beam: { ...DEFAULT_CONFIG.beam, ...overrides?.beam },
     barNumbers: { ...DEFAULT_CONFIG.barNumbers, ...overrides?.barNumbers },
     keySignature: { ...DEFAULT_CONFIG.keySignature, ...overrides?.keySignature },
+    drums: { ...DEFAULT_CONFIG.drums, ...overrides?.drums },
   };
 }

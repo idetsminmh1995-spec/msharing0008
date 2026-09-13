@@ -45,6 +45,7 @@ import {
   type BarlineType,
   type BeamStyle as BeamStyleOption,
 } from './geometry/index.js';
+import { DEFAULT_DRUM_MAPPING_TABLE, lookupDrumMapEntry } from './drums/index.js';
 import type { Diagnostic, MeasureAttributes } from './parser/index.js';
 import { parseMusicXml, type ParseMusicXmlOptions } from './parser/index.js';
 import { naiveMeasureLayout } from './layout/index.js';
@@ -145,6 +146,8 @@ function glyphWidthOf(glyphName: string): number {
 interface RenderCtx {
   readonly clefDef: ClefDefinition;
   readonly measureBottomY: number;
+  /** Phase 41: this part's own <instrument id="..."> -> GM note number map (from Phase 35's parsed <midi-instrument> data), if any. Lets an unpitched note with a known GM number use the real drum mapping table instead of only its file-supplied display-step/octave. */
+  readonly midiInstrumentsByPart: ReadonlyMap<string, number> | undefined;
 }
 
 /** Draws a note's accidental (if needed)/notehead/ledger-lines only -- no stem, no flag. Shared by both the plain (unbeamed) path and the beam-group path, which differ only in how the stem/flag (or beam) gets drawn afterward. */
@@ -153,7 +156,13 @@ function renderNoteheadPart(
   x: number,
   ctx: RenderCtx,
   accidentalState: AccidentalState,
-): { svg: string; position: number; noteheadGlyph: string; newAccidentalState: AccidentalState } {
+): {
+  svg: string;
+  position: number;
+  noteheadGlyph: string;
+  newAccidentalState: AccidentalState;
+  drumStemDirection?: StemDirection;
+} {
   const parts: string[] = [];
 
   // Percussion: <unpitched>'s display-step/display-octave ARE a staff
@@ -164,7 +173,25 @@ function renderNoteheadPart(
   const isUnpitched = note.pitch.kind === 'unpitched';
   const step = isUnpitched ? note.pitch.displayStep : note.pitch.step;
   const octave = isUnpitched ? note.pitch.displayOctave : note.pitch.octave;
-  const position = staffPositionForPitch(ctx.clefDef, step, octave);
+
+  // Phase 41/§13.3: an unpitched note whose <instrument id> resolves to a
+  // known GM percussion note (via Phase 35's parsed <midi-instrument> map)
+  // uses the real drum mapping table's own staff position -- GM numbers
+  // are unambiguous (§13.1's own authority rule for "which drum sound"),
+  // while a file's own display-step/octave is only ever a rendering hint.
+  // A note with no resolvable GM number keeps using its own display
+  // position exactly as before -- this is additive, not a replacement.
+  const gmNote =
+    isUnpitched && note.instrumentId !== undefined
+      ? ctx.midiInstrumentsByPart?.get(note.instrumentId)
+      : undefined;
+  const drumEntry =
+    gmNote !== undefined ? lookupDrumMapEntry(gmNote, DEFAULT_DRUM_MAPPING_TABLE).entry : undefined;
+
+  const position =
+    drumEntry !== undefined
+      ? drumEntry.staffPosition
+      : staffPositionForPitch(ctx.clefDef, step, octave);
   const y = ctx.measureBottomY + position;
 
   let state = accidentalState;
@@ -195,6 +222,9 @@ function renderNoteheadPart(
     pitch: note.pitch,
     durationType: note.duration.type,
     ...(note.explicitNotehead !== undefined ? { explicitNotehead: note.explicitNotehead } : {}),
+    ...(gmNote !== undefined && drumEntry !== undefined
+      ? { midiNote: gmNote, overridesByKey: { [String(gmNote)]: drumEntry.noteheadShape } }
+      : {}),
   });
   parts.push(renderNotehead(noteheadGlyph, { x, y, color: INK_COLOR, fontFamily: FONT_FAMILY }));
 
@@ -212,7 +242,15 @@ function renderNoteheadPart(
     );
   }
 
-  return { svg: parts.join('\n'), position, noteheadGlyph, newAccidentalState: state };
+  return {
+    svg: parts.join('\n'),
+    position,
+    noteheadGlyph,
+    newAccidentalState: state,
+    ...(drumEntry?.stemDirection !== undefined
+      ? { drumStemDirection: drumEntry.stemDirection }
+      : {}),
+  };
 }
 
 function renderNoteOrRest(
@@ -306,13 +344,18 @@ function renderNoteOrRest(
   // Computed unconditionally (even for a whole note, which draws no real
   // stem) because §9.15's tie side needs SOME resolved direction even
   // then -- "imagine where the stem would go if there was one."
+  // Phase 41: a drum-table stem-direction convention (hands up / feet
+  // down, §13.3) sits between an explicit file <stem> and automatic
+  // placement -- the file's own explicit direction for this specific
+  // note still wins if present; only when it's absent does the drum
+  // table's own convention apply, ahead of ordinary automatic placement.
+  const explicitDirection = ev.explicitStemDirection ?? head.drumStemDirection;
+
   const direction = resolveStemDirection({
     positions: [head.position],
     numLines: STAFF_LINES,
     ...(forcedDirection !== undefined ? { forcedDirection } : {}),
-    ...(ev.explicitStemDirection !== undefined
-      ? { explicitDirection: ev.explicitStemDirection }
-      : {}),
+    ...(explicitDirection !== undefined ? { explicitDirection } : {}),
   });
 
   if (ev.duration.type !== 'whole') {
@@ -560,7 +603,12 @@ export function renderFromMusicXml(
   xmlText: string,
   options?: RenderFromMusicXmlOptions,
 ): RenderFromMusicXmlResult {
-  const { score, attributes, diagnostics: parseDiagnostics } = parseMusicXml(xmlText, options);
+  const {
+    score,
+    attributes,
+    diagnostics: parseDiagnostics,
+    midiInstrumentsByPart: midiInstrumentsByPartMap,
+  } = parseMusicXml(xmlText, options);
   const diagnostics: Diagnostic[] = [...parseDiagnostics];
 
   const part = score.parts[0];
@@ -580,6 +628,11 @@ export function renderFromMusicXml(
   const layouts = naiveMeasureLayout(part.measures.length, MEASURE_WIDTH);
   const lastLayout = layouts[layouts.length - 1];
   const totalWidth = lastLayout !== undefined ? lastLayout.x + MEASURE_WIDTH : MEASURE_WIDTH;
+
+  // Phase 41: this part's own GM instrument map, if any -- used to look
+  // up a real drum-table entry for an unpitched note whose <instrument
+  // id> resolves to a known GM percussion note number.
+  const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part.id);
 
   const svgParts: string[] = [];
   const staffGeometry = computeStaffGeometry(STAFF_LINES);
@@ -679,7 +732,7 @@ export function renderFromMusicXml(
     }
 
     if (clefDef.positionsByPitch) {
-      const ctx: RenderCtx = { clefDef, measureBottomY: bottomY };
+      const ctx: RenderCtx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart };
       const noteAreaX = Math.max(layout.x + layout.width * 0.25, cursorX);
       const noteAreaWidth = layout.x + layout.width - noteAreaX;
       // §9.14: forced stem direction only applies once a staff genuinely

@@ -25,7 +25,10 @@ var NotationEngine = (() => {
     BASS_CLEF: () => BASS_CLEF,
     ByteReader: () => ByteReader,
     DEFAULT_CONFIG: () => DEFAULT_CONFIG,
+    DEFAULT_DRUM_MAPPING_TABLE: () => DEFAULT_DRUM_MAPPING_TABLE,
     DEFAULT_STEM_LENGTH: () => DEFAULT_STEM_LENGTH,
+    DRUM_FALLBACK_NOTEHEAD_SHAPE: () => DRUM_FALLBACK_NOTEHEAD_SHAPE,
+    DRUM_FALLBACK_STAFF_POSITION: () => DRUM_FALLBACK_STAFF_POSITION,
     ENGINE_VERSION: () => ENGINE_VERSION,
     FLAT_ORDER: () => FLAT_ORDER,
     MAX_BEAM_SLOPE: () => MAX_BEAM_SLOPE,
@@ -81,6 +84,7 @@ var NotationEngine = (() => {
     denominatorText: () => denominatorText,
     diagnostic: () => diagnostic,
     diatonicIndex: () => diatonicIndex,
+    drumDiagnostic: () => drumDiagnostic,
     duration: () => duration,
     durationDefaultNotehead: () => durationDefaultNotehead,
     durationTypeAndDotsFromTicks: () => durationTypeAndDotsFromTicks,
@@ -102,10 +106,12 @@ var NotationEngine = (() => {
     isPitched: () => isPitched,
     isUnpitched: () => isUnpitched,
     keySignatureAccidentals: () => keySignatureAccidentals,
+    lookupDrumMapEntry: () => lookupDrumMapEntry,
     lyricElisionGlyphName: () => lyricElisionGlyphName,
     lyricHyphenGlyphName: () => lyricHyphenGlyphName,
     lyricSide: () => lyricSide,
     measure: () => measure,
+    mergeDrumMappingTable: () => mergeDrumMappingTable,
     middleLineY: () => middleLineY,
     midiDiagnostic: () => midiDiagnostic,
     multiMeasureRestGlyphName: () => multiMeasureRestGlyphName,
@@ -59168,7 +59174,8 @@ ${denominator}`;
     },
     keySignature: {
       style: "standard"
-    }
+    },
+    drums: {}
   };
   function resolveConfig(overrides) {
     return {
@@ -59178,7 +59185,8 @@ ${denominator}`;
       noteheadMapping: { ...DEFAULT_CONFIG.noteheadMapping, ...overrides?.noteheadMapping },
       beam: { ...DEFAULT_CONFIG.beam, ...overrides?.beam },
       barNumbers: { ...DEFAULT_CONFIG.barNumbers, ...overrides?.barNumbers },
-      keySignature: { ...DEFAULT_CONFIG.keySignature, ...overrides?.keySignature }
+      keySignature: { ...DEFAULT_CONFIG.keySignature, ...overrides?.keySignature },
+      drums: { ...DEFAULT_CONFIG.drums, ...overrides?.drums }
     };
   }
 
@@ -59505,6 +59513,7 @@ ${denominator}`;
       ...ev.tieStart ? { tieStart: true } : {},
       ...ev.tieStop ? { tieStop: true } : {},
       ...ev.explicitNotehead !== void 0 ? { explicitNotehead: ev.explicitNotehead } : {},
+      ...ev.instrumentId !== void 0 ? { instrumentId: ev.instrumentId } : {},
       ...ev.isGrace ? { isGrace: true, graceSlash: ev.graceSlash } : {},
       ...ev.explicitStemDirection !== void 0 ? { explicitStemDirection: ev.explicitStemDirection } : {},
       ...ev.hasExplicitAccidental ? { hasExplicitAccidental: true } : {}
@@ -60894,6 +60903,214 @@ ${denominator}`;
     return s.startTick + measuresIntoSegment * measureLen + tickInMeasure;
   }
 
+  // src/drums/diagnostic.ts
+  function drumDiagnostic(severity, code, message) {
+    return { severity, code, message };
+  }
+
+  // src/drums/drum-map.ts
+  var DEFAULT_DRUM_MAPPING_TABLE = {
+    35: {
+      midiNote: 35,
+      name: "Acoustic Bass Drum",
+      staffPosition: -0.5,
+      noteheadShape: "normal",
+      stemDirection: "down"
+    },
+    36: {
+      midiNote: 36,
+      name: "Bass Drum 1",
+      staffPosition: -0.5,
+      noteheadShape: "normal",
+      stemDirection: "down"
+    },
+    37: {
+      midiNote: 37,
+      name: "Side Stick",
+      staffPosition: -1.5,
+      noteheadShape: "x",
+      stemDirection: "up"
+    },
+    38: {
+      midiNote: 38,
+      name: "Acoustic Snare",
+      staffPosition: -1.5,
+      noteheadShape: "normal",
+      stemDirection: "up"
+    },
+    40: {
+      midiNote: 40,
+      name: "Electric Snare",
+      staffPosition: -1.5,
+      noteheadShape: "normal",
+      stemDirection: "up"
+    },
+    41: {
+      midiNote: 41,
+      name: "Low Floor Tom",
+      staffPosition: 0,
+      noteheadShape: "normal",
+      stemDirection: "up"
+    },
+    43: {
+      midiNote: 43,
+      name: "High Floor Tom",
+      staffPosition: -0.5,
+      noteheadShape: "normal",
+      stemDirection: "up"
+    },
+    45: {
+      midiNote: 45,
+      name: "Low Tom",
+      staffPosition: -1,
+      noteheadShape: "normal",
+      stemDirection: "up"
+    },
+    47: {
+      midiNote: 47,
+      name: "Low-Mid Tom",
+      staffPosition: -2,
+      noteheadShape: "normal",
+      stemDirection: "up"
+    },
+    48: {
+      midiNote: 48,
+      name: "Hi-Mid Tom",
+      staffPosition: -2.5,
+      noteheadShape: "normal",
+      stemDirection: "up"
+    },
+    50: {
+      midiNote: 50,
+      name: "High Tom",
+      staffPosition: -3,
+      noteheadShape: "normal",
+      stemDirection: "up"
+    },
+    42: {
+      midiNote: 42,
+      name: "Closed Hi-Hat",
+      staffPosition: -4,
+      noteheadShape: "x",
+      stemDirection: "up"
+    },
+    44: {
+      midiNote: 44,
+      name: "Pedal Hi-Hat",
+      staffPosition: -3.5,
+      noteheadShape: "x",
+      stemDirection: "down"
+    },
+    46: {
+      midiNote: 46,
+      name: "Open Hi-Hat",
+      staffPosition: -4,
+      noteheadShape: "x",
+      stemDirection: "up",
+      articulation: "open"
+    },
+    49: {
+      midiNote: 49,
+      name: "Crash Cymbal 1",
+      staffPosition: -5,
+      noteheadShape: "x",
+      stemDirection: "up"
+    },
+    57: {
+      midiNote: 57,
+      name: "Crash Cymbal 2",
+      staffPosition: -5.5,
+      noteheadShape: "x",
+      stemDirection: "up"
+    },
+    51: {
+      midiNote: 51,
+      name: "Ride Cymbal 1",
+      staffPosition: -4.5,
+      noteheadShape: "x",
+      stemDirection: "up"
+    },
+    53: {
+      midiNote: 53,
+      name: "Ride Bell",
+      staffPosition: -4.5,
+      noteheadShape: "diamond",
+      stemDirection: "up"
+    },
+    59: {
+      midiNote: 59,
+      name: "Ride Cymbal 2 (edge)",
+      staffPosition: -4.5,
+      noteheadShape: "x",
+      stemDirection: "up"
+    },
+    52: {
+      midiNote: 52,
+      name: "Chinese Cymbal",
+      staffPosition: -5,
+      noteheadShape: "x",
+      stemDirection: "up"
+    },
+    55: {
+      midiNote: 55,
+      name: "Splash Cymbal",
+      staffPosition: -5.5,
+      noteheadShape: "x",
+      stemDirection: "up"
+    },
+    56: {
+      midiNote: 56,
+      name: "Cowbell",
+      staffPosition: -4,
+      noteheadShape: "diamond",
+      stemDirection: "up"
+    },
+    54: {
+      midiNote: 54,
+      name: "Tambourine",
+      staffPosition: -4.5,
+      noteheadShape: "x",
+      stemDirection: "up"
+    }
+  };
+  var DRUM_FALLBACK_STAFF_POSITION = -2;
+  var DRUM_FALLBACK_NOTEHEAD_SHAPE = "normal";
+  function lookupDrumMapEntry(midiNote, table) {
+    const entry = table[midiNote];
+    if (entry !== void 0) {
+      return { entry, diagnostics: [] };
+    }
+    const outOfRange = midiNote < 35 || midiNote > 81;
+    const code = outOfRange ? "DRUM_NOTE_OUT_OF_RANGE" : "DRUM_NOTE_UNMAPPED";
+    const message = outOfRange ? `MIDI note ${midiNote} is outside the GM percussion range (35-81); using the default notehead on the middle line.` : `MIDI note ${midiNote} has no entry in the drum mapping table; using the default notehead on the middle line.`;
+    return {
+      entry: {
+        midiNote,
+        name: `Unmapped (${midiNote})`,
+        staffPosition: DRUM_FALLBACK_STAFF_POSITION,
+        noteheadShape: DRUM_FALLBACK_NOTEHEAD_SHAPE
+      },
+      diagnostics: [drumDiagnostic("warning", code, message)]
+    };
+  }
+  function mergeDrumMappingTable(overrides) {
+    if (overrides === void 0) return DEFAULT_DRUM_MAPPING_TABLE;
+    const merged = { ...DEFAULT_DRUM_MAPPING_TABLE };
+    for (const [key, override] of Object.entries(overrides)) {
+      const midiNote = Number(key);
+      const existing = merged[midiNote];
+      merged[midiNote] = {
+        midiNote,
+        name: override.name ?? existing?.name ?? `Note ${midiNote}`,
+        staffPosition: override.staffPosition ?? existing?.staffPosition ?? DRUM_FALLBACK_STAFF_POSITION,
+        noteheadShape: override.noteheadShape ?? existing?.noteheadShape ?? DRUM_FALLBACK_NOTEHEAD_SHAPE,
+        ...override.stemDirection !== void 0 ? { stemDirection: override.stemDirection } : existing?.stemDirection !== void 0 ? { stemDirection: existing.stemDirection } : {},
+        ...override.articulation !== void 0 ? { articulation: override.articulation } : existing?.articulation !== void 0 ? { articulation: existing.articulation } : {}
+      };
+    }
+    return merged;
+  }
+
   // src/render-from-musicxml.ts
   var STAFF_LINES = 5;
   var STAFF_BOTTOM_Y = 8;
@@ -60950,7 +61167,9 @@ ${denominator}`;
     const isUnpitched2 = note2.pitch.kind === "unpitched";
     const step = isUnpitched2 ? note2.pitch.displayStep : note2.pitch.step;
     const octave = isUnpitched2 ? note2.pitch.displayOctave : note2.pitch.octave;
-    const position = staffPositionForPitch(ctx.clefDef, step, octave);
+    const gmNote = isUnpitched2 && note2.instrumentId !== void 0 ? ctx.midiInstrumentsByPart?.get(note2.instrumentId) : void 0;
+    const drumEntry = gmNote !== void 0 ? lookupDrumMapEntry(gmNote, DEFAULT_DRUM_MAPPING_TABLE).entry : void 0;
+    const position = drumEntry !== void 0 ? drumEntry.staffPosition : staffPositionForPitch(ctx.clefDef, step, octave);
     const y = ctx.measureBottomY + position;
     let state = accidentalState;
     if (note2.pitch.kind === "pitched") {
@@ -60978,7 +61197,8 @@ ${denominator}`;
     const noteheadGlyph = selectNoteheadGlyphName({
       pitch: note2.pitch,
       durationType: note2.duration.type,
-      ...note2.explicitNotehead !== void 0 ? { explicitNotehead: note2.explicitNotehead } : {}
+      ...note2.explicitNotehead !== void 0 ? { explicitNotehead: note2.explicitNotehead } : {},
+      ...gmNote !== void 0 && drumEntry !== void 0 ? { midiNote: gmNote, overridesByKey: { [String(gmNote)]: drumEntry.noteheadShape } } : {}
     });
     parts.push(renderNotehead(noteheadGlyph, { x: x2, y, color: INK_COLOR, fontFamily: FONT_FAMILY }));
     const ledgerLines = computeLedgerLines(position, STAFF_LINES);
@@ -60994,7 +61214,13 @@ ${denominator}`;
         })
       );
     }
-    return { svg: parts.join("\n"), position, noteheadGlyph, newAccidentalState: state };
+    return {
+      svg: parts.join("\n"),
+      position,
+      noteheadGlyph,
+      newAccidentalState: state,
+      ...drumEntry?.stemDirection !== void 0 ? { drumStemDirection: drumEntry.stemDirection } : {}
+    };
   }
   function renderNoteOrRest(ev, x2, ctx, accidentalState, forcedDirection, restOffset) {
     if (ev.kind === "rest") {
@@ -61058,11 +61284,12 @@ ${denominator}`;
     const head = renderNoteheadPart(ev, x2, ctx, accidentalState);
     parts.push(head.svg);
     const y = ctx.measureBottomY + head.position;
+    const explicitDirection = ev.explicitStemDirection ?? head.drumStemDirection;
     const direction = resolveStemDirection({
       positions: [head.position],
       numLines: STAFF_LINES,
       ...forcedDirection !== void 0 ? { forcedDirection } : {},
-      ...ev.explicitStemDirection !== void 0 ? { explicitDirection: ev.explicitStemDirection } : {}
+      ...explicitDirection !== void 0 ? { explicitDirection } : {}
     });
     if (ev.duration.type !== "whole") {
       const length = computeStemLength(head.position, middleLineY(STAFF_LINES));
@@ -61248,7 +61475,12 @@ ${denominator}`;
     return { svg: parts.join("\n"), newAccidentalState: state };
   }
   function renderFromMusicXml(xmlText, options) {
-    const { score: score2, attributes, diagnostics: parseDiagnostics } = parseMusicXml(xmlText, options);
+    const {
+      score: score2,
+      attributes,
+      diagnostics: parseDiagnostics,
+      midiInstrumentsByPart: midiInstrumentsByPartMap
+    } = parseMusicXml(xmlText, options);
     const diagnostics = [...parseDiagnostics];
     const part2 = score2.parts[0];
     if (part2 === void 0) {
@@ -61266,6 +61498,7 @@ ${denominator}`;
     const layouts = naiveMeasureLayout(part2.measures.length, MEASURE_WIDTH);
     const lastLayout = layouts[layouts.length - 1];
     const totalWidth = lastLayout !== void 0 ? lastLayout.x + MEASURE_WIDTH : MEASURE_WIDTH;
+    const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part2.id);
     const svgParts = [];
     const staffGeometry = computeStaffGeometry(STAFF_LINES);
     let accidentalState;
@@ -61347,7 +61580,7 @@ ${denominator}`;
         accidentalState = resetMeasure(accidentalState);
       }
       if (clefDef.positionsByPitch) {
-        const ctx = { clefDef, measureBottomY: bottomY };
+        const ctx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart };
         const noteAreaX = Math.max(layout.x + layout.width * 0.25, cursorX);
         const noteAreaWidth = layout.x + layout.width - noteAreaX;
         const isMultiVoice = measure2.voices.length > 1;
