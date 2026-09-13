@@ -12,3 +12,4 @@ export * from './rest.js';
 export * from './accidental.js';
 export * from './beam.js';
 export * from './tie.js';
+export * from './slur.js';

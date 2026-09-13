@@ -1012,6 +1012,63 @@ inside them.
 
 ---
 
+### 9.16 Slurs `[BUILT for geometry/rendering -- not wired, see Doc/phase-27-slurs.md]`
+
+**Responsibility.** A curved line spanning **2 or more notes of
+potentially different pitches**, indicating legato phrasing (unlike a tie,
+which connects exactly two notes of the *same* pitch to mean "don't
+re-articulate"). MusicXML's `<slur>` lives under `<notations>`, which
+§10.4 already scopes as v2 parser work — this section specifies the
+*geometry*, independent of when parsing catches up to feed it real data.
+
+**Side (above/below) is a single decision for the WHOLE span, not
+per-note** — confirmed by two independent sources with no disagreement:
+Wikipedia's "Slur (music)" ("placed over the notes if the stems point
+downward, and under them if the stems point upwards") and Dorico's own
+published engraving-conventions page, which resolves the mixed case
+explicitly: *"a slur on a single staff always curves upwards and is placed
+above the notes, unless all of the notes under the slur are up-stem, in
+which case it curves downwards and is placed below."* So the rule is a
+simple binary check across every note in the span: **all up-stem → below;
+otherwise (all down-stem, or any mix) → above.** This is a different shape
+of rule from a tie's (which flips per individual note) — a slur commits to
+one side for its entire length, the same way a beam commits to one shared
+direction for its whole group (§9.13), just via a different test.
+
+**Metrics reuse the SAME real Bravura values as ties** —
+`slurEndpointThickness` = 0.1sp, `slurMidpointThickness` = 0.22sp,
+numerically identical to `tie*Thickness` (confirmed directly against
+`bravura_metadata.json`, not assumed identical). The shape (a tapered
+lens, thin at the ends and thick at the peak) and its rendering approach
+are therefore the same primitive Phase 26 already built for ties — a
+separate function, not a shared one, since a tie and a slur remain
+different musical concepts even where the drawing code overlaps.
+
+**Span**: unlike a tie (always exactly 2 notes), a slur's endpoints are
+its span's *first* and *last* note only; intermediate notes are not
+individually checked for the curve clearing them (a real refinement real
+engraving software does; out of scope here, matching how Phase 24's beam
+curve style already doesn't do exact contour-following either).
+
+**Interfaces.**
+```ts
+slurSide(stemDirections): 'above' | 'below'
+computeSlurShape(startX, endX, y, side): SlurShape   // same shape as TieShape
+renderSlur(shape, options): string
+```
+
+**Tests.** All up-stem notes → below; all down-stem → above; a mixed
+group (some up, some down) → above, matching Dorico's explicit tie-break;
+a single-note "span" is nonsensical for a slur (2+ notes required) and
+should be rejected rather than silently drawing something.
+
+**Known limitation.** Parsing `<slur>` from real MusicXML is v2 scope
+(§10.4) — this section's geometry has no wiring into
+`renderFromMusicXml` yet, the same honestly-stated gap as Phase 25's
+notehead-collision offsetting.
+
+---
+
 ## 10. Module: `parser/musicxml/` — MusicXML Parser `[IN PROGRESS — v1 built (Phase 20); .mxl/score-timewise/v2 elements are Phase 35-36]`
 
 **Responsibility.** Turn any valid MusicXML document into a `Score` (§6),
@@ -1779,7 +1836,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 21 | Naive single-system layout + `renderFromMusicXML()` end to end | ✅ |
 | 22 | **Milestone: a real simple `.musicxml` file renders correctly.** Everything after this point is validated against real files from day one | ✅ |
 
-### Stage 4 — Rhythm and structure `[IN PROGRESS — 23-26 of 29]`
+### Stage 4 — Rhythm and structure `[IN PROGRESS — 23-27 of 29]`
 
 | Phase | What | Status |
 |---|---|---|
@@ -1787,7 +1844,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 24 | Beam geometry + the three styles (straight / flat / curved) | ✅ |
 | 25 | Multi-voice per staff + voice collision and rest separation | ✅ (core); notehead-offset wiring pending |
 | 26 | Ties | ✅ (common case); cross-barline/beam/chord ties pending |
-| 27 | Slurs | |
+| 27 | Slurs | ✅ (geometry); wiring pending v2 parser |
 | 28 | Tuplets | |
 | 29 | Grand staff / multi-part systems | |
 

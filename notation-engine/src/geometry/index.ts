@@ -13,4 +13,5 @@ export * from './accidental.js';
 export * from './beam.js';
 export * from './voice.js';
 export * from './tie.js';
+export * from './slur.js';
 export * from './beam-shape.js';

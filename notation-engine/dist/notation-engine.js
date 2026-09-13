@@ -56,6 +56,7 @@ var NotationEngine = (() => {
     computeBarlineGeometry: () => computeBarlineGeometry,
     computeBeamShape: () => computeBeamShape,
     computeLedgerLines: () => computeLedgerLines,
+    computeSlurShape: () => computeSlurShape,
     computeStaffGeometry: () => computeStaffGeometry,
     computeStemLength: () => computeStemLength,
     computeTieShape: () => computeTieShape,
@@ -109,6 +110,7 @@ var NotationEngine = (() => {
     renderLedgerLines: () => renderLedgerLines,
     renderNotehead: () => renderNotehead,
     renderRest: () => renderRest,
+    renderSlur: () => renderSlur,
     renderStaff: () => renderStaff,
     renderStem: () => renderStem,
     renderTie: () => renderTie,
@@ -125,6 +127,7 @@ var NotationEngine = (() => {
     shapeGlyphName: () => shapeGlyphName,
     sharpsForCount: () => sharpsForCount,
     shouldShowBarNumber: () => shouldShowBarNumber,
+    slurSide: () => slurSide,
     staffPositionForPitch: () => staffPositionForPitch,
     sumTicks: () => sumTicks,
     svgGlyphText: () => svgGlyphText,
@@ -58475,6 +58478,19 @@ var NotationEngine = (() => {
     return { startX, endX, y, side, bulgeHeight: TIE_BULGE_HEIGHT };
   }
 
+  // src/geometry/slur.ts
+  function slurSide(stemDirections) {
+    if (stemDirections.length === 0) {
+      throw new Error("slurSide needs at least one stem direction");
+    }
+    const allUp = stemDirections.every((d) => d === "up");
+    return allUp ? "below" : "above";
+  }
+  var SLUR_BULGE_HEIGHT = 0.5;
+  function computeSlurShape(startX, endX, y, side) {
+    return { startX, endX, y, side, bulgeHeight: SLUR_BULGE_HEIGHT };
+  }
+
   // src/geometry/beam-shape.ts
   var MAX_BEAM_SLOPE = 1;
   function naturalStemTipY(position, direction, stemLength) {
@@ -58849,6 +58865,16 @@ ${denominator}`;
 
   // src/render/tie.ts
   function renderTie(shape, options) {
+    const towardBulge = shape.side === "above" ? -1 : 1;
+    const midX = (shape.startX + shape.endX) / 2;
+    const innerY = shape.y + towardBulge * (shape.bulgeHeight - options.midpointThickness / 2);
+    const outerY = shape.y + towardBulge * (shape.bulgeHeight + options.midpointThickness / 2);
+    const d = `M ${shape.startX} ${shape.y} Q ${midX} ${innerY} ${shape.endX} ${shape.y} Q ${midX} ${outerY} ${shape.startX} ${shape.y} Z`;
+    return svgPath(d, { fill: options.color, stroke: "none" });
+  }
+
+  // src/render/slur.ts
+  function renderSlur(shape, options) {
     const towardBulge = shape.side === "above" ? -1 : 1;
     const midX = (shape.startX + shape.endX) / 2;
     const innerY = shape.y + towardBulge * (shape.bulgeHeight - options.midpointThickness / 2);
