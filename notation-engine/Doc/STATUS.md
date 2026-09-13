@@ -11,10 +11,10 @@ after Phase 29 (end of Stage 4).
 
 ---
 
-## A. DONE — Phases 1–41 ✅ (Stage 2 through 6 complete; Stage 7 in progress)
+## A. DONE — Phases 1–42 ✅ (Stage 2 through 7 complete)
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 392/392 across them.
+`npm run verify` passes 405/405 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -59,6 +59,7 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 39 | Standard MIDI File parser | VLQ, running status, note-on-zero, tempo/timesig/keysig meta events, 480-tick normalization; never throws | [`phase-39`](./phase-39-midi-parser.md) |
 | 40 | Timing engine | Anti-drift TempoMap (precompute-once), tick<->seconds, tick<->measure/beat; passes required 10-min drift test | [`phase-40`](./phase-40-timing-engine.md) |
 | 41 | Drum mapping table + GM defaults | Default GM table for the standard kit; wired into rendering via <instrument>-to-GM parsing (real notehead/position/stem) | [`phase-41`](./phase-41-drum-mapping.md) |
+| 42 | MIDI↔MusicXML alignment | 4-tier matching cascade (exact/tolerance/ordinal/unmatched); real end-to-end fixture pair confirmed | [`phase-42`](./phase-42-midi-musicxml-alignment.md) |
 
 **Public API today:** 137 exports from `dist/notation-engine.js`.
 
@@ -72,11 +73,6 @@ that specifies it.
 ### Stage 5 — Expression
 | # | Phase | Spec |
 |---|---|---|
-
-### Stage 7 — MIDI and timing ← the whole area v1 was missing
-| # | Phase | Spec |
-|---|---|---|
-| **42** | MIDI ↔ MusicXML alignment | §13.1–§13.2 |
 
 ### Stage 8 — Real layout
 | # | Phase | Spec |

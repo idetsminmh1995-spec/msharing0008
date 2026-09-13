@@ -44,6 +44,8 @@ var NotationEngine = (() => {
     TREBLE_CLEF: () => TREBLE_CLEF,
     accidentalGlyphName: () => accidentalGlyphName,
     accidentalX: () => accidentalX,
+    alignNotes: () => alignNotes,
+    alignmentDiagnostic: () => alignmentDiagnostic,
     applyTuplet: () => applyTuplet,
     articulationGlyphName: () => articulationGlyphName,
     articulationSide: () => articulationSide,
@@ -63,6 +65,7 @@ var NotationEngine = (() => {
     chordSymbolAccidentalGlyphName: () => chordSymbolAccidentalGlyphName,
     chordSymbolQualityGlyphName: () => chordSymbolQualityGlyphName,
     chordSymbolSide: () => chordSymbolSide,
+    chromaticNoteNumber: () => chromaticNoteNumber,
     codepointToChar: () => codepointToChar,
     computeBarlineGeometry: () => computeBarlineGeometry,
     computeBeamShape: () => computeBeamShape,
@@ -78,6 +81,7 @@ var NotationEngine = (() => {
     computeTieShape: () => computeTieShape,
     computeTupletBracketShape: () => computeTupletBracketShape,
     convertTimewiseToPartwise: () => convertTimewiseToPartwise,
+    coreNoteRefKey: () => coreNoteRefKey,
     createAccidentalState: () => createAccidentalState,
     createSvgDocument: () => createSvgDocument,
     defaultRestY: () => defaultRestY,
@@ -94,6 +98,7 @@ var NotationEngine = (() => {
     evaluateAccidental: () => evaluateAccidental,
     flagGlyphName: () => flagGlyphName,
     flatsForCount: () => flatsForCount,
+    flattenPartNotes: () => flattenPartNotes,
     getEngravingDefault: () => getEngravingDefault,
     getEngravingDefaults: () => getEngravingDefaults,
     getFontInfo: () => getFontInfo,
@@ -60901,6 +60906,136 @@ ${denominator}`;
     const beatLen = 4 / s.denominator * TICKS_PER_QUARTER;
     const tickInMeasure = (position.beat - 1) * beatLen;
     return s.startTick + measuresIntoSegment * measureLen + tickInMeasure;
+  }
+
+  // src/timing/alignment/diagnostic.ts
+  function alignmentDiagnostic(severity, code, message) {
+    return { severity, code, message };
+  }
+
+  // src/timing/alignment/flatten.ts
+  function coreNoteRefKey(ref) {
+    return `${ref.measureNumber}:${ref.voiceId}:${ref.eventIndex}`;
+  }
+  var STEP_SEMITONE = {
+    C: 0,
+    D: 2,
+    E: 4,
+    F: 5,
+    G: 7,
+    A: 9,
+    B: 11
+  };
+  function chromaticNoteNumber(step, alter, octave) {
+    return (octave + 1) * 12 + STEP_SEMITONE[step] + alter;
+  }
+  function measureLengthTicks2(attrs) {
+    return attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
+  }
+  function flattenPartNotes(part2, measureAttributes, gmByInstrumentId) {
+    const flat = [];
+    let measureStartTick = 0;
+    for (const measure2 of part2.measures) {
+      const attrs = measureAttributes.find(
+        (a) => a.partId === part2.id && a.measureNumber === measure2.number
+      );
+      for (const v of measure2.voices) {
+        let tickWithinVoice = 0;
+        v.events.forEach((event, eventIndex) => {
+          if (event.kind === "note") {
+            const noteNumber = event.pitch.kind === "pitched" ? chromaticNoteNumber(event.pitch.step, event.pitch.alter, event.pitch.octave) : event.instrumentId !== void 0 ? gmByInstrumentId?.get(event.instrumentId) : void 0;
+            flat.push({
+              ref: { measureNumber: measure2.number, voiceId: v.id, eventIndex },
+              tick: measureStartTick + tickWithinVoice,
+              noteNumber
+            });
+          }
+          tickWithinVoice += event.duration.ticks;
+        });
+      }
+      measureStartTick += attrs !== void 0 ? measureLengthTicks2(attrs) : 0;
+    }
+    return flat;
+  }
+
+  // src/timing/alignment/match.ts
+  var DEFAULT_TOLERANCE_TICKS = TICKS_PER_QUARTER / 8;
+  function alignNotes(coreNotes, midiNotes, toleranceTicks = DEFAULT_TOLERANCE_TICKS) {
+    const alignment = /* @__PURE__ */ new Map();
+    const claimedMidi = /* @__PURE__ */ new Set();
+    const afterExact = [];
+    for (const cn of coreNotes) {
+      const idx = cn.noteNumber !== void 0 ? midiNotes.findIndex(
+        (mn, i2) => !claimedMidi.has(i2) && mn.tick === cn.tick && mn.noteNumber === cn.noteNumber
+      ) : -1;
+      if (idx !== -1) {
+        const midiNote = midiNotes[idx];
+        if (midiNote !== void 0) {
+          alignment.set(coreNoteRefKey(cn.ref), { midiNote, tier: "exact" });
+          claimedMidi.add(idx);
+          continue;
+        }
+      }
+      afterExact.push(cn);
+    }
+    const afterTolerance = [];
+    for (const cn of afterExact) {
+      let bestIndex = -1;
+      let bestDistance = Infinity;
+      if (cn.noteNumber !== void 0) {
+        midiNotes.forEach((mn, i2) => {
+          if (claimedMidi.has(i2) || mn.noteNumber !== cn.noteNumber) return;
+          const distance = Math.abs(mn.tick - cn.tick);
+          if (distance <= toleranceTicks && distance < bestDistance) {
+            bestDistance = distance;
+            bestIndex = i2;
+          }
+        });
+      }
+      if (bestIndex !== -1) {
+        const midiNote = midiNotes[bestIndex];
+        if (midiNote !== void 0) {
+          alignment.set(coreNoteRefKey(cn.ref), { midiNote, tier: "tolerance" });
+          claimedMidi.add(bestIndex);
+          continue;
+        }
+      }
+      afterTolerance.push(cn);
+    }
+    const remainingMidiIndices = midiNotes.map((_, i2) => i2).filter((i2) => !claimedMidi.has(i2));
+    const diagnostics = [];
+    if (afterTolerance.length > 0 && afterTolerance.length === remainingMidiIndices.length) {
+      afterTolerance.forEach((cn, i2) => {
+        const midiIndex = remainingMidiIndices[i2];
+        const midiNote = midiIndex !== void 0 ? midiNotes[midiIndex] : void 0;
+        if (midiIndex !== void 0 && midiNote !== void 0) {
+          alignment.set(coreNoteRefKey(cn.ref), { midiNote, tier: "ordinal" });
+          claimedMidi.add(midiIndex);
+        }
+      });
+    } else {
+      for (const cn of afterTolerance) {
+        diagnostics.push(
+          alignmentDiagnostic(
+            "warning",
+            "UNMATCHED_CORE_NOTE",
+            `No matching MIDI note found for the note at measure ${cn.ref.measureNumber}, voice ${cn.ref.voiceId}, event ${cn.ref.eventIndex} (tick ${cn.tick}).`
+          )
+        );
+      }
+      const stillUnclaimedMidi = midiNotes.map((_, i2) => i2).filter((i2) => !claimedMidi.has(i2));
+      for (const midiIndex of stillUnclaimedMidi) {
+        const mn = midiNotes[midiIndex];
+        diagnostics.push(
+          alignmentDiagnostic(
+            "warning",
+            "UNMATCHED_MIDI_NOTE",
+            `No matching core note found for the MIDI note at tick ${mn?.tick ?? "?"} (note number ${mn?.noteNumber ?? "?"}).`
+          )
+        );
+      }
+    }
+    return { alignment, diagnostics };
   }
 
   // src/drums/diagnostic.ts
