@@ -44,6 +44,8 @@ export interface MeasureAttributes {
   readonly staves: number;
   /** Integration A: every staff's own clef, keyed by staff number -- what a grand staff needs so its bass staff isn't collapsed onto its treble staff. */
   readonly clefsByStaff: Readonly<Record<number, ClefSpec>>;
+  /** Integration B: each staff's own line count (tab = 6, most = 5), keyed by staff number. Absent entries mean the ordinary 5. */
+  readonly staffLinesByStaff: Readonly<Record<number, number>>;
   /** Raw MusicXML <bar-style> text (e.g. "light-heavy") for this measure's ending barline, if present. Mapping this to Phase 13's BarlineType is a later integration step's job, not the parser's. */
   readonly barlineStyle?: string;
   readonly repeatDirection?: 'forward' | 'backward';
@@ -272,6 +274,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
     // number="2"> change must not wipe staff 1's own clef, which a plain
     // object-replace would do.
     let currentStaves = 1;
+    let currentStaffLinesByStaff: Record<number, number> = {};
     let currentClefsByStaff: Record<number, ClefSpec> = {
       1:
         DEFAULT_CLEF_LINE !== undefined
@@ -314,6 +317,12 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           if (update.staves !== undefined) currentStaves = update.staves;
           if (update.clefsByStaff !== undefined) {
             currentClefsByStaff = { ...currentClefsByStaff, ...update.clefsByStaff };
+          }
+          if (update.staffLinesByStaff !== undefined) {
+            currentStaffLinesByStaff = {
+              ...currentStaffLinesByStaff,
+              ...update.staffLinesByStaff,
+            };
           }
         } else if (child.tagName === 'note') {
           if (currentDivisions === undefined) {
@@ -455,6 +464,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
         ...(currentClefLine !== undefined ? { clefLine: currentClefLine } : {}),
         staves: currentStaves,
         clefsByStaff: { ...currentClefsByStaff },
+        staffLinesByStaff: { ...currentStaffLinesByStaff },
         ...(barlineStyle !== undefined ? { barlineStyle } : {}),
         ...(repeatDirection !== undefined ? { repeatDirection } : {}),
       });

@@ -69,6 +69,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-41-drum-mapping.md`](./phase-41-drum-mapping.md) | Phase 41 GM drum mapping table -- built, tested, AND wired into rendering (real notehead/position/stem from GM data) |
 | [`phase-42-midi-musicxml-alignment.md`](./phase-42-midi-musicxml-alignment.md) | Phase 42 MIDI<->MusicXML alignment (4-tier matching cascade; completes Stage 7) |
 | [`integration-a-grand-staff.md`](./integration-a-grand-staff.md) | Integration A: grand staff wired end to end + a real clef-glyph-placement bug fix (NOT a numbered phase) |
+| [`integration-b-multi-part.md`](./integration-b-multi-part.md) | Integration B: every part renders (guitar tab part no longer dropped) + per-staff line counts from `<staff-lines>` |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

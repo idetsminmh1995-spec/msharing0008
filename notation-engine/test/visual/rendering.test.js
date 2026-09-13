@@ -580,4 +580,13 @@ describe('visual regression (Phase 8)', () => {
     const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
     matchSnapshot('render-from-musicxml-piano-grand-staff', svg, SNAPSHOT_DIR);
   });
+
+  test('Integration B: a real two-part guitar fixture (notation part + 6-line tab part, stacked) renders identically to the saved snapshot', () => {
+    const xml = fs.readFileSync(
+      path.join(__dirname, '..', 'fixtures', 'musicxml', 'guitar-two-part-tab.musicxml'),
+      'utf8',
+    );
+    const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
+    matchSnapshot('render-from-musicxml-guitar-two-part-tab', svg, SNAPSHOT_DIR);
+  });
 });

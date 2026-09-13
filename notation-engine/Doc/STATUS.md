@@ -11,10 +11,10 @@ after Phase 29 (end of Stage 4).
 
 ---
 
-## A. DONE — Phases 1–42 ✅ (Stage 2 through 7 complete) + Integration Pass A
+## A. DONE — Phases 1–42 ✅ (Stage 2 through 7 complete) + Integration Passes A & B
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 423/423 across them.
+`npm run verify` passes 435/435 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -61,6 +61,7 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 41 | Drum mapping table + GM defaults | Default GM table for the standard kit; wired into rendering via <instrument>-to-GM parsing (real notehead/position/stem) | [`phase-41`](./phase-41-drum-mapping.md) |
 | 42 | MIDI↔MusicXML alignment | 4-tier matching cascade (exact/tolerance/ordinal/unmatched); real end-to-end fixture pair confirmed | [`phase-42`](./phase-42-midi-musicxml-alignment.md) |
 | — | **Integration A** (not a numbered phase) | Grand staff wired end to end (`<staves>`, per-staff clefs, brace, continuous barline) + fixed clef glyphs being drawn on the wrong line | [`integration-a`](./integration-a-grand-staff.md) |
+| — | **Integration B** (not a numbered phase) | Every part renders (guitar tab part no longer dropped); per-staff line counts from `<staff-lines>` (tab = 6) | [`integration-b`](./integration-b-multi-part.md) |
 
 **Public API today:** 137 exports from `dist/notation-engine.js`.
 

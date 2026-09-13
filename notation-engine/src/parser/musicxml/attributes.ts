@@ -22,6 +22,14 @@ export interface AttributesUpdate {
   /** §9.18/Integration A: how many staves this part has (piano = 2). Absent means one staff. */
   readonly staves?: number;
   /**
+   * Each staff's own line count, keyed by staff number, from
+   * `<staff-details><staff-lines>`. Absent means the ordinary 5. A guitar
+   * tab staff declares 6; some percussion parts declare 1. Read from the
+   * file rather than inferred from the clef, since the file is the
+   * authority on its own staff and a clef does not imply a line count.
+   */
+  readonly staffLinesByStaff?: Readonly<Record<number, number>>;
+  /**
    * Every `<clef>` in this element, keyed by its `number` attribute (an
    * unnumbered clef is staff 1). A multi-staff part declares one clef per
    * staff -- keeping only the first, as this parser did before Integration A,
@@ -41,6 +49,7 @@ export function parseAttributesElement(attributesEl: Element): AttributesUpdate 
     clefLine?: number;
     staves?: number;
     clefsByStaff?: Record<number, ClefSpec>;
+    staffLinesByStaff?: Record<number, number>;
   } = {};
 
   const divisionsEl = firstChildNamed(attributesEl, 'divisions');
@@ -49,6 +58,20 @@ export function parseAttributesElement(attributesEl: Element): AttributesUpdate 
 
   const staves = intOf(firstChildNamed(attributesEl, 'staves'));
   if (staves !== undefined) result.staves = staves;
+
+  const staffDetailsEls = childrenNamed(attributesEl, 'staff-details');
+  if (staffDetailsEls.length > 0) {
+    const linesByStaff: Record<number, number> = {};
+    for (const el of staffDetailsEls) {
+      const rawNumber = el.getAttribute('number');
+      const staffNumber = rawNumber !== null ? Number(rawNumber) : 1;
+      const lines = intOf(firstChildNamed(el, 'staff-lines'));
+      if (lines !== undefined && lines > 0 && Number.isFinite(staffNumber)) {
+        linesByStaff[staffNumber] = lines;
+      }
+    }
+    if (Object.keys(linesByStaff).length > 0) result.staffLinesByStaff = linesByStaff;
+  }
 
   const keyEl = firstChildNamed(attributesEl, 'key');
   if (keyEl !== undefined) {
