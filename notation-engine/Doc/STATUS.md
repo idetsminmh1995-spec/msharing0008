@@ -224,3 +224,22 @@ they'd sensibly be tackled:
 boundaries from Phases 20/35/36, F6 is simply later-stage work not yet
 reached. They're listed here so "what's left to make the app actually
 good?" has a written answer rather than living in memory.
+
+---
+
+## G. Standing instruction from the user (2026-09-12)
+
+Drum notation now renders with correct stem directions (Phase 25), but
+the **overall visual style is not yet what the user wants**. Rather than
+iterating on style now, the user asked to **defer all visual/stylistic
+rework to one final pass, once every planned phase (through Phase 54) is
+built** — at that point, review everything end to end and rewrite/restyle
+as needed with the full picture in view, rather than repeatedly restyling
+piecemeal as each new phase changes what's possible.
+
+**Until that final pass:** keep building phases in order; keep noting any
+deferred/incomplete piece in this file (§F, and each phase's own
+`Doc/phase-NN-*.md`) exactly as already practiced, so nothing gets
+forgotten by the time that final review happens. Do not treat "the drum
+notation doesn't look right yet" as a signal to stop and restyle now —
+that is expected and already accounted for.
