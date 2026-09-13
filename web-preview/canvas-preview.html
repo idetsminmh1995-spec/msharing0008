@@ -721,10 +721,20 @@
     try {
       // .mxl (compressed MusicXML) is a ZIP archive -- must be read as
       // binary, not text, or the archive's bytes get corrupted by UTF-8
-      // decoding before unzipping ever sees them.
-      const xmlText = file.name.toLowerCase().endsWith('.mxl')
-        ? NotationEngine.unzipMxl(new Uint8Array(await file.arrayBuffer()), window.DOMParser)
-        : await file.text();
+      // decoding before unzipping ever sees them. unzipMxl never throws
+      // (§10.7/Phase 38) -- a malformed archive comes back as a
+      // diagnostic with xmlText left undefined, surfaced here the same
+      // way any other unrenderable input already is.
+      let xmlText;
+      if (file.name.toLowerCase().endsWith('.mxl')) {
+        const unzipped = NotationEngine.unzipMxl(new Uint8Array(await file.arrayBuffer()), window.DOMParser);
+        if (unzipped.xmlText === undefined) {
+          throw new Error(unzipped.diagnostics.map((d) => d.message).join(' ') || 'Could not read this .mxl file.');
+        }
+        xmlText = unzipped.xmlText;
+      } else {
+        xmlText = await file.text();
+      }
 
       // The real Notation Engine. In a browser the engine uses the native
       // DOMParser automatically, so no domParser option is needed here --

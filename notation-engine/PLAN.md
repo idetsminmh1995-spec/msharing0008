@@ -1615,7 +1615,7 @@ The rarely-used alternative document order. Convert to partwise on load
 (a mechanical transposition of the measure/part nesting) so the rest of the
 parser sees only one shape.
 
-### 10.7 Error conditions and partial rendering `[BUILT for v1's element set]`
+### 10.7 Error conditions and partial rendering `[BUILT -- extended to all elements through Phase 37 by Phase 38's hardening pass, which also fixed 2 real crash bugs; see Doc/phase-38-diagnostics-hardening.md]`
 
 The parser **never throws on malformed input**. It records a `Diagnostic`
 and continues:
@@ -2319,14 +2319,14 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 33 | Chord symbols | ✅ (accidentals/qualities/placement); root letter deferred |
 | 34 | Grace notes | ✅ |
 
-### Stage 6 — Full import `[IN PROGRESS — 35-37 of 38]`
+### Stage 6 — Full import `[COMPLETE]`
 
 | Phase | What | Status |
 |---|---|---|
 | 35 | MusicXML parser v2 (§10.4) — every element the renderer now supports | ✅ (Tier 1); Tier 2/3 remain |
 | 36 | `.mxl` support + `<score-timewise>` conversion | ✅ |
 | 37 | Cross-software compatibility corpus and fixes (§10.8) | ✅ (representative fixtures; no real program access) |
-| 38 | Diagnostics and partial-render hardening (§10.7) | |
+| 38 | Diagnostics and partial-render hardening (§10.7) | ✅ (fixed 2 real crash bugs) |
 
 ### Stage 7 — MIDI and timing ← entirely absent from v1 (§2.1)
 

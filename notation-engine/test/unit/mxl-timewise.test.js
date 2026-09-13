@@ -14,16 +14,17 @@ const MXL_DIR = path.join(__dirname, '..', 'fixtures', 'mxl');
 const NE = loadEngine();
 const domParser = testDomParser();
 
-describe('.mxl support (Phase 36)', () => {
+describe('.mxl support (Phase 36/38)', () => {
   test('unzipMxl follows the container.xml pointer and extracts the real score text', () => {
     const bytes = fs.readFileSync(path.join(MXL_DIR, 'simple-single-voice.mxl'));
-    const xmlText = NE.unzipMxl(new Uint8Array(bytes), domParser);
+    const { xmlText, diagnostics } = NE.unzipMxl(new Uint8Array(bytes), domParser);
+    assert.deepEqual([...diagnostics], []);
     assert.match(xmlText, /<score-partwise/);
   });
 
   test('an unzipped .mxl file renders BYTE-IDENTICAL output to the original uncompressed .musicxml file', () => {
     const bytes = fs.readFileSync(path.join(MXL_DIR, 'simple-single-voice.mxl'));
-    const xmlText = NE.unzipMxl(new Uint8Array(bytes), domParser);
+    const { xmlText } = NE.unzipMxl(new Uint8Array(bytes), domParser);
     const { svg: mxlSvg, diagnostics: mxlDiagnostics } = NE.renderFromMusicXml(xmlText, { domParser });
 
     const originalXml = fs.readFileSync(path.join(MUSICXML_DIR, 'simple-single-voice.musicxml'), 'utf8');
@@ -33,16 +34,35 @@ describe('.mxl support (Phase 36)', () => {
     assert.equal(mxlSvg, originalSvg);
   });
 
-  test('unzipMxl throws a clear error for an archive with no META-INF/container.xml', () => {
+  test('unzipMxl NEVER throws -- a missing META-INF/container.xml produces a diagnostic and undefined xmlText', () => {
     const bytes = zipSync({ 'not-a-container.xml': strToU8('hello') });
-    assert.throws(() => NE.unzipMxl(bytes, domParser), /container\.xml/);
+    const { xmlText, diagnostics } = NE.unzipMxl(bytes, domParser);
+    assert.equal(xmlText, undefined);
+    assert.ok([...diagnostics].some((d) => d.code === 'MXL_MISSING_CONTAINER'));
   });
 
-  test("unzipMxl throws a clear error when container.xml's rootfile points to a missing entry", () => {
+  test("unzipMxl NEVER throws -- a container.xml with no <rootfile> pointer at all produces a diagnostic and undefined xmlText", () => {
+    const containerXml = '<?xml version="1.0"?><container><rootfiles></rootfiles></container>';
+    const bytes = zipSync({ 'META-INF/container.xml': strToU8(containerXml) });
+    const { xmlText, diagnostics } = NE.unzipMxl(bytes, domParser);
+    assert.equal(xmlText, undefined);
+    assert.ok([...diagnostics].some((d) => d.code === 'MXL_MISSING_ROOTFILE_POINTER'));
+  });
+
+  test("unzipMxl NEVER throws -- container.xml's rootfile pointing to a missing entry produces a diagnostic and undefined xmlText", () => {
     const containerXml =
       '<?xml version="1.0"?><container><rootfiles><rootfile full-path="missing.xml"/></rootfiles></container>';
     const bytes = zipSync({ 'META-INF/container.xml': strToU8(containerXml) });
-    assert.throws(() => NE.unzipMxl(bytes, domParser), /isn't in the archive/);
+    const { xmlText, diagnostics } = NE.unzipMxl(bytes, domParser);
+    assert.equal(xmlText, undefined);
+    assert.ok([...diagnostics].some((d) => d.code === 'MXL_MISSING_SCORE_FILE'));
+  });
+
+  test('unzipMxl NEVER throws -- genuinely non-ZIP bytes produce a diagnostic and undefined xmlText', () => {
+    const garbage = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    const { xmlText, diagnostics } = NE.unzipMxl(garbage, domParser);
+    assert.equal(xmlText, undefined);
+    assert.ok([...diagnostics].some((d) => d.code === 'MXL_INVALID_ARCHIVE'));
   });
 });
 

@@ -98,6 +98,27 @@ export function parseNoteElement(
   // advancing the shared tick cursor as if it were a real rhythmic event.
   const isGrace = firstChildNamed(noteEl, 'grace') !== undefined;
 
+  // §10.7/Phase 38: a non-positive <divisions> (0, or -- in principle,
+  // though never legally negative per the spec -- a negative value from
+  // a genuinely malformed file) would make xmlDivisionsToTicks divide by
+  // zero or invert every duration. Recovered here, at the boundary where
+  // untrusted file data meets that function's own strict contract,
+  // rather than by weakening xmlDivisionsToTicks itself -- its callers
+  // elsewhere in this codebase pass only already-validated values and
+  // should keep getting a hard failure if THEY misuse it.
+  let safeDivisions = currentDivisions;
+  if (safeDivisions <= 0) {
+    diagnostics.push(
+      diagnostic(
+        'warning',
+        'INVALID_DIVISIONS',
+        `<divisions> must be positive, got ${safeDivisions}; assuming 1.`,
+        location,
+      ),
+    );
+    safeDivisions = 1;
+  }
+
   const rawDuration = intOf(firstChildNamed(noteEl, 'duration'));
   let ticks: number;
   if (isGrace) {
@@ -111,9 +132,9 @@ export function parseNoteElement(
         location,
       ),
     );
-    ticks = xmlDivisionsToTicks(currentDivisions, currentDivisions); // one quarter note's ticks
+    ticks = xmlDivisionsToTicks(safeDivisions, safeDivisions); // one quarter note's ticks
   } else {
-    ticks = xmlDivisionsToTicks(rawDuration, currentDivisions);
+    ticks = xmlDivisionsToTicks(rawDuration, safeDivisions);
   }
 
   const dots = childrenNamed(noteEl, 'dot').length;

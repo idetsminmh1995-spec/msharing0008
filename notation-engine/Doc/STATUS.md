@@ -11,10 +11,10 @@ after Phase 29 (end of Stage 4).
 
 ---
 
-## A. DONE — Phases 1–37 ✅ (Stage 2, 3, 4 & 5 complete; Stage 6 in progress)
+## A. DONE — Phases 1–38 ✅ (Stage 2 through 6 complete)
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 329/329 across them.
+`npm run verify` passes 339/339 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -55,6 +55,7 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 35 | MusicXML parser v2 (Tier 1) | midi-instrument/notehead/grace/tuplet-ratio/stem/accidental parsed + wired; 2 real bugs found+fixed | [`phase-35`](./phase-35-musicxml-parser-v2.md) |
 | 36 | `.mxl` + score-timewise | Both confirmed byte-identical to partwise/uncompressed rendering; wired into the web app | [`phase-36`](./phase-36-mxl-timewise.md) |
 | 37 | Cross-software corpus | 7 §10.8 divergences covered by real fixtures; fixed a real `<tied>`-only-tie bug | [`phase-37`](./phase-37-cross-software-corpus.md) |
+| 38 | Diagnostics hardening | Fixed 2 real crash bugs (`.mxl` throwing, zero-divisions) + a real test-coverage gap; dynamic code-coverage check | [`phase-38`](./phase-38-diagnostics-hardening.md) |
 
 **Public API today:** 137 exports from `dist/notation-engine.js`.
 
@@ -68,11 +69,6 @@ that specifies it.
 ### Stage 5 — Expression
 | # | Phase | Spec |
 |---|---|---|
-
-### Stage 6 — Full import
-| # | Phase | Spec |
-|---|---|---|
-| **38** | Diagnostics and partial-render hardening | §10.7 |
 
 ### Stage 7 — MIDI and timing ← the whole area v1 was missing
 | # | Phase | Spec |

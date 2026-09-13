@@ -15,7 +15,18 @@ doesn't violate `§1`'s independence requirement), reads
 pointer to find the real score file — **never assumes a filename**,
 exactly as `§10.2` requires (some exporters use the score's own title,
 others a generic name). Returns the score file's raw text, ready for the
-existing `parseMusicXml`/`renderFromMusicXml`. Throws a clear, specific
+existing `parseMusicXml`/`renderFromMusicXml`.
+
+> **Updated by Phase 38**: this originally *threw* a distinct error for
+> each real failure mode. Phase 38's hardening pass found this
+> inconsistent with `§10.7`'s own "never throws on malformed input"
+> philosophy and changed `unzipMxl` to return `{ xmlText, diagnostics }`
+> instead — see `Doc/phase-38-diagnostics-hardening.md` for the full
+> story. The description below is kept as a historical record of what
+> this phase originally built; treat `Doc/phase-38-diagnostics-hardening.md`
+> as authoritative for `unzipMxl`'s current behavior.
+
+Throws a clear, specific
 error for each real failure mode: no `container.xml` at all, no
 `<rootfile>` pointer inside it, or a pointer to an entry that isn't
 actually in the archive — each a genuinely different malformed-*archive*
@@ -68,10 +79,11 @@ already-established, already-verified uncompressed/partwise path:
   existing partwise fixture. Confirmed the parsed `Score`'s part/
   measure/voice/event counts match, and confirmed the **full rendered
   SVG is byte-identical** to the partwise version.
-- Confirmed `unzipMxl` throws distinct, specific errors for a missing
-  `container.xml` and for a `container.xml` whose pointer targets a
-  nonexistent entry — two different failure modes, not conflated into
-  one message.
+- Confirmed `unzipMxl` originally threw distinct, specific errors for a
+  missing `container.xml` and for a `container.xml` whose pointer
+  targets a nonexistent entry — two different failure modes, not
+  conflated into one message (Phase 38 later changed this to a
+  non-throwing diagnostic shape; see the note in §1 above).
 - Confirmed a genuinely unrecognized root (neither partwise nor
   timewise) still produces `UNSUPPORTED_ROOT` and never throws.
 - Simulated the actual browser upload path end to end (native

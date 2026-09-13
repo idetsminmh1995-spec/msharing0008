@@ -245,17 +245,12 @@ describe('MusicXML parser v1 (Phase 20)', () => {
     assert.equal(events[0].pitch.step, 'C');
   });
 
-  test('every diagnostic code the parser can emit is covered by a test in this file', () => {
-    // Guards against a future recovery rule being added to the parser
-    // without a matching test -- §10.7 requires asserting the exact code.
-    const EMITTED_CODES = [
-      'INVALID_CHORD', 'INVALID_PITCH_STEP', 'MEASURE_OVERRUN', 'MISSING_DIVISIONS',
-      'MISSING_DURATION', 'MISSING_OCTAVE', 'NO_MEASURES', 'UNKNOWN_DURATION_TYPE',
-      'UNKNOWN_ELEMENT', 'UNSUPPORTED_NOTE', 'UNSUPPORTED_ROOT',
-    ];
-    const source = fs.readFileSync(fileURLToPath(import.meta.url), 'utf8');
-    for (const code of EMITTED_CODES) {
-      assert.ok(source.includes(`'${code}'`), `No test asserts the ${code} diagnostic`);
-    }
-  });
+  // The old hand-maintained EMITTED_CODES coverage check that used to
+  // live here was replaced in Phase 38 by a dynamic version
+  // (test/unit/diagnostics-hardening.test.js) that scans the actual
+  // parser source for every diagnostic code and checks coverage across
+  // the WHOLE test suite, not just this one file's hardcoded list --
+  // strictly more robust, so kept in one place instead of two
+  // diverging mechanisms for the same concern.
+
 });

@@ -59268,6 +59268,18 @@ ${denominator}`;
     const voice2 = intOf(firstChildNamed(noteEl, "voice")) ?? 1;
     const staff = intOf(firstChildNamed(noteEl, "staff"));
     const isGrace = firstChildNamed(noteEl, "grace") !== void 0;
+    let safeDivisions = currentDivisions;
+    if (safeDivisions <= 0) {
+      diagnostics.push(
+        diagnostic(
+          "warning",
+          "INVALID_DIVISIONS",
+          `<divisions> must be positive, got ${safeDivisions}; assuming 1.`,
+          location
+        )
+      );
+      safeDivisions = 1;
+    }
     const rawDuration = intOf(firstChildNamed(noteEl, "duration"));
     let ticks;
     if (isGrace) {
@@ -59281,9 +59293,9 @@ ${denominator}`;
           location
         )
       );
-      ticks = xmlDivisionsToTicks(currentDivisions, currentDivisions);
+      ticks = xmlDivisionsToTicks(safeDivisions, safeDivisions);
     } else {
-      ticks = xmlDivisionsToTicks(rawDuration, currentDivisions);
+      ticks = xmlDivisionsToTicks(rawDuration, safeDivisions);
     }
     const dots = childrenNamed(noteEl, "dot").length;
     const rawType = textOf(firstChildNamed(noteEl, "type"));
@@ -60215,12 +60227,30 @@ ${denominator}`;
 
   // src/parser/musicxml/mxl.ts
   function unzipMxl(bytes, domParser) {
-    const files = unzipSync(bytes);
+    const diagnostics = [];
+    let files;
+    try {
+      files = unzipSync(bytes);
+    } catch {
+      diagnostics.push(
+        diagnostic(
+          "error",
+          "MXL_INVALID_ARCHIVE",
+          "Could not read this file as a .mxl (ZIP) archive."
+        )
+      );
+      return { xmlText: void 0, diagnostics };
+    }
     const containerBytes = files["META-INF/container.xml"];
     if (containerBytes === void 0) {
-      throw new Error(
-        ".mxl archive has no META-INF/container.xml -- cannot find the score file inside it."
+      diagnostics.push(
+        diagnostic(
+          "error",
+          "MXL_MISSING_CONTAINER",
+          ".mxl archive has no META-INF/container.xml -- cannot find the score file inside it."
+        )
       );
+      return { xmlText: void 0, diagnostics };
     }
     const containerXml = strFromU8(containerBytes);
     const containerDoc = new domParser().parseFromString(containerXml, "application/xml");
@@ -60229,15 +60259,27 @@ ${denominator}`;
     const rootfileEl = rootfilesEl !== void 0 ? firstChildNamed(rootfilesEl, "rootfile") : void 0;
     const fullPath = rootfileEl?.getAttribute("full-path");
     if (fullPath === null || fullPath === void 0) {
-      throw new Error(`.mxl archive's container.xml has no <rootfile full-path="..."> pointer.`);
+      diagnostics.push(
+        diagnostic(
+          "error",
+          "MXL_MISSING_ROOTFILE_POINTER",
+          `.mxl archive's container.xml has no <rootfile full-path="..."> pointer.`
+        )
+      );
+      return { xmlText: void 0, diagnostics };
     }
     const scoreBytes = files[fullPath];
     if (scoreBytes === void 0) {
-      throw new Error(
-        `.mxl archive's container.xml points to "${fullPath}", but that file isn't in the archive.`
+      diagnostics.push(
+        diagnostic(
+          "error",
+          "MXL_MISSING_SCORE_FILE",
+          `.mxl archive's container.xml points to "${fullPath}", but that file isn't in the archive.`
+        )
       );
+      return { xmlText: void 0, diagnostics };
     }
-    return strFromU8(scoreBytes);
+    return { xmlText: strFromU8(scoreBytes), diagnostics };
   }
 
   // src/layout/naive.ts
