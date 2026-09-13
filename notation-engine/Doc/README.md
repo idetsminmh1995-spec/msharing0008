@@ -55,6 +55,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-27-slurs.md`](./phase-27-slurs.md) | Phase 27 slurs (whole-span side rule; geometry built, not yet wired -- parsing is v2 scope) |
 | [`phase-28-tuplets.md`](./phase-28-tuplets.md) | Phase 28 tuplets (bracket-needed rule, stem-side placement; geometry built, not yet wired) |
 | [`phase-29-grand-staff-multi-part.md`](./phase-29-grand-staff-multi-part.md) | Phase 29 grand staff/multi-part (brace rule, system stacking; geometry built, not yet wired) |
+| [`phase-30-articulations-ornaments.md`](./phase-30-articulations-ornaments.md) | Phase 30 articulations (opposite-stem, marcato exception) + ornaments (always above); not yet wired |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

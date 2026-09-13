@@ -1197,6 +1197,101 @@ stacked staves are a fixed default, not content-aware.
 
 ---
 
+### 9.19 Articulations `[BUILT for geometry/rendering -- not wired, see Doc/phase-30-articulations-ornaments.md]`
+
+**Responsibility.** The small marks attached directly to a note —
+staccato, accent, tenuto, marcato, staccatissimo — indicating how it
+should be attacked or released. `<articulations>` under `<notations>` is
+v2 parser scope (§10.4); this section is the geometry, independent of
+when parsing catches up.
+
+**Side (above/below), confirmed by Dorico's own published conventions and
+cross-checked against three independent teaching sources with full
+agreement**: the default rule is "notehead side" — which resolves, for a
+single note, to the exact same *opposite-of-stem* relationship ties
+already use (§9.15): stem down → mark above; stem up → mark below. One
+real, named exception exists in single-voice writing: **marcato is
+always placed above the staff**, regardless of stem direction — every
+source consulted agrees on this specific exception with no disagreement.
+
+**Glyphs are real, pre-drawn per side** — checked `glyphnames.json` before
+assuming a single glyph needing rotation/flipping: every articulation in
+SMuFL already has separate `...Above`/`...Below` variants
+(`articStaccatoAbove`/`articStaccatoBelow`, etc.), so side selection is
+just picking the correspondingly-suffixed name, no transform needed
+(unlike, say, Phase 29's brace, which genuinely needs scaling).
+
+**Scope for this section**: five common articulation types — accent,
+staccato, tenuto, marcato, staccatissimo. SMuFL defines many combined
+marks (`articAccentStaccato`, `articMarcatoTenuto`, etc.); supporting
+combinations is a stated future extension, not implemented here.
+
+**Interfaces.**
+```ts
+type ArticulationType = 'accent' | 'staccato' | 'tenuto' | 'marcato' | 'staccatissimo';
+articulationSide(type, stemDirection): 'above' | 'below'
+articulationGlyphName(type, side): string
+```
+
+**Tests.** Accent/staccato/tenuto/staccatissimo all follow the
+opposite-of-stem rule identically to `tieSide` (down→above, up→below);
+marcato is above regardless of stem direction, confirmed for BOTH stem
+directions explicitly (not just one, since the whole point is that it
+*doesn't* vary); every type×side combination resolves to a real glyph.
+
+**Known limitation.** The documented multi-voice exception (marks move to
+the *stem* side, not the notehead side, when multiple voices share a
+staff, to keep each voice's marks unambiguous) is not implemented —
+this section only covers the single-voice default. Combined articulation
+marks (staccato+accent, etc.) are not implemented either, per the scope
+note above.
+
+---
+
+### 9.20 Ornaments `[BUILT for geometry/rendering -- not wired, see Doc/phase-30-articulations-ornaments.md]`
+
+**Responsibility.** Trill, mordent, turn — symbols indicating a rapid
+melodic decoration around the written note. `<ornaments>` under
+`<notations>` is v2 parser scope (§10.4), the same situation as
+articulations above; this section is the geometry.
+
+**Placement is simpler than articulations, and genuinely different from
+them**: multiple clean, mutually-agreeing sources describe ornaments as
+placed **above the note by default, unconditionally** — not dependent on
+stem direction the way articulations are. (One lower-quality source
+claimed a stem-dependent rule for trills specifically; discounted here in
+favor of the clean, mutually-agreeing majority, and because it directly
+contradicted itself within the same passage about whether the rule was
+stem-based or position-based — not a reliable single citation to build a
+rule on.) This is a genuinely different placement *shape* from
+`§9.19`'s articulations, worth stating plainly rather than assuming the
+two categories work the same way just because both are "marks near a
+note."
+
+**Scope**: three ornament types — trill, mordent, turn — using real
+SMuFL glyphs confirmed in `glyphnames.json` before assuming otherwise:
+`ornamentTrill`, `ornamentMordent`, `ornamentTurn` (plus
+`ornamentTurnInverted` for the inverted turn). **No separate simple
+"inverted mordent" glyph exists** in this SMuFL build (only the plain
+`ornamentMordent` and unrelated lute/precomposed variants) — stated as a
+real gap rather than substituting a wrong glyph.
+
+**Interfaces.**
+```ts
+type OrnamentType = 'trill' | 'mordent' | 'turn' | 'turnInverted'
+ornamentGlyphName(type): string   // always 'above' -- no side parameter needed
+```
+
+**Tests.** Every ornament type resolves to its real, distinct glyph;
+confirmed that (unlike articulations) there is no stem-direction
+parameter in the interface at all, since none is needed.
+
+**Known limitation.** No inverted/lower mordent (no such simple glyph
+exists in this SMuFL build); no precomposed trill-with-termination or
+similar compound ornaments.
+
+---
+
 ## 10. Module: `parser/musicxml/` — MusicXML Parser `[IN PROGRESS — v1 built (Phase 20); .mxl/score-timewise/v2 elements are Phase 35-36]`
 
 **Responsibility.** Turn any valid MusicXML document into a `Score` (§6),
@@ -1976,15 +2071,15 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 28 | Tuplets | ✅ (geometry); wiring pending v2 parser |
 | 29 | Grand staff / multi-part systems | ✅ (geometry/layout); render-loop wiring pending |
 
-### Stage 5 — Expression
+### Stage 5 — Expression `[IN PROGRESS — 30 of 34]`
 
-| Phase | What |
-|---|---|
-| 30 | Articulations and ornaments |
-| 31 | Dynamics, hairpins, tempo marks, rehearsal marks |
-| 32 | Lyrics |
-| 33 | Chord symbols |
-| 34 | Grace notes |
+| Phase | What | Status |
+|---|---|---|
+| 30 | Articulations and ornaments | ✅ (geometry); wiring pending v2 parser |
+| 31 | Dynamics, hairpins, tempo marks, rehearsal marks | |
+| 32 | Lyrics | |
+| 33 | Chord symbols | |
+| 34 | Grace notes | |
 
 ### Stage 6 — Full import
 

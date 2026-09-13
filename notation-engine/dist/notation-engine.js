@@ -41,6 +41,8 @@ var NotationEngine = (() => {
     accidentalGlyphName: () => accidentalGlyphName,
     accidentalX: () => accidentalX,
     applyTuplet: () => applyTuplet,
+    articulationGlyphName: () => articulationGlyphName,
+    articulationSide: () => articulationSide,
     assignAccidentalColumns: () => assignAccidentalColumns,
     automaticStemDirection: () => automaticStemDirection,
     baseTicksForType: () => baseTicksForType,
@@ -100,6 +102,7 @@ var NotationEngine = (() => {
     noteheadWidth: () => noteheadWidth,
     numBeamLines: () => numBeamLines,
     numeratorText: () => numeratorText,
+    ornamentGlyphName: () => ornamentGlyphName,
     parseMusicXml: () => parseMusicXml,
     part: () => part,
     pitchedPitch: () => pitchedPitch,
@@ -114,6 +117,7 @@ var NotationEngine = (() => {
     renderFromMusicXml: () => renderFromMusicXml,
     renderKeySignature: () => renderKeySignature,
     renderLedgerLines: () => renderLedgerLines,
+    renderMark: () => renderMark,
     renderNotehead: () => renderNotehead,
     renderRest: () => renderRest,
     renderSlur: () => renderSlur,
@@ -58531,6 +58535,35 @@ var NotationEngine = (() => {
     return { x, topY: topStaffY, bottomY: bottomStaffY };
   }
 
+  // src/geometry/articulation.ts
+  function articulationSide(type, stemDirection) {
+    if (type === "marcato") {
+      return "above";
+    }
+    return stemDirection === "down" ? "above" : "below";
+  }
+  var GLYPH_NAMES = {
+    accent: { above: "articAccentAbove", below: "articAccentBelow" },
+    staccato: { above: "articStaccatoAbove", below: "articStaccatoBelow" },
+    tenuto: { above: "articTenutoAbove", below: "articTenutoBelow" },
+    marcato: { above: "articMarcatoAbove", below: "articMarcatoBelow" },
+    staccatissimo: { above: "articStaccatissimoAbove", below: "articStaccatissimoBelow" }
+  };
+  function articulationGlyphName(type, side) {
+    return GLYPH_NAMES[type][side];
+  }
+
+  // src/geometry/ornament.ts
+  var GLYPH_NAMES2 = {
+    trill: "ornamentTrill",
+    mordent: "ornamentMordent",
+    turn: "ornamentTurn",
+    turnInverted: "ornamentTurnInverted"
+  };
+  function ornamentGlyphName(type) {
+    return GLYPH_NAMES2[type];
+  }
+
   // src/geometry/beam-shape.ts
   var MAX_BEAM_SLOPE = 1;
   function naturalStemTipY(position, direction, stemLength) {
@@ -58953,6 +58986,17 @@ ${denominator}`;
     const scaleY = nominalHeight !== 0 ? targetHeight / nominalHeight : 1;
     const inner = svgGlyphText(0, 0, glyph.char, options.fontFamily, { fill: options.color });
     return `<g transform="translate(${shape.x} ${shape.topY}) scale(1 ${scaleY})">${inner}</g>`;
+  }
+
+  // src/render/mark.ts
+  function renderMark(glyphName, options) {
+    const glyph = getGlyph(glyphName);
+    if (glyph === void 0) {
+      throw new Error(`No glyph found for mark "${glyphName}"`);
+    }
+    return svgGlyphText(options.x, options.y, glyph.char, options.fontFamily, {
+      fill: options.color
+    });
   }
 
   // src/config/config.ts
