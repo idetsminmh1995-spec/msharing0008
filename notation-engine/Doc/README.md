@@ -65,6 +65,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-37-cross-software-corpus.md`](./phase-37-cross-software-corpus.md) | Phase 37 cross-software corpus (§10.8 divergences; fixed a real tied-only-tie bug) |
 | [`phase-38-diagnostics-hardening.md`](./phase-38-diagnostics-hardening.md) | Phase 38 diagnostics hardening (fixed 2 real crash bugs + a real test-coverage gap; completes Stage 6) |
 | [`phase-39-midi-parser.md`](./phase-39-midi-parser.md) | Phase 39 Standard MIDI File parser (VLQ, running status, tempo/meta timeline; starts Stage 7) |
+| [`phase-40-timing-engine.md`](./phase-40-timing-engine.md) | Phase 40 timing engine (anti-drift TempoMap, tick<->seconds, tick<->measure/beat; passes 10-min drift test) |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

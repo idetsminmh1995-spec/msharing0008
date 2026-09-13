@@ -1727,7 +1727,7 @@ rather than an exception.
 
 ---
 
-## 12. Module: `timing/` — Musical Timing Engine `[TODO]`
+## 12. Module: `timing/` — Musical Timing Engine `[BUILT -- see Doc/phase-40-timing-engine.md]`
 
 **Responsibility.** Convert between the three time domains that must stay
 consistent: **ticks** (musical), **seconds** (wall clock), and
@@ -2328,12 +2328,12 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 37 | Cross-software compatibility corpus and fixes (§10.8) | ✅ (representative fixtures; no real program access) |
 | 38 | Diagnostics and partial-render hardening (§10.7) | ✅ (fixed 2 real crash bugs) |
 
-### Stage 7 — MIDI and timing ← entirely absent from v1 (§2.1) `[IN PROGRESS — 39 of 42]`
+### Stage 7 — MIDI and timing ← entirely absent from v1 (§2.1) `[IN PROGRESS — 39-40 of 42]`
 
 | Phase | What | Status |
 |---|---|---|
 | 39 | Standard MIDI File parser (§11) | ✅ |
-| 40 | Timing engine: tempo map, tick↔seconds, measure/beat (§12) | |
+| 40 | Timing engine: tempo map, tick↔seconds, measure/beat (§12) | ✅ |
 | 41 | Drum mapping table + GM defaults (§13.3) | |
 | 42 | MIDI↔MusicXML alignment (§13.1–§13.2) | |
 

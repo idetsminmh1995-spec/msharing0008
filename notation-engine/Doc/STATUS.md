@@ -11,10 +11,10 @@ after Phase 29 (end of Stage 4).
 
 ---
 
-## A. DONE — Phases 1–39 ✅ (Stage 2 through 6 complete; Stage 7 in progress)
+## A. DONE — Phases 1–40 ✅ (Stage 2 through 6 complete; Stage 7 in progress)
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 361/361 across them.
+`npm run verify` passes 374/374 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -57,6 +57,7 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 37 | Cross-software corpus | 7 §10.8 divergences covered by real fixtures; fixed a real `<tied>`-only-tie bug | [`phase-37`](./phase-37-cross-software-corpus.md) |
 | 38 | Diagnostics hardening | Fixed 2 real crash bugs (`.mxl` throwing, zero-divisions) + a real test-coverage gap; dynamic code-coverage check | [`phase-38`](./phase-38-diagnostics-hardening.md) |
 | 39 | Standard MIDI File parser | VLQ, running status, note-on-zero, tempo/timesig/keysig meta events, 480-tick normalization; never throws | [`phase-39`](./phase-39-midi-parser.md) |
+| 40 | Timing engine | Anti-drift TempoMap (precompute-once), tick<->seconds, tick<->measure/beat; passes required 10-min drift test | [`phase-40`](./phase-40-timing-engine.md) |
 
 **Public API today:** 137 exports from `dist/notation-engine.js`.
 
@@ -74,7 +75,6 @@ that specifies it.
 ### Stage 7 — MIDI and timing ← the whole area v1 was missing
 | # | Phase | Spec |
 |---|---|---|
-| **40** | Timing engine: tempo map, tick↔seconds, measure/beat | §12 |
 | **41** | Drum mapping table + GM defaults | §13.3 |
 | **42** | MIDI ↔ MusicXML alignment | §13.1–§13.2 |
 

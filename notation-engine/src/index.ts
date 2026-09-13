@@ -13,4 +13,5 @@ export * from './render/index.js';
 export * from './config/index.js';
 export * from './parser/index.js';
 export * from './layout/index.js';
+export * from './timing/index.js';
 export * from './render-from-musicxml.js';

@@ -51,6 +51,8 @@ var NotationEngine = (() => {
     beamDirection: () => beamDirection,
     beamYAtX: () => beamYAtX,
     beamedEventIndices: () => beamedEventIndices,
+    buildMeasureMap: () => buildMeasureMap,
+    buildTempoMap: () => buildTempoMap,
     cancellationNaturals: () => cancellationNaturals,
     charAdvance: () => charAdvance,
     chord: () => chord,
@@ -123,6 +125,7 @@ var NotationEngine = (() => {
     parseMusicXml: () => parseMusicXml,
     part: () => part,
     pitchedPitch: () => pitchedPitch,
+    positionToTick: () => positionToTick,
     readVariableLengthQuantity: () => readVariableLengthQuantity,
     rehearsalMarkSide: () => rehearsalMarkSide,
     renderAccidental: () => renderAccidental,
@@ -156,6 +159,7 @@ var NotationEngine = (() => {
     restGlyphName: () => restGlyphName,
     restY: () => restY,
     score: () => score,
+    secondsToTick: () => secondsToTick,
     selectNoteheadGlyphName: () => selectNoteheadGlyphName,
     shapeGlyphName: () => shapeGlyphName,
     sharpsForCount: () => sharpsForCount,
@@ -171,11 +175,14 @@ var NotationEngine = (() => {
     svgText: () => svgText,
     tempoMarkSide: () => tempoMarkSide,
     textWidth: () => textWidth,
+    tickToPosition: () => tickToPosition,
+    tickToSeconds: () => tickToSeconds,
     ticksForDisplayedDuration: () => ticksForDisplayedDuration,
     ticksToXmlDivisions: () => ticksToXmlDivisions,
     ticksWithDots: () => ticksWithDots,
     tieSide: () => tieSide,
     timeSignature: () => timeSignature,
+    timingDiagnostic: () => timingDiagnostic,
     tupletBracketNeeded: () => tupletBracketNeeded,
     tupletDigitGlyphName: () => tupletDigitGlyphName,
     tupletSide: () => tupletSide,
@@ -60667,6 +60674,224 @@ ${denominator}`;
       y += partGap - staffGap;
     });
     return { positions };
+  }
+
+  // src/timing/diagnostic.ts
+  function timingDiagnostic(severity, code, message) {
+    return { severity, code, message };
+  }
+
+  // src/timing/tempo-map.ts
+  var DEFAULT_MICROSECONDS_PER_QUARTER = 5e5;
+  function buildTempoMap(rawEvents) {
+    const diagnostics = [];
+    const sorted = [...rawEvents].sort((a, b) => a.tick - b.tick);
+    const byTick = /* @__PURE__ */ new Map();
+    for (const e of sorted) byTick.set(e.tick, e.microsecondsPerQuarter);
+    let dedupedTicks = [...byTick.keys()].sort((a, b) => a - b);
+    if (dedupedTicks.length === 0) {
+      diagnostics.push(
+        timingDiagnostic(
+          "warning",
+          "EMPTY_TEMPO_MAP",
+          "No tempo events at all; assuming a constant 120 BPM."
+        )
+      );
+      return {
+        tempoMap: {
+          segments: [
+            {
+              startTick: 0,
+              startSeconds: 0,
+              microsecondsPerQuarter: DEFAULT_MICROSECONDS_PER_QUARTER
+            }
+          ]
+        },
+        diagnostics
+      };
+    }
+    if (dedupedTicks[0] !== 0) {
+      dedupedTicks = [0, ...dedupedTicks];
+      byTick.set(0, DEFAULT_MICROSECONDS_PER_QUARTER);
+    }
+    const segments = [];
+    let previousStartSeconds = 0;
+    let previousStartTick = 0;
+    let previousMicrosecondsPerQuarter = DEFAULT_MICROSECONDS_PER_QUARTER;
+    dedupedTicks.forEach((tick, index) => {
+      const microsecondsPerQuarter = byTick.get(tick) ?? DEFAULT_MICROSECONDS_PER_QUARTER;
+      if (index === 0) {
+        segments.push({ startTick: tick, startSeconds: 0, microsecondsPerQuarter });
+        previousStartSeconds = 0;
+        previousStartTick = tick;
+        previousMicrosecondsPerQuarter = microsecondsPerQuarter;
+        return;
+      }
+      const startSeconds = previousStartSeconds + (tick - previousStartTick) / TICKS_PER_QUARTER * (previousMicrosecondsPerQuarter / 1e6);
+      segments.push({ startTick: tick, startSeconds, microsecondsPerQuarter });
+      previousStartSeconds = startSeconds;
+      previousStartTick = tick;
+      previousMicrosecondsPerQuarter = microsecondsPerQuarter;
+    });
+    return { tempoMap: { segments }, diagnostics };
+  }
+
+  // src/timing/tick-seconds.ts
+  function findSegmentForTick(tempoMap, tick) {
+    const segments = tempoMap.segments;
+    const first = segments[0];
+    if (first === void 0) {
+      throw new Error("TempoMap has no segments -- buildTempoMap should never produce this.");
+    }
+    if (tick <= first.startTick) return first;
+    let low = 0;
+    let high = segments.length - 1;
+    while (low < high) {
+      const mid = Math.ceil((low + high) / 2);
+      const midSegment = segments[mid];
+      if (midSegment !== void 0 && midSegment.startTick <= tick) {
+        low = mid;
+      } else {
+        high = mid - 1;
+      }
+    }
+    return segments[low] ?? first;
+  }
+  function findSegmentForSeconds(tempoMap, seconds) {
+    const segments = tempoMap.segments;
+    const first = segments[0];
+    if (first === void 0) {
+      throw new Error("TempoMap has no segments -- buildTempoMap should never produce this.");
+    }
+    if (seconds <= first.startSeconds) return first;
+    let low = 0;
+    let high = segments.length - 1;
+    while (low < high) {
+      const mid = Math.ceil((low + high) / 2);
+      const midSegment = segments[mid];
+      if (midSegment !== void 0 && midSegment.startSeconds <= seconds) {
+        low = mid;
+      } else {
+        high = mid - 1;
+      }
+    }
+    return segments[low] ?? first;
+  }
+  function tickToSeconds(tempoMap, tick) {
+    const s = findSegmentForTick(tempoMap, tick);
+    return s.startSeconds + (tick - s.startTick) / TICKS_PER_QUARTER * (s.microsecondsPerQuarter / 1e6);
+  }
+  function secondsToTick(tempoMap, seconds) {
+    const s = findSegmentForSeconds(tempoMap, seconds);
+    return s.startTick + (seconds - s.startSeconds) * 1e6 * TICKS_PER_QUARTER / s.microsecondsPerQuarter;
+  }
+
+  // src/timing/measure-position.ts
+  var DEFAULT_NUMERATOR = 4;
+  var DEFAULT_DENOMINATOR = 4;
+  function measureLengthTicks(numerator, denominator) {
+    return numerator * (4 / denominator) * TICKS_PER_QUARTER;
+  }
+  function buildMeasureMap(rawEvents, firstMeasureNumber = 1) {
+    const sorted = [...rawEvents].sort((a, b) => a.tick - b.tick);
+    const byTick = /* @__PURE__ */ new Map();
+    for (const e of sorted)
+      byTick.set(e.tick, { numerator: e.numerator, denominator: e.denominator });
+    let ticks = [...byTick.keys()].sort((a, b) => a - b);
+    if (ticks.length === 0 || ticks[0] !== 0) {
+      ticks = [0, ...ticks];
+      if (!byTick.has(0))
+        byTick.set(0, { numerator: DEFAULT_NUMERATOR, denominator: DEFAULT_DENOMINATOR });
+    }
+    const segments = [];
+    let previousStartTick = 0;
+    let previousMeasureNumber = firstMeasureNumber;
+    let previousNumerator = DEFAULT_NUMERATOR;
+    let previousDenominator = DEFAULT_DENOMINATOR;
+    ticks.forEach((tick, index) => {
+      const sig = byTick.get(tick) ?? {
+        numerator: DEFAULT_NUMERATOR,
+        denominator: DEFAULT_DENOMINATOR
+      };
+      if (index === 0) {
+        segments.push({ startTick: tick, startMeasureNumber: firstMeasureNumber, ...sig });
+        previousStartTick = tick;
+        previousMeasureNumber = firstMeasureNumber;
+        previousNumerator = sig.numerator;
+        previousDenominator = sig.denominator;
+        return;
+      }
+      const elapsedTicks = tick - previousStartTick;
+      const measuresElapsed = Math.round(
+        elapsedTicks / measureLengthTicks(previousNumerator, previousDenominator)
+      );
+      const startMeasureNumber = previousMeasureNumber + measuresElapsed;
+      segments.push({ startTick: tick, startMeasureNumber, ...sig });
+      previousStartTick = tick;
+      previousMeasureNumber = startMeasureNumber;
+      previousNumerator = sig.numerator;
+      previousDenominator = sig.denominator;
+    });
+    return { segments };
+  }
+  function findSegmentForTick2(measureMap, tick) {
+    const segments = measureMap.segments;
+    const first = segments[0];
+    if (first === void 0) {
+      throw new Error("MeasureMap has no segments -- buildMeasureMap should never produce this.");
+    }
+    if (tick <= first.startTick) return first;
+    let low = 0;
+    let high = segments.length - 1;
+    while (low < high) {
+      const mid = Math.ceil((low + high) / 2);
+      const midSegment = segments[mid];
+      if (midSegment !== void 0 && midSegment.startTick <= tick) {
+        low = mid;
+      } else {
+        high = mid - 1;
+      }
+    }
+    return segments[low] ?? first;
+  }
+  function tickToPosition(measureMap, tick) {
+    const s = findSegmentForTick2(measureMap, tick);
+    const measureLen = measureLengthTicks(s.numerator, s.denominator);
+    const ticksIntoSegment = tick - s.startTick;
+    const measuresIntoSegment = Math.floor(ticksIntoSegment / measureLen);
+    const measureNumber = s.startMeasureNumber + measuresIntoSegment;
+    const tickInMeasure = ticksIntoSegment - measuresIntoSegment * measureLen;
+    const beatLen = 4 / s.denominator * TICKS_PER_QUARTER;
+    const beat = 1 + tickInMeasure / beatLen;
+    return { measureNumber, beat, tickInMeasure };
+  }
+  function findSegmentForMeasure(measureMap, measureNumber) {
+    const segments = measureMap.segments;
+    const first = segments[0];
+    if (first === void 0) {
+      throw new Error("MeasureMap has no segments -- buildMeasureMap should never produce this.");
+    }
+    if (measureNumber <= first.startMeasureNumber) return first;
+    let low = 0;
+    let high = segments.length - 1;
+    while (low < high) {
+      const mid = Math.ceil((low + high) / 2);
+      const midSegment = segments[mid];
+      if (midSegment !== void 0 && midSegment.startMeasureNumber <= measureNumber) {
+        low = mid;
+      } else {
+        high = mid - 1;
+      }
+    }
+    return segments[low] ?? first;
+  }
+  function positionToTick(measureMap, position) {
+    const s = findSegmentForMeasure(measureMap, position.measureNumber);
+    const measureLen = measureLengthTicks(s.numerator, s.denominator);
+    const measuresIntoSegment = position.measureNumber - s.startMeasureNumber;
+    const beatLen = 4 / s.denominator * TICKS_PER_QUARTER;
+    const tickInMeasure = (position.beat - 1) * beatLen;
+    return s.startTick + measuresIntoSegment * measureLen + tickInMeasure;
   }
 
   // src/render-from-musicxml.ts
