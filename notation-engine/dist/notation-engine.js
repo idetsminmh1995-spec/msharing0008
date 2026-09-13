@@ -93,6 +93,7 @@ var NotationEngine = (() => {
     getKeySignaturePositions: () => getKeySignaturePositions,
     glyphForTimeSigChar: () => glyphForTimeSigChar,
     glyphNameForTimeSigChar: () => glyphNameForTimeSigChar,
+    graceNoteGlyphName: () => graceNoteGlyphName,
     groupBeams: () => groupBeams,
     isPitched: () => isPitched,
     isUnpitched: () => isUnpitched,
@@ -58658,6 +58659,21 @@ var NotationEngine = (() => {
   };
   function chordSymbolQualityGlyphName(quality) {
     return QUALITY_GLYPHS[quality];
+  }
+
+  // src/geometry/grace-note.ts
+  var GLYPH_NAMES4 = {
+    acciaccatura: {
+      up: "graceNoteAcciaccaturaStemUp",
+      down: "graceNoteAcciaccaturaStemDown"
+    },
+    appoggiatura: {
+      up: "graceNoteAppoggiaturaStemUp",
+      down: "graceNoteAppoggiaturaStemDown"
+    }
+  };
+  function graceNoteGlyphName(kind, direction) {
+    return GLYPH_NAMES4[kind][direction];
   }
 
   // src/geometry/beam-shape.ts

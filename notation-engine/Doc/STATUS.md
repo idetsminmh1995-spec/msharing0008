@@ -11,10 +11,10 @@ after Phase 29 (end of Stage 4).
 
 ---
 
-## A. DONE — Phases 1–33 ✅ (Stage 2, 3 & 4 complete; Stage 5 in progress)
+## A. DONE — Phases 1–34 ✅ (Stage 2, 3, 4 & 5 complete)
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 296/296 across them.
+`npm run verify` passes 300/300 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -51,12 +51,13 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 31 | Dynamics/hairpins/tempo/rehearsal | Dynamics+hairpins built (real glyphs, scalable wedge); tempo/rehearsal marks placement-only (text rendering deferred) | [`phase-31`](./phase-31-dynamics-hairpins-tempo-rehearsal.md) |
 | 32 | Lyrics | Real hyphen/elision glyphs + extender line built; syllable text rendering deferred (needs a text-font system) | [`phase-32`](./phase-32-lyrics.md) |
 | 33 | Chord symbols | Real `csym` accidental + 5 quality glyphs built; root letter/bass note deferred (needs a text-font system) | [`phase-33`](./phase-33-chord-symbols.md) |
+| 34 | Grace notes | Real precomposed acciaccatura/appoggiatura glyphs (no text-font gap this time) | [`phase-34`](./phase-34-grace-notes.md) |
 
 **Public API today:** 137 exports from `dist/notation-engine.js`.
 
 ---
 
-## B. NOT DONE — Phases 34–54
+## B. NOT DONE — Phases 35–54
 
 Nothing below exists in `src/` yet. Each line links to the `PLAN.md` section
 that specifies it.
@@ -64,7 +65,6 @@ that specifies it.
 ### Stage 5 — Expression
 | # | Phase | Spec |
 |---|---|---|
-| **34** | Grace notes | §9 |
 
 ### Stage 6 — Full import
 | # | Phase | Spec |

@@ -59,6 +59,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-31-dynamics-hairpins-tempo-rehearsal.md`](./phase-31-dynamics-hairpins-tempo-rehearsal.md) | Phase 31 dynamics + hairpins (built), tempo/rehearsal marks (placement only, text rendering deferred) |
 | [`phase-32-lyrics.md`](./phase-32-lyrics.md) | Phase 32 lyrics (real hyphen/elision glyphs, extender line; syllable text deferred) |
 | [`phase-33-chord-symbols.md`](./phase-33-chord-symbols.md) | Phase 33 chord symbols (real csym accidental + 5 quality glyphs; root letter deferred) |
+| [`phase-34-grace-notes.md`](./phase-34-grace-notes.md) | Phase 34 grace notes (real precomposed acciaccatura/appoggiatura glyphs -- no text-font gap here) |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

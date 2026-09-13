@@ -23,4 +23,5 @@ export * from './hairpin.js';
 export * from './expression-mark.js';
 export * from './lyric.js';
 export * from './chord-symbol.js';
+export * from './grace-note.js';
 export * from './beam-shape.js';

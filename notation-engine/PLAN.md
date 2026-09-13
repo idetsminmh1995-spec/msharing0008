@@ -1477,6 +1477,59 @@ can be drawn.
 
 ---
 
+### 9.24 Grace notes `[BUILT]`
+
+**Responsibility.** Small ornamental notes borrowing time from an
+adjacent main note, with no rhythmic value of their own — the
+acciaccatura (slashed stem, "crushed," very fast) and the appoggiatura
+(unslashed, takes a real proportion of the main note's value). Completes
+Stage 5.
+
+**Unlike Phases 31–33, this section does *not* hit the missing-text-font
+gap** — checked `glyphnames.json` before assuming it would, since three
+consecutive phases just had: Bravura provides **precomposed, direction-
+aware glyphs for the entire grace-note figure** —
+`graceNoteAcciaccaturaStemUp`/`...StemDown` and
+`graceNoteAppoggiaturaStemUp`/`...StemDown` — each one already a
+correctly-scaled small notehead+stem+flag combination, not something
+this section needs to assemble from a full-size notehead scaled down by
+a chosen ratio. This is a materially simpler situation than lyrics/
+tempo-marks/chord-symbols, and is stated as such rather than assumed to
+be the same kind of gap by pattern-matching on "this is Stage 5, so it
+probably needs text too."
+
+**Distinguishing mark, confirmed with full agreement across every source
+consulted (Wikipedia, MasterClass, StudyBass, MuseScore's own handbook,
+and a dedicated music-dictionary entry)**: a slash through the stem means
+acciaccatura; no slash means appoggiatura. No disagreement found on which
+way round this goes.
+
+**Stem direction reuses §9.8's existing rule directly** — confirmed by
+a source stating plainly "their stems follow the same direction rules as
+regular notes." No new direction logic is needed; a grace note's own
+pitch position decides its direction exactly like an ordinary note's.
+
+**Interfaces.**
+```ts
+type GraceNoteKind = 'acciaccatura' | 'appoggiatura'
+graceNoteGlyphName(kind, direction): string
+```
+
+**Tests.** All four kind×direction combinations resolve to real, mutually
+distinct glyphs; `graceNoteGlyphName('acciaccatura', ...)` and
+`graceNoteGlyphName('appoggiatura', ...)` never resolve to the same name
+for the same direction (confirming the slash/no-slash distinction is
+real, not accidentally collapsed).
+
+**Known limitations.** Only a single, unbeamed grace note is covered —
+a group of several grace notes beamed together (common in practice) is
+out of scope, the same kind of scope boundary Phase 24's beam engine
+already has for chords. No independent notehead-shape mapping (§9.7) for
+grace notes — the precomposed glyph's notehead shape is fixed by the
+font, not swappable the way an ordinary note's is.
+
+---
+
 ## 10. Module: `parser/musicxml/` — MusicXML Parser `[IN PROGRESS — v1 built (Phase 20); .mxl/score-timewise/v2 elements are Phase 35-36]`
 
 **Responsibility.** Turn any valid MusicXML document into a `Score` (§6),
@@ -2256,7 +2309,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 28 | Tuplets | ✅ (geometry); wiring pending v2 parser |
 | 29 | Grand staff / multi-part systems | ✅ (geometry/layout); render-loop wiring pending |
 
-### Stage 5 — Expression `[IN PROGRESS — 30-33 of 34]`
+### Stage 5 — Expression `[COMPLETE]`
 
 | Phase | What | Status |
 |---|---|---|
@@ -2264,7 +2317,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 31 | Dynamics, hairpins, tempo marks, rehearsal marks | ✅ (dynamics/hairpins); tempo/rehearsal placement-only |
 | 32 | Lyrics | ✅ (punctuation/placement); syllable text deferred |
 | 33 | Chord symbols | ✅ (accidentals/qualities/placement); root letter deferred |
-| 34 | Grace notes | |
+| 34 | Grace notes | ✅ |
 
 ### Stage 6 — Full import
 
