@@ -54,6 +54,9 @@ var NotationEngine = (() => {
     charAdvance: () => charAdvance,
     chord: () => chord,
     chordStemDirection: () => chordStemDirection,
+    chordSymbolAccidentalGlyphName: () => chordSymbolAccidentalGlyphName,
+    chordSymbolQualityGlyphName: () => chordSymbolQualityGlyphName,
+    chordSymbolSide: () => chordSymbolSide,
     codepointToChar: () => codepointToChar,
     computeBarlineGeometry: () => computeBarlineGeometry,
     computeBeamShape: () => computeBeamShape,
@@ -58624,6 +58627,37 @@ var NotationEngine = (() => {
   }
   function computeExtenderLine(startX, endX, y) {
     return { startX, endX, y };
+  }
+
+  // src/geometry/chord-symbol.ts
+  function chordSymbolSide() {
+    return "above";
+  }
+  var ACCIDENTAL_GLYPHS = {
+    [-2]: "csymAccidentalDoubleFlat",
+    [-1]: "csymAccidentalFlat",
+    0: "csymAccidentalNatural",
+    1: "csymAccidentalSharp",
+    2: "csymAccidentalDoubleSharp"
+  };
+  function chordSymbolAccidentalGlyphName(alter) {
+    const name = ACCIDENTAL_GLYPHS[alter];
+    if (name === void 0) {
+      throw new Error(
+        `No chord-symbol accidental glyph for alter=${alter} (only -2..2 are supported).`
+      );
+    }
+    return name;
+  }
+  var QUALITY_GLYPHS = {
+    minor: "csymMinor",
+    diminished: "csymDiminished",
+    halfDiminished: "csymHalfDiminished",
+    augmented: "csymAugmented",
+    majorSeventh: "csymMajorSeventh"
+  };
+  function chordSymbolQualityGlyphName(quality) {
+    return QUALITY_GLYPHS[quality];
   }
 
   // src/geometry/beam-shape.ts

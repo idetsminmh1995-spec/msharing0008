@@ -1419,6 +1419,64 @@ stack.
 
 ---
 
+### 9.23 Chord symbols `[PARTIAL -- placement/accidentals/qualities built, root letter deferred, see Doc/phase-33-chord-symbols.md]`
+
+**Responsibility.** Lead-sheet harmony markings ("Cmaj7", "Dm7♭5",
+"G7/B") above the melody. `<harmony>` is v2 parser scope (§10.4); this
+section is the geometry.
+
+**Placement is universal with no exception found, unlike lyrics or
+dynamics**: every one of seven independent sources consulted (Berklee's
+own published lead-sheet guide among them) agrees chord symbols sit
+**above the staff**, centered over the beat the harmony begins on. No
+vocal-vs-instrumental split the way `§9.21`/`§9.22` had to account for.
+
+**A chord symbol has three parts, and — checked before assuming
+otherwise — they have genuinely different glyph availability**:
+1. **Root letter** (A–G) — the same gap `§9.21`/`§9.22` already
+   identified: Bravura has no plain Latin-alphabet glyphs at all.
+2. **Root accidental** (♯/♭ on the root) — **real, dedicated glyphs
+   exist**: `csymAccidentalSharp`/`csymAccidentalFlat`/etc., separate
+   from the ordinary notehead-accidental glyphs `§9.11` already uses
+   (checked `glyphnames.json` rather than assuming the two could be
+   shared).
+3. **Quality suffix** — SMuFL defines real glyphs for several common
+   qualities: `csymMinor`, `csymDiminished`, `csymHalfDiminished`,
+   `csymAugmented`, `csymMajorSeventh`. Extended qualities beyond these
+   (add9, sus4, 13, etc.) have no dedicated glyph and would need plain
+   text — the same root-letter gap, not a new one.
+4. **Bracket/parenthesis and altered-bass slash** — also real, dedicated
+   glyphs (`csymBracketLeftTall`/`csymParensLeftTall`/
+   `csymAlteredBassSlash`, etc.).
+
+So a chord symbol is **not** uniformly blocked by the missing-text-font
+gap — only its root letter (and any bass note after a slash, which is
+also a root letter) is. The accidental, the five common qualities, and
+the surrounding brackets/slash can all be assembled from real glyphs
+today.
+
+**Interfaces.**
+```ts
+chordSymbolSide(): 'above'
+chordSymbolAccidentalGlyphName(alter): string   // csym-prefixed, distinct from §9.11's plain accidentals
+chordSymbolQualityGlyphName(quality): string    // 'minor'|'diminished'|'halfDiminished'|'augmented'|'majorSeventh'
+```
+
+**Tests.** `chordSymbolSide` is always `'above'`; every alter value's
+`csym` accidental glyph resolves and is confirmed distinct from `§9.11`'s
+plain accidental glyph for the same alter (proving the two glyph sets
+are genuinely separate, not accidentally aliased); all five quality
+glyphs resolve to real, mutually distinct glyphs.
+
+**Known limitation.** No root-letter (or bass-note) rendering — the same
+text-font gap `§9.21`/`§9.22` already identified, now hit a third time.
+No extended-quality text (add9, sus4, 13, etc.) — same gap. No
+assembly logic combining root+accidental+quality+bass into one
+positioned symbol — meaningless to build before the root letter itself
+can be drawn.
+
+---
+
 ## 10. Module: `parser/musicxml/` — MusicXML Parser `[IN PROGRESS — v1 built (Phase 20); .mxl/score-timewise/v2 elements are Phase 35-36]`
 
 **Responsibility.** Turn any valid MusicXML document into a `Score` (§6),
@@ -2198,14 +2256,14 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 28 | Tuplets | ✅ (geometry); wiring pending v2 parser |
 | 29 | Grand staff / multi-part systems | ✅ (geometry/layout); render-loop wiring pending |
 
-### Stage 5 — Expression `[IN PROGRESS — 30-32 of 34]`
+### Stage 5 — Expression `[IN PROGRESS — 30-33 of 34]`
 
 | Phase | What | Status |
 |---|---|---|
 | 30 | Articulations and ornaments | ✅ (geometry); wiring pending v2 parser |
 | 31 | Dynamics, hairpins, tempo marks, rehearsal marks | ✅ (dynamics/hairpins); tempo/rehearsal placement-only |
 | 32 | Lyrics | ✅ (punctuation/placement); syllable text deferred |
-| 33 | Chord symbols | |
+| 33 | Chord symbols | ✅ (accidentals/qualities/placement); root letter deferred |
 | 34 | Grace notes | |
 
 ### Stage 6 — Full import

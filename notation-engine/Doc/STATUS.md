@@ -11,10 +11,10 @@ after Phase 29 (end of Stage 4).
 
 ---
 
-## A. DONE — Phases 1–32 ✅ (Stage 2, 3 & 4 complete; Stage 5 in progress)
+## A. DONE — Phases 1–33 ✅ (Stage 2, 3 & 4 complete; Stage 5 in progress)
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 290/290 across them.
+`npm run verify` passes 296/296 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -50,12 +50,13 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 30 | Articulations + ornaments | `articulationSide` (opposite-stem, marcato exception), `ornamentGlyphName` (always above); geometry built, not wired | [`phase-30`](./phase-30-articulations-ornaments.md) |
 | 31 | Dynamics/hairpins/tempo/rehearsal | Dynamics+hairpins built (real glyphs, scalable wedge); tempo/rehearsal marks placement-only (text rendering deferred) | [`phase-31`](./phase-31-dynamics-hairpins-tempo-rehearsal.md) |
 | 32 | Lyrics | Real hyphen/elision glyphs + extender line built; syllable text rendering deferred (needs a text-font system) | [`phase-32`](./phase-32-lyrics.md) |
+| 33 | Chord symbols | Real `csym` accidental + 5 quality glyphs built; root letter/bass note deferred (needs a text-font system) | [`phase-33`](./phase-33-chord-symbols.md) |
 
 **Public API today:** 137 exports from `dist/notation-engine.js`.
 
 ---
 
-## B. NOT DONE — Phases 33–54
+## B. NOT DONE — Phases 34–54
 
 Nothing below exists in `src/` yet. Each line links to the `PLAN.md` section
 that specifies it.
@@ -63,7 +64,6 @@ that specifies it.
 ### Stage 5 — Expression
 | # | Phase | Spec |
 |---|---|---|
-| **33** | Chord symbols | §9 |
 | **34** | Grace notes | §9 |
 
 ### Stage 6 — Full import
