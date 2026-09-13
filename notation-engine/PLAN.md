@@ -1292,6 +1292,74 @@ similar compound ornaments.
 
 ---
 
+### 9.21 Dynamics, hairpins, tempo marks, rehearsal marks `[PARTIAL -- dynamics/hairpins built, tempo/rehearsal marks placement-only, see Doc/phase-31-dynamics-hairpins-tempo-rehearsal.md]`
+
+**Responsibility.** Four distinct expression-mark categories, bundled in
+one phase per the roadmap but researched and scoped separately, since
+"all four sit near a note" doesn't mean they share a placement rule or
+even a rendering *mechanism*.
+
+**Dynamics** (p, f, mf, ff, etc.): placed **below the staff by default**,
+confirmed by MOLA's own published guidelines and Wikipedia's "Dynamics
+(music)" — vocal music is the one named exception (above, to clear the
+lyrics), out of scope here since this engine has no lyric-awareness (the
+same stated gap `§9.18` already noted for barline continuity). Uses real,
+**precomposed** SMuFL glyphs — checked `glyphnames.json` before assuming
+individual-letter assembly was needed: `dynamicPP`, `dynamicMP`,
+`dynamicMF`, `dynamicFF`, `dynamicPPP`, `dynamicFFF`, `dynamicSforzato`,
+etc. all exist as single glyphs.
+
+**Hairpins** (crescendo/decrescendo wedges): also placed below by
+default (same sources). Confirmed this is **drawn geometry, not a
+fixed-width glyph**, despite SMuFL defining `dynamicCrescendoHairpin`/
+`dynamicDiminuendoHairpin` glyphs — checked their own bounding boxes
+before assuming otherwise: both are a small, fixed size (~2.9 × ~1.05sp),
+appropriate for a palette/legend icon, not for spanning an arbitrary
+musical distance the way a real hairpin must. Bravura's own real
+`hairpinThickness` (0.16sp) is the line thickness to use when drawing the
+wedge as two line segments from a chosen start X to end X, opening
+(crescendo) or closing (decrescendo) by a chosen spread height — no
+source gives one universal spread number, the same situation as every
+other bulge/slope/offset constant chosen throughout Phases 24–30.
+
+**Tempo marks and rehearsal marks**: both placed **above the staff** by
+convention (tempo marks confirmed directly; rehearsal marks by
+near-universal convention, boxed or circled). **Both are stated as
+placement-rule-only in this phase** — a real tempo mark (a note-value
+glyph + "=" + a number, e.g. "♩ = 120") and a real rehearsal mark (an
+arbitrary letter/number inside a box or circle) both need **general
+text/multi-glyph composition this engine has never built**: every glyph
+this engine has drawn so far has been one single SMuFL character
+resolved by name, never an arbitrary alphanumeric string laid out with
+real character-width spacing the way ordinary prose text would need.
+Building that composition mechanism is a real, larger piece of work,
+honestly out of this phase's scope rather than faked with a placeholder.
+
+**Interfaces.**
+```ts
+dynamicSide(): 'below'                      // vocal exception out of scope
+dynamicGlyphName(level): string             // 'pp'|'p'|'mp'|'mf'|'f'|'ff'|'ppp'|'fff'|'sfz'
+computeHairpinShape(startX, endX, y, kind): HairpinShape   // kind: 'crescendo'|'decrescendo'
+renderHairpin(shape, options): string
+tempoMarkSide(): 'above'
+rehearsalMarkSide(): 'above'
+```
+
+**Tests.** Every dynamic level resolves to its real glyph; a crescendo's
+wedge opens left-to-right (narrow at start, wide at end), a decrescendo's
+closes (wide at start, narrow at end) — the two are confirmed to be
+mirror images of each other, not independently-guessed shapes;
+`tempoMarkSide`/`rehearsalMarkSide` both return `'above'`.
+
+**Known limitations.** Vocal-music dynamics-above exception not
+implemented (no lyric-awareness). Tempo marks and rehearsal marks have
+no glyph/text rendering at all yet, only their placement rule — real
+implementation needs general multi-glyph/text composition, a
+genuinely larger piece of infrastructure than this phase's other three
+marks needed.
+
+---
+
 ## 10. Module: `parser/musicxml/` — MusicXML Parser `[IN PROGRESS — v1 built (Phase 20); .mxl/score-timewise/v2 elements are Phase 35-36]`
 
 **Responsibility.** Turn any valid MusicXML document into a `Score` (§6),
@@ -2071,12 +2139,12 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 28 | Tuplets | ✅ (geometry); wiring pending v2 parser |
 | 29 | Grand staff / multi-part systems | ✅ (geometry/layout); render-loop wiring pending |
 
-### Stage 5 — Expression `[IN PROGRESS — 30 of 34]`
+### Stage 5 — Expression `[IN PROGRESS — 30-31 of 34]`
 
 | Phase | What | Status |
 |---|---|---|
 | 30 | Articulations and ornaments | ✅ (geometry); wiring pending v2 parser |
-| 31 | Dynamics, hairpins, tempo marks, rehearsal marks | |
+| 31 | Dynamics, hairpins, tempo marks, rehearsal marks | ✅ (dynamics/hairpins); tempo/rehearsal placement-only |
 | 32 | Lyrics | |
 | 33 | Chord symbols | |
 | 34 | Grace notes | |

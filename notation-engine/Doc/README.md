@@ -56,6 +56,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-28-tuplets.md`](./phase-28-tuplets.md) | Phase 28 tuplets (bracket-needed rule, stem-side placement; geometry built, not yet wired) |
 | [`phase-29-grand-staff-multi-part.md`](./phase-29-grand-staff-multi-part.md) | Phase 29 grand staff/multi-part (brace rule, system stacking; geometry built, not yet wired) |
 | [`phase-30-articulations-ornaments.md`](./phase-30-articulations-ornaments.md) | Phase 30 articulations (opposite-stem, marcato exception) + ornaments (always above); not yet wired |
+| [`phase-31-dynamics-hairpins-tempo-rehearsal.md`](./phase-31-dynamics-hairpins-tempo-rehearsal.md) | Phase 31 dynamics + hairpins (built), tempo/rehearsal marks (placement only, text rendering deferred) |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

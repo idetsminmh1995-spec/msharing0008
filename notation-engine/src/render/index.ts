@@ -16,3 +16,4 @@ export * from './slur.js';
 export * from './tuplet.js';
 export * from './system.js';
 export * from './mark.js';
+export * from './hairpin.js';

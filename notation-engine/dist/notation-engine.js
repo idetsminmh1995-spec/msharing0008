@@ -58,6 +58,7 @@ var NotationEngine = (() => {
     computeBarlineGeometry: () => computeBarlineGeometry,
     computeBeamShape: () => computeBeamShape,
     computeBraceShape: () => computeBraceShape,
+    computeHairpinShape: () => computeHairpinShape,
     computeLedgerLines: () => computeLedgerLines,
     computeSlurShape: () => computeSlurShape,
     computeStaffGeometry: () => computeStaffGeometry,
@@ -74,6 +75,8 @@ var NotationEngine = (() => {
     duration: () => duration,
     durationDefaultNotehead: () => durationDefaultNotehead,
     durationTypeAndDotsFromTicks: () => durationTypeAndDotsFromTicks,
+    dynamicGlyphName: () => dynamicGlyphName,
+    dynamicSide: () => dynamicSide,
     escapeXmlText: () => escapeXmlText,
     evaluateAccidental: () => evaluateAccidental,
     flagGlyphName: () => flagGlyphName,
@@ -106,6 +109,7 @@ var NotationEngine = (() => {
     parseMusicXml: () => parseMusicXml,
     part: () => part,
     pitchedPitch: () => pitchedPitch,
+    rehearsalMarkSide: () => rehearsalMarkSide,
     renderAccidental: () => renderAccidental,
     renderBarNumber: () => renderBarNumber,
     renderBarline: () => renderBarline,
@@ -115,6 +119,7 @@ var NotationEngine = (() => {
     renderClef: () => renderClef,
     renderFlag: () => renderFlag,
     renderFromMusicXml: () => renderFromMusicXml,
+    renderHairpin: () => renderHairpin,
     renderKeySignature: () => renderKeySignature,
     renderLedgerLines: () => renderLedgerLines,
     renderMark: () => renderMark,
@@ -148,6 +153,7 @@ var NotationEngine = (() => {
     svgPath: () => svgPath,
     svgRect: () => svgRect,
     svgText: () => svgText,
+    tempoMarkSide: () => tempoMarkSide,
     textWidth: () => textWidth,
     ticksForDisplayedDuration: () => ticksForDisplayedDuration,
     ticksToXmlDivisions: () => ticksToXmlDivisions,
@@ -58564,6 +58570,39 @@ var NotationEngine = (() => {
     return GLYPH_NAMES2[type];
   }
 
+  // src/geometry/dynamic.ts
+  function dynamicSide() {
+    return "below";
+  }
+  var GLYPH_NAMES3 = {
+    ppp: "dynamicPPP",
+    pp: "dynamicPP",
+    p: "dynamicPiano",
+    mp: "dynamicMP",
+    mf: "dynamicMF",
+    f: "dynamicForte",
+    ff: "dynamicFF",
+    fff: "dynamicFFF",
+    sfz: "dynamicSforzato"
+  };
+  function dynamicGlyphName(level) {
+    return GLYPH_NAMES3[level];
+  }
+
+  // src/geometry/hairpin.ts
+  var HAIRPIN_SPREAD = 1;
+  function computeHairpinShape(startX, endX, y, kind) {
+    return { startX, endX, y, kind, spread: HAIRPIN_SPREAD };
+  }
+
+  // src/geometry/expression-mark.ts
+  function tempoMarkSide() {
+    return "above";
+  }
+  function rehearsalMarkSide() {
+    return "above";
+  }
+
   // src/geometry/beam-shape.ts
   var MAX_BEAM_SLOPE = 1;
   function naturalStemTipY(position, direction, stemLength) {
@@ -58997,6 +59036,17 @@ ${denominator}`;
     return svgGlyphText(options.x, options.y, glyph.char, options.fontFamily, {
       fill: options.color
     });
+  }
+
+  // src/render/hairpin.ts
+  function renderHairpin(shape, options) {
+    const narrowX = shape.kind === "crescendo" ? shape.startX : shape.endX;
+    const wideX = shape.kind === "crescendo" ? shape.endX : shape.startX;
+    const attrs = { stroke: options.color, "stroke-width": options.thickness };
+    return [
+      svgLine(narrowX, shape.y, wideX, shape.y - shape.spread, attrs),
+      svgLine(narrowX, shape.y, wideX, shape.y + shape.spread, attrs)
+    ].join("\n");
   }
 
   // src/config/config.ts

@@ -18,4 +18,7 @@ export * from './tuplet.js';
 export * from './system.js';
 export * from './articulation.js';
 export * from './ornament.js';
+export * from './dynamic.js';
+export * from './hairpin.js';
+export * from './expression-mark.js';
 export * from './beam-shape.js';
