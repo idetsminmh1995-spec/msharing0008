@@ -15,4 +15,5 @@ export * from './voice.js';
 export * from './tie.js';
 export * from './slur.js';
 export * from './tuplet.js';
+export * from './system.js';
 export * from './beam-shape.js';

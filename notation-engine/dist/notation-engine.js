@@ -55,10 +55,12 @@ var NotationEngine = (() => {
     codepointToChar: () => codepointToChar,
     computeBarlineGeometry: () => computeBarlineGeometry,
     computeBeamShape: () => computeBeamShape,
+    computeBraceShape: () => computeBraceShape,
     computeLedgerLines: () => computeLedgerLines,
     computeSlurShape: () => computeSlurShape,
     computeStaffGeometry: () => computeStaffGeometry,
     computeStemLength: () => computeStemLength,
+    computeSystemLayout: () => computeSystemLayout,
     computeTieShape: () => computeTieShape,
     computeTupletBracketShape: () => computeTupletBracketShape,
     createAccidentalState: () => createAccidentalState,
@@ -90,6 +92,8 @@ var NotationEngine = (() => {
     multiMeasureRestGlyphName: () => multiMeasureRestGlyphName,
     musicXmlNoteheadToShape: () => musicXmlNoteheadToShape,
     naiveMeasureLayout: () => naiveMeasureLayout,
+    needsBrace: () => needsBrace,
+    needsContinuousBarline: () => needsContinuousBarline,
     needsFlag: () => needsFlag,
     note: () => note,
     noteheadMappingKey: () => noteheadMappingKey,
@@ -103,6 +107,7 @@ var NotationEngine = (() => {
     renderBarNumber: () => renderBarNumber,
     renderBarline: () => renderBarline,
     renderBeam: () => renderBeam,
+    renderBrace: () => renderBrace,
     renderCancellationNaturals: () => renderCancellationNaturals,
     renderClef: () => renderClef,
     renderFlag: () => renderFlag,
@@ -58515,6 +58520,17 @@ var NotationEngine = (() => {
     return { startX, endX, y, side, hookLength: HOOK_LENGTH };
   }
 
+  // src/geometry/system.ts
+  function needsBrace(stavesInPart) {
+    return stavesInPart >= 2;
+  }
+  function needsContinuousBarline(stavesInGroup) {
+    return needsBrace(stavesInGroup);
+  }
+  function computeBraceShape(topStaffY, bottomStaffY, x) {
+    return { x, topY: topStaffY, bottomY: bottomStaffY };
+  }
+
   // src/geometry/beam-shape.ts
   var MAX_BEAM_SLOPE = 1;
   function naturalStemTipY(position, direction, stemLength) {
@@ -58924,6 +58940,19 @@ ${denominator}`;
       throw new Error(`No glyph found for tuplet number "${glyphName}"`);
     }
     return svgGlyphText(x, y, glyph.char, options.fontFamily, { fill: options.color });
+  }
+
+  // src/render/system.ts
+  function renderBrace(shape, options) {
+    const glyph = getGlyph("brace");
+    if (glyph === void 0) {
+      throw new Error('No glyph found for "brace"');
+    }
+    const nominalHeight = glyph.bBox !== void 0 ? glyph.bBox.bBoxNE[1] - glyph.bBox.bBoxSW[1] : 1;
+    const targetHeight = shape.bottomY - shape.topY;
+    const scaleY = nominalHeight !== 0 ? targetHeight / nominalHeight : 1;
+    const inner = svgGlyphText(0, 0, glyph.char, options.fontFamily, { fill: options.color });
+    return `<g transform="translate(${shape.x} ${shape.topY}) scale(1 ${scaleY})">${inner}</g>`;
   }
 
   // src/config/config.ts
@@ -59444,6 +59473,22 @@ ${denominator}`;
       x += measureWidth;
     }
     return result;
+  }
+
+  // src/layout/system.ts
+  var DEFAULT_STAFF_GAP = 8;
+  var DEFAULT_PART_GAP = 12;
+  function computeSystemLayout(partStaffCounts, staffGap = DEFAULT_STAFF_GAP, partGap = DEFAULT_PART_GAP) {
+    const positions = [];
+    let y = 0;
+    partStaffCounts.forEach((staffCount, partIndex) => {
+      for (let staffIndexInPart = 0; staffIndexInPart < staffCount; staffIndexInPart++) {
+        positions.push({ partIndex, staffIndexInPart, y });
+        y += staffGap;
+      }
+      y += partGap - staffGap;
+    });
+    return { positions };
   }
 
   // src/render-from-musicxml.ts

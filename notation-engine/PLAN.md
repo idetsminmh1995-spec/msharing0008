@@ -1133,6 +1133,70 @@ per the number-format note above.
 
 ---
 
+### 9.18 Grand staff / multi-part systems `[BUILT for geometry/layout/rendering -- not wired, see Doc/phase-29-grand-staff-multi-part.md]`
+
+**Responsibility.** Render every part of a score, not just the first
+(§21's own stated limitation), stacking multiple staves vertically into
+one **system** — the same horizontal measure positions shared down the
+page — and drawing the connecting brace/bracket + continuous barline
+where real convention calls for one.
+
+**Brace vs. bracket is a real, well-sourced distinction, confirmed
+across six independent sources with full agreement**: a **brace**
+(curved, glyph `brace`) connects multiple staves belonging to **one
+instrument** — the canonical case is a piano's grand staff (MusicXML:
+one `<part>` declaring `<staves>2</staves>` in its `<attributes>`, with
+each note's `<staff>` element saying which one it's on). A **bracket**
+(straight, glyphs `bracket`/`bracketTop`/`bracketBottom`) connects
+staves belonging to **different instruments/parts** grouped for ensemble
+reading (MusicXML: `<part-group>`). The two are not interchangeable and
+this section does not treat them as such.
+
+**Barline continuity follows the same split**: within a brace group (one
+instrument, multiple staves), the barline runs continuously through every
+staff and the gap between them — real convention, confirmed by multiple
+sources, with no exception found for the plain instrumental case.
+Between *different* parts, continuous barlines are common in orchestral
+practice but **not universal** — one source specifically documents vocal
+scores omitting the connecting segment so it doesn't cut through the
+lyric text below the staff. Since this engine has no lyric-awareness at
+all yet, the conservative, defensible default adopted here is: **only
+draw a continuous barline within a brace group** (one part's own multiple
+staves); across *different* parts, each keeps its own independent
+barline, stated as a limitation rather than guessed at.
+
+**Grouping scope for this engine, stated plainly**: `<part-group>`
+(the MusicXML element that would tell us to bracket several *different*
+parts together) is v2 parser scope, not yet parsed (§10.4). So for now:
+- A part with `<staves>N ≥ 2</staves>` gets a **brace**, unconditionally
+  — this needs no external grouping metadata, since it's inherent to the
+  part's own declared structure.
+- Multiple *different* parts are stacked into the same system (sharing
+  horizontal measure positions) but get **no bracket at all**, since we
+  have no `<part-group>` data to decide one is warranted. Assuming a
+  bracket where none was declared would be presumptuous.
+
+**Interfaces.**
+```ts
+needsBrace(stavesInPart): boolean            // stavesInPart >= 2
+needsContinuousBarline(stavesInGroup): boolean  // same test, same reasoning
+computeBraceShape(topStaffY, bottomStaffY, x): BraceShape
+computeSystemLayout(parts): SystemLayout     // vertical Y offset per part/staff
+```
+
+**Tests.** A single-staff part needs no brace; a 2-or-more-staff part
+does; the same test applied to barline continuity gives the identical
+answer (both follow the exact same rule, by design); a 3-part score's
+vertical stacking places each part's staff at a distinct, non-overlapping
+Y.
+
+**Known limitations.** `<part-group>` bracket grouping across different
+instruments is not parsed (v2, §10.4). No skyline-based dynamic spacing
+between staves yet (§15 is itself still `[TODO]`) — vertical gaps between
+stacked staves are a fixed default, not content-aware.
+
+---
+
 ## 10. Module: `parser/musicxml/` — MusicXML Parser `[IN PROGRESS — v1 built (Phase 20); .mxl/score-timewise/v2 elements are Phase 35-36]`
 
 **Responsibility.** Turn any valid MusicXML document into a `Score` (§6),
@@ -1900,7 +1964,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 21 | Naive single-system layout + `renderFromMusicXML()` end to end | ✅ |
 | 22 | **Milestone: a real simple `.musicxml` file renders correctly.** Everything after this point is validated against real files from day one | ✅ |
 
-### Stage 4 — Rhythm and structure `[IN PROGRESS — 23-28 of 29]`
+### Stage 4 — Rhythm and structure `[COMPLETE]`
 
 | Phase | What | Status |
 |---|---|---|
@@ -1910,7 +1974,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 26 | Ties | ✅ (common case); cross-barline/beam/chord ties pending |
 | 27 | Slurs | ✅ (geometry); wiring pending v2 parser |
 | 28 | Tuplets | ✅ (geometry); wiring pending v2 parser |
-| 29 | Grand staff / multi-part systems | |
+| 29 | Grand staff / multi-part systems | ✅ (geometry/layout); render-loop wiring pending |
 
 ### Stage 5 — Expression
 

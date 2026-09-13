@@ -6,15 +6,15 @@ A+B+C corrective work** (making notes actually visible in the web app).
 Numbering is **`PLAN.md` §22's phase numbering** — deliberately not a second
 numbering system. Say a number from §B below and that's the phase to build.
 
-**Last audited:** against the code in `src/` and the 89-test suite, at the
-commit that added this file.
+**Last audited:** against the code in `src/` and the 267-test suite,
+after Phase 29 (end of Stage 4).
 
 ---
 
-## A. DONE — Phases 1–28 ✅ (Stage 2 & Stage 3 complete; Stage 4 in progress)
+## A. DONE — Phases 1–29 ✅ (Stage 2, 3 & 4 complete)
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 259/259 across them.
+`npm run verify` passes 267/267 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -46,25 +46,16 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 26 | Ties | Tapered lens shape (Bezier), side-opposite-stem rule, wired end to end (same-voice/same-measure/non-beamed/non-chord) | [`phase-26`](./phase-26-ties.md) |
 | 27 | Slurs | Whole-span side rule (`slurSide`), same Bezier primitive as ties; geometry built, not wired (parsing is v2 scope) | [`phase-27`](./phase-27-slurs.md) |
 | 28 | Tuplets | `tupletBracketNeeded`, stem-side placement (opposite ties/slurs); geometry built, not wired (parsing is v2 scope) | [`phase-28`](./phase-28-tuplets.md) |
+| 29 | Grand staff / multi-part | Brace rule + `computeSystemLayout` vertical stacking; geometry built, not wired (needs <staves> parsing + render-loop restructure) | [`phase-29`](./phase-29-grand-staff-multi-part.md) |
 
-**Public API today:** 70 exports from `dist/notation-engine.js`.
+**Public API today:** 137 exports from `dist/notation-engine.js`.
 
 ---
 
-## B. NOT DONE — Phases 29–54
+## B. NOT DONE — Phases 30–54
 
 Nothing below exists in `src/` yet. Each line links to the `PLAN.md` section
 that specifies it.
-
-### Stage 4 — Rhythm and structure
-| # | Phase | Spec |
-|---|---|---|
-| **23** | Beam grouping (by beat structure, with override) | §9.12 |
-| **25** | Multi-voice per staff + voice collision / rest separation | §9.14 |
-| **26** | Ties | §9.15 |
-| **27** | Slurs | §9.16 |
-| **28** | Tuplets | §9.17 |
-| **29** | Grand staff / multi-part systems | §16 |
 
 ### Stage 5 — Expression
 | # | Phase | Spec |
