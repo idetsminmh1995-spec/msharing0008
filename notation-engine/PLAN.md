@@ -949,6 +949,69 @@ stacking) — noted as future work, not implemented here.
 
 ---
 
+### 9.15 Ties `[BUILT for the common case -- see Doc/phase-26-ties.md for the cross-barline/beam/chord limitations]`
+
+**Responsibility.** A curved line connecting two noteheads of the **same
+pitch**, indicating the second continues the first's sound rather than
+re-articulating it — parsed already (Phase 20's `tieStart`/`tieStop`
+booleans on `Note`); this section draws it.
+
+**Side (above/below) is universal and confirmed by multiple independent
+sources with zero disagreement**: Wikipedia's "Tie (music)" states plainly
+"ties are normally placed opposite the stem direction of the notes";
+Da Capo Academy's teaching guide gives the identical rule ("if the stem is
+pointing down, the tie goes on top, and if the stem is pointing up, the
+tie goes on the bottom") and extends it to notes with no stem at all (a
+whole note): "imagine where the stem would go if there was one, and write
+the tie on the opposite side." So this section needs no new
+position-vs-middle-line logic of its own — it reuses whatever direction
+was already resolved for that note (automatic, or forced per §9.14 in a
+multi-voice context — Wikipedia's own caveat, "unless there are two or
+more voices simultaneously," is exactly why this reuses the note's
+*actual resolved* direction rather than recomputing a fresh one).
+
+**Metrics are real, from Bravura's own `engravingDefaults`, checked before
+writing this**: `tieEndpointThickness` = 0.1sp (the line's thickness at
+each end) and `tieMidpointThickness` = 0.22sp (its thickness at the
+curve's peak) — a tie visibly tapers thinner at its ends than at its
+middle, unlike a beam's uniform thickness. No SMuFL glyph exists for a tie
+at all (it is drawn geometry, not a font character), matching how this
+engine already draws beams as raw SVG paths rather than glyphs.
+
+**Shape**: a shallow curved line (quadratic Bézier, the same primitive
+already used for Phase 24's curved beam style) from just past the first
+notehead's right edge to just before the second notehead's left edge —
+close to the noteheads but never touching them, per the small horizontal
+gap convention already established for accidentals (§9.11's 0.16sp). The
+curve's bulge height is a chosen explicit value (no source gives one
+universal number, the same situation Phase 24's slope cap and this
+section's own rest-offset already handled the same way) — `0.5`sp of
+vertical clearance from the endpoint to the peak.
+
+**Known limitation, stated rather than silently wrong.** For a tied
+*chord* (2+ simultaneous notes all tied to their next occurrence), real
+notation individually decides each member's side — outermost notes curve
+away from the chord (topmost up, bottommost down), only the innermost
+member(s) get a free choice. This section specifies and implements only
+the single-note case (by far the common one); the chord-tie refinement is
+future work, the same kind of explicitly-scoped gap as Phase 25's
+notehead-collision offsetting.
+
+**Interfaces.**
+```ts
+tieSide(stemDirection): 'above' | 'below'   // always the OPPOSITE side
+computeTieShape(startX, endX, y, side): TieShape
+renderTie(shape, options): string
+```
+
+**Tests.** A down-stem note's tie curves above; an up-stem note's tie
+curves below; a whole note (no stem at all) still gets a side, matching
+what its position-based automatic direction would have been; the curve's
+two endpoints sit outside both noteheads' own horizontal extents, never
+inside them.
+
+---
+
 ## 10. Module: `parser/musicxml/` — MusicXML Parser `[IN PROGRESS — v1 built (Phase 20); .mxl/score-timewise/v2 elements are Phase 35-36]`
 
 **Responsibility.** Turn any valid MusicXML document into a `Score` (§6),
@@ -1716,14 +1779,14 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 21 | Naive single-system layout + `renderFromMusicXML()` end to end | ✅ |
 | 22 | **Milestone: a real simple `.musicxml` file renders correctly.** Everything after this point is validated against real files from day one | ✅ |
 
-### Stage 4 — Rhythm and structure `[IN PROGRESS — 23-25 of 29]`
+### Stage 4 — Rhythm and structure `[IN PROGRESS — 23-26 of 29]`
 
 | Phase | What | Status |
 |---|---|---|
 | 23 | Beam grouping (by time-signature beat structure, with override) | ✅ |
 | 24 | Beam geometry + the three styles (straight / flat / curved) | ✅ |
 | 25 | Multi-voice per staff + voice collision and rest separation | ✅ (core); notehead-offset wiring pending |
-| 26 | Ties | |
+| 26 | Ties | ✅ (common case); cross-barline/beam/chord ties pending |
 | 27 | Slurs | |
 | 28 | Tuplets | |
 | 29 | Grand staff / multi-part systems | |

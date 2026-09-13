@@ -51,6 +51,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-24-beam-geometry.md`](./phase-24-beam-geometry.md) | Phase 24 beam geometry (3 styles, slope clamping; fixed a real beam-overlap bug) |
 | [`abc-make-notes-visible.md`](./abc-make-notes-visible.md) | **A+B+C corrective work** — percussion support, committed bundle + font, web app rewired to the real engine |
 | [`phase-25-multi-voice.md`](./phase-25-multi-voice.md) | Phase 25 multi-voice (forced stem direction, rest separation; fixes the reported hand/foot stem bug) |
+| [`phase-26-ties.md`](./phase-26-ties.md) | Phase 26 ties (tapered lens shape, side-opposite-stem rule, wired end to end) |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

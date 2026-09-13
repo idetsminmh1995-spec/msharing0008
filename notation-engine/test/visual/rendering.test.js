@@ -544,4 +544,13 @@ describe('visual regression (Phase 8)', () => {
     const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
     matchSnapshot('render-from-musicxml-two-voice-drum', svg, SNAPSHOT_DIR);
   });
+
+  test('Phase 26: a real tied-note fixture renders identically to the saved snapshot (tie curves above a high note)', () => {
+    const xml = fs.readFileSync(
+      path.join(__dirname, '..', 'fixtures', 'musicxml', 'tied-note.musicxml'),
+      'utf8',
+    );
+    const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
+    matchSnapshot('render-from-musicxml-tied-note', svg, SNAPSHOT_DIR);
+  });
 });

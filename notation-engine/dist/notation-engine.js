@@ -58,6 +58,7 @@ var NotationEngine = (() => {
     computeLedgerLines: () => computeLedgerLines,
     computeStaffGeometry: () => computeStaffGeometry,
     computeStemLength: () => computeStemLength,
+    computeTieShape: () => computeTieShape,
     createAccidentalState: () => createAccidentalState,
     createSvgDocument: () => createSvgDocument,
     defaultRestY: () => defaultRestY,
@@ -110,6 +111,7 @@ var NotationEngine = (() => {
     renderRest: () => renderRest,
     renderStaff: () => renderStaff,
     renderStem: () => renderStem,
+    renderTie: () => renderTie,
     renderTimeSignature: () => renderTimeSignature,
     resetMeasure: () => resetMeasure,
     resolveConfig: () => resolveConfig,
@@ -135,6 +137,7 @@ var NotationEngine = (() => {
     ticksForDisplayedDuration: () => ticksForDisplayedDuration,
     ticksToXmlDivisions: () => ticksToXmlDivisions,
     ticksWithDots: () => ticksWithDots,
+    tieSide: () => tieSide,
     timeSignature: () => timeSignature,
     unpitchedPitch: () => unpitchedPitch,
     voice: () => voice,
@@ -58463,6 +58466,15 @@ var NotationEngine = (() => {
     return { offsetA: noteheadWidth2, offsetB: 0 };
   }
 
+  // src/geometry/tie.ts
+  function tieSide(stemDirection) {
+    return stemDirection === "down" ? "above" : "below";
+  }
+  var TIE_BULGE_HEIGHT = 0.5;
+  function computeTieShape(startX, endX, y, side) {
+    return { startX, endX, y, side, bulgeHeight: TIE_BULGE_HEIGHT };
+  }
+
   // src/geometry/beam-shape.ts
   var MAX_BEAM_SLOPE = 1;
   function naturalStemTipY(position, direction, stemLength) {
@@ -58833,6 +58845,16 @@ ${denominator}`;
       }
     }
     return svgGroup(lines);
+  }
+
+  // src/render/tie.ts
+  function renderTie(shape, options) {
+    const towardBulge = shape.side === "above" ? -1 : 1;
+    const midX = (shape.startX + shape.endX) / 2;
+    const innerY = shape.y + towardBulge * (shape.bulgeHeight - options.midpointThickness / 2);
+    const outerY = shape.y + towardBulge * (shape.bulgeHeight + options.midpointThickness / 2);
+    const d = `M ${shape.startX} ${shape.y} Q ${midX} ${innerY} ${shape.endX} ${shape.y} Q ${midX} ${outerY} ${shape.startX} ${shape.y} Z`;
+    return svgPath(d, { fill: options.color, stroke: "none" });
   }
 
   // src/config/config.ts
@@ -59367,6 +59389,7 @@ ${denominator}`;
   var LEDGER_EXTENSION_FALLBACK = 0.4;
   var LEDGER_THICKNESS_FALLBACK = 0.16;
   var STEM_THICKNESS_FALLBACK = 0.12;
+  var TIE_MIDPOINT_THICKNESS_FALLBACK = 0.22;
   var BEAM_THICKNESS_FALLBACK = 0.5;
   var BEAM_SPACING_FALLBACK = 0.25;
   var DEFAULT_UNBEAMED_STEM_LENGTH = 3.5;
@@ -59469,12 +59492,12 @@ ${denominator}`;
     const head = renderNoteheadPart(ev, x, ctx, accidentalState);
     parts.push(head.svg);
     const y = ctx.measureBottomY + head.position;
+    const direction = resolveStemDirection({
+      positions: [head.position],
+      numLines: STAFF_LINES,
+      ...forcedDirection !== void 0 ? { forcedDirection } : {}
+    });
     if (ev.duration.type !== "whole") {
-      const direction = resolveStemDirection({
-        positions: [head.position],
-        numLines: STAFF_LINES,
-        ...forcedDirection !== void 0 ? { forcedDirection } : {}
-      });
       const length = computeStemLength(head.position, middleLineY(STAFF_LINES));
       parts.push(
         renderStem({
@@ -59506,7 +59529,11 @@ ${denominator}`;
         }
       }
     }
-    return { svg: parts.join("\n"), newAccidentalState: head.newAccidentalState };
+    return {
+      svg: parts.join("\n"),
+      newAccidentalState: head.newAccidentalState,
+      tieAnchor: { direction, position: head.position, noteheadGlyph: head.noteheadGlyph }
+    };
   }
   function renderBeamGroup(notes, xs, ctx, accidentalState, beamStyle, forcedDirection) {
     const parts = [];
@@ -59760,6 +59787,7 @@ ${denominator}`;
         for (const voice2 of measure2.voices) {
           const forcedDirection = isMultiVoice ? voiceForcedDirection(voice2.id) : void 0;
           const restOffset = isMultiVoice ? voiceRestOffset(voice2.id) : 0;
+          let pendingTie;
           const starts = eventStartTicks(voice2.events);
           const total = totalTicks(voice2.events) || 1;
           const eventXs = voice2.events.map((_, idx) => {
@@ -59813,7 +59841,7 @@ ${denominator}`;
               svgParts.push(svg2);
               accidentalState = newAccidentalState;
             } else {
-              const { svg: svg2, newAccidentalState } = renderNoteOrRest(
+              const { svg: svg2, newAccidentalState, tieAnchor } = renderNoteOrRest(
                 event,
                 eventX,
                 ctx,
@@ -59821,6 +59849,22 @@ ${denominator}`;
                 forcedDirection,
                 restOffset
               );
+              if (event.kind === "note" && event.tieStop && pendingTie !== void 0) {
+                const side = tieSide(pendingTie.direction);
+                const startX = pendingTie.x + noteheadWidth(tieAnchor?.noteheadGlyph ?? "noteheadBlack");
+                const shape = computeTieShape(startX, eventX, pendingTie.y, side);
+                svgParts.push(
+                  renderTie(shape, {
+                    color: INK_COLOR,
+                    midpointThickness: getEngravingDefault("tieMidpointThickness") ?? TIE_MIDPOINT_THICKNESS_FALLBACK
+                  })
+                );
+              }
+              pendingTie = event.kind === "note" && event.tieStart && tieAnchor !== void 0 ? {
+                x: eventX,
+                y: ctx.measureBottomY + tieAnchor.position,
+                direction: tieAnchor.direction
+              } : void 0;
               svgParts.push(svg2);
               accidentalState = newAccidentalState;
             }

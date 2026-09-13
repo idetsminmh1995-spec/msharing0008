@@ -124,4 +124,26 @@ describe('renderFromMusicXml end-to-end (Phase 21)', () => {
     assert.match(svg, /^<svg/);
     assert.ok([...diagnostics].some((d) => d.code === 'UNSUPPORTED_ROOT'));
   });
+
+  test('Phase 26: a tied pair of notes produces exactly one filled tie path, anchored at the first note\'s right edge and the second note\'s own x', () => {
+    const { svg, diagnostics } = render('tied-note.musicxml');
+    assert.deepEqual([...diagnostics], []);
+    const tiePaths = [...svg.matchAll(/<path d="M ([\d.]+) ([\d.]+) Q [\d.]+ ([\d.]+) ([\d.]+) [\d.]+/g)];
+    assert.equal(tiePaths.length, 1);
+    const [, startX, startY, , endX] = tiePaths[0];
+    assert.equal(Number(startX), 6 + 1.18); // notehead x (6) + noteheadBlack's own width (1.18)
+    assert.equal(Number(endX), 10.5); // the second tied note's own x
+    assert.equal(Number(startY), 5.5); // C5's own y (bottomY 8 + position -2.5)
+  });
+
+  test("Phase 26: the tie curves ABOVE for a high note (C5, automatic direction 'down')", () => {
+    const { svg } = render('tied-note.musicxml');
+    const controlYs = [...svg.matchAll(/<path d="M [\d.]+ ([\d.]+) Q [\d.]+ (-?[\d.]+)/g)].map((m) => [
+      Number(m[1]),
+      Number(m[2]),
+    ]);
+    assert.equal(controlYs.length, 1);
+    const [baseline, controlY] = controlYs[0];
+    assert.ok(controlY < baseline, 'the tie should bulge to a smaller (more negative, i.e. above) Y than the notes');
+  });
 });

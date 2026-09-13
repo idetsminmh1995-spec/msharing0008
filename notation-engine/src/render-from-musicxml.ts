@@ -29,6 +29,8 @@ import {
   needsFlag,
   numBeamLines,
   resolveStemDirection,
+  computeTieShape,
+  tieSide,
   voiceForcedDirection,
   voiceRestOffset,
   resetMeasure,
@@ -58,6 +60,7 @@ import {
   renderRest,
   renderStaff,
   renderStem,
+  renderTie,
   renderTimeSignature,
   noteheadWidth,
 } from './render/index.js';
@@ -74,6 +77,7 @@ const MEASURE_WIDTH = 24;
 const LEDGER_EXTENSION_FALLBACK = 0.4;
 const LEDGER_THICKNESS_FALLBACK = 0.16;
 const STEM_THICKNESS_FALLBACK = 0.12;
+const TIE_MIDPOINT_THICKNESS_FALLBACK = 0.22;
 const BEAM_THICKNESS_FALLBACK = 0.5;
 const BEAM_SPACING_FALLBACK = 0.25;
 /** The natural (unbeamed) stem length a beam group's shape starts from, matching Phase 16's own default. */
@@ -214,7 +218,12 @@ function renderNoteOrRest(
   accidentalState: AccidentalState,
   forcedDirection: StemDirection | undefined,
   restOffset: number,
-): { svg: string; newAccidentalState: AccidentalState } {
+): {
+  svg: string;
+  newAccidentalState: AccidentalState;
+  /** The resolved direction and notehead width -- undefined for a rest, since a rest has neither. Exposed so a caller can anchor a tie to/from this note without recomputing this note's own geometry. */
+  tieAnchor?: { direction: StemDirection; position: number; noteheadGlyph: string };
+} {
   if (ev.kind === 'rest') {
     const y = ctx.measureBottomY + restY(ev.duration.type, STAFF_LINES, restOffset);
     const svg = renderRest(restGlyphName(ev.duration.type), {
@@ -231,15 +240,19 @@ function renderNoteOrRest(
   parts.push(head.svg);
   const y = ctx.measureBottomY + head.position;
 
+  // §9.14: voice-forced direction (when multiple voices share the staff)
+  // wins over automatic placement -- "upper up, lower down, always" --
+  // reusing Phase 16's own priority chain rather than hand-rolling it.
+  // Computed unconditionally (even for a whole note, which draws no real
+  // stem) because §9.15's tie side needs SOME resolved direction even
+  // then -- "imagine where the stem would go if there was one."
+  const direction = resolveStemDirection({
+    positions: [head.position],
+    numLines: STAFF_LINES,
+    ...(forcedDirection !== undefined ? { forcedDirection } : {}),
+  });
+
   if (ev.duration.type !== 'whole') {
-    // §9.14: voice-forced direction (when multiple voices share the staff)
-    // wins over automatic placement -- "upper up, lower down, always" --
-    // reusing Phase 16's own priority chain rather than hand-rolling it.
-    const direction = resolveStemDirection({
-      positions: [head.position],
-      numLines: STAFF_LINES,
-      ...(forcedDirection !== undefined ? { forcedDirection } : {}),
-    });
     const length = computeStemLength(head.position, middleLineY(STAFF_LINES));
     parts.push(
       renderStem({
@@ -272,7 +285,11 @@ function renderNoteOrRest(
     }
   }
 
-  return { svg: parts.join('\n'), newAccidentalState: head.newAccidentalState };
+  return {
+    svg: parts.join('\n'),
+    newAccidentalState: head.newAccidentalState,
+    tieAnchor: { direction, position: head.position, noteheadGlyph: head.noteheadGlyph },
+  };
 }
 
 /**
@@ -611,6 +628,13 @@ export function renderFromMusicXml(
       for (const voice of measure.voices) {
         const forcedDirection = isMultiVoice ? voiceForcedDirection(voice.id) : undefined;
         const restOffset = isMultiVoice ? voiceRestOffset(voice.id) : 0;
+        // §9.15: tracks the most recent note that started a tie (tieStart)
+        // in THIS voice, so the next note carrying tieStop can be
+        // connected to it. Scoped to within one measure and to
+        // non-beamed, non-chord notes only -- a tie spanning a barline,
+        // or into/out of a beamed or chord note, is documented as not yet
+        // drawn (see Doc/phase-26).
+        let pendingTie: { x: number; y: number; direction: StemDirection } | undefined;
         const starts = eventStartTicks(voice.events);
         const total = totalTicks(voice.events) || 1;
         const eventXs = voice.events.map((_, idx) => {
@@ -674,7 +698,7 @@ export function renderFromMusicXml(
             svgParts.push(svg);
             accidentalState = newAccidentalState;
           } else {
-            const { svg, newAccidentalState } = renderNoteOrRest(
+            const { svg, newAccidentalState, tieAnchor } = renderNoteOrRest(
               event,
               eventX,
               ctx,
@@ -682,6 +706,29 @@ export function renderFromMusicXml(
               forcedDirection,
               restOffset,
             );
+
+            if (event.kind === 'note' && event.tieStop && pendingTie !== undefined) {
+              const side = tieSide(pendingTie.direction);
+              const startX =
+                pendingTie.x + noteheadWidth(tieAnchor?.noteheadGlyph ?? 'noteheadBlack');
+              const shape = computeTieShape(startX, eventX, pendingTie.y, side);
+              svgParts.push(
+                renderTie(shape, {
+                  color: INK_COLOR,
+                  midpointThickness:
+                    getEngravingDefault('tieMidpointThickness') ?? TIE_MIDPOINT_THICKNESS_FALLBACK,
+                }),
+              );
+            }
+            pendingTie =
+              event.kind === 'note' && event.tieStart && tieAnchor !== undefined
+                ? {
+                    x: eventX,
+                    y: ctx.measureBottomY + tieAnchor.position,
+                    direction: tieAnchor.direction,
+                  }
+                : undefined;
+
             svgParts.push(svg);
             accidentalState = newAccidentalState;
           }
