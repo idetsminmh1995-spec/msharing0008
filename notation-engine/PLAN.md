@@ -1636,7 +1636,7 @@ ignore and record `info`. A file that produces zero parseable measures is the
 only case that yields an empty `Score` — and even then the caller gets
 diagnostics, not an exception.
 
-### 10.8 Cross-software compatibility — a hard requirement
+### 10.8 Cross-software compatibility — a hard requirement `[PARTIAL -- Phase 37 covers all 7 named divergences via representative fixtures (real program access unavailable in this environment, see Doc/phase-37-cross-software-corpus.md); a real tied-only-tie bug found and fixed]`
 
 Every major program emits *valid but differently-shaped* MusicXML. Known
 divergences the parser must absorb:
@@ -2319,13 +2319,13 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 33 | Chord symbols | ✅ (accidentals/qualities/placement); root letter deferred |
 | 34 | Grace notes | ✅ |
 
-### Stage 6 — Full import `[IN PROGRESS — 35-36 of 38]`
+### Stage 6 — Full import `[IN PROGRESS — 35-37 of 38]`
 
 | Phase | What | Status |
 |---|---|---|
 | 35 | MusicXML parser v2 (§10.4) — every element the renderer now supports | ✅ (Tier 1); Tier 2/3 remain |
 | 36 | `.mxl` support + `<score-timewise>` conversion | ✅ |
-| 37 | Cross-software compatibility corpus and fixes (§10.8) | |
+| 37 | Cross-software compatibility corpus and fixes (§10.8) | ✅ (representative fixtures; no real program access) |
 | 38 | Diagnostics and partial-render hardening (§10.7) | |
 
 ### Stage 7 — MIDI and timing ← entirely absent from v1 (§2.1)

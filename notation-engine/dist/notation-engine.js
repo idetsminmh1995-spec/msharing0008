@@ -59305,8 +59305,10 @@ ${denominator}`;
       durationType = derived?.type ?? "quarter";
     }
     const tieEls = childrenNamed(noteEl, "tie");
-    const tieStart = tieEls.some((el) => el.getAttribute("type") === "start");
-    const tieStop = tieEls.some((el) => el.getAttribute("type") === "stop");
+    const notationsEl = firstChildNamed(noteEl, "notations");
+    const tiedEls = notationsEl !== void 0 ? childrenNamed(notationsEl, "tied") : [];
+    const tieStart = tieEls.some((el) => el.getAttribute("type") === "start") || tiedEls.some((el) => el.getAttribute("type") === "start");
+    const tieStop = tieEls.some((el) => el.getAttribute("type") === "stop") || tiedEls.some((el) => el.getAttribute("type") === "stop");
     const explicitNotehead = textOf(firstChildNamed(noteEl, "notehead"));
     const graceEl = firstChildNamed(noteEl, "grace");
     const graceSlash = graceEl?.getAttribute("slash") === "yes";

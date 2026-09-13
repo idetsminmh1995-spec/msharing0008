@@ -62,6 +62,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-34-grace-notes.md`](./phase-34-grace-notes.md) | Phase 34 grace notes (real precomposed acciaccatura/appoggiatura glyphs -- no text-font gap here) |
 | [`phase-35-musicxml-parser-v2.md`](./phase-35-musicxml-parser-v2.md) | Phase 35 MusicXML parser v2 Tier 1 (midi-instrument/notehead/grace/tuplet/stem/accidental; 2 bugs found+fixed) |
 | [`phase-36-mxl-timewise.md`](./phase-36-mxl-timewise.md) | Phase 36 .mxl support + score-timewise conversion (both byte-identical to partwise/uncompressed) |
+| [`phase-37-cross-software-corpus.md`](./phase-37-cross-software-corpus.md) | Phase 37 cross-software corpus (§10.8 divergences; fixed a real tied-only-tie bug) |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

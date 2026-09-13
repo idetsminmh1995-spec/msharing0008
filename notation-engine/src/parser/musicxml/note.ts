@@ -136,9 +136,22 @@ export function parseNoteElement(
     durationType = derived?.type ?? 'quarter';
   }
 
+  // §10.8: real software diverges on whether a tie is encoded as <tie>
+  // (the sound-level element, a direct child of <note>), <tied> (the
+  // notation-level element, under <notations>), or both -- the MusicXML
+  // spec's own recommended practice is to emit both together, but not
+  // every real exporter reliably does. Treat either one's presence as
+  // sufficient, rather than only ever reading <tie> and silently missing
+  // a file that expressed the same tie only via <tied>.
   const tieEls = childrenNamed(noteEl, 'tie');
-  const tieStart = tieEls.some((el) => el.getAttribute('type') === 'start');
-  const tieStop = tieEls.some((el) => el.getAttribute('type') === 'stop');
+  const notationsEl = firstChildNamed(noteEl, 'notations');
+  const tiedEls = notationsEl !== undefined ? childrenNamed(notationsEl, 'tied') : [];
+  const tieStart =
+    tieEls.some((el) => el.getAttribute('type') === 'start') ||
+    tiedEls.some((el) => el.getAttribute('type') === 'start');
+  const tieStop =
+    tieEls.some((el) => el.getAttribute('type') === 'stop') ||
+    tiedEls.some((el) => el.getAttribute('type') === 'stop');
 
   // §10.4/Phase 35 additions -- each a direct child of <note>, independent
   // of whether the note is pitched/unpitched/a rest.
