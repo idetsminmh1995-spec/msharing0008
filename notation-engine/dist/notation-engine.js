@@ -71,6 +71,7 @@ var NotationEngine = (() => {
     computeSystemLayout: () => computeSystemLayout,
     computeTieShape: () => computeTieShape,
     computeTupletBracketShape: () => computeTupletBracketShape,
+    convertTimewiseToPartwise: () => convertTimewiseToPartwise,
     createAccidentalState: () => createAccidentalState,
     createSvgDocument: () => createSvgDocument,
     defaultRestY: () => defaultRestY,
@@ -175,6 +176,7 @@ var NotationEngine = (() => {
     tupletDigitGlyphName: () => tupletDigitGlyphName,
     tupletSide: () => tupletSide,
     unpitchedPitch: () => unpitchedPitch,
+    unzipMxl: () => unzipMxl,
     voice: () => voice,
     voiceForcedDirection: () => voiceForcedDirection,
     voiceRestOffset: () => voiceRestOffset,
@@ -57824,8 +57826,8 @@ var NotationEngine = (() => {
       throw new Error(`numLines must be a positive integer, got ${numLines}`);
     }
     const lineYPositions = [];
-    for (let i = 0; i < numLines; i++) {
-      lineYPositions.push(0 - i);
+    for (let i2 = 0; i2 < numLines; i2++) {
+      lineYPositions.push(0 - i2);
     }
     return { numLines, lineYPositions, height: numLines - 1 };
   }
@@ -57939,15 +57941,15 @@ var NotationEngine = (() => {
     const positions = getKeySignaturePositions(clefName);
     const count = Math.min(Math.abs(fifths), 7);
     if (fifths > 0) {
-      return sharpsForCount(count).map((step, i) => {
-        const y = positions.sharpPositions[i];
-        if (y === void 0) throw new Error(`Internal error: missing sharp position ${i}`);
+      return sharpsForCount(count).map((step, i2) => {
+        const y = positions.sharpPositions[i2];
+        if (y === void 0) throw new Error(`Internal error: missing sharp position ${i2}`);
         return { step, type: "sharp", y };
       });
     }
-    return flatsForCount(count).map((step, i) => {
-      const y = positions.flatPositions[i];
-      if (y === void 0) throw new Error(`Internal error: missing flat position ${i}`);
+    return flatsForCount(count).map((step, i2) => {
+      const y = positions.flatPositions[i2];
+      if (y === void 0) throw new Error(`Internal error: missing flat position ${i2}`);
       return { step, type: "flat", y };
     });
   }
@@ -58456,8 +58458,8 @@ var NotationEngine = (() => {
       current = [];
       currentUnitIndex = void 0;
     };
-    events.forEach((event, i) => {
-      const tick = startTicks[i] ?? 0;
+    events.forEach((event, i2) => {
+      const tick = startTicks[i2] ?? 0;
       if (event.isRest || !isBeamable(event.durationType)) {
         flush();
         return;
@@ -58466,7 +58468,7 @@ var NotationEngine = (() => {
       if (currentUnitIndex !== void 0 && unitIndex !== currentUnitIndex) {
         flush();
       }
-      current.push(i);
+      current.push(i2);
       currentUnitIndex = unitIndex;
     });
     flush();
@@ -58548,8 +58550,8 @@ var NotationEngine = (() => {
   function needsContinuousBarline(stavesInGroup) {
     return needsBrace(stavesInGroup);
   }
-  function computeBraceShape(topStaffY, bottomStaffY, x) {
-    return { x, topY: topStaffY, bottomY: bottomStaffY };
+  function computeBraceShape(topStaffY, bottomStaffY, x2) {
+    return { x: x2, topY: topStaffY, bottomY: bottomStaffY };
   }
 
   // src/geometry/articulation.ts
@@ -58704,9 +58706,9 @@ var NotationEngine = (() => {
     const endY = Math.abs(diff) > MAX_BEAM_SLOPE ? startY + Math.sign(diff) * MAX_BEAM_SLOPE : naturalEndY;
     return { direction, style, startX: firstX, startY, endX: lastX, endY };
   }
-  function beamYAtX(shape, x) {
+  function beamYAtX(shape, x2) {
     if (shape.endX === shape.startX) return shape.startY;
-    const t = (x - shape.startX) / (shape.endX - shape.startX);
+    const t = (x2 - shape.startX) / (shape.endX - shape.startX);
     return shape.startY + t * (shape.endY - shape.startY);
   }
   function numBeamLines(durationType) {
@@ -58757,14 +58759,14 @@ var NotationEngine = (() => {
   function svgPath(d, attrs) {
     return `<path d="${escapeXmlAttribute(d)}"${attrsToString(attrs)} />`;
   }
-  function svgRect(x, y, width, height, attrs) {
-    return `<rect x="${x}" y="${y}" width="${width}" height="${height}"${attrsToString(attrs)} />`;
+  function svgRect(x2, y, width, height, attrs) {
+    return `<rect x="${x2}" y="${y}" width="${width}" height="${height}"${attrsToString(attrs)} />`;
   }
-  function svgText(x, y, content, attrs) {
-    return `<text x="${x}" y="${y}"${attrsToString(attrs)}>${escapeXmlText(content)}</text>`;
+  function svgText(x2, y, content, attrs) {
+    return `<text x="${x2}" y="${y}"${attrsToString(attrs)}>${escapeXmlText(content)}</text>`;
   }
-  function svgGlyphText(x, y, char, fontFamily, attrs) {
-    return svgText(x, y, char, {
+  function svgGlyphText(x2, y, char, fontFamily, attrs) {
+    return svgText(x2, y, char, {
       "font-family": fontFamily,
       "font-size": SMUFL_STAFF_SPACES_PER_EM,
       ...attrs
@@ -58787,9 +58789,9 @@ ${children.join("\n")}
 
   // src/render/staff.ts
   function renderStaff(geometry, options) {
-    const { x, y, width, color, lineThickness } = options;
+    const { x: x2, y, width, color, lineThickness } = options;
     const lines = geometry.lineYPositions.map(
-      (lineY) => svgLine(x, y + lineY, x + width, y + lineY, { stroke: color, "stroke-width": lineThickness })
+      (lineY) => svgLine(x2, y + lineY, x2 + width, y + lineY, { stroke: color, "stroke-width": lineThickness })
     );
     return svgGroup(lines);
   }
@@ -58815,8 +58817,8 @@ ${children.join("\n")}
       throw new Error(`No glyph found for accidental type (glyph name "${glyphName}")`);
     }
     return accidentals.map(
-      (acc, i) => svgGlyphText(
-        options.x + i * options.spacing,
+      (acc, i2) => svgGlyphText(
+        options.x + i2 * options.spacing,
         options.staffBottomY + acc.y,
         glyph.char,
         options.fontFamily,
@@ -58832,8 +58834,8 @@ ${children.join("\n")}
       throw new Error("No glyph found for accidentalNatural");
     }
     return naturals.map(
-      (n, i) => svgGlyphText(
-        options.x + i * options.spacing,
+      (n, i2) => svgGlyphText(
+        options.x + i2 * options.spacing,
         options.staffBottomY + n.y,
         glyph.char,
         options.fontFamily,
@@ -58845,9 +58847,9 @@ ${children.join("\n")}
   }
 
   // src/render/time-signature.ts
-  function renderDigitString(text, x, y, fontFamily, color) {
+  function renderDigitString(text, x2, y, fontFamily, color) {
     const parts = [];
-    let cursor = x;
+    let cursor = x2;
     for (const ch of text) {
       const glyph = glyphForTimeSigChar(ch);
       parts.push(svgGlyphText(cursor, y, glyph.char, fontFamily, { fill: color }));
@@ -58856,7 +58858,7 @@ ${children.join("\n")}
     return parts.join("\n");
   }
   function renderTimeSignature(sig, options) {
-    const { x, staffBottomY, color, fontFamily } = options;
+    const { x: x2, staffBottomY, color, fontFamily } = options;
     if (sig.symbol === "common" || sig.symbol === "cut") {
       const glyphName = sig.symbol === "common" ? "timeSigCommon" : "timeSigCutCommon";
       const glyph = getGlyph(glyphName);
@@ -58865,15 +58867,15 @@ ${children.join("\n")}
           `No glyph found for time signature symbol "${sig.symbol}" (glyph name "${glyphName}")`
         );
       }
-      return svgGlyphText(x, staffBottomY - 2, glyph.char, fontFamily, { fill: color });
+      return svgGlyphText(x2, staffBottomY - 2, glyph.char, fontFamily, { fill: color });
     }
     const numText = numeratorText(sig);
     const denText = denominatorText(sig);
     const numWidth = textWidth(numText);
     const denWidth = textWidth(denText);
     const blockWidth = Math.max(numWidth, denWidth);
-    const numX = x + (blockWidth - numWidth) / 2;
-    const denX = x + (blockWidth - denWidth) / 2;
+    const numX = x2 + (blockWidth - numWidth) / 2;
+    const denX = x2 + (blockWidth - denWidth) / 2;
     const numerator = renderDigitString(numText, numX, staffBottomY - 3, fontFamily, color);
     const denominator = renderDigitString(denText, denX, staffBottomY - 1, fontFamily, color);
     return `${numerator}
@@ -58884,19 +58886,19 @@ ${denominator}`;
   var REPEAT_DOT_UPPER_Y = -1.5;
   var REPEAT_DOT_LOWER_Y = -2.5;
   function renderBarline(geometry, options) {
-    const { x, staffBottomY, height, color, fontFamily } = options;
+    const { x: x2, staffBottomY, height, color, fontFamily } = options;
     const parts = [];
     for (const stroke of geometry.strokes) {
       if (stroke.kind === "line") {
         parts.push(
-          svgLine(x + stroke.x, staffBottomY, x + stroke.x, staffBottomY - height, {
+          svgLine(x2 + stroke.x, staffBottomY, x2 + stroke.x, staffBottomY - height, {
             stroke: color,
             "stroke-width": stroke.thickness
           })
         );
       } else if (stroke.kind === "dashedLine") {
         parts.push(
-          svgLine(x + stroke.x, staffBottomY, x + stroke.x, staffBottomY - height, {
+          svgLine(x2 + stroke.x, staffBottomY, x2 + stroke.x, staffBottomY - height, {
             stroke: color,
             "stroke-width": stroke.thickness,
             "stroke-dasharray": `${stroke.dashLength},${stroke.gapLength}`
@@ -58908,12 +58910,12 @@ ${denominator}`;
           throw new Error("No glyph found for repeatDot");
         }
         parts.push(
-          svgGlyphText(x + stroke.x, staffBottomY + REPEAT_DOT_UPPER_Y, glyph.char, fontFamily, {
+          svgGlyphText(x2 + stroke.x, staffBottomY + REPEAT_DOT_UPPER_Y, glyph.char, fontFamily, {
             fill: color
           })
         );
         parts.push(
-          svgGlyphText(x + stroke.x, staffBottomY + REPEAT_DOT_LOWER_Y, glyph.char, fontFamily, {
+          svgGlyphText(x2 + stroke.x, staffBottomY + REPEAT_DOT_LOWER_Y, glyph.char, fontFamily, {
             fill: color
           })
         );
@@ -58932,12 +58934,12 @@ ${denominator}`;
 
   // src/render/ledger-line.ts
   function renderLedgerLines(lines, options) {
-    const { x, noteheadWidth: noteheadWidth2, staffBottomY, extension, thickness, color } = options;
-    const x1 = x - noteheadWidth2 / 2 - extension;
-    const x2 = x + noteheadWidth2 / 2 + extension;
+    const { x: x2, noteheadWidth: noteheadWidth2, staffBottomY, extension, thickness, color } = options;
+    const x1 = x2 - noteheadWidth2 / 2 - extension;
+    const x22 = x2 + noteheadWidth2 / 2 + extension;
     return svgGroup(
       lines.map(
-        (line) => svgLine(x1, staffBottomY + line.y, x2, staffBottomY + line.y, {
+        (line) => svgLine(x1, staffBottomY + line.y, x22, staffBottomY + line.y, {
           stroke: color,
           "stroke-width": thickness
         })
@@ -59025,8 +59027,8 @@ ${denominator}`;
     const towardNotehead = shape.direction === "up" ? 1 : -1;
     const centerStep = thickness + spacing;
     const lines = [];
-    for (let i = 0; i < lineCount; i++) {
-      const offset = i * centerStep * towardNotehead;
+    for (let i2 = 0; i2 < lineCount; i2++) {
+      const offset = i2 * centerStep * towardNotehead;
       const y1 = shape.startY + offset;
       const y2 = shape.endY + offset;
       if (shape.style === "curved") {
@@ -59080,12 +59082,12 @@ ${denominator}`;
       svgLine(shape.endX, shape.y, shape.endX, hookEndY, attrs)
     ].join("\n");
   }
-  function renderTupletNumber(glyphName, x, y, options) {
+  function renderTupletNumber(glyphName, x2, y, options) {
     const glyph = getGlyph(glyphName);
     if (glyph === void 0) {
       throw new Error(`No glyph found for tuplet number "${glyphName}"`);
     }
-    return svgGlyphText(x, y, glyph.char, options.fontFamily, { fill: options.color });
+    return svgGlyphText(x2, y, glyph.char, options.fontFamily, { fill: options.color });
   }
 
   // src/render/system.ts
@@ -59407,6 +59409,49 @@ ${denominator}`;
     return map;
   }
 
+  // src/parser/musicxml/timewise.ts
+  function convertTimewiseToPartwise(timewiseRoot) {
+    const doc = timewiseRoot.ownerDocument;
+    if (doc === null) {
+      throw new Error("Cannot convert <score-timewise>: its root element has no owner document.");
+    }
+    const partwiseRoot = doc.createElement("score-partwise");
+    const version = timewiseRoot.getAttribute("version");
+    if (version !== null) partwiseRoot.setAttribute("version", version);
+    for (const child of childElements(timewiseRoot)) {
+      if (child.tagName !== "measure") {
+        partwiseRoot.appendChild(child.cloneNode(true));
+      }
+    }
+    const partsById = /* @__PURE__ */ new Map();
+    const partOrder = [];
+    for (const measureEl of childrenNamed(timewiseRoot, "measure")) {
+      const measureNumber = measureEl.getAttribute("number");
+      for (const partInMeasureEl of childrenNamed(measureEl, "part")) {
+        const id = partInMeasureEl.getAttribute("id");
+        if (id === null) continue;
+        let partEl = partsById.get(id);
+        if (partEl === void 0) {
+          partEl = doc.createElement("part");
+          partEl.setAttribute("id", id);
+          partsById.set(id, partEl);
+          partOrder.push(id);
+        }
+        const newMeasureEl = doc.createElement("measure");
+        if (measureNumber !== null) newMeasureEl.setAttribute("number", measureNumber);
+        for (const contentChild of childElements(partInMeasureEl)) {
+          newMeasureEl.appendChild(contentChild.cloneNode(true));
+        }
+        partEl.appendChild(newMeasureEl);
+      }
+    }
+    for (const id of partOrder) {
+      const partEl = partsById.get(id);
+      if (partEl !== void 0) partwiseRoot.appendChild(partEl);
+    }
+    return partwiseRoot;
+  }
+
   // src/parser/musicxml/parse.ts
   var DEFAULT_DIVISIONS = 1;
   var DEFAULT_FIFTHS = 0;
@@ -59463,12 +59508,12 @@ ${denominator}`;
     }
     try {
       return chord(notesOnly);
-    } catch (err) {
+    } catch (err2) {
       diagnostics.push(
         diagnostic(
           "warning",
           "INVALID_CHORD",
-          `Chord group rejected (${err instanceof Error ? err.message : String(err)}); using the first note only.`,
+          `Chord group rejected (${err2 instanceof Error ? err2.message : String(err2)}); using the first note only.`,
           location
         )
       );
@@ -59488,13 +59533,14 @@ ${denominator}`;
       );
     }
     const doc = new DOMParserCtor().parseFromString(xmlText, "application/xml");
-    const root = doc.documentElement;
+    const rawRoot = doc.documentElement;
+    const root = rawRoot !== null && rawRoot.tagName === "score-timewise" ? convertTimewiseToPartwise(rawRoot) : rawRoot;
     if (root === null || root.tagName !== "score-partwise") {
       diagnostics.push(
         diagnostic(
           "error",
           "UNSUPPORTED_ROOT",
-          `Expected <score-partwise>, got "${root?.tagName ?? "nothing"}" (score-timewise is a later phase).`
+          `Expected <score-partwise> or <score-timewise>, got "${root?.tagName ?? "nothing"}".`
         )
       );
       return {
@@ -59624,12 +59670,12 @@ ${denominator}`;
         for (const [voiceId, list] of byVoice) {
           const sorted = [...list].sort((a, b) => a.tick - b.tick);
           const events = [];
-          let i = 0;
-          while (i < sorted.length) {
-            const head = sorted[i];
+          let i2 = 0;
+          while (i2 < sorted.length) {
+            const head = sorted[i2];
             if (head === void 0) break;
             const group = [head.ev];
-            let j = i + 1;
+            let j = i2 + 1;
             for (; ; ) {
               const next = sorted[j];
               if (next === void 0 || next.tick !== head.tick || !next.ev.isChordMember) break;
@@ -59637,7 +59683,7 @@ ${denominator}`;
               j++;
             }
             events.push(buildEvent(group, location, diagnostics));
-            i = j;
+            i2 = j;
           }
           voices.push(voice(voiceId, events));
           const lastRecord = sorted[sorted.length - 1];
@@ -59691,13 +59737,514 @@ ${denominator}`;
     };
   }
 
+  // node_modules/fflate/esm/browser.js
+  var u8 = Uint8Array;
+  var u16 = Uint16Array;
+  var i32 = Int32Array;
+  var fleb = new u8([
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    1,
+    2,
+    2,
+    2,
+    2,
+    3,
+    3,
+    3,
+    3,
+    4,
+    4,
+    4,
+    4,
+    5,
+    5,
+    5,
+    5,
+    0,
+    /* unused */
+    0,
+    0,
+    /* impossible */
+    0
+  ]);
+  var fdeb = new u8([
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    2,
+    2,
+    3,
+    3,
+    4,
+    4,
+    5,
+    5,
+    6,
+    6,
+    7,
+    7,
+    8,
+    8,
+    9,
+    9,
+    10,
+    10,
+    11,
+    11,
+    12,
+    12,
+    13,
+    13,
+    /* unused */
+    0,
+    0
+  ]);
+  var clim = new u8([16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]);
+  var freb = function(eb, start) {
+    var b = new u16(31);
+    for (var i2 = 0; i2 < 31; ++i2) {
+      b[i2] = start += 1 << eb[i2 - 1];
+    }
+    var r = new i32(b[30]);
+    for (var i2 = 1; i2 < 30; ++i2) {
+      for (var j = b[i2]; j < b[i2 + 1]; ++j) {
+        r[j] = j - b[i2] << 5 | i2;
+      }
+    }
+    return { b, r };
+  };
+  var _a = freb(fleb, 2);
+  var fl = _a.b;
+  var revfl = _a.r;
+  fl[28] = 258, revfl[258] = 28;
+  var _b = freb(fdeb, 0);
+  var fd = _b.b;
+  var revfd = _b.r;
+  var rev = new u16(32768);
+  for (i = 0; i < 32768; ++i) {
+    x = (i & 43690) >> 1 | (i & 21845) << 1;
+    x = (x & 52428) >> 2 | (x & 13107) << 2;
+    x = (x & 61680) >> 4 | (x & 3855) << 4;
+    rev[i] = ((x & 65280) >> 8 | (x & 255) << 8) >> 1;
+  }
+  var x;
+  var i;
+  var hMap = (function(cd, mb, r) {
+    var s = cd.length;
+    var i2 = 0;
+    var l = new u16(mb);
+    for (; i2 < s; ++i2) {
+      if (cd[i2])
+        ++l[cd[i2] - 1];
+    }
+    var le = new u16(mb);
+    for (i2 = 1; i2 < mb; ++i2) {
+      le[i2] = le[i2 - 1] + l[i2 - 1] << 1;
+    }
+    var co;
+    if (r) {
+      co = new u16(1 << mb);
+      var rvb = 15 - mb;
+      for (i2 = 0; i2 < s; ++i2) {
+        if (cd[i2]) {
+          var sv = i2 << 4 | cd[i2];
+          var r_1 = mb - cd[i2];
+          var v = le[cd[i2] - 1]++ << r_1;
+          for (var m = v | (1 << r_1) - 1; v <= m; ++v) {
+            co[rev[v] >> rvb] = sv;
+          }
+        }
+      }
+    } else {
+      co = new u16(s);
+      for (i2 = 0; i2 < s; ++i2) {
+        if (cd[i2]) {
+          co[i2] = rev[le[cd[i2] - 1]++] >> 15 - cd[i2];
+        }
+      }
+    }
+    return co;
+  });
+  var flt = new u8(288);
+  for (i = 0; i < 144; ++i)
+    flt[i] = 8;
+  var i;
+  for (i = 144; i < 256; ++i)
+    flt[i] = 9;
+  var i;
+  for (i = 256; i < 280; ++i)
+    flt[i] = 7;
+  var i;
+  for (i = 280; i < 288; ++i)
+    flt[i] = 8;
+  var i;
+  var fdt = new u8(32);
+  for (i = 0; i < 32; ++i)
+    fdt[i] = 5;
+  var i;
+  var flrm = /* @__PURE__ */ hMap(flt, 9, 1);
+  var fdrm = /* @__PURE__ */ hMap(fdt, 5, 1);
+  var max = function(a) {
+    var m = a[0];
+    for (var i2 = 1; i2 < a.length; ++i2) {
+      if (a[i2] > m)
+        m = a[i2];
+    }
+    return m;
+  };
+  var bits = function(d, p, m) {
+    var o = p / 8 | 0;
+    return (d[o] | d[o + 1] << 8) >> (p & 7) & m;
+  };
+  var bits16 = function(d, p) {
+    var o = p / 8 | 0;
+    return (d[o] | d[o + 1] << 8 | d[o + 2] << 16) >> (p & 7);
+  };
+  var shft = function(p) {
+    return (p + 7) / 8 | 0;
+  };
+  var slc = function(v, s, e) {
+    if (s == null || s < 0)
+      s = 0;
+    if (e == null || e > v.length)
+      e = v.length;
+    return new u8(v.subarray(s, e));
+  };
+  var ec = [
+    "unexpected EOF",
+    "invalid block type",
+    "invalid length/literal",
+    "invalid distance",
+    "stream finished",
+    "no stream handler",
+    ,
+    // determined by compression function
+    "no callback",
+    "invalid UTF-8 data",
+    "extra field too long",
+    "date not in range 1980-2099",
+    "filename too long",
+    "stream finishing",
+    "invalid zip data"
+    // determined by unknown compression method
+  ];
+  var err = function(ind, msg, nt) {
+    var e = new Error(msg || ec[ind]);
+    e.code = ind;
+    if (Error.captureStackTrace)
+      Error.captureStackTrace(e, err);
+    if (!nt)
+      throw e;
+    return e;
+  };
+  var inflt = function(dat, st, buf, dict) {
+    var sl = dat.length, dl = dict ? dict.length : 0;
+    if (!sl || st.f && !st.l)
+      return buf || new u8(0);
+    var noBuf = !buf;
+    var resize = noBuf || st.i != 2;
+    var noSt = st.i;
+    if (noBuf)
+      buf = new u8(sl * 3);
+    var cbuf = function(l2) {
+      var bl = buf.length;
+      if (l2 > bl) {
+        var nbuf = new u8(Math.max(bl * 2, l2));
+        nbuf.set(buf);
+        buf = nbuf;
+      }
+    };
+    var final = st.f || 0, pos = st.p || 0, bt = st.b || 0, lm = st.l, dm = st.d, lbt = st.m, dbt = st.n;
+    var tbts = sl * 8;
+    do {
+      if (!lm) {
+        final = bits(dat, pos, 1);
+        var type = bits(dat, pos + 1, 3);
+        pos += 3;
+        if (!type) {
+          var s = shft(pos) + 4, l = dat[s - 4] | dat[s - 3] << 8, t = s + l;
+          if (t > sl) {
+            if (noSt)
+              err(0);
+            break;
+          }
+          if (resize)
+            cbuf(bt + l);
+          buf.set(dat.subarray(s, t), bt);
+          st.b = bt += l, st.p = pos = t * 8, st.f = final;
+          continue;
+        } else if (type == 1)
+          lm = flrm, dm = fdrm, lbt = 9, dbt = 5;
+        else if (type == 2) {
+          var hLit = bits(dat, pos, 31) + 257, hcLen = bits(dat, pos + 10, 15) + 4;
+          var tl = hLit + bits(dat, pos + 5, 31) + 1;
+          pos += 14;
+          var ldt = new u8(tl);
+          var clt = new u8(19);
+          for (var i2 = 0; i2 < hcLen; ++i2) {
+            clt[clim[i2]] = bits(dat, pos + i2 * 3, 7);
+          }
+          pos += hcLen * 3;
+          var clb = max(clt), clbmsk = (1 << clb) - 1;
+          var clm = hMap(clt, clb, 1);
+          for (var i2 = 0; i2 < tl; ) {
+            var r = clm[bits(dat, pos, clbmsk)];
+            pos += r & 15;
+            var s = r >> 4;
+            if (s < 16) {
+              ldt[i2++] = s;
+            } else {
+              var c = 0, n = 0;
+              if (s == 16)
+                n = 3 + bits(dat, pos, 3), pos += 2, c = ldt[i2 - 1];
+              else if (s == 17)
+                n = 3 + bits(dat, pos, 7), pos += 3;
+              else if (s == 18)
+                n = 11 + bits(dat, pos, 127), pos += 7;
+              while (n--)
+                ldt[i2++] = c;
+            }
+          }
+          var lt = ldt.subarray(0, hLit), dt = ldt.subarray(hLit);
+          lbt = max(lt);
+          dbt = max(dt);
+          lm = hMap(lt, lbt, 1);
+          dm = hMap(dt, dbt, 1);
+        } else
+          err(1);
+        if (pos > tbts) {
+          if (noSt)
+            err(0);
+          break;
+        }
+      }
+      if (resize)
+        cbuf(bt + 131072);
+      var lms = (1 << lbt) - 1, dms = (1 << dbt) - 1;
+      var lpos = pos;
+      for (; ; lpos = pos) {
+        var c = lm[bits16(dat, pos) & lms], sym = c >> 4;
+        pos += c & 15;
+        if (pos > tbts) {
+          if (noSt)
+            err(0);
+          break;
+        }
+        if (!c)
+          err(2);
+        if (sym < 256)
+          buf[bt++] = sym;
+        else if (sym == 256) {
+          lpos = pos, lm = null;
+          break;
+        } else {
+          var add = sym - 254;
+          if (sym > 264) {
+            var i2 = sym - 257, b = fleb[i2];
+            add = bits(dat, pos, (1 << b) - 1) + fl[i2];
+            pos += b;
+          }
+          var d = dm[bits16(dat, pos) & dms], dsym = d >> 4;
+          if (!d)
+            err(3);
+          pos += d & 15;
+          var dt = fd[dsym];
+          if (dsym > 3) {
+            var b = fdeb[dsym];
+            dt += bits16(dat, pos) & (1 << b) - 1, pos += b;
+          }
+          if (pos > tbts) {
+            if (noSt)
+              err(0);
+            break;
+          }
+          if (resize)
+            cbuf(bt + 131072);
+          var end = bt + add;
+          if (bt < dt) {
+            var shift = dl - dt, dend = Math.min(dt, end);
+            if (shift + bt < 0)
+              err(3);
+            for (; bt < dend; ++bt)
+              buf[bt] = dict[shift + bt];
+          }
+          for (; bt < end; ++bt)
+            buf[bt] = buf[bt - dt];
+        }
+      }
+      st.l = lm, st.p = lpos, st.b = bt, st.f = final;
+      if (lm)
+        final = 1, st.m = lbt, st.d = dm, st.n = dbt;
+    } while (!final);
+    return bt != buf.length && noBuf ? slc(buf, 0, bt) : buf.subarray(0, bt);
+  };
+  var et = /* @__PURE__ */ new u8(0);
+  var b2 = function(d, b) {
+    return d[b] | d[b + 1] << 8;
+  };
+  var b4 = function(d, b) {
+    return (d[b] | d[b + 1] << 8 | d[b + 2] << 16 | d[b + 3] << 24) >>> 0;
+  };
+  var b8 = function(d, b) {
+    return b4(d, b) + b4(d, b + 4) * 4294967296;
+  };
+  function inflateSync(data, opts) {
+    return inflt(data, { i: 2 }, opts && opts.out, opts && opts.dictionary);
+  }
+  var td = typeof TextDecoder != "undefined" && /* @__PURE__ */ new TextDecoder();
+  var tds = 0;
+  try {
+    td.decode(et, { stream: true });
+    tds = 1;
+  } catch (e) {
+  }
+  var dutf8 = function(d) {
+    for (var r = "", i2 = 0; ; ) {
+      var c = d[i2++];
+      var eb = (c > 127) + (c > 223) + (c > 239);
+      if (i2 + eb > d.length)
+        return { s: r, r: slc(d, i2 - 1) };
+      if (!eb)
+        r += String.fromCharCode(c);
+      else if (eb == 3) {
+        c = ((c & 15) << 18 | (d[i2++] & 63) << 12 | (d[i2++] & 63) << 6 | d[i2++] & 63) - 65536, r += String.fromCharCode(55296 | c >> 10, 56320 | c & 1023);
+      } else if (eb & 1)
+        r += String.fromCharCode((c & 31) << 6 | d[i2++] & 63);
+      else
+        r += String.fromCharCode((c & 15) << 12 | (d[i2++] & 63) << 6 | d[i2++] & 63);
+    }
+  };
+  function strFromU8(dat, latin1) {
+    if (latin1) {
+      var r = "";
+      for (var i2 = 0; i2 < dat.length; i2 += 16384)
+        r += String.fromCharCode.apply(null, dat.subarray(i2, i2 + 16384));
+      return r;
+    } else if (td) {
+      return td.decode(dat);
+    } else {
+      var _a2 = dutf8(dat), s = _a2.s, r = _a2.r;
+      if (r.length)
+        err(8);
+      return s;
+    }
+  }
+  var slzh = function(d, b) {
+    return b + 30 + b2(d, b + 26) + b2(d, b + 28);
+  };
+  var zh = function(d, b, z) {
+    var fnl = b2(d, b + 28), efl = b2(d, b + 30), fn = strFromU8(d.subarray(b + 46, b + 46 + fnl), !(b2(d, b + 8) & 2048)), es = b + 46 + fnl;
+    var _a2 = z64hs(d, es, efl, z, b4(d, b + 20), b4(d, b + 24), b4(d, b + 42)), sc = _a2[0], su = _a2[1], off = _a2[2];
+    return [b2(d, b + 10), sc, su, fn, es + efl + b2(d, b + 32), off];
+  };
+  var z64hs = function(d, b, l, z, sc, su, off) {
+    var nsc = sc == 4294967295, nsu = su == 4294967295, noff = off == 4294967295, e = b + l;
+    var nf = nsc + nsu + noff;
+    if (z && nf) {
+      for (; b + 4 < e; b += 4 + b2(d, b + 2)) {
+        if (b2(d, b) == 1) {
+          return [
+            nsc ? b8(d, b + 4 + 8 * nsu) : sc,
+            nsu ? b8(d, b + 4) : su,
+            noff ? b8(d, b + 4 + 8 * (nsu + nsc)) : off,
+            1
+          ];
+        }
+      }
+      if (z < 2)
+        err(13);
+    }
+    return [sc, su, off, 0];
+  };
+  function unzipSync(data, opts) {
+    var files = {};
+    var e = data.length - 22;
+    for (; b4(data, e) != 101010256; --e) {
+      if (!e || data.length - e > 65558)
+        err(13);
+    }
+    ;
+    var c = b2(data, e + 8);
+    if (!c)
+      return {};
+    var o = b4(data, e + 16);
+    var z = b4(data, e - 20) == 117853008;
+    if (z) {
+      var ze = b4(data, e - 12);
+      z = b4(data, ze) == 101075792;
+      if (z) {
+        c = b4(data, ze + 32);
+        o = b4(data, ze + 48);
+      }
+    }
+    var fltr = opts && opts.filter;
+    for (var i2 = 0; i2 < c; ++i2) {
+      var _a2 = zh(data, o, z), c_2 = _a2[0], sc = _a2[1], su = _a2[2], fn = _a2[3], no = _a2[4], off = _a2[5], b = slzh(data, off);
+      o = no;
+      if (!fltr || fltr({
+        name: fn,
+        size: sc,
+        originalSize: su,
+        compression: c_2
+      })) {
+        if (!c_2)
+          files[fn] = slc(data, b, b + sc);
+        else if (c_2 == 8)
+          files[fn] = inflateSync(data.subarray(b, b + sc), { out: new u8(su) });
+        else
+          err(14, "unknown compression type " + c_2);
+      }
+    }
+    return files;
+  }
+
+  // src/parser/musicxml/mxl.ts
+  function unzipMxl(bytes, domParser) {
+    const files = unzipSync(bytes);
+    const containerBytes = files["META-INF/container.xml"];
+    if (containerBytes === void 0) {
+      throw new Error(
+        ".mxl archive has no META-INF/container.xml -- cannot find the score file inside it."
+      );
+    }
+    const containerXml = strFromU8(containerBytes);
+    const containerDoc = new domParser().parseFromString(containerXml, "application/xml");
+    const root = containerDoc.documentElement;
+    const rootfilesEl = root !== null ? firstChildNamed(root, "rootfiles") : void 0;
+    const rootfileEl = rootfilesEl !== void 0 ? firstChildNamed(rootfilesEl, "rootfile") : void 0;
+    const fullPath = rootfileEl?.getAttribute("full-path");
+    if (fullPath === null || fullPath === void 0) {
+      throw new Error(`.mxl archive's container.xml has no <rootfile full-path="..."> pointer.`);
+    }
+    const scoreBytes = files[fullPath];
+    if (scoreBytes === void 0) {
+      throw new Error(
+        `.mxl archive's container.xml points to "${fullPath}", but that file isn't in the archive.`
+      );
+    }
+    return strFromU8(scoreBytes);
+  }
+
   // src/layout/naive.ts
   function naiveMeasureLayout(measureCount, measureWidth = 20) {
     const result = [];
-    let x = 0;
-    for (let i = 0; i < measureCount; i++) {
-      result.push({ measureNumber: i + 1, x, width: measureWidth });
-      x += measureWidth;
+    let x2 = 0;
+    for (let i2 = 0; i2 < measureCount; i2++) {
+      result.push({ measureNumber: i2 + 1, x: x2, width: measureWidth });
+      x2 += measureWidth;
     }
     return result;
   }
@@ -59769,7 +60316,7 @@ ${denominator}`;
     const bbox = getGlyph(glyphName)?.bBox;
     return bbox !== void 0 ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
   }
-  function renderNoteheadPart(note2, x, ctx, accidentalState) {
+  function renderNoteheadPart(note2, x2, ctx, accidentalState) {
     const parts = [];
     const isUnpitched2 = note2.pitch.kind === "unpitched";
     const step = isUnpitched2 ? note2.pitch.displayStep : note2.pitch.step;
@@ -59791,7 +60338,7 @@ ${denominator}`;
         const width = glyphWidthOf(glyphName);
         parts.push(
           renderAccidental(glyphName, {
-            x: accidentalX(x, width, 0),
+            x: accidentalX(x2, width, 0),
             y,
             color: INK_COLOR,
             fontFamily: FONT_FAMILY
@@ -59804,12 +60351,12 @@ ${denominator}`;
       durationType: note2.duration.type,
       ...note2.explicitNotehead !== void 0 ? { explicitNotehead: note2.explicitNotehead } : {}
     });
-    parts.push(renderNotehead(noteheadGlyph, { x, y, color: INK_COLOR, fontFamily: FONT_FAMILY }));
+    parts.push(renderNotehead(noteheadGlyph, { x: x2, y, color: INK_COLOR, fontFamily: FONT_FAMILY }));
     const ledgerLines = computeLedgerLines(position, STAFF_LINES);
     if (ledgerLines.length > 0) {
       parts.push(
         renderLedgerLines(ledgerLines, {
-          x,
+          x: x2,
           noteheadWidth: noteheadWidth(noteheadGlyph),
           staffBottomY: ctx.measureBottomY,
           extension: getEngravingDefault("legerLineExtension") ?? LEDGER_EXTENSION_FALLBACK,
@@ -59820,11 +60367,11 @@ ${denominator}`;
     }
     return { svg: parts.join("\n"), position, noteheadGlyph, newAccidentalState: state };
   }
-  function renderNoteOrRest(ev, x, ctx, accidentalState, forcedDirection, restOffset) {
+  function renderNoteOrRest(ev, x2, ctx, accidentalState, forcedDirection, restOffset) {
     if (ev.kind === "rest") {
       const y2 = ctx.measureBottomY + restY(ev.duration.type, STAFF_LINES, restOffset);
       const svg = renderRest(restGlyphName(ev.duration.type), {
-        x,
+        x: x2,
         y: y2,
         color: INK_COLOR,
         fontFamily: FONT_FAMILY
@@ -59853,7 +60400,7 @@ ${denominator}`;
           const width = glyphWidthOf(glyphName);
           parts2.push(
             renderAccidental(glyphName, {
-              x: accidentalX(x, width, 0),
+              x: accidentalX(x2, width, 0),
               y: graceY,
               color: INK_COLOR,
               fontFamily: FONT_FAMILY
@@ -59870,7 +60417,7 @@ ${denominator}`;
       const kind = ev.graceSlash ? "acciaccatura" : "appoggiatura";
       parts2.push(
         renderMark(graceNoteGlyphName(kind, graceDirection), {
-          x,
+          x: x2,
           y: graceY,
           color: INK_COLOR,
           fontFamily: FONT_FAMILY
@@ -59879,7 +60426,7 @@ ${denominator}`;
       return { svg: parts2.join("\n"), newAccidentalState: state };
     }
     const parts = [];
-    const head = renderNoteheadPart(ev, x, ctx, accidentalState);
+    const head = renderNoteheadPart(ev, x2, ctx, accidentalState);
     parts.push(head.svg);
     const y = ctx.measureBottomY + head.position;
     const direction = resolveStemDirection({
@@ -59893,7 +60440,7 @@ ${denominator}`;
       parts.push(
         renderStem({
           noteheadGlyphName: head.noteheadGlyph,
-          noteX: x,
+          noteX: x2,
           noteY: y,
           direction,
           length,
@@ -59905,7 +60452,7 @@ ${denominator}`;
         const anchorName = direction === "up" ? "stemUpSE" : "stemDownNW";
         const anchor = getGlyph(head.noteheadGlyph)?.anchors?.[anchorName];
         if (anchor !== void 0) {
-          const stemX = x + anchor[0];
+          const stemX = x2 + anchor[0];
           const attachY = y - anchor[1];
           const endY = direction === "up" ? attachY - length : attachY + length;
           parts.push(
@@ -59931,10 +60478,10 @@ ${denominator}`;
     let state = accidentalState;
     const positions = [];
     const noteheadGlyphs = [];
-    notes.forEach((note2, i) => {
-      const x = xs[i];
-      if (x === void 0) return;
-      const head = renderNoteheadPart(note2, x, ctx, state);
+    notes.forEach((note2, i2) => {
+      const x2 = xs[i2];
+      if (x2 === void 0) return;
+      const head = renderNoteheadPart(note2, x2, ctx, state);
       parts.push(head.svg);
       state = head.newAccidentalState;
       positions.push(head.position);
@@ -59947,20 +60494,20 @@ ${denominator}`;
       ...positions.map((p) => computeStemLength(p, middle))
     );
     const shape = computeBeamShape(positions, [...xs], direction, beamStyle, naturalLength);
-    notes.forEach((_note, i) => {
-      const x = xs[i];
-      const position = positions[i];
-      const noteheadGlyph = noteheadGlyphs[i];
-      if (x === void 0 || position === void 0 || noteheadGlyph === void 0) return;
+    notes.forEach((_note, i2) => {
+      const x2 = xs[i2];
+      const position = positions[i2];
+      const noteheadGlyph = noteheadGlyphs[i2];
+      if (x2 === void 0 || position === void 0 || noteheadGlyph === void 0) return;
       const y = ctx.measureBottomY + position;
-      const beamY = ctx.measureBottomY + beamYAtX(shape, x);
+      const beamY = ctx.measureBottomY + beamYAtX(shape, x2);
       const anchorName = direction === "up" ? "stemUpSE" : "stemDownNW";
       const anchor = getGlyph(noteheadGlyph)?.anchors?.[anchorName];
       if (anchor === void 0) return;
       parts.push(
         renderStem({
           noteheadGlyphName: noteheadGlyph,
-          noteX: x,
+          noteX: x2,
           noteY: y,
           direction,
           // renderStem draws from the notehead anchor a fixed `length` in
@@ -59988,7 +60535,7 @@ ${denominator}`;
     );
     return { svg: parts.join("\n"), newAccidentalState: state };
   }
-  function renderChord(chord2, x, ctx, accidentalState, forcedDirection) {
+  function renderChord(chord2, x2, ctx, accidentalState, forcedDirection) {
     const parts = [];
     const positions = chord2.notes.map(
       (n) => n.pitch.kind === "pitched" ? staffPositionForPitch(ctx.clefDef, n.pitch.step, n.pitch.octave) : staffPositionForPitch(ctx.clefDef, n.pitch.displayStep, n.pitch.displayOctave)
@@ -60007,20 +60554,20 @@ ${denominator}`;
         alters.push(0);
       }
     }
-    const positionsNeedingAccidentals = positions.filter((_, i) => drawFlags[i] === true);
+    const positionsNeedingAccidentals = positions.filter((_, i2) => drawFlags[i2] === true);
     const placements = assignAccidentalColumns(positionsNeedingAccidentals);
     let placementIndex = 0;
-    drawFlags.forEach((shouldDraw, i) => {
+    drawFlags.forEach((shouldDraw, i2) => {
       if (!shouldDraw) return;
       const placement = placements[placementIndex];
       placementIndex += 1;
       if (placement === void 0) return;
-      const alter = alters[i] ?? 0;
+      const alter = alters[i2] ?? 0;
       const glyphName = accidentalGlyphName(alter);
       const width = glyphWidthOf(glyphName);
       parts.push(
         renderAccidental(glyphName, {
-          x: accidentalX(x, width, placement.column),
+          x: accidentalX(x2, width, placement.column),
           y: ctx.measureBottomY + placement.y,
           color: INK_COLOR,
           fontFamily: FONT_FAMILY
@@ -60028,7 +60575,7 @@ ${denominator}`;
       );
     });
     let widestGlyph;
-    chord2.notes.forEach((n, i) => {
+    chord2.notes.forEach((n, i2) => {
       const glyphName = selectNoteheadGlyphName({
         pitch: n.pitch,
         durationType: chord2.duration.type
@@ -60036,14 +60583,14 @@ ${denominator}`;
       if (widestGlyph === void 0 || glyphWidthOf(glyphName) > glyphWidthOf(widestGlyph)) {
         widestGlyph = glyphName;
       }
-      const position = positions[i] ?? 0;
+      const position = positions[i2] ?? 0;
       const y = ctx.measureBottomY + position;
-      parts.push(renderNotehead(glyphName, { x, y, color: INK_COLOR, fontFamily: FONT_FAMILY }));
+      parts.push(renderNotehead(glyphName, { x: x2, y, color: INK_COLOR, fontFamily: FONT_FAMILY }));
       const ledgerLines = computeLedgerLines(position, STAFF_LINES);
       if (ledgerLines.length > 0) {
         parts.push(
           renderLedgerLines(ledgerLines, {
-            x,
+            x: x2,
             noteheadWidth: noteheadWidth(glyphName),
             staffBottomY: ctx.measureBottomY,
             extension: getEngravingDefault("legerLineExtension") ?? LEDGER_EXTENSION_FALLBACK,
@@ -60060,7 +60607,7 @@ ${denominator}`;
       parts.push(
         renderStem({
           noteheadGlyphName: widestGlyph ?? "noteheadBlack",
-          noteX: x,
+          noteX: x2,
           noteY: ctx.measureBottomY + outermost,
           direction,
           length,
@@ -60094,11 +60641,11 @@ ${denominator}`;
     const staffGeometry = computeStaffGeometry(STAFF_LINES);
     let accidentalState;
     let previousAttrs;
-    part2.measures.forEach((measure2, i) => {
+    part2.measures.forEach((measure2, i2) => {
       const attrs = attributes.find(
         (a) => a.partId === part2.id && a.measureNumber === measure2.number
       );
-      const layout = layouts[i];
+      const layout = layouts[i2];
       if (attrs === void 0 || layout === void 0) return;
       const { clefDef, keySigClefName } = mapClef(attrs.clefSign, attrs.clefLine);
       const bottomY = STAFF_BOTTOM_Y;
@@ -60111,7 +60658,7 @@ ${denominator}`;
           lineThickness: getEngravingDefault("staffLineThickness") ?? 0.13
         })
       );
-      const isFirstMeasure = i === 0;
+      const isFirstMeasure = i2 === 0;
       const clefChanged = previousAttrs === void 0 || previousAttrs.clefSign !== attrs.clefSign || previousAttrs.clefLine !== attrs.clefLine;
       const keyChanged = previousAttrs === void 0 || previousAttrs.fifths !== attrs.fifths;
       const timeChanged = previousAttrs === void 0 || previousAttrs.timeNumerator !== attrs.timeNumerator || previousAttrs.timeDenominator !== attrs.timeDenominator;
@@ -60135,11 +60682,11 @@ ${denominator}`;
             })
           );
           cursorX += accidentals.length + 0.5;
-        } catch (err) {
+        } catch (err2) {
           diagnostics.push({
             severity: "warning",
             code: "UNSUPPORTED_KEY_SIGNATURE_CLEF",
-            message: err instanceof Error ? err.message : String(err),
+            message: err2 instanceof Error ? err2.message : String(err2),
             location: { partId: part2.id, measureNumber: measure2.number }
           });
         }
@@ -60156,11 +60703,11 @@ ${denominator}`;
             })
           );
           cursorX += 2.5;
-        } catch (err) {
+        } catch (err2) {
           diagnostics.push({
             severity: "warning",
             code: "INVALID_TIME_SIGNATURE",
-            message: err instanceof Error ? err.message : String(err),
+            message: err2 instanceof Error ? err2.message : String(err2),
             location: { partId: part2.id, measureNumber: measure2.number }
           });
         }
@@ -60208,8 +60755,8 @@ ${denominator}`;
             if (!isGraceNote && beamedIndices.has(idx)) {
               const group = groupByFirstIndex.get(idx);
               if (group === void 0) return;
-              const groupNotes = group.eventIndices.map((i2) => voice2.events[i2]).filter((e) => e !== void 0 && e.kind === "note");
-              const groupXs = group.eventIndices.map((i2) => eventXs[i2] ?? 0);
+              const groupNotes = group.eventIndices.map((i3) => voice2.events[i3]).filter((e) => e !== void 0 && e.kind === "note");
+              const groupXs = group.eventIndices.map((i3) => eventXs[i3] ?? 0);
               const { svg: svg2, newAccidentalState } = renderBeamGroup(
                 groupNotes,
                 groupXs,

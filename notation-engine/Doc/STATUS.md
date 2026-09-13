@@ -11,10 +11,10 @@ after Phase 29 (end of Stage 4).
 
 ---
 
-## A. DONE — Phases 1–35 ✅ (Stage 2, 3, 4 & 5 complete; Stage 6 in progress)
+## A. DONE — Phases 1–36 ✅ (Stage 2, 3, 4 & 5 complete; Stage 6 in progress)
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 312/312 across them.
+`npm run verify` passes 320/320 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -53,6 +53,7 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 33 | Chord symbols | Real `csym` accidental + 5 quality glyphs built; root letter/bass note deferred (needs a text-font system) | [`phase-33`](./phase-33-chord-symbols.md) |
 | 34 | Grace notes | Real precomposed acciaccatura/appoggiatura glyphs (no text-font gap this time) | [`phase-34`](./phase-34-grace-notes.md) |
 | 35 | MusicXML parser v2 (Tier 1) | midi-instrument/notehead/grace/tuplet-ratio/stem/accidental parsed + wired; 2 real bugs found+fixed | [`phase-35`](./phase-35-musicxml-parser-v2.md) |
+| 36 | `.mxl` + score-timewise | Both confirmed byte-identical to partwise/uncompressed rendering; wired into the web app | [`phase-36`](./phase-36-mxl-timewise.md) |
 
 **Public API today:** 137 exports from `dist/notation-engine.js`.
 
@@ -70,7 +71,6 @@ that specifies it.
 ### Stage 6 — Full import
 | # | Phase | Spec |
 |---|---|---|
-| **36** | `.mxl` (zipped) support + `<score-timewise>` conversion | §10.5 |
 | **37** | Cross-software compatibility corpus and fixes | §10.8 |
 | **38** | Diagnostics and partial-render hardening | §10.7 |
 

@@ -240,7 +240,7 @@
 <!-- The Notation Engine's built bundle (committed to the repo -- GitHub Pages
      has no build step; see notation-engine/.gitignore). Exposes the global
      `NotationEngine`, including renderFromMusicXml(). -->
-<script src="../notation-engine/dist/notation-engine.js?v=1"></script>
+<script src="../notation-engine/dist/notation-engine.js?v=2"></script>
 <script>
   // Self-diagnosis: if the browser served a stale cached page, or the bundle
   // failed to load at all, the notation panel would silently show nothing and
@@ -719,10 +719,12 @@
     els.notationStatus.textContent = 'Loading…';
     els.notationStatus.classList.remove('hidden');
     try {
-      if (file.name.toLowerCase().endsWith('.mxl')) {
-        throw new Error('.mxl (compressed MusicXML) is not supported yet — please export as uncompressed .musicxml.');
-      }
-      const xmlText = await file.text();
+      // .mxl (compressed MusicXML) is a ZIP archive -- must be read as
+      // binary, not text, or the archive's bytes get corrupted by UTF-8
+      // decoding before unzipping ever sees them.
+      const xmlText = file.name.toLowerCase().endsWith('.mxl')
+        ? NotationEngine.unzipMxl(new Uint8Array(await file.arrayBuffer()), window.DOMParser)
+        : await file.text();
 
       // The real Notation Engine. In a browser the engine uses the native
       // DOMParser automatically, so no domParser option is needed here --

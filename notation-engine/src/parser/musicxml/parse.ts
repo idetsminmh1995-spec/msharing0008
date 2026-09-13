@@ -14,6 +14,7 @@ import { parseAttributesElement } from './attributes.js';
 import { parseNoteElement, type ParsedNoteEvent } from './note.js';
 import { attrOf, childrenNamed, firstChildNamed, intOf, textOf } from './dom-helpers.js';
 import { parseMidiInstrumentMap } from './instrument.js';
+import { convertTimewiseToPartwise } from './timewise.js';
 
 const DEFAULT_DIVISIONS = 1;
 const DEFAULT_FIFTHS = 0;
@@ -206,14 +207,21 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
   }
 
   const doc = new DOMParserCtor().parseFromString(xmlText, 'application/xml');
-  const root = doc.documentElement;
+  const rawRoot = doc.documentElement;
+
+  // §10.6: convert <score-timewise> to <score-partwise> up front so
+  // everything below this point only ever sees one shape.
+  const root =
+    rawRoot !== null && rawRoot.tagName === 'score-timewise'
+      ? convertTimewiseToPartwise(rawRoot)
+      : rawRoot;
 
   if (root === null || root.tagName !== 'score-partwise') {
     diagnostics.push(
       diagnostic(
         'error',
         'UNSUPPORTED_ROOT',
-        `Expected <score-partwise>, got "${root?.tagName ?? 'nothing'}" (score-timewise is a later phase).`,
+        `Expected <score-partwise> or <score-timewise>, got "${root?.tagName ?? 'nothing'}".`,
       ),
     );
     return {

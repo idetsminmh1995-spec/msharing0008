@@ -1563,7 +1563,7 @@ The tick cursor is the note's musical position within the measure. Combined
 with the measure's start tick, it gives every event an absolute position in
 the piece — which §12 needs for MIDI alignment and §17 for the cursor.
 
-### 10.2 `.mxl` (compressed MusicXML)
+### 10.2 `.mxl` (compressed MusicXML) `[BUILT]`
 
 A `.mxl` is a ZIP archive. `META-INF/container.xml` names the real score file;
 the parser must read that pointer rather than assuming a filename.
@@ -1609,7 +1609,7 @@ currently draws a round notehead instead of an ✕. The absent-display-step
 fallback to the middle line is also not implemented (a diagnostic is emitted
 instead). See `Doc/STATUS.md` §F1/§F2.
 
-### 10.6 `<score-timewise>`
+### 10.6 `<score-timewise>` `[BUILT]`
 
 The rarely-used alternative document order. Convert to partwise on load
 (a mechanical transposition of the measure/part nesting) so the rest of the
@@ -2319,12 +2319,12 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 33 | Chord symbols | ✅ (accidentals/qualities/placement); root letter deferred |
 | 34 | Grace notes | ✅ |
 
-### Stage 6 — Full import `[IN PROGRESS — 35 of 38]`
+### Stage 6 — Full import `[IN PROGRESS — 35-36 of 38]`
 
 | Phase | What | Status |
 |---|---|---|
 | 35 | MusicXML parser v2 (§10.4) — every element the renderer now supports | ✅ (Tier 1); Tier 2/3 remain |
-| 36 | `.mxl` support + `<score-timewise>` conversion | |
+| 36 | `.mxl` support + `<score-timewise>` conversion | ✅ |
 | 37 | Cross-software compatibility corpus and fixes (§10.8) | |
 | 38 | Diagnostics and partial-render hardening (§10.7) | |
 

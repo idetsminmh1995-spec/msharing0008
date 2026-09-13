@@ -25,5 +25,8 @@
     "jsdom": "^30.0.1",
     "prettier": "3.9.6",
     "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3"
   }
 }
