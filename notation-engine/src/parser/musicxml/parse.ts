@@ -10,7 +10,7 @@ import { measure as makeMeasure, type Measure } from '../../core/measure.js';
 import { part as makePart, type Part } from '../../core/part.js';
 import { score as makeScore, type Score } from '../../core/score.js';
 import { diagnostic, type Diagnostic, type DiagnosticLocation } from './diagnostic.js';
-import { parseAttributesElement } from './attributes.js';
+import { parseAttributesElement, type ClefSpec } from './attributes.js';
 import { parseNoteElement, type ParsedNoteEvent } from './note.js';
 import { attrOf, childrenNamed, firstChildNamed, intOf, textOf } from './dom-helpers.js';
 import { parseMidiInstrumentMap } from './instrument.js';
@@ -40,6 +40,10 @@ export interface MeasureAttributes {
   readonly timeDenominator: number;
   readonly clefSign: string;
   readonly clefLine?: number;
+  /** Integration A: how many staves this part has (piano = 2, most instruments = 1). */
+  readonly staves: number;
+  /** Integration A: every staff's own clef, keyed by staff number -- what a grand staff needs so its bass staff isn't collapsed onto its treble staff. */
+  readonly clefsByStaff: Readonly<Record<number, ClefSpec>>;
   /** Raw MusicXML <bar-style> text (e.g. "light-heavy") for this measure's ending barline, if present. Mapping this to Phase 13's BarlineType is a later integration step's job, not the parser's. */
   readonly barlineStyle?: string;
   readonly repeatDirection?: 'forward' | 'backward';
@@ -263,6 +267,17 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
     let currentTimeDenominator = DEFAULT_TIME_DENOMINATOR;
     let currentClefSign = DEFAULT_CLEF_SIGN;
     let currentClefLine: number | undefined = DEFAULT_CLEF_LINE;
+    // Integration A: a part's staff count and its per-staff clefs. Merged
+    // PER STAFF rather than replaced wholesale -- a mid-piece <clef
+    // number="2"> change must not wipe staff 1's own clef, which a plain
+    // object-replace would do.
+    let currentStaves = 1;
+    let currentClefsByStaff: Record<number, ClefSpec> = {
+      1:
+        DEFAULT_CLEF_LINE !== undefined
+          ? { sign: DEFAULT_CLEF_SIGN, line: DEFAULT_CLEF_LINE }
+          : { sign: DEFAULT_CLEF_SIGN },
+    };
 
     const measures: Measure[] = [];
 
@@ -296,6 +311,10 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           if (update.timeDenominator !== undefined) currentTimeDenominator = update.timeDenominator;
           if (update.clefSign !== undefined) currentClefSign = update.clefSign;
           if (update.clefLine !== undefined) currentClefLine = update.clefLine;
+          if (update.staves !== undefined) currentStaves = update.staves;
+          if (update.clefsByStaff !== undefined) {
+            currentClefsByStaff = { ...currentClefsByStaff, ...update.clefsByStaff };
+          }
         } else if (child.tagName === 'note') {
           if (currentDivisions === undefined) {
             currentDivisions = DEFAULT_DIVISIONS;
@@ -434,6 +453,8 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
         timeDenominator: currentTimeDenominator,
         clefSign: currentClefSign,
         ...(currentClefLine !== undefined ? { clefLine: currentClefLine } : {}),
+        staves: currentStaves,
+        clefsByStaff: { ...currentClefsByStaff },
         ...(barlineStyle !== undefined ? { barlineStyle } : {}),
         ...(repeatDirection !== undefined ? { repeatDirection } : {}),
       });

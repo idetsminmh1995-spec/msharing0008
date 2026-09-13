@@ -64,6 +64,21 @@ export interface ClefDefinition {
    * plain clef, -1 for an "8" above (ottava alta) variant.
    */
   readonly octaveShift: number;
+  /**
+   * Y position (staff-space units) at which to DRAW this clef's glyph --
+   * i.e. where the glyph's own SMuFL design origin must land.
+   *
+   * Deliberately SEPARATE from `referenceY`, which answers a different
+   * question (where a given PITCH sits). For most clefs the two coincide,
+   * because a clef glyph's origin is by design the very line it names --
+   * gClef's origin is the G line, fClef's is the F line. They diverge for
+   * the percussion clef, whose `referenceY` borrows treble's line purely
+   * to map <unpitched> display positions, while its glyph (a symmetric
+   * bar pair, SMuFL bBox -1.0..+1.0) must sit centred on the MIDDLE line
+   * instead. Conflating the two is exactly what drew the bass clef three
+   * staff spaces too low before Integration A.
+   */
+  readonly glyphY: number;
 }
 
 function clef(
@@ -73,6 +88,7 @@ function clef(
   referenceOctave: number,
   referenceY: number,
   octaveShift = 0,
+  glyphYOverride?: number,
 ): ClefDefinition {
   return {
     name,
@@ -81,6 +97,9 @@ function clef(
     referenceDiatonicIndex: diatonicIndex(referencePitchStep, referenceOctave),
     referenceY,
     octaveShift,
+    // A pitch clef's glyph origin IS the line it names, so these coincide
+    // by default; `glyphYOverride` exists for the clefs where they don't.
+    glyphY: glyphYOverride ?? referenceY,
   };
 }
 
@@ -125,6 +144,11 @@ export const PERCUSSION_CLEF: ClefDefinition = clef(
   'G',
   4,
   -1,
+  0,
+  // Glyph placement diverges from referenceY here: SMuFL's own bBox for
+  // this glyph is symmetric (-1.0..+1.0), so its origin is its centre and
+  // it belongs on the staff's MIDDLE line (-2), not the G line (-1).
+  -2,
 );
 
 /** Tab clef -- string number (not pitch) determines vertical position; positionsByPitch is false. */
@@ -133,6 +157,13 @@ export const TAB_CLEF: ClefDefinition = {
   glyphName: '6stringTabClef',
   positionsByPitch: false,
   octaveShift: 0,
+  // SMuFL's 6stringTabClef bBox spans roughly -3..+3, i.e. its origin is
+  // its own centre, so it belongs on the centre line of a SIX-line tab
+  // staff: lines at 0..-5, centre -2.5. Note this assumes a real 6-line
+  // tab staff, which the renderer does not yet draw (it draws 5 lines for
+  // every clef) -- giving tab its own staff-line count is part of the
+  // separate guitar/tab work, not this pass.
+  glyphY: -2.5,
 };
 
 /**

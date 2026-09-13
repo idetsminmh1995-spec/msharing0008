@@ -571,4 +571,13 @@ describe('visual regression (Phase 8)', () => {
     const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
     matchSnapshot('render-from-musicxml-gm-drum-mapping', svg, SNAPSHOT_DIR);
   });
+
+  test('Integration A: a real piano grand-staff fixture (two staves, independent clefs, brace, continuous barline) renders identically to the saved snapshot', () => {
+    const xml = fs.readFileSync(
+      path.join(__dirname, '..', 'fixtures', 'musicxml', 'piano-grand-staff.musicxml'),
+      'utf8',
+    );
+    const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
+    matchSnapshot('render-from-musicxml-piano-grand-staff', svg, SNAPSHOT_DIR);
+  });
 });

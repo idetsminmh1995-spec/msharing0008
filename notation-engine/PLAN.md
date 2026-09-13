@@ -1133,7 +1133,7 @@ per the number-format note above.
 
 ---
 
-### 9.18 Grand staff / multi-part systems `[BUILT for geometry/layout/rendering -- not wired, see Doc/phase-29-grand-staff-multi-part.md]`
+### 9.18 Grand staff / multi-part systems `[BUILT and WIRED for the multi-STAFF case by Integration Pass A (piano grand staff renders: 2 staves, per-staff clefs, brace, continuous barline). Multi-PART rendering (still only parts[0]) remains -- see Doc/integration-a-grand-staff.md]`
 
 **Responsibility.** Render every part of a score, not just the first
 (§21's own stated limitation), stacking multiple staves vertically into

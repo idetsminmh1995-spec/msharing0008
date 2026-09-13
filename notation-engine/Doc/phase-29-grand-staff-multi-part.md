@@ -6,6 +6,16 @@ structural change than the prior few phases' integrations and is
 deliberately given its own unhurried pass rather than a rushed retrofit;
 see §3.
 
+> **Updated by Integration Pass A:** the "not wired" status below is no
+> longer true for the multi-STAFF case. `computeSystemLayout`,
+> `needsBrace`, `needsContinuousBarline` and `renderBrace` are all now
+> real callers in `render-from-musicxml.ts`, and a piano grand staff
+> renders correctly. The §3 limitation list below (which correctly
+> predicted that `<staves>` parsing and a render-loop restructure were
+> both needed) was worked through exactly as written. Multi-PART
+> rendering is still outstanding. See
+> `Doc/integration-a-grand-staff.md`.
+
 Completes Stage 4 (Phases 23-29). Sixth consecutive phase where the same
 pattern held: another specification gap found and fixed before writing
 any code — though this one's content spans `geometry/`, `layout/`, and

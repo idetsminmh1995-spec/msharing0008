@@ -46,6 +46,9 @@ import {
   type BeamStyle as BeamStyleOption,
 } from './geometry/index.js';
 import { DEFAULT_DRUM_MAPPING_TABLE, lookupDrumMapEntry } from './drums/index.js';
+import { computeSystemLayout } from './layout/index.js';
+import { computeBraceShape, needsBrace, needsContinuousBarline } from './geometry/index.js';
+import { renderBrace } from './render/index.js';
 import type { Diagnostic, MeasureAttributes } from './parser/index.js';
 import { parseMusicXml, type ParseMusicXmlOptions } from './parser/index.js';
 import { naiveMeasureLayout } from './layout/index.js';
@@ -637,7 +640,10 @@ export function renderFromMusicXml(
   const svgParts: string[] = [];
   const staffGeometry = computeStaffGeometry(STAFF_LINES);
 
-  let accidentalState: AccidentalState | undefined;
+  // Integration A: accidental state is per STAFF -- a measure-local accidental
+  // on the treble staff must not carry over onto the bass staff, and each
+  // staff resets independently at its own barline.
+  const accidentalStateByStaff = new Map<number, AccidentalState>();
   let previousAttrs: MeasureAttributes | undefined;
 
   part.measures.forEach((measure, i) => {
@@ -647,231 +653,269 @@ export function renderFromMusicXml(
     const layout = layouts[i];
     if (attrs === undefined || layout === undefined) return;
 
-    const { clefDef, keySigClefName } = mapClef(attrs.clefSign, attrs.clefLine);
-    const bottomY = STAFF_BOTTOM_Y;
+    // Integration A: one pass per staff. A single-staff part runs this
+    // exactly once (staffNumber 1), producing byte-identical output to
+    // the pre-Integration-A single-staff renderer; a grand staff runs it once per
+    // staff, each with its OWN clef and its own vertical offset.
+    const staffNumbers = Array.from({ length: Math.max(1, attrs.staves) }, (_, n) => n + 1);
+    const systemLayout = computeSystemLayout([staffNumbers.length]);
 
-    svgParts.push(
-      renderStaff(staffGeometry, {
-        x: layout.x,
-        y: bottomY,
-        width: layout.width,
-        color: INK_COLOR,
-        lineThickness: getEngravingDefault('staffLineThickness') ?? 0.13,
-      }),
-    );
-
-    const isFirstMeasure = i === 0;
-    const clefChanged =
-      previousAttrs === undefined ||
-      previousAttrs.clefSign !== attrs.clefSign ||
-      previousAttrs.clefLine !== attrs.clefLine;
-    const keyChanged = previousAttrs === undefined || previousAttrs.fifths !== attrs.fifths;
-    const timeChanged =
-      previousAttrs === undefined ||
-      previousAttrs.timeNumerator !== attrs.timeNumerator ||
-      previousAttrs.timeDenominator !== attrs.timeDenominator;
-
-    let cursorX = layout.x + 0.5;
-
-    if (isFirstMeasure || clefChanged) {
-      svgParts.push(
-        renderClef(clefDef, { x: cursorX, y: bottomY, color: INK_COLOR, fontFamily: FONT_FAMILY }),
+    staffNumbers.forEach((staffNumber, staffIndex) => {
+      // Integration A: THIS staff's own clef, not the part's first clef --
+      // using attrs.clefSign for every staff is exactly what collapsed a
+      // piano's bass staff onto its treble staff. Falls back to staff 1's
+      // clef (then the parser's own default) when a file declares fewer
+      // clefs than it does staves.
+      const staffClef = attrs.clefsByStaff[staffNumber] ?? attrs.clefsByStaff[1];
+      const { clefDef, keySigClefName } = mapClef(
+        staffClef?.sign ?? attrs.clefSign,
+        staffClef?.line ?? attrs.clefLine,
       );
-      cursorX += 3;
-    }
+      const bottomY = STAFF_BOTTOM_Y + (systemLayout.positions[staffIndex]?.y ?? 0);
 
-    if ((isFirstMeasure || keyChanged) && attrs.fifths !== 0) {
-      try {
-        const accidentals = keySignatureAccidentals(attrs.fifths, keySigClefName);
+      svgParts.push(
+        renderStaff(staffGeometry, {
+          x: layout.x,
+          y: bottomY,
+          width: layout.width,
+          color: INK_COLOR,
+          lineThickness: getEngravingDefault('staffLineThickness') ?? 0.13,
+        }),
+      );
+
+      const isFirstMeasure = i === 0;
+      const clefChanged =
+        previousAttrs === undefined ||
+        previousAttrs.clefSign !== attrs.clefSign ||
+        previousAttrs.clefLine !== attrs.clefLine;
+      const keyChanged = previousAttrs === undefined || previousAttrs.fifths !== attrs.fifths;
+      const timeChanged =
+        previousAttrs === undefined ||
+        previousAttrs.timeNumerator !== attrs.timeNumerator ||
+        previousAttrs.timeDenominator !== attrs.timeDenominator;
+
+      let cursorX = layout.x + 0.5;
+
+      if (isFirstMeasure || clefChanged) {
         svgParts.push(
-          renderKeySignature(accidentals, {
+          renderClef(clefDef, {
             x: cursorX,
-            spacing: 1,
-            staffBottomY: bottomY,
+            // Integration A bug fix: a clef glyph belongs on the line it names
+            // (gClef on G, fClef on F), not on the staff's bottom line.
+            // Passing bottomY alone drew every clef too low -- barely
+            // noticeable for treble (1 space) but glaring for bass (3).
+            y: bottomY + clefDef.glyphY,
             color: INK_COLOR,
             fontFamily: FONT_FAMILY,
           }),
         );
-        cursorX += accidentals.length + 0.5;
-      } catch (err) {
-        diagnostics.push({
-          severity: 'warning',
-          code: 'UNSUPPORTED_KEY_SIGNATURE_CLEF',
-          message: err instanceof Error ? err.message : String(err),
-          location: { partId: part.id, measureNumber: measure.number },
-        });
+        cursorX += 3;
       }
-    }
 
-    if (isFirstMeasure || timeChanged) {
-      try {
-        const sig = timeSignature(attrs.timeNumerator, attrs.timeDenominator);
-        svgParts.push(
-          renderTimeSignature(sig, {
-            x: cursorX,
-            staffBottomY: bottomY,
-            color: INK_COLOR,
-            fontFamily: FONT_FAMILY,
-          }),
-        );
-        cursorX += 2.5;
-      } catch (err) {
-        diagnostics.push({
-          severity: 'warning',
-          code: 'INVALID_TIME_SIGNATURE',
-          message: err instanceof Error ? err.message : String(err),
-          location: { partId: part.id, measureNumber: measure.number },
-        });
-      }
-    }
-
-    if (accidentalState === undefined || keyChanged) {
-      accidentalState = createAccidentalState(attrs.fifths);
-    } else {
-      accidentalState = resetMeasure(accidentalState);
-    }
-
-    if (clefDef.positionsByPitch) {
-      const ctx: RenderCtx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart };
-      const noteAreaX = Math.max(layout.x + layout.width * 0.25, cursorX);
-      const noteAreaWidth = layout.x + layout.width - noteAreaX;
-      // §9.14: forced stem direction only applies once a staff genuinely
-      // has multiple voices sharing it -- a single voice keeps ordinary
-      // automatic direction (renderNoteOrRest/renderChord/renderBeamGroup
-      // all fall back to automatic when this is undefined).
-      const isMultiVoice = measure.voices.length > 1;
-
-      for (const voice of measure.voices) {
-        const forcedDirection = isMultiVoice ? voiceForcedDirection(voice.id) : undefined;
-        const restOffset = isMultiVoice ? voiceRestOffset(voice.id) : 0;
-        // §9.15: tracks the most recent note that started a tie (tieStart)
-        // in THIS voice, so the next note carrying tieStop can be
-        // connected to it. Scoped to within one measure and to
-        // non-beamed, non-chord notes only -- a tie spanning a barline,
-        // or into/out of a beamed or chord note, is documented as not yet
-        // drawn (see Doc/phase-26).
-        let pendingTie: { x: number; y: number; direction: StemDirection } | undefined;
-        const starts = eventStartTicks(voice.events);
-        const total = totalTicks(voice.events) || 1;
-        const eventXs = voice.events.map((_, idx) => {
-          const startTick = starts[idx] ?? 0;
-          return noteAreaX + (startTick / total) * noteAreaWidth;
-        });
-
-        // Phase 23 grouping: treat a rest, a chord, OR a grace note as
-        // breaking a beamable run. Chords aren't supported by
-        // renderBeamGroup yet (documented scope limit). Grace notes draw
-        // as one precomposed Phase 34 glyph with the flag/stem already
-        // baked in -- they must never be swept into an ordinary beam
-        // group alongside real notes, which is exactly what happened
-        // before this check existed: a real MusicXML fixture with two
-        // grace notes immediately preceding a beamed triplet produced a
-        // single 5-note beam group (2 grace + 3 real), silently drawing
-        // the grace notes as if they were ordinary noteheads and never
-        // reaching the grace-note rendering branch below at all.
-        const beamableEvents = voice.events.map((event) => ({
-          durationType: event.duration.type,
-          isRest: event.kind !== 'note' || event.isGrace === true,
-        }));
-        const groups = groupBeams(
-          beamableEvents,
-          starts,
-          attrs.timeNumerator,
-          attrs.timeDenominator,
-        );
-        const beamedIndices = beamedEventIndices(groups);
-        const groupByFirstIndex = new Map<number, (typeof groups)[number]>();
-        for (const group of groups) {
-          const firstIndex = group.eventIndices[0];
-          if (firstIndex !== undefined) groupByFirstIndex.set(firstIndex, group);
+      if ((isFirstMeasure || keyChanged) && attrs.fifths !== 0) {
+        try {
+          const accidentals = keySignatureAccidentals(attrs.fifths, keySigClefName);
+          svgParts.push(
+            renderKeySignature(accidentals, {
+              x: cursorX,
+              spacing: 1,
+              staffBottomY: bottomY,
+              color: INK_COLOR,
+              fontFamily: FONT_FAMILY,
+            }),
+          );
+          cursorX += accidentals.length + 0.5;
+        } catch (err) {
+          diagnostics.push({
+            severity: 'warning',
+            code: 'UNSUPPORTED_KEY_SIGNATURE_CLEF',
+            message: err instanceof Error ? err.message : String(err),
+            location: { partId: part.id, measureNumber: measure.number },
+          });
         }
+      }
 
-        voice.events.forEach((event, idx) => {
-          if (accidentalState === undefined) return;
-          const eventX = eventXs[idx] ?? 0;
+      if (isFirstMeasure || timeChanged) {
+        try {
+          const sig = timeSignature(attrs.timeNumerator, attrs.timeDenominator);
+          svgParts.push(
+            renderTimeSignature(sig, {
+              x: cursorX,
+              staffBottomY: bottomY,
+              color: INK_COLOR,
+              fontFamily: FONT_FAMILY,
+            }),
+          );
+          cursorX += 2.5;
+        } catch (err) {
+          diagnostics.push({
+            severity: 'warning',
+            code: 'INVALID_TIME_SIGNATURE',
+            message: err instanceof Error ? err.message : String(err),
+            location: { partId: part.id, measureNumber: measure.number },
+          });
+        }
+      }
 
-          // Defense in depth: grace notes are already excluded from
-          // `beamableEvents` above, so `beamedIndices` should never
-          // contain one -- but route them to their own path
-          // unconditionally regardless, rather than relying solely on
-          // that upstream exclusion holding forever.
-          const isGraceNote = event.kind === 'note' && event.isGrace === true;
+      const previousStaffState = accidentalStateByStaff.get(staffNumber);
+      let accidentalState: AccidentalState =
+        previousStaffState === undefined || keyChanged
+          ? createAccidentalState(attrs.fifths)
+          : resetMeasure(previousStaffState);
+      accidentalStateByStaff.set(staffNumber, accidentalState);
 
-          if (!isGraceNote && beamedIndices.has(idx)) {
-            const group = groupByFirstIndex.get(idx);
-            if (group === undefined) return; // a non-first member of an already-rendered group
-            const groupNotes = group.eventIndices
-              .map((i) => voice.events[i])
-              .filter((e): e is Note => e !== undefined && e.kind === 'note');
-            const groupXs = group.eventIndices.map((i) => eventXs[i] ?? 0);
-            const { svg, newAccidentalState } = renderBeamGroup(
-              groupNotes,
-              groupXs,
-              ctx,
-              accidentalState,
-              DEFAULT_BEAM_STYLE,
-              forcedDirection,
-            );
-            svgParts.push(svg);
-            accidentalState = newAccidentalState;
-            return;
+      if (clefDef.positionsByPitch) {
+        const ctx: RenderCtx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart };
+        const noteAreaX = Math.max(layout.x + layout.width * 0.25, cursorX);
+        const noteAreaWidth = layout.x + layout.width - noteAreaX;
+        // §9.14: forced stem direction only applies once a staff genuinely
+        // has multiple voices sharing it -- a single voice keeps ordinary
+        // automatic direction (renderNoteOrRest/renderChord/renderBeamGroup
+        // all fall back to automatic when this is undefined).
+        const isMultiVoice = measure.voices.length > 1;
+
+        for (const voice of measure.voices) {
+          const forcedDirection = isMultiVoice ? voiceForcedDirection(voice.id) : undefined;
+          const restOffset = isMultiVoice ? voiceRestOffset(voice.id) : 0;
+          // §9.15: tracks the most recent note that started a tie (tieStart)
+          // in THIS voice, so the next note carrying tieStop can be
+          // connected to it. Scoped to within one measure and to
+          // non-beamed, non-chord notes only -- a tie spanning a barline,
+          // or into/out of a beamed or chord note, is documented as not yet
+          // drawn (see Doc/phase-26).
+          let pendingTie: { x: number; y: number; direction: StemDirection } | undefined;
+          const starts = eventStartTicks(voice.events);
+          const total = totalTicks(voice.events) || 1;
+          const eventXs = voice.events.map((_, idx) => {
+            const startTick = starts[idx] ?? 0;
+            return noteAreaX + (startTick / total) * noteAreaWidth;
+          });
+
+          // Phase 23 grouping: treat a rest, a chord, OR a grace note as
+          // breaking a beamable run. Chords aren't supported by
+          // renderBeamGroup yet (documented scope limit). Grace notes draw
+          // as one precomposed Phase 34 glyph with the flag/stem already
+          // baked in -- they must never be swept into an ordinary beam
+          // group alongside real notes, which is exactly what happened
+          // before this check existed: a real MusicXML fixture with two
+          // grace notes immediately preceding a beamed triplet produced a
+          // single 5-note beam group (2 grace + 3 real), silently drawing
+          // the grace notes as if they were ordinary noteheads and never
+          // reaching the grace-note rendering branch below at all.
+          const beamableEvents = voice.events.map((event) => ({
+            durationType: event.duration.type,
+            isRest: event.kind !== 'note' || event.isGrace === true,
+          }));
+          const groups = groupBeams(
+            beamableEvents,
+            starts,
+            attrs.timeNumerator,
+            attrs.timeDenominator,
+          );
+          const beamedIndices = beamedEventIndices(groups);
+          const groupByFirstIndex = new Map<number, (typeof groups)[number]>();
+          for (const group of groups) {
+            const firstIndex = group.eventIndices[0];
+            if (firstIndex !== undefined) groupByFirstIndex.set(firstIndex, group);
           }
 
-          if (event.kind === 'chord') {
-            const { svg, newAccidentalState } = renderChord(
-              event,
-              eventX,
-              ctx,
-              accidentalState,
-              forcedDirection,
-            );
-            svgParts.push(svg);
-            accidentalState = newAccidentalState;
-          } else {
-            const { svg, newAccidentalState, tieAnchor } = renderNoteOrRest(
-              event,
-              eventX,
-              ctx,
-              accidentalState,
-              forcedDirection,
-              restOffset,
-            );
+          voice.events.forEach((event, idx) => {
+            // Integration A: a multi-staff part's voices carry events for
+            // EVERY staff; this pass draws only the ones belonging to the
+            // staff currently being rendered. An event with no <staff> is
+            // staff 1, matching MusicXML's own default. Note the x
+            // positions were computed from ALL events above, deliberately
+            // -- both staves of a grand staff share one horizontal
+            // timeline, so a bass note stays aligned under the treble note
+            // it sounds with.
+            const eventStaff = event.staff ?? 1;
+            if (eventStaff !== staffNumber) return;
+            const eventX = eventXs[idx] ?? 0;
 
-            if (event.kind === 'note' && event.tieStop && pendingTie !== undefined) {
-              const side = tieSide(pendingTie.direction);
-              const startX =
-                pendingTie.x + noteheadWidth(tieAnchor?.noteheadGlyph ?? 'noteheadBlack');
-              const shape = computeTieShape(startX, eventX, pendingTie.y, side);
-              svgParts.push(
-                renderTie(shape, {
-                  color: INK_COLOR,
-                  midpointThickness:
-                    getEngravingDefault('tieMidpointThickness') ?? TIE_MIDPOINT_THICKNESS_FALLBACK,
-                }),
+            // Defense in depth: grace notes are already excluded from
+            // `beamableEvents` above, so `beamedIndices` should never
+            // contain one -- but route them to their own path
+            // unconditionally regardless, rather than relying solely on
+            // that upstream exclusion holding forever.
+            const isGraceNote = event.kind === 'note' && event.isGrace === true;
+
+            if (!isGraceNote && beamedIndices.has(idx)) {
+              const group = groupByFirstIndex.get(idx);
+              if (group === undefined) return; // a non-first member of an already-rendered group
+              const groupNotes = group.eventIndices
+                .map((i) => voice.events[i])
+                .filter((e): e is Note => e !== undefined && e.kind === 'note');
+              const groupXs = group.eventIndices.map((i) => eventXs[i] ?? 0);
+              const { svg, newAccidentalState } = renderBeamGroup(
+                groupNotes,
+                groupXs,
+                ctx,
+                accidentalState,
+                DEFAULT_BEAM_STYLE,
+                forcedDirection,
               );
+              svgParts.push(svg);
+              accidentalState = newAccidentalState;
+              return;
             }
-            pendingTie =
-              event.kind === 'note' && event.tieStart && tieAnchor !== undefined
-                ? {
-                    x: eventX,
-                    y: ctx.measureBottomY + tieAnchor.position,
-                    direction: tieAnchor.direction,
-                  }
-                : undefined;
 
-            svgParts.push(svg);
-            accidentalState = newAccidentalState;
-          }
+            if (event.kind === 'chord') {
+              const { svg, newAccidentalState } = renderChord(
+                event,
+                eventX,
+                ctx,
+                accidentalState,
+                forcedDirection,
+              );
+              svgParts.push(svg);
+              accidentalState = newAccidentalState;
+            } else {
+              const { svg, newAccidentalState, tieAnchor } = renderNoteOrRest(
+                event,
+                eventX,
+                ctx,
+                accidentalState,
+                forcedDirection,
+                restOffset,
+              );
+
+              if (event.kind === 'note' && event.tieStop && pendingTie !== undefined) {
+                const side = tieSide(pendingTie.direction);
+                const startX =
+                  pendingTie.x + noteheadWidth(tieAnchor?.noteheadGlyph ?? 'noteheadBlack');
+                const shape = computeTieShape(startX, eventX, pendingTie.y, side);
+                svgParts.push(
+                  renderTie(shape, {
+                    color: INK_COLOR,
+                    midpointThickness:
+                      getEngravingDefault('tieMidpointThickness') ??
+                      TIE_MIDPOINT_THICKNESS_FALLBACK,
+                  }),
+                );
+              }
+              pendingTie =
+                event.kind === 'note' && event.tieStart && tieAnchor !== undefined
+                  ? {
+                      x: eventX,
+                      y: ctx.measureBottomY + tieAnchor.position,
+                      direction: tieAnchor.direction,
+                    }
+                  : undefined;
+
+              svgParts.push(svg);
+              accidentalState = newAccidentalState;
+            }
+          });
+        }
+      } else {
+        diagnostics.push({
+          severity: 'info',
+          code: 'UNSUPPORTED_CLEF_FOR_NOTES',
+          message: `Clef "${attrs.clefSign}" does not position notes by pitch; skipping notes in this measure.`,
+          location: { partId: part.id, measureNumber: measure.number },
         });
       }
-    } else {
-      diagnostics.push({
-        severity: 'info',
-        code: 'UNSUPPORTED_CLEF_FOR_NOTES',
-        message: `Clef "${attrs.clefSign}" does not position notes by pitch; skipping notes in this measure.`,
-        location: { partId: part.id, measureNumber: measure.number },
-      });
-    }
+    });
 
     const barlineType = mapBarline(attrs.barlineStyle, attrs.repeatDirection);
     const barlineMetrics = {
@@ -883,11 +927,19 @@ export function renderFromMusicXml(
       gapLength: getEngravingDefault('dashedBarlineGapLength') ?? 0.25,
     };
     const barlineGeometry = computeBarlineGeometry(barlineType, barlineMetrics);
+    // §9.18: within a brace group (one instrument's own multiple staves),
+    // the barline runs CONTINUOUSLY through every staff and the gaps
+    // between them -- one tall barline, not one per staff.
+    const lastStaffOffset = systemLayout.positions[staffNumbers.length - 1]?.y ?? 0;
+    const barlineBottomY = STAFF_BOTTOM_Y + lastStaffOffset;
+    const barlineHeight = needsContinuousBarline(staffNumbers.length)
+      ? staffGeometry.height + lastStaffOffset
+      : staffGeometry.height;
     svgParts.push(
       renderBarline(barlineGeometry, {
         x: layout.x + layout.width,
-        staffBottomY: bottomY,
-        height: staffGeometry.height,
+        staffBottomY: barlineBottomY,
+        height: barlineHeight,
         color: INK_COLOR,
         fontFamily: FONT_FAMILY,
       }),
@@ -896,10 +948,31 @@ export function renderFromMusicXml(
     previousAttrs = attrs;
   });
 
+  // §9.18/Phase 29: a part with 2+ staves is ONE instrument, so its staves
+  // are joined by a brace at the system's left edge -- drawn once for the
+  // whole system, not per measure.
+  const firstAttrs = attributes.find((a) => a.partId === part.id);
+  const systemStaffCount = Math.max(1, firstAttrs?.staves ?? 1);
+  if (needsBrace(systemStaffCount)) {
+    const layoutForBrace = computeSystemLayout([systemStaffCount]);
+    const lastOffset = layoutForBrace.positions[systemStaffCount - 1]?.y ?? 0;
+    const braceShape = computeBraceShape(
+      STAFF_BOTTOM_Y - staffGeometry.height,
+      STAFF_BOTTOM_Y + lastOffset,
+      0,
+    );
+    svgParts.push(renderBrace(braceShape, { color: INK_COLOR, fontFamily: FONT_FAMILY }));
+  }
+
   const svg = createSvgDocument(
     {
       viewBoxWidth: totalWidth + 2,
-      viewBoxHeight: SYSTEM_HEIGHT,
+      // Integration A: a grand staff is taller than one staff -- the viewBox
+      // must grow to fit every staff, or the lower one is simply clipped
+      // out of the rendered image.
+      viewBoxHeight:
+        SYSTEM_HEIGHT +
+        (computeSystemLayout([systemStaffCount]).positions[systemStaffCount - 1]?.y ?? 0),
       pxPerStaffSpace: PX_PER_STAFF_SPACE,
       backgroundColor: BACKGROUND_COLOR,
     },

@@ -11,10 +11,10 @@ after Phase 29 (end of Stage 4).
 
 ---
 
-## A. DONE — Phases 1–42 ✅ (Stage 2 through 7 complete)
+## A. DONE — Phases 1–42 ✅ (Stage 2 through 7 complete) + Integration Pass A
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 405/405 across them.
+`npm run verify` passes 423/423 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -60,6 +60,7 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 40 | Timing engine | Anti-drift TempoMap (precompute-once), tick<->seconds, tick<->measure/beat; passes required 10-min drift test | [`phase-40`](./phase-40-timing-engine.md) |
 | 41 | Drum mapping table + GM defaults | Default GM table for the standard kit; wired into rendering via <instrument>-to-GM parsing (real notehead/position/stem) | [`phase-41`](./phase-41-drum-mapping.md) |
 | 42 | MIDI↔MusicXML alignment | 4-tier matching cascade (exact/tolerance/ordinal/unmatched); real end-to-end fixture pair confirmed | [`phase-42`](./phase-42-midi-musicxml-alignment.md) |
+| — | **Integration A** (not a numbered phase) | Grand staff wired end to end (`<staves>`, per-staff clefs, brace, continuous barline) + fixed clef glyphs being drawn on the wrong line | [`integration-a`](./integration-a-grand-staff.md) |
 
 **Public API today:** 137 exports from `dist/notation-engine.js`.
 

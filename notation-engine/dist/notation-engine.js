@@ -57876,14 +57876,17 @@ var NotationEngine = (() => {
   function diatonicIndex(step, octave) {
     return octave * 7 + stepOffset(step);
   }
-  function clef(name, glyphName, referencePitchStep, referenceOctave, referenceY, octaveShift = 0) {
+  function clef(name, glyphName, referencePitchStep, referenceOctave, referenceY, octaveShift = 0, glyphYOverride) {
     return {
       name,
       glyphName,
       positionsByPitch: true,
       referenceDiatonicIndex: diatonicIndex(referencePitchStep, referenceOctave),
       referenceY,
-      octaveShift
+      octaveShift,
+      // A pitch clef's glyph origin IS the line it names, so these coincide
+      // by default; `glyphYOverride` exists for the clefs where they don't.
+      glyphY: glyphYOverride ?? referenceY
     };
   }
   var TREBLE_CLEF = clef("treble", "gClef", "G", 4, -1);
@@ -57898,13 +57901,25 @@ var NotationEngine = (() => {
     "unpitchedPercussionClef1",
     "G",
     4,
-    -1
+    -1,
+    0,
+    // Glyph placement diverges from referenceY here: SMuFL's own bBox for
+    // this glyph is symmetric (-1.0..+1.0), so its origin is its centre and
+    // it belongs on the staff's MIDDLE line (-2), not the G line (-1).
+    -2
   );
   var TAB_CLEF = {
     name: "tab",
     glyphName: "6stringTabClef",
     positionsByPitch: false,
-    octaveShift: 0
+    octaveShift: 0,
+    // SMuFL's 6stringTabClef bBox spans roughly -3..+3, i.e. its origin is
+    // its own centre, so it belongs on the centre line of a SIX-line tab
+    // staff: lines at 0..-5, centre -2.5. Note this assumes a real 6-line
+    // tab staff, which the renderer does not yet draw (it draws 5 lines for
+    // every clef) -- giving tab its own staff-line count is part of the
+    // separate guitar/tab work, not this pass.
+    glyphY: -2.5
   };
   function staffPositionForPitch(clefDef, step, octave) {
     if (!clefDef.positionsByPitch || clefDef.referenceDiatonicIndex === void 0 || clefDef.referenceY === void 0) {
@@ -59238,6 +59253,8 @@ ${denominator}`;
     const divisionsEl = firstChildNamed(attributesEl, "divisions");
     const divisions = intOf(divisionsEl);
     if (divisions !== void 0) result.divisions = divisions;
+    const staves = intOf(firstChildNamed(attributesEl, "staves"));
+    if (staves !== void 0) result.staves = staves;
     const keyEl = firstChildNamed(attributesEl, "key");
     if (keyEl !== void 0) {
       const fifths = intOf(firstChildNamed(keyEl, "fifths"));
@@ -59251,12 +59268,24 @@ ${denominator}`;
       if (beatType !== void 0) result.timeDenominator = beatType;
     }
     const clefEls = childrenNamed(attributesEl, "clef");
-    const clefEl = clefEls.find((el) => el.getAttribute("number") === "1" || !el.hasAttribute("number")) ?? clefEls[0];
-    if (clefEl !== void 0) {
-      const sign = textOf(firstChildNamed(clefEl, "sign"));
-      const line = intOf(firstChildNamed(clefEl, "line"));
-      if (sign !== void 0) result.clefSign = sign;
-      if (line !== void 0) result.clefLine = line;
+    if (clefEls.length > 0) {
+      const byStaff = {};
+      for (const el of clefEls) {
+        const rawNumber = el.getAttribute("number");
+        const staffNumber = rawNumber !== null ? Number(rawNumber) : 1;
+        const sign = textOf(firstChildNamed(el, "sign"));
+        if (sign === void 0 || !Number.isFinite(staffNumber)) continue;
+        const line = intOf(firstChildNamed(el, "line"));
+        byStaff[staffNumber] = line !== void 0 ? { sign, line } : { sign };
+      }
+      if (Object.keys(byStaff).length > 0) {
+        result.clefsByStaff = byStaff;
+        const staff1 = byStaff[1];
+        if (staff1 !== void 0) {
+          result.clefSign = staff1.sign;
+          if (staff1.line !== void 0) result.clefLine = staff1.line;
+        }
+      }
     }
     return result;
   }
@@ -59614,6 +59643,10 @@ ${denominator}`;
       let currentTimeDenominator = DEFAULT_TIME_DENOMINATOR;
       let currentClefSign = DEFAULT_CLEF_SIGN;
       let currentClefLine = DEFAULT_CLEF_LINE;
+      let currentStaves = 1;
+      let currentClefsByStaff = {
+        1: DEFAULT_CLEF_LINE !== void 0 ? { sign: DEFAULT_CLEF_SIGN, line: DEFAULT_CLEF_LINE } : { sign: DEFAULT_CLEF_SIGN }
+      };
       const measures = [];
       for (const measureEl of childrenNamed(partEl, "measure")) {
         const rawNumber = attrOf(measureEl, "number");
@@ -59633,6 +59666,10 @@ ${denominator}`;
             if (update.timeDenominator !== void 0) currentTimeDenominator = update.timeDenominator;
             if (update.clefSign !== void 0) currentClefSign = update.clefSign;
             if (update.clefLine !== void 0) currentClefLine = update.clefLine;
+            if (update.staves !== void 0) currentStaves = update.staves;
+            if (update.clefsByStaff !== void 0) {
+              currentClefsByStaff = { ...currentClefsByStaff, ...update.clefsByStaff };
+            }
           } else if (child.tagName === "note") {
             if (currentDivisions === void 0) {
               currentDivisions = DEFAULT_DIVISIONS;
@@ -59752,6 +59789,8 @@ ${denominator}`;
           timeDenominator: currentTimeDenominator,
           clefSign: currentClefSign,
           ...currentClefLine !== void 0 ? { clefLine: currentClefLine } : {},
+          staves: currentStaves,
+          clefsByStaff: { ...currentClefsByStaff },
           ...barlineStyle !== void 0 ? { barlineStyle } : {},
           ...repeatDirection !== void 0 ? { repeatDirection } : {}
         });
@@ -61636,7 +61675,7 @@ ${denominator}`;
     const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part2.id);
     const svgParts = [];
     const staffGeometry = computeStaffGeometry(STAFF_LINES);
-    let accidentalState;
+    const accidentalStateByStaff = /* @__PURE__ */ new Map();
     let previousAttrs;
     part2.measures.forEach((measure2, i2) => {
       const attrs = attributes.find(
@@ -61644,176 +61683,192 @@ ${denominator}`;
       );
       const layout = layouts[i2];
       if (attrs === void 0 || layout === void 0) return;
-      const { clefDef, keySigClefName } = mapClef(attrs.clefSign, attrs.clefLine);
-      const bottomY = STAFF_BOTTOM_Y;
-      svgParts.push(
-        renderStaff(staffGeometry, {
-          x: layout.x,
-          y: bottomY,
-          width: layout.width,
-          color: INK_COLOR,
-          lineThickness: getEngravingDefault("staffLineThickness") ?? 0.13
-        })
-      );
-      const isFirstMeasure = i2 === 0;
-      const clefChanged = previousAttrs === void 0 || previousAttrs.clefSign !== attrs.clefSign || previousAttrs.clefLine !== attrs.clefLine;
-      const keyChanged = previousAttrs === void 0 || previousAttrs.fifths !== attrs.fifths;
-      const timeChanged = previousAttrs === void 0 || previousAttrs.timeNumerator !== attrs.timeNumerator || previousAttrs.timeDenominator !== attrs.timeDenominator;
-      let cursorX = layout.x + 0.5;
-      if (isFirstMeasure || clefChanged) {
-        svgParts.push(
-          renderClef(clefDef, { x: cursorX, y: bottomY, color: INK_COLOR, fontFamily: FONT_FAMILY })
+      const staffNumbers = Array.from({ length: Math.max(1, attrs.staves) }, (_, n) => n + 1);
+      const systemLayout = computeSystemLayout([staffNumbers.length]);
+      staffNumbers.forEach((staffNumber, staffIndex) => {
+        const staffClef = attrs.clefsByStaff[staffNumber] ?? attrs.clefsByStaff[1];
+        const { clefDef, keySigClefName } = mapClef(
+          staffClef?.sign ?? attrs.clefSign,
+          staffClef?.line ?? attrs.clefLine
         );
-        cursorX += 3;
-      }
-      if ((isFirstMeasure || keyChanged) && attrs.fifths !== 0) {
-        try {
-          const accidentals = keySignatureAccidentals(attrs.fifths, keySigClefName);
+        const bottomY = STAFF_BOTTOM_Y + (systemLayout.positions[staffIndex]?.y ?? 0);
+        svgParts.push(
+          renderStaff(staffGeometry, {
+            x: layout.x,
+            y: bottomY,
+            width: layout.width,
+            color: INK_COLOR,
+            lineThickness: getEngravingDefault("staffLineThickness") ?? 0.13
+          })
+        );
+        const isFirstMeasure = i2 === 0;
+        const clefChanged = previousAttrs === void 0 || previousAttrs.clefSign !== attrs.clefSign || previousAttrs.clefLine !== attrs.clefLine;
+        const keyChanged = previousAttrs === void 0 || previousAttrs.fifths !== attrs.fifths;
+        const timeChanged = previousAttrs === void 0 || previousAttrs.timeNumerator !== attrs.timeNumerator || previousAttrs.timeDenominator !== attrs.timeDenominator;
+        let cursorX = layout.x + 0.5;
+        if (isFirstMeasure || clefChanged) {
           svgParts.push(
-            renderKeySignature(accidentals, {
+            renderClef(clefDef, {
               x: cursorX,
-              spacing: 1,
-              staffBottomY: bottomY,
+              // Integration A bug fix: a clef glyph belongs on the line it names
+              // (gClef on G, fClef on F), not on the staff's bottom line.
+              // Passing bottomY alone drew every clef too low -- barely
+              // noticeable for treble (1 space) but glaring for bass (3).
+              y: bottomY + clefDef.glyphY,
               color: INK_COLOR,
               fontFamily: FONT_FAMILY
             })
           );
-          cursorX += accidentals.length + 0.5;
-        } catch (err2) {
-          diagnostics.push({
-            severity: "warning",
-            code: "UNSUPPORTED_KEY_SIGNATURE_CLEF",
-            message: err2 instanceof Error ? err2.message : String(err2),
-            location: { partId: part2.id, measureNumber: measure2.number }
-          });
+          cursorX += 3;
         }
-      }
-      if (isFirstMeasure || timeChanged) {
-        try {
-          const sig = timeSignature(attrs.timeNumerator, attrs.timeDenominator);
-          svgParts.push(
-            renderTimeSignature(sig, {
-              x: cursorX,
-              staffBottomY: bottomY,
-              color: INK_COLOR,
-              fontFamily: FONT_FAMILY
-            })
-          );
-          cursorX += 2.5;
-        } catch (err2) {
-          diagnostics.push({
-            severity: "warning",
-            code: "INVALID_TIME_SIGNATURE",
-            message: err2 instanceof Error ? err2.message : String(err2),
-            location: { partId: part2.id, measureNumber: measure2.number }
-          });
-        }
-      }
-      if (accidentalState === void 0 || keyChanged) {
-        accidentalState = createAccidentalState(attrs.fifths);
-      } else {
-        accidentalState = resetMeasure(accidentalState);
-      }
-      if (clefDef.positionsByPitch) {
-        const ctx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart };
-        const noteAreaX = Math.max(layout.x + layout.width * 0.25, cursorX);
-        const noteAreaWidth = layout.x + layout.width - noteAreaX;
-        const isMultiVoice = measure2.voices.length > 1;
-        for (const voice2 of measure2.voices) {
-          const forcedDirection = isMultiVoice ? voiceForcedDirection(voice2.id) : void 0;
-          const restOffset = isMultiVoice ? voiceRestOffset(voice2.id) : 0;
-          let pendingTie;
-          const starts = eventStartTicks(voice2.events);
-          const total = totalTicks(voice2.events) || 1;
-          const eventXs = voice2.events.map((_, idx) => {
-            const startTick = starts[idx] ?? 0;
-            return noteAreaX + startTick / total * noteAreaWidth;
-          });
-          const beamableEvents = voice2.events.map((event) => ({
-            durationType: event.duration.type,
-            isRest: event.kind !== "note" || event.isGrace === true
-          }));
-          const groups = groupBeams(
-            beamableEvents,
-            starts,
-            attrs.timeNumerator,
-            attrs.timeDenominator
-          );
-          const beamedIndices = beamedEventIndices(groups);
-          const groupByFirstIndex = /* @__PURE__ */ new Map();
-          for (const group of groups) {
-            const firstIndex = group.eventIndices[0];
-            if (firstIndex !== void 0) groupByFirstIndex.set(firstIndex, group);
+        if ((isFirstMeasure || keyChanged) && attrs.fifths !== 0) {
+          try {
+            const accidentals = keySignatureAccidentals(attrs.fifths, keySigClefName);
+            svgParts.push(
+              renderKeySignature(accidentals, {
+                x: cursorX,
+                spacing: 1,
+                staffBottomY: bottomY,
+                color: INK_COLOR,
+                fontFamily: FONT_FAMILY
+              })
+            );
+            cursorX += accidentals.length + 0.5;
+          } catch (err2) {
+            diagnostics.push({
+              severity: "warning",
+              code: "UNSUPPORTED_KEY_SIGNATURE_CLEF",
+              message: err2 instanceof Error ? err2.message : String(err2),
+              location: { partId: part2.id, measureNumber: measure2.number }
+            });
           }
-          voice2.events.forEach((event, idx) => {
-            if (accidentalState === void 0) return;
-            const eventX = eventXs[idx] ?? 0;
-            const isGraceNote = event.kind === "note" && event.isGrace === true;
-            if (!isGraceNote && beamedIndices.has(idx)) {
-              const group = groupByFirstIndex.get(idx);
-              if (group === void 0) return;
-              const groupNotes = group.eventIndices.map((i3) => voice2.events[i3]).filter((e) => e !== void 0 && e.kind === "note");
-              const groupXs = group.eventIndices.map((i3) => eventXs[i3] ?? 0);
-              const { svg: svg2, newAccidentalState } = renderBeamGroup(
-                groupNotes,
-                groupXs,
-                ctx,
-                accidentalState,
-                DEFAULT_BEAM_STYLE,
-                forcedDirection
-              );
-              svgParts.push(svg2);
-              accidentalState = newAccidentalState;
-              return;
+        }
+        if (isFirstMeasure || timeChanged) {
+          try {
+            const sig = timeSignature(attrs.timeNumerator, attrs.timeDenominator);
+            svgParts.push(
+              renderTimeSignature(sig, {
+                x: cursorX,
+                staffBottomY: bottomY,
+                color: INK_COLOR,
+                fontFamily: FONT_FAMILY
+              })
+            );
+            cursorX += 2.5;
+          } catch (err2) {
+            diagnostics.push({
+              severity: "warning",
+              code: "INVALID_TIME_SIGNATURE",
+              message: err2 instanceof Error ? err2.message : String(err2),
+              location: { partId: part2.id, measureNumber: measure2.number }
+            });
+          }
+        }
+        const previousStaffState = accidentalStateByStaff.get(staffNumber);
+        let accidentalState = previousStaffState === void 0 || keyChanged ? createAccidentalState(attrs.fifths) : resetMeasure(previousStaffState);
+        accidentalStateByStaff.set(staffNumber, accidentalState);
+        if (clefDef.positionsByPitch) {
+          const ctx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart };
+          const noteAreaX = Math.max(layout.x + layout.width * 0.25, cursorX);
+          const noteAreaWidth = layout.x + layout.width - noteAreaX;
+          const isMultiVoice = measure2.voices.length > 1;
+          for (const voice2 of measure2.voices) {
+            const forcedDirection = isMultiVoice ? voiceForcedDirection(voice2.id) : void 0;
+            const restOffset = isMultiVoice ? voiceRestOffset(voice2.id) : 0;
+            let pendingTie;
+            const starts = eventStartTicks(voice2.events);
+            const total = totalTicks(voice2.events) || 1;
+            const eventXs = voice2.events.map((_, idx) => {
+              const startTick = starts[idx] ?? 0;
+              return noteAreaX + startTick / total * noteAreaWidth;
+            });
+            const beamableEvents = voice2.events.map((event) => ({
+              durationType: event.duration.type,
+              isRest: event.kind !== "note" || event.isGrace === true
+            }));
+            const groups = groupBeams(
+              beamableEvents,
+              starts,
+              attrs.timeNumerator,
+              attrs.timeDenominator
+            );
+            const beamedIndices = beamedEventIndices(groups);
+            const groupByFirstIndex = /* @__PURE__ */ new Map();
+            for (const group of groups) {
+              const firstIndex = group.eventIndices[0];
+              if (firstIndex !== void 0) groupByFirstIndex.set(firstIndex, group);
             }
-            if (event.kind === "chord") {
-              const { svg: svg2, newAccidentalState } = renderChord(
-                event,
-                eventX,
-                ctx,
-                accidentalState,
-                forcedDirection
-              );
-              svgParts.push(svg2);
-              accidentalState = newAccidentalState;
-            } else {
-              const { svg: svg2, newAccidentalState, tieAnchor } = renderNoteOrRest(
-                event,
-                eventX,
-                ctx,
-                accidentalState,
-                forcedDirection,
-                restOffset
-              );
-              if (event.kind === "note" && event.tieStop && pendingTie !== void 0) {
-                const side = tieSide(pendingTie.direction);
-                const startX = pendingTie.x + noteheadWidth(tieAnchor?.noteheadGlyph ?? "noteheadBlack");
-                const shape = computeTieShape(startX, eventX, pendingTie.y, side);
-                svgParts.push(
-                  renderTie(shape, {
-                    color: INK_COLOR,
-                    midpointThickness: getEngravingDefault("tieMidpointThickness") ?? TIE_MIDPOINT_THICKNESS_FALLBACK
-                  })
+            voice2.events.forEach((event, idx) => {
+              const eventStaff = event.staff ?? 1;
+              if (eventStaff !== staffNumber) return;
+              const eventX = eventXs[idx] ?? 0;
+              const isGraceNote = event.kind === "note" && event.isGrace === true;
+              if (!isGraceNote && beamedIndices.has(idx)) {
+                const group = groupByFirstIndex.get(idx);
+                if (group === void 0) return;
+                const groupNotes = group.eventIndices.map((i3) => voice2.events[i3]).filter((e) => e !== void 0 && e.kind === "note");
+                const groupXs = group.eventIndices.map((i3) => eventXs[i3] ?? 0);
+                const { svg: svg2, newAccidentalState } = renderBeamGroup(
+                  groupNotes,
+                  groupXs,
+                  ctx,
+                  accidentalState,
+                  DEFAULT_BEAM_STYLE,
+                  forcedDirection
                 );
+                svgParts.push(svg2);
+                accidentalState = newAccidentalState;
+                return;
               }
-              pendingTie = event.kind === "note" && event.tieStart && tieAnchor !== void 0 ? {
-                x: eventX,
-                y: ctx.measureBottomY + tieAnchor.position,
-                direction: tieAnchor.direction
-              } : void 0;
-              svgParts.push(svg2);
-              accidentalState = newAccidentalState;
-            }
+              if (event.kind === "chord") {
+                const { svg: svg2, newAccidentalState } = renderChord(
+                  event,
+                  eventX,
+                  ctx,
+                  accidentalState,
+                  forcedDirection
+                );
+                svgParts.push(svg2);
+                accidentalState = newAccidentalState;
+              } else {
+                const { svg: svg2, newAccidentalState, tieAnchor } = renderNoteOrRest(
+                  event,
+                  eventX,
+                  ctx,
+                  accidentalState,
+                  forcedDirection,
+                  restOffset
+                );
+                if (event.kind === "note" && event.tieStop && pendingTie !== void 0) {
+                  const side = tieSide(pendingTie.direction);
+                  const startX = pendingTie.x + noteheadWidth(tieAnchor?.noteheadGlyph ?? "noteheadBlack");
+                  const shape = computeTieShape(startX, eventX, pendingTie.y, side);
+                  svgParts.push(
+                    renderTie(shape, {
+                      color: INK_COLOR,
+                      midpointThickness: getEngravingDefault("tieMidpointThickness") ?? TIE_MIDPOINT_THICKNESS_FALLBACK
+                    })
+                  );
+                }
+                pendingTie = event.kind === "note" && event.tieStart && tieAnchor !== void 0 ? {
+                  x: eventX,
+                  y: ctx.measureBottomY + tieAnchor.position,
+                  direction: tieAnchor.direction
+                } : void 0;
+                svgParts.push(svg2);
+                accidentalState = newAccidentalState;
+              }
+            });
+          }
+        } else {
+          diagnostics.push({
+            severity: "info",
+            code: "UNSUPPORTED_CLEF_FOR_NOTES",
+            message: `Clef "${attrs.clefSign}" does not position notes by pitch; skipping notes in this measure.`,
+            location: { partId: part2.id, measureNumber: measure2.number }
           });
         }
-      } else {
-        diagnostics.push({
-          severity: "info",
-          code: "UNSUPPORTED_CLEF_FOR_NOTES",
-          message: `Clef "${attrs.clefSign}" does not position notes by pitch; skipping notes in this measure.`,
-          location: { partId: part2.id, measureNumber: measure2.number }
-        });
-      }
+      });
       const barlineType = mapBarline(attrs.barlineStyle, attrs.repeatDirection);
       const barlineMetrics = {
         thinThickness: getEngravingDefault("thinBarlineThickness") ?? 0.16,
@@ -61824,21 +61879,39 @@ ${denominator}`;
         gapLength: getEngravingDefault("dashedBarlineGapLength") ?? 0.25
       };
       const barlineGeometry = computeBarlineGeometry(barlineType, barlineMetrics);
+      const lastStaffOffset = systemLayout.positions[staffNumbers.length - 1]?.y ?? 0;
+      const barlineBottomY = STAFF_BOTTOM_Y + lastStaffOffset;
+      const barlineHeight = needsContinuousBarline(staffNumbers.length) ? staffGeometry.height + lastStaffOffset : staffGeometry.height;
       svgParts.push(
         renderBarline(barlineGeometry, {
           x: layout.x + layout.width,
-          staffBottomY: bottomY,
-          height: staffGeometry.height,
+          staffBottomY: barlineBottomY,
+          height: barlineHeight,
           color: INK_COLOR,
           fontFamily: FONT_FAMILY
         })
       );
       previousAttrs = attrs;
     });
+    const firstAttrs = attributes.find((a) => a.partId === part2.id);
+    const systemStaffCount = Math.max(1, firstAttrs?.staves ?? 1);
+    if (needsBrace(systemStaffCount)) {
+      const layoutForBrace = computeSystemLayout([systemStaffCount]);
+      const lastOffset = layoutForBrace.positions[systemStaffCount - 1]?.y ?? 0;
+      const braceShape = computeBraceShape(
+        STAFF_BOTTOM_Y - staffGeometry.height,
+        STAFF_BOTTOM_Y + lastOffset,
+        0
+      );
+      svgParts.push(renderBrace(braceShape, { color: INK_COLOR, fontFamily: FONT_FAMILY }));
+    }
     const svg = createSvgDocument(
       {
         viewBoxWidth: totalWidth + 2,
-        viewBoxHeight: SYSTEM_HEIGHT,
+        // Integration A: a grand staff is taller than one staff -- the viewBox
+        // must grow to fit every staff, or the lower one is simply clipped
+        // out of the rendered image.
+        viewBoxHeight: SYSTEM_HEIGHT + (computeSystemLayout([systemStaffCount]).positions[systemStaffCount - 1]?.y ?? 0),
         pxPerStaffSpace: PX_PER_STAFF_SPACE,
         backgroundColor: BACKGROUND_COLOR
       },
