@@ -604,4 +604,13 @@ describe('visual regression (Phase 8)', () => {
     const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
     matchSnapshot('render-from-musicxml-tempo-mark', svg, SNAPSHOT_DIR);
   });
+
+  test('Phase 44 wiring: a real crossing-hands fixture (content-aware grand-staff distance, gap grown to 16) renders identically to the saved snapshot', () => {
+    const xml = fs.readFileSync(
+      path.join(__dirname, '..', 'fixtures', 'musicxml', 'piano-crossing-hands.musicxml'),
+      'utf8',
+    );
+    const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
+    matchSnapshot('render-from-musicxml-piano-crossing-hands', svg, SNAPSHOT_DIR);
+  });
 });

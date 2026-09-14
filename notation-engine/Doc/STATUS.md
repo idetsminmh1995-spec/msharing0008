@@ -14,7 +14,7 @@ after Phase 29 (end of Stage 4).
 ## A. DONE — Phases 1–42 ✅ (Stage 2 through 7 complete) + Integration Passes A & B
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 510/510 across them.
+`npm run verify` passes 517/517 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -65,8 +65,9 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | — | **Integration C** (not a numbered phase) | Tab fret numbers drawn on their own string lines (multi-digit, open strings); no text-font system needed | [`integration-c`](./integration-c-tab-frets.md) |
 | — | **Integration D** (not a numbered phase) | Tempo marks (dotted-quarter-equals-BPM) assembled from real glyphs, drawn above the staff; no text-font system needed | [`integration-d`](./integration-d-tempo-marks.md) |
 | 43 | Spacing algorithm | Full §14 algorithm (reference duration, log-scale proportional spacing, min-distance, justification); WIRED into rendering by Integration E | [`phase-43`](./phase-43-spacing-algorithm.md) |
-| 44 | Skyline collision avoidance | Full §15 algorithm; found+fixed a real staff-distance formula bug while testing; not yet wired into rendering | [`phase-44`](./phase-44-skyline-collision-avoidance.md) |
+| 44 | Skyline collision avoidance | Full §15 algorithm; found+fixed a real staff-distance formula bug while testing; grand-staff distance WIRED into rendering by Integration F | [`phase-44`](./phase-44-skyline-collision-avoidance.md) |
 | — | **Integration E** (not a numbered phase) | Wired Phase 43's spacing into rendering (real content-driven note positions, replacing fixed-width layout); found+fixed a real chord-exclusion bug while testing | [`integration-e`](./integration-e-spacing-wiring.md) |
+| — | **Integration F** (not a numbered phase) | Wired Phase 44's skyline into grand-staff distance (content-aware gap, confirmed growing from 8 to 16 on real crossing-hands content) | [`integration-f`](./integration-f-skyline-wiring.md) |
 
 **Public API today:** 137 exports from `dist/notation-engine.js`.
 

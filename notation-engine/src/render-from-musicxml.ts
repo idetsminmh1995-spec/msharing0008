@@ -46,7 +46,12 @@ import {
   type BeamStyle as BeamStyleOption,
 } from './geometry/index.js';
 import { DEFAULT_DRUM_MAPPING_TABLE, lookupDrumMapEntry } from './drums/index.js';
-import { computeSystemLayout } from './layout/index.js';
+import {
+  computeSystemLayoutVariableGaps,
+  emptySkyline,
+  addToSkyline,
+  computeStaffDistance,
+} from './layout/index.js';
 import { fretDigitGlyphNames, tabStringPosition } from './geometry/index.js';
 import {
   metronomeNoteGlyphName,
@@ -122,6 +127,72 @@ const MEASURE_TRAILING_MARGIN = 2.0;
  * directly as a limitation rather than silently accepted.
  */
 const MEASURE_HEADER_ALLOWANCE = 4.0;
+
+/** Phase 29's own default, kept as this wiring's fallback floor when computeStaffDistance's own configured minimum isn't threaded through as a real EngineConfig parameter (see the Phase 43 wiring's own note on why RenderFromMusicXmlOptions stays domParser-only for now). */
+const DEFAULT_STAFF_GAP_FALLBACK = 8;
+
+/**
+ * Phase 44 wiring: the single most extreme staff-position value any note
+ * on `staffNumber` reaches, expressed as a non-negative extent AWAY from
+ * that staff's own near edge -- exactly the shape `Skyline`'s segments
+ * need. `side: 'south'` finds how far below the bottom line the lowest
+ * note goes; `'north'` finds how far above the top line the highest note
+ * goes. Scans every measure/voice/staff-matching note (including chord
+ * members and unpitched display positions) across the whole part, using
+ * only the FIRST measure's clef for that staff -- a mid-piece clef
+ * change on one staff of a grand staff is a rare enough case that this
+ * wiring accepts the small inaccuracy rather than re-deriving clefs per
+ * measure just for this estimate.
+ */
+function worstCaseStaffExtent(
+  part: { readonly id: string; readonly measures: readonly Measure[] },
+  staffNumber: number,
+  allAttributes: readonly MeasureAttributes[],
+  side: 'north' | 'south',
+): number {
+  const firstAttrs = allAttributes.find((a) => a.partId === part.id);
+  const clefSpec = firstAttrs?.clefsByStaff[staffNumber];
+  if (clefSpec === undefined) return 0;
+  const { clefDef } = mapClef(clefSpec.sign, clefSpec.line);
+  if (!clefDef.positionsByPitch) return 0;
+
+  const staffLines = firstAttrs?.staffLinesByStaff[staffNumber] ?? STAFF_LINES;
+  const topLineY = -(staffLines - 1);
+
+  let worst: number | undefined;
+  const consider = (position: number) => {
+    worst =
+      worst === undefined
+        ? position
+        : side === 'south'
+          ? Math.max(worst, position)
+          : Math.min(worst, position);
+  };
+
+  for (const measure of part.measures) {
+    for (const voice of measure.voices) {
+      for (const event of voice.events) {
+        if ((event.staff ?? 1) !== staffNumber) continue;
+        if (event.kind === 'note') {
+          const p = event.pitch;
+          consider(
+            p.kind === 'pitched'
+              ? staffPositionForPitch(clefDef, p.step, p.octave)
+              : staffPositionForPitch(clefDef, p.displayStep, p.displayOctave),
+          );
+        } else if (event.kind === 'chord') {
+          for (const n of event.notes) {
+            const p = n.pitch;
+            if (p.kind === 'pitched') consider(staffPositionForPitch(clefDef, p.step, p.octave));
+          }
+        }
+      }
+    }
+  }
+
+  if (worst === undefined) return 0;
+  return side === 'south' ? Math.max(0, worst) : Math.max(0, topLineY - worst);
+}
 
 /**
  * Phase 43/44 wiring: a measure's REAL, content-driven width and the
@@ -763,11 +834,32 @@ export function renderFromMusicXml(
   // the one before it. Phase 29's computeSystemLayout already handles
   // multi-PART stacking (not just multi-staff), so it is given the real
   // per-part staff counts here rather than a single part's.
+  // Phase 44 wiring: for every part with a grand staff (2+ staves), the
+  // REAL distance each adjacent staff pair needs, using §15's skyline --
+  // "worst case" extents (the single highest/lowest note anywhere in
+  // that staff, across the whole part) rather than per-x-position
+  // tracking, since notes aren't positioned yet at this point in the
+  // render (staff Y itself depends on this very computation). A stated
+  // approximation: stems/beams/ledger lines aren't added on top of a
+  // note's own position, so a very tall stem could still, in principle,
+  // reach slightly further than this accounts for.
+  const staffDistanceForPair = (partIndex: number, staffIndexInPart: number): number => {
+    const part = score.parts[partIndex];
+    if (part === undefined) return 8;
+    const upperStaffNumber = staffIndexInPart + 1;
+    const lowerStaffNumber = staffIndexInPart + 2;
+    const upperExtent = worstCaseStaffExtent(part, upperStaffNumber, attributes, 'south');
+    const lowerExtent = worstCaseStaffExtent(part, lowerStaffNumber, attributes, 'north');
+    const upperSouth = addToSkyline(emptySkyline('south'), { xStart: 0, xEnd: 1, y: upperExtent });
+    const lowerNorth = addToSkyline(emptySkyline('north'), { xStart: 0, xEnd: 1, y: lowerExtent });
+    return computeStaffDistance(upperSouth, lowerNorth, DEFAULT_STAFF_GAP_FALLBACK);
+  };
+
   const partStaffCounts = score.parts.map((p) => {
     const a = attributes.find((x) => x.partId === p.id);
     return Math.max(1, a?.staves ?? 1);
   });
-  const scoreLayout = computeSystemLayout(partStaffCounts);
+  const scoreLayout = computeSystemLayoutVariableGaps(partStaffCounts, staffDistanceForPair);
   const staffOffsetFor = (partIndex: number, staffIndexInPart: number): number =>
     scoreLayout.positions.find(
       (pos) => pos.partIndex === partIndex && pos.staffIndexInPart === staffIndexInPart,

@@ -36,3 +36,32 @@ export function computeSystemLayout(
   });
   return { positions };
 }
+
+/**
+ * Phase 44 wiring: the same vertical stacking as `computeSystemLayout`,
+ * but the gap AFTER a given staff (before the next staff within the
+ * same part) is supplied per-pair by `staffGapForPair`, rather than one
+ * fixed value applied everywhere. This is the "§15's skyline is what
+ * would make this respect actual content extents" the plain function's
+ * own docstring names -- kept as a separate, additive function instead
+ * of changing `computeSystemLayout`'s signature, so every existing
+ * caller (including its own tests) is completely unaffected.
+ */
+export function computeSystemLayoutVariableGaps(
+  partStaffCounts: readonly number[],
+  staffGapForPair: (partIndex: number, staffIndexInPart: number) => number,
+  partGap: number = DEFAULT_PART_GAP,
+): SystemLayout {
+  const positions: PartStaffPosition[] = [];
+  let y = 0;
+  partStaffCounts.forEach((staffCount, partIndex) => {
+    for (let staffIndexInPart = 0; staffIndexInPart < staffCount; staffIndexInPart++) {
+      positions.push({ partIndex, staffIndexInPart, y });
+      if (staffIndexInPart < staffCount - 1) {
+        y += staffGapForPair(partIndex, staffIndexInPart);
+      }
+    }
+    y += partGap;
+  });
+  return { positions };
+}

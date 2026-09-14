@@ -86,6 +86,7 @@ var NotationEngine = (() => {
     computeStaffGeometry: () => computeStaffGeometry,
     computeStemLength: () => computeStemLength,
     computeSystemLayout: () => computeSystemLayout,
+    computeSystemLayoutVariableGaps: () => computeSystemLayoutVariableGaps,
     computeTieShape: () => computeTieShape,
     computeTupletBracketShape: () => computeTupletBracketShape,
     convertTimewiseToPartwise: () => convertTimewiseToPartwise,
@@ -60977,6 +60978,20 @@ ${denominator}`;
     });
     return { positions };
   }
+  function computeSystemLayoutVariableGaps(partStaffCounts, staffGapForPair, partGap = DEFAULT_PART_GAP) {
+    const positions = [];
+    let y = 0;
+    partStaffCounts.forEach((staffCount, partIndex) => {
+      for (let staffIndexInPart = 0; staffIndexInPart < staffCount; staffIndexInPart++) {
+        positions.push({ partIndex, staffIndexInPart, y });
+        if (staffIndexInPart < staffCount - 1) {
+          y += staffGapForPair(partIndex, staffIndexInPart);
+        }
+      }
+      y += partGap;
+    });
+    return { positions };
+  }
 
   // src/layout/spacing-diagnostic.ts
   function spacingDiagnostic(severity, code, message) {
@@ -61731,6 +61746,40 @@ ${denominator}`;
   var ESTIMATED_ACCIDENTAL_ALLOWANCE = 1;
   var MEASURE_TRAILING_MARGIN = 2;
   var MEASURE_HEADER_ALLOWANCE = 4;
+  var DEFAULT_STAFF_GAP_FALLBACK = 8;
+  function worstCaseStaffExtent(part2, staffNumber, allAttributes, side) {
+    const firstAttrs = allAttributes.find((a) => a.partId === part2.id);
+    const clefSpec = firstAttrs?.clefsByStaff[staffNumber];
+    if (clefSpec === void 0) return 0;
+    const { clefDef } = mapClef(clefSpec.sign, clefSpec.line);
+    if (!clefDef.positionsByPitch) return 0;
+    const staffLines = firstAttrs?.staffLinesByStaff[staffNumber] ?? STAFF_LINES;
+    const topLineY = -(staffLines - 1);
+    let worst;
+    const consider = (position) => {
+      worst = worst === void 0 ? position : side === "south" ? Math.max(worst, position) : Math.min(worst, position);
+    };
+    for (const measure2 of part2.measures) {
+      for (const voice2 of measure2.voices) {
+        for (const event of voice2.events) {
+          if ((event.staff ?? 1) !== staffNumber) continue;
+          if (event.kind === "note") {
+            const p = event.pitch;
+            consider(
+              p.kind === "pitched" ? staffPositionForPitch(clefDef, p.step, p.octave) : staffPositionForPitch(clefDef, p.displayStep, p.displayOctave)
+            );
+          } else if (event.kind === "chord") {
+            for (const n of event.notes) {
+              const p = n.pitch;
+              if (p.kind === "pitched") consider(staffPositionForPitch(clefDef, p.step, p.octave));
+            }
+          }
+        }
+      }
+    }
+    if (worst === void 0) return 0;
+    return side === "south" ? Math.max(0, worst) : Math.max(0, topLineY - worst);
+  }
   function computeMeasureLayout(measure2, measureTicks) {
     const hasAccidentalByTick = /* @__PURE__ */ new Map();
     for (const voice2 of measure2.voices) {
@@ -62144,11 +62193,22 @@ ${denominator}`;
       );
       return { svg: doc, diagnostics };
     }
+    const staffDistanceForPair = (partIndex, staffIndexInPart) => {
+      const part2 = score2.parts[partIndex];
+      if (part2 === void 0) return 8;
+      const upperStaffNumber = staffIndexInPart + 1;
+      const lowerStaffNumber = staffIndexInPart + 2;
+      const upperExtent = worstCaseStaffExtent(part2, upperStaffNumber, attributes, "south");
+      const lowerExtent = worstCaseStaffExtent(part2, lowerStaffNumber, attributes, "north");
+      const upperSouth = addToSkyline(emptySkyline("south"), { xStart: 0, xEnd: 1, y: upperExtent });
+      const lowerNorth = addToSkyline(emptySkyline("north"), { xStart: 0, xEnd: 1, y: lowerExtent });
+      return computeStaffDistance(upperSouth, lowerNorth, DEFAULT_STAFF_GAP_FALLBACK);
+    };
     const partStaffCounts = score2.parts.map((p) => {
       const a = attributes.find((x2) => x2.partId === p.id);
       return Math.max(1, a?.staves ?? 1);
     });
-    const scoreLayout = computeSystemLayout(partStaffCounts);
+    const scoreLayout = computeSystemLayoutVariableGaps(partStaffCounts, staffDistanceForPair);
     const staffOffsetFor = (partIndex, staffIndexInPart) => scoreLayout.positions.find(
       (pos) => pos.partIndex === partIndex && pos.staffIndexInPart === staffIndexInPart
     )?.y ?? 0;

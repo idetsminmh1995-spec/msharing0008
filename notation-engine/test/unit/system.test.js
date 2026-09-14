@@ -59,4 +59,32 @@ describe('grand staff / multi-part systems (Phase 29)', () => {
     const ys = layout.positions.map((p) => p.y);
     assert.equal(new Set(ys).size, 4);
   });
+
+  describe('computeSystemLayoutVariableGaps (Phase 44 wiring)', () => {
+    test('a uniform callback reproduces computeSystemLayout exactly', () => {
+      const variable = NE.computeSystemLayoutVariableGaps([2, 1, 1], () => 8, 12);
+      const original = NE.computeSystemLayout([2, 1, 1], 8, 12);
+      assert.deepEqual([...variable.positions], [...original.positions]);
+    });
+
+    test("a single-staff part's own gap is never even queried (there is no pair within it)", () => {
+      let calls = 0;
+      NE.computeSystemLayoutVariableGaps([1, 1], () => {
+        calls++;
+        return 8;
+      });
+      assert.equal(calls, 0);
+    });
+
+    test('a larger gap for one specific staff pair widens only that pair, leaving other gaps at their own default', () => {
+      const layout = NE.computeSystemLayoutVariableGaps(
+        [2, 1],
+        (partIndex, staffIndexInPart) => (partIndex === 0 && staffIndexInPart === 0 ? 15 : 8),
+        12,
+      );
+      const positions = [...layout.positions];
+      assert.equal(positions[1].y - positions[0].y, 15); // the widened grand-staff pair
+      assert.equal(positions[2].y - positions[1].y, 12); // the ordinary part gap, unaffected
+    });
+  });
 });
