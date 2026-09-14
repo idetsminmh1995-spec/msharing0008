@@ -1,6 +1,7 @@
 import { pitchedPitch, unpitchedPitch, type PitchStep } from '../../core/pitch.js';
 import { duration as makeDuration, type Duration } from '../../core/duration.js';
 import { xmlDivisionsToTicks, TICKS_PER_QUARTER } from '../../core/duration-math.js';
+import type { DurationType } from '../../core/duration.js';
 import { note as makeNote, type Note } from '../../core/note.js';
 import { rest as makeRest, type Rest } from '../../core/rest.js';
 import { chord as makeChord } from '../../core/chord.js';
@@ -11,6 +12,7 @@ import { part as makePart, type Part } from '../../core/part.js';
 import { score as makeScore, type Score } from '../../core/score.js';
 import { diagnostic, type Diagnostic, type DiagnosticLocation } from './diagnostic.js';
 import { parseAttributesElement, type ClefSpec } from './attributes.js';
+import { isKnownDurationType } from './note.js';
 import { parseNoteElement, type ParsedNoteEvent } from './note.js';
 import { attrOf, childrenNamed, firstChildNamed, intOf, textOf } from './dom-helpers.js';
 import { parseMidiInstrumentMap } from './instrument.js';
@@ -51,10 +53,22 @@ export interface MeasureAttributes {
   readonly repeatDirection?: 'forward' | 'backward';
 }
 
+export interface TempoMarkEvent {
+  readonly partId: string;
+  readonly measureNumber: number;
+  /** This measure-local tick, from the shared §10.1 cursor, at which the mark appears -- a <direction> is a marking, not a note/rest, and never advances that cursor. */
+  readonly tick: number;
+  readonly beatUnit: DurationType;
+  readonly beatUnitDots: number;
+  readonly perMinute: number;
+}
+
 export interface ParseResult {
   readonly score: Score;
   readonly attributes: readonly MeasureAttributes[];
   readonly diagnostics: readonly Diagnostic[];
+  /** Integration D: every real <direction><direction-type><metronome> found, in document order. A separate side-table for the same reason midiInstrumentsByPart is -- a rendering-relevant fact Phase 3 deliberately keeps off the core Score/Note types. */
+  readonly tempoMarks: readonly TempoMarkEvent[];
   /**
    * Phase 35/§10.4's `<midi-instrument>` data: per-part, a map from each
    * `<instrument id="...">` a `<note>` can reference to its GM
@@ -237,6 +251,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
       score: makeScore({ parts: [] }),
       attributes: [],
       diagnostics,
+      tempoMarks: [],
       midiInstrumentsByPart: new Map(),
     };
   }
@@ -257,6 +272,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
 
   const parts: Part[] = [];
   const allAttributes: MeasureAttributes[] = [];
+  const tempoMarks: TempoMarkEvent[] = [];
 
   for (const partEl of childrenNamed(root, 'part')) {
     const partId = attrOf(partEl, 'id') ?? `part-${parts.length + 1}`;
@@ -378,12 +394,64 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           const repeatEl = firstChildNamed(child, 'repeat');
           const dir = repeatEl?.getAttribute('direction');
           if (dir === 'forward' || dir === 'backward') repeatDirection = dir;
+        } else if (child.tagName === 'direction') {
+          // Integration D: <direction><direction-type><metronome> is a
+          // MARKING, not a note/rest -- it never advances the shared tick
+          // cursor. Recorded at the CURRENT (measure-local) tick, since
+          // §10.1's cursor is exactly where this direction was encountered
+          // in document order. A <direction> with no <metronome> (e.g.
+          // <words> text, <dynamics>, <wedge>) is still v2/out-of-scope --
+          // recorded the same UNKNOWN_ELEMENT way as before, rather than
+          // silently swallowed now that <direction> itself has a branch.
+          let recognizedSomething = false;
+          for (const directionTypeEl of childrenNamed(child, 'direction-type')) {
+            const metronomeEl = firstChildNamed(directionTypeEl, 'metronome');
+            if (metronomeEl === undefined) continue;
+            const rawBeatUnit = textOf(firstChildNamed(metronomeEl, 'beat-unit'));
+            const perMinute = intOf(firstChildNamed(metronomeEl, 'per-minute'));
+            if (
+              rawBeatUnit === undefined ||
+              !isKnownDurationType(rawBeatUnit) ||
+              perMinute === undefined
+            ) {
+              diagnostics.push(
+                diagnostic(
+                  'info',
+                  'UNSUPPORTED_METRONOME',
+                  'A <metronome> element is missing a recognized <beat-unit> or <per-minute>; skipping it.',
+                  location,
+                ),
+              );
+              recognizedSomething = true;
+              continue;
+            }
+            const beatUnitDots = childrenNamed(metronomeEl, 'beat-unit-dot').length;
+            tempoMarks.push({
+              partId,
+              measureNumber,
+              tick,
+              beatUnit: rawBeatUnit,
+              beatUnitDots,
+              perMinute,
+            });
+            recognizedSomething = true;
+          }
+          if (!recognizedSomething) {
+            diagnostics.push(
+              diagnostic(
+                'info',
+                'UNKNOWN_ELEMENT',
+                'Ignored <direction> (no <metronome> found; not handled by the v1 parser).',
+                location,
+              ),
+            );
+          }
         } else {
           // §10.7: an unknown element is ignored but recorded at 'info'
           // severity -- not silently dropped without a trace. Covers
           // both genuinely unknown tags and v1-out-of-scope v2 elements
-          // (<direction>, <print>, etc.) alike; v1 doesn't act on any of
-          // them, but the caller can still see they were present.
+          // (<print>, etc.) alike; v1 doesn't act on most of them, but the
+          // caller can still see they were present.
           diagnostics.push(
             diagnostic(
               'info',
@@ -494,6 +562,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
     score: makeScore({ parts }),
     attributes: allAttributes,
     diagnostics,
+    tempoMarks,
     midiInstrumentsByPart: midiInstrumentMaps,
   };
 }

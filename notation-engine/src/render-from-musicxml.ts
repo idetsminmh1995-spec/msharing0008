@@ -48,6 +48,14 @@ import {
 import { DEFAULT_DRUM_MAPPING_TABLE, lookupDrumMapEntry } from './drums/index.js';
 import { computeSystemLayout } from './layout/index.js';
 import { fretDigitGlyphNames, tabStringPosition } from './geometry/index.js';
+import {
+  metronomeNoteGlyphName,
+  metronomeDotGlyphName,
+  metronomeEqualsGlyphName,
+  metronomeBpmDigitGlyphNames,
+} from './geometry/metronome.js';
+import { renderMetronomeMark } from './render/metronome.js';
+import { TICKS_PER_QUARTER } from './core/duration-math.js';
 import { renderTabNumber } from './render/index.js';
 import { computeBraceShape, needsBrace, needsContinuousBarline } from './geometry/index.js';
 import { renderBrace } from './render/index.js';
@@ -616,6 +624,7 @@ export function renderFromMusicXml(
     score,
     attributes,
     diagnostics: parseDiagnostics,
+    tempoMarks,
     midiInstrumentsByPart: midiInstrumentsByPartMap,
   } = parseMusicXml(xmlText, options);
   const diagnostics: Diagnostic[] = [...parseDiagnostics];
@@ -679,6 +688,46 @@ export function renderFromMusicXml(
       // the pre-Integration-A single-staff renderer; a grand staff runs it once per
       // staff, each with its OWN clef and its own vertical offset.
       const staffNumbers = Array.from({ length: Math.max(1, attrs.staves) }, (_, n) => n + 1);
+
+      // Integration D: draw this measure's own tempo marks ONCE (above the
+      // topmost staff, per tempoMarkSide()), never once per staff -- a
+      // tempo mark describes the whole system, not one staff of it.
+      // Computed directly from staff 1's own known geometry, since the
+      // per-staff cursorX/staffGeometry the note-rendering loop below uses
+      // aren't in scope yet at this point (each staff computes its own).
+      const measureTempoMarks = tempoMarks.filter(
+        (m) => m.partId === part.id && m.measureNumber === measure.number,
+      );
+      if (measureTempoMarks.length > 0) {
+        const noteAreaX = layout.x + layout.width * 0.25;
+        const noteAreaWidth = layout.width * 0.75;
+        const measureTotalTicks =
+          attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
+        const topStaffLines = attrs.staffLinesByStaff[1] ?? STAFF_LINES;
+        const topStaffGeometry = computeStaffGeometry(topStaffLines);
+        const topStaffY = STAFF_BOTTOM_Y - topStaffGeometry.height;
+        for (const mark of measureTempoMarks) {
+          const dotGlyph = mark.beatUnitDots > 0 ? metronomeDotGlyphName() : undefined;
+          const eventX = noteAreaX + (mark.tick / (measureTotalTicks || 1)) * noteAreaWidth;
+          svgParts.push(
+            renderMetronomeMark(
+              metronomeNoteGlyphName(mark.beatUnit),
+              dotGlyph,
+              metronomeEqualsGlyphName(),
+              metronomeBpmDigitGlyphNames(mark.perMinute),
+              {
+                x: eventX,
+                // tempoMarkSide() is always 'above' -- placed just clear of
+                // the topmost staff's own top line.
+                y: topStaffY - 1,
+                color: INK_COLOR,
+                fontFamily: FONT_FAMILY,
+                noteToEqualsGap: 0.6,
+              },
+            ),
+          );
+        }
+      }
 
       staffNumbers.forEach((staffNumber, staffIndex) => {
         // Integration A: THIS staff's own clef, not the part's first clef --

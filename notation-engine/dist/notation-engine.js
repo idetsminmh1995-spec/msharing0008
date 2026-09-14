@@ -118,6 +118,10 @@ var NotationEngine = (() => {
     lyricSide: () => lyricSide,
     measure: () => measure,
     mergeDrumMappingTable: () => mergeDrumMappingTable,
+    metronomeBpmDigitGlyphNames: () => metronomeBpmDigitGlyphNames,
+    metronomeDotGlyphName: () => metronomeDotGlyphName,
+    metronomeEqualsGlyphName: () => metronomeEqualsGlyphName,
+    metronomeNoteGlyphName: () => metronomeNoteGlyphName,
     middleLineY: () => middleLineY,
     midiDiagnostic: () => midiDiagnostic,
     multiMeasureRestGlyphName: () => multiMeasureRestGlyphName,
@@ -154,6 +158,7 @@ var NotationEngine = (() => {
     renderKeySignature: () => renderKeySignature,
     renderLedgerLines: () => renderLedgerLines,
     renderMark: () => renderMark,
+    renderMetronomeMark: () => renderMetronomeMark,
     renderNotehead: () => renderNotehead,
     renderRest: () => renderRest,
     renderSlur: () => renderSlur,
@@ -58810,6 +58815,54 @@ var NotationEngine = (() => {
     });
   }
 
+  // src/geometry/metronome.ts
+  var MET_NOTE_GLYPHS = {
+    whole: "metNoteWhole",
+    half: "metNoteHalfUp",
+    quarter: "metNoteQuarterUp",
+    eighth: "metNote8thUp",
+    "16th": "metNote16thUp",
+    "32nd": "metNote32ndUp",
+    "64th": "metNote64thUp",
+    "128th": "metNote128thUp",
+    "256th": "metNote256thUp",
+    "512th": "metNote512thUp",
+    "1024th": "metNote1024thUp"
+  };
+  function metronomeNoteGlyphName(beatUnit) {
+    return MET_NOTE_GLYPHS[beatUnit];
+  }
+  function metronomeDotGlyphName() {
+    return "metAugmentationDot";
+  }
+  function metronomeEqualsGlyphName() {
+    return "timeSigEquals";
+  }
+  var BPM_DIGIT_GLYPHS = [
+    "fingering0",
+    "fingering1",
+    "fingering2",
+    "fingering3",
+    "fingering4",
+    "fingering5",
+    "fingering6",
+    "fingering7",
+    "fingering8",
+    "fingering9"
+  ];
+  function metronomeBpmDigitGlyphNames(beatsPerMinute) {
+    if (!Number.isInteger(beatsPerMinute) || beatsPerMinute < 0) {
+      throw new Error(`Metronome BPM must be a non-negative integer, got ${beatsPerMinute}.`);
+    }
+    return String(beatsPerMinute).split("").map((d) => {
+      const glyph = BPM_DIGIT_GLYPHS[Number(d)];
+      if (glyph === void 0) {
+        throw new Error(`No digit glyph for "${d}".`);
+      }
+      return glyph;
+    });
+  }
+
   // src/render/svg-primitives.ts
   var SMUFL_STAFF_SPACES_PER_EM = 4;
   function escapeXmlText(text) {
@@ -59238,6 +59291,37 @@ ${denominator}`;
       cursorX += widths[i2] ?? 0;
     });
     return parts.join("\n");
+  }
+
+  // src/render/metronome.ts
+  function glyphWidth(glyphName) {
+    const bbox = getGlyph(glyphName)?.bBox;
+    return bbox !== void 0 ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
+  }
+  function renderMetronomeMark(noteGlyphName, dotGlyphName, equalsGlyphName, bpmDigitGlyphNames, options) {
+    const sequence = [noteGlyphName];
+    if (dotGlyphName !== void 0) sequence.push(dotGlyphName);
+    const parts = [];
+    let cursorX = options.x;
+    for (const name of sequence) {
+      parts.push(drawGlyph(name, cursorX, options));
+      cursorX += glyphWidth(name);
+    }
+    cursorX += options.noteToEqualsGap;
+    parts.push(drawGlyph(equalsGlyphName, cursorX, options));
+    cursorX += glyphWidth(equalsGlyphName) + options.noteToEqualsGap;
+    for (const name of bpmDigitGlyphNames) {
+      parts.push(drawGlyph(name, cursorX, options));
+      cursorX += glyphWidth(name);
+    }
+    return parts.join("\n");
+  }
+  function drawGlyph(name, x2, options) {
+    const glyph = getGlyph(name);
+    if (glyph === void 0) {
+      throw new Error(`No glyph found for metronome mark component "${name}"`);
+    }
+    return svgGlyphText(x2, options.y, glyph.char, options.fontFamily, { fill: options.color });
   }
 
   // src/config/config.ts
@@ -59705,6 +59789,7 @@ ${denominator}`;
         score: score({ parts: [] }),
         attributes: [],
         diagnostics,
+        tempoMarks: [],
         midiInstrumentsByPart: /* @__PURE__ */ new Map()
       };
     }
@@ -59723,6 +59808,7 @@ ${denominator}`;
     }
     const parts = [];
     const allAttributes = [];
+    const tempoMarks = [];
     for (const partEl of childrenNamed(root, "part")) {
       const partId = attrOf(partEl, "id") ?? `part-${parts.length + 1}`;
       const partName = partNames.get(partId);
@@ -59819,6 +59905,46 @@ ${denominator}`;
             const repeatEl = firstChildNamed(child, "repeat");
             const dir = repeatEl?.getAttribute("direction");
             if (dir === "forward" || dir === "backward") repeatDirection = dir;
+          } else if (child.tagName === "direction") {
+            let recognizedSomething = false;
+            for (const directionTypeEl of childrenNamed(child, "direction-type")) {
+              const metronomeEl = firstChildNamed(directionTypeEl, "metronome");
+              if (metronomeEl === void 0) continue;
+              const rawBeatUnit = textOf(firstChildNamed(metronomeEl, "beat-unit"));
+              const perMinute = intOf(firstChildNamed(metronomeEl, "per-minute"));
+              if (rawBeatUnit === void 0 || !isKnownDurationType(rawBeatUnit) || perMinute === void 0) {
+                diagnostics.push(
+                  diagnostic(
+                    "info",
+                    "UNSUPPORTED_METRONOME",
+                    "A <metronome> element is missing a recognized <beat-unit> or <per-minute>; skipping it.",
+                    location
+                  )
+                );
+                recognizedSomething = true;
+                continue;
+              }
+              const beatUnitDots = childrenNamed(metronomeEl, "beat-unit-dot").length;
+              tempoMarks.push({
+                partId,
+                measureNumber,
+                tick,
+                beatUnit: rawBeatUnit,
+                beatUnitDots,
+                perMinute
+              });
+              recognizedSomething = true;
+            }
+            if (!recognizedSomething) {
+              diagnostics.push(
+                diagnostic(
+                  "info",
+                  "UNKNOWN_ELEMENT",
+                  "Ignored <direction> (no <metronome> found; not handled by the v1 parser).",
+                  location
+                )
+              );
+            }
           } else {
             diagnostics.push(
               diagnostic(
@@ -59909,6 +60035,7 @@ ${denominator}`;
       score: score({ parts }),
       attributes: allAttributes,
       diagnostics,
+      tempoMarks,
       midiInstrumentsByPart: midiInstrumentMaps
     };
   }
@@ -61751,6 +61878,7 @@ ${denominator}`;
       score: score2,
       attributes,
       diagnostics: parseDiagnostics,
+      tempoMarks,
       midiInstrumentsByPart: midiInstrumentsByPartMap
     } = parseMusicXml(xmlText, options);
     const diagnostics = [...parseDiagnostics];
@@ -61791,6 +61919,38 @@ ${denominator}`;
         const layout = layouts[i2];
         if (attrs === void 0 || layout === void 0) return;
         const staffNumbers = Array.from({ length: Math.max(1, attrs.staves) }, (_, n) => n + 1);
+        const measureTempoMarks = tempoMarks.filter(
+          (m) => m.partId === part2.id && m.measureNumber === measure2.number
+        );
+        if (measureTempoMarks.length > 0) {
+          const noteAreaX = layout.x + layout.width * 0.25;
+          const noteAreaWidth = layout.width * 0.75;
+          const measureTotalTicks = attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
+          const topStaffLines = attrs.staffLinesByStaff[1] ?? STAFF_LINES;
+          const topStaffGeometry = computeStaffGeometry(topStaffLines);
+          const topStaffY = STAFF_BOTTOM_Y - topStaffGeometry.height;
+          for (const mark of measureTempoMarks) {
+            const dotGlyph = mark.beatUnitDots > 0 ? metronomeDotGlyphName() : void 0;
+            const eventX = noteAreaX + mark.tick / (measureTotalTicks || 1) * noteAreaWidth;
+            svgParts.push(
+              renderMetronomeMark(
+                metronomeNoteGlyphName(mark.beatUnit),
+                dotGlyph,
+                metronomeEqualsGlyphName(),
+                metronomeBpmDigitGlyphNames(mark.perMinute),
+                {
+                  x: eventX,
+                  // tempoMarkSide() is always 'above' -- placed just clear of
+                  // the topmost staff's own top line.
+                  y: topStaffY - 1,
+                  color: INK_COLOR,
+                  fontFamily: FONT_FAMILY,
+                  noteToEqualsGap: 0.6
+                }
+              )
+            );
+          }
+        }
         staffNumbers.forEach((staffNumber, staffIndex) => {
           const staffClef = attrs.clefsByStaff[staffNumber] ?? attrs.clefsByStaff[1];
           const { clefDef, keySigClefName } = mapClef(

@@ -18,7 +18,7 @@ const KNOWN_DURATION_TYPES: ReadonlySet<string> = new Set([
   '1024th',
 ]);
 
-function isKnownDurationType(value: string): value is DurationType {
+export function isKnownDurationType(value: string): value is DurationType {
   return KNOWN_DURATION_TYPES.has(value);
 }
 

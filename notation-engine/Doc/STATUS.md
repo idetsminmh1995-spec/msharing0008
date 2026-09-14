@@ -14,7 +14,7 @@ after Phase 29 (end of Stage 4).
 ## A. DONE — Phases 1–42 ✅ (Stage 2 through 7 complete) + Integration Passes A & B
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 451/451 across them.
+`npm run verify` passes 468/468 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -63,6 +63,7 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | — | **Integration A** (not a numbered phase) | Grand staff wired end to end (`<staves>`, per-staff clefs, brace, continuous barline) + fixed clef glyphs being drawn on the wrong line | [`integration-a`](./integration-a-grand-staff.md) |
 | — | **Integration B** (not a numbered phase) | Every part renders (guitar tab part no longer dropped); per-staff line counts from `<staff-lines>` (tab = 6) | [`integration-b`](./integration-b-multi-part.md) |
 | — | **Integration C** (not a numbered phase) | Tab fret numbers drawn on their own string lines (multi-digit, open strings); no text-font system needed | [`integration-c`](./integration-c-tab-frets.md) |
+| — | **Integration D** (not a numbered phase) | Tempo marks (dotted-quarter-equals-BPM) assembled from real glyphs, drawn above the staff; no text-font system needed | [`integration-d`](./integration-d-tempo-marks.md) |
 
 **Public API today:** 137 exports from `dist/notation-engine.js`.
 

@@ -598,4 +598,10 @@ describe('visual regression (Phase 8)', () => {
     const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
     matchSnapshot('render-from-musicxml-guitar-tab-frets', svg, SNAPSHOT_DIR);
   });
+
+  test('Integration D: a real tempo-mark fixture (dotted quarter = 96, assembled from real glyphs above the staff) renders identically to the saved snapshot', () => {
+    const xml = fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'musicxml', 'tempo-mark.musicxml'), 'utf8');
+    const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
+    matchSnapshot('render-from-musicxml-tempo-mark', svg, SNAPSHOT_DIR);
+  });
 });

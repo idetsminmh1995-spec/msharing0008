@@ -26,3 +26,4 @@ export * from './chord-symbol.js';
 export * from './grace-note.js';
 export * from './beam-shape.js';
 export * from './tab.js';
+export * from './metronome.js';
