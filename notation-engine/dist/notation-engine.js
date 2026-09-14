@@ -46,6 +46,7 @@ var NotationEngine = (() => {
     accidentalX: () => accidentalX,
     alignNotes: () => alignNotes,
     alignmentDiagnostic: () => alignmentDiagnostic,
+    applyMinimumDistance: () => applyMinimumDistance,
     applyTuplet: () => applyTuplet,
     articulationGlyphName: () => articulationGlyphName,
     articulationSide: () => articulationSide,
@@ -60,6 +61,7 @@ var NotationEngine = (() => {
     buildTempoMap: () => buildTempoMap,
     cancellationNaturals: () => cancellationNaturals,
     charAdvance: () => charAdvance,
+    checkMeasureOverflow: () => checkMeasureOverflow,
     chord: () => chord,
     chordStemDirection: () => chordStemDirection,
     chordSymbolAccidentalGlyphName: () => chordSymbolAccidentalGlyphName,
@@ -70,10 +72,13 @@ var NotationEngine = (() => {
     computeBarlineGeometry: () => computeBarlineGeometry,
     computeBeamShape: () => computeBeamShape,
     computeBraceShape: () => computeBraceShape,
+    computeEventSpace: () => computeEventSpace,
     computeExtenderLine: () => computeExtenderLine,
     computeHairpinShape: () => computeHairpinShape,
     computeHyphenX: () => computeHyphenX,
     computeLedgerLines: () => computeLedgerLines,
+    computeProportionalPositions: () => computeProportionalPositions,
+    computeReferenceDuration: () => computeReferenceDuration,
     computeSlurShape: () => computeSlurShape,
     computeStaffGeometry: () => computeStaffGeometry,
     computeStemLength: () => computeStemLength,
@@ -111,6 +116,7 @@ var NotationEngine = (() => {
     groupBeams: () => groupBeams,
     isPitched: () => isPitched,
     isUnpitched: () => isUnpitched,
+    justifySystem: () => justifySystem,
     keySignatureAccidentals: () => keySignatureAccidentals,
     lookupDrumMapEntry: () => lookupDrumMapEntry,
     lyricElisionGlyphName: () => lyricElisionGlyphName,
@@ -183,6 +189,7 @@ var NotationEngine = (() => {
     sharpsForCount: () => sharpsForCount,
     shouldShowBarNumber: () => shouldShowBarNumber,
     slurSide: () => slurSide,
+    spacingDiagnostic: () => spacingDiagnostic,
     staffPositionForPitch: () => staffPositionForPitch,
     sumTicks: () => sumTicks,
     svgGlyphText: () => svgGlyphText,
@@ -59349,6 +59356,12 @@ ${denominator}`;
     keySignature: {
       style: "standard"
     },
+    spacing: {
+      spacingIncrement: 1.2,
+      shortestDurationSpace: 2,
+      minNoteDistance: 0.5,
+      justify: true
+    },
     drums: {}
   };
   function resolveConfig(overrides) {
@@ -59360,6 +59373,7 @@ ${denominator}`;
       beam: { ...DEFAULT_CONFIG.beam, ...overrides?.beam },
       barNumbers: { ...DEFAULT_CONFIG.barNumbers, ...overrides?.barNumbers },
       keySignature: { ...DEFAULT_CONFIG.keySignature, ...overrides?.keySignature },
+      spacing: { ...DEFAULT_CONFIG.spacing, ...overrides?.spacing },
       drums: { ...DEFAULT_CONFIG.drums, ...overrides?.drums }
     };
   }
@@ -60952,6 +60966,91 @@ ${denominator}`;
       y += partGap - staffGap;
     });
     return { positions };
+  }
+
+  // src/layout/spacing-diagnostic.ts
+  function spacingDiagnostic(severity, code, message) {
+    return { severity, code, message };
+  }
+
+  // src/layout/spacing.ts
+  function computeReferenceDuration(events, ticksPerQuarter) {
+    if (events.length === 0) return ticksPerQuarter;
+    const counts = /* @__PURE__ */ new Map();
+    for (const e of events) {
+      counts.set(e.ticks, (counts.get(e.ticks) ?? 0) + 1);
+    }
+    let best;
+    let bestCount = -1;
+    for (const [ticks, count] of counts) {
+      if (count > bestCount || count === bestCount && best !== void 0 && ticks < best) {
+        best = ticks;
+        bestCount = count;
+      }
+    }
+    return best ?? ticksPerQuarter;
+  }
+  function computeEventSpace(ticks, referenceTicks, config) {
+    const baseSpace = config.shortestDurationSpace * config.spacingIncrement;
+    const ratio = ticks / referenceTicks;
+    if (ratio >= 1) {
+      return baseSpace + config.spacingIncrement * Math.log2(ratio);
+    }
+    return baseSpace * ratio;
+  }
+  function computeProportionalPositions(events, referenceTicks, config) {
+    const positions = [];
+    let x2 = 0;
+    for (const e of events) {
+      positions.push(x2);
+      x2 += computeEventSpace(e.ticks, referenceTicks, config);
+    }
+    return positions;
+  }
+  function applyMinimumDistance(positions, events, config) {
+    if (positions.length === 0) return positions;
+    const result = [positions[0] ?? 0];
+    for (let i2 = 1; i2 < positions.length; i2++) {
+      const previousPosition = result[i2 - 1] ?? 0;
+      const previousWidth = events[i2 - 1]?.renderedWidth ?? 0;
+      const minimumX = previousPosition + previousWidth + config.minNoteDistance;
+      const proportionalX = positions[i2] ?? 0;
+      result.push(Math.max(proportionalX, minimumX));
+    }
+    return result;
+  }
+  function justifySystem(positions, targetWidth, config) {
+    if (!config.justify || positions.length < 2) return positions;
+    const first = positions[0] ?? 0;
+    const last = positions[positions.length - 1] ?? 0;
+    const naturalWidth = last - first;
+    const extra = targetWidth - naturalWidth;
+    if (naturalWidth <= 0 || extra <= 0) return positions;
+    const gaps = [];
+    for (let i2 = 1; i2 < positions.length; i2++) {
+      gaps.push((positions[i2] ?? 0) - (positions[i2 - 1] ?? 0));
+    }
+    const result = [first];
+    let x2 = first;
+    for (const gap of gaps) {
+      const stretchedGap = gap + extra * (gap / naturalWidth);
+      x2 += stretchedGap;
+      result.push(x2);
+    }
+    return result;
+  }
+  function checkMeasureOverflow(positions, events, availableWidth) {
+    if (positions.length === 0) return void 0;
+    const first = positions[0] ?? 0;
+    const last = positions[positions.length - 1] ?? 0;
+    const lastWidth = events[events.length - 1]?.renderedWidth ?? 0;
+    const requiredWidth = last - first + lastWidth;
+    if (requiredWidth <= availableWidth) return void 0;
+    return spacingDiagnostic(
+      "warning",
+      "MEASURE_OVERFLOWS_SYSTEM_WIDTH",
+      `This measure needs ${requiredWidth.toFixed(2)} staff spaces but only ${availableWidth.toFixed(2)} are available even at minimum spacing; allowing the overflow.`
+    );
   }
 
   // src/timing/diagnostic.ts

@@ -86,6 +86,28 @@ export interface KeySignatureConfig {
   readonly style: KeySignatureStyle;
 }
 
+// ---- horizontal spacing (Phase 43, §14) ----
+
+/**
+ * §14's own published constants (LilyPond's, used as this engine's
+ * defaults -- the product of decades of real engraving practice, not
+ * invented here). `spacingIncrement` is roughly one notehead width;
+ * `shortestDurationSpace` is how many increments the reference duration
+ * itself gets. `minNoteDistance` is §14.2's own minimum-gap floor
+ * (notehead + accidentals + dots + wide articulations, plus this), a
+ * small value chosen the same way every other "reasonable small gap"
+ * default in this codebase already was (Integration C's tab mask
+ * padding, Phase 24's beam bulge, etc.) -- real, but not itself derived
+ * from a single universal source, and fully overridable for exactly
+ * that reason. `justify` disables stretching entirely per §14.3.
+ */
+export interface SpacingConfig {
+  readonly spacingIncrement: number;
+  readonly shortestDurationSpace: number;
+  readonly minNoteDistance: number;
+  readonly justify: boolean;
+}
+
 // ---- drum mapping (Phase 41) ----
 
 /**
@@ -127,6 +149,7 @@ export interface EngineConfig {
   readonly beam: BeamConfig;
   readonly barNumbers: BarNumberConfig;
   readonly keySignature: KeySignatureConfig;
+  readonly spacing: SpacingConfig;
   readonly drums: DrumsConfig;
 }
 
@@ -139,6 +162,7 @@ export interface PartialEngineConfig {
   readonly beam?: Partial<BeamConfig>;
   readonly barNumbers?: Partial<BarNumberConfig>;
   readonly keySignature?: Partial<KeySignatureConfig>;
+  readonly spacing?: Partial<SpacingConfig>;
   readonly drums?: Partial<DrumsConfig>;
 }
 
@@ -173,6 +197,12 @@ export const DEFAULT_CONFIG: EngineConfig = {
   keySignature: {
     style: 'standard',
   },
+  spacing: {
+    spacingIncrement: 1.2,
+    shortestDurationSpace: 2.0,
+    minNoteDistance: 0.5,
+    justify: true,
+  },
   drums: {},
 };
 
@@ -193,6 +223,7 @@ export function resolveConfig(overrides?: PartialEngineConfig): EngineConfig {
     beam: { ...DEFAULT_CONFIG.beam, ...overrides?.beam },
     barNumbers: { ...DEFAULT_CONFIG.barNumbers, ...overrides?.barNumbers },
     keySignature: { ...DEFAULT_CONFIG.keySignature, ...overrides?.keySignature },
+    spacing: { ...DEFAULT_CONFIG.spacing, ...overrides?.spacing },
     drums: { ...DEFAULT_CONFIG.drums, ...overrides?.drums },
   };
 }

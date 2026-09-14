@@ -14,7 +14,7 @@ after Phase 29 (end of Stage 4).
 ## A. DONE — Phases 1–42 ✅ (Stage 2 through 7 complete) + Integration Passes A & B
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 468/468 across them.
+`npm run verify` passes 486/486 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -64,6 +64,7 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | — | **Integration B** (not a numbered phase) | Every part renders (guitar tab part no longer dropped); per-staff line counts from `<staff-lines>` (tab = 6) | [`integration-b`](./integration-b-multi-part.md) |
 | — | **Integration C** (not a numbered phase) | Tab fret numbers drawn on their own string lines (multi-digit, open strings); no text-font system needed | [`integration-c`](./integration-c-tab-frets.md) |
 | — | **Integration D** (not a numbered phase) | Tempo marks (dotted-quarter-equals-BPM) assembled from real glyphs, drawn above the staff; no text-font system needed | [`integration-d`](./integration-d-tempo-marks.md) |
+| 43 | Spacing algorithm | Full §14 algorithm (reference duration, log-scale proportional spacing, min-distance, justification); not yet wired into rendering | [`phase-43`](./phase-43-spacing-algorithm.md) |
 
 **Public API today:** 137 exports from `dist/notation-engine.js`.
 
@@ -81,7 +82,6 @@ that specifies it.
 ### Stage 8 — Real layout
 | # | Phase | Spec |
 |---|---|---|
-| **43** | Spacing algorithm (replaces Phase 21's naive layout) | §14 |
 | **44** | Skyline collision avoidance | §15 |
 | **45** | Scroll layout | §16.1 |
 | **46** | Page layout + system/page breaking | §16.2 |

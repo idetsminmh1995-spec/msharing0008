@@ -1867,7 +1867,7 @@ each exercised with a purpose-built fixture pair.
 
 ---
 
-## 14. Module: `layout/spacing` — Horizontal Spacing `[TODO]`
+## 14. Module: `layout/spacing` — Horizontal Spacing `[BUILT for the full algorithm -- not yet wired into rendering, see Doc/phase-43-spacing-algorithm.md]`
 
 **Responsibility.** Decide the x-position of every event in a measure, and
 the measure's total width. Pure math; produces numbers, not SVG.
@@ -2337,15 +2337,15 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 41 | Drum mapping table + GM defaults (§13.3) | ✅ (built + wired into rendering) |
 | 42 | MIDI↔MusicXML alignment (§13.1–§13.2) | ✅ |
 
-### Stage 8 — Real layout
+### Stage 8 — Real layout `[IN PROGRESS — 43 of 47]`
 
-| Phase | What |
-|---|---|
-| 43 | Spacing algorithm (§14), replacing Phase 21's naive layout |
-| 44 | Skyline collision avoidance (§15) |
-| 45 | Scroll layout (§16.1) |
-| 46 | Page layout + system/page breaking (§16.2) |
-| 47 | Arbitrary W×H resize, incl. the O(1) pure-scale fast path (§16.3) |
+| Phase | What | Status |
+|---|---|---|
+| 43 | Spacing algorithm (§14), replacing Phase 21's naive layout | ✅ (algorithm); wiring pending |
+| 44 | Skyline collision avoidance (§15) | |
+| 45 | Scroll layout (§16.1) | |
+| 46 | Page layout + system/page breaking (§16.2) | |
+| 47 | Arbitrary W×H resize, incl. the O(1) pure-scale fast path (§16.3) | |
 
 ### Stage 9 — Playback surface
 

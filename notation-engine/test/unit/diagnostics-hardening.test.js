@@ -13,6 +13,7 @@ const SRC_DIRS = [
   path.join(__dirname, '..', '..', 'src', 'timing'),
   path.join(__dirname, '..', '..', 'src', 'timing', 'alignment'),
   path.join(__dirname, '..', '..', 'src', 'drums'),
+  path.join(__dirname, '..', '..', 'src', 'layout'),
 ];
 const TEST_UNIT_DIR = __dirname;
 
@@ -27,7 +28,7 @@ function discoverEmittedCodes() {
       if (!name.endsWith('.ts')) continue;
       const content = fs.readFileSync(path.join(dir, name), 'utf8');
       for (const m of content.matchAll(
-        /\b(?:diagnostic|midiDiagnostic|timingDiagnostic|alignmentDiagnostic|drumDiagnostic)\(\s*'\w+'\s*,\s*'([A-Z_0-9]+)'/g,
+        /\b(?:diagnostic|midiDiagnostic|timingDiagnostic|alignmentDiagnostic|drumDiagnostic|spacingDiagnostic)\(\s*'\w+'\s*,\s*'([A-Z_0-9]+)'/g,
       )) {
         codes.add(m[1]);
       }
@@ -37,7 +38,7 @@ function discoverEmittedCodes() {
 }
 
 describe('diagnostics and partial-render hardening (Phase 38, §10.7)', () => {
-  test('every diagnostic code any parser or module (MusicXML, MIDI, timing, alignment, drums) can emit is asserted SOMEWHERE across the whole test suite', () => {
+  test('every diagnostic code any parser or module (MusicXML, MIDI, timing, alignment, drums, spacing) can emit is asserted SOMEWHERE across the whole test suite', () => {
     const codes = discoverEmittedCodes();
     assert.ok(codes.length > 0, 'the scan itself found nothing -- likely a regex/path problem, not real coverage');
 
