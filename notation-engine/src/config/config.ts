@@ -108,6 +108,18 @@ export interface SpacingConfig {
   readonly justify: boolean;
 }
 
+// ---- skyline / staff distance (Phase 44, §15) ----
+
+/**
+ * §15.1's own sensible default: "around 3.5 staff spaces at minimum;
+ * generous scores use more." The skyline computes the REAL distance two
+ * adjacent staves need given their actual content; this is only the
+ * floor that applies even when both staves are otherwise empty.
+ */
+export interface StavesConfig {
+  readonly minStaffDistance: number;
+}
+
 // ---- drum mapping (Phase 41) ----
 
 /**
@@ -150,6 +162,7 @@ export interface EngineConfig {
   readonly barNumbers: BarNumberConfig;
   readonly keySignature: KeySignatureConfig;
   readonly spacing: SpacingConfig;
+  readonly staves: StavesConfig;
   readonly drums: DrumsConfig;
 }
 
@@ -163,6 +176,7 @@ export interface PartialEngineConfig {
   readonly barNumbers?: Partial<BarNumberConfig>;
   readonly keySignature?: Partial<KeySignatureConfig>;
   readonly spacing?: Partial<SpacingConfig>;
+  readonly staves?: Partial<StavesConfig>;
   readonly drums?: Partial<DrumsConfig>;
 }
 
@@ -203,6 +217,9 @@ export const DEFAULT_CONFIG: EngineConfig = {
     minNoteDistance: 0.5,
     justify: true,
   },
+  staves: {
+    minStaffDistance: 3.5,
+  },
   drums: {},
 };
 
@@ -224,6 +241,7 @@ export function resolveConfig(overrides?: PartialEngineConfig): EngineConfig {
     barNumbers: { ...DEFAULT_CONFIG.barNumbers, ...overrides?.barNumbers },
     keySignature: { ...DEFAULT_CONFIG.keySignature, ...overrides?.keySignature },
     spacing: { ...DEFAULT_CONFIG.spacing, ...overrides?.spacing },
+    staves: { ...DEFAULT_CONFIG.staves, ...overrides?.staves },
     drums: { ...DEFAULT_CONFIG.drums, ...overrides?.drums },
   };
 }

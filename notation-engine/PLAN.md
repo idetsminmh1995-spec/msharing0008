@@ -1923,7 +1923,7 @@ in for a wide chord; justification summing exactly to the target width.
 
 ---
 
-## 15. Module: `layout/skyline` — Collision Avoidance `[TODO]`
+## 15. Module: `layout/skyline` — Collision Avoidance `[BUILT for the full algorithm -- not yet wired into rendering, see Doc/phase-44-skyline-collision-avoidance.md]`
 
 **Responsibility.** Prevent overlaps *vertically*, between the staff's own
 contents and everything placed above/below it (dynamics, lyrics, chord
@@ -2337,12 +2337,12 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 41 | Drum mapping table + GM defaults (§13.3) | ✅ (built + wired into rendering) |
 | 42 | MIDI↔MusicXML alignment (§13.1–§13.2) | ✅ |
 
-### Stage 8 — Real layout `[IN PROGRESS — 43 of 47]`
+### Stage 8 — Real layout `[IN PROGRESS — 44 of 47]`
 
 | Phase | What | Status |
 |---|---|---|
 | 43 | Spacing algorithm (§14), replacing Phase 21's naive layout | ✅ (algorithm); wiring pending |
-| 44 | Skyline collision avoidance (§15) | |
+| 44 | Skyline collision avoidance (§15) | ✅ (algorithm); wiring pending |
 | 45 | Scroll layout (§16.1) | |
 | 46 | Page layout + system/page breaking (§16.2) | |
 | 47 | Arbitrary W×H resize, incl. the O(1) pure-scale fast path (§16.3) | |

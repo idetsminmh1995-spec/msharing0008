@@ -44,7 +44,9 @@ var NotationEngine = (() => {
     TREBLE_CLEF: () => TREBLE_CLEF,
     accidentalGlyphName: () => accidentalGlyphName,
     accidentalX: () => accidentalX,
+    addToSkyline: () => addToSkyline,
     alignNotes: () => alignNotes,
+    alignedGroupY: () => alignedGroupY,
     alignmentDiagnostic: () => alignmentDiagnostic,
     applyMinimumDistance: () => applyMinimumDistance,
     applyTuplet: () => applyTuplet,
@@ -80,6 +82,7 @@ var NotationEngine = (() => {
     computeProportionalPositions: () => computeProportionalPositions,
     computeReferenceDuration: () => computeReferenceDuration,
     computeSlurShape: () => computeSlurShape,
+    computeStaffDistance: () => computeStaffDistance,
     computeStaffGeometry: () => computeStaffGeometry,
     computeStemLength: () => computeStemLength,
     computeSystemLayout: () => computeSystemLayout,
@@ -99,6 +102,7 @@ var NotationEngine = (() => {
     durationTypeAndDotsFromTicks: () => durationTypeAndDotsFromTicks,
     dynamicGlyphName: () => dynamicGlyphName,
     dynamicSide: () => dynamicSide,
+    emptySkyline: () => emptySkyline,
     escapeXmlText: () => escapeXmlText,
     evaluateAccidental: () => evaluateAccidental,
     flagGlyphName: () => flagGlyphName,
@@ -130,6 +134,7 @@ var NotationEngine = (() => {
     metronomeNoteGlyphName: () => metronomeNoteGlyphName,
     middleLineY: () => middleLineY,
     midiDiagnostic: () => midiDiagnostic,
+    minDistance: () => minDistance,
     multiMeasureRestGlyphName: () => multiMeasureRestGlyphName,
     musicXmlNoteheadToShape: () => musicXmlNoteheadToShape,
     naiveMeasureLayout: () => naiveMeasureLayout,
@@ -147,6 +152,7 @@ var NotationEngine = (() => {
     parseMusicXml: () => parseMusicXml,
     part: () => part,
     pitchedPitch: () => pitchedPitch,
+    placeElement: () => placeElement,
     positionToTick: () => positionToTick,
     readVariableLengthQuantity: () => readVariableLengthQuantity,
     rehearsalMarkSide: () => rehearsalMarkSide,
@@ -59362,6 +59368,9 @@ ${denominator}`;
       minNoteDistance: 0.5,
       justify: true
     },
+    staves: {
+      minStaffDistance: 3.5
+    },
     drums: {}
   };
   function resolveConfig(overrides) {
@@ -59374,6 +59383,7 @@ ${denominator}`;
       barNumbers: { ...DEFAULT_CONFIG.barNumbers, ...overrides?.barNumbers },
       keySignature: { ...DEFAULT_CONFIG.keySignature, ...overrides?.keySignature },
       spacing: { ...DEFAULT_CONFIG.spacing, ...overrides?.spacing },
+      staves: { ...DEFAULT_CONFIG.staves, ...overrides?.staves },
       drums: { ...DEFAULT_CONFIG.drums, ...overrides?.drums }
     };
   }
@@ -61051,6 +61061,99 @@ ${denominator}`;
       "MEASURE_OVERFLOWS_SYSTEM_WIDTH",
       `This measure needs ${requiredWidth.toFixed(2)} staff spaces but only ${availableWidth.toFixed(2)} are available even at minimum spacing; allowing the overflow.`
     );
+  }
+
+  // src/layout/skyline.ts
+  function emptySkyline(side) {
+    return { side, segments: [] };
+  }
+  function moreExtreme(side, a, b) {
+    return side === "north" ? Math.min(a, b) : Math.max(a, b);
+  }
+  function addToSkyline(skyline, shape) {
+    if (shape.xEnd <= shape.xStart) return skyline;
+    const boundaries = /* @__PURE__ */ new Set([shape.xStart, shape.xEnd]);
+    for (const seg of skyline.segments) {
+      boundaries.add(seg.xStart);
+      boundaries.add(seg.xEnd);
+    }
+    const sorted = [...boundaries].sort((a, b) => a - b);
+    const rawSegments = [];
+    for (let i2 = 0; i2 < sorted.length - 1; i2++) {
+      const xStart = sorted[i2];
+      const xEnd = sorted[i2 + 1];
+      if (xStart === void 0 || xEnd === void 0 || xEnd <= xStart) continue;
+      const existing = skyline.segments.find((s) => s.xStart <= xStart && s.xEnd >= xEnd);
+      const shapeCoversHere = shape.xStart <= xStart && shape.xEnd >= xEnd;
+      let y;
+      if (existing !== void 0 && shapeCoversHere) {
+        y = moreExtreme(skyline.side, existing.y, shape.y);
+      } else if (existing !== void 0) {
+        y = existing.y;
+      } else if (shapeCoversHere) {
+        y = shape.y;
+      }
+      if (y !== void 0) rawSegments.push({ xStart, xEnd, y });
+    }
+    const merged = [];
+    for (const seg of rawSegments) {
+      const last = merged[merged.length - 1];
+      if (last !== void 0 && last.xEnd === seg.xStart && last.y === seg.y) {
+        merged[merged.length - 1] = { xStart: last.xStart, xEnd: seg.xEnd, y: seg.y };
+      } else {
+        merged.push(seg);
+      }
+    }
+    return { side: skyline.side, segments: merged };
+  }
+  function minDistance(a, b) {
+    let result;
+    for (const segA of a.segments) {
+      for (const segB of b.segments) {
+        const xStart = Math.max(segA.xStart, segB.xStart);
+        const xEnd = Math.min(segA.xEnd, segB.xEnd);
+        if (xEnd <= xStart) continue;
+        const gap = segB.y - segA.y;
+        result = result === void 0 ? gap : Math.min(result, gap);
+      }
+    }
+    return result;
+  }
+
+  // src/layout/skyline-placement.ts
+  function placeElement(skyline, xStart, xEnd, defaultY, padding) {
+    let y = defaultY;
+    for (const seg of skyline.segments) {
+      const overlapStart = Math.max(seg.xStart, xStart);
+      const overlapEnd = Math.min(seg.xEnd, xEnd);
+      if (overlapEnd <= overlapStart) continue;
+      if (skyline.side === "north") {
+        const requiredY = seg.y - padding;
+        if (y > requiredY) y = requiredY;
+      } else {
+        const requiredY = seg.y + padding;
+        if (y < requiredY) y = requiredY;
+      }
+    }
+    return { y, skyline: addToSkyline(skyline, { xStart, xEnd, y }) };
+  }
+  function alignedGroupY(side, memberYs) {
+    if (memberYs.length === 0) {
+      throw new Error("alignedGroupY needs at least one member y value.");
+    }
+    return side === "north" ? Math.min(...memberYs) : Math.max(...memberYs);
+  }
+  function computeStaffDistance(upperSouth, lowerNorth, minStaffDistance) {
+    let required = 0;
+    for (const segA of upperSouth.segments) {
+      for (const segB of lowerNorth.segments) {
+        const xStart = Math.max(segA.xStart, segB.xStart);
+        const xEnd = Math.min(segA.xEnd, segB.xEnd);
+        if (xEnd <= xStart) continue;
+        required = Math.max(required, segA.y + segB.y);
+      }
+    }
+    return Math.max(minStaffDistance, required);
   }
 
   // src/timing/diagnostic.ts

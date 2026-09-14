@@ -73,6 +73,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`integration-c-tab-frets.md`](./integration-c-tab-frets.md) | Integration C: tab fret numbers drawn on their string lines (no text-font system needed after all) |
 | [`integration-d-tempo-marks.md`](./integration-d-tempo-marks.md) | Integration D: tempo marks drawn above the staff from real glyphs (no text-font system needed after all) |
 | [`phase-43-spacing-algorithm.md`](./phase-43-spacing-algorithm.md) | Phase 43 real spacing algorithm (§14, LilyPond-derived constants); not yet wired into rendering |
+| [`phase-44-skyline-collision-avoidance.md`](./phase-44-skyline-collision-avoidance.md) | Phase 44 skyline collision avoidance (§15); found+fixed a real staff-distance formula bug; not yet wired into rendering |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file
