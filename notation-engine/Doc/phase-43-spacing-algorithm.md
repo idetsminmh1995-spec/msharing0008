@@ -1,10 +1,12 @@
 # Phase 43 — Horizontal Spacing Algorithm
 
 **Status:** the full `§14` algorithm is built and tested against every
-requirement `§14` itself names. 486/486 tests pass. **Not wired into
-`renderFromMusicXml`** — see §3 for why, matching the established
-precedent of building a substantial algorithm/geometry module fully
-before attempting an invasive rendering-pipeline integration.
+requirement `§14` itself names. 486/486 tests pass at the time this
+phase was built. **Wired into `renderFromMusicXml` by Integration Pass
+E** — see `Doc/integration-e-spacing-wiring.md` for the wiring itself,
+the real bug it found and fixed (chord events silently excluded from
+spacing), and its own stated limitations (approximate note widths, no
+justification without Phase 46's page breaking).
 
 Starts Stage 8 (Real layout), replacing Phase 21's deliberately naive,
 fixed-width measure layout — whose own docstring already said plainly
@@ -107,7 +109,23 @@ Ran `npm run verify` clean, **486/486** (18 new tests). Every test
 Also extended Phase 38's dynamic diagnostic-coverage checker to scan
 `layout/` too -- no gaps found.
 
-## 3. Known limitation: not wired into `renderFromMusicXml`
+## 3. Update: now wired (Integration Pass E)
+
+The reasoning below explains why wiring was deliberately deferred when
+this phase was first built. It has since been done — see
+`Doc/integration-e-spacing-wiring.md`. In the end the "genuinely
+different rendering architecture" concern was resolved with a lighter
+touch than expected: rather than a full two-pass render with exact
+glyph widths known ahead of drawing, a single pre-pass per measure
+estimates each event's width well enough for `§14.2`'s minimum-distance
+pass, computes the real position map once, and the existing single-pass
+draw loop looks positions up from it. The original concern about
+rushing this (Integration D's own regression is cited below) proved
+well-founded in a smaller way: wiring this in surfaced a real bug (chord
+events excluded from the position map), caught by testing before it
+shipped.
+
+Original reasoning, kept for the record:
 
 Wiring this properly would require a genuinely different rendering
 architecture than the one every phase since Phase 21 has built on: every

@@ -61721,6 +61721,54 @@ ${denominator}`;
   var BACKGROUND_COLOR = "#ffffff";
   var PX_PER_STAFF_SPACE = 20;
   var MEASURE_WIDTH = 24;
+  var SPACING_CONFIG = {
+    spacingIncrement: 1.2,
+    shortestDurationSpace: 2,
+    minNoteDistance: 0.5,
+    justify: false
+  };
+  var ESTIMATED_NOTEHEAD_WIDTH = 1;
+  var ESTIMATED_ACCIDENTAL_ALLOWANCE = 1;
+  var MEASURE_TRAILING_MARGIN = 2;
+  var MEASURE_HEADER_ALLOWANCE = 4;
+  function computeMeasureLayout(measure2, measureTicks) {
+    const hasAccidentalByTick = /* @__PURE__ */ new Map();
+    for (const voice2 of measure2.voices) {
+      const starts = eventStartTicks(voice2.events);
+      voice2.events.forEach((event, idx) => {
+        if (event.kind !== "note" && event.kind !== "chord" && event.kind !== "rest") return;
+        const tick = starts[idx] ?? 0;
+        const hasAccidental = event.kind === "note" ? event.pitch.kind === "pitched" && event.pitch.alter !== 0 || event.hasExplicitAccidental === true : event.kind === "chord" ? event.notes.some(
+          (n) => n.pitch.kind === "pitched" && n.pitch.alter !== 0 || n.hasExplicitAccidental === true
+        ) : false;
+        hasAccidentalByTick.set(tick, (hasAccidentalByTick.get(tick) ?? false) || hasAccidental);
+      });
+    }
+    const ticks = [...hasAccidentalByTick.keys()].sort((a, b) => a - b);
+    if (ticks.length === 0) {
+      return { width: MEASURE_WIDTH, positionsByTick: /* @__PURE__ */ new Map() };
+    }
+    const spacingEvents = ticks.map((tick, i2) => {
+      const nextTick = i2 + 1 < ticks.length ? ticks[i2 + 1] ?? measureTicks : measureTicks;
+      const gapTicks = Math.max(1, nextTick - tick);
+      const width2 = ESTIMATED_NOTEHEAD_WIDTH + (hasAccidentalByTick.get(tick) === true ? ESTIMATED_ACCIDENTAL_ALLOWANCE : 0);
+      return { ticks: gapTicks, renderedWidth: width2 };
+    });
+    const referenceTicks = computeReferenceDuration(spacingEvents, TICKS_PER_QUARTER);
+    const proportional = computeProportionalPositions(spacingEvents, referenceTicks, SPACING_CONFIG);
+    const enforced = applyMinimumDistance(proportional, spacingEvents, SPACING_CONFIG);
+    const positionsByTick = /* @__PURE__ */ new Map();
+    ticks.forEach((tick, i2) => {
+      positionsByTick.set(tick, enforced[i2] ?? 0);
+    });
+    const lastX = enforced[enforced.length - 1] ?? 0;
+    const lastWidth = spacingEvents[spacingEvents.length - 1]?.renderedWidth ?? 0;
+    const width = Math.max(
+      MEASURE_WIDTH * 0.3,
+      MEASURE_HEADER_ALLOWANCE + lastX + lastWidth + MEASURE_TRAILING_MARGIN
+    );
+    return { width, positionsByTick };
+  }
   var LEDGER_EXTENSION_FALLBACK = 0.4;
   var LEDGER_THICKNESS_FALLBACK = 0.16;
   var STEM_THICKNESS_FALLBACK = 0.12;
@@ -62107,9 +62155,21 @@ ${denominator}`;
     const svgParts = [];
     let totalWidth = MEASURE_WIDTH;
     score2.parts.forEach((part2, partIndex) => {
-      const layouts = naiveMeasureLayout(part2.measures.length, MEASURE_WIDTH);
+      const measureLayoutsByNumber = /* @__PURE__ */ new Map();
+      let cumulativeX = 0;
+      const layouts = [];
+      for (const measure2 of part2.measures) {
+        const attrs = attributes.find(
+          (a) => a.partId === part2.id && a.measureNumber === measure2.number
+        );
+        const measureTicks = attrs !== void 0 ? attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER : TICKS_PER_QUARTER * 4;
+        const measureLayout = computeMeasureLayout(measure2, measureTicks);
+        measureLayoutsByNumber.set(measure2.number, measureLayout);
+        layouts.push({ measureNumber: measure2.number, x: cumulativeX, width: measureLayout.width });
+        cumulativeX += measureLayout.width;
+      }
       const lastLayout = layouts[layouts.length - 1];
-      const partWidth = lastLayout !== void 0 ? lastLayout.x + MEASURE_WIDTH : MEASURE_WIDTH;
+      const partWidth = lastLayout !== void 0 ? lastLayout.x + lastLayout.width : MEASURE_WIDTH;
       totalWidth = Math.max(totalWidth, partWidth);
       const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part2.id);
       const accidentalStateByStaff = /* @__PURE__ */ new Map();
@@ -62239,8 +62299,8 @@ ${denominator}`;
           accidentalStateByStaff.set(staffNumber, accidentalState);
           if (clefDef.positionsByPitch) {
             const ctx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart };
-            const noteAreaX = Math.max(layout.x + layout.width * 0.25, cursorX);
-            const noteAreaWidth = layout.x + layout.width - noteAreaX;
+            const noteAreaX = Math.max(layout.x + MEASURE_HEADER_ALLOWANCE, cursorX);
+            const measureLayout = measureLayoutsByNumber.get(measure2.number);
             const isMultiVoice = measure2.voices.length > 1;
             for (const voice2 of measure2.voices) {
               const forcedDirection = isMultiVoice ? voiceForcedDirection(voice2.id) : void 0;
@@ -62248,9 +62308,11 @@ ${denominator}`;
               let pendingTie;
               const starts = eventStartTicks(voice2.events);
               const total = totalTicks(voice2.events) || 1;
+              const fallbackNoteAreaWidth = layout.x + layout.width - noteAreaX;
               const eventXs = voice2.events.map((_, idx) => {
                 const startTick = starts[idx] ?? 0;
-                return noteAreaX + startTick / total * noteAreaWidth;
+                const realX = measureLayout?.positionsByTick.get(startTick);
+                return realX !== void 0 ? noteAreaX + realX : noteAreaX + startTick / total * fallbackNoteAreaWidth;
               });
               const beamableEvents = voice2.events.map((event) => ({
                 durationType: event.duration.type,
@@ -62331,8 +62393,9 @@ ${denominator}`;
               });
             }
           } else if (clefDef.name === "tab") {
-            const noteAreaX = Math.max(layout.x + layout.width * 0.25, cursorX);
-            const noteAreaWidth = layout.x + layout.width - noteAreaX;
+            const noteAreaX = Math.max(layout.x + MEASURE_HEADER_ALLOWANCE, cursorX);
+            const fallbackNoteAreaWidth = layout.x + layout.width - noteAreaX;
+            const measureLayout = measureLayoutsByNumber.get(measure2.number);
             for (const voice2 of measure2.voices) {
               const starts = eventStartTicks(voice2.events);
               const total = totalTicks(voice2.events) || 1;
@@ -62360,7 +62423,9 @@ ${denominator}`;
                   });
                   return;
                 }
-                const eventX = noteAreaX + (starts[idx] ?? 0) / total * noteAreaWidth;
+                const startTick = starts[idx] ?? 0;
+                const realX = measureLayout?.positionsByTick.get(startTick);
+                const eventX = realX !== void 0 ? noteAreaX + realX : noteAreaX + startTick / total * fallbackNoteAreaWidth;
                 svgParts.push(
                   renderTabNumber(fretDigitGlyphNames(event.fret), {
                     x: eventX,

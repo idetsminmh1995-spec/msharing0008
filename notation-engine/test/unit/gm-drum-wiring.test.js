@@ -31,10 +31,10 @@ describe('GM drum mapping wired into rendering (Phase 41, §13.1/§13.3)', () =>
 
   test("the kick (GM 36) renders as a plain oval, at the kick's own staff position, stem DOWN (feet convention)", () => {
     const { svg } = render();
-    assert.match(svg, /x="10\.5" y="7\.5"[^>]*>\uE0A4/);
+    assert.match(svg, /x="8\.4" y="7\.5"[^>]*>\uE0A4/);
     const stems = [
       ...svg.matchAll(
-        /<line x1="10\.5" y1="([\d.]+)" x2="10\.5" y2="([\d.]+)" stroke="#000000" stroke-width="0\.12"/g,
+        /<line x1="8\.4" y1="([\d.]+)" x2="8\.4" y2="([\d.]+)" stroke="#000000" stroke-width="0\.12"/g,
       ),
     ];
     assert.equal(stems.length, 1);
@@ -43,7 +43,7 @@ describe('GM drum mapping wired into rendering (Phase 41, §13.1/§13.3)', () =>
 
   test("the closed hi-hat (GM 42) renders as an X notehead, at the hi-hat's own (much higher) staff position, stem up", () => {
     const { svg } = render();
-    assert.match(svg, /x="15" y="4"[^>]*>\uE0A9/);
+    assert.match(svg, /x="10\.8" y="4"[^>]*>\uE0A9/);
   });
 
   test('an explicit <notehead> override still wins over the GM-derived shape (priority order preserved)', () => {

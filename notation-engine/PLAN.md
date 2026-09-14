@@ -1867,7 +1867,7 @@ each exercised with a purpose-built fixture pair.
 
 ---
 
-## 14. Module: `layout/spacing` — Horizontal Spacing `[BUILT for the full algorithm -- not yet wired into rendering, see Doc/phase-43-spacing-algorithm.md]`
+## 14. Module: `layout/spacing` — Horizontal Spacing `[BUILT and WIRED into rendering by Integration E -- see Doc/integration-e-spacing-wiring.md]`
 
 **Responsibility.** Decide the x-position of every event in a measure, and
 the measure's total width. Pure math; produces numbers, not SVG.
@@ -2341,7 +2341,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 
 | Phase | What | Status |
 |---|---|---|
-| 43 | Spacing algorithm (§14), replacing Phase 21's naive layout | ✅ (algorithm); wiring pending |
+| 43 | Spacing algorithm (§14), replacing Phase 21's naive layout | ✅ (algorithm + wired into rendering by Integration E) |
 | 44 | Skyline collision avoidance (§15) | ✅ (algorithm); wiring pending |
 | 45 | Scroll layout (§16.1) | |
 | 46 | Page layout + system/page breaking (§16.2) | |

@@ -1,10 +1,11 @@
 # Phase 44 — Skyline Collision Avoidance
 
 **Status:** the full `§15` algorithm is built and tested against every
-requirement `§15` itself names. 505/505 tests pass. **Not wired into
-rendering** — same reasoning as Phase 43: this is the algorithm, and
-wiring it into `renderFromMusicXml` is a larger, separately-scoped
-integration.
+requirement `§15` itself names. 505/505 tests pass. **Not yet consumed
+by rendering** — Integration Pass E wired Phase 43's spacing (horizontal)
+into `renderFromMusicXml`, but this phase's skyline (vertical collision
+avoidance) remains unwired; see `Doc/integration-e-spacing-wiring.md`
+§4/§5 for the current state and what wiring it in next would involve.
 
 Continues Stage 8 (Real layout), following Phase 43's spacing algorithm.
 

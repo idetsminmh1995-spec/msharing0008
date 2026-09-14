@@ -1,4 +1,4 @@
-import type { Chord, MeasureEvent, Note, Rest } from './core/index.js';
+import type { Chord, Measure, MeasureEvent, Note, Rest } from './core/index.js';
 import { getEngravingDefault, getGlyph } from './glyphs/index.js';
 import {
   ALTO_CLEF,
@@ -61,7 +61,12 @@ import { computeBraceShape, needsBrace, needsContinuousBarline } from './geometr
 import { renderBrace } from './render/index.js';
 import type { Diagnostic, MeasureAttributes } from './parser/index.js';
 import { parseMusicXml, type ParseMusicXmlOptions } from './parser/index.js';
-import { naiveMeasureLayout } from './layout/index.js';
+import {
+  computeReferenceDuration,
+  computeProportionalPositions,
+  applyMinimumDistance,
+  type SpacingEvent,
+} from './layout/spacing.js';
 import {
   createSvgDocument,
   renderAccidental,
@@ -90,6 +95,118 @@ const INK_COLOR = '#000000';
 const BACKGROUND_COLOR = '#ffffff';
 const PX_PER_STAFF_SPACE = 20;
 const MEASURE_WIDTH = 24;
+
+// Phase 43/44 wiring: real Sec14 spacing constants, matching
+// config/config.ts's own SpacingConfig defaults. Not threaded through
+// as an actual EngineConfig parameter -- RenderFromMusicXmlOptions
+// currently accepts only domParser, and widening that public surface
+// is a separate decision from wiring the algorithm itself.
+const SPACING_CONFIG = {
+  spacingIncrement: 1.2,
+  shortestDurationSpace: 2.0,
+  minNoteDistance: 0.5,
+  justify: false,
+};
+/** A rough per-note width estimate for Sec14.2's minimum-distance pass -- notehead alone, or notehead+accidental-allowance. Real per-glyph widths would need sharing the accidental-DISPLAY state (not just the pitch's own alter) between a measurement pass and the render pass; this stays a documented approximation rather than duplicating that state. */
+const ESTIMATED_NOTEHEAD_WIDTH = 1.0;
+const ESTIMATED_ACCIDENTAL_ALLOWANCE = 1.0;
+/** Trailing room after a measure's last event, so it isn't flush against the barline. */
+const MEASURE_TRAILING_MARGIN = 2.0;
+/**
+ * Reserved space at the start of EVERY measure for a possible clef/key/
+ * time-signature header, even on a measure that doesn't actually draw
+ * one. Simpler and safer than computing the real header width per
+ * measure (which would need duplicating the isFirstMeasure/clefChanged/
+ * keyChanged/timeChanged logic here before it's otherwise needed) at
+ * the cost of some wasted blank space on ordinary measures -- stated
+ * directly as a limitation rather than silently accepted.
+ */
+const MEASURE_HEADER_ALLOWANCE = 4.0;
+
+/**
+ * Phase 43/44 wiring: a measure's REAL, content-driven width and the
+ * real x-position of every distinct tick within it -- replacing
+ * Phase 21's fixed MEASURE_WIDTH and the old tick-fraction interpolation
+ * that used to serve every voice and every staff alike.
+ *
+ * Built from EVERY voice across EVERY staff of the measure combined
+ * (not staff-by-staff): Sec14's spacing is one shared horizontal
+ * timeline for the whole measure, and computing it once here is what
+ * keeps a bass-staff note aligned under the treble-staff note it
+ * sounds with, exactly as the old per-staff-but-tick-identical formula
+ * already did.
+ */
+function computeMeasureLayout(
+  measure: Measure,
+  measureTicks: number,
+): { readonly width: number; readonly positionsByTick: ReadonlyMap<number, number> } {
+  const hasAccidentalByTick = new Map<number, boolean>();
+  for (const voice of measure.voices) {
+    const starts = eventStartTicks(voice.events);
+    voice.events.forEach((event, idx) => {
+      // Phase 43/44 wiring: a chord needs a spacing entry exactly like a
+      // single note does -- it occupies its own attack point on the
+      // shared timeline, and its own accidental allowance is whichever
+      // of its member notes needs one. A rest also occupies its own
+      // attack point (it still needs to be DRAWN somewhere consistent
+      // with the rest of the measure's real spacing), just with no
+      // accidental to account for. Missing the chord case was a real bug
+      // caught by testing: a chord's own tick simply never entered the
+      // position map, leaving it (and the note colliding with it) both
+      // falling back to the old formula.
+      if (event.kind !== 'note' && event.kind !== 'chord' && event.kind !== 'rest') return;
+      const tick = starts[idx] ?? 0;
+      const hasAccidental =
+        event.kind === 'note'
+          ? (event.pitch.kind === 'pitched' && event.pitch.alter !== 0) ||
+            event.hasExplicitAccidental === true
+          : event.kind === 'chord'
+            ? event.notes.some(
+                (n) =>
+                  (n.pitch.kind === 'pitched' && n.pitch.alter !== 0) ||
+                  n.hasExplicitAccidental === true,
+              )
+            : false;
+      hasAccidentalByTick.set(tick, (hasAccidentalByTick.get(tick) ?? false) || hasAccidental);
+    });
+  }
+
+  const ticks = [...hasAccidentalByTick.keys()].sort((a, b) => a - b);
+  if (ticks.length === 0) {
+    return { width: MEASURE_WIDTH, positionsByTick: new Map() };
+  }
+
+  // Sec14's "duration" for spacing purposes, generalized to multiple
+  // voices sharing one axis: the gap to the NEXT distinct attack point
+  // (or to the measure's own end, for the last one) -- not each note's
+  // own written duration, which can differ across simultaneous voices.
+  const spacingEvents: SpacingEvent[] = ticks.map((tick, i) => {
+    const nextTick = i + 1 < ticks.length ? (ticks[i + 1] ?? measureTicks) : measureTicks;
+    const gapTicks = Math.max(1, nextTick - tick);
+    const width =
+      ESTIMATED_NOTEHEAD_WIDTH +
+      (hasAccidentalByTick.get(tick) === true ? ESTIMATED_ACCIDENTAL_ALLOWANCE : 0);
+    return { ticks: gapTicks, renderedWidth: width };
+  });
+
+  const referenceTicks = computeReferenceDuration(spacingEvents, TICKS_PER_QUARTER);
+  const proportional = computeProportionalPositions(spacingEvents, referenceTicks, SPACING_CONFIG);
+  const enforced = applyMinimumDistance(proportional, spacingEvents, SPACING_CONFIG);
+
+  const positionsByTick = new Map<number, number>();
+  ticks.forEach((tick, i) => {
+    positionsByTick.set(tick, enforced[i] ?? 0);
+  });
+
+  const lastX = enforced[enforced.length - 1] ?? 0;
+  const lastWidth = spacingEvents[spacingEvents.length - 1]?.renderedWidth ?? 0;
+  const width = Math.max(
+    MEASURE_WIDTH * 0.3,
+    MEASURE_HEADER_ALLOWANCE + lastX + lastWidth + MEASURE_TRAILING_MARGIN,
+  );
+
+  return { width, positionsByTick };
+}
 const LEDGER_EXTENSION_FALLBACK = 0.4;
 const LEDGER_THICKNESS_FALLBACK = 0.16;
 const STEM_THICKNESS_FALLBACK = 0.12;
@@ -660,9 +777,36 @@ export function renderFromMusicXml(
   let totalWidth = MEASURE_WIDTH;
 
   score.parts.forEach((part, partIndex) => {
-    const layouts = naiveMeasureLayout(part.measures.length, MEASURE_WIDTH);
+    // Phase 43/44 wiring: each measure's own real, content-driven width
+    // and per-tick position map -- computed once per part, up front,
+    // replacing naiveMeasureLayout's fixed-width assumption. Needs each
+    // measure's own real length (from its own time signature) to give
+    // the LAST event reasonable trailing space.
+    const measureLayoutsByNumber = new Map<
+      number,
+      { readonly width: number; readonly positionsByTick: ReadonlyMap<number, number> }
+    >();
+    let cumulativeX = 0;
+    const layouts: {
+      readonly measureNumber: number;
+      readonly x: number;
+      readonly width: number;
+    }[] = [];
+    for (const measure of part.measures) {
+      const attrs = attributes.find(
+        (a) => a.partId === part.id && a.measureNumber === measure.number,
+      );
+      const measureTicks =
+        attrs !== undefined
+          ? attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER
+          : TICKS_PER_QUARTER * 4;
+      const measureLayout = computeMeasureLayout(measure, measureTicks);
+      measureLayoutsByNumber.set(measure.number, measureLayout);
+      layouts.push({ measureNumber: measure.number, x: cumulativeX, width: measureLayout.width });
+      cumulativeX += measureLayout.width;
+    }
     const lastLayout = layouts[layouts.length - 1];
-    const partWidth = lastLayout !== undefined ? lastLayout.x + MEASURE_WIDTH : MEASURE_WIDTH;
+    const partWidth = lastLayout !== undefined ? lastLayout.x + lastLayout.width : MEASURE_WIDTH;
     totalWidth = Math.max(totalWidth, partWidth);
 
     // Phase 41: this part's own GM instrument map, if any -- used to look
@@ -844,8 +988,11 @@ export function renderFromMusicXml(
 
         if (clefDef.positionsByPitch) {
           const ctx: RenderCtx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart };
-          const noteAreaX = Math.max(layout.x + layout.width * 0.25, cursorX);
-          const noteAreaWidth = layout.x + layout.width - noteAreaX;
+          // Phase 43/44 wiring: the header allowance every measure reserves
+          // (see computeMeasureLayout), not a fraction of this measure's
+          // own (now content-driven, no longer fixed) width.
+          const noteAreaX = Math.max(layout.x + MEASURE_HEADER_ALLOWANCE, cursorX);
+          const measureLayout = measureLayoutsByNumber.get(measure.number);
           // §9.14: forced stem direction only applies once a staff genuinely
           // has multiple voices sharing it -- a single voice keeps ordinary
           // automatic direction (renderNoteOrRest/renderChord/renderBeamGroup
@@ -864,9 +1011,19 @@ export function renderFromMusicXml(
             let pendingTie: { x: number; y: number; direction: StemDirection } | undefined;
             const starts = eventStartTicks(voice.events);
             const total = totalTicks(voice.events) || 1;
+            // Phase 43/44 wiring: a real, content-driven position for every
+            // tick that has an event ANYWHERE in the measure (computed once,
+            // shared across every voice and staff of this measure -- see
+            // computeMeasureLayout). Falls back to the old tick-fraction
+            // formula only if this measure had no notes at all to build a
+            // real map from (computeMeasureLayout's own empty-measure case).
+            const fallbackNoteAreaWidth = layout.x + layout.width - noteAreaX;
             const eventXs = voice.events.map((_, idx) => {
               const startTick = starts[idx] ?? 0;
-              return noteAreaX + (startTick / total) * noteAreaWidth;
+              const realX = measureLayout?.positionsByTick.get(startTick);
+              return realX !== undefined
+                ? noteAreaX + realX
+                : noteAreaX + (startTick / total) * fallbackNoteAreaWidth;
             });
 
             // Phase 23 grouping: treat a rest, a chord, OR a grace note as
@@ -990,8 +1147,9 @@ export function renderFromMusicXml(
           // by pitch. The horizontal timeline is computed exactly as the
           // pitched branch does, so a tab staff stays aligned under the
           // notation staff it accompanies.
-          const noteAreaX = Math.max(layout.x + layout.width * 0.25, cursorX);
-          const noteAreaWidth = layout.x + layout.width - noteAreaX;
+          const noteAreaX = Math.max(layout.x + MEASURE_HEADER_ALLOWANCE, cursorX);
+          const fallbackNoteAreaWidth = layout.x + layout.width - noteAreaX;
+          const measureLayout = measureLayoutsByNumber.get(measure.number);
 
           for (const voice of measure.voices) {
             const starts = eventStartTicks(voice.events);
@@ -1026,7 +1184,12 @@ export function renderFromMusicXml(
                 return;
               }
 
-              const eventX = noteAreaX + ((starts[idx] ?? 0) / total) * noteAreaWidth;
+              const startTick = starts[idx] ?? 0;
+              const realX = measureLayout?.positionsByTick.get(startTick);
+              const eventX =
+                realX !== undefined
+                  ? noteAreaX + realX
+                  : noteAreaX + (startTick / total) * fallbackNoteAreaWidth;
               svgParts.push(
                 renderTabNumber(fretDigitGlyphNames(event.fret), {
                   x: eventX,
