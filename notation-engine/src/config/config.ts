@@ -120,6 +120,25 @@ export interface StavesConfig {
   readonly minStaffDistance: number;
 }
 
+// ---- page geometry (Phase 46, §16.2) ----
+
+/**
+ * §16.2's own requirement: "page geometry (size, margins) comes from
+ * `config.page`." Defaults match a standard A4 page in staff spaces at
+ * a typical engraving scale (roughly 7mm per staff space, the same
+ * scale most notation software defaults to) -- a reasonable starting
+ * point, fully overridable, the same way every other config default in
+ * this codebase already is.
+ */
+export interface PageConfig {
+  readonly pageWidth: number;
+  readonly pageHeight: number;
+  readonly marginTop: number;
+  readonly marginBottom: number;
+  readonly marginLeft: number;
+  readonly marginRight: number;
+}
+
 // ---- drum mapping (Phase 41) ----
 
 /**
@@ -163,6 +182,7 @@ export interface EngineConfig {
   readonly keySignature: KeySignatureConfig;
   readonly spacing: SpacingConfig;
   readonly staves: StavesConfig;
+  readonly page: PageConfig;
   readonly drums: DrumsConfig;
 }
 
@@ -177,6 +197,7 @@ export interface PartialEngineConfig {
   readonly keySignature?: Partial<KeySignatureConfig>;
   readonly spacing?: Partial<SpacingConfig>;
   readonly staves?: Partial<StavesConfig>;
+  readonly page?: Partial<PageConfig>;
   readonly drums?: Partial<DrumsConfig>;
 }
 
@@ -220,6 +241,16 @@ export const DEFAULT_CONFIG: EngineConfig = {
   staves: {
     minStaffDistance: 3.5,
   },
+  page: {
+    // A4 (210mm x 297mm) at roughly 7mm per staff space -- a common
+    // engraving scale, not a universal standard; fully overridable.
+    pageWidth: 30,
+    pageHeight: 42,
+    marginTop: 3,
+    marginBottom: 3,
+    marginLeft: 2.5,
+    marginRight: 2.5,
+  },
   drums: {},
 };
 
@@ -242,6 +273,7 @@ export function resolveConfig(overrides?: PartialEngineConfig): EngineConfig {
     keySignature: { ...DEFAULT_CONFIG.keySignature, ...overrides?.keySignature },
     spacing: { ...DEFAULT_CONFIG.spacing, ...overrides?.spacing },
     staves: { ...DEFAULT_CONFIG.staves, ...overrides?.staves },
+    page: { ...DEFAULT_CONFIG.page, ...overrides?.page },
     drums: { ...DEFAULT_CONFIG.drums, ...overrides?.drums },
   };
 }

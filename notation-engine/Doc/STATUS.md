@@ -14,7 +14,7 @@ after Phase 29 (end of Stage 4).
 ## A. DONE — Phases 1–42 ✅ (Stage 2 through 7 complete) + Integration Passes A & B
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 525/525 across them.
+`npm run verify` passes 537/537 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -69,6 +69,7 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | — | **Integration E** (not a numbered phase) | Wired Phase 43's spacing into rendering (real content-driven note positions, replacing fixed-width layout); found+fixed a real chord-exclusion bug while testing | [`integration-e`](./integration-e-spacing-wiring.md) |
 | — | **Integration F** (not a numbered phase) | Wired Phase 44's skyline into grand-staff distance (content-aware gap, confirmed growing from 8 to 16 on real crossing-hands content) | [`integration-f`](./integration-f-skyline-wiring.md) |
 | 45 | Scroll layout | Full §16.1 mode (computeScrollLayout), formalizing + wiring what the renderer already did since Integration E; zero regressions from the extraction | [`phase-45`](./phase-45-scroll-layout.md) |
+| 46 | Page layout (system + page breaking) | Full §16.2 algorithm; found+fixed a real single-measure justification gap in Phase 43's own justifySystem; not yet wired into rendering | [`phase-46`](./phase-46-page-layout.md) |
 
 **Public API today:** 137 exports from `dist/notation-engine.js`.
 
@@ -86,7 +87,6 @@ that specifies it.
 ### Stage 8 — Real layout
 | # | Phase | Spec |
 |---|---|---|
-| **46** | Page layout + system/page breaking | §16.2 |
 | **47** | Arbitrary W×H resize + O(1) pure-scale fast path | §16.3 |
 
 ### Stage 9 — Playback surface

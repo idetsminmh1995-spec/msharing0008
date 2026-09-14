@@ -1987,7 +1987,7 @@ One unbroken system, arbitrarily wide. Measures are laid out left to right at
 their natural (unjustified) widths. This is the mode a video/cursor use case
 wants.
 
-### 16.2 Page mode
+### 16.2 Page mode `[BUILT for the full algorithm -- not yet wired into rendering, see Doc/phase-46-page-layout.md]`
 
 Measures are packed into systems until the next measure would exceed the
 usable width, then a system break occurs and the completed system is
@@ -2337,14 +2337,14 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 41 | Drum mapping table + GM defaults (§13.3) | ✅ (built + wired into rendering) |
 | 42 | MIDI↔MusicXML alignment (§13.1–§13.2) | ✅ |
 
-### Stage 8 — Real layout `[IN PROGRESS — 45 of 47]`
+### Stage 8 — Real layout `[IN PROGRESS — 46 of 47]`
 
 | Phase | What | Status |
 |---|---|---|
 | 43 | Spacing algorithm (§14), replacing Phase 21's naive layout | ✅ (algorithm + wired into rendering by Integration E) |
 | 44 | Skyline collision avoidance (§15) | ✅ (algorithm + grand-staff distance wired into rendering by Integration F) |
 | 45 | Scroll layout (§16.1) | ✅ (built + wired into rendering) |
-| 46 | Page layout + system/page breaking (§16.2) | |
+| 46 | Page layout + system/page breaking (§16.2) | ✅ (algorithm); wiring pending |
 | 47 | Arbitrary W×H resize, incl. the O(1) pure-scale fast path (§16.3) | |
 
 ### Stage 9 — Playback surface

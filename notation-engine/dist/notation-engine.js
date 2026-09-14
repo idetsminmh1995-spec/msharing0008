@@ -79,6 +79,7 @@ var NotationEngine = (() => {
     computeHairpinShape: () => computeHairpinShape,
     computeHyphenX: () => computeHyphenX,
     computeLedgerLines: () => computeLedgerLines,
+    computePageLayout: () => computePageLayout,
     computeProportionalPositions: () => computeProportionalPositions,
     computeReferenceDuration: () => computeReferenceDuration,
     computeScrollLayout: () => computeScrollLayout,
@@ -59373,6 +59374,16 @@ ${denominator}`;
     staves: {
       minStaffDistance: 3.5
     },
+    page: {
+      // A4 (210mm x 297mm) at roughly 7mm per staff space -- a common
+      // engraving scale, not a universal standard; fully overridable.
+      pageWidth: 30,
+      pageHeight: 42,
+      marginTop: 3,
+      marginBottom: 3,
+      marginLeft: 2.5,
+      marginRight: 2.5
+    },
     drums: {}
   };
   function resolveConfig(overrides) {
@@ -59386,6 +59397,7 @@ ${denominator}`;
       keySignature: { ...DEFAULT_CONFIG.keySignature, ...overrides?.keySignature },
       spacing: { ...DEFAULT_CONFIG.spacing, ...overrides?.spacing },
       staves: { ...DEFAULT_CONFIG.staves, ...overrides?.staves },
+      page: { ...DEFAULT_CONFIG.page, ...overrides?.page },
       drums: { ...DEFAULT_CONFIG.drums, ...overrides?.drums }
     };
   }
@@ -61181,6 +61193,82 @@ ${denominator}`;
       x2 += m.width;
     }
     return { measures, totalWidth: x2 };
+  }
+
+  // src/layout/page.ts
+  function groupIntoRawSystems(measures, usableWidth) {
+    const systems = [];
+    let current = [];
+    let currentWidth = 0;
+    for (const m of measures) {
+      const wouldOverflow = current.length > 0 && currentWidth + m.width > usableWidth;
+      if (current.length > 0 && (m.forceNewSystem === true || m.forceNewPage === true || wouldOverflow)) {
+        systems.push(current);
+        current = [];
+        currentWidth = 0;
+      }
+      current.push(m);
+      currentWidth += m.width;
+    }
+    if (current.length > 0) systems.push(current);
+    return systems;
+  }
+  function groupIntoRawPages(rawSystems, systemHeight, usableHeight) {
+    const pages = [];
+    let current = [];
+    let currentHeight = 0;
+    for (const system of rawSystems) {
+      const firstMeasure = system[0];
+      const wouldOverflow = current.length > 0 && currentHeight + systemHeight > usableHeight;
+      if (current.length > 0 && (firstMeasure?.forceNewPage === true || wouldOverflow)) {
+        pages.push(current);
+        current = [];
+        currentHeight = 0;
+      }
+      current.push(system);
+      currentHeight += systemHeight;
+    }
+    if (current.length > 0) pages.push(current);
+    return pages;
+  }
+  function computePageLayout(measures, systemHeight, config, spacingConfig) {
+    const usableWidth = config.pageWidth - config.marginLeft - config.marginRight;
+    const usableHeight = config.pageHeight - config.marginTop - config.marginBottom;
+    const rawSystems = groupIntoRawSystems(measures, usableWidth);
+    const rawPages = groupIntoRawPages(rawSystems, systemHeight, usableHeight);
+    const pages = rawPages.map((pageSystems, pageIndex) => {
+      const systems = pageSystems.map((systemMeasures, systemIndexOnPage) => {
+        const isLastSystemOfPiece = pageIndex === rawPages.length - 1 && systemIndexOnPage === pageSystems.length - 1;
+        const scrollInput = systemMeasures.map((m) => ({
+          measureNumber: m.measureNumber,
+          width: m.width
+        }));
+        const local = computeScrollLayout(scrollInput);
+        const positions = local.measures.map((m) => m.x);
+        const originalWidths = local.measures.map((m) => m.width);
+        if (local.measures.length === 1) {
+          const only = local.measures[0];
+          if (only === void 0) return { measures: [] };
+          const shouldFillWidth = !isLastSystemOfPiece && only.width < usableWidth;
+          const width = shouldFillWidth ? usableWidth : only.width;
+          return { measures: [{ measureNumber: only.measureNumber, x: 0, width }] };
+        }
+        const finalPositions = isLastSystemOfPiece ? positions : justifySystem(positions, usableWidth, spacingConfig);
+        const wasActuallyJustified = !isLastSystemOfPiece && finalPositions !== positions;
+        const systemMeasureLayouts = local.measures.map((m, i2) => {
+          const x2 = finalPositions[i2] ?? m.x;
+          if (!wasActuallyJustified) {
+            return { measureNumber: m.measureNumber, x: x2, width: originalWidths[i2] ?? m.width };
+          }
+          const nextX = i2 + 1 < finalPositions.length ? finalPositions[i2 + 1] : usableWidth;
+          const width = (nextX ?? usableWidth) - x2;
+          return { measureNumber: m.measureNumber, x: x2, width };
+        });
+        return { measures: systemMeasureLayouts };
+      });
+      return { systems };
+    });
+    return { pages, usableWidth, usableHeight };
   }
 
   // src/timing/diagnostic.ts
