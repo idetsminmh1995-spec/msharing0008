@@ -152,4 +152,14 @@ describe('metronome rendering end to end (Integration D)', () => {
     const { svg } = NE.renderFromMusicXml(load('simple-single-voice.musicxml'), { domParser });
     assert.doesNotMatch(svg, /\uECA5|\uECB7|\uE08F/);
   });
+
+  test("the measure holding the tempo mark is wide enough for it -- the barline lands clear past the mark's own right edge, never overlapping it", () => {
+    const { svg } = render();
+    const markGlyphXs = [
+      ...svg.matchAll(/<text x="([\d.]+)" y="[\d.]+"[^>]*>[\uECA0-\uED30]/g),
+    ].map((m) => Number(m[1]));
+    const markRightEdge = Math.max(...markGlyphXs) + 1; // +1sp: a loose upper bound on any single glyph's own width
+    const barlineX = Number(svg.match(/<line x1="([\d.]+)" y1="[\d.]+" x2="\1" y2="[\d.]+" stroke="#000000" stroke-width="0\.16"/)[1]);
+    assert.ok(barlineX > markRightEdge, `expected the barline (${barlineX}) clear past the tempo mark's own right edge (${markRightEdge})`);
+  });
 });

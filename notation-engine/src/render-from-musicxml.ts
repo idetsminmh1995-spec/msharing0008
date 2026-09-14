@@ -1,4 +1,5 @@
 import type { Chord, Measure, MeasureEvent, Note, Rest } from './core/index.js';
+import type { DurationType } from './core/duration.js';
 import { getEngravingDefault, getGlyph } from './glyphs/index.js';
 import {
   ALTO_CLEF,
@@ -60,7 +61,7 @@ import {
   metronomeEqualsGlyphName,
   metronomeBpmDigitGlyphNames,
 } from './geometry/metronome.js';
-import { renderMetronomeMark } from './render/metronome.js';
+import { renderMetronomeMark, metronomeMarkWidth } from './render/metronome.js';
 import { TICKS_PER_QUARTER } from './core/duration-math.js';
 import { renderTabNumber } from './render/index.js';
 import { computeBraceShape, needsBrace, needsContinuousBarline } from './geometry/index.js';
@@ -211,6 +212,11 @@ function worstCaseStaffExtent(
 function computeMeasureLayout(
   measure: Measure,
   measureTicks: number,
+  measureTempoMarks: readonly {
+    readonly beatUnit: string;
+    readonly beatUnitDots: number;
+    readonly perMinute: number;
+  }[],
 ): { readonly width: number; readonly positionsByTick: ReadonlyMap<number, number> } {
   const hasAccidentalByTick = new Map<number, boolean>();
   for (const voice of measure.voices) {
@@ -244,8 +250,26 @@ function computeMeasureLayout(
   }
 
   const ticks = [...hasAccidentalByTick.keys()].sort((a, b) => a - b);
+
+  // Phase 43/44 wiring: a measure holding a tempo mark must be wide
+  // enough for it -- the notes' own widths alone don't guarantee this
+  // (a narrow pickup measure with only a rest is not wide enough to
+  // hold "quarter = 120" without the mark visually overrunning the
+  // barline that follows it).
+  const tempoMarkMinWidth = measureTempoMarks.reduce((max, tm) => {
+    const dotGlyph = tm.beatUnitDots > 0 ? metronomeDotGlyphName() : undefined;
+    const markWidth = metronomeMarkWidth(
+      metronomeNoteGlyphName(tm.beatUnit as DurationType),
+      dotGlyph,
+      metronomeEqualsGlyphName(),
+      metronomeBpmDigitGlyphNames(tm.perMinute),
+      1.0,
+    );
+    return Math.max(max, MEASURE_HEADER_ALLOWANCE + markWidth + MEASURE_TRAILING_MARGIN);
+  }, 0);
+
   if (ticks.length === 0) {
-    return { width: MEASURE_WIDTH, positionsByTick: new Map() };
+    return { width: Math.max(MEASURE_WIDTH, tempoMarkMinWidth), positionsByTick: new Map() };
   }
 
   // Sec14's "duration" for spacing purposes, generalized to multiple
@@ -275,6 +299,7 @@ function computeMeasureLayout(
   const width = Math.max(
     MEASURE_WIDTH * 0.3,
     MEASURE_HEADER_ALLOWANCE + lastX + lastWidth + MEASURE_TRAILING_MARGIN,
+    tempoMarkMinWidth,
   );
 
   return { width, positionsByTick };
@@ -891,7 +916,11 @@ export function renderFromMusicXml(
         attrs !== undefined
           ? attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER
           : TICKS_PER_QUARTER * 4;
-      const measureLayout = computeMeasureLayout(measure, measureTicks);
+      const measureLayout = computeMeasureLayout(
+        measure,
+        measureTicks,
+        tempoMarks.filter((tm) => tm.partId === part.id && tm.measureNumber === measure.number),
+      );
       measureLayoutsByNumber.set(measure.number, measureLayout);
       measureWidthsForScrollLayout.push({
         measureNumber: measure.number,
@@ -963,12 +992,16 @@ export function renderFromMusicXml(
               metronomeBpmDigitGlyphNames(mark.perMinute),
               {
                 x: eventX,
-                // tempoMarkSide() is always 'above' -- placed just clear of
-                // the topmost staff's own top line.
-                y: topStaffY - 1,
+                // tempoMarkSide() is always 'above' -- given generous
+                // clearance from the topmost staff's own top line rather
+                // than the bare minimum: the metNote* glyph's own SMuFL
+                // bounding box is tall (its stem reaches well above its
+                // own anchor point), so a small offset left it looking
+                // cramped against the staff in practice.
+                y: topStaffY - 2.5,
                 color: INK_COLOR,
                 fontFamily: FONT_FAMILY,
-                noteToEqualsGap: 0.6,
+                noteToEqualsGap: 1.0,
               },
             ),
           );

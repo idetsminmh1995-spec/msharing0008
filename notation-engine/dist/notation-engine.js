@@ -134,6 +134,7 @@ var NotationEngine = (() => {
     metronomeBpmDigitGlyphNames: () => metronomeBpmDigitGlyphNames,
     metronomeDotGlyphName: () => metronomeDotGlyphName,
     metronomeEqualsGlyphName: () => metronomeEqualsGlyphName,
+    metronomeMarkWidth: () => metronomeMarkWidth,
     metronomeNoteGlyphName: () => metronomeNoteGlyphName,
     middleLineY: () => middleLineY,
     midiDiagnostic: () => midiDiagnostic,
@@ -59314,6 +59315,13 @@ ${denominator}`;
     const bbox = getGlyph(glyphName)?.bBox;
     return bbox !== void 0 ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
   }
+  function metronomeMarkWidth(noteGlyphName, dotGlyphName, equalsGlyphName, bpmDigitGlyphNames, noteToEqualsGap) {
+    let width = glyphWidth(noteGlyphName);
+    if (dotGlyphName !== void 0) width += glyphWidth(dotGlyphName);
+    width += noteToEqualsGap + glyphWidth(equalsGlyphName) + noteToEqualsGap;
+    for (const d of bpmDigitGlyphNames) width += glyphWidth(d);
+    return width;
+  }
   function renderMetronomeMark(noteGlyphName, dotGlyphName, equalsGlyphName, bpmDigitGlyphNames, options) {
     const sequence = [noteGlyphName];
     if (dotGlyphName !== void 0) sequence.push(dotGlyphName);
@@ -61880,7 +61888,7 @@ ${denominator}`;
     if (worst === void 0) return 0;
     return side === "south" ? Math.max(0, worst) : Math.max(0, topLineY - worst);
   }
-  function computeMeasureLayout(measure2, measureTicks) {
+  function computeMeasureLayout(measure2, measureTicks, measureTempoMarks) {
     const hasAccidentalByTick = /* @__PURE__ */ new Map();
     for (const voice2 of measure2.voices) {
       const starts = eventStartTicks(voice2.events);
@@ -61894,8 +61902,19 @@ ${denominator}`;
       });
     }
     const ticks = [...hasAccidentalByTick.keys()].sort((a, b) => a - b);
+    const tempoMarkMinWidth = measureTempoMarks.reduce((max2, tm) => {
+      const dotGlyph = tm.beatUnitDots > 0 ? metronomeDotGlyphName() : void 0;
+      const markWidth = metronomeMarkWidth(
+        metronomeNoteGlyphName(tm.beatUnit),
+        dotGlyph,
+        metronomeEqualsGlyphName(),
+        metronomeBpmDigitGlyphNames(tm.perMinute),
+        1
+      );
+      return Math.max(max2, MEASURE_HEADER_ALLOWANCE + markWidth + MEASURE_TRAILING_MARGIN);
+    }, 0);
     if (ticks.length === 0) {
-      return { width: MEASURE_WIDTH, positionsByTick: /* @__PURE__ */ new Map() };
+      return { width: Math.max(MEASURE_WIDTH, tempoMarkMinWidth), positionsByTick: /* @__PURE__ */ new Map() };
     }
     const spacingEvents = ticks.map((tick, i2) => {
       const nextTick = i2 + 1 < ticks.length ? ticks[i2 + 1] ?? measureTicks : measureTicks;
@@ -61914,7 +61933,8 @@ ${denominator}`;
     const lastWidth = spacingEvents[spacingEvents.length - 1]?.renderedWidth ?? 0;
     const width = Math.max(
       MEASURE_WIDTH * 0.3,
-      MEASURE_HEADER_ALLOWANCE + lastX + lastWidth + MEASURE_TRAILING_MARGIN
+      MEASURE_HEADER_ALLOWANCE + lastX + lastWidth + MEASURE_TRAILING_MARGIN,
+      tempoMarkMinWidth
     );
     return { width, positionsByTick };
   }
@@ -62322,7 +62342,11 @@ ${denominator}`;
           (a) => a.partId === part2.id && a.measureNumber === measure2.number
         );
         const measureTicks = attrs !== void 0 ? attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER : TICKS_PER_QUARTER * 4;
-        const measureLayout = computeMeasureLayout(measure2, measureTicks);
+        const measureLayout = computeMeasureLayout(
+          measure2,
+          measureTicks,
+          tempoMarks.filter((tm) => tm.partId === part2.id && tm.measureNumber === measure2.number)
+        );
         measureLayoutsByNumber.set(measure2.number, measureLayout);
         measureWidthsForScrollLayout.push({
           measureNumber: measure2.number,
@@ -62365,12 +62389,16 @@ ${denominator}`;
                 metronomeBpmDigitGlyphNames(mark.perMinute),
                 {
                   x: eventX,
-                  // tempoMarkSide() is always 'above' -- placed just clear of
-                  // the topmost staff's own top line.
-                  y: topStaffY - 1,
+                  // tempoMarkSide() is always 'above' -- given generous
+                  // clearance from the topmost staff's own top line rather
+                  // than the bare minimum: the metNote* glyph's own SMuFL
+                  // bounding box is tall (its stem reaches well above its
+                  // own anchor point), so a small offset left it looking
+                  // cramped against the staff in practice.
+                  y: topStaffY - 2.5,
                   color: INK_COLOR,
                   fontFamily: FONT_FAMILY,
-                  noteToEqualsGap: 0.6
+                  noteToEqualsGap: 1
                 }
               )
             );

@@ -17,6 +17,30 @@ function glyphWidth(glyphName: string): number {
 }
 
 /**
+ * The full metronome mark's own total rendered width -- note glyph
+ * (+dot, if any) + noteToEqualsGap + equals sign + noteToEqualsGap +
+ * every BPM digit. Exposed so a caller (Phase 43/44's measure-width
+ * computation) can ensure the measure containing a tempo mark is wide
+ * enough for it, which the notes' own widths alone don't guarantee --
+ * a narrow pickup measure with only a rest is otherwise not wide enough
+ * to hold "quarter = 120" without the mark visually overrunning into
+ * the next measure or a following barline.
+ */
+export function metronomeMarkWidth(
+  noteGlyphName: string,
+  dotGlyphName: string | undefined,
+  equalsGlyphName: string,
+  bpmDigitGlyphNames: readonly string[],
+  noteToEqualsGap: number,
+): number {
+  let width = glyphWidth(noteGlyphName);
+  if (dotGlyphName !== undefined) width += glyphWidth(dotGlyphName);
+  width += noteToEqualsGap + glyphWidth(equalsGlyphName) + noteToEqualsGap;
+  for (const d of bpmDigitGlyphNames) width += glyphWidth(d);
+  return width;
+}
+
+/**
  * Draws a full metronome mark -- note glyph, an optional augmentation
  * dot, "=", then every BPM digit -- left to right along one shared
  * baseline. Each glyph advances by its own real width; nothing here
