@@ -81,6 +81,7 @@ var NotationEngine = (() => {
     computeLedgerLines: () => computeLedgerLines,
     computeProportionalPositions: () => computeProportionalPositions,
     computeReferenceDuration: () => computeReferenceDuration,
+    computeScrollLayout: () => computeScrollLayout,
     computeSlurShape: () => computeSlurShape,
     computeStaffDistance: () => computeStaffDistance,
     computeStaffGeometry: () => computeStaffGeometry,
@@ -61171,6 +61172,17 @@ ${denominator}`;
     return Math.max(minStaffDistance, required);
   }
 
+  // src/layout/scroll.ts
+  function computeScrollLayout(measureWidths) {
+    const measures = [];
+    let x2 = 0;
+    for (const m of measureWidths) {
+      measures.push({ measureNumber: m.measureNumber, x: x2, width: m.width });
+      x2 += m.width;
+    }
+    return { measures, totalWidth: x2 };
+  }
+
   // src/timing/diagnostic.ts
   function timingDiagnostic(severity, code, message) {
     return { severity, code, message };
@@ -62216,8 +62228,7 @@ ${denominator}`;
     let totalWidth = MEASURE_WIDTH;
     score2.parts.forEach((part2, partIndex) => {
       const measureLayoutsByNumber = /* @__PURE__ */ new Map();
-      let cumulativeX = 0;
-      const layouts = [];
+      const measureWidthsForScrollLayout = [];
       for (const measure2 of part2.measures) {
         const attrs = attributes.find(
           (a) => a.partId === part2.id && a.measureNumber === measure2.number
@@ -62225,9 +62236,13 @@ ${denominator}`;
         const measureTicks = attrs !== void 0 ? attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER : TICKS_PER_QUARTER * 4;
         const measureLayout = computeMeasureLayout(measure2, measureTicks);
         measureLayoutsByNumber.set(measure2.number, measureLayout);
-        layouts.push({ measureNumber: measure2.number, x: cumulativeX, width: measureLayout.width });
-        cumulativeX += measureLayout.width;
+        measureWidthsForScrollLayout.push({
+          measureNumber: measure2.number,
+          width: measureLayout.width
+        });
       }
+      const scrollLayout = computeScrollLayout(measureWidthsForScrollLayout);
+      const layouts = scrollLayout.measures;
       const lastLayout = layouts[layouts.length - 1];
       const partWidth = lastLayout !== void 0 ? lastLayout.x + lastLayout.width : MEASURE_WIDTH;
       totalWidth = Math.max(totalWidth, partWidth);

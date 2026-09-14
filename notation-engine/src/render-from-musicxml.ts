@@ -48,6 +48,7 @@ import {
 import { DEFAULT_DRUM_MAPPING_TABLE, lookupDrumMapEntry } from './drums/index.js';
 import {
   computeSystemLayoutVariableGaps,
+  computeScrollLayout,
   emptySkyline,
   addToSkyline,
   computeStaffDistance,
@@ -878,10 +879,8 @@ export function renderFromMusicXml(
       number,
       { readonly width: number; readonly positionsByTick: ReadonlyMap<number, number> }
     >();
-    let cumulativeX = 0;
-    const layouts: {
+    const measureWidthsForScrollLayout: {
       readonly measureNumber: number;
-      readonly x: number;
       readonly width: number;
     }[] = [];
     for (const measure of part.measures) {
@@ -894,9 +893,20 @@ export function renderFromMusicXml(
           : TICKS_PER_QUARTER * 4;
       const measureLayout = computeMeasureLayout(measure, measureTicks);
       measureLayoutsByNumber.set(measure.number, measureLayout);
-      layouts.push({ measureNumber: measure.number, x: cumulativeX, width: measureLayout.width });
-      cumulativeX += measureLayout.width;
+      measureWidthsForScrollLayout.push({
+        measureNumber: measure.number,
+        width: measureLayout.width,
+      });
     }
+    // Phase 45/§16.1: scroll mode -- one unbroken system, measures at
+    // their own natural widths, left to right, arbitrarily wide. This is
+    // the actual layout render-from-musicxml.ts has produced since
+    // Integration Pass E; computeScrollLayout formalizes it as its own
+    // independently-testable module rather than leaving it as an inline
+    // cumulative-x loop, and is what §16.2's future page mode (Phase 46)
+    // will sit alongside as a genuinely different, selectable mode.
+    const scrollLayout = computeScrollLayout(measureWidthsForScrollLayout);
+    const layouts = scrollLayout.measures;
     const lastLayout = layouts[layouts.length - 1];
     const partWidth = lastLayout !== undefined ? lastLayout.x + lastLayout.width : MEASURE_WIDTH;
     totalWidth = Math.max(totalWidth, partWidth);
