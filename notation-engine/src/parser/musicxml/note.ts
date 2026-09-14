@@ -60,6 +60,10 @@ export interface ParsedNoteEvent {
   readonly explicitStemDirection?: 'up' | 'down';
   /** §10.4/Phase 35: an explicit <accidental> element's presence -- feeds Phase 19's evaluateAccidental hasExplicitAccidental (courtesy-accidental) parameter. */
   readonly hasExplicitAccidental: boolean;
+  /** Integration C: <notations><technical><string> -- which string a tab note is played on (1 = highest-pitched). */
+  readonly stringNumber?: number;
+  /** Integration C: <notations><technical><fret> -- which fret, 0 meaning an open string. */
+  readonly fret?: number;
 }
 
 /**
@@ -167,6 +171,13 @@ export function parseNoteElement(
   const tieEls = childrenNamed(noteEl, 'tie');
   const notationsEl = firstChildNamed(noteEl, 'notations');
   const tiedEls = notationsEl !== undefined ? childrenNamed(notationsEl, 'tied') : [];
+  // Integration C: tablature places a note by STRING and FRET, not by
+  // pitch -- both live under <notations><technical>.
+  const technicalEl =
+    notationsEl !== undefined ? firstChildNamed(notationsEl, 'technical') : undefined;
+  const stringNumber =
+    technicalEl !== undefined ? intOf(firstChildNamed(technicalEl, 'string')) : undefined;
+  const fret = technicalEl !== undefined ? intOf(firstChildNamed(technicalEl, 'fret')) : undefined;
   const tieStart =
     tieEls.some((el) => el.getAttribute('type') === 'start') ||
     tiedEls.some((el) => el.getAttribute('type') === 'start');
@@ -274,6 +285,8 @@ export function parseNoteElement(
     ...(tupletNormalNotes !== undefined ? { tupletNormalNotes } : {}),
     ...(explicitStemDirection !== undefined ? { explicitStemDirection } : {}),
     hasExplicitAccidental,
+    ...(stringNumber !== undefined ? { stringNumber } : {}),
+    ...(fret !== undefined ? { fret } : {}),
   };
 
   return { event, diagnostics };

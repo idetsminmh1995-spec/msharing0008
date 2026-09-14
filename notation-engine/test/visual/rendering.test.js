@@ -589,4 +589,13 @@ describe('visual regression (Phase 8)', () => {
     const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
     matchSnapshot('render-from-musicxml-guitar-two-part-tab', svg, SNAPSHOT_DIR);
   });
+
+  test('Integration C: a real guitar tab fixture (fret numbers on their own string lines, incl. a two-digit fret) renders identically to the saved snapshot', () => {
+    const xml = fs.readFileSync(
+      path.join(__dirname, '..', 'fixtures', 'musicxml', 'guitar-tab-frets.musicxml'),
+      'utf8',
+    );
+    const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
+    matchSnapshot('render-from-musicxml-guitar-tab-frets', svg, SNAPSHOT_DIR);
+  });
 });

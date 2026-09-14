@@ -117,6 +117,8 @@ function buildSingle(ev: ParsedNoteEvent): Note | Rest {
     ...(ev.tieStop ? { tieStop: true } : {}),
     ...(ev.explicitNotehead !== undefined ? { explicitNotehead: ev.explicitNotehead } : {}),
     ...(ev.instrumentId !== undefined ? { instrumentId: ev.instrumentId } : {}),
+    ...(ev.stringNumber !== undefined ? { stringNumber: ev.stringNumber } : {}),
+    ...(ev.fret !== undefined ? { fret: ev.fret } : {}),
     ...(ev.isGrace ? { isGrace: true, graceSlash: ev.graceSlash } : {}),
     ...(ev.explicitStemDirection !== undefined
       ? { explicitStemDirection: ev.explicitStemDirection }

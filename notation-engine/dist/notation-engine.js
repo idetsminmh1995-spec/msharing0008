@@ -99,6 +99,7 @@ var NotationEngine = (() => {
     flagGlyphName: () => flagGlyphName,
     flatsForCount: () => flatsForCount,
     flattenPartNotes: () => flattenPartNotes,
+    fretDigitGlyphNames: () => fretDigitGlyphNames,
     getEngravingDefault: () => getEngravingDefault,
     getEngravingDefaults: () => getEngravingDefaults,
     getFontInfo: () => getFontInfo,
@@ -158,6 +159,7 @@ var NotationEngine = (() => {
     renderSlur: () => renderSlur,
     renderStaff: () => renderStaff,
     renderStem: () => renderStem,
+    renderTabNumber: () => renderTabNumber,
     renderTie: () => renderTie,
     renderTimeSignature: () => renderTimeSignature,
     renderTupletBracket: () => renderTupletBracket,
@@ -184,6 +186,7 @@ var NotationEngine = (() => {
     svgPath: () => svgPath,
     svgRect: () => svgRect,
     svgText: () => svgText,
+    tabStringPosition: () => tabStringPosition,
     tempoMarkSide: () => tempoMarkSide,
     textWidth: () => textWidth,
     tickToPosition: () => tickToPosition,
@@ -58773,6 +58776,40 @@ var NotationEngine = (() => {
     }
   }
 
+  // src/geometry/tab.ts
+  function tabStringPosition(stringNumber, numLines) {
+    if (!Number.isInteger(stringNumber) || stringNumber < 1 || stringNumber > numLines) {
+      throw new Error(
+        `String ${stringNumber} is outside a ${numLines}-line tab staff (valid: 1..${numLines}).`
+      );
+    }
+    return stringNumber - numLines;
+  }
+  var FRET_DIGIT_GLYPHS = [
+    "fingering0",
+    "fingering1",
+    "fingering2",
+    "fingering3",
+    "fingering4",
+    "fingering5",
+    "fingering6",
+    "fingering7",
+    "fingering8",
+    "fingering9"
+  ];
+  function fretDigitGlyphNames(fret) {
+    if (!Number.isInteger(fret) || fret < 0) {
+      throw new Error(`Fret number must be a non-negative integer, got ${fret}.`);
+    }
+    return String(fret).split("").map((d) => {
+      const glyph = FRET_DIGIT_GLYPHS[Number(d)];
+      if (glyph === void 0) {
+        throw new Error(`No digit glyph for "${d}".`);
+      }
+      return glyph;
+    });
+  }
+
   // src/render/svg-primitives.ts
   var SMUFL_STAFF_SPACES_PER_EM = 4;
   function escapeXmlText(text) {
@@ -59170,6 +59207,39 @@ ${denominator}`;
     });
   }
 
+  // src/render/tab.ts
+  function digitWidth(glyphName) {
+    const bbox = getGlyph(glyphName)?.bBox;
+    return bbox !== void 0 ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
+  }
+  var MASK_HALF_HEIGHT = 0.42;
+  var MASK_PADDING = 0.12;
+  function renderTabNumber(glyphNames, options) {
+    const widths = glyphNames.map(digitWidth);
+    const totalWidth = widths.reduce((sum, w) => sum + w, 0);
+    const parts = [
+      svgRect(
+        options.x - totalWidth / 2 - MASK_PADDING,
+        options.y - MASK_HALF_HEIGHT,
+        totalWidth + MASK_PADDING * 2,
+        MASK_HALF_HEIGHT * 2,
+        { fill: options.backgroundColor }
+      )
+    ];
+    let cursorX = options.x - totalWidth / 2;
+    glyphNames.forEach((name, i2) => {
+      const glyph = getGlyph(name);
+      if (glyph === void 0) {
+        throw new Error(`No glyph found for tab digit "${name}"`);
+      }
+      parts.push(
+        svgGlyphText(cursorX, options.y, glyph.char, options.fontFamily, { fill: options.color })
+      );
+      cursorX += widths[i2] ?? 0;
+    });
+    return parts.join("\n");
+  }
+
   // src/config/config.ts
   var DEFAULT_CONFIG = {
     colors: {
@@ -59385,6 +59455,9 @@ ${denominator}`;
     const tieEls = childrenNamed(noteEl, "tie");
     const notationsEl = firstChildNamed(noteEl, "notations");
     const tiedEls = notationsEl !== void 0 ? childrenNamed(notationsEl, "tied") : [];
+    const technicalEl = notationsEl !== void 0 ? firstChildNamed(notationsEl, "technical") : void 0;
+    const stringNumber = technicalEl !== void 0 ? intOf(firstChildNamed(technicalEl, "string")) : void 0;
+    const fret = technicalEl !== void 0 ? intOf(firstChildNamed(technicalEl, "fret")) : void 0;
     const tieStart = tieEls.some((el) => el.getAttribute("type") === "start") || tiedEls.some((el) => el.getAttribute("type") === "start");
     const tieStop = tieEls.some((el) => el.getAttribute("type") === "stop") || tiedEls.some((el) => el.getAttribute("type") === "stop");
     const explicitNotehead = textOf(firstChildNamed(noteEl, "notehead"));
@@ -59471,7 +59544,9 @@ ${denominator}`;
       ...tupletActualNotes !== void 0 ? { tupletActualNotes } : {},
       ...tupletNormalNotes !== void 0 ? { tupletNormalNotes } : {},
       ...explicitStemDirection !== void 0 ? { explicitStemDirection } : {},
-      hasExplicitAccidental
+      hasExplicitAccidental,
+      ...stringNumber !== void 0 ? { stringNumber } : {},
+      ...fret !== void 0 ? { fret } : {}
     };
     return { event, diagnostics };
   }
@@ -59561,6 +59636,8 @@ ${denominator}`;
       ...ev.tieStop ? { tieStop: true } : {},
       ...ev.explicitNotehead !== void 0 ? { explicitNotehead: ev.explicitNotehead } : {},
       ...ev.instrumentId !== void 0 ? { instrumentId: ev.instrumentId } : {},
+      ...ev.stringNumber !== void 0 ? { stringNumber: ev.stringNumber } : {},
+      ...ev.fret !== void 0 ? { fret: ev.fret } : {},
       ...ev.isGrace ? { isGrace: true, graceSlash: ev.graceSlash } : {},
       ...ev.explicitStemDirection !== void 0 ? { explicitStemDirection: ev.explicitStemDirection } : {},
       ...ev.hasExplicitAccidental ? { hasExplicitAccidental: true } : {}
@@ -61889,6 +61966,48 @@ ${denominator}`;
                   svgParts.push(svg2);
                   accidentalState = newAccidentalState;
                 }
+              });
+            }
+          } else if (clefDef.name === "tab") {
+            const noteAreaX = Math.max(layout.x + layout.width * 0.25, cursorX);
+            const noteAreaWidth = layout.x + layout.width - noteAreaX;
+            for (const voice2 of measure2.voices) {
+              const starts = eventStartTicks(voice2.events);
+              const total = totalTicks(voice2.events) || 1;
+              voice2.events.forEach((event, idx) => {
+                if (event.kind !== "note") return;
+                if ((event.staff ?? 1) !== staffNumber) return;
+                if (event.stringNumber === void 0 || event.fret === void 0) {
+                  diagnostics.push({
+                    severity: "info",
+                    code: "TAB_NOTE_MISSING_STRING_OR_FRET",
+                    message: `A note on a tab staff has no <string>/<fret>; it cannot be placed and was skipped.`,
+                    location: { partId: part2.id, measureNumber: measure2.number }
+                  });
+                  return;
+                }
+                let position;
+                try {
+                  position = tabStringPosition(event.stringNumber, staffLines);
+                } catch {
+                  diagnostics.push({
+                    severity: "warning",
+                    code: "TAB_STRING_OUT_OF_RANGE",
+                    message: `String ${event.stringNumber} does not exist on this ${staffLines}-line tab staff; the note was skipped.`,
+                    location: { partId: part2.id, measureNumber: measure2.number }
+                  });
+                  return;
+                }
+                const eventX = noteAreaX + (starts[idx] ?? 0) / total * noteAreaWidth;
+                svgParts.push(
+                  renderTabNumber(fretDigitGlyphNames(event.fret), {
+                    x: eventX,
+                    y: bottomY + position,
+                    color: INK_COLOR,
+                    backgroundColor: BACKGROUND_COLOR,
+                    fontFamily: FONT_FAMILY
+                  })
+                );
               });
             }
           } else {

@@ -47,6 +47,8 @@ import {
 } from './geometry/index.js';
 import { DEFAULT_DRUM_MAPPING_TABLE, lookupDrumMapEntry } from './drums/index.js';
 import { computeSystemLayout } from './layout/index.js';
+import { fretDigitGlyphNames, tabStringPosition } from './geometry/index.js';
+import { renderTabNumber } from './render/index.js';
 import { computeBraceShape, needsBrace, needsContinuousBarline } from './geometry/index.js';
 import { renderBrace } from './render/index.js';
 import type { Diagnostic, MeasureAttributes } from './parser/index.js';
@@ -934,7 +936,66 @@ export function renderFromMusicXml(
               }
             });
           }
+        } else if (clefDef.name === 'tab') {
+          // Integration C: tablature places a note by STRING and FRET, not
+          // by pitch. The horizontal timeline is computed exactly as the
+          // pitched branch does, so a tab staff stays aligned under the
+          // notation staff it accompanies.
+          const noteAreaX = Math.max(layout.x + layout.width * 0.25, cursorX);
+          const noteAreaWidth = layout.x + layout.width - noteAreaX;
+
+          for (const voice of measure.voices) {
+            const starts = eventStartTicks(voice.events);
+            const total = totalTicks(voice.events) || 1;
+
+            voice.events.forEach((event, idx) => {
+              if (event.kind !== 'note') return;
+              if ((event.staff ?? 1) !== staffNumber) return;
+              if (event.stringNumber === undefined || event.fret === undefined) {
+                // A tab staff whose notes carry no <string>/<fret> can't be
+                // drawn -- say so rather than rendering an empty staff with
+                // no explanation.
+                diagnostics.push({
+                  severity: 'info',
+                  code: 'TAB_NOTE_MISSING_STRING_OR_FRET',
+                  message: `A note on a tab staff has no <string>/<fret>; it cannot be placed and was skipped.`,
+                  location: { partId: part.id, measureNumber: measure.number },
+                });
+                return;
+              }
+
+              let position: number;
+              try {
+                position = tabStringPosition(event.stringNumber, staffLines);
+              } catch {
+                diagnostics.push({
+                  severity: 'warning',
+                  code: 'TAB_STRING_OUT_OF_RANGE',
+                  message: `String ${event.stringNumber} does not exist on this ${staffLines}-line tab staff; the note was skipped.`,
+                  location: { partId: part.id, measureNumber: measure.number },
+                });
+                return;
+              }
+
+              const eventX = noteAreaX + ((starts[idx] ?? 0) / total) * noteAreaWidth;
+              svgParts.push(
+                renderTabNumber(fretDigitGlyphNames(event.fret), {
+                  x: eventX,
+                  y: bottomY + position,
+                  color: INK_COLOR,
+                  backgroundColor: BACKGROUND_COLOR,
+                  fontFamily: FONT_FAMILY,
+                }),
+              );
+            });
+          }
         } else {
+          // Currently UNREACHABLE: tab is the only clef with
+          // positionsByPitch === false, and Integration C gave it its own
+          // branch above. Deliberately retained rather than deleted, so
+          // that a future non-pitch clef fails loudly here instead of
+          // silently dropping every note on that staff. If one is added,
+          // this branch becomes live again and needs its own test.
           diagnostics.push({
             severity: 'info',
             code: 'UNSUPPORTED_CLEF_FOR_NOTES',

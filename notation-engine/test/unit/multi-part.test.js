@@ -76,9 +76,13 @@ describe('multi-part rendering (Integration B)', () => {
     assert.ok(height > Math.max(...ys), 'the lowest staff line must fit inside the viewBox');
   });
 
-  test('a tab part reports UNSUPPORTED_CLEF_FOR_NOTES rather than silently drawing nothing', () => {
+  // Integration C superseded this: a tab part is no longer 'unsupported'.
+  // Its notes are drawn as fret numbers when they carry <string>/<fret>;
+  // this fixture's notes don't, so it now reports that specific reason
+  // instead of the old blanket 'clef not supported' message.
+  test('a tab part whose notes lack <string>/<fret> says exactly that, rather than silently drawing nothing', () => {
     const { diagnostics } = renderGuitar();
-    assert.ok([...diagnostics].some((d) => d.code === 'UNSUPPORTED_CLEF_FOR_NOTES'));
+    assert.ok([...diagnostics].some((d) => d.code === 'TAB_NOTE_MISSING_STRING_OR_FRET'));
   });
 
   test('the notation part still renders its own notes normally', () => {
