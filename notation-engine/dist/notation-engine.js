@@ -61853,7 +61853,7 @@ ${denominator}`;
   var ESTIMATED_NOTEHEAD_WIDTH = 1;
   var ESTIMATED_ACCIDENTAL_ALLOWANCE = 1;
   var MEASURE_TRAILING_MARGIN = 2;
-  var MEASURE_HEADER_ALLOWANCE = 4;
+  var MEASURE_HEADER_ALLOWANCE = 6;
   var DEFAULT_STAFF_GAP_FALLBACK = 8;
   function worstCaseStaffExtent(part2, staffNumber, allAttributes, side) {
     const firstAttrs = allAttributes.find((a) => a.partId === part2.id);
@@ -62372,8 +62372,8 @@ ${denominator}`;
           (m) => m.partId === part2.id && m.measureNumber === measure2.number
         );
         if (measureTempoMarks.length > 0) {
-          const noteAreaX = layout.x + layout.width * 0.25;
-          const noteAreaWidth = layout.width * 0.75;
+          const noteAreaX = layout.x + MEASURE_HEADER_ALLOWANCE;
+          const noteAreaWidth = layout.x + layout.width - noteAreaX;
           const measureTotalTicks = attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
           const topStaffLines = attrs.staffLinesByStaff[1] ?? STAFF_LINES;
           const topStaffGeometry = computeStaffGeometry(topStaffLines);

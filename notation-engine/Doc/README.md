@@ -78,7 +78,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`integration-f-skyline-wiring.md`](./integration-f-skyline-wiring.md) | Integration F: Phase 44's skyline wired into grand-staff distance (content-aware gap, confirmed on real crossing-hands content) |
 | [`phase-45-scroll-layout.md`](./phase-45-scroll-layout.md) | Phase 45 scroll layout (§16.1), formalizing + wiring what the renderer already did since Integration E |
 | [`phase-46-page-layout.md`](./phase-46-page-layout.md) | Phase 46 page layout (§16.2) -- system/page breaking + justification; found+fixed a real single-measure justification gap; not yet wired into rendering |
-| [`integration-g-tempo-mark-fixes.md`](./integration-g-tempo-mark-fixes.md) | Integration G: tempo mark display/positioning fixes (equals-sign spacing, vertical clearance, measure-width awareness) |
+| [`integration-g-tempo-mark-fixes.md`](./integration-g-tempo-mark-fixes.md) | Integration G: tempo mark display/positioning fixes, in two rounds (equals-sign spacing, vertical clearance, measure-width awareness, x-formula inconsistency) |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

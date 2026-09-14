@@ -153,6 +153,13 @@ describe('metronome rendering end to end (Integration D)', () => {
     assert.doesNotMatch(svg, /\uECA5|\uECB7|\uE08F/);
   });
 
+  test('the tempo mark visually ALIGNS with the first note of the same measure -- both use the same noteAreaX (real bug: they used to use two different formulas)', () => {
+    const { svg } = render();
+    const markNoteX = Number(svg.match(/x="([\d.]+)" y="[\d.]+"[^>]*>\uECA5/)[1]);
+    const firstRealNoteX = Number(svg.match(/x="([\d.]+)" y="[\d.]+"[^>]*>\uE0A3/)[1]);
+    assert.equal(markNoteX, firstRealNoteX);
+  });
+
   test("the measure holding the tempo mark is wide enough for it -- the barline lands clear past the mark's own right edge, never overlapping it", () => {
     const { svg } = render();
     const markGlyphXs = [

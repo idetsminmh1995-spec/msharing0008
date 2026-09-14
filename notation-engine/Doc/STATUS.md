@@ -14,7 +14,7 @@ after Phase 29 (end of Stage 4).
 ## A. DONE — Phases 1–42 ✅ (Stage 2 through 7 complete) + Integration Passes A & B
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 538/538 across them.
+`npm run verify` passes 539/539 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -70,7 +70,7 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | — | **Integration F** (not a numbered phase) | Wired Phase 44's skyline into grand-staff distance (content-aware gap, confirmed growing from 8 to 16 on real crossing-hands content) | [`integration-f`](./integration-f-skyline-wiring.md) |
 | 45 | Scroll layout | Full §16.1 mode (computeScrollLayout), formalizing + wiring what the renderer already did since Integration E; zero regressions from the extraction | [`phase-45`](./phase-45-scroll-layout.md) |
 | 46 | Page layout (system + page breaking) | Full §16.2 algorithm; found+fixed a real single-measure justification gap in Phase 43's own justifySystem; not yet wired into rendering | [`phase-46`](./phase-46-page-layout.md) |
-| — | **Integration G** (not a numbered phase) | Tempo mark display/positioning fixes (equals-sign spacing, vertical clearance, measure-width awareness) -- prompted by user-reported screenshots | [`integration-g`](./integration-g-tempo-mark-fixes.md) |
+| — | **Integration G** (not a numbered phase) | Tempo mark display/positioning fixes, in two rounds (equals-sign spacing, vertical clearance, measure-width awareness, and a real x-formula inconsistency found by testing against the user's own real file) -- prompted by user-reported screenshots | [`integration-g`](./integration-g-tempo-mark-fixes.md) |
 
 **Public API today:** 137 exports from `dist/notation-engine.js`.
 

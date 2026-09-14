@@ -127,8 +127,20 @@ const MEASURE_TRAILING_MARGIN = 2.0;
  * keyChanged/timeChanged logic here before it's otherwise needed) at
  * the cost of some wasted blank space on ordinary measures -- stated
  * directly as a limitation rather than silently accepted.
+ *
+ * 6.0, not 4.0: empirically checked against the real cursorX a clef +
+ * a 4/4 time signature actually advances to (confirmed identically for
+ * both a treble clef and a percussion clef -- both real first notes
+ * land at x=6 given layout.x=0). The original 4.0 undershot this,
+ * which was invisible for ordinary notes (their own noteAreaX already
+ * takes `Math.max(this allowance, the real cursorX)`, so undershooting
+ * just meant cursorX won silently) but became a real, visible bug for
+ * a tempo mark on a measure that DOES draw this header: the tempo
+ * mark's own x used this allowance directly, with no cursorX to fall
+ * back on, landing noticeably left of where the first note actually
+ * starts.
  */
-const MEASURE_HEADER_ALLOWANCE = 4.0;
+const MEASURE_HEADER_ALLOWANCE = 6.0;
 
 /** Phase 29's own default, kept as this wiring's fallback floor when computeStaffDistance's own configured minimum isn't threaded through as a real EngineConfig parameter (see the Phase 43 wiring's own note on why RenderFromMusicXmlOptions stays domParser-only for now). */
 const DEFAULT_STAFF_GAP_FALLBACK = 8;
@@ -974,8 +986,21 @@ export function renderFromMusicXml(
         (m) => m.partId === part.id && m.measureNumber === measure.number,
       );
       if (measureTempoMarks.length > 0) {
-        const noteAreaX = layout.x + layout.width * 0.25;
-        const noteAreaWidth = layout.width * 0.75;
+        // Use the EXACT same header allowance the note-rendering pass
+        // below uses for noteAreaX -- a real, second bug: this used to
+        // compute noteAreaX as a FRACTION of the measure's own width
+        // (layout.width * 0.25), which is a DIFFERENT coordinate system
+        // from the notes' own fixed-allowance formula. As long as a
+        // measure stayed near its old default width the two formulas
+        // happened to roughly agree, but once a measure is genuinely
+        // widened to fit a tempo mark (as this file's own measure 2
+        // needs), the fraction-based x grows right along with it,
+        // drifting the mark further from where the notes actually start
+        // -- exactly the "no visible change" the user reported, since
+        // widening the measure and this drift canceled each other out
+        // visually.
+        const noteAreaX = layout.x + MEASURE_HEADER_ALLOWANCE;
+        const noteAreaWidth = layout.x + layout.width - noteAreaX;
         const measureTotalTicks =
           attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
         const topStaffLines = attrs.staffLinesByStaff[1] ?? STAFF_LINES;
