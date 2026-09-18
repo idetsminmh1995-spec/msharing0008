@@ -24,13 +24,16 @@ page — each with an Upload File area (MusicXML / MIDI / Audio), so the
 full navigation flow (Home → Video Create → pick an instrument → reach
 the upload area) can be clicked through end to end once deployed.
 
-## Cloudflare Pages deployment settings
+## Cloudflare deployment settings
 
-When connecting this repo in the Cloudflare Pages dashboard:
+This Cloudflare account's Pages build system uses the newer, unified
+Workers + static-assets model rather than a classic "build output
+directory" field, so this folder carries its own `wrangler.jsonc`
+declaring itself as a static-assets Worker. Settings in the dashboard:
 
-- **Build command:** *(leave empty — nothing to build)*
-- **Build output directory:** `website`
-- **Root directory:** *(repo root — leave default)*
+- **Root directory:** `website`
+- **Build command:** *(leave empty)*
+- **Deploy command:** `npx wrangler deploy`
 
 Every push to `main` will redeploy automatically once connected.
 
