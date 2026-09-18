@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MusicNote — Music &amp; Online Courses</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --red:#C81E2C; --red-dark:#A21A26; --near-black:#17110E;
+    --cream:#FAF7F3; --pink:#FCEDEC; --border:#EFE6DF;
+    --text:#1E1512; --muted:#8A7C74;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--cream);font-family:'Manrope',sans-serif;color:var(--text);}
+  a{color:inherit;text-decoration:none;}
+  ::selection{background:var(--red);color:#fff;}
+  .wrap{max-width:1440px;margin:0 auto;}
+  .row{display:flex;align-items:center;}
+  .btn{border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;}
+  .btn-red{background:var(--red);color:#fff;}
+  .badge-new{background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;}
+
+  .topbar{background:var(--near-black);color:#D8CFC7;font-size:12px;padding:8px 64px;display:flex;justify-content:space-between;}
+  .topbar span{display:flex;gap:24px;}
+
+  .header{background:var(--red);padding:18px 64px;display:flex;align-items:center;gap:32px;}
+  .logo{display:flex;align-items:center;gap:10px;}
+  .logo-name{font-family:'Sora',sans-serif;font-weight:800;font-size:20px;color:#fff;line-height:1;}
+  .logo-sub{font-size:10px;color:#F3C9C9;letter-spacing:.03em;}
+  .search{flex:1;display:flex;align-items:center;background:#fff;border-radius:8px;overflow:hidden;height:44px;}
+  .search select{border:none;background:#F1EAE5;height:100%;padding:0 14px;font-size:13px;color:#4A3F3A;}
+  .search input{flex:1;border:none;padding:0 16px;font-size:14px;outline:none;}
+  .search button{width:52px;height:100%;border:none;background:var(--near-black);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .head-actions{display:flex;align-items:center;gap:26px;color:#fff;font-size:12px;}
+  .head-actions .item{text-align:center;}
+
+  .nav{background:#fff;padding:0 64px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
+  .nav-links{display:flex;gap:34px;font-size:14px;font-weight:600;padding:16px 0;}
+  .nav-links a{color:#4A3F3A;}
+  .nav-links .active{color:var(--red);border-bottom:2px solid var(--red);padding-bottom:14px;}
+  .nav-links .vc-link{color:var(--red);display:flex;align-items:center;gap:6px;}
+
+  .hero{padding:28px 64px;display:flex;gap:24px;}
+  .hero-main{flex:1;background:linear-gradient(120deg,#1B120F 0%,#2B1210 100%);border-radius:16px;padding:56px;color:#fff;}
+  .hero-eyebrow{font-size:16px;color:#F3B8B8;font-weight:600;margin-bottom:10px;}
+  .hero-title{font-family:'Sora',sans-serif;font-size:44px;font-weight:800;line-height:1.15;max-width:480px;}
+  .hero-sub{font-size:15px;color:#D8CFC7;margin-top:18px;max-width:420px;line-height:1.6;}
+  .hero-cta{display:flex;gap:14px;margin-top:28px;}
+  .btn-outline{background:transparent;color:#fff;border:1px solid #6B5A55;border-radius:8px;padding:14px 26px;font-weight:700;font-size:14px;}
+  .btn-red.lg{padding:14px 26px;font-size:14px;}
+  .hero-side{width:340px;background:var(--near-black);border-radius:16px;padding:28px;color:#fff;}
+  .offer-tag{font-size:12px;color:#D8AE7A;font-weight:700;letter-spacing:.05em;}
+  .offer-title{font-family:'Sora',sans-serif;font-size:26px;font-weight:800;margin-top:8px;}
+  .offer-code{background:#241713;border:1px dashed #6B5A55;border-radius:8px;padding:10px 16px;margin-top:18px;font-size:13px;font-weight:700;color:#F0B8B8;}
+  .btn-red.sm{margin-top:16px;padding:12px 22px;font-size:13px;}
+
+  .cats{padding:8px 64px 28px;display:flex;justify-content:space-between;}
+  .cat{text-align:center;width:110px;}
+  .cat-icon{width:64px;height:64px;border-radius:50%;background:var(--pink);display:flex;align-items:center;justify-content:center;margin:0 auto;border:1px solid var(--border);position:relative;color:var(--red);}
+  .cat-icon.on{background:var(--red);color:#fff;}
+  .cat-badge{position:absolute;top:-6px;right:-4px;}
+  .cat-label{font-size:12px;font-weight:700;margin-top:10px;}
+  .cat-label.on{color:var(--red);}
+
+  .section{padding:0 64px 36px;}
+  .section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
+  .section-title{font-family:'Sora',sans-serif;font-size:20px;font-weight:700;border-left:4px solid var(--red);padding-left:12px;}
+  .section-link{color:var(--red);font-size:13px;font-weight:700;}
+
+  .notes-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:20px;}
+  .note-card{background:#fff;border-radius:12px;overflow:hidden;border:1px solid var(--border);}
+  .note-thumb{height:130px;position:relative;}
+  .note-badge{position:absolute;top:10px;left:10px;background:var(--red);color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:4px;}
+  .note-body{padding:14px;}
+  .note-title{font-size:13px;font-weight:700;line-height:1.3;}
+  .note-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+  .note-rating{font-size:11px;color:#D8AE7A;margin-top:6px;}
+  .note-foot{display:flex;justify-content:space-between;align-items:center;margin-top:10px;}
+  .note-price{color:var(--red);font-weight:800;font-size:15px;}
+  .note-cart{width:30px;height:30px;background:var(--red);border-radius:6px;display:flex;align-items:center;justify-content:center;}
+
+  .vc-strip{padding:0 64px 40px;}
+  .vc-box{background:var(--near-black);border-radius:16px;padding:36px 44px;display:flex;align-items:center;justify-content:space-between;color:#fff;}
+  .vc-box-text{max-width:560px;}
+  .vc-eyebrow{display:inline-block;background:var(--red);font-size:10px;font-weight:800;padding:3px 8px;border-radius:4px;margin-bottom:10px;}
+  .vc-title{font-family:'Sora',sans-serif;font-size:26px;font-weight:800;line-height:1.25;}
+  .vc-sub{font-size:14px;color:#D8CFC7;margin-top:8px;line-height:1.6;}
+  .vc-box .btn-red{padding:14px 26px;font-size:14px;white-space:nowrap;}
+
+  .perks{background:#F3E2DF;padding:22px 64px;display:flex;justify-content:space-around;}
+  .perk{display:flex;align-items:center;gap:12px;}
+  .perk-icon{width:38px;height:38px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;color:var(--red);}
+  .perk-title{font-size:13px;font-weight:700;}
+  .perk-sub{font-size:11px;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>Free shipping on digital notes over $15</div>
+  <span><span>Help Center</span><span>Track Order</span></span>
+</div>
+
+<header class="header">
+  <a class="logo" href="/">
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    <div><div class="logo-name">MusicNote</div><div class="logo-sub">Music &amp; Online Courses</div></div>
+  </a>
+  <div class="search">
+    <select aria-label="Category"><option>All Categories</option></select>
+    <input type="text" placeholder="Search notes, courses..." aria-label="Search">
+    <button aria-label="Search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
+  </div>
+  <div class="head-actions">
+    <div class="item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg><div>Cart</div></div>
+    <div class="item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.8 4.6a5 5 0 0 0-7.1 0L12 6.3l-1.7-1.7a5 5 0 1 0-7.1 7.1l1.7 1.7L12 20.7l7.1-7.1 1.7-1.7a5 5 0 0 0 0-7.1Z"/></svg><div>Wishlist</div></div>
+    <div class="row" style="gap:6px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="7" r="4"/></svg><span>Login / Register</span></div>
+  </div>
+</header>
+
+<nav class="nav">
+  <div class="nav-links">
+    <a class="active" href="/">Home</a>
+    <a href="#">Notes Store</a>
+    <a href="#">Online Courses</a>
+    <a href="#">Instructors</a>
+    <a href="#">Membership</a>
+    <a href="#">Blog</a>
+    <a class="vc-link" href="/video-create/">Video Create<span class="badge-new">NEW</span></a>
+    <a href="#">Contact</a>
+  </div>
+  <button class="btn btn-red" style="padding:10px 20px;font-size:13px;">Sell Your Notes</button>
+</nav>
+
+<section class="hero">
+  <div class="hero-main">
+    <div class="hero-eyebrow">Find. Learn. Play.</div>
+    <div class="hero-title">Your Music Journey Starts Here</div>
+    <div class="hero-sub">Buy Drum, Piano, Guitar Notes and learn from the best instructors online.</div>
+    <div class="hero-cta">
+      <button class="btn btn-red lg">Shop Notes</button>
+      <button class="btn btn-outline">Explore Courses</button>
+    </div>
+  </div>
+  <div class="hero-side">
+    <div class="offer-tag">SPECIAL OFFER</div>
+    <div class="offer-title">Get 20% OFF<br>For All Notes</div>
+    <div class="offer-code">Use Code: MUSIC20</div>
+    <button class="btn btn-red sm">Shop Now</button>
+  </div>
+</section>
+
+<section class="cats">
+  <a class="cat" href="#"><div class="cat-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="8" ry="3"/></svg></div><div class="cat-label">Drum Notes</div></a>
+  <a class="cat" href="#"><div class="cat-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="18" height="10" rx="1"/><path d="M7 8v10M11 8v10M15 8v10"/></svg></div><div class="cat-label">Piano Notes</div></a>
+  <a class="cat" href="#"><div class="cat-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l9-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="15" cy="16" r="3"/></svg></div><div class="cat-label">Guitar Notes</div></a>
+  <a class="cat" href="#"><div class="cat-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V6l9-2.5v12"/><circle cx="6" cy="18" r="3"/></svg></div><div class="cat-label">Bass Notes</div></a>
+  <a class="cat" href="#"><div class="cat-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M3 20c0-3 2-5 5-5s5 2 5 5M11 20c0-3 2-5 5-5s5 2 5 5"/></svg></div><div class="cat-label">Band Scores</div></a>
+  <a class="cat" href="#"><div class="cat-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l1-.2M9 5v13a3 3 0 1 1-2-2.8"/><circle cx="7" cy="18" r="3"/></svg></div><div class="cat-label">MIDI / GP Files</div></a>
+  <a class="cat" href="/video-create/">
+    <div class="cat-icon on">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="m21 8-4 3.2v1.6l4 3.2z"/></svg>
+      <span class="badge-new cat-badge">NEW</span>
+    </div>
+    <div class="cat-label on">Video Create</div>
+  </a>
+  <a class="cat" href="#"><div class="cat-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div><div class="cat-label">All Categories</div></a>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <div class="section-title">Featured Notes</div>
+    <a class="section-link" href="#">View All ›</a>
+  </div>
+  <div class="notes-grid">
+    <div class="note-card">
+      <div class="note-thumb" style="background:#2A1210;"><div class="note-badge">NEW</div></div>
+      <div class="note-body">
+        <div class="note-title">Drum Fill Pack Vol.1</div>
+        <div class="note-sub">PDF</div>
+        <div class="note-rating">★★★★☆ (25)</div>
+        <div class="note-foot"><div class="note-price">$5.00</div><div class="note-cart"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg></div></div>
+      </div>
+    </div>
+    <div class="note-card">
+      <div class="note-thumb" style="background:#241E14;"><div class="note-badge">-20%</div></div>
+      <div class="note-body">
+        <div class="note-title">Piano Exercises For Beginners</div>
+        <div class="note-sub">PDF</div>
+        <div class="note-rating">★★★★★ (18)</div>
+        <div class="note-foot"><div class="note-price">$4.00</div><div class="note-cart"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg></div></div>
+      </div>
+    </div>
+    <div class="note-card">
+      <div class="note-thumb" style="background:#2A1E10;"><div class="note-badge">NEW</div></div>
+      <div class="note-body">
+        <div class="note-title">Guitar Tabs Collection</div>
+        <div class="note-sub">Top 50 Hits · PDF</div>
+        <div class="note-rating">★★★★☆ (30)</div>
+        <div class="note-foot"><div class="note-price">$6.00</div><div class="note-cart"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg></div></div>
+      </div>
+    </div>
+    <div class="note-card">
+      <div class="note-thumb" style="background:#251020;"><div class="note-badge">-15%</div></div>
+      <div class="note-body">
+        <div class="note-title">Worship Songs Band Score</div>
+        <div class="note-sub">PDF</div>
+        <div class="note-rating">★★★★☆ (22)</div>
+        <div class="note-foot"><div class="note-price">$5.10</div><div class="note-cart"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg></div></div>
+      </div>
+    </div>
+    <div class="note-card">
+      <div class="note-thumb" style="background:#1F1210;"><div class="note-badge">NEW</div></div>
+      <div class="note-body">
+        <div class="note-title">MIDI Chord Progressions Vol.1</div>
+        <div class="note-sub">MIDI</div>
+        <div class="note-rating">★★★★☆ (15)</div>
+        <div class="note-foot"><div class="note-price">$7.00</div><div class="note-cart"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="vc-strip">
+  <div class="vc-box">
+    <div class="vc-box-text">
+      <div class="vc-eyebrow">NEW · VIDEO CREATE</div>
+      <div class="vc-title">Turn any MIDI or score into a performance video.</div>
+      <div class="vc-sub">Upload your file, pick your instrument, and MusicNote's Video Engine generates the animation, notation and sound for you.</div>
+    </div>
+    <a class="btn btn-red" href="/video-create/">Try Video Create →</a>
+  </div>
+</section>
+
+<footer class="perks">
+  <div class="perk"><div class="perk-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4v12m0 0-5-5m5 5 5-5"/><path d="M4 20h16"/></svg></div><div><div class="perk-title">Instant Download</div><div class="perk-sub">Download your files instantly</div></div></div>
+  <div class="perk"><div class="perk-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2.5 2.5L16 9.5"/></svg></div><div><div class="perk-title">Secure Payment</div><div class="perk-sub">100% secure checkout</div></div></div>
+  <div class="perk"><div class="perk-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M9 12h6M9 16h6"/></svg></div><div><div class="perk-title">High Quality Files</div><div class="perk-sub">PDF, GP, MIDI and more</div></div></div>
+  <div class="perk"><div class="perk-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2C9.6 21 3 14.4 3 6a2 2 0 0 1 2-2z"/></svg></div><div><div class="perk-title">24/7 Support</div><div class="perk-sub">We're here to help you</div></div></div>
+</footer>
+
+</body>
+</html>

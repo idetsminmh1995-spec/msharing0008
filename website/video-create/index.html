@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MusicNote — Video Create</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --red:#C81E2C; --near-black:#17110E; --cream:#FAF7F3;
+    --pink:#FCEDEC; --border:#EFE6DF; --text:#1E1512; --muted:#8A7C74;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--cream);font-family:'Manrope',sans-serif;color:var(--text);}
+  a{color:inherit;text-decoration:none;}
+  .btn{border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;}
+  .btn-red{background:var(--red);color:#fff;}
+
+  .header{background:var(--red);padding:18px 64px;display:flex;align-items:center;gap:32px;}
+  .logo{display:flex;align-items:center;gap:10px;}
+  .logo-name{font-family:'Sora',sans-serif;font-weight:800;font-size:20px;color:#fff;line-height:1;}
+  .logo-sub{font-size:10px;color:#F3C9C9;letter-spacing:.03em;}
+  .head-actions{display:flex;align-items:center;gap:26px;color:#fff;font-size:12px;margin-left:auto;}
+
+  .crumbbar{background:#fff;padding:14px 64px;border-bottom:1px solid var(--border);display:flex;gap:8px;font-size:13px;color:var(--muted);}
+  .crumbbar .active{color:var(--red);font-weight:700;}
+
+  .intro{padding:44px 64px 8px;text-align:center;}
+  .step-tag{display:inline-block;background:var(--pink);color:var(--red);font-size:11px;font-weight:800;padding:5px 12px;border-radius:20px;margin-bottom:14px;}
+  .intro-title{font-family:'Sora',sans-serif;font-size:34px;font-weight:800;}
+  .intro-sub{font-size:15px;color:var(--muted);margin-top:8px;max-width:560px;margin:8px auto 0;line-height:1.6;}
+
+  .grid{padding:36px 64px 20px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:22px;}
+  .instr-card{background:#fff;border:2px solid var(--border);border-radius:16px;padding:28px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;transition:border-color .15s,box-shadow .15s;position:relative;}
+  .instr-card:hover{border-color:var(--red);box-shadow:0 8px 24px rgba(200,30,44,0.14);}
+  .instr-card.disabled{cursor:default;}
+  .soon-badge{position:absolute;top:10px;right:10px;background:#F1EAE5;color:var(--muted);font-size:9px;font-weight:800;padding:3px 7px;border-radius:5px;}
+  .instr-icon{width:64px;height:64px;border-radius:50%;background:var(--pink);display:flex;align-items:center;justify-content:center;color:var(--red);}
+  .instr-label{font-family:'Sora',sans-serif;font-weight:700;font-size:15px;}
+  .instr-desc{font-size:11px;color:var(--muted);text-align:center;line-height:1.5;}
+
+  .how{padding:20px 64px 60px;}
+  .how-box{background:var(--near-black);border-radius:16px;padding:36px 44px;color:#fff;}
+  .how-title{font-family:'Sora',sans-serif;font-size:18px;font-weight:700;margin-bottom:22px;}
+  .how-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;}
+  .how-num{width:34px;height:34px;border-radius:8px;background:var(--red);color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;}
+  .how-step-title{font-size:14px;font-weight:700;margin-bottom:4px;}
+  .how-step-desc{font-size:12px;color:#D8CFC7;line-height:1.6;}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <a class="logo" href="/">
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    <div><div class="logo-name">MusicNote</div><div class="logo-sub">Music &amp; Online Courses</div></div>
+  </a>
+  <div class="head-actions">
+    <div style="display:flex;align-items:center;gap:6px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="7" r="4"/></svg><span>Login / Register</span></div>
+  </div>
+</header>
+
+<div class="crumbbar">
+  <a href="/">Home</a><span>/</span><span class="active">Video Create</span>
+</div>
+
+<section class="intro">
+  <div class="step-tag">STEP 1 OF 2</div>
+  <div class="intro-title">Choose Your Instrument</div>
+  <div class="intro-sub">Pick the instrument your video is built around. We'll load the right engine and inputs for it next.</div>
+</section>
+
+<section class="grid">
+  <a class="instr-card" href="/video-create/drum/">
+    <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="8" ry="3"/></svg></div>
+    <div class="instr-label">Drum</div>
+    <div class="instr-desc">MIDI-driven sticking animation</div>
+  </a>
+  <a class="instr-card disabled" href="#" aria-disabled="true">
+    <div class="soon-badge">SOON</div>
+    <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="18" height="10" rx="1"/><path d="M7 8v10M11 8v10M15 8v10"/></svg></div>
+    <div class="instr-label">Piano</div>
+    <div class="instr-desc">Code-generated finger movement</div>
+  </a>
+  <a class="instr-card disabled" href="#" aria-disabled="true">
+    <div class="soon-badge">SOON</div>
+    <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l9-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="15" cy="16" r="3"/></svg></div>
+    <div class="instr-label">Guitar</div>
+    <div class="instr-desc">Fretboard finger positions</div>
+  </a>
+  <a class="instr-card disabled" href="#" aria-disabled="true">
+    <div class="soon-badge">SOON</div>
+    <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V6l9-2.5v12"/><circle cx="6" cy="18" r="3"/></svg></div>
+    <div class="instr-label">Bass Guitar</div>
+    <div class="instr-desc">Fretboard finger positions</div>
+  </a>
+  <a class="instr-card disabled" href="#" aria-disabled="true">
+    <div class="soon-badge">SOON</div>
+    <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3c2 2 2 5 0 7s-2 5 0 7"/><path d="M15 3c-2 2-2 5 0 7s2 5 0 7"/></svg></div>
+    <div class="instr-label">Violin</div>
+    <div class="instr-desc">Bowing &amp; finger animation</div>
+  </a>
+  <a class="instr-card disabled" href="#" aria-disabled="true">
+    <div class="soon-badge">SOON</div>
+    <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3c2 2 2 5 0 7s-2 5 0 7"/><path d="M15 3c-2 2-2 5 0 7s2 5 0 7"/></svg></div>
+    <div class="instr-label">Viola</div>
+    <div class="instr-desc">Bowing &amp; finger animation</div>
+  </a>
+  <a class="instr-card disabled" href="#" aria-disabled="true">
+    <div class="soon-badge">SOON</div>
+    <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2c3 3 3 8 0 11s-3 8 0 11"/><path d="M16 2c-3 3-3 8 0 11s3 8 0 11"/></svg></div>
+    <div class="instr-label">Cello</div>
+    <div class="instr-desc">Bowing &amp; finger animation</div>
+  </a>
+  <a class="instr-card disabled" href="#" aria-disabled="true">
+    <div class="soon-badge">SOON</div>
+    <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2c3 3 3 8 0 11s-3 8 0 11"/><path d="M16 2c-3 3-3 8 0 11s3 8 0 11"/></svg></div>
+    <div class="instr-label">Bass Cello</div>
+    <div class="instr-desc">Bowing &amp; finger animation</div>
+  </a>
+  <a class="instr-card disabled" href="#" aria-disabled="true">
+    <div class="soon-badge">SOON</div>
+    <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg></div>
+    <div class="instr-label">Vocal</div>
+    <div class="instr-desc">Lyric &amp; performance overlay</div>
+  </a>
+</section>
+
+<section class="how">
+  <div class="how-box">
+    <div class="how-title">How Video Create works</div>
+    <div class="how-grid">
+      <div><div class="how-num">1</div><div class="how-step-title">Choose instrument</div><div class="how-step-desc">Pick the box that matches your file.</div></div>
+      <div><div class="how-num">2</div><div class="how-step-title">Upload &amp; style</div><div class="how-step-desc">Add your MIDI/score, titles and kit or preset.</div></div>
+      <div><div class="how-num">3</div><div class="how-step-title">Preview live</div><div class="how-step-desc">Watch the notation and animation sync in real time.</div></div>
+      <div><div class="how-num">4</div><div class="how-step-title">Generate &amp; download</div><div class="how-step-desc">Export a finished MP4, ready to share.</div></div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
