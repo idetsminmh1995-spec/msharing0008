@@ -197,7 +197,7 @@
 
     <div class="video-frame">
       <div class="video-top">
-        <div class="video-title">Drum Lesson 5</div>
+        <div class="video-title" id="videoTitle"></div>
         <div class="tempo-chip" id="tempoChip">♩ = —</div>
       </div>
       <div class="video-mid">
@@ -285,6 +285,18 @@
   }
 
   kitSelect.addEventListener('change', (e) => loadKitPreview(e.target.value));
+
+  // Title 1 live-binds to the video preview's own title -- previously
+  // that title was a hardcoded "Drum Lesson 5" with no connection to
+  // this input at all, so it showed even when Title 1 was genuinely
+  // empty. Now it shows exactly what's typed, live, nothing else.
+  const title1Input = document.getElementById('title1');
+  const videoTitle = document.getElementById('videoTitle');
+  function syncVideoTitle() {
+    videoTitle.textContent = title1Input.value;
+  }
+  title1Input.addEventListener('input', syncVideoTitle);
+  syncVideoTitle();
   loadDrumSets();
 
   // --- Real Notation Engine wiring -----------------------------------
