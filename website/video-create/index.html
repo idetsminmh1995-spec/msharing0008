@@ -33,8 +33,6 @@
   .grid{padding:36px 64px 20px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:22px;}
   .instr-card{background:#fff;border:2px solid var(--border);border-radius:16px;padding:28px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;transition:border-color .15s,box-shadow .15s;position:relative;}
   .instr-card:hover{border-color:var(--red);box-shadow:0 8px 24px rgba(200,30,44,0.14);}
-  .instr-card.disabled{cursor:default;}
-  .soon-badge{position:absolute;top:10px;right:10px;background:#F1EAE5;color:var(--muted);font-size:9px;font-weight:800;padding:3px 7px;border-radius:5px;}
   .instr-icon{width:64px;height:64px;border-radius:50%;background:var(--pink);display:flex;align-items:center;justify-content:center;color:var(--red);}
   .instr-label{font-family:'Sora',sans-serif;font-weight:700;font-size:15px;}
   .instr-desc{font-size:11px;color:var(--muted);text-align:center;line-height:1.5;}
@@ -76,50 +74,42 @@
     <div class="instr-label">Drum</div>
     <div class="instr-desc">MIDI-driven sticking animation</div>
   </a>
-  <a class="instr-card disabled" href="#" aria-disabled="true">
-    <div class="soon-badge">SOON</div>
+  <a class="instr-card" href="/video-create/piano/">
     <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="18" height="10" rx="1"/><path d="M7 8v10M11 8v10M15 8v10"/></svg></div>
     <div class="instr-label">Piano</div>
     <div class="instr-desc">Code-generated finger movement</div>
   </a>
-  <a class="instr-card disabled" href="#" aria-disabled="true">
-    <div class="soon-badge">SOON</div>
+  <a class="instr-card" href="/video-create/guitar/">
     <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l9-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="15" cy="16" r="3"/></svg></div>
     <div class="instr-label">Guitar</div>
     <div class="instr-desc">Fretboard finger positions</div>
   </a>
-  <a class="instr-card disabled" href="#" aria-disabled="true">
-    <div class="soon-badge">SOON</div>
+  <a class="instr-card" href="/video-create/bass-guitar/">
     <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V6l9-2.5v12"/><circle cx="6" cy="18" r="3"/></svg></div>
     <div class="instr-label">Bass Guitar</div>
     <div class="instr-desc">Fretboard finger positions</div>
   </a>
-  <a class="instr-card disabled" href="#" aria-disabled="true">
-    <div class="soon-badge">SOON</div>
+  <a class="instr-card" href="/video-create/violin/">
     <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3c2 2 2 5 0 7s-2 5 0 7"/><path d="M15 3c-2 2-2 5 0 7s2 5 0 7"/></svg></div>
     <div class="instr-label">Violin</div>
     <div class="instr-desc">Bowing &amp; finger animation</div>
   </a>
-  <a class="instr-card disabled" href="#" aria-disabled="true">
-    <div class="soon-badge">SOON</div>
+  <a class="instr-card" href="/video-create/viola/">
     <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3c2 2 2 5 0 7s-2 5 0 7"/><path d="M15 3c-2 2-2 5 0 7s2 5 0 7"/></svg></div>
     <div class="instr-label">Viola</div>
     <div class="instr-desc">Bowing &amp; finger animation</div>
   </a>
-  <a class="instr-card disabled" href="#" aria-disabled="true">
-    <div class="soon-badge">SOON</div>
+  <a class="instr-card" href="/video-create/cello/">
     <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2c3 3 3 8 0 11s-3 8 0 11"/><path d="M16 2c-3 3-3 8 0 11s3 8 0 11"/></svg></div>
     <div class="instr-label">Cello</div>
     <div class="instr-desc">Bowing &amp; finger animation</div>
   </a>
-  <a class="instr-card disabled" href="#" aria-disabled="true">
-    <div class="soon-badge">SOON</div>
+  <a class="instr-card" href="/video-create/bass-cello/">
     <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2c3 3 3 8 0 11s-3 8 0 11"/><path d="M16 2c-3 3-3 8 0 11s3 8 0 11"/></svg></div>
     <div class="instr-label">Bass Cello</div>
     <div class="instr-desc">Bowing &amp; finger animation</div>
   </a>
-  <a class="instr-card disabled" href="#" aria-disabled="true">
-    <div class="soon-badge">SOON</div>
+  <a class="instr-card" href="/video-create/vocal/">
     <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg></div>
     <div class="instr-label">Vocal</div>
     <div class="instr-desc">Lyric &amp; performance overlay</div>
