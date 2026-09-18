@@ -86,6 +86,8 @@
   .engine-pills{display:flex;gap:8px;flex-wrap:wrap;}
   .engine-pill{background:var(--pink);color:var(--red);font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;}
 </style>
+<!-- The real Notation Engine bundle (github.com/idetsminmh1995-spec/msharing0008/notation-engine) -->
+<script src="../../assets/notation-engine.js"></script>
 </head>
 <body>
 
@@ -186,39 +188,24 @@
     <div class="preview-head">
       <div class="title">Live Preview</div>
       <div class="preview-stats">
-        <span>BPM <b>120</b></span>
-        <span>Time <b>4/4</b></span>
-        <span>Duration <b>1:43.07</b></span>
+        <span>BPM <b id="statBpm">—</b></span>
+        <span>Time <b id="statTime">—</b></span>
+        <span>Measures <b id="statMeasures">—</b></span>
       </div>
     </div>
 
     <div class="video-frame">
       <div class="video-top">
         <div class="video-title">Drum Lesson 5</div>
-        <div class="tempo-chip">♩ = 120</div>
+        <div class="tempo-chip" id="tempoChip">♩ = —</div>
       </div>
       <div class="video-mid">
         <div class="drum-circle">
           <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="9" ry="3.4"/></svg>
         </div>
       </div>
-      <div class="video-notation">
-        <svg width="100%" height="52" viewBox="0 0 760 52">
-          <line x1="0" y1="8" x2="760" y2="8" stroke="#1E1512" stroke-width="0.8"/>
-          <line x1="0" y1="18" x2="760" y2="18" stroke="#1E1512" stroke-width="0.8"/>
-          <line x1="0" y1="28" x2="760" y2="28" stroke="#1E1512" stroke-width="0.8"/>
-          <line x1="0" y1="38" x2="760" y2="38" stroke="#1E1512" stroke-width="0.8"/>
-          <line x1="0" y1="48" x2="760" y2="48" stroke="#1E1512" stroke-width="0.8"/>
-          <circle cx="40" cy="28" r="4.5" fill="#1E1512"/><circle cx="90" cy="28" r="4.5" fill="#1E1512"/>
-          <circle cx="140" cy="28" r="4.5" fill="#1E1512"/><circle cx="184" cy="28" r="4.5" fill="#1E1512"/>
-          <circle cx="230" cy="28" r="4.5" fill="#1E1512"/><circle cx="280" cy="28" r="4.5" fill="#1E1512"/>
-          <circle cx="330" cy="28" r="4.5" fill="#1E1512"/><circle cx="380" cy="28" r="4.5" fill="#1E1512"/>
-          <circle cx="430" cy="28" r="4.5" fill="#1E1512"/><circle cx="480" cy="28" r="4.5" fill="#1E1512"/>
-          <circle cx="530" cy="28" r="4.5" fill="#1E1512"/><circle cx="580" cy="28" r="4.5" fill="#1E1512"/>
-          <circle cx="630" cy="28" r="4.5" fill="#1E1512"/><circle cx="680" cy="28" r="4.5" fill="#1E1512"/>
-          <circle cx="720" cy="28" r="4.5" fill="#1E1512"/><circle cx="750" cy="28" r="4.5" fill="#1E1512"/>
-          <rect x="184" y="4" width="3" height="48" fill="#C81E2C"/>
-        </svg>
+      <div class="video-notation" id="notationContainer" style="overflow-x:auto;overflow-y:hidden;white-space:nowrap;">
+        <span style="font-size:12px;color:var(--muted);">Loading notation…</span>
       </div>
     </div>
 
@@ -298,6 +285,104 @@
 
   kitSelect.addEventListener('change', (e) => loadKitPreview(e.target.value));
   loadDrumSets();
+
+  // --- Real Notation Engine wiring -----------------------------------
+  // Renders actual notation via the same notation-engine.js this repo
+  // builds and tests (notation-engine/), not a static mockup. Loads a
+  // real demo file (the user's own Drum_Lesson_5.musicxml) on page
+  // load, and re-renders live if the person picks their own MusicXML
+  // file via the Upload File card above.
+  const notationContainer = document.getElementById('notationContainer');
+  const statBpm = document.getElementById('statBpm');
+  const statTime = document.getElementById('statTime');
+  const statMeasures = document.getElementById('statMeasures');
+  const tempoChip = document.getElementById('tempoChip');
+  const uploadConfirm = document
+    .getElementById('upload-musicxml')
+    .closest('.card')
+    .querySelector('.confirm-msg');
+
+  function renderNotation(xmlText, fileLabel) {
+    if (typeof NotationEngine === 'undefined') {
+      notationContainer.textContent = 'Notation Engine failed to load.';
+      return;
+    }
+    let parsed;
+    let rendered;
+    try {
+      parsed = NotationEngine.parseMusicXml(xmlText);
+      rendered = NotationEngine.renderFromMusicXml(xmlText);
+    } catch (err) {
+      console.error('Notation Engine failed on this file:', err);
+      notationContainer.textContent = 'Could not parse this file -- see console for details.';
+      if (uploadConfirm) uploadConfirm.textContent = `Could not parse "${fileLabel}".`;
+      return;
+    }
+
+    // Inject the real rendered SVG, height-constrained to fit the strip
+    // (its own real width is left alone, so a long piece scrolls).
+    notationContainer.innerHTML = rendered.svg;
+    const svgEl = notationContainer.querySelector('svg');
+    if (svgEl) {
+      svgEl.removeAttribute('width');
+      svgEl.style.height = '52px';
+      svgEl.style.width = 'auto';
+      svgEl.style.display = 'block';
+    }
+
+    // Real stats, read from the actual parsed score -- not hardcoded.
+    const firstMark = parsed.tempoMarks && parsed.tempoMarks[0];
+    const firstAttrs = parsed.attributes && parsed.attributes[0];
+    const measureCount = parsed.score?.parts?.[0]?.measures?.length ?? 0;
+    if (firstMark) {
+      statBpm.textContent = String(firstMark.perMinute);
+      tempoChip.textContent = `\u266A = ${firstMark.perMinute}`;
+    } else {
+      statBpm.textContent = '\u2014';
+      tempoChip.textContent = '\u266A = \u2014';
+    }
+    if (firstAttrs) {
+      statTime.textContent = `${firstAttrs.timeNumerator}/${firstAttrs.timeDenominator}`;
+    } else {
+      statTime.textContent = '\u2014';
+    }
+    statMeasures.textContent = String(measureCount);
+
+    if (uploadConfirm) {
+      const errorCount = rendered.diagnostics.filter((d) => d.severity === 'error').length;
+      uploadConfirm.textContent =
+        errorCount === 0
+          ? `\u2713 Loaded "${fileLabel}" -- ${measureCount} measures rendered by the real Notation Engine.`
+          : `\u2713 Loaded "${fileLabel}" -- ${measureCount} measures, ${errorCount} error(s) (see console).`;
+      if (rendered.diagnostics.length > 0) console.log('Notation Engine diagnostics:', rendered.diagnostics);
+    }
+  }
+
+  function loadDemoNotation() {
+    fetch('../../assets/Drum_Lesson_5.musicxml')
+      .then((res) => {
+        if (!res.ok) throw new Error(`demo file request failed (${res.status})`);
+        return res.text();
+      })
+      .then((xmlText) => renderNotation(xmlText, 'Drum_Lesson_5.musicxml'))
+      .catch((err) => {
+        console.error('Demo notation failed to load:', err);
+        notationContainer.textContent = 'Could not load the demo score.';
+      });
+  }
+
+  document.getElementById('upload-musicxml').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => renderNotation(reader.result, file.name);
+    reader.onerror = () => {
+      if (uploadConfirm) uploadConfirm.textContent = `Could not read "${file.name}".`;
+    };
+    reader.readAsText(file);
+  });
+
+  loadDemoNotation();
 </script>
 </body>
 </html>
