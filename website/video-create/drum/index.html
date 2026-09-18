@@ -146,7 +146,7 @@
     <div class="card">
       <div class="card-head"><span class="card-num">3</span>Drum Kit</div>
       <label for="kit" style="position:absolute;left:-9999px;">Drum Kit</label>
-      <select id="kit" class="drum-input"><option>MS Drum 1</option><option>MS Drum 2</option><option>Studio Kit</option></select>
+      <select id="kit" class="drum-input"><option>Loading drum kits…</option></select>
       <div class="confirm-msg">✓ Kit loaded — background, kick, snare, hi-hat mapped.</div>
     </div>
 
@@ -240,5 +240,64 @@
 
 </div>
 
+<script>
+  // Connects this page to the Cloudflare Worker that proxies drum-kit
+  // images out of R2 (cloudflare-worker/src/index.ts). Populates the
+  // Drum Kit dropdown from the real R2 contents, and loads the selected
+  // kit's real background photo into the Live Preview panel.
+  const API_BASE = 'https://msharing-api.idetsminmh1995.workers.dev';
+  const ASPECT = '16x9';
+  const kitSelect = document.getElementById('kit');
+  const videoFrame = document.querySelector('.video-frame');
+  const drumCircle = document.querySelector('.drum-circle');
+  const kitConfirm = kitSelect.closest('.card').querySelector('.confirm-msg');
+
+  async function loadKitPreview(drumSetName) {
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/drum-sets/${encodeURIComponent(drumSetName)}/${ASPECT}/manifest`,
+      );
+      if (!res.ok) throw new Error(`manifest request failed (${res.status})`);
+      const manifest = await res.json();
+      if (manifest.hasBackground) {
+        const imgUrl = `${API_BASE}/assets/${encodeURIComponent(drumSetName)}/${ASPECT}/${encodeURIComponent(manifest.backgroundFile)}`;
+        videoFrame.style.backgroundImage = `url("${imgUrl}")`;
+        videoFrame.style.backgroundSize = 'cover';
+        videoFrame.style.backgroundPosition = 'center';
+        if (drumCircle) drumCircle.style.display = 'none';
+        if (kitConfirm) {
+          kitConfirm.textContent = `✓ Loaded "${drumSetName}" background + ${manifest.files.length} note images from R2.`;
+        }
+      } else {
+        if (kitConfirm) kitConfirm.textContent = `"${drumSetName}" has no background image for ${ASPECT} yet.`;
+      }
+    } catch (err) {
+      console.error('Drum kit preview failed to load:', err);
+      if (kitConfirm) kitConfirm.textContent = `Could not load "${drumSetName}" from the asset server.`;
+    }
+  }
+
+  async function loadDrumSets() {
+    try {
+      const res = await fetch(`${API_BASE}/api/drum-sets`);
+      if (!res.ok) throw new Error(`drum-sets request failed (${res.status})`);
+      const data = await res.json();
+      if (!Array.isArray(data.drumSets) || data.drumSets.length === 0) {
+        kitSelect.innerHTML = '<option>No drum kits found</option>';
+        return;
+      }
+      kitSelect.innerHTML = data.drumSets
+        .map((name) => `<option value="${name}">${name}</option>`)
+        .join('');
+      await loadKitPreview(kitSelect.value);
+    } catch (err) {
+      console.error('Drum kit list failed to load:', err);
+      kitSelect.innerHTML = '<option>Could not reach asset server</option>';
+    }
+  }
+
+  kitSelect.addEventListener('change', (e) => loadKitPreview(e.target.value));
+  loadDrumSets();
+</script>
 </body>
 </html>
