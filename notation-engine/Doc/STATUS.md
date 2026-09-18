@@ -14,7 +14,7 @@ after Phase 29 (end of Stage 4).
 ## A. DONE — Phases 1–42 ✅ (Stage 2 through 7 complete) + Integration Passes A & B
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 539/539 across them.
+`npm run verify` passes 552/552 across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -71,6 +71,7 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 45 | Scroll layout | Full §16.1 mode (computeScrollLayout), formalizing + wiring what the renderer already did since Integration E; zero regressions from the extraction | [`phase-45`](./phase-45-scroll-layout.md) |
 | 46 | Page layout (system + page breaking) | Full §16.2 algorithm; found+fixed a real single-measure justification gap in Phase 43's own justifySystem; not yet wired into rendering | [`phase-46`](./phase-46-page-layout.md) |
 | — | **Integration G** (not a numbered phase) | Tempo mark display/positioning fixes, in two rounds (equals-sign spacing, vertical clearance, measure-width awareness, and a real x-formula inconsistency found by testing against the user's own real file) -- prompted by user-reported screenshots | [`integration-g`](./integration-g-tempo-mark-fixes.md) |
+| 47 | Arbitrary resize | Full §16.3 O(1) pure-scale fast path; directly usable on any rendered SVG today (no wiring pass needed) -- completes Stage 8 | [`phase-47`](./phase-47-arbitrary-resize.md) |
 
 **Public API today:** 137 exports from `dist/notation-engine.js`.
 
@@ -88,7 +89,6 @@ that specifies it.
 ### Stage 8 — Real layout
 | # | Phase | Spec |
 |---|---|---|
-| **47** | Arbitrary W×H resize + O(1) pure-scale fast path | §16.3 |
 
 ### Stage 9 — Playback surface
 | # | Phase | Spec |

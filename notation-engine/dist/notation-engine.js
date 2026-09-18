@@ -81,6 +81,7 @@ var NotationEngine = (() => {
     computeLedgerLines: () => computeLedgerLines,
     computePageLayout: () => computePageLayout,
     computeProportionalPositions: () => computeProportionalPositions,
+    computePxPerStaffSpace: () => computePxPerStaffSpace,
     computeReferenceDuration: () => computeReferenceDuration,
     computeScrollLayout: () => computeScrollLayout,
     computeSlurShape: () => computeSlurShape,
@@ -108,6 +109,7 @@ var NotationEngine = (() => {
     emptySkyline: () => emptySkyline,
     escapeXmlText: () => escapeXmlText,
     evaluateAccidental: () => evaluateAccidental,
+    extractViewBox: () => extractViewBox,
     flagGlyphName: () => flagGlyphName,
     flatsForCount: () => flatsForCount,
     flattenPartNotes: () => flattenPartNotes,
@@ -145,6 +147,7 @@ var NotationEngine = (() => {
     needsBrace: () => needsBrace,
     needsContinuousBarline: () => needsContinuousBarline,
     needsFlag: () => needsFlag,
+    needsReflow: () => needsReflow,
     note: () => note,
     noteheadMappingKey: () => noteheadMappingKey,
     noteheadWidth: () => noteheadWidth,
@@ -186,6 +189,7 @@ var NotationEngine = (() => {
     renderTupletBracket: () => renderTupletBracket,
     renderTupletNumber: () => renderTupletNumber,
     resetMeasure: () => resetMeasure,
+    resizePureScale: () => resizePureScale,
     resolveConfig: () => resolveConfig,
     resolveNoteheadCollision: () => resolveNoteheadCollision,
     resolveStemDirection: () => resolveStemDirection,
@@ -61277,6 +61281,41 @@ ${denominator}`;
       return { systems };
     });
     return { pages, usableWidth, usableHeight };
+  }
+
+  // src/layout/resize.ts
+  function extractViewBox(svg) {
+    const match = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
+    if (match === null) return void 0;
+    const width = Number(match[1]);
+    const height = Number(match[2]);
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0)
+      return void 0;
+    return { width, height };
+  }
+  function computePxPerStaffSpace(viewBox, targetWidthPx, targetHeightPx) {
+    const widthScale = targetWidthPx / viewBox.width;
+    const heightScale = targetHeightPx / viewBox.height;
+    return Math.min(widthScale, heightScale);
+  }
+  function resizePureScale(svg, targetWidthPx, targetHeightPx) {
+    const viewBox = extractViewBox(svg);
+    if (viewBox === void 0) return { svg, pxPerStaffSpace: 0 };
+    const pxPerStaffSpace = computePxPerStaffSpace(viewBox, targetWidthPx, targetHeightPx);
+    const newWidthPx = viewBox.width * pxPerStaffSpace;
+    const newHeightPx = viewBox.height * pxPerStaffSpace;
+    const resized = svg.replace(
+      /<svg xmlns="[^"]*" width="[\d.]+" height="[\d.]+"/,
+      (fullMatch) => fullMatch.replace(
+        /width="[\d.]+" height="[\d.]+"/,
+        `width="${newWidthPx}" height="${newHeightPx}"`
+      )
+    );
+    return { svg: resized, pxPerStaffSpace };
+  }
+  function needsReflow(layoutMode, oldUsableWidthSp, newUsableWidthSp) {
+    if (layoutMode === "scroll") return false;
+    return oldUsableWidthSp !== newUsableWidthSp;
   }
 
   // src/timing/diagnostic.ts

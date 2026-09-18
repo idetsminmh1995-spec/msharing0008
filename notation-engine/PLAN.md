@@ -1997,7 +1997,7 @@ exceed usable height, then a page break occurs.
 Respects explicit `<print new-system="yes">` / `new-page="yes"` from MusicXML.
 Page geometry (size, margins) comes from `config.page`.
 
-### 16.3 Arbitrary width × height resize — a hard requirement
+### 16.3 Arbitrary width × height resize — a hard requirement `[BUILT and directly usable -- see Doc/phase-47-arbitrary-resize.md]`
 
 ```ts
 engine.resize(widthPx: number, heightPx: number): void
@@ -2337,7 +2337,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 41 | Drum mapping table + GM defaults (§13.3) | ✅ (built + wired into rendering) |
 | 42 | MIDI↔MusicXML alignment (§13.1–§13.2) | ✅ |
 
-### Stage 8 — Real layout `[IN PROGRESS — 46 of 47]`
+### Stage 8 — Real layout `[COMPLETE]`
 
 | Phase | What | Status |
 |---|---|---|
@@ -2345,7 +2345,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 44 | Skyline collision avoidance (§15) | ✅ (algorithm + grand-staff distance wired into rendering by Integration F) |
 | 45 | Scroll layout (§16.1) | ✅ (built + wired into rendering) |
 | 46 | Page layout + system/page breaking (§16.2) | ✅ (algorithm); wiring pending |
-| 47 | Arbitrary W×H resize, incl. the O(1) pure-scale fast path (§16.3) | |
+| 47 | Arbitrary W×H resize, incl. the O(1) pure-scale fast path (§16.3) | ✅ (built + directly usable) |
 
 ### Stage 9 — Playback surface
 

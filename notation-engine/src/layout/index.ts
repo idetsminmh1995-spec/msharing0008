@@ -6,3 +6,4 @@ export * from './skyline.js';
 export * from './skyline-placement.js';
 export * from './scroll.js';
 export * from './page.js';
+export * from './resize.js';
