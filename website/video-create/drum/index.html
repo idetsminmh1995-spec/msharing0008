@@ -374,6 +374,33 @@
   document.getElementById('upload-musicxml').addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
+    const isMxl = /\.mxl$/i.test(file.name);
+
+    if (isMxl) {
+      // §10.2: a .mxl file is a ZIP archive -- the real score XML lives
+      // inside it, pointed to by META-INF/container.xml. Read it as
+      // bytes (never text -- it's binary) and hand it to the engine's
+      // own unzipMxl, the exact same code path notation-engine's own
+      // tests use for this format.
+      const reader = new FileReader();
+      reader.onload = () => {
+        const bytes = new Uint8Array(reader.result);
+        const unzipped = NotationEngine.unzipMxl(bytes, window.DOMParser);
+        if (unzipped.xmlText === undefined) {
+          const reason = unzipped.diagnostics[0]?.message ?? 'Unknown error while unzipping.';
+          if (uploadConfirm) uploadConfirm.textContent = `Could not read "${file.name}": ${reason}`;
+          console.error('unzipMxl failed:', unzipped.diagnostics);
+          return;
+        }
+        renderNotation(unzipped.xmlText, file.name);
+      };
+      reader.onerror = () => {
+        if (uploadConfirm) uploadConfirm.textContent = `Could not read "${file.name}".`;
+      };
+      reader.readAsArrayBuffer(file);
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => renderNotation(reader.result, file.name);
     reader.onerror = () => {
