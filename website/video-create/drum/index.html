@@ -35,7 +35,7 @@
   .step-current{color:var(--text);font-weight:700;}
 
   .body{display:flex;gap:24px;padding:28px 64px 60px;align-items:flex-start;}
-  .left{width:420px;display:flex;flex-direction:column;gap:16px;}
+  .left{width:420px;flex-shrink:0;display:flex;flex-direction:column;gap:16px;}
   .page-title{font-family:'Sora',sans-serif;font-size:22px;font-weight:800;}
 
   .card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:18px;}
@@ -61,19 +61,20 @@
   .cost-line{text-align:center;font-size:12px;color:var(--muted);}
   .cost-line b{color:var(--red);font-weight:700;}
 
-  .right{flex:1;display:flex;flex-direction:column;gap:14px;}
+  .right{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px;}
   .preview-head{display:flex;justify-content:space-between;align-items:center;}
   .preview-head .title{font-weight:700;font-size:14px;}
   .preview-stats{display:flex;gap:16px;font-size:12px;color:var(--muted);}
   .preview-stats b{color:var(--text);}
 
-  .video-frame{background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;}
+  .video-frame{background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-width:0;}
   .video-top{padding:22px 26px 0;display:flex;justify-content:space-between;}
   .video-title{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:20px;}
   .tempo-chip{background:var(--red);color:#fff;font-size:11px;font-weight:800;padding:4px 10px;border-radius:6px;}
   .video-mid{flex:1;display:flex;align-items:center;justify-content:center;}
   .drum-circle{width:120px;height:120px;border-radius:50%;border:3px solid var(--red);display:flex;align-items:center;justify-content:center;color:var(--red);}
-  .video-notation{background:#fff;padding:14px 20px;}
+  .video-notation{background:#fff;padding:14px 20px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;}
+  .video-notation svg{display:block;height:52px;width:auto;max-width:none;}
 
   .transport{display:flex;align-items:center;gap:14px;}
   .play-btn{width:42px;height:42px;border-radius:50%;background:var(--red);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
@@ -204,7 +205,7 @@
           <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="9" ry="3.4"/></svg>
         </div>
       </div>
-      <div class="video-notation" id="notationContainer" style="overflow-x:auto;overflow-y:hidden;white-space:nowrap;">
+      <div class="video-notation" id="notationContainer">
         <span style="font-size:12px;color:var(--muted);">Loading notation…</span>
       </div>
     </div>
@@ -325,9 +326,7 @@
     const svgEl = notationContainer.querySelector('svg');
     if (svgEl) {
       svgEl.removeAttribute('width');
-      svgEl.style.height = '52px';
-      svgEl.style.width = 'auto';
-      svgEl.style.display = 'block';
+      svgEl.removeAttribute('height');
     }
 
     // Real stats, read from the actual parsed score -- not hardcoded.
@@ -407,6 +406,69 @@
       if (uploadConfirm) uploadConfirm.textContent = `Could not read "${file.name}".`;
     };
     reader.readAsText(file);
+  });
+
+  // MIDI/Audio slots: switch which slot looks "active" so the person
+  // gets visible feedback that a file was picked at all (previously
+  // these two inputs had no listener whatsoever -- selecting a file
+  // did nothing visible, which is what was reported as "doesn't
+  // work"). MIDI is genuinely parsed (the engine's own real MIDI
+  // parser, Phase 39) and its real stats are reported; full notation
+  // RENDERING from MIDI isn't wired into this page, so that limit is
+  // stated plainly rather than pretended away. Audio has no parsing
+  // path in this engine at all, so it's named as unsupported, not
+  // silently accepted.
+  function setActiveSlot(inputId) {
+    document.querySelectorAll('.upload-slot').forEach((slot) => {
+      slot.classList.toggle('active', slot.getAttribute('for') === inputId);
+    });
+  }
+
+  document.getElementById('upload-musicxml').addEventListener('click', () => setActiveSlot('upload-musicxml'));
+  document.getElementById('upload-midi').addEventListener('click', () => setActiveSlot('upload-midi'));
+  document.getElementById('upload-audio').addEventListener('click', () => setActiveSlot('upload-audio'));
+
+  document.getElementById('upload-midi').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setActiveSlot('upload-midi');
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const bytes = new Uint8Array(reader.result);
+        const result = NotationEngine.parseMidiFile(bytes);
+        if (result.midiFile === undefined) {
+          const reason = result.diagnostics[0]?.message ?? 'Unknown error.';
+          if (uploadConfirm) uploadConfirm.textContent = `Could not read "${file.name}": ${reason}`;
+          return;
+        }
+        const noteCount = result.midiFile.tracks.reduce((sum, t) => sum + t.notes.length, 0);
+        const firstTempo = result.midiFile.tempoEvents[0];
+        const bpm = firstTempo ? Math.round(60000000 / firstTempo.microsecondsPerQuarter) : undefined;
+        if (uploadConfirm) {
+          uploadConfirm.textContent =
+            `Parsed "${file.name}" -- ${result.midiFile.tracks.length} track(s), ${noteCount} notes` +
+            (bpm ? `, ${bpm} BPM` : '') +
+            '. Notation rendering from MIDI isn\u2019t wired into this preview yet -- upload a MusicXML/MXL file to see notation.';
+        }
+      } catch (err) {
+        console.error('MIDI parse failed:', err);
+        if (uploadConfirm) uploadConfirm.textContent = `Could not read "${file.name}" as a MIDI file.`;
+      }
+    };
+    reader.onerror = () => {
+      if (uploadConfirm) uploadConfirm.textContent = `Could not read "${file.name}".`;
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  document.getElementById('upload-audio').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setActiveSlot('upload-audio');
+    if (uploadConfirm) {
+      uploadConfirm.textContent = `"${file.name}" selected -- audio-to-notation isn\u2019t supported yet. Upload a MusicXML/MXL file to see notation.`;
+    }
   });
 
   loadDemoNotation();
