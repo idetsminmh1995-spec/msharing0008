@@ -86,7 +86,7 @@ import { computeDebugSkylines, filterDiagnostics, measureSvgBoxes } from './debu
 import { computeBraceShape, needsBrace, needsContinuousBarline } from './geometry/index.js';
 import { renderBrace } from './render/index.js';
 import type { Diagnostic, MeasureAttributes } from './parser/index.js';
-import { parseMusicXml, type ParseMusicXmlOptions } from './parser/index.js';
+import { parseMusicXml, type ParseMusicXmlOptions, type ParseResult } from './parser/index.js';
 import {
   resolveConfig,
   type EngineConfig,
@@ -496,18 +496,18 @@ const BEAM_THICKNESS_FALLBACK = 0.5;
 const BEAM_SPACING_FALLBACK = 0.25;
 /** The natural (unbeamed) stem length a beam group's shape starts from, matching Phase 16's own default. */
 const DEFAULT_UNBEAMED_STEM_LENGTH = 3.5;
-export interface RenderFromMusicXmlOptions extends ParseMusicXmlOptions {
+/** What `renderParsedMusicXml` takes: everything `renderFromMusicXml` does, minus the parser's own options (parsing already happened). */
+export interface RenderParsedMusicXmlOptions {
   /**
-   * Integration L/§16.2: the engine config. Only the sections this
-   * renderer actually reads are honoured today -- `layout.mode`
-   * ('scroll' vs 'page'), `page` (page geometry), and `spacing`.
-   * Everything else (colours, fonts, bar numbers, ...) is still the
-   * hardcoded constant it was; unifying ALL of them is Phase 50's own
-   * job (§8, Stage 10), and pretending otherwise here would be worse
-   * than saying so.
+   * Integration L/§16.2 + Phase 50/§8: the engine config. Every section
+   * the renderer can act on is live -- see `buildTheme` and
+   * `Doc/phase-50-theming-api.md`.
    */
   readonly config?: PartialEngineConfig;
 }
+
+export interface RenderFromMusicXmlOptions
+  extends ParseMusicXmlOptions, RenderParsedMusicXmlOptions {}
 
 export interface RenderFromMusicXmlResult {
   readonly svg: string;
@@ -1647,9 +1647,25 @@ function renderSpans(
  * slurs and tuplets (I); dynamics and hairpins (J); multi-voice notehead
  * collisions (K).
  */
-export function renderFromMusicXml(
-  xmlText: string,
-  options?: RenderFromMusicXmlOptions,
+/**
+ * Phase 53/§18.1: render a score that has ALREADY been parsed.
+ *
+ * §18.1's own performance strategy says "the `Score` and layout result
+ * are cached so resize/re-theme never re-parse", and until this phase
+ * there was no way to honour it: `renderFromMusicXml` always parsed, so
+ * every resize, every theme change and every scroll/page switch paid for
+ * the XML again. Parsing is by far the most expensive step (measured on
+ * a 100-measure score in Chromium: 35.8ms of a 46.9ms total), so a host
+ * driving an interactive resize was spending three quarters of its
+ * budget re-deriving a `Score` it already had.
+ *
+ * Hold the `parseMusicXml` result, call this as often as you like.
+ * `renderFromMusicXml` is exactly `parseMusicXml` + this, so nothing
+ * about the one-shot path changes.
+ */
+export function renderParsedMusicXml(
+  parsed: ParseResult,
+  options?: RenderParsedMusicXmlOptions,
 ): RenderFromMusicXmlResult {
   const {
     score,
@@ -1659,7 +1675,7 @@ export function renderFromMusicXml(
     midiInstrumentsByPart: midiInstrumentsByPartMap,
     directions,
     prints,
-  } = parseMusicXml(xmlText, options);
+  } = parsed;
   const diagnostics: Diagnostic[] = [...parseDiagnostics];
   const config = resolveConfig(options?.config);
   // Phase 50/§8: one resolution of every user-facing drawing value, passed
@@ -2902,4 +2918,21 @@ export function renderFromMusicXml(
   // everything, so a caller that sets nothing sees exactly what it always
   // did.
   return { svg, diagnostics: filterDiagnostics(diagnostics, config.debug.logLevel), playback };
+}
+
+/**
+ * Parse a MusicXML document and render it, in one call -- the ordinary
+ * entry point, and exactly `parseMusicXml` followed by
+ * `renderParsedMusicXml`.
+ *
+ * For anything that re-renders the SAME score (a resize, a theme change,
+ * a scroll/page switch), keep the `parseMusicXml` result and call
+ * `renderParsedMusicXml` instead: parsing is the expensive step, and
+ * §18.1's interactive budgets assume it is not repeated.
+ */
+export function renderFromMusicXml(
+  xmlText: string,
+  options?: RenderFromMusicXmlOptions,
+): RenderFromMusicXmlResult {
+  return renderParsedMusicXml(parseMusicXml(xmlText, options), options);
 }

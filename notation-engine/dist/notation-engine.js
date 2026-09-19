@@ -204,6 +204,7 @@ var NotationEngine = (() => {
     renderMark: () => renderMark,
     renderMetronomeMark: () => renderMetronomeMark,
     renderNotehead: () => renderNotehead,
+    renderParsedMusicXml: () => renderParsedMusicXml,
     renderRest: () => renderRest,
     renderSkylineOverlay: () => renderSkylineOverlay,
     renderSlur: () => renderSlur,
@@ -64474,7 +64475,7 @@ ${xrefOffset}
     }
     return parts.join("\n");
   }
-  function renderFromMusicXml(xmlText, options) {
+  function renderParsedMusicXml(parsed, options) {
     const {
       score: score2,
       attributes,
@@ -64483,7 +64484,7 @@ ${xrefOffset}
       midiInstrumentsByPart: midiInstrumentsByPartMap,
       directions,
       prints
-    } = parseMusicXml(xmlText, options);
+    } = parsed;
     const diagnostics = [...parseDiagnostics];
     const config = resolveConfig(options?.config);
     const theme = buildTheme(config);
@@ -65255,6 +65256,9 @@ ${xrefOffset}
       measureHeaderAllowance: MEASURE_HEADER_ALLOWANCE
     });
     return { svg, diagnostics: filterDiagnostics(diagnostics, config.debug.logLevel), playback };
+  }
+  function renderFromMusicXml(xmlText, options) {
+    return renderParsedMusicXml(parseMusicXml(xmlText, options), options);
   }
 
   // src/index.ts

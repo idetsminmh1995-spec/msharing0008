@@ -2124,7 +2124,7 @@ tempo map; cursor x under both modes for the same tick.
 
 ## 18. Engineering Concerns
 
-### 18.1 Performance budget
+### 18.1 Performance budget `[MEASURED and ENFORCED -- Phase 53]`
 
 | Operation | Target | Note |
 |---|---|---|
@@ -2136,7 +2136,9 @@ tempo map; cursor x under both modes for the same tick.
 | Cursor position update | < 1 ms | called every frame |
 
 **Strategies:** the `Score` and layout result are cached so resize/re-theme
-never re-parse; `positionToX` uses binary search over a precomputed
+never re-parse (Phase 53's `renderParsedMusicXml`, which takes an
+already-parsed score -- parsing is ~80% of a render's cost, so this is the
+whole of the interactive budget); `positionToX` uses binary search over a precomputed
 position table, never a linear scan; SVG is built by array-join, not repeated
 string concatenation; geometry functions are pure and therefore memoisable if
 profiling shows a need (do not pre-optimise).
@@ -2420,7 +2422,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 50 | Full theming API — unify every config section (§8) | ✅ (built -- see Doc/phase-50-theming-api.md) |
 | 51 | Debug overlays and diagnostics surface (§18.3) | ✅ (built -- see Doc/phase-51-debug-overlays.md) |
 | 52 | Export: SVG, PNG, PDF (§3, §16.2) | ✅ (built -- see Doc/phase-52-export.md) |
-| 53 | Performance pass against §18.1's budgets | |
+| 53 | Performance pass against §18.1's budgets | ✅ (built -- see Doc/phase-53-performance.md) |
 | 54 | Public API surface + generated reference docs into `docs/` | |
 
 ### Sequencing rules
