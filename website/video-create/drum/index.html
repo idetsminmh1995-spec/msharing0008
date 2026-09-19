@@ -102,7 +102,7 @@
   /* Brand mark, burned into the exported video's own frame (top-left,
      inside .video-logo-row) -- replaces the generic note-icon placeholder
      that stood in for it before the real logo existed. */
-  .video-logo-mark{height:34px;width:auto;flex-shrink:0;}
+  .video-logo-mark{height:80px;width:auto;flex-shrink:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));}
 
   .transport{display:flex;align-items:center;gap:14px;}
   .play-btn{width:42px;height:42px;border-radius:50%;background:var(--red);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
@@ -226,7 +226,7 @@
     <div class="video-frame">
       <div class="video-top">
         <div class="video-logo-row">
-          <img class="video-logo-mark" src="../../assets/logo/sharing-drum-mark.webp" alt="M Sharing Drum">
+          <img class="video-logo-mark" src="../../assets/logo/sharing-drum-logo-full.webp" alt="M Sharing Drum">
           <div class="video-title" id="videoTitle"></div>
         </div>
         <div class="video-stats">

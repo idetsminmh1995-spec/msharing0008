@@ -62158,21 +62158,21 @@ ${denominator}`;
     37: {
       midiNote: 37,
       name: "Side Stick",
-      staffPosition: -1.5,
+      staffPosition: -2.5,
       noteheadShape: "x",
       stemDirection: "up"
     },
     38: {
       midiNote: 38,
       name: "Acoustic Snare",
-      staffPosition: -1.5,
+      staffPosition: -2.5,
       noteheadShape: "normal",
       stemDirection: "up"
     },
     40: {
       midiNote: 40,
       name: "Electric Snare",
-      staffPosition: -1.5,
+      staffPosition: -2.5,
       noteheadShape: "normal",
       stemDirection: "up"
     },
@@ -62221,7 +62221,7 @@ ${denominator}`;
     42: {
       midiNote: 42,
       name: "Closed Hi-Hat",
-      staffPosition: -4,
+      staffPosition: -4.5,
       noteheadShape: "x",
       stemDirection: "up"
     },
@@ -62235,7 +62235,7 @@ ${denominator}`;
     46: {
       midiNote: 46,
       name: "Open Hi-Hat",
-      staffPosition: -4,
+      staffPosition: -4.5,
       noteheadShape: "x",
       stemDirection: "up",
       articulation: "open"
