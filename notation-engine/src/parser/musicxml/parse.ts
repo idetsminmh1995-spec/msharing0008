@@ -17,6 +17,15 @@ import { parseNoteElement, type ParsedNoteEvent } from './note.js';
 import { attrOf, childrenNamed, firstChildNamed, intOf, textOf } from './dom-helpers.js';
 import { parseMidiInstrumentMap } from './instrument.js';
 import { convertTimewiseToPartwise } from './timewise.js';
+import {
+  directionPlacement,
+  directionStaff,
+  parseDirectionElement,
+  parseSoundTempo,
+  type ParsedDynamicLevel,
+  type ParsedWedge,
+} from './direction.js';
+import { parseHarmonyElement, type ParsedHarmony } from './harmony.js';
 
 const DEFAULT_DIVISIONS = 1;
 const DEFAULT_FIFTHS = 0;
@@ -40,6 +49,8 @@ export interface MeasureAttributes {
   readonly fifths: number;
   readonly timeNumerator: number;
   readonly timeDenominator: number;
+  /** STATUS C3/§9.4: an additive meter's written form ("3+2+2"), when the file wrote one. Absent for an ordinary meter. */
+  readonly timeNumeratorDisplay?: string;
   readonly clefSign: string;
   readonly clefLine?: number;
   /** Integration A: how many staves this part has (piano = 2, most instruments = 1). */
@@ -63,6 +74,45 @@ export interface TempoMarkEvent {
   readonly perMinute: number;
 }
 
+/**
+ * Phase 35 Tier 2/§10.4: one `<direction>`'s recognized content at the
+ * measure-local tick it appeared at. A side-table for the same reason
+ * `tempoMarks` is one -- a direction attaches to a POSITION, not to a
+ * note, so Phase 3's core `Score` deliberately has nowhere to put it.
+ */
+export interface DirectionEvent {
+  readonly partId: string;
+  readonly measureNumber: number;
+  /** Measure-local tick from §10.1's shared cursor. A `<direction>` is a marking and never advances it. */
+  readonly tick: number;
+  /** `<direction staff="N">`, defaulting to 1 -- which staff of a grand staff this marking sits under. */
+  readonly staff: number;
+  readonly placement?: 'above' | 'below';
+  readonly dynamics: readonly ParsedDynamicLevel[];
+  readonly wedges: readonly ParsedWedge[];
+  readonly words: readonly string[];
+  readonly rehearsals: readonly string[];
+}
+
+/** Phase 35 Tier 2/§10.4: one `<harmony>` (chord symbol) at a measure-local tick. See `harmony.ts` for why the `<kind>` is preserved raw rather than reduced. */
+export interface HarmonyEvent extends ParsedHarmony {
+  readonly partId: string;
+  readonly measureNumber: number;
+  readonly tick: number;
+}
+
+/**
+ * Phase 35 Tier 2/§10.4: one `<print>`'s system/page break request.
+ * §16.2's page layout consumes this directly ("Respects explicit
+ * `<print new-system="yes">`/`new-page="yes"` from MusicXML").
+ */
+export interface PrintEvent {
+  readonly partId: string;
+  readonly measureNumber: number;
+  readonly newSystem: boolean;
+  readonly newPage: boolean;
+}
+
 export interface ParseResult {
   readonly score: Score;
   readonly attributes: readonly MeasureAttributes[];
@@ -82,6 +132,12 @@ export interface ParseResult {
    * actually consumes this; this phase only makes the mapping available.
    */
   readonly midiInstrumentsByPart: ReadonlyMap<string, ReadonlyMap<string, number>>;
+  /** Phase 35 Tier 2/§10.4: every `<direction>` with recognized content, in document order. */
+  readonly directions: readonly DirectionEvent[];
+  /** Phase 35 Tier 2/§10.4: every `<harmony>`, in document order. */
+  readonly harmonies: readonly HarmonyEvent[];
+  /** Phase 35 Tier 2/§10.4: every `<print>` that asks for a system or page break, in document order. */
+  readonly prints: readonly PrintEvent[];
 }
 
 /** Minimal shape of what a DOMParser needs to provide -- lets tests inject jsdom's (or any other) implementation, per §10's "tests inject a parser so Node can run them." */
@@ -114,6 +170,8 @@ function buildSingle(ev: ParsedNoteEvent): Note | Rest {
       duration: buildDuration(ev),
       voice: ev.voice,
       ...(ev.staff !== undefined ? { staff: ev.staff } : {}),
+      // A rest can carry a fermata exactly as a note can (§10.4).
+      ...(ev.notations.hasFermata ? { hasFermata: true } : {}),
     });
   }
   // Percussion (<unpitched>) and pitched notes use the SAME Note type --
@@ -138,6 +196,20 @@ function buildSingle(ev: ParsedNoteEvent): Note | Rest {
       ? { explicitStemDirection: ev.explicitStemDirection }
       : {}),
     ...(ev.hasExplicitAccidental ? { hasExplicitAccidental: true } : {}),
+    // Phase 35 Tier 2/§10.4. Every one of these is omitted entirely when
+    // empty rather than set to an empty array, so a note from a file
+    // with no notations at all produces a byte-identical object to the
+    // one it produced before this phase -- which is what keeps every
+    // pre-existing snapshot and deep-equality test valid.
+    ...(ev.notations.articulations.length > 0 ? { articulations: ev.notations.articulations } : {}),
+    ...(ev.notations.ornaments.length > 0 ? { ornaments: ev.notations.ornaments } : {}),
+    ...(ev.notations.hasFermata ? { hasFermata: true } : {}),
+    ...(ev.notations.slurStarts.length > 0 ? { slurStarts: ev.notations.slurStarts } : {}),
+    ...(ev.notations.slurStops.length > 0 ? { slurStops: ev.notations.slurStops } : {}),
+    ...(ev.notations.tupletStart ? { tupletStart: true } : {}),
+    ...(ev.notations.tupletStop ? { tupletStop: true } : {}),
+    ...(ev.beams.length > 0 ? { beams: ev.beams } : {}),
+    ...(ev.lyrics.length > 0 ? { lyrics: ev.lyrics } : {}),
   });
 }
 
@@ -253,6 +325,9 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
       diagnostics,
       tempoMarks: [],
       midiInstrumentsByPart: new Map(),
+      directions: [],
+      harmonies: [],
+      prints: [],
     };
   }
 
@@ -273,6 +348,9 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
   const parts: Part[] = [];
   const allAttributes: MeasureAttributes[] = [];
   const tempoMarks: TempoMarkEvent[] = [];
+  const directions: DirectionEvent[] = [];
+  const harmonies: HarmonyEvent[] = [];
+  const prints: PrintEvent[] = [];
 
   for (const partEl of childrenNamed(root, 'part')) {
     const partId = attrOf(partEl, 'id') ?? `part-${parts.length + 1}`;
@@ -285,6 +363,8 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
     let currentFifths = DEFAULT_FIFTHS;
     let currentTimeNumerator = DEFAULT_TIME_NUMERATOR;
     let currentTimeDenominator = DEFAULT_TIME_DENOMINATOR;
+    /** STATUS C3: an additive meter's written form, cleared whenever a later <time> is an ordinary one -- otherwise a 7/8 "3+2+2" would keep displaying over a subsequent plain 4/4. */
+    let currentTimeNumeratorDisplay: string | undefined;
     let currentClefSign = DEFAULT_CLEF_SIGN;
     let currentClefLine: number | undefined = DEFAULT_CLEF_LINE;
     // Integration A: a part's staff count and its per-staff clefs. Merged
@@ -328,7 +408,12 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           const update = parseAttributesElement(child);
           if (update.divisions !== undefined) currentDivisions = update.divisions;
           if (update.fifths !== undefined) currentFifths = update.fifths;
-          if (update.timeNumerator !== undefined) currentTimeNumerator = update.timeNumerator;
+          if (update.timeNumerator !== undefined) {
+            currentTimeNumerator = update.timeNumerator;
+            // Deliberately assigned even when undefined: a new <time> that
+            // is NOT additive must clear a previous additive display.
+            currentTimeNumeratorDisplay = update.timeNumeratorDisplay;
+          }
           if (update.timeDenominator !== undefined) currentTimeDenominator = update.timeDenominator;
           if (update.clefSign !== undefined) currentClefSign = update.clefSign;
           if (update.clefLine !== undefined) currentClefLine = update.clefLine;
@@ -404,6 +489,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           // recorded the same UNKNOWN_ELEMENT way as before, rather than
           // silently swallowed now that <direction> itself has a branch.
           let recognizedSomething = false;
+          let producedTempoMark = false;
           for (const directionTypeEl of childrenNamed(child, 'direction-type')) {
             const metronomeEl = firstChildNamed(directionTypeEl, 'metronome');
             if (metronomeEl === undefined) continue;
@@ -435,16 +521,105 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
               perMinute,
             });
             recognizedSomething = true;
+            producedTempoMark = true;
           }
+
+          // Phase 35 Tier 2/§10.4: the rest of <direction>'s content --
+          // dynamics, wedges, words, rehearsal marks -- plus <sound tempo>.
+          const { content, diagnostics: directionDiags } = parseDirectionElement(child, location);
+          diagnostics.push(...directionDiags);
+          if (directionDiags.length > 0) recognizedSomething = true;
+          const placement = directionPlacement(child);
+          if (
+            content.dynamics.length > 0 ||
+            content.wedges.length > 0 ||
+            content.words.length > 0 ||
+            content.rehearsals.length > 0
+          ) {
+            directions.push({
+              partId,
+              measureNumber,
+              tick,
+              staff: directionStaff(child),
+              ...(placement !== undefined ? { placement } : {}),
+              dynamics: content.dynamics,
+              wedges: content.wedges,
+              words: content.words,
+              rehearsals: content.rehearsals,
+            });
+            recognizedSomething = true;
+          }
+          // A <sound tempo> alongside a <metronome> in the SAME <direction>
+          // is the same tempo stated twice (MuseScore and others routinely
+          // emit both) -- taking both would put two marks at one tick. The
+          // notated <metronome> wins, since it carries a real beat unit;
+          // <sound tempo> is quarter-notes-per-minute by definition and is
+          // only used when nothing notated said otherwise here.
+          if (content.soundTempo !== undefined && !producedTempoMark) {
+            tempoMarks.push({
+              partId,
+              measureNumber,
+              tick,
+              beatUnit: 'quarter',
+              beatUnitDots: 0,
+              perMinute: content.soundTempo,
+            });
+            recognizedSomething = true;
+          }
+
           if (!recognizedSomething) {
             diagnostics.push(
               diagnostic(
                 'info',
                 'UNKNOWN_ELEMENT',
-                'Ignored <direction> (no <metronome> found; not handled by the v1 parser).',
+                'Ignored <direction> (nothing the v2 parser recognizes inside it).',
                 location,
               ),
             );
+          }
+        } else if (child.tagName === 'harmony') {
+          // Phase 35 Tier 2/§10.4: a chord symbol at the current cursor
+          // position. Like <direction>, it is a marking and never advances
+          // the tick cursor.
+          harmonies.push({ partId, measureNumber, tick, ...parseHarmonyElement(child) });
+        } else if (child.tagName === 'print') {
+          // Phase 35 Tier 2/§10.4 + §16.2: an explicit system/page break.
+          // Recorded only when it actually asks for one -- a <print> that
+          // merely carries layout hints is not a break request.
+          const newSystem = child.getAttribute('new-system') === 'yes';
+          const newPage = child.getAttribute('new-page') === 'yes';
+          if (newSystem || newPage) {
+            prints.push({ partId, measureNumber, newSystem, newPage });
+          }
+          // A <print> also legally carries page/system/staff LAYOUT hints
+          // (<system-layout>, <staff-layout>, ...). Those are genuinely
+          // not read by this parser, and §10.7's no-silent-loss rule means
+          // saying so beats going quiet just because the same element's
+          // break attributes happen to be understood now.
+          const ignoredPrintChildren = Array.from(child.children).map((c) => c.tagName);
+          if (ignoredPrintChildren.length > 0) {
+            diagnostics.push(
+              diagnostic(
+                'info',
+                'UNKNOWN_ELEMENT',
+                `Ignored <print> layout hints: <${ignoredPrintChildren.join('>, <')}>.`,
+                location,
+              ),
+            );
+          }
+        } else if (child.tagName === 'sound') {
+          // A bare <sound tempo> directly under <measure> (legal, and how
+          // some exporters state a tempo with no visible marking at all).
+          const soundTempo = parseSoundTempo(child);
+          if (soundTempo !== undefined) {
+            tempoMarks.push({
+              partId,
+              measureNumber,
+              tick,
+              beatUnit: 'quarter',
+              beatUnitDots: 0,
+              perMinute: soundTempo,
+            });
           }
         } else {
           // §10.7: an unknown element is ignored but recorded at 'info'
@@ -530,6 +705,9 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
         fifths: currentFifths,
         timeNumerator: currentTimeNumerator,
         timeDenominator: currentTimeDenominator,
+        ...(currentTimeNumeratorDisplay !== undefined
+          ? { timeNumeratorDisplay: currentTimeNumeratorDisplay }
+          : {}),
         clefSign: currentClefSign,
         ...(currentClefLine !== undefined ? { clefLine: currentClefLine } : {}),
         staves: currentStaves,
@@ -564,5 +742,8 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
     diagnostics,
     tempoMarks,
     midiInstrumentsByPart: midiInstrumentMaps,
+    directions,
+    harmonies,
+    prints,
   };
 }

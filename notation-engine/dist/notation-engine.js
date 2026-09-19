@@ -123,6 +123,8 @@ var NotationEngine = (() => {
     glyphNameForTimeSigChar: () => glyphNameForTimeSigChar,
     graceNoteGlyphName: () => graceNoteGlyphName,
     groupBeams: () => groupBeams,
+    groupBeamsFromHints: () => groupBeamsFromHints,
+    hasExplicitBeams: () => hasExplicitBeams,
     isPitched: () => isPitched,
     isUnpitched: () => isUnpitched,
     justifySystem: () => justifySystem,
@@ -58549,6 +58551,40 @@ var NotationEngine = (() => {
     }
     return set;
   }
+  function hasExplicitBeams(events) {
+    return events.some((e) => !e.isRest && e.beamValue !== void 0);
+  }
+  function groupBeamsFromHints(events) {
+    const groups = [];
+    let current = [];
+    const flush = () => {
+      if (current.length >= 2) groups.push({ eventIndices: current });
+      current = [];
+    };
+    events.forEach((event, i2) => {
+      if (event.isRest || event.beamValue === void 0) {
+        flush();
+        return;
+      }
+      switch (event.beamValue) {
+        case "begin":
+          flush();
+          current.push(i2);
+          break;
+        case "continue":
+        case "forward hook":
+        case "backward hook":
+          current.push(i2);
+          break;
+        case "end":
+          current.push(i2);
+          flush();
+          break;
+      }
+    });
+    flush();
+    return groups;
+  }
 
   // src/geometry/voice.ts
   function voiceForcedDirection(voiceId) {
@@ -59479,9 +59515,24 @@ ${denominator}`;
     }
     const timeEl = firstChildNamed(attributesEl, "time");
     if (timeEl !== void 0) {
-      const beats = intOf(firstChildNamed(timeEl, "beats"));
+      const beatsEls = childrenNamed(timeEl, "beats");
+      const terms = [];
+      const written = [];
+      for (const el of beatsEls) {
+        const raw = textOf(el);
+        if (raw === void 0 || raw.length === 0) continue;
+        written.push(raw);
+        for (const piece of raw.split("+")) {
+          const n = Number.parseInt(piece.trim(), 10);
+          if (!Number.isNaN(n)) terms.push(n);
+        }
+      }
+      if (terms.length > 0) {
+        result.timeNumerator = terms.reduce((sum, n) => sum + n, 0);
+        const display = written.join("+");
+        if (terms.length > 1) result.timeNumeratorDisplay = display;
+      }
       const beatType = intOf(firstChildNamed(timeEl, "beat-type"));
-      if (beats !== void 0) result.timeNumerator = beats;
       if (beatType !== void 0) result.timeDenominator = beatType;
     }
     const clefEls = childrenNamed(attributesEl, "clef");
@@ -59505,6 +59556,174 @@ ${denominator}`;
       }
     }
     return result;
+  }
+
+  // src/parser/musicxml/notations.ts
+  var ARTICULATION_BY_ELEMENT = {
+    accent: "accent",
+    "strong-accent": "marcato",
+    staccato: "staccato",
+    tenuto: "tenuto",
+    staccatissimo: "staccatissimo"
+  };
+  var ORNAMENT_BY_ELEMENT = {
+    "trill-mark": "trill",
+    mordent: "mordent",
+    turn: "turn",
+    "inverted-turn": "turnInverted"
+  };
+  var BEAM_VALUES = /* @__PURE__ */ new Set([
+    "begin",
+    "continue",
+    "end",
+    "forward hook",
+    "backward hook"
+  ]);
+  var SYLLABIC_VALUES = /* @__PURE__ */ new Set(["single", "begin", "middle", "end"]);
+  var EMPTY_NOTATIONS = {
+    articulations: [],
+    ornaments: [],
+    hasFermata: false,
+    slurStarts: [],
+    slurStops: [],
+    tupletStart: false,
+    tupletStop: false
+  };
+  function numberAttr(el) {
+    const raw = attrOf(el, "number");
+    if (raw === void 0) return 1;
+    const n = Number.parseInt(raw, 10);
+    return Number.isNaN(n) ? 1 : n;
+  }
+  function parseNotations(noteEl, location) {
+    const notationsEl = firstChildNamed(noteEl, "notations");
+    if (notationsEl === void 0) {
+      return { notations: EMPTY_NOTATIONS, diagnostics: [] };
+    }
+    const diagnostics = [];
+    const articulations = [];
+    const ornaments = [];
+    const slurStarts = [];
+    const slurStops = [];
+    let hasFermata = false;
+    let tupletStart = false;
+    let tupletStop = false;
+    for (const el of childElements(notationsEl)) {
+      switch (el.tagName) {
+        case "slur": {
+          const type = attrOf(el, "type");
+          if (type === "start") slurStarts.push(numberAttr(el));
+          else if (type === "stop") slurStops.push(numberAttr(el));
+          break;
+        }
+        case "tuplet": {
+          const type = attrOf(el, "type");
+          if (type === "start") tupletStart = true;
+          else if (type === "stop") tupletStop = true;
+          break;
+        }
+        case "fermata":
+          hasFermata = true;
+          break;
+        case "articulations":
+          for (const child of childElements(el)) {
+            const mapped = ARTICULATION_BY_ELEMENT[child.tagName];
+            if (mapped !== void 0) {
+              articulations.push(mapped);
+            } else {
+              diagnostics.push(
+                diagnostic(
+                  "info",
+                  "UNSUPPORTED_ARTICULATION",
+                  `Ignored <${child.tagName}>; \xA79.19 supports accent, staccato, tenuto, strong-accent (marcato) and staccatissimo.`,
+                  location
+                )
+              );
+            }
+          }
+          break;
+        case "ornaments":
+          for (const child of childElements(el)) {
+            const mapped = ORNAMENT_BY_ELEMENT[child.tagName];
+            if (mapped !== void 0) {
+              ornaments.push(mapped);
+            } else if (child.tagName !== "accidental-mark") {
+              diagnostics.push(
+                diagnostic(
+                  "info",
+                  "UNSUPPORTED_ORNAMENT",
+                  `Ignored <${child.tagName}>; \xA79.20 supports trill-mark, mordent, turn and inverted-turn.`,
+                  location
+                )
+              );
+            }
+          }
+          break;
+        case "tied":
+        case "technical":
+          break;
+        default:
+          diagnostics.push(
+            diagnostic(
+              "info",
+              "UNKNOWN_ELEMENT",
+              `Ignored <notations><${el.tagName}> (not handled by the v2 parser).`,
+              location
+            )
+          );
+      }
+    }
+    return {
+      notations: {
+        articulations,
+        ornaments,
+        hasFermata,
+        slurStarts,
+        slurStops,
+        tupletStart,
+        tupletStop
+      },
+      diagnostics
+    };
+  }
+  function parseBeamHints(noteEl, location) {
+    const els = childrenNamed(noteEl, "beam");
+    if (els.length === 0) return { beams: [], diagnostics: [] };
+    const diagnostics = [];
+    const beams = [];
+    for (const el of els) {
+      const value = textOf(el);
+      if (value !== void 0 && BEAM_VALUES.has(value)) {
+        beams.push({ number: numberAttr(el), value });
+      } else {
+        diagnostics.push(
+          diagnostic(
+            "info",
+            "UNSUPPORTED_BEAM_VALUE",
+            `Ignored <beam>${value ?? ""}</beam>; expected begin, continue, end, forward hook or backward hook.`,
+            location
+          )
+        );
+      }
+    }
+    return { beams, diagnostics };
+  }
+  function parseLyrics(noteEl) {
+    const els = childrenNamed(noteEl, "lyric");
+    if (els.length === 0) return [];
+    const lyrics = [];
+    for (const el of els) {
+      const text = childrenNamed(el, "text").map((t) => textOf(t) ?? "").join("");
+      const rawSyllabic = textOf(firstChildNamed(el, "syllabic"));
+      const syllabic = rawSyllabic !== void 0 && SYLLABIC_VALUES.has(rawSyllabic) ? rawSyllabic : void 0;
+      lyrics.push({
+        number: numberAttr(el),
+        ...syllabic !== void 0 ? { syllabic } : {},
+        text,
+        extend: firstChildNamed(el, "extend") !== void 0
+      });
+    }
+    return lyrics;
   }
 
   // src/parser/musicxml/note.ts
@@ -59603,6 +59822,11 @@ ${denominator}`;
     const rawStemText = textOf(firstChildNamed(noteEl, "stem"));
     const explicitStemDirection = rawStemText === "up" || rawStemText === "down" ? rawStemText : void 0;
     const hasExplicitAccidental = firstChildNamed(noteEl, "accidental") !== void 0;
+    const { notations, diagnostics: notationDiags } = parseNotations(noteEl, location);
+    diagnostics.push(...notationDiags);
+    const { beams, diagnostics: beamDiags } = parseBeamHints(noteEl, location);
+    diagnostics.push(...beamDiags);
+    const lyrics = parseLyrics(noteEl);
     let step;
     let alter;
     let octave;
@@ -59680,7 +59904,10 @@ ${denominator}`;
       ...explicitStemDirection !== void 0 ? { explicitStemDirection } : {},
       hasExplicitAccidental,
       ...stringNumber !== void 0 ? { stringNumber } : {},
-      ...fret !== void 0 ? { fret } : {}
+      ...fret !== void 0 ? { fret } : {},
+      notations,
+      beams,
+      lyrics
     };
     return { event, diagnostics };
   }
@@ -59741,6 +59968,155 @@ ${denominator}`;
     return partwiseRoot;
   }
 
+  // src/parser/musicxml/direction.ts
+  var DYNAMIC_ELEMENTS = {
+    ppp: "ppp",
+    pp: "pp",
+    p: "p",
+    mp: "mp",
+    mf: "mf",
+    f: "f",
+    ff: "ff",
+    fff: "fff",
+    sfz: "sfz"
+  };
+  var WEDGE_TYPES = {
+    crescendo: "crescendo",
+    // MusicXML's own name for the closing wedge is "diminuendo"; §9.21's
+    // geometry calls the same shape "decrescendo". Two names, one mark --
+    // which is why this is a table, not a cast.
+    diminuendo: "decrescendo",
+    stop: "stop"
+  };
+  function numberAttr2(el) {
+    const raw = attrOf(el, "number");
+    if (raw === void 0) return 1;
+    const n = Number.parseInt(raw, 10);
+    return Number.isNaN(n) ? 1 : n;
+  }
+  function parseSoundTempo(soundEl) {
+    const raw = attrOf(soundEl, "tempo");
+    if (raw === void 0) return void 0;
+    const value = Number.parseFloat(raw);
+    return Number.isFinite(value) && value > 0 ? value : void 0;
+  }
+  function parseDirectionElement(directionEl, location) {
+    const diagnostics = [];
+    const dynamics = [];
+    const wedges = [];
+    const words = [];
+    const rehearsals = [];
+    for (const directionTypeEl of childrenNamed(directionEl, "direction-type")) {
+      for (const el of childElements(directionTypeEl)) {
+        switch (el.tagName) {
+          case "dynamics":
+            for (const child of childElements(el)) {
+              const level = DYNAMIC_ELEMENTS[child.tagName];
+              if (level !== void 0) {
+                dynamics.push(level);
+              } else {
+                diagnostics.push(
+                  diagnostic(
+                    "info",
+                    "UNSUPPORTED_DYNAMIC",
+                    `Ignored <dynamics><${child.tagName}>; \xA79.21 supports ppp, pp, p, mp, mf, f, ff, fff and sfz.`,
+                    location
+                  )
+                );
+              }
+            }
+            break;
+          case "wedge": {
+            const rawType = attrOf(el, "type");
+            const mapped = rawType !== void 0 ? WEDGE_TYPES[rawType] : void 0;
+            if (mapped !== void 0) {
+              wedges.push({ type: mapped, number: numberAttr2(el) });
+            } else if (rawType !== "continue") {
+              diagnostics.push(
+                diagnostic(
+                  "info",
+                  "UNSUPPORTED_WEDGE",
+                  `Ignored <wedge type="${rawType ?? ""}">; expected crescendo, diminuendo or stop.`,
+                  location
+                )
+              );
+            }
+            break;
+          }
+          case "words": {
+            const text = textOf(el);
+            if (text !== void 0 && text.length > 0) words.push(text);
+            break;
+          }
+          case "rehearsal": {
+            const text = textOf(el);
+            if (text !== void 0 && text.length > 0) rehearsals.push(text);
+            break;
+          }
+          case "metronome":
+            break;
+          default:
+            diagnostics.push(
+              diagnostic(
+                "info",
+                "UNKNOWN_ELEMENT",
+                `Ignored <direction-type><${el.tagName}> (not handled by the v2 parser).`,
+                location
+              )
+            );
+        }
+      }
+    }
+    const soundEl = firstChildNamed(directionEl, "sound");
+    const soundTempo = soundEl !== void 0 ? parseSoundTempo(soundEl) : void 0;
+    return {
+      content: {
+        dynamics,
+        wedges,
+        words,
+        rehearsals,
+        ...soundTempo !== void 0 ? { soundTempo } : {}
+      },
+      diagnostics
+    };
+  }
+  function directionStaff(directionEl) {
+    return intOf(firstChildNamed(directionEl, "staff")) ?? 1;
+  }
+  function directionPlacement(directionEl) {
+    const raw = attrOf(directionEl, "placement");
+    return raw === "above" || raw === "below" ? raw : void 0;
+  }
+
+  // src/parser/musicxml/harmony.ts
+  var STEPS = /* @__PURE__ */ new Set(["C", "D", "E", "F", "G", "A", "B"]);
+  function stepOf(parent, childName) {
+    if (parent === void 0) return void 0;
+    const raw = textOf(firstChildNamed(parent, childName));
+    return raw !== void 0 && STEPS.has(raw) ? raw : void 0;
+  }
+  function alterOf(parent, childName) {
+    if (parent === void 0) return 0;
+    return intOf(firstChildNamed(parent, childName)) ?? 0;
+  }
+  function parseHarmonyElement(harmonyEl) {
+    const rootEl = firstChildNamed(harmonyEl, "root");
+    const bassEl = firstChildNamed(harmonyEl, "bass");
+    const kindEl = firstChildNamed(harmonyEl, "kind");
+    const rootStep = stepOf(rootEl, "root-step");
+    const kind = textOf(kindEl);
+    const kindText = kindEl !== void 0 ? attrOf(kindEl, "text") : void 0;
+    const bassStep = stepOf(bassEl, "bass-step");
+    return {
+      ...rootStep !== void 0 ? { rootStep } : {},
+      rootAlter: alterOf(rootEl, "root-alter"),
+      ...kind !== void 0 ? { kind } : {},
+      ...kindText !== void 0 ? { kindText } : {},
+      ...bassStep !== void 0 ? { bassStep } : {},
+      bassAlter: alterOf(bassEl, "bass-alter")
+    };
+  }
+
   // src/parser/musicxml/parse.ts
   var DEFAULT_DIVISIONS = 1;
   var DEFAULT_FIFTHS = 0;
@@ -59757,7 +60133,9 @@ ${denominator}`;
       return rest({
         duration: buildDuration(ev),
         voice: ev.voice,
-        ...ev.staff !== void 0 ? { staff: ev.staff } : {}
+        ...ev.staff !== void 0 ? { staff: ev.staff } : {},
+        // A rest can carry a fermata exactly as a note can (§10.4).
+        ...ev.notations.hasFermata ? { hasFermata: true } : {}
       });
     }
     const pitch = ev.isUnpitched ? unpitchedPitch(ev.step, ev.octave) : pitchedPitch(ev.step, ev.alter ?? 0, ev.octave);
@@ -59774,7 +60152,21 @@ ${denominator}`;
       ...ev.fret !== void 0 ? { fret: ev.fret } : {},
       ...ev.isGrace ? { isGrace: true, graceSlash: ev.graceSlash } : {},
       ...ev.explicitStemDirection !== void 0 ? { explicitStemDirection: ev.explicitStemDirection } : {},
-      ...ev.hasExplicitAccidental ? { hasExplicitAccidental: true } : {}
+      ...ev.hasExplicitAccidental ? { hasExplicitAccidental: true } : {},
+      // Phase 35 Tier 2/§10.4. Every one of these is omitted entirely when
+      // empty rather than set to an empty array, so a note from a file
+      // with no notations at all produces a byte-identical object to the
+      // one it produced before this phase -- which is what keeps every
+      // pre-existing snapshot and deep-equality test valid.
+      ...ev.notations.articulations.length > 0 ? { articulations: ev.notations.articulations } : {},
+      ...ev.notations.ornaments.length > 0 ? { ornaments: ev.notations.ornaments } : {},
+      ...ev.notations.hasFermata ? { hasFermata: true } : {},
+      ...ev.notations.slurStarts.length > 0 ? { slurStarts: ev.notations.slurStarts } : {},
+      ...ev.notations.slurStops.length > 0 ? { slurStops: ev.notations.slurStops } : {},
+      ...ev.notations.tupletStart ? { tupletStart: true } : {},
+      ...ev.notations.tupletStop ? { tupletStop: true } : {},
+      ...ev.beams.length > 0 ? { beams: ev.beams } : {},
+      ...ev.lyrics.length > 0 ? { lyrics: ev.lyrics } : {}
     });
   }
   function buildEvent(group, location, diagnostics) {
@@ -59840,7 +60232,10 @@ ${denominator}`;
         attributes: [],
         diagnostics,
         tempoMarks: [],
-        midiInstrumentsByPart: /* @__PURE__ */ new Map()
+        midiInstrumentsByPart: /* @__PURE__ */ new Map(),
+        directions: [],
+        harmonies: [],
+        prints: []
       };
     }
     const partListEl = firstChildNamed(root, "part-list");
@@ -59859,6 +60254,9 @@ ${denominator}`;
     const parts = [];
     const allAttributes = [];
     const tempoMarks = [];
+    const directions = [];
+    const harmonies = [];
+    const prints = [];
     for (const partEl of childrenNamed(root, "part")) {
       const partId = attrOf(partEl, "id") ?? `part-${parts.length + 1}`;
       const partName = partNames.get(partId);
@@ -59867,6 +60265,7 @@ ${denominator}`;
       let currentFifths = DEFAULT_FIFTHS;
       let currentTimeNumerator = DEFAULT_TIME_NUMERATOR;
       let currentTimeDenominator = DEFAULT_TIME_DENOMINATOR;
+      let currentTimeNumeratorDisplay;
       let currentClefSign = DEFAULT_CLEF_SIGN;
       let currentClefLine = DEFAULT_CLEF_LINE;
       let currentStaves = 1;
@@ -59889,7 +60288,10 @@ ${denominator}`;
             const update = parseAttributesElement(child);
             if (update.divisions !== void 0) currentDivisions = update.divisions;
             if (update.fifths !== void 0) currentFifths = update.fifths;
-            if (update.timeNumerator !== void 0) currentTimeNumerator = update.timeNumerator;
+            if (update.timeNumerator !== void 0) {
+              currentTimeNumerator = update.timeNumerator;
+              currentTimeNumeratorDisplay = update.timeNumeratorDisplay;
+            }
             if (update.timeDenominator !== void 0) currentTimeDenominator = update.timeDenominator;
             if (update.clefSign !== void 0) currentClefSign = update.clefSign;
             if (update.clefLine !== void 0) currentClefLine = update.clefLine;
@@ -59957,6 +60359,7 @@ ${denominator}`;
             if (dir === "forward" || dir === "backward") repeatDirection = dir;
           } else if (child.tagName === "direction") {
             let recognizedSomething = false;
+            let producedTempoMark = false;
             for (const directionTypeEl of childrenNamed(child, "direction-type")) {
               const metronomeEl = firstChildNamed(directionTypeEl, "metronome");
               if (metronomeEl === void 0) continue;
@@ -59984,16 +60387,77 @@ ${denominator}`;
                 perMinute
               });
               recognizedSomething = true;
+              producedTempoMark = true;
+            }
+            const { content, diagnostics: directionDiags } = parseDirectionElement(child, location);
+            diagnostics.push(...directionDiags);
+            if (directionDiags.length > 0) recognizedSomething = true;
+            const placement = directionPlacement(child);
+            if (content.dynamics.length > 0 || content.wedges.length > 0 || content.words.length > 0 || content.rehearsals.length > 0) {
+              directions.push({
+                partId,
+                measureNumber,
+                tick,
+                staff: directionStaff(child),
+                ...placement !== void 0 ? { placement } : {},
+                dynamics: content.dynamics,
+                wedges: content.wedges,
+                words: content.words,
+                rehearsals: content.rehearsals
+              });
+              recognizedSomething = true;
+            }
+            if (content.soundTempo !== void 0 && !producedTempoMark) {
+              tempoMarks.push({
+                partId,
+                measureNumber,
+                tick,
+                beatUnit: "quarter",
+                beatUnitDots: 0,
+                perMinute: content.soundTempo
+              });
+              recognizedSomething = true;
             }
             if (!recognizedSomething) {
               diagnostics.push(
                 diagnostic(
                   "info",
                   "UNKNOWN_ELEMENT",
-                  "Ignored <direction> (no <metronome> found; not handled by the v1 parser).",
+                  "Ignored <direction> (nothing the v2 parser recognizes inside it).",
                   location
                 )
               );
+            }
+          } else if (child.tagName === "harmony") {
+            harmonies.push({ partId, measureNumber, tick, ...parseHarmonyElement(child) });
+          } else if (child.tagName === "print") {
+            const newSystem = child.getAttribute("new-system") === "yes";
+            const newPage = child.getAttribute("new-page") === "yes";
+            if (newSystem || newPage) {
+              prints.push({ partId, measureNumber, newSystem, newPage });
+            }
+            const ignoredPrintChildren = Array.from(child.children).map((c) => c.tagName);
+            if (ignoredPrintChildren.length > 0) {
+              diagnostics.push(
+                diagnostic(
+                  "info",
+                  "UNKNOWN_ELEMENT",
+                  `Ignored <print> layout hints: <${ignoredPrintChildren.join(">, <")}>.`,
+                  location
+                )
+              );
+            }
+          } else if (child.tagName === "sound") {
+            const soundTempo = parseSoundTempo(child);
+            if (soundTempo !== void 0) {
+              tempoMarks.push({
+                partId,
+                measureNumber,
+                tick,
+                beatUnit: "quarter",
+                beatUnitDots: 0,
+                perMinute: soundTempo
+              });
             }
           } else {
             diagnostics.push(
@@ -60060,6 +60524,7 @@ ${denominator}`;
           fifths: currentFifths,
           timeNumerator: currentTimeNumerator,
           timeDenominator: currentTimeDenominator,
+          ...currentTimeNumeratorDisplay !== void 0 ? { timeNumeratorDisplay: currentTimeNumeratorDisplay } : {},
           clefSign: currentClefSign,
           ...currentClefLine !== void 0 ? { clefLine: currentClefLine } : {},
           staves: currentStaves,
@@ -60086,7 +60551,10 @@ ${denominator}`;
       attributes: allAttributes,
       diagnostics,
       tempoMarks,
-      midiInstrumentsByPart: midiInstrumentMaps
+      midiInstrumentsByPart: midiInstrumentMaps,
+      directions,
+      harmonies,
+      prints
     };
   }
 
@@ -61894,6 +62362,18 @@ ${denominator}`;
   var MEASURE_TRAILING_MARGIN = 2;
   var MEASURE_HEADER_ALLOWANCE = 6;
   var DEFAULT_STAFF_GAP_FALLBACK = 8;
+  var ARTICULATION_GAP = 1;
+  var ORNAMENT_GAP = 1.5;
+  var SLUR_GAP = 1.2;
+  var TUPLET_GAP = 1.8;
+  var SLUR_MIDPOINT_THICKNESS_FALLBACK = 0.22;
+  var TUPLET_BRACKET_THICKNESS_FALLBACK = 0.16;
+  var DYNAMIC_GAP = 2.5;
+  var HAIRPIN_THICKNESS_FALLBACK = 0.16;
+  function staffPositionOfNote(note2, clefDef) {
+    const p = note2.pitch;
+    return p.kind === "pitched" ? staffPositionForPitch(clefDef, p.step, p.octave) : staffPositionForPitch(clefDef, p.displayStep, p.displayOctave);
+  }
   function worstCaseStaffExtent(part2, staffNumber, allAttributes, side) {
     const firstAttrs = allAttributes.find((a) => a.partId === part2.id);
     const clefSpec = firstAttrs?.clefsByStaff[staffNumber];
@@ -61911,14 +62391,10 @@ ${denominator}`;
         for (const event of voice2.events) {
           if ((event.staff ?? 1) !== staffNumber) continue;
           if (event.kind === "note") {
-            const p = event.pitch;
-            consider(
-              p.kind === "pitched" ? staffPositionForPitch(clefDef, p.step, p.octave) : staffPositionForPitch(clefDef, p.displayStep, p.displayOctave)
-            );
+            consider(staffPositionOfNote(event, clefDef));
           } else if (event.kind === "chord") {
             for (const n of event.notes) {
-              const p = n.pitch;
-              if (p.kind === "pitched") consider(staffPositionForPitch(clefDef, p.step, p.octave));
+              consider(staffPositionOfNote(n, clefDef));
             }
           }
         }
@@ -62019,14 +62495,66 @@ ${denominator}`;
     const bbox = getGlyph(glyphName)?.bBox;
     return bbox !== void 0 ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
   }
-  function renderNoteheadPart(note2, x2, ctx, accidentalState) {
+  function renderNoteMarks(source, x2, topPosition, bottomPosition, direction, ctx) {
+    const articulations = source.articulations ?? [];
+    const ornaments = source.ornaments ?? [];
+    if (articulations.length === 0 && ornaments.length === 0) return "";
     const parts = [];
+    const topLine = -(STAFF_LINES - 1);
+    let aboveStaff = Math.min(topPosition, topLine);
+    let aboveNote = topPosition;
+    let belowNote = bottomPosition;
+    const place = (glyphName, position) => {
+      parts.push(
+        renderMark(glyphName, {
+          x: x2,
+          y: ctx.measureBottomY + position,
+          color: INK_COLOR,
+          fontFamily: FONT_FAMILY
+        })
+      );
+    };
+    for (const type of articulations) {
+      const side = articulationSide(type, direction);
+      if (type === "marcato") {
+        aboveStaff -= ARTICULATION_GAP;
+        place(articulationGlyphName(type, side), aboveStaff);
+      } else if (side === "above") {
+        aboveNote -= ARTICULATION_GAP;
+        place(articulationGlyphName(type, side), aboveNote);
+      } else {
+        belowNote += ARTICULATION_GAP;
+        place(articulationGlyphName(type, side), belowNote);
+      }
+    }
+    for (const type of ornaments) {
+      aboveStaff -= ORNAMENT_GAP;
+      place(ornamentGlyphName(type), aboveStaff);
+    }
+    return parts.join("\n");
+  }
+  function resolveNoteRendering(note2, ctx) {
     const isUnpitched2 = note2.pitch.kind === "unpitched";
     const step = isUnpitched2 ? note2.pitch.displayStep : note2.pitch.step;
     const octave = isUnpitched2 ? note2.pitch.displayOctave : note2.pitch.octave;
     const gmNote = isUnpitched2 && note2.instrumentId !== void 0 ? ctx.midiInstrumentsByPart?.get(note2.instrumentId) : void 0;
     const drumEntry = gmNote !== void 0 ? lookupDrumMapEntry(gmNote, DEFAULT_DRUM_MAPPING_TABLE).entry : void 0;
     const position = drumEntry !== void 0 ? drumEntry.staffPosition : staffPositionForPitch(ctx.clefDef, step, octave);
+    const noteheadGlyph = selectNoteheadGlyphName({
+      pitch: note2.pitch,
+      durationType: note2.duration.type,
+      ...note2.explicitNotehead !== void 0 ? { explicitNotehead: note2.explicitNotehead } : {},
+      ...gmNote !== void 0 && drumEntry !== void 0 ? { midiNote: gmNote, overridesByKey: { [String(gmNote)]: drumEntry.noteheadShape } } : {}
+    });
+    return {
+      position,
+      noteheadGlyph,
+      ...drumEntry?.stemDirection !== void 0 ? { drumStemDirection: drumEntry.stemDirection } : {}
+    };
+  }
+  function renderNoteheadPart(note2, x2, ctx, accidentalState) {
+    const parts = [];
+    const { position, noteheadGlyph, drumStemDirection } = resolveNoteRendering(note2, ctx);
     const y = ctx.measureBottomY + position;
     let state = accidentalState;
     if (note2.pitch.kind === "pitched") {
@@ -62051,12 +62579,6 @@ ${denominator}`;
         );
       }
     }
-    const noteheadGlyph = selectNoteheadGlyphName({
-      pitch: note2.pitch,
-      durationType: note2.duration.type,
-      ...note2.explicitNotehead !== void 0 ? { explicitNotehead: note2.explicitNotehead } : {},
-      ...gmNote !== void 0 && drumEntry !== void 0 ? { midiNote: gmNote, overridesByKey: { [String(gmNote)]: drumEntry.noteheadShape } } : {}
-    });
     parts.push(renderNotehead(noteheadGlyph, { x: x2, y, color: INK_COLOR, fontFamily: FONT_FAMILY }));
     const ledgerLines = computeLedgerLines(position, STAFF_LINES);
     if (ledgerLines.length > 0) {
@@ -62076,7 +62598,7 @@ ${denominator}`;
       position,
       noteheadGlyph,
       newAccidentalState: state,
-      ...drumEntry?.stemDirection !== void 0 ? { drumStemDirection: drumEntry.stemDirection } : {}
+      ...drumStemDirection !== void 0 ? { drumStemDirection } : {}
     };
   }
   function renderNoteOrRest(ev, x2, ctx, accidentalState, forcedDirection, restOffset) {
@@ -62180,6 +62702,8 @@ ${denominator}`;
         }
       }
     }
+    const marks = renderNoteMarks(ev, x2, head.position, head.position, direction, ctx);
+    if (marks !== "") parts.push(marks);
     return {
       svg: parts.join("\n"),
       newAccidentalState: head.newAccidentalState,
@@ -62232,6 +62756,27 @@ ${denominator}`;
         })
       );
     });
+    notes.forEach((note2, i2) => {
+      const x2 = xs[i2];
+      const position = positions[i2];
+      if (x2 === void 0 || position === void 0) return;
+      const marks = renderNoteMarks(note2, x2, position, position, direction, ctx);
+      if (marks !== "") parts.push(marks);
+    });
+    const anchors = [];
+    notes.forEach((_note, i2) => {
+      const x2 = xs[i2];
+      const position = positions[i2];
+      const noteheadGlyph = noteheadGlyphs[i2];
+      if (x2 === void 0 || position === void 0 || noteheadGlyph === void 0) return;
+      anchors.push({
+        x: x2,
+        topPosition: position,
+        bottomPosition: position,
+        direction,
+        noteheadGlyph
+      });
+    });
     const lineCount = Math.max(1, ...notes.map((n) => numBeamLines(n.duration.type)));
     const offsetShape = {
       ...shape,
@@ -62246,7 +62791,7 @@ ${denominator}`;
         color: INK_COLOR
       })
     );
-    return { svg: parts.join("\n"), newAccidentalState: state };
+    return { svg: parts.join("\n"), newAccidentalState: state, anchors };
   }
   function renderChord(chord2, x2, ctx, accidentalState, forcedDirection) {
     const parts = [];
@@ -62313,23 +62858,228 @@ ${denominator}`;
         );
       }
     });
-    if (chord2.duration.type !== "whole" && positions.length > 0) {
+    if (positions.length > 0) {
       const direction = forcedDirection ?? chordStemDirection(positions, middleLineY(STAFF_LINES));
-      const outermost = direction === "up" ? Math.max(...positions) : Math.min(...positions);
-      const length = computeStemLength(outermost, middleLineY(STAFF_LINES));
-      parts.push(
-        renderStem({
-          noteheadGlyphName: widestGlyph ?? "noteheadBlack",
-          noteX: x2,
-          noteY: ctx.measureBottomY + outermost,
+      if (chord2.duration.type !== "whole") {
+        const outermost = direction === "up" ? Math.max(...positions) : Math.min(...positions);
+        const length = computeStemLength(outermost, middleLineY(STAFF_LINES));
+        parts.push(
+          renderStem({
+            noteheadGlyphName: widestGlyph ?? "noteheadBlack",
+            noteX: x2,
+            noteY: ctx.measureBottomY + outermost,
+            direction,
+            length,
+            thickness: getEngravingDefault("stemThickness") ?? STEM_THICKNESS_FALLBACK,
+            color: INK_COLOR
+          })
+        );
+      }
+      const firstNote = chord2.notes[0];
+      if (firstNote !== void 0) {
+        const marks = renderNoteMarks(
+          firstNote,
+          x2,
+          Math.min(...positions),
+          Math.max(...positions),
           direction,
-          length,
-          thickness: getEngravingDefault("stemThickness") ?? STEM_THICKNESS_FALLBACK,
-          color: INK_COLOR
-        })
-      );
+          ctx
+        );
+        if (marks !== "") parts.push(marks);
+      }
+      return {
+        svg: parts.join("\n"),
+        newAccidentalState: state,
+        anchor: {
+          x: x2,
+          topPosition: Math.min(...positions),
+          bottomPosition: Math.max(...positions),
+          direction,
+          noteheadGlyph: widestGlyph ?? "noteheadBlack"
+        }
+      };
     }
     return { svg: parts.join("\n"), newAccidentalState: state };
+  }
+  function computeVoiceCollisionOffsets(measure2, staffNumber, ctx) {
+    const offsets = /* @__PURE__ */ new Map();
+    const entries = [];
+    for (const voice2 of measure2.voices) {
+      const starts = eventStartTicks(voice2.events);
+      voice2.events.forEach((event, idx) => {
+        if ((event.staff ?? 1) !== staffNumber) return;
+        const tick = starts[idx] ?? 0;
+        const notes = event.kind === "note" ? [event] : event.kind === "chord" ? event.notes : [];
+        for (const note2 of notes) {
+          if (note2.isGrace === true) continue;
+          const { position, noteheadGlyph } = resolveNoteRendering(note2, ctx);
+          entries.push({
+            voiceId: voice2.id,
+            tick,
+            position,
+            width: noteheadWidth(noteheadGlyph)
+          });
+        }
+      });
+    }
+    const distinctVoices = new Set(entries.map((e) => e.voiceId));
+    if (distinctVoices.size < 2) return offsets;
+    const record = (voiceId, tick, offset) => {
+      if (offset === 0) return;
+      const key = `${voiceId}:${tick}`;
+      offsets.set(key, Math.max(offsets.get(key) ?? 0, offset));
+    };
+    for (let i2 = 0; i2 < entries.length; i2++) {
+      for (let j = i2 + 1; j < entries.length; j++) {
+        const a = entries[i2];
+        const b = entries[j];
+        if (a === void 0 || b === void 0) continue;
+        if (a.tick !== b.tick || a.voiceId === b.voiceId) continue;
+        const movingWidth = a.voiceId > b.voiceId ? a.width : b.width;
+        const { offsetA, offsetB } = resolveNoteheadCollision(
+          a.position,
+          a.voiceId,
+          b.position,
+          b.voiceId,
+          movingWidth
+        );
+        record(a.voiceId, a.tick, offsetA);
+        record(b.voiceId, b.tick, offsetB);
+      }
+    }
+    return offsets;
+  }
+  function spanSourceNote(event) {
+    if (event.kind === "note") return event;
+    if (event.kind === "chord") return event.notes[0];
+    return void 0;
+  }
+  function renderSpans(events, anchorByIndex, beamedIndices, ctx, onDiagnostic) {
+    const parts = [];
+    const spanAnchors = (startIdx, endIdx) => {
+      const out = [];
+      for (let i2 = startIdx; i2 <= endIdx; i2++) {
+        const anchor = anchorByIndex.get(i2);
+        if (anchor !== void 0) out.push(anchor);
+      }
+      return out;
+    };
+    const openSlurs = /* @__PURE__ */ new Map();
+    events.forEach((event, idx) => {
+      const note2 = spanSourceNote(event);
+      if (note2 === void 0) return;
+      for (const number of note2.slurStops ?? []) {
+        const startIdx = openSlurs.get(number);
+        if (startIdx === void 0) {
+          onDiagnostic(
+            "UNMATCHED_SLUR",
+            `A <slur type="stop" number="${number}"> has no matching start in this measure and voice; the slur was not drawn.`
+          );
+          continue;
+        }
+        openSlurs.delete(number);
+        const anchors = spanAnchors(startIdx, idx);
+        if (anchors.length < 2) continue;
+        const side = slurSide(anchors.map((a) => a.direction));
+        const y = side === "above" ? Math.min(...anchors.map((a) => a.topPosition)) - SLUR_GAP : Math.max(...anchors.map((a) => a.bottomPosition)) + SLUR_GAP;
+        const first = anchors[0];
+        const last = anchors[anchors.length - 1];
+        if (first === void 0 || last === void 0) continue;
+        const shape = computeSlurShape(
+          // Start just past the first notehead and end at the last one's own
+          // x, the same convention Phase 26's ties already use.
+          first.x + noteheadWidth(first.noteheadGlyph),
+          last.x,
+          ctx.measureBottomY + y,
+          side
+        );
+        parts.push(
+          renderSlur(shape, {
+            color: INK_COLOR,
+            midpointThickness: getEngravingDefault("slurMidpointThickness") ?? SLUR_MIDPOINT_THICKNESS_FALLBACK
+          })
+        );
+      }
+      for (const number of note2.slurStarts ?? []) {
+        openSlurs.set(number, idx);
+      }
+    });
+    if (openSlurs.size > 0) {
+      onDiagnostic(
+        "UNMATCHED_SLUR",
+        `${openSlurs.size} slur(s) start in this measure and voice but never stop in it; a slur crossing a barline is not drawn (see Doc/integration-i-slur-tuplet-wiring.md).`
+      );
+    }
+    let openTuplet;
+    events.forEach((event, idx) => {
+      const note2 = spanSourceNote(event);
+      if (note2 === void 0) return;
+      if (note2.tupletStart === true) openTuplet = idx;
+      if (note2.tupletStop !== true) return;
+      const startIdx = openTuplet;
+      openTuplet = void 0;
+      if (startIdx === void 0) {
+        onDiagnostic(
+          "UNMATCHED_TUPLET",
+          'A <tuplet type="stop"> has no matching start in this measure and voice; the tuplet mark was not drawn.'
+        );
+        return;
+      }
+      const anchors = spanAnchors(startIdx, idx);
+      if (anchors.length < 2) return;
+      const actualNotes = note2.duration.tuplet?.actualNotes;
+      if (actualNotes === void 0) {
+        onDiagnostic(
+          "TUPLET_WITHOUT_RATIO",
+          "A <tuplet> has no <time-modification> to take its number from; the tuplet mark was not drawn."
+        );
+        return;
+      }
+      let digitGlyph;
+      try {
+        digitGlyph = tupletDigitGlyphName(actualNotes);
+      } catch {
+        onDiagnostic(
+          "TUPLET_NUMBER_UNSUPPORTED",
+          `A ${actualNotes}-note tuplet needs multi-digit layout, which \xA79.17 does not implement; the tuplet mark was not drawn.`
+        );
+        return;
+      }
+      const allMembersBeamed = (() => {
+        for (let i2 = startIdx; i2 <= idx; i2++) {
+          if (anchorByIndex.get(i2) === void 0) continue;
+          if (!beamedIndices.has(i2)) return false;
+        }
+        return true;
+      })();
+      const first = anchors[0];
+      const last = anchors[anchors.length - 1];
+      if (first === void 0 || last === void 0) return;
+      const side = tupletSide(first.direction);
+      const y = side === "above" ? Math.min(...anchors.map((a) => a.topPosition)) - TUPLET_GAP : Math.max(...anchors.map((a) => a.bottomPosition)) + TUPLET_GAP;
+      const absoluteY = ctx.measureBottomY + y;
+      if (tupletBracketNeeded(allMembersBeamed)) {
+        parts.push(
+          renderTupletBracket(computeTupletBracketShape(first.x, last.x, absoluteY, side), {
+            thickness: getEngravingDefault("tupletBracketThickness") ?? TUPLET_BRACKET_THICKNESS_FALLBACK,
+            color: INK_COLOR
+          })
+        );
+      }
+      parts.push(
+        renderTupletNumber(digitGlyph, (first.x + last.x) / 2, absoluteY, {
+          color: INK_COLOR,
+          fontFamily: FONT_FAMILY
+        })
+      );
+    });
+    if (openTuplet !== void 0) {
+      onDiagnostic(
+        "UNMATCHED_TUPLET",
+        "A <tuplet> starts in this measure and voice but never stops in it; a tuplet crossing a barline is not drawn."
+      );
+    }
+    return parts.join("\n");
   }
   function renderFromMusicXml(xmlText, options) {
     const {
@@ -62337,9 +63087,13 @@ ${denominator}`;
       attributes,
       diagnostics: parseDiagnostics,
       tempoMarks,
-      midiInstrumentsByPart: midiInstrumentsByPartMap
+      midiInstrumentsByPart: midiInstrumentsByPartMap,
+      directions,
+      prints
     } = parseMusicXml(xmlText, options);
     const diagnostics = [...parseDiagnostics];
+    const config = resolveConfig(options?.config);
+    const pageSpacingConfig = { ...DEFAULT_CONFIG.spacing, ...options?.config?.spacing };
     if (score2.parts.length === 0) {
       const doc = createSvgDocument(
         {
@@ -62351,6 +63105,49 @@ ${denominator}`;
         []
       );
       return { svg: doc, diagnostics };
+    }
+    const measureNumbersInOrder = [];
+    const measureByPartAndNumber = /* @__PURE__ */ new Map();
+    {
+      const seen = /* @__PURE__ */ new Set();
+      for (const part2 of score2.parts) {
+        for (const m of part2.measures) {
+          measureByPartAndNumber.set(`${part2.id}:${m.number}`, m);
+          if (seen.has(m.number)) continue;
+          seen.add(m.number);
+          measureNumbersInOrder.push(m.number);
+        }
+      }
+    }
+    const attributesByPartAndMeasure = /* @__PURE__ */ new Map();
+    for (const a of attributes) {
+      attributesByPartAndMeasure.set(`${a.partId}:${a.measureNumber}`, a);
+    }
+    const firstAttributesByPart = /* @__PURE__ */ new Map();
+    for (const a of attributes) {
+      if (!firstAttributesByPart.has(a.partId)) firstAttributesByPart.set(a.partId, a);
+    }
+    const measureLayoutsByNumber = /* @__PURE__ */ new Map();
+    const measureTicksByNumber = /* @__PURE__ */ new Map();
+    for (const measureNumber of measureNumbersInOrder) {
+      const combinedVoices = [];
+      let measureTicks;
+      for (const part2 of score2.parts) {
+        const m = measureByPartAndNumber.get(`${part2.id}:${measureNumber}`);
+        if (m === void 0) continue;
+        combinedVoices.push(...m.voices);
+        const attrs = attributesByPartAndMeasure.get(`${part2.id}:${measureNumber}`);
+        if (attrs === void 0) continue;
+        const ticks = attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
+        measureTicks = measureTicks === void 0 ? ticks : Math.max(measureTicks, ticks);
+      }
+      const layout = computeMeasureLayout(
+        measure(measureNumber, combinedVoices),
+        measureTicks ?? TICKS_PER_QUARTER * 4,
+        tempoMarks.filter((tm) => tm.measureNumber === measureNumber)
+      );
+      measureLayoutsByNumber.set(measureNumber, layout);
+      measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
     }
     const staffDistanceForPair = (partIndex, staffIndexInPart) => {
       const part2 = score2.parts[partIndex];
@@ -62364,48 +63161,152 @@ ${denominator}`;
       return computeStaffDistance(upperSouth, lowerNorth, DEFAULT_STAFF_GAP_FALLBACK);
     };
     const partStaffCounts = score2.parts.map((p) => {
-      const a = attributes.find((x2) => x2.partId === p.id);
+      const a = firstAttributesByPart.get(p.id);
       return Math.max(1, a?.staves ?? 1);
     });
     const scoreLayout = computeSystemLayoutVariableGaps(partStaffCounts, staffDistanceForPair);
     const staffOffsetFor = (partIndex, staffIndexInPart) => scoreLayout.positions.find(
       (pos) => pos.partIndex === partIndex && pos.staffIndexInPart === staffIndexInPart
     )?.y ?? 0;
-    const svgParts = [];
-    let totalWidth = MEASURE_WIDTH;
-    score2.parts.forEach((part2, partIndex) => {
-      const measureLayoutsByNumber = /* @__PURE__ */ new Map();
-      const measureWidthsForScrollLayout = [];
-      for (const measure2 of part2.measures) {
-        const attrs = attributes.find(
-          (a) => a.partId === part2.id && a.measureNumber === measure2.number
-        );
-        const measureTicks = attrs !== void 0 ? attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER : TICKS_PER_QUARTER * 4;
-        const measureLayout = computeMeasureLayout(
-          measure2,
-          measureTicks,
-          tempoMarks.filter((tm) => tm.partId === part2.id && tm.measureNumber === measure2.number)
-        );
-        measureLayoutsByNumber.set(measure2.number, measureLayout);
-        measureWidthsForScrollLayout.push({
-          measureNumber: measure2.number,
-          width: measureLayout.width
+    const placementByMeasureNumber = /* @__PURE__ */ new Map();
+    const systemOrigins = [];
+    const lowestStaffOffset = scoreLayout.positions[scoreLayout.positions.length - 1]?.y ?? 0;
+    const systemHeight = SYSTEM_HEIGHT + lowestStaffOffset;
+    const widthOf = (measureNumber) => measureLayoutsByNumber.get(measureNumber)?.width ?? MEASURE_WIDTH;
+    let pageCount = 1;
+    if (config.layout.mode === "page") {
+      const breaksByMeasure = /* @__PURE__ */ new Map();
+      for (const pr of prints) {
+        const existing = breaksByMeasure.get(pr.measureNumber);
+        breaksByMeasure.set(pr.measureNumber, {
+          newSystem: (existing?.newSystem ?? false) || pr.newSystem,
+          newPage: (existing?.newPage ?? false) || pr.newPage
         });
       }
-      const scrollLayout = computeScrollLayout(measureWidthsForScrollLayout);
-      const layouts = scrollLayout.measures;
-      const lastLayout = layouts[layouts.length - 1];
-      const partWidth = lastLayout !== void 0 ? lastLayout.x + lastLayout.width : MEASURE_WIDTH;
-      totalWidth = Math.max(totalWidth, partWidth);
+      const pageInputs = measureNumbersInOrder.map((measureNumber) => {
+        const breaks = breaksByMeasure.get(measureNumber);
+        return {
+          measureNumber,
+          width: widthOf(measureNumber),
+          ...breaks?.newSystem === true ? { forceNewSystem: true } : {},
+          ...breaks?.newPage === true ? { forceNewPage: true } : {}
+        };
+      });
+      const pageLayout = computePageLayout(pageInputs, systemHeight, config.page, pageSpacingConfig);
+      pageCount = Math.max(1, pageLayout.pages.length);
+      let systemIndex = 0;
+      pageLayout.pages.forEach((page, pageIndex) => {
+        page.systems.forEach((system, systemIndexOnPage) => {
+          const systemY = pageIndex * config.page.pageHeight + config.page.marginTop + systemIndexOnPage * systemHeight;
+          systemOrigins.push({ systemIndex, x: config.page.marginLeft, systemY });
+          system.measures.forEach((m, i2) => {
+            placementByMeasureNumber.set(m.measureNumber, {
+              x: config.page.marginLeft + m.x,
+              width: m.width,
+              systemY,
+              systemIndex,
+              isSystemStart: i2 === 0
+            });
+          });
+          systemIndex += 1;
+        });
+      });
+    } else {
+      const scrollLayout = computeScrollLayout(
+        measureNumbersInOrder.map((measureNumber) => ({
+          measureNumber,
+          width: widthOf(measureNumber)
+        }))
+      );
+      systemOrigins.push({ systemIndex: 0, x: scrollLayout.measures[0]?.x ?? 0, systemY: 0 });
+      scrollLayout.measures.forEach((m, i2) => {
+        placementByMeasureNumber.set(m.measureNumber, {
+          x: m.x,
+          width: m.width,
+          systemY: 0,
+          systemIndex: 0,
+          isSystemStart: i2 === 0
+        });
+      });
+    }
+    const svgParts = [];
+    let totalWidth = MEASURE_WIDTH;
+    for (const placement of placementByMeasureNumber.values()) {
+      totalWidth = Math.max(totalWidth, placement.x + placement.width);
+    }
+    score2.parts.forEach((part2, partIndex) => {
+      const directionXFor = (measureNumber, tick) => {
+        const placement = placementByMeasureNumber.get(measureNumber);
+        if (placement === void 0) return void 0;
+        const noteAreaX = placement.x + MEASURE_HEADER_ALLOWANCE;
+        const realX = measureLayoutsByNumber.get(measureNumber)?.positionsByTick.get(tick);
+        if (realX !== void 0) return noteAreaX + realX;
+        const measureTicks = measureTicksByNumber.get(measureNumber) ?? TICKS_PER_QUARTER * 4;
+        return noteAreaX + tick / (measureTicks || 1) * (placement.x + placement.width - noteAreaX);
+      };
+      const partDirections = directions.filter((d) => d.partId === part2.id);
+      const wedgeSpansByMeasure = /* @__PURE__ */ new Map();
+      {
+        const openWedges = /* @__PURE__ */ new Map();
+        for (const d of partDirections) {
+          const x2 = directionXFor(d.measureNumber, d.tick);
+          if (x2 === void 0) continue;
+          for (const wedge of d.wedges) {
+            const key = `${d.staff}:${wedge.number}`;
+            if (wedge.type === "stop") {
+              const open = openWedges.get(key);
+              if (open === void 0) {
+                diagnostics.push({
+                  severity: "info",
+                  code: "UNMATCHED_WEDGE",
+                  message: `A <wedge type="stop" number="${wedge.number}"> has no matching start in this part; the hairpin was not drawn.`,
+                  location: { partId: part2.id, measureNumber: d.measureNumber }
+                });
+                continue;
+              }
+              openWedges.delete(key);
+              const startSystem = placementByMeasureNumber.get(open.measureNumber)?.systemIndex;
+              const endSystem = placementByMeasureNumber.get(d.measureNumber)?.systemIndex;
+              if (startSystem !== endSystem) {
+                diagnostics.push({
+                  severity: "info",
+                  code: "WEDGE_CROSSES_SYSTEM",
+                  message: "A hairpin spans a system break; splitting one across systems is not implemented, so it was not drawn.",
+                  location: { partId: part2.id, measureNumber: open.measureNumber }
+                });
+                continue;
+              }
+              const list = wedgeSpansByMeasure.get(open.measureNumber) ?? [];
+              list.push({ staff: open.staff, startX: open.x, endX: x2, kind: open.kind });
+              wedgeSpansByMeasure.set(open.measureNumber, list);
+            } else {
+              openWedges.set(key, {
+                measureNumber: d.measureNumber,
+                staff: d.staff,
+                x: x2,
+                kind: wedge.type
+              });
+            }
+          }
+        }
+        for (const [key, open] of openWedges) {
+          diagnostics.push({
+            severity: "info",
+            code: "UNMATCHED_WEDGE",
+            message: `A wedge (${key}) starts but never stops in this part; the hairpin was not drawn.`,
+            location: { partId: part2.id, measureNumber: open.measureNumber }
+          });
+        }
+      }
       const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part2.id);
       const accidentalStateByStaff = /* @__PURE__ */ new Map();
       let previousAttrs;
       part2.measures.forEach((measure2, i2) => {
-        const attrs = attributes.find(
-          (a) => a.partId === part2.id && a.measureNumber === measure2.number
-        );
-        const layout = layouts[i2];
+        const attrs = attributesByPartAndMeasure.get(`${part2.id}:${measure2.number}`);
+        const layout = placementByMeasureNumber.get(measure2.number);
         if (attrs === void 0 || layout === void 0) return;
+        const systemY = layout.systemY;
+        const isSystemStart = layout.isSystemStart;
         const staffNumbers = Array.from({ length: Math.max(1, attrs.staves) }, (_, n) => n + 1);
         const measureTempoMarks = tempoMarks.filter(
           (m) => m.partId === part2.id && m.measureNumber === measure2.number
@@ -62416,7 +63317,7 @@ ${denominator}`;
           const measureTotalTicks = attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
           const topStaffLines = attrs.staffLinesByStaff[1] ?? STAFF_LINES;
           const topStaffGeometry = computeStaffGeometry(topStaffLines);
-          const topStaffY = STAFF_BOTTOM_Y - topStaffGeometry.height;
+          const topStaffY = STAFF_BOTTOM_Y + systemY - topStaffGeometry.height;
           for (const mark of measureTempoMarks) {
             const dotGlyph = mark.beatUnitDots > 0 ? metronomeDotGlyphName() : void 0;
             const eventX = noteAreaX + mark.tick / (measureTotalTicks || 1) * noteAreaWidth;
@@ -62451,7 +63352,7 @@ ${denominator}`;
           );
           const staffLines = attrs.staffLinesByStaff[staffNumber] ?? STAFF_LINES;
           const staffGeometry = computeStaffGeometry(staffLines);
-          const bottomY = STAFF_BOTTOM_Y + staffOffsetFor(partIndex, staffIndex);
+          const bottomY = STAFF_BOTTOM_Y + systemY + staffOffsetFor(partIndex, staffIndex);
           svgParts.push(
             renderStaff(staffGeometry, {
               x: layout.x,
@@ -62461,12 +63362,48 @@ ${denominator}`;
               lineThickness: getEngravingDefault("staffLineThickness") ?? 0.13
             })
           );
-          const isFirstMeasure = i2 === 0;
+          {
+            const topLineY = bottomY - staffGeometry.height;
+            const markY = (placement) => placement === "above" ? topLineY - DYNAMIC_GAP : bottomY + DYNAMIC_GAP;
+            for (const d of partDirections) {
+              if (d.measureNumber !== measure2.number || d.staff !== staffNumber) continue;
+              if (d.dynamics.length === 0) continue;
+              const x2 = directionXFor(d.measureNumber, d.tick);
+              if (x2 === void 0) continue;
+              const y = markY(d.placement ?? dynamicSide());
+              let cursor = x2;
+              for (const level of d.dynamics) {
+                const glyphName = dynamicGlyphName(level);
+                svgParts.push(
+                  renderMark(glyphName, {
+                    x: cursor,
+                    y,
+                    color: INK_COLOR,
+                    fontFamily: FONT_FAMILY
+                  })
+                );
+                cursor += glyphWidthOf(glyphName);
+              }
+            }
+            for (const span of wedgeSpansByMeasure.get(measure2.number) ?? []) {
+              if (span.staff !== staffNumber) continue;
+              svgParts.push(
+                renderHairpin(
+                  computeHairpinShape(span.startX, span.endX, markY(dynamicSide()), span.kind),
+                  {
+                    thickness: getEngravingDefault("hairpinThickness") ?? HAIRPIN_THICKNESS_FALLBACK,
+                    color: INK_COLOR
+                  }
+                )
+              );
+            }
+          }
+          const isFirstMeasureOfPart = i2 === 0;
           const clefChanged = previousAttrs === void 0 || previousAttrs.clefSign !== attrs.clefSign || previousAttrs.clefLine !== attrs.clefLine;
           const keyChanged = previousAttrs === void 0 || previousAttrs.fifths !== attrs.fifths;
           const timeChanged = previousAttrs === void 0 || previousAttrs.timeNumerator !== attrs.timeNumerator || previousAttrs.timeDenominator !== attrs.timeDenominator;
           let cursorX = layout.x + 0.5;
-          if (isFirstMeasure || clefChanged) {
+          if (isSystemStart || clefChanged) {
             svgParts.push(
               renderClef(clefDef, {
                 x: cursorX,
@@ -62481,7 +63418,7 @@ ${denominator}`;
             );
             cursorX += 3;
           }
-          if ((isFirstMeasure || keyChanged) && attrs.fifths !== 0) {
+          if ((isSystemStart || keyChanged) && attrs.fifths !== 0) {
             try {
               const accidentals = keySignatureAccidentals(attrs.fifths, keySigClefName);
               svgParts.push(
@@ -62503,9 +63440,11 @@ ${denominator}`;
               });
             }
           }
-          if (isFirstMeasure || timeChanged) {
+          if (isFirstMeasureOfPart || timeChanged) {
             try {
-              const sig = timeSignature(attrs.timeNumerator, attrs.timeDenominator);
+              const sig = timeSignature(attrs.timeNumerator, attrs.timeDenominator, {
+                ...attrs.timeNumeratorDisplay !== void 0 ? { numeratorDisplay: attrs.timeNumeratorDisplay } : {}
+              });
               svgParts.push(
                 renderTimeSignature(sig, {
                   x: cursorX,
@@ -62532,6 +63471,7 @@ ${denominator}`;
             const noteAreaX = Math.max(layout.x + MEASURE_HEADER_ALLOWANCE, cursorX);
             const measureLayout = measureLayoutsByNumber.get(measure2.number);
             const isMultiVoice = measure2.voices.length > 1;
+            const collisionOffsets = computeVoiceCollisionOffsets(measure2, staffNumber, ctx);
             for (const voice2 of measure2.voices) {
               const forcedDirection = isMultiVoice ? voiceForcedDirection(voice2.id) : void 0;
               const restOffset = isMultiVoice ? voiceRestOffset(voice2.id) : 0;
@@ -62542,24 +63482,30 @@ ${denominator}`;
               const eventXs = voice2.events.map((_, idx) => {
                 const startTick = starts[idx] ?? 0;
                 const realX = measureLayout?.positionsByTick.get(startTick);
-                return realX !== void 0 ? noteAreaX + realX : noteAreaX + startTick / total * fallbackNoteAreaWidth;
+                const baseX = realX !== void 0 ? noteAreaX + realX : noteAreaX + startTick / total * fallbackNoteAreaWidth;
+                return baseX + (collisionOffsets.get(`${voice2.id}:${startTick}`) ?? 0);
               });
               const beamableEvents = voice2.events.map((event) => ({
                 durationType: event.duration.type,
-                isRest: event.kind !== "note" || event.isGrace === true
+                isRest: event.kind !== "note" || event.isGrace === true,
+                // §10.4/§10.8: the file's own level-1 <beam>, when it wrote
+                // one. Only a plain Note can carry one here -- a chord is
+                // already excluded from beaming above (a documented scope
+                // limit of renderBeamGroup), so reading its first note's
+                // hints would claim a grouping this renderer cannot draw.
+                ...event.kind === "note" && event.isGrace !== true ? (() => {
+                  const level1 = event.beams?.find((b) => b.number === 1);
+                  return level1 !== void 0 ? { beamValue: level1.value } : {};
+                })() : {}
               }));
-              const groups = groupBeams(
-                beamableEvents,
-                starts,
-                attrs.timeNumerator,
-                attrs.timeDenominator
-              );
+              const groups = hasExplicitBeams(beamableEvents) ? groupBeamsFromHints(beamableEvents) : groupBeams(beamableEvents, starts, attrs.timeNumerator, attrs.timeDenominator);
               const beamedIndices = beamedEventIndices(groups);
               const groupByFirstIndex = /* @__PURE__ */ new Map();
               for (const group of groups) {
                 const firstIndex = group.eventIndices[0];
                 if (firstIndex !== void 0) groupByFirstIndex.set(firstIndex, group);
               }
+              const anchorByIndex = /* @__PURE__ */ new Map();
               voice2.events.forEach((event, idx) => {
                 const eventStaff = event.staff ?? 1;
                 if (eventStaff !== staffNumber) return;
@@ -62568,9 +63514,16 @@ ${denominator}`;
                 if (!isGraceNote && beamedIndices.has(idx)) {
                   const group = groupByFirstIndex.get(idx);
                   if (group === void 0) return;
-                  const groupNotes = group.eventIndices.map((i3) => voice2.events[i3]).filter((e) => e !== void 0 && e.kind === "note");
-                  const groupXs = group.eventIndices.map((i3) => eventXs[i3] ?? 0);
-                  const { svg: svg2, newAccidentalState } = renderBeamGroup(
+                  const groupIndices = group.eventIndices.filter(
+                    (i3) => voice2.events[i3]?.kind === "note"
+                  );
+                  const groupNotes = groupIndices.map((i3) => voice2.events[i3]).filter((e) => e !== void 0 && e.kind === "note");
+                  const groupXs = groupIndices.map((i3) => eventXs[i3] ?? 0);
+                  const {
+                    svg: svg2,
+                    newAccidentalState,
+                    anchors: groupAnchors
+                  } = renderBeamGroup(
                     groupNotes,
                     groupXs,
                     ctx,
@@ -62578,18 +63531,23 @@ ${denominator}`;
                     DEFAULT_BEAM_STYLE,
                     forcedDirection
                   );
+                  groupAnchors.forEach((anchor, memberIndex) => {
+                    const eventIndex = groupIndices[memberIndex];
+                    if (eventIndex !== void 0) anchorByIndex.set(eventIndex, anchor);
+                  });
                   svgParts.push(svg2);
                   accidentalState = newAccidentalState;
                   return;
                 }
                 if (event.kind === "chord") {
-                  const { svg: svg2, newAccidentalState } = renderChord(
+                  const { svg: svg2, newAccidentalState, anchor } = renderChord(
                     event,
                     eventX,
                     ctx,
                     accidentalState,
                     forcedDirection
                   );
+                  if (anchor !== void 0) anchorByIndex.set(idx, anchor);
                   svgParts.push(svg2);
                   accidentalState = newAccidentalState;
                 } else {
@@ -62617,10 +63575,34 @@ ${denominator}`;
                     y: ctx.measureBottomY + tieAnchor.position,
                     direction: tieAnchor.direction
                   } : void 0;
+                  if (event.kind === "note" && tieAnchor !== void 0) {
+                    anchorByIndex.set(idx, {
+                      x: eventX,
+                      topPosition: tieAnchor.position,
+                      bottomPosition: tieAnchor.position,
+                      direction: tieAnchor.direction,
+                      noteheadGlyph: tieAnchor.noteheadGlyph
+                    });
+                  }
                   svgParts.push(svg2);
                   accidentalState = newAccidentalState;
                 }
               });
+              const spans = renderSpans(
+                voice2.events,
+                anchorByIndex,
+                beamedIndices,
+                ctx,
+                (code, message) => {
+                  diagnostics.push({
+                    severity: "info",
+                    code,
+                    message,
+                    location: { partId: part2.id, measureNumber: measure2.number }
+                  });
+                }
+              );
+              if (spans !== "") svgParts.push(spans);
             }
           } else if (clefDef.name === "tab") {
             const noteAreaX = Math.max(layout.x + MEASURE_HEADER_ALLOWANCE, cursorX);
@@ -62691,7 +63673,7 @@ ${denominator}`;
         );
         const firstStaffOffset = staffOffsetFor(partIndex, 0);
         const lastStaffOffset = staffOffsetFor(partIndex, staffNumbers.length - 1);
-        const barlineBottomY = STAFF_BOTTOM_Y + lastStaffOffset;
+        const barlineBottomY = STAFF_BOTTOM_Y + systemY + lastStaffOffset;
         const barlineHeight = needsContinuousBarline(staffNumbers.length) ? outerStaffGeometry.height + (lastStaffOffset - firstStaffOffset) : outerStaffGeometry.height;
         svgParts.push(
           renderBarline(barlineGeometry, {
@@ -62708,25 +63690,29 @@ ${denominator}`;
       if (needsBrace(partStaffCount)) {
         const firstOffset = staffOffsetFor(partIndex, 0);
         const lastOffset = staffOffsetFor(partIndex, partStaffCount - 1);
-        const partFirstAttrs = attributes.find((a) => a.partId === part2.id);
+        const partFirstAttrs = firstAttributesByPart.get(part2.id);
         const topStaffHeight = computeStaffGeometry(
           partFirstAttrs?.staffLinesByStaff[1] ?? STAFF_LINES
         ).height;
-        const braceShape = computeBraceShape(
-          STAFF_BOTTOM_Y + firstOffset - topStaffHeight,
-          STAFF_BOTTOM_Y + lastOffset,
-          0
-        );
-        svgParts.push(renderBrace(braceShape, { color: INK_COLOR, fontFamily: FONT_FAMILY }));
+        for (const origin of systemOrigins) {
+          const braceShape = computeBraceShape(
+            STAFF_BOTTOM_Y + origin.systemY + firstOffset - topStaffHeight,
+            STAFF_BOTTOM_Y + origin.systemY + lastOffset,
+            origin.x
+          );
+          svgParts.push(renderBrace(braceShape, { color: INK_COLOR, fontFamily: FONT_FAMILY }));
+        }
       }
     });
     const svg = createSvgDocument(
       {
-        viewBoxWidth: totalWidth + 2,
+        // §16.2: page mode's canvas is the PAGE, however much or little of
+        // it the music fills; scroll mode's is as wide as the music itself.
+        viewBoxWidth: config.layout.mode === "page" ? config.page.pageWidth : totalWidth + 2,
         // Integration A/B: the viewBox must fit EVERY staff of EVERY part,
         // or the lower ones are simply clipped out of the rendered image.
-        // The last position in the score-wide layout is the lowest staff.
-        viewBoxHeight: SYSTEM_HEIGHT + (scoreLayout.positions[scoreLayout.positions.length - 1]?.y ?? 0),
+        // In page mode that means every page, stacked.
+        viewBoxHeight: config.layout.mode === "page" ? pageCount * config.page.pageHeight : systemHeight,
         pxPerStaffSpace: PX_PER_STAFF_SPACE,
         backgroundColor: BACKGROUND_COLOR
       },

@@ -1,6 +1,12 @@
 import type { StemDirection } from './stem.js';
+import type { ArticulationType } from '../core/note.js';
 
-export type ArticulationType = 'accent' | 'staccato' | 'tenuto' | 'marcato' | 'staccatissimo';
+// §9.19's type is DECLARED in core/note.ts (the layer that owns the Note
+// these attach to) and re-exported here, so geometry callers keep
+// importing it from geometry exactly as before -- one declaration, not
+// two that can drift. Same shape as geometry/flag.ts's DurationType
+// re-export.
+export type { ArticulationType };
 export type ArticulationSide = 'above' | 'below';
 
 /**

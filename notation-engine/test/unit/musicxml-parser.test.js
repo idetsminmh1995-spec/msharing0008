@@ -128,7 +128,12 @@ describe('MusicXML parser v1 (Phase 20)', () => {
   test('an unknown/v2-only element inside a measure is ignored but recorded as an info diagnostic', () => {
     const result = loadFixture('unknown-element.musicxml');
     const infos = [...result.diagnostics].filter((d) => d.severity === 'info');
+    // <bookmark> is the genuinely-unhandled element here. The fixture's
+    // <direction><words> used to be the one; Phase 35 Tier 2 reads that
+    // now, so the fixture gained a real unknown element rather than this
+    // test being weakened to match.
     assert.ok(infos.some((d) => d.code === 'UNKNOWN_ELEMENT'));
+    assert.ok(infos.some((d) => d.message.includes('bookmark')));
     // The note after the ignored <direction> element must still parse correctly.
     const note = result.score.parts[0].measures[0].voices[0].events[0];
     assert.equal(note.pitch.step, 'C');

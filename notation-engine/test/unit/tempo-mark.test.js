@@ -80,9 +80,20 @@ describe('metronome parsing (Integration D)', () => {
     assert.equal(tempoMarks[0].measureNumber, 1);
   });
 
-  test('a <direction> with no <metronome> still reports UNKNOWN_ELEMENT, not silently swallowed', () => {
-    const { diagnostics, tempoMarks } = NE.parseMusicXml(load('unknown-element.musicxml'), { domParser });
+  test('a <direction> with no <metronome> produces no tempo mark, and its <words> is captured rather than swallowed', () => {
+    const { diagnostics, tempoMarks, directions } = NE.parseMusicXml(
+      load('unknown-element.musicxml'),
+      { domParser },
+    );
     assert.equal(tempoMarks.length, 0);
+    // Phase 35 Tier 2 changed what "no <metronome>" means: <words> is now
+    // real parsed content, so this <direction> is recognized rather than
+    // reported as unknown. The unknown-element guarantee itself still
+    // holds -- the fixture's <bookmark> proves it, asserted in
+    // musicxml-parser.test.js.
+    assert.equal(directions.length, 1);
+    assert.deepEqual([...directions[0].words], ['Allegro']);
+    assert.equal(directions[0].placement, 'above');
     assert.ok([...diagnostics].some((d) => d.code === 'UNKNOWN_ELEMENT'));
   });
 

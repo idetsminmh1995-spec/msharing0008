@@ -6,15 +6,17 @@ A+B+C corrective work** (making notes actually visible in the web app).
 Numbering is **`PLAN.md` §22's phase numbering** — deliberately not a second
 numbering system. Say a number from §B below and that's the phase to build.
 
-**Last audited:** against the code in `src/` and the 267-test suite,
-after Phase 29 (end of Stage 4).
+**Last audited:** against the code in `src/` and the **646-test** suite,
+after Integration Pass L (Phase 35's Tier 2/3 completion, Integrations H-L,
+and the three defects those passes uncovered). Stages 0-8 are complete and
+every phase numbered 1-47 is now built AND wired.
 
 ---
 
-## A. DONE — Phases 1–42 ✅ (Stage 2 through 7 complete) + Integration Passes A & B
+## A. DONE — Phases 1–47 ✅ (Stages 0 through 8 complete) + Integration Passes A–L
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes 552/552 across them.
+`npm run verify` passes **646/646** across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -53,6 +55,7 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 33 | Chord symbols | Real `csym` accidental + 5 quality glyphs built; root letter/bass note deferred (needs a text-font system) | [`phase-33`](./phase-33-chord-symbols.md) |
 | 34 | Grace notes | Real precomposed acciaccatura/appoggiatura glyphs (no text-font gap this time) | [`phase-34`](./phase-34-grace-notes.md) |
 | 35 | MusicXML parser v2 (Tier 1) | midi-instrument/notehead/grace/tuplet-ratio/stem/accidental parsed + wired; 2 real bugs found+fixed | [`phase-35`](./phase-35-musicxml-parser-v2.md) |
+| 35 | **MusicXML parser v2 (Tier 2/3) — completion** | Every remaining §10.4 element: `<notations>` (slur/tuplet/articulations/ornaments/fermata), `<beam>`, `<lyric>`, `<harmony>`, `<direction>` (dynamics/wedge/words/rehearsal), `<print>`, `<sound tempo>`. Also closed §C3 (additive meters -- a real silent wrong-meter bug) and §10.8's explicit-`<beam>` divergence | [`phase-35-tier23`](./phase-35-musicxml-parser-v2-tier23.md) |
 | 36 | `.mxl` + score-timewise | Both confirmed byte-identical to partwise/uncompressed rendering; wired into the web app | [`phase-36`](./phase-36-mxl-timewise.md) |
 | 37 | Cross-software corpus | 7 §10.8 divergences covered by real fixtures; fixed a real `<tied>`-only-tie bug | [`phase-37`](./phase-37-cross-software-corpus.md) |
 | 38 | Diagnostics hardening | Fixed 2 real crash bugs (`.mxl` throwing, zero-divisions) + a real test-coverage gap; dynamic code-coverage check | [`phase-38`](./phase-38-diagnostics-hardening.md) |
@@ -71,24 +74,22 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 45 | Scroll layout | Full §16.1 mode (computeScrollLayout), formalizing + wiring what the renderer already did since Integration E; zero regressions from the extraction | [`phase-45`](./phase-45-scroll-layout.md) |
 | 46 | Page layout (system + page breaking) | Full §16.2 algorithm; found+fixed a real single-measure justification gap in Phase 43's own justifySystem; not yet wired into rendering | [`phase-46`](./phase-46-page-layout.md) |
 | — | **Integration G** (not a numbered phase) | Tempo mark display/positioning fixes, in two rounds (equals-sign spacing, vertical clearance, measure-width awareness, and a real x-formula inconsistency found by testing against the user's own real file) -- prompted by user-reported screenshots | [`integration-g`](./integration-g-tempo-mark-fixes.md) |
-| 47 | Arbitrary resize | Full §16.3 O(1) pure-scale fast path; directly usable on any rendered SVG today (no wiring pass needed) -- completes Stage 8 | [`phase-47`](./phase-47-arbitrary-resize.md) |
+| 47 | Arbitrary resize | Full §16.3 O(1) pure-scale fast path; directly usable on any rendered SVG today (no wiring pass needed) | [`phase-47`](./phase-47-arbitrary-resize.md) |
+| — | **Integration H** (not a numbered phase) | §9.19 articulations + §9.20 ornaments drawn, including §9.19's marcato-always-above exception; fermata parsed but deliberately not drawn (§9 has no placement section for it) | [`integration-h`](./integration-h-articulations-ornaments.md) |
+| — | **Integration I** (not a numbered phase) | §9.16 slurs + §9.17 tuplets drawn, via a span pass over anchors captured as each event renders; found+fixed a latent beam-group index/x misalignment | [`integration-i`](./integration-i-slur-tuplet-wiring.md) |
+| — | **Integration J** (not a numbered phase) | §9.21 dynamics + hairpins drawn, including wedges spanning several measures; explicit `placement` honoured | [`integration-j`](./integration-j-dynamics-hairpins.md) |
+| — | **Integration K** (not a numbered phase) | §9.14 multi-voice notehead-collision offsetting wired -- completes Phase 25's last unwired piece | [`integration-k`](./integration-k-voice-collision.md) |
+| — | **Integration L** (not a numbered phase) | §16.2 page mode wired (completes Phase 46, and Stage 8) + **fixed parts laying themselves out independently**, so a score finally shares ONE horizontal timeline; also de-quadratic-ed the per-measure lookups | [`integration-l`](./integration-l-page-layout-and-score-wide-spacing.md) |
 
-**Public API today:** 137 exports from `dist/notation-engine.js`.
+**Public API today:** 213 exports from `dist/notation-engine.js`.
 
 ---
 
-## B. NOT DONE — Phases 36–54
+## B. NOT DONE — Phases 48–54
 
 Nothing below exists in `src/` yet. Each line links to the `PLAN.md` section
-that specifies it.
-
-### Stage 5 — Expression
-| # | Phase | Spec |
-|---|---|---|
-
-### Stage 8 — Real layout
-| # | Phase | Spec |
-|---|---|---|
+that specifies it. **Everything numbered 1–47 is done** (see §A); these seven
+are Stages 9 and 10.
 
 ### Stage 9 — Playback surface
 | # | Phase | Spec |
@@ -121,15 +122,20 @@ left rather than guessed at — each is documented at the point it was found.
   same verification process treble/bass/alto got. See
   [`phase-11`](./phase-11-key-signature-engine.md) §4 and `PLAN.md` §19.
 
-- **C2 — Config sections are declared but unused.** Phase 7 reserved all 7
-  `EngineConfig` sections, but only the ones whose modules exist are read by
-  anything. `noteheadMapping`, `beam`, `cursor` and most of `layout` are
-  inert until Phases 15/24/49/45-47 land. This is by design (§8.2), not a
-  bug — but don't mistake "the option exists" for "the option does anything".
+- **C2 — Most config sections are still declared but unread.** Integration L
+  made `renderFromMusicXml` accept a `PartialEngineConfig`, but it honours
+  only `layout.mode`, `page` and `spacing`. `colors`, `noteheadMapping`,
+  `beam`, `barNumbers`, `keySignature`, `drums` and `cursor` are still
+  hardcoded constants inside the renderer. Unifying every section is
+  **Phase 50**'s own job (§8, Stage 10) — until then, don't mistake "the
+  option exists" for "the option does anything".
 
-- **C3 — `numeratorDisplay` additive meters render but aren't parsed.**
-  Phase 12 can *draw* `3+2+2`, but nothing reads it from a file yet; that
-  arrives with the parser (Phase 20/35).
+- **C3 — CLOSED.** Additive meters are now parsed *and* drawn. This turned
+  out to be a real bug rather than a missing feature: `<beats>3+2+2</beats>`
+  went through `Number.parseInt`, which stops at the `+`, so every 7/8 file
+  written the common way silently parsed as **3/8** — wrong meter, wrong
+  beaming, and a spurious `MEASURE_OVERRUN` on every measure. See
+  [`phase-35-tier23`](./phase-35-musicxml-parser-v2-tier23.md).
 
 ### Audited against the v2 plan — findings and resolution
 
@@ -151,6 +157,28 @@ coordinate convention and the `SMUFL_STAFF_SPACES_PER_EM = 4` constant match
 Not a defect: `EngineConfig`'s `[TODO]` sections from §8.2 (`spacing`,
 `staves`, `page`, `fonts`, `drums`, `debug`) are absent by design — §8.2 says
 each lands with its own module.
+
+### Fourth audit round, after Integrations H–L
+
+Three real defects found while wiring Phases 25/27/28/30/31/46, each now
+fixed with a regression test in
+`test/unit/bugfixes-phase47-review.test.js` (or its integration's own file):
+
+| Finding | Resolution |
+|---|---|
+| **Every part laid itself out independently.** Measure widths and x positions were computed per part, so a part with a busy measure 1 put its barline at x=25.8 while another part's whole-note measure 1 ended at x=9. Two parts of one score simply did not line up — contradicting §9.18's "the same horizontal measure positions shared down the system" and §14's one-shared-axis rule, and making page mode impossible | **Fixed.** The horizontal layout is computed **once for the whole score**, from every part's voices combined, before the part loop. Both parts now use identical barline positions, in scroll and page mode alike |
+| **`<beats>3+2+2</beats>` parsed as 3.** See §C3 above | **Fixed** in `parser/musicxml/attributes.ts`; the numeric total and the written form are now separate |
+| **Unpitched chord members were skipped by the skyline's staff-distance estimate.** `worstCaseStaffExtent` handled unpitched notes in its single-note branch but its chord branch tested `p.kind === 'pitched'` and dropped everything else. A drum chart legitimately writes kick+hi-hat as one chord, so on a multi-staff percussion part every chord contributed nothing and the staves stayed at the minimum distance | **Fixed** by extracting `staffPositionOfNote`, used by both branches — §4.3's "no code path branches on is-this-a-drum" invariant, applied to the one place that still did |
+
+Also found and fixed while wiring: `renderBeamGroup`'s caller derived its
+member notes and their x positions from two separately-filtered lists, so any
+non-note group member would have shifted every following note onto the wrong
+x. Not currently reachable, which is exactly why it was worth fixing before
+it became reachable.
+
+Also done in the same pass, for §18.1's sake: three linear `.find()` scans
+that ran once per measure per part were replaced with indexes built once —
+they made a full render quadratic in measure count.
 
 ### Second audit round, after Phases 14–17
 
@@ -206,12 +234,13 @@ they'd sensibly be tackled:
 
 | # | Item | Why it matters | Belongs to |
 |---|---|---|---|
-| **F1** | **Drum notehead shapes are wrong.** A hi-hat/cymbal renders as a round notehead instead of an ✕. | The most visible remaining defect on a real drum chart. The hard part is already done — the parser now captures each note's `instrumentId`, and Phase 15's `selectNoteheadGlyphName` already supports per-note shape overrides. What's missing is the table connecting the two. | Phase 35 (percussion), or a small standalone item |
-| **F2** | **No drum instrument → staff-position mapping.** Positions come straight from the file's own `<display-step>`/`<display-octave>`. | Fine for a well-formed file, but a file that omits them (or uses a different convention) has nothing to fall back on. Needs the GM percussion table. | Phase 41 (drum mapping) |
-| **F3** | **`.mxl` (zipped MusicXML) still rejected.** The app shows a clear error rather than opening it. | Many programs export `.mxl` by default, so a user's first file may well be one. | Phase 36 |
+| ~~**F1**~~ | ~~Drum notehead shapes are wrong~~ — **CLOSED by Phase 41.** A hi-hat/cymbal renders as a real ✕ (`noteheadXBlack`); verified on the project's own `Drum_Lesson_5.musicxml`, which draws 186 of them. | — | done |
+| ~~**F2**~~ | ~~No drum instrument → staff-position mapping~~ — **CLOSED by Phase 41.** `<midi-instrument>`/`<midi-unpitched>` resolves to a GM number, which drives position, notehead shape and stem direction from `DEFAULT_DRUM_MAPPING_TABLE`. | — | done |
+| ~~**F3**~~ | ~~`.mxl` still rejected~~ — **CLOSED by Phase 36**, and wired into the web app's upload path. | — | done |
 | **F4** | **No visual/browser-level test.** Every test asserts on SVG markup, which is exactly why the missing-font blocker (#4 in the A+B+C doc) went unnoticed for so long. | A markup-only suite structurally cannot catch "the glyphs are correct but nothing can draw them." | Stage 10 (Phase 53), or sooner if another font-class bug appears |
 | **F5** | **`quick-demo/` is now dead code.** Referenced by nothing since the rewiring. | Harmless, but it's the last thing still claiming to be "the notation renderer" to a casual reader. | Trivial cleanup, any time |
-| **F6** | **The app's notation is still decorative.** It renders below the video canvas; it is not composited into the exported frames, and there's no cursor/playback sync. | This is what the drum-video project actually needs the engine *for*. | Stage 8 + Stage 9 (Phases 43–49) |
+| **F6** | **The app's notation is still decorative.** It renders in the video preview panel, but it is not composited into exported frames and there is no cursor/playback sync. | This is what the drum-video project actually needs the engine *for*. Stage 8 is now complete, so what remains is **Stage 9 (Phases 48–49)** plus Phase 52's PNG export. | Stage 9 + Phase 52 |
+| **F7** | **The deployed website does not serve the Bravura font.** `website/video-create/drum/index.html` has no `@font-face` and `website/assets/` has no `.woff2`, while the engine emits `font-family="Bravura"`. The old `web-preview/canvas-preview.html` did have the rule. | Every notehead/clef/rest on the live site will fall back or render blank — this is blocker #4 from the A+B+C work recurring, exactly as F4 predicted a markup-only suite could not catch. **Outside the engine**, so not fixed by the Phase 1–47 work. | website/ (one `@font-face` rule + the committed `.woff2`) |
 
 **None of these are regressions** — F1/F2/F3 are documented scope
 boundaries from Phases 20/35/36, F6 is simply later-stage work not yet

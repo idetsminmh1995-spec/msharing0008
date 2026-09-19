@@ -89,3 +89,74 @@ describe('beam grouping (Phase 23)', () => {
     assert.deepEqual([...indices].sort((a, b) => a - b), [0, 1, 2, 3, 4, 5, 6, 7]);
   });
 });
+
+describe('explicit <beam> hints (§10.4/§10.8)', () => {
+  const ev = (beamValue, isRest = false) => ({
+    durationType: 'eighth',
+    isRest,
+    ...(beamValue !== undefined ? { beamValue } : {}),
+  });
+
+  test('hasExplicitBeams is false when nothing carries a hint, true when something does', () => {
+    assert.equal(NE.hasExplicitBeams([ev(undefined), ev(undefined)]), false);
+    assert.equal(NE.hasExplicitBeams([ev(undefined), ev('begin')]), true);
+    // A rest's own hint (which real files never write) must not count as
+    // the file "stating its beaming" -- rests are never beamed.
+    assert.equal(NE.hasExplicitBeams([ev('begin', true)]), false);
+  });
+
+  test('begin/continue/end forms one group spanning exactly those events', () => {
+    const groups = NE.groupBeamsFromHints([
+      ev('begin'),
+      ev('continue'),
+      ev('continue'),
+      ev('end'),
+    ]);
+    assert.equal(groups.length, 1);
+    assert.deepEqual([...groups[0].eventIndices], [0, 1, 2, 3]);
+  });
+
+  test('two hinted runs separated by an unhinted note produce two groups, and the unhinted note is in neither', () => {
+    const groups = NE.groupBeamsFromHints([
+      ev('begin'),
+      ev('end'),
+      ev(undefined),
+      ev('begin'),
+      ev('end'),
+    ]);
+    assert.equal(groups.length, 2);
+    assert.deepEqual([...groups[0].eventIndices], [0, 1]);
+    assert.deepEqual([...groups[1].eventIndices], [3, 4]);
+  });
+
+  test('a rest breaks a hinted run exactly as it breaks an inferred one', () => {
+    const groups = NE.groupBeamsFromHints([
+      ev('begin'),
+      ev('continue'),
+      ev(undefined, true),
+      ev('continue'),
+      ev('end'),
+    ]);
+    assert.equal(groups.length, 2);
+    assert.deepEqual([...groups[0].eventIndices], [0, 1]);
+    assert.deepEqual([...groups[1].eventIndices], [3, 4]);
+  });
+
+  test('a lone hinted note is dropped -- it keeps its individual flag, matching groupBeams', () => {
+    assert.deepEqual([...NE.groupBeamsFromHints([ev('begin'), ev(undefined)])], []);
+  });
+
+  test('malformed hints never throw: a continue/end with no open group simply opens one', () => {
+    assert.doesNotThrow(() => NE.groupBeamsFromHints([ev('continue'), ev('end')]));
+    const groups = NE.groupBeamsFromHints([ev('continue'), ev('end')]);
+    assert.equal(groups.length, 1);
+    assert.deepEqual([...groups[0].eventIndices], [0, 1]);
+  });
+
+  test('a back-to-back begin closes the previous group rather than swallowing it', () => {
+    const groups = NE.groupBeamsFromHints([ev('begin'), ev('end'), ev('begin'), ev('end')]);
+    assert.equal(groups.length, 2);
+    assert.deepEqual([...groups[0].eventIndices], [0, 1]);
+    assert.deepEqual([...groups[1].eventIndices], [2, 3]);
+  });
+});

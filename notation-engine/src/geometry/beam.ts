@@ -1,4 +1,5 @@
 import type { DurationType } from '../core/duration.js';
+import type { BeamHint } from '../core/note.js';
 import { TICKS_PER_QUARTER } from '../core/duration-math.js';
 
 /** True for the durations §9.9 already gives an individual flag when unbeamed -- eighth and shorter. */
@@ -103,4 +104,77 @@ export function beamedEventIndices(groups: readonly BeamGroup[]): ReadonlySet<nu
     }
   }
   return set;
+}
+
+/**
+ * An event plus the file's OWN level-1 `<beam>` value for it, if it gave
+ * one (§10.4/§10.8). Level 1 is the primary (eighth-note) beam -- the one
+ * that decides GROUPING; levels 2+ only add secondary beams within a
+ * group already established at level 1, and §9.13's own rendering takes
+ * its line count from the group's durations rather than from those
+ * hints.
+ */
+export interface BeamHintedEvent {
+  readonly durationType: DurationType;
+  readonly isRest: boolean;
+  readonly beamValue?: BeamHint['value'];
+}
+
+/** True when at least one event carries a level-1 `<beam>` hint -- i.e. the file states its own beaming and should be believed rather than second-guessed. */
+export function hasExplicitBeams(events: readonly BeamHintedEvent[]): boolean {
+  return events.some((e) => !e.isRest && e.beamValue !== undefined);
+}
+
+/**
+ * §10.8: "beams given explicitly via `<beam>` vs. left for the renderer
+ * to infer" is a named cross-software divergence, and a file that states
+ * its own beaming is the authority on it -- re-deriving grouping from the
+ * time signature would silently override, say, a drum chart's deliberate
+ * cross-beat grouping.
+ *
+ * Walks the level-1 hints: `begin` opens a group, `continue` extends it,
+ * `end` closes it. A note with no hint at all closes any open group (it
+ * is unbeamed, and an unbeamed note breaks a run exactly as a rest does).
+ * Hooks (`forward hook`/`backward hook`) only ever occur at levels 2+ in
+ * real files, but are treated as `continue` here rather than as a group
+ * break, so a malformed file that puts one at level 1 degrades to
+ * something sensible instead of splitting a beam mid-run.
+ *
+ * Malformed input never throws (§10.7): a `continue`/`end` with no open
+ * group simply opens one. As with `groupBeams`, a group of fewer than 2
+ * events is dropped -- a lone note keeps its individual flag.
+ */
+export function groupBeamsFromHints(events: readonly BeamHintedEvent[]): readonly BeamGroup[] {
+  const groups: BeamGroup[] = [];
+  let current: number[] = [];
+
+  const flush = (): void => {
+    if (current.length >= 2) groups.push({ eventIndices: current });
+    current = [];
+  };
+
+  events.forEach((event, i) => {
+    if (event.isRest || event.beamValue === undefined) {
+      flush();
+      return;
+    }
+    switch (event.beamValue) {
+      case 'begin':
+        flush();
+        current.push(i);
+        break;
+      case 'continue':
+      case 'forward hook':
+      case 'backward hook':
+        current.push(i);
+        break;
+      case 'end':
+        current.push(i);
+        flush();
+        break;
+    }
+  });
+  flush();
+
+  return groups;
 }

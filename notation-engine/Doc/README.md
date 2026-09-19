@@ -80,6 +80,12 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-46-page-layout.md`](./phase-46-page-layout.md) | Phase 46 page layout (§16.2) -- system/page breaking + justification; found+fixed a real single-measure justification gap; not yet wired into rendering |
 | [`integration-g-tempo-mark-fixes.md`](./integration-g-tempo-mark-fixes.md) | Integration G: tempo mark display/positioning fixes, in two rounds (equals-sign spacing, vertical clearance, measure-width awareness, x-formula inconsistency) |
 | [`phase-47-arbitrary-resize.md`](./phase-47-arbitrary-resize.md) | Phase 47 arbitrary resize (§16.3) -- O(1) pure-scale fast path, directly usable on any rendered SVG today, no separate wiring needed |
+| [`phase-35-musicxml-parser-v2-tier23.md`](./phase-35-musicxml-parser-v2-tier23.md) | Phase 35 COMPLETION: parser v2 Tier 2/3 (notations, beam, lyric, harmony, direction, print, sound tempo) + additive meters (C3) + explicit beam hints (§10.8) |
+| [`integration-h-articulations-ornaments.md`](./integration-h-articulations-ornaments.md) | Integration H: §9.19 articulations + §9.20 ornaments drawn (incl. the marcato exception); fermata parsed but deliberately not drawn |
+| [`integration-i-slur-tuplet-wiring.md`](./integration-i-slur-tuplet-wiring.md) | Integration I: §9.16 slurs + §9.17 tuplets drawn via a span pass over captured anchors; fixed a latent beam-group index/x misalignment |
+| [`integration-j-dynamics-hairpins.md`](./integration-j-dynamics-hairpins.md) | Integration J: §9.21 dynamics + hairpins drawn, incl. wedges spanning measures |
+| [`integration-k-voice-collision.md`](./integration-k-voice-collision.md) | Integration K: §9.14 multi-voice notehead collision offsetting wired -- completes Phase 25 |
+| [`integration-l-page-layout-and-score-wide-spacing.md`](./integration-l-page-layout-and-score-wide-spacing.md) | Integration L: §16.2 page mode wired (completes Phase 46) + fixed parts laying themselves out independently, so a score now shares ONE horizontal timeline |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

@@ -1,4 +1,8 @@
-export type OrnamentType = 'trill' | 'mordent' | 'turn' | 'turnInverted';
+import type { OrnamentType } from '../core/note.js';
+
+// Declared in core/note.ts and re-exported here -- see the identical
+// note in geometry/articulation.ts.
+export type { OrnamentType };
 
 const GLYPH_NAMES: Readonly<Record<OrnamentType, string>> = {
   trill: 'ornamentTrill',

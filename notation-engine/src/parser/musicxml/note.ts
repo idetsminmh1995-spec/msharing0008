@@ -1,8 +1,10 @@
 import type { DurationType } from '../../core/duration.js';
+import type { BeamHint, LyricSyllable } from '../../core/note.js';
 import { durationTypeAndDotsFromTicks, xmlDivisionsToTicks } from '../../core/duration-math.js';
 import type { PitchStep } from '../../core/pitch.js';
 import { diagnostic, type Diagnostic, type DiagnosticLocation } from './diagnostic.js';
 import { childrenNamed, firstChildNamed, intOf, textOf } from './dom-helpers.js';
+import { parseBeamHints, parseLyrics, parseNotations, type ParsedNotations } from './notations.js';
 
 const KNOWN_DURATION_TYPES: ReadonlySet<string> = new Set([
   'whole',
@@ -64,6 +66,12 @@ export interface ParsedNoteEvent {
   readonly stringNumber?: number;
   /** Integration C: <notations><technical><fret> -- which fret, 0 meaning an open string. */
   readonly fret?: number;
+  /** Phase 35 Tier 2/§10.4: this note's parsed <notations> -- articulations, ornaments, fermata, slur endpoints, tuplet endpoints. */
+  readonly notations: ParsedNotations;
+  /** Phase 35 Tier 2/§10.4/§10.8: the file's own <beam> hints for this note, empty when it gave none. */
+  readonly beams: readonly BeamHint[];
+  /** Phase 35 Tier 2/§10.4: this note's <lyric> syllables (§9.22), empty when it has none. */
+  readonly lyrics: readonly LyricSyllable[];
 }
 
 /**
@@ -200,6 +208,17 @@ export function parseNoteElement(
     rawStemText === 'up' || rawStemText === 'down' ? rawStemText : undefined;
   const hasExplicitAccidental = firstChildNamed(noteEl, 'accidental') !== undefined;
 
+  // §10.4 Tier 2: the rest of <notations>, plus <beam> and <lyric>.
+  // Every one of these is independent of whether the note is pitched,
+  // unpitched or a rest -- a rest can carry a fermata, a percussion note
+  // can carry an accent -- so they are read here, before the
+  // pitch/unpitched branch below, not inside it.
+  const { notations, diagnostics: notationDiags } = parseNotations(noteEl, location);
+  diagnostics.push(...notationDiags);
+  const { beams, diagnostics: beamDiags } = parseBeamHints(noteEl, location);
+  diagnostics.push(...beamDiags);
+  const lyrics = parseLyrics(noteEl);
+
   let step: PitchStep | undefined;
   let alter: number | undefined;
   let octave: number | undefined;
@@ -287,6 +306,9 @@ export function parseNoteElement(
     hasExplicitAccidental,
     ...(stringNumber !== undefined ? { stringNumber } : {}),
     ...(fret !== undefined ? { fret } : {}),
+    notations,
+    beams,
+    lyrics,
   };
 
   return { event, diagnostics };

@@ -17,6 +17,14 @@ export interface AttributesUpdate {
   readonly fifths?: number;
   readonly timeNumerator?: number;
   readonly timeDenominator?: number;
+  /**
+   * STATUS C3/§9.4: an ADDITIVE meter's own written form ("3+2+2"), when
+   * the file writes one. `timeNumerator` stays the numeric total (7),
+   * which is what every beat/tick calculation in the engine needs; this
+   * is only what gets DRAWN. Phase 12 could already render this; nothing
+   * read it from a file until now.
+   */
+  readonly timeNumeratorDisplay?: string;
   readonly clefSign?: string;
   readonly clefLine?: number;
   /** §9.18/Integration A: how many staves this part has (piano = 2). Absent means one staff. */
@@ -45,6 +53,7 @@ export function parseAttributesElement(attributesEl: Element): AttributesUpdate 
     fifths?: number;
     timeNumerator?: number;
     timeDenominator?: number;
+    timeNumeratorDisplay?: string;
     clefSign?: string;
     clefLine?: number;
     staves?: number;
@@ -81,9 +90,35 @@ export function parseAttributesElement(attributesEl: Element): AttributesUpdate 
 
   const timeEl = firstChildNamed(attributesEl, 'time');
   if (timeEl !== undefined) {
-    const beats = intOf(firstChildNamed(timeEl, 'beats'));
+    // STATUS C3/§9.4: an additive meter is written either as one <beats>
+    // holding "3+2+2", or as several <beats>/<beat-type> pairs. BOTH used
+    // to parse as plain 3/8 here, because `intOf` runs Number.parseInt,
+    // which stops dead at the '+' and silently returns just the first
+    // term -- a real, silent wrong-time-signature bug on any 7/8 file
+    // written the common way. The numeric total is what every tick and
+    // beaming calculation needs; the written form is kept separately, for
+    // display only.
+    const beatsEls = childrenNamed(timeEl, 'beats');
+    const terms: number[] = [];
+    const written: string[] = [];
+    for (const el of beatsEls) {
+      const raw = textOf(el);
+      if (raw === undefined || raw.length === 0) continue;
+      written.push(raw);
+      for (const piece of raw.split('+')) {
+        const n = Number.parseInt(piece.trim(), 10);
+        if (!Number.isNaN(n)) terms.push(n);
+      }
+    }
+    if (terms.length > 0) {
+      result.timeNumerator = terms.reduce((sum, n) => sum + n, 0);
+      const display = written.join('+');
+      // Only an ACTUAL additive meter gets a display override; a plain
+      // "4" must keep numeratorDisplay absent so Phase 12 renders it the
+      // ordinary way and existing snapshots stay byte-identical.
+      if (terms.length > 1) result.timeNumeratorDisplay = display;
+    }
     const beatType = intOf(firstChildNamed(timeEl, 'beat-type'));
-    if (beats !== undefined) result.timeNumerator = beats;
     if (beatType !== undefined) result.timeDenominator = beatType;
   }
 

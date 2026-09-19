@@ -563,6 +563,45 @@ describe('visual regression (Phase 8)', () => {
     matchSnapshot('render-from-musicxml-v2-elements', svg, SNAPSHOT_DIR);
   });
 
+  test('Integration I: a real slur/tuplet fixture (below-side slur, bracketless beamed triplet, bracketed rest triplet) renders identically to the saved snapshot', () => {
+    const xml = fs.readFileSync(
+      path.join(__dirname, '..', 'fixtures', 'musicxml', 'slur-tuplet.musicxml'),
+      'utf8',
+    );
+    const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
+    matchSnapshot('render-from-musicxml-slur-tuplet', svg, SNAPSHOT_DIR);
+  });
+
+  test('Integration J: a real dynamics/hairpin fixture (a dynamic below the staff, a crescendo spanning a barline) renders identically to the saved snapshot', () => {
+    const xml = fs.readFileSync(
+      path.join(__dirname, '..', 'fixtures', 'musicxml', 'dynamics-hairpin.musicxml'),
+      'utf8',
+    );
+    const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
+    matchSnapshot('render-from-musicxml-dynamics-hairpin', svg, SNAPSHOT_DIR);
+  });
+
+  test('Integration L: the piano grand-staff fixture in PAGE mode (systems stacked on a page, clef/key restated, brace per system) renders identically to the saved snapshot', () => {
+    const xml = fs.readFileSync(
+      path.join(__dirname, '..', 'fixtures', 'musicxml', 'piano-grand-staff.musicxml'),
+      'utf8',
+    );
+    const { svg } = NE.renderFromMusicXml(xml, {
+      domParser: testDomParser(),
+      config: { layout: { mode: 'page' } },
+    });
+    matchSnapshot('render-from-musicxml-page-mode', svg, SNAPSHOT_DIR);
+  });
+
+  test('Integration H: a real articulations/ornaments fixture (notehead-side marks, the marcato exception, an unconditional ornament) renders identically to the saved snapshot', () => {
+    const xml = fs.readFileSync(
+      path.join(__dirname, '..', 'fixtures', 'musicxml', 'articulations-ornaments.musicxml'),
+      'utf8',
+    );
+    const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
+    matchSnapshot('render-from-musicxml-articulations-ornaments', svg, SNAPSHOT_DIR);
+  });
+
   test('Phase 41: a real gm-drum-mapping fixture (GM-driven notehead shape, position, and stem direction) renders identically to the saved snapshot', () => {
     const xml = fs.readFileSync(
       path.join(__dirname, '..', 'fixtures', 'musicxml', 'gm-drum-mapping.musicxml'),

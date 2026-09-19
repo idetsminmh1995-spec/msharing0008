@@ -281,21 +281,23 @@ notation-engine/
                            Voice, Measure, Part, Score + duration/tick math
     glyphs/       [BUILT]  SMuFL glyph table + Bravura metadata loader
     config/       [BUILT]  the single typed EngineConfig + resolveConfig()
-    geometry/     [PARTIAL] pure math: staff, clef, key-sig, time-sig, barline
-                           [TODO] notehead, stem, flag, rest, accidental, beam,
-                           tie, slur, tuplet, ledger, spacing, skyline
-    render/       [PARTIAL] SVG string building: primitives, staff, clef,
-                           key-sig, time-sig, barline [TODO] the rest
-    parser/       [TODO]   musicxml/ and midi/ subfolders
-    timing/       [TODO]   tempo map, tick<->seconds, MIDI/XML alignment
-    layout/       [TODO]   measure widths, system breaking, scroll/page modes
-    playback/     [TODO]   position API + event stream (§17)
-    export/       [TODO]   SVG/PNG/PDF output
+    geometry/     [BUILT]  pure math: staff, clef, key-sig, time-sig, barline,
+                           ledger, notehead, stem, flag, rest, accidental,
+                           beam, tie, slur, tuplet, voice, system, articulation,
+                           ornament, dynamic, hairpin, lyric, chord-symbol,
+                           grace-note, tab, metronome
+    render/       [BUILT]  SVG string building: one render/X.ts per geometry/X.ts
+    drums/        [BUILT]  GM percussion mapping table (§13.3)
+    parser/       [BUILT]  musicxml/ (incl. .mxl, timewise) and midi/
+    timing/       [BUILT]  tempo map, tick<->seconds, MIDI/XML alignment
+    layout/       [BUILT]  spacing, skyline, scroll, page, resize, system
+    playback/     [TODO]   position API + event stream (§17) -- Phase 48/49
+    export/       [TODO]   SVG/PNG/PDF output -- Phase 52
     index.ts      [BUILT]  public API barrel
   test/
     unit/         [BUILT]  per-module unit tests (node --test)
     visual/       [BUILT]  snapshot regression tests + __snapshots__/
-    fixtures/     [TODO]   real MusicXML/MIDI files from multiple programs
+    fixtures/     [BUILT]  real MusicXML/.mxl files, incl. the §10.8 corpus
     helpers/      [BUILT]  loadEngine(), matchSnapshot()
 ```
 
@@ -506,6 +508,15 @@ obtain a config; nothing reads `DEFAULT_CONFIG` directly.
   debug:     { logLevel:'silent'|'error'|'warn'|'info'|'debug';
                drawBoundingBoxes:boolean; drawSkyline:boolean }  // §18.3
 ```
+
+**Note on what the renderer actually reads.** `spacing`, `staves`, `page` and
+`drums` now exist as real sections, and `renderFromMusicXml` accepts a
+`PartialEngineConfig` — but it honours only `layout.mode`, `page` and
+`spacing`. Colours, fonts, notehead mapping, beam style, bar numbers and key
+signature style are still hardcoded constants inside the renderer. Unifying
+every section into one live theming API is **Phase 50**'s own job; until
+then, "the option exists" is not the same as "the option does anything"
+(`Doc/STATUS.md` §C2 says the same thing from the other direction).
 
 **Rule for adding a section:** add its interface, add its default to
 `DEFAULT_CONFIG`, add one line to `resolveConfig`'s merge. Nothing else
@@ -748,7 +759,7 @@ MusicXML complication: a file may supply an explicit `<accidental>` element,
 which must be honoured even when our own state machine would not have drawn
 one (that is what courtesy accidentals are).
 
-### 9.12 Beam grouping `[TODO]`
+### 9.12 Beam grouping `[BUILT and WIRED -- inference by Phase 23, and the file's own explicit <beam> hints (§10.8) take precedence over it since Phase 35 Tier 2. See Doc/phase-23-beam-grouping.md and Doc/phase-35-musicxml-parser-v2-tier23.md]`
 
 **Responsibility.** Decide which consecutive eighth-or-shorter notes within a
 measure share one beam, and which stand alone with an individual flag
@@ -883,7 +894,7 @@ endpoints exactly match what the equivalent straight group would produce.
 
 ---
 
-### 9.14 Multi-voice per staff `[PARTIAL — stem direction + rest separation built and wired; notehead-collision offsetting has geometry but is not yet wired into renderFromMusicXml]`
+### 9.14 Multi-voice per staff `[BUILT and WIRED -- stem direction + rest separation by Phase 25, notehead-collision offsetting by Integration Pass K. See Doc/integration-k-voice-collision.md. The 3-or-4-voice pile-up remains a stated limitation below]`
 
 **Responsibility.** When two (or more) voices share one staff — the drum
 hand/foot split, a piano's LH/RH split-voice passages, an SATB pair — decide
@@ -1012,7 +1023,7 @@ inside them.
 
 ---
 
-### 9.16 Slurs `[BUILT for geometry/rendering -- not wired, see Doc/phase-27-slurs.md]`
+### 9.16 Slurs `[BUILT and WIRED -- geometry by Phase 27, parsing by Phase 35 Tier 2, drawing by Integration Pass I. See Doc/integration-i-slur-tuplet-wiring.md. A slur crossing a barline is not drawn (diagnostic, not silence)]`
 
 **Responsibility.** A curved line spanning **2 or more notes of
 potentially different pitches**, indicating legato phrasing (unlike a tie,
@@ -1069,7 +1080,7 @@ notehead-collision offsetting.
 
 ---
 
-### 9.17 Tuplets `[BUILT for geometry/rendering -- not wired, see Doc/phase-28-tuplets.md]`
+### 9.17 Tuplets `[BUILT and WIRED -- geometry by Phase 28, parsing by Phase 35 Tier 2, drawing by Integration Pass I. See Doc/integration-i-slur-tuplet-wiring.md]`
 
 **Responsibility.** The bracket + number marking an irregular grouping
 (a triplet, quintuplet, etc.) — the tick MATH already exists (Phase 4's
@@ -1133,7 +1144,7 @@ per the number-format note above.
 
 ---
 
-### 9.18 Grand staff / multi-part systems `[BUILT and WIRED -- multi-STAFF by Integration Pass A (brace, per-staff clefs, continuous barline), multi-PART by Integration Pass B (every part renders, stacked; per-staff line counts). <part-group> BRACKETS across different instruments remain (v2 parser scope, §10.4). See Doc/integration-a-grand-staff.md and Doc/integration-b-multi-part.md]`
+### 9.18 Grand staff / multi-part systems `[BUILT and WIRED -- multi-STAFF by Integration Pass A (brace, per-staff clefs, continuous barline), multi-PART by Integration Pass B (every part renders, stacked; per-staff line counts). <part-group> BRACKETS across different instruments remain unparsed -- note that §10.4's own element list never included <part-group>, so this is its own outstanding item, not part of the now-complete v2 parser work. One score-wide horizontal timeline (so every part's barlines actually align) by Integration Pass L. See Doc/integration-a-grand-staff.md, Doc/integration-b-multi-part.md and Doc/integration-l-page-layout-and-score-wide-spacing.md]`
 
 **Responsibility.** Render every part of a score, not just the first
 (§21's own stated limitation), stacking multiple staves vertically into
@@ -1197,7 +1208,7 @@ stacked staves are a fixed default, not content-aware.
 
 ---
 
-### 9.19 Articulations `[BUILT for geometry/rendering -- not wired, see Doc/phase-30-articulations-ornaments.md]`
+### 9.19 Articulations `[BUILT and WIRED -- geometry by Phase 30, parsing by Phase 35 Tier 2, drawing by Integration Pass H. See Doc/integration-h-articulations-ornaments.md]`
 
 **Responsibility.** The small marks attached directly to a note —
 staccato, accent, tenuto, marcato, staccatissimo — indicating how it
@@ -1248,7 +1259,7 @@ note above.
 
 ---
 
-### 9.20 Ornaments `[BUILT for geometry/rendering -- not wired, see Doc/phase-30-articulations-ornaments.md]`
+### 9.20 Ornaments `[BUILT and WIRED -- geometry by Phase 30, parsing by Phase 35 Tier 2, drawing by Integration Pass H. See Doc/integration-h-articulations-ornaments.md]`
 
 **Responsibility.** Trill, mordent, turn — symbols indicating a rapid
 melodic decoration around the written note. `<ornaments>` under
@@ -1292,7 +1303,7 @@ similar compound ornaments.
 
 ---
 
-### 9.21 Dynamics, hairpins, tempo marks, rehearsal marks `[PARTIAL -- dynamics/hairpins built, tempo/rehearsal marks placement-only, see Doc/phase-31-dynamics-hairpins-tempo-rehearsal.md]`
+### 9.21 Dynamics, hairpins, tempo marks, rehearsal marks `[PARTIAL -- dynamics/hairpins BUILT and WIRED (Integration Pass J); tempo marks drawn since Integration Pass D; rehearsal marks remain placement-only (they need arbitrary text, which this engine still has no font for). See Doc/integration-j-dynamics-hairpins.md]`
 
 **Responsibility.** Four distinct expression-mark categories, bundled in
 one phase per the roadmap but researched and scoped separately, since
@@ -1360,7 +1371,7 @@ marks needed.
 
 ---
 
-### 9.22 Lyrics `[PARTIAL -- placement/hyphen/elision/extender-line built, syllable text deferred, see Doc/phase-32-lyrics.md]`
+### 9.22 Lyrics `[PARTIAL -- placement/hyphen/elision/extender-line built (Phase 32) and <lyric> now PARSED and preserved (Phase 35 Tier 2); syllable text still undrawn, because Bravura has no Latin alphabet and this engine has no text font. Nothing is wired into rendering: a row of floating hyphens with no words would be worse than the gap. See §19.10]`
 
 **Responsibility.** Syllables of sung text aligned under the notes they
 belong to, plus the punctuation that connects them (hyphens for a word
@@ -1419,7 +1430,7 @@ stack.
 
 ---
 
-### 9.23 Chord symbols `[PARTIAL -- placement/accidentals/qualities built, root letter deferred, see Doc/phase-33-chord-symbols.md]`
+### 9.23 Chord symbols `[PARTIAL -- placement/accidentals/qualities built (Phase 33) and <harmony> now PARSED and preserved verbatim, kind string included (Phase 35 Tier 2); nothing is drawn, per this section's own "meaningless to build before the root letter can be drawn". See §19.10]`
 
 **Responsibility.** Lead-sheet harmony markings ("Cmaj7", "Dm7♭5",
 "G7/B") above the melody. `<harmony>` is v2 parser scope (§10.4); this
@@ -1578,7 +1589,7 @@ violate §1's independence requirement.
 `<note>` (`<pitch>`, `<rest>`, `<duration>`, `<type>`, `<dot>`, `<voice>`,
 `<staff>`, `<chord>`, `<tie>`), `<backup>`, `<forward>`, `<barline>`.
 
-### 10.4 Elements parsed — v2 (full) `[PARTIAL -- Tier 1 built by Phase 35 (midi-instrument, notehead, grace, time-modification, stem, accidental); Tier 2/3 remain -- notations sub-elements, direction sub-elements, lyric, harmony, print, sound tempo, beam. See Doc/phase-35-musicxml-parser-v2.md]`
+### 10.4 Elements parsed — v2 (full) `[BUILT -- Tier 1 by Phase 35, Tier 2/3 by its completion pass (notations sub-elements, beam, lyric, harmony, direction sub-elements, print, sound tempo). Every element listed below is now parsed; what is DRAWN with each is Integration Passes H-L, and <lyric>/<harmony> text is deliberately preserved-but-undrawn (no text font). See Doc/phase-35-musicxml-parser-v2-tier23.md]`
 
 `<unpitched>`, `<instrument>`, `<notehead>`, `<time-modification>`
 (tuplets), `<notations>` (`<tied>`, `<slur>`, `<tuplet>`, `<articulations>`,
@@ -1588,7 +1599,7 @@ violate §1's independence requirement.
 `<print>` (system/page breaks), `<sound tempo>`, `<midi-instrument>`
 (`<midi-unpitched>`, `<midi-channel>`).
 
-### 10.5 Percussion handling `[PARTIAL — parsing built by the A+B+C work; the mapping pieces below are Phase 35/41]`
+### 10.5 Percussion handling `[BUILT -- parsing by the A+B+C work, the GM mapping by Phase 41]`
 
 Per the spec text quoted in §9.2: `<unpitched>` with `<display-step>` +
 `<display-octave>` positions as if treble clef. **If those children are
@@ -1600,14 +1611,14 @@ number, which becomes the notehead-mapping key (§9.7) and the drum-mapping key
 Note: MusicXML's `<midi-unpitched>` is **1-based** while GM note numbers are
 0-based — subtract 1. This is a classic off-by-one; assert it in tests.
 
-**Built so far:** `<unpitched>` is parsed into a real unpitched `Note`
-(display-step/display-octave → staff position), and each note's
-`<instrument id="...">` is captured. **Not yet built:** the
-`<midi-instrument>`/`<midi-unpitched>` lookup that turns that id into a GM
-note number, and therefore the notehead-shape mapping (§9.7) — so a hi-hat
-currently draws a round notehead instead of an ✕. The absent-display-step
-fallback to the middle line is also not implemented (a diagnostic is emitted
-instead). See `Doc/STATUS.md` §F1/§F2.
+**All built.** `<unpitched>` parses into a real unpitched `Note`
+(display-step/display-octave → staff position); each note's
+`<instrument id="...">` is captured; and Phase 41's
+`<midi-instrument>`/`<midi-unpitched>` lookup turns that id into a GM note
+number, which drives the notehead shape (§9.7), the staff position and the
+stem direction from `DEFAULT_DRUM_MAPPING_TABLE` (§13.3). A hi-hat draws a
+real ✕. The absent-display-step case recovers via a documented fallback with
+a diagnostic, never silently.
 
 ### 10.6 `<score-timewise>` `[BUILT]`
 
@@ -1979,7 +1990,7 @@ low-hanging content.
 
 ---
 
-## 16. Module: `layout/` — System, Page and Resize `[TODO]`
+## 16. Module: `layout/` — System, Page and Resize `[BUILT and WIRED -- §16.1 by Phase 45, §16.2 by Phase 46 + Integration Pass L, §16.3 by Phase 47]`
 
 ### 16.1 Scroll mode `[BUILT and WIRED into rendering by Phase 45 -- see Doc/phase-45-scroll-layout.md]`
 
@@ -1987,7 +1998,7 @@ One unbroken system, arbitrarily wide. Measures are laid out left to right at
 their natural (unjustified) widths. This is the mode a video/cursor use case
 wants.
 
-### 16.2 Page mode `[BUILT for the full algorithm -- not yet wired into rendering, see Doc/phase-46-page-layout.md]`
+### 16.2 Page mode `[BUILT and WIRED -- algorithm by Phase 46, wired into rendering by Integration Pass L via `config.layout.mode = 'page'`. See Doc/integration-l-page-layout-and-score-wide-spacing.md]`
 
 Measures are packed into systems until the next measure would exceed the
 usable width, then a system break occurs and the completed system is
@@ -2199,6 +2210,19 @@ API can be designed *then*, informed by what that extension actually needs.
 9. **Notation cannot be inferred from MIDI alone** — a MIDI-only input
    renders with default spelling, single voice, and inferred beaming, and
    this is documented behaviour, not a bug. Full notation requires MusicXML.
+10. **No arbitrary text is drawn anywhere** — lyric syllables (§9.22), chord
+    symbol root letters (§9.23), rehearsal marks and `<words>` directions
+    (§9.21) are all **parsed and preserved** but not rendered. Bravura is a
+    music-symbol font with no Latin alphabet at all, and this engine has no
+    text-font/character-metrics system. This is one gap, hit in four places,
+    not four separate gaps.
+11. **A slur or tuplet crossing a barline is not drawn**, and a hairpin
+    crossing a system break is not drawn — each reports a diagnostic rather
+    than drawing something wrong. Same class of boundary as limitation 2.
+12. **Fermata is parsed but not drawn** — §9 has no fermata placement
+    section, and guessing one would not be implementing a spec.
+13. **Multi-voice collision is pairwise only** (§9.14) — a genuine 3-or-4
+    voice pile-up needs column assignment, not pair resolution.
 
 ---
 
@@ -2303,27 +2327,27 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 |---|---|---|
 | 23 | Beam grouping (by time-signature beat structure, with override) | ✅ |
 | 24 | Beam geometry + the three styles (straight / flat / curved) | ✅ |
-| 25 | Multi-voice per staff + voice collision and rest separation | ✅ (core); notehead-offset wiring pending |
+| 25 | Multi-voice per staff + voice collision and rest separation | ✅ (notehead-offset wired by Integration K) |
 | 26 | Ties | ✅ (common case); cross-barline/beam/chord ties pending |
-| 27 | Slurs | ✅ (geometry); wiring pending v2 parser |
-| 28 | Tuplets | ✅ (geometry); wiring pending v2 parser |
-| 29 | Grand staff / multi-part systems | ✅ (geometry/layout); render-loop wiring pending |
+| 27 | Slurs | ✅ (wired by Integration I) |
+| 28 | Tuplets | ✅ (wired by Integration I) |
+| 29 | Grand staff / multi-part systems | ✅ (wired by Integrations A/B; one score-wide timeline by Integration L) |
 
 ### Stage 5 — Expression `[COMPLETE]`
 
 | Phase | What | Status |
 |---|---|---|
-| 30 | Articulations and ornaments | ✅ (geometry); wiring pending v2 parser |
-| 31 | Dynamics, hairpins, tempo marks, rehearsal marks | ✅ (dynamics/hairpins); tempo/rehearsal placement-only |
-| 32 | Lyrics | ✅ (punctuation/placement); syllable text deferred |
-| 33 | Chord symbols | ✅ (accidentals/qualities/placement); root letter deferred |
+| 30 | Articulations and ornaments | ✅ (wired by Integration H) |
+| 31 | Dynamics, hairpins, tempo marks, rehearsal marks | ✅ dynamics/hairpins wired by Integration J, tempo marks by Integration D; rehearsal marks still placement-only (no text font) |
+| 32 | Lyrics | ✅ (punctuation/placement + parsing); syllable text deferred — no text font |
+| 33 | Chord symbols | ✅ (accidentals/qualities/placement + parsing); root letter deferred — no text font |
 | 34 | Grace notes | ✅ |
 
 ### Stage 6 — Full import `[COMPLETE]`
 
 | Phase | What | Status |
 |---|---|---|
-| 35 | MusicXML parser v2 (§10.4) — every element the renderer now supports | ✅ (Tier 1); Tier 2/3 remain |
+| 35 | MusicXML parser v2 (§10.4) — every element the renderer now supports | ✅ (Tier 1 + Tier 2/3; §10.4 complete) |
 | 36 | `.mxl` support + `<score-timewise>` conversion | ✅ |
 | 37 | Cross-software compatibility corpus and fixes (§10.8) | ✅ (representative fixtures; no real program access) |
 | 38 | Diagnostics and partial-render hardening (§10.7) | ✅ (fixed 2 real crash bugs) |
@@ -2344,7 +2368,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 43 | Spacing algorithm (§14), replacing Phase 21's naive layout | ✅ (algorithm + wired into rendering by Integration E) |
 | 44 | Skyline collision avoidance (§15) | ✅ (algorithm + grand-staff distance wired into rendering by Integration F) |
 | 45 | Scroll layout (§16.1) | ✅ (built + wired into rendering) |
-| 46 | Page layout + system/page breaking (§16.2) | ✅ (algorithm); wiring pending |
+| 46 | Page layout + system/page breaking (§16.2) | ✅ (algorithm + wired into rendering by Integration L) |
 | 47 | Arbitrary W×H resize, incl. the O(1) pure-scale fast path (§16.3) | ✅ (built + directly usable) |
 
 ### Stage 9 — Playback surface

@@ -24,8 +24,22 @@ import {
   computeStemLength,
   createAccidentalState,
   evaluateAccidental,
+  articulationGlyphName,
+  articulationSide,
   beamedEventIndices,
   groupBeams,
+  groupBeamsFromHints,
+  hasExplicitBeams,
+  ornamentGlyphName,
+  computeSlurShape,
+  slurSide,
+  computeTupletBracketShape,
+  tupletBracketNeeded,
+  tupletDigitGlyphName,
+  tupletSide,
+  computeHairpinShape,
+  dynamicGlyphName,
+  dynamicSide,
   keySignatureAccidentals,
   middleLineY,
   needsFlag,
@@ -33,6 +47,7 @@ import {
   resolveStemDirection,
   computeTieShape,
   tieSide,
+  resolveNoteheadCollision,
   voiceForcedDirection,
   voiceRestOffset,
   resetMeasure,
@@ -68,6 +83,9 @@ import { computeBraceShape, needsBrace, needsContinuousBarline } from './geometr
 import { renderBrace } from './render/index.js';
 import type { Diagnostic, MeasureAttributes } from './parser/index.js';
 import { parseMusicXml, type ParseMusicXmlOptions } from './parser/index.js';
+import { resolveConfig, DEFAULT_CONFIG, type PartialEngineConfig } from './config/index.js';
+import { computePageLayout, type PageMeasureInput } from './layout/index.js';
+import { measure as makeMeasure } from './core/index.js';
 import {
   computeReferenceDuration,
   computeProportionalPositions,
@@ -85,10 +103,14 @@ import {
   renderLedgerLines,
   renderMark,
   renderNotehead,
+  renderHairpin,
   renderRest,
+  renderSlur,
   renderStaff,
   renderStem,
   renderTie,
+  renderTupletBracket,
+  renderTupletNumber,
   renderTimeSignature,
   noteheadWidth,
 } from './render/index.js';
@@ -104,10 +126,11 @@ const PX_PER_STAFF_SPACE = 20;
 const MEASURE_WIDTH = 24;
 
 // Phase 43/44 wiring: real Sec14 spacing constants, matching
-// config/config.ts's own SpacingConfig defaults. Not threaded through
-// as an actual EngineConfig parameter -- RenderFromMusicXmlOptions
-// currently accepts only domParser, and widening that public surface
-// is a separate decision from wiring the algorithm itself.
+// config/config.ts's own SpacingConfig defaults, EXCEPT `justify` --
+// see the note on `pageSpacingConfig` in renderFromMusicXml for why a
+// scroll system is never justified while a page system is. These are
+// the WITHIN-measure spacing constants; Integration L's `config.spacing`
+// option feeds the between-measure justification instead.
 const SPACING_CONFIG = {
   spacingIncrement: 1.2,
   shortestDurationSpace: 2.0,
@@ -142,8 +165,41 @@ const MEASURE_TRAILING_MARGIN = 2.0;
  */
 const MEASURE_HEADER_ALLOWANCE = 6.0;
 
-/** Phase 29's own default, kept as this wiring's fallback floor when computeStaffDistance's own configured minimum isn't threaded through as a real EngineConfig parameter (see the Phase 43 wiring's own note on why RenderFromMusicXmlOptions stays domParser-only for now). */
+/** Phase 29's own default, kept as this wiring's fallback floor. `config.staves.minStaffDistance` is not read yet -- one of the sections Phase 50 (§8, Stage 10) still has to unify; see Doc/STATUS.md §C2. */
 const DEFAULT_STAFF_GAP_FALLBACK = 8;
+
+/**
+ * §9.19/§9.20 specify each mark's SIDE, not its distance -- no source
+ * gives one universal number, exactly as Phase 24's beam-slope cap and
+ * Phase 31's hairpin spread already found. These are chosen, consistent
+ * values: one staff space from the notehead to the first articulation
+ * (and between stacked ones), and a slightly larger gap for ornaments,
+ * which sit clear of the staff rather than next to the notehead.
+ */
+const ARTICULATION_GAP = 1.0;
+const ORNAMENT_GAP = 1.5;
+
+/**
+ * Integration I: how far a slur's endpoints and a tuplet's bracket sit
+ * from the noteheads they span. Chosen values for the same reason as the
+ * two gaps above -- §9.16 and §9.17 specify the SIDE and the shape, not a
+ * distance, and no source gives one universal number.
+ */
+const SLUR_GAP = 1.2;
+const TUPLET_GAP = 1.8;
+const SLUR_MIDPOINT_THICKNESS_FALLBACK = 0.22;
+const TUPLET_BRACKET_THICKNESS_FALLBACK = 0.16;
+
+/**
+ * Integration J: how far a dynamic or hairpin sits from the staff it
+ * belongs to. §9.21 specifies the SIDE ("below the staff by default")
+ * and the shapes, not a distance -- another chosen value, matching the
+ * gaps above. Measured from the staff's own near line, so an "above"
+ * mark clears the top line by the same amount a "below" one clears the
+ * bottom.
+ */
+const DYNAMIC_GAP = 2.5;
+const HAIRPIN_THICKNESS_FALLBACK = 0.16;
 
 /**
  * Phase 44 wiring: the single most extreme staff-position value any note
@@ -158,6 +214,25 @@ const DEFAULT_STAFF_GAP_FALLBACK = 8;
  * wiring accepts the small inaccuracy rather than re-deriving clefs per
  * measure just for this estimate.
  */
+/**
+ * One note's staff position from its pitch OR its unpitched display
+ * position -- the two are the same kind of answer (§4.3's invariant: no
+ * code path branches on "is this a drum"), and every caller must treat
+ * them identically.
+ *
+ * Extracted because `worstCaseStaffExtent` below handled unpitched notes
+ * in its single-note branch but silently SKIPPED them in its chord
+ * branch. A drum chart legitimately writes kick+hi-hat as one chord, so
+ * on a multi-staff percussion part every chord contributed nothing to
+ * §15's staff-distance estimate, understating the gap the staves need.
+ */
+function staffPositionOfNote(note: Note, clefDef: ClefDefinition): number {
+  const p = note.pitch;
+  return p.kind === 'pitched'
+    ? staffPositionForPitch(clefDef, p.step, p.octave)
+    : staffPositionForPitch(clefDef, p.displayStep, p.displayOctave);
+}
+
 function worstCaseStaffExtent(
   part: { readonly id: string; readonly measures: readonly Measure[] },
   staffNumber: number,
@@ -188,16 +263,10 @@ function worstCaseStaffExtent(
       for (const event of voice.events) {
         if ((event.staff ?? 1) !== staffNumber) continue;
         if (event.kind === 'note') {
-          const p = event.pitch;
-          consider(
-            p.kind === 'pitched'
-              ? staffPositionForPitch(clefDef, p.step, p.octave)
-              : staffPositionForPitch(clefDef, p.displayStep, p.displayOctave),
-          );
+          consider(staffPositionOfNote(event, clefDef));
         } else if (event.kind === 'chord') {
           for (const n of event.notes) {
-            const p = n.pitch;
-            if (p.kind === 'pitched') consider(staffPositionForPitch(clefDef, p.step, p.octave));
+            consider(staffPositionOfNote(n, clefDef));
           }
         }
       }
@@ -327,7 +396,18 @@ const DEFAULT_UNBEAMED_STEM_LENGTH = 3.5;
 /** Hardcoded pending Phase 50's full config wiring -- same pattern as INK_COLOR/FONT_FAMILY above (Phase 21's documented limitation, not new to this phase). */
 const DEFAULT_BEAM_STYLE: BeamStyleOption = 'straight';
 
-export type RenderFromMusicXmlOptions = ParseMusicXmlOptions;
+export interface RenderFromMusicXmlOptions extends ParseMusicXmlOptions {
+  /**
+   * Integration L/§16.2: the engine config. Only the sections this
+   * renderer actually reads are honoured today -- `layout.mode`
+   * ('scroll' vs 'page'), `page` (page geometry), and `spacing`.
+   * Everything else (colours, fonts, bar numbers, ...) is still the
+   * hardcoded constant it was; unifying ALL of them is Phase 50's own
+   * job (§8, Stage 10), and pretending otherwise here would be worse
+   * than saying so.
+   */
+  readonly config?: PartialEngineConfig;
+}
 
 export interface RenderFromMusicXmlResult {
   readonly svg: string;
@@ -382,11 +462,158 @@ function glyphWidthOf(glyphName: string): number {
   return bbox !== undefined ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
 }
 
+/**
+ * Integration H: draws a note's §9.19 articulations and §9.20 ornaments.
+ *
+ * Placement follows each section's own rule exactly, and they are
+ * genuinely different rules -- which is why this cannot be one shared
+ * loop over "marks near a note":
+ *
+ * - An articulation goes on the NOTEHEAD side (opposite the stem), next
+ *   to the notehead itself. `articulationSide` decides which side.
+ * - Marcato is §9.19's one named exception: "always placed above the
+ *   staff", so it uses the above-the-staff cursor rather than the
+ *   notehead one, regardless of stem direction.
+ * - An ornament is ALWAYS above, unconditionally (§9.20 is explicit that
+ *   this is not the articulation rule reused), and sits above the staff.
+ *
+ * Marcato and ornaments share one above-the-staff cursor so a note
+ * carrying both does not draw them on top of each other.
+ *
+ * `topPosition`/`bottomPosition` are the highest and lowest noteheads of
+ * the event -- identical for a single note, the chord's outer notes for a
+ * chord, so a chord's marks clear every member rather than just the first.
+ *
+ * Known limitation (§9.19's own): the multi-voice exception, where marks
+ * move to the STEM side to keep each voice's marks unambiguous, is not
+ * implemented -- this is the single-voice default only.
+ */
+function renderNoteMarks(
+  source: Note,
+  x: number,
+  topPosition: number,
+  bottomPosition: number,
+  direction: StemDirection,
+  ctx: RenderCtx,
+): string {
+  const articulations = source.articulations ?? [];
+  const ornaments = source.ornaments ?? [];
+  if (articulations.length === 0 && ornaments.length === 0) return '';
+
+  const parts: string[] = [];
+  const topLine = -(STAFF_LINES - 1);
+  // Staff-position units: more negative is higher up the page.
+  let aboveStaff = Math.min(topPosition, topLine);
+  let aboveNote = topPosition;
+  let belowNote = bottomPosition;
+
+  const place = (glyphName: string, position: number): void => {
+    parts.push(
+      renderMark(glyphName, {
+        x,
+        y: ctx.measureBottomY + position,
+        color: INK_COLOR,
+        fontFamily: FONT_FAMILY,
+      }),
+    );
+  };
+
+  for (const type of articulations) {
+    const side = articulationSide(type, direction);
+    if (type === 'marcato') {
+      aboveStaff -= ARTICULATION_GAP;
+      place(articulationGlyphName(type, side), aboveStaff);
+    } else if (side === 'above') {
+      aboveNote -= ARTICULATION_GAP;
+      place(articulationGlyphName(type, side), aboveNote);
+    } else {
+      belowNote += ARTICULATION_GAP;
+      place(articulationGlyphName(type, side), belowNote);
+    }
+  }
+
+  for (const type of ornaments) {
+    aboveStaff -= ORNAMENT_GAP;
+    place(ornamentGlyphName(type), aboveStaff);
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Integration I: everything a SPAN (a slur, §9.16; a tuplet, §9.17) needs
+ * to know about one already-drawn event, captured as that event renders
+ * so the span pass never re-derives geometry a second, possibly
+ * disagreeing way. `topPosition`/`bottomPosition` differ only for a
+ * chord; for a single note they are the same value.
+ */
+interface EventAnchor {
+  readonly x: number;
+  readonly topPosition: number;
+  readonly bottomPosition: number;
+  readonly direction: StemDirection;
+  readonly noteheadGlyph: string;
+}
+
 interface RenderCtx {
   readonly clefDef: ClefDefinition;
   readonly measureBottomY: number;
   /** Phase 41: this part's own <instrument id="..."> -> GM note number map (from Phase 35's parsed <midi-instrument> data), if any. Lets an unpitched note with a known GM number use the real drum mapping table instead of only its file-supplied display-step/octave. */
   readonly midiInstrumentsByPart: ReadonlyMap<string, number> | undefined;
+}
+
+/**
+ * Where a note's notehead goes and which glyph draws it -- the two facts
+ * that must be identical everywhere they are needed.
+ *
+ * Extracted so §9.14's collision pass (Integration K) computes them with
+ * the EXACT code that draws them, rather than a second implementation
+ * that could disagree. A drum note's GM-mapped staff position is the
+ * case that makes this matter: re-deriving it from display-step/octave
+ * would place the collision check on a different line than the notehead
+ * actually lands on.
+ */
+function resolveNoteRendering(
+  note: Note,
+  ctx: RenderCtx,
+): { position: number; noteheadGlyph: string; drumStemDirection?: StemDirection } {
+  const isUnpitched = note.pitch.kind === 'unpitched';
+  const step = isUnpitched ? note.pitch.displayStep : note.pitch.step;
+  const octave = isUnpitched ? note.pitch.displayOctave : note.pitch.octave;
+
+  // Phase 41/§13.3: an unpitched note whose <instrument id> resolves to a
+  // known GM percussion note (via Phase 35's parsed <midi-instrument> map)
+  // uses the real drum mapping table's own staff position -- GM numbers
+  // are unambiguous (§13.1's own authority rule for "which drum sound"),
+  // while a file's own display-step/octave is only ever a rendering hint.
+  const gmNote =
+    isUnpitched && note.instrumentId !== undefined
+      ? ctx.midiInstrumentsByPart?.get(note.instrumentId)
+      : undefined;
+  const drumEntry =
+    gmNote !== undefined ? lookupDrumMapEntry(gmNote, DEFAULT_DRUM_MAPPING_TABLE).entry : undefined;
+
+  const position =
+    drumEntry !== undefined
+      ? drumEntry.staffPosition
+      : staffPositionForPitch(ctx.clefDef, step, octave);
+
+  const noteheadGlyph = selectNoteheadGlyphName({
+    pitch: note.pitch,
+    durationType: note.duration.type,
+    ...(note.explicitNotehead !== undefined ? { explicitNotehead: note.explicitNotehead } : {}),
+    ...(gmNote !== undefined && drumEntry !== undefined
+      ? { midiNote: gmNote, overridesByKey: { [String(gmNote)]: drumEntry.noteheadShape } }
+      : {}),
+  });
+
+  return {
+    position,
+    noteheadGlyph,
+    ...(drumEntry?.stemDirection !== undefined
+      ? { drumStemDirection: drumEntry.stemDirection }
+      : {}),
+  };
 }
 
 /** Draws a note's accidental (if needed)/notehead/ledger-lines only -- no stem, no flag. Shared by both the plain (unbeamed) path and the beam-group path, which differ only in how the stem/flag (or beam) gets drawn afterward. */
@@ -405,32 +632,12 @@ function renderNoteheadPart(
   const parts: string[] = [];
 
   // Percussion: <unpitched>'s display-step/display-octave ARE a staff
-  // position, so they go through the same staffPositionForPitch as a real
-  // pitch -- but an unpitched note can never carry an accidental (there's
-  // no pitch to alter), so the whole accidental branch is skipped rather
-  // than special-cased inside it.
-  const isUnpitched = note.pitch.kind === 'unpitched';
-  const step = isUnpitched ? note.pitch.displayStep : note.pitch.step;
-  const octave = isUnpitched ? note.pitch.displayOctave : note.pitch.octave;
-
-  // Phase 41/§13.3: an unpitched note whose <instrument id> resolves to a
-  // known GM percussion note (via Phase 35's parsed <midi-instrument> map)
-  // uses the real drum mapping table's own staff position -- GM numbers
-  // are unambiguous (§13.1's own authority rule for "which drum sound"),
-  // while a file's own display-step/octave is only ever a rendering hint.
-  // A note with no resolvable GM number keeps using its own display
-  // position exactly as before -- this is additive, not a replacement.
-  const gmNote =
-    isUnpitched && note.instrumentId !== undefined
-      ? ctx.midiInstrumentsByPart?.get(note.instrumentId)
-      : undefined;
-  const drumEntry =
-    gmNote !== undefined ? lookupDrumMapEntry(gmNote, DEFAULT_DRUM_MAPPING_TABLE).entry : undefined;
-
-  const position =
-    drumEntry !== undefined
-      ? drumEntry.staffPosition
-      : staffPositionForPitch(ctx.clefDef, step, octave);
+  // position -- but an unpitched note can never carry an accidental
+  // (there's no pitch to alter), so the whole accidental branch below is
+  // skipped rather than special-cased inside it. The position and glyph
+  // themselves come from resolveNoteRendering, shared with §9.14's
+  // collision pass so the two can never disagree.
+  const { position, noteheadGlyph, drumStemDirection } = resolveNoteRendering(note, ctx);
   const y = ctx.measureBottomY + position;
 
   let state = accidentalState;
@@ -457,14 +664,6 @@ function renderNoteheadPart(
     }
   }
 
-  const noteheadGlyph = selectNoteheadGlyphName({
-    pitch: note.pitch,
-    durationType: note.duration.type,
-    ...(note.explicitNotehead !== undefined ? { explicitNotehead: note.explicitNotehead } : {}),
-    ...(gmNote !== undefined && drumEntry !== undefined
-      ? { midiNote: gmNote, overridesByKey: { [String(gmNote)]: drumEntry.noteheadShape } }
-      : {}),
-  });
   parts.push(renderNotehead(noteheadGlyph, { x, y, color: INK_COLOR, fontFamily: FONT_FAMILY }));
 
   const ledgerLines = computeLedgerLines(position, STAFF_LINES);
@@ -486,9 +685,7 @@ function renderNoteheadPart(
     position,
     noteheadGlyph,
     newAccidentalState: state,
-    ...(drumEntry?.stemDirection !== undefined
-      ? { drumStemDirection: drumEntry.stemDirection }
-      : {}),
+    ...(drumStemDirection !== undefined ? { drumStemDirection } : {}),
   };
 }
 
@@ -630,6 +827,12 @@ function renderNoteOrRest(
     }
   }
 
+  // Integration H: §9.19/§9.20 marks. Pushed only when there ARE marks --
+  // an unconditional push of an empty string would add a stray blank line
+  // to every note's output and invalidate every existing snapshot.
+  const marks = renderNoteMarks(ev, x, head.position, head.position, direction, ctx);
+  if (marks !== '') parts.push(marks);
+
   return {
     svg: parts.join('\n'),
     newAccidentalState: head.newAccidentalState,
@@ -652,7 +855,12 @@ function renderBeamGroup(
   accidentalState: AccidentalState,
   beamStyle: BeamStyleOption,
   forcedDirection: StemDirection | undefined,
-): { svg: string; newAccidentalState: AccidentalState } {
+): {
+  svg: string;
+  newAccidentalState: AccidentalState;
+  /** Integration I: one anchor per member note, in the same order as `notes`. */
+  anchors: readonly EventAnchor[];
+} {
   const parts: string[] = [];
   let state = accidentalState;
   const positions: number[] = [];
@@ -702,6 +910,32 @@ function renderBeamGroup(
     );
   });
 
+  // Integration H: a beamed note carries its own §9.19/§9.20 marks, using
+  // the beam's own shared stem direction (§9.13) rather than re-deriving
+  // a per-note one, so every mark in the group sits on the same side.
+  notes.forEach((note, i) => {
+    const x = xs[i];
+    const position = positions[i];
+    if (x === undefined || position === undefined) return;
+    const marks = renderNoteMarks(note, x, position, position, direction, ctx);
+    if (marks !== '') parts.push(marks);
+  });
+
+  const anchors: EventAnchor[] = [];
+  notes.forEach((_note, i) => {
+    const x = xs[i];
+    const position = positions[i];
+    const noteheadGlyph = noteheadGlyphs[i];
+    if (x === undefined || position === undefined || noteheadGlyph === undefined) return;
+    anchors.push({
+      x,
+      topPosition: position,
+      bottomPosition: position,
+      direction,
+      noteheadGlyph,
+    });
+  });
+
   // §9.13's documented simplification: line count is the MAX across every
   // note in the group (whichever duration needs the most beam lines --
   // the finest subdivision present), not just the first note's own
@@ -727,7 +961,7 @@ function renderBeamGroup(
     }),
   );
 
-  return { svg: parts.join('\n'), newAccidentalState: state };
+  return { svg: parts.join('\n'), newAccidentalState: state, anchors };
 }
 
 function renderChord(
@@ -736,7 +970,7 @@ function renderChord(
   ctx: RenderCtx,
   accidentalState: AccidentalState,
   forcedDirection: StemDirection | undefined,
-): { svg: string; newAccidentalState: AccidentalState } {
+): { svg: string; newAccidentalState: AccidentalState; anchor?: EventAnchor } {
   const parts: string[] = [];
   // Chord members may be pitched OR unpitched (a drum chart legitimately
   // writes e.g. kick+hi-hat as a simultaneous group). Both go through the
@@ -811,36 +1045,344 @@ function renderChord(
     }
   });
 
-  if (chord.duration.type !== 'whole' && positions.length > 0) {
+  if (positions.length > 0) {
     const direction = forcedDirection ?? chordStemDirection(positions, middleLineY(STAFF_LINES));
-    const outermost = direction === 'up' ? Math.max(...positions) : Math.min(...positions);
-    const length = computeStemLength(outermost, middleLineY(STAFF_LINES));
-    parts.push(
-      renderStem({
-        noteheadGlyphName: widestGlyph ?? 'noteheadBlack',
-        noteX: x,
-        noteY: ctx.measureBottomY + outermost,
+    if (chord.duration.type !== 'whole') {
+      const outermost = direction === 'up' ? Math.max(...positions) : Math.min(...positions);
+      const length = computeStemLength(outermost, middleLineY(STAFF_LINES));
+      parts.push(
+        renderStem({
+          noteheadGlyphName: widestGlyph ?? 'noteheadBlack',
+          noteX: x,
+          noteY: ctx.measureBottomY + outermost,
+          direction,
+          length,
+          thickness: getEngravingDefault('stemThickness') ?? STEM_THICKNESS_FALLBACK,
+          color: INK_COLOR,
+        }),
+      );
+    }
+    // Integration H: MusicXML attaches a chord's <notations> to its FIRST
+    // <note> (the others carry only <chord/>), so that note's marks are
+    // the chord's marks. They clear the chord's OUTER noteheads, not just
+    // the first one's own position.
+    const firstNote = chord.notes[0];
+    if (firstNote !== undefined) {
+      const marks = renderNoteMarks(
+        firstNote,
+        x,
+        Math.min(...positions),
+        Math.max(...positions),
         direction,
-        length,
-        thickness: getEngravingDefault('stemThickness') ?? STEM_THICKNESS_FALLBACK,
-        color: INK_COLOR,
-      }),
-    );
+        ctx,
+      );
+      if (marks !== '') parts.push(marks);
+    }
+    return {
+      svg: parts.join('\n'),
+      newAccidentalState: state,
+      anchor: {
+        x,
+        topPosition: Math.min(...positions),
+        bottomPosition: Math.max(...positions),
+        direction,
+        noteheadGlyph: widestGlyph ?? 'noteheadBlack',
+      },
+    };
   }
 
   return { svg: parts.join('\n'), newAccidentalState: state };
 }
 
 /**
- * The Phase 21 vertical-slice entry point: MusicXML text in, a complete
- * SVG string out. Still deliberately naive in its LAYOUT (fixed-width
- * measures via layout/naive.ts, no content-aware spacing) -- see PLAN.md
- * §22's sequencing note that this phase "exists to be thrown away" once
- * Stage 8's real layout lands.
+ * Integration K/§9.14: how far each voice's noteheads must shift right at
+ * each tick so two voices sharing a staff never render as an ambiguous
+ * smear. The key is `voiceId:tick`; an absent key means no shift.
  *
- * Integration passes A and B have since made its CONTENT handling real:
- * every part renders, each part's staves render with their own clefs and
- * line counts, and a grand staff gets its brace and continuous barline.
+ * §9.14 owns the rule itself (`resolveNoteheadCollision`); this only
+ * feeds it real note positions and collects the answers. Positions come
+ * from `resolveNoteRendering`, the same function that draws them, so a
+ * drum note's GM-mapped line is the line actually tested.
+ *
+ * Known limitation, exactly as §9.14 states it: only PAIRWISE comparison
+ * is specified, so a genuine 3-or-4-voice pile-up where a middle voice is
+ * squeezed from both sides is not solved -- each pair is resolved
+ * independently and the largest resulting shift wins for that voice.
+ */
+function computeVoiceCollisionOffsets(
+  measure: Measure,
+  staffNumber: number,
+  ctx: RenderCtx,
+): ReadonlyMap<string, number> {
+  const offsets = new Map<string, number>();
+
+  /** One notehead's staff position, with the voice and tick it belongs to. */
+  const entries: { voiceId: number; tick: number; position: number; width: number }[] = [];
+  for (const voice of measure.voices) {
+    const starts = eventStartTicks(voice.events);
+    voice.events.forEach((event, idx) => {
+      if ((event.staff ?? 1) !== staffNumber) return;
+      const tick = starts[idx] ?? 0;
+      const notes = event.kind === 'note' ? [event] : event.kind === 'chord' ? event.notes : [];
+      for (const note of notes) {
+        if (note.isGrace === true) continue; // a grace note is a precomposed glyph, not a notehead to offset
+        const { position, noteheadGlyph } = resolveNoteRendering(note, ctx);
+        entries.push({
+          voiceId: voice.id,
+          tick,
+          position,
+          width: noteheadWidth(noteheadGlyph),
+        });
+      }
+    });
+  }
+
+  const distinctVoices = new Set(entries.map((e) => e.voiceId));
+  if (distinctVoices.size < 2) return offsets;
+
+  const record = (voiceId: number, tick: number, offset: number): void => {
+    if (offset === 0) return;
+    const key = `${voiceId}:${tick}`;
+    offsets.set(key, Math.max(offsets.get(key) ?? 0, offset));
+  };
+
+  for (let i = 0; i < entries.length; i++) {
+    for (let j = i + 1; j < entries.length; j++) {
+      const a = entries[i];
+      const b = entries[j];
+      if (a === undefined || b === undefined) continue;
+      if (a.tick !== b.tick || a.voiceId === b.voiceId) continue;
+      // §9.14 moves the HIGHER-numbered voice, so that note's own width
+      // is the shift distance.
+      const movingWidth = a.voiceId > b.voiceId ? a.width : b.width;
+      const { offsetA, offsetB } = resolveNoteheadCollision(
+        a.position,
+        a.voiceId,
+        b.position,
+        b.voiceId,
+        movingWidth,
+      );
+      record(a.voiceId, a.tick, offsetA);
+      record(b.voiceId, b.tick, offsetB);
+    }
+  }
+
+  return offsets;
+}
+
+/**
+ * The `<notations>`-carrying note of an event: a plain Note is itself;
+ * a Chord's notations live on its FIRST note, which is where MusicXML
+ * puts them (the rest carry only `<chord/>`). A Rest carries none of the
+ * span notations this function's callers care about.
+ */
+function spanSourceNote(event: MeasureEvent): Note | undefined {
+  if (event.kind === 'note') return event;
+  if (event.kind === 'chord') return event.notes[0];
+  return undefined;
+}
+
+/**
+ * Integration I: draws one voice's SPANS -- §9.16 slurs and §9.17 tuplets
+ * -- after every event in that voice has been drawn and has contributed
+ * its `EventAnchor`.
+ *
+ * A span is deliberately a second pass rather than something the
+ * event-drawing loop does inline: both endpoints must already be placed
+ * before either can be drawn, and a slur legitimately spans beamed notes,
+ * chords and plain notes alike, which are three different drawing paths.
+ * Collecting anchors once and resolving spans here is what lets all three
+ * participate without each path knowing about spans at all.
+ *
+ * Scope, stated rather than implied: a span is resolved only WITHIN one
+ * voice of one measure. A slur or tuplet that crosses a barline is left
+ * undrawn with a diagnostic -- the same honest boundary Phase 26's ties
+ * already draw at, and for the same reason (nothing here can see the next
+ * measure's x positions).
+ */
+function renderSpans(
+  events: readonly MeasureEvent[],
+  anchorByIndex: ReadonlyMap<number, EventAnchor>,
+  beamedIndices: ReadonlySet<number>,
+  ctx: RenderCtx,
+  onDiagnostic: (code: string, message: string) => void,
+): string {
+  const parts: string[] = [];
+
+  const spanAnchors = (startIdx: number, endIdx: number): EventAnchor[] => {
+    const out: EventAnchor[] = [];
+    for (let i = startIdx; i <= endIdx; i++) {
+      const anchor = anchorByIndex.get(i);
+      if (anchor !== undefined) out.push(anchor);
+    }
+    return out;
+  };
+
+  // ---- §9.16 slurs ----------------------------------------------------
+  const openSlurs = new Map<number, number>();
+  events.forEach((event, idx) => {
+    const note = spanSourceNote(event);
+    if (note === undefined) return;
+
+    for (const number of note.slurStops ?? []) {
+      const startIdx = openSlurs.get(number);
+      if (startIdx === undefined) {
+        onDiagnostic(
+          'UNMATCHED_SLUR',
+          `A <slur type="stop" number="${number}"> has no matching start in this measure and voice; the slur was not drawn.`,
+        );
+        continue;
+      }
+      openSlurs.delete(number);
+      const anchors = spanAnchors(startIdx, idx);
+      // §9.16: "a single-note span is nonsensical for a slur (2+ notes
+      // required) and should be rejected rather than silently drawing
+      // something."
+      if (anchors.length < 2) continue;
+      const side = slurSide(anchors.map((a) => a.direction));
+      const y =
+        side === 'above'
+          ? Math.min(...anchors.map((a) => a.topPosition)) - SLUR_GAP
+          : Math.max(...anchors.map((a) => a.bottomPosition)) + SLUR_GAP;
+      const first = anchors[0];
+      const last = anchors[anchors.length - 1];
+      if (first === undefined || last === undefined) continue;
+      const shape = computeSlurShape(
+        // Start just past the first notehead and end at the last one's own
+        // x, the same convention Phase 26's ties already use.
+        first.x + noteheadWidth(first.noteheadGlyph),
+        last.x,
+        ctx.measureBottomY + y,
+        side,
+      );
+      parts.push(
+        renderSlur(shape, {
+          color: INK_COLOR,
+          midpointThickness:
+            getEngravingDefault('slurMidpointThickness') ?? SLUR_MIDPOINT_THICKNESS_FALLBACK,
+        }),
+      );
+    }
+
+    for (const number of note.slurStarts ?? []) {
+      openSlurs.set(number, idx);
+    }
+  });
+  if (openSlurs.size > 0) {
+    onDiagnostic(
+      'UNMATCHED_SLUR',
+      `${openSlurs.size} slur(s) start in this measure and voice but never stop in it; a slur crossing a barline is not drawn (see Doc/integration-i-slur-tuplet-wiring.md).`,
+    );
+  }
+
+  // ---- §9.17 tuplets --------------------------------------------------
+  let openTuplet: number | undefined;
+  events.forEach((event, idx) => {
+    const note = spanSourceNote(event);
+    if (note === undefined) return;
+
+    if (note.tupletStart === true) openTuplet = idx;
+
+    if (note.tupletStop !== true) return;
+    const startIdx = openTuplet;
+    openTuplet = undefined;
+    if (startIdx === undefined) {
+      onDiagnostic(
+        'UNMATCHED_TUPLET',
+        'A <tuplet type="stop"> has no matching start in this measure and voice; the tuplet mark was not drawn.',
+      );
+      return;
+    }
+
+    const anchors = spanAnchors(startIdx, idx);
+    if (anchors.length < 2) return;
+
+    const actualNotes = note.duration.tuplet?.actualNotes;
+    if (actualNotes === undefined) {
+      onDiagnostic(
+        'TUPLET_WITHOUT_RATIO',
+        'A <tuplet> has no <time-modification> to take its number from; the tuplet mark was not drawn.',
+      );
+      return;
+    }
+    let digitGlyph: string;
+    try {
+      digitGlyph = tupletDigitGlyphName(actualNotes);
+    } catch {
+      // §9.17's own stated limitation: single-digit counts only.
+      onDiagnostic(
+        'TUPLET_NUMBER_UNSUPPORTED',
+        `A ${actualNotes}-note tuplet needs multi-digit layout, which §9.17 does not implement; the tuplet mark was not drawn.`,
+      );
+      return;
+    }
+
+    // §9.17: the bracket is redundant when one beam already shows the
+    // group's extent -- which is true only if EVERY member is beamed.
+    const allMembersBeamed = (() => {
+      for (let i = startIdx; i <= idx; i++) {
+        if (anchorByIndex.get(i) === undefined) continue;
+        if (!beamedIndices.has(i)) return false;
+      }
+      return true;
+    })();
+
+    const first = anchors[0];
+    const last = anchors[anchors.length - 1];
+    if (first === undefined || last === undefined) return;
+    // §9.17's side rule is the OPPOSITE of a tie's or slur's: the
+    // bracket/number sits on the STEM side. The group shares one stem
+    // direction in practice; the first member's is used when it does not.
+    const side = tupletSide(first.direction);
+    const y =
+      side === 'above'
+        ? Math.min(...anchors.map((a) => a.topPosition)) - TUPLET_GAP
+        : Math.max(...anchors.map((a) => a.bottomPosition)) + TUPLET_GAP;
+    const absoluteY = ctx.measureBottomY + y;
+
+    if (tupletBracketNeeded(allMembersBeamed)) {
+      parts.push(
+        renderTupletBracket(computeTupletBracketShape(first.x, last.x, absoluteY, side), {
+          thickness:
+            getEngravingDefault('tupletBracketThickness') ?? TUPLET_BRACKET_THICKNESS_FALLBACK,
+          color: INK_COLOR,
+        }),
+      );
+    }
+    parts.push(
+      renderTupletNumber(digitGlyph, (first.x + last.x) / 2, absoluteY, {
+        color: INK_COLOR,
+        fontFamily: FONT_FAMILY,
+      }),
+    );
+  });
+  if (openTuplet !== undefined) {
+    onDiagnostic(
+      'UNMATCHED_TUPLET',
+      'A <tuplet> starts in this measure and voice but never stops in it; a tuplet crossing a barline is not drawn.',
+    );
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * The engine's main entry point: MusicXML text in, a complete SVG string
+ * out.
+ *
+ * It began as Phase 21's deliberately naive vertical slice (fixed-width
+ * measures via `layout/naive.ts`) -- PLAN.md §22 said that phase "exists
+ * to be thrown away", and Stage 8 duly threw it away. Nothing here uses
+ * `layout/naive.ts` any more: measure widths come from §14's real
+ * spacing algorithm (Integration E), grand-staff distance from §15's
+ * skyline (Integration F), and system/page placement from §16.1/§16.2
+ * (Phase 45 and Integration L).
+ *
+ * Content handling grew the same way: every part renders with its own
+ * clefs, line counts, brace and continuous barline (Integrations A/B);
+ * tab frets (C); tempo marks (D/G); articulations and ornaments (H);
+ * slurs and tuplets (I); dynamics and hairpins (J); multi-voice notehead
+ * collisions (K).
  */
 export function renderFromMusicXml(
   xmlText: string,
@@ -852,8 +1394,21 @@ export function renderFromMusicXml(
     diagnostics: parseDiagnostics,
     tempoMarks,
     midiInstrumentsByPart: midiInstrumentsByPartMap,
+    directions,
+    prints,
   } = parseMusicXml(xmlText, options);
   const diagnostics: Diagnostic[] = [...parseDiagnostics];
+  const config = resolveConfig(options?.config);
+  /**
+   * §14.3's justification fills a system to a KNOWN width. Scroll mode
+   * (§16.1) has no such width -- its single system is as wide as the
+   * music -- so it never justifies, which is why the scroll path keeps
+   * SPACING_CONFIG's own `justify: false`. Page mode does have one
+   * (`usableWidth`), so it takes the config's value, whose default is
+   * true. This is the semantics, not a workaround: the same score in the
+   * two modes is genuinely laid out differently.
+   */
+  const pageSpacingConfig = { ...DEFAULT_CONFIG.spacing, ...options?.config?.spacing };
 
   if (score.parts.length === 0) {
     const doc = createSvgDocument(
@@ -866,6 +1421,77 @@ export function renderFromMusicXml(
       [],
     );
     return { svg: doc, diagnostics };
+  }
+
+  /**
+   * Integration L: ONE horizontal timeline for the whole score.
+   *
+   * This used to be computed per part, which meant a part whose measure 1
+   * held eight eighth notes made that measure wide while another part's
+   * whole-note measure 1 stayed narrow -- so the two parts' barlines
+   * landed at completely different x positions and nothing lined up
+   * vertically. §14's spacing is one shared axis for the whole SYSTEM,
+   * and §9.18 says in as many words that a system shares "the same
+   * horizontal measure positions ... down the system". Computing it once
+   * here, from every part's voices combined, is what makes that true.
+   */
+  const measureNumbersInOrder: number[] = [];
+  /** `partId:measureNumber` -> that part's own Measure, so the loops below never re-scan a part's measure array. */
+  const measureByPartAndNumber = new Map<string, Measure>();
+  {
+    const seen = new Set<number>();
+    for (const part of score.parts) {
+      for (const m of part.measures) {
+        measureByPartAndNumber.set(`${part.id}:${m.number}`, m);
+        if (seen.has(m.number)) continue;
+        seen.add(m.number);
+        measureNumbersInOrder.push(m.number);
+      }
+    }
+  }
+  /**
+   * The same index for the attributes side-table. Both exist because the
+   * score-wide layout below, and the render loop after it, each look a
+   * (part, measure) pair up once per measure -- with a linear `.find()`
+   * that made the whole render quadratic in measure count on a large
+   * score, well before §18.1's own budget would have allowed it.
+   */
+  const attributesByPartAndMeasure = new Map<string, MeasureAttributes>();
+  for (const a of attributes) {
+    attributesByPartAndMeasure.set(`${a.partId}:${a.measureNumber}`, a);
+  }
+  /** The first `<attributes>` of a part, for the score-wide passes that need a part's starting state. */
+  const firstAttributesByPart = new Map<string, MeasureAttributes>();
+  for (const a of attributes) {
+    if (!firstAttributesByPart.has(a.partId)) firstAttributesByPart.set(a.partId, a);
+  }
+
+  const measureLayoutsByNumber = new Map<
+    number,
+    { readonly width: number; readonly positionsByTick: ReadonlyMap<number, number> }
+  >();
+  const measureTicksByNumber = new Map<number, number>();
+  for (const measureNumber of measureNumbersInOrder) {
+    const combinedVoices = [];
+    let measureTicks: number | undefined;
+    for (const part of score.parts) {
+      const m = measureByPartAndNumber.get(`${part.id}:${measureNumber}`);
+      if (m === undefined) continue;
+      combinedVoices.push(...m.voices);
+      const attrs = attributesByPartAndMeasure.get(`${part.id}:${measureNumber}`);
+      if (attrs === undefined) continue;
+      const ticks = attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
+      // Parts SHOULD agree on the meter; if a file disagrees, the longest
+      // wins so no part's last note falls outside the measure.
+      measureTicks = measureTicks === undefined ? ticks : Math.max(measureTicks, ticks);
+    }
+    const layout = computeMeasureLayout(
+      makeMeasure(measureNumber, combinedVoices),
+      measureTicks ?? TICKS_PER_QUARTER * 4,
+      tempoMarks.filter((tm) => tm.measureNumber === measureNumber),
+    );
+    measureLayoutsByNumber.set(measureNumber, layout);
+    measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
   }
 
   // Integration B: every part is rendered, each offset vertically below
@@ -894,7 +1520,7 @@ export function renderFromMusicXml(
   };
 
   const partStaffCounts = score.parts.map((p) => {
-    const a = attributes.find((x) => x.partId === p.id);
+    const a = firstAttributesByPart.get(p.id);
     return Math.max(1, a?.staves ?? 1);
   });
   const scoreLayout = computeSystemLayoutVariableGaps(partStaffCounts, staffDistanceForPair);
@@ -903,55 +1529,184 @@ export function renderFromMusicXml(
       (pos) => pos.partIndex === partIndex && pos.staffIndexInPart === staffIndexInPart,
     )?.y ?? 0;
 
-  const svgParts: string[] = [];
-  let totalWidth = MEASURE_WIDTH;
+  /** Where one measure sits: its x/width, which system it belongs to, and that system's own vertical origin. */
+  interface MeasurePlacement {
+    readonly x: number;
+    readonly width: number;
+    readonly systemY: number;
+    readonly systemIndex: number;
+    readonly isSystemStart: boolean;
+  }
+  const placementByMeasureNumber = new Map<number, MeasurePlacement>();
+  /** Each system's own left edge and vertical origin -- what a brace needs, once per system rather than once per part. */
+  const systemOrigins: { systemIndex: number; x: number; systemY: number }[] = [];
 
-  score.parts.forEach((part, partIndex) => {
-    // Phase 43/44 wiring: each measure's own real, content-driven width
-    // and per-tick position map -- computed once per part, up front,
-    // replacing naiveMeasureLayout's fixed-width assumption. Needs each
-    // measure's own real length (from its own time signature) to give
-    // the LAST event reasonable trailing space.
-    const measureLayoutsByNumber = new Map<
-      number,
-      { readonly width: number; readonly positionsByTick: ReadonlyMap<number, number> }
-    >();
-    const measureWidthsForScrollLayout: {
-      readonly measureNumber: number;
-      readonly width: number;
-    }[] = [];
-    for (const measure of part.measures) {
-      const attrs = attributes.find(
-        (a) => a.partId === part.id && a.measureNumber === measure.number,
-      );
-      const measureTicks =
-        attrs !== undefined
-          ? attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER
-          : TICKS_PER_QUARTER * 4;
-      const measureLayout = computeMeasureLayout(
-        measure,
-        measureTicks,
-        tempoMarks.filter((tm) => tm.partId === part.id && tm.measureNumber === measure.number),
-      );
-      measureLayoutsByNumber.set(measure.number, measureLayout);
-      measureWidthsForScrollLayout.push({
-        measureNumber: measure.number,
-        width: measureLayout.width,
+  // One system's full vertical extent: the tallest staff stack in the
+  // score (every part, every staff) plus the room STAFF_BOTTOM_Y already
+  // reserves above the first staff.
+  const lowestStaffOffset = scoreLayout.positions[scoreLayout.positions.length - 1]?.y ?? 0;
+  const systemHeight = SYSTEM_HEIGHT + lowestStaffOffset;
+
+  const widthOf = (measureNumber: number): number =>
+    measureLayoutsByNumber.get(measureNumber)?.width ?? MEASURE_WIDTH;
+
+  let pageCount = 1;
+  if (config.layout.mode === 'page') {
+    // §16.2: "<print new-system/new-page> from MusicXML" is respected.
+    // Any part asking for a break breaks the whole system -- a system is
+    // score-wide, so one part cannot break alone.
+    const breaksByMeasure = new Map<number, { newSystem: boolean; newPage: boolean }>();
+    for (const pr of prints) {
+      const existing = breaksByMeasure.get(pr.measureNumber);
+      breaksByMeasure.set(pr.measureNumber, {
+        newSystem: (existing?.newSystem ?? false) || pr.newSystem,
+        newPage: (existing?.newPage ?? false) || pr.newPage,
       });
     }
-    // Phase 45/§16.1: scroll mode -- one unbroken system, measures at
-    // their own natural widths, left to right, arbitrarily wide. This is
-    // the actual layout render-from-musicxml.ts has produced since
-    // Integration Pass E; computeScrollLayout formalizes it as its own
-    // independently-testable module rather than leaving it as an inline
-    // cumulative-x loop, and is what §16.2's future page mode (Phase 46)
-    // will sit alongside as a genuinely different, selectable mode.
-    const scrollLayout = computeScrollLayout(measureWidthsForScrollLayout);
-    const layouts = scrollLayout.measures;
-    const lastLayout = layouts[layouts.length - 1];
-    const partWidth = lastLayout !== undefined ? lastLayout.x + lastLayout.width : MEASURE_WIDTH;
-    totalWidth = Math.max(totalWidth, partWidth);
+    const pageInputs: PageMeasureInput[] = measureNumbersInOrder.map((measureNumber) => {
+      const breaks = breaksByMeasure.get(measureNumber);
+      return {
+        measureNumber,
+        width: widthOf(measureNumber),
+        ...(breaks?.newSystem === true ? { forceNewSystem: true } : {}),
+        ...(breaks?.newPage === true ? { forceNewPage: true } : {}),
+      };
+    });
+    const pageLayout = computePageLayout(pageInputs, systemHeight, config.page, pageSpacingConfig);
+    pageCount = Math.max(1, pageLayout.pages.length);
+    let systemIndex = 0;
+    pageLayout.pages.forEach((page, pageIndex) => {
+      page.systems.forEach((system, systemIndexOnPage) => {
+        const systemY =
+          pageIndex * config.page.pageHeight +
+          config.page.marginTop +
+          systemIndexOnPage * systemHeight;
+        systemOrigins.push({ systemIndex, x: config.page.marginLeft, systemY });
+        system.measures.forEach((m, i) => {
+          placementByMeasureNumber.set(m.measureNumber, {
+            x: config.page.marginLeft + m.x,
+            width: m.width,
+            systemY,
+            systemIndex,
+            isSystemStart: i === 0,
+          });
+        });
+        systemIndex += 1;
+      });
+    });
+  } else {
+    const scrollLayout = computeScrollLayout(
+      measureNumbersInOrder.map((measureNumber) => ({
+        measureNumber,
+        width: widthOf(measureNumber),
+      })),
+    );
+    systemOrigins.push({ systemIndex: 0, x: scrollLayout.measures[0]?.x ?? 0, systemY: 0 });
+    scrollLayout.measures.forEach((m, i) => {
+      placementByMeasureNumber.set(m.measureNumber, {
+        x: m.x,
+        width: m.width,
+        systemY: 0,
+        systemIndex: 0,
+        isSystemStart: i === 0,
+      });
+    });
+  }
 
+  const svgParts: string[] = [];
+  let totalWidth = MEASURE_WIDTH;
+  for (const placement of placementByMeasureNumber.values()) {
+    totalWidth = Math.max(totalWidth, placement.x + placement.width);
+  }
+
+  score.parts.forEach((part, partIndex) => {
+    // Integration L: the measure x/width/system placement is SCORE-wide
+    // now (see the block above), so a part only looks its own measures up
+    // in the shared map rather than laying them out again for itself.
+    const directionXFor = (measureNumber: number, tick: number): number | undefined => {
+      const placement = placementByMeasureNumber.get(measureNumber);
+      if (placement === undefined) return undefined;
+      // The SAME header allowance the note pass uses for noteAreaX --
+      // Integration G's own hard-won lesson was that a marking computing
+      // its x in a different coordinate system than the notes drifts
+      // apart from them as soon as a measure's width changes.
+      const noteAreaX = placement.x + MEASURE_HEADER_ALLOWANCE;
+      const realX = measureLayoutsByNumber.get(measureNumber)?.positionsByTick.get(tick);
+      if (realX !== undefined) return noteAreaX + realX;
+      const measureTicks = measureTicksByNumber.get(measureNumber) ?? TICKS_PER_QUARTER * 4;
+      return noteAreaX + (tick / (measureTicks || 1)) * (placement.x + placement.width - noteAreaX);
+    };
+
+    const partDirections = directions.filter((d) => d.partId === part.id);
+    /** Resolved crescendo/decrescendo spans, keyed by the measure they START in so each is drawn exactly once. */
+    const wedgeSpansByMeasure = new Map<
+      number,
+      { staff: number; startX: number; endX: number; kind: 'crescendo' | 'decrescendo' }[]
+    >();
+    {
+      // A wedge's own `number` distinguishes overlapping wedges; its
+      // staff keeps two staves' wedges from closing each other's spans.
+      const openWedges = new Map<
+        string,
+        { measureNumber: number; staff: number; x: number; kind: 'crescendo' | 'decrescendo' }
+      >();
+      for (const d of partDirections) {
+        const x = directionXFor(d.measureNumber, d.tick);
+        if (x === undefined) continue;
+        for (const wedge of d.wedges) {
+          const key = `${d.staff}:${wedge.number}`;
+          if (wedge.type === 'stop') {
+            const open = openWedges.get(key);
+            if (open === undefined) {
+              diagnostics.push({
+                severity: 'info',
+                code: 'UNMATCHED_WEDGE',
+                message: `A <wedge type="stop" number="${wedge.number}"> has no matching start in this part; the hairpin was not drawn.`,
+                location: { partId: part.id, measureNumber: d.measureNumber },
+              });
+              continue;
+            }
+            openWedges.delete(key);
+            // Integration L: in page mode the two ends can land in
+            // different SYSTEMS, where the x axis restarts and the y
+            // differs -- drawing one line between them would run
+            // diagonally across the page. Real engraving splits such a
+            // hairpin at the system break; that is not built, so this
+            // says so rather than drawing something wrong.
+            const startSystem = placementByMeasureNumber.get(open.measureNumber)?.systemIndex;
+            const endSystem = placementByMeasureNumber.get(d.measureNumber)?.systemIndex;
+            if (startSystem !== endSystem) {
+              diagnostics.push({
+                severity: 'info',
+                code: 'WEDGE_CROSSES_SYSTEM',
+                message:
+                  'A hairpin spans a system break; splitting one across systems is not implemented, so it was not drawn.',
+                location: { partId: part.id, measureNumber: open.measureNumber },
+              });
+              continue;
+            }
+            const list = wedgeSpansByMeasure.get(open.measureNumber) ?? [];
+            list.push({ staff: open.staff, startX: open.x, endX: x, kind: open.kind });
+            wedgeSpansByMeasure.set(open.measureNumber, list);
+          } else {
+            openWedges.set(key, {
+              measureNumber: d.measureNumber,
+              staff: d.staff,
+              x,
+              kind: wedge.type,
+            });
+          }
+        }
+      }
+      for (const [key, open] of openWedges) {
+        diagnostics.push({
+          severity: 'info',
+          code: 'UNMATCHED_WEDGE',
+          message: `A wedge (${key}) starts but never stops in this part; the hairpin was not drawn.`,
+          location: { partId: part.id, measureNumber: open.measureNumber },
+        });
+      }
+    }
     // Phase 41: this part's own GM instrument map, if any -- used to look
     // up a real drum-table entry for an unpitched note whose <instrument
     // id> resolves to a known GM percussion note number.
@@ -964,11 +1719,16 @@ export function renderFromMusicXml(
     let previousAttrs: MeasureAttributes | undefined;
 
     part.measures.forEach((measure, i) => {
-      const attrs = attributes.find(
-        (a) => a.partId === part.id && a.measureNumber === measure.number,
-      );
-      const layout = layouts[i];
+      const attrs = attributesByPartAndMeasure.get(`${part.id}:${measure.number}`);
+      const layout = placementByMeasureNumber.get(measure.number);
       if (attrs === undefined || layout === undefined) return;
+      // Integration L: in page mode a measure sits in one of several
+      // stacked systems, so every y in this measure is offset by that
+      // system's own origin. In scroll mode `systemY` is always 0 and
+      // every formula below reduces to exactly what it was.
+      const systemY = layout.systemY;
+      /** §16.2: a clef and key signature are redrawn at the start of EVERY system, not only the first measure of the piece. */
+      const isSystemStart = layout.isSystemStart;
 
       // Integration A: one pass per staff. A single-staff part runs this
       // exactly once (staffNumber 1), producing byte-identical output to
@@ -1005,7 +1765,7 @@ export function renderFromMusicXml(
           attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
         const topStaffLines = attrs.staffLinesByStaff[1] ?? STAFF_LINES;
         const topStaffGeometry = computeStaffGeometry(topStaffLines);
-        const topStaffY = STAFF_BOTTOM_Y - topStaffGeometry.height;
+        const topStaffY = STAFF_BOTTOM_Y + systemY - topStaffGeometry.height;
         for (const mark of measureTempoMarks) {
           const dotGlyph = mark.beatUnitDots > 0 ? metronomeDotGlyphName() : undefined;
           const eventX = noteAreaX + (mark.tick / (measureTotalTicks || 1)) * noteAreaWidth;
@@ -1053,7 +1813,7 @@ export function renderFromMusicXml(
         // diagnostic), so no note math depends on this being 6.
         const staffLines = attrs.staffLinesByStaff[staffNumber] ?? STAFF_LINES;
         const staffGeometry = computeStaffGeometry(staffLines);
-        const bottomY = STAFF_BOTTOM_Y + staffOffsetFor(partIndex, staffIndex);
+        const bottomY = STAFF_BOTTOM_Y + systemY + staffOffsetFor(partIndex, staffIndex);
 
         svgParts.push(
           renderStaff(staffGeometry, {
@@ -1065,7 +1825,57 @@ export function renderFromMusicXml(
           }),
         );
 
-        const isFirstMeasure = i === 0;
+        // Integration J: §9.21's dynamics and hairpins for THIS staff of
+        // this measure. Drawn before the notes so a notehead is never
+        // hidden behind a mark; both sit clear of the staff anyway.
+        {
+          const topLineY = bottomY - staffGeometry.height;
+          const markY = (placement: 'above' | 'below'): number =>
+            placement === 'above' ? topLineY - DYNAMIC_GAP : bottomY + DYNAMIC_GAP;
+
+          for (const d of partDirections) {
+            if (d.measureNumber !== measure.number || d.staff !== staffNumber) continue;
+            if (d.dynamics.length === 0) continue;
+            const x = directionXFor(d.measureNumber, d.tick);
+            if (x === undefined) continue;
+            // §9.21's default is 'below'; a file that states its own
+            // placement is believed instead, the same way Phase 35
+            // already lets an explicit <stem> or <notehead> win over
+            // this engine's own convention.
+            const y = markY(d.placement ?? dynamicSide());
+            // Several <dynamics> children in one element are ONE compound
+            // marking ("sf" + "p" = sfp), so they are laid out left to
+            // right rather than stacked on one spot.
+            let cursor = x;
+            for (const level of d.dynamics) {
+              const glyphName = dynamicGlyphName(level);
+              svgParts.push(
+                renderMark(glyphName, {
+                  x: cursor,
+                  y,
+                  color: INK_COLOR,
+                  fontFamily: FONT_FAMILY,
+                }),
+              );
+              cursor += glyphWidthOf(glyphName);
+            }
+          }
+
+          for (const span of wedgeSpansByMeasure.get(measure.number) ?? []) {
+            if (span.staff !== staffNumber) continue;
+            svgParts.push(
+              renderHairpin(
+                computeHairpinShape(span.startX, span.endX, markY(dynamicSide()), span.kind),
+                {
+                  thickness: getEngravingDefault('hairpinThickness') ?? HAIRPIN_THICKNESS_FALLBACK,
+                  color: INK_COLOR,
+                },
+              ),
+            );
+          }
+        }
+
+        const isFirstMeasureOfPart = i === 0;
         const clefChanged =
           previousAttrs === undefined ||
           previousAttrs.clefSign !== attrs.clefSign ||
@@ -1078,7 +1888,7 @@ export function renderFromMusicXml(
 
         let cursorX = layout.x + 0.5;
 
-        if (isFirstMeasure || clefChanged) {
+        if (isSystemStart || clefChanged) {
           svgParts.push(
             renderClef(clefDef, {
               x: cursorX,
@@ -1094,7 +1904,7 @@ export function renderFromMusicXml(
           cursorX += 3;
         }
 
-        if ((isFirstMeasure || keyChanged) && attrs.fifths !== 0) {
+        if ((isSystemStart || keyChanged) && attrs.fifths !== 0) {
           try {
             const accidentals = keySignatureAccidentals(attrs.fifths, keySigClefName);
             svgParts.push(
@@ -1117,9 +1927,20 @@ export function renderFromMusicXml(
           }
         }
 
-        if (isFirstMeasure || timeChanged) {
+        // A time signature, unlike a clef or key signature, is NOT
+        // restated at each system start -- only where it actually changes
+        // (and at the very start of the part).
+        if (isFirstMeasureOfPart || timeChanged) {
           try {
-            const sig = timeSignature(attrs.timeNumerator, attrs.timeDenominator);
+            // STATUS C3/§9.4: an additive meter is DRAWN as the file
+            // wrote it ("3+2+2") while every tick calculation keeps using
+            // the numeric total (7). Phase 12 could already render this;
+            // the parser only started supplying it with Phase 35 Tier 2.
+            const sig = timeSignature(attrs.timeNumerator, attrs.timeDenominator, {
+              ...(attrs.timeNumeratorDisplay !== undefined
+                ? { numeratorDisplay: attrs.timeNumeratorDisplay }
+                : {}),
+            });
             svgParts.push(
               renderTimeSignature(sig, {
                 x: cursorX,
@@ -1158,6 +1979,10 @@ export function renderFromMusicXml(
           // automatic direction (renderNoteOrRest/renderChord/renderBeamGroup
           // all fall back to automatic when this is undefined).
           const isMultiVoice = measure.voices.length > 1;
+          // Integration K/§9.14: computed once per (measure, staff),
+          // because a collision is by definition a fact ABOUT two voices
+          // and cannot be seen from inside either one's own loop.
+          const collisionOffsets = computeVoiceCollisionOffsets(measure, staffNumber, ctx);
 
           for (const voice of measure.voices) {
             const forcedDirection = isMultiVoice ? voiceForcedDirection(voice.id) : undefined;
@@ -1181,9 +2006,16 @@ export function renderFromMusicXml(
             const eventXs = voice.events.map((_, idx) => {
               const startTick = starts[idx] ?? 0;
               const realX = measureLayout?.positionsByTick.get(startTick);
-              return realX !== undefined
-                ? noteAreaX + realX
-                : noteAreaX + (startTick / total) * fallbackNoteAreaWidth;
+              const baseX =
+                realX !== undefined
+                  ? noteAreaX + realX
+                  : noteAreaX + (startTick / total) * fallbackNoteAreaWidth;
+              // §9.14's shift is applied to the event's x itself, so the
+              // notehead, its accidental, its ledger lines, its stem and
+              // any tie/slur anchored to it all move together -- exactly
+              // what §9.14 requires ("its own ledger lines / accidental,
+              // which move with it").
+              return baseX + (collisionOffsets.get(`${voice.id}:${startTick}`) ?? 0);
             });
 
             // Phase 23 grouping: treat a rest, a chord, OR a grace note as
@@ -1200,19 +2032,34 @@ export function renderFromMusicXml(
             const beamableEvents = voice.events.map((event) => ({
               durationType: event.duration.type,
               isRest: event.kind !== 'note' || event.isGrace === true,
+              // §10.4/§10.8: the file's own level-1 <beam>, when it wrote
+              // one. Only a plain Note can carry one here -- a chord is
+              // already excluded from beaming above (a documented scope
+              // limit of renderBeamGroup), so reading its first note's
+              // hints would claim a grouping this renderer cannot draw.
+              ...(event.kind === 'note' && event.isGrace !== true
+                ? (() => {
+                    const level1 = event.beams?.find((b) => b.number === 1);
+                    return level1 !== undefined ? { beamValue: level1.value } : {};
+                  })()
+                : {}),
             }));
-            const groups = groupBeams(
-              beamableEvents,
-              starts,
-              attrs.timeNumerator,
-              attrs.timeDenominator,
-            );
+            // §10.8: a file that states its own beaming is the authority
+            // on it. Only when NO note in this voice gave a level-1 hint
+            // does Phase 23's time-signature inference decide instead.
+            const groups = hasExplicitBeams(beamableEvents)
+              ? groupBeamsFromHints(beamableEvents)
+              : groupBeams(beamableEvents, starts, attrs.timeNumerator, attrs.timeDenominator);
             const beamedIndices = beamedEventIndices(groups);
             const groupByFirstIndex = new Map<number, (typeof groups)[number]>();
             for (const group of groups) {
               const firstIndex = group.eventIndices[0];
               if (firstIndex !== undefined) groupByFirstIndex.set(firstIndex, group);
             }
+
+            // Integration I: every drawn event's geometry, keyed by its
+            // own index in this voice, for the span pass below.
+            const anchorByIndex = new Map<number, EventAnchor>();
 
             voice.events.forEach((event, idx) => {
               // Integration A: a multi-staff part's voices carry events for
@@ -1237,11 +2084,27 @@ export function renderFromMusicXml(
               if (!isGraceNote && beamedIndices.has(idx)) {
                 const group = groupByFirstIndex.get(idx);
                 if (group === undefined) return; // a non-first member of an already-rendered group
-                const groupNotes = group.eventIndices
+                // The indices, the notes and the x positions are all
+                // derived from ONE filtered list. They used to be derived
+                // separately -- `groupNotes` filtered to real notes while
+                // `groupXs` mapped every index unfiltered -- so any group
+                // member that was not a plain Note would have silently
+                // shifted every following note onto the wrong x. Nothing
+                // can currently put a non-note in a group, which is
+                // exactly why the misalignment would have been so hard to
+                // find if something ever did.
+                const groupIndices = group.eventIndices.filter(
+                  (i) => voice.events[i]?.kind === 'note',
+                );
+                const groupNotes = groupIndices
                   .map((i) => voice.events[i])
                   .filter((e): e is Note => e !== undefined && e.kind === 'note');
-                const groupXs = group.eventIndices.map((i) => eventXs[i] ?? 0);
-                const { svg, newAccidentalState } = renderBeamGroup(
+                const groupXs = groupIndices.map((i) => eventXs[i] ?? 0);
+                const {
+                  svg,
+                  newAccidentalState,
+                  anchors: groupAnchors,
+                } = renderBeamGroup(
                   groupNotes,
                   groupXs,
                   ctx,
@@ -1249,19 +2112,24 @@ export function renderFromMusicXml(
                   DEFAULT_BEAM_STYLE,
                   forcedDirection,
                 );
+                groupAnchors.forEach((anchor, memberIndex) => {
+                  const eventIndex = groupIndices[memberIndex];
+                  if (eventIndex !== undefined) anchorByIndex.set(eventIndex, anchor);
+                });
                 svgParts.push(svg);
                 accidentalState = newAccidentalState;
                 return;
               }
 
               if (event.kind === 'chord') {
-                const { svg, newAccidentalState } = renderChord(
+                const { svg, newAccidentalState, anchor } = renderChord(
                   event,
                   eventX,
                   ctx,
                   accidentalState,
                   forcedDirection,
                 );
+                if (anchor !== undefined) anchorByIndex.set(idx, anchor);
                 svgParts.push(svg);
                 accidentalState = newAccidentalState;
               } else {
@@ -1297,10 +2165,39 @@ export function renderFromMusicXml(
                       }
                     : undefined;
 
+                if (event.kind === 'note' && tieAnchor !== undefined) {
+                  anchorByIndex.set(idx, {
+                    x: eventX,
+                    topPosition: tieAnchor.position,
+                    bottomPosition: tieAnchor.position,
+                    direction: tieAnchor.direction,
+                    noteheadGlyph: tieAnchor.noteheadGlyph,
+                  });
+                }
+
                 svgParts.push(svg);
                 accidentalState = newAccidentalState;
               }
             });
+
+            // Integration I: §9.16 slurs and §9.17 tuplets, drawn after
+            // every event in this voice is placed (both endpoints of a
+            // span must exist before either can be drawn).
+            const spans = renderSpans(
+              voice.events,
+              anchorByIndex,
+              beamedIndices,
+              ctx,
+              (code, message) => {
+                diagnostics.push({
+                  severity: 'info',
+                  code,
+                  message,
+                  location: { partId: part.id, measureNumber: measure.number },
+                });
+              },
+            );
+            if (spans !== '') svgParts.push(spans);
           }
         } else if (clefDef.name === 'tab') {
           // Integration C: tablature places a note by STRING and FRET, not
@@ -1395,7 +2292,7 @@ export function renderFromMusicXml(
       );
       const firstStaffOffset = staffOffsetFor(partIndex, 0);
       const lastStaffOffset = staffOffsetFor(partIndex, staffNumbers.length - 1);
-      const barlineBottomY = STAFF_BOTTOM_Y + lastStaffOffset;
+      const barlineBottomY = STAFF_BOTTOM_Y + systemY + lastStaffOffset;
       const barlineHeight = needsContinuousBarline(staffNumbers.length)
         ? outerStaffGeometry.height + (lastStaffOffset - firstStaffOffset)
         : outerStaffGeometry.height;
@@ -1413,35 +2310,39 @@ export function renderFromMusicXml(
     });
 
     // §9.18/Phase 29: a part with 2+ staves is ONE instrument, so its staves
-    // are joined by a brace at the system's left edge -- drawn once for the
-    // whole system, not per measure.
+    // are joined by a brace at each system's left edge -- drawn once per
+    // SYSTEM (page mode has several), not once per measure.
     const partStaffCount = partStaffCounts[partIndex] ?? 1;
     if (needsBrace(partStaffCount)) {
       const firstOffset = staffOffsetFor(partIndex, 0);
       const lastOffset = staffOffsetFor(partIndex, partStaffCount - 1);
       // This block sits outside the measure loop, so it reads the part's
       // own first <attributes> rather than a per-measure `attrs`.
-      const partFirstAttrs = attributes.find((a) => a.partId === part.id);
+      const partFirstAttrs = firstAttributesByPart.get(part.id);
       const topStaffHeight = computeStaffGeometry(
         partFirstAttrs?.staffLinesByStaff[1] ?? STAFF_LINES,
       ).height;
-      const braceShape = computeBraceShape(
-        STAFF_BOTTOM_Y + firstOffset - topStaffHeight,
-        STAFF_BOTTOM_Y + lastOffset,
-        0,
-      );
-      svgParts.push(renderBrace(braceShape, { color: INK_COLOR, fontFamily: FONT_FAMILY }));
+      for (const origin of systemOrigins) {
+        const braceShape = computeBraceShape(
+          STAFF_BOTTOM_Y + origin.systemY + firstOffset - topStaffHeight,
+          STAFF_BOTTOM_Y + origin.systemY + lastOffset,
+          origin.x,
+        );
+        svgParts.push(renderBrace(braceShape, { color: INK_COLOR, fontFamily: FONT_FAMILY }));
+      }
     }
   });
 
   const svg = createSvgDocument(
     {
-      viewBoxWidth: totalWidth + 2,
+      // §16.2: page mode's canvas is the PAGE, however much or little of
+      // it the music fills; scroll mode's is as wide as the music itself.
+      viewBoxWidth: config.layout.mode === 'page' ? config.page.pageWidth : totalWidth + 2,
       // Integration A/B: the viewBox must fit EVERY staff of EVERY part,
       // or the lower ones are simply clipped out of the rendered image.
-      // The last position in the score-wide layout is the lowest staff.
+      // In page mode that means every page, stacked.
       viewBoxHeight:
-        SYSTEM_HEIGHT + (scoreLayout.positions[scoreLayout.positions.length - 1]?.y ?? 0),
+        config.layout.mode === 'page' ? pageCount * config.page.pageHeight : systemHeight,
       pxPerStaffSpace: PX_PER_STAFF_SPACE,
       backgroundColor: BACKGROUND_COLOR,
     },

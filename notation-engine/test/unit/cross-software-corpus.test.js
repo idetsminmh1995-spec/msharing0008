@@ -60,10 +60,26 @@ describe('cross-software compatibility corpus (Phase 37, §10.8)', () => {
     assert.equal(result.score.parts[0].measures[1].voices[0].events[0].duration.ticks, 1920);
   });
 
-  test('an explicit <beam> element is safely ignored, not crashed on -- notes still parse and render', () => {
+  test('explicit <beam> hints WIN over the engine\'s own inference -- §10.8\'s "the file is the authority" rule', () => {
     const result = render('explicit-beam-hints.musicxml');
     assert.deepEqual([...result.diagnostics], []);
     assert.match(result.svg, /\uE0A4/); // noteheadBlack -- the real notes still rendered
+
+    // The fixture writes its four eighth notes as ONE beam group across
+    // the half-bar; Phase 23's inference would make TWO (one per beat).
+    // A beam line is the only thing drawn at Bravura's beamThickness, so
+    // counting those lines distinguishes the two outcomes directly.
+    const beamLines = (result.svg.match(/stroke-width="0.5"/g) ?? []).length;
+    assert.equal(beamLines, 1);
+
+    // Proof this is the HINTS deciding, not a coincidence: the identical
+    // music with the <beam> elements stripped falls back to inference and
+    // produces two groups instead.
+    const stripped = fs
+      .readFileSync(path.join(CORPUS_DIR, 'explicit-beam-hints.musicxml'), 'utf8')
+      .replace(/<beam[^>]*>[^<]*<\/beam>/g, '');
+    const inferred = NE.renderFromMusicXml(stripped, { domParser });
+    assert.equal((inferred.svg.match(/stroke-width="0.5"/g) ?? []).length, 2);
   });
 
   test('<attributes> appearing mid-measure (a clef change partway through) does not throw', () => {

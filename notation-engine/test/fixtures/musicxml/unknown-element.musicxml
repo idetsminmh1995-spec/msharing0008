@@ -12,6 +12,9 @@
       <direction placement="above">
         <direction-type><words>Allegro</words></direction-type>
       </direction>
+      <!-- Genuinely unhandled by the v2 parser (§10.4 does not list it),
+           unlike <direction><words>, which Phase 35 Tier 2 now reads. -->
+      <bookmark id="B1"/>
       <note>
         <pitch><step>C</step><octave>4</octave></pitch>
         <duration>8</duration><voice>1</voice><type>whole</type>

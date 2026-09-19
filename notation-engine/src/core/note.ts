@@ -9,6 +9,49 @@ import type { Pitch } from './pitch.js';
 export type VoiceId = number;
 
 /**
+ * §9.19's five articulation types. Declared HERE, in the layer that owns
+ * the `Note` they attach to, and re-exported by `geometry/articulation.ts`
+ * -- one declaration, not two that can silently drift apart. (The same
+ * non-conflicting re-export situation `geometry/flag.ts` already has with
+ * `DurationType`, which is why `export *` from both layers in `index.ts`
+ * stays unambiguous: both names resolve to this single declaration.)
+ */
+export type ArticulationType = 'accent' | 'staccato' | 'tenuto' | 'marcato' | 'staccatissimo';
+
+/** §9.20's ornament types -- declared here for the same reason as ArticulationType above. */
+export type OrnamentType = 'trill' | 'mordent' | 'turn' | 'turnInverted';
+
+/**
+ * One `<beam number="N">` hint exactly as the file wrote it (§10.4).
+ * §10.8 names "beams given explicitly via `<beam>` vs. left for the
+ * renderer to infer" as a real cross-software divergence: a file that
+ * states its own beaming is the authority on it, and this is that
+ * statement, carried through unmodified rather than thrown away and
+ * re-inferred.
+ */
+export interface BeamHint {
+  /** The beam LEVEL (1 = primary/eighth beam, 2 = sixteenth, ...), from the element's `number` attribute. Defaults to 1 when absent. */
+  readonly number: number;
+  readonly value: 'begin' | 'continue' | 'end' | 'forward hook' | 'backward hook';
+}
+
+/**
+ * One `<lyric>` syllable attached to a note (§9.22/§10.4). The syllable
+ * TEXT is carried here even though §9.22's renderer cannot draw it yet
+ * (Bravura has no Latin letters at all, a documented known limitation):
+ * §10.7's "no silent data loss" rule means the parser's job is to
+ * preserve it regardless of whether a later stage can currently use it.
+ */
+export interface LyricSyllable {
+  /** Verse number, from the element's `number` attribute. Defaults to 1 when absent. */
+  readonly number: number;
+  readonly syllabic?: 'single' | 'begin' | 'middle' | 'end';
+  readonly text: string;
+  /** `<extend/>` -- this syllable continues as a melisma over following notes. */
+  readonly extend: boolean;
+}
+
+/**
  * A single sounding note -- pitched or unpitched, doesn't matter, both use
  * this same type (see pitch.ts). Multiple Notes at the same tick within the
  * same Voice form a Chord (see chord.ts); a bare Note is always exactly one
@@ -42,6 +85,24 @@ export interface Note {
   readonly stringNumber?: number;
   /** Integration C: which fret, 0 meaning an open string. */
   readonly fret?: number;
+  /** Phase 35 Tier 2/§10.4: `<notations><articulations>` -- §9.19's marks, in document order. Absent means none. */
+  readonly articulations?: readonly ArticulationType[];
+  /** Phase 35 Tier 2/§10.4: `<notations><ornaments>` -- §9.20's marks, in document order. Absent means none. */
+  readonly ornaments?: readonly OrnamentType[];
+  /** Phase 35 Tier 2/§10.4: `<notations><fermata>`. Parsed and preserved; §9 has no fermata placement section yet, so nothing draws it (see Doc/phase-35-musicxml-parser-v2-tier23.md). */
+  readonly hasFermata?: boolean;
+  /** Phase 35 Tier 2/§10.4: the `<slur type="start">` numbers beginning at this note (§9.16). */
+  readonly slurStarts?: readonly number[];
+  /** Phase 35 Tier 2/§10.4: the `<slur type="stop">` numbers ending at this note (§9.16). */
+  readonly slurStops?: readonly number[];
+  /** Phase 35 Tier 2/§10.4: `<notations><tuplet type="start">` (§9.17). */
+  readonly tupletStart?: boolean;
+  /** Phase 35 Tier 2/§10.4: `<notations><tuplet type="stop">` (§9.17). */
+  readonly tupletStop?: boolean;
+  /** Phase 35 Tier 2/§10.4/§10.8: the file's own `<beam>` hints for this note, if it gave any. */
+  readonly beams?: readonly BeamHint[];
+  /** Phase 35 Tier 2/§10.4: `<lyric>` syllables attached to this note (§9.22). */
+  readonly lyrics?: readonly LyricSyllable[];
 }
 
 export interface NoteInit {
@@ -59,6 +120,15 @@ export interface NoteInit {
   hasExplicitAccidental?: boolean;
   stringNumber?: number;
   fret?: number;
+  articulations?: readonly ArticulationType[];
+  ornaments?: readonly OrnamentType[];
+  hasFermata?: boolean;
+  slurStarts?: readonly number[];
+  slurStops?: readonly number[];
+  tupletStart?: boolean;
+  tupletStop?: boolean;
+  beams?: readonly BeamHint[];
+  lyrics?: readonly LyricSyllable[];
 }
 
 export function note(init: NoteInit): Note {
