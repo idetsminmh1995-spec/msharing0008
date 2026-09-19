@@ -14,7 +14,7 @@ remains.
 
 ---
 
-## A. DONE — Phases 1–49 ✅ (Stages 0 through 9 complete) + Integration Passes A–Q
+## A. DONE — Phases 1–50 ✅ (Stages 0 through 9 complete, Stage 10 begun) + Integration Passes A–Q
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 `npm run verify` passes **679/679** across them.
@@ -88,21 +88,21 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | — | **Integration Q** (not a numbered phase) | A `<barline location="left">` was drawn at its measure's right edge instead of its left -- a whole measure late; real files commonly write a repeat-begin this way | [`integration-q`](./integration-q-barline-location.md) |
 | 49 | Cursor, both sync modes | Full §17.2 in one module (`computeCursorPlacement` + `renderCursor`), both modes built on the same `positionToX`; repeat handling stays the host's, per §17.2 | [`phase-49`](./phase-49-cursor.md) |
 | 48 | Playback position API + event stream | Full §17.1 (`positionToX`/`xToPosition`/`getEventStream`/`resolvePosition`), wired into `renderFromMusicXml`'s own result from the exact layout that produced its SVG; deletes the superseded `src/cursor/` placeholder | [`phase-48`](./phase-48-playback-position-api.md) |
+| 50 | Full theming API (§8) | Every config section is now LIVE in the renderer: colours (incl. per-category `colors.overrides`), fonts, bar numbers (drawn at last), beam style, notehead mapping, drum mapping, staff distance, pixel scale. Six hardcoded constants deleted. Found and fixed two real bugs -- a tab staff crashed anything drawn above it, and grand-staff distance was short by one staff height | [`phase-50`](./phase-50-theming-api.md) |
 
-**Public API today:** 219 exports from `dist/notation-engine.js`.
+**Public API today:** 222 exports from `dist/notation-engine.js`.
 
 ---
 
-## B. NOT DONE — Phases 50–54
+## B. NOT DONE — Phases 51–54
 
 Nothing below exists in `src/` yet. Each line links to the `PLAN.md` section
-that specifies it. **Everything numbered 1–49 is done** (see §A), so Stages 0-9 are
-complete; these five are all of Stage 10.
+that specifies it. **Everything numbered 1–50 is done** (see §A), so Stages 0-9 are
+complete and Stage 10 is under way; these four are what remains of it.
 
 ### Stage 10 — Polish and delivery
 | # | Phase | Spec |
 |---|---|---|
-| **50** | Full theming API — unify every config section | §8 |
 | **51** | Debug overlays and diagnostics surface | §18.3 |
 | **52** | Export: SVG, PNG, PDF | §3, §16.2 |
 | **53** | Performance pass against the §18.1 budgets | §18.1 |
@@ -124,13 +124,16 @@ left rather than guessed at — each is documented at the point it was found.
   same verification process treble/bass/alto got. See
   [`phase-11`](./phase-11-key-signature-engine.md) §4 and `PLAN.md` §19.
 
-- **C2 — Most config sections are still declared but unread.** Integration L
-  made `renderFromMusicXml` accept a `PartialEngineConfig`, but it honours
-  only `layout.mode`, `page` and `spacing`. `colors`, `noteheadMapping`,
-  `beam`, `barNumbers`, `keySignature`, `drums` and `cursor` are still
-  hardcoded constants inside the renderer. Unifying every section is
-  **Phase 50**'s own job (§8, Stage 10) — until then, don't mistake "the
-  option exists" for "the option does anything".
+- **C2 — CLOSED.** Every config section the renderer can act on now does
+  something: `colors` (including per-category `overrides`), `fonts`,
+  `noteheadMapping`, `beam`, `barNumbers`, `drums`, `staves`, `layout`,
+  `page` and `spacing`. `cursor` is read by `computeCursorPlacement`
+  (Phase 49), which is a host-side call rather than part of a render.
+  Two things stay deliberately unwired and are named as such:
+  `keySignature.style` has exactly one member, so there is nothing to
+  branch on, and four of the five `fonts.sizes` belong to elements drawn
+  from fixed-size SMuFL glyphs or not drawn at all yet. See
+  [`phase-50`](./phase-50-theming-api.md) §4.
 
 - **C3 — CLOSED.** Additive meters are now parsed *and* drawn. This turned
   out to be a real bug rather than a missing feature: `<beats>3+2+2</beats>`

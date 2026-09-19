@@ -54,6 +54,7 @@ import {
   restGlyphName,
   restY,
   selectNoteheadGlyphName,
+  shouldShowBarNumber,
   staffPositionForPitch,
   timeSignature,
   computeStaffGeometry,
@@ -61,7 +62,7 @@ import {
   type BarlineType,
   type BeamStyle as BeamStyleOption,
 } from './geometry/index.js';
-import { DEFAULT_DRUM_MAPPING_TABLE, lookupDrumMapEntry } from './drums/index.js';
+import { lookupDrumMapEntry, mergeDrumMappingTable, type DrumMappingTable } from './drums/index.js';
 import {
   computeSystemLayoutVariableGaps,
   computeScrollLayout,
@@ -84,7 +85,13 @@ import { computeBraceShape, needsBrace, needsContinuousBarline } from './geometr
 import { renderBrace } from './render/index.js';
 import type { Diagnostic, MeasureAttributes } from './parser/index.js';
 import { parseMusicXml, type ParseMusicXmlOptions } from './parser/index.js';
-import { resolveConfig, DEFAULT_CONFIG, type PartialEngineConfig } from './config/index.js';
+import {
+  resolveConfig,
+  type EngineConfig,
+  type FontSizeConfig,
+  type NoteheadMappingConfig,
+  type PartialEngineConfig,
+} from './config/index.js';
 import { computePageLayout, type PageMeasureInput } from './layout/index.js';
 import { measure as makeMeasure } from './core/index.js';
 import {
@@ -97,6 +104,7 @@ import {
   createSvgDocument,
   renderAccidental,
   renderBarline,
+  renderBarNumber,
   renderBeam,
   renderClef,
   renderFlag,
@@ -120,11 +128,90 @@ const STAFF_LINES = 5;
 /** How far down from the SVG's top the staff's BOTTOM line sits -- leaves room above for stems/ledger lines/accidentals in this deliberately naive layout. */
 const STAFF_BOTTOM_Y = 8;
 const SYSTEM_HEIGHT = 16;
-const FONT_FAMILY = 'Bravura';
-const INK_COLOR = '#000000';
-const BACKGROUND_COLOR = '#ffffff';
-const PX_PER_STAFF_SPACE = 20;
 const MEASURE_WIDTH = 24;
+
+/**
+ * Phase 50/§8: every element category `config.colors.overrides` can be
+ * keyed by.
+ *
+ * §8's ColorConfig deliberately types `overrides` as a plain
+ * string-keyed map (the `config/` module may import from nothing else in
+ * the codebase, §4.1), so this union is where the real key set is
+ * *stated*. A caller writing `{ overrides: { notehead: '#c00' } }` is
+ * writing one of these names; anything else silently matches nothing,
+ * which is why the supported names are enumerated here rather than left
+ * to be discovered from the renderer's call sites.
+ */
+export type ColorCategory =
+  | 'staff'
+  | 'ledger'
+  | 'barline'
+  | 'brace'
+  | 'notehead'
+  | 'stem'
+  | 'flag'
+  | 'beam'
+  | 'rest'
+  | 'accidental'
+  | 'clef'
+  | 'keySignature'
+  | 'timeSignature'
+  | 'tie'
+  | 'slur'
+  | 'tuplet'
+  | 'mark'
+  | 'dynamic'
+  | 'hairpin'
+  | 'tempo'
+  | 'barNumber'
+  | 'tabNumber';
+
+/**
+ * Phase 50/§8: the drawing values the renderer reads, resolved ONCE from
+ * an `EngineConfig` at the top of `renderFromMusicXml` and then carried
+ * on `RenderCtx` to every function that draws anything.
+ *
+ * §8's own rule is "nothing user-facing may be hardcoded anywhere else
+ * in the engine". Before this phase the renderer held `INK_COLOR`,
+ * `FONT_FAMILY`, `BACKGROUND_COLOR`, `PX_PER_STAFF_SPACE` and
+ * `DEFAULT_BEAM_STYLE` as module constants and read the default drum
+ * table directly, so those options existed in the config object without
+ * doing anything. This type is what replaced them: resolving in one
+ * place (rather than each call site reaching into `config` itself) keeps
+ * the ~30 drawing calls reading one short name each, and makes the merge
+ * work -- the drum table, the notehead overrides -- happen once per
+ * render instead of once per note.
+ */
+interface RenderTheme {
+  readonly ink: string;
+  readonly background: string;
+  /** The SMuFL font every glyph is drawn in (`config.fonts.musicFont`). */
+  readonly musicFont: string;
+  /** The ordinary text font for non-glyph text -- bar numbers today. */
+  readonly textFont: string;
+  readonly sizes: FontSizeConfig;
+  readonly beamStyle: BeamStyleOption;
+  /** `DEFAULT_DRUM_MAPPING_TABLE` with `config.drums.mapping` merged on top (§13.3). */
+  readonly drumMap: DrumMappingTable;
+  readonly noteheadMapping: NoteheadMappingConfig;
+  /** `config.colors.overrides[category]`, falling back to `config.colors.ink`. */
+  readonly colorOf: (category: ColorCategory) => string;
+}
+
+function buildTheme(config: EngineConfig): RenderTheme {
+  const overrides = config.colors.overrides;
+  return {
+    ink: config.colors.ink,
+    background: config.colors.background,
+    musicFont: config.fonts.musicFont,
+    textFont: config.fonts.textFont,
+    sizes: config.fonts.sizes,
+    beamStyle: config.beam.style,
+    drumMap: mergeDrumMappingTable(config.drums.mapping),
+    noteheadMapping: config.noteheadMapping,
+    colorOf: (category) => overrides?.[category] ?? config.colors.ink,
+  };
+}
 
 // Phase 43/44 wiring: real Sec14 spacing constants, matching
 // config/config.ts's own SpacingConfig defaults, EXCEPT `justify` --
@@ -166,9 +253,6 @@ const MEASURE_TRAILING_MARGIN = 2.0;
  */
 const MEASURE_HEADER_ALLOWANCE = 6.0;
 
-/** Phase 29's own default, kept as this wiring's fallback floor. `config.staves.minStaffDistance` is not read yet -- one of the sections Phase 50 (§8, Stage 10) still has to unify; see Doc/STATUS.md §C2. */
-const DEFAULT_STAFF_GAP_FALLBACK = 8;
-
 /**
  * Integration M: a tempo mark is drawn ABOVE the staff (§9.21), but "above
  * the staff" is not the same as "above the staff's top LINE" -- stems,
@@ -180,6 +264,8 @@ const DEFAULT_STAFF_GAP_FALLBACK = 8;
 const TEMPO_MARK_GAP = 1.5;
 /** The metNote* glyphs are tall (the stem reaches well above the anchor), so the mark needs this much room above its own baseline. */
 const TEMPO_MARK_HEIGHT = 2.0;
+/** Phase 50: a bar number's own clearance above whatever its measure reaches -- smaller than a tempo mark's, since plain digits have no tall stem to keep clear of the staff. */
+const BAR_NUMBER_GAP = 1.0;
 /** Added to a note's own position when estimating how high its stem and beam can reach: DEFAULT_UNBEAMED_STEM_LENGTH (declared below, next to the other stem constants) plus one beam's thickness. */
 const STEM_AND_BEAM_ALLOWANCE = 3.5 + 0.5;
 
@@ -408,9 +494,6 @@ const BEAM_THICKNESS_FALLBACK = 0.5;
 const BEAM_SPACING_FALLBACK = 0.25;
 /** The natural (unbeamed) stem length a beam group's shape starts from, matching Phase 16's own default. */
 const DEFAULT_UNBEAMED_STEM_LENGTH = 3.5;
-/** Hardcoded pending Phase 50's full config wiring -- same pattern as INK_COLOR/FONT_FAMILY above (Phase 21's documented limitation, not new to this phase). */
-const DEFAULT_BEAM_STYLE: BeamStyleOption = 'straight';
-
 export interface RenderFromMusicXmlOptions extends ParseMusicXmlOptions {
   /**
    * Integration L/§16.2: the engine config. Only the sections this
@@ -529,8 +612,8 @@ function renderNoteMarks(
       renderMark(glyphName, {
         x,
         y: ctx.measureBottomY + position,
-        color: INK_COLOR,
-        fontFamily: FONT_FAMILY,
+        color: ctx.theme.colorOf('mark'),
+        fontFamily: ctx.theme.musicFont,
       }),
     );
   };
@@ -575,6 +658,8 @@ interface EventAnchor {
 interface RenderCtx {
   readonly clefDef: ClefDefinition;
   readonly measureBottomY: number;
+  /** Phase 50/§8: the resolved config values every drawing call below reads. */
+  readonly theme: RenderTheme;
   /** Phase 41: this part's own <instrument id="..."> -> GM note number map (from Phase 35's parsed <midi-instrument> data), if any. Lets an unpitched note with a known GM number use the real drum mapping table instead of only its file-supplied display-step/octave. */
   readonly midiInstrumentsByPart: ReadonlyMap<string, number> | undefined;
 }
@@ -608,20 +693,36 @@ function resolveNoteRendering(
       ? ctx.midiInstrumentsByPart?.get(note.instrumentId)
       : undefined;
   const drumEntry =
-    gmNote !== undefined ? lookupDrumMapEntry(gmNote, DEFAULT_DRUM_MAPPING_TABLE).entry : undefined;
+    gmNote !== undefined ? lookupDrumMapEntry(gmNote, ctx.theme.drumMap).entry : undefined;
 
   const position =
     drumEntry !== undefined
       ? drumEntry.staffPosition
       : staffPositionForPitch(ctx.clefDef, step, octave);
 
+  // §9.7's selection order, with the two override sources merged in
+  // precedence order: the drum table's own shape for this GM note is the
+  // engine's default opinion, and `config.noteheadMapping.overridesByKey`
+  // is the USER's -- so the user's entry for the same key wins. (A user
+  // who sets `{ "38": "diamond" }` means it for the snare whether or not
+  // the drum table already had an opinion about the snare.)
+  const drumOverride =
+    gmNote !== undefined && drumEntry !== undefined
+      ? { [String(gmNote)]: drumEntry.noteheadShape }
+      : undefined;
+  const configOverrides = ctx.theme.noteheadMapping.overridesByKey;
+  const overridesByKey =
+    drumOverride !== undefined || configOverrides !== undefined
+      ? { ...drumOverride, ...configOverrides }
+      : undefined;
+
   const noteheadGlyph = selectNoteheadGlyphName({
     pitch: note.pitch,
     durationType: note.duration.type,
+    defaultShape: ctx.theme.noteheadMapping.defaultShape,
     ...(note.explicitNotehead !== undefined ? { explicitNotehead: note.explicitNotehead } : {}),
-    ...(gmNote !== undefined && drumEntry !== undefined
-      ? { midiNote: gmNote, overridesByKey: { [String(gmNote)]: drumEntry.noteheadShape } }
-      : {}),
+    ...(gmNote !== undefined ? { midiNote: gmNote } : {}),
+    ...(overridesByKey !== undefined ? { overridesByKey } : {}),
   });
 
   return {
@@ -644,6 +745,13 @@ function resolveNoteRendering(
  * staff space is invisible; colliding with a beam is not.
  */
 function measureNorthExtent(measure: Measure, staffNumber: number, ctx: RenderCtx): number {
+  // A clef that doesn't position notes by pitch (a tab clef) has no
+  // pitch-derived reach at all: Integration C draws its events as fret
+  // numbers ON the string lines, which never leave the staff. Asking
+  // resolveNoteRendering for a staff position here would throw -- the
+  // same guard worstCaseStaffExtent already carries, and the reason a
+  // tab part was the one fixture that could not carry a tempo mark.
+  if (!ctx.clefDef.positionsByPitch) return 0;
   const topLineY = -(STAFF_LINES - 1);
   let highest: number | undefined;
   const consider = (position: number): void => {
@@ -704,14 +812,21 @@ function renderNoteheadPart(
         renderAccidental(glyphName, {
           x: accidentalX(x, width, 0),
           y,
-          color: INK_COLOR,
-          fontFamily: FONT_FAMILY,
+          color: ctx.theme.colorOf('accidental'),
+          fontFamily: ctx.theme.musicFont,
         }),
       );
     }
   }
 
-  parts.push(renderNotehead(noteheadGlyph, { x, y, color: INK_COLOR, fontFamily: FONT_FAMILY }));
+  parts.push(
+    renderNotehead(noteheadGlyph, {
+      x,
+      y,
+      color: ctx.theme.colorOf('notehead'),
+      fontFamily: ctx.theme.musicFont,
+    }),
+  );
 
   const ledgerLines = computeLedgerLines(position, STAFF_LINES);
   if (ledgerLines.length > 0) {
@@ -722,7 +837,7 @@ function renderNoteheadPart(
         staffBottomY: ctx.measureBottomY,
         extension: getEngravingDefault('legerLineExtension') ?? LEDGER_EXTENSION_FALLBACK,
         thickness: getEngravingDefault('legerLineThickness') ?? LEDGER_THICKNESS_FALLBACK,
-        color: INK_COLOR,
+        color: ctx.theme.colorOf('ledger'),
       }),
     );
   }
@@ -754,8 +869,8 @@ function renderNoteOrRest(
     const svg = renderRest(restGlyphName(ev.duration.type), {
       x,
       y,
-      color: INK_COLOR,
-      fontFamily: FONT_FAMILY,
+      color: ctx.theme.colorOf('rest'),
+      fontFamily: ctx.theme.musicFont,
     });
     return { svg, newAccidentalState: accidentalState };
   }
@@ -790,8 +905,8 @@ function renderNoteOrRest(
           renderAccidental(glyphName, {
             x: accidentalX(x, width, 0),
             y: graceY,
-            color: INK_COLOR,
-            fontFamily: FONT_FAMILY,
+            color: ctx.theme.colorOf('accidental'),
+            fontFamily: ctx.theme.musicFont,
           }),
         );
       }
@@ -809,8 +924,8 @@ function renderNoteOrRest(
       renderMark(graceNoteGlyphName(kind, graceDirection), {
         x,
         y: graceY,
-        color: INK_COLOR,
-        fontFamily: FONT_FAMILY,
+        color: ctx.theme.colorOf('notehead'),
+        fontFamily: ctx.theme.musicFont,
       }),
     );
     return { svg: parts.join('\n'), newAccidentalState: state };
@@ -851,7 +966,7 @@ function renderNoteOrRest(
         direction,
         length,
         thickness: getEngravingDefault('stemThickness') ?? STEM_THICKNESS_FALLBACK,
-        color: INK_COLOR,
+        color: ctx.theme.colorOf('stem'),
       }),
     );
     if (needsFlag(ev.duration.type, false)) {
@@ -866,8 +981,8 @@ function renderNoteOrRest(
             x: stemX,
             y: endY,
             direction,
-            color: INK_COLOR,
-            fontFamily: FONT_FAMILY,
+            color: ctx.theme.colorOf('flag'),
+            fontFamily: ctx.theme.musicFont,
           }),
         );
       }
@@ -1003,7 +1118,7 @@ function renderBeamGroup(
         // spans the whole chord and still ends exactly on the beam.
         length: Math.abs(beamY - (y - anchor[1])),
         thickness: getEngravingDefault('stemThickness') ?? STEM_THICKNESS_FALLBACK,
-        color: INK_COLOR,
+        color: ctx.theme.colorOf('stem'),
       }),
     );
   });
@@ -1055,7 +1170,7 @@ function renderBeamGroup(
       lineCount,
       thickness: getEngravingDefault('beamThickness') ?? BEAM_THICKNESS_FALLBACK,
       spacing: getEngravingDefault('beamSpacing') ?? BEAM_SPACING_FALLBACK,
-      color: INK_COLOR,
+      color: ctx.theme.colorOf('beam'),
     }),
   );
 
@@ -1119,8 +1234,8 @@ function renderChordHeadsPart(
       renderAccidental(glyphName, {
         x: accidentalX(x, width, placement.column),
         y: ctx.measureBottomY + placement.y,
-        color: INK_COLOR,
-        fontFamily: FONT_FAMILY,
+        color: ctx.theme.colorOf('accidental'),
+        fontFamily: ctx.theme.musicFont,
       }),
     );
   });
@@ -1135,7 +1250,14 @@ function renderChordHeadsPart(
     }
     const position = positions[i] ?? 0;
     const y = ctx.measureBottomY + position;
-    parts.push(renderNotehead(glyphName, { x, y, color: INK_COLOR, fontFamily: FONT_FAMILY }));
+    parts.push(
+      renderNotehead(glyphName, {
+        x,
+        y,
+        color: ctx.theme.colorOf('notehead'),
+        fontFamily: ctx.theme.musicFont,
+      }),
+    );
     const ledgerLines = computeLedgerLines(position, STAFF_LINES);
     if (ledgerLines.length > 0) {
       parts.push(
@@ -1145,7 +1267,7 @@ function renderChordHeadsPart(
           staffBottomY: ctx.measureBottomY,
           extension: getEngravingDefault('legerLineExtension') ?? LEDGER_EXTENSION_FALLBACK,
           thickness: getEngravingDefault('legerLineThickness') ?? LEDGER_THICKNESS_FALLBACK,
-          color: INK_COLOR,
+          color: ctx.theme.colorOf('ledger'),
         }),
       );
     }
@@ -1185,7 +1307,7 @@ function renderChord(
           direction,
           length,
           thickness: getEngravingDefault('stemThickness') ?? STEM_THICKNESS_FALLBACK,
-          color: INK_COLOR,
+          color: ctx.theme.colorOf('stem'),
         }),
       );
     }
@@ -1384,7 +1506,7 @@ function renderSpans(
       );
       parts.push(
         renderSlur(shape, {
-          color: INK_COLOR,
+          color: ctx.theme.colorOf('slur'),
           midpointThickness:
             getEngravingDefault('slurMidpointThickness') ?? SLUR_MIDPOINT_THICKNESS_FALLBACK,
         }),
@@ -1472,14 +1594,14 @@ function renderSpans(
         renderTupletBracket(computeTupletBracketShape(first.x, last.x, absoluteY, side), {
           thickness:
             getEngravingDefault('tupletBracketThickness') ?? TUPLET_BRACKET_THICKNESS_FALLBACK,
-          color: INK_COLOR,
+          color: ctx.theme.colorOf('tuplet'),
         }),
       );
     }
     parts.push(
       renderTupletNumber(digitGlyph, (first.x + last.x) / 2, absoluteY, {
-        color: INK_COLOR,
-        fontFamily: FONT_FAMILY,
+        color: ctx.theme.colorOf('tuplet'),
+        fontFamily: ctx.theme.musicFont,
       }),
     );
   });
@@ -1526,6 +1648,9 @@ export function renderFromMusicXml(
   } = parseMusicXml(xmlText, options);
   const diagnostics: Diagnostic[] = [...parseDiagnostics];
   const config = resolveConfig(options?.config);
+  // Phase 50/§8: one resolution of every user-facing drawing value, passed
+  // down on RenderCtx. Everything below reads `theme`, never a constant.
+  const theme = buildTheme(config);
   /**
    * §14.3's justification fills a system to a KNOWN width. Scroll mode
    * (§16.1) has no such width -- its single system is as wide as the
@@ -1535,15 +1660,15 @@ export function renderFromMusicXml(
    * true. This is the semantics, not a workaround: the same score in the
    * two modes is genuinely laid out differently.
    */
-  const pageSpacingConfig = { ...DEFAULT_CONFIG.spacing, ...options?.config?.spacing };
+  const pageSpacingConfig = config.spacing;
 
   if (score.parts.length === 0) {
     const doc = createSvgDocument(
       {
         viewBoxWidth: MEASURE_WIDTH,
         viewBoxHeight: SYSTEM_HEIGHT,
-        pxPerStaffSpace: PX_PER_STAFF_SPACE,
-        backgroundColor: BACKGROUND_COLOR,
+        pxPerStaffSpace: config.layout.pxPerStaffSpace,
+        backgroundColor: theme.background,
       },
       [],
     );
@@ -1646,20 +1771,55 @@ export function renderFromMusicXml(
   }
 
   /**
-   * Integration M: how much extra room above the staff the tempo marks
-   * need, beyond what STAFF_BOTTOM_Y already leaves. Computed score-wide
-   * and applied uniformly, so every staff of every system shifts together
-   * and the marks never land outside the viewBox. Zero for a score with
-   * no tempo marks, which is what keeps every such fixture byte-identical.
+   * Phase 50: whether measure `measureNumber` of the TOP part could carry
+   * a bar number, for headroom purposes only.
+   *
+   * Which measures actually start a system isn't known until layout runs
+   * -- and layout's own system height depends on the padding computed
+   * from this, so it cannot simply be reordered. In scroll mode (§16.1)
+   * there is exactly ONE system, so only the score's first measure can
+   * start one and the answer is exact. In page mode any measure can, so
+   * every measure counts as a candidate: an over-estimate of the
+   * headroom, never an under-estimate that would clip a number off the
+   * top of the page.
    */
-  const tempoTopPadding = (() => {
-    if (tempoMarks.length === 0) return 0;
+  const couldCarryBarNumber = (measureNumber: number, isFirstOfScore: boolean): boolean => {
+    if (config.barNumbers.display === 'systemStart') {
+      return config.layout.mode === 'scroll' ? isFirstOfScore : true;
+    }
+    return shouldShowBarNumber(measureNumber, config.barNumbers, false);
+  };
+
+  /**
+   * Integration M (extended by Phase 50): how much extra room above the
+   * staff the things drawn ABOVE it need -- tempo marks, and now bar
+   * numbers -- beyond what STAFF_BOTTOM_Y already leaves. Computed
+   * score-wide and applied uniformly, so every staff of every system
+   * shifts together and nothing lands outside the viewBox. Zero when
+   * nothing needs more room than the existing headroom, which is what
+   * keeps most fixtures byte-identical.
+   */
+  const aboveStaffPadding = (() => {
     const existingHeadroom = STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
     let needed = 0;
-    for (const part of score.parts) {
+    score.parts.forEach((part, partIndex) => {
       const midi = midiInstrumentsByPartMap.get(part.id);
-      for (const m of part.measures) {
-        if (!tempoMarks.some((t) => t.partId === part.id && t.measureNumber === m.number)) continue;
+      part.measures.forEach((m, measureIndex) => {
+        const hasTempoMark = tempoMarks.some(
+          (t) => t.partId === part.id && t.measureNumber === m.number,
+        );
+        // Only the top part draws bar numbers (see where they're drawn).
+        const hasBarNumber = partIndex === 0 && couldCarryBarNumber(m.number, measureIndex === 0);
+        if (hasBarNumber) {
+          // A bar number sits at the measure's own LEFT EDGE, before the
+          // header allowance the notes start after, so unlike a tempo
+          // mark it has nothing to clear but the staff's top line -- no
+          // note, stem or beam is ever drawn at that x. The digits rise
+          // from their own baseline, so the font size is a safe
+          // over-estimate of how far above it they reach.
+          needed = Math.max(needed, BAR_NUMBER_GAP + theme.sizes.barNumber);
+        }
+        if (!hasTempoMark) return;
         const a = attributesByPartAndMeasure.get(`${part.id}:${m.number}`);
         const spec = a?.clefsByStaff[1];
         const { clefDef } = mapClef(spec?.sign ?? a?.clefSign ?? 'G', spec?.line ?? a?.clefLine);
@@ -1667,14 +1827,15 @@ export function renderFromMusicXml(
           clefDef,
           measureBottomY: 0,
           midiInstrumentsByPart: midi,
+          theme,
         });
         needed = Math.max(needed, extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
-      }
-    }
+      });
+    });
     return Math.max(0, needed - existingHeadroom);
   })();
-  /** Every staff's bottom line sits this far down, tempo-mark headroom included. */
-  const staffBottomY = STAFF_BOTTOM_Y + tempoTopPadding;
+  /** Every staff's bottom line sits this far down, above-staff headroom included. */
+  const staffBottomY = STAFF_BOTTOM_Y + aboveStaffPadding;
 
   // Integration B: every part is rendered, each offset vertically below
   // the one before it. Phase 29's computeSystemLayout already handles
@@ -1698,7 +1859,25 @@ export function renderFromMusicXml(
     const lowerExtent = worstCaseStaffExtent(part, lowerStaffNumber, attributes, 'north');
     const upperSouth = addToSkyline(emptySkyline('south'), { xStart: 0, xEnd: 1, y: upperExtent });
     const lowerNorth = addToSkyline(emptySkyline('north'), { xStart: 0, xEnd: 1, y: lowerExtent });
-    return computeStaffDistance(upperSouth, lowerNorth, DEFAULT_STAFF_GAP_FALLBACK);
+    // §15.1's distance is a CLEARANCE: from the upper staff's bottom line
+    // down to the lower staff's TOP line (upperSouth reaches below the
+    // one, lowerNorth reaches above the other). computeSystemLayoutVariableGaps
+    // stacks staves by their BOTTOM lines, so the lower staff's own
+    // height is added here to convert between the two frames.
+    //
+    // Phase 50 found this while wiring `config.staves.minStaffDistance`:
+    // the clearance used to be handed to the layout as though it were
+    // already a bottom-to-bottom offset, which under-allocated by exactly
+    // one staff height -- visible on the crossing-hands fixture, where 16
+    // units of required clearance were granted only 12.
+    const lowerStaffLines =
+      attributes.find((a) => a.partId === part.id)?.staffLinesByStaff[lowerStaffNumber] ??
+      STAFF_LINES;
+    const lowerStaffHeight = computeStaffGeometry(lowerStaffLines).height;
+    return (
+      lowerStaffHeight +
+      computeStaffDistance(upperSouth, lowerNorth, config.staves.minStaffDistance)
+    );
   };
 
   const partStaffCounts = score.parts.map((p) => {
@@ -1729,7 +1908,7 @@ export function renderFromMusicXml(
   // score (every part, every staff) plus the room STAFF_BOTTOM_Y already
   // reserves above the first staff.
   const lowestStaffOffset = scoreLayout.positions[scoreLayout.positions.length - 1]?.y ?? 0;
-  const systemHeight = SYSTEM_HEIGHT + tempoTopPadding + lowestStaffOffset;
+  const systemHeight = SYSTEM_HEIGHT + aboveStaffPadding + lowestStaffOffset;
 
   const widthOf = (measureNumber: number): number =>
     measureLayoutsByNumber.get(measureNumber)?.width ?? MEASURE_WIDTH;
@@ -1922,12 +2101,63 @@ export function renderFromMusicXml(
       // staff, each with its OWN clef and its own vertical offset.
       const staffNumbers = Array.from({ length: Math.max(1, attrs.staves) }, (_, n) => n + 1);
 
+      /**
+       * Where the top staff sits, and how far this measure's own content
+       * reaches above it -- shared by everything this engine draws ABOVE
+       * the system (Integration D's tempo mark, Phase 50's bar number) so
+       * the two can never disagree about what they have to clear.
+       *
+       * Computed directly from staff 1's own known geometry, since the
+       * per-staff cursorX/staffGeometry the note-rendering loop below uses
+       * aren't in scope yet at this point (each staff computes its own).
+       * Lazy and memoized: a measure with neither a tempo mark nor a bar
+       * number never pays for measureNorthExtent's scan of its notes.
+       */
+      let topStaffCache: { topStaffY: number; staffHeight: number } | undefined;
+      const topStaff = (): { topStaffY: number; staffHeight: number } => {
+        if (topStaffCache === undefined) {
+          const topStaffGeometry = computeStaffGeometry(attrs.staffLinesByStaff[1] ?? STAFF_LINES);
+          topStaffCache = {
+            topStaffY: staffBottomY + systemY - topStaffGeometry.height,
+            staffHeight: topStaffGeometry.height,
+          };
+        }
+        return topStaffCache;
+      };
+
+      /**
+       * Integration M: how far this measure's own content reaches above
+       * the top staff line -- what a TEMPO MARK has to clear. The real
+       * content, not just the staff's top line: on a drum chart the
+       * hi-hat line IS the top line, so a fixed offset from it put the
+       * mark straight through the beams -- measured on this project's own
+       * fixture, the mark sat at y=1.50 while the first note's stem ran
+       * 3.56 -> 0.50 at the very same x.
+       *
+       * Lazy: a measure with no tempo mark never pays for the scan. (A
+       * bar number does NOT use this -- see where it's drawn.)
+       */
+      let northExtentCache: number | undefined;
+      const topStaffNorthExtent = (): number => {
+        if (northExtentCache === undefined) {
+          const topClefSpec = attrs.clefsByStaff[1];
+          const { clefDef: topClefDef } = mapClef(
+            topClefSpec?.sign ?? attrs.clefSign,
+            topClefSpec?.line ?? attrs.clefLine,
+          );
+          northExtentCache = measureNorthExtent(measure, 1, {
+            clefDef: topClefDef,
+            measureBottomY: 0,
+            midiInstrumentsByPart: midiInstrumentsByPartMap.get(part.id),
+            theme,
+          });
+        }
+        return northExtentCache;
+      };
+
       // Integration D: draw this measure's own tempo marks ONCE (above the
       // topmost staff, per tempoMarkSide()), never once per staff -- a
       // tempo mark describes the whole system, not one staff of it.
-      // Computed directly from staff 1's own known geometry, since the
-      // per-staff cursorX/staffGeometry the note-rendering loop below uses
-      // aren't in scope yet at this point (each staff computes its own).
       const measureTempoMarks = tempoMarks.filter(
         (m) => m.partId === part.id && m.measureNumber === measure.number,
       );
@@ -1949,25 +2179,8 @@ export function renderFromMusicXml(
         const noteAreaWidth = layout.x + layout.width - noteAreaX;
         const measureTotalTicks =
           attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
-        const topStaffLines = attrs.staffLinesByStaff[1] ?? STAFF_LINES;
-        const topStaffGeometry = computeStaffGeometry(topStaffLines);
-        const topStaffY = staffBottomY + systemY - topStaffGeometry.height;
-        // Integration M: clear the measure's REAL content, not just the
-        // staff's top line. On a drum chart the hi-hat line IS the top
-        // line, so a fixed offset from it put the mark straight through
-        // the beams -- measured on this project's own fixture, the mark
-        // sat at y=1.50 while the first note's stem ran 3.56 -> 0.50 at
-        // the very same x.
-        const topClefSpec = attrs.clefsByStaff[1];
-        const { clefDef: topClefDef } = mapClef(
-          topClefSpec?.sign ?? attrs.clefSign,
-          topClefSpec?.line ?? attrs.clefLine,
-        );
-        const northExtent = measureNorthExtent(measure, 1, {
-          clefDef: topClefDef,
-          measureBottomY: 0,
-          midiInstrumentsByPart: midiInstrumentsByPartMap.get(part.id),
-        });
+        const { topStaffY } = topStaff();
+        const northExtent = topStaffNorthExtent();
         for (const mark of measureTempoMarks) {
           const dotGlyph = mark.beatUnitDots > 0 ? metronomeDotGlyphName() : undefined;
           const eventX = noteAreaX + (mark.tick / (measureTotalTicks || 1)) * noteAreaWidth;
@@ -1984,8 +2197,8 @@ export function renderFromMusicXml(
                 // reaches (stems and beams included), not from the staff
                 // line -- see the note where northExtent is computed.
                 y: topStaffY - northExtent - TEMPO_MARK_GAP,
-                color: INK_COLOR,
-                fontFamily: FONT_FAMILY,
+                color: theme.colorOf('tempo'),
+                fontFamily: theme.musicFont,
                 noteToEqualsGap: 1.0,
               },
             ),
@@ -2020,7 +2233,7 @@ export function renderFromMusicXml(
             x: layout.x,
             y: bottomY,
             width: layout.width,
-            color: INK_COLOR,
+            color: theme.colorOf('staff'),
             lineThickness: getEngravingDefault('staffLineThickness') ?? 0.13,
           }),
         );
@@ -2053,8 +2266,8 @@ export function renderFromMusicXml(
                 renderMark(glyphName, {
                   x: cursor,
                   y,
-                  color: INK_COLOR,
-                  fontFamily: FONT_FAMILY,
+                  color: theme.colorOf('dynamic'),
+                  fontFamily: theme.musicFont,
                 }),
               );
               cursor += glyphWidthOf(glyphName);
@@ -2068,7 +2281,7 @@ export function renderFromMusicXml(
                 computeHairpinShape(span.startX, span.endX, markY(dynamicSide()), span.kind),
                 {
                   thickness: getEngravingDefault('hairpinThickness') ?? HAIRPIN_THICKNESS_FALLBACK,
-                  color: INK_COLOR,
+                  color: theme.colorOf('hairpin'),
                 },
               ),
             );
@@ -2097,8 +2310,8 @@ export function renderFromMusicXml(
               // Passing bottomY alone drew every clef too low -- barely
               // noticeable for treble (1 space) but glaring for bass (3).
               y: bottomY + clefDef.glyphY,
-              color: INK_COLOR,
-              fontFamily: FONT_FAMILY,
+              color: theme.colorOf('clef'),
+              fontFamily: theme.musicFont,
             }),
           );
           cursorX += 3;
@@ -2112,8 +2325,8 @@ export function renderFromMusicXml(
                 x: cursorX,
                 spacing: 1,
                 staffBottomY: bottomY,
-                color: INK_COLOR,
-                fontFamily: FONT_FAMILY,
+                color: theme.colorOf('keySignature'),
+                fontFamily: theme.musicFont,
               }),
             );
             cursorX += accidentals.length + 0.5;
@@ -2145,8 +2358,8 @@ export function renderFromMusicXml(
               renderTimeSignature(sig, {
                 x: cursorX,
                 staffBottomY: bottomY,
-                color: INK_COLOR,
-                fontFamily: FONT_FAMILY,
+                color: theme.colorOf('timeSignature'),
+                fontFamily: theme.musicFont,
               }),
             );
             cursorX += 2.5;
@@ -2168,7 +2381,7 @@ export function renderFromMusicXml(
         accidentalStateByStaff.set(staffNumber, accidentalState);
 
         if (clefDef.positionsByPitch) {
-          const ctx: RenderCtx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart };
+          const ctx: RenderCtx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart, theme };
           // Phase 43/44 wiring: the header allowance every measure reserves
           // (see computeMeasureLayout), not a fraction of this measure's
           // own (now content-driven, no longer fixed) width.
@@ -2317,7 +2530,7 @@ export function renderFromMusicXml(
                   groupXs,
                   ctx,
                   accidentalState,
-                  DEFAULT_BEAM_STYLE,
+                  theme.beamStyle,
                   forcedDirection,
                 );
                 groupAnchors.forEach((anchor, memberIndex) => {
@@ -2357,7 +2570,7 @@ export function renderFromMusicXml(
                   const shape = computeTieShape(startX, eventX, pendingTie.y, side);
                   svgParts.push(
                     renderTie(shape, {
-                      color: INK_COLOR,
+                      color: theme.colorOf('tie'),
                       midpointThickness:
                         getEngravingDefault('tieMidpointThickness') ??
                         TIE_MIDPOINT_THICKNESS_FALLBACK,
@@ -2459,9 +2672,9 @@ export function renderFromMusicXml(
                 renderTabNumber(fretDigitGlyphNames(event.fret), {
                   x: eventX,
                   y: bottomY + position,
-                  color: INK_COLOR,
-                  backgroundColor: BACKGROUND_COLOR,
-                  fontFamily: FONT_FAMILY,
+                  color: theme.colorOf('tabNumber'),
+                  backgroundColor: theme.background,
+                  fontFamily: theme.musicFont,
                 }),
               );
             });
@@ -2523,10 +2736,44 @@ export function renderFromMusicXml(
           x: layout.x + layout.width,
           staffBottomY: barlineBottomY,
           height: barlineHeight,
-          color: INK_COLOR,
-          fontFamily: FONT_FAMILY,
+          color: theme.colorOf('barline'),
+          fontFamily: theme.musicFont,
         }),
       );
+
+      // Phase 50/§13.1: the bar number, drawn per `config.barNumbers`
+      // (default 'systemStart'). Like a tempo mark this belongs to the
+      // SYSTEM, not to a staff, so only the top part draws it -- a piano
+      // score must not number each measure twice, once per staff.
+      //
+      // Drawn AFTER this measure's staves and notes so the digits sit on
+      // top of anything they overlap, and at the measure's own left edge
+      // (before the header allowance the notes start after), which keeps
+      // it clear of a tempo mark in the same measure without needing to
+      // know whether there is one: the mark starts at the note area, a
+      // full MEASURE_HEADER_ALLOWANCE to the right of a one- or two-digit
+      // number.
+      if (
+        partIndex === 0 &&
+        shouldShowBarNumber(measure.number, config.barNumbers, isSystemStart)
+      ) {
+        const { topStaffY, staffHeight } = topStaff();
+        svgParts.push(
+          renderBarNumber(measure.number, {
+            x: layout.x,
+            staffBottomY: topStaffY + staffHeight,
+            staffHeight,
+            // A fixed gap above the TOP LINE, not above the measure's
+            // content the way Integration M clears a tempo mark: the
+            // number is at the measure's left edge, where no note, stem or
+            // beam is ever drawn, so there is nothing else to clear.
+            offsetAboveStaff: BAR_NUMBER_GAP,
+            color: theme.colorOf('barNumber'),
+            fontFamily: theme.textFont,
+            fontSize: theme.sizes.barNumber,
+          }),
+        );
+      }
 
       previousAttrs = attrs;
     });
@@ -2550,7 +2797,9 @@ export function renderFromMusicXml(
           staffBottomY + origin.systemY + lastOffset,
           origin.x,
         );
-        svgParts.push(renderBrace(braceShape, { color: INK_COLOR, fontFamily: FONT_FAMILY }));
+        svgParts.push(
+          renderBrace(braceShape, { color: theme.colorOf('brace'), fontFamily: theme.musicFont }),
+        );
       }
     }
   });
@@ -2565,8 +2814,8 @@ export function renderFromMusicXml(
       // In page mode that means every page, stacked.
       viewBoxHeight:
         config.layout.mode === 'page' ? pageCount * config.page.pageHeight : systemHeight,
-      pxPerStaffSpace: PX_PER_STAFF_SPACE,
-      backgroundColor: BACKGROUND_COLOR,
+      pxPerStaffSpace: config.layout.pxPerStaffSpace,
+      backgroundColor: theme.background,
     },
     svgParts,
   );

@@ -26,7 +26,7 @@ function staffBottomYs(svg) {
 }
 
 describe('Phase 44 wired into rendering: content-aware grand-staff distance', () => {
-  test('ordinary grand-staff content (nothing crossing toward the other staff) keeps the default 8-unit staff gap', () => {
+  test('ordinary grand-staff content (nothing crossing toward the other staff) keeps the default 8-unit staff gap (a 4-unit clearance below a 4-unit staff)', () => {
     const { svg } = NE.renderFromMusicXml(load('piano-grand-staff.musicxml'), { domParser });
     const { trebleBottom, bassBottom } = staffBottomYs(svg);
     assert.equal(bassBottom - trebleBottom, 8);
@@ -38,9 +38,11 @@ describe('Phase 44 wired into rendering: content-aware grand-staff distance', ()
     const { trebleBottom, bassBottom } = staffBottomYs(svg);
     // Treble's C2 sits 8 units below its own staff; bass's C6 sits 8
     // units above its own staff -- computeStaffDistance's own formula
-    // (upperExtent + lowerExtent) makes the real required distance 16,
-    // exceeding the 8-unit default, checked to the exact expected value.
-    assert.equal(bassBottom - trebleBottom, 16);
+    // (upperExtent + lowerExtent) makes the real required CLEARANCE 16,
+    // far exceeding the 4-unit default floor. Bottom line to bottom line
+    // is that clearance plus the lower staff's own height (Phase 50), so
+    // 16 + 4 = 20, checked to the exact expected value.
+    assert.equal(bassBottom - trebleBottom, 20);
   });
 
   test('a single-staff file is completely unaffected by this wiring (no staff pair exists to query)', () => {

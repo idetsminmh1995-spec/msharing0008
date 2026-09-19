@@ -17,9 +17,12 @@ function render(name) {
   return NE.renderFromMusicXml(xml, { domParser });
 }
 
+// SMuFL glyph text only: every glyph is drawn in the music font, while
+// ordinary text (Phase 50's bar numbers) is drawn in the text font, so
+// the font-family is what separates the two.
 function glyphCodepoints(svg) {
   const out = [];
-  const re = /<text[^>]*>([^<]*)<\/text>/g;
+  const re = /<text[^>]*font-family="Bravura"[^>]*>([^<]*)<\/text>/g;
   let m;
   while ((m = re.exec(svg)) !== null) {
     if (m[1]) out.push('U+' + m[1].codePointAt(0).toString(16).toUpperCase().padStart(4, '0'));

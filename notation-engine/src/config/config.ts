@@ -36,6 +36,33 @@ export interface LayoutConfig {
   readonly pxPerStaffSpace: number;
 }
 
+// ---- fonts (Phase 50/§8.2: the music font, the text font, and every text size) ----
+
+export interface FontSizeConfig {
+  /** In staff spaces, like every other size in this engine -- NOT CSS pixels, so a font size survives `resize` unchanged. */
+  readonly barNumber: number;
+  readonly lyric: number;
+  readonly dynamic: number;
+  readonly tempo: number;
+  readonly chordSymbol: number;
+}
+
+export interface FontsConfig {
+  /**
+   * The SMuFL music font every notehead/clef/rest/flag/accidental is
+   * drawn in. The engine's own glyph METRICS come from Bravura
+   * (`glyphs/data/bravura_metadata.json`), so substituting a
+   * metric-incompatible font moves glyphs relative to their anchors --
+   * a SMuFL-compliant alternative with Bravura-compatible metrics is
+   * the supported case, not any arbitrary font.
+   */
+  readonly musicFont: string;
+  /** The ordinary text font for bar numbers and other non-glyph text. */
+  readonly textFont: string;
+  readonly lyricFont: string;
+  readonly sizes: FontSizeConfig;
+}
+
 // ---- cursor (Phase 45-47: cursor-moves vs notation-moves sync) ----
 
 export type CursorMode = 'cursorMoves' | 'notationMoves';
@@ -60,7 +87,16 @@ export interface CursorConfig {
 // ---- notehead mapping (Phase 16/17: per-instrument notehead shapes) ----
 
 export interface NoteheadMappingConfig {
-  /** The notehead glyph name (see Phase 5's getGlyph) used when nothing more specific matches. */
+  /**
+   * The notehead SHAPE FAMILY used when nothing more specific matches --
+   * one of 'normal', 'x', 'circle-x', 'diamond', 'triangle', 'square',
+   * 'slash', 'plus' (§9.7's own table, in `geometry/notehead.ts`).
+   *
+   * A shape family, not a glyph name: the fill still follows the
+   * duration, so 'normal' means noteheadWhole/Half/Black as the note
+   * requires. Naming one fixed glyph here would draw every whole note
+   * filled.
+   */
   readonly defaultShape: string;
   /**
    * Per-instrument/pitch overrides. The exact key scheme (by MIDI note
@@ -128,9 +164,22 @@ export interface SpacingConfig {
  * generous scores use more." The skyline computes the REAL distance two
  * adjacent staves need given their actual content; this is only the
  * floor that applies even when both staves are otherwise empty.
+ *
+ * Both numbers are CLEARANCES -- the empty space between two staves, not
+ * the distance between their lines. `minStaffDistance` measures from the
+ * upper staff's bottom line to the lower staff's top line, and 4.0 (one
+ * staff height, the upper end of §15.1's "generous scores use more") is
+ * this engine's own default.
  */
 export interface StavesConfig {
   readonly minStaffDistance: number;
+  /**
+   * §15.2: the floor between the BOTTOM staff of one system and the TOP
+   * staff of the next. Systems are conventionally separated by more than
+   * the staves within a system, so this is deliberately its own number
+   * rather than reusing `minStaffDistance`.
+   */
+  readonly minSystemDistance: number;
 }
 
 // ---- page geometry (Phase 46, §16.2) ----
@@ -188,6 +237,7 @@ export interface DrumsConfig {
 export interface EngineConfig {
   readonly colors: ColorConfig;
   readonly layout: LayoutConfig;
+  readonly fonts: FontsConfig;
   readonly cursor: CursorConfig;
   readonly noteheadMapping: NoteheadMappingConfig;
   readonly beam: BeamConfig;
@@ -203,6 +253,9 @@ export interface EngineConfig {
 export interface PartialEngineConfig {
   readonly colors?: Partial<ColorConfig>;
   readonly layout?: Partial<LayoutConfig>;
+  readonly fonts?: Partial<Omit<FontsConfig, 'sizes'>> & {
+    readonly sizes?: Partial<FontSizeConfig>;
+  };
   readonly cursor?: Partial<CursorConfig>;
   readonly noteheadMapping?: Partial<NoteheadMappingConfig>;
   readonly beam?: Partial<BeamConfig>;
@@ -228,7 +281,25 @@ export const DEFAULT_CONFIG: EngineConfig = {
   },
   layout: {
     mode: 'scroll',
-    pxPerStaffSpace: 10,
+    // 20 real pixels per staff space -- the scale `renderFromMusicXml`
+    // has always emitted, now stated here instead of inside the renderer.
+    pxPerStaffSpace: 20,
+  },
+  fonts: {
+    musicFont: 'Bravura',
+    // The project's own UI font, with a generic fallback so a host that
+    // has not loaded it still gets proportional text rather than serif.
+    textFont: 'Manrope, sans-serif',
+    lyricFont: 'Manrope, sans-serif',
+    // Staff spaces, not pixels (see FontSizeConfig) -- §13.1's own bar
+    // number size, and the text sizes the renderer already drew at.
+    sizes: {
+      barNumber: 1.6,
+      lyric: 1.8,
+      dynamic: 2.2,
+      tempo: 1.8,
+      chordSymbol: 1.8,
+    },
   },
   cursor: {
     mode: 'notationMoves',
@@ -238,7 +309,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
     opacity: 0.85,
   },
   noteheadMapping: {
-    defaultShape: 'noteheadBlack',
+    defaultShape: 'normal',
   },
   beam: {
     style: 'straight',
@@ -256,7 +327,11 @@ export const DEFAULT_CONFIG: EngineConfig = {
     justify: true,
   },
   staves: {
-    minStaffDistance: 3.5,
+    minStaffDistance: 4.0,
+    // §15.2's own "systems are separated by more than staves are" -- the
+    // same kind of sensible, fully overridable default as every other
+    // number in this object.
+    minSystemDistance: 6.0,
   },
   page: {
     // A4 (210mm x 297mm) at roughly 7mm per staff space -- a common
@@ -283,6 +358,14 @@ export function resolveConfig(overrides?: PartialEngineConfig): EngineConfig {
   return {
     colors: { ...DEFAULT_CONFIG.colors, ...overrides?.colors },
     layout: { ...DEFAULT_CONFIG.layout, ...overrides?.layout },
+    // `fonts` is the one section with a nested object, so its `sizes` gets
+    // the same field-by-field merge the sections themselves get -- overriding
+    // one size must not drop the other four.
+    fonts: {
+      ...DEFAULT_CONFIG.fonts,
+      ...overrides?.fonts,
+      sizes: { ...DEFAULT_CONFIG.fonts.sizes, ...overrides?.fonts?.sizes },
+    },
     cursor: { ...DEFAULT_CONFIG.cursor, ...overrides?.cursor },
     noteheadMapping: { ...DEFAULT_CONFIG.noteheadMapping, ...overrides?.noteheadMapping },
     beam: { ...DEFAULT_CONFIG.beam, ...overrides?.beam },

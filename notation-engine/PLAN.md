@@ -470,7 +470,7 @@ Bravura's published defaults matched exactly, unknown names returning
 
 ---
 
-## 8. Module: `config/` — Engine Configuration `[BUILT, needs extension]`
+## 8. Module: `config/` — Engine Configuration `[BUILT + WIRED]`
 
 **Responsibility.** Hold every user-facing setting in one typed object.
 **Nothing user-facing may be hardcoded anywhere else in the engine.**
@@ -494,7 +494,7 @@ Every enum-like field is a **union type, not a string**, so typos are compile
 errors rather than silent no-ops. `resolveConfig` is the only supported way to
 obtain a config; nothing reads `DEFAULT_CONFIG` directly.
 
-### 8.2 Sections to be added as their modules land `[TODO]`
+### 8.2 Sections added as their modules landed `[BUILT]`
 
 ```ts
   spacing:   { increment:number; shortestDurationSpace:number;
@@ -509,14 +509,25 @@ obtain a config; nothing reads `DEFAULT_CONFIG` directly.
                drawBoundingBoxes:boolean; drawSkyline:boolean }  // §18.3
 ```
 
-**Note on what the renderer actually reads.** `spacing`, `staves`, `page` and
-`drums` now exist as real sections, and `renderFromMusicXml` accepts a
-`PartialEngineConfig` — but it honours only `layout.mode`, `page` and
-`spacing`. Colours, fonts, notehead mapping, beam style, bar numbers and key
-signature style are still hardcoded constants inside the renderer. Unifying
-every section into one live theming API is **Phase 50**'s own job; until
-then, "the option exists" is not the same as "the option does anything"
-(`Doc/STATUS.md` §C2 says the same thing from the other direction).
+**Note on what the renderer actually reads `[Phase 50, done]`.** Every
+section above is now live inside `renderFromMusicXml`: `colors` (including
+per-category `colors.overrides`, whose supported keys are the exported
+`ColorCategory` union), `fonts`, `layout`, `noteheadMapping`, `beam`,
+`barNumbers`, `spacing`, `staves`, `page` and `drums`. `cursor` is read by
+`computeCursorPlacement` (§17.2), a host-side call rather than part of a
+render. The six constants that used to shadow them (`FONT_FAMILY`,
+`INK_COLOR`, `BACKGROUND_COLOR`, `PX_PER_STAFF_SPACE`,
+`DEFAULT_BEAM_STYLE`, `DEFAULT_STAFF_GAP_FALLBACK`) are gone.
+
+Two things stay deliberately unwired, and are named rather than pretended
+away: `keySignature.style` has exactly one member, so there is nothing to
+branch on until a second one exists; and four of the five `fonts.sizes`
+(`lyric`, `dynamic`, `tempo`, `chordSymbol`) belong to elements drawn from
+fixed-size SMuFL glyphs or not drawn as text at all yet. See
+`Doc/phase-50-theming-api.md` §4.
+
+The `debug` section in the list above is still `[TODO]` — it lands with
+**Phase 51**, together with the overlays it switches on.
 
 **Rule for adding a section:** add its interface, add its default to
 `DEFAULT_CONFIG`, add one line to `resolveConfig`'s merge. Nothing else
@@ -2380,13 +2391,13 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 
 ### Stage 10 — Polish and delivery
 
-| Phase | What |
-|---|---|
-| 50 | Full theming API — unify every config section (§8) |
-| 51 | Debug overlays and diagnostics surface (§18.3) |
-| 52 | Export: SVG, PNG, PDF (§3, §16.2) |
-| 53 | Performance pass against §18.1's budgets |
-| 54 | Public API surface + generated reference docs into `docs/` |
+| Phase | What | Status |
+|---|---|---|
+| 50 | Full theming API — unify every config section (§8) | ✅ (built -- see Doc/phase-50-theming-api.md) |
+| 51 | Debug overlays and diagnostics surface (§18.3) | |
+| 52 | Export: SVG, PNG, PDF (§3, §16.2) | |
+| 53 | Performance pass against §18.1's budgets | |
+| 54 | Public API surface + generated reference docs into `docs/` | |
 
 ### Sequencing rules
 

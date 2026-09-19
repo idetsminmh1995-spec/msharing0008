@@ -58315,6 +58315,9 @@ var NotationEngine = (() => {
     if (override !== void 0) {
       return shapeGlyphName(override, input.durationType);
     }
+    if (input.defaultShape !== void 0) {
+      return shapeGlyphName(input.defaultShape, input.durationType);
+    }
     return durationDefaultNotehead(input.durationType);
   }
 
@@ -59424,7 +59427,25 @@ ${denominator}`;
     },
     layout: {
       mode: "scroll",
-      pxPerStaffSpace: 10
+      // 20 real pixels per staff space -- the scale `renderFromMusicXml`
+      // has always emitted, now stated here instead of inside the renderer.
+      pxPerStaffSpace: 20
+    },
+    fonts: {
+      musicFont: "Bravura",
+      // The project's own UI font, with a generic fallback so a host that
+      // has not loaded it still gets proportional text rather than serif.
+      textFont: "Manrope, sans-serif",
+      lyricFont: "Manrope, sans-serif",
+      // Staff spaces, not pixels (see FontSizeConfig) -- §13.1's own bar
+      // number size, and the text sizes the renderer already drew at.
+      sizes: {
+        barNumber: 1.6,
+        lyric: 1.8,
+        dynamic: 2.2,
+        tempo: 1.8,
+        chordSymbol: 1.8
+      }
     },
     cursor: {
       mode: "notationMoves",
@@ -59434,7 +59455,7 @@ ${denominator}`;
       opacity: 0.85
     },
     noteheadMapping: {
-      defaultShape: "noteheadBlack"
+      defaultShape: "normal"
     },
     beam: {
       style: "straight"
@@ -59452,7 +59473,11 @@ ${denominator}`;
       justify: true
     },
     staves: {
-      minStaffDistance: 3.5
+      minStaffDistance: 4,
+      // §15.2's own "systems are separated by more than staves are" -- the
+      // same kind of sensible, fully overridable default as every other
+      // number in this object.
+      minSystemDistance: 6
     },
     page: {
       // A4 (210mm x 297mm) at roughly 7mm per staff space -- a common
@@ -59470,6 +59495,14 @@ ${denominator}`;
     return {
       colors: { ...DEFAULT_CONFIG.colors, ...overrides?.colors },
       layout: { ...DEFAULT_CONFIG.layout, ...overrides?.layout },
+      // `fonts` is the one section with a nested object, so its `sizes` gets
+      // the same field-by-field merge the sections themselves get -- overriding
+      // one size must not drop the other four.
+      fonts: {
+        ...DEFAULT_CONFIG.fonts,
+        ...overrides?.fonts,
+        sizes: { ...DEFAULT_CONFIG.fonts.sizes, ...overrides?.fonts?.sizes }
+      },
       cursor: { ...DEFAULT_CONFIG.cursor, ...overrides?.cursor },
       noteheadMapping: { ...DEFAULT_CONFIG.noteheadMapping, ...overrides?.noteheadMapping },
       beam: { ...DEFAULT_CONFIG.beam, ...overrides?.beam },
@@ -62566,11 +62599,21 @@ ${denominator}`;
   var STAFF_LINES = 5;
   var STAFF_BOTTOM_Y = 8;
   var SYSTEM_HEIGHT = 16;
-  var FONT_FAMILY = "Bravura";
-  var INK_COLOR = "#000000";
-  var BACKGROUND_COLOR = "#ffffff";
-  var PX_PER_STAFF_SPACE = 20;
   var MEASURE_WIDTH = 24;
+  function buildTheme(config) {
+    const overrides = config.colors.overrides;
+    return {
+      ink: config.colors.ink,
+      background: config.colors.background,
+      musicFont: config.fonts.musicFont,
+      textFont: config.fonts.textFont,
+      sizes: config.fonts.sizes,
+      beamStyle: config.beam.style,
+      drumMap: mergeDrumMappingTable(config.drums.mapping),
+      noteheadMapping: config.noteheadMapping,
+      colorOf: (category) => overrides?.[category] ?? config.colors.ink
+    };
+  }
   var SPACING_CONFIG = {
     spacingIncrement: 1.2,
     shortestDurationSpace: 2,
@@ -62581,9 +62624,9 @@ ${denominator}`;
   var ESTIMATED_ACCIDENTAL_ALLOWANCE = 1;
   var MEASURE_TRAILING_MARGIN = 2;
   var MEASURE_HEADER_ALLOWANCE = 6;
-  var DEFAULT_STAFF_GAP_FALLBACK = 8;
   var TEMPO_MARK_GAP = 1.5;
   var TEMPO_MARK_HEIGHT = 2;
+  var BAR_NUMBER_GAP = 1;
   var STEM_AND_BEAM_ALLOWANCE = 3.5 + 0.5;
   var ARTICULATION_GAP = 1;
   var ORNAMENT_GAP = 1.5;
@@ -62683,7 +62726,6 @@ ${denominator}`;
   var BEAM_THICKNESS_FALLBACK = 0.5;
   var BEAM_SPACING_FALLBACK = 0.25;
   var DEFAULT_UNBEAMED_STEM_LENGTH = 3.5;
-  var DEFAULT_BEAM_STYLE = "straight";
   function mapClef(sign, line) {
     if (sign === "G") return { clefDef: TREBLE_CLEF, keySigClefName: "treble" };
     if (sign === "F") return { clefDef: BASS_CLEF, keySigClefName: "bass" };
@@ -62732,8 +62774,8 @@ ${denominator}`;
         renderMark(glyphName, {
           x: x2,
           y: ctx.measureBottomY + position,
-          color: INK_COLOR,
-          fontFamily: FONT_FAMILY
+          color: ctx.theme.colorOf("mark"),
+          fontFamily: ctx.theme.musicFont
         })
       );
     };
@@ -62761,13 +62803,18 @@ ${denominator}`;
     const step = isUnpitched2 ? note2.pitch.displayStep : note2.pitch.step;
     const octave = isUnpitched2 ? note2.pitch.displayOctave : note2.pitch.octave;
     const gmNote = isUnpitched2 && note2.instrumentId !== void 0 ? ctx.midiInstrumentsByPart?.get(note2.instrumentId) : void 0;
-    const drumEntry = gmNote !== void 0 ? lookupDrumMapEntry(gmNote, DEFAULT_DRUM_MAPPING_TABLE).entry : void 0;
+    const drumEntry = gmNote !== void 0 ? lookupDrumMapEntry(gmNote, ctx.theme.drumMap).entry : void 0;
     const position = drumEntry !== void 0 ? drumEntry.staffPosition : staffPositionForPitch(ctx.clefDef, step, octave);
+    const drumOverride = gmNote !== void 0 && drumEntry !== void 0 ? { [String(gmNote)]: drumEntry.noteheadShape } : void 0;
+    const configOverrides = ctx.theme.noteheadMapping.overridesByKey;
+    const overridesByKey = drumOverride !== void 0 || configOverrides !== void 0 ? { ...drumOverride, ...configOverrides } : void 0;
     const noteheadGlyph = selectNoteheadGlyphName({
       pitch: note2.pitch,
       durationType: note2.duration.type,
+      defaultShape: ctx.theme.noteheadMapping.defaultShape,
       ...note2.explicitNotehead !== void 0 ? { explicitNotehead: note2.explicitNotehead } : {},
-      ...gmNote !== void 0 && drumEntry !== void 0 ? { midiNote: gmNote, overridesByKey: { [String(gmNote)]: drumEntry.noteheadShape } } : {}
+      ...gmNote !== void 0 ? { midiNote: gmNote } : {},
+      ...overridesByKey !== void 0 ? { overridesByKey } : {}
     });
     return {
       position,
@@ -62776,6 +62823,7 @@ ${denominator}`;
     };
   }
   function measureNorthExtent(measure2, staffNumber, ctx) {
+    if (!ctx.clefDef.positionsByPitch) return 0;
     const topLineY = -(STAFF_LINES - 1);
     let highest;
     const consider = (position) => {
@@ -62815,13 +62863,20 @@ ${denominator}`;
           renderAccidental(glyphName, {
             x: accidentalX(x2, width, 0),
             y,
-            color: INK_COLOR,
-            fontFamily: FONT_FAMILY
+            color: ctx.theme.colorOf("accidental"),
+            fontFamily: ctx.theme.musicFont
           })
         );
       }
     }
-    parts.push(renderNotehead(noteheadGlyph, { x: x2, y, color: INK_COLOR, fontFamily: FONT_FAMILY }));
+    parts.push(
+      renderNotehead(noteheadGlyph, {
+        x: x2,
+        y,
+        color: ctx.theme.colorOf("notehead"),
+        fontFamily: ctx.theme.musicFont
+      })
+    );
     const ledgerLines = computeLedgerLines(position, STAFF_LINES);
     if (ledgerLines.length > 0) {
       parts.push(
@@ -62831,7 +62886,7 @@ ${denominator}`;
           staffBottomY: ctx.measureBottomY,
           extension: getEngravingDefault("legerLineExtension") ?? LEDGER_EXTENSION_FALLBACK,
           thickness: getEngravingDefault("legerLineThickness") ?? LEDGER_THICKNESS_FALLBACK,
-          color: INK_COLOR
+          color: ctx.theme.colorOf("ledger")
         })
       );
     }
@@ -62849,8 +62904,8 @@ ${denominator}`;
       const svg = renderRest(restGlyphName(ev.duration.type), {
         x: x2,
         y: y2,
-        color: INK_COLOR,
-        fontFamily: FONT_FAMILY
+        color: ctx.theme.colorOf("rest"),
+        fontFamily: ctx.theme.musicFont
       });
       return { svg, newAccidentalState: accidentalState };
     }
@@ -62878,8 +62933,8 @@ ${denominator}`;
             renderAccidental(glyphName, {
               x: accidentalX(x2, width, 0),
               y: graceY,
-              color: INK_COLOR,
-              fontFamily: FONT_FAMILY
+              color: ctx.theme.colorOf("accidental"),
+              fontFamily: ctx.theme.musicFont
             })
           );
         }
@@ -62895,8 +62950,8 @@ ${denominator}`;
         renderMark(graceNoteGlyphName(kind, graceDirection), {
           x: x2,
           y: graceY,
-          color: INK_COLOR,
-          fontFamily: FONT_FAMILY
+          color: ctx.theme.colorOf("notehead"),
+          fontFamily: ctx.theme.musicFont
         })
       );
       return { svg: parts2.join("\n"), newAccidentalState: state };
@@ -62922,7 +62977,7 @@ ${denominator}`;
           direction,
           length,
           thickness: getEngravingDefault("stemThickness") ?? STEM_THICKNESS_FALLBACK,
-          color: INK_COLOR
+          color: ctx.theme.colorOf("stem")
         })
       );
       if (needsFlag(ev.duration.type, false)) {
@@ -62937,8 +62992,8 @@ ${denominator}`;
               x: stemX,
               y: endY,
               direction,
-              color: INK_COLOR,
-              fontFamily: FONT_FAMILY
+              color: ctx.theme.colorOf("flag"),
+              fontFamily: ctx.theme.musicFont
             })
           );
         }
@@ -63007,7 +63062,7 @@ ${denominator}`;
           // spans the whole chord and still ends exactly on the beam.
           length: Math.abs(beamY - (y - anchor[1])),
           thickness: getEngravingDefault("stemThickness") ?? STEM_THICKNESS_FALLBACK,
-          color: INK_COLOR
+          color: ctx.theme.colorOf("stem")
         })
       );
     });
@@ -63042,7 +63097,7 @@ ${denominator}`;
         lineCount,
         thickness: getEngravingDefault("beamThickness") ?? BEAM_THICKNESS_FALLBACK,
         spacing: getEngravingDefault("beamSpacing") ?? BEAM_SPACING_FALLBACK,
-        color: INK_COLOR
+        color: ctx.theme.colorOf("beam")
       })
     );
     return { svg: parts.join("\n"), newAccidentalState: state, anchors };
@@ -63080,8 +63135,8 @@ ${denominator}`;
         renderAccidental(glyphName, {
           x: accidentalX(x2, width, placement.column),
           y: ctx.measureBottomY + placement.y,
-          color: INK_COLOR,
-          fontFamily: FONT_FAMILY
+          color: ctx.theme.colorOf("accidental"),
+          fontFamily: ctx.theme.musicFont
         })
       );
     });
@@ -63095,7 +63150,14 @@ ${denominator}`;
       }
       const position = positions[i2] ?? 0;
       const y = ctx.measureBottomY + position;
-      parts.push(renderNotehead(glyphName, { x: x2, y, color: INK_COLOR, fontFamily: FONT_FAMILY }));
+      parts.push(
+        renderNotehead(glyphName, {
+          x: x2,
+          y,
+          color: ctx.theme.colorOf("notehead"),
+          fontFamily: ctx.theme.musicFont
+        })
+      );
       const ledgerLines = computeLedgerLines(position, STAFF_LINES);
       if (ledgerLines.length > 0) {
         parts.push(
@@ -63105,7 +63167,7 @@ ${denominator}`;
             staffBottomY: ctx.measureBottomY,
             extension: getEngravingDefault("legerLineExtension") ?? LEDGER_EXTENSION_FALLBACK,
             thickness: getEngravingDefault("legerLineThickness") ?? LEDGER_THICKNESS_FALLBACK,
-            color: INK_COLOR
+            color: ctx.theme.colorOf("ledger")
           })
         );
       }
@@ -63135,7 +63197,7 @@ ${denominator}`;
             direction,
             length,
             thickness: getEngravingDefault("stemThickness") ?? STEM_THICKNESS_FALLBACK,
-            color: INK_COLOR
+            color: ctx.theme.colorOf("stem")
           })
         );
       }
@@ -63259,7 +63321,7 @@ ${denominator}`;
         );
         parts.push(
           renderSlur(shape, {
-            color: INK_COLOR,
+            color: ctx.theme.colorOf("slur"),
             midpointThickness: getEngravingDefault("slurMidpointThickness") ?? SLUR_MIDPOINT_THICKNESS_FALLBACK
           })
         );
@@ -63326,14 +63388,14 @@ ${denominator}`;
         parts.push(
           renderTupletBracket(computeTupletBracketShape(first.x, last.x, absoluteY, side), {
             thickness: getEngravingDefault("tupletBracketThickness") ?? TUPLET_BRACKET_THICKNESS_FALLBACK,
-            color: INK_COLOR
+            color: ctx.theme.colorOf("tuplet")
           })
         );
       }
       parts.push(
         renderTupletNumber(digitGlyph, (first.x + last.x) / 2, absoluteY, {
-          color: INK_COLOR,
-          fontFamily: FONT_FAMILY
+          color: ctx.theme.colorOf("tuplet"),
+          fontFamily: ctx.theme.musicFont
         })
       );
     });
@@ -63357,14 +63419,15 @@ ${denominator}`;
     } = parseMusicXml(xmlText, options);
     const diagnostics = [...parseDiagnostics];
     const config = resolveConfig(options?.config);
-    const pageSpacingConfig = { ...DEFAULT_CONFIG.spacing, ...options?.config?.spacing };
+    const theme = buildTheme(config);
+    const pageSpacingConfig = config.spacing;
     if (score2.parts.length === 0) {
       const doc = createSvgDocument(
         {
           viewBoxWidth: MEASURE_WIDTH,
           viewBoxHeight: SYSTEM_HEIGHT,
-          pxPerStaffSpace: PX_PER_STAFF_SPACE,
-          backgroundColor: BACKGROUND_COLOR
+          pxPerStaffSpace: config.layout.pxPerStaffSpace,
+          backgroundColor: theme.background
         },
         []
       );
@@ -63433,28 +63496,41 @@ ${denominator}`;
       measureLayoutsByNumber.set(measureNumber, layout);
       measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
     }
-    const tempoTopPadding = (() => {
-      if (tempoMarks.length === 0) return 0;
+    const couldCarryBarNumber = (measureNumber, isFirstOfScore) => {
+      if (config.barNumbers.display === "systemStart") {
+        return config.layout.mode === "scroll" ? isFirstOfScore : true;
+      }
+      return shouldShowBarNumber(measureNumber, config.barNumbers, false);
+    };
+    const aboveStaffPadding = (() => {
       const existingHeadroom = STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
       let needed = 0;
-      for (const part2 of score2.parts) {
+      score2.parts.forEach((part2, partIndex) => {
         const midi = midiInstrumentsByPartMap.get(part2.id);
-        for (const m of part2.measures) {
-          if (!tempoMarks.some((t) => t.partId === part2.id && t.measureNumber === m.number)) continue;
+        part2.measures.forEach((m, measureIndex) => {
+          const hasTempoMark = tempoMarks.some(
+            (t) => t.partId === part2.id && t.measureNumber === m.number
+          );
+          const hasBarNumber = partIndex === 0 && couldCarryBarNumber(m.number, measureIndex === 0);
+          if (hasBarNumber) {
+            needed = Math.max(needed, BAR_NUMBER_GAP + theme.sizes.barNumber);
+          }
+          if (!hasTempoMark) return;
           const a = attributesByPartAndMeasure.get(`${part2.id}:${m.number}`);
           const spec = a?.clefsByStaff[1];
           const { clefDef } = mapClef(spec?.sign ?? a?.clefSign ?? "G", spec?.line ?? a?.clefLine);
           const extent = measureNorthExtent(m, 1, {
             clefDef,
             measureBottomY: 0,
-            midiInstrumentsByPart: midi
+            midiInstrumentsByPart: midi,
+            theme
           });
           needed = Math.max(needed, extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
-        }
-      }
+        });
+      });
       return Math.max(0, needed - existingHeadroom);
     })();
-    const staffBottomY = STAFF_BOTTOM_Y + tempoTopPadding;
+    const staffBottomY = STAFF_BOTTOM_Y + aboveStaffPadding;
     const staffDistanceForPair = (partIndex, staffIndexInPart) => {
       const part2 = score2.parts[partIndex];
       if (part2 === void 0) return 8;
@@ -63464,7 +63540,9 @@ ${denominator}`;
       const lowerExtent = worstCaseStaffExtent(part2, lowerStaffNumber, attributes, "north");
       const upperSouth = addToSkyline(emptySkyline("south"), { xStart: 0, xEnd: 1, y: upperExtent });
       const lowerNorth = addToSkyline(emptySkyline("north"), { xStart: 0, xEnd: 1, y: lowerExtent });
-      return computeStaffDistance(upperSouth, lowerNorth, DEFAULT_STAFF_GAP_FALLBACK);
+      const lowerStaffLines = attributes.find((a) => a.partId === part2.id)?.staffLinesByStaff[lowerStaffNumber] ?? STAFF_LINES;
+      const lowerStaffHeight = computeStaffGeometry(lowerStaffLines).height;
+      return lowerStaffHeight + computeStaffDistance(upperSouth, lowerNorth, config.staves.minStaffDistance);
     };
     const partStaffCounts = score2.parts.map((p) => {
       const a = firstAttributesByPart.get(p.id);
@@ -63477,7 +63555,7 @@ ${denominator}`;
     const placementByMeasureNumber = /* @__PURE__ */ new Map();
     const systemOrigins = [];
     const lowestStaffOffset = scoreLayout.positions[scoreLayout.positions.length - 1]?.y ?? 0;
-    const systemHeight = SYSTEM_HEIGHT + tempoTopPadding + lowestStaffOffset;
+    const systemHeight = SYSTEM_HEIGHT + aboveStaffPadding + lowestStaffOffset;
     const widthOf = (measureNumber) => measureLayoutsByNumber.get(measureNumber)?.width ?? MEASURE_WIDTH;
     let pageCount = 1;
     if (config.layout.mode === "page") {
@@ -63616,6 +63694,34 @@ ${denominator}`;
         const systemY = layout.systemY;
         const isSystemStart = layout.isSystemStart;
         const staffNumbers = Array.from({ length: Math.max(1, attrs.staves) }, (_, n) => n + 1);
+        let topStaffCache;
+        const topStaff = () => {
+          if (topStaffCache === void 0) {
+            const topStaffGeometry = computeStaffGeometry(attrs.staffLinesByStaff[1] ?? STAFF_LINES);
+            topStaffCache = {
+              topStaffY: staffBottomY + systemY - topStaffGeometry.height,
+              staffHeight: topStaffGeometry.height
+            };
+          }
+          return topStaffCache;
+        };
+        let northExtentCache;
+        const topStaffNorthExtent = () => {
+          if (northExtentCache === void 0) {
+            const topClefSpec = attrs.clefsByStaff[1];
+            const { clefDef: topClefDef } = mapClef(
+              topClefSpec?.sign ?? attrs.clefSign,
+              topClefSpec?.line ?? attrs.clefLine
+            );
+            northExtentCache = measureNorthExtent(measure2, 1, {
+              clefDef: topClefDef,
+              measureBottomY: 0,
+              midiInstrumentsByPart: midiInstrumentsByPartMap.get(part2.id),
+              theme
+            });
+          }
+          return northExtentCache;
+        };
         const measureTempoMarks = tempoMarks.filter(
           (m) => m.partId === part2.id && m.measureNumber === measure2.number
         );
@@ -63623,19 +63729,8 @@ ${denominator}`;
           const noteAreaX = layout.x + MEASURE_HEADER_ALLOWANCE;
           const noteAreaWidth = layout.x + layout.width - noteAreaX;
           const measureTotalTicks = attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
-          const topStaffLines = attrs.staffLinesByStaff[1] ?? STAFF_LINES;
-          const topStaffGeometry = computeStaffGeometry(topStaffLines);
-          const topStaffY = staffBottomY + systemY - topStaffGeometry.height;
-          const topClefSpec = attrs.clefsByStaff[1];
-          const { clefDef: topClefDef } = mapClef(
-            topClefSpec?.sign ?? attrs.clefSign,
-            topClefSpec?.line ?? attrs.clefLine
-          );
-          const northExtent = measureNorthExtent(measure2, 1, {
-            clefDef: topClefDef,
-            measureBottomY: 0,
-            midiInstrumentsByPart: midiInstrumentsByPartMap.get(part2.id)
-          });
+          const { topStaffY } = topStaff();
+          const northExtent = topStaffNorthExtent();
           for (const mark of measureTempoMarks) {
             const dotGlyph = mark.beatUnitDots > 0 ? metronomeDotGlyphName() : void 0;
             const eventX = noteAreaX + mark.tick / (measureTotalTicks || 1) * noteAreaWidth;
@@ -63652,8 +63747,8 @@ ${denominator}`;
                   // reaches (stems and beams included), not from the staff
                   // line -- see the note where northExtent is computed.
                   y: topStaffY - northExtent - TEMPO_MARK_GAP,
-                  color: INK_COLOR,
-                  fontFamily: FONT_FAMILY,
+                  color: theme.colorOf("tempo"),
+                  fontFamily: theme.musicFont,
                   noteToEqualsGap: 1
                 }
               )
@@ -63674,7 +63769,7 @@ ${denominator}`;
               x: layout.x,
               y: bottomY,
               width: layout.width,
-              color: INK_COLOR,
+              color: theme.colorOf("staff"),
               lineThickness: getEngravingDefault("staffLineThickness") ?? 0.13
             })
           );
@@ -63694,8 +63789,8 @@ ${denominator}`;
                   renderMark(glyphName, {
                     x: cursor,
                     y,
-                    color: INK_COLOR,
-                    fontFamily: FONT_FAMILY
+                    color: theme.colorOf("dynamic"),
+                    fontFamily: theme.musicFont
                   })
                 );
                 cursor += glyphWidthOf(glyphName);
@@ -63708,7 +63803,7 @@ ${denominator}`;
                   computeHairpinShape(span.startX, span.endX, markY(dynamicSide()), span.kind),
                   {
                     thickness: getEngravingDefault("hairpinThickness") ?? HAIRPIN_THICKNESS_FALLBACK,
-                    color: INK_COLOR
+                    color: theme.colorOf("hairpin")
                   }
                 )
               );
@@ -63728,8 +63823,8 @@ ${denominator}`;
                 // Passing bottomY alone drew every clef too low -- barely
                 // noticeable for treble (1 space) but glaring for bass (3).
                 y: bottomY + clefDef.glyphY,
-                color: INK_COLOR,
-                fontFamily: FONT_FAMILY
+                color: theme.colorOf("clef"),
+                fontFamily: theme.musicFont
               })
             );
             cursorX += 3;
@@ -63742,8 +63837,8 @@ ${denominator}`;
                   x: cursorX,
                   spacing: 1,
                   staffBottomY: bottomY,
-                  color: INK_COLOR,
-                  fontFamily: FONT_FAMILY
+                  color: theme.colorOf("keySignature"),
+                  fontFamily: theme.musicFont
                 })
               );
               cursorX += accidentals.length + 0.5;
@@ -63765,8 +63860,8 @@ ${denominator}`;
                 renderTimeSignature(sig, {
                   x: cursorX,
                   staffBottomY: bottomY,
-                  color: INK_COLOR,
-                  fontFamily: FONT_FAMILY
+                  color: theme.colorOf("timeSignature"),
+                  fontFamily: theme.musicFont
                 })
               );
               cursorX += 2.5;
@@ -63783,7 +63878,7 @@ ${denominator}`;
           let accidentalState = previousStaffState === void 0 || keyChanged ? createAccidentalState(attrs.fifths) : resetMeasure(previousStaffState);
           accidentalStateByStaff.set(staffNumber, accidentalState);
           if (clefDef.positionsByPitch) {
-            const ctx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart };
+            const ctx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart, theme };
             const noteAreaX = Math.max(layout.x + MEASURE_HEADER_ALLOWANCE, cursorX);
             const measureLayout = measureLayoutsByNumber.get(measure2.number);
             const isMultiVoice = measure2.voices.length > 1;
@@ -63844,7 +63939,7 @@ ${denominator}`;
                     groupXs,
                     ctx,
                     accidentalState,
-                    DEFAULT_BEAM_STYLE,
+                    theme.beamStyle,
                     forcedDirection
                   );
                   groupAnchors.forEach((anchor, memberIndex) => {
@@ -63881,7 +63976,7 @@ ${denominator}`;
                     const shape = computeTieShape(startX, eventX, pendingTie.y, side);
                     svgParts.push(
                       renderTie(shape, {
-                        color: INK_COLOR,
+                        color: theme.colorOf("tie"),
                         midpointThickness: getEngravingDefault("tieMidpointThickness") ?? TIE_MIDPOINT_THICKNESS_FALLBACK
                       })
                     );
@@ -63958,9 +64053,9 @@ ${denominator}`;
                   renderTabNumber(fretDigitGlyphNames(event.fret), {
                     x: eventX,
                     y: bottomY + position,
-                    color: INK_COLOR,
-                    backgroundColor: BACKGROUND_COLOR,
-                    fontFamily: FONT_FAMILY
+                    color: theme.colorOf("tabNumber"),
+                    backgroundColor: theme.background,
+                    fontFamily: theme.musicFont
                   })
                 );
               });
@@ -64000,10 +64095,28 @@ ${denominator}`;
             x: layout.x + layout.width,
             staffBottomY: barlineBottomY,
             height: barlineHeight,
-            color: INK_COLOR,
-            fontFamily: FONT_FAMILY
+            color: theme.colorOf("barline"),
+            fontFamily: theme.musicFont
           })
         );
+        if (partIndex === 0 && shouldShowBarNumber(measure2.number, config.barNumbers, isSystemStart)) {
+          const { topStaffY, staffHeight } = topStaff();
+          svgParts.push(
+            renderBarNumber(measure2.number, {
+              x: layout.x,
+              staffBottomY: topStaffY + staffHeight,
+              staffHeight,
+              // A fixed gap above the TOP LINE, not above the measure's
+              // content the way Integration M clears a tempo mark: the
+              // number is at the measure's left edge, where no note, stem or
+              // beam is ever drawn, so there is nothing else to clear.
+              offsetAboveStaff: BAR_NUMBER_GAP,
+              color: theme.colorOf("barNumber"),
+              fontFamily: theme.textFont,
+              fontSize: theme.sizes.barNumber
+            })
+          );
+        }
         previousAttrs = attrs;
       });
       const partStaffCount = partStaffCounts[partIndex] ?? 1;
@@ -64020,7 +64133,9 @@ ${denominator}`;
             staffBottomY + origin.systemY + lastOffset,
             origin.x
           );
-          svgParts.push(renderBrace(braceShape, { color: INK_COLOR, fontFamily: FONT_FAMILY }));
+          svgParts.push(
+            renderBrace(braceShape, { color: theme.colorOf("brace"), fontFamily: theme.musicFont })
+          );
         }
       }
     });
@@ -64033,8 +64148,8 @@ ${denominator}`;
         // or the lower ones are simply clipped out of the rendered image.
         // In page mode that means every page, stacked.
         viewBoxHeight: config.layout.mode === "page" ? pageCount * config.page.pageHeight : systemHeight,
-        pxPerStaffSpace: PX_PER_STAFF_SPACE,
-        backgroundColor: BACKGROUND_COLOR
+        pxPerStaffSpace: config.layout.pxPerStaffSpace,
+        backgroundColor: theme.background
       },
       svgParts
     );

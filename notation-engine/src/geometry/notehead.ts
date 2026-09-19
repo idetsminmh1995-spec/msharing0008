@@ -118,6 +118,15 @@ export interface NoteheadSelectionInput {
   readonly midiNote?: number;
   /** `config.noteheadMapping.overridesByKey`, if a config is in effect. */
   readonly overridesByKey?: Readonly<Record<string, string>>;
+  /**
+   * `config.noteheadMapping.defaultShape` (Phase 50/§8) -- the shape
+   * family used when neither an explicit `<notehead>` nor a keyed
+   * override matches. A shape FAMILY ('normal', 'x', 'diamond', ...)
+   * rather than a glyph name, because the fill still has to follow the
+   * duration: a default of one fixed glyph would draw a whole note as a
+   * filled head. Omitted means 'normal'.
+   */
+  readonly defaultShape?: string;
 }
 
 /**
@@ -140,5 +149,8 @@ export function selectNoteheadGlyphName(input: NoteheadSelectionInput): string {
     return shapeGlyphName(override, input.durationType);
   }
 
+  if (input.defaultShape !== undefined) {
+    return shapeGlyphName(input.defaultShape, input.durationType);
+  }
   return durationDefaultNotehead(input.durationType);
 }
