@@ -96,13 +96,13 @@
   .stat-box .stat-value{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:16px;display:block;}
   .video-mid{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;}
   .drum-circle{width:120px;height:120px;border-radius:50%;border:3px solid var(--red);display:flex;align-items:center;justify-content:center;color:var(--red);}
-  .video-notation{background:#fff;padding:10px 20px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;flex-shrink:0;}
-  .video-notation svg{display:block;height:110px;width:auto;max-width:none;}
+  .video-notation{background:#fff;padding:14px 20px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;flex-shrink:0;}
+  .video-notation svg{display:block;height:170px;width:auto;max-width:none;}
 
-  /* Brand watermark, burned into the exported video's own frame (bottom-right
-     corner, low-profile) -- distinct from .video-logo-row's app icon at the
-     top, which is page chrome and is NOT part of the exported frame. */
-  .video-watermark{position:absolute;right:14px;bottom:14px;height:46px;width:auto;opacity:.92;pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));}
+  /* Brand mark, burned into the exported video's own frame (top-left,
+     inside .video-logo-row) -- replaces the generic note-icon placeholder
+     that stood in for it before the real logo existed. */
+  .video-logo-mark{height:34px;width:auto;flex-shrink:0;}
 
   .transport{display:flex;align-items:center;gap:14px;}
   .play-btn{width:42px;height:42px;border-radius:50%;background:var(--red);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
@@ -226,7 +226,7 @@
     <div class="video-frame">
       <div class="video-top">
         <div class="video-logo-row">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#C81E2C" stroke-width="2" style="flex-shrink:0;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          <img class="video-logo-mark" src="../../assets/logo/sharing-drum-mark.webp" alt="M Sharing Drum">
           <div class="video-title" id="videoTitle"></div>
         </div>
         <div class="video-stats">
@@ -243,7 +243,6 @@
           <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="9" ry="3.4"/></svg>
         </div>
       </div>
-      <img class="video-watermark" src="../../assets/logo/sharing-drum-mark.webp" alt="M Sharing Drum">
     </div>
 
     <div class="transport">
