@@ -23,6 +23,13 @@ export function renderBrace(shape: BraceShape, options: RenderBraceOptions): str
   const targetHeight = shape.bottomY - shape.topY;
   const scaleY = nominalHeight !== 0 ? targetHeight / nominalHeight : 1;
 
+  // Anchored at the BOTTOM, not the top. Bravura's brace sits entirely
+  // ABOVE its own origin (bBoxSW y = 0, bBoxNE y = 3.988), so a glyph
+  // drawn at `topY` runs UPWARD from there and the brace lands above the
+  // system instead of beside it -- amplified by `scaleY`, which on a
+  // grand staff put it a dozen staff spaces clear of the music, and in
+  // page mode dropped each system's brace onto the PREVIOUS page. Found
+  // by Phase 52, reading back an exported PDF of a real piano score.
   const inner = svgGlyphText(0, 0, glyph.char, options.fontFamily, { fill: options.color });
-  return `<g transform="translate(${shape.x} ${shape.topY}) scale(1 ${scaleY})">${inner}</g>`;
+  return `<g transform="translate(${shape.x} ${shape.bottomY}) scale(1 ${scaleY})">${inner}</g>`;
 }

@@ -73,6 +73,38 @@ describe('grand staff rendering (Integration A)', () => {
     assert.match(svg, /\uE000/); // brace
   });
 
+  test('the brace spans the two staves rather than sitting above them', () => {
+    const { svg } = renderPiano();
+    // Bravura's brace grows UPWARD from its own origin (bBoxSW y = 0,
+    // bBoxNE y = 3.988), so the glyph must be anchored at the BOTTOM
+    // staff's bottom line and scaled up from there. Anchoring it at the
+    // top -- which this engine did until Phase 52 read back an exported
+    // PDF and saw it -- puts the whole brace above the music.
+    const m = /<g transform="translate\(([\d.]+) ([\d.]+)\) scale\(1 ([\d.]+)\)"><text[^>]*>\uE000</.exec(svg);
+    assert.ok(m !== null, 'the brace is drawn with a scale transform');
+    const originY = Number(m[2]);
+    const scaleY = Number(m[3]);
+    const nominal = NE.getGlyph('brace').bBox.bBoxNE[1] - NE.getGlyph('brace').bBox.bBoxSW[1];
+    const top = originY - nominal * scaleY;
+
+    // The staff lines this render actually drew, so the assertion is
+    // against the real geometry rather than a remembered constant.
+    const staffLineYs = [
+      ...new Set(
+        [...svg.matchAll(/<line x1="[\d.]+" y1="([\d.]+)"[^>]*stroke-width="0\.13"/g)].map((x) =>
+          Number(x[1]),
+        ),
+      ),
+    ].sort((a, b) => a - b);
+    const topLine = staffLineYs[0];
+    const bottomLine = staffLineYs[staffLineYs.length - 1];
+    assert.ok(Math.abs(top - topLine) < 1e-6, `brace top ${top} vs top staff line ${topLine}`);
+    assert.ok(
+      Math.abs(originY - bottomLine) < 1e-6,
+      `brace bottom ${originY} vs bottom staff line ${bottomLine}`,
+    );
+  });
+
   test('a single-staff file draws NO brace', () => {
     const { svg } = NE.renderFromMusicXml(load('simple-single-voice.musicxml'), { domParser });
     assert.doesNotMatch(svg, /\uE000/);

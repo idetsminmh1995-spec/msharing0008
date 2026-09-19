@@ -95,6 +95,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-49-cursor.md`](./phase-49-cursor.md) | Phase 49: §17.2 cursor, both sync modes in ONE module (`computeCursorPlacement` + `renderCursor`) -- completes Stage 9; repeats stay the host's business, never simulated here |
 | [`phase-50-theming-api.md`](./phase-50-theming-api.md) | Phase 50: §8's theming API made live -- colours (with per-category `colors.overrides`), fonts, bar numbers, beam style, notehead + drum mapping and staff distance all read from `config` instead of six hardcoded constants; opens Stage 10 and closes STATUS §C2 |
 | [`phase-51-debug-overlays.md`](./phase-51-debug-overlays.md) | Phase 51: §18.3's debugging surface -- `config.debug` (logLevel + both overlays), a stable `data-id` on every drawn event sharing the playback event stream's own id scheme, and bounding boxes/skylines measured FROM the emitted SVG so they can never disagree with it |
+| [`phase-52-export.md`](./phase-52-export.md) | Phase 52: §3's export -- a standalone SVG that carries its own font, a real PNG encoder and a real PDF writer, with rasterizing borrowed from the host through an injected backend; verified by reading an exported PDF back with pdf.js, which is how the brace bug surfaced |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

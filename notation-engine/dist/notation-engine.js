@@ -60,9 +60,11 @@ var NotationEngine = (() => {
     beamDirection: () => beamDirection,
     beamYAtX: () => beamYAtX,
     beamedEventIndices: () => beamedEventIndices,
+    browserRasterBackend: () => browserRasterBackend,
     buildEventStream: () => buildEventStream,
     buildMeasureMap: () => buildMeasureMap,
     buildTempoMap: () => buildTempoMap,
+    bytesToBase64: () => bytesToBase64,
     cancellationNaturals: () => cancellationNaturals,
     charAdvance: () => charAdvance,
     checkMeasureOverflow: () => checkMeasureOverflow,
@@ -113,13 +115,19 @@ var NotationEngine = (() => {
     dynamicSide: () => dynamicSide,
     elementIdForNoteId: () => elementIdForNoteId,
     emptySkyline: () => emptySkyline,
+    encodePdf: () => encodePdf,
+    encodePng: () => encodePng,
     escapeXmlText: () => escapeXmlText,
     evaluateAccidental: () => evaluateAccidental,
+    exportPdf: () => exportPdf,
+    exportPng: () => exportPng,
+    exportSvg: () => exportSvg,
     extractViewBox: () => extractViewBox,
     filterDiagnostics: () => filterDiagnostics,
     flagGlyphName: () => flagGlyphName,
     flatsForCount: () => flatsForCount,
     flattenPartNotes: () => flattenPartNotes,
+    flattenToRgb: () => flattenToRgb,
     fretDigitGlyphNames: () => fretDigitGlyphNames,
     getEngravingDefault: () => getEngravingDefault,
     getEngravingDefaults: () => getEngravingDefaults,
@@ -175,6 +183,7 @@ var NotationEngine = (() => {
     placeElement: () => placeElement,
     positionToTick: () => positionToTick,
     positionToX: () => positionToX,
+    rasterizeSvg: () => rasterizeSvg,
     readVariableLengthQuantity: () => readVariableLengthQuantity,
     rehearsalMarkSide: () => rehearsalMarkSide,
     renderAccidental: () => renderAccidental,
@@ -224,6 +233,7 @@ var NotationEngine = (() => {
     slurSide: () => slurSide,
     spacingDiagnostic: () => spacingDiagnostic,
     staffPositionForPitch: () => staffPositionForPitch,
+    stringToUtf8: () => stringToUtf8,
     sumTicks: () => sumTicks,
     svgGlyphText: () => svgGlyphText,
     svgGroup: () => svgGroup,
@@ -231,6 +241,7 @@ var NotationEngine = (() => {
     svgPath: () => svgPath,
     svgRect: () => svgRect,
     svgText: () => svgText,
+    svgToDataUri: () => svgToDataUri,
     tabStringPosition: () => tabStringPosition,
     tempoMarkSide: () => tempoMarkSide,
     textWidth: () => textWidth,
@@ -59324,7 +59335,7 @@ ${denominator}`;
     const targetHeight = shape.bottomY - shape.topY;
     const scaleY = nominalHeight !== 0 ? targetHeight / nominalHeight : 1;
     const inner = svgGlyphText(0, 0, glyph.char, options.fontFamily, { fill: options.color });
-    return `<g transform="translate(${shape.x} ${shape.topY}) scale(1 ${scaleY})">${inner}</g>`;
+    return `<g transform="translate(${shape.x} ${shape.bottomY}) scale(1 ${scaleY})">${inner}</g>`;
   }
 
   // src/render/mark.ts
@@ -60866,7 +60877,9 @@ ${denominator}`;
   for (i = 0; i < 32; ++i)
     fdt[i] = 5;
   var i;
+  var flm = /* @__PURE__ */ hMap(flt, 9, 0);
   var flrm = /* @__PURE__ */ hMap(flt, 9, 1);
+  var fdm = /* @__PURE__ */ hMap(fdt, 5, 0);
   var fdrm = /* @__PURE__ */ hMap(fdt, 5, 1);
   var max = function(a) {
     var m = a[0];
@@ -61062,7 +61075,341 @@ ${denominator}`;
     } while (!final);
     return bt != buf.length && noBuf ? slc(buf, 0, bt) : buf.subarray(0, bt);
   };
+  var wbits = function(d, p, v) {
+    v <<= p & 7;
+    var o = p / 8 | 0;
+    d[o] |= v;
+    d[o + 1] |= v >> 8;
+  };
+  var wbits16 = function(d, p, v) {
+    v <<= p & 7;
+    var o = p / 8 | 0;
+    d[o] |= v;
+    d[o + 1] |= v >> 8;
+    d[o + 2] |= v >> 16;
+  };
+  var hTree = function(d, mb) {
+    var t = [];
+    for (var i2 = 0; i2 < d.length; ++i2) {
+      if (d[i2])
+        t.push({ s: i2, f: d[i2] });
+    }
+    var s = t.length;
+    var t2 = t.slice();
+    if (!s)
+      return { t: et, l: 0 };
+    if (s == 1) {
+      var v = new u8(t[0].s + 1);
+      v[t[0].s] = 1;
+      return { t: v, l: 1 };
+    }
+    t.sort(function(a, b) {
+      return a.f - b.f;
+    });
+    t.push({ s: -1, f: 25001 });
+    var l = t[0], r = t[1], i0 = 0, i1 = 1, i22 = 2;
+    t[0] = { s: -1, f: l.f + r.f, l, r };
+    while (i1 != s - 1) {
+      l = t[t[i0].f < t[i22].f ? i0++ : i22++];
+      r = t[i0 != i1 && t[i0].f < t[i22].f ? i0++ : i22++];
+      t[i1++] = { s: -1, f: l.f + r.f, l, r };
+    }
+    var maxSym = t2[0].s;
+    for (var i2 = 1; i2 < s; ++i2) {
+      if (t2[i2].s > maxSym)
+        maxSym = t2[i2].s;
+    }
+    var tr = new u16(maxSym + 1);
+    var mbt = ln(t[i1 - 1], tr, 0);
+    if (mbt > mb) {
+      var i2 = 0, dt = 0;
+      var lft = mbt - mb, cst = 1 << lft;
+      t2.sort(function(a, b) {
+        return tr[b.s] - tr[a.s] || a.f - b.f;
+      });
+      for (; i2 < s; ++i2) {
+        var i2_1 = t2[i2].s;
+        if (tr[i2_1] > mb) {
+          dt += cst - (1 << mbt - tr[i2_1]);
+          tr[i2_1] = mb;
+        } else
+          break;
+      }
+      dt >>= lft;
+      while (dt > 0) {
+        var i2_2 = t2[i2].s;
+        if (tr[i2_2] < mb)
+          dt -= 1 << mb - tr[i2_2]++ - 1;
+        else
+          ++i2;
+      }
+      for (; i2 >= 0 && dt; --i2) {
+        var i2_3 = t2[i2].s;
+        if (tr[i2_3] == mb) {
+          --tr[i2_3];
+          ++dt;
+        }
+      }
+      mbt = mb;
+    }
+    return { t: new u8(tr), l: mbt };
+  };
+  var ln = function(n, l, d) {
+    return n.s == -1 ? Math.max(ln(n.l, l, d + 1), ln(n.r, l, d + 1)) : l[n.s] = d;
+  };
+  var lc = function(c) {
+    var s = c.length;
+    while (s && !c[--s])
+      ;
+    var cl = new u16(++s);
+    var cli = 0, cln = c[0], cls = 1;
+    var w = function(v) {
+      cl[cli++] = v;
+    };
+    for (var i2 = 1; i2 <= s; ++i2) {
+      if (c[i2] == cln && i2 != s)
+        ++cls;
+      else {
+        if (!cln && cls > 2) {
+          for (; cls > 138; cls -= 138)
+            w(32754);
+          if (cls > 2) {
+            w(cls > 10 ? cls - 11 << 5 | 28690 : cls - 3 << 5 | 12305);
+            cls = 0;
+          }
+        } else if (cls > 3) {
+          w(cln), --cls;
+          for (; cls > 6; cls -= 6)
+            w(8304);
+          if (cls > 2)
+            w(cls - 3 << 5 | 8208), cls = 0;
+        }
+        while (cls--)
+          w(cln);
+        cls = 1;
+        cln = c[i2];
+      }
+    }
+    return { c: cl.subarray(0, cli), n: s };
+  };
+  var clen = function(cf, cl) {
+    var l = 0;
+    for (var i2 = 0; i2 < cl.length; ++i2)
+      l += cf[i2] * cl[i2];
+    return l;
+  };
+  var wfblk = function(out, pos, dat) {
+    var s = dat.length;
+    var o = shft(pos + 2);
+    out[o] = s & 255;
+    out[o + 1] = s >> 8;
+    out[o + 2] = out[o] ^ 255;
+    out[o + 3] = out[o + 1] ^ 255;
+    for (var i2 = 0; i2 < s; ++i2)
+      out[o + i2 + 4] = dat[i2];
+    return (o + 4 + s) * 8;
+  };
+  var wblk = function(dat, out, final, syms, lf, df, eb, li, bs, bl, p) {
+    wbits(out, p++, final);
+    ++lf[256];
+    var _a2 = hTree(lf, 15), dlt = _a2.t, mlb = _a2.l;
+    var _b2 = hTree(df, 15), ddt = _b2.t, mdb = _b2.l;
+    var _c = lc(dlt), lclt = _c.c, nlc = _c.n;
+    var _d = lc(ddt), lcdt = _d.c, ndc = _d.n;
+    var lcfreq = new u16(19);
+    for (var i2 = 0; i2 < lclt.length; ++i2)
+      ++lcfreq[lclt[i2] & 31];
+    for (var i2 = 0; i2 < lcdt.length; ++i2)
+      ++lcfreq[lcdt[i2] & 31];
+    var _e = hTree(lcfreq, 7), lct = _e.t, mlcb = _e.l;
+    var nlcc = 19;
+    for (; nlcc > 4 && !lct[clim[nlcc - 1]]; --nlcc)
+      ;
+    var flen = bl + 5 << 3;
+    var ftlen = clen(lf, flt) + clen(df, fdt) + eb;
+    var dtlen = clen(lf, dlt) + clen(df, ddt) + eb + 14 + 3 * nlcc + clen(lcfreq, lct) + 2 * lcfreq[16] + 3 * lcfreq[17] + 7 * lcfreq[18];
+    if (bs >= 0 && flen <= ftlen && flen <= dtlen)
+      return wfblk(out, p, dat.subarray(bs, bs + bl));
+    var lm, ll, dm, dl;
+    wbits(out, p, 1 + (dtlen < ftlen)), p += 2;
+    if (dtlen < ftlen) {
+      lm = hMap(dlt, mlb, 0), ll = dlt, dm = hMap(ddt, mdb, 0), dl = ddt;
+      var llm = hMap(lct, mlcb, 0);
+      wbits(out, p, nlc - 257);
+      wbits(out, p + 5, ndc - 1);
+      wbits(out, p + 10, nlcc - 4);
+      p += 14;
+      for (var i2 = 0; i2 < nlcc; ++i2)
+        wbits(out, p + 3 * i2, lct[clim[i2]]);
+      p += 3 * nlcc;
+      var lcts = [lclt, lcdt];
+      for (var it = 0; it < 2; ++it) {
+        var clct = lcts[it];
+        for (var i2 = 0; i2 < clct.length; ++i2) {
+          var len = clct[i2] & 31;
+          wbits(out, p, llm[len]), p += lct[len];
+          if (len > 15)
+            wbits(out, p, clct[i2] >> 5 & 127), p += clct[i2] >> 12;
+        }
+      }
+    } else {
+      lm = flm, ll = flt, dm = fdm, dl = fdt;
+    }
+    for (var i2 = 0; i2 < li; ++i2) {
+      var sym = syms[i2];
+      if (sym > 255) {
+        var len = sym >> 18 & 31;
+        wbits16(out, p, lm[len + 257]), p += ll[len + 257];
+        if (len > 7)
+          wbits(out, p, sym >> 23 & 31), p += fleb[len];
+        var dst = sym & 31;
+        wbits16(out, p, dm[dst]), p += dl[dst];
+        if (dst > 3)
+          wbits16(out, p, sym >> 5 & 8191), p += fdeb[dst];
+      } else {
+        wbits16(out, p, lm[sym]), p += ll[sym];
+      }
+    }
+    wbits16(out, p, lm[256]);
+    return p + ll[256];
+  };
+  var deo = /* @__PURE__ */ new i32([65540, 131080, 131088, 131104, 262176, 1048704, 1048832, 2114560, 2117632]);
   var et = /* @__PURE__ */ new u8(0);
+  var dflt = function(dat, lvl, plvl, pre, post, st) {
+    var s = st.z || dat.length;
+    var o = new u8(pre + s + 5 * (1 + Math.ceil(s / 7e3)) + post);
+    var w = o.subarray(pre, o.length - post);
+    var lst = st.l;
+    var pos = (st.r || 0) & 7;
+    if (lvl) {
+      if (pos)
+        w[0] = st.r >> 3;
+      var opt = deo[lvl - 1];
+      var n = opt >> 13, c = opt & 8191;
+      var msk_1 = (1 << plvl) - 1;
+      var prev = st.p || new u16(32768), head = st.h || new u16(msk_1 + 1);
+      var bs1_1 = Math.ceil(plvl / 3), bs2_1 = 2 * bs1_1;
+      var hsh = function(i3) {
+        return (dat[i3] ^ dat[i3 + 1] << bs1_1 ^ dat[i3 + 2] << bs2_1) & msk_1;
+      };
+      var syms = new i32(25e3);
+      var lf = new u16(288), df = new u16(32);
+      var lc_1 = 0, eb = 0, i2 = st.i || 0, li = 0, wi = st.w || 0, bs = 0;
+      for (; i2 + 2 < s; ++i2) {
+        var hv = hsh(i2);
+        var imod = i2 & 32767, pimod = head[hv];
+        prev[imod] = pimod;
+        head[hv] = imod;
+        if (wi <= i2) {
+          var rem = s - i2;
+          if ((lc_1 > 7e3 || li > 24576) && (rem > 423 || !lst)) {
+            pos = wblk(dat, w, 0, syms, lf, df, eb, li, bs, i2 - bs, pos);
+            li = lc_1 = eb = 0, bs = i2;
+            for (var j = 0; j < 286; ++j)
+              lf[j] = 0;
+            for (var j = 0; j < 30; ++j)
+              df[j] = 0;
+          }
+          var l = 2, d = 0, ch_1 = c, dif = imod - pimod & 32767;
+          if (rem > 2 && hv == hsh(i2 - dif)) {
+            var maxn = Math.min(n, rem) - 1;
+            var maxd = Math.min(32767, i2);
+            var ml = Math.min(258, rem);
+            while (dif <= maxd && --ch_1 && imod != pimod) {
+              if (dat[i2 + l] == dat[i2 + l - dif]) {
+                var nl = 0;
+                for (; nl < ml && dat[i2 + nl] == dat[i2 + nl - dif]; ++nl)
+                  ;
+                if (nl > l) {
+                  l = nl, d = dif;
+                  if (nl > maxn)
+                    break;
+                  var mmd = Math.min(dif, nl - 2);
+                  var md = 0;
+                  for (var j = 0; j < mmd; ++j) {
+                    var ti = i2 - dif + j & 32767;
+                    var pti = prev[ti];
+                    var cd = ti - pti & 32767;
+                    if (cd > md)
+                      md = cd, pimod = ti;
+                  }
+                }
+              }
+              imod = pimod, pimod = prev[imod];
+              dif += imod - pimod & 32767;
+            }
+          }
+          if (d) {
+            syms[li++] = 268435456 | revfl[l] << 18 | revfd[d];
+            var lin = revfl[l] & 31, din = revfd[d] & 31;
+            eb += fleb[lin] + fdeb[din];
+            ++lf[257 + lin];
+            ++df[din];
+            wi = i2 + l;
+            ++lc_1;
+          } else {
+            syms[li++] = dat[i2];
+            ++lf[dat[i2]];
+          }
+        }
+      }
+      for (i2 = Math.max(i2, wi); i2 < s; ++i2) {
+        syms[li++] = dat[i2];
+        ++lf[dat[i2]];
+      }
+      pos = wblk(dat, w, lst, syms, lf, df, eb, li, bs, i2 - bs, pos);
+      if (!lst) {
+        st.r = pos & 7 | w[pos / 8 | 0] << 3;
+        pos -= 7;
+        st.h = head, st.p = prev, st.i = i2, st.w = wi;
+      }
+    } else {
+      for (var i2 = st.w || 0; i2 < s + lst; i2 += 65535) {
+        var e = i2 + 65535;
+        if (e >= s) {
+          w[pos / 8 | 0] = lst;
+          e = s;
+        }
+        pos = wfblk(w, pos + 1, dat.subarray(i2, e));
+      }
+      st.i = s;
+    }
+    return slc(o, 0, pre + shft(pos) + post);
+  };
+  var adler = function() {
+    var a = 1, b = 0;
+    return {
+      p: function(d) {
+        var n = a, m = b;
+        var l = d.length | 0;
+        for (var i2 = 0; i2 != l; ) {
+          var e = Math.min(i2 + 2655, l);
+          for (; i2 < e; ++i2)
+            m += n += d[i2];
+          n = (n & 65535) + 15 * (n >> 16), m = (m & 65535) + 15 * (m >> 16);
+        }
+        a = n, b = m;
+      },
+      d: function() {
+        a %= 65521, b %= 65521;
+        return (a & 255) << 24 | (a & 65280) << 8 | (b & 255) << 8 | b >> 8;
+      }
+    };
+  };
+  var dopt = function(dat, opt, pre, post, st) {
+    if (!st) {
+      st = { l: 1 };
+      if (opt.dictionary) {
+        var dict = opt.dictionary.subarray(-32768);
+        var newDat = new u8(dict.length + dat.length);
+        newDat.set(dict);
+        newDat.set(dat, dict.length);
+        dat = newDat;
+        st.w = dict.length;
+      }
+    }
+    return dflt(dat, opt.level == null ? 6 : opt.level, opt.mem == null ? st.l ? Math.ceil(Math.max(8, Math.min(13, Math.log(dat.length))) * 1.5) : 20 : 12 + opt.mem, pre, post, st);
+  };
   var b2 = function(d, b) {
     return d[b] | d[b + 1] << 8;
   };
@@ -61072,8 +61419,30 @@ ${denominator}`;
   var b8 = function(d, b) {
     return b4(d, b) + b4(d, b + 4) * 4294967296;
   };
+  var wbytes = function(d, b, v) {
+    for (; v; ++b)
+      d[b] = v, v >>>= 8;
+  };
+  var zlh = function(c, o) {
+    var lv = o.level, fl2 = lv == 0 ? 0 : lv < 6 ? 1 : lv == 9 ? 3 : 2;
+    c[0] = 120, c[1] = fl2 << 6 | (o.dictionary && 32);
+    c[1] |= 31 - (c[0] << 8 | c[1]) % 31;
+    if (o.dictionary) {
+      var h = adler();
+      h.p(o.dictionary);
+      wbytes(c, 2, h.d());
+    }
+  };
   function inflateSync(data, opts) {
     return inflt(data, { i: 2 }, opts && opts.out, opts && opts.dictionary);
+  }
+  function zlibSync(data, opts) {
+    if (!opts)
+      opts = {};
+    var a = adler();
+    a.p(data);
+    var d = dopt(data, opts, opts.dictionary ? 6 : 2, 4);
+    return zlh(d, opts), wbytes(d, d.length - 4, a.d()), d;
   }
   var td = typeof TextDecoder != "undefined" && /* @__PURE__ */ new TextDecoder();
   var tds = 0;
@@ -62899,6 +63268,395 @@ ${denominator}`;
       north: toSegments(north[i2] ?? /* @__PURE__ */ new Map(), sampleWidth),
       south: toSegments(south[i2] ?? /* @__PURE__ */ new Map(), sampleWidth)
     }));
+  }
+
+  // src/export/svg.ts
+  var XML_DECLARATION = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>';
+  var MIME_BY_FORMAT = {
+    woff2: "font/woff2",
+    woff: "font/woff",
+    opentype: "font/otf",
+    truetype: "font/ttf"
+  };
+  function escapeXmlText2(text) {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function fontFaceRule(font) {
+    const format = font.format ?? "woff2";
+    const mime = MIME_BY_FORMAT[format] ?? "application/octet-stream";
+    return [
+      "@font-face {",
+      `  font-family: '${font.family}';`,
+      `  src: url(data:${mime};base64,${font.base64}) format('${format}');`,
+      "}"
+    ].join("\n");
+  }
+  function exportSvg(svg, options = {}) {
+    const openTagEnd = svg.indexOf(">");
+    if (!svg.startsWith("<svg") || openTagEnd === -1) {
+      throw new Error("exportSvg expects a string starting with an <svg ...> element.");
+    }
+    const head = [];
+    if (options.title !== void 0) head.push(`<title>${escapeXmlText2(options.title)}</title>`);
+    if (options.description !== void 0) {
+      head.push(`<desc>${escapeXmlText2(options.description)}</desc>`);
+    }
+    const fonts = options.fonts ?? [];
+    if (fonts.length > 0) {
+      head.push(
+        `<style type="text/css"><![CDATA[
+${fonts.map(fontFaceRule).join("\n")}
+]]></style>`
+      );
+    } else {
+      head.push(
+        "<!-- No font embedded. This file references its font by NAME only, so it will render with missing glyphs anywhere that font is not installed. Pass options.fonts to embed it. -->"
+      );
+    }
+    const body = svg.slice(0, openTagEnd + 1) + "\n" + head.join("\n") + svg.slice(openTagEnd + 1);
+    return options.omitXmlDeclaration === true ? body : `${XML_DECLARATION}
+${body}`;
+  }
+  function bytesToBase64(bytes) {
+    const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let out = "";
+    for (let i2 = 0; i2 < bytes.length; i2 += 3) {
+      const b0 = bytes[i2] ?? 0;
+      const b1 = bytes[i2 + 1] ?? 0;
+      const b22 = bytes[i2 + 2] ?? 0;
+      const triple = b0 << 16 | b1 << 8 | b22;
+      out += ALPHABET[triple >> 18 & 63];
+      out += ALPHABET[triple >> 12 & 63];
+      out += i2 + 1 < bytes.length ? ALPHABET[triple >> 6 & 63] : "=";
+      out += i2 + 2 < bytes.length ? ALPHABET[triple & 63] : "=";
+    }
+    return out;
+  }
+  function stringToUtf8(text) {
+    const out = [];
+    for (const ch of text) {
+      const code = ch.codePointAt(0) ?? 0;
+      if (code < 128) out.push(code);
+      else if (code < 2048) out.push(192 | code >> 6, 128 | code & 63);
+      else if (code < 65536) {
+        out.push(224 | code >> 12, 128 | code >> 6 & 63, 128 | code & 63);
+      } else {
+        out.push(
+          240 | code >> 18,
+          128 | code >> 12 & 63,
+          128 | code >> 6 & 63,
+          128 | code & 63
+        );
+      }
+    }
+    return Uint8Array.from(out);
+  }
+  function svgToDataUri(svg) {
+    return `data:image/svg+xml;base64,${bytesToBase64(stringToUtf8(svg))}`;
+  }
+
+  // src/export/png.ts
+  var PNG_SIGNATURE = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  var crcTable;
+  function crc32(bytes) {
+    if (crcTable === void 0) {
+      crcTable = new Uint32Array(256);
+      for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
+        crcTable[n] = c >>> 0;
+      }
+    }
+    let crc = 4294967295;
+    for (const byte of bytes) {
+      crc = (crcTable[(crc ^ byte) & 255] ?? 0) ^ crc >>> 8;
+    }
+    return (crc ^ 4294967295) >>> 0;
+  }
+  function u32(value) {
+    return Uint8Array.from([
+      value >>> 24 & 255,
+      value >>> 16 & 255,
+      value >>> 8 & 255,
+      value & 255
+    ]);
+  }
+  function chunk(type, data) {
+    const typeBytes = Uint8Array.from([...type].map((c) => c.charCodeAt(0)));
+    const body = new Uint8Array(typeBytes.length + data.length);
+    body.set(typeBytes, 0);
+    body.set(data, typeBytes.length);
+    const out = new Uint8Array(4 + body.length + 4);
+    out.set(u32(data.length), 0);
+    out.set(body, 4);
+    out.set(u32(crc32(body)), 4 + body.length);
+    return out;
+  }
+  function filterRows(image) {
+    const { width, height, data } = image;
+    const stride = width * 4;
+    const out = new Uint8Array((stride + 1) * height);
+    for (let y = 0; y < height; y++) {
+      const rowStart = y * stride;
+      const outStart = y * (stride + 1);
+      out[outStart] = 1;
+      for (let i2 = 0; i2 < stride; i2++) {
+        const value = data[rowStart + i2] ?? 0;
+        const left = i2 >= 4 ? data[rowStart + i2 - 4] ?? 0 : 0;
+        out[outStart + 1 + i2] = value - left & 255;
+      }
+    }
+    return out;
+  }
+  function encodePng(image, options = {}) {
+    const { width, height, data } = image;
+    if (width <= 0 || height <= 0) {
+      throw new Error(`encodePng needs a non-empty image; got ${width}x${height}.`);
+    }
+    if (data.length !== width * height * 4) {
+      throw new Error(
+        `encodePng expects RGBA data of ${width * height * 4} bytes for ${width}x${height}; got ${data.length}.`
+      );
+    }
+    const ihdr = new Uint8Array(13);
+    ihdr.set(u32(width), 0);
+    ihdr.set(u32(height), 4);
+    ihdr[8] = 8;
+    ihdr[9] = 6;
+    ihdr[10] = 0;
+    ihdr[11] = 0;
+    ihdr[12] = 0;
+    const chunks = [PNG_SIGNATURE, chunk("IHDR", ihdr)];
+    if (options.pixelsPerMetre !== void 0) {
+      const phys = new Uint8Array(9);
+      const ppm = Math.round(options.pixelsPerMetre);
+      phys.set(u32(ppm), 0);
+      phys.set(u32(ppm), 4);
+      phys[8] = 1;
+      chunks.push(chunk("pHYs", phys));
+    }
+    chunks.push(chunk("IDAT", zlibSync(filterRows(image), { level: 6 })));
+    chunks.push(chunk("IEND", new Uint8Array(0)));
+    const total = chunks.reduce((sum, c) => sum + c.length, 0);
+    const out = new Uint8Array(total);
+    let offset = 0;
+    for (const c of chunks) {
+      out.set(c, offset);
+      offset += c.length;
+    }
+    return out;
+  }
+  function flattenToRgb(image, background = [255, 255, 255]) {
+    const { width, height, data } = image;
+    const out = new Uint8Array(width * height * 3);
+    const [br, bg, bb] = background;
+    for (let p = 0; p < width * height; p++) {
+      const alpha = (data[p * 4 + 3] ?? 255) / 255;
+      const inv = 1 - alpha;
+      out[p * 3] = Math.round((data[p * 4] ?? 0) * alpha + br * inv);
+      out[p * 3 + 1] = Math.round((data[p * 4 + 1] ?? 0) * alpha + bg * inv);
+      out[p * 3 + 2] = Math.round((data[p * 4 + 2] ?? 0) * alpha + bb * inv);
+    }
+    return out;
+  }
+
+  // src/export/pdf.ts
+  var POINTS_PER_INCH = 72;
+  function pdfDate(date) {
+    const p = (n, w = 2) => String(n).padStart(w, "0");
+    return `D:${p(date.getUTCFullYear(), 4)}${p(date.getUTCMonth() + 1)}${p(date.getUTCDate())}${p(date.getUTCHours())}${p(date.getUTCMinutes())}${p(date.getUTCSeconds())}Z`;
+  }
+  function pdfString(text) {
+    return `(${text.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)")})`;
+  }
+  function concat(parts) {
+    const total = parts.reduce((sum, p) => sum + p.length, 0);
+    const out = new Uint8Array(total);
+    let offset = 0;
+    for (const p of parts) {
+      out.set(p, offset);
+      offset += p.length;
+    }
+    return out;
+  }
+  function encodePdf(pages, options = {}) {
+    if (pages.length === 0) throw new Error("encodePdf needs at least one page.");
+    const dpi = options.dpi ?? 96;
+    const scale = POINTS_PER_INCH / dpi;
+    const chunks = [];
+    const offsets = [0];
+    let length = 0;
+    const push = (bytes) => {
+      chunks.push(bytes);
+      length += bytes.length;
+    };
+    const pushText = (text) => push(stringToUtf8(text));
+    const CATALOG = 1;
+    const PAGES = 2;
+    const INFO = 3;
+    const firstPageObject = 4;
+    const objectForPage = (i2) => firstPageObject + i2 * 3;
+    const beginObject = (n) => {
+      offsets[n] = length;
+      pushText(`${n} 0 obj
+`);
+    };
+    const endObject = () => pushText("endobj\n");
+    pushText("%PDF-1.4\n");
+    push(Uint8Array.from([37, 226, 227, 207, 211, 10]));
+    beginObject(CATALOG);
+    pushText(`<< /Type /Catalog /Pages ${PAGES} 0 R >>
+`);
+    endObject();
+    const kids = pages.map((_, i2) => `${objectForPage(i2)} 0 R`).join(" ");
+    beginObject(PAGES);
+    pushText(`<< /Type /Pages /Count ${pages.length} /Kids [ ${kids} ] >>
+`);
+    endObject();
+    beginObject(INFO);
+    const created = pdfDate(options.creationDate ?? /* @__PURE__ */ new Date());
+    pushText(
+      `<< /Producer ${pdfString("notation-engine")}` + (options.title !== void 0 ? ` /Title ${pdfString(options.title)}` : "") + ` /CreationDate ${pdfString(created)} >>
+`
+    );
+    endObject();
+    pages.forEach((page, i2) => {
+      const pageObject = objectForPage(i2);
+      const contentObject = pageObject + 1;
+      const imageObject = pageObject + 2;
+      const { width, height } = page.image;
+      const widthPt = page.widthPt ?? width * scale;
+      const heightPt = page.heightPt ?? height * scale;
+      beginObject(pageObject);
+      pushText(
+        `<< /Type /Page /Parent ${PAGES} 0 R /MediaBox [ 0 0 ${widthPt.toFixed(3)} ${heightPt.toFixed(3)} ] /Resources << /XObject << /Im0 ${imageObject} 0 R >> >> /Contents ${contentObject} 0 R >>
+`
+      );
+      endObject();
+      const content = `q
+${widthPt.toFixed(3)} 0 0 ${heightPt.toFixed(3)} 0 0 cm
+/Im0 Do
+Q
+`;
+      const contentBytes = stringToUtf8(content);
+      beginObject(contentObject);
+      pushText(`<< /Length ${contentBytes.length} >>
+stream
+`);
+      push(contentBytes);
+      pushText("endstream\n");
+      endObject();
+      const rgb = flattenToRgb(page.image, options.background);
+      const compressed = zlibSync(rgb, { level: 6 });
+      beginObject(imageObject);
+      pushText(
+        `<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length ${compressed.length} >>
+stream
+`
+      );
+      push(compressed);
+      pushText("\nendstream\n");
+      endObject();
+    });
+    const objectCount = firstPageObject + pages.length * 3;
+    const xrefOffset = length;
+    pushText(`xref
+0 ${objectCount}
+`);
+    pushText("0000000000 65535 f \n");
+    for (let n = 1; n < objectCount; n++) {
+      pushText(`${String(offsets[n] ?? 0).padStart(10, "0")} 00000 n 
+`);
+    }
+    pushText(
+      `trailer
+<< /Size ${objectCount} /Root ${CATALOG} 0 R /Info ${INFO} 0 R >>
+startxref
+${xrefOffset}
+%%EOF
+`
+    );
+    return concat(chunks);
+  }
+
+  // src/export/raster.ts
+  function browserRasterBackend() {
+    const globalScope = globalThis;
+    if (globalScope.document === void 0 || globalScope.Image === void 0) {
+      throw new Error(
+        "browserRasterBackend() needs a DOM (document + Image). Outside a browser, pass your own RasterBackend -- e.g. one built on @napi-rs/canvas -- via options.backend."
+      );
+    }
+    const doc = globalScope.document;
+    const ImageCtor = globalScope.Image;
+    return {
+      createCanvas(width, height) {
+        const canvas = doc.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        if (context === null) throw new Error("Could not get a 2d context from the canvas.");
+        return {
+          drawImage: (image, x2, y, w, h) => context.drawImage(image, x2, y, w, h),
+          getImageData: () => context.getImageData(0, 0, width, height)
+        };
+      },
+      loadImage(dataUri) {
+        return new Promise((resolve, reject) => {
+          const image = new ImageCtor();
+          image.onload = () => resolve(image);
+          image.onerror = (error) => reject(
+            error instanceof Error ? error : new Error("Could not decode the SVG as an image.")
+          );
+          image.src = dataUri;
+        });
+      }
+    };
+  }
+  function svgPixelSize(svg) {
+    const width = Number(/\swidth="([\d.]+)"/.exec(svg)?.[1]);
+    const height = Number(/\sheight="([\d.]+)"/.exec(svg)?.[1]);
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      throw new Error("Could not read a positive width/height from the <svg> element.");
+    }
+    return { width, height };
+  }
+  async function rasterizeSvg(svg, options = {}) {
+    const scale = options.scale ?? 2;
+    const slices = Math.max(1, Math.floor(options.slices ?? 1));
+    const backend = options.backend ?? browserRasterBackend();
+    const { width, height } = svgPixelSize(svg);
+    const image = await backend.loadImage(svgToDataUri(svg));
+    const fullWidth = Math.max(1, Math.round(width * scale));
+    const fullHeight = Math.max(1, Math.round(height * scale));
+    const sliceHeight = Math.max(1, Math.round(fullHeight / slices));
+    const out = [];
+    for (let i2 = 0; i2 < slices; i2++) {
+      const canvas = backend.createCanvas(fullWidth, sliceHeight);
+      const offsetY = i2 === 0 ? 0 : -(i2 * sliceHeight);
+      canvas.drawImage(image, 0, offsetY, fullWidth, fullHeight);
+      out.push(canvas.getImageData());
+    }
+    return out;
+  }
+  async function exportPng(svg, options = {}) {
+    const [image] = await rasterizeSvg(svg, options);
+    if (image === void 0) throw new Error("Rasterizing produced no image.");
+    return encodePng(
+      image,
+      options.dpi !== void 0 ? { pixelsPerMetre: Math.round(options.dpi / 0.0254 * (options.scale ?? 2)) } : {}
+    );
+  }
+  async function exportPdf(svg, options = {}) {
+    const images = await rasterizeSvg(svg, options);
+    return encodePdf(
+      images.map((image) => ({
+        image,
+        ...options.pageWidthPt !== void 0 ? { widthPt: options.pageWidthPt } : {},
+        ...options.pageHeightPt !== void 0 ? { heightPt: options.pageHeightPt } : {}
+      })),
+      options
+    );
   }
 
   // src/render-from-musicxml.ts

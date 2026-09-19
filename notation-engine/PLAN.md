@@ -207,6 +207,7 @@ permitted dependencies — verified against the code, not aspirational:
 | `drums/` | (nothing) | everything else |
 | `playback/` | `core/`, `timing/`, `config/` | `render/`, `geometry/`, `parser/` |
 | `debug/` | `config/`, `glyphs/` | everything else |
+| `export/` | (nothing but `fflate`) | everything else |
 
 In words:
 
@@ -301,7 +302,7 @@ notation-engine/
     timing/       [BUILT]  tempo map, tick<->seconds, MIDI/XML alignment
     layout/       [BUILT]  spacing, skyline, scroll, page, resize, system
     playback/     [TODO]   position API + event stream (§17) -- Phase 48/49
-    export/       [TODO]   SVG/PNG/PDF output -- Phase 52
+    export/       [BUILT]  SVG/PNG/PDF output -- Phase 52
     index.ts      [BUILT]  public API barrel
   test/
     unit/         [BUILT]  per-module unit tests (node --test)
@@ -2418,7 +2419,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 |---|---|---|
 | 50 | Full theming API — unify every config section (§8) | ✅ (built -- see Doc/phase-50-theming-api.md) |
 | 51 | Debug overlays and diagnostics surface (§18.3) | ✅ (built -- see Doc/phase-51-debug-overlays.md) |
-| 52 | Export: SVG, PNG, PDF (§3, §16.2) | |
+| 52 | Export: SVG, PNG, PDF (§3, §16.2) | ✅ (built -- see Doc/phase-52-export.md) |
 | 53 | Performance pass against §18.1's budgets | |
 | 54 | Public API surface + generated reference docs into `docs/` | |
 

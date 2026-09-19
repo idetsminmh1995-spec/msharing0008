@@ -14,7 +14,7 @@ remains.
 
 ---
 
-## A. DONE — Phases 1–51 ✅ (Stages 0 through 9 complete, Stage 10 half done) + Integration Passes A–Q
+## A. DONE — Phases 1–52 ✅ (Stages 0 through 9 complete, Stage 10 all but two) + Integration Passes A–Q
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 `npm run verify` passes **679/679** across them.
@@ -90,21 +90,21 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 48 | Playback position API + event stream | Full §17.1 (`positionToX`/`xToPosition`/`getEventStream`/`resolvePosition`), wired into `renderFromMusicXml`'s own result from the exact layout that produced its SVG; deletes the superseded `src/cursor/` placeholder | [`phase-48`](./phase-48-playback-position-api.md) |
 | 50 | Full theming API (§8) | Every config section is now LIVE in the renderer: colours (incl. per-category `colors.overrides`), fonts, bar numbers (drawn at last), beam style, notehead mapping, drum mapping, staff distance, pixel scale. Six hardcoded constants deleted. Found and fixed two real bugs -- a tab staff crashed anything drawn above it, and grand-staff distance was short by one staff height | [`phase-50`](./phase-50-theming-api.md) |
 | 51 | Debug overlays + diagnostics surface (§18.3) | All four §18.3 bullets: `config.debug` (logLevel, drawBoundingBoxes, drawSkyline), a `data-id` on every note/chord/rest built by the SAME function the playback event stream uses, and both overlays measured from the emitted SVG so they cannot disagree with what was drawn | [`phase-51`](./phase-51-debug-overlays.md) |
+| 52 | Export: SVG, PNG, PDF (§3) | Standalone SVG with the font embedded; a real PNG encoder (IHDR/IDAT/IEND, Sub filter, fflate zlib); a real PDF writer (one Flate-compressed RGB image per page, correct xref). Rasterizing is BORROWED from the host via an injected backend, so everything either side of it is pure and testable without a browser. Found and fixed the grand-staff brace being drawn above the music instead of beside it | [`phase-52`](./phase-52-export.md) |
 
-**Public API today:** 231 exports from `dist/notation-engine.js`.
+**Public API today:** 242 exports from `dist/notation-engine.js`.
 
 ---
 
-## B. NOT DONE — Phases 52–54
+## B. NOT DONE — Phases 53–54
 
 Nothing below exists in `src/` yet. Each line links to the `PLAN.md` section
-that specifies it. **Everything numbered 1–51 is done** (see §A), so Stages 0-9 are
-complete and Stage 10 is half built; these three are what remains of it.
+that specifies it. **Everything numbered 1–52 is done** (see §A), so Stages 0-9 are
+complete and only two phases of Stage 10 remain.
 
 ### Stage 10 — Polish and delivery
 | # | Phase | Spec |
 |---|---|---|
-| **52** | Export: SVG, PNG, PDF | §3, §16.2 |
 | **53** | Performance pass against the §18.1 budgets | §18.1 |
 | **54** | Public API surface + generated reference docs | §22 |
 
