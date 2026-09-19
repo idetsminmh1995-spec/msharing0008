@@ -68,7 +68,16 @@
   .upload-slot.active{border-color:var(--red);background:var(--pink);color:var(--red);}
   .upload-slot .icon{margin-bottom:6px;}
   .upload-slot .label{font-size:11px;font-weight:700;}
-  .confirm-msg{margin-top:10px;background:var(--pink);border-radius:8px;padding:9px 12px;font-size:11px;color:var(--red-dark);font-weight:600;}
+  /* Hidden until JS sets a real outcome -- no more static "Loaded X"
+     placeholder that made every fresh page load (and every refresh)
+     look like a file was already uploaded when none had been. Success
+     gets a green dot + green text (.ok); an actual failure keeps the
+     original red-on-pink look (.err) -- the two are no longer the same
+     style, so a successful upload doesn't read as an error. */
+  .confirm-msg{margin-top:10px;border-radius:8px;padding:9px 12px;font-size:11px;font-weight:600;display:none;align-items:center;gap:7px;}
+  .confirm-msg.ok{display:flex;background:#E9F7EE;color:#1C7C3C;}
+  .confirm-msg.ok::before{content:'';width:8px;height:8px;border-radius:50%;background:#2FAE5C;flex-shrink:0;}
+  .confirm-msg.err{display:flex;background:var(--pink);color:var(--red-dark);}
 
   .radio-row{display:flex;gap:16px;margin-bottom:14px;font-size:13px;}
   .radio-row label{display:flex;align-items:center;gap:6px;font-weight:400;color:var(--text);}
@@ -163,7 +172,7 @@
           <div class="label">Audio</div>
         </label>
       </div>
-      <div class="confirm-msg">✓ Loaded "Drum_Lesson_5.musicxml" — 492 symbols rendered.</div>
+      <div class="confirm-msg"></div>
     </div>
 
     <div class="card">
@@ -178,7 +187,7 @@
       <div class="card-head"><span class="card-num">3</span>Drum Kit</div>
       <label for="kit" style="position:absolute;left:-9999px;">Drum Kit</label>
       <select id="kit" class="drum-input"><option>Loading drum kits…</option></select>
-      <div class="confirm-msg">✓ Kit loaded — background, kick, snare, hi-hat mapped.</div>
+      <div class="confirm-msg ok">✓ Kit loaded — background, kick, snare, hi-hat mapped.</div>
     </div>
 
     <div class="card">
@@ -236,7 +245,7 @@
         </div>
       </div>
       <div class="video-notation" id="notationContainer">
-        <span style="font-size:12px;color:var(--muted);">Loading notation…</span>
+        <span style="font-size:12px;color:var(--muted);">Upload a MusicXML file to preview notation.</span>
       </div>
       <div class="video-mid">
         <div class="drum-circle">
@@ -290,13 +299,20 @@
         if (drumCircle) drumCircle.style.display = 'none';
         if (kitConfirm) {
           kitConfirm.textContent = `✓ Loaded "${drumSetName}" background + ${manifest.files.length} note images from R2.`;
+          kitConfirm.className = 'confirm-msg ok';
         }
       } else {
-        if (kitConfirm) kitConfirm.textContent = `"${drumSetName}" has no background image for ${ASPECT} yet.`;
+        if (kitConfirm) {
+          kitConfirm.textContent = `"${drumSetName}" has no background image for ${ASPECT} yet.`;
+          kitConfirm.className = 'confirm-msg err';
+        }
       }
     } catch (err) {
       console.error('Drum kit preview failed to load:', err);
-      if (kitConfirm) kitConfirm.textContent = `Could not load "${drumSetName}" from the asset server.`;
+      if (kitConfirm) {
+        kitConfirm.textContent = `Could not load "${drumSetName}" from the asset server.`;
+        kitConfirm.className = 'confirm-msg err';
+      }
     }
   }
 
@@ -336,10 +352,11 @@
 
   // --- Real Notation Engine wiring -----------------------------------
   // Renders actual notation via the same notation-engine.js this repo
-  // builds and tests (notation-engine/), not a static mockup. Loads a
-  // real demo file (the user's own Drum_Lesson_5.musicxml) on page
-  // load, and re-renders live if the person picks their own MusicXML
-  // file via the Upload File card above.
+  // builds and tests (notation-engine/), not a static mockup. Nothing
+  // loads until the person actually picks a file via the Upload File
+  // card above -- there used to be a demo file auto-loaded on every
+  // page open, which made a plain refresh look like an uploaded file
+  // was still sitting there when nothing had actually been uploaded.
   const notationContainer = document.getElementById('notationContainer');
   const statBpm = document.getElementById('statBpm');
   const statTime = document.getElementById('statTime');
@@ -349,6 +366,12 @@
     .getElementById('upload-musicxml')
     .closest('.card')
     .querySelector('.confirm-msg');
+
+  function setUploadConfirm(text, ok) {
+    if (!uploadConfirm) return;
+    uploadConfirm.textContent = text;
+    uploadConfirm.className = `confirm-msg ${ok ? 'ok' : 'err'}`;
+  }
 
   function renderNotation(xmlText, fileLabel) {
     if (typeof NotationEngine === 'undefined') {
@@ -363,7 +386,7 @@
     } catch (err) {
       console.error('Notation Engine failed on this file:', err);
       notationContainer.textContent = 'Could not parse this file -- see console for details.';
-      if (uploadConfirm) uploadConfirm.textContent = `Could not parse "${fileLabel}".`;
+      setUploadConfirm(`Could not parse "${fileLabel}".`, false);
       return;
     }
 
@@ -398,27 +421,14 @@
     }
     statMeasures.textContent = String(measureCount);
 
-    if (uploadConfirm) {
-      const errorCount = rendered.diagnostics.filter((d) => d.severity === 'error').length;
-      uploadConfirm.textContent =
-        errorCount === 0
-          ? `\u2713 Loaded "${fileLabel}" -- ${measureCount} measures rendered by the real Notation Engine.`
-          : `\u2713 Loaded "${fileLabel}" -- ${measureCount} measures, ${errorCount} error(s) (see console).`;
-      if (rendered.diagnostics.length > 0) console.log('Notation Engine diagnostics:', rendered.diagnostics);
-    }
-  }
-
-  function loadDemoNotation() {
-    fetch('../../assets/Drum_Lesson_5.musicxml')
-      .then((res) => {
-        if (!res.ok) throw new Error(`demo file request failed (${res.status})`);
-        return res.text();
-      })
-      .then((xmlText) => renderNotation(xmlText, 'Drum_Lesson_5.musicxml'))
-      .catch((err) => {
-        console.error('Demo notation failed to load:', err);
-        notationContainer.textContent = 'Could not load the demo score.';
-      });
+    const errorCount = rendered.diagnostics.filter((d) => d.severity === 'error').length;
+    setUploadConfirm(
+      errorCount === 0
+        ? `\u2713 "${fileLabel}" \u2014 ${measureCount} measures loaded.`
+        : `"${fileLabel}" \u2014 ${measureCount} measures, ${errorCount} error(s) (see console).`,
+      errorCount === 0,
+    );
+    if (rendered.diagnostics.length > 0) console.log('Notation Engine diagnostics:', rendered.diagnostics);
   }
 
   document.getElementById('upload-musicxml').addEventListener('change', (e) => {
@@ -438,24 +448,20 @@
         const unzipped = NotationEngine.unzipMxl(bytes, window.DOMParser);
         if (unzipped.xmlText === undefined) {
           const reason = unzipped.diagnostics[0]?.message ?? 'Unknown error while unzipping.';
-          if (uploadConfirm) uploadConfirm.textContent = `Could not read "${file.name}": ${reason}`;
+          setUploadConfirm(`Could not read "${file.name}": ${reason}`, false);
           console.error('unzipMxl failed:', unzipped.diagnostics);
           return;
         }
         renderNotation(unzipped.xmlText, file.name);
       };
-      reader.onerror = () => {
-        if (uploadConfirm) uploadConfirm.textContent = `Could not read "${file.name}".`;
-      };
+      reader.onerror = () => setUploadConfirm(`Could not read "${file.name}".`, false);
       reader.readAsArrayBuffer(file);
       return;
     }
 
     const reader = new FileReader();
     reader.onload = () => renderNotation(reader.result, file.name);
-    reader.onerror = () => {
-      if (uploadConfirm) uploadConfirm.textContent = `Could not read "${file.name}".`;
-    };
+    reader.onerror = () => setUploadConfirm(`Could not read "${file.name}".`, false);
     reader.readAsText(file);
   });
 
@@ -490,26 +496,24 @@
         const result = NotationEngine.parseMidiFile(bytes);
         if (result.midiFile === undefined) {
           const reason = result.diagnostics[0]?.message ?? 'Unknown error.';
-          if (uploadConfirm) uploadConfirm.textContent = `Could not read "${file.name}": ${reason}`;
+          setUploadConfirm(`Could not read "${file.name}": ${reason}`, false);
           return;
         }
         const noteCount = result.midiFile.tracks.reduce((sum, t) => sum + t.notes.length, 0);
         const firstTempo = result.midiFile.tempoEvents[0];
         const bpm = firstTempo ? Math.round(60000000 / firstTempo.microsecondsPerQuarter) : undefined;
-        if (uploadConfirm) {
-          uploadConfirm.textContent =
-            `Parsed "${file.name}" -- ${result.midiFile.tracks.length} track(s), ${noteCount} notes` +
+        setUploadConfirm(
+          `Parsed "${file.name}" -- ${result.midiFile.tracks.length} track(s), ${noteCount} notes` +
             (bpm ? `, ${bpm} BPM` : '') +
-            '. Notation rendering from MIDI isn\u2019t wired into this preview yet -- upload a MusicXML/MXL file to see notation.';
-        }
+            '. Notation rendering from MIDI isn\u2019t wired into this preview yet -- upload a MusicXML/MXL file to see notation.',
+          true,
+        );
       } catch (err) {
         console.error('MIDI parse failed:', err);
-        if (uploadConfirm) uploadConfirm.textContent = `Could not read "${file.name}" as a MIDI file.`;
+        setUploadConfirm(`Could not read "${file.name}" as a MIDI file.`, false);
       }
     };
-    reader.onerror = () => {
-      if (uploadConfirm) uploadConfirm.textContent = `Could not read "${file.name}".`;
-    };
+    reader.onerror = () => setUploadConfirm(`Could not read "${file.name}".`, false);
     reader.readAsArrayBuffer(file);
   });
 
@@ -517,12 +521,11 @@
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     setActiveSlot('upload-audio');
-    if (uploadConfirm) {
-      uploadConfirm.textContent = `"${file.name}" selected -- audio-to-notation isn\u2019t supported yet. Upload a MusicXML/MXL file to see notation.`;
-    }
+    setUploadConfirm(
+      `"${file.name}" selected -- audio-to-notation isn\u2019t supported yet. Upload a MusicXML/MXL file to see notation.`,
+      false,
+    );
   });
-
-  loadDemoNotation();
 </script>
 </body>
 </html>
