@@ -59,6 +59,7 @@ var NotationEngine = (() => {
     beamDirection: () => beamDirection,
     beamYAtX: () => beamYAtX,
     beamedEventIndices: () => beamedEventIndices,
+    buildEventStream: () => buildEventStream,
     buildMeasureMap: () => buildMeasureMap,
     buildTempoMap: () => buildTempoMap,
     cancellationNaturals: () => cancellationNaturals,
@@ -80,6 +81,7 @@ var NotationEngine = (() => {
     computeHyphenX: () => computeHyphenX,
     computeLedgerLines: () => computeLedgerLines,
     computePageLayout: () => computePageLayout,
+    computePlaybackData: () => computePlaybackData,
     computeProportionalPositions: () => computeProportionalPositions,
     computePxPerStaffSpace: () => computePxPerStaffSpace,
     computeReferenceDuration: () => computeReferenceDuration,
@@ -116,6 +118,7 @@ var NotationEngine = (() => {
     fretDigitGlyphNames: () => fretDigitGlyphNames,
     getEngravingDefault: () => getEngravingDefault,
     getEngravingDefaults: () => getEngravingDefaults,
+    getEventStream: () => getEventStream,
     getFontInfo: () => getFontInfo,
     getGlyph: () => getGlyph,
     getKeySignaturePositions: () => getKeySignaturePositions,
@@ -163,6 +166,7 @@ var NotationEngine = (() => {
     pitchedPitch: () => pitchedPitch,
     placeElement: () => placeElement,
     positionToTick: () => positionToTick,
+    positionToX: () => positionToX,
     readVariableLengthQuantity: () => readVariableLengthQuantity,
     rehearsalMarkSide: () => rehearsalMarkSide,
     renderAccidental: () => renderAccidental,
@@ -194,6 +198,7 @@ var NotationEngine = (() => {
     resizePureScale: () => resizePureScale,
     resolveConfig: () => resolveConfig,
     resolveNoteheadCollision: () => resolveNoteheadCollision,
+    resolvePosition: () => resolvePosition,
     resolveStemDirection: () => resolveStemDirection,
     rest: () => rest,
     restGlyphName: () => restGlyphName,
@@ -233,6 +238,7 @@ var NotationEngine = (() => {
     voice: () => voice,
     voiceForcedDirection: () => voiceForcedDirection,
     voiceRestOffset: () => voiceRestOffset,
+    xToPosition: () => xToPosition,
     xmlDivisionsToTicks: () => xmlDivisionsToTicks
   });
 
@@ -62358,6 +62364,157 @@ ${denominator}`;
     return merged;
   }
 
+  // src/playback/event-stream.ts
+  function noteIdsForEvent(partId, measureNumber, voiceId, eventIndex, event) {
+    const base = `${partId}#m${measureNumber}#v${voiceId}#e${eventIndex}`;
+    if (event.kind === "note") return [base];
+    if (event.kind === "chord") return event.notes.map((_, i2) => `${base}#n${i2}`);
+    return [];
+  }
+  function buildEventStream(score2, globalTickOffsetByMeasure, tempoMap) {
+    const events = [];
+    for (const part2 of score2.parts) {
+      for (const measure2 of part2.measures) {
+        const offset = globalTickOffsetByMeasure.get(measure2.number) ?? 0;
+        for (const voice2 of measure2.voices) {
+          let tickInMeasure = 0;
+          voice2.events.forEach((event, index) => {
+            const noteIds = noteIdsForEvent(part2.id, measure2.number, voice2.id, index, event);
+            if (noteIds.length > 0) {
+              const tick = offset + tickInMeasure;
+              events.push({
+                tick,
+                seconds: tickToSeconds(tempoMap, tick),
+                noteIds,
+                measureNumber: measure2.number
+              });
+            }
+            tickInMeasure += event.duration.ticks;
+          });
+        }
+      }
+    }
+    events.sort((a, b) => a.tick - b.tick);
+    return events;
+  }
+  function getEventStream(playback) {
+    return playback.events;
+  }
+
+  // src/playback/position.ts
+  function measureAtTick(playback, tick) {
+    const order = playback.measureNumbersInOrder;
+    if (order.length === 0) return void 0;
+    let low = 0;
+    let high = order.length - 1;
+    while (low < high) {
+      const mid = Math.ceil((low + high) / 2);
+      const midMeasure = order[mid];
+      const midOffset = midMeasure !== void 0 ? playback.globalTickOffsetByMeasure.get(midMeasure) ?? 0 : 0;
+      if (midOffset <= tick) low = mid;
+      else high = mid - 1;
+    }
+    return order[low];
+  }
+  function floorEntry(positionsByTick, tickInMeasure) {
+    let best;
+    for (const t of positionsByTick.keys()) {
+      if (t <= tickInMeasure && (best === void 0 || t > best)) best = t;
+    }
+    return best;
+  }
+  function tickToMusicalPosition(playback, tick) {
+    const measureNumber = measureAtTick(playback, tick);
+    if (measureNumber === void 0) return { measureNumber: 1, beat: 1, tickInMeasure: 0 };
+    const offset = playback.globalTickOffsetByMeasure.get(measureNumber) ?? 0;
+    const tickInMeasure = tick - offset;
+    const denominator = playback.timeSignatureByMeasure.get(measureNumber)?.denominator ?? 4;
+    const beatLenTicks = 4 / denominator * TICKS_PER_QUARTER;
+    const beat = 1 + tickInMeasure / beatLenTicks;
+    return { measureNumber, beat, tickInMeasure };
+  }
+  function resolvePosition(playback, tick) {
+    return {
+      tick,
+      seconds: tickToSeconds(playback.tempoMap, tick),
+      position: tickToMusicalPosition(playback, tick)
+    };
+  }
+  function positionToX(playback, tick) {
+    const measureNumber = measureAtTick(playback, tick);
+    if (measureNumber === void 0) return { x: 0, systemIndex: 0, pageIndex: 0 };
+    const offset = playback.globalTickOffsetByMeasure.get(measureNumber) ?? 0;
+    const tickInMeasure = Math.max(0, tick - offset);
+    const layout = playback.measureLayoutsByNumber.get(measureNumber);
+    const placement = playback.placementByMeasureNumber.get(measureNumber);
+    const floorTick = layout !== void 0 ? floorEntry(layout.positionsByTick, tickInMeasure) : void 0;
+    const withinMeasureX = floorTick !== void 0 ? layout?.positionsByTick.get(floorTick) ?? 0 : 0;
+    return {
+      x: (placement?.x ?? 0) + playback.measureHeaderAllowance + withinMeasureX,
+      systemIndex: placement?.systemIndex ?? 0,
+      pageIndex: placement?.pageIndex ?? 0
+    };
+  }
+  function xToPosition(playback, x2, systemIndex) {
+    const candidates = [...playback.placementByMeasureNumber.entries()].filter(([, p]) => p.systemIndex === systemIndex).sort((a, b) => a[1].x - b[1].x);
+    if (candidates.length === 0) return 0;
+    let chosen = candidates[0];
+    for (const candidate of candidates) {
+      if (candidate[1].x <= x2) chosen = candidate;
+      else break;
+    }
+    const measureNumber = chosen?.[0];
+    const placement = chosen?.[1];
+    if (measureNumber === void 0 || placement === void 0) return 0;
+    const localX = x2 - placement.x - playback.measureHeaderAllowance;
+    const layout = playback.measureLayoutsByNumber.get(measureNumber);
+    let bestTick = 0;
+    let bestX;
+    if (layout !== void 0) {
+      for (const [tick, tickX] of layout.positionsByTick) {
+        if (tickX <= localX && (bestX === void 0 || tickX > bestX)) {
+          bestX = tickX;
+          bestTick = tick;
+        }
+      }
+    }
+    const offset = playback.globalTickOffsetByMeasure.get(measureNumber) ?? 0;
+    return offset + bestTick;
+  }
+
+  // src/playback/compute.ts
+  var DEFAULT_MEASURE_TICKS = TICKS_PER_QUARTER * 4;
+  var DEFAULT_MICROSECONDS_PER_QUARTER2 = 5e5;
+  function microsecondsPerQuarterFor(mark) {
+    const beatUnitTicks = ticksWithDots(baseTicksForType(mark.beatUnit), mark.beatUnitDots);
+    const quarterNotesPerMinute = mark.perMinute * (beatUnitTicks / TICKS_PER_QUARTER);
+    return quarterNotesPerMinute > 0 ? 6e7 / quarterNotesPerMinute : DEFAULT_MICROSECONDS_PER_QUARTER2;
+  }
+  function computePlaybackData(input) {
+    const globalTickOffsetByMeasure = /* @__PURE__ */ new Map();
+    let running = 0;
+    for (const measureNumber of input.measureNumbersInOrder) {
+      globalTickOffsetByMeasure.set(measureNumber, running);
+      running += input.measureTicksByNumber.get(measureNumber) ?? DEFAULT_MEASURE_TICKS;
+    }
+    const rawTempoEvents = input.tempoMarks.map((mark) => ({
+      tick: (globalTickOffsetByMeasure.get(mark.measureNumber) ?? 0) + mark.tick,
+      microsecondsPerQuarter: microsecondsPerQuarterFor(mark)
+    }));
+    const { tempoMap } = buildTempoMap(rawTempoEvents);
+    const events = buildEventStream(input.score, globalTickOffsetByMeasure, tempoMap);
+    return {
+      measureNumbersInOrder: input.measureNumbersInOrder,
+      globalTickOffsetByMeasure,
+      timeSignatureByMeasure: input.timeSignatureByMeasure,
+      measureLayoutsByNumber: input.measureLayoutsByNumber,
+      placementByMeasureNumber: input.placementByMeasureNumber,
+      measureHeaderAllowance: input.measureHeaderAllowance,
+      tempoMap,
+      events
+    };
+  }
+
   // src/render-from-musicxml.ts
   var STAFF_LINES = 5;
   var STAFF_BOTTOM_Y = 8;
@@ -63164,7 +63321,20 @@ ${denominator}`;
         },
         []
       );
-      return { svg: doc, diagnostics };
+      return {
+        svg: doc,
+        diagnostics,
+        playback: computePlaybackData({
+          score: score2,
+          measureNumbersInOrder: [],
+          measureTicksByNumber: /* @__PURE__ */ new Map(),
+          timeSignatureByMeasure: /* @__PURE__ */ new Map(),
+          tempoMarks: [],
+          measureLayoutsByNumber: /* @__PURE__ */ new Map(),
+          placementByMeasureNumber: /* @__PURE__ */ new Map(),
+          measureHeaderAllowance: MEASURE_HEADER_ALLOWANCE
+        })
+      };
     }
     const measureNumbersInOrder = [];
     const measureByPartAndNumber = /* @__PURE__ */ new Map();
@@ -63189,6 +63359,7 @@ ${denominator}`;
     }
     const measureLayoutsByNumber = /* @__PURE__ */ new Map();
     const measureTicksByNumber = /* @__PURE__ */ new Map();
+    const timeSignatureByMeasure = /* @__PURE__ */ new Map();
     for (const measureNumber of measureNumbersInOrder) {
       const combinedVoices = [];
       let measureTicks;
@@ -63199,7 +63370,13 @@ ${denominator}`;
         const attrs = attributesByPartAndMeasure.get(`${part2.id}:${measureNumber}`);
         if (attrs === void 0) continue;
         const ticks = attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
-        measureTicks = measureTicks === void 0 ? ticks : Math.max(measureTicks, ticks);
+        if (measureTicks === void 0 || ticks > measureTicks) {
+          measureTicks = ticks;
+          timeSignatureByMeasure.set(measureNumber, {
+            numerator: attrs.timeNumerator,
+            denominator: attrs.timeDenominator
+          });
+        }
       }
       const layout = computeMeasureLayout(
         measure(measureNumber, combinedVoices),
@@ -63287,6 +63464,7 @@ ${denominator}`;
               width: m.width,
               systemY,
               systemIndex,
+              pageIndex,
               isSystemStart: i2 === 0
             });
           });
@@ -63307,6 +63485,7 @@ ${denominator}`;
           width: m.width,
           systemY: 0,
           systemIndex: 0,
+          pageIndex: 0,
           isSystemStart: i2 === 0
         });
       });
@@ -63812,7 +63991,17 @@ ${denominator}`;
       },
       svgParts
     );
-    return { svg, diagnostics };
+    const playback = computePlaybackData({
+      score: score2,
+      measureNumbersInOrder,
+      measureTicksByNumber,
+      timeSignatureByMeasure,
+      tempoMarks,
+      measureLayoutsByNumber,
+      placementByMeasureNumber,
+      measureHeaderAllowance: MEASURE_HEADER_ALLOWANCE
+    });
+    return { svg, diagnostics, playback };
   }
 
   // src/index.ts

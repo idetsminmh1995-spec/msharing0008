@@ -6,10 +6,11 @@ A+B+C corrective work** (making notes actually visible in the web app).
 Numbering is **`PLAN.md` §22's phase numbering** — deliberately not a second
 numbering system. Say a number from §B below and that's the phase to build.
 
-**Last audited:** against the code in `src/` and the **653-test** suite,
-after Integration Pass L (Phase 35's Tier 2/3 completion, Integrations H-L,
-and the three defects those passes uncovered). Stages 0-8 are complete and
-every phase numbered 1-47 is now built AND wired.
+**Last audited:** against the code in `src/` and the **670-test** suite,
+after Phase 48 (§17.1's playback position API + event stream). Stages
+0-8 are complete and every phase numbered 1-47 is built AND wired;
+Stage 9 (Phases 48-49) is now half done -- Phase 48 built, Phase 49
+(cursor) next.
 
 ---
 
@@ -81,21 +82,25 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | — | **Integration K** (not a numbered phase) | §9.14 multi-voice notehead-collision offsetting wired -- completes Phase 25's last unwired piece | [`integration-k`](./integration-k-voice-collision.md) |
 | — | **Integration M** (not a numbered phase) | The three defects a real drum chart exposed: the deployed site served no music font (every glyph a box), every chord broke its beam (62 stray flags on a 32-measure chart), and the tempo mark was drawn through the notes. Verified in a real headless Chromium, not only in markup | [`integration-m`](./integration-m-drum-chart-defects.md) |
 | — | **Integration L** (not a numbered phase) | §16.2 page mode wired (completes Phase 46, and Stage 8) + **fixed parts laying themselves out independently**, so a score finally shares ONE horizontal timeline; also de-quadratic-ed the per-measure lookups | [`integration-l`](./integration-l-page-layout-and-score-wide-spacing.md) |
+| — | **Integration N** (not a numbered phase) | Corrected the GM drum table's snare (1 full staff-space) and hi-hat (half a staff-space) default positions, verified against a real drum-lesson file's own 100%-consistent encoding | [`integration-n`](./integration-n-drum-position-corrections.md) |
+| — | **Integration O** (not a numbered phase) | Closed §9.8's deferred stem-shortening gap -- a forced direction pointing away from the middle for a note outside the staff now shortens toward the 2.5sp floor instead of staying at a fixed 3.5sp | [`integration-o`](./integration-o-stem-shortening.md) |
+| — | **Integration P** (not a numbered phase) | Beam line endpoints were computed from each note's raw x instead of its actual stem-attach x (the notehead glyph's own anchor offset) -- a beamed group's last stem fell just short of the beam, appearing disconnected | [`integration-p`](./integration-p-beam-endpoint-anchor.md) |
+| — | **Integration Q** (not a numbered phase) | A `<barline location="left">` was drawn at its measure's right edge instead of its left -- a whole measure late; real files commonly write a repeat-begin this way | [`integration-q`](./integration-q-barline-location.md) |
+| 48 | Playback position API + event stream | Full §17.1 (`positionToX`/`xToPosition`/`getEventStream`/`resolvePosition`), wired into `renderFromMusicXml`'s own result from the exact layout that produced its SVG; deletes the superseded `src/cursor/` placeholder | [`phase-48`](./phase-48-playback-position-api.md) |
 
-**Public API today:** 213 exports from `dist/notation-engine.js`.
+**Public API today:** 219 exports from `dist/notation-engine.js`.
 
 ---
 
-## B. NOT DONE — Phases 48–54
+## B. NOT DONE — Phases 49–54
 
 Nothing below exists in `src/` yet. Each line links to the `PLAN.md` section
-that specifies it. **Everything numbered 1–47 is done** (see §A); these seven
-are Stages 9 and 10.
+that specifies it. **Everything numbered 1–48 is done** (see §A); these six
+are the rest of Stage 9 and all of Stage 10.
 
 ### Stage 9 — Playback surface
 | # | Phase | Spec |
 |---|---|---|
-| **48** | Position API + event stream | §17.1 |
 | **49** | Cursor, both sync modes | §17.2 |
 
 ### Stage 10 — Polish and delivery
@@ -227,9 +232,11 @@ new instrument branching or unordered-iteration-affecting-output crept in.
   [`phase-09-staff-lines.md`](./phase-09-staff-lines.md). Safe to delete once
   the real engine renders something the app can use.
 
-- **`src/cursor/`, `src/theme/`, `src/plugins/`** — empty Phase-1
-  placeholders whose concepts v2 moved or deferred. Each README says where
-  the concept went. No code belongs in them.
+- **`src/theme/`, `src/plugins/`** — empty Phase-1 placeholders whose
+  concepts v2 moved or deferred. Each README says where the concept
+  went. No code belongs in them. (`src/cursor/`, the third such
+  placeholder, was deleted by Phase 48 once its real home, `src/playback/`,
+  existed — exactly what its own README said to do.)
 
 ---
 

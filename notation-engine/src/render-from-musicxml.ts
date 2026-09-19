@@ -78,6 +78,7 @@ import {
 } from './geometry/metronome.js';
 import { renderMetronomeMark, metronomeMarkWidth } from './render/metronome.js';
 import { TICKS_PER_QUARTER } from './core/duration-math.js';
+import { computePlaybackData, type PlaybackData } from './playback/index.js';
 import { renderTabNumber } from './render/index.js';
 import { computeBraceShape, needsBrace, needsContinuousBarline } from './geometry/index.js';
 import { renderBrace } from './render/index.js';
@@ -426,6 +427,8 @@ export interface RenderFromMusicXmlOptions extends ParseMusicXmlOptions {
 export interface RenderFromMusicXmlResult {
   readonly svg: string;
   readonly diagnostics: readonly Diagnostic[];
+  /** Phase 48/PLAN.md §17.1: the position API and event stream for this exact render -- pass this into `positionToX`/`xToPosition`/`resolvePosition`/`getEventStream` (all pure functions of it). */
+  readonly playback: PlaybackData;
 }
 
 interface ClefMapping {
@@ -1544,7 +1547,20 @@ export function renderFromMusicXml(
       },
       [],
     );
-    return { svg: doc, diagnostics };
+    return {
+      svg: doc,
+      diagnostics,
+      playback: computePlaybackData({
+        score,
+        measureNumbersInOrder: [],
+        measureTicksByNumber: new Map(),
+        timeSignatureByMeasure: new Map(),
+        tempoMarks: [],
+        measureLayoutsByNumber: new Map(),
+        placementByMeasureNumber: new Map(),
+        measureHeaderAllowance: MEASURE_HEADER_ALLOWANCE,
+      }),
+    };
   }
 
   /**
@@ -1595,6 +1611,11 @@ export function renderFromMusicXml(
     { readonly width: number; readonly positionsByTick: ReadonlyMap<number, number> }
   >();
   const measureTicksByNumber = new Map<number, number>();
+  /** Phase 48/§17.1: each measure's own time signature, from the SAME part whose ticks won the "longest wins" comparison just below -- what `computePlaybackData` needs for §17.2's beat-position math. */
+  const timeSignatureByMeasure = new Map<
+    number,
+    { readonly numerator: number; readonly denominator: number }
+  >();
   for (const measureNumber of measureNumbersInOrder) {
     const combinedVoices = [];
     let measureTicks: number | undefined;
@@ -1607,7 +1628,13 @@ export function renderFromMusicXml(
       const ticks = attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
       // Parts SHOULD agree on the meter; if a file disagrees, the longest
       // wins so no part's last note falls outside the measure.
-      measureTicks = measureTicks === undefined ? ticks : Math.max(measureTicks, ticks);
+      if (measureTicks === undefined || ticks > measureTicks) {
+        measureTicks = ticks;
+        timeSignatureByMeasure.set(measureNumber, {
+          numerator: attrs.timeNumerator,
+          denominator: attrs.timeDenominator,
+        });
+      }
     }
     const layout = computeMeasureLayout(
       makeMeasure(measureNumber, combinedVoices),
@@ -1684,12 +1711,14 @@ export function renderFromMusicXml(
       (pos) => pos.partIndex === partIndex && pos.staffIndexInPart === staffIndexInPart,
     )?.y ?? 0;
 
-  /** Where one measure sits: its x/width, which system it belongs to, and that system's own vertical origin. */
+  /** Where one measure sits: its x/width, which system and page it belongs to, and that system's own vertical origin. */
   interface MeasurePlacement {
     readonly x: number;
     readonly width: number;
     readonly systemY: number;
     readonly systemIndex: number;
+    /** Phase 48/§17.1: always 0 in scroll mode (one page); the page-mode branch below sets the real value -- `positionToX` needs it to tell a host which page a tick's cursor lands on. */
+    readonly pageIndex: number;
     readonly isSystemStart: boolean;
   }
   const placementByMeasureNumber = new Map<number, MeasurePlacement>();
@@ -1743,6 +1772,7 @@ export function renderFromMusicXml(
             width: m.width,
             systemY,
             systemIndex,
+            pageIndex,
             isSystemStart: i === 0,
           });
         });
@@ -1763,6 +1793,7 @@ export function renderFromMusicXml(
         width: m.width,
         systemY: 0,
         systemIndex: 0,
+        pageIndex: 0,
         isSystemStart: i === 0,
       });
     });
@@ -2540,5 +2571,16 @@ export function renderFromMusicXml(
     svgParts,
   );
 
-  return { svg, diagnostics };
+  const playback = computePlaybackData({
+    score,
+    measureNumbersInOrder,
+    measureTicksByNumber,
+    timeSignatureByMeasure,
+    tempoMarks,
+    measureLayoutsByNumber,
+    placementByMeasureNumber,
+    measureHeaderAllowance: MEASURE_HEADER_ALLOWANCE,
+  });
+
+  return { svg, diagnostics, playback };
 }
