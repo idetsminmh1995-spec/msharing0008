@@ -165,8 +165,10 @@ voices per staff, grand staff / multi-part scores, lyrics, chord symbols,
 grace notes, ledger lines, percussion/drum notation, measure numbering.
 
 **Out of scope for now:** cross-staff beaming, microtonal accidentals,
-figured bass, tablature *rendering* (the data model tolerates it; the
-renderer does not implement fret numbers), mensural/early notation, jianpu.
+figured bass, mensural/early notation, jianpu. (Tablature *rendering* was
+on this list and is no longer — Integration C draws fret numbers on their
+own string lines. Lyrics and chord symbols are parsed and have geometry
+modules, but have no text renderer yet.)
 
 ---
 
@@ -301,12 +303,14 @@ notation-engine/
     parser/       [BUILT]  musicxml/ (incl. .mxl, timewise) and midi/
     timing/       [BUILT]  tempo map, tick<->seconds, MIDI/XML alignment
     layout/       [BUILT]  spacing, skyline, scroll, page, resize, system
-    playback/     [TODO]   position API + event stream (§17) -- Phase 48/49
+    playback/     [BUILT]  position API + event stream (§17) -- Phases 48/49
+    debug/        [BUILT]  log-level filter + bounding-box/skyline measurement -- Phase 51
     export/       [BUILT]  SVG/PNG/PDF output -- Phase 52
     index.ts      [BUILT]  public API barrel
   test/
     unit/         [BUILT]  per-module unit tests (node --test)
-    visual/       [BUILT]  snapshot regression tests + __snapshots__/
+    visual/       [BUILT]  snapshot regression + a real-browser check (Phase 54/§F4)
+    perf/         [BUILT]  the §18.1 budgets, as assertions -- Phase 53
     fixtures/     [BUILT]  real MusicXML/.mxl files, incl. the §10.8 corpus
     helpers/      [BUILT]  loadEngine(), matchSnapshot()
 ```
@@ -1227,9 +1231,11 @@ vertical stacking places each part's staff at a distinct, non-overlapping
 Y.
 
 **Known limitations.** `<part-group>` bracket grouping across different
-instruments is not parsed (v2, §10.4). No skyline-based dynamic spacing
-between staves yet (§15 is itself still `[TODO]`) — vertical gaps between
-stacked staves are a fixed default, not content-aware.
+instruments is not parsed (§10.4), so several *different* parts are
+stacked without a bracket. Skyline-based staff distance is no longer a
+gap: §15 is built and Integration F wired it, so the gap between a grand
+staff's two staves is content-aware (Phase 50 also corrected the frame it
+was applied in — see Doc/phase-50-theming-api.md §2).
 
 ---
 
@@ -2153,13 +2159,21 @@ Three layers, all runnable with `npm run verify` (typecheck → lint → format 
 build → test) `[BUILT]`:
 
 1. **Unit tests** (`test/unit/`) — pure functions, exact expected values.
-   `[BUILT: 89 tests across 12 suites]`
+   `[BUILT: 796 tests across 151 suites, all suites together]`
 2. **Snapshot/visual regression** (`test/visual/`) — render a known score,
    compare the SVG string to a committed golden file. `UPDATE_SNAPSHOTS=1`
    accepts an intentional change. **The mechanism itself was verified** by
    corrupting a snapshot and confirming the test fails. `[BUILT]`
-3. **Integration/corpus tests** `[TODO]` — the multi-program MusicXML corpus
-   (§10.8) and MIDI+XML pairs, asserting the whole pipeline.
+3. **Integration/corpus tests** `[BUILT]` — `test/unit/cross-software-corpus.test.js`
+   over `test/fixtures/cross-software/`: the §10.8 disagreements between
+   programs (tie vs tied, mid-measure `<attributes>`, per-part and
+   mid-piece `<divisions>`, explicit beam hints, percussion without
+   display-step, `<print>` breaks), each asserted through the whole
+   pipeline. MIDI+XML alignment pairs remain the one untested combination.
+4. **Real-browser checks** `[BUILT — Phase 54]` — `test/visual/browser.test.js`
+   screenshots renders in headless Chromium, because a markup-only suite
+   structurally cannot catch "the glyphs are correct but nothing can draw
+   them" (which is exactly what happened in Integration M).
 
 Two environment gotchas already discovered, recorded so they are not
 rediscovered: `node --test <dir>` with explicit path arguments fails on Node
@@ -2229,11 +2243,15 @@ API can be designed *then*, informed by what that extension actually needs.
 
 ## 19. Known Limitations (accepted, documented, not hidden)
 
-1. **Tenor and soprano clef key signatures are not implemented** — they
-   throw a named error. Tenor's sharps follow a genuinely different shape
-   that could not be verified with confidence; a silently wrong key signature
-   is worse than a refusal. Closing this needs an explicit line-by-line
-   source for tenor, verified the way treble/bass/alto were.
+1. **Soprano clef key signatures are not implemented** — they throw a
+   named error, which `renderFromMusicXml` turns into a warning and a
+   render complete except for that one signature. (**Tenor was closed by
+   Phase 54**: its sharps ascend from F3 and alternate perfectly, derived
+   by a construction that reproduces all six already-verified
+   treble/bass/alto rows exactly.) Soprano stays open because no source
+   consulted describes its shape and the construction is genuinely
+   ambiguous for it — a silently wrong key signature is worse than a
+   refusal. See Doc/phase-54-public-api.md §3.
 2. **Cross-staff beaming is not supported** (piano passages where a beam
    spans both staves). Deferred as rare and expensive.
 3. **Microtonal accidentals** are not rendered, though SMuFL has the glyphs.
@@ -2241,8 +2259,10 @@ API can be designed *then*, informed by what that extension actually needs.
    `TICKS_PER_QUARTER = 480`. Legal but inexact; vanishingly rare in practice.
 5. **MIDI format 2** files are rejected with a diagnostic.
 6. **SMPTE-division MIDI files** are rejected with a diagnostic.
-7. **Tablature is a data-model citizen but not a rendered one** — a 6-line
-   staff draws, fret numbers do not.
+7. ~~**Tablature is a data-model citizen but not a rendered one**~~ —
+   **closed by Integration C**: fret numbers draw on their own string
+   lines, multi-digit frets side by side, each masking the staff line
+   behind it. §3.2's out-of-scope list is updated to match.
 8. **No MusicXML export.**
 9. **Notation cannot be inferred from MIDI alone** — a MIDI-only input
    renders with default spelling, single voice, and inferred beaming, and

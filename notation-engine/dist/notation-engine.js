@@ -57954,6 +57954,7 @@ var NotationEngine = (() => {
       name,
       glyphName,
       positionsByPitch: true,
+      takesKeySignature: name !== "percussion",
       referenceDiatonicIndex: diatonicIndex(referencePitchStep, referenceOctave),
       referenceY,
       octaveShift,
@@ -57985,6 +57986,7 @@ var NotationEngine = (() => {
     name: "tab",
     glyphName: "6stringTabClef",
     positionsByPitch: false,
+    takesKeySignature: false,
     octaveShift: 0,
     // SMuFL's 6stringTabClef bBox spans roughly -3..+3, i.e. its origin is
     // its own centre, so it belongs on the centre line of a SIX-line tab
@@ -62959,13 +62961,15 @@ ${denominator}`;
     const placement = playback.placementByMeasureNumber.get(measureNumber);
     const floorTick = layout !== void 0 ? floorEntry(layout.positionsByTick, tickInMeasure) : void 0;
     const withinMeasureX = floorTick !== void 0 ? layout?.positionsByTick.get(floorTick) ?? 0 : 0;
+    const headerWidth = layout?.headerWidth ?? playback.measureHeaderAllowance;
     return {
-      x: (placement?.x ?? 0) + playback.measureHeaderAllowance + withinMeasureX,
+      x: (placement?.x ?? 0) + headerWidth + withinMeasureX,
       systemIndex: placement?.systemIndex ?? 0,
       pageIndex: placement?.pageIndex ?? 0,
       systemY: placement?.systemY ?? 0
     };
   }
+  var X_EPSILON = 1e-9;
   function xToPosition(playback, x2, systemIndex) {
     const candidates = [...playback.placementByMeasureNumber.entries()].filter(([, p]) => p.systemIndex === systemIndex).sort((a, b) => a[1].x - b[1].x);
     if (candidates.length === 0) return 0;
@@ -62977,13 +62981,13 @@ ${denominator}`;
     const measureNumber = chosen?.[0];
     const placement = chosen?.[1];
     if (measureNumber === void 0 || placement === void 0) return 0;
-    const localX = x2 - placement.x - playback.measureHeaderAllowance;
     const layout = playback.measureLayoutsByNumber.get(measureNumber);
+    const localX = x2 - placement.x - (layout?.headerWidth ?? playback.measureHeaderAllowance);
     let bestTick = 0;
     let bestX;
     if (layout !== void 0) {
       for (const [tick, tickX] of layout.positionsByTick) {
-        if (tickX <= localX && (bestX === void 0 || tickX > bestX)) {
+        if (tickX <= localX + X_EPSILON && (bestX === void 0 || tickX > bestX)) {
           bestX = tickX;
           bestTick = tick;
         }
@@ -64567,7 +64571,10 @@ ${xrefOffset}
         measureTicks ?? TICKS_PER_QUARTER * 4,
         tempoMarks.filter((tm) => tm.measureNumber === measureNumber)
       );
-      measureLayoutsByNumber.set(measureNumber, layout);
+      measureLayoutsByNumber.set(measureNumber, {
+        ...layout,
+        headerWidth: MEASURE_HEADER_ALLOWANCE
+      });
       measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
     }
     const couldCarryBarNumber = (measureNumber, isFirstOfScore) => {
@@ -64689,6 +64696,53 @@ ${xrefOffset}
         });
       });
     }
+    const resolveHeaderWidths = () => {
+      const widthByMeasure = /* @__PURE__ */ new Map();
+      for (const part2 of score2.parts) {
+        let previousAttrs;
+        part2.measures.forEach((measure2, measureIndex) => {
+          const attrs = attributesByPartAndMeasure.get(`${part2.id}:${measure2.number}`);
+          if (attrs === void 0) return;
+          const isSystemStart = placementByMeasureNumber.get(measure2.number)?.isSystemStart ?? false;
+          const clefChanged = previousAttrs === void 0 || previousAttrs.clefSign !== attrs.clefSign || previousAttrs.clefLine !== attrs.clefLine;
+          const keyChanged = previousAttrs === void 0 || previousAttrs.fifths !== attrs.fifths;
+          const timeChanged = previousAttrs === void 0 || previousAttrs.timeNumerator !== attrs.timeNumerator || previousAttrs.timeDenominator !== attrs.timeDenominator;
+          const staffNumbers = Array.from({ length: Math.max(1, attrs.staves) }, (_, n) => n + 1);
+          for (const staffNumber of staffNumbers) {
+            const staffClef = attrs.clefsByStaff[staffNumber] ?? attrs.clefsByStaff[1];
+            const { clefDef, keySigClefName } = mapClef(
+              staffClef?.sign ?? attrs.clefSign,
+              staffClef?.line ?? attrs.clefLine
+            );
+            let width = 0.5;
+            if (isSystemStart || clefChanged) width += 3;
+            if ((isSystemStart || keyChanged) && attrs.fifths !== 0 && clefDef.takesKeySignature) {
+              try {
+                width += keySignatureAccidentals(attrs.fifths, keySigClefName).length + 0.5;
+              } catch {
+              }
+            }
+            if (measureIndex === 0 || timeChanged) width += 2.5;
+            widthByMeasure.set(
+              measure2.number,
+              Math.max(widthByMeasure.get(measure2.number) ?? 0, width)
+            );
+          }
+          previousAttrs = attrs;
+        });
+      }
+      for (const [measureNumber, layout] of measureLayoutsByNumber) {
+        measureLayoutsByNumber.set(measureNumber, {
+          ...layout,
+          // The constant stays a FLOOR: a measure with no header at all
+          // still reserves it, which is what every existing snapshot was
+          // laid out against.
+          headerWidth: Math.max(MEASURE_HEADER_ALLOWANCE, widthByMeasure.get(measureNumber) ?? 0)
+        });
+      }
+    };
+    resolveHeaderWidths();
+    const noteAreaXOf = (measureX, measureNumber) => measureX + (measureLayoutsByNumber.get(measureNumber)?.headerWidth ?? MEASURE_HEADER_ALLOWANCE);
     const svgParts = [];
     let totalWidth = MEASURE_WIDTH;
     for (const placement of placementByMeasureNumber.values()) {
@@ -64698,7 +64752,7 @@ ${xrefOffset}
       const directionXFor = (measureNumber, tick) => {
         const placement = placementByMeasureNumber.get(measureNumber);
         if (placement === void 0) return void 0;
-        const noteAreaX = placement.x + MEASURE_HEADER_ALLOWANCE;
+        const noteAreaX = noteAreaXOf(placement.x, measureNumber);
         const realX = measureLayoutsByNumber.get(measureNumber)?.positionsByTick.get(tick);
         if (realX !== void 0) return noteAreaX + realX;
         const measureTicks = measureTicksByNumber.get(measureNumber) ?? TICKS_PER_QUARTER * 4;
@@ -64800,7 +64854,7 @@ ${xrefOffset}
           (m) => m.partId === part2.id && m.measureNumber === measure2.number
         );
         if (measureTempoMarks.length > 0) {
-          const noteAreaX = layout.x + MEASURE_HEADER_ALLOWANCE;
+          const noteAreaX = noteAreaXOf(layout.x, measure2.number);
           const noteAreaWidth = layout.x + layout.width - noteAreaX;
           const measureTotalTicks = attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
           const { topStaffY } = topStaff();
@@ -64904,7 +64958,7 @@ ${xrefOffset}
             );
             cursorX += 3;
           }
-          if ((isSystemStart || keyChanged) && attrs.fifths !== 0) {
+          if ((isSystemStart || keyChanged) && attrs.fifths !== 0 && clefDef.takesKeySignature) {
             try {
               const accidentals = keySignatureAccidentals(attrs.fifths, keySigClefName);
               svgParts.push(
@@ -64954,7 +65008,7 @@ ${xrefOffset}
           accidentalStateByStaff.set(staffNumber, accidentalState);
           if (clefDef.positionsByPitch) {
             const ctx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart, theme };
-            const noteAreaX = Math.max(layout.x + MEASURE_HEADER_ALLOWANCE, cursorX);
+            const noteAreaX = Math.max(noteAreaXOf(layout.x, measure2.number), cursorX);
             const measureLayout = measureLayoutsByNumber.get(measure2.number);
             const isMultiVoice = measure2.voices.length > 1;
             const collisionOffsets = computeVoiceCollisionOffsets(measure2, staffNumber, ctx);
@@ -65100,7 +65154,7 @@ ${xrefOffset}
               if (spans !== "") svgParts.push(spans);
             }
           } else if (clefDef.name === "tab") {
-            const noteAreaX = Math.max(layout.x + MEASURE_HEADER_ALLOWANCE, cursorX);
+            const noteAreaX = Math.max(noteAreaXOf(layout.x, measure2.number), cursorX);
             const fallbackNoteAreaWidth = layout.x + layout.width - noteAreaX;
             const measureLayout = measureLayoutsByNumber.get(measure2.number);
             for (const voice2 of measure2.voices) {

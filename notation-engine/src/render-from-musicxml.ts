@@ -1765,7 +1765,12 @@ export function renderParsedMusicXml(
 
   const measureLayoutsByNumber = new Map<
     number,
-    { readonly width: number; readonly positionsByTick: ReadonlyMap<number, number> }
+    {
+      readonly width: number;
+      readonly positionsByTick: ReadonlyMap<number, number>;
+      /** Seeded with the floor below, then replaced with each measure's REAL header width once system placement is known (see `resolveHeaderWidths`). */
+      readonly headerWidth: number;
+    }
   >();
   const measureTicksByNumber = new Map<number, number>();
   /** Phase 48/§17.1: each measure's own time signature, from the SAME part whose ticks won the "longest wins" comparison just below -- what `computePlaybackData` needs for §17.2's beat-position math. */
@@ -1798,7 +1803,10 @@ export function renderParsedMusicXml(
       measureTicks ?? TICKS_PER_QUARTER * 4,
       tempoMarks.filter((tm) => tm.measureNumber === measureNumber),
     );
-    measureLayoutsByNumber.set(measureNumber, layout);
+    measureLayoutsByNumber.set(measureNumber, {
+      ...layout,
+      headerWidth: MEASURE_HEADER_ALLOWANCE,
+    });
     measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
   }
 
@@ -2010,6 +2018,93 @@ export function renderParsedMusicXml(
     });
   }
 
+  /**
+   * Each measure's REAL header width -- the clef, key signature and time
+   * signature it actually draws -- computed by the same rules the draw
+   * loop below uses, and maximised over every part and staff because all
+   * parts share ONE horizontal timeline (§Integration L).
+   *
+   * This exists because `MEASURE_HEADER_ALLOWANCE` is a constant (6.0)
+   * and a real header is not: a four-sharp key signature makes it 10.
+   * The draw loop already handled that with a local
+   * `Math.max(layout.x + allowance, cursorX)`, so the NOTES were always
+   * drawn in the right place -- but the tempo mark, the direction
+   * placement and, worst, `positionToX` all kept using the bare
+   * constant. On the user's own E-major score the playback cursor
+   * reported x=6.00 for a note drawn at x=10.5. Found in the final
+   * end-to-end review.
+   *
+   * Computing it here rather than inside the draw loop is what lets all
+   * four agree: it needs `isSystemStart`, which only exists once system
+   * placement is done, and it must be one number per measure rather than
+   * one per staff, or a percussion part (no key signature) and a piano
+   * part (four sharps) would start their notes at different x.
+   */
+  const resolveHeaderWidths = (): void => {
+    const widthByMeasure = new Map<number, number>();
+    for (const part of score.parts) {
+      let previousAttrs: MeasureAttributes | undefined;
+      part.measures.forEach((measure, measureIndex) => {
+        const attrs = attributesByPartAndMeasure.get(`${part.id}:${measure.number}`);
+        if (attrs === undefined) return;
+        const isSystemStart = placementByMeasureNumber.get(measure.number)?.isSystemStart ?? false;
+        const clefChanged =
+          previousAttrs === undefined ||
+          previousAttrs.clefSign !== attrs.clefSign ||
+          previousAttrs.clefLine !== attrs.clefLine;
+        const keyChanged = previousAttrs === undefined || previousAttrs.fifths !== attrs.fifths;
+        const timeChanged =
+          previousAttrs === undefined ||
+          previousAttrs.timeNumerator !== attrs.timeNumerator ||
+          previousAttrs.timeDenominator !== attrs.timeDenominator;
+
+        // Per staff, because `takesKeySignature` differs between them --
+        // a guitar part's tab staff draws no key signature while its
+        // notation staff does, and the WIDER one governs the timeline.
+        const staffNumbers = Array.from({ length: Math.max(1, attrs.staves) }, (_, n) => n + 1);
+        for (const staffNumber of staffNumbers) {
+          const staffClef = attrs.clefsByStaff[staffNumber] ?? attrs.clefsByStaff[1];
+          const { clefDef, keySigClefName } = mapClef(
+            staffClef?.sign ?? attrs.clefSign,
+            staffClef?.line ?? attrs.clefLine,
+          );
+          let width = 0.5;
+          if (isSystemStart || clefChanged) width += 3;
+          if ((isSystemStart || keyChanged) && attrs.fifths !== 0 && clefDef.takesKeySignature) {
+            try {
+              width += keySignatureAccidentals(attrs.fifths, keySigClefName).length + 0.5;
+            } catch {
+              // An unsupported clef draws no key signature at all (the
+              // draw loop catches the same throw and warns), so it costs
+              // no width either.
+            }
+          }
+          if (measureIndex === 0 || timeChanged) width += 2.5;
+          widthByMeasure.set(
+            measure.number,
+            Math.max(widthByMeasure.get(measure.number) ?? 0, width),
+          );
+        }
+        previousAttrs = attrs;
+      });
+    }
+
+    for (const [measureNumber, layout] of measureLayoutsByNumber) {
+      measureLayoutsByNumber.set(measureNumber, {
+        ...layout,
+        // The constant stays a FLOOR: a measure with no header at all
+        // still reserves it, which is what every existing snapshot was
+        // laid out against.
+        headerWidth: Math.max(MEASURE_HEADER_ALLOWANCE, widthByMeasure.get(measureNumber) ?? 0),
+      });
+    }
+  };
+  resolveHeaderWidths();
+
+  /** Where a measure's notes actually begin: its own left edge plus its real header. */
+  const noteAreaXOf = (measureX: number, measureNumber: number): number =>
+    measureX + (measureLayoutsByNumber.get(measureNumber)?.headerWidth ?? MEASURE_HEADER_ALLOWANCE);
+
   const svgParts: string[] = [];
   let totalWidth = MEASURE_WIDTH;
   for (const placement of placementByMeasureNumber.values()) {
@@ -2023,11 +2118,12 @@ export function renderParsedMusicXml(
     const directionXFor = (measureNumber: number, tick: number): number | undefined => {
       const placement = placementByMeasureNumber.get(measureNumber);
       if (placement === undefined) return undefined;
-      // The SAME header allowance the note pass uses for noteAreaX --
-      // Integration G's own hard-won lesson was that a marking computing
-      // its x in a different coordinate system than the notes drifts
-      // apart from them as soon as a measure's width changes.
-      const noteAreaX = placement.x + MEASURE_HEADER_ALLOWANCE;
+      // The SAME note-area x the note pass uses -- Integration G's own
+      // hard-won lesson was that a marking computing its x in a different
+      // coordinate system than the notes drifts apart from them as soon
+      // as a measure's width changes, and the final review found exactly
+      // that between the constant allowance and a real wide header.
+      const noteAreaX = noteAreaXOf(placement.x, measureNumber);
       const realX = measureLayoutsByNumber.get(measureNumber)?.positionsByTick.get(tick);
       if (realX !== undefined) return noteAreaX + realX;
       const measureTicks = measureTicksByNumber.get(measureNumber) ?? TICKS_PER_QUARTER * 4;
@@ -2207,7 +2303,7 @@ export function renderParsedMusicXml(
         // -- exactly the "no visible change" the user reported, since
         // widening the measure and this drift canceled each other out
         // visually.
-        const noteAreaX = layout.x + MEASURE_HEADER_ALLOWANCE;
+        const noteAreaX = noteAreaXOf(layout.x, measure.number);
         const noteAreaWidth = layout.x + layout.width - noteAreaX;
         const measureTotalTicks =
           attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
@@ -2352,7 +2448,17 @@ export function renderParsedMusicXml(
           cursorX += 3;
         }
 
-        if ((isSystemStart || keyChanged) && attrs.fifths !== 0) {
+        // A key signature is drawn only on a staff that HAS a key --
+        // `clefDef.takesKeySignature`, which is false for tab (says which
+        // fret, not which pitch) and for percussion (a drum staff has no
+        // key), and true everywhere else. NOT `positionsByPitch`: a
+        // percussion clef does position by pitch, since it maps
+        // `<unpitched>` display-step/octave through treble's reference
+        // line, so that predicate would have kept the bug on drum staves.
+        //
+        // Found in the final end-to-end review, on the user's own guitar
+        // file: it drew an F# on the TAB staff.
+        if ((isSystemStart || keyChanged) && attrs.fifths !== 0 && clefDef.takesKeySignature) {
           try {
             const accidentals = keySignatureAccidentals(attrs.fifths, keySigClefName);
             svgParts.push(
@@ -2420,7 +2526,11 @@ export function renderParsedMusicXml(
           // Phase 43/44 wiring: the header allowance every measure reserves
           // (see computeMeasureLayout), not a fraction of this measure's
           // own (now content-driven, no longer fixed) width.
-          const noteAreaX = Math.max(layout.x + MEASURE_HEADER_ALLOWANCE, cursorX);
+          // `noteAreaXOf` is the score-wide maximum across every part and
+          // staff, so it is already at least this staff's own cursorX --
+          // the Math.max that used to live here only ever compensated for
+          // the constant being too small.
+          const noteAreaX = Math.max(noteAreaXOf(layout.x, measure.number), cursorX);
           const measureLayout = measureLayoutsByNumber.get(measure.number);
           // §9.14: forced stem direction only applies once a staff genuinely
           // has multiple voices sharing it -- a single voice keeps ordinary
@@ -2687,7 +2797,11 @@ export function renderParsedMusicXml(
           // by pitch. The horizontal timeline is computed exactly as the
           // pitched branch does, so a tab staff stays aligned under the
           // notation staff it accompanies.
-          const noteAreaX = Math.max(layout.x + MEASURE_HEADER_ALLOWANCE, cursorX);
+          // `noteAreaXOf` is the score-wide maximum across every part and
+          // staff, so it is already at least this staff's own cursorX --
+          // the Math.max that used to live here only ever compensated for
+          // the constant being too small.
+          const noteAreaX = Math.max(noteAreaXOf(layout.x, measure.number), cursorX);
           const fallbackNoteAreaWidth = layout.x + layout.width - noteAreaX;
           const measureLayout = measureLayoutsByNumber.get(measure.number);
 

@@ -139,6 +139,44 @@ describe('key signature engine (Phase 11)', () => {
     });
   });
 
+  describe('staves that have no key at all (final review)', () => {
+    const score = (clefSign, clefLine, note) =>
+      `<?xml version="1.0"?><score-partwise version="4.0">` +
+      `<part-list><score-part id="P1"><part-name>X</part-name></score-part></part-list>` +
+      `<part id="P1"><measure number="1"><attributes><divisions>1</divisions>` +
+      `<key><fifths>2</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time>` +
+      `<clef><sign>${clefSign}</sign><line>${clefLine}</line></clef></attributes>` +
+      `${note}<duration>4</duration><type>whole</type></note></measure></part></score-partwise>`;
+    const sharps = (xml) =>
+      [...NE.renderFromMusicXml(xml, { domParser }).svg.matchAll(/\uE262/g)].length;
+
+    const PITCHED = '<note><pitch><step>C</step><octave>4</octave></pitch>';
+    const UNPITCHED =
+      '<note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched>';
+
+    test('a percussion staff draws NO key signature, however many fifths the file declares', () => {
+      // A drum staff has no key. The percussion clef nevertheless reports
+      // positionsByPitch: true (it maps <unpitched> display-step/octave
+      // through treble's own reference line), which is why the predicate
+      // has to be `takesKeySignature` rather than `positionsByPitch`.
+      assert.equal(sharps(score('percussion', 2, UNPITCHED)), 0);
+      assert.equal(NE.PERCUSSION_CLEF.positionsByPitch, true);
+      assert.equal(NE.PERCUSSION_CLEF.takesKeySignature, false);
+    });
+
+    test('a TAB staff draws NO key signature -- a fret number is not a pitch', () => {
+      assert.equal(sharps(score('TAB', 5, PITCHED)), 0);
+      assert.equal(NE.TAB_CLEF.takesKeySignature, false);
+    });
+
+    test('an ordinary staff still does -- the control this fix must not break', () => {
+      assert.equal(sharps(score('G', 2, PITCHED)), 2);
+      assert.equal(NE.TREBLE_CLEF.takesKeySignature, true);
+      assert.equal(NE.BASS_CLEF.takesKeySignature, true);
+      assert.equal(NE.TENOR_CLEF.takesKeySignature, true);
+    });
+  });
+
   test('cancellation: moving to C major cancels every old accidental', () => {
     const naturals = NE.cancellationNaturals(3, 0, 'treble'); // A major (3 sharps) -> C major
     assert.equal(naturals.length, 3);

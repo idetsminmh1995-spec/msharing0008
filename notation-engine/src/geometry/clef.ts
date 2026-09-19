@@ -79,6 +79,23 @@ export interface ClefDefinition {
    * staff spaces too low before Integration A.
    */
   readonly glyphY: number;
+  /**
+   * Whether a key signature is drawn on this staff.
+   *
+   * Separate from `positionsByPitch`, and the two genuinely differ: a
+   * PERCUSSION clef positions by pitch (it maps `<unpitched>`
+   * display-step/octave through treble's own reference line) but has no
+   * key -- a drum staff never carries a signature. A TAB staff says
+   * which fret, not which pitch, so an accidental in front of it means
+   * nothing either.
+   *
+   * Found in the final end-to-end review: the renderer had no such
+   * predicate, and `mapClef` falls back to `keySigClefName: 'treble'`
+   * for both clefs so that nothing throws -- which stopped the error and
+   * started drawing a treble key signature on a tab staff instead,
+   * visible on the user's own guitar file.
+   */
+  readonly takesKeySignature: boolean;
 }
 
 function clef(
@@ -94,6 +111,7 @@ function clef(
     name,
     glyphName,
     positionsByPitch: true,
+    takesKeySignature: name !== 'percussion',
     referenceDiatonicIndex: diatonicIndex(referencePitchStep, referenceOctave),
     referenceY,
     octaveShift,
@@ -156,6 +174,7 @@ export const TAB_CLEF: ClefDefinition = {
   name: 'tab',
   glyphName: '6stringTabClef',
   positionsByPitch: false,
+  takesKeySignature: false,
   octaveShift: 0,
   // SMuFL's 6stringTabClef bBox spans roughly -3..+3, i.e. its origin is
   // its own centre, so it belongs on the centre line of a SIX-line tab

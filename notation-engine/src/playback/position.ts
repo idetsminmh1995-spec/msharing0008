@@ -14,6 +14,25 @@ export interface PlaybackPosition {
 export interface PlaybackMeasureLayout {
   readonly width: number;
   readonly positionsByTick: ReadonlyMap<number, number>;
+  /**
+   * How much of this measure's own width its HEADER takes -- the clef,
+   * key signature and time signature it actually draws, which is not the
+   * same for every measure (a system start restates all three; an
+   * ordinary measure draws none) and not a constant across scores (a
+   * four-sharp key signature is four units wider than no key signature).
+   *
+   * `positionsByTick`'s values are relative to just past this, not to the
+   * measure's bare x -- so a note's real x is
+   * `placement.x + headerWidth + positionsByTick.get(tick)`.
+   *
+   * Added in the final end-to-end review: this used to be one score-wide
+   * constant (6.0), which the RENDERER already overrode per staff when a
+   * real header was wider. The cursor did not, so on the user's own
+   * E-major score `positionToX` reported x=6.00 for a note drawn at
+   * x=10.5 -- four and a half staff spaces of playback drift, on every
+   * measure with a header wider than the constant.
+   */
+  readonly headerWidth: number;
 }
 
 /** Where one measure sits on the page -- the playback-relevant slice of `renderFromMusicXml`'s own internal `MeasurePlacement`. */
@@ -52,7 +71,13 @@ export interface PlaybackData {
   >;
   readonly measureLayoutsByNumber: ReadonlyMap<number, PlaybackMeasureLayout>;
   readonly placementByMeasureNumber: ReadonlyMap<number, PlaybackMeasurePlacement>;
-  /** The same header allowance (clef/key/time-signature reservation) `renderFromMusicXml` itself reserves at every measure's own left edge -- `positionsByTick`'s values are relative to just past it, not to the measure's bare x. */
+  /**
+   * The floor every measure's header is at least this wide -- what a
+   * measure that draws no header at all still reserves. The REAL
+   * per-measure width is `measureLayoutsByNumber.get(n).headerWidth`,
+   * which is what `positionToX` uses; this is only the fallback for a
+   * measure with no layout entry.
+   */
   readonly measureHeaderAllowance: number;
   readonly tempoMap: TempoMap;
   readonly events: readonly NotationEvent[];
@@ -130,13 +155,21 @@ export function positionToX(playback: PlaybackData, tick: number): EventPosition
     layout !== undefined ? floorEntry(layout.positionsByTick, tickInMeasure) : undefined;
   const withinMeasureX =
     floorTick !== undefined ? (layout?.positionsByTick.get(floorTick) ?? 0) : 0;
+  const headerWidth = layout?.headerWidth ?? playback.measureHeaderAllowance;
   return {
-    x: (placement?.x ?? 0) + playback.measureHeaderAllowance + withinMeasureX,
+    x: (placement?.x ?? 0) + headerWidth + withinMeasureX,
     systemIndex: placement?.systemIndex ?? 0,
     pageIndex: placement?.pageIndex ?? 0,
     systemY: placement?.systemY ?? 0,
   };
 }
+
+/**
+ * How close to a note's own x still counts as that note, absorbing the
+ * floating-point error of `positionToX`'s own addition being undone.
+ * 1e-9 staff spaces is a hundred-millionth of a notehead.
+ */
+const X_EPSILON = 1e-9;
 
 /** §17.1: where on the page -> time, for click-to-seek in a host app. The exact inverse of `positionToX` at a real event's own x (floor-by-x within the chosen measure mirrors `positionToX`'s own floor-by-tick). `systemIndex` narrows the search to one system, since the same x can legitimately appear in several (one per system/page). */
 export function xToPosition(playback: PlaybackData, x: number, systemIndex: number): number {
@@ -154,13 +187,19 @@ export function xToPosition(playback: PlaybackData, x: number, systemIndex: numb
   const placement = chosen?.[1];
   if (measureNumber === undefined || placement === undefined) return 0;
 
-  const localX = x - placement.x - playback.measureHeaderAllowance;
   const layout = playback.measureLayoutsByNumber.get(measureNumber);
+  const localX = x - placement.x - (layout?.headerWidth ?? playback.measureHeaderAllowance);
   let bestTick = 0;
   let bestX: number | undefined;
   if (layout !== undefined) {
     for (const [tick, tickX] of layout.positionsByTick) {
-      if (tickX <= localX && (bestX === undefined || tickX > bestX)) {
+      // `localX` is a subtraction of three numbers that were added to
+      // produce `x` in the first place, so an EXACT hit on a note can
+      // come back a few ulps short and fall to the previous note. Found
+      // in the final review: clicking precisely on a notehead selected
+      // the one before it. The tolerance is far below one staff space,
+      // so it can never reach a genuinely different note.
+      if (tickX <= localX + X_EPSILON && (bestX === undefined || tickX > bestX)) {
         bestX = tickX;
         bestTick = tick;
       }
