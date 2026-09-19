@@ -839,7 +839,7 @@ function renderNoteOrRest(
   });
 
   if (ev.duration.type !== 'whole') {
-    const length = computeStemLength(head.position, middleLineY(STAFF_LINES));
+    const length = computeStemLength(head.position, middleLineY(STAFF_LINES), direction);
     parts.push(
       renderStem({
         noteheadGlyphName: head.noteheadGlyph,
@@ -960,7 +960,7 @@ function renderBeamGroup(
   const beamPositions = members.map(beamPositionOf);
   const naturalLength = Math.max(
     DEFAULT_UNBEAMED_STEM_LENGTH,
-    ...beamPositions.map((p) => computeStemLength(p, middle)),
+    ...beamPositions.map((p) => computeStemLength(p, middle, direction)),
   );
   const shape = computeBeamShape(
     beamPositions,
@@ -1163,7 +1163,7 @@ function renderChord(
       forcedDirection ?? chordStemDirection([...positions], middleLineY(STAFF_LINES));
     if (chord.duration.type !== 'whole') {
       const outermost = direction === 'up' ? Math.max(...positions) : Math.min(...positions);
-      const length = computeStemLength(outermost, middleLineY(STAFF_LINES));
+      const length = computeStemLength(outermost, middleLineY(STAFF_LINES), direction);
       parts.push(
         renderStem({
           noteheadGlyphName: heads.widestGlyph,

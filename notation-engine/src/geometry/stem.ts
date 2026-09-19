@@ -73,14 +73,60 @@ export const DEFAULT_STEM_LENGTH = 3.5;
 const MIN_STEM_LENGTH = 2.5;
 
 /**
- * §9.8's length rule: default 3.5sp, extended so the stem's far end reaches
- * at least the middle line when the note is far outside the staff, never
- * shortened below 2.5sp (the floor is redundant against the 3.5 default
- * today, since nothing yet shortens a stem below it, but is kept explicit
- * because a future phase -- e.g. beam-slant adjustment -- may shorten
- * stems and must not go below it).
+ * §9.8's length rule: default 3.5sp, extended so the stem's far end
+ * reaches at least the middle line when the note is far outside the
+ * staff, shortened never below 2.5sp.
+ *
+ * The "shortened" half of that rule was a deliberately deferred gap
+ * through Phase 16/24 (their own doc records call the 2.5 floor
+ * "currently redundant... kept for a future shortening phase") --
+ * closed here, once a real case actually needed it: §9.14's forced
+ * per-voice direction ("hands up, feet down") can point a stem AWAY
+ * from the middle line for a note that already sits outside the staff
+ * on that side (a hi-hat pattern sitting above the staff, voice 1
+ * always forced up, is exactly this). Extending such a stem further
+ * (the existing "reach the middle" branch) makes no sense when the
+ * middle line is in the OPPOSITE direction from where the stem is
+ * headed -- confirmed as a real, visible bug against a real drum
+ * chart, see Doc/integration-o-stem-shortening.md.
+ *
+ * `direction` decides which branch applies:
+ * - **Heading toward the middle** (the ordinary case: automatic
+ *   direction always points this way, and this is what the original
+ *   "reach the middle" rule was built for) -- unchanged: extend past
+ *   3.5sp only as far as needed to reach the middle line, never below
+ *   2.5sp either.
+ * - **Heading away from the middle** (only reachable via a forced or
+ *   explicit direction that disagrees with the note's own automatic
+ *   choice) -- shortened below the 3.5sp default by exactly how far
+ *   the notehead already lies beyond the staff's own edge on that
+ *   side (a note still inside the staff needs no shortening at all),
+ *   floored at 2.5sp so it never disappears into the notehead.
  */
-export function computeStemLength(notePosition: number, staffMiddleLineY: number): number {
-  const requiredToReachMiddle = Math.abs(notePosition - staffMiddleLineY);
-  return Math.max(DEFAULT_STEM_LENGTH, requiredToReachMiddle, MIN_STEM_LENGTH);
+export function computeStemLength(
+  notePosition: number,
+  staffMiddleLineY: number,
+  direction: StemDirection,
+): number {
+  const signedDistance = notePosition - staffMiddleLineY;
+  const requiredToReachMiddle = Math.abs(signedDistance);
+
+  // 'up' decreases Y (moves higher up the page); 'down' increases it.
+  // The stem heads TOWARD the middle exactly when that movement would
+  // shrink |signedDistance| -- i.e. the note sits on the side the
+  // direction is moving away FROM, not the side it's heading TO.
+  const headingTowardMiddle =
+    (direction === 'down' && signedDistance <= 0) || (direction === 'up' && signedDistance >= 0);
+
+  if (headingTowardMiddle) {
+    return Math.max(DEFAULT_STEM_LENGTH, requiredToReachMiddle, MIN_STEM_LENGTH);
+  }
+
+  // Heading away: shorten by exactly how far outside the staff's own
+  // edge the notehead already sits on this side (0 if it's still
+  // within the staff -- middleLineY's own magnitude is the staff's
+  // half-extent, e.g. 2sp for a standard 5-line staff).
+  const staffHalfExtent = Math.abs(staffMiddleLineY);
+  const beyondStaff = Math.max(0, requiredToReachMiddle - staffHalfExtent);
+  return Math.max(DEFAULT_STEM_LENGTH - beyondStaff, MIN_STEM_LENGTH);
 }

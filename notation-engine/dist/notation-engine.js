@@ -58339,9 +58339,16 @@ var NotationEngine = (() => {
   }
   var DEFAULT_STEM_LENGTH = 3.5;
   var MIN_STEM_LENGTH = 2.5;
-  function computeStemLength(notePosition, staffMiddleLineY) {
-    const requiredToReachMiddle = Math.abs(notePosition - staffMiddleLineY);
-    return Math.max(DEFAULT_STEM_LENGTH, requiredToReachMiddle, MIN_STEM_LENGTH);
+  function computeStemLength(notePosition, staffMiddleLineY, direction) {
+    const signedDistance = notePosition - staffMiddleLineY;
+    const requiredToReachMiddle = Math.abs(signedDistance);
+    const headingTowardMiddle = direction === "down" && signedDistance <= 0 || direction === "up" && signedDistance >= 0;
+    if (headingTowardMiddle) {
+      return Math.max(DEFAULT_STEM_LENGTH, requiredToReachMiddle, MIN_STEM_LENGTH);
+    }
+    const staffHalfExtent = Math.abs(staffMiddleLineY);
+    const beyondStaff = Math.max(0, requiredToReachMiddle - staffHalfExtent);
+    return Math.max(DEFAULT_STEM_LENGTH - beyondStaff, MIN_STEM_LENGTH);
   }
 
   // src/geometry/flag.ts
@@ -62693,7 +62700,7 @@ ${denominator}`;
       ...explicitDirection !== void 0 ? { explicitDirection } : {}
     });
     if (ev.duration.type !== "whole") {
-      const length = computeStemLength(head.position, middleLineY(STAFF_LINES));
+      const length = computeStemLength(head.position, middleLineY(STAFF_LINES), direction);
       parts.push(
         renderStem({
           noteheadGlyphName: head.noteheadGlyph,
@@ -62759,7 +62766,7 @@ ${denominator}`;
     const beamPositions = members.map(beamPositionOf);
     const naturalLength = Math.max(
       DEFAULT_UNBEAMED_STEM_LENGTH,
-      ...beamPositions.map((p) => computeStemLength(p, middle))
+      ...beamPositions.map((p) => computeStemLength(p, middle, direction))
     );
     const shape = computeBeamShape(
       beamPositions,
@@ -62907,7 +62914,7 @@ ${denominator}`;
       const direction = forcedDirection ?? chordStemDirection([...positions], middleLineY(STAFF_LINES));
       if (chord2.duration.type !== "whole") {
         const outermost = direction === "up" ? Math.max(...positions) : Math.min(...positions);
-        const length = computeStemLength(outermost, middleLineY(STAFF_LINES));
+        const length = computeStemLength(outermost, middleLineY(STAFF_LINES), direction);
         parts.push(
           renderStem({
             noteheadGlyphName: heads.widestGlyph,

@@ -88,6 +88,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`integration-l-page-layout-and-score-wide-spacing.md`](./integration-l-page-layout-and-score-wide-spacing.md) | Integration L: §16.2 page mode wired (completes Phase 46) + fixed parts laying themselves out independently, so a score now shares ONE horizontal timeline |
 | [`integration-m-drum-chart-defects.md`](./integration-m-drum-chart-defects.md) | Integration M: the three defects a real drum chart exposed -- the deployed site served no music font, every chord broke its beam (62 stray flags), and the tempo mark was drawn through the notes |
 | [`integration-n-drum-position-corrections.md`](./integration-n-drum-position-corrections.md) | Integration N: corrected the GM drum table's snare (1 full staff-space) and hi-hat (half a staff-space) default positions, verified against a real drum-lesson file's own 100%-consistent encoding |
+| [`integration-o-stem-shortening.md`](./integration-o-stem-shortening.md) | Integration O: closed §9.8's deferred stem-shortening gap -- a forced direction pointing AWAY from the middle for a note outside the staff (drum charts: hands-up hi-hat sitting above the staff) now shortens toward the 2.5sp floor instead of staying at a fixed 3.5sp |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

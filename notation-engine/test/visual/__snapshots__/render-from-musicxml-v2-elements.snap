@@ -11,7 +11,7 @@
 <text x="3.5" y="5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="7" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="6" y="3.5" font-family="Bravura" font-size="4" fill="#000000"></text>
-<line x1="7.16" y1="3.056" x2="7.16" y2="-0.44399999999999995" stroke="#000000" stroke-width="0.12" />
+<line x1="7.16" y1="3.056" x2="7.16" y2="0.05600000000000005" stroke="#000000" stroke-width="0.12" />
 <text x="9.101955000865388" y="5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="9.101955000865388" y="4.5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="9.101955000865388" y="5.5" font-family="Bravura" font-size="4" fill="#000000"></text>

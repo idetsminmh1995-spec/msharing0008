@@ -58,23 +58,58 @@ describe('stem direction (Phase 16)', () => {
   });
 });
 
-describe('stem length (Phase 16)', () => {
-  test('default length is 3.5sp for a note near the staff', () => {
-    assert.equal(NE.computeStemLength(0, -2), 3.5); // bottom line, distance to middle = 2, less than default
+describe('stem length (Phase 16, extended by Integration O)', () => {
+  test('default length is 3.5sp for a note near the staff, stem heading toward the middle', () => {
+    // Bottom line (0), 2 away from the middle (-2) -- less than the
+    // default, and 'up' heads toward the middle from there.
+    assert.equal(NE.computeStemLength(0, -2, 'up'), 3.5);
   });
 
-  test('extends so the stem reaches at least the middle line for a note far outside the staff', () => {
+  test('extends so the stem reaches at least the middle line for a note far outside the staff, heading toward it', () => {
     // A note at y=-6 (2 above the top line) is 4 away from the middle
     // line (-2) -- longer than the 3.5 default, so the stem must extend
-    // to 4 to actually reach the middle line.
-    assert.equal(NE.computeStemLength(-6, -2), 4);
+    // to 4 to actually reach the middle line. 'down' heads toward the
+    // middle from above it.
+    assert.equal(NE.computeStemLength(-6, -2, 'down'), 4);
   });
 
-  test('never shortened below the 2.5sp floor', () => {
+  test('never shortened below the 2.5sp floor when heading toward the middle', () => {
     // A note extremely close to the middle line would only need a tiny
     // length to "reach" it, but the default (3.5) already exceeds the
     // floor (2.5), so this only ever matters if something else were to
     // shorten it below -- confirmed the floor itself holds regardless.
-    assert.ok(NE.computeStemLength(-2, -2) >= 2.5);
+    assert.ok(NE.computeStemLength(-2, -2, 'up') >= 2.5);
+  });
+
+  test('a note still WITHIN the staff needs no shortening even heading away from the middle', () => {
+    // Position -3.5 is within a 5-line staff (top line is -4), so even
+    // though 'up' here heads away from the middle (toward the already-far
+    // top of the staff), there is no "beyond the staff" excess yet --
+    // stays at the ordinary 3.5 default.
+    assert.equal(NE.computeStemLength(-3.5, -2, 'up'), 3.5);
+  });
+
+  test('shortens by exactly how far the note lies beyond the staff edge, heading away from the middle', () => {
+    // Integration O's real case: a note 0.5sp beyond the top line
+    // (-4.5, top line at -4 for a 5-line staff), stem forced 'up' --
+    // heading further away from the middle, not toward it. Shortened by
+    // that same 0.5 excess: 3.5 - 0.5 = 3.0.
+    assert.equal(NE.computeStemLength(-4.5, -2, 'up'), 3);
+  });
+
+  test('shortening away from the middle never drops below the 2.5sp floor, however far out the note is', () => {
+    // Position +4 (far below a 5-line staff) forced 'down' -- heading
+    // even further away. The raw formula would go negative; the floor
+    // catches it.
+    assert.equal(NE.computeStemLength(4, -2, 'down'), 2.5);
+  });
+
+  test('the SAME note/staff position gets a shorter stem heading away from the middle than heading toward it', () => {
+    // The direction-only difference this whole fix is about: identical
+    // notePosition and staffMiddleLineY, opposite conclusions depending
+    // purely on which way the stem points.
+    const toward = NE.computeStemLength(-4.5, -2, 'down'); // -4.5 is above middle; 'down' heads toward it
+    const away = NE.computeStemLength(-4.5, -2, 'up'); // 'up' heads further away
+    assert.ok(away < toward, `expected the away-heading stem (${away}) shorter than the toward-heading one (${toward})`);
   });
 });
