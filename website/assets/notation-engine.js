@@ -62768,18 +62768,17 @@ ${denominator}`;
       DEFAULT_UNBEAMED_STEM_LENGTH,
       ...beamPositions.map((p) => computeStemLength(p, middle, direction))
     );
-    const shape = computeBeamShape(
-      beamPositions,
-      members.map((m) => m.x),
-      direction,
-      beamStyle,
-      naturalLength
-    );
-    members.forEach((m) => {
+    const anchorName = direction === "up" ? "stemUpSE" : "stemDownNW";
+    const stemXs = members.map((m) => {
+      const anchor = getGlyph(m.glyph)?.anchors?.[anchorName];
+      return m.x + (anchor?.[0] ?? 0);
+    });
+    const shape = computeBeamShape(beamPositions, stemXs, direction, beamStyle, naturalLength);
+    members.forEach((m, i2) => {
       const attachPosition = attachPositionOf(m);
       const y = ctx.measureBottomY + attachPosition;
-      const beamY = ctx.measureBottomY + beamYAtX(shape, m.x);
-      const anchorName = direction === "up" ? "stemUpSE" : "stemDownNW";
+      const stemX = stemXs[i2] ?? m.x;
+      const beamY = ctx.measureBottomY + beamYAtX(shape, stemX);
       const anchor = getGlyph(m.glyph)?.anchors?.[anchorName];
       if (anchor === void 0) return;
       parts.push(

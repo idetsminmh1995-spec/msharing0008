@@ -962,19 +962,29 @@ function renderBeamGroup(
     DEFAULT_UNBEAMED_STEM_LENGTH,
     ...beamPositions.map((p) => computeStemLength(p, middle, direction)),
   );
-  const shape = computeBeamShape(
-    beamPositions,
-    members.map((m) => m.x),
-    direction,
-    beamStyle,
-    naturalLength,
-  );
+  const anchorName = direction === 'up' ? 'stemUpSE' : 'stemDownNW';
+  // Integration P: the beam's own endpoints must land where the stems
+  // actually attach (the notehead's own stem-side corner -- e.g. an X
+  // notehead's stemUpSE anchor sits 1.16sp to the right of its origin),
+  // not at each notehead's raw, unadjusted x. Using the raw x here made
+  // the beam fall short of (or overshoot) the actual stem by that same
+  // anchor offset -- harmless as overshoot at the group's first note, but
+  // at the last note it left the beam ending before the stem it was
+  // supposed to meet, so the group's final stem appeared to float,
+  // disconnected from the beam, with no flag either (a genuinely
+  // different defect from Integration O's stem-length fix, and the one
+  // the user's own reference-image comparison was actually showing).
+  const stemXs = members.map((m) => {
+    const anchor = getGlyph(m.glyph)?.anchors?.[anchorName];
+    return m.x + (anchor?.[0] ?? 0);
+  });
+  const shape = computeBeamShape(beamPositions, stemXs, direction, beamStyle, naturalLength);
 
-  members.forEach((m) => {
+  members.forEach((m, i) => {
     const attachPosition = attachPositionOf(m);
     const y = ctx.measureBottomY + attachPosition;
-    const beamY = ctx.measureBottomY + beamYAtX(shape, m.x);
-    const anchorName = direction === 'up' ? 'stemUpSE' : 'stemDownNW';
+    const stemX = stemXs[i] ?? m.x;
+    const beamY = ctx.measureBottomY + beamYAtX(shape, stemX);
     const anchor = getGlyph(m.glyph)?.anchors?.[anchorName];
     if (anchor === undefined) return;
     parts.push(
