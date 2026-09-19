@@ -169,6 +169,20 @@ const MEASURE_HEADER_ALLOWANCE = 6.0;
 const DEFAULT_STAFF_GAP_FALLBACK = 8;
 
 /**
+ * Integration M: a tempo mark is drawn ABOVE the staff (§9.21), but "above
+ * the staff" is not the same as "above the staff's top LINE" -- stems,
+ * beams and flags get there first. Integration D placed the mark a fixed
+ * 2.5sp above the top line, which on any chart whose notes sit high (a
+ * drum chart's hi-hat line is the top line) put it straight through the
+ * beams. These are the clearances measured from the real content instead.
+ */
+const TEMPO_MARK_GAP = 1.5;
+/** The metNote* glyphs are tall (the stem reaches well above the anchor), so the mark needs this much room above its own baseline. */
+const TEMPO_MARK_HEIGHT = 2.0;
+/** Added to a note's own position when estimating how high its stem and beam can reach: DEFAULT_UNBEAMED_STEM_LENGTH (declared below, next to the other stem constants) plus one beam's thickness. */
+const STEM_AND_BEAM_ALLOWANCE = 3.5 + 0.5;
+
+/**
  * §9.19/§9.20 specify each mark's SIDE, not its distance -- no source
  * gives one universal number, exactly as Phase 24's beam-slope cap and
  * Phase 31's hairpin spread already found. These are chosen, consistent
@@ -616,6 +630,36 @@ function resolveNoteRendering(
   };
 }
 
+/**
+ * Integration M: how far above `staffNumber`'s own top line this measure's
+ * content reaches, in staff spaces (never negative).
+ *
+ * A deliberate over-estimate: every note is treated as though it carried
+ * an up stem and a beam, because the cheap alternative -- working out each
+ * note's real stem direction here -- would duplicate resolveStemDirection's
+ * whole priority chain in a second place. Over-clearing a tempo mark by a
+ * staff space is invisible; colliding with a beam is not.
+ */
+function measureNorthExtent(measure: Measure, staffNumber: number, ctx: RenderCtx): number {
+  const topLineY = -(STAFF_LINES - 1);
+  let highest: number | undefined;
+  const consider = (position: number): void => {
+    const reach = position - STEM_AND_BEAM_ALLOWANCE;
+    highest = highest === undefined ? reach : Math.min(highest, reach);
+  };
+  for (const voice of measure.voices) {
+    for (const event of voice.events) {
+      if ((event.staff ?? 1) !== staffNumber) continue;
+      if (event.kind === 'note') consider(resolveNoteRendering(event, ctx).position);
+      else if (event.kind === 'chord') {
+        for (const n of event.notes) consider(resolveNoteRendering(n, ctx).position);
+      }
+    }
+  }
+  if (highest === undefined) return 0;
+  return Math.max(0, topLineY - highest);
+}
+
 /** Draws a note's accidental (if needed)/notehead/ledger-lines only -- no stem, no flag. Shared by both the plain (unbeamed) path and the beam-group path, which differ only in how the stem/flag (or beam) gets drawn afterward. */
 function renderNoteheadPart(
   note: Note,
@@ -849,7 +893,7 @@ function renderNoteOrRest(
  * (`beamYAtX`) rather than using its natural unbeamed length.
  */
 function renderBeamGroup(
-  notes: readonly Note[],
+  events: readonly (Note | Chord)[],
   xs: readonly number[],
   ctx: RenderCtx,
   accidentalState: AccidentalState,
@@ -858,51 +902,92 @@ function renderBeamGroup(
 ): {
   svg: string;
   newAccidentalState: AccidentalState;
-  /** Integration I: one anchor per member note, in the same order as `notes`. */
+  /** Integration I: one anchor per member event, in the same order as `events`. */
   anchors: readonly EventAnchor[];
 } {
   const parts: string[] = [];
   let state = accidentalState;
-  const positions: number[] = [];
-  const noteheadGlyphs: string[] = [];
 
-  notes.forEach((note, i) => {
+  /**
+   * One member of the beam group. A plain note has a single notehead, so
+   * all three positions coincide; a CHORD has several, and the stem and
+   * the beam attach to different ones -- which is the whole reason this
+   * intermediate shape exists.
+   */
+  interface BeamMember {
+    readonly x: number;
+    readonly positions: readonly number[];
+    /** The widest notehead, whose anchor the stem is measured from. */
+    readonly glyph: string;
+    readonly source: Note | Chord;
+  }
+
+  const members: BeamMember[] = [];
+  events.forEach((event, i) => {
     const x = xs[i];
     if (x === undefined) return;
-    const head = renderNoteheadPart(note, x, ctx, state);
-    parts.push(head.svg);
-    state = head.newAccidentalState;
-    positions.push(head.position);
-    noteheadGlyphs.push(head.noteheadGlyph);
+    if (event.kind === 'chord') {
+      // Integration M: a chord in a beam group. Drum charts are built
+      // from these (hi-hat + snare struck together), so excluding them
+      // left a stray flag on every beamed chord -- 62 of them on this
+      // project's own drum fixture, one for every chord the file beams.
+      const heads = renderChordHeadsPart(event, x, ctx, state);
+      parts.push(heads.svg);
+      state = heads.newAccidentalState;
+      members.push({ x, positions: heads.positions, glyph: heads.widestGlyph, source: event });
+    } else {
+      const head = renderNoteheadPart(event, x, ctx, state);
+      parts.push(head.svg);
+      state = head.newAccidentalState;
+      members.push({ x, positions: [head.position], glyph: head.noteheadGlyph, source: event });
+    }
   });
 
   const middle = middleLineY(STAFF_LINES);
-  const direction = forcedDirection ?? beamDirection(positions, middle);
+  // Every notehead in the group votes on the shared direction (§9.13),
+  // not just one per event -- a chord's own spread is exactly the kind of
+  // thing that decides which way a beam should go.
+  const allPositions = members.flatMap((m) => [...m.positions]);
+  const direction = forcedDirection ?? beamDirection(allPositions, middle);
+
+  /** The notehead nearest the beam: the beam must clear it. */
+  const beamPositionOf = (m: BeamMember): number =>
+    direction === 'up' ? Math.min(...m.positions) : Math.max(...m.positions);
+  /** The notehead the stem attaches to: the far end of the chord from the beam. */
+  const attachPositionOf = (m: BeamMember): number =>
+    direction === 'up' ? Math.max(...m.positions) : Math.min(...m.positions);
+
+  const beamPositions = members.map(beamPositionOf);
   const naturalLength = Math.max(
     DEFAULT_UNBEAMED_STEM_LENGTH,
-    ...positions.map((p) => computeStemLength(p, middle)),
+    ...beamPositions.map((p) => computeStemLength(p, middle)),
   );
-  const shape = computeBeamShape(positions, [...xs], direction, beamStyle, naturalLength);
+  const shape = computeBeamShape(
+    beamPositions,
+    members.map((m) => m.x),
+    direction,
+    beamStyle,
+    naturalLength,
+  );
 
-  notes.forEach((_note, i) => {
-    const x = xs[i];
-    const position = positions[i];
-    const noteheadGlyph = noteheadGlyphs[i];
-    if (x === undefined || position === undefined || noteheadGlyph === undefined) return;
-    const y = ctx.measureBottomY + position;
-    const beamY = ctx.measureBottomY + beamYAtX(shape, x);
+  members.forEach((m) => {
+    const attachPosition = attachPositionOf(m);
+    const y = ctx.measureBottomY + attachPosition;
+    const beamY = ctx.measureBottomY + beamYAtX(shape, m.x);
     const anchorName = direction === 'up' ? 'stemUpSE' : 'stemDownNW';
-    const anchor = getGlyph(noteheadGlyph)?.anchors?.[anchorName];
+    const anchor = getGlyph(m.glyph)?.anchors?.[anchorName];
     if (anchor === undefined) return;
     parts.push(
       renderStem({
-        noteheadGlyphName: noteheadGlyph,
-        noteX: x,
+        noteheadGlyphName: m.glyph,
+        noteX: m.x,
         noteY: y,
         direction,
         // renderStem draws from the notehead anchor a fixed `length` in
         // `direction` -- passing the exact distance to the beam's own Y
-        // makes the stem tip land precisely on the (possibly sloped) beam.
+        // makes the stem tip land precisely on the (possibly sloped)
+        // beam. Measured from the ATTACH notehead, so a chord's stem
+        // spans the whole chord and still ends exactly on the beam.
         length: Math.abs(beamY - (y - anchor[1])),
         thickness: getEngravingDefault('stemThickness') ?? STEM_THICKNESS_FALLBACK,
         color: INK_COLOR,
@@ -910,38 +995,38 @@ function renderBeamGroup(
     );
   });
 
-  // Integration H: a beamed note carries its own §9.19/§9.20 marks, using
+  // Integration H: a beamed event carries its own §9.19/§9.20 marks, using
   // the beam's own shared stem direction (§9.13) rather than re-deriving
-  // a per-note one, so every mark in the group sits on the same side.
-  notes.forEach((note, i) => {
-    const x = xs[i];
-    const position = positions[i];
-    if (x === undefined || position === undefined) return;
-    const marks = renderNoteMarks(note, x, position, position, direction, ctx);
-    if (marks !== '') parts.push(marks);
-  });
-
-  const anchors: EventAnchor[] = [];
-  notes.forEach((_note, i) => {
-    const x = xs[i];
-    const position = positions[i];
-    const noteheadGlyph = noteheadGlyphs[i];
-    if (x === undefined || position === undefined || noteheadGlyph === undefined) return;
-    anchors.push({
-      x,
-      topPosition: position,
-      bottomPosition: position,
+  // a per-note one, so every mark in the group sits on the same side. A
+  // chord's marks live on its FIRST note, as MusicXML writes them.
+  for (const m of members) {
+    const markSource = m.source.kind === 'chord' ? m.source.notes[0] : m.source;
+    if (markSource === undefined) continue;
+    const marks = renderNoteMarks(
+      markSource,
+      m.x,
+      Math.min(...m.positions),
+      Math.max(...m.positions),
       direction,
-      noteheadGlyph,
-    });
-  });
+      ctx,
+    );
+    if (marks !== '') parts.push(marks);
+  }
+
+  const anchors: EventAnchor[] = members.map((m) => ({
+    x: m.x,
+    topPosition: Math.min(...m.positions),
+    bottomPosition: Math.max(...m.positions),
+    direction,
+    noteheadGlyph: m.glyph,
+  }));
 
   // §9.13's documented simplification: line count is the MAX across every
-  // note in the group (whichever duration needs the most beam lines --
-  // the finest subdivision present), not just the first note's own
+  // event in the group (whichever duration needs the most beam lines --
+  // the finest subdivision present), not just the first one's own
   // duration. A group like [eighth, 16th, 16th] needs 2 lines throughout,
   // not 1.
-  const lineCount = Math.max(1, ...notes.map((n) => numBeamLines(n.duration.type)));
+  const lineCount = Math.max(1, ...events.map((e) => numBeamLines(e.duration.type)));
   // `shape`'s Y values are in staff-position-RELATIVE units (matching
   // `positions`, which came straight from staffPositionForPitch with no
   // offset) -- renderBeam draws in absolute SVG space, so the beam's own
@@ -964,23 +1049,32 @@ function renderBeamGroup(
   return { svg: parts.join('\n'), newAccidentalState: state, anchors };
 }
 
-function renderChord(
+/**
+ * Draws a chord's accidentals, noteheads and ledger lines -- everything
+ * except the stem. The chord-shaped counterpart of `renderNoteheadPart`,
+ * and extracted for exactly the same reason: both `renderChord` (which
+ * adds its own stem) and `renderBeamGroup` (whose stems reach a shared
+ * beam) need these heads drawn identically.
+ */
+function renderChordHeadsPart(
   chord: Chord,
   x: number,
   ctx: RenderCtx,
   accidentalState: AccidentalState,
-  forcedDirection: StemDirection | undefined,
-): { svg: string; newAccidentalState: AccidentalState; anchor?: EventAnchor } {
+): {
+  svg: string;
+  positions: readonly number[];
+  glyphs: readonly string[];
+  widestGlyph: string;
+  newAccidentalState: AccidentalState;
+} {
   const parts: string[] = [];
   // Chord members may be pitched OR unpitched (a drum chart legitimately
   // writes e.g. kick+hi-hat as a simultaneous group). Both go through the
-  // same staffPositionForPitch -- an unpitched note's display-step/octave
+  // same resolveNoteRendering -- an unpitched note's display-step/octave
   // IS its staff position. Only pitched members can carry an accidental.
-  const positions = chord.notes.map((n) =>
-    n.pitch.kind === 'pitched'
-      ? staffPositionForPitch(ctx.clefDef, n.pitch.step, n.pitch.octave)
-      : staffPositionForPitch(ctx.clefDef, n.pitch.displayStep, n.pitch.displayOctave),
-  );
+  const resolved = chord.notes.map((n) => resolveNoteRendering(n, ctx));
+  const positions = resolved.map((r) => r.position);
 
   let state = accidentalState;
   const drawFlags: boolean[] = [];
@@ -1019,11 +1113,10 @@ function renderChord(
   });
 
   let widestGlyph: string | undefined;
-  chord.notes.forEach((n, i) => {
-    const glyphName = selectNoteheadGlyphName({
-      pitch: n.pitch,
-      durationType: chord.duration.type,
-    });
+  const glyphs: string[] = [];
+  resolved.forEach((r, i) => {
+    const glyphName = r.noteheadGlyph;
+    glyphs.push(glyphName);
     if (widestGlyph === undefined || glyphWidthOf(glyphName) > glyphWidthOf(widestGlyph)) {
       widestGlyph = glyphName;
     }
@@ -1045,14 +1138,35 @@ function renderChord(
     }
   });
 
+  return {
+    svg: parts.join('\n'),
+    positions,
+    glyphs,
+    widestGlyph: widestGlyph ?? 'noteheadBlack',
+    newAccidentalState: state,
+  };
+}
+
+function renderChord(
+  chord: Chord,
+  x: number,
+  ctx: RenderCtx,
+  accidentalState: AccidentalState,
+  forcedDirection: StemDirection | undefined,
+): { svg: string; newAccidentalState: AccidentalState; anchor?: EventAnchor } {
+  const heads = renderChordHeadsPart(chord, x, ctx, accidentalState);
+  const parts: string[] = [heads.svg];
+  const positions = heads.positions;
+
   if (positions.length > 0) {
-    const direction = forcedDirection ?? chordStemDirection(positions, middleLineY(STAFF_LINES));
+    const direction =
+      forcedDirection ?? chordStemDirection([...positions], middleLineY(STAFF_LINES));
     if (chord.duration.type !== 'whole') {
       const outermost = direction === 'up' ? Math.max(...positions) : Math.min(...positions);
       const length = computeStemLength(outermost, middleLineY(STAFF_LINES));
       parts.push(
         renderStem({
-          noteheadGlyphName: widestGlyph ?? 'noteheadBlack',
+          noteheadGlyphName: heads.widestGlyph,
           noteX: x,
           noteY: ctx.measureBottomY + outermost,
           direction,
@@ -1080,18 +1194,18 @@ function renderChord(
     }
     return {
       svg: parts.join('\n'),
-      newAccidentalState: state,
+      newAccidentalState: heads.newAccidentalState,
       anchor: {
         x,
         topPosition: Math.min(...positions),
         bottomPosition: Math.max(...positions),
         direction,
-        noteheadGlyph: widestGlyph ?? 'noteheadBlack',
+        noteheadGlyph: heads.widestGlyph,
       },
     };
   }
 
-  return { svg: parts.join('\n'), newAccidentalState: state };
+  return { svg: parts.join('\n'), newAccidentalState: heads.newAccidentalState };
 }
 
 /**
@@ -1494,6 +1608,37 @@ export function renderFromMusicXml(
     measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
   }
 
+  /**
+   * Integration M: how much extra room above the staff the tempo marks
+   * need, beyond what STAFF_BOTTOM_Y already leaves. Computed score-wide
+   * and applied uniformly, so every staff of every system shifts together
+   * and the marks never land outside the viewBox. Zero for a score with
+   * no tempo marks, which is what keeps every such fixture byte-identical.
+   */
+  const tempoTopPadding = (() => {
+    if (tempoMarks.length === 0) return 0;
+    const existingHeadroom = STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
+    let needed = 0;
+    for (const part of score.parts) {
+      const midi = midiInstrumentsByPartMap.get(part.id);
+      for (const m of part.measures) {
+        if (!tempoMarks.some((t) => t.partId === part.id && t.measureNumber === m.number)) continue;
+        const a = attributesByPartAndMeasure.get(`${part.id}:${m.number}`);
+        const spec = a?.clefsByStaff[1];
+        const { clefDef } = mapClef(spec?.sign ?? a?.clefSign ?? 'G', spec?.line ?? a?.clefLine);
+        const extent = measureNorthExtent(m, 1, {
+          clefDef,
+          measureBottomY: 0,
+          midiInstrumentsByPart: midi,
+        });
+        needed = Math.max(needed, extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
+      }
+    }
+    return Math.max(0, needed - existingHeadroom);
+  })();
+  /** Every staff's bottom line sits this far down, tempo-mark headroom included. */
+  const staffBottomY = STAFF_BOTTOM_Y + tempoTopPadding;
+
   // Integration B: every part is rendered, each offset vertically below
   // the one before it. Phase 29's computeSystemLayout already handles
   // multi-PART stacking (not just multi-staff), so it is given the real
@@ -1545,7 +1690,7 @@ export function renderFromMusicXml(
   // score (every part, every staff) plus the room STAFF_BOTTOM_Y already
   // reserves above the first staff.
   const lowestStaffOffset = scoreLayout.positions[scoreLayout.positions.length - 1]?.y ?? 0;
-  const systemHeight = SYSTEM_HEIGHT + lowestStaffOffset;
+  const systemHeight = SYSTEM_HEIGHT + tempoTopPadding + lowestStaffOffset;
 
   const widthOf = (measureNumber: number): number =>
     measureLayoutsByNumber.get(measureNumber)?.width ?? MEASURE_WIDTH;
@@ -1765,7 +1910,23 @@ export function renderFromMusicXml(
           attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
         const topStaffLines = attrs.staffLinesByStaff[1] ?? STAFF_LINES;
         const topStaffGeometry = computeStaffGeometry(topStaffLines);
-        const topStaffY = STAFF_BOTTOM_Y + systemY - topStaffGeometry.height;
+        const topStaffY = staffBottomY + systemY - topStaffGeometry.height;
+        // Integration M: clear the measure's REAL content, not just the
+        // staff's top line. On a drum chart the hi-hat line IS the top
+        // line, so a fixed offset from it put the mark straight through
+        // the beams -- measured on this project's own fixture, the mark
+        // sat at y=1.50 while the first note's stem ran 3.56 -> 0.50 at
+        // the very same x.
+        const topClefSpec = attrs.clefsByStaff[1];
+        const { clefDef: topClefDef } = mapClef(
+          topClefSpec?.sign ?? attrs.clefSign,
+          topClefSpec?.line ?? attrs.clefLine,
+        );
+        const northExtent = measureNorthExtent(measure, 1, {
+          clefDef: topClefDef,
+          measureBottomY: 0,
+          midiInstrumentsByPart: midiInstrumentsByPartMap.get(part.id),
+        });
         for (const mark of measureTempoMarks) {
           const dotGlyph = mark.beatUnitDots > 0 ? metronomeDotGlyphName() : undefined;
           const eventX = noteAreaX + (mark.tick / (measureTotalTicks || 1)) * noteAreaWidth;
@@ -1777,13 +1938,11 @@ export function renderFromMusicXml(
               metronomeBpmDigitGlyphNames(mark.perMinute),
               {
                 x: eventX,
-                // tempoMarkSide() is always 'above' -- given generous
-                // clearance from the topmost staff's own top line rather
-                // than the bare minimum: the metNote* glyph's own SMuFL
-                // bounding box is tall (its stem reaches well above its
-                // own anchor point), so a small offset left it looking
-                // cramped against the staff in practice.
-                y: topStaffY - 2.5,
+                // tempoMarkSide() is always 'above'. The clearance is
+                // measured from whatever this measure's content actually
+                // reaches (stems and beams included), not from the staff
+                // line -- see the note where northExtent is computed.
+                y: topStaffY - northExtent - TEMPO_MARK_GAP,
                 color: INK_COLOR,
                 fontFamily: FONT_FAMILY,
                 noteToEqualsGap: 1.0,
@@ -1813,7 +1972,7 @@ export function renderFromMusicXml(
         // diagnostic), so no note math depends on this being 6.
         const staffLines = attrs.staffLinesByStaff[staffNumber] ?? STAFF_LINES;
         const staffGeometry = computeStaffGeometry(staffLines);
-        const bottomY = STAFF_BOTTOM_Y + systemY + staffOffsetFor(partIndex, staffIndex);
+        const bottomY = staffBottomY + systemY + staffOffsetFor(partIndex, staffIndex);
 
         svgParts.push(
           renderStaff(staffGeometry, {
@@ -2029,21 +2188,25 @@ export function renderFromMusicXml(
             // single 5-note beam group (2 grace + 3 real), silently drawing
             // the grace notes as if they were ordinary noteheads and never
             // reaching the grace-note rendering branch below at all.
-            const beamableEvents = voice.events.map((event) => ({
-              durationType: event.duration.type,
-              isRest: event.kind !== 'note' || event.isGrace === true,
+            const beamableEvents = voice.events.map((event) => {
+              // Integration M: a CHORD is beamable now. It used to be
+              // lumped in with rests here, which broke every beam run a
+              // chord sat in -- on a drum chart, where hi-hat + snare
+              // struck together IS a chord, that was most of them.
+              const beamSource =
+                event.kind === 'chord' ? event.notes[0] : event.kind === 'note' ? event : undefined;
+              const isRest =
+                event.kind === 'rest' || (event.kind === 'note' && event.isGrace === true);
               // §10.4/§10.8: the file's own level-1 <beam>, when it wrote
-              // one. Only a plain Note can carry one here -- a chord is
-              // already excluded from beaming above (a documented scope
-              // limit of renderBeamGroup), so reading its first note's
-              // hints would claim a grouping this renderer cannot draw.
-              ...(event.kind === 'note' && event.isGrace !== true
-                ? (() => {
-                    const level1 = event.beams?.find((b) => b.number === 1);
-                    return level1 !== undefined ? { beamValue: level1.value } : {};
-                  })()
-                : {}),
-            }));
+              // one. A chord's <beam> lives on its first note, exactly
+              // where MusicXML puts it.
+              const level1 = isRest ? undefined : beamSource?.beams?.find((b) => b.number === 1);
+              return {
+                durationType: event.duration.type,
+                isRest,
+                ...(level1 !== undefined ? { beamValue: level1.value } : {}),
+              };
+            });
             // §10.8: a file that states its own beaming is the authority
             // on it. Only when NO note in this voice gave a level-1 hint
             // does Phase 23's time-signature inference decide instead.
@@ -2093,12 +2256,16 @@ export function renderFromMusicXml(
                 // can currently put a non-note in a group, which is
                 // exactly why the misalignment would have been so hard to
                 // find if something ever did.
-                const groupIndices = group.eventIndices.filter(
-                  (i) => voice.events[i]?.kind === 'note',
-                );
+                const groupIndices = group.eventIndices.filter((i) => {
+                  const kind = voice.events[i]?.kind;
+                  return kind === 'note' || kind === 'chord';
+                });
                 const groupNotes = groupIndices
                   .map((i) => voice.events[i])
-                  .filter((e): e is Note => e !== undefined && e.kind === 'note');
+                  .filter(
+                    (e): e is Note | Chord =>
+                      e !== undefined && (e.kind === 'note' || e.kind === 'chord'),
+                  );
                 const groupXs = groupIndices.map((i) => eventXs[i] ?? 0);
                 const {
                   svg,
@@ -2292,7 +2459,7 @@ export function renderFromMusicXml(
       );
       const firstStaffOffset = staffOffsetFor(partIndex, 0);
       const lastStaffOffset = staffOffsetFor(partIndex, staffNumbers.length - 1);
-      const barlineBottomY = STAFF_BOTTOM_Y + systemY + lastStaffOffset;
+      const barlineBottomY = staffBottomY + systemY + lastStaffOffset;
       const barlineHeight = needsContinuousBarline(staffNumbers.length)
         ? outerStaffGeometry.height + (lastStaffOffset - firstStaffOffset)
         : outerStaffGeometry.height;
@@ -2324,8 +2491,8 @@ export function renderFromMusicXml(
       ).height;
       for (const origin of systemOrigins) {
         const braceShape = computeBraceShape(
-          STAFF_BOTTOM_Y + origin.systemY + firstOffset - topStaffHeight,
-          STAFF_BOTTOM_Y + origin.systemY + lastOffset,
+          staffBottomY + origin.systemY + firstOffset - topStaffHeight,
+          staffBottomY + origin.systemY + lastOffset,
           origin.x,
         );
         svgParts.push(renderBrace(braceShape, { color: INK_COLOR, fontFamily: FONT_FAMILY }));

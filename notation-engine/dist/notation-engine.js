@@ -62362,6 +62362,9 @@ ${denominator}`;
   var MEASURE_TRAILING_MARGIN = 2;
   var MEASURE_HEADER_ALLOWANCE = 6;
   var DEFAULT_STAFF_GAP_FALLBACK = 8;
+  var TEMPO_MARK_GAP = 1.5;
+  var TEMPO_MARK_HEIGHT = 2;
+  var STEM_AND_BEAM_ALLOWANCE = 3.5 + 0.5;
   var ARTICULATION_GAP = 1;
   var ORNAMENT_GAP = 1.5;
   var SLUR_GAP = 1.2;
@@ -62552,6 +62555,25 @@ ${denominator}`;
       ...drumEntry?.stemDirection !== void 0 ? { drumStemDirection: drumEntry.stemDirection } : {}
     };
   }
+  function measureNorthExtent(measure2, staffNumber, ctx) {
+    const topLineY = -(STAFF_LINES - 1);
+    let highest;
+    const consider = (position) => {
+      const reach = position - STEM_AND_BEAM_ALLOWANCE;
+      highest = highest === void 0 ? reach : Math.min(highest, reach);
+    };
+    for (const voice2 of measure2.voices) {
+      for (const event of voice2.events) {
+        if ((event.staff ?? 1) !== staffNumber) continue;
+        if (event.kind === "note") consider(resolveNoteRendering(event, ctx).position);
+        else if (event.kind === "chord") {
+          for (const n of event.notes) consider(resolveNoteRendering(n, ctx).position);
+        }
+      }
+    }
+    if (highest === void 0) return 0;
+    return Math.max(0, topLineY - highest);
+  }
   function renderNoteheadPart(note2, x2, ctx, accidentalState) {
     const parts = [];
     const { position, noteheadGlyph, drumStemDirection } = resolveNoteRendering(note2, ctx);
@@ -62710,74 +62732,87 @@ ${denominator}`;
       tieAnchor: { direction, position: head.position, noteheadGlyph: head.noteheadGlyph }
     };
   }
-  function renderBeamGroup(notes, xs, ctx, accidentalState, beamStyle, forcedDirection) {
+  function renderBeamGroup(events, xs, ctx, accidentalState, beamStyle, forcedDirection) {
     const parts = [];
     let state = accidentalState;
-    const positions = [];
-    const noteheadGlyphs = [];
-    notes.forEach((note2, i2) => {
+    const members = [];
+    events.forEach((event, i2) => {
       const x2 = xs[i2];
       if (x2 === void 0) return;
-      const head = renderNoteheadPart(note2, x2, ctx, state);
-      parts.push(head.svg);
-      state = head.newAccidentalState;
-      positions.push(head.position);
-      noteheadGlyphs.push(head.noteheadGlyph);
+      if (event.kind === "chord") {
+        const heads = renderChordHeadsPart(event, x2, ctx, state);
+        parts.push(heads.svg);
+        state = heads.newAccidentalState;
+        members.push({ x: x2, positions: heads.positions, glyph: heads.widestGlyph, source: event });
+      } else {
+        const head = renderNoteheadPart(event, x2, ctx, state);
+        parts.push(head.svg);
+        state = head.newAccidentalState;
+        members.push({ x: x2, positions: [head.position], glyph: head.noteheadGlyph, source: event });
+      }
     });
     const middle = middleLineY(STAFF_LINES);
-    const direction = forcedDirection ?? beamDirection(positions, middle);
+    const allPositions = members.flatMap((m) => [...m.positions]);
+    const direction = forcedDirection ?? beamDirection(allPositions, middle);
+    const beamPositionOf = (m) => direction === "up" ? Math.min(...m.positions) : Math.max(...m.positions);
+    const attachPositionOf = (m) => direction === "up" ? Math.max(...m.positions) : Math.min(...m.positions);
+    const beamPositions = members.map(beamPositionOf);
     const naturalLength = Math.max(
       DEFAULT_UNBEAMED_STEM_LENGTH,
-      ...positions.map((p) => computeStemLength(p, middle))
+      ...beamPositions.map((p) => computeStemLength(p, middle))
     );
-    const shape = computeBeamShape(positions, [...xs], direction, beamStyle, naturalLength);
-    notes.forEach((_note, i2) => {
-      const x2 = xs[i2];
-      const position = positions[i2];
-      const noteheadGlyph = noteheadGlyphs[i2];
-      if (x2 === void 0 || position === void 0 || noteheadGlyph === void 0) return;
-      const y = ctx.measureBottomY + position;
-      const beamY = ctx.measureBottomY + beamYAtX(shape, x2);
+    const shape = computeBeamShape(
+      beamPositions,
+      members.map((m) => m.x),
+      direction,
+      beamStyle,
+      naturalLength
+    );
+    members.forEach((m) => {
+      const attachPosition = attachPositionOf(m);
+      const y = ctx.measureBottomY + attachPosition;
+      const beamY = ctx.measureBottomY + beamYAtX(shape, m.x);
       const anchorName = direction === "up" ? "stemUpSE" : "stemDownNW";
-      const anchor = getGlyph(noteheadGlyph)?.anchors?.[anchorName];
+      const anchor = getGlyph(m.glyph)?.anchors?.[anchorName];
       if (anchor === void 0) return;
       parts.push(
         renderStem({
-          noteheadGlyphName: noteheadGlyph,
-          noteX: x2,
+          noteheadGlyphName: m.glyph,
+          noteX: m.x,
           noteY: y,
           direction,
           // renderStem draws from the notehead anchor a fixed `length` in
           // `direction` -- passing the exact distance to the beam's own Y
-          // makes the stem tip land precisely on the (possibly sloped) beam.
+          // makes the stem tip land precisely on the (possibly sloped)
+          // beam. Measured from the ATTACH notehead, so a chord's stem
+          // spans the whole chord and still ends exactly on the beam.
           length: Math.abs(beamY - (y - anchor[1])),
           thickness: getEngravingDefault("stemThickness") ?? STEM_THICKNESS_FALLBACK,
           color: INK_COLOR
         })
       );
     });
-    notes.forEach((note2, i2) => {
-      const x2 = xs[i2];
-      const position = positions[i2];
-      if (x2 === void 0 || position === void 0) return;
-      const marks = renderNoteMarks(note2, x2, position, position, direction, ctx);
-      if (marks !== "") parts.push(marks);
-    });
-    const anchors = [];
-    notes.forEach((_note, i2) => {
-      const x2 = xs[i2];
-      const position = positions[i2];
-      const noteheadGlyph = noteheadGlyphs[i2];
-      if (x2 === void 0 || position === void 0 || noteheadGlyph === void 0) return;
-      anchors.push({
-        x: x2,
-        topPosition: position,
-        bottomPosition: position,
+    for (const m of members) {
+      const markSource = m.source.kind === "chord" ? m.source.notes[0] : m.source;
+      if (markSource === void 0) continue;
+      const marks = renderNoteMarks(
+        markSource,
+        m.x,
+        Math.min(...m.positions),
+        Math.max(...m.positions),
         direction,
-        noteheadGlyph
-      });
-    });
-    const lineCount = Math.max(1, ...notes.map((n) => numBeamLines(n.duration.type)));
+        ctx
+      );
+      if (marks !== "") parts.push(marks);
+    }
+    const anchors = members.map((m) => ({
+      x: m.x,
+      topPosition: Math.min(...m.positions),
+      bottomPosition: Math.max(...m.positions),
+      direction,
+      noteheadGlyph: m.glyph
+    }));
+    const lineCount = Math.max(1, ...events.map((e) => numBeamLines(e.duration.type)));
     const offsetShape = {
       ...shape,
       startY: shape.startY + ctx.measureBottomY,
@@ -62793,11 +62828,10 @@ ${denominator}`;
     );
     return { svg: parts.join("\n"), newAccidentalState: state, anchors };
   }
-  function renderChord(chord2, x2, ctx, accidentalState, forcedDirection) {
+  function renderChordHeadsPart(chord2, x2, ctx, accidentalState) {
     const parts = [];
-    const positions = chord2.notes.map(
-      (n) => n.pitch.kind === "pitched" ? staffPositionForPitch(ctx.clefDef, n.pitch.step, n.pitch.octave) : staffPositionForPitch(ctx.clefDef, n.pitch.displayStep, n.pitch.displayOctave)
-    );
+    const resolved = chord2.notes.map((n) => resolveNoteRendering(n, ctx));
+    const positions = resolved.map((r) => r.position);
     let state = accidentalState;
     const drawFlags = [];
     const alters = [];
@@ -62833,11 +62867,10 @@ ${denominator}`;
       );
     });
     let widestGlyph;
-    chord2.notes.forEach((n, i2) => {
-      const glyphName = selectNoteheadGlyphName({
-        pitch: n.pitch,
-        durationType: chord2.duration.type
-      });
+    const glyphs = [];
+    resolved.forEach((r, i2) => {
+      const glyphName = r.noteheadGlyph;
+      glyphs.push(glyphName);
       if (widestGlyph === void 0 || glyphWidthOf(glyphName) > glyphWidthOf(widestGlyph)) {
         widestGlyph = glyphName;
       }
@@ -62858,14 +62891,26 @@ ${denominator}`;
         );
       }
     });
+    return {
+      svg: parts.join("\n"),
+      positions,
+      glyphs,
+      widestGlyph: widestGlyph ?? "noteheadBlack",
+      newAccidentalState: state
+    };
+  }
+  function renderChord(chord2, x2, ctx, accidentalState, forcedDirection) {
+    const heads = renderChordHeadsPart(chord2, x2, ctx, accidentalState);
+    const parts = [heads.svg];
+    const positions = heads.positions;
     if (positions.length > 0) {
-      const direction = forcedDirection ?? chordStemDirection(positions, middleLineY(STAFF_LINES));
+      const direction = forcedDirection ?? chordStemDirection([...positions], middleLineY(STAFF_LINES));
       if (chord2.duration.type !== "whole") {
         const outermost = direction === "up" ? Math.max(...positions) : Math.min(...positions);
         const length = computeStemLength(outermost, middleLineY(STAFF_LINES));
         parts.push(
           renderStem({
-            noteheadGlyphName: widestGlyph ?? "noteheadBlack",
+            noteheadGlyphName: heads.widestGlyph,
             noteX: x2,
             noteY: ctx.measureBottomY + outermost,
             direction,
@@ -62889,17 +62934,17 @@ ${denominator}`;
       }
       return {
         svg: parts.join("\n"),
-        newAccidentalState: state,
+        newAccidentalState: heads.newAccidentalState,
         anchor: {
           x: x2,
           topPosition: Math.min(...positions),
           bottomPosition: Math.max(...positions),
           direction,
-          noteheadGlyph: widestGlyph ?? "noteheadBlack"
+          noteheadGlyph: heads.widestGlyph
         }
       };
     }
-    return { svg: parts.join("\n"), newAccidentalState: state };
+    return { svg: parts.join("\n"), newAccidentalState: heads.newAccidentalState };
   }
   function computeVoiceCollisionOffsets(measure2, staffNumber, ctx) {
     const offsets = /* @__PURE__ */ new Map();
@@ -63149,6 +63194,28 @@ ${denominator}`;
       measureLayoutsByNumber.set(measureNumber, layout);
       measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
     }
+    const tempoTopPadding = (() => {
+      if (tempoMarks.length === 0) return 0;
+      const existingHeadroom = STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
+      let needed = 0;
+      for (const part2 of score2.parts) {
+        const midi = midiInstrumentsByPartMap.get(part2.id);
+        for (const m of part2.measures) {
+          if (!tempoMarks.some((t) => t.partId === part2.id && t.measureNumber === m.number)) continue;
+          const a = attributesByPartAndMeasure.get(`${part2.id}:${m.number}`);
+          const spec = a?.clefsByStaff[1];
+          const { clefDef } = mapClef(spec?.sign ?? a?.clefSign ?? "G", spec?.line ?? a?.clefLine);
+          const extent = measureNorthExtent(m, 1, {
+            clefDef,
+            measureBottomY: 0,
+            midiInstrumentsByPart: midi
+          });
+          needed = Math.max(needed, extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
+        }
+      }
+      return Math.max(0, needed - existingHeadroom);
+    })();
+    const staffBottomY = STAFF_BOTTOM_Y + tempoTopPadding;
     const staffDistanceForPair = (partIndex, staffIndexInPart) => {
       const part2 = score2.parts[partIndex];
       if (part2 === void 0) return 8;
@@ -63171,7 +63238,7 @@ ${denominator}`;
     const placementByMeasureNumber = /* @__PURE__ */ new Map();
     const systemOrigins = [];
     const lowestStaffOffset = scoreLayout.positions[scoreLayout.positions.length - 1]?.y ?? 0;
-    const systemHeight = SYSTEM_HEIGHT + lowestStaffOffset;
+    const systemHeight = SYSTEM_HEIGHT + tempoTopPadding + lowestStaffOffset;
     const widthOf = (measureNumber) => measureLayoutsByNumber.get(measureNumber)?.width ?? MEASURE_WIDTH;
     let pageCount = 1;
     if (config.layout.mode === "page") {
@@ -63317,7 +63384,17 @@ ${denominator}`;
           const measureTotalTicks = attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
           const topStaffLines = attrs.staffLinesByStaff[1] ?? STAFF_LINES;
           const topStaffGeometry = computeStaffGeometry(topStaffLines);
-          const topStaffY = STAFF_BOTTOM_Y + systemY - topStaffGeometry.height;
+          const topStaffY = staffBottomY + systemY - topStaffGeometry.height;
+          const topClefSpec = attrs.clefsByStaff[1];
+          const { clefDef: topClefDef } = mapClef(
+            topClefSpec?.sign ?? attrs.clefSign,
+            topClefSpec?.line ?? attrs.clefLine
+          );
+          const northExtent = measureNorthExtent(measure2, 1, {
+            clefDef: topClefDef,
+            measureBottomY: 0,
+            midiInstrumentsByPart: midiInstrumentsByPartMap.get(part2.id)
+          });
           for (const mark of measureTempoMarks) {
             const dotGlyph = mark.beatUnitDots > 0 ? metronomeDotGlyphName() : void 0;
             const eventX = noteAreaX + mark.tick / (measureTotalTicks || 1) * noteAreaWidth;
@@ -63329,13 +63406,11 @@ ${denominator}`;
                 metronomeBpmDigitGlyphNames(mark.perMinute),
                 {
                   x: eventX,
-                  // tempoMarkSide() is always 'above' -- given generous
-                  // clearance from the topmost staff's own top line rather
-                  // than the bare minimum: the metNote* glyph's own SMuFL
-                  // bounding box is tall (its stem reaches well above its
-                  // own anchor point), so a small offset left it looking
-                  // cramped against the staff in practice.
-                  y: topStaffY - 2.5,
+                  // tempoMarkSide() is always 'above'. The clearance is
+                  // measured from whatever this measure's content actually
+                  // reaches (stems and beams included), not from the staff
+                  // line -- see the note where northExtent is computed.
+                  y: topStaffY - northExtent - TEMPO_MARK_GAP,
                   color: INK_COLOR,
                   fontFamily: FONT_FAMILY,
                   noteToEqualsGap: 1
@@ -63352,7 +63427,7 @@ ${denominator}`;
           );
           const staffLines = attrs.staffLinesByStaff[staffNumber] ?? STAFF_LINES;
           const staffGeometry = computeStaffGeometry(staffLines);
-          const bottomY = STAFF_BOTTOM_Y + systemY + staffOffsetFor(partIndex, staffIndex);
+          const bottomY = staffBottomY + systemY + staffOffsetFor(partIndex, staffIndex);
           svgParts.push(
             renderStaff(staffGeometry, {
               x: layout.x,
@@ -63485,19 +63560,16 @@ ${denominator}`;
                 const baseX = realX !== void 0 ? noteAreaX + realX : noteAreaX + startTick / total * fallbackNoteAreaWidth;
                 return baseX + (collisionOffsets.get(`${voice2.id}:${startTick}`) ?? 0);
               });
-              const beamableEvents = voice2.events.map((event) => ({
-                durationType: event.duration.type,
-                isRest: event.kind !== "note" || event.isGrace === true,
-                // §10.4/§10.8: the file's own level-1 <beam>, when it wrote
-                // one. Only a plain Note can carry one here -- a chord is
-                // already excluded from beaming above (a documented scope
-                // limit of renderBeamGroup), so reading its first note's
-                // hints would claim a grouping this renderer cannot draw.
-                ...event.kind === "note" && event.isGrace !== true ? (() => {
-                  const level1 = event.beams?.find((b) => b.number === 1);
-                  return level1 !== void 0 ? { beamValue: level1.value } : {};
-                })() : {}
-              }));
+              const beamableEvents = voice2.events.map((event) => {
+                const beamSource = event.kind === "chord" ? event.notes[0] : event.kind === "note" ? event : void 0;
+                const isRest = event.kind === "rest" || event.kind === "note" && event.isGrace === true;
+                const level1 = isRest ? void 0 : beamSource?.beams?.find((b) => b.number === 1);
+                return {
+                  durationType: event.duration.type,
+                  isRest,
+                  ...level1 !== void 0 ? { beamValue: level1.value } : {}
+                };
+              });
               const groups = hasExplicitBeams(beamableEvents) ? groupBeamsFromHints(beamableEvents) : groupBeams(beamableEvents, starts, attrs.timeNumerator, attrs.timeDenominator);
               const beamedIndices = beamedEventIndices(groups);
               const groupByFirstIndex = /* @__PURE__ */ new Map();
@@ -63514,10 +63586,13 @@ ${denominator}`;
                 if (!isGraceNote && beamedIndices.has(idx)) {
                   const group = groupByFirstIndex.get(idx);
                   if (group === void 0) return;
-                  const groupIndices = group.eventIndices.filter(
-                    (i3) => voice2.events[i3]?.kind === "note"
+                  const groupIndices = group.eventIndices.filter((i3) => {
+                    const kind = voice2.events[i3]?.kind;
+                    return kind === "note" || kind === "chord";
+                  });
+                  const groupNotes = groupIndices.map((i3) => voice2.events[i3]).filter(
+                    (e) => e !== void 0 && (e.kind === "note" || e.kind === "chord")
                   );
-                  const groupNotes = groupIndices.map((i3) => voice2.events[i3]).filter((e) => e !== void 0 && e.kind === "note");
                   const groupXs = groupIndices.map((i3) => eventXs[i3] ?? 0);
                   const {
                     svg: svg2,
@@ -63673,7 +63748,7 @@ ${denominator}`;
         );
         const firstStaffOffset = staffOffsetFor(partIndex, 0);
         const lastStaffOffset = staffOffsetFor(partIndex, staffNumbers.length - 1);
-        const barlineBottomY = STAFF_BOTTOM_Y + systemY + lastStaffOffset;
+        const barlineBottomY = staffBottomY + systemY + lastStaffOffset;
         const barlineHeight = needsContinuousBarline(staffNumbers.length) ? outerStaffGeometry.height + (lastStaffOffset - firstStaffOffset) : outerStaffGeometry.height;
         svgParts.push(
           renderBarline(barlineGeometry, {
@@ -63696,8 +63771,8 @@ ${denominator}`;
         ).height;
         for (const origin of systemOrigins) {
           const braceShape = computeBraceShape(
-            STAFF_BOTTOM_Y + origin.systemY + firstOffset - topStaffHeight,
-            STAFF_BOTTOM_Y + origin.systemY + lastOffset,
+            staffBottomY + origin.systemY + firstOffset - topStaffHeight,
+            staffBottomY + origin.systemY + lastOffset,
             origin.x
           );
           svgParts.push(renderBrace(braceShape, { color: INK_COLOR, fontFamily: FONT_FAMILY }));

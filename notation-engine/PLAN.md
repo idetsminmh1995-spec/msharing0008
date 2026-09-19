@@ -759,7 +759,7 @@ MusicXML complication: a file may supply an explicit `<accidental>` element,
 which must be honoured even when our own state machine would not have drawn
 one (that is what courtesy accidentals are).
 
-### 9.12 Beam grouping `[BUILT and WIRED -- inference by Phase 23, and the file's own explicit <beam> hints (§10.8) take precedence over it since Phase 35 Tier 2. See Doc/phase-23-beam-grouping.md and Doc/phase-35-musicxml-parser-v2-tier23.md]`
+### 9.12 Beam grouping `[BUILT and WIRED (chords included since Integration M) -- inference by Phase 23, and the file's own explicit <beam> hints (§10.8) take precedence over it since Phase 35 Tier 2. See Doc/phase-23-beam-grouping.md and Doc/phase-35-musicxml-parser-v2-tier23.md]`
 
 **Responsibility.** Decide which consecutive eighth-or-shorter notes within a
 measure share one beam, and which stand alone with an individual flag
@@ -1303,7 +1303,7 @@ similar compound ornaments.
 
 ---
 
-### 9.21 Dynamics, hairpins, tempo marks, rehearsal marks `[PARTIAL -- dynamics/hairpins BUILT and WIRED (Integration Pass J); tempo marks drawn since Integration Pass D; rehearsal marks remain placement-only (they need arbitrary text, which this engine still has no font for). See Doc/integration-j-dynamics-hairpins.md]`
+### 9.21 Dynamics, hairpins, tempo marks, rehearsal marks `[PARTIAL -- dynamics/hairpins BUILT and WIRED (Integration Pass J); tempo marks drawn since Integration Pass D and given real content-aware clearance by Integration Pass M; rehearsal marks remain placement-only (they need arbitrary text, which this engine still has no font for). See Doc/integration-j-dynamics-hairpins.md]`
 
 **Responsibility.** Four distinct expression-mark categories, bundled in
 one phase per the roadmap but researched and scoped separately, since
@@ -2326,7 +2326,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | Phase | What | Status |
 |---|---|---|
 | 23 | Beam grouping (by time-signature beat structure, with override) | ✅ |
-| 24 | Beam geometry + the three styles (straight / flat / curved) | ✅ |
+| 24 | Beam geometry + the three styles (straight / flat / curved) | ✅ (beams span chords since Integration M) |
 | 25 | Multi-voice per staff + voice collision and rest separation | ✅ (notehead-offset wired by Integration K) |
 | 26 | Ties | ✅ (common case); cross-barline/beam/chord ties pending |
 | 27 | Slurs | ✅ (wired by Integration I) |

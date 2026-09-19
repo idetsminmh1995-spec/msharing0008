@@ -6,7 +6,7 @@ A+B+C corrective work** (making notes actually visible in the web app).
 Numbering is **`PLAN.md` §22's phase numbering** — deliberately not a second
 numbering system. Say a number from §B below and that's the phase to build.
 
-**Last audited:** against the code in `src/` and the **646-test** suite,
+**Last audited:** against the code in `src/` and the **653-test** suite,
 after Integration Pass L (Phase 35's Tier 2/3 completion, Integrations H-L,
 and the three defects those passes uncovered). Stages 0-8 are complete and
 every phase numbered 1-47 is now built AND wired.
@@ -16,7 +16,7 @@ every phase numbered 1-47 is now built AND wired.
 ## A. DONE — Phases 1–47 ✅ (Stages 0 through 8 complete) + Integration Passes A–L
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes **646/646** across them.
+`npm run verify` passes **653/653** across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -79,6 +79,7 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | — | **Integration I** (not a numbered phase) | §9.16 slurs + §9.17 tuplets drawn, via a span pass over anchors captured as each event renders; found+fixed a latent beam-group index/x misalignment | [`integration-i`](./integration-i-slur-tuplet-wiring.md) |
 | — | **Integration J** (not a numbered phase) | §9.21 dynamics + hairpins drawn, including wedges spanning several measures; explicit `placement` honoured | [`integration-j`](./integration-j-dynamics-hairpins.md) |
 | — | **Integration K** (not a numbered phase) | §9.14 multi-voice notehead-collision offsetting wired -- completes Phase 25's last unwired piece | [`integration-k`](./integration-k-voice-collision.md) |
+| — | **Integration M** (not a numbered phase) | The three defects a real drum chart exposed: the deployed site served no music font (every glyph a box), every chord broke its beam (62 stray flags on a 32-measure chart), and the tempo mark was drawn through the notes. Verified in a real headless Chromium, not only in markup | [`integration-m`](./integration-m-drum-chart-defects.md) |
 | — | **Integration L** (not a numbered phase) | §16.2 page mode wired (completes Phase 46, and Stage 8) + **fixed parts laying themselves out independently**, so a score finally shares ONE horizontal timeline; also de-quadratic-ed the per-measure lookups | [`integration-l`](./integration-l-page-layout-and-score-wide-spacing.md) |
 
 **Public API today:** 213 exports from `dist/notation-engine.js`.
@@ -157,6 +158,25 @@ coordinate convention and the `SMUFL_STAFF_SPACES_PER_EM = 4` constant match
 Not a defect: `EngineConfig`'s `[TODO]` sections from §8.2 (`spacing`,
 `staves`, `page`, `fonts`, `drums`, `debug`) are absent by design — §8.2 says
 each lands with its own module.
+
+### Fifth audit round — prompted by a screenshot of the real app
+
+The user loaded their own drum MusicXML into the deployed site and sent a
+screenshot. Everything numbered 1–47 was built and wired; the screenshot
+showed boxes. Three defects, all now fixed, all in
+[`integration-m`](./integration-m-drum-chart-defects.md):
+
+| Finding | Resolution |
+|---|---|
+| **The deployed site served no Bravura font** (§F7 below, raised in the fourth round and now closed). Staff lines, stems and beams drew perfectly — they are `<line>` elements — while every glyph was an empty box | **Fixed.** `website/assets/fonts/Bravura.woff2` is committed and the drum page declares `@font-face` + preload |
+| **Every chord broke its beam.** `renderBeamGroup` took `readonly Note[]`, so the caller classified a chord as unbeamable — the same bucket as a rest. §9.13 recorded this as a scope limit, but a drum chart's hi-hat-plus-snare IS a chord: 62 chords carried a `<beam>` hint and 62 stray flags were drawn, an exact match | **Fixed.** `renderChordHeadsPart` extracted; `renderBeamGroup` now takes `(Note \| Chord)[]` and distinguishes the notehead the beam must clear from the one the stem attaches to. 62 flags → 0 |
+| **The tempo mark was drawn through the notes.** Integration D placed it a fixed 2.5sp above the top staff LINE, which on a chart whose notes sit on that line is below the beams — measured: mark at y=1.50, stem running 3.56→0.50 at the same x | **Fixed.** `measureNorthExtent` clears the measure's real content, and `tempoTopPadding` gives the mark somewhere to be without clipping. Now 2 staff spaces above the highest beam |
+
+**Process change this round:** a markup-only suite structurally cannot
+catch a missing font or a mark drawn behind a beam, which is what §F4 has
+said since the A+B+C work. Renders are now checked in a real headless
+Chromium (Playwright, already in the image) before a rendering change is
+called done.
 
 ### Fourth audit round, after Integrations H–L
 
@@ -237,10 +257,10 @@ they'd sensibly be tackled:
 | ~~**F1**~~ | ~~Drum notehead shapes are wrong~~ — **CLOSED by Phase 41.** A hi-hat/cymbal renders as a real ✕ (`noteheadXBlack`); verified on the project's own `Drum_Lesson_5.musicxml`, which draws 186 of them. | — | done |
 | ~~**F2**~~ | ~~No drum instrument → staff-position mapping~~ — **CLOSED by Phase 41.** `<midi-instrument>`/`<midi-unpitched>` resolves to a GM number, which drives position, notehead shape and stem direction from `DEFAULT_DRUM_MAPPING_TABLE`. | — | done |
 | ~~**F3**~~ | ~~`.mxl` still rejected~~ — **CLOSED by Phase 36**, and wired into the web app's upload path. | — | done |
-| **F4** | **No visual/browser-level test.** Every test asserts on SVG markup, which is exactly why the missing-font blocker (#4 in the A+B+C doc) went unnoticed for so long. | A markup-only suite structurally cannot catch "the glyphs are correct but nothing can draw them." | Stage 10 (Phase 53), or sooner if another font-class bug appears |
+| **F4** | **No visual/browser-level test in the automated suite.** Integration M now drives a real headless Chromium by hand before calling a rendering change done — which is how §F7 and two placement bugs were finally caught — but that check is not yet part of `npm run verify`. | A markup-only suite structurally cannot catch "the glyphs are correct but nothing can draw them." The manual browser step closes the hole in practice; automating it closes it permanently. | Stage 10 (Phase 53) |
 | **F5** | **`quick-demo/` is now dead code.** Referenced by nothing since the rewiring. | Harmless, but it's the last thing still claiming to be "the notation renderer" to a casual reader. | Trivial cleanup, any time |
 | **F6** | **The app's notation is still decorative.** It renders in the video preview panel, but it is not composited into exported frames and there is no cursor/playback sync. | This is what the drum-video project actually needs the engine *for*. Stage 8 is now complete, so what remains is **Stage 9 (Phases 48–49)** plus Phase 52's PNG export. | Stage 9 + Phase 52 |
-| **F7** | **The deployed website does not serve the Bravura font.** `website/video-create/drum/index.html` has no `@font-face` and `website/assets/` has no `.woff2`, while the engine emits `font-family="Bravura"`. The old `web-preview/canvas-preview.html` did have the rule. | Every notehead/clef/rest on the live site will fall back or render blank — this is blocker #4 from the A+B+C work recurring, exactly as F4 predicted a markup-only suite could not catch. **Outside the engine**, so not fixed by the Phase 1–47 work. | website/ (one `@font-face` rule + the committed `.woff2`) |
+| ~~**F7**~~ | ~~The deployed website does not serve the Bravura font~~ — **CLOSED by Integration M**, after the user's own screenshot showed exactly the predicted result: every glyph an empty box. `website/assets/fonts/Bravura.woff2` is committed and the drum page declares `@font-face` + preload. | — | done |
 
 **None of these are regressions** — F1/F2/F3 are documented scope
 boundaries from Phases 20/35/36, F6 is simply later-stage work not yet
