@@ -42,6 +42,19 @@ export type CursorMode = 'cursorMoves' | 'notationMoves';
 
 export interface CursorConfig {
   readonly mode: CursorMode;
+  /**
+   * Phase 49/§17.2: `notationMoves` only -- where in the viewport the
+   * fixed marker sits, as a 0..1 fraction of its width. Ignored by
+   * `cursorMoves`, where the marker goes to the note rather than the
+   * note coming to the marker.
+   */
+  readonly fixedFraction: number;
+  /** Marker thickness in staff spaces. */
+  readonly thickness: number;
+  /** Marker colour. Its own field rather than `colors.ink`: a cursor is an overlay on the music, and is conventionally NOT the same colour as the notes it sits over. */
+  readonly color: string;
+  /** 0..1 marker opacity. */
+  readonly opacity: number;
 }
 
 // ---- notehead mapping (Phase 16/17: per-instrument notehead shapes) ----
@@ -219,6 +232,10 @@ export const DEFAULT_CONFIG: EngineConfig = {
   },
   cursor: {
     mode: 'notationMoves',
+    fixedFraction: 1 / 3,
+    thickness: 0.3,
+    color: '#C81E2C',
+    opacity: 0.85,
   },
   noteheadMapping: {
     defaultShape: 'noteheadBlack',

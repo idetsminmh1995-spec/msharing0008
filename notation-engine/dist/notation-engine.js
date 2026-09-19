@@ -25,6 +25,7 @@ var NotationEngine = (() => {
     BASS_CLEF: () => BASS_CLEF,
     ByteReader: () => ByteReader,
     DEFAULT_CONFIG: () => DEFAULT_CONFIG,
+    DEFAULT_CURSOR_FIXED_FRACTION: () => DEFAULT_CURSOR_FIXED_FRACTION,
     DEFAULT_DRUM_MAPPING_TABLE: () => DEFAULT_DRUM_MAPPING_TABLE,
     DEFAULT_STEM_LENGTH: () => DEFAULT_STEM_LENGTH,
     DRUM_FALLBACK_NOTEHEAD_SHAPE: () => DRUM_FALLBACK_NOTEHEAD_SHAPE,
@@ -75,6 +76,7 @@ var NotationEngine = (() => {
     computeBarlineGeometry: () => computeBarlineGeometry,
     computeBeamShape: () => computeBeamShape,
     computeBraceShape: () => computeBraceShape,
+    computeCursorPlacement: () => computeCursorPlacement,
     computeEventSpace: () => computeEventSpace,
     computeExtenderLine: () => computeExtenderLine,
     computeHairpinShape: () => computeHairpinShape,
@@ -176,6 +178,7 @@ var NotationEngine = (() => {
     renderBrace: () => renderBrace,
     renderCancellationNaturals: () => renderCancellationNaturals,
     renderClef: () => renderClef,
+    renderCursor: () => renderCursor,
     renderExtenderLine: () => renderExtenderLine,
     renderFlag: () => renderFlag,
     renderFromMusicXml: () => renderFromMusicXml,
@@ -59401,6 +59404,18 @@ ${denominator}`;
     return svgGlyphText(x2, options.y, glyph.char, options.fontFamily, { fill: options.color });
   }
 
+  // src/render/cursor.ts
+  function renderCursor(placement, options) {
+    const top = options.top + placement.systemY;
+    const line = svgLine(placement.markerX, top, placement.markerX, top + options.height, {
+      stroke: options.color,
+      "stroke-width": options.thickness,
+      "stroke-linecap": "round",
+      ...options.opacity !== void 0 ? { opacity: options.opacity } : {}
+    });
+    return svgGroup([line], { class: "notation-cursor" });
+  }
+
   // src/config/config.ts
   var DEFAULT_CONFIG = {
     colors: {
@@ -59412,7 +59427,11 @@ ${denominator}`;
       pxPerStaffSpace: 10
     },
     cursor: {
-      mode: "notationMoves"
+      mode: "notationMoves",
+      fixedFraction: 1 / 3,
+      thickness: 0.3,
+      color: "#C81E2C",
+      opacity: 0.85
     },
     noteheadMapping: {
       defaultShape: "noteheadBlack"
@@ -62442,7 +62461,7 @@ ${denominator}`;
   }
   function positionToX(playback, tick) {
     const measureNumber = measureAtTick(playback, tick);
-    if (measureNumber === void 0) return { x: 0, systemIndex: 0, pageIndex: 0 };
+    if (measureNumber === void 0) return { x: 0, systemIndex: 0, pageIndex: 0, systemY: 0 };
     const offset = playback.globalTickOffsetByMeasure.get(measureNumber) ?? 0;
     const tickInMeasure = Math.max(0, tick - offset);
     const layout = playback.measureLayoutsByNumber.get(measureNumber);
@@ -62452,7 +62471,8 @@ ${denominator}`;
     return {
       x: (placement?.x ?? 0) + playback.measureHeaderAllowance + withinMeasureX,
       systemIndex: placement?.systemIndex ?? 0,
-      pageIndex: placement?.pageIndex ?? 0
+      pageIndex: placement?.pageIndex ?? 0,
+      systemY: placement?.systemY ?? 0
     };
   }
   function xToPosition(playback, x2, systemIndex) {
@@ -62512,6 +62532,33 @@ ${denominator}`;
       measureHeaderAllowance: input.measureHeaderAllowance,
       tempoMap,
       events
+    };
+  }
+
+  // src/playback/cursor.ts
+  var DEFAULT_CURSOR_FIXED_FRACTION = 1 / 3;
+  function computeCursorPlacement(playback, tick, options) {
+    const position = positionToX(playback, tick);
+    if (options.mode === "cursorMoves") {
+      return {
+        markerX: position.x,
+        notationTranslateX: 0,
+        systemIndex: position.systemIndex,
+        pageIndex: position.pageIndex,
+        systemY: position.systemY,
+        noteX: position.x
+      };
+    }
+    const viewportWidth = options.viewportWidth ?? 0;
+    const fraction = options.fixedFraction ?? DEFAULT_CURSOR_FIXED_FRACTION;
+    const fixedX = viewportWidth * fraction;
+    return {
+      markerX: fixedX,
+      notationTranslateX: -(position.x - fixedX),
+      systemIndex: position.systemIndex,
+      pageIndex: position.pageIndex,
+      systemY: position.systemY,
+      noteX: position.x
     };
   }
 

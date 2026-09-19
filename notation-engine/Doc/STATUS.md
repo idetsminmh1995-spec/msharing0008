@@ -6,18 +6,18 @@ A+B+C corrective work** (making notes actually visible in the web app).
 Numbering is **`PLAN.md` §22's phase numbering** — deliberately not a second
 numbering system. Say a number from §B below and that's the phase to build.
 
-**Last audited:** against the code in `src/` and the **670-test** suite,
-after Phase 48 (§17.1's playback position API + event stream). Stages
-0-8 are complete and every phase numbered 1-47 is built AND wired;
-Stage 9 (Phases 48-49) is now half done -- Phase 48 built, Phase 49
-(cursor) next.
+**Last audited:** against the code in `src/` and the **679-test** suite,
+after Phase 49. Stages 0-9 are complete: every phase numbered 1-49 is
+built AND wired, including the full playback surface (§17.1's position
+API and event stream, §17.2's cursor). Stage 10 (Phases 50-54) is what
+remains.
 
 ---
 
-## A. DONE — Phases 1–47 ✅ (Stages 0 through 8 complete) + Integration Passes A–L
+## A. DONE — Phases 1–49 ✅ (Stages 0 through 9 complete) + Integration Passes A–Q
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes **653/653** across them.
+`npm run verify` passes **679/679** across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -86,22 +86,18 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | — | **Integration O** (not a numbered phase) | Closed §9.8's deferred stem-shortening gap -- a forced direction pointing away from the middle for a note outside the staff now shortens toward the 2.5sp floor instead of staying at a fixed 3.5sp | [`integration-o`](./integration-o-stem-shortening.md) |
 | — | **Integration P** (not a numbered phase) | Beam line endpoints were computed from each note's raw x instead of its actual stem-attach x (the notehead glyph's own anchor offset) -- a beamed group's last stem fell just short of the beam, appearing disconnected | [`integration-p`](./integration-p-beam-endpoint-anchor.md) |
 | — | **Integration Q** (not a numbered phase) | A `<barline location="left">` was drawn at its measure's right edge instead of its left -- a whole measure late; real files commonly write a repeat-begin this way | [`integration-q`](./integration-q-barline-location.md) |
+| 49 | Cursor, both sync modes | Full §17.2 in one module (`computeCursorPlacement` + `renderCursor`), both modes built on the same `positionToX`; repeat handling stays the host's, per §17.2 | [`phase-49`](./phase-49-cursor.md) |
 | 48 | Playback position API + event stream | Full §17.1 (`positionToX`/`xToPosition`/`getEventStream`/`resolvePosition`), wired into `renderFromMusicXml`'s own result from the exact layout that produced its SVG; deletes the superseded `src/cursor/` placeholder | [`phase-48`](./phase-48-playback-position-api.md) |
 
 **Public API today:** 219 exports from `dist/notation-engine.js`.
 
 ---
 
-## B. NOT DONE — Phases 49–54
+## B. NOT DONE — Phases 50–54
 
 Nothing below exists in `src/` yet. Each line links to the `PLAN.md` section
-that specifies it. **Everything numbered 1–48 is done** (see §A); these six
-are the rest of Stage 9 and all of Stage 10.
-
-### Stage 9 — Playback surface
-| # | Phase | Spec |
-|---|---|---|
-| **49** | Cursor, both sync modes | §17.2 |
+that specifies it. **Everything numbered 1–49 is done** (see §A), so Stages 0-9 are
+complete; these five are all of Stage 10.
 
 ### Stage 10 — Polish and delivery
 | # | Phase | Spec |

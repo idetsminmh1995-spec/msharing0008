@@ -92,6 +92,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`integration-p-beam-endpoint-anchor.md`](./integration-p-beam-endpoint-anchor.md) | Integration P: beam line endpoints were computed from each note's raw x instead of its actual stem-attach x (the notehead glyph's own anchor offset) -- a beamed group's LAST stem fell just short of the beam, appearing disconnected with no flag either |
 | [`integration-q-barline-location.md`](./integration-q-barline-location.md) | Integration Q: a `<barline location="left">` (a real file's own way of writing a repeat-begin on the FIRST measure of the repeated section) was drawn at that measure's right edge instead of its left -- a whole measure late |
 | [`phase-48-playback-position-api.md`](./phase-48-playback-position-api.md) | Phase 48: §17.1 playback position API + event stream (`positionToX`/`xToPosition`/`getEventStream`/`resolvePosition`), wired into `renderFromMusicXml`'s own result -- completes Stage 9's first half; deletes the superseded `src/cursor/` placeholder |
+| [`phase-49-cursor.md`](./phase-49-cursor.md) | Phase 49: §17.2 cursor, both sync modes in ONE module (`computeCursorPlacement` + `renderCursor`) -- completes Stage 9; repeats stay the host's business, never simulated here |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

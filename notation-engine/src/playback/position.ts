@@ -21,12 +21,16 @@ export interface PlaybackMeasurePlacement {
   readonly x: number;
   readonly systemIndex: number;
   readonly pageIndex: number;
+  /** That system's own vertical origin, in the same staff-space coordinates the SVG uses -- what Phase 49's cursor needs to draw its marker on the right system in page mode. */
+  readonly systemY: number;
 }
 
 export interface EventPosition {
   readonly x: number;
   readonly systemIndex: number;
   readonly pageIndex: number;
+  /** The vertical origin of the system this x belongs to -- 0 in scroll mode, the system's own offset in page mode. */
+  readonly systemY: number;
 }
 
 /**
@@ -117,7 +121,7 @@ export function resolvePosition(playback: PlaybackData, tick: number): PlaybackP
 /** §17.1: time -> where on the page. The x of the note currently sounding at `tick` (see `floorEntry`), in the same coordinate space the rendered SVG itself uses. */
 export function positionToX(playback: PlaybackData, tick: number): EventPosition {
   const measureNumber = measureAtTick(playback, tick);
-  if (measureNumber === undefined) return { x: 0, systemIndex: 0, pageIndex: 0 };
+  if (measureNumber === undefined) return { x: 0, systemIndex: 0, pageIndex: 0, systemY: 0 };
   const offset = playback.globalTickOffsetByMeasure.get(measureNumber) ?? 0;
   const tickInMeasure = Math.max(0, tick - offset);
   const layout = playback.measureLayoutsByNumber.get(measureNumber);
@@ -130,6 +134,7 @@ export function positionToX(playback: PlaybackData, tick: number): EventPosition
     x: (placement?.x ?? 0) + playback.measureHeaderAllowance + withinMeasureX,
     systemIndex: placement?.systemIndex ?? 0,
     pageIndex: placement?.pageIndex ?? 0,
+    systemY: placement?.systemY ?? 0,
   };
 }
 

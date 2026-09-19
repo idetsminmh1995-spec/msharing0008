@@ -2037,7 +2037,7 @@ to the original (determinism, §4.4).
 
 ---
 
-## 17. Module: `playback/` — Position API and Event Stream `[IN PROGRESS -- §17.1 BUILT by Phase 48 (see Doc/phase-48-playback-position-api.md); §17.2 (Cursor) is Phase 49, not yet built]`
+## 17. Module: `playback/` — Position API and Event Stream `[BUILT -- §17.1 by Phase 48, §17.2 by Phase 49. See Doc/phase-48-playback-position-api.md and Doc/phase-49-cursor.md]`
 
 **This is the boundary between the engine and any host application.** The
 engine has **no** knowledge of audio, video, or animation — see §2.3.
@@ -2376,7 +2376,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | Phase | What | Status |
 |---|---|---|
 | 48 | Position API + event stream (§17.1) | ✅ (built + wired into `renderFromMusicXml`'s own result -- see Doc/phase-48-playback-position-api.md) |
-| 49 | Cursor, both modes (§17.2) | |
+| 49 | Cursor, both modes (§17.2) | ✅ (built -- see Doc/phase-49-cursor.md) |
 
 ### Stage 10 — Polish and delivery
 
