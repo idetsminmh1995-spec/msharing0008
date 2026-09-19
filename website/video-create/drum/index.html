@@ -86,7 +86,7 @@
   .preview-stats{display:flex;gap:16px;font-size:12px;color:var(--muted);}
   .preview-stats b{color:var(--text);}
 
-  .video-frame{background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-width:0;}
+  .video-frame{position:relative;background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-width:0;}
   .video-top{padding:16px 24px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;}
   .video-logo-row{display:flex;align-items:center;gap:10px;min-width:0;}
   .video-title{color:#fff;font-family:'Baloo 2','Sora',sans-serif;font-weight:700;font-size:26px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -98,6 +98,11 @@
   .drum-circle{width:120px;height:120px;border-radius:50%;border:3px solid var(--red);display:flex;align-items:center;justify-content:center;color:var(--red);}
   .video-notation{background:#fff;padding:10px 20px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;flex-shrink:0;}
   .video-notation svg{display:block;height:110px;width:auto;max-width:none;}
+
+  /* Brand watermark, burned into the exported video's own frame (bottom-right
+     corner, low-profile) -- distinct from .video-logo-row's app icon at the
+     top, which is page chrome and is NOT part of the exported frame. */
+  .video-watermark{position:absolute;right:14px;bottom:14px;height:46px;width:auto;opacity:.92;pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));}
 
   .transport{display:flex;align-items:center;gap:14px;}
   .play-btn{width:42px;height:42px;border-radius:50%;background:var(--red);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
@@ -238,6 +243,7 @@
           <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="9" ry="3.4"/></svg>
         </div>
       </div>
+      <img class="video-watermark" src="../../assets/logo/sharing-drum-mark.webp" alt="M Sharing Drum">
     </div>
 
     <div class="transport">
