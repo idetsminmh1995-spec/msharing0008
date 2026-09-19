@@ -596,7 +596,11 @@
       // on after the written music does.
       const events = NotationEngine.getEventStream(notationPlayback);
       const lastTick = events.length > 0 ? events[events.length - 1].tick : 0;
-      x = NotationEngine.positionToX(notationPlayback, Math.min(tick, lastTick)).x;
+      // playheadX, not positionToX: the latter reports the last NOTE's
+      // own x, so the marker would freeze between notes and sit still
+      // for a whole measure that has none (an opening whole rest). This
+      // one moves continuously through the music.
+      x = NotationEngine.playheadX(notationPlayback, Math.min(tick, lastTick)).x;
     } catch (err) {
       return;
     }

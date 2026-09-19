@@ -38,6 +38,8 @@ export interface PlaybackMeasureLayout {
 /** Where one measure sits on the page -- the playback-relevant slice of `renderFromMusicXml`'s own internal `MeasurePlacement`. */
 export interface PlaybackMeasurePlacement {
   readonly x: number;
+  /** This measure's own drawn width -- what `playheadX` interpolates across, and (in page mode) the JUSTIFIED width, not the pre-justification one. */
+  readonly width: number;
   readonly systemIndex: number;
   readonly pageIndex: number;
   /** That system's own vertical origin, in the same staff-space coordinates the SVG uses -- what Phase 49's cursor needs to draw its marker on the right system in page mode. */
@@ -162,6 +164,80 @@ export function positionToX(playback: PlaybackData, tick: number): EventPosition
     pageIndex: placement?.pageIndex ?? 0,
     systemY: placement?.systemY ?? 0,
   };
+}
+
+/**
+ * §17.1, for a MOVING playhead: where the music is at `tick`, as a
+ * continuous position rather than the last note's own x.
+ *
+ * `positionToX` answers "where is the note sounding right now", which is
+ * what note-highlighting and `xToPosition` need -- and it is a STEP
+ * function, holding still between one note and the next. A playback line
+ * driven by it freezes on each note and jumps, and on a measure with no
+ * notes at all (a whole rest) it does not move for the entire measure.
+ * The user reported exactly that: "even if there is no note, in 4/4 it
+ * should still travel four beats".
+ *
+ * So this interpolates between the surrounding positions instead:
+ * between two notes, proportionally to the tick; after a measure's last
+ * note, on toward that measure's own right edge. At a note's exact tick
+ * it returns exactly what `positionToX` does, so the two never disagree
+ * about where a note IS -- only about what happens in between.
+ */
+export function playheadX(playback: PlaybackData, tick: number): EventPosition {
+  const measureNumber = measureAtTick(playback, tick);
+  if (measureNumber === undefined) return { x: 0, systemIndex: 0, pageIndex: 0, systemY: 0 };
+  const placement = playback.placementByMeasureNumber.get(measureNumber);
+  const layout = playback.measureLayoutsByNumber.get(measureNumber);
+  const frame = {
+    systemIndex: placement?.systemIndex ?? 0,
+    pageIndex: placement?.pageIndex ?? 0,
+    systemY: placement?.systemY ?? 0,
+  };
+  if (layout === undefined || placement === undefined) {
+    return { x: positionToX(playback, tick).x, ...frame };
+  }
+
+  const offset = playback.globalTickOffsetByMeasure.get(measureNumber) ?? 0;
+  const tickInMeasure = Math.max(0, tick - offset);
+  const noteAreaX = placement.x + layout.headerWidth;
+
+  // The measure's own tick length, so the last note can interpolate
+  // toward the barline over the RIGHT amount of time.
+  const signature = playback.timeSignatureByMeasure.get(measureNumber);
+  const measureTicks =
+    signature !== undefined
+      ? signature.numerator * (4 / signature.denominator) * TICKS_PER_QUARTER
+      : undefined;
+
+  const entries = [...layout.positionsByTick.entries()].sort((a, b) => a[0] - b[0]);
+  // A measure with no events at all (an empty measure, or one whose
+  // rest produced no spacing entry) still spans real time, so the
+  // playhead crosses it from its note area to its right edge.
+  let fromTick = 0;
+  let fromX = noteAreaX;
+  let toTick = measureTicks ?? tickInMeasure;
+  let toX = placement.x + placement.width;
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    if (entry === undefined || entry[0] > tickInMeasure) break;
+    fromTick = entry[0];
+    fromX = noteAreaX + entry[1];
+    const next = entries[i + 1];
+    if (next !== undefined) {
+      toTick = next[0];
+      toX = noteAreaX + next[1];
+    } else {
+      toTick = measureTicks ?? fromTick;
+      toX = placement.x + placement.width;
+    }
+  }
+
+  const span = toTick - fromTick;
+  if (span <= 0) return { x: fromX, ...frame };
+  const fraction = Math.min(1, Math.max(0, (tickInMeasure - fromTick) / span));
+  return { x: fromX + (toX - fromX) * fraction, ...frame };
 }
 
 /**

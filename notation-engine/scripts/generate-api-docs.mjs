@@ -38,7 +38,7 @@ const ENTRY_POINTS = [
   ['Configuration', ['resolveConfig', 'DEFAULT_CONFIG']],
   [
     'Playback and cursor',
-    ['getEventStream', 'positionToX', 'xToPosition', 'resolvePosition', 'computeCursorPlacement', 'renderCursor', 'notationEventId', 'elementIdForNoteId'],
+    ['getEventStream', 'positionToX', 'playheadX', 'xToPosition', 'resolvePosition', 'computeCursorPlacement', 'renderCursor', 'notationEventId', 'elementIdForNoteId'],
   ],
   ['Resize', ['resizePureScale', 'needsReflow', 'extractViewBox', 'computePxPerStaffSpace']],
   ['Export', ['exportSvg', 'exportPng', 'exportPdf', 'rasterizeSvg', 'encodePng', 'encodePdf', 'browserRasterBackend', 'svgToDataUri']],
@@ -215,8 +215,27 @@ function main() {
     out.push('');
   }
 
+  const generated = out.join('\n') + '\n';
+
+  // `--check` compares instead of writing. It deliberately does NOT ask
+  // git whether the file is modified: that conflates "stale" (the code
+  // moved and nobody regenerated) with "not committed yet" (the normal
+  // state mid-change), and would make `npm run verify` fail on every
+  // legitimate docs update until it was committed.
+  if (process.argv.includes('--check')) {
+    const current = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8') : '';
+    if (current !== generated) {
+      console.error(
+        'docs/API.md is out of date -- run `npm run docs` and commit the result.',
+      );
+      process.exit(1);
+    }
+    console.log(`docs/API.md is up to date (${byName.size} symbols).`);
+    return;
+  }
+
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  fs.writeFileSync(OUT, out.join('\n') + '\n');
+  fs.writeFileSync(OUT, generated);
   console.log(`docs/API.md: ${byName.size} symbols across ${byModule.size} modules.`);
 }
 

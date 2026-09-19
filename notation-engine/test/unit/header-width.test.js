@@ -109,14 +109,28 @@ describe('a measure header wider than the constant allowance', () => {
     }
   });
 
-  test('the measure reports its real header width, not the constant', () => {
+  test('the measure reports its real header width, wide AND narrow', () => {
     const { playback } = render('wide-key-signature.musicxml');
-    const first = playback.measureLayoutsByNumber.get(1);
-    const second = playback.measureLayoutsByNumber.get(2);
     // Measure 1: 0.5 + clef 3 + (4 sharps + 0.5) + time 2.5 = 10.5.
-    assert.equal(first.headerWidth, 10.5);
-    // Measure 2 restates nothing, so it keeps the floor.
-    assert.equal(second.headerWidth, 6);
+    assert.equal(playback.measureLayoutsByNumber.get(1).headerWidth, 10.5);
+    // Measure 2 restates NOTHING, so it reserves only the leading pad --
+    // not the 6.0 every measure used to reserve, which left five staff
+    // spaces of empty air after every barline.
+    assert.equal(playback.measureLayoutsByNumber.get(2).headerWidth, 0.5);
+  });
+
+  test('an ordinary measure no longer reserves a header it never draws', () => {
+    const { playback } = render('simple-single-voice.musicxml');
+    assert.equal(playback.measureLayoutsByNumber.get(2).headerWidth, 0.5);
+  });
+
+  test('a measure OPENED by a repeat barline reserves room for it', () => {
+    // The barline is drawn at the boundary and extends right, into this
+    // measure -- so its width is part of this measure's own header, or
+    // the first note lands on top of the repeat dots.
+    const { playback } = render('two-voice-drum-groove.musicxml');
+    const widths = [...playback.measureLayoutsByNumber.values()].map((l) => l.headerWidth);
+    assert.ok(widths.every((w) => w >= 0.5));
   });
 
   test('the tempo mark clears the key signature instead of overprinting it', () => {
@@ -137,7 +151,9 @@ describe('a measure header wider than the constant allowance', () => {
     );
   });
 
-  test('a narrow header keeps the constant, so nothing that fitted before moved', () => {
+  test('a first measure still reserves its clef and time signature', () => {
+    // 0.5 + clef 3 + time 2.5 = 6.0 -- which is where the old blanket
+    // constant came from, and the only measure it was ever right for.
     const { playback } = render('simple-single-voice.musicxml');
     assert.equal(playback.measureLayoutsByNumber.get(1).headerWidth, 6);
   });
@@ -149,6 +165,6 @@ describe('a measure header wider than the constant allowance', () => {
     const { playback } = render('guitar-two-part-tab.musicxml');
     const widths = [...playback.measureLayoutsByNumber.values()].map((l) => l.headerWidth);
     assert.equal(new Set(widths.map((w) => w.toFixed(3))).size <= widths.length, true);
-    assert.ok(widths.every((w) => w >= 6));
+    assert.ok(widths.every((w) => w >= 0.5));
   });
 });

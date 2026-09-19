@@ -1,5 +1,5 @@
 import type { CursorMode } from '../config/config.js';
-import { positionToX, type PlaybackData } from './position.js';
+import { playheadX, positionToX, type PlaybackData } from './position.js';
 
 /**
  * §17.2's own default for `notationMoves`: where in the viewport the fixed
@@ -43,7 +43,7 @@ export interface CursorPlacement {
   readonly pageIndex: number;
   /** That system's own vertical origin, so the marker is drawn on the correct system rather than always the first. */
   readonly systemY: number;
-  /** Where the current note actually is -- the same `positionToX(tick).x` both modes are built on, exposed so a host can tell "the note" from "the marker" (they coincide only in `cursorMoves`). */
+  /** Where the current NOTE actually is (`positionToX(tick).x`) -- exposed so a host can tell "the note" from "the marker", and so note-highlighting and the moving marker can disagree without either being wrong. */
   readonly noteX: number;
 }
 
@@ -73,7 +73,14 @@ export function computeCursorPlacement(
   tick: number,
   options: CursorPlacementOptions,
 ): CursorPlacement {
-  const position = positionToX(playback, tick);
+  // The MARKER follows the continuous playhead, not the last note's own
+  // x. `positionToX` is a step function -- it holds still between notes,
+  // and across a measure with no notes at all it does not move for the
+  // whole measure -- so a marker driven by it freezes and jumps. `noteX`
+  // below still reports the note itself, which is what it has always
+  // meant and what note-highlighting wants.
+  const position = playheadX(playback, tick);
+  const noteX = positionToX(playback, tick).x;
 
   if (options.mode === 'cursorMoves') {
     return {
@@ -82,7 +89,7 @@ export function computeCursorPlacement(
       systemIndex: position.systemIndex,
       pageIndex: position.pageIndex,
       systemY: position.systemY,
-      noteX: position.x,
+      noteX,
     };
   }
 
@@ -95,6 +102,6 @@ export function computeCursorPlacement(
     systemIndex: position.systemIndex,
     pageIndex: position.pageIndex,
     systemY: position.systemY,
-    noteX: position.x,
+    noteX,
   };
 }

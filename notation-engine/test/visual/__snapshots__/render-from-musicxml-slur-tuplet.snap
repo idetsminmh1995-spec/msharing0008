@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="898.1173000519232" height="320" viewBox="0 0 44.90586500259616 16">
-<rect x="0" y="0" width="44.90586500259616" height="16" fill="#ffffff" />
+<svg xmlns="http://www.w3.org/2000/svg" width="788.1173000519232" height="320" viewBox="0 0 39.40586500259616 16">
+<rect x="0" y="0" width="39.40586500259616" height="16" fill="#ffffff" />
 <g>
 <line x1="0" y1="8" x2="26.705865002596163" y2="8" stroke="#000000" stroke-width="0.13" />
 <line x1="0" y1="7" x2="26.705865002596163" y2="7" stroke="#000000" stroke-width="0.13" />
@@ -44,33 +44,33 @@
 </g>
 <text x="0" y="3" fill="#000000" font-family="Manrope, sans-serif" font-size="1.6">1</text>
 <g>
-<line x1="26.705865002596163" y1="8" x2="42.90586500259616" y2="8" stroke="#000000" stroke-width="0.13" />
-<line x1="26.705865002596163" y1="7" x2="42.90586500259616" y2="7" stroke="#000000" stroke-width="0.13" />
-<line x1="26.705865002596163" y1="6" x2="42.90586500259616" y2="6" stroke="#000000" stroke-width="0.13" />
-<line x1="26.705865002596163" y1="5" x2="42.90586500259616" y2="5" stroke="#000000" stroke-width="0.13" />
-<line x1="26.705865002596163" y1="4" x2="42.90586500259616" y2="4" stroke="#000000" stroke-width="0.13" />
+<line x1="26.705865002596163" y1="8" x2="37.40586500259616" y2="8" stroke="#000000" stroke-width="0.13" />
+<line x1="26.705865002596163" y1="7" x2="37.40586500259616" y2="7" stroke="#000000" stroke-width="0.13" />
+<line x1="26.705865002596163" y1="6" x2="37.40586500259616" y2="6" stroke="#000000" stroke-width="0.13" />
+<line x1="26.705865002596163" y1="5" x2="37.40586500259616" y2="5" stroke="#000000" stroke-width="0.13" />
+<line x1="26.705865002596163" y1="4" x2="37.40586500259616" y2="4" stroke="#000000" stroke-width="0.13" />
 </g>
 <g data-id="P1#m2#v1#e0">
-<text x="32.70586500259616" y="5.5" font-family="Bravura" font-size="4" fill="#000000"></text>
-<line x1="32.70586500259616" y1="5.668" x2="32.70586500259616" y2="9.168" stroke="#000000" stroke-width="0.12" />
-<text x="32.70586500259616" y="9.168" font-family="Bravura" font-size="4" fill="#000000"></text>
+<text x="27.205865002596163" y="5.5" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="27.205865002596163" y1="5.668" x2="27.205865002596163" y2="9.168" stroke="#000000" stroke-width="0.12" />
+<text x="27.205865002596163" y="9.168" font-family="Bravura" font-size="4" fill="#000000"></text>
 </g>
 <g data-id="P1#m2#v1#e1">
-<text x="35.10586500259616" y="6" font-family="Bravura" font-size="4" fill="#000000"></text>
+<text x="29.60586500259616" y="6" font-family="Bravura" font-size="4" fill="#000000"></text>
 </g>
 <g data-id="P1#m2#v1#e2">
-<text x="37.50586500259616" y="4.5" font-family="Bravura" font-size="4" fill="#000000"></text>
-<line x1="37.50586500259616" y1="4.668" x2="37.50586500259616" y2="8.168" stroke="#000000" stroke-width="0.12" />
-<text x="37.50586500259616" y="8.168" font-family="Bravura" font-size="4" fill="#000000"></text>
+<text x="32.00586500259616" y="4.5" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="32.00586500259616" y1="4.668" x2="32.00586500259616" y2="8.168" stroke="#000000" stroke-width="0.12" />
+<text x="32.00586500259616" y="8.168" font-family="Bravura" font-size="4" fill="#000000"></text>
 </g>
 <g data-id="P1#m2#v1#e3">
-<text x="39.90586500259616" y="6" font-family="Bravura" font-size="4" fill="#000000"></text>
+<text x="34.40586500259616" y="6" font-family="Bravura" font-size="4" fill="#000000"></text>
 </g>
-<line x1="32.70586500259616" y1="7.3" x2="37.50586500259616" y2="7.3" stroke="#000000" stroke-width="0.16" />
-<line x1="32.70586500259616" y1="7.3" x2="32.70586500259616" y2="6.8" stroke="#000000" stroke-width="0.16" />
-<line x1="37.50586500259616" y1="7.3" x2="37.50586500259616" y2="6.8" stroke="#000000" stroke-width="0.16" />
-<text x="35.10586500259616" y="7.3" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="27.205865002596163" y1="7.3" x2="32.00586500259616" y2="7.3" stroke="#000000" stroke-width="0.16" />
+<line x1="27.205865002596163" y1="7.3" x2="27.205865002596163" y2="6.8" stroke="#000000" stroke-width="0.16" />
+<line x1="32.00586500259616" y1="7.3" x2="32.00586500259616" y2="6.8" stroke="#000000" stroke-width="0.16" />
+<text x="29.60586500259616" y="7.3" font-family="Bravura" font-size="4" fill="#000000"></text>
 <g>
-<line x1="42.90586500259616" y1="8" x2="42.90586500259616" y2="4" stroke="#000000" stroke-width="0.16" />
+<line x1="37.40586500259616" y1="8" x2="37.40586500259616" y2="4" stroke="#000000" stroke-width="0.16" />
 </g>
 </svg>

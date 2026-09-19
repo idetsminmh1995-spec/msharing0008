@@ -181,6 +181,7 @@ var NotationEngine = (() => {
     part: () => part,
     pitchedPitch: () => pitchedPitch,
     placeElement: () => placeElement,
+    playheadX: () => playheadX,
     positionToTick: () => positionToTick,
     positionToX: () => positionToX,
     rasterizeSvg: () => rasterizeSvg,
@@ -62982,6 +62983,48 @@ ${denominator}`;
       systemY: placement?.systemY ?? 0
     };
   }
+  function playheadX(playback, tick) {
+    const measureNumber = measureAtTick(playback, tick);
+    if (measureNumber === void 0) return { x: 0, systemIndex: 0, pageIndex: 0, systemY: 0 };
+    const placement = playback.placementByMeasureNumber.get(measureNumber);
+    const layout = playback.measureLayoutsByNumber.get(measureNumber);
+    const frame = {
+      systemIndex: placement?.systemIndex ?? 0,
+      pageIndex: placement?.pageIndex ?? 0,
+      systemY: placement?.systemY ?? 0
+    };
+    if (layout === void 0 || placement === void 0) {
+      return { x: positionToX(playback, tick).x, ...frame };
+    }
+    const offset = playback.globalTickOffsetByMeasure.get(measureNumber) ?? 0;
+    const tickInMeasure = Math.max(0, tick - offset);
+    const noteAreaX = placement.x + layout.headerWidth;
+    const signature = playback.timeSignatureByMeasure.get(measureNumber);
+    const measureTicks = signature !== void 0 ? signature.numerator * (4 / signature.denominator) * TICKS_PER_QUARTER : void 0;
+    const entries = [...layout.positionsByTick.entries()].sort((a, b) => a[0] - b[0]);
+    let fromTick = 0;
+    let fromX = noteAreaX;
+    let toTick = measureTicks ?? tickInMeasure;
+    let toX = placement.x + placement.width;
+    for (let i2 = 0; i2 < entries.length; i2++) {
+      const entry = entries[i2];
+      if (entry === void 0 || entry[0] > tickInMeasure) break;
+      fromTick = entry[0];
+      fromX = noteAreaX + entry[1];
+      const next = entries[i2 + 1];
+      if (next !== void 0) {
+        toTick = next[0];
+        toX = noteAreaX + next[1];
+      } else {
+        toTick = measureTicks ?? fromTick;
+        toX = placement.x + placement.width;
+      }
+    }
+    const span = toTick - fromTick;
+    if (span <= 0) return { x: fromX, ...frame };
+    const fraction = Math.min(1, Math.max(0, (tickInMeasure - fromTick) / span));
+    return { x: fromX + (toX - fromX) * fraction, ...frame };
+  }
   var X_EPSILON = 1e-9;
   function xToPosition(playback, x2, systemIndex) {
     const candidates = [...playback.placementByMeasureNumber.entries()].filter(([, p]) => p.systemIndex === systemIndex).sort((a, b) => a[1].x - b[1].x);
@@ -63046,7 +63089,8 @@ ${denominator}`;
   // src/playback/cursor.ts
   var DEFAULT_CURSOR_FIXED_FRACTION = 1 / 3;
   function computeCursorPlacement(playback, tick, options) {
-    const position = positionToX(playback, tick);
+    const position = playheadX(playback, tick);
+    const noteX = positionToX(playback, tick).x;
     if (options.mode === "cursorMoves") {
       return {
         markerX: position.x,
@@ -63054,7 +63098,7 @@ ${denominator}`;
         systemIndex: position.systemIndex,
         pageIndex: position.pageIndex,
         systemY: position.systemY,
-        noteX: position.x
+        noteX
       };
     }
     const viewportWidth = options.viewportWidth ?? 0;
@@ -63066,7 +63110,7 @@ ${denominator}`;
       systemIndex: position.systemIndex,
       pageIndex: position.pageIndex,
       systemY: position.systemY,
-      noteX: position.x
+      noteX
     };
   }
 
@@ -63710,6 +63754,7 @@ ${xrefOffset}
   var ESTIMATED_NOTEHEAD_WIDTH = 1;
   var ESTIMATED_ACCIDENTAL_ALLOWANCE = 1;
   var MEASURE_TRAILING_MARGIN = 2;
+  var MEASURE_LEADING_PAD = 0.5;
   var MEASURE_HEADER_ALLOWANCE = 6;
   var TEMPO_MARK_GAP = 1.5;
   var TEMPO_MARK_HEIGHT = 2;
@@ -63756,7 +63801,7 @@ ${xrefOffset}
     if (worst === void 0) return 0;
     return side === "south" ? Math.max(0, worst) : Math.max(0, topLineY - worst);
   }
-  function computeMeasureLayout(measure2, measureTicks, measureTempoMarks) {
+  function computeMeasureLayout(measure2, measureTicks, measureTempoMarks, headerWidth) {
     const hasAccidentalByTick = /* @__PURE__ */ new Map();
     for (const voice2 of measure2.voices) {
       const starts = eventStartTicks(voice2.events);
@@ -63779,7 +63824,7 @@ ${xrefOffset}
         metronomeBpmDigitGlyphNames(tm.perMinute),
         1
       );
-      return Math.max(max2, MEASURE_HEADER_ALLOWANCE + markWidth + MEASURE_TRAILING_MARGIN);
+      return Math.max(max2, headerWidth + markWidth + MEASURE_TRAILING_MARGIN);
     }, 0);
     if (ticks.length === 0) {
       return { width: Math.max(MEASURE_WIDTH, tempoMarkMinWidth), positionsByTick: /* @__PURE__ */ new Map() };
@@ -63801,7 +63846,7 @@ ${xrefOffset}
     const lastWidth = spacingEvents[spacingEvents.length - 1]?.renderedWidth ?? 0;
     const width = Math.max(
       MEASURE_WIDTH * 0.3,
-      MEASURE_HEADER_ALLOWANCE + lastX + lastWidth + MEASURE_TRAILING_MARGIN,
+      headerWidth + lastX + lastWidth + MEASURE_TRAILING_MARGIN,
       tempoMarkMinWidth
     );
     return { width, positionsByTick };
@@ -64563,6 +64608,77 @@ ${xrefOffset}
     const measureLayoutsByNumber = /* @__PURE__ */ new Map();
     const measureTicksByNumber = /* @__PURE__ */ new Map();
     const timeSignatureByMeasure = /* @__PURE__ */ new Map();
+    const BARLINE_METRICS = {
+      thinThickness: getEngravingDefault("thinBarlineThickness") ?? 0.16,
+      thickThickness: getEngravingDefault("thickBarlineThickness") ?? 0.5,
+      separation: getEngravingDefault("barlineSeparation") ?? 0.4,
+      dotWidth: 0.4,
+      dashLength: getEngravingDefault("dashedBarlineDashLength") ?? 0.5,
+      gapLength: getEngravingDefault("dashedBarlineGapLength") ?? 0.25
+    };
+    const openingBarlineWidth = (partId, measureNumber) => {
+      const here = attributesByPartAndMeasure.get(`${partId}:${measureNumber}`);
+      const previous = attributesByPartAndMeasure.get(`${partId}:${measureNumber - 1}`);
+      const style = here?.leftBarlineStyle ?? previous?.barlineStyle;
+      const direction = here?.leftRepeatDirection ?? previous?.repeatDirection;
+      if (style === void 0 && direction === void 0) return 0;
+      return computeBarlineGeometry(mapBarline(style, direction), BARLINE_METRICS).width;
+    };
+    const headerWidths = (isSystemStart) => {
+      const widthByMeasure = /* @__PURE__ */ new Map();
+      for (const part2 of score2.parts) {
+        let previousAttrs;
+        part2.measures.forEach((measure2, measureIndex) => {
+          const attrs = attributesByPartAndMeasure.get(`${part2.id}:${measure2.number}`);
+          if (attrs === void 0) return;
+          const systemStart = isSystemStart(measure2.number);
+          const clefChanged = previousAttrs === void 0 || previousAttrs.clefSign !== attrs.clefSign || previousAttrs.clefLine !== attrs.clefLine;
+          const keyChanged = previousAttrs === void 0 || previousAttrs.fifths !== attrs.fifths;
+          const timeChanged = previousAttrs === void 0 || previousAttrs.timeNumerator !== attrs.timeNumerator || previousAttrs.timeDenominator !== attrs.timeDenominator;
+          const staffNumbers = Array.from({ length: Math.max(1, attrs.staves) }, (_, n) => n + 1);
+          for (const staffNumber of staffNumbers) {
+            const staffClef = attrs.clefsByStaff[staffNumber] ?? attrs.clefsByStaff[1];
+            const { clefDef, keySigClefName } = mapClef(
+              staffClef?.sign ?? attrs.clefSign,
+              staffClef?.line ?? attrs.clefLine
+            );
+            let width = MEASURE_LEADING_PAD + openingBarlineWidth(part2.id, measure2.number);
+            if (systemStart || clefChanged) width += 3;
+            if ((systemStart || keyChanged) && attrs.fifths !== 0 && clefDef.takesKeySignature) {
+              try {
+                width += keySignatureAccidentals(attrs.fifths, keySigClefName).length + 0.5;
+              } catch {
+              }
+            }
+            if (measureIndex === 0 || timeChanged) width += 2.5;
+            widthByMeasure.set(
+              measure2.number,
+              Math.max(widthByMeasure.get(measure2.number) ?? 0, width)
+            );
+          }
+          previousAttrs = attrs;
+        });
+      }
+      return widthByMeasure;
+    };
+    const applyHeaderWidths = (isSystemStart) => {
+      const widthByMeasure = headerWidths(isSystemStart);
+      for (const [measureNumber, layout] of measureLayoutsByNumber) {
+        measureLayoutsByNumber.set(measureNumber, {
+          ...layout,
+          headerWidth: widthByMeasure.get(measureNumber) ?? MEASURE_LEADING_PAD
+        });
+      }
+    };
+    const predictedSystemStarts = /* @__PURE__ */ new Set();
+    {
+      const first = measureNumbersInOrder[0];
+      if (first !== void 0) predictedSystemStarts.add(first);
+      for (const pr of prints) {
+        if (pr.newSystem || pr.newPage) predictedSystemStarts.add(pr.measureNumber);
+      }
+    }
+    const predictedHeaderWidths = headerWidths((n) => predictedSystemStarts.has(n));
     for (const measureNumber of measureNumbersInOrder) {
       const combinedVoices = [];
       let measureTicks;
@@ -64581,15 +64697,14 @@ ${xrefOffset}
           });
         }
       }
+      const headerWidth = predictedHeaderWidths.get(measureNumber) ?? MEASURE_LEADING_PAD;
       const layout = computeMeasureLayout(
         measure(measureNumber, combinedVoices),
         measureTicks ?? TICKS_PER_QUARTER * 4,
-        tempoMarks.filter((tm) => tm.measureNumber === measureNumber)
+        tempoMarks.filter((tm) => tm.measureNumber === measureNumber),
+        headerWidth
       );
-      measureLayoutsByNumber.set(measureNumber, {
-        ...layout,
-        headerWidth: MEASURE_HEADER_ALLOWANCE
-      });
+      measureLayoutsByNumber.set(measureNumber, { ...layout, headerWidth });
       measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
     }
     const couldCarryBarNumber = (measureNumber, isFirstOfScore) => {
@@ -64711,52 +64826,9 @@ ${xrefOffset}
         });
       });
     }
-    const resolveHeaderWidths = () => {
-      const widthByMeasure = /* @__PURE__ */ new Map();
-      for (const part2 of score2.parts) {
-        let previousAttrs;
-        part2.measures.forEach((measure2, measureIndex) => {
-          const attrs = attributesByPartAndMeasure.get(`${part2.id}:${measure2.number}`);
-          if (attrs === void 0) return;
-          const isSystemStart = placementByMeasureNumber.get(measure2.number)?.isSystemStart ?? false;
-          const clefChanged = previousAttrs === void 0 || previousAttrs.clefSign !== attrs.clefSign || previousAttrs.clefLine !== attrs.clefLine;
-          const keyChanged = previousAttrs === void 0 || previousAttrs.fifths !== attrs.fifths;
-          const timeChanged = previousAttrs === void 0 || previousAttrs.timeNumerator !== attrs.timeNumerator || previousAttrs.timeDenominator !== attrs.timeDenominator;
-          const staffNumbers = Array.from({ length: Math.max(1, attrs.staves) }, (_, n) => n + 1);
-          for (const staffNumber of staffNumbers) {
-            const staffClef = attrs.clefsByStaff[staffNumber] ?? attrs.clefsByStaff[1];
-            const { clefDef, keySigClefName } = mapClef(
-              staffClef?.sign ?? attrs.clefSign,
-              staffClef?.line ?? attrs.clefLine
-            );
-            let width = 0.5;
-            if (isSystemStart || clefChanged) width += 3;
-            if ((isSystemStart || keyChanged) && attrs.fifths !== 0 && clefDef.takesKeySignature) {
-              try {
-                width += keySignatureAccidentals(attrs.fifths, keySigClefName).length + 0.5;
-              } catch {
-              }
-            }
-            if (measureIndex === 0 || timeChanged) width += 2.5;
-            widthByMeasure.set(
-              measure2.number,
-              Math.max(widthByMeasure.get(measure2.number) ?? 0, width)
-            );
-          }
-          previousAttrs = attrs;
-        });
-      }
-      for (const [measureNumber, layout] of measureLayoutsByNumber) {
-        measureLayoutsByNumber.set(measureNumber, {
-          ...layout,
-          // The constant stays a FLOOR: a measure with no header at all
-          // still reserves it, which is what every existing snapshot was
-          // laid out against.
-          headerWidth: Math.max(MEASURE_HEADER_ALLOWANCE, widthByMeasure.get(measureNumber) ?? 0)
-        });
-      }
-    };
-    resolveHeaderWidths();
+    applyHeaderWidths(
+      (measureNumber) => placementByMeasureNumber.get(measureNumber)?.isSystemStart ?? false
+    );
     const noteAreaXOf = (measureX, measureNumber) => measureX + (measureLayoutsByNumber.get(measureNumber)?.headerWidth ?? MEASURE_HEADER_ALLOWANCE);
     const svgParts = [];
     let totalWidth = MEASURE_WIDTH;

@@ -105,6 +105,16 @@ export function positionToX(playback: PlaybackData, tick: number): EventPosition
 
 *(`src/playback/position.ts`)*
 
+#### `playheadX`
+
+```ts
+export function playheadX(playback: PlaybackData, tick: number): EventPosition;
+```
+
+§17.1, for a MOVING playhead: where the music is at `tick`, as a continuous position rather than the last note's own x.
+
+*(`src/playback/position.ts`)*
+
 #### `xToPosition`
 
 ```ts
@@ -343,7 +353,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-479 exported symbols, by module.
+480 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -1117,6 +1127,7 @@ The diagnostics `level` lets through, in their original order.
 | interface | `PlaybackData` | PLAN.md §17.1's full "what the engine provides" for one rendered score, computed ONCE by `computePlaybackData` (called from `renderFromMusicXml` itself, from the exact layout maps that produced the SVG) -- never a second, independently-computed layout that could drift from what was actually drawn. |
 | **API** | `resolvePosition` | §17.1's `PlaybackPosition` for an arbitrary tick -- tick, real seconds (§12's tempo map) and measure+beat, all three views of the same instant. |
 | **API** | `positionToX` | §17.1: time -> where on the page. |
+| **API** | `playheadX` | §17.1, for a MOVING playhead: where the music is at `tick`, as a continuous position rather than the last note's own x. |
 | **API** | `xToPosition` | §17.1: where on the page -> time, for click-to-seek in a host app. |
 
 ### `src/render-from-musicxml.ts`

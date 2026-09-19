@@ -21,8 +21,14 @@ function realSvg() {
 describe('extractViewBox (Phase 47, §16.3)', () => {
   test('reads the real width/height out of a real rendered SVG', () => {
     const vb = NE.extractViewBox(realSvg());
-    assert.equal(vb.width, 29.6);
-    assert.equal(vb.height, 16);
+    // Read from the SVG itself rather than restating a number that moves
+    // whenever spacing changes -- what this test is for is that
+    // extractViewBox AGREES with the document, not what the document's
+    // own width happens to be this week.
+    const declared = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(realSvg());
+    assert.equal(vb.width, Number(declared[1]));
+    assert.equal(vb.height, Number(declared[2]));
+    assert.ok(vb.width > 0 && vb.height > 0);
   });
 
   test('returns undefined for a string with no viewBox, rather than throwing', () => {

@@ -4,7 +4,8 @@
 against MuseScore's render of the same file, and reporting that the
 preview showed no cursor during playback.
 
-**Status:** both fixed. `npm run verify` clean, 816/816 tests.
+**Status:** all fixed. `npm run verify` clean, 826/826 tests. Sections
+4-6 are the follow-up round, from the user's second screenshot.
 
 ## 1. The notation bug: a voice that skips time
 
@@ -130,7 +131,86 @@ land on measures 1, 2 and 3 the same way.
 Past the last event the marker now stops at the final note rather than
 running off into whitespace, so neither limit looks like a crash.
 
-## 4. How to revert
+## 4. Follow-up: the gap after every barline
+
+The user's next screenshot circled the **empty space between a barline
+and the first note of the measure after it** — present on every measure,
+and not there in MuseScore's output.
+
+`MEASURE_HEADER_ALLOWANCE = 6.0` was reserved at the start of **every**
+measure, for a clef/key/time-signature header that most measures never
+draw. It was honest about being an approximation ("at the cost of some
+wasted blank space on ordinary measures — stated directly as a
+limitation"), but the waste was 5.5 staff spaces per measure, which on a
+32-measure drum chart is a fifth of the whole width.
+
+The final review had already computed each measure's **real** header
+width (for the cursor bug above), and then kept 6.0 as a *floor* to avoid
+snapshot churn. Keeping that floor was the wrong call: it preserved
+exactly the defect the user was pointing at. The floor is now
+`MEASURE_LEADING_PAD = 0.5` — the small pad that stops a clef or notehead
+sitting flush against the barline — and the real width is used
+everywhere.
+
+The drum file's total width went from 817 to 664 staff spaces, with
+nothing overlapping.
+
+Two consequences had to be handled:
+
+- **The measure's own width** is computed before layout, but the real
+  header depends on `isSystemStart`, which layout decides. So the width
+  pass *predicts* it (the score's first measure, plus any `<print
+  new-system>`/`new-page`) — exact in scroll mode, and in page mode a
+  measure that unexpectedly starts a system just ends up slightly tight.
+  Nothing drifts: the post-layout pass records the exact width, and both
+  the notes and `positionToX` read that.
+- **A repeat-begin barline needs room.** It is drawn *at* the boundary
+  and extends right, into the measure it opens — nearly two staff spaces
+  for a heavy-light plus its dots. The old blanket 6.0 hid that; with it
+  gone, the first note landed on the dots. `headerWidths` now adds the
+  opening barline's own geometry width, which is what caught this in the
+  existing Integration Q test rather than in a screenshot.
+
+## 5. Follow-up: a cursor that stops in an empty bar
+
+The same screenshot asked why the marker did not move through measure 1,
+which is a whole rest: *"even if there is no note, in 4/4 it should still
+travel four beats."* Correct, and it did not.
+
+`positionToX` is a **step function** by design — §17.1 defines it as "the
+x of the note currently sounding at `tick`". That is what note
+highlighting wants, and it is what `xToPosition` inverts. But a marker
+driven by it freezes on each note and jumps to the next, and across a
+measure containing no notes at all it does not move for the entire
+measure.
+
+So there is now a second function, `playheadX`, for the moving marker:
+
+- between two notes it interpolates proportionally to the tick;
+- after a measure's last note it continues toward that measure's own
+  right edge;
+- a measure with no events at all is crossed from its note area to its
+  barline;
+- **at a note's exact tick it returns exactly what `positionToX` does**,
+  so the two can never disagree about where a note *is* — only about
+  what happens in between.
+
+`computeCursorPlacement` now drives `markerX` from `playheadX` while
+`noteX` keeps reporting the note itself, which is what it has always
+meant. Measured on the drum file, the marker across the opening rest bar
+now reads 6.00 → 8.31 → 10.63 → 12.94 → 17.62 where it used to read 6.00
+five times.
+
+## 6. A test-infrastructure fix this turned up
+
+`npm run docs:check` was implemented as "regenerate, then `git diff
+--quiet`". That conflates **stale** (the code moved and nobody
+regenerated) with **not committed yet** (the normal state in the middle
+of a change), so `npm run verify` failed on every legitimate docs update
+until it was committed. It now compares the generated text against the
+file's contents directly and never asks git anything.
+
+## 7. How to revert
 
 Drop `startTick` from `core/note.ts`/`rest.ts`/`chord.ts` and the spread
 in `parse.ts`; restore the four running-sum loops; delete

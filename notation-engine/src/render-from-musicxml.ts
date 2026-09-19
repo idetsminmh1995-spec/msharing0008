@@ -233,25 +233,30 @@ const ESTIMATED_ACCIDENTAL_ALLOWANCE = 1.0;
 /** Trailing room after a measure's last event, so it isn't flush against the barline. */
 const MEASURE_TRAILING_MARGIN = 2.0;
 /**
- * Reserved space at the start of EVERY measure for a possible clef/key/
- * time-signature header, even on a measure that doesn't actually draw
- * one. Simpler and safer than computing the real header width per
- * measure (which would need duplicating the isFirstMeasure/clefChanged/
- * keyChanged/timeChanged logic here before it's otherwise needed) at
- * the cost of some wasted blank space on ordinary measures -- stated
- * directly as a limitation rather than silently accepted.
+ * The small pad every measure leaves at its own left edge, before
+ * anything is drawn -- so a clef, or the first notehead, is not flush
+ * against the barline.
  *
- * 6.0, not 4.0: empirically checked against the real cursorX a clef +
- * a 4/4 time signature actually advances to (confirmed identically for
- * both a treble clef and a percussion clef -- both real first notes
- * land at x=6 given layout.x=0). The original 4.0 undershot this,
- * which was invisible for ordinary notes (their own noteAreaX already
- * takes `Math.max(this allowance, the real cursorX)`, so undershooting
- * just meant cursorX won silently) but became a real, visible bug for
- * a tempo mark on a measure that DOES draw this header: the tempo
- * mark's own x used this allowance directly, with no cursorX to fall
- * back on, landing noticeably left of where the first note actually
- * starts.
+ * This is ALL an ordinary measure reserves. The real header width is
+ * computed per measure by `headerWidths` (clef + key signature + time
+ * signature, only where the measure actually draws them), because a
+ * header is not a constant: a four-sharp key signature needs 10.5, and
+ * a measure that restates nothing needs just this.
+ *
+ * It used to be one constant, `MEASURE_HEADER_ALLOWANCE = 6.0`, applied
+ * to every measure. That was two bugs at once -- too NARROW where a key
+ * signature was restated (the tempo mark and the playback cursor landed
+ * inside the header) and too WIDE everywhere else (five staff spaces of
+ * empty air after every barline, which is what made this engine's drum
+ * output look unlike MuseScore's).
+ */
+const MEASURE_LEADING_PAD = 0.5;
+
+/**
+ * The fallback header width for a measure with no layout entry of its
+ * own -- `positionToX`'s last resort, and nothing else. Kept at the old
+ * constant's value so a caller that somehow reaches it is no worse off
+ * than before.
  */
 const MEASURE_HEADER_ALLOWANCE = 6.0;
 
@@ -401,6 +406,8 @@ function computeMeasureLayout(
     readonly beatUnitDots: number;
     readonly perMinute: number;
   }[],
+  /** This measure's OWN header width (see `headerWidths`), not a score-wide constant. */
+  headerWidth: number,
 ): { readonly width: number; readonly positionsByTick: ReadonlyMap<number, number> } {
   const hasAccidentalByTick = new Map<number, boolean>();
   for (const voice of measure.voices) {
@@ -449,7 +456,7 @@ function computeMeasureLayout(
       metronomeBpmDigitGlyphNames(tm.perMinute),
       1.0,
     );
-    return Math.max(max, MEASURE_HEADER_ALLOWANCE + markWidth + MEASURE_TRAILING_MARGIN);
+    return Math.max(max, headerWidth + markWidth + MEASURE_TRAILING_MARGIN);
   }, 0);
 
   if (ticks.length === 0) {
@@ -482,7 +489,7 @@ function computeMeasureLayout(
   const lastWidth = spacingEvents[spacingEvents.length - 1]?.renderedWidth ?? 0;
   const width = Math.max(
     MEASURE_WIDTH * 0.3,
-    MEASURE_HEADER_ALLOWANCE + lastX + lastWidth + MEASURE_TRAILING_MARGIN,
+    headerWidth + lastX + lastWidth + MEASURE_TRAILING_MARGIN,
     tempoMarkMinWidth,
   );
 
@@ -1791,6 +1798,143 @@ export function renderParsedMusicXml(
     number,
     { readonly numerator: number; readonly denominator: number }
   >();
+  const BARLINE_METRICS = {
+    thinThickness: getEngravingDefault('thinBarlineThickness') ?? 0.16,
+    thickThickness: getEngravingDefault('thickBarlineThickness') ?? 0.5,
+    separation: getEngravingDefault('barlineSeparation') ?? 0.4,
+    dotWidth: 0.4,
+    dashLength: getEngravingDefault('dashedBarlineDashLength') ?? 0.5,
+    gapLength: getEngravingDefault('dashedBarlineGapLength') ?? 0.25,
+  };
+
+  /**
+   * How much of `measureNumber`'s own left edge the barline drawn there
+   * occupies.
+   *
+   * Integration Q: that barline is ONE physical line at the boundary the
+   * two measures share, and either side may declare it -- a repeat-begin
+   * is normally written as `location="left"` on the measure it opens.
+   * Whoever declares it, it is drawn starting AT the boundary and
+   * extending right, so it is this measure's space that it takes.
+   */
+  const openingBarlineWidth = (partId: string, measureNumber: number): number => {
+    const here = attributesByPartAndMeasure.get(`${partId}:${measureNumber}`);
+    const previous = attributesByPartAndMeasure.get(`${partId}:${measureNumber - 1}`);
+    const style = here?.leftBarlineStyle ?? previous?.barlineStyle;
+    const direction = here?.leftRepeatDirection ?? previous?.repeatDirection;
+    if (style === undefined && direction === undefined) return 0;
+    return computeBarlineGeometry(mapBarline(style, direction), BARLINE_METRICS).width;
+  };
+
+  /**
+   * How wide a measure's HEADER is -- the clef, key signature and time
+   * signature it actually draws -- by the same rules the draw loop uses,
+   * maximised over every part and staff because all parts share ONE
+   * horizontal timeline (Integration L).
+   *
+   * It is not a constant, and `MEASURE_HEADER_ALLOWANCE` being one was
+   * two separate bugs. A measure with a FOUR-SHARP key signature needs
+   * 10.5 and got 6.0, so the tempo mark and the playback cursor landed
+   * inside the header. A measure that restates NOTHING needs 0.5 and
+   * also got 6.0, so every barline in the score was followed by five
+   * staff spaces of empty air -- visible on this project's own drum
+   * file, and the thing that made it look unlike MuseScore's output.
+   *
+   * `isSystemStart` is a parameter rather than a lookup because it is
+   * needed BOTH before layout (to give each measure a width that fits
+   * its own header) and after it (to record the final, exact width for
+   * `positionToX`). Before layout the real answer does not exist yet --
+   * which measures start a system is what layout decides -- so the
+   * caller predicts it from the score's own `<print>` breaks, and the
+   * post-layout pass corrects it.
+   */
+  const headerWidths = (isSystemStart: (measureNumber: number) => boolean): Map<number, number> => {
+    const widthByMeasure = new Map<number, number>();
+    for (const part of score.parts) {
+      let previousAttrs: MeasureAttributes | undefined;
+      part.measures.forEach((measure, measureIndex) => {
+        const attrs = attributesByPartAndMeasure.get(`${part.id}:${measure.number}`);
+        if (attrs === undefined) return;
+        const systemStart = isSystemStart(measure.number);
+        const clefChanged =
+          previousAttrs === undefined ||
+          previousAttrs.clefSign !== attrs.clefSign ||
+          previousAttrs.clefLine !== attrs.clefLine;
+        const keyChanged = previousAttrs === undefined || previousAttrs.fifths !== attrs.fifths;
+        const timeChanged =
+          previousAttrs === undefined ||
+          previousAttrs.timeNumerator !== attrs.timeNumerator ||
+          previousAttrs.timeDenominator !== attrs.timeDenominator;
+
+        // Per staff, because `takesKeySignature` differs between them --
+        // a guitar part's tab staff draws no key signature while its
+        // notation staff does, and the WIDER one governs the timeline.
+        const staffNumbers = Array.from({ length: Math.max(1, attrs.staves) }, (_, n) => n + 1);
+        for (const staffNumber of staffNumbers) {
+          const staffClef = attrs.clefsByStaff[staffNumber] ?? attrs.clefsByStaff[1];
+          const { clefDef, keySigClefName } = mapClef(
+            staffClef?.sign ?? attrs.clefSign,
+            staffClef?.line ?? attrs.clefLine,
+          );
+          // A barline drawn at this measure's LEFT edge extends RIGHT,
+          // into the measure -- a repeat-begin ("heavy-light" plus its
+          // two dots) is nearly two staff spaces wide. Reserving it here
+          // is what keeps the first note clear of it; the note used to
+          // be pushed past it by the old blanket 6.0 allowance, which is
+          // why removing that allowance is what exposed this.
+          let width = MEASURE_LEADING_PAD + openingBarlineWidth(part.id, measure.number);
+          if (systemStart || clefChanged) width += 3;
+          if ((systemStart || keyChanged) && attrs.fifths !== 0 && clefDef.takesKeySignature) {
+            try {
+              width += keySignatureAccidentals(attrs.fifths, keySigClefName).length + 0.5;
+            } catch {
+              // An unsupported clef draws no key signature at all (the
+              // draw loop catches the same throw and warns), so it costs
+              // no width either.
+            }
+          }
+          if (measureIndex === 0 || timeChanged) width += 2.5;
+          widthByMeasure.set(
+            measure.number,
+            Math.max(widthByMeasure.get(measure.number) ?? 0, width),
+          );
+        }
+        previousAttrs = attrs;
+      });
+    }
+    return widthByMeasure;
+  };
+
+  /** Rewrites every measure layout's `headerWidth` from a (now known) isSystemStart. */
+  const applyHeaderWidths = (isSystemStart: (measureNumber: number) => boolean): void => {
+    const widthByMeasure = headerWidths(isSystemStart);
+    for (const [measureNumber, layout] of measureLayoutsByNumber) {
+      measureLayoutsByNumber.set(measureNumber, {
+        ...layout,
+        headerWidth: widthByMeasure.get(measureNumber) ?? MEASURE_LEADING_PAD,
+      });
+    }
+  };
+
+  /**
+   * The pre-layout prediction. A measure starts a system if it is the
+   * score's first, or if the file itself asked for a break there
+   * (`<print new-system>`/`new-page`). Page mode can break elsewhere
+   * too, and those measures end up slightly narrow -- the draw loop's
+   * own `Math.max(noteAreaXOf(...), cursorX)` still places their notes
+   * correctly, and `applyHeaderWidths` below records the exact width, so
+   * nothing DRIFTS; the measure is only a little tight.
+   */
+  const predictedSystemStarts = new Set<number>();
+  {
+    const first = measureNumbersInOrder[0];
+    if (first !== undefined) predictedSystemStarts.add(first);
+    for (const pr of prints) {
+      if (pr.newSystem || pr.newPage) predictedSystemStarts.add(pr.measureNumber);
+    }
+  }
+  const predictedHeaderWidths = headerWidths((n) => predictedSystemStarts.has(n));
+
   for (const measureNumber of measureNumbersInOrder) {
     const combinedVoices = [];
     let measureTicks: number | undefined;
@@ -1811,15 +1955,14 @@ export function renderParsedMusicXml(
         });
       }
     }
+    const headerWidth = predictedHeaderWidths.get(measureNumber) ?? MEASURE_LEADING_PAD;
     const layout = computeMeasureLayout(
       makeMeasure(measureNumber, combinedVoices),
       measureTicks ?? TICKS_PER_QUARTER * 4,
       tempoMarks.filter((tm) => tm.measureNumber === measureNumber),
+      headerWidth,
     );
-    measureLayoutsByNumber.set(measureNumber, {
-      ...layout,
-      headerWidth: MEASURE_HEADER_ALLOWANCE,
-    });
+    measureLayoutsByNumber.set(measureNumber, { ...layout, headerWidth });
     measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
   }
 
@@ -2053,66 +2196,9 @@ export function renderParsedMusicXml(
    * one per staff, or a percussion part (no key signature) and a piano
    * part (four sharps) would start their notes at different x.
    */
-  const resolveHeaderWidths = (): void => {
-    const widthByMeasure = new Map<number, number>();
-    for (const part of score.parts) {
-      let previousAttrs: MeasureAttributes | undefined;
-      part.measures.forEach((measure, measureIndex) => {
-        const attrs = attributesByPartAndMeasure.get(`${part.id}:${measure.number}`);
-        if (attrs === undefined) return;
-        const isSystemStart = placementByMeasureNumber.get(measure.number)?.isSystemStart ?? false;
-        const clefChanged =
-          previousAttrs === undefined ||
-          previousAttrs.clefSign !== attrs.clefSign ||
-          previousAttrs.clefLine !== attrs.clefLine;
-        const keyChanged = previousAttrs === undefined || previousAttrs.fifths !== attrs.fifths;
-        const timeChanged =
-          previousAttrs === undefined ||
-          previousAttrs.timeNumerator !== attrs.timeNumerator ||
-          previousAttrs.timeDenominator !== attrs.timeDenominator;
-
-        // Per staff, because `takesKeySignature` differs between them --
-        // a guitar part's tab staff draws no key signature while its
-        // notation staff does, and the WIDER one governs the timeline.
-        const staffNumbers = Array.from({ length: Math.max(1, attrs.staves) }, (_, n) => n + 1);
-        for (const staffNumber of staffNumbers) {
-          const staffClef = attrs.clefsByStaff[staffNumber] ?? attrs.clefsByStaff[1];
-          const { clefDef, keySigClefName } = mapClef(
-            staffClef?.sign ?? attrs.clefSign,
-            staffClef?.line ?? attrs.clefLine,
-          );
-          let width = 0.5;
-          if (isSystemStart || clefChanged) width += 3;
-          if ((isSystemStart || keyChanged) && attrs.fifths !== 0 && clefDef.takesKeySignature) {
-            try {
-              width += keySignatureAccidentals(attrs.fifths, keySigClefName).length + 0.5;
-            } catch {
-              // An unsupported clef draws no key signature at all (the
-              // draw loop catches the same throw and warns), so it costs
-              // no width either.
-            }
-          }
-          if (measureIndex === 0 || timeChanged) width += 2.5;
-          widthByMeasure.set(
-            measure.number,
-            Math.max(widthByMeasure.get(measure.number) ?? 0, width),
-          );
-        }
-        previousAttrs = attrs;
-      });
-    }
-
-    for (const [measureNumber, layout] of measureLayoutsByNumber) {
-      measureLayoutsByNumber.set(measureNumber, {
-        ...layout,
-        // The constant stays a FLOOR: a measure with no header at all
-        // still reserves it, which is what every existing snapshot was
-        // laid out against.
-        headerWidth: Math.max(MEASURE_HEADER_ALLOWANCE, widthByMeasure.get(measureNumber) ?? 0),
-      });
-    }
-  };
-  resolveHeaderWidths();
+  applyHeaderWidths(
+    (measureNumber) => placementByMeasureNumber.get(measureNumber)?.isSystemStart ?? false,
+  );
 
   /** Where a measure's notes actually begin: its own left edge plus its real header. */
   const noteAreaXOf = (measureX: number, measureNumber: number): number =>
