@@ -15,10 +15,14 @@
 <text x="0.5" y="9.5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="7.5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="9.5" font-family="Bravura" font-size="4" fill="#000000"></text>
+<g data-id="P1#m1#v1#e0">
 <text x="6" y="8" font-family="Bravura" font-size="4" fill="#000000"></text>
 <line x1="6" y1="8.168" x2="6" y2="11.668" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-id="P1#m1#v1#e1">
 <text x="8.4" y="7.5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <line x1="8.4" y1="7.668" x2="8.4" y2="11.168" stroke="#000000" stroke-width="0.12" />
+</g>
 <g>
 <line x1="15.088" y1="10.5" x2="15.088" y2="6.5" stroke="#000000" stroke-width="0.16" />
 </g>

@@ -94,3 +94,29 @@ export function getEngravingDefaults(): Readonly<Record<string, number>> {
 export function getFontInfo(): { readonly name: string; readonly version: string } {
   return { name: bravuraMetadata.fontName, version: bravuraMetadata.fontVersion };
 }
+
+/**
+ * Phase 51/§18.3: the reverse of `getGlyph` -- a glyph's CHARACTER back to
+ * its entry. Built lazily and once, because the forward direction (name ->
+ * char) is what every renderer needs and the reverse is needed only by the
+ * debug overlay, which measures glyphs it finds in already-emitted SVG and
+ * has nothing but the character to go on.
+ *
+ * SMuFL codepoints are unique per glyph within a font's private-use area,
+ * but `glyphnames.json` also carries a handful of aliases and optional
+ * glyphs sharing one codepoint; first-wins is deliberate, since the two
+ * entries describe the same drawn shape and therefore the same bounding box.
+ */
+let charIndex: Map<string, string> | undefined;
+
+export function getGlyphByChar(char: string): GlyphInfo | undefined {
+  if (charIndex === undefined) {
+    charIndex = new Map();
+    for (const [name, entry] of Object.entries(glyphnames)) {
+      const c = codepointToChar(entry.codepoint);
+      if (!charIndex.has(c)) charIndex.set(c, name);
+    }
+  }
+  const name = charIndex.get(char);
+  return name === undefined ? undefined : getGlyph(name);
+}

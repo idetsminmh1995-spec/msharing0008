@@ -10,13 +10,21 @@
 <text x="0.5" y="6" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="7" font-family="Bravura" font-size="4" fill="#000000"></text>
+<g data-id="P1#m1#v1#e0">
 <text x="6" y="5.5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <line x1="7.18" y1="5.332" x2="7.18" y2="1.8319999999999999" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-id="P1#m1#v1#e1">
 <text x="8.4" y="7.5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <line x1="8.4" y1="7.668" x2="8.4" y2="11.168" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-id="P1#m1#v1#e2">
 <text x="10.8" y="3.5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <line x1="11.96" y1="3.056" x2="11.96" y2="0.05600000000000005" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-id="P1#m1#v1#e3">
 <text x="13.2" y="6" font-family="Bravura" font-size="4" fill="#000000"></text>
+</g>
 <g>
 <line x1="16.2" y1="8" x2="16.2" y2="4" stroke="#000000" stroke-width="0.16" />
 </g>

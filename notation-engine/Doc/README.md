@@ -94,6 +94,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-48-playback-position-api.md`](./phase-48-playback-position-api.md) | Phase 48: §17.1 playback position API + event stream (`positionToX`/`xToPosition`/`getEventStream`/`resolvePosition`), wired into `renderFromMusicXml`'s own result -- completes Stage 9's first half; deletes the superseded `src/cursor/` placeholder |
 | [`phase-49-cursor.md`](./phase-49-cursor.md) | Phase 49: §17.2 cursor, both sync modes in ONE module (`computeCursorPlacement` + `renderCursor`) -- completes Stage 9; repeats stay the host's business, never simulated here |
 | [`phase-50-theming-api.md`](./phase-50-theming-api.md) | Phase 50: §8's theming API made live -- colours (with per-category `colors.overrides`), fonts, bar numbers, beam style, notehead + drum mapping and staff distance all read from `config` instead of six hardcoded constants; opens Stage 10 and closes STATUS §C2 |
+| [`phase-51-debug-overlays.md`](./phase-51-debug-overlays.md) | Phase 51: §18.3's debugging surface -- `config.debug` (logLevel + both overlays), a stable `data-id` on every drawn event sharing the playback event stream's own id scheme, and bounding boxes/skylines measured FROM the emitted SVG so they can never disagree with it |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file

@@ -34,6 +34,36 @@ export interface NotationEvent {
   readonly measureNumber: number;
 }
 
+/**
+ * The id of ONE notated event -- the `data-id` its `<g>` carries in the
+ * rendered SVG (Phase 51/§18.3) and the stem every `noteIds` entry below
+ * is built from.
+ *
+ * Exported because two independent places need the exact same string: the
+ * renderer, which stamps it on the group it draws, and the event stream,
+ * which reports it to a host. A second implementation of this format is
+ * precisely the bug that would make note-highlighting silently miss.
+ */
+export function notationEventId(
+  partId: string,
+  measureNumber: number,
+  voiceId: number,
+  eventIndex: number,
+): string {
+  return `${partId}#m${measureNumber}#v${voiceId}#e${eventIndex}`;
+}
+
+/**
+ * The rendered element a `noteId` belongs to: a chord member's
+ * `...#e3#n1` lives inside the chord's own `...#e3` group, since a chord
+ * is drawn as one element with several noteheads. A bare note's id is
+ * already its element's.
+ */
+export function elementIdForNoteId(noteId: string): string {
+  const cut = noteId.lastIndexOf('#n');
+  return cut === -1 ? noteId : noteId.slice(0, cut);
+}
+
 function noteIdsForEvent(
   partId: string,
   measureNumber: number,
@@ -41,7 +71,7 @@ function noteIdsForEvent(
   eventIndex: number,
   event: MeasureEvent,
 ): readonly string[] {
-  const base = `${partId}#m${measureNumber}#v${voiceId}#e${eventIndex}`;
+  const base = notationEventId(partId, measureNumber, voiceId, eventIndex);
   if (event.kind === 'note') return [base];
   if (event.kind === 'chord') return event.notes.map((_, i) => `${base}#n${i}`);
   return [];

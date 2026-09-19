@@ -10,6 +10,7 @@
 <text x="0.5" y="7" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="7" font-family="Bravura" font-size="4" fill="#000000"></text>
+<g data-id="P1#m1#v1#e0">
 <text x="6" y="16" font-family="Bravura" font-size="4" fill="#000000"></text>
 <g>
 <line x1="4.755999999999999" y1="9" x2="7.244000000000001" y2="9" stroke="#000000" stroke-width="0.16" />
@@ -21,6 +22,7 @@
 <line x1="4.755999999999999" y1="15" x2="7.244000000000001" y2="15" stroke="#000000" stroke-width="0.16" />
 <line x1="4.755999999999999" y1="16" x2="7.244000000000001" y2="16" stroke="#000000" stroke-width="0.16" />
 </g>
+</g>
 <g>
 <line x1="0" y1="28" x2="9" y2="28" stroke="#000000" stroke-width="0.13" />
 <line x1="0" y1="27" x2="9" y2="27" stroke="#000000" stroke-width="0.13" />
@@ -31,6 +33,7 @@
 <text x="0.5" y="25" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="25" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="27" font-family="Bravura" font-size="4" fill="#000000"></text>
+<g data-id="P1#m1#v2#e0">
 <text x="6" y="16" font-family="Bravura" font-size="4" fill="#000000"></text>
 <g>
 <line x1="4.755999999999999" y1="23" x2="7.244000000000001" y2="23" stroke="#000000" stroke-width="0.16" />
@@ -41,6 +44,7 @@
 <line x1="4.755999999999999" y1="18" x2="7.244000000000001" y2="18" stroke="#000000" stroke-width="0.16" />
 <line x1="4.755999999999999" y1="17" x2="7.244000000000001" y2="17" stroke="#000000" stroke-width="0.16" />
 <line x1="4.755999999999999" y1="16" x2="7.244000000000001" y2="16" stroke="#000000" stroke-width="0.16" />
+</g>
 </g>
 <g>
 <line x1="9" y1="28" x2="9" y2="4" stroke="#000000" stroke-width="0.16" />

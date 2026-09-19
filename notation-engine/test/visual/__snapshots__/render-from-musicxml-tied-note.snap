@@ -10,13 +10,19 @@
 <text x="0.5" y="7" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="7" font-family="Bravura" font-size="4" fill="#000000"></text>
+<g data-id="P1#m1#v1#e0">
 <text x="6" y="5.5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <line x1="6" y1="5.668" x2="6" y2="9.168" stroke="#000000" stroke-width="0.12" />
+</g>
 <path d="M 7.18 5.5 Q 7.79 5.11 8.4 5.5 Q 7.79 4.89 7.18 5.5 Z" fill="#000000" stroke="none" />
+<g data-id="P1#m1#v1#e1">
 <text x="8.4" y="5.5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <line x1="8.4" y1="5.668" x2="8.4" y2="9.168" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-id="P1#m1#v1#e2">
 <text x="10.8" y="5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <line x1="10.8" y1="5.168" x2="10.8" y2="8.668" stroke="#000000" stroke-width="0.12" />
+</g>
 <g>
 <line x1="13.8" y1="8" x2="13.8" y2="4" stroke="#000000" stroke-width="0.16" />
 </g>

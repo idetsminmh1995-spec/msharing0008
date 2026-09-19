@@ -203,6 +203,10 @@ permitted dependencies — verified against the code, not aspirational:
 | `render/` | `geometry/`, `glyphs/`, `config/` | `core/` directly, `layout/`, `parser/` |
 | `layout/` | `core/`, `geometry/`, `config/` | `render/` |
 | `parser/` | `core/` | everything else |
+| `timing/` | `core/` | everything else |
+| `drums/` | (nothing) | everything else |
+| `playback/` | `core/`, `timing/`, `config/` | `render/`, `geometry/`, `parser/` |
+| `debug/` | `config/`, `glyphs/` | everything else |
 
 In words:
 
@@ -216,6 +220,11 @@ In words:
 - `layout/` orchestrates geometry into positioned systems; it never emits SVG
   directly — it produces positions that `render/` draws.
 - `parser/` produces `core/` objects and nothing else.
+- `debug/` (§18.3) measures and filters; it emits no SVG of its own. Its
+  bounding-box pass reads glyph metrics from `glyphs/` for the same reason
+  `geometry/` does — measurement needs them — and its overlays are *drawn*
+  by `render/debug-overlay.ts`, which lives in `render/` precisely so the
+  "only `render/` emits SVG" rule keeps holding.
 
 `config/` is a leaf that anything may read, which is what makes it usable as
 the single customisation backbone (§8) without creating cycles.
@@ -526,8 +535,12 @@ branch on until a second one exists; and four of the five `fonts.sizes`
 fixed-size SMuFL glyphs or not drawn as text at all yet. See
 `Doc/phase-50-theming-api.md` §4.
 
-The `debug` section in the list above is still `[TODO]` — it lands with
-**Phase 51**, together with the overlays it switches on.
+The `debug` section in the list above landed with **Phase 51**, together
+with the overlays it switches on — `logLevel` filters the diagnostics a
+render returns, and `drawBoundingBoxes`/`drawSkyline` add their overlays
+on top of the music. It carries two colours of its own
+(`boundingBoxColor`, `skylineColor`) rather than borrowing
+`colors.overrides`, since an overlay is not part of the music.
 
 **Rule for adding a section:** add its interface, add its default to
 `DEFAULT_CONFIG`, add one line to `resolveConfig`'s merge. Nothing else
@@ -2151,7 +2164,7 @@ rediscovered: `node --test <dir>` with explicit path arguments fails on Node
 sandbox boundary even for structurally identical objects (spread into the
 test's own realm first).
 
-### 18.3 Debugging and logging
+### 18.3 Debugging and logging `[BUILT — Phase 51]`
 
 - A single `Diagnostic[]` channel (§10.7) rather than scattered
   `console.log`. Severity-filtered by `config.debug.logLevel`.
@@ -2160,6 +2173,16 @@ test's own realm first).
 - `config.debug.drawSkyline` overlays the north/south skylines (§15).
 - Every rendered element carries a stable `data-id` attribute tracing back to
   its `Score` node, so a visual bug can be traced to a source element.
+
+**How it was built.** The boxes are measured from the SVG the render just
+produced (`measureSvgBoxes`), not collected as it draws: an overlay that
+can disagree with what was drawn is worse than no overlay, and measuring
+the output cannot drift from the output. The skylines are derived from
+those same boxes, so the two overlays can never contradict each other.
+The `data-id` is `notationEventId(...)` — the exact function §17.1's
+event stream builds its `noteIds` from, so a host can turn "the note
+sounding now" into a DOM node with one `querySelector` and no second id
+scheme. See `Doc/phase-51-debug-overlays.md`.
 
 ### 18.4 Error handling philosophy
 
@@ -2394,7 +2417,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | Phase | What | Status |
 |---|---|---|
 | 50 | Full theming API — unify every config section (§8) | ✅ (built -- see Doc/phase-50-theming-api.md) |
-| 51 | Debug overlays and diagnostics surface (§18.3) | |
+| 51 | Debug overlays and diagnostics surface (§18.3) | ✅ (built -- see Doc/phase-51-debug-overlays.md) |
 | 52 | Export: SVG, PNG, PDF (§3, §16.2) | |
 | 53 | Performance pass against §18.1's budgets | |
 | 54 | Public API surface + generated reference docs into `docs/` | |

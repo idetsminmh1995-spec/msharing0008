@@ -79,8 +79,10 @@ import {
 } from './geometry/metronome.js';
 import { renderMetronomeMark, metronomeMarkWidth } from './render/metronome.js';
 import { TICKS_PER_QUARTER } from './core/duration-math.js';
-import { computePlaybackData, type PlaybackData } from './playback/index.js';
-import { renderTabNumber } from './render/index.js';
+import { computePlaybackData, notationEventId, type PlaybackData } from './playback/index.js';
+import { renderTabNumber, svgGroup } from './render/index.js';
+import { renderBoundingBoxOverlay, renderSkylineOverlay } from './render/debug-overlay.js';
+import { computeDebugSkylines, filterDiagnostics, measureSvgBoxes } from './debug/index.js';
 import { computeBraceShape, needsBrace, needsContinuousBarline } from './geometry/index.js';
 import { renderBrace } from './render/index.js';
 import type { Diagnostic, MeasureAttributes } from './parser/index.js';
@@ -1018,12 +1020,21 @@ function renderBeamGroup(
   beamStyle: BeamStyleOption,
   forcedDirection: StemDirection | undefined,
 ): {
-  svg: string;
+  /**
+   * Phase 51/§18.3: each member's OWN drawn content (its noteheads,
+   * accidentals, ledger lines, stem and marks), in the same order as
+   * `events`, so the caller can stamp each one with its own `data-id`.
+   * The beam itself is shared by the whole group and is returned
+   * separately -- it belongs to no single event.
+   */
+  memberSvgs: readonly string[];
+  beamSvg: string;
   newAccidentalState: AccidentalState;
   /** Integration I: one anchor per member event, in the same order as `events`. */
   anchors: readonly EventAnchor[];
 } {
-  const parts: string[] = [];
+  /** One bucket per member, filled in three passes (heads, stems, marks) below. */
+  const memberParts: string[][] = [];
   let state = accidentalState;
 
   /**
@@ -1050,12 +1061,12 @@ function renderBeamGroup(
       // left a stray flag on every beamed chord -- 62 of them on this
       // project's own drum fixture, one for every chord the file beams.
       const heads = renderChordHeadsPart(event, x, ctx, state);
-      parts.push(heads.svg);
+      memberParts.push([heads.svg]);
       state = heads.newAccidentalState;
       members.push({ x, positions: heads.positions, glyph: heads.widestGlyph, source: event });
     } else {
       const head = renderNoteheadPart(event, x, ctx, state);
-      parts.push(head.svg);
+      memberParts.push([head.svg]);
       state = head.newAccidentalState;
       members.push({ x, positions: [head.position], glyph: head.noteheadGlyph, source: event });
     }
@@ -1105,7 +1116,7 @@ function renderBeamGroup(
     const beamY = ctx.measureBottomY + beamYAtX(shape, stemX);
     const anchor = getGlyph(m.glyph)?.anchors?.[anchorName];
     if (anchor === undefined) return;
-    parts.push(
+    memberParts[i]?.push(
       renderStem({
         noteheadGlyphName: m.glyph,
         noteX: m.x,
@@ -1127,9 +1138,9 @@ function renderBeamGroup(
   // the beam's own shared stem direction (§9.13) rather than re-deriving
   // a per-note one, so every mark in the group sits on the same side. A
   // chord's marks live on its FIRST note, as MusicXML writes them.
-  for (const m of members) {
+  members.forEach((m, i) => {
     const markSource = m.source.kind === 'chord' ? m.source.notes[0] : m.source;
-    if (markSource === undefined) continue;
+    if (markSource === undefined) return;
     const marks = renderNoteMarks(
       markSource,
       m.x,
@@ -1138,8 +1149,8 @@ function renderBeamGroup(
       direction,
       ctx,
     );
-    if (marks !== '') parts.push(marks);
-  }
+    if (marks !== '') memberParts[i]?.push(marks);
+  });
 
   const anchors: EventAnchor[] = members.map((m) => ({
     x: m.x,
@@ -1165,16 +1176,19 @@ function renderBeamGroup(
     startY: shape.startY + ctx.measureBottomY,
     endY: shape.endY + ctx.measureBottomY,
   };
-  parts.push(
-    renderBeam(offsetShape, {
-      lineCount,
-      thickness: getEngravingDefault('beamThickness') ?? BEAM_THICKNESS_FALLBACK,
-      spacing: getEngravingDefault('beamSpacing') ?? BEAM_SPACING_FALLBACK,
-      color: ctx.theme.colorOf('beam'),
-    }),
-  );
+  const beamSvg = renderBeam(offsetShape, {
+    lineCount,
+    thickness: getEngravingDefault('beamThickness') ?? BEAM_THICKNESS_FALLBACK,
+    spacing: getEngravingDefault('beamSpacing') ?? BEAM_SPACING_FALLBACK,
+    color: ctx.theme.colorOf('beam'),
+  });
 
-  return { svg: parts.join('\n'), newAccidentalState: state, anchors };
+  return {
+    memberSvgs: memberParts.map((p) => p.join('\n')),
+    beamSvg,
+    newAccidentalState: state,
+    anchors,
+  };
 }
 
 /**
@@ -1651,6 +1665,8 @@ export function renderFromMusicXml(
   // Phase 50/§8: one resolution of every user-facing drawing value, passed
   // down on RenderCtx. Everything below reads `theme`, never a constant.
   const theme = buildTheme(config);
+  /** Phase 51/§18.3: the absolute y of every staff bottom line drawn, for the skyline overlay. */
+  const staffBottomYs = new Set<number>();
   /**
    * §14.3's justification fills a system to a KNOWN width. Scroll mode
    * (§16.1) has no such width -- its single system is as wide as the
@@ -2227,6 +2243,9 @@ export function renderFromMusicXml(
         const staffLines = attrs.staffLinesByStaff[staffNumber] ?? STAFF_LINES;
         const staffGeometry = computeStaffGeometry(staffLines);
         const bottomY = staffBottomY + systemY + staffOffsetFor(partIndex, staffIndex);
+        // Phase 51/§18.3: every staff line this render actually drew, for
+        // the skyline overlay to hang its per-staff envelopes on.
+        staffBottomYs.add(bottomY);
 
         svgParts.push(
           renderStaff(staffGeometry, {
@@ -2478,6 +2497,23 @@ export function renderFromMusicXml(
             // own index in this voice, for the span pass below.
             const anchorByIndex = new Map<number, EventAnchor>();
 
+            /**
+             * Phase 51/§18.3: "every rendered element carries a stable
+             * `data-id` attribute tracing back to its `Score` node".
+             *
+             * The id comes from `notationEventId`, the SAME function the
+             * playback event stream builds its `noteIds` from (§17.1) --
+             * so a host handed `{ tick, noteIds }` can find the exact
+             * `<g>` that sounds at that tick with a plain
+             * `querySelector`, with no second id scheme to keep in sync.
+             * A chord member's `#n<i>` suffix resolves to its chord's own
+             * group via `elementIdForNoteId`.
+             */
+            const withEventId = (svg: string, voiceId: number, eventIndex: number): string =>
+              svgGroup([svg], {
+                'data-id': notationEventId(part.id, measure.number, voiceId, eventIndex),
+              });
+
             voice.events.forEach((event, idx) => {
               // Integration A: a multi-staff part's voices carry events for
               // EVERY staff; this pass draws only the ones belonging to the
@@ -2522,7 +2558,8 @@ export function renderFromMusicXml(
                   );
                 const groupXs = groupIndices.map((i) => eventXs[i] ?? 0);
                 const {
-                  svg,
+                  memberSvgs,
+                  beamSvg,
                   newAccidentalState,
                   anchors: groupAnchors,
                 } = renderBeamGroup(
@@ -2537,7 +2574,16 @@ export function renderFromMusicXml(
                   const eventIndex = groupIndices[memberIndex];
                   if (eventIndex !== undefined) anchorByIndex.set(eventIndex, anchor);
                 });
-                svgParts.push(svg);
+                // Phase 51/§18.3: each member carries its OWN id, not the
+                // group's -- a beam is a relationship between events, and
+                // a host highlighting one eighth note must not light up
+                // the other three it happens to be beamed to.
+                memberSvgs.forEach((memberSvg, memberIndex) => {
+                  const eventIndex = groupIndices[memberIndex];
+                  if (eventIndex === undefined) return;
+                  svgParts.push(withEventId(memberSvg, voice.id, eventIndex));
+                });
+                svgParts.push(beamSvg);
                 accidentalState = newAccidentalState;
                 return;
               }
@@ -2551,7 +2597,7 @@ export function renderFromMusicXml(
                   forcedDirection,
                 );
                 if (anchor !== undefined) anchorByIndex.set(idx, anchor);
-                svgParts.push(svg);
+                svgParts.push(withEventId(svg, voice.id, idx));
                 accidentalState = newAccidentalState;
               } else {
                 const { svg, newAccidentalState, tieAnchor } = renderNoteOrRest(
@@ -2596,7 +2642,7 @@ export function renderFromMusicXml(
                   });
                 }
 
-                svgParts.push(svg);
+                svgParts.push(withEventId(svg, voice.id, idx));
                 accidentalState = newAccidentalState;
               }
             });
@@ -2804,6 +2850,25 @@ export function renderFromMusicXml(
     }
   });
 
+  // Phase 51/§18.3: the overlays, appended LAST so they sit on top of the
+  // music they describe. Both are measured from the SVG this render just
+  // produced (see `measureSvgBoxes`), so neither can disagree with what
+  // was actually drawn -- and when both are off (the default) nothing
+  // below runs at all.
+  if (config.debug.drawBoundingBoxes || config.debug.drawSkyline) {
+    const boxes = measureSvgBoxes(svgParts.join('\n'));
+    if (config.debug.drawBoundingBoxes) {
+      svgParts.push(renderBoundingBoxOverlay(boxes, { color: config.debug.boundingBoxColor }));
+    }
+    if (config.debug.drawSkyline) {
+      const skylines = computeDebugSkylines(
+        boxes,
+        [...staffBottomYs].sort((a, b) => a - b),
+      );
+      svgParts.push(renderSkylineOverlay(skylines, { color: config.debug.skylineColor }));
+    }
+  }
+
   const svg = createSvgDocument(
     {
       // §16.2: page mode's canvas is the PAGE, however much or little of
@@ -2831,5 +2896,10 @@ export function renderFromMusicXml(
     measureHeaderAllowance: MEASURE_HEADER_ALLOWANCE,
   });
 
-  return { svg, diagnostics, playback };
+  // §18.3: ONE diagnostic channel, severity-filtered by
+  // `config.debug.logLevel` -- the engine has no console logging anywhere
+  // for this filter to have to compete with. The default ('info') passes
+  // everything, so a caller that sets nothing sees exactly what it always
+  // did.
+  return { svg, diagnostics: filterDiagnostics(diagnostics, config.debug.logLevel), playback };
 }

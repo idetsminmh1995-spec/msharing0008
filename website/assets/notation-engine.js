@@ -77,6 +77,7 @@ var NotationEngine = (() => {
     computeBeamShape: () => computeBeamShape,
     computeBraceShape: () => computeBraceShape,
     computeCursorPlacement: () => computeCursorPlacement,
+    computeDebugSkylines: () => computeDebugSkylines,
     computeEventSpace: () => computeEventSpace,
     computeExtenderLine: () => computeExtenderLine,
     computeHairpinShape: () => computeHairpinShape,
@@ -110,10 +111,12 @@ var NotationEngine = (() => {
     durationTypeAndDotsFromTicks: () => durationTypeAndDotsFromTicks,
     dynamicGlyphName: () => dynamicGlyphName,
     dynamicSide: () => dynamicSide,
+    elementIdForNoteId: () => elementIdForNoteId,
     emptySkyline: () => emptySkyline,
     escapeXmlText: () => escapeXmlText,
     evaluateAccidental: () => evaluateAccidental,
     extractViewBox: () => extractViewBox,
+    filterDiagnostics: () => filterDiagnostics,
     flagGlyphName: () => flagGlyphName,
     flatsForCount: () => flatsForCount,
     flattenPartNotes: () => flattenPartNotes,
@@ -123,6 +126,7 @@ var NotationEngine = (() => {
     getEventStream: () => getEventStream,
     getFontInfo: () => getFontInfo,
     getGlyph: () => getGlyph,
+    getGlyphByChar: () => getGlyphByChar,
     getKeySignaturePositions: () => getKeySignaturePositions,
     glyphForTimeSigChar: () => glyphForTimeSigChar,
     glyphNameForTimeSigChar: () => glyphNameForTimeSigChar,
@@ -139,6 +143,7 @@ var NotationEngine = (() => {
     lyricHyphenGlyphName: () => lyricHyphenGlyphName,
     lyricSide: () => lyricSide,
     measure: () => measure,
+    measureSvgBoxes: () => measureSvgBoxes,
     mergeDrumMappingTable: () => mergeDrumMappingTable,
     metronomeBpmDigitGlyphNames: () => metronomeBpmDigitGlyphNames,
     metronomeDotGlyphName: () => metronomeDotGlyphName,
@@ -155,6 +160,7 @@ var NotationEngine = (() => {
     needsContinuousBarline: () => needsContinuousBarline,
     needsFlag: () => needsFlag,
     needsReflow: () => needsReflow,
+    notationEventId: () => notationEventId,
     note: () => note,
     noteheadMappingKey: () => noteheadMappingKey,
     noteheadWidth: () => noteheadWidth,
@@ -175,6 +181,7 @@ var NotationEngine = (() => {
     renderBarNumber: () => renderBarNumber,
     renderBarline: () => renderBarline,
     renderBeam: () => renderBeam,
+    renderBoundingBoxOverlay: () => renderBoundingBoxOverlay,
     renderBrace: () => renderBrace,
     renderCancellationNaturals: () => renderCancellationNaturals,
     renderClef: () => renderClef,
@@ -189,6 +196,7 @@ var NotationEngine = (() => {
     renderMetronomeMark: () => renderMetronomeMark,
     renderNotehead: () => renderNotehead,
     renderRest: () => renderRest,
+    renderSkylineOverlay: () => renderSkylineOverlay,
     renderSlur: () => renderSlur,
     renderStaff: () => renderStaff,
     renderStem: () => renderStem,
@@ -209,6 +217,7 @@ var NotationEngine = (() => {
     score: () => score,
     secondsToTick: () => secondsToTick,
     selectNoteheadGlyphName: () => selectNoteheadGlyphName,
+    severityPassesLogLevel: () => severityPassesLogLevel,
     shapeGlyphName: () => shapeGlyphName,
     sharpsForCount: () => sharpsForCount,
     shouldShowBarNumber: () => shouldShowBarNumber,
@@ -57881,6 +57890,18 @@ var NotationEngine = (() => {
   function getFontInfo() {
     return { name: bravuraMetadata.fontName, version: bravuraMetadata.fontVersion };
   }
+  var charIndex;
+  function getGlyphByChar(char) {
+    if (charIndex === void 0) {
+      charIndex = /* @__PURE__ */ new Map();
+      for (const [name2, entry] of Object.entries(glyphnames)) {
+        const c = codepointToChar(entry.codepoint);
+        if (!charIndex.has(c)) charIndex.set(c, name2);
+      }
+    }
+    const name = charIndex.get(char);
+    return name === void 0 ? void 0 : getGlyph(name);
+  }
 
   // src/geometry/staff.ts
   function computeStaffGeometry(numLines) {
@@ -59419,6 +59440,48 @@ ${denominator}`;
     return svgGroup([line], { class: "notation-cursor" });
   }
 
+  // src/render/debug-overlay.ts
+  var DEFAULT_OVERLAY_THICKNESS = 0.04;
+  function renderBoundingBoxOverlay(boxes, options) {
+    const thickness = options.thickness ?? DEFAULT_OVERLAY_THICKNESS;
+    const rects = boxes.map(
+      (box) => svgRect(box.x, box.y, box.width, box.height, {
+        fill: "none",
+        stroke: options.color,
+        "stroke-width": thickness,
+        ...box.approximate === true ? { "stroke-dasharray": `${thickness * 4} ${thickness * 4}` } : {}
+      })
+    );
+    return svgGroup(rects, { class: "debug-bounding-boxes" });
+  }
+  function skylinePath(segments) {
+    if (segments.length === 0) return "";
+    const parts = [];
+    let previous;
+    for (const segment of segments) {
+      if (previous === void 0 || Math.abs(previous.xEnd - segment.xStart) > 1e-9) {
+        parts.push(`M ${segment.xStart} ${segment.y}`);
+      } else if (previous.y !== segment.y) {
+        parts.push(`L ${segment.xStart} ${segment.y}`);
+      }
+      parts.push(`L ${segment.xEnd} ${segment.y}`);
+      previous = segment;
+    }
+    return parts.join(" ");
+  }
+  function renderSkylineOverlay(skylines, options) {
+    const thickness = options.thickness ?? DEFAULT_OVERLAY_THICKNESS * 2;
+    const paths = [];
+    for (const skyline of skylines) {
+      for (const side of [skyline.north, skyline.south]) {
+        const d = skylinePath(side);
+        if (d === "") continue;
+        paths.push(svgPath(d, { fill: "none", stroke: options.color, "stroke-width": thickness }));
+      }
+    }
+    return svgGroup(paths, { class: "debug-skyline" });
+  }
+
   // src/config/config.ts
   var DEFAULT_CONFIG = {
     colors: {
@@ -59489,7 +59552,19 @@ ${denominator}`;
       marginLeft: 2.5,
       marginRight: 2.5
     },
-    drums: {}
+    drums: {},
+    debug: {
+      // 'info' keeps every diagnostic the engine produces, which is what
+      // every caller got before this section existed -- a filter whose
+      // default drops information would be a surprising regression.
+      logLevel: "info",
+      drawBoundingBoxes: false,
+      drawSkyline: false,
+      // Translucent primaries: an overlay has to be legible ON TOP of black
+      // notation without being mistaken for part of it.
+      boundingBoxColor: "rgba(0, 120, 255, 0.55)",
+      skylineColor: "rgba(220, 40, 40, 0.75)"
+    }
   };
   function resolveConfig(overrides) {
     return {
@@ -59511,7 +59586,8 @@ ${denominator}`;
       spacing: { ...DEFAULT_CONFIG.spacing, ...overrides?.spacing },
       staves: { ...DEFAULT_CONFIG.staves, ...overrides?.staves },
       page: { ...DEFAULT_CONFIG.page, ...overrides?.page },
-      drums: { ...DEFAULT_CONFIG.drums, ...overrides?.drums }
+      drums: { ...DEFAULT_CONFIG.drums, ...overrides?.drums },
+      debug: { ...DEFAULT_CONFIG.debug, ...overrides?.debug }
     };
   }
 
@@ -62417,8 +62493,15 @@ ${denominator}`;
   }
 
   // src/playback/event-stream.ts
+  function notationEventId(partId, measureNumber, voiceId, eventIndex) {
+    return `${partId}#m${measureNumber}#v${voiceId}#e${eventIndex}`;
+  }
+  function elementIdForNoteId(noteId) {
+    const cut = noteId.lastIndexOf("#n");
+    return cut === -1 ? noteId : noteId.slice(0, cut);
+  }
   function noteIdsForEvent(partId, measureNumber, voiceId, eventIndex, event) {
-    const base = `${partId}#m${measureNumber}#v${voiceId}#e${eventIndex}`;
+    const base = notationEventId(partId, measureNumber, voiceId, eventIndex);
     if (event.kind === "note") return [base];
     if (event.kind === "chord") return event.notes.map((_, i2) => `${base}#n${i2}`);
     return [];
@@ -62593,6 +62676,229 @@ ${denominator}`;
       systemY: position.systemY,
       noteX: position.x
     };
+  }
+
+  // src/debug/log-level.ts
+  var LEVEL_RANK = {
+    silent: 0,
+    error: 1,
+    warn: 2,
+    info: 3,
+    debug: 3
+  };
+  var SEVERITY_RANK = {
+    error: 1,
+    warning: 2,
+    info: 3
+  };
+  function severityPassesLogLevel(severity, level) {
+    return SEVERITY_RANK[severity] <= LEVEL_RANK[level];
+  }
+  function filterDiagnostics(diagnostics, level) {
+    if (LEVEL_RANK[level] >= SEVERITY_RANK.info) return diagnostics;
+    if (level === "silent") return [];
+    return diagnostics.filter((d) => severityPassesLogLevel(d.severity, level));
+  }
+
+  // src/debug/measure.ts
+  var TEXT_ADVANCE_RATIO = 0.62;
+  function boxFrom(b, kind, id, approximate) {
+    return {
+      x: b.minX,
+      y: b.minY,
+      width: b.maxX - b.minX,
+      height: b.maxY - b.minY,
+      kind,
+      ...id !== void 0 ? { id } : {},
+      ...approximate ? { approximate: true } : {}
+    };
+  }
+  function attr(tag, name) {
+    const m = new RegExp(`\\s${name}="([^"]*)"`).exec(tag);
+    return m?.[1];
+  }
+  function num(tag, name, fallback = 0) {
+    const raw = attr(tag, name);
+    if (raw === void 0) return fallback;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : fallback;
+  }
+  function measureSvgBoxes(svg) {
+    const boxes = [];
+    const idStack = [];
+    const currentId = () => {
+      for (let i2 = idStack.length - 1; i2 >= 0; i2--) {
+        const id = idStack[i2];
+        if (id !== void 0) return id;
+      }
+      return void 0;
+    };
+    const tagRe = /<(\/?)([a-zA-Z]+)([^>]*)>([^<]*)/g;
+    let m;
+    while ((m = tagRe.exec(svg)) !== null) {
+      const closing = m[1] === "/";
+      const name = m[2] ?? "";
+      const rest2 = m[3] ?? "";
+      const text = m[4] ?? "";
+      const tag = ` ${rest2}`;
+      if (name === "g") {
+        if (closing) idStack.pop();
+        else if (!rest2.endsWith("/")) idStack.push(attr(tag, "data-id"));
+        continue;
+      }
+      if (closing) continue;
+      const id = currentId();
+      switch (name) {
+        case "line": {
+          const x1 = num(tag, "x1");
+          const y1 = num(tag, "y1");
+          const x2 = num(tag, "x2");
+          const y2 = num(tag, "y2");
+          const half = num(tag, "stroke-width") / 2;
+          boxes.push(
+            boxFrom(
+              {
+                minX: Math.min(x1, x2) - half,
+                maxX: Math.max(x1, x2) + half,
+                minY: Math.min(y1, y2) - half,
+                maxY: Math.max(y1, y2) + half
+              },
+              "line",
+              id,
+              false
+            )
+          );
+          break;
+        }
+        case "rect": {
+          const x2 = num(tag, "x");
+          const y = num(tag, "y");
+          boxes.push(
+            boxFrom(
+              { minX: x2, minY: y, maxX: x2 + num(tag, "width"), maxY: y + num(tag, "height") },
+              "rect",
+              id,
+              false
+            )
+          );
+          break;
+        }
+        case "path": {
+          const d = attr(tag, "d");
+          if (d === void 0) break;
+          const nums = d.match(/-?\d+(?:\.\d+)?(?:e-?\d+)?/g);
+          if (nums === null || nums.length < 2) break;
+          const b = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+          for (let i2 = 0; i2 + 1 < nums.length; i2 += 2) {
+            const x2 = Number(nums[i2]);
+            const y = Number(nums[i2 + 1]);
+            b.minX = Math.min(b.minX, x2);
+            b.maxX = Math.max(b.maxX, x2);
+            b.minY = Math.min(b.minY, y);
+            b.maxY = Math.max(b.maxY, y);
+          }
+          if (Number.isFinite(b.minX)) boxes.push(boxFrom(b, "path", id, true));
+          break;
+        }
+        case "text": {
+          const x2 = num(tag, "x");
+          const y = num(tag, "y");
+          const fontSize = num(tag, "font-size", 1);
+          const glyph = text.length > 0 ? getGlyphByChar(text) : void 0;
+          const bBox = glyph?.bBox;
+          if (bBox !== void 0) {
+            boxes.push(
+              boxFrom(
+                {
+                  minX: x2 + bBox.bBoxSW[0],
+                  maxX: x2 + bBox.bBoxNE[0],
+                  minY: y - bBox.bBoxNE[1],
+                  maxY: y - bBox.bBoxSW[1]
+                },
+                "glyph",
+                id,
+                false
+              )
+            );
+          } else if (text.length > 0) {
+            boxes.push(
+              boxFrom(
+                {
+                  minX: x2,
+                  maxX: x2 + text.length * fontSize * TEXT_ADVANCE_RATIO,
+                  minY: y - fontSize,
+                  maxY: y
+                },
+                "text",
+                id,
+                true
+              )
+            );
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    return boxes;
+  }
+
+  // src/debug/skyline.ts
+  var SAMPLE_WIDTH = 0.25;
+  function nearestStaffIndex(centreY, staffBottomYs) {
+    let best = 0;
+    let bestDistance = Infinity;
+    staffBottomYs.forEach((y, i2) => {
+      const d = Math.abs(centreY - y);
+      if (d < bestDistance) {
+        bestDistance = d;
+        best = i2;
+      }
+    });
+    return best;
+  }
+  function toSegments(samples, sampleWidth) {
+    const keys = [...samples.keys()].sort((a, b) => a - b);
+    const out = [];
+    for (const key of keys) {
+      const y = samples.get(key);
+      if (y === void 0) continue;
+      const xStart = key * sampleWidth;
+      const last = out[out.length - 1];
+      if (last !== void 0 && last.y === y && Math.abs(last.xEnd - xStart) < 1e-9) {
+        out[out.length - 1] = { xStart: last.xStart, xEnd: xStart + sampleWidth, y };
+      } else {
+        out.push({ xStart, xEnd: xStart + sampleWidth, y });
+      }
+    }
+    return out;
+  }
+  function computeDebugSkylines(boxes, staffBottomYs, sampleWidth = SAMPLE_WIDTH) {
+    if (staffBottomYs.length === 0) return [];
+    const north = staffBottomYs.map(() => /* @__PURE__ */ new Map());
+    const south = staffBottomYs.map(() => /* @__PURE__ */ new Map());
+    for (const box of boxes) {
+      if (box.width <= 0 && box.height <= 0) continue;
+      const staffIndex = nearestStaffIndex(box.y + box.height / 2, staffBottomYs);
+      const from = Math.floor(box.x / sampleWidth);
+      const to = Math.max(from, Math.ceil((box.x + box.width) / sampleWidth) - 1);
+      const n = north[staffIndex];
+      const s = south[staffIndex];
+      if (n === void 0 || s === void 0) continue;
+      for (let k = from; k <= to; k++) {
+        const currentN = n.get(k);
+        if (currentN === void 0 || box.y < currentN) n.set(k, box.y);
+        const bottom = box.y + box.height;
+        const currentS = s.get(k);
+        if (currentS === void 0 || bottom > currentS) s.set(k, bottom);
+      }
+    }
+    return staffBottomYs.map((staffBottomY, i2) => ({
+      staffBottomY,
+      north: toSegments(north[i2] ?? /* @__PURE__ */ new Map(), sampleWidth),
+      south: toSegments(south[i2] ?? /* @__PURE__ */ new Map(), sampleWidth)
+    }));
   }
 
   // src/render-from-musicxml.ts
@@ -63008,7 +63314,7 @@ ${denominator}`;
     };
   }
   function renderBeamGroup(events, xs, ctx, accidentalState, beamStyle, forcedDirection) {
-    const parts = [];
+    const memberParts = [];
     let state = accidentalState;
     const members = [];
     events.forEach((event, i2) => {
@@ -63016,12 +63322,12 @@ ${denominator}`;
       if (x2 === void 0) return;
       if (event.kind === "chord") {
         const heads = renderChordHeadsPart(event, x2, ctx, state);
-        parts.push(heads.svg);
+        memberParts.push([heads.svg]);
         state = heads.newAccidentalState;
         members.push({ x: x2, positions: heads.positions, glyph: heads.widestGlyph, source: event });
       } else {
         const head = renderNoteheadPart(event, x2, ctx, state);
-        parts.push(head.svg);
+        memberParts.push([head.svg]);
         state = head.newAccidentalState;
         members.push({ x: x2, positions: [head.position], glyph: head.noteheadGlyph, source: event });
       }
@@ -63049,7 +63355,7 @@ ${denominator}`;
       const beamY = ctx.measureBottomY + beamYAtX(shape, stemX);
       const anchor = getGlyph(m.glyph)?.anchors?.[anchorName];
       if (anchor === void 0) return;
-      parts.push(
+      memberParts[i2]?.push(
         renderStem({
           noteheadGlyphName: m.glyph,
           noteX: m.x,
@@ -63066,9 +63372,9 @@ ${denominator}`;
         })
       );
     });
-    for (const m of members) {
+    members.forEach((m, i2) => {
       const markSource = m.source.kind === "chord" ? m.source.notes[0] : m.source;
-      if (markSource === void 0) continue;
+      if (markSource === void 0) return;
       const marks = renderNoteMarks(
         markSource,
         m.x,
@@ -63077,8 +63383,8 @@ ${denominator}`;
         direction,
         ctx
       );
-      if (marks !== "") parts.push(marks);
-    }
+      if (marks !== "") memberParts[i2]?.push(marks);
+    });
     const anchors = members.map((m) => ({
       x: m.x,
       topPosition: Math.min(...m.positions),
@@ -63092,15 +63398,18 @@ ${denominator}`;
       startY: shape.startY + ctx.measureBottomY,
       endY: shape.endY + ctx.measureBottomY
     };
-    parts.push(
-      renderBeam(offsetShape, {
-        lineCount,
-        thickness: getEngravingDefault("beamThickness") ?? BEAM_THICKNESS_FALLBACK,
-        spacing: getEngravingDefault("beamSpacing") ?? BEAM_SPACING_FALLBACK,
-        color: ctx.theme.colorOf("beam")
-      })
-    );
-    return { svg: parts.join("\n"), newAccidentalState: state, anchors };
+    const beamSvg = renderBeam(offsetShape, {
+      lineCount,
+      thickness: getEngravingDefault("beamThickness") ?? BEAM_THICKNESS_FALLBACK,
+      spacing: getEngravingDefault("beamSpacing") ?? BEAM_SPACING_FALLBACK,
+      color: ctx.theme.colorOf("beam")
+    });
+    return {
+      memberSvgs: memberParts.map((p) => p.join("\n")),
+      beamSvg,
+      newAccidentalState: state,
+      anchors
+    };
   }
   function renderChordHeadsPart(chord2, x2, ctx, accidentalState) {
     const parts = [];
@@ -63420,6 +63729,7 @@ ${denominator}`;
     const diagnostics = [...parseDiagnostics];
     const config = resolveConfig(options?.config);
     const theme = buildTheme(config);
+    const staffBottomYs = /* @__PURE__ */ new Set();
     const pageSpacingConfig = config.spacing;
     if (score2.parts.length === 0) {
       const doc = createSvgDocument(
@@ -63764,6 +64074,7 @@ ${denominator}`;
           const staffLines = attrs.staffLinesByStaff[staffNumber] ?? STAFF_LINES;
           const staffGeometry = computeStaffGeometry(staffLines);
           const bottomY = staffBottomY + systemY + staffOffsetFor(partIndex, staffIndex);
+          staffBottomYs.add(bottomY);
           svgParts.push(
             renderStaff(staffGeometry, {
               x: layout.x,
@@ -63914,6 +64225,9 @@ ${denominator}`;
                 if (firstIndex !== void 0) groupByFirstIndex.set(firstIndex, group);
               }
               const anchorByIndex = /* @__PURE__ */ new Map();
+              const withEventId = (svg2, voiceId, eventIndex) => svgGroup([svg2], {
+                "data-id": notationEventId(part2.id, measure2.number, voiceId, eventIndex)
+              });
               voice2.events.forEach((event, idx) => {
                 const eventStaff = event.staff ?? 1;
                 if (eventStaff !== staffNumber) return;
@@ -63931,7 +64245,8 @@ ${denominator}`;
                   );
                   const groupXs = groupIndices.map((i3) => eventXs[i3] ?? 0);
                   const {
-                    svg: svg2,
+                    memberSvgs,
+                    beamSvg,
                     newAccidentalState,
                     anchors: groupAnchors
                   } = renderBeamGroup(
@@ -63946,7 +64261,12 @@ ${denominator}`;
                     const eventIndex = groupIndices[memberIndex];
                     if (eventIndex !== void 0) anchorByIndex.set(eventIndex, anchor);
                   });
-                  svgParts.push(svg2);
+                  memberSvgs.forEach((memberSvg, memberIndex) => {
+                    const eventIndex = groupIndices[memberIndex];
+                    if (eventIndex === void 0) return;
+                    svgParts.push(withEventId(memberSvg, voice2.id, eventIndex));
+                  });
+                  svgParts.push(beamSvg);
                   accidentalState = newAccidentalState;
                   return;
                 }
@@ -63959,7 +64279,7 @@ ${denominator}`;
                     forcedDirection
                   );
                   if (anchor !== void 0) anchorByIndex.set(idx, anchor);
-                  svgParts.push(svg2);
+                  svgParts.push(withEventId(svg2, voice2.id, idx));
                   accidentalState = newAccidentalState;
                 } else {
                   const { svg: svg2, newAccidentalState, tieAnchor } = renderNoteOrRest(
@@ -63995,7 +64315,7 @@ ${denominator}`;
                       noteheadGlyph: tieAnchor.noteheadGlyph
                     });
                   }
-                  svgParts.push(svg2);
+                  svgParts.push(withEventId(svg2, voice2.id, idx));
                   accidentalState = newAccidentalState;
                 }
               });
@@ -64139,6 +64459,19 @@ ${denominator}`;
         }
       }
     });
+    if (config.debug.drawBoundingBoxes || config.debug.drawSkyline) {
+      const boxes = measureSvgBoxes(svgParts.join("\n"));
+      if (config.debug.drawBoundingBoxes) {
+        svgParts.push(renderBoundingBoxOverlay(boxes, { color: config.debug.boundingBoxColor }));
+      }
+      if (config.debug.drawSkyline) {
+        const skylines = computeDebugSkylines(
+          boxes,
+          [...staffBottomYs].sort((a, b) => a - b)
+        );
+        svgParts.push(renderSkylineOverlay(skylines, { color: config.debug.skylineColor }));
+      }
+    }
     const svg = createSvgDocument(
       {
         // §16.2: page mode's canvas is the PAGE, however much or little of
@@ -64163,7 +64496,7 @@ ${denominator}`;
       placementByMeasureNumber,
       measureHeaderAllowance: MEASURE_HEADER_ALLOWANCE
     });
-    return { svg, diagnostics, playback };
+    return { svg, diagnostics: filterDiagnostics(diagnostics, config.debug.logLevel), playback };
   }
 
   // src/index.ts

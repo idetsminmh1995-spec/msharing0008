@@ -13,10 +13,14 @@
 <text x="0.5" y="7" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="7" font-family="Bravura" font-size="4" fill="#000000"></text>
+<g data-id="P1#m1#v1#e0">
 <text x="6" y="5.5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <line x1="6" y1="5.668" x2="6" y2="9.168" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-id="P1#m1#v1#e1">
 <text x="8.4" y="5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <line x1="8.4" y1="5.168" x2="8.4" y2="8.668" stroke="#000000" stroke-width="0.12" />
+</g>
 <g>
 <line x1="11.4" y1="8" x2="11.4" y2="4" stroke="#000000" stroke-width="0.16" />
 </g>
@@ -29,10 +33,14 @@
 <line x1="11.4" y1="4" x2="22.8" y2="4" stroke="#000000" stroke-width="0.13" />
 </g>
 <text x="19.799999999999997" y="10.5" font-family="Bravura" font-size="4" fill="#000000"></text>
+<g data-id="P1#m2#v1#e0">
 <text x="17.4" y="4.5" font-family="Bravura" font-size="4" fill="#000000"></text>
 <line x1="17.4" y1="4.668" x2="17.4" y2="8.168" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-id="P1#m2#v1#e1">
 <text x="19.799999999999997" y="4" font-family="Bravura" font-size="4" fill="#000000"></text>
 <line x1="19.799999999999997" y1="4.168" x2="19.799999999999997" y2="7.668" stroke="#000000" stroke-width="0.12" />
+</g>
 <g>
 <line x1="22.8" y1="8" x2="22.8" y2="4" stroke="#000000" stroke-width="0.16" />
 </g>

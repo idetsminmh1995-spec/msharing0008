@@ -232,6 +232,30 @@ export interface DrumsConfig {
   readonly mapping?: Readonly<Record<number, DrumMapEntryOverride>>;
 }
 
+// ---- debug (Phase 51, §18.3) ----
+
+/**
+ * §18.3's own severity ladder. `silent` returns nothing, `error` only
+ * errors, `warn` errors + warnings, and `info`/`debug` everything --
+ * `debug` is distinguished from `info` not by which diagnostics pass
+ * (both pass all three severities) but by it being the level at which a
+ * host says "give me everything you have", which future internal tracing
+ * can key off without changing what `info` means today.
+ */
+export type LogLevel = 'silent' | 'error' | 'warn' | 'info' | 'debug';
+
+export interface DebugConfig {
+  /** Filters the `diagnostics` a render returns (§10.7's single channel -- there is no console logging anywhere in this engine). */
+  readonly logLevel: LogLevel;
+  /** Overlay every drawn element's real bounding box on the SVG. */
+  readonly drawBoundingBoxes: boolean;
+  /** Overlay §15's north/south skylines, per staff. */
+  readonly drawSkyline: boolean;
+  /** Colour of the bounding-box overlay. Its own field, not `colors.overrides`: an overlay is not part of the music. */
+  readonly boundingBoxColor: string;
+  readonly skylineColor: string;
+}
+
 // ---- the whole thing ----
 
 export interface EngineConfig {
@@ -247,6 +271,7 @@ export interface EngineConfig {
   readonly staves: StavesConfig;
   readonly page: PageConfig;
   readonly drums: DrumsConfig;
+  readonly debug: DebugConfig;
 }
 
 /** Same shape as EngineConfig, but every section and every field within it is optional -- what callers pass to resolveConfig(). */
@@ -265,6 +290,7 @@ export interface PartialEngineConfig {
   readonly staves?: Partial<StavesConfig>;
   readonly page?: Partial<PageConfig>;
   readonly drums?: Partial<DrumsConfig>;
+  readonly debug?: Partial<DebugConfig>;
 }
 
 /**
@@ -344,6 +370,18 @@ export const DEFAULT_CONFIG: EngineConfig = {
     marginRight: 2.5,
   },
   drums: {},
+  debug: {
+    // 'info' keeps every diagnostic the engine produces, which is what
+    // every caller got before this section existed -- a filter whose
+    // default drops information would be a surprising regression.
+    logLevel: 'info',
+    drawBoundingBoxes: false,
+    drawSkyline: false,
+    // Translucent primaries: an overlay has to be legible ON TOP of black
+    // notation without being mistaken for part of it.
+    boundingBoxColor: 'rgba(0, 120, 255, 0.55)',
+    skylineColor: 'rgba(220, 40, 40, 0.75)',
+  },
 };
 
 /**
@@ -375,5 +413,6 @@ export function resolveConfig(overrides?: PartialEngineConfig): EngineConfig {
     staves: { ...DEFAULT_CONFIG.staves, ...overrides?.staves },
     page: { ...DEFAULT_CONFIG.page, ...overrides?.page },
     drums: { ...DEFAULT_CONFIG.drums, ...overrides?.drums },
+    debug: { ...DEFAULT_CONFIG.debug, ...overrides?.debug },
   };
 }
