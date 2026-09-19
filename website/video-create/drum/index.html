@@ -365,6 +365,13 @@
   // page open, which made a plain refresh look like an uploaded file
   // was still sitting there when nothing had actually been uploaded.
   const notationContainer = document.getElementById('notationContainer');
+
+  // Playback-cursor state. Declared here, beside the container it draws
+  // into, because renderNotation() sets it and the transport below reads
+  // it -- keeping them apart is how it would quietly stop being set.
+  let notationPlayback = null;
+  let cursorLine = null;
+  let cursorRaf = 0;
   const statBpm = document.getElementById('statBpm');
   const statTime = document.getElementById('statTime');
   const statMeasures = document.getElementById('statMeasures');
@@ -409,6 +416,14 @@
       svgEl.removeAttribute('width');
       svgEl.removeAttribute('height');
     }
+
+    // §17.1's playback data for THIS render -- the position API reads it
+    // to turn a moment in the audio into an x on this exact SVG. Kept
+    // rather than discarded, which is what left the preview without a
+    // cursor.
+    notationPlayback = rendered.playback;
+    attachCursor(svgEl);
+    updateCursor();
 
     // Real stats, read from the actual parsed score -- not hardcoded.
     const firstMark = parsed.tempoMarks && parsed.tempoMarks[0];
@@ -541,6 +556,82 @@
   // play button, scrub bar and time readout are this page's own UI,
   // kept in sync with it via its standard events rather than reimplementing
   // any of that.
+  // ---- playback cursor -------------------------------------------------
+  // The notation engine reports WHERE a moment in the music is
+  // (§17.1's positionToX); drawing the marker and scrolling to it is the
+  // host's job (§17.3), which is this block.
+  /** Adds (or re-adds) the marker line to a freshly rendered SVG. */
+  function attachCursor(svgEl) {
+    cursorLine = null;
+    if (!svgEl) return;
+    const viewBox = (svgEl.getAttribute('viewBox') || '').split(/\s+/).map(Number);
+    const height = viewBox.length === 4 ? viewBox[3] : 20;
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('class', 'playback-cursor');
+    line.setAttribute('y1', '0');
+    line.setAttribute('y2', String(height));
+    line.setAttribute('stroke', '#C81E2C');
+    line.setAttribute('stroke-width', '0.3');
+    line.setAttribute('stroke-linecap', 'round');
+    line.setAttribute('opacity', '0.85');
+    line.setAttribute('x1', '0');
+    line.setAttribute('x2', '0');
+    line.style.display = 'none';
+    svgEl.appendChild(line);
+    cursorLine = line;
+  }
+
+  /** Moves the marker to wherever the audio currently is, and scrolls it into view. */
+  function updateCursor() {
+    if (!cursorLine || !notationPlayback || typeof NotationEngine === 'undefined') return;
+    const seconds = audioPlayer.currentTime;
+    if (!Number.isFinite(seconds)) return;
+    let x;
+    try {
+      const tick = NotationEngine.secondsToTick(notationPlayback.tempoMap, seconds);
+      // Past the last note the score simply has no x to point at, so the
+      // marker stops at the end rather than running off into whitespace.
+      // This is where an audio file LONGER than its notation ends up --
+      // a recording that takes the repeats, or one with a count-in, runs
+      // on after the written music does.
+      const events = NotationEngine.getEventStream(notationPlayback);
+      const lastTick = events.length > 0 ? events[events.length - 1].tick : 0;
+      x = NotationEngine.positionToX(notationPlayback, Math.min(tick, lastTick)).x;
+    } catch (err) {
+      return;
+    }
+    cursorLine.setAttribute('x1', String(x));
+    cursorLine.setAttribute('x2', String(x));
+    cursorLine.style.display = '';
+
+    // Keep the marker in view. The strip scrolls horizontally, and the
+    // SVG's own user units are scaled to its rendered height, so one
+    // staff space is (rendered width / viewBox width) real pixels.
+    const svgEl = notationContainer.querySelector('svg');
+    if (!svgEl) return;
+    const viewBox = (svgEl.getAttribute('viewBox') || '').split(/\s+/).map(Number);
+    const unitsWide = viewBox.length === 4 ? viewBox[2] : 0;
+    if (!unitsWide) return;
+    const pxPerUnit = svgEl.getBoundingClientRect().width / unitsWide;
+    const cursorPx = x * pxPerUnit;
+    const view = notationContainer.clientWidth;
+    const margin = view * 0.25;
+    if (cursorPx < notationContainer.scrollLeft + margin ||
+        cursorPx > notationContainer.scrollLeft + view - margin) {
+      notationContainer.scrollLeft = Math.max(0, cursorPx - view / 3);
+    }
+  }
+
+  /** While playing, follow every frame rather than only `timeupdate`'s ~4/second. */
+  function startCursorLoop() {
+    cancelAnimationFrame(cursorRaf);
+    const step = () => {
+      updateCursor();
+      if (!audioPlayer.paused && !audioPlayer.ended) cursorRaf = requestAnimationFrame(step);
+    };
+    cursorRaf = requestAnimationFrame(step);
+  }
+
   const audioPlayer = document.getElementById('audioPlayer');
   const playBtn = document.getElementById('playBtn');
   const playIcon = document.getElementById('playIcon');
@@ -586,10 +677,19 @@
     const file = document.getElementById('upload-audio').files?.[0];
     setUploadConfirm(`Could not play "${file ? file.name : 'this file'}" -- unsupported or corrupt audio.`, false);
   });
-  audioPlayer.addEventListener('timeupdate', updateTransport);
-  audioPlayer.addEventListener('play', () => { playIcon.querySelector('path').setAttribute('d', PAUSE_PATH); });
-  audioPlayer.addEventListener('pause', () => { playIcon.querySelector('path').setAttribute('d', PLAY_PATH); });
-  audioPlayer.addEventListener('ended', updateTransport);
+  audioPlayer.addEventListener('timeupdate', () => { updateTransport(); updateCursor(); });
+  audioPlayer.addEventListener('seeked', updateCursor);
+  audioPlayer.addEventListener('loadedmetadata', updateCursor);
+  audioPlayer.addEventListener('play', () => {
+    playIcon.querySelector('path').setAttribute('d', PAUSE_PATH);
+    startCursorLoop();
+  });
+  audioPlayer.addEventListener('pause', () => {
+    playIcon.querySelector('path').setAttribute('d', PLAY_PATH);
+    cancelAnimationFrame(cursorRaf);
+    updateCursor();
+  });
+  audioPlayer.addEventListener('ended', () => { updateTransport(); updateCursor(); });
 
   playBtn.addEventListener('click', () => {
     if (!audioPlayer.src) return;
@@ -604,6 +704,7 @@
     const fraction = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
     audioPlayer.currentTime = fraction * dur;
     updateTransport();
+    updateCursor();
   });
 </script>
 </body>

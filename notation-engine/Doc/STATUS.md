@@ -113,6 +113,15 @@ brace drawn above the music), all fixed, and swept eight stale claims out
 of `PLAN.md`. Every one of the four was found by measuring real renders
 of the user's own files, not by re-reading the code.
 
+**Then the user found a fifth**, by comparing our render against
+MuseScore's of the same file: a voice that SKIPS time with `<forward>`
+(how MuseScore writes any drum voice that doesn't play continuously) had
+every later event pulled early, because four separate places re-derived
+each event's tick by summing the durations before it. 31 of the drum
+file's 342 notes were in the wrong place. See
+[`forward-gaps-and-playback-cursor.md`](./forward-gaps-and-playback-cursor.md),
+which also covers the playback cursor now drawn on the drum page.
+
 ---
 
 ## C. Partially done / known gaps inside "done" phases

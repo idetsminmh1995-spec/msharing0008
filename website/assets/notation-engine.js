@@ -60507,7 +60507,18 @@ ${denominator}`;
             }
           } else if (child.tagName === "backup") {
             const amount = intOf(firstChildNamed(child, "duration")) ?? 0;
-            tick -= xmlDivisionsToTicks(amount, currentDivisions ?? DEFAULT_DIVISIONS);
+            const target = tick - xmlDivisionsToTicks(amount, currentDivisions ?? DEFAULT_DIVISIONS);
+            if (target < 0) {
+              diagnostics.push(
+                diagnostic(
+                  "warning",
+                  "BACKUP_BEFORE_MEASURE_START",
+                  `A <backup> of ${amount} divisions would move ${-target} ticks before the start of the measure; clamped to the measure start.`,
+                  location
+                )
+              );
+            }
+            tick = Math.max(0, target);
             lastAdvance = 0;
           } else if (child.tagName === "forward") {
             const amount = intOf(firstChildNamed(child, "duration")) ?? 0;
@@ -60662,7 +60673,7 @@ ${denominator}`;
               group.push(next.ev);
               j++;
             }
-            events.push(buildEvent(group, location, diagnostics));
+            events.push({ ...buildEvent(group, location, diagnostics), startTick: head.tick });
             i2 = j;
           }
           voices.push(voice(voiceId, events));
@@ -62565,15 +62576,16 @@ ${denominator}`;
       for (const v of measure2.voices) {
         let tickWithinVoice = 0;
         v.events.forEach((event, eventIndex) => {
+          const startTick = event.startTick ?? tickWithinVoice;
           if (event.kind === "note") {
             const noteNumber = event.pitch.kind === "pitched" ? chromaticNoteNumber(event.pitch.step, event.pitch.alter, event.pitch.octave) : event.instrumentId !== void 0 ? gmByInstrumentId?.get(event.instrumentId) : void 0;
             flat.push({
               ref: { measureNumber: measure2.number, voiceId: v.id, eventIndex },
-              tick: measureStartTick + tickWithinVoice,
+              tick: measureStartTick + startTick,
               noteNumber
             });
           }
-          tickWithinVoice += event.duration.ticks;
+          tickWithinVoice = startTick + event.duration.ticks;
         });
       }
       measureStartTick += attrs !== void 0 ? measureLengthTicks2(attrs) : 0;
@@ -62891,9 +62903,10 @@ ${denominator}`;
         for (const voice2 of measure2.voices) {
           let tickInMeasure = 0;
           voice2.events.forEach((event, index) => {
+            const startTick = event.startTick ?? tickInMeasure;
             const noteIds = noteIdsForEvent(part2.id, measure2.number, voice2.id, index, event);
             if (noteIds.length > 0) {
-              const tick = offset + tickInMeasure;
+              const tick = offset + startTick;
               events.push({
                 tick,
                 seconds: tickToSeconds(tempoMap, tick),
@@ -62901,7 +62914,7 @@ ${denominator}`;
                 measureNumber: measure2.number
               });
             }
-            tickInMeasure += event.duration.ticks;
+            tickInMeasure = startTick + event.duration.ticks;
           });
         }
       }
@@ -63822,13 +63835,15 @@ ${xrefOffset}
     const starts = [];
     let tick = 0;
     for (const ev of events) {
-      starts.push(tick);
-      tick += ev.duration.ticks;
+      const start = ev.startTick ?? tick;
+      starts.push(start);
+      tick = start + ev.duration.ticks;
     }
     return starts;
   }
   function totalTicks(events) {
-    return events.reduce((sum, ev) => sum + ev.duration.ticks, 0);
+    const starts = eventStartTicks(events);
+    return events.reduce((end, ev, i2) => Math.max(end, (starts[i2] ?? 0) + ev.duration.ticks), 0);
   }
   function glyphWidthOf(glyphName) {
     const bbox = getGlyph(glyphName)?.bBox;

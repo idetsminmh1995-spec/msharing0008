@@ -97,9 +97,15 @@ export function buildEventStream(
       for (const voice of measure.voices) {
         let tickInMeasure = 0;
         voice.events.forEach((event, index) => {
+          // The event's OWN start tick where the parser recorded one --
+          // a voice with a `<forward>` gap does not start each event
+          // where the previous one ended, and playing it as though it
+          // did puts every note after the gap early. See `startTick` in
+          // core/note.ts.
+          const startTick = event.startTick ?? tickInMeasure;
           const noteIds = noteIdsForEvent(part.id, measure.number, voice.id, index, event);
           if (noteIds.length > 0) {
-            const tick = offset + tickInMeasure;
+            const tick = offset + startTick;
             events.push({
               tick,
               seconds: tickToSeconds(tempoMap, tick),
@@ -107,7 +113,7 @@ export function buildEventStream(
               measureNumber: measure.number,
             });
           }
-          tickInMeasure += event.duration.ticks;
+          tickInMeasure = startTick + event.duration.ticks;
         });
       }
     }

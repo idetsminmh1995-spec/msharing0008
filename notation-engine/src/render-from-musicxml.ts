@@ -545,18 +545,31 @@ function mapBarline(
 }
 
 /** Cumulative start-tick of each event within a voice, recomputed from each event's own Duration.ticks -- Phase 3's Voice doesn't store per-event tick positions itself, so this reconstructs them from durations in order. */
+/**
+ * Each event's start tick within its measure.
+ *
+ * Prefers the event's OWN `startTick` (§10.1's parser cursor, which
+ * honours `<backup>`/`<forward>`) and falls back to the running sum only
+ * for an event that has none -- a hand-built `Score`, where a voice has
+ * no gaps by construction. Summing alone is wrong the moment a voice
+ * skips time without writing a rest, which is how a drum kick that plays
+ * on beats 1 and 3 is normally written.
+ */
 function eventStartTicks(events: readonly MeasureEvent[]): readonly number[] {
   const starts: number[] = [];
   let tick = 0;
   for (const ev of events) {
-    starts.push(tick);
-    tick += ev.duration.ticks;
+    const start = ev.startTick ?? tick;
+    starts.push(start);
+    tick = start + ev.duration.ticks;
   }
   return starts;
 }
 
+/** How far into the measure this voice's last event ENDS -- not the sum of its durations, which ignores any gap between them. */
 function totalTicks(events: readonly MeasureEvent[]): number {
-  return events.reduce((sum, ev) => sum + ev.duration.ticks, 0);
+  const starts = eventStartTicks(events);
+  return events.reduce((end, ev, i) => Math.max(end, (starts[i] ?? 0) + ev.duration.ticks), 0);
 }
 
 function glyphWidthOf(glyphName: string): number {

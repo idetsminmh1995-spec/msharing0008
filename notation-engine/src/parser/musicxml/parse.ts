@@ -480,7 +480,26 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           }
         } else if (child.tagName === 'backup') {
           const amount = intOf(firstChildNamed(child, 'duration')) ?? 0;
-          tick -= xmlDivisionsToTicks(amount, currentDivisions ?? DEFAULT_DIVISIONS);
+          const target = tick - xmlDivisionsToTicks(amount, currentDivisions ?? DEFAULT_DIVISIONS);
+          // MusicXML's own rule: `<backup>` may not move before the start
+          // of the measure. Real files break it -- writing the measure's
+          // LENGTH where they meant the elapsed amount is a common
+          // mistake, and this project's own tie-dot-staff fixture does
+          // exactly that. Clamping keeps the following voice at the
+          // measure start (where it plainly belongs) instead of placing
+          // it at a negative tick; §10.7's rule is to say so rather than
+          // silently absorb it.
+          if (target < 0) {
+            diagnostics.push(
+              diagnostic(
+                'warning',
+                'BACKUP_BEFORE_MEASURE_START',
+                `A <backup> of ${amount} divisions would move ${-target} ticks before the start of the measure; clamped to the measure start.`,
+                location,
+              ),
+            );
+          }
+          tick = Math.max(0, target);
           lastAdvance = 0; // a chord can never span a backup/forward boundary
         } else if (child.tagName === 'forward') {
           const amount = intOf(firstChildNamed(child, 'duration')) ?? 0;
@@ -692,7 +711,12 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
             group.push(next.ev);
             j++;
           }
-          events.push(buildEvent(group, location, diagnostics));
+          // §10.1's cursor, carried onto the event itself. Without this
+          // every consumer re-derives the tick by summing the durations
+          // before it, which is wrong for any voice with a `<forward>`
+          // gap or one that starts partway into the measure -- see
+          // `startTick`'s own comment in core/note.ts.
+          events.push({ ...buildEvent(group, location, diagnostics), startTick: head.tick });
           i = j;
         }
         voices.push(makeVoice(voiceId, events));

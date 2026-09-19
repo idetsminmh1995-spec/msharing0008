@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The shape that exposed the <forward> bug, reduced from this project's
+  own Drum_Lesson_5.musicxml measure 2.
+
+  Voice 1 (hi-hat, stems up) plays eight straight eighths, with the snare
+  chorded on beats 2 and 4. Voice 2 (kick, stems down) plays a quarter on
+  beat 1, SKIPS beat 2 with a <forward> rather than writing a rest, plays
+  two beamed eighths on beats 3 and 3.5, then skips beat 4 the same way.
+
+  That is how MuseScore writes a kick drum, and it is the case where
+  re-deriving an event's tick by summing the durations before it goes
+  wrong: the beamed pair lands on beat 2 instead of beat 3.
+-->
+<score-partwise version="4.0">
+  <part-list>
+    <score-part id="P1">
+      <part-name>Drums</part-name>
+      <score-instrument id="P1-I37"><instrument-name>Bass Drum 1</instrument-name></score-instrument>
+      <score-instrument id="P1-I39"><instrument-name>Acoustic Snare</instrument-name></score-instrument>
+      <score-instrument id="P1-I43"><instrument-name>Closed Hi-Hat</instrument-name></score-instrument>
+      <midi-instrument id="P1-I37"><midi-unpitched>37</midi-unpitched></midi-instrument>
+      <midi-instrument id="P1-I39"><midi-unpitched>39</midi-unpitched></midi-instrument>
+      <midi-instrument id="P1-I43"><midi-unpitched>43</midi-unpitched></midi-instrument>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>2</divisions>
+        <key><fifths>0</fifths></key>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>percussion</sign><line>2</line></clef>
+      </attributes>
+      <note><rest measure="yes"/><duration>8</duration><voice>1</voice></note>
+    </measure>
+    <measure number="2">
+      <note><unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched><duration>1</duration><instrument id="P1-I43"/><voice>1</voice><type>eighth</type><stem>up</stem><notehead>x</notehead><beam number="1">begin</beam></note>
+      <note><unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched><duration>1</duration><instrument id="P1-I43"/><voice>1</voice><type>eighth</type><stem>up</stem><notehead>x</notehead><beam number="1">continue</beam></note>
+      <note><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched><duration>1</duration><instrument id="P1-I39"/><voice>1</voice><type>eighth</type><stem>up</stem><beam number="1">continue</beam></note>
+      <note><chord/><unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched><duration>1</duration><instrument id="P1-I43"/><voice>1</voice><type>eighth</type><stem>up</stem><notehead>x</notehead></note>
+      <note><unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched><duration>1</duration><instrument id="P1-I43"/><voice>1</voice><type>eighth</type><stem>up</stem><notehead>x</notehead><beam number="1">end</beam></note>
+      <note><unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched><duration>1</duration><instrument id="P1-I43"/><voice>1</voice><type>eighth</type><stem>up</stem><notehead>x</notehead><beam number="1">begin</beam></note>
+      <note><unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched><duration>1</duration><instrument id="P1-I43"/><voice>1</voice><type>eighth</type><stem>up</stem><notehead>x</notehead><beam number="1">continue</beam></note>
+      <note><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched><duration>1</duration><instrument id="P1-I39"/><voice>1</voice><type>eighth</type><stem>up</stem><beam number="1">continue</beam></note>
+      <note><chord/><unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched><duration>1</duration><instrument id="P1-I43"/><voice>1</voice><type>eighth</type><stem>up</stem><notehead>x</notehead></note>
+      <note><unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched><duration>1</duration><instrument id="P1-I43"/><voice>1</voice><type>eighth</type><stem>up</stem><notehead>x</notehead><beam number="1">end</beam></note>
+      <backup><duration>8</duration></backup>
+      <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>2</duration><instrument id="P1-I37"/><voice>2</voice><type>quarter</type><stem>down</stem></note>
+      <forward><duration>2</duration></forward>
+      <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>1</duration><instrument id="P1-I37"/><voice>2</voice><type>eighth</type><stem>down</stem><beam number="1">begin</beam></note>
+      <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>1</duration><instrument id="P1-I37"/><voice>2</voice><type>eighth</type><stem>down</stem><beam number="1">end</beam></note>
+      <forward><duration>2</duration></forward>
+    </measure>
+  </part>
+</score-partwise>

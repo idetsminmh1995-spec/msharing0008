@@ -74,6 +74,11 @@ export function flattenPartNotes(
     for (const v of measure.voices) {
       let tickWithinVoice = 0;
       v.events.forEach((event, eventIndex) => {
+        // The parser's own cursor where it recorded one: a voice with a
+        // `<forward>` gap does not start each event where the previous
+        // one ended. Aligning MIDI against a running sum would match
+        // every note after such a gap to the wrong MIDI note.
+        const startTick = event.startTick ?? tickWithinVoice;
         if (event.kind === 'note') {
           const noteNumber =
             event.pitch.kind === 'pitched'
@@ -83,11 +88,11 @@ export function flattenPartNotes(
                 : undefined;
           flat.push({
             ref: { measureNumber: measure.number, voiceId: v.id, eventIndex },
-            tick: measureStartTick + tickWithinVoice,
+            tick: measureStartTick + startTick,
             noteNumber,
           });
         }
-        tickWithinVoice += event.duration.ticks;
+        tickWithinVoice = startTick + event.duration.ticks;
       });
     }
     measureStartTick += attrs !== undefined ? measureLengthTicks(attrs) : 0;

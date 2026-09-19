@@ -14,6 +14,24 @@ export interface Chord {
   readonly duration: Duration;
   readonly voice: VoiceId;
   readonly staff?: number;
+  /**
+   * Where this event starts within its measure, in ticks.
+   *
+   * Set by the parser from §10.1's own cursor, which honours `<backup>`
+   * and `<forward>`. It is NOT redundant with summing the durations
+   * before it: a voice can legitimately have GAPS (a `<forward>` skips
+   * time without writing a rest, which is how MuseScore writes a kick
+   * drum that plays on beats 1 and 3 and nothing in between) and can
+   * legitimately start partway into the measure. Summing durations
+   * silently pulls every event after a gap too early -- on this
+   * project's own drum file that put the kick's beamed pair on beat 2
+   * instead of beat 3.
+   *
+   * Optional because a hand-built `Score` (tests, a future editor) may
+   * not set it; consumers fall back to the running sum, which is exactly
+   * right for a voice with no gaps.
+   */
+  readonly startTick?: number;
 }
 
 export function chord(notes: readonly Note[]): Chord {
