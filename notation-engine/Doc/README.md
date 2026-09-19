@@ -24,6 +24,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 
 | Doc file | Covers |
 |---|---|
+| [`final-review.md`](./final-review.md) | **The final end-to-end review**, after Phase 54 completed the roadmap: how it was reviewed, the four real bugs it found (a key signature on tab/percussion staves, a playback cursor 4.5 staff spaces off its note, click-to-seek landing on the previous note, the brace drawn above the music), what it checked and did NOT find, and the two gaps confirmed still open |
 | [`phase-01-folder-structure.md`](./phase-01-folder-structure.md) | Phase 1 folder skeleton (`src/`, `test/`, `docs/`) |
 | [`phase-02-toolchain.md`](./phase-02-toolchain.md) | Phase 2 toolchain (TypeScript, esbuild, ESLint, Prettier) |
 | [`phase-03-core-data-model.md`](./phase-03-core-data-model.md) | Phase 3 core data model (`Pitch`, `Note`, `Chord`, `Voice`, `Measure`, `Part`, `Score`) |
@@ -50,6 +51,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`phase-23-beam-grouping.md`](./phase-23-beam-grouping.md) | Phase 23 beam grouping (wrote the missing §9.12 spec first, then implemented it) |
 | [`phase-24-beam-geometry.md`](./phase-24-beam-geometry.md) | Phase 24 beam geometry (3 styles, slope clamping; fixed a real beam-overlap bug) |
 | [`abc-make-notes-visible.md`](./abc-make-notes-visible.md) | **A+B+C corrective work** — percussion support, committed bundle + font, web app rewired to the real engine |
+| [`plan-update-request-2026-09.md`](./plan-update-request-2026-09.md) | The original v1 build plan, kept verbatim as the historical record `PLAN.md` v2 was critically reviewed against (see PLAN.md §2) |
 | [`phase-25-multi-voice.md`](./phase-25-multi-voice.md) | Phase 25 multi-voice (forced stem direction, rest separation; fixes the reported hand/foot stem bug) |
 | [`phase-26-ties.md`](./phase-26-ties.md) | Phase 26 ties (tapered lens shape, side-opposite-stem rule, wired end to end) |
 | [`phase-27-slurs.md`](./phase-27-slurs.md) | Phase 27 slurs (whole-span side rule; geometry built, not yet wired -- parsing is v2 scope) |

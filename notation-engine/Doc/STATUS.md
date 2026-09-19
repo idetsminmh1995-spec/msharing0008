@@ -104,6 +104,15 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 plus Integration Passes A–Q. What remains is not roadmap work but the
 named, documented gaps in §C and §F below.
 
+**Reviewed end to end** after Phase 54 — see
+[`final-review.md`](./final-review.md). It found four real bugs (a key
+signature drawn on tab and percussion staves; the playback cursor
+pointing 4.5 staff spaces away from its own note on any measure with a
+wide header; click-to-seek landing on the previous note; the grand-staff
+brace drawn above the music), all fixed, and swept eight stale claims out
+of `PLAN.md`. Every one of the four was found by measuring real renders
+of the user's own files, not by re-reading the code.
+
 ---
 
 ## C. Partially done / known gaps inside "done" phases

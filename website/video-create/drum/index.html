@@ -388,8 +388,12 @@
     let parsed;
     let rendered;
     try {
+      // Parse ONCE and render from that. renderFromMusicXml(xmlText)
+      // would parse a second time, and parsing is ~80% of a render
+      // (Phase 53's own measurements), so this halves the work on every
+      // upload -- and keeps `parsed` for the stats below.
       parsed = NotationEngine.parseMusicXml(xmlText);
-      rendered = NotationEngine.renderFromMusicXml(xmlText);
+      rendered = NotationEngine.renderParsedMusicXml(parsed);
     } catch (err) {
       console.error('Notation Engine failed on this file:', err);
       notationContainer.textContent = 'Could not parse this file -- see console for details.';
