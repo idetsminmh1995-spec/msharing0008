@@ -2415,7 +2415,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 48 | Position API + event stream (§17.1) | ✅ (built + wired into `renderFromMusicXml`'s own result -- see Doc/phase-48-playback-position-api.md) |
 | 49 | Cursor, both modes (§17.2) | ✅ (built -- see Doc/phase-49-cursor.md) |
 
-### Stage 10 — Polish and delivery
+### Stage 10 — Polish and delivery `[COMPLETE]`
 
 | Phase | What | Status |
 |---|---|---|
@@ -2423,7 +2423,7 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 51 | Debug overlays and diagnostics surface (§18.3) | ✅ (built -- see Doc/phase-51-debug-overlays.md) |
 | 52 | Export: SVG, PNG, PDF (§3, §16.2) | ✅ (built -- see Doc/phase-52-export.md) |
 | 53 | Performance pass against §18.1's budgets | ✅ (built -- see Doc/phase-53-performance.md) |
-| 54 | Public API surface + generated reference docs into `docs/` | |
+| 54 | Public API surface + generated reference docs into `docs/` | ✅ (built -- see Doc/phase-54-public-api.md) |
 
 ### Sequencing rules
 

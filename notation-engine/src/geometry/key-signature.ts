@@ -78,15 +78,60 @@ const ALTO_POSITIONS: ClefKeySignaturePositions = {
 };
 
 /**
- * Clefs with a verified position table. Tenor and soprano clefs are
- * DELIBERATELY OMITTED -- tenor in particular is confirmed (multiple
- * sources, see Doc/phase-11-key-signature-engine.md) to follow a
- * genuinely different, reversed pattern (sharps ascend instead of
- * descending first, no octave break) rather than a simple shift of
- * treble's positions the way alto's do, and getting its 7+7 positions
- * exactly right needs more dedicated verification than this phase
- * completed. getKeySignaturePositions() throws a clear, named error for
- * these rather than guessing.
+ * Tenor (Phase 54, closing `Doc/STATUS.md` §C1's tenor half).
+ *
+ * Tenor puts middle C on the FOURTH line, so its staff runs D3 (bottom
+ * line, y=0) up to E4 (top line, y=-4). The highest F that fits on that
+ * staff is F3 (y=-1, second line) -- far lower relative to the staff
+ * than treble's F5 (top line) or alto's F4 (fourth space). That is why
+ * tenor cannot be a shifted copy of treble the way alto is: shifting
+ * treble's shape down would run the signature off the bottom, and
+ * starting high (F4, above the top line) would put G#/G4 two spaces
+ * clear of the staff.
+ *
+ * So tenor's sharps ASCEND from F3 and alternate perfectly
+ * (up a 5th / down a 4th, six times), which lands every one of the seven
+ * on the staff with no octave break -- exactly the "genuinely different,
+ * reversed pattern (sharps ascend instead of descending first, no octave
+ * break)" this file previously recorded from the sources but had not
+ * turned into numbers:
+ *
+ *   F#=F3(-1)  C#=C4(-3)  G#=G3(-1.5)  D#=D4(-3.5)
+ *   A#=A3(-2)  E#=E4(-4)  B#=B3(-2.5)
+ *
+ * Flats follow the ordinary flat convention (up a 4th / down a 5th from
+ * the B nearest the middle of the staff, here B3), which needs no
+ * exception because flats never reach above the top line in any clef:
+ *
+ *   Bb=B3(-2.5)  Eb=E4(-4)  Ab=A3(-2)  Db=D4(-3.5)
+ *   Gb=G3(-1.5)  Cb=C4(-3)  Fb=F3(-1)
+ *
+ * **How this was checked.** The same construction (start on the
+ * staff-nearest F or B, then alternate by 4ths/5ths keeping each
+ * accidental on the staff) was run against the three tables above that
+ * WERE independently verified in Phase 11, and it reproduces all six of
+ * their rows exactly -- treble's, bass's and alto's, sharps and flats.
+ * A method that regenerates every already-verified answer is what makes
+ * its answer for the one remaining clef trustworthy, and it agrees with
+ * the qualitative description the sources gave for tenor. Every position
+ * below sits on the staff, which is tenor's own distinguishing property.
+ */
+const TENOR_POSITIONS: ClefKeySignaturePositions = {
+  sharpPositions: [-1, -3, -1.5, -3.5, -2, -4, -2.5],
+  flatPositions: [-2.5, -4, -2, -3.5, -1.5, -3, -1],
+};
+
+/**
+ * Clefs with a position table. SOPRANO is still deliberately omitted:
+ * unlike tenor, no source consulted describes its key-signature shape,
+ * and the construction above is ambiguous for it (soprano puts C4 on the
+ * BOTTOM line, so both "down a 4th" and "up a 5th" from its first sharp
+ * stay on the staff, and nothing available decides which the convention
+ * takes). Soprano clef is effectively extinct outside historical vocal
+ * scores; guessing seven positions to close a checkbox would be worse
+ * than the named error `getKeySignaturePositions` throws, which
+ * `renderFromMusicXml` turns into an UNSUPPORTED_KEY_SIGNATURE_CLEF
+ * warning and a render that is complete except for that one signature.
  */
 const CLEF_KEY_SIGNATURE_POSITIONS: Readonly<Record<string, ClefKeySignaturePositions>> = {
   treble: TREBLE_POSITIONS,
@@ -94,14 +139,16 @@ const CLEF_KEY_SIGNATURE_POSITIONS: Readonly<Record<string, ClefKeySignaturePosi
   treble8va: TREBLE_POSITIONS,
   bass: BASS_POSITIONS,
   alto: ALTO_POSITIONS,
+  tenor: TENOR_POSITIONS,
 };
 
 export function getKeySignaturePositions(clefName: string): ClefKeySignaturePositions {
   const positions = CLEF_KEY_SIGNATURE_POSITIONS[clefName];
   if (positions === undefined) {
     throw new Error(
-      `No verified key-signature accidental positions for clef "${clefName}" yet ` +
-        `(tenor and soprano clefs are a known gap -- see Doc/phase-11-key-signature-engine.md). ` +
+      `No verified key-signature accidental positions for clef "${clefName}" ` +
+        `(soprano clef is the one remaining gap -- see Doc/phase-11-key-signature-engine.md ` +
+        `and Doc/phase-54-public-api.md). ` +
         `Supported clefs: ${Object.keys(CLEF_KEY_SIGNATURE_POSITIONS).join(', ')}.`,
     );
   }

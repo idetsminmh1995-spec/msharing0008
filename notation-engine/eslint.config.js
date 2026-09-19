@@ -28,6 +28,6 @@ export default [
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', 'quick-demo/**'],
+    ignores: ['dist/**', 'node_modules/**'],
   },
 ];

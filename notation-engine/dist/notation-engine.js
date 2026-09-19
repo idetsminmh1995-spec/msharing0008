@@ -58030,18 +58030,23 @@ var NotationEngine = (() => {
     sharpPositions: TREBLE_POSITIONS.sharpPositions.map((y) => y + 0.5),
     flatPositions: TREBLE_POSITIONS.flatPositions.map((y) => y + 0.5)
   };
+  var TENOR_POSITIONS = {
+    sharpPositions: [-1, -3, -1.5, -3.5, -2, -4, -2.5],
+    flatPositions: [-2.5, -4, -2, -3.5, -1.5, -3, -1]
+  };
   var CLEF_KEY_SIGNATURE_POSITIONS = {
     treble: TREBLE_POSITIONS,
     treble8vb: TREBLE_POSITIONS,
     treble8va: TREBLE_POSITIONS,
     bass: BASS_POSITIONS,
-    alto: ALTO_POSITIONS
+    alto: ALTO_POSITIONS,
+    tenor: TENOR_POSITIONS
   };
   function getKeySignaturePositions(clefName) {
     const positions = CLEF_KEY_SIGNATURE_POSITIONS[clefName];
     if (positions === void 0) {
       throw new Error(
-        `No verified key-signature accidental positions for clef "${clefName}" yet (tenor and soprano clefs are a known gap -- see Doc/phase-11-key-signature-engine.md). Supported clefs: ${Object.keys(CLEF_KEY_SIGNATURE_POSITIONS).join(", ")}.`
+        `No verified key-signature accidental positions for clef "${clefName}" (soprano clef is the one remaining gap -- see Doc/phase-11-key-signature-engine.md and Doc/phase-54-public-api.md). Supported clefs: ${Object.keys(CLEF_KEY_SIGNATURE_POSITIONS).join(", ")}.`
       );
     }
     return positions;

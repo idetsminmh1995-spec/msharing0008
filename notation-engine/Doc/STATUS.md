@@ -14,7 +14,7 @@ remains.
 
 ---
 
-## A. DONE — Phases 1–53 ✅ (Stages 0 through 9 complete, Stage 10 all but one) + Integration Passes A–Q
+## A. DONE — Phases 1–54 ✅ (**every stage complete**) + Integration Passes A–Q
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 `npm run verify` passes **679/679** across them.
@@ -92,21 +92,17 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | 51 | Debug overlays + diagnostics surface (§18.3) | All four §18.3 bullets: `config.debug` (logLevel, drawBoundingBoxes, drawSkyline), a `data-id` on every note/chord/rest built by the SAME function the playback event stream uses, and both overlays measured from the emitted SVG so they cannot disagree with what was drawn | [`phase-51`](./phase-51-debug-overlays.md) |
 | 52 | Export: SVG, PNG, PDF (§3) | Standalone SVG with the font embedded; a real PNG encoder (IHDR/IDAT/IEND, Sub filter, fflate zlib); a real PDF writer (one Flate-compressed RGB image per page, correct xref). Rasterizing is BORROWED from the host via an injected backend, so everything either side of it is pure and testable without a browser. Found and fixed the grand-staff brace being drawn above the music instead of beside it | [`phase-52`](./phase-52-export.md) |
 | 53 | Performance pass (§18.1) | Every budget met with margin, measured in both Chromium and Node+jsdom; the budgets are now tests, with scaling checks that catch an accidental O(n²). Implemented the one §18.1 strategy that was written down but missing -- `renderParsedMusicXml`, so a resize/re-theme never re-parses (9x faster on that path) | [`phase-53`](./phase-53-performance.md) |
+| 54 | Public API surface + generated reference docs (§22) | `docs/API.md` generated from the emitted .d.ts, with the ~30 supported entry points called out from the 479 exported symbols; `npm run docs:check` is in `verify`, so the reference cannot drift. Also closed §C1's tenor half (tenor-clef key signatures), §F4 (a browser-level visual test) and §F5 (dead `quick-demo/`) | [`phase-54`](./phase-54-public-api.md) |
 
-**Public API today:** 243 exports from `dist/notation-engine.js`.
+**Public API today:** 243 runtime exports from `dist/notation-engine.js` (479 symbols including types). See [`../docs/API.md`](../docs/API.md) — generated, and checked by `npm run verify`.
 
 ---
 
-## B. NOT DONE — Phase 54
+## B. NOT DONE — nothing
 
-Each line links to the `PLAN.md` section that specifies it. **Everything
-numbered 1–53 is done** (see §A), so Stages 0-9 are complete and one phase
-of Stage 10 remains.
-
-### Stage 10 — Polish and delivery
-| # | Phase | Spec |
-|---|---|---|
-| **54** | Public API surface + generated reference docs | §22 |
+`PLAN.md` §22's roadmap is complete: Phases 1–54, Stages 0 through 10,
+plus Integration Passes A–Q. What remains is not roadmap work but the
+named, documented gaps in §C and §F below.
 
 ---
 
@@ -115,14 +111,20 @@ of Stage 10 remains.
 These sit inside phases marked ✅ above. They are real gaps, deliberately
 left rather than guessed at — each is documented at the point it was found.
 
-- **C1 — Key signatures: tenor and soprano clefs (Phase 11).**
-  `keySignatureAccidentals()` **throws** for `'tenor'`, `'soprano'`,
-  `'percussion'` and `'tab'` instead of returning a wrong answer. Tenor's
-  sharps follow a genuinely different shape (not a uniform offset of
-  treble's), confirmed by multiple sources including VexFlow's own hardcoded
-  exception array. Closing it needs an explicit line-by-line source, then the
-  same verification process treble/bass/alto got. See
-  [`phase-11`](./phase-11-key-signature-engine.md) §4 and `PLAN.md` §19.
+- **C1 — Key signatures: SOPRANO clef only (Phase 11; tenor closed by
+  Phase 54).** Tenor now has a real position table, derived by a
+  construction that reproduces all six already-verified treble/bass/alto
+  rows exactly and matches the qualitative description Phase 11's sources
+  gave — so a cello/bassoon/trombone part in tenor clef renders its key
+  signature. Soprano stays open *deliberately*: no source consulted
+  describes its shape, and the construction is genuinely ambiguous for it
+  (soprano puts C4 on the bottom line, so both directions from its first
+  sharp stay on the staff). `keySignatureAccidentals()` throws a named
+  error, which `renderFromMusicXml` turns into an
+  `UNSUPPORTED_KEY_SIGNATURE_CLEF` warning and a render complete except
+  for that one signature. See
+  [`phase-54`](./phase-54-public-api.md) §3 and
+  [`phase-11`](./phase-11-key-signature-engine.md) §4.
 
 - **C2 — CLOSED.** Every config section the renderer can act on now does
   something: `colors` (including per-category `overrides`), `fonts`,
@@ -264,8 +266,8 @@ they'd sensibly be tackled:
 | ~~**F2**~~ | ~~No drum instrument → staff-position mapping~~ — **CLOSED by Phase 41.** `<midi-instrument>`/`<midi-unpitched>` resolves to a GM number, which drives position, notehead shape and stem direction from `DEFAULT_DRUM_MAPPING_TABLE`. | — | done |
 | ~~**F3**~~ | ~~`.mxl` still rejected~~ — **CLOSED by Phase 36**, and wired into the web app's upload path. | — | done |
 | **F4** | **No visual/browser-level test in the automated suite.** Integration M now drives a real headless Chromium by hand before calling a rendering change done — which is how §F7 and two placement bugs were finally caught — but that check is not yet part of `npm run verify`. | A markup-only suite structurally cannot catch "the glyphs are correct but nothing can draw them." The manual browser step closes the hole in practice; automating it closes it permanently. | Stage 10 (Phase 53) |
-| **F5** | **`quick-demo/` is now dead code.** Referenced by nothing since the rewiring. | Harmless, but it's the last thing still claiming to be "the notation renderer" to a casual reader. | Trivial cleanup, any time |
-| **F6** | **The app's notation is still decorative.** It renders in the video preview panel, but it is not composited into exported frames and there is no cursor/playback sync. | This is what the drum-video project actually needs the engine *for*. Stage 8 is now complete, so what remains is **Stage 9 (Phases 48–49)** plus Phase 52's PNG export. | Stage 9 + Phase 52 |
+| ~~**F5**~~ | ~~`quick-demo/` is now dead code~~ — **CLOSED by Phase 54.** Deleted, along with its `eslint.config.js` ignore entry. | — | done |
+| **F6** | **The app's notation is still decorative.** It renders in the video preview panel, but it is not composited into exported frames and there is no cursor/playback sync. | This is what the drum-video project actually needs the engine *for*. Every engine-side piece it needs now exists — Phase 48's position API, Phase 49's cursor, Phase 52's PNG export — so what remains is **host-side wiring in `website/`**, not engine work. | The web app |
 | ~~**F7**~~ | ~~The deployed website does not serve the Bravura font~~ — **CLOSED by Integration M**, after the user's own screenshot showed exactly the predicted result: every glyph an empty box. `website/assets/fonts/Bravura.woff2` is committed and the drum page declares `@font-face` + preload. | — | done |
 
 **None of these are regressions** — F1/F2/F3 are documented scope

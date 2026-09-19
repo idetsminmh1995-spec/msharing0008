@@ -15,7 +15,9 @@
     "format:check": "prettier --check \"src/**/*.ts\"",
     "test": "npm run build && node --test",
     "test:update-snapshots": "npm run build && UPDATE_SNAPSHOTS=1 node --test",
-    "verify": "npm run typecheck && npm run lint && npm run format:check && npm run test"
+    "verify": "npm run typecheck && npm run lint && npm run format:check && npm run docs:check && npm run test",
+    "docs": "npm run declarations && node scripts/generate-api-docs.mjs",
+    "docs:check": "npm run docs && git diff --quiet -- docs/API.md || (echo \"docs/API.md is out of date -- run: npm run docs\" && exit 1)"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "8.70.0",
