@@ -2451,7 +2451,21 @@ export function renderFromMusicXml(
         }
       });
 
-      const barlineType = mapBarline(attrs.barlineStyle, attrs.repeatDirection);
+      // Integration Q: the boundary this measure draws at its OWN right
+      // edge is the exact same physical barline the NEXT measure might
+      // instead describe via `location="left"` on ITS `<barline>` -- a
+      // real file's repeat-begin is commonly written that way, on the
+      // first measure of the repeated section, rather than as this
+      // measure's own `location="right"`. When the next measure states
+      // one, it wins (drawn HERE, at the shared boundary) over whatever
+      // (usually nothing, defaulting to a plain single line) this measure
+      // declared for the same edge -- never both, so the boundary is
+      // still drawn exactly once.
+      const nextAttrs = attributesByPartAndMeasure.get(`${part.id}:${measure.number + 1}`);
+      const barlineType = mapBarline(
+        nextAttrs?.leftBarlineStyle ?? attrs.barlineStyle,
+        nextAttrs?.leftRepeatDirection ?? attrs.repeatDirection,
+      );
       const barlineMetrics = {
         thinThickness: getEngravingDefault('thinBarlineThickness') ?? 0.16,
         thickThickness: getEngravingDefault('thickBarlineThickness') ?? 0.5,

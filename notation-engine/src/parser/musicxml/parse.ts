@@ -59,9 +59,20 @@ export interface MeasureAttributes {
   readonly clefsByStaff: Readonly<Record<number, ClefSpec>>;
   /** Integration B: each staff's own line count (tab = 6, most = 5), keyed by staff number. Absent entries mean the ordinary 5. */
   readonly staffLinesByStaff: Readonly<Record<number, number>>;
-  /** Raw MusicXML <bar-style> text (e.g. "light-heavy") for this measure's ending barline, if present. Mapping this to Phase 13's BarlineType is a later integration step's job, not the parser's. */
+  /** Raw MusicXML <bar-style> text (e.g. "light-heavy") for this measure's ending (right-edge) barline, if present -- from a <barline> with no `location`, or an explicit `location="right"`. Mapping this to Phase 13's BarlineType is a later integration step's job, not the parser's. */
   readonly barlineStyle?: string;
   readonly repeatDirection?: 'forward' | 'backward';
+  /**
+   * Integration Q: the SAME two fields, but for a `<barline location="left">`
+   * -- this measure's OWN starting (left-edge) barline, a different
+   * physical position from its ending one above. Real files commonly write
+   * a repeat's opening barline this way, on the first measure of the
+   * repeated section, rather than as a `location="right"` on the measure
+   * before it -- both describe the same barline conceptually, but only
+   * `location` says which edge of THIS measure to draw it on.
+   */
+  readonly leftBarlineStyle?: string;
+  readonly leftRepeatDirection?: 'forward' | 'backward';
 }
 
 export interface TempoMarkEvent {
@@ -399,6 +410,8 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
       let lastAdvance = 0;
       let barlineStyle: string | undefined;
       let repeatDirection: 'forward' | 'backward' | undefined;
+      let leftBarlineStyle: string | undefined;
+      let leftRepeatDirection: 'forward' | 'backward' | undefined;
 
       // §10.1: walk direct children IN DOCUMENT ORDER, maintaining one
       // shared tick cursor. Never filter by voice -- that's the exact bug
@@ -474,11 +487,23 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           tick += xmlDivisionsToTicks(amount, currentDivisions ?? DEFAULT_DIVISIONS);
           lastAdvance = 0;
         } else if (child.tagName === 'barline') {
+          // Integration Q: `location="left"` is a DIFFERENT physical
+          // position (this measure's own starting edge) from the default
+          // /`"right"` case (its ending edge) -- conflating them put a
+          // real file's repeat-begin barline (written this way on the
+          // first measure of the repeated section) a whole measure late,
+          // sharing the ending-barline fields with whatever THIS measure's
+          // own right edge needed instead.
           const style = textOf(firstChildNamed(child, 'bar-style'));
-          if (style !== undefined) barlineStyle = style;
           const repeatEl = firstChildNamed(child, 'repeat');
           const dir = repeatEl?.getAttribute('direction');
-          if (dir === 'forward' || dir === 'backward') repeatDirection = dir;
+          if (child.getAttribute('location') === 'left') {
+            if (style !== undefined) leftBarlineStyle = style;
+            if (dir === 'forward' || dir === 'backward') leftRepeatDirection = dir;
+          } else {
+            if (style !== undefined) barlineStyle = style;
+            if (dir === 'forward' || dir === 'backward') repeatDirection = dir;
+          }
         } else if (child.tagName === 'direction') {
           // Integration D: <direction><direction-type><metronome> is a
           // MARKING, not a note/rest -- it never advances the shared tick
@@ -715,6 +740,8 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
         staffLinesByStaff: { ...currentStaffLinesByStaff },
         ...(barlineStyle !== undefined ? { barlineStyle } : {}),
         ...(repeatDirection !== undefined ? { repeatDirection } : {}),
+        ...(leftBarlineStyle !== undefined ? { leftBarlineStyle } : {}),
+        ...(leftRepeatDirection !== undefined ? { leftRepeatDirection } : {}),
       });
     }
 

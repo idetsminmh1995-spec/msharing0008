@@ -60290,6 +60290,8 @@ ${denominator}`;
         let lastAdvance = 0;
         let barlineStyle;
         let repeatDirection;
+        let leftBarlineStyle;
+        let leftRepeatDirection;
         for (const child of Array.from(measureEl.children)) {
           if (child.tagName === "attributes") {
             const update = parseAttributesElement(child);
@@ -60360,10 +60362,15 @@ ${denominator}`;
             lastAdvance = 0;
           } else if (child.tagName === "barline") {
             const style = textOf(firstChildNamed(child, "bar-style"));
-            if (style !== void 0) barlineStyle = style;
             const repeatEl = firstChildNamed(child, "repeat");
             const dir = repeatEl?.getAttribute("direction");
-            if (dir === "forward" || dir === "backward") repeatDirection = dir;
+            if (child.getAttribute("location") === "left") {
+              if (style !== void 0) leftBarlineStyle = style;
+              if (dir === "forward" || dir === "backward") leftRepeatDirection = dir;
+            } else {
+              if (style !== void 0) barlineStyle = style;
+              if (dir === "forward" || dir === "backward") repeatDirection = dir;
+            }
           } else if (child.tagName === "direction") {
             let recognizedSomething = false;
             let producedTempoMark = false;
@@ -60538,7 +60545,9 @@ ${denominator}`;
           clefsByStaff: { ...currentClefsByStaff },
           staffLinesByStaff: { ...currentStaffLinesByStaff },
           ...barlineStyle !== void 0 ? { barlineStyle } : {},
-          ...repeatDirection !== void 0 ? { repeatDirection } : {}
+          ...repeatDirection !== void 0 ? { repeatDirection } : {},
+          ...leftBarlineStyle !== void 0 ? { leftBarlineStyle } : {},
+          ...leftRepeatDirection !== void 0 ? { leftRepeatDirection } : {}
         });
       }
       parts.push(part(partId, measures, partName));
@@ -63739,7 +63748,11 @@ ${denominator}`;
             });
           }
         });
-        const barlineType = mapBarline(attrs.barlineStyle, attrs.repeatDirection);
+        const nextAttrs = attributesByPartAndMeasure.get(`${part2.id}:${measure2.number + 1}`);
+        const barlineType = mapBarline(
+          nextAttrs?.leftBarlineStyle ?? attrs.barlineStyle,
+          nextAttrs?.leftRepeatDirection ?? attrs.repeatDirection
+        );
         const barlineMetrics = {
           thinThickness: getEngravingDefault("thinBarlineThickness") ?? 0.16,
           thickThickness: getEngravingDefault("thickBarlineThickness") ?? 0.5,

@@ -90,6 +90,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`integration-n-drum-position-corrections.md`](./integration-n-drum-position-corrections.md) | Integration N: corrected the GM drum table's snare (1 full staff-space) and hi-hat (half a staff-space) default positions, verified against a real drum-lesson file's own 100%-consistent encoding |
 | [`integration-o-stem-shortening.md`](./integration-o-stem-shortening.md) | Integration O: closed §9.8's deferred stem-shortening gap -- a forced direction pointing AWAY from the middle for a note outside the staff (drum charts: hands-up hi-hat sitting above the staff) now shortens toward the 2.5sp floor instead of staying at a fixed 3.5sp |
 | [`integration-p-beam-endpoint-anchor.md`](./integration-p-beam-endpoint-anchor.md) | Integration P: beam line endpoints were computed from each note's raw x instead of its actual stem-attach x (the notehead glyph's own anchor offset) -- a beamed group's LAST stem fell just short of the beam, appearing disconnected with no flag either |
+| [`integration-q-barline-location.md`](./integration-q-barline-location.md) | Integration Q: a `<barline location="left">` (a real file's own way of writing a repeat-begin on the FIRST measure of the repeated section) was drawn at that measure's right edge instead of its left -- a whole measure late |
 | [`phase-09-staff-lines.md`](./phase-09-staff-lines.md) | Quick-demo 5-line staff renderer (`quick-demo/staff.ts`) |
 
 ## Convention for each doc file
