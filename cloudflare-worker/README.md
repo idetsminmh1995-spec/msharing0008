@@ -99,8 +99,10 @@ to diagnose.
 
 ### Bar announcements: `Counts vocal/M{n}.wav`
 
-Counts Vocal **Style B** names the bar you are in, for the whole piece
-rather than just the count-in, from the same shared area:
+Two cards read these. **Count Voice** (card 5) names the bar you are in
+at every bar of the piece, and **Count-in Style B** (card 4) names the
+bar at the top of each count-in bar instead of counting its beats. Both
+come from the same shared area:
 
 ```
 Counts vocal/M1.wav   Counts vocal/M2.wav   Counts vocal/M3.wav   ...
@@ -115,7 +117,9 @@ performance timeline, so a repeated bar 5 is announced as `M5` again on
 the second pass rather than as `M9`, and tempo changes are already
 folded into when it fires. Upload as many as your longest lesson needs;
 a bar with no sample simply passes in silence and the hint under the
-card names which ones those were.
+card names which ones those were. In the count-in, a bar with no sample
+falls back to the synthesised click rather than going quiet, so a
+count-in is always audible.
 
 ## Endpoints
 

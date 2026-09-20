@@ -34,6 +34,13 @@
   .instr-card{background:#fff;border:2px solid var(--border);border-radius:16px;padding:28px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;transition:border-color .15s,box-shadow .15s;position:relative;}
   .instr-card:hover{border-color:var(--red);box-shadow:0 8px 24px rgba(200,30,44,0.14);}
   .instr-icon{width:64px;height:64px;border-radius:50%;background:var(--pink);display:flex;align-items:center;justify-content:center;color:var(--red);}
+  /* Drum gets its real logo instead of the generic outline the other
+     instruments use. Sized so the ARTWORK is about the same size as
+     their 28px glyphs: the file is 1414x2000 with blank margin around
+     the mark, so the image has to be taller than the glyph for the ink
+     to match it. It is centred within half a percent in its own file,
+     so the flex centring above places it correctly with no nudging. */
+  .instr-logo{height:44px;width:auto;display:block;}
   .instr-label{font-family:'Sora',sans-serif;font-weight:700;font-size:15px;}
   .instr-desc{font-size:11px;color:var(--muted);text-align:center;line-height:1.5;}
 
@@ -70,7 +77,7 @@
 
 <section class="grid">
   <a class="instr-card" href="/video-create/drum/">
-    <div class="instr-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="8" ry="3"/></svg></div>
+    <div class="instr-icon"><img class="instr-logo" src="../assets/logo/sharing-drum-logo-full.webp" alt=""></div>
     <div class="instr-label">Drum</div>
     <div class="instr-desc">MIDI-driven sticking animation</div>
   </a>

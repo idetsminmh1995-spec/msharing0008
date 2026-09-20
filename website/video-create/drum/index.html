@@ -68,6 +68,14 @@
   .upload-slot.active{border-color:var(--red);background:var(--pink);color:var(--red);}
   .upload-slot .icon{margin-bottom:6px;}
   .upload-slot .label{font-size:11px;font-weight:700;}
+
+  /* A card whose slot is built but not switched on. Greyed and
+     pointer-inert rather than hidden, so the numbering either side of
+     it is stable and it is obvious the feature is coming rather than
+     missing. `pointer-events` on the card, not just `disabled` on the
+     input, because the <label> would otherwise still look clickable. */
+  .card-off{opacity:.5;pointer-events:none;}
+  .card-soon{margin-left:auto;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:2px 8px;}
   /* Hidden until JS sets a real outcome -- no more static "Loaded X"
      placeholder that made every fresh page load (and every refresh)
      look like a file was already uploaded when none had been. Success
@@ -160,7 +168,18 @@
      that gets the brand colour rather than a size change alone. */
   .stat-box.on-downbeat{border-color:var(--red);background:rgba(200,30,44,.16);}
   .video-mid{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;}
-  .drum-circle{width:120px;height:120px;border-radius:50%;border:3px solid var(--red);display:flex;align-items:center;justify-content:center;color:var(--red);}
+  /* The stand-in shown until a drum-kit photo loads. The real logo,
+     not a generic drum outline -- it is the only thing in the frame
+     while someone is still picking a kit, so it may as well be the
+     brand.
+
+     `height` only: the artwork is almost exactly centred in its own
+     file (its ink spans rows 329..1648 of 2000 and columns 151..1257
+     of 1414, both within half a percent of centre), so unlike the
+     header mark this one needs no margin correction to sit in the
+     middle of the frame. */
+  .drum-circle{height:150px;width:auto;display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,.45));}
+  .video-frame.style-white .drum-circle{filter:none;}
   /* The strip still SCROLLS -- the cursor drives `scrollLeft` to keep
      itself in view -- it just doesn't draw a scrollbar. The bar and its
      two arrows are browser chrome, and this strip is a preview of a
@@ -357,15 +376,60 @@
     </div>
 
     <div class="card">
-      <div class="card-head"><span class="card-num">4</span>Count-in &amp; Beat Display</div>
+      <div class="card-head"><span class="card-num">4</span>Count-in</div>
       <div class="field-row">
         <div>
-          <label for="counts-vocal">Counts Vocal</label>
+          <label for="counts-vocal">Style</label>
           <select id="counts-vocal" class="drum-input">
             <option value="beats">Style A (1,2,3,4...)</option>
             <option value="measures">Style B (M1,M2...)</option>
           </select>
         </div>
+        <div>
+          <label for="countInBars">Length</label>
+          <select id="countInBars" class="drum-input">
+            <option value="1">1 bar</option>
+            <option value="2">2 bars</option>
+            <option value="0">Off</option>
+          </select>
+        </div>
+      </div>
+      <div class="title-controls">
+        <div class="tc-size">
+          <label for="countsVolume">Volume</label>
+          <div class="tc-size-row">
+            <input id="countsVolume" type="range" min="0" max="100" step="1" value="80">
+            <span class="tc-px" id="countsVolumeOut">80%</span>
+          </div>
+        </div>
+      </div>
+      <div class="field-hint" id="countHint">Counted at the score's own tempo and time signature, before the audio starts.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-num">5</span>Count Voice</div>
+      <div class="field-row">
+        <div>
+          <label for="countVoiceOn">Announce bars</label>
+          <select id="countVoiceOn" class="drum-input">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
+        <div class="tc-size">
+          <label for="measureVolume">Volume</label>
+          <div class="tc-size-row">
+            <input id="measureVolume" type="range" min="0" max="100" step="1" value="70">
+            <span class="tc-px" id="measureVolumeOut">70%</span>
+          </div>
+        </div>
+      </div>
+      <div class="field-hint" id="countVoiceHint">Names the bar you are in at every bar of the MusicXML file, from <b>Counts vocal/M1.wav</b> in R2.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-num">6</span>Beat Display</div>
+      <div class="field-row">
         <div>
           <label for="beat-label">Beat Label</label>
           <select id="beat-label" class="drum-input">
@@ -374,41 +438,31 @@
             <option value="1 e &amp; a">1 e &amp; a</option>
           </select>
         </div>
+        <div></div>
       </div>
-      <div class="title-controls">
-        <!-- Two levels, both always live. The count-in and the bar
-             announcements are different jobs -- one is four beats
-             before the music, the other runs underneath it for the
-             whole piece -- so one slider serving both would mean
-             re-setting it every time. -->
-        <div class="tc-size">
-          <label for="countsVolume">Counts Volume</label>
-          <div class="tc-size-row">
-            <input id="countsVolume" type="range" min="0" max="100" step="1" value="80">
-            <span class="tc-px" id="countsVolumeOut">80%</span>
-          </div>
-        </div>
-        <div class="tc-size" id="measureVolumeField">
-          <label for="measureVolume">M Volume</label>
-          <div class="tc-size-row">
-            <input id="measureVolume" type="range" min="0" max="100" step="1" value="70">
-            <span class="tc-px" id="measureVolumeOut">70%</span>
-          </div>
-        </div>
-        <div>
-          <label for="countInBars">Count-in</label>
-          <select id="countInBars" class="drum-input">
-            <option value="1">1 bar</option>
-            <option value="2">2 bars</option>
-            <option value="0">Off</option>
-          </select>
-        </div>
+      <div class="field-hint">The COUNT box in the video frame ticks through this, on the score's own beat.</div>
+    </div>
+
+    <!-- Card 7 is deliberately inert: the slot is here so the numbering
+         and the layout are already settled, and turning it on later is
+         a matter of removing `card-off` and wiring the input, not of
+         re-cutting the cards around it. -->
+    <div class="card card-off" id="logoCard" aria-disabled="true">
+      <div class="card-head"><span class="card-num">7</span>Logo<span class="card-soon">Coming soon</span></div>
+      <div class="upload-grid">
+        <label class="upload-slot">
+          <input id="upload-logo" type="file" accept="image/*" disabled style="display:none;">
+          <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></div>
+          <div class="label">Logo image</div>
+        </label>
+        <div></div>
+        <div></div>
       </div>
-      <div class="field-hint" id="countHint">Counted at the score's own tempo and time signature, before the audio starts.</div>
+      <div class="field-hint">Your own logo in the video frame, in place of the built-in one. Not switched on yet.</div>
     </div>
 
     <div class="card">
-      <div class="card-head"><span class="card-num">5</span>Video Style</div>
+      <div class="card-head"><span class="card-num">8</span>Video Style</div>
       <div class="radio-row">
         <label><input type="radio" name="vc" id="styleBlack" value="black" checked>Black</label>
         <label><input type="radio" name="vc" id="styleWhite" value="white">White</label>
@@ -455,9 +509,7 @@
       </div>
       <div class="hit-layer" id="hitLayer" aria-hidden="true"></div>
       <div class="video-mid">
-        <div class="drum-circle">
-          <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="9" ry="3.4"/></svg>
-        </div>
+        <img class="drum-circle" src="../../assets/logo/sharing-drum-logo-full.webp" alt="M Sharing Drum">
       </div>
     </div>
 
@@ -826,7 +878,7 @@
     // stale. Declared further down; hoisting is what lets this read in
     // the order the page actually works.
     stopMeasureAnnouncements();
-    refreshVocalStyle();
+    refreshCountVoice();
   }
 
 
@@ -1507,6 +1559,8 @@
   const measureVolumeOut = document.getElementById('measureVolumeOut');
   const measureVolumeField = document.getElementById('measureVolumeField');
   const countsVocalSelect = document.getElementById('counts-vocal');
+  const countVoiceOnSelect = document.getElementById('countVoiceOn');
+  const countVoiceHint = document.getElementById('countVoiceHint');
   const countInBarsSelect = document.getElementById('countInBars');
   const beatLabelSelect = document.getElementById('beat-label');
   const countHint = document.getElementById('countHint');
@@ -1525,10 +1579,30 @@
   const countSampleCache = new Map();
   /** measure number -> AudioBuffer, same null-means-absent convention. */
   const measureSampleCache = new Map();
+  /**
+   * measure number -> the in-flight request for it.
+   *
+   * The resolved cache above cannot dedupe on its own: it is only
+   * written when a fetch RESOLVES, so two callers arriving while one is
+   * in the air both miss and both fetch. That happens for real -- a
+   * score load and a card change land together -- and it doubled every
+   * request on the first play.
+   */
+  const measureSampleInFlight = new Map();
 
-  /** Which vocal the Counts Vocal card is asking for. */
-  function vocalStyle() {
+  /**
+   * The COUNT-IN's own voice (card 4). Style A counts the beats of the
+   * bar from `Voices/{n}.wav`; Style B names the bar from
+   * `Counts vocal/M{n}.wav` instead -- one announcement per count-in
+   * bar rather than one per beat.
+   */
+  function countInStyle() {
     return countsVocalSelect.value === 'measures' ? 'measures' : 'beats';
+  }
+
+  /** Whether the Count Voice card (5) is announcing bars at all. */
+  function countVoiceEnabled() {
+    return countVoiceOnSelect.value !== 'off';
   }
 
   /**
@@ -1638,25 +1712,33 @@
    * too, so a score longer than the bucket's samples asks once per bar
    * number rather than once per playback.
    */
-  async function measureSample(measureNumber) {
-    if (measureSampleCache.has(measureNumber)) return measureSampleCache.get(measureNumber);
-    const ctx = ensureAudioContext();
-    if (!ctx) {
-      measureSampleCache.set(measureNumber, null);
-      return null;
+  function measureSample(measureNumber) {
+    if (measureSampleCache.has(measureNumber)) {
+      return Promise.resolve(measureSampleCache.get(measureNumber));
     }
-    try {
-      const res = await fetch(
-        `${API_BASE}/assets/shared/${encodeURIComponent('Counts vocal')}/M${measureNumber}.wav`,
-      );
-      if (!res.ok) throw new Error(`measure voice request failed (${res.status})`);
-      const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
+    const pending = measureSampleInFlight.get(measureNumber);
+    if (pending !== undefined) return pending;
+
+    const request = (async () => {
+      const ctx = ensureAudioContext();
+      if (!ctx) return null;
+      try {
+        const res = await fetch(
+          `${API_BASE}/assets/shared/${encodeURIComponent('Counts vocal')}/M${measureNumber}.wav`,
+        );
+        if (!res.ok) throw new Error(`measure voice request failed (${res.status})`);
+        return await ctx.decodeAudioData(await res.arrayBuffer());
+      } catch (err) {
+        return null;
+      }
+    })().then((buffer) => {
       measureSampleCache.set(measureNumber, buffer);
+      measureSampleInFlight.delete(measureNumber);
       return buffer;
-    } catch (err) {
-      measureSampleCache.set(measureNumber, null);
-      return null;
-    }
+    });
+
+    measureSampleInFlight.set(measureNumber, request);
+    return request;
   }
 
   /**
@@ -1710,7 +1792,7 @@
   }
 
   function pumpMeasureAnnouncements() {
-    if (vocalStyle() !== 'measures' || audioPlayer.paused || audioCtx === null) return;
+    if (!countVoiceEnabled() || audioPlayer.paused || audioCtx === null) return;
     const schedule = measureSchedule();
     if (schedule.length === 0) return;
 
@@ -1740,7 +1822,7 @@
 
   function startMeasureAnnouncements() {
     stopMeasureAnnouncements();
-    if (vocalStyle() !== 'measures') return;
+    if (!countVoiceEnabled()) return;
     ensureAudioContext();
     measureAnnounce.timer = setInterval(pumpMeasureAnnouncements, MEASURE_POLL_MS);
     pumpMeasureAnnouncements();
@@ -1958,16 +2040,23 @@
     const { beatsPerBar, secondsPerBeat } = scoreBeat();
     const total = bars * beatsPerBar;
 
-    const names = [];
-    for (let i = 1; i <= beatsPerBar; i++) names.push(String(i));
-    const samples = new Map(
-      await Promise.all(names.map(async (n) => [n, await countSample(n)])),
-    );
+    // Style A speaks once per BEAT and Style B once per BAR, so the two
+    // load different samples and schedule a different number of them.
+    // Everything else about the count-in -- its length, its tempo, the
+    // COUNT box ticking through it -- is the same either way.
+    const measures = countInStyle() === 'measures';
+    const samples = new Map();
+    if (measures) {
+      for (let bar = 1; bar <= bars; bar++) samples.set(bar, await measureSample(bar));
+    } else {
+      for (let i = 1; i <= beatsPerBar; i++) samples.set(String(i), await countSample(String(i)));
+    }
     const haveSamples = [...samples.values()].some((b) => b !== null);
-    // Only when Style A is the one speaking -- Style B's hint is about
-    // the bars, and this would replace it with a sentence about a
-    // count-in the viewer is not being given.
-    if (vocalStyle() === 'beats') {
+    if (measures) {
+      countHint.innerHTML = haveSamples
+        ? "Names the bar at the top of each count-in bar, at the score's own tempo, from <b>Counts vocal/M1.wav</b> in R2."
+        : "No <b>Counts vocal/M1.wav</b> in the bucket, so the count-in falls back to a <b>synthesised count</b> on each beat.";
+    } else {
       countHint.innerHTML = haveSamples
         ? "Counted at the score's own tempo and time signature, before the audio starts. Using the <b>Voices</b> samples from R2."
         : "Counted at the score's own tempo and time signature, before the audio starts. No <b>Voices/1.wav</b> in the bucket, so a <b>synthesised count</b> is used.";
@@ -1981,11 +2070,17 @@
     if (ctx) {
       const start = ctx.currentTime + LEAD_SECONDS;
       for (let i = 0; i < total; i++) {
-        const name = String((i % beatsPerBar) + 1);
         const at = start + i * secondsPerBeat;
-        const buffer = samples.get(name);
+        const isDownbeat = i % beatsPerBar === 0;
+        // Style B has nothing to say on beats 2, 3 and 4 -- it names
+        // the bar, not the beat -- so those beats are left to the
+        // synthesised click, which keeps the count-in a count-in
+        // rather than one word and then silence.
+        const buffer = measures
+          ? (isDownbeat ? samples.get(Math.floor(i / beatsPerBar) + 1) : null)
+          : samples.get(String((i % beatsPerBar) + 1));
         if (buffer) schedulePlayback(ctx, buffer, at);
-        else scheduleSynthCount(ctx, at, i % beatsPerBar === 0);
+        else scheduleSynthCount(ctx, at, isDownbeat);
       }
     }
 
@@ -2024,56 +2119,58 @@
   }
 
   /**
-   * Says which vocal is running and what it found, and shows the
-   * slider that belongs to it.
+   * Card 5's own line: which bars actually have a sample.
    *
-   * Style B's line names the bars it has NO sample for, because that is
-   * the thing you cannot hear and therefore cannot diagnose. Style A
-   * keeps its own wording, which `runCountIn` refines once it knows
-   * whether the Voices samples were there.
+   * It names the bars it has NO sample for, because that is the thing
+   * you cannot hear and therefore cannot diagnose from the video.
    */
-  async function refreshVocalStyle() {
-    const measures = vocalStyle() === 'measures';
-    // The M slider is only dimmed, never hidden: a control that
-    // disappears is a control you have to rediscover.
-    measureVolumeField.style.opacity = measures ? '' : '0.45';
-    measureVolumeInput.disabled = !measures;
-    if (!measures) {
+  async function refreshCountVoice() {
+    const on = countVoiceEnabled();
+    measureVolumeInput.disabled = !on;
+    if (!on) {
       stopMeasureAnnouncements();
-      countHint.innerHTML =
-        "Counted at the score's own tempo and time signature, before the audio starts.";
+      countVoiceHint.innerHTML =
+        'Off. Turn it on to have the bar you are in named at every bar of the ' +
+        'MusicXML file, from <b>Counts vocal/M1.wav</b> in R2.';
       return;
     }
 
     if (measureSchedule().length === 0) {
-      countHint.innerHTML =
-        'Announces the bar number through the whole piece, from <b>Counts vocal/M1.wav</b> ' +
-        'in R2. Load a MusicXML file and it will follow that score\'s own bars.';
+      countVoiceHint.innerHTML =
+        'Names the bar you are in at every bar of the MusicXML file, from ' +
+        '<b>Counts vocal/M1.wav</b> in R2. Load a MusicXML file and it will ' +
+        "follow that score's own bars.";
       return;
     }
-    countHint.textContent = 'Loading bar announcements\u2026';
+    countVoiceHint.textContent = 'Loading bar announcements\u2026';
     const { have, missing } = await preloadMeasureSamples();
-    if (vocalStyle() !== 'measures') return;
+    if (!countVoiceEnabled()) return;
     if (have.length === 0) {
-      countHint.innerHTML =
+      countVoiceHint.innerHTML =
         'No <b>Counts vocal/M1.wav</b> in the bucket, so no bar is announced. ' +
         'Upload <b>M1.wav</b>, <b>M2.wav</b>\u2026 to the shared <b>Counts vocal</b> folder.';
       return;
     }
-    countHint.innerHTML =
-      `Counted in first, then ${summariseNumbers(have)} announced at each bar's ` +
-      'downbeat through the whole piece, repeats included. ' +
+    countVoiceHint.innerHTML =
+      `${summariseNumbers(have)} announced at each bar's downbeat, repeats included. ` +
       (missing.length > 0
         ? `No sample for ${summariseNumbers(missing)}, so ${missing.length === 1 ? 'that bar passes' : 'those bars pass'} in silence.`
         : 'Every bar in this score has one.');
   }
 
   countsVocalSelect.addEventListener('change', () => {
+    countHint.innerHTML =
+      countInStyle() === 'measures'
+        ? "Names the bar at the top of each count-in bar, at the score's own tempo, from <b>Counts vocal/M1.wav</b> in R2."
+        : "Counted at the score's own tempo and time signature, before the audio starts.";
+  });
+
+  countVoiceOnSelect.addEventListener('change', () => {
     stopMeasureAnnouncements();
-    refreshVocalStyle();
+    refreshCountVoice();
     if (!audioPlayer.paused) startMeasureAnnouncements();
   });
-  refreshVocalStyle();
+  refreshCountVoice();
 
   // A seek lands somewhere else in the piece, so everything queued for
   // where we WERE is wrong. Dropping them lets the next poll re-fill
