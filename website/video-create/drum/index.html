@@ -118,7 +118,12 @@
   .preview-stats b{color:var(--text);}
 
   .video-frame{position:relative;background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-width:0;}
-  .video-top{padding:4px 24px 0;display:flex;justify-content:space-between;align-items:center;gap:16px;}
+  /* Left padding matches .video-notation's, so the logo's ink and the
+     staff's left edge stand on one vertical line. No padding above:
+     the artwork's own blank top edge is taken off by the negative
+     margin below, so the mark sits as high in the frame as it can
+     without leaving it. */
+  .video-top{padding:0 20px;display:flex;justify-content:space-between;align-items:center;gap:16px;}
   .video-logo-row{display:flex;align-items:center;gap:10px;min-width:0;}
   /* The title block sits beside the logo, stacked: Title 1 over Title
      2. Both lines read their size and colour from CSS variables set on
@@ -187,16 +192,37 @@
   /* Brand mark, burned into the exported video's own frame (top-left,
      inside .video-logo-row) -- replaces the generic note-icon placeholder
      that stood in for it before the real logo existed. */
-  /* `margin-bottom` reclaims the logo FILE's own blank bottom edge.
-     The artwork's ink stops at 333 of its 400 rows (measured, not
-     guessed), so a plain 80px-tall <img> carries ~13px of empty space
-     under it -- which pushed the notation down and put the mark's
-     visual centre below the stat boxes it shares a row with. Pulling
-     the box tight around the ink puts the two on one centreline
-     (.video-top's `align-items:center`) and hands those pixels back to
-     the music. The overflow below the margin box is the blank part, so
-     nothing is clipped and nothing overlaps. */
-  .video-logo-mark{height:80px;width:auto;flex-shrink:0;margin-bottom:-13px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));}
+  /* The logo FILE carries blank margin on ALL FOUR sides, and only the
+     bottom one used to be accounted for -- which is why the mark sat
+     both too low and too far in from the corner.
+     
+     Measured, not guessed: the artwork is 1414x2000 and its ink
+     occupies rows 329..1648 and columns 151..1257. At 80px tall that
+     is ~13px of nothing above the mark, ~14px below and ~6px either
+     side.
+
+     The negative margins pull the LAYOUT box tight around the ink, so
+     three things follow. The row's `align-items:center` now centres
+     the mark itself on the stat boxes instead of centring a
+     mostly-empty rectangle (it was 6px low). The ink's left edge lands
+     on .video-top's padding rather than 6px inside it. And the row
+     stops reserving 27px of vertical space for blank artwork, which
+     goes back to the music.
+
+     Written as fractions of the file's own pixel counts so changing
+     --logo-h re-derives all four; a hand-tuned px value would silently
+     go wrong. Nothing is clipped -- everything outside the margin box
+     is the blank part of the image. */
+  .video-logo-mark{
+    --logo-h:80px;
+    --logo-w:calc(var(--logo-h) * 1414 / 2000);
+    height:var(--logo-h);width:auto;flex-shrink:0;
+    margin-top:calc(var(--logo-h) * -329 / 2000);
+    margin-bottom:calc(var(--logo-h) * -351 / 2000);
+    margin-left:calc(var(--logo-w) * -151 / 1414);
+    margin-right:calc(var(--logo-w) * -156 / 1414);
+    filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));
+  }
 
   .transport{display:flex;align-items:center;gap:14px;}
   .play-btn{width:42px;height:42px;border-radius:50%;background:var(--red);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
