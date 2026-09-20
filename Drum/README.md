@@ -61,12 +61,12 @@ python3 scripts/generate_golden.py   # re-record the Python's output
 
 The drum video page (`website/video-create/drum/`) shows a **Human
 Sticking Engine** pill next to **Notation Engine** and **Video Engine**.
-It is now that engine, live: card 5 letters every note the score
-contains with the hand that plays it, under the staff, at the same x as
-the notehead.
+It is now that engine, live — and what it drives is **which drum-kit
+photo lights up**, not text on the video.
 
-The bridge between the two engines is deliberately thin, and lives in
-the page rather than in either engine:
+The kit photos in R2 are named `R{gmNote}.png` / `L{gmNote}.png`: a
+full-frame overlay of the stick or foot that plays that drum, from that
+side. The sticking engine is what decides which of the two it is. So:
 
 ```
 MusicXML ──notation-engine──▶ score + playback data
@@ -75,17 +75,25 @@ MusicXML ──notation-engine──▶ score + playback data
                                       │
                             sticking-engine (the port)
                                       │
-                             limb per note ──▶ R / L
+                         limb per note ──▶ R38.png / L38.png
 ```
 
-Velocities are DERIVED from what the score notates — the prevailing
-dynamic marking, plus the note's own accent — because MusicXML has no
-velocities and the sticking engine reads them for its ghost and accent
-thresholds. A made-up number would show up as a made-up articulation.
-Notes with no `<midi-unpitched>` instrument are skipped rather than
-guessed at: a wrong GM number is a note placed on the wrong drum.
+The bridge is deliberately thin and lives in the page rather than in
+either engine. Three decisions inside it:
 
-**Feet are not lettered.** An R or L on a kick reads as a stick.
+- **Velocities are derived, not invented.** MusicXML has none, and the
+  sticking engine reads velocity for its ghost and accent thresholds
+  (Rule 9), so they come from the prevailing dynamic marking plus the
+  note's own accent. A made-up number would show up as a made-up
+  articulation.
+- **Notes with no `<midi-unpitched>` instrument are skipped**, not
+  guessed at: a wrong GM number is a note placed on the wrong drum.
+- **A stroke with no photo in the chosen kit is skipped**, and the card
+  says how many — rather than lighting a neighbour's picture.
+
+The side, not the limb, is what the filename encodes: a kick is
+`R36.png` because it is the right **foot**, and the photo shows a foot.
+So RH and RF both map to `R`, LH and LF to `L`.
 
 ## A note on the two uploads
 

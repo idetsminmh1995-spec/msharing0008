@@ -157,11 +157,15 @@
   .video-notation{padding:0 20px 14px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;flex-shrink:0;scrollbar-width:none;-ms-overflow-style:none;}
   .video-notation::-webkit-scrollbar{display:none;width:0;height:0;}
   .video-notation svg{display:block;height:170px;width:auto;max-width:none;}
-  /* The sticking letters are drawn INTO the notation SVG, in its own
-     staff-space units, so they scale with the music and sit at the same
-     x as the notehead they belong to. Colour follows the Video Style the
-     same way the notation's ink does. */
-  .video-notation .sticking-letter{font-family:'Sora',sans-serif;font-weight:700;}
+  /* The R2 hit images. Each is a FULL-FRAME overlay -- a stick or a
+     limb drawn in position over the kit photo -- so they stack on the
+     frame at its own size rather than being placed per-drum. They sit
+     under nothing: `pointer-events:none` keeps them out of the way of
+     the transport and the scrub bar below. */
+  .hit-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+  .hit-layer img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+    opacity:0;transition:opacity .06s linear;}
+  .hit-layer img.lit{opacity:1;}
 
   /* Video Style (card 5) is a property of the whole FRAME, not of the
      notation strip. The strip itself is never painted -- and neither is
@@ -359,7 +363,7 @@
     <div class="card">
       <div class="card-head"><span class="card-num">5</span>Sticking</div>
       <div class="radio-row">
-        <label><input type="checkbox" id="stickingOn" checked>Show R / L under the notes</label>
+        <label><input type="checkbox" id="stickingOn" checked>Light up the kit as it plays</label>
       </div>
       <div class="field-row">
         <div>
@@ -381,7 +385,7 @@
           </select>
         </div>
       </div>
-      <div class="field-hint" id="stickingHint">Feet are not lettered &mdash; a kick has no stick.</div>
+      <div class="field-hint" id="stickingHint">Which hand or foot plays each note, shown by lighting the matching drum-kit photo from R2.</div>
     </div>
 
     <div class="card">
@@ -430,6 +434,7 @@
       <div class="video-notation" id="notationContainer">
         <span style="font-size:12px;color:var(--muted);">Upload a MusicXML file to preview notation.</span>
       </div>
+      <div class="hit-layer" id="hitLayer" aria-hidden="true"></div>
       <div class="video-mid">
         <div class="drum-circle">
           <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="9" ry="3.4"/></svg>
@@ -497,6 +502,15 @@
     kitConfirm.className = `confirm-msg ${ok ? 'ok' : 'err'}`;
   }
 
+  /**
+   * The currently-loaded kit's assets: its name, and which
+   * `{R|L}{note}.png` files R2 actually has for it. Kept because the
+   * sticking engine's answer is only useful here if there is a photo to
+   * show for it -- a hit with no image is skipped rather than guessed
+   * at with a neighbour's picture.
+   */
+  let currentKit = { name: null, files: new Set() };
+
   async function loadKitPreview(drumSetName) {
     try {
       const res = await fetch(
@@ -504,6 +518,11 @@
       );
       if (!res.ok) throw new Error(`manifest request failed (${res.status})`);
       const manifest = await res.json();
+      currentKit = { name: drumSetName, files: new Set(manifest.files ?? []) };
+      // Rebuild against THIS kit's files. Which strokes have a photo is
+      // a property of the kit, not of the score, so switching kits has
+      // to re-answer it -- and the kit commonly loads after the score.
+      renderSticking();
       if (manifest.hasBackground) {
         const imgUrl = `${API_BASE}/assets/${encodeURIComponent(drumSetName)}/${ASPECT}/${encodeURIComponent(manifest.backgroundFile)}`;
         videoFrame.style.backgroundImage = `url("${imgUrl}")`;
@@ -757,17 +776,14 @@
     renderSticking();
 
     // Real stats, read from the actual parsed score -- not hardcoded.
-    const firstMark = parsed.tempoMarks && parsed.tempoMarks[0];
     const firstAttrs = parsed.attributes && parsed.attributes[0];
     const measureCount = parsed.score?.parts?.[0]?.measures?.length ?? 0;
     const statTimeBox = document.getElementById('statTimeBox');
-    if (firstMark) {
-      statBpm.textContent = String(firstMark.perMinute);
-      tempoChip.textContent = String(firstMark.perMinute);
-    } else {
-      statBpm.textContent = '\u2014';
-      tempoChip.textContent = '\u2014';
-    }
+    // Through the same tempo-map lookup the live display uses, so the
+    // number before you press play and the number after cannot come
+    // from two different places and disagree.
+    shownBpm = null;
+    showBpm(bpmAtTick(0));
     if (firstAttrs) {
       const timeStr = `${firstAttrs.timeNumerator}/${firstAttrs.timeDenominator}`;
       statTime.textContent = timeStr;
@@ -800,6 +816,7 @@
   // Neither engine knows about the other, which is §17.3's own split --
   // the notation engine says where the music is, the sticking engine
   // says which hand plays it, the page draws.
+  const hitLayer = document.getElementById('hitLayer');
   const stickingOn = document.getElementById('stickingOn');
   const stickingHand = document.getElementById('stickingHand');
   const stickingGenre = document.getElementById('stickingGenre');
@@ -817,9 +834,8 @@
   const ACCENT_BOOST = 24;
 
   /**
-   * Every notehead of the score as `{time, note, velocity}`, plus the
-   * notation `noteId` each one came from so the answer can be drawn back
-   * onto the right notehead.
+   * Every notehead of the score as `{time, note, velocity}`, in the
+   * order the sticking engine's `src_...` ids are handed out.
    *
    * Notes with no `<midi-unpitched>` instrument are skipped rather than
    * guessed at: the sticking engine maps GM numbers to kit positions,
@@ -828,8 +844,7 @@
    */
   function buildDrumNoteList(parsed, playback) {
     const notes = [];
-    const noteIds = [];
-    if (!parsed || !parsed.score) return { notes, noteIds };
+    if (!parsed || !parsed.score) return { notes };
 
     for (const part of parsed.score.parts) {
       const instrumentMidi = parsed.midiInstrumentsByPart?.get(part.id);
@@ -846,7 +861,7 @@
         const measureOffset = playback.globalTickOffsetByMeasure.get(measure.number) ?? 0;
         for (const voice of measure.voices) {
           let running = 0;
-          voice.events.forEach((event, eventIndex) => {
+          voice.events.forEach((event) => {
             const startTick = event.startTick ?? running;
             running = startTick + event.duration.ticks;
             if (event.kind !== 'note' && event.kind !== 'chord') return;
@@ -863,7 +878,7 @@
             }
 
             const members = event.kind === 'chord' ? event.notes : [event];
-            members.forEach((note, memberIndex) => {
+            members.forEach((note) => {
               const midiNote = note.instrumentId ? instrumentMidi.get(note.instrumentId) : undefined;
               if (midiNote === undefined) return;
 
@@ -872,28 +887,17 @@
               );
               const velocity = Math.max(1, Math.min(127, currentVelocity + (accented ? ACCENT_BOOST : 0)));
 
-              const globalTick = measureOffset + startTick;
-              const baseId = NotationEngine.notationEventId(
-                part.id,
-                measure.number,
-                voice.id,
-                eventIndex,
-              );
               notes.push({
-                time: NotationEngine.tickToSeconds(playback.tempoMap, globalTick),
+                time: NotationEngine.tickToSeconds(playback.tempoMap, measureOffset + startTick),
                 note: midiNote,
                 velocity,
-              });
-              noteIds.push({
-                noteId: event.kind === 'chord' ? `${baseId}#n${memberIndex}` : baseId,
-                tick: globalTick,
               });
             });
           });
         }
       }
     }
-    return { notes, noteIds };
+    return { notes };
   }
 
   /** `src_00000007` -> 6. See below for why this is safe. */
@@ -903,28 +907,80 @@
   }
 
   /**
-   * Runs the sticking engine over the current score and draws a letter
-   * under every note a HAND plays.
+   * The solved performance as a list of hits to light: when, and which
+   * R2 image.
    *
-   * Feet are deliberately unlettered: R/L on a kick would read as a
-   * stick, and a drummer reading this chart would be looking for one.
+   * `{R|L}{gmNote}.png` is the naming R2 already uses, and the side --
+   * not the limb -- is what it encodes: a kick is `R36.png` because it
+   * is the RIGHT foot, and the photo shows a foot, not a stick. So RH
+   * and RF both map to `R`, LH and LF to `L`.
+   */
+  let hitTimeline = [];
+
+  function stickingImageName(limb, midiNote) {
+    const side = limb === 'RH' || limb === 'RF' ? 'R' : 'L';
+    return `${side}${midiNote}.png`;
+  }
+
+  function hitImageUrl(fileName) {
+    return (
+      `${API_BASE}/assets/${encodeURIComponent(currentKit.name)}/${ASPECT}/` +
+      encodeURIComponent(fileName)
+    );
+  }
+
+  /**
+   * One `<img>` per distinct image the timeline needs, created once and
+   * then only toggled.
+   *
+   * Creating them per hit would fetch the same PNG dozens of times a
+   * second and flash white while each decoded; an eighth-note hi-hat at
+   * 120bpm is four images a second, and a browser will not keep up with
+   * that by URL alone.
+   */
+  function preloadHitImages() {
+    if (!hitLayer) return;
+    const wanted = new Set(hitTimeline.map((h) => h.file));
+    for (const img of [...hitLayer.children]) {
+      if (!wanted.has(img.dataset.file)) img.remove();
+    }
+    const have = new Set([...hitLayer.children].map((img) => img.dataset.file));
+    for (const file of wanted) {
+      if (have.has(file) || currentKit.name === null) continue;
+      const img = document.createElement('img');
+      img.dataset.file = file;
+      img.alt = '';
+      img.src = hitImageUrl(file);
+      hitLayer.appendChild(img);
+    }
+  }
+
+  /**
+   * Runs the sticking engine over the current score and builds the hit
+   * timeline the playback loop lights the kit from.
+   *
+   * The R/L letters this used to draw under the staff are gone: the
+   * sticking is not something the VIDEO shows, it is what decides which
+   * photo lights up. Reading it off the page was only ever a way to see
+   * that the engine was working.
    */
   function renderSticking() {
-    const layerClass = 'sticking-layer';
-    const svgEl = notationContainer.querySelector('svg');
-    if (!svgEl) return;
-    const existing = svgEl.querySelector('.' + layerClass);
-    if (existing) existing.remove();
-    if (!stickingOn.checked || lastParsed === null || notationPlayback === null) return;
+    hitTimeline = [];
+    clearLitHits();
+    if (!stickingOn.checked || lastParsed === null || notationPlayback === null) {
+      preloadHitImages();
+      return;
+    }
     if (typeof StickingEngine === 'undefined') {
       stickingHint.textContent = 'Sticking Engine failed to load.';
       return;
     }
 
-    const { notes, noteIds } = buildDrumNoteList(lastParsed, notationPlayback);
+    const { notes } = buildDrumNoteList(lastParsed, notationPlayback);
     if (notes.length === 0) {
       stickingHint.textContent =
-        'No <midi-unpitched> instruments in this file, so there is nothing to letter.';
+        'No <midi-unpitched> instruments in this file, so there is nothing to solve.';
+      preloadHitImages();
       return;
     }
 
@@ -934,7 +990,7 @@
       // ... in note-list order from one counter, and `sourceIndex` below
       // reads that number to find which note an event came from. Without
       // the reset a second run would start where the first left off and
-      // every letter would land on the wrong note.
+      // every hit would light the wrong drum.
       StickingEngine.resetIdCounter();
       const engine = new StickingEngine.Engine({
         style: StickingEngine.drummerStyle({ dominantHand: stickingHand.value }),
@@ -950,56 +1006,78 @@
       return;
     }
 
-    const viewBox = (svgEl.getAttribute('viewBox') || '').split(/\s+/).map(Number);
-    const height = viewBox.length === 4 ? viewBox[3] : 16;
-    const layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    layer.setAttribute('class', layerClass);
-
-    // How many letters already sit at this x, so two hands playing at
-    // once stack instead of overprinting.
-    const stackAtX = new Map();
-    let hands = 0;
+    let missing = 0;
     for (const ev of performance.events) {
-      if (ev.limb !== 'RH' && ev.limb !== 'LH') continue; // feet get no letter
-      const source = noteIds[sourceIndex(ev.sourceId)];
+      const source = notes[sourceIndex(ev.sourceId)];
       if (source === undefined) continue;
-      hands++;
-
-      // The x of the note ITSELF, from the notation engine's own position
-      // API -- not measured off the SVG, which would drift the moment
-      // anything about the layout changed.
-      let x;
-      try {
-        x = NotationEngine.positionToX(notationPlayback, source.tick).x;
-      } catch (err) {
+      const file = stickingImageName(ev.limb, source.note);
+      if (!currentKit.files.has(file)) {
+        missing++;
         continue;
       }
-      const key = x.toFixed(3);
-      const depth = stackAtX.get(key) ?? 0;
-      stackAtX.set(key, depth + 1);
-      // The first letter at an x sits CLOSEST to the staff and any
-      // second one goes below it, so the row a reader scans along stays
-      // at one distance from the music. Stacking the other way put the
-      // occasional two-hand stroke above the row and made it read like a
-      // different kind of marking.
-
-      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      text.setAttribute('class', 'sticking-letter');
-      text.setAttribute('x', String(x));
-      text.setAttribute('y', String(height - 2.4 + depth * 1.6));
-      text.setAttribute('font-size', '1.5');
-      text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('fill', notationConfig().colors.ink);
-      text.textContent = ev.limb === 'RH' ? 'R' : 'L';
-      layer.appendChild(text);
+      hitTimeline.push({ time: ev.timeSeconds, file, limb: ev.limb });
     }
-    svgEl.appendChild(layer);
+    hitTimeline.sort((a, b) => a.time - b.time);
+    preloadHitImages();
 
     const issues = performance.validation.issues.length;
     stickingHint.textContent =
-      `${hands} hand strokes lettered from ${notes.length} notes` +
-      (issues > 0 ? ` -- ${issues} physical issue(s), see console.` : '. Feet are not lettered.');
+      currentKit.name === null
+        ? `${performance.events.length} strokes solved. Pick a drum kit to light them.`
+        : `${hitTimeline.length} of ${performance.events.length} strokes have a photo in "${currentKit.name}"` +
+          (missing > 0 ? ` -- ${missing} have none and are skipped.` : '.') +
+          (issues > 0 ? ` ${issues} physical issue(s), see console.` : '');
     if (issues > 0) console.log('Sticking Engine validation:', performance.validation.issues);
+  }
+
+  // --- lighting the kit -------------------------------------------
+  /** How long one hit's photo stays lit. Short: a stroke is an instant, not a pose. */
+  const HIT_VISIBLE_S = 0.11;
+  let litFiles = new Set();
+
+  function clearLitHits() {
+    if (!hitLayer) return;
+    for (const img of hitLayer.children) img.classList.remove('lit');
+    litFiles = new Set();
+  }
+
+  /**
+   * Lights whichever photos belong to strokes happening right now.
+   *
+   * Driven from the audio clock through the SAME repeat-unfolded
+   * timeline the cursor uses, so on the second pass of a repeat the kit
+   * lights up again rather than going quiet -- the hit timeline is in
+   * WRITTEN time, and `writtenTickAt` is what maps the audio onto it.
+   */
+  function updateHitLayer() {
+    if (!hitLayer) return;
+    if (hitTimeline.length === 0) {
+      if (litFiles.size > 0) clearLitHits();
+      return;
+    }
+    const tick = writtenTickAt(audioPlayer.currentTime);
+    if (tick === undefined) return;
+    let seconds;
+    try {
+      seconds = NotationEngine.tickToSeconds(notationPlayback.tempoMap, tick);
+    } catch (err) {
+      return;
+    }
+
+    const now = new Set();
+    // The timeline is sorted, so this could binary-search; at a few
+    // hundred hits a linear scan per frame is well under a millisecond
+    // and the simpler code is worth more than the microseconds.
+    for (const hit of hitTimeline) {
+      if (hit.time > seconds) break;
+      if (seconds - hit.time <= HIT_VISIBLE_S) now.add(hit.file);
+    }
+
+    if (now.size === litFiles.size && [...now].every((f) => litFiles.has(f))) return;
+    for (const img of hitLayer.children) {
+      img.classList.toggle('lit', now.has(img.dataset.file));
+    }
+    litFiles = now;
   }
 
   for (const control of [stickingOn, stickingHand, stickingGenre]) {
@@ -1152,24 +1230,72 @@
   // (§17.1's positionToX); drawing the marker and scrolling to it is the
   // host's job (§17.3), which is this block.
   /** Adds (or re-adds) the marker line to a freshly rendered SVG. */
+  /** Pure red, as asked for. Not the brand red -- this one has to read as a playhead, not as chrome. */
+  const CURSOR_COLOR = '#FF0000';
+  /** How far past the staff's own lines the capsule reaches, top and bottom, in staff spaces. */
+  const CURSOR_OVERHANG = 1.1;
+  const CURSOR_WIDTH = 1.7;
+  const CURSOR_STROKE = 0.22;
+
+  /**
+   * The staff's vertical extent, MEASURED from the SVG that was just
+   * drawn rather than assumed.
+   *
+   * The engine does not publish `staffBottomY`, and it genuinely moves:
+   * headroom grows for a tempo mark, a bar number, a volta. Staff lines
+   * are the horizontal lines that span nearly the whole width at the
+   * engine's own staff-line thickness, so they are findable without
+   * guessing -- and if none are found (an empty score) the caller falls
+   * back to the viewBox.
+   */
+  function measureStaffExtent(svgEl, viewBoxHeight) {
+    let top = Infinity;
+    let bottom = -Infinity;
+    for (const line of svgEl.querySelectorAll('line')) {
+      const y1 = Number(line.getAttribute('y1'));
+      const y2 = Number(line.getAttribute('y2'));
+      const x1 = Number(line.getAttribute('x1'));
+      const x2 = Number(line.getAttribute('x2'));
+      if (!Number.isFinite(y1) || y1 !== y2) continue; // not horizontal
+      if (Math.abs(x2 - x1) < 4) continue; // too short to be a staff line
+      top = Math.min(top, y1);
+      bottom = Math.max(bottom, y1);
+    }
+    if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom <= top) {
+      return { top: 1, bottom: Math.max(2, viewBoxHeight - 1) };
+    }
+    return { top, bottom };
+  }
+
+  /**
+   * Adds (or re-adds) the playhead to a freshly rendered SVG.
+   *
+   * A rounded capsule OUTLINE around the current position rather than a
+   * line through the whole frame. A full-height line crosses the titles
+   * and the drum kit behind the staff; a capsule sits on the music,
+   * which is what it is pointing at.
+   */
   function attachCursor(svgEl) {
     cursorLine = null;
     if (!svgEl) return;
     const viewBox = (svgEl.getAttribute('viewBox') || '').split(/\s+/).map(Number);
     const height = viewBox.length === 4 ? viewBox[3] : 20;
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('class', 'playback-cursor');
-    line.setAttribute('y1', '0');
-    line.setAttribute('y2', String(height));
-    line.setAttribute('stroke', '#C81E2C');
-    line.setAttribute('stroke-width', '0.3');
-    line.setAttribute('stroke-linecap', 'round');
-    line.setAttribute('opacity', '0.85');
-    line.setAttribute('x1', '0');
-    line.setAttribute('x2', '0');
-    line.style.display = 'none';
-    svgEl.appendChild(line);
-    cursorLine = line;
+    const staff = measureStaffExtent(svgEl, height);
+
+    const capsule = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    capsule.setAttribute('class', 'playback-cursor');
+    capsule.setAttribute('width', String(CURSOR_WIDTH));
+    capsule.setAttribute('height', String(staff.bottom - staff.top + CURSOR_OVERHANG * 2));
+    capsule.setAttribute('y', String(staff.top - CURSOR_OVERHANG));
+    capsule.setAttribute('rx', String(CURSOR_WIDTH / 2));
+    capsule.setAttribute('ry', String(CURSOR_WIDTH / 2));
+    capsule.setAttribute('fill', 'none');
+    capsule.setAttribute('stroke', CURSOR_COLOR);
+    capsule.setAttribute('stroke-width', String(CURSOR_STROKE));
+    capsule.setAttribute('x', '0');
+    capsule.style.display = 'none';
+    svgEl.appendChild(capsule);
+    cursorLine = capsule;
   }
 
   /** Moves the marker to wherever the audio currently is, and scrolls it into view. */
@@ -1206,8 +1332,9 @@
     } catch (err) {
       return;
     }
-    cursorLine.setAttribute('x1', String(x));
-    cursorLine.setAttribute('x2', String(x));
+    // The capsule is CENTRED on the playhead, so its outline sits
+    // around the note rather than beside it.
+    cursorLine.setAttribute('x', String(x - CURSOR_WIDTH / 2));
     cursorLine.style.display = '';
 
     // Keep the marker in view. The strip scrolls horizontally, and the
@@ -1234,6 +1361,7 @@
     const step = () => {
       updateCursor();
       updateBeatDisplay();
+      updateHitLayer();
       if (!audioPlayer.paused && !audioPlayer.ended) cursorRaf = requestAnimationFrame(step);
     };
     cursorRaf = requestAnimationFrame(step);
@@ -1285,7 +1413,7 @@
     setUploadConfirm(`Could not play "${file ? file.name : 'this file'}" -- unsupported or corrupt audio.`, false);
   });
   audioPlayer.addEventListener('timeupdate', () => { updateTransport(); updateCursor(); updateBeatDisplay(); });
-  audioPlayer.addEventListener('seeked', () => { updateCursor(); updateBeatDisplay(); });
+  audioPlayer.addEventListener('seeked', () => { updateCursor(); updateBeatDisplay(); updateHitLayer(); });
   audioPlayer.addEventListener('loadedmetadata', updateCursor);
   audioPlayer.addEventListener('play', () => {
     playIcon.querySelector('path').setAttribute('d', PAUSE_PATH);
@@ -1295,6 +1423,9 @@
     playIcon.querySelector('path').setAttribute('d', PLAY_PATH);
     cancelAnimationFrame(cursorRaf);
     updateCursor();
+    // A stroke is an instant. Leaving one lit while paused would read
+    // as a stick resting on the drum.
+    clearLitHits();
   });
   audioPlayer.addEventListener('ended', () => { updateTransport(); updateCursor(); });
 
@@ -1467,27 +1598,74 @@
     if (statCountWrap) statCountWrap.classList.toggle('on-downbeat', isDownbeat);
   }
 
-  /** Ticks the COUNT box from wherever the audio is. Called from the cursor loop. */
+  /**
+   * The written tick sounding at `seconds` of audio, through the repeat
+   * timeline when the score has one.
+   *
+   * One function because three things need the same answer -- the COUNT
+   * box, the BPM box and the playhead -- and three copies of it is how
+   * they would start disagreeing about where the music is.
+   */
+  function writtenTickAt(seconds) {
+    const pb = notationPlayback;
+    if (!pb || typeof NotationEngine === 'undefined' || !Number.isFinite(seconds)) return undefined;
+    const perf = pb.performance;
+    if (perf && perf.entries.length > 0) {
+      return NotationEngine.performanceSecondsToWritten(
+        perf,
+        pb.tempoMap,
+        Math.min(seconds, perf.totalSeconds),
+      ).writtenTick;
+    }
+    return NotationEngine.secondsToTick(pb.tempoMap, seconds);
+  }
+
+  /**
+   * The tempo in effect at a written tick, read from the score's own
+   * tempo map.
+   *
+   * The map stores microseconds per quarter note (§12's own unit), so
+   * the BPM a reader recognises is 60,000,000 divided by it. Rounded for
+   * display only -- nothing downstream reads this number.
+   */
+  function bpmAtTick(tick) {
+    const pb = notationPlayback;
+    if (!pb || !pb.tempoMap || !pb.tempoMap.segments) return undefined;
+    let current;
+    for (const segment of pb.tempoMap.segments) {
+      if (segment.startTick <= tick) current = segment;
+      else break;
+    }
+    if (current === undefined || !(current.microsecondsPerQuarter > 0)) return undefined;
+    return Math.round(60000000 / current.microsecondsPerQuarter);
+  }
+
+  let shownBpm = null;
+  function showBpm(bpm) {
+    if (bpm === shownBpm) return;
+    shownBpm = bpm;
+    const text = bpm === undefined ? '\u2014' : String(bpm);
+    if (tempoChip) tempoChip.textContent = text;
+    if (statBpm) statBpm.textContent = text;
+  }
+
+  /** Ticks the COUNT and BPM boxes from wherever the audio is. Called from the cursor loop. */
   function updateBeatDisplay() {
     if (countIn.running) return; // the count-in drives it itself
     const pb = notationPlayback;
     if (!pb || typeof NotationEngine === 'undefined') return;
-    const seconds = audioPlayer.currentTime;
-    if (!Number.isFinite(seconds)) return;
     try {
-      const perf = pb.performance;
-      const tick =
-        perf && perf.entries.length > 0
-          ? NotationEngine.performanceSecondsToWritten(
-              perf,
-              pb.tempoMap,
-              Math.min(seconds, perf.totalSeconds),
-            ).writtenTick
-          : NotationEngine.secondsToTick(pb.tempoMap, seconds);
+      const tick = writtenTickAt(audioPlayer.currentTime);
+      if (tick === undefined) return;
       const { beat } = NotationEngine.resolvePosition(pb, tick).position;
       const parts = beatLabelParts();
       const isDownbeat = Math.floor(beat) === 1 && beat - Math.floor(beat) < 1 / parts.length;
       showBeatLabel(beatLabelFor(beat), isDownbeat);
+      // The BPM box used to show the score's FIRST tempo and then never
+      // move, so a piece that changes tempo -- which is most of why a
+      // lesson has a tempo mark in the middle of it -- displayed a
+      // number that had stopped being true.
+      showBpm(bpmAtTick(tick));
     } catch (err) {
       /* a score the position API cannot place is not worth a broken transport */
     }

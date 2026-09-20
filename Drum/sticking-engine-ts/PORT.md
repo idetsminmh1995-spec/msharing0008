@@ -80,21 +80,28 @@ Python's way.
 ## How the page uses it
 
 `website/video-create/drum/` loads `assets/sticking-engine.js` next to
-`assets/notation-engine.js` and letters every note under the staff. The
-bridge lives in the page, not in either engine: it builds the note list
-from the parsed score (time from the tempo map, GM number from
-`<midi-unpitched>`, velocity derived from the notated dynamic plus the
-note's own accent), runs the engine, and puts an R or L at the x the
-notation engine reports for that note.
+`assets/notation-engine.js`. The engine's answer is not shown as text —
+it decides **which R2 drum-kit photo lights up** as each note is played,
+since those photos are already named `R{gmNote}.png` / `L{gmNote}.png`.
 
-Two details worth knowing before changing it:
+The bridge lives in the page, not in either engine: it builds the note
+list from the parsed score (time from the tempo map, GM number from
+`<midi-unpitched>`, velocity derived from the notated dynamic plus the
+note's own accent), runs the engine, and turns each solved event into a
+timestamped image name.
+
+Three details worth knowing before changing it:
 
 - **`resetIdCounter()` is called before every run.** The engine hands
   out `src_00000001`, `src_00000002`… from one counter in note-list
   order, and the page reads that number back to know which note an event
   came from. Without the reset, a second run starts where the first left
-  off and every letter lands on the wrong note.
-- **Feet get no letter.** An R or L on a kick reads as a stick.
+  off and every hit lights the wrong drum.
+- **The side, not the limb, is the filename.** A kick is `R36.png`
+  because it is the right FOOT. RH and RF both map to `R`.
+- **The lit state is driven through the repeat-unfolded timeline**, the
+  same one the playhead uses, so the kit lights up again on a repeat's
+  second pass instead of going quiet.
 
 ## What is deliberately not ported
 
