@@ -97,6 +97,26 @@ if they are absent**: the page synthesises a count instead and says so
 under the Count-in card, so a missing sample is never silence you have
 to diagnose.
 
+### Bar announcements: `Counts vocal/M{n}.wav`
+
+Counts Vocal **Style B** names the bar you are in, for the whole piece
+rather than just the count-in, from the same shared area:
+
+```
+Counts vocal/M1.wav   Counts vocal/M2.wav   Counts vocal/M3.wav   ...
+```
+
+served at `/assets/shared/Counts%20vocal/M1.wav` — the space in the
+folder name is fine, the Worker decodes each path segment before
+building the R2 key.
+
+The number is the **written** bar number, taken from the score's own
+performance timeline, so a repeated bar 5 is announced as `M5` again on
+the second pass rather than as `M9`, and tempo changes are already
+folded into when it fires. Upload as many as your longest lesson needs;
+a bar with no sample simply passes in silence and the hint under the
+card names which ones those were.
+
 ## Endpoints
 
 - `GET /api/drum-sets` → `{ "drumSets": ["drum1", ...] }`

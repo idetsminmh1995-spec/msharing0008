@@ -361,7 +361,10 @@
       <div class="field-row">
         <div>
           <label for="counts-vocal">Counts Vocal</label>
-          <select id="counts-vocal" class="drum-input"><option>Style A (1,2,3,4...)</option><option>Style B (M1,M2...)</option></select>
+          <select id="counts-vocal" class="drum-input">
+            <option value="beats">Style A (1,2,3,4...)</option>
+            <option value="measures">Style B (M1,M2...)</option>
+          </select>
         </div>
         <div>
           <label for="beat-label">Beat Label</label>
@@ -373,11 +376,23 @@
         </div>
       </div>
       <div class="title-controls">
+        <!-- Two levels, both always live. The count-in and the bar
+             announcements are different jobs -- one is four beats
+             before the music, the other runs underneath it for the
+             whole piece -- so one slider serving both would mean
+             re-setting it every time. -->
         <div class="tc-size">
           <label for="countsVolume">Counts Volume</label>
           <div class="tc-size-row">
             <input id="countsVolume" type="range" min="0" max="100" step="1" value="80">
             <span class="tc-px" id="countsVolumeOut">80%</span>
+          </div>
+        </div>
+        <div class="tc-size" id="measureVolumeField">
+          <label for="measureVolume">M Volume</label>
+          <div class="tc-size-row">
+            <input id="measureVolume" type="range" min="0" max="100" step="1" value="70">
+            <span class="tc-px" id="measureVolumeOut">70%</span>
           </div>
         </div>
         <div>
@@ -806,6 +821,12 @@
       errorCount === 0,
     );
     if (rendered.diagnostics.length > 0) console.log('Notation Engine diagnostics:', rendered.diagnostics);
+    // A new score is a new set of bars, so anything queued for the old
+    // one is wrong and the hint about which bars have a sample is
+    // stale. Declared further down; hoisting is what lets this read in
+    // the order the page actually works.
+    stopMeasureAnnouncements();
+    refreshVocalStyle();
   }
 
 
@@ -1482,6 +1503,10 @@
   // of it is hardcoded to 4/4 at 120.
   const countsVolumeInput = document.getElementById('countsVolume');
   const countsVolumeOut = document.getElementById('countsVolumeOut');
+  const measureVolumeInput = document.getElementById('measureVolume');
+  const measureVolumeOut = document.getElementById('measureVolumeOut');
+  const measureVolumeField = document.getElementById('measureVolumeField');
+  const countsVocalSelect = document.getElementById('counts-vocal');
   const countInBarsSelect = document.getElementById('countInBars');
   const beatLabelSelect = document.getElementById('beat-label');
   const countHint = document.getElementById('countHint');
@@ -1495,8 +1520,16 @@
 
   let audioCtx = null;
   let countGain = null;
+  let measureGain = null;
   /** name -> AudioBuffer, or null for "asked the server, it hasn't got one". */
   const countSampleCache = new Map();
+  /** measure number -> AudioBuffer, same null-means-absent convention. */
+  const measureSampleCache = new Map();
+
+  /** Which vocal the Counts Vocal card is asking for. */
+  function vocalStyle() {
+    return countsVocalSelect.value === 'measures' ? 'measures' : 'beats';
+  }
 
   /**
    * One AudioContext for the page, created on the first real click.
@@ -1511,7 +1544,13 @@
       audioCtx = new Ctx();
       countGain = audioCtx.createGain();
       countGain.connect(audioCtx.destination);
+      // Its own node, not a child of countGain: the two vocals are
+      // alternatives and each carries its own level, so neither may
+      // scale the other.
+      measureGain = audioCtx.createGain();
+      measureGain.connect(audioCtx.destination);
       applyCountsVolume();
+      applyMeasureVolume();
     }
     if (audioCtx.state === 'suspended') audioCtx.resume();
     return audioCtx;
@@ -1523,6 +1562,13 @@
   }
   countsVolumeInput.addEventListener('input', applyCountsVolume);
   applyCountsVolume();
+
+  function applyMeasureVolume() {
+    measureVolumeOut.textContent = `${measureVolumeInput.value}%`;
+    if (measureGain) measureGain.gain.value = Number(measureVolumeInput.value) / 100;
+  }
+  measureVolumeInput.addEventListener('input', applyMeasureVolume);
+  applyMeasureVolume();
 
   /**
    * One count voice sample from the shared R2 folder, decoded and
@@ -1577,6 +1623,178 @@
     src.buffer = buffer;
     src.connect(countGain);
     src.start(at);
+  }
+
+  // --- Style B: the bar announcements -------------------------------
+  // Style A counts the beats of a count-in and then stops. Style B is a
+  // different job: it names the bar you are in, for the whole piece, so
+  // a lesson video can be followed without counting along. It reads the
+  // score's own performance timeline, which means a repeated bar 5 is
+  // announced as M5 again on the second pass rather than as M9 -- the
+  // written bar number is the one the viewer is looking at.
+
+  /**
+   * One measure-announcement sample, decoded and cached. A miss caches
+   * too, so a score longer than the bucket's samples asks once per bar
+   * number rather than once per playback.
+   */
+  async function measureSample(measureNumber) {
+    if (measureSampleCache.has(measureNumber)) return measureSampleCache.get(measureNumber);
+    const ctx = ensureAudioContext();
+    if (!ctx) {
+      measureSampleCache.set(measureNumber, null);
+      return null;
+    }
+    try {
+      const res = await fetch(
+        `${API_BASE}/assets/shared/${encodeURIComponent('Counts vocal')}/M${measureNumber}.wav`,
+      );
+      if (!res.ok) throw new Error(`measure voice request failed (${res.status})`);
+      const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
+      measureSampleCache.set(measureNumber, buffer);
+      return buffer;
+    } catch (err) {
+      measureSampleCache.set(measureNumber, null);
+      return null;
+    }
+  }
+
+  /**
+   * Where every bar starts, in the same seconds the audio element
+   * counts in.
+   *
+   * Straight off the notation engine's performance timeline, so it is
+   * the score's own answer rather than a second guess at it: tempo
+   * changes and repeats are already folded in, and each entry still
+   * carries the WRITTEN measure number to announce.
+   */
+  function measureSchedule() {
+    const pb = notationPlayback;
+    const entries = pb?.performance?.entries;
+    if (!entries || entries.length === 0) return [];
+    return entries.map((entry) => ({
+      at: entry.startSeconds,
+      measureNumber: entry.measureNumber,
+    }));
+  }
+
+  // How far ahead of the audio clock announcements are queued, and how
+  // often the queue is topped up. The standard Web Audio arrangement: a
+  // coarse timer decides WHAT to play, the audio clock decides WHEN, so
+  // a stalled frame cannot make a bar land late.
+  const MEASURE_LOOKAHEAD_S = 0.75;
+  const MEASURE_POLL_MS = 200;
+  /** At most this many samples are fetched for one score. */
+  const MEASURE_PRELOAD_LIMIT = 256;
+
+  const measureAnnounce = { timer: null, sources: new Map() };
+
+  /** Drops every queued announcement -- for a pause, a seek, or a style change. */
+  function clearMeasureAnnouncements() {
+    for (const src of measureAnnounce.sources.values()) {
+      try {
+        src.stop();
+      } catch (err) {
+        /* already finished: stopping twice is not an error worth having */
+      }
+    }
+    measureAnnounce.sources.clear();
+  }
+
+  function stopMeasureAnnouncements() {
+    if (measureAnnounce.timer !== null) {
+      clearInterval(measureAnnounce.timer);
+      measureAnnounce.timer = null;
+    }
+    clearMeasureAnnouncements();
+  }
+
+  function pumpMeasureAnnouncements() {
+    if (vocalStyle() !== 'measures' || audioPlayer.paused || audioCtx === null) return;
+    const schedule = measureSchedule();
+    if (schedule.length === 0) return;
+
+    const nowAudio = audioPlayer.currentTime;
+    const nowCtx = audioCtx.currentTime;
+    for (let i = 0; i < schedule.length; i++) {
+      const { at, measureNumber } = schedule[i];
+      if (at < nowAudio - 0.02 || at >= nowAudio + MEASURE_LOOKAHEAD_S) continue;
+      if (measureAnnounce.sources.has(i)) continue;
+      // Only what is already decoded. Fetching here would mean waiting,
+      // and a bar announced late is worse than one not announced --
+      // `preloadMeasureSamples` is what makes sure it is here in time.
+      const buffer = measureSampleCache.get(measureNumber);
+      if (!buffer) continue;
+      const src = audioCtx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(measureGain);
+      src.start(Math.max(nowCtx, nowCtx + (at - nowAudio)));
+      // Kept until a pause or a seek clears the lot, rather than
+      // dropped when it finishes: the map is also the record of what
+      // has already been queued, and a sample shorter than the poll's
+      // own tolerance would otherwise be re-queued the instant it
+      // ended. One entry per bar of the piece is nothing to hold.
+      measureAnnounce.sources.set(i, src);
+    }
+  }
+
+  function startMeasureAnnouncements() {
+    stopMeasureAnnouncements();
+    if (vocalStyle() !== 'measures') return;
+    ensureAudioContext();
+    measureAnnounce.timer = setInterval(pumpMeasureAnnouncements, MEASURE_POLL_MS);
+    pumpMeasureAnnouncements();
+  }
+
+  /**
+   * Fetches a sample for every bar number the score actually uses,
+   * before playback rather than during it.
+   *
+   * Distinct numbers, not entries: a bar played three times needs one
+   * sample. Fetched a few at a time so a long score does not open a
+   * hundred connections at once, and capped so a pathological file
+   * cannot turn one play into an unbounded number of requests.
+   */
+  let measurePreloadToken = 0;
+  async function preloadMeasureSamples() {
+    const token = ++measurePreloadToken;
+    const schedule = measureSchedule();
+    const wanted = [...new Set(schedule.map((m) => m.measureNumber))]
+      .sort((a, b) => a - b)
+      .slice(0, MEASURE_PRELOAD_LIMIT);
+    if (wanted.length === 0) return { have: [], missing: [] };
+
+    const CONCURRENCY = 6;
+    for (let i = 0; i < wanted.length; i += CONCURRENCY) {
+      if (token !== measurePreloadToken) return { have: [], missing: [] };
+      await Promise.all(wanted.slice(i, i + CONCURRENCY).map((n) => measureSample(n)));
+    }
+    return {
+      have: wanted.filter((n) => measureSampleCache.get(n)),
+      missing: wanted.filter((n) => !measureSampleCache.get(n)),
+    };
+  }
+
+  /**
+   * A run of consecutive numbers read as a range, so a hint about 40
+   * bars is one line rather than forty.
+   */
+  function summariseNumbers(numbers) {
+    if (numbers.length === 0) return '';
+    const parts = [];
+    let start = numbers[0];
+    let previous = numbers[0];
+    for (const n of numbers.slice(1)) {
+      if (n === previous + 1) {
+        previous = n;
+        continue;
+      }
+      parts.push(start === previous ? `M${start}` : `M${start}\u2013M${previous}`);
+      start = n;
+      previous = n;
+    }
+    parts.push(start === previous ? `M${start}` : `M${start}\u2013M${previous}`);
+    return parts.join(', ');
   }
 
   /**
@@ -1746,9 +1964,14 @@
       await Promise.all(names.map(async (n) => [n, await countSample(n)])),
     );
     const haveSamples = [...samples.values()].some((b) => b !== null);
-    countHint.innerHTML = haveSamples
-      ? "Counted at the score's own tempo and time signature, before the audio starts. Using the <b>Voices</b> samples from R2."
-      : "Counted at the score's own tempo and time signature, before the audio starts. No <b>Voices/1.wav</b> in the bucket, so a <b>synthesised count</b> is used.";
+    // Only when Style A is the one speaking -- Style B's hint is about
+    // the bars, and this would replace it with a sentence about a
+    // count-in the viewer is not being given.
+    if (vocalStyle() === 'beats') {
+      countHint.innerHTML = haveSamples
+        ? "Counted at the score's own tempo and time signature, before the audio starts. Using the <b>Voices</b> samples from R2."
+        : "Counted at the score's own tempo and time signature, before the audio starts. No <b>Voices/1.wav</b> in the bucket, so a <b>synthesised count</b> is used.";
+    }
 
     countIn.running = true;
     playIcon.querySelector('path').setAttribute('d', PAUSE_PATH);
@@ -1799,6 +2022,66 @@
       );
     });
   }
+
+  /**
+   * Says which vocal is running and what it found, and shows the
+   * slider that belongs to it.
+   *
+   * Style B's line names the bars it has NO sample for, because that is
+   * the thing you cannot hear and therefore cannot diagnose. Style A
+   * keeps its own wording, which `runCountIn` refines once it knows
+   * whether the Voices samples were there.
+   */
+  async function refreshVocalStyle() {
+    const measures = vocalStyle() === 'measures';
+    // The M slider is only dimmed, never hidden: a control that
+    // disappears is a control you have to rediscover.
+    measureVolumeField.style.opacity = measures ? '' : '0.45';
+    measureVolumeInput.disabled = !measures;
+    if (!measures) {
+      stopMeasureAnnouncements();
+      countHint.innerHTML =
+        "Counted at the score's own tempo and time signature, before the audio starts.";
+      return;
+    }
+
+    if (measureSchedule().length === 0) {
+      countHint.innerHTML =
+        'Announces the bar number through the whole piece, from <b>Counts vocal/M1.wav</b> ' +
+        'in R2. Load a MusicXML file and it will follow that score\'s own bars.';
+      return;
+    }
+    countHint.textContent = 'Loading bar announcements\u2026';
+    const { have, missing } = await preloadMeasureSamples();
+    if (vocalStyle() !== 'measures') return;
+    if (have.length === 0) {
+      countHint.innerHTML =
+        'No <b>Counts vocal/M1.wav</b> in the bucket, so no bar is announced. ' +
+        'Upload <b>M1.wav</b>, <b>M2.wav</b>\u2026 to the shared <b>Counts vocal</b> folder.';
+      return;
+    }
+    countHint.innerHTML =
+      `Counted in first, then ${summariseNumbers(have)} announced at each bar's ` +
+      'downbeat through the whole piece, repeats included. ' +
+      (missing.length > 0
+        ? `No sample for ${summariseNumbers(missing)}, so ${missing.length === 1 ? 'that bar passes' : 'those bars pass'} in silence.`
+        : 'Every bar in this score has one.');
+  }
+
+  countsVocalSelect.addEventListener('change', () => {
+    stopMeasureAnnouncements();
+    refreshVocalStyle();
+    if (!audioPlayer.paused) startMeasureAnnouncements();
+  });
+  refreshVocalStyle();
+
+  // A seek lands somewhere else in the piece, so everything queued for
+  // where we WERE is wrong. Dropping them lets the next poll re-fill
+  // from the new position.
+  audioPlayer.addEventListener('seeking', clearMeasureAnnouncements);
+  audioPlayer.addEventListener('play', startMeasureAnnouncements);
+  audioPlayer.addEventListener('pause', stopMeasureAnnouncements);
+  audioPlayer.addEventListener('ended', stopMeasureAnnouncements);
 
   playBtn.addEventListener('click', async () => {
     if (!audioPlayer.src) return;
