@@ -29,6 +29,40 @@ drums/
   or rclone). New Drum Sets are picked up automatically — nothing to change
   in code.
 
+### Naming a drum set: `Brand - Model`
+
+The drum page shows **Brand** and **Model** as two dropdowns, and it
+derives both from the folder name — the Worker is not involved and the
+bucket needs no reorganising.
+
+```
+drums/Yamaha - Stage Custom/16x9/...      -> Yamaha  /  Stage Custom
+drums/Pearl | Masters Maple/16x9/...      -> Pearl   /  Masters Maple
+drums/Tama__Starclassic/16x9/...          -> Tama    /  Starclassic
+drums/drum1/16x9/...                      -> Other   /  drum1
+```
+
+The separator must be **spaced** (` - `, ` – `, ` — `, ` | `) or a
+**double underscore** (`__`). A bare hyphen is not a separator, so
+`Stage-Custom` stays one model name rather than becoming a brand called
+"Stage". A folder with no separator keeps working exactly as it always
+has — it just appears under **Other**.
+
+### Count voices: `Voices/{n}.wav`
+
+The count-in reads its voice samples from the **shared** (non-drum-set)
+area, one per beat of the bar:
+
+```
+Voices/1.wav   Voices/2.wav   Voices/3.wav   ...
+```
+
+served at `/assets/shared/Voices/1.wav`. Upload as many as your longest
+bar needs (`1`–`6` covers 6/8; `1`–`12` covers 12/8). **Nothing breaks
+if they are absent**: the page synthesises a count instead and says so
+under the Count-in card, so a missing sample is never silence you have
+to diagnose.
+
 ## Endpoints
 
 - `GET /api/drum-sets` → `{ "drumSets": ["drum1", ...] }`
