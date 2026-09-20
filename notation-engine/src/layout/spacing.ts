@@ -1,4 +1,20 @@
 import type { SpacingConfig } from '../config/config.js';
+
+/**
+ * The part of `SpacingConfig` §14's own algorithms actually read.
+ *
+ * A `Pick` rather than the whole interface because `SpacingConfig` also
+ * carries `minMeasureWidth`, which is a MEASURE-level floor applied by
+ * the renderer, not an input to proportional spacing -- and because the
+ * renderer deliberately passes these four with a different `justify`
+ * than the config's (a scroll system is never stretched). Taking only
+ * what is used keeps a caller from having to invent a value for a field
+ * that would be ignored.
+ */
+type SpacingAlgorithmConfig = Pick<
+  SpacingConfig,
+  'spacingIncrement' | 'shortestDurationSpace' | 'minNoteDistance' | 'justify'
+>;
 import { spacingDiagnostic, type SpacingDiagnostic } from './spacing-diagnostic.js';
 
 /**
@@ -69,7 +85,7 @@ export function computeReferenceDuration(
 export function computeEventSpace(
   ticks: number,
   referenceTicks: number,
-  config: SpacingConfig,
+  config: SpacingAlgorithmConfig,
 ): number {
   const baseSpace = config.shortestDurationSpace * config.spacingIncrement;
   const ratio = ticks / referenceTicks;
@@ -90,7 +106,7 @@ export function computeEventSpace(
 export function computeProportionalPositions(
   events: readonly SpacingEvent[],
   referenceTicks: number,
-  config: SpacingConfig,
+  config: SpacingAlgorithmConfig,
 ): readonly number[] {
   const positions: number[] = [];
   let x = 0;
@@ -113,7 +129,7 @@ export function computeProportionalPositions(
 export function applyMinimumDistance(
   positions: readonly number[],
   events: readonly SpacingEvent[],
-  config: SpacingConfig,
+  config: SpacingAlgorithmConfig,
 ): readonly number[] {
   if (positions.length === 0) return positions;
   const result: number[] = [positions[0] ?? 0];
@@ -144,7 +160,7 @@ export function applyMinimumDistance(
 export function justifySystem(
   positions: readonly number[],
   targetWidth: number,
-  config: SpacingConfig,
+  config: SpacingAlgorithmConfig,
 ): readonly number[] {
   if (!config.justify || positions.length < 2) return positions;
 

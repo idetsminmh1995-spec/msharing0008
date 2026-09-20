@@ -3,6 +3,7 @@ import { TICKS_PER_QUARTER, baseTicksForType, ticksWithDots } from '../core/dura
 import type { TempoMarkEvent } from '../parser/musicxml/parse.js';
 import { buildTempoMap, type RawTempoEvent } from '../timing/tempo-map.js';
 import { buildEventStream } from './event-stream.js';
+import { buildRepeatPlan, type RepeatMeasureSpec } from './repeats.js';
 import type { PlaybackData, PlaybackMeasureLayout, PlaybackMeasurePlacement } from './position.js';
 
 const DEFAULT_MEASURE_TICKS = TICKS_PER_QUARTER * 4;
@@ -42,6 +43,13 @@ export interface ComputePlaybackDataInput {
   /** `renderFromMusicXml`'s own `placementByMeasureNumber`. */
   readonly placementByMeasureNumber: ReadonlyMap<number, PlaybackMeasurePlacement>;
   readonly measureHeaderAllowance: number;
+  /**
+   * Each measure's repeat/volta marks, in written order, already
+   * resolved from both sides of every shared barline. Omitted means
+   * "this score has no repeats", which is what a hand-built `Score`
+   * (no MusicXML barlines at all) is.
+   */
+  readonly repeatMeasures?: readonly RepeatMeasureSpec[];
 }
 
 /**
@@ -68,6 +76,19 @@ export function computePlaybackData(input: ComputePlaybackDataInput): PlaybackDa
 
   const events = buildEventStream(input.score, globalTickOffsetByMeasure, tempoMap);
 
+  const { plan, diagnostics: repeatDiagnostics } = buildRepeatPlan({
+    measures:
+      input.repeatMeasures ??
+      input.measureNumbersInOrder.map((measureNumber) => ({
+        measureNumber,
+        ticks: input.measureTicksByNumber.get(measureNumber) ?? DEFAULT_MEASURE_TICKS,
+        repeatStart: false,
+        endingStop: false,
+      })),
+    writtenTickByMeasure: globalTickOffsetByMeasure,
+    tempoMap,
+  });
+
   return {
     measureNumbersInOrder: input.measureNumbersInOrder,
     globalTickOffsetByMeasure,
@@ -77,5 +98,7 @@ export function computePlaybackData(input: ComputePlaybackDataInput): PlaybackDa
     measureHeaderAllowance: input.measureHeaderAllowance,
     tempoMap,
     events,
+    performance: plan,
+    repeatDiagnostics,
   };
 }

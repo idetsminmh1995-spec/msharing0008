@@ -303,7 +303,9 @@ notation-engine/
     parser/       [BUILT]  musicxml/ (incl. .mxl, timewise) and midi/
     timing/       [BUILT]  tempo map, tick<->seconds, MIDI/XML alignment
     layout/       [BUILT]  spacing, skyline, scroll, page, resize, system
-    playback/     [BUILT]  position API + event stream (§17) -- Phases 48/49
+    playback/     [BUILT]  position API + event stream + repeat
+                           unfolding (§17) -- Phases 48/49, repeats by
+                           Doc/any-drum-notation.md
     debug/        [BUILT]  log-level filter + bounding-box/skyline measurement -- Phase 51
     export/       [BUILT]  SVG/PNG/PDF output -- Phase 52
     index.ts      [BUILT]  public API barrel
@@ -512,7 +514,8 @@ obtain a config; nothing reads `DEFAULT_CONFIG` directly.
 
 ```ts
   spacing:   { increment:number; shortestDurationSpace:number;
-               minNoteDistance:number; justify:boolean }        // §14
+               minNoteDistance:number; justify:boolean;
+               minMeasureWidth:number }                         // §14
   staves:    { minStaffDistance:number; minSystemDistance:number } // §15
   page:      { width:number; height:number; margins:{...} }      // §16.2
   fonts:     { musicFont:string; textFont:string; lyricFont:string;
@@ -673,6 +676,28 @@ from real Bravura metrics. Dot direction is semantic, not decorative:
 four display modes. `isSystemStart` is supplied by the caller because only the
 layout engine knows where systems break.
 
+**Which measure draws a boundary.** A barline is ONE physical line that
+two measures share, and either may declare it (`location="right"` on the
+measure before, or `location="left"` on the measure after). The measure
+before draws it — except where there is no measure before it (the first
+measure of the score) or where the next measure starts a new system, in
+which case the *later* measure draws it at its own left edge. A
+repeat-begin drawn at the end of a line points the reader back at
+something that is on the next line.
+
+Whoever draws it, the line extends RIGHT into the measure it opens
+(nearly two staff spaces for a repeat-begin), so the measure's header
+reserves that width and its clef starts after it.
+
+**Voltas** (`computeVoltaGeometry` / `renderVolta`) are the part of a
+repeat structure drawn *above* the staff: a horizontal line over the
+ending's measures, a down-hook at each real end (a `discontinue` ending
+has no closing hook), and a `"1."` / `"1, 2."` label. A volta crossing a
+system break becomes one bracket per system, hooked and labelled only at
+its own ends. `renderRepeatCount` draws the `×4` over a repeat played
+more than twice — never over a plain 2× repeat, which a repeat sign
+already says.
+
 ### 9.6 Ledger lines `[BUILT]`
 
 **Responsibility.** Draw short line segments for notes beyond the staff.
@@ -704,15 +729,34 @@ none. A note 3 ledger lines up → 3 segments at consecutive integers.
 
 **Responsibility.** Map a note to its notehead glyph, and draw it.
 
-**Shapes.** All SMuFL lookups, never custom paths: `noteheadWhole`,
-`noteheadHalf`, `noteheadBlack`, `noteheadXWhole/Half/Black`,
-`noteheadCircleX`, `noteheadDiamondWhole/Half/Black`,
-`noteheadTriangleUp…`, `noteheadSquare…`, `noteheadSlash…`, `noteheadPlus…`.
+**Shapes.** All SMuFL lookups, never custom paths. **Every `<notehead>`
+value MusicXML 4.0 defines** has a shape family here — the plain
+`noteheadWhole/Half/Black`, the drum-chart ones (`x`, `circle-x`,
+`diamond`, `triangle`, `inverted triangle`, `slash`, `slashed`, `back
+slashed`, `cross` = the *plus* shape, `circled`, `circle dot`,
+`cluster`, `arrow up`/`down`, `left triangle`, `rectangle`, `none` =
+SMuFL's zero-ink `noteheadNull`) and the seven Aikin shape notes
+(`do re mi fa so la ti`, plus `fa up`) on SMuFL's `noteShape*` glyphs.
 
 **Shape selection order** (first match wins):
-1. an explicit `<notehead>` element from MusicXML for this note;
-2. `config.noteheadMapping.overridesByKey[key]`;
-3. the duration's default (whole / half / black).
+1. the `<notehead>` element's own `smufl` attribute, which is how
+   MusicXML's `other` value carries a shape outside its enumeration
+   (`<notehead smufl="noteheadHeavyXHat">other</notehead>`) — used as a
+   glyph name directly, with no duration variant, because the file named
+   one exact glyph;
+2. an explicit `<notehead>` element from MusicXML for this note;
+3. `config.noteheadMapping.overridesByKey[key]`;
+4. `config.noteheadMapping.defaultShape`;
+5. the duration's default (whole / half / black).
+
+**An unrecognized value is never fatal.** A value outside the spec (or a
+`smufl` name no font has) reports `UNKNOWN_NOTEHEAD` and falls through to
+the tiers below. This is §10.7's rule, and it is not hypothetical: the
+engine used to *throw*, and a real MuseScore drum chart came back as
+"Could not parse this file" over two noteheads in a file whose notes,
+rhythms, voices and barlines it read perfectly. A notation file is
+input, not a program. `shapeGlyphName` still throws for a *config*
+value, where an unknown shape is a mistake in the host application.
 
 **The mapping key.** For unpitched notes the key is the **GM MIDI note number**
 (e.g. `"38"` for snare) when known, else `"<displayStep><displayOctave>"`.
@@ -1958,6 +2002,29 @@ standard practice. `config.spacing.justify` can disable stretching entirely.
 minimum spacing → allow the overflow, warn, and let §16 break the system
 earlier next time.
 
+### 14.4 Minimum measure width
+
+Proportional spacing answers "how far apart are these notes", which says
+nothing at all about a bar holding one whole rest — that bar came out
+barely wider than the rest itself, and a bar of three quarter notes came
+out visibly narrower than its neighbours of four. A reader reported
+exactly that, comparing this engine's drum output against MuseScore's.
+
+So a measure's note area (its width past whatever clef/key/time header
+it draws) is never narrower than `config.spacing.minMeasureWidth`,
+scaled by the measure's own notated length against a whole note and
+clamped to [0.35, 2] of it — a 2/4 bar should not be as wide as a 4/4
+one, and a twenty-beat cadenza "measure" should not reserve a screenful
+of blank staff. A measure with NO events at all gets the same width as
+one whose events are merely sparse: a reader should not be able to tell
+"nothing written here" from "one whole rest written here" by the bar's
+width.
+
+The default, 12.0 staff spaces, comes from this engine's own output: a
+plain 4/4 bar of four quarter notes lays out at 10.2 of note area, so 12
+makes the sparse bars match the ordinary ones without stretching the
+ordinary ones.
+
 **Tests.** Ratio assertions (a quarter gets exactly `spacingIncrement` more
 than an 8th at the same reference); reference-duration selection given a
 mixed-rhythm measure with one stray 32nd; the minimum-distance pass kicking
@@ -2068,7 +2135,7 @@ to the original (determinism, §4.4).
 
 ---
 
-## 17. Module: `playback/` — Position API and Event Stream `[BUILT -- §17.1 by Phase 48, §17.2 by Phase 49. See Doc/phase-48-playback-position-api.md and Doc/phase-49-cursor.md]`
+## 17. Module: `playback/` — Position API and Event Stream `[BUILT -- §17.1 by Phase 48, §17.2 by Phase 49, repeat unfolding by Doc/any-drum-notation.md. See Doc/phase-48-playback-position-api.md and Doc/phase-49-cursor.md]`
 
 **This is the boundary between the engine and any host application.** The
 engine has **no** knowledge of audio, video, or animation — see §2.3.
@@ -2108,9 +2175,26 @@ One module, one `mode` option (not two modules — see §2.4):
 
 Both call the *same* `positionToX`. Switching modes is a config change.
 
-Repeat handling: when playback passes a repeat-end barline and jumps back,
-the host supplies the *musical* tick it jumped to; the engine does not
-simulate playback order itself.
+**Repeat handling.** The engine unfolds the score's own written repeats
+into the order it is actually played (`playback/repeats.ts`), and
+`PlaybackData.performance` carries the result: every measure, every time
+it is played, with its tick and second offsets in *performance* time
+alongside the *written* tick it plays. `performanceSecondsToWritten`
+turns a moment of audio into the written tick sounding then, which is
+what `positionToX`/`playheadX` take. Repeat begin/end barlines,
+`times="4"` and friends, nested repeats and first/second/nth-time
+voltas are all resolved; a structure that cannot terminate reports
+`REPEAT_RUNAWAY` and falls back to playing straight through.
+
+This used to say the opposite — that the host supplies the tick it
+jumped to, and the engine never simulates playback order. That is still
+the right boundary for a D.S., a coda or a manual seek, none of which
+the file describes in a form the engine can resolve. It was the wrong
+boundary for an ordinary repeat sign, which IS written in the file: the
+visible result was a cursor that simply stopped at the repeat barline on
+a two-bar drum loop. Reading what the file says is this engine's job.
+The boundary that remains is §17.3's: the engine says *where* the music
+is; the host still decides what to draw and when.
 
 ### 17.3 What the host application does (explicitly not the engine)
 
@@ -2280,6 +2364,22 @@ API can be designed *then*, informed by what that extension actually needs.
     section, and guessing one would not be implementing a spec.
 13. **Multi-voice collision is pairwise only** (§9.14) — a genuine 3-or-4
     voice pile-up needs column assignment, not pair resolution.
+14. **`rectangle` draws as a square notehead** (§9.7) — SMuFL has no
+    rectangular notehead, and its square is the nearest real glyph. The
+    wrong-but-adjacent shape beats refusing the file, but it is not
+    exact and is not pretended to be.
+15. **D.S., D.C., segno, coda and "to coda" are not followed** (§17.2).
+    Written repeats — repeat barlines, `times="N"`, voltas, nesting —
+    are resolved into playback order; a jump described only by an
+    italic instruction is not. Neither is a repeat structure whose two
+    halves genuinely contradict each other; that reports
+    `REPEAT_RUNAWAY` and plays straight through.
+16. **A volta bracket is drawn above the bar numbers, not below them**
+    (§9.5) — the reverse of the usual engraving order. Bar numbers sit
+    at a measure's own left edge, which is exactly where a volta
+    starts, so the two would collide on precisely the measures a volta
+    cares about. Correct would be to move the bar number above the
+    bracket, which is a bar-number-placement change, not a volta one.
 
 ---
 

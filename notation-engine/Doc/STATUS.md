@@ -6,18 +6,20 @@ A+B+C corrective work** (making notes actually visible in the web app).
 Numbering is **`PLAN.md` §22's phase numbering** — deliberately not a second
 numbering system. Say a number from §B below and that's the phase to build.
 
-**Last audited:** against the code in `src/` and the **679-test** suite,
-after Phase 49. Stages 0-9 are complete: every phase numbered 1-49 is
-built AND wired, including the full playback surface (§17.1's position
-API and event stream, §17.2's cursor). Stage 10 (Phases 50-54) is what
-remains.
+**Last audited:** against the code in `src/` and the **856-test** suite,
+after the "read any drum notation" round
+([`any-drum-notation.md`](./any-drum-notation.md)). Stages 0-10 are
+complete: every phase numbered 1-54 is built AND wired, including the
+full playback surface (§17.1's position API and event stream, §17.2's
+cursor and repeat unfolding). What remains is the named gaps in §C and
+§F, not roadmap work.
 
 ---
 
 ## A. DONE — Phases 1–54 ✅ (**every stage complete**) + Integration Passes A–Q
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes **679/679** across them.
+`npm run verify` passes **856/856** across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -121,6 +123,31 @@ each event's tick by summing the durations before it. 31 of the drum
 file's 342 notes were in the wrong place. See
 [`forward-gaps-and-playback-cursor.md`](./forward-gaps-and-playback-cursor.md),
 which also covers the playback cursor now drawn on the drum page.
+
+**And then a sixth, seventh and eighth**, from the user's next two files
+— see [`any-drum-notation.md`](./any-drum-notation.md):
+
+1. **A whole file refused to open.** `musicXmlNoteheadToShape` THREW on
+   any `<notehead>` value outside a seven-item list. A real MuseScore
+   drum chart writes `slashed` and
+   `<notehead smufl="noteheadHeavyXHat">other</notehead>`, so the page
+   showed "Could not parse this file" over two noteheads in a file whose
+   notes, rhythms, voices and barlines the engine read perfectly. All 27
+   values MusicXML 4.0 defines are supported now, the `smufl` attribute
+   is honoured, and anything unrecognized reports `UNKNOWN_NOTEHEAD` and
+   draws the ordinary head. **A notation file is input, not a program.**
+2. **A bar had no standard width.** `config.spacing.minMeasureWidth`
+   (default 12.0, scaled by the measure's own length) now floors the
+   note area, so a bar of three quarters is not visibly narrower than
+   its neighbours of four and a whole-rest bar is not barely wider than
+   the rest itself.
+3. **The cursor stopped at a repeat barline.** §17.2 said playback order
+   was the host's business. That is right for a D.S. and wrong for a
+   repeat sign, which IS written in the file. `playback/repeats.ts` now
+   unfolds repeats (including `times="4"`, nesting and voltas) into
+   performance order, and the same round drew the voltas and `×N` on the
+   page, drew a repeat-begin on measure 1 at all, and stopped the clef
+   being drawn on top of its dots.
 
 ---
 

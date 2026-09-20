@@ -40,6 +40,10 @@ const ENTRY_POINTS = [
     'Playback and cursor',
     ['getEventStream', 'positionToX', 'playheadX', 'xToPosition', 'resolvePosition', 'computeCursorPlacement', 'renderCursor', 'notationEventId', 'elementIdForNoteId'],
   ],
+  [
+    'Repeats (playback order)',
+    ['performanceSecondsToWritten', 'performanceTickToWritten', 'writtenTickToPerformanceTicks', 'buildRepeatPlan'],
+  ],
   ['Resize', ['resizePureScale', 'needsReflow', 'extractViewBox', 'computePxPerStaffSpace']],
   ['Export', ['exportSvg', 'exportPng', 'exportPdf', 'rasterizeSvg', 'encodePng', 'encodePdf', 'browserRasterBackend', 'svgToDataUri']],
   ['Debug', ['measureSvgBoxes', 'computeDebugSkylines', 'renderBoundingBoxOverlay', 'renderSkylineOverlay', 'filterDiagnostics']],

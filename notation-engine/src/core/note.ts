@@ -91,6 +91,8 @@ export interface Note {
   readonly instrumentId?: string;
   /** Phase 35/§10.4: an explicit <notehead> override from the file (e.g. "x", "diamond") -- Phase 15's selectNoteheadGlyphName's highest-priority tier. */
   readonly explicitNotehead?: string;
+  /** The same `<notehead>`'s `smufl` attribute -- MusicXML's `other` value names its shape there instead of in the enumeration. Used as a glyph name directly. */
+  readonly explicitNoteheadSmufl?: string;
   /** Phase 35/§10.4: true if this note is a <grace/> note. */
   readonly isGrace?: boolean;
   /** Phase 35/§10.4: the grace note's slash attribute -- true for an acciaccatura, false for an appoggiatura. Meaningless unless isGrace is true. */
@@ -131,6 +133,7 @@ export interface NoteInit {
   tieStart?: boolean;
   tieStop?: boolean;
   explicitNotehead?: string;
+  explicitNoteheadSmufl?: string;
   instrumentId?: string;
   isGrace?: boolean;
   graceSlash?: boolean;

@@ -5,6 +5,7 @@ import type { PitchStep } from '../../core/pitch.js';
 import { diagnostic, type Diagnostic, type DiagnosticLocation } from './diagnostic.js';
 import { childrenNamed, firstChildNamed, intOf, textOf } from './dom-helpers.js';
 import { parseBeamHints, parseLyrics, parseNotations, type ParsedNotations } from './notations.js';
+import { isKnownMusicXmlNotehead } from '../../geometry/notehead.js';
 
 const KNOWN_DURATION_TYPES: ReadonlySet<string> = new Set([
   'whole',
@@ -52,6 +53,8 @@ export interface ParsedNoteEvent {
   readonly instrumentId?: string;
   /** §10.4/Phase 35: an explicit <notehead> override (e.g. "x", "diamond") -- feeds Phase 15's selectNoteheadGlyphName as its highest-priority tier. */
   readonly explicitNotehead?: string;
+  /** That <notehead>'s own `smufl` attribute -- what MusicXML's `other` value carries its real shape in (`<notehead smufl="noteheadHeavyXHat">other</notehead>`). */
+  readonly explicitNoteheadSmufl?: string;
   /** §10.4/Phase 35: <grace/> presence and its slash attribute -- true for an acciaccatura (slash="yes"), false for an appoggiatura. */
   readonly isGrace: boolean;
   readonly graceSlash: boolean;
@@ -195,7 +198,24 @@ export function parseNoteElement(
 
   // §10.4/Phase 35 additions -- each a direct child of <note>, independent
   // of whether the note is pitched/unpitched/a rest.
-  const explicitNotehead = textOf(firstChildNamed(noteEl, 'notehead'));
+  const noteheadEl = firstChildNamed(noteEl, 'notehead');
+  const explicitNotehead = textOf(noteheadEl);
+  const explicitNoteheadSmufl = noteheadEl?.getAttribute('smufl') ?? undefined;
+  if (explicitNotehead !== undefined && !isKnownMusicXmlNotehead(explicitNotehead)) {
+    // §10.7: report, never refuse. This exact check is what a real
+    // MuseScore drum chart needed -- it writes `slashed` and
+    // `<notehead smufl="...">other</notehead>`, and the engine used to
+    // THROW on any value outside a seven-item list, taking the whole
+    // render down over one note's head.
+    diagnostics.push(
+      diagnostic(
+        'warning',
+        'UNKNOWN_NOTEHEAD',
+        `Unknown <notehead> value "${explicitNotehead}"; drawing the ordinary notehead instead.`,
+        location,
+      ),
+    );
+  }
   const graceEl = firstChildNamed(noteEl, 'grace');
   const graceSlash = graceEl?.getAttribute('slash') === 'yes';
   const timeModEl = firstChildNamed(noteEl, 'time-modification');
@@ -298,6 +318,7 @@ export function parseNoteElement(
     isUnpitched,
     ...(instrumentId !== undefined ? { instrumentId } : {}),
     ...(explicitNotehead !== undefined ? { explicitNotehead } : {}),
+    ...(explicitNoteheadSmufl !== undefined ? { explicitNoteheadSmufl } : {}),
     isGrace,
     graceSlash,
     ...(tupletActualNotes !== undefined ? { tupletActualNotes } : {}),

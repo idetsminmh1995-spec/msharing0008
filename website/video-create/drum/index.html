@@ -588,19 +588,30 @@
     if (!Number.isFinite(seconds)) return;
     let x;
     try {
-      const tick = NotationEngine.secondsToTick(notationPlayback.tempoMap, seconds);
-      // Past the last note the score simply has no x to point at, so the
-      // marker stops at the end rather than running off into whitespace.
-      // This is where an audio file LONGER than its notation ends up --
-      // a recording that takes the repeats, or one with a count-in, runs
-      // on after the written music does.
-      const events = NotationEngine.getEventStream(notationPlayback);
-      const lastTick = events.length > 0 ? events[events.length - 1].tick : 0;
+      // The audio plays the music IN PERFORMANCE ORDER -- it takes the
+      // repeats. `performance` is the written score unfolded into that
+      // order, so a second of audio maps to the written tick actually
+      // sounding then, and the marker jumps back at a repeat barline
+      // instead of stopping there.
+      const perf = notationPlayback.performance;
+      let tick;
+      if (perf && perf.entries.length > 0) {
+        const at = Math.min(seconds, perf.totalSeconds);
+        tick = NotationEngine.performanceSecondsToWritten(perf, notationPlayback.tempoMap, at).writtenTick;
+      } else {
+        // No repeat data (an older render, or an empty score): straight
+        // through, clamped at the last note so the marker stops there
+        // rather than running off into whitespace.
+        const straight = NotationEngine.secondsToTick(notationPlayback.tempoMap, seconds);
+        const events = NotationEngine.getEventStream(notationPlayback);
+        const lastTick = events.length > 0 ? events[events.length - 1].tick : 0;
+        tick = Math.min(straight, lastTick);
+      }
       // playheadX, not positionToX: the latter reports the last NOTE's
       // own x, so the marker would freeze between notes and sit still
       // for a whole measure that has none (an opening whole rest). This
       // one moves continuously through the music.
-      x = NotationEngine.playheadX(notationPlayback, Math.min(tick, lastTick)).x;
+      x = NotationEngine.playheadX(notationPlayback, tick).x;
     } catch (err) {
       return;
     }

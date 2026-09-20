@@ -155,6 +155,26 @@ export interface SpacingConfig {
   readonly shortestDurationSpace: number;
   readonly minNoteDistance: number;
   readonly justify: boolean;
+  /**
+   * The minimum width, in staff spaces, of one measure's NOTE AREA (so:
+   * not counting whatever clef/key/time header that measure draws), for
+   * a measure one whole note long. Shorter or longer measures scale
+   * with their own notated duration.
+   *
+   * §14's proportional spacing answers "how far apart are these notes",
+   * which says nothing at all about a bar holding one whole rest -- that
+   * bar came out barely wider than the rest itself, and a bar of three
+   * quarters came out noticeably narrower than its neighbours of four.
+   * A reader reported exactly this: a bar needs a standard width even
+   * when nothing is written in it. Engraving practice agrees; so does
+   * every other notation program.
+   *
+   * 12.0 is this engine's own default, chosen from its own output: a
+   * plain 4/4 bar of four quarter notes lays out at 10.2 of note area,
+   * so 12 makes the sparse bars match the ordinary ones without
+   * stretching the ordinary ones.
+   */
+  readonly minMeasureWidth: number;
 }
 
 // ---- skyline / staff distance (Phase 44, §15) ----
@@ -351,6 +371,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
     shortestDurationSpace: 2.0,
     minNoteDistance: 0.5,
     justify: true,
+    minMeasureWidth: 12.0,
   },
   staves: {
     minStaffDistance: 4.0,

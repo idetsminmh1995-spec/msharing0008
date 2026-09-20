@@ -3,6 +3,7 @@ import type { MusicalPosition } from '../timing/measure-position.js';
 import type { TempoMap } from '../timing/tempo-map.js';
 import { tickToSeconds } from '../timing/tick-seconds.js';
 import type { NotationEvent } from './event-stream.js';
+import type { RepeatDiagnostic, RepeatPlan } from './repeats.js';
 
 export interface PlaybackPosition {
   readonly tick: number;
@@ -83,6 +84,16 @@ export interface PlaybackData {
   readonly measureHeaderAllowance: number;
   readonly tempoMap: TempoMap;
   readonly events: readonly NotationEvent[];
+  /**
+   * The score's repeats, unfolded into the order it is actually played
+   * (`playback/repeats.ts`). For a score with no repeat marks this is
+   * the written order, once through, and `performance.hasRepeats` is
+   * false -- so a host can drive the cursor through it unconditionally
+   * and get identical behaviour either way.
+   */
+  readonly performance: RepeatPlan;
+  /** Anything the repeat resolver could not make sense of. Also surfaced in the render's own `diagnostics`. */
+  readonly repeatDiagnostics: readonly RepeatDiagnostic[];
 }
 
 /** The last measure in performance order whose own start is at or before `tick` -- binary search, since `measureNumbersInOrder`'s offsets are monotonically non-decreasing by construction (`computePlaybackData` builds them as a running sum of non-negative measure lengths). */

@@ -66,8 +66,22 @@ describe('notehead selection (Phase 15)', () => {
     assert.equal(NE.noteheadMappingKey(pitch), 'C4'); // alter doesn't affect the key
   });
 
-  test('an unrecognized MusicXML notehead value throws rather than silently ignoring it', () => {
-    assert.throws(() => NE.musicXmlNoteheadToShape('cluster'), /not supported yet/);
+  test('an unrecognized MusicXML notehead value falls back instead of throwing', () => {
+    // This test used to assert the opposite. Throwing here took down the
+    // WHOLE render of a real MuseScore drum chart over one notehead
+    // MusicXML does define and this engine had not listed -- see
+    // Doc/any-drum-notation.md. A file is input; §10.7 says report and
+    // carry on.
+    assert.equal(NE.musicXmlNoteheadToShape('not-a-real-notehead'), undefined);
+    assert.equal(NE.isKnownMusicXmlNotehead('not-a-real-notehead'), false);
+    assert.equal(
+      NE.selectNoteheadGlyphName({
+        pitch: NE.unpitchedPitch('F', 4),
+        durationType: 'quarter',
+        explicitNotehead: 'not-a-real-notehead',
+      }),
+      'noteheadBlack',
+    );
   });
 
   test('an unrecognized shape name passed directly throws', () => {

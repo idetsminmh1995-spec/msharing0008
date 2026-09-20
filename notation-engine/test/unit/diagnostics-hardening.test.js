@@ -14,6 +14,7 @@ const SRC_DIRS = [
   path.join(__dirname, '..', '..', 'src', 'timing', 'alignment'),
   path.join(__dirname, '..', '..', 'src', 'drums'),
   path.join(__dirname, '..', '..', 'src', 'layout'),
+  path.join(__dirname, '..', '..', 'src', 'playback'),
 ];
 const TEST_UNIT_DIR = __dirname;
 
@@ -28,7 +29,7 @@ function discoverEmittedCodes() {
       if (!name.endsWith('.ts')) continue;
       const content = fs.readFileSync(path.join(dir, name), 'utf8');
       for (const m of content.matchAll(
-        /\b(?:diagnostic|midiDiagnostic|timingDiagnostic|alignmentDiagnostic|drumDiagnostic|spacingDiagnostic)\(\s*'\w+'\s*,\s*'([A-Z_0-9]+)'/g,
+        /\b(?:diagnostic|midiDiagnostic|timingDiagnostic|alignmentDiagnostic|drumDiagnostic|spacingDiagnostic|repeatDiagnostic)\(\s*'\w+'\s*,\s*'([A-Z_0-9]+)'/g,
       )) {
         codes.add(m[1]);
       }

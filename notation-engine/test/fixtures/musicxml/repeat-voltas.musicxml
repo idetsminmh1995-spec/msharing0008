@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list>
+    <score-part id="P1"><part-name>Drums</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <!-- m1: opens a 4x repeated section -->
+    <measure number="1">
+      <attributes>
+        <divisions>1</divisions>
+        <key><fifths>0</fifths></key>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>percussion</sign><line>2</line></clef>
+      </attributes>
+      <barline location="left">
+        <bar-style>heavy-light</bar-style>
+        <repeat direction="forward"/>
+      </barline>
+      <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>4</duration><voice>1</voice><type>whole</type></note>
+    </measure>
+    <!-- m2: plain -->
+    <measure number="2">
+      <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>4</duration><voice>1</voice><type>whole</type></note>
+    </measure>
+    <!-- m3: first ending, closing the repeat, played 4 times in total -->
+    <measure number="3">
+      <barline location="left">
+        <ending number="1, 2, 3" type="start"/>
+      </barline>
+      <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>4</duration><voice>1</voice><type>whole</type></note>
+      <barline location="right">
+        <bar-style>light-heavy</bar-style>
+        <ending number="1, 2, 3" type="stop"/>
+        <repeat direction="backward" times="4"/>
+      </barline>
+    </measure>
+    <!-- m4: second ending -->
+    <measure number="4">
+      <barline location="left">
+        <ending number="4" type="start"/>
+      </barline>
+      <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>4</duration><voice>1</voice><type>whole</type></note>
+      <barline location="right">
+        <bar-style>light-heavy</bar-style>
+        <ending number="4" type="discontinue"/>
+      </barline>
+    </measure>
+  </part>
+</score-partwise>

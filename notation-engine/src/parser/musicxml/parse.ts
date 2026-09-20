@@ -63,6 +63,20 @@ export interface MeasureAttributes {
   readonly barlineStyle?: string;
   readonly repeatDirection?: 'forward' | 'backward';
   /**
+   * `<repeat times="N">` on that same ending barline -- how many times
+   * the repeated section is played IN TOTAL, not how many times it is
+   * jumped back to. MusicXML's default when the attribute is absent is
+   * 2 (play it, jump back, play it again), which is why this is
+   * optional rather than defaulted here: "the file said 2" and "the
+   * file said nothing" are different facts, and only the repeat
+   * resolver needs to collapse them.
+   */
+  readonly repeatTimes?: number;
+  /** `<ending number="1,2">` on the ending barline -- the volta numbers this measure's right edge closes. */
+  readonly endingNumbers?: readonly number[];
+  /** That `<ending>`'s own type. `discontinue` is an open-ended volta (no down-hook), which plays exactly like `stop`. */
+  readonly endingType?: 'start' | 'stop' | 'discontinue';
+  /**
    * Integration Q: the SAME two fields, but for a `<barline location="left">`
    * -- this measure's OWN starting (left-edge) barline, a different
    * physical position from its ending one above. Real files commonly write
@@ -73,6 +87,30 @@ export interface MeasureAttributes {
    */
   readonly leftBarlineStyle?: string;
   readonly leftRepeatDirection?: 'forward' | 'backward';
+  readonly leftRepeatTimes?: number;
+  /** `<ending number="1,2" type="start">` on the STARTING barline -- the volta numbers this measure opens, which is where a volta bracket is drawn from. */
+  readonly leftEndingNumbers?: readonly number[];
+  readonly leftEndingType?: 'start' | 'stop' | 'discontinue';
+}
+
+/**
+ * `<ending number="...">` is a comma-separated list of volta numbers
+ * ("1", or "1,2", or "1, 3"). Anything non-numeric in it is dropped
+ * rather than rejected -- MusicXML also allows a purely textual ending
+ * label, which has no place in a repeat structure but should not cost
+ * the file its other endings.
+ */
+function parseEndingNumbers(raw: string | null): readonly number[] | undefined {
+  if (raw === null) return undefined;
+  const numbers = raw
+    .split(',')
+    .map((part) => Number.parseInt(part.trim(), 10))
+    .filter((n) => Number.isInteger(n) && n > 0);
+  return numbers.length > 0 ? numbers : undefined;
+}
+
+function parseEndingType(raw: string | null): 'start' | 'stop' | 'discontinue' | undefined {
+  return raw === 'start' || raw === 'stop' || raw === 'discontinue' ? raw : undefined;
 }
 
 export interface TempoMarkEvent {
@@ -199,6 +237,9 @@ function buildSingle(ev: ParsedNoteEvent): Note | Rest {
     ...(ev.tieStart ? { tieStart: true } : {}),
     ...(ev.tieStop ? { tieStop: true } : {}),
     ...(ev.explicitNotehead !== undefined ? { explicitNotehead: ev.explicitNotehead } : {}),
+    ...(ev.explicitNoteheadSmufl !== undefined
+      ? { explicitNoteheadSmufl: ev.explicitNoteheadSmufl }
+      : {}),
     ...(ev.instrumentId !== undefined ? { instrumentId: ev.instrumentId } : {}),
     ...(ev.stringNumber !== undefined ? { stringNumber: ev.stringNumber } : {}),
     ...(ev.fret !== undefined ? { fret: ev.fret } : {}),
@@ -410,8 +451,14 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
       let lastAdvance = 0;
       let barlineStyle: string | undefined;
       let repeatDirection: 'forward' | 'backward' | undefined;
+      let repeatTimes: number | undefined;
+      let endingNumbers: readonly number[] | undefined;
+      let endingType: 'start' | 'stop' | 'discontinue' | undefined;
       let leftBarlineStyle: string | undefined;
       let leftRepeatDirection: 'forward' | 'backward' | undefined;
+      let leftRepeatTimes: number | undefined;
+      let leftEndingNumbers: readonly number[] | undefined;
+      let leftEndingType: 'start' | 'stop' | 'discontinue' | undefined;
 
       // §10.1: walk direct children IN DOCUMENT ORDER, maintaining one
       // shared tick cursor. Never filter by voice -- that's the exact bug
@@ -516,12 +563,26 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           const style = textOf(firstChildNamed(child, 'bar-style'));
           const repeatEl = firstChildNamed(child, 'repeat');
           const dir = repeatEl?.getAttribute('direction');
+          const rawTimes = repeatEl?.getAttribute('times');
+          const times =
+            rawTimes !== null && rawTimes !== undefined
+              ? Number.parseInt(rawTimes, 10)
+              : Number.NaN;
+          const endingEl = firstChildNamed(child, 'ending');
+          const numbers = parseEndingNumbers(endingEl?.getAttribute('number') ?? null);
+          const type = parseEndingType(endingEl?.getAttribute('type') ?? null);
           if (child.getAttribute('location') === 'left') {
             if (style !== undefined) leftBarlineStyle = style;
             if (dir === 'forward' || dir === 'backward') leftRepeatDirection = dir;
+            if (Number.isInteger(times) && times >= 1) leftRepeatTimes = times;
+            if (numbers !== undefined) leftEndingNumbers = numbers;
+            if (type !== undefined) leftEndingType = type;
           } else {
             if (style !== undefined) barlineStyle = style;
             if (dir === 'forward' || dir === 'backward') repeatDirection = dir;
+            if (Number.isInteger(times) && times >= 1) repeatTimes = times;
+            if (numbers !== undefined) endingNumbers = numbers;
+            if (type !== undefined) endingType = type;
           }
         } else if (child.tagName === 'direction') {
           // Integration D: <direction><direction-type><metronome> is a
@@ -764,8 +825,14 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
         staffLinesByStaff: { ...currentStaffLinesByStaff },
         ...(barlineStyle !== undefined ? { barlineStyle } : {}),
         ...(repeatDirection !== undefined ? { repeatDirection } : {}),
+        ...(repeatTimes !== undefined ? { repeatTimes } : {}),
+        ...(endingNumbers !== undefined ? { endingNumbers } : {}),
+        ...(endingType !== undefined ? { endingType } : {}),
         ...(leftBarlineStyle !== undefined ? { leftBarlineStyle } : {}),
         ...(leftRepeatDirection !== undefined ? { leftRepeatDirection } : {}),
+        ...(leftRepeatTimes !== undefined ? { leftRepeatTimes } : {}),
+        ...(leftEndingNumbers !== undefined ? { leftEndingNumbers } : {}),
+        ...(leftEndingType !== undefined ? { leftEndingType } : {}),
       });
     }
 

@@ -18,6 +18,8 @@ import {
   beamYAtX,
   chordStemDirection,
   computeBarlineGeometry,
+  computeVoltaGeometry,
+  voltaLabel,
   computeBeamShape,
   graceNoteGlyphName,
   computeLedgerLines,
@@ -79,7 +81,13 @@ import {
 } from './geometry/metronome.js';
 import { renderMetronomeMark, metronomeMarkWidth } from './render/metronome.js';
 import { TICKS_PER_QUARTER } from './core/duration-math.js';
-import { computePlaybackData, notationEventId, type PlaybackData } from './playback/index.js';
+import {
+  computePlaybackData,
+  notationEventId,
+  DEFAULT_REPEAT_TIMES,
+  type PlaybackData,
+  type RepeatMeasureSpec,
+} from './playback/index.js';
 import { renderTabNumber, svgGroup } from './render/index.js';
 import { renderBoundingBoxOverlay, renderSkylineOverlay } from './render/debug-overlay.js';
 import { computeDebugSkylines, filterDiagnostics, measureSvgBoxes } from './debug/index.js';
@@ -106,6 +114,8 @@ import {
   createSvgDocument,
   renderAccidental,
   renderBarline,
+  renderVolta,
+  renderRepeatCount,
   renderBarNumber,
   renderBeam,
   renderClef,
@@ -166,7 +176,8 @@ export type ColorCategory =
   | 'hairpin'
   | 'tempo'
   | 'barNumber'
-  | 'tabNumber';
+  | 'tabNumber'
+  | 'volta';
 
 /**
  * Phase 50/§8: the drawing values the renderer reads, resolved ONCE from
@@ -273,6 +284,65 @@ const TEMPO_MARK_GAP = 1.5;
 const TEMPO_MARK_HEIGHT = 2.0;
 /** Phase 50: a bar number's own clearance above whatever its measure reaches -- smaller than a tempo mark's, since plain digits have no tall stem to keep clear of the staff. */
 const BAR_NUMBER_GAP = 1.0;
+/**
+ * A volta bracket's end hooks drop this far toward the staff, and the
+ * bracket itself is drawn this much clear of the bar-number band below
+ * it.
+ *
+ * The bracket sits ABOVE the bar numbers rather than the other way
+ * round, which is the reverse of the usual engraving order. Deliberate:
+ * bar numbers are drawn at a measure's own left edge, which is exactly
+ * where a volta starts, and the two would collide on precisely the
+ * measures a volta cares about. Putting the bracket higher costs a
+ * little air above the staff on a score that has voltas, and nothing at
+ * all on a score that does not.
+ */
+const VOLTA_HOOK_DEPTH = 1.0;
+const VOLTA_BAR_NUMBER_CLEARANCE = 0.4;
+
+/** How far above the top staff line a volta bracket's horizontal line sits -- clear of the bar-number band beneath it (see VOLTA_HOOK_DEPTH). */
+function voltaGapAboveStaff(sizes: { readonly barNumber: number }): number {
+  return BAR_NUMBER_GAP + sizes.barNumber + VOLTA_BAR_NUMBER_CLEARANCE + VOLTA_HOOK_DEPTH;
+}
+
+/** One volta bracket to draw: the measures it covers, its numbers, and whether it closes (a `discontinue` ending, and one running off the end of the score, do not). */
+interface VoltaSpan {
+  readonly measureNumbers: readonly number[];
+  readonly numbers: readonly number[];
+  readonly closed: boolean;
+}
+
+/**
+ * The volta brackets a score's measures describe.
+ *
+ * A volta runs from the measure that OPENS it to whichever comes first:
+ * the measure that closes it (`<ending type="stop">`), the measure
+ * before the next volta opens, or the end of the score. MusicXML states
+ * the open and the close independently and real files leave the close
+ * off -- so the "next volta opens" and "score ends" cases are not error
+ * recovery, they are the ordinary reading.
+ */
+function voltaSpans(specs: readonly RepeatMeasureSpec[]): readonly VoltaSpan[] {
+  const spans: VoltaSpan[] = [];
+  for (let i = 0; i < specs.length; i++) {
+    const numbers = specs[i]?.endingStart;
+    if (numbers === undefined) continue;
+    const measureNumbers: number[] = [];
+    let closed = false;
+    for (let j = i; j < specs.length; j++) {
+      const spec = specs[j];
+      if (spec === undefined) break;
+      if (j > i && spec.endingStart !== undefined) break;
+      measureNumbers.push(spec.measureNumber);
+      if (spec.endingStop) {
+        closed = spec.endingDiscontinue !== true;
+        break;
+      }
+    }
+    if (measureNumbers.length > 0) spans.push({ measureNumbers, numbers, closed });
+  }
+  return spans;
+}
 /** Added to a note's own position when estimating how high its stem and beam can reach: DEFAULT_UNBEAMED_STEM_LENGTH (declared below, next to the other stem constants) plus one beam's thickness. */
 const STEM_AND_BEAM_ALLOWANCE = 3.5 + 0.5;
 
@@ -408,6 +478,8 @@ function computeMeasureLayout(
   }[],
   /** This measure's OWN header width (see `headerWidths`), not a score-wide constant. */
   headerWidth: number,
+  /** `config.spacing.minMeasureWidth` -- the note area's own floor for a whole-note-long measure. */
+  minMeasureWidth: number,
 ): { readonly width: number; readonly positionsByTick: ReadonlyMap<number, number> } {
   const hasAccidentalByTick = new Map<number, boolean>();
   for (const voice of measure.voices) {
@@ -459,8 +531,27 @@ function computeMeasureLayout(
     return Math.max(max, headerWidth + markWidth + MEASURE_TRAILING_MARGIN);
   }, 0);
 
+  /**
+   * `config.spacing.minMeasureWidth`, scaled by this measure's own
+   * notated length -- a 2/4 bar should not be as wide as a 4/4 one, and
+   * a 12/8 bar should not be as narrow.
+   *
+   * Clamped at both ends. The lower clamp keeps a one-beat pickup from
+   * collapsing to a quarter of a bar (a pickup still needs room for its
+   * own notes plus its header); the upper one keeps a pathological
+   * "measure" of twenty beats -- which real files do write, for a
+   * cadenza or an unmetered passage -- from reserving a screenful of
+   * blank staff.
+   */
+  const durationScale = Math.min(2, Math.max(0.35, measureTicks / (TICKS_PER_QUARTER * 4)));
+  const minWidth = headerWidth + minMeasureWidth * durationScale;
+
   if (ticks.length === 0) {
-    return { width: Math.max(MEASURE_WIDTH, tempoMarkMinWidth), positionsByTick: new Map() };
+    // A measure with no events at all gets exactly the same standard
+    // width as a measure whose events happen to be sparse -- the reader
+    // should not be able to tell "nothing written here" from "one whole
+    // rest written here" by the bar's width.
+    return { width: Math.max(minWidth, tempoMarkMinWidth), positionsByTick: new Map() };
   }
 
   // Sec14's "duration" for spacing purposes, generalized to multiple
@@ -488,7 +579,7 @@ function computeMeasureLayout(
   const lastX = enforced[enforced.length - 1] ?? 0;
   const lastWidth = spacingEvents[spacingEvents.length - 1]?.renderedWidth ?? 0;
   const width = Math.max(
-    MEASURE_WIDTH * 0.3,
+    minWidth,
     headerWidth + lastX + lastWidth + MEASURE_TRAILING_MARGIN,
     tempoMarkMinWidth,
   );
@@ -743,6 +834,9 @@ function resolveNoteRendering(
     durationType: note.duration.type,
     defaultShape: ctx.theme.noteheadMapping.defaultShape,
     ...(note.explicitNotehead !== undefined ? { explicitNotehead: note.explicitNotehead } : {}),
+    ...(note.explicitNoteheadSmufl !== undefined
+      ? { explicitNoteheadSmufl: note.explicitNoteheadSmufl }
+      : {}),
     ...(gmNote !== undefined ? { midiNote: gmNote } : {}),
     ...(overridesByKey !== undefined ? { overridesByKey } : {}),
   });
@@ -1817,13 +1911,114 @@ export function renderParsedMusicXml(
    * Whoever declares it, it is drawn starting AT the boundary and
    * extending right, so it is this measure's space that it takes.
    */
-  const openingBarlineWidth = (partId: string, measureNumber: number): number => {
+  /**
+   * The same width, maximised over every part -- what the HEADER
+   * reserves, and therefore what the clef/key/time drawn inside it must
+   * start after.
+   *
+   * Maximised rather than per-part because all parts share one
+   * horizontal timeline (Integration L): if one part declares the
+   * repeat barline and another does not, both parts' clefs still have
+   * to line up, and they line up at the wider of the two.
+   */
+  const openingBarlineAllowance = (measureNumber: number): number => {
+    let widest = 0;
+    for (const part of score.parts) {
+      widest = Math.max(widest, openingBarlineWidthForPart(part.id, measureNumber));
+    }
+    return widest;
+  };
+
+  const openingBarlineWidthForPart = (partId: string, measureNumber: number): number => {
     const here = attributesByPartAndMeasure.get(`${partId}:${measureNumber}`);
     const previous = attributesByPartAndMeasure.get(`${partId}:${measureNumber - 1}`);
     const style = here?.leftBarlineStyle ?? previous?.barlineStyle;
     const direction = here?.leftRepeatDirection ?? previous?.repeatDirection;
     if (style === undefined && direction === undefined) return 0;
     return computeBarlineGeometry(mapBarline(style, direction), BARLINE_METRICS).width;
+  };
+
+  /**
+   * Every measure's repeat and volta marks, in written order, resolved
+   * from BOTH sides of each shared barline -- what `playback/repeats.ts`
+   * unfolds into the order the score is actually played.
+   *
+   * Read from the first part that says anything about a given barline.
+   * A repeat is a property of the SCORE, not of one instrument: parts
+   * must agree, and where a file only marks the repeat on one staff
+   * (common enough in drum charts, where the repeat is written once on
+   * the top part) taking the first part that has it is the only reading
+   * that plays the piece as written.
+   */
+  let repeatMeasureSpecsCache: readonly RepeatMeasureSpec[] | undefined;
+  const repeatMeasureSpecs = (): readonly RepeatMeasureSpec[] => {
+    if (repeatMeasureSpecsCache !== undefined) return repeatMeasureSpecsCache;
+    const attrsFor = (measureNumber: number) => {
+      for (const part of score.parts) {
+        const attrs = attributesByPartAndMeasure.get(`${part.id}:${measureNumber}`);
+        if (attrs !== undefined) return attrs;
+      }
+      return undefined;
+    };
+    /** The first part that declares anything at all about this measure's edges. */
+    const edgeFor = (measureNumber: number) => {
+      for (const part of score.parts) {
+        const attrs = attributesByPartAndMeasure.get(`${part.id}:${measureNumber}`);
+        if (attrs === undefined) continue;
+        if (
+          attrs.repeatDirection !== undefined ||
+          attrs.leftRepeatDirection !== undefined ||
+          attrs.endingNumbers !== undefined ||
+          attrs.leftEndingNumbers !== undefined
+        ) {
+          return attrs;
+        }
+      }
+      return attrsFor(measureNumber);
+    };
+
+    repeatMeasureSpecsCache = measureNumbersInOrder.map((measureNumber, index) => {
+      const here = edgeFor(measureNumber);
+      const previousNumber = measureNumbersInOrder[index - 1];
+      const nextNumber = measureNumbersInOrder[index + 1];
+      const previous = previousNumber !== undefined ? edgeFor(previousNumber) : undefined;
+      const next = nextNumber !== undefined ? edgeFor(nextNumber) : undefined;
+
+      const repeatStart =
+        here?.leftRepeatDirection === 'forward' || previous?.repeatDirection === 'forward';
+      const endsRepeat =
+        here?.repeatDirection === 'backward' || next?.leftRepeatDirection === 'backward';
+      const declaredTimes =
+        (here?.repeatDirection === 'backward' ? here.repeatTimes : undefined) ??
+        (next?.leftRepeatDirection === 'backward' ? next.leftRepeatTimes : undefined);
+
+      // An <ending type="start"> normally rides this measure's LEFT
+      // barline; a file that writes it on the PREVIOUS measure's right
+      // barline means the same thing, one measure earlier in the
+      // document but at the same physical line.
+      const endingStart =
+        (here?.leftEndingType !== 'stop' && here?.leftEndingType !== 'discontinue'
+          ? here?.leftEndingNumbers
+          : undefined) ?? (previous?.endingType === 'start' ? previous.endingNumbers : undefined);
+      const endingStop =
+        here?.endingType === 'stop' ||
+        here?.endingType === 'discontinue' ||
+        next?.leftEndingType === 'stop' ||
+        next?.leftEndingType === 'discontinue';
+      const endingDiscontinue =
+        here?.endingType === 'discontinue' || next?.leftEndingType === 'discontinue';
+
+      return {
+        measureNumber,
+        ticks: measureTicksByNumber.get(measureNumber) ?? TICKS_PER_QUARTER * 4,
+        repeatStart,
+        ...(endsRepeat ? { repeatEndTimes: declaredTimes ?? DEFAULT_REPEAT_TIMES } : {}),
+        ...(endingStart !== undefined ? { endingStart } : {}),
+        endingStop,
+        ...(endingDiscontinue ? { endingDiscontinue: true } : {}),
+      };
+    });
+    return repeatMeasureSpecsCache;
   };
 
   /**
@@ -1882,7 +2077,7 @@ export function renderParsedMusicXml(
           // is what keeps the first note clear of it; the note used to
           // be pushed past it by the old blanket 6.0 allowance, which is
           // why removing that allowance is what exposed this.
-          let width = MEASURE_LEADING_PAD + openingBarlineWidth(part.id, measure.number);
+          let width = MEASURE_LEADING_PAD + openingBarlineAllowance(measure.number);
           if (systemStart || clefChanged) width += 3;
           if ((systemStart || keyChanged) && attrs.fifths !== 0 && clefDef.takesKeySignature) {
             try {
@@ -1961,6 +2156,7 @@ export function renderParsedMusicXml(
       measureTicks ?? TICKS_PER_QUARTER * 4,
       tempoMarks.filter((tm) => tm.measureNumber === measureNumber),
       headerWidth,
+      config.spacing.minMeasureWidth,
     );
     measureLayoutsByNumber.set(measureNumber, { ...layout, headerWidth });
     measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
@@ -2028,6 +2224,33 @@ export function renderParsedMusicXml(
         needed = Math.max(needed, extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
       });
     });
+    // A volta bracket (or a `×N`) is drawn above everything else that
+    // goes above the staff, so it, not the bar number, sets the
+    // headroom on a score that has one. `voltaGapAboveStaff` is the
+    // distance to its LINE; the text of a `×N` rises above that line
+    // from its own baseline, hence the font size on top.
+    const specsForHeadroom = repeatMeasureSpecs();
+    const needsVoltaRoom =
+      specsForHeadroom.some((spec) => spec.endingStart !== undefined) ||
+      specsForHeadroom.some(
+        (spec) => spec.repeatEndTimes !== undefined && spec.repeatEndTimes > DEFAULT_REPEAT_TIMES,
+      );
+    if (needsVoltaRoom) {
+      const raisedCount = specsForHeadroom.some(
+        (spec) =>
+          spec.repeatEndTimes !== undefined &&
+          spec.repeatEndTimes > DEFAULT_REPEAT_TIMES &&
+          voltaSpans(specsForHeadroom).some((span) =>
+            span.measureNumbers.includes(spec.measureNumber),
+          ),
+      );
+      needed = Math.max(
+        needed,
+        voltaGapAboveStaff(theme.sizes) +
+          theme.sizes.barNumber +
+          (raisedCount ? theme.sizes.barNumber + VOLTA_BAR_NUMBER_CLEARANCE : 0),
+      );
+    }
     return Math.max(0, needed - existingHeadroom);
   })();
   /** Every staff's bottom line sits this far down, above-staff headroom included. */
@@ -2529,7 +2752,13 @@ export function renderParsedMusicXml(
           previousAttrs.timeNumerator !== attrs.timeNumerator ||
           previousAttrs.timeDenominator !== attrs.timeDenominator;
 
-        let cursorX = layout.x + 0.5;
+        // Past the small leading pad AND past whatever barline is drawn
+        // at this measure's own left edge, which extends RIGHT into the
+        // measure -- a repeat-begin is nearly two staff spaces of thick
+        // line, thin line and dots. `headerWidths` reserves exactly this
+        // much, and the clef used to be drawn on top of it: the dots of
+        // a repeat-begin on measure 1 landed inside the percussion clef.
+        let cursorX = layout.x + MEASURE_LEADING_PAD + openingBarlineAllowance(measure.number);
 
         if (isSystemStart || clefChanged) {
           svgParts.push(
@@ -2980,10 +3209,18 @@ export function renderParsedMusicXml(
       // (usually nothing, defaulting to a plain single line) this measure
       // declared for the same edge -- never both, so the boundary is
       // still drawn exactly once.
+      //
+      // With ONE exception: if the next measure starts a new SYSTEM, the
+      // barline it declares belongs to that system's left edge, not to
+      // the trailing edge of this one. A repeat-begin drawn at the end
+      // of a line is the wrong place for it -- the reader is told to
+      // repeat from a point that is then on the next line.
       const nextAttrs = attributesByPartAndMeasure.get(`${part.id}:${measure.number + 1}`);
+      const nextStartsSystem =
+        placementByMeasureNumber.get(measure.number + 1)?.isSystemStart ?? false;
       const barlineType = mapBarline(
-        nextAttrs?.leftBarlineStyle ?? attrs.barlineStyle,
-        nextAttrs?.leftRepeatDirection ?? attrs.repeatDirection,
+        (nextStartsSystem ? undefined : nextAttrs?.leftBarlineStyle) ?? attrs.barlineStyle,
+        (nextStartsSystem ? undefined : nextAttrs?.leftRepeatDirection) ?? attrs.repeatDirection,
       );
       const barlineMetrics = {
         thinThickness: getEngravingDefault('thinBarlineThickness') ?? 0.16,
@@ -3015,6 +3252,36 @@ export function renderParsedMusicXml(
           fontFamily: theme.musicFont,
         }),
       );
+
+      // This measure's OWN left edge, drawn only where no measure before
+      // it could have: the first measure of the score, and any measure
+      // that starts a system (whose predecessor now deliberately skips
+      // it, just above).
+      //
+      // `openingBarlineWidth` has always RESERVED room for this -- which
+      // is how a repeat-begin on measure 1 came to occupy space with
+      // nothing drawn in it. A repeat from the top of the chart is about
+      // as ordinary as a repeat gets, so this is not an edge case.
+      if (
+        isSystemStart &&
+        (attrs.leftBarlineStyle !== undefined || attrs.leftRepeatDirection !== undefined)
+      ) {
+        svgParts.push(
+          renderBarline(
+            computeBarlineGeometry(
+              mapBarline(attrs.leftBarlineStyle, attrs.leftRepeatDirection),
+              barlineMetrics,
+            ),
+            {
+              x: layout.x,
+              staffBottomY: barlineBottomY,
+              height: barlineHeight,
+              color: theme.colorOf('barline'),
+              fontFamily: theme.musicFont,
+            },
+          ),
+        );
+      }
 
       // Phase 50/§13.1: the bar number, drawn per `config.barNumbers`
       // (default 'systemStart'). Like a tempo mark this belongs to the
@@ -3079,6 +3346,117 @@ export function renderParsedMusicXml(
     }
   });
 
+  /**
+   * §9.18: the two things a repeat structure draws ABOVE the staff --
+   * volta ("1." / "2.") brackets, and the `×N` over a repeat played
+   * more than twice.
+   *
+   * Drawn after every part, from `placementByMeasureNumber`, for one
+   * reason the measure loop could not give: a volta spans a RANGE of
+   * measures, and that range may cross a system break. Knowing which
+   * measures share a system is exactly what the placement map is, so
+   * one bracket per (volta, system) falls out of it -- with hooks only
+   * at the volta's real ends, not at the break.
+   */
+  {
+    const topPart = score.parts[0];
+    const specs = topPart !== undefined ? repeatMeasureSpecs() : [];
+    const spans = voltaSpans(specs);
+    const repeatCounts = specs.filter(
+      (spec) => spec.repeatEndTimes !== undefined && spec.repeatEndTimes > DEFAULT_REPEAT_TIMES,
+    );
+    if (topPart !== undefined && (spans.length > 0 || repeatCounts.length > 0)) {
+      const topAttrs = firstAttributesByPart.get(topPart.id);
+      const topStaffHeight = computeStaffGeometry(
+        topAttrs?.staffLinesByStaff[1] ?? STAFF_LINES,
+      ).height;
+      const voltaGap = voltaGapAboveStaff(theme.sizes);
+      const lineYFor = (measureNumber: number): number | undefined => {
+        const placement = placementByMeasureNumber.get(measureNumber);
+        if (placement === undefined) return undefined;
+        return staffBottomY + placement.systemY - topStaffHeight - voltaGap;
+      };
+      const metrics = {
+        thickness: getEngravingDefault('repeatEndingLineThickness') ?? 0.16,
+        hookDepth: VOLTA_HOOK_DEPTH,
+      };
+
+      for (const span of spans) {
+        // One bracket per contiguous run of the span's measures that
+        // share a system.
+        let runStart = 0;
+        for (let i = 0; i <= span.measureNumbers.length; i++) {
+          const current = span.measureNumbers[i];
+          const previous = span.measureNumbers[i - 1];
+          const sameSystem =
+            current !== undefined &&
+            previous !== undefined &&
+            placementByMeasureNumber.get(current)?.systemIndex ===
+              placementByMeasureNumber.get(previous)?.systemIndex;
+          if (i > 0 && sameSystem) continue;
+          if (i > 0) {
+            const first = span.measureNumbers[runStart];
+            const last = span.measureNumbers[i - 1];
+            const firstPlacement =
+              first !== undefined ? placementByMeasureNumber.get(first) : undefined;
+            const lastPlacement =
+              last !== undefined ? placementByMeasureNumber.get(last) : undefined;
+            const y = first !== undefined ? lineYFor(first) : undefined;
+            if (firstPlacement !== undefined && lastPlacement !== undefined && y !== undefined) {
+              svgParts.push(
+                renderVolta(
+                  computeVoltaGeometry(
+                    {
+                      width: lastPlacement.x + lastPlacement.width - firstPlacement.x,
+                      hasStartHook: runStart === 0,
+                      hasEndHook: span.closed && i === span.measureNumbers.length,
+                    },
+                    metrics,
+                  ),
+                  {
+                    x: firstPlacement.x,
+                    y,
+                    // Only the volta's FIRST piece is labelled; a
+                    // continuation after a system break repeating "1."
+                    // would read as a second, different ending.
+                    label: runStart === 0 ? voltaLabel(span.numbers) : '',
+                    color: theme.colorOf('volta'),
+                    fontFamily: theme.textFont,
+                    fontSize: theme.sizes.barNumber,
+                  },
+                ),
+              );
+            }
+          }
+          runStart = i;
+        }
+      }
+
+      for (const spec of repeatCounts) {
+        const placement = placementByMeasureNumber.get(spec.measureNumber);
+        const y = lineYFor(spec.measureNumber);
+        if (placement === undefined || y === undefined || spec.repeatEndTimes === undefined) {
+          continue;
+        }
+        // The count sits ON the volta band when nothing else is there,
+        // and one text height above it when a volta bracket already
+        // ends at this very barline -- which is the normal case, since
+        // a repeat played four times is usually the one with the
+        // endings.
+        const underVolta = spans.some((span) => span.measureNumbers.includes(spec.measureNumber));
+        svgParts.push(
+          renderRepeatCount(spec.repeatEndTimes, {
+            x: placement.x + placement.width,
+            y: underVolta ? y - (theme.sizes.barNumber + VOLTA_BAR_NUMBER_CLEARANCE) : y,
+            color: theme.colorOf('volta'),
+            fontFamily: theme.textFont,
+            fontSize: theme.sizes.barNumber,
+          }),
+        );
+      }
+    }
+  }
+
   // Phase 51/§18.3: the overlays, appended LAST so they sit on top of the
   // music they describe. Both are measured from the SVG this render just
   // produced (see `measureSvgBoxes`), so neither can disagree with what
@@ -3123,7 +3501,15 @@ export function renderParsedMusicXml(
     measureLayoutsByNumber,
     placementByMeasureNumber,
     measureHeaderAllowance: MEASURE_HEADER_ALLOWANCE,
+    repeatMeasures: repeatMeasureSpecs(),
   });
+  // One diagnostic channel for the caller (§18.3), whichever module
+  // produced the finding -- `playback/repeats.ts` keeps its own
+  // reporting shape for the same reason `timing/` does, and this is
+  // where the two meet.
+  for (const d of playback.repeatDiagnostics) {
+    diagnostics.push({ severity: d.severity, code: d.code, message: d.message });
+  }
 
   // §18.3: ONE diagnostic channel, severity-filtered by
   // `config.debug.logLevel` -- the engine has no console logging anywhere

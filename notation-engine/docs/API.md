@@ -175,6 +175,48 @@ The rendered element a `noteId` belongs to: a chord member's `...#e3#n1` lives i
 
 *(`src/playback/event-stream.ts`)*
 
+### Repeats (playback order)
+
+#### `performanceSecondsToWritten`
+
+```ts
+export function performanceSecondsToWritten(plan: RepeatPlan, tempoMap: TempoMap, seconds: number): PerformancePoint;
+```
+
+Maps a moment of audio playback (seconds from the start of the performance) onto the written tick sounding then.
+
+*(`src/playback/repeats.ts`)*
+
+#### `performanceTickToWritten`
+
+```ts
+export function performanceTickToWritten(plan: RepeatPlan, performanceTick: number): PerformancePoint;
+```
+
+Maps a tick in performance order onto the written tick it plays.
+
+*(`src/playback/repeats.ts`)*
+
+#### `writtenTickToPerformanceTicks`
+
+```ts
+export function writtenTickToPerformanceTicks(plan: RepeatPlan, writtenTick: number): readonly number[];
+```
+
+Every performance tick at which `writtenTick` is played -- the inverse of `performanceTickToWritten`, which is one-to-many exactly because a repeated bar is played more than once.
+
+*(`src/playback/repeats.ts`)*
+
+#### `buildRepeatPlan`
+
+```ts
+export function buildRepeatPlan(input: BuildRepeatPlanInput):
+```
+
+Unfolds a score's repeats into a `RepeatPlan`: for every measure, every time it is played, where that playing sits in performance time and which written measure it is.
+
+*(`src/playback/repeats.ts`)*
+
 ### Resize
 
 #### `resizePureScale`
@@ -353,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-480 exported symbols, by module.
+506 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -744,9 +786,13 @@ The diagnostics `level` lets through, in their original order.
 
 | | Name | Summary |
 |---|---|---|
-| function | `shapeGlyphName` | The duration-appropriate glyph name for a shape family (e.g. 'x' + a quarter note -> 'noteheadXBlack'). |
+| function | `isKnownMusicXmlNotehead` | Whether `value` is a `<notehead>` value MusicXML actually defines -- what separates "the file asked for the ordinary head" from "the file said something we have never heard of". |
+| function | `supportedMusicXmlNoteheads` | Every `<notehead>` value this engine understands, for a diagnostic's own message. |
+| function | `shapeGlyphNameOrUndefined` | The duration-appropriate glyph name for a shape family (e.g. 'x' + a quarter note -> 'noteheadXBlack'), or `undefined` for a family this engine has no glyphs for. |
+| function | `shapeGlyphName` | The same lookup, throwing on an unknown family. |
+| function | `supportedNoteheadShapes` | Every notehead shape family this engine can draw -- what a config error message lists. |
 | function | `durationDefaultNotehead` | The plain duration-based default notehead glyph -- priority 3 (lowest) in §9.7's selection order. |
-| function | `musicXmlNoteheadToShape` | Maps a MusicXML `<notehead>` element's value to this phase's shape-family key. |
+| function | `musicXmlNoteheadToShape` | Maps a MusicXML `<notehead>` element's value to this engine's shape-family key, or `undefined` for "no override, use the ordinary duration-based head". |
 | function | `noteheadMappingKey` | The key used to look up a per-note notehead override in `config.noteheadMapping.overridesByKey` (§9.7, §8's NoteheadMappingConfig). |
 | interface | `NoteheadSelectionInput` |  |
 | function | `selectNoteheadGlyphName` | The full §9.7 selection: explicit XML notehead, then a config override keyed by pitch/MIDI-note, then the plain duration default. |
@@ -852,6 +898,16 @@ The diagnostics `level` lets through, in their original order.
 | function | `voiceRestOffset` | §9.14's rest-separation offset (fed into Phase 18's existing `restY(..., voiceOffset)`): the odd (upper) voice's rests shift toward the top of the staff, the even (lower) voice's shift toward the bottom, so with both voices otherwise defaulting to the same shared middle line (Phase 18's own defau... |
 | interface | `NoteheadCollisionResolution` |  |
 | function | `resolveNoteheadCollision` | §9.14's horizontal-collision rule: at the same tick, if two different voices' notes sit within `NOTEHEAD_COLLISION_THRESHOLD` staff-spaces of each other (confirmed by an independent source -- Clairnote, citing LilyPond's own collision engine -- that the real threshold is notes one vertical staff ... |
+
+### `src/geometry/volta.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `VoltaGeometry` | A volta -- the "1." / "2." bracket over a repeated section's alternative endings (§9.18's barline family, the part of it that is drawn above the staff rather than through it). |
+| interface | `VoltaEngravingMetrics` |  |
+| interface | `VoltaSpec` |  |
+| function | `computeVoltaGeometry` |  |
+| function | `voltaLabel` | The bracket's own label from its volta numbers: "1." for a single ending, "1, 2." for one that serves two passes. |
 
 ### `src/glyphs/glyph-table.ts`
 
@@ -1130,6 +1186,24 @@ The diagnostics `level` lets through, in their original order.
 | **API** | `playheadX` | §17.1, for a MOVING playhead: where the music is at `tick`, as a continuous position rather than the last note's own x. |
 | **API** | `xToPosition` | §17.1: where on the page -> time, for click-to-seek in a host app. |
 
+### `src/playback/repeats.ts`
+
+| | Name | Summary |
+|---|---|---|
+| type | `RepeatDiagnosticSeverity` |  |
+| interface | `RepeatDiagnostic` | A repeat structure this engine could not resolve exactly. |
+| function | `repeatDiagnostic` |  |
+| interface | `RepeatMeasureSpec` | One written measure, as the repeat resolver needs it: its number, its length, and whatever repeat/volta marks sit on its two edges. |
+| interface | `PerformanceEntry` | One measure, one time through: where it sits in written time and where it sits in performance time. |
+| interface | `RepeatPlan` | The written score unfolded into the order it is actually played. |
+| const | `DEFAULT_REPEAT_TIMES` | MusicXML's own default for `<repeat direction="backward">` with no `times`: play the section twice. |
+| interface | `BuildRepeatPlanInput` |  |
+| **API** | `buildRepeatPlan` | Unfolds a score's repeats into a `RepeatPlan`: for every measure, every time it is played, where that playing sits in performance time and which written measure it is. |
+| interface | `PerformancePoint` | Where one moment of the performance is: which written tick it plays, and which time through. |
+| **API** | `performanceTickToWritten` | Maps a tick in performance order onto the written tick it plays. |
+| **API** | `performanceSecondsToWritten` | Maps a moment of audio playback (seconds from the start of the performance) onto the written tick sounding then. |
+| **API** | `writtenTickToPerformanceTicks` | Every performance tick at which `writtenTick` is played -- the inverse of `performanceTickToWritten`, which is one-to-many exactly because a repeated bar is played more than once. |
+
 ### `src/render-from-musicxml.ts`
 
 | | Name | Summary |
@@ -1330,6 +1404,15 @@ The diagnostics `level` lets through, in their original order.
 | function | `renderTupletBracket` | Draws the bracket as a horizontal line with a short perpendicular hook at each end pointing back toward the notes (down from an "above" bracket, up from a "below" one) -- the visual shape a beam's own line replaces when §9.17's tupletBracketNeeded() says a bracket is redundant. |
 | interface | `RenderTupletNumberOptions` |  |
 | function | `renderTupletNumber` | Draws the tuplet's digit glyph (from geometry's tupletDigitGlyphName) centered at the given position. |
+
+### `src/render/volta.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `RenderVoltaOptions` |  |
+| function | `renderVolta` | Draws one volta bracket: its horizontal line, whichever end hooks it has, and its number label. |
+| interface | `RenderRepeatCountOptions` |  |
+| function | `renderRepeatCount` | The "×4" over a repeat-end barline that is played more than twice. |
 
 ### `src/timing/alignment/diagnostic.ts`
 

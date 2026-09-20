@@ -27,6 +27,7 @@ var NotationEngine = (() => {
     DEFAULT_CONFIG: () => DEFAULT_CONFIG,
     DEFAULT_CURSOR_FIXED_FRACTION: () => DEFAULT_CURSOR_FIXED_FRACTION,
     DEFAULT_DRUM_MAPPING_TABLE: () => DEFAULT_DRUM_MAPPING_TABLE,
+    DEFAULT_REPEAT_TIMES: () => DEFAULT_REPEAT_TIMES,
     DEFAULT_STEM_LENGTH: () => DEFAULT_STEM_LENGTH,
     DRUM_FALLBACK_NOTEHEAD_SHAPE: () => DRUM_FALLBACK_NOTEHEAD_SHAPE,
     DRUM_FALLBACK_STAFF_POSITION: () => DRUM_FALLBACK_STAFF_POSITION,
@@ -63,6 +64,7 @@ var NotationEngine = (() => {
     browserRasterBackend: () => browserRasterBackend,
     buildEventStream: () => buildEventStream,
     buildMeasureMap: () => buildMeasureMap,
+    buildRepeatPlan: () => buildRepeatPlan,
     buildTempoMap: () => buildTempoMap,
     bytesToBase64: () => bytesToBase64,
     cancellationNaturals: () => cancellationNaturals,
@@ -99,6 +101,7 @@ var NotationEngine = (() => {
     computeSystemLayoutVariableGaps: () => computeSystemLayoutVariableGaps,
     computeTieShape: () => computeTieShape,
     computeTupletBracketShape: () => computeTupletBracketShape,
+    computeVoltaGeometry: () => computeVoltaGeometry,
     convertTimewiseToPartwise: () => convertTimewiseToPartwise,
     coreNoteRefKey: () => coreNoteRefKey,
     createAccidentalState: () => createAccidentalState,
@@ -142,6 +145,7 @@ var NotationEngine = (() => {
     groupBeams: () => groupBeams,
     groupBeamsFromHints: () => groupBeamsFromHints,
     hasExplicitBeams: () => hasExplicitBeams,
+    isKnownMusicXmlNotehead: () => isKnownMusicXmlNotehead,
     isPitched: () => isPitched,
     isUnpitched: () => isUnpitched,
     justifySystem: () => justifySystem,
@@ -179,6 +183,8 @@ var NotationEngine = (() => {
     parseMidiInstrumentMap: () => parseMidiInstrumentMap,
     parseMusicXml: () => parseMusicXml,
     part: () => part,
+    performanceSecondsToWritten: () => performanceSecondsToWritten,
+    performanceTickToWritten: () => performanceTickToWritten,
     pitchedPitch: () => pitchedPitch,
     placeElement: () => placeElement,
     playheadX: () => playheadX,
@@ -206,6 +212,7 @@ var NotationEngine = (() => {
     renderMetronomeMark: () => renderMetronomeMark,
     renderNotehead: () => renderNotehead,
     renderParsedMusicXml: () => renderParsedMusicXml,
+    renderRepeatCount: () => renderRepeatCount,
     renderRest: () => renderRest,
     renderSkylineOverlay: () => renderSkylineOverlay,
     renderSlur: () => renderSlur,
@@ -216,6 +223,8 @@ var NotationEngine = (() => {
     renderTimeSignature: () => renderTimeSignature,
     renderTupletBracket: () => renderTupletBracket,
     renderTupletNumber: () => renderTupletNumber,
+    renderVolta: () => renderVolta,
+    repeatDiagnostic: () => repeatDiagnostic,
     resetMeasure: () => resetMeasure,
     resizePureScale: () => resizePureScale,
     resolveConfig: () => resolveConfig,
@@ -230,6 +239,7 @@ var NotationEngine = (() => {
     selectNoteheadGlyphName: () => selectNoteheadGlyphName,
     severityPassesLogLevel: () => severityPassesLogLevel,
     shapeGlyphName: () => shapeGlyphName,
+    shapeGlyphNameOrUndefined: () => shapeGlyphNameOrUndefined,
     sharpsForCount: () => sharpsForCount,
     shouldShowBarNumber: () => shouldShowBarNumber,
     slurSide: () => slurSide,
@@ -237,6 +247,8 @@ var NotationEngine = (() => {
     staffPositionForPitch: () => staffPositionForPitch,
     stringToUtf8: () => stringToUtf8,
     sumTicks: () => sumTicks,
+    supportedMusicXmlNoteheads: () => supportedMusicXmlNoteheads,
+    supportedNoteheadShapes: () => supportedNoteheadShapes,
     svgGlyphText: () => svgGlyphText,
     svgGroup: () => svgGroup,
     svgLine: () => svgLine,
@@ -263,6 +275,8 @@ var NotationEngine = (() => {
     voice: () => voice,
     voiceForcedDirection: () => voiceForcedDirection,
     voiceRestOffset: () => voiceRestOffset,
+    voltaLabel: () => voltaLabel,
+    writtenTickToPerformanceTicks: () => writtenTickToPerformanceTicks,
     xToPosition: () => xToPosition,
     xmlDivisionsToTicks: () => xmlDivisionsToTicks
   });
@@ -58251,6 +58265,20 @@ var NotationEngine = (() => {
     }
   }
 
+  // src/geometry/volta.ts
+  function computeVoltaGeometry(spec, metrics) {
+    return {
+      width: Math.max(0, spec.width),
+      startHookDepth: spec.hasStartHook ? metrics.hookDepth : 0,
+      endHookDepth: spec.hasEndHook ? metrics.hookDepth : 0,
+      thickness: metrics.thickness
+    };
+  }
+  function voltaLabel(numbers) {
+    if (numbers.length === 0) return "";
+    return `${numbers.join(", ")}.`;
+  }
+
   // src/geometry/ledger-line.ts
   function computeLedgerLines(position, numLines) {
     if (!Number.isInteger(numLines) || numLines < 1) {
@@ -58296,7 +58324,29 @@ var NotationEngine = (() => {
       half: "noteheadTriangleUpHalf",
       black: "noteheadTriangleUpBlack"
     },
+    "inverted-triangle": {
+      whole: "noteheadTriangleDownWhole",
+      half: "noteheadTriangleDownHalf",
+      black: "noteheadTriangleDownBlack"
+    },
+    // MusicXML's "left triangle" points RIGHT when drawn -- the name
+    // describes the vertical edge on its left, not where the apex points.
+    // SMuFL names the same glyph from the apex, hence TriangleRight.
+    "left-triangle": {
+      whole: "noteheadTriangleRightWhite",
+      half: "noteheadTriangleRightWhite",
+      black: "noteheadTriangleRightBlack"
+    },
     square: {
+      whole: "noteheadSquareWhite",
+      half: "noteheadSquareWhite",
+      black: "noteheadSquareBlack"
+    },
+    // SMuFL has no rectangle notehead; the square is its nearest real
+    // shape, and drawing the wrong-but-adjacent glyph beats refusing the
+    // file. Recorded in Doc/ and in §19's known limitations rather than
+    // silently pretended to be exact.
+    rectangle: {
       whole: "noteheadSquareWhite",
       half: "noteheadSquareWhite",
       black: "noteheadSquareBlack"
@@ -58306,37 +58356,142 @@ var NotationEngine = (() => {
       half: "noteheadSlashWhiteHalf",
       black: "noteheadSlashVerticalEnds"
     },
-    plus: { whole: "noteheadPlusWhole", half: "noteheadPlusHalf", black: "noteheadPlusBlack" }
+    slashed: {
+      whole: "noteheadSlashedWhole1",
+      half: "noteheadSlashedHalf1",
+      black: "noteheadSlashedBlack1"
+    },
+    "back-slashed": {
+      whole: "noteheadSlashedWhole2",
+      half: "noteheadSlashedHalf2",
+      black: "noteheadSlashedBlack2"
+    },
+    // MusicXML's "cross" is the PLUS shape (+); its "x" is the other one.
+    // Getting these two the wrong way round is the classic mistake here,
+    // so `plus` stays the shape-family key and `cross` maps onto it.
+    plus: { whole: "noteheadPlusWhole", half: "noteheadPlusHalf", black: "noteheadPlusBlack" },
+    circled: {
+      whole: "noteheadCircledWhole",
+      half: "noteheadCircledHalf",
+      black: "noteheadCircledBlack"
+    },
+    "circle-dot": {
+      whole: "noteheadRoundWhiteWithDot",
+      half: "noteheadRoundWhiteWithDot",
+      black: "noteheadRoundWhiteWithDot"
+    },
+    "arrow-up": {
+      whole: "noteheadLargeArrowUpWhole",
+      half: "noteheadLargeArrowUpHalf",
+      black: "noteheadLargeArrowUpBlack"
+    },
+    "arrow-down": {
+      whole: "noteheadLargeArrowDownWhole",
+      half: "noteheadLargeArrowDownHalf",
+      black: "noteheadLargeArrowDownBlack"
+    },
+    cluster: {
+      whole: "noteheadClusterRoundWhite",
+      half: "noteheadClusterRoundWhite",
+      black: "noteheadClusterRoundBlack"
+    },
+    // `none` is not "no glyph" here: noteheadNull is SMuFL's own
+    // zero-ink notehead, which keeps the stem, beam and spacing anchored
+    // exactly where the file put them while drawing nothing.
+    none: { whole: "noteheadNull", half: "noteheadNull", black: "noteheadNull" },
+    // The seven Aikin shape-note heads, plus "fa up". SMuFL's noteShape*
+    // glyphs come in White/Black only (no whole-note variant), so a whole
+    // note uses the white one -- which is what the shape-note engraving
+    // tradition does too.
+    do: {
+      whole: "noteShapeTriangleUpWhite",
+      half: "noteShapeTriangleUpWhite",
+      black: "noteShapeTriangleUpBlack"
+    },
+    re: { whole: "noteShapeMoonWhite", half: "noteShapeMoonWhite", black: "noteShapeMoonBlack" },
+    mi: {
+      whole: "noteShapeDiamondWhite",
+      half: "noteShapeDiamondWhite",
+      black: "noteShapeDiamondBlack"
+    },
+    fa: {
+      whole: "noteShapeTriangleRightWhite",
+      half: "noteShapeTriangleRightWhite",
+      black: "noteShapeTriangleRightBlack"
+    },
+    "fa-up": {
+      whole: "noteShapeTriangleLeftWhite",
+      half: "noteShapeTriangleLeftWhite",
+      black: "noteShapeTriangleLeftBlack"
+    },
+    so: { whole: "noteShapeRoundWhite", half: "noteShapeRoundWhite", black: "noteShapeRoundBlack" },
+    la: {
+      whole: "noteShapeSquareWhite",
+      half: "noteShapeSquareWhite",
+      black: "noteShapeSquareBlack"
+    },
+    ti: {
+      whole: "noteShapeKeystoneWhite",
+      half: "noteShapeKeystoneWhite",
+      black: "noteShapeKeystoneBlack"
+    }
   };
+  var MUSICXML_NOTEHEAD_SHAPES = {
+    normal: void 0,
+    other: void 0,
+    slash: "slash",
+    triangle: "triangle",
+    diamond: "diamond",
+    square: "square",
+    cross: "plus",
+    x: "x",
+    "circle-x": "circle-x",
+    "inverted triangle": "inverted-triangle",
+    "arrow down": "arrow-down",
+    "arrow up": "arrow-up",
+    circled: "circled",
+    slashed: "slashed",
+    "back slashed": "back-slashed",
+    cluster: "cluster",
+    "circle dot": "circle-dot",
+    "left triangle": "left-triangle",
+    rectangle: "rectangle",
+    none: "none",
+    do: "do",
+    re: "re",
+    mi: "mi",
+    fa: "fa",
+    "fa up": "fa-up",
+    so: "so",
+    la: "la",
+    ti: "ti"
+  };
+  function isKnownMusicXmlNotehead(value) {
+    return Object.prototype.hasOwnProperty.call(MUSICXML_NOTEHEAD_SHAPES, value);
+  }
+  function supportedMusicXmlNoteheads() {
+    return Object.keys(MUSICXML_NOTEHEAD_SHAPES);
+  }
+  function shapeGlyphNameOrUndefined(shape, durationType) {
+    return SHAPE_GLYPHS[shape]?.[fillForDuration(durationType)];
+  }
   function shapeGlyphName(shape, durationType) {
-    const fills = SHAPE_GLYPHS[shape];
-    if (fills === void 0) {
+    const glyph = shapeGlyphNameOrUndefined(shape, durationType);
+    if (glyph === void 0) {
       throw new Error(
         `Unknown notehead shape "${shape}". Supported: ${Object.keys(SHAPE_GLYPHS).join(", ")}.`
       );
     }
-    return fills[fillForDuration(durationType)];
+    return glyph;
+  }
+  function supportedNoteheadShapes() {
+    return Object.keys(SHAPE_GLYPHS);
   }
   function durationDefaultNotehead(durationType) {
     return shapeGlyphName("normal", durationType);
   }
   function musicXmlNoteheadToShape(value) {
-    switch (value) {
-      case "normal":
-        return void 0;
-      case "x":
-      case "diamond":
-      case "triangle":
-      case "square":
-      case "slash":
-        return value;
-      case "circle-x":
-        return "circle-x";
-      default:
-        throw new Error(
-          `MusicXML notehead value "${value}" is not supported yet. Supported: normal, x, diamond, triangle, square, slash, circle-x.`
-        );
-    }
+    return MUSICXML_NOTEHEAD_SHAPES[value];
   }
   function noteheadMappingKey(pitch, midiNote) {
     if (isUnpitched(pitch)) {
@@ -58345,10 +58500,14 @@ var NotationEngine = (() => {
     return `${pitch.step}${pitch.octave}`;
   }
   function selectNoteheadGlyphName(input) {
+    if (input.explicitNoteheadSmufl !== void 0 && getGlyph(input.explicitNoteheadSmufl) !== void 0) {
+      return input.explicitNoteheadSmufl;
+    }
     if (input.explicitNotehead !== void 0) {
       const shape = musicXmlNoteheadToShape(input.explicitNotehead);
       if (shape !== void 0) {
-        return shapeGlyphName(shape, input.durationType);
+        const glyph = shapeGlyphNameOrUndefined(shape, input.durationType);
+        if (glyph !== void 0) return glyph;
       }
     }
     const key = noteheadMappingKey(input.pitch, input.midiNote);
@@ -59176,6 +59335,50 @@ ${denominator}`;
     });
   }
 
+  // src/render/volta.ts
+  var LABEL_INSET = 0.45;
+  var LABEL_DROP = 1.15;
+  function renderVolta(geometry, options) {
+    const { x: x2, y, color } = options;
+    const parts = [
+      svgLine(x2, y, x2 + geometry.width, y, { stroke: color, "stroke-width": geometry.thickness })
+    ];
+    if (geometry.startHookDepth > 0) {
+      parts.push(
+        svgLine(x2, y, x2, y + geometry.startHookDepth, {
+          stroke: color,
+          "stroke-width": geometry.thickness
+        })
+      );
+    }
+    if (geometry.endHookDepth > 0) {
+      parts.push(
+        svgLine(x2 + geometry.width, y, x2 + geometry.width, y + geometry.endHookDepth, {
+          stroke: color,
+          "stroke-width": geometry.thickness
+        })
+      );
+    }
+    if (options.label !== "") {
+      parts.push(
+        svgText(x2 + LABEL_INSET, y + LABEL_DROP, options.label, {
+          "font-family": options.fontFamily,
+          "font-size": options.fontSize,
+          fill: color
+        })
+      );
+    }
+    return svgGroup(parts);
+  }
+  function renderRepeatCount(times, options) {
+    return svgText(options.x, options.y, `\xD7${times}`, {
+      "font-family": options.fontFamily,
+      "font-size": options.fontSize,
+      fill: options.color,
+      "text-anchor": "end"
+    });
+  }
+
   // src/render/ledger-line.ts
   function renderLedgerLines(lines, options) {
     const { x: x2, noteheadWidth: noteheadWidth2, staffBottomY, extension, thickness, color } = options;
@@ -59553,7 +59756,8 @@ ${denominator}`;
       spacingIncrement: 1.2,
       shortestDurationSpace: 2,
       minNoteDistance: 0.5,
-      justify: true
+      justify: true,
+      minMeasureWidth: 12
     },
     staves: {
       minStaffDistance: 4,
@@ -59974,7 +60178,19 @@ ${denominator}`;
     const fret = technicalEl !== void 0 ? intOf(firstChildNamed(technicalEl, "fret")) : void 0;
     const tieStart = tieEls.some((el) => el.getAttribute("type") === "start") || tiedEls.some((el) => el.getAttribute("type") === "start");
     const tieStop = tieEls.some((el) => el.getAttribute("type") === "stop") || tiedEls.some((el) => el.getAttribute("type") === "stop");
-    const explicitNotehead = textOf(firstChildNamed(noteEl, "notehead"));
+    const noteheadEl = firstChildNamed(noteEl, "notehead");
+    const explicitNotehead = textOf(noteheadEl);
+    const explicitNoteheadSmufl = noteheadEl?.getAttribute("smufl") ?? void 0;
+    if (explicitNotehead !== void 0 && !isKnownMusicXmlNotehead(explicitNotehead)) {
+      diagnostics.push(
+        diagnostic(
+          "warning",
+          "UNKNOWN_NOTEHEAD",
+          `Unknown <notehead> value "${explicitNotehead}"; drawing the ordinary notehead instead.`,
+          location
+        )
+      );
+    }
     const graceEl = firstChildNamed(noteEl, "grace");
     const graceSlash = graceEl?.getAttribute("slash") === "yes";
     const timeModEl = firstChildNamed(noteEl, "time-modification");
@@ -60058,6 +60274,7 @@ ${denominator}`;
       isUnpitched: isUnpitched2,
       ...instrumentId !== void 0 ? { instrumentId } : {},
       ...explicitNotehead !== void 0 ? { explicitNotehead } : {},
+      ...explicitNoteheadSmufl !== void 0 ? { explicitNoteheadSmufl } : {},
       isGrace,
       graceSlash,
       ...tupletActualNotes !== void 0 ? { tupletActualNotes } : {},
@@ -60285,6 +60502,14 @@ ${denominator}`;
   var DEFAULT_TIME_DENOMINATOR = 4;
   var DEFAULT_CLEF_SIGN = "G";
   var DEFAULT_CLEF_LINE = 2;
+  function parseEndingNumbers(raw) {
+    if (raw === null) return void 0;
+    const numbers = raw.split(",").map((part2) => Number.parseInt(part2.trim(), 10)).filter((n) => Number.isInteger(n) && n > 0);
+    return numbers.length > 0 ? numbers : void 0;
+  }
+  function parseEndingType(raw) {
+    return raw === "start" || raw === "stop" || raw === "discontinue" ? raw : void 0;
+  }
   function buildDuration(ev) {
     const tuplet = ev.tupletActualNotes !== void 0 && ev.tupletNormalNotes !== void 0 ? { actualNotes: ev.tupletActualNotes, normalNotes: ev.tupletNormalNotes } : void 0;
     return duration(ev.durationType, ev.dots, ev.ticks, tuplet);
@@ -60308,6 +60533,7 @@ ${denominator}`;
       ...ev.tieStart ? { tieStart: true } : {},
       ...ev.tieStop ? { tieStop: true } : {},
       ...ev.explicitNotehead !== void 0 ? { explicitNotehead: ev.explicitNotehead } : {},
+      ...ev.explicitNoteheadSmufl !== void 0 ? { explicitNoteheadSmufl: ev.explicitNoteheadSmufl } : {},
       ...ev.instrumentId !== void 0 ? { instrumentId: ev.instrumentId } : {},
       ...ev.stringNumber !== void 0 ? { stringNumber: ev.stringNumber } : {},
       ...ev.fret !== void 0 ? { fret: ev.fret } : {},
@@ -60444,8 +60670,14 @@ ${denominator}`;
         let lastAdvance = 0;
         let barlineStyle;
         let repeatDirection;
+        let repeatTimes;
+        let endingNumbers;
+        let endingType;
         let leftBarlineStyle;
         let leftRepeatDirection;
+        let leftRepeatTimes;
+        let leftEndingNumbers;
+        let leftEndingType;
         for (const child of Array.from(measureEl.children)) {
           if (child.tagName === "attributes") {
             const update = parseAttributesElement(child);
@@ -60529,12 +60761,23 @@ ${denominator}`;
             const style = textOf(firstChildNamed(child, "bar-style"));
             const repeatEl = firstChildNamed(child, "repeat");
             const dir = repeatEl?.getAttribute("direction");
+            const rawTimes = repeatEl?.getAttribute("times");
+            const times = rawTimes !== null && rawTimes !== void 0 ? Number.parseInt(rawTimes, 10) : Number.NaN;
+            const endingEl = firstChildNamed(child, "ending");
+            const numbers = parseEndingNumbers(endingEl?.getAttribute("number") ?? null);
+            const type = parseEndingType(endingEl?.getAttribute("type") ?? null);
             if (child.getAttribute("location") === "left") {
               if (style !== void 0) leftBarlineStyle = style;
               if (dir === "forward" || dir === "backward") leftRepeatDirection = dir;
+              if (Number.isInteger(times) && times >= 1) leftRepeatTimes = times;
+              if (numbers !== void 0) leftEndingNumbers = numbers;
+              if (type !== void 0) leftEndingType = type;
             } else {
               if (style !== void 0) barlineStyle = style;
               if (dir === "forward" || dir === "backward") repeatDirection = dir;
+              if (Number.isInteger(times) && times >= 1) repeatTimes = times;
+              if (numbers !== void 0) endingNumbers = numbers;
+              if (type !== void 0) endingType = type;
             }
           } else if (child.tagName === "direction") {
             let recognizedSomething = false;
@@ -60711,8 +60954,14 @@ ${denominator}`;
           staffLinesByStaff: { ...currentStaffLinesByStaff },
           ...barlineStyle !== void 0 ? { barlineStyle } : {},
           ...repeatDirection !== void 0 ? { repeatDirection } : {},
+          ...repeatTimes !== void 0 ? { repeatTimes } : {},
+          ...endingNumbers !== void 0 ? { endingNumbers } : {},
+          ...endingType !== void 0 ? { endingType } : {},
           ...leftBarlineStyle !== void 0 ? { leftBarlineStyle } : {},
-          ...leftRepeatDirection !== void 0 ? { leftRepeatDirection } : {}
+          ...leftRepeatDirection !== void 0 ? { leftRepeatDirection } : {},
+          ...leftRepeatTimes !== void 0 ? { leftRepeatTimes } : {},
+          ...leftEndingNumbers !== void 0 ? { leftEndingNumbers } : {},
+          ...leftEndingType !== void 0 ? { leftEndingType } : {}
         });
       }
       parts.push(part(partId, measures, partName));
@@ -63053,6 +63302,188 @@ ${denominator}`;
     return offset + bestTick;
   }
 
+  // src/playback/repeats.ts
+  function repeatDiagnostic(severity, code, message) {
+    return { severity, code, message };
+  }
+  var MAX_PASSES_PER_MEASURE = 64;
+  var DEFAULT_REPEAT_TIMES = 2;
+  function straightThrough(measures) {
+    return measures.map((m) => m.measureNumber);
+  }
+  function resolveOrder(measures) {
+    const diagnostics = [];
+    const n = measures.length;
+    if (n === 0) return { order: [], diagnostics };
+    const order = [];
+    const sections = [{ start: 0, pass: 1 }];
+    const taken = /* @__PURE__ */ new Map();
+    const playCount = /* @__PURE__ */ new Map();
+    const skipTarget = (from, pass) => {
+      for (let j = from + 1; j < n; j++) {
+        const numbers = measures[j]?.endingStart;
+        if (numbers !== void 0 && numbers.includes(pass)) return j;
+      }
+      for (let j = from; j < n; j++) {
+        if (measures[j]?.endingStop === true) return j + 1;
+      }
+      return n;
+    };
+    let i2 = 0;
+    while (i2 < n) {
+      const measure2 = measures[i2];
+      if (measure2 === void 0) break;
+      const section = sections[sections.length - 1] ?? { start: 0, pass: 1 };
+      if (measure2.repeatStart && section.start !== i2) {
+        sections.push({ start: i2, pass: 1 });
+      }
+      const current = sections[sections.length - 1] ?? { start: 0, pass: 1 };
+      const endingStart = measure2.endingStart;
+      if (endingStart !== void 0 && !endingStart.includes(current.pass)) {
+        const target = skipTarget(i2, current.pass);
+        if (target <= i2) break;
+        i2 = target;
+        continue;
+      }
+      const plays = (playCount.get(i2) ?? 0) + 1;
+      playCount.set(i2, plays);
+      if (plays > MAX_PASSES_PER_MEASURE) {
+        diagnostics.push(
+          repeatDiagnostic(
+            "warning",
+            "REPEAT_RUNAWAY",
+            `Measure ${measure2.measureNumber} would be played more than ${MAX_PASSES_PER_MEASURE} times; the repeat structure does not terminate. Playing the score straight through instead.`
+          )
+        );
+        return { order: straightThrough(measures).map((_, index) => index), diagnostics };
+      }
+      order.push(i2);
+      const times = measure2.repeatEndTimes;
+      if (times !== void 0) {
+        const already = (taken.get(i2) ?? 0) + 1;
+        taken.set(i2, already);
+        if (already < times) {
+          for (const index of [...taken.keys()]) {
+            if (index >= current.start && index < i2) taken.delete(index);
+          }
+          current.pass = already + 1;
+          i2 = current.start;
+          continue;
+        }
+        if (sections.length > 1 && current.start !== 0) sections.pop();
+        taken.delete(i2);
+      }
+      i2++;
+    }
+    return { order, diagnostics };
+  }
+  function buildRepeatPlan(input) {
+    const { measures, writtenTickByMeasure, tempoMap } = input;
+    const hasRepeats = measures.some(
+      (m) => m.repeatStart || m.repeatEndTimes !== void 0 || m.endingStart !== void 0
+    );
+    const { order, diagnostics } = resolveOrder(measures);
+    const entries = [];
+    const passByIndex = /* @__PURE__ */ new Map();
+    let performanceTick = 0;
+    let startSeconds = 0;
+    for (const index of order) {
+      const measure2 = measures[index];
+      if (measure2 === void 0) continue;
+      const pass = (passByIndex.get(index) ?? 0) + 1;
+      passByIndex.set(index, pass);
+      const writtenTick = writtenTickByMeasure.get(measure2.measureNumber) ?? 0;
+      const writtenStartSeconds = tickToSeconds(tempoMap, writtenTick);
+      entries.push({
+        measureNumber: measure2.measureNumber,
+        ticks: measure2.ticks,
+        performanceTick,
+        writtenTick,
+        startSeconds,
+        writtenStartSeconds,
+        pass
+      });
+      performanceTick += measure2.ticks;
+      startSeconds += tickToSeconds(tempoMap, writtenTick + measure2.ticks) - writtenStartSeconds;
+    }
+    return {
+      plan: {
+        entries,
+        totalTicks: performanceTick,
+        totalSeconds: startSeconds,
+        hasRepeats
+      },
+      diagnostics
+    };
+  }
+  function entryAtPerformanceTick(plan, performanceTick) {
+    const entries = plan.entries;
+    if (entries.length === 0) return -1;
+    let low = 0;
+    let high = entries.length - 1;
+    while (low < high) {
+      const mid = Math.ceil((low + high) / 2);
+      if ((entries[mid]?.performanceTick ?? 0) <= performanceTick) low = mid;
+      else high = mid - 1;
+    }
+    return low;
+  }
+  function entryAtSeconds(plan, seconds) {
+    const entries = plan.entries;
+    if (entries.length === 0) return -1;
+    let low = 0;
+    let high = entries.length - 1;
+    while (low < high) {
+      const mid = Math.ceil((low + high) / 2);
+      if ((entries[mid]?.startSeconds ?? 0) <= seconds) low = mid;
+      else high = mid - 1;
+    }
+    return low;
+  }
+  function performanceTickToWritten(plan, performanceTick) {
+    const index = entryAtPerformanceTick(plan, performanceTick);
+    const entry = plan.entries[index];
+    if (entry === void 0) {
+      return { writtenTick: performanceTick, performanceTick, measureNumber: 0, pass: 1 };
+    }
+    const within = Math.min(Math.max(0, performanceTick - entry.performanceTick), entry.ticks);
+    return {
+      writtenTick: entry.writtenTick + within,
+      performanceTick,
+      measureNumber: entry.measureNumber,
+      pass: entry.pass
+    };
+  }
+  function performanceSecondsToWritten(plan, tempoMap, seconds) {
+    const index = entryAtSeconds(plan, seconds);
+    const entry = plan.entries[index];
+    if (entry === void 0) {
+      const tick = secondsToTick(tempoMap, seconds);
+      return { writtenTick: tick, performanceTick: tick, measureNumber: 0, pass: 1 };
+    }
+    const intoMeasure = Math.max(0, seconds - entry.startSeconds);
+    const writtenTick = secondsToTick(tempoMap, entry.writtenStartSeconds + intoMeasure);
+    const clamped = Math.min(
+      Math.max(writtenTick, entry.writtenTick),
+      entry.writtenTick + entry.ticks
+    );
+    return {
+      writtenTick: clamped,
+      performanceTick: entry.performanceTick + (clamped - entry.writtenTick),
+      measureNumber: entry.measureNumber,
+      pass: entry.pass
+    };
+  }
+  function writtenTickToPerformanceTicks(plan, writtenTick) {
+    const out = [];
+    for (const entry of plan.entries) {
+      if (writtenTick >= entry.writtenTick && writtenTick < entry.writtenTick + entry.ticks) {
+        out.push(entry.performanceTick + (writtenTick - entry.writtenTick));
+      }
+    }
+    return out;
+  }
+
   // src/playback/compute.ts
   var DEFAULT_MEASURE_TICKS = TICKS_PER_QUARTER * 4;
   var DEFAULT_MICROSECONDS_PER_QUARTER2 = 5e5;
@@ -63074,6 +63505,16 @@ ${denominator}`;
     }));
     const { tempoMap } = buildTempoMap(rawTempoEvents);
     const events = buildEventStream(input.score, globalTickOffsetByMeasure, tempoMap);
+    const { plan, diagnostics: repeatDiagnostics } = buildRepeatPlan({
+      measures: input.repeatMeasures ?? input.measureNumbersInOrder.map((measureNumber) => ({
+        measureNumber,
+        ticks: input.measureTicksByNumber.get(measureNumber) ?? DEFAULT_MEASURE_TICKS,
+        repeatStart: false,
+        endingStop: false
+      })),
+      writtenTickByMeasure: globalTickOffsetByMeasure,
+      tempoMap
+    });
     return {
       measureNumbersInOrder: input.measureNumbersInOrder,
       globalTickOffsetByMeasure,
@@ -63082,7 +63523,9 @@ ${denominator}`;
       placementByMeasureNumber: input.placementByMeasureNumber,
       measureHeaderAllowance: input.measureHeaderAllowance,
       tempoMap,
-      events
+      events,
+      performance: plan,
+      repeatDiagnostics
     };
   }
 
@@ -63759,6 +64202,32 @@ ${xrefOffset}
   var TEMPO_MARK_GAP = 1.5;
   var TEMPO_MARK_HEIGHT = 2;
   var BAR_NUMBER_GAP = 1;
+  var VOLTA_HOOK_DEPTH = 1;
+  var VOLTA_BAR_NUMBER_CLEARANCE = 0.4;
+  function voltaGapAboveStaff(sizes) {
+    return BAR_NUMBER_GAP + sizes.barNumber + VOLTA_BAR_NUMBER_CLEARANCE + VOLTA_HOOK_DEPTH;
+  }
+  function voltaSpans(specs) {
+    const spans = [];
+    for (let i2 = 0; i2 < specs.length; i2++) {
+      const numbers = specs[i2]?.endingStart;
+      if (numbers === void 0) continue;
+      const measureNumbers = [];
+      let closed = false;
+      for (let j = i2; j < specs.length; j++) {
+        const spec = specs[j];
+        if (spec === void 0) break;
+        if (j > i2 && spec.endingStart !== void 0) break;
+        measureNumbers.push(spec.measureNumber);
+        if (spec.endingStop) {
+          closed = spec.endingDiscontinue !== true;
+          break;
+        }
+      }
+      if (measureNumbers.length > 0) spans.push({ measureNumbers, numbers, closed });
+    }
+    return spans;
+  }
   var STEM_AND_BEAM_ALLOWANCE = 3.5 + 0.5;
   var ARTICULATION_GAP = 1;
   var ORNAMENT_GAP = 1.5;
@@ -63801,7 +64270,7 @@ ${xrefOffset}
     if (worst === void 0) return 0;
     return side === "south" ? Math.max(0, worst) : Math.max(0, topLineY - worst);
   }
-  function computeMeasureLayout(measure2, measureTicks, measureTempoMarks, headerWidth) {
+  function computeMeasureLayout(measure2, measureTicks, measureTempoMarks, headerWidth, minMeasureWidth) {
     const hasAccidentalByTick = /* @__PURE__ */ new Map();
     for (const voice2 of measure2.voices) {
       const starts = eventStartTicks(voice2.events);
@@ -63826,8 +64295,10 @@ ${xrefOffset}
       );
       return Math.max(max2, headerWidth + markWidth + MEASURE_TRAILING_MARGIN);
     }, 0);
+    const durationScale = Math.min(2, Math.max(0.35, measureTicks / (TICKS_PER_QUARTER * 4)));
+    const minWidth = headerWidth + minMeasureWidth * durationScale;
     if (ticks.length === 0) {
-      return { width: Math.max(MEASURE_WIDTH, tempoMarkMinWidth), positionsByTick: /* @__PURE__ */ new Map() };
+      return { width: Math.max(minWidth, tempoMarkMinWidth), positionsByTick: /* @__PURE__ */ new Map() };
     }
     const spacingEvents = ticks.map((tick, i2) => {
       const nextTick = i2 + 1 < ticks.length ? ticks[i2 + 1] ?? measureTicks : measureTicks;
@@ -63845,7 +64316,7 @@ ${xrefOffset}
     const lastX = enforced[enforced.length - 1] ?? 0;
     const lastWidth = spacingEvents[spacingEvents.length - 1]?.renderedWidth ?? 0;
     const width = Math.max(
-      MEASURE_WIDTH * 0.3,
+      minWidth,
       headerWidth + lastX + lastWidth + MEASURE_TRAILING_MARGIN,
       tempoMarkMinWidth
     );
@@ -63947,6 +64418,7 @@ ${xrefOffset}
       durationType: note2.duration.type,
       defaultShape: ctx.theme.noteheadMapping.defaultShape,
       ...note2.explicitNotehead !== void 0 ? { explicitNotehead: note2.explicitNotehead } : {},
+      ...note2.explicitNoteheadSmufl !== void 0 ? { explicitNoteheadSmufl: note2.explicitNoteheadSmufl } : {},
       ...gmNote !== void 0 ? { midiNote: gmNote } : {},
       ...overridesByKey !== void 0 ? { overridesByKey } : {}
     });
@@ -64616,13 +65088,64 @@ ${xrefOffset}
       dashLength: getEngravingDefault("dashedBarlineDashLength") ?? 0.5,
       gapLength: getEngravingDefault("dashedBarlineGapLength") ?? 0.25
     };
-    const openingBarlineWidth = (partId, measureNumber) => {
+    const openingBarlineAllowance = (measureNumber) => {
+      let widest = 0;
+      for (const part2 of score2.parts) {
+        widest = Math.max(widest, openingBarlineWidthForPart(part2.id, measureNumber));
+      }
+      return widest;
+    };
+    const openingBarlineWidthForPart = (partId, measureNumber) => {
       const here = attributesByPartAndMeasure.get(`${partId}:${measureNumber}`);
       const previous = attributesByPartAndMeasure.get(`${partId}:${measureNumber - 1}`);
       const style = here?.leftBarlineStyle ?? previous?.barlineStyle;
       const direction = here?.leftRepeatDirection ?? previous?.repeatDirection;
       if (style === void 0 && direction === void 0) return 0;
       return computeBarlineGeometry(mapBarline(style, direction), BARLINE_METRICS).width;
+    };
+    let repeatMeasureSpecsCache;
+    const repeatMeasureSpecs = () => {
+      if (repeatMeasureSpecsCache !== void 0) return repeatMeasureSpecsCache;
+      const attrsFor = (measureNumber) => {
+        for (const part2 of score2.parts) {
+          const attrs = attributesByPartAndMeasure.get(`${part2.id}:${measureNumber}`);
+          if (attrs !== void 0) return attrs;
+        }
+        return void 0;
+      };
+      const edgeFor = (measureNumber) => {
+        for (const part2 of score2.parts) {
+          const attrs = attributesByPartAndMeasure.get(`${part2.id}:${measureNumber}`);
+          if (attrs === void 0) continue;
+          if (attrs.repeatDirection !== void 0 || attrs.leftRepeatDirection !== void 0 || attrs.endingNumbers !== void 0 || attrs.leftEndingNumbers !== void 0) {
+            return attrs;
+          }
+        }
+        return attrsFor(measureNumber);
+      };
+      repeatMeasureSpecsCache = measureNumbersInOrder.map((measureNumber, index) => {
+        const here = edgeFor(measureNumber);
+        const previousNumber = measureNumbersInOrder[index - 1];
+        const nextNumber = measureNumbersInOrder[index + 1];
+        const previous = previousNumber !== void 0 ? edgeFor(previousNumber) : void 0;
+        const next = nextNumber !== void 0 ? edgeFor(nextNumber) : void 0;
+        const repeatStart = here?.leftRepeatDirection === "forward" || previous?.repeatDirection === "forward";
+        const endsRepeat = here?.repeatDirection === "backward" || next?.leftRepeatDirection === "backward";
+        const declaredTimes = (here?.repeatDirection === "backward" ? here.repeatTimes : void 0) ?? (next?.leftRepeatDirection === "backward" ? next.leftRepeatTimes : void 0);
+        const endingStart = (here?.leftEndingType !== "stop" && here?.leftEndingType !== "discontinue" ? here?.leftEndingNumbers : void 0) ?? (previous?.endingType === "start" ? previous.endingNumbers : void 0);
+        const endingStop = here?.endingType === "stop" || here?.endingType === "discontinue" || next?.leftEndingType === "stop" || next?.leftEndingType === "discontinue";
+        const endingDiscontinue = here?.endingType === "discontinue" || next?.leftEndingType === "discontinue";
+        return {
+          measureNumber,
+          ticks: measureTicksByNumber.get(measureNumber) ?? TICKS_PER_QUARTER * 4,
+          repeatStart,
+          ...endsRepeat ? { repeatEndTimes: declaredTimes ?? DEFAULT_REPEAT_TIMES } : {},
+          ...endingStart !== void 0 ? { endingStart } : {},
+          endingStop,
+          ...endingDiscontinue ? { endingDiscontinue: true } : {}
+        };
+      });
+      return repeatMeasureSpecsCache;
     };
     const headerWidths = (isSystemStart) => {
       const widthByMeasure = /* @__PURE__ */ new Map();
@@ -64642,7 +65165,7 @@ ${xrefOffset}
               staffClef?.sign ?? attrs.clefSign,
               staffClef?.line ?? attrs.clefLine
             );
-            let width = MEASURE_LEADING_PAD + openingBarlineWidth(part2.id, measure2.number);
+            let width = MEASURE_LEADING_PAD + openingBarlineAllowance(measure2.number);
             if (systemStart || clefChanged) width += 3;
             if ((systemStart || keyChanged) && attrs.fifths !== 0 && clefDef.takesKeySignature) {
               try {
@@ -64702,7 +65225,8 @@ ${xrefOffset}
         measure(measureNumber, combinedVoices),
         measureTicks ?? TICKS_PER_QUARTER * 4,
         tempoMarks.filter((tm) => tm.measureNumber === measureNumber),
-        headerWidth
+        headerWidth,
+        config.spacing.minMeasureWidth
       );
       measureLayoutsByNumber.set(measureNumber, { ...layout, headerWidth });
       measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
@@ -64739,6 +65263,21 @@ ${xrefOffset}
           needed = Math.max(needed, extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
         });
       });
+      const specsForHeadroom = repeatMeasureSpecs();
+      const needsVoltaRoom = specsForHeadroom.some((spec) => spec.endingStart !== void 0) || specsForHeadroom.some(
+        (spec) => spec.repeatEndTimes !== void 0 && spec.repeatEndTimes > DEFAULT_REPEAT_TIMES
+      );
+      if (needsVoltaRoom) {
+        const raisedCount = specsForHeadroom.some(
+          (spec) => spec.repeatEndTimes !== void 0 && spec.repeatEndTimes > DEFAULT_REPEAT_TIMES && voltaSpans(specsForHeadroom).some(
+            (span) => span.measureNumbers.includes(spec.measureNumber)
+          )
+        );
+        needed = Math.max(
+          needed,
+          voltaGapAboveStaff(theme.sizes) + theme.sizes.barNumber + (raisedCount ? theme.sizes.barNumber + VOLTA_BAR_NUMBER_CLEARANCE : 0)
+        );
+      }
       return Math.max(0, needed - existingHeadroom);
     })();
     const staffBottomY = STAFF_BOTTOM_Y + aboveStaffPadding;
@@ -65029,7 +65568,7 @@ ${xrefOffset}
           const clefChanged = previousAttrs === void 0 || previousAttrs.clefSign !== attrs.clefSign || previousAttrs.clefLine !== attrs.clefLine;
           const keyChanged = previousAttrs === void 0 || previousAttrs.fifths !== attrs.fifths;
           const timeChanged = previousAttrs === void 0 || previousAttrs.timeNumerator !== attrs.timeNumerator || previousAttrs.timeDenominator !== attrs.timeDenominator;
-          let cursorX = layout.x + 0.5;
+          let cursorX = layout.x + MEASURE_LEADING_PAD + openingBarlineAllowance(measure2.number);
           if (isSystemStart || clefChanged) {
             svgParts.push(
               renderClef(clefDef, {
@@ -65295,9 +65834,10 @@ ${xrefOffset}
           }
         });
         const nextAttrs = attributesByPartAndMeasure.get(`${part2.id}:${measure2.number + 1}`);
+        const nextStartsSystem = placementByMeasureNumber.get(measure2.number + 1)?.isSystemStart ?? false;
         const barlineType = mapBarline(
-          nextAttrs?.leftBarlineStyle ?? attrs.barlineStyle,
-          nextAttrs?.leftRepeatDirection ?? attrs.repeatDirection
+          (nextStartsSystem ? void 0 : nextAttrs?.leftBarlineStyle) ?? attrs.barlineStyle,
+          (nextStartsSystem ? void 0 : nextAttrs?.leftRepeatDirection) ?? attrs.repeatDirection
         );
         const barlineMetrics = {
           thinThickness: getEngravingDefault("thinBarlineThickness") ?? 0.16,
@@ -65324,6 +65864,23 @@ ${xrefOffset}
             fontFamily: theme.musicFont
           })
         );
+        if (isSystemStart && (attrs.leftBarlineStyle !== void 0 || attrs.leftRepeatDirection !== void 0)) {
+          svgParts.push(
+            renderBarline(
+              computeBarlineGeometry(
+                mapBarline(attrs.leftBarlineStyle, attrs.leftRepeatDirection),
+                barlineMetrics
+              ),
+              {
+                x: layout.x,
+                staffBottomY: barlineBottomY,
+                height: barlineHeight,
+                color: theme.colorOf("barline"),
+                fontFamily: theme.musicFont
+              }
+            )
+          );
+        }
         if (partIndex === 0 && shouldShowBarNumber(measure2.number, config.barNumbers, isSystemStart)) {
           const { topStaffY, staffHeight } = topStaff();
           svgParts.push(
@@ -65364,6 +65921,89 @@ ${xrefOffset}
         }
       }
     });
+    {
+      const topPart = score2.parts[0];
+      const specs = topPart !== void 0 ? repeatMeasureSpecs() : [];
+      const spans = voltaSpans(specs);
+      const repeatCounts = specs.filter(
+        (spec) => spec.repeatEndTimes !== void 0 && spec.repeatEndTimes > DEFAULT_REPEAT_TIMES
+      );
+      if (topPart !== void 0 && (spans.length > 0 || repeatCounts.length > 0)) {
+        const topAttrs = firstAttributesByPart.get(topPart.id);
+        const topStaffHeight = computeStaffGeometry(
+          topAttrs?.staffLinesByStaff[1] ?? STAFF_LINES
+        ).height;
+        const voltaGap = voltaGapAboveStaff(theme.sizes);
+        const lineYFor = (measureNumber) => {
+          const placement = placementByMeasureNumber.get(measureNumber);
+          if (placement === void 0) return void 0;
+          return staffBottomY + placement.systemY - topStaffHeight - voltaGap;
+        };
+        const metrics = {
+          thickness: getEngravingDefault("repeatEndingLineThickness") ?? 0.16,
+          hookDepth: VOLTA_HOOK_DEPTH
+        };
+        for (const span of spans) {
+          let runStart = 0;
+          for (let i2 = 0; i2 <= span.measureNumbers.length; i2++) {
+            const current = span.measureNumbers[i2];
+            const previous = span.measureNumbers[i2 - 1];
+            const sameSystem = current !== void 0 && previous !== void 0 && placementByMeasureNumber.get(current)?.systemIndex === placementByMeasureNumber.get(previous)?.systemIndex;
+            if (i2 > 0 && sameSystem) continue;
+            if (i2 > 0) {
+              const first = span.measureNumbers[runStart];
+              const last = span.measureNumbers[i2 - 1];
+              const firstPlacement = first !== void 0 ? placementByMeasureNumber.get(first) : void 0;
+              const lastPlacement = last !== void 0 ? placementByMeasureNumber.get(last) : void 0;
+              const y = first !== void 0 ? lineYFor(first) : void 0;
+              if (firstPlacement !== void 0 && lastPlacement !== void 0 && y !== void 0) {
+                svgParts.push(
+                  renderVolta(
+                    computeVoltaGeometry(
+                      {
+                        width: lastPlacement.x + lastPlacement.width - firstPlacement.x,
+                        hasStartHook: runStart === 0,
+                        hasEndHook: span.closed && i2 === span.measureNumbers.length
+                      },
+                      metrics
+                    ),
+                    {
+                      x: firstPlacement.x,
+                      y,
+                      // Only the volta's FIRST piece is labelled; a
+                      // continuation after a system break repeating "1."
+                      // would read as a second, different ending.
+                      label: runStart === 0 ? voltaLabel(span.numbers) : "",
+                      color: theme.colorOf("volta"),
+                      fontFamily: theme.textFont,
+                      fontSize: theme.sizes.barNumber
+                    }
+                  )
+                );
+              }
+            }
+            runStart = i2;
+          }
+        }
+        for (const spec of repeatCounts) {
+          const placement = placementByMeasureNumber.get(spec.measureNumber);
+          const y = lineYFor(spec.measureNumber);
+          if (placement === void 0 || y === void 0 || spec.repeatEndTimes === void 0) {
+            continue;
+          }
+          const underVolta = spans.some((span) => span.measureNumbers.includes(spec.measureNumber));
+          svgParts.push(
+            renderRepeatCount(spec.repeatEndTimes, {
+              x: placement.x + placement.width,
+              y: underVolta ? y - (theme.sizes.barNumber + VOLTA_BAR_NUMBER_CLEARANCE) : y,
+              color: theme.colorOf("volta"),
+              fontFamily: theme.textFont,
+              fontSize: theme.sizes.barNumber
+            })
+          );
+        }
+      }
+    }
     if (config.debug.drawBoundingBoxes || config.debug.drawSkyline) {
       const boxes = measureSvgBoxes(svgParts.join("\n"));
       if (config.debug.drawBoundingBoxes) {
@@ -65399,8 +66039,12 @@ ${xrefOffset}
       tempoMarks,
       measureLayoutsByNumber,
       placementByMeasureNumber,
-      measureHeaderAllowance: MEASURE_HEADER_ALLOWANCE
+      measureHeaderAllowance: MEASURE_HEADER_ALLOWANCE,
+      repeatMeasures: repeatMeasureSpecs()
     });
+    for (const d of playback.repeatDiagnostics) {
+      diagnostics.push({ severity: d.severity, code: d.code, message: d.message });
+    }
     return { svg, diagnostics: filterDiagnostics(diagnostics, config.debug.logLevel), playback };
   }
   function renderFromMusicXml(xmlText, options) {
