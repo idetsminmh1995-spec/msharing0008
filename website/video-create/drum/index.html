@@ -389,7 +389,6 @@
           <label for="countInBars">Length</label>
           <select id="countInBars" class="drum-input">
             <option value="1">1 bar</option>
-            <option value="2">2 bars</option>
             <option value="0">Off</option>
           </select>
         </div>
@@ -1630,16 +1629,31 @@
     return audioCtx;
   }
 
+  /**
+   * Slider percent -> the gain a listener will agree with.
+   *
+   * Squared, not linear. A linear slider halved is -6dB, which the ear
+   * reads as "slightly quieter", so most of the travel seems to do
+   * nothing and the control feels broken. Squaring makes 50% land at
+   * -12dB -- about half as loud to a person -- and spreads the useful
+   * range across the whole slider instead of bunching it at the bottom.
+   * 0 is still exactly silent and 100 still exactly unity.
+   */
+  function perceivedGain(percent) {
+    const fraction = Math.min(1, Math.max(0, Number(percent) / 100));
+    return fraction * fraction;
+  }
+
   function applyCountsVolume() {
     countsVolumeOut.textContent = `${countsVolumeInput.value}%`;
-    if (countGain) countGain.gain.value = Number(countsVolumeInput.value) / 100;
+    if (countGain) countGain.gain.value = perceivedGain(countsVolumeInput.value);
   }
   countsVolumeInput.addEventListener('input', applyCountsVolume);
   applyCountsVolume();
 
   function applyMeasureVolume() {
     measureVolumeOut.textContent = `${measureVolumeInput.value}%`;
-    if (measureGain) measureGain.gain.value = Number(measureVolumeInput.value) / 100;
+    if (measureGain) measureGain.gain.value = perceivedGain(measureVolumeInput.value);
   }
   measureVolumeInput.addEventListener('input', applyMeasureVolume);
   applyMeasureVolume();
