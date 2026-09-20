@@ -96,7 +96,7 @@
   .preview-stats b{color:var(--text);}
 
   .video-frame{position:relative;background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-width:0;}
-  .video-top{padding:16px 24px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;}
+  .video-top{padding:10px 24px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;}
   .video-logo-row{display:flex;align-items:center;gap:10px;min-width:0;}
   .video-title{color:#fff;font-family:'Baloo 2','Sora',sans-serif;font-weight:700;font-size:26px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .video-stats{display:flex;gap:8px;flex-shrink:0;}
@@ -109,17 +109,27 @@
      itself in view -- it just doesn't draw a scrollbar. The bar and its
      two arrows are browser chrome, and this strip is a preview of a
      VIDEO frame: nothing in the exported video has a scrollbar in it. */
-  .video-notation{padding:14px 20px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;flex-shrink:0;scrollbar-width:none;-ms-overflow-style:none;}
+  .video-notation{padding:2px 20px 14px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;flex-shrink:0;scrollbar-width:none;-ms-overflow-style:none;}
   .video-notation::-webkit-scrollbar{display:none;width:0;height:0;}
   .video-notation svg{display:block;height:170px;width:auto;max-width:none;}
 
-  /* Video Style (card 5). The notation engine draws INK ONLY -- it is
-     told `colors.background:'none'` either way -- so the backdrop the
-     notation sits on is this one rule, and the two styles differ only
-     in who supplies it: the black style lets the video frame itself
-     show through, the white style paints the strip white. */
-  .video-frame.style-black .video-notation{background:transparent;}
-  .video-frame.style-white .video-notation{background:#fff;}
+  /* Video Style (card 5) is a property of the whole FRAME, not of the
+     notation strip. The strip itself is never painted -- and neither is
+     the notation, which the engine draws with
+     `colors.background:'none'` in both styles -- so the music always
+     sits directly on the video, exactly as it will in the export.
+
+     A white strip banded across an otherwise black frame is what the
+     first attempt produced, and it read as a page element sitting ON a
+     video rather than as part of one. Black style: near-black frame,
+     white notation, white titles. White style: white frame, near-black
+     notation, dark titles, and the stat-box label in the brand red
+     since its tan is for a dark backdrop. */
+  .video-frame.style-white{background:#fff;}
+  .video-frame.style-white .video-title{color:var(--text);}
+  .video-frame.style-white .stat-box .stat-value{color:var(--text);}
+  .video-frame.style-white .stat-box .stat-label{color:var(--red);}
+  .video-frame.style-white .video-logo-mark{filter:none;}
 
   /* Brand mark, burned into the exported video's own frame (top-left,
      inside .video-logo-row) -- replaces the generic note-icon placeholder

@@ -259,6 +259,19 @@ things in it were page chrome rather than video:
   the notation is now drawn in **white, directly on the video's own
   frame**.
 
+**Video Style is a property of the whole frame**, not of the notation
+strip. The first attempt painted only the strip white, which banded a
+white stripe across an otherwise black frame and read as a page element
+sitting ON a video rather than as part of one. So the strip is never
+painted at all now, in either style, and the frame carries the scheme:
+near-black frame + white notation + white titles, or white frame +
+near-black notation + dark titles (with the stat-box label in the brand
+red, since its tan is for a dark backdrop).
+
+The notation also sits a little higher in the frame -- 18px of air came
+out from above the top row and above the staff -- so the music is
+closer to the titles and further from the drum graphic below it.
+
 `colors.background` gained one rule for this: **`'none'` (or
 `'transparent'`) draws no background rectangle at all** — not a
 rectangle that happens to be see-through. That distinction is the whole
@@ -291,7 +304,8 @@ costs the case that prompted the change nothing.
 | Opening barline drawn / clef clearance | the `isSystemStart` barline block and `openingBarlineAllowance` in `render-from-musicxml.ts` |
 | Host wiring | the `performance` branch in `updateCursor`, `website/video-create/drum/index.html` |
 | Transparent background | `hasBackground()` in `src/render/svg-primitives.ts`, its two call sites (`createSvgDocument`, `renderTabNumber`), `TAB_MASK_ON_TRANSPARENT_BACKGROUND` |
-| Video Style / no scrollbar | `.video-notation` CSS + `.style-black`/`.style-white` rules, `notationConfig()`/`applyVideoStyle()` in the drum page |
+| Video Style / no scrollbar | `.video-notation` CSS + the `.video-frame.style-white` rules, `notationConfig()`/`applyVideoStyle()` in the drum page |
+| The notation sitting higher | `.video-top` and `.video-notation` padding in the drum page |
 
 **Do not revert any of it without a reason.** Each one is a case where
 the engine disagreed with what the file actually said — and the first
