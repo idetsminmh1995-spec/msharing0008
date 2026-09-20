@@ -40,14 +40,52 @@ hands on the hi-hat, rim shots on 2 and 4, the ghost note detected from
 its velocity, a three-tom fill and a choked crash, with
 `Approved: True  Issues: 0`.
 
+## `/Drum/sticking-engine-ts`
+
+The same engine in TypeScript, so the browser can run it. Parity-tested
+against the Python above, event by event — see `PORT.md` for what
+"parity" is asserted to mean and for the three things that could not be
+transliterated (CPython's random number generator, its correctly-rounded
+`math.dist`, and its banker's rounding). `INTEGRATION-PLAN.md` at this
+folder's root says why a port rather than a service, Pyodide or
+precomputing.
+
+```bash
+cd Drum/sticking-engine-ts
+npm install
+npm run verify       # typecheck, lint, format, and the parity suite
+python3 scripts/generate_golden.py   # re-record the Python's output
+```
+
 ### Where it fits
 
-The drum video page (`website/video-create/drum/`) already shows a
-**Human Sticking Engine** pill next to **Notation Engine** and **Video
-Engine**. This is that engine. It is not wired into the page yet — the
-page is JavaScript in the browser and this is Python, so connecting the
-two is its own decision (a service, a port, or a build step), not
-something to assume.
+The drum video page (`website/video-create/drum/`) shows a **Human
+Sticking Engine** pill next to **Notation Engine** and **Video Engine**.
+It is now that engine, live: card 5 letters every note the score
+contains with the hand that plays it, under the staff, at the same x as
+the notehead.
+
+The bridge between the two engines is deliberately thin, and lives in
+the page rather than in either engine:
+
+```
+MusicXML ──notation-engine──▶ score + playback data
+                                      │
+                    time, GM drum number, velocity
+                                      │
+                            sticking-engine (the port)
+                                      │
+                             limb per note ──▶ R / L
+```
+
+Velocities are DERIVED from what the score notates — the prevailing
+dynamic marking, plus the note's own accent — because MusicXML has no
+velocities and the sticking engine reads them for its ghost and accent
+thresholds. A made-up number would show up as a made-up articulation.
+Notes with no `<midi-unpitched>` instrument are skipped rather than
+guessed at: a wrong GM number is a note placed on the wrong drum.
+
+**Feet are not lettered.** An R or L on a kick reads as a stick.
 
 ## A note on the two uploads
 

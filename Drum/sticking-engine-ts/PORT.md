@@ -77,6 +77,25 @@ enough for that to cross Rule 9's ghost/accent thresholds, so
 `rule12-humanization.ts` and `rule03-04-timing-density.ts` both round
 Python's way.
 
+## How the page uses it
+
+`website/video-create/drum/` loads `assets/sticking-engine.js` next to
+`assets/notation-engine.js` and letters every note under the staff. The
+bridge lives in the page, not in either engine: it builds the note list
+from the parsed score (time from the tempo map, GM number from
+`<midi-unpitched>`, velocity derived from the notated dynamic plus the
+note's own accent), runs the engine, and puts an R or L at the x the
+notation engine reports for that note.
+
+Two details worth knowing before changing it:
+
+- **`resetIdCounter()` is called before every run.** The engine hands
+  out `src_00000001`, `src_00000002`… from one counter in note-list
+  order, and the page reads that number back to know which note an event
+  came from. Without the reset, a second run starts where the first left
+  off and every letter lands on the wrong note.
+- **Feet get no letter.** An R or L on a kick reads as a stick.
+
 ## What is deliberately not ported
 
 `rule01`'s **MIDI-file** path. The Python reads `.mid` with `mido`; the

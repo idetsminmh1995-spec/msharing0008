@@ -157,6 +157,11 @@
   .video-notation{padding:0 20px 14px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;flex-shrink:0;scrollbar-width:none;-ms-overflow-style:none;}
   .video-notation::-webkit-scrollbar{display:none;width:0;height:0;}
   .video-notation svg{display:block;height:170px;width:auto;max-width:none;}
+  /* The sticking letters are drawn INTO the notation SVG, in its own
+     staff-space units, so they scale with the music and sit at the same
+     x as the notehead they belong to. Colour follows the Video Style the
+     same way the notation's ink does. */
+  .video-notation .sticking-letter{font-family:'Sora',sans-serif;font-weight:700;}
 
   /* Video Style (card 5) is a property of the whole FRAME, not of the
      notation strip. The strip itself is never painted -- and neither is
@@ -203,6 +208,11 @@
 </style>
 <!-- The real Notation Engine bundle (github.com/idetsminmh1995-spec/msharing0008/notation-engine) -->
 <script src="../../assets/notation-engine.js"></script>
+<!-- The Human Sticking Engine: Drum/sticking-engine-ts, a TypeScript port
+     of Drum/sticking-engine (Python) that is parity-tested against it. It
+     decides which limb plays every note; the R/L under the staff is its
+     output. -->
+<script src="../../assets/sticking-engine.js"></script>
 </head>
 <body>
 
@@ -347,7 +357,35 @@
     </div>
 
     <div class="card">
-      <div class="card-head"><span class="card-num">5</span>Video Style</div>
+      <div class="card-head"><span class="card-num">5</span>Sticking</div>
+      <div class="radio-row">
+        <label><input type="checkbox" id="stickingOn" checked>Show R / L under the notes</label>
+      </div>
+      <div class="field-row">
+        <div>
+          <label for="stickingHand">Dominant hand</label>
+          <select id="stickingHand" class="drum-input">
+            <option value="R">Right</option>
+            <option value="L">Left</option>
+          </select>
+        </div>
+        <div>
+          <label for="stickingGenre">Genre</label>
+          <select id="stickingGenre" class="drum-input">
+            <option value="rock">Rock</option>
+            <option value="metal">Metal</option>
+            <option value="jazz">Jazz</option>
+            <option value="funk">Funk</option>
+            <option value="latin">Latin</option>
+            <option value="generic">Generic</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-hint" id="stickingHint">Feet are not lettered &mdash; a kick has no stick.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-num">6</span>Video Style</div>
       <div class="radio-row">
         <label><input type="radio" name="vc" id="styleBlack" value="black" checked>Black</label>
         <label><input type="radio" name="vc" id="styleWhite" value="white">White</label>
@@ -716,6 +754,7 @@
     notationPlayback = rendered.playback;
     attachCursor(svgEl);
     updateCursor();
+    renderSticking();
 
     // Real stats, read from the actual parsed score -- not hardcoded.
     const firstMark = parsed.tempoMarks && parsed.tempoMarks[0];
@@ -747,6 +786,224 @@
       errorCount === 0,
     );
     if (rendered.diagnostics.length > 0) console.log('Notation Engine diagnostics:', rendered.diagnostics);
+  }
+
+
+  // --- Human Sticking Engine -----------------------------------------
+  // Drum/sticking-engine-ts, the TypeScript port of the Python engine in
+  // Drum/sticking-engine, parity-tested against it. It takes a note list
+  // -- time, GM drum number, velocity -- and decides which limb plays
+  // each one. The R / L drawn under the staff is that decision.
+  //
+  // This block is the BRIDGE and nothing else: turning a notated score
+  // into a note list, and turning limbs back into letters on the page.
+  // Neither engine knows about the other, which is §17.3's own split --
+  // the notation engine says where the music is, the sticking engine
+  // says which hand plays it, the page draws.
+  const stickingOn = document.getElementById('stickingOn');
+  const stickingHand = document.getElementById('stickingHand');
+  const stickingGenre = document.getElementById('stickingGenre');
+  const stickingHint = document.getElementById('stickingHint');
+
+  /**
+   * MusicXML has no velocities, so they are DERIVED from what the score
+   * actually notates -- the prevailing dynamic marking, plus the note's
+   * own accent. Not invented per note: the sticking engine reads
+   * velocity for its ghost/accent thresholds (Rule 9), so a made-up
+   * number would show up as made-up articulations.
+   */
+  const DYNAMIC_VELOCITY = { ppp: 24, pp: 36, p: 52, mp: 68, mf: 84, f: 100, ff: 112, fff: 122, sfz: 118 };
+  const DEFAULT_VELOCITY = DYNAMIC_VELOCITY.mf;
+  const ACCENT_BOOST = 24;
+
+  /**
+   * Every notehead of the score as `{time, note, velocity}`, plus the
+   * notation `noteId` each one came from so the answer can be drawn back
+   * onto the right notehead.
+   *
+   * Notes with no `<midi-unpitched>` instrument are skipped rather than
+   * guessed at: the sticking engine maps GM numbers to kit positions,
+   * and a wrong number is a note placed on the wrong drum, which is a
+   * worse answer than no answer.
+   */
+  function buildDrumNoteList(parsed, playback) {
+    const notes = [];
+    const noteIds = [];
+    if (!parsed || !parsed.score) return { notes, noteIds };
+
+    for (const part of parsed.score.parts) {
+      const instrumentMidi = parsed.midiInstrumentsByPart?.get(part.id);
+      if (!instrumentMidi) continue;
+
+      // The prevailing dynamic, advanced in time order as the part is walked.
+      const partDirections = (parsed.directions ?? [])
+        .filter((d) => d.partId === part.id && d.dynamics && d.dynamics.length > 0)
+        .sort((a, b) => a.measureNumber - b.measureNumber || a.tick - b.tick);
+      let directionCursor = 0;
+      let currentVelocity = DEFAULT_VELOCITY;
+
+      for (const measure of part.measures) {
+        const measureOffset = playback.globalTickOffsetByMeasure.get(measure.number) ?? 0;
+        for (const voice of measure.voices) {
+          let running = 0;
+          voice.events.forEach((event, eventIndex) => {
+            const startTick = event.startTick ?? running;
+            running = startTick + event.duration.ticks;
+            if (event.kind !== 'note' && event.kind !== 'chord') return;
+
+            while (
+              directionCursor < partDirections.length &&
+              (partDirections[directionCursor].measureNumber < measure.number ||
+                (partDirections[directionCursor].measureNumber === measure.number &&
+                  partDirections[directionCursor].tick <= startTick))
+            ) {
+              const level = partDirections[directionCursor].dynamics[0];
+              if (DYNAMIC_VELOCITY[level] !== undefined) currentVelocity = DYNAMIC_VELOCITY[level];
+              directionCursor++;
+            }
+
+            const members = event.kind === 'chord' ? event.notes : [event];
+            members.forEach((note, memberIndex) => {
+              const midiNote = note.instrumentId ? instrumentMidi.get(note.instrumentId) : undefined;
+              if (midiNote === undefined) return;
+
+              const accented = (note.articulations ?? []).some(
+                (a) => a === 'accent' || a === 'marcato',
+              );
+              const velocity = Math.max(1, Math.min(127, currentVelocity + (accented ? ACCENT_BOOST : 0)));
+
+              const globalTick = measureOffset + startTick;
+              const baseId = NotationEngine.notationEventId(
+                part.id,
+                measure.number,
+                voice.id,
+                eventIndex,
+              );
+              notes.push({
+                time: NotationEngine.tickToSeconds(playback.tempoMap, globalTick),
+                note: midiNote,
+                velocity,
+              });
+              noteIds.push({
+                noteId: event.kind === 'chord' ? `${baseId}#n${memberIndex}` : baseId,
+                tick: globalTick,
+              });
+            });
+          });
+        }
+      }
+    }
+    return { notes, noteIds };
+  }
+
+  /** `src_00000007` -> 6. See below for why this is safe. */
+  function sourceIndex(sourceId) {
+    const n = Number.parseInt(String(sourceId).split('_')[1], 10);
+    return Number.isFinite(n) ? n - 1 : -1;
+  }
+
+  /**
+   * Runs the sticking engine over the current score and draws a letter
+   * under every note a HAND plays.
+   *
+   * Feet are deliberately unlettered: R/L on a kick would read as a
+   * stick, and a drummer reading this chart would be looking for one.
+   */
+  function renderSticking() {
+    const layerClass = 'sticking-layer';
+    const svgEl = notationContainer.querySelector('svg');
+    if (!svgEl) return;
+    const existing = svgEl.querySelector('.' + layerClass);
+    if (existing) existing.remove();
+    if (!stickingOn.checked || lastParsed === null || notationPlayback === null) return;
+    if (typeof StickingEngine === 'undefined') {
+      stickingHint.textContent = 'Sticking Engine failed to load.';
+      return;
+    }
+
+    const { notes, noteIds } = buildDrumNoteList(lastParsed, notationPlayback);
+    if (notes.length === 0) {
+      stickingHint.textContent =
+        'No <midi-unpitched> instruments in this file, so there is nothing to letter.';
+      return;
+    }
+
+    let performance;
+    try {
+      // Reset FIRST: the engine hands out `src_00000001`, `src_00000002`
+      // ... in note-list order from one counter, and `sourceIndex` below
+      // reads that number to find which note an event came from. Without
+      // the reset a second run would start where the first left off and
+      // every letter would land on the wrong note.
+      StickingEngine.resetIdCounter();
+      const engine = new StickingEngine.Engine({
+        style: StickingEngine.drummerStyle({ dominantHand: stickingHand.value }),
+        intent: StickingEngine.performanceIntent(),
+        genre: stickingGenre.value,
+        seed: 42,
+        mode: 'HIGH',
+      });
+      performance = engine.run({ noteList: notes });
+    } catch (err) {
+      console.error('Sticking Engine failed on this score:', err);
+      stickingHint.textContent = 'Sticking Engine failed on this score -- see console.';
+      return;
+    }
+
+    const viewBox = (svgEl.getAttribute('viewBox') || '').split(/\s+/).map(Number);
+    const height = viewBox.length === 4 ? viewBox[3] : 16;
+    const layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    layer.setAttribute('class', layerClass);
+
+    // How many letters already sit at this x, so two hands playing at
+    // once stack instead of overprinting.
+    const stackAtX = new Map();
+    let hands = 0;
+    for (const ev of performance.events) {
+      if (ev.limb !== 'RH' && ev.limb !== 'LH') continue; // feet get no letter
+      const source = noteIds[sourceIndex(ev.sourceId)];
+      if (source === undefined) continue;
+      hands++;
+
+      // The x of the note ITSELF, from the notation engine's own position
+      // API -- not measured off the SVG, which would drift the moment
+      // anything about the layout changed.
+      let x;
+      try {
+        x = NotationEngine.positionToX(notationPlayback, source.tick).x;
+      } catch (err) {
+        continue;
+      }
+      const key = x.toFixed(3);
+      const depth = stackAtX.get(key) ?? 0;
+      stackAtX.set(key, depth + 1);
+      // The first letter at an x sits CLOSEST to the staff and any
+      // second one goes below it, so the row a reader scans along stays
+      // at one distance from the music. Stacking the other way put the
+      // occasional two-hand stroke above the row and made it read like a
+      // different kind of marking.
+
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('class', 'sticking-letter');
+      text.setAttribute('x', String(x));
+      text.setAttribute('y', String(height - 2.4 + depth * 1.6));
+      text.setAttribute('font-size', '1.5');
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('fill', notationConfig().colors.ink);
+      text.textContent = ev.limb === 'RH' ? 'R' : 'L';
+      layer.appendChild(text);
+    }
+    svgEl.appendChild(layer);
+
+    const issues = performance.validation.issues.length;
+    stickingHint.textContent =
+      `${hands} hand strokes lettered from ${notes.length} notes` +
+      (issues > 0 ? ` -- ${issues} physical issue(s), see console.` : '. Feet are not lettered.');
+    if (issues > 0) console.log('Sticking Engine validation:', performance.validation.issues);
+  }
+
+  for (const control of [stickingOn, stickingHand, stickingGenre]) {
+    control.addEventListener('change', renderSticking);
   }
 
   /**
@@ -783,6 +1040,7 @@
     notationPlayback = rendered.playback;
     attachCursor(svgEl);
     updateCursor();
+    renderSticking();
   }
 
   for (const radio of document.querySelectorAll('input[name="vc"]')) {
