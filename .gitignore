@@ -17,6 +17,14 @@ build/
 notation-engine/dist/*.map
 notation-engine/dist/**/*.d.ts
 notation-engine/dist/*.d.ts
+
+# Same exception, same reason, for the sticking engine's bundle: the
+# drum page loads it with a <script> tag from a host with no build step.
+!Drum/sticking-engine-ts/dist/
+!Drum/sticking-engine-ts/dist/sticking-engine.js
+Drum/sticking-engine-ts/dist/*.map
+Drum/sticking-engine-ts/dist/**/*.d.ts
+Drum/sticking-engine-ts/dist/*.d.ts
 .env
 *.log
 .DS_Store

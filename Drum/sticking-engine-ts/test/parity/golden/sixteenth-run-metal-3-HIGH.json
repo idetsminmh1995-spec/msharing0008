@@ -1,0 +1,530 @@
+{
+ "input": {
+  "genre": "metal",
+  "mode": "HIGH",
+  "notes": [
+   {
+    "note": 42,
+    "time": 0.0,
+    "velocity": 80
+   },
+   {
+    "note": 42,
+    "time": 0.0625,
+    "velocity": 90
+   },
+   {
+    "note": 42,
+    "time": 0.125,
+    "velocity": 100
+   },
+   {
+    "note": 42,
+    "time": 0.1875,
+    "velocity": 80
+   },
+   {
+    "note": 42,
+    "time": 0.25,
+    "velocity": 90
+   },
+   {
+    "note": 42,
+    "time": 0.3125,
+    "velocity": 100
+   },
+   {
+    "note": 42,
+    "time": 0.375,
+    "velocity": 80
+   },
+   {
+    "note": 42,
+    "time": 0.4375,
+    "velocity": 90
+   },
+   {
+    "note": 42,
+    "time": 0.5,
+    "velocity": 100
+   },
+   {
+    "note": 42,
+    "time": 0.5625,
+    "velocity": 80
+   },
+   {
+    "note": 42,
+    "time": 0.625,
+    "velocity": 90
+   },
+   {
+    "note": 42,
+    "time": 0.6875,
+    "velocity": 100
+   },
+   {
+    "note": 42,
+    "time": 0.75,
+    "velocity": 80
+   },
+   {
+    "note": 42,
+    "time": 0.8125,
+    "velocity": 90
+   },
+   {
+    "note": 42,
+    "time": 0.875,
+    "velocity": 100
+   },
+   {
+    "note": 42,
+    "time": 0.9375,
+    "velocity": 80
+   },
+   {
+    "note": 42,
+    "time": 1.0,
+    "velocity": 90
+   },
+   {
+    "note": 42,
+    "time": 1.0625,
+    "velocity": 100
+   },
+   {
+    "note": 42,
+    "time": 1.125,
+    "velocity": 80
+   },
+   {
+    "note": 42,
+    "time": 1.1875,
+    "velocity": 90
+   },
+   {
+    "note": 42,
+    "time": 1.25,
+    "velocity": 100
+   },
+   {
+    "note": 42,
+    "time": 1.3125,
+    "velocity": 80
+   },
+   {
+    "note": 42,
+    "time": 1.375,
+    "velocity": 90
+   },
+   {
+    "note": 42,
+    "time": 1.4375,
+    "velocity": 100
+   },
+   {
+    "note": 42,
+    "time": 1.5,
+    "velocity": 80
+   },
+   {
+    "note": 42,
+    "time": 1.5625,
+    "velocity": 90
+   },
+   {
+    "note": 42,
+    "time": 1.625,
+    "velocity": 100
+   },
+   {
+    "note": 42,
+    "time": 1.6875,
+    "velocity": 80
+   },
+   {
+    "note": 42,
+    "time": 1.75,
+    "velocity": 90
+   },
+   {
+    "note": 42,
+    "time": 1.8125,
+    "velocity": 100
+   },
+   {
+    "note": 42,
+    "time": 1.875,
+    "velocity": 80
+   },
+   {
+    "note": 42,
+    "time": 1.9375,
+    "velocity": 90
+   }
+  ],
+  "seed": 3
+ },
+ "output": {
+  "approved": true,
+  "duration_s": 1.9754212598425196,
+  "engine_version": "1.0.0",
+  "events": [
+   {
+    "dynamic_level": 0.6299212598425197,
+    "event_id": "evt_00000033",
+    "instrument": "hihat_closed",
+    "limb": "RH",
+    "microtiming_offset_ms": -0.5384349796930332,
+    "source_id": "src_00000001",
+    "stroke_type": "single",
+    "time_seconds": -0.0005384349796930333,
+    "velocity": 80
+   },
+   {
+    "dynamic_level": 0.7086614173228346,
+    "event_id": "evt_00000034",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": -1.3720481709346888,
+    "source_id": "src_00000002",
+    "stroke_type": "single",
+    "time_seconds": 0.06112795182906531,
+    "velocity": 89
+   },
+   {
+    "dynamic_level": 0.7874015748031497,
+    "event_id": "evt_00000035",
+    "instrument": "hihat_closed",
+    "limb": "RH",
+    "microtiming_offset_ms": 0.40926742114982906,
+    "source_id": "src_00000003",
+    "stroke_type": "accent",
+    "time_seconds": 0.12540926742114983,
+    "velocity": 99
+   },
+   {
+    "dynamic_level": 0.6299212598425197,
+    "event_id": "evt_00000036",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": -1.1009974214980867,
+    "source_id": "src_00000004",
+    "stroke_type": "single",
+    "time_seconds": 0.18639900257850192,
+    "velocity": 81
+   },
+   {
+    "dynamic_level": 0.7086614173228346,
+    "event_id": "evt_00000037",
+    "instrument": "hihat_closed",
+    "limb": "RH",
+    "microtiming_offset_ms": 0.451940550461182,
+    "source_id": "src_00000005",
+    "stroke_type": "single",
+    "time_seconds": 0.25045194055046116,
+    "velocity": 91
+   },
+   {
+    "dynamic_level": 0.7874015748031497,
+    "event_id": "evt_00000038",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": -2.1271598755226635,
+    "source_id": "src_00000006",
+    "stroke_type": "accent",
+    "time_seconds": 0.31037284012447736,
+    "velocity": 99
+   },
+   {
+    "dynamic_level": 0.6299212598425197,
+    "event_id": "evt_00000039",
+    "instrument": "hihat_closed",
+    "limb": "RH",
+    "microtiming_offset_ms": -1.9426325740742192,
+    "source_id": "src_00000007",
+    "stroke_type": "single",
+    "time_seconds": 0.37305736742592577,
+    "velocity": 81
+   },
+   {
+    "dynamic_level": 0.7086614173228346,
+    "event_id": "evt_00000040",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": 1.2081452924808294,
+    "source_id": "src_00000008",
+    "stroke_type": "single",
+    "time_seconds": 0.4387081452924808,
+    "velocity": 89
+   },
+   {
+    "dynamic_level": 0.7874015748031497,
+    "event_id": "evt_00000041",
+    "instrument": "hihat_closed",
+    "limb": "RH",
+    "microtiming_offset_ms": -1.0163150367487914,
+    "source_id": "src_00000009",
+    "stroke_type": "accent",
+    "time_seconds": 0.4989836849632512,
+    "velocity": 100
+   },
+   {
+    "dynamic_level": 0.6299212598425197,
+    "event_id": "evt_00000042",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": -0.8819616005333981,
+    "source_id": "src_00000010",
+    "stroke_type": "single",
+    "time_seconds": 0.5616180383994666,
+    "velocity": 82
+   },
+   {
+    "dynamic_level": 0.7086614173228346,
+    "event_id": "evt_00000043",
+    "instrument": "hihat_closed",
+    "limb": "RH",
+    "microtiming_offset_ms": -0.8465096839568915,
+    "source_id": "src_00000011",
+    "stroke_type": "single",
+    "time_seconds": 0.6241534903160431,
+    "velocity": 89
+   },
+   {
+    "dynamic_level": 0.7874015748031497,
+    "event_id": "evt_00000044",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": -0.07396938234646688,
+    "source_id": "src_00000012",
+    "stroke_type": "accent",
+    "time_seconds": 0.6874260306176535,
+    "velocity": 100
+   },
+   {
+    "dynamic_level": 0.6299212598425197,
+    "event_id": "evt_00000045",
+    "instrument": "hihat_closed",
+    "limb": "RH",
+    "microtiming_offset_ms": 0.24429912019929967,
+    "source_id": "src_00000013",
+    "stroke_type": "single",
+    "time_seconds": 0.7502442991201993,
+    "velocity": 79
+   },
+   {
+    "dynamic_level": 0.7086614173228346,
+    "event_id": "evt_00000046",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": -2.3521841216737553,
+    "source_id": "src_00000014",
+    "stroke_type": "single",
+    "time_seconds": 0.8101478158783263,
+    "velocity": 90
+   },
+   {
+    "dynamic_level": 0.7874015748031497,
+    "event_id": "evt_00000047",
+    "instrument": "hihat_closed",
+    "limb": "RH",
+    "microtiming_offset_ms": 2.243836298200622,
+    "source_id": "src_00000015",
+    "stroke_type": "accent",
+    "time_seconds": 0.8772438362982006,
+    "velocity": 100
+   },
+   {
+    "dynamic_level": 0.6299212598425197,
+    "event_id": "evt_00000048",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": 1.0126975972778336,
+    "source_id": "src_00000016",
+    "stroke_type": "single",
+    "time_seconds": 0.9385126975972778,
+    "velocity": 80
+   },
+   {
+    "dynamic_level": 0.7086614173228346,
+    "event_id": "evt_00000049",
+    "instrument": "hihat_closed",
+    "limb": "RH",
+    "microtiming_offset_ms": -1.9864661197891218,
+    "source_id": "src_00000017",
+    "stroke_type": "single",
+    "time_seconds": 0.9980135338802109,
+    "velocity": 89
+   },
+   {
+    "dynamic_level": 0.7874015748031497,
+    "event_id": "evt_00000050",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": -1.9693109157729847,
+    "source_id": "src_00000018",
+    "stroke_type": "accent",
+    "time_seconds": 1.060530689084227,
+    "velocity": 100
+   },
+   {
+    "dynamic_level": 0.6299212598425197,
+    "event_id": "evt_00000051",
+    "instrument": "hihat_closed",
+    "limb": "RH",
+    "microtiming_offset_ms": -0.1952723309889226,
+    "source_id": "src_00000019",
+    "stroke_type": "single",
+    "time_seconds": 1.1248047276690112,
+    "velocity": 82
+   },
+   {
+    "dynamic_level": 0.7086614173228346,
+    "event_id": "evt_00000052",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": 0.9681462070835818,
+    "source_id": "src_00000020",
+    "stroke_type": "single",
+    "time_seconds": 1.1884681462070836,
+    "velocity": 91
+   },
+   {
+    "dynamic_level": 0.7874015748031497,
+    "event_id": "evt_00000053",
+    "instrument": "hihat_closed",
+    "limb": "RH",
+    "microtiming_offset_ms": -0.4759734253407575,
+    "source_id": "src_00000021",
+    "stroke_type": "accent",
+    "time_seconds": 1.2495240265746592,
+    "velocity": 99
+   },
+   {
+    "dynamic_level": 0.6299212598425197,
+    "event_id": "evt_00000054",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": 0.6720809497333948,
+    "source_id": "src_00000022",
+    "stroke_type": "single",
+    "time_seconds": 1.3131720809497334,
+    "velocity": 80
+   },
+   {
+    "dynamic_level": 0.7086614173228346,
+    "event_id": "evt_00000055",
+    "instrument": "hihat_closed",
+    "limb": "RH",
+    "microtiming_offset_ms": -0.39040134496270884,
+    "source_id": "src_00000023",
+    "stroke_type": "single",
+    "time_seconds": 1.3746095986550373,
+    "velocity": 91
+   },
+   {
+    "dynamic_level": 0.7874015748031497,
+    "event_id": "evt_00000056",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": 1.8818769832851356,
+    "source_id": "src_00000024",
+    "stroke_type": "accent",
+    "time_seconds": 1.4393818769832851,
+    "velocity": 99
+   },
+   {
+    "dynamic_level": 0.6299212598425197,
+    "event_id": "evt_00000057",
+    "instrument": "hihat_closed",
+    "limb": "RH",
+    "microtiming_offset_ms": 1.4942625565065697,
+    "source_id": "src_00000025",
+    "stroke_type": "single",
+    "time_seconds": 1.5014942625565066,
+    "velocity": 79
+   },
+   {
+    "dynamic_level": 0.7086614173228346,
+    "event_id": "evt_00000058",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": 2.0769264102066916,
+    "source_id": "src_00000026",
+    "stroke_type": "single",
+    "time_seconds": 1.5645769264102067,
+    "velocity": 92
+   },
+   {
+    "dynamic_level": 0.7874015748031497,
+    "event_id": "evt_00000059",
+    "instrument": "hihat_closed",
+    "limb": "RH",
+    "microtiming_offset_ms": -0.1242269130443856,
+    "source_id": "src_00000027",
+    "stroke_type": "accent",
+    "time_seconds": 1.6248757730869556,
+    "velocity": 99
+   },
+   {
+    "dynamic_level": 0.6299212598425197,
+    "event_id": "evt_00000060",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": 2.3375317881930795,
+    "source_id": "src_00000028",
+    "stroke_type": "single",
+    "time_seconds": 1.689837531788193,
+    "velocity": 79
+   },
+   {
+    "dynamic_level": 0.7086614173228346,
+    "event_id": "evt_00000061",
+    "instrument": "hihat_closed",
+    "limb": "RH",
+    "microtiming_offset_ms": 0.19186190673447534,
+    "source_id": "src_00000029",
+    "stroke_type": "single",
+    "time_seconds": 1.7501918619067345,
+    "velocity": 88
+   },
+   {
+    "dynamic_level": 0.7874015748031497,
+    "event_id": "evt_00000062",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": -1.2039234183639045,
+    "source_id": "src_00000030",
+    "stroke_type": "accent",
+    "time_seconds": 1.8112960765816362,
+    "velocity": 100
+   },
+   {
+    "dynamic_level": 0.6299212598425197,
+    "event_id": "evt_00000063",
+    "instrument": "hihat_closed",
+    "limb": "RH",
+    "microtiming_offset_ms": 0.7733776029645356,
+    "source_id": "src_00000031",
+    "stroke_type": "single",
+    "time_seconds": 1.8757733776029646,
+    "velocity": 80
+   },
+   {
+    "dynamic_level": 0.7086614173228346,
+    "event_id": "evt_00000064",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": -1.7721388926745365,
+    "source_id": "src_00000032",
+    "stroke_type": "single",
+    "time_seconds": 1.9357278611073254,
+    "velocity": 89
+   }
+  ],
+  "issues": [],
+  "seed": 3
+ }
+}

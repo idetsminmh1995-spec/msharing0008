@@ -1,0 +1,274 @@
+{
+ "input": {
+  "genre": "funk",
+  "mode": "HIGH",
+  "notes": [
+   {
+    "note": 42,
+    "time": 0.0,
+    "velocity": 96
+   },
+   {
+    "note": 43,
+    "time": 0.2,
+    "velocity": 96
+   },
+   {
+    "note": 42,
+    "time": 0.4,
+    "velocity": 96
+   },
+   {
+    "note": 43,
+    "time": 0.6000000000000001,
+    "velocity": 96
+   },
+   {
+    "note": 42,
+    "time": 0.8,
+    "velocity": 96
+   },
+   {
+    "note": 43,
+    "time": 1.0,
+    "velocity": 96
+   },
+   {
+    "note": 42,
+    "time": 1.2000000000000002,
+    "velocity": 96
+   },
+   {
+    "note": 43,
+    "time": 1.4000000000000001,
+    "velocity": 96
+   },
+   {
+    "note": 42,
+    "time": 1.6,
+    "velocity": 96
+   },
+   {
+    "note": 43,
+    "time": 1.8,
+    "velocity": 96
+   },
+   {
+    "note": 42,
+    "time": 2.0,
+    "velocity": 96
+   },
+   {
+    "note": 43,
+    "time": 2.2,
+    "velocity": 96
+   },
+   {
+    "note": 42,
+    "time": 2.4000000000000004,
+    "velocity": 96
+   },
+   {
+    "note": 43,
+    "time": 2.6,
+    "velocity": 96
+   },
+   {
+    "note": 42,
+    "time": 2.8000000000000003,
+    "velocity": 96
+   },
+   {
+    "note": 43,
+    "time": 3.0,
+    "velocity": 96
+   }
+  ],
+  "seed": 11
+ },
+ "output": {
+  "approved": true,
+  "duration_s": 3.0385826771653544,
+  "engine_version": "1.0.0",
+  "events": [
+   {
+    "dynamic_level": 0.7559055118110236,
+    "event_id": "evt_00000017",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": -0.7850509283970895,
+    "source_id": "src_00000001",
+    "stroke_type": "single",
+    "time_seconds": -0.0007850509283970895,
+    "velocity": 97
+   },
+   {
+    "dynamic_level": 0.7559055118110236,
+    "event_id": "evt_00000018",
+    "instrument": "floor_tom",
+    "limb": "RH",
+    "microtiming_offset_ms": -0.2959321855445127,
+    "source_id": "src_00000002",
+    "stroke_type": "single",
+    "time_seconds": 0.1997040678144555,
+    "velocity": 96
+   },
+   {
+    "dynamic_level": 0.7559055118110236,
+    "event_id": "evt_00000019",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": -0.8098015188767653,
+    "source_id": "src_00000003",
+    "stroke_type": "single",
+    "time_seconds": 0.39919019848112325,
+    "velocity": 96
+   },
+   {
+    "dynamic_level": 0.7559055118110236,
+    "event_id": "evt_00000020",
+    "instrument": "floor_tom",
+    "limb": "RH",
+    "microtiming_offset_ms": 0.4522318816773443,
+    "source_id": "src_00000004",
+    "stroke_type": "single",
+    "time_seconds": 0.6004522318816774,
+    "velocity": 95
+   },
+   {
+    "dynamic_level": 0.7559055118110236,
+    "event_id": "evt_00000021",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": -1.7588047315974835,
+    "source_id": "src_00000005",
+    "stroke_type": "single",
+    "time_seconds": 0.7982411952684025,
+    "velocity": 95
+   },
+   {
+    "dynamic_level": 0.7559055118110236,
+    "event_id": "evt_00000022",
+    "instrument": "floor_tom",
+    "limb": "RH",
+    "microtiming_offset_ms": 2.515241003031287,
+    "source_id": "src_00000006",
+    "stroke_type": "single",
+    "time_seconds": 1.0025152410030314,
+    "velocity": 97
+   },
+   {
+    "dynamic_level": 0.7559055118110236,
+    "event_id": "evt_00000023",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": 0.5902010845327754,
+    "source_id": "src_00000007",
+    "stroke_type": "single",
+    "time_seconds": 1.2005902010845328,
+    "velocity": 96
+   },
+   {
+    "dynamic_level": 0.7559055118110236,
+    "event_id": "evt_00000024",
+    "instrument": "floor_tom",
+    "limb": "RH",
+    "microtiming_offset_ms": -0.862527419537044,
+    "source_id": "src_00000008",
+    "stroke_type": "single",
+    "time_seconds": 1.399137472580463,
+    "velocity": 95
+   },
+   {
+    "dynamic_level": 0.7559055118110236,
+    "event_id": "evt_00000025",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": 0.7583676984122287,
+    "source_id": "src_00000009",
+    "stroke_type": "single",
+    "time_seconds": 1.6007583676984123,
+    "velocity": 94
+   },
+   {
+    "dynamic_level": 0.7559055118110236,
+    "event_id": "evt_00000026",
+    "instrument": "floor_tom",
+    "limb": "RH",
+    "microtiming_offset_ms": 1.0336808928572965,
+    "source_id": "src_00000010",
+    "stroke_type": "single",
+    "time_seconds": 1.8010336808928573,
+    "velocity": 97
+   },
+   {
+    "dynamic_level": 0.7559055118110236,
+    "event_id": "evt_00000027",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": 1.6533570007737257,
+    "source_id": "src_00000011",
+    "stroke_type": "single",
+    "time_seconds": 2.0016533570007735,
+    "velocity": 95
+   },
+   {
+    "dynamic_level": 0.7559055118110236,
+    "event_id": "evt_00000028",
+    "instrument": "floor_tom",
+    "limb": "RH",
+    "microtiming_offset_ms": -1.1126392142123012,
+    "source_id": "src_00000012",
+    "stroke_type": "single",
+    "time_seconds": 2.198887360785788,
+    "velocity": 97
+   },
+   {
+    "dynamic_level": 0.7559055118110236,
+    "event_id": "evt_00000029",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": 2.0609079578273164,
+    "source_id": "src_00000013",
+    "stroke_type": "single",
+    "time_seconds": 2.4020609079578277,
+    "velocity": 97
+   },
+   {
+    "dynamic_level": 0.7559055118110236,
+    "event_id": "evt_00000030",
+    "instrument": "floor_tom",
+    "limb": "RH",
+    "microtiming_offset_ms": -1.5373628368502648,
+    "source_id": "src_00000014",
+    "stroke_type": "single",
+    "time_seconds": 2.59846263716315,
+    "velocity": 97
+   },
+   {
+    "dynamic_level": 0.7559055118110236,
+    "event_id": "evt_00000031",
+    "instrument": "hihat_closed",
+    "limb": "LH",
+    "microtiming_offset_ms": -1.307362111697907,
+    "source_id": "src_00000015",
+    "stroke_type": "single",
+    "time_seconds": 2.7986926378883026,
+    "velocity": 96
+   },
+   {
+    "dynamic_level": 0.7559055118110236,
+    "event_id": "evt_00000032",
+    "instrument": "floor_tom",
+    "limb": "RH",
+    "microtiming_offset_ms": 1.3331080433044522,
+    "source_id": "src_00000016",
+    "stroke_type": "single",
+    "time_seconds": 3.0013331080433043,
+    "velocity": 96
+   }
+  ],
+  "issues": [],
+  "seed": 11
+ }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "sticking-engine",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TypeScript port of Drum/sticking-engine (Python). Decides which limb plays every note of a drum part, and how.",
+  "type": "module",
+  "main": "dist/sticking-engine.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --outfile=dist/sticking-engine.js --format=iife --global-name=StickingEngine --sourcemap",
+    "typecheck": "tsc --noEmit",
+    "declarations": "tsc --emitDeclarationOnly",
+    "lint": "eslint src",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "golden": "python3 scripts/generate_golden.py",
+    "test": "npm run build && node --test",
+    "verify": "npm run typecheck && npm run lint && npm run format:check && npm run test"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "8.70.0",
+    "@typescript-eslint/parser": "8.70.0",
+    "esbuild": "0.28.2",
+    "eslint": "10.10.0",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3"
+  }
+}
