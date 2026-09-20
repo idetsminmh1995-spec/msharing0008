@@ -1,5 +1,5 @@
 import { getGlyph } from '../glyphs/glyph-table.js';
-import { svgGlyphText, svgRect } from './svg-primitives.js';
+import { hasBackground, svgGlyphText, svgRect } from './svg-primitives.js';
 
 export interface RenderTabNumberOptions {
   readonly x: number;
@@ -12,6 +12,17 @@ export interface RenderTabNumberOptions {
    * instead; masking achieves the same visual result without the
    * renderer having to know every number's position before it draws the
    * staff, which the current per-measure draw order doesn't allow.
+   */
+  /**
+   * What the mask behind the digits is painted in -- the page's own
+   * background, so the string line appears to break for them.
+   *
+   * `'none'`/`'transparent'` draws NO mask, and the string line then
+   * runs straight through the digits. That is the honest outcome of a
+   * transparent render: the engine cannot paint over a line in a colour
+   * it does not know. `renderFromMusicXml` reports
+   * `TAB_MASK_ON_TRANSPARENT_BACKGROUND` when it happens rather than
+   * leaving the reader to notice.
    */
   readonly backgroundColor: string;
   readonly fontFamily: string;
@@ -41,15 +52,17 @@ export function renderTabNumber(
   const widths = glyphNames.map(digitWidth);
   const totalWidth = widths.reduce((sum, w) => sum + w, 0);
 
-  const parts: string[] = [
-    svgRect(
-      options.x - totalWidth / 2 - MASK_PADDING,
-      options.y - MASK_HALF_HEIGHT,
-      totalWidth + MASK_PADDING * 2,
-      MASK_HALF_HEIGHT * 2,
-      { fill: options.backgroundColor },
-    ),
-  ];
+  const parts: string[] = hasBackground(options.backgroundColor)
+    ? [
+        svgRect(
+          options.x - totalWidth / 2 - MASK_PADDING,
+          options.y - MASK_HALF_HEIGHT,
+          totalWidth + MASK_PADDING * 2,
+          MASK_HALF_HEIGHT * 2,
+          { fill: options.backgroundColor },
+        ),
+      ]
+    : [];
 
   let cursorX = options.x - totalWidth / 2;
   glyphNames.forEach((name, i) => {

@@ -2374,7 +2374,15 @@ API can be designed *then*, informed by what that extension actually needs.
     italic instruction is not. Neither is a repeat structure whose two
     halves genuinely contradict each other; that reports
     `REPEAT_RUNAWAY` and plays straight through.
-16. **A volta bracket is drawn above the bar numbers, not below them**
+16. **A tab staff's fret numbers cannot mask their string line on a
+    transparent background** (`colors.background: 'none'`). Integration
+    C's mask is painted in the page's own background colour, which a
+    transparent render does not have, so the string line runs through
+    the digits. Reported as `TAB_MASK_ON_TRANSPARENT_BACKGROUND`, once
+    per render, rather than left for the reader to notice. Breaking the
+    line instead of painting over it would need the staff-line pass to
+    know every fret's x, which is a different piece of work.
+17. **A volta bracket is drawn above the bar numbers, not below them**
     (§9.5) — the reverse of the usual engraving order. Bar numbers sit
     at a measure's own left edge, which is exactly where a volta
     starts, so the two would collide on precisely the measures a volta

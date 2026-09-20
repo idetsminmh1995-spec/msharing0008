@@ -105,8 +105,21 @@
   .stat-box .stat-value{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:16px;display:block;}
   .video-mid{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;}
   .drum-circle{width:120px;height:120px;border-radius:50%;border:3px solid var(--red);display:flex;align-items:center;justify-content:center;color:var(--red);}
-  .video-notation{background:#fff;padding:14px 20px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;flex-shrink:0;}
+  /* The strip still SCROLLS -- the cursor drives `scrollLeft` to keep
+     itself in view -- it just doesn't draw a scrollbar. The bar and its
+     two arrows are browser chrome, and this strip is a preview of a
+     VIDEO frame: nothing in the exported video has a scrollbar in it. */
+  .video-notation{padding:14px 20px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;flex-shrink:0;scrollbar-width:none;-ms-overflow-style:none;}
+  .video-notation::-webkit-scrollbar{display:none;width:0;height:0;}
   .video-notation svg{display:block;height:170px;width:auto;max-width:none;}
+
+  /* Video Style (card 5). The notation engine draws INK ONLY -- it is
+     told `colors.background:'none'` either way -- so the backdrop the
+     notation sits on is this one rule, and the two styles differ only
+     in who supplies it: the black style lets the video frame itself
+     show through, the white style paints the strip white. */
+  .video-frame.style-black .video-notation{background:transparent;}
+  .video-frame.style-white .video-notation{background:#fff;}
 
   /* Brand mark, burned into the exported video's own frame (top-left,
      inside .video-logo-row) -- replaces the generic note-icon placeholder
@@ -208,8 +221,8 @@
     <div class="card">
       <div class="card-head"><span class="card-num">5</span>Video Style</div>
       <div class="radio-row">
-        <label><input type="radio" name="vc" checked>Black</label>
-        <label><input type="radio" name="vc">White</label>
+        <label><input type="radio" name="vc" id="styleBlack" value="black" checked>Black</label>
+        <label><input type="radio" name="vc" id="styleWhite" value="white">White</label>
       </div>
       <label>Aspect Ratio</label>
       <div class="ratio-row">
@@ -233,7 +246,7 @@
       </div>
     </div>
 
-    <div class="video-frame">
+    <div class="video-frame style-black" id="videoFrame">
       <div class="video-top">
         <div class="video-logo-row">
           <img class="video-logo-mark" src="../../assets/logo/sharing-drum-logo-full.webp" alt="M Sharing Drum">
@@ -372,6 +385,37 @@
   let notationPlayback = null;
   let cursorLine = null;
   let cursorRaf = 0;
+  // The last PARSED score, kept so switching Video Style re-renders
+  // without re-reading the file -- parsing is ~80% of a render.
+  let lastParsed = null;
+  let lastFileLabel = '';
+
+  // --- Video Style (card 5) ---------------------------------------
+  // The notation engine draws INK ONLY: `colors.background:'none'` in
+  // both styles, so it never paints a rectangle behind the music. What
+  // the music sits on is the page's business -- the video frame itself
+  // for the black style, a white strip for the white one -- which is
+  // the same §17.3 split the playback cursor already follows: the
+  // engine says what the notation IS, the host says where it goes.
+  const styleBlack = document.getElementById('styleBlack');
+  const videoFrameEl = document.getElementById('videoFrame');
+
+  function currentVideoStyle() {
+    return styleBlack && styleBlack.checked ? 'black' : 'white';
+  }
+
+  function notationConfig() {
+    return {
+      colors: {
+        // White notation on the video's own dark frame; near-black on
+        // the white strip. `background:'none'` means the engine draws
+        // NO background rectangle at all -- not a see-through one --
+        // so the frame (or the drum-kit photo behind it) shows through.
+        ink: currentVideoStyle() === 'black' ? '#ffffff' : '#111111',
+        background: 'none',
+      },
+    };
+  }
   const statBpm = document.getElementById('statBpm');
   const statTime = document.getElementById('statTime');
   const statMeasures = document.getElementById('statMeasures');
@@ -400,13 +444,16 @@
       // (Phase 53's own measurements), so this halves the work on every
       // upload -- and keeps `parsed` for the stats below.
       parsed = NotationEngine.parseMusicXml(xmlText);
-      rendered = NotationEngine.renderParsedMusicXml(parsed);
+      rendered = NotationEngine.renderParsedMusicXml(parsed, { config: notationConfig() });
     } catch (err) {
       console.error('Notation Engine failed on this file:', err);
       notationContainer.textContent = 'Could not parse this file -- see console for details.';
       setUploadConfirm(`Could not parse "${fileLabel}".`, false);
       return;
     }
+
+    lastParsed = parsed;
+    lastFileLabel = fileLabel;
 
     // Inject the real rendered SVG, height-constrained to fit the strip
     // (its own real width is left alone, so a long piece scrolls).
@@ -456,6 +503,45 @@
     );
     if (rendered.diagnostics.length > 0) console.log('Notation Engine diagnostics:', rendered.diagnostics);
   }
+
+  /**
+   * Re-draws the notation in the newly-picked style, from the score
+   * already parsed -- no file is re-read and nothing is re-parsed.
+   *
+   * The whole SVG is replaced (its ink colour is baked into every
+   * element), so the cursor line goes with it and has to be re-attached
+   * and put back where the audio is. Skipping that is how a style
+   * switch mid-playback would leave the marker behind.
+   */
+  function applyVideoStyle() {
+    const style = currentVideoStyle();
+    if (videoFrameEl) {
+      videoFrameEl.classList.toggle('style-black', style === 'black');
+      videoFrameEl.classList.toggle('style-white', style === 'white');
+    }
+    if (lastParsed === null || typeof NotationEngine === 'undefined') return;
+    let rendered;
+    try {
+      rendered = NotationEngine.renderParsedMusicXml(lastParsed, { config: notationConfig() });
+    } catch (err) {
+      console.error('Notation Engine failed re-rendering in the ' + style + ' style:', err);
+      return;
+    }
+    notationContainer.innerHTML = rendered.svg;
+    const svgEl = notationContainer.querySelector('svg');
+    if (svgEl) {
+      svgEl.removeAttribute('width');
+      svgEl.removeAttribute('height');
+    }
+    notationPlayback = rendered.playback;
+    attachCursor(svgEl);
+    updateCursor();
+  }
+
+  for (const radio of document.querySelectorAll('input[name="vc"]')) {
+    radio.addEventListener('change', applyVideoStyle);
+  }
+  applyVideoStyle();
 
   document.getElementById('upload-musicxml').addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];

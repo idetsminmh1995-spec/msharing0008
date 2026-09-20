@@ -6,7 +6,7 @@ A+B+C corrective work** (making notes actually visible in the web app).
 Numbering is **`PLAN.md` §22's phase numbering** — deliberately not a second
 numbering system. Say a number from §B below and that's the phase to build.
 
-**Last audited:** against the code in `src/` and the **856-test** suite,
+**Last audited:** against the code in `src/` and the **864-test** suite,
 after the "read any drum notation" round
 ([`any-drum-notation.md`](./any-drum-notation.md)). Stages 0-10 are
 complete: every phase numbered 1-54 is built AND wired, including the
@@ -19,7 +19,7 @@ cursor and repeat unfolding). What remains is the named gaps in §C and
 ## A. DONE — Phases 1–54 ✅ (**every stage complete**) + Integration Passes A–Q
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes **856/856** across them.
+`npm run verify` passes **864/864** across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -148,6 +148,14 @@ which also covers the playback cursor now drawn on the drum page.
    performance order, and the same round drew the voltas and `×N` on the
    page, drew a repeat-begin on measure 1 at all, and stopped the clef
    being drawn on top of its dots.
+4. **The preview showed page chrome, not a video frame.** The notation
+   strip drew a scrollbar (it still scrolls -- the cursor drives
+   `scrollLeft` -- it just no longer draws a bar and two arrows), and
+   the music sat on a white strip regardless of Video Style. With the
+   Black style the engine now draws **white ink on no background at
+   all**: `colors.background: 'none'` omits the background rectangle
+   entirely rather than painting a see-through one, so the video frame
+   (or the drum-kit photo behind it) shows through.
 
 ---
 

@@ -240,13 +240,46 @@ Both sit **above** the bar-number band rather than below it, which is
 the reverse of the usual engraving order. Bar numbers are drawn at a
 measure's own left edge, which is exactly where a volta starts, so the
 two would collide on precisely the measures a volta cares about. Stated
-as limitation 16 rather than left as a surprise: the correct fix is to
+as limitation 17 rather than left as a surprise: the correct fix is to
 move the bar number above the bracket, which is a bar-number change.
 
 A score with no volta and no `×N` reserves none of this extra headroom,
 which is what keeps every existing fixture byte-identical.
 
-## 6. How to revert
+## 6. A transparent render, for the video frame
+
+The drum page's Live Preview is a preview of a **video frame**, and two
+things in it were page chrome rather than video:
+
+- **The scrollbar.** The notation strip still scrolls — the playback
+  cursor drives `scrollLeft` to keep itself in view — it just no longer
+  draws a bar and two arrows. Nothing in the exported video has a
+  scrollbar in it.
+- **The white strip behind the music.** With Video Style set to Black,
+  the notation is now drawn in **white, directly on the video's own
+  frame**.
+
+`colors.background` gained one rule for this: **`'none'` (or
+`'transparent'`) draws no background rectangle at all** — not a
+rectangle that happens to be see-through. That distinction is the whole
+point. A `fill="none"` rect would still be an element in the document,
+still hit-testable, and a rasteriser that treats a missing fill as the
+default would still flood an exported PNG with opaque white. The page
+now passes `background: 'none'` in **both** styles and supplies the
+backdrop itself (the video frame for black, a white strip for white),
+which is the same §17.3 split the cursor already follows: the engine
+says what the notation IS, the host says where it goes.
+
+One thing genuinely breaks on a transparent background, and it says so
+rather than going quiet: Integration C masks the staff line behind a
+**tab fret number** by painting the page's background colour over it.
+There is no such colour here, so the line runs through the digits.
+`TAB_MASK_ON_TRANSPARENT_BACKGROUND` is reported once per render (not
+once per fret — a 200-note tab part would bury every other diagnostic),
+and it is §19's limitation 16. A drum chart has no tab staff, so this
+costs the case that prompted the change nothing.
+
+## 7. How to revert
 
 | Change | Where |
 |---|---|
@@ -257,6 +290,8 @@ which is what keeps every existing fixture byte-identical.
 | Voltas and `×N` | `src/geometry/volta.ts`, `src/render/volta.ts`, the volta block in `render-from-musicxml.ts`, `VOLTA_*` constants |
 | Opening barline drawn / clef clearance | the `isSystemStart` barline block and `openingBarlineAllowance` in `render-from-musicxml.ts` |
 | Host wiring | the `performance` branch in `updateCursor`, `website/video-create/drum/index.html` |
+| Transparent background | `hasBackground()` in `src/render/svg-primitives.ts`, its two call sites (`createSvgDocument`, `renderTabNumber`), `TAB_MASK_ON_TRANSPARENT_BACKGROUND` |
+| Video Style / no scrollbar | `.video-notation` CSS + `.style-black`/`.style-white` rules, `notationConfig()`/`applyVideoStyle()` in the drum page |
 
 **Do not revert any of it without a reason.** Each one is a case where
 the engine disagreed with what the file actually said — and the first

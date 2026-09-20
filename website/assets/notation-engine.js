@@ -144,6 +144,7 @@ var NotationEngine = (() => {
     graceNoteGlyphName: () => graceNoteGlyphName,
     groupBeams: () => groupBeams,
     groupBeamsFromHints: () => groupBeamsFromHints,
+    hasBackground: () => hasBackground,
     hasExplicitBeams: () => hasExplicitBeams,
     isKnownMusicXmlNotehead: () => isKnownMusicXmlNotehead,
     isPitched: () => isPitched,
@@ -59180,11 +59181,14 @@ var NotationEngine = (() => {
 ${children.join("\n")}
 </g>`;
   }
+  function hasBackground(backgroundColor) {
+    return backgroundColor !== void 0 && backgroundColor !== "none" && backgroundColor !== "transparent";
+  }
   function createSvgDocument(options, children) {
     const { viewBoxWidth, viewBoxHeight, pxPerStaffSpace, backgroundColor } = options;
     const pxWidth = viewBoxWidth * pxPerStaffSpace;
     const pxHeight = viewBoxHeight * pxPerStaffSpace;
-    const background = backgroundColor !== void 0 ? svgRect(0, 0, viewBoxWidth, viewBoxHeight, { fill: backgroundColor }) : "";
+    const background = hasBackground(backgroundColor) ? svgRect(0, 0, viewBoxWidth, viewBoxHeight, { fill: backgroundColor }) : "";
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${pxWidth}" height="${pxHeight}" viewBox="0 0 ${viewBoxWidth} ${viewBoxHeight}">
 ` + (background !== "" ? background + "\n" : "") + children.join("\n") + `
 </svg>`;
@@ -59590,7 +59594,7 @@ ${denominator}`;
   function renderTabNumber(glyphNames, options) {
     const widths = glyphNames.map(digitWidth);
     const totalWidth = widths.reduce((sum, w) => sum + w, 0);
-    const parts = [
+    const parts = hasBackground(options.backgroundColor) ? [
       svgRect(
         options.x - totalWidth / 2 - MASK_PADDING,
         options.y - MASK_HALF_HEIGHT,
@@ -59598,7 +59602,7 @@ ${denominator}`;
         MASK_HALF_HEIGHT * 2,
         { fill: options.backgroundColor }
       )
-    ];
+    ] : [];
     let cursorX = options.x - totalWidth / 2;
     glyphNames.forEach((name, i2) => {
       const glyph = getGlyph(name);
@@ -65030,6 +65034,7 @@ ${xrefOffset}
     const config = resolveConfig(options?.config);
     const theme = buildTheme(config);
     const staffBottomYs = /* @__PURE__ */ new Set();
+    let reportedTransparentTabMask = false;
     const pageSpacingConfig = config.spacing;
     if (score2.parts.length === 0) {
       const doc = createSvgDocument(
@@ -65813,6 +65818,15 @@ ${xrefOffset}
                 const startTick = starts[idx] ?? 0;
                 const realX = measureLayout?.positionsByTick.get(startTick);
                 const eventX = realX !== void 0 ? noteAreaX + realX : noteAreaX + startTick / total * fallbackNoteAreaWidth;
+                if (!hasBackground(theme.background) && !reportedTransparentTabMask) {
+                  reportedTransparentTabMask = true;
+                  diagnostics.push({
+                    severity: "info",
+                    code: "TAB_MASK_ON_TRANSPARENT_BACKGROUND",
+                    message: "Tab fret numbers cannot mask the string line behind them on a transparent background, so the line runs through them. Set colors.background to the colour this render will sit on.",
+                    location: { partId: part2.id, measureNumber: measure2.number }
+                  });
+                }
                 svgParts.push(
                   renderTabNumber(fretDigitGlyphNames(event.fret), {
                     x: eventX,

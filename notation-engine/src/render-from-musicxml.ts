@@ -112,6 +112,7 @@ import {
 } from './layout/spacing.js';
 import {
   createSvgDocument,
+  hasBackground,
   renderAccidental,
   renderBarline,
   renderVolta,
@@ -1797,6 +1798,8 @@ export function renderParsedMusicXml(
   const theme = buildTheme(config);
   /** Phase 51/§18.3: the absolute y of every staff bottom line drawn, for the skyline overlay. */
   const staffBottomYs = new Set<number>();
+  /** Whether this render has already said that a tab mask cannot work on a transparent background. */
+  let reportedTransparentTabMask = false;
   /**
    * §14.3's justification fills a system to a KNOWN width. Scroll mode
    * (§16.1) has no such width -- its single system is as wide as the
@@ -3172,6 +3175,23 @@ export function renderParsedMusicXml(
                 realX !== undefined
                   ? noteAreaX + realX
                   : noteAreaX + (startTick / total) * fallbackNoteAreaWidth;
+              // Integration C's fret-number mask is painted in the
+              // page's background colour, which a transparent render
+              // does not have. Said once per render, not once per
+              // fret -- a 200-note tab part would otherwise bury every
+              // other diagnostic.
+              if (!hasBackground(theme.background) && !reportedTransparentTabMask) {
+                reportedTransparentTabMask = true;
+                diagnostics.push({
+                  severity: 'info',
+                  code: 'TAB_MASK_ON_TRANSPARENT_BACKGROUND',
+                  message:
+                    'Tab fret numbers cannot mask the string line behind them on a transparent ' +
+                    'background, so the line runs through them. Set colors.background to the ' +
+                    'colour this render will sit on.',
+                  location: { partId: part.id, measureNumber: measure.number },
+                });
+              }
               svgParts.push(
                 renderTabNumber(fretDigitGlyphNames(event.fret), {
                   x: eventX,

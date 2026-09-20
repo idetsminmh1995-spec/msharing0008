@@ -211,6 +211,74 @@ describe('Phase 50: the theming API is live (§8)', () => {
     });
   });
 
+  /**
+   * A host compositing the notation over something else -- a video
+   * frame, a dark page, a PNG that needs a real alpha channel -- needs
+   * NO background rectangle, not a see-through one. A `fill="none"`
+   * rect would still be an element in the document and still
+   * hit-testable, and a rasteriser treating a missing fill as the
+   * default would still flood an exported PNG with opaque white.
+   */
+  describe('a transparent render (colors.background)', () => {
+    const rectCount = (svg) => (svg.match(/<rect/g) ?? []).length;
+
+    test('an ordinary colour still paints the background rectangle', () => {
+      assert.equal(
+        rectCount(render('simple-single-voice.musicxml', { colors: { background: '#202020' } }).svg),
+        1,
+      );
+    });
+
+    test("'none' and 'transparent' draw no rectangle at all", () => {
+      for (const background of ['none', 'transparent']) {
+        const { svg } = render('simple-single-voice.musicxml', { colors: { background } });
+        assert.equal(rectCount(svg), 0, `background: ${background}`);
+        assert.ok(!svg.includes('fill="none"'), 'and not an invisible one either');
+      }
+    });
+
+    test('white ink on no background is exactly what a dark video frame needs', () => {
+      const { svg } = render('drum-forward-gap.musicxml', {
+        colors: { ink: '#ffffff', background: 'none' },
+      });
+      assert.ok(!svg.includes('<rect'), 'nothing behind the music');
+      assert.ok(svg.includes('#ffffff'), 'and the music is drawn in white');
+      assert.ok(!svg.includes('#000000'), 'with no black left anywhere');
+    });
+
+    test('hasBackground is the one rule both call sites read', () => {
+      assert.equal(NE.hasBackground('#fff'), true);
+      assert.equal(NE.hasBackground('none'), false);
+      assert.equal(NE.hasBackground('transparent'), false);
+      assert.equal(NE.hasBackground(undefined), false);
+    });
+
+    test('a tab staff says so rather than silently losing its fret mask', () => {
+      // Integration C masks the string line behind a fret number by
+      // painting the background colour over it -- which a transparent
+      // render does not have. Said once, not once per fret.
+      const { svg, diagnostics } = NE.renderFromMusicXml(
+        fs.readFileSync(path.join(FIXTURES_DIR, 'guitar-tab-frets.musicxml'), 'utf8'),
+        { domParser, config: { colors: { background: 'none' } } },
+      );
+      const said = [...diagnostics].filter(
+        (d) => d.code === 'TAB_MASK_ON_TRANSPARENT_BACKGROUND',
+      );
+      assert.equal(said.length, 1, 'reported exactly once for the whole render');
+      assert.ok(!svg.includes('<rect'), 'and no mask was drawn');
+    });
+
+    test('...and says nothing when the background is a real colour', () => {
+      const { diagnostics } = NE.renderFromMusicXml(
+        fs.readFileSync(path.join(FIXTURES_DIR, 'guitar-tab-frets.musicxml'), 'utf8'),
+        { domParser },
+      );
+      assert.ok(
+        ![...diagnostics].some((d) => d.code === 'TAB_MASK_ON_TRANSPARENT_BACKGROUND'),
+      );
+    });
+  });
+
   describe('the config object itself', () => {
     test('the fonts section resolves and merges like every other section', () => {
       const c = NE.resolveConfig({ fonts: { musicFont: 'Petaluma' } });

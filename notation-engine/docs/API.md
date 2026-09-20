@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-506 exported symbols, by module.
+507 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -1366,6 +1366,7 @@ The diagnostics `level` lets through, in their original order.
 | function | `svgGlyphText` | One SMuFL glyph character, sized correctly per the 0.25-em convention (see SMUFL_STAFF_SPACES_PER_EM above). |
 | function | `svgGroup` | Groups children under one <g>, optionally with shared attributes (e.g. a transform or fill color applied to the whole group). |
 | interface | `SvgDocumentOptions` |  |
+| function | `hasBackground` | Whether a background colour means "draw a rectangle". |
 | function | `createSvgDocument` | Wraps a list of already-built primitive strings into one complete, standalone <svg>...</svg> document. |
 
 ### `src/render/system.ts`

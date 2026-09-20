@@ -13,6 +13,18 @@
 export interface ColorConfig {
   /** Default drawing color for everything (staff lines, stems, noteheads, text) unless a more specific override applies. */
   readonly ink: string;
+  /**
+   * The colour of the background rectangle drawn behind the whole
+   * score.
+   *
+   * **`'none'` or `'transparent'` draws no rectangle at all** -- not a
+   * rectangle that happens to be see-through. That is what a host
+   * compositing the notation over something else needs: a video frame,
+   * a dark page, a PNG with a real alpha channel. A `fill="none"` rect
+   * would still be an element in the document, still hit-testable, and
+   * would still fill an exported PNG with opaque white in any
+   * rasteriser that treats a missing fill as the default.
+   */
   readonly background: string;
   /**
    * Per-element-category overrides, keyed by a category name Phase 18

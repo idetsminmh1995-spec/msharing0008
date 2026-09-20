@@ -119,7 +119,20 @@ export interface SvgDocumentOptions {
    * viewBox (staff-space units) together define the scale factor.
    */
   readonly pxPerStaffSpace: number;
+  /** Omitted -- or `'none'`/`'transparent'` -- draws no background rectangle at all. See `ColorConfig.background`. */
   readonly backgroundColor?: string;
+}
+
+/**
+ * Whether a background colour means "draw a rectangle". `undefined`,
+ * `'none'` and `'transparent'` all mean no rectangle -- see
+ * `ColorConfig.background` for why these draw NOTHING rather than
+ * drawing a see-through rectangle.
+ */
+export function hasBackground(backgroundColor: string | undefined): backgroundColor is string {
+  return (
+    backgroundColor !== undefined && backgroundColor !== 'none' && backgroundColor !== 'transparent'
+  );
 }
 
 /** Wraps a list of already-built primitive strings into one complete, standalone <svg>...</svg> document. */
@@ -130,10 +143,9 @@ export function createSvgDocument(
   const { viewBoxWidth, viewBoxHeight, pxPerStaffSpace, backgroundColor } = options;
   const pxWidth = viewBoxWidth * pxPerStaffSpace;
   const pxHeight = viewBoxHeight * pxPerStaffSpace;
-  const background =
-    backgroundColor !== undefined
-      ? svgRect(0, 0, viewBoxWidth, viewBoxHeight, { fill: backgroundColor })
-      : '';
+  const background = hasBackground(backgroundColor)
+    ? svgRect(0, 0, viewBoxWidth, viewBoxHeight, { fill: backgroundColor })
+    : '';
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${pxWidth}" height="${pxHeight}" ` +
     `viewBox="0 0 ${viewBoxWidth} ${viewBoxHeight}">\n` +
