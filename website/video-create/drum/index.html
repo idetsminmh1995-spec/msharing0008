@@ -79,6 +79,20 @@
   .confirm-msg.ok::before{content:'';width:8px;height:8px;border-radius:50%;background:#2FAE5C;flex-shrink:0;}
   .confirm-msg.err{display:flex;background:var(--pink);color:var(--red-dark);}
 
+  /* Card 2's per-title Size + Color row. Two fields on one line under
+     each text input, so a title and everything about it stay together
+     rather than being split across the card. */
+  .title-controls{display:flex;align-items:flex-end;gap:12px;margin-top:8px;}
+  .title-controls .tc-size{flex:1;min-width:0;}
+  .title-controls label{margin-bottom:4px;}
+  .tc-size-row{display:flex;align-items:center;gap:8px;}
+  .tc-size-row input[type=range]{flex:1;min-width:0;accent-color:var(--red);}
+  .tc-px{font-size:11px;font-weight:700;color:var(--text);min-width:34px;text-align:right;font-variant-numeric:tabular-nums;}
+  .tc-color-row{display:flex;align-items:center;gap:6px;}
+  .tc-color-row input[type=color]{width:34px;height:30px;padding:0;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;}
+  .tc-auto{border:1.5px solid var(--border);background:#fff;border-radius:7px;font-size:10px;font-weight:700;color:var(--muted);padding:7px 8px;cursor:pointer;line-height:1;}
+  .tc-auto[data-following="yes"]{border-color:var(--red);background:var(--pink);color:var(--red);}
+
   .radio-row{display:flex;gap:16px;margin-bottom:14px;font-size:13px;}
   .radio-row label{display:flex;align-items:center;gap:6px;font-weight:400;color:var(--text);}
   .ratio-row{display:flex;gap:8px;margin-top:6px;}
@@ -98,7 +112,20 @@
   .video-frame{position:relative;background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-width:0;}
   .video-top{padding:4px 24px 0;display:flex;justify-content:space-between;align-items:center;gap:16px;}
   .video-logo-row{display:flex;align-items:center;gap:10px;min-width:0;}
-  .video-title{color:#fff;font-family:'Baloo 2','Sora',sans-serif;font-weight:700;font-size:26px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  /* The title block sits beside the logo, stacked: Title 1 over Title
+     2. Both lines read their size and colour from CSS variables set on
+     .video-frame, so card 2's controls change one property in one place
+     and never touch the elements themselves.
+
+     `:empty` rather than a JS display toggle: an untyped title is an
+     element with no text, and CSS already knows that. A title that is
+     only spaces is deliberately NOT empty -- someone indenting a title
+     with spaces meant it. */
+  .video-titles{display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0;}
+  .video-title{font-family:'Baloo 2','Sora',sans-serif;line-height:1.16;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .video-title:empty{display:none;}
+  .video-title-1{font-weight:700;font-size:var(--title1-size,32px);color:var(--title1-color,#fff);}
+  .video-title-2{font-weight:600;font-size:var(--title2-size,18px);color:var(--title2-color,#fff);}
   .video-stats{display:flex;gap:8px;flex-shrink:0;}
   .stat-box{border:1.5px solid var(--red);border-radius:8px;padding:4px 12px;text-align:center;min-width:52px;}
   .stat-box .stat-label{color:#D8AE7A;font-size:8px;font-weight:700;letter-spacing:.05em;display:block;}
@@ -126,7 +153,6 @@
      notation, dark titles, and the stat-box label in the brand red
      since its tan is for a dark backdrop. */
   .video-frame.style-white{background:#fff;}
-  .video-frame.style-white .video-title{color:var(--text);}
   .video-frame.style-white .stat-box .stat-value{color:var(--text);}
   .video-frame.style-white .stat-box .stat-label{color:var(--red);}
   .video-frame.style-white .video-logo-mark{filter:none;}
@@ -212,8 +238,42 @@
       <div class="card-head"><span class="card-num">2</span>Titles</div>
       <label for="title1">Title 1</label>
       <input id="title1" class="drum-input" type="text" placeholder="Your Title 1">
+      <div class="title-controls">
+        <div class="tc-size">
+          <label for="title1Size">Size</label>
+          <div class="tc-size-row">
+            <input id="title1Size" type="range" min="12" max="72" step="1" value="32">
+            <span class="tc-px" id="title1SizeOut">32px</span>
+          </div>
+        </div>
+        <div>
+          <label for="title1Color">Color</label>
+          <div class="tc-color-row">
+            <input id="title1Color" type="color" value="#FFFFFF">
+            <button type="button" class="tc-auto" id="title1Auto" data-following="yes"
+              title="Follow the Video Style (white on a black video, dark on a white one)">Auto</button>
+          </div>
+        </div>
+      </div>
       <label for="title2">Title 2 (subtitle)</label>
       <input id="title2" class="drum-input" type="text" placeholder="Your Title 2">
+      <div class="title-controls">
+        <div class="tc-size">
+          <label for="title2Size">Size</label>
+          <div class="tc-size-row">
+            <input id="title2Size" type="range" min="10" max="56" step="1" value="18">
+            <span class="tc-px" id="title2SizeOut">18px</span>
+          </div>
+        </div>
+        <div>
+          <label for="title2Color">Color</label>
+          <div class="tc-color-row">
+            <input id="title2Color" type="color" value="#FFFFFF">
+            <button type="button" class="tc-auto" id="title2Auto" data-following="yes"
+              title="Follow the Video Style (white on a black video, dark on a white one)">Auto</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -269,7 +329,10 @@
       <div class="video-top">
         <div class="video-logo-row">
           <img class="video-logo-mark" src="../../assets/logo/sharing-drum-logo-full.webp" alt="M Sharing Drum">
-          <div class="video-title" id="videoTitle"></div>
+          <div class="video-titles">
+            <div class="video-title video-title-1" id="videoTitle1"></div>
+            <div class="video-title video-title-2" id="videoTitle2"></div>
+          </div>
         </div>
         <div class="video-stats">
           <div class="stat-box"><span class="stat-label">TIME</span><span class="stat-value" id="statTimeBox">—</span></div>
@@ -319,7 +382,24 @@
   const API_BASE = 'https://msharing-api.idetsminmh1995.workers.dev';
   const ASPECT = '16x9';
   const kitSelect = document.getElementById('kit');
-  const videoFrame = document.querySelector('.video-frame');
+  const videoFrame = document.getElementById('videoFrame');
+
+  // --- Video Style (card 5) ---------------------------------------
+  // Declared here, at the top, because BOTH the titles (card 2) and the
+  // notation engine's ink colour depend on which style is picked --
+  // reading it in two places from two different element lookups is how
+  // the two would drift apart.
+  //
+  // The notation engine itself draws INK ONLY (`colors.background:
+  // 'none'` in both styles), so it never paints a rectangle behind the
+  // music. What the music sits on is the page's business, which is the
+  // same §17.3 split the playback cursor already follows: the engine
+  // says what the notation IS, the host says where it goes.
+  const styleBlack = document.getElementById('styleBlack');
+
+  function currentVideoStyle() {
+    return styleBlack && styleBlack.checked ? 'black' : 'white';
+  }
   const drumCircle = document.querySelector('.drum-circle');
   const kitConfirm = kitSelect.closest('.card').querySelector('.confirm-msg');
 
@@ -376,17 +456,67 @@
 
   kitSelect.addEventListener('change', (e) => loadKitPreview(e.target.value));
 
-  // Title 1 live-binds to the video preview's own title -- previously
-  // that title was a hardcoded "Drum Lesson 5" with no connection to
-  // this input at all, so it showed even when Title 1 was genuinely
-  // empty. Now it shows exactly what's typed, live, nothing else.
-  const title1Input = document.getElementById('title1');
-  const videoTitle = document.getElementById('videoTitle');
-  function syncVideoTitle() {
-    videoTitle.textContent = title1Input.value;
+  // --- Titles (card 2) --------------------------------------------
+  // Both titles live-bind to the video preview, each with its own size
+  // and colour. Nothing here is a hardcoded string: the preview title
+  // used to read "Drum Lesson 5" whatever was typed, and an empty title
+  // still showed.
+  //
+  // Size and colour are written as CSS VARIABLES on .video-frame rather
+  // than as inline styles on the two title elements. One property, one
+  // place: the elements keep their own rule, re-rendering the notation
+  // or swapping Video Style can never drop them, and the video engine
+  // that eventually exports this frame can read the same variables.
+  const TITLE_COUNT = 2;
+  /**
+   * What a title's colour is when the person has not chosen one: white
+   * on a black video, near-black on a white one. Following the Video
+   * Style is the sane default -- picking Black and getting invisible
+   * black-on-black titles is not a choice anyone means to make -- and
+   * `Auto` goes back to it after a manual pick.
+   */
+  const TITLE_AUTO_COLOR = { black: '#FFFFFF', white: '#1E1512' };
+
+  const titleFields = [];
+  for (let n = 1; n <= TITLE_COUNT; n++) {
+    titleFields.push({
+      n,
+      text: document.getElementById(`title${n}`),
+      size: document.getElementById(`title${n}Size`),
+      sizeOut: document.getElementById(`title${n}SizeOut`),
+      color: document.getElementById(`title${n}Color`),
+      auto: document.getElementById(`title${n}Auto`),
+      target: document.getElementById(`videoTitle${n}`),
+      // True until the person picks a colour of their own.
+      following: true,
+    });
   }
-  title1Input.addEventListener('input', syncVideoTitle);
-  syncVideoTitle();
+
+  function syncTitles() {
+    const style = currentVideoStyle();
+    for (const f of titleFields) {
+      f.target.textContent = f.text.value;
+      f.sizeOut.textContent = `${f.size.value}px`;
+      if (f.following) f.color.value = TITLE_AUTO_COLOR[style];
+      f.auto.dataset.following = f.following ? 'yes' : 'no';
+      videoFrame.style.setProperty(`--title${f.n}-size`, `${f.size.value}px`);
+      videoFrame.style.setProperty(`--title${f.n}-color`, f.color.value);
+    }
+  }
+
+  for (const f of titleFields) {
+    f.text.addEventListener('input', syncTitles);
+    f.size.addEventListener('input', syncTitles);
+    f.color.addEventListener('input', () => {
+      f.following = false;
+      syncTitles();
+    });
+    f.auto.addEventListener('click', () => {
+      f.following = true;
+      syncTitles();
+    });
+  }
+  syncTitles();
   loadDrumSets();
 
   // --- Real Notation Engine wiring -----------------------------------
@@ -408,20 +538,6 @@
   // without re-reading the file -- parsing is ~80% of a render.
   let lastParsed = null;
   let lastFileLabel = '';
-
-  // --- Video Style (card 5) ---------------------------------------
-  // The notation engine draws INK ONLY: `colors.background:'none'` in
-  // both styles, so it never paints a rectangle behind the music. What
-  // the music sits on is the page's business -- the video frame itself
-  // for the black style, a white strip for the white one -- which is
-  // the same §17.3 split the playback cursor already follows: the
-  // engine says what the notation IS, the host says where it goes.
-  const styleBlack = document.getElementById('styleBlack');
-  const videoFrameEl = document.getElementById('videoFrame');
-
-  function currentVideoStyle() {
-    return styleBlack && styleBlack.checked ? 'black' : 'white';
-  }
 
   function notationConfig() {
     return {
@@ -534,10 +650,12 @@
    */
   function applyVideoStyle() {
     const style = currentVideoStyle();
-    if (videoFrameEl) {
-      videoFrameEl.classList.toggle('style-black', style === 'black');
-      videoFrameEl.classList.toggle('style-white', style === 'white');
+    if (videoFrame) {
+      videoFrame.classList.toggle('style-black', style === 'black');
+      videoFrame.classList.toggle('style-white', style === 'white');
     }
+    // A title still following the style has to move with it.
+    syncTitles();
     if (lastParsed === null || typeof NotationEngine === 'undefined') return;
     let rendered;
     try {
