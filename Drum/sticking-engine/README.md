@@ -68,7 +68,10 @@ MIDI note numbers follow the General MIDI drum map (36=kick, 38=snare,
 
 - `DrummerStyleProfile` — dominant hand, crossing aversion, alternation
   preference, ghost/accent velocity thresholds, max stroke rate, variation
-  amount.
+  amount. `max_single_hand_rate_hz` is a real physical limit, not a
+  preference: it is enforced in `rule06_reachability.py` and it is what
+  decides whether a fast hi-hat pattern stays on one hand or gets shared
+  between two.
 - `PerformanceIntentContext` — energy, intensity, groove commitment, fill
   freedom (these bias scoring; they never override physical feasibility).
 - `genre` — applies a bounded weighting preset from
@@ -79,6 +82,29 @@ MIDI note numbers follow the General MIDI drum map (36=kick, 38=snare,
   micro-variation (Rule 12/26 determinism).
 
 ## What "correct" means here
+
+- **A groove is held by one hand.** A hi-hat or ride running at a steady
+  rate is one arm moving continuously, so the engine keeps one hand on
+  it and gives the backbeat underneath to the other. It only splits the
+  stream between two hands when it is faster than one hand can strike
+  (`max_single_hand_rate_hz`). A drummer does not alternate R/L through
+  an eighth-note hi-hat, and neither does this.
+
+  Rule 5 finds the streams, Rule 7 scores staying on one, Rule 8
+  penalizes switching mid-stream, and the hand that took a stream is
+  recorded in `DrummerState.ostinato_lead_hand` at the commit point so
+  it stays put.
+
+- **A fill has a shape.** A run of free single notes with no stream
+  under it is handed to Rule 34's rudiment library whole, rather than
+  decided note by note, so fills come out as singles, doubles or
+  paradiddles rather than an arbitrary string of hands. The library
+  proposes; the solver still picks, and a plain per-note answer is
+  always among the options.
+
+- **Hands and feet are solved together.** One pass over all four limbs
+  (Rule 11), not hands-then-feet, so a hand choice is made knowing what
+  the kick is doing on the same beat.
 
 - **Hard physical limits are never violated.** A hand assignment is only
   ever offered if it can physically reach the target in the available time

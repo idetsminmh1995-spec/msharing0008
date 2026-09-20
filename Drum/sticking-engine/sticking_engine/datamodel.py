@@ -226,6 +226,41 @@ class PatternContext:
     section_id: str
     role: PatternRole
     role_confidence: float
+    # --- ostinato identity (Rule 5) ------------------------------------
+    # A time-keeping stream -- hi-hat or ride running at a near-uniform
+    # rate -- is one continuous physical gesture, not a series of
+    # unrelated notes. These fields name WHICH stream an event belongs
+    # to so Rule 7/8 can keep one hand on it; they never say which hand,
+    # because that is the solver's decision to own (Rule 37).
+    ostinato_id: str = ""
+    ostinato_index: int = -1
+    ostinato_rate_hz: float = 0.0
+    # True for an event that is NOT itself in the stream but happens
+    # while one is running -- a backbeat under a hi-hat pattern. The
+    # stream's hand is busy; this one is for the other hand.
+    ostinato_active: bool = False
+
+
+@dataclass(frozen=True)
+class EventRoleContext:
+    """Rule 5 -> Rule 7/8 hand-off: what MUSICAL role this event plays.
+
+    Rule 5 Boundary forbids it from taking ownership of a downstream
+    decision, so this carries no limb. It says "this note is the 3rd in
+    ostinato ost_4 running at 4 Hz"; Rule 7 turns that into a score and
+    Rule 8/29 picks the hand.
+    """
+    event_id: str
+    role: PatternRole = PatternRole.UNKNOWN
+    role_confidence: float = 0.0
+    ostinato_id: str = ""
+    ostinato_index: int = -1
+    ostinato_rate_hz: float = 0.0
+    ostinato_active: bool = False
+
+    @property
+    def in_ostinato(self) -> bool:
+        return self.ostinato_id != ""
 
 
 # ---------------------------------------------------------------------------
@@ -268,6 +303,11 @@ class StickingPatternCandidate:
     limb_sequence: List[Limb]
     event_ids: List[str]
     grammar_tags: List[str] = field(default_factory=list)
+    # How ordinary this pattern is, 0..1. Singles are what a drummer
+    # reaches for without thinking; a double paradiddle is a decision.
+    # The solver uses it to weight Rule 34's prior, so a longer rudiment
+    # has to actually score better to be chosen rather than winning a tie.
+    prior_weight: float = 1.0
 
 
 @dataclass
@@ -512,6 +552,15 @@ class DrummerState:
     )
     style: DrummerStyleProfile = field(default_factory=DrummerStyleProfile)
     intent: PerformanceIntentContext = field(default_factory=PerformanceIntentContext)
+    # Rule 8/30: which hand took each ostinato stream. Written at the
+    # commit point like every other piece of state, so a speculative beam
+    # branch that tried the other hand cannot leak into the real answer
+    # (Rule 39). Empty until the stream's first note is committed.
+    ostinato_lead_hand: Dict[str, Limb] = field(default_factory=dict)
+    # Rule 33: motif fingerprint -> the limb sequence that played it. A
+    # bar that already happened is how the next identical bar gets the
+    # same sticking instead of being re-solved from nothing.
+    motif_stickings: Dict[str, List[Limb]] = field(default_factory=dict)
 
     def snapshot(self) -> "DrummerState":
         """Rule 39: explicit state snapshot for rollback support."""

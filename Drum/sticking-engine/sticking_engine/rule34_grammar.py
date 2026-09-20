@@ -33,6 +33,18 @@ RUDIMENT_LIBRARY: Dict[str, List[Limb]] = {
 }
 
 
+def prior_weight(template: List[Limb]) -> float:
+    """How ordinary a rudiment is.
+
+    Length is the honest proxy: a two-element template (singles) is the
+    default motion of two hands, and every longer one is a deliberate
+    figure a drummer chooses for a reason. Expressed as a weight on Rule
+    34's prior rather than a score of its own, because the library's job
+    is to offer vocabulary, not to rank it against physics.
+    """
+    return 2.0 / len(template) if template else 0.0
+
+
 def tile_pattern(template: List[Limb], length: int) -> List[Limb]:
     """Repeat/truncate a rudiment template to exactly `length` limb slots."""
     if length <= 0:
@@ -70,5 +82,6 @@ def generate_pattern_candidates(event_ids: List[str], style_hint: str = "generic
             limb_sequence=seq,
             event_ids=list(event_ids),
             grammar_tags=[style_hint],
+            prior_weight=prior_weight(template),
         ))
     return candidates

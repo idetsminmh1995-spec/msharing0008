@@ -21,20 +21,30 @@ var StickingEngine = (() => {
   // src/index.ts
   var index_exports = {};
   __export(index_exports, {
+    COMFORTABLE_TRAVEL_FRACTION: () => COMFORTABLE_TRAVEL_FRACTION,
     DEFAULT_BEAM_WIDTH: () => DEFAULT_BEAM_WIDTH,
     DEFAULT_WINDOW: () => DEFAULT_WINDOW,
     DrummerStateMachine: () => DrummerStateMachine,
     Engine: () => Engine,
     FOOT_MAX_SPEED_MPS: () => FOOT_MAX_SPEED_MPS,
+    FOOT_MAX_STROKE_RATE_HZ: () => FOOT_MAX_STROKE_RATE_HZ,
     GM_DRUM_MAP: () => GM_DRUM_MAP,
+    GRAMMAR_PRIOR_PER_NOTE: () => GRAMMAR_PRIOR_PER_NOTE,
     HANDS: () => HANDS,
+    HAND_COMFORT_REACH_M: () => HAND_COMFORT_REACH_M,
     HAND_MAX_SPEED_MPS: () => HAND_MAX_SPEED_MPS,
+    HAND_MAX_STROKE_RATE_HZ: () => HAND_MAX_STROKE_RATE_HZ,
     IDIOM_PRESETS: () => IDIOM_PRESETS,
     LIMBS: () => LIMBS,
     MANUAL_LIMBS: () => MANUAL_LIMBS,
     MAX_MICROTIMING_MS: () => MAX_MICROTIMING_MS,
     MAX_VELOCITY_JITTER: () => MAX_VELOCITY_JITTER,
+    MIN_GRAMMAR_RUN: () => MIN_GRAMMAR_RUN,
     MIN_SAME_LIMB_INTERVAL_S: () => MIN_SAME_LIMB_INTERVAL_S,
+    MOTIF_REUSE_BONUS: () => MOTIF_REUSE_BONUS,
+    OSTINATO_LEAD_BONUS: () => OSTINATO_LEAD_BONUS,
+    OSTINATO_OFF_HAND_BONUS: () => OSTINATO_OFF_HAND_BONUS,
+    PREPARATION_PENALTY: () => PREPARATION_PENALTY,
     PerformanceMemory: () => PerformanceMemory,
     PerformanceRuntime: () => PerformanceRuntime,
     ProfileCalibrator: () => ProfileCalibrator,
@@ -43,7 +53,9 @@ var StickingEngine = (() => {
     SAFETY_MARGIN_S: () => SAFETY_MARGIN_S,
     SEARCH_PRESETS: () => SEARCH_PRESETS,
     SIMULTANEITY_EPSILON_S: () => SIMULTANEITY_EPSILON_S,
+    STREAM_SWITCH_PENALTY: () => STREAM_SWITCH_PENALTY,
     SUBDIVISION_GRID: () => SUBDIVISION_GRID,
+    VOICE_INCONSISTENCY_PENALTY: () => VOICE_INCONSISTENCY_PENALTY,
     analyzeDensity: () => analyzeDensity,
     analyzeTiming: () => analyzeTiming,
     appendRecoveryKeyframe: () => appendRecoveryKeyframe,
@@ -64,28 +76,35 @@ var StickingEngine = (() => {
     engineConfig: () => engineConfig,
     fatigueAdjustedStyle: () => fatigueAdjustedStyle,
     fatigueState: () => fatigueState,
+    findOstinatoRuns: () => findOstinatoRuns,
     fingerprint: () => fingerprint,
     fromNoteList: () => fromNoteList,
     generateHandCandidates: () => generateHandCandidates,
     generatePatternCandidates: () => generatePatternCandidates,
     humanizeTiming: () => humanizeTiming,
     humanizeVelocity: () => humanizeVelocity,
+    inOstinato: () => inOstinato,
     isFootLimb: () => isFootLimb,
+    isTwoHandedStream: () => isTwoHandedStream,
     learnedProfile: () => learnedProfile,
     loadFor: () => loadFor,
     makeIdiomContext: () => makeIdiomContext,
     mapEvents: () => mapEvents,
     neutralPosition: () => neutralPosition,
+    neutralRole: () => neutralRole,
     newId: () => newId,
     otherHand: () => otherHand,
     performanceIntent: () => performanceIntent,
     performanceTable: () => performanceTable,
     pickAmongNearTies: () => pickAmongNearTies,
     planRecovery: () => planRecovery,
+    priorWeight: () => priorWeight,
     repairSuperhumanRate: () => repairSuperhumanRate,
     resetIdCounter: () => resetIdCounter,
     resolveInstrument: () => resolveInstrument,
+    roleContexts: () => roleContexts,
     selectTechnique: () => selectTechnique,
+    sequenceScore: () => sequenceScore,
     sha256Hex: () => sha256Hex,
     snapshotState: () => snapshotState,
     solveSticking: () => solveSticking,
@@ -481,6 +500,20 @@ var StickingEngine = (() => {
       isFootTarget: options.isFootTarget ?? false
     };
   }
+  function neutralRole(eventId) {
+    return {
+      eventId,
+      role: "unknown",
+      roleConfidence: 0,
+      ostinatoId: "",
+      ostinatoIndex: -1,
+      ostinatoRateHz: 0,
+      ostinatoActive: false
+    };
+  }
+  function inOstinato(role) {
+    return role.ostinatoId !== "";
+  }
   function performanceIntent(overrides = {}) {
     return {
       energy: 0.5,
@@ -534,7 +567,9 @@ var StickingEngine = (() => {
       fatigue: fatigueState(),
       memory: { recentLimbSequence: [], recentStrokeTypes: [], recentEventIds: [] },
       style: overrides.style ?? drummerStyle(),
-      intent: overrides.intent ?? performanceIntent()
+      intent: overrides.intent ?? performanceIntent(),
+      ostinatoLeadHand: /* @__PURE__ */ new Map(),
+      motifStickings: /* @__PURE__ */ new Map()
     };
   }
   function snapshotState(state) {
@@ -561,7 +596,9 @@ var StickingEngine = (() => {
         recentEventIds: [...state.memory.recentEventIds]
       },
       style: state.style,
-      intent: state.intent
+      intent: state.intent,
+      ostinatoLeadHand: new Map(state.ostinatoLeadHand),
+      motifStickings: new Map(state.motifStickings)
     };
   }
 
@@ -796,6 +833,84 @@ var StickingEngine = (() => {
     "ride",
     "ride_bell"
   ]);
+  var OSTINATO_SURFACES = {
+    hihat_closed: "hihat",
+    hihat_open: "hihat",
+    ride: "ride",
+    ride_bell: "ride"
+  };
+  var MIN_OSTINATO_EVENTS = 4;
+  var OSTINATO_GAP_TOLERANCE = 0.15;
+  var OSTINATO_MAX_GAP_MULTIPLE = 4;
+  function findOstinatoRuns(events) {
+    const bySurface = /* @__PURE__ */ new Map();
+    for (const ev of events) {
+      const surface = OSTINATO_SURFACES[ev.instrument];
+      if (surface === void 0) continue;
+      const bucket = bySurface.get(surface);
+      if (bucket === void 0) bySurface.set(surface, [ev]);
+      else bucket.push(ev);
+    }
+    const runs = [];
+    for (const surface of [...bySurface.keys()].sort()) {
+      const stream = [...bySurface.get(surface)].sort(
+        (a, b) => a.timeSeconds !== b.timeSeconds ? a.timeSeconds - b.timeSeconds : a.eventId < b.eventId ? -1 : a.eventId > b.eventId ? 1 : 0
+      );
+      let current = [];
+      let baseGap = 0;
+      for (const ev of stream) {
+        if (current.length === 0) {
+          current = [ev];
+          baseGap = 0;
+          continue;
+        }
+        const gap = ev.timeSeconds - current[current.length - 1].timeSeconds;
+        if (gap <= 0) {
+          current.push(ev);
+          continue;
+        }
+        if (baseGap <= 0) {
+          current.push(ev);
+          baseGap = gap;
+          continue;
+        }
+        const multiple = gap / baseGap;
+        const nearest = pyRound(multiple);
+        const fits = nearest >= 1 && nearest <= OSTINATO_MAX_GAP_MULTIPLE && Math.abs(multiple - nearest) <= OSTINATO_GAP_TOLERANCE * nearest;
+        if (fits) {
+          current.push(ev);
+          if (gap < baseGap) baseGap = gap;
+        } else {
+          if (current.length >= MIN_OSTINATO_EVENTS) runs.push(current);
+          current = [ev];
+          baseGap = 0;
+        }
+      }
+      if (current.length >= MIN_OSTINATO_EVENTS) runs.push(current);
+    }
+    runs.sort((a, b) => {
+      const ea = a[0];
+      const eb = b[0];
+      if (ea.timeSeconds !== eb.timeSeconds) return ea.timeSeconds - eb.timeSeconds;
+      return ea.eventId < eb.eventId ? -1 : ea.eventId > eb.eventId ? 1 : 0;
+    });
+    return runs;
+  }
+  function pyRound(value) {
+    const floor = Math.floor(value);
+    const diff = value - floor;
+    if (diff > 0.5) return floor + 1;
+    if (diff < 0.5) return floor;
+    return floor % 2 === 0 ? floor : floor + 1;
+  }
+  function baseGapOf(run) {
+    let smallest = 0;
+    for (let i = 1; i < run.length; i++) {
+      const gap = run[i].timeSeconds - run[i - 1].timeSeconds;
+      if (gap > 0 && (smallest === 0 || gap < smallest)) smallest = gap;
+    }
+    return smallest;
+  }
   function classifyPatterns(events, timing, _density, measureGroupSize = 1) {
     const timByeId = new Map(timing.map((t) => [t.eventId, t]));
     const measures = /* @__PURE__ */ new Map();
@@ -810,6 +925,22 @@ var StickingEngine = (() => {
     let total = 0;
     for (const evs of measures.values()) total += evs.length;
     const avgCount = measures.size > 0 ? total / measures.size : 0;
+    const ostinatoOf = /* @__PURE__ */ new Map();
+    const ostinatoSpans = [];
+    for (const run of findOstinatoRuns(events)) {
+      const runId = newId("ost");
+      const gap = baseGapOf(run);
+      const rate = gap > 0 ? 1 / gap : 0;
+      run.forEach((ev, index) => ostinatoOf.set(ev.eventId, { id: runId, index, rate }));
+      ostinatoSpans.push({
+        start: run[0].timeSeconds,
+        end: run[run.length - 1].timeSeconds,
+        gap
+      });
+    }
+    const ostinatoRunningAt = (t) => ostinatoSpans.some(
+      (span) => span.start - span.gap - 1e-9 <= t && t <= span.end + span.gap + 1e-9
+    );
     const out = [];
     const sectionId = newId("section");
     for (const evs of measures.values()) {
@@ -836,8 +967,48 @@ var StickingEngine = (() => {
         conf = 0.4;
       }
       for (const ev of evs) {
-        out.push({ eventId: ev.eventId, phraseId, sectionId, role, roleConfidence: conf });
+        const found = ostinatoOf.get(ev.eventId);
+        if (found !== void 0) {
+          out.push({
+            eventId: ev.eventId,
+            phraseId,
+            sectionId,
+            role: "ostinato",
+            roleConfidence: conf,
+            ostinatoId: found.id,
+            ostinatoIndex: found.index,
+            ostinatoRateHz: found.rate,
+            ostinatoActive: true
+          });
+        } else {
+          out.push({
+            eventId: ev.eventId,
+            phraseId,
+            sectionId,
+            role,
+            roleConfidence: conf,
+            ostinatoId: "",
+            ostinatoIndex: -1,
+            ostinatoRateHz: 0,
+            ostinatoActive: ostinatoRunningAt(ev.timeSeconds)
+          });
+        }
       }
+    }
+    return out;
+  }
+  function roleContexts(patterns) {
+    const out = /* @__PURE__ */ new Map();
+    for (const p of patterns) {
+      out.set(p.eventId, {
+        eventId: p.eventId,
+        role: p.role,
+        roleConfidence: p.roleConfidence,
+        ostinatoId: p.ostinatoId,
+        ostinatoIndex: p.ostinatoIndex,
+        ostinatoRateHz: p.ostinatoRateHz,
+        ostinatoActive: p.ostinatoActive
+      });
     }
     return out;
   }
@@ -846,6 +1017,9 @@ var StickingEngine = (() => {
   var HAND_MAX_SPEED_MPS = 4.2;
   var FOOT_MAX_SPEED_MPS = 2;
   var SAFETY_MARGIN_S = 0.012;
+  var HAND_MAX_STROKE_RATE_HZ = 14;
+  var FOOT_MAX_STROKE_RATE_HZ = 10;
+  var HAND_COMFORT_REACH_M = 0.4;
   var HAND_NEUTRAL_X = { RH: 0.3, LH: -0.3 };
   var HAND_NEUTRAL_Y = 0.3;
   var FOOT_NEUTRAL_X = { RF: 0, LF: -0.55 };
@@ -856,11 +1030,11 @@ var StickingEngine = (() => {
     return distance2d(p1[0], p1[1], x, y);
   }
   function crossesBody(limb, toX) {
-    if (limb === "RH") return toX < -0.05;
-    if (limb === "LH") return toX > 0.05;
+    if (limb === "RH") return toX < -HAND_COMFORT_REACH_M;
+    if (limb === "LH") return toX > HAND_COMFORT_REACH_M;
     return false;
   }
-  function checkReachability(limb, limbState, targetPoint, availableTimeS, eventId) {
+  function checkReachability(limb, limbState, targetPoint, availableTimeS, eventId, maxStrokeRateHz = 0) {
     const isFoot = isFootLimb(limb);
     if (isFoot && !targetPoint.isFootTarget) {
       return {
@@ -893,9 +1067,18 @@ var StickingEngine = (() => {
     const maxSpeed = isFoot ? FOOT_MAX_SPEED_MPS : HAND_MAX_SPEED_MPS;
     const travelTime = maxSpeed > 0 ? distanceM / maxSpeed : Infinity;
     const crosses = !isFoot && crossesBody(limb, targetPoint.x);
-    const reachable = availableTimeS - travelTime >= SAFETY_MARGIN_S || availableTimeS <= 0;
+    let reachable = availableTimeS - travelTime >= SAFETY_MARGIN_S || availableTimeS <= 0;
     const margin = availableTimeS - travelTime;
-    const reason = reachable ? "" : `insufficient time: needs ${(travelTime * 1e3).toFixed(1)}ms, has ${(availableTimeS * 1e3).toFixed(1)}ms`;
+    let reason = reachable ? "" : `insufficient time: needs ${(travelTime * 1e3).toFixed(1)}ms, has ${(availableTimeS * 1e3).toFixed(1)}ms`;
+    const defaultRate = isFoot ? FOOT_MAX_STROKE_RATE_HZ : HAND_MAX_STROKE_RATE_HZ;
+    const rateCeiling = maxStrokeRateHz > 0 ? maxStrokeRateHz : defaultRate;
+    if (reachable && rateCeiling > 0 && availableTimeS > 0) {
+      const minInterval = 1 / rateCeiling;
+      if (availableTimeS < minInterval) {
+        reachable = false;
+        reason = `stroke rate: ${(1 / availableTimeS).toFixed(1)}Hz exceeds this limb's ${rateCeiling.toFixed(1)}Hz ceiling`;
+      }
+    }
     return {
       limb,
       eventId,
@@ -917,13 +1100,35 @@ var StickingEngine = (() => {
 
   // src/rule07-hand-candidates.ts
   var MANUAL_LIMBS = ["RH", "LH"];
-  function generateHandCandidates(event, state, availableTimeByLimb) {
+  var OSTINATO_LEAD_BONUS = 1.2;
+  var OSTINATO_OFF_HAND_BONUS = 0.6;
+  function isTwoHandedStream(role, style) {
+    return inOstinato(role) && style.maxSingleHandRateHz > 0 && role.ostinatoRateHz > style.maxSingleHandRateHz;
+  }
+  function leadHandFor(role, state, dominantLimb) {
+    return state.ostinatoLeadHand.get(role.ostinatoId) ?? dominantLimb;
+  }
+  function generateHandCandidates(event, state, availableTimeByLimb, roleContext) {
     const style = state.style;
     const candidates = [];
+    const role = roleContext ?? neutralRole(event.eventId);
+    const dominantLimb = style.dominantHand === "R" ? "RH" : "LH";
+    const twoHandedOstinato = isTwoHandedStream(role, style);
+    const holdsStream = inOstinato(role) && !twoHandedOstinato;
+    const underStream = role.ostinatoActive && !inOstinato(role);
+    const leadLimb = role.ostinatoActive ? leadHandFor(role, state, dominantLimb) : void 0;
+    const alternationApplies = !holdsStream && !underStream;
     for (const limb of MANUAL_LIMBS) {
       const limbState = state.limbs[limb];
       const avail = availableTimeByLimb[limb] ?? 999;
-      const reach = checkReachability(limb, limbState, event.target, avail, event.eventId);
+      const reach = checkReachability(
+        limb,
+        limbState,
+        event.target,
+        avail,
+        event.eventId,
+        style.maxSingleHandRateHz
+      );
       if (!reach.reachable) {
         candidates.push({
           eventId: event.eventId,
@@ -938,14 +1143,28 @@ var StickingEngine = (() => {
       }
       let score = 0;
       const tags = [];
-      const dominantLimb = style.dominantHand === "R" ? "RH" : "LH";
       if (limb === dominantLimb) {
         score += style.dominanceBias;
         tags.push("dominant");
       }
+      if (holdsStream) {
+        if (limb === leadLimb) {
+          score += OSTINATO_LEAD_BONUS;
+          tags.push("ostinato_lead");
+        } else {
+          tags.push("ostinato_off_lead");
+        }
+      } else if (underStream) {
+        if (limb !== leadLimb) {
+          score += OSTINATO_OFF_HAND_BONUS;
+          tags.push("under_ostinato");
+        }
+      } else if (twoHandedOstinato) {
+        tags.push("ostinato_two_handed");
+      }
       const recent = state.memory.recentLimbSequence;
       const lastLimb = recent.length > 0 ? recent[recent.length - 1] : void 0;
-      if (lastLimb !== void 0) {
+      if (lastLimb !== void 0 && alternationApplies) {
         if (limb !== lastLimb) {
           score += 0.25 * style.alternationPreference;
         } else {
@@ -972,10 +1191,61 @@ var StickingEngine = (() => {
     return candidates;
   }
 
+  // src/rule34-grammar.ts
+  var R = "RH";
+  var L = "LH";
+  var RUDIMENT_LIBRARY = {
+    singles_RL: [R, L],
+    singles_LR: [L, R],
+    doubles_RRLL: [R, R, L, L],
+    paradiddle_RLRR_LRLL: [R, L, R, R, L, R, L, L],
+    double_paradiddle: [R, L, R, L, R, R, L, R, L, R, L, L],
+    triple_paradiddle: [R, L, R, L, R, L, R, R, L, R, L, R, L, R, L, L],
+    paradiddlediddle: [R, L, R, R, L, L],
+    inverted_paradiddle: [R, R, L, R, L, L, R, L],
+    triplets_RLL_LRR: [R, L, L, L, R, R]
+  };
+  function priorWeight(template) {
+    return template.length > 0 ? 2 / template.length : 0;
+  }
+  function tilePattern(template, length) {
+    if (length <= 0) return [];
+    const out = [];
+    for (let i = 0; i < length; i++) out.push(template[i % template.length]);
+    return out;
+  }
+  function generatePatternCandidates(eventIds, styleHint = "generic", startingLimb) {
+    const n = eventIds.length;
+    if (n === 0) return [];
+    const candidates = [];
+    for (const [name, template] of Object.entries(RUDIMENT_LIBRARY)) {
+      let seq = tilePattern(template, n);
+      if (startingLimb !== void 0 && seq[0] !== startingLimb) {
+        const rotated = tilePattern([...template.slice(1), template[0]], n);
+        if (rotated[0] === startingLimb) seq = rotated;
+      }
+      candidates.push({
+        patternName: name,
+        limbSequence: seq,
+        eventIds: [...eventIds],
+        grammarTags: [styleHint],
+        priorWeight: priorWeight(template)
+      });
+    }
+    return candidates;
+  }
+
   // src/rule08-11-29-39-solver.ts
   var SIMULTANEITY_EPSILON_S = 4e-3;
   var DEFAULT_WINDOW = 12;
   var DEFAULT_BEAM_WIDTH = 6;
+  var STREAM_SWITCH_PENALTY = 0.9;
+  var VOICE_INCONSISTENCY_PENALTY = 0.45;
+  var MOTIF_REUSE_BONUS = 0.35;
+  var PREPARATION_PENALTY = 2;
+  var COMFORTABLE_TRAVEL_FRACTION = 0.33;
+  var MIN_GRAMMAR_RUN = 4;
+  var GRAMMAR_PRIOR_PER_NOTE = 0.08;
   function groupSimultaneous(events) {
     const groups = [];
     for (const ev of events) {
@@ -988,7 +1258,18 @@ var StickingEngine = (() => {
     }
     return groups;
   }
-  function applyDecision(state, event, limb) {
+  function roleFor(roles, event) {
+    return roles?.get(event.eventId) ?? neutralRole(event.eventId);
+  }
+  function motifKey(group, roles) {
+    return [...group].sort((a, b) => a.instrument < b.instrument ? -1 : a.instrument > b.instrument ? 1 : 0).map((ev) => `${ev.instrument}${inOstinato(roleFor(roles, ev)) ? "*" : ""}`).join("+");
+  }
+  function motifValue(group, assignment) {
+    const limbOf = /* @__PURE__ */ new Map();
+    for (const [ev, limb] of assignment) limbOf.set(ev.eventId, limb);
+    return [...group].sort((a, b) => a.instrument < b.instrument ? -1 : a.instrument > b.instrument ? 1 : 0).filter((ev) => limbOf.has(ev.eventId)).map((ev) => limbOf.get(ev.eventId)).join(" ");
+  }
+  function applyDecision(state, event, limb, role) {
     const ls = state.limbs[limb];
     ls.position = [event.target.x, event.target.y, event.target.height];
     ls.lastEventId = event.eventId;
@@ -1000,18 +1281,43 @@ var StickingEngine = (() => {
       state.memory.recentLimbSequence.shift();
       state.memory.recentEventIds.shift();
     }
+    if (role !== void 0 && inOstinato(role) && (limb === "RH" || limb === "LH") && !state.ostinatoLeadHand.has(role.ostinatoId)) {
+      state.ostinatoLeadHand.set(role.ostinatoId, limb);
+    }
   }
   function availableTime(state, limb, eventTime) {
     const lastT = state.limbs[limb].lastActionTimeS;
     if (lastT < -900) return 999;
     return Math.max(0, eventTime - lastT);
   }
-  function solveGroupCandidates(group, state) {
+  function assignFeetIn(group, state) {
+    const out = [];
+    for (const ev of group) {
+      if (!ev.target.isFootTarget) continue;
+      const limb = ev.target.preferredLimb;
+      const avail = availableTime(state, limb, ev.timeSeconds);
+      const reach = checkReachability(limb, state.limbs[limb], ev.target, avail, ev.eventId);
+      out.push([ev, limb, reach.reachable ? 0 : -5]);
+    }
+    return out;
+  }
+  function solveGroupCandidates(wholeGroup, state, roles) {
+    const footPart = assignFeetIn(wholeGroup, state);
+    let footScore = 0;
+    for (const [, , sc] of footPart) footScore += sc;
+    const group = wholeGroup.filter((ev) => !ev.target.isFootTarget);
+    const finish = (options) => {
+      if (footPart.length === 0) return options;
+      return options.map(
+        ([assignment2, score]) => [[...assignment2, ...footPart], score + footScore]
+      );
+    };
+    if (group.length === 0) return finish([[[], 0]]);
     if (group.length === 1) {
       const ev = group[0];
       const avail = {};
       for (const l of MANUAL_LIMBS) avail[l] = availableTime(state, l, ev.timeSeconds);
-      const cands = generateHandCandidates(ev, state, avail);
+      const cands = generateHandCandidates(ev, state, avail, roleFor(roles, ev));
       const options = [];
       for (const c of cands) {
         if (c.reachable) options.push([[[ev, c.limb, c.score]], c.score]);
@@ -1019,9 +1325,9 @@ var StickingEngine = (() => {
       if (options.length === 0) {
         let best = cands[0];
         for (const c of cands) if (c.score > best.score) best = c;
-        return [[[[ev, best.limb, best.score]], best.score]];
+        return finish([[[[ev, best.limb, best.score]], best.score]]);
       }
-      return options;
+      return finish(options);
     }
     if (group.length === 2) {
       const options = [];
@@ -1036,7 +1342,7 @@ var StickingEngine = (() => {
           const ev = group[i];
           const limb = perm[i];
           const avail = availableTime(state, limb, ev.timeSeconds);
-          const cands = generateHandCandidates(ev, state, { [limb]: avail });
+          const cands = generateHandCandidates(ev, state, { [limb]: avail }, roleFor(roles, ev));
           const cand = cands.find((c) => c.limb === limb);
           if (cand === void 0 || !cand.reachable) {
             ok = false;
@@ -1048,7 +1354,7 @@ var StickingEngine = (() => {
         if (ok) options.push([assignment2, total2]);
       }
       if (options.length === 0) {
-        return [
+        return finish([
           [
             [
               [group[0], "RH", -5],
@@ -1056,9 +1362,9 @@ var StickingEngine = (() => {
             ],
             -10
           ]
-        ];
+        ]);
       }
-      return options;
+      return finish(options);
     }
     const assignment = [];
     let total = 0;
@@ -1066,21 +1372,176 @@ var StickingEngine = (() => {
       assignment.push([ev, MANUAL_LIMBS[i % 2], -2]);
       total -= 2;
     });
-    return [[assignment, total]];
+    return finish([[assignment, total]]);
   }
-  function solveWindow(groups, baseState, beamWidth = DEFAULT_BEAM_WIDTH) {
+  function isFreeSingle(group, roles) {
+    const manual = group.filter((ev) => !ev.target.isFootTarget);
+    if (manual.length !== 1) return false;
+    return !roleFor(roles, manual[0]).ostinatoActive;
+  }
+  function fillRunLength(groups, start, roles) {
+    let n = 0;
+    while (start + n < groups.length && isFreeSingle(groups[start + n], roles)) {
+      n++;
+    }
+    return n;
+  }
+  function scoreLimbFor(event, limb, state, roles) {
+    const avail = availableTime(state, limb, event.timeSeconds);
+    const cands = generateHandCandidates(event, state, { [limb]: avail }, roleFor(roles, event));
+    const cand = cands.find((c) => c.limb === limb);
+    if (cand === void 0 || !cand.reachable) return void 0;
+    return cand.score;
+  }
+  function grammarOptions(run, state, roles) {
+    const manual = [];
+    for (const group of run) {
+      for (const ev of group) if (!ev.target.isFootTarget) manual.push(ev);
+    }
+    const eventIds = manual.map((ev) => ev.eventId);
+    const options = [];
+    const walk = (limbFor) => {
+      const st = snapshotState(state);
+      const assignment = [];
+      let total = 0;
+      let index = 0;
+      for (const group of run) {
+        for (const [ev, limb, sc] of assignFeetIn(group, st)) {
+          assignment.push([ev, limb, sc]);
+          total += sc;
+          applyDecision(st, ev, limb, roleFor(roles, ev));
+        }
+        for (const ev of group) {
+          if (ev.target.isFootTarget) continue;
+          const limb = limbFor(index, ev, st);
+          if (limb === void 0) return void 0;
+          const score = scoreLimbFor(ev, limb, st, roles);
+          if (score === void 0) return void 0;
+          assignment.push([ev, limb, score]);
+          total += score;
+          applyDecision(st, ev, limb, roleFor(roles, ev));
+          index++;
+        }
+      }
+      return [assignment, total];
+    };
+    for (const pattern of generatePatternCandidates(eventIds)) {
+      const walked = walk((i) => pattern.limbSequence[i]);
+      if (walked === void 0) continue;
+      const [assignment, total] = walked;
+      options.push([
+        assignment,
+        total + GRAMMAR_PRIOR_PER_NOTE * eventIds.length * pattern.priorWeight
+      ]);
+    }
+    const bestFree = (_i, ev, st) => {
+      const avail = {};
+      for (const l of MANUAL_LIMBS) avail[l] = availableTime(st, l, ev.timeSeconds);
+      const cands = generateHandCandidates(ev, st, avail, roleFor(roles, ev)).filter(
+        (c) => c.reachable
+      );
+      if (cands.length === 0) return void 0;
+      let best = cands[0];
+      for (const c of cands) {
+        if (c.score > best.score || c.score === best.score && c.limb < best.limb) best = c;
+      }
+      return best.limb;
+    };
+    const free = walk(bestFree);
+    if (free !== void 0) options.push(free);
+    return options;
+  }
+  function sequenceScore(decisions, eventsById, roles, baseState) {
+    if (decisions.length === 0) return 0;
+    const ordered = [...decisions].sort((a, b) => {
+      const ea = eventsById.get(a.eventId);
+      const eb = eventsById.get(b.eventId);
+      if (ea.timeSeconds !== eb.timeSeconds) return ea.timeSeconds - eb.timeSeconds;
+      return a.eventId < b.eventId ? -1 : a.eventId > b.eventId ? 1 : 0;
+    });
+    let score = 0;
+    const lastLimbOnStream = new Map(baseState.ostinatoLeadHand);
+    for (const d of ordered) {
+      const role = roleFor(roles, eventsById.get(d.eventId));
+      if (!inOstinato(role) || d.limb !== "RH" && d.limb !== "LH") continue;
+      if (isTwoHandedStream(role, baseState.style)) {
+        continue;
+      }
+      const previous = lastLimbOnStream.get(role.ostinatoId);
+      if (previous !== void 0 && previous !== d.limb) score -= STREAM_SWITCH_PENALTY;
+      lastLimbOnStream.set(role.ostinatoId, d.limb);
+    }
+    const lastOnLimb = /* @__PURE__ */ new Map();
+    for (const limb of LIMBS) {
+      const ls = baseState.limbs[limb];
+      if (ls.lastActionTimeS > -900) {
+        lastOnLimb.set(limb, { t: ls.lastActionTimeS, x: ls.position[0], y: ls.position[1] });
+      }
+    }
+    for (const d of ordered) {
+      const ev = eventsById.get(d.eventId);
+      const previous = lastOnLimb.get(d.limb);
+      if (previous !== void 0) {
+        const gap = ev.timeSeconds - previous.t;
+        if (gap > 0) {
+          const dx = ev.target.x - previous.x;
+          const dy = ev.target.y - previous.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const speed = ev.target.isFootTarget ? FOOT_MAX_SPEED_MPS : HAND_MAX_SPEED_MPS;
+          const strain = speed > 0 ? dist / speed / gap : 0;
+          if (strain > COMFORTABLE_TRAVEL_FRACTION) {
+            score -= PREPARATION_PENALTY * (strain - COMFORTABLE_TRAVEL_FRACTION);
+          }
+        }
+      }
+      lastOnLimb.set(d.limb, { t: ev.timeSeconds, x: ev.target.x, y: ev.target.y });
+    }
+    const handByVoice = /* @__PURE__ */ new Map();
+    for (const d of ordered) {
+      const ev = eventsById.get(d.eventId);
+      const role = roleFor(roles, ev);
+      if (inOstinato(role) || !role.ostinatoActive) continue;
+      if (d.limb !== "RH" && d.limb !== "LH") continue;
+      const previous = handByVoice.get(ev.instrument);
+      if (previous !== void 0 && previous !== d.limb) score -= VOICE_INCONSISTENCY_PENALTY;
+      handByVoice.set(ev.instrument, d.limb);
+    }
+    return score;
+  }
+  function solveWindow(groups, baseState, beamWidth = DEFAULT_BEAM_WIDTH, roles) {
+    const eventsById = /* @__PURE__ */ new Map();
+    for (const group of groups) for (const ev of group) eventsById.set(ev.eventId, ev);
     let beam = [
       { state: snapshotState(baseState), decisions: [], score: 0 }
     ];
-    for (const group of groups) {
+    let index = 0;
+    while (index < groups.length) {
+      const runLength = fillRunLength(groups, index, roles);
+      const useGrammar = runLength >= MIN_GRAMMAR_RUN;
+      let segment;
+      let key;
+      if (useGrammar) {
+        segment = groups.slice(index, index + runLength);
+        key = "run:" + segment.map((g) => motifKey(g, roles)).join("|");
+        index += runLength;
+      } else {
+        segment = [groups[index]];
+        key = motifKey(groups[index], roles);
+        index += 1;
+      }
+      const segmentEvents = [];
+      for (const g of segment) segmentEvents.push(...g);
       const newBeam = [];
       for (const branch of beam) {
-        const options = solveGroupCandidates(group, branch.state);
+        let options = useGrammar ? grammarOptions(segment, branch.state, roles) : solveGroupCandidates(segment[0], branch.state, roles);
+        if (options.length === 0) {
+          options = solveGroupCandidates(segment[0], branch.state, roles);
+        }
         for (const [assignment, groupScore] of options) {
           const st2 = snapshotState(branch.state);
           const newDecisions = [...branch.decisions];
           for (const [ev, limb, noteScore] of assignment) {
-            applyDecision(st2, ev, limb);
+            applyDecision(st2, ev, limb, roleFor(roles, ev));
             newDecisions.push({
               eventId: ev.eventId,
               limb,
@@ -1089,24 +1550,50 @@ var StickingEngine = (() => {
               lookaheadWindow: groups.length
             });
           }
-          newBeam.push({ state: st2, decisions: newDecisions, score: branch.score + groupScore });
+          let motifBonus = 0;
+          const remembered = st2.motifStickings.get(key);
+          const value = motifValue(segmentEvents, assignment);
+          if (remembered !== void 0 && remembered.join(" ") === value) {
+            motifBonus = MOTIF_REUSE_BONUS;
+          }
+          if (!st2.motifStickings.has(key)) {
+            st2.motifStickings.set(
+              key,
+              assignment.map(([, limb]) => limb)
+            );
+          }
+          newBeam.push({
+            state: st2,
+            decisions: newDecisions,
+            score: branch.score + groupScore + motifBonus
+          });
         }
       }
-      newBeam.sort((a, b) => -a.score - -b.score);
-      beam = newBeam.slice(0, beamWidth);
+      const ranked = newBeam.map((b) => ({
+        branch: b,
+        total: b.score + sequenceScore(b.decisions, eventsById, roles, baseState)
+      }));
+      ranked.sort((a, b) => -a.total - -b.total);
+      beam = ranked.slice(0, beamWidth).map((r) => r.branch);
     }
     const best = beam[0];
     return { decisions: best.decisions, state: best.state };
   }
-  function solveSticking(manualEvents, state, windowSize = DEFAULT_WINDOW, beamWidth = DEFAULT_BEAM_WIDTH) {
-    if (manualEvents.length === 0) return [];
-    const groups = groupSimultaneous(manualEvents);
+  function solveSticking(events, state, windowSize = DEFAULT_WINDOW, beamWidth = DEFAULT_BEAM_WIDTH, roles) {
+    if (events.length === 0) return [];
+    const ordered = [...events].sort((a, b) => {
+      if (a.timeSeconds !== b.timeSeconds) return a.timeSeconds - b.timeSeconds;
+      return a.eventId < b.eventId ? -1 : a.eventId > b.eventId ? 1 : 0;
+    });
+    const groups = groupSimultaneous(ordered);
     const allDecisions = [];
     for (let i = 0; i < groups.length; i += windowSize) {
       const window = groups.slice(i, i + windowSize);
-      const { decisions, state: resolved } = solveWindow(window, state, beamWidth);
+      const { decisions, state: resolved } = solveWindow(window, state, beamWidth, roles);
       for (const limb of LIMBS) state.limbs[limb] = resolved.limbs[limb];
       state.memory = resolved.memory;
+      state.ostinatoLeadHand = resolved.ostinatoLeadHand;
+      state.motifStickings = resolved.motifStickings;
       allDecisions.push(...decisions);
     }
     return allDecisions;
@@ -1671,46 +2158,6 @@ var StickingEngine = (() => {
     }
   };
 
-  // src/rule34-grammar.ts
-  var R = "RH";
-  var L = "LH";
-  var RUDIMENT_LIBRARY = {
-    singles_RL: [R, L],
-    singles_LR: [L, R],
-    doubles_RRLL: [R, R, L, L],
-    paradiddle_RLRR_LRLL: [R, L, R, R, L, R, L, L],
-    double_paradiddle: [R, L, R, L, R, R, L, R, L, R, L, L],
-    triple_paradiddle: [R, L, R, L, R, L, R, R, L, R, L, R, L, R, L, L],
-    paradiddlediddle: [R, L, R, R, L, L],
-    inverted_paradiddle: [R, R, L, R, L, L, R, L],
-    triplets_RLL_LRR: [R, L, L, L, R, R]
-  };
-  function tilePattern(template, length) {
-    if (length <= 0) return [];
-    const out = [];
-    for (let i = 0; i < length; i++) out.push(template[i % template.length]);
-    return out;
-  }
-  function generatePatternCandidates(eventIds, styleHint = "generic", startingLimb) {
-    const n = eventIds.length;
-    if (n === 0) return [];
-    const candidates = [];
-    for (const [name, template] of Object.entries(RUDIMENT_LIBRARY)) {
-      let seq = tilePattern(template, n);
-      if (startingLimb !== void 0 && seq[0] !== startingLimb) {
-        const rotated = tilePattern([...template.slice(1), template[0]], n);
-        if (rotated[0] === startingLimb) seq = rotated;
-      }
-      candidates.push({
-        patternName: name,
-        limbSequence: seq,
-        eventIds: [...eventIds],
-        grammarTags: [styleHint]
-      });
-    }
-    return candidates;
-  }
-
   // src/engine.ts
   var SEARCH_PRESETS = {
     FAST: { windowSize: 6, beamWidth: 3 },
@@ -1744,7 +2191,7 @@ var StickingEngine = (() => {
       drumEvents.sort((a, b) => a.timeSeconds - b.timeSeconds);
       const timing = analyzeTiming(drumEvents, normalized.tempoMap, normalized.timeSignatureMap);
       const density = analyzeDensity(drumEvents);
-      classifyPatterns(drumEvents, timing, density);
+      const roles = roleContexts(classifyPatterns(drumEvents, timing, density));
       const idiom = makeIdiomContext(cfg.genre);
       const effectiveStyle = buildEffectiveStyle(
         cfg.style,
@@ -1761,16 +2208,13 @@ var StickingEngine = (() => {
         ls.readyTimeS = -999;
       }
       const sm = new DrummerStateMachine(state);
-      const manualEvents = drumEvents.filter((e) => !e.target.isFootTarget);
-      const footEvents = drumEvents.filter((e) => e.target.isFootTarget);
-      const stickingDecisions = solveSticking(
-        manualEvents,
+      const allDecisions = solveSticking(
+        drumEvents,
         sm.state,
         preset.windowSize,
-        preset.beamWidth
+        preset.beamWidth,
+        roles
       );
-      const footDecisions = assignFeet(footEvents, sm.state);
-      const allDecisions = [...stickingDecisions, ...footDecisions];
       this.memory.recordCommitted(allDecisions);
       const eventById = new Map(drumEvents.map((e) => [e.eventId, e]));
       const replayPosition = {};

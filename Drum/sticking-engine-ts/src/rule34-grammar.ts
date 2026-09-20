@@ -24,6 +24,19 @@ export const RUDIMENT_LIBRARY: Readonly<Record<string, readonly Limb[]>> = {
   triplets_RLL_LRR: [R, L, L, L, R, R],
 };
 
+/**
+ * How ordinary a rudiment is.
+ *
+ * Length is the honest proxy: a two-element template (singles) is the
+ * default motion of two hands, and every longer one is a deliberate
+ * figure a drummer chooses for a reason. Expressed as a weight on Rule
+ * 34's prior rather than a score of its own, because the library's job
+ * is to offer vocabulary, not to rank it against physics.
+ */
+export function priorWeight(template: readonly Limb[]): number {
+  return template.length > 0 ? 2.0 / template.length : 0.0;
+}
+
 /** Repeat/truncate a rudiment template to exactly `length` limb slots. */
 export function tilePattern(template: readonly Limb[], length: number): Limb[] {
   if (length <= 0) return [];
@@ -59,6 +72,7 @@ export function generatePatternCandidates(
       limbSequence: seq,
       eventIds: [...eventIds],
       grammarTags: [styleHint],
+      priorWeight: priorWeight(template),
     });
   }
   return candidates;

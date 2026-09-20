@@ -75,14 +75,28 @@ all 400 distances the geometry can produce.
 Python and 99 in JavaScript. Velocities land on exact halves often
 enough for that to cross Rule 9's ghost/accent thresholds, so
 `rule12-humanization.ts` and `rule03-04-timing-density.ts` both round
-Python's way.
+Python's way — and so does `rule05-pattern.ts`, where the same tie
+decides whether a gap of exactly 1.5 base gaps continues an ostinato
+run or ends it.
+
+**4. `DrummerState` carries two Maps now.** `ostinatoLeadHand` (which
+hand took each time-keeping stream) and `motifStickings` (what this
+drummer already played for a given shape) are written at the commit
+point like every other piece of state, so `snapshotState` has to copy
+them — a shared Map would let a rejected beam branch decide which hand
+rides the hi-hat. They are `Map` rather than plain objects because the
+keys are generated ids, and iteration order has to match Python's dict
+insertion order for the parity fixtures to line up.
 
 ## How the page uses it
 
 `website/video-create/drum/` loads `assets/sticking-engine.js` next to
 `assets/notation-engine.js`. The engine's answer is not shown as text —
-it decides **which R2 drum-kit photo lights up** as each note is played,
-since those photos are already named `R{gmNote}.png` / `L{gmNote}.png`.
+it decides **which R2 drum-kit photo lights up** as each note is played.
+Hand photos are named `R{gmNote}.png` / `L{gmNote}.png` and foot photos
+`{gmNote}.png`; the GM number is never substituted for another, because
+35 and 36 are two different kick photos even though General MIDI calls
+both of them a kick.
 
 The bridge lives in the page, not in either engine: it builds the note
 list from the parsed score (time from the tempo map, GM number from

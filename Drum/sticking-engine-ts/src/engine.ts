@@ -32,9 +32,9 @@ import { LIMBS, drummerState, drummerStyle, fatigueState, performanceIntent } fr
 import { fromNoteList, type NoteListEntry } from './rule01-input.js';
 import { drumMappingProfile, mapEvents, type DrumMappingProfile } from './rule02-mapping.js';
 import { analyzeDensity, analyzeTiming } from './rule03-04-timing-density.js';
-import { classifyPatterns } from './rule05-pattern.js';
+import { classifyPatterns, roleContexts } from './rule05-pattern.js';
 import { neutralPosition } from './rule06-reachability.js';
-import { assignFeet, solveSticking } from './rule08-11-29-39-solver.js';
+import { solveSticking } from './rule08-11-29-39-solver.js';
 import { selectTechnique } from './rule09-technique.js';
 import { planRecovery } from './rule10-recovery.js';
 import { humanizeTiming, humanizeVelocity } from './rule12-humanization.js';
@@ -116,13 +116,11 @@ export class Engine {
 
     const timing = analyzeTiming(drumEvents, normalized.tempoMap, normalized.timeSignatureMap);
     const density = analyzeDensity(drumEvents);
-    // Timing/density/pattern context is available to any rule that wants
-    // it; the reference solver uses reachability and style scoring
-    // directly, which already reacts to density through available-time
-    // windows. Computed anyway because the Python computes it, and
-    // because Rule 5 consumes ID-counter values -- skipping it would
-    // shift every later ID and make a parity diff unreadable.
-    classifyPatterns(drumEvents, timing, density);
+    // RULE 5 -> RULE 7/8. What each note is FOR is an input to the
+    // sticking, not a report about it: it is what tells the solver that
+    // a run of hi-hat notes is one hand keeping time rather than a
+    // series of unrelated notes to alternate across.
+    const roles = roleContexts(classifyPatterns(drumEvents, timing, density));
 
     // ---- Remember / Predict (Rules 20/31/32/35 setup) ----
     const idiom = makeIdiomContext(cfg.genre);
@@ -144,17 +142,17 @@ export class Engine {
     const sm = new DrummerStateMachine(state);
 
     // ---- Generate / Simulate / Decide (Rules 6-12, 29, 39) ----
-    const manualEvents = drumEvents.filter((e) => !e.target.isFootTarget);
-    const footEvents = drumEvents.filter((e) => e.target.isFootTarget);
-
-    const stickingDecisions = solveSticking(
-      manualEvents,
+    // RULE 11: all four limbs in ONE solve. Splitting the hands from the
+    // feet and concatenating afterwards would mean the hands choose
+    // without knowing a kick lands on the same beat, which is precisely
+    // what Rule 11's Core Principle rules out.
+    const allDecisions: SequenceDecision[] = solveSticking(
+      drumEvents,
       sm.state,
       preset.windowSize,
       preset.beamWidth,
+      roles,
     );
-    const footDecisions = assignFeet(footEvents, sm.state);
-    const allDecisions: SequenceDecision[] = [...stickingDecisions, ...footDecisions];
 
     this.memory.recordCommitted(allDecisions);
     const eventById = new Map(drumEvents.map((e) => [e.eventId, e]));

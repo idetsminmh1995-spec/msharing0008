@@ -49,9 +49,9 @@ from .datamodel import (
 from .rule01_input import parse_midi_file, from_note_list
 from .rule02_mapping import DrumMappingProfile, map_events
 from .rule03_04_timing_density import analyze_timing, analyze_density
-from .rule05_pattern import classify_patterns
+from .rule05_pattern import classify_patterns, role_contexts
 from .rule06_reachability import neutral_position
-from .rule08_11_29_39_solver import solve_sticking, assign_feet
+from .rule08_11_29_39_solver import solve_sticking
 from .rule09_technique import select_technique
 from .rule10_recovery import plan_recovery
 from .rule12_humanization import humanize_timing, humanize_velocity
@@ -125,10 +125,11 @@ class Engine:
         timing_ctx = analyze_timing(drum_events, normalized.tempo_map, normalized.time_signature_map)
         density_ctx = analyze_density(drum_events)
         pattern_ctx = classify_patterns(drum_events, timing_ctx, density_ctx)
-        # timing/density/pattern context is available to any rule that wants
-        # it (e.g. a future Rule 21 intensity model); the reference solver
-        # here uses reachability + style scoring directly, which already
-        # implicitly reacts to density through available-time windows.
+        # RULE 5 -> RULE 7/8. What each note is FOR is an input to the
+        # sticking, not a report about it: it is what tells the solver that
+        # a run of hi-hat notes is one hand keeping time rather than a
+        # series of unrelated notes to alternate across.
+        roles = role_contexts(pattern_ctx)
 
         # ---- Remember / Predict (Rules 20/31/32/35 setup) ----
         idiom = make_idiom_context(cfg.genre)
@@ -145,15 +146,15 @@ class Engine:
         sm = DrummerStateMachine(state)
 
         # ---- Generate / Simulate / Decide (Rules 6-12, 29, 39) ----
-        manual_events = [e for e in drum_events if not e.target.is_foot_target]
-        foot_events = [e for e in drum_events if e.target.is_foot_target]
-
-        sticking_decisions = solve_sticking(
-            manual_events, sm.state,
+        # RULE 11: all four limbs in ONE solve. Splitting the hands from the
+        # feet and concatenating afterwards would mean the hands choose
+        # without knowing a kick lands on the same beat, which is precisely
+        # what Rule 11's Core Principle rules out.
+        all_decisions = solve_sticking(
+            drum_events, sm.state,
             window_size=preset["window_size"], beam_width=preset["beam_width"],
+            roles=roles,
         )
-        foot_decisions = assign_feet(foot_events, sm.state)
-        all_decisions = sticking_decisions + foot_decisions
 
         self.memory.record_committed(all_decisions)
         decision_by_event = {d.event_id: d for d in all_decisions}

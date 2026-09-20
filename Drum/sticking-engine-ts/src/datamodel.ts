@@ -205,6 +205,53 @@ export interface PatternContext {
   readonly sectionId: string;
   readonly role: PatternRole;
   readonly roleConfidence: number;
+  // --- ostinato identity (Rule 5) ------------------------------------
+  // A time-keeping stream -- hi-hat or ride running at a near-uniform
+  // rate -- is one continuous physical gesture, not a series of
+  // unrelated notes. These name WHICH stream an event belongs to so
+  // Rule 7/8 can keep one hand on it; they never say which hand,
+  // because that is the solver's decision to own (Rule 37).
+  readonly ostinatoId: string;
+  readonly ostinatoIndex: number;
+  readonly ostinatoRateHz: number;
+  // True for an event that is NOT itself in the stream but happens
+  // while one runs -- a backbeat under a hi-hat pattern. The stream's
+  // hand is busy; this one is for the other hand.
+  readonly ostinatoActive: boolean;
+}
+
+/**
+ * Rule 5 -> Rule 7/8 hand-off: what MUSICAL role this event plays.
+ *
+ * Rule 5 Boundary forbids it from taking ownership of a downstream
+ * decision, so this carries no limb. It says "this note is the 3rd in
+ * ostinato ost_4 running at 4 Hz"; Rule 7 turns that into a score and
+ * Rule 8/29 picks the hand.
+ */
+export interface EventRoleContext {
+  readonly eventId: string;
+  readonly role: PatternRole;
+  readonly roleConfidence: number;
+  readonly ostinatoId: string;
+  readonly ostinatoIndex: number;
+  readonly ostinatoRateHz: number;
+  readonly ostinatoActive: boolean;
+}
+
+export function neutralRole(eventId: string): EventRoleContext {
+  return {
+    eventId,
+    role: 'unknown',
+    roleConfidence: 0.0,
+    ostinatoId: '',
+    ostinatoIndex: -1,
+    ostinatoRateHz: 0.0,
+    ostinatoActive: false,
+  };
+}
+
+export function inOstinato(role: EventRoleContext): boolean {
+  return role.ostinatoId !== '';
 }
 
 // ---------------------------------------------------------------------------
@@ -245,6 +292,13 @@ export interface StickingPatternCandidate {
   readonly limbSequence: readonly Limb[];
   readonly eventIds: readonly string[];
   readonly grammarTags: readonly string[];
+  /**
+   * How ordinary this pattern is, 0..1. Singles are what a drummer
+   * reaches for without thinking; a double paradiddle is a decision.
+   * The solver weights Rule 34's prior by it, so a longer rudiment has
+   * to actually score better rather than winning a tie.
+   */
+  readonly priorWeight: number;
 }
 
 /** Rule 8/29/30 committed decision for one event: which limb plays it. */
@@ -506,6 +560,19 @@ export interface DrummerState {
   memory: MemoryContext;
   style: DrummerStyleProfile;
   intent: PerformanceIntentContext;
+  /**
+   * Rule 8/30: which hand took each ostinato stream. Written at the
+   * commit point like every other piece of state, so a speculative beam
+   * branch that tried the other hand cannot leak into the real answer
+   * (Rule 39). Empty until the stream's first note is committed.
+   */
+  ostinatoLeadHand: Map<string, Limb>;
+  /**
+   * Rule 33: motif fingerprint -> the limb sequence that played it. A
+   * bar that already happened is how the next identical bar gets the
+   * same sticking instead of being re-solved from nothing.
+   */
+  motifStickings: Map<string, Limb[]>;
 }
 
 export function drummerState(
@@ -522,6 +589,8 @@ export function drummerState(
     memory: { recentLimbSequence: [], recentStrokeTypes: [], recentEventIds: [] },
     style: overrides.style ?? drummerStyle(),
     intent: overrides.intent ?? performanceIntent(),
+    ostinatoLeadHand: new Map(),
+    motifStickings: new Map(),
   };
 }
 
@@ -561,6 +630,8 @@ export function snapshotState(state: DrummerState): DrummerState {
     },
     style: state.style,
     intent: state.intent,
+    ostinatoLeadHand: new Map(state.ostinatoLeadHand),
+    motifStickings: new Map(state.motifStickings),
   };
 }
 
