@@ -21,3 +21,17 @@ notation-engine/dist/*.d.ts
 *.log
 .DS_Store
 *.mid
+
+# EXCEPTION: the sticking engine's own demo fixture. `*.mid` above is for
+# the sample files that pile up while testing; this one is a committed
+# 185-byte part of the module, named in its README as the file to run the
+# demo against. See Drum/README.md.
+!Drum/sticking-engine/test_beat.mid
+
+# The sticking engine's demo writes this next to itself on every run.
+Drum/sticking-engine/output_performance.json
+
+# Python bytecode caches. The repo had no Python in it until Drum/, so
+# this is the first time it has needed these.
+__pycache__/
+*.pyc

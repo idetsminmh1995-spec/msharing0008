@@ -33,6 +33,15 @@ Sets dynamically (no hardcoded names) and serves manifest + asset endpoints.
 See `cloudflare-worker/README.md` for the R2 folder layout it expects and
 deploy instructions.
 
+## `/Drum`
+
+Drum-specific work, kept apart from the instrument-agnostic modules above.
+Currently holds **`Drum/sticking-engine`**: a Python engine that decides
+which limb plays every note of a drum MIDI file, what technique each
+stroke uses, and whether the limb can physically get there in time —
+all 40 rules of the sticking specification, with the rule documents kept
+beside the code. See `Drum/README.md`.
+
 ## `/web-preview`
 
 A single-file, dependency-free HTML app (`index.html`) that runs the same
