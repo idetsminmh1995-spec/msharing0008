@@ -55,27 +55,32 @@ plays that drum, composited over `Drum Bg.png`. The drum page lights one
 as each note is played, and which side it picks comes from the sticking
 engine (`Drum/`).
 
-Both namings work, and the page prefers whichever suits the limb:
+Hands carry a side, feet do not:
 
 ```
 drums/{set}/16x9/R38.png    right hand on the snare
 drums/{set}/16x9/L38.png    left hand on the snare
-drums/{set}/16x9/36.png     the kick -- one pedal photo serves either foot
+drums/{set}/16x9/36.png     kick 36
+drums/{set}/16x9/35.png     kick 35 -- a different photo, not the same drum
 drums/{set}/16x9/44.png     the hi-hat pedal
 ```
 
 - A **hand** needs its side, because the photo is a stick coming from
-  the left or from the right. `R{note}.png` is tried first, then the
-  bare `{note}.png`.
-- A **foot** usually does not, so the bare `{note}.png` is tried first,
-  then `R{note}.png`/`L{note}.png`. A kit that uploaded only `36.png`
-  for the kick is not missing anything.
-- If neither exists, **the same drum's other GM numbers are tried** —
-  35 and 36 are both a kick, 41 and 43 both a floor tom — so a bucket
-  with `36.png` still lights for a score written with 35.
-- If none of those exists the stroke is skipped, and the Sticking card
-  names exactly which limb and which drum had no photo, rather than
-  lighting a neighbour's picture.
+  the left or from the right: `R38.png` and `L38.png` are two different
+  pictures of the same snare.
+- A **foot** does not, because a pedal going down looks the same
+  whichever foot pushed it. The kick and the hi-hat pedal are the bare
+  `{note}.png`.
+- **The note number is never swapped for another one.** General MIDI
+  calls both 35 and 36 a kick, but in a bucket they are two different
+  kick photos, so a score written with 35 lights `35.png` and nothing
+  else. Lighting `36.png` instead would be lighting the wrong drum.
+- If the photo for a stroke's own number is missing, the stroke is
+  skipped and the browser console names exactly which limb and which
+  drum had no photo, rather than lighting a neighbour's picture. (The
+  opposite naming — `R36.png` for a foot, `38.png` for a hand — is
+  still accepted as a last resort, since that is the same note number
+  and only the side prefix differs.)
 
 ### Count voices: `Voices/{n}.wav`
 

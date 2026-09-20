@@ -361,35 +361,7 @@
     </div>
 
     <div class="card">
-      <div class="card-head"><span class="card-num">5</span>Sticking</div>
-      <div class="radio-row">
-        <label><input type="checkbox" id="stickingOn" checked>Light up the kit as it plays</label>
-      </div>
-      <div class="field-row">
-        <div>
-          <label for="stickingHand">Dominant hand</label>
-          <select id="stickingHand" class="drum-input">
-            <option value="R">Right</option>
-            <option value="L">Left</option>
-          </select>
-        </div>
-        <div>
-          <label for="stickingGenre">Genre</label>
-          <select id="stickingGenre" class="drum-input">
-            <option value="rock">Rock</option>
-            <option value="metal">Metal</option>
-            <option value="jazz">Jazz</option>
-            <option value="funk">Funk</option>
-            <option value="latin">Latin</option>
-            <option value="generic">Generic</option>
-          </select>
-        </div>
-      </div>
-      <div class="field-hint" id="stickingHint">Which hand or foot plays each note, shown by lighting the matching drum-kit photo from R2.</div>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><span class="card-num">6</span>Video Style</div>
+      <div class="card-head"><span class="card-num">5</span>Video Style</div>
       <div class="radio-row">
         <label><input type="radio" name="vc" id="styleBlack" value="black" checked>Black</label>
         <label><input type="radio" name="vc" id="styleWhite" value="white">White</label>
@@ -817,10 +789,23 @@
   // the notation engine says where the music is, the sticking engine
   // says which hand plays it, the page draws.
   const hitLayer = document.getElementById('hitLayer');
-  const stickingOn = document.getElementById('stickingOn');
-  const stickingHand = document.getElementById('stickingHand');
-  const stickingGenre = document.getElementById('stickingGenre');
-  const stickingHint = document.getElementById('stickingHint');
+
+  /**
+   * The sticking engine has no controls on this page, on purpose.
+   *
+   * Its answer is not something the viewer reads -- it decides which
+   * drum-kit photo lights up -- so a card asking them to pick a
+   * dominant hand and a genre was asking about machinery, not about
+   * their video. These are the engine's own defaults; the place to
+   * change them is here, or a future per-kit setting, not a control
+   * the person has to have an opinion about.
+   */
+  const STICKING = { dominantHand: 'R', genre: 'generic', seed: 42, mode: 'HIGH' };
+
+  /** Where the sticking's own status goes now that no card shows it. */
+  function stickingStatus(message) {
+    console.log('Sticking Engine:', message);
+  }
 
   /**
    * MusicXML has no velocities, so they are DERIVED from what the score
@@ -908,63 +893,38 @@
 
   /**
    * The solved performance as a list of hits to light: when, and which
-   * R2 image.
-   *
-   * `{R|L}{gmNote}.png` is the naming R2 already uses, and the side --
-   * not the limb -- is what it encodes: a kick is `R36.png` because it
-   * is the RIGHT foot, and the photo shows a foot, not a stick. So RH
-   * and RF both map to `R`, LH and LF to `L`.
+   * R2 image. See `stickingImageCandidates` for how a stroke becomes a
+   * filename.
    */
   let hitTimeline = [];
 
   /**
-   * Every GM note number that means the SAME drum, so a kit that
-   * uploaded `36.png` still lights when the score writes 35.
-   *
-   * Built by inverting the sticking engine's own GM map rather than
-   * hand-listing pairs here: 35/36 are both a kick and 41/43 are both a
-   * floor tom because that map says so, and a second copy of that
-   * knowledge would drift from it.
-   */
-  const GM_ALIASES = (() => {
-    const byInstrument = new Map();
-    if (typeof StickingEngine === 'undefined') return new Map();
-    for (const [note, instrument] of Object.entries(StickingEngine.GM_DRUM_MAP)) {
-      const group = byInstrument.get(instrument);
-      if (group === undefined) byInstrument.set(instrument, [Number(note)]);
-      else group.push(Number(note));
-    }
-    const aliases = new Map();
-    for (const group of byInstrument.values()) {
-      for (const note of group) aliases.set(note, group);
-    }
-    return aliases;
-  })();
-
-  /**
    * The R2 filenames that could hold this stroke's photo, best first.
    *
-   * Two namings are in use and both are reasonable. A HAND needs its
-   * side -- the photo is a stick coming from the left or the right --
-   * so `R38.png` / `L38.png`. A FOOT does not: one pedal photo serves
-   * either foot, and a kit that uploaded a plain `36.png` for the kick
-   * is not missing anything. So hands prefer the sided name and feet
-   * prefer the bare number, and each falls back to the other rather
-   * than going dark on a kit that named things the other way.
+   * R2 names hands and feet differently, and the difference is real
+   * rather than an inconsistency. A HAND photo shows a stick coming in
+   * from one side, so it needs the side: `R38.png` and `L38.png` are
+   * two different pictures of the same snare. A FOOT photo shows a
+   * pedal going down, which looks the same whichever foot pushed it,
+   * so the kick and the hi-hat pedal are just `36.png`, `35.png`,
+   * `44.png`.
    *
-   * Last come the same drum's other GM numbers, because a kit with
-   * `36.png` and a score written with 35 is the same kick either way.
+   * The GM note number is NEVER swapped for another one. 35 and 36 are
+   * both "kick" to General MIDI, but they are two different kick
+   * photos in R2, and lighting 36 for a written 35 would be lighting
+   * the wrong drum. A stroke whose own number has no photo stays dark
+   * and gets reported, which is the honest answer.
+   *
+   * The opposite naming is kept as a last resort -- same note number,
+   * only the side prefix differs -- so a kit that named one file the
+   * other way still lights instead of going dark.
    */
   function stickingImageCandidates(limb, midiNote) {
     const side = limb === 'RH' || limb === 'RF' ? 'R' : 'L';
     const isFoot = limb === 'RF' || limb === 'LF';
-    const forNote = (n) => (isFoot ? [`${n}.png`, `${side}${n}.png`] : [`${side}${n}.png`, `${n}.png`]);
-
-    const candidates = forNote(midiNote);
-    for (const alias of GM_ALIASES.get(midiNote) ?? []) {
-      if (alias !== midiNote) candidates.push(...forNote(alias));
-    }
-    return candidates;
+    return isFoot
+      ? [`${midiNote}.png`, `${side}${midiNote}.png`]
+      : [`${side}${midiNote}.png`, `${midiNote}.png`];
   }
 
   function hitImageUrl(fileName) {
@@ -1012,19 +972,18 @@
   function renderSticking() {
     hitTimeline = [];
     clearLitHits();
-    if (!stickingOn.checked || lastParsed === null || notationPlayback === null) {
+    if (lastParsed === null || notationPlayback === null) {
       preloadHitImages();
       return;
     }
     if (typeof StickingEngine === 'undefined') {
-      stickingHint.textContent = 'Sticking Engine failed to load.';
+      stickingStatus('failed to load.');
       return;
     }
 
     const { notes } = buildDrumNoteList(lastParsed, notationPlayback);
     if (notes.length === 0) {
-      stickingHint.textContent =
-        'No <midi-unpitched> instruments in this file, so there is nothing to solve.';
+      stickingStatus('no <midi-unpitched> instruments in this file, so there is nothing to solve.');
       preloadHitImages();
       return;
     }
@@ -1038,16 +997,15 @@
       // every hit would light the wrong drum.
       StickingEngine.resetIdCounter();
       const engine = new StickingEngine.Engine({
-        style: StickingEngine.drummerStyle({ dominantHand: stickingHand.value }),
+        style: StickingEngine.drummerStyle({ dominantHand: STICKING.dominantHand }),
         intent: StickingEngine.performanceIntent(),
-        genre: stickingGenre.value,
-        seed: 42,
-        mode: 'HIGH',
+        genre: STICKING.genre,
+        seed: STICKING.seed,
+        mode: STICKING.mode,
       });
       performance = engine.run({ noteList: notes });
     } catch (err) {
       console.error('Sticking Engine failed on this score:', err);
-      stickingHint.textContent = 'Sticking Engine failed on this score -- see console.';
       return;
     }
 
@@ -1070,17 +1028,18 @@
     preloadHitImages();
 
     const issues = performance.validation.issues.length;
-    stickingHint.textContent =
+    stickingStatus(
       currentKit.name === null
-        ? `${performance.events.length} strokes solved. Pick a drum kit to light them.`
+        ? `${performance.events.length} strokes solved; no drum kit loaded yet to light them.`
         : `${hitTimeline.length} of ${performance.events.length} strokes have a photo in "${currentKit.name}"` +
           (missing > 0 ? ` -- no image for ${[...missingNotes].join(', ')}.` : '.') +
-          (issues > 0 ? ` ${issues} physical issue(s), see console.` : '');
+          (issues > 0 ? ` ${issues} physical issue(s).` : ''),
+    );
     if (missing > 0) {
       console.log(
-        'Sticking: no R2 image for these strokes. Looked for both namings ' +
-          '(R38.png / L38.png for hands, 36.png for feet) and the same drum\'s ' +
-          'other GM numbers:',
+        'Sticking: no R2 image for these strokes. Hands are named ' +
+          'R38.png / L38.png, feet 36.png / 35.png / 44.png, and the note ' +
+          'number is never substituted -- 35 and 36 are two different kicks:',
         [...missingNotes],
       );
     }
@@ -1135,10 +1094,6 @@
       img.classList.toggle('lit', now.has(img.dataset.file));
     }
     litFiles = now;
-  }
-
-  for (const control of [stickingOn, stickingHand, stickingGenre]) {
-    control.addEventListener('change', renderSticking);
   }
 
   /**
