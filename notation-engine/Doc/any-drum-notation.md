@@ -268,9 +268,16 @@ near-black frame + white notation + white titles, or white frame +
 near-black notation + dark titles (with the stat-box label in the brand
 red, since its tan is for a dark backdrop).
 
-The notation also sits a little higher in the frame -- 18px of air came
-out from above the top row and above the staff -- so the music is
-closer to the titles and further from the drum graphic below it.
+The notation also sits higher in the frame, and the brand mark sits on
+the same centreline as the TIME/BPM/COUNT boxes it shares a row with.
+Most of that came from the logo FILE rather than from the layout: its
+artwork stops at row 333 of 400 (measured, not guessed), so a plain
+80px-tall `<img>` carried ~13px of empty space under it, which pushed
+the notation down AND put the mark's visual centre below the stat
+boxes. A `-13px` bottom margin pulls the box tight around the ink;
+`.video-top`'s `align-items:center` then puts the two on one line, and
+those pixels go to the music. With the smaller paddings the notation
+starts 19px higher than it did.
 
 `colors.background` gained one rule for this: **`'none'` (or
 `'transparent'`) draws no background rectangle at all** — not a
@@ -305,7 +312,7 @@ costs the case that prompted the change nothing.
 | Host wiring | the `performance` branch in `updateCursor`, `website/video-create/drum/index.html` |
 | Transparent background | `hasBackground()` in `src/render/svg-primitives.ts`, its two call sites (`createSvgDocument`, `renderTabNumber`), `TAB_MASK_ON_TRANSPARENT_BACKGROUND` |
 | Video Style / no scrollbar | `.video-notation` CSS + the `.video-frame.style-white` rules, `notationConfig()`/`applyVideoStyle()` in the drum page |
-| The notation sitting higher | `.video-top` and `.video-notation` padding in the drum page |
+| The notation sitting higher | `.video-top`/`.video-notation` padding and `.video-logo-mark`'s negative bottom margin in the drum page |
 
 **Do not revert any of it without a reason.** Each one is a case where
 the engine disagreed with what the file actually said — and the first
