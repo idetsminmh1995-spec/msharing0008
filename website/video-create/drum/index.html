@@ -917,9 +917,54 @@
    */
   let hitTimeline = [];
 
-  function stickingImageName(limb, midiNote) {
+  /**
+   * Every GM note number that means the SAME drum, so a kit that
+   * uploaded `36.png` still lights when the score writes 35.
+   *
+   * Built by inverting the sticking engine's own GM map rather than
+   * hand-listing pairs here: 35/36 are both a kick and 41/43 are both a
+   * floor tom because that map says so, and a second copy of that
+   * knowledge would drift from it.
+   */
+  const GM_ALIASES = (() => {
+    const byInstrument = new Map();
+    if (typeof StickingEngine === 'undefined') return new Map();
+    for (const [note, instrument] of Object.entries(StickingEngine.GM_DRUM_MAP)) {
+      const group = byInstrument.get(instrument);
+      if (group === undefined) byInstrument.set(instrument, [Number(note)]);
+      else group.push(Number(note));
+    }
+    const aliases = new Map();
+    for (const group of byInstrument.values()) {
+      for (const note of group) aliases.set(note, group);
+    }
+    return aliases;
+  })();
+
+  /**
+   * The R2 filenames that could hold this stroke's photo, best first.
+   *
+   * Two namings are in use and both are reasonable. A HAND needs its
+   * side -- the photo is a stick coming from the left or the right --
+   * so `R38.png` / `L38.png`. A FOOT does not: one pedal photo serves
+   * either foot, and a kit that uploaded a plain `36.png` for the kick
+   * is not missing anything. So hands prefer the sided name and feet
+   * prefer the bare number, and each falls back to the other rather
+   * than going dark on a kit that named things the other way.
+   *
+   * Last come the same drum's other GM numbers, because a kit with
+   * `36.png` and a score written with 35 is the same kick either way.
+   */
+  function stickingImageCandidates(limb, midiNote) {
     const side = limb === 'RH' || limb === 'RF' ? 'R' : 'L';
-    return `${side}${midiNote}.png`;
+    const isFoot = limb === 'RF' || limb === 'LF';
+    const forNote = (n) => (isFoot ? [`${n}.png`, `${side}${n}.png`] : [`${side}${n}.png`, `${n}.png`]);
+
+    const candidates = forNote(midiNote);
+    for (const alias of GM_ALIASES.get(midiNote) ?? []) {
+      if (alias !== midiNote) candidates.push(...forNote(alias));
+    }
+    return candidates;
   }
 
   function hitImageUrl(fileName) {
@@ -1007,12 +1052,16 @@
     }
 
     let missing = 0;
+    const missingNotes = new Set();
     for (const ev of performance.events) {
       const source = notes[sourceIndex(ev.sourceId)];
       if (source === undefined) continue;
-      const file = stickingImageName(ev.limb, source.note);
-      if (!currentKit.files.has(file)) {
+      const file = stickingImageCandidates(ev.limb, source.note).find((name) =>
+        currentKit.files.has(name),
+      );
+      if (file === undefined) {
         missing++;
+        missingNotes.add(`${ev.limb} ${ev.instrument} (${source.note})`);
         continue;
       }
       hitTimeline.push({ time: ev.timeSeconds, file, limb: ev.limb });
@@ -1025,8 +1074,16 @@
       currentKit.name === null
         ? `${performance.events.length} strokes solved. Pick a drum kit to light them.`
         : `${hitTimeline.length} of ${performance.events.length} strokes have a photo in "${currentKit.name}"` +
-          (missing > 0 ? ` -- ${missing} have none and are skipped.` : '.') +
+          (missing > 0 ? ` -- no image for ${[...missingNotes].join(', ')}.` : '.') +
           (issues > 0 ? ` ${issues} physical issue(s), see console.` : '');
+    if (missing > 0) {
+      console.log(
+        'Sticking: no R2 image for these strokes. Looked for both namings ' +
+          '(R38.png / L38.png for hands, 36.png for feet) and the same drum\'s ' +
+          'other GM numbers:',
+        [...missingNotes],
+      );
+    }
     if (issues > 0) console.log('Sticking Engine validation:', performance.validation.issues);
   }
 
