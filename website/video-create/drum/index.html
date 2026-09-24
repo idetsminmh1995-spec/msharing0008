@@ -278,6 +278,8 @@
 <script src="../../assets/sticking-engine.js"></script>
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
 <script src="../../assets/outro-video.js"></script>
+<!-- One video frame per drawn frame, at a steady rate. -->
+<script src="../../assets/frame-pump.js"></script>
 </head>
 <body>
 
@@ -2724,7 +2726,15 @@
     // not a performance you have to sit through.
     muteMonitor(ctx, source);
 
-    const stream = canvas.captureStream(CAPTURE_FPS);
+    // The pump owns the video track, so it has to exist before the
+    // recorder does. It calls `pumpDraw`, which the phases below fill
+    // in -- until then it commits the canvas as it stands, and the
+    // recorder has not been started, so those frames go nowhere.
+    let pumpDraw = null;
+    const pump = FramePump.start(canvas, CAPTURE_FPS, async () => {
+      if (pumpDraw) await pumpDraw();
+    });
+    const stream = pump.stream;
     for (const track of dest.stream.getAudioTracks()) stream.addTrack(track);
 
     const chunks = [];
@@ -2734,13 +2744,11 @@
     };
 
     let cancelled = false;
-    let frameTimer = null;
     /** Read by `onstop`, which is written before the clip is fetched. */
     let outroUsed = false;
 
     const finish = () => {
-      if (frameTimer !== null) clearInterval(frameTimer);
-      frameTimer = null;
+      pump.stop();
       try {
         countGain.disconnect(dest);
         measureGain.disconnect(dest);
@@ -2774,7 +2782,8 @@
         const blob = new Blob(chunks, { type: mimeType });
         offerDownload(blob, extension);
         setUploadConfirm(
-          `✓ Video ready — ${canvas.width}×${canvas.height}, opening on a ${HOLD_SECONDS}s still` +
+          `✓ Video ready — ${canvas.width}×${canvas.height} at ${pump.fps().toFixed(0)}fps, ` +
+            `opening on a ${HOLD_SECONDS}s still` +
             (outroUsed
               ? ' and closing with the Thank You clip'
               : ' (no Thank You clip in the bucket)') +
@@ -2802,46 +2811,46 @@
     recorder.start();
     drawDrumFrame(ctx2d, canvas);
 
-    // A timer, not requestAnimationFrame: frames have to keep being
-    // produced in a background tab, and rAF stops there -- which would
-    // leave a recording that is mostly one frozen image.
-    //
-    // Started before ANY phase, not just before the take: the still
-    // second and the count-in are both part of the video, and a canvas
-    // nobody draws on records its last frame over and over.
-    //
-    // The timer draws whatever the phase says; the phases themselves
-    // run as a plain sequence below, which reads far better than a
-    // state machine inside the timer.
+    // The pump draws whatever the phase says and commits exactly one
+    // video frame per draw. It is drawing from the FIRST phase, not
+    // just the take: the still second and the count-in are both part
+    // of the video.
     let phase = 'hold';
-    let busy = false;
-    frameTimer = setInterval(() => {
-      if (busy || cancelled) return;
-      busy = true;
-      try {
-        if (phase === 'outro' && outro) {
-          OutroVideo.drawCover(ctx2d, canvas, outro.video);
-          genLabel.textContent = 'Thank you…';
-          return;
-        }
-        drawDrumFrame(ctx2d, canvas);
-        if (phase === 'hold') {
-          genLabel.textContent = 'Opening…';
-          return;
-        }
-        if (phase === 'countin') {
-          genLabel.textContent = 'Counting in…';
-          return;
-        }
-        const total = Number.isFinite(audioPlayer.duration) ? audioPlayer.duration : 0;
-        const at = audioPlayer.currentTime;
-        const fraction = total > 0 ? Math.min(1, at / total) : 0;
-        genFill.style.width = `${(fraction * 100).toFixed(1)}%`;
-        genLabel.textContent = `Recording… ${formatTime(at)} / ${formatTime(total)}`;
-      } finally {
-        busy = false;
+    // Four times a second, not thirty. Writing the label and the bar
+    // every frame forces a style recalculation on the very thread that
+    // is composing the next one -- and this page's frame is read from
+    // the live DOM, so that recalculation is not free.
+    let nextReport = 0;
+    const report = (text, fraction) => {
+      const now = performance.now();
+      if (now < nextReport) return;
+      nextReport = now + 250;
+      if (fraction !== undefined) genFill.style.width = `${(fraction * 100).toFixed(1)}%`;
+      genLabel.textContent = text;
+    };
+
+    pumpDraw = () => {
+      if (cancelled) return;
+      if (phase === 'outro' && outro) {
+        OutroVideo.drawCover(ctx2d, canvas, outro.video);
+        report('Thank you…');
+        return;
       }
-    }, Math.round(1000 / CAPTURE_FPS));
+      drawDrumFrame(ctx2d, canvas);
+      if (phase === 'hold') {
+        report('Opening…');
+        return;
+      }
+      if (phase === 'countin') {
+        report('Counting in…');
+        return;
+      }
+      const total = Number.isFinite(audioPlayer.duration) ? audioPlayer.duration : 0;
+      report(
+        `Recording… ${formatTime(audioPlayer.currentTime)} / ${formatTime(total)}`,
+        total > 0 ? Math.min(1, audioPlayer.currentTime / total) : 0,
+      );
+    };
 
     const stillGoing = () => !cancelled && recorder.state !== 'inactive';
     const waitFor = async (test) => {

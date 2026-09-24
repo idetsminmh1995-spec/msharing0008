@@ -62024,6 +62024,7 @@ ${denominator}`;
     const allTempoEvents = [];
     const allTimeSignatureEvents = [];
     const allKeySignatureEvents = [];
+    let endTicks = 0;
     for (let trackIndex = 0; trackIndex < trackCount; trackIndex++) {
       const trackMagic = reader.readAscii(4);
       const trackLength = reader.readUint32BE();
@@ -62039,7 +62040,8 @@ ${denominator}`;
         break;
       }
       const trackEnd = reader.position + trackLength;
-      const { notes, meta } = parseTrackEvents(reader, trackEnd, trackIndex, diagnostics);
+      const { notes, meta, endRawTick } = parseTrackEvents(reader, trackEnd, trackIndex, diagnostics);
+      endTicks = Math.max(endTicks, normalizeTick(endRawTick, ppq));
       tracks.push({ notes: notes.map((n) => normalizeNote(n, ppq)) });
       allTempoEvents.push(...meta.tempoEvents.map((e) => normalizeTempoEvent(e, ppq)));
       allTimeSignatureEvents.push(
@@ -62055,7 +62057,8 @@ ${denominator}`;
       tracks,
       tempoEvents: allTempoEvents,
       timeSignatureEvents: allTimeSignatureEvents,
-      keySignatureEvents: allKeySignatureEvents
+      keySignatureEvents: allKeySignatureEvents,
+      endTicks
     };
     return { midiFile, diagnostics };
   }
@@ -62191,7 +62194,7 @@ ${denominator}`;
         }
       }
     }
-    return { notes, meta };
+    return { notes, meta, endRawTick: rawTick };
   }
   function parseMetaEvent(reader, rawTick, trackIndex, meta, diagnostics) {
     const metaType = reader.readUint8();

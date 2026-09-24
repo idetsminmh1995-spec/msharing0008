@@ -296,6 +296,8 @@
 <script src="../../assets/metronome-engine.js"></script>
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
 <script src="../../assets/outro-video.js"></script>
+<!-- One video frame per drawn frame, at a steady rate. -->
+<script src="../../assets/frame-pump.js"></script>
 <script>
   // The metronome reads its tempo and time signature from the uploaded
   // MIDI file and clicks along with the uploaded audio. Everything it
@@ -892,7 +894,12 @@
             ? [...result.midiFile.timeSignatureEvents].sort((a, b) => a.tick - b.tick)
             : DEFAULT_TIME_SIGNATURES;
         hasMidi = true;
-        songEndTicks = 0;
+        // The FILE's own end, not the end of its last note. A MIDI
+        // written as a conductor track -- a tempo map and nothing else
+        // -- has no notes at all, and measuring those gave it a length
+        // of zero, which fell through to the ten-minute free run. A
+        // three-minute file came out as a ten-minute video.
+        songEndTicks = result.midiFile.endTicks ?? 0;
         for (const track of result.midiFile.tracks) {
           for (const note of track.notes) {
             songEndTicks = Math.max(songEndTicks, note.tick + note.durationTicks);
@@ -908,7 +915,9 @@
           `"${file.name}" — ${bpm ?? '?'} BPM, ${sig.numerator}/${sig.denominator}` +
             (changes > 0 ? `, ${changes} tempo change(s)` : '') +
             `. ${beatGrid.length} beats over ${formatTime(duration())}` +
-            (songEndTicks > 0 ? '.' : ' (no notes in the file, so the count is open-ended).'),
+            (songEndTicks > 0
+              ? ' — the video will be exactly that long.'
+              : ' (the file declares no length at all, so the count is open-ended).'),
           true,
         );
         loadVoices();
@@ -1228,7 +1237,15 @@
       /* never connected */
     }
 
-    const stream = canvas.captureStream(CAPTURE_FPS);
+    // The pump owns the video track, so it has to exist before the
+    // recorder does. It calls `pumpDraw`, which the phases below fill
+    // in -- until then it commits the canvas as it stands, and the
+    // recorder has not been started, so those frames go nowhere.
+    let pumpDraw = null;
+    const pump = FramePump.start(canvas, CAPTURE_FPS, async () => {
+      if (pumpDraw) await pumpDraw();
+    });
+    const stream = pump.stream;
     for (const track of dest.stream.getAudioTracks()) stream.addTrack(track);
 
     const chunks = [];
@@ -1239,13 +1256,11 @@
 
     const total = duration();
     let cancelled = false;
-    let frameTimer = null;
     /** Read by `onstop`, which is written before the clip is fetched. */
     let outroUsed = false;
 
     const finish = () => {
-      if (frameTimer !== null) clearInterval(frameTimer);
-      frameTimer = null;
+      pump.stop();
       try {
         clickGain.disconnect(dest);
       } catch (err) {
@@ -1278,7 +1293,8 @@
         const blob = new Blob(chunks, { type: mimeType });
         offerDownload(blob, extension);
         setConfirm(
-          `Video ready — ${formatTime(total)} of music, ${canvas.width}×${canvas.height}, ` +
+          `Video ready — ${formatTime(total)} of music, ${canvas.width}×${canvas.height} ` +
+            `at ${pump.fps().toFixed(0)}fps, ` +
             `opening on a ${HOLD_SECONDS}s still` +
             (outroUsed ? ' and closing with the Thank You clip' : ' (no Thank You clip in the bucket)') +
             '. Press Download Video to save it.',
@@ -1300,37 +1316,42 @@
     // does not open on a blank canvas.
     await drawToCanvas(ctx2d, canvas, 0);
 
-    // A timer rather than requestAnimationFrame: frames must keep being
-    // produced when the tab is in the background, and rAF stops there --
-    // which would leave a recording that is mostly one frozen image.
-    //
-    // The timer draws whatever the phase says; the phases themselves
-    // run as a plain sequence below, which is far easier to follow than
-    // a state machine inside the timer.
+    // The pump draws whatever the phase says and commits exactly one
+    // video frame per draw; the phases themselves run as a plain
+    // sequence below, which is far easier to follow than a state
+    // machine inside a timer.
     let phase = 'hold';
-    let busy = false;
-    frameTimer = setInterval(async () => {
-      if (busy || cancelled) return;
-      busy = true;
-      try {
-        if (phase === 'outro' && outro) {
-          OutroVideo.drawCover(ctx2d, canvas, outro.video);
-          genLabel.textContent = 'Thank you…';
-          return;
-        }
-        const at = phase === 'hold' ? 0 : position();
-        await drawToCanvas(ctx2d, canvas, at);
-        if (phase === 'hold') {
-          genLabel.textContent = 'Opening…';
-          return;
-        }
-        const fraction = total > 0 ? Math.min(1, at / total) : 0;
-        genFill.style.width = `${(fraction * 100).toFixed(1)}%`;
-        genLabel.textContent = `Recording… ${formatTime(at)} / ${formatTime(total)}`;
-      } finally {
-        busy = false;
+    // Four times a second, not thirty. Writing the label and the bar
+    // every frame forces a style recalculation on the very thread that
+    // is rasterising the next one, and a progress bar that moves four
+    // times a second looks no different to anyone watching it.
+    let nextReport = 0;
+    const report = (text, fraction) => {
+      const now = performance.now();
+      if (now < nextReport) return;
+      nextReport = now + 250;
+      if (fraction !== undefined) genFill.style.width = `${(fraction * 100).toFixed(1)}%`;
+      genLabel.textContent = text;
+    };
+
+    pumpDraw = async () => {
+      if (cancelled) return;
+      if (phase === 'outro' && outro) {
+        OutroVideo.drawCover(ctx2d, canvas, outro.video);
+        report('Thank you…');
+        return;
       }
-    }, Math.round(1000 / CAPTURE_FPS));
+      const at = phase === 'hold' ? 0 : position();
+      await drawToCanvas(ctx2d, canvas, at);
+      if (phase === 'hold') {
+        report('Opening…');
+        return;
+      }
+      report(
+        `Recording… ${formatTime(at)} / ${formatTime(total)}`,
+        total > 0 ? Math.min(1, at / total) : 0,
+      );
+    };
 
     const stillGoing = () => !cancelled && recorder.state !== 'inactive';
     const waitFor = async (test) => {

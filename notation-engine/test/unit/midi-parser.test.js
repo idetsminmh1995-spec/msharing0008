@@ -270,3 +270,62 @@ describe('MIDI parser: unknown meta events are skipped by declared length (Phase
     assert.equal(midiFile.tracks[0].notes[0].noteNumber, 72);
   });
 });
+
+describe('MIDI parser: the file’s own length (endTicks)', () => {
+  test('endTicks is where the track STOPS, not where the last note stops', () => {
+    // Two bars at 480 PPQ: a note in the first, then silence to the
+    // end-of-track marker a bar later. A player reading the notes
+    // would call this piece one beat long; it is five.
+    const bytes = buildMidiFile({
+      format: 0,
+      ppq: 480,
+      tracks: [
+        [
+          noteEvent(0, 0x90, 60, 100),
+          noteEvent(480, 0x80, 60, 0),
+          endOfTrackMetaEvent(1440),
+        ],
+      ],
+    });
+    const { midiFile } = NE.parseMidiFile(bytes);
+    assert.equal(midiFile.tracks[0].notes[0].durationTicks, 480);
+    assert.equal(midiFile.endTicks, 1920);
+  });
+
+  test('a file with NO notes still has a length', () => {
+    // A conductor track: a tempo map and nothing else. This is the
+    // case that made a three-minute file render as ten minutes of
+    // video -- there were no notes to measure, so nothing measured it.
+    const bytes = buildMidiFile({
+      format: 0,
+      ppq: 480,
+      tracks: [[tempoMetaEvent(0, 500000), tempoMetaEvent(3840, 400000), endOfTrackMetaEvent(960)]],
+    });
+    const { midiFile } = NE.parseMidiFile(bytes);
+    assert.equal(midiFile.tracks[0].notes.length, 0);
+    assert.equal(midiFile.endTicks, 4800);
+  });
+
+  test('endTicks is normalized off the file’s own PPQ, like every other tick', () => {
+    const bytes = buildMidiFile({
+      format: 0,
+      ppq: 96,
+      tracks: [[noteEvent(0, 0x90, 60, 100), noteEvent(96, 0x80, 60, 0), endOfTrackMetaEvent(96)]],
+    });
+    const { midiFile } = NE.parseMidiFile(bytes);
+    assert.equal(midiFile.endTicks, 960); // 192 ticks at 96 PPQ = two quarters
+  });
+
+  test('the LONGEST track decides, not the first', () => {
+    const bytes = buildMidiFile({
+      format: 1,
+      ppq: 480,
+      tracks: [
+        [tempoMetaEvent(0, 500000), endOfTrackMetaEvent(480)],
+        [noteEvent(0, 0x90, 60, 100), noteEvent(1920, 0x80, 60, 0), endOfTrackMetaEvent(0)],
+      ],
+    });
+    const { midiFile } = NE.parseMidiFile(bytes);
+    assert.equal(midiFile.endTicks, 1920);
+  });
+});

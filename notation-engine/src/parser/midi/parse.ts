@@ -115,6 +115,7 @@ export function parseMidiFile(bytes: Uint8Array): ParseMidiResult {
   const allTempoEvents: TempoEvent[] = [];
   const allTimeSignatureEvents: TimeSignatureEvent[] = [];
   const allKeySignatureEvents: KeySignatureEvent[] = [];
+  let endTicks = 0;
 
   for (let trackIndex = 0; trackIndex < trackCount; trackIndex++) {
     const trackMagic = reader.readAscii(4);
@@ -132,7 +133,8 @@ export function parseMidiFile(bytes: Uint8Array): ParseMidiResult {
     }
 
     const trackEnd = reader.position + trackLength;
-    const { notes, meta } = parseTrackEvents(reader, trackEnd, trackIndex, diagnostics);
+    const { notes, meta, endRawTick } = parseTrackEvents(reader, trackEnd, trackIndex, diagnostics);
+    endTicks = Math.max(endTicks, normalizeTick(endRawTick, ppq));
     tracks.push({ notes: notes.map((n) => normalizeNote(n, ppq)) });
     allTempoEvents.push(...meta.tempoEvents.map((e) => normalizeTempoEvent(e, ppq)));
     allTimeSignatureEvents.push(
@@ -150,6 +152,7 @@ export function parseMidiFile(bytes: Uint8Array): ParseMidiResult {
     tempoEvents: allTempoEvents,
     timeSignatureEvents: allTimeSignatureEvents,
     keySignatureEvents: allKeySignatureEvents,
+    endTicks,
   };
   return { midiFile, diagnostics };
 }
@@ -205,7 +208,7 @@ function parseTrackEvents(
   trackEnd: number,
   trackIndex: number,
   diagnostics: MidiDiagnostic[],
-): { notes: RawMidiNote[]; meta: RawMetaEvents } {
+): { notes: RawMidiNote[]; meta: RawMetaEvents; endRawTick: number } {
   const notes: RawMidiNote[] = [];
   const meta: RawMetaEvents = { tempoEvents: [], timeSignatureEvents: [], keySignatureEvents: [] };
   // §11.1: an active note-on per (channel, noteNumber), so a later
@@ -324,7 +327,10 @@ function parseTrackEvents(
     // correctly consumed above so the stream stays in sync.
   }
 
-  return { notes, meta };
+  // `rawTick` has had every delta added to it, end-of-track's
+  // included, so it IS where this track stops -- which is past the
+  // last note-off, and is the only answer a track with no notes has.
+  return { notes, meta, endRawTick: rawTick };
 }
 
 /** Returns false if the meta event was truncated (caller should stop parsing this track). */

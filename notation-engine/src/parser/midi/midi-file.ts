@@ -7,6 +7,19 @@ export interface MidiFile {
   readonly tempoEvents: readonly TempoEvent[];
   readonly timeSignatureEvents: readonly TimeSignatureEvent[];
   readonly keySignatureEvents: readonly KeySignatureEvent[];
+  /**
+   * The last tick anything happens on, across every track, normalized
+   * like every other tick here.
+   *
+   * This is the file's LENGTH, and it is not the same as the end of
+   * the last note. A track's end-of-track marker (FF 2F) usually sits
+   * past the final note-off, and a file can carry a tempo map with no
+   * notes in it at all -- a click track, a conductor track -- where
+   * the notes say nothing about how long the file is. Anything asking
+   * "how long is this piece" should read this rather than scanning
+   * `tracks[].notes`, which answers a different question.
+   */
+  readonly endTicks: number;
 }
 
 export interface MidiTrack {
