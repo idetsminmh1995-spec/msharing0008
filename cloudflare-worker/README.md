@@ -146,6 +146,14 @@ page uses its Video Style radio, and the Metronome page uses whether
 the chosen design's palette is light or dark -- the design owns the
 look there, so a white design should not end on a black card.
 
+The Metronome page's INSTRUMENT is per design, because not every one
+of the eleven has an ending of its own yet. `OUTRO_KIND` in that page
+names the ones that are spoken for and everything else falls through
+to `metronome`. Today it holds one entry: **`pendulum` closes with the
+`drum` clip**. Giving another design its own ending is a line there
+plus the file in the bucket, and thanks to the walk outward below the
+line can go in first.
+
 **A bucket with only some of them still works.** Each page tries the
 exact match, then the same clip in the other colour, then the drum clip
 of the same shape, and finally `Thank Video/16x9/drum/16x9 Black

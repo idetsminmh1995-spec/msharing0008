@@ -491,7 +491,7 @@
       <div class="gen-line"><span id="genLabel">Recording…</span><button class="btn-ghost" id="cancelBtn" type="button">Cancel</button></div>
     </div>
     <div class="cost-line" id="costLine">Estimated cost: <b>18 points</b> · You have 240</div>
-    <div class="field-hint" id="genNote">Recorded in your browser, in real time &mdash; a 3-minute take needs 3 minutes, and the tab has to stay open. The file is a WebM of the frame exactly as you see it: a still second, the count-in, the audio, and the Thank You clip from the asset server at the end.</div>
+    <div class="field-hint" id="genNote">Recorded in your browser, in real time &mdash; a 3-minute take needs 3 minutes, and the tab has to stay open. It records silently: nothing is heard while it runs, but everything is in the file. That file is a WebM of the frame exactly as you see it: a still second, the count-in, the audio, and the Thank You clip from the asset server at the end.</div>
   </div>
 
   <div class="right">
@@ -2315,6 +2315,38 @@
    * per-take would leave every take after the first silent.
    */
   let takeSource = null;
+
+  /**
+   * Takes the three sound paths off the speakers, and puts them back.
+   *
+   * `restoreMonitor` is called from the recorder's own clean-up AND
+   * from the click handler's catch, because the mute happens before
+   * the recorder exists -- a take that fell over in that gap would
+   * otherwise leave the page silent for good.
+   */
+  function muteMonitor(ctx, source) {
+    for (const node of [countGain, measureGain, source]) {
+      if (!node) continue;
+      try {
+        node.disconnect(ctx.destination);
+      } catch (err) {
+        /* never connected */
+      }
+    }
+  }
+
+  function restoreMonitor() {
+    if (!audioCtx) return;
+    for (const node of [countGain, measureGain, takeSource]) {
+      if (!node) continue;
+      try {
+        node.connect(audioCtx.destination);
+      } catch (err) {
+        /* already connected */
+      }
+    }
+  }
+
   function ensureTakeSource(ctx) {
     if (takeSource) return takeSource;
     try {
@@ -2686,6 +2718,12 @@
     const source = ensureTakeSource(ctx);
     if (source) source.connect(dest);
 
+    // Everything is taken OFF the speakers while it records. All three
+    // still reach the file, because that is a different connection;
+    // what they stop reaching is the room. A take is a background job,
+    // not a performance you have to sit through.
+    muteMonitor(ctx, source);
+
     const stream = canvas.captureStream(CAPTURE_FPS);
     for (const track of dest.stream.getAudioTracks()) stream.addTrack(track);
 
@@ -2712,6 +2750,7 @@
       }
       for (const track of stream.getTracks()) track.stop();
       audioPlayer.pause();
+      restoreMonitor();
       recording = null;
       setGenerating(false);
     };
@@ -2863,6 +2902,7 @@
     generateVideo().catch((err) => {
       console.error('Generate failed:', err);
       if (recording) recording.cancel();
+      restoreMonitor();
       setGenerating(false);
       setUploadConfirm(`Generating stopped: ${err && err.message ? err.message : err}`, false);
     });

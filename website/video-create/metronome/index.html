@@ -252,7 +252,7 @@
       <div class="gen-line"><span id="genLabel">Recording…</span><button class="btn-ghost" id="cancelBtn" type="button">Cancel</button></div>
     </div>
     <div class="cost-line" id="costLine">Estimated cost: <b>12 points</b> · You have 240</div>
-    <div class="field-hint" id="genNote">Recorded in your browser, in real time. The take opens on a still second, runs for exactly as long as the MIDI, and closes with the Thank You clip from the asset server.</div>
+    <div class="field-hint" id="genNote">Recorded in your browser, in real time &mdash; silently, in the background: the preview holds still and nothing is heard, but the count is in the file. The take opens on a still second, runs for exactly as long as the MIDI, and closes with the Thank You clip from the asset server.</div>
   </div>
 
   <div class="right">
@@ -779,7 +779,37 @@
     });
   }
 
+  /**
+   * True while a take is being recorded.
+   *
+   * The recording draws its own frames onto its own canvas from the
+   * same `frameState`, so the PREVIEW has nothing to contribute while
+   * it runs -- and rebuilding a whole SVG sixty times a second next to
+   * an encoder only slows the encoder down. The take runs in the
+   * background: the preview holds its opening frame and the progress
+   * bar says how far along it is.
+   */
+  let generating = false;
+
+  /**
+   * Puts the count back on the speakers.
+   *
+   * Called from the recorder's own clean-up AND from the click
+   * handler's catch, because the mute happens a few lines before the
+   * recorder exists -- and a take that fell over in that gap would
+   * otherwise leave the page silent for good.
+   */
+  function restoreMonitor() {
+    if (!audioCtx || !clickGain) return;
+    try {
+      clickGain.connect(audioCtx.destination);
+    } catch (err) {
+      /* already connected */
+    }
+  }
+
   function updateDisplay() {
+    if (generating) return;
     const at = position();
     showTempoBoxes();
     drawFrame();
@@ -1042,6 +1072,22 @@
   const CAPTURE_FPS = 30;
   /** 1080p is the most a browser encoder handles comfortably in real time. */
   const MAX_CAPTURE_LONG_SIDE = 1920;
+
+  /**
+   * Which instrument's Thank You clip a design closes with.
+   *
+   * Not every design has an ending of its own yet, so this names the
+   * ones that are spoken for and everything else falls through to the
+   * default. The Pendulum closes with the DRUM clip: it is the drum
+   * ending that was made for it.
+   *
+   * Adding a design's own clip later is one line here -- the folder
+   * and file naming are `OutroVideo`'s business, and the walk outward
+   * it does means a name added before the file is uploaded still
+   * closes a video.
+   */
+  const OUTRO_KIND = { pendulum: 'drum' };
+  const OUTRO_KIND_DEFAULT = 'metronome';
   /**
    * A still second before the count starts.
    *
@@ -1094,13 +1140,22 @@
   }
 
   function setGenerating(on) {
+    generating = on;
     generateBtn.disabled = on;
     generateBtn.textContent = on ? 'Generating…' : 'Generate Video';
     genProgress.hidden = !on;
     costLine.hidden = on;
+    // The transport belongs to the preview, and the preview is not
+    // what is being recorded. Pressing play mid-take would move the
+    // clock the recording is reading from.
+    playBtn.disabled = on;
+    scrubBar.style.pointerEvents = on ? 'none' : '';
     if (on) {
       downloadBtn.hidden = true;
       genFill.style.width = '0%';
+    } else {
+      setPlayIcon(false);
+      updateDisplay();
     }
   }
 
@@ -1163,6 +1218,15 @@
     // through, so the mix you heard is the mix that is written.
     const dest = ctx.createMediaStreamDestination();
     clickGain.connect(dest);
+    // ...and taken OFF the speakers while it records. The count still
+    // reaches the file, because that is a different connection; what
+    // it stops reaching is the room. A take is a background job, not a
+    // performance you have to sit through.
+    try {
+      clickGain.disconnect(ctx.destination);
+    } catch (err) {
+      /* never connected */
+    }
 
     const stream = canvas.captureStream(CAPTURE_FPS);
     for (const track of dest.stream.getAudioTracks()) stream.addTrack(track);
@@ -1187,6 +1251,8 @@
       } catch (err) {
         /* already disconnected */
       }
+      // Back on the speakers, so pressing play after a take is heard.
+      restoreMonitor();
       for (const track of stream.getTracks()) track.stop();
       stopPlayback(true);
       recording = null;
@@ -1328,7 +1394,7 @@
     try {
       return await OutroVideo.loadOutro(API_BASE, {
         aspect: currentAspect(),
-        kind: 'metronome',
+        kind: OUTRO_KIND[designSelect.value] ?? OUTRO_KIND_DEFAULT,
         style: light ? 'white' : 'black',
       });
     } catch (err) {
@@ -1345,6 +1411,7 @@
     generateVideo().catch((err) => {
       console.error('Generate failed:', err);
       if (recording) recording.cancel();
+      restoreMonitor();
       setGenerating(false);
       refreshGenerateBtn();
       setConfirm(`Generating stopped: ${err && err.message ? err.message : err}`, false);
