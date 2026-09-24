@@ -27,7 +27,7 @@ const svg = renderMetronomeFrame({
 
 | # | id | What makes it different | Look |
 |---|---|---|---|
-| 1 | `pendulum` | The instrument itself: a weighted arm swinging over a scale. | Warm wood & red |
+| 1 | `pendulum` | The instrument itself: a neon case with an arm swinging over its scale. | Black & neon red |
 | 2 | `beat-dots` | One dot per beat — a row, a column or an arc. | Black & red |
 | 3 | `pulse-ring` | Rings thrown outward on each beat, fading as they grow. | Night blue |
 | 4 | `bar-meter` | Columns that stay filled, so you see what is LEFT of the bar. | Paper & ink |
@@ -64,15 +64,24 @@ channel's worth of videos should not move them around:
 
 - **The logo is always the top-left corner.** A mark that moves between
   designs is a mark the eye has to hunt for, and on a run of videos the
-  corner it sits in IS the branding. `header` reserves room for it, so
-  nothing is drawn over it. With no logo, nothing is drawn at all — a
-  placeholder box in an exported video is worse than empty space.
+  corner it sits in IS the branding. Its size is one constant,
+  `LOGO_FRACTION`, read by both `logoBox` and `bands` — the top band
+  reserves room for the mark, so a size those two disagreed about would
+  let a design draw underneath it. With no logo, nothing is drawn at all
+  — a placeholder box in an exported video is worse than empty space.
 - **The tempo and the time signature are large.** Two big figures with a
   small `BPM` unit between them, not a line of small type: on a lesson
   video the tempo is the second thing a viewer looks for after the
   count, and it has to survive being watched on a phone. The header band
   is measured from the type it actually holds, so the readout can grow
   without landing on the subtitle.
+
+A design may set `ownHeader` and draw its own title, readout and mark
+instead. `pendulum` is the only one that does: its arrangement — the
+readout flanking the instrument in landscape, gathered into a bar along
+the bottom in the two narrow shapes — is the design, and the shared
+header would put a second title on top of it. The two rules above still
+hold there; it places them itself.
 
 ## Ratios
 

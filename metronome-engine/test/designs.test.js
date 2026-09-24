@@ -147,6 +147,22 @@ test('a logo is placed when given and nothing is drawn when not', () => {
   }
 });
 
+test('the header reserves room for the mark, in every ratio', () => {
+  // The two used to carry their own copy of the size, and when one
+  // changed a design drew underneath the logo. They read one constant
+  // now; this is what says so.
+  for (const aspect of ['16x9', '9x16', '1x1']) {
+    const canvas = M.canvasFor(aspect);
+    const box = M.logoBox(canvas);
+    const { stage } = M.bands(canvas);
+    assert.ok(
+      box.y + box.height <= stage.y + 0.5,
+      `${aspect}: the stage starts at ${stage.y}, under a mark ending at ${box.y + box.height}`,
+    );
+    assert.ok(box.width > canvas.short * 0.12, `${aspect}: the mark is smaller than it should be`);
+  }
+});
+
 test('text is escaped, so a title cannot break the frame', () => {
   const svg = M.renderMetronomeFrame({
     design: 'big-number',

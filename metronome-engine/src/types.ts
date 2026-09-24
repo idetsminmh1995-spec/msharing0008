@@ -89,6 +89,17 @@ export interface Design {
    * only what to call them.
    */
   readonly look: string;
+  /**
+   * True when this design draws its OWN title, tempo readout and mark,
+   * and the shared header must stand aside.
+   *
+   * The shared header puts the title top-left and the readout top-
+   * right, which is right for ten of the eleven. A design whose whole
+   * point is a particular arrangement -- the readout flanking the
+   * instrument, or gathered into a bar along the bottom -- cannot have
+   * a second title drawn over it.
+   */
+  readonly ownHeader?: boolean;
   /** The design's own body, drawn inside the shared <svg> shell. */
   draw(context: DesignContext): string;
 }

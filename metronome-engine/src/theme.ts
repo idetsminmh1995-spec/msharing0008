@@ -37,8 +37,8 @@ function light(background: string, ink: string, accent: string, accentSoft: stri
  * apart in a picker than eleven variations on black.
  */
 const PALETTES: Readonly<Record<string, Palette>> = {
-  // Warm wood, because it is a wooden instrument.
-  pendulum: dark('#1A1210', BRAND_RED, '#42171A'),
+  // Near-black and a neon red: the instrument lit on a dark stage.
+  pendulum: dark('#070506', '#E4141F', '#2A0A0D'),
   // The house black-and-red.
   'beat-dots': dark('#17110E', BRAND_RED, '#5A1218'),
   // Night blue: rings on water.

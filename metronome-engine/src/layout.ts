@@ -62,7 +62,7 @@ export function gutter(canvas: Canvas): number {
 export function bands(canvas: Canvas): { header: Rect; stage: Rect } {
   const pad = gutter(canvas);
   const size = typeScale(canvas);
-  const mark = canvas.short * 0.11;
+  const mark = logoBox(canvas).height;
   // Measured from what the header actually holds, not as a fraction of
   // the frame. It used to be a fraction, and when the tempo readout grew
   // the band did not -- so it landed on top of the subtitle in the two
@@ -128,9 +128,18 @@ export function advanceWidth(value: string, fontSize: number): number {
   return units * fontSize;
 }
 
+/**
+ * How much of the short side the mark takes up.
+ *
+ * One number, read by both `logoBox` and `bands` -- the band at the top
+ * reserves room for the mark, so a size the two disagreed about would
+ * put a design's drawing under the logo.
+ */
+export const LOGO_FRACTION = 0.15;
+
 /** Where the mark goes. Top-left, always -- see `logo`. */
 export function logoBox(canvas: Canvas): Rect {
-  const size = canvas.short * 0.11;
+  const size = canvas.short * LOGO_FRACTION;
   const pad = gutter(canvas);
   return { x: pad, y: pad, width: size, height: size };
 }

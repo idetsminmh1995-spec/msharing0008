@@ -24,10 +24,13 @@ var MetronomeDesigns = (() => {
     ASPECT_RATIOS: () => ASPECT_RATIOS,
     DEFAULT_DESIGN_ID: () => DEFAULT_DESIGN_ID,
     DESIGNS: () => DESIGNS,
+    LOGO_FRACTION: () => LOGO_FRACTION,
+    bands: () => bands,
     canvasFor: () => canvasFor,
     designById: () => designById,
     isLightPalette: () => isLightPalette,
     listDesigns: () => listDesigns,
+    logoBox: () => logoBox,
     paletteForDesign: () => paletteForDesign,
     renderMetronomeFrame: () => renderMetronomeFrame
   });
@@ -131,7 +134,7 @@ var MetronomeDesigns = (() => {
   function bands(canvas) {
     const pad = gutter(canvas);
     const size = typeScale(canvas);
-    const mark = canvas.short * 0.11;
+    const mark = logoBox(canvas).height;
     const headerHeight = canvas.isPortrait || canvas.isSquare ? Math.max(size.title + size.subtitle * 1.45 + size.stat * 1.35, mark + pad) : Math.max(size.title + size.subtitle * 1.5, size.stat * 1.6, mark);
     const header2 = {
       x: pad,
@@ -176,8 +179,9 @@ var MetronomeDesigns = (() => {
     }
     return units * fontSize;
   }
+  var LOGO_FRACTION = 0.15;
   function logoBox(canvas) {
-    const size = canvas.short * 0.11;
+    const size = canvas.short * LOGO_FRACTION;
     const pad = gutter(canvas);
     return { x: pad, y: pad, width: size, height: size };
   }
@@ -269,67 +273,260 @@ var MetronomeDesigns = (() => {
   }
 
   // src/designs/01-pendulum.ts
-  var MAX_SWING = 0.072;
+  var MAX_SWING = 0.045;
+  var TICKS = 31;
+  var FAN_SPAN = 0.3;
+  var CAP_GAP = 0.045;
+  function halfWidthAt(box, t) {
+    return lerp(box.halfTop, box.halfBottom, t);
+  }
+  function pointAt(box, t, x = 0) {
+    return [box.cx + x, box.top + box.height * t];
+  }
+  function bloom(cx, cy, radius, palette) {
+    let out = "";
+    for (let i = 5; i >= 1; i--) {
+      const scale = i / 5;
+      out += tag("ellipse", {
+        cx,
+        cy,
+        rx: radius * scale,
+        ry: radius * scale * 0.78,
+        fill: palette.accentSoft,
+        opacity: 0.055 + (1 - scale) * 0.05
+      });
+    }
+    return out;
+  }
+  function fan(box, progress, canvas, palette) {
+    const [fx, fy] = pointAt(box, 0.5);
+    const inner = box.height * 0.5;
+    const outer = box.height * 0.565;
+    const step = FAN_SPAN * 2 / (TICKS - 1);
+    const head = lerp(-FAN_SPAN, FAN_SPAN, progress);
+    const marks = [];
+    for (let i = 0; i < TICKS; i++) {
+      const turns = -FAN_SPAN + i * step;
+      if (Math.abs(turns) < CAP_GAP) continue;
+      const isHead = Math.abs(turns - head) < step * 1.1;
+      const passed = turns < head;
+      const atLimit = i < 2 || i >= TICKS - 2;
+      const reach = isHead ? outer * 1.08 : outer;
+      const [x1, y1] = polar(fx, fy, inner, turns);
+      const [x2, y2] = polar(fx, fy, reach, turns);
+      marks.push(
+        line(x1, y1, x2, y2, {
+          stroke: isHead || passed || atLimit ? palette.accent : palette.ink,
+          "stroke-width": canvas.short * (isHead ? 8e-3 : 45e-4),
+          opacity: isHead ? 1 : atLimit ? 0.7 : passed ? 0.45 : 0.26
+        })
+      );
+    }
+    return group({ "stroke-linecap": "round" }, marks.join(""));
+  }
+  function instrument(box, canvas, palette) {
+    const bottom = box.top + box.height;
+    const shape = `M ${box.cx - box.halfBottom} ${bottom} L ${box.cx - box.halfTop} ${box.top} L ${box.cx + box.halfTop} ${box.top} L ${box.cx + box.halfBottom} ${bottom} Z`;
+    const frameWidth = canvas.short * 0.016;
+    const capWidth = box.halfTop * 2.3;
+    const capHeight = box.height * 0.042;
+    const baseWidth = box.halfBottom * 2.35;
+    const baseHeight = box.height * 0.055;
+    return (
+      // The window, then the frame over its edge, then a wider dim stroke
+      // outside it for the bloom the neon throws onto the dark.
+      path(shape, { fill: "#0C0A0B" }) + path(shape, {
+        fill: "none",
+        stroke: palette.accent,
+        "stroke-width": frameWidth * 2.6,
+        "stroke-linejoin": "round",
+        opacity: 0.16
+      }) + path(shape, {
+        fill: "none",
+        stroke: palette.accent,
+        "stroke-width": frameWidth,
+        "stroke-linejoin": "round"
+      }) + // The cap, and the little tab on top of it.
+      rect(box.cx - capWidth / 2, box.top - capHeight, capWidth, capHeight, {
+        fill: palette.accent,
+        rx: capHeight * 0.35
+      }) + rect(box.cx - capWidth * 0.22, box.top - capHeight * 1.7, capWidth * 0.44, capHeight * 0.8, {
+        fill: palette.accent,
+        rx: capHeight * 0.25
+      }) + // The floor the base glows onto, then the base itself.
+      tag("ellipse", {
+        cx: box.cx,
+        cy: bottom + baseHeight * 1.1,
+        rx: baseWidth * 0.75,
+        ry: baseHeight * 0.9,
+        fill: palette.accent,
+        opacity: 0.22
+      }) + rect(box.cx - baseWidth / 2, bottom - baseHeight * 0.15, baseWidth, baseHeight, {
+        fill: palette.accent,
+        rx: baseHeight * 0.35
+      }) + rect(
+        box.cx - baseWidth * 0.42,
+        bottom + baseHeight * 0.8,
+        baseWidth * 0.84,
+        baseHeight * 0.45,
+        { fill: palette.accent, rx: baseHeight * 0.22, opacity: 0.85 }
+      )
+    );
+  }
+  function arm(box, turns, canvas, palette) {
+    const [px, py] = pointAt(box, 0.045);
+    const length = box.height * 0.835;
+    const hang = 0.5 + turns;
+    const [tipX, tipY] = polar(px, py, length, hang);
+    const [sliderX, sliderY] = polar(px, py, length * 0.42, hang);
+    return line(px, py, tipX, tipY, {
+      stroke: palette.ink,
+      "stroke-width": canvas.short * 9e-3,
+      "stroke-linecap": "round"
+    }) + circle(sliderX, sliderY, box.height * 0.055, { fill: palette.accent }) + circle(sliderX, sliderY, box.height * 0.016, { fill: "#7A0A11" }) + circle(tipX, tipY, box.height * 0.045, { fill: palette.ink });
+  }
+  function stack(value, label, cx, cy, canvas, palette) {
+    const big = canvas.short * 0.185;
+    const small = canvas.short * 0.055;
+    return text(value, cx, cy, {
+      fill: palette.ink,
+      "font-family": FONT_DISPLAY,
+      "font-size": big,
+      "font-weight": 800,
+      "text-anchor": "middle"
+    }) + text(label, cx, cy + small * 1.65, {
+      fill: palette.accent,
+      "font-family": FONT_DISPLAY,
+      "font-size": small,
+      "font-weight": 700,
+      "text-anchor": "middle",
+      "letter-spacing": small * 0.06
+    });
+  }
+  function inline(value, label, cx, baseline, valueFill, canvas, palette) {
+    const big = canvas.short * 0.085;
+    const small = canvas.short * 0.032;
+    const gap = small * 0.5;
+    const valueWidth = advanceWidth(value, big);
+    const labelWidth = advanceWidth(label, small);
+    const left = cx - (valueWidth + gap + labelWidth) / 2;
+    return text(value, left, baseline, {
+      fill: valueFill,
+      "font-family": FONT_DISPLAY,
+      "font-size": big,
+      "font-weight": 800
+    }) + text(label, left + valueWidth + gap, baseline, {
+      fill: palette.inkSoft,
+      "font-family": FONT_DISPLAY,
+      "font-size": small,
+      "font-weight": 700,
+      "letter-spacing": small * 0.06
+    });
+  }
   var pendulum = {
     id: "pendulum",
     name: "Pendulum",
-    description: "The instrument itself \u2014 a weighted arm swinging over a scale.",
-    look: "Warm wood & red",
+    description: "The instrument itself \u2014 a neon case with an arm swinging over its scale.",
+    look: "Black & neon red",
+    ownHeader: true,
     draw(context) {
-      const { canvas, palette, frame } = context;
-      const { stage } = bands(canvas);
-      const [cx] = centreOf(stage);
+      const { canvas, palette, frame, title, subtitle } = context;
+      const pad = gutter(canvas);
       const size = typeScale(canvas);
-      const caseHeight = Math.min(stage.height * 0.88, stage.width * 1.35);
-      const baseWidth = Math.min(stage.width * 0.62, caseHeight * 0.62);
-      const topWidth = baseWidth * 0.3;
-      const baseY = stage.y + (stage.height + caseHeight) / 2;
-      const topY = baseY - caseHeight;
-      const pivotY = baseY - caseHeight * 0.12;
-      const armLength = caseHeight * 0.78;
+      const mark = logoBox(canvas);
+      const cx = canvas.width / 2;
+      const timeSignature = `${frame.timeSignature.numerator}/${frame.timeSignature.denominator}`;
+      const titleSize = size.title * (canvas.isPortrait || canvas.isSquare ? 1.15 : 1.3);
+      const titleBaseline = mark.y + mark.height * 0.58 + titleSize * 0.34;
+      const hasSubtitle = subtitle !== "";
+      const headerBottom = titleBaseline + titleSize * 0.4 + (hasSubtitle ? size.subtitle * 1.9 : size.subtitle * 0.5);
+      const barHeight = canvas.short * 0.115;
+      const usesBar = canvas.isPortrait || canvas.isSquare;
+      const barTop = canvas.height - pad - barHeight;
+      const footRoom = usesBar ? canvas.height - barTop + pad * 0.35 : pad;
+      const roomHigh = canvas.height - headerBottom - footRoom;
+      const roomWide = usesBar ? canvas.width - pad * 2 : canvas.width * 0.42;
+      const overhang = 1.22;
+      const caseHeight = Math.min(roomHigh / overhang * 0.97, roomWide * 1.5);
+      const box = {
+        cx,
+        top: headerBottom + (roomHigh - caseHeight * overhang) / 2 + caseHeight * 0.085,
+        height: caseHeight,
+        halfTop: caseHeight * 0.13,
+        halfBottom: caseHeight * 0.36
+      };
       const goingRight = frame.beat % 2 === 1;
-      const eased = easeInOut(frame.phase);
-      const turns = lerp(
+      const swing = lerp(
         goingRight ? -MAX_SWING : MAX_SWING,
         goingRight ? MAX_SWING : -MAX_SWING,
-        eased
+        easeInOut(frame.phase)
       );
-      const [tipX, tipY] = polar(cx, pivotY, armLength, turns);
-      const [weightX, weightY] = polar(cx, pivotY, armLength * 0.62, turns);
-      const body = path(
-        `M ${cx - baseWidth / 2} ${baseY} L ${cx - topWidth / 2} ${topY} L ${cx + topWidth / 2} ${topY} L ${cx + baseWidth / 2} ${baseY} Z`,
-        {
-          fill: palette.accentSoft,
-          stroke: palette.accent,
-          "stroke-width": canvas.short * 6e-3,
-          "stroke-linejoin": "round"
-        }
-      ) + // The scale the arm swings over.
-      group(
-        { stroke: palette.inkSoft, "stroke-width": canvas.short * 25e-4, opacity: 0.55 },
-        Array.from({ length: 9 }, (_, i) => {
-          const t = i / 8 * 2 * MAX_SWING - MAX_SWING;
-          const [x1, y1] = polar(cx, pivotY, armLength * 0.86, t);
-          const [x2, y2] = polar(cx, pivotY, armLength * 0.94, t);
-          return line(x1, y1, x2, y2);
-        }).join("")
-      ) + line(cx, pivotY, tipX, tipY, {
-        stroke: palette.ink,
-        "stroke-width": canvas.short * 9e-3,
-        "stroke-linecap": "round"
-      }) + circle(weightX, weightY, canvas.short * 0.035, { fill: palette.accent }) + circle(cx, pivotY, canvas.short * 0.018, { fill: palette.ink }) + rect(cx - baseWidth * 0.58, baseY, baseWidth * 1.16, canvas.short * 0.022, {
-        fill: palette.accent,
-        rx: canvas.short * 8e-3
-      });
-      const countBaseline = Math.max(stage.y + size.readout * 0.8, topY - size.label * 0.9);
-      const count = text(String(frame.beat), cx, countBaseline, {
-        fill: palette.accent,
+      const barProgress = Math.min(
+        1,
+        (frame.beat - 1 + frame.phase) / Math.max(1, frame.beatsPerBar)
+      );
+      const beatDepth = 0.6;
+      const beatSize = Math.min(
+        caseHeight * 0.21,
+        halfWidthAt(box, beatDepth) * 1.6 / Math.max(1, String(frame.beat).length) / 0.62
+      );
+      const [beatX, beatY] = pointAt(box, beatDepth);
+      const beat = text(String(frame.beat), beatX, beatY + beatSize * 0.35, {
+        fill: palette.ink,
         "font-family": FONT_DISPLAY,
-        "font-size": size.readout,
+        "font-size": beatSize,
         "font-weight": 800,
         "text-anchor": "middle"
       });
-      return body + count + logo(context);
+      const titleX = usesBar ? (mark.x + mark.width + canvas.width - pad) / 2 : mark.x + mark.width + pad * 0.55;
+      const titleAnchor = usesBar ? "middle" : "start";
+      const ruleWidth = Math.max(canvas.short * 0.06, advanceWidth(title, titleSize) * 0.42);
+      const ruleX = usesBar ? titleX - ruleWidth / 2 : titleX;
+      const words = text(title, titleX, titleBaseline, {
+        fill: palette.ink,
+        "font-family": FONT_DISPLAY,
+        "font-size": titleSize,
+        "font-weight": 800,
+        "text-anchor": titleAnchor
+      }) + (title === "" ? "" : rect(ruleX, titleBaseline + titleSize * 0.28, ruleWidth, canvas.short * 75e-4, {
+        fill: palette.accent,
+        rx: canvas.short * 4e-3
+      })) + text(subtitle, titleX, titleBaseline + titleSize * 0.28 + size.subtitle * 1.5, {
+        fill: palette.inkSoft,
+        "font-family": FONT_TEXT,
+        "font-size": size.subtitle,
+        "font-weight": 600,
+        "text-anchor": titleAnchor
+      });
+      let readout;
+      if (usesBar) {
+        const half = (canvas.width - pad * 2) / 2;
+        const baseline = barTop + barHeight * 0.64;
+        readout = rect(pad, barTop, canvas.width - pad * 2, barHeight, {
+          fill: "#100C0E",
+          stroke: palette.accentSoft,
+          "stroke-width": canvas.short * 3e-3,
+          rx: barHeight * 0.28
+        }) + line(cx, barTop + barHeight * 0.24, cx, barTop + barHeight * 0.76, {
+          stroke: palette.inkSoft,
+          "stroke-width": canvas.short * 2e-3,
+          opacity: 0.5
+        }) + inline(
+          String(frame.bpm),
+          "BPM",
+          pad + half / 2,
+          baseline,
+          palette.accent,
+          canvas,
+          palette
+        ) + inline(timeSignature, "TIME", pad + half * 1.5, baseline, palette.ink, canvas, palette);
+      } else {
+        const columnCx = (pad + (cx - box.halfBottom * 1.35)) / 2;
+        const middle = box.top + box.height * 0.42;
+        readout = stack(String(frame.bpm), "BPM", columnCx, middle, canvas, palette) + stack(timeSignature, "TIME", canvas.width - columnCx, middle, canvas, palette);
+      }
+      const [glowX, glowY] = pointAt(box, 0.45);
+      return bloom(glowX, glowY, caseHeight * 1.15, palette) + fan(box, barProgress, canvas, palette) + instrument(box, canvas, palette) + arm(box, swing, canvas, palette) + beat + words + readout + logo(context);
     }
   };
 
@@ -1040,8 +1237,8 @@ var MetronomeDesigns = (() => {
     return { background, ink, inkSoft: "#8A7C74", accent, accentSoft, onAccent: "#FFFFFF" };
   }
   var PALETTES = {
-    // Warm wood, because it is a wooden instrument.
-    pendulum: dark("#1A1210", BRAND_RED, "#42171A"),
+    // Near-black and a neon red: the instrument lit on a dark stage.
+    pendulum: dark("#070506", "#E4141F", "#2A0A0D"),
     // The house black-and-red.
     "beat-dots": dark("#17110E", BRAND_RED, "#5A1218"),
     // Night blue: rings on water.
@@ -1124,7 +1321,7 @@ var MetronomeDesigns = (() => {
     };
     const background = rect(0, 0, canvas.width, canvas.height, { fill: palette.background });
     const body = design.draw(context);
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n(canvas.width)} ${n(canvas.height)}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${escapeText(`${design.name} metronome, beat ${frame.beat} of ${frame.beatsPerBar}`)}">` + background + header(context) + body + "</svg>";
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n(canvas.width)} ${n(canvas.height)}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${escapeText(`${design.name} metronome, beat ${frame.beat} of ${frame.beatsPerBar}`)}">` + background + (design.ownHeader === true ? "" : header(context)) + body + "</svg>";
   }
   return __toCommonJS(index_exports);
 })();

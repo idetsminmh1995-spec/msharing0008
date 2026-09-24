@@ -25,7 +25,7 @@ import type {
 
 export { DESIGNS, DEFAULT_DESIGN_ID, designById } from './designs/index.js';
 export { ASPECT_RATIOS } from './types.js';
-export { canvasFor } from './layout.js';
+export { canvasFor, bands, logoBox, LOGO_FRACTION } from './layout.js';
 export { paletteForDesign, isLightPalette } from './theme.js';
 export type {
   AspectRatio,
@@ -114,7 +114,7 @@ export function renderMetronomeFrame(input: MetronomeRenderInput): string {
     `width="100%" height="100%" preserveAspectRatio="xMidYMid meet" ` +
     `role="img" aria-label="${escapeText(`${design.name} metronome, beat ${frame.beat} of ${frame.beatsPerBar}`)}">` +
     background +
-    header(context) +
+    (design.ownHeader === true ? '' : header(context)) +
     body +
     '</svg>'
   );
