@@ -1534,10 +1534,9 @@
         `Video ready — ${formatTime(total)} of music, ${width}×${height} at ${result.fps}fps, ` +
           `opening on a ${HOLD_SECONDS}s still` +
           (outro ? ' and closing with the Thank You clip' : ' (no Thank You clip in the bucket)') +
-          `. ${result.frames} frames, every one of them exact` +
           (result.path === 'mediarecorder'
-            ? ' — recorded in real time, because this browser has no WebCodecs.'
-            : '.') +
+            ? `. ${result.frames} frames, recorded in real time because this browser has no WebCodecs — some may have been dropped.`
+            : `. ${result.frames} frames, every one of them exact.`) +
           ' Press Download Video to save it.',
         true,
       );
