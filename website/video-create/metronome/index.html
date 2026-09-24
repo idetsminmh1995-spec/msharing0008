@@ -104,7 +104,15 @@
 
   /* The preview frame. Laid out like the drum page's so the two read as
      the same product: stat boxes top-right, the mark in the middle. */
-  .video-frame{position:relative;}
+  /* The holder centres the frame; the frame's own aspect-ratio follows
+     the picked ratio, so 9:16 really is a tall frame rather than a wide
+     one with bars. */
+  .frame-holder{display:flex;justify-content:center;align-items:flex-start;background:var(--cream);border-radius:14px;padding:0;}
+  .video-frame{position:relative;background:transparent;border-radius:14px;overflow:hidden;max-height:62vh;}
+  .video-frame svg{display:block;width:100%;height:100%;}
+  .video-frame[data-aspect="16x9"]{aspect-ratio:16/9;width:100%;}
+  .video-frame[data-aspect="9x16"]{aspect-ratio:9/16;height:62vh;width:auto;}
+  .video-frame[data-aspect="1x1"]{aspect-ratio:1/1;height:62vh;width:auto;max-width:100%;}
   .video-frame.style-white{background:#FFFFFF;}
   .video-frame.style-white .video-title{color:var(--text);}
   .video-top{padding:14px 20px 0;align-items:center;gap:16px;}
@@ -192,7 +200,14 @@
     </div>
 
     <div class="card">
-      <div class="card-head"><span class="card-num">3</span>Metronome</div>
+      <div class="card-head"><span class="card-num">3</span>Design</div>
+      <label for="designSelect" style="position:absolute;left:-9999px;">Design</label>
+      <select id="designSelect" class="drum-input"></select>
+      <div class="field-hint" id="designHint"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-num">4</span>Metronome</div>
       <div class="field-row">
         <div>
           <label for="clickSound">Click</label>
@@ -219,7 +234,7 @@
     </div>
 
     <div class="card">
-      <div class="card-head"><span class="card-num">4</span>Video Style</div>
+      <div class="card-head"><span class="card-num">5</span>Video Style</div>
       <div class="radio-row">
         <label><input type="radio" name="vc" id="styleBlack" value="black" checked>Black</label>
         <label><input type="radio" name="vc" id="styleWhite" value="white">White</label>
@@ -246,21 +261,12 @@
       </div>
     </div>
 
-    <div class="video-frame style-black" id="videoFrame">
-      <div class="video-top">
-        <div class="video-title" id="videoTitle">Metronome</div>
-        <div class="video-stats">
-          <div class="stat-box"><span class="stat-label">TIME</span><span class="stat-value" id="statTimeBox">4/4</span></div>
-          <div class="stat-box"><span class="stat-label">BPM</span><span class="stat-value" id="statBpmBox">120</span></div>
-          <div class="stat-box" id="countBox"><span class="stat-label">COUNT</span><span class="stat-value" id="statCountBox">1</span></div>
-        </div>
-      </div>
-      <div class="video-mid">
-        <img class="metro-logo" id="frameLogo" src="../../assets/logo/sharing-drum-logo-full.webp" alt="">
-        <div class="beat-dots" id="beatDots"></div>
-      </div>
-      <div style="height:26px;"></div>
-    </div>
+    <!-- The frame is drawn entirely by metronome-engine: one SVG per
+         video frame, from the design, the ratio, the style and where
+         the beat is. Nothing here is laid out in CSS, so what the
+         preview shows and what an export would render are the same
+         drawing. -->
+    <div class="frame-holder" id="frameHolder"><div class="video-frame" id="videoFrame"></div></div>
 
     <div class="transport">
       <button class="play-btn" id="playBtn" aria-label="Play">
@@ -275,6 +281,7 @@
       <div class="engine-label">Engines running for this video</div>
       <div class="engine-pills">
         <span class="engine-pill">Notation Engine</span>
+        <span class="engine-pill">Metronome Design Engine</span>
         <span class="engine-pill">Video Engine</span>
       </div>
     </div>
@@ -283,6 +290,7 @@
 </div>
 
 <script src="../../assets/notation-engine.js"></script>
+<script src="../../assets/metronome-engine.js"></script>
 <script>
   // The metronome reads its tempo and time signature from the uploaded
   // MIDI file and clicks along with the uploaded audio. Everything it
@@ -306,16 +314,12 @@
   const scrubBar = document.getElementById('scrubBar');
   const scrubFill = document.getElementById('scrubFill');
   const timeDisplay = document.getElementById('timeDisplay');
-  const beatDots = document.getElementById('beatDots');
-  const countBox = document.getElementById('countBox');
-  const statCountBox = document.getElementById('statCountBox');
-  const statTimeBox = document.getElementById('statTimeBox');
-  const statBpmBox = document.getElementById('statBpmBox');
   const statBpm = document.getElementById('statBpm');
   const statTime = document.getElementById('statTime');
   const statDuration = document.getElementById('statDuration');
   const videoFrame = document.getElementById('videoFrame');
-  const frameLogo = document.getElementById('frameLogo');
+  const designSelect = document.getElementById('designSelect');
+  const designHint = document.getElementById('designHint');
   const clickVolume = document.getElementById('clickVolume');
   const clickVolumeOut = document.getElementById('clickVolumeOut');
   const clickSound = document.getElementById('clickSound');
@@ -343,7 +347,7 @@
   let tempoEvents = DEFAULT_TEMPO_EVENTS;
   let timeSignatures = DEFAULT_TIME_SIGNATURES;
   let tempoMap = null;
-  /** [{at, beat, beatsPerBar}] -- every beat of the piece, in seconds. */
+  /** [{at, beat, beatsPerBar, bar}] -- every beat of the piece, in seconds. */
   let beatGrid = [];
 
   function rebuildClock() {
@@ -370,10 +374,12 @@
     let tick = 0;
     let sigIndex = 0;
     let beatInBar = 0;
+    let bar = 1;
     while (out.length < MAX_BEATS) {
       while (sigIndex + 1 < sigs.length && sigs[sigIndex + 1].tick <= tick) {
         sigIndex += 1;
-        beatInBar = 0; // a new time signature starts a new bar
+        if (beatInBar !== 0) bar += 1; // a new time signature starts a new bar
+        beatInBar = 0;
       }
       const sig = sigs[sigIndex];
       const beatsPerBar = Math.max(1, sig.numerator);
@@ -383,9 +389,10 @@
       if (!(ticksPerBeat > 0)) break;
       const at = NotationEngine.tickToSeconds(tempoMap, tick);
       if (at > limitSeconds) break;
-      out.push({ at, beat: beatInBar + 1, beatsPerBar });
+      out.push({ at, beat: beatInBar + 1, beatsPerBar, bar });
       tick += ticksPerBeat;
       beatInBar = (beatInBar + 1) % beatsPerBar;
+      if (beatInBar === 0) bar += 1;
     }
     return out;
   }
@@ -417,36 +424,8 @@
   function showTempoBoxes() {
     const bpm = bpmAt(position());
     const sig = signatureAt(position());
-    statBpmBox.textContent = bpm === undefined ? '—' : String(bpm);
-    statBpm.textContent = statBpmBox.textContent;
-    statTimeBox.textContent = `${sig.numerator}/${sig.denominator}`;
-    statTime.textContent = statTimeBox.textContent;
-    renderBeatDots(Math.max(1, sig.numerator));
-  }
-
-  let dotCount = 0;
-  function renderBeatDots(count) {
-    if (count === dotCount) return;
-    dotCount = count;
-    beatDots.innerHTML = '';
-    for (let i = 0; i < count; i++) {
-      const dot = document.createElement('div');
-      dot.className = 'beat-dot';
-      beatDots.appendChild(dot);
-    }
-  }
-
-  let shownBeat = null;
-  function showBeat(beat, beatsPerBar) {
-    renderBeatDots(beatsPerBar);
-    if (beat === shownBeat) return;
-    shownBeat = beat;
-    statCountBox.textContent = String(beat);
-    countBox.classList.toggle('on-downbeat', beat === 1);
-    [...beatDots.children].forEach((dot, i) => {
-      dot.classList.toggle('lit', i === beat - 1);
-      dot.classList.toggle('downbeat', beat === 1);
-    });
+    statBpm.textContent = bpm === undefined ? '\u2014' : String(bpm);
+    statTime.textContent = `${sig.numerator}/${sig.denominator}`;
   }
 
   // --- audio ---------------------------------------------------------
@@ -581,16 +560,74 @@
     return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
   }
 
+  /**
+   * Which beat we are in and how far through it, for the designs.
+   *
+   * `phase` comes from the gap to the NEXT beat rather than from the
+   * BPM, so it stays correct across a tempo change instead of running
+   * fast or slow for the rest of the bar it happened in.
+   */
+  function frameState(at) {
+    const sig = signatureAt(at);
+    const fallback = {
+      beat: 1,
+      beatsPerBar: Math.max(1, sig.numerator),
+      phase: 0,
+      bar: 1,
+      bpm: bpmAt(at) ?? 120,
+      timeSignature: { numerator: sig.numerator, denominator: sig.denominator },
+    };
+    if (beatGrid.length === 0) return fallback;
+
+    let index = -1;
+    for (let i = 0; i < beatGrid.length; i++) {
+      if (beatGrid[i].at <= at + 1e-6) index = i;
+      else break;
+    }
+    if (index < 0) return fallback;
+    const entry = beatGrid[index];
+    const next = beatGrid[index + 1];
+    const span = next ? next.at - entry.at : 0;
+    return {
+      beat: entry.beat,
+      beatsPerBar: entry.beatsPerBar,
+      phase: span > 0 ? Math.min(1, Math.max(0, (at - entry.at) / span)) : 0,
+      bar: entry.bar,
+      bpm: bpmAt(at) ?? fallback.bpm,
+      timeSignature: { numerator: sig.numerator, denominator: sig.denominator },
+    };
+  }
+
+  /** Which ratio pill is lit, as the engine names it. */
+  function currentAspect() {
+    const active = document.querySelector('.ratio-pill.active');
+    const label = active ? active.textContent.trim() : '16:9';
+    return label === '9:16' ? '9x16' : label === '1:1' ? '1x1' : '16x9';
+  }
+
+  /**
+   * Draws one frame of the chosen design -- the WHOLE preview, every
+   * time. The engine owns the layout, so nothing here can drift from
+   * what an export would render.
+   */
+  function drawFrame() {
+    if (typeof MetronomeDesigns === 'undefined') return;
+    const aspect = currentAspect();
+    videoFrame.dataset.aspect = aspect;
+    videoFrame.innerHTML = MetronomeDesigns.renderMetronomeFrame({
+      design: designSelect.value,
+      aspect,
+      style: document.getElementById('styleWhite').checked ? 'white' : 'black',
+      frame: frameState(position()),
+      title: 'Metronome',
+      logoUrl: frameLogoUrl,
+    });
+  }
+
   function updateDisplay() {
     const at = position();
-    const entry = beatAt(at);
-    if (entry) showBeat(entry.beat, entry.beatsPerBar);
-    const bpm = bpmAt(at);
-    statBpmBox.textContent = bpm === undefined ? '—' : String(bpm);
-    statBpm.textContent = statBpmBox.textContent;
-    const sig = signatureAt(at);
-    statTimeBox.textContent = `${sig.numerator}/${sig.denominator}`;
-    statTime.textContent = statTimeBox.textContent;
+    showTempoBoxes();
+    drawFrame();
 
     const total = hasAudio() && Number.isFinite(audioPlayer.duration) ? audioPlayer.duration : 0;
     timeDisplay.textContent = `${formatTime(at)} / ${formatTime(total)}`;
@@ -720,26 +757,30 @@
   });
 
   // --- the logo --------------------------------------------------------
+  // The engine draws it, so all this decides is which URL it gets.
+  // `undefined` would mean "no logo", and a design then leaves that
+  // space alone rather than drawing an empty box.
   const logoInput = document.getElementById('upload-logo');
   const logoPreview = document.getElementById('logoPreview');
   const logoClear = document.getElementById('logoClear');
   const logoName = document.getElementById('logoName');
   const BUILT_IN_LOGO = '../../assets/logo/sharing-drum-logo-full.webp';
-  let logoUrl = null;
+  let frameLogoUrl = BUILT_IN_LOGO;
+  let chosenLogoUrl = null;
 
   function showLogo(url, name) {
-    if (logoUrl) URL.revokeObjectURL(logoUrl);
-    logoUrl = url;
-    frameLogo.src = url ?? BUILT_IN_LOGO;
+    if (chosenLogoUrl) URL.revokeObjectURL(chosenLogoUrl);
+    chosenLogoUrl = url;
+    frameLogoUrl = url ?? BUILT_IN_LOGO;
     logoPreview.innerHTML = '';
     const img = document.createElement('img');
-    img.src = frameLogo.src;
+    img.src = frameLogoUrl;
     img.alt = '';
     logoPreview.appendChild(img);
     logoClear.hidden = url === null;
-    logoName.textContent = url === null
-      ? 'No logo chosen — the built-in mark is used.'
-      : name;
+    logoName.textContent =
+      url === null ? 'No logo chosen \u2014 the built-in mark is used.' : name;
+    drawFrame();
   }
 
   logoInput.addEventListener('change', (e) => {
@@ -751,23 +792,53 @@
     logoInput.value = '';
     showLogo(null, '');
   });
-  showLogo(null, '');
 
-  // --- video style ------------------------------------------------------
-  for (const radio of [document.getElementById('styleBlack'), document.getElementById('styleWhite')]) {
-    radio.addEventListener('change', () => {
-      const white = document.getElementById('styleWhite').checked;
-      videoFrame.classList.toggle('style-white', white);
-      videoFrame.classList.toggle('style-black', !white);
+  // --- the design picker -------------------------------------------------
+  // Numbered, because the designs have a fixed order and "design 4" is
+  // how someone will refer to one in their notes.
+  function fillDesigns() {
+    if (typeof MetronomeDesigns === 'undefined') {
+      designHint.textContent = 'Design engine failed to load.';
+      return;
+    }
+    designSelect.innerHTML = '';
+    MetronomeDesigns.listDesigns().forEach((design, i) => {
+      const option = document.createElement('option');
+      option.value = design.id;
+      option.textContent = `${i + 1}. ${design.name}`;
+      designSelect.appendChild(option);
     });
+    designSelect.value = MetronomeDesigns.DEFAULT_DESIGN_ID;
+    showDesignHint();
+  }
+
+  function showDesignHint() {
+    if (typeof MetronomeDesigns === 'undefined') return;
+    const design = MetronomeDesigns.listDesigns().find((d) => d.id === designSelect.value);
+    designHint.textContent = design
+      ? `${design.description} Laid out for 16:9, 9:16 and 1:1.`
+      : '';
+  }
+
+  designSelect.addEventListener('change', () => {
+    showDesignHint();
+    drawFrame();
+  });
+
+  // --- video style and ratio ---------------------------------------------
+  for (const radio of [document.getElementById('styleBlack'), document.getElementById('styleWhite')]) {
+    radio.addEventListener('change', drawFrame);
   }
   for (const pill of document.querySelectorAll('.ratio-pill')) {
     pill.addEventListener('click', () => {
       for (const other of document.querySelectorAll('.ratio-pill')) other.classList.remove('active');
       pill.classList.add('active');
+      drawFrame();
     });
   }
 
+  fillDesigns();
+  showLogo(null, '');
   rebuildClock();
   updateDisplay();
 </script>

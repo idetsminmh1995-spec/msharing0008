@@ -1,0 +1,27 @@
+{
+  "name": "metronome-engine",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TypeScript + SVG metronome video designs. Eleven designs, each laid out for 16x9, 9x16 and 1x1.",
+  "type": "module",
+  "main": "dist/metronome-engine.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --outfile=dist/metronome-engine.js --format=iife --global-name=MetronomeDesigns --sourcemap",
+    "typecheck": "tsc --noEmit",
+    "declarations": "tsc --emitDeclarationOnly",
+    "lint": "eslint src",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "test": "npm run build && node --test",
+    "verify": "npm run typecheck && npm run lint && npm run format:check && npm run test"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "8.70.0",
+    "@typescript-eslint/parser": "8.70.0",
+    "esbuild": "0.28.2",
+    "eslint": "10.10.0",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3"
+  }
+}

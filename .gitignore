@@ -1,4 +1,9 @@
 node_modules/
+# The trailing slash above only matches directories, and
+# metronome-engine's is a SYMLINK to the sticking engine's -- the two
+# packages pin the same toolchain, so there is no reason to install it
+# twice. Without this line git would offer to commit the link.
+metronome-engine/node_modules
 dist/
 build/
 
@@ -23,6 +28,15 @@ notation-engine/dist/*.d.ts
 !Drum/sticking-engine-ts/dist/
 !Drum/sticking-engine-ts/dist/sticking-engine.js
 Drum/sticking-engine-ts/dist/*.map
+
+# Same for the Metronome Design Engine: the drum page loads its bundle
+# from website/assets, and the Metronome page loads it from there too,
+# so the built file has to be in the repo. Sourcemap and .d.ts do not.
+!metronome-engine/dist/
+!metronome-engine/dist/metronome-engine.js
+metronome-engine/dist/*.map
+metronome-engine/dist/**/*.d.ts
+metronome-engine/dist/*.d.ts
 Drum/sticking-engine-ts/dist/**/*.d.ts
 Drum/sticking-engine-ts/dist/*.d.ts
 .env
