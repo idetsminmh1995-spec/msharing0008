@@ -23,6 +23,7 @@ export const pendulum: Design = {
   id: 'pendulum',
   name: 'Pendulum',
   description: 'The instrument itself — a weighted arm swinging over a scale.',
+  look: 'Warm wood & red',
   draw(context: DesignContext): string {
     const { canvas, palette, frame } = context;
     const { stage } = bands(canvas);

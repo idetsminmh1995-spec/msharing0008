@@ -34,6 +34,7 @@ export const segmentRing: Design = {
   id: 'segment-ring',
   name: 'Segment Ring',
   description: 'The bar cut into wedges, the current beat filled.',
+  look: 'Deep green',
   draw(context: DesignContext): string {
     const { canvas, palette, frame } = context;
     const { stage } = bands(canvas);

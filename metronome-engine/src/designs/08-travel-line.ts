@@ -33,6 +33,7 @@ export const travelLine: Design = {
   id: 'travel-line',
   name: 'Travel Line',
   description: 'A marker travelling a track — across, down, or right round the frame.',
+  look: 'Off-white & ink blue',
   draw(context: DesignContext): string {
     const { canvas, palette, frame } = context;
     const { stage } = bands(canvas);

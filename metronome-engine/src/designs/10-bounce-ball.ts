@@ -16,6 +16,7 @@ export const bounceBall: Design = {
   id: 'bounce-ball',
   name: 'Bounce Ball',
   description: 'A ball arcing from beat to beat and landing on each one.',
+  look: 'Cream & orange',
   draw(context: DesignContext): string {
     const { canvas, palette, frame } = context;
     const { stage } = bands(canvas);

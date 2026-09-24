@@ -11,9 +11,6 @@
 export type AspectRatio = '16x9' | '9x16' | '1x1';
 export const ASPECT_RATIOS: readonly AspectRatio[] = ['16x9', '9x16', '1x1'];
 
-/** Dark frame or light frame. The designs read their palette from this. */
-export type FrameStyle = 'black' | 'white';
-
 export interface MetronomeFrame {
   /** 1-based beat within the bar. */
   readonly beat: number;
@@ -36,7 +33,6 @@ export interface MetronomeFrame {
 export interface MetronomeRenderInput {
   readonly design: string;
   readonly aspect: AspectRatio;
-  readonly style: FrameStyle;
   readonly frame: MetronomeFrame;
   /** Shown by the designs that have a place for it. Empty means no title. */
   readonly title?: string;
@@ -77,7 +73,6 @@ export interface DesignContext {
   readonly canvas: Canvas;
   readonly palette: Palette;
   readonly frame: MetronomeFrame;
-  readonly style: FrameStyle;
   readonly title: string;
   readonly subtitle: string;
   readonly logoUrl: string | undefined;
@@ -88,6 +83,12 @@ export interface Design {
   readonly name: string;
   /** One line for a picker: what makes this one different from the other ten. */
   readonly description: string;
+  /**
+   * How to describe this design's look in a picker -- "black & red",
+   * "paper & ink". The colours themselves live in `theme.ts`; this is
+   * only what to call them.
+   */
+  readonly look: string;
   /** The design's own body, drawn inside the shared <svg> shell. */
   draw(context: DesignContext): string;
 }

@@ -15,6 +15,7 @@ export const stackBlocks: Design = {
   id: 'stack-blocks',
   name: 'Stack Blocks',
   description: 'A block laid on every beat, the stack cleared at the bar line.',
+  look: 'Slate & violet',
   draw(context: DesignContext): string {
     const { canvas, palette, frame } = context;
     const { stage } = bands(canvas);

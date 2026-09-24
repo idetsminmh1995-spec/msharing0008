@@ -11,14 +11,13 @@
 import { canvasFor, header } from './layout.js';
 import { DESIGNS, designById } from './designs/index.js';
 import { escapeText, n, rect } from './svg.js';
-import { paletteFor } from './theme.js';
+import { isLightPalette, paletteForDesign } from './theme.js';
 import { ASPECT_RATIOS } from './types.js';
 import type {
   AspectRatio,
   Canvas,
   Design,
   DesignContext,
-  FrameStyle,
   MetronomeFrame,
   MetronomeRenderInput,
   Palette,
@@ -27,13 +26,12 @@ import type {
 export { DESIGNS, DEFAULT_DESIGN_ID, designById } from './designs/index.js';
 export { ASPECT_RATIOS } from './types.js';
 export { canvasFor } from './layout.js';
-export { paletteFor } from './theme.js';
+export { paletteForDesign, isLightPalette } from './theme.js';
 export type {
   AspectRatio,
   Canvas,
   Design,
   DesignContext,
-  FrameStyle,
   MetronomeFrame,
   MetronomeRenderInput,
   Palette,
@@ -44,14 +42,26 @@ export interface DesignSummary {
   readonly id: string;
   readonly name: string;
   readonly description: string;
+  /** What this design's colours are called, for a picker. */
+  readonly look: string;
+  /** The design's own palette, for anything that has to sit beside its frame. */
+  readonly palette: Palette;
+  /** True when the design's ground is light -- a host may need to know. */
+  readonly isLight: boolean;
 }
 
 export function listDesigns(): readonly DesignSummary[] {
-  return DESIGNS.map((design) => ({
-    id: design.id,
-    name: design.name,
-    description: design.description,
-  }));
+  return DESIGNS.map((design) => {
+    const palette = paletteForDesign(design.id);
+    return {
+      id: design.id,
+      name: design.name,
+      description: design.description,
+      look: design.look,
+      palette,
+      isLight: isLightPalette(palette),
+    };
+  });
 }
 
 /**
@@ -82,14 +92,15 @@ export function renderMetronomeFrame(input: MetronomeRenderInput): string {
   const design: Design = designById(input.design) ?? DESIGNS[0]!;
   const aspect: AspectRatio = ASPECT_RATIOS.includes(input.aspect) ? input.aspect : '16x9';
   const canvas = canvasFor(aspect);
-  const palette = paletteFor(input.style === 'white' ? 'white' : 'black');
+  // The look belongs to the DESIGN, not to a switch. Picking design 6
+  // is picking white-and-red the same way it is picking a big number.
+  const palette = paletteForDesign(design.id);
   const frame = normalizeFrame(input.frame);
 
   const context: DesignContext = {
     canvas,
     palette,
     frame,
-    style: input.style === 'white' ? 'white' : 'black',
     title: input.title ?? '',
     subtitle: input.subtitle ?? '',
     logoUrl: input.logoUrl === '' ? undefined : input.logoUrl,

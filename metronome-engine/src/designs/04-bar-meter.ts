@@ -15,6 +15,7 @@ export const barMeter: Design = {
   id: 'bar-meter',
   name: 'Bar Meter',
   description: 'Columns that fill through the bar, so you see what is left of it.',
+  look: 'Paper & ink',
   draw(context: DesignContext): string {
     const { canvas, palette, frame } = context;
     const { stage } = bands(canvas);

@@ -15,6 +15,7 @@ export const flashFrame: Design = {
   id: 'flash-frame',
   name: 'Flash Frame',
   description: 'A border that flares on every beat and hard on the downbeat.',
+  look: 'True black & hot red',
   draw(context: DesignContext): string {
     const { canvas, palette, frame } = context;
     const { stage } = bands(canvas);

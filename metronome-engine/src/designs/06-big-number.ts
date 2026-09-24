@@ -14,6 +14,7 @@ export const bigNumber: Design = {
   id: 'big-number',
   name: 'Big Number',
   description: 'The count filling the frame, with the rest of the bar as a thin rail.',
+  look: 'White & red',
   draw(context: DesignContext): string {
     const { canvas, palette, frame } = context;
     const { stage } = bands(canvas);

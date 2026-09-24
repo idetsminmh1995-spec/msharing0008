@@ -35,7 +35,7 @@ test('every design renders every ratio, and gets the ratio right', () => {
   const expected = { '16x9': '0 0 1920 1080', '9x16': '0 0 1080 1920', '1x1': '0 0 1080 1080' };
   for (const design of M.listDesigns()) {
     for (const aspect of RATIOS) {
-      const svg = M.renderMetronomeFrame({ design: design.id, aspect, style: 'black', frame: frame() });
+      const svg = M.renderMetronomeFrame({ design: design.id, aspect, frame: frame() });
       assert.ok(svg.startsWith('<svg'), `${design.id}/${aspect} is not an svg`);
       assert.ok(svg.endsWith('</svg>'), `${design.id}/${aspect} is not closed`);
       assert.ok(
@@ -60,8 +60,7 @@ test('the 33 layouts are all different from each other', () => {
       const svg = M.renderMetronomeFrame({
         design: design.id,
         aspect,
-        style: 'black',
-        frame: frame({ beat: 2, phase: 0.3 }),
+          frame: frame({ beat: 2, phase: 0.3 }),
       });
       // Ignore the shared shell and header -- two designs are allowed to
       // agree about where the BPM goes, and must not agree about
@@ -80,22 +79,31 @@ test('the 33 layouts are all different from each other', () => {
 test('a design looks different at different points in the bar', () => {
   for (const design of M.listDesigns()) {
     const frames = [
-      M.renderMetronomeFrame({ design: design.id, aspect: '16x9', style: 'black', frame: frame({ beat: 1, phase: 0 }) }),
-      M.renderMetronomeFrame({ design: design.id, aspect: '16x9', style: 'black', frame: frame({ beat: 3, phase: 0 }) }),
-      M.renderMetronomeFrame({ design: design.id, aspect: '16x9', style: 'black', frame: frame({ beat: 3, phase: 0.6 }) }),
+      M.renderMetronomeFrame({ design: design.id, aspect: '16x9', frame: frame({ beat: 1, phase: 0 }) }),
+      M.renderMetronomeFrame({ design: design.id, aspect: '16x9', frame: frame({ beat: 3, phase: 0 }) }),
+      M.renderMetronomeFrame({ design: design.id, aspect: '16x9', frame: frame({ beat: 3, phase: 0.6 }) }),
     ];
     assert.notEqual(frames[0], frames[1], `${design.id} does not react to the beat`);
     assert.notEqual(frames[1], frames[2], `${design.id} does not move within a beat`);
   }
 });
 
-test('both styles are honoured, and neither leaks the other', () => {
-  for (const design of M.listDesigns()) {
-    const black = M.renderMetronomeFrame({ design: design.id, aspect: '1x1', style: 'black', frame: frame() });
-    const white = M.renderMetronomeFrame({ design: design.id, aspect: '1x1', style: 'white', frame: frame() });
-    assert.ok(black.includes('#17110E'), `${design.id} has no dark background`);
-    assert.ok(white.includes('#FFFFFF'), `${design.id} has no light background`);
-    assert.notEqual(black, white, `${design.id} ignores the style`);
+test('every design has its own look, and draws in it', () => {
+  const designs = M.listDesigns();
+  const grounds = designs.map((d) => d.palette.background);
+  assert.equal(new Set(grounds).size, 11, 'two designs share a background');
+  assert.equal(new Set(designs.map((d) => d.look)).size, 11, 'two designs share a look name');
+  // Both grounds are represented: a picker of eleven dark frames is
+  // much harder to tell apart than a mixed one.
+  assert.ok(designs.some((d) => d.isLight), 'no light design at all');
+  assert.ok(designs.some((d) => !d.isLight), 'no dark design at all');
+  for (const design of designs) {
+    const svg = M.renderMetronomeFrame({ design: design.id, aspect: '1x1', frame: frame() });
+    assert.ok(
+      svg.includes(`fill="${design.palette.background}"`),
+      `${design.id} is not drawn on its own background`,
+    );
+    assert.ok(svg.includes(design.palette.accent), `${design.id} never uses its own accent`);
   }
 });
 
@@ -105,8 +113,7 @@ test('odd time signatures are drawn, not rounded away', () => {
       const svg = M.renderMetronomeFrame({
         design: design.id,
         aspect: '9x16',
-        style: 'black',
-        frame: frame({ beatsPerBar, beat: beatsPerBar, timeSignature: { numerator: beatsPerBar, denominator: 8 } }),
+          frame: frame({ beatsPerBar, beat: beatsPerBar, timeSignature: { numerator: beatsPerBar, denominator: 8 } }),
       });
       assert.ok(!svg.includes('NaN'), `${design.id} broke on ${beatsPerBar}/8`);
       assert.ok(svg.length > 400, `${design.id} drew almost nothing for ${beatsPerBar}/8`);
@@ -118,7 +125,6 @@ test('nonsense input is clamped rather than drawn', () => {
   const svg = M.renderMetronomeFrame({
     design: 'no-such-design',
     aspect: 'banana',
-    style: 'neither',
     frame: { beat: 0, beatsPerBar: 0, phase: NaN, bar: -3, bpm: 0, timeSignature: { numerator: 0, denominator: 0 } },
   });
   assert.ok(svg.includes('viewBox="0 0 1920 1080"'), 'unknown ratio should fall back to 16x9');
@@ -128,11 +134,10 @@ test('nonsense input is clamped rather than drawn', () => {
 
 test('a logo is placed when given and nothing is drawn when not', () => {
   for (const design of M.listDesigns()) {
-    const without = M.renderMetronomeFrame({ design: design.id, aspect: '16x9', style: 'black', frame: frame() });
+    const without = M.renderMetronomeFrame({ design: design.id, aspect: '16x9', frame: frame() });
     const with_ = M.renderMetronomeFrame({
       design: design.id,
       aspect: '16x9',
-      style: 'black',
       frame: frame(),
       logoUrl: 'https://example.test/logo.png',
     });
@@ -146,7 +151,6 @@ test('text is escaped, so a title cannot break the frame', () => {
   const svg = M.renderMetronomeFrame({
     design: 'big-number',
     aspect: '1x1',
-    style: 'white',
     frame: frame(),
     title: '<script>x</script> & "quotes"',
   });

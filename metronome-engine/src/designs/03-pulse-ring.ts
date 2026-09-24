@@ -18,6 +18,7 @@ export const pulseRing: Design = {
   id: 'pulse-ring',
   name: 'Pulse Ring',
   description: 'Rings thrown outward on each beat, fading as they grow.',
+  look: 'Night blue',
   draw(context: DesignContext): string {
     const { canvas, palette, frame } = context;
     const { stage } = bands(canvas);

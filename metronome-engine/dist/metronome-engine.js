@@ -26,8 +26,9 @@ var MetronomeDesigns = (() => {
     DESIGNS: () => DESIGNS,
     canvasFor: () => canvasFor,
     designById: () => designById,
+    isLightPalette: () => isLightPalette,
     listDesigns: () => listDesigns,
-    paletteFor: () => paletteFor,
+    paletteForDesign: () => paletteForDesign,
     renderMetronomeFrame: () => renderMetronomeFrame
   });
 
@@ -234,6 +235,7 @@ var MetronomeDesigns = (() => {
     id: "pendulum",
     name: "Pendulum",
     description: "The instrument itself \u2014 a weighted arm swinging over a scale.",
+    look: "Warm wood & red",
     draw(context) {
       const { canvas, palette, frame } = context;
       const { stage } = bands(canvas);
@@ -296,6 +298,7 @@ var MetronomeDesigns = (() => {
     id: "beat-dots",
     name: "Beat Dots",
     description: "One dot per beat, the current one lit \u2014 a row, a column or an arc.",
+    look: "Black & red",
     draw(context) {
       const { canvas, palette, frame } = context;
       const { stage } = bands(canvas);
@@ -357,6 +360,7 @@ var MetronomeDesigns = (() => {
     id: "pulse-ring",
     name: "Pulse Ring",
     description: "Rings thrown outward on each beat, fading as they grow.",
+    look: "Night blue",
     draw(context) {
       const { canvas, palette, frame } = context;
       const { stage } = bands(canvas);
@@ -397,6 +401,7 @@ var MetronomeDesigns = (() => {
     id: "bar-meter",
     name: "Bar Meter",
     description: "Columns that fill through the bar, so you see what is left of it.",
+    look: "Paper & ink",
     draw(context) {
       const { canvas, palette, frame } = context;
       const { stage } = bands(canvas);
@@ -465,6 +470,7 @@ var MetronomeDesigns = (() => {
     id: "sweep-dial",
     name: "Sweep Dial",
     description: "A hand sweeping once round the bar, ticked at every beat.",
+    look: "Charcoal & amber",
     draw(context) {
       const { canvas, palette, frame } = context;
       const { stage } = bands(canvas);
@@ -527,6 +533,7 @@ var MetronomeDesigns = (() => {
     id: "big-number",
     name: "Big Number",
     description: "The count filling the frame, with the rest of the bar as a thin rail.",
+    look: "White & red",
     draw(context) {
       const { canvas, palette, frame } = context;
       const { stage } = bands(canvas);
@@ -599,6 +606,7 @@ var MetronomeDesigns = (() => {
     id: "segment-ring",
     name: "Segment Ring",
     description: "The bar cut into wedges, the current beat filled.",
+    look: "Deep green",
     draw(context) {
       const { canvas, palette, frame } = context;
       const { stage } = bands(canvas);
@@ -657,6 +665,7 @@ var MetronomeDesigns = (() => {
     id: "travel-line",
     name: "Travel Line",
     description: "A marker travelling a track \u2014 across, down, or right round the frame.",
+    look: "Off-white & ink blue",
     draw(context) {
       const { canvas, palette, frame } = context;
       const { stage } = bands(canvas);
@@ -762,6 +771,7 @@ var MetronomeDesigns = (() => {
     id: "flash-frame",
     name: "Flash Frame",
     description: "A border that flares on every beat and hard on the downbeat.",
+    look: "True black & hot red",
     draw(context) {
       const { canvas, palette, frame } = context;
       const { stage } = bands(canvas);
@@ -807,6 +817,7 @@ var MetronomeDesigns = (() => {
     id: "bounce-ball",
     name: "Bounce Ball",
     description: "A ball arcing from beat to beat and landing on each one.",
+    look: "Cream & orange",
     draw(context) {
       const { canvas, palette, frame } = context;
       const { stage } = bands(canvas);
@@ -871,6 +882,7 @@ var MetronomeDesigns = (() => {
     id: "stack-blocks",
     name: "Stack Blocks",
     description: "A block laid on every beat, the stack cleared at the bar line.",
+    look: "Slate & violet",
     draw(context) {
       const { canvas, palette, frame } = context;
       const { stage } = bands(canvas);
@@ -986,24 +998,54 @@ var MetronomeDesigns = (() => {
 
   // src/theme.ts
   var BRAND_RED = "#C81E2C";
-  var BLACK = {
-    background: "#17110E",
-    ink: "#FFFFFF",
-    inkSoft: "#8A7C74",
-    accent: BRAND_RED,
-    accentSoft: "#5A1218",
-    onAccent: "#FFFFFF"
+  function dark(background, accent, accentSoft) {
+    return {
+      background,
+      ink: "#FFFFFF",
+      inkSoft: "#8A8078",
+      accent,
+      accentSoft,
+      onAccent: "#FFFFFF"
+    };
+  }
+  function light(background, ink, accent, accentSoft) {
+    return { background, ink, inkSoft: "#8A7C74", accent, accentSoft, onAccent: "#FFFFFF" };
+  }
+  var PALETTES = {
+    // Warm wood, because it is a wooden instrument.
+    pendulum: dark("#1A1210", BRAND_RED, "#42171A"),
+    // The house black-and-red.
+    "beat-dots": dark("#17110E", BRAND_RED, "#5A1218"),
+    // Night blue: rings on water.
+    "pulse-ring": dark("#0E1628", "#4EA8DE", "#14283F"),
+    // Paper, for the one design you read like a chart.
+    "bar-meter": light("#FAF7F3", "#1E1512", BRAND_RED, "#FCEDEC"),
+    // Amber on charcoal, like an instrument panel.
+    "sweep-dial": dark("#16181D", "#E8B33C", "#3A3020"),
+    // Plain white: nothing but the number.
+    "big-number": light("#FFFFFF", "#14100E", BRAND_RED, "#FCEDEC"),
+    // Deep green, so it does not read as the Sweep Dial's twin.
+    "segment-ring": dark("#0D1F1A", "#3DDC97", "#123329"),
+    // Ink blue on off-white.
+    "travel-line": light("#F4F1EC", "#221C19", "#1E5EFF", "#E4EAFF"),
+    // True black and a hot red -- it is a design about contrast.
+    "flash-frame": dark("#000000", "#FF2D2D", "#3A0A0A"),
+    // Warm cream and orange: the friendliest of the eleven.
+    "bounce-ball": light("#FFF6E9", "#2A1D12", "#FF6B35", "#FFE4D3"),
+    // Slate and violet.
+    "stack-blocks": dark("#1C2128", "#C77DFF", "#33244A")
   };
-  var WHITE = {
-    background: "#FFFFFF",
-    ink: "#1E1512",
-    inkSoft: "#8A7C74",
-    accent: BRAND_RED,
-    accentSoft: "#FCEDEC",
-    onAccent: "#FFFFFF"
-  };
-  function paletteFor(style) {
-    return style === "white" ? WHITE : BLACK;
+  var FALLBACK = dark("#17110E", BRAND_RED, "#5A1218");
+  function paletteForDesign(designId) {
+    return PALETTES[designId] ?? FALLBACK;
+  }
+  function isLightPalette(palette) {
+    const hex = palette.background.replace("#", "");
+    if (hex.length !== 6) return false;
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return (r * 299 + g * 587 + b * 114) / 1e3 > 140;
   }
 
   // src/types.ts
@@ -1011,11 +1053,17 @@ var MetronomeDesigns = (() => {
 
   // src/index.ts
   function listDesigns() {
-    return DESIGNS.map((design) => ({
-      id: design.id,
-      name: design.name,
-      description: design.description
-    }));
+    return DESIGNS.map((design) => {
+      const palette = paletteForDesign(design.id);
+      return {
+        id: design.id,
+        name: design.name,
+        description: design.description,
+        look: design.look,
+        palette,
+        isLight: isLightPalette(palette)
+      };
+    });
   }
   function normalizeFrame(frame) {
     const beatsPerBar = Math.max(1, Math.round(frame.beatsPerBar));
@@ -1036,13 +1084,12 @@ var MetronomeDesigns = (() => {
     const design = designById(input.design) ?? DESIGNS[0];
     const aspect = ASPECT_RATIOS.includes(input.aspect) ? input.aspect : "16x9";
     const canvas = canvasFor(aspect);
-    const palette = paletteFor(input.style === "white" ? "white" : "black");
+    const palette = paletteForDesign(design.id);
     const frame = normalizeFrame(input.frame);
     const context = {
       canvas,
       palette,
       frame,
-      style: input.style === "white" ? "white" : "black",
       title: input.title ?? "",
       subtitle: input.subtitle ?? "",
       logoUrl: input.logoUrl === "" ? void 0 : input.logoUrl

@@ -18,6 +18,7 @@ export const beatDots: Design = {
   id: 'beat-dots',
   name: 'Beat Dots',
   description: 'One dot per beat, the current one lit — a row, a column or an arc.',
+  look: 'Black & red',
   draw(context: DesignContext): string {
     const { canvas, palette, frame } = context;
     const { stage } = bands(canvas);

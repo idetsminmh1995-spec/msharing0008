@@ -14,6 +14,7 @@ export const sweepDial: Design = {
   id: 'sweep-dial',
   name: 'Sweep Dial',
   description: 'A hand sweeping once round the bar, ticked at every beat.',
+  look: 'Charcoal & amber',
   draw(context: DesignContext): string {
     const { canvas, palette, frame } = context;
     const { stage } = bands(canvas);
