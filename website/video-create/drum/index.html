@@ -278,8 +278,8 @@
 <script src="../../assets/sticking-engine.js"></script>
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
 <script src="../../assets/outro-video.js"></script>
-<!-- One video frame per drawn frame, at a steady rate. -->
-<script src="../../assets/frame-pump.js"></script>
+<!-- The video engine: renders frames rather than recording them. -->
+<script src="../../assets/video-engine.js"></script>
 </head>
 <body>
 
@@ -490,10 +490,10 @@
     <button class="btn btn-dark generate-btn" id="downloadBtn" hidden>Download Video</button>
     <div class="gen-progress" id="genProgress" hidden>
       <div class="gen-bar"><div class="gen-fill" id="genFill"></div></div>
-      <div class="gen-line"><span id="genLabel">Recording…</span><button class="btn-ghost" id="cancelBtn" type="button">Cancel</button></div>
+      <div class="gen-line"><span id="genLabel">Rendering…</span><button class="btn-ghost" id="cancelBtn" type="button">Cancel</button></div>
     </div>
     <div class="cost-line" id="costLine">Estimated cost: <b>18 points</b> · You have 240</div>
-    <div class="field-hint" id="genNote">Recorded in your browser, in real time &mdash; a 3-minute take needs 3 minutes, and the tab has to stay open. It records silently: nothing is heard while it runs, but everything is in the file. That file is a WebM of the frame exactly as you see it: a still second, the count-in, the audio, and the Thank You clip from the asset server at the end.</div>
+    <div class="field-hint" id="genNote">Rendered in your browser, frame by frame &mdash; not recorded, so it is usually <b>faster than the video is long</b> and every frame lands on its exact 1/30th of a second. Nothing plays and nothing is heard while it runs. The file is a WebM of the frame exactly as you see it: a still second, the count-in, the audio, and the Thank You clip from the asset server at the end.</div>
   </div>
 
   <div class="right">
@@ -1205,13 +1205,13 @@
    * lights up again rather than going quiet -- the hit timeline is in
    * WRITTEN time, and `writtenTickAt` is what maps the audio onto it.
    */
-  function updateHitLayer() {
+  function updateHitLayer(atSeconds = audioPlayer.currentTime) {
     if (!hitLayer) return;
     if (hitTimeline.length === 0) {
       if (litFiles.size > 0) clearLitHits();
       return;
     }
-    const tick = writtenTickAt(audioPlayer.currentTime);
+    const tick = writtenTickAt(atSeconds);
     if (tick === undefined) return;
     let seconds;
     try {
@@ -1451,9 +1451,9 @@
   }
 
   /** Moves the marker to wherever the audio currently is, and scrolls it into view. */
-  function updateCursor() {
+  function updateCursor(atSeconds = audioPlayer.currentTime) {
     if (!cursorLine || !notationPlayback || typeof NotationEngine === 'undefined') return;
-    const seconds = audioPlayer.currentTime;
+    const seconds = atSeconds;
     if (!Number.isFinite(seconds)) return;
     let x;
     try {
@@ -2077,12 +2077,12 @@
   }
 
   /** Ticks the COUNT and BPM boxes from wherever the audio is. Called from the cursor loop. */
-  function updateBeatDisplay() {
+  function updateBeatDisplay(atSeconds = audioPlayer.currentTime) {
     if (countIn.running) return; // the count-in drives it itself
     const pb = notationPlayback;
     if (!pb || typeof NotationEngine === 'undefined') return;
     try {
-      const tick = writtenTickAt(audioPlayer.currentTime);
+      const tick = writtenTickAt(atSeconds);
       if (tick === undefined) return;
       const { beat } = NotationEngine.resolvePosition(pb, tick).position;
       const parts = beatLabelParts();
@@ -2305,74 +2305,6 @@
   let recording = null;
   let downloadUrl = null;
   let downloadName = 'drum.webm';
-
-  /**
-   * The uploaded take, tapped for recording.
-   *
-   * `createMediaElementSource` may be called ONCE per element for the
-   * life of the page -- a second call throws, and the first call has
-   * already taken the element's output away from the speakers. So the
-   * node is made once, permanently wired to the speakers, and only its
-   * branch into the recorder comes and goes with each take. Making it
-   * per-take would leave every take after the first silent.
-   */
-  let takeSource = null;
-
-  /**
-   * Takes the three sound paths off the speakers, and puts them back.
-   *
-   * `restoreMonitor` is called from the recorder's own clean-up AND
-   * from the click handler's catch, because the mute happens before
-   * the recorder exists -- a take that fell over in that gap would
-   * otherwise leave the page silent for good.
-   */
-  function muteMonitor(ctx, source) {
-    for (const node of [countGain, measureGain, source]) {
-      if (!node) continue;
-      try {
-        node.disconnect(ctx.destination);
-      } catch (err) {
-        /* never connected */
-      }
-    }
-  }
-
-  function restoreMonitor() {
-    if (!audioCtx) return;
-    for (const node of [countGain, measureGain, takeSource]) {
-      if (!node) continue;
-      try {
-        node.connect(audioCtx.destination);
-      } catch (err) {
-        /* already connected */
-      }
-    }
-  }
-
-  function ensureTakeSource(ctx) {
-    if (takeSource) return takeSource;
-    try {
-      takeSource = ctx.createMediaElementSource(audioPlayer);
-      takeSource.connect(ctx.destination);
-    } catch (err) {
-      console.error('Could not tap the audio element:', err);
-      takeSource = null;
-    }
-    return takeSource;
-  }
-
-  function pickMimeType() {
-    const wanted = [
-      'video/webm;codecs=vp9,opus',
-      'video/webm;codecs=vp8,opus',
-      'video/webm',
-      'video/mp4',
-    ];
-    for (const type of wanted) {
-      if (window.MediaRecorder && MediaRecorder.isTypeSupported(type)) return type;
-    }
-    return '';
-  }
 
   /**
    * Bravura, base64, fetched once.
@@ -2638,7 +2570,7 @@
 
   function setGenerating(on) {
     generateBtn.disabled = on;
-    generateBtn.textContent = on ? 'Generating…' : 'Generate Video';
+    generateBtn.textContent = on ? 'Rendering…' : 'Generate Video';
     genProgress.hidden = !on;
     costLine.hidden = on;
     if (on) {
@@ -2680,234 +2612,239 @@
     if (recording) recording.cancel();
   });
 
+  /**
+   * The count-in, mixed offline instead of scheduled a beat at a time.
+   *
+   * Same samples, same fallback click, same volume as the live one --
+   * `runCountIn` is chasing a clock and this is not, which is the only
+   * difference. Returns null when there is no count-in to play.
+   */
+  async function renderCountInAudio() {
+    const bars = Number(countInBarsSelect.value);
+    if (!Number.isFinite(bars) || bars <= 0) return null;
+    const { beatsPerBar, secondsPerBeat } = scoreBeat();
+    const total = bars * beatsPerBar;
+    const seconds = total * secondsPerBeat;
+    const rate = audioCtx ? audioCtx.sampleRate : 48000;
+    const offline = new OfflineAudioContext(2, Math.max(1, Math.ceil(seconds * rate)), rate);
+    const gain = offline.createGain();
+    gain.gain.value = perceivedGain(countsVolumeInput.value);
+    gain.connect(offline.destination);
+
+    const useM = countInStyle() === 'measures';
+    for (let i = 0; i < total; i++) {
+      const beat = (i % beatsPerBar) + 1;
+      const at = i * secondsPerBeat;
+      const buffer = useM ? await measureSample(beat) : await countSample(String(beat));
+      if (buffer) {
+        const source = offline.createBufferSource();
+        source.buffer = buffer;
+        source.connect(gain);
+        source.start(at);
+        continue;
+      }
+      // The synthesised fallback, so a bucket with no voices still counts.
+      const osc = offline.createOscillator();
+      const env = offline.createGain();
+      const isDownbeat = i % beatsPerBar === 0;
+      osc.type = 'sine';
+      osc.frequency.value = isDownbeat ? 1320 : 880;
+      env.gain.setValueAtTime(0.0001, at);
+      env.gain.exponentialRampToValueAtTime(isDownbeat ? 1 : 0.6, at + 0.004);
+      env.gain.exponentialRampToValueAtTime(0.0001, at + 0.12);
+      osc.connect(env);
+      env.connect(gain);
+      osc.start(at);
+      osc.stop(at + 0.16);
+    }
+    return { buffer: await offline.startRendering(), seconds, beatsPerBar, secondsPerBeat };
+  }
+
+  /**
+   * The take: the uploaded audio with the bar announcements over it.
+   *
+   * Both go through the same two gains the preview uses, so the mix
+   * written is the mix the volume sliders describe.
+   */
+  async function renderTakeAudio(seconds) {
+    const file = document.getElementById('upload-audio').files?.[0];
+    const rate = audioCtx ? audioCtx.sampleRate : 48000;
+    const offline = new OfflineAudioContext(2, Math.max(1, Math.ceil(seconds * rate)), rate);
+
+    if (file) {
+      try {
+        const decoded = await offline.decodeAudioData(await file.arrayBuffer());
+        const source = offline.createBufferSource();
+        source.buffer = decoded;
+        source.connect(offline.destination);
+        source.start(0);
+      } catch (err) {
+        console.error('The uploaded audio could not be decoded for rendering:', err);
+      }
+    }
+
+    if (countVoiceOnSelect.value !== 'off') {
+      const gain = offline.createGain();
+      gain.gain.value = perceivedGain(measureVolumeInput.value);
+      gain.connect(offline.destination);
+      for (const entry of countVoiceSchedule()) {
+        if (entry.at >= seconds) break;
+        const buffer = await measureSample(entry.beat);
+        if (!buffer) continue;
+        const source = offline.createBufferSource();
+        source.buffer = buffer;
+        source.connect(gain);
+        source.start(entry.at);
+      }
+    }
+    return await offline.startRendering();
+  }
+
   async function generateVideo() {
+    if (typeof VideoEngine === 'undefined') return;
     if (!audioPlayer.src) {
       setUploadConfirm('Upload an audio file first — it is what the video plays.', false);
       return;
     }
-    if (!window.MediaRecorder) {
-      setUploadConfirm('This browser cannot record video. Try Chrome, Edge or Firefox.', false);
-      return;
-    }
-    const mimeType = pickMimeType();
-    if (mimeType === '') {
-      setUploadConfirm('This browser has no video format MediaRecorder can write.', false);
-      return;
-    }
-    const ctx = ensureAudioContext();
-    if (!ctx) {
-      setUploadConfirm('This browser has no Web Audio, so there would be no sound.', false);
+    const takeSeconds = Number.isFinite(audioPlayer.duration) ? audioPlayer.duration : 0;
+    if (!(takeSeconds > 0)) {
+      setUploadConfirm('That audio file has no length the browser can read.', false);
       return;
     }
 
     audioPlayer.pause();
     audioPlayer.currentTime = 0;
     setGenerating(true);
-    await refreshNotationImage();
 
     const frameRect = videoFrame.getBoundingClientRect();
-    const canvas = document.createElement('canvas');
-    canvas.width = CAPTURE_WIDTH;
-    canvas.height = Math.round((CAPTURE_WIDTH * frameRect.height) / frameRect.width);
-    const ctx2d = canvas.getContext('2d');
-
-    // Both sources into one recording: the count-in and the announcements
-    // come through the Web Audio graph, the take itself through the
-    // <audio> element, so the mix written is the mix heard.
-    const dest = ctx.createMediaStreamDestination();
-    countGain.connect(dest);
-    measureGain.connect(dest);
-    const source = ensureTakeSource(ctx);
-    if (source) source.connect(dest);
-
-    // Everything is taken OFF the speakers while it records. All three
-    // still reach the file, because that is a different connection;
-    // what they stop reaching is the room. A take is a background job,
-    // not a performance you have to sit through.
-    muteMonitor(ctx, source);
-
-    // The pump owns the video track, so it has to exist before the
-    // recorder does. It calls `pumpDraw`, which the phases below fill
-    // in -- until then it commits the canvas as it stands, and the
-    // recorder has not been started, so those frames go nowhere.
-    let pumpDraw = null;
-    const pump = FramePump.start(canvas, CAPTURE_FPS, async () => {
-      if (pumpDraw) await pumpDraw();
-    });
-    const stream = pump.stream;
-    for (const track of dest.stream.getAudioTracks()) stream.addTrack(track);
-
-    const chunks = [];
-    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
-    recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) chunks.push(e.data);
-    };
+    const width = CAPTURE_WIDTH;
+    const height = Math.round((CAPTURE_WIDTH * frameRect.height) / frameRect.width);
 
     let cancelled = false;
-    /** Read by `onstop`, which is written before the clip is fetched. */
-    let outroUsed = false;
-
-    const finish = () => {
-      pump.stop();
-      try {
-        countGain.disconnect(dest);
-        measureGain.disconnect(dest);
-        if (source) source.disconnect(dest);
-      } catch (err) {
-        /* already disconnected */
-      }
-      for (const track of stream.getTracks()) track.stop();
-      audioPlayer.pause();
-      restoreMonitor();
-      recording = null;
-      setGenerating(false);
-    };
-
     recording = {
       cancel() {
         cancelled = true;
-        if (recorder.state !== 'inactive') recorder.stop();
       },
     };
 
-    const done = new Promise((resolve) => {
-      recorder.onstop = () => {
-        finish();
-        if (cancelled) {
-          setUploadConfirm('Recording cancelled.', false);
-          resolve(null);
-          return;
-        }
-        const extension = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
-        const blob = new Blob(chunks, { type: mimeType });
-        offerDownload(blob, extension);
-        setUploadConfirm(
-          `✓ Video ready — ${canvas.width}×${canvas.height} at ${pump.fps().toFixed(0)}fps, ` +
-            `opening on a ${HOLD_SECONDS}s still` +
-            (outroUsed
-              ? ' and closing with the Thank You clip'
-              : ' (no Thank You clip in the bucket)') +
-            '. Press Download Video to save it.',
-          true,
-        );
-        resolve(blob);
+    try {
+      genLabel.textContent = 'Fetching the Thank You clip…';
+      const outro =
+        typeof OutroVideo === 'undefined'
+          ? null
+          : await OutroVideo.loadOutro(API_BASE, {
+              aspect: ASPECT,
+              kind: 'drum',
+              style: currentVideoStyle(),
+            }).catch(() => null);
+
+      genLabel.textContent = 'Preparing the notation…';
+      await refreshNotationImage();
+      genLabel.textContent = 'Mixing the sound…';
+      const countIn = await renderCountInAudio();
+      const takeAudio = await renderTakeAudio(takeSeconds);
+
+      // Drawing the frame means moving the PAGE to that moment first:
+      // this frame is composed from the live DOM, so the cursor, the
+      // COUNT box and the lit photos have to be where they would be.
+      const drawAt = (ctx, seconds) => {
+        updateCursor(seconds);
+        updateBeatDisplay(seconds);
+        updateHitLayer(seconds);
+        drawDrumFrame(ctx, ctx.canvas);
       };
-    });
 
-    // The Thank You clip, fetched before the take rather than during
-    // it: a download that lands mid-recording shows up as dropped
-    // frames in the video it is supposed to be closing.
-    genLabel.textContent = 'Fetching the Thank You clip…';
-    const outro =
-      typeof OutroVideo === 'undefined'
-        ? null
-        : await OutroVideo.loadOutro(API_BASE, {
-            aspect: ASPECT,
-            kind: 'drum',
-            style: currentVideoStyle(),
-          }).catch(() => null);
-    outroUsed = outro !== null;
+      const segments = [
+        {
+          seconds: HOLD_SECONDS,
+          draw: (ctx) => drawAt(ctx, 0),
+        },
+      ];
+      if (countIn) {
+        segments.push({
+          seconds: countIn.seconds,
+          audio: countIn.buffer,
+          draw: (ctx, at) => {
+            // The count-in counts; the notation has not started.
+            const index = Math.min(
+              countIn.beatsPerBar - 1,
+              Math.floor(at / countIn.secondsPerBeat) % countIn.beatsPerBar,
+            );
+            showBeatLabel(String(index + 1), index === 0);
+            updateCursor(0);
+            updateHitLayer(0);
+            drawDrumFrame(ctx, ctx.canvas);
+          },
+        });
+      }
+      segments.push({
+        seconds: takeSeconds,
+        audio: takeAudio,
+        draw: (ctx, at) => drawAt(ctx, at),
+      });
+      if (outro && outro.seconds > 0) {
+        const outroAudio = await outro.audio(new OfflineAudioContext(2, 1, 48000));
+        segments.push({
+          seconds: outro.seconds,
+          realtime: true,
+          audio: outroAudio,
+          onStart: async () => {
+            outro.video.muted = true;
+            outro.video.currentTime = 0;
+            try {
+              await outro.video.play();
+            } catch (err) {
+              /* a clip that will not play leaves its seconds as the last frame */
+            }
+          },
+          onEnd: async () => outro.video.pause(),
+          draw: (ctx) => OutroVideo.drawCover(ctx, ctx.canvas, outro.video),
+        });
+      }
 
-    // A timeslice, not a bare start(). Without one, MediaRecorder
-    // holds the WHOLE recording in its own buffer until stop -- tens of
-    // megabytes by the end of a three-minute take -- and a muxer under
-    // that much pressure starts dropping frames in runs. Measured: an
-    // 8-second take kept 99% of its frames, a 60-second one kept 79%
-    // and lost 1.3 SECONDS in a single gap. Handing the data over once
-    // a second keeps that buffer small and the drops with it.
-    recorder.start(1000);
-    drawDrumFrame(ctx2d, canvas);
+      const result = await VideoEngine.render({
+        width,
+        height,
+        fps: CAPTURE_FPS,
+        segments,
+        onProgress: (fraction, label) => {
+          genFill.style.width = `${(Math.min(1, fraction) * 100).toFixed(1)}%`;
+          genLabel.textContent = `${label}… ${(Math.min(1, fraction) * 100).toFixed(0)}%`;
+        },
+        shouldStop: () => cancelled,
+      });
 
-    // The pump draws whatever the phase says and commits exactly one
-    // video frame per draw. It is drawing from the FIRST phase, not
-    // just the take: the still second and the count-in are both part
-    // of the video.
-    let phase = 'hold';
-    // Four times a second, not thirty. Writing the label and the bar
-    // every frame forces a style recalculation on the very thread that
-    // is composing the next one -- and this page's frame is read from
-    // the live DOM, so that recalculation is not free.
-    let nextReport = 0;
-    const report = (text, fraction) => {
-      const now = performance.now();
-      if (now < nextReport) return;
-      nextReport = now + 250;
-      if (fraction !== undefined) genFill.style.width = `${(fraction * 100).toFixed(1)}%`;
-      genLabel.textContent = text;
-    };
-
-    pumpDraw = () => {
-      if (cancelled) return;
-      if (phase === 'outro' && outro) {
-        OutroVideo.drawCover(ctx2d, canvas, outro.video);
-        report('Thank you…');
+      // Put the page back where it was: rendering moved it about.
+      clearLitHits();
+      updateCursor(0);
+      updateBeatDisplay(0);
+      recording = null;
+      setGenerating(false);
+      if (!result) {
+        setUploadConfirm('This browser can neither render nor record video.', false);
         return;
       }
-      drawDrumFrame(ctx2d, canvas);
-      if (phase === 'hold') {
-        report('Opening…');
+      if (cancelled) {
+        setUploadConfirm('Rendering cancelled.', false);
         return;
       }
-      if (phase === 'countin') {
-        report('Counting in…');
-        return;
-      }
-      const total = Number.isFinite(audioPlayer.duration) ? audioPlayer.duration : 0;
-      report(
-        `Recording… ${formatTime(audioPlayer.currentTime)} / ${formatTime(total)}`,
-        total > 0 ? Math.min(1, audioPlayer.currentTime / total) : 0,
+      offerDownload(result.blob, result.extension);
+      setUploadConfirm(
+        `\u2713 Video ready — ${width}×${height} at ${result.fps}fps, opening on a ${HOLD_SECONDS}s still` +
+          (outro ? ' and closing with the Thank You clip' : ' (no Thank You clip in the bucket)') +
+          `. ${result.frames} frames, every one of them exact` +
+          (result.path === 'mediarecorder'
+            ? ' — recorded in real time, because this browser has no WebCodecs.'
+            : '.') +
+          ' Press Download Video to save it.',
+        true,
       );
-    };
-
-    const stillGoing = () => !cancelled && recorder.state !== 'inactive';
-    const waitFor = async (test) => {
-      while (stillGoing() && !test()) await new Promise((r) => setTimeout(r, 40));
-    };
-
-    // 1. the still second.
-    const holdUntil = performance.now() + HOLD_SECONDS * 1000;
-    await waitFor(() => performance.now() >= holdUntil);
-
-    // 2. the count-in, then the take.
-    let counted = false;
-    if (stillGoing()) {
-      phase = 'countin';
-      counted = await runCountIn();
+    } catch (err) {
+      recording = null;
+      setGenerating(false);
+      console.error('Rendering failed:', err);
+      setUploadConfirm(`Rendering stopped: ${err && err.message ? err.message : err}`, false);
     }
-    if (stillGoing() && counted) {
-      phase = 'take';
-      try {
-        await audioPlayer.play();
-        await waitFor(() => audioPlayer.ended);
-      } catch (err) {
-        setUploadConfirm('The browser refused to start playback, so there is nothing to record.', false);
-        if (recorder.state !== 'inactive') recorder.stop();
-        return done;
-      }
-    }
-
-    // 3. the Thank You clip.
-    if (stillGoing() && outro) {
-      phase = 'outro';
-      genFill.style.width = '100%';
-      try {
-        OutroVideo.outroSource(ctx, outro.video).connect(dest);
-        outro.video.currentTime = 0;
-        await outro.video.play();
-        await waitFor(() => outro.video.ended);
-      } catch (err) {
-        console.error('The Thank You clip would not play:', err);
-      }
-      outro.video.pause();
-      try {
-        OutroVideo.outroSource(ctx, outro.video).disconnect(dest);
-      } catch (err) {
-        /* already disconnected */
-      }
-    }
-
-    if (recorder.state !== 'inactive') recorder.stop();
-    await done;
   }
 
   generateBtn.addEventListener('click', () => {
@@ -2918,7 +2855,6 @@
     generateVideo().catch((err) => {
       console.error('Generate failed:', err);
       if (recording) recording.cancel();
-      restoreMonitor();
       setGenerating(false);
       setUploadConfirm(`Generating stopped: ${err && err.message ? err.message : err}`, false);
     });
