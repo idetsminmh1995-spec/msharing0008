@@ -61,11 +61,17 @@ export function gutter(canvas: Canvas): number {
  */
 export function bands(canvas: Canvas): { header: Rect; stage: Rect } {
   const pad = gutter(canvas);
-  const headerHeight = canvas.isPortrait
-    ? canvas.height * 0.11
-    : canvas.isSquare
-      ? canvas.height * 0.15
-      : canvas.height * 0.18;
+  const size = typeScale(canvas);
+  const mark = canvas.short * 0.11;
+  // Measured from what the header actually holds, not as a fraction of
+  // the frame. It used to be a fraction, and when the tempo readout grew
+  // the band did not -- so it landed on top of the subtitle in the two
+  // narrow ratios. Room is now reserved for the type that is really
+  // there, plus the mark, whatever the frame's shape.
+  const headerHeight =
+    canvas.isPortrait || canvas.isSquare
+      ? Math.max(size.title + size.subtitle * 1.45 + size.stat * 1.35, mark + pad)
+      : Math.max(size.title + size.subtitle * 1.5, size.stat * 1.6, mark);
   const header: Rect = {
     x: pad,
     y: pad,
@@ -93,24 +99,114 @@ export function typeScale(canvas: Canvas) {
     label: 26 * unit,
     readout: 88 * unit,
     huge: 420 * unit,
+    /** The tempo and the time signature. Big enough to read across a room. */
+    stat: 72 * unit,
+    /** The word "BPM" beside its number -- a unit, not a headline. */
+    statUnit: 28 * unit,
   };
+}
+
+/**
+ * Roughly how wide a string will be.
+ *
+ * SVG has no measurement without a DOM, and the readout has to be
+ * right-aligned out of pieces at two different sizes. Per-character
+ * estimates are a few percent out on a proportional face, which on a
+ * tempo readout is invisible -- and the alternative is either one
+ * uniform size or a DOM dependency this engine does not want.
+ */
+export function advanceWidth(value: string, fontSize: number): number {
+  let units = 0;
+  for (const ch of value) {
+    if (ch === ' ') units += 0.3;
+    else if ('.,:\u00b7'.includes(ch)) units += 0.32;
+    else if (ch === '/') units += 0.44;
+    else if (ch >= '0' && ch <= '9') units += 0.62;
+    else if (ch === ch.toUpperCase() && ch !== ch.toLowerCase()) units += 0.7;
+    else units += 0.56;
+  }
+  return units * fontSize;
+}
+
+/** Where the mark goes. Top-left, always -- see `logo`. */
+export function logoBox(canvas: Canvas): Rect {
+  const size = canvas.short * 0.11;
+  const pad = gutter(canvas);
+  return { x: pad, y: pad, width: size, height: size };
 }
 
 export const FONT_DISPLAY = "'Sora', 'Trebuchet MS', sans-serif";
 export const FONT_TEXT = "'Manrope', 'Segoe UI', sans-serif";
 
 /**
- * Title, subtitle and the BPM / time-signature readout.
+ * The tempo and the time signature, drawn big.
  *
- * Landscape puts the readout on the right of the title; portrait and
- * square stack it under, because a narrow frame has no room beside the
- * words and a centred stack is what a phone video wants anyway.
+ * Two large figures with a small unit label between them, rather than
+ * one line of small type: on a lesson video the BPM is the second thing
+ * a viewer looks for after the count, and it has to survive being
+ * watched on a phone.
+ *
+ * Laid out right-to-left from `rightEdge` when `align` is 'end', which
+ * is why it needs `advanceWidth` -- the pieces are at two different
+ * sizes, so a single `text-anchor="end"` cannot place them.
+ */
+function tempoReadout(
+  context: DesignContext,
+  x: number,
+  baseline: number,
+  align: 'middle' | 'end',
+): string {
+  const { canvas, palette, frame } = context;
+  const size = typeScale(canvas);
+  const bpm = String(frame.bpm);
+  const signature = `${frame.timeSignature.numerator}/${frame.timeSignature.denominator}`;
+  const unit = 'BPM';
+  const gap = size.statUnit * 0.5;
+
+  const wBpm = advanceWidth(bpm, size.stat);
+  const wUnit = advanceWidth(unit, size.statUnit);
+  const wSig = advanceWidth(signature, size.stat);
+  const total = wBpm + gap + wUnit + gap * 2.2 + wSig;
+
+  const left = align === 'end' ? x - total : x - total / 2;
+  const big = {
+    'font-family': FONT_DISPLAY,
+    'font-size': size.stat,
+    'font-weight': 800,
+  };
+
+  let cursor = left;
+  let body = text(bpm, cursor, baseline, { fill: palette.accent, ...big });
+  cursor += wBpm + gap;
+  body += text(unit, cursor, baseline, {
+    fill: palette.inkSoft,
+    'font-family': FONT_TEXT,
+    'font-size': size.statUnit,
+    'font-weight': 700,
+    'letter-spacing': n(size.statUnit * 0.1),
+  });
+  cursor += wUnit + gap * 2.2;
+  body += text(signature, cursor, baseline, { fill: palette.ink, ...big });
+  return body;
+}
+
+/**
+ * Title, subtitle and the tempo readout.
+ *
+ * Landscape runs the title along the top with the readout right-
+ * aligned against it; portrait and square stack the two centred,
+ * because a narrow frame has no room beside the words and a centred
+ * stack is what a phone video wants anyway.
+ *
+ * The title starts clear of the logo, which always sits in the
+ * top-left corner -- see `logo`.
  */
 export function header(context: DesignContext): string {
-  const { canvas, palette, frame, title, subtitle } = context;
+  const { canvas, palette, title, subtitle, logoUrl } = context;
   const { header: box } = bands(canvas);
   const size = typeScale(canvas);
-  const readout = `${frame.bpm} BPM  ·  ${frame.timeSignature.numerator}/${frame.timeSignature.denominator}`;
+  const mark = logoBox(canvas);
+  const hasLogo = logoUrl !== undefined && logoUrl !== '';
 
   if (canvas.isPortrait || canvas.isSquare) {
     const [cx] = centreOf(box);
@@ -132,57 +228,44 @@ export function header(context: DesignContext): string {
         'text-anchor': 'middle',
       });
     }
-    body += text(readout, cx, box.y + box.height, {
-      fill: palette.accent,
-      'font-family': FONT_TEXT,
-      'font-size': size.label,
-      'font-weight': 700,
-      'letter-spacing': n(size.label * 0.08),
-      'text-anchor': 'middle',
-    });
+    body += tempoReadout(context, cx, box.y + box.height, 'middle');
     return group({}, body);
   }
 
-  let body = text(title, box.x, box.y + size.title, {
+  // Landscape: the title clears the mark, the readout hugs the right.
+  const textLeft = hasLogo ? mark.x + mark.width + gutter(canvas) * 0.6 : box.x;
+  let body = text(title, textLeft, box.y + size.title, {
     fill: palette.ink,
     'font-family': FONT_DISPLAY,
     'font-size': size.title,
     'font-weight': 800,
   });
   if (subtitle !== '') {
-    body += text(subtitle, box.x, box.y + size.title + size.subtitle * 1.4, {
+    body += text(subtitle, textLeft, box.y + size.title + size.subtitle * 1.4, {
       fill: palette.inkSoft,
       'font-family': FONT_TEXT,
       'font-size': size.subtitle,
       'font-weight': 600,
     });
   }
-  body += text(readout, box.x + box.width, box.y + size.title, {
-    fill: palette.accent,
-    'font-family': FONT_TEXT,
-    'font-size': size.label * 1.15,
-    'font-weight': 700,
-    'letter-spacing': n(size.label * 0.08),
-    'text-anchor': 'end',
-  });
+  body += tempoReadout(context, box.x + box.width, box.y + size.stat * 0.85, 'end');
   return group({}, body);
 }
 
 /**
- * The logo, placed in a corner of the stage rather than over it.
+ * The mark, always in the TOP-LEFT corner.
+ *
+ * Always, and not per design: a logo that moves between designs is a
+ * logo the eye has to hunt for, and on a channel's worth of videos the
+ * corner it sits in IS the branding. `header` reserves room for it, so
+ * nothing is drawn over it.
  *
  * Nothing is drawn when there is no logo: a placeholder box in an
  * exported video is worse than empty space.
  */
-export function logo(
-  context: DesignContext,
-  where: 'top-left' | 'bottom-right' = 'bottom-right',
-): string {
+export function logo(context: DesignContext): string {
   const { canvas, logoUrl } = context;
   if (logoUrl === undefined || logoUrl === '') return '';
-  const size = canvas.short * 0.11;
-  const pad = gutter(canvas);
-  const x = where === 'top-left' ? pad : canvas.width - pad - size;
-  const y = where === 'top-left' ? pad : canvas.height - pad - size;
-  return `<image href="${logoUrl.replace(/"/g, '&quot;')}" x="${n(x)}" y="${n(y)}" width="${n(size)}" height="${n(size)}" preserveAspectRatio="xMidYMid meet"/>`;
+  const box = logoBox(canvas);
+  return `<image href="${logoUrl.replace(/"/g, '&quot;')}" x="${n(box.x)}" y="${n(box.y)}" width="${n(box.width)}" height="${n(box.height)}" preserveAspectRatio="xMidYMid meet"/>`;
 }

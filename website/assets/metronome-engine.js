@@ -130,7 +130,9 @@ var MetronomeDesigns = (() => {
   }
   function bands(canvas) {
     const pad = gutter(canvas);
-    const headerHeight = canvas.isPortrait ? canvas.height * 0.11 : canvas.isSquare ? canvas.height * 0.15 : canvas.height * 0.18;
+    const size = typeScale(canvas);
+    const mark = canvas.short * 0.11;
+    const headerHeight = canvas.isPortrait || canvas.isSquare ? Math.max(size.title + size.subtitle * 1.45 + size.stat * 1.35, mark + pad) : Math.max(size.title + size.subtitle * 1.5, size.stat * 1.6, mark);
     const header2 = {
       x: pad,
       y: pad,
@@ -155,16 +157,69 @@ var MetronomeDesigns = (() => {
       subtitle: 34 * unit,
       label: 26 * unit,
       readout: 88 * unit,
-      huge: 420 * unit
+      huge: 420 * unit,
+      /** The tempo and the time signature. Big enough to read across a room. */
+      stat: 72 * unit,
+      /** The word "BPM" beside its number -- a unit, not a headline. */
+      statUnit: 28 * unit
     };
+  }
+  function advanceWidth(value, fontSize) {
+    let units = 0;
+    for (const ch of value) {
+      if (ch === " ") units += 0.3;
+      else if (".,:\xB7".includes(ch)) units += 0.32;
+      else if (ch === "/") units += 0.44;
+      else if (ch >= "0" && ch <= "9") units += 0.62;
+      else if (ch === ch.toUpperCase() && ch !== ch.toLowerCase()) units += 0.7;
+      else units += 0.56;
+    }
+    return units * fontSize;
+  }
+  function logoBox(canvas) {
+    const size = canvas.short * 0.11;
+    const pad = gutter(canvas);
+    return { x: pad, y: pad, width: size, height: size };
   }
   var FONT_DISPLAY = "'Sora', 'Trebuchet MS', sans-serif";
   var FONT_TEXT = "'Manrope', 'Segoe UI', sans-serif";
+  function tempoReadout(context, x, baseline, align) {
+    const { canvas, palette, frame } = context;
+    const size = typeScale(canvas);
+    const bpm = String(frame.bpm);
+    const signature = `${frame.timeSignature.numerator}/${frame.timeSignature.denominator}`;
+    const unit = "BPM";
+    const gap = size.statUnit * 0.5;
+    const wBpm = advanceWidth(bpm, size.stat);
+    const wUnit = advanceWidth(unit, size.statUnit);
+    const wSig = advanceWidth(signature, size.stat);
+    const total = wBpm + gap + wUnit + gap * 2.2 + wSig;
+    const left = align === "end" ? x - total : x - total / 2;
+    const big = {
+      "font-family": FONT_DISPLAY,
+      "font-size": size.stat,
+      "font-weight": 800
+    };
+    let cursor = left;
+    let body = text(bpm, cursor, baseline, { fill: palette.accent, ...big });
+    cursor += wBpm + gap;
+    body += text(unit, cursor, baseline, {
+      fill: palette.inkSoft,
+      "font-family": FONT_TEXT,
+      "font-size": size.statUnit,
+      "font-weight": 700,
+      "letter-spacing": n(size.statUnit * 0.1)
+    });
+    cursor += wUnit + gap * 2.2;
+    body += text(signature, cursor, baseline, { fill: palette.ink, ...big });
+    return body;
+  }
   function header(context) {
-    const { canvas, palette, frame, title, subtitle } = context;
+    const { canvas, palette, title, subtitle, logoUrl } = context;
     const { header: box } = bands(canvas);
     const size = typeScale(canvas);
-    const readout = `${frame.bpm} BPM  \xB7  ${frame.timeSignature.numerator}/${frame.timeSignature.denominator}`;
+    const mark = logoBox(canvas);
+    const hasLogo = logoUrl !== void 0 && logoUrl !== "";
     if (canvas.isPortrait || canvas.isSquare) {
       const [cx] = centreOf(box);
       let y = box.y + size.title;
@@ -185,48 +240,32 @@ var MetronomeDesigns = (() => {
           "text-anchor": "middle"
         });
       }
-      body2 += text(readout, cx, box.y + box.height, {
-        fill: palette.accent,
-        "font-family": FONT_TEXT,
-        "font-size": size.label,
-        "font-weight": 700,
-        "letter-spacing": n(size.label * 0.08),
-        "text-anchor": "middle"
-      });
+      body2 += tempoReadout(context, cx, box.y + box.height, "middle");
       return group({}, body2);
     }
-    let body = text(title, box.x, box.y + size.title, {
+    const textLeft = hasLogo ? mark.x + mark.width + gutter(canvas) * 0.6 : box.x;
+    let body = text(title, textLeft, box.y + size.title, {
       fill: palette.ink,
       "font-family": FONT_DISPLAY,
       "font-size": size.title,
       "font-weight": 800
     });
     if (subtitle !== "") {
-      body += text(subtitle, box.x, box.y + size.title + size.subtitle * 1.4, {
+      body += text(subtitle, textLeft, box.y + size.title + size.subtitle * 1.4, {
         fill: palette.inkSoft,
         "font-family": FONT_TEXT,
         "font-size": size.subtitle,
         "font-weight": 600
       });
     }
-    body += text(readout, box.x + box.width, box.y + size.title, {
-      fill: palette.accent,
-      "font-family": FONT_TEXT,
-      "font-size": size.label * 1.15,
-      "font-weight": 700,
-      "letter-spacing": n(size.label * 0.08),
-      "text-anchor": "end"
-    });
+    body += tempoReadout(context, box.x + box.width, box.y + size.stat * 0.85, "end");
     return group({}, body);
   }
-  function logo(context, where = "bottom-right") {
+  function logo(context) {
     const { canvas, logoUrl } = context;
     if (logoUrl === void 0 || logoUrl === "") return "";
-    const size = canvas.short * 0.11;
-    const pad = gutter(canvas);
-    const x = where === "top-left" ? pad : canvas.width - pad - size;
-    const y = where === "top-left" ? pad : canvas.height - pad - size;
-    return `<image href="${logoUrl.replace(/"/g, "&quot;")}" x="${n(x)}" y="${n(y)}" width="${n(size)}" height="${n(size)}" preserveAspectRatio="xMidYMid meet"/>`;
+    const box = logoBox(canvas);
+    return `<image href="${logoUrl.replace(/"/g, "&quot;")}" x="${n(box.x)}" y="${n(box.y)}" width="${n(box.width)}" height="${n(box.height)}" preserveAspectRatio="xMidYMid meet"/>`;
   }
 
   // src/designs/01-pendulum.ts
@@ -282,7 +321,8 @@ var MetronomeDesigns = (() => {
         fill: palette.accent,
         rx: canvas.short * 8e-3
       });
-      const count = text(String(frame.beat), cx, topY - size.label * 0.9, {
+      const countBaseline = Math.max(stage.y + size.readout * 0.8, topY - size.label * 0.9);
+      const count = text(String(frame.beat), cx, countBaseline, {
         fill: palette.accent,
         "font-family": FONT_DISPLAY,
         "font-size": size.readout,
@@ -461,7 +501,7 @@ var MetronomeDesigns = (() => {
           "text-anchor": "middle"
         });
       }).join("");
-      return group({}, bars.join("")) + labels + logo(context, "top-left");
+      return group({}, bars.join("")) + labels + logo(context);
     }
   };
 
@@ -823,22 +863,19 @@ var MetronomeDesigns = (() => {
       const { stage } = bands(canvas);
       const size = typeScale(canvas);
       const count = Math.max(1, frame.beatsPerBar);
-      const vertical = canvas.isPortrait;
-      const runway = (vertical ? stage.height : stage.width) * 0.76;
-      const start = (vertical ? stage.y : stage.x) + ((vertical ? stage.height : stage.width) - runway) / 2;
-      const baseline = vertical ? stage.x + stage.width * 0.72 : stage.y + stage.height * 0.72;
-      const slot = runway / Math.max(1, count - 1 === 0 ? 1 : count - 1);
+      const widthFraction = canvas.isPortrait ? 0.92 : canvas.isSquare ? 0.84 : 0.76;
+      const baselineFraction = canvas.isPortrait ? 0.7 : canvas.isSquare ? 0.72 : 0.7;
+      const runway = stage.width * widthFraction;
+      const start = stage.x + (stage.width - runway) / 2;
+      const baseline = stage.y + stage.height * baselineFraction;
+      const gaps = Math.max(1, count - 1);
+      const slot = runway / gaps;
       const at = (i) => count === 1 ? start + runway / 2 : start + slot * i;
+      const padThickness = canvas.short * 0.016;
+      const padLength = Math.min(slot * 0.62, canvas.short * 0.17);
       const pads = Array.from({ length: count }, (_, i) => {
         const current = i === frame.beat - 1;
-        const padLength = Math.min(slot * 0.55, canvas.short * 0.16);
-        const padThickness = canvas.short * 0.016;
-        const p = at(i);
-        return vertical ? rect(baseline, p - padLength / 2, padThickness, padLength, {
-          fill: current ? palette.accent : palette.inkSoft,
-          opacity: current ? 1 : 0.35,
-          rx: padThickness / 2
-        }) : rect(p - padLength / 2, baseline, padLength, padThickness, {
+        return rect(at(i) - padLength / 2, baseline, padLength, padThickness, {
           fill: current ? palette.accent : palette.inkSoft,
           opacity: current ? 1 : 0.35,
           rx: padThickness / 2
@@ -846,34 +883,25 @@ var MetronomeDesigns = (() => {
       }).join("");
       const fromIndex = frame.beat - 1;
       const toIndex = frame.beat % count;
-      const travel = count === 1 ? 0 : frame.phase;
-      const along = lerp(at(fromIndex), at(toIndex), travel);
-      const hop = Math.sin(Math.PI * frame.phase) * Math.min(runway * 0.24, canvas.short * 0.26);
-      const radius = canvas.short * 0.032;
-      const ballX = vertical ? baseline - hop - radius * 1.2 : along;
-      const ballY = vertical ? along : baseline - hop - radius * 1.2;
+      const along = count === 1 ? at(0) : lerp(at(fromIndex), at(toIndex), frame.phase);
+      const hop = Math.sin(Math.PI * frame.phase) * Math.min(slot * (canvas.isPortrait ? 0.9 : 0.5), stage.height * 0.42);
+      const radius = canvas.short * 0.034;
+      const ballY = baseline - hop - radius * 1.2;
       const squash = 1 - 0.22 * (1 - easeOut(Math.min(1, frame.phase * 5)));
-      const ball = `<ellipse cx="${n(ballX)}" cy="${n(ballY)}" rx="${n(radius * (vertical ? squash : 2 - squash))}" ry="${n(radius * (vertical ? 2 - squash : squash))}" fill="${palette.accent}"/>`;
+      const ball = `<ellipse cx="${n(along)}" cy="${n(ballY)}" rx="${n(radius * (2 - squash))}" ry="${n(radius * squash)}" fill="${palette.accent}"/>`;
       const shadowWidth = radius * lerp(1.5, 0.7, Math.sin(Math.PI * frame.phase));
-      const shadow = vertical ? `<ellipse cx="${n(baseline + canvas.short * 6e-3)}" cy="${n(along)}" rx="${n(radius * 0.35)}" ry="${n(shadowWidth)}" fill="${palette.ink}" opacity="0.18"/>` : `<ellipse cx="${n(along)}" cy="${n(baseline + canvas.short * 6e-3)}" rx="${n(shadowWidth)}" ry="${n(radius * 0.35)}" fill="${palette.ink}" opacity="0.18"/>`;
-      const numbers = Array.from({ length: count }, (_, i) => {
-        const p = at(i);
-        const current = i === frame.beat - 1;
-        return vertical ? text(String(i + 1), baseline + canvas.short * 0.06, p + size.label * 0.4, {
-          fill: current ? palette.accent : palette.inkSoft,
+      const shadow = `<ellipse cx="${n(along)}" cy="${n(baseline + padThickness * 1.6)}" rx="${n(shadowWidth)}" ry="${n(radius * 0.32)}" fill="${palette.ink}" opacity="0.16"/>`;
+      const numbers = Array.from(
+        { length: count },
+        (_, i) => text(String(i + 1), at(i), baseline + canvas.short * 0.085, {
+          fill: i === frame.beat - 1 ? palette.accent : palette.inkSoft,
           "font-family": FONT_DISPLAY,
-          "font-size": size.label * 1.3,
+          "font-size": size.label * 1.5,
           "font-weight": 800,
           "text-anchor": "middle"
-        }) : text(String(i + 1), p, baseline + canvas.short * 0.075, {
-          fill: current ? palette.accent : palette.inkSoft,
-          "font-family": FONT_DISPLAY,
-          "font-size": size.label * 1.3,
-          "font-weight": 800,
-          "text-anchor": "middle"
-        });
-      }).join("");
-      return group({}, pads) + shadow + ball + numbers + logo(context, "top-left");
+        })
+      ).join("");
+      return group({}, pads) + shadow + ball + numbers + logo(context);
     }
   };
 

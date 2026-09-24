@@ -57,6 +57,23 @@ Designs also never name a colour or a canvas size. Those come from
 single design file, and 9:16 is a genuinely different arrangement rather
 than 16:9 squeezed sideways.
 
+## The frame's furniture
+
+Two things sit in the same place in all thirty-three layouts, because a
+channel's worth of videos should not move them around:
+
+- **The logo is always the top-left corner.** A mark that moves between
+  designs is a mark the eye has to hunt for, and on a run of videos the
+  corner it sits in IS the branding. `header` reserves room for it, so
+  nothing is drawn over it. With no logo, nothing is drawn at all — a
+  placeholder box in an exported video is worse than empty space.
+- **The tempo and the time signature are large.** Two big figures with a
+  small `BPM` unit between them, not a line of small type: on a lesson
+  video the tempo is the second thing a viewer looks for after the
+  count, and it has to survive being watched on a phone. The header band
+  is measured from the type it actually holds, so the readout can grow
+  without landing on the subtitle.
+
 ## Ratios
 
 | aspect | canvas | what changes |

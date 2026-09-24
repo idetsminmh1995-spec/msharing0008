@@ -86,7 +86,11 @@ export const pendulum: Design = {
         rx: canvas.short * 0.008,
       });
 
-    const count = text(String(frame.beat), cx, topY - size.label * 0.9, {
+    // Kept inside the stage: the case's own top leaves only a few
+    // pixels above it in a square frame, and a 88-unit glyph hung off
+    // that baseline reaches up into the header.
+    const countBaseline = Math.max(stage.y + size.readout * 0.8, topY - size.label * 0.9);
+    const count = text(String(frame.beat), cx, countBaseline, {
       fill: palette.accent,
       'font-family': FONT_DISPLAY,
       'font-size': size.readout,

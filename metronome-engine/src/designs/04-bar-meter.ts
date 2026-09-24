@@ -84,6 +84,6 @@ export const barMeter: Design = {
           });
     }).join('');
 
-    return group({}, bars.join('')) + labels + logo(context, 'top-left');
+    return group({}, bars.join('')) + labels + logo(context);
   },
 };
