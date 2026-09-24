@@ -2562,7 +2562,11 @@
     const clone = svgEl.cloneNode(true);
     for (const el of clone.querySelectorAll('.playback-cursor')) el.remove();
     const markup = new XMLSerializer().serializeToString(clone);
-    const key = String(markup.length) + '|' + (currentKit.path ?? '');
+    // The style is part of the key because the INK is part of the
+    // picture: white ink and black ink are the same seven characters,
+    // so two renders of one score are the same length and length alone
+    // would hand back the previous style's bitmap.
+    const key = String(markup.length) + '|' + currentVideoStyle() + '|' + (currentKit.path ?? '');
     if (key === notationImageKey && notationImage) return;
     const font = await loadBravura();
     const standalone = NotationEngine.exportSvg(markup, {
