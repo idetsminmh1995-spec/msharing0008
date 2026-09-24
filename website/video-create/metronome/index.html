@@ -180,12 +180,12 @@
       <div class="card-head"><span class="card-num">1</span>Upload File</div>
       <div class="upload-grid" style="grid-template-columns:1fr;">
         <label class="upload-slot active" for="upload-midi">
-          <input id="upload-midi" type="file" accept=".mid,.midi" style="display:none;">
+          <input id="upload-midi" type="file" accept=".mid,.midi,.xml,.musicxml,.mxl" style="display:none;">
           <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 15V6l12-2v11"/></svg></div>
-          <div class="label">MIDI</div>
+          <div class="label">MIDI or MusicXML</div>
         </label>
       </div>
-      <div class="confirm-msg" id="uploadConfirm">One MIDI file is the whole input. Its tempo and time signature drive the count, and the voice comes from R2.</div>
+      <div class="confirm-msg" id="uploadConfirm">One file is the whole input &mdash; MIDI or MusicXML. Its tempo and time signature drive the count, and the voice comes from R2. <b>MusicXML also says how many bars it has</b>, so the video is exactly that long without your having to set it.</div>
     </div>
 
     <div class="card">
@@ -243,7 +243,7 @@
         <div>
           <label for="lengthMode">Length</label>
           <select id="lengthMode" class="drum-input">
-            <option value="midi">From the MIDI file</option>
+            <option value="midi">From the file</option>
             <option value="fixed">Set it here</option>
           </select>
         </div>
@@ -256,7 +256,7 @@
           </div>
         </div>
       </div>
-      <div class="field-hint" id="lengthHint">A MIDI file that carries real music says how long it is, and the video matches it. One that only carries a tempo and a time signature does not &mdash; set the length here instead.</div>
+      <div class="field-hint" id="lengthHint">A MusicXML file is a list of bars, so it always says how long it is and the video matches it. A MIDI only says when it carries notes or a real end mark &mdash; one holding just a tempo and a time signature does not, and then the length is set here.</div>
     </div>
 
     <div class="card">
@@ -395,28 +395,50 @@
    * against it would record ten minutes of a file nobody chose.
    */
   let hasMidi = false;
+  /** 'none' | 'midi' | 'musicxml' -- which kind of file the clock came from. */
+  let sourceKind = 'none';
+  /**
+   * The length the FILE declares, in seconds, or null when it declares
+   * none. A MusicXML score always declares one: it is a list of bars.
+   * A MIDI only does when it carries notes or an end-of-track marker
+   * past the first bar -- see `readMidiLength`.
+   */
+  let declaredSeconds = null;
+  /** The rendered score's playback data, when the file was a MusicXML. */
+  let scorePlayback = null;
+  /** measure number -> its time signature, for a score. */
+  let scoreSignatures = new Map();
   let tempoMap = null;
   /** [{at, beat, beatsPerBar, bar}] -- every beat of the piece, in seconds. */
   let beatGrid = [];
 
   /**
-   * The length the FILE itself declares, or null when it declares none.
+   * The length a MIDI declares, or null when it declares none.
    *
-   * "None" is a real and common answer. A MIDI exported as a metronome
-   * SETTING -- one track holding a name, a time signature, a tempo, a
-   * few controller values and an end-of-track marker a tick later --
-   * carries no length at all, and no amount of reading it will produce
-   * one. Anything shorter than a single bar is treated as that case
-   * rather than taken literally, which would give a video a few
+   * "None" is a real and common answer for MIDI. A file exported as a
+   * metronome SETTING -- one track holding a name, a time signature, a
+   * tempo, a few controller values and an end-of-track marker a tick
+   * later -- carries no length at all, and no amount of reading it will
+   * produce one. Anything shorter than a single bar is treated as that
+   * case rather than taken literally, which would give a video a few
    * milliseconds long.
+   *
+   * A MusicXML score never reaches this: it is a list of bars, so it
+   * always has a length, and that is the whole reason to prefer one.
    */
-  function midiDeclaredSeconds() {
-    if (!hasMidi || !tempoMap || songEndTicks <= 0) return null;
+  function readMidiLength() {
+    if (!tempoMap || songEndTicks <= 0) return null;
     const sig = timeSignatures[0] ?? DEFAULT_TIME_SIGNATURES[0];
     const ticksPerBar =
       Math.max(1, sig.numerator) * (4 / Math.max(1, sig.denominator)) * TICKS_PER_QUARTER;
     if (songEndTicks < ticksPerBar) return null;
     return NotationEngine.tickToSeconds(tempoMap, songEndTicks);
+  }
+
+  /** How many bars the loaded score plays, repeats counted once each time round. */
+  function scoreBarCount() {
+    const perf = scorePlayback && scorePlayback.performance;
+    return perf ? perf.entries.length : 0;
   }
 
   /** The length typed into card 5. */
@@ -437,7 +459,7 @@
    * picking it triggers.
    */
   function refreshLengthCard(adopt = false) {
-    const declared = midiDeclaredSeconds();
+    const declared = declaredSeconds;
     const midiOption = lengthMode.querySelector('option[value="midi"]');
     midiOption.disabled = declared === null;
     if (declared === null && lengthMode.value === 'midi') lengthMode.value = 'fixed';
@@ -450,17 +472,60 @@
     lengthMinutes.disabled = fromFile;
     lengthSeconds.disabled = fromFile;
     lengthHint.innerHTML = fromFile
-      ? `The file declares its own length, <b>${formatTime(declared)}</b>, and the video is exactly that.`
-      : hasMidi
-        ? 'This file carries a tempo and a time signature but <b>no length of its own</b> &mdash; nothing in it says when to stop. The video is as long as you set here.'
-        : 'No MIDI loaded yet. The video is as long as you set here.';
+      ? `The file declares its own length, <b>${formatTime(declared)}</b>${
+          sourceKind === 'musicxml' ? ` over ${beatGrid.length ? scoreBarCount() : 0} bars` : ''
+        }, and the video is exactly that.`
+      : sourceKind === 'midi'
+        ? 'This MIDI carries a tempo and a time signature but <b>no length of its own</b> &mdash; nothing in it says when to stop. The video is as long as you set here. A MusicXML file would say, because it is a list of bars.'
+        : 'No file loaded yet. The video is as long as you set here.';
+  }
+
+  /**
+   * Every beat of a SCORE, walked through its performance timeline.
+   *
+   * Not through the written one: `performance.entries` is the score
+   * unfolded into the order it is actually played, so a repeated bar
+   * appears once per pass and the count goes round with it. Each bar's
+   * beats are placed by converting ticks inside that bar, which keeps
+   * a tempo change mid-bar honest.
+   */
+  function buildBeatGridFromScore(limitSeconds) {
+    const perf = scorePlayback && scorePlayback.performance;
+    const out = [];
+    if (!perf) return out;
+    const toSeconds = (tick) => NotationEngine.tickToSeconds(scorePlayback.tempoMap, tick);
+    for (const entry of perf.entries) {
+      const sig = scoreSignatures.get(entry.measureNumber) ?? DEFAULT_TIME_SIGNATURES[0];
+      const beatsPerBar = Math.max(1, sig.numerator);
+      const ticksPerBeat = (4 / Math.max(1, sig.denominator)) * TICKS_PER_QUARTER;
+      const barStart = toSeconds(entry.writtenTick);
+      for (let b = 0; b < beatsPerBar; b++) {
+        const at = entry.startSeconds + (toSeconds(entry.writtenTick + b * ticksPerBeat) - barStart);
+        if (at > limitSeconds + 1e-6) return out;
+        out.push({
+          at,
+          beat: b + 1,
+          beatsPerBar,
+          bar: entry.measureNumber,
+          denominator: Math.max(1, sig.denominator),
+        });
+        if (out.length >= MAX_BEATS) return out;
+      }
+    }
+    return out;
   }
 
   function rebuildClock(adoptLength = false) {
     if (typeof NotationEngine === 'undefined') return;
-    tempoMap = NotationEngine.buildTempoMap(tempoEvents).tempoMap;
+    if (sourceKind === 'musicxml' && scorePlayback) {
+      tempoMap = scorePlayback.tempoMap;
+    } else {
+      tempoMap = NotationEngine.buildTempoMap(tempoEvents).tempoMap;
+      declaredSeconds = hasMidi ? readMidiLength() : null;
+    }
     refreshLengthCard(adoptLength);
-    beatGrid = buildBeatGrid(duration());
+    beatGrid =
+      sourceKind === 'musicxml' ? buildBeatGridFromScore(duration()) : buildBeatGrid(duration());
     showTempoBoxes();
     // The FRAME too, not only the boxes beside it. A new file means a
     // new tempo and a new time signature, and the frame is where the
@@ -498,7 +563,7 @@
       if (!(ticksPerBeat > 0)) break;
       const at = NotationEngine.tickToSeconds(tempoMap, tick);
       if (at > limitSeconds) break;
-      out.push({ at, beat: beatInBar + 1, beatsPerBar, bar });
+      out.push({ at, beat: beatInBar + 1, beatsPerBar, bar, denominator: Math.max(1, sig.denominator) });
       tick += ticksPerBeat;
       beatInBar = (beatInBar + 1) % beatsPerBar;
       if (beatInBar === 0) bar += 1;
@@ -519,6 +584,13 @@
   }
 
   function signatureAt(seconds) {
+    // A score's signature lives on the beat grid, which was built from
+    // its own bars -- the tick-keyed list below is the MIDI's, and says
+    // nothing about a MusicXML.
+    if (sourceKind === 'musicxml') {
+      const entry = beatAt(seconds) ?? beatGrid[0];
+      if (entry) return { numerator: entry.beatsPerBar, denominator: entry.denominator };
+    }
     const sigs = timeSignatures.length > 0 ? timeSignatures : DEFAULT_TIME_SIGNATURES;
     if (!tempoMap) return sigs[0];
     const tick = NotationEngine.secondsToTick(tempoMap, Math.max(0, seconds));
@@ -710,8 +782,7 @@
    * to turn a file with nothing in it into ten minutes of video.
    */
   function duration() {
-    const declared = midiDeclaredSeconds();
-    if (lengthMode.value === 'midi' && declared !== null) return declared;
+    if (lengthMode.value === 'midi' && declaredSeconds !== null) return declaredSeconds;
     return chosenSeconds();
   }
 
@@ -951,16 +1022,98 @@
   }
 
   // --- uploads ---------------------------------------------------------
+  // One slot, two formats. Which one a file is comes from its own first
+  // four bytes where it can -- a .mid renamed to .musicxml is still a
+  // MIDI, and a MusicXML saved as .xml is still a score -- and from the
+  // extension only for .mxl, which is a ZIP and says nothing useful in
+  // its first bytes.
+  function looksLikeMidi(bytes) {
+    return bytes.length >= 4 && bytes[0] === 0x4d && bytes[1] === 0x54 && bytes[2] === 0x68 && bytes[3] === 0x64;
+  }
+
+  /**
+   * Takes a score's own timeline as the clock.
+   *
+   * A MusicXML file is a list of bars, so all three things this page
+   * needs -- tempo, time signature, and how long the piece is -- are
+   * read rather than inferred. `renderParsedMusicXml` is what produces
+   * the performance timeline (repeats already unfolded); its SVG is
+   * thrown away here, which costs about 13ms for a 49-bar score and
+   * saves writing a second timeline builder that could disagree with
+   * the drum page's.
+   */
+  function loadScore(xmlText, fileName) {
+    const parsed = NotationEngine.parseMusicXml(xmlText);
+    const rendered = NotationEngine.renderParsedMusicXml(parsed, {});
+    const playback = rendered.playback;
+    const perf = playback && playback.performance;
+    if (!perf || perf.entries.length === 0) {
+      setConfirm(`"${fileName}" has no bars in it.`, false);
+      return;
+    }
+    scorePlayback = playback;
+    scoreSignatures = new Map();
+    for (const attrs of parsed.attributes ?? []) {
+      if (!scoreSignatures.has(attrs.measureNumber)) {
+        scoreSignatures.set(attrs.measureNumber, {
+          numerator: attrs.timeNumerator,
+          denominator: attrs.timeDenominator,
+        });
+      }
+    }
+    sourceKind = 'musicxml';
+    hasMidi = true;
+    declaredSeconds = perf.totalSeconds;
+    songEndTicks = 0;
+    stopPlayback(true);
+    rebuildClock(true);
+
+    const first = scoreSignatures.get(perf.entries[0].measureNumber) ?? DEFAULT_TIME_SIGNATURES[0];
+    const bpm = bpmAt(0);
+    const errors = (rendered.diagnostics ?? []).filter((d) => d.severity === 'error').length;
+    setConfirm(
+      `"${fileName}" — ${bpm ?? '?'} BPM, ${first.numerator}/${first.denominator}, ` +
+        `${perf.entries.length} bars over ${formatTime(perf.totalSeconds)}. ` +
+        'The video will be exactly that long.' +
+        (errors > 0 ? ` (${errors} parse error(s) — see the console.)` : ''),
+      true,
+    );
+    loadVoices();
+    refreshGenerateBtn();
+  }
+
   document.getElementById('upload-midi').addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
+      const bytes = new Uint8Array(reader.result);
+      if (!looksLikeMidi(bytes)) {
+        try {
+          if (/\.mxl$/i.test(file.name)) {
+            // A .mxl is a ZIP with the real score inside it.
+            const unzipped = NotationEngine.unzipMxl(bytes, window.DOMParser);
+            if (unzipped.xmlText === undefined) {
+              const why = unzipped.diagnostics[0]?.message ?? 'Unknown error while unzipping.';
+              setConfirm(`Could not open "${file.name}": ${why}`, false);
+              return;
+            }
+            loadScore(unzipped.xmlText, file.name);
+          } else {
+            loadScore(new TextDecoder().decode(bytes), file.name);
+          }
+        } catch (err) {
+          console.error('MusicXML failed to load:', err);
+          setConfirm(`Could not read "${file.name}" as MusicXML.`, false);
+        }
+        return;
+      }
       try {
-        const result = NotationEngine.parseMidiFile(new Uint8Array(reader.result));
+        const result = NotationEngine.parseMidiFile(bytes);
         if (result.midiFile === undefined) {
           const reason = result.diagnostics[0]?.message ?? 'Unknown error.';
           hasMidi = false;
+          sourceKind = 'none';
           setConfirm(`Could not read "${file.name}": ${reason}`, false);
           return;
         }
@@ -975,6 +1128,9 @@
             ? [...result.midiFile.timeSignatureEvents].sort((a, b) => a.tick - b.tick)
             : DEFAULT_TIME_SIGNATURES;
         hasMidi = true;
+        sourceKind = 'midi';
+        scorePlayback = null;
+        scoreSignatures = new Map();
         // The FILE's own end, not the end of its last note. A MIDI
         // written as a conductor track -- a tempo map and nothing else
         // -- has no notes at all, and measuring those gave it a length
@@ -996,8 +1152,8 @@
         setConfirm(
           `"${file.name}" — ${bpm ?? '?'} BPM, ${sig.numerator}/${sig.denominator}` +
             (changes > 0 ? `, ${changes} tempo change(s)` : '') +
-            (midiDeclaredSeconds() === null
-              ? `. This file declares no length of its own, so the video is the ${formatTime(duration())} set in card 5.`
+            (declaredSeconds === null
+              ? `. This MIDI declares no length of its own, so the video is the ${formatTime(duration())} set in card 5 — a MusicXML file would say.`
               : `. ${beatGrid.length} beats over ${formatTime(duration())} — the video will be exactly that long.`),
           true,
         );
@@ -1006,6 +1162,7 @@
       } catch (err) {
         console.error('MIDI parse failed:', err);
         hasMidi = false;
+        sourceKind = 'none';
         setConfirm(`Could not read "${file.name}" as a MIDI file.`, false);
       }
     };
