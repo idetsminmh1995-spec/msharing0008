@@ -383,7 +383,7 @@
           <select id="kit" class="drum-input"><option>Loading…</option></select>
         </div>
       </div>
-      <div class="field-hint" id="kitHint">Name an R2 folder <b>Brand - Model</b> (e.g. <b>Yamaha - Stage Custom</b>) and it splits across these two. A folder with no separator lands under <b>Other</b>.</div>
+      <div class="field-hint" id="kitHint">These two are R2 folders: <b>drums/{Brand}/{Model}/{ratio}/</b> — e.g. <b>drums/MSDrums/MS Drum 1/16x9/</b>. A kit filed straight under <b>drums/</b> still works and appears under <b>Other</b>.</div>
       <div class="confirm-msg"></div>
     </div>
 
@@ -612,8 +612,8 @@
     videoFrame.style.backgroundImage = '';
     kitBackgroundImage = null;
     if (hitLayer) hitLayer.innerHTML = '';
-    if (currentKit.name) {
-      void loadKitPreview(currentKit.name);
+    if (currentKit.path) {
+      void loadKitPreview(currentKit.path);
     } else {
       renderSticking();
     }
@@ -638,13 +638,37 @@
   }
 
   /**
-   * The currently-loaded kit's assets: its name, and which
-   * `{R|L}{note}.png` files R2 actually has for it. Kept because the
-   * sticking engine's answer is only useful here if there is a photo to
-   * show for it -- a hit with no image is skipped rather than guessed
-   * at with a neighbour's picture.
+   * The currently-loaded kit: where it lives, what to call it, and
+   * which `{R|L}{note}.png` files R2 actually has for it.
+   *
+   * `path` is the key path under `drums/` -- "MSDrums/MS Drum 1" --
+   * and is what every request is built from. `label` is the model
+   * folder alone, which is what a person calls the kit and all any
+   * message here should show. The file list is kept because the
+   * sticking engine's answer is only useful if there is a photo to
+   * show for it: a hit with no image is skipped rather than guessed at
+   * with a neighbour's picture.
    */
-  let currentKit = { name: null, files: new Set() };
+  let currentKit = { path: null, label: null, files: new Set() };
+
+  /**
+   * A kit's R2 path as URL path segments.
+   *
+   * The slash in "MSDrums/MS Drum 1" separates two real folders and
+   * has to stay a slash, while the spaces inside each name have to be
+   * escaped. Encoding the whole string would turn the separator into
+   * `%2F` and ask the Worker for one folder with a slash in its name;
+   * encoding segment by segment keeps the shape and escapes the names.
+   */
+  function kitUrlPath(path) {
+    return path.split('/').map(encodeURIComponent).join('/');
+  }
+
+  /** The model folder -- the part of the path a person calls the kit. */
+  function kitLabel(path) {
+    const parts = String(path).split('/');
+    return parts[parts.length - 1];
+  }
 
   /**
    * The kit photo as an IMAGE, alongside the CSS background.
@@ -657,20 +681,21 @@
    */
   let kitBackgroundImage = null;
 
-  async function loadKitPreview(drumSetName) {
+  async function loadKitPreview(kitPath) {
+    const label = kitLabel(kitPath);
     try {
       const res = await fetch(
-        `${API_BASE}/api/drum-sets/${encodeURIComponent(drumSetName)}/${currentAspect()}/manifest`,
+        `${API_BASE}/api/drum-sets/${kitUrlPath(kitPath)}/${currentAspect()}/manifest`,
       );
       if (!res.ok) throw new Error(`manifest request failed (${res.status})`);
       const manifest = await res.json();
-      currentKit = { name: drumSetName, files: new Set(manifest.files ?? []) };
+      currentKit = { path: kitPath, label, files: new Set(manifest.files ?? []) };
       // Rebuild against THIS kit's files. Which strokes have a photo is
       // a property of the kit, not of the score, so switching kits has
       // to re-answer it -- and the kit commonly loads after the score.
       renderSticking();
       if (manifest.hasBackground) {
-        const imgUrl = `${API_BASE}/assets/${encodeURIComponent(drumSetName)}/${currentAspect()}/${encodeURIComponent(manifest.backgroundFile)}`;
+        const imgUrl = `${API_BASE}/assets/${kitUrlPath(kitPath)}/${currentAspect()}/${encodeURIComponent(manifest.backgroundFile)}`;
         videoFrame.style.backgroundImage = `url("${imgUrl}")`;
         videoFrame.style.backgroundSize = 'cover';
         videoFrame.style.backgroundPosition = 'center';
@@ -680,55 +705,102 @@
         kitBackgroundImage = bg;
         if (drumCircle) drumCircle.style.display = 'none';
         setKitStatus(
-          `\u2713 Loaded "${drumSetName}" background + ${manifest.files.length} note images from R2.`,
+          `\u2713 Loaded "${label}" background + ${manifest.files.length} note images from R2.`,
           true,
         );
       } else {
-        setKitStatus(`"${drumSetName}" has no background image for ${currentAspect()} yet.`, false);
+        setKitStatus(`"${label}" has no background image for ${currentAspect()} yet.`, false);
       }
     } catch (err) {
       console.error('Drum kit preview failed to load:', err);
-      setKitStatus(`Could not load "${drumSetName}" from the asset server.`, false);
+      setKitStatus(`Could not load "${label}" from the asset server.`, false);
     }
   }
 
   /**
-   * Splits one R2 drum-set folder name into a brand and a model.
+   * The brand a kit gets when the bucket does not name one.
+   *
+   * It is a pile, not a brand: a folder sitting straight under
+   * `drums/` is a kit whose maker nobody wrote down.
+   */
+  const KIT_UNBRANDED = 'Other';
+
+  /**
+   * The old way of naming a brand: one folder, "Yamaha - Stage Custom".
+   *
+   * Kept for one reason -- an asset server that has not been updated
+   * yet answers with those flat names and nothing else. Reading them
+   * the old way means this page keeps listing kits against the Worker
+   * that is live right now, instead of going blank until the new one
+   * is deployed. A folder with no separator lands under "Other".
    *
    * The separator must be SPACED (" - ", " | ") or a double underscore.
    * A bare hyphen is not one: "Stage-Custom" is a model, not a brand
-   * called "Stage" -- and hyphenated model names are common enough that
-   * splitting on every hyphen would mangle more names than it sorted.
-   *
-   * A folder with no separator at all keeps working exactly as it did:
-   * it lands under "Other" with its own name as the model. That is why
-   * this lives in the page and not in the Worker -- no bucket needs
-   * reorganising, no key needs renaming, and a folder named the old way
-   * is still selectable today.
+   * called "Stage".
    */
   const KIT_SEPARATOR = /\s+[-\u2013\u2014|]\s+|__/;
-  const KIT_UNBRANDED = 'Other';
 
   function splitKitName(name) {
     const at = name.search(KIT_SEPARATOR);
-    if (at === -1) return { brand: KIT_UNBRANDED, model: name, full: name };
+    if (at === -1) return { brand: KIT_UNBRANDED, model: name, path: name };
     const separator = KIT_SEPARATOR.exec(name.slice(at))[0];
     const brand = name.slice(0, at).trim();
     const model = name.slice(at + separator.length).trim();
-    if (brand === '' || model === '') return { brand: KIT_UNBRANDED, model: name, full: name };
-    return { brand, model, full: name };
+    if (brand === '' || model === '') return { brand: KIT_UNBRANDED, model: name, path: name };
+    return { brand, model, path: name };
   }
 
-  /** Every kit the server offers, grouped by brand -- brand -> [{model, full}]. */
+  /**
+   * The kit list, however the asset server names it.
+   *
+   * `kits` is the real answer: one entry per folder pair, so Brand is
+   * the brand folder in R2 (`drums/MSDrums/`) and Drum Kit is the model
+   * folder inside it (`drums/MSDrums/MS Drum 1/`). Nothing is parsed
+   * out of a name -- the bucket's own shape says which is which, and a
+   * model called "MS Drum 1 - Studio" cannot be mistaken for a brand.
+   *
+   * `drumSets`, a flat list of names, is what an older Worker answers
+   * with, and is read through `splitKitName` so this page works against
+   * either one.
+   */
+  function readKits(data) {
+    if (Array.isArray(data.kits) && data.kits.length > 0) {
+      return data.kits
+        .filter((kit) => kit && typeof kit.path === 'string' && kit.path !== '')
+        .map((kit) => {
+          const model = kit.model || kitLabel(kit.path);
+          if (kit.brand) return { brand: kit.brand, model, path: kit.path };
+          // No brand FOLDER -- a kit filed straight under drums/. Its
+          // own name is asked the old question before it goes in the
+          // pile, so a folder called "Yamaha - Stage Custom" still
+          // lands under Yamaha without being moved.
+          const named = splitKitName(model);
+          return { brand: named.brand, model: named.model, path: kit.path };
+        });
+    }
+    if (Array.isArray(data.drumSets)) return data.drumSets.map(splitKitName);
+    return [];
+  }
+
+  /** Every kit the server offers, grouped by brand -- brand -> [{brand, model, path}]. */
   let kitsByBrand = new Map();
 
-  /** Fills the Model select with the chosen brand's kits, then previews the first. */
-  async function populateKitModels(brand, preferFull) {
+  /** Replaces a select's options. Built as elements, so a folder name with a quote in it cannot break the markup. */
+  function fillSelect(select, options) {
+    select.innerHTML = '';
+    for (const { value, text } of options) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = text;
+      select.append(option);
+    }
+  }
+
+  /** Fills the Drum Kit select with the chosen brand's kits, then previews the first. */
+  async function populateKitModels(brand, preferPath) {
     const kits = kitsByBrand.get(brand) ?? [];
-    kitSelect.innerHTML = kits
-      .map((k) => `<option value="${k.full}">${k.model}</option>`)
-      .join('');
-    if (kits.some((k) => k.full === preferFull)) kitSelect.value = preferFull;
+    fillSelect(kitSelect, kits.map((kit) => ({ value: kit.path, text: kit.model })));
+    if (kits.some((kit) => kit.path === preferPath)) kitSelect.value = preferPath;
     if (kitSelect.value) await loadKitPreview(kitSelect.value);
   }
 
@@ -736,16 +808,15 @@
     try {
       const res = await fetch(`${API_BASE}/api/drum-sets`);
       if (!res.ok) throw new Error(`drum-sets request failed (${res.status})`);
-      const data = await res.json();
-      if (!Array.isArray(data.drumSets) || data.drumSets.length === 0) {
-        kitBrandSelect.innerHTML = '<option>No drum kits found</option>';
-        kitSelect.innerHTML = '<option>No drum kits found</option>';
+      const kits = readKits(await res.json());
+      if (kits.length === 0) {
+        fillSelect(kitBrandSelect, [{ value: '', text: 'No drum kits found' }]);
+        fillSelect(kitSelect, [{ value: '', text: 'No drum kits found' }]);
         return;
       }
 
       kitsByBrand = new Map();
-      for (const name of data.drumSets) {
-        const kit = splitKitName(name);
+      for (const kit of kits) {
         if (!kitsByBrand.has(kit.brand)) kitsByBrand.set(kit.brand, []);
         kitsByBrand.get(kit.brand).push(kit);
       }
@@ -759,14 +830,12 @@
       for (const brand of brands) {
         kitsByBrand.get(brand).sort((a, b) => a.model.localeCompare(b.model));
       }
-      kitBrandSelect.innerHTML = brands
-        .map((b) => `<option value="${b}">${b}</option>`)
-        .join('');
+      fillSelect(kitBrandSelect, brands.map((brand) => ({ value: brand, text: brand })));
       await populateKitModels(brands[0]);
     } catch (err) {
       console.error('Drum kit list failed to load:', err);
-      kitBrandSelect.innerHTML = '<option>Could not reach asset server</option>';
-      kitSelect.innerHTML = '<option>Could not reach asset server</option>';
+      fillSelect(kitBrandSelect, [{ value: '', text: 'Could not reach asset server' }]);
+      fillSelect(kitSelect, [{ value: '', text: 'Could not reach asset server' }]);
     }
   }
 
@@ -1113,7 +1182,7 @@
 
   function hitImageUrl(fileName) {
     return (
-      `${API_BASE}/assets/${encodeURIComponent(currentKit.name)}/${currentAspect()}/` +
+      `${API_BASE}/assets/${kitUrlPath(currentKit.path)}/${currentAspect()}/` +
       encodeURIComponent(fileName)
     );
   }
@@ -1135,7 +1204,7 @@
     }
     const have = new Set([...hitLayer.children].map((img) => img.dataset.file));
     for (const file of wanted) {
-      if (have.has(file) || currentKit.name === null) continue;
+      if (have.has(file) || currentKit.path === null) continue;
       const img = document.createElement('img');
       img.dataset.file = file;
       img.alt = '';
@@ -1216,9 +1285,9 @@
 
     const issues = performance.validation.issues.length;
     stickingStatus(
-      currentKit.name === null
+      currentKit.path === null
         ? `${performance.events.length} strokes solved; no drum kit loaded yet to light them.`
-        : `${hitTimeline.length} of ${performance.events.length} strokes have a photo in "${currentKit.name}"` +
+        : `${hitTimeline.length} of ${performance.events.length} strokes have a photo in "${currentKit.label}"` +
           (missing > 0 ? ` -- no image for ${[...missingNotes].join(', ')}.` : '.') +
           (issues > 0 ? ` ${issues} physical issue(s).` : ''),
     );
@@ -2468,7 +2537,7 @@
     const clone = svgEl.cloneNode(true);
     for (const el of clone.querySelectorAll('.playback-cursor')) el.remove();
     const markup = new XMLSerializer().serializeToString(clone);
-    const key = String(markup.length) + '|' + (currentKit.name ?? '');
+    const key = String(markup.length) + '|' + (currentKit.path ?? '');
     if (key === notationImageKey && notationImage) return;
     const font = await loadBravura();
     const standalone = NotationEngine.exportSvg(markup, {
@@ -2641,7 +2710,7 @@
   function offerDownload(blob, extension) {
     if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     downloadUrl = URL.createObjectURL(blob);
-    downloadName = `drum-${(currentKit.name ?? 'video').replace(/\s+/g, '-').toLowerCase()}.${extension}`;
+    downloadName = `drum-${(currentKit.label ?? 'video').replace(/\s+/g, '-').toLowerCase()}.${extension}`;
     downloadBtn.hidden = false;
     downloadBtn.textContent = `Download Video (${(blob.size / 1048576).toFixed(1)} MB)`;
   }

@@ -10,17 +10,29 @@ Live at: **https://msharing0008.idetsminmh1995.workers.dev**
 
 ```
 drums/
-  {drumSetName}/
-    16x9/
-      Drum Bg.png
-      R{note}.png
-      L{note}.png
-    9x16/
-      ...
-    1x1/
-      ...
+  {Brand}/
+    {Model}/
+      16x9/
+        Drum Bg.png
+        R{note}.png
+        L{note}.png
+      9x16/
+        ...
+      1x1/
+        ...
 ```
 
+Two real folders, e.g.
+
+```
+drums/MSDrums/MS Drum 1/16x9/Drum Bg.png
+drums/MSDrums/MS Drum 1/9x16/Drum Bg.png
+drums/RolandDrums/TD-27/16x9/R38.png
+```
+
+- The **brand folder** fills the Brand dropdown, the **model folder**
+  inside it fills Drum Kit. Adding a brand is making a folder; adding a
+  kit is making one inside it. Nothing in the code names either.
 - Aspect folders are named `16x9`, `9x16`, `1x1` (no colon — URL-safe).
 - The background image is named `Drum Bg.png` and sits directly in the
   aspect folder (no separate `Bg/` subfolder).
@@ -29,24 +41,31 @@ drums/
   or rclone). New Drum Sets are picked up automatically — nothing to change
   in code.
 
-### Naming a drum set: `Brand - Model`
+### Kits filed the old way still work
 
-The drum page shows **Brand** and **Model** as two dropdowns, and it
-derives both from the folder name — the Worker is not involved and the
-bucket needs no reorganising.
+The bucket used to hold kits one level down — `drums/{name}/16x9/` —
+with the brand written into the name. Those folders are still listed,
+so nothing has to be moved before new kits land beside them:
 
 ```
-drums/Yamaha - Stage Custom/16x9/...      -> Yamaha  /  Stage Custom
+drums/MSDrums/MS Drum 1/16x9/...          -> MSDrums /  MS Drum 1   (folders)
+drums/Yamaha - Stage Custom/16x9/...      -> Yamaha  /  Stage Custom (name)
 drums/Pearl | Masters Maple/16x9/...      -> Pearl   /  Masters Maple
 drums/Tama__Starclassic/16x9/...          -> Tama    /  Starclassic
 drums/drum1/16x9/...                      -> Other   /  drum1
 ```
 
-The separator must be **spaced** (` - `, ` – `, ` — `, ` | `) or a
-**double underscore** (`__`). A bare hyphen is not a separator, so
-`Stage-Custom` stays one model name rather than becoming a brand called
-"Stage". A folder with no separator keeps working exactly as it always
-has — it just appears under **Other**.
+A folder directly under `drums/` is read as a kit when its own children
+are aspect folders, and as a brand when they are not — the bucket's
+shape answers it, so no name has to be reserved. Only for those old
+one-level folders does the page still split the NAME, on a **spaced**
+separator (` - `, ` – `, ` — `, ` | `) or a **double underscore**
+(`__`); a bare hyphen is not one, so `Stage-Custom` stays a model name.
+A name with no separator appears under **Other**.
+
+New kits should use the two folders. It is the same information without
+the guessing: a model called `MS Drum 1 - Studio` cannot be read as a
+brand when the brand is a folder of its own.
 
 ### Hit photos: `R{note}.png` / `L{note}.png` — or just `{note}.png`
 
@@ -58,11 +77,11 @@ engine (`Drum/`).
 Hands carry a side, feet do not:
 
 ```
-drums/{set}/16x9/R38.png    right hand on the snare
-drums/{set}/16x9/L38.png    left hand on the snare
-drums/{set}/16x9/36.png     kick 36
-drums/{set}/16x9/35.png     kick 35 -- a different photo, not the same drum
-drums/{set}/16x9/44.png     the hi-hat pedal
+drums/MSDrums/MS Drum 1/16x9/R38.png    right hand on the snare
+drums/MSDrums/MS Drum 1/16x9/L38.png    left hand on the snare
+drums/MSDrums/MS Drum 1/16x9/36.png     kick 36
+drums/MSDrums/MS Drum 1/16x9/35.png     kick 35 -- a different photo, not the same drum
+drums/MSDrums/MS Drum 1/16x9/44.png     the hi-hat pedal
 ```
 
 - A **hand** needs its side, because the photo is a stick coming from
@@ -168,13 +187,19 @@ answer.
 
 ## Endpoints
 
-- `GET /api/drum-sets` → `{ "drumSets": ["drum1", ...] }`
-- `GET /api/drum-sets/:drumSet/:aspect/manifest` → asset filenames for that
-  drum set + aspect ratio, e.g.
-  `{ "drumSet": "drum1", "aspect": "16x9", "hasBackground": true, "backgroundFile": "Drum Bg.png", "files": ["R38.png", "L38.png", ...] }`.
-  `:aspect` is one of `16x9`, `9x16`, `1x1`.
-- `GET /assets/:drumSet/:aspect/*filePath` → streams the actual PNG, e.g.
-  `/assets/drum1/16x9/Drum%20Bg.png` or `/assets/drum1/16x9/R38.png`.
+- `GET /api/drum-sets` → every kit in the bucket, as folders:
+  `{ "kits": [{ "path": "MSDrums/MS Drum 1", "brand": "MSDrums", "model": "MS Drum 1" }, ...], "drumSets": ["MSDrums/MS Drum 1", ...] }`.
+  `brand` is `null` for a kit filed straight under `drums/`. `drumSets`
+  is the same list as bare paths, kept so a page deployed before the
+  Worker keeps listing kits instead of going blank between the two.
+- `GET /api/drum-sets/:brand/:model/:aspect/manifest` → asset filenames for
+  that kit + aspect ratio, e.g.
+  `{ "drumSet": "MSDrums/MS Drum 1", "aspect": "16x9", "hasBackground": true, "backgroundFile": "Drum Bg.png", "files": ["R38.png", "L38.png", ...] }`.
+  `:aspect` is one of `16x9`, `9x16`, `1x1`, and a kit filed one level
+  down asks for it one segment shorter — the aspect is what the Worker
+  splits the path on, not a fixed segment count.
+- `GET /assets/:brand/:model/:aspect/*filePath` → streams the actual PNG,
+  e.g. `/assets/MSDrums/MS%20Drum%201/16x9/Drum%20Bg.png`.
 
 ## Local development
 
@@ -185,8 +210,14 @@ npm run dev
 
 ## Deploy
 
-Deployed automatically via Cloudflare Workers Builds (GitHub-connected) on
-every push to `main`. To deploy manually instead:
+**The live Worker is edited in the Cloudflare dashboard.** `src/index.ts`
+in this repo is a reference copy and can lag behind what is deployed, so
+read the dashboard before assuming what is running — and if Workers
+Builds is still connected to this repo, a push to `main` would deploy
+this copy over the dashboard's. Check that it is switched off, or keep
+the two in step yourself.
+
+To deploy from a checkout instead:
 
 ```bash
 npx wrangler login   # first time only
