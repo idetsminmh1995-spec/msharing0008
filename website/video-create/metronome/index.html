@@ -1,0 +1,775 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MusicNote — Metronome Video Create</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --red:#C81E2C; --red-dark:#A21A26; --near-black:#17110E;
+    --cream:#FAF7F3; --pink:#FCEDEC; --border:#EFE6DF;
+    --text:#1E1512; --muted:#8A7C74;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--cream);font-family:'Manrope',sans-serif;color:var(--text);}
+  a{color:inherit;text-decoration:none;}
+  input,select,button{font-family:'Manrope',sans-serif;}
+  .drum-input{border:1px solid #E4D9D1;border-radius:8px;padding:10px 12px;font-size:13px;width:100%;outline:none;}
+  .drum-input:focus{border-color:var(--red);}
+  .btn{border:none;border-radius:10px;font-weight:800;cursor:pointer;font-family:'Sora',sans-serif;}
+  .btn-red{background:var(--red);color:#fff;}
+
+  .header{background:var(--red);padding:18px 64px;display:flex;align-items:center;gap:32px;}
+  .logo{display:flex;align-items:center;gap:10px;}
+  .logo-name{font-family:'Sora',sans-serif;font-weight:800;font-size:20px;color:#fff;line-height:1;}
+  .logo-sub{font-size:10px;color:#F3C9C9;letter-spacing:.03em;}
+  .head-actions{display:flex;align-items:center;gap:26px;color:#fff;font-size:12px;margin-left:auto;}
+
+  .crumbbar{background:#fff;padding:14px 64px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+  .crumb{display:flex;gap:8px;font-size:13px;color:var(--muted);}
+  .crumb .active{color:var(--red);font-weight:700;}
+  .steps{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);}
+  .step-dot{width:26px;height:26px;border-radius:50%;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;}
+  .step-line{width:24px;height:1px;background:var(--border);}
+  .step-current{color:var(--text);font-weight:700;}
+
+  .body{display:flex;gap:24px;padding:28px 64px 60px;align-items:flex-start;}
+  .left{width:420px;display:flex;flex-direction:column;gap:16px;}
+  .page-title{font-family:'Sora',sans-serif;font-size:22px;font-weight:800;}
+
+  .card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:18px;}
+  .card-head{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;margin-bottom:12px;}
+  .card-num{background:var(--red);color:#fff;width:20px;height:20px;border-radius:5px;font-size:11px;display:flex;align-items:center;justify-content:center;}
+  .card label{font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:6px;}
+  .card label + label{margin-top:10px;}
+
+  .upload-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .upload-slot{border:1.5px dashed var(--border);border-radius:10px;padding:14px 6px;text-align:center;background:var(--cream);cursor:pointer;color:var(--muted);}
+  .upload-slot.active{border-color:var(--red);background:var(--pink);color:var(--red);}
+  .upload-slot .icon{margin-bottom:6px;}
+  .upload-slot .label{font-size:11px;font-weight:700;}
+  .confirm-msg{margin-top:10px;background:var(--pink);border-radius:8px;padding:9px 12px;font-size:11px;color:var(--red-dark);font-weight:600;}
+
+  .radio-row{display:flex;gap:16px;margin-bottom:14px;font-size:13px;}
+  .radio-row label{display:flex;align-items:center;gap:6px;font-weight:400;color:var(--text);}
+  .ratio-row{display:flex;gap:8px;margin-top:6px;}
+  .ratio-pill{flex:1;text-align:center;border:1.5px solid var(--border);background:#fff;border-radius:8px;padding:8px 4px;font-size:12px;font-weight:700;color:#4A3F3A;cursor:pointer;}
+  .ratio-pill.active{border-color:var(--red);background:var(--pink);color:var(--red);}
+
+  .generate-btn{padding:16px;font-size:15px;}
+  .cost-line{text-align:center;font-size:12px;color:var(--muted);}
+  .cost-line b{color:var(--red);font-weight:700;}
+
+  .right{flex:1;display:flex;flex-direction:column;gap:14px;}
+  .preview-head{display:flex;justify-content:space-between;align-items:center;}
+  .preview-head .title{font-weight:700;font-size:14px;}
+  .preview-stats{display:flex;gap:16px;font-size:12px;color:var(--muted);}
+  .preview-stats b{color:var(--text);}
+
+  .video-frame{background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;}
+  .video-top{padding:22px 26px 0;display:flex;justify-content:space-between;}
+  .video-title{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:20px;}
+  .tempo-chip{background:var(--red);color:#fff;font-size:11px;font-weight:800;padding:4px 10px;border-radius:6px;}
+  .video-mid{flex:1;display:flex;align-items:center;justify-content:center;}
+  .drum-circle{width:120px;height:120px;border-radius:50%;border:3px solid var(--red);display:flex;align-items:center;justify-content:center;color:var(--red);}
+  .video-notation{background:#fff;padding:14px 20px;}
+
+  .transport{display:flex;align-items:center;gap:14px;}
+  .play-btn{width:42px;height:42px;border-radius:50%;background:var(--red);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .scrub{flex:1;height:6px;background:var(--border);border-radius:3px;position:relative;}
+  .scrub-fill{position:absolute;left:0;top:0;height:100%;width:24%;background:var(--red);border-radius:3px;}
+  .time{font-size:12px;color:var(--muted);}
+
+  .engine-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px 18px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  .engine-label{font-size:12px;color:var(--muted);}
+  .engine-pills{display:flex;gap:8px;flex-wrap:wrap;}
+  .engine-pill{background:var(--pink);color:var(--red);font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;}
+
+  /* --- Metronome-only additions ------------------------------------ */
+  .field-row{display:flex;gap:10px;}
+  .field-row > div{flex:1;min-width:0;}
+  .field-hint{margin-top:10px;font-size:11px;color:var(--muted);line-height:1.6;}
+  .vol-row{display:flex;align-items:center;gap:8px;}
+  .vol-row input[type=range]{flex:1;min-width:0;accent-color:var(--red);}
+  .vol-out{font-size:11px;font-weight:700;min-width:34px;text-align:right;font-variant-numeric:tabular-nums;}
+
+  .logo-slot{display:flex;align-items:center;gap:12px;}
+  .logo-preview{width:56px;height:56px;border-radius:10px;border:1.5px dashed var(--border);background:var(--cream);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;}
+  .logo-preview img{max-width:100%;max-height:100%;display:block;}
+  .logo-actions{display:flex;flex-direction:column;gap:6px;min-width:0;}
+  .btn-ghost{border:1.5px solid var(--border);background:#fff;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;color:#4A3F3A;cursor:pointer;font-family:'Manrope',sans-serif;}
+  .btn-ghost:hover{border-color:var(--red);color:var(--red);}
+  .logo-name-line{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  /* The preview frame. Laid out like the drum page's so the two read as
+     the same product: stat boxes top-right, the mark in the middle. */
+  .video-frame{position:relative;}
+  .video-frame.style-white{background:#FFFFFF;}
+  .video-frame.style-white .video-title{color:var(--text);}
+  .video-top{padding:14px 20px 0;align-items:center;gap:16px;}
+  .video-stats{display:flex;gap:8px;flex-shrink:0;}
+  .stat-box{border:1.5px solid var(--red);border-radius:8px;padding:4px 12px;text-align:center;min-width:56px;}
+  .stat-label{display:block;font-size:8px;font-weight:800;letter-spacing:.08em;color:var(--red);}
+  .stat-value{display:block;font-family:'Sora',sans-serif;font-weight:800;font-size:15px;color:#fff;line-height:1.2;}
+  .video-frame.style-white .stat-value{color:var(--text);}
+  .stat-box.on-downbeat{background:var(--red);}
+  .stat-box.on-downbeat .stat-label{color:#fff;}
+  .stat-box.on-downbeat .stat-value{color:#fff;}
+
+  /* The beat pulse: one ring per beat of the bar, the current one lit.
+     A row of dots says where you are in the bar at a glance, which a
+     single flashing light cannot. */
+  .beat-dots{display:flex;gap:14px;justify-content:center;margin-top:18px;}
+  .beat-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--red);opacity:.35;transition:opacity .08s linear,transform .08s linear;}
+  .beat-dot.lit{opacity:1;background:var(--red);transform:scale(1.35);}
+  .beat-dot.lit.downbeat{transform:scale(1.7);}
+
+  .metro-logo{max-height:160px;max-width:60%;width:auto;display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,.45));}
+  .video-frame.style-white .metro-logo{filter:none;}
+  .metro-placeholder{font-size:12px;color:#6E625C;text-align:center;line-height:1.7;}
+  .video-mid{flex-direction:column;}
+</style>
+
+</head>
+<body>
+
+<header class="header">
+  <a class="logo" href="/">
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    <div><div class="logo-name">MusicNote</div><div class="logo-sub">Music &amp; Online Courses</div></div>
+  </a>
+  <div class="head-actions">
+    <div style="display:flex;align-items:center;gap:6px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="7" r="4"/></svg><span>Login / Register</span></div>
+  </div>
+</header>
+
+
+<div class="crumbbar">
+  <div class="crumb"><a href="/">Home</a><span>/</span><a href="/video-create/">Video Create</a><span>/</span><span class="active">Metronome</span></div>
+  <div class="steps">
+    <div class="step-dot">✓</div><span>Instrument</span>
+    <div class="step-line"></div>
+    <div class="step-dot">2</div><span class="step-current">Create Video</span>
+  </div>
+</div>
+
+<div class="body">
+
+  <div class="left">
+    <div class="page-title">Metronome Video Create</div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-num">1</span>Upload File</div>
+      <div class="upload-grid" style="grid-template-columns:repeat(2,1fr);">
+        <label class="upload-slot active" for="upload-midi">
+          <input id="upload-midi" type="file" accept=".mid,.midi" style="display:none;">
+          <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 15V6l12-2v11"/></svg></div>
+          <div class="label">MIDI</div>
+        </label>
+        <label class="upload-slot" for="upload-audio">
+          <input id="upload-audio" type="file" accept="audio/*" style="display:none;">
+          <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v10.5a3.5 3.5 0 1 1-2-3.16"/><path d="M12 3c3 0 5 2 5 5"/></svg></div>
+          <div class="label">Audio</div>
+        </label>
+      </div>
+      <div class="confirm-msg" id="uploadConfirm">The MIDI file sets the tempo and time signature. The audio file is what plays underneath.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-num">2</span>Logo</div>
+      <div class="logo-slot">
+        <div class="logo-preview" id="logoPreview">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C7B9B0" stroke-width="1.8"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+        </div>
+        <div class="logo-actions">
+          <label class="btn-ghost" for="upload-logo" style="text-align:center;">Choose image</label>
+          <input id="upload-logo" type="file" accept="image/*" style="display:none;">
+          <button class="btn-ghost" id="logoClear" type="button" hidden>Remove</button>
+          <div class="logo-name-line" id="logoName">No logo chosen &mdash; the built-in mark is used.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-num">3</span>Metronome</div>
+      <div class="field-row">
+        <div>
+          <label for="clickSound">Click</label>
+          <select id="clickSound" class="drum-input">
+            <option value="beep">Beep</option>
+            <option value="wood">Wood block</option>
+            <option value="tick">Soft tick</option>
+          </select>
+        </div>
+        <div>
+          <label for="accentOn">Accent beat 1</label>
+          <select id="accentOn" class="drum-input">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
+      </div>
+      <label for="clickVolume" style="margin-top:10px;">Volume</label>
+      <div class="vol-row">
+        <input id="clickVolume" type="range" min="0" max="100" step="1" value="80">
+        <span class="vol-out" id="clickVolumeOut">80%</span>
+      </div>
+      <div class="field-hint" id="metroHint">120 BPM, 4/4 until a MIDI file says otherwise. Press play to hear it.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-num">4</span>Video Style</div>
+      <div class="radio-row">
+        <label><input type="radio" name="vc" id="styleBlack" value="black" checked>Black</label>
+        <label><input type="radio" name="vc" id="styleWhite" value="white">White</label>
+      </div>
+      <label>Aspect Ratio</label>
+      <div class="ratio-row">
+        <div class="ratio-pill active">16:9</div>
+        <div class="ratio-pill">9:16</div>
+        <div class="ratio-pill">1:1</div>
+      </div>
+    </div>
+
+    <button class="btn btn-red generate-btn">Generate Video</button>
+    <div class="cost-line">Estimated cost: <b>12 points</b> · You have 240</div>
+  </div>
+
+  <div class="right">
+    <div class="preview-head">
+      <div class="title">Live Preview</div>
+      <div class="preview-stats">
+        <span>BPM <b id="statBpm">—</b></span>
+        <span>Time <b id="statTime">—</b></span>
+        <span>Duration <b id="statDuration">—</b></span>
+      </div>
+    </div>
+
+    <div class="video-frame style-black" id="videoFrame">
+      <div class="video-top">
+        <div class="video-title" id="videoTitle">Metronome</div>
+        <div class="video-stats">
+          <div class="stat-box"><span class="stat-label">TIME</span><span class="stat-value" id="statTimeBox">4/4</span></div>
+          <div class="stat-box"><span class="stat-label">BPM</span><span class="stat-value" id="statBpmBox">120</span></div>
+          <div class="stat-box" id="countBox"><span class="stat-label">COUNT</span><span class="stat-value" id="statCountBox">1</span></div>
+        </div>
+      </div>
+      <div class="video-mid">
+        <img class="metro-logo" id="frameLogo" src="../../assets/logo/sharing-drum-logo-full.webp" alt="">
+        <div class="beat-dots" id="beatDots"></div>
+      </div>
+      <div style="height:26px;"></div>
+    </div>
+
+    <div class="transport">
+      <button class="play-btn" id="playBtn" aria-label="Play">
+        <svg id="playIcon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <div class="scrub" id="scrubBar"><div class="scrub-fill" id="scrubFill" style="width:0%;"></div></div>
+      <div class="time" id="timeDisplay">0:00 / 0:00</div>
+    </div>
+    <audio id="audioPlayer" preload="metadata"></audio>
+
+    <div class="engine-card">
+      <div class="engine-label">Engines running for this video</div>
+      <div class="engine-pills">
+        <span class="engine-pill">Notation Engine</span>
+        <span class="engine-pill">Video Engine</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="../../assets/notation-engine.js"></script>
+<script>
+  // The metronome reads its tempo and time signature from the uploaded
+  // MIDI file and clicks along with the uploaded audio. Everything it
+  // needs -- parsing the file, turning ticks into seconds -- is the
+  // notation engine's, so this page decides nothing about musical time
+  // for itself.
+
+  const TICKS_PER_QUARTER = 480;
+  /** What a page with no MIDI file counts: 4/4 at 120. */
+  const DEFAULT_TEMPO_EVENTS = [{ tick: 0, microsecondsPerQuarter: 500000 }];
+  const DEFAULT_TIME_SIGNATURES = [{ tick: 0, numerator: 4, denominator: 4 }];
+  /** Longer than any lesson, and short enough that the grid is cheap. */
+  const FREE_RUN_SECONDS = 600;
+  const MAX_BEATS = 20000;
+
+  const uploadConfirm = document.getElementById('uploadConfirm');
+  const metroHint = document.getElementById('metroHint');
+  const audioPlayer = document.getElementById('audioPlayer');
+  const playBtn = document.getElementById('playBtn');
+  const playIcon = document.getElementById('playIcon');
+  const scrubBar = document.getElementById('scrubBar');
+  const scrubFill = document.getElementById('scrubFill');
+  const timeDisplay = document.getElementById('timeDisplay');
+  const beatDots = document.getElementById('beatDots');
+  const countBox = document.getElementById('countBox');
+  const statCountBox = document.getElementById('statCountBox');
+  const statTimeBox = document.getElementById('statTimeBox');
+  const statBpmBox = document.getElementById('statBpmBox');
+  const statBpm = document.getElementById('statBpm');
+  const statTime = document.getElementById('statTime');
+  const statDuration = document.getElementById('statDuration');
+  const videoFrame = document.getElementById('videoFrame');
+  const frameLogo = document.getElementById('frameLogo');
+  const clickVolume = document.getElementById('clickVolume');
+  const clickVolumeOut = document.getElementById('clickVolumeOut');
+  const clickSound = document.getElementById('clickSound');
+  const accentOn = document.getElementById('accentOn');
+
+  const PLAY_PATH = 'M8 5v14l11-7z';
+  const PAUSE_PATH = 'M6 5h4v14H6zM14 5h4v14h-4z';
+
+  function setConfirm(text, ok) {
+    uploadConfirm.textContent = text;
+    uploadConfirm.style.background = ok === false ? '#FDECEC' : '';
+    uploadConfirm.style.color = ok === false ? '#A21A26' : '';
+  }
+
+  function setActiveSlot(id) {
+    for (const slot of document.querySelectorAll('.upload-slot')) {
+      slot.classList.toggle('active', slot.getAttribute('for') === id);
+    }
+  }
+  for (const id of ['upload-midi', 'upload-audio']) {
+    document.getElementById(id).addEventListener('click', () => setActiveSlot(id));
+  }
+
+  // --- the musical clock, from the MIDI file --------------------------
+  let tempoEvents = DEFAULT_TEMPO_EVENTS;
+  let timeSignatures = DEFAULT_TIME_SIGNATURES;
+  let tempoMap = null;
+  /** [{at, beat, beatsPerBar}] -- every beat of the piece, in seconds. */
+  let beatGrid = [];
+
+  function rebuildClock() {
+    if (typeof NotationEngine === 'undefined') return;
+    tempoMap = NotationEngine.buildTempoMap(tempoEvents).tempoMap;
+    const limit = Number.isFinite(audioPlayer.duration) && audioPlayer.duration > 0
+      ? audioPlayer.duration
+      : FREE_RUN_SECONDS;
+    beatGrid = buildBeatGrid(limit);
+    showTempoBoxes();
+  }
+
+  /**
+   * Every beat of the piece, in seconds from its start.
+   *
+   * Walks the tick timeline rather than multiplying a BPM by a beat
+   * count, so a tempo change moves every later beat and a time
+   * signature change restarts the count mid-piece -- both of which a
+   * "beats per minute times minutes" calculation gets wrong.
+   */
+  function buildBeatGrid(limitSeconds) {
+    const sigs = timeSignatures.length > 0 ? timeSignatures : DEFAULT_TIME_SIGNATURES;
+    const out = [];
+    let tick = 0;
+    let sigIndex = 0;
+    let beatInBar = 0;
+    while (out.length < MAX_BEATS) {
+      while (sigIndex + 1 < sigs.length && sigs[sigIndex + 1].tick <= tick) {
+        sigIndex += 1;
+        beatInBar = 0; // a new time signature starts a new bar
+      }
+      const sig = sigs[sigIndex];
+      const beatsPerBar = Math.max(1, sig.numerator);
+      // The beat is the signature's own denominator unit: a 6/8 bar is
+      // six eighth-note beats, not six quarters.
+      const ticksPerBeat = (4 / Math.max(1, sig.denominator)) * TICKS_PER_QUARTER;
+      if (!(ticksPerBeat > 0)) break;
+      const at = NotationEngine.tickToSeconds(tempoMap, tick);
+      if (at > limitSeconds) break;
+      out.push({ at, beat: beatInBar + 1, beatsPerBar });
+      tick += ticksPerBeat;
+      beatInBar = (beatInBar + 1) % beatsPerBar;
+    }
+    return out;
+  }
+
+  function bpmAt(seconds) {
+    if (!tempoMap || !tempoMap.segments) return undefined;
+    const tick = NotationEngine.secondsToTick(tempoMap, Math.max(0, seconds));
+    let current;
+    for (const segment of tempoMap.segments) {
+      if (segment.startTick <= tick) current = segment;
+      else break;
+    }
+    if (current === undefined || !(current.microsecondsPerQuarter > 0)) return undefined;
+    return Math.round(60000000 / current.microsecondsPerQuarter);
+  }
+
+  function signatureAt(seconds) {
+    const sigs = timeSignatures.length > 0 ? timeSignatures : DEFAULT_TIME_SIGNATURES;
+    if (!tempoMap) return sigs[0];
+    const tick = NotationEngine.secondsToTick(tempoMap, Math.max(0, seconds));
+    let current = sigs[0];
+    for (const sig of sigs) {
+      if (sig.tick <= tick) current = sig;
+      else break;
+    }
+    return current;
+  }
+
+  function showTempoBoxes() {
+    const bpm = bpmAt(position());
+    const sig = signatureAt(position());
+    statBpmBox.textContent = bpm === undefined ? '—' : String(bpm);
+    statBpm.textContent = statBpmBox.textContent;
+    statTimeBox.textContent = `${sig.numerator}/${sig.denominator}`;
+    statTime.textContent = statTimeBox.textContent;
+    renderBeatDots(Math.max(1, sig.numerator));
+  }
+
+  let dotCount = 0;
+  function renderBeatDots(count) {
+    if (count === dotCount) return;
+    dotCount = count;
+    beatDots.innerHTML = '';
+    for (let i = 0; i < count; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'beat-dot';
+      beatDots.appendChild(dot);
+    }
+  }
+
+  let shownBeat = null;
+  function showBeat(beat, beatsPerBar) {
+    renderBeatDots(beatsPerBar);
+    if (beat === shownBeat) return;
+    shownBeat = beat;
+    statCountBox.textContent = String(beat);
+    countBox.classList.toggle('on-downbeat', beat === 1);
+    [...beatDots.children].forEach((dot, i) => {
+      dot.classList.toggle('lit', i === beat - 1);
+      dot.classList.toggle('downbeat', beat === 1);
+    });
+  }
+
+  // --- audio ---------------------------------------------------------
+  let audioCtx = null;
+  let clickGain = null;
+
+  function ensureAudioContext() {
+    if (audioCtx === null) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      audioCtx = new Ctx();
+      clickGain = audioCtx.createGain();
+      clickGain.connect(audioCtx.destination);
+      applyClickVolume();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  /**
+   * Slider percent -> the gain a listener will agree with. Squared, not
+   * linear: a linear slider halved is only -6dB, which reads as
+   * "slightly quieter" and makes most of the travel feel dead.
+   */
+  function perceivedGain(percent) {
+    const fraction = Math.min(1, Math.max(0, Number(percent) / 100));
+    return fraction * fraction;
+  }
+
+  function applyClickVolume() {
+    clickVolumeOut.textContent = `${clickVolume.value}%`;
+    if (clickGain) clickGain.gain.value = perceivedGain(clickVolume.value);
+  }
+  clickVolume.addEventListener('input', applyClickVolume);
+  applyClickVolume();
+
+  /** The three click voices, as envelopes rather than samples -- nothing to load, nothing to 404. */
+  const CLICK_VOICES = {
+    beep: { type: 'sine', low: 880, high: 1318.5, decay: 0.09 },
+    wood: { type: 'triangle', low: 1200, high: 1800, decay: 0.045 },
+    tick: { type: 'square', low: 2000, high: 2600, decay: 0.022 },
+  };
+
+  function scheduleClick(ctx, at, isDownbeat) {
+    const voice = CLICK_VOICES[clickSound.value] ?? CLICK_VOICES.beep;
+    const accent = accentOn.value !== 'off' && isDownbeat;
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.type = voice.type;
+    osc.frequency.value = accent ? voice.high : voice.low;
+    env.gain.setValueAtTime(0.0001, at);
+    env.gain.exponentialRampToValueAtTime(accent ? 1 : 0.6, at + 0.004);
+    env.gain.exponentialRampToValueAtTime(0.0001, at + voice.decay);
+    osc.connect(env);
+    env.connect(clickGain);
+    osc.start(at);
+    osc.stop(at + voice.decay + 0.02);
+  }
+
+  // --- where we are ---------------------------------------------------
+  // With an audio file loaded the audio element is the clock, so the
+  // clicks cannot drift away from the track. Without one the metronome
+  // runs on the AudioContext's clock instead, so the page is useful
+  // before anything has been uploaded.
+  let freeRunStartCtx = null;
+
+  function hasAudio() {
+    return Boolean(audioPlayer.src);
+  }
+
+  function running() {
+    return hasAudio() ? !audioPlayer.paused : freeRunStartCtx !== null;
+  }
+
+  function position() {
+    if (hasAudio()) return audioPlayer.currentTime;
+    if (freeRunStartCtx !== null && audioCtx) return audioCtx.currentTime - freeRunStartCtx;
+    return 0;
+  }
+
+  const LOOKAHEAD_S = 0.6;
+  const POLL_MS = 120;
+  const click = { timer: null, scheduled: new Set() };
+
+  function clearScheduled() {
+    click.scheduled.clear();
+  }
+
+  function pumpClicks() {
+    if (!running() || audioCtx === null || beatGrid.length === 0) return;
+    const nowAudio = position();
+    const nowCtx = audioCtx.currentTime;
+    for (let i = 0; i < beatGrid.length; i++) {
+      const { at } = beatGrid[i];
+      if (at < nowAudio - 0.02) continue;
+      if (at >= nowAudio + LOOKAHEAD_S) break;
+      if (click.scheduled.has(i)) continue;
+      click.scheduled.add(i);
+      scheduleClick(audioCtx, Math.max(nowCtx, nowCtx + (at - nowAudio)), beatGrid[i].beat === 1);
+    }
+  }
+
+  function startClicks() {
+    stopClicks();
+    ensureAudioContext();
+    click.timer = setInterval(pumpClicks, POLL_MS);
+    pumpClicks();
+  }
+
+  function stopClicks() {
+    if (click.timer !== null) {
+      clearInterval(click.timer);
+      click.timer = null;
+    }
+    clearScheduled();
+  }
+
+  // --- the display loop ------------------------------------------------
+  function beatAt(seconds) {
+    if (beatGrid.length === 0) return null;
+    let found = null;
+    for (const entry of beatGrid) {
+      if (entry.at <= seconds + 1e-6) found = entry;
+      else break;
+    }
+    return found;
+  }
+
+  function formatTime(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+    const whole = Math.floor(seconds);
+    return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+  }
+
+  function updateDisplay() {
+    const at = position();
+    const entry = beatAt(at);
+    if (entry) showBeat(entry.beat, entry.beatsPerBar);
+    const bpm = bpmAt(at);
+    statBpmBox.textContent = bpm === undefined ? '—' : String(bpm);
+    statBpm.textContent = statBpmBox.textContent;
+    const sig = signatureAt(at);
+    statTimeBox.textContent = `${sig.numerator}/${sig.denominator}`;
+    statTime.textContent = statTimeBox.textContent;
+
+    const total = hasAudio() && Number.isFinite(audioPlayer.duration) ? audioPlayer.duration : 0;
+    timeDisplay.textContent = `${formatTime(at)} / ${formatTime(total)}`;
+    scrubFill.style.width = total > 0 ? `${Math.min(100, (at / total) * 100)}%` : '0%';
+    if (running()) requestAnimationFrame(updateDisplay);
+  }
+
+  // --- transport -------------------------------------------------------
+  function setPlayIcon(playing) {
+    playIcon.querySelector('path').setAttribute('d', playing ? PAUSE_PATH : PLAY_PATH);
+  }
+
+  playBtn.addEventListener('click', () => {
+    ensureAudioContext();
+    if (running()) {
+      if (hasAudio()) audioPlayer.pause();
+      else {
+        freeRunStartCtx = null;
+        stopClicks();
+        setPlayIcon(false);
+      }
+      return;
+    }
+    if (hasAudio()) {
+      audioPlayer.play();
+      return;
+    }
+    freeRunStartCtx = audioCtx ? audioCtx.currentTime : null;
+    startClicks();
+    setPlayIcon(true);
+    updateDisplay();
+  });
+
+  audioPlayer.addEventListener('play', () => {
+    setPlayIcon(true);
+    startClicks();
+    updateDisplay();
+  });
+  audioPlayer.addEventListener('pause', () => {
+    setPlayIcon(false);
+    stopClicks();
+  });
+  audioPlayer.addEventListener('ended', () => {
+    setPlayIcon(false);
+    stopClicks();
+  });
+  // A seek lands somewhere else, so everything queued for where we were
+  // is wrong; the next poll refills from the new position.
+  audioPlayer.addEventListener('seeking', clearScheduled);
+  audioPlayer.addEventListener('loadedmetadata', () => {
+    statDuration.textContent = formatTime(audioPlayer.duration);
+    rebuildClock();
+    updateDisplay();
+  });
+
+  scrubBar.addEventListener('click', (e) => {
+    if (!hasAudio()) return;
+    const duration = audioPlayer.duration;
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    const rect = scrubBar.getBoundingClientRect();
+    const fraction = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    audioPlayer.currentTime = fraction * duration;
+    updateDisplay();
+  });
+
+  for (const control of [clickSound, accentOn]) {
+    // A voice change should be heard now, not on the next beat after the
+    // look-ahead window has already committed the old one.
+    control.addEventListener('change', clearScheduled);
+  }
+
+  // --- uploads ---------------------------------------------------------
+  document.getElementById('upload-midi').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setActiveSlot('upload-midi');
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const result = NotationEngine.parseMidiFile(new Uint8Array(reader.result));
+        if (result.midiFile === undefined) {
+          const reason = result.diagnostics[0]?.message ?? 'Unknown error.';
+          setConfirm(`Could not read "${file.name}": ${reason}`, false);
+          return;
+        }
+        // A file with no tempo or no time signature is not broken -- MIDI
+        // simply lets both be left out, and means 120 and 4/4 by then.
+        tempoEvents = result.midiFile.tempoEvents.length > 0
+          ? [...result.midiFile.tempoEvents]
+          : DEFAULT_TEMPO_EVENTS;
+        timeSignatures = result.midiFile.timeSignatureEvents.length > 0
+          ? [...result.midiFile.timeSignatureEvents].sort((a, b) => a.tick - b.tick)
+          : DEFAULT_TIME_SIGNATURES;
+        clearScheduled();
+        rebuildClock();
+        updateDisplay();
+
+        const bpm = bpmAt(0);
+        const sig = signatureAt(0);
+        const changes = Math.max(0, tempoEvents.length - 1);
+        setConfirm(
+          `"${file.name}" — ${bpm ?? '?'} BPM, ${sig.numerator}/${sig.denominator}` +
+            (changes > 0 ? `, ${changes} tempo change(s)` : '') +
+            `. ${beatGrid.length} beats counted.`,
+          true,
+        );
+        metroHint.textContent =
+          `Counting this file's own tempo and time signature` +
+          (changes > 0 ? ', tempo changes included.' : '.');
+      } catch (err) {
+        console.error('MIDI parse failed:', err);
+        setConfirm(`Could not read "${file.name}" as a MIDI file.`, false);
+      }
+    };
+    reader.onerror = () => setConfirm(`Could not read "${file.name}".`, false);
+    reader.readAsArrayBuffer(file);
+  });
+
+  document.getElementById('upload-audio').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setActiveSlot('upload-audio');
+    if (audioPlayer.src) URL.revokeObjectURL(audioPlayer.src);
+    audioPlayer.src = URL.createObjectURL(file);
+    audioPlayer.load();
+    setConfirm(`"${file.name}" loaded. The metronome will click along with it.`, true);
+  });
+
+  // --- the logo --------------------------------------------------------
+  const logoInput = document.getElementById('upload-logo');
+  const logoPreview = document.getElementById('logoPreview');
+  const logoClear = document.getElementById('logoClear');
+  const logoName = document.getElementById('logoName');
+  const BUILT_IN_LOGO = '../../assets/logo/sharing-drum-logo-full.webp';
+  let logoUrl = null;
+
+  function showLogo(url, name) {
+    if (logoUrl) URL.revokeObjectURL(logoUrl);
+    logoUrl = url;
+    frameLogo.src = url ?? BUILT_IN_LOGO;
+    logoPreview.innerHTML = '';
+    const img = document.createElement('img');
+    img.src = frameLogo.src;
+    img.alt = '';
+    logoPreview.appendChild(img);
+    logoClear.hidden = url === null;
+    logoName.textContent = url === null
+      ? 'No logo chosen — the built-in mark is used.'
+      : name;
+  }
+
+  logoInput.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    showLogo(URL.createObjectURL(file), file.name);
+  });
+  logoClear.addEventListener('click', () => {
+    logoInput.value = '';
+    showLogo(null, '');
+  });
+  showLogo(null, '');
+
+  // --- video style ------------------------------------------------------
+  for (const radio of [document.getElementById('styleBlack'), document.getElementById('styleWhite')]) {
+    radio.addEventListener('change', () => {
+      const white = document.getElementById('styleWhite').checked;
+      videoFrame.classList.toggle('style-white', white);
+      videoFrame.classList.toggle('style-black', !white);
+    });
+  }
+  for (const pill of document.querySelectorAll('.ratio-pill')) {
+    pill.addEventListener('click', () => {
+      for (const other of document.querySelectorAll('.ratio-pill')) other.classList.remove('active');
+      pill.classList.add('active');
+    });
+  }
+
+  rebuildClock();
+  updateDisplay();
+</script>
+</body>
+</html>
