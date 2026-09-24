@@ -116,6 +116,14 @@
   .ratio-pill.active{border-color:var(--red);background:var(--pink);color:var(--red);}
 
   .generate-btn{padding:16px;font-size:15px;}
+  .generate-btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-dark{background:var(--near-black);color:#fff;}
+  .btn-ghost{border:1.5px solid var(--border);background:#fff;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;color:#4A3F3A;cursor:pointer;font-family:'Manrope',sans-serif;}
+  .btn-ghost:hover{border-color:var(--red);color:var(--red);}
+  .gen-progress{display:flex;flex-direction:column;gap:8px;}
+  .gen-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+  .gen-fill{height:100%;width:0;background:var(--red);border-radius:3px;transition:width .12s linear;}
+  .gen-line{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted);font-weight:600;}
   .cost-line{text-align:center;font-size:12px;color:var(--muted);}
   .cost-line b{color:var(--red);font-weight:700;}
 
@@ -474,8 +482,14 @@
       </div>
     </div>
 
-    <button class="btn btn-red generate-btn">Generate Video</button>
-    <div class="cost-line">Estimated cost: <b>18 points</b> · You have 240</div>
+    <button class="btn btn-red generate-btn" id="generateBtn">Generate Video</button>
+    <button class="btn btn-dark generate-btn" id="downloadBtn" hidden>Download Video</button>
+    <div class="gen-progress" id="genProgress" hidden>
+      <div class="gen-bar"><div class="gen-fill" id="genFill"></div></div>
+      <div class="gen-line"><span id="genLabel">Recording…</span><button class="btn-ghost" id="cancelBtn" type="button">Cancel</button></div>
+    </div>
+    <div class="cost-line" id="costLine">Estimated cost: <b>18 points</b> · You have 240</div>
+    <div class="field-hint" id="genNote">Recorded in your browser, in real time &mdash; a 3-minute take needs 3 minutes, and the tab has to stay open. The file is a WebM of the frame exactly as you see it, with the count-in and the audio already in it.</div>
   </div>
 
   <div class="right">
@@ -581,6 +595,17 @@
    */
   let currentKit = { name: null, files: new Set() };
 
+  /**
+   * The kit photo as an IMAGE, alongside the CSS background.
+   *
+   * The preview only needs the CSS rule; the recorder needs pixels it
+   * can draw, and it needs them fetched with CORS or the canvas it
+   * draws them onto is tainted and `captureStream` refuses to record.
+   * So the same file is loaded twice, once for each purpose -- the
+   * browser serves the second from cache.
+   */
+  let kitBackgroundImage = null;
+
   async function loadKitPreview(drumSetName) {
     try {
       const res = await fetch(
@@ -598,6 +623,10 @@
         videoFrame.style.backgroundImage = `url("${imgUrl}")`;
         videoFrame.style.backgroundSize = 'cover';
         videoFrame.style.backgroundPosition = 'center';
+        const bg = new Image();
+        bg.crossOrigin = 'anonymous';
+        bg.src = imgUrl;
+        kitBackgroundImage = bg;
         if (drumCircle) drumCircle.style.display = 'none';
         setKitStatus(
           `\u2713 Loaded "${drumSetName}" background + ${manifest.files.length} note images from R2.`,
@@ -1059,6 +1088,9 @@
       const img = document.createElement('img');
       img.dataset.file = file;
       img.alt = '';
+      // Fetched with CORS so the recorder can draw it: a photo pulled
+      // without it still SHOWS, but taints the capture canvas.
+      img.crossOrigin = 'anonymous';
       img.src = hitImageUrl(file);
       hitLayer.appendChild(img);
     }
@@ -2239,6 +2271,530 @@
     }
     audioPlayer.play();
   });
+
+  // --- Generate Video ----------------------------------------------------
+  // The frame here is DOM, not one SVG, so it is composed onto a canvas
+  // piece by piece -- reading each piece's LIVE position and computed
+  // style rather than re-implementing the CSS. That is what keeps the
+  // recording matching the preview when the preview changes: nothing
+  // below knows where the logo goes, only that it is wherever the
+  // browser just put it.
+  const generateBtn = document.getElementById('generateBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const genProgress = document.getElementById('genProgress');
+  const genFill = document.getElementById('genFill');
+  const genLabel = document.getElementById('genLabel');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const costLine = document.getElementById('costLine');
+
+  const CAPTURE_FPS = 30;
+  const CAPTURE_WIDTH = 1920;
+
+  let recording = null;
+  let downloadUrl = null;
+  let downloadName = 'drum.webm';
+
+  /**
+   * The uploaded take, tapped for recording.
+   *
+   * `createMediaElementSource` may be called ONCE per element for the
+   * life of the page -- a second call throws, and the first call has
+   * already taken the element's output away from the speakers. So the
+   * node is made once, permanently wired to the speakers, and only its
+   * branch into the recorder comes and goes with each take. Making it
+   * per-take would leave every take after the first silent.
+   */
+  let takeSource = null;
+  function ensureTakeSource(ctx) {
+    if (takeSource) return takeSource;
+    try {
+      takeSource = ctx.createMediaElementSource(audioPlayer);
+      takeSource.connect(ctx.destination);
+    } catch (err) {
+      console.error('Could not tap the audio element:', err);
+      takeSource = null;
+    }
+    return takeSource;
+  }
+
+  function pickMimeType() {
+    const wanted = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm',
+      'video/mp4',
+    ];
+    for (const type of wanted) {
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported(type)) return type;
+    }
+    return '';
+  }
+
+  /**
+   * Bravura, base64, fetched once.
+   *
+   * The notation is the one part of the frame that has to go through an
+   * <img> to reach the canvas, and an SVG rasterised that way loads
+   * nothing external -- including its font. Without the font embedded,
+   * every notehead, clef and rest in the exported video is a missing-
+   * glyph box. `exportSvg` takes the bytes and writes them in.
+   */
+  let bravuraBase64 = null;
+  async function loadBravura() {
+    if (bravuraBase64 !== null) return bravuraBase64;
+    try {
+      const res = await fetch('../../assets/fonts/Bravura.woff2');
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      bravuraBase64 = btoa(binary);
+    } catch (err) {
+      bravuraBase64 = '';
+    }
+    return bravuraBase64;
+  }
+
+  /** An element's box, in canvas pixels relative to the frame. */
+  function rectIn(el, frameRect, scale) {
+    const r = el.getBoundingClientRect();
+    return {
+      x: (r.left - frameRect.left) * scale,
+      y: (r.top - frameRect.top) * scale,
+      w: r.width * scale,
+      h: r.height * scale,
+    };
+  }
+
+  function isVisible(el) {
+    const cs = getComputedStyle(el);
+    return cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity) > 0.01;
+  }
+
+  /** `object-fit: cover` / `background-size: cover`, as a destination rect. */
+  function coverRect(naturalW, naturalH, boxW, boxH) {
+    if (!(naturalW > 0) || !(naturalH > 0)) return { x: 0, y: 0, w: boxW, h: boxH };
+    const scale = Math.max(boxW / naturalW, boxH / naturalH);
+    const w = naturalW * scale;
+    const h = naturalH * scale;
+    return { x: (boxW - w) / 2, y: (boxH - h) / 2, w, h };
+  }
+
+  function roundRectPath(ctx2d, x, y, w, h, r) {
+    const radius = Math.min(r, w / 2, h / 2);
+    ctx2d.beginPath();
+    ctx2d.moveTo(x + radius, y);
+    ctx2d.arcTo(x + w, y, x + w, y + h, radius);
+    ctx2d.arcTo(x + w, y + h, x, y + h, radius);
+    ctx2d.arcTo(x, y + h, x, y, radius);
+    ctx2d.arcTo(x, y, x + w, y, radius);
+    ctx2d.closePath();
+  }
+
+  /**
+   * One text element, at its own box.
+   *
+   * Drawn per LEAF element rather than per block, so a stat box's label
+   * and value land in their own places without this code knowing that a
+   * stat box has two lines in it. Canvas uses the document's own fonts,
+   * so Sora and Manrope are the real ones here -- only the notation has
+   * to carry its font with it.
+   */
+  function drawTextEl(ctx2d, el, frameRect, scale) {
+    const value = (el.textContent ?? '').trim();
+    if (value === '' || !isVisible(el)) return;
+    const cs = getComputedStyle(el);
+    const box = rectIn(el, frameRect, scale);
+    const size = parseFloat(cs.fontSize) * scale;
+    ctx2d.font = `${cs.fontStyle} ${cs.fontWeight} ${size}px ${cs.fontFamily}`;
+    ctx2d.fillStyle = cs.color;
+    ctx2d.textBaseline = 'middle';
+    if ('letterSpacing' in ctx2d) {
+      const spacing = parseFloat(cs.letterSpacing);
+      ctx2d.letterSpacing = Number.isFinite(spacing) ? `${spacing * scale}px` : '0px';
+    }
+    const align = cs.textAlign;
+    if (align === 'center') {
+      ctx2d.textAlign = 'center';
+      ctx2d.fillText(value, box.x + box.w / 2, box.y + box.h / 2);
+    } else if (align === 'right' || align === 'end') {
+      ctx2d.textAlign = 'right';
+      ctx2d.fillText(value, box.x + box.w, box.y + box.h / 2);
+    } else {
+      ctx2d.textAlign = 'left';
+      ctx2d.fillText(value, box.x, box.y + box.h / 2);
+    }
+    if ('letterSpacing' in ctx2d) ctx2d.letterSpacing = '0px';
+  }
+
+  /** The notation, rasterised once per frame with its font travelling with it. */
+  let notationImage = null;
+  let notationImageKey = '';
+  async function refreshNotationImage() {
+    const svgEl = notationContainer.querySelector('svg');
+    if (!svgEl) {
+      notationImage = null;
+      notationImageKey = '';
+      return;
+    }
+    // The playhead is stripped out before rasterising, and drawn onto
+    // the canvas directly instead. It moves every frame; the staff
+    // behind it does not, and re-rasterising an SVG 30 times a second
+    // to move one rectangle would cost more than the rest of the frame
+    // put together.
+    const clone = svgEl.cloneNode(true);
+    for (const el of clone.querySelectorAll('.playback-cursor')) el.remove();
+    const markup = new XMLSerializer().serializeToString(clone);
+    const key = String(markup.length) + '|' + (currentKit.name ?? '');
+    if (key === notationImageKey && notationImage) return;
+    const font = await loadBravura();
+    const standalone = NotationEngine.exportSvg(markup, {
+      omitXmlDeclaration: true,
+      ...(font ? { fonts: [{ family: 'Bravura', base64: font, format: 'woff2' }] } : {}),
+    });
+    const blob = new Blob([standalone], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      notationImage = img;
+      notationImageKey = key;
+    } catch (err) {
+      notationImage = null;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  /**
+   * The playhead capsule, straight onto the canvas.
+   *
+   * Its rectangle is in the SVG's user units, so it is mapped through
+   * the viewBox to the box the SVG actually occupies -- which is how
+   * the browser is drawing it, and therefore lands in the same place.
+   */
+  function drawCursor(ctx2d, svgEl, svgBox) {
+    if (!svgEl || !cursorLine || cursorLine.style.display === 'none') return;
+    const viewBox = (svgEl.getAttribute('viewBox') || '').split(/\s+/).map(Number);
+    if (viewBox.length !== 4 || !(viewBox[2] > 0) || !(viewBox[3] > 0)) return;
+    const perUnitX = svgBox.w / viewBox[2];
+    const perUnitY = svgBox.h / viewBox[3];
+    const x = svgBox.x + (Number(cursorLine.getAttribute('x')) - viewBox[0]) * perUnitX;
+    const y = svgBox.y + (Number(cursorLine.getAttribute('y')) - viewBox[1]) * perUnitY;
+    const w = Number(cursorLine.getAttribute('width')) * perUnitX;
+    const h = Number(cursorLine.getAttribute('height')) * perUnitY;
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !(w > 0) || !(h > 0)) return;
+    ctx2d.strokeStyle = CURSOR_COLOR;
+    ctx2d.lineWidth = CURSOR_STROKE * perUnitX;
+    roundRectPath(ctx2d, x, y, w, h, (CURSOR_WIDTH / 2) * perUnitX);
+    ctx2d.stroke();
+  }
+
+  /**
+   * The whole frame, in the browser's own paint order: the frame's
+   * background, then its in-flow content, then the absolutely
+   * positioned hit layer on top -- which is where the browser puts it,
+   * and why a lit R2 photo sits over the notation rather than under it.
+   */
+  function drawDrumFrame(ctx2d, canvas) {
+    const frameRect = videoFrame.getBoundingClientRect();
+    if (!(frameRect.width > 0)) return;
+    const scale = canvas.width / frameRect.width;
+    const cs = getComputedStyle(videoFrame);
+
+    ctx2d.fillStyle = cs.backgroundColor;
+    ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+
+    // The kit photo, painted as `cover` exactly as the CSS does.
+    if (kitBackgroundImage && kitBackgroundImage.complete && kitBackgroundImage.naturalWidth > 0) {
+      const fit = coverRect(
+        kitBackgroundImage.naturalWidth,
+        kitBackgroundImage.naturalHeight,
+        canvas.width,
+        canvas.height,
+      );
+      ctx2d.drawImage(kitBackgroundImage, fit.x, fit.y, fit.w, fit.h);
+    }
+
+    // The notation, clipped to its container.
+    //
+    // The staff is wider than the frame and the container scrolls it,
+    // so the image is drawn at the SVG's own live position -- which is
+    // off to the left once the cursor has moved along -- and then cut
+    // to the container's box, exactly as `overflow` cuts it on screen.
+    // Without the clip the far end of the piece would be painted
+    // across the stat boxes.
+    if (notationImage) {
+      const box = rectIn(notationContainer, frameRect, scale);
+      const svgEl = notationContainer.querySelector('svg');
+      ctx2d.save();
+      ctx2d.beginPath();
+      ctx2d.rect(box.x, box.y, box.w, box.h);
+      ctx2d.clip();
+      const at = svgEl ? rectIn(svgEl, frameRect, scale) : box;
+      ctx2d.drawImage(notationImage, at.x, at.y, at.w, at.h);
+      drawCursor(ctx2d, svgEl, at);
+      ctx2d.restore();
+    }
+
+    // The stand-in mark, while no kit photo has loaded.
+    const placeholder = document.querySelector('.drum-circle');
+    if (placeholder && isVisible(placeholder) && placeholder.complete) {
+      const box = rectIn(placeholder, frameRect, scale);
+      ctx2d.drawImage(placeholder, box.x, box.y, box.w, box.h);
+    }
+
+    // The logo.
+    const mark = document.querySelector('.video-logo-mark');
+    if (mark && isVisible(mark) && mark.complete) {
+      const box = rectIn(mark, frameRect, scale);
+      ctx2d.drawImage(mark, box.x, box.y, box.w, box.h);
+    }
+
+    // Titles.
+    for (const el of videoFrame.querySelectorAll('.video-title')) {
+      drawTextEl(ctx2d, el, frameRect, scale);
+    }
+
+    // Stat boxes: their border, then each line of text at its own box.
+    for (const box of videoFrame.querySelectorAll('.stat-box')) {
+      if (!isVisible(box)) continue;
+      const style = getComputedStyle(box);
+      const r = rectIn(box, frameRect, scale);
+      if (style.backgroundColor && style.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+        ctx2d.fillStyle = style.backgroundColor;
+        roundRectPath(ctx2d, r.x, r.y, r.w, r.h, parseFloat(style.borderRadius) * scale);
+        ctx2d.fill();
+      }
+      const border = parseFloat(style.borderTopWidth) * scale;
+      if (border > 0) {
+        ctx2d.strokeStyle = style.borderTopColor;
+        ctx2d.lineWidth = border;
+        roundRectPath(
+          ctx2d,
+          r.x + border / 2,
+          r.y + border / 2,
+          r.w - border,
+          r.h - border,
+          parseFloat(style.borderRadius) * scale,
+        );
+        ctx2d.stroke();
+      }
+      for (const line of box.querySelectorAll('span')) drawTextEl(ctx2d, line, frameRect, scale);
+    }
+
+    // The lit hit photos, last -- the hit layer is positioned, so the
+    // browser paints it above everything in flow.
+    for (const img of hitLayer.children) {
+      if (!img.classList.contains('lit') || !img.complete || img.naturalWidth === 0) continue;
+      const fit = coverRect(img.naturalWidth, img.naturalHeight, canvas.width, canvas.height);
+      ctx2d.drawImage(img, fit.x, fit.y, fit.w, fit.h);
+    }
+  }
+
+  function setGenerating(on) {
+    generateBtn.disabled = on;
+    generateBtn.textContent = on ? 'Generating…' : 'Generate Video';
+    genProgress.hidden = !on;
+    costLine.hidden = on;
+    if (on) {
+      downloadBtn.hidden = true;
+      genFill.style.width = '0%';
+    } else {
+      setTimeout(refreshGenerateBtn, 0);
+    }
+  }
+
+  function refreshGenerateBtn() {
+    if (recording) return;
+    const ready = Boolean(audioPlayer.src);
+    generateBtn.disabled = !ready;
+    generateBtn.textContent = ready
+      ? 'Generate Video'
+      : 'Generate Video — upload an audio file first';
+  }
+
+  function offerDownload(blob, extension) {
+    if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+    downloadUrl = URL.createObjectURL(blob);
+    downloadName = `drum-${(currentKit.name ?? 'video').replace(/\s+/g, '-').toLowerCase()}.${extension}`;
+    downloadBtn.hidden = false;
+    downloadBtn.textContent = `Download Video (${(blob.size / 1048576).toFixed(1)} MB)`;
+  }
+
+  downloadBtn.addEventListener('click', () => {
+    if (!downloadUrl) return;
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = downloadName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    if (recording) recording.cancel();
+  });
+
+  async function generateVideo() {
+    if (!audioPlayer.src) {
+      setUploadConfirm('Upload an audio file first — it is what the video plays.', false);
+      return;
+    }
+    if (!window.MediaRecorder) {
+      setUploadConfirm('This browser cannot record video. Try Chrome, Edge or Firefox.', false);
+      return;
+    }
+    const mimeType = pickMimeType();
+    if (mimeType === '') {
+      setUploadConfirm('This browser has no video format MediaRecorder can write.', false);
+      return;
+    }
+    const ctx = ensureAudioContext();
+    if (!ctx) {
+      setUploadConfirm('This browser has no Web Audio, so there would be no sound.', false);
+      return;
+    }
+
+    audioPlayer.pause();
+    audioPlayer.currentTime = 0;
+    setGenerating(true);
+    await refreshNotationImage();
+
+    const frameRect = videoFrame.getBoundingClientRect();
+    const canvas = document.createElement('canvas');
+    canvas.width = CAPTURE_WIDTH;
+    canvas.height = Math.round((CAPTURE_WIDTH * frameRect.height) / frameRect.width);
+    const ctx2d = canvas.getContext('2d');
+
+    // Both sources into one recording: the count-in and the announcements
+    // come through the Web Audio graph, the take itself through the
+    // <audio> element, so the mix written is the mix heard.
+    const dest = ctx.createMediaStreamDestination();
+    countGain.connect(dest);
+    measureGain.connect(dest);
+    const source = ensureTakeSource(ctx);
+    if (source) source.connect(dest);
+
+    const stream = canvas.captureStream(CAPTURE_FPS);
+    for (const track of dest.stream.getAudioTracks()) stream.addTrack(track);
+
+    const chunks = [];
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) chunks.push(e.data);
+    };
+
+    let cancelled = false;
+    let frameTimer = null;
+
+    const finish = () => {
+      if (frameTimer !== null) clearInterval(frameTimer);
+      frameTimer = null;
+      try {
+        countGain.disconnect(dest);
+        measureGain.disconnect(dest);
+        if (source) source.disconnect(dest);
+      } catch (err) {
+        /* already disconnected */
+      }
+      for (const track of stream.getTracks()) track.stop();
+      audioPlayer.pause();
+      recording = null;
+      setGenerating(false);
+    };
+
+    recording = {
+      cancel() {
+        cancelled = true;
+        if (recorder.state !== 'inactive') recorder.stop();
+      },
+    };
+
+    const done = new Promise((resolve) => {
+      recorder.onstop = () => {
+        finish();
+        if (cancelled) {
+          setUploadConfirm('Recording cancelled.', false);
+          resolve(null);
+          return;
+        }
+        const extension = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
+        const blob = new Blob(chunks, { type: mimeType });
+        offerDownload(blob, extension);
+        setUploadConfirm(
+          `✓ Video ready — ${canvas.width}×${canvas.height}. Press Download Video to save it.`,
+          true,
+        );
+        resolve(blob);
+      };
+    });
+
+    recorder.start();
+    drawDrumFrame(ctx2d, canvas);
+
+    // A timer, not requestAnimationFrame: frames have to keep being
+    // produced in a background tab, and rAF stops there -- which would
+    // leave a recording that is mostly one frozen image.
+    //
+    // Started BEFORE the count-in, not after it: the count-in is part
+    // of the video, and a canvas nobody draws on records its last frame
+    // over and over -- the counted bar would be a still.
+    let busy = false;
+    let playing = false;
+    frameTimer = setInterval(() => {
+      if (busy || cancelled) return;
+      busy = true;
+      try {
+        drawDrumFrame(ctx2d, canvas);
+        const total = Number.isFinite(audioPlayer.duration) ? audioPlayer.duration : 0;
+        const at = audioPlayer.currentTime;
+        if (!playing) {
+          genLabel.textContent = 'Counting in…';
+        } else {
+          const fraction = total > 0 ? Math.min(1, at / total) : 0;
+          genFill.style.width = `${(fraction * 100).toFixed(1)}%`;
+          genLabel.textContent = `Recording… ${formatTime(at)} / ${formatTime(total)}`;
+          if (total > 0 && audioPlayer.ended && recorder.state !== 'inactive') recorder.stop();
+        }
+      } finally {
+        busy = false;
+      }
+    }, Math.round(1000 / CAPTURE_FPS));
+
+    // The count-in first, so the recording opens the way playback does.
+    const counted = await runCountIn();
+    if (cancelled) return done;
+    if (counted) {
+      playing = true;
+      try {
+        await audioPlayer.play();
+      } catch (err) {
+        playing = false;
+        if (recorder.state !== 'inactive') recorder.stop();
+        setUploadConfirm('The browser refused to start playback, so there is nothing to record.', false);
+        return done;
+      }
+    } else if (recorder.state !== 'inactive') {
+      recorder.stop();
+    }
+
+    audioPlayer.addEventListener(
+      'ended',
+      () => {
+        if (recorder.state !== 'inactive') recorder.stop();
+      },
+      { once: true },
+    );
+
+    await done;
+  }
+
+  generateBtn.addEventListener('click', () => {
+    void generateVideo();
+  });
+  audioPlayer.addEventListener('loadedmetadata', refreshGenerateBtn);
+  refreshGenerateBtn();
 
   scrubBar.addEventListener('click', (e) => {
     const dur = audioPlayer.duration;
