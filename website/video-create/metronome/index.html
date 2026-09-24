@@ -231,8 +231,8 @@
       </div>
       <label for="clickVolume" style="margin-top:10px;">Volume</label>
       <div class="vol-row">
-        <input id="clickVolume" type="range" min="0" max="100" step="1" value="80">
-        <span class="vol-out" id="clickVolumeOut">80%</span>
+        <input id="clickVolume" type="range" min="0" max="100" step="1" value="100">
+        <span class="vol-out" id="clickVolumeOut">100%</span>
       </div>
       <div class="field-hint" id="metroHint">120 BPM, 4/4 until a MIDI file says otherwise. Press play to hear it.</div>
     </div>
@@ -655,6 +655,48 @@
       : `${API_BASE}/assets/shared/${encodeURIComponent('Counts vocal')}/M${beat}.wav`;
   }
 
+  /**
+   * How loud a decoded voice is allowed to peak.
+   *
+   * Just under full scale, so two beats landing together still have
+   * somewhere to go before they clip.
+   */
+  const SAMPLE_PEAK = 0.95;
+
+  /**
+   * Brings a voice up to that peak, in place.
+   *
+   * The files in the bucket are not mastered to any particular level
+   * -- the ones measured here peaked at 0.79, which is 2dB of silence
+   * carried through every mix they appear in, on top of whatever the
+   * volume slider takes off. Lifting each voice to a known peak as it
+   * is decoded means the slider starts from a full-scale sound rather
+   * than from whatever the file happened to be, and it is the same
+   * sound in the preview and in the video, because both read this
+   * cache.
+   *
+   * Only ever applied to a voice, never to a mix: a mix can have two
+   * voices on top of each other, and normalising THAT would pump.
+   */
+  function liftToPeak(buffer) {
+    let peak = 0;
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const data = buffer.getChannelData(c);
+      for (let i = 0; i < data.length; i++) {
+        const level = Math.abs(data[i]);
+        if (level > peak) peak = level;
+      }
+    }
+    if (!(peak > 0)) return buffer;
+    const gain = SAMPLE_PEAK / peak;
+    if (Math.abs(gain - 1) < 0.02) return buffer;
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const data = buffer.getChannelData(c);
+      for (let i = 0; i < data.length; i++) data[i] *= gain;
+    }
+    return buffer;
+  }
+
   function loadSample(key) {
     if (sampleCache.has(key)) return Promise.resolve(sampleCache.get(key));
     const pending = sampleInFlight.get(key);
@@ -666,7 +708,7 @@
       try {
         const res = await fetch(sampleUrl(key));
         if (!res.ok) throw new Error(`sample request failed (${res.status})`);
-        return await ctx.decodeAudioData(await res.arrayBuffer());
+        return liftToPeak(await ctx.decodeAudioData(await res.arrayBuffer()));
       } catch (err) {
         return null;
       }
@@ -1440,7 +1482,26 @@
       osc.start(entry.at);
       osc.stop(entry.at + voice.decay + 0.02);
     }
-    return await offline.startRendering();
+    const mixed = await offline.startRendering();
+    // Two voices landing together can sum past full scale even when
+    // neither does alone. Pulled back only when that happens, and by
+    // exactly enough -- this is a safety rail, not a level control.
+    let peak = 0;
+    for (let c = 0; c < mixed.numberOfChannels; c++) {
+      const data = mixed.getChannelData(c);
+      for (let i = 0; i < data.length; i++) {
+        const level = Math.abs(data[i]);
+        if (level > peak) peak = level;
+      }
+    }
+    if (peak > 0.99) {
+      const gain = 0.99 / peak;
+      for (let c = 0; c < mixed.numberOfChannels; c++) {
+        const data = mixed.getChannelData(c);
+        for (let i = 0; i < data.length; i++) data[i] *= gain;
+      }
+    }
+    return mixed;
   }
 
   async function generateVideo() {
