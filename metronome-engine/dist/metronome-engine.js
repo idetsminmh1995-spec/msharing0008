@@ -179,7 +179,7 @@ var MetronomeDesigns = (() => {
     }
     return units * fontSize;
   }
-  var LOGO_FRACTION = 0.15;
+  var LOGO_FRACTION = 0.2;
   function logoBox(canvas) {
     const size = canvas.short * LOGO_FRACTION;
     const pad = gutter(canvas);

@@ -126,6 +126,38 @@ passes in silence and the hint under card 5 names which; in the
 count-in it falls back to the synthesised click instead, so a count-in
 is always audible.
 
+### Thank You clip: `Thank Video/{aspect}/{kind}/{aspect} {Colour} {Kind}.mp4`
+
+The ending both video pages append to a generated take:
+
+```
+Thank Video/16x9/drum/16x9 Black Drum.mp4
+Thank Video/16x9/drum/16x9 White Drum.mp4
+Thank Video/9x16/metronome/9x16 Black Metronome.mp4
+```
+
+The folder is the aspect and then the instrument in lower case; the
+file name repeats the aspect, then the frame's colour and the
+instrument capitalised. Served at
+`/assets/shared/Thank%20Video/16x9/drum/16x9%20Black%20Drum.mp4`.
+
+Which one a page asks for follows the frame it just recorded: the Drum
+page uses its Video Style radio, and the Metronome page uses whether
+the chosen design's palette is light or dark -- the design owns the
+look there, so a white design should not end on a black card.
+
+**A bucket with only some of them still works.** Each page tries the
+exact match, then the same clip in the other colour, then the drum clip
+of the same shape, and finally `Thank Video/16x9/drum/16x9 Black
+Drum.mp4`. With none of them uploaded the take is written without an
+ending and the message under the button says so, rather than failing.
+
+The clip is downloaded in full BEFORE recording starts -- a download
+landing mid-take shows up as dropped frames -- and played from a blob,
+because a `<video>` streaming from the Worker's origin would taint the
+canvas being recorded and would want Range requests the Worker does not
+answer.
+
 ## Endpoints
 
 - `GET /api/drum-sets` → `{ "drumSets": ["drum1", ...] }`

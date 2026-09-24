@@ -252,6 +252,7 @@
       <div class="gen-line"><span id="genLabel">Recording…</span><button class="btn-ghost" id="cancelBtn" type="button">Cancel</button></div>
     </div>
     <div class="cost-line" id="costLine">Estimated cost: <b>12 points</b> · You have 240</div>
+    <div class="field-hint" id="genNote">Recorded in your browser, in real time. The take opens on a still second, runs for exactly as long as the MIDI, and closes with the Thank You clip from the asset server.</div>
   </div>
 
   <div class="right">
@@ -293,6 +294,8 @@
 
 <script src="../../assets/notation-engine.js"></script>
 <script src="../../assets/metronome-engine.js"></script>
+<!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
+<script src="../../assets/outro-video.js"></script>
 <script>
   // The metronome reads its tempo and time signature from the uploaded
   // MIDI file and clicks along with the uploaded audio. Everything it
@@ -376,6 +379,11 @@
         : FREE_RUN_SECONDS;
     beatGrid = buildBeatGrid(limit);
     showTempoBoxes();
+    // The FRAME too, not only the boxes beside it. A new file means a
+    // new tempo and a new time signature, and the frame is where the
+    // viewer reads them -- it used to keep showing 120 and 4/4 until
+    // something else happened to redraw it.
+    drawFrame();
   }
 
   /**
@@ -610,7 +618,25 @@
   let startedAtCtx = null;
   let pausedAt = 0;
 
+  /**
+   * How long the piece is -- and therefore how long the video is.
+   *
+   * When a MIDI has been read, this is the MIDI's OWN length: the end
+   * of its last note, converted through the same tempo map everything
+   * else here uses. Not the last beat plus a beat, which is what it
+   * used to be and which ran the video past the file it was made from.
+   *
+   * With no file loaded the page is still a usable metronome, and
+   * there is no "end" to read -- the free-running grid's last beat plus
+   * one beat is as good an answer as there is.
+   */
   function duration() {
+    if (hasMidi && songEndTicks > 0 && tempoMap) {
+      return Math.min(
+        FREE_RUN_SECONDS,
+        NotationEngine.tickToSeconds(tempoMap, songEndTicks),
+      );
+    }
     if (beatGrid.length === 0) return 0;
     const last = beatGrid[beatGrid.length - 1];
     const previous = beatGrid[beatGrid.length - 2];
@@ -1016,6 +1042,14 @@
   const CAPTURE_FPS = 30;
   /** 1080p is the most a browser encoder handles comfortably in real time. */
   const MAX_CAPTURE_LONG_SIDE = 1920;
+  /**
+   * A still second before the count starts.
+   *
+   * A video that begins on its first click gives a viewer nothing to
+   * land on; a second of the frame sitting there is what a title card
+   * is for, and it costs one second.
+   */
+  const HOLD_SECONDS = 1;
 
   let recording = null;
   let downloadUrl = null;
@@ -1142,6 +1176,8 @@
     const total = duration();
     let cancelled = false;
     let frameTimer = null;
+    /** Read by `onstop`, which is written before the clip is fetched. */
+    let outroUsed = false;
 
     const finish = () => {
       if (frameTimer !== null) clearInterval(frameTimer);
@@ -1176,44 +1212,143 @@
         const blob = new Blob(chunks, { type: mimeType });
         offerDownload(blob, extension);
         setConfirm(
-          `Video ready — ${formatTime(total)}, ${canvas.width}×${canvas.height}. ` +
-            'Press Download Video to save it.',
+          `Video ready — ${formatTime(total)} of music, ${canvas.width}×${canvas.height}, ` +
+            `opening on a ${HOLD_SECONDS}s still` +
+            (outroUsed ? ' and closing with the Thank You clip' : ' (no Thank You clip in the bucket)') +
+            '. Press Download Video to save it.',
           true,
         );
         resolve(blob);
       };
     });
 
+    // The Thank You clip, fetched before the take rather than during
+    // it: a download that lands mid-recording would show up as dropped
+    // frames in the video it is supposed to be closing.
+    genLabel.textContent = 'Fetching the Thank You clip…';
+    const outro = await loadOutroClip();
+    outroUsed = outro !== null;
+
     recorder.start();
-    // Draw the first frame before the audio starts, so the recording
+    // Draw the first frame before anything starts, so the recording
     // does not open on a blank canvas.
     await drawToCanvas(ctx2d, canvas, 0);
-    startPlayback();
 
     // A timer rather than requestAnimationFrame: frames must keep being
     // produced when the tab is in the background, and rAF stops there --
     // which would leave a recording that is mostly one frozen image.
+    //
+    // The timer draws whatever the phase says; the phases themselves
+    // run as a plain sequence below, which is far easier to follow than
+    // a state machine inside the timer.
+    let phase = 'hold';
     let busy = false;
     frameTimer = setInterval(async () => {
       if (busy || cancelled) return;
       busy = true;
       try {
-        const at = position();
+        if (phase === 'outro' && outro) {
+          OutroVideo.drawCover(ctx2d, canvas, outro.video);
+          genLabel.textContent = 'Thank you…';
+          return;
+        }
+        const at = phase === 'hold' ? 0 : position();
         await drawToCanvas(ctx2d, canvas, at);
+        if (phase === 'hold') {
+          genLabel.textContent = 'Opening…';
+          return;
+        }
         const fraction = total > 0 ? Math.min(1, at / total) : 0;
         genFill.style.width = `${(fraction * 100).toFixed(1)}%`;
         genLabel.textContent = `Recording… ${formatTime(at)} / ${formatTime(total)}`;
-        if (at >= total - 1e-3 && recorder.state !== 'inactive') recorder.stop();
       } finally {
         busy = false;
       }
     }, Math.round(1000 / CAPTURE_FPS));
 
+    const stillGoing = () => !cancelled && recorder.state !== 'inactive';
+    const waitFor = async (test) => {
+      while (stillGoing() && !test()) await new Promise((r) => setTimeout(r, 40));
+    };
+
+    // 1. the still second.
+    const holdUntil = performance.now() + HOLD_SECONDS * 1000;
+    await waitFor(() => performance.now() >= holdUntil);
+
+    // 2. the piece. `running()` going false ends it as surely as the
+    // clock reaching the end: the click pump stops playback itself when
+    // it runs out of beats, and after that `position()` reads 0 again.
+    if (stillGoing()) {
+      phase = 'take';
+      startPlayback();
+      await waitFor(() => !running() || position() >= total - 1e-3);
+      stopPlayback(true);
+    }
+
+    // 3. the Thank You clip.
+    if (stillGoing() && outro) {
+      phase = 'outro';
+      genFill.style.width = '100%';
+      try {
+        OutroVideo.outroSource(ctx, outro.video).connect(dest);
+        outro.video.currentTime = 0;
+        await outro.video.play();
+        await waitFor(() => outro.video.ended);
+      } catch (err) {
+        console.error('The Thank You clip would not play:', err);
+      }
+      outro.video.pause();
+      try {
+        OutroVideo.outroSource(ctx, outro.video).disconnect(dest);
+      } catch (err) {
+        /* already disconnected */
+      }
+    }
+
+    if (recorder.state !== 'inactive') recorder.stop();
     await done;
   }
 
+  /**
+   * The Thank You clip for the frame as it is set up now.
+   *
+   * The colour comes from the DESIGN, because the design owns the look
+   * here -- a light design wants the white ending, not the black one.
+   */
+  async function loadOutroClip() {
+    if (typeof OutroVideo === 'undefined' || typeof MetronomeDesigns === 'undefined') return null;
+    let light = false;
+    try {
+      light = MetronomeDesigns.isLightPalette(
+        MetronomeDesigns.paletteForDesign(designSelect.value),
+      );
+    } catch (err) {
+      /* an unknown design id is a dark one */
+    }
+    try {
+      return await OutroVideo.loadOutro(API_BASE, {
+        aspect: currentAspect(),
+        kind: 'metronome',
+        style: light ? 'white' : 'black',
+      });
+    } catch (err) {
+      console.error('Could not load the Thank You clip:', err);
+      return null;
+    }
+  }
+
   generateBtn.addEventListener('click', () => {
-    void generateVideo();
+    // Not `void`: an async function called and forgotten swallows its
+    // own rejection, and the only sign left is a button that says
+    // "Generating…" for ever. A take that breaks says what broke and
+    // gives the button back.
+    generateVideo().catch((err) => {
+      console.error('Generate failed:', err);
+      if (recording) recording.cancel();
+      setGenerating(false);
+      refreshGenerateBtn();
+      setConfirm(`Generating stopped: ${err && err.message ? err.message : err}`, false);
+    });
   });
 
   /** The button says what it needs, instead of only saying so once clicked. */

@@ -135,7 +135,7 @@ export function advanceWidth(value: string, fontSize: number): number {
  * reserves room for the mark, so a size the two disagreed about would
  * put a design's drawing under the logo.
  */
-export const LOGO_FRACTION = 0.15;
+export const LOGO_FRACTION = 0.2;
 
 /** Where the mark goes. Top-left, always -- see `logo`. */
 export function logoBox(canvas: Canvas): Rect {

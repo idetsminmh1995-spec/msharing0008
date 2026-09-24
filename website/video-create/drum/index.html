@@ -247,7 +247,7 @@
      go wrong. Nothing is clipped -- everything outside the margin box
      is the blank part of the image. */
   .video-logo-mark{
-    --logo-h:80px;
+    --logo-h:104px;
     --logo-w:calc(var(--logo-h) * 1414 / 2000);
     height:var(--logo-h);width:auto;flex-shrink:0;
     margin-top:calc(var(--logo-h) * -329 / 2000);
@@ -276,6 +276,8 @@
      decides which limb plays every note; the R/L under the staff is its
      output. -->
 <script src="../../assets/sticking-engine.js"></script>
+<!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
+<script src="../../assets/outro-video.js"></script>
 </head>
 <body>
 
@@ -489,7 +491,7 @@
       <div class="gen-line"><span id="genLabel">Recording…</span><button class="btn-ghost" id="cancelBtn" type="button">Cancel</button></div>
     </div>
     <div class="cost-line" id="costLine">Estimated cost: <b>18 points</b> · You have 240</div>
-    <div class="field-hint" id="genNote">Recorded in your browser, in real time &mdash; a 3-minute take needs 3 minutes, and the tab has to stay open. The file is a WebM of the frame exactly as you see it, with the count-in and the audio already in it.</div>
+    <div class="field-hint" id="genNote">Recorded in your browser, in real time &mdash; a 3-minute take needs 3 minutes, and the tab has to stay open. The file is a WebM of the frame exactly as you see it: a still second, the count-in, the audio, and the Thank You clip from the asset server at the end.</div>
   </div>
 
   <div class="right">
@@ -2289,6 +2291,14 @@
 
   const CAPTURE_FPS = 30;
   const CAPTURE_WIDTH = 1920;
+  /**
+   * A still second before the count-in starts.
+   *
+   * A video that begins on its first count gives a viewer nothing to
+   * land on; a second of the frame sitting there is what a title card
+   * is for, and it costs one second.
+   */
+  const HOLD_SECONDS = 1;
 
   let recording = null;
   let downloadUrl = null;
@@ -2687,6 +2697,8 @@
 
     let cancelled = false;
     let frameTimer = null;
+    /** Read by `onstop`, which is written before the clip is fetched. */
+    let outroUsed = false;
 
     const finish = () => {
       if (frameTimer !== null) clearInterval(frameTimer);
@@ -2723,12 +2735,30 @@
         const blob = new Blob(chunks, { type: mimeType });
         offerDownload(blob, extension);
         setUploadConfirm(
-          `✓ Video ready — ${canvas.width}×${canvas.height}. Press Download Video to save it.`,
+          `✓ Video ready — ${canvas.width}×${canvas.height}, opening on a ${HOLD_SECONDS}s still` +
+            (outroUsed
+              ? ' and closing with the Thank You clip'
+              : ' (no Thank You clip in the bucket)') +
+            '. Press Download Video to save it.',
           true,
         );
         resolve(blob);
       };
     });
+
+    // The Thank You clip, fetched before the take rather than during
+    // it: a download that lands mid-recording shows up as dropped
+    // frames in the video it is supposed to be closing.
+    genLabel.textContent = 'Fetching the Thank You clip…';
+    const outro =
+      typeof OutroVideo === 'undefined'
+        ? null
+        : await OutroVideo.loadOutro(API_BASE, {
+            aspect: ASPECT,
+            kind: 'drum',
+            style: currentVideoStyle(),
+          }).catch(() => null);
+    outroUsed = outro !== null;
 
     recorder.start();
     drawDrumFrame(ctx2d, canvas);
@@ -2737,61 +2767,105 @@
     // produced in a background tab, and rAF stops there -- which would
     // leave a recording that is mostly one frozen image.
     //
-    // Started BEFORE the count-in, not after it: the count-in is part
-    // of the video, and a canvas nobody draws on records its last frame
-    // over and over -- the counted bar would be a still.
+    // Started before ANY phase, not just before the take: the still
+    // second and the count-in are both part of the video, and a canvas
+    // nobody draws on records its last frame over and over.
+    //
+    // The timer draws whatever the phase says; the phases themselves
+    // run as a plain sequence below, which reads far better than a
+    // state machine inside the timer.
+    let phase = 'hold';
     let busy = false;
-    let playing = false;
     frameTimer = setInterval(() => {
       if (busy || cancelled) return;
       busy = true;
       try {
+        if (phase === 'outro' && outro) {
+          OutroVideo.drawCover(ctx2d, canvas, outro.video);
+          genLabel.textContent = 'Thank you…';
+          return;
+        }
         drawDrumFrame(ctx2d, canvas);
+        if (phase === 'hold') {
+          genLabel.textContent = 'Opening…';
+          return;
+        }
+        if (phase === 'countin') {
+          genLabel.textContent = 'Counting in…';
+          return;
+        }
         const total = Number.isFinite(audioPlayer.duration) ? audioPlayer.duration : 0;
         const at = audioPlayer.currentTime;
-        if (!playing) {
-          genLabel.textContent = 'Counting in…';
-        } else {
-          const fraction = total > 0 ? Math.min(1, at / total) : 0;
-          genFill.style.width = `${(fraction * 100).toFixed(1)}%`;
-          genLabel.textContent = `Recording… ${formatTime(at)} / ${formatTime(total)}`;
-          if (total > 0 && audioPlayer.ended && recorder.state !== 'inactive') recorder.stop();
-        }
+        const fraction = total > 0 ? Math.min(1, at / total) : 0;
+        genFill.style.width = `${(fraction * 100).toFixed(1)}%`;
+        genLabel.textContent = `Recording… ${formatTime(at)} / ${formatTime(total)}`;
       } finally {
         busy = false;
       }
     }, Math.round(1000 / CAPTURE_FPS));
 
-    // The count-in first, so the recording opens the way playback does.
-    const counted = await runCountIn();
-    if (cancelled) return done;
-    if (counted) {
-      playing = true;
+    const stillGoing = () => !cancelled && recorder.state !== 'inactive';
+    const waitFor = async (test) => {
+      while (stillGoing() && !test()) await new Promise((r) => setTimeout(r, 40));
+    };
+
+    // 1. the still second.
+    const holdUntil = performance.now() + HOLD_SECONDS * 1000;
+    await waitFor(() => performance.now() >= holdUntil);
+
+    // 2. the count-in, then the take.
+    let counted = false;
+    if (stillGoing()) {
+      phase = 'countin';
+      counted = await runCountIn();
+    }
+    if (stillGoing() && counted) {
+      phase = 'take';
       try {
         await audioPlayer.play();
+        await waitFor(() => audioPlayer.ended);
       } catch (err) {
-        playing = false;
-        if (recorder.state !== 'inactive') recorder.stop();
         setUploadConfirm('The browser refused to start playback, so there is nothing to record.', false);
+        if (recorder.state !== 'inactive') recorder.stop();
         return done;
       }
-    } else if (recorder.state !== 'inactive') {
-      recorder.stop();
     }
 
-    audioPlayer.addEventListener(
-      'ended',
-      () => {
-        if (recorder.state !== 'inactive') recorder.stop();
-      },
-      { once: true },
-    );
+    // 3. the Thank You clip.
+    if (stillGoing() && outro) {
+      phase = 'outro';
+      genFill.style.width = '100%';
+      try {
+        OutroVideo.outroSource(ctx, outro.video).connect(dest);
+        outro.video.currentTime = 0;
+        await outro.video.play();
+        await waitFor(() => outro.video.ended);
+      } catch (err) {
+        console.error('The Thank You clip would not play:', err);
+      }
+      outro.video.pause();
+      try {
+        OutroVideo.outroSource(ctx, outro.video).disconnect(dest);
+      } catch (err) {
+        /* already disconnected */
+      }
+    }
 
+    if (recorder.state !== 'inactive') recorder.stop();
     await done;
   }
 
   generateBtn.addEventListener('click', () => {
-    void generateVideo();
+    // Not `void`: an async function called and forgotten swallows its
+    // own rejection, and the only sign left is a button that says
+    // "Generating…" for ever. A take that breaks says what broke and
+    // gives the button back.
+    generateVideo().catch((err) => {
+      console.error('Generate failed:', err);
+      if (recording) recording.cancel();
+      setGenerating(false);
+      setUploadConfirm(`Generating stopped: ${err && err.message ? err.message : err}`, false);
+    });
   });
   audioPlayer.addEventListener('loadedmetadata', refreshGenerateBtn);
   refreshGenerateBtn();
