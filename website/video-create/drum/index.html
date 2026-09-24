@@ -1576,10 +1576,10 @@
   let measureGain = null;
   /** name -> AudioBuffer, or null for "asked the server, it hasn't got one". */
   const countSampleCache = new Map();
-  /** measure number -> AudioBuffer, same null-means-absent convention. */
+  /** beat number within the bar -> AudioBuffer, same null-means-absent convention. */
   const measureSampleCache = new Map();
   /**
-   * measure number -> the in-flight request for it.
+   * beat number -> the in-flight request for it.
    *
    * The resolved cache above cannot dedupe on its own: it is only
    * written when a fetch RESOLVES, so two callers arriving while one is
@@ -1722,15 +1722,15 @@
   // written bar number is the one the viewer is looking at.
 
   /**
-   * One measure-announcement sample, decoded and cached. A miss caches
-   * too, so a score longer than the bucket's samples asks once per bar
-   * number rather than once per playback.
+   * One count-voice sample -- `M{beat}.wav` -- decoded and cached. A
+   * miss caches too, so a bar longer than the bucket's samples asks
+   * once per beat number rather than once per playback.
    */
-  function measureSample(measureNumber) {
-    if (measureSampleCache.has(measureNumber)) {
-      return Promise.resolve(measureSampleCache.get(measureNumber));
+  function measureSample(beatNumber) {
+    if (measureSampleCache.has(beatNumber)) {
+      return Promise.resolve(measureSampleCache.get(beatNumber));
     }
-    const pending = measureSampleInFlight.get(measureNumber);
+    const pending = measureSampleInFlight.get(beatNumber);
     if (pending !== undefined) return pending;
 
     const request = (async () => {
@@ -1738,7 +1738,7 @@
       if (!ctx) return null;
       try {
         const res = await fetch(
-          `${API_BASE}/assets/shared/${encodeURIComponent('Counts vocal')}/M${measureNumber}.wav`,
+          `${API_BASE}/assets/shared/${encodeURIComponent('Counts vocal')}/M${beatNumber}.wav`,
         );
         if (!res.ok) throw new Error(`measure voice request failed (${res.status})`);
         return await ctx.decodeAudioData(await res.arrayBuffer());
@@ -1746,42 +1746,75 @@
         return null;
       }
     })().then((buffer) => {
-      measureSampleCache.set(measureNumber, buffer);
-      measureSampleInFlight.delete(measureNumber);
+      measureSampleCache.set(beatNumber, buffer);
+      measureSampleInFlight.delete(beatNumber);
       return buffer;
     });
 
-    measureSampleInFlight.set(measureNumber, request);
+    measureSampleInFlight.set(beatNumber, request);
     return request;
   }
 
   /**
-   * Where every bar starts, in the same seconds the audio element
-   * counts in.
+   * Every BEAT of every bar of the score, in the same seconds the audio
+   * element counts in, each carrying its beat number within the bar.
+   *
+   * The count runs 1, 2, 3, 4 | 1, 2, 3, 4 | ... for the whole piece --
+   * the number is where you are in the BAR, not which bar it is, so a
+   * kit of four samples counts a hundred bars.
    *
    * Straight off the notation engine's performance timeline, so it is
-   * the score's own answer rather than a second guess at it: tempo
-   * changes and repeats are already folded in, and each entry still
-   * carries the WRITTEN measure number to announce.
+   * the score's own answer rather than a second guess at it: repeats
+   * are already unfolded, and each beat's offset inside its bar is
+   * taken through the tempo map, so a tempo change mid-bar moves the
+   * later beats of that bar with it.
    */
-  function measureSchedule() {
+  function countVoiceSchedule() {
     const pb = notationPlayback;
     const entries = pb?.performance?.entries;
-    if (!entries || entries.length === 0) return [];
-    return entries.map((entry) => ({
-      at: entry.startSeconds,
-      measureNumber: entry.measureNumber,
-    }));
+    if (!entries || entries.length === 0 || typeof NotationEngine === 'undefined') return [];
+
+    const out = [];
+    for (const entry of entries) {
+      const sig = pb.timeSignatureByMeasure.get(entry.measureNumber) ?? {
+        numerator: 4,
+        denominator: 4,
+      };
+      // The beat is the time signature's own denominator unit: a 6/8
+      // bar is six eighth-note beats, not six quarters.
+      const fullBeats = Math.max(1, sig.numerator);
+      const ticksPerBeat = (4 / sig.denominator) * TICKS_PER_QUARTER;
+      if (!(ticksPerBeat > 0)) continue;
+
+      const beatsHere = Math.max(1, Math.round(entry.ticks / ticksPerBeat));
+      // A pickup bar is short, and a drummer counts it from the END:
+      // one beat of pickup in 4/4 is beat 4, not beat 1. A full bar
+      // just starts at 1.
+      const firstBeat = beatsHere < fullBeats ? fullBeats - beatsHere + 1 : 1;
+      const barStartSeconds = NotationEngine.tickToSeconds(pb.tempoMap, entry.writtenTick);
+
+      for (let k = 0; k < beatsHere; k++) {
+        const offset =
+          NotationEngine.tickToSeconds(pb.tempoMap, entry.writtenTick + k * ticksPerBeat) -
+          barStartSeconds;
+        out.push({ at: entry.startSeconds + offset, beat: firstBeat + k });
+      }
+    }
+    return out;
   }
 
   // How far ahead of the audio clock announcements are queued, and how
   // often the queue is topped up. The standard Web Audio arrangement: a
   // coarse timer decides WHAT to play, the audio clock decides WHEN, so
-  // a stalled frame cannot make a bar land late.
+  // a stalled frame cannot make a beat land late.
   const MEASURE_LOOKAHEAD_S = 0.75;
   const MEASURE_POLL_MS = 200;
-  /** At most this many samples are fetched for one score. */
-  const MEASURE_PRELOAD_LIMIT = 256;
+  /**
+   * At most this many samples are fetched for one score. Beat numbers,
+   * not bar numbers, so this is "how long is the longest bar" -- 32
+   * covers anything anyone writes.
+   */
+  const MEASURE_PRELOAD_LIMIT = 32;
 
   const measureAnnounce = { timer: null, sources: new Map() };
 
@@ -1807,19 +1840,19 @@
 
   function pumpMeasureAnnouncements() {
     if (!countVoiceEnabled() || audioPlayer.paused || audioCtx === null) return;
-    const schedule = measureSchedule();
+    const schedule = countVoiceSchedule();
     if (schedule.length === 0) return;
 
     const nowAudio = audioPlayer.currentTime;
     const nowCtx = audioCtx.currentTime;
     for (let i = 0; i < schedule.length; i++) {
-      const { at, measureNumber } = schedule[i];
+      const { at, beat } = schedule[i];
       if (at < nowAudio - 0.02 || at >= nowAudio + MEASURE_LOOKAHEAD_S) continue;
       if (measureAnnounce.sources.has(i)) continue;
       // Only what is already decoded. Fetching here would mean waiting,
-      // and a bar announced late is worse than one not announced --
+      // and a beat counted late is worse than one not counted --
       // `preloadMeasureSamples` is what makes sure it is here in time.
-      const buffer = measureSampleCache.get(measureNumber);
+      const buffer = measureSampleCache.get(beat);
       if (!buffer) continue;
       const src = audioCtx.createBufferSource();
       src.buffer = buffer;
@@ -1843,19 +1876,19 @@
   }
 
   /**
-   * Fetches a sample for every bar number the score actually uses,
+   * Fetches a sample for every beat number the score actually uses,
    * before playback rather than during it.
    *
-   * Distinct numbers, not entries: a bar played three times needs one
-   * sample. Fetched a few at a time so a long score does not open a
-   * hundred connections at once, and capped so a pathological file
-   * cannot turn one play into an unbounded number of requests.
+   * Distinct numbers, not beats: a 4/4 piece needs four samples however
+   * many bars long it is. Fetched a few at a time, and capped, so a
+   * pathological file cannot turn one play into an unbounded number of
+   * requests.
    */
   let measurePreloadToken = 0;
   async function preloadMeasureSamples() {
     const token = ++measurePreloadToken;
-    const schedule = measureSchedule();
-    const wanted = [...new Set(schedule.map((m) => m.measureNumber))]
+    const schedule = countVoiceSchedule();
+    const wanted = [...new Set(schedule.map((m) => m.beat))]
       .sort((a, b) => a - b)
       .slice(0, MEASURE_PRELOAD_LIMIT);
     if (wanted.length === 0) return { have: [], missing: [] };
@@ -1872,8 +1905,8 @@
   }
 
   /**
-   * A run of consecutive numbers read as a range, so a hint about 40
-   * bars is one line rather than forty.
+   * A run of consecutive numbers read as a range, so a 12/8 bar's
+   * twelve beats are one line rather than twelve.
    */
   function summariseNumbers(numbers) {
     if (numbers.length === 0) return '';
@@ -2054,27 +2087,21 @@
     const { beatsPerBar, secondsPerBeat } = scoreBeat();
     const total = bars * beatsPerBar;
 
-    // Style A speaks once per BEAT and Style B once per BAR, so the two
-    // load different samples and schedule a different number of them.
-    // Everything else about the count-in -- its length, its tempo, the
-    // COUNT box ticking through it -- is the same either way.
-    const measures = countInStyle() === 'measures';
+    // Both styles count the same beats; they differ only in WHICH
+    // voice says them -- `Voices/1.wav` or `Counts vocal/M1.wav`. Two
+    // sample sets for one job, so everything else about the count-in
+    // is identical either way.
+    const useM = countInStyle() === 'measures';
     const samples = new Map();
-    if (measures) {
-      for (let bar = 1; bar <= bars; bar++) samples.set(bar, await measureSample(bar));
-    } else {
-      for (let i = 1; i <= beatsPerBar; i++) samples.set(String(i), await countSample(String(i)));
+    for (let beat = 1; beat <= beatsPerBar; beat++) {
+      samples.set(beat, useM ? await measureSample(beat) : await countSample(String(beat)));
     }
     const haveSamples = [...samples.values()].some((b) => b !== null);
-    if (measures) {
-      countHint.innerHTML = haveSamples
-        ? "Names the bar at the top of each count-in bar, at the score's own tempo, from <b>Counts vocal/M1.wav</b> in R2."
-        : "No <b>Counts vocal/M1.wav</b> in the bucket, so the count-in falls back to a <b>synthesised count</b> on each beat.";
-    } else {
-      countHint.innerHTML = haveSamples
-        ? "Counted at the score's own tempo and time signature, before the audio starts. Using the <b>Voices</b> samples from R2."
-        : "Counted at the score's own tempo and time signature, before the audio starts. No <b>Voices/1.wav</b> in the bucket, so a <b>synthesised count</b> is used.";
-    }
+    const missingName = useM ? 'Counts vocal/M1.wav' : 'Voices/1.wav';
+    const voiceName = useM ? 'Counts vocal' : 'Voices';
+    countHint.innerHTML = haveSamples
+      ? `Counted at the score's own tempo and time signature, before the audio starts. Using the <b>${voiceName}</b> samples from R2.`
+      : `Counted at the score's own tempo and time signature, before the audio starts. No <b>${missingName}</b> in the bucket, so a <b>synthesised count</b> is used.`;
 
     countIn.running = true;
     playIcon.querySelector('path').setAttribute('d', PAUSE_PATH);
@@ -2086,13 +2113,7 @@
       for (let i = 0; i < total; i++) {
         const at = start + i * secondsPerBeat;
         const isDownbeat = i % beatsPerBar === 0;
-        // Style B has nothing to say on beats 2, 3 and 4 -- it names
-        // the bar, not the beat -- so those beats are left to the
-        // synthesised click, which keeps the count-in a count-in
-        // rather than one word and then silence.
-        const buffer = measures
-          ? (isDownbeat ? samples.get(Math.floor(i / beatsPerBar) + 1) : null)
-          : samples.get(String((i % beatsPerBar) + 1));
+        const buffer = samples.get((i % beatsPerBar) + 1);
         if (buffer) schedulePlayback(ctx, buffer, at);
         else scheduleSynthCount(ctx, at, isDownbeat);
       }
@@ -2133,9 +2154,9 @@
   }
 
   /**
-   * Card 5's own line: which bars actually have a sample.
+   * Card 5's own line: which beats of the bar actually have a sample.
    *
-   * It names the bars it has NO sample for, because that is the thing
+   * It names the ones it has NO sample for, because that is the thing
    * you cannot hear and therefore cannot diagnose from the video.
    */
   async function refreshCountVoice() {
@@ -2144,39 +2165,44 @@
     if (!on) {
       stopMeasureAnnouncements();
       countVoiceHint.innerHTML =
-        'Off. Turn it on to have the bar you are in named at every bar of the ' +
-        'MusicXML file, from <b>Counts vocal/M1.wav</b> in R2.';
+        'Off. Turn it on to count every beat of every bar \u2014 M1, M2, M3, M4 \u2014 ' +
+        'through the whole file, from the shared <b>Counts vocal</b> folder in R2.';
       return;
     }
 
-    if (measureSchedule().length === 0) {
+    if (countVoiceSchedule().length === 0) {
       countVoiceHint.innerHTML =
-        'Names the bar you are in at every bar of the MusicXML file, from ' +
-        '<b>Counts vocal/M1.wav</b> in R2. Load a MusicXML file and it will ' +
-        "follow that score's own bars.";
+        'Counts every beat of every bar \u2014 <b>M1</b> on beat 1, <b>M2</b> on beat 2 ' +
+        "and so on \u2014 through the whole file. Load a MusicXML file and it will follow " +
+        "that score's own bars, time signature and tempo.";
       return;
     }
-    countVoiceHint.textContent = 'Loading bar announcements\u2026';
+    countVoiceHint.textContent = 'Loading the count voice\u2026';
     const { have, missing } = await preloadMeasureSamples();
     if (!countVoiceEnabled()) return;
     if (have.length === 0) {
       countVoiceHint.innerHTML =
-        'No <b>Counts vocal/M1.wav</b> in the bucket, so no bar is announced. ' +
+        'No <b>Counts vocal/M1.wav</b> in the bucket, so nothing is counted. ' +
         'Upload <b>M1.wav</b>, <b>M2.wav</b>\u2026 to the shared <b>Counts vocal</b> folder.';
       return;
     }
+    const bars = new Set(countVoiceSchedule().map((b) => b.at)).size;
     countVoiceHint.innerHTML =
-      `${summariseNumbers(have)} announced at each bar's downbeat, repeats included. ` +
+      `Counting ${summariseNumbers(have)} on every beat of every bar, ${bars} beats ` +
+      'through this score, repeats included. ' +
       (missing.length > 0
-        ? `No sample for ${summariseNumbers(missing)}, so ${missing.length === 1 ? 'that bar passes' : 'those bars pass'} in silence.`
-        : 'Every bar in this score has one.');
+        ? `No sample for ${summariseNumbers(missing)}, so ${missing.length === 1 ? 'that beat passes' : 'those beats pass'} in silence.`
+        : 'Every beat of the bar has one.');
   }
 
   countsVocalSelect.addEventListener('change', () => {
+    // Which samples are actually there is only known once they have
+    // been asked for, which `runCountIn` does on the next play; until
+    // then say which set will be used, not what it found.
     countHint.innerHTML =
       countInStyle() === 'measures'
-        ? "Names the bar at the top of each count-in bar, at the score's own tempo, from <b>Counts vocal/M1.wav</b> in R2."
-        : "Counted at the score's own tempo and time signature, before the audio starts.";
+        ? "Counted at the score's own tempo and time signature, before the audio starts. Using the <b>Counts vocal</b> samples (<b>M1.wav</b>, <b>M2.wav</b>\u2026) from R2."
+        : "Counted at the score's own tempo and time signature, before the audio starts. Using the <b>Voices</b> samples (<b>1.wav</b>, <b>2.wav</b>\u2026) from R2.";
   });
 
   countVoiceOnSelect.addEventListener('change', () => {

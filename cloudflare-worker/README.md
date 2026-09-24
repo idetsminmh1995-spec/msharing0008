@@ -97,29 +97,34 @@ if they are absent**: the page synthesises a count instead and says so
 under the Count-in card, so a missing sample is never silence you have
 to diagnose.
 
-### Bar announcements: `Counts vocal/M{n}.wav`
+### Count voice: `Counts vocal/M{n}.wav`
 
-Two cards read these. **Count Voice** (card 5) names the bar you are in
-at every bar of the piece, and **Count-in Style B** (card 4) names the
-bar at the top of each count-in bar instead of counting its beats. Both
-come from the same shared area:
+The second voice, and `{n}` is the **beat of the bar** -- not the bar
+number:
 
 ```
 Counts vocal/M1.wav   Counts vocal/M2.wav   Counts vocal/M3.wav   ...
 ```
 
-served at `/assets/shared/Counts%20vocal/M1.wav` — the space in the
+served at `/assets/shared/Counts%20vocal/M1.wav` -- the space in the
 folder name is fine, the Worker decodes each path segment before
 building the R2 key.
 
-The number is the **written** bar number, taken from the score's own
-performance timeline, so a repeated bar 5 is announced as `M5` again on
-the second pass rather than as `M9`, and tempo changes are already
-folded into when it fires. Upload as many as your longest lesson needs;
-a bar with no sample simply passes in silence and the hint under the
-card names which ones those were. In the count-in, a bar with no sample
-falls back to the synthesised click rather than going quiet, so a
-count-in is always audible.
+Two cards read them, and both count beats:
+
+- **Count Voice** (card 5) counts every beat of every bar for the whole
+  piece: `M1 M2 M3 M4 | M1 M2 M3 M4 | ...`. Four samples count a
+  hundred bars, because the number is where you are in the BAR.
+- **Count-in Style B** (card 4) counts the one count-in bar with these
+  instead of the `Voices/` numbers. Same four beats, different voice.
+
+Upload one per beat of your longest bar (`M1`-`M4` covers 4/4, `M1`-`M6`
+covers 6/8, `M1`-`M12` covers 12/8). The beat times come from the
+score's own performance timeline, so repeats are already unfolded and a
+tempo change moves the rest of its bar with it. A beat with no sample
+passes in silence and the hint under card 5 names which; in the
+count-in it falls back to the synthesised click instead, so a count-in
+is always audible.
 
 ## Endpoints
 
