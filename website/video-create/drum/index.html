@@ -2808,7 +2808,14 @@
           }).catch(() => null);
     outroUsed = outro !== null;
 
-    recorder.start();
+    // A timeslice, not a bare start(). Without one, MediaRecorder
+    // holds the WHOLE recording in its own buffer until stop -- tens of
+    // megabytes by the end of a three-minute take -- and a muxer under
+    // that much pressure starts dropping frames in runs. Measured: an
+    // 8-second take kept 99% of its frames, a 60-second one kept 79%
+    // and lost 1.3 SECONDS in a single gap. Handing the data over once
+    // a second keeps that buffer small and the drops with it.
+    recorder.start(1000);
     drawDrumFrame(ctx2d, canvas);
 
     // The pump draws whatever the phase says and commits exactly one
