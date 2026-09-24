@@ -713,7 +713,15 @@
       }
     } catch (err) {
       console.error('Drum kit preview failed to load:', err);
-      setKitStatus(`Could not load "${label}" from the asset server.`, false);
+      setKitStatus(
+        `Could not load "${label}" from the asset server.` +
+          (legacyKitServer
+            ? ' The asset server is still the older version: it lists one folder level,' +
+              ' so it offers drums/{Brand}/ as a kit and finds no photos inside. Deploy the' +
+              ' updated Worker and this becomes Brand + Drum Kit.'
+            : ''),
+        false,
+      );
     }
   }
 
@@ -785,6 +793,18 @@
   /** Every kit the server offers, grouped by brand -- brand -> [{brand, model, path}]. */
   let kitsByBrand = new Map();
 
+  /**
+   * True while the asset server is the one that lists a single level.
+   *
+   * It matters because of what that server does with the NEW bucket:
+   * `drums/MSDrums/MS Drum 1/` makes it answer "MSDrums" -- a brand
+   * offered as if it were a kit, whose manifest is then empty because
+   * the photos are a folder deeper. The dropdowns look wrong and the
+   * load fails, and neither says why. So the page remembers which
+   * server answered and puts the reason in the message.
+   */
+  let legacyKitServer = false;
+
   /** Replaces a select's options. Built as elements, so a folder name with a quote in it cannot break the markup. */
   function fillSelect(select, options) {
     select.innerHTML = '';
@@ -808,7 +828,12 @@
     try {
       const res = await fetch(`${API_BASE}/api/drum-sets`);
       if (!res.ok) throw new Error(`drum-sets request failed (${res.status})`);
-      const kits = readKits(await res.json());
+      const data = await res.json();
+      // No `kits` in the answer means the older Worker, which cannot
+      // see a kit that is two folders down. Remembered so the failure
+      // that follows can name its own cause.
+      legacyKitServer = !Array.isArray(data.kits);
+      const kits = readKits(data);
       if (kits.length === 0) {
         fillSelect(kitBrandSelect, [{ value: '', text: 'No drum kits found' }]);
         fillSelect(kitSelect, [{ value: '', text: 'No drum kits found' }]);

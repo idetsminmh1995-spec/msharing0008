@@ -4,7 +4,10 @@ A thin Cloudflare Worker that proxies the `msharing0008` R2 bucket for the
 Drum MIDI → Video app. The frontend never talks to R2 directly — it only
 calls this Worker, which holds the R2 binding.
 
-Live at: **https://msharing0008.idetsminmh1995.workers.dev**
+Live at: **https://msharing-api.idetsminmh1995.workers.dev** — the URL
+both video pages have as `API_BASE`. In the Cloudflare dashboard that is
+the Worker named **msharing-api**, which is the one to edit; a Worker of
+another name may answer on its own URL, but no page is calling it.
 
 ## R2 bucket layout expected
 
