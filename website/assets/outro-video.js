@@ -82,8 +82,9 @@
       try {
         const res = await fetch(sharedUrl(apiBase, key));
         if (!res.ok) continue;
-        const blob = await res.blob();
-        if (blob.size === 0) continue;
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        if (bytes.length === 0) continue;
+        const blob = new Blob([bytes], { type: res.headers.get('content-type') || 'video/mp4' });
         const video = document.createElement('video');
         video.preload = 'auto';
         video.playsInline = true;
@@ -94,7 +95,28 @@
           setTimeout(resolve, 8000);
         });
         if (!(video.videoWidth > 0)) continue;
-        found = { video, key, seconds: Number.isFinite(video.duration) ? video.duration : 0 };
+        found = {
+          video,
+          key,
+          seconds: Number.isFinite(video.duration) ? video.duration : 0,
+          /**
+           * The clip's own sound, as a buffer.
+           *
+           * A rendered video mixes its audio offline, so the clip
+           * cannot simply be played into a live graph -- its samples
+           * have to be handed over. Decoded from a COPY of the bytes,
+           * because decodeAudioData takes ownership of what it is
+           * given and a second take would find an empty buffer.
+           */
+          async audio(ctx) {
+            try {
+              return await ctx.decodeAudioData(bytes.slice().buffer);
+            } catch (err) {
+              console.error('The Thank You clip has no sound this browser can read:', err);
+              return null;
+            }
+          },
+        };
         break;
       } catch (err) {
         /* try the next candidate */
