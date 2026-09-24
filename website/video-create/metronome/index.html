@@ -58,6 +58,12 @@
   .ratio-pill.active{border-color:var(--red);background:var(--pink);color:var(--red);}
 
   .generate-btn{padding:16px;font-size:15px;}
+  .generate-btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-dark{background:var(--near-black);color:#fff;}
+  .gen-progress{display:flex;flex-direction:column;gap:8px;}
+  .gen-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+  .gen-fill{height:100%;width:0;background:var(--red);border-radius:3px;transition:width .12s linear;}
+  .gen-line{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted);font-weight:600;}
   .cost-line{text-align:center;font-size:12px;color:var(--muted);}
   .cost-line b{color:var(--red);font-weight:700;}
 
@@ -239,8 +245,13 @@
       <div class="field-hint">The frame's colours belong to the Design, not to a switch &mdash; picking design 6 is picking white-and-red the same way it is picking a big number.</div>
     </div>
 
-    <button class="btn btn-red generate-btn">Generate Video</button>
-    <div class="cost-line">Estimated cost: <b>12 points</b> · You have 240</div>
+    <button class="btn btn-red generate-btn" id="generateBtn">Generate Video</button>
+    <button class="btn btn-dark generate-btn" id="downloadBtn" hidden>Download Video</button>
+    <div class="gen-progress" id="genProgress" hidden>
+      <div class="gen-bar"><div class="gen-fill" id="genFill"></div></div>
+      <div class="gen-line"><span id="genLabel">Recording…</span><button class="btn-ghost" id="cancelBtn" type="button">Cancel</button></div>
+    </div>
+    <div class="cost-line" id="costLine">Estimated cost: <b>12 points</b> · You have 240</div>
   </div>
 
   <div class="right">
@@ -341,6 +352,15 @@
    * still a usable metronome rather than silent.
    */
   let songEndTicks = 0;
+  /**
+   * Whether a MIDI file has actually been read.
+   *
+   * NOT the same as "the beat grid has entries": the page builds a
+   * default 4/4-at-120 grid so it is a usable metronome before anything
+   * is uploaded, and that grid runs to FREE_RUN_SECONDS. Generating
+   * against it would record ten minutes of a file nobody chose.
+   */
+  let hasMidi = false;
   let tempoMap = null;
   /** [{at, beat, beatsPerBar, bar}] -- every beat of the piece, in seconds. */
   let beatGrid = [];
@@ -801,6 +821,7 @@
         const result = NotationEngine.parseMidiFile(new Uint8Array(reader.result));
         if (result.midiFile === undefined) {
           const reason = result.diagnostics[0]?.message ?? 'Unknown error.';
+          hasMidi = false;
           setConfirm(`Could not read "${file.name}": ${reason}`, false);
           return;
         }
@@ -814,6 +835,7 @@
           result.midiFile.timeSignatureEvents.length > 0
             ? [...result.midiFile.timeSignatureEvents].sort((a, b) => a.tick - b.tick)
             : DEFAULT_TIME_SIGNATURES;
+        hasMidi = true;
         songEndTicks = 0;
         for (const track of result.midiFile.tracks) {
           for (const note of track.notes) {
@@ -834,8 +856,10 @@
           true,
         );
         loadVoices();
+        refreshGenerateBtn();
       } catch (err) {
         console.error('MIDI parse failed:', err);
+        hasMidi = false;
         setConfirm(`Could not read "${file.name}" as a MIDI file.`, false);
       }
     };
@@ -876,10 +900,38 @@
   let frameLogoUrl = BUILT_IN_LOGO;
   let chosenLogoUrl = null;
 
+  /**
+   * The same image as a data URI.
+   *
+   * An SVG drawn into a canvas is rendered in an isolated context that
+   * does not fetch anything external, so an `<image href="...">`
+   * pointing at a file or a blob URL comes out BLANK in the recording.
+   * A data URI is part of the document, so it survives.
+   */
+  let frameLogoDataUrl = undefined;
+  async function toDataUrl(url) {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (err) {
+      return undefined;
+    }
+  }
+
   function showLogo(url, name) {
     if (chosenLogoUrl) URL.revokeObjectURL(chosenLogoUrl);
     chosenLogoUrl = url;
     frameLogoUrl = url ?? BUILT_IN_LOGO;
+    frameLogoDataUrl = undefined;
+    void toDataUrl(frameLogoUrl).then((data) => {
+      frameLogoDataUrl = data;
+    });
     logoPreview.innerHTML = '';
     const img = document.createElement('img');
     img.src = frameLogoUrl;
@@ -943,7 +995,236 @@
     });
   }
 
+  // --- Generate Video ----------------------------------------------------
+  // Recorded in the browser: the same designs that draw the preview are
+  // rasterised into a canvas while the same voices that play the preview
+  // are routed into the recording. There is no server step, so what you
+  // watched is literally what gets written.
+  //
+  // MediaRecorder records in REAL TIME -- a three-minute piece takes
+  // three minutes. That is the trade for having no encoder to ship and
+  // no upload; the progress bar says how far along it is and Cancel
+  // stops it.
+  const generateBtn = document.getElementById('generateBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const genProgress = document.getElementById('genProgress');
+  const genFill = document.getElementById('genFill');
+  const genLabel = document.getElementById('genLabel');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const costLine = document.getElementById('costLine');
+
+  const CAPTURE_FPS = 30;
+  /** 1080p is the most a browser encoder handles comfortably in real time. */
+  const MAX_CAPTURE_LONG_SIDE = 1920;
+
+  let recording = null;
+  let downloadUrl = null;
+  let downloadName = 'metronome.webm';
+
+  /** The best container this browser will actually record. */
+  function pickMimeType() {
+    const wanted = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm',
+      'video/mp4',
+    ];
+    for (const type of wanted) {
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported(type)) return type;
+    }
+    return '';
+  }
+
+  /** One frame of the chosen design, rasterised into the canvas. */
+  async function drawToCanvas(ctx2d, canvas, at) {
+    const svg = MetronomeDesigns.renderMetronomeFrame({
+      design: designSelect.value,
+      aspect: currentAspect(),
+      frame: frameState(at),
+      title: 'Metronome',
+      // The data URI, not the page's own URL -- see `toDataUrl`.
+      logoUrl: frameLogoDataUrl,
+    });
+    const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      ctx2d.drawImage(img, 0, 0, canvas.width, canvas.height);
+    } catch (err) {
+      /* a frame that will not rasterise is one dropped frame, not a failed take */
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  function setGenerating(on) {
+    generateBtn.disabled = on;
+    generateBtn.textContent = on ? 'Generating…' : 'Generate Video';
+    genProgress.hidden = !on;
+    costLine.hidden = on;
+    if (on) {
+      downloadBtn.hidden = true;
+      genFill.style.width = '0%';
+    }
+  }
+
+  function offerDownload(blob, extension) {
+    if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+    downloadUrl = URL.createObjectURL(blob);
+    downloadName = `metronome-${designSelect.value}-${currentAspect()}.${extension}`;
+    downloadBtn.hidden = false;
+    downloadBtn.textContent = `Download Video (${(blob.size / 1048576).toFixed(1)} MB)`;
+  }
+
+  downloadBtn.addEventListener('click', () => {
+    if (!downloadUrl) return;
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = downloadName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    if (recording) recording.cancel();
+  });
+
+  async function generateVideo() {
+    if (typeof MetronomeDesigns === 'undefined') return;
+    if (beatGrid.length === 0) {
+      setConfirm('Upload a MIDI file first — it is what the video is made from.', false);
+      return;
+    }
+    if (!window.MediaRecorder) {
+      setConfirm('This browser cannot record video. Try Chrome, Edge or Firefox.', false);
+      return;
+    }
+    const mimeType = pickMimeType();
+    if (mimeType === '') {
+      setConfirm('This browser has no video format MediaRecorder can write.', false);
+      return;
+    }
+    const ctx = ensureAudioContext();
+    if (!ctx) {
+      setConfirm('This browser has no Web Audio, so there would be no sound.', false);
+      return;
+    }
+
+    stopPlayback(true);
+    setGenerating(true);
+
+    // The canvas is the design's own canvas, capped so a 1080p encode
+    // stays inside what a browser can do in real time.
+    const shape = MetronomeDesigns.canvasFor(currentAspect());
+    const scale = Math.min(1, MAX_CAPTURE_LONG_SIDE / Math.max(shape.width, shape.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(shape.width * scale);
+    canvas.height = Math.round(shape.height * scale);
+    const ctx2d = canvas.getContext('2d');
+
+    // The recording's audio is the SAME gain node the preview plays
+    // through, so the mix you heard is the mix that is written.
+    const dest = ctx.createMediaStreamDestination();
+    clickGain.connect(dest);
+
+    const stream = canvas.captureStream(CAPTURE_FPS);
+    for (const track of dest.stream.getAudioTracks()) stream.addTrack(track);
+
+    const chunks = [];
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 });
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) chunks.push(e.data);
+    };
+
+    const total = duration();
+    let cancelled = false;
+    let frameTimer = null;
+
+    const finish = () => {
+      if (frameTimer !== null) clearInterval(frameTimer);
+      frameTimer = null;
+      try {
+        clickGain.disconnect(dest);
+      } catch (err) {
+        /* already disconnected */
+      }
+      for (const track of stream.getTracks()) track.stop();
+      stopPlayback(true);
+      recording = null;
+      setGenerating(false);
+    };
+
+    recording = {
+      cancel() {
+        cancelled = true;
+        if (recorder.state !== 'inactive') recorder.stop();
+      },
+    };
+
+    const done = new Promise((resolve) => {
+      recorder.onstop = () => {
+        finish();
+        if (cancelled) {
+          setConfirm('Recording cancelled.', false);
+          resolve(null);
+          return;
+        }
+        const extension = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
+        const blob = new Blob(chunks, { type: mimeType });
+        offerDownload(blob, extension);
+        setConfirm(
+          `Video ready — ${formatTime(total)}, ${canvas.width}×${canvas.height}. ` +
+            'Press Download Video to save it.',
+          true,
+        );
+        resolve(blob);
+      };
+    });
+
+    recorder.start();
+    // Draw the first frame before the audio starts, so the recording
+    // does not open on a blank canvas.
+    await drawToCanvas(ctx2d, canvas, 0);
+    startPlayback();
+
+    // A timer rather than requestAnimationFrame: frames must keep being
+    // produced when the tab is in the background, and rAF stops there --
+    // which would leave a recording that is mostly one frozen image.
+    let busy = false;
+    frameTimer = setInterval(async () => {
+      if (busy || cancelled) return;
+      busy = true;
+      try {
+        const at = position();
+        await drawToCanvas(ctx2d, canvas, at);
+        const fraction = total > 0 ? Math.min(1, at / total) : 0;
+        genFill.style.width = `${(fraction * 100).toFixed(1)}%`;
+        genLabel.textContent = `Recording… ${formatTime(at)} / ${formatTime(total)}`;
+        if (at >= total - 1e-3 && recorder.state !== 'inactive') recorder.stop();
+      } finally {
+        busy = false;
+      }
+    }, Math.round(1000 / CAPTURE_FPS));
+
+    await done;
+  }
+
+  generateBtn.addEventListener('click', () => {
+    void generateVideo();
+  });
+
+  /** The button says what it needs, instead of only saying so once clicked. */
+  function refreshGenerateBtn() {
+    if (recording) return;
+    generateBtn.disabled = !hasMidi;
+    generateBtn.textContent = hasMidi ? 'Generate Video' : 'Generate Video \u2014 upload a MIDI first';
+  }
+
   fillDesigns();
+  refreshGenerateBtn();
   showLogo(null, '');
   rebuildClock();
   updateDisplay();
