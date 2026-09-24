@@ -1,0 +1,247 @@
+/**
+ * stage.ts — the notes falling, and the keyboard they fall onto.
+ *
+ * A frame is described ONCE, as a list of rectangles (`stageShapes`),
+ * and then written out however the caller draws: as SVG for a page, or
+ * painted onto a canvas for a video, where rasterising an SVG thirty
+ * times a second would cost more than the rest of the frame together.
+ * Neither renderer decides what a frame looks like, so neither can
+ * drift from the other.
+ */
+import { keyboardGeometry, pressedAt } from './keyboard.js';
+import { n, rect, wrap } from './svg.js';
+import type {
+  FallingBar,
+  Hand,
+  PianoColors,
+  PianoKey,
+  PianoNote,
+  PianoStageOptions,
+  StageShape,
+} from './types.js';
+
+export const DEFAULT_COLORS: PianoColors = {
+  whiteKey: '#F7F4F0',
+  blackKey: '#141010',
+  keyEdge: '#2A2320',
+  strikeLine: '#C81E2C',
+  leftHand: '#FFC400',
+  rightHand: '#4FA3FF',
+  background: 'none',
+};
+
+/** A note falls for this long before it is played, unless the caller says otherwise. */
+export const DEFAULT_LEAD_SECONDS = 2.5;
+
+/** How tall the keyboard is when nothing says: a third of the stage. */
+const KEYBOARD_FRACTION = 1 / 3;
+/** The strike line's thickness, as a fraction of the keyboard's height. */
+const LINE_FRACTION = 0.05;
+
+export function resolveColors(colors?: Partial<PianoColors>): PianoColors {
+  return { ...DEFAULT_COLORS, ...(colors ?? {}) };
+}
+
+export function keyboardBox(options: { width: number; height: number; keyboardHeight?: number }): {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} {
+  const height =
+    options.keyboardHeight !== undefined && options.keyboardHeight > 0
+      ? Math.min(options.keyboardHeight, options.height)
+      : options.height * KEYBOARD_FRACTION;
+  return { x: 0, y: options.height - height, width: options.width, height };
+}
+
+/**
+ * The bars on their way down, at one moment.
+ *
+ * A note's y is its distance from the strike line in TIME, scaled by
+ * how long the fall takes: a note due in one second, on a 2.5 second
+ * fall, sits 40% of the way down. Long notes are long bars, because
+ * the bar's height is its duration through the same scale -- which is
+ * what makes a held chord read as held rather than as a row of dots.
+ *
+ * Anything already past the line, or not yet risen above the top, is
+ * dropped here rather than drawn off-stage.
+ */
+export function fallingBars(
+  notes: readonly PianoNote[],
+  options: {
+    size: PianoStageOptions['size'];
+    width: number;
+    height: number;
+    seconds: number;
+    leadSeconds?: number;
+    keyboardHeight?: number;
+  },
+): readonly FallingBar[] {
+  const lead =
+    options.leadSeconds !== undefined && options.leadSeconds > 0
+      ? options.leadSeconds
+      : DEFAULT_LEAD_SECONDS;
+  const board = keyboardBox(options);
+  const fallHeight = board.y;
+  if (!(fallHeight > 0)) return [];
+  const perSecond = fallHeight / lead;
+
+  const keys = keyboardGeometry(options.size, {
+    width: options.width,
+    height: board.height,
+  });
+  const keyByMidi = new Map<number, PianoKey>();
+  for (const key of keys) keyByMidi.set(key.midi, key);
+
+  const bars: FallingBar[] = [];
+  for (const note of notes) {
+    const untilStart = note.startSeconds - options.seconds;
+    if (untilStart > lead) continue; // still above the stage
+    if (note.endSeconds <= options.seconds) continue; // already played
+    const key = keyByMidi.get(note.midi);
+    if (key === undefined) continue; // outside this keyboard
+
+    const bottom = board.y - untilStart * perSecond;
+    const top = board.y - (note.endSeconds - options.seconds) * perSecond;
+    const clippedTop = Math.max(0, top);
+    const clippedBottom = Math.min(board.y, bottom);
+    const height = clippedBottom - clippedTop;
+    if (!(height > 0)) continue;
+
+    bars.push({
+      midi: note.midi,
+      hand: note.hand,
+      x: key.x,
+      y: clippedTop,
+      width: key.width,
+      height,
+    });
+  }
+  return bars;
+}
+
+export function handColor(hand: Hand, colors: PianoColors): string {
+  return hand === 'left' ? colors.leftHand : colors.rightHand;
+}
+
+/**
+ * A whole frame as a list of rectangles, in paint order.
+ *
+ * Everything that decides what the stage LOOKS like is here: which
+ * colour a key is, what goes over what, where the line sits. Both
+ * renderers just write these out.
+ */
+export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
+  const colors = resolveColors(options.colors);
+  const notes = options.notes ?? [];
+  const board = keyboardBox(options);
+  const keys = keyboardGeometry(options.size, board);
+  const down = pressedAt(notes, options.seconds);
+  const lineHeight = Math.max(1, board.height * LINE_FRACTION);
+  const edge = Math.max(0.5, board.width / 900);
+
+  const shapes: StageShape[] = [];
+  if (colors.background !== 'none') {
+    shapes.push({
+      x: 0,
+      y: 0,
+      width: options.width,
+      height: options.height,
+      fill: colors.background,
+    });
+  }
+
+  // The falling notes go UNDER the keyboard: a bar that has landed
+  // should look like it went into the key, not over it.
+  for (const bar of fallingBars(notes, options)) {
+    shapes.push({
+      x: bar.x,
+      y: bar.y,
+      width: bar.width,
+      height: bar.height,
+      fill: handColor(bar.hand, colors),
+      radius: Math.min(bar.width, bar.height) / 4,
+    });
+  }
+
+  const fillFor = (key: PianoKey): string => {
+    const hand = down.get(key.midi);
+    if (hand !== undefined) return handColor(hand, colors);
+    return key.black ? colors.blackKey : colors.whiteKey;
+  };
+
+  // Whites, then blacks over them -- the order a piano is built in,
+  // and the reason a black key is not cut in half by its neighbour.
+  for (const key of keys) {
+    if (key.black) continue;
+    shapes.push({
+      x: key.x,
+      y: key.y,
+      width: key.width,
+      height: key.height,
+      fill: fillFor(key),
+      stroke: colors.keyEdge,
+      strokeWidth: edge,
+    });
+  }
+  for (const key of keys) {
+    if (!key.black) continue;
+    shapes.push({
+      x: key.x,
+      y: key.y,
+      width: key.width,
+      height: key.height,
+      fill: fillFor(key),
+    });
+  }
+
+  // The line the notes land on, last, so no key covers it.
+  shapes.push({
+    x: 0,
+    y: board.y - lineHeight / 2,
+    width: options.width,
+    height: lineHeight,
+    fill: colors.strikeLine,
+  });
+  return shapes;
+}
+
+function shapesToSvg(shapes: readonly StageShape[], width: number, height: number): string {
+  const body = shapes
+    .map((shape) =>
+      rect(shape.x, shape.y, shape.width, shape.height, {
+        fill: shape.fill,
+        ...(shape.stroke !== undefined ? { stroke: shape.stroke } : {}),
+        ...(shape.strokeWidth !== undefined ? { 'stroke-width': shape.strokeWidth } : {}),
+        ...(shape.radius !== undefined && shape.radius > 0 ? { rx: shape.radius } : {}),
+      }),
+    )
+    .join('');
+  return wrap(
+    'svg',
+    {
+      xmlns: 'http://www.w3.org/2000/svg',
+      viewBox: `0 0 ${n(width)} ${n(height)}`,
+      width,
+      height,
+      preserveAspectRatio: 'none',
+    },
+    body,
+  );
+}
+
+/**
+ * The whole stage at one moment: falling bars, keyboard, lit keys.
+ *
+ * One string, no DOM, no state -- which is what a preview, a test and
+ * an export all want from the same call.
+ */
+export function renderPianoStage(options: PianoStageOptions): string {
+  return shapesToSvg(stageShapes(options), options.width, options.height);
+}
+
+/** The keyboard with nothing played: the same drawing, no notes. */
+export function renderKeyboardSvg(options: Omit<PianoStageOptions, 'seconds' | 'notes'>): string {
+  return renderPianoStage({ ...options, seconds: 0, notes: [] });
+}

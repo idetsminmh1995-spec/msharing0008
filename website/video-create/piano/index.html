@@ -175,26 +175,25 @@
   /* A downbeat is the one the reader is counting FROM, so it is the one
      that gets the brand colour rather than a size change alone. */
   .stat-box.on-downbeat{border-color:var(--red);background:rgba(200,30,44,.16);}
-  .video-mid{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;}
-  /* The mark in the middle of the frame: the real logo, not a generic
-     piano outline. Until the finger engine draws a keyboard here, this
-     is what the frame's middle IS, so it may as well be the brand.
-
-     `height` only: the artwork is almost exactly centred in its own
-     file (its ink spans rows 329..1648 of 2000 and columns 151..1257
-     of 1414, both within half a percent of centre), so unlike the
-     header mark this one needs no margin correction to sit in the
-     middle of the frame. */
-  /* `max-height` so the staff always wins: a taller staff leaves the
-     mark less room, and a mark that overflowed would be cut off by the
-     frame rather than simply sitting smaller. */
-  .brand-mark{height:150px;max-height:100%;width:auto;display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,.45));}
-  .video-frame.style-white .brand-mark{filter:none;}
+  .video-mid{flex:1;display:flex;align-items:center;justify-content:center;min-height:34%;}
+  /* The keyboard fills whatever the notation leaves: `min-height:0`
+     on .video-mid lets it shrink, and the SVG stretches to the box it
+     is given rather than keeping the keyboard's own ratio -- a
+     keyboard is a picture of a thing that is 1.2m wide, and a frame
+     is what it has to fit in. */
+  .piano-stage{width:100%;height:100%;min-height:0;}
+  .piano-stage svg{display:block;width:100%;height:100%;}
   /* The strip still SCROLLS -- the cursor drives `scrollLeft` to keep
      itself in view -- it just doesn't draw a scrollbar. The bar and its
      two arrows are browser chrome, and this strip is a preview of a
      VIDEO frame: nothing in the exported video has a scrollbar in it. */
-  .video-notation{padding:0 20px 14px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;flex-shrink:0;scrollbar-width:none;-ms-overflow-style:none;}
+  /* `max-height` and a staff that may shrink, because the frame is
+     not always as big as this screen: in a narrow window the notation
+     at its full height would take the whole frame and squeeze the
+     keyboard out of it -- and the exported video is laid out from
+     THIS box, so a keyboard missing here is a keyboard missing in the
+     file. The notation gives way; the keyboard keeps its share. */
+  .video-notation{padding:0 20px 14px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;max-height:52%;flex-shrink:1;scrollbar-width:none;-ms-overflow-style:none;}
   .video-notation::-webkit-scrollbar{display:none;width:0;height:0;}
   /* How tall the staff is drawn, and therefore how big the notes
      are: the SVG keeps its own ratio, so height is the only dial.
@@ -206,7 +205,7 @@
      photo under the staff, only the brand mark, so the middle of the
      frame was empty space. */
   :root{--notation-height:225px;}
-  .video-notation svg{display:block;height:var(--notation-height);width:auto;max-width:none;}
+  .video-notation svg{display:block;height:var(--notation-height);max-height:100%;width:auto;max-width:none;}
   /* Video Style (card 5) is a property of the whole FRAME, not of the
      notation strip. The strip itself is never painted -- and neither is
      the notation, which the engine draws with
@@ -273,6 +272,9 @@
 </style>
 <!-- The real Notation Engine bundle (github.com/idetsminmh1995-spec/msharing0008/notation-engine) -->
 <script src="../../assets/notation-engine.js"></script>
+<!-- The piano stage: the keyboard, and the notes falling onto it.
+     piano-engine/, TypeScript + SVG, built to this bundle. -->
+<script src="../../assets/piano-engine.js"></script>
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
 <script src="../../assets/outro-video.js"></script>
 <!-- The video engine: renders frames rather than recording them. -->
@@ -369,7 +371,41 @@
     </div>
 
     <div class="card">
-      <div class="card-head"><span class="card-num">3</span>Count-in</div>
+      <div class="card-head"><span class="card-num">3</span>Piano Keyboard</div>
+      <div class="field-row">
+        <div>
+          <label for="keyboardSize">Keys</label>
+          <select id="keyboardSize" class="drum-input">
+            <option value="61">61 Keys</option>
+            <option value="73">73 Keys</option>
+            <option value="76">76 Keys</option>
+            <option value="88" selected>88 Keys</option>
+          </select>
+        </div>
+        <div>
+          <label for="fallSeconds">Fall time</label>
+          <select id="fallSeconds" class="drum-input">
+            <option value="1.5">1.5 s</option>
+            <option value="2.5" selected>2.5 s</option>
+            <option value="4">4 s</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div>
+          <label for="leftHandColor">Left hand</label>
+          <div class="tc-color-row"><input id="leftHandColor" type="color" value="#FFC400"></div>
+        </div>
+        <div>
+          <label for="rightHandColor">Right hand</label>
+          <div class="tc-color-row"><input id="rightHandColor" type="color" value="#4FA3FF"></div>
+        </div>
+      </div>
+      <div class="field-hint" id="keyboardHint">Which hand plays a note comes from the score's own staves &mdash; the upper staff is the right hand, the lower the left. A note outside the keyboard you pick is not drawn, so a 61 shows less of a wide piece than an 88 does.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-num">4</span>Count-in</div>
       <div class="field-row">
         <div>
           <label for="counts-vocal">Style</label>
@@ -399,7 +435,7 @@
     </div>
 
     <div class="card">
-      <div class="card-head"><span class="card-num">4</span>Count Voice</div>
+      <div class="card-head"><span class="card-num">5</span>Count Voice</div>
       <div class="field-row">
         <div>
           <label for="countVoiceOn">Announce bars</label>
@@ -420,7 +456,7 @@
     </div>
 
     <div class="card">
-      <div class="card-head"><span class="card-num">5</span>Beat Display</div>
+      <div class="card-head"><span class="card-num">6</span>Beat Display</div>
       <div class="field-row">
         <div>
           <label for="beat-label">Beat Label</label>
@@ -440,7 +476,7 @@
          a matter of removing `card-off` and wiring the input, not of
          re-cutting the cards around it. -->
     <div class="card card-off" id="logoCard" aria-disabled="true">
-      <div class="card-head"><span class="card-num">6</span>Logo<span class="card-soon">Coming soon</span></div>
+      <div class="card-head"><span class="card-num">7</span>Logo<span class="card-soon">Coming soon</span></div>
       <div class="upload-grid">
         <label class="upload-slot">
           <input id="upload-logo" type="file" accept="image/*" disabled style="display:none;">
@@ -454,7 +490,7 @@
     </div>
 
     <div class="card">
-      <div class="card-head"><span class="card-num">7</span>Video Style</div>
+      <div class="card-head"><span class="card-num">8</span>Video Style</div>
       <div class="radio-row">
         <label><input type="radio" name="vc" id="styleBlack" value="black" checked>Black</label>
         <label><input type="radio" name="vc" id="styleWhite" value="white">White</label>
@@ -508,8 +544,10 @@
       <div class="video-notation" id="notationContainer">
         <span style="font-size:12px;color:var(--muted);">Upload a MusicXML file to preview notation.</span>
       </div>
+      <!-- The middle of the frame IS the piano now: notes falling
+           onto a keyboard, drawn by piano-engine. -->
       <div class="video-mid">
-        <img class="brand-mark" src="../../assets/logo/sharing-piano-logo-full.webp" alt="M Sharing Piano">
+        <div class="piano-stage" id="pianoStage" aria-hidden="true"></div>
       </div>
     </div>
 
@@ -529,6 +567,7 @@
       <div class="engine-label">Engines running for this video</div>
       <div class="engine-pills">
         <span class="engine-pill">Notation Engine</span>
+        <span class="engine-pill">Piano Engine</span>
         <span class="engine-pill">Video Engine</span>
       </div>
     </div>
@@ -763,6 +802,8 @@
     buildKeyTimeline();
     shownKey = null;
     showKey(keyAtTick(0));
+    buildPianoNotes();
+    drawStage(0);
     if (firstAttrs) {
       const timeStr = `${firstAttrs.timeNumerator}/${firstAttrs.timeDenominator}`;
       statTime.textContent = timeStr;
@@ -825,6 +866,11 @@
     attachCursor(svgEl);
     updateCursor();
     buildKeyTimeline();
+    // The re-render built a new playback; the note list is placed
+    // against it, so it is rebuilt rather than left pointing at the old
+    // one's ticks.
+    buildPianoNotes();
+    drawStage();
   }
 
   for (const radio of document.querySelectorAll('input[name="vc"]')) {
@@ -882,6 +928,163 @@
       slot.classList.toggle('active', slot.getAttribute('for') === inputId);
     });
   }
+
+
+  // --- The piano stage (card 3) -------------------------------------
+  // piano-engine/ draws it: a keyboard of 61, 73, 76 or 88 keys, the
+  // notes falling onto it, and a colour per hand. This block is the
+  // BRIDGE and nothing else -- turning a parsed score into notes in
+  // seconds, and handing the engine the box it is drawing into.
+  //
+  // The engine is asked for the same frame twice over, in two forms:
+  // `renderPianoStage` writes SVG for the preview, `stageShapes` hands
+  // back the same rectangles for the canvas the video is rendered on.
+  // Rasterising an SVG thirty times a second would cost more than the
+  // rest of the frame together, and two hand-written drawings would
+  // drift apart.
+  const pianoStage = document.getElementById('pianoStage');
+  const keyboardSizeSelect = document.getElementById('keyboardSize');
+  const fallSecondsSelect = document.getElementById('fallSeconds');
+  const leftHandColorInput = document.getElementById('leftHandColor');
+  const rightHandColorInput = document.getElementById('rightHandColor');
+
+  function keyboardSize() {
+    const value = Number(keyboardSizeSelect?.value);
+    return value === 61 || value === 73 || value === 76 || value === 88 ? value : 88;
+  }
+
+  function fallSeconds() {
+    const value = Number(fallSecondsSelect?.value);
+    return Number.isFinite(value) && value > 0 ? value : 2.5;
+  }
+
+  function stageColors() {
+    return {
+      leftHand: leftHandColorInput?.value || '#FFC400',
+      rightHand: rightHandColorInput?.value || '#4FA3FF',
+    };
+  }
+
+  /** MIDI note number from a parsed pitch: 60 is middle C, which is C4. */
+  const STEP_SEMITONES = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  function midiOfPitch(pitch) {
+    if (!pitch || pitch.kind !== 'pitched') return undefined;
+    const step = STEP_SEMITONES[pitch.step];
+    if (step === undefined || !Number.isFinite(pitch.octave)) return undefined;
+    return (pitch.octave + 1) * 12 + step + (Number(pitch.alter) || 0);
+  }
+
+  /**
+   * Every note of the score, in WRITTEN seconds, with the hand that
+   * plays it.
+   *
+   * Written seconds, not performance seconds, for the same reason the
+   * drum page lit its photos that way: a repeat plays the same written
+   * bar again, and mapping the audio's moment back to a written tick is
+   * what makes the second pass light up like the first.
+   *
+   * The hand is the score's own answer. A piano part is written on two
+   * staves and MusicXML says which one every note is on: staff 1 is the
+   * upper one, played by the right hand, staff 2 the lower, played by
+   * the left. A part with one staff has no such answer, so its notes go
+   * to the right hand rather than being split by pitch -- guessing
+   * would put a left-hand melody in the wrong colour and look like a
+   * bug in the engine.
+   */
+  let pianoNotes = [];
+
+  function buildPianoNotes() {
+    pianoNotes = [];
+    const parsed = lastParsed;
+    const playback = notationPlayback;
+    if (!parsed || !parsed.score || !playback || typeof NotationEngine === 'undefined') return;
+
+    for (const part of parsed.score.parts) {
+      for (const measure of part.measures) {
+        const measureOffset = playback.globalTickOffsetByMeasure?.get(measure.number) ?? 0;
+        for (const voice of measure.voices) {
+          let running = 0;
+          for (const event of voice.events) {
+            const startTick = event.startTick ?? running;
+            running = startTick + (event.duration?.ticks ?? 0);
+            if (event.kind !== 'note' && event.kind !== 'chord') continue;
+            const members = event.kind === 'chord' ? event.notes : [event];
+            for (const note of members) {
+              const midi = midiOfPitch(note.pitch);
+              if (midi === undefined) continue;
+              const ticks = note.duration?.ticks ?? event.duration?.ticks ?? 0;
+              let startSeconds;
+              let endSeconds;
+              try {
+                startSeconds = NotationEngine.tickToSeconds(playback.tempoMap, measureOffset + startTick);
+                endSeconds = NotationEngine.tickToSeconds(
+                  playback.tempoMap,
+                  measureOffset + startTick + Math.max(1, ticks),
+                );
+              } catch (err) {
+                continue;
+              }
+              pianoNotes.push({
+                midi,
+                startSeconds,
+                endSeconds,
+                hand: (note.staff ?? 1) >= 2 ? 'left' : 'right',
+              });
+            }
+          }
+        }
+      }
+    }
+    pianoNotes.sort((a, b) => a.startSeconds - b.startSeconds);
+  }
+
+  /**
+   * The moment the stage should show, in the score's WRITTEN seconds.
+   *
+   * Straight through `writtenTickAt`, which is what the cursor and the
+   * COUNT box already use, so the falling note and the playhead under
+   * it can never be telling different stories.
+   */
+  function stageSeconds(atSeconds) {
+    const tick = writtenTickAt(atSeconds);
+    if (tick === undefined || !notationPlayback) return 0;
+    try {
+      return NotationEngine.tickToSeconds(notationPlayback.tempoMap, tick);
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  /** What the engine is being asked to draw, for a box of this size. */
+  function stageOptions(width, height, atSeconds) {
+    return {
+      size: keyboardSize(),
+      width,
+      height,
+      seconds: stageSeconds(atSeconds),
+      notes: pianoNotes,
+      leadSeconds: fallSeconds(),
+      colors: stageColors(),
+    };
+  }
+
+  /** The preview's stage, redrawn where it is. */
+  function drawStage(atSeconds = audioPlayer.currentTime) {
+    if (!pianoStage || typeof PianoEngine === 'undefined') return;
+    const box = pianoStage.getBoundingClientRect();
+    const width = Math.max(1, Math.round(box.width));
+    const height = Math.max(1, Math.round(box.height));
+    if (!(width > 1) || !(height > 1)) return;
+    pianoStage.innerHTML = PianoEngine.renderPianoStage(stageOptions(width, height, atSeconds));
+  }
+
+  for (const control of [keyboardSizeSelect, fallSecondsSelect, leftHandColorInput, rightHandColorInput]) {
+    if (!control) continue;
+    control.addEventListener('change', () => drawStage());
+    control.addEventListener('input', () => drawStage());
+  }
+  window.addEventListener('resize', () => drawStage());
+  drawStage(0);
 
   document.getElementById('upload-musicxml').addEventListener('click', () => setActiveSlot('upload-musicxml'));
   document.getElementById('upload-midi').addEventListener('click', () => setActiveSlot('upload-midi'));
@@ -1067,6 +1270,7 @@
     const step = () => {
       updateCursor();
       updateBeatDisplay();
+      drawStage();
       if (!audioPlayer.paused && !audioPlayer.ended) cursorRaf = requestAnimationFrame(step);
     };
     cursorRaf = requestAnimationFrame(step);
@@ -1118,7 +1322,7 @@
     setUploadConfirm(`Could not play "${file ? file.name : 'this file'}" -- unsupported or corrupt audio.`, false);
   });
   audioPlayer.addEventListener('timeupdate', () => { updateTransport(); updateCursor(); updateBeatDisplay(); });
-  audioPlayer.addEventListener('seeked', () => { updateCursor(); updateBeatDisplay(); });
+  audioPlayer.addEventListener('seeked', () => { updateCursor(); updateBeatDisplay(); drawStage(); });
   audioPlayer.addEventListener('loadedmetadata', updateCursor);
   audioPlayer.addEventListener('play', () => {
     playIcon.querySelector('path').setAttribute('d', PAUSE_PATH);
@@ -1128,6 +1332,7 @@
     playIcon.querySelector('path').setAttribute('d', PLAY_PATH);
     cancelAnimationFrame(cursorRaf);
     updateCursor();
+    drawStage();
   });
   audioPlayer.addEventListener('ended', () => { updateTransport(); updateCursor(); });
 
@@ -2097,7 +2302,40 @@
    * The whole frame, in the browser's own paint order: the frame's
    * background, then its in-flow content on top of it.
    */
-  function drawPianoFrame(ctx2d, canvas) {
+  /**
+   * The piano stage, painted onto the canvas.
+   *
+   * The same call the preview uses, written out as canvas rectangles
+   * instead of SVG -- `stageShapes` is the engine's one description of
+   * a frame, so the exported video cannot look different from what was
+   * on screen. Painting ~130 rectangles costs microseconds; rasterising
+   * the SVG instead would cost more than every other part of the frame
+   * put together, thirty times a second.
+   */
+  function paintStage(ctx2d, box, atSeconds) {
+    if (!pianoStage || typeof PianoEngine === 'undefined') return;
+    if (!(box.w > 1) || !(box.h > 1) || !isVisible(pianoStage)) return;
+    const shapes = PianoEngine.stageShapes(stageOptions(box.w, box.h, atSeconds));
+    ctx2d.save();
+    ctx2d.translate(box.x, box.y);
+    for (const shape of shapes) {
+      ctx2d.fillStyle = shape.fill;
+      if (shape.radius > 0) {
+        roundRectPath(ctx2d, shape.x, shape.y, shape.width, shape.height, shape.radius);
+        ctx2d.fill();
+      } else {
+        ctx2d.fillRect(shape.x, shape.y, shape.width, shape.height);
+      }
+      if (shape.stroke !== undefined && shape.strokeWidth > 0) {
+        ctx2d.strokeStyle = shape.stroke;
+        ctx2d.lineWidth = shape.strokeWidth;
+        ctx2d.strokeRect(shape.x, shape.y, shape.width, shape.height);
+      }
+    }
+    ctx2d.restore();
+  }
+
+  function drawPianoFrame(ctx2d, canvas, atSeconds = audioPlayer.currentTime) {
     const frameRect = videoFrame.getBoundingClientRect();
     if (!(frameRect.width > 0)) return;
     const scale = canvas.width / frameRect.width;
@@ -2127,12 +2365,8 @@
       ctx2d.restore();
     }
 
-    // The brand mark in the middle of the frame.
-    const placeholder = document.querySelector('.brand-mark');
-    if (placeholder && isVisible(placeholder) && placeholder.complete) {
-      const box = rectIn(placeholder, frameRect, scale);
-      ctx2d.drawImage(placeholder, box.x, box.y, box.w, box.h);
-    }
+    // The piano stage, in the middle of the frame.
+    if (pianoStage) paintStage(ctx2d, rectIn(pianoStage, frameRect, scale), atSeconds);
 
     // The logo.
     const mark = document.querySelector('.video-logo-mark');
@@ -2366,7 +2600,7 @@
       const drawAt = (ctx, seconds) => {
         updateCursor(seconds);
         updateBeatDisplay(seconds);
-        drawPianoFrame(ctx, ctx.canvas);
+        drawPianoFrame(ctx, ctx.canvas, seconds);
       };
 
       const segments = [
@@ -2387,7 +2621,10 @@
             );
             showBeatLabel(String(index + 1), index === 0);
             updateCursor(0);
-            drawPianoFrame(ctx, ctx.canvas);
+            // The count-in happens before the music: the stage shows
+            // the opening bar's notes already falling, which is what
+            // counting in is FOR.
+            drawPianoFrame(ctx, ctx.canvas, 0);
           },
         });
       }
@@ -2431,6 +2668,7 @@
       // Put the page back where it was: rendering moved it about.
       updateCursor(0);
       updateBeatDisplay(0);
+      drawStage(0);
       recording = null;
       setGenerating(false);
       if (!result) {
