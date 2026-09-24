@@ -64,6 +64,9 @@
   .gen-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
   .gen-fill{height:100%;width:0;background:var(--red);border-radius:3px;transition:width .12s linear;}
   .gen-line{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted);font-weight:600;}
+  .len-row{display:flex;align-items:center;gap:6px;}
+  .len-row .drum-input{text-align:center;}
+  .len-colon{font-weight:700;color:var(--muted);}
   .cost-line{text-align:center;font-size:12px;color:var(--muted);}
   .cost-line b{color:var(--red);font-weight:700;}
 
@@ -235,7 +238,29 @@
     </div>
 
     <div class="card">
-      <div class="card-head"><span class="card-num">5</span>Video Ratio</div>
+      <div class="card-head"><span class="card-num">5</span>Video Length</div>
+      <div class="field-row">
+        <div>
+          <label for="lengthMode">Length</label>
+          <select id="lengthMode" class="drum-input">
+            <option value="midi">From the MIDI file</option>
+            <option value="fixed">Set it here</option>
+          </select>
+        </div>
+        <div>
+          <label for="lengthMinutes">Minutes &amp; seconds</label>
+          <div class="len-row">
+            <input id="lengthMinutes" class="drum-input" type="number" min="0" max="60" step="1" value="3">
+            <span class="len-colon">:</span>
+            <input id="lengthSeconds" class="drum-input" type="number" min="0" max="59" step="1" value="0">
+          </div>
+        </div>
+      </div>
+      <div class="field-hint" id="lengthHint">A MIDI file that carries real music says how long it is, and the video matches it. One that only carries a tempo and a time signature does not &mdash; set the length here instead.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-num">6</span>Video Ratio</div>
       <label>Aspect Ratio</label>
       <div class="ratio-row">
         <div class="ratio-pill active">16:9</div>
@@ -252,7 +277,7 @@
       <div class="gen-line"><span id="genLabel">Recording…</span><button class="btn-ghost" id="cancelBtn" type="button">Cancel</button></div>
     </div>
     <div class="cost-line" id="costLine">Estimated cost: <b>12 points</b> · You have 240</div>
-    <div class="field-hint" id="genNote">Recorded in your browser, in real time &mdash; silently, in the background: the preview holds still and nothing is heard, but the count is in the file. The take opens on a still second, runs for exactly as long as the MIDI, and closes with the Thank You clip from the asset server.</div>
+    <div class="field-hint" id="genNote">Recorded in your browser, in real time &mdash; silently, in the background: the preview holds still and nothing is heard, but the count is in the file. The take opens on a still second, runs for the length set in card 5, and closes with the Thank You clip from the asset server. It settles on the frame rate this machine can actually hold, and says which in the message above.</div>
   </div>
 
   <div class="right">
@@ -329,6 +354,10 @@
   const clickVolume = document.getElementById('clickVolume');
   const clickVolumeOut = document.getElementById('clickVolumeOut');
   const clickSound = document.getElementById('clickSound');
+  const lengthMode = document.getElementById('lengthMode');
+  const lengthMinutes = document.getElementById('lengthMinutes');
+  const lengthSeconds = document.getElementById('lengthSeconds');
+  const lengthHint = document.getElementById('lengthHint');
   const accentOn = document.getElementById('accentOn');
 
   const PLAY_PATH = 'M8 5v14l11-7z';
@@ -370,16 +399,68 @@
   /** [{at, beat, beatsPerBar, bar}] -- every beat of the piece, in seconds. */
   let beatGrid = [];
 
-  function rebuildClock() {
+  /**
+   * The length the FILE itself declares, or null when it declares none.
+   *
+   * "None" is a real and common answer. A MIDI exported as a metronome
+   * SETTING -- one track holding a name, a time signature, a tempo, a
+   * few controller values and an end-of-track marker a tick later --
+   * carries no length at all, and no amount of reading it will produce
+   * one. Anything shorter than a single bar is treated as that case
+   * rather than taken literally, which would give a video a few
+   * milliseconds long.
+   */
+  function midiDeclaredSeconds() {
+    if (!hasMidi || !tempoMap || songEndTicks <= 0) return null;
+    const sig = timeSignatures[0] ?? DEFAULT_TIME_SIGNATURES[0];
+    const ticksPerBar =
+      Math.max(1, sig.numerator) * (4 / Math.max(1, sig.denominator)) * TICKS_PER_QUARTER;
+    if (songEndTicks < ticksPerBar) return null;
+    return NotationEngine.tickToSeconds(tempoMap, songEndTicks);
+  }
+
+  /** The length typed into card 5. */
+  function chosenSeconds() {
+    const m = Math.min(60, Math.max(0, Math.floor(Number(lengthMinutes.value) || 0)));
+    const sec = Math.min(59, Math.max(0, Math.floor(Number(lengthSeconds.value) || 0)));
+    return Math.min(FREE_RUN_SECONDS, Math.max(1, m * 60 + sec));
+  }
+
+  /**
+   * Fits card 5 to the file that is loaded.
+   *
+   * `adopt` is true only when a NEW file has just been read: that is
+   * when a file with a real length gets "From the MIDI" selected and
+   * the boxes filled in to match, so the number is visible rather than
+   * implied. Every other call leaves the choice alone -- otherwise
+   * picking "Set it here" would be undone by the very redraw that
+   * picking it triggers.
+   */
+  function refreshLengthCard(adopt = false) {
+    const declared = midiDeclaredSeconds();
+    const midiOption = lengthMode.querySelector('option[value="midi"]');
+    midiOption.disabled = declared === null;
+    if (declared === null && lengthMode.value === 'midi') lengthMode.value = 'fixed';
+    if (declared !== null && adopt) {
+      lengthMode.value = 'midi';
+      lengthMinutes.value = String(Math.floor(declared / 60));
+      lengthSeconds.value = String(Math.round(declared % 60));
+    }
+    const fromFile = lengthMode.value === 'midi' && declared !== null;
+    lengthMinutes.disabled = fromFile;
+    lengthSeconds.disabled = fromFile;
+    lengthHint.innerHTML = fromFile
+      ? `The file declares its own length, <b>${formatTime(declared)}</b>, and the video is exactly that.`
+      : hasMidi
+        ? 'This file carries a tempo and a time signature but <b>no length of its own</b> &mdash; nothing in it says when to stop. The video is as long as you set here.'
+        : 'No MIDI loaded yet. The video is as long as you set here.';
+  }
+
+  function rebuildClock(adoptLength = false) {
     if (typeof NotationEngine === 'undefined') return;
     tempoMap = NotationEngine.buildTempoMap(tempoEvents).tempoMap;
-    // The MIDI is the whole input, so its own last note is what ends
-    // the count -- not a media element's length, and not a fixed cap.
-    const limit =
-      songEndTicks > 0
-        ? Math.min(FREE_RUN_SECONDS, NotationEngine.tickToSeconds(tempoMap, songEndTicks))
-        : FREE_RUN_SECONDS;
-    beatGrid = buildBeatGrid(limit);
+    refreshLengthCard(adoptLength);
+    beatGrid = buildBeatGrid(duration());
     showTempoBoxes();
     // The FRAME too, not only the boxes beside it. A new file means a
     // new tempo and a new time signature, and the frame is where the
@@ -623,27 +704,15 @@
   /**
    * How long the piece is -- and therefore how long the video is.
    *
-   * When a MIDI has been read, this is the MIDI's OWN length: the end
-   * of its last note, converted through the same tempo map everything
-   * else here uses. Not the last beat plus a beat, which is what it
-   * used to be and which ran the video past the file it was made from.
-   *
-   * With no file loaded the page is still a usable metronome, and
-   * there is no "end" to read -- the free-running grid's last beat plus
-   * one beat is as good an answer as there is.
+   * One of two answers, and card 5 says which: the length the FILE
+   * declares, or the length that was typed in. There is deliberately
+   * no third answer invented from the beat grid -- that is what used
+   * to turn a file with nothing in it into ten minutes of video.
    */
   function duration() {
-    if (hasMidi && songEndTicks > 0 && tempoMap) {
-      return Math.min(
-        FREE_RUN_SECONDS,
-        NotationEngine.tickToSeconds(tempoMap, songEndTicks),
-      );
-    }
-    if (beatGrid.length === 0) return 0;
-    const last = beatGrid[beatGrid.length - 1];
-    const previous = beatGrid[beatGrid.length - 2];
-    const tail = previous ? last.at - previous.at : 0.5;
-    return last.at + tail;
+    const declared = midiDeclaredSeconds();
+    if (lengthMode.value === 'midi' && declared !== null) return declared;
+    return chosenSeconds();
   }
 
   function running() {
@@ -863,6 +932,18 @@
     updateDisplay();
   });
 
+  for (const control of [lengthMode, lengthMinutes, lengthSeconds]) {
+    control.addEventListener('change', () => {
+      stopPlayback(true);
+      rebuildClock();
+      updateDisplay();
+    });
+    control.addEventListener('input', () => {
+      rebuildClock();
+      updateDisplay();
+    });
+  }
+
   for (const control of [clickSound, accentOn]) {
     // A voice change should be heard now, not on the next beat after the
     // look-ahead window has already committed the old one.
@@ -906,7 +987,8 @@
           }
         }
         stopPlayback(true);
-        rebuildClock();
+        // A new file: card 5 adopts whatever length it declares.
+        rebuildClock(true);
 
         const bpm = bpmAt(0);
         const sig = signatureAt(0);
@@ -914,10 +996,9 @@
         setConfirm(
           `"${file.name}" — ${bpm ?? '?'} BPM, ${sig.numerator}/${sig.denominator}` +
             (changes > 0 ? `, ${changes} tempo change(s)` : '') +
-            `. ${beatGrid.length} beats over ${formatTime(duration())}` +
-            (songEndTicks > 0
-              ? ' — the video will be exactly that long.'
-              : ' (the file declares no length at all, so the count is open-ended).'),
+            (midiDeclaredSeconds() === null
+              ? `. This file declares no length of its own, so the video is the ${formatTime(duration())} set in card 5.`
+              : `. ${beatGrid.length} beats over ${formatTime(duration())} — the video will be exactly that long.`),
           true,
         );
         loadVoices();
