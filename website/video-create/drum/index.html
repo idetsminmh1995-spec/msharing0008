@@ -560,7 +560,20 @@
   // Drum Kit dropdown from the real R2 contents, and loads the selected
   // kit's real background photo into the Live Preview panel.
   const API_BASE = 'https://msharing-api.idetsminmh1995.workers.dev';
-  const ASPECT = '16x9';
+  /**
+   * Which shape is being made, as R2 names it.
+   *
+   * Read from the lit pill rather than fixed, because every asset this
+   * page pulls is stored PER SHAPE -- the kit background, each hit
+   * photo and the Thank You clip all live under their own aspect
+   * folder. A 16x9 background is not a 9x16 one, so choosing the shape
+   * has to re-fetch them.
+   */
+  function currentAspect() {
+    const active = document.querySelector('.ratio-pill.active');
+    const label = active ? active.textContent.trim() : '16:9';
+    return label === '9:16' ? '9x16' : label === '1:1' ? '1x1' : '16x9';
+  }
   const kitSelect = document.getElementById('kit');
   const kitBrandSelect = document.getElementById('kitBrand');
   const videoFrame = document.getElementById('videoFrame');
@@ -582,6 +595,40 @@
     return styleBlack && styleBlack.checked ? 'black' : 'white';
   }
   const drumCircle = document.querySelector('.drum-circle');
+
+  /**
+   * Switches the frame to a shape and re-fetches everything that is
+   * stored per shape.
+   *
+   * The hit layer is emptied first: those <img> elements are keyed by
+   * file NAME, and the same name under a different aspect is a
+   * different picture. Left alone they would keep showing the old
+   * shape's photos.
+   */
+  function applyAspect() {
+    const aspect = currentAspect();
+    videoFrame.style.aspectRatio =
+      aspect === '9x16' ? '9 / 16' : aspect === '1x1' ? '1 / 1' : '16 / 9';
+    videoFrame.style.backgroundImage = '';
+    kitBackgroundImage = null;
+    if (hitLayer) hitLayer.innerHTML = '';
+    if (currentKit.name) {
+      void loadKitPreview(currentKit.name);
+    } else {
+      renderSticking();
+    }
+  }
+
+  for (const pill of document.querySelectorAll('.ratio-pill')) {
+    pill.addEventListener('click', () => {
+      if (pill.classList.contains('active')) return;
+      for (const other of document.querySelectorAll('.ratio-pill')) {
+        other.classList.remove('active');
+      }
+      pill.classList.add('active');
+      applyAspect();
+    });
+  }
   const kitConfirm = kitSelect.closest('.card').querySelector('.confirm-msg');
 
   function setKitStatus(text, ok) {
@@ -613,7 +660,7 @@
   async function loadKitPreview(drumSetName) {
     try {
       const res = await fetch(
-        `${API_BASE}/api/drum-sets/${encodeURIComponent(drumSetName)}/${ASPECT}/manifest`,
+        `${API_BASE}/api/drum-sets/${encodeURIComponent(drumSetName)}/${currentAspect()}/manifest`,
       );
       if (!res.ok) throw new Error(`manifest request failed (${res.status})`);
       const manifest = await res.json();
@@ -623,7 +670,7 @@
       // to re-answer it -- and the kit commonly loads after the score.
       renderSticking();
       if (manifest.hasBackground) {
-        const imgUrl = `${API_BASE}/assets/${encodeURIComponent(drumSetName)}/${ASPECT}/${encodeURIComponent(manifest.backgroundFile)}`;
+        const imgUrl = `${API_BASE}/assets/${encodeURIComponent(drumSetName)}/${currentAspect()}/${encodeURIComponent(manifest.backgroundFile)}`;
         videoFrame.style.backgroundImage = `url("${imgUrl}")`;
         videoFrame.style.backgroundSize = 'cover';
         videoFrame.style.backgroundPosition = 'center';
@@ -637,7 +684,7 @@
           true,
         );
       } else {
-        setKitStatus(`"${drumSetName}" has no background image for ${ASPECT} yet.`, false);
+        setKitStatus(`"${drumSetName}" has no background image for ${currentAspect()} yet.`, false);
       }
     } catch (err) {
       console.error('Drum kit preview failed to load:', err);
@@ -1066,7 +1113,7 @@
 
   function hitImageUrl(fileName) {
     return (
-      `${API_BASE}/assets/${encodeURIComponent(currentKit.name)}/${ASPECT}/` +
+      `${API_BASE}/assets/${encodeURIComponent(currentKit.name)}/${currentAspect()}/` +
       encodeURIComponent(fileName)
     );
   }
@@ -2292,7 +2339,8 @@
   const costLine = document.getElementById('costLine');
 
   const CAPTURE_FPS = 30;
-  const CAPTURE_WIDTH = 1920;
+  /** 1080 on the short side, whichever shape is being made. */
+  const CAPTURE_SHORT_SIDE = 1080;
   /**
    * A still second before the count-in starts.
    *
@@ -2716,9 +2764,15 @@
     audioPlayer.currentTime = 0;
     setGenerating(true);
 
+    // The SHORT side is what is capped, so every shape comes out at a
+    // real delivery size: 1920x1080, 1080x1920, 1080x1080. Capping the
+    // long side instead would make a portrait video 1920 wide and
+    // 3413 tall, which no encoder wants.
     const frameRect = videoFrame.getBoundingClientRect();
-    const width = CAPTURE_WIDTH;
-    const height = Math.round((CAPTURE_WIDTH * frameRect.height) / frameRect.width);
+    const scale = CAPTURE_SHORT_SIDE / Math.max(1, Math.min(frameRect.width, frameRect.height));
+    const even = (value) => Math.max(2, Math.round(value / 2) * 2);
+    const width = even(frameRect.width * scale);
+    const height = even(frameRect.height * scale);
 
     let cancelled = false;
     recording = {
@@ -2733,7 +2787,7 @@
         typeof OutroVideo === 'undefined'
           ? null
           : await OutroVideo.loadOutro(API_BASE, {
-              aspect: ASPECT,
+              aspect: currentAspect(),
               kind: 'drum',
               style: currentVideoStyle(),
             }).catch(() => null);
