@@ -15,6 +15,13 @@ export interface ClefSpec {
 export interface AttributesUpdate {
   readonly divisions?: number;
   readonly fifths?: number;
+  /**
+   * `<key><mode>`, lower-cased: "major", "minor", or one of the church
+   * modes MusicXML allows. Kept because `fifths` ALONE cannot name a
+   * key -- one sharp is G major and E minor, and the file is the only
+   * thing that knows which. Absent when the file does not say.
+   */
+  readonly mode?: string;
   readonly timeNumerator?: number;
   readonly timeDenominator?: number;
   /**
@@ -51,6 +58,7 @@ export function parseAttributesElement(attributesEl: Element): AttributesUpdate 
   const result: {
     divisions?: number;
     fifths?: number;
+    mode?: string;
     timeNumerator?: number;
     timeDenominator?: number;
     timeNumeratorDisplay?: string;
@@ -86,6 +94,8 @@ export function parseAttributesElement(attributesEl: Element): AttributesUpdate 
   if (keyEl !== undefined) {
     const fifths = intOf(firstChildNamed(keyEl, 'fifths'));
     if (fifths !== undefined) result.fifths = fifths;
+    const mode = textOf(firstChildNamed(keyEl, 'mode'));
+    if (mode !== undefined && mode.trim().length > 0) result.mode = mode.trim().toLowerCase();
   }
 
   const timeEl = firstChildNamed(attributesEl, 'time');

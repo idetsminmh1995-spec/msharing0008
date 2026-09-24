@@ -59881,6 +59881,8 @@ ${denominator}`;
     if (keyEl !== void 0) {
       const fifths = intOf(firstChildNamed(keyEl, "fifths"));
       if (fifths !== void 0) result.fifths = fifths;
+      const mode = textOf(firstChildNamed(keyEl, "mode"));
+      if (mode !== void 0 && mode.trim().length > 0) result.mode = mode.trim().toLowerCase();
     }
     const timeEl = firstChildNamed(attributesEl, "time");
     if (timeEl !== void 0) {
@@ -60654,6 +60656,7 @@ ${denominator}`;
       let currentDivisions;
       let warnedMissingDivisions = false;
       let currentFifths = DEFAULT_FIFTHS;
+      let currentMode;
       let currentTimeNumerator = DEFAULT_TIME_NUMERATOR;
       let currentTimeDenominator = DEFAULT_TIME_DENOMINATOR;
       let currentTimeNumeratorDisplay;
@@ -60687,6 +60690,7 @@ ${denominator}`;
             const update = parseAttributesElement(child);
             if (update.divisions !== void 0) currentDivisions = update.divisions;
             if (update.fifths !== void 0) currentFifths = update.fifths;
+            if (update.fifths !== void 0 || update.mode !== void 0) currentMode = update.mode;
             if (update.timeNumerator !== void 0) {
               currentTimeNumerator = update.timeNumerator;
               currentTimeNumeratorDisplay = update.timeNumeratorDisplay;
@@ -60948,6 +60952,7 @@ ${denominator}`;
           measureNumber,
           divisions: currentDivisions ?? DEFAULT_DIVISIONS,
           fifths: currentFifths,
+          ...currentMode !== void 0 ? { mode: currentMode } : {},
           timeNumerator: currentTimeNumerator,
           timeDenominator: currentTimeDenominator,
           ...currentTimeNumeratorDisplay !== void 0 ? { timeNumeratorDisplay: currentTimeNumeratorDisplay } : {},

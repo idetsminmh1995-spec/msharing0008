@@ -161,7 +161,7 @@
   .video-title:empty{display:none;}
   .video-title-1{font-weight:700;font-size:var(--title1-size,32px);color:var(--title1-color,#fff);}
   .video-title-2{font-weight:600;font-size:var(--title2-size,18px);color:var(--title2-color,#fff);}
-  .video-stats{display:flex;gap:8px;flex-shrink:0;}
+  .video-stats{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
   .stat-box{border:1.5px solid var(--red);border-radius:8px;padding:4px 12px;text-align:center;min-width:52px;}
   .stat-box .stat-label{color:#D8AE7A;font-size:8px;font-weight:700;letter-spacing:.05em;display:block;}
   .stat-box .stat-value{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:16px;display:block;}
@@ -484,6 +484,9 @@
           </div>
         </div>
         <div class="video-stats">
+          <!-- KEY comes first because that is the order a player reads
+               a score in: what key, then what metre, then how fast. -->
+          <div class="stat-box"><span class="stat-label">KEY</span><span class="stat-value" id="statKeyBox">—</span></div>
           <div class="stat-box"><span class="stat-label">TIME</span><span class="stat-value" id="statTimeBox">—</span></div>
           <div class="stat-box"><span class="stat-label">BPM</span><span class="stat-value" id="statBpmBox">—</span></div>
           <div class="stat-box"><span class="stat-label">COUNT</span><span class="stat-value" id="statCountBox">1</span></div>
@@ -682,6 +685,7 @@
   const statTime = document.getElementById('statTime');
   const statMeasures = document.getElementById('statMeasures');
   const tempoChip = document.getElementById('statBpmBox');
+  const statKeyBox = document.getElementById('statKeyBox');
   const uploadConfirm = document
     .getElementById('upload-musicxml')
     .closest('.card')
@@ -743,6 +747,9 @@
     // from two different places and disagree.
     shownBpm = null;
     showBpm(bpmAtTick(0));
+    buildKeyTimeline();
+    shownKey = null;
+    showKey(keyAtTick(0));
     if (firstAttrs) {
       const timeStr = `${firstAttrs.timeNumerator}/${firstAttrs.timeDenominator}`;
       statTime.textContent = timeStr;
@@ -804,6 +811,7 @@
     notationPlayback = rendered.playback;
     attachCursor(svgEl);
     updateCursor();
+    buildKeyTimeline();
   }
 
   for (const radio of document.querySelectorAll('input[name="vc"]')) {
@@ -1596,6 +1604,81 @@
     return Math.round(60000000 / current.microsecondsPerQuarter);
   }
 
+  /**
+   * The key a signature spells, as a reader would say it.
+   *
+   * `fifths` counts the sharps or flats and NOTHING else: one sharp is
+   * G major and E minor both, so the mode is what picks the name. The
+   * notation engine passes the file's own `<key><mode>` through for
+   * exactly this. When the file does not say, the major name is shown,
+   * which is how a lone key signature is read anyway.
+   *
+   * Index 0 is seven flats, index 14 seven sharps -- the circle of
+   * fifths end to end, so `fifths + 7` is the lookup.
+   */
+  const MAJOR_KEYS = ['C\u266d', 'G\u266d', 'D\u266d', 'A\u266d', 'E\u266d', 'B\u266d', 'F', 'C', 'G', 'D', 'A', 'E', 'B', 'F\u266f', 'C\u266f'];
+  const MINOR_KEYS = ['A\u266d', 'E\u266d', 'B\u266d', 'F', 'C', 'G', 'D', 'A', 'E', 'B', 'F\u266f', 'C\u266f', 'G\u266f', 'D\u266f', 'A\u266f'];
+  const MINOR_MODES = new Set(['minor', 'aeolian']);
+
+  function keyName(fifths, mode) {
+    if (!Number.isFinite(fifths)) return undefined;
+    const index = Math.round(fifths) + 7;
+    if (index < 0 || index >= MAJOR_KEYS.length) return undefined;
+    return MINOR_MODES.has(mode) ? `${MINOR_KEYS[index]}m` : MAJOR_KEYS[index];
+  }
+
+  /**
+   * Every key the score is in, in written ticks -- one entry per
+   * CHANGE, not per bar.
+   *
+   * Built from the engine's own per-measure attributes, placed in time
+   * by the same performance timeline the cursor and the count use. A
+   * piece that modulates says so in the KEY box at the bar it happens,
+   * rather than showing what it opened in for the whole video.
+   */
+  let keyTimeline = [];
+
+  function buildKeyTimeline() {
+    keyTimeline = [];
+    const attributes = lastParsed?.attributes;
+    if (!attributes || attributes.length === 0) return;
+    // One part's worth: a grand staff is two staves of ONE part, and a
+    // second part would otherwise repeat every change.
+    const partId = attributes[0].partId;
+    const tickByMeasure = new Map();
+    for (const entry of notationPlayback?.performance?.entries ?? []) {
+      if (!tickByMeasure.has(entry.measureNumber)) {
+        tickByMeasure.set(entry.measureNumber, entry.writtenTick);
+      }
+    }
+    let last;
+    for (const attrs of attributes) {
+      if (attrs.partId !== partId) continue;
+      const name = keyName(attrs.fifths, attrs.mode);
+      if (name === undefined || name === last) continue;
+      keyTimeline.push({ tick: tickByMeasure.get(attrs.measureNumber) ?? 0, name });
+      last = name;
+    }
+    keyTimeline.sort((a, b) => a.tick - b.tick);
+  }
+
+  function keyAtTick(tick) {
+    if (keyTimeline.length === 0) return undefined;
+    let current = keyTimeline[0].name;
+    for (const change of keyTimeline) {
+      if (change.tick <= tick) current = change.name;
+      else break;
+    }
+    return current;
+  }
+
+  let shownKey = null;
+  function showKey(name) {
+    if (name === shownKey) return;
+    shownKey = name;
+    if (statKeyBox) statKeyBox.textContent = name === undefined ? '\u2014' : name;
+  }
+
   let shownBpm = null;
   function showBpm(bpm) {
     if (bpm === shownBpm) return;
@@ -1622,6 +1705,7 @@
       // lesson has a tempo mark in the middle of it -- displayed a
       // number that had stopped being true.
       showBpm(bpmAtTick(tick));
+      showKey(keyAtTick(tick));
     } catch (err) {
       /* a score the position API cannot place is not worth a broken transport */
     }

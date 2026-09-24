@@ -47,6 +47,8 @@ export interface MeasureAttributes {
   readonly measureNumber: number;
   readonly divisions: number;
   readonly fifths: number;
+  /** `<key><mode>` as the file wrote it, lower-cased. Absent when it wrote none -- `fifths` alone cannot tell G major from E minor. */
+  readonly mode?: string;
   readonly timeNumerator: number;
   readonly timeDenominator: number;
   /** STATUS C3/§9.4: an additive meter's written form ("3+2+2"), when the file wrote one. Absent for an ordinary meter. */
@@ -413,6 +415,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
     let currentDivisions: number | undefined;
     let warnedMissingDivisions = false;
     let currentFifths = DEFAULT_FIFTHS;
+    let currentMode: string | undefined;
     let currentTimeNumerator = DEFAULT_TIME_NUMERATOR;
     let currentTimeDenominator = DEFAULT_TIME_DENOMINATOR;
     /** STATUS C3: an additive meter's written form, cleared whenever a later <time> is an ordinary one -- otherwise a 7/8 "3+2+2" would keep displaying over a subsequent plain 4/4. */
@@ -468,6 +471,10 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           const update = parseAttributesElement(child);
           if (update.divisions !== undefined) currentDivisions = update.divisions;
           if (update.fifths !== undefined) currentFifths = update.fifths;
+          // Assigned even when undefined: a new <key> with no <mode>
+          // has stopped saying, and carrying the old answer forward
+          // would report a mode this file no longer claims.
+          if (update.fifths !== undefined || update.mode !== undefined) currentMode = update.mode;
           if (update.timeNumerator !== undefined) {
             currentTimeNumerator = update.timeNumerator;
             // Deliberately assigned even when undefined: a new <time> that
@@ -813,6 +820,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
         measureNumber,
         divisions: currentDivisions ?? DEFAULT_DIVISIONS,
         fifths: currentFifths,
+        ...(currentMode !== undefined ? { mode: currentMode } : {}),
         timeNumerator: currentTimeNumerator,
         timeDenominator: currentTimeDenominator,
         ...(currentTimeNumeratorDisplay !== undefined

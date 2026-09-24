@@ -55,6 +55,73 @@ describe('MusicXML parser v1 (Phase 20)', () => {
     assert.equal(a2.clefSign, 'G');
   });
 
+  test('<key><mode> is captured, because fifths alone cannot name a key', () => {
+    // One sharp is G major AND E minor. The file says which; the parser
+    // has to pass it on, or every host has to guess "major".
+    const xml = (mode) => `<?xml version="1.0"?>
+      <score-partwise version="4.0">
+        <part-list><score-part id="P1"><part-name>P</part-name></score-part></part-list>
+        <part id="P1"><measure number="1">
+          <attributes><divisions>1</divisions>
+            <key><fifths>1</fifths>${mode}</key>
+            <time><beats>4</beats><beat-type>4</beat-type></time>
+            <clef><sign>G</sign><line>2</line></clef>
+          </attributes>
+          <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration><type>whole</type></note>
+        </measure></part>
+      </score-partwise>`;
+    const minor = NE.parseMusicXml(xml('<mode>minor</mode>'), { domParser });
+    assert.equal(minor.attributes[0].fifths, 1);
+    assert.equal(minor.attributes[0].mode, 'minor');
+
+    const major = NE.parseMusicXml(xml('<mode>Major</mode>'), { domParser });
+    assert.equal(major.attributes[0].mode, 'major', 'the mode is lower-cased');
+
+    // A file that says nothing says nothing: no invented "major".
+    const silent = NE.parseMusicXml(xml(''), { domParser });
+    assert.equal(silent.attributes[0].fifths, 1);
+    assert.equal(silent.attributes[0].mode, undefined);
+  });
+
+  test('a mid-score key change carries its own mode, and clears the old one', () => {
+    const xml = `<?xml version="1.0"?>
+      <score-partwise version="4.0">
+        <part-list><score-part id="P1"><part-name>P</part-name></score-part></part-list>
+        <part id="P1">
+          <measure number="1">
+            <attributes><divisions>1</divisions>
+              <key><fifths>0</fifths><mode>minor</mode></key>
+              <time><beats>4</beats><beat-type>4</beat-type></time>
+              <clef><sign>G</sign><line>2</line></clef>
+            </attributes>
+            <note><pitch><step>A</step><octave>4</octave></pitch><duration>4</duration><type>whole</type></note>
+          </measure>
+          <measure number="2">
+            <attributes><key><fifths>-2</fifths><mode>major</mode></key></attributes>
+            <note><pitch><step>B</step><alter>-1</alter><octave>4</octave></pitch><duration>4</duration><type>whole</type></note>
+          </measure>
+          <measure number="3">
+            <attributes><key><fifths>2</fifths></key></attributes>
+            <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration><type>whole</type></note>
+          </measure>
+        </part>
+      </score-partwise>`;
+    const result = NE.parseMusicXml(xml, { domParser });
+    // Read one at a time rather than deep-comparing a mapped array: the
+    // engine is loaded in its own realm by the test helper, so an array
+    // it built has a different Array.prototype and strict deep equality
+    // rejects it for that alone.
+    assert.equal(result.attributes.length, 3);
+    assert.equal(result.attributes[0].fifths, 0);
+    assert.equal(result.attributes[0].mode, 'minor');
+    assert.equal(result.attributes[1].fifths, -2);
+    assert.equal(result.attributes[1].mode, 'major');
+    // Measure 3 changed the key without saying the mode. It is not
+    // still "major" -- this file stopped claiming one.
+    assert.equal(result.attributes[2].fifths, 2);
+    assert.equal(result.attributes[2].mode, undefined);
+  });
+
   test('barline info is captured in the attributes side-table', () => {
     const result = loadFixture('simple-single-voice.musicxml');
     assert.equal(result.attributes[1].barlineStyle, 'light-heavy');
