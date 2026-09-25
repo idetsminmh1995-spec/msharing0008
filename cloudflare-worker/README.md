@@ -163,6 +163,21 @@ file name repeats the aspect, then the frame's colour and the
 instrument capitalised. Served at
 `/assets/shared/Thank%20Video/16x9/drum/16x9%20Black%20Drum.mp4`.
 
+**The instrument word is the bucket's, not the code's.** The Piano
+page's clips are filed under **`paino`**, so that is what the page
+asks for:
+
+```
+Thank Video/16x9/paino/16x9 Black Paino.mp4
+Thank Video/16x9/paino/16x9 White Paino.mp4
+Thank Video/9x16/paino/9x16 Black Paino.mp4
+Thank Video/9x16/paino/9x16 White Paino.mp4
+Thank Video/1x1/paino/1x1 Black Paino.mp4
+```
+
+Renaming the folder in R2 is a one-word change in the page (`kind`),
+and the walk outward below keeps takes closing while the two disagree.
+
 Which one a page asks for follows the frame it just recorded: the Drum
 page uses its Video Style radio, and the Metronome page uses whether
 the chosen design's palette is light or dark -- the design owns the

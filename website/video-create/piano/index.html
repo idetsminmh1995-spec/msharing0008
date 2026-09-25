@@ -2640,11 +2640,15 @@
           ? null
           : await OutroVideo.loadOutro(API_BASE, {
               aspect: currentAspect(),
-              // No piano ending in the bucket yet: outro-video.js
-              // walks outward from here and closes on the drum clip of
-              // the same shape until `Thank Video/{aspect}/piano/` has
-              // one of its own.
-              kind: 'piano',
+              // "paino", not "piano": the folder and the file name in
+              // the bucket are spelled that way, and outro-video.js
+              // builds the key from this word --
+              //   Thank Video/16x9/paino/16x9 Black Paino.mp4
+              //   Thank Video/9x16/paino/9x16 White Paino.mp4
+              // A rename in R2 is a one-word change here, and until
+              // then the walk outward still closes a take on the drum
+              // clip of the same shape if these are missing.
+              kind: 'paino',
               style: currentVideoStyle(),
             }).catch(() => null);
 
