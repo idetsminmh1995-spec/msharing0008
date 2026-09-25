@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<!--
+  Fixture F-01 (Plan Part 08): C major scale C3 -> C4, MusicXML with NO
+  tab staff, no <string>, no <fret> and no <fingering>. The solver has
+  to find open position on its own.
+
+  Expected result (the plan's own table, also in f01-c-major-scale.expected.json,
+  in THIS engine's string numbering -- string 1 is the low E [DM-01]):
+
+    C3 = string 2 fret 3 finger 3    G3 = string 4 open
+    D3 = string 3 open               A3 = string 4 fret 2 finger 2
+    E3 = string 3 fret 2 finger 2    B3 = string 5 open
+    F3 = string 3 fret 3 finger 3    C4 = string 5 fret 1 finger 1
+
+  Written pitch is sounding pitch here: the octave-transposing guitar
+  staff is fixture F-09's job, and the two must come out the same.
+-->
+<score-partwise version="3.1">
+  <work>
+    <work-title>F-01 C major scale</work-title>
+  </work>
+  <part-list>
+    <score-part id="P1">
+      <part-name>Guitar</part-name>
+      <score-instrument id="P1-I1">
+        <instrument-name>Acoustic Guitar</instrument-name>
+      </score-instrument>
+      <midi-instrument id="P1-I1">
+        <midi-channel>1</midi-channel>
+        <midi-program>26</midi-program>
+      </midi-instrument>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>1</divisions>
+        <key><fifths>0</fifths><mode>major</mode></key>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef>
+      </attributes>
+      <direction placement="above">
+        <direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>120</per-minute></metronome></direction-type>
+        <sound tempo="120"/>
+      </direction>
+      <note>
+        <pitch><step>C</step><octave>3</octave></pitch>
+        <duration>1</duration><voice>1</voice><type>quarter</type><stem>up</stem>
+      </note>
+      <note>
+        <pitch><step>D</step><octave>3</octave></pitch>
+        <duration>1</duration><voice>1</voice><type>quarter</type><stem>up</stem>
+      </note>
+      <note>
+        <pitch><step>E</step><octave>3</octave></pitch>
+        <duration>1</duration><voice>1</voice><type>quarter</type><stem>up</stem>
+      </note>
+      <note>
+        <pitch><step>F</step><octave>3</octave></pitch>
+        <duration>1</duration><voice>1</voice><type>quarter</type><stem>up</stem>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>G</step><octave>3</octave></pitch>
+        <duration>1</duration><voice>1</voice><type>quarter</type><stem>up</stem>
+      </note>
+      <note>
+        <pitch><step>A</step><octave>3</octave></pitch>
+        <duration>1</duration><voice>1</voice><type>quarter</type><stem>up</stem>
+      </note>
+      <note>
+        <pitch><step>B</step><octave>3</octave></pitch>
+        <duration>1</duration><voice>1</voice><type>quarter</type><stem>up</stem>
+      </note>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>1</duration><voice>1</voice><type>quarter</type><stem>up</stem>
+      </note>
+      <barline location="right"><bar-style>light-heavy</bar-style></barline>
+    </measure>
+  </part>
+</score-partwise>
