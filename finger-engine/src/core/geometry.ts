@@ -18,10 +18,36 @@ export interface GeometryConfig {
   readonly fingertipBehindFret: number;
 }
 
+/**
+ * Remembered fret positions, for one scale length at a time.
+ *
+ * `fretDistanceMm` is a pure function of two numbers, and the solver
+ * asks it for the same two dozen frets hundreds of thousands of times
+ * in one song -- it is the single hottest line in the engine. The
+ * memo changes no answer; it only stops the same power being raised
+ * again and again. A plain array beats a map here because the key is
+ * a small integer, and one scale length is enough: a session plays
+ * one guitar, and a second one simply rebuilds the table.
+ */
+const MEMO_FRETS = 64;
+let memoScaleLength = -1;
+let memoDistances = new Float64Array(MEMO_FRETS + 1).fill(Number.NaN);
+
 /** [GEO-01] Distance from the nut to fret `n`. Fret 12 lands at exactly half the scale. */
 export function fretDistanceMm(scaleLengthMm: number, fret: number): number {
   if (fret <= 0) return 0;
-  return scaleLengthMm * (1 - Math.pow(2, -fret / 12));
+  if (fret > MEMO_FRETS || !Number.isInteger(fret)) {
+    return scaleLengthMm * (1 - Math.pow(2, -fret / 12));
+  }
+  if (scaleLengthMm !== memoScaleLength) {
+    memoScaleLength = scaleLengthMm;
+    memoDistances = new Float64Array(MEMO_FRETS + 1).fill(Number.NaN);
+  }
+  const remembered = memoDistances[fret] as number;
+  if (!Number.isNaN(remembered)) return remembered;
+  const distance = scaleLengthMm * (1 - Math.pow(2, -fret / 12));
+  memoDistances[fret] = distance;
+  return distance;
 }
 
 /** [GEO-02] The width of the fret SPACE `n`, between wire n-1 and wire n. */
@@ -44,14 +70,31 @@ export function fingertipXMm(
   fret: number,
 ): number {
   if (fret <= 0) return 0;
-  if (instrument.capo > 0 && fret <= instrument.capo) {
-    return fretDistanceMm(instrument.scaleLengthMm, instrument.capo);
+  const whole = fret <= MEMO_FRETS && Number.isInteger(fret);
+  if (whole) {
+    // Same memo, same reason as the fret distances -- one step higher
+    // up, because THIS is the number the cost model actually asks for,
+    // and asking for it folds three fret distances into one lookup.
+    const signature =
+      instrument.scaleLengthMm * 1e6 + instrument.capo * 1e3 + geometry.fingertipBehindFret;
+    if (signature !== memoTipSignature) {
+      memoTipSignature = signature;
+      memoTips = new Float64Array(MEMO_FRETS + 1).fill(Number.NaN);
+    }
+    const remembered = memoTips[fret] as number;
+    if (!Number.isNaN(remembered)) return remembered;
   }
-  return (
-    fretDistanceMm(instrument.scaleLengthMm, fret) -
-    geometry.fingertipBehindFret * fretWidthMm(instrument.scaleLengthMm, fret)
-  );
+  const x =
+    instrument.capo > 0 && fret <= instrument.capo
+      ? fretDistanceMm(instrument.scaleLengthMm, instrument.capo)
+      : fretDistanceMm(instrument.scaleLengthMm, fret) -
+        geometry.fingertipBehindFret * fretWidthMm(instrument.scaleLengthMm, fret);
+  if (whole) memoTips[fret] = x;
+  return x;
 }
+
+let memoTipSignature = Number.NaN;
+let memoTips = new Float64Array(MEMO_FRETS + 1).fill(Number.NaN);
 
 /**
  * [GEO-04] The gap between neighbouring strings at a point along the

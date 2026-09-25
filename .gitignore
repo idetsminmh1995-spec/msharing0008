@@ -78,7 +78,13 @@ Drum/sticking-engine-ts/dist/*.d.ts
 # the sample files that pile up while testing; this one is a committed
 # 185-byte part of the module, named in its README as the file to run the
 # demo against. See Drum/README.md.
+#
+# Same for the Finger Engine's MIDI fixture: F-13 is the plan's own test
+# that a MIDI file, which carries no string, fret or finger at all, comes
+# out fingered exactly like the MusicXML version of the same scale. It is
+# 125 bytes and the test cannot run without it.
 !Drum/sticking-engine/test_beat.mid
+!finger-engine/test/fixtures/*.mid
 
 # The sticking engine's demo writes this next to itself on every run.
 Drum/sticking-engine/output_performance.json

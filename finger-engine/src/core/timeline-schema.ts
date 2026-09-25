@@ -7,10 +7,15 @@
  * renderer can refuse one it does not understand instead of drawing
  * nonsense.
  */
-import type { LHFinger, Technique } from './types.js';
+import type { LHFinger, RHFinger, Technique } from './types.js';
 
 export const TIMELINE_SCHEMA = 'finger-timeline' as const;
 export const TIMELINE_SCHEMA_VERSION = '1.0.0' as const;
+
+/** What the engine calls itself in the timeline it writes. */
+export const ENGINE_NAME = 'guitar-finger-engine' as const;
+/** The engine's own version, which is not the schema's: code may change without the contract changing. */
+export const ENGINE_VERSION = '1.0.0';
 
 export type FingerKey = '1' | '2' | '3' | '4' | 'T';
 
@@ -63,12 +68,19 @@ export interface TimelineBarre {
 }
 
 export interface RightHandEvent {
+  /** Seconds; for a strum, when the FIRST string is hit (RH-P06). */
   readonly time: number;
   readonly noteIds: readonly string[];
+  /** In the order they are hit. */
   readonly strings: readonly number[];
-  readonly kind: 'pick' | 'strum' | 'finger';
+  readonly kind: 'pick' | 'strum' | 'pluck' | 'tap';
   readonly direction?: 'down' | 'up';
-  readonly finger?: 'p' | 'i' | 'm' | 'a' | 'c';
+  /** [RH-F*] fingerstyle: one finger per string in `strings`. */
+  readonly fingers?: readonly RHFinger[];
+  /** [RH-P06] a strum hits its strings one after another; this is when each one is hit. */
+  readonly stringTimes?: readonly number[];
+  readonly muted?: boolean;
+  /** Why this stroke: 'GRID_DOWN', 'ECONOMY', 'LOCKED', 'HOME_STRING'. */
   readonly reason?: string;
 }
 

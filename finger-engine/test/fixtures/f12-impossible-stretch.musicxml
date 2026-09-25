@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<!--
+  Fixture F-12 (Plan Part 08): two notes written to sound together,
+  one at fret 1 and one at fret 8 -- a seven-fret stretch down at the
+  nut, where the frets are widest, which no hand makes.
+
+  Expected: the tab is played exactly as written (P-001 -- the engine
+  never rewrites what the file decided), a TAB_INFEASIBLE warning says
+  so, and everything else about the output is still valid.
+-->
+<score-partwise version="3.1">
+  <work><work-title>F-12 an impossible written stretch</work-title></work>
+  <part-list>
+    <score-part id="P1">
+      <part-name>Guitar</part-name>
+      <score-instrument id="P1-I1"><instrument-name>Electric Guitar</instrument-name></score-instrument>
+      <midi-instrument id="P1-I1"><midi-channel>1</midi-channel><midi-program>28</midi-program></midi-instrument>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>1</divisions>
+        <key><fifths>0</fifths></key>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef>
+      </attributes>
+      <direction placement="above">
+        <direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>120</per-minute></metronome></direction-type>
+        <sound tempo="120"/>
+      </direction>
+      <note>
+        <pitch><step>F</step><octave>2</octave></pitch>
+        <duration>1</duration><voice>1</voice><type>quarter</type>
+        <notations><technical>
+          <string>6</string><fret>1</fret>
+        </technical></notations>
+      </note>
+      <note>
+        <chord/>
+        <pitch><step>F</step><octave>3</octave></pitch>
+        <duration>1</duration><voice>1</voice><type>quarter</type>
+        <notations><technical>
+          <string>5</string><fret>8</fret>
+        </technical></notations>
+      </note>
+      <note><rest/><duration>3</duration><voice>1</voice><type>half</type></note>
+      <barline location="right"><bar-style>light-heavy</bar-style></barline>
+    </measure>
+  </part>
+</score-partwise>

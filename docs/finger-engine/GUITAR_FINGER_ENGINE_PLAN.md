@@ -1098,14 +1098,14 @@ Status: DRAFT
 Each phase ends with a demo video of its fixtures that the owner approves before the next
 phase starts. The coding tool implements **only the current phase** (README rule 1).
 
-### Phase 0 — Foundations
+### Phase 0 — Foundations — IMPLEMENTED
 - **Read the Notation Engine's score types first** and fill in the "Notation Engine data model" row of Part 01 §6 (fields available, string numbering, time unit, note IDs). Report which guitar fields are missing (OQ-11).
 - `core/`: types (02), `defaults.ts` (10), tuning, geometry (GEO-01..05), tempo map, seeded RNG, timeline schema constant (09).
 - Validator skeleton (V-01, V-08) and test harness.
 - Hand-written fixture files for F-01 and F-09.
 - **Done when**: geometry numbers match the table in 04 §3; string-numbering conversions (IN-X03, IN-E04) unit-tested.
 
-### Phase 1 — Single-note lines (melody, riffs, solos without techniques)
+### Phase 1 — Single-note lines (melody, riffs, solos without techniques) — IMPLEMENTED
 - Input: Notation Engine adapter (IN-E01..06), MusicXML technical data (IN-X01..04, 06, 10–13, 20, 22–25) and MIDI (IN-M01–05, 07); normalizer (IN-N*).
 - Solver for single-note stages: SV-01..04, 10–14, 20–24 with static/transition features that apply to single notes.
 - Motion planner: MP-01..06, MP-20..23.
@@ -1189,6 +1189,35 @@ strum spread, weights) are **engineering estimates**, not values from these pape
 ## Changelog
 
 Format: `## [plan version] — date` then the changed rule IDs.
+
+### [0.2.3] — 2026-09-25
+- **Phase 1 implemented** in `finger-engine/`: the Notation Engine adapter (IN-E01..06), the
+  standalone MusicXML (IN-X01..04, 06, 10–13, 20, 22–25) and MIDI (IN-M01..05, 07) readers,
+  the normalizer (IN-N*), stages (SV-01..04), candidates (SV-10..14), the left-hand cost
+  model and beam/Viterbi solver (SV-20..24), pick-mode right hand (RH-01, RH-P01, P03, P04),
+  the motion planner (MP-01..06, 20..23), the guitar validator (V-02..V-07, V-09, V-10),
+  the timeline (09) and the debug report (11 §4). 88 tests.
+- Fixtures F-01, F-02, F-03, F-05, F-09, F-12, F-13, F-14 and F-17 all pass, and the
+  validator reports no errors on any of them (11 §3).
+- **07 §4 vs 09**: the timeline's `RightHandEvent` now matches Part 07 §4 exactly
+  (`kind: 'pick' | 'strum' | 'pluck' | 'tap'`, `fingers`, `stringTimes`, `muted`). The
+  Phase 0 sketch had `'finger'` and a single `finger`. Schema version unchanged: nothing
+  had read it yet.
+- **RH-P01 clarified in code**: the grid slot is counted inside its own beat, so every beat
+  starts on a down-stroke however it is divided — the same "down on the beat, up on the
+  off-beat" RH-P05 states for strums.
+- **V-05 and TAB_INFEASIBLE**: where the FILE's own tab needs a stretch past the limits
+  (F-12), the validator does not re-measure it. P-001 keeps the tab as written and the
+  warning has already said so; reporting it again as an engine error would blame the engine
+  for obeying the rule.
+- New warning codes used by Phase 1, all reported and never thrown: `MXL_NOT_UNZIPPED` and
+  `NOT_MUSICXML` (the file is not what it claims), `NOT_MIDI`, `MIDI_SMPTE_UNSUPPORTED`,
+  `NO_NOTES`, `NO_PARTS`, and `RIGHT_HAND_FALLBACK` (fingerstyle asked for before Phase 3).
+- **01 §5 performance**: a five-minute part of ordinary density (~1,200 notes) analyzes in
+  about 1 s; five minutes of unbroken sixteenths (3,000 notes) in about 2.5 s. CALIBRATE.
+- IN-X01 (.mxl) is read by the app's existing ZIP reader before the engine sees it, as the
+  rule says to reuse rather than reimplement; handed an archive, the parser says so instead
+  of guessing.
 
 ### [0.2.2] — 2026-09-25
 - **OQ-11 answered** and the "Notation Engine data model" row of 01 §6 filled in, by reading

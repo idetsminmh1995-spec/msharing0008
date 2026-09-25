@@ -11,9 +11,10 @@ and a failing test points at the paragraph it came from.
 
 ## What is built
 
-**Phase 0 (foundations) only.** The plan builds in phases, one at a time, and each ends
-with a demo the owner approves before the next begins. Phase 0 is everything the later
-phases stand on:
+**Phases 0 and 1.** The plan builds in phases, one at a time, and each ends with a demo
+the owner approves before the next begins.
+
+Phase 0 is everything the later phases stand on:
 
 | File | Plan | What it is |
 |---|---|---|
@@ -26,8 +27,28 @@ phases stand on:
 | `src/core/validate-core.ts` | Part 11 §1 | The checks that do not know about guitars (V-01, V-08). |
 | `src/defaults.ts` | Part 10 | Every number the engine uses. There are no others. |
 
-The input adapters, the solver, the motion planner and the right hand are **Phases 1–3
-and are deliberately absent**.
+Phase 1 is a single-note line played end to end — a melody, a riff, a solo without
+techniques:
+
+| File | Plan | What it is |
+|---|---|---|
+| `src/input/notation-engine/adapter.ts` | IN-E01..06 | The Notation Engine's score, unrolled, with its own times. |
+| `src/input/musicxml/parse.ts`, `technical.ts`, `xml.ts` | IN-X* | A MusicXML file on its own, for the fields notation does not keep and for the tests. |
+| `src/input/midi/parse.ts` | IN-M01..05, 07 | A MIDI file: pitch and time and nothing else. |
+| `src/input/normalize.ts` | IN-N* | One shape, in seconds, in range. |
+| `src/guitar/stages.ts` | SV-01..04 | The part cut into onset moments. |
+| `src/guitar/candidates.ts` | SV-10..14 | Every way a stage could be played. |
+| `src/guitar/left-hand-rules.ts` | LH-01..15 | What a hand cannot do, at all. |
+| `src/guitar/left-hand-cost.ts` | Part 06 §3/§4 | What it costs to hold a shape, and to get to it. |
+| `src/core/solver/viterbi.ts`, `beam.ts` | SV-20..22 | The shortest path through the whole phrase. |
+| `src/guitar/right-hand/pick.ts` | RH-01, P01, P03, P04 | Which way the pick is travelling. |
+| `src/guitar/motion/planner.ts` | MP-01..06, 20..23 | When each finger sets off, lands, holds and lifts. |
+| `src/guitar/validate-guitar.ts` | V-02..V-07, V-09, V-10 | The finished timeline, re-read as a hand. |
+| `src/debug/report.ts` | Part 11 §4 | Why each note came out the way it did. |
+
+**Chords and barres (Phase 2), and the techniques — hammer-on, pull-off, slide, bend,
+fingerstyle (Phase 3) — are deliberately absent.** A stage that would need a barre is
+refused and reported rather than half-drawn.
 
 ## The bug this engine is built around
 
@@ -52,6 +73,27 @@ in the engine is allowed to do the arithmetic inline.
    no `Math.random` anywhere; `makeRng(seed)` is the only source.
 5. **The timeline is a contract.** Anything that breaks a reader needs a new major schema
    version, and the version travels inside every timeline.
+
+## Using it
+
+```js
+// The preferred road in: the Notation Engine owns note order and timing (D-011).
+const { parts } = FingerEngine.fromNotationEngine(score, playback, { musicXml });
+const timeline = FingerEngine.analyzeGuitar(parts[0], { seed: 1 });
+
+// Standalone, for tests and for files the app reads directly:
+const fromXml = FingerEngine.parseMusicXml(text).parts;
+const fromMidi = FingerEngine.parseMidi(bytes).parts;
+```
+
+`timeline` is `finger-timeline@1.0.0` (Part 09): every note with its string, fret, finger,
+reasons and confidence; a keyframe track per finger; the picking hand's strokes; and the
+warnings. It is the only thing the renderer ever sees.
+
+**Speed.** A five-minute part of ordinary density (about 1,200 notes) analyzes in ~1 s;
+five minutes of unbroken sixteenth notes (3,000 notes) takes ~2.5 s, a little over the
+plan's 2 s target for a case no song really is. Measured in Node on this machine, not a
+laptop, so treat both as CALIBRATE.
 
 ## Build and test
 
@@ -80,9 +122,15 @@ or join to a string.
   pitch instead would put the whole scale twelve frets up the neck: playable, and completely
   wrong.
 
-Phase 0 checks that the files say what the plan says they say, with a throwaway reader in
-the test — using the real adapter to check the adapter's own fixtures would prove nothing.
-Phase 1 runs them through the solver.
+Phase 1 adds the rest of its own row of the table: **F-02** (the same pentatonic box with
+tab, where the file fixes the position and only the fingers are the engine's), **F-03** (the
+same notes without tab), **F-05** (a repeated note in sixteenths with a rest inside it),
+**F-12** (a written stretch no hand makes), **F-13** (F-01 as a MIDI file) and **F-14** (a
+note below the instrument). **F-17**, determinism, is a test rather than a file.
+
+The fixtures are checked the way Part 08 asks: exactly where one fingering is the right
+answer, and by PROPERTY — "at most one shift", "no span violations" — where several are
+things a guitarist really does.
 
 ## Notation Engine data model (Part 01 §6, OQ-11)
 
