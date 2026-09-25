@@ -80,6 +80,19 @@ That is the same time made visible over more pixels; the page offers
 1.5s / 2.5s / 4s so a shape that feels too fast can be given a longer
 fall.
 
+## The grid the notes fall through
+
+`gridLines` is a list of `{ seconds, kind: 'bar' | 'beat' }` — the
+score's own bars and beats, in the same seconds the notes use. A
+barline is ruled a little stronger than a beat, both faint enough to
+read past, and both scroll with the music so a bar's line and that
+bar's notes arrive together.
+
+The engine does not work out where the bars are: a caller that knows
+the score hands them over, which is how a 6/8 bar rules six lines and
+a 3/4 bar three, and how a tempo change spaces them exactly as it
+spaces the notes.
+
 ## Tests
 
 `npm test` runs against the BUILT bundle in a bare sandbox — the same

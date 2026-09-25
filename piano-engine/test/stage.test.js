@@ -160,3 +160,59 @@ test('the SVG is exactly the shape list written out', () => {
     assert.ok(svg.includes(`fill="${shape.fill}"`), `${shape.fill} is drawn`);
   }
 });
+
+const gridStage = { size: 88, width: 1920, height: 600, seconds: 0, leadSeconds: 2.5 };
+const bars = (times) => times.map((seconds, i) => ({ seconds, kind: i % 4 === 0 ? 'bar' : 'beat' }));
+
+test('the grid is ruled where the music is, in the same time the notes fall in', () => {
+  const board = P.keyboardBox(gridStage);
+  const lines = [{ seconds: 1.25, kind: 'bar' }];
+  const [shape] = P.gridShapes(lines, gridStage);
+  // Due in half the lead -> half way down the fall.
+  assert.ok(Math.abs(shape.y + shape.height / 2 - board.y / 2) < 1);
+  assert.equal(shape.x, 0);
+  assert.equal(shape.width, gridStage.width, 'a line rules the whole stage');
+
+  const landing = P.gridShapes(lines, { ...gridStage, seconds: 1.25 });
+  assert.ok(Math.abs(landing[0].y + landing[0].height / 2 - board.y) < 1, 'arrives at the keyboard');
+});
+
+test('a barline is drawn stronger than a beat line, and both are faint', () => {
+  const both = P.gridShapes([{ seconds: 1, kind: 'bar' }, { seconds: 1, kind: 'beat' }], gridStage);
+  assert.ok(both[0].height > both[1].height, 'the bar is thicker');
+  assert.equal(both[0].fill, P.DEFAULT_COLORS.barLine);
+  assert.equal(both[1].fill, P.DEFAULT_COLORS.beatLine);
+  // Faint enough to read past: both are translucent by default.
+  assert.match(P.DEFAULT_COLORS.barLine, /rgba/);
+  assert.match(P.DEFAULT_COLORS.beatLine, /rgba/);
+});
+
+test('a line already played, or not yet on stage, is not drawn', () => {
+  const lines = bars([0.5, 1, 2, 3, 9, 40]);
+  const shapes = P.gridShapes(lines, { ...gridStage, seconds: 1 });
+  // From 1s with a 2.5s lead: 1, 2, 3 are on stage; 0.5 is past; 9 and 40 are not yet.
+  assert.equal(shapes.length, 3);
+  for (const shape of shapes) {
+    assert.ok(shape.y >= -shape.height, 'not above the stage');
+    assert.ok(shape.y <= P.keyboardBox(gridStage).y, 'not over the keyboard');
+  }
+});
+
+test('the grid is behind the notes, and absent when nobody asks for one', () => {
+  const notes = [{ midi: 60, startSeconds: 1, endSeconds: 1.5, hand: 'right' }];
+  const without = P.stageShapes({ ...gridStage, notes });
+  const withGrid = P.stageShapes({ ...gridStage, notes, gridLines: bars([0.5, 1, 1.5, 2]) });
+  assert.equal(withGrid.length, without.length + 4, 'one shape per line');
+  // The grid comes first: the falling note is drawn over it.
+  assert.equal(withGrid[0].fill, P.DEFAULT_COLORS.barLine);
+  assert.equal(withGrid[4].fill, P.DEFAULT_COLORS.rightHand, 'the note, after the grid');
+  assert.equal(without[0].fill, P.DEFAULT_COLORS.rightHand, 'no grid, no lines');
+});
+
+test('a caller can recolour the grid for a light frame', () => {
+  const [bar] = P.gridShapes([{ seconds: 0.5, kind: 'bar' }], {
+    ...gridStage,
+    colors: { barLine: 'rgba(0,0,0,0.2)' },
+  });
+  assert.equal(bar.fill, 'rgba(0,0,0,0.2)');
+});

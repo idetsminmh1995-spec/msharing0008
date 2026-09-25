@@ -33,6 +33,20 @@ export interface PianoKey {
   readonly height: number;
 }
 
+/**
+ * One line of the grid the notes fall through: a barline, or a beat
+ * inside a bar.
+ *
+ * In seconds, like everything else here, because the grid IS the
+ * music's own time -- the caller reads the bars and beats off the
+ * score and hands them over, rather than this engine assuming 4/4 or
+ * a fixed tempo.
+ */
+export interface GridLine {
+  readonly seconds: number;
+  readonly kind: 'bar' | 'beat';
+}
+
 /** One falling bar, already clipped to the area it falls through. */
 export interface FallingBar {
   readonly midi: number;
@@ -56,6 +70,9 @@ export interface PianoColors {
   readonly keyEdge: string;
   /** The line the notes land on, along the top of the keyboard. */
   readonly strikeLine: string;
+  /** The grid the notes fall through: a barline, and the beats inside a bar. Faint on purpose -- it is there to be read past, not at. */
+  readonly barLine: string;
+  readonly beatLine: string;
   readonly leftHand: string;
   readonly rightHand: string;
   /** Behind the falling notes. `'none'` draws nothing, which is what a video frame wants. */
@@ -70,6 +87,8 @@ export interface PianoStageOptions {
   /** Where the music is now, in seconds. */
   readonly seconds: number;
   readonly notes?: readonly PianoNote[];
+  /** Bars and beats to rule the falling area with. Empty or absent draws no grid. */
+  readonly gridLines?: readonly GridLine[];
   /**
    * How long a note takes to fall from the top of the stage to the
    * keyboard. Longer means more of the coming music is on screen at

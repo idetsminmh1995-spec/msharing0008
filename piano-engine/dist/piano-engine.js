@@ -26,6 +26,7 @@ var PianoEngine = (() => {
     KEYBOARD_RANGES: () => KEYBOARD_RANGES,
     KEYBOARD_SIZES: () => KEYBOARD_SIZES,
     fallingBars: () => fallingBars,
+    gridShapes: () => gridShapes,
     handColor: () => handColor,
     isBlackKey: () => isBlackKey,
     keyboardBox: () => keyboardBox,
@@ -149,11 +150,17 @@ var PianoEngine = (() => {
     blackKey: "#141010",
     keyEdge: "#2A2320",
     strikeLine: "#C81E2C",
+    // Faint: the grid is there to be read PAST. A line as strong as a
+    // note would compete with the thing it is meant to place.
+    barLine: "rgba(255,255,255,0.34)",
+    beatLine: "rgba(255,255,255,0.16)",
     leftHand: "#FFC400",
     rightHand: "#4FA3FF",
     background: "none"
   };
   var DEFAULT_LEAD_SECONDS = 2.5;
+  var BAR_LINE_FRACTION = 7e-3;
+  var BEAT_LINE_FRACTION = 35e-4;
   var KEYBOARD_FRACTION = 1 / 3;
   var LINE_FRACTION = 0.05;
   function resolveColors(colors) {
@@ -199,6 +206,32 @@ var PianoEngine = (() => {
     }
     return bars;
   }
+  function gridShapes(lines, options) {
+    const colors = resolveColors(options.colors);
+    const lead = options.leadSeconds !== void 0 && options.leadSeconds > 0 ? options.leadSeconds : DEFAULT_LEAD_SECONDS;
+    const board = keyboardBox(options);
+    const fallHeight = board.y;
+    if (!(fallHeight > 0)) return [];
+    const perSecond = fallHeight / lead;
+    const barThickness = Math.max(1.5, options.height * BAR_LINE_FRACTION);
+    const beatThickness = Math.max(1, options.height * BEAT_LINE_FRACTION);
+    const shapes = [];
+    for (const line of lines) {
+      const until = line.seconds - options.seconds;
+      if (until > lead || until < 0) continue;
+      const thickness = line.kind === "bar" ? barThickness : beatThickness;
+      const y = board.y - until * perSecond - thickness / 2;
+      if (y + thickness < 0 || y > board.y) continue;
+      shapes.push({
+        x: 0,
+        y,
+        width: options.width,
+        height: thickness,
+        fill: line.kind === "bar" ? colors.barLine : colors.beatLine
+      });
+    }
+    return shapes;
+  }
   function handColor(hand, colors) {
     return hand === "left" ? colors.leftHand : colors.rightHand;
   }
@@ -220,6 +253,7 @@ var PianoEngine = (() => {
         fill: colors.background
       });
     }
+    for (const shape of gridShapes(options.gridLines ?? [], options)) shapes.push(shape);
     for (const bar of fallingBars(notes, options)) {
       shapes.push({
         x: bar.x,

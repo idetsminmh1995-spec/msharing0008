@@ -19,6 +19,7 @@ export {
   DEFAULT_COLORS,
   DEFAULT_LEAD_SECONDS,
   fallingBars,
+  gridShapes,
   handColor,
   keyboardBox,
   renderKeyboardSvg,
@@ -28,6 +29,7 @@ export {
 } from './stage.js';
 export type {
   FallingBar,
+  GridLine,
   Hand,
   KeyboardSize,
   PianoColors,

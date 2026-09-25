@@ -803,6 +803,7 @@
     shownKey = null;
     showKey(keyAtTick(0));
     buildPianoNotes();
+    buildGridLines();
     drawStage(0);
     if (firstAttrs) {
       const timeStr = `${firstAttrs.timeNumerator}/${firstAttrs.timeDenominator}`;
@@ -870,6 +871,7 @@
     // against it, so it is rebuilt rather than left pointing at the old
     // one's ticks.
     buildPianoNotes();
+    buildGridLines();
     drawStage();
   }
 
@@ -959,9 +961,16 @@
   }
 
   function stageColors() {
+    const white = currentVideoStyle() === 'white';
     return {
       leftHand: leftHandColorInput?.value || '#FFC400',
       rightHand: rightHandColorInput?.value || '#4FA3FF',
+      // The grid has to be faint AGAINST ITS OWN FRAME: pale lines on
+      // a black video, dark ones on a white one. The same rgba on both
+      // would be invisible on one of them.
+      barLine: white ? 'rgba(30,21,18,0.38)' : 'rgba(255,255,255,0.34)',
+      beatLine: white ? 'rgba(30,21,18,0.18)' : 'rgba(255,255,255,0.16)',
+      ...(white ? { keyEdge: '#8A7C74' } : {}),
     };
   }
 
@@ -1039,6 +1048,52 @@
   }
 
   /**
+   * The bars and beats of the score, in WRITTEN seconds.
+   *
+   * The notes fall through a grid rather than through nothing: a
+   * stronger line on every barline, a fainter one on every beat
+   * inside it. Both are the score's own -- each bar is measured with
+   * its OWN time signature and its own tempo, so a 6/8 bar rules six
+   * lines and a 3/4 bar three, and a tempo change spaces them the way
+   * it spaces the notes.
+   *
+   * Written time, like the notes, and one entry per written bar: a
+   * repeat plays the same bar again rather than making new lines.
+   */
+  let gridLines = [];
+
+  function buildGridLines() {
+    gridLines = [];
+    const pb = notationPlayback;
+    const entries = pb?.performance?.entries;
+    if (!entries || entries.length === 0 || typeof NotationEngine === 'undefined') return;
+
+    const seen = new Set();
+    for (const entry of entries) {
+      if (seen.has(entry.measureNumber)) continue;
+      seen.add(entry.measureNumber);
+      const sig = pb.timeSignatureByMeasure.get(entry.measureNumber) ?? {
+        numerator: 4,
+        denominator: 4,
+      };
+      const ticksPerBeat = (4 / sig.denominator) * TICKS_PER_QUARTER;
+      if (!(ticksPerBeat > 0)) continue;
+      const beats = Math.max(1, Math.round(entry.ticks / ticksPerBeat));
+      for (let k = 0; k < beats; k++) {
+        try {
+          gridLines.push({
+            seconds: NotationEngine.tickToSeconds(pb.tempoMap, entry.writtenTick + k * ticksPerBeat),
+            kind: k === 0 ? 'bar' : 'beat',
+          });
+        } catch (err) {
+          /* a bar the tempo map cannot place rules no line */
+        }
+      }
+    }
+    gridLines.sort((a, b) => a.seconds - b.seconds);
+  }
+
+  /**
    * The moment the stage should show, in the score's WRITTEN seconds.
    *
    * Straight through `writtenTickAt`, which is what the cursor and the
@@ -1063,6 +1118,7 @@
       height,
       seconds: stageSeconds(atSeconds),
       notes: pianoNotes,
+      gridLines,
       leadSeconds: fallSeconds(),
       colors: stageColors(),
     };

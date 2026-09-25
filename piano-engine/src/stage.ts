@@ -12,6 +12,7 @@ import { keyboardGeometry, pressedAt } from './keyboard.js';
 import { n, rect, wrap } from './svg.js';
 import type {
   FallingBar,
+  GridLine,
   Hand,
   PianoColors,
   PianoKey,
@@ -25,6 +26,10 @@ export const DEFAULT_COLORS: PianoColors = {
   blackKey: '#141010',
   keyEdge: '#2A2320',
   strikeLine: '#C81E2C',
+  // Faint: the grid is there to be read PAST. A line as strong as a
+  // note would compete with the thing it is meant to place.
+  barLine: 'rgba(255,255,255,0.34)',
+  beatLine: 'rgba(255,255,255,0.16)',
   leftHand: '#FFC400',
   rightHand: '#4FA3FF',
   background: 'none',
@@ -32,6 +37,10 @@ export const DEFAULT_COLORS: PianoColors = {
 
 /** A note falls for this long before it is played, unless the caller says otherwise. */
 export const DEFAULT_LEAD_SECONDS = 2.5;
+
+/** Grid thickness, as a fraction of the stage's height. */
+const BAR_LINE_FRACTION = 0.007;
+const BEAT_LINE_FRACTION = 0.0035;
 
 /** How tall the keyboard is when nothing says: a third of the stage. */
 const KEYBOARD_FRACTION = 1 / 3;
@@ -121,6 +130,59 @@ export function fallingBars(
   return bars;
 }
 
+/**
+ * The grid, where it is NOW.
+ *
+ * The same mapping the notes use -- a moment's distance from the
+ * keyboard is its distance in time -- so a barline and the notes of
+ * that bar move together and arrive together. A line already past the
+ * keyboard, or not yet risen above the stage, is dropped.
+ */
+export function gridShapes(
+  lines: readonly GridLine[],
+  options: {
+    width: number;
+    height: number;
+    seconds: number;
+    leadSeconds?: number;
+    keyboardHeight?: number;
+    colors?: Partial<PianoColors>;
+  },
+): readonly StageShape[] {
+  const colors = resolveColors(options.colors);
+  const lead =
+    options.leadSeconds !== undefined && options.leadSeconds > 0
+      ? options.leadSeconds
+      : DEFAULT_LEAD_SECONDS;
+  const board = keyboardBox(options);
+  const fallHeight = board.y;
+  if (!(fallHeight > 0)) return [];
+  const perSecond = fallHeight / lead;
+
+  // A minimum of a whole pixel each: a line half a pixel thick is
+  // spread across two rows by the renderer, and half of a faint colour
+  // twice over is a line nobody can see.
+  const barThickness = Math.max(1.5, options.height * BAR_LINE_FRACTION);
+  const beatThickness = Math.max(1, options.height * BEAT_LINE_FRACTION);
+
+  const shapes: StageShape[] = [];
+  for (const line of lines) {
+    const until = line.seconds - options.seconds;
+    if (until > lead || until < 0) continue;
+    const thickness = line.kind === 'bar' ? barThickness : beatThickness;
+    const y = board.y - until * perSecond - thickness / 2;
+    if (y + thickness < 0 || y > board.y) continue;
+    shapes.push({
+      x: 0,
+      y,
+      width: options.width,
+      height: thickness,
+      fill: line.kind === 'bar' ? colors.barLine : colors.beatLine,
+    });
+  }
+  return shapes;
+}
+
 export function handColor(hand: Hand, colors: PianoColors): string {
   return hand === 'left' ? colors.leftHand : colors.rightHand;
 }
@@ -151,6 +213,9 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
       fill: colors.background,
     });
   }
+
+  // The grid first, so the notes come out of it rather than sit on it.
+  for (const shape of gridShapes(options.gridLines ?? [], options)) shapes.push(shape);
 
   // The falling notes go UNDER the keyboard: a bar that has landed
   // should look like it went into the key, not over it.
