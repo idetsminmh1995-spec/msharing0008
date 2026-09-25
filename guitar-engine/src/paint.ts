@@ -86,3 +86,35 @@ export function pathShape(
 ): StageShape {
   return { kind: 'path', d, ...bounds, fill, ...extra };
 }
+
+/**
+ * The same shapes, moved.
+ *
+ * Used to drop one drawing inside another -- the hand legend into the
+ * band above the neck -- without either of them knowing where it
+ * ended up. Paths carry their own coordinates, so those are shifted
+ * in the `d` string itself.
+ */
+export function translateShapes(
+  shapes: readonly StageShape[],
+  dx: number,
+  dy: number,
+): readonly StageShape[] {
+  if (dx === 0 && dy === 0) return shapes;
+  return shapes.map((shape) => ({
+    ...shape,
+    x: shape.x + dx,
+    y: shape.y + dy,
+    ...(shape.d === undefined ? {} : { d: shiftPath(shape.d, dx, dy) }),
+  }));
+}
+
+/** Every coordinate pair in a path, moved. Only the commands this engine writes. */
+function shiftPath(d: string, dx: number, dy: number): string {
+  let index = 0;
+  return d.replace(/-?\d+(?:\.\d+)?/g, (value) => {
+    const moved = Number(value) + (index % 2 === 0 ? dx : dy);
+    index += 1;
+    return String(Math.round(moved * 1000) / 1000);
+  });
+}

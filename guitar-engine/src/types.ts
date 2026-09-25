@@ -196,6 +196,17 @@ export interface FretboardOptions {
   readonly tuning?: readonly number[];
   /** The numbered circles and note names at the head of each string. On unless a caller says otherwise. */
   readonly stringLabels?: boolean;
+  /**
+   * Let the instrument run off both edges of the picture.
+   *
+   * A guitar filmed for a video fills the frame: the neck comes in
+   * from one edge and the body leaves by the other, and what you see
+   * is a window onto something bigger. Off, the whole instrument is
+   * drawn inside the box with its string labels beside it.
+   */
+  readonly bleed?: boolean;
+  /** Draw the four-colour hand in a band above the neck, as the video's own legend. */
+  readonly handLegend?: boolean;
   readonly colors?: Partial<GuitarColors>;
 }
 

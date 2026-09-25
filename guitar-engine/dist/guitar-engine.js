@@ -65,6 +65,9 @@ var GuitarEngine = (() => {
   var BOARD_FILL = 0.88;
   var STRING_MARGIN = 0.18;
   var HEADSTOCK_SHARE = 0.1;
+  var BLEED_BODY_VISIBLE = 0.17;
+  var BLEED_BODY_SHARE = 0.3;
+  var HAND_BAND_SHARE = 0.22;
   var LABELS_SHARE = 0.055;
   var BODY_SHARE = 0.2;
   var NUMBERS_SHARE = 0.16;
@@ -85,22 +88,26 @@ var GuitarEngine = (() => {
     const width = Math.max(0, options.width);
     const height = Math.max(0, options.height);
     const numbers = options.fretNumbers === false ? 0 : height * NUMBERS_SHARE;
-    const boardHeight = height - numbers;
-    const labelsWidth = options.stringLabels === false ? 0 : width * LABELS_SHARE;
-    const headstockWidth = width * HEADSTOCK_SHARE;
-    const bodyWidth = width * BODY_SHARE;
+    const handBand = options.handLegend === true ? height * HAND_BAND_SHARE : 0;
+    const boardHeight = Math.max(1, height - numbers - handBand);
+    const bleed = options.bleed === true;
+    const labelsWidth = bleed || options.stringLabels === false ? 0 : width * LABELS_SHARE;
+    const headstockWidth = bleed ? 0 : width * HEADSTOCK_SHARE;
+    const bodyWidth = width * (bleed ? BLEED_BODY_SHARE : BODY_SHARE);
+    const bodyX = bleed ? width * (1 - BLEED_BODY_VISIBLE) : width - bodyWidth;
     return {
-      board: { x: 0, y: 0, width, height: boardHeight },
-      labels: { x: 0, y: 0, width: labelsWidth, height: boardHeight },
-      headstock: { x: labelsWidth, y: 0, width: headstockWidth, height: boardHeight },
+      board: { x: 0, y: handBand, width, height: boardHeight },
+      labels: { x: 0, y: handBand, width: labelsWidth, height: boardHeight },
+      headstock: { x: labelsWidth, y: handBand, width: headstockWidth, height: boardHeight },
       neck: {
         x: labelsWidth + headstockWidth,
-        y: 0,
-        width: Math.max(1, width - labelsWidth - headstockWidth - bodyWidth),
+        y: handBand,
+        width: Math.max(1, bodyX - labelsWidth - headstockWidth),
         height: boardHeight
       },
-      body: { x: width - bodyWidth, y: 0, width: bodyWidth, height: boardHeight },
-      numbersY: boardHeight
+      body: { x: bodyX, y: handBand, width: bodyWidth, height: boardHeight },
+      hand: { x: 0, y: 0, width, height: handBand },
+      numbersY: handBand + boardHeight
     };
   }
   function taperAt(options, x) {
@@ -126,7 +133,12 @@ var GuitarEngine = (() => {
       height: options.height,
       ...options.strings !== void 0 ? { strings: options.strings } : {},
       ...options.fretNumbers !== void 0 ? { fretNumbers: options.fretNumbers } : {},
-      ...options.stringLabels !== void 0 ? { stringLabels: options.stringLabels } : {}
+      ...options.stringLabels !== void 0 ? { stringLabels: options.stringLabels } : {},
+      // These two move the board -- a bled neck starts at the left edge,
+      // and a hand legend pushes everything down under its band -- so a
+      // string worked out without them lands somewhere there is no neck.
+      ...options.bleed !== void 0 ? { bleed: options.bleed } : {},
+      ...options.handLegend !== void 0 ? { handLegend: options.handLegend } : {}
     };
     const board = guitarLayout(full).board;
     const middle = board.y + board.height / 2;
@@ -260,6 +272,23 @@ var GuitarEngine = (() => {
   }
   function pathShape(d, bounds, fill, extra = {}) {
     return { kind: "path", d, ...bounds, fill, ...extra };
+  }
+  function translateShapes(shapes, dx, dy) {
+    if (dx === 0 && dy === 0) return shapes;
+    return shapes.map((shape) => ({
+      ...shape,
+      x: shape.x + dx,
+      y: shape.y + dy,
+      ...shape.d === void 0 ? {} : { d: shiftPath(shape.d, dx, dy) }
+    }));
+  }
+  function shiftPath(d, dx, dy) {
+    let index = 0;
+    return d.replace(/-?\d+(?:\.\d+)?/g, (value) => {
+      const moved = Number(value) + (index % 2 === 0 ? dx : dy);
+      index += 1;
+      return String(Math.round(moved * 1e3) / 1e3);
+    });
   }
 
   // src/instrument.ts
@@ -654,6 +683,82 @@ var GuitarEngine = (() => {
     return shapes;
   }
 
+  // src/colors.ts
+  var FINGER_COLORS = {
+    index: "#E8352B",
+    middle: "#2B5BE8",
+    ring: "#1FA04A",
+    little: "#F2C200"
+  };
+  var DEFAULT_COLORS = {
+    board: "#D9AE6B",
+    boardDark: "#B0813F",
+    boardEdge: "#6B4A22",
+    neckWood: "#E3BE80",
+    neckWoodDark: "#B98C4A",
+    binding: "#F2E6CE",
+    fretWire: "#F0ECE6",
+    fretShadow: "rgba(0,0,0,0.42)",
+    nut: "#F5EEDF",
+    inlay: "#2E2018",
+    inlayEdge: "rgba(0,0,0,0.4)",
+    string: "#E4DACA",
+    stringShine: "rgba(255,255,255,0.75)",
+    fretNumber: "rgba(255,255,255,0.34)",
+    headstock: "#D9AE6B",
+    headstockEdge: "#8A6430",
+    peg: "#E0DCD5",
+    pegPost: "#A8A29A",
+    stringLabel: "#F1E7DC",
+    stringLabelInk: "#20130D",
+    body: "#171717",
+    bodyEdge: "#000000",
+    bodyBurst: "#2A0F0A",
+    bodyCentre: "#3A3A3A",
+    pickguard: "#F3F0E6",
+    pickguardEdge: "#BEB8A8",
+    soundhole: "#140B07",
+    rosette: "#C9A227",
+    pickup: "#EFE8D6",
+    pickupPole: "#9A958C",
+    hardware: "#D6D1CA",
+    hardwareDark: "#6E6963",
+    knob: "#F0EBE1",
+    pick: "#F7F4F0",
+    unassigned: "#F7F4F0",
+    open: "#9AA6B2",
+    ...FINGER_COLORS,
+    background: "none"
+  };
+  function instrumentColors(instrument) {
+    return modelColors(instrument);
+  }
+  function resolveColors(colors, instrument) {
+    return { ...DEFAULT_COLORS, ...instrumentColors(instrument), ...colors ?? {} };
+  }
+  function fingerColor(finger, colors) {
+    switch (finger) {
+      case 0:
+        return colors.open;
+      case 1:
+        return colors.index;
+      case 2:
+        return colors.middle;
+      case 3:
+        return colors.ring;
+      case 4:
+        return colors.little;
+      default:
+        return colors.unassigned;
+    }
+  }
+  var FINGER_NAMES = {
+    1: "Index",
+    2: "Middle",
+    3: "Ring",
+    4: "Little"
+  };
+
   // src/svg.ts
   function escapeText(value) {
     return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -728,82 +833,117 @@ var GuitarEngine = (() => {
     return `<${name}${attrs(values)}>${body}</${name}>`;
   }
 
-  // src/stage.ts
-  var FINGER_COLORS = {
-    index: "#E8352B",
-    middle: "#2B5BE8",
-    ring: "#1FA04A",
-    little: "#F2C200"
+  // src/hand.ts
+  var FINGER_LENGTH = {
+    1: 0.88,
+    2: 1,
+    3: 0.94,
+    4: 0.74
   };
-  var DEFAULT_COLORS = {
-    board: "#D9AE6B",
-    boardDark: "#B0813F",
-    boardEdge: "#6B4A22",
-    neckWood: "#E3BE80",
-    neckWoodDark: "#B98C4A",
-    binding: "#F2E6CE",
-    fretWire: "#F0ECE6",
-    fretShadow: "rgba(0,0,0,0.42)",
-    nut: "#F5EEDF",
-    inlay: "#2E2018",
-    inlayEdge: "rgba(0,0,0,0.4)",
-    string: "#E4DACA",
-    stringShine: "rgba(255,255,255,0.75)",
-    fretNumber: "rgba(255,255,255,0.34)",
-    headstock: "#D9AE6B",
-    headstockEdge: "#8A6430",
-    peg: "#E0DCD5",
-    pegPost: "#A8A29A",
-    stringLabel: "#F1E7DC",
-    stringLabelInk: "#20130D",
-    body: "#171717",
-    bodyEdge: "#000000",
-    bodyBurst: "#2A0F0A",
-    bodyCentre: "#3A3A3A",
-    pickguard: "#F3F0E6",
-    pickguardEdge: "#BEB8A8",
-    soundhole: "#140B07",
-    rosette: "#C9A227",
-    pickup: "#EFE8D6",
-    pickupPole: "#9A958C",
-    hardware: "#D6D1CA",
-    hardwareDark: "#6E6963",
-    knob: "#F0EBE1",
-    pick: "#F7F4F0",
-    unassigned: "#F7F4F0",
-    open: "#9AA6B2",
-    ...FINGER_COLORS,
-    background: "none"
-  };
-  function instrumentColors(instrument) {
-    return modelColors(instrument);
-  }
-  var MARK_SIZE = 1.5;
-  function resolveColors(colors, instrument) {
-    return { ...DEFAULT_COLORS, ...instrumentColors(instrument), ...colors ?? {} };
-  }
-  function fingerColor(finger, colors) {
-    switch (finger) {
-      case 0:
-        return colors.open;
-      case 1:
-        return colors.index;
-      case 2:
-        return colors.middle;
-      case 3:
-        return colors.ring;
-      case 4:
-        return colors.little;
-      default:
-        return colors.unassigned;
+  function handShapes(options) {
+    const colors = resolveColors(options.colors);
+    const { width, height } = options;
+    if (!(width > 0) || !(height > 0)) return [];
+    const skin = options.handColor ?? "#F2E7DF";
+    const outline = options.outline ?? "#8A7C74";
+    const line = Math.max(1, width * 0.012);
+    const shapes = [];
+    const palmLeft = width * 0.22;
+    const palmRight = width * 0.94;
+    const palmTop = height * 0.5;
+    const palmWidth = palmRight - palmLeft;
+    const palmHeight = height - palmTop - height * 0.03;
+    const thumbWidth = palmWidth * 0.26;
+    shapes.push({
+      kind: "rect",
+      x: palmLeft - thumbWidth * 0.8,
+      y: palmTop + palmHeight * 0.16,
+      width: thumbWidth,
+      height: palmHeight * 0.66,
+      fill: skin,
+      stroke: outline,
+      strokeWidth: line,
+      radius: thumbWidth / 2
+    });
+    shapes.push({
+      kind: "rect",
+      x: palmLeft,
+      y: palmTop,
+      width: palmWidth,
+      height: palmHeight,
+      fill: skin,
+      stroke: outline,
+      strokeWidth: line,
+      radius: Math.min(palmWidth, palmHeight) * 0.3
+    });
+    const gap = palmWidth * 0.06;
+    const fingerWidth = (palmWidth - gap * 3) / 4;
+    const longest = palmTop - height * 0.06;
+    const dots = [];
+    for (const key of [1, 2, 3, 4]) {
+      const index = key - 1;
+      const length = longest * FINGER_LENGTH[key];
+      const x = palmLeft + index * (fingerWidth + gap);
+      const y = palmTop - length;
+      shapes.push({
+        kind: "rect",
+        x,
+        y,
+        width: fingerWidth,
+        // Reaching into the palm, so no seam shows where they meet.
+        height: length + palmHeight * 0.32,
+        fill: skin,
+        stroke: outline,
+        strokeWidth: line,
+        radius: fingerWidth / 2
+      });
+      const colour = key === 1 ? colors.index : key === 2 ? colors.middle : key === 3 ? colors.ring : colors.little;
+      dots.push({
+        kind: "rect",
+        x,
+        y,
+        width: fingerWidth,
+        height: length * 0.62,
+        fill: colour,
+        radius: fingerWidth / 2
+      });
     }
+    return [...shapes, ...dots];
   }
-  var FINGER_NAMES = {
-    1: "Index",
-    2: "Middle",
-    3: "Ring",
-    4: "Little"
-  };
+  function renderHand(options) {
+    const gradients = new GradientBank();
+    const body = handShapes(options).map((shape) => {
+      const common = {
+        fill: gradients.paint(shape.fill),
+        ...shape.stroke !== void 0 ? { stroke: shape.stroke } : {},
+        ...shape.strokeWidth !== void 0 ? { "stroke-width": shape.strokeWidth } : {}
+      };
+      if (shape.kind === "circle") {
+        return tag("circle", { cx: shape.x, cy: shape.y, r: shape.width / 2, ...common });
+      }
+      return tag("rect", {
+        x: shape.x,
+        y: shape.y,
+        width: shape.width,
+        height: shape.height,
+        ...shape.radius !== void 0 ? { rx: shape.radius } : {},
+        ...common
+      });
+    }).join("");
+    return wrap(
+      "svg",
+      {
+        xmlns: "http://www.w3.org/2000/svg",
+        viewBox: `0 0 ${n(options.width)} ${n(options.height)}`,
+        width: options.width,
+        height: options.height
+      },
+      gradients.finish(body)
+    );
+  }
+
+  // src/stage.ts
+  var MARK_SIZE = 1.5;
   function stringGap(options) {
     const lines = stringLines(options);
     return lines.length > 1 ? lines[1].offset - lines[0].offset : guitarLayout(options).board.height / 6;
@@ -892,12 +1032,25 @@ var GuitarEngine = (() => {
         );
       }
     }
+    shapes.push(...handLegendShapes(options));
     shapes.push(...inlayShapes(options, colors));
     shapes.push(...fretShapes(options, colors));
     shapes.push(...stringShapes(options, colors, endX));
     shapes.push(...stringLabelShapes(options, colors));
     shapes.push(...fretNumberShapes(options, colors));
     return shapes;
+  }
+  function handLegendShapes(options) {
+    if (options.handLegend !== true) return [];
+    const band = guitarLayout(options).hand;
+    if (!(band.height > 0)) return [];
+    const height = band.height * 0.94;
+    const width = height * 0.78;
+    return translateShapes(
+      handShapes({ width, height, handColor: "#F6EDE6", outline: "rgba(0,0,0,0.35)" }),
+      band.x + band.width * 0.012,
+      band.y + (band.height - height) / 2
+    );
   }
   function inlayShapes(options, colors) {
     const shapes = [];
@@ -1268,114 +1421,6 @@ var GuitarEngine = (() => {
   }
   function renderFretboard(options) {
     return renderGuitarStage({ ...options, seconds: 0, notes: [] });
-  }
-
-  // src/hand.ts
-  var FINGER_LENGTH = {
-    1: 0.88,
-    2: 1,
-    3: 0.94,
-    4: 0.74
-  };
-  function handShapes(options) {
-    const colors = resolveColors(options.colors);
-    const { width, height } = options;
-    if (!(width > 0) || !(height > 0)) return [];
-    const skin = options.handColor ?? "#F2E7DF";
-    const outline = options.outline ?? "#8A7C74";
-    const line = Math.max(1, width * 0.012);
-    const shapes = [];
-    const palmLeft = width * 0.22;
-    const palmRight = width * 0.94;
-    const palmTop = height * 0.5;
-    const palmWidth = palmRight - palmLeft;
-    const palmHeight = height - palmTop - height * 0.03;
-    const thumbWidth = palmWidth * 0.26;
-    shapes.push({
-      kind: "rect",
-      x: palmLeft - thumbWidth * 0.8,
-      y: palmTop + palmHeight * 0.16,
-      width: thumbWidth,
-      height: palmHeight * 0.66,
-      fill: skin,
-      stroke: outline,
-      strokeWidth: line,
-      radius: thumbWidth / 2
-    });
-    shapes.push({
-      kind: "rect",
-      x: palmLeft,
-      y: palmTop,
-      width: palmWidth,
-      height: palmHeight,
-      fill: skin,
-      stroke: outline,
-      strokeWidth: line,
-      radius: Math.min(palmWidth, palmHeight) * 0.3
-    });
-    const gap = palmWidth * 0.06;
-    const fingerWidth = (palmWidth - gap * 3) / 4;
-    const longest = palmTop - height * 0.06;
-    const dots = [];
-    for (const key of [1, 2, 3, 4]) {
-      const index = key - 1;
-      const length = longest * FINGER_LENGTH[key];
-      const x = palmLeft + index * (fingerWidth + gap);
-      const y = palmTop - length;
-      shapes.push({
-        kind: "rect",
-        x,
-        y,
-        width: fingerWidth,
-        // Reaching into the palm, so no seam shows where they meet.
-        height: length + palmHeight * 0.32,
-        fill: skin,
-        stroke: outline,
-        strokeWidth: line,
-        radius: fingerWidth / 2
-      });
-      const dotR = fingerWidth * 0.42;
-      dots.push({
-        kind: "circle",
-        x: x + fingerWidth / 2,
-        y: y + dotR * 1.5,
-        width: dotR * 2,
-        height: dotR * 2,
-        fill: key === 1 ? colors.index : key === 2 ? colors.middle : key === 3 ? colors.ring : colors.little
-      });
-    }
-    return [...shapes, ...dots];
-  }
-  function renderHand(options) {
-    const gradients = new GradientBank();
-    const body = handShapes(options).map((shape) => {
-      const common = {
-        fill: gradients.paint(shape.fill),
-        ...shape.stroke !== void 0 ? { stroke: shape.stroke } : {},
-        ...shape.strokeWidth !== void 0 ? { "stroke-width": shape.strokeWidth } : {}
-      };
-      if (shape.kind === "circle") {
-        return tag("circle", { cx: shape.x, cy: shape.y, r: shape.width / 2, ...common });
-      }
-      return tag("rect", {
-        x: shape.x,
-        y: shape.y,
-        width: shape.width,
-        height: shape.height,
-        ...shape.radius !== void 0 ? { rx: shape.radius } : {},
-        ...common
-      });
-    }).join("");
-    return wrap(
-      "svg",
-      {
-        xmlns: "http://www.w3.org/2000/svg",
-        viewBox: `0 0 ${n(options.width)} ${n(options.height)}`,
-        width: options.width,
-        height: options.height
-      },
-      gradients.finish(body)
-    );
   }
   return __toCommonJS(index_exports);
 })();

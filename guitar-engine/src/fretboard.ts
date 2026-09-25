@@ -40,6 +40,20 @@ const STRING_MARGIN = 0.18;
  */
 const HEADSTOCK_SHARE = 0.1;
 /**
+ * BLEED: the instrument runs off both edges of the picture.
+ *
+ * A guitar photographed for a video does not sit inside the frame
+ * with air around it -- the neck runs in from one edge and the body
+ * out of the other, and the frame is a window onto an instrument
+ * bigger than it. In this mode the nut is at the left edge (the
+ * headstock is off-screen) and only the near part of the body is
+ * seen, which leaves far more room for the frets that matter.
+ */
+const BLEED_BODY_VISIBLE = 0.17;
+const BLEED_BODY_SHARE = 0.3;
+/** The band above the neck where the hand legend sits, when one is drawn. */
+const HAND_BAND_SHARE = 0.22;
+/**
  * The gutter at the far left, where each string's number and name go.
  *
  * Its own strip, OUTSIDE the instrument: printed over the headstock
@@ -89,33 +103,44 @@ export function guitarLayout(options: {
   height: number;
   fretNumbers?: boolean;
   stringLabels?: boolean;
+  bleed?: boolean;
+  handLegend?: boolean;
 }): {
   board: { x: number; y: number; width: number; height: number };
   labels: { x: number; y: number; width: number; height: number };
   neck: { x: number; y: number; width: number; height: number };
   headstock: { x: number; y: number; width: number; height: number };
   body: { x: number; y: number; width: number; height: number };
+  /** The strip above the neck, empty unless a hand legend is drawn in it. */
+  hand: { x: number; y: number; width: number; height: number };
   numbersY: number;
 } {
   const width = Math.max(0, options.width);
   const height = Math.max(0, options.height);
   const numbers = options.fretNumbers === false ? 0 : height * NUMBERS_SHARE;
-  const boardHeight = height - numbers;
-  const labelsWidth = options.stringLabels === false ? 0 : width * LABELS_SHARE;
-  const headstockWidth = width * HEADSTOCK_SHARE;
-  const bodyWidth = width * BODY_SHARE;
+  const handBand = options.handLegend === true ? height * HAND_BAND_SHARE : 0;
+  const boardHeight = Math.max(1, height - numbers - handBand);
+  const bleed = options.bleed === true;
+  // Bled, the head and the label gutter are off the left edge and the
+  // body runs off the right; otherwise the whole instrument is inside
+  // the picture with its gutter beside it.
+  const labelsWidth = bleed || options.stringLabels === false ? 0 : width * LABELS_SHARE;
+  const headstockWidth = bleed ? 0 : width * HEADSTOCK_SHARE;
+  const bodyWidth = width * (bleed ? BLEED_BODY_SHARE : BODY_SHARE);
+  const bodyX = bleed ? width * (1 - BLEED_BODY_VISIBLE) : width - bodyWidth;
   return {
-    board: { x: 0, y: 0, width, height: boardHeight },
-    labels: { x: 0, y: 0, width: labelsWidth, height: boardHeight },
-    headstock: { x: labelsWidth, y: 0, width: headstockWidth, height: boardHeight },
+    board: { x: 0, y: handBand, width, height: boardHeight },
+    labels: { x: 0, y: handBand, width: labelsWidth, height: boardHeight },
+    headstock: { x: labelsWidth, y: handBand, width: headstockWidth, height: boardHeight },
     neck: {
       x: labelsWidth + headstockWidth,
-      y: 0,
-      width: Math.max(1, width - labelsWidth - headstockWidth - bodyWidth),
+      y: handBand,
+      width: Math.max(1, bodyX - labelsWidth - headstockWidth),
       height: boardHeight,
     },
-    body: { x: width - bodyWidth, y: 0, width: bodyWidth, height: boardHeight },
-    numbersY: boardHeight,
+    body: { x: bodyX, y: handBand, width: bodyWidth, height: boardHeight },
+    hand: { x: 0, y: 0, width, height: handBand },
+    numbersY: handBand + boardHeight,
   };
 }
 
@@ -161,6 +186,8 @@ export function stringLines(options: {
   lastFret?: number;
   fretNumbers?: boolean;
   stringLabels?: boolean;
+  bleed?: boolean;
+  handLegend?: boolean;
 }): readonly StringLine[] {
   const count = stringCount(options);
   if (!(options.height > 0)) return [];
@@ -170,6 +197,11 @@ export function stringLines(options: {
     ...(options.strings !== undefined ? { strings: options.strings } : {}),
     ...(options.fretNumbers !== undefined ? { fretNumbers: options.fretNumbers } : {}),
     ...(options.stringLabels !== undefined ? { stringLabels: options.stringLabels } : {}),
+    // These two move the board -- a bled neck starts at the left edge,
+    // and a hand legend pushes everything down under its band -- so a
+    // string worked out without them lands somewhere there is no neck.
+    ...(options.bleed !== undefined ? { bleed: options.bleed } : {}),
+    ...(options.handLegend !== undefined ? { handLegend: options.handLegend } : {}),
   };
   const board = guitarLayout(full).board;
   const middle = board.y + board.height / 2;

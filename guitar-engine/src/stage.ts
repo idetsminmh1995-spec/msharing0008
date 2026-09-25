@@ -27,131 +27,36 @@ import {
   stringYAt,
   tuningFor,
 } from './fretboard.js';
-import { bodyShapes, headstockShapes, inlayStyle, modelColors } from './instrument.js';
-import { circleShape, downward, pathShape, radial, rectShape } from './paint.js';
+import { fingerColor, resolveColors } from './colors.js';
+import { handShapes } from './hand.js';
+import { bodyShapes, headstockShapes, inlayStyle } from './instrument.js';
+import { circleShape, downward, pathShape, radial, rectShape, translateShapes } from './paint.js';
 import { GradientBank, escapeText, n, tag, wrap } from './svg.js';
 import type {
-  Finger,
   FretboardOptions,
   GuitarColors,
   GuitarStageOptions,
-  Instrument,
   LivePosition,
   PickMark,
   StageShape,
 } from './types.js';
 
-/**
- * The finger colours are the ones on the hand: index red, middle
- * blue, ring green, little yellow.
- *
- * They are FIXED rather than pickable, because their whole job is to
- * be learnt once -- a viewer who has seen the hand knows what red
- * means for the rest of the video, and for the next video too. Four
- * colours anyone can re-pick is four colours nobody can learn.
- */
-export const FINGER_COLORS = {
-  index: '#E8352B',
-  middle: '#2B5BE8',
-  ring: '#1FA04A',
-  little: '#F2C200',
-} as const;
-
-/**
- * The default guitar: a maple-necked electric.
- *
- * Light board, black dots, a white scratchplate and three single
- * coils -- the instrument most people picture when they hear
- * "electric guitar", and the one the page opens on.
- */
-export const DEFAULT_COLORS: GuitarColors = {
-  board: '#D9AE6B',
-  boardDark: '#B0813F',
-  boardEdge: '#6B4A22',
-  neckWood: '#E3BE80',
-  neckWoodDark: '#B98C4A',
-  binding: '#F2E6CE',
-  fretWire: '#F0ECE6',
-  fretShadow: 'rgba(0,0,0,0.42)',
-  nut: '#F5EEDF',
-  inlay: '#2E2018',
-  inlayEdge: 'rgba(0,0,0,0.4)',
-  string: '#E4DACA',
-  stringShine: 'rgba(255,255,255,0.75)',
-  fretNumber: 'rgba(255,255,255,0.34)',
-  headstock: '#D9AE6B',
-  headstockEdge: '#8A6430',
-  peg: '#E0DCD5',
-  pegPost: '#A8A29A',
-  stringLabel: '#F1E7DC',
-  stringLabelInk: '#20130D',
-  body: '#171717',
-  bodyEdge: '#000000',
-  bodyBurst: '#2A0F0A',
-  bodyCentre: '#3A3A3A',
-  pickguard: '#F3F0E6',
-  pickguardEdge: '#BEB8A8',
-  soundhole: '#140B07',
-  rosette: '#C9A227',
-  pickup: '#EFE8D6',
-  pickupPole: '#9A958C',
-  hardware: '#D6D1CA',
-  hardwareDark: '#6E6963',
-  knob: '#F0EBE1',
-  pick: '#F7F4F0',
-  unassigned: '#F7F4F0',
-  open: '#9AA6B2',
-  ...FINGER_COLORS,
-  background: 'none',
-};
-
-export { ACOUSTIC_COLORS, SINGLE_CUT_COLORS } from './instrument.js';
-
-export function instrumentColors(instrument: Instrument | undefined): Partial<GuitarColors> {
-  return modelColors(instrument);
-}
+// The palette lives next door so the hand legend can read it too; it
+// is re-exported here because this is where callers have always found
+// it.
+export {
+  ACOUSTIC_COLORS,
+  DEFAULT_COLORS,
+  FINGER_COLORS,
+  FINGER_NAMES,
+  SINGLE_CUT_COLORS,
+  fingerColor,
+  instrumentColors,
+  resolveColors,
+} from './colors.js';
 
 /** How big a played mark is, as a fraction of the gap between two strings. */
 const MARK_SIZE = 1.5;
-
-export function resolveColors(
-  colors?: Partial<GuitarColors>,
-  instrument?: Instrument,
-): GuitarColors {
-  return { ...DEFAULT_COLORS, ...instrumentColors(instrument), ...(colors ?? {}) };
-}
-
-/**
- * The colour a finger is drawn in.
- *
- * An unanswered note is NOT given a finger's colour: it gets its own,
- * so a video never says "little finger" about a note nobody has
- * decided yet.
- */
-export function fingerColor(finger: Finger | undefined, colors: GuitarColors): string {
-  switch (finger) {
-    case 0:
-      return colors.open;
-    case 1:
-      return colors.index;
-    case 2:
-      return colors.middle;
-    case 3:
-      return colors.ring;
-    case 4:
-      return colors.little;
-    default:
-      return colors.unassigned;
-  }
-}
-
-/** The names, in the order a hand has them. Exported so a page's legend and this engine agree. */
-export const FINGER_NAMES: Readonly<Record<1 | 2 | 3 | 4, string>> = {
-  1: 'Index',
-  2: 'Middle',
-  3: 'Ring',
-  4: 'Little',
-};
 
 /** The gap between two strings at the nut, which everything is sized against. */
 function stringGap(options: FretboardOptions): number {
@@ -274,6 +179,7 @@ export function fretboardShapes(options: FretboardOptions): readonly StageShape[
     }
   }
 
+  shapes.push(...handLegendShapes(options));
   shapes.push(...inlayShapes(options, colors));
   shapes.push(...fretShapes(options, colors));
   shapes.push(...stringShapes(options, colors, endX));
@@ -281,6 +187,27 @@ export function fretboardShapes(options: FretboardOptions): readonly StageShape[
   shapes.push(...fretNumberShapes(options, colors));
 
   return shapes;
+}
+
+/**
+ * The four-colour hand, in the band above the neck.
+ *
+ * The video's own legend: the colours on the neck mean nothing until
+ * someone is told what they mean, and a hand says it without words.
+ * It is drawn INTO the stage rather than laid over it by the page, so
+ * the exported video carries it too.
+ */
+function handLegendShapes(options: FretboardOptions): readonly StageShape[] {
+  if (options.handLegend !== true) return [];
+  const band = guitarLayout(options).hand;
+  if (!(band.height > 0)) return [];
+  const height = band.height * 0.94;
+  const width = height * 0.78;
+  return translateShapes(
+    handShapes({ width, height, handColor: '#F6EDE6', outline: 'rgba(0,0,0,0.35)' }),
+    band.x + band.width * 0.012,
+    band.y + (band.height - height) / 2,
+  );
 }
 
 /** The dots, or the pearl blocks, set into the wood under the strings. */

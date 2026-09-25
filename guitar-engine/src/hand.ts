@@ -11,7 +11,7 @@
  * It is the FRETTING hand, the one doing the stopping, seen palm on
  * with the thumb to the left.
  */
-import { resolveColors } from './stage.js';
+import { resolveColors } from './colors.js';
 import { GradientBank, n, tag, wrap } from './svg.js';
 import type { GuitarColors, StageShape } from './types.js';
 
@@ -104,23 +104,26 @@ export function handShapes(options: HandOptions): readonly StageShape[] {
       strokeWidth: line,
       radius: fingerWidth / 2,
     });
-    // The dot goes ON the fingertip, and is drawn after every finger
-    // so a neighbour's outline never crosses it.
-    const dotR = fingerWidth * 0.42;
+    // The top of the finger is painted in that finger's colour, not
+    // just a dot on the tip. At the size this is drawn in a video
+    // frame -- a couple of centimetres -- a dot is a speck and a
+    // coloured finger is unmistakable.
+    const colour =
+      key === 1
+        ? colors.index
+        : key === 2
+          ? colors.middle
+          : key === 3
+            ? colors.ring
+            : colors.little;
     dots.push({
-      kind: 'circle',
-      x: x + fingerWidth / 2,
-      y: y + dotR * 1.5,
-      width: dotR * 2,
-      height: dotR * 2,
-      fill:
-        key === 1
-          ? colors.index
-          : key === 2
-            ? colors.middle
-            : key === 3
-              ? colors.ring
-              : colors.little,
+      kind: 'rect',
+      x,
+      y,
+      width: fingerWidth,
+      height: length * 0.62,
+      fill: colour,
+      radius: fingerWidth / 2,
     });
   }
   return [...shapes, ...dots];
