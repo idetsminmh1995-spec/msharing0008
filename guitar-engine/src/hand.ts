@@ -12,7 +12,7 @@
  * with the thumb to the left.
  */
 import { resolveColors } from './stage.js';
-import { n, tag, wrap } from './svg.js';
+import { GradientBank, n, tag, wrap } from './svg.js';
 import type { GuitarColors, StageShape } from './types.js';
 
 /** Finger lengths, as fractions of the longest -- a real hand, roughly. */
@@ -127,10 +127,11 @@ export function handShapes(options: HandOptions): readonly StageShape[] {
 }
 
 export function renderHand(options: HandOptions): string {
+  const gradients = new GradientBank();
   const body = handShapes(options)
     .map((shape) => {
       const common = {
-        fill: shape.fill,
+        fill: gradients.paint(shape.fill),
         ...(shape.stroke !== undefined ? { stroke: shape.stroke } : {}),
         ...(shape.strokeWidth !== undefined ? { 'stroke-width': shape.strokeWidth } : {}),
       };
@@ -155,6 +156,6 @@ export function renderHand(options: HandOptions): string {
       width: options.width,
       height: options.height,
     },
-    body,
+    gradients.finish(body),
   );
 }

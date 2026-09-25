@@ -67,31 +67,90 @@ export interface FretWire {
   readonly offset: number;
 }
 
+/** One colour stop of a gradient. The colour carries its own alpha if it needs one. */
+export interface GradientStop {
+  /** 0 at the start of the gradient, 1 at its end. */
+  readonly offset: number;
+  readonly color: string;
+}
+
+/**
+ * A gradient, in the same coordinates as the shape it fills.
+ *
+ * Wood is not one colour, and neither is a fret wire, a string or a
+ * sunburst top. Both renderers can draw these -- SVG as a
+ * `<linearGradient>` in its defs, canvas as a `CanvasGradient` -- so
+ * the picture can look like an instrument without either side
+ * inventing anything the other cannot.
+ */
+export interface LinearGradient {
+  readonly kind: 'linear';
+  readonly x1: number;
+  readonly y1: number;
+  readonly x2: number;
+  readonly y2: number;
+  readonly stops: readonly GradientStop[];
+}
+
+export interface RadialGradient {
+  readonly kind: 'radial';
+  readonly cx: number;
+  readonly cy: number;
+  readonly r: number;
+  readonly stops: readonly GradientStop[];
+}
+
+/** What a shape is filled with. */
+export type Paint = string | LinearGradient | RadialGradient;
+
 export interface GuitarColors {
-  /** The neck itself. */
+  /** The fretboard itself: the wood the frets are set into. */
   readonly board: string;
+  /** The same wood in shadow, for the gradient down the board. */
+  readonly boardDark: string;
   readonly boardEdge: string;
+  /** The neck's own wood, seen at the edges of the board. */
+  readonly neckWood: string;
+  readonly neckWoodDark: string;
+  /** The cream binding down the edge of a bound neck and a bound body. */
+  readonly binding: string;
   readonly fretWire: string;
+  /** The dark side of a fret wire, which is what makes it look round. */
+  readonly fretShadow: string;
   readonly nut: string;
   readonly inlay: string;
+  readonly inlayEdge: string;
   readonly string: string;
+  /** The line of light along the top of a wound string. */
+  readonly stringShine: string;
   /** The fret numbers under the board -- faint, they are there to be glanced at. */
   readonly fretNumber: string;
   /** The headstock at the left, and the tuning pegs on it. */
   readonly headstock: string;
+  readonly headstockEdge: string;
   readonly peg: string;
+  readonly pegPost: string;
   /** The numbered circle at the head of each string, and the note name beside it. */
   readonly stringLabel: string;
   readonly stringLabelInk: string;
   /** The body at the right: the top, and what is on it. */
   readonly body: string;
   readonly bodyEdge: string;
+  /** The dark rim of a sunburst top, and the amber at its centre. */
+  readonly bodyBurst: string;
+  readonly bodyCentre: string;
+  /** The scratchplate on an electric, and the one on an acoustic. */
+  readonly pickguard: string;
+  readonly pickguardEdge: string;
   /** An acoustic's soundhole and the ring round it. */
   readonly soundhole: string;
   readonly rosette: string;
   /** An electric's pickups and bridge. */
   readonly pickup: string;
+  readonly pickupPole: string;
   readonly hardware: string;
+  readonly hardwareDark: string;
+  readonly knob: string;
   /** The picking hand's stroke marks, over the strings it is hitting. */
   readonly pick: string;
   /** A note nobody has assigned a finger to yet -- not a finger's colour. */
@@ -140,7 +199,17 @@ export interface FretboardOptions {
   readonly colors?: Partial<GuitarColors>;
 }
 
-export type Instrument = 'acoustic' | 'electric';
+/**
+ * Which guitar is drawn.
+ *
+ * Not decoration: these are different instruments to look at, and a
+ * page that offers them should show the one that was picked. Each
+ * changes the wood, the inlays, the headstock and what is mounted on
+ * the body -- a maple board with dots and a scratchplate, a spruce top
+ * with a soundhole, or an ebony board with block inlays and a pair of
+ * humbuckers.
+ */
+export type Instrument = 'acoustic' | 'electric' | 'singleCut';
 
 /**
  * A stroke of the picking hand, as the frame should show it.
@@ -178,7 +247,7 @@ export interface StageShape {
   /** A rect's box; a circle's diameter; a text's own size is `fontSize`. */
   readonly width: number;
   readonly height: number;
-  readonly fill: string;
+  readonly fill: Paint;
   readonly stroke?: string;
   readonly strokeWidth?: number;
   readonly radius?: number;
@@ -189,7 +258,26 @@ export interface StageShape {
    * string labels at the head. It changes nothing about the drawing:
    * a renderer paints every shape the same way.
    */
-  readonly role?: 'fretNumber' | 'stringLabel' | 'stringName';
+  readonly role?:
+    | 'fretNumber'
+    | 'stringLabel'
+    | 'stringName'
+    | 'neck'
+    | 'board'
+    | 'binding'
+    | 'fret'
+    | 'nut'
+    | 'inlay'
+    | 'string'
+    | 'headstock'
+    | 'tuner'
+    | 'body'
+    | 'pickguard'
+    | 'soundhole'
+    | 'pickup'
+    | 'hardware'
+    | 'mark'
+    | 'pickStroke';
   /**
    * Path only: an SVG path, filled (never stroked), in the same
    * coordinates as everything else.

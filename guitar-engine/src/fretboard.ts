@@ -18,19 +18,36 @@ export const DEFAULT_FIRST_FRET = 0;
 export const DEFAULT_LAST_FRET = 12;
 
 /**
- * How much of the height the strings span, leaving the rest as the
- * edge of the neck above and below them.
+ * The neck is a WEDGE, and these three numbers are its shape.
+ *
+ * A real neck is narrow at the nut and wide at the body, which is
+ * most of why a photograph of a guitar reads as a guitar and a row of
+ * parallel lines reads as a ladder. The board is drawn to fill the
+ * height at its widest point and to be `NECK_TAPER` times narrower at
+ * the nut; the strings sit inside it with a margin of wood either
+ * side, the way they do on the instrument.
  */
-const STRING_SPAN = 0.82;
+const NECK_TAPER = 1.18;
+/** How much of the height the board takes at its widest. */
+const BOARD_FILL = 0.88;
+/** The wood outside the outer strings, as a share of the board's half-height. */
+const STRING_MARGIN = 0.18;
+
 /**
  * The picture is a GUITAR, not a fretboard on its own: a headstock at
  * the left, the fretted neck in the middle, the body at the right.
  * These are the shares of the width each takes.
  */
-const HEADSTOCK_SHARE = 0.085;
-/** The head grows when it has to carry a numbered circle and a note name. */
-const LABELLED_HEADSTOCK_SHARE = 0.13;
-const BODY_SHARE = 0.16;
+const HEADSTOCK_SHARE = 0.1;
+/**
+ * The gutter at the far left, where each string's number and name go.
+ *
+ * Its own strip, OUTSIDE the instrument: printed over the headstock
+ * they would sit on top of the tuners, and a picture meant to look
+ * like a guitar cannot have writing across its head.
+ */
+const LABELS_SHARE = 0.055;
+const BODY_SHARE = 0.2;
 /** The strip under the board where the fret numbers go. */
 const NUMBERS_SHARE = 0.16;
 /** The thinnest and thickest string, as a fraction of the gap between two strings. */
@@ -74,6 +91,7 @@ export function guitarLayout(options: {
   stringLabels?: boolean;
 }): {
   board: { x: number; y: number; width: number; height: number };
+  labels: { x: number; y: number; width: number; height: number };
   neck: { x: number; y: number; width: number; height: number };
   headstock: { x: number; y: number; width: number; height: number };
   body: { x: number; y: number; width: number; height: number };
@@ -83,16 +101,17 @@ export function guitarLayout(options: {
   const height = Math.max(0, options.height);
   const numbers = options.fretNumbers === false ? 0 : height * NUMBERS_SHARE;
   const boardHeight = height - numbers;
-  const headstockWidth =
-    width * (options.stringLabels === false ? HEADSTOCK_SHARE : LABELLED_HEADSTOCK_SHARE);
+  const labelsWidth = options.stringLabels === false ? 0 : width * LABELS_SHARE;
+  const headstockWidth = width * HEADSTOCK_SHARE;
   const bodyWidth = width * BODY_SHARE;
   return {
     board: { x: 0, y: 0, width, height: boardHeight },
-    headstock: { x: 0, y: 0, width: headstockWidth, height: boardHeight },
+    labels: { x: 0, y: 0, width: labelsWidth, height: boardHeight },
+    headstock: { x: labelsWidth, y: 0, width: headstockWidth, height: boardHeight },
     neck: {
-      x: headstockWidth,
+      x: labelsWidth + headstockWidth,
       y: 0,
-      width: Math.max(1, width - headstockWidth - bodyWidth),
+      width: Math.max(1, width - labelsWidth - headstockWidth - bodyWidth),
       height: boardHeight,
     },
     body: { x: width - bodyWidth, y: 0, width: bodyWidth, height: boardHeight },
@@ -101,42 +120,83 @@ export function guitarLayout(options: {
 }
 
 /**
- * Every string, in the order they are drawn.
+ * How far along the taper a point is: 0 at the nut, 1 where the neck
+ * meets the body. Beyond the body the strings stay as they are --
+ * they are heading for the bridge, and the neck has ended.
+ */
+function taperAt(options: FretboardOptions, x: number): number {
+  const layout = guitarLayout(options);
+  const nut = layout.neck.x;
+  const end = Math.max(nut + 1, layout.body.x);
+  return Math.min(1, Math.max(0, (x - nut) / (end - nut)));
+}
+
+/** Half the board's height at a point along the neck. */
+export function boardHalfAt(options: FretboardOptions, x: number): number {
+  const board = guitarLayout(options).board;
+  const widest = (board.height * BOARD_FILL) / 2;
+  const narrow = widest / NECK_TAPER;
+  return narrow + (widest - narrow) * taperAt(options, x);
+}
+
+/** Half the span the strings themselves take, at a point along the neck. */
+export function stringHalfAt(options: FretboardOptions, x: number): number {
+  return boardHalfAt(options, x) * (1 - STRING_MARGIN);
+}
+
+/**
+ * Every string, in the order they are drawn, AT THE NUT.
  *
  * String 1 is at the top and the thinnest; the lowest string is at the
  * bottom and the thickest. Thickness is drawn because it is how a
- * player recognises which string is which at a glance.
+ * player recognises which string is which at a glance. Where a string
+ * is further along the neck is `stringYAt`, because by then it has
+ * fanned out.
  */
 export function stringLines(options: {
   width?: number;
   height: number;
   strings?: number;
+  firstFret?: number;
+  lastFret?: number;
   fretNumbers?: boolean;
   stringLabels?: boolean;
 }): readonly StringLine[] {
   const count = stringCount(options);
   if (!(options.height > 0)) return [];
-  // The strings run across the BOARD, which is the height minus the
-  // strip the fret numbers sit in.
-  const board = guitarLayout({
+  const full: FretboardOptions = {
     width: options.width ?? 1,
     height: options.height,
+    ...(options.strings !== undefined ? { strings: options.strings } : {}),
     ...(options.fretNumbers !== undefined ? { fretNumbers: options.fretNumbers } : {}),
     ...(options.stringLabels !== undefined ? { stringLabels: options.stringLabels } : {}),
-  }).board;
-  const span = board.height * STRING_SPAN;
-  const top = board.y + (board.height - span) / 2;
-  const gap = count > 1 ? span / (count - 1) : 0;
+  };
+  const board = guitarLayout(full).board;
+  const middle = board.y + board.height / 2;
+  const half = stringHalfAt(full, guitarLayout(full).neck.x);
+  const gap = count > 1 ? (half * 2) / (count - 1) : 0;
   const lines: StringLine[] = [];
   for (let i = 0; i < count; i++) {
     const t = count > 1 ? i / (count - 1) : 0;
     lines.push({
       string: i + 1,
-      offset: top + i * gap,
+      offset: middle - half + i * gap,
       thickness: Math.max(1, (THINNEST + (THICKEST - THINNEST) * t) * (gap || board.height / 6)),
     });
   }
   return lines;
+}
+
+/** Where a string is, at a point along the neck. */
+export function stringYAt(options: FretboardOptions, string: number, x: number): number {
+  const lines = stringLines(options);
+  const line = lines.find((candidate) => candidate.string === string);
+  const board = guitarLayout(options).board;
+  const middle = board.y + board.height / 2;
+  if (line === undefined) return middle;
+  const atNut = stringHalfAt(options, guitarLayout(options).neck.x);
+  if (!(atNut > 0)) return middle;
+  return middle + (line.offset - middle) * (stringHalfAt(options, x) / atNut);
 }
 
 /**

@@ -9,6 +9,19 @@ vm.runInContext(readFileSync(new URL('../dist/guitar-engine.js', import.meta.url
 const G = sandbox.GuitarEngine;
 
 const STAGE = { width: 1200, height: 300, seconds: 0, firstFret: 0, lastFret: 12 };
+
+/**
+ * The colour a shape really is.
+ *
+ * Wood, metal and a fingertip are gradients now, not flat colours, so
+ * a test that asks "what colour is this" wants the one in the middle
+ * of the gradient -- the colour the eye actually reads.
+ */
+const paintOf = (shape) =>
+  typeof shape.fill === 'string'
+    ? shape.fill
+    : shape.fill.stops[Math.floor(shape.fill.stops.length / 2)].color;
+const roled = (shapes, role) => shapes.filter((s) => s.role === role);
 const note = (over = {}) => ({ string: 3, fret: 5, startSeconds: 0, endSeconds: 1, ...over });
 
 test('every finger has its own colour, and an unanswered note has none of them', () => {
@@ -36,27 +49,43 @@ test('the finger colours are the ones on the hand, and the marks use them', () =
   const marks = G.markShapes(G.positionsAt(notes, 0.5), STAGE);
   assert.equal(marks.length, 4);
   const c = G.FINGER_COLORS;
-  assert.equal(marks.map((m) => m.fill).join(','), [c.index, c.middle, c.ring, c.little].join(','));
+  assert.equal(marks.map(paintOf).join(','), [c.index, c.middle, c.ring, c.little].join(','));
   // Fixed, not pickable: the whole point is that they are learnt once.
   assert.equal(G.DEFAULT_COLORS.index, c.index);
   assert.equal(G.DEFAULT_COLORS.little, c.little);
 });
 
-test('an acoustic and an electric are different instruments to look at', () => {
-  const electric = G.fretboardShapes({ ...STAGE, instrument: 'electric' });
-  const acoustic = G.fretboardShapes({ ...STAGE, instrument: 'acoustic' });
-  const fills = (shapes) => shapes.map((s) => s.fill);
-  assert.ok(fills(acoustic).includes(G.DEFAULT_COLORS.soundhole), 'an acoustic has a soundhole');
-  assert.ok(fills(acoustic).includes(G.DEFAULT_COLORS.rosette));
-  assert.ok(!fills(electric).includes(G.DEFAULT_COLORS.soundhole));
-  assert.ok(fills(electric).includes(G.DEFAULT_COLORS.pickup), 'an electric has pickups');
-  assert.ok(fills(electric).includes(G.DEFAULT_COLORS.hardware), 'and a bridge');
+test('the three guitars are three different instruments to look at', () => {
+  const of = (instrument) => G.fretboardShapes({ ...STAGE, instrument });
+  const electric = of('electric');
+  const acoustic = of('acoustic');
+  const singleCut = of('singleCut');
+
+  // Each is recognisable by what is on its body.
+  assert.ok(roled(acoustic, 'soundhole').length >= 2, 'an acoustic has a soundhole and a rosette');
+  assert.equal(roled(electric, 'soundhole').length, 0);
+  assert.ok(roled(electric, 'pickguard').length > 0, 'an electric has a scratchplate');
+  assert.ok(roled(electric, 'pickup').length >= 3, 'and three single coils');
+  assert.ok(roled(singleCut, 'pickup').length >= 2, 'the single-cut has two humbuckers');
+  assert.equal(roled(singleCut, 'pickguard').length, 0);
+  for (const shapes of [electric, acoustic, singleCut]) {
+    assert.ok(roled(shapes, 'hardware').length > 0, 'and every one has a bridge');
+    assert.ok(roled(shapes, 'tuner').length >= 6, 'and a tuner per string');
+  }
+
   // The wood differs too, not only what is mounted on it.
-  assert.notEqual(
-    acoustic.find((s) => s.fill === G.ACOUSTIC_COLORS.board),
-    undefined,
-  );
-  assert.ok(fills(electric).includes(G.DEFAULT_COLORS.board));
+  const boardOf = (shapes) => paintOf(roled(shapes, 'board')[0]);
+  assert.equal(boardOf(electric), G.DEFAULT_COLORS.board, 'maple');
+  assert.equal(boardOf(acoustic), G.ACOUSTIC_COLORS.board, 'rosewood');
+  assert.equal(boardOf(singleCut), G.SINGLE_CUT_COLORS.board, 'ebony');
+  assert.equal(new Set([boardOf(electric), boardOf(acoustic), boardOf(singleCut)]).size, 3);
+
+  // And so do the inlays: dots on two of them, pearl blocks on the third.
+  assert.ok(roled(acoustic, 'inlay').every((s) => s.kind === 'circle'));
+  assert.ok(roled(singleCut, 'inlay').every((s) => s.kind === 'path'), 'blocks, not dots');
+  // A bound neck has its cream edging; a bolt-on maple one does not.
+  assert.equal(roled(electric, 'binding').length, 0);
+  assert.equal(roled(singleCut, 'binding').length, 2);
 });
 
 const fretNumbers = (shapes) => shapes.filter((s) => s.role === 'fretNumber');
@@ -87,7 +116,9 @@ test('a crowded neck numbers the frets a player looks for, not every one', () =>
 
 test('each string is numbered at the head, and named', () => {
   const shapes = G.fretboardShapes(STAGE);
-  const badges = shapes.filter((s) => s.role === 'stringLabel');
+  // The role is on the circle and on the number inside it; the
+  // numbers are the ones with text.
+  const badges = shapes.filter((s) => s.role === 'stringLabel' && s.text !== undefined);
   const names = shapes.filter((s) => s.role === 'stringName');
   assert.equal(badges.map((b) => b.text).join(','), '1,2,3,4,5,6');
   // Drawn order: string 1 is the thin e at the top, string 6 the low E.
@@ -95,7 +126,9 @@ test('each string is numbered at the head, and named', () => {
   const strings = G.stringLines(STAGE);
   for (const badge of badges) {
     assert.equal(badge.y, strings.find((l) => String(l.string) === badge.text).offset);
-    assert.ok(badge.x < G.guitarLayout(STAGE).neck.x, 'on the headstock, not the neck');
+    // In their own gutter, clear of the instrument: printed over the
+    // headstock they would sit on top of the tuners.
+    assert.ok(badge.x < G.guitarLayout(STAGE).headstock.x, 'left of the headstock');
   }
   assert.equal(G.fretboardShapes({ ...STAGE, stringLabels: false }).filter(
     (s) => s.role === 'stringLabel' || s.role === 'stringName',
@@ -115,31 +148,39 @@ test('a different tuning names different strings', () => {
 
 test('the picking hand draws the two marks a guitarist already reads', () => {
   const withPick = (direction, age) =>
-    G.stageShapes({ ...STAGE, pick: { direction, strings: [1, 2, 3], age } }).filter(
-      (s) => s.kind === 'path',
-    );
-  const [down] = withPick('down', 0);
-  const [up] = withPick('up', 0);
-  assert.ok(down.d.length > 0 && up.d.length > 0);
-  assert.notEqual(down.d, up.d, 'a down-stroke and an up-stroke are different marks');
-  // It sits where the hand is: past the frets, before the body.
+    roled(G.stageShapes({ ...STAGE, pick: { direction, strings: [1, 2, 3], age } }), 'pickStroke');
+  const down = withPick('down', 0);
+  const up = withPick('up', 0);
+  // Two shapes each: a dark halo, and the mark on top of it, so the
+  // stroke reads on a black scratchplate and on a spruce top alike.
+  assert.equal(down.length, 2);
+  assert.notEqual(down[1].d, up[1].d, 'a down-stroke and an up-stroke are different marks');
+  assert.match(String(down[0].fill), /rgba\(0,0,0/, 'the halo is the dark one');
+  // It sits where the picking hand is: over the body, past the frets.
   const layout = G.guitarLayout(STAGE);
-  assert.ok(down.x < layout.body.x, 'clear of the body');
-  assert.ok(down.x > layout.neck.x, 'and past the nut');
+  assert.ok(down[1].x >= layout.body.x - down[1].width, 'at the body end of the strings');
+  assert.ok(down[1].x > layout.neck.x, 'and well past the nut');
 
   // It fades rather than blinking off, and is gone when it is over.
-  assert.ok(withPick('down', 0.8)[0].opacity < down.opacity);
+  assert.ok(withPick('down', 0.8)[1].opacity < down[1].opacity);
   assert.equal(withPick('down', 1).length, 0);
-  assert.equal(G.stageShapes(STAGE).filter((s) => s.kind === 'path').length, 0, 'none by default');
+  assert.equal(
+    G.stageShapes(STAGE).filter((s) => s.role === 'pickStroke').length,
+    0,
+    'none by default',
+  );
 });
 
 test('a mark sits on its own string, in its own fret', () => {
-  const strings = G.stringLines(STAGE);
   for (const string of [1, 3, 6]) {
     const [mark] = G.markShapes(G.positionsAt([note({ string, fret: 7 })], 0.5), STAGE);
+    const x = G.fretCenter(7, STAGE);
     assert.equal(mark.kind, 'circle');
-    assert.equal(mark.y, strings.find((s) => s.string === string).offset, `string ${string}`);
-    assert.ok(Math.abs(mark.x - G.fretCenter(7, STAGE)) < 1e-9, 'in the 7th fret');
+    assert.ok(Math.abs(mark.x - x) < 1e-9, 'in the 7th fret');
+    // On the string WHERE IT IS at that fret: the strings fan out as
+    // they go, so the nut's spacing is the wrong answer by the time
+    // the seventh fret comes round.
+    assert.equal(mark.y, G.stringYAt(STAGE, string, x), `string ${string}`);
   }
 });
 
@@ -167,11 +208,16 @@ test('the neck is drawn once, the notes on top of it', () => {
   const board = G.fretboardShapes(STAGE);
   const withNote = G.stageShapes({ ...STAGE, seconds: 0.5, notes: [note({ finger: 2 })] });
   assert.equal(withNote.length, board.length + 1);
-  assert.equal(withNote[withNote.length - 1].fill, G.DEFAULT_COLORS.middle, 'the note is last');
-  // The strings are drawn over the inlays, as they are on a guitar.
-  const stringAt = board.findIndex((s) => s.fill === G.DEFAULT_COLORS.string);
-  const inlayAt = board.findIndex((s) => s.fill === G.DEFAULT_COLORS.inlay);
-  assert.ok(inlayAt < stringAt);
+  assert.equal(paintOf(withNote[withNote.length - 1]), G.DEFAULT_COLORS.middle, 'the note is last');
+  // Drawn in the order the guitar is built: the body and the head
+  // first, then the neck over them, the inlays in the wood, the fret
+  // wire on top of those, and the strings over everything.
+  const firstOf = (role) => board.findIndex((s) => s.role === role);
+  assert.ok(firstOf('body') < firstOf('neck'));
+  assert.ok(firstOf('neck') < firstOf('board'));
+  assert.ok(firstOf('board') < firstOf('inlay'));
+  assert.ok(firstOf('inlay') < firstOf('fret'));
+  assert.ok(firstOf('fret') < firstOf('string'));
 });
 
 test('the SVG is the shape list written out', () => {
@@ -179,10 +225,13 @@ test('the SVG is the shape list written out', () => {
   assert.ok(svg.startsWith('<svg'));
   assert.ok(svg.includes('viewBox="0 0 1200 300"'));
   const shapes = G.stageShapes({ ...STAGE, seconds: 0.5, notes: [note({ finger: 4 })] });
-  const drawn = (svg.match(/<(rect|circle|text)/g) ?? []).length;
+  const drawn = (svg.match(/<(rect|circle|text|path)[ >]/g) ?? []).length;
   assert.equal(drawn, shapes.length, 'every shape is written, fret numbers included');
   assert.ok(svg.includes('>5</text>'), 'the numbers are real text, not drawn as boxes');
   assert.ok(svg.includes(G.DEFAULT_COLORS.little));
+  // The gradients are defined before anything points at them.
+  assert.ok(svg.indexOf('<defs>') < svg.indexOf('url(#'), 'defs first');
+  assert.ok(/id="g[0-9a-z]+-\d+"/.test(svg), 'and their ids are this drawing\'s own');
 });
 
 test('the hand is plain, and the colour is on the fingertips', () => {

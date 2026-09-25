@@ -18,6 +18,14 @@ test('six strings by default, thinnest at the top, thickest at the bottom', () =
   assert.equal(lines.length, 6);
   assert.equal(lines[0].string, 1);
   assert.ok(lines[0].offset < lines[5].offset, 'string 1 is drawn at the top');
+  // The neck is a wedge: the strings sit closer together at the nut
+  // than they do down by the body, which is most of why the picture
+  // reads as a guitar rather than as a ladder.
+  const nut = G.guitarLayout(BOARD).neck.x;
+  const atNut = G.stringYAt(BOARD, 6, nut) - G.stringYAt(BOARD, 1, nut);
+  const atBody = G.stringYAt(BOARD, 6, G.guitarLayout(BOARD).body.x) - G.stringYAt(BOARD, 1, G.guitarLayout(BOARD).body.x);
+  assert.ok(atBody > atNut * 1.1, `strings fan out: ${atNut} at the nut, ${atBody} at the body`);
+  assert.ok(G.boardHalfAt(BOARD, nut) < G.boardHalfAt(BOARD, G.guitarLayout(BOARD).body.x));
   assert.ok(lines[0].thickness < lines[5].thickness, 'and is the thinner one');
   for (let i = 1; i < lines.length; i++) {
     assert.ok(lines[i].offset > lines[i - 1].offset, 'in order down the neck');
@@ -27,9 +35,18 @@ test('six strings by default, thinnest at the top, thickest at the bottom', () =
 
 test('the picture is a guitar: a headstock, the neck, then the body', () => {
   const layout = G.guitarLayout(BOARD);
-  assert.equal(layout.headstock.x, 0);
+  // The string numbers and names have their own gutter at the far
+  // left, OUTSIDE the instrument, so the headstock can be a headstock.
+  assert.equal(layout.labels.x, 0);
+  assert.ok(layout.labels.width > 0);
+  assert.equal(layout.headstock.x, layout.labels.width);
   assert.ok(layout.headstock.width > 0);
-  assert.equal(layout.neck.x, layout.headstock.width, 'the neck starts where the headstock ends');
+  assert.equal(
+    layout.neck.x,
+    layout.labels.width + layout.headstock.width,
+    'the neck starts where the headstock ends',
+  );
+  assert.equal(G.guitarLayout({ ...BOARD, stringLabels: false }).labels.width, 0);
   assert.ok(Math.abs(layout.neck.x + layout.neck.width - layout.body.x) < 1e-9, 'and ends at the body');
   assert.ok(Math.abs(layout.body.x + layout.body.width - BOARD.width) < 1e-9);
   // The fret numbers get a strip under the board, so the strings do

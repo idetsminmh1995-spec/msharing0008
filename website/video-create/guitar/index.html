@@ -406,14 +406,15 @@
       </div>
       <label for="instrument">Guitar</label>
       <select id="instrument" class="drum-input">
+        <option value="electric" selected>Electric &mdash; maple neck</option>
+        <option value="singleCut">Electric &mdash; single cut</option>
         <option value="acoustic">Acoustic</option>
-        <option value="electric" selected>Electric</option>
       </select>
       <div class="finger-legend">
         <div class="finger-hand" id="fingerHand" aria-hidden="true"></div>
         <div class="finger-names" id="fingerNames"></div>
       </div>
-      <div class="field-hint" id="fretHint">The neck lights where each note is played &mdash; its string, its fret and the finger stopping it, with the fret numbers along the bottom. When the score writes a position or a fingering down, that is what you see; when it does not, the Human Finger Engine works out how a guitarist would play the line: it weighs every place each note could go, what the hand would have to stretch, and how long it has to get there, then picks the way through with the least work in it. The picking hand is drawn too, as the square bracket and the V every guitarist reads. A slide travels along the string rather than jumping, an open string has its own colour, and the four finger colours are fixed, not chosen: they are meant to be learnt once and read in every video after.</div>
+      <div class="field-hint" id="fretHint">The neck lights where each note is played &mdash; its string, its fret and the finger stopping it, with the fret numbers along the bottom. When the score writes a position or a fingering down, that is what you see; when it does not, the Human Finger Engine works out how a guitarist would play the line: it weighs every place each note could go, what the hand would have to stretch, and how long it has to get there, then picks the way through with the least work in it. The picking hand is drawn too, as the square bracket and the V every guitarist reads. Pick the guitar you want drawn &mdash; a maple-necked electric with a scratchplate, a single-cut with pearl blocks and two humbuckers, or a dreadnought with a soundhole &mdash; and the whole instrument is drawn for you: headstock, tuners, the neck widening towards the body, and the wood each one is made of. It is all shapes and gradients rather than a photograph, so the video is drawn at whatever size you export. A slide travels along the string rather than jumping, an open string has its own colour, and the four finger colours are fixed, not chosen: they are meant to be learnt once and read in every video after.</div>
     </div>
 
     <div class="card">
@@ -980,15 +981,16 @@
   }
 
   /**
-   * Acoustic or electric.
+   * Which of the three guitars the video draws.
    *
    * Not decoration: they are different instruments to look at, and a
-   * page that offers both should show the one that was picked -- the
-   * wood, the body, and whether there is a soundhole or a pair of
-   * pickups on it.
+   * page that offers them should show the one that was picked -- the
+   * wood of the neck, the inlays, the headstock, and whether the body
+   * carries a scratchplate, a soundhole or a pair of humbuckers.
    */
   function instrument() {
-    return instrumentSelect?.value === 'acoustic' ? 'acoustic' : 'electric';
+    const value = instrumentSelect?.value;
+    return value === 'acoustic' || value === 'singleCut' ? value : 'electric';
   }
 
   /**
@@ -1225,7 +1227,7 @@
    * height is whatever keeps that shape inside the space the notation
    * leaves, so a 9:16 frame gets the same neck as a 16:9 one, smaller.
    */
-  const NECK_RATIO = 0.26;
+  const NECK_RATIO = 0.3;
 
   function neckBox() {
     if (!guitarStage) return null;
@@ -2502,6 +2504,24 @@
    * the SVG instead would cost more than every other part of the frame
    * put together, thirty times a second.
    */
+  /**
+   * A fill, as this canvas can use it.
+   *
+   * The engine describes wood, metal and a sunburst top as gradients,
+   * in the same coordinates as the shape -- which is exactly what
+   * `createLinearGradient` wants, since the transform is already set
+   * when this is called. A plain colour passes straight through.
+   */
+  function canvasPaint(ctx2d, fill) {
+    if (typeof fill === 'string') return fill;
+    const gradient =
+      fill.kind === 'linear'
+        ? ctx2d.createLinearGradient(fill.x1, fill.y1, fill.x2, fill.y2)
+        : ctx2d.createRadialGradient(fill.cx, fill.cy, 0, fill.cx, fill.cy, fill.r);
+    for (const stop of fill.stops) gradient.addColorStop(stop.offset, stop.color);
+    return gradient;
+  }
+
   function paintStage(ctx2d, box, atSeconds) {
     if (!guitarStage || typeof GuitarEngine === 'undefined') return;
     if (!(box.w > 1) || !(box.h > 1) || !isVisible(guitarStage)) return;
@@ -2518,8 +2538,14 @@
     ctx2d.translate(box.x, box.y + (box.h - height) / 2);
     ctx2d.scale(scale, scale);
     for (const shape of shapes) {
-      ctx2d.fillStyle = shape.fill;
+      const painted = shape.fill !== 'none';
+      if (painted) ctx2d.fillStyle = canvasPaint(ctx2d, shape.fill);
       ctx2d.globalAlpha = shape.opacity === undefined ? 1 : shape.opacity;
+      const stroked = shape.stroke !== undefined && shape.strokeWidth > 0;
+      if (stroked) {
+        ctx2d.strokeStyle = shape.stroke;
+        ctx2d.lineWidth = shape.strokeWidth;
+      }
       if (shape.kind === 'text') {
         // The fret numbers. Canvas uses the document's own fonts, so
         // this is the same Sora the rest of the frame is drawn in.
@@ -2530,24 +2556,24 @@
       } else if (shape.kind === 'circle') {
         ctx2d.beginPath();
         ctx2d.arc(shape.x, shape.y, shape.width / 2, 0, Math.PI * 2);
-        ctx2d.fill();
+        if (painted) ctx2d.fill();
+        if (stroked) ctx2d.stroke();
       } else if (shape.kind === 'path') {
-        // The picking marks: the one thing in the frame that is
-        // neither a rectangle nor a circle. Path2D takes the same `d`
-        // the SVG side writes, so both draw the same symbol.
-        ctx2d.fill(new Path2D(shape.d));
+        // The wood, the strings, the inlay blocks and the picking
+        // marks. Path2D takes the same `d` the SVG side writes, so
+        // both draw the same shape.
+        const path = new Path2D(shape.d);
+        if (painted) ctx2d.fill(path);
+        if (stroked) ctx2d.stroke(path);
       } else if (shape.radius > 0) {
         roundRectPath(ctx2d, shape.x, shape.y, shape.width, shape.height, shape.radius);
-        ctx2d.fill();
+        if (painted) ctx2d.fill();
+        if (stroked) ctx2d.stroke();
       } else {
-        ctx2d.fillRect(shape.x, shape.y, shape.width, shape.height);
+        if (painted) ctx2d.fillRect(shape.x, shape.y, shape.width, shape.height);
+        if (stroked) ctx2d.strokeRect(shape.x, shape.y, shape.width, shape.height);
       }
       ctx2d.globalAlpha = 1;
-      if (shape.stroke !== undefined && shape.strokeWidth > 0) {
-        ctx2d.strokeStyle = shape.stroke;
-        ctx2d.lineWidth = shape.strokeWidth;
-        ctx2d.strokeRect(shape.x, shape.y, shape.width, shape.height);
-      }
     }
     ctx2d.restore();
     void width;

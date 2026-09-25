@@ -25,6 +25,82 @@ export function n(value: number): string {
 
 export type Attrs = Record<string, string | number | undefined>;
 
+/**
+ * Gradients, collected while a drawing is written out.
+ *
+ * SVG cannot put a gradient in a `fill` attribute: it has to be
+ * defined once, given an id, and referred to. So the writer hands
+ * every paint through here, gets back a plain colour or a `url(#…)`,
+ * and asks for the finished markup at the end.
+ *
+ * The ids carry a hash of the gradients themselves. Two drawings on
+ * ONE page -- the neck and the hand beside it, or three necks in a
+ * row -- would otherwise both define `g0`, and every `url(#g0)` on the
+ * page would resolve to whichever came first: the second drawing would
+ * silently wear the first one's colours. Hashing also keeps the markup
+ * deterministic, which numbering alone would not once two drawings are
+ * involved.
+ */
+export class GradientBank {
+  private readonly defs: string[] = [];
+
+  paint(value: import('./types.js').Paint): string {
+    if (typeof value === 'string') return value;
+    // A placeholder until the hash is known: `@` appears in no
+    // colour, path or number this drawing writes.
+    const id = `@@${this.defs.length}@@`;
+    const stops = value.stops
+      .map((stop) => tag('stop', { offset: stop.offset, 'stop-color': stop.color }))
+      .join('');
+    this.defs.push(
+      value.kind === 'linear'
+        ? wrap(
+            'linearGradient',
+            {
+              id,
+              gradientUnits: 'userSpaceOnUse',
+              x1: value.x1,
+              y1: value.y1,
+              x2: value.x2,
+              y2: value.y2,
+            },
+            stops,
+          )
+        : wrap(
+            'radialGradient',
+            { id, gradientUnits: 'userSpaceOnUse', cx: value.cx, cy: value.cy, r: value.r },
+            stops,
+          ),
+    );
+    return `url(#@@${this.defs.length - 1}@@)`;
+  }
+
+  /**
+   * The defs and the body, with every id made unique to this drawing.
+   *
+   * The placeholders are replaced once, at the end, when the hash of
+   * what was collected is known.
+   */
+  finish(body: string): string {
+    if (this.defs.length === 0) return body;
+    const defs = wrap('defs', {}, this.defs.join(''));
+    const stamp = hash(defs);
+    const fill = (text: string) =>
+      text.replace(/@@(\d+)@@/g, (_all, index: string) => `${stamp}-${index}`);
+    return fill(defs) + fill(body);
+  }
+}
+
+/** FNV-1a, for a short stable id from the drawing's own colours. */
+function hash(text: string): string {
+  let value = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    value ^= text.charCodeAt(i);
+    value = Math.imul(value, 0x01000193) >>> 0;
+  }
+  return `g${value.toString(36)}`;
+}
+
 function attrs(values: Attrs): string {
   const parts: string[] = [];
   for (const [key, value] of Object.entries(values)) {
