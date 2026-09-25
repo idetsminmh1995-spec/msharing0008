@@ -69,6 +69,27 @@ export interface ParsedNoteEvent {
   readonly stringNumber?: number;
   /** Integration C: <notations><technical><fret> -- which fret, 0 meaning an open string. */
   readonly fret?: number;
+  /**
+   * `<notations><technical><fingering>` -- which finger stops the note,
+   * as the file numbers them: 1 index, 2 middle, 3 ring, 4 little, and
+   * 0 (or "0") an open string.
+   *
+   * Read because a score that WRITES a fingering has already answered
+   * the question, and no engine's guess should overrule the composer.
+   * Absent when the file says nothing, which is most of the time.
+   */
+  readonly fingering?: number;
+  /**
+   * `<notations><slide>` / `<glissando>` -- this note slides to or from
+   * another.
+   *
+   * A guitar slide is one finger travelling along a string, so the
+   * position it draws is not a fret but a fret MOVING. Which fret it
+   * arrives at is the next note's, so a renderer needs both ends: this
+   * says which end this note is.
+   */
+  readonly slideStart?: boolean;
+  readonly slideStop?: boolean;
   /** Phase 35 Tier 2/§10.4: this note's parsed <notations> -- articulations, ornaments, fermata, slur endpoints, tuplet endpoints. */
   readonly notations: ParsedNotations;
   /** Phase 35 Tier 2/§10.4/§10.8: the file's own <beam> hints for this note, empty when it gave none. */
@@ -189,6 +210,17 @@ export function parseNoteElement(
   const stringNumber =
     technicalEl !== undefined ? intOf(firstChildNamed(technicalEl, 'string')) : undefined;
   const fret = technicalEl !== undefined ? intOf(firstChildNamed(technicalEl, 'fret')) : undefined;
+  const fingering =
+    technicalEl !== undefined ? intOf(firstChildNamed(technicalEl, 'fingering')) : undefined;
+  // MusicXML writes a guitar slide as <slide> and a smooth one as
+  // <glissando>; both are the same gesture to a fretboard, so both are
+  // read into the same pair of flags.
+  const slideEls =
+    notationsEl !== undefined
+      ? [...childrenNamed(notationsEl, 'slide'), ...childrenNamed(notationsEl, 'glissando')]
+      : [];
+  const slideStart = slideEls.some((el) => el.getAttribute('type') === 'start');
+  const slideStop = slideEls.some((el) => el.getAttribute('type') === 'stop');
   const tieStart =
     tieEls.some((el) => el.getAttribute('type') === 'start') ||
     tiedEls.some((el) => el.getAttribute('type') === 'start');
@@ -326,6 +358,9 @@ export function parseNoteElement(
     ...(explicitStemDirection !== undefined ? { explicitStemDirection } : {}),
     hasExplicitAccidental,
     ...(stringNumber !== undefined ? { stringNumber } : {}),
+    ...(fingering !== undefined ? { fingering } : {}),
+    ...(slideStart ? { slideStart: true } : {}),
+    ...(slideStop ? { slideStop: true } : {}),
     ...(fret !== undefined ? { fret } : {}),
     notations,
     beams,

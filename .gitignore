@@ -29,9 +29,10 @@ notation-engine/dist/*.d.ts
 !Drum/sticking-engine-ts/dist/sticking-engine.js
 Drum/sticking-engine-ts/dist/*.map
 
-# The Piano Engine's node_modules is the same symlink trick as the
-# metronome engine's -- one toolchain, installed once.
+# The Piano and Guitar Engines' node_modules are the same symlink trick
+# as the metronome engine's -- one toolchain, installed once.
 piano-engine/node_modules
+guitar-engine/node_modules
 
 # Same for the Metronome Design Engine: the drum page loads its bundle
 # from website/assets, and the Metronome page loads it from there too,
@@ -48,6 +49,13 @@ metronome-engine/dist/*.d.ts
 piano-engine/dist/*.map
 piano-engine/dist/**/*.d.ts
 piano-engine/dist/*.d.ts
+
+# And the Guitar Engine, for the Guitar page.
+!guitar-engine/dist/
+!guitar-engine/dist/guitar-engine.js
+guitar-engine/dist/*.map
+guitar-engine/dist/**/*.d.ts
+guitar-engine/dist/*.d.ts
 Drum/sticking-engine-ts/dist/**/*.d.ts
 Drum/sticking-engine-ts/dist/*.d.ts
 .env

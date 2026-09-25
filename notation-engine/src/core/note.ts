@@ -105,6 +105,12 @@ export interface Note {
   readonly stringNumber?: number;
   /** Integration C: which fret, 0 meaning an open string. */
   readonly fret?: number;
+  /** `<technical><fingering>`: 1 index, 2 middle, 3 ring, 4 little, 0 an open string. The file's own answer, when it gives one. */
+  readonly fingering?: number;
+  /** `<slide>`/`<glissando>` type="start": this note slides to the next one on its string. */
+  readonly slideStart?: boolean;
+  /** `<slide>`/`<glissando>` type="stop": this note is where a slide arrives. */
+  readonly slideStop?: boolean;
   /** Phase 35 Tier 2/§10.4: `<notations><articulations>` -- §9.19's marks, in document order. Absent means none. */
   readonly articulations?: readonly ArticulationType[];
   /** Phase 35 Tier 2/§10.4: `<notations><ornaments>` -- §9.20's marks, in document order. Absent means none. */
@@ -141,6 +147,9 @@ export interface NoteInit {
   hasExplicitAccidental?: boolean;
   stringNumber?: number;
   fret?: number;
+  fingering?: number;
+  slideStart?: boolean;
+  slideStop?: boolean;
   articulations?: readonly ArticulationType[];
   ornaments?: readonly OrnamentType[];
   hasFermata?: boolean;

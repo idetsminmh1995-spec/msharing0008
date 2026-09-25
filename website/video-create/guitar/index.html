@@ -4,8 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MusicNote — Guitar Video Create</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=Baloo+2:wght@600;700&display=swap">
+<link rel="preload" href="../../assets/fonts/Bravura.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+  /* Bravura is the SMuFL music font the Notation Engine's glyph metrics
+     come from (notation-engine/src/glyphs/data/bravura_metadata.json).
+     The engine emits font-family="Bravura" on every notehead, clef, rest,
+     flag, accidental and time-signature digit it draws -- so WITHOUT this
+     rule the browser has nothing to draw them with and every one of them
+     renders as an empty box, even though the SVG itself is perfectly
+     correct. (That is exactly what happened: the rule existed in the old
+     web-preview page and was lost when this site was built.)
+     SIL OFL 1.1, from steinbergmedia/bravura tag bravura-1.380 -- see
+     ../../assets/fonts/LICENSE.md. font-display:block so the notation
+     waits for the real glyphs rather than flashing boxes first. */
+  @font-face {
+    font-family: 'Bravura';
+    src: url('../../assets/fonts/Bravura.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: block;
+  }
   :root{
     --red:#C81E2C; --red-dark:#A21A26; --near-black:#17110E;
     --cream:#FAF7F3; --pink:#FCEDEC; --border:#EFE6DF;
@@ -35,7 +54,7 @@
   .step-current{color:var(--text);font-weight:700;}
 
   .body{display:flex;gap:24px;padding:28px 64px 60px;align-items:flex-start;}
-  .left{width:420px;display:flex;flex-direction:column;gap:16px;}
+  .left{width:420px;flex-shrink:0;display:flex;flex-direction:column;gap:16px;}
   .page-title{font-family:'Sora',sans-serif;font-size:22px;font-weight:800;}
 
   .card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:18px;}
@@ -49,7 +68,46 @@
   .upload-slot.active{border-color:var(--red);background:var(--pink);color:var(--red);}
   .upload-slot .icon{margin-bottom:6px;}
   .upload-slot .label{font-size:11px;font-weight:700;}
-  .confirm-msg{margin-top:10px;background:var(--pink);border-radius:8px;padding:9px 12px;font-size:11px;color:var(--red-dark);font-weight:600;}
+
+  /* A card whose slot is built but not switched on. Greyed and
+     pointer-inert rather than hidden, so the numbering either side of
+     it is stable and it is obvious the feature is coming rather than
+     missing. `pointer-events` on the card, not just `disabled` on the
+     input, because the <label> would otherwise still look clickable. */
+  .card-off{opacity:.5;pointer-events:none;}
+  .card-soon{margin-left:auto;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:2px 8px;}
+  /* Hidden until JS sets a real outcome -- no more static "Loaded X"
+     placeholder that made every fresh page load (and every refresh)
+     look like a file was already uploaded when none had been. Success
+     gets a green dot + green text (.ok); an actual failure keeps the
+     original red-on-pink look (.err) -- the two are no longer the same
+     style, so a successful upload doesn't read as an error. */
+  .confirm-msg{margin-top:10px;border-radius:8px;padding:9px 12px;font-size:11px;font-weight:600;display:none;align-items:center;gap:7px;}
+  .confirm-msg.ok{display:flex;background:#E9F7EE;color:#1C7C3C;}
+  .confirm-msg.ok::before{content:'';width:8px;height:8px;border-radius:50%;background:#2FAE5C;flex-shrink:0;}
+  .confirm-msg.err{display:flex;background:var(--pink);color:var(--red-dark);}
+
+  /* Card 2's per-title Size + Color row. Two fields on one line under
+     each text input, so a title and everything about it stay together
+     rather than being split across the card. */
+  .title-controls{display:flex;align-items:flex-end;gap:12px;margin-top:8px;}
+  .title-controls .tc-size{flex:1;min-width:0;}
+  .title-controls label{margin-bottom:4px;}
+  .tc-size-row{display:flex;align-items:center;gap:8px;}
+  .tc-size-row input[type=range]{flex:1;min-width:0;accent-color:var(--red);}
+  .tc-px{font-size:11px;font-weight:700;color:var(--text);min-width:34px;text-align:right;font-variant-numeric:tabular-nums;}
+  .tc-color-row{display:flex;align-items:center;gap:6px;}
+  .tc-color-row input[type=color]{width:34px;height:30px;padding:0;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;}
+  .tc-auto{border:1.5px solid var(--border);background:#fff;border-radius:7px;font-size:10px;font-weight:700;color:var(--muted);padding:7px 8px;cursor:pointer;line-height:1;}
+  .tc-auto[data-following="yes"]{border-color:var(--red);background:var(--pink);color:var(--red);}
+
+  /* Two equal fields on one line -- Brand/Model, Counts Vocal/Beat
+     Label. The cards used to do this with an inline style repeated at
+     each site; one class keeps them the same width as each other. */
+  .field-row{display:flex;gap:10px;}
+  .field-row > div{flex:1;min-width:0;}
+  .field-hint{margin-top:8px;font-size:10.5px;line-height:1.5;color:var(--muted);}
+  .field-hint b{color:var(--text);font-weight:700;}
 
   .radio-row{display:flex;gap:16px;margin-bottom:14px;font-size:13px;}
   .radio-row label{display:flex;align-items:center;gap:6px;font-weight:400;color:var(--text);}
@@ -58,34 +116,182 @@
   .ratio-pill.active{border-color:var(--red);background:var(--pink);color:var(--red);}
 
   .generate-btn{padding:16px;font-size:15px;}
+  .generate-btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-dark{background:var(--near-black);color:#fff;}
+  .btn-ghost{border:1.5px solid var(--border);background:#fff;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;color:#4A3F3A;cursor:pointer;font-family:'Manrope',sans-serif;}
+  .btn-ghost:hover{border-color:var(--red);color:var(--red);}
+  .gen-progress{display:flex;flex-direction:column;gap:8px;}
+  .gen-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+  .gen-fill{height:100%;width:0;background:var(--red);border-radius:3px;transition:width .12s linear;}
+  .gen-line{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted);font-weight:600;}
   .cost-line{text-align:center;font-size:12px;color:var(--muted);}
   .cost-line b{color:var(--red);font-weight:700;}
 
-  .right{flex:1;display:flex;flex-direction:column;gap:14px;}
+  .right{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px;}
   .preview-head{display:flex;justify-content:space-between;align-items:center;}
   .preview-head .title{font-weight:700;font-size:14px;}
   .preview-stats{display:flex;gap:16px;font-size:12px;color:var(--muted);}
   .preview-stats b{color:var(--text);}
 
-  .video-frame{background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;}
-  .video-top{padding:22px 26px 0;display:flex;justify-content:space-between;}
-  .video-title{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:20px;}
-  .tempo-chip{background:var(--red);color:#fff;font-size:11px;font-weight:800;padding:4px 10px;border-radius:6px;}
-  .video-mid{flex:1;display:flex;align-items:center;justify-content:center;}
-  .drum-circle{width:120px;height:120px;border-radius:50%;border:3px solid var(--red);display:flex;align-items:center;justify-content:center;color:var(--red);}
-  .video-notation{background:#fff;padding:14px 20px;}
+  .video-frame{position:relative;background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-width:0;}
+  /* Padding here lands the logo's INK, not its image box -- the
+     negative margins on .video-logo-mark have already pulled the box
+     onto the artwork, so the left padding IS the ink's left edge.
+
+     Vertically it is padding plus whatever `align-items:center` adds:
+     the row is as tall as the title block, and the shorter logo
+     centres inside it, which is ~3px at the default title sizes. 4px
+     of padding therefore puts the mark 7px below the frame's edge.
+     That offset moves if the titles are resized -- which is correct,
+     because the mark is meant to stay on the stat boxes' centreline
+     rather than at a fixed height. */
+  .video-top{padding:4px 20px 0 15px;display:flex;justify-content:space-between;align-items:center;gap:16px;}
+  .video-logo-row{display:flex;align-items:center;gap:10px;min-width:0;}
+  /* The title block sits beside the logo, stacked: Title 1 over Title
+     2. Both lines read their size and colour from CSS variables set on
+     .video-frame, so card 2's controls change one property in one place
+     and never touch the elements themselves.
+
+     `:empty` rather than a JS display toggle: an untyped title is an
+     element with no text, and CSS already knows that. A title that is
+     only spaces is deliberately NOT empty -- someone indenting a title
+     with spaces meant it. */
+  .video-titles{display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0;}
+  .video-title{font-family:'Baloo 2','Sora',sans-serif;line-height:1.16;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .video-title:empty{display:none;}
+  .video-title-1{font-weight:700;font-size:var(--title1-size,32px);color:var(--title1-color,#fff);}
+  .video-title-2{font-weight:600;font-size:var(--title2-size,18px);color:var(--title2-color,#fff);}
+  .video-stats{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
+  .stat-box{border:1.5px solid var(--red);border-radius:8px;padding:4px 12px;text-align:center;min-width:52px;}
+  .stat-box .stat-label{color:#D8AE7A;font-size:8px;font-weight:700;letter-spacing:.05em;display:block;}
+  .stat-box .stat-value{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:16px;display:block;}
+  /* The COUNT box ticks through the Beat Label while the count-in and
+     the music play. The pulse is re-triggered by removing and re-adding
+     the class, which needs a reflow between the two -- see `beat()`. */
+  .stat-box .stat-value.beat-pulse{animation:beat-pulse .18s ease-out;}
+  @keyframes beat-pulse{0%{transform:scale(1.32);color:var(--red);}100%{transform:scale(1);}}
+  .video-frame.style-white .stat-box .stat-value.beat-pulse{animation-name:beat-pulse-light;}
+  @keyframes beat-pulse-light{0%{transform:scale(1.32);color:var(--red);}100%{transform:scale(1);}}
+  /* A downbeat is the one the reader is counting FROM, so it is the one
+     that gets the brand colour rather than a size change alone. */
+  .stat-box.on-downbeat{border-color:var(--red);background:rgba(200,30,44,.16);}
+  .video-mid{flex:1;display:flex;align-items:center;justify-content:center;min-height:34%;}
+  /* The keyboard fills whatever the notation leaves: `min-height:0`
+     on .video-mid lets it shrink, and the SVG stretches to the box it
+     is given rather than keeping the keyboard's own ratio -- a
+     keyboard is a picture of a thing that is 1.2m wide, and a frame
+     is what it has to fit in. */
+  /* The neck fills whatever the notation leaves. It is drawn to the
+     box rather than to a guitar's own proportions: a real neck is
+     1.5cm by 45cm, and a video frame is not. */
+  .guitar-stage{width:100%;height:100%;min-height:0;display:flex;align-items:center;}
+  .guitar-stage svg{display:block;width:100%;height:auto;max-height:100%;}
+  /* The hand in the card, saying which colour is which finger. */
+  .finger-legend{display:flex;align-items:center;gap:14px;margin-top:12px;}
+  .finger-hand{width:76px;flex-shrink:0;}
+  .finger-hand svg{display:block;width:100%;height:auto;}
+  .finger-names{display:grid;grid-template-columns:auto auto;gap:4px 10px;font-size:11px;color:var(--muted);}
+  .finger-names b{font-weight:700;}
+  .finger-swatch{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;}
+  /* The strip still SCROLLS -- the cursor drives `scrollLeft` to keep
+     itself in view -- it just doesn't draw a scrollbar. The bar and its
+     two arrows are browser chrome, and this strip is a preview of a
+     VIDEO frame: nothing in the exported video has a scrollbar in it. */
+  /* `max-height` and a staff that may shrink, because the frame is
+     not always as big as this screen: in a narrow window the notation
+     at its full height would take the whole frame and squeeze the
+     keyboard out of it -- and the exported video is laid out from
+     THIS box, so a keyboard missing here is a keyboard missing in the
+     file. The notation gives way; the keyboard keeps its share. */
+  .video-notation{padding:0 20px 14px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;max-height:52%;flex-shrink:1;scrollbar-width:none;-ms-overflow-style:none;}
+  .video-notation::-webkit-scrollbar{display:none;width:0;height:0;}
+  /* How tall the staff is drawn, and therefore how big the notes
+     are: the SVG keeps its own ratio, so height is the only dial.
+     One variable because it is a thing to TUNE -- bigger notes mean
+     fewer bars across the frame, and where that balance sits is a
+     judgement, not a constant to hunt for in a rule.
+
+     A piano frame can afford more than a drum one: there is no kit
+     photo under the staff, only the brand mark, so the middle of the
+     frame was empty space. */
+  :root{--notation-height:225px;}
+  .video-notation svg{display:block;height:var(--notation-height);max-height:100%;width:auto;max-width:none;}
+  /* Video Style (card 5) is a property of the whole FRAME, not of the
+     notation strip. The strip itself is never painted -- and neither is
+     the notation, which the engine draws with
+     `colors.background:'none'` in both styles -- so the music always
+     sits directly on the video, exactly as it will in the export.
+
+     A white strip banded across an otherwise black frame is what the
+     first attempt produced, and it read as a page element sitting ON a
+     video rather than as part of one. Black style: near-black frame,
+     white notation, white titles. White style: white frame, near-black
+     notation, dark titles, and the stat-box label in the brand red
+     since its tan is for a dark backdrop. */
+  .video-frame.style-white{background:#fff;}
+  .video-frame.style-white .stat-box .stat-value{color:var(--text);}
+  .video-frame.style-white .stat-box .stat-label{color:var(--red);}
+  .video-frame.style-white .video-logo-mark{filter:none;}
+
+  /* Brand mark, burned into the exported video's own frame (top-left,
+     inside .video-logo-row) -- replaces the generic note-icon placeholder
+     that stood in for it before the real logo existed. */
+  /* The logo FILE carries blank margin on ALL FOUR sides, and only the
+     bottom one used to be accounted for -- which is why the mark sat
+     both too low and too far in from the corner.
+     
+     Measured, not guessed: the artwork is 1414x2000 and its ink
+     occupies rows 329..1648 and columns 151..1257. At 80px tall that
+     is ~13px of nothing above the mark, ~14px below and ~6px either
+     side.
+
+     The negative margins pull the LAYOUT box tight around the ink, so
+     three things follow. The row's `align-items:center` now centres
+     the mark itself on the stat boxes instead of centring a
+     mostly-empty rectangle (it was 6px low). The ink's left edge lands
+     on .video-top's padding rather than 6px inside it. And the row
+     stops reserving 27px of vertical space for blank artwork, which
+     goes back to the music.
+
+     Written as fractions of the file's own pixel counts so changing
+     --logo-h re-derives all four; a hand-tuned px value would silently
+     go wrong. Nothing is clipped -- everything outside the margin box
+     is the blank part of the image. */
+  .video-logo-mark{
+    --logo-h:104px;
+    --logo-w:calc(var(--logo-h) * 1414 / 2000);
+    height:var(--logo-h);width:auto;flex-shrink:0;
+    margin-top:calc(var(--logo-h) * -329 / 2000);
+    margin-bottom:calc(var(--logo-h) * -351 / 2000);
+    margin-left:calc(var(--logo-w) * -151 / 1414);
+    margin-right:calc(var(--logo-w) * -156 / 1414);
+    filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));
+  }
 
   .transport{display:flex;align-items:center;gap:14px;}
-  .play-btn{width:42px;height:42px;border-radius:50%;background:var(--red);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
-  .scrub{flex:1;height:6px;background:var(--border);border-radius:3px;position:relative;}
-  .scrub-fill{position:absolute;left:0;top:0;height:100%;width:24%;background:var(--red);border-radius:3px;}
-  .time{font-size:12px;color:var(--muted);}
+  .play-btn{width:42px;height:42px;border-radius:50%;background:var(--red);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+  .play-btn:disabled{opacity:.4;cursor:not-allowed;}
+  .scrub{flex:1;height:6px;background:var(--border);border-radius:3px;position:relative;cursor:pointer;}
+  .scrub-fill{position:absolute;left:0;top:0;height:100%;width:0;background:var(--red);border-radius:3px;pointer-events:none;}
+  .time{font-size:12px;color:var(--muted);flex-shrink:0;}
 
   .engine-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px 18px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;}
   .engine-label{font-size:12px;color:var(--muted);}
   .engine-pills{display:flex;gap:8px;flex-wrap:wrap;}
   .engine-pill{background:var(--pink);color:var(--red);font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;}
+  /* An engine the page is already shaped for, but which is not written
+     yet: named so the gap is visible rather than quietly missing. */
+  .engine-pill-soon{background:#F1ECE7;color:var(--muted);}
 </style>
+<!-- The real Notation Engine bundle (github.com/idetsminmh1995-spec/msharing0008/notation-engine) -->
+<script src="../../assets/notation-engine.js"></script>
+<!-- The guitar stage: the neck, and the strings lit where they are
+     played. guitar-engine/, TypeScript + SVG, built to this bundle. -->
+<script src="../../assets/guitar-engine.js"></script>
+<!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
+<script src="../../assets/outro-video.js"></script>
+<!-- The video engine: renders frames rather than recording them. -->
+<script src="../../assets/video-engine.js"></script>
 </head>
 <body>
 
@@ -132,28 +338,188 @@
           <div class="label">Audio</div>
         </label>
       </div>
-      <div class="confirm-msg">Upload a MusicXML, MIDI, or audio file to preview it here.</div>
+      <div class="confirm-msg"></div>
     </div>
 
     <div class="card">
       <div class="card-head"><span class="card-num">2</span>Titles</div>
       <label for="title1">Title 1</label>
       <input id="title1" class="drum-input" type="text" placeholder="Your Title 1">
+      <div class="title-controls">
+        <div class="tc-size">
+          <label for="title1Size">Size</label>
+          <div class="tc-size-row">
+            <input id="title1Size" type="range" min="12" max="72" step="1" value="32">
+            <span class="tc-px" id="title1SizeOut">32px</span>
+          </div>
+        </div>
+        <div>
+          <label for="title1Color">Color</label>
+          <div class="tc-color-row">
+            <input id="title1Color" type="color" value="#FFFFFF">
+            <button type="button" class="tc-auto" id="title1Auto" data-following="yes"
+              title="Follow the Video Style (white on a black video, dark on a white one)">Auto</button>
+          </div>
+        </div>
+      </div>
       <label for="title2">Title 2 (subtitle)</label>
       <input id="title2" class="drum-input" type="text" placeholder="Your Title 2">
+      <div class="title-controls">
+        <div class="tc-size">
+          <label for="title2Size">Size</label>
+          <div class="tc-size-row">
+            <input id="title2Size" type="range" min="10" max="56" step="1" value="18">
+            <span class="tc-px" id="title2SizeOut">18px</span>
+          </div>
+        </div>
+        <div>
+          <label for="title2Color">Color</label>
+          <div class="tc-color-row">
+            <input id="title2Color" type="color" value="#FFFFFF">
+            <button type="button" class="tc-auto" id="title2Auto" data-following="yes"
+              title="Follow the Video Style (white on a black video, dark on a white one)">Auto</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="card">
-      <div class="card-head"><span class="card-num">3</span>Guitar Tone</div>
-      <label for="preset" style="position:absolute;left:-9999px;">Guitar Tone</label>
-      <select id="preset" class="drum-input"><option>Acoustic</option><option>Clean Electric</option><option>Distorted Electric</option></select>
+      <div class="card-head"><span class="card-num">3</span>Guitar Fretboard</div>
+      <div class="field-row">
+        <div>
+          <label for="fretCount">Frets shown</label>
+          <select id="fretCount" class="drum-input">
+            <option value="12">Nut to 12</option>
+            <option value="15">Nut to 15</option>
+            <option value="22">Nut to 22</option>
+          </select>
+        </div>
+        <div>
+          <label for="stringCount">Strings</label>
+          <select id="stringCount" class="drum-input">
+            <option value="6" selected>6 (guitar)</option>
+            <option value="7">7</option>
+            <option value="4">4 (bass)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div>
+          <label for="fingerIndex">Index finger</label>
+          <div class="tc-color-row"><input id="fingerIndex" type="color" value="#FFC400"></div>
+        </div>
+        <div>
+          <label for="fingerMiddle">Middle finger</label>
+          <div class="tc-color-row"><input id="fingerMiddle" type="color" value="#4FA3FF"></div>
+        </div>
+      </div>
+      <div class="field-row">
+        <div>
+          <label for="fingerRing">Ring finger</label>
+          <div class="tc-color-row"><input id="fingerRing" type="color" value="#FF5C8A"></div>
+        </div>
+        <div>
+          <label for="fingerLittle">Little finger</label>
+          <div class="tc-color-row"><input id="fingerLittle" type="color" value="#9B6BFF"></div>
+        </div>
+      </div>
+      <div class="finger-legend">
+        <div class="finger-hand" id="fingerHand" aria-hidden="true"></div>
+        <div class="finger-names" id="fingerNames"></div>
+      </div>
+      <div class="field-hint" id="fretHint">The neck lights where the score says a note is stopped &mdash; its string and its fret. A slide travels along the string rather than jumping, and an open string has its own colour. Which finger stops a note comes from the score when it writes one; the Human Finger Engine answers the rest.</div>
     </div>
 
     <div class="card">
-      <div class="card-head"><span class="card-num">4</span>Video Style</div>
+      <div class="card-head"><span class="card-num">4</span>Count-in</div>
+      <div class="field-row">
+        <div>
+          <label for="counts-vocal">Style</label>
+          <select id="counts-vocal" class="drum-input">
+            <option value="beats">Style A (1,2,3,4...)</option>
+            <option value="measures">Style B (M1,M2...)</option>
+          </select>
+        </div>
+        <div>
+          <label for="countInBars">Length</label>
+          <select id="countInBars" class="drum-input">
+            <option value="1">1 bar</option>
+            <option value="0">Off</option>
+          </select>
+        </div>
+      </div>
+      <div class="title-controls">
+        <div class="tc-size">
+          <label for="countsVolume">Volume</label>
+          <div class="tc-size-row">
+            <input id="countsVolume" type="range" min="0" max="100" step="1" value="80">
+            <span class="tc-px" id="countsVolumeOut">80%</span>
+          </div>
+        </div>
+      </div>
+      <div class="field-hint" id="countHint">Counted at the score's own tempo and time signature, before the audio starts.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-num">5</span>Count Voice</div>
+      <div class="field-row">
+        <div>
+          <label for="countVoiceOn">Announce bars</label>
+          <select id="countVoiceOn" class="drum-input">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
+        <div class="tc-size">
+          <label for="measureVolume">Volume</label>
+          <div class="tc-size-row">
+            <input id="measureVolume" type="range" min="0" max="100" step="1" value="70">
+            <span class="tc-px" id="measureVolumeOut">70%</span>
+          </div>
+        </div>
+      </div>
+      <div class="field-hint" id="countVoiceHint">Names the bar you are in at every bar of the MusicXML file, from <b>Counts vocal/M1.wav</b> in R2.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-num">6</span>Beat Display</div>
+      <div class="field-row">
+        <div>
+          <label for="beat-label">Beat Label</label>
+          <select id="beat-label" class="drum-input">
+            <option value="1">1</option>
+            <option value="1 &amp;">1 &amp;</option>
+            <option value="1 e &amp; a">1 e &amp; a</option>
+          </select>
+        </div>
+        <div></div>
+      </div>
+      <div class="field-hint">The COUNT box in the video frame ticks through this, on the score's own beat.</div>
+    </div>
+
+    <!-- Card 7 is deliberately inert: the slot is here so the numbering
+         and the layout are already settled, and turning it on later is
+         a matter of removing `card-off` and wiring the input, not of
+         re-cutting the cards around it. -->
+    <div class="card card-off" id="logoCard" aria-disabled="true">
+      <div class="card-head"><span class="card-num">7</span>Logo<span class="card-soon">Coming soon</span></div>
+      <div class="upload-grid">
+        <label class="upload-slot">
+          <input id="upload-logo" type="file" accept="image/*" disabled style="display:none;">
+          <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></div>
+          <div class="label">Logo image</div>
+        </label>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="field-hint">Your own logo in the video frame, in place of the built-in one. Not switched on yet.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-num">8</span>Video Style</div>
       <div class="radio-row">
-        <label><input type="radio" name="vc" checked>Black</label>
-        <label><input type="radio" name="vc">White</label>
+        <label><input type="radio" name="vc" id="styleBlack" value="black" checked>Black</label>
+        <label><input type="radio" name="vc" id="styleWhite" value="white">White</label>
       </div>
       <label>Aspect Ratio</label>
       <div class="ratio-row">
@@ -163,52 +529,71 @@
       </div>
     </div>
 
-    <button class="btn btn-red generate-btn">Generate Video</button>
-    <div class="cost-line">Estimated cost: <b>20 points</b> · You have 240</div>
+    <button class="btn btn-red generate-btn" id="generateBtn">Generate Video</button>
+    <button class="btn btn-dark generate-btn" id="downloadBtn" hidden>Download Video</button>
+    <div class="gen-progress" id="genProgress" hidden>
+      <div class="gen-bar"><div class="gen-fill" id="genFill"></div></div>
+      <div class="gen-line"><span id="genLabel">Rendering…</span><button class="btn-ghost" id="cancelBtn" type="button">Cancel</button></div>
+    </div>
+    <div class="cost-line" id="costLine">Estimated cost: <b>18 points</b> · You have 240</div>
+    <div class="field-hint" id="genNote">Rendered in your browser, frame by frame &mdash; not recorded, so it is usually <b>faster than the video is long</b> and every frame lands on its exact 1/30th of a second. Nothing plays and nothing is heard while it runs. The file is a WebM of the frame exactly as you see it: a still second, the count-in, the audio, and the Thank You clip from the asset server at the end.</div>
   </div>
 
   <div class="right">
     <div class="preview-head">
       <div class="title">Live Preview</div>
       <div class="preview-stats">
-        <span>BPM <b>—</b></span>
-        <span>Time <b>—</b></span>
-        <span>Duration <b>—</b></span>
+        <span>BPM <b id="statBpm">—</b></span>
+        <span>Time <b id="statTime">—</b></span>
+        <span>Measures <b id="statMeasures">—</b></span>
       </div>
     </div>
 
-    <div class="video-frame">
+    <div class="video-frame style-black" id="videoFrame">
       <div class="video-top">
-        <div class="video-title">Guitar Video</div>
-        <div class="tempo-chip">No file yet</div>
-      </div>
-      <div class="video-mid">
-        <div class="drum-circle">
-          <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 18V5l9-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="15" cy="16" r="3"/></svg>
+        <div class="video-logo-row">
+          <div class="video-titles">
+            <div class="video-title video-title-1" id="videoTitle1"></div>
+            <div class="video-title video-title-2" id="videoTitle2"></div>
+          </div>
+        </div>
+        <div class="video-stats">
+          <!-- KEY comes first because that is the order a player reads
+               a score in: what key, then what metre, then how fast. -->
+          <div class="stat-box"><span class="stat-label">KEY</span><span class="stat-value" id="statKeyBox">—</span></div>
+          <div class="stat-box"><span class="stat-label">TIME</span><span class="stat-value" id="statTimeBox">—</span></div>
+          <div class="stat-box"><span class="stat-label">BPM</span><span class="stat-value" id="statBpmBox">—</span></div>
+          <div class="stat-box"><span class="stat-label">COUNT</span><span class="stat-value" id="statCountBox">1</span></div>
         </div>
       </div>
-      <div class="video-notation">
-        <svg width="100%" height="52" viewBox="0 0 760 52">
-          <line x1="0" y1="8" x2="760" y2="8" stroke="#1E1512" stroke-width="0.8"/>
-          <line x1="0" y1="18" x2="760" y2="18" stroke="#1E1512" stroke-width="0.8"/>
-          <line x1="0" y1="28" x2="760" y2="28" stroke="#1E1512" stroke-width="0.8"/>
-          <line x1="0" y1="38" x2="760" y2="38" stroke="#1E1512" stroke-width="0.8"/>
-          <line x1="0" y1="48" x2="760" y2="48" stroke="#1E1512" stroke-width="0.8"/>
-        </svg>
+      <div class="video-notation" id="notationContainer">
+        <span style="font-size:12px;color:var(--muted);">Upload a MusicXML file to preview notation.</span>
+      </div>
+      <!-- The middle of the frame IS the guitar: the neck, lit where
+           the music is being played, drawn by guitar-engine. -->
+      <div class="video-mid">
+        <div class="guitar-stage" id="guitarStage" aria-hidden="true"></div>
       </div>
     </div>
 
     <div class="transport">
-      <button class="play-btn" aria-label="Play"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
-      <div class="scrub"><div class="scrub-fill" style="width:0%;"></div></div>
-      <div class="time">0:00 / 0:00</div>
+      <button class="play-btn" id="playBtn" aria-label="Play" disabled>
+        <svg id="playIcon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <div class="scrub" id="scrubBar"><div class="scrub-fill" id="scrubFill"></div></div>
+      <div class="time" id="timeDisplay">0:00 / 0:00</div>
     </div>
+    <!-- Real playback for an uploaded Audio-slot file -- no controls attr,
+         since the custom play button/scrub bar/time display above ARE the
+         controls; this element is just the actual audio engine. -->
+    <audio id="audioPlayer" preload="metadata"></audio>
 
     <div class="engine-card">
       <div class="engine-label">Engines running for this video</div>
       <div class="engine-pills">
         <span class="engine-pill">Notation Engine</span>
-        <span class="engine-pill">Guitar Finger Engine</span>
+        <span class="engine-pill">Guitar Engine</span>
+        <span class="engine-pill engine-pill-soon">Human Finger Engine</span>
         <span class="engine-pill">Video Engine</span>
       </div>
     </div>
@@ -216,5 +601,2228 @@
 
 </div>
 
+<script>
+  // Connects this page to the Cloudflare Worker that proxies the
+  // shared assets out of R2 (cloudflare-worker/src/index.ts): the count
+  // voices this page counts with, and the Thank You clip that closes a
+  // generated take. The piano frame has no photo library of its own
+  // yet -- when the finger engine brings one, it comes from here too.
+  const API_BASE = 'https://msharing-api.idetsminmh1995.workers.dev';
+  /**
+   * Which shape is being made, as R2 names it.
+   *
+   * Read from the lit pill rather than fixed, because what is stored
+   * PER SHAPE is read by name: the Thank You clip lives under its own
+   * aspect folder, and the export sizes itself from the frame's own
+   * box. Whatever the finger engine stores per shape will read this
+   * too.
+   */
+  function currentAspect() {
+    const active = document.querySelector('.ratio-pill.active');
+    const label = active ? active.textContent.trim() : '16:9';
+    return label === '9:16' ? '9x16' : label === '1:1' ? '1x1' : '16x9';
+  }
+  const videoFrame = document.getElementById('videoFrame');
+
+  // --- Video Style (card 5) ---------------------------------------
+  // Declared here, at the top, because BOTH the titles (card 2) and the
+  // notation engine's ink colour depend on which style is picked --
+  // reading it in two places from two different element lookups is how
+  // the two would drift apart.
+  //
+  // The notation engine itself draws INK ONLY (`colors.background:
+  // 'none'` in both styles), so it never paints a rectangle behind the
+  // music. What the music sits on is the page's business, which is the
+  // same §17.3 split the playback cursor already follows: the engine
+  // says what the notation IS, the host says where it goes.
+  const styleBlack = document.getElementById('styleBlack');
+
+  function currentVideoStyle() {
+    return styleBlack && styleBlack.checked ? 'black' : 'white';
+  }
+
+  /**
+   * Switches the frame to a shape.
+   *
+   * The shape is still a real choice rather than a preview trick: the
+   * Thank You clip is stored per shape, and the export reads the
+   * frame's own box, so a 9:16 take is rendered 1080x1920 and closes
+   * with the 9x16 ending.
+   */
+  function applyAspect() {
+    const aspect = currentAspect();
+    videoFrame.style.aspectRatio =
+      aspect === '9x16' ? '9 / 16' : aspect === '1x1' ? '1 / 1' : '16 / 9';
+  }
+
+  for (const pill of document.querySelectorAll('.ratio-pill')) {
+    pill.addEventListener('click', () => {
+      if (pill.classList.contains('active')) return;
+      for (const other of document.querySelectorAll('.ratio-pill')) {
+        other.classList.remove('active');
+      }
+      pill.classList.add('active');
+      applyAspect();
+    });
+  }
+  // --- Titles (card 2) --------------------------------------------
+  // Both titles live-bind to the video preview, each with its own size
+  // and colour. Nothing here is a hardcoded string: the preview title
+  // on the drum page used to read a hardcoded name whatever was typed,
+  // still showed.
+  //
+  // Size and colour are written as CSS VARIABLES on .video-frame rather
+  // than as inline styles on the two title elements. One property, one
+  // place: the elements keep their own rule, re-rendering the notation
+  // or swapping Video Style can never drop them, and the video engine
+  // that eventually exports this frame can read the same variables.
+  const TITLE_COUNT = 2;
+  /**
+   * What a title's colour is when the person has not chosen one: white
+   * on a black video, near-black on a white one. Following the Video
+   * Style is the sane default -- picking Black and getting invisible
+   * black-on-black titles is not a choice anyone means to make -- and
+   * `Auto` goes back to it after a manual pick.
+   */
+  const TITLE_AUTO_COLOR = { black: '#FFFFFF', white: '#1E1512' };
+
+  const titleFields = [];
+  for (let n = 1; n <= TITLE_COUNT; n++) {
+    titleFields.push({
+      n,
+      text: document.getElementById(`title${n}`),
+      size: document.getElementById(`title${n}Size`),
+      sizeOut: document.getElementById(`title${n}SizeOut`),
+      color: document.getElementById(`title${n}Color`),
+      auto: document.getElementById(`title${n}Auto`),
+      target: document.getElementById(`videoTitle${n}`),
+      // True until the person picks a colour of their own.
+      following: true,
+    });
+  }
+
+  function syncTitles() {
+    const style = currentVideoStyle();
+    for (const f of titleFields) {
+      f.target.textContent = f.text.value;
+      f.sizeOut.textContent = `${f.size.value}px`;
+      if (f.following) f.color.value = TITLE_AUTO_COLOR[style];
+      f.auto.dataset.following = f.following ? 'yes' : 'no';
+      videoFrame.style.setProperty(`--title${f.n}-size`, `${f.size.value}px`);
+      videoFrame.style.setProperty(`--title${f.n}-color`, f.color.value);
+    }
+  }
+
+  for (const f of titleFields) {
+    f.text.addEventListener('input', syncTitles);
+    f.size.addEventListener('input', syncTitles);
+    f.color.addEventListener('input', () => {
+      f.following = false;
+      syncTitles();
+    });
+    f.auto.addEventListener('click', () => {
+      f.following = true;
+      syncTitles();
+    });
+  }
+  syncTitles();
+
+  // --- Real Notation Engine wiring -----------------------------------
+  // Renders actual notation via the same notation-engine.js this repo
+  // builds and tests (notation-engine/), not a static mockup. Nothing
+  // loads until the person actually picks a file via the Upload File
+  // card above -- there used to be a demo file auto-loaded on every
+  // page open, which made a plain refresh look like an uploaded file
+  // was still sitting there when nothing had actually been uploaded.
+  const notationContainer = document.getElementById('notationContainer');
+
+  // Playback-cursor state. Declared here, beside the container it draws
+  // into, because renderNotation() sets it and the transport below reads
+  // it -- keeping them apart is how it would quietly stop being set.
+  let notationPlayback = null;
+  let cursorLine = null;
+  let cursorRaf = 0;
+  // The last PARSED score, kept so switching Video Style re-renders
+  // without re-reading the file -- parsing is ~80% of a render.
+  let lastParsed = null;
+  let lastFileLabel = '';
+
+  function notationConfig() {
+    return {
+      colors: {
+        // White notation on the video's own dark frame; near-black on
+        // the white strip. `background:'none'` means the engine draws
+        // NO background rectangle at all -- not a see-through one --
+        // so the frame itself shows through behind the music.
+        ink: currentVideoStyle() === 'black' ? '#ffffff' : '#111111',
+        background: 'none',
+      },
+    };
+  }
+  const statBpm = document.getElementById('statBpm');
+  const statTime = document.getElementById('statTime');
+  const statMeasures = document.getElementById('statMeasures');
+  const tempoChip = document.getElementById('statBpmBox');
+  const statKeyBox = document.getElementById('statKeyBox');
+  const uploadConfirm = document
+    .getElementById('upload-musicxml')
+    .closest('.card')
+    .querySelector('.confirm-msg');
+
+  function setUploadConfirm(text, ok) {
+    if (!uploadConfirm) return;
+    uploadConfirm.textContent = text;
+    uploadConfirm.className = `confirm-msg ${ok ? 'ok' : 'err'}`;
+  }
+
+  function renderNotation(xmlText, fileLabel) {
+    if (typeof NotationEngine === 'undefined') {
+      notationContainer.textContent = 'Notation Engine failed to load.';
+      return;
+    }
+    let parsed;
+    let rendered;
+    try {
+      // Parse ONCE and render from that. renderFromMusicXml(xmlText)
+      // would parse a second time, and parsing is ~80% of a render
+      // (Phase 53's own measurements), so this halves the work on every
+      // upload -- and keeps `parsed` for the stats below.
+      parsed = NotationEngine.parseMusicXml(xmlText);
+      rendered = NotationEngine.renderParsedMusicXml(parsed, { config: notationConfig() });
+    } catch (err) {
+      console.error('Notation Engine failed on this file:', err);
+      notationContainer.textContent = 'Could not parse this file -- see console for details.';
+      setUploadConfirm(`Could not parse "${fileLabel}".`, false);
+      return;
+    }
+
+    lastParsed = parsed;
+    lastFileLabel = fileLabel;
+
+    // Inject the real rendered SVG, height-constrained to fit the strip
+    // (its own real width is left alone, so a long piece scrolls).
+    notationContainer.innerHTML = rendered.svg;
+    const svgEl = notationContainer.querySelector('svg');
+    if (svgEl) {
+      svgEl.removeAttribute('width');
+      svgEl.removeAttribute('height');
+    }
+
+    // §17.1's playback data for THIS render -- the position API reads it
+    // to turn a moment in the audio into an x on this exact SVG. Kept
+    // rather than discarded, which is what left the preview without a
+    // cursor.
+    notationPlayback = rendered.playback;
+    attachCursor(svgEl);
+    updateCursor();
+
+    // Real stats, read from the actual parsed score -- not hardcoded.
+    const firstAttrs = parsed.attributes && parsed.attributes[0];
+    const measureCount = parsed.score?.parts?.[0]?.measures?.length ?? 0;
+    const statTimeBox = document.getElementById('statTimeBox');
+    // Through the same tempo-map lookup the live display uses, so the
+    // number before you press play and the number after cannot come
+    // from two different places and disagree.
+    shownBpm = null;
+    showBpm(bpmAtTick(0));
+    buildKeyTimeline();
+    shownKey = null;
+    showKey(keyAtTick(0));
+    buildGuitarNotes();
+    drawStage(0);
+    if (firstAttrs) {
+      const timeStr = `${firstAttrs.timeNumerator}/${firstAttrs.timeDenominator}`;
+      statTime.textContent = timeStr;
+      if (statTimeBox) statTimeBox.textContent = timeStr;
+    } else {
+      statTime.textContent = '\u2014';
+      if (statTimeBox) statTimeBox.textContent = '\u2014';
+    }
+    statMeasures.textContent = String(measureCount);
+
+    const errorCount = rendered.diagnostics.filter((d) => d.severity === 'error').length;
+    setUploadConfirm(
+      errorCount === 0
+        ? `\u2713 "${fileLabel}" \u2014 ${measureCount} measures loaded.`
+        : `"${fileLabel}" \u2014 ${measureCount} measures, ${errorCount} error(s) (see console).`,
+      errorCount === 0,
+    );
+    if (rendered.diagnostics.length > 0) console.log('Notation Engine diagnostics:', rendered.diagnostics);
+    // A new score is a new set of bars, so anything queued for the old
+    // one is wrong and the hint about which bars have a sample is
+    // stale. Declared further down; hoisting is what lets this read in
+    // the order the page actually works.
+    stopMeasureAnnouncements();
+    refreshCountVoice();
+  }
+
+
+  /**
+   * Re-draws the notation in the newly-picked style, from the score
+   * already parsed -- no file is re-read and nothing is re-parsed.
+   *
+   * The whole SVG is replaced (its ink colour is baked into every
+   * element), so the cursor line goes with it and has to be re-attached
+   * and put back where the audio is. Skipping that is how a style
+   * switch mid-playback would leave the marker behind.
+   */
+  function applyVideoStyle() {
+    const style = currentVideoStyle();
+    if (videoFrame) {
+      videoFrame.classList.toggle('style-black', style === 'black');
+      videoFrame.classList.toggle('style-white', style === 'white');
+    }
+    // A title still following the style has to move with it.
+    syncTitles();
+    if (lastParsed === null || typeof NotationEngine === 'undefined') return;
+    let rendered;
+    try {
+      rendered = NotationEngine.renderParsedMusicXml(lastParsed, { config: notationConfig() });
+    } catch (err) {
+      console.error('Notation Engine failed re-rendering in the ' + style + ' style:', err);
+      return;
+    }
+    notationContainer.innerHTML = rendered.svg;
+    const svgEl = notationContainer.querySelector('svg');
+    if (svgEl) {
+      svgEl.removeAttribute('width');
+      svgEl.removeAttribute('height');
+    }
+    notationPlayback = rendered.playback;
+    attachCursor(svgEl);
+    updateCursor();
+    buildKeyTimeline();
+    // The re-render built a new playback; the note list is placed
+    // against it, so it is rebuilt rather than left pointing at the old
+    // one's ticks.
+    buildGuitarNotes();
+    drawStage();
+  }
+
+  for (const radio of document.querySelectorAll('input[name="vc"]')) {
+    radio.addEventListener('change', applyVideoStyle);
+  }
+  applyVideoStyle();
+
+  document.getElementById('upload-musicxml').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const isMxl = /\.mxl$/i.test(file.name);
+
+    if (isMxl) {
+      // §10.2: a .mxl file is a ZIP archive -- the real score XML lives
+      // inside it, pointed to by META-INF/container.xml. Read it as
+      // bytes (never text -- it's binary) and hand it to the engine's
+      // own unzipMxl, the exact same code path notation-engine's own
+      // tests use for this format.
+      const reader = new FileReader();
+      reader.onload = () => {
+        const bytes = new Uint8Array(reader.result);
+        const unzipped = NotationEngine.unzipMxl(bytes, window.DOMParser);
+        if (unzipped.xmlText === undefined) {
+          const reason = unzipped.diagnostics[0]?.message ?? 'Unknown error while unzipping.';
+          setUploadConfirm(`Could not read "${file.name}": ${reason}`, false);
+          console.error('unzipMxl failed:', unzipped.diagnostics);
+          return;
+        }
+        renderNotation(unzipped.xmlText, file.name);
+      };
+      reader.onerror = () => setUploadConfirm(`Could not read "${file.name}".`, false);
+      reader.readAsArrayBuffer(file);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => renderNotation(reader.result, file.name);
+    reader.onerror = () => setUploadConfirm(`Could not read "${file.name}".`, false);
+    reader.readAsText(file);
+  });
+
+  // MIDI/Audio slots: switch which slot looks "active" so the person
+  // gets visible feedback that a file was picked at all (previously
+  // these two inputs had no listener whatsoever -- selecting a file
+  // did nothing visible, which is what was reported as "doesn't
+  // work"). MIDI is genuinely parsed (the engine's own real MIDI
+  // parser, Phase 39) and its real stats are reported; full notation
+  // RENDERING from MIDI isn't wired into this page, so that limit is
+  // stated plainly rather than pretended away. Audio has no NOTATION
+  // parsing path in this engine (nothing turns a waveform into notes) --
+  // but the file itself now plays for real through the transport bar
+  // below, which is what "isn't supported yet" used to block entirely.
+  function setActiveSlot(inputId) {
+    document.querySelectorAll('.upload-slot').forEach((slot) => {
+      slot.classList.toggle('active', slot.getAttribute('for') === inputId);
+    });
+  }
+
+
+  // --- The guitar stage (card 3) -------------------------------------
+  // guitar-engine/ draws it: the neck, and the strings lit where the
+  // music is being played. This block is the BRIDGE and nothing else --
+  // turning a parsed score into positions in seconds, and handing the
+  // engine the box it is drawing into.
+  //
+  // The engine is asked for the same frame twice over, in two forms:
+  // `renderGuitarStage` writes SVG for the preview, `stageShapes` hands
+  // back the same shapes for the canvas the video is rendered on.
+  const guitarStage = document.getElementById('guitarStage');
+  const fretCountSelect = document.getElementById('fretCount');
+  const stringCountSelect = document.getElementById('stringCount');
+  const fingerInputs = {
+    1: document.getElementById('fingerIndex'),
+    2: document.getElementById('fingerMiddle'),
+    3: document.getElementById('fingerRing'),
+    4: document.getElementById('fingerLittle'),
+  };
+  const fingerHand = document.getElementById('fingerHand');
+  const fingerNames = document.getElementById('fingerNames');
+
+  function lastFret() {
+    const value = Number(fretCountSelect?.value);
+    return Number.isFinite(value) && value > 0 ? value : 12;
+  }
+
+  function stringCount() {
+    const value = Number(stringCountSelect?.value);
+    return Number.isFinite(value) && value >= 2 ? value : 6;
+  }
+
+  function stageColors() {
+    return {
+      index: fingerInputs[1]?.value || '#FFC400',
+      middle: fingerInputs[2]?.value || '#4FA3FF',
+      ring: fingerInputs[3]?.value || '#FF5C8A',
+      little: fingerInputs[4]?.value || '#9B6BFF',
+    };
+  }
+
+  /**
+   * Every note of the score as a PLACE on the neck, in written seconds.
+   *
+   * Written seconds, like the drum page's photos and the piano's keys:
+   * a repeat plays the same written bar again, and mapping the audio's
+   * moment back to a written tick is what makes the second pass light
+   * up like the first.
+   *
+   * A guitar note is a string and a fret, and only the file knows them
+   * -- the same pitch is playable in five places, so nothing is
+   * inferred here. A score with no tab positions lights nothing, and
+   * the hint under the card says so rather than guessing a shape.
+   */
+  let guitarNotes = [];
+
+  function buildGuitarNotes() {
+    guitarNotes = [];
+    const parsed = lastParsed;
+    const playback = notationPlayback;
+    if (!parsed || !parsed.score || !playback || typeof NotationEngine === 'undefined') return;
+
+    const raw = [];
+    for (const part of parsed.score.parts) {
+      for (const measure of part.measures) {
+        const measureOffset = playback.globalTickOffsetByMeasure?.get(measure.number) ?? 0;
+        for (const voice of measure.voices) {
+          let running = 0;
+          for (const event of voice.events) {
+            const startTick = event.startTick ?? running;
+            running = startTick + (event.duration?.ticks ?? 0);
+            if (event.kind !== 'note' && event.kind !== 'chord') continue;
+            const members = event.kind === 'chord' ? event.notes : [event];
+            for (const note of members) {
+              if (note.stringNumber === undefined || note.fret === undefined) continue;
+              const ticks = note.duration?.ticks ?? event.duration?.ticks ?? 0;
+              let startSeconds;
+              let endSeconds;
+              try {
+                startSeconds = NotationEngine.tickToSeconds(playback.tempoMap, measureOffset + startTick);
+                endSeconds = NotationEngine.tickToSeconds(
+                  playback.tempoMap,
+                  measureOffset + startTick + Math.max(1, ticks),
+                );
+              } catch (err) {
+                continue;
+              }
+              raw.push({
+                string: note.stringNumber,
+                fret: note.fret,
+                startSeconds,
+                endSeconds,
+                ...(Number.isFinite(note.fingering) ? { finger: note.fingering } : {}),
+                slideStart: note.slideStart === true,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // A slide is two notes: the one that leaves and the one that
+    // arrives. The file marks the first, and the fret it travels TO is
+    // the next note on the same string -- which is the only place that
+    // number exists, so the pairing happens here rather than in the
+    // engine.
+    raw.sort((a, b) => a.startSeconds - b.startSeconds || a.string - b.string);
+    for (let i = 0; i < raw.length; i++) {
+      const note = raw[i];
+      if (!note.slideStart) continue;
+      const next = raw.slice(i + 1).find((other) => other.string === note.string);
+      if (next && next.fret !== note.fret) note.slideToFret = next.fret;
+    }
+    guitarNotes = raw.map(({ slideStart, ...note }) => note);
+  }
+
+  /**
+   * The moment the stage should show, in the score's WRITTEN seconds.
+   *
+   * Through `writtenTickAt`, which the cursor and the COUNT box already
+   * use, so the lit string and the playhead above it can never be
+   * telling different stories.
+   */
+  function stageSeconds(atSeconds) {
+    const tick = writtenTickAt(atSeconds);
+    if (tick === undefined || !notationPlayback) return 0;
+    try {
+      return NotationEngine.tickToSeconds(notationPlayback.tempoMap, tick);
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  /** What the engine is being asked to draw, for a box of this size. */
+  function stageOptions(width, height, atSeconds) {
+    return {
+      width,
+      height,
+      strings: stringCount(),
+      firstFret: 0,
+      lastFret: lastFret(),
+      seconds: stageSeconds(atSeconds),
+      notes: guitarNotes,
+      colors: stageColors(),
+    };
+  }
+
+  /**
+   * The neck is drawn at a fixed shape, not stretched to its box.
+   *
+   * A neck squashed into a tall frame stops looking like a neck. The
+   * height is whatever keeps that shape inside the space the notation
+   * leaves, so a 9:16 frame gets the same neck as a 16:9 one, smaller.
+   */
+  const NECK_RATIO = 0.22;
+
+  function neckBox() {
+    if (!guitarStage) return null;
+    const box = guitarStage.getBoundingClientRect();
+    const width = Math.max(1, Math.round(box.width));
+    const height = Math.max(1, Math.min(Math.round(box.height), Math.round(width * NECK_RATIO)));
+    return { width, height };
+  }
+
+  /** The preview's stage, redrawn where it is. */
+  function drawStage(atSeconds = audioPlayer.currentTime) {
+    if (!guitarStage || typeof GuitarEngine === 'undefined') return;
+    const box = neckBox();
+    if (!box || !(box.width > 1) || !(box.height > 1)) return;
+    guitarStage.innerHTML = GuitarEngine.renderGuitarStage(
+      stageOptions(box.width, box.height, atSeconds),
+    );
+  }
+
+  /** The hand, and the names beside it, in the colours currently picked. */
+  function drawFingerLegend() {
+    if (typeof GuitarEngine === 'undefined') return;
+    const colors = stageColors();
+    // The palm is drawn in the CARD's ink, not the frame's: the
+    // engine's default is meant for a dark video, and on a white card
+    // a near-white palm is a hand with no hand in it.
+    if (fingerHand) {
+      fingerHand.innerHTML = GuitarEngine.renderHand({
+        width: 120,
+        height: 150,
+        colors,
+        palmColor: '#C3B4AA',
+      });
+    }
+    if (fingerNames) {
+      const names = GuitarEngine.FINGER_NAMES;
+      const key = { 1: 'index', 2: 'middle', 3: 'ring', 4: 'little' };
+      fingerNames.innerHTML = [1, 2, 3, 4]
+        .map(
+          (n) =>
+            `<div><span class="finger-swatch" style="background:${colors[key[n]]}"></span>${names[n]}</div>` +
+            `<div><b>${n}</b></div>`,
+        )
+        .join('');
+    }
+  }
+
+  for (const control of [fretCountSelect, stringCountSelect, ...Object.values(fingerInputs)]) {
+    if (!control) continue;
+    const redraw = () => {
+      drawFingerLegend();
+      drawStage();
+    };
+    control.addEventListener('change', redraw);
+    control.addEventListener('input', redraw);
+  }
+  window.addEventListener('resize', () => drawStage());
+  drawFingerLegend();
+  drawStage(0);
+
+  document.getElementById('upload-musicxml').addEventListener('click', () => setActiveSlot('upload-musicxml'));
+  document.getElementById('upload-midi').addEventListener('click', () => setActiveSlot('upload-midi'));
+  document.getElementById('upload-audio').addEventListener('click', () => setActiveSlot('upload-audio'));
+
+  document.getElementById('upload-midi').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setActiveSlot('upload-midi');
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const bytes = new Uint8Array(reader.result);
+        const result = NotationEngine.parseMidiFile(bytes);
+        if (result.midiFile === undefined) {
+          const reason = result.diagnostics[0]?.message ?? 'Unknown error.';
+          setUploadConfirm(`Could not read "${file.name}": ${reason}`, false);
+          return;
+        }
+        const noteCount = result.midiFile.tracks.reduce((sum, t) => sum + t.notes.length, 0);
+        const firstTempo = result.midiFile.tempoEvents[0];
+        const bpm = firstTempo ? Math.round(60000000 / firstTempo.microsecondsPerQuarter) : undefined;
+        setUploadConfirm(
+          `Parsed "${file.name}" -- ${result.midiFile.tracks.length} track(s), ${noteCount} notes` +
+            (bpm ? `, ${bpm} BPM` : '') +
+            '. Notation rendering from MIDI isn\u2019t wired into this preview yet -- upload a MusicXML/MXL file to see notation.',
+          true,
+        );
+      } catch (err) {
+        console.error('MIDI parse failed:', err);
+        setUploadConfirm(`Could not read "${file.name}" as a MIDI file.`, false);
+      }
+    };
+    reader.onerror = () => setUploadConfirm(`Could not read "${file.name}".`, false);
+    reader.readAsArrayBuffer(file);
+  });
+
+  document.getElementById('upload-audio').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setActiveSlot('upload-audio');
+    loadAudioFile(file);
+  });
+
+  // --- Transport: real playback for the uploaded Audio-slot file -----
+  // A plain HTML5 <audio> element does the actual decoding/playing; the
+  // play button, scrub bar and time readout are this page's own UI,
+  // kept in sync with it via its standard events rather than reimplementing
+  // any of that.
+  // ---- playback cursor -------------------------------------------------
+  // The notation engine reports WHERE a moment in the music is
+  // (§17.1's positionToX); drawing the marker and scrolling to it is the
+  // host's job (§17.3), which is this block.
+  /** Adds (or re-adds) the marker line to a freshly rendered SVG. */
+  /** Pure red, as asked for. Not the brand red -- this one has to read as a playhead, not as chrome. */
+  const CURSOR_COLOR = '#FF0000';
+  /** How far past the staff's own lines the capsule reaches, top and bottom, in staff spaces. */
+  const CURSOR_OVERHANG = 1.1;
+  const CURSOR_WIDTH = 1.7;
+  const CURSOR_STROKE = 0.22;
+
+  /**
+   * The staff's vertical extent, MEASURED from the SVG that was just
+   * drawn rather than assumed.
+   *
+   * The engine does not publish `staffBottomY`, and it genuinely moves:
+   * headroom grows for a tempo mark, a bar number, a volta. Staff lines
+   * are the horizontal lines that span nearly the whole width at the
+   * engine's own staff-line thickness, so they are findable without
+   * guessing -- and if none are found (an empty score) the caller falls
+   * back to the viewBox.
+   */
+  function measureStaffExtent(svgEl, viewBoxHeight) {
+    let top = Infinity;
+    let bottom = -Infinity;
+    for (const line of svgEl.querySelectorAll('line')) {
+      const y1 = Number(line.getAttribute('y1'));
+      const y2 = Number(line.getAttribute('y2'));
+      const x1 = Number(line.getAttribute('x1'));
+      const x2 = Number(line.getAttribute('x2'));
+      if (!Number.isFinite(y1) || y1 !== y2) continue; // not horizontal
+      if (Math.abs(x2 - x1) < 4) continue; // too short to be a staff line
+      top = Math.min(top, y1);
+      bottom = Math.max(bottom, y1);
+    }
+    if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom <= top) {
+      return { top: 1, bottom: Math.max(2, viewBoxHeight - 1) };
+    }
+    return { top, bottom };
+  }
+
+  /**
+   * Adds (or re-adds) the playhead to a freshly rendered SVG.
+   *
+   * A rounded capsule OUTLINE around the current position rather than a
+   * line through the whole frame. A full-height line crosses the titles
+   * and whatever else the frame holds; a capsule sits on the music,
+   * which is what it is pointing at.
+   */
+  function attachCursor(svgEl) {
+    cursorLine = null;
+    if (!svgEl) return;
+    const viewBox = (svgEl.getAttribute('viewBox') || '').split(/\s+/).map(Number);
+    const height = viewBox.length === 4 ? viewBox[3] : 20;
+    const staff = measureStaffExtent(svgEl, height);
+
+    const capsule = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    capsule.setAttribute('class', 'playback-cursor');
+    capsule.setAttribute('width', String(CURSOR_WIDTH));
+    capsule.setAttribute('height', String(staff.bottom - staff.top + CURSOR_OVERHANG * 2));
+    capsule.setAttribute('y', String(staff.top - CURSOR_OVERHANG));
+    capsule.setAttribute('rx', String(CURSOR_WIDTH / 2));
+    capsule.setAttribute('ry', String(CURSOR_WIDTH / 2));
+    capsule.setAttribute('fill', 'none');
+    capsule.setAttribute('stroke', CURSOR_COLOR);
+    capsule.setAttribute('stroke-width', String(CURSOR_STROKE));
+    capsule.setAttribute('x', '0');
+    capsule.style.display = 'none';
+    svgEl.appendChild(capsule);
+    cursorLine = capsule;
+  }
+
+  /** Moves the marker to wherever the audio currently is, and scrolls it into view. */
+  function updateCursor(atSeconds = audioPlayer.currentTime) {
+    if (!cursorLine || !notationPlayback || typeof NotationEngine === 'undefined') return;
+    const seconds = atSeconds;
+    if (!Number.isFinite(seconds)) return;
+    let x;
+    try {
+      // The audio plays the music IN PERFORMANCE ORDER -- it takes the
+      // repeats. `performance` is the written score unfolded into that
+      // order, so a second of audio maps to the written tick actually
+      // sounding then, and the marker jumps back at a repeat barline
+      // instead of stopping there.
+      const perf = notationPlayback.performance;
+      let tick;
+      if (perf && perf.entries.length > 0) {
+        const at = Math.min(seconds, perf.totalSeconds);
+        tick = NotationEngine.performanceSecondsToWritten(perf, notationPlayback.tempoMap, at).writtenTick;
+      } else {
+        // No repeat data (an older render, or an empty score): straight
+        // through, clamped at the last note so the marker stops there
+        // rather than running off into whitespace.
+        const straight = NotationEngine.secondsToTick(notationPlayback.tempoMap, seconds);
+        const events = NotationEngine.getEventStream(notationPlayback);
+        const lastTick = events.length > 0 ? events[events.length - 1].tick : 0;
+        tick = Math.min(straight, lastTick);
+      }
+      // playheadX, not positionToX: the latter reports the last NOTE's
+      // own x, so the marker would freeze between notes and sit still
+      // for a whole measure that has none (an opening whole rest). This
+      // one moves continuously through the music.
+      x = NotationEngine.playheadX(notationPlayback, tick).x;
+    } catch (err) {
+      return;
+    }
+    // The capsule is CENTRED on the playhead, so its outline sits
+    // around the note rather than beside it.
+    cursorLine.setAttribute('x', String(x - CURSOR_WIDTH / 2));
+    cursorLine.style.display = '';
+
+    // Keep the marker in view. The strip scrolls horizontally, and the
+    // SVG's own user units are scaled to its rendered height, so one
+    // staff space is (rendered width / viewBox width) real pixels.
+    const svgEl = notationContainer.querySelector('svg');
+    if (!svgEl) return;
+    const viewBox = (svgEl.getAttribute('viewBox') || '').split(/\s+/).map(Number);
+    const unitsWide = viewBox.length === 4 ? viewBox[2] : 0;
+    if (!unitsWide) return;
+    const pxPerUnit = svgEl.getBoundingClientRect().width / unitsWide;
+    const cursorPx = x * pxPerUnit;
+    const view = notationContainer.clientWidth;
+    const margin = view * 0.25;
+    if (cursorPx < notationContainer.scrollLeft + margin ||
+        cursorPx > notationContainer.scrollLeft + view - margin) {
+      notationContainer.scrollLeft = Math.max(0, cursorPx - view / 3);
+    }
+  }
+
+  /** While playing, follow every frame rather than only `timeupdate`'s ~4/second. */
+  function startCursorLoop() {
+    cancelAnimationFrame(cursorRaf);
+    const step = () => {
+      updateCursor();
+      updateBeatDisplay();
+      drawStage();
+      if (!audioPlayer.paused && !audioPlayer.ended) cursorRaf = requestAnimationFrame(step);
+    };
+    cursorRaf = requestAnimationFrame(step);
+  }
+
+  const audioPlayer = document.getElementById('audioPlayer');
+  const playBtn = document.getElementById('playBtn');
+  const playIcon = document.getElementById('playIcon');
+  const scrubBar = document.getElementById('scrubBar');
+  const scrubFill = document.getElementById('scrubFill');
+  const timeDisplay = document.getElementById('timeDisplay');
+  const PLAY_PATH = 'M8 5v14l11-7z';
+  const PAUSE_PATH = 'M7 5h4v14H7zM13 5h4v14h-4z';
+  let currentAudioUrl;
+
+  function formatTime(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  function updateTransport() {
+    const dur = audioPlayer.duration;
+    timeDisplay.textContent = `${formatTime(audioPlayer.currentTime)} / ${formatTime(dur)}`;
+    scrubFill.style.width = Number.isFinite(dur) && dur > 0 ? `${(audioPlayer.currentTime / dur) * 100}%` : '0%';
+  }
+
+  function loadAudioFile(file) {
+    if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl);
+    currentAudioUrl = URL.createObjectURL(file);
+    playBtn.disabled = true;
+    audioPlayer.pause();
+    audioPlayer.src = currentAudioUrl;
+    updateTransport();
+  }
+
+  audioPlayer.addEventListener('loadedmetadata', () => {
+    playBtn.disabled = false;
+    updateTransport();
+    const file = document.getElementById('upload-audio').files?.[0];
+    if (file) {
+      setUploadConfirm(`\u2713 "${file.name}" \u2014 ${formatTime(audioPlayer.duration)} loaded.`, true);
+    }
+  });
+  audioPlayer.addEventListener('error', () => {
+    playBtn.disabled = true;
+    const file = document.getElementById('upload-audio').files?.[0];
+    setUploadConfirm(`Could not play "${file ? file.name : 'this file'}" -- unsupported or corrupt audio.`, false);
+  });
+  audioPlayer.addEventListener('timeupdate', () => { updateTransport(); updateCursor(); updateBeatDisplay(); });
+  audioPlayer.addEventListener('seeked', () => { updateCursor(); updateBeatDisplay(); drawStage(); });
+  audioPlayer.addEventListener('loadedmetadata', updateCursor);
+  audioPlayer.addEventListener('play', () => {
+    playIcon.querySelector('path').setAttribute('d', PAUSE_PATH);
+    startCursorLoop();
+  });
+  audioPlayer.addEventListener('pause', () => {
+    playIcon.querySelector('path').setAttribute('d', PLAY_PATH);
+    cancelAnimationFrame(cursorRaf);
+    updateCursor();
+    drawStage();
+  });
+  audioPlayer.addEventListener('ended', () => { updateTransport(); updateCursor(); });
+
+
+  // --- Count-in, the count voice, and the beat clock ----------------
+  // Three things that are really one thing: a bar of counts before the
+  // music, the volume that bar is played at, and the COUNT box ticking
+  // through the Beat Label. All three read the SCORE's own tempo and
+  // time signature, so a 6/8 piece at 76 counts six beats at 76 -- none
+  // of it is hardcoded to 4/4 at 120.
+  const countsVolumeInput = document.getElementById('countsVolume');
+  const countsVolumeOut = document.getElementById('countsVolumeOut');
+  const measureVolumeInput = document.getElementById('measureVolume');
+  const measureVolumeOut = document.getElementById('measureVolumeOut');
+  const measureVolumeField = document.getElementById('measureVolumeField');
+  const countsVocalSelect = document.getElementById('counts-vocal');
+  const countVoiceOnSelect = document.getElementById('countVoiceOn');
+  const countVoiceHint = document.getElementById('countVoiceHint');
+  const countInBarsSelect = document.getElementById('countInBars');
+  const beatLabelSelect = document.getElementById('beat-label');
+  const countHint = document.getElementById('countHint');
+  const statCountBox = document.getElementById('statCountBox');
+  const statCountWrap = statCountBox.closest('.stat-box');
+
+  /** What a score with no notation loaded is counted at: 4/4, 120bpm. */
+  const FALLBACK_BEATS_PER_BAR = 4;
+  const FALLBACK_SECONDS_PER_BEAT = 0.5;
+  const TICKS_PER_QUARTER = 480;
+
+  let audioCtx = null;
+  let countGain = null;
+  let measureGain = null;
+  /** name -> AudioBuffer, or null for "asked the server, it hasn't got one". */
+  const countSampleCache = new Map();
+  /** beat number within the bar -> AudioBuffer, same null-means-absent convention. */
+  const measureSampleCache = new Map();
+  /**
+   * beat number -> the in-flight request for it.
+   *
+   * The resolved cache above cannot dedupe on its own: it is only
+   * written when a fetch RESOLVES, so two callers arriving while one is
+   * in the air both miss and both fetch. That happens for real -- a
+   * score load and a card change land together -- and it doubled every
+   * request on the first play.
+   */
+  const measureSampleInFlight = new Map();
+
+  /**
+   * The COUNT-IN's own voice (card 4). Style A counts the beats of the
+   * bar from `Voices/{n}.wav`; Style B names the bar from
+   * `Counts vocal/M{n}.wav` instead -- one announcement per count-in
+   * bar rather than one per beat.
+   */
+  function countInStyle() {
+    return countsVocalSelect.value === 'measures' ? 'measures' : 'beats';
+  }
+
+  /** Whether the Count Voice card (5) is announcing bars at all. */
+  function countVoiceEnabled() {
+    return countVoiceOnSelect.value !== 'off';
+  }
+
+  /**
+   * One AudioContext for the page, created on the first real click.
+   * Browsers refuse to start one outside a user gesture, and a context
+   * created at load time sits `suspended` forever -- which is exactly
+   * how a count-in ends up silent with no error anywhere.
+   */
+  function ensureAudioContext() {
+    if (audioCtx === null) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      audioCtx = new Ctx();
+      countGain = audioCtx.createGain();
+      countGain.connect(audioCtx.destination);
+      // Its own node, not a child of countGain: the two vocals are
+      // alternatives and each carries its own level, so neither may
+      // scale the other.
+      measureGain = audioCtx.createGain();
+      measureGain.connect(audioCtx.destination);
+      applyCountsVolume();
+      applyMeasureVolume();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  /**
+   * Slider percent -> the gain a listener will agree with.
+   *
+   * Squared, not linear. A linear slider halved is -6dB, which the ear
+   * reads as "slightly quieter", so most of the travel seems to do
+   * nothing and the control feels broken. Squaring makes 50% land at
+   * -12dB -- about half as loud to a person -- and spreads the useful
+   * range across the whole slider instead of bunching it at the bottom.
+   * 0 is still exactly silent and 100 still exactly unity.
+   */
+  function perceivedGain(percent) {
+    const fraction = Math.min(1, Math.max(0, Number(percent) / 100));
+    return fraction * fraction;
+  }
+
+  function applyCountsVolume() {
+    countsVolumeOut.textContent = `${countsVolumeInput.value}%`;
+    if (countGain) countGain.gain.value = perceivedGain(countsVolumeInput.value);
+  }
+  countsVolumeInput.addEventListener('input', applyCountsVolume);
+  applyCountsVolume();
+
+  function applyMeasureVolume() {
+    measureVolumeOut.textContent = `${measureVolumeInput.value}%`;
+    if (measureGain) measureGain.gain.value = perceivedGain(measureVolumeInput.value);
+  }
+  measureVolumeInput.addEventListener('input', applyMeasureVolume);
+  applyMeasureVolume();
+
+  /**
+   * One count voice sample from the shared R2 folder, decoded and
+   * cached. A miss is cached too -- a bucket with no Voices/ folder
+   * would otherwise be asked once per beat, forever.
+   */
+  async function countSample(name) {
+    if (countSampleCache.has(name)) return countSampleCache.get(name);
+    const ctx = ensureAudioContext();
+    if (!ctx) {
+      countSampleCache.set(name, null);
+      return null;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/assets/shared/Voices/${encodeURIComponent(name)}.wav`);
+      if (!res.ok) throw new Error(`voice request failed (${res.status})`);
+      const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
+      countSampleCache.set(name, buffer);
+      return buffer;
+    } catch (err) {
+      countSampleCache.set(name, null);
+      return null;
+    }
+  }
+
+  /**
+   * The count when no recorded voice is available: a short blip, higher
+   * on the downbeat.
+   *
+   * Deliberately not silence. A count-in that makes no sound because a
+   * bucket has no Voices/ folder is indistinguishable from a count-in
+   * that is broken, and the person cannot tell which -- so this always
+   * makes the beat audible, and the hint under the card says which of
+   * the two is being heard.
+   */
+  function scheduleSynthCount(ctx, at, isDownbeat) {
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = isDownbeat ? 1318.5 : 880;
+    env.gain.setValueAtTime(0.0001, at);
+    env.gain.exponentialRampToValueAtTime(1, at + 0.006);
+    env.gain.exponentialRampToValueAtTime(0.0001, at + 0.13);
+    osc.connect(env);
+    env.connect(countGain);
+    osc.start(at);
+    osc.stop(at + 0.15);
+  }
+
+  function schedulePlayback(ctx, buffer, at) {
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(countGain);
+    src.start(at);
+  }
+
+  // --- Style B: the bar announcements -------------------------------
+  // Style A counts the beats of a count-in and then stops. Style B is a
+  // different job: it names the bar you are in, for the whole piece, so
+  // a lesson video can be followed without counting along. It reads the
+  // score's own performance timeline, which means a repeated bar 5 is
+  // announced as M5 again on the second pass rather than as M9 -- the
+  // written bar number is the one the viewer is looking at.
+
+  /**
+   * One count-voice sample -- `M{beat}.wav` -- decoded and cached. A
+   * miss caches too, so a bar longer than the bucket's samples asks
+   * once per beat number rather than once per playback.
+   */
+  function measureSample(beatNumber) {
+    if (measureSampleCache.has(beatNumber)) {
+      return Promise.resolve(measureSampleCache.get(beatNumber));
+    }
+    const pending = measureSampleInFlight.get(beatNumber);
+    if (pending !== undefined) return pending;
+
+    const request = (async () => {
+      const ctx = ensureAudioContext();
+      if (!ctx) return null;
+      try {
+        const res = await fetch(
+          `${API_BASE}/assets/shared/${encodeURIComponent('Counts vocal')}/M${beatNumber}.wav`,
+        );
+        if (!res.ok) throw new Error(`measure voice request failed (${res.status})`);
+        return await ctx.decodeAudioData(await res.arrayBuffer());
+      } catch (err) {
+        return null;
+      }
+    })().then((buffer) => {
+      measureSampleCache.set(beatNumber, buffer);
+      measureSampleInFlight.delete(beatNumber);
+      return buffer;
+    });
+
+    measureSampleInFlight.set(beatNumber, request);
+    return request;
+  }
+
+  /**
+   * Every BEAT of every bar of the score, in the same seconds the audio
+   * element counts in, each carrying its beat number within the bar.
+   *
+   * The count runs 1, 2, 3, 4 | 1, 2, 3, 4 | ... for the whole piece --
+   * the number is where you are in the BAR, not which bar it is, so a
+   * kit of four samples counts a hundred bars.
+   *
+   * Straight off the notation engine's performance timeline, so it is
+   * the score's own answer rather than a second guess at it: repeats
+   * are already unfolded, and each beat's offset inside its bar is
+   * taken through the tempo map, so a tempo change mid-bar moves the
+   * later beats of that bar with it.
+   */
+  function countVoiceSchedule() {
+    const pb = notationPlayback;
+    const entries = pb?.performance?.entries;
+    if (!entries || entries.length === 0 || typeof NotationEngine === 'undefined') return [];
+
+    const out = [];
+    for (const entry of entries) {
+      const sig = pb.timeSignatureByMeasure.get(entry.measureNumber) ?? {
+        numerator: 4,
+        denominator: 4,
+      };
+      // The beat is the time signature's own denominator unit: a 6/8
+      // bar is six eighth-note beats, not six quarters.
+      const fullBeats = Math.max(1, sig.numerator);
+      const ticksPerBeat = (4 / sig.denominator) * TICKS_PER_QUARTER;
+      if (!(ticksPerBeat > 0)) continue;
+
+      const beatsHere = Math.max(1, Math.round(entry.ticks / ticksPerBeat));
+      // A pickup bar is short, and it is counted from the END:
+      // one beat of pickup in 4/4 is beat 4, not beat 1. A full bar
+      // just starts at 1.
+      const firstBeat = beatsHere < fullBeats ? fullBeats - beatsHere + 1 : 1;
+      const barStartSeconds = NotationEngine.tickToSeconds(pb.tempoMap, entry.writtenTick);
+
+      for (let k = 0; k < beatsHere; k++) {
+        const offset =
+          NotationEngine.tickToSeconds(pb.tempoMap, entry.writtenTick + k * ticksPerBeat) -
+          barStartSeconds;
+        out.push({ at: entry.startSeconds + offset, beat: firstBeat + k });
+      }
+    }
+    return out;
+  }
+
+  // How far ahead of the audio clock announcements are queued, and how
+  // often the queue is topped up. The standard Web Audio arrangement: a
+  // coarse timer decides WHAT to play, the audio clock decides WHEN, so
+  // a stalled frame cannot make a beat land late.
+  const MEASURE_LOOKAHEAD_S = 0.75;
+  const MEASURE_POLL_MS = 200;
+  /**
+   * At most this many samples are fetched for one score. Beat numbers,
+   * not bar numbers, so this is "how long is the longest bar" -- 32
+   * covers anything anyone writes.
+   */
+  const MEASURE_PRELOAD_LIMIT = 32;
+
+  const measureAnnounce = { timer: null, sources: new Map() };
+
+  /** Drops every queued announcement -- for a pause, a seek, or a style change. */
+  function clearMeasureAnnouncements() {
+    for (const src of measureAnnounce.sources.values()) {
+      try {
+        src.stop();
+      } catch (err) {
+        /* already finished: stopping twice is not an error worth having */
+      }
+    }
+    measureAnnounce.sources.clear();
+  }
+
+  function stopMeasureAnnouncements() {
+    if (measureAnnounce.timer !== null) {
+      clearInterval(measureAnnounce.timer);
+      measureAnnounce.timer = null;
+    }
+    clearMeasureAnnouncements();
+  }
+
+  function pumpMeasureAnnouncements() {
+    if (!countVoiceEnabled() || audioPlayer.paused || audioCtx === null) return;
+    const schedule = countVoiceSchedule();
+    if (schedule.length === 0) return;
+
+    const nowAudio = audioPlayer.currentTime;
+    const nowCtx = audioCtx.currentTime;
+    for (let i = 0; i < schedule.length; i++) {
+      const { at, beat } = schedule[i];
+      if (at < nowAudio - 0.02 || at >= nowAudio + MEASURE_LOOKAHEAD_S) continue;
+      if (measureAnnounce.sources.has(i)) continue;
+      // Only what is already decoded. Fetching here would mean waiting,
+      // and a beat counted late is worse than one not counted --
+      // `preloadMeasureSamples` is what makes sure it is here in time.
+      const buffer = measureSampleCache.get(beat);
+      if (!buffer) continue;
+      const src = audioCtx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(measureGain);
+      src.start(Math.max(nowCtx, nowCtx + (at - nowAudio)));
+      // Kept until a pause or a seek clears the lot, rather than
+      // dropped when it finishes: the map is also the record of what
+      // has already been queued, and a sample shorter than the poll's
+      // own tolerance would otherwise be re-queued the instant it
+      // ended. One entry per bar of the piece is nothing to hold.
+      measureAnnounce.sources.set(i, src);
+    }
+  }
+
+  function startMeasureAnnouncements() {
+    stopMeasureAnnouncements();
+    if (!countVoiceEnabled()) return;
+    ensureAudioContext();
+    measureAnnounce.timer = setInterval(pumpMeasureAnnouncements, MEASURE_POLL_MS);
+    pumpMeasureAnnouncements();
+  }
+
+  /**
+   * Fetches a sample for every beat number the score actually uses,
+   * before playback rather than during it.
+   *
+   * Distinct numbers, not beats: a 4/4 piece needs four samples however
+   * many bars long it is. Fetched a few at a time, and capped, so a
+   * pathological file cannot turn one play into an unbounded number of
+   * requests.
+   */
+  let measurePreloadToken = 0;
+  async function preloadMeasureSamples() {
+    const token = ++measurePreloadToken;
+    const schedule = countVoiceSchedule();
+    const wanted = [...new Set(schedule.map((m) => m.beat))]
+      .sort((a, b) => a - b)
+      .slice(0, MEASURE_PRELOAD_LIMIT);
+    if (wanted.length === 0) return { have: [], missing: [] };
+
+    const CONCURRENCY = 6;
+    for (let i = 0; i < wanted.length; i += CONCURRENCY) {
+      if (token !== measurePreloadToken) return { have: [], missing: [] };
+      await Promise.all(wanted.slice(i, i + CONCURRENCY).map((n) => measureSample(n)));
+    }
+    return {
+      have: wanted.filter((n) => measureSampleCache.get(n)),
+      missing: wanted.filter((n) => !measureSampleCache.get(n)),
+    };
+  }
+
+  /**
+   * A run of consecutive numbers read as a range, so a 12/8 bar's
+   * twelve beats are one line rather than twelve.
+   */
+  function summariseNumbers(numbers) {
+    if (numbers.length === 0) return '';
+    const parts = [];
+    let start = numbers[0];
+    let previous = numbers[0];
+    for (const n of numbers.slice(1)) {
+      if (n === previous + 1) {
+        previous = n;
+        continue;
+      }
+      parts.push(start === previous ? `M${start}` : `M${start}\u2013M${previous}`);
+      start = n;
+      previous = n;
+    }
+    parts.push(start === previous ? `M${start}` : `M${start}\u2013M${previous}`);
+    return parts.join(', ');
+  }
+
+  /**
+   * How the loaded score counts: beats per bar and how long one beat
+   * really lasts, both read from the notation rather than assumed.
+   *
+   * The beat is the time signature's own DENOMINATOR unit (a 6/8 bar is
+   * six eighth-note beats, not six quarters), and its length comes from
+   * the score's tempo map at the very start, so "dotted quarter = 76"
+   * counts at 76 without this code knowing what a metronome mark is.
+   */
+  function scoreBeat() {
+    const pb = notationPlayback;
+    if (!pb || typeof NotationEngine === 'undefined' || pb.measureNumbersInOrder.length === 0) {
+      return { beatsPerBar: FALLBACK_BEATS_PER_BAR, secondsPerBeat: FALLBACK_SECONDS_PER_BEAT };
+    }
+    const first = pb.measureNumbersInOrder[0];
+    const sig = pb.timeSignatureByMeasure.get(first) ?? { numerator: 4, denominator: 4 };
+    const ticksPerBeat = (4 / sig.denominator) * TICKS_PER_QUARTER;
+    const secondsPerBeat =
+      NotationEngine.tickToSeconds(pb.tempoMap, ticksPerBeat) -
+      NotationEngine.tickToSeconds(pb.tempoMap, 0);
+    return {
+      beatsPerBar: Math.max(1, sig.numerator),
+      secondsPerBeat: secondsPerBeat > 0 ? secondsPerBeat : FALLBACK_SECONDS_PER_BEAT,
+    };
+  }
+
+  // --- the Beat Label ----------------------------------------------
+  const BEAT_LABEL_PARTS = {
+    '1': ['1'],
+    '1 &': ['1', '&'],
+    '1 e & a': ['1', 'e', '&', 'a'],
+  };
+
+  function beatLabelParts() {
+    return BEAT_LABEL_PARTS[beatLabelSelect.value] ?? BEAT_LABEL_PARTS['1'];
+  }
+
+  /**
+   * The label for a 1-based fractional beat: beat 2.5 in "1 &" is "&",
+   * in "1 e & a" it is "&" too, and in "1" it is still "2" -- the
+   * setting says how finely the bar is counted, not where we are.
+   */
+  function beatLabelFor(beat) {
+    const parts = beatLabelParts();
+    const whole = Math.floor(beat);
+    const within = Math.min(parts.length - 1, Math.floor((beat - whole) * parts.length + 1e-6));
+    return within === 0 ? String(whole) : parts[within];
+  }
+
+  let shownBeatLabel = null;
+  function showBeatLabel(label, isDownbeat) {
+    if (label === shownBeatLabel) return;
+    shownBeatLabel = label;
+    statCountBox.textContent = label;
+    // Removing and re-adding is not enough on its own: without a reflow
+    // between the two the browser coalesces them and the animation
+    // never restarts, so every beat after the first would be still.
+    statCountBox.classList.remove('beat-pulse');
+    void statCountBox.offsetWidth;
+    statCountBox.classList.add('beat-pulse');
+    if (statCountWrap) statCountWrap.classList.toggle('on-downbeat', isDownbeat);
+  }
+
+  /**
+   * The written tick sounding at `seconds` of audio, through the repeat
+   * timeline when the score has one.
+   *
+   * One function because three things need the same answer -- the COUNT
+   * box, the BPM box and the playhead -- and three copies of it is how
+   * they would start disagreeing about where the music is.
+   */
+  function writtenTickAt(seconds) {
+    const pb = notationPlayback;
+    if (!pb || typeof NotationEngine === 'undefined' || !Number.isFinite(seconds)) return undefined;
+    const perf = pb.performance;
+    if (perf && perf.entries.length > 0) {
+      return NotationEngine.performanceSecondsToWritten(
+        perf,
+        pb.tempoMap,
+        Math.min(seconds, perf.totalSeconds),
+      ).writtenTick;
+    }
+    return NotationEngine.secondsToTick(pb.tempoMap, seconds);
+  }
+
+  /**
+   * The tempo in effect at a written tick, read from the score's own
+   * tempo map.
+   *
+   * The map stores microseconds per quarter note (§12's own unit), so
+   * the BPM a reader recognises is 60,000,000 divided by it. Rounded for
+   * display only -- nothing downstream reads this number.
+   */
+  function bpmAtTick(tick) {
+    const pb = notationPlayback;
+    if (!pb || !pb.tempoMap || !pb.tempoMap.segments) return undefined;
+    let current;
+    for (const segment of pb.tempoMap.segments) {
+      if (segment.startTick <= tick) current = segment;
+      else break;
+    }
+    if (current === undefined || !(current.microsecondsPerQuarter > 0)) return undefined;
+    return Math.round(60000000 / current.microsecondsPerQuarter);
+  }
+
+  /**
+   * The key a signature spells, as a reader would say it.
+   *
+   * `fifths` counts the sharps or flats and NOTHING else: one sharp is
+   * G major and E minor both, so the mode is what picks the name. The
+   * notation engine passes the file's own `<key><mode>` through for
+   * exactly this. When the file does not say, the major name is shown,
+   * which is how a lone key signature is read anyway.
+   *
+   * Index 0 is seven flats, index 14 seven sharps -- the circle of
+   * fifths end to end, so `fifths + 7` is the lookup.
+   */
+  const MAJOR_KEYS = ['C\u266d', 'G\u266d', 'D\u266d', 'A\u266d', 'E\u266d', 'B\u266d', 'F', 'C', 'G', 'D', 'A', 'E', 'B', 'F\u266f', 'C\u266f'];
+  const MINOR_KEYS = ['A\u266d', 'E\u266d', 'B\u266d', 'F', 'C', 'G', 'D', 'A', 'E', 'B', 'F\u266f', 'C\u266f', 'G\u266f', 'D\u266f', 'A\u266f'];
+  const MINOR_MODES = new Set(['minor', 'aeolian']);
+
+  function keyName(fifths, mode) {
+    if (!Number.isFinite(fifths)) return undefined;
+    const index = Math.round(fifths) + 7;
+    if (index < 0 || index >= MAJOR_KEYS.length) return undefined;
+    return MINOR_MODES.has(mode) ? `${MINOR_KEYS[index]}m` : MAJOR_KEYS[index];
+  }
+
+  /**
+   * Every key the score is in, in written ticks -- one entry per
+   * CHANGE, not per bar.
+   *
+   * Built from the engine's own per-measure attributes, placed in time
+   * by the same performance timeline the cursor and the count use. A
+   * piece that modulates says so in the KEY box at the bar it happens,
+   * rather than showing what it opened in for the whole video.
+   */
+  let keyTimeline = [];
+
+  function buildKeyTimeline() {
+    keyTimeline = [];
+    const attributes = lastParsed?.attributes;
+    if (!attributes || attributes.length === 0) return;
+    // One part's worth: a grand staff is two staves of ONE part, and a
+    // second part would otherwise repeat every change.
+    const partId = attributes[0].partId;
+    const tickByMeasure = new Map();
+    for (const entry of notationPlayback?.performance?.entries ?? []) {
+      if (!tickByMeasure.has(entry.measureNumber)) {
+        tickByMeasure.set(entry.measureNumber, entry.writtenTick);
+      }
+    }
+    let last;
+    for (const attrs of attributes) {
+      if (attrs.partId !== partId) continue;
+      const name = keyName(attrs.fifths, attrs.mode);
+      if (name === undefined || name === last) continue;
+      keyTimeline.push({ tick: tickByMeasure.get(attrs.measureNumber) ?? 0, name });
+      last = name;
+    }
+    keyTimeline.sort((a, b) => a.tick - b.tick);
+  }
+
+  function keyAtTick(tick) {
+    if (keyTimeline.length === 0) return undefined;
+    let current = keyTimeline[0].name;
+    for (const change of keyTimeline) {
+      if (change.tick <= tick) current = change.name;
+      else break;
+    }
+    return current;
+  }
+
+  let shownKey = null;
+  function showKey(name) {
+    if (name === shownKey) return;
+    shownKey = name;
+    if (statKeyBox) statKeyBox.textContent = name === undefined ? '\u2014' : name;
+  }
+
+  let shownBpm = null;
+  function showBpm(bpm) {
+    if (bpm === shownBpm) return;
+    shownBpm = bpm;
+    const text = bpm === undefined ? '\u2014' : String(bpm);
+    if (tempoChip) tempoChip.textContent = text;
+    if (statBpm) statBpm.textContent = text;
+  }
+
+  /** Ticks the COUNT and BPM boxes from wherever the audio is. Called from the cursor loop. */
+  function updateBeatDisplay(atSeconds = audioPlayer.currentTime) {
+    if (countIn.running) return; // the count-in drives it itself
+    const pb = notationPlayback;
+    if (!pb || typeof NotationEngine === 'undefined') return;
+    try {
+      const tick = writtenTickAt(atSeconds);
+      if (tick === undefined) return;
+      const { beat } = NotationEngine.resolvePosition(pb, tick).position;
+      const parts = beatLabelParts();
+      const isDownbeat = Math.floor(beat) === 1 && beat - Math.floor(beat) < 1 / parts.length;
+      showBeatLabel(beatLabelFor(beat), isDownbeat);
+      // The BPM box used to show the score's FIRST tempo and then never
+      // move, so a piece that changes tempo -- which is most of why a
+      // lesson has a tempo mark in the middle of it -- displayed a
+      // number that had stopped being true.
+      showBpm(bpmAtTick(tick));
+      showKey(keyAtTick(tick));
+    } catch (err) {
+      /* a score the position API cannot place is not worth a broken transport */
+    }
+  }
+
+  // --- the count-in -------------------------------------------------
+  const countIn = { running: false, stop: null };
+
+  function cancelCountIn() {
+    if (countIn.stop) countIn.stop(false);
+  }
+
+  /**
+   * Sounds `countInBars` bars of counts, at the score's own tempo, and
+   * resolves when they are done -- so the caller can start the audio on
+   * the downbeat that follows.
+   *
+   * Scheduled against the AudioContext's own clock rather than
+   * setTimeout: a timer drifts by tens of milliseconds under load,
+   * which on a count-in is audible as an uneven bar. The VISUAL half
+   * runs on requestAnimationFrame off the same start time, so the box
+   * and the sound cannot disagree.
+   */
+  async function runCountIn() {
+    const bars = Number(countInBarsSelect.value);
+    if (!Number.isFinite(bars) || bars <= 0) return true;
+    const ctx = ensureAudioContext();
+    const { beatsPerBar, secondsPerBeat } = scoreBeat();
+    const total = bars * beatsPerBar;
+
+    // Both styles count the same beats; they differ only in WHICH
+    // voice says them -- `Voices/1.wav` or `Counts vocal/M1.wav`. Two
+    // sample sets for one job, so everything else about the count-in
+    // is identical either way.
+    const useM = countInStyle() === 'measures';
+    const samples = new Map();
+    for (let beat = 1; beat <= beatsPerBar; beat++) {
+      samples.set(beat, useM ? await measureSample(beat) : await countSample(String(beat)));
+    }
+    const haveSamples = [...samples.values()].some((b) => b !== null);
+    const missingName = useM ? 'Counts vocal/M1.wav' : 'Voices/1.wav';
+    const voiceName = useM ? 'Counts vocal' : 'Voices';
+    countHint.innerHTML = haveSamples
+      ? `Counted at the score's own tempo and time signature, before the audio starts. Using the <b>${voiceName}</b> samples from R2.`
+      : `Counted at the score's own tempo and time signature, before the audio starts. No <b>${missingName}</b> in the bucket, so a <b>synthesised count</b> is used.`;
+
+    countIn.running = true;
+    playIcon.querySelector('path').setAttribute('d', PAUSE_PATH);
+
+    // A small lead-in so the first beat is scheduled, not already late.
+    const LEAD_SECONDS = 0.12;
+    if (ctx) {
+      const start = ctx.currentTime + LEAD_SECONDS;
+      for (let i = 0; i < total; i++) {
+        const at = start + i * secondsPerBeat;
+        const isDownbeat = i % beatsPerBar === 0;
+        const buffer = samples.get((i % beatsPerBar) + 1);
+        if (buffer) schedulePlayback(ctx, buffer, at);
+        else scheduleSynthCount(ctx, at, isDownbeat);
+      }
+    }
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const timers = [];
+      const finish = (completed) => {
+        if (settled) return;
+        settled = true;
+        countIn.running = false;
+        countIn.stop = null;
+        for (const t of timers) clearTimeout(t);
+        if (!completed) playIcon.querySelector('path').setAttribute('d', PLAY_PATH);
+        resolve(completed);
+      };
+      countIn.stop = finish;
+
+      // One timer per beat for the COUNT box, and one for the end --
+      // deliberately NOT requestAnimationFrame. A label that changes
+      // once a beat has nothing to interpolate, and frames stop
+      // entirely in a backgrounded tab, which would leave a count-in
+      // that never finishes and music that never starts. Timers are
+      // throttled there, not cancelled.
+      for (let i = 0; i < total; i++) {
+        timers.push(
+          setTimeout(
+            () => showBeatLabel(String((i % beatsPerBar) + 1), i % beatsPerBar === 0),
+            (LEAD_SECONDS + i * secondsPerBeat) * 1000,
+          ),
+        );
+      }
+      timers.push(
+        setTimeout(() => finish(true), (LEAD_SECONDS + total * secondsPerBeat) * 1000),
+      );
+    });
+  }
+
+  /**
+   * Card 5's own line: which beats of the bar actually have a sample.
+   *
+   * It names the ones it has NO sample for, because that is the thing
+   * you cannot hear and therefore cannot diagnose from the video.
+   */
+  async function refreshCountVoice() {
+    const on = countVoiceEnabled();
+    measureVolumeInput.disabled = !on;
+    if (!on) {
+      stopMeasureAnnouncements();
+      countVoiceHint.innerHTML =
+        'Off. Turn it on to count every beat of every bar \u2014 M1, M2, M3, M4 \u2014 ' +
+        'through the whole file, from the shared <b>Counts vocal</b> folder in R2.';
+      return;
+    }
+
+    if (countVoiceSchedule().length === 0) {
+      countVoiceHint.innerHTML =
+        'Counts every beat of every bar \u2014 <b>M1</b> on beat 1, <b>M2</b> on beat 2 ' +
+        "and so on \u2014 through the whole file. Load a MusicXML file and it will follow " +
+        "that score's own bars, time signature and tempo.";
+      return;
+    }
+    countVoiceHint.textContent = 'Loading the count voice\u2026';
+    const { have, missing } = await preloadMeasureSamples();
+    if (!countVoiceEnabled()) return;
+    if (have.length === 0) {
+      countVoiceHint.innerHTML =
+        'No <b>Counts vocal/M1.wav</b> in the bucket, so nothing is counted. ' +
+        'Upload <b>M1.wav</b>, <b>M2.wav</b>\u2026 to the shared <b>Counts vocal</b> folder.';
+      return;
+    }
+    const bars = new Set(countVoiceSchedule().map((b) => b.at)).size;
+    countVoiceHint.innerHTML =
+      `Counting ${summariseNumbers(have)} on every beat of every bar, ${bars} beats ` +
+      'through this score, repeats included. ' +
+      (missing.length > 0
+        ? `No sample for ${summariseNumbers(missing)}, so ${missing.length === 1 ? 'that beat passes' : 'those beats pass'} in silence.`
+        : 'Every beat of the bar has one.');
+  }
+
+  countsVocalSelect.addEventListener('change', () => {
+    // Which samples are actually there is only known once they have
+    // been asked for, which `runCountIn` does on the next play; until
+    // then say which set will be used, not what it found.
+    countHint.innerHTML =
+      countInStyle() === 'measures'
+        ? "Counted at the score's own tempo and time signature, before the audio starts. Using the <b>Counts vocal</b> samples (<b>M1.wav</b>, <b>M2.wav</b>\u2026) from R2."
+        : "Counted at the score's own tempo and time signature, before the audio starts. Using the <b>Voices</b> samples (<b>1.wav</b>, <b>2.wav</b>\u2026) from R2.";
+  });
+
+  countVoiceOnSelect.addEventListener('change', () => {
+    stopMeasureAnnouncements();
+    refreshCountVoice();
+    if (!audioPlayer.paused) startMeasureAnnouncements();
+  });
+  refreshCountVoice();
+
+  // A seek lands somewhere else in the piece, so everything queued for
+  // where we WERE is wrong. Dropping them lets the next poll re-fill
+  // from the new position.
+  audioPlayer.addEventListener('seeking', clearMeasureAnnouncements);
+  audioPlayer.addEventListener('play', startMeasureAnnouncements);
+  audioPlayer.addEventListener('pause', stopMeasureAnnouncements);
+  audioPlayer.addEventListener('ended', stopMeasureAnnouncements);
+
+  playBtn.addEventListener('click', async () => {
+    if (!audioPlayer.src) return;
+    if (countIn.running) {
+      cancelCountIn();
+      return;
+    }
+    if (!audioPlayer.paused) {
+      audioPlayer.pause();
+      return;
+    }
+    // Count in when starting from the top. Resuming mid-take does not
+    // re-count: a count-in marks the beginning of the piece, and one
+    // fired every time someone unpauses would be noise.
+    if (audioPlayer.currentTime < 0.05) {
+      const finished = await runCountIn();
+      if (!finished) return;
+    }
+    audioPlayer.play();
+  });
+
+  // --- Generate Video ----------------------------------------------------
+  // The frame here is DOM, not one SVG, so it is composed onto a canvas
+  // piece by piece -- reading each piece's LIVE position and computed
+  // style rather than re-implementing the CSS. That is what keeps the
+  // recording matching the preview when the preview changes: nothing
+  // below knows where the logo goes, only that it is wherever the
+  // browser just put it.
+  const generateBtn = document.getElementById('generateBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const genProgress = document.getElementById('genProgress');
+  const genFill = document.getElementById('genFill');
+  const genLabel = document.getElementById('genLabel');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const costLine = document.getElementById('costLine');
+
+  const CAPTURE_FPS = 30;
+  /** 1080 on the short side, whichever shape is being made. */
+  const CAPTURE_SHORT_SIDE = 1080;
+  /**
+   * A still second before the count-in starts.
+   *
+   * A video that begins on its first count gives a viewer nothing to
+   * land on; a second of the frame sitting there is what a title card
+   * is for, and it costs one second.
+   */
+  const HOLD_SECONDS = 1;
+
+  let recording = null;
+  let downloadUrl = null;
+  let downloadName = 'guitar-video.webm';
+
+  /**
+   * Bravura, base64, fetched once.
+   *
+   * The notation is the one part of the frame that has to go through an
+   * <img> to reach the canvas, and an SVG rasterised that way loads
+   * nothing external -- including its font. Without the font embedded,
+   * every notehead, clef and rest in the exported video is a missing-
+   * glyph box. `exportSvg` takes the bytes and writes them in.
+   */
+  let bravuraBase64 = null;
+  async function loadBravura() {
+    if (bravuraBase64 !== null) return bravuraBase64;
+    try {
+      const res = await fetch('../../assets/fonts/Bravura.woff2');
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      bravuraBase64 = btoa(binary);
+    } catch (err) {
+      bravuraBase64 = '';
+    }
+    return bravuraBase64;
+  }
+
+  /** An element's box, in canvas pixels relative to the frame. */
+  function rectIn(el, frameRect, scale) {
+    const r = el.getBoundingClientRect();
+    return {
+      x: (r.left - frameRect.left) * scale,
+      y: (r.top - frameRect.top) * scale,
+      w: r.width * scale,
+      h: r.height * scale,
+    };
+  }
+
+  function isVisible(el) {
+    const cs = getComputedStyle(el);
+    return cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity) > 0.01;
+  }
+
+  /** `object-fit: cover` / `background-size: cover`, as a destination rect. */
+  function coverRect(naturalW, naturalH, boxW, boxH) {
+    if (!(naturalW > 0) || !(naturalH > 0)) return { x: 0, y: 0, w: boxW, h: boxH };
+    const scale = Math.max(boxW / naturalW, boxH / naturalH);
+    const w = naturalW * scale;
+    const h = naturalH * scale;
+    return { x: (boxW - w) / 2, y: (boxH - h) / 2, w, h };
+  }
+
+  function roundRectPath(ctx2d, x, y, w, h, r) {
+    const radius = Math.min(r, w / 2, h / 2);
+    ctx2d.beginPath();
+    ctx2d.moveTo(x + radius, y);
+    ctx2d.arcTo(x + w, y, x + w, y + h, radius);
+    ctx2d.arcTo(x + w, y + h, x, y + h, radius);
+    ctx2d.arcTo(x, y + h, x, y, radius);
+    ctx2d.arcTo(x, y, x + w, y, radius);
+    ctx2d.closePath();
+  }
+
+  /**
+   * One text element, at its own box.
+   *
+   * Drawn per LEAF element rather than per block, so a stat box's label
+   * and value land in their own places without this code knowing that a
+   * stat box has two lines in it. Canvas uses the document's own fonts,
+   * so Sora and Manrope are the real ones here -- only the notation has
+   * to carry its font with it.
+   */
+  function drawTextEl(ctx2d, el, frameRect, scale) {
+    const value = (el.textContent ?? '').trim();
+    if (value === '' || !isVisible(el)) return;
+    const cs = getComputedStyle(el);
+    const box = rectIn(el, frameRect, scale);
+    const size = parseFloat(cs.fontSize) * scale;
+    ctx2d.font = `${cs.fontStyle} ${cs.fontWeight} ${size}px ${cs.fontFamily}`;
+    ctx2d.fillStyle = cs.color;
+    ctx2d.textBaseline = 'middle';
+    if ('letterSpacing' in ctx2d) {
+      const spacing = parseFloat(cs.letterSpacing);
+      ctx2d.letterSpacing = Number.isFinite(spacing) ? `${spacing * scale}px` : '0px';
+    }
+    const align = cs.textAlign;
+    if (align === 'center') {
+      ctx2d.textAlign = 'center';
+      ctx2d.fillText(value, box.x + box.w / 2, box.y + box.h / 2);
+    } else if (align === 'right' || align === 'end') {
+      ctx2d.textAlign = 'right';
+      ctx2d.fillText(value, box.x + box.w, box.y + box.h / 2);
+    } else {
+      ctx2d.textAlign = 'left';
+      ctx2d.fillText(value, box.x, box.y + box.h / 2);
+    }
+    if ('letterSpacing' in ctx2d) ctx2d.letterSpacing = '0px';
+  }
+
+  /** The notation, rasterised once per frame with its font travelling with it. */
+  let notationImage = null;
+  let notationImageKey = '';
+  async function refreshNotationImage() {
+    const svgEl = notationContainer.querySelector('svg');
+    if (!svgEl) {
+      notationImage = null;
+      notationImageKey = '';
+      return;
+    }
+    // The playhead is stripped out before rasterising, and drawn onto
+    // the canvas directly instead. It moves every frame; the staff
+    // behind it does not, and re-rasterising an SVG 30 times a second
+    // to move one rectangle would cost more than the rest of the frame
+    // put together.
+    const clone = svgEl.cloneNode(true);
+    for (const el of clone.querySelectorAll('.playback-cursor')) el.remove();
+    const markup = new XMLSerializer().serializeToString(clone);
+    const key = String(markup.length) + '|' + currentVideoStyle();
+    if (key === notationImageKey && notationImage) return;
+    const font = await loadBravura();
+    const standalone = NotationEngine.exportSvg(markup, {
+      omitXmlDeclaration: true,
+      ...(font ? { fonts: [{ family: 'Bravura', base64: font, format: 'woff2' }] } : {}),
+    });
+    const blob = new Blob([standalone], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      notationImage = img;
+      notationImageKey = key;
+    } catch (err) {
+      notationImage = null;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  /**
+   * The playhead capsule, straight onto the canvas.
+   *
+   * Its rectangle is in the SVG's user units, so it is mapped through
+   * the viewBox to the box the SVG actually occupies -- which is how
+   * the browser is drawing it, and therefore lands in the same place.
+   */
+  function drawCursor(ctx2d, svgEl, svgBox) {
+    if (!svgEl || !cursorLine || cursorLine.style.display === 'none') return;
+    const viewBox = (svgEl.getAttribute('viewBox') || '').split(/\s+/).map(Number);
+    if (viewBox.length !== 4 || !(viewBox[2] > 0) || !(viewBox[3] > 0)) return;
+    const perUnitX = svgBox.w / viewBox[2];
+    const perUnitY = svgBox.h / viewBox[3];
+    const x = svgBox.x + (Number(cursorLine.getAttribute('x')) - viewBox[0]) * perUnitX;
+    const y = svgBox.y + (Number(cursorLine.getAttribute('y')) - viewBox[1]) * perUnitY;
+    const w = Number(cursorLine.getAttribute('width')) * perUnitX;
+    const h = Number(cursorLine.getAttribute('height')) * perUnitY;
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !(w > 0) || !(h > 0)) return;
+    ctx2d.strokeStyle = CURSOR_COLOR;
+    ctx2d.lineWidth = CURSOR_STROKE * perUnitX;
+    roundRectPath(ctx2d, x, y, w, h, (CURSOR_WIDTH / 2) * perUnitX);
+    ctx2d.stroke();
+  }
+
+  /**
+   * The whole frame, in the browser's own paint order: the frame's
+   * background, then its in-flow content on top of it.
+   */
+  /**
+   * The piano stage, painted onto the canvas.
+   *
+   * The same call the preview uses, written out as canvas rectangles
+   * instead of SVG -- `stageShapes` is the engine's one description of
+   * a frame, so the exported video cannot look different from what was
+   * on screen. Painting ~130 rectangles costs microseconds; rasterising
+   * the SVG instead would cost more than every other part of the frame
+   * put together, thirty times a second.
+   */
+  function paintStage(ctx2d, box, atSeconds) {
+    if (!guitarStage || typeof GuitarEngine === 'undefined') return;
+    if (!(box.w > 1) || !(box.h > 1) || !isVisible(guitarStage)) return;
+    // The neck keeps its shape, and sits where the preview puts it:
+    // centred in its box, which is what the CSS does on the page.
+    const rect = guitarStage.getBoundingClientRect();
+    const scale = box.w / Math.max(1, rect.width);
+    const neck = neckBox();
+    if (!neck) return;
+    const width = neck.width * scale;
+    const height = neck.height * scale;
+    const shapes = GuitarEngine.stageShapes(stageOptions(neck.width, neck.height, atSeconds));
+    ctx2d.save();
+    ctx2d.translate(box.x, box.y + (box.h - height) / 2);
+    ctx2d.scale(scale, scale);
+    for (const shape of shapes) {
+      ctx2d.fillStyle = shape.fill;
+      ctx2d.globalAlpha = shape.opacity === undefined ? 1 : shape.opacity;
+      if (shape.kind === 'circle') {
+        ctx2d.beginPath();
+        ctx2d.arc(shape.x, shape.y, shape.width / 2, 0, Math.PI * 2);
+        ctx2d.fill();
+      } else if (shape.radius > 0) {
+        roundRectPath(ctx2d, shape.x, shape.y, shape.width, shape.height, shape.radius);
+        ctx2d.fill();
+      } else {
+        ctx2d.fillRect(shape.x, shape.y, shape.width, shape.height);
+      }
+      ctx2d.globalAlpha = 1;
+      if (shape.stroke !== undefined && shape.strokeWidth > 0) {
+        ctx2d.strokeStyle = shape.stroke;
+        ctx2d.lineWidth = shape.strokeWidth;
+        ctx2d.strokeRect(shape.x, shape.y, shape.width, shape.height);
+      }
+    }
+    ctx2d.restore();
+    void width;
+  }
+
+  function drawGuitarFrame(ctx2d, canvas, atSeconds = audioPlayer.currentTime) {
+    const frameRect = videoFrame.getBoundingClientRect();
+    if (!(frameRect.width > 0)) return;
+    const scale = canvas.width / frameRect.width;
+    const cs = getComputedStyle(videoFrame);
+
+    ctx2d.fillStyle = cs.backgroundColor;
+    ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+
+    // The notation, clipped to its container.
+    //
+    // The staff is wider than the frame and the container scrolls it,
+    // so the image is drawn at the SVG's own live position -- which is
+    // off to the left once the cursor has moved along -- and then cut
+    // to the container's box, exactly as `overflow` cuts it on screen.
+    // Without the clip the far end of the piece would be painted
+    // across the stat boxes.
+    if (notationImage) {
+      const box = rectIn(notationContainer, frameRect, scale);
+      const svgEl = notationContainer.querySelector('svg');
+      ctx2d.save();
+      ctx2d.beginPath();
+      ctx2d.rect(box.x, box.y, box.w, box.h);
+      ctx2d.clip();
+      const at = svgEl ? rectIn(svgEl, frameRect, scale) : box;
+      ctx2d.drawImage(notationImage, at.x, at.y, at.w, at.h);
+      drawCursor(ctx2d, svgEl, at);
+      ctx2d.restore();
+    }
+
+    // The neck, in the middle of the frame.
+    if (guitarStage) paintStage(ctx2d, rectIn(guitarStage, frameRect, scale), atSeconds);
+
+    // The logo.
+    const mark = document.querySelector('.video-logo-mark');
+    if (mark && isVisible(mark) && mark.complete) {
+      const box = rectIn(mark, frameRect, scale);
+      ctx2d.drawImage(mark, box.x, box.y, box.w, box.h);
+    }
+
+    // Titles.
+    for (const el of videoFrame.querySelectorAll('.video-title')) {
+      drawTextEl(ctx2d, el, frameRect, scale);
+    }
+
+    // Stat boxes: their border, then each line of text at its own box.
+    for (const box of videoFrame.querySelectorAll('.stat-box')) {
+      if (!isVisible(box)) continue;
+      const style = getComputedStyle(box);
+      const r = rectIn(box, frameRect, scale);
+      if (style.backgroundColor && style.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+        ctx2d.fillStyle = style.backgroundColor;
+        roundRectPath(ctx2d, r.x, r.y, r.w, r.h, parseFloat(style.borderRadius) * scale);
+        ctx2d.fill();
+      }
+      const border = parseFloat(style.borderTopWidth) * scale;
+      if (border > 0) {
+        ctx2d.strokeStyle = style.borderTopColor;
+        ctx2d.lineWidth = border;
+        roundRectPath(
+          ctx2d,
+          r.x + border / 2,
+          r.y + border / 2,
+          r.w - border,
+          r.h - border,
+          parseFloat(style.borderRadius) * scale,
+        );
+        ctx2d.stroke();
+      }
+      for (const line of box.querySelectorAll('span')) drawTextEl(ctx2d, line, frameRect, scale);
+    }
+  }
+
+  function setGenerating(on) {
+    generateBtn.disabled = on;
+    generateBtn.textContent = on ? 'Rendering…' : 'Generate Video';
+    genProgress.hidden = !on;
+    costLine.hidden = on;
+    if (on) {
+      downloadBtn.hidden = true;
+      genFill.style.width = '0%';
+    } else {
+      setTimeout(refreshGenerateBtn, 0);
+    }
+  }
+
+  function refreshGenerateBtn() {
+    if (recording) return;
+    const ready = Boolean(audioPlayer.src);
+    generateBtn.disabled = !ready;
+    generateBtn.textContent = ready
+      ? 'Generate Video'
+      : 'Generate Video — upload an audio file first';
+  }
+
+  function offerDownload(blob, extension) {
+    if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+    downloadUrl = URL.createObjectURL(blob);
+    downloadName = `guitar-video.${extension}`;
+    downloadBtn.hidden = false;
+    downloadBtn.textContent = `Download Video (${(blob.size / 1048576).toFixed(1)} MB)`;
+  }
+
+  downloadBtn.addEventListener('click', () => {
+    if (!downloadUrl) return;
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = downloadName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    if (recording) recording.cancel();
+  });
+
+  /**
+   * The count-in, mixed offline instead of scheduled a beat at a time.
+   *
+   * Same samples, same fallback click, same volume as the live one --
+   * `runCountIn` is chasing a clock and this is not, which is the only
+   * difference. Returns null when there is no count-in to play.
+   */
+  async function renderCountInAudio() {
+    const bars = Number(countInBarsSelect.value);
+    if (!Number.isFinite(bars) || bars <= 0) return null;
+    const { beatsPerBar, secondsPerBeat } = scoreBeat();
+    const total = bars * beatsPerBar;
+    const seconds = total * secondsPerBeat;
+    const rate = audioCtx ? audioCtx.sampleRate : 48000;
+    const offline = new OfflineAudioContext(2, Math.max(1, Math.ceil(seconds * rate)), rate);
+    const gain = offline.createGain();
+    gain.gain.value = perceivedGain(countsVolumeInput.value);
+    gain.connect(offline.destination);
+
+    const useM = countInStyle() === 'measures';
+    for (let i = 0; i < total; i++) {
+      const beat = (i % beatsPerBar) + 1;
+      const at = i * secondsPerBeat;
+      const buffer = useM ? await measureSample(beat) : await countSample(String(beat));
+      if (buffer) {
+        const source = offline.createBufferSource();
+        source.buffer = buffer;
+        source.connect(gain);
+        source.start(at);
+        continue;
+      }
+      // The synthesised fallback, so a bucket with no voices still counts.
+      const osc = offline.createOscillator();
+      const env = offline.createGain();
+      const isDownbeat = i % beatsPerBar === 0;
+      osc.type = 'sine';
+      osc.frequency.value = isDownbeat ? 1320 : 880;
+      env.gain.setValueAtTime(0.0001, at);
+      env.gain.exponentialRampToValueAtTime(isDownbeat ? 1 : 0.6, at + 0.004);
+      env.gain.exponentialRampToValueAtTime(0.0001, at + 0.12);
+      osc.connect(env);
+      env.connect(gain);
+      osc.start(at);
+      osc.stop(at + 0.16);
+    }
+    return { buffer: await offline.startRendering(), seconds, beatsPerBar, secondsPerBeat };
+  }
+
+  /**
+   * The take: the uploaded audio with the bar announcements over it.
+   *
+   * Both go through the same two gains the preview uses, so the mix
+   * written is the mix the volume sliders describe.
+   */
+  async function renderTakeAudio(seconds) {
+    const file = document.getElementById('upload-audio').files?.[0];
+    const rate = audioCtx ? audioCtx.sampleRate : 48000;
+    const offline = new OfflineAudioContext(2, Math.max(1, Math.ceil(seconds * rate)), rate);
+
+    if (file) {
+      try {
+        const decoded = await offline.decodeAudioData(await file.arrayBuffer());
+        const source = offline.createBufferSource();
+        source.buffer = decoded;
+        source.connect(offline.destination);
+        source.start(0);
+      } catch (err) {
+        console.error('The uploaded audio could not be decoded for rendering:', err);
+      }
+    }
+
+    if (countVoiceOnSelect.value !== 'off') {
+      const gain = offline.createGain();
+      gain.gain.value = perceivedGain(measureVolumeInput.value);
+      gain.connect(offline.destination);
+      for (const entry of countVoiceSchedule()) {
+        if (entry.at >= seconds) break;
+        const buffer = await measureSample(entry.beat);
+        if (!buffer) continue;
+        const source = offline.createBufferSource();
+        source.buffer = buffer;
+        source.connect(gain);
+        source.start(entry.at);
+      }
+    }
+    return await offline.startRendering();
+  }
+
+  async function generateVideo() {
+    if (typeof VideoEngine === 'undefined') return;
+    if (!audioPlayer.src) {
+      setUploadConfirm('Upload an audio file first — it is what the video plays.', false);
+      return;
+    }
+    const takeSeconds = Number.isFinite(audioPlayer.duration) ? audioPlayer.duration : 0;
+    if (!(takeSeconds > 0)) {
+      setUploadConfirm('That audio file has no length the browser can read.', false);
+      return;
+    }
+
+    audioPlayer.pause();
+    audioPlayer.currentTime = 0;
+    setGenerating(true);
+
+    // The SHORT side is what is capped, so every shape comes out at a
+    // real delivery size: 1920x1080, 1080x1920, 1080x1080. Capping the
+    // long side instead would make a portrait video 1920 wide and
+    // 3413 tall, which no encoder wants.
+    const frameRect = videoFrame.getBoundingClientRect();
+    const scale = CAPTURE_SHORT_SIDE / Math.max(1, Math.min(frameRect.width, frameRect.height));
+    const even = (value) => Math.max(2, Math.round(value / 2) * 2);
+    const width = even(frameRect.width * scale);
+    const height = even(frameRect.height * scale);
+
+    let cancelled = false;
+    recording = {
+      cancel() {
+        cancelled = true;
+      },
+    };
+
+    try {
+      genLabel.textContent = 'Fetching the Thank You clip…';
+      const outro =
+        typeof OutroVideo === 'undefined'
+          ? null
+          : await OutroVideo.loadOutro(API_BASE, {
+              aspect: currentAspect(),
+              // Thank Video/16x9/guitar/16x9 Black Guitar.mp4, and so
+              // on -- outro-video.js builds the key from this word. If
+              // the bucket spells the folder differently (the Piano's
+              // is "paino"), this one word is the whole change; until
+              // then the walk outward closes a take on the drum clip of
+              // the same shape rather than on nothing.
+              kind: 'guitar',
+              style: currentVideoStyle(),
+            }).catch(() => null);
+
+      genLabel.textContent = 'Preparing the notation…';
+      await refreshNotationImage();
+      genLabel.textContent = 'Mixing the sound…';
+      const countIn = await renderCountInAudio();
+      const takeAudio = await renderTakeAudio(takeSeconds);
+
+      // Drawing the frame means moving the PAGE to that moment first:
+      // this frame is composed from the live DOM, so the cursor and the
+      // COUNT box have to be where they would be.
+      const drawAt = (ctx, seconds) => {
+        updateCursor(seconds);
+        updateBeatDisplay(seconds);
+        drawGuitarFrame(ctx, ctx.canvas, seconds);
+      };
+
+      const segments = [
+        {
+          seconds: HOLD_SECONDS,
+          draw: (ctx) => drawAt(ctx, 0),
+        },
+      ];
+      if (countIn) {
+        segments.push({
+          seconds: countIn.seconds,
+          audio: countIn.buffer,
+          draw: (ctx, at) => {
+            // The count-in counts; the notation has not started.
+            const index = Math.min(
+              countIn.beatsPerBar - 1,
+              Math.floor(at / countIn.secondsPerBeat) % countIn.beatsPerBar,
+            );
+            showBeatLabel(String(index + 1), index === 0);
+            updateCursor(0);
+            // The count-in happens before the music: the stage shows
+            // the opening bar's notes already falling, which is what
+            // counting in is FOR.
+            drawGuitarFrame(ctx, ctx.canvas, 0);
+          },
+        });
+      }
+      segments.push({
+        seconds: takeSeconds,
+        audio: takeAudio,
+        draw: (ctx, at) => drawAt(ctx, at),
+      });
+      if (outro && outro.seconds > 0) {
+        const outroAudio = await outro.audio(new OfflineAudioContext(2, 1, 48000));
+        segments.push({
+          seconds: outro.seconds,
+          realtime: true,
+          audio: outroAudio,
+          onStart: async () => {
+            outro.video.muted = true;
+            outro.video.currentTime = 0;
+            try {
+              await outro.video.play();
+            } catch (err) {
+              /* a clip that will not play leaves its seconds as the last frame */
+            }
+          },
+          onEnd: async () => outro.video.pause(),
+          draw: (ctx) => OutroVideo.drawCover(ctx, ctx.canvas, outro.video),
+        });
+      }
+
+      const result = await VideoEngine.render({
+        width,
+        height,
+        fps: CAPTURE_FPS,
+        segments,
+        onProgress: (fraction, label) => {
+          genFill.style.width = `${(Math.min(1, fraction) * 100).toFixed(1)}%`;
+          genLabel.textContent = `${label}… ${(Math.min(1, fraction) * 100).toFixed(0)}%`;
+        },
+        shouldStop: () => cancelled,
+      });
+
+      // Put the page back where it was: rendering moved it about.
+      updateCursor(0);
+      updateBeatDisplay(0);
+      drawStage(0);
+      recording = null;
+      setGenerating(false);
+      if (!result) {
+        setUploadConfirm('This browser can neither render nor record video.', false);
+        return;
+      }
+      if (cancelled) {
+        setUploadConfirm('Rendering cancelled.', false);
+        return;
+      }
+      offerDownload(result.blob, result.extension);
+      setUploadConfirm(
+        `\u2713 Video ready — ${width}×${height} at ${result.fps}fps, opening on a ${HOLD_SECONDS}s still` +
+          (outro ? ' and closing with the Thank You clip' : ' (no Thank You clip in the bucket)') +
+          (result.path === 'mediarecorder'
+            ? `. ${result.frames} frames, recorded in real time because this browser has no WebCodecs — some may have been dropped.`
+            : `. ${result.frames} frames, every one of them exact.`) +
+          ' Press Download Video to save it.',
+        true,
+      );
+    } catch (err) {
+      recording = null;
+      setGenerating(false);
+      console.error('Rendering failed:', err);
+      setUploadConfirm(`Rendering stopped: ${err && err.message ? err.message : err}`, false);
+    }
+  }
+
+  generateBtn.addEventListener('click', () => {
+    // Not `void`: an async function called and forgotten swallows its
+    // own rejection, and the only sign left is a button that says
+    // "Generating…" for ever. A take that breaks says what broke and
+    // gives the button back.
+    generateVideo().catch((err) => {
+      console.error('Generate failed:', err);
+      if (recording) recording.cancel();
+      setGenerating(false);
+      setUploadConfirm(`Generating stopped: ${err && err.message ? err.message : err}`, false);
+    });
+  });
+  audioPlayer.addEventListener('loadedmetadata', refreshGenerateBtn);
+  refreshGenerateBtn();
+
+  scrubBar.addEventListener('click', (e) => {
+    const dur = audioPlayer.duration;
+    if (!Number.isFinite(dur) || dur <= 0) return;
+    const rect = scrubBar.getBoundingClientRect();
+    const fraction = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    audioPlayer.currentTime = fraction * dur;
+    updateTransport();
+    updateCursor();
+  });
+</script>
 </body>
 </html>

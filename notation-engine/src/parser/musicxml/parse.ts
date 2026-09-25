@@ -245,6 +245,9 @@ function buildSingle(ev: ParsedNoteEvent): Note | Rest {
     ...(ev.instrumentId !== undefined ? { instrumentId: ev.instrumentId } : {}),
     ...(ev.stringNumber !== undefined ? { stringNumber: ev.stringNumber } : {}),
     ...(ev.fret !== undefined ? { fret: ev.fret } : {}),
+    ...(ev.fingering !== undefined ? { fingering: ev.fingering } : {}),
+    ...(ev.slideStart ? { slideStart: true } : {}),
+    ...(ev.slideStop ? { slideStop: true } : {}),
     ...(ev.isGrace ? { isGrace: true, graceSlash: ev.graceSlash } : {}),
     ...(ev.explicitStemDirection !== undefined
       ? { explicitStemDirection: ev.explicitStemDirection }

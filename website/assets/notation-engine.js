@@ -60182,6 +60182,10 @@ ${denominator}`;
     const technicalEl = notationsEl !== void 0 ? firstChildNamed(notationsEl, "technical") : void 0;
     const stringNumber = technicalEl !== void 0 ? intOf(firstChildNamed(technicalEl, "string")) : void 0;
     const fret = technicalEl !== void 0 ? intOf(firstChildNamed(technicalEl, "fret")) : void 0;
+    const fingering = technicalEl !== void 0 ? intOf(firstChildNamed(technicalEl, "fingering")) : void 0;
+    const slideEls = notationsEl !== void 0 ? [...childrenNamed(notationsEl, "slide"), ...childrenNamed(notationsEl, "glissando")] : [];
+    const slideStart = slideEls.some((el) => el.getAttribute("type") === "start");
+    const slideStop = slideEls.some((el) => el.getAttribute("type") === "stop");
     const tieStart = tieEls.some((el) => el.getAttribute("type") === "start") || tiedEls.some((el) => el.getAttribute("type") === "start");
     const tieStop = tieEls.some((el) => el.getAttribute("type") === "stop") || tiedEls.some((el) => el.getAttribute("type") === "stop");
     const noteheadEl = firstChildNamed(noteEl, "notehead");
@@ -60288,6 +60292,9 @@ ${denominator}`;
       ...explicitStemDirection !== void 0 ? { explicitStemDirection } : {},
       hasExplicitAccidental,
       ...stringNumber !== void 0 ? { stringNumber } : {},
+      ...fingering !== void 0 ? { fingering } : {},
+      ...slideStart ? { slideStart: true } : {},
+      ...slideStop ? { slideStop: true } : {},
       ...fret !== void 0 ? { fret } : {},
       notations,
       beams,
@@ -60543,6 +60550,9 @@ ${denominator}`;
       ...ev.instrumentId !== void 0 ? { instrumentId: ev.instrumentId } : {},
       ...ev.stringNumber !== void 0 ? { stringNumber: ev.stringNumber } : {},
       ...ev.fret !== void 0 ? { fret: ev.fret } : {},
+      ...ev.fingering !== void 0 ? { fingering: ev.fingering } : {},
+      ...ev.slideStart ? { slideStart: true } : {},
+      ...ev.slideStop ? { slideStop: true } : {},
       ...ev.isGrace ? { isGrace: true, graceSlash: ev.graceSlash } : {},
       ...ev.explicitStemDirection !== void 0 ? { explicitStemDirection: ev.explicitStemDirection } : {},
       ...ev.hasExplicitAccidental ? { hasExplicitAccidental: true } : {},

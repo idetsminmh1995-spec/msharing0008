@@ -122,6 +122,59 @@ describe('MusicXML parser v1 (Phase 20)', () => {
     assert.equal(result.attributes[2].mode, undefined);
   });
 
+  test('a guitar note carries its string, fret, fingering and slide', () => {
+    // A slide is one finger travelling along a string, so a fretboard
+    // needs both ends of it: the note it leaves and the note it
+    // arrives at. MusicXML writes it as <slide>, or <glissando> for a
+    // smooth one; both are the same gesture here.
+    const xml = `<?xml version="1.0"?>
+      <score-partwise version="4.0">
+        <part-list><score-part id="P1"><part-name>Guitar</part-name></score-part></part-list>
+        <part id="P1"><measure number="1">
+          <attributes><divisions>2</divisions>
+            <time><beats>4</beats><beat-type>4</beat-type></time>
+            <clef><sign>TAB</sign><line>5</line></clef>
+            <staff-details><staff-lines>6</staff-lines></staff-details>
+          </attributes>
+          <note><pitch><step>A</step><octave>3</octave></pitch><duration>2</duration><type>quarter</type>
+            <notations><technical><string>3</string><fret>2</fret><fingering>1</fingering></technical>
+              <slide type="start" number="1"/></notations></note>
+          <note><pitch><step>B</step><octave>3</octave></pitch><duration>2</duration><type>quarter</type>
+            <notations><technical><string>3</string><fret>4</fret><fingering>3</fingering></technical>
+              <slide type="stop" number="1"/></notations></note>
+          <note><pitch><step>E</step><octave>4</octave></pitch><duration>2</duration><type>quarter</type>
+            <notations><technical><string>1</string><fret>0</fret><fingering>0</fingering></technical>
+              <glissando type="start" number="1"/></notations></note>
+          <note><pitch><step>G</step><octave>4</octave></pitch><duration>2</duration><type>quarter</type>
+            <notations><technical><string>1</string><fret>3</fret></technical></notations></note>
+        </measure></part>
+      </score-partwise>`;
+    const result = NE.parseMusicXml(xml, { domParser });
+    const events = result.score.parts[0].measures[0].voices[0].events;
+    assert.equal(events.length, 4);
+
+    assert.equal(events[0].stringNumber, 3);
+    assert.equal(events[0].fret, 2);
+    assert.equal(events[0].fingering, 1, 'the index finger, as the file numbers them');
+    assert.equal(events[0].slideStart, true);
+    assert.equal(events[0].slideStop, undefined);
+
+    assert.equal(events[1].fret, 4);
+    assert.equal(events[1].fingering, 3);
+    assert.equal(events[1].slideStop, true, 'where the slide arrives');
+    assert.equal(events[1].slideStart, undefined);
+
+    // An open string is fingering 0, and a <glissando> is a slide too.
+    assert.equal(events[2].fret, 0);
+    assert.equal(events[2].fingering, 0);
+    assert.equal(events[2].slideStart, true);
+
+    // A note that says nothing says nothing -- no invented finger.
+    assert.equal(events[3].fingering, undefined);
+    assert.equal(events[3].slideStart, undefined);
+    assert.equal(events[3].slideStop, undefined);
+  });
+
   test('barline info is captured in the attributes side-table', () => {
     const result = loadFixture('simple-single-voice.musicxml');
     assert.equal(result.attributes[1].barlineStyle, 'light-heavy');
