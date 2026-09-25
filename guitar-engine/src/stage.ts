@@ -26,7 +26,9 @@ import type {
   GuitarStageOptions,
   Instrument,
   LivePosition,
+  PickMark,
   StageShape,
+  StringLine,
 } from './types.js';
 
 /**
@@ -63,6 +65,7 @@ export const DEFAULT_COLORS: GuitarColors = {
   rosette: '#C9A227',
   pickup: '#1B1512',
   hardware: '#C6BCB1',
+  pick: '#F7F4F0',
   unassigned: '#F7F4F0',
   open: '#9AA6B2',
   ...FINGER_COLORS,
@@ -442,7 +445,99 @@ export function markShapes(
 /** A whole frame: the neck, then what is played on it. */
 export function stageShapes(options: GuitarStageOptions): readonly StageShape[] {
   const positions = positionsAt(options.notes ?? [], options.seconds);
-  return [...fretboardShapes(options), ...markShapes(positions, options)];
+  return [
+    ...fretboardShapes(options),
+    ...markShapes(positions, options),
+    ...pickShapes(options.pick, options),
+  ];
+}
+
+/**
+ * [D-004/RH-P01] The picking hand's stroke, drawn where the hand is.
+ *
+ * Two marks, and they are not arrows: a down-stroke is the square
+ * bracket and an up-stroke the V that every guitarist has read above a
+ * stave since they started. An arrow would have to point somewhere,
+ * and which way "down" points on a screen depends on which end of the
+ * neck the thin string is drawn at -- these do not care.
+ *
+ * It fades rather than blinking off, so a still frame taken just after
+ * a note still shows what the right hand did.
+ */
+export function pickShapes(
+  mark: PickMark | undefined,
+  options: FretboardOptions,
+): readonly StageShape[] {
+  if (mark === undefined || mark.age >= 1) return [];
+  const colors = resolveColors(options.colors, options.instrument);
+  const layout = guitarLayout(options);
+  const strings = stringLines(options);
+  const struck = strings.filter((line) => mark.strings.includes(line.string));
+  if (struck.length === 0) return [];
+
+  const first = struck[0] as StringLine;
+  const last = struck[struck.length - 1] as StringLine;
+  const centreY = (first.offset + last.offset) / 2;
+  const spread = Math.abs(last.offset - first.offset);
+  const height = Math.max(layout.board.height * 0.2, spread + layout.board.height * 0.08);
+  const width = height * 0.66;
+  const thickness = Math.max(1.5, width * 0.24);
+  // Just short of the body, where the picking hand is -- over the neck
+  // rather than on the body, where it would be a light mark on a dark
+  // one and hard to read at video size.
+  const centreX = layout.body.x - width * 0.85;
+
+  return [
+    {
+      kind: 'path',
+      x: centreX,
+      y: centreY,
+      width,
+      height,
+      fill: colors.pick,
+      opacity: 0.9 * (1 - mark.age),
+      d:
+        mark.direction === 'down'
+          ? downStrokePath(centreX, centreY, width, height, thickness)
+          : upStrokePath(centreX, centreY, width, height, thickness),
+    },
+  ];
+}
+
+/** The square bracket: down. */
+function downStrokePath(cx: number, cy: number, w: number, h: number, t: number): string {
+  const left = cx - w / 2;
+  const right = cx + w / 2;
+  const top = cy - h / 2;
+  const bottom = cy + h / 2;
+  return [
+    `M${left} ${bottom}`,
+    `L${left} ${top}`,
+    `L${right} ${top}`,
+    `L${right} ${bottom}`,
+    `L${right - t} ${bottom}`,
+    `L${right - t} ${top + t}`,
+    `L${left + t} ${top + t}`,
+    `L${left + t} ${bottom}`,
+    'Z',
+  ].join(' ');
+}
+
+/** The V: up. */
+function upStrokePath(cx: number, cy: number, w: number, h: number, t: number): string {
+  const left = cx - w / 2;
+  const right = cx + w / 2;
+  const top = cy - h / 2;
+  const bottom = cy + h / 2;
+  return [
+    `M${left} ${top}`,
+    `L${left + t} ${top}`,
+    `L${cx} ${bottom - t * 0.8}`,
+    `L${right - t} ${top}`,
+    `L${right} ${top}`,
+    `L${cx} ${bottom}`,
+    'Z',
+  ].join(' ');
 }
 
 function shapesToSvg(shapes: readonly StageShape[], width: number, height: number): string {
@@ -456,6 +551,9 @@ function shapesToSvg(shapes: readonly StageShape[], width: number, height: numbe
       };
       if (shape.kind === 'circle') {
         return tag('circle', { cx: shape.x, cy: shape.y, r: shape.width / 2, ...common });
+      }
+      if (shape.kind === 'path') {
+        return tag('path', { d: shape.d ?? '', ...common });
       }
       if (shape.kind === 'text') {
         return wrap(

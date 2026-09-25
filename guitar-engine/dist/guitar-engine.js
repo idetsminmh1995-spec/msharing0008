@@ -40,6 +40,7 @@ var GuitarEngine = (() => {
     inlayFrets: () => inlayFrets,
     instrumentColors: () => instrumentColors,
     markShapes: () => markShapes,
+    pickShapes: () => pickShapes,
     positionsAt: () => positionsAt,
     renderFretboard: () => renderFretboard,
     renderGuitarStage: () => renderGuitarStage,
@@ -240,6 +241,7 @@ var GuitarEngine = (() => {
     rosette: "#C9A227",
     pickup: "#1B1512",
     hardware: "#C6BCB1",
+    pick: "#F7F4F0",
     unassigned: "#F7F4F0",
     open: "#9AA6B2",
     ...FINGER_COLORS,
@@ -532,7 +534,71 @@ var GuitarEngine = (() => {
   }
   function stageShapes(options) {
     const positions = positionsAt(options.notes ?? [], options.seconds);
-    return [...fretboardShapes(options), ...markShapes(positions, options)];
+    return [
+      ...fretboardShapes(options),
+      ...markShapes(positions, options),
+      ...pickShapes(options.pick, options)
+    ];
+  }
+  function pickShapes(mark, options) {
+    if (mark === void 0 || mark.age >= 1) return [];
+    const colors = resolveColors(options.colors, options.instrument);
+    const layout = guitarLayout(options);
+    const strings = stringLines(options);
+    const struck = strings.filter((line) => mark.strings.includes(line.string));
+    if (struck.length === 0) return [];
+    const first = struck[0];
+    const last = struck[struck.length - 1];
+    const centreY = (first.offset + last.offset) / 2;
+    const spread = Math.abs(last.offset - first.offset);
+    const height = Math.max(layout.board.height * 0.2, spread + layout.board.height * 0.08);
+    const width = height * 0.66;
+    const thickness = Math.max(1.5, width * 0.24);
+    const centreX = layout.body.x - width * 0.85;
+    return [
+      {
+        kind: "path",
+        x: centreX,
+        y: centreY,
+        width,
+        height,
+        fill: colors.pick,
+        opacity: 0.9 * (1 - mark.age),
+        d: mark.direction === "down" ? downStrokePath(centreX, centreY, width, height, thickness) : upStrokePath(centreX, centreY, width, height, thickness)
+      }
+    ];
+  }
+  function downStrokePath(cx, cy, w, h, t) {
+    const left = cx - w / 2;
+    const right = cx + w / 2;
+    const top = cy - h / 2;
+    const bottom = cy + h / 2;
+    return [
+      `M${left} ${bottom}`,
+      `L${left} ${top}`,
+      `L${right} ${top}`,
+      `L${right} ${bottom}`,
+      `L${right - t} ${bottom}`,
+      `L${right - t} ${top + t}`,
+      `L${left + t} ${top + t}`,
+      `L${left + t} ${bottom}`,
+      "Z"
+    ].join(" ");
+  }
+  function upStrokePath(cx, cy, w, h, t) {
+    const left = cx - w / 2;
+    const right = cx + w / 2;
+    const top = cy - h / 2;
+    const bottom = cy + h / 2;
+    return [
+      `M${left} ${top}`,
+      `L${left + t} ${top}`,
+      `L${cx} ${bottom - t * 0.8}`,
+      `L${right - t} ${top}`,
+      `L${right} ${top}`,
+      `L${cx} ${bottom}`,
+      "Z"
+    ].join(" ");
   }
   function shapesToSvg(shapes, width, height) {
     const body = shapes.map((shape) => {
@@ -544,6 +610,9 @@ var GuitarEngine = (() => {
       };
       if (shape.kind === "circle") {
         return tag("circle", { cx: shape.x, cy: shape.y, r: shape.width / 2, ...common });
+      }
+      if (shape.kind === "path") {
+        return tag("path", { d: shape.d ?? "", ...common });
       }
       if (shape.kind === "text") {
         return wrap(

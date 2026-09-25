@@ -113,6 +113,26 @@ test('a different tuning names different strings', () => {
   assert.equal(G.tuningFor(6).join(','), G.STANDARD_TUNING.join(','));
 });
 
+test('the picking hand draws the two marks a guitarist already reads', () => {
+  const withPick = (direction, age) =>
+    G.stageShapes({ ...STAGE, pick: { direction, strings: [1, 2, 3], age } }).filter(
+      (s) => s.kind === 'path',
+    );
+  const [down] = withPick('down', 0);
+  const [up] = withPick('up', 0);
+  assert.ok(down.d.length > 0 && up.d.length > 0);
+  assert.notEqual(down.d, up.d, 'a down-stroke and an up-stroke are different marks');
+  // It sits where the hand is: past the frets, before the body.
+  const layout = G.guitarLayout(STAGE);
+  assert.ok(down.x < layout.body.x, 'clear of the body');
+  assert.ok(down.x > layout.neck.x, 'and past the nut');
+
+  // It fades rather than blinking off, and is gone when it is over.
+  assert.ok(withPick('down', 0.8)[0].opacity < down.opacity);
+  assert.equal(withPick('down', 1).length, 0);
+  assert.equal(G.stageShapes(STAGE).filter((s) => s.kind === 'path').length, 0, 'none by default');
+});
+
 test('a mark sits on its own string, in its own fret', () => {
   const strings = G.stringLines(STAGE);
   for (const string of [1, 3, 6]) {

@@ -280,6 +280,27 @@ export function fromNotationEngine(
   return { parts, warnings };
 }
 
+/**
+ * [DM-09] The ID a notation note is known by.
+ *
+ * The Notation Engine gives its notes no ID of their own, so one is
+ * derived from where the note is written: part, measure, voice, and
+ * how many notes into that voice it is. Two runs of the same file
+ * produce the same IDs, which is what lets the video light the note on
+ * the staff and the dot on the neck together [IN-E03].
+ *
+ * It is exported because the page walks the same score to draw it, and
+ * one formula in one place is the only way the two walks can agree.
+ */
+export function notationNoteId(
+  partId: string,
+  measureNumber: number,
+  voiceId: number | string,
+  indexInVoice: number,
+): string {
+  return `${partId}-m${measureNumber}-v${String(voiceId)}-n${indexInVoice}`;
+}
+
 function readWrittenNotes(part: NotationPartLike, partId: string): readonly WrittenNote[] {
   const out: WrittenNote[] = [];
   for (const measure of part.measures ?? []) {
@@ -304,10 +325,7 @@ function readWrittenNotes(part: NotationPartLike, partId: string): readonly Writ
             durationTicks: Math.max(1, member.duration?.ticks ?? eventTicks),
             pitch,
             note: member,
-            // [DM-09] the Notation Engine gives notes no ID of their own,
-            // so one is derived from where the note is written. Two runs
-            // of the same file produce the same IDs.
-            notationNoteId: `${partId}-m${measureNumber}-v${voiceId}-n${index++}`,
+            notationNoteId: notationNoteId(partId, measureNumber, voiceId, index++),
           });
         }
       }

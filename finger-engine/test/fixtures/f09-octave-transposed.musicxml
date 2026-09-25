@@ -2,13 +2,13 @@
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
 <!--
   Fixture F-09 (Plan Part 08): F-01's part written the way guitar
-  music is normally engraved -- an octave HIGHER than it sounds, with
+  music is normally engraved — an octave HIGHER than it sounds, with
   <transpose><octave-change>-1</octave-change></transpose> saying so.
 
   The notes on the page are C4 -> C5; the strings sound C3 -> C4.
   [IN-X22] The engine reads sounding pitch, so this fixture must
   produce exactly F-01's fingering. Reading the written pitch instead
-  would put the whole scale twelve frets up the neck -- playable, and
+  would put the whole scale twelve frets up the neck — playable, and
   completely wrong.
 -->
 <score-partwise version="3.1">

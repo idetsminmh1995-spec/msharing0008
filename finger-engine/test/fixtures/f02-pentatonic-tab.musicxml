@@ -3,7 +3,7 @@
 <!--
   Fixture F-02 (Plan Part 08): the A minor pentatonic box at the 5th
   fret, WITH tab. Every note names its string and its fret, so the
-  engine has no position to choose -- only fingers.
+  engine has no position to choose — only fingers.
 
   Expected: fret 5 -> finger 1, fret 7 -> finger 3, fret 8 -> finger 4,
   the hand at position 5 the whole way, and not one shift.

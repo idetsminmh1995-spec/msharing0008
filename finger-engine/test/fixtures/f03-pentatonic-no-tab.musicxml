@@ -4,7 +4,7 @@
   Fixture F-03 (Plan Part 08): F-02's notes with the tab taken away.
   The solver has to find the box by itself.
 
-  Expected is a PROPERTY, not an exact answer -- several fingerings of
+  Expected is a PROPERTY, not an exact answer — several fingerings of
   this are things a guitarist really does: at most one hand shift in
   the whole phrase, no span past the limits, and a confidence on every
   note.

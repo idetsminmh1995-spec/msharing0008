@@ -92,6 +92,8 @@ export interface GuitarColors {
   /** An electric's pickups and bridge. */
   readonly pickup: string;
   readonly hardware: string;
+  /** The picking hand's stroke marks, over the strings it is hitting. */
+  readonly pick: string;
   /** A note nobody has assigned a finger to yet -- not a finger's colour. */
   readonly unassigned: string;
   /** An open string: played, but by no finger. */
@@ -140,10 +142,26 @@ export interface FretboardOptions {
 
 export type Instrument = 'acoustic' | 'electric';
 
+/**
+ * A stroke of the picking hand, as the frame should show it.
+ *
+ * `age` is how far through its life the mark is, 0 at the stroke and 1
+ * when it has faded out -- so a still frame shows the stroke that has
+ * just happened rather than nothing at all.
+ */
+export interface PickMark {
+  readonly direction: 'down' | 'up';
+  /** The strings being hit, in the drawn numbering. */
+  readonly strings: readonly number[];
+  readonly age: number;
+}
+
 export interface GuitarStageOptions extends FretboardOptions {
   /** Where the music is now, in seconds. */
   readonly seconds: number;
   readonly notes?: readonly GuitarNote[];
+  /** [D-004] what the right hand is doing, if anything. */
+  readonly pick?: PickMark;
 }
 
 /**
@@ -154,7 +172,7 @@ export interface GuitarStageOptions extends FretboardOptions {
  * video without either one re-deciding what it looks like.
  */
 export interface StageShape {
-  readonly kind: 'rect' | 'circle' | 'text';
+  readonly kind: 'rect' | 'circle' | 'text' | 'path';
   readonly x: number;
   readonly y: number;
   /** A rect's box; a circle's diameter; a text's own size is `fontSize`. */
@@ -172,6 +190,15 @@ export interface StageShape {
    * a renderer paints every shape the same way.
    */
   readonly role?: 'fretNumber' | 'stringLabel' | 'stringName';
+  /**
+   * Path only: an SVG path, filled (never stroked), in the same
+   * coordinates as everything else.
+   *
+   * Here for one reason -- the picking symbols. A down-stroke is a
+   * square bracket and an up-stroke a V, the two marks every guitarist
+   * already reads, and neither is a rectangle or a circle.
+   */
+  readonly d?: string;
   /** Text only. `x`/`y` are the anchor, which `align` and `baseline` place it against. */
   readonly text?: string;
   readonly fontSize?: number;

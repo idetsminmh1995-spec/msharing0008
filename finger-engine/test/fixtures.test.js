@@ -57,6 +57,30 @@ test('[F-01] is a C major scale C3 to C4, with no tab and no hints', () => {
   }
 });
 
+test('every fixture is XML a strict parser will read', () => {
+  // This engine's own reader is lenient, so it would never notice --
+  // but the browser's DOMParser is not, and a `--` inside an XML
+  // comment makes it throw the whole file away and hand back an HTML
+  // error document. That is exactly how these fixtures were found to
+  // be broken: the Guitar page refused to load one.
+  for (const name of [
+    'f01-c-major-scale.musicxml',
+    'f02-pentatonic-tab.musicxml',
+    'f03-pentatonic-no-tab.musicxml',
+    'f05-repeated-sixteenths.musicxml',
+    'f09-octave-transposed.musicxml',
+    'f12-impossible-stretch.musicxml',
+    'f14-out-of-range.musicxml',
+  ]) {
+    const text = fixture(name);
+    for (const comment of text.match(/<!--[\s\S]*?-->/g) ?? []) {
+      const body = comment.slice(4, -3);
+      assert.ok(!body.includes('--'), `${name}: an XML comment cannot contain "--"`);
+    }
+    assert.ok(text.includes('<score-partwise'), `${name} is a partwise score`);
+  }
+});
+
 test('[F-09] is written an octave high and sounds exactly F-01', () => {
   const f09 = readFixture(fixture('f09-octave-transposed.musicxml'));
   assert.equal(f09.shift, -12, '<octave-change>-1 is a twelve-semitone drop');

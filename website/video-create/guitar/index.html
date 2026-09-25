@@ -288,6 +288,7 @@
 <!-- The guitar stage: the neck, and the strings lit where they are
      played. guitar-engine/, TypeScript + SVG, built to this bundle. -->
 <script src="../../assets/guitar-engine.js"></script>
+<script src="../../assets/finger-engine.js"></script>
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
 <script src="../../assets/outro-video.js"></script>
 <!-- The video engine: renders frames rather than recording them. -->
@@ -412,7 +413,7 @@
         <div class="finger-hand" id="fingerHand" aria-hidden="true"></div>
         <div class="finger-names" id="fingerNames"></div>
       </div>
-      <div class="field-hint" id="fretHint">The neck lights where the score says a note is stopped &mdash; its string and its fret, with the fret numbers along the bottom. A slide travels along the string rather than jumping, and an open string has its own colour. The four finger colours are fixed, not chosen: they are meant to be learnt once and read in every video after. Which finger stops a note comes from the score when it writes one; the Human Finger Engine answers the rest.</div>
+      <div class="field-hint" id="fretHint">The neck lights where each note is played &mdash; its string, its fret and the finger stopping it, with the fret numbers along the bottom. When the score writes a position or a fingering down, that is what you see; when it does not, the Human Finger Engine works out how a guitarist would play the line: it weighs every place each note could go, what the hand would have to stretch, and how long it has to get there, then picks the way through with the least work in it. The picking hand is drawn too, as the square bracket and the V every guitarist reads. A slide travels along the string rather than jumping, an open string has its own colour, and the four finger colours are fixed, not chosen: they are meant to be learnt once and read in every video after.</div>
     </div>
 
     <div class="card">
@@ -579,7 +580,7 @@
       <div class="engine-pills">
         <span class="engine-pill">Notation Engine</span>
         <span class="engine-pill">Guitar Engine</span>
-        <span class="engine-pill engine-pill-soon">Human Finger Engine</span>
+        <span class="engine-pill">Human Finger Engine</span>
         <span class="engine-pill">Video Engine</span>
       </div>
     </div>
@@ -732,6 +733,15 @@
   // without re-reading the file -- parsing is ~80% of a render.
   let lastParsed = null;
   let lastFileLabel = '';
+  /**
+   * The file's own text, kept for the Finger Engine.
+   *
+   * [IN-E02] The Notation Engine does not keep `<transpose>`,
+   * `<staff-tuning>` or `<capo>`, and a guitar part is usually written
+   * an octave above where it sounds -- so the finger engine reads
+   * those three from the file itself.
+   */
+  let lastXmlText = '';
 
   function notationConfig() {
     return {
@@ -784,6 +794,7 @@
 
     lastParsed = parsed;
     lastFileLabel = fileLabel;
+    lastXmlText = xmlText;
 
     // Inject the real rendered SVG, height-constrained to fit the strip
     // (its own real width is left alone, so a long piece scrolls).
@@ -988,32 +999,48 @@
    * moment back to a written tick is what makes the second pass light
    * up like the first.
    *
-   * A guitar note is a string and a fret, and only the file knows them
-   * -- the same pitch is playable in five places, so nothing is
-   * inferred here. A score with no tab positions lights nothing, and
-   * the hint under the card says so rather than guessing a shape.
+   * A guitar note is a PLACE, not a pitch -- the same note is playable
+   * in five of them. When the file writes the place down, that is the
+   * answer and nothing here may change it. When it does not, the
+   * Human Finger Engine works out how a guitarist would play the line
+   * and answers string, fret and finger for every note.
    */
   let guitarNotes = [];
+  /** [RH-P01] the picking hand's strokes, in the same written seconds. */
+  let guitarPicks = [];
 
-  function buildGuitarNotes() {
-    guitarNotes = [];
-    const parsed = lastParsed;
-    const playback = notationPlayback;
-    if (!parsed || !parsed.score || !playback || typeof NotationEngine === 'undefined') return;
+  /** How long a pick mark stays on screen after the stroke. */
+  const PICK_FADE_SEC = 0.22;
 
-    const raw = [];
+  /**
+   * Every pitched note the Notation Engine holds, in its own order,
+   * carrying the ID the finger engine knows it by.
+   *
+   * The ID comes from the engine's own `notationNoteId`, not from a
+   * copy of the formula: two walks of the same score have to agree on
+   * which note is which, and one function in one place is the only way
+   * they can.
+   */
+  function writtenNotes(parsed, playback) {
+    const out = [];
     for (const part of parsed.score.parts) {
       for (const measure of part.measures) {
         const measureOffset = playback.globalTickOffsetByMeasure?.get(measure.number) ?? 0;
         for (const voice of measure.voices) {
           let running = 0;
+          let index = 0;
           for (const event of voice.events) {
             const startTick = event.startTick ?? running;
             running = startTick + (event.duration?.ticks ?? 0);
             if (event.kind !== 'note' && event.kind !== 'chord') continue;
             const members = event.kind === 'chord' ? event.notes : [event];
             for (const note of members) {
-              if (note.stringNumber === undefined || note.fret === undefined) continue;
+              if (!note.pitch || note.pitch.kind !== 'pitched') continue;
+              const id =
+                typeof FingerEngine === 'undefined'
+                  ? `${part.id}-m${measure.number}-v${voice.id}-n${index}`
+                  : FingerEngine.notationNoteId(part.id, measure.number, voice.id, index);
+              index += 1;
               const ticks = note.duration?.ticks ?? event.duration?.ticks ?? 0;
               let startSeconds;
               let endSeconds;
@@ -1026,17 +1053,95 @@
               } catch (err) {
                 continue;
               }
-              raw.push({
-                string: note.stringNumber,
-                fret: note.fret,
-                startSeconds,
-                endSeconds,
-                ...(Number.isFinite(note.fingering) ? { finger: note.fingering } : {}),
-                slideStart: note.slideStart === true,
-              });
+              out.push({ id, note, startSeconds, endSeconds });
             }
           }
         }
+      }
+    }
+    return out;
+  }
+
+  /**
+   * What the Human Finger Engine says about this score.
+   *
+   * A map from the notation's own note ID to the place and finger the
+   * engine chose, plus the picking strokes. The engine is given the
+   * neck the page is DRAWING -- if only twelve frets are on screen, a
+   * fingering up at the fifteenth would be a dot nobody can see.
+   *
+   * Nothing here is required: if the engine is missing or something in
+   * the score defeats it, the page falls back to what the file wrote
+   * and says so in the console rather than losing the take.
+   */
+  function solveFingering(parsed, playback) {
+    const empty = { byNote: new Map(), picks: [], solved: false };
+    if (typeof FingerEngine === 'undefined') return empty;
+    try {
+      const read = FingerEngine.fromNotationEngine(parsed.score, playback, {
+        musicXml: lastXmlText,
+        numStrings: stringCount(),
+      });
+      const part = read.parts[0];
+      if (!part) return empty;
+      const timeline = FingerEngine.analyzeGuitar(part, {
+        instrument: { numStrings: stringCount(), numFrets: lastFret() },
+      });
+      const byNote = new Map();
+      for (const note of timeline.notes) {
+        // A repeat plays the same written note again; the page draws
+        // written seconds, so the first pass is the one it needs.
+        if (!byNote.has(note.noteId)) byNote.set(note.noteId, note);
+      }
+      const picked = new Map();
+      for (const event of timeline.rightHand.events) {
+        for (const noteId of event.noteIds) if (!picked.has(noteId)) picked.set(noteId, event.direction);
+      }
+      const warned = timeline.warnings.filter((w) => w.code !== 'SHIFT_RUSHED');
+      if (warned.length > 0) console.log('Finger Engine:', warned);
+      return { byNote, picked, picks: [], solved: byNote.size > 0 };
+    } catch (err) {
+      console.error('Human Finger Engine failed on this score:', err);
+      return empty;
+    }
+  }
+
+  function buildGuitarNotes() {
+    guitarNotes = [];
+    guitarPicks = [];
+    const parsed = lastParsed;
+    const playback = notationPlayback;
+    if (!parsed || !parsed.score || !playback || typeof NotationEngine === 'undefined') return;
+
+    const written = writtenNotes(parsed, playback);
+    const solved = solveFingering(parsed, playback);
+    const strings = stringCount();
+
+    const raw = [];
+    for (const entry of written) {
+      const answer = solved.byNote.get(entry.id);
+      // The engine counts strings from the low E [DM-01]; the neck is
+      // drawn with string 1 at the top, the way tab is written, so the
+      // number is flipped on the way out [OUT-05].
+      const string = answer
+        ? FingerEngine.internalStringToRenderer(answer.string, strings)
+        : entry.note.stringNumber;
+      const fret = answer ? answer.fret : entry.note.fret;
+      if (string === undefined || fret === undefined) continue;
+      const finger = answer
+        ? (answer.finger === null ? 0 : Number(answer.finger))
+        : entry.note.fingering;
+      raw.push({
+        string,
+        fret,
+        startSeconds: entry.startSeconds,
+        endSeconds: entry.endSeconds,
+        ...(Number.isFinite(finger) ? { finger } : {}),
+        slideStart: entry.note.slideStart === true,
+      });
+      const direction = solved.picked?.get(entry.id);
+      if (direction !== undefined) {
+        guitarPicks.push({ seconds: entry.startSeconds, direction, string });
       }
     }
 
@@ -1053,6 +1158,27 @@
       if (next && next.fret !== note.fret) note.slideToFret = next.fret;
     }
     guitarNotes = raw.map(({ slideStart, ...note }) => note);
+    guitarPicks.sort((a, b) => a.seconds - b.seconds);
+  }
+
+  /**
+   * The stroke to draw at this moment, if the hand has just made one.
+   *
+   * It fades over its own short life rather than blinking off, so a
+   * frame taken between notes still shows what the right hand did.
+   */
+  function pickAt(seconds) {
+    let found;
+    for (const pick of guitarPicks) {
+      if (pick.seconds > seconds) break;
+      if (seconds - pick.seconds <= PICK_FADE_SEC) found = pick;
+    }
+    if (!found) return undefined;
+    return {
+      direction: found.direction,
+      strings: [found.string],
+      age: Math.max(0, Math.min(1, (seconds - found.seconds) / PICK_FADE_SEC)),
+    };
   }
 
   /**
@@ -1084,6 +1210,7 @@
       fretNumbers: true,
       seconds: stageSeconds(atSeconds),
       notes: guitarNotes,
+      pick: pickAt(stageSeconds(atSeconds)),
       // No `colors`: the four finger colours are the engine's own, on
       // purpose. They are learnt once from the hand in the card and
       // then read in every video, which a per-video colour picker
@@ -2404,6 +2531,11 @@
         ctx2d.beginPath();
         ctx2d.arc(shape.x, shape.y, shape.width / 2, 0, Math.PI * 2);
         ctx2d.fill();
+      } else if (shape.kind === 'path') {
+        // The picking marks: the one thing in the frame that is
+        // neither a rectangle nor a circle. Path2D takes the same `d`
+        // the SVG side writes, so both draw the same symbol.
+        ctx2d.fill(new Path2D(shape.d));
       } else if (shape.radius > 0) {
         roundRectPath(ctx2d, shape.x, shape.y, shape.width, shape.height, shape.radius);
         ctx2d.fill();

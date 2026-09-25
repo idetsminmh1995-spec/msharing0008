@@ -5,7 +5,7 @@
   below the low E string.
 
   Expected: it is SKIPPED with an OUT_OF_RANGE warning and not
-  transposed into range (P-013 -- moving it would be inventing music
+  transposed into range (P-013 — moving it would be inventing music
   the file does not contain), and the three notes after it are played
   exactly as if it had never been there.
 -->

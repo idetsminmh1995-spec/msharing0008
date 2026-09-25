@@ -2,10 +2,10 @@
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
 <!--
   Fixture F-12 (Plan Part 08): two notes written to sound together,
-  one at fret 1 and one at fret 8 -- a seven-fret stretch down at the
+  one at fret 1 and one at fret 8 — a seven-fret stretch down at the
   nut, where the frets are widest, which no hand makes.
 
-  Expected: the tab is played exactly as written (P-001 -- the engine
+  Expected: the tab is played exactly as written (P-001 — the engine
   never rewrites what the file decided), a TAB_INFEASIBLE warning says
   so, and everything else about the output is still valid.
 -->

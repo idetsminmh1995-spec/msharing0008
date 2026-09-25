@@ -27,7 +27,7 @@ export { DEFAULTS, configHash, mergeConfig } from './defaults.js';
 // ---- the public API the plan names (01 §4) --------------------------
 export { analyzeGuitar, resolveInstrument } from './guitar/index.js';
 export type { AnalyzeOptions } from './guitar/index.js';
-export { fromNotationEngine } from './input/notation-engine/adapter.js';
+export { fromNotationEngine, notationNoteId } from './input/notation-engine/adapter.js';
 export type {
   NotationAdapterOptions,
   NotationAdapterResult,

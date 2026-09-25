@@ -37,6 +37,7 @@ export {
   fretboardShapes,
   instrumentColors,
   markShapes,
+  pickShapes,
   renderFretboard,
   renderGuitarStage,
   resolveColors,
@@ -53,6 +54,7 @@ export type {
   GuitarStageOptions,
   Instrument,
   LivePosition,
+  PickMark,
   StageShape,
   StringLine,
 } from './types.js';
