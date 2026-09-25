@@ -22,8 +22,11 @@ export {
   guitarLayout,
   inlayFrets,
   positionsAt,
+  STANDARD_TUNING,
   stringCount,
   stringLines,
+  stringName,
+  tuningFor,
 } from './fretboard.js';
 export {
   ACOUSTIC_COLORS,

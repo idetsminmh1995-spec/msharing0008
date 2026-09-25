@@ -15,6 +15,8 @@ import {
   inlayFrets,
   positionsAt,
   stringLines,
+  stringName,
+  tuningFor,
 } from './fretboard.js';
 import { escapeText, n, tag, wrap } from './svg.js';
 import type {
@@ -53,6 +55,8 @@ export const DEFAULT_COLORS: GuitarColors = {
   fretNumber: 'rgba(255,255,255,0.34)',
   headstock: '#20130D',
   peg: '#BDB2A6',
+  stringLabel: '#F1E7DC',
+  stringLabelInk: '#20130D',
   body: '#7A2418',
   bodyEdge: '#2A0F0A',
   soundhole: '#140B07',
@@ -230,12 +234,63 @@ export function fretboardShapes(options: FretboardOptions): readonly StageShape[
   for (const line of strings) {
     shapes.push({
       kind: 'circle',
-      x: head.x + head.width * 0.42,
+      x: head.x + head.width * 0.82,
       y: line.offset,
       width: pegR * 2,
       height: pegR * 2,
       fill: colors.peg,
     });
+  }
+
+  // The numbered circle and the note name at the head of each string.
+  // A reader who knows "the D string" should not have to count lines
+  // to find it, and the number is the one every tab and every teacher
+  // uses -- 1 for the thinnest.
+  if (options.stringLabels !== false) {
+    const tuning = tuningFor(options);
+    const badgeR = Math.min(gap * 0.42, head.width * 0.17);
+    const labelSize = badgeR * 1.5;
+    for (const line of strings) {
+      const midi = tuning[line.string - 1];
+      shapes.push({
+        kind: 'circle',
+        x: head.x + head.width * 0.2,
+        y: line.offset,
+        width: badgeR * 2,
+        height: badgeR * 2,
+        fill: colors.stringLabel,
+      });
+      shapes.push({
+        kind: 'text',
+        x: head.x + head.width * 0.2,
+        y: line.offset,
+        width: badgeR * 2,
+        height: badgeR * 2,
+        fill: colors.stringLabelInk,
+        role: 'stringLabel',
+        text: String(line.string),
+        fontSize: labelSize,
+        fontWeight: 800,
+        align: 'middle',
+        baseline: 'middle',
+      });
+      if (midi !== undefined) {
+        shapes.push({
+          kind: 'text',
+          x: head.x + head.width * 0.44,
+          y: line.offset,
+          width: head.width * 0.4,
+          height: badgeR * 2,
+          fill: colors.stringLabel,
+          role: 'stringName',
+          text: stringName(midi, line.string === 1),
+          fontSize: labelSize,
+          fontWeight: 700,
+          align: 'start',
+          baseline: 'middle',
+        });
+      }
+    }
   }
 
   // The neck.
@@ -281,10 +336,20 @@ export function fretboardShapes(options: FretboardOptions): readonly StageShape[
     );
   }
 
-  // The strings, the whole length of the instrument.
+  // The strings, from their tuning peg to the bridge. They start AT
+  // the peg rather than at the left edge, so the labels sit clear of
+  // them the way they do on a chart -- a number with a string drawn
+  // through it is a number nobody can read.
+  const stringStart = options.stringLabels === false ? 0 : head.x + head.width * 0.78;
   for (const line of strings) {
     shapes.push(
-      rectShape(0, line.offset - line.thickness / 2, width, line.thickness, colors.string),
+      rectShape(
+        stringStart,
+        line.offset - line.thickness / 2,
+        width - stringStart,
+        line.thickness,
+        colors.string,
+      ),
     );
   }
 
@@ -292,9 +357,16 @@ export function fretboardShapes(options: FretboardOptions): readonly StageShape[
   // rather than read. Only where there is room for them -- on a long
   // neck drawn small, every third fret is the one a player looks for.
   if (options.fretNumbers !== false && layout.numbersY < height) {
-    const size = Math.min((height - layout.numbersY) * 0.62, per * 0.5);
     const { last } = fretRange(options);
-    const everyFret = per > size * 1.6;
+    // The size a number would like to be, from the strip it is drawn in.
+    const wanted = (height - layout.numbersY) * 0.62;
+    // A number has to fit ACROSS its own fret -- half the fret width
+    // holds two digits -- and it has to stay big enough to read. When
+    // a long neck drawn small would shrink them past that, only the
+    // frets a player looks for are numbered, and those get the room
+    // the three frets between them leave.
+    const everyFret = per * 0.5 >= height * 0.035;
+    const size = Math.min(wanted, per * (everyFret ? 0.5 : 1.4));
     for (let fret = Math.max(1, first + 1); fret <= last; fret++) {
       if (!everyFret && fret % 3 !== 0 && !inlayFrets(options).some((i) => i.fret === fret))
         continue;
@@ -305,6 +377,7 @@ export function fretboardShapes(options: FretboardOptions): readonly StageShape[
         width: per,
         height: height - layout.numbersY,
         fill: colors.fretNumber,
+        role: 'fretNumber',
         text: String(fret),
         fontSize: size,
         fontWeight: 700,

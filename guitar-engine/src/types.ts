@@ -80,6 +80,9 @@ export interface GuitarColors {
   /** The headstock at the left, and the tuning pegs on it. */
   readonly headstock: string;
   readonly peg: string;
+  /** The numbered circle at the head of each string, and the note name beside it. */
+  readonly stringLabel: string;
+  readonly stringLabelInk: string;
   /** The body at the right: the top, and what is on it. */
   readonly body: string;
   readonly bodyEdge: string;
@@ -121,6 +124,17 @@ export interface FretboardOptions {
   readonly instrument?: Instrument;
   /** The fret numbers under the board. On unless a caller says otherwise. */
   readonly fretNumbers?: boolean;
+  /**
+   * The open-string pitches, as MIDI numbers, in the order the strings
+   * are DRAWN: index 0 is string 1, the thinnest and highest.
+   *
+   * Standard tuning when nothing says otherwise. It is here so the
+   * string labels can name the notes -- a reader who knows "the D
+   * string" should not have to count lines to find it.
+   */
+  readonly tuning?: readonly number[];
+  /** The numbered circles and note names at the head of each string. On unless a caller says otherwise. */
+  readonly stringLabels?: boolean;
   readonly colors?: Partial<GuitarColors>;
 }
 
@@ -151,6 +165,13 @@ export interface StageShape {
   readonly strokeWidth?: number;
   readonly radius?: number;
   readonly opacity?: number;
+  /**
+   * What this shape is for, when a caller has to tell two shapes of
+   * the same kind apart -- the fret numbers under the board from the
+   * string labels at the head. It changes nothing about the drawing:
+   * a renderer paints every shape the same way.
+   */
+  readonly role?: 'fretNumber' | 'stringLabel' | 'stringName';
   /** Text only. `x`/`y` are the anchor, which `align` and `baseline` place it against. */
   readonly text?: string;
   readonly fontSize?: number;

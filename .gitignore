@@ -29,10 +29,11 @@ notation-engine/dist/*.d.ts
 !Drum/sticking-engine-ts/dist/sticking-engine.js
 Drum/sticking-engine-ts/dist/*.map
 
-# The Piano and Guitar Engines' node_modules are the same symlink trick
-# as the metronome engine's -- one toolchain, installed once.
+# The Piano, Guitar and Finger Engines' node_modules are the same symlink
+# trick as the metronome engine's -- one toolchain, installed once.
 piano-engine/node_modules
 guitar-engine/node_modules
+finger-engine/node_modules
 
 # Same for the Metronome Design Engine: the drum page loads its bundle
 # from website/assets, and the Metronome page loads it from there too,
@@ -56,6 +57,16 @@ piano-engine/dist/*.d.ts
 guitar-engine/dist/*.map
 guitar-engine/dist/**/*.d.ts
 guitar-engine/dist/*.d.ts
+
+# And the Finger Engine. Nothing loads it from the web yet -- Phase 1 wires
+# it into the Guitar page -- but its tests run against the BUILT bundle, so
+# committing it keeps a checkout testable without a build step, the same way
+# every other engine here works.
+!finger-engine/dist/
+!finger-engine/dist/finger-engine.js
+finger-engine/dist/*.map
+finger-engine/dist/**/*.d.ts
+finger-engine/dist/*.d.ts
 Drum/sticking-engine-ts/dist/**/*.d.ts
 Drum/sticking-engine-ts/dist/*.d.ts
 .env

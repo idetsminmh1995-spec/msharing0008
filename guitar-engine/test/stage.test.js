@@ -59,9 +59,11 @@ test('an acoustic and an electric are different instruments to look at', () => {
   assert.ok(fills(electric).includes(G.DEFAULT_COLORS.board));
 });
 
+const fretNumbers = (shapes) => shapes.filter((s) => s.role === 'fretNumber');
+
 test('the fret numbers are drawn under the board, faint, and can be turned off', () => {
   const shapes = G.fretboardShapes(STAGE);
-  const numbers = shapes.filter((s) => s.kind === 'text');
+  const numbers = fretNumbers(shapes);
   assert.ok(numbers.length > 0);
   const layout = G.guitarLayout(STAGE);
   for (const number of numbers) {
@@ -72,15 +74,43 @@ test('the fret numbers are drawn under the board, faint, and can be turned off',
   // Each sits over its own fret.
   const five = numbers.find((t) => t.text === '5');
   assert.ok(Math.abs(five.x - G.fretCenter(5, STAGE)) < 1e-9);
-  assert.equal(G.fretboardShapes({ ...STAGE, fretNumbers: false }).filter((s) => s.kind === 'text').length, 0);
+  assert.equal(fretNumbers(G.fretboardShapes({ ...STAGE, fretNumbers: false })).length, 0);
 });
 
 test('a crowded neck numbers the frets a player looks for, not every one', () => {
-  const wide = G.fretboardShapes({ ...STAGE, lastFret: 12 }).filter((s) => s.kind === 'text');
-  const narrow = G.fretboardShapes({ ...STAGE, width: 420, lastFret: 22 }).filter((s) => s.kind === 'text');
+  const wide = fretNumbers(G.fretboardShapes({ ...STAGE, lastFret: 12 }));
+  const narrow = fretNumbers(G.fretboardShapes({ ...STAGE, width: 420, lastFret: 22 }));
   assert.equal(wide.length, 12, 'room for all twelve');
   assert.ok(narrow.length < 22, 'no room for twenty-two');
   assert.ok(narrow.some((t) => t.text === '12'), 'the twelfth is always there');
+});
+
+test('each string is numbered at the head, and named', () => {
+  const shapes = G.fretboardShapes(STAGE);
+  const badges = shapes.filter((s) => s.role === 'stringLabel');
+  const names = shapes.filter((s) => s.role === 'stringName');
+  assert.equal(badges.map((b) => b.text).join(','), '1,2,3,4,5,6');
+  // Drawn order: string 1 is the thin e at the top, string 6 the low E.
+  assert.equal(names.map((n) => n.text).join(','), 'e,B,G,D,A,E');
+  const strings = G.stringLines(STAGE);
+  for (const badge of badges) {
+    assert.equal(badge.y, strings.find((l) => String(l.string) === badge.text).offset);
+    assert.ok(badge.x < G.guitarLayout(STAGE).neck.x, 'on the headstock, not the neck');
+  }
+  assert.equal(G.fretboardShapes({ ...STAGE, stringLabels: false }).filter(
+    (s) => s.role === 'stringLabel' || s.role === 'stringName',
+  ).length, 0);
+});
+
+test('a different tuning names different strings', () => {
+  // Drop D: the sixth string is a whole tone down, and nothing else moves.
+  const dropD = G.fretboardShapes({ ...STAGE, tuning: [64, 59, 55, 50, 45, 38] });
+  const names = dropD.filter((s) => s.role === 'stringName').map((s) => s.text);
+  assert.equal(names.join(','), 'e,B,G,D,A,D');
+  // The lower-case top string is not a typo: it is how guitarists write it.
+  assert.equal(G.stringName(64, true), 'e');
+  assert.equal(G.stringName(64, false), 'E');
+  assert.equal(G.tuningFor(6).join(','), G.STANDARD_TUNING.join(','));
 });
 
 test('a mark sits on its own string, in its own fret', () => {

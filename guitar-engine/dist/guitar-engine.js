@@ -28,6 +28,7 @@ var GuitarEngine = (() => {
     DEFAULT_STRINGS: () => DEFAULT_STRINGS,
     FINGER_COLORS: () => FINGER_COLORS,
     FINGER_NAMES: () => FINGER_NAMES,
+    STANDARD_TUNING: () => STANDARD_TUNING,
     fingerColor: () => fingerColor,
     fretCenter: () => fretCenter,
     fretRange: () => fretRange,
@@ -46,7 +47,9 @@ var GuitarEngine = (() => {
     resolveColors: () => resolveColors,
     stageShapes: () => stageShapes,
     stringCount: () => stringCount,
-    stringLines: () => stringLines
+    stringLines: () => stringLines,
+    stringName: () => stringName,
+    tuningFor: () => tuningFor
   });
 
   // src/fretboard.ts
@@ -55,6 +58,7 @@ var GuitarEngine = (() => {
   var DEFAULT_LAST_FRET = 12;
   var STRING_SPAN = 0.82;
   var HEADSTOCK_SHARE = 0.085;
+  var LABELLED_HEADSTOCK_SHARE = 0.13;
   var BODY_SHARE = 0.16;
   var NUMBERS_SHARE = 0.16;
   var THINNEST = 0.07;
@@ -75,7 +79,7 @@ var GuitarEngine = (() => {
     const height = Math.max(0, options.height);
     const numbers = options.fretNumbers === false ? 0 : height * NUMBERS_SHARE;
     const boardHeight = height - numbers;
-    const headstockWidth = width * HEADSTOCK_SHARE;
+    const headstockWidth = width * (options.stringLabels === false ? HEADSTOCK_SHARE : LABELLED_HEADSTOCK_SHARE);
     const bodyWidth = width * BODY_SHARE;
     return {
       board: { x: 0, y: 0, width, height: boardHeight },
@@ -96,7 +100,8 @@ var GuitarEngine = (() => {
     const board = guitarLayout({
       width: options.width ?? 1,
       height: options.height,
-      ...options.fretNumbers !== void 0 ? { fretNumbers: options.fretNumbers } : {}
+      ...options.fretNumbers !== void 0 ? { fretNumbers: options.fretNumbers } : {},
+      ...options.stringLabels !== void 0 ? { stringLabels: options.stringLabels } : {}
     }).board;
     const span = board.height * STRING_SPAN;
     const top = board.y + (board.height - span) / 2;
@@ -166,6 +171,25 @@ var GuitarEngine = (() => {
     }
     return live;
   }
+  var STANDARD_TUNING = [64, 59, 55, 50, 45, 40];
+  var NOTE_LETTERS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  function stringName(midi, isHighest) {
+    if (!Number.isFinite(midi)) return "";
+    const letter = NOTE_LETTERS[(Math.round(midi) % 12 + 12) % 12] ?? "";
+    return isHighest ? letter.toLowerCase() : letter;
+  }
+  function tuningFor(options) {
+    const count = stringCount(options);
+    const given = options.tuning ?? STANDARD_TUNING;
+    const out = [];
+    for (let i = 0; i < count; i++) {
+      const value = given[i];
+      out.push(
+        Number.isFinite(value) ? value : (out[i - 1] ?? STANDARD_TUNING[0] ?? 64) - 5
+      );
+    }
+    return out;
+  }
 
   // src/svg.ts
   function escapeText(value) {
@@ -208,6 +232,8 @@ var GuitarEngine = (() => {
     fretNumber: "rgba(255,255,255,0.34)",
     headstock: "#20130D",
     peg: "#BDB2A6",
+    stringLabel: "#F1E7DC",
+    stringLabelInk: "#20130D",
     body: "#7A2418",
     bodyEdge: "#2A0F0A",
     soundhole: "#140B07",
@@ -339,12 +365,58 @@ var GuitarEngine = (() => {
     for (const line of strings) {
       shapes.push({
         kind: "circle",
-        x: head.x + head.width * 0.42,
+        x: head.x + head.width * 0.82,
         y: line.offset,
         width: pegR * 2,
         height: pegR * 2,
         fill: colors.peg
       });
+    }
+    if (options.stringLabels !== false) {
+      const tuning = tuningFor(options);
+      const badgeR = Math.min(gap * 0.42, head.width * 0.17);
+      const labelSize = badgeR * 1.5;
+      for (const line of strings) {
+        const midi = tuning[line.string - 1];
+        shapes.push({
+          kind: "circle",
+          x: head.x + head.width * 0.2,
+          y: line.offset,
+          width: badgeR * 2,
+          height: badgeR * 2,
+          fill: colors.stringLabel
+        });
+        shapes.push({
+          kind: "text",
+          x: head.x + head.width * 0.2,
+          y: line.offset,
+          width: badgeR * 2,
+          height: badgeR * 2,
+          fill: colors.stringLabelInk,
+          role: "stringLabel",
+          text: String(line.string),
+          fontSize: labelSize,
+          fontWeight: 800,
+          align: "middle",
+          baseline: "middle"
+        });
+        if (midi !== void 0) {
+          shapes.push({
+            kind: "text",
+            x: head.x + head.width * 0.44,
+            y: line.offset,
+            width: head.width * 0.4,
+            height: badgeR * 2,
+            fill: colors.stringLabel,
+            role: "stringName",
+            text: stringName(midi, line.string === 1),
+            fontSize: labelSize,
+            fontWeight: 700,
+            align: "start",
+            baseline: "middle"
+          });
+        }
+      }
     }
     const neck = layout.neck;
     shapes.push(rectShape(neck.x, neck.y, neck.width, neck.height, colors.board));
@@ -384,15 +456,23 @@ var GuitarEngine = (() => {
         rectShape(wire.offset - w / 2, neck.y, w, neck.height, isNut ? colors.nut : colors.fretWire)
       );
     }
+    const stringStart = options.stringLabels === false ? 0 : head.x + head.width * 0.78;
     for (const line of strings) {
       shapes.push(
-        rectShape(0, line.offset - line.thickness / 2, width, line.thickness, colors.string)
+        rectShape(
+          stringStart,
+          line.offset - line.thickness / 2,
+          width - stringStart,
+          line.thickness,
+          colors.string
+        )
       );
     }
     if (options.fretNumbers !== false && layout.numbersY < height) {
-      const size = Math.min((height - layout.numbersY) * 0.62, per * 0.5);
       const { last } = fretRange(options);
-      const everyFret = per > size * 1.6;
+      const wanted = (height - layout.numbersY) * 0.62;
+      const everyFret = per * 0.5 >= height * 0.035;
+      const size = Math.min(wanted, per * (everyFret ? 0.5 : 1.4));
       for (let fret = Math.max(1, first + 1); fret <= last; fret++) {
         if (!everyFret && fret % 3 !== 0 && !inlayFrets(options).some((i) => i.fret === fret))
           continue;
@@ -403,6 +483,7 @@ var GuitarEngine = (() => {
           width: per,
           height: height - layout.numbersY,
           fill: colors.fretNumber,
+          role: "fretNumber",
           text: String(fret),
           fontSize: size,
           fontWeight: 700,

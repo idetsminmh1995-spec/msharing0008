@@ -28,6 +28,8 @@ const STRING_SPAN = 0.82;
  * These are the shares of the width each takes.
  */
 const HEADSTOCK_SHARE = 0.085;
+/** The head grows when it has to carry a numbered circle and a note name. */
+const LABELLED_HEADSTOCK_SHARE = 0.13;
 const BODY_SHARE = 0.16;
 /** The strip under the board where the fret numbers go. */
 const NUMBERS_SHARE = 0.16;
@@ -65,7 +67,12 @@ export function fretRange(options: { firstFret?: number; lastFret?: number }): {
  * about where the neck IS -- and because a page measuring the picture
  * needs the same numbers.
  */
-export function guitarLayout(options: { width: number; height: number; fretNumbers?: boolean }): {
+export function guitarLayout(options: {
+  width: number;
+  height: number;
+  fretNumbers?: boolean;
+  stringLabels?: boolean;
+}): {
   board: { x: number; y: number; width: number; height: number };
   neck: { x: number; y: number; width: number; height: number };
   headstock: { x: number; y: number; width: number; height: number };
@@ -76,7 +83,8 @@ export function guitarLayout(options: { width: number; height: number; fretNumbe
   const height = Math.max(0, options.height);
   const numbers = options.fretNumbers === false ? 0 : height * NUMBERS_SHARE;
   const boardHeight = height - numbers;
-  const headstockWidth = width * HEADSTOCK_SHARE;
+  const headstockWidth =
+    width * (options.stringLabels === false ? HEADSTOCK_SHARE : LABELLED_HEADSTOCK_SHARE);
   const bodyWidth = width * BODY_SHARE;
   return {
     board: { x: 0, y: 0, width, height: boardHeight },
@@ -104,6 +112,7 @@ export function stringLines(options: {
   height: number;
   strings?: number;
   fretNumbers?: boolean;
+  stringLabels?: boolean;
 }): readonly StringLine[] {
   const count = stringCount(options);
   if (!(options.height > 0)) return [];
@@ -113,6 +122,7 @@ export function stringLines(options: {
     width: options.width ?? 1,
     height: options.height,
     ...(options.fretNumbers !== undefined ? { fretNumbers: options.fretNumbers } : {}),
+    ...(options.stringLabels !== undefined ? { stringLabels: options.stringLabels } : {}),
   }).board;
   const span = board.height * STRING_SPAN;
   const top = board.y + (board.height - span) / 2;
@@ -221,4 +231,41 @@ export function positionsAt(
     });
   }
   return live;
+}
+
+/** Standard tuning, in the order the strings are drawn: 1 = high E. */
+export const STANDARD_TUNING: readonly number[] = [64, 59, 55, 50, 45, 40];
+
+const NOTE_LETTERS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
+
+/**
+ * What a string is called.
+ *
+ * The highest string is written in lower case -- "e" against "E" for
+ * the lowest -- which is how guitarists have always written the two
+ * apart, and how the string labels read on a real diagram.
+ */
+export function stringName(midi: number, isHighest: boolean): string {
+  if (!Number.isFinite(midi)) return '';
+  const letter = NOTE_LETTERS[((Math.round(midi) % 12) + 12) % 12] ?? '';
+  return isHighest ? letter.toLowerCase() : letter;
+}
+
+/** The tuning to draw with: the caller's, padded or cut to the strings actually drawn. */
+export function tuningFor(options: {
+  strings?: number;
+  tuning?: readonly number[];
+}): readonly number[] {
+  const count = stringCount(options);
+  const given = options.tuning ?? STANDARD_TUNING;
+  const out: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const value = given[i];
+    // A string the tuning does not name keeps going down in fourths,
+    // which is how a seven-string is tuned below a six.
+    out.push(
+      Number.isFinite(value) ? (value as number) : (out[i - 1] ?? STANDARD_TUNING[0] ?? 64) - 5,
+    );
+  }
+  return out;
 }
