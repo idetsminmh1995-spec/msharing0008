@@ -75,6 +75,20 @@ export interface GuitarColors {
   readonly nut: string;
   readonly inlay: string;
   readonly string: string;
+  /** The fret numbers under the board -- faint, they are there to be glanced at. */
+  readonly fretNumber: string;
+  /** The headstock at the left, and the tuning pegs on it. */
+  readonly headstock: string;
+  readonly peg: string;
+  /** The body at the right: the top, and what is on it. */
+  readonly body: string;
+  readonly bodyEdge: string;
+  /** An acoustic's soundhole and the ring round it. */
+  readonly soundhole: string;
+  readonly rosette: string;
+  /** An electric's pickups and bridge. */
+  readonly pickup: string;
+  readonly hardware: string;
   /** A note nobody has assigned a finger to yet -- not a finger's colour. */
   readonly unassigned: string;
   /** An open string: played, but by no finger. */
@@ -96,8 +110,21 @@ export interface FretboardOptions {
   /** The first and last fret drawn. The nut is fret 0. */
   readonly firstFret?: number;
   readonly lastFret?: number;
+  /**
+   * Which guitar this is.
+   *
+   * Not decoration: an acoustic and an electric are different
+   * instruments to look at, and a page that offers both should show
+   * the one that was picked. It changes the wood, the body and what
+   * is mounted on it -- a soundhole, or pickups.
+   */
+  readonly instrument?: Instrument;
+  /** The fret numbers under the board. On unless a caller says otherwise. */
+  readonly fretNumbers?: boolean;
   readonly colors?: Partial<GuitarColors>;
 }
+
+export type Instrument = 'acoustic' | 'electric';
 
 export interface GuitarStageOptions extends FretboardOptions {
   /** Where the music is now, in seconds. */
@@ -113,10 +140,10 @@ export interface GuitarStageOptions extends FretboardOptions {
  * video without either one re-deciding what it looks like.
  */
 export interface StageShape {
-  readonly kind: 'rect' | 'circle';
+  readonly kind: 'rect' | 'circle' | 'text';
   readonly x: number;
   readonly y: number;
-  /** A rect's box; a circle's diameter. */
+  /** A rect's box; a circle's diameter; a text's own size is `fontSize`. */
   readonly width: number;
   readonly height: number;
   readonly fill: string;
@@ -124,4 +151,10 @@ export interface StageShape {
   readonly strokeWidth?: number;
   readonly radius?: number;
   readonly opacity?: number;
+  /** Text only. `x`/`y` are the anchor, which `align` and `baseline` place it against. */
+  readonly text?: string;
+  readonly fontSize?: number;
+  readonly fontWeight?: number;
+  readonly align?: 'start' | 'middle' | 'end';
+  readonly baseline?: 'top' | 'middle' | 'bottom';
 }

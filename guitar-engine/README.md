@@ -30,11 +30,22 @@ Nothing is inferred from pitch. Where a score writes no tab position,
 this engine draws nothing rather than guessing a shape — an invented
 fingering shown confidently is worse than an empty neck.
 
-## The four fingers
+## The four fingers, in colours that do not move
 
 `finger` is numbered as a score numbers them: **1 index, 2 middle,
 3 ring, 4 little**, and **0 an open string** — played, but by no
 finger, so it has its own colour rather than borrowing one.
+
+The four colours are **fixed**, not pickable:
+
+```
+1 index   red      2 middle  blue
+3 ring    green    4 little  yellow
+```
+
+Their whole job is to be learnt once. A viewer who has seen the hand
+knows what red means for the rest of the video, and for the next video
+too; four colours anyone can re-pick is four colours nobody can learn.
 
 `undefined` is a fifth case and a real one: nobody has decided yet.
 It is drawn in `colors.unassigned`, never in a finger's colour, so a
@@ -72,6 +83,21 @@ rasterising an SVG thirty times a second costs more than the rest of
 the frame together. Two hand-written drawings would drift, and the
 first anyone would know of it is a published video that does not match
 the preview.
+
+## A guitar, not a fretboard
+
+The picture reads as an instrument: a headstock with a tuning peg per
+string at one end, the fretted neck, and the body at the other —
+a soundhole and its rosette on an **acoustic**, two pickups and a
+bridge on an **electric**, with the wood changing to match. That is
+what `instrument: 'acoustic' | 'electric'` picks, and the strings run
+the whole length as they do on the real thing.
+
+The fret numbers are ruled under the board in a faint ink, there to be
+glanced at rather than read. When the neck is drawn too small to carry
+all of them, the ones a player actually looks for are kept — the
+inlaid frets and every third — rather than crushing twenty-two
+numbers into the space.
 
 ## The neck is a diagram, not a photograph
 

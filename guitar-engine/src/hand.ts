@@ -3,12 +3,13 @@
  *
  * The colours on the neck mean nothing until someone is told what
  * they mean, and a legend of four coloured squares is a legend of
- * four coloured squares. A hand says it without words: this finger,
- * that colour.
+ * four coloured squares. A hand says it without words: a dot on the
+ * fingertip, in that finger's colour.
  *
- * Drawn as the FRETTING hand seen from the back, fingers up, thumb
- * to the left -- a right-handed player's left hand, which is the hand
- * doing the stopping and therefore the hand these colours are about.
+ * The hand itself stays plain -- an outline, no colour of its own --
+ * so the only colours in the picture are the four being explained.
+ * It is the FRETTING hand, the one doing the stopping, seen palm on
+ * with the thumb to the left.
  */
 import { resolveColors } from './stage.js';
 import { n, tag, wrap } from './svg.js';
@@ -22,6 +23,15 @@ const FINGER_LENGTH: Readonly<Record<1 | 2 | 3 | 4, number>> = {
   4: 0.74,
 };
 
+export interface HandOptions {
+  readonly width: number;
+  readonly height: number;
+  readonly colors?: Partial<GuitarColors>;
+  /** The hand's own ink. Defaults to something that reads on a light card. */
+  readonly handColor?: string;
+  readonly outline?: string;
+}
+
 /**
  * The hand, in the box it is given.
  *
@@ -29,39 +39,35 @@ const FINGER_LENGTH: Readonly<Record<1 | 2 | 3 | 4, number>> = {
  * page's SVG and the video's canvas can both paint it from the same
  * list.
  */
-export function handShapes(options: {
-  width: number;
-  height: number;
-  colors?: Partial<GuitarColors>;
-  /** The palm and thumb, when a frame wants them in its own ink rather than the default. */
-  palmColor?: string;
-}): readonly StageShape[] {
+export function handShapes(options: HandOptions): readonly StageShape[] {
   const colors = resolveColors(options.colors);
   const { width, height } = options;
   if (!(width > 0) || !(height > 0)) return [];
 
-  const palm = options.palmColor ?? colors.unassigned;
+  const skin = options.handColor ?? '#F2E7DF';
+  const outline = options.outline ?? '#8A7C74';
+  const line = Math.max(1, width * 0.012);
   const shapes: StageShape[] = [];
 
-  // The palm: the bottom half, with the fingers standing on it.
-  const palmLeft = width * 0.2;
-  const palmRight = width * 0.92;
-  const palmTop = height * 0.52;
+  const palmLeft = width * 0.22;
+  const palmRight = width * 0.94;
+  const palmTop = height * 0.5;
   const palmWidth = palmRight - palmLeft;
-  const palmHeight = height - palmTop;
+  const palmHeight = height - palmTop - height * 0.03;
 
   // The thumb, tucked to the left and lower, as it is when a hand is
-  // round a neck. A nub rather than a jointed thumb: this is a legend.
+  // round a neck.
   const thumbWidth = palmWidth * 0.26;
   shapes.push({
     kind: 'rect',
-    x: palmLeft - thumbWidth * 0.75,
-    y: palmTop + palmHeight * 0.18,
+    x: palmLeft - thumbWidth * 0.8,
+    y: palmTop + palmHeight * 0.16,
     width: thumbWidth,
-    height: palmHeight * 0.62,
-    fill: palm,
+    height: palmHeight * 0.66,
+    fill: skin,
+    stroke: outline,
+    strokeWidth: line,
     radius: thumbWidth / 2,
-    opacity: 0.55,
   });
 
   shapes.push({
@@ -70,17 +76,17 @@ export function handShapes(options: {
     y: palmTop,
     width: palmWidth,
     height: palmHeight,
-    fill: palm,
-    radius: Math.min(palmWidth, palmHeight) * 0.28,
-    opacity: 0.55,
+    fill: skin,
+    stroke: outline,
+    strokeWidth: line,
+    radius: Math.min(palmWidth, palmHeight) * 0.3,
   });
 
-  // Four fingers, index on the left through little on the right --
-  // the order they are in when you look at the back of your own left
-  // hand with the fingers pointing up.
+  // Four fingers, index on the left through little on the right.
   const gap = palmWidth * 0.06;
   const fingerWidth = (palmWidth - gap * 3) / 4;
-  const longest = palmTop - height * 0.04;
+  const longest = palmTop - height * 0.06;
+  const dots: StageShape[] = [];
   for (const key of [1, 2, 3, 4] as const) {
     const index = key - 1;
     const length = longest * FINGER_LENGTH[key];
@@ -90,9 +96,23 @@ export function handShapes(options: {
       kind: 'rect',
       x,
       y,
-      // A finger reaches INTO the palm, so no seam shows where they meet.
       width: fingerWidth,
-      height: length + palmHeight * 0.3,
+      // Reaching into the palm, so no seam shows where they meet.
+      height: length + palmHeight * 0.32,
+      fill: skin,
+      stroke: outline,
+      strokeWidth: line,
+      radius: fingerWidth / 2,
+    });
+    // The dot goes ON the fingertip, and is drawn after every finger
+    // so a neighbour's outline never crosses it.
+    const dotR = fingerWidth * 0.42;
+    dots.push({
+      kind: 'circle',
+      x: x + fingerWidth / 2,
+      y: y + dotR * 1.5,
+      width: dotR * 2,
+      height: dotR * 2,
       fill:
         key === 1
           ? colors.index
@@ -101,30 +121,31 @@ export function handShapes(options: {
             : key === 3
               ? colors.ring
               : colors.little,
-      radius: fingerWidth / 2,
     });
   }
-  return shapes;
+  return [...shapes, ...dots];
 }
 
-export function renderHand(options: {
-  width: number;
-  height: number;
-  colors?: Partial<GuitarColors>;
-  palmColor?: string;
-}): string {
+export function renderHand(options: HandOptions): string {
   const body = handShapes(options)
-    .map((shape) =>
-      tag('rect', {
+    .map((shape) => {
+      const common = {
+        fill: shape.fill,
+        ...(shape.stroke !== undefined ? { stroke: shape.stroke } : {}),
+        ...(shape.strokeWidth !== undefined ? { 'stroke-width': shape.strokeWidth } : {}),
+      };
+      if (shape.kind === 'circle') {
+        return tag('circle', { cx: shape.x, cy: shape.y, r: shape.width / 2, ...common });
+      }
+      return tag('rect', {
         x: shape.x,
         y: shape.y,
         width: shape.width,
         height: shape.height,
-        fill: shape.fill,
         ...(shape.radius !== undefined ? { rx: shape.radius } : {}),
-        ...(shape.opacity !== undefined ? { opacity: shape.opacity } : {}),
-      }),
-    )
+        ...common,
+      });
+    })
     .join('');
   return wrap(
     'svg',

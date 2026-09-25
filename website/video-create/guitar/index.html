@@ -403,31 +403,16 @@
           </select>
         </div>
       </div>
-      <div class="field-row">
-        <div>
-          <label for="fingerIndex">Index finger</label>
-          <div class="tc-color-row"><input id="fingerIndex" type="color" value="#FFC400"></div>
-        </div>
-        <div>
-          <label for="fingerMiddle">Middle finger</label>
-          <div class="tc-color-row"><input id="fingerMiddle" type="color" value="#4FA3FF"></div>
-        </div>
-      </div>
-      <div class="field-row">
-        <div>
-          <label for="fingerRing">Ring finger</label>
-          <div class="tc-color-row"><input id="fingerRing" type="color" value="#FF5C8A"></div>
-        </div>
-        <div>
-          <label for="fingerLittle">Little finger</label>
-          <div class="tc-color-row"><input id="fingerLittle" type="color" value="#9B6BFF"></div>
-        </div>
-      </div>
+      <label for="instrument">Guitar</label>
+      <select id="instrument" class="drum-input">
+        <option value="acoustic">Acoustic</option>
+        <option value="electric" selected>Electric</option>
+      </select>
       <div class="finger-legend">
         <div class="finger-hand" id="fingerHand" aria-hidden="true"></div>
         <div class="finger-names" id="fingerNames"></div>
       </div>
-      <div class="field-hint" id="fretHint">The neck lights where the score says a note is stopped &mdash; its string and its fret. A slide travels along the string rather than jumping, and an open string has its own colour. Which finger stops a note comes from the score when it writes one; the Human Finger Engine answers the rest.</div>
+      <div class="field-hint" id="fretHint">The neck lights where the score says a note is stopped &mdash; its string and its fret, with the fret numbers along the bottom. A slide travels along the string rather than jumping, and an open string has its own colour. The four finger colours are fixed, not chosen: they are meant to be learnt once and read in every video after. Which finger stops a note comes from the score when it writes one; the Human Finger Engine answers the rest.</div>
     </div>
 
     <div class="card">
@@ -552,6 +537,7 @@
     <div class="video-frame style-black" id="videoFrame">
       <div class="video-top">
         <div class="video-logo-row">
+          <img class="video-logo-mark" src="../../assets/logo/sharing-guitar-logo-full.webp" alt="M Sharing Guitar">
           <div class="video-titles">
             <div class="video-title video-title-1" id="videoTitle1"></div>
             <div class="video-title video-title-2" id="videoTitle2"></div>
@@ -968,12 +954,7 @@
   const guitarStage = document.getElementById('guitarStage');
   const fretCountSelect = document.getElementById('fretCount');
   const stringCountSelect = document.getElementById('stringCount');
-  const fingerInputs = {
-    1: document.getElementById('fingerIndex'),
-    2: document.getElementById('fingerMiddle'),
-    3: document.getElementById('fingerRing'),
-    4: document.getElementById('fingerLittle'),
-  };
+  const instrumentSelect = document.getElementById('instrument');
   const fingerHand = document.getElementById('fingerHand');
   const fingerNames = document.getElementById('fingerNames');
 
@@ -987,13 +968,16 @@
     return Number.isFinite(value) && value >= 2 ? value : 6;
   }
 
-  function stageColors() {
-    return {
-      index: fingerInputs[1]?.value || '#FFC400',
-      middle: fingerInputs[2]?.value || '#4FA3FF',
-      ring: fingerInputs[3]?.value || '#FF5C8A',
-      little: fingerInputs[4]?.value || '#9B6BFF',
-    };
+  /**
+   * Acoustic or electric.
+   *
+   * Not decoration: they are different instruments to look at, and a
+   * page that offers both should show the one that was picked -- the
+   * wood, the body, and whether there is a soundhole or a pair of
+   * pickups on it.
+   */
+  function instrument() {
+    return instrumentSelect?.value === 'acoustic' ? 'acoustic' : 'electric';
   }
 
   /**
@@ -1096,9 +1080,14 @@
       strings: stringCount(),
       firstFret: 0,
       lastFret: lastFret(),
+      instrument: instrument(),
+      fretNumbers: true,
       seconds: stageSeconds(atSeconds),
       notes: guitarNotes,
-      colors: stageColors(),
+      // No `colors`: the four finger colours are the engine's own, on
+      // purpose. They are learnt once from the hand in the card and
+      // then read in every video, which a per-video colour picker
+      // would make impossible.
     };
   }
 
@@ -1109,7 +1098,7 @@
    * height is whatever keeps that shape inside the space the notation
    * leaves, so a 9:16 frame gets the same neck as a 16:9 one, smaller.
    */
-  const NECK_RATIO = 0.22;
+  const NECK_RATIO = 0.26;
 
   function neckBox() {
     if (!guitarStage) return null;
@@ -1129,21 +1118,16 @@
     );
   }
 
-  /** The hand, and the names beside it, in the colours currently picked. */
+  /**
+   * The hand, and the names beside it.
+   *
+   * It is a LEGEND, not a control: the colours are the engine's and
+   * cannot be changed here, so this only says what they mean.
+   */
   function drawFingerLegend() {
     if (typeof GuitarEngine === 'undefined') return;
-    const colors = stageColors();
-    // The palm is drawn in the CARD's ink, not the frame's: the
-    // engine's default is meant for a dark video, and on a white card
-    // a near-white palm is a hand with no hand in it.
-    if (fingerHand) {
-      fingerHand.innerHTML = GuitarEngine.renderHand({
-        width: 120,
-        height: 150,
-        colors,
-        palmColor: '#C3B4AA',
-      });
-    }
+    const colors = GuitarEngine.FINGER_COLORS;
+    if (fingerHand) fingerHand.innerHTML = GuitarEngine.renderHand({ width: 120, height: 150 });
     if (fingerNames) {
       const names = GuitarEngine.FINGER_NAMES;
       const key = { 1: 'index', 2: 'middle', 3: 'ring', 4: 'little' };
@@ -1157,14 +1141,9 @@
     }
   }
 
-  for (const control of [fretCountSelect, stringCountSelect, ...Object.values(fingerInputs)]) {
+  for (const control of [fretCountSelect, stringCountSelect, instrumentSelect]) {
     if (!control) continue;
-    const redraw = () => {
-      drawFingerLegend();
-      drawStage();
-    };
-    control.addEventListener('change', redraw);
-    control.addEventListener('input', redraw);
+    control.addEventListener('change', () => drawStage());
   }
   window.addEventListener('resize', () => drawStage());
   drawFingerLegend();
@@ -2414,7 +2393,14 @@
     for (const shape of shapes) {
       ctx2d.fillStyle = shape.fill;
       ctx2d.globalAlpha = shape.opacity === undefined ? 1 : shape.opacity;
-      if (shape.kind === 'circle') {
+      if (shape.kind === 'text') {
+        // The fret numbers. Canvas uses the document's own fonts, so
+        // this is the same Sora the rest of the frame is drawn in.
+        ctx2d.font = `${shape.fontWeight ?? 700} ${shape.fontSize}px 'Sora', 'Manrope', sans-serif`;
+        ctx2d.textAlign = shape.align === 'middle' ? 'center' : (shape.align ?? 'left');
+        ctx2d.textBaseline = shape.baseline ?? 'alphabetic';
+        ctx2d.fillText(shape.text, shape.x, shape.y);
+      } else if (shape.kind === 'circle') {
         ctx2d.beginPath();
         ctx2d.arc(shape.x, shape.y, shape.width / 2, 0, Math.PI * 2);
         ctx2d.fill();

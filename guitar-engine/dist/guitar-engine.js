@@ -21,10 +21,12 @@ var GuitarEngine = (() => {
   // src/index.ts
   var index_exports = {};
   __export(index_exports, {
+    ACOUSTIC_COLORS: () => ACOUSTIC_COLORS,
     DEFAULT_COLORS: () => DEFAULT_COLORS,
     DEFAULT_FIRST_FRET: () => DEFAULT_FIRST_FRET,
     DEFAULT_LAST_FRET: () => DEFAULT_LAST_FRET,
     DEFAULT_STRINGS: () => DEFAULT_STRINGS,
+    FINGER_COLORS: () => FINGER_COLORS,
     FINGER_NAMES: () => FINGER_NAMES,
     fingerColor: () => fingerColor,
     fretCenter: () => fretCenter,
@@ -32,8 +34,10 @@ var GuitarEngine = (() => {
     fretWidth: () => fretWidth,
     fretWires: () => fretWires,
     fretboardShapes: () => fretboardShapes,
+    guitarLayout: () => guitarLayout,
     handShapes: () => handShapes,
     inlayFrets: () => inlayFrets,
+    instrumentColors: () => instrumentColors,
     markShapes: () => markShapes,
     positionsAt: () => positionsAt,
     renderFretboard: () => renderFretboard,
@@ -50,6 +54,9 @@ var GuitarEngine = (() => {
   var DEFAULT_FIRST_FRET = 0;
   var DEFAULT_LAST_FRET = 12;
   var STRING_SPAN = 0.82;
+  var HEADSTOCK_SHARE = 0.085;
+  var BODY_SHARE = 0.16;
+  var NUMBERS_SHARE = 0.16;
   var THINNEST = 0.07;
   var THICKEST = 0.2;
   var INLAY_FRETS = /* @__PURE__ */ new Set([3, 5, 7, 9, 15, 17, 19, 21]);
@@ -63,11 +70,36 @@ var GuitarEngine = (() => {
     const lastRaw = Number.isFinite(options.lastFret) ? Math.round(options.lastFret) : DEFAULT_LAST_FRET;
     return { first, last: Math.max(first + 1, lastRaw) };
   }
+  function guitarLayout(options) {
+    const width = Math.max(0, options.width);
+    const height = Math.max(0, options.height);
+    const numbers = options.fretNumbers === false ? 0 : height * NUMBERS_SHARE;
+    const boardHeight = height - numbers;
+    const headstockWidth = width * HEADSTOCK_SHARE;
+    const bodyWidth = width * BODY_SHARE;
+    return {
+      board: { x: 0, y: 0, width, height: boardHeight },
+      headstock: { x: 0, y: 0, width: headstockWidth, height: boardHeight },
+      neck: {
+        x: headstockWidth,
+        y: 0,
+        width: Math.max(1, width - headstockWidth - bodyWidth),
+        height: boardHeight
+      },
+      body: { x: width - bodyWidth, y: 0, width: bodyWidth, height: boardHeight },
+      numbersY: boardHeight
+    };
+  }
   function stringLines(options) {
     const count = stringCount(options);
     if (!(options.height > 0)) return [];
-    const span = options.height * STRING_SPAN;
-    const top = (options.height - span) / 2;
+    const board = guitarLayout({
+      width: options.width ?? 1,
+      height: options.height,
+      ...options.fretNumbers !== void 0 ? { fretNumbers: options.fretNumbers } : {}
+    }).board;
+    const span = board.height * STRING_SPAN;
+    const top = board.y + (board.height - span) / 2;
     const gap = count > 1 ? span / (count - 1) : 0;
     const lines = [];
     for (let i = 0; i < count; i++) {
@@ -75,7 +107,7 @@ var GuitarEngine = (() => {
       lines.push({
         string: i + 1,
         offset: top + i * gap,
-        thickness: Math.max(1, (THINNEST + (THICKEST - THINNEST) * t) * (gap || options.height / 6))
+        thickness: Math.max(1, (THINNEST + (THICKEST - THINNEST) * t) * (gap || board.height / 6))
       });
     }
     return lines;
@@ -83,23 +115,24 @@ var GuitarEngine = (() => {
   function fretWires(options) {
     const { first, last } = fretRange(options);
     if (!(options.width > 0)) return [];
-    const steps = last - first;
-    const perFret = options.width / steps;
+    const neck = guitarLayout(options).neck;
+    const perFret = neck.width / (last - first);
     const wires = [];
     for (let fret = first; fret <= last; fret++) {
-      wires.push({ fret, offset: (fret - first) * perFret });
+      wires.push({ fret, offset: neck.x + (fret - first) * perFret });
     }
     return wires;
   }
   function fretWidth(options) {
     const { first, last } = fretRange(options);
-    return options.width / Math.max(1, last - first);
+    return guitarLayout(options).neck.width / Math.max(1, last - first);
   }
   function fretCenter(fret, options) {
     const { first } = fretRange(options);
+    const neck = guitarLayout(options).neck;
     const per = fretWidth(options);
-    if (fret <= 0) return 0;
-    return (fret - first - 0.5) * per;
+    if (fret <= 0) return neck.x;
+    return neck.x + (fret - first - 0.5) * per;
   }
   function inlayFrets(options) {
     const { first, last } = fretRange(options);
@@ -159,6 +192,12 @@ var GuitarEngine = (() => {
   }
 
   // src/stage.ts
+  var FINGER_COLORS = {
+    index: "#E8352B",
+    middle: "#2B5BE8",
+    ring: "#1FA04A",
+    little: "#F2C200"
+  };
   var DEFAULT_COLORS = {
     board: "#2A1A12",
     boardEdge: "#120A06",
@@ -166,17 +205,32 @@ var GuitarEngine = (() => {
     nut: "#E8DCCB",
     inlay: "#6E6158",
     string: "#D9CDBE",
+    fretNumber: "rgba(255,255,255,0.34)",
+    headstock: "#20130D",
+    peg: "#BDB2A6",
+    body: "#7A2418",
+    bodyEdge: "#2A0F0A",
+    soundhole: "#140B07",
+    rosette: "#C9A227",
+    pickup: "#1B1512",
+    hardware: "#C6BCB1",
     unassigned: "#F7F4F0",
-    open: "#63D28B",
-    index: "#FFC400",
-    middle: "#4FA3FF",
-    ring: "#FF5C8A",
-    little: "#9B6BFF",
+    open: "#9AA6B2",
+    ...FINGER_COLORS,
     background: "none"
   };
+  var ACOUSTIC_COLORS = {
+    board: "#4A2C1A",
+    headstock: "#3A2213",
+    body: "#D9B478",
+    bodyEdge: "#5A3A20"
+  };
+  function instrumentColors(instrument) {
+    return instrument === "acoustic" ? ACOUSTIC_COLORS : {};
+  }
   var MARK_SIZE = 1.5;
-  function resolveColors(colors) {
-    return { ...DEFAULT_COLORS, ...colors ?? {} };
+  function resolveColors(colors, instrument) {
+    return { ...DEFAULT_COLORS, ...instrumentColors(instrument), ...colors ?? {} };
   }
   function fingerColor(finger, colors) {
     switch (finger) {
@@ -204,23 +258,96 @@ var GuitarEngine = (() => {
     return { kind: "rect", x, y, width, height, fill, ...extra };
   }
   function fretboardShapes(options) {
-    const colors = resolveColors(options.colors);
+    const colors = resolveColors(options.colors, options.instrument);
     const { width, height } = options;
     if (!(width > 0) || !(height > 0)) return [];
+    const layout = guitarLayout(options);
     const shapes = [];
     if (colors.background !== "none") {
       shapes.push(rectShape(0, 0, width, height, colors.background));
     }
-    shapes.push(
-      rectShape(0, 0, width, height, colors.board, { radius: Math.min(height, width) * 0.04 })
-    );
-    const per = fretWidth(options);
-    const { first } = fretRange(options);
-    const wireWidth = Math.max(1, per * 0.045);
-    const nutWidth = Math.max(2, per * 0.12);
     const strings = stringLines(options);
-    const middleY = height / 2;
-    const gap = strings.length > 1 ? strings[1].offset - strings[0].offset : height / 6;
+    const middleY = layout.board.y + layout.board.height / 2;
+    const gap = strings.length > 1 ? strings[1].offset - strings[0].offset : layout.board.height / 6;
+    const body = layout.body;
+    shapes.push(
+      rectShape(body.x, body.y, body.width, body.height, colors.body, {
+        radius: Math.min(body.width, body.height) * 0.22
+      })
+    );
+    if (options.instrument === "acoustic") {
+      const r = Math.min(body.width, body.height) * 0.3;
+      const cx = body.x + body.width * 0.52;
+      shapes.push({
+        kind: "circle",
+        x: cx,
+        y: middleY,
+        width: r * 2.3,
+        height: r * 2.3,
+        fill: colors.rosette
+      });
+      shapes.push({
+        kind: "circle",
+        x: cx,
+        y: middleY,
+        width: r * 2,
+        height: r * 2,
+        fill: colors.soundhole
+      });
+    } else {
+      const pickupWidth = body.width * 0.16;
+      const pickupHeight = layout.board.height * 0.52;
+      for (const at of [0.3, 0.58]) {
+        shapes.push(
+          rectShape(
+            body.x + body.width * at,
+            middleY - pickupHeight / 2,
+            pickupWidth,
+            pickupHeight,
+            colors.pickup,
+            {
+              radius: pickupWidth * 0.25
+            }
+          )
+        );
+      }
+      shapes.push(
+        rectShape(
+          body.x + body.width * 0.82,
+          middleY - pickupHeight * 0.55,
+          body.width * 0.07,
+          pickupHeight * 1.1,
+          colors.hardware,
+          { radius: body.width * 0.02 }
+        )
+      );
+    }
+    const head = layout.headstock;
+    shapes.push(
+      rectShape(
+        head.x,
+        head.y + head.height * 0.12,
+        head.width,
+        head.height * 0.76,
+        colors.headstock,
+        {
+          radius: head.width * 0.28
+        }
+      )
+    );
+    const pegR = Math.max(1.5, gap * 0.22);
+    for (const line of strings) {
+      shapes.push({
+        kind: "circle",
+        x: head.x + head.width * 0.42,
+        y: line.offset,
+        width: pegR * 2,
+        height: pegR * 2,
+        fill: colors.peg
+      });
+    }
+    const neck = layout.neck;
+    shapes.push(rectShape(neck.x, neck.y, neck.width, neck.height, colors.board));
     const inlayR = Math.max(2, gap * 0.34);
     for (const inlay of inlayFrets(options)) {
       const cx = fretCenter(inlay.fret, options);
@@ -246,20 +373,48 @@ var GuitarEngine = (() => {
         });
       }
     }
+    const per = fretWidth(options);
+    const { first } = fretRange(options);
+    const wireWidth = Math.max(1, per * 0.045);
+    const nutWidth = Math.max(2, per * 0.12);
     for (const wire of fretWires(options)) {
       const isNut = wire.fret === 0 && first === 0;
       const w = isNut ? nutWidth : wireWidth;
-      shapes.push(rectShape(wire.offset - w / 2, 0, w, height, isNut ? colors.nut : colors.fretWire));
+      shapes.push(
+        rectShape(wire.offset - w / 2, neck.y, w, neck.height, isNut ? colors.nut : colors.fretWire)
+      );
     }
     for (const line of strings) {
       shapes.push(
         rectShape(0, line.offset - line.thickness / 2, width, line.thickness, colors.string)
       );
     }
+    if (options.fretNumbers !== false && layout.numbersY < height) {
+      const size = Math.min((height - layout.numbersY) * 0.62, per * 0.5);
+      const { last } = fretRange(options);
+      const everyFret = per > size * 1.6;
+      for (let fret = Math.max(1, first + 1); fret <= last; fret++) {
+        if (!everyFret && fret % 3 !== 0 && !inlayFrets(options).some((i) => i.fret === fret))
+          continue;
+        shapes.push({
+          kind: "text",
+          x: fretCenter(fret, options),
+          y: layout.numbersY + (height - layout.numbersY) / 2,
+          width: per,
+          height: height - layout.numbersY,
+          fill: colors.fretNumber,
+          text: String(fret),
+          fontSize: size,
+          fontWeight: 700,
+          align: "middle",
+          baseline: "middle"
+        });
+      }
+    }
     return shapes;
   }
   function markShapes(positions, options) {
-    const colors = resolveColors(options.colors);
+    const colors = resolveColors(options.colors, options.instrument);
     const strings = stringLines(options);
     const byString = new Map(strings.map((line) => [line.string, line]));
     const gap = strings.length > 1 ? strings[1].offset - strings[0].offset : options.height / 6;
@@ -309,6 +464,22 @@ var GuitarEngine = (() => {
       if (shape.kind === "circle") {
         return tag("circle", { cx: shape.x, cy: shape.y, r: shape.width / 2, ...common });
       }
+      if (shape.kind === "text") {
+        return wrap(
+          "text",
+          {
+            x: shape.x,
+            y: shape.y,
+            "font-size": shape.fontSize,
+            "font-weight": shape.fontWeight,
+            "font-family": "'Sora', 'Manrope', sans-serif",
+            "text-anchor": shape.align ?? "middle",
+            "dominant-baseline": shape.baseline === "middle" ? "central" : shape.baseline ?? "alphabetic",
+            ...common
+          },
+          escapeText(shape.text ?? "")
+        );
+      }
       return tag("rect", {
         x: shape.x,
         y: shape.y,
@@ -348,23 +519,26 @@ var GuitarEngine = (() => {
     const colors = resolveColors(options.colors);
     const { width, height } = options;
     if (!(width > 0) || !(height > 0)) return [];
-    const palm = options.palmColor ?? colors.unassigned;
+    const skin = options.handColor ?? "#F2E7DF";
+    const outline = options.outline ?? "#8A7C74";
+    const line = Math.max(1, width * 0.012);
     const shapes = [];
-    const palmLeft = width * 0.2;
-    const palmRight = width * 0.92;
-    const palmTop = height * 0.52;
+    const palmLeft = width * 0.22;
+    const palmRight = width * 0.94;
+    const palmTop = height * 0.5;
     const palmWidth = palmRight - palmLeft;
-    const palmHeight = height - palmTop;
+    const palmHeight = height - palmTop - height * 0.03;
     const thumbWidth = palmWidth * 0.26;
     shapes.push({
       kind: "rect",
-      x: palmLeft - thumbWidth * 0.75,
-      y: palmTop + palmHeight * 0.18,
+      x: palmLeft - thumbWidth * 0.8,
+      y: palmTop + palmHeight * 0.16,
       width: thumbWidth,
-      height: palmHeight * 0.62,
-      fill: palm,
-      radius: thumbWidth / 2,
-      opacity: 0.55
+      height: palmHeight * 0.66,
+      fill: skin,
+      stroke: outline,
+      strokeWidth: line,
+      radius: thumbWidth / 2
     });
     shapes.push({
       kind: "rect",
@@ -372,13 +546,15 @@ var GuitarEngine = (() => {
       y: palmTop,
       width: palmWidth,
       height: palmHeight,
-      fill: palm,
-      radius: Math.min(palmWidth, palmHeight) * 0.28,
-      opacity: 0.55
+      fill: skin,
+      stroke: outline,
+      strokeWidth: line,
+      radius: Math.min(palmWidth, palmHeight) * 0.3
     });
     const gap = palmWidth * 0.06;
     const fingerWidth = (palmWidth - gap * 3) / 4;
-    const longest = palmTop - height * 0.04;
+    const longest = palmTop - height * 0.06;
+    const dots = [];
     for (const key of [1, 2, 3, 4]) {
       const index = key - 1;
       const length = longest * FINGER_LENGTH[key];
@@ -388,27 +564,45 @@ var GuitarEngine = (() => {
         kind: "rect",
         x,
         y,
-        // A finger reaches INTO the palm, so no seam shows where they meet.
         width: fingerWidth,
-        height: length + palmHeight * 0.3,
-        fill: key === 1 ? colors.index : key === 2 ? colors.middle : key === 3 ? colors.ring : colors.little,
+        // Reaching into the palm, so no seam shows where they meet.
+        height: length + palmHeight * 0.32,
+        fill: skin,
+        stroke: outline,
+        strokeWidth: line,
         radius: fingerWidth / 2
       });
+      const dotR = fingerWidth * 0.42;
+      dots.push({
+        kind: "circle",
+        x: x + fingerWidth / 2,
+        y: y + dotR * 1.5,
+        width: dotR * 2,
+        height: dotR * 2,
+        fill: key === 1 ? colors.index : key === 2 ? colors.middle : key === 3 ? colors.ring : colors.little
+      });
     }
-    return shapes;
+    return [...shapes, ...dots];
   }
   function renderHand(options) {
-    const body = handShapes(options).map(
-      (shape) => tag("rect", {
+    const body = handShapes(options).map((shape) => {
+      const common = {
+        fill: shape.fill,
+        ...shape.stroke !== void 0 ? { stroke: shape.stroke } : {},
+        ...shape.strokeWidth !== void 0 ? { "stroke-width": shape.strokeWidth } : {}
+      };
+      if (shape.kind === "circle") {
+        return tag("circle", { cx: shape.x, cy: shape.y, r: shape.width / 2, ...common });
+      }
+      return tag("rect", {
         x: shape.x,
         y: shape.y,
         width: shape.width,
         height: shape.height,
-        fill: shape.fill,
         ...shape.radius !== void 0 ? { rx: shape.radius } : {},
-        ...shape.opacity !== void 0 ? { opacity: shape.opacity } : {}
-      })
-    ).join("");
+        ...common
+      });
+    }).join("");
     return wrap(
       "svg",
       {

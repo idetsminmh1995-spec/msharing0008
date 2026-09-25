@@ -11,19 +11,37 @@ import {
   fretRange,
   fretWidth,
   fretWires,
+  guitarLayout,
   inlayFrets,
   positionsAt,
   stringLines,
 } from './fretboard.js';
-import { n, tag, wrap } from './svg.js';
+import { escapeText, n, tag, wrap } from './svg.js';
 import type {
   Finger,
   FretboardOptions,
   GuitarColors,
   GuitarStageOptions,
+  Instrument,
   LivePosition,
   StageShape,
 } from './types.js';
+
+/**
+ * The finger colours are the ones on the hand: index red, middle
+ * blue, ring green, little yellow.
+ *
+ * They are FIXED rather than pickable, because their whole job is to
+ * be learnt once -- a viewer who has seen the hand knows what red
+ * means for the rest of the video, and for the next video too. Four
+ * colours anyone can re-pick is four colours nobody can learn.
+ */
+export const FINGER_COLORS = {
+  index: '#E8352B',
+  middle: '#2B5BE8',
+  ring: '#1FA04A',
+  little: '#F2C200',
+} as const;
 
 export const DEFAULT_COLORS: GuitarColors = {
   board: '#2A1A12',
@@ -32,20 +50,41 @@ export const DEFAULT_COLORS: GuitarColors = {
   nut: '#E8DCCB',
   inlay: '#6E6158',
   string: '#D9CDBE',
+  fretNumber: 'rgba(255,255,255,0.34)',
+  headstock: '#20130D',
+  peg: '#BDB2A6',
+  body: '#7A2418',
+  bodyEdge: '#2A0F0A',
+  soundhole: '#140B07',
+  rosette: '#C9A227',
+  pickup: '#1B1512',
+  hardware: '#C6BCB1',
   unassigned: '#F7F4F0',
-  open: '#63D28B',
-  index: '#FFC400',
-  middle: '#4FA3FF',
-  ring: '#FF5C8A',
-  little: '#9B6BFF',
+  open: '#9AA6B2',
+  ...FINGER_COLORS,
   background: 'none',
 };
+
+/** An acoustic is a different instrument to look at: lighter wood, a soundhole. */
+export const ACOUSTIC_COLORS: Partial<GuitarColors> = {
+  board: '#4A2C1A',
+  headstock: '#3A2213',
+  body: '#D9B478',
+  bodyEdge: '#5A3A20',
+};
+
+export function instrumentColors(instrument: Instrument | undefined): Partial<GuitarColors> {
+  return instrument === 'acoustic' ? ACOUSTIC_COLORS : {};
+}
 
 /** How big a played mark is, as a fraction of the gap between two strings. */
 const MARK_SIZE = 1.5;
 
-export function resolveColors(colors?: Partial<GuitarColors>): GuitarColors {
-  return { ...DEFAULT_COLORS, ...(colors ?? {}) };
+export function resolveColors(
+  colors?: Partial<GuitarColors>,
+  instrument?: Instrument,
+): GuitarColors {
+  return { ...DEFAULT_COLORS, ...instrumentColors(instrument), ...(colors ?? {}) };
 }
 
 /**
@@ -91,29 +130,119 @@ function rectShape(
   return { kind: 'rect', x, y, width, height, fill, ...extra };
 }
 
-/** The neck with nothing played on it: board, frets, inlays, strings. */
+/**
+ * The instrument with nothing played on it.
+ *
+ * A fretboard on its own is a diagram; this is meant to read as a
+ * GUITAR, so it has a headstock with tuning pegs at one end and a
+ * body at the other -- a soundhole on an acoustic, pickups on an
+ * electric -- with the fretted neck between them. The strings run
+ * the whole way, as they do on the instrument.
+ */
 export function fretboardShapes(options: FretboardOptions): readonly StageShape[] {
-  const colors = resolveColors(options.colors);
+  const colors = resolveColors(options.colors, options.instrument);
   const { width, height } = options;
   if (!(width > 0) || !(height > 0)) return [];
+  const layout = guitarLayout(options);
   const shapes: StageShape[] = [];
 
   if (colors.background !== 'none') {
     shapes.push(rectShape(0, 0, width, height, colors.background));
   }
-  shapes.push(
-    rectShape(0, 0, width, height, colors.board, { radius: Math.min(height, width) * 0.04 }),
-  );
 
-  const per = fretWidth(options);
-  const { first } = fretRange(options);
-  const wireWidth = Math.max(1, per * 0.045);
-  const nutWidth = Math.max(2, per * 0.12);
-
-  // The inlays sit UNDER the strings, as they do in the wood.
   const strings = stringLines(options);
-  const middleY = height / 2;
-  const gap = strings.length > 1 ? strings[1]!.offset - strings[0]!.offset : height / 6;
+  const middleY = layout.board.y + layout.board.height / 2;
+  const gap =
+    strings.length > 1 ? strings[1]!.offset - strings[0]!.offset : layout.board.height / 6;
+
+  // The body first, so the neck overlaps it the way it does in wood.
+  const body = layout.body;
+  shapes.push(
+    rectShape(body.x, body.y, body.width, body.height, colors.body, {
+      radius: Math.min(body.width, body.height) * 0.22,
+    }),
+  );
+  if (options.instrument === 'acoustic') {
+    // A soundhole, with its rosette ring round it.
+    const r = Math.min(body.width, body.height) * 0.3;
+    const cx = body.x + body.width * 0.52;
+    shapes.push({
+      kind: 'circle',
+      x: cx,
+      y: middleY,
+      width: r * 2.3,
+      height: r * 2.3,
+      fill: colors.rosette,
+    });
+    shapes.push({
+      kind: 'circle',
+      x: cx,
+      y: middleY,
+      width: r * 2,
+      height: r * 2,
+      fill: colors.soundhole,
+    });
+  } else {
+    // Two pickups and a bridge: an electric, at a glance.
+    const pickupWidth = body.width * 0.16;
+    const pickupHeight = layout.board.height * 0.52;
+    for (const at of [0.3, 0.58]) {
+      shapes.push(
+        rectShape(
+          body.x + body.width * at,
+          middleY - pickupHeight / 2,
+          pickupWidth,
+          pickupHeight,
+          colors.pickup,
+          {
+            radius: pickupWidth * 0.25,
+          },
+        ),
+      );
+    }
+    shapes.push(
+      rectShape(
+        body.x + body.width * 0.82,
+        middleY - pickupHeight * 0.55,
+        body.width * 0.07,
+        pickupHeight * 1.1,
+        colors.hardware,
+        { radius: body.width * 0.02 },
+      ),
+    );
+  }
+
+  // The headstock, and a peg per string.
+  const head = layout.headstock;
+  shapes.push(
+    rectShape(
+      head.x,
+      head.y + head.height * 0.12,
+      head.width,
+      head.height * 0.76,
+      colors.headstock,
+      {
+        radius: head.width * 0.28,
+      },
+    ),
+  );
+  const pegR = Math.max(1.5, gap * 0.22);
+  for (const line of strings) {
+    shapes.push({
+      kind: 'circle',
+      x: head.x + head.width * 0.42,
+      y: line.offset,
+      width: pegR * 2,
+      height: pegR * 2,
+      fill: colors.peg,
+    });
+  }
+
+  // The neck.
+  const neck = layout.neck;
+  shapes.push(rectShape(neck.x, neck.y, neck.width, neck.height, colors.board));
+
+  // Inlays sit UNDER the strings, as they do in the wood.
   const inlayR = Math.max(2, gap * 0.34);
   for (const inlay of inlayFrets(options)) {
     const cx = fretCenter(inlay.fret, options);
@@ -140,16 +269,49 @@ export function fretboardShapes(options: FretboardOptions): readonly StageShape[
     }
   }
 
+  const per = fretWidth(options);
+  const { first } = fretRange(options);
+  const wireWidth = Math.max(1, per * 0.045);
+  const nutWidth = Math.max(2, per * 0.12);
   for (const wire of fretWires(options)) {
     const isNut = wire.fret === 0 && first === 0;
     const w = isNut ? nutWidth : wireWidth;
-    shapes.push(rectShape(wire.offset - w / 2, 0, w, height, isNut ? colors.nut : colors.fretWire));
+    shapes.push(
+      rectShape(wire.offset - w / 2, neck.y, w, neck.height, isNut ? colors.nut : colors.fretWire),
+    );
   }
 
+  // The strings, the whole length of the instrument.
   for (const line of strings) {
     shapes.push(
       rectShape(0, line.offset - line.thickness / 2, width, line.thickness, colors.string),
     );
+  }
+
+  // The fret numbers, under the board: faint, there to be glanced at
+  // rather than read. Only where there is room for them -- on a long
+  // neck drawn small, every third fret is the one a player looks for.
+  if (options.fretNumbers !== false && layout.numbersY < height) {
+    const size = Math.min((height - layout.numbersY) * 0.62, per * 0.5);
+    const { last } = fretRange(options);
+    const everyFret = per > size * 1.6;
+    for (let fret = Math.max(1, first + 1); fret <= last; fret++) {
+      if (!everyFret && fret % 3 !== 0 && !inlayFrets(options).some((i) => i.fret === fret))
+        continue;
+      shapes.push({
+        kind: 'text',
+        x: fretCenter(fret, options),
+        y: layout.numbersY + (height - layout.numbersY) / 2,
+        width: per,
+        height: height - layout.numbersY,
+        fill: colors.fretNumber,
+        text: String(fret),
+        fontSize: size,
+        fontWeight: 700,
+        align: 'middle',
+        baseline: 'middle',
+      });
+    }
   }
   return shapes;
 }
@@ -166,7 +328,7 @@ export function markShapes(
   positions: readonly LivePosition[],
   options: FretboardOptions,
 ): readonly StageShape[] {
-  const colors = resolveColors(options.colors);
+  const colors = resolveColors(options.colors, options.instrument);
   const strings = stringLines(options);
   const byString = new Map(strings.map((line) => [line.string, line]));
   const gap = strings.length > 1 ? strings[1]!.offset - strings[0]!.offset : options.height / 6;
@@ -221,6 +383,23 @@ function shapesToSvg(shapes: readonly StageShape[], width: number, height: numbe
       };
       if (shape.kind === 'circle') {
         return tag('circle', { cx: shape.x, cy: shape.y, r: shape.width / 2, ...common });
+      }
+      if (shape.kind === 'text') {
+        return wrap(
+          'text',
+          {
+            x: shape.x,
+            y: shape.y,
+            'font-size': shape.fontSize,
+            'font-weight': shape.fontWeight,
+            'font-family': "'Sora', 'Manrope', sans-serif",
+            'text-anchor': shape.align ?? 'middle',
+            'dominant-baseline':
+              shape.baseline === 'middle' ? 'central' : (shape.baseline ?? 'alphabetic'),
+            ...common,
+          },
+          escapeText(shape.text ?? ''),
+        );
       }
       return tag('rect', {
         x: shape.x,

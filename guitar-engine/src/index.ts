@@ -19,16 +19,20 @@ export {
   fretRange,
   fretWidth,
   fretWires,
+  guitarLayout,
   inlayFrets,
   positionsAt,
   stringCount,
   stringLines,
 } from './fretboard.js';
 export {
+  ACOUSTIC_COLORS,
   DEFAULT_COLORS,
+  FINGER_COLORS,
   FINGER_NAMES,
   fingerColor,
   fretboardShapes,
+  instrumentColors,
   markShapes,
   renderFretboard,
   renderGuitarStage,
@@ -36,6 +40,7 @@ export {
   stageShapes,
 } from './stage.js';
 export { handShapes, renderHand } from './hand.js';
+export type { HandOptions } from './hand.js';
 export type {
   Finger,
   FretWire,
@@ -43,6 +48,7 @@ export type {
   GuitarColors,
   GuitarNote,
   GuitarStageOptions,
+  Instrument,
   LivePosition,
   StageShape,
   StringLine,

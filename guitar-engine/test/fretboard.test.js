@@ -12,6 +12,9 @@ const BOARD = { width: 1200, height: 300 };
 
 test('six strings by default, thinnest at the top, thickest at the bottom', () => {
   const lines = G.stringLines(BOARD);
+  // They run across the board, above the fret-number strip.
+  const board = G.guitarLayout(BOARD).board;
+  assert.ok(lines[lines.length - 1].offset < board.height, 'clear of the numbers');
   assert.equal(lines.length, 6);
   assert.equal(lines[0].string, 1);
   assert.ok(lines[0].offset < lines[5].offset, 'string 1 is drawn at the top');
@@ -22,25 +25,42 @@ test('six strings by default, thinnest at the top, thickest at the bottom', () =
   assert.equal(G.stringLines({ ...BOARD, strings: 4 }).length, 4, 'a bass has four');
 });
 
-test('the frets divide the board, the nut is at the left edge', () => {
-  const wires = G.fretWires({ ...BOARD, firstFret: 0, lastFret: 12 });
+test('the picture is a guitar: a headstock, the neck, then the body', () => {
+  const layout = G.guitarLayout(BOARD);
+  assert.equal(layout.headstock.x, 0);
+  assert.ok(layout.headstock.width > 0);
+  assert.equal(layout.neck.x, layout.headstock.width, 'the neck starts where the headstock ends');
+  assert.ok(Math.abs(layout.neck.x + layout.neck.width - layout.body.x) < 1e-9, 'and ends at the body');
+  assert.ok(Math.abs(layout.body.x + layout.body.width - BOARD.width) < 1e-9);
+  // The fret numbers get a strip under the board, so the strings do
+  // not run through them.
+  assert.ok(layout.board.height < BOARD.height);
+  assert.equal(layout.numbersY, layout.board.height);
+  assert.equal(G.guitarLayout({ ...BOARD, fretNumbers: false }).board.height, BOARD.height);
+});
+
+test('the frets divide the NECK, the nut where the neck starts', () => {
+  const options = { ...BOARD, firstFret: 0, lastFret: 12 };
+  const neck = G.guitarLayout(options).neck;
+  const wires = G.fretWires(options);
   assert.equal(wires.length, 13, 'the nut and twelve wires');
   assert.equal(wires[0].fret, 0);
-  assert.equal(wires[0].offset, 0);
-  assert.equal(wires[12].offset, BOARD.width);
-  const per = G.fretWidth({ ...BOARD, lastFret: 12 });
-  assert.ok(Math.abs(per - 100) < 1e-9);
+  assert.ok(Math.abs(wires[0].offset - neck.x) < 1e-9);
+  assert.ok(Math.abs(wires[12].offset - (neck.x + neck.width)) < 1e-9);
+  assert.ok(Math.abs(G.fretWidth(options) - neck.width / 12) < 1e-9);
 });
 
 test('a stopped note sits inside its fret, an open string on the nut', () => {
   const options = { ...BOARD, firstFret: 0, lastFret: 12 };
+  const neck = G.guitarLayout(options).neck;
+  const per = G.fretWidth(options);
   // Fret 1 is the space between the nut and the first wire: its mark
   // goes in the middle of that space, where the finger goes.
-  assert.ok(Math.abs(G.fretCenter(1, options) - 50) < 1e-9);
-  assert.ok(Math.abs(G.fretCenter(5, options) - 450) < 1e-9);
-  assert.equal(G.fretCenter(0, options), 0, 'an open string is at the nut');
+  assert.ok(Math.abs(G.fretCenter(1, options) - (neck.x + per * 0.5)) < 1e-9);
+  assert.ok(Math.abs(G.fretCenter(5, options) - (neck.x + per * 4.5)) < 1e-9);
+  assert.ok(Math.abs(G.fretCenter(0, options) - neck.x) < 1e-9, 'an open string is at the nut');
   // A slide passes between frets rather than jumping.
-  assert.ok(Math.abs(G.fretCenter(5.5, options) - 500) < 1e-9);
+  assert.ok(Math.abs(G.fretCenter(5.5, options) - (neck.x + per * 5)) < 1e-9);
 });
 
 test('the inlays are where a guitar has them, doubled at the twelfth', () => {
