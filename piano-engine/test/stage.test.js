@@ -216,3 +216,55 @@ test('a caller can recolour the grid for a light frame', () => {
   });
   assert.equal(bar.fill, 'rgba(0,0,0,0.2)');
 });
+
+test('a colour can be read as a page writes it, or not at all', () => {
+  assert.deepEqual({ ...P.parseColor('#17110E') }, { r: 23, g: 17, b: 14 });
+  assert.deepEqual({ ...P.parseColor('#abc') }, { r: 170, g: 187, b: 204 });
+  assert.deepEqual({ ...P.parseColor('rgb(23, 17, 14)') }, { r: 23, g: 17, b: 14 });
+  assert.deepEqual({ ...P.parseColor('rgba(23, 17, 14, 0.5)') }, { r: 23, g: 17, b: 14 });
+  assert.equal(P.parseColor('rebeccapurple'), null, 'a name is not guessed at');
+  assert.equal(P.parseColor(''), null);
+});
+
+test('the fade covers the top of the fall and nothing else', () => {
+  const board = P.keyboardBox(gridStage);
+  const shapes = P.fadeShapes({ ...gridStage, fade: { color: '#17110E' } });
+  assert.ok(shapes.length > 8, 'drawn in bands, not one block');
+  const top = shapes[0];
+  const bottom = shapes[shapes.length - 1];
+  assert.equal(top.y, 0, 'starts at the top of the stage');
+  assert.ok(bottom.y + bottom.height < board.y, 'ends well above the keyboard');
+  for (const shape of shapes) {
+    assert.equal(shape.x, 0);
+    assert.equal(shape.width, gridStage.width);
+    assert.match(shape.fill, /^rgba\(23,17,14,/);
+  }
+});
+
+test('the fade is strongest at the top and gone at the bottom of its band', () => {
+  const shapes = P.fadeShapes({ ...gridStage, fade: { color: '#17110E' } });
+  const alpha = (shape) => Number(/rgba\([^)]*,([0-9.]+)\)/.exec(shape.fill)[1]);
+  for (let i = 1; i < shapes.length; i++) {
+    assert.ok(alpha(shapes[i]) < alpha(shapes[i - 1]), 'each band is fainter than the one above');
+  }
+  assert.ok(alpha(shapes[0]) < 1, 'a note appears dim, never hidden outright');
+  assert.ok(alpha(shapes[shapes.length - 1]) < 0.1, 'and is at full colour by the end of the fade');
+});
+
+test('no fade is asked for, none is drawn; an unreadable colour is not guessed at', () => {
+  assert.equal(P.fadeShapes({ ...gridStage }).length, 0);
+  assert.equal(P.fadeShapes({ ...gridStage, fade: { color: 'thistle' } }).length, 0);
+});
+
+test('the fade dims the notes and the grid, never the keyboard', () => {
+  const notes = [{ midi: 60, startSeconds: 1, endSeconds: 1.5, hand: 'right' }];
+  const options = { ...gridStage, notes, gridLines: bars([1, 1.5]), fade: { color: '#17110E' } };
+  const shapes = P.stageShapes(options);
+  const fadeAt = shapes.findIndex((s) => /rgba\(23,17,14/.test(s.fill));
+  const noteAt = shapes.findIndex((s) => s.fill === P.DEFAULT_COLORS.rightHand);
+  const keyAt = shapes.findIndex((s) => s.fill === P.DEFAULT_COLORS.whiteKey);
+  const lineAt = shapes.findIndex((s) => s.fill === P.DEFAULT_COLORS.strikeLine);
+  assert.ok(noteAt < fadeAt, 'the note is behind the fade');
+  assert.ok(fadeAt < keyAt, 'the keyboard is in front of it');
+  assert.ok(keyAt < lineAt, 'and the strike line in front of that');
+});

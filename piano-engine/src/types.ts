@@ -90,6 +90,20 @@ export interface PianoStageOptions {
   /** Bars and beats to rule the falling area with. Empty or absent draws no grid. */
   readonly gridLines?: readonly GridLine[];
   /**
+   * Fades the TOP of the falling area, so notes and grid come down out
+   * of the frame rather than appearing at an edge.
+   *
+   * `color` is what they fade into -- the frame's own background, which
+   * only the caller knows. `fraction` is how much of the fall the fade
+   * covers, and `strength` how dim a note is when it first appears:
+   * 1 would hide it completely, which is not a fade but a wall.
+   */
+  readonly fade?: {
+    readonly color: string;
+    readonly fraction?: number;
+    readonly strength?: number;
+  };
+  /**
    * How long a note takes to fall from the top of the stage to the
    * keyboard. Longer means more of the coming music is on screen at
    * once, and slower-looking movement.

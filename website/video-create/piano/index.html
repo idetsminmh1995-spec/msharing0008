@@ -1119,6 +1119,10 @@
       seconds: stageSeconds(atSeconds),
       notes: pianoNotes,
       gridLines,
+      // Notes and grid come down OUT OF the frame: the fade is the
+      // frame's own background colour, read from the frame itself, so
+      // it follows the Video Style without being told twice.
+      fade: { color: getComputedStyle(videoFrame).backgroundColor },
       leadSeconds: fallSeconds(),
       colors: stageColors(),
     };

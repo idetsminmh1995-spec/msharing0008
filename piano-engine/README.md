@@ -93,6 +93,23 @@ the score hands them over, which is how a 6/8 bar rules six lines and
 a 3/4 bar three, and how a tempo change spaces them exactly as it
 spaces the notes.
 
+## Coming down out of the frame
+
+`fade` dims the top of the falling area, so a note appears faintly and
+gains its colour as it comes down instead of switching on at an edge.
+It takes the colour it fades INTO — the frame's own background, which
+only the caller knows — plus how much of the fall it covers and how
+dim a note starts:
+
+```js
+fade: { color: 'rgb(23, 17, 14)', fraction: 0.38, strength: 0.88 }
+```
+
+It is drawn as bands of that colour at falling alphas rather than as a
+gradient, because a rectangle is the one thing the SVG and the canvas
+draw identically. `strength: 1` would not be a fade but a wall, so a
+note is always at least faintly visible.
+
 ## Tests
 
 `npm test` runs against the BUILT bundle in a bare sandbox — the same

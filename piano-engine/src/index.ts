@@ -18,10 +18,12 @@ export {
 export {
   DEFAULT_COLORS,
   DEFAULT_LEAD_SECONDS,
+  fadeShapes,
   fallingBars,
   gridShapes,
   handColor,
   keyboardBox,
+  parseColor,
   renderKeyboardSvg,
   renderPianoStage,
   resolveColors,

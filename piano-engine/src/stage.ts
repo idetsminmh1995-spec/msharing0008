@@ -38,6 +38,12 @@ export const DEFAULT_COLORS: PianoColors = {
 /** A note falls for this long before it is played, unless the caller says otherwise. */
 export const DEFAULT_LEAD_SECONDS = 2.5;
 
+/** How much of the fall a top fade covers, and how dim a note starts. */
+const FADE_FRACTION = 0.38;
+const FADE_STRENGTH = 0.88;
+/** Bands the fade is drawn in. Enough that the steps do not show; few enough to cost nothing. */
+const FADE_BANDS = 18;
+
 /** Grid thickness, as a fraction of the stage's height. */
 const BAR_LINE_FRACTION = 0.007;
 const BEAT_LINE_FRACTION = 0.0035;
@@ -183,6 +189,91 @@ export function gridShapes(
   return shapes;
 }
 
+/**
+ * `#rgb`, `#rrggbb`, `rgb(...)` or `rgba(...)` as numbers.
+ *
+ * Needed because a fade is the frame's OWN background at a series of
+ * alphas, and a page hands that over in whatever form it reads the
+ * colour in -- a computed style is `rgb(23, 17, 14)`, a stylesheet is
+ * `#17110E`. Returns null for anything else rather than guessing, and
+ * the fade is then simply not drawn.
+ */
+export function parseColor(value: string): { r: number; g: number; b: number } | null {
+  const text = value.trim();
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(text);
+  if (hex) {
+    const digits = hex[1] ?? '';
+    const full =
+      digits.length === 3
+        ? digits
+            .split('')
+            .map((d) => d + d)
+            .join('')
+        : digits;
+    return {
+      r: Number.parseInt(full.slice(0, 2), 16),
+      g: Number.parseInt(full.slice(2, 4), 16),
+      b: Number.parseInt(full.slice(4, 6), 16),
+    };
+  }
+  const rgb = /^rgba?\(([^)]+)\)$/i.exec(text);
+  if (rgb) {
+    const parts = (rgb[1] ?? '').split(/[,/\s]+/).filter((p) => p.length > 0);
+    const [r, g, b] = parts.map((p) => Number.parseFloat(p));
+    if ([r, g, b].every((n) => Number.isFinite(n))) {
+      return { r: r as number, g: g as number, b: b as number };
+    }
+  }
+  return null;
+}
+
+/**
+ * The fade at the top of the falling area, as bands of the frame's own
+ * colour at falling alphas.
+ *
+ * Bands rather than a gradient because a frame is drawn two ways here
+ * -- as SVG on the page and onto a canvas for the video -- and a
+ * rectangle is the one thing both draw identically. Eighteen of them
+ * across the band is smooth at any size a video is made in.
+ */
+export function fadeShapes(options: {
+  width: number;
+  height: number;
+  keyboardHeight?: number;
+  fade?: PianoStageOptions['fade'];
+}): readonly StageShape[] {
+  const fade = options.fade;
+  if (!fade) return [];
+  const rgb = parseColor(fade.color);
+  if (!rgb) return [];
+  const board = keyboardBox(options);
+  const fallHeight = board.y;
+  if (!(fallHeight > 0)) return [];
+
+  const fraction =
+    fade.fraction !== undefined && fade.fraction > 0 ? Math.min(1, fade.fraction) : FADE_FRACTION;
+  const strength =
+    fade.strength !== undefined ? Math.max(0, Math.min(1, fade.strength)) : FADE_STRENGTH;
+  const bandHeight = (fallHeight * fraction) / FADE_BANDS;
+  if (!(bandHeight > 0)) return [];
+
+  const shapes: StageShape[] = [];
+  for (let i = 0; i < FADE_BANDS; i++) {
+    // Strongest at the very top, gone by the bottom of the band.
+    const alpha = strength * (1 - i / FADE_BANDS);
+    if (alpha <= 0.002) continue;
+    shapes.push({
+      x: 0,
+      y: i * bandHeight,
+      width: options.width,
+      // A hair of overlap, so no seam shows between bands.
+      height: bandHeight + 0.5,
+      fill: `rgba(${Math.round(rgb.r)},${Math.round(rgb.g)},${Math.round(rgb.b)},${alpha.toFixed(3)})`,
+    });
+  }
+  return shapes;
+}
+
 export function handColor(hand: Hand, colors: PianoColors): string {
   return hand === 'left' ? colors.leftHand : colors.rightHand;
 }
@@ -229,6 +320,10 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
       radius: Math.min(bar.width, bar.height) / 4,
     });
   }
+
+  // The fade goes over the grid and the notes, and under the keyboard:
+  // a key is a thing in the room, not something in the distance.
+  for (const shape of fadeShapes(options)) shapes.push(shape);
 
   const fillFor = (key: PianoKey): string => {
     const hand = down.get(key.midi);

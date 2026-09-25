@@ -25,6 +25,7 @@ var PianoEngine = (() => {
     DEFAULT_LEAD_SECONDS: () => DEFAULT_LEAD_SECONDS,
     KEYBOARD_RANGES: () => KEYBOARD_RANGES,
     KEYBOARD_SIZES: () => KEYBOARD_SIZES,
+    fadeShapes: () => fadeShapes,
     fallingBars: () => fallingBars,
     gridShapes: () => gridShapes,
     handColor: () => handColor,
@@ -32,6 +33,7 @@ var PianoEngine = (() => {
     keyboardBox: () => keyboardBox,
     keyboardGeometry: () => keyboardGeometry,
     keyboardRange: () => keyboardRange,
+    parseColor: () => parseColor,
     pressedAt: () => pressedAt,
     renderKeyboardSvg: () => renderKeyboardSvg,
     renderPianoStage: () => renderPianoStage,
@@ -159,6 +161,9 @@ var PianoEngine = (() => {
     background: "none"
   };
   var DEFAULT_LEAD_SECONDS = 2.5;
+  var FADE_FRACTION = 0.38;
+  var FADE_STRENGTH = 0.88;
+  var FADE_BANDS = 18;
   var BAR_LINE_FRACTION = 7e-3;
   var BEAT_LINE_FRACTION = 35e-4;
   var KEYBOARD_FRACTION = 1 / 3;
@@ -232,6 +237,55 @@ var PianoEngine = (() => {
     }
     return shapes;
   }
+  function parseColor(value) {
+    const text = value.trim();
+    const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(text);
+    if (hex) {
+      const digits = hex[1] ?? "";
+      const full = digits.length === 3 ? digits.split("").map((d) => d + d).join("") : digits;
+      return {
+        r: Number.parseInt(full.slice(0, 2), 16),
+        g: Number.parseInt(full.slice(2, 4), 16),
+        b: Number.parseInt(full.slice(4, 6), 16)
+      };
+    }
+    const rgb = /^rgba?\(([^)]+)\)$/i.exec(text);
+    if (rgb) {
+      const parts = (rgb[1] ?? "").split(/[,/\s]+/).filter((p) => p.length > 0);
+      const [r, g, b] = parts.map((p) => Number.parseFloat(p));
+      if ([r, g, b].every((n2) => Number.isFinite(n2))) {
+        return { r, g, b };
+      }
+    }
+    return null;
+  }
+  function fadeShapes(options) {
+    const fade = options.fade;
+    if (!fade) return [];
+    const rgb = parseColor(fade.color);
+    if (!rgb) return [];
+    const board = keyboardBox(options);
+    const fallHeight = board.y;
+    if (!(fallHeight > 0)) return [];
+    const fraction = fade.fraction !== void 0 && fade.fraction > 0 ? Math.min(1, fade.fraction) : FADE_FRACTION;
+    const strength = fade.strength !== void 0 ? Math.max(0, Math.min(1, fade.strength)) : FADE_STRENGTH;
+    const bandHeight = fallHeight * fraction / FADE_BANDS;
+    if (!(bandHeight > 0)) return [];
+    const shapes = [];
+    for (let i = 0; i < FADE_BANDS; i++) {
+      const alpha = strength * (1 - i / FADE_BANDS);
+      if (alpha <= 2e-3) continue;
+      shapes.push({
+        x: 0,
+        y: i * bandHeight,
+        width: options.width,
+        // A hair of overlap, so no seam shows between bands.
+        height: bandHeight + 0.5,
+        fill: `rgba(${Math.round(rgb.r)},${Math.round(rgb.g)},${Math.round(rgb.b)},${alpha.toFixed(3)})`
+      });
+    }
+    return shapes;
+  }
   function handColor(hand, colors) {
     return hand === "left" ? colors.leftHand : colors.rightHand;
   }
@@ -264,6 +318,7 @@ var PianoEngine = (() => {
         radius: Math.min(bar.width, bar.height) / 4
       });
     }
+    for (const shape of fadeShapes(options)) shapes.push(shape);
     const fillFor = (key) => {
       const hand = down.get(key.midi);
       if (hand !== void 0) return handColor(hand, colors);
