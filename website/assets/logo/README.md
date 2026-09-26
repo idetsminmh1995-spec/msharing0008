@@ -2,7 +2,8 @@
 
 `sharing-drum-logo-full.webp`, `sharing-guitar-logo-full.webp`,
 `sharing-piano-logo-full.webp` — the brand mark, top-left of every
-frame. Each file carries blank margin on all four sides, and the CSS
+frame. **`sharing-bass-logo-full.webp` is missing**: the Bass page
+asks for it and falls back to the guitar mark until it is here. Each file carries blank margin on all four sides, and the CSS
 pulls the layout box onto the ink with negative margins written as
 fractions of the file's own pixel counts; `--logo-h` is the FILE's
 height, not the ink's. Changing the file means re-measuring the ink's

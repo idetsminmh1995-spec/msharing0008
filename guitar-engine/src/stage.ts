@@ -566,7 +566,7 @@ export function pickShapes(
   // stroke to draw: each string gets the letter of the finger that
   // takes it, which is how fingerstyle has always been written.
   if (options.picking === 'fingers') {
-    return fingerstyleShapes(struck, options, colors, centreX, mark.age, mark.direction);
+    return fingerstyleShapes(struck, options, colors, centreX, mark, mark.direction);
   }
 
   const thickness = Math.max(1.5, width * 0.24);
@@ -609,18 +609,23 @@ function fingerstyleShapes(
   options: FretboardOptions,
   colors: GuitarColors,
   centreX: number,
-  age: number,
+  mark: PickMark,
   direction: PickMark['direction'],
 ): readonly StageShape[] {
   const gap = stringGap(options);
   const size = gap * MARK_SIZE;
-  const fade = 1 - age;
+  const fade = 1 - mark.age;
   const shapes: StageShape[] = [];
   const ys = struck.map((line) => stringYAt(options, line.string, centreX));
 
   for (const [index, line] of struck.entries()) {
     const y = ys[index] as number;
-    const color = pluckColor(line.string, colors);
+    // The caller's own answer first: a bassist alternates index and
+    // middle whatever string the note is on, which no rule about
+    // strings can work out.
+    const named = mark.fingers?.[mark.strings.indexOf(line.string)];
+    const color =
+      named === undefined ? pluckColor(line.string, colors) : fingerColor(named, colors);
     shapes.push(
       circleShape(
         centreX,

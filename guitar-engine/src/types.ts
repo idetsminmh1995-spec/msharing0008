@@ -244,6 +244,21 @@ export interface PickMark {
   /** The strings being hit, in the drawn numbering. */
   readonly strings: readonly number[];
   readonly age: number;
+  /**
+   * Which digit takes each of those strings, one per entry of
+   * `strings`, when the caller knows better than the engine does.
+   *
+   * A classical guitarist's right hand is decided by the STRING -- a
+   * on the first, m on the second, i on the third, the thumb below --
+   * and the engine can work that out on its own. A bassist's is not:
+   * index and middle ALTERNATE, note after note, whichever string
+   * each one lands on, so which finger plucks this note depends on
+   * what the one before it used. Only the caller walking the piece
+   * knows that, so the caller may say.
+   *
+   * Left out, the engine falls back to the guitar's own rule.
+   */
+  readonly fingers?: readonly Finger[];
 }
 
 export interface GuitarStageOptions extends FretboardOptions {

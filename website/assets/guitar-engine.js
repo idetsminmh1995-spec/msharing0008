@@ -1853,7 +1853,7 @@ var GuitarEngine = (() => {
     const spread = last - first;
     const height = Math.max(height0 * 0.2, spread + height0 * 0.08);
     if (options.picking === "fingers") {
-      return fingerstyleShapes(struck, options, colors, centreX, mark.age, mark.direction);
+      return fingerstyleShapes(struck, options, colors, centreX, mark, mark.direction);
     }
     const thickness = Math.max(1.5, width * 0.24);
     const d = mark.direction === "down" ? downStrokePath(centreX, centreY, width, height, thickness) : upStrokePath(centreX, centreY, width, height, thickness);
@@ -1867,15 +1867,16 @@ var GuitarEngine = (() => {
       pathShape(d, bounds, colors.pick, { opacity: 0.95 * (1 - mark.age), role: "pickStroke" })
     ];
   }
-  function fingerstyleShapes(struck, options, colors, centreX, age, direction) {
+  function fingerstyleShapes(struck, options, colors, centreX, mark, direction) {
     const gap = stringGap(options);
     const size = gap * MARK_SIZE;
-    const fade = 1 - age;
+    const fade = 1 - mark.age;
     const shapes = [];
     const ys = struck.map((line) => stringYAt(options, line.string, centreX));
     for (const [index, line] of struck.entries()) {
       const y = ys[index];
-      const color = pluckColor(line.string, colors);
+      const named = mark.fingers?.[mark.strings.indexOf(line.string)];
+      const color = named === void 0 ? pluckColor(line.string, colors) : fingerColor(named, colors);
       shapes.push(
         circleShape(
           centreX,
