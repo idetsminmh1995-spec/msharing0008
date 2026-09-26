@@ -24,6 +24,7 @@ var GuitarEngine = (() => {
     ACOUSTIC_BOARD: () => ACOUSTIC_BOARD,
     ACOUSTIC_COLORS: () => ACOUSTIC_COLORS,
     ACOUSTIC_CUTAWAY: () => ACOUSTIC_CUTAWAY,
+    ACOUSTIC_SUNBURST: () => ACOUSTIC_SUNBURST,
     CLASSICAL_BOARD: () => CLASSICAL_BOARD,
     CLASSICAL_COLORS: () => CLASSICAL_COLORS,
     DEFAULT_COLORS: () => DEFAULT_COLORS,
@@ -104,6 +105,39 @@ var GuitarEngine = (() => {
     stringsAtEnd: [392, 534],
     boardAtNut: [413, 527],
     boardAtEnd: [376, 548]
+  };
+  var ACOUSTIC_SUNBURST = {
+    width: 2e3,
+    height: 714,
+    fit: "frame",
+    frets: [
+      90,
+      220,
+      332,
+      439,
+      539,
+      636,
+      725,
+      808,
+      885,
+      960,
+      1028,
+      1093,
+      1157,
+      1214,
+      1270,
+      1321,
+      1368,
+      1416,
+      1458,
+      1498,
+      1538
+    ],
+    boardEndX: 1590,
+    stringsAtNut: [434.8, 547.9],
+    stringsAtEnd: [414.1, 565.1],
+    boardAtNut: [428, 558.6],
+    boardAtEnd: [398.3, 578.5]
   };
   var CLASSICAL_BOARD = {
     width: 2880,
@@ -244,6 +278,7 @@ var GuitarEngine = (() => {
   };
   var PHOTOS = {
     "acoustic-cutaway": ACOUSTIC_CUTAWAY,
+    "acoustic-sunburst": ACOUSTIC_SUNBURST,
     "fretboard-classical": CLASSICAL_BOARD,
     "fretboard-acoustic": ACOUSTIC_BOARD,
     "fretboard-electric": ELECTRIC_BOARD,
@@ -357,10 +392,15 @@ var GuitarEngine = (() => {
   function stageHeightFor(width, photo, options) {
     if (!(width > 0) || !(photo.width > 0) || !(photo.height > 0)) return 0;
     const scaled = photo.height * (width / photo.width);
-    if (photo.fit === "frame") return Math.round(scaled);
     const numbers = options?.fretNumbers === false ? 0 : NUMBERS_SHARE;
     const hand = options?.handLegend === true ? HAND_BAND_SHARE : 0;
     const share = Math.max(0.2, 1 - numbers - hand);
+    if (photo.fit === "frame") {
+      const at = photoStringMiddle(photo) / photo.height;
+      const band = hand + share / 2;
+      const cover = Math.min(at / band, (1 - at) / (1 - band));
+      return Math.round(scaled * Math.max(0.05, cover));
+    }
     return Math.round(scaled / share);
   }
   function photoPlacement(options) {

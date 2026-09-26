@@ -19,11 +19,37 @@ with one of a different size means changing those two numbers.
 Trimmed to the ink, transparent background, drawn with the thumb to
 the left and the fingers up.
 
+## The photograph
+
+`acoustic-sunburst.webp` — a sunburst cutaway dreadnought, neck
+running in from the left and the body filling the right, on a
+transparent background. This is what the page draws for **Acoustic
+Guitar**, and it is a real photograph.
+
+It is the best-looking thing here by a distance, and it is worth
+being plain about why: no renderer written by hand is going to beat a
+photograph of a real instrument. The renders below are what to use
+when there is no photograph.
+
+It was measured off the file — the fret wires as the bright lines
+across the dark board, the strings as the bright lines along it, both
+fitted across the whole run. The board edges came out to within about
+a pixel and the strings to within two, where a string gap is
+twenty-three. The numbers live in `guitar-engine/src/photo.ts` as
+`ACOUSTIC_SUNBURST`.
+
+**A photograph for one of the other three goes in the same way.** It
+wants to be shot along the neck, nut at the left, body at the right,
+background removed, and at least 2000px wide. Measuring it is an hour
+with the same script that measured this one.
+
 ## The guitar renders
 
 `fretboard-classical.webp`, `fretboard-acoustic.webp`,
 `fretboard-electric.webp`, `fretboard-extended.webp` — one studio
-render per guitar, and what the video frame actually draws. Each is a
+render per guitar. Three of them are what the video frame draws; the
+acoustic's is kept for reference, since the photograph above took its
+place. Each is a
 WHOLE guitar in a frame-shaped window: the neck, the joint where the
 body opens out, the cutaway, and the top with its soundhole or its
 pickups, with the body running off the top and the bottom of the

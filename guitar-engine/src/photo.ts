@@ -104,6 +104,36 @@ export const ACOUSTIC_CUTAWAY: PhotoMeasurements = {
   boardAtEnd: [376, 548],
 };
 
+/**
+ * The photograph: a sunburst cutaway dreadnought, neck running in
+ * from the left and the body filling the right.
+ *
+ * A real photograph, and the only thing here that is. The renders
+ * below are good; a photograph of a real instrument is better, and no
+ * renderer written by hand is going to beat one. Measured the hard
+ * way, off the file: the fret wires as the bright lines across the
+ * dark board, the strings as the bright lines along it, both fitted
+ * across the whole run -- the board edges to within about a pixel,
+ * the strings to within two, where a string gap is twenty-three.
+ *
+ * Twenty frets, and the light band at 1590 is where the board ENDS
+ * rather than a twenty-first: the soundhole starts just past it.
+ */
+export const ACOUSTIC_SUNBURST: PhotoMeasurements = {
+  width: 2000,
+  height: 714,
+  fit: 'frame',
+  frets: [
+    90.0, 220, 332, 439, 539, 636, 725, 808, 885, 960, 1028, 1093, 1157, 1214, 1270, 1321, 1368,
+    1416, 1458, 1498, 1538,
+  ],
+  boardEndX: 1590.0,
+  stringsAtNut: [434.8, 547.9],
+  stringsAtEnd: [414.1, 565.1],
+  boardAtNut: [428.0, 558.6],
+  boardAtEnd: [398.3, 578.5],
+};
+
 /** A classical: a wide, flat rosewood board with nothing set into it, and nylon strings. Nineteen frets. */
 export const CLASSICAL_BOARD: PhotoMeasurements = {
   width: 2880,
@@ -179,6 +209,7 @@ export const EXTENDED_BOARD: PhotoMeasurements = {
  */
 export const PHOTOS: Readonly<Record<string, PhotoMeasurements>> = {
   'acoustic-cutaway': ACOUSTIC_CUTAWAY,
+  'acoustic-sunburst': ACOUSTIC_SUNBURST,
   'fretboard-classical': CLASSICAL_BOARD,
   'fretboard-acoustic': ACOUSTIC_BOARD,
   'fretboard-electric': ELECTRIC_BOARD,
