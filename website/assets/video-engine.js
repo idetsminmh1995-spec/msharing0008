@@ -31,17 +31,22 @@
  *
  *   VideoEngine.render({
  *     width, height, fps,
- *     segments: [ { seconds, draw, audio, realtime } ],
+ *     segments: [ { seconds, draw, audio, onStart, onEnd } ],
  *     onProgress, shouldStop,
  *   })  ->  { blob, extension, frames, fps, seconds, path }
  *
  * A SEGMENT is a stretch of the finished video. `draw(ctx, at, index)`
  * paints one frame of it, `at` measured from that segment's own start,
  * and may be async. `audio` is an AudioBuffer for the same stretch, or
- * null for silence. `realtime: true` says the segment cannot be drawn
- * faster than it plays -- a <video> element being read frame by frame
- * is the case that needs it -- and the engine paces those draws to the
- * wall clock while still stamping them exactly.
+ * null for silence.
+ *
+ * Nothing here waits on a clock. A segment that reads a source with a
+ * speed of its own -- a <video> element -- asks that source for the
+ * frame at `at` and waits inside its own `draw`. Pacing the render to
+ * the wall clock instead, and copying whatever the source happened to
+ * be showing, is how a clip ends up juddering: the encoder's
+ * backpressure holds the loop past the moment a frame was due, the
+ * same picture is copied twice, and the next one is never asked for.
  *
  * Segments are what let the body of a video and the Thank You clip at
  * the end of it be one file without either page knowing how a WebM is
@@ -456,21 +461,19 @@
       if (stopped) break;
       if (segment.onStart) await segment.onStart();
       const count = Math.max(0, Math.round(segment.seconds * fps));
-      const startedAt = performance.now();
       for (let i = 0; i < count; i++) {
         if (shouldStop && shouldStop()) {
           stopped = true;
           break;
         }
         const at = i / fps;
-        // A real-time segment is reading something that plays at its
-        // own speed -- a <video> -- so its frames cannot be fetched
-        // early. The TIMESTAMP is still exact; only the waiting is real.
-        if (segment.realtime) {
-          const due = startedAt + at * 1000;
-          const wait = due - performance.now();
-          if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-        }
+        // Every segment is drawn as fast as the machine manages, and
+        // nothing waits on a clock. A segment reading a <video> used
+        // to be paced in real time and photographed as it played,
+        // which meant the encoder's own backpressure could make it
+        // copy one frame twice and miss the next. A source that has
+        // to be waited for waits inside its own `draw` -- for the
+        // frame it was actually asked for.
         await segment.draw(ctx, at, i);
         const frame = new window.VideoFrame(canvas, {
           timestamp: Math.round(frameIndex * frameDuration),

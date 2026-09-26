@@ -1478,10 +1478,11 @@
       genLabel.textContent = 'Mixing the count…';
       const countAudio = await renderCountAudio(total);
 
-      // Three stretches of one video. The first two are drawn as fast
-      // as the machine manages, because a design frame is a pure
-      // function of time; the Thank You clip cannot be, so it is the
-      // one marked `realtime` and the engine paces it.
+      // Three stretches of one video: a still second, the count for
+      // the whole of the file, and the Thank You clip. None of them
+      // is paced by a clock -- a design frame is a pure function of
+      // time, and the clip is read a frame at a time by seeking to
+      // each one.
       const segments = [
         {
           seconds: HOLD_SECONDS,
@@ -1495,22 +1496,11 @@
       ];
       if (outro && outro.seconds > 0) {
         const outroAudio = await outro.audio(new OfflineAudioContext(2, 1, 48000));
-        segments.push({
-          seconds: outro.seconds,
-          realtime: true,
-          audio: outroAudio,
-          onStart: async () => {
-            outro.video.muted = true;
-            outro.video.currentTime = 0;
-            try {
-              await outro.video.play();
-            } catch (err) {
-              /* a clip that will not play leaves its seconds as the last frame */
-            }
-          },
-          onEnd: async () => outro.video.pause(),
-          draw: (ctx) => OutroVideo.drawCover(ctx, ctx.canvas, outro.video),
-        });
+        // The clip is never played: the segment seeks to the frame it
+        // wants and draws that one. Played and photographed, it
+        // juddered under the encoder's own backpressure and could come
+        // out as sound over a frozen picture.
+        segments.push(OutroVideo.outroSegment(outro, outroAudio, CAPTURE_FPS));
       }
 
       const result = await VideoEngine.render({

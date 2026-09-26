@@ -138,14 +138,161 @@
   function drawCover(ctx2d, canvas, source) {
     const w = source.videoWidth || source.naturalWidth || 0;
     const h = source.videoHeight || source.naturalHeight || 0;
+    if (!(w > 0) || !(h > 0)) return false;
+    // A <video> with no current data draws NOTHING, and a frame
+    // blacked out first and not drawn on is a black frame in the
+    // finished video. Rather than that, leave what is already on the
+    // canvas: the take's last frame held for a moment reads as a
+    // pause, where black reads as a fault.
+    if (source.readyState !== undefined && source.readyState < 2) return false;
     ctx2d.fillStyle = '#000';
     ctx2d.fillRect(0, 0, canvas.width, canvas.height);
-    if (!(w > 0) || !(h > 0)) return;
     const scale = Math.max(canvas.width / w, canvas.height / h);
     const dw = w * scale;
     const dh = h * scale;
     ctx2d.drawImage(source, (canvas.width - dw) / 2, (canvas.height - dh) / 2, dw, dh);
+    return true;
   }
 
-  window.OutroVideo = { outroKeys, sharedUrl, loadOutro, outroSource, drawCover };
+  // -----------------------------------------------------------------
+  // Reading the clip a FRAME AT A TIME.
+  //
+  // The clip used to be played and photographed: the renderer waited
+  // out each frame's worth of wall-clock time and copied whatever the
+  // <video> happened to be showing. Two things go wrong with that,
+  // and both of them were being seen.
+  //
+  // It JUDDERS: the encoder's own backpressure can hold the loop past
+  // the moment a frame was due, so the same picture is copied twice
+  // and the next one is missed. Nothing in the video says which frame
+  // was wanted, so nothing can put it right.
+  //
+  // And it can come out as SOUND ONLY: the audio is decoded from the
+  // file and mixed exactly, but the picture depends on `play()`
+  // succeeding and on the element having data at the instant it is
+  // read. A clip whose audio track outlasts its video track plays
+  // past its last frame the same way. Either leaves the ending heard
+  // but not seen.
+  //
+  // So the clip is never played. Each frame is SEEKED to and drawn:
+  // the element is asked for the frame at 0, 1/30, 2/30... and waited
+  // for. It is exact, it cannot drift, and it does not care how busy
+  // the encoder is.
+  // -----------------------------------------------------------------
+
+  /** A seek that cannot hang a render: after this, the last good frame stands. */
+  const SEEK_TIMEOUT_MS = 2000;
+  /** How long to wait for the seeked frame to actually be presented. */
+  const PRESENT_TIMEOUT_MS = 80;
+  /** The rate a caller that does not say is assumed to be rendering at. */
+  const DEFAULT_FPS = 30;
+
+  function seekTo(video, seconds) {
+    if (video.readyState >= 2 && Math.abs(video.currentTime - seconds) < 1e-3) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        video.removeEventListener('seeked', finish);
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(finish, SEEK_TIMEOUT_MS);
+      video.addEventListener('seeked', finish);
+      try {
+        video.currentTime = seconds;
+      } catch (err) {
+        finish();
+      }
+    });
+  }
+
+  /**
+   * Waits for the frame to be on screen, not merely decoded.
+   *
+   * `seeked` says the data is there; `requestVideoFrameCallback` says
+   * the picture has actually been put up, which is the one drawImage
+   * will copy. Capped, because a browser without it -- or a frame
+   * identical to the one already showing -- must not stall the render.
+   */
+  function presented(video) {
+    if (typeof video.requestVideoFrameCallback !== 'function') return Promise.resolve();
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(finish, PRESENT_TIMEOUT_MS);
+      video.requestVideoFrameCallback(finish);
+    });
+  }
+
+  /**
+   * The clip's frame at a moment, ready to draw.
+   *
+   * Held just inside the end: a clip whose audio runs a beat longer
+   * than its pictures is asked for a frame it does not have, and the
+   * honest answer is its last one rather than black.
+   */
+  async function frameAt(video, seconds) {
+    const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+    const last = duration > 0 ? Math.max(0, duration - 0.001) : seconds;
+    await seekTo(video, Math.max(0, Math.min(seconds, last)));
+    await presented(video);
+  }
+
+  /**
+   * The clip as a segment of a render: its own length, its own sound,
+   * and one seeked frame per frame of video.
+   *
+   * Built here rather than on each page, so all four pages end the
+   * same way and there is one place this has to be right.
+   */
+  function outroSegment(outro, audio, fps) {
+    const rate = Number.isFinite(fps) && fps > 0 ? fps : DEFAULT_FPS;
+    // Each frame is asked for in the MIDDLE of its own slice of time,
+    // not on the edge of it. A clip's frames begin where its container
+    // says they begin -- rounded to the millisecond in a WebM, to a
+    // timescale tick in an MP4 -- and a frame boundary asked for
+    // exactly lands on either side of itself: one frame comes out
+    // twice and the next never comes out at all. That is what the
+    // judder was. Half a frame in, nothing rounds far enough to
+    // matter.
+    const middle = 0.5 / rate;
+    return {
+      seconds: outro.seconds,
+      ...(audio ? { audio } : {}),
+      onStart: async () => {
+        // Never played: muted, paused, and parked on its first frame,
+        // so the very first frame of the ending is the right one.
+        outro.video.muted = true;
+        try {
+          outro.video.pause();
+        } catch (err) {
+          /* an element that will not pause was not playing */
+        }
+        await frameAt(outro.video, middle);
+      },
+      draw: async (ctx, at) => {
+        await frameAt(outro.video, at + middle);
+        drawCover(ctx, ctx.canvas, outro.video);
+      },
+    };
+  }
+
+  window.OutroVideo = {
+    outroKeys,
+    sharedUrl,
+    loadOutro,
+    outroSource,
+    drawCover,
+    frameAt,
+    outroSegment,
+  };
 })();

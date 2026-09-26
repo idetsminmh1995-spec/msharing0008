@@ -3051,22 +3051,11 @@
       });
       if (outro && outro.seconds > 0) {
         const outroAudio = await outro.audio(new OfflineAudioContext(2, 1, 48000));
-        segments.push({
-          seconds: outro.seconds,
-          realtime: true,
-          audio: outroAudio,
-          onStart: async () => {
-            outro.video.muted = true;
-            outro.video.currentTime = 0;
-            try {
-              await outro.video.play();
-            } catch (err) {
-              /* a clip that will not play leaves its seconds as the last frame */
-            }
-          },
-          onEnd: async () => outro.video.pause(),
-          draw: (ctx) => OutroVideo.drawCover(ctx, ctx.canvas, outro.video),
-        });
+        // The clip is never played: the segment seeks to the frame it
+        // wants and draws that one. Played and photographed, it
+        // juddered under the encoder's own backpressure and could come
+        // out as sound over a frozen picture.
+        segments.push(OutroVideo.outroSegment(outro, outroAudio, CAPTURE_FPS));
       }
 
       const result = await VideoEngine.render({
