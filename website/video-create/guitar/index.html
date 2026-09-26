@@ -560,7 +560,11 @@
            image it already has, and a frame is rendered the instant
            the button is pressed. It is never shown here -- the stage's
            own SVG draws it, from the same file. -->
-      <img data-guitar-photo="acoustic-cutaway" src="../../assets/guitar/acoustic-cutaway.webp"
+      <img data-stage-image data-guitar-photo="acoustic-cutaway"
+           src="../../assets/guitar/acoustic-cutaway.webp" alt="" style="display:none" decoding="async">
+      <!-- The hand in the corner of the frame: the page's own drawing,
+           not the one the engine used to assemble out of rectangles. -->
+      <img data-stage-image id="handPicture" src="../../assets/guitar/hand-fingers.webp"
            alt="" style="display:none" decoding="async">
     </div>
 
@@ -1041,6 +1045,22 @@
       img,
     ]),
   );
+  /** Every picture the stage can draw: the guitars, and the hand. */
+  const stageImages = [...document.querySelectorAll('img[data-stage-image]')];
+  const handImageEl = document.getElementById('handPicture');
+
+  /**
+   * The drawing of the hand for the legend in the corner.
+   *
+   * The engine still decides where it goes and how big -- that has to
+   * agree with the neck beside it -- and draws its own rectangle hand
+   * if this is missing, so a lost file costs the artwork rather than
+   * the legend.
+   */
+  function handImage() {
+    if (!handImageEl || typeof GuitarEngine === 'undefined') return undefined;
+    return GuitarEngine.handPicture(handImageEl.getAttribute('src'));
+  }
 
   /**
    * The photograph to draw the picked guitar with, if there is one.
@@ -1059,16 +1079,24 @@
     return GuitarEngine.guitarPhoto(img.getAttribute('src'));
   }
 
-  /** The picture, once the browser has it. A frame drawn before that has no guitar in it. */
+  /**
+   * Every picture the frame draws, once the browser has it.
+   *
+   * A canvas cannot fetch: whatever has not arrived by the time a
+   * frame is painted is simply missing from it, and the video is
+   * rendered the instant the button is pressed.
+   */
   async function photoReady() {
-    const img = guitarPhotos.get(guitar().photo);
-    if (!img) return;
-    try {
-      await img.decode();
-    } catch (err) {
-      // A picture that will not load is not a reason to lose the
-      // video: the rest of the frame is still worth drawing.
-    }
+    await Promise.all(
+      stageImages.map(async (img) => {
+        try {
+          await img.decode();
+        } catch (err) {
+          // A picture that will not load is not a reason to lose the
+          // video: the rest of the frame is still worth drawing.
+        }
+      }),
+    );
   }
 
   /**
@@ -1291,6 +1319,7 @@
       // frets it shows are the frets there are, so the fret count
       // above stops applying -- there is no arguing with a picture.
       photo: guitarPhoto(),
+      handImage: handImage(),
       picking: picking(),
       fretNumbers: true,
       // The guitar fills the frame the way a photographed one does:
@@ -1346,7 +1375,14 @@
   function drawFingerLegend() {
     if (typeof GuitarEngine === 'undefined') return;
     const colors = GuitarEngine.FINGER_COLORS;
-    if (fingerHand) fingerHand.innerHTML = GuitarEngine.renderHand({ width: 120, height: 150 });
+    // The same drawing the video frame carries, so the card is
+    // teaching exactly what the video will show.
+    if (fingerHand) {
+      const src = handImageEl?.getAttribute('src');
+      fingerHand.innerHTML = src
+        ? `<img src="${src}" alt="" style="height:150px;width:auto;display:block;margin:0 auto">`
+        : GuitarEngine.renderHand({ width: 120, height: 150 });
+    }
     if (fingerNames) {
       const names = GuitarEngine.FINGER_NAMES;
       const key = { 1: 'index', 2: 'middle', 3: 'ring', 4: 'little' };
@@ -2628,7 +2664,7 @@
    */
   function imageFor(href) {
     if (!href) return undefined;
-    for (const img of guitarPhotos.values()) {
+    for (const img of stageImages) {
       if (img.getAttribute('src') !== href) continue;
       return img.complete && img.naturalWidth > 0 ? img : undefined;
     }

@@ -12,18 +12,24 @@ import type { Finger, GuitarColors, Instrument } from './types.js';
 
 /**
  * The finger colours are the ones on the hand: index red, middle
- * blue, ring green, little yellow.
+ * blue, ring green, little pink.
  *
  * They are FIXED rather than pickable, because their whole job is to
  * be learnt once -- a viewer who has seen the hand knows what red
  * means for the rest of the video, and for the next video too. Four
  * colours anyone can re-pick is four colours nobody can learn.
+ *
+ * These four are read off the page's own drawing of the hand, to the
+ * hex. The legend is what teaches the code, so a mark that is a
+ * shade off the fingertip it is naming is a mark that has to be
+ * worked out rather than recognised -- and the little finger was
+ * YELLOW here until that drawing arrived with a pink one.
  */
 export const FINGER_COLORS = {
-  index: '#E8352B',
-  middle: '#2B5BE8',
-  ring: '#1FA04A',
-  little: '#F2C200',
+  index: '#FF725F',
+  middle: '#6EB2FF',
+  ring: '#3FE489',
+  little: '#FF7DE4',
 } as const;
 
 /**

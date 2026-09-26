@@ -210,6 +210,19 @@ export interface FretboardOptions {
   /** Draw the four-colour hand in a band above the neck, as the video's own legend. */
   readonly handLegend?: boolean;
   /**
+   * A drawing of the hand to use in place of the engine's own.
+   *
+   * The built-in hand is rectangles, because rectangles are what both
+   * renderers can paint. A real drawing is better than a good
+   * rectangle arrangement, so when there is a file it wins -- and the
+   * engine still decides WHERE it goes and how big, because that is
+   * the part that has to agree with the neck beside it.
+   *
+   * `width` and `height` are the file's own, so its shape survives
+   * being fitted into the band.
+   */
+  readonly handImage?: HandPicture;
+  /**
    * What the RIGHT hand is playing with.
    *
    * A plectrum strikes the strings together and is written as one
@@ -258,6 +271,13 @@ export interface FretboardOptions {
  * electric twenty-four, and the caller says which with `lastFret`.
  */
 export type Instrument = 'classical' | 'acoustic' | 'electric' | 'singleCut';
+
+/** A drawing of the hand, and the size it was drawn at. */
+export interface HandPicture {
+  readonly href: string;
+  readonly width: number;
+  readonly height: number;
+}
 
 /** A plectrum, or the fingers. */
 export type Picking = 'pick' | 'fingers';
@@ -311,6 +331,7 @@ export interface StageShape {
    */
   readonly role?:
     | 'photo'
+    | 'handLegend'
     | 'fretNumber'
     | 'stringLabel'
     | 'stringName'

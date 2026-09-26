@@ -52,11 +52,12 @@ export {
 } from './stage.js';
 export { ACOUSTIC_CUTAWAY, guitarPhoto, photoFretCount } from './photo.js';
 export type { GuitarPhotograph, PhotoMeasurements } from './photo.js';
-export { handShapes, renderHand } from './hand.js';
+export { HAND_PICTURE, handPicture, handShapes, renderHand } from './hand.js';
 export type { HandOptions } from './hand.js';
 export type { PhotoPlacement } from './fretboard.js';
 export type {
   Finger,
+  HandPicture,
   Picking,
   FretWire,
   FretboardOptions,

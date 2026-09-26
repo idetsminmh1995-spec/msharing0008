@@ -57,6 +57,9 @@ export {
   resolveColors,
 } from './colors.js';
 
+/** The widest a drawing of the hand may be, as a share of the frame. */
+const HAND_IMAGE_WIDEST = 0.18;
+
 /** How big a played mark is, as a fraction of the gap between two strings. */
 const MARK_SIZE = 1.5;
 
@@ -250,6 +253,30 @@ function handLegendShapes(options: FretboardOptions): readonly StageShape[] {
       : band.y + band.height;
   const height = Math.max(band.height, floor - band.y) * 0.94;
   const width = height * 0.78;
+  // A drawing of the hand, when the caller has one, in the same place
+  // and at the same size the built-in hand would have taken. Its own
+  // shape is kept -- a hand squashed to fit a box stops looking like
+  // a hand -- and it is never allowed to grow across the frame.
+  const picture = options.handImage;
+  if (picture !== undefined && picture.width > 0 && picture.height > 0) {
+    const scale = Math.min(
+      height / picture.height,
+      (options.width * HAND_IMAGE_WIDEST) / picture.width,
+    );
+    const drawn = { width: picture.width * scale, height: picture.height * scale };
+    return [
+      {
+        kind: 'image',
+        x: band.x + band.width * 0.012,
+        y: band.y + (Math.max(band.height, floor - band.y) - drawn.height) / 2,
+        width: drawn.width,
+        height: drawn.height,
+        fill: 'none',
+        href: picture.href,
+        role: 'handLegend',
+      },
+    ];
+  }
   return translateShapes(
     handShapes({ width, height, handColor: '#F6EDE6', outline: 'rgba(0,0,0,0.35)' }),
     band.x + band.width * 0.012,

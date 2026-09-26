@@ -1,4 +1,25 @@
-# The photographed guitar
+# The pictures the Guitar video frame draws
+
+## The hand
+
+`hand-fingers.webp` — the four-colour hand in the corner of the frame,
+and the same drawing in the card beside the controls. It is the
+LEGEND: a viewer who has seen it knows what each colour means for the
+rest of the video.
+
+Its fingertip colours are the engine's finger colours, to the hex
+(`FINGER_COLORS` in `guitar-engine/src/colors.ts`) — index `#FF725F`,
+middle `#6EB2FF`, ring `#3FE489`, little `#FF7DE4`. **Changing a
+fingertip in this file means changing that constant with it**, or the
+video will name a colour the neck never shows. Its size is recorded as
+`HAND_PICTURE` in `guitar-engine/src/hand.ts`, so the frame can lay it
+out before the browser has finished loading it; replacing the file
+with one of a different size means changing those two numbers.
+
+Trimmed to the ink, transparent background, drawn with the thumb to
+the left and the fingers up.
+
+## The photographed guitar
 
 `acoustic-cutaway.webp` — a cutaway dreadnought, neck running in from
 the left edge and the body leaving by the right. It is what the Guitar

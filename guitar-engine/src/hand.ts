@@ -13,7 +13,22 @@
  */
 import { resolveColors } from './colors.js';
 import { GradientBank, n, tag, wrap } from './svg.js';
-import type { GuitarColors, StageShape } from './types.js';
+import type { GuitarColors, HandPicture, StageShape } from './types.js';
+
+/**
+ * The drawn hand that came with the page's own artwork.
+ *
+ * Its size is the file's, kept here for the same reason the
+ * photograph's fret wires are: the engine has to lay the picture out
+ * before the browser has finished loading it, and a hand that jumps
+ * size when the file arrives is worse than one drawn a frame late.
+ */
+export const HAND_PICTURE: Omit<HandPicture, 'href'> = { width: 839, height: 915 };
+
+/** That drawing, at the path the caller keeps it. */
+export function handPicture(href: string): HandPicture {
+  return { ...HAND_PICTURE, href };
+}
 
 /** Finger lengths, as fractions of the longest -- a real hand, roughly. */
 const FINGER_LENGTH: Readonly<Record<1 | 2 | 3 | 4, number>> = {

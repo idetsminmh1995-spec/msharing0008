@@ -216,6 +216,35 @@ test('fingers are written a letter at a time, on the string each one takes', () 
   assert.ok(late[late.length - 1].opacity < letters[0].opacity);
 });
 
+test('the hand legend is the page\u2019s own drawing when there is one', () => {
+  const banded = { ...STAGE, handLegend: true };
+  const drawn = G.fretboardShapes(banded);
+  assert.equal(roled(drawn, 'handLegend').length, 0, 'rectangles, with no file');
+  const picture = G.handPicture('hand.webp');
+  const shapes = G.fretboardShapes({ ...banded, handImage: picture });
+  const [hand, ...rest] = roled(shapes, 'handLegend');
+  assert.equal(rest.length, 0, 'one picture, not a pile of them');
+  assert.equal(hand.kind, 'image');
+  assert.equal(hand.href, 'hand.webp');
+  // Its own shape survives being fitted into the band: a hand
+  // squashed to fill a box stops looking like a hand.
+  assert.ok(
+    Math.abs(hand.width / hand.height - picture.width / picture.height) < 1e-6,
+    'drawn at the shape it was made at',
+  );
+  // In the band above the neck, at the left, clear of the strings.
+  const band = G.guitarLayout(banded).hand;
+  assert.ok(hand.x >= band.x && hand.x < band.width * 0.1, 'at the left');
+  assert.ok(hand.width < STAGE.width * 0.19, 'never across the frame');
+  // And the rectangle hand is gone: two hands is one too many.
+  assert.ok(
+    shapes.filter((shape) => shape.fill === G.FINGER_COLORS.index).length === 0,
+    'the drawn one stands down',
+  );
+  // No band, no legend, picture or not.
+  assert.equal(roled(G.fretboardShapes({ ...STAGE, handImage: picture }), 'handLegend').length, 0);
+});
+
 test('a classical guitar has nothing in its board', () => {
   const classical = G.fretboardShapes({ ...STAGE, instrument: 'classical' });
   assert.equal(roled(classical, 'inlay').length, 0, 'not a marker in the wood');

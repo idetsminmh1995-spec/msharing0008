@@ -39,13 +39,18 @@ finger, so it has its own colour rather than borrowing one.
 The four colours are **fixed**, not pickable:
 
 ```
-1 index   red      2 middle  blue
-3 ring    green    4 little  yellow
+1 index   #FF725F red     2 middle  #6EB2FF blue
+3 ring    #3FE489 green   4 little  #FF7DE4 pink
 ```
 
 Their whole job is to be learnt once. A viewer who has seen the hand
 knows what red means for the rest of the video, and for the next video
 too; four colours anyone can re-pick is four colours nobody can learn.
+
+They are read off the page's own drawing of the hand, to the hex: the
+legend is what teaches the code, so a mark a shade off the fingertip
+it is naming is a mark that has to be worked out rather than
+recognised.
 
 `undefined` is a fifth case and a real one: nobody has decided yet.
 It is drawn in `colors.unassigned`, never in a finger's colour, so a
@@ -59,6 +64,20 @@ Engine's question, and this engine draws whatever it is told.
 the fretting hand seen from the back, fingers up. A legend of four
 coloured squares is a legend of four coloured squares; a hand says it
 without words.
+
+It is rectangles, because rectangles are what both renderers can
+paint — so when the caller has a real drawing, `handImage` takes its
+place in the band above the neck:
+
+```js
+{ handLegend: true, handImage: handPicture('assets/guitar/hand-fingers.webp') }
+```
+
+The engine still decides where it goes and how big, because that is
+the part that has to agree with the neck beside it; the file keeps its
+own shape and is never allowed to grow across the frame. With no
+file, the rectangles are still there, so a lost asset costs the
+artwork rather than the legend.
 
 ## Slides
 

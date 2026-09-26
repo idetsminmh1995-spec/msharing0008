@@ -30,6 +30,7 @@ var GuitarEngine = (() => {
     DEFAULT_STRINGS: () => DEFAULT_STRINGS,
     FINGER_COLORS: () => FINGER_COLORS,
     FINGER_NAMES: () => FINGER_NAMES,
+    HAND_PICTURE: () => HAND_PICTURE,
     SINGLE_CUT_COLORS: () => SINGLE_CUT_COLORS,
     STANDARD_TUNING: () => STANDARD_TUNING,
     boardEdgesAt: () => boardEdgesAt,
@@ -42,6 +43,7 @@ var GuitarEngine = (() => {
     fretboardShapes: () => fretboardShapes,
     guitarLayout: () => guitarLayout,
     guitarPhoto: () => guitarPhoto,
+    handPicture: () => handPicture,
     handShapes: () => handShapes,
     inlayFrets: () => inlayFrets,
     instrumentColors: () => instrumentColors,
@@ -917,10 +919,10 @@ var GuitarEngine = (() => {
 
   // src/colors.ts
   var FINGER_COLORS = {
-    index: "#E8352B",
-    middle: "#2B5BE8",
-    ring: "#1FA04A",
-    little: "#F2C200"
+    index: "#FF725F",
+    middle: "#6EB2FF",
+    ring: "#3FE489",
+    little: "#FF7DE4"
   };
   var DEFAULT_COLORS = {
     board: "#D9AE6B",
@@ -1066,6 +1068,10 @@ var GuitarEngine = (() => {
   }
 
   // src/hand.ts
+  var HAND_PICTURE = { width: 839, height: 915 };
+  function handPicture(href) {
+    return { ...HAND_PICTURE, href };
+  }
   var FINGER_LENGTH = {
     1: 0.88,
     2: 1,
@@ -1175,6 +1181,7 @@ var GuitarEngine = (() => {
   }
 
   // src/stage.ts
+  var HAND_IMAGE_WIDEST = 0.18;
   var MARK_SIZE = 1.5;
   function stringGap(options) {
     const lines = stringLines(options);
@@ -1299,6 +1306,26 @@ var GuitarEngine = (() => {
     const floor = photoPlacement(options) !== void 0 ? boardEdges(options, fretCenter(1, options)).top : band.y + band.height;
     const height = Math.max(band.height, floor - band.y) * 0.94;
     const width = height * 0.78;
+    const picture = options.handImage;
+    if (picture !== void 0 && picture.width > 0 && picture.height > 0) {
+      const scale = Math.min(
+        height / picture.height,
+        options.width * HAND_IMAGE_WIDEST / picture.width
+      );
+      const drawn = { width: picture.width * scale, height: picture.height * scale };
+      return [
+        {
+          kind: "image",
+          x: band.x + band.width * 0.012,
+          y: band.y + (Math.max(band.height, floor - band.y) - drawn.height) / 2,
+          width: drawn.width,
+          height: drawn.height,
+          fill: "none",
+          href: picture.href,
+          role: "handLegend"
+        }
+      ];
+    }
     return translateShapes(
       handShapes({ width, height, handColor: "#F6EDE6", outline: "rgba(0,0,0,0.35)" }),
       band.x + band.width * 0.012,
