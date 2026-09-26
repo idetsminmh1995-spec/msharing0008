@@ -19,11 +19,17 @@ with one of a different size means changing those two numbers.
 Trimmed to the ink, transparent background, drawn with the thumb to
 the left and the fingers up.
 
-## The fretboard renders
+## The guitar renders
 
 `fretboard-classical.webp`, `fretboard-acoustic.webp`,
 `fretboard-electric.webp`, `fretboard-extended.webp` — one studio
-render per guitar, and what the video frame actually draws.
+render per guitar, and what the video frame actually draws. Each is a
+WHOLE guitar in a frame-shaped window: the neck, the joint where the
+body opens out, the cutaway, and the top with its soundhole or its
+pickups, with the body running off the top and the bottom of the
+window because a guitar's body is wider than any frame. (A bare
+fretboard strip is `--view board`, which is what these were at first
+and which does not read as a guitar.)
 
 The photoreal plugins do not draw their instruments at runtime: they
 model one, light it, render it once at high resolution, and blit the
@@ -34,6 +40,12 @@ picture. These are that step, and the model is in the repository —
 python3 tools/render_fretboard.py --model acoustic --width 2880 \
     --out /tmp/fretboard-acoustic.png
 ```
+
+`--view guitar` (the default) frames the whole instrument;
+`--aspect` is the window's shape and `--strings-at` is where down it
+the strings sit — 0.53, which is where the engine's board band has
+its middle, so the picture lines up with the marks drawn over it
+without anything having to be nudged.
 
 It builds each board from the real measurements of the instrument —
 the 17.817 rule for the frets, the nut width, the string gauges — so

@@ -45,6 +45,21 @@ export interface GuitarPhotograph {
   /** The board's own edges -- the wood outside the strings -- at those same two places. */
   readonly boardAtNut: readonly [number, number];
   readonly boardAtEnd: readonly [number, number];
+  /**
+   * What the picture IS, and so what box it wants.
+   *
+   * `board` is a strip of fretboard and nothing else: it belongs in
+   * the board's own band, with the hand legend above it and the fret
+   * numbers below.
+   *
+   * `frame` is a whole guitar, framed -- neck, the body opening out
+   * past the joint, and the body running off the top and the bottom
+   * because a body is wider than any frame. It IS the frame, so it
+   * fills it, and the legend and the numbers are drawn over it. Such a
+   * picture is made with its strings already where the board's band
+   * has its middle, so the two line up without anything being moved.
+   */
+  readonly fit?: 'board' | 'frame';
 }
 
 /** A photograph's measurements without the path to it. */
@@ -92,61 +107,65 @@ export const ACOUSTIC_CUTAWAY: PhotoMeasurements = {
 /** A classical: a wide, flat rosewood board with nothing set into it, and nylon strings. Nineteen frets. */
 export const CLASSICAL_BOARD: PhotoMeasurements = {
   width: 2880,
-  height: 488,
+  height: 824,
+  fit: 'frame',
   frets: [
-    85.2, 307.3, 516.9, 714.8, 901.5, 1077.8, 1244.2, 1401.2, 1549.5, 1689.4, 1821.4, 1946.1,
-    2063.7, 2174.8, 2279.6, 2378.5, 2471.9, 2560.0, 2643.2, 2721.7,
+    71.8, 259.1, 435.8, 602.5, 760.0, 908.6, 1048.8, 1181.2, 1306.1, 1424.1, 1535.4, 1640.4, 1739.6,
+    1833.2, 1921.6, 2005.0, 2083.7, 2158.0, 2228.1, 2294.3,
   ],
   boardEndX: 2880.0,
-  stringsAtNut: [113.1, 374.9],
-  stringsAtEnd: [60.4, 427.6],
-  boardAtNut: [85.7, 402.3],
-  boardAtEnd: [42.7, 445.3],
+  stringsAtNut: [326.4, 547.0],
+  stringsAtEnd: [270.2, 603.2],
+  boardAtNut: [303.3, 570.1],
+  boardAtEnd: [260.1, 613.3],
 };
 
 /** A steel-string acoustic: rosewood, pearl dots, three wound strings. Twenty frets. */
 export const ACOUSTIC_BOARD: PhotoMeasurements = {
   width: 2880,
-  height: 418,
+  height: 824,
+  fit: 'frame',
   frets: [
-    83.3, 299.8, 504.1, 696.9, 879.0, 1050.8, 1212.9, 1366.0, 1510.5, 1646.8, 1775.5, 1897.0,
-    2011.7, 2119.9, 2222.1, 2318.5, 2409.5, 2495.4, 2576.5, 2653.0, 2725.3,
+    68.6, 246.8, 414.9, 573.7, 723.5, 864.9, 998.4, 1124.3, 1243.3, 1355.5, 1461.4, 1561.4, 1655.8,
+    1744.9, 1829.0, 1908.3, 1983.3, 2054.0, 2120.7, 2183.7, 2243.1,
   ],
   boardEndX: 2880.0,
-  stringsAtNut: [101.9, 316.1],
-  stringsAtEnd: [65.2, 352.8],
-  boardAtNut: [81.0, 337.0],
-  boardAtEnd: [42.2, 375.8],
+  stringsAtNut: [348.5, 524.9],
+  stringsAtEnd: [309.5, 563.9],
+  boardAtNut: [331.4, 542.0],
+  boardAtEnd: [292.3, 581.1],
 };
 
 /** An electric: a dark bound board with pearl blocks in it, and the shorter scale that goes with it. Twenty-two frets. */
 export const ELECTRIC_BOARD: PhotoMeasurements = {
   width: 2880,
-  height: 408,
+  height: 824,
+  fit: 'frame',
   frets: [
-    82.0, 288.4, 483.2, 667.1, 840.7, 1004.5, 1159.2, 1305.1, 1442.9, 1573.0, 1695.7, 1811.5,
-    1920.9, 2024.1, 2121.5, 2213.5, 2300.2, 2382.2, 2459.5, 2532.5, 2601.3, 2666.4, 2727.7,
+    68.1, 239.7, 401.6, 554.4, 698.6, 834.8, 963.3, 1084.6, 1199.1, 1307.1, 1409.1, 1505.4, 1596.3,
+    1682.1, 1763.0, 1839.4, 1911.5, 1979.6, 2043.9, 2104.5, 2161.8, 2215.8, 2266.8,
   ],
   boardEndX: 2880.0,
-  stringsAtNut: [101.5, 306.5],
-  stringsAtEnd: [63.6, 344.4],
-  boardAtNut: [81.0, 327.0],
-  boardAtEnd: [40.9, 367.1],
+  stringsAtNut: [351.6, 521.9],
+  stringsAtEnd: [311.3, 562.2],
+  boardAtNut: [334.5, 538.9],
+  boardAtEnd: [294.2, 579.2],
 };
 
 /** An extended-range electric: a flatter, wider board with small dots, going all the way to the twenty-fourth fret. */
 export const EXTENDED_BOARD: PhotoMeasurements = {
   width: 2880,
-  height: 408,
+  height: 824,
+  fit: 'frame',
   frets: [
-    76.7, 275.8, 463.7, 641.2, 808.6, 966.7, 1115.8, 1256.6, 1389.5, 1515.0, 1633.4, 1745.2, 1850.6,
-    1950.2, 2044.2, 2132.9, 2216.6, 2295.6, 2370.2, 2440.6, 2507.1, 2569.8, 2629.0, 2684.9, 2737.6,
+    64.4, 231.7, 389.7, 538.7, 679.4, 812.2, 937.6, 1055.9, 1167.6, 1273.0, 1372.5, 1466.4, 1555.0,
+    1638.7, 1717.6, 1792.2, 1862.5, 1928.9, 1991.6, 2050.8, 2106.6, 2159.3, 2209.0, 2256.0, 2300.3,
   ],
   boardEndX: 2880.0,
-  stringsAtNut: [108.2, 299.8],
-  stringsAtEnd: [63.0, 345.0],
-  boardAtNut: [86.3, 321.7],
-  boardAtEnd: [38.7, 369.3],
+  stringsAtNut: [356.2, 517.2],
+  stringsAtEnd: [308.4, 565.0],
+  boardAtNut: [337.8, 535.6],
+  boardAtEnd: [290.0, 583.4],
 };
 
 /**

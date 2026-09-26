@@ -35,6 +35,8 @@ MODELS = {
         binding=(0.92, 0.86, 0.70), binding_mm=0.0,
         inlay='dot', inlay_color=(0.93, 0.92, 0.88),
         wound=3,
+        body='acoustic', joint_fret=14, top=(0.80, 0.63, 0.40),
+        top_edge=(0.34, 0.14, 0.05), hole=100.0, plate=True,
     ),
     'classical': dict(
         scale=650.0, frets=19, nut_width=52.0, width_at_12=62.0,
@@ -43,6 +45,8 @@ MODELS = {
         binding=(0.86, 0.78, 0.60), binding_mm=0.0,
         inlay='none', inlay_color=(0.93, 0.92, 0.88),
         wound=3, nylon=True,
+        body='acoustic', joint_fret=12, top=(0.86, 0.72, 0.48),
+        top_edge=(0.52, 0.34, 0.16), hole=87.0, plate=False,
     ),
     'electric': dict(
         scale=628.0, frets=22, nut_width=42.0, width_at_12=51.0,
@@ -51,6 +55,8 @@ MODELS = {
         binding=(0.95, 0.91, 0.78), binding_mm=1.8,
         inlay='block', inlay_color=(0.95, 0.94, 0.90),
         wound=3,
+        body='solid', joint_fret=16, top=(0.62, 0.30, 0.07),
+        top_edge=(0.10, 0.04, 0.02), pickups=2, hardware=(0.78, 0.78, 0.80),
     ),
     'extended': dict(
         scale=648.0, frets=24, nut_width=43.0, width_at_12=54.0,
@@ -59,6 +65,8 @@ MODELS = {
         binding=(0.9, 0.9, 0.9), binding_mm=0.0,
         inlay='dot', inlay_color=(0.88, 0.89, 0.92),
         wound=3,
+        body='solid', joint_fret=20, top=(0.10, 0.16, 0.34),
+        top_edge=(0.03, 0.05, 0.12), pickups=2, hardware=(0.62, 0.63, 0.66),
     ),
 }
 
@@ -109,6 +117,20 @@ def fbm(shape, freq, rng, octaves=5, gain=0.5):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--model', default='acoustic', choices=sorted(MODELS))
+    ap.add_argument(
+        '--view',
+        default='guitar',
+        choices=('guitar', 'board'),
+        help='the whole instrument in a frame-shaped window, or the board on its own',
+    )
+    ap.add_argument('--aspect', type=float, default=3.4936, help='window width / height')
+    ap.add_argument(
+        '--strings-at',
+        dest='strings_at',
+        type=float,
+        default=0.53,
+        help="where down the window the strings sit: the engine's board band has its middle at 0.53",
+    )
     ap.add_argument('--width', type=int, default=3600)
     ap.add_argument('--out', default=None)
     ap.add_argument('--seed', type=int, default=7)
@@ -118,18 +140,36 @@ def main():
 
     scale = spec['scale']
     last = spec['frets']
-    # The strip: a little wood before the nut, and past the last fret.
+    board_at = lambda x: spec['nut_width'] + (spec['width_at_12'] - spec['nut_width']) * (x / fret_mm(scale, 12))
+    strings_at = lambda x: spec['string_nut'] + (spec['string_at_12'] - spec['string_nut']) * (x / fret_mm(scale, 12))
+    board_end = fret_mm(scale, last) + 8.0
+    joint = fret_mm(scale, spec['joint_fret']) if args.view == 'guitar' else None
+    hole_x = board_end + (spec.get('hole', 50.0) * 0.52)
+
+    # The window. A bare board is a strip; a whole guitar is a WINDOW
+    # on to one, cut to the shape of the frame it will be drawn in, so
+    # that the body runs off the top and the bottom the way it does in
+    # a photograph of a guitar taken along the neck.
     x_from = -14.0
-    x_to = fret_mm(scale, last) + 26.0
+    if args.view == 'guitar':
+        x_to = (hole_x + spec['hole'] * 0.70) if spec['body'] == 'acoustic' else board_end + 118.0
+    else:
+        x_to = fret_mm(scale, last) + 26.0
     span = x_to - x_from
     W = args.width
     ppm = W / span
-    # Tall enough for the widest end of the board and the shadow round it.
-    board_at = lambda x: spec['nut_width'] + (spec['width_at_12'] - spec['nut_width']) * (x / fret_mm(scale, 12))
-    strings_at = lambda x: spec['string_nut'] + (spec['string_at_12'] - spec['string_nut']) * (x / fret_mm(scale, 12))
-    H = int(round((board_at(x_to) + 14.0) * ppm))
-    H += H % 2
-    mid = H / 2.0
+    if args.view == 'guitar':
+        H = int(round(W / args.aspect))
+        H += H % 2
+        # The strings sit where the engine's board band has its middle,
+        # so the picture fills the frame instead of hanging in it: the
+        # hand legend's band above, the fret numbers' strip below.
+        mid = H * args.strings_at
+    else:
+        # Tall enough for the widest end of the board and the shadow round it.
+        H = int(round((board_at(x_to) + 14.0) * ppm))
+        H += H % 2
+        mid = H / 2.0
 
     # Pixel grids, in millimetres from the nut and from the centre line.
     xs_mm = (np.arange(W) + 0.5) / ppm + x_from
@@ -137,8 +177,8 @@ def main():
     X = np.repeat(xs_mm[None, :], H, axis=0)
     Y = np.repeat(ys_mm[:, None], W, axis=1)
 
-    half = board_at(np.clip(X, 0, None)) / 2.0
-    on_board = (np.abs(Y) <= half) & (X >= -1.2)
+    half = board_at(np.clip(X, 0, np.float64(board_end))) / 2.0
+    on_board = (np.abs(Y) <= half) & (X >= -1.2) & (X <= board_end)
 
     # --- the wood -------------------------------------------------
     # Grain runs ALONG the neck, so the noise is stretched that way.
@@ -176,7 +216,12 @@ def main():
             offsets = [-strings_at(cx) * 0.28, strings_at(cx) * 0.28] if n in DOUBLE_INLAY else [0.0]
             for cy in offsets:
                 if spec['inlay'] == 'block':
-                    w2, h2 = 14.0, board_at(cx) * 0.30
+                    # As wide as a third of its own fret and no wider:
+                    # a fixed width fills the narrow frets completely
+                    # and the board turns into a row of white slabs.
+                    gap_mm = fret_mm(scale, n) - fret_mm(scale, n - 1)
+                    w2 = min(9.5, gap_mm * 0.34)
+                    h2 = board_at(cx) * 0.26
                     d = np.maximum(np.abs(X - cx) / w2, np.abs(Y - cy) / h2)
                     m = np.clip((1.02 - d) * 24, 0, 1)
                 else:
@@ -185,7 +230,7 @@ def main():
                     m = np.clip((1.0 - d) * 18, 0, 1)
                 m = m * on_board
                 pearl = np.array(spec['inlay_color'])[None, None, :] * (
-                    0.82 + 0.3 * fbm((H, W), (2.0, 0.6), rng, octaves=3)
+                    0.68 + 0.26 * fbm((H, W), (2.0, 0.6), rng, octaves=3)
                 )[:, :, None]
                 # Pearl catches the light in drifting bands. Driven by
                 # noise, not by a sine: a regular stripe over every dot
@@ -222,17 +267,134 @@ def main():
         colour = np.where(shade[:, :, None], colour * 0.55, colour)
         colour = np.where(m[:, :, None], bar, colour)
 
+    # --- the edges of the board, and what is beyond them -----------
+    edge = np.clip((half - np.abs(Y)) * ppm, 0, 6) / 6.0
+    colour *= (0.72 + 0.28 * edge)[:, :, None]
+    if spec['binding_mm'] > 0:
+        b = (np.abs(Y) <= half) & (np.abs(Y) >= half - spec['binding_mm'])
+        colour = np.where(b[:, :, None], np.array(spec['binding'])[None, None, :] * (0.8 + 0.3 * edge)[:, :, None], colour)
+
+    # Outside the board: the neck's own wood at the very edge, then
+    # away into the dark. The plugins all float the board on a dark
+    # surround, and it is the surround that makes the board read as a
+    # thing with a thickness rather than a picture pasted down.
+    neck = np.array(spec['board']) * 1.9
+    outside = ~on_board
+    beyond = np.clip((np.abs(Y) - half) / 2.5, 0, 1)
+    away = np.clip((np.abs(Y) - half - 2.5) / 7.0, 0, 1)
+    behind = neck[None, None, :] * (1 - beyond * 0.35)[:, :, None]
+    behind = behind * (1 - away * 0.92)[:, :, None] + 0.035
+
+    # --- the body -------------------------------------------------
+    #
+    # A bare fretboard is not a guitar, and it does not read as one.
+    # From the joint the instrument opens out into a body far wider
+    # than the window, so what is drawn is the part a player sees
+    # along their own neck: the cutaway where the two meet, the top,
+    # and the soundhole or the pickups on it.
+    if joint is not None:
+        u = X - joint
+        neck_half = board_at(joint) / 2.0 + 2.2
+        # The two sides are not the same shape. The bass side climbs
+        # away from the heel at once; the treble side hugs the neck
+        # first and then flares, which is what a cutaway IS.
+        def flare(start, run, to):
+            t = np.clip((u - start) / run, 0, 1)
+            t = t * t * (3 - 2 * t)
+            return neck_half + (to - neck_half) * t
+
+        if spec['body'] == 'acoustic':
+            bass = flare(-6.0, 120.0, 165.0)
+            treble = flare(24.0, 130.0, 150.0)
+        else:
+            bass = flare(-4.0, 58.0, 150.0)
+            # The horn and the cutaway behind it. The scoop is a
+            # gaussian rather than a notch, because a cutaway is a
+            # curve and a notch put two corners in the silhouette.
+            treble = flare(-2.0, 62.0, 150.0)
+            scoop = 34.0 * np.exp(-(((u - 46.0) / 30.0) ** 2))
+            treble = np.maximum(treble - scoop, neck_half * 0.96)
+        body_half = np.where(Y < 0, treble, bass)
+        on_body = (u > -8.0) & (np.abs(Y) <= body_half)
+
+        # The top. Lit from the left, and darkening towards its edge
+        # the way a sunburst or a shaded top does.
+        along = np.clip(u / 260.0, 0, 1)
+        out = np.clip(np.abs(Y) / 150.0, 0, 1)
+        grain_top = fbm((H, W), (0.5, 0.008), rng, octaves=4)
+        top_c = np.array(spec['top'])
+        edge_c = np.array(spec['top_edge'])
+        shade = np.clip(out ** 2.2 * 0.9 + along * 0.10, 0, 1)
+        body = top_c[None, None, :] * (1 - shade)[:, :, None] + edge_c[None, None, :] * shade[:, :, None]
+        if spec['body'] == 'acoustic':
+            # Spruce: fine straight grain running down the top.
+            body = body * (0.93 + 0.13 * grain_top)[:, :, None]
+        else:
+            body = body * (0.97 + 0.06 * grain_top)[:, :, None]
+        # A broad highlight where the light lands on it.
+        gleam = np.clip(1.0 - np.abs((u - 70.0) / 150.0), 0, 1) ** 2
+        gleam = gleam * np.clip(1.0 - np.abs((Y + 40.0) / 90.0), 0, 1)
+        body = body + (gleam * 0.10)[:, :, None]
+
+        if spec['body'] == 'acoustic':
+            # The soundhole: a shadow with a lip, not a black disc, and
+            # the rosette ring round it.
+            rh = spec['hole'] / 2.0
+            d = np.sqrt((X - hole_x) ** 2 + Y ** 2)
+            ring = np.clip(1.0 - np.abs(d - rh * 1.14) / (rh * 0.10), 0, 1)
+            rose = np.array([0.30, 0.20, 0.11])
+            body = body * (1 - ring * 0.9)[:, :, None] + (rose[None, None, :] * ring[:, :, None]) * 0.9
+            hole = np.clip((rh - d) * ppm * 0.5, 0, 1)
+            # Inside it: dark, with the light that gets in landing on
+            # the far wall low down -- which is what stops a soundhole
+            # reading as a black sticker.
+            lit = np.clip((Y - rh * 0.25) / (rh * 0.75), 0, 1) ** 1.6
+            depth = 0.035 + 0.13 * lit
+            inner = np.stack([depth, depth * 0.78, depth * 0.58], axis=2)
+            body = body * (1 - hole[:, :, None]) + inner * hole[:, :, None]
+            if spec['plate']:
+                # The scratchplate: a teardrop below the hole and to
+                # the bridge side of it, in dark tortoiseshell.
+                pu = (X - hole_x - rh * 0.62) / (rh * 1.22)
+                pv = (Y - rh * 1.16) / (rh * 0.60)
+                plate = np.clip((1.0 - (pu * pu + pv * pv)) * 7, 0, 1)
+                dark = np.array([0.075, 0.042, 0.028])
+                body = body * (1 - plate[:, :, None]) + dark[None, None, :] * plate[:, :, None]
+        else:
+            # Two pickups and their surrounds, square to the strings.
+            hw = np.array(spec['hardware'])
+            for n in range(spec.get('pickups', 2)):
+                cx = board_end + 26.0 + n * 62.0
+                pw, ph = 19.0, strings_at(board_end) * 0.80
+                inbox = (np.abs(X - cx) <= pw / 2) & (np.abs(Y) <= ph / 2)
+                surround = (np.abs(X - cx) <= pw / 2 + 3.5) & (np.abs(Y) <= ph / 2 + 4.0)
+                body = np.where(surround[:, :, None], np.array([0.045, 0.045, 0.05])[None, None, :], body)
+                across = np.clip(1 - ((Y / (ph / 2)) ** 2), 0, 1)
+                cover = hw[None, None, :] * (0.72 + 0.34 * across)[:, :, None]
+                body = np.where(inbox[:, :, None], np.clip(cover, 0, 1), body)
+            # The bridge, at the end of what is seen.
+            bx = board_end + 150.0
+            bridge = (np.abs(X - bx) <= 7.0) & (np.abs(Y) <= strings_at(board_end) * 0.75)
+            body = np.where(bridge[:, :, None], (hw * 0.8)[None, None, :], body)
+
+        # The binding round the edge, and the shadow the body sits in.
+        rim = np.clip((body_half - np.abs(Y)) * ppm, 0, 5) / 5.0
+        body = body * (0.55 + 0.45 * rim)[:, :, None]
+        bind = (np.abs(Y) <= body_half) & (np.abs(Y) >= body_half - 2.6)
+        body = np.where(bind[:, :, None], np.array(spec['binding'])[None, None, :] * 0.92, body)
+        behind = np.where(on_body[:, :, None], np.clip(body, 0, 1), behind)
+
+    colour = np.where(outside[:, :, None], behind, colour)
+
     # --- strings --------------------------------------------------
     gauges = [0.30, 0.38, 0.61, 0.81, 1.09, 1.35]
     if spec.get('nylon'):
         gauges = [0.71, 0.81, 1.00, 0.80, 0.90, 1.05]
-    string_lines = []
     for i, g in enumerate(gauges):
         t_i = i / (len(gauges) - 1)
         y_at = lambda x: (-strings_at(np.clip(x, 0, None)) / 2.0
                           + strings_at(np.clip(x, 0, None)) * t_i)
         yy = y_at(X)
-        string_lines.append((y_at(np.array([0.0]))[0], y_at(np.array([fret_mm(scale, last)]))[0]))
         rad = g / 2.0 + 0.10
         u = (Y - yy) / rad
         inside = np.abs(u) <= 1.0
@@ -257,25 +419,6 @@ def main():
         colour = colour * (1.0 - 0.45 * sh)[:, :, None]
         colour = np.where((inside & (X > -1.0))[:, :, None], line, colour)
 
-    # --- the edges of the board, and what is beyond them -----------
-    edge = np.clip((half - np.abs(Y)) * ppm, 0, 6) / 6.0
-    colour *= (0.72 + 0.28 * edge)[:, :, None]
-    if spec['binding_mm'] > 0:
-        b = (np.abs(Y) <= half) & (np.abs(Y) >= half - spec['binding_mm'])
-        colour = np.where(b[:, :, None], np.array(spec['binding'])[None, None, :] * (0.8 + 0.3 * edge)[:, :, None], colour)
-
-    # Outside the board: the neck's own wood at the very edge, then
-    # away into the dark. The plugins all float the board on a dark
-    # surround, and it is the surround that makes the board read as a
-    # thing with a thickness rather than a picture pasted down.
-    neck = np.array(spec['board']) * 1.9
-    outside = ~on_board
-    beyond = np.clip((np.abs(Y) - half) / 2.5, 0, 1)
-    away = np.clip((np.abs(Y) - half - 2.5) / 7.0, 0, 1)
-    behind = neck[None, None, :] * (1 - beyond * 0.35)[:, :, None]
-    behind = behind * (1 - away * 0.92)[:, :, None] + 0.035
-    colour = np.where(outside[:, :, None], behind, colour)
-
     # --- the studio: one broad sheen and a vignette ---------------
     sheen = np.clip(1.0 - np.abs((X - x_from) / span - 0.34) * 1.5, 0, 1) ** 2
     colour += (sheen * 0.05)[:, :, None]
@@ -296,14 +439,20 @@ def main():
 
     to_px_x = lambda mm: round((mm - x_from) * ppm, 1)
     to_px_y = lambda mm: round(mid + mm * ppm, 1)
+    # Measured at the SAME two places the engine interpolates between:
+    # the nut, and whatever `boardEndX` says. Reporting the strings at
+    # the last fret while pointing boardEndX past the soundhole would
+    # stretch the fan over the wrong distance and put every mark on
+    # the wrong string at the body end.
     calib = {
         'width': W,
         'height': H,
+        'fit': 'frame' if args.view == 'guitar' else 'board',
         'frets': [to_px_x(w) for w in wires],
         'boardEndX': to_px_x(x_to),
-        'stringsAtNut': [to_px_y(string_lines[0][0]), to_px_y(string_lines[-1][0])],
-        'stringsAtEnd': [to_px_y(string_lines[0][1]), to_px_y(string_lines[-1][1])],
-        'boardAtNut': [to_px_y(-board_at(0) / 2), to_px_y(board_at(0) / 2)],
+        'stringsAtNut': [to_px_y(-strings_at(0.0) / 2), to_px_y(strings_at(0.0) / 2)],
+        'stringsAtEnd': [to_px_y(-strings_at(x_to) / 2), to_px_y(strings_at(x_to) / 2)],
+        'boardAtNut': [to_px_y(-board_at(0.0) / 2), to_px_y(board_at(0.0) / 2)],
         'boardAtEnd': [to_px_y(-board_at(x_to) / 2), to_px_y(board_at(x_to) / 2)],
     }
     print(path, f'{W}x{H}', f'{ppm:.2f} px/mm')

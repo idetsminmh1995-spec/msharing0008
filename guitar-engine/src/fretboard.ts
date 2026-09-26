@@ -188,10 +188,16 @@ export function stageHeightFor(
   options?: { handLegend?: boolean; fretNumbers?: boolean },
 ): number {
   if (!(width > 0) || !(photo.width > 0) || !(photo.height > 0)) return 0;
+  const scaled = photo.height * (width / photo.width);
+  // A whole guitar already IS the frame: it was made with its strings
+  // where the board's band has its middle, and its body runs off the
+  // top and the bottom. Giving it the extra height a bare board needs
+  // for its two bands would only push the guitar out of the frame.
+  if (photo.fit === 'frame') return Math.round(scaled);
   const numbers = options?.fretNumbers === false ? 0 : NUMBERS_SHARE;
   const hand = options?.handLegend === true ? HAND_BAND_SHARE : 0;
   const share = Math.max(0.2, 1 - numbers - hand);
-  return Math.round((photo.height * (width / photo.width)) / share);
+  return Math.round(scaled / share);
 }
 
 /**
