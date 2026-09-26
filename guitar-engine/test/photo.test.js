@@ -297,3 +297,45 @@ test('the classical is the owner’s drawing, read out of the file', () => {
     assert.ok(Math.abs(y - drawn) < 2, `string ${string} at ${y}, drawn at ${drawn}`);
   }
 });
+
+test('a picture can be drawn bigger, and hung lower', () => {
+  const plain = { ...G.photoNamed('acoustic-natural', 'a.webp') };
+  const width = 1920;
+  const frame = (photo) => ({
+    width,
+    height: G.stageHeightFor(width, photo, { handLegend: true, fretNumbers: true }),
+    photo,
+    bleed: true,
+    handLegend: true,
+    fretNumbers: true,
+  });
+  const flat = G.photoPlacement(frame(plain));
+
+  // Zoom grows the picture from its LEFT edge: the headstock and the
+  // low frets keep their place and the body runs off the right.
+  const big = G.photoPlacement(frame({ ...plain, zoom: 1.5 }));
+  assert.equal(big.x, 0, 'the left edge stays on the frame’s');
+  assert.ok(Math.abs(big.scale - flat.scale * 1.5) < 1e-9, 'half as big again');
+
+  // Drop moves it down the stage, and everything drawn on it follows.
+  const box = frame({ ...plain, drop: 0.1 });
+  const low = G.photoPlacement(box);
+  const level = G.photoPlacement({ ...box, photo: plain });
+  assert.ok(low.y - level.y > 0, 'it hangs lower');
+  assert.ok(Math.abs(low.y - level.y - box.height * 0.1) < 1e-9, 'by a tenth of the stage');
+
+  // Nonsense is ignored rather than drawn.
+  for (const bad of [0, -2, NaN, 40, undefined]) {
+    const tried = G.photoPlacement(frame({ ...plain, zoom: bad }));
+    assert.ok(Math.abs(tried.scale - flat.scale) < 1e-9, `zoom ${bad} is not a zoom`);
+  }
+
+  // However low it hangs, the fret numbers stay inside the frame.
+  const deep = { ...plain, zoom: 1.5, drop: 0.3 };
+  const shapes = G.stageShapes({ ...frame(deep), seconds: 0, notes: [] });
+  const numbers = shapes.filter((shape) => shape.role === 'fretNumber');
+  assert.ok(numbers.length > 5, 'there are still numbers');
+  for (const number of numbers) {
+    assert.ok(number.y < frame(deep).height, `${number.text} is still in the frame`);
+  }
+});

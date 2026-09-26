@@ -171,7 +171,13 @@ var GuitarEngine = (() => {
     stringsAtNut: [267.7, 325.9],
     stringsAtEnd: [256.7, 336.9],
     boardAtNut: [261.2, 332.3],
-    boardAtEnd: [249, 344.5]
+    boardAtEnd: [249, 344.5],
+    // The owner wanted it bigger and lower than scaled-to-the-width put
+    // it: the drawing has air around the guitar where a photograph has
+    // the body already running off the edges, so at 1 it sat small with
+    // the notation towering over it.
+    zoom: 1.45,
+    drop: 0.13
   };
   var ACOUSTIC_SUNBURST = {
     width: 2e3,
@@ -457,13 +463,13 @@ var GuitarEngine = (() => {
   }
   function stageHeightFor(width, photo, options) {
     if (!(width > 0) || !(photo.width > 0) || !(photo.height > 0)) return 0;
-    const scaled = photo.height * (width / photo.width);
+    const scaled = photo.height * (width / photo.width) * photoZoom(photo);
     const numbers = options?.fretNumbers === false ? 0 : NUMBERS_SHARE;
     const hand = options?.handLegend === true ? HAND_BAND_SHARE : 0;
     const share = Math.max(0.2, 1 - numbers - hand);
     if (photo.fit === "frame") {
       const at = photoStringMiddle(photo) / photo.height;
-      const band = hand + share / 2;
+      const band = Math.min(0.95, Math.max(0.05, hand + share / 2 + photoDrop(photo)));
       const cover = Math.min(at / band, (1 - at) / (1 - band));
       return Math.round(scaled * Math.max(0.05, cover));
     }
@@ -472,14 +478,22 @@ var GuitarEngine = (() => {
   function photoPlacement(options) {
     const photo = options.photo;
     if (photo === void 0 || !(photo.width > 0) || !(options.width > 0)) return void 0;
-    const scale = options.width / photo.width;
+    const scale = options.width / photo.width * photoZoom(photo);
     const board = guitarLayout(options).board;
     return {
       photo,
       scale,
       x: 0,
-      y: board.y + board.height / 2 - photoStringMiddle(photo) * scale
+      y: board.y + board.height / 2 - photoStringMiddle(photo) * scale + photoDrop(photo) * options.height
     };
+  }
+  function photoZoom(photo) {
+    const zoom = photo.zoom;
+    return typeof zoom === "number" && zoom > 0.05 && zoom < 20 ? zoom : 1;
+  }
+  function photoDrop(photo) {
+    const drop = photo.drop;
+    return typeof drop === "number" && drop > -0.9 && drop < 0.9 ? drop : 0;
   }
   function alongPhoto(place, x) {
     return place.x + x * place.scale;
@@ -1904,7 +1918,12 @@ var GuitarEngine = (() => {
       shapes.push({
         kind: "text",
         x,
-        y: photographed ? boardEdges(options, x).bottom + size * 0.9 : layout.numbersY + (height - layout.numbersY) / 2,
+        y: photographed ? (
+          // Under the board, and never off the bottom of the stage: a
+          // picture hung low enough would otherwise carry its numbers
+          // out of the frame, where nobody can read them.
+          Math.min(boardEdges(options, x).bottom + size * 0.9, height - size * 0.55)
+        ) : layout.numbersY + (height - layout.numbersY) / 2,
         width: per,
         height: height - layout.numbersY,
         fill: colors.fretNumber,

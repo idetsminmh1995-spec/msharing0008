@@ -49,6 +49,17 @@ Turning it counter-clockwise puts the low E at the bottom, which is
 where the engine numbers string 6: upright, the low E is on the left,
 and the left side goes down.
 
+It is drawn BIGGER than the frame's width and hung lower than the
+middle — `zoom: 1.45`, `drop: 0.13` in `photo.ts`. A photograph of a
+guitar already has its body running off the edges, because that is
+how someone frames one; a drawing has air around it, so scaled to the
+width it came out small with the notation towering over it. Zoom
+grows it from the LEFT edge, so the headstock and the low frets keep
+their place and the body runs off the right the way a photograph's
+does. Drop moves it down the stage, and everything drawn on it — the
+marks, the numbers, the board — goes with it, because they are all
+worked out from where the picture lands.
+
 An SVG works everywhere a photograph does — the preview's `<image>`
 and the video canvas's `drawImage` both take one — as long as it
 carries `width` and `height` attributes, which is what gives it an

@@ -60,6 +60,34 @@ export interface GuitarPhotograph {
    * has its middle, so the two line up without anything being moved.
    */
   readonly fit?: 'board' | 'frame';
+  /**
+   * How much BIGGER than the frame's width to draw this picture.
+   *
+   * A picture is scaled to the frame's width, which is the right
+   * answer when the guitar was framed for it: neck in from one edge,
+   * body out of the other. A picture framed differently -- a whole
+   * guitar with air around it, a drawing with its headstock well
+   * inside the edge -- comes out small in the frame with the notation
+   * towering over it. This zooms it: 1 is scaled to the width, 1.3 is
+   * a third bigger again, with the extra running off the sides the
+   * way the body already runs off the top and the bottom.
+   *
+   * Everything moves with it -- the marks, the fret numbers, the
+   * board -- because they are all worked out from where the picture
+   * lands.
+   */
+  readonly zoom?: number;
+  /**
+   * How far DOWN the frame to hang this picture, as a share of the
+   * stage's height.
+   *
+   * A picture hangs by its strings, and they land where the drawn
+   * neck's middle would. This moves them: 0 is that middle, 0.08 is a
+   * twelfth of the stage lower. The guitar goes down and the notation
+   * gets the room, which is what a frame with a lot of music in it
+   * wants.
+   */
+  readonly drop?: number;
 }
 
 /** A photograph's measurements without the path to it. */
@@ -188,6 +216,12 @@ export const CLASSICAL_DRAWN: PhotoMeasurements = {
   stringsAtEnd: [256.7, 336.9],
   boardAtNut: [261.2, 332.3],
   boardAtEnd: [249.0, 344.5],
+  // The owner wanted it bigger and lower than scaled-to-the-width put
+  // it: the drawing has air around the guitar where a photograph has
+  // the body already running off the edges, so at 1 it sat small with
+  // the notation towering over it.
+  zoom: 1.45,
+  drop: 0.13,
 };
 
 /**

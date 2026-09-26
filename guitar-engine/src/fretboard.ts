@@ -17,6 +17,7 @@ import {
   photoStringMiddle,
   photoWireX,
   type GuitarPhotograph,
+  type PhotoMeasurements,
 } from './photo.js';
 import type { FretboardOptions, FretWire, GuitarNote, LivePosition, StringLine } from './types.js';
 
@@ -188,7 +189,7 @@ export function stageHeightFor(
   options?: { handLegend?: boolean; fretNumbers?: boolean },
 ): number {
   if (!(width > 0) || !(photo.width > 0) || !(photo.height > 0)) return 0;
-  const scaled = photo.height * (width / photo.width);
+  const scaled = photo.height * (width / photo.width) * photoZoom(photo);
   const numbers = options?.fretNumbers === false ? 0 : NUMBERS_SHARE;
   const hand = options?.handLegend === true ? HAND_BAND_SHARE : 0;
   const share = Math.max(0.2, 1 - numbers - hand);
@@ -201,7 +202,7 @@ export function stageHeightFor(
     // guitar, which is what a picture "filling the frame" must never
     // do.
     const at = photoStringMiddle(photo) / photo.height;
-    const band = hand + share / 2;
+    const band = Math.min(0.95, Math.max(0.05, hand + share / 2 + photoDrop(photo)));
     const cover = Math.min(at / band, (1 - at) / (1 - band));
     return Math.round(scaled * Math.max(0.05, cover));
   }
@@ -229,14 +230,34 @@ export interface PhotoPlacement {
 export function photoPlacement(options: FretboardOptions): PhotoPlacement | undefined {
   const photo = options.photo;
   if (photo === undefined || !(photo.width > 0) || !(options.width > 0)) return undefined;
-  const scale = options.width / photo.width;
+  const scale = (options.width / photo.width) * photoZoom(photo);
   const board = guitarLayout(options).board;
+  // Zoomed, the picture is wider than the frame, and it grows to the
+  // RIGHT: its left edge stays on the frame's, so the headstock and
+  // the low frets -- the end anyone is reading -- keep their place,
+  // and the body runs off the right the way a photographed one does.
   return {
     photo,
     scale,
     x: 0,
-    y: board.y + board.height / 2 - photoStringMiddle(photo) * scale,
+    y:
+      board.y +
+      board.height / 2 -
+      photoStringMiddle(photo) * scale +
+      photoDrop(photo) * options.height,
   };
+}
+
+/** How much bigger than the frame's width a picture is drawn, at least a little. */
+function photoZoom(photo: GuitarPhotograph | PhotoMeasurements): number {
+  const zoom = photo.zoom;
+  return typeof zoom === 'number' && zoom > 0.05 && zoom < 20 ? zoom : 1;
+}
+
+/** How far down the stage it hangs, as a share of the stage's height. */
+function photoDrop(photo: GuitarPhotograph | PhotoMeasurements): number {
+  const drop = photo.drop;
+  return typeof drop === 'number' && drop > -0.9 && drop < 0.9 ? drop : 0;
 }
 
 /** A length along the file, where it lands in the picture. */

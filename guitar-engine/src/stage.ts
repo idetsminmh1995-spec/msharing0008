@@ -725,7 +725,10 @@ function fretNumberShapes(options: FretboardOptions, colors: GuitarColors): read
       kind: 'text',
       x,
       y: photographed
-        ? boardEdges(options, x).bottom + size * 0.9
+        ? // Under the board, and never off the bottom of the stage: a
+          // picture hung low enough would otherwise carry its numbers
+          // out of the frame, where nobody can read them.
+          Math.min(boardEdges(options, x).bottom + size * 0.9, height - size * 0.55)
         : layout.numbersY + (height - layout.numbersY) / 2,
       width: per,
       height: height - layout.numbersY,
