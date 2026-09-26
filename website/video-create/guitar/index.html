@@ -386,36 +386,28 @@
 
     <div class="card">
       <div class="card-head"><span class="card-num">3</span>Guitar Fretboard</div>
-      <div class="field-row">
-        <div>
-          <label for="fretCount">Frets shown</label>
-          <select id="fretCount" class="drum-input">
-            <option value="12">Nut to 12</option>
-            <option value="15">Nut to 15</option>
-            <option value="22">Nut to 22</option>
-          </select>
-        </div>
-        <div>
-          <label for="stringCount">Strings</label>
-          <select id="stringCount" class="drum-input">
-            <option value="6" selected>6 (guitar)</option>
-            <option value="7">7</option>
-            <option value="4">4 (bass)</option>
-          </select>
-        </div>
-      </div>
+      <!-- One list, not three. How many frets a guitar has is not a
+           setting: a classical has nineteen and a modern electric
+           twenty-four, so the guitar that is picked brings its own
+           number with it. Six strings, because every one of these
+           has six. -->
       <label for="instrument">Guitar</label>
       <select id="instrument" class="drum-input">
-        <option value="photo" selected>Acoustic &mdash; photograph</option>
-        <option value="electric">Electric &mdash; maple neck</option>
-        <option value="singleCut">Electric &mdash; single cut</option>
-        <option value="acoustic">Acoustic</option>
+        <option value="classical">Classical Guitar &mdash; 19 frets</option>
+        <option value="acoustic" selected>Acoustic Guitar &mdash; 20 frets</option>
+        <option value="electric">Electric Guitar &mdash; 22 frets</option>
+        <option value="extended">Extended-range Electric &mdash; 24 frets</option>
+      </select>
+      <label for="picking">Picking hand</label>
+      <select id="picking" class="drum-input">
+        <option value="pick" selected>Plectrum &mdash; down and up strokes</option>
+        <option value="fingers">Fingers &mdash; p i m a</option>
       </select>
       <div class="finger-legend">
         <div class="finger-hand" id="fingerHand" aria-hidden="true"></div>
         <div class="finger-names" id="fingerNames"></div>
       </div>
-      <div class="field-hint" id="fretHint">The neck lights where each note is played &mdash; its string, its fret and the finger stopping it, with the fret numbers along the bottom. When the score writes a position or a fingering down, that is what you see; when it does not, the Human Finger Engine works out how a guitarist would play the line: it weighs every place each note could go, what the hand would have to stretch, and how long it has to get there, then picks the way through with the least work in it. The picking hand is drawn too, as the square bracket and the V every guitarist reads. Pick the guitar you want drawn &mdash; a maple-necked electric with a scratchplate, a single-cut with pearl blocks and two humbuckers, or a dreadnought with a soundhole &mdash; and the whole instrument is drawn for you: headstock, tuners, the neck widening towards the body, and the wood each one is made of. Those three are shapes and gradients rather than a photograph, so the video is drawn at whatever size you export. The last one IS a photograph: a real cutaway dreadnought, measured fret by fret so every mark still lands on the right string in the right fret &mdash; it shows the twenty frets the picture has, whatever the fret count above says. A slide travels along the string rather than jumping, an open string has its own colour, and the four finger colours are fixed, not chosen: they are meant to be learnt once and read in every video after.</div>
+      <div class="field-hint" id="fretHint">The neck lights where each note is played &mdash; its string, its fret and the finger stopping it, with the fret numbers along the bottom. When the score writes a position or a fingering down, that is what you see; when it does not, the Human Finger Engine works out how a guitarist would play the line: it weighs every place each note could go, what the hand would have to stretch, and how long it has to get there, then picks the way through with the least work in it. The picking hand is drawn too, as the square bracket and the V every guitarist reads. Pick the guitar and it brings its own neck with it &mdash; a classical stops at 19 frets with nothing in its board, a dreadnought around 20, an electric at 22, a modern extended-range at 24 &mdash; so there is no fret count to set: that is a fact about the instrument, not a view. Six strings throughout. The Acoustic is a PHOTOGRAPH of a real cutaway dreadnought, measured fret by fret so every mark still lands on the right string in the right fret; the others are drawn out of shapes and gradients, headstock, tuners, wood and all, at whatever size you export. Then say what the right hand is doing: a plectrum is written as the square bracket and the V every guitarist reads, and fingers are written a letter at a time on the string each one takes &mdash; p the thumb, then i, m and a. A slide travels along the string rather than jumping, an open string has its own colour, and the four finger colours are fixed, not chosen: they are meant to be learnt once and read in every video after.</div>
     </div>
 
     <div class="card">
@@ -568,8 +560,8 @@
            image it already has, and a frame is rendered the instant
            the button is pressed. It is never shown here -- the stage's
            own SVG draws it, from the same file. -->
-      <img id="guitarPhoto" src="../../assets/guitar/acoustic-cutaway.webp" alt=""
-           style="display:none" decoding="async">
+      <img data-guitar-photo="acoustic-cutaway" src="../../assets/guitar/acoustic-cutaway.webp"
+           alt="" style="display:none" decoding="async">
     </div>
 
     <div class="transport">
@@ -972,60 +964,107 @@
   // `renderGuitarStage` writes SVG for the preview, `stageShapes` hands
   // back the same shapes for the canvas the video is rendered on.
   const guitarStage = document.getElementById('guitarStage');
-  const fretCountSelect = document.getElementById('fretCount');
-  const stringCountSelect = document.getElementById('stringCount');
   const instrumentSelect = document.getElementById('instrument');
+  const pickingSelect = document.getElementById('picking');
   const fingerHand = document.getElementById('fingerHand');
   const fingerNames = document.getElementById('fingerNames');
 
-  function lastFret() {
-    const value = Number(fretCountSelect?.value);
-    return Number.isFinite(value) && value > 0 ? value : 12;
+  /**
+   * The guitars the page offers, and what each one IS.
+   *
+   * How many frets a guitar has is not a setting somebody should be
+   * asked for: it is a fact about the instrument. A classical stops
+   * at nineteen, a dreadnought around twenty, an electric at
+   * twenty-two and a modern shredder at twenty-four. So the guitar
+   * brings its own fret count, and there is one list instead of
+   * three. (The ranges really are ranges -- an acoustic can be
+   * anything from 18 to 22 -- and the number here is the commonest.)
+   *
+   * `model` is the one the engine DRAWS; `photo` is a picture of a
+   * real one, measured, which replaces the drawing entirely when it
+   * is there. Six strings throughout, because every one of these has
+   * six.
+   */
+  const GUITARS = {
+    classical: { frets: 19, model: 'classical' },
+    acoustic: { frets: 20, model: 'acoustic', photo: 'acoustic-cutaway' },
+    electric: { frets: 22, model: 'singleCut' },
+    extended: { frets: 24, model: 'electric' },
+  };
+  const DEFAULT_GUITAR = 'acoustic';
+
+  function guitar() {
+    return GUITARS[instrumentSelect?.value] ?? GUITARS[DEFAULT_GUITAR];
   }
 
+  /** The last fret the instrument has. Not a view setting: the guitar's own. */
+  function lastFret() {
+    return guitar().frets;
+  }
+
+  /** Six. Every guitar on the list has six strings. */
   function stringCount() {
-    const value = Number(stringCountSelect?.value);
-    return Number.isFinite(value) && value >= 2 ? value : 6;
+    return 6;
   }
 
   /**
-   * Which of the three guitars the video draws.
+   * Which guitar the video draws.
    *
-   * Not decoration: they are different instruments to look at, and a
-   * page that offers them should show the one that was picked -- the
-   * wood of the neck, the inlays, the headstock, and whether the body
-   * carries a scratchplate, a soundhole or a pair of humbuckers.
+   * Not decoration: these are different instruments to look at, and
+   * the one that was picked is the one to show -- the wood of the
+   * neck, the inlays (or, on a classical, none), the headstock, and
+   * whether the body carries a scratchplate, a soundhole or a pair of
+   * humbuckers. Where a photograph stands in for the drawing, this
+   * still decides the palette, because the marks, the numbers and the
+   * picking strokes over the picture are coloured from it.
    */
   function instrument() {
-    const value = instrumentSelect?.value;
-    // The photograph IS an acoustic: the palette still has to be the
-    // right one, because the marks, the numbers and the picking
-    // strokes drawn over the picture are coloured from it.
-    if (value === 'photo') return 'acoustic';
-    return value === 'acoustic' || value === 'singleCut' ? value : 'electric';
+    return guitar().model;
   }
 
-  const guitarPhotoImage = document.getElementById('guitarPhoto');
+  /** Whether the right hand is holding a plectrum or playing with its fingers. */
+  function picking() {
+    return pickingSelect?.value === 'fingers' ? 'fingers' : 'pick';
+  }
 
   /**
-   * The photograph to draw with, when the photograph is what was
-   * picked.
+   * The photographs, one per guitar that has one.
+   *
+   * They are `<img>` elements in the page rather than URLs, because
+   * the canvas the video is painted on can only draw a picture the
+   * browser already holds, and a frame is rendered the instant the
+   * button is pressed.
+   */
+  const guitarPhotos = new Map(
+    [...document.querySelectorAll('img[data-guitar-photo]')].map((img) => [
+      img.dataset.guitarPhoto,
+      img,
+    ]),
+  );
+
+  /**
+   * The photograph to draw the picked guitar with, if there is one.
    *
    * The engine holds the measurements -- where every fret wire and
    * every string is in that file -- and is handed the path, because
-   * only the page knows where the page's own assets live.
+   * only the page knows where the page's own assets live. A guitar
+   * with no photograph yet is drawn instead, which is what this
+   * engine did all along.
    */
   function guitarPhoto() {
-    if (instrumentSelect?.value !== 'photo') return undefined;
-    if (typeof GuitarEngine === 'undefined' || !guitarPhotoImage) return undefined;
-    return GuitarEngine.guitarPhoto(guitarPhotoImage.getAttribute('src'));
+    const name = guitar().photo;
+    if (!name || typeof GuitarEngine === 'undefined') return undefined;
+    const img = guitarPhotos.get(name);
+    if (!img) return undefined;
+    return GuitarEngine.guitarPhoto(img.getAttribute('src'));
   }
 
   /** The picture, once the browser has it. A frame drawn before that has no guitar in it. */
   async function photoReady() {
-    if (!guitarPhotoImage) return;
+    const img = guitarPhotos.get(guitar().photo);
+    if (!img) return;
     try {
-      await guitarPhotoImage.decode();
+      await img.decode();
     } catch (err) {
       // A picture that will not load is not a reason to lose the
       // video: the rest of the frame is still worth drawing.
@@ -1252,6 +1291,7 @@
       // frets it shows are the frets there are, so the fret count
       // above stops applying -- there is no arguing with a picture.
       photo: guitarPhoto(),
+      picking: picking(),
       fretNumbers: true,
       // The guitar fills the frame the way a photographed one does:
       // in from the left edge, out past the right, with the hand
@@ -1320,10 +1360,16 @@
     }
   }
 
-  for (const control of [fretCountSelect, stringCountSelect, instrumentSelect]) {
-    if (!control) continue;
-    control.addEventListener('change', () => drawStage());
-  }
+  // Changing the guitar changes how many frets there are, and that
+  // changes the ANSWER, not just the picture: a line a classical
+  // guitarist has to play at the fifth fret is a line a
+  // twenty-four-fret electric can take higher up. So the fingering is
+  // worked out again, then drawn.
+  instrumentSelect?.addEventListener('change', () => {
+    buildGuitarNotes();
+    drawStage();
+  });
+  pickingSelect?.addEventListener('change', () => drawStage());
   window.addEventListener('resize', () => drawStage());
   drawFingerLegend();
   drawStage(0);
@@ -2581,11 +2627,12 @@
    * be worse than a frame without one.
    */
   function imageFor(href) {
-    if (!href || !guitarPhotoImage) return undefined;
-    const same = guitarPhotoImage.getAttribute('src') === href;
-    return same && guitarPhotoImage.complete && guitarPhotoImage.naturalWidth > 0
-      ? guitarPhotoImage
-      : undefined;
+    if (!href) return undefined;
+    for (const img of guitarPhotos.values()) {
+      if (img.getAttribute('src') !== href) continue;
+      return img.complete && img.naturalWidth > 0 ? img : undefined;
+    }
+    return undefined;
   }
 
   function paintStage(ctx2d, box, atSeconds) {

@@ -18,13 +18,23 @@ import type { FretboardOptions, GuitarColors, Instrument, StageShape } from './t
 
 /** What the picked guitar changes about the palette. */
 export function modelColors(instrument: Instrument | undefined): Partial<GuitarColors> {
+  if (instrument === 'classical') return CLASSICAL_COLORS;
   if (instrument === 'acoustic') return ACOUSTIC_COLORS;
   if (instrument === 'singleCut') return SINGLE_CUT_COLORS;
   return {};
 }
 
-/** A maple board takes dots; an ebony one takes the big pearl blocks. */
-export function inlayStyle(instrument: Instrument | undefined): 'dot' | 'block' {
+/**
+ * A maple board takes dots; an ebony one takes the big pearl blocks;
+ * a classical board takes NOTHING.
+ *
+ * That last one is not an omission. A classical guitar has no markers
+ * in its face -- the player is reading the music, not the neck -- and
+ * dotting one is the quickest way to tell a classical guitarist the
+ * picture was drawn by somebody who has not held one.
+ */
+export function inlayStyle(instrument: Instrument | undefined): 'dot' | 'block' | 'none' {
+  if (instrument === 'classical') return 'none';
   return instrument === 'singleCut' ? 'block' : 'dot';
 }
 
@@ -58,6 +68,40 @@ export const ACOUSTIC_COLORS: Partial<GuitarColors> = {
   hardware: '#3A2418',
   hardwareDark: '#1A0E07',
   knob: '#F1EADD',
+};
+
+/**
+ * The classical: nylon strings, a rosewood board with nothing on it,
+ * a pale spruce top and a rosette round the hole.
+ *
+ * Lighter than the steel-string acoustic everywhere -- the top is
+ * unstained spruce rather than a sunburst, the binding is wood rather
+ * than cream plastic, and there is no scratchplate, because nothing
+ * scratches it.
+ */
+export const CLASSICAL_COLORS: Partial<GuitarColors> = {
+  board: '#3A2419',
+  boardDark: '#241309',
+  boardEdge: '#150B05',
+  neckWood: '#B0824A',
+  neckWoodDark: '#7A5528',
+  binding: '#D8C9A6',
+  inlay: '#F1EADD',
+  inlayEdge: 'rgba(0,0,0,0.3)',
+  headstock: '#4A2E1C',
+  headstockEdge: '#241309',
+  peg: '#EFE9DC',
+  pegPost: '#C9A227',
+  string: '#F0E8D8',
+  body: '#EBD3A3',
+  bodyCentre: '#F8E9C8',
+  bodyBurst: '#C9A468',
+  bodyEdge: '#8A5A31',
+  rosette: '#6B3F22',
+  soundhole: '#120A05',
+  hardware: '#3A2419',
+  hardwareDark: '#150B05',
+  knob: '#EFE9DC',
 };
 
 /**
@@ -205,7 +249,7 @@ export function bodyShapes({ options, colors }: Parts): readonly StageShape[] {
   // The top. An acoustic is lit spruce, a single-cut is a sunburst,
   // and a plain electric is one colour with a sheen down it.
   const top =
-    model === 'acoustic'
+    model === 'acoustic' || model === 'classical'
       ? radial(geom.at(0.55), geom.middle, geom.visible * 1.1, [
           [0, colors.bodyCentre],
           [0.6, colors.body],
@@ -244,8 +288,11 @@ export function bodyShapes({ options, colors }: Parts): readonly StageShape[] {
     }),
   );
 
-  if (model === 'acoustic') shapes.push(...acousticTop(geom, colors, options));
-  else if (model === 'singleCut') shapes.push(...singleCutTop(geom, colors, options));
+  if (model === 'acoustic' || model === 'classical') {
+    // The one difference at this size: a steel-string has a
+    // scratchplate beside the hole and a classical has bare wood.
+    shapes.push(...acousticTop(geom, colors, options, model === 'acoustic'));
+  } else if (model === 'singleCut') shapes.push(...singleCutTop(geom, colors, options));
   else shapes.push(...electricTop(geom, colors, options));
 
   return shapes;
@@ -319,7 +366,7 @@ function bodyOutline(model: Instrument, geom: BodyGeometry): string {
   const jointTop = middle - neckHalf * 1.1;
   const jointBottom = middle + neckHalf * 1.1;
 
-  if (model === 'acoustic') {
+  if (model === 'acoustic' || model === 'classical') {
     // A dreadnought: no horn, a shoulder that climbs away from the
     // neck and the widest part of the body off to the right.
     return [
@@ -369,6 +416,7 @@ function acousticTop(
   geom: BodyGeometry,
   colors: GuitarColors,
   options: FretboardOptions,
+  plate: boolean,
 ): readonly StageShape[] {
   const shapes: StageShape[] = [];
   const { middle, height, at, visible } = geom;
@@ -376,14 +424,15 @@ function acousticTop(
   const cx = at(0.52);
 
   // The scratchplate tucks under the soundhole, as it does on the real one.
-  shapes.push(
-    pathShape(
-      `M${cx} ${middle - r * 0.2} L${cx + r * 2} ${middle + r * 0.55} L${cx + r * 1.6} ${middle + r * 1.7} L${cx - r * 0.2} ${middle + r * 1.2} Z`,
-      { x: cx - r, y: middle, width: r * 3, height: r * 2 },
-      colors.pickguard,
-      { opacity: 0.9, role: 'pickguard' },
-    ),
-  );
+  if (plate)
+    shapes.push(
+      pathShape(
+        `M${cx} ${middle - r * 0.2} L${cx + r * 2} ${middle + r * 0.55} L${cx + r * 1.6} ${middle + r * 1.7} L${cx - r * 0.2} ${middle + r * 1.2} Z`,
+        { x: cx - r, y: middle, width: r * 3, height: r * 2 },
+        colors.pickguard,
+        { opacity: 0.9, role: 'pickguard' },
+      ),
+    );
   // The rosette, then the hole itself, which is a shadow and not a disc.
   shapes.push(circleShape(cx, middle, r * 1.22, colors.rosette, { role: 'soundhole' }));
   shapes.push(circleShape(cx, middle, r * 1.1, colors.body, { role: 'soundhole' }));

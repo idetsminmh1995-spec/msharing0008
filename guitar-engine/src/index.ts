@@ -35,6 +35,7 @@ export {
 } from './fretboard.js';
 export {
   ACOUSTIC_COLORS,
+  CLASSICAL_COLORS,
   SINGLE_CUT_COLORS,
   DEFAULT_COLORS,
   FINGER_COLORS,
@@ -56,6 +57,7 @@ export type { HandOptions } from './hand.js';
 export type { PhotoPlacement } from './fretboard.js';
 export type {
   Finger,
+  Picking,
   FretWire,
   FretboardOptions,
   GuitarColors,

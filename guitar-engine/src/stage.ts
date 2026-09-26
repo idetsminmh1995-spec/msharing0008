@@ -47,6 +47,7 @@ import type {
 // it.
 export {
   ACOUSTIC_COLORS,
+  CLASSICAL_COLORS,
   DEFAULT_COLORS,
   FINGER_COLORS,
   FINGER_NAMES,
@@ -258,9 +259,13 @@ function handLegendShapes(options: FretboardOptions): readonly StageShape[] {
 
 /** The dots, or the pearl blocks, set into the wood under the strings. */
 function inlayShapes(options: FretboardOptions, colors: GuitarColors): readonly StageShape[] {
+  const style = inlayStyle(options.instrument);
+  // A classical board has nothing in it at all, and that is the
+  // instrument rather than a shortcut.
+  if (style === 'none') return [];
   const shapes: StageShape[] = [];
   const gap = stringGap(options);
-  const block = inlayStyle(options.instrument) === 'block';
+  const block = style === 'block';
   const per = fretWidth(options);
 
   for (const inlay of inlayFrets(options)) {
@@ -690,6 +695,13 @@ export function pickShapes(
   const centreY = (first + last) / 2;
   const spread = last - first;
   const height = Math.max(height0 * 0.2, spread + height0 * 0.08);
+  // Fingers do not strike the strings together, so there is no one
+  // stroke to draw: each string gets the letter of the finger that
+  // takes it, which is how fingerstyle has always been written.
+  if (options.picking === 'fingers') {
+    return fingerstyleShapes(struck, options, colors, centreX, mark.age);
+  }
+
   const thickness = Math.max(1.5, width * 0.24);
   const d =
     mark.direction === 'down'
@@ -710,6 +722,77 @@ export function pickShapes(
     }),
     pathShape(d, bounds, colors.pick, { opacity: 0.95 * (1 - mark.age), role: 'pickStroke' }),
   ];
+}
+
+/**
+ * p, i, m and a -- one letter per string, on the string.
+ *
+ * The right hand's own notation, and the only one that says anything
+ * useful about fingerstyle: the thumb takes the basses and the three
+ * fingers take the top three, so WHICH string a letter is on is the
+ * whole instruction. Each sits on a dark disc, because a letter alone
+ * would be lost against a rosette or a scratchplate.
+ */
+function fingerstyleShapes(
+  struck: readonly { string: number }[],
+  options: FretboardOptions,
+  colors: GuitarColors,
+  centreX: number,
+  age: number,
+): readonly StageShape[] {
+  const gap = stringGap(options);
+  const size = gap * 1.3;
+  const shapes: StageShape[] = [];
+  const fade = 1 - age;
+  const ys = struck.map((line) => stringYAt(options, line.string, centreX));
+  const top = Math.min(...ys);
+  const bottom = Math.max(...ys);
+  // ONE dark plaque behind the letters rather than a disc under each:
+  // p, i, m and a are often on four strings in a row, and four discs
+  // a string apart overlap into a blob.
+  shapes.push(
+    rectShape(
+      centreX - size * 0.6,
+      top - size * 0.62,
+      size * 1.2,
+      bottom - top + size * 1.24,
+      'rgba(0,0,0,0.5)',
+      { radius: size * 0.55, opacity: 0.92 * fade, role: 'pickStroke' },
+    ),
+  );
+  for (const [index, line] of struck.entries()) {
+    const y = ys[index] as number;
+    shapes.push({
+      kind: 'text',
+      x: centreX,
+      y,
+      width: size,
+      height: size,
+      fill: colors.pick,
+      opacity: 0.98 * fade,
+      role: 'pickStroke',
+      text: pluckingFinger(line.string),
+      fontSize: size,
+      fontWeight: 800,
+      align: 'middle',
+      baseline: 'middle',
+    });
+  }
+  return shapes;
+}
+
+/**
+ * Which finger plucks a string.
+ *
+ * a on the first, m on the second, i on the third, and the thumb on
+ * everything below -- the assignment every classical method opens
+ * with, and the one a player's hand falls into on its own.
+ */
+function pluckingFinger(string: number): string {
+  if (string === 1) return 'a';
+  if (string === 2) return 'm';
+  if (string === 3) return 'i';
+  return 'p';
 }
 
 /** The square bracket: down. */

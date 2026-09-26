@@ -210,6 +210,20 @@ export interface FretboardOptions {
   /** Draw the four-colour hand in a band above the neck, as the video's own legend. */
   readonly handLegend?: boolean;
   /**
+   * What the RIGHT hand is playing with.
+   *
+   * A plectrum strikes the strings together and is written as one
+   * mark over all of them -- the square bracket down, the V up.
+   * Fingers pluck them one at a time and are written a letter at a
+   * time, on the string each finger takes: p the thumb, then i, m and
+   * a. They are two different notations because they are two
+   * different things to watch, and a video that shows the wrong one
+   * is teaching the wrong hand.
+   *
+   * A plectrum unless a caller says otherwise.
+   */
+  readonly picking?: Picking;
+  /**
    * A PHOTOGRAPH of a guitar, in place of the drawn one.
    *
    * The drawing is shapes and gradients and looks like what it is.
@@ -236,9 +250,17 @@ export interface FretboardOptions {
  * changes the wood, the inlays, the headstock and what is mounted on
  * the body -- a maple board with dots and a scratchplate, a spruce top
  * with a soundhole, or an ebony board with block inlays and a pair of
- * humbuckers.
+ * humbuckers. A `classical` is the one with nothing on its board at
+ * all: nylon strings, a plain rosette, and not a marker in the wood.
+ *
+ * How many FRETS each one has is not decided here, because it is not
+ * a property of the drawing -- a classical has nineteen and a modern
+ * electric twenty-four, and the caller says which with `lastFret`.
  */
-export type Instrument = 'acoustic' | 'electric' | 'singleCut';
+export type Instrument = 'classical' | 'acoustic' | 'electric' | 'singleCut';
+
+/** A plectrum, or the fingers. */
+export type Picking = 'pick' | 'fingers';
 
 /**
  * A stroke of the picking hand, as the frame should show it.

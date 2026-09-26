@@ -90,9 +90,30 @@ The picture reads as an instrument: a headstock with a tuning peg per
 string at one end, the fretted neck, and the body at the other —
 a soundhole and its rosette on an **acoustic**, a scratchplate and
 three single coils on an **electric**, pearl blocks and two humbuckers
-on a **singleCut**, with the wood changing to match. That is what
-`instrument: 'acoustic' | 'electric' | 'singleCut'` picks, and the
-strings run the whole length as they do on the real thing.
+on a **singleCut**, a plain rosewood board with nothing at all in it
+on a **classical**, with the wood changing to match. That is what
+`instrument` picks, and the strings run the whole length as they do on
+the real thing.
+
+How many FRETS there are is not part of that, because it is not part
+of the drawing: a classical stops at 19, a dreadnought around 20, an
+electric at 22 and a modern extended-range at 24. The caller says so
+with `lastFret`, and the Guitar page treats it as a fact about the
+instrument rather than a setting — picking the guitar picks the fret
+count with it.
+
+## The right hand: a plectrum, or fingers
+
+`picking: 'pick' | 'fingers'` decides how a stroke is written, and
+they are two different notations because they are two different
+things to watch. A plectrum strikes the strings together, so it is
+ONE mark over all of them: the square bracket down, the V up, which
+every guitarist has read above a stave since they started. Fingers
+pluck the strings one at a time, so each gets the letter of the
+finger that takes it — **a** on the first string, **m** on the
+second, **i** on the third and **p**, the thumb, on everything below.
+The letters sit on a dark plaque, because a letter alone is lost
+against a rosette.
 
 The fret numbers are ruled under the board in a faint ink, there to be
 glanced at rather than read. When the neck is drawn too small to carry

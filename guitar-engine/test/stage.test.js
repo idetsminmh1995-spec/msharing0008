@@ -171,6 +171,67 @@ test('the picking hand draws the two marks a guitarist already reads', () => {
   );
 });
 
+test('fingers are written a letter at a time, on the string each one takes', () => {
+  const shapes = roled(
+    G.stageShapes({
+      ...STAGE,
+      picking: 'fingers',
+      pick: { direction: 'down', strings: [1, 2, 3, 5], age: 0 },
+    }),
+    'pickStroke',
+  );
+  const letters = shapes.filter((shape) => shape.kind === 'text');
+  // p the thumb, then i, m, a -- a on the first string, and the thumb
+  // on everything below the third.
+  assert.equal(letters.map((letter) => letter.text).join(','), 'a,m,i,p');
+  // Each letter is ON its string, not in a row beside them.
+  for (const [index, string] of [1, 2, 3, 5].entries()) {
+    const letter = letters[index];
+    assert.ok(
+      Math.abs(letter.y - G.stringYAt(STAGE, string, letter.x)) < 1e-6,
+      `${letter.text} is on string ${string}`,
+    );
+  }
+  // One dark plaque behind them all, so no letter is lost against a
+  // rosette -- and not a disc each, which would overlap into a blob
+  // the moment three strings in a row are plucked.
+  const plaques = shapes.filter((shape) => shape.kind === 'rect');
+  assert.equal(plaques.length, 1);
+  assert.ok(plaques[0].y < letters[0].y, 'it covers the first letter');
+  assert.ok(
+    plaques[0].y + plaques[0].height > letters[letters.length - 1].y,
+    'and the last one',
+  );
+  // No plectrum stroke when the hand is not holding one.
+  assert.equal(shapes.filter((shape) => shape.kind === 'path').length, 0);
+  // And it fades out the same way the plectrum's mark does.
+  const late = roled(
+    G.stageShapes({
+      ...STAGE,
+      picking: 'fingers',
+      pick: { direction: 'down', strings: [1], age: 0.8 },
+    }),
+    'pickStroke',
+  );
+  assert.ok(late[late.length - 1].opacity < letters[0].opacity);
+});
+
+test('a classical guitar has nothing in its board', () => {
+  const classical = G.fretboardShapes({ ...STAGE, instrument: 'classical' });
+  assert.equal(roled(classical, 'inlay').length, 0, 'not a marker in the wood');
+  // The others do have them.
+  assert.ok(roled(G.fretboardShapes({ ...STAGE, instrument: 'acoustic' }), 'inlay').length > 0);
+  assert.ok(roled(G.fretboardShapes({ ...STAGE, instrument: 'singleCut' }), 'inlay').length > 0);
+  // Nor a scratchplate, because nothing scratches it.
+  assert.equal(roled(classical, 'pickguard').length, 0);
+  assert.ok(roled(G.fretboardShapes({ ...STAGE, instrument: 'acoustic' }), 'pickguard').length > 0);
+  // It is its own instrument to look at: pale spruce, not a sunburst.
+  assert.equal(G.instrumentColors('classical').body, G.CLASSICAL_COLORS.body);
+  assert.notEqual(G.CLASSICAL_COLORS.body, G.ACOUSTIC_COLORS.body);
+  // A soundhole all the same.
+  assert.ok(roled(classical, 'soundhole').length > 0);
+});
+
 test('a mark sits on its own string, in its own fret', () => {
   for (const string of [1, 3, 6]) {
     const [mark] = G.markShapes(G.positionsAt([note({ string, fret: 7 })], 0.5), STAGE);

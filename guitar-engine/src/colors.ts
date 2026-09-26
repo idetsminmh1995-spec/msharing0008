@@ -78,7 +78,7 @@ export const DEFAULT_COLORS: GuitarColors = {
   background: 'none',
 };
 
-export { ACOUSTIC_COLORS, SINGLE_CUT_COLORS } from './instrument.js';
+export { ACOUSTIC_COLORS, CLASSICAL_COLORS, SINGLE_CUT_COLORS } from './instrument.js';
 
 export function instrumentColors(instrument: Instrument | undefined): Partial<GuitarColors> {
   return modelColors(instrument);

@@ -23,6 +23,7 @@ var GuitarEngine = (() => {
   __export(index_exports, {
     ACOUSTIC_COLORS: () => ACOUSTIC_COLORS,
     ACOUSTIC_CUTAWAY: () => ACOUSTIC_CUTAWAY,
+    CLASSICAL_COLORS: () => CLASSICAL_COLORS,
     DEFAULT_COLORS: () => DEFAULT_COLORS,
     DEFAULT_FIRST_FRET: () => DEFAULT_FIRST_FRET,
     DEFAULT_LAST_FRET: () => DEFAULT_LAST_FRET,
@@ -454,11 +455,13 @@ var GuitarEngine = (() => {
 
   // src/instrument.ts
   function modelColors(instrument) {
+    if (instrument === "classical") return CLASSICAL_COLORS;
     if (instrument === "acoustic") return ACOUSTIC_COLORS;
     if (instrument === "singleCut") return SINGLE_CUT_COLORS;
     return {};
   }
   function inlayStyle(instrument) {
+    if (instrument === "classical") return "none";
     return instrument === "singleCut" ? "block" : "dot";
   }
   function tunerLayout(instrument) {
@@ -486,6 +489,30 @@ var GuitarEngine = (() => {
     hardware: "#3A2418",
     hardwareDark: "#1A0E07",
     knob: "#F1EADD"
+  };
+  var CLASSICAL_COLORS = {
+    board: "#3A2419",
+    boardDark: "#241309",
+    boardEdge: "#150B05",
+    neckWood: "#B0824A",
+    neckWoodDark: "#7A5528",
+    binding: "#D8C9A6",
+    inlay: "#F1EADD",
+    inlayEdge: "rgba(0,0,0,0.3)",
+    headstock: "#4A2E1C",
+    headstockEdge: "#241309",
+    peg: "#EFE9DC",
+    pegPost: "#C9A227",
+    string: "#F0E8D8",
+    body: "#EBD3A3",
+    bodyCentre: "#F8E9C8",
+    bodyBurst: "#C9A468",
+    bodyEdge: "#8A5A31",
+    rosette: "#6B3F22",
+    soundhole: "#120A05",
+    hardware: "#3A2419",
+    hardwareDark: "#150B05",
+    knob: "#EFE9DC"
   };
   var SINGLE_CUT_COLORS = {
     board: "#2A1C14",
@@ -590,7 +617,7 @@ var GuitarEngine = (() => {
     const model = options.instrument ?? "electric";
     const geom = bodyGeometry(options, body);
     const shapes = [];
-    const top = model === "acoustic" ? radial(geom.at(0.55), geom.middle, geom.visible * 1.1, [
+    const top = model === "acoustic" || model === "classical" ? radial(geom.at(0.55), geom.middle, geom.visible * 1.1, [
       [0, colors.bodyCentre],
       [0.6, colors.body],
       [1, colors.bodyBurst]
@@ -617,8 +644,9 @@ var GuitarEngine = (() => {
         role: "body"
       })
     );
-    if (model === "acoustic") shapes.push(...acousticTop(geom, colors, options));
-    else if (model === "singleCut") shapes.push(...singleCutTop(geom, colors, options));
+    if (model === "acoustic" || model === "classical") {
+      shapes.push(...acousticTop(geom, colors, options, model === "acoustic"));
+    } else if (model === "singleCut") shapes.push(...singleCutTop(geom, colors, options));
     else shapes.push(...electricTop(geom, colors, options));
     return shapes;
   }
@@ -644,7 +672,7 @@ var GuitarEngine = (() => {
     const bottom = geom.y + height * 0.96;
     const jointTop = middle - neckHalf * 1.1;
     const jointBottom = middle + neckHalf * 1.1;
-    if (model === "acoustic") {
+    if (model === "acoustic" || model === "classical") {
       return [
         `M${x} ${jointTop}`,
         `C${at(0.1)} ${jointTop - height * 0.16} ${at(0.24)} ${top} ${at(0.55)} ${top}`,
@@ -679,19 +707,20 @@ var GuitarEngine = (() => {
       "Z"
     ].join(" ");
   }
-  function acousticTop(geom, colors, options) {
+  function acousticTop(geom, colors, options, plate) {
     const shapes = [];
     const { middle, height, at, visible } = geom;
     const r = Math.min(visible * 0.3, height * 0.32);
     const cx = at(0.52);
-    shapes.push(
-      pathShape(
-        `M${cx} ${middle - r * 0.2} L${cx + r * 2} ${middle + r * 0.55} L${cx + r * 1.6} ${middle + r * 1.7} L${cx - r * 0.2} ${middle + r * 1.2} Z`,
-        { x: cx - r, y: middle, width: r * 3, height: r * 2 },
-        colors.pickguard,
-        { opacity: 0.9, role: "pickguard" }
-      )
-    );
+    if (plate)
+      shapes.push(
+        pathShape(
+          `M${cx} ${middle - r * 0.2} L${cx + r * 2} ${middle + r * 0.55} L${cx + r * 1.6} ${middle + r * 1.7} L${cx - r * 0.2} ${middle + r * 1.2} Z`,
+          { x: cx - r, y: middle, width: r * 3, height: r * 2 },
+          colors.pickguard,
+          { opacity: 0.9, role: "pickguard" }
+        )
+      );
     shapes.push(circleShape(cx, middle, r * 1.22, colors.rosette, { role: "soundhole" }));
     shapes.push(circleShape(cx, middle, r * 1.1, colors.body, { role: "soundhole" }));
     shapes.push(
@@ -1277,9 +1306,11 @@ var GuitarEngine = (() => {
     );
   }
   function inlayShapes(options, colors) {
+    const style = inlayStyle(options.instrument);
+    if (style === "none") return [];
     const shapes = [];
     const gap = stringGap(options);
-    const block = inlayStyle(options.instrument) === "block";
+    const block = style === "block";
     const per = fretWidth(options);
     for (const inlay of inlayFrets(options)) {
       const cx = fretCenter(inlay.fret, options);
@@ -1583,6 +1614,9 @@ var GuitarEngine = (() => {
     const centreY = (first + last) / 2;
     const spread = last - first;
     const height = Math.max(height0 * 0.2, spread + height0 * 0.08);
+    if (options.picking === "fingers") {
+      return fingerstyleShapes(struck, options, colors, centreX, mark.age);
+    }
     const thickness = Math.max(1.5, width * 0.24);
     const d = mark.direction === "down" ? downStrokePath(centreX, centreY, width, height, thickness) : upStrokePath(centreX, centreY, width, height, thickness);
     const halo = mark.direction === "down" ? downStrokePath(centreX, centreY, width * 1.28, height * 1.18, thickness * 1.5) : upStrokePath(centreX, centreY, width * 1.28, height * 1.18, thickness * 1.5);
@@ -1594,6 +1628,50 @@ var GuitarEngine = (() => {
       }),
       pathShape(d, bounds, colors.pick, { opacity: 0.95 * (1 - mark.age), role: "pickStroke" })
     ];
+  }
+  function fingerstyleShapes(struck, options, colors, centreX, age) {
+    const gap = stringGap(options);
+    const size = gap * 1.3;
+    const shapes = [];
+    const fade = 1 - age;
+    const ys = struck.map((line) => stringYAt(options, line.string, centreX));
+    const top = Math.min(...ys);
+    const bottom = Math.max(...ys);
+    shapes.push(
+      rectShape(
+        centreX - size * 0.6,
+        top - size * 0.62,
+        size * 1.2,
+        bottom - top + size * 1.24,
+        "rgba(0,0,0,0.5)",
+        { radius: size * 0.55, opacity: 0.92 * fade, role: "pickStroke" }
+      )
+    );
+    for (const [index, line] of struck.entries()) {
+      const y = ys[index];
+      shapes.push({
+        kind: "text",
+        x: centreX,
+        y,
+        width: size,
+        height: size,
+        fill: colors.pick,
+        opacity: 0.98 * fade,
+        role: "pickStroke",
+        text: pluckingFinger(line.string),
+        fontSize: size,
+        fontWeight: 800,
+        align: "middle",
+        baseline: "middle"
+      });
+    }
+    return shapes;
+  }
+  function pluckingFinger(string) {
+    if (string === 1) return "a";
+    if (string === 2) return "m";
+    if (string === 3) return "i";
+    return "p";
   }
   function downStrokePath(cx, cy, w, h, t) {
     const left = cx - w / 2;
