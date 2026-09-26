@@ -29,21 +29,20 @@ test('the picture is shown whole, and the span decides how much of it', () => {
   const across = to - from;
   const fit = Math.min(FRAME.width / across, FRAME.height / PHOTO.height);
   assert.ok(Math.abs(place.scale - fit) < 1e-9);
-  // Down, nothing is ever cut: the picture is held inside the box.
-  assert.ok(place.y >= -1e-9, 'its top is in the box');
-  assert.ok(place.y + PHOTO.height * place.scale <= FRAME.height + 1e-9, 'and so is its bottom');
-  // A box tall enough lets it hang by its strings where the board's
-  // band wants them, rather than being pinned to an edge.
-  const roomy = { ...FRAME, height: Math.round(PHOTO.height * (FRAME.width / across)) + 200 };
-  const hung = G.photoPlacement(roomy);
-  const board = G.guitarLayout(roomy).board;
+  // Down, it hangs by its STRINGS: they land where the board's band
+  // puts them and `drop` moves them from there. Nothing pulls it
+  // back, because the box is the whole video frame and an edge that
+  // runs past it is the frame's own.
+  const board = G.guitarLayout(FRAME).board;
   const nutMid = (PHOTO.stringsAtNut[0] + PHOTO.stringsAtNut[1]) / 2;
   const endMid = (PHOTO.stringsAtEnd[0] + PHOTO.stringsAtEnd[1]) / 2;
-  const middle = hung.y + ((nutMid + endMid) / 2) * hung.scale;
-  assert.ok(Math.abs(middle - (board.y + board.height / 2)) < 1, `hung at ${middle}`);
+  const middle = place.y + ((nutMid + endMid) / 2) * place.scale;
+  const wanted = board.y + board.height / 2 + PHOTO.drop * FRAME.height;
+  assert.ok(Math.abs(middle - wanted) < 1, `hung at ${middle}, wanted ${wanted}`);
+  assert.ok(middle > FRAME.height * 0.7, 'which is low down the frame, as it is meant to be');
   // And the box a page should give it is its own height at that width.
-  const wanted = G.stageHeightFor(FRAME.width, PHOTO, { handLegend: true, fretNumbers: true });
-  assert.equal(wanted, Math.round(PHOTO.height * (FRAME.width / across)));
+  const box = G.stageHeightFor(FRAME.width, PHOTO, { handLegend: true, fretNumbers: true });
+  assert.equal(box, Math.round(PHOTO.height * (FRAME.width / across)));
   assert.equal(G.photoPlacement({ width: 1920, height: 497 }), undefined, 'no photo, no placement');
 });
 
@@ -211,10 +210,16 @@ test('a cropped picture is faded into the frame, not cut off by it', () => {
   // at its outline, and a band there is fog over the guitar.
   // A picture shown WHOLE is never cut, so it never gets a band. One
   // framed to fill the frame is cut, and does.
-  const photo = { ...G.photoNamed('acoustic-drawn', 'acoustic.svg'), fit: 'frame' };
+  // Stripped of the framing the page gives it: this is about where
+  // the bands go, not about where the guitar hangs.
+  const photo = {
+    ...G.photoNamed('acoustic-drawn', 'acoustic.svg'),
+    fit: 'frame',
+    drop: undefined,
+  };
   const height = G.stageHeightFor(1920, photo, { handLegend: true, fretNumbers: true });
   const seen = new Set();
-  for (const drop of [-0.8, -0.55, -0.3, 0, 0.13, 0.4]) {
+  for (const drop of [-0.9, -0.7, -0.45, -0.3, 0, 0.2]) {
     const box = {
       ...FRAME,
       photo: { ...photo, drop },

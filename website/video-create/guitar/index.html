@@ -1412,24 +1412,22 @@
   }
 
   /**
-   * The box the guitar gets, which the PICTURE decides.
+   * The box the guitar gets: the WHOLE video frame.
    *
-   * A picture is scaled to fit the width, so its height is settled
-   * the moment the width is: the box follows the picture rather than
-   * the picture rattling around inside a box meant for something
-   * else. Never taller than the room the notation leaves.
+   * It used to be the strip the notation left, and the guitar was cut
+   * at the top of it -- a hard line across the middle of a picture.
+   * The stage covers the frame instead and the notation is printed
+   * over it, so the only edges the guitar meets are the frame's own.
+   * That also makes every guitar's box the same height, which is what
+   * lets one `drop` hang all four of them at the same place.
    */
   function neckBox() {
     if (!guitarStage) return null;
     const box = guitarStage.getBoundingClientRect();
-    const width = Math.max(1, Math.round(box.width));
-    const photo = guitarPhoto();
-    if (!photo) return { width, height: Math.max(1, Math.round(box.height)) };
-    const wanted = GuitarEngine.stageHeightFor(width, photo, {
-      handLegend: true,
-      fretNumbers: true,
-    });
-    return { width, height: Math.max(1, Math.min(Math.round(box.height), wanted)) };
+    return {
+      width: Math.max(1, Math.round(box.width)),
+      height: Math.max(1, Math.round(box.height)),
+    };
   }
 
   /** The preview's stage, redrawn where it is. */

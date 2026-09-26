@@ -104,7 +104,11 @@ var GuitarEngine = (() => {
     // the BRIDGE, which is the framing the owner asked for by name: the
     // headstock runs off the left edge and the rest of the body off the
     // right, and the whole playing length gets the frame.
-    span: [223, 1454]
+    span: [223, 1454],
+    // How far down the frame the neck sits. The owner drew an arrow:
+    // the fretboard belongs down at the bottom, with the body running
+    // off the bottom edge and the notation over the space it leaves.
+    drop: 0.31
   };
   var CLASSICAL_DRAWN = {
     width: 1513.5,
@@ -141,7 +145,11 @@ var GuitarEngine = (() => {
     // the BRIDGE, which is the framing the owner asked for by name: the
     // headstock runs off the left edge and the rest of the body off the
     // right, and the whole playing length gets the frame.
-    span: [251, 1293]
+    span: [251, 1293],
+    // How far down the frame the neck sits. The owner drew an arrow:
+    // the fretboard belongs down at the bottom, with the body running
+    // off the bottom edge and the notation over the space it leaves.
+    drop: 0.31
   };
   var STRAT_DRAWN = {
     width: 3058,
@@ -181,7 +189,11 @@ var GuitarEngine = (() => {
     // the BRIDGE, which is the framing the owner asked for by name: the
     // headstock runs off the left edge and the rest of the body off the
     // right, and the whole playing length gets the frame.
-    span: [512, 2761]
+    span: [512, 2761],
+    // How far down the frame the neck sits. The owner drew an arrow:
+    // the fretboard belongs down at the bottom, with the body running
+    // off the bottom edge and the notation over the space it leaves.
+    drop: 0.31
   };
   var ELECTRIC_DRAWN = {
     width: 1920,
@@ -221,7 +233,11 @@ var GuitarEngine = (() => {
     // the BRIDGE, which is the framing the owner asked for by name: the
     // headstock runs off the left edge and the rest of the body off the
     // right, and the whole playing length gets the frame.
-    span: [375, 1654]
+    span: [375, 1654],
+    // How far down the frame the neck sits. The owner drew an arrow:
+    // the fretboard belongs down at the bottom, with the body running
+    // off the bottom edge and the notation over the space it leaves.
+    drop: 0.31
   };
   var PHOTOS = {
     "acoustic-drawn": ACOUSTIC_DRAWN,
@@ -325,17 +341,14 @@ var GuitarEngine = (() => {
       const [from, to] = photoSpan(photo);
       const across = to - from;
       const scale2 = Math.min(options.width / across, options.height / photo.height);
-      const drawn = photo.height * scale2;
       const board2 = guitarLayout(options).board;
-      const hung = board2.y + board2.height / 2 - photoStringMiddle(photo) * scale2 + photoDrop(photo) * options.height;
-      const room = options.height - drawn;
       return {
         photo,
         scale: scale2,
         // Centred across when the height ran out first and the span no
         // longer fills the width.
         x: -from * scale2 + (options.width - across * scale2) / 2,
-        y: Math.min(Math.max(hung, Math.min(0, room)), Math.max(0, room))
+        y: board2.y + board2.height / 2 - photoStringMiddle(photo) * scale2 + photoDrop(photo) * options.height
       };
     }
     const scale = photoScale(options.width, photo);
@@ -960,12 +973,10 @@ var GuitarEngine = (() => {
     if (options.handLegend !== true) return [];
     const band = guitarLayout(options).hand;
     if (!(band.height > 0)) return [];
-    const under = boardEdges(options, fretCenter(1, options)).bottom;
-    const ceiling = under + boardDepth(options) * 0.75;
-    const height = Math.max(band.height, options.height - ceiling) * 0.94;
+    const floor = boardEdges(options, fretCenter(1, options)).top - boardDepth(options) * 0.2;
+    const height = Math.max(band.height, floor) * 0.94;
     const width = height * 0.78;
     const left = band.x + band.width * 0.012;
-    const floor = options.height - (options.height - ceiling) * 0.03;
     const picture = options.handImage;
     if (picture !== void 0 && picture.width > 0 && picture.height > 0) {
       const scale = Math.min(

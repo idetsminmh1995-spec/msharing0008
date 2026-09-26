@@ -154,6 +154,10 @@ export const ACOUSTIC_DRAWN: PhotoMeasurements = {
   // headstock runs off the left edge and the rest of the body off the
   // right, and the whole playing length gets the frame.
   span: [223, 1454],
+  // How far down the frame the neck sits. The owner drew an arrow:
+  // the fretboard belongs down at the bottom, with the body running
+  // off the bottom edge and the notation over the space it leaves.
+  drop: 0.31,
 };
 
 /**
@@ -201,6 +205,10 @@ export const CLASSICAL_DRAWN: PhotoMeasurements = {
   // headstock runs off the left edge and the rest of the body off the
   // right, and the whole playing length gets the frame.
   span: [251, 1293],
+  // How far down the frame the neck sits. The owner drew an arrow:
+  // the fretboard belongs down at the bottom, with the body running
+  // off the bottom edge and the notation over the space it leaves.
+  drop: 0.31,
 };
 
 /**
@@ -245,6 +253,10 @@ export const STRAT_DRAWN: PhotoMeasurements = {
   // headstock runs off the left edge and the rest of the body off the
   // right, and the whole playing length gets the frame.
   span: [512, 2761],
+  // How far down the frame the neck sits. The owner drew an arrow:
+  // the fretboard belongs down at the bottom, with the body running
+  // off the bottom edge and the notation over the space it leaves.
+  drop: 0.31,
 };
 
 /**
@@ -300,6 +312,10 @@ export const ELECTRIC_DRAWN: PhotoMeasurements = {
   // headstock runs off the left edge and the rest of the body off the
   // right, and the whole playing length gets the frame.
   span: [375, 1654],
+  // How far down the frame the neck sits. The owner drew an arrow:
+  // the fretboard belongs down at the bottom, with the body running
+  // off the bottom edge and the notation over the space it leaves.
+  drop: 0.31,
 };
 /**
  * Every set of measurements this engine carries, by the name of the

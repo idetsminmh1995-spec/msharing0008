@@ -172,29 +172,28 @@ export function photoPlacement(options: FretboardOptions): PhotoPlacement | unde
   // the body off the sides. That is a decision about the PICTURE, not
   // a box cutting it.
   //
-  // Down, the picture hangs by its strings the way a framed one does,
-  // and is then held inside the box: it can move to put the strings
-  // where the board's band wants them, but not far enough to lose an
-  // edge. Given a box as tall as the frame there is room for both.
+  // Down, the picture hangs by its STRINGS: they land where the
+  // board's band puts them, `drop` moves them from there, and nothing
+  // pulls them back. The box is the whole video frame, so an edge
+  // that runs past it is the frame's own edge -- which is not a cut
+  // anybody reads as one, and is the only reason the guitar can sit
+  // low with its body running off the bottom.
   if (photo.fit === 'whole' && photo.height > 0 && options.height > 0) {
     const [from, to] = photoSpan(photo);
     const across = to - from;
     const scale = Math.min(options.width / across, options.height / photo.height);
-    const drawn = photo.height * scale;
     const board = guitarLayout(options).board;
-    const hung =
-      board.y +
-      board.height / 2 -
-      photoStringMiddle(photo) * scale +
-      photoDrop(photo) * options.height;
-    const room = options.height - drawn;
     return {
       photo,
       scale,
       // Centred across when the height ran out first and the span no
       // longer fills the width.
       x: -from * scale + (options.width - across * scale) / 2,
-      y: Math.min(Math.max(hung, Math.min(0, room)), Math.max(0, room)),
+      y:
+        board.y +
+        board.height / 2 -
+        photoStringMiddle(photo) * scale +
+        photoDrop(photo) * options.height,
     };
   }
   const scale = photoScale(options.width, photo);

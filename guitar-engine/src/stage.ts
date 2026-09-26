@@ -287,24 +287,22 @@ function photoFadeShapes(options: FretboardOptions): readonly StageShape[] {
  * It is drawn INTO the stage rather than laid over it by the page, so
  * the exported video carries it too.
  *
- * It used to sit in the band ABOVE the neck. The guitar has the whole
- * frame now and the notation is printed over the top of it, so that
- * band is the notation's: the hand goes to the bottom left instead,
- * under the fret numbers, which on every one of these guitars is the
- * corner the body has left empty.
+ * It sits just ABOVE the neck at the left, in the gap between the
+ * notation printed across the top of the frame and the board itself.
+ * Its bottom is the board's top, so it follows the guitar down the
+ * frame instead of being pinned to a band, and it never grows wider
+ * than a share of the frame however much room it is given.
  */
 function handLegendShapes(options: FretboardOptions): readonly StageShape[] {
   if (options.handLegend !== true) return [];
   const band = guitarLayout(options).hand;
   if (!(band.height > 0)) return [];
-  // The corner: from under the neck and its numbers, down to the
-  // bottom of the stage.
-  const under = boardEdges(options, fretCenter(1, options)).bottom;
-  const ceiling = under + boardDepth(options) * 0.75;
-  const height = Math.max(band.height, options.height - ceiling) * 0.94;
+  // The gap above the neck: down to the board's own top edge, which
+  // is where the guitar starts and the legend has to stop.
+  const floor = boardEdges(options, fretCenter(1, options)).top - boardDepth(options) * 0.2;
+  const height = Math.max(band.height, floor) * 0.94;
   const width = height * 0.78;
   const left = band.x + band.width * 0.012;
-  const floor = options.height - (options.height - ceiling) * 0.03;
   // A drawing of the hand, when the caller has one, in the same place
   // and at the same size the built-in hand would have taken. Its own
   // shape is kept -- a hand squashed to fit a box stops looking like

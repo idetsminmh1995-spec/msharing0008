@@ -124,19 +124,23 @@ runs off the left, the rest of the body off the right, and the whole
 playing length gets the frame. That is a decision about the picture,
 not a box cutting it.
 
-**Down, nothing is cut at all.** The picture hangs by its strings, so
-they land where the board's band wants them, and is then held inside
-its box: it can move, but not far enough to lose an edge. The box it
-is given is the whole video frame — `.video-mid` is `position:
-absolute; inset: 0` and the notation is printed over the top of it.
-That is the point. Cut at the top of the strip the notation left, the
-body stopped dead in the middle of the picture and had to be faded
-out; given the whole frame it runs off the frame's own edges, which
-nobody reads as a cut.
+**Down, it hangs by its strings** — they land where the board's band
+puts them, and `drop` moves them from there. All four use `drop:
+0.31`, which is the owner's arrow: the fretboard belongs down at the
+bottom of the frame, with the body running off the bottom edge and
+the notation over the space that leaves.
 
-The hand legend went to the bottom LEFT with that change, under the
-fret numbers. It used to sit in the band above the neck, which is now
-where the notation is printed.
+Nothing pulls the picture back, because the box it is given is the
+whole video frame — `.video-mid` is `position: absolute; inset: 0`
+and the notation is printed over the top of it. That is the point.
+Cut at the top of the strip the notation used to leave, the body
+stopped dead in the middle of the picture and had to be faded out;
+given the whole frame, every edge it meets is the frame's own, which
+nobody reads as a cut. It also makes all four boxes the same height,
+which is what lets ONE `drop` hang all four at the same place.
+
+The hand legend sits just above the neck at the left, with its bottom
+on the board's top edge, so it follows the guitar down the frame.
 
 `fit: 'frame'` is the other way — fill the frame and let the body run
 off the top and the bottom of its box. Nothing uses it now, but it is
