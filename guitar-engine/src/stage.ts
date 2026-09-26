@@ -638,7 +638,12 @@ export function markShapes(
     if (!strings.has(position.string)) continue;
     if (position.fret < first || position.fret > last) continue;
     const color = fingerColor(position.finger, colors);
-    const x = fretCenter(position.fret, options);
+    // A picture whose neck runs in from the left edge has its nut off
+    // that edge, and an OPEN string is played at the nut. Drawing it
+    // where the nut really is puts it outside the frame, where it
+    // teaches nobody anything; held at the edge it is at least on the
+    // right string, pointing the way the nut went.
+    const x = Math.max(size * 0.6, fretCenter(position.fret, options));
     const y = stringYAt(options, position.string, x);
 
     if (position.sliding) {

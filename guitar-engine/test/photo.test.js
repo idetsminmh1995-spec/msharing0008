@@ -84,6 +84,25 @@ test('a mark lands on the picture’s own string', () => {
   for (const gap of gaps) assert.ok(Math.abs(gap - gaps[0]) < 0.001, `even at the nut: ${gaps}`);
 });
 
+test('an open string is still shown when the nut is off the edge', () => {
+  // A picture framed with the neck running in from the left edge:
+  // the nut, and the first fret with it, are off it.
+  const bled = {
+    ...FRAME,
+    photo: { ...PHOTO, frets: [-180, -70, ...PHOTO.frets.slice(2)] },
+  };
+  assert.ok(G.fretCenter(0, bled) < 0, 'the nut really is off the edge');
+  const [mark] = G.markShapes(
+    G.positionsAt([{ string: 3, fret: 0, startSeconds: 0, endSeconds: 1, finger: 0 }], 0.5),
+    bled,
+  );
+  assert.ok(mark.x > 0 && mark.x < mark.width, 'held at the edge the nut went past');
+  assert.ok(
+    Math.abs(mark.y - G.stringYAt(bled, 3, mark.x)) < 1e-6,
+    'and still on its own string',
+  );
+});
+
 test('the photograph replaces the drawn instrument, not the playing', () => {
   const shapes = G.stageShapes({
     ...FRAME,

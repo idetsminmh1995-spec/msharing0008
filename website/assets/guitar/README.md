@@ -19,24 +19,43 @@ with one of a different size means changing those two numbers.
 Trimmed to the ink, transparent background, drawn with the thumb to
 the left and the fingers up.
 
-## The photograph
+## The photographs
 
-`acoustic-sunburst.webp` — a sunburst cutaway dreadnought, neck
-running in from the left and the body filling the right, on a
-transparent background. This is what the page draws for **Acoustic
-Guitar**, and it is a real photograph.
+`acoustic-natural.webp` — a natural-top dreadnought, framed by its
+owner: neck in from the left edge, body filling the right,
+background cut away. This is what the page draws for **Acoustic
+Guitar**.
+
+`acoustic-sunburst.webp` — a sunburst cutaway dreadnought, the same
+idea. Kept, measured and ready; nothing draws it at the moment.
+
+### Measuring one: the dots are the anchor, not the first wire
+
+A geometric fret series fits equally well however the wires are
+numbered — the nut position and the scale length absorb any shift —
+so counting "the first wire I can see must be fret 1" is a coin toss,
+and getting it wrong puts every mark a fret out for the whole video.
+It happened once here, silently.
+
+The INLAY DOTS cannot move: 3, 5, 7, 9, 12, 15, 17, 19 are where a
+guitar puts them, and a dot sits between the wires of its own fret
+and the one before. Fit the scale to the dots, then read off which
+fret each wire lands on: the right numbering lands them within about
+0.2 of whole numbers, and a wrong one is off by half a fret. That fit
+is what says the natural-top photograph starts at the SECOND fret,
+with its nut off the left edge — which is why its first two entries
+are negative.
 
 It is the best-looking thing here by a distance, and it is worth
 being plain about why: no renderer written by hand is going to beat a
 photograph of a real instrument. The renders below are what to use
 when there is no photograph.
 
-It was measured off the file — the fret wires as the bright lines
-across the dark board, the strings as the bright lines along it, both
-fitted across the whole run. The board edges came out to within about
-a pixel and the strings to within two, where a string gap is
-twenty-three. The numbers live in `guitar-engine/src/photo.ts` as
-`ACOUSTIC_SUNBURST`.
+Both were measured off their files — the fret wires as the bright
+lines across the dark board, the strings as the bright lines along
+it, fitted across the whole run rather than read off two points. The
+strings land within half a pixel of their fits, where a string gap is
+about twenty. The numbers live in `guitar-engine/src/photo.ts`.
 
 **A photograph for one of the other three goes in the same way.** It
 wants to be shot along the neck, nut at the left, body at the right,

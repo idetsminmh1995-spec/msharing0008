@@ -24,6 +24,7 @@ var GuitarEngine = (() => {
     ACOUSTIC_BOARD: () => ACOUSTIC_BOARD,
     ACOUSTIC_COLORS: () => ACOUSTIC_COLORS,
     ACOUSTIC_CUTAWAY: () => ACOUSTIC_CUTAWAY,
+    ACOUSTIC_NATURAL: () => ACOUSTIC_NATURAL,
     ACOUSTIC_SUNBURST: () => ACOUSTIC_SUNBURST,
     CLASSICAL_BOARD: () => CLASSICAL_BOARD,
     CLASSICAL_COLORS: () => CLASSICAL_COLORS,
@@ -106,12 +107,47 @@ var GuitarEngine = (() => {
     boardAtNut: [413, 527],
     boardAtEnd: [376, 548]
   };
+  var ACOUSTIC_NATURAL = {
+    width: 1920,
+    height: 711,
+    fit: "frame",
+    frets: [
+      -181.1,
+      -72.9,
+      34,
+      132,
+      220,
+      304,
+      383,
+      458,
+      529,
+      596,
+      660,
+      721,
+      779,
+      834,
+      885,
+      934,
+      980,
+      1025,
+      1066,
+      1106,
+      1143,
+      1178,
+      1212
+    ],
+    boardEndX: 1250,
+    stringsAtNut: [492.6, 589.1],
+    stringsAtEnd: [470.4, 609.9],
+    boardAtNut: [489.5, 592.5],
+    boardAtEnd: [463.8, 620.7]
+  };
   var ACOUSTIC_SUNBURST = {
     width: 2e3,
     height: 714,
     fit: "frame",
     frets: [
-      90,
+      106.8,
       220,
       332,
       439,
@@ -276,6 +312,7 @@ var GuitarEngine = (() => {
   var PHOTOS = {
     "acoustic-cutaway": ACOUSTIC_CUTAWAY,
     "acoustic-sunburst": ACOUSTIC_SUNBURST,
+    "acoustic-natural": ACOUSTIC_NATURAL,
     "fretboard-classical": CLASSICAL_BOARD,
     "fretboard-acoustic": ACOUSTIC_BOARD,
     "fretboard-electric": ELECTRIC_BOARD,
@@ -1786,7 +1823,7 @@ var GuitarEngine = (() => {
       if (!strings.has(position.string)) continue;
       if (position.fret < first || position.fret > last) continue;
       const color = fingerColor(position.finger, colors);
-      const x = fretCenter(position.fret, options);
+      const x = Math.max(size * 0.6, fretCenter(position.fret, options));
       const y = stringYAt(options, position.string, x);
       if (position.sliding) {
         const fromX = fretCenter(position.fromFret, options);

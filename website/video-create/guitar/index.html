@@ -414,7 +414,7 @@
       <label for="instrument">Guitar</label>
       <select id="instrument" class="drum-input">
         <option value="classical">Classical Guitar &mdash; 19 frets</option>
-        <option value="acoustic" selected>Acoustic Guitar &mdash; 20 frets</option>
+        <option value="acoustic" selected>Acoustic Guitar &mdash; 19 frets</option>
         <option value="electric">Electric Guitar, single cut &mdash; 22 frets</option>
         <option value="strat">Electric Guitar, double cut &mdash; 21 frets</option>
       </select>
@@ -587,8 +587,8 @@
            src="../../assets/guitar/fretboard-classical.webp" alt="" style="display:none" decoding="async">
       <!-- The acoustic is a PHOTOGRAPH of a real one, measured. The
            other three are renders until photographs of them arrive. -->
-      <img data-stage-image data-guitar-photo="acoustic-sunburst"
-           src="../../assets/guitar/acoustic-sunburst.webp" alt="" style="display:none" decoding="async">
+      <img data-stage-image data-guitar-photo="acoustic-natural"
+           src="../../assets/guitar/acoustic-natural.webp" alt="" style="display:none" decoding="async">
       <img data-stage-image data-guitar-photo="fretboard-electric"
            src="../../assets/guitar/fretboard-electric.webp" alt="" style="display:none" decoding="async">
       <img data-stage-image data-guitar-photo="fretboard-strat"
@@ -1022,7 +1022,7 @@
    */
   const GUITARS = {
     classical: { frets: 19, model: 'classical', photo: 'fretboard-classical' },
-    acoustic: { frets: 20, model: 'acoustic', photo: 'acoustic-sunburst' },
+    acoustic: { frets: 19, model: 'acoustic', photo: 'acoustic-natural' },
     electric: { frets: 22, model: 'singleCut', photo: 'fretboard-electric' },
     strat: { frets: 21, model: 'electric', photo: 'fretboard-strat' },
   };
@@ -1032,8 +1032,16 @@
     return GUITARS[instrumentSelect?.value] ?? GUITARS[DEFAULT_GUITAR];
   }
 
-  /** The last fret the instrument has. Not a view setting: the guitar's own. */
+  /**
+   * The last fret the instrument has. Not a view setting: the
+   * guitar's own -- and where there is a picture of one, the
+   * PICTURE's, because that is the neck a viewer is looking at. A
+   * fingering worked out for a fret the picture does not have is a
+   * mark with nowhere to land.
+   */
   function lastFret() {
+    const photo = guitarPhoto();
+    if (photo && typeof GuitarEngine !== 'undefined') return GuitarEngine.photoFretCount(photo);
     return guitar().frets;
   }
 

@@ -105,6 +105,40 @@ export const ACOUSTIC_CUTAWAY: PhotoMeasurements = {
 };
 
 /**
+ * The photograph the page draws for an acoustic: a natural-top
+ * dreadnought, framed by its owner -- neck in from the left edge,
+ * body filling the right, background cut away.
+ *
+ * Measured off the file, and the INLAY DOTS are what settle it. A
+ * geometric fret series fits equally well however the wires are
+ * numbered -- the nut position and the scale length absorb any shift
+ * -- so counting from the first wire in the picture is a coin toss,
+ * and getting it wrong puts every mark a fret out. The markers
+ * cannot move: 5, 7, 9, 17, 19 are where a guitar puts them. Fitting
+ * to those five lands the wires within 0.18 of whole fret numbers,
+ * and says the first wire in the picture is the SECOND fret: the nut
+ * and the first fret are off the left edge, which is why they are
+ * negative here.
+ *
+ * The strings were fitted across twenty-six places and land within
+ * half a pixel, where a string gap is twenty-two.
+ */
+export const ACOUSTIC_NATURAL: PhotoMeasurements = {
+  width: 1920,
+  height: 711,
+  fit: 'frame',
+  frets: [
+    -181.1, -72.9, 34, 132, 220, 304, 383, 458, 529, 596, 660, 721, 779, 834, 885, 934, 980, 1025,
+    1066, 1106, 1143, 1178, 1212,
+  ],
+  boardEndX: 1250.0,
+  stringsAtNut: [492.6, 589.1],
+  stringsAtEnd: [470.4, 609.9],
+  boardAtNut: [489.5, 592.5],
+  boardAtEnd: [463.8, 620.7],
+};
+
+/**
  * The photograph: a sunburst cutaway dreadnought, neck running in
  * from the left and the body filling the right.
  *
@@ -117,14 +151,17 @@ export const ACOUSTIC_CUTAWAY: PhotoMeasurements = {
  * the strings to within two, where a string gap is twenty-three.
  *
  * Twenty frets, and the light band at 1590 is where the board ENDS
- * rather than a twenty-first: the soundhole starts just past it.
+ * rather than a twenty-first: the soundhole starts just past it. The
+ * numbering was checked the way the natural-top one was -- fitted to
+ * the inlay dots, which land its wires within 0.18 of whole fret
+ * numbers with the first of them at fret 1.
  */
 export const ACOUSTIC_SUNBURST: PhotoMeasurements = {
   width: 2000,
   height: 714,
   fit: 'frame',
   frets: [
-    90.0, 220, 332, 439, 539, 636, 725, 808, 885, 960, 1028, 1093, 1157, 1214, 1270, 1321, 1368,
+    106.8, 220, 332, 439, 539, 636, 725, 808, 885, 960, 1028, 1093, 1157, 1214, 1270, 1321, 1368,
     1416, 1458, 1498, 1538,
   ],
   boardEndX: 1590.0,
@@ -210,6 +247,7 @@ export const STRAT_BOARD: PhotoMeasurements = {
 export const PHOTOS: Readonly<Record<string, PhotoMeasurements>> = {
   'acoustic-cutaway': ACOUSTIC_CUTAWAY,
   'acoustic-sunburst': ACOUSTIC_SUNBURST,
+  'acoustic-natural': ACOUSTIC_NATURAL,
   'fretboard-classical': CLASSICAL_BOARD,
   'fretboard-acoustic': ACOUSTIC_BOARD,
   'fretboard-electric': ELECTRIC_BOARD,
