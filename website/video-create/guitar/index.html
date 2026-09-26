@@ -426,14 +426,14 @@
       </select>
       <label for="picking">Picking hand</label>
       <select id="picking" class="drum-input">
-        <option value="pick" selected>Plectrum &mdash; down and up strokes</option>
-        <option value="fingers">Fingers &mdash; p i m a</option>
+        <option value="fingers" selected>Fingers &mdash; the string in its finger's colour</option>
+        <option value="pick">Plectrum &mdash; down and up strokes</option>
       </select>
       <div class="finger-legend">
         <div class="finger-hand" id="fingerHand" aria-hidden="true"></div>
         <div class="finger-names" id="fingerNames"></div>
       </div>
-      <div class="field-hint" id="fretHint">The neck lights where each note is played &mdash; its string, its fret and the finger stopping it, with the fret numbers along the bottom. When the score writes a position or a fingering down, that is what you see; when it does not, the Human Finger Engine works out how a guitarist would play the line: it weighs every place each note could go, what the hand would have to stretch, and how long it has to get there, then picks the way through with the least work in it. The picking hand is drawn too, as the square bracket and the V every guitarist reads. Pick the guitar and it brings its own neck with it &mdash; so there is no fret count to set: that is a fact about the instrument, not a view, and the number beside each name is counted off the drawing itself. Six strings throughout. All four are DRAWINGS of real guitars, in vector, measured fret by fret so every mark lands on the right string in the right fret and stays sharp at whatever size you export. Then say what the right hand is doing: a plectrum is written as the square bracket and the V every guitarist reads, and fingers are written a letter at a time on the string each one takes &mdash; p the thumb, then i, m and a. A slide travels along the string rather than jumping, an open string has its own colour, and the four finger colours are fixed, not chosen: they are meant to be learnt once and read in every video after.</div>
+      <div class="field-hint" id="fretHint">The neck lights where each note is played &mdash; its string, its fret and the finger stopping it, with the fret numbers along the bottom. When the score writes a position or a fingering down, that is what you see; when it does not, the Human Finger Engine works out how a guitarist would play the line: it weighs every place each note could go, what the hand would have to stretch, and how long it has to get there, then picks the way through with the least work in it. The picking hand is drawn too, in the same colours as the fretting one. Pick the guitar and it brings its own neck with it &mdash; so there is no fret count to set: that is a fact about the instrument, not a view, and the number beside each name is counted off the drawing itself. Six strings throughout. All four are DRAWINGS of real guitars, in vector, measured fret by fret so every mark lands on the right string in the right fret and stays sharp at whatever size you export. Then say what the right hand is doing. Playing with the fingers, each string is marked in the colour of the digit that takes it &mdash; the thumb on the bass strings, then index, middle and ring &mdash; the same five colours the hand in the corner names, with a white arrow beside them for which way the stroke travelled. A plectrum has no fingers to name, so that one is written as the square bracket and the V every guitarist reads. A slide travels along the string rather than jumping, an open string has its own colour, and the five finger colours are fixed, not chosen: they are meant to be learnt once and read in every video after.</div>
     </div>
 
     <div class="card">
@@ -1483,10 +1483,12 @@
       fingerHand.innerHTML = GuitarEngine.renderHand({ width: 126, height: 150 });
     }
     if (fingerNames) {
-      // Five digits, not four: the thumb has a colour too, because
-      // the picking hand's p is drawn in it.
+      // Five digits, not four: the thumb has a colour too. It is the
+      // one a fretting hand reaches over the neck with, and it is the
+      // one the picking hand takes the bass strings with, and both
+      // are drawn in it.
       const digits = [
-        ['thumb', 'Thumb', 'p'],
+        ['thumb', 'Thumb', 'T'],
         ['index', 'Index', '1'],
         ['middle', 'Middle', '2'],
         ['ring', 'Ring', '3'],

@@ -2,12 +2,16 @@
 
 ## The hand
 
-There is no hand FILE any more. The engine draws it, from the owner's
-own outline: a flat silhouette, palm on, four fingers up and the thumb
-out to the left, in `guitar-engine/src/hand.ts`. The same drawing
-appears twice — small in the corner of the video frame, and in the
-card beside the controls — because the card has to teach exactly what
-the video will show.
+There is no hand FILE any more. The engine carries the drawing itself,
+in `guitar-engine/src/hand.ts`: the owner's own silhouette — palm on,
+four fingers up, the thumb out to the left — **traced** off their
+artwork rather than approximated from it. The outline is walked along
+the pixel lattice of the 165×196 drawing and then thinned until no
+point is more than half a pixel from where they put it, which is a
+fifth of a pixel at the size the legend is ever drawn. The same
+drawing appears twice — small in the corner of the video frame, and in
+the card beside the controls — because the card has to teach exactly
+what the video will show.
 
 Every digit is painted, **thumb included**, and those five colours are
 the engine's own (`FINGER_COLORS` in `guitar-engine/src/colors.ts`):
@@ -24,10 +28,19 @@ colours of everything the hands do: a fretting finger's mark on the
 neck, and the right hand's mark on the string it plucks. Change one
 and both change, which is the point.
 
-It is drawn out of rounded RECTANGLES and nothing else. The legend is
-built into the stage and then moved into its corner, and moving a
-rectangle is adding two numbers to it; an arc would have to be
-re-written, and a mis-shifted arc is a hand with a broken thumb.
+It is six closed outlines, all of them straight lines: the hand, and
+the five digits cut out of it. Every point on a digit's edge is a
+point on the hand's edge, so a colour cannot disagree with the outline
+it sits in; the fingers are cut at the knuckles, staggered rather than
+level, and the thumb along the crease it makes with the palm, which in
+this drawing is the only place to put the join — thumb and heel are
+one unbroken stretch of edge.
+
+`M`, `L` and `Z`, and nothing else. The legend is built into the stage
+and then moved into its corner, and the move walks every number in the
+path alternating x, y. That is right for a line and wrong for an arc,
+whose radii and flags are not coordinates — a mis-shifted arc is a
+hand with a broken thumb. There is a test that holds the paths to it.
 
 ## The guitars
 
@@ -213,12 +226,19 @@ middle-and-a-half model put every string a sixth of a gap out at both
 ends of this acoustic.
 
 `pickX` has to be measured like the rest, because every guitar puts
-something different in the way: over the soundhole on a dreadnought,
-between the neck pickup and the bridge one on a Telecaster, between
-the neck and middle pickups on a Stratocaster. There is no share of
-the run from the board's end to the bridge that is right for all
-four — half way lands on one guitar's neck pickup and the next one's
-bridge pickup.
+something different in the way: the soundhole and its rosette on a
+dreadnought and a classical, a pickup and then another pickup on a
+Telecaster and a Stratocaster. There is no share of the run from the
+board's end to the bridge that is right for all four — half way lands
+on one guitar's neck pickup and the next one's bridge pickup.
+
+Measure it the way a hand finds it: the plain top between the
+soundhole (or the last pickup) and the bridge, and the middle of it.
+Scanning a native-size render along the string band gives both edges
+to the pixel — on the dreadnought the hole ends at 1201 and its
+rosette rings at 1228, the bridge starts at 1344, so the mark goes at
+1275. Both acoustics were once set by eye and both were INSIDE the
+soundhole, which is exactly the thing the owner circled.
 
 **Replacing a file means re-measuring it.** The numbers are not
 guesses to be nudged until it looks right: a wire half a fret out puts

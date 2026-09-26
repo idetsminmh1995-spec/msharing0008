@@ -173,8 +173,12 @@ export const ACOUSTIC_DRAWN: PhotoMeasurements = {
   // the fretboard belongs down at the bottom, with the body running
   // off the bottom edge and the notation over the space it leaves.
   drop: 0.31,
-  // Just behind the soundhole, towards the bridge.
-  pickX: 1180,
+  // Just behind the soundhole, towards the bridge. Measured off a
+  // render: the soundhole's dark disc ends at 1201 and its rosette
+  // rings at 1228, the bridge starts at 1344, and this is the middle
+  // of what is left -- plain spruce, which is where a hand actually
+  // plucks. It was 1180 and that is INSIDE the hole.
+  pickX: 1275,
 };
 
 /**
@@ -226,8 +230,11 @@ export const CLASSICAL_DRAWN: PhotoMeasurements = {
   // the fretboard belongs down at the bottom, with the body running
   // off the bottom edge and the notation over the space it leaves.
   drop: 0.31,
-  // Over the soundhole.
-  pickX: 1010,
+  // Just behind the soundhole, towards the bridge, like the
+  // dreadnought. Measured off a render: the hole is 916 to 1043 and
+  // the bridge 1212 to 1251, and this is the middle of the cedar
+  // between them. It was 1010, which is INSIDE the hole.
+  pickX: 1120,
 };
 
 /**

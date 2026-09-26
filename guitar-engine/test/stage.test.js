@@ -353,3 +353,39 @@ test('the hand is five coloured digits on a plain palm', () => {
   const ratio = (list) => list[1].width / list[1].height;
   assert.ok(Math.abs(ratio(wide) - ratio(tall)) < 1e-6, 'never squashed to fill');
 });
+
+test('the hand is the traced drawing, and it can be moved', () => {
+  const shapes = G.handShapes({ width: 120, height: 160 });
+  // Straight lines and nothing else. The legend is built here and
+  // then shifted into its corner, and the shift walks every number in
+  // a path alternating x, y -- which is right for M and L and wrong
+  // for an arc, whose radii and flags are not coordinates.
+  for (const shape of shapes) {
+    assert.equal(shape.kind, 'path');
+    assert.ok(/^M[-\d.,]+(L[-\d.,]+)+Z$/.test(shape.d), 'only M, L and Z');
+  }
+  // Every digit is cut out of the hand, so no digit can stick out of
+  // the outline it is meant to be part of.
+  const [palm, ...digits] = shapes;
+  for (const digit of digits) {
+    assert.ok(digit.x >= palm.x - 0.01 && digit.y >= palm.y - 0.01, 'inside the hand');
+    assert.ok(digit.x + digit.width <= palm.x + palm.width + 0.01, 'inside the hand');
+    assert.ok(digit.y + digit.height <= palm.y + palm.height + 0.01, 'inside the hand');
+  }
+  // It is the OWNER'S hand: the thumb comes off the palm low and to
+  // the left, and the middle finger is the tallest of the four.
+  const [thumb, index, middle, ring, little] = digits;
+  assert.ok(thumb.y > index.y, 'the thumb starts below the fingers');
+  assert.ok(middle.y < index.y && middle.y < ring.y, 'the middle finger is tallest');
+  assert.ok(little.y > ring.y, 'the little finger is shortest');
+  // The numbers in the path really do run x, y, x, y -- which is the
+  // thing the shift assumes, and the thing an arc would break.
+  for (const shape of shapes) {
+    const numbers = (shape.d.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+    assert.equal(numbers.length % 2, 0, 'pairs');
+    const xs = numbers.filter((_, i) => i % 2 === 0);
+    const ys = numbers.filter((_, i) => i % 2 === 1);
+    assert.ok(Math.abs(Math.min(...xs) - shape.x) < 0.01, 'the bounds are the path\'s own');
+    assert.ok(Math.abs(Math.min(...ys) - shape.y) < 0.01, 'the bounds are the path\'s own');
+  }
+});
