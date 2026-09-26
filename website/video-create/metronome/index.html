@@ -592,9 +592,14 @@
    * `Counts Vocal`, `.wav` or `.wave` or `.mp3` -- and every sample
    * after that costs one request.
    */
-  function sampleBytes(key) {
+  async function sampleBytes(key) {
     const [kind, beat] = key.split(':');
-    return VoiceSamples.load(API_BASE, kind === 'voice' ? 'count' : 'measure', beat);
+    if (kind === 'voice') return VoiceSamples.load(API_BASE, 'count', beat);
+    // No `Counts vocal` folder in the bucket, but bar 1's own voice
+    // counts the same beats. "One, two, three, four" is not "M1, M2",
+    // and it is very much better than silence.
+    const m = await VoiceSamples.load(API_BASE, 'measure', beat);
+    return m ?? VoiceSamples.load(API_BASE, 'count', beat);
   }
 
   /**

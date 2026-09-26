@@ -32,16 +32,23 @@
    */
   var KINDS = {
     count: {
-      folders: ['Voices', 'voices', 'Voice'],
-      file: function (id) {
-        return String(id);
-      },
+      folders: ['Voices', 'voices', 'Voice', 'Vocals'],
+      // A count-in voice is filed under its own number.
+      prefixes: [''],
     },
     measure: {
-      folders: ['Counts vocal', 'Counts Vocal', 'counts vocal', 'Count vocal'],
-      file: function (id) {
-        return 'M' + id;
-      },
+      folders: [
+        'Counts vocal',
+        'Counts Vocal',
+        'counts vocal',
+        'Counts vocals',
+        'Counts Vocals',
+        'Count vocal',
+      ],
+      // `M1` is the documented name; a folder whose files are just
+      // `1.wav` is the same recording filed without the prefix, and
+      // there is no reason for it to be silent.
+      prefixes: ['M', '', 'm'],
     },
   };
 
@@ -53,7 +60,7 @@
    * `M1.WAV` and `M1.wav` are two different objects, and a person
    * uploading from a desktop has no idea which one they have.
    */
-  var EXTENSIONS = ['wav', 'wave', 'WAV', 'mp3', 'm4a', 'ogg'];
+  var EXTENSIONS = ['wav', 'wave', 'WAV', 'mp3', 'm4a'];
 
   /** kind -> { folder, extension } once something has answered. */
   var resolved = Object.create(null);
@@ -93,28 +100,56 @@
    * happens once per page load; every sample after it costs one
    * request, exactly as before.
    */
-  function find(apiBase, kind, id) {
+  /** Every address worth asking for one sample, in the order to ask. */
+  function addresses(apiBase, kind, id) {
     var spec = KINDS[kind];
-    var file = spec.file(id);
+    var out = [];
+    for (var f = 0; f < spec.folders.length; f++) {
+      for (var n = 0; n < spec.prefixes.length; n++) {
+        for (var e = 0; e < EXTENSIONS.length; e++) {
+          var name = spec.prefixes[n] + id;
+          out.push({
+            folder: spec.folders[f],
+            prefix: spec.prefixes[n],
+            name: name,
+            extension: EXTENSIONS[e],
+            url: url(apiBase, spec.folders[f], name, EXTENSIONS[e]),
+          });
+        }
+      }
+    }
+    return out;
+  }
+
+  function find(apiBase, kind, id) {
+    var list = addresses(apiBase, kind, id);
     var at = 0;
-    function folder() {
-      if (at >= spec.folders.length) return Promise.resolve(null);
-      var here = spec.folders[at++];
+    // A batch at a time rather than one at a time: a bucket that has
+    // none of them is a few dozen 404s, and asked one after another
+    // that is a visible pause before the page can say so.
+    function round() {
+      if (at >= list.length) return Promise.resolve(null);
+      var batch = list.slice(at, at + 8);
+      at += batch.length;
       return Promise.all(
-        EXTENSIONS.map(function (extension) {
-          return get(url(apiBase, here, file, extension));
+        batch.map(function (attempt) {
+          return get(attempt.url);
         }),
       ).then(function (results) {
         for (var i = 0; i < results.length; i++) {
           if (results[i] !== null) {
-            resolved[kind] = { folder: here, extension: EXTENSIONS[i] };
+            resolved[kind] = {
+              folder: batch[i].folder,
+              extension: batch[i].extension,
+              prefix: batch[i].prefix,
+            };
             return results[i];
           }
         }
-        return folder();
+        return round();
       });
     }
-    return folder();
+    return round();
   }
 
   /**
@@ -131,7 +166,7 @@
     var spec = KINDS[kind];
     if (!spec) return Promise.resolve(null);
     var known = resolved[kind];
-    if (known) return get(url(apiBase, known.folder, spec.file(id), known.extension));
+    if (known) return get(url(apiBase, known.folder, known.prefix + id, known.extension));
 
     if (!searching[kind]) {
       var pending = { id: String(id), promise: null };
@@ -155,7 +190,7 @@
       if (search.id === wanted) return bytes;
       var found = resolved[kind];
       if (!found) return null;
-      return get(url(apiBase, found.folder, spec.file(id), found.extension));
+      return get(url(apiBase, found.folder, found.prefix + id, found.extension));
     });
   }
 
@@ -167,10 +202,52 @@
    * their own bucket rather than the documentation.
    */
   function describe(kind, id) {
-    var spec = KINDS[kind];
     var found = resolved[kind];
-    if (!spec || !found) return null;
-    return found.folder + '/' + spec.file(id === undefined ? 1 : id) + '.' + found.extension;
+    if (!KINDS[kind] || !found) return null;
+    return found.folder + '/' + found.prefix + (id === undefined ? 1 : id) + '.' + found.extension;
+  }
+
+  /**
+   * The same search, but reporting rather than caching.
+   *
+   * For the card's Test button: it asks every address it would ever
+   * ask, says which one answered, and hands back the whole list so a
+   * bucket with nothing in it can be read off the page instead of
+   * guessed at. Nothing here writes to the cache -- a test is a test.
+   */
+  function probe(apiBase, kind, id) {
+    var list = addresses(apiBase, kind, id === undefined ? 1 : id);
+    var tried = [];
+    var at = 0;
+    function round() {
+      if (at >= list.length) return Promise.resolve({ found: null, bytes: null, tried: tried });
+      var batch = list.slice(at, at + 8);
+      at += batch.length;
+      return Promise.all(
+        batch.map(function (attempt) {
+          return fetch(attempt.url).then(
+            function (res) {
+              return res.ok ? res.arrayBuffer() : null;
+            },
+            function () {
+              return 'error';
+            },
+          );
+        }),
+      ).then(function (results) {
+        for (var i = 0; i < results.length; i++) {
+          var label = batch[i].folder + '/' + batch[i].name + '.' + batch[i].extension;
+          if (results[i] === null || results[i] === 'error') {
+            tried.push({ path: label, ok: false, network: results[i] === 'error' });
+            continue;
+          }
+          tried.push({ path: label, ok: true, network: false });
+          return { found: label, bytes: results[i], tried: tried };
+        }
+        return round();
+      });
+    }
+    return round();
   }
 
   /** Forget the search, so turning the feature off and on retries the bucket. */
@@ -184,5 +261,11 @@
     delete searching[kind];
   }
 
-  global.VoiceSamples = { load: load, describe: describe, reset: reset, EXTENSIONS: EXTENSIONS };
+  global.VoiceSamples = {
+    load: load,
+    describe: describe,
+    probe: probe,
+    reset: reset,
+    EXTENSIONS: EXTENSIONS,
+  };
 })(window);

@@ -12,7 +12,10 @@ bounding box.
 
 `drumstick-left.svg` (amber) and `drumstick-right.svg` (blue) — a hand
 gripping a stick, one for each bottom corner of the **9:16** drum
-frame. They are the owner's own artwork: traced off the mock-up they
+frame. The web address that sits between them in the finished video is
+NOT drawn here: it is burned into the kit photo itself, in
+`Drum Bg.png` under the kit's own `9x16` folder, and a frame that drew
+its own would print it twice. They are the owner's own artwork: traced off the mock-up they
 sent, at the half-way line of the colour ramp rather than at a
 yes/no threshold, so the long diagonal of the shaft comes out straight
 instead of as a staircase. About sixty points each, straight lines

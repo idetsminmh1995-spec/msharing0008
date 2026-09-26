@@ -314,15 +314,6 @@
   .video-stick{position:absolute;bottom:0;height:auto;}
   .video-stick-left{left:2.1cqw;width:16.1cqw;}
   .video-stick-right{right:1.7cqw;width:17.3cqw;}
-  /* Centred on the frame, not between the sticks: the two are
-     different widths, so splitting the gap would sit the address a
-     few pixels off the middle of the video. */
-  .video-site{
-    position:absolute;left:0;right:0;bottom:10cqw;text-align:center;
-    font-family:'Sora',sans-serif;font-weight:800;font-size:5.1cqw;
-    line-height:1;color:#F80404;letter-spacing:-.01em;
-  }
-  .video-frame.style-white .video-site{color:var(--red);}
 
   .transport{display:flex;align-items:center;gap:14px;}
   .play-btn{width:42px;height:42px;border-radius:50%;background:var(--red);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
@@ -504,6 +495,9 @@
           </div>
         </div>
       </div>
+      <div class="title-controls">
+        <button class="btn-ghost" id="countVoiceTest" type="button">Test the voice</button>
+      </div>
       <div class="field-hint" id="countVoiceHint">Names the bar you are in at every bar of the MusicXML file, from <b>Counts vocal/M1.wav</b> in R2.</div>
     </div>
 
@@ -597,13 +591,16 @@
       <div class="video-mid">
         <img class="drum-circle" src="../../assets/logo/sharing-drum-logo-full.webp" alt="M Sharing Drum">
       </div>
-      <!-- The 9:16 footer: a stick in each bottom corner and the site
-           between them. Absolute rather than in the column, so it sits
-           on the frame's own bottom edge whatever the notation and the
-           kit above it are doing. Hidden in the other two shapes. -->
+      <!-- The 9:16 footer: a stick in each bottom corner. Absolute
+           rather than in the column, so they sit on the frame's own
+           bottom edge whatever the notation and the kit above them are
+           doing. Hidden in the other two shapes.
+
+           There is no web address here. It is part of the kit photo --
+           the owner burns it into `Drum Bg.png` itself -- and a frame
+           that wrote its own would print it twice. -->
       <div class="video-footer" aria-hidden="true">
         <img class="video-stick video-stick-left" src="../../assets/logo/drumstick-left.svg" alt="">
-        <div class="video-site" id="videoSite">www.msharingmm.com</div>
         <img class="video-stick video-stick-right" src="../../assets/logo/drumstick-right.svg" alt="">
       </div>
     </div>
@@ -1985,6 +1982,9 @@
    * miss caches too, so a bar longer than the bucket's samples asks
    * once per beat number rather than once per playback.
    */
+  /** Which of the two sample sets the announcements ended up using. */
+  let measureVoiceFrom = null;
+
   function measureSample(beatNumber) {
     if (measureSampleCache.has(beatNumber)) {
       return Promise.resolve(measureSampleCache.get(beatNumber));
@@ -1996,8 +1996,19 @@
       const ctx = ensureAudioContext();
       if (!ctx) return null;
       try {
-        const bytes = await VoiceSamples.load(API_BASE, 'measure', beatNumber);
+        let bytes = await VoiceSamples.load(API_BASE, 'measure', beatNumber);
+        let from = 'measure';
+        // No M set in the bucket, but the count-in's own voice counts
+        // the same beats -- "one, two, three, four" is not "M1, M2",
+        // but it IS the bar being counted out loud, which is the job.
+        // Silence is the one answer that helps nobody, and the hint
+        // below says which of the two is being heard.
+        if (!bytes) {
+          bytes = await VoiceSamples.load(API_BASE, 'count', beatNumber);
+          from = 'count';
+        }
         if (!bytes) throw new Error('no such count voice in the bucket');
+        measureVoiceFrom = from;
         return await ctx.decodeAudioData(bytes);
       } catch (err) {
         return null;
@@ -2431,6 +2442,7 @@
    * misses and the folder the search settled on, and looks properly.
    */
   function forgetVoiceSamples() {
+    measureVoiceFrom = null;
     countSampleCache.clear();
     measureSampleCache.clear();
     measureSampleInFlight.clear();
@@ -2468,11 +2480,17 @@
     }
     const bars = new Set(countVoiceSchedule().map((b) => b.at)).size;
     const found =
-      typeof VoiceSamples === 'undefined' ? null : VoiceSamples.describe('measure', have[0]);
+      typeof VoiceSamples === 'undefined'
+        ? null
+        : VoiceSamples.describe(measureVoiceFrom === 'count' ? 'count' : 'measure', have[0]);
     countVoiceHint.innerHTML =
       `Counting ${summariseNumbers(have)} on every beat of every bar, ${bars} beats ` +
       'through this score, repeats included. ' +
       (found ? `Reading <b>${found}</b> from R2. ` : '') +
+      (measureVoiceFrom === 'count'
+        ? 'There is no <b>Counts vocal</b> folder in the bucket, so the count-in\u2019s own ' +
+          'voice is counting instead. '
+        : '') +
       (missing.length > 0
         ? `No sample for ${summariseNumbers(missing)}, so ${missing.length === 1 ? 'that beat passes' : 'those beats pass'} in silence.`
         : 'Every beat of the bar has one.');
@@ -2486,6 +2504,80 @@
       countInStyle() === 'measures'
         ? "Counted at the score's own tempo and time signature, before the audio starts. Using the <b>Counts vocal</b> samples (<b>M1</b>, <b>M2</b>\u2026) from R2."
         : "Counted at the score's own tempo and time signature, before the audio starts. Using the <b>Voices</b> samples (<b>1</b>, <b>2</b>\u2026) from R2.";
+  });
+
+  /**
+   * The Test button: what is in the bucket, said out loud and in
+   * writing.
+   *
+   * "It does not work" is three different faults wearing one coat --
+   * nothing uploaded, uploaded under a name nothing asks for, or
+   * uploaded and found but inaudible because a slider is at zero or
+   * the browser has not let this tab make a sound yet. Nothing in the
+   * page could tell them apart, so this asks for every name the
+   * samples could have, plays the one it finds, and prints the rest.
+   */
+  const countVoiceTestBtn = document.getElementById('countVoiceTest');
+  countVoiceTestBtn?.addEventListener('click', async () => {
+    if (typeof VoiceSamples === 'undefined') return;
+    countVoiceTestBtn.disabled = true;
+    countVoiceHint.textContent = 'Asking the bucket for every name these could have…';
+    forgetVoiceSamples();
+    const ctx = ensureAudioContext();
+    try {
+      const measure = await VoiceSamples.probe(API_BASE, 'measure', 1);
+      const counted = measure.found ? null : await VoiceSamples.probe(API_BASE, 'count', 1);
+      const hit = measure.found ? measure : counted;
+      const tried = measure.tried.length + (counted ? counted.tried.length : 0);
+      const offline = [...measure.tried, ...(counted ? counted.tried : [])].some((t) => t.network);
+
+      if (!hit || !hit.found) {
+        const folders = [...new Set(measure.tried.map((t) => t.path.split('/')[0]))];
+        countVoiceHint.innerHTML =
+          `Nothing. ${tried} addresses asked, all of them empty` +
+          (offline
+            ? ' — and at least one could not be reached at all, which is the asset ' +
+              'server or the network rather than a missing file. '
+            : '. ') +
+          `Folders asked for: <b>${folders.join('</b>, <b>')}</b>, each with ` +
+          `<b>M1</b> and <b>1</b>, as <b>${VoiceSamples.EXTENSIONS.join('</b>, <b>')}</b>. ` +
+          'Upload one of those and press this again.';
+        return;
+      }
+
+      // Found. Play it through the same gain the announcements use, so
+      // a silent result points at the slider rather than the bucket.
+      let played = false;
+      if (ctx && hit.bytes) {
+        try {
+          const buffer = await ctx.decodeAudioData(hit.bytes.slice(0));
+          const src = ctx.createBufferSource();
+          src.buffer = buffer;
+          src.connect(measureGain);
+          src.start();
+          played = true;
+        } catch (err) {
+          countVoiceHint.innerHTML =
+            `Found <b>${hit.found}</b>, but the browser could not decode it. ` +
+            'It is there under that name; it is not a sound file this browser reads.';
+          return;
+        }
+      }
+      const testLine =
+        `Found <b>${hit.found}</b> after ${tried} addresses, and ` +
+        (played
+          ? `played it at ${measureVolumeInput.value}%. If you did not hear that, the volume ` +
+            'or the browser is the problem, not the bucket.'
+          : 'nothing to play it through yet — press play once and try again.');
+      // The real loader starts from nothing, so it re-finds what the
+      // probe just found and the announcements use it. Its line goes
+      // first, because that is the one that stays on the card.
+      VoiceSamples.reset();
+      await refreshCountVoice();
+      countVoiceHint.innerHTML += ` — ${testLine}`;
+    } finally {
+      countVoiceTestBtn.disabled = false;
+    }
   });
 
   countVoiceOnSelect.addEventListener('change', () => {
@@ -2782,8 +2874,8 @@
       ctx2d.drawImage(mark, box.x, box.y, box.w, box.h);
     }
 
-    // Titles, and the address under the 9:16 footer.
-    for (const el of videoFrame.querySelectorAll('.video-title, .video-site')) {
+    // Titles.
+    for (const el of videoFrame.querySelectorAll('.video-title')) {
       drawTextEl(ctx2d, el, frameRect, scale);
     }
 
