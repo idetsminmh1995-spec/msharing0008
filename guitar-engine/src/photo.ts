@@ -149,6 +149,48 @@ export const ACOUSTIC_NATURAL: PhotoMeasurements = {
 };
 
 /**
+ * The classical guitar the page draws: the owner's own drawing, not a
+ * photograph.
+ *
+ * An Illustrator file, upright -- headstock at the top, body at the
+ * bottom -- turned a quarter turn counter-clockwise so it lies the way
+ * every other guitar here lies. `classical-drawn.svg` in the assets
+ * folder is that turned copy; `Classic Guitar.svg` beside it is the
+ * upright original it was built from.
+ *
+ * Nothing here was measured off pixels. A drawing carries its own
+ * numbers, so these are read straight out of the file: every fret bar
+ * is a rectangle with a stated y and height, and the centre of the
+ * bar is the wire. Which line is the nut needs no argument either --
+ * it is the one drawn 7.3 thick where every fret is 3.6, so it can be
+ * picked out rather than guessed at, which is what the dots have to
+ * do on a photograph. TWENTY lines: the nut and nineteen frets, which
+ * is what a classical has.
+ *
+ * The drawing is a good one. Taking the nut and the twelfth as the
+ * scale, every other wire lands within 2.6 units of where the real
+ * 17.817 rule puts it, across a scale of 920.
+ *
+ * Turning it puts the low E at the BOTTOM: upright it is on the left,
+ * and a quarter turn counter-clockwise sends the left side down,
+ * which is where the engine numbers string 6.
+ */
+export const CLASSICAL_DRAWN: PhotoMeasurements = {
+  width: 1513.5,
+  height: 584.3,
+  fit: 'frame',
+  frets: [
+    277.85, 331, 378.7, 423.5, 466.7, 508.5, 545.9, 581.3, 616.7, 649.6, 680.7, 711.1, 738, 764.1,
+    788.3, 812.7, 835.3, 855.7, 874.9, 893.4,
+  ],
+  boardEndX: 937.5,
+  stringsAtNut: [267.7, 325.9],
+  stringsAtEnd: [256.7, 336.9],
+  boardAtNut: [261.2, 332.3],
+  boardAtEnd: [249.0, 344.5],
+};
+
+/**
  * The photograph: a sunburst cutaway dreadnought, neck running in
  * from the left and the body filling the right.
  *
@@ -258,6 +300,7 @@ export const PHOTOS: Readonly<Record<string, PhotoMeasurements>> = {
   'acoustic-cutaway': ACOUSTIC_CUTAWAY,
   'acoustic-sunburst': ACOUSTIC_SUNBURST,
   'acoustic-natural': ACOUSTIC_NATURAL,
+  'classical-drawn': CLASSICAL_DRAWN,
   'fretboard-classical': CLASSICAL_BOARD,
   'fretboard-acoustic': ACOUSTIC_BOARD,
   'fretboard-electric': ELECTRIC_BOARD,

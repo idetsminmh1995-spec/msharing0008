@@ -252,3 +252,48 @@ test('a cropped picture is faded into the frame, not cut off by it', () => {
   const svg = G.renderGuitarStage(CUT);
   assert.ok(svg.includes('stop-color="rgba(18, 18, 22, 0)"'), 'the fade ends see-through');
 });
+
+test('the classical is the owner’s drawing, read out of the file', () => {
+  const photo = G.photoNamed('classical-drawn', 'classical-drawn.svg');
+  assert.equal(photo.frets.length, 20, 'twenty lines');
+  assert.equal(G.photoFretCount(photo), 19, 'which is the nut and nineteen frets');
+
+  // No dots to argue about: the nut is drawn thick and the numbers
+  // come straight out of the artwork. What CAN be checked is that the
+  // drawing is a good one -- take the nut and the twelfth as the
+  // scale, and every other wire should land where the real rule puts
+  // it.
+  const nut = photo.frets[0];
+  const scale = (photo.frets[12] - nut) * 2;
+  for (let fret = 1; fret <= 19; fret++) {
+    const want = nut + scale * (1 - Math.pow(2, -fret / 12));
+    const off = Math.abs(photo.frets[fret] - want);
+    assert.ok(off < 3, `fret ${fret} is ${off.toFixed(1)} from the 17.817 rule`);
+  }
+
+  // Turned counter-clockwise, so the low E is at the BOTTOM -- which
+  // is string 6, where the engine puts its thickest line.
+  const width = 1513.5;
+  const height = G.stageHeightFor(width, photo, { handLegend: true, fretNumbers: true });
+  const frame = { width, height, photo, bleed: true, handLegend: true, fretNumbers: true };
+  const lines = G.stringLines(frame);
+  assert.equal(lines.length, 6);
+  assert.ok(lines[0].offset < lines[5].offset, 'string 1 rides above string 6');
+  assert.ok(lines[0].thickness < lines[5].thickness, 'and is the thinner of the two');
+
+  // A mark on each outer string lands between the picture’s own two
+  // fret wires, on the picture’s own string.
+  const place = G.photoPlacement(frame);
+  for (const [string, fret, edge] of [
+    [1, 1, photo.stringsAtNut[0]],
+    [6, 19, photo.stringsAtNut[1]],
+  ]) {
+    const x = G.fretCenter(fret, frame);
+    const wanted = ((photo.frets[fret - 1] + photo.frets[fret]) / 2) * place.scale;
+    assert.ok(Math.abs(x - wanted) < 0.5, `fret ${fret} at ${x}, wanted ${wanted}`);
+    // At the nut the string is where the drawing drew it.
+    const y = G.stringYAt(frame, string, G.fretCenter(0.02, frame));
+    const drawn = place.y + edge * place.scale;
+    assert.ok(Math.abs(y - drawn) < 2, `string ${string} at ${y}, drawn at ${drawn}`);
+  }
+});

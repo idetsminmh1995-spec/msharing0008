@@ -19,6 +19,42 @@ with one of a different size means changing those two numbers.
 Trimmed to the ink, transparent background, drawn with the thumb to
 the left and the fingers up.
 
+## The drawing
+
+`classical-drawn.svg` — the owner's own classical guitar, drawn in
+Illustrator and turned a quarter turn counter-clockwise so it lies the
+way every other guitar here lies: headstock in from the left, body out
+to the right. This is what the page draws for **Classical Guitar**.
+
+`Classic Guitar.svg` — the upright original it was built from, kept as
+the source. Nothing draws it.
+
+Two things were changed in the turned copy and nothing else. The whole
+drawing is rotated (`translate(0,584.3) rotate(-90)` around the
+original artwork, with the viewBox turned to match), and the two
+middle strings were moved 1.7 units at the nut onto even spacing —
+they were drawn 8.4 apart where the others are 12.5, and the engine
+spaces six strings evenly between the outer two.
+
+Measuring it took no measuring. A drawing carries its own numbers, so
+the calibration is read straight out of the file: every fret bar is a
+rectangle with a stated y and height, and the centre of the bar is the
+wire. The nut needs no argument either — it is the bar drawn 7.3 thick
+where every fret is 3.6. **Twenty lines: the nut and nineteen frets.**
+It is a good drawing: taking the nut and the twelfth as the scale,
+every other wire lands within 2.6 units of the real 17.817 rule,
+across a scale of 920.
+
+Turning it counter-clockwise puts the low E at the bottom, which is
+where the engine numbers string 6: upright, the low E is on the left,
+and the left side goes down.
+
+An SVG works everywhere a photograph does — the preview's `<image>`
+and the video canvas's `drawImage` both take one — as long as it
+carries `width` and `height` attributes, which is what gives it an
+intrinsic size for the canvas. It also stays sharp at any frame size,
+which a photograph does not.
+
 ## The photographs
 
 `acoustic-natural.webp` — a natural-top dreadnought, framed by its
@@ -87,10 +123,10 @@ with the same script that measured this one.
 ## The guitar renders
 
 `fretboard-classical.webp`, `fretboard-acoustic.webp`,
-`fretboard-electric.webp`, `fretboard-extended.webp` — one studio
-render per guitar. Three of them are what the video frame draws; the
-acoustic's is kept for reference, since the photograph above took its
-place. Each is a
+`fretboard-electric.webp`, `fretboard-strat.webp` — one studio render
+per guitar. The two electrics' are what the video frame draws; the
+classical's and the acoustic's are kept for reference, since the
+owner's drawing and the photograph above took their places. Each is a
 WHOLE guitar in a frame-shaped window: the neck, the joint where the
 body opens out, the cutaway, and the top with its soundhole or its
 pickups, with the body running off the top and the bottom of the

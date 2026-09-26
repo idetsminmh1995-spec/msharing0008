@@ -580,13 +580,15 @@
            image it already has, and a frame is rendered the instant
            the button is pressed. It is never shown here -- the stage's
            own SVG draws it, from the same file. -->
-      <!-- One studio render per guitar. They are what the frame draws:
-           the engine holds each one's measurements under the same
-           name, so a mark lands on the real fret in the real string. -->
-      <img data-stage-image data-guitar-photo="fretboard-classical"
-           src="../../assets/guitar/fretboard-classical.webp" alt="" style="display:none" decoding="async">
-      <!-- The acoustic is a PHOTOGRAPH of a real one, measured. The
-           other three are renders until photographs of them arrive. -->
+      <!-- One picture per guitar, and the frame draws THAT: the engine
+           holds each one's measurements under the same name, so a mark
+           lands on the real fret in the real string.
+
+           The classical is the owner's own drawing, turned on its
+           side; the acoustic is a photograph of a real one. The two
+           electrics are studio renders until pictures of them arrive. -->
+      <img data-stage-image data-guitar-photo="classical-drawn"
+           src="../../assets/guitar/classical-drawn.svg" alt="" style="display:none" decoding="async">
       <img data-stage-image data-guitar-photo="acoustic-natural"
            src="../../assets/guitar/acoustic-natural.webp" alt="" style="display:none" decoding="async">
       <img data-stage-image data-guitar-photo="fretboard-electric"
@@ -1021,7 +1023,7 @@
    * six.
    */
   const GUITARS = {
-    classical: { frets: 19, model: 'classical', photo: 'fretboard-classical' },
+    classical: { frets: 19, model: 'classical', photo: 'classical-drawn' },
     acoustic: { frets: 20, model: 'acoustic', photo: 'acoustic-natural' },
     electric: { frets: 22, model: 'singleCut', photo: 'fretboard-electric' },
     strat: { frets: 21, model: 'electric', photo: 'fretboard-strat' },

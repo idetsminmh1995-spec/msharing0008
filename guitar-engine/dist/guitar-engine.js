@@ -28,6 +28,7 @@ var GuitarEngine = (() => {
     ACOUSTIC_SUNBURST: () => ACOUSTIC_SUNBURST,
     CLASSICAL_BOARD: () => CLASSICAL_BOARD,
     CLASSICAL_COLORS: () => CLASSICAL_COLORS,
+    CLASSICAL_DRAWN: () => CLASSICAL_DRAWN,
     DEFAULT_COLORS: () => DEFAULT_COLORS,
     DEFAULT_FIRST_FRET: () => DEFAULT_FIRST_FRET,
     DEFAULT_LAST_FRET: () => DEFAULT_LAST_FRET,
@@ -139,6 +140,38 @@ var GuitarEngine = (() => {
     stringsAtEnd: [470.3, 610],
     boardAtNut: [485.6, 596.7],
     boardAtEnd: [463.7, 620.8]
+  };
+  var CLASSICAL_DRAWN = {
+    width: 1513.5,
+    height: 584.3,
+    fit: "frame",
+    frets: [
+      277.85,
+      331,
+      378.7,
+      423.5,
+      466.7,
+      508.5,
+      545.9,
+      581.3,
+      616.7,
+      649.6,
+      680.7,
+      711.1,
+      738,
+      764.1,
+      788.3,
+      812.7,
+      835.3,
+      855.7,
+      874.9,
+      893.4
+    ],
+    boardEndX: 937.5,
+    stringsAtNut: [267.7, 325.9],
+    stringsAtEnd: [256.7, 336.9],
+    boardAtNut: [261.2, 332.3],
+    boardAtEnd: [249, 344.5]
   };
   var ACOUSTIC_SUNBURST = {
     width: 2e3,
@@ -311,6 +344,7 @@ var GuitarEngine = (() => {
     "acoustic-cutaway": ACOUSTIC_CUTAWAY,
     "acoustic-sunburst": ACOUSTIC_SUNBURST,
     "acoustic-natural": ACOUSTIC_NATURAL,
+    "classical-drawn": CLASSICAL_DRAWN,
     "fretboard-classical": CLASSICAL_BOARD,
     "fretboard-acoustic": ACOUSTIC_BOARD,
     "fretboard-electric": ELECTRIC_BOARD,
