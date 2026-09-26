@@ -410,8 +410,14 @@ export function stringLines(options: {
     ...(options.photo !== undefined ? { photo: options.photo } : {}),
   };
   const board = guitarLayout(full).board;
-  const middle = middleOf(full);
-  const half = stringHalfAt(full, nutXOf(full));
+  // A photographed neck's strings are not symmetric about one line:
+  // the band between the outer two drifts as well as widening, and a
+  // middle-and-a-half model puts every string a sixth of a gap out at
+  // both ends. So the outer two are asked for where they ARE, and the
+  // rest are spread evenly between them.
+  const ends = stringEdgesAt(full, nutXOf(full));
+  const middle = (ends.top + ends.bottom) / 2;
+  const half = (ends.bottom - ends.top) / 2;
   const gap = count > 1 ? (half * 2) / (count - 1) : 0;
   const lines: StringLine[] = [];
   for (let i = 0; i < count; i++) {
@@ -427,6 +433,16 @@ export function stringLines(options: {
 
 /** Where a string is, at a point along the neck. */
 export function stringYAt(options: FretboardOptions, string: number, x: number): number {
+  // On a photograph the two outer strings are measured at both ends
+  // of the board, so a string at any point is simply its share of the
+  // way between them -- which follows the drift of the band as well
+  // as its spread, and a fan about a single middle line does not.
+  if (options.photo !== undefined) {
+    const count = stringCount(options);
+    const { top, bottom } = stringEdgesAt(options, x);
+    const at = Math.min(Math.max(string, 1), count);
+    return count > 1 ? top + ((bottom - top) * (at - 1)) / (count - 1) : (top + bottom) / 2;
+  }
   const lines = stringLines(options);
   const line = lines.find((candidate) => candidate.string === string);
   const middle = middleOf(options);
@@ -434,6 +450,27 @@ export function stringYAt(options: FretboardOptions, string: number, x: number):
   const atNut = stringHalfAt(options, nutXOf(options));
   if (!(atNut > 0)) return middle;
   return middle + (line.offset - middle) * (stringHalfAt(options, x) / atNut);
+}
+
+/**
+ * Where the two OUTER strings run, at a point along the neck.
+ *
+ * The photograph's own, where it has one: measured at the nut and at
+ * the board's end and read off in between. Without one, the drawn
+ * neck's symmetric band.
+ */
+function stringEdgesAt(options: FretboardOptions, x: number): { top: number; bottom: number } {
+  const place = photoPlacement(options);
+  if (place !== undefined) {
+    const at = inPhoto(place, x);
+    return {
+      top: acrossPhoto(place, photoEdgeY(place.photo, 'strings', 0, at)),
+      bottom: acrossPhoto(place, photoEdgeY(place.photo, 'strings', 1, at)),
+    };
+  }
+  const middle = middleOf(options);
+  const half = stringHalfAt(options, x);
+  return { top: middle - half, bottom: middle + half };
 }
 
 /**

@@ -100,86 +100,52 @@ export interface GuitarPhotograph {
 export type PhotoMeasurements = Omit<GuitarPhotograph, 'href'>;
 
 /**
- * THE STUDIO RENDERS.
+ * The dreadnought acoustic the page draws: the owner's own drawing,
+ * and it already lies the way the page wants it.
  *
- * The photoreal plugins do not draw their instruments at runtime.
- * They model one, light it, render it once at high resolution and
- * blit the picture -- a filmstrip, in that trade. These four are that
- * step: `tools/render_fretboard.py` builds each board out of the real
- * measurements of the instrument (the 17.817 rule, the nut width, the
- * string gauges), lights it, and writes a strip.
+ * The file is a 177.2 square with the guitar across the middle, so
+ * the copy the page loads carries a tight viewBox -- the guitar's own
+ * bounding box at ten pixels to the unit, 1743 by 682, which is the
+ * space these numbers are in. Without that the engine would take the
+ * stage's height from a picture that is mostly empty sky.
  *
- * Which is why these numbers are not measured off anything. The
- * renderer knows where it put every fret wire and every string,
- * because it put them there, and prints these on its way out. Re-run
- * it and paste what it prints.
+ * Measured off a render, like the electric: an <img> at the picture's
+ * exact size in a page with no margin, never the SVG opened as a
+ * document. Twenty-one lines cross the board and the first is wider
+ * than the rest, which makes it the nut: the nut and TWENTY frets,
+ * which is what a dreadnought has.
+ *
+ * The numbering is settled here by the FRET RULE rather than by the
+ * dots, because this drawing is accurate about the one and stylised
+ * about the other. Fitting the nut and the scale to all twenty wires
+ * at once lands every one of them within 1.7 of where the real 17.817
+ * rule puts it, across a scale of 1091 -- and puts the nut at 254.7,
+ * which is the front edge of the nut bar as drawn, where a string
+ * really does leave it. No other numbering fits that way.
+ *
+ * The dots agree as far as they go and then wander: 5, 7 (a double,
+ * as on this owner's other drawings), 9 and 12 land within a pixel of
+ * their own midpoints, but the last two sit on 14 and 16 where a real
+ * guitar would put 15 and 17. They are decoration here, so the rule
+ * wins.
  */
-
-/**
- * The sample: a cutaway dreadnought, neck running in from the left
- * edge and the body leaving by the right.
- *
- * The numbers were read off the file itself -- the fret wires are
- * where the picture's fret wires are, not where the 17.817 rule says
- * they should be, because the picture is what the marks are landing
- * on. Frets 0 to 20, which is what a cutaway shows.
- */
-export const ACOUSTIC_CUTAWAY: PhotoMeasurements = {
-  width: 1920,
-  height: 636,
-  frets: [
-    80, 222, 329, 430, 525, 614, 698, 777, 852, 922, 988, 1050, 1110, 1165, 1217, 1268, 1313, 1359,
-    1398, 1437, 1475,
-  ],
-  boardEndX: 1521,
-  stringsAtNut: [409, 517],
-  stringsAtEnd: [392, 534],
-  boardAtNut: [413, 527],
-  boardAtEnd: [376, 548],
-};
-
-/**
- * The photograph the page draws for an acoustic: a natural-top
- * dreadnought, framed by its owner -- neck in from the left edge,
- * body filling the right, background cut away.
- *
- * Twenty-one lines across the board, and they are the NUT and twenty
- * frets. Measured off the file, and the INLAY DOTS are what settle
- * the numbering, because the wires alone cannot: a geometric series
- * fits equally well however they are numbered -- the nut position
- * and the scale length absorb any shift -- so counting from the
- * first line is a coin toss, and getting it wrong puts every mark a
- * fret out, which it did twice here.
- *
- * The dots cannot move. There are seven, at 262, 420, 562, 690, 859,
- * 1003 and 1086, and they have to come out as fret numbers a guitar
- * is actually inlaid at. Taking the first line as the nut lands them
- * on 3, 5, 7, 9, 12, 15 and 17, every one within a pixel of the
- * midpoint it belongs to -- the standard set. Taking it as the first
- * fret instead lands them on 4, 6, 8, 10, 13, 16, 18, which is not a
- * pattern any guitar has ever been built with. So the first line is
- * the nut, and it is on the picture.
- *
- * (This one is double-dotted at the SEVENTH as well as the twelfth,
- * which is unusual and is why "the double dot is the twelfth" is not
- * the check here. The whole set is.)
- *
- * The strings were fitted across twenty-six places and land within
- * half a pixel, where a string gap is twenty-two.
- */
-export const ACOUSTIC_NATURAL: PhotoMeasurements = {
-  width: 1920,
-  height: 711,
+export const ACOUSTIC_DRAWN: PhotoMeasurements = {
+  width: 1743,
+  height: 682,
   fit: 'frame',
   frets: [
-    34, 132, 220, 304, 383, 458, 529, 596, 660, 721, 779, 834, 885, 934, 980, 1025, 1066, 1106,
-    1143, 1178, 1212,
+    254.7, 316, 374, 428, 479, 529, 574.5, 617, 657, 698.5, 732, 767, 801.5, 830, 859, 886, 912,
+    936.5, 959, 982, 1003,
   ],
-  boardEndX: 1255.0,
-  stringsAtNut: [489.2, 592.2],
-  stringsAtEnd: [470.3, 610.0],
-  boardAtNut: [485.6, 596.7],
-  boardAtEnd: [463.7, 620.8],
+  boardEndX: 1035,
+  stringsAtNut: [300.8, 361.7],
+  stringsAtEnd: [294.7, 378.4],
+  boardAtNut: [292, 369.4],
+  boardAtEnd: [284.5, 389.1],
+  // Nut on one edge of the frame, bridge on the other, like the other
+  // two. The bridge ends at 1404.5.
+  span: [223, 1454],
+  drop: 0.13,
 };
 
 /**
@@ -288,103 +254,6 @@ export const ELECTRIC_DRAWN: PhotoMeasurements = {
   drop: 0.13,
 };
 /**
- * The photograph: a sunburst cutaway dreadnought, neck running in
- * from the left and the body filling the right.
- *
- * A real photograph, and the only thing here that is. The renders
- * below are good; a photograph of a real instrument is better, and no
- * renderer written by hand is going to beat one. Measured the hard
- * way, off the file: the fret wires as the bright lines across the
- * dark board, the strings as the bright lines along it, both fitted
- * across the whole run -- the board edges to within about a pixel,
- * the strings to within two, where a string gap is twenty-three.
- *
- * Twenty frets, and the light band at 1590 is where the board ENDS
- * rather than a twenty-first: the soundhole starts just past it. The
- * numbering was checked the way the natural-top one was -- fitted to
- * the inlay dots, which land its wires within 0.18 of whole fret
- * numbers with the first of them at fret 1.
- */
-export const ACOUSTIC_SUNBURST: PhotoMeasurements = {
-  width: 2000,
-  height: 714,
-  fit: 'frame',
-  frets: [
-    106.8, 220, 332, 439, 539, 636, 725, 808, 885, 960, 1028, 1093, 1157, 1214, 1270, 1321, 1368,
-    1416, 1458, 1498, 1538,
-  ],
-  boardEndX: 1590.0,
-  stringsAtNut: [434.8, 547.9],
-  stringsAtEnd: [414.1, 565.1],
-  boardAtNut: [428.0, 558.6],
-  boardAtEnd: [398.3, 578.5],
-};
-
-/** A classical: a wide, flat rosewood board with nothing set into it, and nylon strings. Nineteen frets. */
-export const CLASSICAL_BOARD: PhotoMeasurements = {
-  width: 2880,
-  height: 824,
-  fit: 'frame',
-  frets: [
-    71.8, 259.1, 435.8, 602.5, 760.0, 908.6, 1048.8, 1181.2, 1306.1, 1424.1, 1535.4, 1640.4, 1739.6,
-    1833.2, 1921.6, 2005.0, 2083.7, 2158.0, 2228.1, 2294.3,
-  ],
-  boardEndX: 2880.0,
-  stringsAtNut: [326.4, 547.0],
-  stringsAtEnd: [270.2, 603.2],
-  boardAtNut: [303.3, 570.1],
-  boardAtEnd: [260.1, 613.3],
-};
-
-/** A steel-string acoustic: rosewood, pearl dots, three wound strings. Twenty frets. */
-export const ACOUSTIC_BOARD: PhotoMeasurements = {
-  width: 2880,
-  height: 824,
-  fit: 'frame',
-  frets: [
-    68.8, 246.8, 414.8, 573.3, 723.0, 864.2, 997.5, 1123.4, 1242.2, 1354.3, 1460.1, 1560.0, 1654.2,
-    1743.2, 1827.2, 1906.5, 1981.3, 2051.9, 2118.6, 2181.5, 2240.9,
-  ],
-  boardEndX: 2880.0,
-  stringsAtNut: [348.2, 525.2],
-  stringsAtEnd: [309.0, 564.4],
-  boardAtNut: [328.6, 544.9],
-  boardAtEnd: [289.3, 584.1],
-};
-
-/** An electric: a dark bound board with pearl blocks in it, and the shorter scale that goes with it. Twenty-two frets. */
-export const ELECTRIC_BOARD: PhotoMeasurements = {
-  width: 2880,
-  height: 824,
-  fit: 'frame',
-  frets: [
-    68.1, 239.7, 401.6, 554.4, 698.6, 834.8, 963.3, 1084.6, 1199.1, 1307.1, 1409.1, 1505.4, 1596.3,
-    1682.1, 1763.0, 1839.4, 1911.5, 1979.6, 2043.9, 2104.5, 2161.8, 2215.8, 2266.8,
-  ],
-  boardEndX: 2880.0,
-  stringsAtNut: [351.6, 521.9],
-  stringsAtEnd: [311.3, 562.2],
-  boardAtNut: [334.5, 538.9],
-  boardAtEnd: [294.2, 579.2],
-};
-
-/** A Stratocaster: a rosewood board with small dots, three single coils on a cream scratchplate, and twenty-one frets. */
-export const STRAT_BOARD: PhotoMeasurements = {
-  width: 2880,
-  height: 824,
-  fit: 'frame',
-  frets: [
-    67.7, 243.7, 409.7, 566.5, 714.4, 854.1, 985.9, 1110.3, 1227.7, 1338.5, 1443.1, 1541.9, 1635.1,
-    1723.0, 1806.1, 1884.4, 1958.4, 2028.2, 2094.1, 2156.3, 2215.1, 2270.5,
-  ],
-  boardEndX: 2880.0,
-  stringsAtNut: [352.1, 521.4],
-  stringsAtEnd: [313.0, 560.4],
-  boardAtNut: [335.1, 538.3],
-  boardAtEnd: [293.9, 579.5],
-};
-
-/**
  * Every set of measurements this engine carries, by the name of the
  * file it belongs to.
  *
@@ -394,15 +263,9 @@ export const STRAT_BOARD: PhotoMeasurements = {
  * place -- so an unknown name is nothing, not a guess.
  */
 export const PHOTOS: Readonly<Record<string, PhotoMeasurements>> = {
-  'acoustic-cutaway': ACOUSTIC_CUTAWAY,
-  'acoustic-sunburst': ACOUSTIC_SUNBURST,
-  'acoustic-natural': ACOUSTIC_NATURAL,
+  'acoustic-drawn': ACOUSTIC_DRAWN,
   'classical-drawn': CLASSICAL_DRAWN,
   'electric-drawn': ELECTRIC_DRAWN,
-  'fretboard-classical': CLASSICAL_BOARD,
-  'fretboard-acoustic': ACOUSTIC_BOARD,
-  'fretboard-electric': ELECTRIC_BOARD,
-  'fretboard-strat': STRAT_BOARD,
 };
 
 /** The picture a page names, at the path the page keeps it. */
@@ -414,7 +277,7 @@ export function photoNamed(name: string, href: string): GuitarPhotograph | undef
 /** A photograph to draw with: measurements, and where the file is. */
 export function guitarPhoto(
   href: string,
-  measurements: PhotoMeasurements = ACOUSTIC_CUTAWAY,
+  measurements: PhotoMeasurements = ACOUSTIC_DRAWN,
 ): GuitarPhotograph {
   return { ...measurements, href };
 }

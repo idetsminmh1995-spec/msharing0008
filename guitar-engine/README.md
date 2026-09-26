@@ -147,7 +147,7 @@ is. When a picture of a REAL instrument is wanted instead, hand over a
 photograph:
 
 ```js
-{ photo: guitarPhoto('assets/guitar/acoustic-cutaway.webp') }
+{ photo: guitarPhoto('assets/guitar/acoustic-drawn.svg') }
 ```
 
 and the drawn instrument is not drawn at all — no wood, no frets, no
@@ -169,8 +169,8 @@ builds each board out of the real measurements of the instrument — the
 17.817 rule, the nut width, the string gauges — lights it, and prints
 the calibration on its way out, so `ACOUSTIC_BOARD` and its three
 siblings are exact by construction rather than read off an image with
-a ruler. `ACOUSTIC_CUTAWAY` is the other kind: a photograph of a whole
-guitar, measured the hard way.
+a ruler. `ACOUSTIC_DRAWN` is the other kind: a whole guitar, measured the
+hard way off the file that draws it.
 
 Two things follow from it being a photograph. The frets it shows are
 the frets there are, so `firstFret`/`lastFret` stop applying; and the
@@ -188,7 +188,7 @@ That cut is a hard line straight across a guitar, so give the engine
 the colour behind the stage and it fades the picture into it instead:
 
 ```js
-{ photo: guitarPhoto('assets/guitar/acoustic-natural.webp'), fadeTo: '#17110E' }
+{ photo: guitarPhoto('assets/guitar/acoustic-drawn.svg'), fadeTo: '#17110E' }
 ```
 
 A picture framed with air around it can say which PART of itself to

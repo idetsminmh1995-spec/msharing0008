@@ -19,123 +19,102 @@ with one of a different size means changing those two numbers.
 Trimmed to the ink, transparent background, drawn with the thumb to
 the left and the fingers up.
 
-## The drawings
+## The guitars
 
-`electric-drawn.svg` — the owner's own single-cut electric, a
-Telecaster shape. This is what the page draws for **Electric Guitar,
-single cut**. It is their upload exactly as it came, renamed (a space
-in a filename is a `%20` in every URL that asks for it) with `width`
-and `height` added beside the viewBox so the picture has an intrinsic
-size for the video canvas. The artwork is untouched — it already lies
-the way the page wants it, headstock in from the left and body out to
-the right.
+Three drawings, all the owner's own, all SVG. There are no photographs
+and no renders here any more: an SVG stays sharp at any frame size, a
+photograph does not, and a vector file can be measured to the tenth of
+a pixel.
 
-Measuring it was the photograph method, not the drawing method: 860
-paths under a transform is not something to read numbers out of. Two
-things are worth knowing if another one has to be measured this way:
+`acoustic-drawn.svg` — a dreadnought. **Acoustic Guitar**, the nut and
+twenty frets. Their upload, renamed, with the viewBox tightened to the
+guitar's own bounding box (see below) and `width`/`height` added.
 
-**Render it into a page, not as a document.** Open an SVG file
-directly in a browser and what comes back is offset by the body
-margin and stretched to the window — a measurement of the browser,
-not of the guitar. It was worth eleven pixels here, which is a sixth
-of a fret at the nut, and every mark in the video sat visibly right
-of where it belonged. An `<img>` at the picture's exact size, in a
-page with `margin: 0`, gives the file's own coordinates.
+`classical-drawn.svg` — a classical, the nut and nineteen frets. Built
+from `Classic Guitar.svg` beside it, which is the upright original:
+this one is turned a quarter turn counter-clockwise so it lies the way
+the others do, and its two middle strings are nudged 1.7 units at the
+nut onto the even spacing the engine's model assumes.
 
-**The wires give themselves away by their shading.** They are drawn
-white along the top of the board and grey along the bottom, the way a
-round wire catches the light. Twenty-three lines pass that test, but
-the last one is white all the way down: that is the end of the
-fretboard, not a wire. The nut and **twenty-two frets**, which is
-what a Telecaster has. The nine inlay dots then come out as 3, 5, 7,
-9, 12 (the double), 15, 17, 19 and 21, each within 0.7 of its own
-midpoint — the standard set, settling the numbering completely.
+`electric-drawn.svg` — a single-cut electric, a Telecaster shape, the
+nut and twenty-two frets. Their upload exactly as it came, renamed,
+with `width`/`height` added.
 
-It is framed `span: [375, 1654]`, `drop: 0.13` — the same framing as
-the classical, which is what the owner asked for.
+**The double cut has no drawing yet.** The page's `GUITARS` map simply
+leaves that one's `photo` out, and the engine draws a neck of its own
+instead — which is what it does whenever there is no picture to lay
+one on. One line puts a drawing in when one arrives.
 
-`classical-drawn.svg` — the owner's own classical guitar, drawn in
-Illustrator and turned a quarter turn counter-clockwise so it lies the
-way every other guitar here lies: headstock in from the left, body out
-to the right. This is what the page draws for **Classical Guitar**.
+### Four things that will bite whoever adds the next one
 
-`Classic Guitar.svg` — the upright original it was built from, kept as
-the source. Nothing draws it.
+**Give it `width` and `height`, not just a viewBox.** They are what
+give the picture an intrinsic size, which is what the video canvas
+needs to draw it at.
 
-Two things were changed in the turned copy and nothing else. The whole
-drawing is rotated (`translate(0,584.3) rotate(-90)` around the
-original artwork, with the viewBox turned to match), and the two
-middle strings were moved 1.7 units at the nut onto even spacing —
-they were drawn 8.4 apart where the others are 12.5, and the engine
-spaces six strings evenly between the outer two.
+**No two hyphens in a row inside an XML comment.** It is not legal,
+the browser refuses the whole file, the `<img>` loads as nothing, and
+the frame comes out with the marks and the fret numbers floating on a
+black background with no guitar under them. It cost a round here.
 
-Measuring it took no measuring. A drawing carries its own numbers, so
-the calibration is read straight out of the file: every fret bar is a
-rectangle with a stated y and height, and the centre of the bar is the
-wire. The nut needs no argument either — it is the bar drawn 7.3 thick
-where every fret is 3.6. **Twenty lines: the nut and nineteen frets.**
-It is a good drawing: taking the nut and the twelfth as the scale,
-every other wire lands within 2.6 units of the real 17.817 rule,
-across a scale of 920.
+**Tighten the viewBox to the guitar.** The acoustic arrived as a 177.2
+square with the guitar lying across the middle of it. The engine hangs
+a picture by its strings and takes the stage's height from the
+picture's, so all that empty sky and floor came out as a box twice as
+tall as the guitar. Measure the drawing's bounding box off a render
+and make that the viewBox.
 
-Turning it counter-clockwise puts the low E at the bottom, which is
-where the engine numbers string 6: upright, the low E is on the left,
-and the left side goes down.
+**Render it into a page, not as a document.** Open an SVG directly in
+a browser and what comes back is offset by the body margin and
+stretched to the window — a measurement of the browser, not of the
+guitar. It was worth eleven pixels on the electric, a sixth of a fret
+at the nut, and every mark in the video sat visibly right of where it
+belonged. An `<img>` at the picture's exact size, in a page with
+`margin: 0`, gives the file's own coordinates.
 
-The frame shows the guitar from just before the NUT to just past the
-BRIDGE — `span: [251, 1293]`, `drop: 0.13` in `photo.ts`. A photograph
-of a guitar already has its body running off the edges, because that
-is how someone frames one; a drawing has air around it, so scaled to
-the width it came out small, with the notation towering over it and
-the headstock taking a quarter of the frame for nothing. `span` says
-which stretch of the file to fill the width with instead, and sets
-the scale and the offset together, because those are one decision.
-`drop` hangs it lower down the stage. Everything drawn on it — the
-marks, the numbers, the board — goes with it, because they are all
-worked out from where the picture lands.
-
-An SVG works everywhere a photograph does — the preview's `<image>`
-and the video canvas's `drawImage` both take one — as long as it
-carries `width` and `height` attributes, which is what gives it an
-intrinsic size for the canvas. It also stays sharp at any frame size,
-which a photograph does not.
-
-## The photographs
-
-`acoustic-natural.webp` — a natural-top dreadnought, framed by its
-owner: neck in from the left edge, body filling the right,
-background cut away. This is what the page draws for **Acoustic
-Guitar**.
-
-`acoustic-sunburst.webp` — a sunburst cutaway dreadnought, the same
-idea. Kept, measured and ready; nothing draws it at the moment.
-
-### Measuring one: the dots are the anchor, not the first wire
+### Which line is which fret
 
 A geometric fret series fits equally well however the wires are
-numbered — the nut position and the scale length absorb any shift —
-so counting "the first wire I can see must be fret 1" is a coin toss,
-and getting it wrong puts every mark a fret out for the whole video.
-It happened twice here, silently, before the check below settled it.
+numbered — the nut position and the scale length absorb any shift — so
+counting "the first line I can see must be fret 1" is a coin toss, and
+getting it wrong puts every mark a fret out for the whole video. It
+happened twice on the photograph this folder used to hold.
 
-The INLAY DOTS cannot move: 3, 5, 7, 9, 12, 15, 17, 19 are where a
-guitar puts them, and a dot sits between the wires of its own fret
-and the one before. So do not fit the dots — **number** them. Measure
-every dot centre, try each numbering of the wires, and keep the one
-that lands the dots on fret numbers a guitar is really inlaid at.
+There are two ways to settle it, and which one to trust depends on the
+drawing.
 
-For `acoustic-natural.webp` there are seven dots, at 262, 420, 562,
-690, 859, 1003 and 1086. Taking the first line in the picture as the
-NUT lands them on 3, 5, 7, 9, 12, 15 and 17 — every one within a pixel
-of its own midpoint, and the standard set. Taking it as the first
-fret instead lands them on 4, 6, 8, 10, 13, 16 and 18, which is not a
-pattern any guitar has ever been built with. So the first line is the
-nut, and the picture shows **21 lines: the nut and twenty frets**.
+**The nut, when it is drawn as a nut.** On the classical it is the bar
+drawn 7.3 thick where every fret is 3.6; on the electric it is a bone
+bar with its own colour; on the acoustic it is the one line wider than
+the rest. When the picture shows the nut, the first line is fret 0 and
+there is nothing to argue about.
 
-(That one is double-dotted at the SEVENTH as well as the twelfth,
-which is unusual. It means "the double dot is the twelfth" is not the
-check on this picture — the whole set is. A fit that used the doubles
-alone is exactly how the second wrong numbering happened.)
+**The fret rule, fitted to every wire at once.** `pos(n) = A − B·2^(−n/12)`
+is linear in `A` and `B`, so a least-squares fit takes a second and
+tells you two things: how well the drawing follows the real 17.817
+rule, and where that rule says the nut is. On the acoustic every wire
+lands within 1.7 of the fit across a scale of 1091, and the fit's nut
+falls on the front edge of the nut bar as drawn. Nothing else fits
+that way.
+
+**The inlay dots are a check, not an oracle.** On a photograph they
+are the only anchor there is. On these drawings they agree as far as
+they go and then wander: this owner puts a DOUBLE dot at the seventh
+as well as the twelfth, and the acoustic's last two dots sit on 14 and
+16 where a real guitar would put 15 and 17. Use them to confirm 3, 5,
+7, 9 and 12; do not use them to number a drawing.
+
+### Which part of the picture fills the frame
+
+`span: [left, right]` in `photo.ts`, in the file's own pixels. All
+three guitars are framed the same way, which is how the owner asked
+for it: **the nut on one edge of the frame and the bridge on the
+other**, so the headstock runs off the left and the rest of the body
+off the right, and the whole playing length gets the frame. `drop`
+hangs the picture lower down the stage; all three use 0.13.
+
+Without a span a picture is scaled to the frame's width and laid
+against its left edge, which is right for a photograph framed for the
+job and wrong for a drawing with air around it.
 
 ### The cut edges are faded, not sliced
 
@@ -165,82 +144,31 @@ wants to be shot along the neck, nut at the left, body at the right,
 background removed, and at least 2000px wide. Measuring it is an hour
 with the same script that measured this one.
 
-## The guitar renders
-
-`fretboard-classical.webp`, `fretboard-acoustic.webp`,
-`fretboard-electric.webp`, `fretboard-strat.webp` — one studio render
-per guitar. Only the double-cut electric's is what the video frame
-draws now; the other three are kept for reference, since the owner's
-two drawings and the photograph above took their places. Each is a
-WHOLE guitar in a frame-shaped window: the neck, the joint where the
-body opens out, the cutaway, and the top with its soundhole or its
-pickups, with the body running off the top and the bottom of the
-window because a guitar's body is wider than any frame. (A bare
-fretboard strip is `--view board`, which is what these were at first
-and which does not read as a guitar.)
-
-The photoreal plugins do not draw their instruments at runtime: they
-model one, light it, render it once at high resolution, and blit the
-picture. These are that step, and the model is in the repository —
-`guitar-engine/tools/render_fretboard.py` (numpy + Pillow):
-
-```bash
-python3 tools/render_fretboard.py --model acoustic --width 2880 \
-    --out /tmp/fretboard-acoustic.png
-```
-
-`--view guitar` (the default) frames the whole instrument;
-`--aspect` is the window's shape and `--strings-at` is where down it
-the strings sit — 0.53, which is where the engine's board band has
-its middle, so the picture lines up with the marks drawn over it
-without anything having to be nudged.
-
-It builds each board from the real measurements of the instrument —
-the 17.817 rule for the frets, the nut width, the string gauges — so
-**the calibration is exact by construction, not measured afterwards**.
-The script prints the numbers on its way out; they are pasted into
-`guitar-engine/src/photo.ts` as `ACOUSTIC_BOARD` and its three
-siblings. Re-render a board and you re-paste them.
-
-## The photographed guitar
-
-`acoustic-cutaway.webp` — the whole-guitar photograph, neck in from
-the left and body off the right. Nothing draws it at the moment: the
-page moved to the fretboard renders above. One line in the page's
-`GUITARS` map puts it back.
- — a cutaway dreadnought, neck running in from
-the left edge and the body leaving by the right. It is what the Guitar
-page draws when **Acoustic — photograph** is picked, in place of the
-guitar the engine draws out of shapes and gradients.
-
-The file is the guitar and nothing else: it was trimmed to the ink, so
-its top edge is the top of the body and its bottom edge is where the
-picture was cut. The background is transparent, so the video frame's
-own colour shows through above and below the neck.
-
 ## It is measured, and the measurements live in the engine
 
 A mark has to land on the fifth fret of the second string, and only
-this file knows where that is. So `guitar-engine/src/photo.ts` carries
-the measurements — `ACOUSTIC_CUTAWAY` — in this file's own pixels:
+the file knows where that is. So `guitar-engine/src/photo.ts` carries
+one set of measurements per drawing — `ACOUSTIC_DRAWN`,
+`CLASSICAL_DRAWN`, `ELECTRIC_DRAWN` — in that file's own pixels:
 
 | what | where |
 | --- | --- |
+| `width` / `height` | the picture's own size, the units of everything below |
 | `frets` | every fret wire, index 0 the nut, index n fret n |
 | `boardEndX` | where the board stops, past the last wire |
 | `stringsAtNut` | the outer strings at the nut: thinnest, thickest |
 | `stringsAtEnd` | the same two where the board ends |
 | `boardAtNut` / `boardAtEnd` | the board's own edges at those places |
+| `span` / `drop` | which part of the picture fills the frame, and how low it hangs |
+| `fit` | `frame` for a whole guitar, `board` for a bare fretboard strip |
 
-**Replacing this file means re-measuring it.** The numbers are not
-guesses to be nudged until it looks right: they were read off the
-image, and a wire half a fret out puts every mark in the video half a
-fret out with it. To measure a new picture, find the fret wires as the
-bright vertical lines across the board (average each column over the
-board's rows and take the peaks) and the strings as the bright
-horizontal lines, at the nut and again at the end of the board.
+The two outer strings are measured at BOTH ends because the band they
+make does not just widen along the board, it drifts: the engine reads
+each of them off at any point and spreads the other four evenly
+between, rather than fanning six strings about one middle line. A
+middle-and-a-half model put every string a sixth of a gap out at both
+ends of this acoustic.
 
-Keep the same shape of picture if you can: neck in from the left, body
-off the right, trimmed to the ink. The engine scales the file to the
-width of the frame and hangs it by its strings, so a picture framed
-differently will sit differently.
+**Replacing a file means re-measuring it.** The numbers are not
+guesses to be nudged until it looks right: a wire half a fret out puts
+every mark in the video half a fret out with it.

@@ -584,17 +584,14 @@
            holds each one's measurements under the same name, so a mark
            lands on the real fret in the real string.
 
-           The classical is the owner's own drawing, turned on its
-           side; the acoustic is a photograph of a real one. The two
-           electrics are studio renders until pictures of them arrive. -->
+           All three are the owner's own drawings. The double cut has
+           none yet, so the engine draws that one itself. -->
       <img data-stage-image data-guitar-photo="classical-drawn"
            src="../../assets/guitar/classical-drawn.svg" alt="" style="display:none" decoding="async">
-      <img data-stage-image data-guitar-photo="acoustic-natural"
-           src="../../assets/guitar/acoustic-natural.webp" alt="" style="display:none" decoding="async">
+      <img data-stage-image data-guitar-photo="acoustic-drawn"
+           src="../../assets/guitar/acoustic-drawn.svg" alt="" style="display:none" decoding="async">
       <img data-stage-image data-guitar-photo="electric-drawn"
            src="../../assets/guitar/electric-drawn.svg" alt="" style="display:none" decoding="async">
-      <img data-stage-image data-guitar-photo="fretboard-strat"
-           src="../../assets/guitar/fretboard-strat.webp" alt="" style="display:none" decoding="async">
       <!-- The hand in the corner of the frame: the page's own drawing,
            not the one the engine used to assemble out of rectangles. -->
       <img data-stage-image id="handPicture" src="../../assets/guitar/hand-fingers.webp"
@@ -1024,9 +1021,11 @@
    */
   const GUITARS = {
     classical: { frets: 19, model: 'classical', photo: 'classical-drawn' },
-    acoustic: { frets: 20, model: 'acoustic', photo: 'acoustic-natural' },
+    acoustic: { frets: 20, model: 'acoustic', photo: 'acoustic-drawn' },
     electric: { frets: 22, model: 'singleCut', photo: 'electric-drawn' },
-    strat: { frets: 21, model: 'electric', photo: 'fretboard-strat' },
+    // No drawing for the double cut yet, so this one is the engine's
+    // own: it draws a neck when there is no picture to lay one on.
+    strat: { frets: 21, model: 'electric' },
   };
   const DEFAULT_GUITAR = 'acoustic';
 

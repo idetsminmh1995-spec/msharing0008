@@ -52,15 +52,9 @@ export {
   stageShapes,
 } from './stage.js';
 export {
-  ACOUSTIC_BOARD,
-  ACOUSTIC_CUTAWAY,
-  ACOUSTIC_NATURAL,
-  ACOUSTIC_SUNBURST,
-  CLASSICAL_BOARD,
+  ACOUSTIC_DRAWN,
   CLASSICAL_DRAWN,
-  ELECTRIC_BOARD,
   ELECTRIC_DRAWN,
-  STRAT_BOARD,
   PHOTOS,
   guitarPhoto,
   photoFretCount,

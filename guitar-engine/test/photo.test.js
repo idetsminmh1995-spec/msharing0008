@@ -21,13 +21,21 @@ const FRAME = {
 
 test('the picture is scaled to the width and hung by its strings', () => {
   const place = G.photoPlacement(FRAME);
-  assert.equal(place.scale, FRAME.width / PHOTO.width);
+  // The picture says which stretch of itself fills the width, so the
+  // scale comes from that stretch and the offset puts its left end on
+  // the frame's left edge.
+  const span = PHOTO.span[1] - PHOTO.span[0];
+  assert.ok(Math.abs(place.scale - FRAME.width / span) < 1e-9);
+  assert.ok(Math.abs(place.x + PHOTO.span[0] * place.scale) < 1e-9);
   // The strings' middle lands where the drawn neck's middle would, so
   // the hand legend keeps its band above and the numbers their strip
   // below.
   const board = G.guitarLayout(FRAME).board;
-  const middle = place.y + ((PHOTO.stringsAtNut[0] + PHOTO.stringsAtNut[1]) / 2) * place.scale;
-  assert.ok(Math.abs(middle - (board.y + board.height / 2)) < 1, `hung at ${middle}`);
+  const nutMid = (PHOTO.stringsAtNut[0] + PHOTO.stringsAtNut[1]) / 2;
+  const endMid = (PHOTO.stringsAtEnd[0] + PHOTO.stringsAtEnd[1]) / 2;
+  const middle = place.y + ((nutMid + endMid) / 2) * place.scale;
+  const wanted = board.y + board.height / 2 + PHOTO.drop * FRAME.height;
+  assert.ok(Math.abs(middle - wanted) < 1, `hung at ${middle}, wanted ${wanted}`);
   // It is BIGGER than the frame: a photographed guitar runs off the
   // top and the bottom the way it runs off the side.
   assert.ok(place.y < 0, 'the body is cut by the top edge');
@@ -45,9 +53,10 @@ test('a photograph shows the frets it has, whatever it is asked for', () => {
 });
 
 test('a mark lands between the picture’s own two fret wires', () => {
-  const scale = G.photoPlacement(FRAME).scale;
+  const place = G.photoPlacement(FRAME);
+  const along = (file) => place.x + file * place.scale;
   for (const fret of [1, 5, 12, 20]) {
-    const wanted = ((PHOTO.frets[fret - 1] + PHOTO.frets[fret]) / 2) * scale;
+    const wanted = along((PHOTO.frets[fret - 1] + PHOTO.frets[fret]) / 2);
     assert.ok(
       Math.abs(G.fretCenter(fret, FRAME) - wanted) < 0.5,
       `fret ${fret}: ${G.fretCenter(fret, FRAME)} wanted ${wanted}`,
@@ -55,7 +64,7 @@ test('a mark lands between the picture’s own two fret wires', () => {
   }
   // An open string is played at the nut, which is wherever the
   // picture puts it -- not at the left edge of the box.
-  assert.ok(Math.abs(G.fretCenter(0, FRAME) - PHOTO.frets[0] * scale) < 0.5);
+  assert.ok(Math.abs(G.fretCenter(0, FRAME) - along(PHOTO.frets[0])) < 0.5);
   // The frets crowd as they climb, because the picture's do.
   const low = G.fretCenter(2, FRAME) - G.fretCenter(1, FRAME);
   const high = G.fretCenter(20, FRAME) - G.fretCenter(19, FRAME);
@@ -65,10 +74,10 @@ test('a mark lands between the picture’s own two fret wires', () => {
 test('a mark lands on the picture’s own string', () => {
   const place = G.photoPlacement(FRAME);
   const at = (file) => place.y + file * place.scale;
-  const nutX = PHOTO.frets[0] * place.scale;
+  const nutX = place.x + PHOTO.frets[0] * place.scale;
   assert.ok(Math.abs(G.stringYAt(FRAME, 1, nutX) - at(PHOTO.stringsAtNut[0])) < 1);
   assert.ok(Math.abs(G.stringYAt(FRAME, 6, nutX) - at(PHOTO.stringsAtNut[1])) < 1);
-  const endX = PHOTO.boardEndX * place.scale;
+  const endX = place.x + PHOTO.boardEndX * place.scale;
   assert.ok(Math.abs(G.stringYAt(FRAME, 1, endX) - at(PHOTO.stringsAtEnd[0])) < 1);
   assert.ok(Math.abs(G.stringYAt(FRAME, 6, endX) - at(PHOTO.stringsAtEnd[1])) < 1);
   // They fan out on the way, as the picture's do.
@@ -160,24 +169,29 @@ test('the SVG writes the picture as an image, and nothing else has to change', (
   assert.ok(svg.includes('<text'), 'the fret numbers still get written');
 });
 
-// The inlay dots' centres, measured off the acoustic the page draws.
-// They are the only thing that says which line in the picture is
-// which fret -- a geometric fret series fits the wires just as well
-// a fret out -- and they have to come out as numbers a guitar is
-// really inlaid at. These are the standard set; the numbering one
-// fret over gives 4, 6, 8, 10, 13, 16, 18, which is nobody's guitar.
-const ACOUSTIC_DOTS = { 3: 262, 5: 421, 7: 563, 9: 691, 12: 860, 15: 1003, 17: 1087 };
-
-test('the acoustic is numbered from its dots: the nut and twenty frets', () => {
-  const photo = G.photoNamed('acoustic-natural', 'acoustic.webp');
+test('the acoustic is numbered by the fret rule: the nut and twenty frets', () => {
+  const photo = G.photoNamed('acoustic-drawn', 'acoustic.svg');
   assert.equal(photo.frets.length, 21, 'twenty-one lines across the board');
   assert.equal(G.photoFretCount(photo), 20, 'which is the nut and twenty frets');
-  assert.equal(photo.frets[0], 34, 'the first line is the nut, and it is on the picture');
-  for (const [fret, dot] of Object.entries(ACOUSTIC_DOTS)) {
-    const at = Number(fret);
-    const middle = (photo.frets[at - 1] + photo.frets[at]) / 2;
-    assert.ok(Math.abs(middle - dot) < 1.5, `fret ${fret} sits at ${middle}, its dot at ${dot}`);
-  }
+
+  // This drawing is accurate about the fret rule and stylised about
+  // its dots, so the RULE is what settles the numbering. Fit the nut
+  // and the scale to all twenty wires at once -- pos(n) = A - B*2^(-n/12),
+  // which is linear in A and B -- and every wire has to land on it.
+  const wires = photo.frets.slice(1);
+  const u = wires.map((_, i) => Math.pow(2, -(i + 1) / 12));
+  const n = wires.length;
+  const su = u.reduce((a, b) => a + b, 0);
+  const suu = u.reduce((a, b) => a + b * b, 0);
+  const sw = wires.reduce((a, b) => a + b, 0);
+  const suw = wires.reduce((a, b, i) => a + b * u[i], 0);
+  const det = n * suu - su * su;
+  const A = (suu * sw - su * suw) / det;
+  const B = (su * sw - n * suw) / det;
+  const worst = Math.max(...wires.map((w, i) => Math.abs(w - (A - B * u[i]))));
+  assert.ok(worst < 2, `worst wire is ${worst.toFixed(2)} off the rule`);
+  // And the fit's own nut is the one the drawing draws.
+  assert.ok(Math.abs(A - B - photo.frets[0]) < 1, `rule says the nut is at ${(A - B).toFixed(1)}`);
 });
 
 test('a cropped picture is faded into the frame, not cut off by it', () => {
@@ -188,20 +202,41 @@ test('a cropped picture is faded into the frame, not cut off by it', () => {
     'no colour behind the stage, no fade -- a guessed one would be the wrong colour',
   );
 
-  // The sample cutaway is cut by the frame's top edge and ends at its
-  // own outline above the bottom one, so it gets ONE band: a band over
-  // an outline would be fog over the guitar, not a cut hidden.
-  const one = G.stageShapes({ ...FRAME, fadeTo: 'rgb(18, 18, 22)', seconds: 0, notes });
-  assert.equal(one.filter((s) => s.role === 'photoFade').length, 1, 'only the edge that is cut');
-
-  // The acoustic the page draws is cut at both: the owner framed it
-  // that way, and the frame crops what is left.
-  const photo = G.photoNamed('acoustic-natural', 'acoustic.webp');
+  // A band goes over each edge the picture is actually CUT at, and
+  // over no other: a picture whose outline ends inside the frame ends
+  // at its outline, and a band there is fog over the guitar.
+  const photo = G.photoNamed('acoustic-drawn', 'acoustic.svg');
   const height = G.stageHeightFor(1920, photo, { handLegend: true, fretNumbers: true });
-  const CUT = { ...FRAME, photo, height, fadeTo: 'rgb(18, 18, 22)', seconds: 0, notes };
+  const seen = new Set();
+  for (const drop of [-0.8, -0.55, -0.3, 0, 0.13, 0.4]) {
+    const box = {
+      ...FRAME,
+      photo: { ...photo, drop },
+      height,
+      fadeTo: 'rgb(18, 18, 22)',
+      seconds: 0,
+      notes,
+    };
+    const place = G.photoPlacement(box);
+    const cut =
+      Number(place.y <= 1) + Number(place.y + place.photo.height * place.scale >= height - 1);
+    const bands = G.stageShapes(box).filter((s) => s.role === 'photoFade').length;
+    assert.equal(bands, cut, `drop ${drop}: ${bands} bands for ${cut} cut edges`);
+    seen.add(cut);
+  }
+  assert.ok(seen.has(1), 'and one of those really did have a single cut edge');
+
+  const CUT = {
+    ...FRAME,
+    photo,
+    height,
+    fadeTo: 'rgb(18, 18, 22)',
+    seconds: 0,
+    notes,
+  };
   const faded = G.stageShapes(CUT);
   const fades = faded.filter((shape) => shape.role === 'photoFade');
-  assert.equal(fades.length, 2, 'the top edge and the bottom edge, both of them cut');
+  assert.equal(fades.length, 2, 'this one is cut at both');
   const [top, bottom] = fades;
 
   // Opaque where the picture is cut, gone where the band ends.
@@ -299,7 +334,7 @@ test('the classical is the owner’s drawing, read out of the file', () => {
 });
 
 test('a picture can be drawn bigger, and hung lower', () => {
-  const plain = { ...G.photoNamed('acoustic-natural', 'a.webp') };
+  const plain = { ...G.photoNamed('acoustic-drawn', 'a.svg'), span: undefined, drop: undefined };
   const width = 1920;
   const frame = (photo) => ({
     width,

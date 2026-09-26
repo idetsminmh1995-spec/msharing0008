@@ -21,19 +21,14 @@ var GuitarEngine = (() => {
   // src/index.ts
   var index_exports = {};
   __export(index_exports, {
-    ACOUSTIC_BOARD: () => ACOUSTIC_BOARD,
     ACOUSTIC_COLORS: () => ACOUSTIC_COLORS,
-    ACOUSTIC_CUTAWAY: () => ACOUSTIC_CUTAWAY,
-    ACOUSTIC_NATURAL: () => ACOUSTIC_NATURAL,
-    ACOUSTIC_SUNBURST: () => ACOUSTIC_SUNBURST,
-    CLASSICAL_BOARD: () => CLASSICAL_BOARD,
+    ACOUSTIC_DRAWN: () => ACOUSTIC_DRAWN,
     CLASSICAL_COLORS: () => CLASSICAL_COLORS,
     CLASSICAL_DRAWN: () => CLASSICAL_DRAWN,
     DEFAULT_COLORS: () => DEFAULT_COLORS,
     DEFAULT_FIRST_FRET: () => DEFAULT_FIRST_FRET,
     DEFAULT_LAST_FRET: () => DEFAULT_LAST_FRET,
     DEFAULT_STRINGS: () => DEFAULT_STRINGS,
-    ELECTRIC_BOARD: () => ELECTRIC_BOARD,
     ELECTRIC_DRAWN: () => ELECTRIC_DRAWN,
     FINGER_COLORS: () => FINGER_COLORS,
     FINGER_NAMES: () => FINGER_NAMES,
@@ -41,7 +36,6 @@ var GuitarEngine = (() => {
     PHOTOS: () => PHOTOS,
     SINGLE_CUT_COLORS: () => SINGLE_CUT_COLORS,
     STANDARD_TUNING: () => STANDARD_TUNING,
-    STRAT_BOARD: () => STRAT_BOARD,
     boardEdgesAt: () => boardEdgesAt,
     boardHalfAt: () => boardHalfAt,
     fingerColor: () => fingerColor,
@@ -77,70 +71,42 @@ var GuitarEngine = (() => {
   });
 
   // src/photo.ts
-  var ACOUSTIC_CUTAWAY = {
-    width: 1920,
-    height: 636,
-    frets: [
-      80,
-      222,
-      329,
-      430,
-      525,
-      614,
-      698,
-      777,
-      852,
-      922,
-      988,
-      1050,
-      1110,
-      1165,
-      1217,
-      1268,
-      1313,
-      1359,
-      1398,
-      1437,
-      1475
-    ],
-    boardEndX: 1521,
-    stringsAtNut: [409, 517],
-    stringsAtEnd: [392, 534],
-    boardAtNut: [413, 527],
-    boardAtEnd: [376, 548]
-  };
-  var ACOUSTIC_NATURAL = {
-    width: 1920,
-    height: 711,
+  var ACOUSTIC_DRAWN = {
+    width: 1743,
+    height: 682,
     fit: "frame",
     frets: [
-      34,
-      132,
-      220,
-      304,
-      383,
-      458,
+      254.7,
+      316,
+      374,
+      428,
+      479,
       529,
-      596,
-      660,
-      721,
-      779,
-      834,
-      885,
-      934,
-      980,
-      1025,
-      1066,
-      1106,
-      1143,
-      1178,
-      1212
+      574.5,
+      617,
+      657,
+      698.5,
+      732,
+      767,
+      801.5,
+      830,
+      859,
+      886,
+      912,
+      936.5,
+      959,
+      982,
+      1003
     ],
-    boardEndX: 1255,
-    stringsAtNut: [489.2, 592.2],
-    stringsAtEnd: [470.3, 610],
-    boardAtNut: [485.6, 596.7],
-    boardAtEnd: [463.7, 620.8]
+    boardEndX: 1035,
+    stringsAtNut: [300.8, 361.7],
+    stringsAtEnd: [294.7, 378.4],
+    boardAtNut: [292, 369.4],
+    boardAtEnd: [284.5, 389.1],
+    // Nut on one edge of the frame, bridge on the other, like the other
+    // two. The bridge ends at 1404.5.
+    span: [223, 1454],
+    drop: 0.13
   };
   var CLASSICAL_DRAWN = {
     width: 1513.5,
@@ -223,189 +189,16 @@ var GuitarEngine = (() => {
     span: [375, 1654],
     drop: 0.13
   };
-  var ACOUSTIC_SUNBURST = {
-    width: 2e3,
-    height: 714,
-    fit: "frame",
-    frets: [
-      106.8,
-      220,
-      332,
-      439,
-      539,
-      636,
-      725,
-      808,
-      885,
-      960,
-      1028,
-      1093,
-      1157,
-      1214,
-      1270,
-      1321,
-      1368,
-      1416,
-      1458,
-      1498,
-      1538
-    ],
-    boardEndX: 1590,
-    stringsAtNut: [434.8, 547.9],
-    stringsAtEnd: [414.1, 565.1],
-    boardAtNut: [428, 558.6],
-    boardAtEnd: [398.3, 578.5]
-  };
-  var CLASSICAL_BOARD = {
-    width: 2880,
-    height: 824,
-    fit: "frame",
-    frets: [
-      71.8,
-      259.1,
-      435.8,
-      602.5,
-      760,
-      908.6,
-      1048.8,
-      1181.2,
-      1306.1,
-      1424.1,
-      1535.4,
-      1640.4,
-      1739.6,
-      1833.2,
-      1921.6,
-      2005,
-      2083.7,
-      2158,
-      2228.1,
-      2294.3
-    ],
-    boardEndX: 2880,
-    stringsAtNut: [326.4, 547],
-    stringsAtEnd: [270.2, 603.2],
-    boardAtNut: [303.3, 570.1],
-    boardAtEnd: [260.1, 613.3]
-  };
-  var ACOUSTIC_BOARD = {
-    width: 2880,
-    height: 824,
-    fit: "frame",
-    frets: [
-      68.8,
-      246.8,
-      414.8,
-      573.3,
-      723,
-      864.2,
-      997.5,
-      1123.4,
-      1242.2,
-      1354.3,
-      1460.1,
-      1560,
-      1654.2,
-      1743.2,
-      1827.2,
-      1906.5,
-      1981.3,
-      2051.9,
-      2118.6,
-      2181.5,
-      2240.9
-    ],
-    boardEndX: 2880,
-    stringsAtNut: [348.2, 525.2],
-    stringsAtEnd: [309, 564.4],
-    boardAtNut: [328.6, 544.9],
-    boardAtEnd: [289.3, 584.1]
-  };
-  var ELECTRIC_BOARD = {
-    width: 2880,
-    height: 824,
-    fit: "frame",
-    frets: [
-      68.1,
-      239.7,
-      401.6,
-      554.4,
-      698.6,
-      834.8,
-      963.3,
-      1084.6,
-      1199.1,
-      1307.1,
-      1409.1,
-      1505.4,
-      1596.3,
-      1682.1,
-      1763,
-      1839.4,
-      1911.5,
-      1979.6,
-      2043.9,
-      2104.5,
-      2161.8,
-      2215.8,
-      2266.8
-    ],
-    boardEndX: 2880,
-    stringsAtNut: [351.6, 521.9],
-    stringsAtEnd: [311.3, 562.2],
-    boardAtNut: [334.5, 538.9],
-    boardAtEnd: [294.2, 579.2]
-  };
-  var STRAT_BOARD = {
-    width: 2880,
-    height: 824,
-    fit: "frame",
-    frets: [
-      67.7,
-      243.7,
-      409.7,
-      566.5,
-      714.4,
-      854.1,
-      985.9,
-      1110.3,
-      1227.7,
-      1338.5,
-      1443.1,
-      1541.9,
-      1635.1,
-      1723,
-      1806.1,
-      1884.4,
-      1958.4,
-      2028.2,
-      2094.1,
-      2156.3,
-      2215.1,
-      2270.5
-    ],
-    boardEndX: 2880,
-    stringsAtNut: [352.1, 521.4],
-    stringsAtEnd: [313, 560.4],
-    boardAtNut: [335.1, 538.3],
-    boardAtEnd: [293.9, 579.5]
-  };
   var PHOTOS = {
-    "acoustic-cutaway": ACOUSTIC_CUTAWAY,
-    "acoustic-sunburst": ACOUSTIC_SUNBURST,
-    "acoustic-natural": ACOUSTIC_NATURAL,
+    "acoustic-drawn": ACOUSTIC_DRAWN,
     "classical-drawn": CLASSICAL_DRAWN,
-    "electric-drawn": ELECTRIC_DRAWN,
-    "fretboard-classical": CLASSICAL_BOARD,
-    "fretboard-acoustic": ACOUSTIC_BOARD,
-    "fretboard-electric": ELECTRIC_BOARD,
-    "fretboard-strat": STRAT_BOARD
+    "electric-drawn": ELECTRIC_DRAWN
   };
   function photoNamed(name, href) {
     const measurements = PHOTOS[name];
     return measurements === void 0 ? void 0 : { ...measurements, href };
   }
-  function guitarPhoto(href, measurements = ACOUSTIC_CUTAWAY) {
+  function guitarPhoto(href, measurements = ACOUSTIC_DRAWN) {
     return { ...measurements, href };
   }
   function photoFretCount(photo) {
@@ -624,8 +417,9 @@ var GuitarEngine = (() => {
       ...options.photo !== void 0 ? { photo: options.photo } : {}
     };
     const board = guitarLayout(full).board;
-    const middle = middleOf(full);
-    const half = stringHalfAt(full, nutXOf(full));
+    const ends = stringEdgesAt(full, nutXOf(full));
+    const middle = (ends.top + ends.bottom) / 2;
+    const half = (ends.bottom - ends.top) / 2;
     const gap = count > 1 ? half * 2 / (count - 1) : 0;
     const lines = [];
     for (let i = 0; i < count; i++) {
@@ -639,6 +433,12 @@ var GuitarEngine = (() => {
     return lines;
   }
   function stringYAt(options, string, x) {
+    if (options.photo !== void 0) {
+      const count = stringCount(options);
+      const { top, bottom } = stringEdgesAt(options, x);
+      const at = Math.min(Math.max(string, 1), count);
+      return count > 1 ? top + (bottom - top) * (at - 1) / (count - 1) : (top + bottom) / 2;
+    }
     const lines = stringLines(options);
     const line = lines.find((candidate) => candidate.string === string);
     const middle = middleOf(options);
@@ -646,6 +446,19 @@ var GuitarEngine = (() => {
     const atNut = stringHalfAt(options, nutXOf(options));
     if (!(atNut > 0)) return middle;
     return middle + (line.offset - middle) * (stringHalfAt(options, x) / atNut);
+  }
+  function stringEdgesAt(options, x) {
+    const place = photoPlacement(options);
+    if (place !== void 0) {
+      const at = inPhoto(place, x);
+      return {
+        top: acrossPhoto(place, photoEdgeY(place.photo, "strings", 0, at)),
+        bottom: acrossPhoto(place, photoEdgeY(place.photo, "strings", 1, at))
+      };
+    }
+    const middle = middleOf(options);
+    const half = stringHalfAt(options, x);
+    return { top: middle - half, bottom: middle + half };
   }
   function fretWires(options) {
     const { first, last } = fretRange(options);
