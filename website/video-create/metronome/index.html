@@ -299,6 +299,7 @@
 <script src="../../assets/notation-engine.js"></script>
 <script src="../../assets/metronome-engine.js"></script>
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
+<script src="../../assets/voice-samples.js"></script>
 <script src="../../assets/outro-video.js"></script>
 <!-- The video engine: renders frames rather than recording them. -->
 <script src="../../assets/video-engine.js"></script>
@@ -583,11 +584,17 @@
     return `${entry.bar === 1 ? 'voice' : 'm'}:${entry.beat}`;
   }
 
-  function sampleUrl(key) {
+  /**
+   * The bytes of one sample, whatever the bucket called it.
+   *
+   * The folder and the extension are not this page's to assume:
+   * `voice-samples.js` finds them once -- `Counts vocal` or
+   * `Counts Vocal`, `.wav` or `.wave` or `.mp3` -- and every sample
+   * after that costs one request.
+   */
+  function sampleBytes(key) {
     const [kind, beat] = key.split(':');
-    return kind === 'voice'
-      ? `${API_BASE}/assets/shared/Voices/${beat}.wav`
-      : `${API_BASE}/assets/shared/${encodeURIComponent('Counts vocal')}/M${beat}.wav`;
+    return VoiceSamples.load(API_BASE, kind === 'voice' ? 'count' : 'measure', beat);
   }
 
   /**
@@ -641,9 +648,9 @@
       const ctx = ensureAudioContext();
       if (!ctx) return null;
       try {
-        const res = await fetch(sampleUrl(key));
-        if (!res.ok) throw new Error(`sample request failed (${res.status})`);
-        return liftToPeak(await ctx.decodeAudioData(await res.arrayBuffer()));
+        const bytes = await sampleBytes(key);
+        if (!bytes) throw new Error('no such voice in the bucket');
+        return liftToPeak(await ctx.decodeAudioData(bytes));
       } catch (err) {
         return null;
       }

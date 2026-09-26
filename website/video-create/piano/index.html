@@ -279,6 +279,8 @@
 <!-- The piano stage: the keyboard, and the notes falling onto it.
      piano-engine/, TypeScript + SVG, built to this bundle. -->
 <script src="../../assets/piano-engine.js"></script>
+<!-- Finds the count voices in the bucket whatever they were named. -->
+<script src="../../assets/voice-samples.js"></script>
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
 <script src="../../assets/outro-video.js"></script>
 <!-- The video engine: renders frames rather than recording them. -->
@@ -1526,9 +1528,9 @@
       return null;
     }
     try {
-      const res = await fetch(`${API_BASE}/assets/shared/Voices/${encodeURIComponent(name)}.wav`);
-      if (!res.ok) throw new Error(`voice request failed (${res.status})`);
-      const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
+      const bytes = await VoiceSamples.load(API_BASE, 'count', name);
+      if (!bytes) throw new Error('no such voice in the bucket');
+      const buffer = await ctx.decodeAudioData(bytes);
       countSampleCache.set(name, buffer);
       return buffer;
     } catch (err) {
@@ -1592,11 +1594,9 @@
       const ctx = ensureAudioContext();
       if (!ctx) return null;
       try {
-        const res = await fetch(
-          `${API_BASE}/assets/shared/${encodeURIComponent('Counts vocal')}/M${beatNumber}.wav`,
-        );
-        if (!res.ok) throw new Error(`measure voice request failed (${res.status})`);
-        return await ctx.decodeAudioData(await res.arrayBuffer());
+        const bytes = await VoiceSamples.load(API_BASE, 'measure', beatNumber);
+        if (!bytes) throw new Error('no such count voice in the bucket');
+        return await ctx.decodeAudioData(bytes);
       } catch (err) {
         return null;
       }
@@ -2030,9 +2030,13 @@
     const haveSamples = [...samples.values()].some((b) => b !== null);
     const missingName = useM ? 'Counts vocal/M1.wav' : 'Voices/1.wav';
     const voiceName = useM ? 'Counts vocal' : 'Voices';
+    const foundPath =
+      typeof VoiceSamples === 'undefined'
+        ? null
+        : VoiceSamples.describe(useM ? 'measure' : 'count', 1);
     countHint.innerHTML = haveSamples
-      ? `Counted at the score's own tempo and time signature, before the audio starts. Using the <b>${voiceName}</b> samples from R2.`
-      : `Counted at the score's own tempo and time signature, before the audio starts. No <b>${missingName}</b> in the bucket, so a <b>synthesised count</b> is used.`;
+      ? `Counted at the score's own tempo and time signature, before the audio starts. Using <b>${foundPath ?? voiceName}</b> from R2.`
+      : `Counted at the score's own tempo and time signature, before the audio starts. Nothing in the bucket's <b>${voiceName}</b> folder \u2014 ${missingName} and the other spellings of it were all asked for \u2014 so a <b>synthesised count</b> is used.`;
 
     countIn.running = true;
     playIcon.querySelector('path').setAttribute('d', PAUSE_PATH);
@@ -2090,6 +2094,23 @@
    * It names the ones it has NO sample for, because that is the thing
    * you cannot hear and therefore cannot diagnose from the video.
    */
+  /**
+   * Throws away everything remembered about the bucket's voices.
+   *
+   * A miss is cached -- otherwise every beat of every bar would ask
+   * the bucket again -- which means a page that looked before the
+   * samples were uploaded stays silent for as long as it is open, with
+   * nothing to tell the person that reloading is what they need. So
+   * turning Count Voice off and on again is a RETRY: it forgets the
+   * misses and the folder the search settled on, and looks properly.
+   */
+  function forgetVoiceSamples() {
+    countSampleCache.clear();
+    measureSampleCache.clear();
+    measureSampleInFlight.clear();
+    if (typeof VoiceSamples !== 'undefined') VoiceSamples.reset();
+  }
+
   async function refreshCountVoice() {
     const on = countVoiceEnabled();
     measureVolumeInput.disabled = !on;
@@ -2113,14 +2134,19 @@
     if (!countVoiceEnabled()) return;
     if (have.length === 0) {
       countVoiceHint.innerHTML =
-        'No <b>Counts vocal/M1.wav</b> in the bucket, so nothing is counted. ' +
-        'Upload <b>M1.wav</b>, <b>M2.wav</b>\u2026 to the shared <b>Counts vocal</b> folder.';
+        'Nothing found to count with, so nothing is counted. Upload <b>M1</b>, ' +
+        '<b>M2</b>\u2026 to the shared <b>Counts vocal</b> folder \u2014 <b>.wav</b>, ' +
+        '<b>.wave</b>, <b>.mp3</b> or <b>.m4a</b> all work, and the folder may be ' +
+        'spelled <b>Counts Vocal</b>. Then turn this off and on again to look again.';
       return;
     }
     const bars = new Set(countVoiceSchedule().map((b) => b.at)).size;
+    const found =
+      typeof VoiceSamples === 'undefined' ? null : VoiceSamples.describe('measure', have[0]);
     countVoiceHint.innerHTML =
       `Counting ${summariseNumbers(have)} on every beat of every bar, ${bars} beats ` +
       'through this score, repeats included. ' +
+      (found ? `Reading <b>${found}</b> from R2. ` : '') +
       (missing.length > 0
         ? `No sample for ${summariseNumbers(missing)}, so ${missing.length === 1 ? 'that beat passes' : 'those beats pass'} in silence.`
         : 'Every beat of the bar has one.');
@@ -2138,6 +2164,9 @@
 
   countVoiceOnSelect.addEventListener('change', () => {
     stopMeasureAnnouncements();
+    // Turning it ON is the retry: whatever was decided about the
+    // bucket last time is thrown away and it is asked again.
+    if (countVoiceEnabled()) forgetVoiceSamples();
     refreshCountVoice();
     if (!audioPlayer.paused) startMeasureAnnouncements();
   });
