@@ -156,14 +156,14 @@ export const ACOUSTIC_BOARD: PhotoMeasurements = {
   height: 824,
   fit: 'frame',
   frets: [
-    68.6, 246.8, 414.9, 573.7, 723.5, 864.9, 998.4, 1124.3, 1243.3, 1355.5, 1461.4, 1561.4, 1655.8,
-    1744.9, 1829.0, 1908.3, 1983.3, 2054.0, 2120.7, 2183.7, 2243.1,
+    68.8, 246.8, 414.8, 573.3, 723.0, 864.2, 997.5, 1123.4, 1242.2, 1354.3, 1460.1, 1560.0, 1654.2,
+    1743.2, 1827.2, 1906.5, 1981.3, 2051.9, 2118.6, 2181.5, 2240.9,
   ],
   boardEndX: 2880.0,
-  stringsAtNut: [348.5, 524.9],
-  stringsAtEnd: [309.5, 563.9],
-  boardAtNut: [331.4, 542.0],
-  boardAtEnd: [292.3, 581.1],
+  stringsAtNut: [348.2, 525.2],
+  stringsAtEnd: [309.0, 564.4],
+  boardAtNut: [328.6, 544.9],
+  boardAtEnd: [289.3, 584.1],
 };
 
 /** An electric: a dark bound board with pearl blocks in it, and the shorter scale that goes with it. Twenty-two frets. */
@@ -182,20 +182,20 @@ export const ELECTRIC_BOARD: PhotoMeasurements = {
   boardAtEnd: [294.2, 579.2],
 };
 
-/** An extended-range electric: a flatter, wider board with small dots, going all the way to the twenty-fourth fret. */
-export const EXTENDED_BOARD: PhotoMeasurements = {
+/** A Stratocaster: a rosewood board with small dots, three single coils on a cream scratchplate, and twenty-one frets. */
+export const STRAT_BOARD: PhotoMeasurements = {
   width: 2880,
   height: 824,
   fit: 'frame',
   frets: [
-    64.4, 231.7, 389.7, 538.7, 679.4, 812.2, 937.6, 1055.9, 1167.6, 1273.0, 1372.5, 1466.4, 1555.0,
-    1638.7, 1717.6, 1792.2, 1862.5, 1928.9, 1991.6, 2050.8, 2106.6, 2159.3, 2209.0, 2256.0, 2300.3,
+    67.7, 243.7, 409.7, 566.5, 714.4, 854.1, 985.9, 1110.3, 1227.7, 1338.5, 1443.1, 1541.9, 1635.1,
+    1723.0, 1806.1, 1884.4, 1958.4, 2028.2, 2094.1, 2156.3, 2215.1, 2270.5,
   ],
   boardEndX: 2880.0,
-  stringsAtNut: [356.2, 517.2],
-  stringsAtEnd: [308.4, 565.0],
-  boardAtNut: [337.8, 535.6],
-  boardAtEnd: [290.0, 583.4],
+  stringsAtNut: [352.1, 521.4],
+  stringsAtEnd: [313.0, 560.4],
+  boardAtNut: [335.1, 538.3],
+  boardAtEnd: [293.9, 579.5],
 };
 
 /**
@@ -213,7 +213,7 @@ export const PHOTOS: Readonly<Record<string, PhotoMeasurements>> = {
   'fretboard-classical': CLASSICAL_BOARD,
   'fretboard-acoustic': ACOUSTIC_BOARD,
   'fretboard-electric': ELECTRIC_BOARD,
-  'fretboard-extended': EXTENDED_BOARD,
+  'fretboard-strat': STRAT_BOARD,
 };
 
 /** The picture a page names, at the path the page keeps it. */

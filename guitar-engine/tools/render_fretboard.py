@@ -28,15 +28,18 @@ from PIL import Image
 
 # --- the instrument, in millimetres -------------------------------
 MODELS = {
+    # An OM with a natural spruce top, a rosewood board with small
+    # dots, and a tortoiseshell scratchplate. No cutaway.
     'acoustic': dict(
-        scale=648.0, frets=20, nut_width=43.0, width_at_12=52.0,
+        scale=645.0, frets=20, nut_width=44.0, width_at_12=53.0,
         string_nut=36.0, string_at_12=45.0,
         board=(0.285, 0.170, 0.108), board_dark=(0.120, 0.066, 0.042),
         binding=(0.92, 0.86, 0.70), binding_mm=0.0,
         inlay='dot', inlay_color=(0.93, 0.92, 0.88),
         wound=3,
-        body='acoustic', joint_fret=14, top=(0.80, 0.63, 0.40),
-        top_edge=(0.34, 0.14, 0.05), hole=100.0, plate=True,
+        body='acoustic', joint_fret=14, top=(0.86, 0.71, 0.46),
+        top_edge=(0.55, 0.36, 0.18), hole=100.0, plate=True,
+        plate_color=(0.16, 0.055, 0.035), cutaway=False,
     ),
     'classical': dict(
         scale=650.0, frets=19, nut_width=52.0, width_at_12=62.0,
@@ -45,8 +48,9 @@ MODELS = {
         binding=(0.86, 0.78, 0.60), binding_mm=0.0,
         inlay='none', inlay_color=(0.93, 0.92, 0.88),
         wound=3, nylon=True,
-        body='acoustic', joint_fret=12, top=(0.86, 0.72, 0.48),
-        top_edge=(0.52, 0.34, 0.16), hole=87.0, plate=False,
+        body='acoustic', joint_fret=12, top=(0.88, 0.74, 0.47),
+        top_edge=(0.58, 0.40, 0.20), hole=87.0, plate=False,
+        cutaway=True,
     ),
     'electric': dict(
         scale=628.0, frets=22, nut_width=42.0, width_at_12=51.0,
@@ -55,18 +59,24 @@ MODELS = {
         binding=(0.95, 0.91, 0.78), binding_mm=1.8,
         inlay='block', inlay_color=(0.95, 0.94, 0.90),
         wound=3,
-        body='solid', joint_fret=16, top=(0.62, 0.30, 0.07),
-        top_edge=(0.10, 0.04, 0.02), pickups=2, hardware=(0.78, 0.78, 0.80),
+        body='solid', joint_fret=16, top=(0.70, 0.50, 0.14),
+        top_edge=(0.055, 0.035, 0.028), pickups=2, pickup_width=22.0,
+        hardware=(0.80, 0.80, 0.82), cutaway=True,
     ),
-    'extended': dict(
-        scale=648.0, frets=24, nut_width=43.0, width_at_12=54.0,
-        string_nut=35.0, string_at_12=46.0,
-        board=(0.135, 0.090, 0.070), board_dark=(0.050, 0.032, 0.024),
-        binding=(0.9, 0.9, 0.9), binding_mm=0.0,
-        inlay='dot', inlay_color=(0.88, 0.89, 0.92),
+    # A Stratocaster: transparent red over a double cutaway, a
+    # rosewood board with small dots, and three single coils on a
+    # cream scratchplate.
+    'strat': dict(
+        scale=648.0, frets=21, nut_width=42.0, width_at_12=51.5,
+        string_nut=35.0, string_at_12=44.0,
+        board=(0.230, 0.130, 0.085), board_dark=(0.095, 0.050, 0.032),
+        binding=(0.92, 0.88, 0.74), binding_mm=0.0,
+        inlay='dot', inlay_color=(0.92, 0.91, 0.86),
         wound=3,
-        body='solid', joint_fret=20, top=(0.10, 0.16, 0.34),
-        top_edge=(0.03, 0.05, 0.12), pickups=2, hardware=(0.62, 0.63, 0.66),
+        body='solid', joint_fret=17, top=(0.62, 0.05, 0.075),
+        top_edge=(0.20, 0.015, 0.025), pickups=3, pickup_width=10.0,
+        hardware=(0.84, 0.84, 0.85), cutaway=False,
+        plate=True, plate_color=(0.93, 0.90, 0.78),
     ),
 }
 
@@ -220,8 +230,8 @@ def main():
                     # a fixed width fills the narrow frets completely
                     # and the board turns into a row of white slabs.
                     gap_mm = fret_mm(scale, n) - fret_mm(scale, n - 1)
-                    w2 = min(9.5, gap_mm * 0.34)
-                    h2 = board_at(cx) * 0.26
+                    w2 = min(14.0, gap_mm * 0.40)
+                    h2 = board_at(cx) * 0.17
                     d = np.maximum(np.abs(X - cx) / w2, np.abs(Y - cy) / h2)
                     m = np.clip((1.02 - d) * 24, 0, 1)
                 else:
@@ -305,15 +315,19 @@ def main():
 
         if spec['body'] == 'acoustic':
             bass = flare(-6.0, 120.0, 165.0)
-            treble = flare(24.0, 130.0, 150.0)
+            # A cutaway is the treble side hugging the neck before it
+            # flares. Without one the two sides are the same shape.
+            treble = flare(24.0, 130.0, 150.0) if spec.get('cutaway', True) else flare(-6.0, 120.0, 162.0)
         else:
             bass = flare(-4.0, 58.0, 150.0)
             # The horn and the cutaway behind it. The scoop is a
             # gaussian rather than a notch, because a cutaway is a
             # curve and a notch put two corners in the silhouette.
+            # A double cutaway has one on the bass side too.
             treble = flare(-2.0, 62.0, 150.0)
-            scoop = 34.0 * np.exp(-(((u - 46.0) / 30.0) ** 2))
-            treble = np.maximum(treble - scoop, neck_half * 0.96)
+            treble = np.maximum(treble - 34.0 * np.exp(-(((u - 46.0) / 30.0) ** 2)), neck_half * 0.96)
+            if not spec.get('cutaway', True):
+                bass = np.maximum(bass - 30.0 * np.exp(-(((u - 40.0) / 28.0) ** 2)), neck_half * 0.96)
         body_half = np.where(Y < 0, treble, bass)
         on_body = (u > -8.0) & (np.abs(Y) <= body_half)
 
@@ -355,25 +369,58 @@ def main():
             if spec['plate']:
                 # The scratchplate: a teardrop below the hole and to
                 # the bridge side of it, in dark tortoiseshell.
-                pu = (X - hole_x - rh * 0.62) / (rh * 1.22)
-                pv = (Y - rh * 1.16) / (rh * 0.60)
-                plate = np.clip((1.0 - (pu * pu + pv * pv)) * 7, 0, 1)
-                dark = np.array([0.075, 0.042, 0.028])
-                body = body * (1 - plate[:, :, None]) + dark[None, None, :] * plate[:, :, None]
+                pu = (X - hole_x - rh * 0.70) / (rh * 1.30)
+                pv = (Y - rh * 1.10) / (rh * 0.64)
+                d2 = pu * pu + pv * pv
+                plate = np.clip((1.0 - d2) * 9, 0, 1)
+                shade = np.array(spec.get('plate_color', (0.075, 0.042, 0.028)))
+                # Tortoiseshell is mottled, and it catches the light
+                # along its edge, which is what makes it read as a
+                # thing stuck on the top rather than a stain in it.
+                mottle = 0.72 + 0.55 * fbm((H, W), (1.1, 0.35), rng, octaves=3)
+                face = np.clip(shade[None, None, :] * mottle[:, :, None], 0, 1)
+                lip = np.clip((1.0 - np.abs(d2 - 0.93) / 0.07), 0, 1) * 0.55
+                face = np.clip(face + lip[:, :, None] * 0.35, 0, 1)
+                body = body * (1 - plate[:, :, None]) + face * plate[:, :, None]
         else:
-            # Two pickups and their surrounds, square to the strings.
             hw = np.array(spec['hardware'])
-            for n in range(spec.get('pickups', 2)):
-                cx = board_end + 26.0 + n * 62.0
-                pw, ph = 19.0, strings_at(board_end) * 0.80
+            count = spec.get('pickups', 2)
+            pw = spec.get('pickup_width', 19.0)
+            ph = strings_at(board_end) * 0.82
+            step = 62.0 if count < 3 else 48.0
+            if spec.get('plate'):
+                # The scratchplate the pickups are mounted through,
+                # which on a Stratocaster is most of what is seen of
+                # the body at all.
+                px0 = board_end - 2.0
+                px1 = board_end + 18.0 + (count - 1) * step + 52.0
+                half_pl = ph * 1.30
+                # A rounded shape, not a box: squared off nowhere, and
+                # narrowing where it passes the neck pocket. A hard
+                # corner beside the board is the one thing that says
+                # "rectangle" rather than "scratchplate".
+                pu = np.clip((X - px0) / (px1 - px0), 0, 1)
+                waist = 1.0 - 0.55 * np.exp(-((pu / 0.16) ** 2)) - 0.5 * np.clip((pu - 0.88) / 0.12, 0, 1) ** 2
+                pl = (X > px0 - 1.0) & (X < px1) & (np.abs(Y) < half_pl * np.clip(waist, 0, 1))
+                shade = np.array(spec.get('plate_color', (0.9, 0.88, 0.78)))
+                lit = np.clip(1.0 - np.abs(Y) / (half_pl * 1.35), 0, 1)
+                body = np.where(pl[:, :, None], (shade[None, None, :] * (0.80 + 0.28 * lit)[:, :, None]), body)
+            for n in range(count):
+                cx = board_end + 26.0 + n * step
                 inbox = (np.abs(X - cx) <= pw / 2) & (np.abs(Y) <= ph / 2)
                 surround = (np.abs(X - cx) <= pw / 2 + 3.5) & (np.abs(Y) <= ph / 2 + 4.0)
                 body = np.where(surround[:, :, None], np.array([0.045, 0.045, 0.05])[None, None, :], body)
                 across = np.clip(1 - ((Y / (ph / 2)) ** 2), 0, 1)
                 cover = hw[None, None, :] * (0.72 + 0.34 * across)[:, :, None]
                 body = np.where(inbox[:, :, None], np.clip(cover, 0, 1), body)
+                # The pole pieces, one per string, on a single coil.
+                if pw < 14.0:
+                    for i in range(6):
+                        sy = -strings_at(cx) / 2 + strings_at(cx) * (i / 5.0)
+                        pole = ((X - cx) ** 2 + (Y - sy) ** 2) < (pw * 0.22) ** 2
+                        body = np.where(pole[:, :, None], (hw * 0.62)[None, None, :], body)
             # The bridge, at the end of what is seen.
-            bx = board_end + 150.0
+            bx = board_end + 30.0 + (count - 1) * step + 54.0
             bridge = (np.abs(X - bx) <= 7.0) & (np.abs(Y) <= strings_at(board_end) * 0.75)
             body = np.where(bridge[:, :, None], (hw * 0.8)[None, None, :], body)
 

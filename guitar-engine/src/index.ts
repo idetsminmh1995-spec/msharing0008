@@ -57,7 +57,7 @@ export {
   ACOUSTIC_SUNBURST,
   CLASSICAL_BOARD,
   ELECTRIC_BOARD,
-  EXTENDED_BOARD,
+  STRAT_BOARD,
   PHOTOS,
   guitarPhoto,
   photoFretCount,

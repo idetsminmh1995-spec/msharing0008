@@ -415,8 +415,8 @@
       <select id="instrument" class="drum-input">
         <option value="classical">Classical Guitar &mdash; 19 frets</option>
         <option value="acoustic" selected>Acoustic Guitar &mdash; 20 frets</option>
-        <option value="electric">Electric Guitar &mdash; 22 frets</option>
-        <option value="extended">Extended-range Electric &mdash; 24 frets</option>
+        <option value="electric">Electric Guitar, single cut &mdash; 22 frets</option>
+        <option value="strat">Electric Guitar, double cut &mdash; 21 frets</option>
       </select>
       <label for="picking">Picking hand</label>
       <select id="picking" class="drum-input">
@@ -427,7 +427,7 @@
         <div class="finger-hand" id="fingerHand" aria-hidden="true"></div>
         <div class="finger-names" id="fingerNames"></div>
       </div>
-      <div class="field-hint" id="fretHint">The neck lights where each note is played &mdash; its string, its fret and the finger stopping it, with the fret numbers along the bottom. When the score writes a position or a fingering down, that is what you see; when it does not, the Human Finger Engine works out how a guitarist would play the line: it weighs every place each note could go, what the hand would have to stretch, and how long it has to get there, then picks the way through with the least work in it. The picking hand is drawn too, as the square bracket and the V every guitarist reads. Pick the guitar and it brings its own neck with it &mdash; a classical stops at 19 frets with nothing in its board, a dreadnought around 20, an electric at 22, a modern extended-range at 24 &mdash; so there is no fret count to set: that is a fact about the instrument, not a view. Six strings throughout. The Acoustic is a PHOTOGRAPH of a real cutaway dreadnought, measured fret by fret so every mark still lands on the right string in the right fret; the others are drawn out of shapes and gradients, headstock, tuners, wood and all, at whatever size you export. Then say what the right hand is doing: a plectrum is written as the square bracket and the V every guitarist reads, and fingers are written a letter at a time on the string each one takes &mdash; p the thumb, then i, m and a. A slide travels along the string rather than jumping, an open string has its own colour, and the four finger colours are fixed, not chosen: they are meant to be learnt once and read in every video after.</div>
+      <div class="field-hint" id="fretHint">The neck lights where each note is played &mdash; its string, its fret and the finger stopping it, with the fret numbers along the bottom. When the score writes a position or a fingering down, that is what you see; when it does not, the Human Finger Engine works out how a guitarist would play the line: it weighs every place each note could go, what the hand would have to stretch, and how long it has to get there, then picks the way through with the least work in it. The picking hand is drawn too, as the square bracket and the V every guitarist reads. Pick the guitar and it brings its own neck with it &mdash; a classical stops at 19 frets with nothing in its board, an acoustic around 20, a single-cut electric at 22, a double-cut at 21 &mdash; so there is no fret count to set: that is a fact about the instrument, not a view. Six strings throughout. The Acoustic is a PHOTOGRAPH of a real cutaway dreadnought, measured fret by fret so every mark still lands on the right string in the right fret; the others are drawn out of shapes and gradients, headstock, tuners, wood and all, at whatever size you export. Then say what the right hand is doing: a plectrum is written as the square bracket and the V every guitarist reads, and fingers are written a letter at a time on the string each one takes &mdash; p the thumb, then i, m and a. A slide travels along the string rather than jumping, an open string has its own colour, and the four finger colours are fixed, not chosen: they are meant to be learnt once and read in every video after.</div>
     </div>
 
     <div class="card">
@@ -591,8 +591,8 @@
            src="../../assets/guitar/acoustic-sunburst.webp" alt="" style="display:none" decoding="async">
       <img data-stage-image data-guitar-photo="fretboard-electric"
            src="../../assets/guitar/fretboard-electric.webp" alt="" style="display:none" decoding="async">
-      <img data-stage-image data-guitar-photo="fretboard-extended"
-           src="../../assets/guitar/fretboard-extended.webp" alt="" style="display:none" decoding="async">
+      <img data-stage-image data-guitar-photo="fretboard-strat"
+           src="../../assets/guitar/fretboard-strat.webp" alt="" style="display:none" decoding="async">
       <!-- The hand in the corner of the frame: the page's own drawing,
            not the one the engine used to assemble out of rectangles. -->
       <img data-stage-image id="handPicture" src="../../assets/guitar/hand-fingers.webp"
@@ -1024,7 +1024,7 @@
     classical: { frets: 19, model: 'classical', photo: 'fretboard-classical' },
     acoustic: { frets: 20, model: 'acoustic', photo: 'acoustic-sunburst' },
     electric: { frets: 22, model: 'singleCut', photo: 'fretboard-electric' },
-    extended: { frets: 24, model: 'electric', photo: 'fretboard-extended' },
+    strat: { frets: 21, model: 'electric', photo: 'fretboard-strat' },
   };
   const DEFAULT_GUITAR = 'acoustic';
 
