@@ -322,6 +322,48 @@
   .video-stick-left{left:2.1cqw;width:16.1cqw;}
   .video-stick-right{right:1.7cqw;width:17.3cqw;}
 
+
+  /* ---- 1:1 -------------------------------------------------------
+     A square keeps the landscape ARRANGEMENT -- it is wide enough for
+     the mark and the titles beside the stat boxes -- but not the
+     landscape SIZES. Both shapes export 1080 tall, so the px above
+     are already the right absolute size for a 1080-tall video; what
+     differs is the preview, which is the same width for every shape.
+     A 16:9 frame is scaled 1920/preview on the way out and a square
+     only 1080/preview, so the same px land at a little over half the
+     size. Everything here is the frame's own share instead, which is
+     why these numbers match the 9:16 ones: both frames are 1080 wide.
+
+     The music then gets more than that again. A square gives the
+     staff about half the width a landscape frame does, so it has to
+     take the height back or its noteheads come out smaller than the
+     ones in the 16:9 cut. */
+  /* Stacked, like the portrait frame: 1080 across is not enough for
+     the mark, a real title AND three stat boxes in one row, and the
+     first square attempt printed "TIME 4/4" straight through the end
+     of the title. */
+  .video-frame.is-square{justify-content:flex-start;}
+  .video-frame.is-square .video-top{
+    flex-direction:column;align-items:stretch;gap:0;padding:2.3cqw 1.6cqw 0;
+  }
+  .video-frame.is-square .video-logo-row{gap:4cqw;}
+  /* A shade smaller than the portrait frame's mark, and the gaps
+     below it tighter, because a square has to fit the header, the
+     music AND the kit into 1080 of height where a portrait has 1920.
+     Every unit taken off the header is a unit the kit photo keeps. */
+  .video-frame.is-square .video-logo-mark{--logo-h:16.5cqw;}
+  .video-frame.is-square .video-title-1{font-size:calc(var(--title1-num,32) * 100cqw / 520);}
+  .video-frame.is-square .video-title-2{font-size:calc(var(--title2-num,18) * 100cqw / 520);}
+  .video-frame.is-square .video-stats{justify-content:center;margin-top:2cqw;gap:1.6cqw;}
+  .video-frame.is-square .stat-box{
+    border-width:.37cqw;border-radius:1.7cqw;padding:1.2cqw 1.8cqw;min-width:11cqw;
+  }
+  .video-frame.is-square .stat-box .stat-label{font-size:2.3cqw;}
+  .video-frame.is-square .stat-box .stat-value{font-size:4.4cqw;}
+  .video-frame.is-square .video-notation{margin-top:1.8cqw;padding:0 2.4cqw 1.3cqw;}
+  .video-frame.is-square .video-notation svg{height:28cqw;}
+  .video-frame.is-square .drum-circle{height:26cqw;}
+
   .transport{display:flex;align-items:center;gap:14px;}
   .play-btn{width:42px;height:42px;border-radius:50%;background:var(--red);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
   .play-btn:disabled{opacity:.4;cursor:not-allowed;}
@@ -692,6 +734,7 @@
     videoFrame.style.aspectRatio =
       aspect === '9x16' ? '9 / 16' : aspect === '1x1' ? '1 / 1' : '16 / 9';
     videoFrame.classList.toggle('is-portrait', aspect === '9x16');
+    videoFrame.classList.toggle('is-square', aspect === '1x1');
     videoFrame.style.backgroundImage = '';
     kitBackgroundImage = null;
     if (hitLayer) hitLayer.innerHTML = '';
