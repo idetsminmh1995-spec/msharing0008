@@ -137,7 +137,16 @@
   .preview-stats{display:flex;gap:16px;font-size:12px;color:var(--muted);}
   .preview-stats b{color:var(--text);}
 
-  .video-frame{position:relative;background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-width:0;}
+  /* `container-type: inline-size` so the portrait rules below can be
+     written in cqw -- 1cqw is 1% of the FRAME's width, whatever the
+     preview happens to be. Everything in the 16:9 frame is in fixed px,
+     which is why the first 9:16 attempt came out as a 16:9 header
+     stranded at the top of a tall black rectangle: the px were tuned
+     against a wide preview and a portrait one is half as wide.
+     `inline-size` rather than `size`: the frame's width comes from the
+     column it sits in, but its HEIGHT still comes from its contents and
+     its aspect-ratio, and size containment would cut that off. */
+  .video-frame{position:relative;background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-width:0;container-type:inline-size;}
   /* Padding here lands the logo's INK, not its image box -- the
      negative margins on .video-logo-mark have already pulled the box
      onto the artwork, so the left padding IS the ink's left edge.
@@ -260,6 +269,60 @@
     margin-right:calc(var(--logo-w) * -156 / 1414);
     filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));
   }
+
+
+  /* ---- 9:16 -----------------------------------------------------
+     A portrait video is not a landscape one turned on its side: the
+     header cannot sit beside the stat boxes when the frame is half as
+     wide, and every fixed px above is a px tuned against a wide
+     preview. So the whole shape is re-laid out here and re-sized in
+     cqw -- a share of the FRAME -- which is what makes one set of
+     numbers land the same way on a 400px preview and a 1080px export.
+
+     The numbers are the owner's own mock-up, measured off it at
+     1080x1920 and divided by 1080. Logo 206 tall, title at 188 across,
+     the stat boxes centred with their tops at 259, the notation at 541,
+     the sticks on the bottom edge and the site across the middle of
+     them. */
+  .video-frame.is-portrait{justify-content:flex-start;}
+  .video-frame.is-portrait .video-top{
+    flex-direction:column;align-items:stretch;gap:0;padding:2.3cqw 1.3cqw 0;
+  }
+  .video-frame.is-portrait .video-logo-row{gap:5.3cqw;}
+  .video-frame.is-portrait .video-logo-mark{--logo-h:19.1cqw;}
+  /* The size slider is px, and px mean nothing to a frame that can be
+     any width, so in portrait it is read as a NUMBER and multiplied by
+     the frame's own unit: the slider's 32 is 32px on a 520-wide frame
+     and 66px on a 1080-wide one, which is the same title. */
+  .video-frame.is-portrait .video-title-1{font-size:calc(var(--title1-num,32) * 100cqw / 520);}
+  .video-frame.is-portrait .video-title-2{font-size:calc(var(--title2-num,18) * 100cqw / 520);}
+  .video-frame.is-portrait .video-stats{justify-content:center;margin-top:9.1cqw;gap:1.9cqw;}
+  .video-frame.is-portrait .stat-box{
+    border-width:.37cqw;border-radius:1.7cqw;padding:1.6cqw 2.2cqw;min-width:13.8cqw;
+  }
+  .video-frame.is-portrait .stat-box .stat-label{font-size:2.8cqw;}
+  .video-frame.is-portrait .stat-box .stat-value{font-size:5.4cqw;}
+  .video-frame.is-portrait .video-notation{margin-top:13cqw;padding:0 2.6cqw 1.3cqw;}
+  .video-frame.is-portrait .video-notation svg{height:28cqw;}
+  .video-frame.is-portrait .drum-circle{height:26cqw;}
+
+  /* The footer is only the portrait shape's. */
+  .video-footer{display:none;}
+  .video-frame.is-portrait .video-footer{
+    display:block;position:absolute;left:0;right:0;bottom:0;height:21cqw;pointer-events:none;
+  }
+  .video-stick{position:absolute;bottom:0;height:auto;}
+  .video-stick-left{left:2.1cqw;width:16.1cqw;}
+  .video-stick-right{right:1.7cqw;width:17.3cqw;}
+  /* Centred on the frame, not between the sticks: the two are
+     different widths, so splitting the gap would sit the address a
+     few pixels off the middle of the video. */
+  .video-site{
+    position:absolute;left:0;right:0;bottom:10cqw;text-align:center;
+    font-family:'Sora',sans-serif;font-weight:800;font-size:5.1cqw;
+    line-height:1;color:#F80404;letter-spacing:-.01em;
+  }
+  .video-frame.style-white .video-site{color:var(--red);}
 
   .transport{display:flex;align-items:center;gap:14px;}
   .play-btn{width:42px;height:42px;border-radius:50%;background:var(--red);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
@@ -534,6 +597,15 @@
       <div class="video-mid">
         <img class="drum-circle" src="../../assets/logo/sharing-drum-logo-full.webp" alt="M Sharing Drum">
       </div>
+      <!-- The 9:16 footer: a stick in each bottom corner and the site
+           between them. Absolute rather than in the column, so it sits
+           on the frame's own bottom edge whatever the notation and the
+           kit above it are doing. Hidden in the other two shapes. -->
+      <div class="video-footer" aria-hidden="true">
+        <img class="video-stick video-stick-left" src="../../assets/logo/drumstick-left.svg" alt="">
+        <div class="video-site" id="videoSite">www.msharingmm.com</div>
+        <img class="video-stick video-stick-right" src="../../assets/logo/drumstick-right.svg" alt="">
+      </div>
     </div>
 
     <div class="transport">
@@ -615,6 +687,7 @@
     const aspect = currentAspect();
     videoFrame.style.aspectRatio =
       aspect === '9x16' ? '9 / 16' : aspect === '1x1' ? '1 / 1' : '16 / 9';
+    videoFrame.classList.toggle('is-portrait', aspect === '9x16');
     videoFrame.style.backgroundImage = '';
     kitBackgroundImage = null;
     if (hitLayer) hitLayer.innerHTML = '';
@@ -917,6 +990,9 @@
       if (f.following) f.color.value = TITLE_AUTO_COLOR[style];
       f.auto.dataset.following = f.following ? 'yes' : 'no';
       videoFrame.style.setProperty(`--title${f.n}-size`, `${f.size.value}px`);
+      // The same number without a unit. A portrait frame multiplies it
+      // by its own width, so one slider means one title at any size.
+      videoFrame.style.setProperty(`--title${f.n}-num`, String(f.size.value));
       videoFrame.style.setProperty(`--title${f.n}-color`, f.color.value);
     }
   }
@@ -2706,9 +2782,19 @@
       ctx2d.drawImage(mark, box.x, box.y, box.w, box.h);
     }
 
-    // Titles.
-    for (const el of videoFrame.querySelectorAll('.video-title')) {
+    // Titles, and the address under the 9:16 footer.
+    for (const el of videoFrame.querySelectorAll('.video-title, .video-site')) {
       drawTextEl(ctx2d, el, frameRect, scale);
+    }
+
+    // The two sticks in the portrait frame's bottom corners. Drawn
+    // from their own boxes rather than `cover`-fitted like the kit
+    // photo: each one is placed against its own edge and the whole
+    // shape is meant to be seen, not filled to.
+    for (const stick of videoFrame.querySelectorAll('.video-stick')) {
+      if (!isVisible(stick) || !stick.complete || stick.naturalWidth === 0) continue;
+      const box = rectIn(stick, frameRect, scale);
+      ctx2d.drawImage(stick, box.x, box.y, box.w, box.h);
     }
 
     // Stat boxes: their border, then each line of text at its own box.
