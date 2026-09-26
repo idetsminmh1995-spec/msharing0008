@@ -302,8 +302,15 @@
   }
   .video-frame.is-portrait .stat-box .stat-label{font-size:2.8cqw;}
   .video-frame.is-portrait .stat-box .stat-value{font-size:5.4cqw;}
-  .video-frame.is-portrait .video-notation{margin-top:13cqw;padding:0 2.6cqw 1.3cqw;}
-  .video-frame.is-portrait .video-notation svg{height:28cqw;}
+  /* Taller than the landscape frame's 170px, and by a long way. A
+     portrait video is read on a phone held upright, where the staff
+     gets a third of the width a laptop gives it -- so the music has to
+     take the height instead, or the noteheads come out smaller than
+     the ones in the 16:9 cut. 36cqw is 389px of a 1080-wide frame,
+     which leaves the music's top at 519 and its bottom clear of where
+     the kit photo starts. */
+  .video-frame.is-portrait .video-notation{margin-top:11.5cqw;padding:0 2.6cqw 1.3cqw;}
+  .video-frame.is-portrait .video-notation svg{height:36cqw;}
   .video-frame.is-portrait .drum-circle{height:26cqw;}
 
   /* The footer is only the portrait shape's. */
@@ -2466,6 +2473,20 @@
         "and so on \u2014 through the whole file. Load a MusicXML file and it will follow " +
         "that score's own bars, time signature and tempo.";
       return;
+    }
+    // A refresh while it is still finding nothing is a RETRY. The
+    // misses are cached -- they have to be, or every beat of every bar
+    // would ask the bucket again -- but a page opened before the
+    // samples were uploaded would otherwise stay silent for as long as
+    // it is open, and loading a new score is exactly when someone who
+    // has just fixed their bucket looks again. Once something answers,
+    // this costs nothing: `describe` is no longer null.
+    if (
+      typeof VoiceSamples !== 'undefined' &&
+      !VoiceSamples.describe('measure') &&
+      !VoiceSamples.describe('count')
+    ) {
+      forgetVoiceSamples();
     }
     countVoiceHint.textContent = 'Loading the count voice\u2026';
     const { have, missing } = await preloadMeasureSamples();

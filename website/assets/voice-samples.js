@@ -44,6 +44,10 @@
         'Counts vocals',
         'Counts Vocals',
         'Count vocal',
+        // Two spaces. A folder typed with one extra space looks
+        // identical in a bucket listing and is a different key.
+        'Counts  vocal',
+        'Counts  Vocal',
       ],
       // `M1` is the documented name; a folder whose files are just
       // `1.wav` is the same recording filed without the prefix, and

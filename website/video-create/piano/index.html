@@ -2147,6 +2147,15 @@
         "that score's own bars, time signature and tempo.";
       return;
     }
+    // A refresh while it is still finding nothing is a RETRY -- see
+    // the drum page for why the misses have to be cached at all.
+    if (
+      typeof VoiceSamples !== 'undefined' &&
+      !VoiceSamples.describe('measure') &&
+      !VoiceSamples.describe('count')
+    ) {
+      forgetVoiceSamples();
+    }
     countVoiceHint.textContent = 'Loading the count voice\u2026';
     const { have, missing } = await preloadMeasureSamples();
     if (!countVoiceEnabled()) return;
