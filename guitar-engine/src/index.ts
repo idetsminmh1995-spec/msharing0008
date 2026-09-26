@@ -25,6 +25,7 @@ export {
   inlayFrets,
   photoPlacement,
   positionsAt,
+  stageHeightFor,
   STANDARD_TUNING,
   stringCount,
   stringHalfAt,
@@ -50,7 +51,17 @@ export {
   resolveColors,
   stageShapes,
 } from './stage.js';
-export { ACOUSTIC_CUTAWAY, guitarPhoto, photoFretCount } from './photo.js';
+export {
+  ACOUSTIC_BOARD,
+  ACOUSTIC_CUTAWAY,
+  CLASSICAL_BOARD,
+  ELECTRIC_BOARD,
+  EXTENDED_BOARD,
+  PHOTOS,
+  guitarPhoto,
+  photoFretCount,
+  photoNamed,
+} from './photo.js';
 export type { GuitarPhotograph, PhotoMeasurements } from './photo.js';
 export { HAND_PICTURE, handPicture, handShapes, renderHand } from './hand.js';
 export type { HandOptions } from './hand.js';

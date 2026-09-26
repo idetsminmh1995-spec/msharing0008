@@ -179,7 +179,13 @@
   /* A downbeat is the one the reader is counting FROM, so it is the one
      that gets the brand colour rather than a size change alone. */
   .stat-box.on-downbeat{border-color:var(--red);background:rgba(200,30,44,.16);}
-  .video-mid{flex:1;display:flex;align-items:center;justify-content:center;min-height:46%;}
+  /* No floor under it any more. The neck used to be DRAWN to
+     whatever box it was given, so reserving 46% of the frame for it
+     made sense; a picture of a fretboard is scaled to the width
+     instead, and its height follows from that. Reserving more than
+     it needs only opens a band of nothing between the notation and
+     the neck. */
+  .video-mid{flex:1;display:flex;align-items:flex-end;justify-content:center;min-height:0;}
   /* The keyboard fills whatever the notation leaves: `min-height:0`
      on .video-mid lets it shrink, and the SVG stretches to the box it
      is given rather than keeping the keyboard's own ratio -- a
@@ -188,7 +194,7 @@
   /* The neck fills whatever the notation leaves. It is drawn to the
      box rather than to a guitar's own proportions: a real neck is
      1.5cm by 45cm, and a video frame is not. */
-  .guitar-stage{width:100%;height:100%;min-height:0;display:flex;align-items:center;}
+  .guitar-stage{width:100%;height:100%;min-height:0;display:flex;align-items:flex-end;}
   .guitar-stage svg{display:block;width:100%;height:auto;max-height:100%;}
   /* The hand in the card, saying which colour is which finger. */
   .finger-legend{display:flex;align-items:center;gap:14px;margin-top:12px;}
@@ -564,8 +570,17 @@
            image it already has, and a frame is rendered the instant
            the button is pressed. It is never shown here -- the stage's
            own SVG draws it, from the same file. -->
-      <img data-stage-image data-guitar-photo="acoustic-cutaway"
-           src="../../assets/guitar/acoustic-cutaway.webp" alt="" style="display:none" decoding="async">
+      <!-- One studio render per guitar. They are what the frame draws:
+           the engine holds each one's measurements under the same
+           name, so a mark lands on the real fret in the real string. -->
+      <img data-stage-image data-guitar-photo="fretboard-classical"
+           src="../../assets/guitar/fretboard-classical.webp" alt="" style="display:none" decoding="async">
+      <img data-stage-image data-guitar-photo="fretboard-acoustic"
+           src="../../assets/guitar/fretboard-acoustic.webp" alt="" style="display:none" decoding="async">
+      <img data-stage-image data-guitar-photo="fretboard-electric"
+           src="../../assets/guitar/fretboard-electric.webp" alt="" style="display:none" decoding="async">
+      <img data-stage-image data-guitar-photo="fretboard-extended"
+           src="../../assets/guitar/fretboard-extended.webp" alt="" style="display:none" decoding="async">
       <!-- The hand in the corner of the frame: the page's own drawing,
            not the one the engine used to assemble out of rectangles. -->
       <img data-stage-image id="handPicture" src="../../assets/guitar/hand-fingers.webp"
@@ -994,10 +1009,10 @@
    * six.
    */
   const GUITARS = {
-    classical: { frets: 19, model: 'classical' },
-    acoustic: { frets: 20, model: 'acoustic', photo: 'acoustic-cutaway' },
-    electric: { frets: 22, model: 'singleCut' },
-    extended: { frets: 24, model: 'electric' },
+    classical: { frets: 19, model: 'classical', photo: 'fretboard-classical' },
+    acoustic: { frets: 20, model: 'acoustic', photo: 'fretboard-acoustic' },
+    electric: { frets: 22, model: 'singleCut', photo: 'fretboard-electric' },
+    extended: { frets: 24, model: 'electric', photo: 'fretboard-extended' },
   };
   const DEFAULT_GUITAR = 'acoustic';
 
@@ -1080,7 +1095,9 @@
     if (!name || typeof GuitarEngine === 'undefined') return undefined;
     const img = guitarPhotos.get(name);
     if (!img) return undefined;
-    return GuitarEngine.guitarPhoto(img.getAttribute('src'));
+    // The engine holds the measurements under the same name, because
+    // only it knows where that picture's fret wires are.
+    return GuitarEngine.photoNamed(name, img.getAttribute('src'));
   }
 
   /**
@@ -1356,7 +1373,15 @@
     if (!guitarStage) return null;
     const box = guitarStage.getBoundingClientRect();
     const width = Math.max(1, Math.round(box.width));
-    const height = Math.max(1, Math.min(Math.round(box.height), Math.round(width * NECK_RATIO)));
+    // A picture is scaled to the width, so its height is decided the
+    // moment the width is: the box follows the picture rather than
+    // the picture rattling around inside a box meant for something
+    // else. Without a picture, the drawn neck keeps its own shape.
+    const photo = guitarPhoto();
+    const wanted = photo
+      ? GuitarEngine.stageHeightFor(width, photo, { handLegend: true, fretNumbers: true })
+      : Math.round(width * NECK_RATIO);
+    const height = Math.max(1, Math.min(Math.round(box.height), wanted));
     return { width, height };
   }
 

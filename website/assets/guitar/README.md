@@ -19,9 +19,36 @@ with one of a different size means changing those two numbers.
 Trimmed to the ink, transparent background, drawn with the thumb to
 the left and the fingers up.
 
+## The fretboard renders
+
+`fretboard-classical.webp`, `fretboard-acoustic.webp`,
+`fretboard-electric.webp`, `fretboard-extended.webp` — one studio
+render per guitar, and what the video frame actually draws.
+
+The photoreal plugins do not draw their instruments at runtime: they
+model one, light it, render it once at high resolution, and blit the
+picture. These are that step, and the model is in the repository —
+`guitar-engine/tools/render_fretboard.py` (numpy + Pillow):
+
+```bash
+python3 tools/render_fretboard.py --model acoustic --width 2880 \
+    --out /tmp/fretboard-acoustic.png
+```
+
+It builds each board from the real measurements of the instrument —
+the 17.817 rule for the frets, the nut width, the string gauges — so
+**the calibration is exact by construction, not measured afterwards**.
+The script prints the numbers on its way out; they are pasted into
+`guitar-engine/src/photo.ts` as `ACOUSTIC_BOARD` and its three
+siblings. Re-render a board and you re-paste them.
+
 ## The photographed guitar
 
-`acoustic-cutaway.webp` — a cutaway dreadnought, neck running in from
+`acoustic-cutaway.webp` — the whole-guitar photograph, neck in from
+the left and body off the right. Nothing draws it at the moment: the
+page moved to the fretboard renders above. One line in the page's
+`GUITARS` map puts it back.
+ — a cutaway dreadnought, neck running in from
 the left edge and the body leaving by the right. It is what the Guitar
 page draws when **Acoustic — photograph** is picked, in place of the
 guitar the engine draws out of shapes and gradients.

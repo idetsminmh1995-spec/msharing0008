@@ -170,6 +170,31 @@ export function guitarLayout(options: {
 }
 
 /**
+ * How tall the stage should be, for a picture drawn across it.
+ *
+ * A photograph is scaled to the WIDTH of the frame, so its height is
+ * decided the moment the width is. Asking for a box of some other
+ * height does not make the picture fill it -- it leaves a band of
+ * nothing above and below, which is exactly what a fretboard strip
+ * dropped into a box meant for a whole guitar looks like.
+ *
+ * So the box follows the picture: this is the height at which the
+ * picture's board lands squarely in the board's own band, with the
+ * hand legend above it and the fret numbers below.
+ */
+export function stageHeightFor(
+  width: number,
+  photo: GuitarPhotograph,
+  options?: { handLegend?: boolean; fretNumbers?: boolean },
+): number {
+  if (!(width > 0) || !(photo.width > 0) || !(photo.height > 0)) return 0;
+  const numbers = options?.fretNumbers === false ? 0 : NUMBERS_SHARE;
+  const hand = options?.handLegend === true ? HAND_BAND_SHARE : 0;
+  const share = Math.max(0.2, 1 - numbers - hand);
+  return Math.round((photo.height * (width / photo.width)) / share);
+}
+
+/**
  * A photograph, placed in the picture.
  *
  * Scaled to the WIDTH of the frame and hung by the strings: their

@@ -160,10 +160,17 @@ on the fifth fret of the second string and only the file knows where
 that is. So a photograph arrives MEASURED (`photo.ts`): the x of every
 fret wire and the y of the outer strings at both ends of the board, in
 the file's own pixels. Scale and shift those with the picture and
-every mark lands where it belongs. `ACOUSTIC_CUTAWAY` holds the
-measurements of the one in `website/assets/guitar/`, which were read
-off the file itself — the wires are where the picture's wires are, not
-where the 17.817 rule says they should be.
+every mark lands where it belongs.
+
+The pictures the page draws are **studio renders**, which is how the
+photoreal plugins do it: model an instrument, light it, render it once
+at high resolution, blit the picture. `tools/render_fretboard.py`
+builds each board out of the real measurements of the instrument — the
+17.817 rule, the nut width, the string gauges — lights it, and prints
+the calibration on its way out, so `ACOUSTIC_BOARD` and its three
+siblings are exact by construction rather than read off an image with
+a ruler. `ACOUSTIC_CUTAWAY` is the other kind: a photograph of a whole
+guitar, measured the hard way.
 
 Two things follow from it being a photograph. The frets it shows are
 the frets there are, so `firstFret`/`lastFret` stop applying; and the

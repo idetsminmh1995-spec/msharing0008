@@ -21,16 +21,21 @@ var GuitarEngine = (() => {
   // src/index.ts
   var index_exports = {};
   __export(index_exports, {
+    ACOUSTIC_BOARD: () => ACOUSTIC_BOARD,
     ACOUSTIC_COLORS: () => ACOUSTIC_COLORS,
     ACOUSTIC_CUTAWAY: () => ACOUSTIC_CUTAWAY,
+    CLASSICAL_BOARD: () => CLASSICAL_BOARD,
     CLASSICAL_COLORS: () => CLASSICAL_COLORS,
     DEFAULT_COLORS: () => DEFAULT_COLORS,
     DEFAULT_FIRST_FRET: () => DEFAULT_FIRST_FRET,
     DEFAULT_LAST_FRET: () => DEFAULT_LAST_FRET,
     DEFAULT_STRINGS: () => DEFAULT_STRINGS,
+    ELECTRIC_BOARD: () => ELECTRIC_BOARD,
+    EXTENDED_BOARD: () => EXTENDED_BOARD,
     FINGER_COLORS: () => FINGER_COLORS,
     FINGER_NAMES: () => FINGER_NAMES,
     HAND_PICTURE: () => HAND_PICTURE,
+    PHOTOS: () => PHOTOS,
     SINGLE_CUT_COLORS: () => SINGLE_CUT_COLORS,
     STANDARD_TUNING: () => STANDARD_TUNING,
     boardEdgesAt: () => boardEdgesAt,
@@ -49,6 +54,7 @@ var GuitarEngine = (() => {
     instrumentColors: () => instrumentColors,
     markShapes: () => markShapes,
     photoFretCount: () => photoFretCount,
+    photoNamed: () => photoNamed,
     photoPlacement: () => photoPlacement,
     pickShapes: () => pickShapes,
     positionsAt: () => positionsAt,
@@ -56,6 +62,7 @@ var GuitarEngine = (() => {
     renderGuitarStage: () => renderGuitarStage,
     renderHand: () => renderHand,
     resolveColors: () => resolveColors,
+    stageHeightFor: () => stageHeightFor,
     stageShapes: () => stageShapes,
     stringCount: () => stringCount,
     stringHalfAt: () => stringHalfAt,
@@ -98,6 +105,150 @@ var GuitarEngine = (() => {
     boardAtNut: [413, 527],
     boardAtEnd: [376, 548]
   };
+  var CLASSICAL_BOARD = {
+    width: 2880,
+    height: 488,
+    frets: [
+      85.2,
+      307.3,
+      516.9,
+      714.8,
+      901.5,
+      1077.8,
+      1244.2,
+      1401.2,
+      1549.5,
+      1689.4,
+      1821.4,
+      1946.1,
+      2063.7,
+      2174.8,
+      2279.6,
+      2378.5,
+      2471.9,
+      2560,
+      2643.2,
+      2721.7
+    ],
+    boardEndX: 2880,
+    stringsAtNut: [113.1, 374.9],
+    stringsAtEnd: [60.4, 427.6],
+    boardAtNut: [85.7, 402.3],
+    boardAtEnd: [42.7, 445.3]
+  };
+  var ACOUSTIC_BOARD = {
+    width: 2880,
+    height: 418,
+    frets: [
+      83.3,
+      299.8,
+      504.1,
+      696.9,
+      879,
+      1050.8,
+      1212.9,
+      1366,
+      1510.5,
+      1646.8,
+      1775.5,
+      1897,
+      2011.7,
+      2119.9,
+      2222.1,
+      2318.5,
+      2409.5,
+      2495.4,
+      2576.5,
+      2653,
+      2725.3
+    ],
+    boardEndX: 2880,
+    stringsAtNut: [101.9, 316.1],
+    stringsAtEnd: [65.2, 352.8],
+    boardAtNut: [81, 337],
+    boardAtEnd: [42.2, 375.8]
+  };
+  var ELECTRIC_BOARD = {
+    width: 2880,
+    height: 408,
+    frets: [
+      82,
+      288.4,
+      483.2,
+      667.1,
+      840.7,
+      1004.5,
+      1159.2,
+      1305.1,
+      1442.9,
+      1573,
+      1695.7,
+      1811.5,
+      1920.9,
+      2024.1,
+      2121.5,
+      2213.5,
+      2300.2,
+      2382.2,
+      2459.5,
+      2532.5,
+      2601.3,
+      2666.4,
+      2727.7
+    ],
+    boardEndX: 2880,
+    stringsAtNut: [101.5, 306.5],
+    stringsAtEnd: [63.6, 344.4],
+    boardAtNut: [81, 327],
+    boardAtEnd: [40.9, 367.1]
+  };
+  var EXTENDED_BOARD = {
+    width: 2880,
+    height: 408,
+    frets: [
+      76.7,
+      275.8,
+      463.7,
+      641.2,
+      808.6,
+      966.7,
+      1115.8,
+      1256.6,
+      1389.5,
+      1515,
+      1633.4,
+      1745.2,
+      1850.6,
+      1950.2,
+      2044.2,
+      2132.9,
+      2216.6,
+      2295.6,
+      2370.2,
+      2440.6,
+      2507.1,
+      2569.8,
+      2629,
+      2684.9,
+      2737.6
+    ],
+    boardEndX: 2880,
+    stringsAtNut: [108.2, 299.8],
+    stringsAtEnd: [63, 345],
+    boardAtNut: [86.3, 321.7],
+    boardAtEnd: [38.7, 369.3]
+  };
+  var PHOTOS = {
+    "acoustic-cutaway": ACOUSTIC_CUTAWAY,
+    "fretboard-classical": CLASSICAL_BOARD,
+    "fretboard-acoustic": ACOUSTIC_BOARD,
+    "fretboard-electric": ELECTRIC_BOARD,
+    "fretboard-extended": EXTENDED_BOARD
+  };
+  function photoNamed(name, href) {
+    const measurements = PHOTOS[name];
+    return measurements === void 0 ? void 0 : { ...measurements, href };
+  }
   function guitarPhoto(href, measurements = ACOUSTIC_CUTAWAY) {
     return { ...measurements, href };
   }
@@ -198,6 +349,13 @@ var GuitarEngine = (() => {
       hand: { x: 0, y: 0, width, height: handBand },
       numbersY: handBand + boardHeight
     };
+  }
+  function stageHeightFor(width, photo, options) {
+    if (!(width > 0) || !(photo.width > 0) || !(photo.height > 0)) return 0;
+    const numbers = options?.fretNumbers === false ? 0 : NUMBERS_SHARE;
+    const hand = options?.handLegend === true ? HAND_BAND_SHARE : 0;
+    const share = Math.max(0.2, 1 - numbers - hand);
+    return Math.round(photo.height * (width / photo.width) / share);
   }
   function photoPlacement(options) {
     const photo = options.photo;

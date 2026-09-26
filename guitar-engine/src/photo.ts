@@ -51,6 +51,22 @@ export interface GuitarPhotograph {
 export type PhotoMeasurements = Omit<GuitarPhotograph, 'href'>;
 
 /**
+ * THE STUDIO RENDERS.
+ *
+ * The photoreal plugins do not draw their instruments at runtime.
+ * They model one, light it, render it once at high resolution and
+ * blit the picture -- a filmstrip, in that trade. These four are that
+ * step: `tools/render_fretboard.py` builds each board out of the real
+ * measurements of the instrument (the 17.817 rule, the nut width, the
+ * string gauges), lights it, and writes a strip.
+ *
+ * Which is why these numbers are not measured off anything. The
+ * renderer knows where it put every fret wire and every string,
+ * because it put them there, and prints these on its way out. Re-run
+ * it and paste what it prints.
+ */
+
+/**
  * The sample: a cutaway dreadnought, neck running in from the left
  * edge and the body leaving by the right.
  *
@@ -72,6 +88,89 @@ export const ACOUSTIC_CUTAWAY: PhotoMeasurements = {
   boardAtNut: [413, 527],
   boardAtEnd: [376, 548],
 };
+
+/** A classical: a wide, flat rosewood board with nothing set into it, and nylon strings. Nineteen frets. */
+export const CLASSICAL_BOARD: PhotoMeasurements = {
+  width: 2880,
+  height: 488,
+  frets: [
+    85.2, 307.3, 516.9, 714.8, 901.5, 1077.8, 1244.2, 1401.2, 1549.5, 1689.4, 1821.4, 1946.1,
+    2063.7, 2174.8, 2279.6, 2378.5, 2471.9, 2560.0, 2643.2, 2721.7,
+  ],
+  boardEndX: 2880.0,
+  stringsAtNut: [113.1, 374.9],
+  stringsAtEnd: [60.4, 427.6],
+  boardAtNut: [85.7, 402.3],
+  boardAtEnd: [42.7, 445.3],
+};
+
+/** A steel-string acoustic: rosewood, pearl dots, three wound strings. Twenty frets. */
+export const ACOUSTIC_BOARD: PhotoMeasurements = {
+  width: 2880,
+  height: 418,
+  frets: [
+    83.3, 299.8, 504.1, 696.9, 879.0, 1050.8, 1212.9, 1366.0, 1510.5, 1646.8, 1775.5, 1897.0,
+    2011.7, 2119.9, 2222.1, 2318.5, 2409.5, 2495.4, 2576.5, 2653.0, 2725.3,
+  ],
+  boardEndX: 2880.0,
+  stringsAtNut: [101.9, 316.1],
+  stringsAtEnd: [65.2, 352.8],
+  boardAtNut: [81.0, 337.0],
+  boardAtEnd: [42.2, 375.8],
+};
+
+/** An electric: a dark bound board with pearl blocks in it, and the shorter scale that goes with it. Twenty-two frets. */
+export const ELECTRIC_BOARD: PhotoMeasurements = {
+  width: 2880,
+  height: 408,
+  frets: [
+    82.0, 288.4, 483.2, 667.1, 840.7, 1004.5, 1159.2, 1305.1, 1442.9, 1573.0, 1695.7, 1811.5,
+    1920.9, 2024.1, 2121.5, 2213.5, 2300.2, 2382.2, 2459.5, 2532.5, 2601.3, 2666.4, 2727.7,
+  ],
+  boardEndX: 2880.0,
+  stringsAtNut: [101.5, 306.5],
+  stringsAtEnd: [63.6, 344.4],
+  boardAtNut: [81.0, 327.0],
+  boardAtEnd: [40.9, 367.1],
+};
+
+/** An extended-range electric: a flatter, wider board with small dots, going all the way to the twenty-fourth fret. */
+export const EXTENDED_BOARD: PhotoMeasurements = {
+  width: 2880,
+  height: 408,
+  frets: [
+    76.7, 275.8, 463.7, 641.2, 808.6, 966.7, 1115.8, 1256.6, 1389.5, 1515.0, 1633.4, 1745.2, 1850.6,
+    1950.2, 2044.2, 2132.9, 2216.6, 2295.6, 2370.2, 2440.6, 2507.1, 2569.8, 2629.0, 2684.9, 2737.6,
+  ],
+  boardEndX: 2880.0,
+  stringsAtNut: [108.2, 299.8],
+  stringsAtEnd: [63.0, 345.0],
+  boardAtNut: [86.3, 321.7],
+  boardAtEnd: [38.7, 369.3],
+};
+
+/**
+ * Every set of measurements this engine carries, by the name of the
+ * file it belongs to.
+ *
+ * A page names a picture; only the engine knows where that picture's
+ * frets are. Anything not in here has to be measured before it can be
+ * used, and using it unmeasured would put every mark in the wrong
+ * place -- so an unknown name is nothing, not a guess.
+ */
+export const PHOTOS: Readonly<Record<string, PhotoMeasurements>> = {
+  'acoustic-cutaway': ACOUSTIC_CUTAWAY,
+  'fretboard-classical': CLASSICAL_BOARD,
+  'fretboard-acoustic': ACOUSTIC_BOARD,
+  'fretboard-electric': ELECTRIC_BOARD,
+  'fretboard-extended': EXTENDED_BOARD,
+};
+
+/** The picture a page names, at the path the page keeps it. */
+export function photoNamed(name: string, href: string): GuitarPhotograph | undefined {
+  const measurements = PHOTOS[name];
+  return measurements === undefined ? undefined : { ...measurements, href };
+}
 
 /** A photograph to draw with: measurements, and where the file is. */
 export function guitarPhoto(
