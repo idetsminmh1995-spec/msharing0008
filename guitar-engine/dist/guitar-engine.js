@@ -71,7 +71,7 @@ var GuitarEngine = (() => {
   var ACOUSTIC_DRAWN = {
     width: 1743,
     height: 682,
-    fit: "frame",
+    fit: "whole",
     frets: [
       254.7,
       316,
@@ -99,16 +99,12 @@ var GuitarEngine = (() => {
     stringsAtNut: [300.8, 361.7],
     stringsAtEnd: [294.7, 378.4],
     boardAtNut: [292, 369.4],
-    boardAtEnd: [284.5, 389.1],
-    // Nut on one edge of the frame, bridge on the other, like the other
-    // two. The bridge ends at 1404.5.
-    span: [223, 1454],
-    drop: 0.13
+    boardAtEnd: [284.5, 389.1]
   };
   var CLASSICAL_DRAWN = {
     width: 1513.5,
     height: 584.3,
-    fit: "frame",
+    fit: "whole",
     frets: [
       277.85,
       331,
@@ -135,20 +131,12 @@ var GuitarEngine = (() => {
     stringsAtNut: [267.7, 325.9],
     stringsAtEnd: [256.7, 336.9],
     boardAtNut: [261.2, 332.3],
-    boardAtEnd: [249, 344.5],
-    // The owner marked the two ends they wanted in the frame: just
-    // before the nut and just past the bridge. The drawing has air
-    // around the guitar where a photograph has the body already
-    // running off the edges, so scaled to the width it sat small with
-    // the notation towering over it and the headstock taking a
-    // quarter of the frame.
-    span: [251, 1293],
-    drop: 0.13
+    boardAtEnd: [249, 344.5]
   };
   var STRAT_DRAWN = {
     width: 3058,
     height: 1002,
-    fit: "frame",
+    fit: "whole",
     frets: [
       570.5,
       683,
@@ -178,16 +166,12 @@ var GuitarEngine = (() => {
     stringsAtNut: [450.5, 561.9],
     stringsAtEnd: [436.2, 583],
     boardAtNut: [446.1, 568.9],
-    boardAtEnd: [422.5, 595.6],
-    // Nut on one edge of the frame, bridge on the other, like the other
-    // three. The bridge ends at 2670.
-    span: [512, 2761],
-    drop: 0.13
+    boardAtEnd: [422.5, 595.6]
   };
   var ELECTRIC_DRAWN = {
     width: 1920,
     height: 638,
-    fit: "frame",
+    fit: "whole",
     frets: [
       407.6,
       471,
@@ -217,13 +201,7 @@ var GuitarEngine = (() => {
     stringsAtNut: [285.5, 345.4],
     stringsAtEnd: [277.7, 355.9],
     boardAtNut: [281.1, 351.5],
-    boardAtEnd: [269.8, 360],
-    // Framed like the classical, because the owner asked for the same:
-    // the nut on one edge of the frame and the bridge on the other, so
-    // the headstock runs off the left and the rest of the body off the
-    // right. The bridge plate ends at 1602.
-    span: [375, 1654],
-    drop: 0.13
+    boardAtEnd: [269.8, 360]
   };
   var PHOTOS = {
     "acoustic-drawn": ACOUSTIC_DRAWN,
@@ -308,6 +286,7 @@ var GuitarEngine = (() => {
   function stageHeightFor(width, photo, options) {
     if (!(width > 0) || !(photo.width > 0) || !(photo.height > 0)) return 0;
     const scaled = photo.height * photoScale(width, photo);
+    if (photo.fit === "whole") return Math.round(scaled);
     const numbers = options?.fretNumbers === false ? 0 : NUMBERS_SHARE;
     const hand = options?.handLegend === true ? HAND_BAND_SHARE : 0;
     const share = Math.max(0.2, 1 - numbers - hand);
@@ -322,6 +301,15 @@ var GuitarEngine = (() => {
   function photoPlacement(options) {
     const photo = options.photo;
     if (photo === void 0 || !(photo.width > 0) || !(options.width > 0)) return void 0;
+    if (photo.fit === "whole" && photo.height > 0 && options.height > 0) {
+      const scale2 = Math.min(options.width / photo.width, options.height / photo.height);
+      return {
+        photo,
+        scale: scale2,
+        x: (options.width - photo.width * scale2) / 2,
+        y: (options.height - photo.height * scale2) / 2
+      };
+    }
     const scale = photoScale(options.width, photo);
     const board = guitarLayout(options).board;
     return {
@@ -891,6 +879,7 @@ var GuitarEngine = (() => {
   function photoFadeShapes(options) {
     const place = photoPlacement(options);
     if (place === void 0) return [];
+    if (place.photo.fit === "whole") return [];
     const rgb = fadeRgb(options.fadeTo);
     if (rgb === void 0) return [];
     const { width, height } = options;

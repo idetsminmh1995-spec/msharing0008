@@ -178,13 +178,14 @@ the colour behind the stage and it fades the picture into it instead:
 { photo: guitarPhoto('assets/guitar/acoustic-drawn.svg'), fadeTo: '#17110E' }
 ```
 
-A picture framed with air around it can say which PART of itself to
-show: `span: [left, right]` in the file's own pixels fills the
-frame's width with that stretch, setting the scale and the offset
-together, and `drop` hangs it lower down the stage as a share of the
-stage's height. Both live with the measurements rather than with the
-caller, because how a picture wants to be framed is a fact about that
-picture.
+`fit` says how a picture meets its box. `'whole'` -- what all four
+guitars use -- scales it to fit on BOTH axes and centres it, so
+nothing is ever cut and a shorter box only shows it smaller.
+`'frame'` fills the frame instead and lets the body run off the top
+and the bottom, with `span: [left, right]` choosing which stretch of
+the file to show and `drop` how far down the stage to hang it. All of
+it lives with the measurements rather than with the caller, because
+how a picture wants to be framed is a fact about that picture.
 
 A band goes over each edge the picture is actually cut at — opaque
 there, gone before it reaches the board — and the hand, the marks and

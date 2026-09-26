@@ -98,11 +98,27 @@ test('the fret numbers are drawn under the board, faint, and can be turned off',
 });
 
 test('a crowded neck numbers the frets a player looks for, not every one', () => {
-  const wide = fretNumbers(G.fretboardShapes({ ...STAGE, width: 2400 }));
-  const narrow = fretNumbers(G.fretboardShapes({ ...STAGE, width: 420 }));
-  assert.ok(wide.length > narrow.length, 'the wider the frame, the more of them fit');
-  assert.ok(narrow.length < G.photoFretCount(PHOTO), 'no room for all of them');
-  assert.ok(narrow.some((t) => t.text === '12'), 'the twelfth is always there');
+  // Everything about the picture scales together -- the frets, the
+  // board's depth, the size a number is drawn at -- so the same frets
+  // get numbered whatever size the frame is. What is NOT the same is
+  // that the high frets, a quarter the width of the first, never have
+  // room.
+  const shaped = (width) => ({
+    ...STAGE,
+    width,
+    height: Math.round(width * (PHOTO.height / PHOTO.width)),
+  });
+  const at = (width) => fretNumbers(G.fretboardShapes(shaped(width))).map((t) => t.text);
+  const small = at(420);
+  assert.ok(small.length < G.photoFretCount(PHOTO), 'no room for all of them');
+  assert.ok(small.includes('12'), 'the twelfth is always there');
+  assert.equal(at(1200).join(','), small.join(','), 'and the same ones at any size');
+  assert.equal(at(2400).join(','), small.join(','));
+  // None of them lands on its neighbour.
+  const numbers = fretNumbers(G.fretboardShapes(shaped(1200)));
+  for (let i = 1; i < numbers.length; i++) {
+    assert.ok(numbers[i].x - numbers[i - 1].x > numbers[i].fontSize * 0.6, `${small[i]} has room`);
+  }
 });
 
 test('the engine still knows what each string is called', () => {

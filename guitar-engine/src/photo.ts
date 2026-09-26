@@ -58,8 +58,15 @@ export interface GuitarPhotograph {
    * fills it, and the legend and the numbers are drawn over it. Such a
    * picture is made with its strings already where the board's band
    * has its middle, so the two line up without anything being moved.
+   *
+   * `whole` shows the ENTIRE picture and cuts nothing: it is scaled
+   * to fit the box on both axes and centred in it, the way a photo
+   * viewer shows a photograph. A guitar that is all there reads as a
+   * guitar; one with its body sliced across the top reads as a
+   * picture that did not fit. `span` and `drop` are for deciding
+   * which PART of a picture to show, so they do not apply here.
    */
-  readonly fit?: 'board' | 'frame';
+  readonly fit?: 'board' | 'frame' | 'whole';
   /**
    * Which stretch of the picture fills the frame's width, in the
    * file's own pixels: `[left, right]`.
@@ -132,7 +139,7 @@ export type PhotoMeasurements = Omit<GuitarPhotograph, 'href'>;
 export const ACOUSTIC_DRAWN: PhotoMeasurements = {
   width: 1743,
   height: 682,
-  fit: 'frame',
+  fit: 'whole',
   frets: [
     254.7, 316, 374, 428, 479, 529, 574.5, 617, 657, 698.5, 732, 767, 801.5, 830, 859, 886, 912,
     936.5, 959, 982, 1003,
@@ -142,10 +149,6 @@ export const ACOUSTIC_DRAWN: PhotoMeasurements = {
   stringsAtEnd: [294.7, 378.4],
   boardAtNut: [292, 369.4],
   boardAtEnd: [284.5, 389.1],
-  // Nut on one edge of the frame, bridge on the other, like the other
-  // two. The bridge ends at 1404.5.
-  span: [223, 1454],
-  drop: 0.13,
 };
 
 /**
@@ -178,7 +181,7 @@ export const ACOUSTIC_DRAWN: PhotoMeasurements = {
 export const CLASSICAL_DRAWN: PhotoMeasurements = {
   width: 1513.5,
   height: 584.3,
-  fit: 'frame',
+  fit: 'whole',
   frets: [
     277.85, 331, 378.7, 423.5, 466.7, 508.5, 545.9, 581.3, 616.7, 649.6, 680.7, 711.1, 738, 764.1,
     788.3, 812.7, 835.3, 855.7, 874.9, 893.4,
@@ -188,14 +191,6 @@ export const CLASSICAL_DRAWN: PhotoMeasurements = {
   stringsAtEnd: [256.7, 336.9],
   boardAtNut: [261.2, 332.3],
   boardAtEnd: [249.0, 344.5],
-  // The owner marked the two ends they wanted in the frame: just
-  // before the nut and just past the bridge. The drawing has air
-  // around the guitar where a photograph has the body already
-  // running off the edges, so scaled to the width it sat small with
-  // the notation towering over it and the headstock taking a
-  // quarter of the frame.
-  span: [251, 1293],
-  drop: 0.13,
 };
 
 /**
@@ -225,7 +220,7 @@ export const CLASSICAL_DRAWN: PhotoMeasurements = {
 export const STRAT_DRAWN: PhotoMeasurements = {
   width: 3058,
   height: 1002,
-  fit: 'frame',
+  fit: 'whole',
   frets: [
     570.5, 683, 790, 889, 983, 1072, 1156.5, 1236.5, 1311, 1382, 1449, 1512, 1571, 1626.5, 1680,
     1731, 1778, 1822, 1865, 1904, 1942, 1978, 2010.5,
@@ -235,10 +230,6 @@ export const STRAT_DRAWN: PhotoMeasurements = {
   stringsAtEnd: [436.2, 583],
   boardAtNut: [446.1, 568.9],
   boardAtEnd: [422.5, 595.6],
-  // Nut on one edge of the frame, bridge on the other, like the other
-  // three. The bridge ends at 2670.
-  span: [512, 2761],
-  drop: 0.13,
 };
 
 /**
@@ -279,7 +270,7 @@ export const STRAT_DRAWN: PhotoMeasurements = {
 export const ELECTRIC_DRAWN: PhotoMeasurements = {
   width: 1920,
   height: 638,
-  fit: 'frame',
+  fit: 'whole',
   frets: [
     407.6, 471, 531, 587.2, 641, 691.2, 738.5, 783.2, 825.8, 865.5, 903.2, 938.8, 972.2, 1004.2,
     1033.8, 1062.8, 1089.2, 1114.5, 1138.2, 1161, 1182.2, 1203.2, 1222,
@@ -289,12 +280,6 @@ export const ELECTRIC_DRAWN: PhotoMeasurements = {
   stringsAtEnd: [277.7, 355.9],
   boardAtNut: [281.1, 351.5],
   boardAtEnd: [269.8, 360],
-  // Framed like the classical, because the owner asked for the same:
-  // the nut on one edge of the frame and the bridge on the other, so
-  // the headstock runs off the left and the rest of the body off the
-  // right. The bridge plate ends at 1602.
-  span: [375, 1654],
-  drop: 0.13,
 };
 /**
  * Every set of measurements this engine carries, by the name of the

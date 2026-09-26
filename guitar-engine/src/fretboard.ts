@@ -120,6 +120,10 @@ export function stageHeightFor(
 ): number {
   if (!(width > 0) || !(photo.width > 0) || !(photo.height > 0)) return 0;
   const scaled = photo.height * photoScale(width, photo);
+  // Shown whole, the picture decides the box outright: this is its
+  // own height at the frame's width, and a box any shorter simply
+  // shows it smaller with air down the sides.
+  if (photo.fit === 'whole') return Math.round(scaled);
   const numbers = options?.fretNumbers === false ? 0 : NUMBERS_SHARE;
   const hand = options?.handLegend === true ? HAND_BAND_SHARE : 0;
   const share = Math.max(0.2, 1 - numbers - hand);
@@ -160,6 +164,19 @@ export interface PhotoPlacement {
 export function photoPlacement(options: FretboardOptions): PhotoPlacement | undefined {
   const photo = options.photo;
   if (photo === undefined || !(photo.width > 0) || !(options.width > 0)) return undefined;
+  // Shown WHOLE: scaled to fit the box on both axes and centred in
+  // it, so nothing is cut. A guitar that is all there reads as a
+  // guitar; one sliced across the body reads as a picture that did
+  // not fit.
+  if (photo.fit === 'whole' && photo.height > 0 && options.height > 0) {
+    const scale = Math.min(options.width / photo.width, options.height / photo.height);
+    return {
+      photo,
+      scale,
+      x: (options.width - photo.width * scale) / 2,
+      y: (options.height - photo.height * scale) / 2,
+    };
+  }
   const scale = photoScale(options.width, photo);
   const board = guitarLayout(options).board;
   return {

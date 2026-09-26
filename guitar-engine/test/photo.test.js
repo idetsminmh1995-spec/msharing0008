@@ -19,27 +19,22 @@ const FRAME = {
   fretNumbers: true,
 };
 
-test('the picture is scaled to the width and hung by its strings', () => {
+test('the picture is shown whole, fitted to the box and centred in it', () => {
   const place = G.photoPlacement(FRAME);
-  // The picture says which stretch of itself fills the width, so the
-  // scale comes from that stretch and the offset puts its left end on
-  // the frame's left edge.
-  const span = PHOTO.span[1] - PHOTO.span[0];
-  assert.ok(Math.abs(place.scale - FRAME.width / span) < 1e-9);
-  assert.ok(Math.abs(place.x + PHOTO.span[0] * place.scale) < 1e-9);
-  // The strings' middle lands where the drawn neck's middle would, so
-  // the hand legend keeps its band above and the numbers their strip
-  // below.
-  const board = G.guitarLayout(FRAME).board;
-  const nutMid = (PHOTO.stringsAtNut[0] + PHOTO.stringsAtNut[1]) / 2;
-  const endMid = (PHOTO.stringsAtEnd[0] + PHOTO.stringsAtEnd[1]) / 2;
-  const middle = place.y + ((nutMid + endMid) / 2) * place.scale;
-  const wanted = board.y + board.height / 2 + PHOTO.drop * FRAME.height;
-  assert.ok(Math.abs(middle - wanted) < 1, `hung at ${middle}, wanted ${wanted}`);
-  // It is BIGGER than the frame: a photographed guitar runs off the
-  // top and the bottom the way it runs off the side.
-  assert.ok(place.y < 0, 'the body is cut by the top edge');
-  assert.ok(place.photo.height * place.scale > FRAME.height * 1.2);
+  // Nothing is cut: the scale is whichever of the two axes runs out
+  // first, and what is left over is air, not a crop.
+  const fit = Math.min(FRAME.width / PHOTO.width, FRAME.height / PHOTO.height);
+  assert.ok(Math.abs(place.scale - fit) < 1e-9);
+  assert.ok(place.x >= -1e-9 && place.y >= -1e-9, 'inside the box on both axes');
+  assert.ok(place.x + PHOTO.width * place.scale <= FRAME.width + 1e-9);
+  assert.ok(place.y + PHOTO.height * place.scale <= FRAME.height + 1e-9);
+  // Centred, so the air is the same on both sides.
+  assert.ok(Math.abs(FRAME.width - (place.x * 2 + PHOTO.width * place.scale)) < 1e-9);
+  assert.ok(Math.abs(FRAME.height - (place.y * 2 + PHOTO.height * place.scale)) < 1e-9);
+  // And the box a page should give it is the picture's own height at
+  // the frame's width.
+  const wanted = G.stageHeightFor(FRAME.width, PHOTO, { handLegend: true, fretNumbers: true });
+  assert.equal(wanted, Math.round(PHOTO.height * (FRAME.width / PHOTO.width)));
   assert.equal(G.photoPlacement({ width: 1920, height: 497 }), undefined, 'no photo, no placement');
 });
 
@@ -98,7 +93,7 @@ test('an open string is still shown when the nut is off the edge', () => {
   // the nut, and the first fret with it, are off it.
   const bled = {
     ...FRAME,
-    photo: { ...PHOTO, frets: [-180, -70, ...PHOTO.frets.slice(2)] },
+    photo: { ...PHOTO, fit: 'frame', frets: [-180, -70, ...PHOTO.frets.slice(2)] },
   };
   assert.ok(G.fretCenter(0, bled) < 0, 'the nut really is off the edge');
   const [mark] = G.markShapes(
@@ -205,7 +200,9 @@ test('a cropped picture is faded into the frame, not cut off by it', () => {
   // A band goes over each edge the picture is actually CUT at, and
   // over no other: a picture whose outline ends inside the frame ends
   // at its outline, and a band there is fog over the guitar.
-  const photo = G.photoNamed('acoustic-drawn', 'acoustic.svg');
+  // A picture shown WHOLE is never cut, so it never gets a band. One
+  // framed to fill the frame is cut, and does.
+  const photo = { ...G.photoNamed('acoustic-drawn', 'acoustic.svg'), fit: 'frame' };
   const height = G.stageHeightFor(1920, photo, { handLegend: true, fretNumbers: true });
   const seen = new Set();
   for (const drop of [-0.8, -0.55, -0.3, 0, 0.13, 0.4]) {
@@ -334,7 +331,7 @@ test('the classical is the owner’s drawing, read out of the file', () => {
 });
 
 test('a picture can be drawn bigger, and hung lower', () => {
-  const plain = { ...G.photoNamed('acoustic-drawn', 'a.svg'), span: undefined, drop: undefined };
+  const plain = { ...G.photoNamed('acoustic-drawn', 'a.svg'), fit: 'frame' };
   const width = 1920;
   const frame = (photo) => ({
     width,

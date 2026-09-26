@@ -112,25 +112,30 @@ of them, and the acoustic's last two dots sit on 14 and 16 where a
 real guitar would put 15 and 17. Use them to confirm 3, 5, 7, 9 and
 12; do not use them alone to number a drawing.
 
-### Which part of the picture fills the frame
+### The whole guitar, never a slice of one
 
-`span: [left, right]` in `photo.ts`, in the file's own pixels. All
-four guitars are framed the same way, which is how the owner asked
-for it: **the nut on one edge of the frame and the bridge on the
-other**, so the headstock runs off the left and the rest of the body
-off the right, and the whole playing length gets the frame. `drop`
-hangs the picture lower down the stage; all three use 0.13.
+All four are `fit: 'whole'`: the picture is scaled to fit its box on
+BOTH axes and centred in it, the way a photo viewer shows a
+photograph, so nothing is ever cut. A guitar that is all there reads
+as a guitar; one sliced across the body reads as a picture that did
+not fit. The box a page should give it is `stageHeightFor`, which for
+a whole picture is simply its own height at the frame's width; a
+shorter box shows it smaller with air down the sides rather than
+cutting it.
 
-Without a span a picture is scaled to the frame's width and laid
-against its left edge, which is right for a photograph framed for the
-job and wrong for a drawing with air around it.
+`fit: 'frame'` is the other way: fill the frame and let the body run
+off the top and the bottom, with `span: [left, right]` saying which
+stretch of the file to show and `drop` how far down the stage to hang
+it. Nothing uses it now -- the owner asked for the whole guitar -- but
+it is what the fade below exists for, and it is still tested.
 
 ### The cut edges are faded, not sliced
 
-A picture scaled to the frame's width is taller than the band the
-stage gets, so the body runs off the top and the bottom and stops
-dead — two hard horizontal lines across a guitar, which is the one
-thing that gives away a picture laid on a page. The page hands the
+(Only for `fit: 'frame'`. A picture shown whole is never cut, so it
+never gets a band.) A picture scaled to the frame's width is taller
+than the band the stage gets, so the body runs off the top and the
+bottom and stops dead — two hard horizontal lines across a guitar,
+which is the one thing that gives away a picture laid on a page. The page hands the
 engine the colour behind the stage (`fadeTo`, read off the video
 frame) and the engine lays a gradient band over each edge the picture
 is actually cut at, opaque at the edge and gone before it reaches the

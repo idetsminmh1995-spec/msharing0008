@@ -216,6 +216,10 @@ const FADE_OVERSHOOT = 2;
 function photoFadeShapes(options: FretboardOptions): readonly StageShape[] {
   const place = photoPlacement(options);
   if (place === undefined) return [];
+  // A picture shown WHOLE is never cut, so there is never anything to
+  // hide -- and a band over an edge that only TOUCHES the frame would
+  // fade the guitar for nothing.
+  if (place.photo.fit === 'whole') return [];
   const rgb = fadeRgb(options.fadeTo);
   if (rgb === undefined) return [];
 
