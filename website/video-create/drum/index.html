@@ -344,24 +344,31 @@
      of the title. */
   .video-frame.is-square{justify-content:flex-start;}
   .video-frame.is-square .video-top{
-    flex-direction:column;align-items:stretch;gap:0;padding:2.3cqw 1.6cqw 0;
+    flex-direction:column;align-items:stretch;gap:0;padding:2cqw 1.6cqw 0;
   }
   .video-frame.is-square .video-logo-row{gap:4cqw;}
   /* A shade smaller than the portrait frame's mark, and the gaps
      below it tighter, because a square has to fit the header, the
      music AND the kit into 1080 of height where a portrait has 1920.
      Every unit taken off the header is a unit the kit photo keeps. */
-  .video-frame.is-square .video-logo-mark{--logo-h:16.5cqw;}
+  .video-frame.is-square .video-logo-mark{--logo-h:13.5cqw;}
   .video-frame.is-square .video-title-1{font-size:calc(var(--title1-num,32) * 100cqw / 520);}
   .video-frame.is-square .video-title-2{font-size:calc(var(--title2-num,18) * 100cqw / 520);}
-  .video-frame.is-square .video-stats{justify-content:center;margin-top:2cqw;gap:1.6cqw;}
+  .video-frame.is-square .video-stats{justify-content:center;margin-top:1.1cqw;gap:1.5cqw;}
   .video-frame.is-square .stat-box{
-    border-width:.37cqw;border-radius:1.7cqw;padding:1.2cqw 1.8cqw;min-width:11cqw;
+    border-width:.37cqw;border-radius:1.7cqw;padding:.9cqw 1.7cqw;min-width:10.5cqw;
   }
-  .video-frame.is-square .stat-box .stat-label{font-size:2.3cqw;}
-  .video-frame.is-square .stat-box .stat-value{font-size:4.4cqw;}
-  .video-frame.is-square .video-notation{margin-top:1.8cqw;padding:0 2.4cqw 1.3cqw;}
-  .video-frame.is-square .video-notation svg{height:28cqw;}
+  .video-frame.is-square .stat-box .stat-label{font-size:2.2cqw;}
+  .video-frame.is-square .stat-box .stat-value{font-size:4.2cqw;}
+  /* The music has to END above the kit, not merely start above it.
+     A staff carries ink well below its bottom line -- the bass drum's
+     stems and their beams -- and at 28cqw those crossed the top of
+     the cymbals. 24cqw puts the lowest ink at about 40% of the frame,
+     which leaves the bottom 55% to the photo, and the header above is
+     tightened rather than the music shrunk further: every unit off
+     the header is a unit the music keeps. */
+  .video-frame.is-square .video-notation{margin-top:1.4cqw;padding:0 2.4cqw 1.3cqw;}
+  .video-frame.is-square .video-notation svg{height:21cqw;}
   .video-frame.is-square .drum-circle{height:26cqw;}
 
   .transport{display:flex;align-items:center;gap:14px;}
