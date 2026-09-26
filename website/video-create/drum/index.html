@@ -207,7 +207,11 @@
      VIDEO frame: nothing in the exported video has a scrollbar in it. */
   .video-notation{padding:0 20px 14px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;flex-shrink:0;scrollbar-width:none;-ms-overflow-style:none;}
   .video-notation::-webkit-scrollbar{display:none;width:0;height:0;}
-  .video-notation svg{display:block;height:170px;width:auto;max-width:none;}
+  /* `--note-h` is set by the page once it has read the kit photo and
+     knows how much room the music actually has above the drums; the
+     value here is what each shape asks for when there is no photo to
+     read, or when a cross-origin one cannot be measured. */
+  .video-notation svg{display:block;height:var(--note-h,170px);width:auto;max-width:none;}
   /* The R2 hit images. Each is a FULL-FRAME overlay -- a stick or a
      limb drawn in position over the kit photo -- so they stack on the
      frame at its own size rather than being placed per-drum. They sit
@@ -310,7 +314,7 @@
      which leaves the music's top at 519 and its bottom clear of where
      the kit photo starts. */
   .video-frame.is-portrait .video-notation{margin-top:11.5cqw;padding:0 2.6cqw 1.3cqw;}
-  .video-frame.is-portrait .video-notation svg{height:36cqw;}
+  .video-frame.is-portrait .video-notation svg{height:var(--note-h,36cqw);}
   .video-frame.is-portrait .drum-circle{height:26cqw;}
 
   /* The footer is only the portrait shape's. */
@@ -368,7 +372,7 @@
      tightened rather than the music shrunk further: every unit off
      the header is a unit the music keeps. */
   .video-frame.is-square .video-notation{margin-top:1.4cqw;padding:0 2.4cqw 1.3cqw;}
-  .video-frame.is-square .video-notation svg{height:21cqw;}
+  .video-frame.is-square .video-notation svg{height:var(--note-h,21cqw);}
   .video-frame.is-square .drum-circle{height:26cqw;}
 
   .transport{display:flex;align-items:center;gap:14px;}
@@ -744,6 +748,8 @@
     videoFrame.classList.toggle('is-square', aspect === '1x1');
     videoFrame.style.backgroundImage = '';
     kitBackgroundImage = null;
+    kitContentTop = null;
+    fitNotationToKit();
     if (hitLayer) hitLayer.innerHTML = '';
     if (currentKit.path) {
       void loadKitPreview(currentKit.path);
@@ -760,6 +766,7 @@
       }
       pill.classList.add('active');
       applyAspect();
+      fitNotationToKit();
     });
   }
   const kitConfirm = kitSelect.closest('.card').querySelector('.confirm-msg');
@@ -834,8 +841,14 @@
         videoFrame.style.backgroundPosition = 'center';
         const bg = new Image();
         bg.crossOrigin = 'anonymous';
+        bg.addEventListener('load', () => {
+          if (kitBackgroundImage !== bg) return;
+          kitContentTop = measureKitTop(bg);
+          fitNotationToKit();
+        });
         bg.src = imgUrl;
         kitBackgroundImage = bg;
+        kitContentTop = null;
         if (drumCircle) drumCircle.style.display = 'none';
         setKitStatus(
           `\u2713 Loaded "${label}" background + ${manifest.files.length} note images from R2.`,
@@ -1188,8 +1201,129 @@
     // the order the page actually works.
     stopMeasureAnnouncements();
     refreshCountVoice();
+    fitNotationToKit();
   }
 
+
+
+  // --- Fitting the music to the kit photo ---------------------------
+  // The staff and the kit share one frame, and how much room the staff
+  // gets is a property of the PHOTO, not of a number typed into a
+  // stylesheet. A 9:16 photo that puts the kit halfway down leaves
+  // twice the room a 1:1 photo does that starts it at 45%, and any
+  // fixed height is therefore either wasting space in one of them or
+  // running into the drums in the other. It ran into the drums.
+  //
+  // So the photo is read. Where its own content begins is measured off
+  // the file once it loads, and the staff takes the room above it.
+
+  /** Where the kit photo's content starts, as a share of its height. */
+  let kitContentTop = null;
+
+  /**
+   * The first row of the photo that is not its own background.
+   *
+   * Measured on a small copy -- a hundred rows is plenty to find an
+   * edge, and reading a 4000px photo pixel by pixel would cost more
+   * than the rest of the frame. The background is taken from the
+   * photo's own top-left corner rather than assumed to be black: a
+   * white-style kit photo is a white background, and a rule that only
+   * knows about black would call its first row content.
+   *
+   * Returns null when the photo cannot be read -- a cross-origin image
+   * without CORS taints the canvas, and a frame that guesses in that
+   * case would be worse than one that keeps its stylesheet's number.
+   */
+  function measureKitTop(img) {
+    if (!img || !img.complete || !(img.naturalWidth > 0)) return null;
+    try {
+      const w = 64;
+      const h = Math.max(1, Math.round((img.naturalHeight / img.naturalWidth) * w));
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx2d = canvas.getContext('2d', { willReadFrequently: true });
+      ctx2d.drawImage(img, 0, 0, w, h);
+      const data = ctx2d.getImageData(0, 0, w, h).data;
+      const at = (x, y) => (y * w + x) * 4;
+      const corner = [data[0], data[1], data[2], data[3]];
+      // A transparent photo has no background to match -- anything
+      // with alpha in it is content.
+      const clear = corner[3] < 16;
+      for (let y = 0; y < h; y++) {
+        let different = 0;
+        for (let x = 0; x < w; x++) {
+          const i = at(x, y);
+          if (data[i + 3] < 16) continue;
+          if (clear) {
+            different += 1;
+            continue;
+          }
+          const gap =
+            Math.abs(data[i] - corner[0]) +
+            Math.abs(data[i + 1] - corner[1]) +
+            Math.abs(data[i + 2] - corner[2]);
+          if (gap > 60) different += 1;
+        }
+        // One stray pixel is compression, not a cymbal.
+        if (different > w * 0.02) return y / h;
+      }
+      return null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  /**
+   * The staff, sized to the room the photo leaves above the kit.
+   *
+   * Clamped both ways against whatever the stylesheet asked for: the
+   * shape's own number is the intention, and this moves it to fit
+   * rather than replacing it. A photo that is all kit does not get a
+   * staff the size of a postage stamp, and one that is all sky does
+   * not get a staff taller than the frame.
+   */
+  function fitNotationToKit() {
+    if (!notationContainer) return;
+    videoFrame.style.removeProperty('--note-h');
+    // 16:9 only, deliberately: that frame is wide enough that the
+    // staff has never been the thing in the way, and it is the one
+    // shape whose look is already settled. The two narrow shapes are
+    // where the music and the kit compete for the same height.
+    const narrow =
+      videoFrame.classList.contains('is-portrait') || videoFrame.classList.contains('is-square');
+    if (!narrow) return;
+    const svg = notationContainer.querySelector('svg');
+    const img = kitBackgroundImage;
+    if (!svg || kitContentTop === null || !img || !(img.naturalHeight > 0)) return;
+    const frame = videoFrame.getBoundingClientRect();
+    const base = svg.getBoundingClientRect().height;
+    if (!(frame.height > 0) || !(base > 0)) return;
+
+    // `cover`: the photo fills the frame and overflows on one axis.
+    const scale = Math.max(frame.width / img.naturalWidth, frame.height / img.naturalHeight);
+    const drawn = img.naturalHeight * scale;
+    const kitTop = (frame.height - drawn) / 2 + kitContentTop * drawn;
+
+    const box = notationContainer.getBoundingClientRect();
+    const top = box.top - frame.top;
+    // The container's own padding, which the staff does not get.
+    const padding = Math.max(0, box.height - base);
+    // The staff's ink runs most of the way down its box -- the bass
+    // drum's stems, their beams, and the R/L under them -- so the box
+    // has to stop short of the kit rather than touch it.
+    const room = kitTop - top - padding - frame.height * 0.02;
+    if (!(room > 0)) return;
+
+    // A band, not a free hand. The shape's own number is the
+    // intention and this moves it to fit; a photo that is all kit does
+    // not get a staff the size of a postage stamp, and one that is all
+    // sky does not get a staff so tall that a bar and a half fills the
+    // frame -- past about a third bigger, the reader loses the shape
+    // of the phrase they are meant to be following.
+    const wanted = Math.max(base * 0.75, Math.min(base * 1.35, room));
+    videoFrame.style.setProperty('--note-h', `${wanted}px`);
+  }
 
   // --- Human Sticking Engine -----------------------------------------
   // Drum/sticking-engine-ts, the TypeScript port of the Python engine in
