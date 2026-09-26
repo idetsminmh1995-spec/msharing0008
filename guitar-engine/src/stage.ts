@@ -280,27 +280,31 @@ function photoFadeShapes(options: FretboardOptions): readonly StageShape[] {
 }
 
 /**
- * The four-colour hand, in the band above the neck.
+ * The four-colour hand, in the corner under the neck.
  *
  * The video's own legend: the colours on the neck mean nothing until
  * someone is told what they mean, and a hand says it without words.
  * It is drawn INTO the stage rather than laid over it by the page, so
  * the exported video carries it too.
+ *
+ * It used to sit in the band ABOVE the neck. The guitar has the whole
+ * frame now and the notation is printed over the top of it, so that
+ * band is the notation's: the hand goes to the bottom left instead,
+ * under the fret numbers, which on every one of these guitars is the
+ * corner the body has left empty.
  */
 function handLegendShapes(options: FretboardOptions): readonly StageShape[] {
   if (options.handLegend !== true) return [];
   const band = guitarLayout(options).hand;
   if (!(band.height > 0)) return [];
-  // A photographed neck is thinner than the band the drawn one fills,
-  // which leaves the legend stranded half a frame above the guitar it
-  // is explaining. It gets the whole gap instead, down to the board
-  // itself -- bigger, and beside the neck rather than adrift over it.
-  const floor =
-    photoPlacement(options) !== undefined
-      ? boardEdges(options, fretCenter(1, options)).top
-      : band.y + band.height;
-  const height = Math.max(band.height, floor - band.y) * 0.94;
+  // The corner: from under the neck and its numbers, down to the
+  // bottom of the stage.
+  const under = boardEdges(options, fretCenter(1, options)).bottom;
+  const ceiling = under + boardDepth(options) * 0.75;
+  const height = Math.max(band.height, options.height - ceiling) * 0.94;
   const width = height * 0.78;
+  const left = band.x + band.width * 0.012;
+  const floor = options.height - (options.height - ceiling) * 0.03;
   // A drawing of the hand, when the caller has one, in the same place
   // and at the same size the built-in hand would have taken. Its own
   // shape is kept -- a hand squashed to fit a box stops looking like
@@ -315,8 +319,8 @@ function handLegendShapes(options: FretboardOptions): readonly StageShape[] {
     return [
       {
         kind: 'image',
-        x: band.x + band.width * 0.012,
-        y: band.y + (Math.max(band.height, floor - band.y) - drawn.height) / 2,
+        x: left,
+        y: Math.max(0, floor - drawn.height),
         width: drawn.width,
         height: drawn.height,
         fill: 'none',
@@ -327,8 +331,8 @@ function handLegendShapes(options: FretboardOptions): readonly StageShape[] {
   }
   return translateShapes(
     handShapes({ width, height, handColor: '#F6EDE6', outline: 'rgba(0,0,0,0.35)' }),
-    band.x + band.width * 0.012,
-    band.y + (band.height - height) / 2,
+    left,
+    Math.max(0, floor - height),
   );
 }
 

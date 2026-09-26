@@ -99,7 +99,12 @@ var GuitarEngine = (() => {
     stringsAtNut: [300.8, 361.7],
     stringsAtEnd: [294.7, 378.4],
     boardAtNut: [292, 369.4],
-    boardAtEnd: [284.5, 389.1]
+    boardAtEnd: [284.5, 389.1],
+    // The frame shows the guitar from just before the NUT to just past
+    // the BRIDGE, which is the framing the owner asked for by name: the
+    // headstock runs off the left edge and the rest of the body off the
+    // right, and the whole playing length gets the frame.
+    span: [223, 1454]
   };
   var CLASSICAL_DRAWN = {
     width: 1513.5,
@@ -131,7 +136,12 @@ var GuitarEngine = (() => {
     stringsAtNut: [267.7, 325.9],
     stringsAtEnd: [256.7, 336.9],
     boardAtNut: [261.2, 332.3],
-    boardAtEnd: [249, 344.5]
+    boardAtEnd: [249, 344.5],
+    // The frame shows the guitar from just before the NUT to just past
+    // the BRIDGE, which is the framing the owner asked for by name: the
+    // headstock runs off the left edge and the rest of the body off the
+    // right, and the whole playing length gets the frame.
+    span: [251, 1293]
   };
   var STRAT_DRAWN = {
     width: 3058,
@@ -166,7 +176,12 @@ var GuitarEngine = (() => {
     stringsAtNut: [450.5, 561.9],
     stringsAtEnd: [436.2, 583],
     boardAtNut: [446.1, 568.9],
-    boardAtEnd: [422.5, 595.6]
+    boardAtEnd: [422.5, 595.6],
+    // The frame shows the guitar from just before the NUT to just past
+    // the BRIDGE, which is the framing the owner asked for by name: the
+    // headstock runs off the left edge and the rest of the body off the
+    // right, and the whole playing length gets the frame.
+    span: [512, 2761]
   };
   var ELECTRIC_DRAWN = {
     width: 1920,
@@ -201,7 +216,12 @@ var GuitarEngine = (() => {
     stringsAtNut: [285.5, 345.4],
     stringsAtEnd: [277.7, 355.9],
     boardAtNut: [281.1, 351.5],
-    boardAtEnd: [269.8, 360]
+    boardAtEnd: [269.8, 360],
+    // The frame shows the guitar from just before the NUT to just past
+    // the BRIDGE, which is the framing the owner asked for by name: the
+    // headstock runs off the left edge and the rest of the body off the
+    // right, and the whole playing length gets the frame.
+    span: [375, 1654]
   };
   var PHOTOS = {
     "acoustic-drawn": ACOUSTIC_DRAWN,
@@ -302,12 +322,20 @@ var GuitarEngine = (() => {
     const photo = options.photo;
     if (photo === void 0 || !(photo.width > 0) || !(options.width > 0)) return void 0;
     if (photo.fit === "whole" && photo.height > 0 && options.height > 0) {
-      const scale2 = Math.min(options.width / photo.width, options.height / photo.height);
+      const [from, to] = photoSpan(photo);
+      const across = to - from;
+      const scale2 = Math.min(options.width / across, options.height / photo.height);
+      const drawn = photo.height * scale2;
+      const board2 = guitarLayout(options).board;
+      const hung = board2.y + board2.height / 2 - photoStringMiddle(photo) * scale2 + photoDrop(photo) * options.height;
+      const room = options.height - drawn;
       return {
         photo,
         scale: scale2,
-        x: (options.width - photo.width * scale2) / 2,
-        y: (options.height - photo.height * scale2) / 2
+        // Centred across when the height ran out first and the span no
+        // longer fills the width.
+        x: -from * scale2 + (options.width - across * scale2) / 2,
+        y: Math.min(Math.max(hung, Math.min(0, room)), Math.max(0, room))
       };
     }
     const scale = photoScale(options.width, photo);
@@ -932,9 +960,12 @@ var GuitarEngine = (() => {
     if (options.handLegend !== true) return [];
     const band = guitarLayout(options).hand;
     if (!(band.height > 0)) return [];
-    const floor = photoPlacement(options) !== void 0 ? boardEdges(options, fretCenter(1, options)).top : band.y + band.height;
-    const height = Math.max(band.height, floor - band.y) * 0.94;
+    const under = boardEdges(options, fretCenter(1, options)).bottom;
+    const ceiling = under + boardDepth(options) * 0.75;
+    const height = Math.max(band.height, options.height - ceiling) * 0.94;
     const width = height * 0.78;
+    const left = band.x + band.width * 0.012;
+    const floor = options.height - (options.height - ceiling) * 0.03;
     const picture = options.handImage;
     if (picture !== void 0 && picture.width > 0 && picture.height > 0) {
       const scale = Math.min(
@@ -945,8 +976,8 @@ var GuitarEngine = (() => {
       return [
         {
           kind: "image",
-          x: band.x + band.width * 0.012,
-          y: band.y + (Math.max(band.height, floor - band.y) - drawn.height) / 2,
+          x: left,
+          y: Math.max(0, floor - drawn.height),
           width: drawn.width,
           height: drawn.height,
           fill: "none",
@@ -957,8 +988,8 @@ var GuitarEngine = (() => {
     }
     return translateShapes(
       handShapes({ width, height, handColor: "#F6EDE6", outline: "rgba(0,0,0,0.35)" }),
-      band.x + band.width * 0.012,
-      band.y + (band.height - height) / 2
+      left,
+      Math.max(0, floor - height)
     );
   }
   function fretNumberShapes(options, colors) {

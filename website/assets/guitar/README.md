@@ -112,22 +112,35 @@ of them, and the acoustic's last two dots sit on 14 and 16 where a
 real guitar would put 15 and 17. Use them to confirm 3, 5, 7, 9 and
 12; do not use them alone to number a drawing.
 
-### The whole guitar, never a slice of one
+### The whole frame, and nothing cut inside it
 
-All four are `fit: 'whole'`: the picture is scaled to fit its box on
-BOTH axes and centred in it, the way a photo viewer shows a
-photograph, so nothing is ever cut. A guitar that is all there reads
-as a guitar; one sliced across the body reads as a picture that did
-not fit. The box a page should give it is `stageHeightFor`, which for
-a whole picture is simply its own height at the frame's width; a
-shorter box shows it smaller with air down the sides rather than
-cutting it.
+All four are `fit: 'whole'` with a `span`, and the two together are
+the framing the owner asked for twice over.
 
-`fit: 'frame'` is the other way: fill the frame and let the body run
-off the top and the bottom, with `span: [left, right]` saying which
-stretch of the file to show and `drop` how far down the stage to hang
-it. Nothing uses it now -- the owner asked for the whole guitar -- but
-it is what the fade below exists for, and it is still tested.
+**Across, the span decides**: `span: [left, right]` in the file's own
+pixels is the stretch the frame shows, and for every one of these it
+is the NUT on one edge and the BRIDGE on the other — the headstock
+runs off the left, the rest of the body off the right, and the whole
+playing length gets the frame. That is a decision about the picture,
+not a box cutting it.
+
+**Down, nothing is cut at all.** The picture hangs by its strings, so
+they land where the board's band wants them, and is then held inside
+its box: it can move, but not far enough to lose an edge. The box it
+is given is the whole video frame — `.video-mid` is `position:
+absolute; inset: 0` and the notation is printed over the top of it.
+That is the point. Cut at the top of the strip the notation left, the
+body stopped dead in the middle of the picture and had to be faded
+out; given the whole frame it runs off the frame's own edges, which
+nobody reads as a cut.
+
+The hand legend went to the bottom LEFT with that change, under the
+fret numbers. It used to sit in the band above the neck, which is now
+where the notation is printed.
+
+`fit: 'frame'` is the other way — fill the frame and let the body run
+off the top and the bottom of its box. Nothing uses it now, but it is
+what the fade below exists for, and it is still tested.
 
 ### The cut edges are faded, not sliced
 

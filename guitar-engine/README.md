@@ -179,13 +179,15 @@ the colour behind the stage and it fades the picture into it instead:
 ```
 
 `fit` says how a picture meets its box. `'whole'` -- what all four
-guitars use -- scales it to fit on BOTH axes and centres it, so
-nothing is ever cut and a shorter box only shows it smaller.
-`'frame'` fills the frame instead and lets the body run off the top
-and the bottom, with `span: [left, right]` choosing which stretch of
-the file to show and `drop` how far down the stage to hang it. All of
-it lives with the measurements rather than with the caller, because
-how a picture wants to be framed is a fact about that picture.
+guitars use -- never lets the box cut it: `span: [left, right]`
+chooses the stretch of the file to show across (the nut on one edge,
+the bridge on the other), and down it hangs by its strings but is
+held inside the box, so it can move without losing an edge. `'frame'`
+is the other way, filling the box and letting the body run off the
+top and the bottom, with `drop` saying how far down to hang it. All
+of it lives with the measurements rather than with the caller,
+because how a picture wants to be framed is a fact about that
+picture.
 
 A band goes over each edge the picture is actually cut at — opaque
 there, gone before it reaches the board — and the hand, the marks and

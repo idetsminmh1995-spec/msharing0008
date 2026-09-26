@@ -137,7 +137,7 @@
   .preview-stats{display:flex;gap:16px;font-size:12px;color:var(--muted);}
   .preview-stats b{color:var(--text);}
 
-  .video-frame{position:relative;background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-width:0;}
+  .video-frame{position:relative;background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:flex-start;overflow:hidden;min-width:0;}
   /* Padding here lands the logo's INK, not its image box -- the
      negative margins on .video-logo-mark have already pulled the box
      onto the artwork, so the left padding IS the ink's left edge.
@@ -185,7 +185,13 @@
      instead, and its height follows from that. Reserving more than
      it needs only opens a band of nothing between the notation and
      the neck. */
-  .video-mid{flex:1;display:flex;align-items:flex-end;justify-content:center;min-height:0;}
+  /* The guitar gets the WHOLE frame, not the strip the notation
+     leaves. Cut at the strip's top edge, the body stopped dead in the
+     middle of the picture; given the whole frame it simply runs off
+     the frame's own edges, which is not a cut anybody reads as one.
+     The notation and the logo row sit over it. */
+  .video-mid{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;z-index:0;}
+  .video-top,.video-notation{position:relative;z-index:1;}
   /* The keyboard fills whatever the notation leaves: `min-height:0`
      on .video-mid lets it shrink, and the SVG stretches to the box it
      is given rather than keeping the keyboard's own ratio -- a
@@ -2913,6 +2919,12 @@
     ctx2d.fillStyle = cs.backgroundColor;
     ctx2d.fillRect(0, 0, canvas.width, canvas.height);
 
+    // The guitar, behind everything: it has the WHOLE frame, so the
+    // body runs off the frame's own edges rather than stopping dead
+    // in the middle of the picture, and the notation goes over it.
+    // That is the order the page stacks them in too.
+    if (guitarStage) paintStage(ctx2d, rectIn(guitarStage, frameRect, scale), atSeconds);
+
     // The notation, clipped to its container.
     //
     // The staff is wider than the frame and the container scrolls it,
@@ -2933,9 +2945,6 @@
       drawCursor(ctx2d, svgEl, at);
       ctx2d.restore();
     }
-
-    // The neck, in the middle of the frame.
-    if (guitarStage) paintStage(ctx2d, rectIn(guitarStage, frameRect, scale), atSeconds);
 
     // The logo.
     const mark = document.querySelector('.video-logo-mark');

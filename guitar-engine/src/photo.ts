@@ -149,6 +149,11 @@ export const ACOUSTIC_DRAWN: PhotoMeasurements = {
   stringsAtEnd: [294.7, 378.4],
   boardAtNut: [292, 369.4],
   boardAtEnd: [284.5, 389.1],
+  // The frame shows the guitar from just before the NUT to just past
+  // the BRIDGE, which is the framing the owner asked for by name: the
+  // headstock runs off the left edge and the rest of the body off the
+  // right, and the whole playing length gets the frame.
+  span: [223, 1454],
 };
 
 /**
@@ -191,6 +196,11 @@ export const CLASSICAL_DRAWN: PhotoMeasurements = {
   stringsAtEnd: [256.7, 336.9],
   boardAtNut: [261.2, 332.3],
   boardAtEnd: [249.0, 344.5],
+  // The frame shows the guitar from just before the NUT to just past
+  // the BRIDGE, which is the framing the owner asked for by name: the
+  // headstock runs off the left edge and the rest of the body off the
+  // right, and the whole playing length gets the frame.
+  span: [251, 1293],
 };
 
 /**
@@ -230,6 +240,11 @@ export const STRAT_DRAWN: PhotoMeasurements = {
   stringsAtEnd: [436.2, 583],
   boardAtNut: [446.1, 568.9],
   boardAtEnd: [422.5, 595.6],
+  // The frame shows the guitar from just before the NUT to just past
+  // the BRIDGE, which is the framing the owner asked for by name: the
+  // headstock runs off the left edge and the rest of the body off the
+  // right, and the whole playing length gets the frame.
+  span: [512, 2761],
 };
 
 /**
@@ -280,6 +295,11 @@ export const ELECTRIC_DRAWN: PhotoMeasurements = {
   stringsAtEnd: [277.7, 355.9],
   boardAtNut: [281.1, 351.5],
   boardAtEnd: [269.8, 360],
+  // The frame shows the guitar from just before the NUT to just past
+  // the BRIDGE, which is the framing the owner asked for by name: the
+  // headstock runs off the left edge and the rest of the body off the
+  // right, and the whole playing length gets the frame.
+  span: [375, 1654],
 };
 /**
  * Every set of measurements this engine carries, by the name of the

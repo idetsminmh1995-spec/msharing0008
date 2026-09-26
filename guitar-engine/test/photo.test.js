@@ -19,22 +19,31 @@ const FRAME = {
   fretNumbers: true,
 };
 
-test('the picture is shown whole, fitted to the box and centred in it', () => {
+test('the picture is shown whole, and the span decides how much of it', () => {
   const place = G.photoPlacement(FRAME);
-  // Nothing is cut: the scale is whichever of the two axes runs out
-  // first, and what is left over is air, not a crop.
-  const fit = Math.min(FRAME.width / PHOTO.width, FRAME.height / PHOTO.height);
+  // Across, the SPAN fills the frame: the nut on one edge and the
+  // bridge on the other, with the headstock and the far end of the
+  // body off the sides. That is a decision about the picture, not a
+  // box cutting it.
+  const [from, to] = PHOTO.span;
+  const across = to - from;
+  const fit = Math.min(FRAME.width / across, FRAME.height / PHOTO.height);
   assert.ok(Math.abs(place.scale - fit) < 1e-9);
-  assert.ok(place.x >= -1e-9 && place.y >= -1e-9, 'inside the box on both axes');
-  assert.ok(place.x + PHOTO.width * place.scale <= FRAME.width + 1e-9);
-  assert.ok(place.y + PHOTO.height * place.scale <= FRAME.height + 1e-9);
-  // Centred, so the air is the same on both sides.
-  assert.ok(Math.abs(FRAME.width - (place.x * 2 + PHOTO.width * place.scale)) < 1e-9);
-  assert.ok(Math.abs(FRAME.height - (place.y * 2 + PHOTO.height * place.scale)) < 1e-9);
-  // And the box a page should give it is the picture's own height at
-  // the frame's width.
+  // Down, nothing is ever cut: the picture is held inside the box.
+  assert.ok(place.y >= -1e-9, 'its top is in the box');
+  assert.ok(place.y + PHOTO.height * place.scale <= FRAME.height + 1e-9, 'and so is its bottom');
+  // A box tall enough lets it hang by its strings where the board's
+  // band wants them, rather than being pinned to an edge.
+  const roomy = { ...FRAME, height: Math.round(PHOTO.height * (FRAME.width / across)) + 200 };
+  const hung = G.photoPlacement(roomy);
+  const board = G.guitarLayout(roomy).board;
+  const nutMid = (PHOTO.stringsAtNut[0] + PHOTO.stringsAtNut[1]) / 2;
+  const endMid = (PHOTO.stringsAtEnd[0] + PHOTO.stringsAtEnd[1]) / 2;
+  const middle = hung.y + ((nutMid + endMid) / 2) * hung.scale;
+  assert.ok(Math.abs(middle - (board.y + board.height / 2)) < 1, `hung at ${middle}`);
+  // And the box a page should give it is its own height at that width.
   const wanted = G.stageHeightFor(FRAME.width, PHOTO, { handLegend: true, fretNumbers: true });
-  assert.equal(wanted, Math.round(PHOTO.height * (FRAME.width / PHOTO.width)));
+  assert.equal(wanted, Math.round(PHOTO.height * (FRAME.width / across)));
   assert.equal(G.photoPlacement({ width: 1920, height: 497 }), undefined, 'no photo, no placement');
 });
 
@@ -331,7 +340,14 @@ test('the classical is the owner’s drawing, read out of the file', () => {
 });
 
 test('a picture can be drawn bigger, and hung lower', () => {
-  const plain = { ...G.photoNamed('acoustic-drawn', 'a.svg'), fit: 'frame' };
+  // Stripped back to a picture with no framing of its own: the ones
+  // the page draws all carry a span and hang whole.
+  const plain = {
+    ...G.photoNamed('acoustic-drawn', 'a.svg'),
+    fit: 'frame',
+    span: undefined,
+    drop: undefined,
+  };
   const width = 1920;
   const frame = (photo) => ({
     width,
@@ -364,7 +380,7 @@ test('a picture can be drawn bigger, and hung lower', () => {
 
   // Nonsense is drawn whole rather than drawn wrong.
   for (const bad of [[1500, 300], [0, 0], [NaN, 900], [900, Infinity], undefined]) {
-    const tried = G.photoPlacement(frame({ ...plain, span: bad }));
+    const tried = G.photoPlacement(frame({ ...plain, span: bad, fit: 'frame' }));
     assert.ok(Math.abs(tried.scale - flat.scale) < 1e-9, `${JSON.stringify(bad)} is not a span`);
     assert.ok(Math.abs(tried.x) < 1e-9, 'and the whole picture starts at the edge');
   }

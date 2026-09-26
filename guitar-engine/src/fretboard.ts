@@ -121,8 +121,8 @@ export function stageHeightFor(
   if (!(width > 0) || !(photo.width > 0) || !(photo.height > 0)) return 0;
   const scaled = photo.height * photoScale(width, photo);
   // Shown whole, the picture decides the box outright: this is its
-  // own height at the frame's width, and a box any shorter simply
-  // shows it smaller with air down the sides.
+  // own height at the width its span is drawn to, and a box any
+  // shorter simply shows it smaller rather than cutting it.
   if (photo.fit === 'whole') return Math.round(scaled);
   const numbers = options?.fretNumbers === false ? 0 : NUMBERS_SHARE;
   const hand = options?.handLegend === true ? HAND_BAND_SHARE : 0;
@@ -164,17 +164,37 @@ export interface PhotoPlacement {
 export function photoPlacement(options: FretboardOptions): PhotoPlacement | undefined {
   const photo = options.photo;
   if (photo === undefined || !(photo.width > 0) || !(options.width > 0)) return undefined;
-  // Shown WHOLE: scaled to fit the box on both axes and centred in
-  // it, so nothing is cut. A guitar that is all there reads as a
-  // guitar; one sliced across the body reads as a picture that did
-  // not fit.
+  // Shown WHOLE: nothing is ever cut by the box.
+  //
+  // Across, the span decides -- the stretch of the file the frame is
+  // meant to show, which for these guitars is the nut on one edge and
+  // the bridge on the other, with the headstock and the far end of
+  // the body off the sides. That is a decision about the PICTURE, not
+  // a box cutting it.
+  //
+  // Down, the picture hangs by its strings the way a framed one does,
+  // and is then held inside the box: it can move to put the strings
+  // where the board's band wants them, but not far enough to lose an
+  // edge. Given a box as tall as the frame there is room for both.
   if (photo.fit === 'whole' && photo.height > 0 && options.height > 0) {
-    const scale = Math.min(options.width / photo.width, options.height / photo.height);
+    const [from, to] = photoSpan(photo);
+    const across = to - from;
+    const scale = Math.min(options.width / across, options.height / photo.height);
+    const drawn = photo.height * scale;
+    const board = guitarLayout(options).board;
+    const hung =
+      board.y +
+      board.height / 2 -
+      photoStringMiddle(photo) * scale +
+      photoDrop(photo) * options.height;
+    const room = options.height - drawn;
     return {
       photo,
       scale,
-      x: (options.width - photo.width * scale) / 2,
-      y: (options.height - photo.height * scale) / 2,
+      // Centred across when the height ran out first and the span no
+      // longer fills the width.
+      x: -from * scale + (options.width - across * scale) / 2,
+      y: Math.min(Math.max(hung, Math.min(0, room)), Math.max(0, room)),
     };
   }
   const scale = photoScale(options.width, photo);
