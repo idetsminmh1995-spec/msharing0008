@@ -252,6 +252,23 @@ export interface FretboardOptions {
    * shows.
    */
   readonly photo?: GuitarPhotograph;
+  /**
+   * The colour the frame behind the stage is, so a cropped
+   * PHOTOGRAPH can be faded into it instead of cut off.
+   *
+   * A picture scaled to the frame's width is taller than the band the
+   * stage gets, so the body runs off the top and the bottom and stops
+   * dead -- two hard horizontal lines across a guitar, which is the
+   * one thing in the frame that gives away that it is a picture laid
+   * on a page. Given the colour behind it, the same edges are faded
+   * out over a band instead, so the instrument comes UP out of the
+   * background rather than being sliced by it.
+   *
+   * Any CSS colour a page can read off itself: `#112`, `#1A1A1F`,
+   * `rgb(26, 26, 31)`, `rgba(...)`. Without it nothing is faded, and
+   * the picture is cut as before.
+   */
+  readonly fadeTo?: string;
   readonly colors?: Partial<GuitarColors>;
 }
 
@@ -331,6 +348,7 @@ export interface StageShape {
    */
   readonly role?:
     | 'photo'
+    | 'photoFade'
     | 'handLegend'
     | 'fretNumber'
     | 'stringLabel'

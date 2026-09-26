@@ -112,8 +112,6 @@ var GuitarEngine = (() => {
     height: 711,
     fit: "frame",
     frets: [
-      -181.1,
-      -72.9,
       34,
       132,
       220,
@@ -136,11 +134,11 @@ var GuitarEngine = (() => {
       1178,
       1212
     ],
-    boardEndX: 1250,
-    stringsAtNut: [492.6, 589.1],
-    stringsAtEnd: [470.4, 609.9],
-    boardAtNut: [489.5, 592.5],
-    boardAtEnd: [463.8, 620.7]
+    boardEndX: 1255,
+    stringsAtNut: [489.2, 592.2],
+    stringsAtEnd: [470.3, 610],
+    boardAtNut: [485.6, 596.7],
+    boardAtEnd: [463.7, 620.8]
   };
   var ACOUSTIC_SUNBURST = {
     width: 2e3,
@@ -1449,6 +1447,7 @@ var GuitarEngine = (() => {
       return [
         ...shapes,
         ...picture,
+        ...photoFadeShapes(options),
         ...handLegendShapes(options),
         ...fretNumberShapes(options, colors)
       ];
@@ -1536,6 +1535,92 @@ var GuitarEngine = (() => {
         role: "photo"
       }
     ];
+  }
+  function fadeRgb(color) {
+    if (typeof color !== "string") return void 0;
+    const text = color.trim().toLowerCase();
+    if (text === "" || text === "none" || text === "transparent") return void 0;
+    const hex = /^#([0-9a-f]{3,8})$/.exec(text);
+    const digits = hex?.[1];
+    if (digits !== void 0) {
+      const short = digits.length === 3 || digits.length === 4;
+      const wide = digits.length === 6 || digits.length === 8;
+      if (!short && !wide) return void 0;
+      const step = short ? 1 : 2;
+      const at = (i) => {
+        const part = digits.slice(i * step, i * step + step);
+        const value = Number.parseInt(short ? part + part : part, 16);
+        return Number.isFinite(value) ? value : 0;
+      };
+      if (digits.length === (short ? 4 : 8) && at(3) === 0) return void 0;
+      return [at(0), at(1), at(2)];
+    }
+    const rgb = /^rgba?\(([^)]*)\)$/.exec(text);
+    const inside = rgb?.[1];
+    if (inside !== void 0) {
+      const parts = inside.split(/[\s,/]+/).filter((part) => part !== "").map((part) => Number.parseFloat(part));
+      const [red, green, blue, alpha] = parts;
+      if (red === void 0 || green === void 0 || blue === void 0) return void 0;
+      if (!Number.isFinite(red) || !Number.isFinite(green) || !Number.isFinite(blue)) {
+        return void 0;
+      }
+      if (alpha === 0) return void 0;
+      return [red, green, blue];
+    }
+    return void 0;
+  }
+  var FADE_SHARE = 0.2;
+  var FADE_OVERSHOOT = 2;
+  function photoFadeShapes(options) {
+    const place = photoPlacement(options);
+    if (place === void 0) return [];
+    const rgb = fadeRgb(options.fadeTo);
+    if (rgb === void 0) return [];
+    const { width, height } = options;
+    const band = height * FADE_SHARE;
+    if (!(band > 0.5)) return [];
+    const top = place.y;
+    const bottom = place.y + place.photo.height * place.scale;
+    const paint = (alpha) => `rgba(${n(rgb[0])}, ${n(rgb[1])}, ${n(rgb[2])}, ${n(alpha)})`;
+    const ramp = (steps) => Array.from({ length: steps + 1 }, (_, i) => {
+      const t = i / steps;
+      return [t, 1 - t * t * (3 - 2 * t)];
+    });
+    const stops = ramp(6);
+    const shapes = [];
+    if (top <= 1) {
+      shapes.push(
+        rectShape(
+          0,
+          -FADE_OVERSHOOT,
+          width,
+          band + FADE_OVERSHOOT,
+          downward(
+            0,
+            band,
+            stops.map(([offset, alpha]) => [offset, paint(alpha)])
+          ),
+          { role: "photoFade" }
+        )
+      );
+    }
+    if (bottom >= height - 1) {
+      shapes.push(
+        rectShape(
+          0,
+          height - band,
+          width,
+          band + FADE_OVERSHOOT,
+          downward(
+            height - band,
+            band,
+            stops.map(([offset, alpha]) => [1 - offset, paint(alpha)]).reverse()
+          ),
+          { role: "photoFade" }
+        )
+      );
+    }
+    return shapes;
   }
   function handLegendShapes(options) {
     if (options.handLegend !== true) return [];

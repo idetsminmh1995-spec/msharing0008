@@ -159,3 +159,96 @@ test('the SVG writes the picture as an image, and nothing else has to change', (
   assert.ok(!svg.includes('fill="none" href'), 'an image is not painted with a fill');
   assert.ok(svg.includes('<text'), 'the fret numbers still get written');
 });
+
+// The inlay dots' centres, measured off the acoustic the page draws.
+// They are the only thing that says which line in the picture is
+// which fret -- a geometric fret series fits the wires just as well
+// a fret out -- and they have to come out as numbers a guitar is
+// really inlaid at. These are the standard set; the numbering one
+// fret over gives 4, 6, 8, 10, 13, 16, 18, which is nobody's guitar.
+const ACOUSTIC_DOTS = { 3: 262, 5: 421, 7: 563, 9: 691, 12: 860, 15: 1003, 17: 1087 };
+
+test('the acoustic is numbered from its dots: the nut and twenty frets', () => {
+  const photo = G.photoNamed('acoustic-natural', 'acoustic.webp');
+  assert.equal(photo.frets.length, 21, 'twenty-one lines across the board');
+  assert.equal(G.photoFretCount(photo), 20, 'which is the nut and twenty frets');
+  assert.equal(photo.frets[0], 34, 'the first line is the nut, and it is on the picture');
+  for (const [fret, dot] of Object.entries(ACOUSTIC_DOTS)) {
+    const at = Number(fret);
+    const middle = (photo.frets[at - 1] + photo.frets[at]) / 2;
+    assert.ok(Math.abs(middle - dot) < 1.5, `fret ${fret} sits at ${middle}, its dot at ${dot}`);
+  }
+});
+
+test('a cropped picture is faded into the frame, not cut off by it', () => {
+  const notes = [];
+  assert.equal(
+    G.stageShapes({ ...FRAME, seconds: 0, notes }).filter((s) => s.role === 'photoFade').length,
+    0,
+    'no colour behind the stage, no fade -- a guessed one would be the wrong colour',
+  );
+
+  // The sample cutaway is cut by the frame's top edge and ends at its
+  // own outline above the bottom one, so it gets ONE band: a band over
+  // an outline would be fog over the guitar, not a cut hidden.
+  const one = G.stageShapes({ ...FRAME, fadeTo: 'rgb(18, 18, 22)', seconds: 0, notes });
+  assert.equal(one.filter((s) => s.role === 'photoFade').length, 1, 'only the edge that is cut');
+
+  // The acoustic the page draws is cut at both: the owner framed it
+  // that way, and the frame crops what is left.
+  const photo = G.photoNamed('acoustic-natural', 'acoustic.webp');
+  const height = G.stageHeightFor(1920, photo, { handLegend: true, fretNumbers: true });
+  const CUT = { ...FRAME, photo, height, fadeTo: 'rgb(18, 18, 22)', seconds: 0, notes };
+  const faded = G.stageShapes(CUT);
+  const fades = faded.filter((shape) => shape.role === 'photoFade');
+  assert.equal(fades.length, 2, 'the top edge and the bottom edge, both of them cut');
+  const [top, bottom] = fades;
+
+  // Opaque where the picture is cut, gone where the band ends.
+  // Both bands run a little past the edge they cover, so the cut --
+  // the viewBox, the canvas clip -- is what ends them, and no smoothed
+  // sliver of picture survives underneath.
+  assert.ok(top.y < 0 && top.y > -4, `the top band starts above the frame, at ${top.y}`);
+  assert.equal(top.fill.stops[0].color, 'rgba(18, 18, 22, 1)');
+  assert.equal(top.fill.stops.at(-1).color, 'rgba(18, 18, 22, 0)');
+  assert.ok(bottom.y < CUT.height && bottom.y + bottom.height > CUT.height, 'and ends below it');
+  assert.equal(bottom.fill.stops[0].color, 'rgba(18, 18, 22, 0)');
+  assert.equal(bottom.fill.stops.at(-1).color, 'rgba(18, 18, 22, 1)');
+  for (const fade of fades) {
+    assert.equal(fade.x, 0);
+    assert.equal(fade.width, CUT.width);
+    let last = -1;
+    for (const stop of fade.fill.stops) {
+      assert.ok(stop.offset > last, 'the stops climb');
+      last = stop.offset;
+    }
+  }
+
+  // The band never reaches the BOARD: the fade hides the cut across
+  // the body, it does not wash out the frets being played on.
+  for (const x of [0, CUT.width * 0.25, CUT.width * 0.5]) {
+    const board = G.boardEdgesAt(CUT, x);
+    assert.ok(board.top > top.height, `the board clears the top band at ${x}`);
+    assert.ok(board.bottom < bottom.y, `and the bottom one at ${x}`);
+  }
+
+  // Down after the picture, before everything about the playing.
+  const roles = faded.map((shape) => shape.role);
+  assert.ok(roles.indexOf('photo') < roles.indexOf('photoFade'), 'over the picture');
+  assert.ok(roles.indexOf('photoFade') < roles.indexOf('fretNumber'), 'under the numbers');
+  const hand = faded.findIndex((shape) => shape.fill === G.FINGER_COLORS.index);
+  assert.ok(hand > roles.indexOf('photoFade'), 'under the hand legend');
+
+  // A hex colour is read the same way, and a see-through or unreadable
+  // one is not read at all.
+  const hexed = G.stageShapes({ ...CUT, fadeTo: '#121216' });
+  assert.equal(hexed.filter((s) => s.role === 'photoFade')[0].fill.stops[0].color, top.fill.stops[0].color);
+  for (const color of ['transparent', 'none', '', 'rgba(0, 0, 0, 0)', '#12121600', 'wood']) {
+    const tried = G.stageShapes({ ...CUT, fadeTo: color });
+    assert.equal(tried.filter((s) => s.role === 'photoFade').length, 0, `"${color}" is not a colour`);
+  }
+
+  // The SVG carries it as a gradient with see-through stops.
+  const svg = G.renderGuitarStage(CUT);
+  assert.ok(svg.includes('stop-color="rgba(18, 18, 22, 0)"'), 'the fade ends see-through');
+});

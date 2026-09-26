@@ -109,16 +109,26 @@ export const ACOUSTIC_CUTAWAY: PhotoMeasurements = {
  * dreadnought, framed by its owner -- neck in from the left edge,
  * body filling the right, background cut away.
  *
- * Measured off the file, and the INLAY DOTS are what settle it. A
- * geometric fret series fits equally well however the wires are
- * numbered -- the nut position and the scale length absorb any shift
- * -- so counting from the first wire in the picture is a coin toss,
- * and getting it wrong puts every mark a fret out. The markers
- * cannot move: 5, 7, 9, 17, 19 are where a guitar puts them. Fitting
- * to those five lands the wires within 0.18 of whole fret numbers,
- * and says the first wire in the picture is the SECOND fret: the nut
- * and the first fret are off the left edge, which is why they are
- * negative here.
+ * Twenty-one lines across the board, and they are the NUT and twenty
+ * frets. Measured off the file, and the INLAY DOTS are what settle
+ * the numbering, because the wires alone cannot: a geometric series
+ * fits equally well however they are numbered -- the nut position
+ * and the scale length absorb any shift -- so counting from the
+ * first line is a coin toss, and getting it wrong puts every mark a
+ * fret out, which it did twice here.
+ *
+ * The dots cannot move. There are seven, at 262, 420, 562, 690, 859,
+ * 1003 and 1086, and they have to come out as fret numbers a guitar
+ * is actually inlaid at. Taking the first line as the nut lands them
+ * on 3, 5, 7, 9, 12, 15 and 17, every one within a pixel of the
+ * midpoint it belongs to -- the standard set. Taking it as the first
+ * fret instead lands them on 4, 6, 8, 10, 13, 16, 18, which is not a
+ * pattern any guitar has ever been built with. So the first line is
+ * the nut, and it is on the picture.
+ *
+ * (This one is double-dotted at the SEVENTH as well as the twelfth,
+ * which is unusual and is why "the double dot is the twelfth" is not
+ * the check here. The whole set is.)
  *
  * The strings were fitted across twenty-six places and land within
  * half a pixel, where a string gap is twenty-two.
@@ -128,14 +138,14 @@ export const ACOUSTIC_NATURAL: PhotoMeasurements = {
   height: 711,
   fit: 'frame',
   frets: [
-    -181.1, -72.9, 34, 132, 220, 304, 383, 458, 529, 596, 660, 721, 779, 834, 885, 934, 980, 1025,
-    1066, 1106, 1143, 1178, 1212,
+    34, 132, 220, 304, 383, 458, 529, 596, 660, 721, 779, 834, 885, 934, 980, 1025, 1066, 1106,
+    1143, 1178, 1212,
   ],
-  boardEndX: 1250.0,
-  stringsAtNut: [492.6, 589.1],
-  stringsAtEnd: [470.4, 609.9],
-  boardAtNut: [489.5, 592.5],
-  boardAtEnd: [463.8, 620.7],
+  boardEndX: 1255.0,
+  stringsAtNut: [489.2, 592.2],
+  stringsAtEnd: [470.3, 610.0],
+  boardAtNut: [485.6, 596.7],
+  boardAtEnd: [463.7, 620.8],
 };
 
 /**

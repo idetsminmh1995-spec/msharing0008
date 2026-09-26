@@ -118,6 +118,7 @@ export function fretboardShapes(options: FretboardOptions): readonly StageShape[
     return [
       ...shapes,
       ...picture,
+      ...photoFadeShapes(options),
       ...handLegendShapes(options),
       ...fretNumberShapes(options, colors),
     ];
@@ -229,6 +230,155 @@ function photoShapes(options: FretboardOptions): readonly StageShape[] {
       role: 'photo',
     },
   ];
+}
+
+/**
+ * The colour a page asked the picture to be faded into, as numbers.
+ *
+ * Whatever a page can read off itself: `#112`, `#1A1A1F`, with or
+ * without an alpha, or the `rgb(...)` form `getComputedStyle` hands
+ * back. A colour that cannot be read, or one that is see-through
+ * already, means no fade -- a guess at the colour behind the stage
+ * would draw a band of the WRONG colour across the guitar, which is
+ * worse than the hard edge it was meant to hide.
+ */
+function fadeRgb(color: string | undefined): readonly [number, number, number] | undefined {
+  if (typeof color !== 'string') return undefined;
+  const text = color.trim().toLowerCase();
+  if (text === '' || text === 'none' || text === 'transparent') return undefined;
+
+  const hex = /^#([0-9a-f]{3,8})$/.exec(text);
+  const digits = hex?.[1];
+  if (digits !== undefined) {
+    const short = digits.length === 3 || digits.length === 4;
+    const wide = digits.length === 6 || digits.length === 8;
+    if (!short && !wide) return undefined;
+    const step = short ? 1 : 2;
+    const at = (i: number): number => {
+      const part = digits.slice(i * step, i * step + step);
+      const value = Number.parseInt(short ? part + part : part, 16);
+      return Number.isFinite(value) ? value : 0;
+    };
+    // An alpha of zero is see-through, and see-through has no colour.
+    if (digits.length === (short ? 4 : 8) && at(3) === 0) return undefined;
+    return [at(0), at(1), at(2)];
+  }
+
+  const rgb = /^rgba?\(([^)]*)\)$/.exec(text);
+  const inside = rgb?.[1];
+  if (inside !== undefined) {
+    const parts = inside
+      .split(/[\s,/]+/)
+      .filter((part) => part !== '')
+      .map((part) => Number.parseFloat(part));
+    const [red, green, blue, alpha] = parts;
+    if (red === undefined || green === undefined || blue === undefined) return undefined;
+    if (!Number.isFinite(red) || !Number.isFinite(green) || !Number.isFinite(blue)) {
+      return undefined;
+    }
+    if (alpha === 0) return undefined;
+    return [red, green, blue];
+  }
+
+  return undefined;
+}
+
+/** How far a fade band reaches in, as a share of the stage's height. */
+const FADE_SHARE = 0.2;
+
+/**
+ * How far past the stage's edge a fade band is drawn, in stage units.
+ *
+ * The band and the picture are cut off at the SAME line -- the SVG's
+ * viewBox, the canvas's clip -- and both edges are drawn smoothed, so
+ * the band covers that last sliver of picture only partly and a
+ * bright hairline of guitar survives along the bottom of the frame.
+ * Running the band a little past the edge, where the gradient holds
+ * its end colour, leaves the cut to do the cutting.
+ */
+const FADE_OVERSHOOT = 2;
+
+/**
+ * The picture's cut edges, faded into the frame behind it.
+ *
+ * A photograph scaled to the frame's width is taller than the band
+ * the stage gets, so the body runs off the top and the bottom and
+ * STOPS -- two hard horizontal lines straight across a guitar, which
+ * is the one thing that gives away a picture laid on a page. Over
+ * each cut edge goes a band of the colour behind the stage, opaque at
+ * the edge and gone by the time it reaches the board, so the
+ * instrument comes up out of the background instead of being sliced
+ * by it.
+ *
+ * Only the edges the picture actually crosses get one: a picture that
+ * fits has nothing to hide, and a band over an edge that is already
+ * background would only dim the frame. The alpha ramp is eased rather
+ * than straight, because a straight one reads as a band with a soft
+ * side and this reads as nothing at all.
+ *
+ * Drawn after the picture and before everything else, so the hand,
+ * the fret numbers and the marks stay on top of it at full strength.
+ */
+function photoFadeShapes(options: FretboardOptions): readonly StageShape[] {
+  const place = photoPlacement(options);
+  if (place === undefined) return [];
+  const rgb = fadeRgb(options.fadeTo);
+  if (rgb === undefined) return [];
+
+  const { width, height } = options;
+  const band = height * FADE_SHARE;
+  if (!(band > 0.5)) return [];
+  const top = place.y;
+  const bottom = place.y + place.photo.height * place.scale;
+
+  const paint = (alpha: number): string =>
+    `rgba(${n(rgb[0])}, ${n(rgb[1])}, ${n(rgb[2])}, ${n(alpha)})`;
+  // Smoothstep: 1 at the cut edge, 0 where the band ends.
+  const ramp = (steps: number): readonly (readonly [number, number])[] =>
+    Array.from({ length: steps + 1 }, (_, i) => {
+      const t = i / steps;
+      return [t, 1 - t * t * (3 - 2 * t)] as const;
+    });
+  const stops = ramp(6);
+
+  const shapes: StageShape[] = [];
+  // Only the edges the picture is CUT at -- the ones that reach the
+  // frame's own edge or run past it. A picture whose body ends inside
+  // the frame ends at its own outline, and a band over an outline is
+  // fog over the guitar rather than a cut hidden.
+  if (top <= 1) {
+    shapes.push(
+      rectShape(
+        0,
+        -FADE_OVERSHOOT,
+        width,
+        band + FADE_OVERSHOOT,
+        downward(
+          0,
+          band,
+          stops.map(([offset, alpha]) => [offset, paint(alpha)] as const),
+        ),
+        { role: 'photoFade' },
+      ),
+    );
+  }
+  if (bottom >= height - 1) {
+    shapes.push(
+      rectShape(
+        0,
+        height - band,
+        width,
+        band + FADE_OVERSHOOT,
+        downward(
+          height - band,
+          band,
+          stops.map(([offset, alpha]) => [1 - offset, paint(alpha)] as const).reverse(),
+        ),
+        { role: 'photoFade' },
+      ),
+    );
+  }
+  return shapes;
 }
 
 /**

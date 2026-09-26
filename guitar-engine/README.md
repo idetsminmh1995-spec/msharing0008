@@ -184,6 +184,21 @@ that framing away, so the body runs off the top and the bottom the way
 the neck runs off the side. A canvas painting the shape list must cut
 it to the stage, as the SVG's viewBox does.
 
+That cut is a hard line straight across a guitar, so give the engine
+the colour behind the stage and it fades the picture into it instead:
+
+```js
+{ photo: guitarPhoto('assets/guitar/acoustic-natural.webp'), fadeTo: '#17110E' }
+```
+
+A band goes over each edge the picture is actually cut at — opaque
+there, gone before it reaches the board — and the hand, the marks and
+the fret numbers are drawn on top of it at full strength. An edge the
+picture ends at by itself gets nothing: a band over an outline is fog
+over the guitar, not a cut hidden. Without `fadeTo` nothing is faded,
+because a guessed colour would draw a band of the WRONG colour across
+the frame.
+
 ## The drawn neck is a diagram, not a photograph
 
 Frets are evenly spaced rather than following the real 17.817 rule:

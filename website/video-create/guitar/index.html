@@ -414,7 +414,7 @@
       <label for="instrument">Guitar</label>
       <select id="instrument" class="drum-input">
         <option value="classical">Classical Guitar &mdash; 19 frets</option>
-        <option value="acoustic" selected>Acoustic Guitar &mdash; 19 frets</option>
+        <option value="acoustic" selected>Acoustic Guitar &mdash; 20 frets</option>
         <option value="electric">Electric Guitar, single cut &mdash; 22 frets</option>
         <option value="strat">Electric Guitar, double cut &mdash; 21 frets</option>
       </select>
@@ -1022,7 +1022,7 @@
    */
   const GUITARS = {
     classical: { frets: 19, model: 'classical', photo: 'fretboard-classical' },
-    acoustic: { frets: 19, model: 'acoustic', photo: 'acoustic-natural' },
+    acoustic: { frets: 20, model: 'acoustic', photo: 'acoustic-natural' },
     electric: { frets: 22, model: 'singleCut', photo: 'fretboard-electric' },
     strat: { frets: 21, model: 'electric', photo: 'fretboard-strat' },
   };
@@ -1030,6 +1030,28 @@
 
   function guitar() {
     return GUITARS[instrumentSelect?.value] ?? GUITARS[DEFAULT_GUITAR];
+  }
+
+  /**
+   * The list says how many frets each guitar has, and the PICTURE is
+   * what says so.
+   *
+   * A number typed into the option text is a number that can drift
+   * away from the neck on screen, and a viewer who counts the frets
+   * in the video is right and the label is wrong. So the label is
+   * written from the same measurement the marks are placed by: count
+   * the lines the picture has, take away the nut, and print that.
+   */
+  function labelGuitarFrets() {
+    if (!instrumentSelect || typeof GuitarEngine === 'undefined') return;
+    for (const option of instrumentSelect.options) {
+      const named = GUITARS[option.value];
+      if (!named?.photo) continue;
+      const photo = GuitarEngine.photoNamed(named.photo, '');
+      if (!photo) continue;
+      named.frets = GuitarEngine.photoFretCount(photo);
+      option.textContent = option.textContent.replace(/\d+ frets$/, `${named.frets} frets`);
+    }
   }
 
   /**
@@ -1347,6 +1369,21 @@
     }
   }
 
+  /**
+   * The colour behind the stage, so a cropped photograph can be faded
+   * into it instead of being cut off.
+   *
+   * Read off the frame rather than hard-coded, because the frame has
+   * two styles and the video paints its background from the same
+   * place. Black style, white style, or anything a later style picks:
+   * the guitar fades into whatever is actually there.
+   */
+  function frameBackground() {
+    if (!videoFrame) return undefined;
+    const color = getComputedStyle(videoFrame).backgroundColor;
+    return color && color !== 'rgba(0, 0, 0, 0)' ? color : undefined;
+  }
+
   /** What the engine is being asked to draw, for a box of this size. */
   function stageOptions(width, height, atSeconds) {
     return {
@@ -1360,6 +1397,11 @@
       // frets it shows are the frets there are, so the fret count
       // above stops applying -- there is no arguing with a picture.
       photo: guitarPhoto(),
+      // The picture is wider than tall and the stage is a band, so a
+      // photograph is always cropped top and bottom. Given the
+      // colour behind it, the engine fades those cuts out instead of
+      // leaving two hard lines across the guitar.
+      fadeTo: frameBackground(),
       handImage: handImage(),
       picking: picking(),
       fretNumbers: true,
@@ -1456,6 +1498,7 @@
   });
   pickingSelect?.addEventListener('change', () => drawStage());
   window.addEventListener('resize', () => drawStage());
+  labelGuitarFrets();
   drawFingerLegend();
   drawStage(0);
 

@@ -35,16 +35,38 @@ A geometric fret series fits equally well however the wires are
 numbered — the nut position and the scale length absorb any shift —
 so counting "the first wire I can see must be fret 1" is a coin toss,
 and getting it wrong puts every mark a fret out for the whole video.
-It happened once here, silently.
+It happened twice here, silently, before the check below settled it.
 
 The INLAY DOTS cannot move: 3, 5, 7, 9, 12, 15, 17, 19 are where a
 guitar puts them, and a dot sits between the wires of its own fret
-and the one before. Fit the scale to the dots, then read off which
-fret each wire lands on: the right numbering lands them within about
-0.2 of whole numbers, and a wrong one is off by half a fret. That fit
-is what says the natural-top photograph starts at the SECOND fret,
-with its nut off the left edge — which is why its first two entries
-are negative.
+and the one before. So do not fit the dots — **number** them. Measure
+every dot centre, try each numbering of the wires, and keep the one
+that lands the dots on fret numbers a guitar is really inlaid at.
+
+For `acoustic-natural.webp` there are seven dots, at 262, 420, 562,
+690, 859, 1003 and 1086. Taking the first line in the picture as the
+NUT lands them on 3, 5, 7, 9, 12, 15 and 17 — every one within a pixel
+of its own midpoint, and the standard set. Taking it as the first
+fret instead lands them on 4, 6, 8, 10, 13, 16 and 18, which is not a
+pattern any guitar has ever been built with. So the first line is the
+nut, and the picture shows **21 lines: the nut and twenty frets**.
+
+(That one is double-dotted at the SEVENTH as well as the twelfth,
+which is unusual. It means "the double dot is the twelfth" is not the
+check on this picture — the whole set is. A fit that used the doubles
+alone is exactly how the second wrong numbering happened.)
+
+### The cut edges are faded, not sliced
+
+A picture scaled to the frame's width is taller than the band the
+stage gets, so the body runs off the top and the bottom and stops
+dead — two hard horizontal lines across a guitar, which is the one
+thing that gives away a picture laid on a page. The page hands the
+engine the colour behind the stage (`fadeTo`, read off the video
+frame) and the engine lays a gradient band over each edge the picture
+is actually cut at, opaque at the edge and gone before it reaches the
+board. Everything about the playing — the hand, the marks, the fret
+numbers — is drawn on top of it at full strength.
 
 It is the best-looking thing here by a distance, and it is worth
 being plain about why: no renderer written by hand is going to beat a
