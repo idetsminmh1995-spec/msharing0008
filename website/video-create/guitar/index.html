@@ -406,7 +406,8 @@
       </div>
       <label for="instrument">Guitar</label>
       <select id="instrument" class="drum-input">
-        <option value="electric" selected>Electric &mdash; maple neck</option>
+        <option value="photo" selected>Acoustic &mdash; photograph</option>
+        <option value="electric">Electric &mdash; maple neck</option>
         <option value="singleCut">Electric &mdash; single cut</option>
         <option value="acoustic">Acoustic</option>
       </select>
@@ -414,7 +415,7 @@
         <div class="finger-hand" id="fingerHand" aria-hidden="true"></div>
         <div class="finger-names" id="fingerNames"></div>
       </div>
-      <div class="field-hint" id="fretHint">The neck lights where each note is played &mdash; its string, its fret and the finger stopping it, with the fret numbers along the bottom. When the score writes a position or a fingering down, that is what you see; when it does not, the Human Finger Engine works out how a guitarist would play the line: it weighs every place each note could go, what the hand would have to stretch, and how long it has to get there, then picks the way through with the least work in it. The picking hand is drawn too, as the square bracket and the V every guitarist reads. Pick the guitar you want drawn &mdash; a maple-necked electric with a scratchplate, a single-cut with pearl blocks and two humbuckers, or a dreadnought with a soundhole &mdash; and the whole instrument is drawn for you: headstock, tuners, the neck widening towards the body, and the wood each one is made of. It is all shapes and gradients rather than a photograph, so the video is drawn at whatever size you export. A slide travels along the string rather than jumping, an open string has its own colour, and the four finger colours are fixed, not chosen: they are meant to be learnt once and read in every video after.</div>
+      <div class="field-hint" id="fretHint">The neck lights where each note is played &mdash; its string, its fret and the finger stopping it, with the fret numbers along the bottom. When the score writes a position or a fingering down, that is what you see; when it does not, the Human Finger Engine works out how a guitarist would play the line: it weighs every place each note could go, what the hand would have to stretch, and how long it has to get there, then picks the way through with the least work in it. The picking hand is drawn too, as the square bracket and the V every guitarist reads. Pick the guitar you want drawn &mdash; a maple-necked electric with a scratchplate, a single-cut with pearl blocks and two humbuckers, or a dreadnought with a soundhole &mdash; and the whole instrument is drawn for you: headstock, tuners, the neck widening towards the body, and the wood each one is made of. Those three are shapes and gradients rather than a photograph, so the video is drawn at whatever size you export. The last one IS a photograph: a real cutaway dreadnought, measured fret by fret so every mark still lands on the right string in the right fret &mdash; it shows the twenty frets the picture has, whatever the fret count above says. A slide travels along the string rather than jumping, an open string has its own colour, and the four finger colours are fixed, not chosen: they are meant to be learnt once and read in every video after.</div>
     </div>
 
     <div class="card">
@@ -562,6 +563,13 @@
       <div class="video-mid">
         <div class="guitar-stage" id="guitarStage" aria-hidden="true"></div>
       </div>
+      <!-- The photographed guitar, loaded whether or not it is the one
+           picked: the canvas the video is drawn on can only paint an
+           image it already has, and a frame is rendered the instant
+           the button is pressed. It is never shown here -- the stage's
+           own SVG draws it, from the same file. -->
+      <img id="guitarPhoto" src="../../assets/guitar/acoustic-cutaway.webp" alt=""
+           style="display:none" decoding="async">
     </div>
 
     <div class="transport">
@@ -990,7 +998,38 @@
    */
   function instrument() {
     const value = instrumentSelect?.value;
+    // The photograph IS an acoustic: the palette still has to be the
+    // right one, because the marks, the numbers and the picking
+    // strokes drawn over the picture are coloured from it.
+    if (value === 'photo') return 'acoustic';
     return value === 'acoustic' || value === 'singleCut' ? value : 'electric';
+  }
+
+  const guitarPhotoImage = document.getElementById('guitarPhoto');
+
+  /**
+   * The photograph to draw with, when the photograph is what was
+   * picked.
+   *
+   * The engine holds the measurements -- where every fret wire and
+   * every string is in that file -- and is handed the path, because
+   * only the page knows where the page's own assets live.
+   */
+  function guitarPhoto() {
+    if (instrumentSelect?.value !== 'photo') return undefined;
+    if (typeof GuitarEngine === 'undefined' || !guitarPhotoImage) return undefined;
+    return GuitarEngine.guitarPhoto(guitarPhotoImage.getAttribute('src'));
+  }
+
+  /** The picture, once the browser has it. A frame drawn before that has no guitar in it. */
+  async function photoReady() {
+    if (!guitarPhotoImage) return;
+    try {
+      await guitarPhotoImage.decode();
+    } catch (err) {
+      // A picture that will not load is not a reason to lose the
+      // video: the rest of the frame is still worth drawing.
+    }
   }
 
   /**
@@ -1209,6 +1248,10 @@
       firstFret: 0,
       lastFret: lastFret(),
       instrument: instrument(),
+      // A photograph replaces the drawn instrument entirely. The
+      // frets it shows are the frets there are, so the fret count
+      // above stops applying -- there is no arguing with a picture.
+      photo: guitarPhoto(),
       fretNumbers: true,
       // The guitar fills the frame the way a photographed one does:
       // in from the left edge, out past the right, with the hand
@@ -2529,6 +2572,22 @@
     return gradient;
   }
 
+  /**
+   * The element a drawn image comes from.
+   *
+   * The engine names a file; the canvas needs a picture already in
+   * memory. Anything it does not recognise, or has not finished
+   * loading, draws nothing -- a grey box where the guitar goes would
+   * be worse than a frame without one.
+   */
+  function imageFor(href) {
+    if (!href || !guitarPhotoImage) return undefined;
+    const same = guitarPhotoImage.getAttribute('src') === href;
+    return same && guitarPhotoImage.complete && guitarPhotoImage.naturalWidth > 0
+      ? guitarPhotoImage
+      : undefined;
+  }
+
   function paintStage(ctx2d, box, atSeconds) {
     if (!guitarStage || typeof GuitarEngine === 'undefined') return;
     if (!(box.w > 1) || !(box.h > 1) || !isVisible(guitarStage)) return;
@@ -2544,6 +2603,14 @@
     ctx2d.save();
     ctx2d.translate(box.x, box.y + (box.h - height) / 2);
     ctx2d.scale(scale, scale);
+    // A photographed guitar is BIGGER than the box it is drawn in --
+    // the frame is a window onto it, and the body runs off the top
+    // and the bottom. The preview's SVG cuts that at its viewBox, so
+    // the canvas is cut to the same box or the video would carry the
+    // guitar up across the notation.
+    ctx2d.beginPath();
+    ctx2d.rect(0, 0, neck.width, neck.height);
+    ctx2d.clip();
     for (const shape of shapes) {
       const painted = shape.fill !== 'none';
       if (painted) ctx2d.fillStyle = canvasPaint(ctx2d, shape.fill);
@@ -2565,6 +2632,12 @@
         ctx2d.arc(shape.x, shape.y, shape.width / 2, 0, Math.PI * 2);
         if (painted) ctx2d.fill();
         if (stroked) ctx2d.stroke();
+      } else if (shape.kind === 'image') {
+        // The photographed guitar. Drawn from the element the page
+        // has already loaded -- a canvas cannot fetch, and a frame is
+        // rendered the moment it is asked for.
+        const picture = imageFor(shape.href);
+        if (picture) ctx2d.drawImage(picture, shape.x, shape.y, shape.width, shape.height);
       } else if (shape.kind === 'path') {
         // The wood, the strings, the inlay blocks and the picking
         // marks. Path2D takes the same `d` the SVG side writes, so
@@ -2843,6 +2916,9 @@
 
       genLabel.textContent = 'Preparing the notation…';
       await refreshNotationImage();
+      // And the guitar, if the one picked is a photograph: the canvas
+      // can only paint a picture the browser already holds.
+      await photoReady();
       genLabel.textContent = 'Mixing the sound…';
       const countIn = await renderCountInAudio();
       const takeAudio = await renderTakeAudio(takeSeconds);

@@ -22,6 +22,7 @@ var GuitarEngine = (() => {
   var index_exports = {};
   __export(index_exports, {
     ACOUSTIC_COLORS: () => ACOUSTIC_COLORS,
+    ACOUSTIC_CUTAWAY: () => ACOUSTIC_CUTAWAY,
     DEFAULT_COLORS: () => DEFAULT_COLORS,
     DEFAULT_FIRST_FRET: () => DEFAULT_FIRST_FRET,
     DEFAULT_LAST_FRET: () => DEFAULT_LAST_FRET,
@@ -30,6 +31,7 @@ var GuitarEngine = (() => {
     FINGER_NAMES: () => FINGER_NAMES,
     SINGLE_CUT_COLORS: () => SINGLE_CUT_COLORS,
     STANDARD_TUNING: () => STANDARD_TUNING,
+    boardEdgesAt: () => boardEdgesAt,
     boardHalfAt: () => boardHalfAt,
     fingerColor: () => fingerColor,
     fretCenter: () => fretCenter,
@@ -38,10 +40,13 @@ var GuitarEngine = (() => {
     fretWires: () => fretWires,
     fretboardShapes: () => fretboardShapes,
     guitarLayout: () => guitarLayout,
+    guitarPhoto: () => guitarPhoto,
     handShapes: () => handShapes,
     inlayFrets: () => inlayFrets,
     instrumentColors: () => instrumentColors,
     markShapes: () => markShapes,
+    photoFretCount: () => photoFretCount,
+    photoPlacement: () => photoPlacement,
     pickShapes: () => pickShapes,
     positionsAt: () => positionsAt,
     renderFretboard: () => renderFretboard,
@@ -57,6 +62,76 @@ var GuitarEngine = (() => {
     tuningFor: () => tuningFor
   });
 
+  // src/photo.ts
+  var ACOUSTIC_CUTAWAY = {
+    width: 1920,
+    height: 636,
+    frets: [
+      80,
+      222,
+      329,
+      430,
+      525,
+      614,
+      698,
+      777,
+      852,
+      922,
+      988,
+      1050,
+      1110,
+      1165,
+      1217,
+      1268,
+      1313,
+      1359,
+      1398,
+      1437,
+      1475
+    ],
+    boardEndX: 1521,
+    stringsAtNut: [409, 517],
+    stringsAtEnd: [392, 534],
+    boardAtNut: [413, 527],
+    boardAtEnd: [376, 548]
+  };
+  function guitarPhoto(href, measurements = ACOUSTIC_CUTAWAY) {
+    return { ...measurements, href };
+  }
+  function photoFretCount(photo) {
+    return Math.max(1, photo.frets.length - 1);
+  }
+  function photoWireX(photo, fret) {
+    const wires = photo.frets;
+    const last = wires.length - 1;
+    const first = wires[0] ?? 0;
+    if (last < 1) return first;
+    if (fret <= 0) return first;
+    if (fret >= last) {
+      const end = wires[last];
+      const before = wires[last - 1];
+      return end + (fret - last) * (end - before);
+    }
+    const low = Math.floor(fret);
+    const a = wires[low];
+    const b = wires[low + 1];
+    return a + (b - a) * (fret - low);
+  }
+  function photoEdgeY(photo, edge, side, x) {
+    const nutX = photo.frets[0] ?? 0;
+    const endX = photo.boardEndX;
+    const from = (edge === "strings" ? photo.stringsAtNut : photo.boardAtNut)[side];
+    const to = (edge === "strings" ? photo.stringsAtEnd : photo.boardAtEnd)[side];
+    const span = endX - nutX;
+    if (!(Math.abs(span) > 0)) return from;
+    return from + (to - from) * ((x - nutX) / span);
+  }
+  function photoStringMiddle(photo) {
+    const nut = (photo.stringsAtNut[0] + photo.stringsAtNut[1]) / 2;
+    const end = (photo.stringsAtEnd[0] + photo.stringsAtEnd[1]) / 2;
+    return (nut + end) / 2;
+  }
+
   // src/fretboard.ts
   var DEFAULT_STRINGS = 6;
   var DEFAULT_FIRST_FRET = 0;
@@ -65,7 +140,7 @@ var GuitarEngine = (() => {
   var BOARD_FILL = 0.88;
   var STRING_MARGIN = 0.18;
   var HEADSTOCK_SHARE = 0.1;
-  var BLEED_BODY_VISIBLE = 0.17;
+  var BLEED_BODY_VISIBLE = 0.26;
   var BLEED_BODY_SHARE = 0.3;
   var HAND_BAND_SHARE = 0.22;
   var LABELS_SHARE = 0.055;
@@ -80,6 +155,8 @@ var GuitarEngine = (() => {
     return Number.isFinite(value) && value >= 2 ? Math.round(value) : DEFAULT_STRINGS;
   }
   function fretRange(options) {
+    const photo = options.photo;
+    if (photo !== void 0) return { first: 0, last: photoFretCount(photo) };
     const first = Number.isFinite(options.firstFret) ? Math.max(0, Math.round(options.firstFret)) : DEFAULT_FIRST_FRET;
     const lastRaw = Number.isFinite(options.lastFret) ? Math.round(options.lastFret) : DEFAULT_LAST_FRET;
     return { first, last: Math.max(first + 1, lastRaw) };
@@ -105,10 +182,51 @@ var GuitarEngine = (() => {
         width: Math.max(1, bodyX - labelsWidth - headstockWidth),
         height: boardHeight
       },
-      body: { x: bodyX, y: handBand, width: bodyWidth, height: boardHeight },
+      // The body is TALLER than the neck, as it is on the instrument:
+      // without that there is no room above the neck for a cutaway horn
+      // or below it for the bout, and the body can only ever be a box
+      // the same height as the fretboard.
+      body: {
+        x: bodyX,
+        y: handBand * 0.25,
+        width: bodyWidth,
+        height: height - handBand * 0.25 - numbers * 0.25
+      },
       hand: { x: 0, y: 0, width, height: handBand },
       numbersY: handBand + boardHeight
     };
+  }
+  function photoPlacement(options) {
+    const photo = options.photo;
+    if (photo === void 0 || !(photo.width > 0) || !(options.width > 0)) return void 0;
+    const scale = options.width / photo.width;
+    const board = guitarLayout(options).board;
+    return {
+      photo,
+      scale,
+      x: 0,
+      y: board.y + board.height / 2 - photoStringMiddle(photo) * scale
+    };
+  }
+  function alongPhoto(place, x) {
+    return place.x + x * place.scale;
+  }
+  function acrossPhoto(place, y) {
+    return place.y + y * place.scale;
+  }
+  function inPhoto(place, x) {
+    return (x - place.x) / place.scale;
+  }
+  function nutXOf(options) {
+    const place = photoPlacement(options);
+    if (place === void 0) return guitarLayout(options).neck.x;
+    return alongPhoto(place, place.photo.frets[0] ?? 0);
+  }
+  function middleOf(options) {
+    const place = photoPlacement(options);
+    if (place !== void 0) return acrossPhoto(place, photoStringMiddle(place.photo));
+    const board = guitarLayout(options).board;
+    return board.y + board.height / 2;
   }
   function taperAt(options, x) {
     const layout = guitarLayout(options);
@@ -117,13 +235,36 @@ var GuitarEngine = (() => {
     return Math.min(1, Math.max(0, (x - nut) / (end - nut)));
   }
   function boardHalfAt(options, x) {
+    const place = photoPlacement(options);
+    if (place !== void 0) return photoHalfAt(place, "board", x);
     const board = guitarLayout(options).board;
     const widest = board.height * BOARD_FILL / 2;
     const narrow = widest / NECK_TAPER;
     return narrow + (widest - narrow) * taperAt(options, x);
   }
   function stringHalfAt(options, x) {
+    const place = photoPlacement(options);
+    if (place !== void 0) return photoHalfAt(place, "strings", x);
     return boardHalfAt(options, x) * (1 - STRING_MARGIN);
+  }
+  function boardEdgesAt(options, x) {
+    const place = photoPlacement(options);
+    if (place !== void 0) {
+      const at = inPhoto(place, x);
+      return {
+        top: acrossPhoto(place, photoEdgeY(place.photo, "board", 0, at)),
+        bottom: acrossPhoto(place, photoEdgeY(place.photo, "board", 1, at))
+      };
+    }
+    const middle = middleOf(options);
+    const half = boardHalfAt(options, x);
+    return { top: middle - half, bottom: middle + half };
+  }
+  function photoHalfAt(place, edge, x) {
+    const at = inPhoto(place, x);
+    const top = photoEdgeY(place.photo, edge, 0, at);
+    const bottom = photoEdgeY(place.photo, edge, 1, at);
+    return (bottom - top) / 2 * place.scale;
   }
   function stringLines(options) {
     const count = stringCount(options);
@@ -138,11 +279,13 @@ var GuitarEngine = (() => {
       // and a hand legend pushes everything down under its band -- so a
       // string worked out without them lands somewhere there is no neck.
       ...options.bleed !== void 0 ? { bleed: options.bleed } : {},
-      ...options.handLegend !== void 0 ? { handLegend: options.handLegend } : {}
+      ...options.handLegend !== void 0 ? { handLegend: options.handLegend } : {},
+      // And this one moves the strings themselves onto a photograph.
+      ...options.photo !== void 0 ? { photo: options.photo } : {}
     };
     const board = guitarLayout(full).board;
-    const middle = board.y + board.height / 2;
-    const half = stringHalfAt(full, guitarLayout(full).neck.x);
+    const middle = middleOf(full);
+    const half = stringHalfAt(full, nutXOf(full));
     const gap = count > 1 ? half * 2 / (count - 1) : 0;
     const lines = [];
     for (let i = 0; i < count; i++) {
@@ -158,16 +301,19 @@ var GuitarEngine = (() => {
   function stringYAt(options, string, x) {
     const lines = stringLines(options);
     const line = lines.find((candidate) => candidate.string === string);
-    const board = guitarLayout(options).board;
-    const middle = board.y + board.height / 2;
+    const middle = middleOf(options);
     if (line === void 0) return middle;
-    const atNut = stringHalfAt(options, guitarLayout(options).neck.x);
+    const atNut = stringHalfAt(options, nutXOf(options));
     if (!(atNut > 0)) return middle;
     return middle + (line.offset - middle) * (stringHalfAt(options, x) / atNut);
   }
   function fretWires(options) {
     const { first, last } = fretRange(options);
     if (!(options.width > 0)) return [];
+    const place = photoPlacement(options);
+    if (place !== void 0) {
+      return place.photo.frets.map((offset, fret) => ({ fret, offset: alongPhoto(place, offset) }));
+    }
     const neck = guitarLayout(options).neck;
     const perFret = neck.width / (last - first);
     const wires = [];
@@ -177,10 +323,25 @@ var GuitarEngine = (() => {
     return wires;
   }
   function fretWidth(options) {
+    const place = photoPlacement(options);
+    if (place !== void 0) {
+      const wires = place.photo.frets;
+      let narrowest = Infinity;
+      for (let index = 1; index < wires.length; index++) {
+        narrowest = Math.min(narrowest, wires[index] - wires[index - 1]);
+      }
+      return Number.isFinite(narrowest) ? narrowest * place.scale : place.photo.width * place.scale;
+    }
     const { first, last } = fretRange(options);
     return guitarLayout(options).neck.width / Math.max(1, last - first);
   }
   function fretCenter(fret, options) {
+    const place = photoPlacement(options);
+    if (place !== void 0) {
+      const photo = place.photo;
+      if (fret <= 0) return alongPhoto(place, photoWireX(photo, 0));
+      return alongPhoto(place, (photoWireX(photo, fret - 1) + photoWireX(photo, fret)) / 2);
+    }
     const { first } = fretRange(options);
     const neck = guitarLayout(options).neck;
     const per = fretWidth(options);
@@ -427,45 +588,105 @@ var GuitarEngine = (() => {
     const body = layout.body;
     if (!(body.width > 0)) return [];
     const model = options.instrument ?? "electric";
-    const middle = body.y + body.height / 2;
+    const geom = bodyGeometry(options, body);
     const shapes = [];
-    const top = model === "acoustic" ? radial(body.x + body.width * 0.55, middle, body.width * 0.9, [
+    const top = model === "acoustic" ? radial(geom.at(0.55), geom.middle, geom.visible * 1.1, [
       [0, colors.bodyCentre],
       [0.6, colors.body],
       [1, colors.bodyBurst]
-    ]) : model === "singleCut" ? radial(body.x + body.width * 0.5, middle, body.width * 0.85, [
+    ]) : model === "singleCut" ? radial(geom.at(0.55), geom.middle - body.height * 0.05, geom.visible * 1.05, [
+      [0, colors.bodyCentre],
+      [0.42, colors.body],
+      [0.85, colors.bodyBurst],
+      [1, colors.bodyEdge]
+    ]) : radial(geom.at(0.4), geom.middle, geom.visible * 1.15, [
       [0, colors.bodyCentre],
       [0.45, colors.body],
-      [1, colors.bodyBurst]
-    ]) : downward(body.y, body.height, [
-      [0, "#2E2E2E"],
-      [0.5, colors.body],
-      [1, "#050505"]
+      [0.88, colors.bodyBurst],
+      [1, colors.bodyEdge]
     ]);
-    const corner = Math.min(body.width, body.height) * 0.3;
+    const outline = bodyOutline(model, geom);
+    const bounds = { x: body.x, y: body.y, width: body.width, height: body.height };
+    shapes.push(pathShape(outline, bounds, top, { role: "body" }));
     shapes.push(
-      rectShape(body.x, body.y, body.width, body.height, top, { radius: corner, role: "body" })
-    );
-    shapes.push(
-      rectShape(body.x, body.y, body.width, body.height, "none", {
-        radius: corner,
+      pathShape(outline, bounds, "none", {
         stroke: model === "electric" ? colors.bodyEdge : colors.binding,
-        strokeWidth: Math.max(1, body.height * (model === "electric" ? 0.02 : 0.035)),
+        // Measured against the NECK: the body is much taller, and a
+        // binding sized from it reads as a cream frame round a picture.
+        strokeWidth: Math.max(1, geom.neckHalf * (model === "electric" ? 0.05 : 0.085)),
         role: "body"
       })
     );
-    if (model === "acoustic") shapes.push(...acousticTop(body, middle, colors, options));
-    else if (model === "singleCut") shapes.push(...singleCutTop(body, middle, colors, options));
-    else shapes.push(...electricTop(body, middle, colors, options));
+    if (model === "acoustic") shapes.push(...acousticTop(geom, colors, options));
+    else if (model === "singleCut") shapes.push(...singleCutTop(geom, colors, options));
+    else shapes.push(...electricTop(geom, colors, options));
     return shapes;
   }
-  function acousticTop(body, middle, colors, options) {
+  function bodyGeometry(options, body) {
+    const visible = Math.max(1, options.width - body.x);
+    const board = guitarLayout(options).board;
+    return {
+      x: body.x,
+      y: body.y,
+      height: body.height,
+      visible,
+      right: body.x + Math.max(visible * 1.05, body.width),
+      // The STRINGS' middle, not the body's: the pickups and the bridge
+      // sit under the strings, and the body is taller than the neck.
+      middle: board.y + board.height / 2,
+      neckHalf: boardHalfAt(options, body.x),
+      at: (fraction) => body.x + visible * fraction
+    };
+  }
+  function bodyOutline(model, geom) {
+    const { x, height, middle, neckHalf, right, at } = geom;
+    const top = geom.y + height * 0.04;
+    const bottom = geom.y + height * 0.96;
+    const jointTop = middle - neckHalf * 1.1;
+    const jointBottom = middle + neckHalf * 1.1;
+    if (model === "acoustic") {
+      return [
+        `M${x} ${jointTop}`,
+        `C${at(0.1)} ${jointTop - height * 0.16} ${at(0.24)} ${top} ${at(0.55)} ${top}`,
+        `L${right} ${top}`,
+        `L${right} ${bottom}`,
+        `C${at(0.5)} ${bottom} ${at(0.18)} ${bottom} ${at(0.07)} ${bottom - height * 0.06}`,
+        `L${x} ${jointBottom}`,
+        "Z"
+      ].join(" ");
+    }
+    if (model === "singleCut") {
+      return [
+        `M${x} ${jointTop}`,
+        `C${at(0.04)} ${jointTop - height * 0.2} ${at(0.14)} ${top + height * 0.06} ${at(0.3)} ${top + height * 0.05}`,
+        `C${at(0.42)} ${top + height * 0.05} ${at(0.44)} ${top + height * 0.15} ${at(0.58)} ${top + height * 0.1}`,
+        `C${at(0.76)} ${top + height * 0.04} ${at(0.88)} ${top} ${right} ${top}`,
+        `L${right} ${bottom}`,
+        `C${at(0.68)} ${bottom} ${at(0.28)} ${bottom} ${at(0.12)} ${bottom - height * 0.07}`,
+        `L${x} ${jointBottom}`,
+        "Z"
+      ].join(" ");
+    }
+    return [
+      `M${x} ${jointTop}`,
+      `C${at(0.03)} ${jointTop - height * 0.2} ${at(0.1)} ${top + height * 0.06} ${at(0.24)} ${top + height * 0.05}`,
+      `C${at(0.36)} ${top + height * 0.05} ${at(0.4)} ${top + height * 0.2} ${at(0.54)} ${top + height * 0.13}`,
+      `C${at(0.72)} ${top + height * 0.05} ${at(0.84)} ${top} ${right} ${top}`,
+      `L${right} ${bottom}`,
+      `C${at(0.8)} ${bottom} ${at(0.56)} ${bottom} ${at(0.42)} ${bottom - height * 0.15}`,
+      `C${at(0.3)} ${bottom - height * 0.25} ${at(0.24)} ${bottom - height * 0.03} ${at(0.12)} ${bottom - height * 0.06}`,
+      `L${x} ${jointBottom}`,
+      "Z"
+    ].join(" ");
+  }
+  function acousticTop(geom, colors, options) {
     const shapes = [];
-    const r = Math.min(body.width * 0.26, body.height * 0.3);
-    const cx = body.x + body.width * 0.56;
+    const { middle, height, at, visible } = geom;
+    const r = Math.min(visible * 0.3, height * 0.32);
+    const cx = at(0.52);
     shapes.push(
       pathShape(
-        `M${cx} ${middle - r * 0.2} L${cx + r * 2.1} ${middle + r * 0.5} L${cx + r * 1.7} ${middle + r * 1.7} L${cx - r * 0.2} ${middle + r * 1.2} Z`,
+        `M${cx} ${middle - r * 0.2} L${cx + r * 2} ${middle + r * 0.55} L${cx + r * 1.6} ${middle + r * 1.7} L${cx - r * 0.2} ${middle + r * 1.2} Z`,
         { x: cx - r, y: middle, width: r * 3, height: r * 2 },
         colors.pickguard,
         { opacity: 0.9, role: "pickguard" }
@@ -486,9 +707,9 @@ var GuitarEngine = (() => {
         { role: "soundhole" }
       )
     );
-    const bridgeX = body.x + body.width * 0.84;
-    const bridgeW = body.width * 0.12;
-    const bridgeH = body.height * 0.46;
+    const bridgeX = at(0.94);
+    const bridgeW = visible * 0.12;
+    const bridgeH = height * 0.46;
     shapes.push(
       rectShape(
         bridgeX,
@@ -518,29 +739,33 @@ var GuitarEngine = (() => {
     }
     return shapes;
   }
-  function electricTop(body, middle, colors, options) {
+  function electricTop(geom, colors, options) {
     const shapes = [];
-    const plateX = body.x + body.width * 0.04;
-    const plateW = body.width * 0.78;
-    const plateH = body.height * 0.82;
+    const { middle, height, at, visible } = geom;
+    const half = geom.neckHalf * 1.1;
+    const plate = [
+      `M${at(0.02)} ${middle - half * 0.8}`,
+      `C${at(0.12)} ${middle - half * 1.12} ${at(0.4)} ${middle - half * 1.1} ${at(0.7)} ${middle - half * 0.94}`,
+      `C${at(0.78)} ${middle - half * 0.88} ${at(0.78)} ${middle + half * 0.88} ${at(0.7)} ${middle + half * 0.94}`,
+      `C${at(0.4)} ${middle + half * 1.1} ${at(0.12)} ${middle + half * 1.12} ${at(0.02)} ${middle + half * 0.8}`,
+      "Z"
+    ].join(" ");
     shapes.push(
-      rectShape(
-        plateX,
-        middle - plateH / 2,
-        plateW,
-        plateH,
-        downward(middle - plateH / 2, plateH, [
+      pathShape(
+        plate,
+        { x: at(0), y: middle - half * 1.2, width: visible, height: half * 2.4 },
+        downward(middle - half * 1.2, half * 2.4, [
           [0, "#FFFFFF"],
           [0.5, colors.pickguard],
           [1, colors.pickguardEdge]
         ]),
-        { radius: plateH * 0.28, role: "pickguard" }
+        { role: "pickguard" }
       )
     );
-    const pickupW = plateW * 0.12;
-    const pickupH = plateH * 0.6;
-    for (const [index, at] of [0.3, 0.52, 0.74].entries()) {
-      const x = plateX + plateW * at;
+    const pickupW = visible * 0.085;
+    const pickupH = geom.neckHalf * 1.55;
+    for (const [index, fraction] of [0.14, 0.36, 0.58].entries()) {
+      const x = at(fraction);
       const lean = (index - 1) * pickupH * 0.06;
       shapes.push(
         rectShape(
@@ -571,51 +796,67 @@ var GuitarEngine = (() => {
         );
       }
     }
-    const bridgeX = body.x + body.width * 0.87;
+    const bridgeX = at(0.94);
+    const bridgeW = visible * 0.08;
     shapes.push(
       rectShape(
         bridgeX,
-        middle - body.height * 0.3,
-        body.width * 0.09,
-        body.height * 0.6,
-        downward(middle - body.height * 0.3, body.height * 0.6, [
+        middle - height * 0.3,
+        bridgeW,
+        height * 0.6,
+        downward(middle - height * 0.3, height * 0.6, [
           [0, "#FFFFFF"],
           [0.4, colors.hardware],
           [1, colors.hardwareDark]
         ]),
-        { radius: body.width * 0.02, role: "hardware" }
+        { radius: bridgeW * 0.2, role: "hardware" }
       )
     );
     for (const line of stringLines(options)) {
       const y = stringYAt(options, line.string, bridgeX);
-      if (Math.abs(y - middle) > body.height * 0.3) continue;
+      if (Math.abs(y - middle) > height * 0.3) continue;
       shapes.push(
-        rectShape(
-          bridgeX,
-          y - body.height * 0.028,
-          body.width * 0.09,
-          body.height * 0.056,
-          colors.hardwareDark,
-          { radius: body.height * 0.02, role: "hardware" }
-        )
+        rectShape(bridgeX, y - height * 0.028, bridgeW, height * 0.056, colors.hardwareDark, {
+          radius: height * 0.02,
+          role: "hardware"
+        })
       );
     }
     return shapes;
   }
-  function singleCutTop(body, middle, colors, options) {
+  function singleCutTop(geom, colors, options) {
     const shapes = [];
-    const pickupW = body.width * 0.15;
-    const pickupH = body.height * 0.54;
-    for (const at of [0.3, 0.55]) {
-      const x = body.x + body.width * at;
+    const { middle, height, at, visible } = geom;
+    const knobR = Math.max(2, height * 0.062);
+    const knobX = at(0.26);
+    const knobY = geom.y + height * 0.14;
+    shapes.push(
+      circleShape(knobX, knobY, knobR * 1.15, "rgba(0,0,0,0.35)", { role: "hardware" }),
+      circleShape(
+        knobX,
+        knobY,
+        knobR,
+        radial(knobX - knobR * 0.4, knobY - knobR * 0.4, knobR * 1.9, [
+          [0, "#FFF6D8"],
+          [0.45, colors.knob],
+          [1, "#6E4E0E"]
+        ]),
+        { role: "hardware" }
+      ),
+      circleShape(knobX, knobY, knobR * 0.45, "rgba(0,0,0,0.18)", { role: "hardware" })
+    );
+    const pickupW = visible * 0.15;
+    const pickupH = geom.neckHalf * 1.5;
+    for (const fraction of [0.5, 0.84]) {
+      const x = at(fraction);
       shapes.push(
         rectShape(
-          x - pickupW * 0.08,
-          middle - pickupH * 0.62,
-          pickupW * 1.16,
-          pickupH * 1.24,
+          x - pickupW * 0.12,
+          middle - pickupH * 0.66,
+          pickupW * 1.24,
+          pickupH * 1.32,
           colors.hardwareDark,
-          { radius: pickupW * 0.14, role: "pickup" }
+          { radius: pickupW * 0.16, role: "pickup" }
         )
       );
       shapes.push(
@@ -629,56 +870,18 @@ var GuitarEngine = (() => {
             [0.35, colors.pickup],
             [1, colors.pickupPole]
           ]),
-          { radius: pickupW * 0.1, role: "pickup" }
+          { radius: pickupW * 0.12, role: "pickup" }
         )
       );
       for (const line of stringLines(options)) {
         const y = stringYAt(options, line.string, x);
-        if (Math.abs(y - middle) > pickupH * 0.42) continue;
+        if (Math.abs(y - middle) > pickupH * 0.44) continue;
         shapes.push(
-          circleShape(x + pickupW * 0.3, y, Math.max(0.6, pickupW * 0.08), colors.pickupPole, {
+          circleShape(x + pickupW * 0.34, y, Math.max(1, pickupW * 0.11), "#5E5852", {
             role: "pickup"
           })
         );
       }
-    }
-    for (const [at, w] of [
-      [0.76, 0.045],
-      [0.88, 0.04]
-    ]) {
-      const x = body.x + body.width * at;
-      shapes.push(
-        rectShape(
-          x,
-          middle - body.height * 0.28,
-          body.width * w,
-          body.height * 0.56,
-          downward(middle - body.height * 0.28, body.height * 0.56, [
-            [0, "#FFFFFF"],
-            [0.4, colors.hardware],
-            [1, colors.hardwareDark]
-          ]),
-          { radius: body.width * 0.015, role: "hardware" }
-        )
-      );
-    }
-    const knobR = Math.max(1.5, body.height * 0.075);
-    for (const at of [0.64, 0.78]) {
-      const x = body.x + body.width * at;
-      const y = body.y + body.height * 0.9;
-      shapes.push(
-        circleShape(
-          x,
-          y,
-          knobR,
-          radial(x - knobR * 0.4, y - knobR * 0.4, knobR * 1.8, [
-            [0, "#FFF3D0"],
-            [0.5, colors.knob],
-            [1, "#7A5A12"]
-          ]),
-          { role: "hardware" }
-        )
-      );
     }
     return shapes;
   }
@@ -711,10 +914,10 @@ var GuitarEngine = (() => {
     pegPost: "#A8A29A",
     stringLabel: "#F1E7DC",
     stringLabelInk: "#20130D",
-    body: "#171717",
-    bodyEdge: "#000000",
-    bodyBurst: "#2A0F0A",
-    bodyCentre: "#3A3A3A",
+    body: "#C9762E",
+    bodyEdge: "#2A1206",
+    bodyBurst: "#5A2410",
+    bodyCentre: "#E8B45C",
     pickguard: "#F3F0E6",
     pickguardEdge: "#BEB8A8",
     soundhole: "#140B07",
@@ -948,12 +1151,7 @@ var GuitarEngine = (() => {
     const lines = stringLines(options);
     return lines.length > 1 ? lines[1].offset - lines[0].offset : guitarLayout(options).board.height / 6;
   }
-  function boardEdges(options, x) {
-    const board = guitarLayout(options).board;
-    const middle = board.y + board.height / 2;
-    const half = boardHalfAt(options, x);
-    return { top: middle - half, bottom: middle + half };
-  }
+  var boardEdges = boardEdgesAt;
   function taperedPath(fromX, toX, topAt, bottomAt) {
     return [
       `M${fromX} ${topAt(fromX)}`,
@@ -972,12 +1170,21 @@ var GuitarEngine = (() => {
     if (colors.background !== "none") {
       shapes.push(rectShape(0, 0, width, height, colors.background));
     }
+    const picture = photoShapes(options);
+    if (picture.length > 0) {
+      return [
+        ...shapes,
+        ...picture,
+        ...handLegendShapes(options),
+        ...fretNumberShapes(options, colors)
+      ];
+    }
     const parts = { options, colors };
     shapes.push(...bodyShapes(parts));
     shapes.push(...headstockShapes(parts));
     const neck = layout.neck;
     const nutX = neck.x;
-    const endX = Math.min(width, layout.body.x + layout.body.width * 0.3);
+    const endX = Math.min(width, layout.body.x + (width - layout.body.x) * 0.06);
     const gap = stringGap(options);
     const bound = options.instrument === "acoustic" || options.instrument === "singleCut";
     const wood = (x) => boardEdges(options, x);
@@ -1040,11 +1247,28 @@ var GuitarEngine = (() => {
     shapes.push(...fretNumberShapes(options, colors));
     return shapes;
   }
+  function photoShapes(options) {
+    const place = photoPlacement(options);
+    if (place === void 0) return [];
+    return [
+      {
+        kind: "image",
+        x: place.x,
+        y: place.y,
+        width: place.photo.width * place.scale,
+        height: place.photo.height * place.scale,
+        fill: "none",
+        href: place.photo.href,
+        role: "photo"
+      }
+    ];
+  }
   function handLegendShapes(options) {
     if (options.handLegend !== true) return [];
     const band = guitarLayout(options).hand;
     if (!(band.height > 0)) return [];
-    const height = band.height * 0.94;
+    const floor = photoPlacement(options) !== void 0 ? boardEdges(options, fretCenter(1, options)).top : band.y + band.height;
+    const height = Math.max(band.height, floor - band.y) * 0.94;
     const width = height * 0.78;
     return translateShapes(
       handShapes({ width, height, handColor: "#F6EDE6", outline: "rgba(0,0,0,0.35)" }),
@@ -1236,14 +1460,36 @@ var GuitarEngine = (() => {
     const { first, last } = fretRange(options);
     const wanted = (height - layout.numbersY) * 0.62;
     const everyFret = per * 0.5 >= height * 0.035;
-    const size = Math.min(wanted, per * (everyFret ? 0.5 : 1.4));
+    const photographed = photoPlacement(options) !== void 0;
+    const size = photographed ? Math.min(wanted, widestFret(options) * 0.42, boardDepth(options) * 0.3) : Math.min(wanted, per * (everyFret ? 0.5 : 1.4));
     const shapes = [];
+    const taken = [];
+    const room = (fret) => {
+      const x = fretCenter(fret, options);
+      const ink = size * 0.62 * String(fret).length + size * 0.24;
+      const from = x - ink / 2;
+      const to = x + ink / 2;
+      if (taken.some((span) => from < span.to && to > span.from)) return false;
+      taken.push({ from, to });
+      return true;
+    };
+    const landmark = new Set(inlayFrets(options).map((inlay) => inlay.fret));
+    const chosen = [];
     for (let fret = Math.max(1, first + 1); fret <= last; fret++) {
-      if (!everyFret && fret % 3 !== 0 && !inlayFrets(options).some((i) => i.fret === fret)) continue;
+      if (landmark.has(fret) && room(fret)) chosen.push(fret);
+    }
+    for (let fret = Math.max(1, first + 1); fret <= last; fret++) {
+      if (landmark.has(fret)) continue;
+      if (!everyFret && !photographed && fret % 3 !== 0) continue;
+      if (room(fret)) chosen.push(fret);
+    }
+    chosen.sort((a, b) => a - b);
+    for (const fret of chosen) {
+      const x = fretCenter(fret, options);
       shapes.push({
         kind: "text",
-        x: fretCenter(fret, options),
-        y: layout.numbersY + (height - layout.numbersY) / 2,
+        x,
+        y: photographed ? boardEdges(options, x).bottom + size * 0.9 : layout.numbersY + (height - layout.numbersY) / 2,
         width: per,
         height: height - layout.numbersY,
         fill: colors.fretNumber,
@@ -1256,6 +1502,20 @@ var GuitarEngine = (() => {
       });
     }
     return shapes;
+  }
+  function boardDepth(options) {
+    const edges = boardEdges(options, fretCenter(1, options));
+    return Math.max(1, edges.bottom - edges.top);
+  }
+  function widestFret(options) {
+    const wires = fretWires(options);
+    let widest = 0;
+    for (let index = 1; index < wires.length; index++) {
+      const a = wires[index - 1];
+      const b = wires[index];
+      widest = Math.max(widest, b.offset - a.offset);
+    }
+    return widest > 0 ? widest : fretWidth(options);
   }
   function markShapes(positions, options) {
     const colors = resolveColors(options.colors, options.instrument);
@@ -1311,9 +1571,12 @@ var GuitarEngine = (() => {
     const layout = guitarLayout(options);
     const struck = stringLines(options).filter((line) => mark.strings.includes(line.string));
     if (struck.length === 0) return [];
-    const height0 = layout.board.height;
+    const place = photoPlacement(options);
+    const bodyX = place === void 0 ? layout.body.x : place.x + place.photo.boardEndX * place.scale;
+    const edges = boardEdges(options, bodyX);
+    const height0 = place === void 0 ? layout.board.height : edges.bottom - edges.top;
     const width = height0 * 0.13;
-    const centreX = layout.body.x + width * 0.9;
+    const centreX = bodyX + width * 0.9;
     const ys = struck.map((line) => stringYAt(options, line.string, centreX));
     const first = Math.min(...ys);
     const last = Math.max(...ys);
@@ -1378,6 +1641,17 @@ var GuitarEngine = (() => {
       }
       if (shape.kind === "path") {
         return tag("path", { d: shape.d ?? "", ...common });
+      }
+      if (shape.kind === "image") {
+        return tag("image", {
+          href: shape.href ?? "",
+          x: shape.x,
+          y: shape.y,
+          width: shape.width,
+          height: shape.height,
+          preserveAspectRatio: "none",
+          ...shape.opacity !== void 0 ? { opacity: shape.opacity } : {}
+        });
       }
       if (shape.kind === "text") {
         return wrap(

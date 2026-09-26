@@ -10,6 +10,8 @@
  * positions in seconds and gets a drawing back.
  */
 
+import type { GuitarPhotograph } from './photo.js';
+
 /**
  * Which finger stops a note, numbered as a score numbers them.
  *
@@ -207,6 +209,22 @@ export interface FretboardOptions {
   readonly bleed?: boolean;
   /** Draw the four-colour hand in a band above the neck, as the video's own legend. */
   readonly handLegend?: boolean;
+  /**
+   * A PHOTOGRAPH of a guitar, in place of the drawn one.
+   *
+   * The drawing is shapes and gradients and looks like what it is.
+   * When a picture of a real instrument is wanted instead, this is
+   * it -- measured, so the marks still land on the right string in
+   * the right fret. Everything the engine would have drawn of the
+   * instrument itself is left out; everything that is ABOUT the
+   * playing -- the hand, the fret numbers, the marks, the picking
+   * strokes -- is drawn on top of the picture exactly as before.
+   *
+   * The picture decides what is seen, so `instrument`, `firstFret`
+   * and `lastFret` no longer do: a photograph shows the frets it
+   * shows.
+   */
+  readonly photo?: GuitarPhotograph;
   readonly colors?: Partial<GuitarColors>;
 }
 
@@ -252,7 +270,7 @@ export interface GuitarStageOptions extends FretboardOptions {
  * video without either one re-deciding what it looks like.
  */
 export interface StageShape {
-  readonly kind: 'rect' | 'circle' | 'text' | 'path';
+  readonly kind: 'rect' | 'circle' | 'text' | 'path' | 'image';
   readonly x: number;
   readonly y: number;
   /** A rect's box; a circle's diameter; a text's own size is `fontSize`. */
@@ -270,6 +288,7 @@ export interface StageShape {
    * a renderer paints every shape the same way.
    */
   readonly role?:
+    | 'photo'
     | 'fretNumber'
     | 'stringLabel'
     | 'stringName'
@@ -298,6 +317,17 @@ export interface StageShape {
    * already reads, and neither is a rectangle or a circle.
    */
   readonly d?: string;
+  /**
+   * Image only: the file to draw, in the box `x`/`y`/`width`/`height`
+   * gives it.
+   *
+   * The one shape a renderer cannot paint out of the box's own
+   * numbers. SVG writes an `<image>`; a canvas draws the element it
+   * has already loaded for this href. Anything that cannot load it
+   * should draw nothing rather than a placeholder -- a grey box where
+   * the guitar goes is worse than a frame without one.
+   */
+  readonly href?: string;
   /** Text only. `x`/`y` are the anchor, which `align` and `baseline` place it against. */
   readonly text?: string;
   readonly fontSize?: number;

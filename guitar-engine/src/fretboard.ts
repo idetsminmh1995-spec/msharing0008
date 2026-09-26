@@ -11,6 +11,13 @@
  * wires stand across them, string 1 (the thinnest, highest) at the
  * top, as a player looking down at their own guitar sees it.
  */
+import {
+  photoEdgeY,
+  photoFretCount,
+  photoStringMiddle,
+  photoWireX,
+  type GuitarPhotograph,
+} from './photo.js';
 import type { FretboardOptions, FretWire, GuitarNote, LivePosition, StringLine } from './types.js';
 
 export const DEFAULT_STRINGS = 6;
@@ -49,7 +56,7 @@ const HEADSTOCK_SHARE = 0.1;
  * headstock is off-screen) and only the near part of the body is
  * seen, which leaves far more room for the frets that matter.
  */
-const BLEED_BODY_VISIBLE = 0.17;
+const BLEED_BODY_VISIBLE = 0.26;
 const BLEED_BODY_SHARE = 0.3;
 /** The band above the neck where the hand legend sits, when one is drawn. */
 const HAND_BAND_SHARE = 0.22;
@@ -78,10 +85,19 @@ export function stringCount(options: { strings?: number }): number {
     : DEFAULT_STRINGS;
 }
 
-export function fretRange(options: { firstFret?: number; lastFret?: number }): {
+export function fretRange(options: {
+  firstFret?: number;
+  lastFret?: number;
+  photo?: GuitarPhotograph;
+}): {
   first: number;
   last: number;
 } {
+  // A photograph shows the frets it shows. Asking it for twelve would
+  // only stop the marks at a fret that is plainly there in the
+  // picture, and the picture is the one thing here nobody can redraw.
+  const photo = options.photo;
+  if (photo !== undefined) return { first: 0, last: photoFretCount(photo) };
   const first = Number.isFinite(options.firstFret)
     ? Math.max(0, Math.round(options.firstFret as number))
     : DEFAULT_FIRST_FRET;
@@ -138,10 +154,86 @@ export function guitarLayout(options: {
       width: Math.max(1, bodyX - labelsWidth - headstockWidth),
       height: boardHeight,
     },
-    body: { x: bodyX, y: handBand, width: bodyWidth, height: boardHeight },
+    // The body is TALLER than the neck, as it is on the instrument:
+    // without that there is no room above the neck for a cutaway horn
+    // or below it for the bout, and the body can only ever be a box
+    // the same height as the fretboard.
+    body: {
+      x: bodyX,
+      y: handBand * 0.25,
+      width: bodyWidth,
+      height: height - handBand * 0.25 - numbers * 0.25,
+    },
     hand: { x: 0, y: 0, width, height: handBand },
     numbersY: handBand + boardHeight,
   };
+}
+
+/**
+ * A photograph, placed in the picture.
+ *
+ * Scaled to the WIDTH of the frame and hung by the strings: their
+ * middle sits where the drawn neck's middle would, so the hand legend
+ * keeps its band above and the fret numbers keep their strip below. A
+ * photograph is framed by whoever took it -- neck in from one edge,
+ * body out of the other -- and stretching it to a box would throw
+ * that away, so the body is left to run off the top and the bottom
+ * the way it runs off the side.
+ */
+export interface PhotoPlacement {
+  readonly photo: GuitarPhotograph;
+  readonly scale: number;
+  readonly x: number;
+  readonly y: number;
+}
+
+export function photoPlacement(options: FretboardOptions): PhotoPlacement | undefined {
+  const photo = options.photo;
+  if (photo === undefined || !(photo.width > 0) || !(options.width > 0)) return undefined;
+  const scale = options.width / photo.width;
+  const board = guitarLayout(options).board;
+  return {
+    photo,
+    scale,
+    x: 0,
+    y: board.y + board.height / 2 - photoStringMiddle(photo) * scale,
+  };
+}
+
+/** A length along the file, where it lands in the picture. */
+function alongPhoto(place: PhotoPlacement, x: number): number {
+  return place.x + x * place.scale;
+}
+
+/** The same across it. */
+function acrossPhoto(place: PhotoPlacement, y: number): number {
+  return place.y + y * place.scale;
+}
+
+/** A point in the picture, back in the file's own pixels. */
+function inPhoto(place: PhotoPlacement, x: number): number {
+  return (x - place.x) / place.scale;
+}
+
+/**
+ * Where the nut is: the photograph's, or the drawn neck's own start.
+ *
+ * Everything across the neck is measured from the nut, and in a
+ * photograph the nut is wherever the picture puts it -- which is not
+ * the left edge of the box.
+ */
+function nutXOf(options: FretboardOptions): number {
+  const place = photoPlacement(options);
+  if (place === undefined) return guitarLayout(options).neck.x;
+  return alongPhoto(place, place.photo.frets[0] ?? 0);
+}
+
+/** The strings' middle, which is what a mark is measured from. */
+function middleOf(options: FretboardOptions): number {
+  const place = photoPlacement(options);
+  if (place !== undefined) return acrossPhoto(place, photoStringMiddle(place.photo));
+  const board = guitarLayout(options).board;
+  return board.y + board.height / 2;
 }
 
 /**
@@ -158,6 +250,8 @@ function taperAt(options: FretboardOptions, x: number): number {
 
 /** Half the board's height at a point along the neck. */
 export function boardHalfAt(options: FretboardOptions, x: number): number {
+  const place = photoPlacement(options);
+  if (place !== undefined) return photoHalfAt(place, 'board', x);
   const board = guitarLayout(options).board;
   const widest = (board.height * BOARD_FILL) / 2;
   const narrow = widest / NECK_TAPER;
@@ -166,7 +260,44 @@ export function boardHalfAt(options: FretboardOptions, x: number): number {
 
 /** Half the span the strings themselves take, at a point along the neck. */
 export function stringHalfAt(options: FretboardOptions, x: number): number {
+  const place = photoPlacement(options);
+  if (place !== undefined) return photoHalfAt(place, 'strings', x);
   return boardHalfAt(options, x) * (1 - STRING_MARGIN);
+}
+
+/**
+ * The board's edges -- the wood outside the outer strings -- at a
+ * point along the neck.
+ *
+ * Drawn, the board is centred on the strings; photographed, it is
+ * wherever it was measured, which is very nearly but not exactly the
+ * same. Anything that has to sit UNDER the board (a fret number, a
+ * fret wire's ends) asks here rather than adding a half to a middle,
+ * so it lands on the picture rather than near it.
+ */
+export function boardEdgesAt(
+  options: FretboardOptions,
+  x: number,
+): { top: number; bottom: number } {
+  const place = photoPlacement(options);
+  if (place !== undefined) {
+    const at = inPhoto(place, x);
+    return {
+      top: acrossPhoto(place, photoEdgeY(place.photo, 'board', 0, at)),
+      bottom: acrossPhoto(place, photoEdgeY(place.photo, 'board', 1, at)),
+    };
+  }
+  const middle = middleOf(options);
+  const half = boardHalfAt(options, x);
+  return { top: middle - half, bottom: middle + half };
+}
+
+/** Half of one of the photograph's two spans, where the picture is drawn. */
+function photoHalfAt(place: PhotoPlacement, edge: 'strings' | 'board', x: number): number {
+  const at = inPhoto(place, x);
+  const top = photoEdgeY(place.photo, edge, 0, at);
+  const bottom = photoEdgeY(place.photo, edge, 1, at);
+  return ((bottom - top) / 2) * place.scale;
 }
 
 /**
@@ -188,6 +319,7 @@ export function stringLines(options: {
   stringLabels?: boolean;
   bleed?: boolean;
   handLegend?: boolean;
+  photo?: GuitarPhotograph;
 }): readonly StringLine[] {
   const count = stringCount(options);
   if (!(options.height > 0)) return [];
@@ -202,10 +334,12 @@ export function stringLines(options: {
     // string worked out without them lands somewhere there is no neck.
     ...(options.bleed !== undefined ? { bleed: options.bleed } : {}),
     ...(options.handLegend !== undefined ? { handLegend: options.handLegend } : {}),
+    // And this one moves the strings themselves onto a photograph.
+    ...(options.photo !== undefined ? { photo: options.photo } : {}),
   };
   const board = guitarLayout(full).board;
-  const middle = board.y + board.height / 2;
-  const half = stringHalfAt(full, guitarLayout(full).neck.x);
+  const middle = middleOf(full);
+  const half = stringHalfAt(full, nutXOf(full));
   const gap = count > 1 ? (half * 2) / (count - 1) : 0;
   const lines: StringLine[] = [];
   for (let i = 0; i < count; i++) {
@@ -223,10 +357,9 @@ export function stringLines(options: {
 export function stringYAt(options: FretboardOptions, string: number, x: number): number {
   const lines = stringLines(options);
   const line = lines.find((candidate) => candidate.string === string);
-  const board = guitarLayout(options).board;
-  const middle = board.y + board.height / 2;
+  const middle = middleOf(options);
   if (line === undefined) return middle;
-  const atNut = stringHalfAt(options, guitarLayout(options).neck.x);
+  const atNut = stringHalfAt(options, nutXOf(options));
   if (!(atNut > 0)) return middle;
   return middle + (line.offset - middle) * (stringHalfAt(options, x) / atNut);
 }
@@ -242,6 +375,12 @@ export function stringYAt(options: FretboardOptions, string: number, x: number):
 export function fretWires(options: FretboardOptions): readonly FretWire[] {
   const { first, last } = fretRange(options);
   if (!(options.width > 0)) return [];
+  // A photograph's wires are where they were measured, which is the
+  // real spacing: wide at the nut, crowding at the body.
+  const place = photoPlacement(options);
+  if (place !== undefined) {
+    return place.photo.frets.map((offset, fret) => ({ fret, offset: alongPhoto(place, offset) }));
+  }
   const neck = guitarLayout(options).neck;
   const perFret = neck.width / (last - first);
   const wires: FretWire[] = [];
@@ -251,8 +390,25 @@ export function fretWires(options: FretboardOptions): readonly FretWire[] {
   return wires;
 }
 
-/** How wide one fret is drawn. */
+/**
+ * How wide one fret is drawn.
+ *
+ * Drawn, every fret is the same width, and that is the answer. On a
+ * photograph they shrink all the way up the neck, and the only thing
+ * that asks this is deciding what will FIT in a fret -- so the answer
+ * is the narrowest one in the picture, which is the fret that decides
+ * it.
+ */
 export function fretWidth(options: FretboardOptions): number {
+  const place = photoPlacement(options);
+  if (place !== undefined) {
+    const wires = place.photo.frets;
+    let narrowest = Infinity;
+    for (let index = 1; index < wires.length; index++) {
+      narrowest = Math.min(narrowest, (wires[index] as number) - (wires[index - 1] as number));
+    }
+    return Number.isFinite(narrowest) ? narrowest * place.scale : place.photo.width * place.scale;
+  }
   const { first, last } = fretRange(options);
   return guitarLayout(options).neck.width / Math.max(1, last - first);
 }
@@ -266,6 +422,15 @@ export function fretWidth(options: FretboardOptions): number {
  * Fractional frets are honoured, so a slide passes smoothly between.
  */
 export function fretCenter(fret: number, options: FretboardOptions): number {
+  // On a photograph a fret is the gap between two real wires, so the
+  // finger goes halfway between them -- and half of a shrinking fret
+  // is not half of an even one.
+  const place = photoPlacement(options);
+  if (place !== undefined) {
+    const photo = place.photo;
+    if (fret <= 0) return alongPhoto(place, photoWireX(photo, 0));
+    return alongPhoto(place, (photoWireX(photo, fret - 1) + photoWireX(photo, fret)) / 2);
+  }
   const { first } = fretRange(options);
   const neck = guitarLayout(options).neck;
   const per = fretWidth(options);

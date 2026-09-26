@@ -14,13 +14,14 @@
  * the exported video paints exactly what the preview drew.
  */
 import {
-  boardHalfAt,
+  boardEdgesAt,
   fretCenter,
   fretRange,
   fretWidth,
   fretWires,
   guitarLayout,
   inlayFrets,
+  photoPlacement,
   positionsAt,
   stringLines,
   stringName,
@@ -67,12 +68,7 @@ function stringGap(options: FretboardOptions): number {
 }
 
 /** The edges of the board at a point along it: the wood outside the outer strings. */
-function boardEdges(options: FretboardOptions, x: number): { top: number; bottom: number } {
-  const board = guitarLayout(options).board;
-  const middle = board.y + board.height / 2;
-  const half = boardHalfAt(options, x);
-  return { top: middle - half, bottom: middle + half };
-}
+const boardEdges = boardEdgesAt;
 
 /** A tapered strip down the neck: the same shape the board itself is. */
 function taperedPath(
@@ -109,13 +105,30 @@ export function fretboardShapes(options: FretboardOptions): readonly StageShape[
     shapes.push(rectShape(0, 0, width, height, colors.background));
   }
 
+  // A photograph IS the instrument: there is nothing left for the
+  // wood, the frets, the strings or the body to do, and drawing them
+  // over the picture would only put a diagram on top of a guitar.
+  // Everything about the PLAYING still gets drawn, on top.
+  const picture = photoShapes(options);
+  if (picture.length > 0) {
+    return [
+      ...shapes,
+      ...picture,
+      ...handLegendShapes(options),
+      ...fretNumberShapes(options, colors),
+    ];
+  }
+
   const parts = { options, colors };
   shapes.push(...bodyShapes(parts));
   shapes.push(...headstockShapes(parts));
 
   const neck = layout.neck;
   const nutX = neck.x;
-  const endX = Math.min(width, layout.body.x + layout.body.width * 0.3);
+  // The board stops just past the joint: a fretboard extension, not a
+  // plank laid over the body. It used to run a third of the way
+  // across it and hide the horn.
+  const endX = Math.min(width, layout.body.x + (width - layout.body.x) * 0.06);
   const gap = stringGap(options);
   const bound = options.instrument === 'acoustic' || options.instrument === 'singleCut';
 
@@ -190,6 +203,31 @@ export function fretboardShapes(options: FretboardOptions): readonly StageShape[
 }
 
 /**
+ * The photograph, where it goes.
+ *
+ * One shape, and the only one in the engine a renderer cannot paint
+ * from numbers alone. The box is the whole file, scaled: the picture
+ * is not cropped to the frame, it is bigger than it, and the frame is
+ * a window onto it.
+ */
+function photoShapes(options: FretboardOptions): readonly StageShape[] {
+  const place = photoPlacement(options);
+  if (place === undefined) return [];
+  return [
+    {
+      kind: 'image',
+      x: place.x,
+      y: place.y,
+      width: place.photo.width * place.scale,
+      height: place.photo.height * place.scale,
+      fill: 'none',
+      href: place.photo.href,
+      role: 'photo',
+    },
+  ];
+}
+
+/**
  * The four-colour hand, in the band above the neck.
  *
  * The video's own legend: the colours on the neck mean nothing until
@@ -201,7 +239,15 @@ function handLegendShapes(options: FretboardOptions): readonly StageShape[] {
   if (options.handLegend !== true) return [];
   const band = guitarLayout(options).hand;
   if (!(band.height > 0)) return [];
-  const height = band.height * 0.94;
+  // A photographed neck is thinner than the band the drawn one fills,
+  // which leaves the legend stranded half a frame above the guitar it
+  // is explaining. It gets the whole gap instead, down to the board
+  // itself -- bigger, and beside the neck rather than adrift over it.
+  const floor =
+    photoPlacement(options) !== undefined
+      ? boardEdges(options, fretCenter(1, options)).top
+      : band.y + band.height;
+  const height = Math.max(band.height, floor - band.y) * 0.94;
   const width = height * 0.78;
   return translateShapes(
     handShapes({ width, height, handColor: '#F6EDE6', outline: 'rgba(0,0,0,0.35)' }),
@@ -444,15 +490,61 @@ function fretNumberShapes(options: FretboardOptions, colors: GuitarColors): read
   // a player looks for are numbered, and those get the room the three
   // frets between them leave.
   const everyFret = per * 0.5 >= height * 0.035;
-  const size = Math.min(wanted, per * (everyFret ? 0.5 : 1.4));
+  // A drawn neck leaves a strip at the bottom of the box for these.
+  // A photographed one does not: its board is thinner and sits where
+  // the picture puts it, so the numbers ride just under the board
+  // itself and lean with it, the way the markers on a neck do.
+  const photographed = photoPlacement(options) !== undefined;
+  // Drawn, every fret is the same width and one size fits all of
+  // them. Photographed, the twentieth fret is a quarter the width of
+  // the first: a size taken from the narrowest would be a size nobody
+  // can read, so it comes from the WIDEST and the crowded end of the
+  // neck simply goes unnumbered.
+  const size = photographed
+    ? Math.min(wanted, widestFret(options) * 0.42, boardDepth(options) * 0.3)
+    : Math.min(wanted, per * (everyFret ? 0.5 : 1.4));
   const shapes: StageShape[] = [];
 
+  // Two numbers on top of each other are two numbers nobody can
+  // read, so each one has to find room. The frets a player LOOKS for
+  // -- the ones with a marker in the wood -- get first refusal on the
+  // space; the rest fill in wherever they still fit.
+  const taken: { from: number; to: number }[] = [];
+  const room = (fret: number): boolean => {
+    const x = fretCenter(fret, options);
+    const ink = size * 0.62 * String(fret).length + size * 0.24;
+    const from = x - ink / 2;
+    const to = x + ink / 2;
+    if (taken.some((span) => from < span.to && to > span.from)) return false;
+    taken.push({ from, to });
+    return true;
+  };
+  const landmark = new Set(inlayFrets(options).map((inlay) => inlay.fret));
+  const chosen: number[] = [];
   for (let fret = Math.max(1, first + 1); fret <= last; fret++) {
-    if (!everyFret && fret % 3 !== 0 && !inlayFrets(options).some((i) => i.fret === fret)) continue;
+    if (landmark.has(fret) && room(fret)) chosen.push(fret);
+  }
+  for (let fret = Math.max(1, first + 1); fret <= last; fret++) {
+    if (landmark.has(fret)) continue;
+    // A drawn neck thins the numbers out by rule, because its frets
+    // are all one width and either they all fit or none of them do. A
+    // photograph does not need the rule: its frets are wide at the nut
+    // and narrow at the body, so the room test above thins them where
+    // they actually crowd and leaves the first frets -- the ones a
+    // beginner is reading -- numbered.
+    if (!everyFret && !photographed && fret % 3 !== 0) continue;
+    if (room(fret)) chosen.push(fret);
+  }
+  chosen.sort((a, b) => a - b);
+
+  for (const fret of chosen) {
+    const x = fretCenter(fret, options);
     shapes.push({
       kind: 'text',
-      x: fretCenter(fret, options),
-      y: layout.numbersY + (height - layout.numbersY) / 2,
+      x,
+      y: photographed
+        ? boardEdges(options, x).bottom + size * 0.9
+        : layout.numbersY + (height - layout.numbersY) / 2,
       width: per,
       height: height - layout.numbersY,
       fill: colors.fretNumber,
@@ -465,6 +557,31 @@ function fretNumberShapes(options: FretboardOptions, colors: GuitarColors): read
     });
   }
   return shapes;
+}
+
+/**
+ * How deep the board is at the nut.
+ *
+ * A photographed neck is a good deal thinner than the band a drawn
+ * one fills, and a number sized from the empty space under it would
+ * be a number bigger than the guitar's own fret markers. This is what
+ * the numbers belong to, so this is what they are sized from.
+ */
+function boardDepth(options: FretboardOptions): number {
+  const edges = boardEdges(options, fretCenter(1, options));
+  return Math.max(1, edges.bottom - edges.top);
+}
+
+/** The widest fret in the picture: the one with room to spare. */
+function widestFret(options: FretboardOptions): number {
+  const wires = fretWires(options);
+  let widest = 0;
+  for (let index = 1; index < wires.length; index++) {
+    const a = wires[index - 1] as { offset: number };
+    const b = wires[index] as { offset: number };
+    widest = Math.max(widest, b.offset - a.offset);
+  }
+  return widest > 0 ? widest : fretWidth(options);
 }
 
 /**
@@ -555,11 +672,18 @@ export function pickShapes(
   const struck = stringLines(options).filter((line) => mark.strings.includes(line.string));
   if (struck.length === 0) return [];
 
-  const height0 = layout.board.height;
-  const width = height0 * 0.13;
   // Over the body, where the picking hand really is -- and clear of
-  // the twelfth fret's inlay, which is what it used to sit on.
-  const centreX = layout.body.x + width * 0.9;
+  // the twelfth fret's inlay, which is what it used to sit on. On a
+  // photograph the body starts where the board stops, and the mark is
+  // sized from the neck it is beside rather than from the band the
+  // drawn one fills: a photographed neck is much the thinner of the
+  // two.
+  const place = photoPlacement(options);
+  const bodyX = place === undefined ? layout.body.x : place.x + place.photo.boardEndX * place.scale;
+  const edges = boardEdges(options, bodyX);
+  const height0 = place === undefined ? layout.board.height : edges.bottom - edges.top;
+  const width = height0 * 0.13;
+  const centreX = bodyX + width * 0.9;
   const ys = struck.map((line) => stringYAt(options, line.string, centreX));
   const first = Math.min(...ys);
   const last = Math.max(...ys);
@@ -639,6 +763,19 @@ function shapesToSvg(shapes: readonly StageShape[], width: number, height: numbe
       }
       if (shape.kind === 'path') {
         return tag('path', { d: shape.d ?? '', ...common });
+      }
+      if (shape.kind === 'image') {
+        // No fill: an image is not painted with one, and an SVG
+        // renderer that is handed `fill="none"` here draws nothing.
+        return tag('image', {
+          href: shape.href ?? '',
+          x: shape.x,
+          y: shape.y,
+          width: shape.width,
+          height: shape.height,
+          preserveAspectRatio: 'none',
+          ...(shape.opacity !== undefined ? { opacity: shape.opacity } : {}),
+        });
       }
       if (shape.kind === 'text') {
         return wrap(

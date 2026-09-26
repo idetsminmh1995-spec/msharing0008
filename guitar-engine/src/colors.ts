@@ -31,7 +31,11 @@ export const FINGER_COLORS = {
  *
  * Light board, black dots, a white scratchplate and three single
  * coils -- the instrument most people picture when they hear
- * "electric guitar", and the one the page opens on.
+ * "electric guitar". Its body is a two-tone sunburst rather than the
+ * black it used to be: these videos are cut on a dark frame, and a
+ * black guitar on a dark frame has no outline at all -- the body
+ * stops being a shape and the horns start reading as something else
+ * entirely.
  */
 export const DEFAULT_COLORS: GuitarColors = {
   board: '#D9AE6B',
@@ -54,10 +58,10 @@ export const DEFAULT_COLORS: GuitarColors = {
   pegPost: '#A8A29A',
   stringLabel: '#F1E7DC',
   stringLabelInk: '#20130D',
-  body: '#171717',
-  bodyEdge: '#000000',
-  bodyBurst: '#2A0F0A',
-  bodyCentre: '#3A3A3A',
+  body: '#C9762E',
+  bodyEdge: '#2A1206',
+  bodyBurst: '#5A2410',
+  bodyCentre: '#E8B45C',
   pickguard: '#F3F0E6',
   pickguardEdge: '#BEB8A8',
   soundhole: '#140B07',

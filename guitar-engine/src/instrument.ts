@@ -12,7 +12,7 @@
  * effects a canvas cannot paint -- so the video the page exports is
  * the same drawing as the preview.
  */
-import { guitarLayout, stringLines, stringYAt } from './fretboard.js';
+import { boardHalfAt, guitarLayout, stringLines, stringYAt } from './fretboard.js';
 import { circleShape, downward, pathShape, radial, rectShape } from './paint.js';
 import type { FretboardOptions, GuitarColors, Instrument, StageShape } from './types.js';
 
@@ -199,67 +199,186 @@ export function bodyShapes({ options, colors }: Parts): readonly StageShape[] {
   const body = layout.body;
   if (!(body.width > 0)) return [];
   const model = options.instrument ?? 'electric';
-  const middle = body.y + body.height / 2;
+  const geom = bodyGeometry(options, body);
   const shapes: StageShape[] = [];
 
   // The top. An acoustic is lit spruce, a single-cut is a sunburst,
   // and a plain electric is one colour with a sheen down it.
   const top =
     model === 'acoustic'
-      ? radial(body.x + body.width * 0.55, middle, body.width * 0.9, [
+      ? radial(geom.at(0.55), geom.middle, geom.visible * 1.1, [
           [0, colors.bodyCentre],
           [0.6, colors.body],
           [1, colors.bodyBurst],
         ])
       : model === 'singleCut'
-        ? radial(body.x + body.width * 0.5, middle, body.width * 0.85, [
+        ? radial(geom.at(0.55), geom.middle - body.height * 0.05, geom.visible * 1.05, [
+            [0, colors.bodyCentre],
+            [0.42, colors.body],
+            [0.85, colors.bodyBurst],
+            [1, colors.bodyEdge],
+          ])
+        : radial(geom.at(0.4), geom.middle, geom.visible * 1.15, [
             [0, colors.bodyCentre],
             [0.45, colors.body],
-            [1, colors.bodyBurst],
-          ])
-        : downward(body.y, body.height, [
-            [0, '#2E2E2E'],
-            [0.5, colors.body],
-            [1, '#050505'],
+            [0.88, colors.bodyBurst],
+            [1, colors.bodyEdge],
           ]);
-  const corner = Math.min(body.width, body.height) * 0.3;
+
+  // The OUTLINE is the instrument: a single-cut's horn where the neck
+  // joins, a dreadnought's shoulder, a double-cut's pair of horns. A
+  // rounded rectangle reads as a box with a guitar's colours on it,
+  // which is exactly what this used to be.
+  const outline = bodyOutline(model, geom);
+  const bounds = { x: body.x, y: body.y, width: body.width, height: body.height };
+  shapes.push(pathShape(outline, bounds, top, { role: 'body' }));
+  // The edge: cream binding on the bound instruments, a dark rim on
+  // the rest, following the same outline.
   shapes.push(
-    rectShape(body.x, body.y, body.width, body.height, top, { radius: corner, role: 'body' }),
-  );
-  // The edge: binding on the bound instruments, a shadow on the rest.
-  shapes.push(
-    rectShape(body.x, body.y, body.width, body.height, 'none', {
-      radius: corner,
+    pathShape(outline, bounds, 'none', {
       stroke: model === 'electric' ? colors.bodyEdge : colors.binding,
-      strokeWidth: Math.max(1, body.height * (model === 'electric' ? 0.02 : 0.035)),
+      // Measured against the NECK: the body is much taller, and a
+      // binding sized from it reads as a cream frame round a picture.
+      strokeWidth: Math.max(1, geom.neckHalf * (model === 'electric' ? 0.05 : 0.085)),
       role: 'body',
     }),
   );
 
-  if (model === 'acoustic') shapes.push(...acousticTop(body, middle, colors, options));
-  else if (model === 'singleCut') shapes.push(...singleCutTop(body, middle, colors, options));
-  else shapes.push(...electricTop(body, middle, colors, options));
+  if (model === 'acoustic') shapes.push(...acousticTop(geom, colors, options));
+  else if (model === 'singleCut') shapes.push(...singleCutTop(geom, colors, options));
+  else shapes.push(...electricTop(geom, colors, options));
 
   return shapes;
 }
 
-type Box = { x: number; y: number; width: number; height: number };
+/**
+ * The body, measured in what is actually SEEN of it.
+ *
+ * The body runs off the right-hand edge, so its own box is bigger
+ * than the picture. Everything about the shape -- where the horn is,
+ * where the pickup sits, how far the bout has got -- is laid out
+ * against the VISIBLE part, or it all ends up crowded into a sliver
+ * at the left while the interesting half is off-screen.
+ */
+export interface BodyGeometry {
+  readonly x: number;
+  readonly y: number;
+  readonly height: number;
+  /** How much of the body the picture actually shows. */
+  readonly visible: number;
+  /** A little past the right-hand edge, where the outline leaves. */
+  readonly right: number;
+  readonly middle: number;
+  /** Half the neck's height where it joins, so the waist meets it exactly. */
+  readonly neckHalf: number;
+  /**
+   * How far across the visible part a fraction lands: 0 at the joint,
+   * 1 at the right-hand edge of the picture.
+   *
+   * A field holding a function rather than a method, because every
+   * shape here pulls it out of the geometry on its own -- and a
+   * method pulled off its object is a method that has lost its
+   * `this`.
+   */
+  readonly at: (fraction: number) => number;
+}
+
+function bodyGeometry(
+  options: FretboardOptions,
+  body: { x: number; y: number; width: number; height: number },
+): BodyGeometry {
+  const visible = Math.max(1, options.width - body.x);
+  const board = guitarLayout(options).board;
+  return {
+    x: body.x,
+    y: body.y,
+    height: body.height,
+    visible,
+    right: body.x + Math.max(visible * 1.05, body.width),
+    // The STRINGS' middle, not the body's: the pickups and the bridge
+    // sit under the strings, and the body is taller than the neck.
+    middle: board.y + board.height / 2,
+    neckHalf: boardHalfAt(options, body.x),
+    at: (fraction: number) => body.x + visible * fraction,
+  };
+}
+
+/**
+ * The shape of the body, from the neck joint to off the right edge.
+ *
+ * Drawn as a real outline, in curves: the waist where the neck meets
+ * it, the horn (or horns) that make the cutaway, and the bout sweeping
+ * out past the frame. The right-hand side leaves the picture on
+ * purpose -- what is drawn is the part a player sees past their own
+ * fretting hand.
+ */
+function bodyOutline(model: Instrument, geom: BodyGeometry): string {
+  const { x, height, middle, neckHalf, right, at } = geom;
+  const top = geom.y + height * 0.04;
+  const bottom = geom.y + height * 0.96;
+  const jointTop = middle - neckHalf * 1.1;
+  const jointBottom = middle + neckHalf * 1.1;
+
+  if (model === 'acoustic') {
+    // A dreadnought: no horn, a shoulder that climbs away from the
+    // neck and the widest part of the body off to the right.
+    return [
+      `M${x} ${jointTop}`,
+      `C${at(0.1)} ${jointTop - height * 0.16} ${at(0.24)} ${top} ${at(0.55)} ${top}`,
+      `L${right} ${top}`,
+      `L${right} ${bottom}`,
+      `C${at(0.5)} ${bottom} ${at(0.18)} ${bottom} ${at(0.07)} ${bottom - height * 0.06}`,
+      `L${x} ${jointBottom}`,
+      'Z',
+    ].join(' ');
+  }
+
+  if (model === 'singleCut') {
+    // One horn, on the treble side where the neck joins, with a
+    // shallow scoop behind it: the cutaway that gives the shape its
+    // name. The tip is rounded -- a pointed one reads as a fin.
+    return [
+      `M${x} ${jointTop}`,
+      `C${at(0.04)} ${jointTop - height * 0.2} ${at(0.14)} ${top + height * 0.06} ${at(0.3)} ${top + height * 0.05}`,
+      `C${at(0.42)} ${top + height * 0.05} ${at(0.44)} ${top + height * 0.15} ${at(0.58)} ${top + height * 0.1}`,
+      `C${at(0.76)} ${top + height * 0.04} ${at(0.88)} ${top} ${right} ${top}`,
+      `L${right} ${bottom}`,
+      `C${at(0.68)} ${bottom} ${at(0.28)} ${bottom} ${at(0.12)} ${bottom - height * 0.07}`,
+      `L${x} ${jointBottom}`,
+      'Z',
+    ].join(' ');
+  }
+
+  // Double cutaway: a horn above and a horn below, the neck between
+  // them, both crests rounded rather than pointed.
+  return [
+    `M${x} ${jointTop}`,
+    `C${at(0.03)} ${jointTop - height * 0.2} ${at(0.1)} ${top + height * 0.06} ${at(0.24)} ${top + height * 0.05}`,
+    `C${at(0.36)} ${top + height * 0.05} ${at(0.4)} ${top + height * 0.2} ${at(0.54)} ${top + height * 0.13}`,
+    `C${at(0.72)} ${top + height * 0.05} ${at(0.84)} ${top} ${right} ${top}`,
+    `L${right} ${bottom}`,
+    `C${at(0.8)} ${bottom} ${at(0.56)} ${bottom} ${at(0.42)} ${bottom - height * 0.15}`,
+    `C${at(0.3)} ${bottom - height * 0.25} ${at(0.24)} ${bottom - height * 0.03} ${at(0.12)} ${bottom - height * 0.06}`,
+    `L${x} ${jointBottom}`,
+    'Z',
+  ].join(' ');
+}
 
 /** Soundhole, rosette, scratchplate and a pinned bridge. */
 function acousticTop(
-  body: Box,
-  middle: number,
+  geom: BodyGeometry,
   colors: GuitarColors,
   options: FretboardOptions,
 ): readonly StageShape[] {
   const shapes: StageShape[] = [];
-  const r = Math.min(body.width * 0.26, body.height * 0.3);
-  const cx = body.x + body.width * 0.56;
+  const { middle, height, at, visible } = geom;
+  const r = Math.min(visible * 0.3, height * 0.32);
+  const cx = at(0.52);
 
   // The scratchplate tucks under the soundhole, as it does on the real one.
   shapes.push(
     pathShape(
-      `M${cx} ${middle - r * 0.2} L${cx + r * 2.1} ${middle + r * 0.5} L${cx + r * 1.7} ${middle + r * 1.7} L${cx - r * 0.2} ${middle + r * 1.2} Z`,
+      `M${cx} ${middle - r * 0.2} L${cx + r * 2} ${middle + r * 0.55} L${cx + r * 1.6} ${middle + r * 1.7} L${cx - r * 0.2} ${middle + r * 1.2} Z`,
       { x: cx - r, y: middle, width: r * 3, height: r * 2 },
       colors.pickguard,
       { opacity: 0.9, role: 'pickguard' },
@@ -283,9 +402,9 @@ function acousticTop(
   );
 
   // The bridge, its saddle and six pins.
-  const bridgeX = body.x + body.width * 0.84;
-  const bridgeW = body.width * 0.12;
-  const bridgeH = body.height * 0.46;
+  const bridgeX = at(0.94);
+  const bridgeW = visible * 0.12;
+  const bridgeH = height * 0.46;
   shapes.push(
     rectShape(
       bridgeX,
@@ -318,35 +437,44 @@ function acousticTop(
 
 /** A scratchplate, three single coils and a six-saddle bridge. */
 function electricTop(
-  body: Box,
-  middle: number,
+  geom: BodyGeometry,
   colors: GuitarColors,
   options: FretboardOptions,
 ): readonly StageShape[] {
   const shapes: StageShape[] = [];
-  const plateX = body.x + body.width * 0.04;
-  const plateW = body.width * 0.78;
-  const plateH = body.height * 0.82;
+  const { middle, height, at, visible } = geom;
+  // The scratchplate, bowed like the body under it rather than drawn
+  // as a pill: a rounded rectangle this big reads as a white blob
+  // with a guitar hidden behind it.
+  const half = geom.neckHalf * 1.1;
+  // It stops short of the bridge and is narrower than the body, so
+  // the shape UNDER it still reads as a guitar. A plate drawn over
+  // the whole visible body is a white slab with a guitar behind it.
+  const plate = [
+    `M${at(0.02)} ${middle - half * 0.8}`,
+    `C${at(0.12)} ${middle - half * 1.12} ${at(0.4)} ${middle - half * 1.1} ${at(0.7)} ${middle - half * 0.94}`,
+    `C${at(0.78)} ${middle - half * 0.88} ${at(0.78)} ${middle + half * 0.88} ${at(0.7)} ${middle + half * 0.94}`,
+    `C${at(0.4)} ${middle + half * 1.1} ${at(0.12)} ${middle + half * 1.12} ${at(0.02)} ${middle + half * 0.8}`,
+    'Z',
+  ].join(' ');
   shapes.push(
-    rectShape(
-      plateX,
-      middle - plateH / 2,
-      plateW,
-      plateH,
-      downward(middle - plateH / 2, plateH, [
+    pathShape(
+      plate,
+      { x: at(0), y: middle - half * 1.2, width: visible, height: half * 2.4 },
+      downward(middle - half * 1.2, half * 2.4, [
         [0, '#FFFFFF'],
         [0.5, colors.pickguard],
         [1, colors.pickguardEdge],
       ]),
-      { radius: plateH * 0.28, role: 'pickguard' },
+      { role: 'pickguard' },
     ),
   );
 
   // Three pickups, leaning the way they do under the strings.
-  const pickupW = plateW * 0.12;
-  const pickupH = plateH * 0.6;
-  for (const [index, at] of [0.3, 0.52, 0.74].entries()) {
-    const x = plateX + plateW * at;
+  const pickupW = visible * 0.085;
+  const pickupH = geom.neckHalf * 1.55;
+  for (const [index, fraction] of [0.14, 0.36, 0.58].entries()) {
+    const x = at(fraction);
     const lean = (index - 1) * pickupH * 0.06;
     shapes.push(
       rectShape(
@@ -379,33 +507,30 @@ function electricTop(
   }
 
   // The bridge: a plate with a saddle per string.
-  const bridgeX = body.x + body.width * 0.87;
+  const bridgeX = at(0.94);
+  const bridgeW = visible * 0.08;
   shapes.push(
     rectShape(
       bridgeX,
-      middle - body.height * 0.3,
-      body.width * 0.09,
-      body.height * 0.6,
-      downward(middle - body.height * 0.3, body.height * 0.6, [
+      middle - height * 0.3,
+      bridgeW,
+      height * 0.6,
+      downward(middle - height * 0.3, height * 0.6, [
         [0, '#FFFFFF'],
         [0.4, colors.hardware],
         [1, colors.hardwareDark],
       ]),
-      { radius: body.width * 0.02, role: 'hardware' },
+      { radius: bridgeW * 0.2, role: 'hardware' },
     ),
   );
   for (const line of stringLines(options)) {
     const y = stringYAt(options, line.string, bridgeX);
-    if (Math.abs(y - middle) > body.height * 0.3) continue;
+    if (Math.abs(y - middle) > height * 0.3) continue;
     shapes.push(
-      rectShape(
-        bridgeX,
-        y - body.height * 0.028,
-        body.width * 0.09,
-        body.height * 0.056,
-        colors.hardwareDark,
-        { radius: body.height * 0.02, role: 'hardware' },
-      ),
+      rectShape(bridgeX, y - height * 0.028, bridgeW, height * 0.056, colors.hardwareDark, {
+        radius: height * 0.02,
+        role: 'hardware',
+      }),
     );
   }
   return shapes;
@@ -413,25 +538,47 @@ function electricTop(
 
 /** Two humbuckers, a tune-o-matic and a stopbar, with the knobs behind them. */
 function singleCutTop(
-  body: Box,
-  middle: number,
+  geom: BodyGeometry,
   colors: GuitarColors,
   options: FretboardOptions,
 ): readonly StageShape[] {
   const shapes: StageShape[] = [];
-  const pickupW = body.width * 0.15;
-  const pickupH = body.height * 0.54;
-  for (const at of [0.3, 0.55]) {
-    const x = body.x + body.width * at;
-    // The black surround, then the chrome cover on top of it.
+  const { middle, height, at, visible } = geom;
+
+  // A knob, up in the horn where the real one sits.
+  const knobR = Math.max(2, height * 0.062);
+  const knobX = at(0.26);
+  const knobY = geom.y + height * 0.14;
+  shapes.push(
+    circleShape(knobX, knobY, knobR * 1.15, 'rgba(0,0,0,0.35)', { role: 'hardware' }),
+    circleShape(
+      knobX,
+      knobY,
+      knobR,
+      radial(knobX - knobR * 0.4, knobY - knobR * 0.4, knobR * 1.9, [
+        [0, '#FFF6D8'],
+        [0.45, colors.knob],
+        [1, '#6E4E0E'],
+      ]),
+      { role: 'hardware' },
+    ),
+    circleShape(knobX, knobY, knobR * 0.45, 'rgba(0,0,0,0.18)', { role: 'hardware' }),
+  );
+
+  // The humbuckers: a black surround with a chrome cover in it, and a
+  // pole piece under every string it sits beneath.
+  const pickupW = visible * 0.15;
+  const pickupH = geom.neckHalf * 1.5;
+  for (const fraction of [0.5, 0.84]) {
+    const x = at(fraction);
     shapes.push(
       rectShape(
-        x - pickupW * 0.08,
-        middle - pickupH * 0.62,
-        pickupW * 1.16,
-        pickupH * 1.24,
+        x - pickupW * 0.12,
+        middle - pickupH * 0.66,
+        pickupW * 1.24,
+        pickupH * 1.32,
         colors.hardwareDark,
-        { radius: pickupW * 0.14, role: 'pickup' },
+        { radius: pickupW * 0.16, role: 'pickup' },
       ),
     );
     shapes.push(
@@ -445,60 +592,18 @@ function singleCutTop(
           [0.35, colors.pickup],
           [1, colors.pickupPole],
         ]),
-        { radius: pickupW * 0.1, role: 'pickup' },
+        { radius: pickupW * 0.12, role: 'pickup' },
       ),
     );
     for (const line of stringLines(options)) {
       const y = stringYAt(options, line.string, x);
-      if (Math.abs(y - middle) > pickupH * 0.42) continue;
+      if (Math.abs(y - middle) > pickupH * 0.44) continue;
       shapes.push(
-        circleShape(x + pickupW * 0.3, y, Math.max(0.6, pickupW * 0.08), colors.pickupPole, {
+        circleShape(x + pickupW * 0.34, y, Math.max(1, pickupW * 0.11), '#5E5852', {
           role: 'pickup',
         }),
       );
     }
-  }
-
-  // Bridge and tailpiece: two bars the strings run over and end at.
-  for (const [at, w] of [
-    [0.76, 0.045],
-    [0.88, 0.04],
-  ] as const) {
-    const x = body.x + body.width * at;
-    shapes.push(
-      rectShape(
-        x,
-        middle - body.height * 0.28,
-        body.width * w,
-        body.height * 0.56,
-        downward(middle - body.height * 0.28, body.height * 0.56, [
-          [0, '#FFFFFF'],
-          [0.4, colors.hardware],
-          [1, colors.hardwareDark],
-        ]),
-        { radius: body.width * 0.015, role: 'hardware' },
-      ),
-    );
-  }
-
-  // A pair of knobs, tucked at the bottom where they sit on the real one.
-  const knobR = Math.max(1.5, body.height * 0.075);
-  for (const at of [0.64, 0.78]) {
-    const x = body.x + body.width * at;
-    const y = body.y + body.height * 0.9;
-    shapes.push(
-      circleShape(
-        x,
-        y,
-        knobR,
-        radial(x - knobR * 0.4, y - knobR * 0.4, knobR * 1.8, [
-          [0, '#FFF3D0'],
-          [0.5, colors.knob],
-          [1, '#7A5A12'],
-        ]),
-        { role: 'hardware' },
-      ),
-    );
   }
   return shapes;
 }

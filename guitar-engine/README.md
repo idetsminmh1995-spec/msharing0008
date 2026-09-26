@@ -88,10 +88,11 @@ the preview.
 
 The picture reads as an instrument: a headstock with a tuning peg per
 string at one end, the fretted neck, and the body at the other —
-a soundhole and its rosette on an **acoustic**, two pickups and a
-bridge on an **electric**, with the wood changing to match. That is
-what `instrument: 'acoustic' | 'electric'` picks, and the strings run
-the whole length as they do on the real thing.
+a soundhole and its rosette on an **acoustic**, a scratchplate and
+three single coils on an **electric**, pearl blocks and two humbuckers
+on a **singleCut**, with the wood changing to match. That is what
+`instrument: 'acoustic' | 'electric' | 'singleCut'` picks, and the
+strings run the whole length as they do on the real thing.
 
 The fret numbers are ruled under the board in a faint ink, there to be
 glanced at rather than read. When the neck is drawn too small to carry
@@ -99,7 +100,44 @@ all of them, the ones a player actually looks for are kept — the
 inlaid frets and every third — rather than crushing twenty-two
 numbers into the space.
 
-## The neck is a diagram, not a photograph
+## Or a photograph, measured
+
+The drawn guitar is shapes and gradients, and it looks like what it
+is. When a picture of a REAL instrument is wanted instead, hand over a
+photograph:
+
+```js
+{ photo: guitarPhoto('assets/guitar/acoustic-cutaway.webp') }
+```
+
+and the drawn instrument is not drawn at all — no wood, no frets, no
+strings, no body. Everything about the PLAYING still is: the hand
+legend, the fret numbers, the marks and the picking strokes, on top of
+the picture.
+
+A picture on its own would be useless here, because a mark has to land
+on the fifth fret of the second string and only the file knows where
+that is. So a photograph arrives MEASURED (`photo.ts`): the x of every
+fret wire and the y of the outer strings at both ends of the board, in
+the file's own pixels. Scale and shift those with the picture and
+every mark lands where it belongs. `ACOUSTIC_CUTAWAY` holds the
+measurements of the one in `website/assets/guitar/`, which were read
+off the file itself — the wires are where the picture's wires are, not
+where the 17.817 rule says they should be.
+
+Two things follow from it being a photograph. The frets it shows are
+the frets there are, so `firstFret`/`lastFret` stop applying; and the
+spacing is the real one, so the numbers thin out where they crowd
+rather than printing over each other.
+
+The picture is scaled to the WIDTH of the frame and hung by its
+strings. It is bigger than the frame on purpose: a photographed guitar
+is framed by whoever took it, and cropping it to a box would throw
+that framing away, so the body runs off the top and the bottom the way
+the neck runs off the side. A canvas painting the shape list must cut
+it to the stage, as the SVG's viewBox does.
+
+## The drawn neck is a diagram, not a photograph
 
 Frets are evenly spaced rather than following the real 17.817 rule:
 this is drawn to be read, and even spacing keeps the high frets wide
