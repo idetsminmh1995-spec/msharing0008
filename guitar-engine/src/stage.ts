@@ -53,6 +53,9 @@ export {
 /** The widest a drawing of the hand may be, as a share of the frame. */
 const HAND_IMAGE_WIDEST = 0.18;
 
+/** The owner's hand is a little taller than it is wide: 165 by 196. */
+const HAND_SHAPE = 165 / 196;
+
 /** How big a played mark is, as a fraction of the gap between two strings. */
 const MARK_SIZE = 1.5;
 
@@ -297,11 +300,13 @@ function handLegendShapes(options: FretboardOptions): readonly StageShape[] {
   if (options.handLegend !== true) return [];
   const band = guitarLayout(options).hand;
   if (!(band.height > 0)) return [];
-  // The gap above the neck: down to the board's own top edge, which
-  // is where the guitar starts and the legend has to stop.
-  const floor = boardEdges(options, fretCenter(1, options)).top - boardDepth(options) * 0.2;
-  const height = Math.max(band.height, floor) * 0.94;
-  const width = height * 0.78;
+  // Its bottom is the board's own top edge, so it follows the guitar
+  // up and down the frame; its SIZE is the band's, which keeps it
+  // small. A legend is a thing to glance at once, and a big hand in
+  // the corner is a big hand in the corner for the whole video.
+  const floor = boardEdges(options, fretCenter(1, options)).top - boardDepth(options) * 0.25;
+  const height = Math.min(band.height, Math.max(0, floor)) * 0.86;
+  const width = height * HAND_SHAPE;
   const left = band.x + band.width * 0.012;
   // A drawing of the hand, when the caller has one, in the same place
   // and at the same size the built-in hand would have taken. Its own
@@ -457,6 +462,10 @@ export function markShapes(
   for (const position of positions) {
     if (!strings.has(position.string)) continue;
     if (position.fret < first || position.fret > last) continue;
+    // An OPEN string is not stopped by anything, so there is no
+    // fretting hand to point at: the right hand plucking it is the
+    // whole of what happens, and that is drawn over at the body.
+    if (position.fret <= 0 && !position.sliding) continue;
     const color = fingerColor(position.finger, colors);
     // A picture whose neck runs in from the left edge has its nut off
     // that edge, and an OPEN string is played at the nut. Drawing it
@@ -540,7 +549,10 @@ export function pickShapes(
   const edges = boardEdges(options, bodyX);
   const height0 = edges.bottom - edges.top;
   const width = height0 * 0.13;
-  const centreX = bodyX + width * 0.9;
+  // Clear of the board's end rather than half on it: the picking hand
+  // is over the body, and a mark lying across the last fret wire
+  // reads as something happening at the twenty-second fret.
+  const centreX = bodyX + height0 * 0.42;
   const ys = struck.map((line) => stringYAt(options, line.string, centreX));
   const first = Math.min(...ys);
   const last = Math.max(...ys);
@@ -551,7 +563,7 @@ export function pickShapes(
   // stroke to draw: each string gets the letter of the finger that
   // takes it, which is how fingerstyle has always been written.
   if (options.picking === 'fingers') {
-    return fingerstyleShapes(struck, options, colors, centreX, mark.age);
+    return fingerstyleShapes(struck, options, colors, centreX, mark.age, mark.direction);
   }
 
   const thickness = Math.max(1.5, width * 0.24);
@@ -577,13 +589,17 @@ export function pickShapes(
 }
 
 /**
- * p, i, m and a -- one letter per string, on the string.
+ * The right hand, drawn the way the left one is: the string it takes,
+ * in the colour of the digit that takes it.
  *
- * The right hand's own notation, and the only one that says anything
- * useful about fingerstyle: the thumb takes the basses and the three
- * fingers take the top three, so WHICH string a letter is on is the
- * whole instruction. Each sits on a dark disc, because a letter alone
- * would be lost against a rosette or a scratchplate.
+ * It used to be the letters p, i, m and a on a dark plaque, which is
+ * how fingerstyle has always been WRITTEN -- but a video is not a
+ * page, and a viewer who has learnt the hand in the corner already
+ * knows amber for the thumb. Same legend for both hands, and nothing
+ * to read.
+ *
+ * The stroke's direction gets its own arrow beside them, because a
+ * mark on a string cannot say which way the hand travelled.
  */
 function fingerstyleShapes(
   struck: readonly { string: number }[],
@@ -591,46 +607,90 @@ function fingerstyleShapes(
   colors: GuitarColors,
   centreX: number,
   age: number,
+  direction: PickMark['direction'],
 ): readonly StageShape[] {
   const gap = stringGap(options);
-  const size = gap * 1.3;
-  const shapes: StageShape[] = [];
+  const size = gap * MARK_SIZE;
   const fade = 1 - age;
+  const shapes: StageShape[] = [];
   const ys = struck.map((line) => stringYAt(options, line.string, centreX));
-  const top = Math.min(...ys);
-  const bottom = Math.max(...ys);
-  // ONE dark plaque behind the letters rather than a disc under each:
-  // p, i, m and a are often on four strings in a row, and four discs
-  // a string apart overlap into a blob.
-  shapes.push(
-    rectShape(
-      centreX - size * 0.6,
-      top - size * 0.62,
-      size * 1.2,
-      bottom - top + size * 1.24,
-      'rgba(0,0,0,0.5)',
-      { radius: size * 0.55, opacity: 0.92 * fade, role: 'pickStroke' },
-    ),
-  );
+
   for (const [index, line] of struck.entries()) {
     const y = ys[index] as number;
-    shapes.push({
-      kind: 'text',
-      x: centreX,
-      y,
-      width: size,
-      height: size,
-      fill: colors.pick,
-      opacity: 0.98 * fade,
-      role: 'pickStroke',
-      text: pluckingFinger(line.string),
-      fontSize: size,
-      fontWeight: 800,
-      align: 'middle',
-      baseline: 'middle',
-    });
+    const color = pluckColor(line.string, colors);
+    shapes.push(
+      circleShape(
+        centreX,
+        y,
+        size / 2,
+        radial(centreX - size * 0.18, y - size * 0.18, size * 0.9, [
+          [0, 'rgba(255,255,255,0.55)'],
+          [0.45, color],
+          [1, color],
+        ]),
+        { opacity: 0.98 * fade, role: 'pickStroke' },
+      ),
+    );
   }
-  return shapes;
+  return [...shapes, ...strokeArrowShapes(ys, centreX + size * 1.15, size, direction, fade)];
+}
+
+/**
+ * The little arrow that says which way the hand went.
+ *
+ * It points the way the stroke TRAVELS ACROSS THE PICTURE, which is
+ * the only thing a viewer can check against what they are looking at.
+ * String 1 is drawn at the top, as it is on a stave of tab, so a
+ * down-stroke -- from the bass string towards the treble -- climbs
+ * the picture and its arrow points up.
+ */
+function strokeArrowShapes(
+  ys: readonly number[],
+  x: number,
+  size: number,
+  direction: PickMark['direction'],
+  fade: number,
+): readonly StageShape[] {
+  if (ys.length === 0) return [];
+  const top = Math.min(...ys);
+  const bottom = Math.max(...ys);
+  const reach = Math.max(size * 1.6, bottom - top + size * 1.2);
+  const middle = (top + bottom) / 2;
+  const up = direction === 'down';
+  const tip = up ? middle - reach / 2 : middle + reach / 2;
+  const tail = up ? middle + reach / 2 : middle - reach / 2;
+  const head = size * 0.5;
+  const stem = Math.max(1.5, size * 0.16);
+  const pointing = up ? 1 : -1;
+  const d = [
+    `M${n(x - stem / 2)},${n(tail)}`,
+    `L${n(x + stem / 2)},${n(tail)}`,
+    `L${n(x + stem / 2)},${n(tip + head * pointing)}`,
+    `L${n(x + head)},${n(tip + head * pointing)}`,
+    `L${n(x)},${n(tip)}`,
+    `L${n(x - head)},${n(tip + head * pointing)}`,
+    `L${n(x - stem / 2)},${n(tip + head * pointing)}`,
+    'Z',
+  ].join('');
+  const bounds = { x: x - head, y: Math.min(tip, tail), width: head * 2, height: reach };
+  return [
+    pathShape(d, bounds, 'rgba(0,0,0,0.55)', { opacity: 0.85 * fade, role: 'pickStroke' }),
+    pathShape(d, bounds, '#F7F4F0', { opacity: 0.95 * fade, role: 'pickStroke' }),
+  ];
+}
+
+/** The colour of the digit that plucks a string: p amber, i red, m blue, a green. */
+function pluckColor(string: number, colors: GuitarColors): string {
+  switch (pluckingFinger(string)) {
+    case 'a':
+      return colors.ring;
+    case 'm':
+      return colors.middle;
+    case 'i':
+      return colors.index;
+    default:
+      return colors.thumb;
+  }
 }
 
 /**

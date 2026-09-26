@@ -164,7 +164,7 @@ test('the picking hand draws the two marks a guitarist already reads', () => {
   );
 });
 
-test('fingers are written a letter at a time, on the string each one takes', () => {
+test('fingers are drawn in their own colour, on the string each one takes', () => {
   const shapes = roled(
     G.stageShapes({
       ...STAGE,
@@ -173,31 +173,42 @@ test('fingers are written a letter at a time, on the string each one takes', () 
     }),
     'pickStroke',
   );
-  const letters = shapes.filter((shape) => shape.kind === 'text');
-  // p the thumb, then i, m, a -- a on the first string, and the thumb
-  // on everything below the third.
-  assert.equal(letters.map((letter) => letter.text).join(','), 'a,m,i,p');
-  // Each letter is ON its string, not in a row beside them.
+  // One mark per string, in the colour of the digit that takes it: a
+  // on the first, m on the second, i on the third, and the thumb on
+  // everything below. Same legend as the fretting hand's marks.
+  const marks = shapes.filter((shape) => shape.kind === 'circle');
+  const c = G.FINGER_COLORS;
+  assert.equal(marks.length, 4);
+  assert.equal(
+    marks.map((mark) => paintOf(mark)).join(','),
+    [c.ring, c.middle, c.index, c.thumb].join(','),
+  );
+  // Each mark is ON its string, not in a row beside them.
   for (const [index, string] of [1, 2, 3, 5].entries()) {
-    const letter = letters[index];
+    const mark = marks[index];
     assert.ok(
-      Math.abs(letter.y - G.stringYAt(STAGE, string, letter.x)) < 1e-6,
-      `${letter.text} is on string ${string}`,
+      Math.abs(mark.y - G.stringYAt(STAGE, string, mark.x)) < 1e-6,
+      `the mark for string ${string} is on it`,
     );
   }
-  // One dark plaque behind them all, so no letter is lost against a
-  // rosette -- and not a disc each, which would overlap into a blob
-  // the moment three strings in a row are plucked.
-  const plaques = shapes.filter((shape) => shape.kind === 'rect');
-  assert.equal(plaques.length, 1);
-  assert.ok(plaques[0].y < letters[0].y, 'it covers the first letter');
-  assert.ok(
-    plaques[0].y + plaques[0].height > letters[letters.length - 1].y,
-    'and the last one',
-  );
-  // No plectrum stroke when the hand is not holding one.
-  assert.equal(shapes.filter((shape) => shape.kind === 'path').length, 0);
-  // And it fades out the same way the plectrum's mark does.
+  // No letters any more: a viewer who has learnt the hand in the
+  // corner already knows amber for the thumb.
+  assert.equal(shapes.filter((shape) => shape.kind === 'text').length, 0);
+
+  // And one arrow beside them, saying which way the hand travelled.
+  // String 1 is drawn at the top, as on a stave of tab, so a
+  // down-stroke climbs the picture.
+  const arrows = shapes.filter((shape) => shape.kind === 'path');
+  assert.equal(arrows.length, 2, 'the arrow, and a dark one behind it');
+  assert.ok(arrows[0].x > marks[0].x, 'beside the marks, not over them');
+  const up = G.stageShapes({
+    ...STAGE,
+    picking: 'fingers',
+    pick: { direction: 'up', strings: [1, 2, 3, 5], age: 0 },
+  }).filter((shape) => shape.role === 'pickStroke' && shape.kind === 'path');
+  assert.notEqual(up[0].d, arrows[0].d, 'and it turns round for an up-stroke');
+
+  // It fades out the same way the plectrum's mark does.
   const late = roled(
     G.stageShapes({
       ...STAGE,
@@ -206,7 +217,7 @@ test('fingers are written a letter at a time, on the string each one takes', () 
     }),
     'pickStroke',
   );
-  assert.ok(late[late.length - 1].opacity < letters[0].opacity);
+  assert.ok(late[0].opacity < marks[0].opacity);
 });
 
 test('the hand legend is the page\u2019s own drawing when there is one', () => {
@@ -303,21 +314,27 @@ test('the SVG is the shape list written out', () => {
   assert.ok(/id="g[0-9a-z]+-\d+"/.test(svg), 'and their ids are this drawing\'s own');
 });
 
-test('the hand is plain, and the colour is on the fingers', () => {
+test('the hand is five coloured digits on a plain palm', () => {
   const shapes = G.handShapes({ width: 120, height: 160 });
   const c = G.FINGER_COLORS;
-  const used = [c.index, c.middle, c.ring, c.little];
-  // The top of each finger is painted in that finger's colour: at the
-  // size this is drawn in a video frame, a dot on the tip is a speck.
+  const used = [c.thumb, c.index, c.middle, c.ring, c.little];
   const coloured = shapes.filter((s) => used.includes(s.fill));
-  assert.equal(coloured.length, 4, 'one coloured finger each');
-  assert.equal(coloured.map((s) => s.fill).join(','), used.join(','), 'index through little');
-  for (let i = 1; i < coloured.length; i++) {
-    assert.ok(coloured[i].x > coloured[i - 1].x, 'left to right');
+  assert.equal(coloured.length, 5, 'the thumb and the four fingers');
+  assert.equal(coloured.map((s) => s.fill).join(','), used.join(','), 'thumb through little');
+  // The thumb is out to the LEFT of the fingers, and the fingers run
+  // index to little across.
+  const fingers = coloured.slice(1);
+  assert.ok(coloured[0].x < fingers[0].x, 'the thumb is furthest left');
+  for (let i = 1; i < fingers.length; i++) {
+    assert.ok(fingers[i].x > fingers[i - 1].x, 'left to right');
   }
-  // The hand itself carries none of the four colours: the only colour
-  // in the picture is the thing being explained.
+  // The palm carries none of the five: the only colours in the
+  // picture are the things being explained.
   const plain = shapes.filter((s) => !used.includes(s.fill));
-  assert.ok(plain.length >= 6, 'a palm, a thumb and four fingers');
-  assert.ok(plain.every((s) => !used.includes(s.fill)));
+  assert.equal(plain.length, 1, 'one palm');
+  // It keeps its own shape in a box of any proportion.
+  const wide = G.handShapes({ width: 400, height: 160 });
+  const tall = G.handShapes({ width: 120, height: 400 });
+  const ratio = (list) => list[1].width / list[1].height;
+  assert.ok(Math.abs(ratio(wide) - ratio(tall)) < 1e-6, 'never squashed to fill');
 });

@@ -114,7 +114,12 @@ export interface GuitarColors {
   readonly unassigned: string;
   /** An open string: played, but by no finger. */
   readonly open: string;
-  /** 1 index, 2 middle, 3 ring, 4 little. */
+  /**
+   * The five digits. 1 index, 2 middle, 3 ring, 4 little for the
+   * fretting hand; the thumb is the picking hand's `p`, which is the
+   * only place it ever plays.
+   */
+  readonly thumb: string;
   readonly index: string;
   readonly middle: string;
   readonly ring: string;

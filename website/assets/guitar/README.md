@@ -2,22 +2,32 @@
 
 ## The hand
 
-`hand-fingers.webp` — the four-colour hand in the corner of the frame,
-and the same drawing in the card beside the controls. It is the
-LEGEND: a viewer who has seen it knows what each colour means for the
-rest of the video.
+There is no hand FILE any more. The engine draws it, from the owner's
+own outline: a flat silhouette, palm on, four fingers up and the thumb
+out to the left, in `guitar-engine/src/hand.ts`. The same drawing
+appears twice — small in the corner of the video frame, and in the
+card beside the controls — because the card has to teach exactly what
+the video will show.
 
-Its fingertip colours are the engine's finger colours, to the hex
-(`FINGER_COLORS` in `guitar-engine/src/colors.ts`) — index `#FF725F`,
-middle `#6EB2FF`, ring `#3FE489`, little `#FF7DE4`. **Changing a
-fingertip in this file means changing that constant with it**, or the
-video will name a colour the neck never shows. Its size is recorded as
-`HAND_PICTURE` in `guitar-engine/src/hand.ts`, so the frame can lay it
-out before the browser has finished loading it; replacing the file
-with one of a different size means changing those two numbers.
+Every digit is painted, **thumb included**, and those five colours are
+the engine's own (`FINGER_COLORS` in `guitar-engine/src/colors.ts`):
 
-Trimmed to the ink, transparent background, drawn with the thumb to
-the left and the fingers up.
+```
+thumb  #FFC93C amber    index  #FF725F red
+middle #6EB2FF blue     ring   #3FE489 green
+little #FF7DE4 pink
+```
+
+Four of them are read off the drawing the owner sent when the hand
+was still a file; the thumb's amber is the engine's own. They are the
+colours of everything the hands do: a fretting finger's mark on the
+neck, and the right hand's mark on the string it plucks. Change one
+and both change, which is the point.
+
+It is drawn out of rounded RECTANGLES and nothing else. The legend is
+built into the stage and then moved into its corner, and moving a
+rectangle is adding two numbers to it; an arc would have to be
+re-written, and a mis-shifted arc is a hand with a broken thumb.
 
 ## The guitars
 

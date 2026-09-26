@@ -30,22 +30,29 @@ Nothing is inferred from pitch. Where a score writes no tab position,
 this engine draws nothing rather than guessing a shape — an invented
 fingering shown confidently is worse than an empty neck.
 
-## The four fingers, in colours that do not move
+## The five digits, in colours that do not move
 
 `finger` is numbered as a score numbers them: **1 index, 2 middle,
 3 ring, 4 little**, and **0 an open string** — played, but by no
-finger, so it has its own colour rather than borrowing one.
+finger. An open string gets NO mark on the neck at all: nothing is
+stopping it, so there is nothing to point at, and the right hand
+plucking it is the whole of what happens.
 
-The four colours are **fixed**, not pickable:
+The colours are **fixed**, not pickable:
 
 ```
+p thumb   #FFC93C amber
 1 index   #FF725F red     2 middle  #6EB2FF blue
 3 ring    #3FE489 green   4 little  #FF7DE4 pink
 ```
 
+The thumb is there because the PICKING hand uses it, and both hands
+are drawn from the same five colours: a fretting finger's mark on the
+neck, and the right hand's mark on the string it plucks.
+
 Their whole job is to be learnt once. A viewer who has seen the hand
 knows what red means for the rest of the video, and for the next video
-too; four colours anyone can re-pick is four colours nobody can learn.
+too; five colours anyone can re-pick is five colours nobody can learn.
 
 They are read off the page's own drawing of the hand, to the hex: the
 legend is what teaches the code, so a mark a shade off the fingertip
@@ -122,12 +129,22 @@ there, which it always is.
 they are two different notations because they are two different
 things to watch. A plectrum strikes the strings together, so it is
 ONE mark over all of them: the square bracket down, the V up, which
-every guitarist has read above a stave since they started. Fingers
-pluck the strings one at a time, so each gets the letter of the
-finger that takes it — **a** on the first string, **m** on the
-second, **i** on the third and **p**, the thumb, on everything below.
-The letters sit on a dark plaque, because a letter alone is lost
-against a rosette.
+every guitarist has read above a stave since they started.
+
+Fingers pluck the strings one at a time, so each plucked string gets
+a mark of its own, in the COLOUR of the digit that takes it — **a**
+on the first string, **m** on the second, **i** on the third and
+**p**, the thumb, on everything below. It used to be those letters on
+a dark plaque, which is how fingerstyle has always been written; but
+a video is not a page, and a viewer who has learnt the hand in the
+corner already knows amber for the thumb. Same legend for both hands,
+and nothing to read.
+
+The stroke's direction gets its own small arrow beside the marks,
+pointing the way the hand TRAVELS ACROSS THE PICTURE — which is the
+only thing a viewer can check against what they are looking at.
+String 1 is drawn at the top, as it is on a stave of tab, so a
+down-stroke climbs the picture and its arrow points up.
 
 The fret numbers are ruled under the board in a faint ink, there to be
 glanced at rather than read. When the neck is drawn too small to carry

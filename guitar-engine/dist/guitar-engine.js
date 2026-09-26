@@ -562,6 +562,7 @@ var GuitarEngine = (() => {
 
   // src/colors.ts
   var FINGER_COLORS = {
+    thumb: "#FFC93C",
     index: "#FF725F",
     middle: "#6EB2FF",
     ring: "#3FE489",
@@ -680,81 +681,72 @@ var GuitarEngine = (() => {
   function handPicture(href) {
     return { ...HAND_PICTURE, href };
   }
-  var FINGER_LENGTH = {
-    1: 0.88,
-    2: 1,
-    3: 0.94,
-    4: 0.74
+  var ART = { width: 165, height: 196 };
+  var FINGERS = {
+    1: { from: 57, to: 73, tip: 42 },
+    2: { from: 75, to: 91, tip: 30 },
+    3: { from: 95, to: 111, tip: 42 },
+    4: { from: 113, to: 129, tip: 54 }
   };
+  var PALM = { from: 57, to: 129, top: 96, bottom: 172 };
+  var THUMB = { from: 22, to: 80, top: 106, bottom: 138 };
   function handShapes(options) {
     const colors = resolveColors(options.colors);
     const { width, height } = options;
     if (!(width > 0) || !(height > 0)) return [];
-    const skin = options.handColor ?? "#F2E7DF";
-    const outline = options.outline ?? "#8A7C74";
-    const line = Math.max(1, width * 0.012);
-    const shapes = [];
-    const palmLeft = width * 0.22;
-    const palmRight = width * 0.94;
-    const palmTop = height * 0.5;
-    const palmWidth = palmRight - palmLeft;
-    const palmHeight = height - palmTop - height * 0.03;
-    const thumbWidth = palmWidth * 0.26;
-    shapes.push({
+    const scale = Math.min(width / ART.width, height / ART.height);
+    const offsetX = (width - ART.width * scale) / 2;
+    const offsetY = (height - ART.height * scale) / 2;
+    const bar = (from, to, top, bottom, fill, round) => ({
       kind: "rect",
-      x: palmLeft - thumbWidth * 0.8,
-      y: palmTop + palmHeight * 0.16,
-      width: thumbWidth,
-      height: palmHeight * 0.66,
-      fill: skin,
-      stroke: outline,
-      strokeWidth: line,
-      radius: thumbWidth / 2
+      x: offsetX + from * scale,
+      y: offsetY + top * scale,
+      width: (to - from) * scale,
+      height: (bottom - top) * scale,
+      fill,
+      radius: round * scale,
+      ...options.outline === void 0 ? {} : { stroke: options.outline, strokeWidth: Math.max(1, width * 0.01) }
     });
-    shapes.push({
-      kind: "rect",
-      x: palmLeft,
-      y: palmTop,
-      width: palmWidth,
-      height: palmHeight,
-      fill: skin,
-      stroke: outline,
-      strokeWidth: line,
-      radius: Math.min(palmWidth, palmHeight) * 0.3
-    });
-    const gap = palmWidth * 0.06;
-    const fingerWidth = (palmWidth - gap * 3) / 4;
-    const longest = palmTop - height * 0.06;
-    const dots = [];
+    const shapes = [
+      bar(
+        THUMB.from,
+        THUMB.to,
+        THUMB.top,
+        THUMB.bottom,
+        colors.thumb,
+        (THUMB.bottom - THUMB.top) / 2
+      )
+    ];
+    const tint = {
+      1: colors.index,
+      2: colors.middle,
+      3: colors.ring,
+      4: colors.little
+    };
     for (const key of [1, 2, 3, 4]) {
-      const index = key - 1;
-      const length = longest * FINGER_LENGTH[key];
-      const x = palmLeft + index * (fingerWidth + gap);
-      const y = palmTop - length;
-      shapes.push({
-        kind: "rect",
-        x,
-        y,
-        width: fingerWidth,
-        // Reaching into the palm, so no seam shows where they meet.
-        height: length + palmHeight * 0.32,
-        fill: skin,
-        stroke: outline,
-        strokeWidth: line,
-        radius: fingerWidth / 2
-      });
-      const colour = key === 1 ? colors.index : key === 2 ? colors.middle : key === 3 ? colors.ring : colors.little;
-      dots.push({
-        kind: "rect",
-        x,
-        y,
-        width: fingerWidth,
-        height: length * 0.62,
-        fill: colour,
-        radius: fingerWidth / 2
-      });
+      const finger = FINGERS[key];
+      shapes.push(
+        bar(
+          finger.from,
+          finger.to,
+          finger.tip,
+          PALM.top + 24,
+          tint[key],
+          (finger.to - finger.from) / 2
+        )
+      );
     }
-    return [...shapes, ...dots];
+    shapes.push(
+      bar(
+        PALM.from,
+        PALM.to,
+        PALM.top,
+        PALM.bottom,
+        options.handColor ?? "#F2E7DF",
+        (PALM.to - PALM.from) / 4.2
+      )
+    );
+    return shapes;
   }
   function renderHand(options) {
     const gradients = new GradientBank();
@@ -842,6 +834,7 @@ var GuitarEngine = (() => {
 
   // src/stage.ts
   var HAND_IMAGE_WIDEST = 0.18;
+  var HAND_SHAPE = 165 / 196;
   var MARK_SIZE = 1.5;
   function stringGap(options) {
     const lines = stringLines(options);
@@ -973,9 +966,9 @@ var GuitarEngine = (() => {
     if (options.handLegend !== true) return [];
     const band = guitarLayout(options).hand;
     if (!(band.height > 0)) return [];
-    const floor = boardEdges(options, fretCenter(1, options)).top - boardDepth(options) * 0.2;
-    const height = Math.max(band.height, floor) * 0.94;
-    const width = height * 0.78;
+    const floor = boardEdges(options, fretCenter(1, options)).top - boardDepth(options) * 0.25;
+    const height = Math.min(band.height, Math.max(0, floor)) * 0.86;
+    const width = height * HAND_SHAPE;
     const left = band.x + band.width * 0.012;
     const picture = options.handImage;
     if (picture !== void 0 && picture.width > 0 && picture.height > 0) {
@@ -1077,6 +1070,7 @@ var GuitarEngine = (() => {
     for (const position of positions) {
       if (!strings.has(position.string)) continue;
       if (position.fret < first || position.fret > last) continue;
+      if (position.fret <= 0 && !position.sliding) continue;
       const color = fingerColor(position.finger, colors);
       const x = Math.max(size * 0.6, fretCenter(position.fret, options));
       const y = stringYAt(options, position.string, x);
@@ -1127,7 +1121,7 @@ var GuitarEngine = (() => {
     const edges = boardEdges(options, bodyX);
     const height0 = edges.bottom - edges.top;
     const width = height0 * 0.13;
-    const centreX = bodyX + width * 0.9;
+    const centreX = bodyX + height0 * 0.42;
     const ys = struck.map((line) => stringYAt(options, line.string, centreX));
     const first = Math.min(...ys);
     const last = Math.max(...ys);
@@ -1135,7 +1129,7 @@ var GuitarEngine = (() => {
     const spread = last - first;
     const height = Math.max(height0 * 0.2, spread + height0 * 0.08);
     if (options.picking === "fingers") {
-      return fingerstyleShapes(struck, options, colors, centreX, mark.age);
+      return fingerstyleShapes(struck, options, colors, centreX, mark.age, mark.direction);
     }
     const thickness = Math.max(1.5, width * 0.24);
     const d = mark.direction === "down" ? downStrokePath(centreX, centreY, width, height, thickness) : upStrokePath(centreX, centreY, width, height, thickness);
@@ -1149,43 +1143,70 @@ var GuitarEngine = (() => {
       pathShape(d, bounds, colors.pick, { opacity: 0.95 * (1 - mark.age), role: "pickStroke" })
     ];
   }
-  function fingerstyleShapes(struck, options, colors, centreX, age) {
+  function fingerstyleShapes(struck, options, colors, centreX, age, direction) {
     const gap = stringGap(options);
-    const size = gap * 1.3;
-    const shapes = [];
+    const size = gap * MARK_SIZE;
     const fade = 1 - age;
+    const shapes = [];
     const ys = struck.map((line) => stringYAt(options, line.string, centreX));
-    const top = Math.min(...ys);
-    const bottom = Math.max(...ys);
-    shapes.push(
-      rectShape(
-        centreX - size * 0.6,
-        top - size * 0.62,
-        size * 1.2,
-        bottom - top + size * 1.24,
-        "rgba(0,0,0,0.5)",
-        { radius: size * 0.55, opacity: 0.92 * fade, role: "pickStroke" }
-      )
-    );
     for (const [index, line] of struck.entries()) {
       const y = ys[index];
-      shapes.push({
-        kind: "text",
-        x: centreX,
-        y,
-        width: size,
-        height: size,
-        fill: colors.pick,
-        opacity: 0.98 * fade,
-        role: "pickStroke",
-        text: pluckingFinger(line.string),
-        fontSize: size,
-        fontWeight: 800,
-        align: "middle",
-        baseline: "middle"
-      });
+      const color = pluckColor(line.string, colors);
+      shapes.push(
+        circleShape(
+          centreX,
+          y,
+          size / 2,
+          radial(centreX - size * 0.18, y - size * 0.18, size * 0.9, [
+            [0, "rgba(255,255,255,0.55)"],
+            [0.45, color],
+            [1, color]
+          ]),
+          { opacity: 0.98 * fade, role: "pickStroke" }
+        )
+      );
     }
-    return shapes;
+    return [...shapes, ...strokeArrowShapes(ys, centreX + size * 1.15, size, direction, fade)];
+  }
+  function strokeArrowShapes(ys, x, size, direction, fade) {
+    if (ys.length === 0) return [];
+    const top = Math.min(...ys);
+    const bottom = Math.max(...ys);
+    const reach = Math.max(size * 1.6, bottom - top + size * 1.2);
+    const middle = (top + bottom) / 2;
+    const up = direction === "down";
+    const tip = up ? middle - reach / 2 : middle + reach / 2;
+    const tail = up ? middle + reach / 2 : middle - reach / 2;
+    const head = size * 0.5;
+    const stem = Math.max(1.5, size * 0.16);
+    const pointing = up ? 1 : -1;
+    const d = [
+      `M${n(x - stem / 2)},${n(tail)}`,
+      `L${n(x + stem / 2)},${n(tail)}`,
+      `L${n(x + stem / 2)},${n(tip + head * pointing)}`,
+      `L${n(x + head)},${n(tip + head * pointing)}`,
+      `L${n(x)},${n(tip)}`,
+      `L${n(x - head)},${n(tip + head * pointing)}`,
+      `L${n(x - stem / 2)},${n(tip + head * pointing)}`,
+      "Z"
+    ].join("");
+    const bounds = { x: x - head, y: Math.min(tip, tail), width: head * 2, height: reach };
+    return [
+      pathShape(d, bounds, "rgba(0,0,0,0.55)", { opacity: 0.85 * fade, role: "pickStroke" }),
+      pathShape(d, bounds, "#F7F4F0", { opacity: 0.95 * fade, role: "pickStroke" })
+    ];
+  }
+  function pluckColor(string, colors) {
+    switch (pluckingFinger(string)) {
+      case "a":
+        return colors.ring;
+      case "m":
+        return colors.middle;
+      case "i":
+        return colors.index;
+      default:
+        return colors.thumb;
+    }
   }
   function pluckingFinger(string) {
     if (string === 1) return "a";

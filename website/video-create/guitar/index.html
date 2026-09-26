@@ -599,10 +599,6 @@
            src="../../assets/guitar/electric-drawn.svg" alt="" style="display:none" decoding="async">
       <img data-stage-image data-guitar-photo="strat-drawn"
            src="../../assets/guitar/strat-drawn.svg" alt="" style="display:none" decoding="async">
-      <!-- The hand in the corner of the frame: the page's own drawing,
-           not the one the engine used to assemble out of rectangles. -->
-      <img data-stage-image id="handPicture" src="../../assets/guitar/hand-fingers.webp"
-           alt="" style="display:none" decoding="async">
     </div>
 
     <div class="transport">
@@ -1100,20 +1096,6 @@
   );
   /** Every picture the stage can draw: the guitars, and the hand. */
   const stageImages = [...document.querySelectorAll('img[data-stage-image]')];
-  const handImageEl = document.getElementById('handPicture');
-
-  /**
-   * The drawing of the hand for the legend in the corner.
-   *
-   * The engine still decides where it goes and how big -- that has to
-   * agree with the neck beside it -- and draws its own rectangle hand
-   * if this is missing, so a lost file costs the artwork rather than
-   * the legend.
-   */
-  function handImage() {
-    if (!handImageEl || typeof GuitarEngine === 'undefined') return undefined;
-    return GuitarEngine.handPicture(handImageEl.getAttribute('src'));
-  }
 
   /**
    * The photograph to draw the picked guitar with, if there is one.
@@ -1393,7 +1375,6 @@
       // colour behind it, the engine fades those cuts out instead of
       // leaving two hard lines across the guitar.
       fadeTo: frameBackground(),
-      handImage: handImage(),
       picking: picking(),
       fretNumbers: true,
       // The guitar fills the frame the way a photographed one does:
@@ -1452,19 +1433,23 @@
     // The same drawing the video frame carries, so the card is
     // teaching exactly what the video will show.
     if (fingerHand) {
-      const src = handImageEl?.getAttribute('src');
-      fingerHand.innerHTML = src
-        ? `<img src="${src}" alt="" style="height:150px;width:auto;display:block;margin:0 auto">`
-        : GuitarEngine.renderHand({ width: 120, height: 150 });
+      fingerHand.innerHTML = GuitarEngine.renderHand({ width: 126, height: 150 });
     }
     if (fingerNames) {
-      const names = GuitarEngine.FINGER_NAMES;
-      const key = { 1: 'index', 2: 'middle', 3: 'ring', 4: 'little' };
-      fingerNames.innerHTML = [1, 2, 3, 4]
+      // Five digits, not four: the thumb has a colour too, because
+      // the picking hand's p is drawn in it.
+      const digits = [
+        ['thumb', 'Thumb', 'p'],
+        ['index', 'Index', '1'],
+        ['middle', 'Middle', '2'],
+        ['ring', 'Ring', '3'],
+        ['little', 'Little', '4'],
+      ];
+      fingerNames.innerHTML = digits
         .map(
-          (n) =>
-            `<div><span class="finger-swatch" style="background:${colors[key[n]]}"></span>${names[n]}</div>` +
-            `<div><b>${n}</b></div>`,
+          ([key, name, mark]) =>
+            `<div><span class="finger-swatch" style="background:${colors[key]}"></span>${name}</div>` +
+            `<div><b>${mark}</b></div>`,
         )
         .join('');
     }
