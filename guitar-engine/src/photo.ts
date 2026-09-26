@@ -91,6 +91,21 @@ export interface GuitarPhotograph {
    */
   readonly span?: readonly [number, number];
   /**
+   * Where the picking hand sits, along the strings, in the file's own
+   * pixels.
+   *
+   * It has to be measured like everything else here, because every
+   * guitar puts something different in the way. Half way from the
+   * board's end to the bridge lands on the neck pickup of one and the
+   * bridge pickup of the next; over the soundhole on a dreadnought is
+   * right, and between the pickups on an electric is right, and there
+   * is no share of anything that is both.
+   *
+   * Without it the mark goes just past the end of the board, which is
+   * at least not on the frets.
+   */
+  readonly pickX?: number;
+  /**
    * How far DOWN the frame to hang this picture, as a share of the
    * stage's height.
    *
@@ -158,6 +173,8 @@ export const ACOUSTIC_DRAWN: PhotoMeasurements = {
   // the fretboard belongs down at the bottom, with the body running
   // off the bottom edge and the notation over the space it leaves.
   drop: 0.31,
+  // Just behind the soundhole, towards the bridge.
+  pickX: 1180,
 };
 
 /**
@@ -209,6 +226,8 @@ export const CLASSICAL_DRAWN: PhotoMeasurements = {
   // the fretboard belongs down at the bottom, with the body running
   // off the bottom edge and the notation over the space it leaves.
   drop: 0.31,
+  // Over the soundhole.
+  pickX: 1010,
 };
 
 /**
@@ -257,6 +276,8 @@ export const STRAT_DRAWN: PhotoMeasurements = {
   // the fretboard belongs down at the bottom, with the body running
   // off the bottom edge and the notation over the space it leaves.
   drop: 0.31,
+  // Between the neck pickup and the middle one.
+  pickX: 2350,
 };
 
 /**
@@ -316,6 +337,8 @@ export const ELECTRIC_DRAWN: PhotoMeasurements = {
   // the fretboard belongs down at the bottom, with the body running
   // off the bottom edge and the notation over the space it leaves.
   drop: 0.31,
+  // Between the neck pickup and the bridge one.
+  pickX: 1370,
 };
 /**
  * Every set of measurements this engine carries, by the name of the

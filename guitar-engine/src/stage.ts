@@ -22,6 +22,7 @@ import {
   guitarLayout,
   inlayFrets,
   photoPlacement,
+  pickingX,
   positionsAt,
   stringLines,
   stringYAt,
@@ -549,10 +550,12 @@ export function pickShapes(
   const edges = boardEdges(options, bodyX);
   const height0 = edges.bottom - edges.top;
   const width = height0 * 0.13;
-  // Clear of the board's end rather than half on it: the picking hand
-  // is over the body, and a mark lying across the last fret wire
-  // reads as something happening at the twenty-second fret.
-  const centreX = bodyX + height0 * 0.42;
+  // Where the hand really is: out past the board and roughly half way
+  // to the bridge. Clear of the last fret wire, where a mark reads as
+  // something happening at the twenty-second fret, and clear of the
+  // neck pickup and the rim of the soundhole, which is where it
+  // landed when it was only clear of the board.
+  const centreX = pickingX(options) ?? bodyX + height0 * 0.42;
   const ys = struck.map((line) => stringYAt(options, line.string, centreX));
   const first = Math.min(...ys);
   const last = Math.max(...ys);
@@ -659,23 +662,33 @@ function strokeArrowShapes(
   const up = direction === 'down';
   const tip = up ? middle - reach / 2 : middle + reach / 2;
   const tail = up ? middle + reach / 2 : middle - reach / 2;
+  const pointing = up ? 1 : -1;
+  const arrow = (head: number, stem: number): string =>
+    [
+      `M${n(x - stem / 2)},${n(tail)}`,
+      `L${n(x + stem / 2)},${n(tail)}`,
+      `L${n(x + stem / 2)},${n(tip + head * pointing)}`,
+      `L${n(x + head)},${n(tip + head * pointing)}`,
+      `L${n(x)},${n(tip)}`,
+      `L${n(x - head)},${n(tip + head * pointing)}`,
+      `L${n(x - stem / 2)},${n(tip + head * pointing)}`,
+      'Z',
+    ].join('');
   const head = size * 0.5;
   const stem = Math.max(1.5, size * 0.16);
-  const pointing = up ? 1 : -1;
-  const d = [
-    `M${n(x - stem / 2)},${n(tail)}`,
-    `L${n(x + stem / 2)},${n(tail)}`,
-    `L${n(x + stem / 2)},${n(tip + head * pointing)}`,
-    `L${n(x + head)},${n(tip + head * pointing)}`,
-    `L${n(x)},${n(tip)}`,
-    `L${n(x - head)},${n(tip + head * pointing)}`,
-    `L${n(x - stem / 2)},${n(tip + head * pointing)}`,
-    'Z',
-  ].join('');
-  const bounds = { x: x - head, y: Math.min(tip, tail), width: head * 2, height: reach };
+  const bounds = { x: x - head * 1.5, y: Math.min(tip, tail), width: head * 3, height: reach };
+  // A dark arrow a size larger behind the light one, so it reads on a
+  // white scratchplate and on a black body alike -- the same trick
+  // the plectrum's stroke uses.
   return [
-    pathShape(d, bounds, 'rgba(0,0,0,0.55)', { opacity: 0.85 * fade, role: 'pickStroke' }),
-    pathShape(d, bounds, '#F7F4F0', { opacity: 0.95 * fade, role: 'pickStroke' }),
+    pathShape(arrow(head * 1.4, stem * 2.6), bounds, 'rgba(0,0,0,0.55)', {
+      opacity: 0.85 * fade,
+      role: 'pickStroke',
+    }),
+    pathShape(arrow(head, stem), bounds, '#F7F4F0', {
+      opacity: 0.98 * fade,
+      role: 'pickStroke',
+    }),
   ];
 }
 

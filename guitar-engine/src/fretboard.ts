@@ -238,6 +238,25 @@ function photoDrop(photo: GuitarPhotograph | PhotoMeasurements): number {
   return typeof drop === 'number' && drop > -0.9 && drop < 0.9 ? drop : 0;
 }
 
+/**
+ * Where the picking hand sits: along the strings, past the board.
+ *
+ * Measured, like everything else about a picture, because every
+ * guitar puts something different in the way: over the soundhole on
+ * a dreadnought, between the pickups on an electric, and no share of
+ * the run from the board's end to the bridge is both. Without a
+ * measurement the mark goes just past the board, which is at least
+ * not on the frets.
+ */
+export function pickingX(options: FretboardOptions): number | undefined {
+  const place = photoPlacement(options);
+  if (place === undefined) return undefined;
+  const measured = place.photo.pickX;
+  const along =
+    typeof measured === 'number' && Number.isFinite(measured) ? measured : place.photo.boardEndX;
+  return alongPhoto(place, along);
+}
+
 /** A length along the file, where it lands in the picture. */
 function alongPhoto(place: PhotoPlacement, x: number): number {
   return place.x + x * place.scale;

@@ -108,7 +108,9 @@ var GuitarEngine = (() => {
     // How far down the frame the neck sits. The owner drew an arrow:
     // the fretboard belongs down at the bottom, with the body running
     // off the bottom edge and the notation over the space it leaves.
-    drop: 0.31
+    drop: 0.31,
+    // Just behind the soundhole, towards the bridge.
+    pickX: 1180
   };
   var CLASSICAL_DRAWN = {
     width: 1513.5,
@@ -149,7 +151,9 @@ var GuitarEngine = (() => {
     // How far down the frame the neck sits. The owner drew an arrow:
     // the fretboard belongs down at the bottom, with the body running
     // off the bottom edge and the notation over the space it leaves.
-    drop: 0.31
+    drop: 0.31,
+    // Over the soundhole.
+    pickX: 1010
   };
   var STRAT_DRAWN = {
     width: 3058,
@@ -193,7 +197,9 @@ var GuitarEngine = (() => {
     // How far down the frame the neck sits. The owner drew an arrow:
     // the fretboard belongs down at the bottom, with the body running
     // off the bottom edge and the notation over the space it leaves.
-    drop: 0.31
+    drop: 0.31,
+    // Between the neck pickup and the middle one.
+    pickX: 2350
   };
   var ELECTRIC_DRAWN = {
     width: 1920,
@@ -237,7 +243,9 @@ var GuitarEngine = (() => {
     // How far down the frame the neck sits. The owner drew an arrow:
     // the fretboard belongs down at the bottom, with the body running
     // off the bottom edge and the notation over the space it leaves.
-    drop: 0.31
+    drop: 0.31,
+    // Between the neck pickup and the bridge one.
+    pickX: 1370
   };
   var PHOTOS = {
     "acoustic-drawn": ACOUSTIC_DRAWN,
@@ -375,6 +383,13 @@ var GuitarEngine = (() => {
   function photoDrop(photo) {
     const drop = photo.drop;
     return typeof drop === "number" && drop > -0.9 && drop < 0.9 ? drop : 0;
+  }
+  function pickingX(options) {
+    const place = photoPlacement(options);
+    if (place === void 0) return void 0;
+    const measured = place.photo.pickX;
+    const along = typeof measured === "number" && Number.isFinite(measured) ? measured : place.photo.boardEndX;
+    return alongPhoto(place, along);
   }
   function alongPhoto(place, x) {
     return place.x + x * place.scale;
@@ -583,6 +598,8 @@ var GuitarEngine = (() => {
     switch (finger) {
       case 0:
         return colors.open;
+      case "T":
+        return colors.thumb;
       case 1:
         return colors.index;
       case 2:
@@ -1121,7 +1138,7 @@ var GuitarEngine = (() => {
     const edges = boardEdges(options, bodyX);
     const height0 = edges.bottom - edges.top;
     const width = height0 * 0.13;
-    const centreX = bodyX + height0 * 0.42;
+    const centreX = pickingX(options) ?? bodyX + height0 * 0.42;
     const ys = struck.map((line) => stringYAt(options, line.string, centreX));
     const first = Math.min(...ys);
     const last = Math.max(...ys);
@@ -1177,23 +1194,29 @@ var GuitarEngine = (() => {
     const up = direction === "down";
     const tip = up ? middle - reach / 2 : middle + reach / 2;
     const tail = up ? middle + reach / 2 : middle - reach / 2;
-    const head = size * 0.5;
-    const stem = Math.max(1.5, size * 0.16);
     const pointing = up ? 1 : -1;
-    const d = [
-      `M${n(x - stem / 2)},${n(tail)}`,
-      `L${n(x + stem / 2)},${n(tail)}`,
-      `L${n(x + stem / 2)},${n(tip + head * pointing)}`,
-      `L${n(x + head)},${n(tip + head * pointing)}`,
+    const arrow = (head2, stem2) => [
+      `M${n(x - stem2 / 2)},${n(tail)}`,
+      `L${n(x + stem2 / 2)},${n(tail)}`,
+      `L${n(x + stem2 / 2)},${n(tip + head2 * pointing)}`,
+      `L${n(x + head2)},${n(tip + head2 * pointing)}`,
       `L${n(x)},${n(tip)}`,
-      `L${n(x - head)},${n(tip + head * pointing)}`,
-      `L${n(x - stem / 2)},${n(tip + head * pointing)}`,
+      `L${n(x - head2)},${n(tip + head2 * pointing)}`,
+      `L${n(x - stem2 / 2)},${n(tip + head2 * pointing)}`,
       "Z"
     ].join("");
-    const bounds = { x: x - head, y: Math.min(tip, tail), width: head * 2, height: reach };
+    const head = size * 0.5;
+    const stem = Math.max(1.5, size * 0.16);
+    const bounds = { x: x - head * 1.5, y: Math.min(tip, tail), width: head * 3, height: reach };
     return [
-      pathShape(d, bounds, "rgba(0,0,0,0.55)", { opacity: 0.85 * fade, role: "pickStroke" }),
-      pathShape(d, bounds, "#F7F4F0", { opacity: 0.95 * fade, role: "pickStroke" })
+      pathShape(arrow(head * 1.4, stem * 2.6), bounds, "rgba(0,0,0,0.55)", {
+        opacity: 0.85 * fade,
+        role: "pickStroke"
+      }),
+      pathShape(arrow(head, stem), bounds, "#F7F4F0", {
+        opacity: 0.98 * fade,
+        role: "pickStroke"
+      })
     ];
   }
   function pluckColor(string, colors) {

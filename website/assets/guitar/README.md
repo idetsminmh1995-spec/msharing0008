@@ -202,6 +202,7 @@ own pixels:
 | `stringsAtEnd` | the same two where the board ends |
 | `boardAtNut` / `boardAtEnd` | the board's own edges at those places |
 | `span` / `drop` | which part of the picture fills the frame, and how low it hangs |
+| `pickX` | where the picking hand sits along the strings |
 | `fit` | `frame` for a whole guitar, `board` for a bare fretboard strip |
 
 The two outer strings are measured at BOTH ends because the band they
@@ -210,6 +211,14 @@ each of them off at any point and spreads the other four evenly
 between, rather than fanning six strings about one middle line. A
 middle-and-a-half model put every string a sixth of a gap out at both
 ends of this acoustic.
+
+`pickX` has to be measured like the rest, because every guitar puts
+something different in the way: over the soundhole on a dreadnought,
+between the neck pickup and the bridge one on a Telecaster, between
+the neck and middle pickups on a Stratocaster. There is no share of
+the run from the board's end to the bridge that is right for all
+four — half way lands on one guitar's neck pickup and the next one's
+bridge pickup.
 
 **Replacing a file means re-measuring it.** The numbers are not
 guesses to be nudged until it looks right: a wire half a fret out puts

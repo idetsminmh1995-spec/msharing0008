@@ -33,7 +33,8 @@ fingering shown confidently is worse than an empty neck.
 ## The five digits, in colours that do not move
 
 `finger` is numbered as a score numbers them: **1 index, 2 middle,
-3 ring, 4 little**, and **0 an open string** — played, but by no
+3 ring, 4 little**, **'T'** the thumb reaching over the top for a
+bass note, and **0 an open string** — played, but by no
 finger. An open string gets NO mark on the neck at all: nothing is
 stopping it, so there is nothing to point at, and the right hand
 plucking it is the whole of what happens.

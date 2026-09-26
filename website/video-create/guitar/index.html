@@ -1273,15 +1273,16 @@
         : entry.note.stringNumber;
       const fret = answer ? answer.fret : entry.note.fret;
       if (string === undefined || fret === undefined) continue;
-      const finger = answer
-        ? (answer.finger === null ? 0 : Number(answer.finger))
-        : entry.note.fingering;
+      // The engine writes its answer as a string: '1'..'4', 'T' for
+      // the thumb over the top, and null for an open string, which is
+      // a real answer and not a missing one.
+      const finger = answer ? fingerOf(answer.finger) : fingerOf(entry.note.fingering);
       raw.push({
         string,
         fret,
         startSeconds: entry.startSeconds,
         endSeconds: entry.endSeconds,
-        ...(Number.isFinite(finger) ? { finger } : {}),
+        ...(finger === undefined ? {} : { finger }),
         slideStart: entry.note.slideStart === true,
       });
       const direction = solved.picked?.get(entry.id);
@@ -1302,8 +1303,54 @@
       const next = raw.slice(i + 1).find((other) => other.string === note.string);
       if (next && next.fret !== note.fret) note.slideToFret = next.fret;
     }
+    fillMissingFingers(raw);
     guitarNotes = raw.map(({ slideStart, ...note }) => note);
     guitarPicks.sort((a, b) => a.seconds - b.seconds);
+  }
+
+  /**
+   * One finger, as the engine writes them: '1'..'4', 'T' for the
+   * thumb, null for an open string. Anything else is nobody's answer.
+   */
+  function fingerOf(value) {
+    if (value === null) return 0;
+    if (value === 'T' || value === 't') return 'T';
+    const number = Number(value);
+    return Number.isInteger(number) && number >= 0 && number <= 4 ? number : undefined;
+  }
+
+  /**
+   * Every fretted note ends up with a finger.
+   *
+   * The Human Finger Engine answers for the notes it can place, and
+   * that is what these marks are coloured by. It does drop one now
+   * and then -- a note it could not fit into any hand shape, or one a
+   * TAB staff puts somewhere the solver would not have -- and the
+   * page still draws it, from the file's own string and fret. Left
+   * alone that mark comes out in the "nobody has said" white, which
+   * is the one colour the legend does not explain.
+   *
+   * So it borrows the hand from the nearest note in time the engine
+   * DID answer: one finger per fret from that anchor, which is how a
+   * hand actually works and keeps the two marks consistent with each
+   * other. Clamped to the four fingers, and never applied to an open
+   * string, which has no finger by definition.
+   */
+  function fillMissingFingers(notes) {
+    const anchors = notes.filter(
+      (note) => typeof note.finger === 'number' && note.finger > 0 && note.fret > 0,
+    );
+    if (anchors.length === 0) return;
+    for (const note of notes) {
+      if (note.finger !== undefined || note.fret <= 0) continue;
+      let best = anchors[0];
+      for (const anchor of anchors) {
+        const near = Math.abs(anchor.startSeconds - note.startSeconds);
+        if (near < Math.abs(best.startSeconds - note.startSeconds)) best = anchor;
+      }
+      const stretched = best.finger + (note.fret - best.fret);
+      note.finger = Math.min(4, Math.max(1, stretched));
+    }
   }
 
   /**

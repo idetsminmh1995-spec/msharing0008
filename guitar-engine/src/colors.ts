@@ -67,6 +67,8 @@ export function fingerColor(finger: Finger | undefined, colors: GuitarColors): s
   switch (finger) {
     case 0:
       return colors.open;
+    case 'T':
+      return colors.thumb;
     case 1:
       return colors.index;
     case 2:

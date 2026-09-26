@@ -16,11 +16,13 @@ import type { GuitarPhotograph } from './photo.js';
  * Which finger stops a note, numbered as a score numbers them.
  *
  * 0 is an open string -- no finger at all -- and it is a real answer
- * rather than a missing one, which is why it has a number. `undefined`
- * means nobody has said yet, and that is drawn in its own colour so an
- * unanswered note never borrows a finger's.
+ * rather than a missing one, which is why it has a number. `'T'` is
+ * the thumb, reaching over the top for a bass note, which is how the
+ * fingering engine writes it. `undefined` means nobody has said yet,
+ * and that is drawn in its own colour so an unanswered note never
+ * borrows a finger's.
  */
-export type Finger = 0 | 1 | 2 | 3 | 4;
+export type Finger = 0 | 1 | 2 | 3 | 4 | 'T';
 
 /** One note, as a place on the neck, in the same seconds the audio is counted in. */
 export interface GuitarNote {

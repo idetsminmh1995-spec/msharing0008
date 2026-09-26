@@ -35,6 +35,21 @@ const paintOf = (shape) =>
 const roled = (shapes, role) => shapes.filter((s) => s.role === role);
 const note = (over = {}) => ({ string: 3, fret: 5, startSeconds: 0, endSeconds: 1, ...over });
 
+test('the thumb over the top is a finger too, and it is amber', () => {
+  // The fingering engine writes a thumb-over bass note as 'T'. It
+  // used to come through as a number that was not a number and land
+  // in the "nobody has said" white, which is the one colour the
+  // legend does not explain.
+  const [mark] = G.markShapes(
+    G.positionsAt([note({ string: 6, fret: 2, finger: 'T' })], 0.5),
+    STAGE,
+  );
+  assert.equal(paintOf(mark), G.FINGER_COLORS.thumb);
+  // And a note nobody has answered for is still its own colour.
+  const [plain] = G.markShapes(G.positionsAt([note({ fret: 2 })], 0.5), STAGE);
+  assert.equal(paintOf(plain), G.DEFAULT_COLORS.unassigned);
+});
+
 test('every finger has its own colour, and an unanswered note has none of them', () => {
   const c = G.DEFAULT_COLORS;
   const used = [c.index, c.middle, c.ring, c.little];
