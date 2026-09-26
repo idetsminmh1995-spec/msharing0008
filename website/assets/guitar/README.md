@@ -21,8 +21,9 @@ the left and the fingers up.
 
 ## The guitars
 
-Three drawings, all the owner's own, all SVG. There are no photographs
-and no renders here any more: an SVG stays sharp at any frame size, a
+Four drawings, all the owner's own, all SVG. There are no photographs
+and no renders here any more, and the engine no longer draws an
+instrument of its own either: an SVG stays sharp at any frame size, a
 photograph does not, and a vector file can be measured to the tenth of
 a pixel.
 
@@ -40,10 +41,16 @@ nut onto the even spacing the engine's model assumes.
 nut and twenty-two frets. Their upload exactly as it came, renamed,
 with `width`/`height` added.
 
-**The double cut has no drawing yet.** The page's `GUITARS` map simply
-leaves that one's `photo` out, and the engine draws a neck of its own
-instead — which is what it does whenever there is no picture to lay
-one on. One line puts a drawing in when one arrives.
+`strat-drawn.svg` — a double-cut electric, a Stratocaster shape, the
+nut and twenty-two frets. Built from `Electric Guitar 1.svg` beside
+it, which is the upright original: this one is turned a quarter turn
+counter-clockwise with its bounding box turned with it.
+
+**There is nothing else to draw a guitar with.** The engine used to
+build an instrument out of shapes and gradients — wood, binding,
+tuners, a soundhole or a pair of humbuckers — and that is gone, with
+the studio renderer that made the fallback pictures. A stage with no
+picture on it now gets its background and nothing else.
 
 ### Four things that will bite whoever adds the next one
 
@@ -83,10 +90,10 @@ There are two ways to settle it, and which one to trust depends on the
 drawing.
 
 **The nut, when it is drawn as a nut.** On the classical it is the bar
-drawn 7.3 thick where every fret is 3.6; on the electric it is a bone
-bar with its own colour; on the acoustic it is the one line wider than
-the rest. When the picture shows the nut, the first line is fret 0 and
-there is nothing to argue about.
+drawn 7.3 thick where every fret is 3.6; on the single cut it is a
+bone bar with its own colour; on the acoustic and the double cut it is
+the one line wider than the rest. When the picture shows the nut, the
+first line is fret 0 and there is nothing to argue about.
 
 **The fret rule, fitted to every wire at once.** `pos(n) = A − B·2^(−n/12)`
 is linear in `A` and `B`, so a least-squares fit takes a second and
@@ -97,16 +104,18 @@ falls on the front edge of the nut bar as drawn. Nothing else fits
 that way.
 
 **The inlay dots are a check, not an oracle.** On a photograph they
-are the only anchor there is. On these drawings they agree as far as
-they go and then wander: this owner puts a DOUBLE dot at the seventh
-as well as the twelfth, and the acoustic's last two dots sit on 14 and
-16 where a real guitar would put 15 and 17. Use them to confirm 3, 5,
-7, 9 and 12; do not use them to number a drawing.
+are the only anchor there is. On these drawings they sometimes agree
+all the way — the double cut's nine come out as 3, 5, 7, 9, 12, 15,
+17, 19 and 21, the full standard set — and sometimes wander: this
+owner puts a DOUBLE dot at the seventh as well as the twelfth on two
+of them, and the acoustic's last two dots sit on 14 and 16 where a
+real guitar would put 15 and 17. Use them to confirm 3, 5, 7, 9 and
+12; do not use them alone to number a drawing.
 
 ### Which part of the picture fills the frame
 
 `span: [left, right]` in `photo.ts`, in the file's own pixels. All
-three guitars are framed the same way, which is how the owner asked
+four guitars are framed the same way, which is how the owner asked
 for it: **the nut on one edge of the frame and the bridge on the
 other**, so the headstock runs off the left and the rest of the body
 off the right, and the whole playing length gets the frame. `drop`
@@ -149,7 +158,8 @@ with the same script that measured this one.
 A mark has to land on the fifth fret of the second string, and only
 the file knows where that is. So `guitar-engine/src/photo.ts` carries
 one set of measurements per drawing — `ACOUSTIC_DRAWN`,
-`CLASSICAL_DRAWN`, `ELECTRIC_DRAWN` — in that file's own pixels:
+`CLASSICAL_DRAWN`, `ELECTRIC_DRAWN`, `STRAT_DRAWN` — in that file's
+own pixels:
 
 | what | where |
 | --- | --- |

@@ -105,21 +105,16 @@ the preview.
 
 ## A guitar, not a fretboard
 
-The picture reads as an instrument: a headstock with a tuning peg per
-string at one end, the fretted neck, and the body at the other —
-a soundhole and its rosette on an **acoustic**, a scratchplate and
-three single coils on an **electric**, pearl blocks and two humbuckers
-on a **singleCut**, a plain rosewood board with nothing at all in it
-on a **classical**, with the wood changing to match. That is what
-`instrument` picks, and the strings run the whole length as they do on
-the real thing.
+The picture reads as an instrument, because it IS one: a drawing of a
+real guitar, headstock and body and all, with everything about the
+playing laid over it. The engine used to build one out of shapes and
+gradients instead — wood, binding, tuners, a soundhole or a pair of
+humbuckers — and that is gone. A stage with no picture on it gets its
+background and nothing else.
 
-How many FRETS there are is not part of that, because it is not part
-of the drawing: a classical stops at 19, a dreadnought around 20, an
-electric at 22 and a modern extended-range at 24. The caller says so
-with `lastFret`, and the Guitar page treats it as a fact about the
-instrument rather than a setting — picking the guitar picks the fret
-count with it.
+How many FRETS there are is not a setting either: it is whatever the
+picture shows. `firstFret`/`lastFret` are ignored when a picture is
+there, which it always is.
 
 ## The right hand: a plectrum, or fingers
 
@@ -140,37 +135,29 @@ all of them, the ones a player actually looks for are kept — the
 inlaid frets and every third — rather than crushing twenty-two
 numbers into the space.
 
-## Or a photograph, measured
+## The guitar is a picture, measured
 
-The drawn guitar is shapes and gradients, and it looks like what it
-is. When a picture of a REAL instrument is wanted instead, hand over a
-photograph:
+Hand over a drawing of a real one:
 
 ```js
 { photo: guitarPhoto('assets/guitar/acoustic-drawn.svg') }
 ```
 
-and the drawn instrument is not drawn at all — no wood, no frets, no
-strings, no body. Everything about the PLAYING still is: the hand
-legend, the fret numbers, the marks and the picking strokes, on top of
-the picture.
+and that is the instrument. Everything about the PLAYING is drawn on
+top of it: the hand legend, the fret numbers, the marks and the
+picking strokes.
 
 A picture on its own would be useless here, because a mark has to land
 on the fifth fret of the second string and only the file knows where
-that is. So a photograph arrives MEASURED (`photo.ts`): the x of every
+that is. So a picture arrives MEASURED (`photo.ts`): the x of every
 fret wire and the y of the outer strings at both ends of the board, in
 the file's own pixels. Scale and shift those with the picture and
 every mark lands where it belongs.
 
-The pictures the page draws are **studio renders**, which is how the
-photoreal plugins do it: model an instrument, light it, render it once
-at high resolution, blit the picture. `tools/render_fretboard.py`
-builds each board out of the real measurements of the instrument — the
-17.817 rule, the nut width, the string gauges — lights it, and prints
-the calibration on its way out, so `ACOUSTIC_BOARD` and its three
-siblings are exact by construction rather than read off an image with
-a ruler. `ACOUSTIC_DRAWN` is the other kind: a whole guitar, measured the
-hard way off the file that draws it.
+The four the page draws — `ACOUSTIC_DRAWN`, `CLASSICAL_DRAWN`,
+`ELECTRIC_DRAWN`, `STRAT_DRAWN` — are the site owner's own SVGs.
+`website/assets/guitar/README.md` is the field guide to measuring
+another one, including the two mistakes that cost a round each.
 
 Two things follow from it being a photograph. The frets it shows are
 the frets there are, so `firstFret`/`lastFret` stop applying; and the
@@ -206,15 +193,6 @@ picture ends at by itself gets nothing: a band over an outline is fog
 over the guitar, not a cut hidden. Without `fadeTo` nothing is faded,
 because a guessed colour would draw a band of the WRONG colour across
 the frame.
-
-## The drawn neck is a diagram, not a photograph
-
-Frets are evenly spaced rather than following the real 17.817 rule:
-this is drawn to be read, and even spacing keeps the high frets wide
-enough to hold a mark. Strings thicken from the first to the last,
-because that is how a player tells them apart at a glance. Inlays sit
-at 3, 5, 7, 9, doubled at the twelfth, under the strings as they are
-in the wood.
 
 ## Tests
 

@@ -199,6 +199,49 @@ export const CLASSICAL_DRAWN: PhotoMeasurements = {
 };
 
 /**
+ * The double-cut electric the page draws: the owner's own drawing, a
+ * Stratocaster shape.
+ *
+ * Their file is upright, headstock at the top, so `strat-drawn.svg`
+ * is the same artwork turned a quarter turn counter-clockwise with
+ * its bounding box turned with it -- 3058 by 1002, which is the
+ * space these numbers are in. Counter-clockwise puts the low E at
+ * the bottom, where the engine numbers string 6.
+ *
+ * Measured off a render at the picture's own size, in a page with no
+ * margin. Twenty-three lines cross the board: the first is drawn
+ * eight wide where every fret is four or five, which makes it the
+ * nut. The nut and TWENTY-TWO frets.
+ *
+ * Both checks agree here, which is the comfortable case. Fitting the
+ * fret rule to all twenty-two wires at once lands every one of them
+ * within 1.1 of it, across a scale of 2002, and puts the nut at
+ * 570.5 -- the front edge of the bar as drawn. And all NINE inlay
+ * dots come out as 3, 5, 7, 9, 12 (the double), 15, 17, 19 and 21,
+ * every one within two of its own midpoint: the full standard
+ * electric set, with nothing wandering the way the acoustic's last
+ * two do.
+ */
+export const STRAT_DRAWN: PhotoMeasurements = {
+  width: 3058,
+  height: 1002,
+  fit: 'frame',
+  frets: [
+    570.5, 683, 790, 889, 983, 1072, 1156.5, 1236.5, 1311, 1382, 1449, 1512, 1571, 1626.5, 1680,
+    1731, 1778, 1822, 1865, 1904, 1942, 1978, 2010.5,
+  ],
+  boardEndX: 2033,
+  stringsAtNut: [450.5, 561.9],
+  stringsAtEnd: [436.2, 583],
+  boardAtNut: [446.1, 568.9],
+  boardAtEnd: [422.5, 595.6],
+  // Nut on one edge of the frame, bridge on the other, like the other
+  // three. The bridge ends at 2670.
+  span: [512, 2761],
+  drop: 0.13,
+};
+
+/**
  * The single-cut electric the page draws: the owner's own drawing, a
  * Telecaster shape, and it already lies the way the page wants it --
  * headstock in from the left, body out to the right.
@@ -266,6 +309,7 @@ export const PHOTOS: Readonly<Record<string, PhotoMeasurements>> = {
   'acoustic-drawn': ACOUSTIC_DRAWN,
   'classical-drawn': CLASSICAL_DRAWN,
   'electric-drawn': ELECTRIC_DRAWN,
+  'strat-drawn': STRAT_DRAWN,
 };
 
 /** The picture a page names, at the path the page keeps it. */

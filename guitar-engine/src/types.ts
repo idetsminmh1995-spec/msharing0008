@@ -106,53 +106,8 @@ export interface RadialGradient {
 export type Paint = string | LinearGradient | RadialGradient;
 
 export interface GuitarColors {
-  /** The fretboard itself: the wood the frets are set into. */
-  readonly board: string;
-  /** The same wood in shadow, for the gradient down the board. */
-  readonly boardDark: string;
-  readonly boardEdge: string;
-  /** The neck's own wood, seen at the edges of the board. */
-  readonly neckWood: string;
-  readonly neckWoodDark: string;
-  /** The cream binding down the edge of a bound neck and a bound body. */
-  readonly binding: string;
-  readonly fretWire: string;
-  /** The dark side of a fret wire, which is what makes it look round. */
-  readonly fretShadow: string;
-  readonly nut: string;
-  readonly inlay: string;
-  readonly inlayEdge: string;
-  readonly string: string;
-  /** The line of light along the top of a wound string. */
-  readonly stringShine: string;
   /** The fret numbers under the board -- faint, they are there to be glanced at. */
   readonly fretNumber: string;
-  /** The headstock at the left, and the tuning pegs on it. */
-  readonly headstock: string;
-  readonly headstockEdge: string;
-  readonly peg: string;
-  readonly pegPost: string;
-  /** The numbered circle at the head of each string, and the note name beside it. */
-  readonly stringLabel: string;
-  readonly stringLabelInk: string;
-  /** The body at the right: the top, and what is on it. */
-  readonly body: string;
-  readonly bodyEdge: string;
-  /** The dark rim of a sunburst top, and the amber at its centre. */
-  readonly bodyBurst: string;
-  readonly bodyCentre: string;
-  /** The scratchplate on an electric, and the one on an acoustic. */
-  readonly pickguard: string;
-  readonly pickguardEdge: string;
-  /** An acoustic's soundhole and the ring round it. */
-  readonly soundhole: string;
-  readonly rosette: string;
-  /** An electric's pickups and bridge. */
-  readonly pickup: string;
-  readonly pickupPole: string;
-  readonly hardware: string;
-  readonly hardwareDark: string;
-  readonly knob: string;
   /** The picking hand's stroke marks, over the strings it is hitting. */
   readonly pick: string;
   /** A note nobody has assigned a finger to yet -- not a finger's colour. */
@@ -164,7 +119,7 @@ export interface GuitarColors {
   readonly middle: string;
   readonly ring: string;
   readonly little: string;
-  /** Behind the neck. `'none'` draws nothing, which is what a video frame wants. */
+  /** Behind the picture. `'none'` draws nothing, which is what a video frame wants. */
   readonly background: string;
 }
 
@@ -176,28 +131,16 @@ export interface FretboardOptions {
   /** The first and last fret drawn. The nut is fret 0. */
   readonly firstFret?: number;
   readonly lastFret?: number;
-  /**
-   * Which guitar this is.
-   *
-   * Not decoration: an acoustic and an electric are different
-   * instruments to look at, and a page that offers both should show
-   * the one that was picked. It changes the wood, the body and what
-   * is mounted on it -- a soundhole, or pickups.
-   */
-  readonly instrument?: Instrument;
   /** The fret numbers under the board. On unless a caller says otherwise. */
   readonly fretNumbers?: boolean;
   /**
    * The open-string pitches, as MIDI numbers, in the order the strings
    * are DRAWN: index 0 is string 1, the thinnest and highest.
    *
-   * Standard tuning when nothing says otherwise. It is here so the
-   * string labels can name the notes -- a reader who knows "the D
-   * string" should not have to count lines to find it.
+   * Standard tuning when nothing says otherwise. A caller can ask
+   * this engine what a string is called; nothing here draws it.
    */
   readonly tuning?: readonly number[];
-  /** The numbered circles and note names at the head of each string. On unless a caller says otherwise. */
-  readonly stringLabels?: boolean;
   /**
    * Let the instrument run off both edges of the picture.
    *
@@ -271,23 +214,6 @@ export interface FretboardOptions {
   readonly fadeTo?: string;
   readonly colors?: Partial<GuitarColors>;
 }
-
-/**
- * Which guitar is drawn.
- *
- * Not decoration: these are different instruments to look at, and a
- * page that offers them should show the one that was picked. Each
- * changes the wood, the inlays, the headstock and what is mounted on
- * the body -- a maple board with dots and a scratchplate, a spruce top
- * with a soundhole, or an ebony board with block inlays and a pair of
- * humbuckers. A `classical` is the one with nothing on its board at
- * all: nylon strings, a plain rosette, and not a marker in the wood.
- *
- * How many FRETS each one has is not decided here, because it is not
- * a property of the drawing -- a classical has nineteen and a modern
- * electric twenty-four, and the caller says which with `lastFret`.
- */
-export type Instrument = 'classical' | 'acoustic' | 'electric' | 'singleCut';
 
 /** A drawing of the hand, and the size it was drawn at. */
 export interface HandPicture {

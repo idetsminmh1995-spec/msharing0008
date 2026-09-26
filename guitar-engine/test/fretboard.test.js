@@ -8,24 +8,28 @@ vm.createContext(sandbox);
 vm.runInContext(readFileSync(new URL('../dist/guitar-engine.js', import.meta.url), 'utf8'), sandbox);
 const G = sandbox.GuitarEngine;
 
-const BOARD = { width: 1200, height: 300 };
+// Every guitar the page draws is a PICTURE now -- the engine stopped
+// drawing instruments out of shapes and gradients -- so the geometry
+// these tests ask about is the geometry of a picture.
+const PHOTO = G.guitarPhoto('guitar.svg');
+const BOARD = { width: 1200, height: 300, photo: PHOTO, bleed: true, handLegend: true };
+const nutX = () => G.fretCenter(0, BOARD);
+const endX = () => {
+  const place = G.photoPlacement(BOARD);
+  return place.x + PHOTO.boardEndX * place.scale;
+};
 
 test('six strings by default, thinnest at the top, thickest at the bottom', () => {
   const lines = G.stringLines(BOARD);
-  // They run across the board, above the fret-number strip.
-  const board = G.guitarLayout(BOARD).board;
-  assert.ok(lines[lines.length - 1].offset < board.height, 'clear of the numbers');
   assert.equal(lines.length, 6);
   assert.equal(lines[0].string, 1);
-  assert.ok(lines[0].offset < lines[5].offset, 'string 1 is drawn at the top');
+  assert.ok(lines[0].offset < lines[5].offset, 'string 1 rides at the top');
   // The neck is a wedge: the strings sit closer together at the nut
-  // than they do down by the body, which is most of why the picture
-  // reads as a guitar rather than as a ladder.
-  const nut = G.guitarLayout(BOARD).neck.x;
-  const atNut = G.stringYAt(BOARD, 6, nut) - G.stringYAt(BOARD, 1, nut);
-  const atBody = G.stringYAt(BOARD, 6, G.guitarLayout(BOARD).body.x) - G.stringYAt(BOARD, 1, G.guitarLayout(BOARD).body.x);
+  // than they do down by the body, because the picture's do.
+  const atNut = G.stringYAt(BOARD, 6, nutX()) - G.stringYAt(BOARD, 1, nutX());
+  const atBody = G.stringYAt(BOARD, 6, endX()) - G.stringYAt(BOARD, 1, endX());
   assert.ok(atBody > atNut * 1.1, `strings fan out: ${atNut} at the nut, ${atBody} at the body`);
-  assert.ok(G.boardHalfAt(BOARD, nut) < G.boardHalfAt(BOARD, G.guitarLayout(BOARD).body.x));
+  assert.ok(G.boardHalfAt(BOARD, nutX()) < G.boardHalfAt(BOARD, endX()));
   assert.ok(lines[0].thickness < lines[5].thickness, 'and is the thinner one');
   for (let i = 1; i < lines.length; i++) {
     assert.ok(lines[i].offset > lines[i - 1].offset, 'in order down the neck');
@@ -33,51 +37,50 @@ test('six strings by default, thinnest at the top, thickest at the bottom', () =
   assert.equal(G.stringLines({ ...BOARD, strings: 4 }).length, 4, 'a bass has four');
 });
 
-test('the picture is a guitar: a headstock, the neck, then the body', () => {
+test('the stage is three bands: the hand, the board, the numbers', () => {
   const layout = G.guitarLayout(BOARD);
-  // The string numbers and names have their own gutter at the far
-  // left, OUTSIDE the instrument, so the headstock can be a headstock.
-  assert.equal(layout.labels.x, 0);
-  assert.ok(layout.labels.width > 0);
-  assert.equal(layout.headstock.x, layout.labels.width);
-  assert.ok(layout.headstock.width > 0);
-  assert.equal(
-    layout.neck.x,
-    layout.labels.width + layout.headstock.width,
-    'the neck starts where the headstock ends',
-  );
-  assert.equal(G.guitarLayout({ ...BOARD, stringLabels: false }).labels.width, 0);
-  assert.ok(Math.abs(layout.neck.x + layout.neck.width - layout.body.x) < 1e-9, 'and ends at the body');
-  assert.ok(Math.abs(layout.body.x + layout.body.width - BOARD.width) < 1e-9);
-  // The fret numbers get a strip under the board, so the strings do
-  // not run through them.
+  // The fret numbers get a strip under the board and the hand legend
+  // one above it, so neither runs through the strings.
+  assert.ok(layout.hand.height > 0, 'the legend has its band');
+  assert.equal(layout.board.y, layout.hand.height, 'the board starts where it ends');
   assert.ok(layout.board.height < BOARD.height);
-  assert.equal(layout.numbersY, layout.board.height);
-  assert.equal(G.guitarLayout({ ...BOARD, fretNumbers: false }).board.height, BOARD.height);
+  assert.equal(layout.numbersY, layout.hand.height + layout.board.height);
+  assert.ok(layout.numbersY < BOARD.height, 'and the numbers have what is left');
+  const plain = { width: 1200, height: 300, fretNumbers: false };
+  assert.equal(G.guitarLayout(plain).board.height, 300, 'both bands can be turned off');
+  assert.equal(G.guitarLayout(plain).hand.height, 0);
 });
 
-test('the frets divide the NECK, the nut where the neck starts', () => {
-  const options = { ...BOARD, firstFret: 0, lastFret: 12 };
-  const neck = G.guitarLayout(options).neck;
-  const wires = G.fretWires(options);
-  assert.equal(wires.length, 13, 'the nut and twelve wires');
-  assert.equal(wires[0].fret, 0);
-  assert.ok(Math.abs(wires[0].offset - neck.x) < 1e-9);
-  assert.ok(Math.abs(wires[12].offset - (neck.x + neck.width)) < 1e-9);
-  assert.ok(Math.abs(G.fretWidth(options) - neck.width / 12) < 1e-9);
+test('the frets are the picture\u2019s own, and the nut is its first line', () => {
+  const wires = G.fretWires(BOARD);
+  assert.equal(wires.length, PHOTO.frets.length, 'one for every line in the picture');
+  assert.equal(wires[0].fret, 0, 'and the first of them is the nut');
+  const place = G.photoPlacement(BOARD);
+  const at = (file) => place.x + file * place.scale;
+  assert.ok(Math.abs(wires[0].offset - at(PHOTO.frets[0])) < 1e-9);
+  assert.ok(Math.abs(wires[5].offset - at(PHOTO.frets[5])) < 1e-9);
+  // They CROWD as they climb, which is the whole difference between a
+  // picture of a neck and a ladder drawn evenly.
+  const low = wires[1].offset - wires[0].offset;
+  const high = wires[wires.length - 1].offset - wires[wires.length - 2].offset;
+  assert.ok(high < low * 0.6, `${high} against ${low}`);
+  // The narrowest fret is what decides whether anything FITS in one.
+  assert.ok(Math.abs(G.fretWidth(BOARD) - high) < 1e-9);
+  // Without a picture there is no guitar, and nothing is drawn.
+  assert.equal(G.fretWires({ width: 1200, height: 300 }).length, 0);
 });
 
 test('a stopped note sits inside its fret, an open string on the nut', () => {
-  const options = { ...BOARD, firstFret: 0, lastFret: 12 };
-  const neck = G.guitarLayout(options).neck;
-  const per = G.fretWidth(options);
-  // Fret 1 is the space between the nut and the first wire: its mark
-  // goes in the middle of that space, where the finger goes.
-  assert.ok(Math.abs(G.fretCenter(1, options) - (neck.x + per * 0.5)) < 1e-9);
-  assert.ok(Math.abs(G.fretCenter(5, options) - (neck.x + per * 4.5)) < 1e-9);
-  assert.ok(Math.abs(G.fretCenter(0, options) - neck.x) < 1e-9, 'an open string is at the nut');
-  // A slide passes between frets rather than jumping.
-  assert.ok(Math.abs(G.fretCenter(5.5, options) - (neck.x + per * 5)) < 1e-9);
+  const place = G.photoPlacement(BOARD);
+  const at = (file) => place.x + file * place.scale;
+  const mid = (fret) => at((PHOTO.frets[fret - 1] + PHOTO.frets[fret]) / 2);
+  assert.ok(Math.abs(G.fretCenter(1, BOARD) - mid(1)) < 1e-9);
+  assert.ok(Math.abs(G.fretCenter(5, BOARD) - mid(5)) < 1e-9);
+  assert.ok(Math.abs(G.fretCenter(0, BOARD) - at(PHOTO.frets[0])) < 1e-9, 'open, at the nut');
+  // A slide passes between frets rather than jumping, and it passes
+  // over the picture's own wires.
+  const half = G.fretCenter(5.5, BOARD);
+  assert.ok(half > G.fretCenter(5, BOARD) && half < G.fretCenter(6, BOARD));
 });
 
 test('the inlays are where a guitar has them, doubled at the twelfth', () => {

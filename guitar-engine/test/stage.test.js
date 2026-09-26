@@ -8,7 +8,18 @@ vm.createContext(sandbox);
 vm.runInContext(readFileSync(new URL('../dist/guitar-engine.js', import.meta.url), 'utf8'), sandbox);
 const G = sandbox.GuitarEngine;
 
-const STAGE = { width: 1200, height: 300, seconds: 0, firstFret: 0, lastFret: 12 };
+// The guitar is a PICTURE now -- the engine stopped drawing
+// instruments out of shapes and gradients -- so a stage without one
+// has no guitar on it at all.
+const PHOTO = G.guitarPhoto('guitar.svg');
+const STAGE = {
+  width: 1200,
+  height: 300,
+  seconds: 0,
+  photo: PHOTO,
+  bleed: true,
+  handLegend: true,
+};
 
 /**
  * The colour a shape really is.
@@ -55,37 +66,17 @@ test('the finger colours are the ones on the hand, and the marks use them', () =
   assert.equal(G.DEFAULT_COLORS.little, c.little);
 });
 
-test('the three guitars are three different instruments to look at', () => {
-  const of = (instrument) => G.fretboardShapes({ ...STAGE, instrument });
-  const electric = of('electric');
-  const acoustic = of('acoustic');
-  const singleCut = of('singleCut');
-
-  // Each is recognisable by what is on its body.
-  assert.ok(roled(acoustic, 'soundhole').length >= 2, 'an acoustic has a soundhole and a rosette');
-  assert.equal(roled(electric, 'soundhole').length, 0);
-  assert.ok(roled(electric, 'pickguard').length > 0, 'an electric has a scratchplate');
-  assert.ok(roled(electric, 'pickup').length >= 3, 'and three single coils');
-  assert.ok(roled(singleCut, 'pickup').length >= 2, 'the single-cut has two humbuckers');
-  assert.equal(roled(singleCut, 'pickguard').length, 0);
-  for (const shapes of [electric, acoustic, singleCut]) {
-    assert.ok(roled(shapes, 'hardware').length > 0, 'and every one has a bridge');
-    assert.ok(roled(shapes, 'tuner').length >= 6, 'and a tuner per string');
-  }
-
-  // The wood differs too, not only what is mounted on it.
-  const boardOf = (shapes) => paintOf(roled(shapes, 'board')[0]);
-  assert.equal(boardOf(electric), G.DEFAULT_COLORS.board, 'maple');
-  assert.equal(boardOf(acoustic), G.ACOUSTIC_COLORS.board, 'rosewood');
-  assert.equal(boardOf(singleCut), G.SINGLE_CUT_COLORS.board, 'ebony');
-  assert.equal(new Set([boardOf(electric), boardOf(acoustic), boardOf(singleCut)]).size, 3);
-
-  // And so do the inlays: dots on two of them, pearl blocks on the third.
-  assert.ok(roled(acoustic, 'inlay').every((s) => s.kind === 'circle'));
-  assert.ok(roled(singleCut, 'inlay').every((s) => s.kind === 'path'), 'blocks, not dots');
-  // A bound neck has its cream edging; a bolt-on maple one does not.
-  assert.equal(roled(electric, 'binding').length, 0);
-  assert.equal(roled(singleCut, 'binding').length, 2);
+test('without a picture there is no guitar, and nothing is drawn', () => {
+  // The engine used to draw an instrument out of shapes and
+  // gradients: wood, binding, tuners, a soundhole or a pair of
+  // humbuckers. It does not any more -- every guitar the page offers
+  // is a drawing of a real one -- so a stage with no picture gets its
+  // background and nothing else.
+  const bare = G.fretboardShapes({ width: 1200, height: 300, colors: { background: '#111' } });
+  assert.equal(bare.length, 1);
+  assert.equal(bare[0].kind, 'rect');
+  assert.equal(bare[0].fill, '#111');
+  assert.equal(G.fretboardShapes({ width: 1200, height: 300 }).length, 0, 'not even that');
 });
 
 const fretNumbers = (shapes) => shapes.filter((s) => s.role === 'fretNumber');
@@ -94,9 +85,9 @@ test('the fret numbers are drawn under the board, faint, and can be turned off',
   const shapes = G.fretboardShapes(STAGE);
   const numbers = fretNumbers(shapes);
   assert.ok(numbers.length > 0);
-  const layout = G.guitarLayout(STAGE);
   for (const number of numbers) {
-    assert.ok(number.y > layout.board.height, 'below the strings');
+    const board = G.boardEdgesAt(STAGE, number.x);
+    assert.ok(number.y > board.bottom, 'below the board it belongs to');
     assert.equal(number.fill, G.DEFAULT_COLORS.fretNumber);
     assert.match(String(number.fill), /rgba/, 'faint enough to read past');
   }
@@ -107,43 +98,27 @@ test('the fret numbers are drawn under the board, faint, and can be turned off',
 });
 
 test('a crowded neck numbers the frets a player looks for, not every one', () => {
-  const wide = fretNumbers(G.fretboardShapes({ ...STAGE, lastFret: 12 }));
-  const narrow = fretNumbers(G.fretboardShapes({ ...STAGE, width: 420, lastFret: 22 }));
-  assert.equal(wide.length, 12, 'room for all twelve');
-  assert.ok(narrow.length < 22, 'no room for twenty-two');
+  const wide = fretNumbers(G.fretboardShapes({ ...STAGE, width: 2400 }));
+  const narrow = fretNumbers(G.fretboardShapes({ ...STAGE, width: 420 }));
+  assert.ok(wide.length > narrow.length, 'the wider the frame, the more of them fit');
+  assert.ok(narrow.length < G.photoFretCount(PHOTO), 'no room for all of them');
   assert.ok(narrow.some((t) => t.text === '12'), 'the twelfth is always there');
 });
 
-test('each string is numbered at the head, and named', () => {
-  const shapes = G.fretboardShapes(STAGE);
-  // The role is on the circle and on the number inside it; the
-  // numbers are the ones with text.
-  const badges = shapes.filter((s) => s.role === 'stringLabel' && s.text !== undefined);
-  const names = shapes.filter((s) => s.role === 'stringName');
-  assert.equal(badges.map((b) => b.text).join(','), '1,2,3,4,5,6');
-  // Drawn order: string 1 is the thin e at the top, string 6 the low E.
-  assert.equal(names.map((n) => n.text).join(','), 'e,B,G,D,A,E');
-  const strings = G.stringLines(STAGE);
-  for (const badge of badges) {
-    assert.equal(badge.y, strings.find((l) => String(l.string) === badge.text).offset);
-    // In their own gutter, clear of the instrument: printed over the
-    // headstock they would sit on top of the tuners.
-    assert.ok(badge.x < G.guitarLayout(STAGE).headstock.x, 'left of the headstock');
-  }
-  assert.equal(G.fretboardShapes({ ...STAGE, stringLabels: false }).filter(
-    (s) => s.role === 'stringLabel' || s.role === 'stringName',
-  ).length, 0);
-});
-
-test('a different tuning names different strings', () => {
+test('the engine still knows what each string is called', () => {
+  // Nothing draws the numbered badges and note names any more: they
+  // lived on the drawn headstock, and there is no drawn headstock.
+  // The naming itself is still here, because a page's own legend
+  // wants it.
+  assert.equal(G.tuningFor(6).join(','), G.STANDARD_TUNING.join(','));
+  const names = G.tuningFor(6).map((midi, i) => G.stringName(midi, i === 0));
+  assert.equal(names.join(','), 'e,B,G,D,A,E');
   // Drop D: the sixth string is a whole tone down, and nothing else moves.
-  const dropD = G.fretboardShapes({ ...STAGE, tuning: [64, 59, 55, 50, 45, 38] });
-  const names = dropD.filter((s) => s.role === 'stringName').map((s) => s.text);
-  assert.equal(names.join(','), 'e,B,G,D,A,D');
+  const dropD = [64, 59, 55, 50, 45, 38].map((midi, i) => G.stringName(midi, i === 0));
+  assert.equal(dropD.join(','), 'e,B,G,D,A,D');
   // The lower-case top string is not a typo: it is how guitarists write it.
   assert.equal(G.stringName(64, true), 'e');
   assert.equal(G.stringName(64, false), 'E');
-  assert.equal(G.tuningFor(6).join(','), G.STANDARD_TUNING.join(','));
 });
 
 test('the picking hand draws the two marks a guitarist already reads', () => {
@@ -156,10 +131,12 @@ test('the picking hand draws the two marks a guitarist already reads', () => {
   assert.equal(down.length, 2);
   assert.notEqual(down[1].d, up[1].d, 'a down-stroke and an up-stroke are different marks');
   assert.match(String(down[0].fill), /rgba\(0,0,0/, 'the halo is the dark one');
-  // It sits where the picking hand is: over the body, past the frets.
-  const layout = G.guitarLayout(STAGE);
-  assert.ok(down[1].x >= layout.body.x - down[1].width, 'at the body end of the strings');
-  assert.ok(down[1].x > layout.neck.x, 'and well past the nut');
+  // It sits where the picking hand is: past the end of the board,
+  // over the body.
+  const place = G.photoPlacement(STAGE);
+  const boardEnd = place.x + PHOTO.boardEndX * place.scale;
+  assert.ok(down[1].x >= boardEnd - down[1].width, 'at the body end of the strings');
+  assert.ok(down[1].x > G.fretCenter(0, STAGE), 'and well past the nut');
 
   // It fades rather than blinking off, and is gone when it is over.
   assert.ok(withPick('down', 0.8)[1].opacity < down[1].opacity);
@@ -220,6 +197,7 @@ test('the hand legend is the page\u2019s own drawing when there is one', () => {
   const banded = { ...STAGE, handLegend: true };
   const drawn = G.fretboardShapes(banded);
   assert.equal(roled(drawn, 'handLegend').length, 0, 'rectangles, with no file');
+  assert.ok(drawn.length > 0, 'and a guitar under them');
   const picture = G.handPicture('hand.webp');
   const shapes = G.fretboardShapes({ ...banded, handImage: picture });
   const [hand, ...rest] = roled(shapes, 'handLegend');
@@ -242,23 +220,8 @@ test('the hand legend is the page\u2019s own drawing when there is one', () => {
     'the drawn one stands down',
   );
   // No band, no legend, picture or not.
-  assert.equal(roled(G.fretboardShapes({ ...STAGE, handImage: picture }), 'handLegend').length, 0);
-});
-
-test('a classical guitar has nothing in its board', () => {
-  const classical = G.fretboardShapes({ ...STAGE, instrument: 'classical' });
-  assert.equal(roled(classical, 'inlay').length, 0, 'not a marker in the wood');
-  // The others do have them.
-  assert.ok(roled(G.fretboardShapes({ ...STAGE, instrument: 'acoustic' }), 'inlay').length > 0);
-  assert.ok(roled(G.fretboardShapes({ ...STAGE, instrument: 'singleCut' }), 'inlay').length > 0);
-  // Nor a scratchplate, because nothing scratches it.
-  assert.equal(roled(classical, 'pickguard').length, 0);
-  assert.ok(roled(G.fretboardShapes({ ...STAGE, instrument: 'acoustic' }), 'pickguard').length > 0);
-  // It is its own instrument to look at: pale spruce, not a sunburst.
-  assert.equal(G.instrumentColors('classical').body, G.CLASSICAL_COLORS.body);
-  assert.notEqual(G.CLASSICAL_COLORS.body, G.ACOUSTIC_COLORS.body);
-  // A soundhole all the same.
-  assert.ok(roled(classical, 'soundhole').length > 0);
+  const unbanded = { ...STAGE, handLegend: false, handImage: picture };
+  assert.equal(roled(G.fretboardShapes(unbanded), 'handLegend').length, 0);
 });
 
 test('a mark sits on its own string, in its own fret', () => {
@@ -289,25 +252,25 @@ test('a slide draws the road it has travelled, with the mark at its head', () =>
   assert.ok(back[0].width > 0);
 });
 
-test('a note outside the drawn frets or off the neck is not drawn', () => {
-  assert.equal(G.markShapes(G.positionsAt([note({ fret: 20 })], 0.5), STAGE).length, 0);
+test('a note outside the picture\u2019s frets or off the neck is not drawn', () => {
+  const past = G.photoFretCount(PHOTO) + 3;
+  assert.equal(G.markShapes(G.positionsAt([note({ fret: past })], 0.5), STAGE).length, 0);
   assert.equal(G.markShapes(G.positionsAt([note({ string: 9 })], 0.5), STAGE).length, 0);
 });
 
-test('the neck is drawn once, the notes on top of it', () => {
+test('the guitar goes down once, the notes on top of it', () => {
   const board = G.fretboardShapes(STAGE);
   const withNote = G.stageShapes({ ...STAGE, seconds: 0.5, notes: [note({ finger: 2 })] });
   assert.equal(withNote.length, board.length + 1);
   assert.equal(paintOf(withNote[withNote.length - 1]), G.DEFAULT_COLORS.middle, 'the note is last');
-  // Drawn in the order the guitar is built: the body and the head
-  // first, then the neck over them, the inlays in the wood, the fret
-  // wire on top of those, and the strings over everything.
+  // The picture first, then everything about the PLAYING on top of
+  // it. Nothing of the instrument itself is drawn: the picture is one.
   const firstOf = (role) => board.findIndex((s) => s.role === role);
-  assert.ok(firstOf('body') < firstOf('neck'));
-  assert.ok(firstOf('neck') < firstOf('board'));
-  assert.ok(firstOf('board') < firstOf('inlay'));
-  assert.ok(firstOf('inlay') < firstOf('fret'));
-  assert.ok(firstOf('fret') < firstOf('string'));
+  assert.equal(firstOf('photo'), 0);
+  assert.ok(firstOf('fretNumber') > firstOf('photo'));
+  for (const gone of ['body', 'neck', 'board', 'inlay', 'fret', 'string', 'headstock', 'tuner']) {
+    assert.equal(firstOf(gone), -1, `nothing is drawn as a ${gone}`);
+  }
 });
 
 test('the SVG is the shape list written out', () => {
@@ -315,8 +278,8 @@ test('the SVG is the shape list written out', () => {
   assert.ok(svg.startsWith('<svg'));
   assert.ok(svg.includes('viewBox="0 0 1200 300"'));
   const shapes = G.stageShapes({ ...STAGE, seconds: 0.5, notes: [note({ finger: 4 })] });
-  const drawn = (svg.match(/<(rect|circle|text|path)[ >]/g) ?? []).length;
-  assert.equal(drawn, shapes.length, 'every shape is written, fret numbers included');
+  const drawn = (svg.match(/<(rect|circle|text|path|image)[ >]/g) ?? []).length;
+  assert.equal(drawn, shapes.length, 'every shape is written, the picture included');
   assert.ok(svg.includes('>5</text>'), 'the numbers are real text, not drawn as boxes');
   assert.ok(svg.includes(G.DEFAULT_COLORS.little));
   // The gradients are defined before anything points at them.

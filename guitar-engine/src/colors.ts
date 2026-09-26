@@ -2,13 +2,12 @@
  * colors.ts — the palette, and the one rule about it.
  *
  * Its own file because two drawings need it and neither should own
- * it: the neck asks what colour its wood is, and the little hand in
- * the legend asks what colour each finger is. With the palette living
- * in one of them, the other would have to import the whole drawing to
+ * it: the marks on the neck ask what colour a finger is, and the
+ * little hand in the legend asks the same. With the palette living in
+ * one of them, the other would have to import the whole drawing to
  * read four hex values.
  */
-import { modelColors } from './instrument.js';
-import type { Finger, GuitarColors, Instrument } from './types.js';
+import type { Finger, GuitarColors } from './types.js';
 
 /**
  * The finger colours are the ones on the hand: index red, middle
@@ -33,50 +32,16 @@ export const FINGER_COLORS = {
 } as const;
 
 /**
- * The default guitar: a maple-necked electric.
+ * What is left of the palette, now that the guitar is a picture.
  *
- * Light board, black dots, a white scratchplate and three single
- * coils -- the instrument most people picture when they hear
- * "electric guitar". Its body is a two-tone sunburst rather than the
- * black it used to be: these videos are cut on a dark frame, and a
- * black guitar on a dark frame has no outline at all -- the body
- * stops being a shape and the horns start reading as something else
- * entirely.
+ * The engine used to draw an instrument out of shapes and gradients,
+ * and most of this file was the wood, the binding, the hardware and
+ * the sunburst on the body. None of that is drawn any more: the page
+ * hands over a drawing of a real guitar and the engine puts the
+ * PLAYING on top of it. What is left is the ink.
  */
 export const DEFAULT_COLORS: GuitarColors = {
-  board: '#D9AE6B',
-  boardDark: '#B0813F',
-  boardEdge: '#6B4A22',
-  neckWood: '#E3BE80',
-  neckWoodDark: '#B98C4A',
-  binding: '#F2E6CE',
-  fretWire: '#F0ECE6',
-  fretShadow: 'rgba(0,0,0,0.42)',
-  nut: '#F5EEDF',
-  inlay: '#2E2018',
-  inlayEdge: 'rgba(0,0,0,0.4)',
-  string: '#E4DACA',
-  stringShine: 'rgba(255,255,255,0.75)',
   fretNumber: 'rgba(255,255,255,0.34)',
-  headstock: '#D9AE6B',
-  headstockEdge: '#8A6430',
-  peg: '#E0DCD5',
-  pegPost: '#A8A29A',
-  stringLabel: '#F1E7DC',
-  stringLabelInk: '#20130D',
-  body: '#C9762E',
-  bodyEdge: '#2A1206',
-  bodyBurst: '#5A2410',
-  bodyCentre: '#E8B45C',
-  pickguard: '#F3F0E6',
-  pickguardEdge: '#BEB8A8',
-  soundhole: '#140B07',
-  rosette: '#C9A227',
-  pickup: '#EFE8D6',
-  pickupPole: '#9A958C',
-  hardware: '#D6D1CA',
-  hardwareDark: '#6E6963',
-  knob: '#F0EBE1',
   pick: '#F7F4F0',
   unassigned: '#F7F4F0',
   open: '#9AA6B2',
@@ -84,17 +49,8 @@ export const DEFAULT_COLORS: GuitarColors = {
   background: 'none',
 };
 
-export { ACOUSTIC_COLORS, CLASSICAL_COLORS, SINGLE_CUT_COLORS } from './instrument.js';
-
-export function instrumentColors(instrument: Instrument | undefined): Partial<GuitarColors> {
-  return modelColors(instrument);
-}
-
-export function resolveColors(
-  colors?: Partial<GuitarColors>,
-  instrument?: Instrument,
-): GuitarColors {
-  return { ...DEFAULT_COLORS, ...instrumentColors(instrument), ...(colors ?? {}) };
+export function resolveColors(colors?: Partial<GuitarColors>): GuitarColors {
+  return { ...DEFAULT_COLORS, ...(colors ?? {}) };
 }
 
 /**

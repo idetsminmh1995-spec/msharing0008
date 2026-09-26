@@ -25,51 +25,8 @@ export const DEFAULT_STRINGS = 6;
 export const DEFAULT_FIRST_FRET = 0;
 export const DEFAULT_LAST_FRET = 12;
 
-/**
- * The neck is a WEDGE, and these three numbers are its shape.
- *
- * A real neck is narrow at the nut and wide at the body, which is
- * most of why a photograph of a guitar reads as a guitar and a row of
- * parallel lines reads as a ladder. The board is drawn to fill the
- * height at its widest point and to be `NECK_TAPER` times narrower at
- * the nut; the strings sit inside it with a margin of wood either
- * side, the way they do on the instrument.
- */
-const NECK_TAPER = 1.18;
-/** How much of the height the board takes at its widest. */
-const BOARD_FILL = 0.88;
-/** The wood outside the outer strings, as a share of the board's half-height. */
-const STRING_MARGIN = 0.18;
-
-/**
- * The picture is a GUITAR, not a fretboard on its own: a headstock at
- * the left, the fretted neck in the middle, the body at the right.
- * These are the shares of the width each takes.
- */
-const HEADSTOCK_SHARE = 0.1;
-/**
- * BLEED: the instrument runs off both edges of the picture.
- *
- * A guitar photographed for a video does not sit inside the frame
- * with air around it -- the neck runs in from one edge and the body
- * out of the other, and the frame is a window onto an instrument
- * bigger than it. In this mode the nut is at the left edge (the
- * headstock is off-screen) and only the near part of the body is
- * seen, which leaves far more room for the frets that matter.
- */
-const BLEED_BODY_VISIBLE = 0.26;
-const BLEED_BODY_SHARE = 0.3;
 /** The band above the neck where the hand legend sits, when one is drawn. */
 const HAND_BAND_SHARE = 0.22;
-/**
- * The gutter at the far left, where each string's number and name go.
- *
- * Its own strip, OUTSIDE the instrument: printed over the headstock
- * they would sit on top of the tuners, and a picture meant to look
- * like a guitar cannot have writing across its head.
- */
-const LABELS_SHARE = 0.055;
-const BODY_SHARE = 0.2;
 /** The strip under the board where the fret numbers go. */
 const NUMBERS_SHARE = 0.16;
 /** The thinnest and thickest string, as a fraction of the gap between two strings. */
@@ -109,25 +66,24 @@ export function fretRange(options: {
 }
 
 /**
- * The three parts of the instrument, and the strip under them.
+ * The three BANDS the stage is divided into, top to bottom: the hand
+ * legend's strip, the board's own, and the strip the fret numbers
+ * ride in.
  *
  * Exported because a mark, a fret wire and a string all have to agree
  * about where the neck IS -- and because a page measuring the picture
- * needs the same numbers.
+ * needs the same numbers. It used to describe an instrument as well,
+ * with a headstock box and a body box and a gutter for the string
+ * labels; nothing draws those any more, and a picture of a guitar
+ * carries its own.
  */
 export function guitarLayout(options: {
   width: number;
   height: number;
   fretNumbers?: boolean;
-  stringLabels?: boolean;
-  bleed?: boolean;
   handLegend?: boolean;
 }): {
   board: { x: number; y: number; width: number; height: number };
-  labels: { x: number; y: number; width: number; height: number };
-  neck: { x: number; y: number; width: number; height: number };
-  headstock: { x: number; y: number; width: number; height: number };
-  body: { x: number; y: number; width: number; height: number };
   /** The strip above the neck, empty unless a hand legend is drawn in it. */
   hand: { x: number; y: number; width: number; height: number };
   numbersY: number;
@@ -137,34 +93,8 @@ export function guitarLayout(options: {
   const numbers = options.fretNumbers === false ? 0 : height * NUMBERS_SHARE;
   const handBand = options.handLegend === true ? height * HAND_BAND_SHARE : 0;
   const boardHeight = Math.max(1, height - numbers - handBand);
-  const bleed = options.bleed === true;
-  // Bled, the head and the label gutter are off the left edge and the
-  // body runs off the right; otherwise the whole instrument is inside
-  // the picture with its gutter beside it.
-  const labelsWidth = bleed || options.stringLabels === false ? 0 : width * LABELS_SHARE;
-  const headstockWidth = bleed ? 0 : width * HEADSTOCK_SHARE;
-  const bodyWidth = width * (bleed ? BLEED_BODY_SHARE : BODY_SHARE);
-  const bodyX = bleed ? width * (1 - BLEED_BODY_VISIBLE) : width - bodyWidth;
   return {
     board: { x: 0, y: handBand, width, height: boardHeight },
-    labels: { x: 0, y: handBand, width: labelsWidth, height: boardHeight },
-    headstock: { x: labelsWidth, y: handBand, width: headstockWidth, height: boardHeight },
-    neck: {
-      x: labelsWidth + headstockWidth,
-      y: handBand,
-      width: Math.max(1, bodyX - labelsWidth - headstockWidth),
-      height: boardHeight,
-    },
-    // The body is TALLER than the neck, as it is on the instrument:
-    // without that there is no room above the neck for a cutaway horn
-    // or below it for the bout, and the body can only ever be a box
-    // the same height as the fretboard.
-    body: {
-      x: bodyX,
-      y: handBand * 0.25,
-      width: bodyWidth,
-      height: height - handBand * 0.25 - numbers * 0.25,
-    },
     hand: { x: 0, y: 0, width, height: handBand },
     numbersY: handBand + boardHeight,
   };
@@ -288,15 +218,15 @@ function inPhoto(place: PhotoPlacement, x: number): number {
 }
 
 /**
- * Where the nut is: the photograph's, or the drawn neck's own start.
+ * Where the nut is.
  *
  * Everything across the neck is measured from the nut, and in a
- * photograph the nut is wherever the picture puts it -- which is not
+ * picture the nut is wherever the picture puts it -- which is not
  * the left edge of the box.
  */
 function nutXOf(options: FretboardOptions): number {
   const place = photoPlacement(options);
-  if (place === undefined) return guitarLayout(options).neck.x;
+  if (place === undefined) return 0;
   return alongPhoto(place, place.photo.frets[0] ?? 0);
 }
 
@@ -308,33 +238,16 @@ function middleOf(options: FretboardOptions): number {
   return board.y + board.height / 2;
 }
 
-/**
- * How far along the taper a point is: 0 at the nut, 1 where the neck
- * meets the body. Beyond the body the strings stay as they are --
- * they are heading for the bridge, and the neck has ended.
- */
-function taperAt(options: FretboardOptions, x: number): number {
-  const layout = guitarLayout(options);
-  const nut = layout.neck.x;
-  const end = Math.max(nut + 1, layout.body.x);
-  return Math.min(1, Math.max(0, (x - nut) / (end - nut)));
-}
-
 /** Half the board's height at a point along the neck. */
 export function boardHalfAt(options: FretboardOptions, x: number): number {
   const place = photoPlacement(options);
-  if (place !== undefined) return photoHalfAt(place, 'board', x);
-  const board = guitarLayout(options).board;
-  const widest = (board.height * BOARD_FILL) / 2;
-  const narrow = widest / NECK_TAPER;
-  return narrow + (widest - narrow) * taperAt(options, x);
+  return place === undefined ? 0 : photoHalfAt(place, 'board', x);
 }
 
 /** Half the span the strings themselves take, at a point along the neck. */
 export function stringHalfAt(options: FretboardOptions, x: number): number {
   const place = photoPlacement(options);
-  if (place !== undefined) return photoHalfAt(place, 'strings', x);
-  return boardHalfAt(options, x) * (1 - STRING_MARGIN);
+  return place === undefined ? 0 : photoHalfAt(place, 'strings', x);
 }
 
 /**
@@ -455,22 +368,20 @@ export function stringYAt(options: FretboardOptions, string: number, x: number):
 /**
  * Where the two OUTER strings run, at a point along the neck.
  *
- * The photograph's own, where it has one: measured at the nut and at
- * the board's end and read off in between. Without one, the drawn
- * neck's symmetric band.
+ * The picture's own: measured at the nut and at the board's end, and
+ * read off in between.
  */
 function stringEdgesAt(options: FretboardOptions, x: number): { top: number; bottom: number } {
   const place = photoPlacement(options);
-  if (place !== undefined) {
-    const at = inPhoto(place, x);
-    return {
-      top: acrossPhoto(place, photoEdgeY(place.photo, 'strings', 0, at)),
-      bottom: acrossPhoto(place, photoEdgeY(place.photo, 'strings', 1, at)),
-    };
+  if (place === undefined) {
+    const middle = middleOf(options);
+    return { top: middle, bottom: middle };
   }
-  const middle = middleOf(options);
-  const half = stringHalfAt(options, x);
-  return { top: middle - half, bottom: middle + half };
+  const at = inPhoto(place, x);
+  return {
+    top: acrossPhoto(place, photoEdgeY(place.photo, 'strings', 0, at)),
+    bottom: acrossPhoto(place, photoEdgeY(place.photo, 'strings', 1, at)),
+  };
 }
 
 /**
@@ -482,31 +393,20 @@ function stringEdgesAt(options: FretboardOptions, x: number): { top: number; bot
  * when the board starts there.
  */
 export function fretWires(options: FretboardOptions): readonly FretWire[] {
-  const { first, last } = fretRange(options);
   if (!(options.width > 0)) return [];
-  // A photograph's wires are where they were measured, which is the
-  // real spacing: wide at the nut, crowding at the body.
+  // The wires are where they were measured in the picture, which is
+  // the real spacing: wide at the nut, crowding at the body.
   const place = photoPlacement(options);
-  if (place !== undefined) {
-    return place.photo.frets.map((offset, fret) => ({ fret, offset: alongPhoto(place, offset) }));
-  }
-  const neck = guitarLayout(options).neck;
-  const perFret = neck.width / (last - first);
-  const wires: FretWire[] = [];
-  for (let fret = first; fret <= last; fret++) {
-    wires.push({ fret, offset: neck.x + (fret - first) * perFret });
-  }
-  return wires;
+  if (place === undefined) return [];
+  return place.photo.frets.map((offset, fret) => ({ fret, offset: alongPhoto(place, offset) }));
 }
 
 /**
- * How wide one fret is drawn.
+ * How wide one fret is.
  *
- * Drawn, every fret is the same width, and that is the answer. On a
- * photograph they shrink all the way up the neck, and the only thing
- * that asks this is deciding what will FIT in a fret -- so the answer
- * is the narrowest one in the picture, which is the fret that decides
- * it.
+ * They shrink all the way up the neck, and the only thing that asks
+ * this is deciding what will FIT in a fret -- so the answer is the
+ * NARROWEST one in the picture, which is the fret that decides it.
  */
 export function fretWidth(options: FretboardOptions): number {
   const place = photoPlacement(options);
@@ -518,8 +418,7 @@ export function fretWidth(options: FretboardOptions): number {
     }
     return Number.isFinite(narrowest) ? narrowest * place.scale : place.photo.width * place.scale;
   }
-  const { first, last } = fretRange(options);
-  return guitarLayout(options).neck.width / Math.max(1, last - first);
+  return 0;
 }
 
 /**
@@ -531,22 +430,14 @@ export function fretWidth(options: FretboardOptions): number {
  * Fractional frets are honoured, so a slide passes smoothly between.
  */
 export function fretCenter(fret: number, options: FretboardOptions): number {
-  // On a photograph a fret is the gap between two real wires, so the
-  // finger goes halfway between them -- and half of a shrinking fret
-  // is not half of an even one.
+  // A fret is the gap between two real wires, so the finger goes
+  // halfway between them -- and half of a shrinking fret is not half
+  // of an even one.
   const place = photoPlacement(options);
-  if (place !== undefined) {
-    const photo = place.photo;
-    if (fret <= 0) return alongPhoto(place, photoWireX(photo, 0));
-    return alongPhoto(place, (photoWireX(photo, fret - 1) + photoWireX(photo, fret)) / 2);
-  }
-  const { first } = fretRange(options);
-  const neck = guitarLayout(options).neck;
-  const per = fretWidth(options);
-  // An open string is played at the nut, which is where the neck
-  // starts -- not at fret 1's own place.
-  if (fret <= 0) return neck.x;
-  return neck.x + (fret - first - 0.5) * per;
+  if (place === undefined) return 0;
+  const photo = place.photo;
+  if (fret <= 0) return alongPhoto(place, photoWireX(photo, 0));
+  return alongPhoto(place, (photoWireX(photo, fret - 1) + photoWireX(photo, fret)) / 2);
 }
 
 /** The dots down the middle of the neck: one at 3, 5, 7, 9, two at the twelfth. */
