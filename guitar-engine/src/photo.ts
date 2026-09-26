@@ -233,6 +233,61 @@ export const CLASSICAL_DRAWN: PhotoMeasurements = {
 };
 
 /**
+ * The single-cut electric the page draws: the owner's own drawing, a
+ * Telecaster shape, and it already lies the way the page wants it --
+ * headstock in from the left, body out to the right.
+ *
+ * Unlike the classical, the file is not structured enough to read
+ * numbers out of: 860 paths, all under a transform. So this one was
+ * measured off a render, the way the photographs were, at twice its
+ * size and drawn into a page with no margin and the picture's exact
+ * width -- open an SVG as a document instead and the browser hands
+ * back the drawing offset by the body margin and stretched to the
+ * window, which is a measurement of the browser rather than of the
+ * guitar, and it was worth eleven pixels here.
+ *
+ * The wires give themselves away by their SHADING. They are drawn
+ * white along the top of the board and grey along the bottom, the
+ * way a round wire catches the light, so a white run in the upper
+ * board is a fret and nothing else is. Twenty-three lines answer to
+ * that -- but the last, at 1242.5, is white all the way down, which
+ * makes it the end of the fretboard and not a wire. So: the nut and
+ * TWENTY-TWO frets, which is what a Telecaster has, and what the
+ * page's list already said.
+ *
+ * The inlay dots settle the numbering completely. There are nine --
+ * 559, 666, 760.5, 845.5, 955.5 (a DOUBLE), 1048, 1102, 1149, 1192 --
+ * and against these wires they come out as 3, 5, 7, 9, 12, 15, 17, 19
+ * and 21, every one within 0.7 of its own midpoint and the double one
+ * on the twelfth. That is the standard set, and nothing else is near.
+ *
+ * The nut is at 407.6, which is not the middle of the bone bar it is
+ * drawn as (405.3) but close to its front edge, where a string
+ * actually leaves it. That is the line the fret spacing is measured
+ * from: take it and the whole series lands within 2.1 of the real
+ * 17.817 rule, across a scale of 1129.
+ */
+export const ELECTRIC_DRAWN: PhotoMeasurements = {
+  width: 1920,
+  height: 638,
+  fit: 'frame',
+  frets: [
+    407.6, 471, 531, 587.2, 641, 691.2, 738.5, 783.2, 825.8, 865.5, 903.2, 938.8, 972.2, 1004.2,
+    1033.8, 1062.8, 1089.2, 1114.5, 1138.2, 1161, 1182.2, 1203.2, 1222,
+  ],
+  boardEndX: 1242.5,
+  stringsAtNut: [285.5, 345.4],
+  stringsAtEnd: [277.7, 355.9],
+  boardAtNut: [281.1, 351.5],
+  boardAtEnd: [269.8, 360],
+  // Framed like the classical, because the owner asked for the same:
+  // the nut on one edge of the frame and the bridge on the other, so
+  // the headstock runs off the left and the rest of the body off the
+  // right. The bridge plate ends at 1602.
+  span: [375, 1654],
+  drop: 0.13,
+};
+/**
  * The photograph: a sunburst cutaway dreadnought, neck running in
  * from the left and the body filling the right.
  *
@@ -343,6 +398,7 @@ export const PHOTOS: Readonly<Record<string, PhotoMeasurements>> = {
   'acoustic-sunburst': ACOUSTIC_SUNBURST,
   'acoustic-natural': ACOUSTIC_NATURAL,
   'classical-drawn': CLASSICAL_DRAWN,
+  'electric-drawn': ELECTRIC_DRAWN,
   'fretboard-classical': CLASSICAL_BOARD,
   'fretboard-acoustic': ACOUSTIC_BOARD,
   'fretboard-electric': ELECTRIC_BOARD,

@@ -34,6 +34,7 @@ var GuitarEngine = (() => {
     DEFAULT_LAST_FRET: () => DEFAULT_LAST_FRET,
     DEFAULT_STRINGS: () => DEFAULT_STRINGS,
     ELECTRIC_BOARD: () => ELECTRIC_BOARD,
+    ELECTRIC_DRAWN: () => ELECTRIC_DRAWN,
     FINGER_COLORS: () => FINGER_COLORS,
     FINGER_NAMES: () => FINGER_NAMES,
     HAND_PICTURE: () => HAND_PICTURE,
@@ -179,6 +180,47 @@ var GuitarEngine = (() => {
     // the notation towering over it and the headstock taking a
     // quarter of the frame.
     span: [251, 1293],
+    drop: 0.13
+  };
+  var ELECTRIC_DRAWN = {
+    width: 1920,
+    height: 638,
+    fit: "frame",
+    frets: [
+      407.6,
+      471,
+      531,
+      587.2,
+      641,
+      691.2,
+      738.5,
+      783.2,
+      825.8,
+      865.5,
+      903.2,
+      938.8,
+      972.2,
+      1004.2,
+      1033.8,
+      1062.8,
+      1089.2,
+      1114.5,
+      1138.2,
+      1161,
+      1182.2,
+      1203.2,
+      1222
+    ],
+    boardEndX: 1242.5,
+    stringsAtNut: [285.5, 345.4],
+    stringsAtEnd: [277.7, 355.9],
+    boardAtNut: [281.1, 351.5],
+    boardAtEnd: [269.8, 360],
+    // Framed like the classical, because the owner asked for the same:
+    // the nut on one edge of the frame and the bridge on the other, so
+    // the headstock runs off the left and the rest of the body off the
+    // right. The bridge plate ends at 1602.
+    span: [375, 1654],
     drop: 0.13
   };
   var ACOUSTIC_SUNBURST = {
@@ -353,6 +395,7 @@ var GuitarEngine = (() => {
     "acoustic-sunburst": ACOUSTIC_SUNBURST,
     "acoustic-natural": ACOUSTIC_NATURAL,
     "classical-drawn": CLASSICAL_DRAWN,
+    "electric-drawn": ELECTRIC_DRAWN,
     "fretboard-classical": CLASSICAL_BOARD,
     "fretboard-acoustic": ACOUSTIC_BOARD,
     "fretboard-electric": ELECTRIC_BOARD,

@@ -19,7 +19,40 @@ with one of a different size means changing those two numbers.
 Trimmed to the ink, transparent background, drawn with the thumb to
 the left and the fingers up.
 
-## The drawing
+## The drawings
+
+`electric-drawn.svg` — the owner's own single-cut electric, a
+Telecaster shape. This is what the page draws for **Electric Guitar,
+single cut**. It is their upload exactly as it came, renamed (a space
+in a filename is a `%20` in every URL that asks for it) with `width`
+and `height` added beside the viewBox so the picture has an intrinsic
+size for the video canvas. The artwork is untouched — it already lies
+the way the page wants it, headstock in from the left and body out to
+the right.
+
+Measuring it was the photograph method, not the drawing method: 860
+paths under a transform is not something to read numbers out of. Two
+things are worth knowing if another one has to be measured this way:
+
+**Render it into a page, not as a document.** Open an SVG file
+directly in a browser and what comes back is offset by the body
+margin and stretched to the window — a measurement of the browser,
+not of the guitar. It was worth eleven pixels here, which is a sixth
+of a fret at the nut, and every mark in the video sat visibly right
+of where it belonged. An `<img>` at the picture's exact size, in a
+page with `margin: 0`, gives the file's own coordinates.
+
+**The wires give themselves away by their shading.** They are drawn
+white along the top of the board and grey along the bottom, the way a
+round wire catches the light. Twenty-three lines pass that test, but
+the last one is white all the way down: that is the end of the
+fretboard, not a wire. The nut and **twenty-two frets**, which is
+what a Telecaster has. The nine inlay dots then come out as 3, 5, 7,
+9, 12 (the double), 15, 17, 19 and 21, each within 0.7 of its own
+midpoint — the standard set, settling the numbering completely.
+
+It is framed `span: [375, 1654]`, `drop: 0.13` — the same framing as
+the classical, which is what the owner asked for.
 
 `classical-drawn.svg` — the owner's own classical guitar, drawn in
 Illustrator and turned a quarter turn counter-clockwise so it lies the
@@ -136,9 +169,9 @@ with the same script that measured this one.
 
 `fretboard-classical.webp`, `fretboard-acoustic.webp`,
 `fretboard-electric.webp`, `fretboard-strat.webp` — one studio render
-per guitar. The two electrics' are what the video frame draws; the
-classical's and the acoustic's are kept for reference, since the
-owner's drawing and the photograph above took their places. Each is a
+per guitar. Only the double-cut electric's is what the video frame
+draws now; the other three are kept for reference, since the owner's
+two drawings and the photograph above took their places. Each is a
 WHOLE guitar in a frame-shaped window: the neck, the joint where the
 body opens out, the cutaway, and the top with its soundhole or its
 pickups, with the body running off the top and the bottom of the
