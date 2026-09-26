@@ -61,22 +61,28 @@ export interface GuitarPhotograph {
    */
   readonly fit?: 'board' | 'frame';
   /**
-   * How much BIGGER than the frame's width to draw this picture.
+   * Which stretch of the picture fills the frame's width, in the
+   * file's own pixels: `[left, right]`.
    *
-   * A picture is scaled to the frame's width, which is the right
-   * answer when the guitar was framed for it: neck in from one edge,
-   * body out of the other. A picture framed differently -- a whole
-   * guitar with air around it, a drawing with its headstock well
-   * inside the edge -- comes out small in the frame with the notation
-   * towering over it. This zooms it: 1 is scaled to the width, 1.3 is
-   * a third bigger again, with the extra running off the sides the
-   * way the body already runs off the top and the bottom.
+   * A picture is scaled to the frame's width and laid against its
+   * left edge, which is the right answer when the guitar was framed
+   * for it -- neck in from one edge, body out of the other. A picture
+   * framed differently, with air around the guitar, comes out small
+   * with the notation towering over it, and the part that matters --
+   * the fretboard -- gets a fraction of the frame.
+   *
+   * This says which part of the file to show instead. `[251, 1293]`
+   * means the frame starts just before the nut and ends just past the
+   * bridge: the headstock runs off the left edge and the rest of the
+   * body off the right, and the whole playing length of the guitar
+   * gets the frame. It sets the scale AND the offset, because those
+   * are one decision: fit that stretch across the width.
    *
    * Everything moves with it -- the marks, the fret numbers, the
    * board -- because they are all worked out from where the picture
    * lands.
    */
-  readonly zoom?: number;
+  readonly span?: readonly [number, number];
   /**
    * How far DOWN the frame to hang this picture, as a share of the
    * stage's height.
@@ -216,11 +222,13 @@ export const CLASSICAL_DRAWN: PhotoMeasurements = {
   stringsAtEnd: [256.7, 336.9],
   boardAtNut: [261.2, 332.3],
   boardAtEnd: [249.0, 344.5],
-  // The owner wanted it bigger and lower than scaled-to-the-width put
-  // it: the drawing has air around the guitar where a photograph has
-  // the body already running off the edges, so at 1 it sat small with
-  // the notation towering over it.
-  zoom: 1.45,
+  // The owner marked the two ends they wanted in the frame: just
+  // before the nut and just past the bridge. The drawing has air
+  // around the guitar where a photograph has the body already
+  // running off the edges, so scaled to the width it sat small with
+  // the notation towering over it and the headstock taking a
+  // quarter of the frame.
+  span: [251, 1293],
   drop: 0.13,
 };
 

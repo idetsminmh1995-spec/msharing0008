@@ -172,11 +172,13 @@ var GuitarEngine = (() => {
     stringsAtEnd: [256.7, 336.9],
     boardAtNut: [261.2, 332.3],
     boardAtEnd: [249, 344.5],
-    // The owner wanted it bigger and lower than scaled-to-the-width put
-    // it: the drawing has air around the guitar where a photograph has
-    // the body already running off the edges, so at 1 it sat small with
-    // the notation towering over it.
-    zoom: 1.45,
+    // The owner marked the two ends they wanted in the frame: just
+    // before the nut and just past the bridge. The drawing has air
+    // around the guitar where a photograph has the body already
+    // running off the edges, so scaled to the width it sat small with
+    // the notation towering over it and the headstock taking a
+    // quarter of the frame.
+    span: [251, 1293],
     drop: 0.13
   };
   var ACOUSTIC_SUNBURST = {
@@ -463,7 +465,7 @@ var GuitarEngine = (() => {
   }
   function stageHeightFor(width, photo, options) {
     if (!(width > 0) || !(photo.width > 0) || !(photo.height > 0)) return 0;
-    const scaled = photo.height * (width / photo.width) * photoZoom(photo);
+    const scaled = photo.height * photoScale(width, photo);
     const numbers = options?.fretNumbers === false ? 0 : NUMBERS_SHARE;
     const hand = options?.handLegend === true ? HAND_BAND_SHARE : 0;
     const share = Math.max(0.2, 1 - numbers - hand);
@@ -478,18 +480,26 @@ var GuitarEngine = (() => {
   function photoPlacement(options) {
     const photo = options.photo;
     if (photo === void 0 || !(photo.width > 0) || !(options.width > 0)) return void 0;
-    const scale = options.width / photo.width * photoZoom(photo);
+    const scale = photoScale(options.width, photo);
     const board = guitarLayout(options).board;
     return {
       photo,
       scale,
-      x: 0,
+      x: -photoSpan(photo)[0] * scale,
       y: board.y + board.height / 2 - photoStringMiddle(photo) * scale + photoDrop(photo) * options.height
     };
   }
-  function photoZoom(photo) {
-    const zoom = photo.zoom;
-    return typeof zoom === "number" && zoom > 0.05 && zoom < 20 ? zoom : 1;
+  function photoSpan(photo) {
+    const span = photo.span;
+    const whole = [0, photo.width];
+    if (span === void 0) return whole;
+    const [from, to] = span;
+    if (!Number.isFinite(from) || !Number.isFinite(to)) return whole;
+    return to - from > photo.width * 0.05 ? [from, to] : whole;
+  }
+  function photoScale(width, photo) {
+    const [from, to] = photoSpan(photo);
+    return width / (to - from);
   }
   function photoDrop(photo) {
     const drop = photo.drop;

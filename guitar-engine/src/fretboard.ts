@@ -189,7 +189,7 @@ export function stageHeightFor(
   options?: { handLegend?: boolean; fretNumbers?: boolean },
 ): number {
   if (!(width > 0) || !(photo.width > 0) || !(photo.height > 0)) return 0;
-  const scaled = photo.height * (width / photo.width) * photoZoom(photo);
+  const scaled = photo.height * photoScale(width, photo);
   const numbers = options?.fretNumbers === false ? 0 : NUMBERS_SHARE;
   const hand = options?.handLegend === true ? HAND_BAND_SHARE : 0;
   const share = Math.max(0.2, 1 - numbers - hand);
@@ -230,16 +230,12 @@ export interface PhotoPlacement {
 export function photoPlacement(options: FretboardOptions): PhotoPlacement | undefined {
   const photo = options.photo;
   if (photo === undefined || !(photo.width > 0) || !(options.width > 0)) return undefined;
-  const scale = (options.width / photo.width) * photoZoom(photo);
+  const scale = photoScale(options.width, photo);
   const board = guitarLayout(options).board;
-  // Zoomed, the picture is wider than the frame, and it grows to the
-  // RIGHT: its left edge stays on the frame's, so the headstock and
-  // the low frets -- the end anyone is reading -- keep their place,
-  // and the body runs off the right the way a photographed one does.
   return {
     photo,
     scale,
-    x: 0,
+    x: -photoSpan(photo)[0] * scale,
     y:
       board.y +
       board.height / 2 -
@@ -248,10 +244,26 @@ export function photoPlacement(options: FretboardOptions): PhotoPlacement | unde
   };
 }
 
-/** How much bigger than the frame's width a picture is drawn, at least a little. */
-function photoZoom(photo: GuitarPhotograph | PhotoMeasurements): number {
-  const zoom = photo.zoom;
-  return typeof zoom === 'number' && zoom > 0.05 && zoom < 20 ? zoom : 1;
+/**
+ * The stretch of the file that fills the frame's width.
+ *
+ * The whole picture unless it says otherwise, and never a stretch
+ * that runs backwards or is too thin to scale from -- a picture that
+ * asks for nonsense is drawn whole rather than drawn wrong.
+ */
+function photoSpan(photo: GuitarPhotograph | PhotoMeasurements): readonly [number, number] {
+  const span = photo.span;
+  const whole: readonly [number, number] = [0, photo.width];
+  if (span === undefined) return whole;
+  const [from, to] = span;
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return whole;
+  return to - from > photo.width * 0.05 ? [from, to] : whole;
+}
+
+/** How big the picture is drawn, for a frame of this width. */
+function photoScale(width: number, photo: GuitarPhotograph | PhotoMeasurements): number {
+  const [from, to] = photoSpan(photo);
+  return width / (to - from);
 }
 
 /** How far down the stage it hangs, as a share of the stage's height. */

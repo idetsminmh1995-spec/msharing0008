@@ -191,12 +191,13 @@ the colour behind the stage and it fades the picture into it instead:
 { photo: guitarPhoto('assets/guitar/acoustic-natural.webp'), fadeTo: '#17110E' }
 ```
 
-A picture framed with air around it can be grown and moved as well:
-`zoom` scales it past the frame's width (from the left edge, so the
-headstock and the low frets keep their place) and `drop` hangs it
-lower down the stage, as a share of the stage's height. Both live
-with the measurements rather than with the caller, because how a
-picture wants to be framed is a fact about that picture.
+A picture framed with air around it can say which PART of itself to
+show: `span: [left, right]` in the file's own pixels fills the
+frame's width with that stretch, setting the scale and the offset
+together, and `drop` hangs it lower down the stage as a share of the
+stage's height. Both live with the measurements rather than with the
+caller, because how a picture wants to be framed is a fact about that
+picture.
 
 A band goes over each edge the picture is actually cut at — opaque
 there, gone before it reaches the board — and the hand, the marks and

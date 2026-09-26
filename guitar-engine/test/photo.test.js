@@ -289,7 +289,7 @@ test('the classical is the owner’s drawing, read out of the file', () => {
     [6, 19, photo.stringsAtNut[1]],
   ]) {
     const x = G.fretCenter(fret, frame);
-    const wanted = ((photo.frets[fret - 1] + photo.frets[fret]) / 2) * place.scale;
+    const wanted = place.x + ((photo.frets[fret - 1] + photo.frets[fret]) / 2) * place.scale;
     assert.ok(Math.abs(x - wanted) < 0.5, `fret ${fret} at ${x}, wanted ${wanted}`);
     // At the nut the string is where the drawing drew it.
     const y = G.stringYAt(frame, string, G.fretCenter(0.02, frame));
@@ -311,11 +311,17 @@ test('a picture can be drawn bigger, and hung lower', () => {
   });
   const flat = G.photoPlacement(frame(plain));
 
-  // Zoom grows the picture from its LEFT edge: the headstock and the
-  // low frets keep their place and the body runs off the right.
-  const big = G.photoPlacement(frame({ ...plain, zoom: 1.5 }));
-  assert.equal(big.x, 0, 'the left edge stays on the frame’s');
-  assert.ok(Math.abs(big.scale - flat.scale * 1.5) < 1e-9, 'half as big again');
+  // A span says which stretch of the file fills the width, and sets
+  // the scale and the offset together: that part, and only that part,
+  // lands across the frame.
+  const from = 300;
+  const to = 1500;
+  const shown = frame({ ...plain, span: [from, to] });
+  const big = G.photoPlacement(shown);
+  assert.ok(Math.abs(big.scale - shown.width / (to - from)) < 1e-9, 'that stretch, across');
+  assert.ok(big.scale > flat.scale, 'which is bigger than the whole picture');
+  assert.ok(Math.abs(big.x + from * big.scale) < 1e-9, 'its left end on the frame’s');
+  assert.ok(Math.abs(big.x + to * big.scale - shown.width) < 1e-6, 'its right end on the other');
 
   // Drop moves it down the stage, and everything drawn on it follows.
   const box = frame({ ...plain, drop: 0.1 });
@@ -324,14 +330,15 @@ test('a picture can be drawn bigger, and hung lower', () => {
   assert.ok(low.y - level.y > 0, 'it hangs lower');
   assert.ok(Math.abs(low.y - level.y - box.height * 0.1) < 1e-9, 'by a tenth of the stage');
 
-  // Nonsense is ignored rather than drawn.
-  for (const bad of [0, -2, NaN, 40, undefined]) {
-    const tried = G.photoPlacement(frame({ ...plain, zoom: bad }));
-    assert.ok(Math.abs(tried.scale - flat.scale) < 1e-9, `zoom ${bad} is not a zoom`);
+  // Nonsense is drawn whole rather than drawn wrong.
+  for (const bad of [[1500, 300], [0, 0], [NaN, 900], [900, Infinity], undefined]) {
+    const tried = G.photoPlacement(frame({ ...plain, span: bad }));
+    assert.ok(Math.abs(tried.scale - flat.scale) < 1e-9, `${JSON.stringify(bad)} is not a span`);
+    assert.ok(Math.abs(tried.x) < 1e-9, 'and the whole picture starts at the edge');
   }
 
   // However low it hangs, the fret numbers stay inside the frame.
-  const deep = { ...plain, zoom: 1.5, drop: 0.3 };
+  const deep = { ...plain, span: [300, 1500], drop: 0.3 };
   const shapes = G.stageShapes({ ...frame(deep), seconds: 0, notes: [] });
   const numbers = shapes.filter((shape) => shape.role === 'fretNumber');
   assert.ok(numbers.length > 5, 'there are still numbers');

@@ -49,14 +49,15 @@ Turning it counter-clockwise puts the low E at the bottom, which is
 where the engine numbers string 6: upright, the low E is on the left,
 and the left side goes down.
 
-It is drawn BIGGER than the frame's width and hung lower than the
-middle — `zoom: 1.45`, `drop: 0.13` in `photo.ts`. A photograph of a
-guitar already has its body running off the edges, because that is
-how someone frames one; a drawing has air around it, so scaled to the
-width it came out small with the notation towering over it. Zoom
-grows it from the LEFT edge, so the headstock and the low frets keep
-their place and the body runs off the right the way a photograph's
-does. Drop moves it down the stage, and everything drawn on it — the
+The frame shows the guitar from just before the NUT to just past the
+BRIDGE — `span: [251, 1293]`, `drop: 0.13` in `photo.ts`. A photograph
+of a guitar already has its body running off the edges, because that
+is how someone frames one; a drawing has air around it, so scaled to
+the width it came out small, with the notation towering over it and
+the headstock taking a quarter of the frame for nothing. `span` says
+which stretch of the file to fill the width with instead, and sets
+the scale and the offset together, because those are one decision.
+`drop` hangs it lower down the stage. Everything drawn on it — the
 marks, the numbers, the board — goes with it, because they are all
 worked out from where the picture lands.
 
