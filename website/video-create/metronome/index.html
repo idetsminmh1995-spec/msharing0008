@@ -61,12 +61,13 @@
   .generate-btn:disabled{opacity:.5;cursor:not-allowed;}
   .btn-dark{background:var(--near-black);color:#fff;}
   .gen-progress{display:flex;flex-direction:column;gap:8px;}
+  /* `hidden` loses to a display rule, so the progress bar and its
+     Cancel button sat under the button from the moment the page
+     opened, with nothing rendering. */
+  .gen-progress[hidden]{display:none;}
   .gen-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
   .gen-fill{height:100%;width:0;background:var(--red);border-radius:3px;transition:width .12s linear;}
   .gen-line{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted);font-weight:600;}
-  .len-row{display:flex;align-items:center;gap:6px;}
-  .len-row .drum-input{text-align:center;}
-  .len-colon{font-weight:700;color:var(--muted);}
   .cost-line{text-align:center;font-size:12px;color:var(--muted);}
   .cost-line b{color:var(--red);font-weight:700;}
 
@@ -185,7 +186,7 @@
           <div class="label">MIDI or MusicXML</div>
         </label>
       </div>
-      <div class="confirm-msg" id="uploadConfirm">One file is the whole input &mdash; MIDI or MusicXML. Its tempo and time signature drive the count, and the voice comes from R2. <b>MusicXML also says how many bars it has</b>, so the video is exactly that long without your having to set it.</div>
+      <div class="confirm-msg" id="uploadConfirm">One file is the whole input &mdash; MIDI or MusicXML. Its tempo and time signature drive the count, and the voice comes from R2. <b>The file says how long the video is</b>: a MusicXML is a list of bars, so a ten-minute score makes a ten-minute video. A MIDI holding only a tempo and a time signature declares no length, and that one cannot be made into a video.</div>
     </div>
 
     <div class="card">
@@ -238,29 +239,7 @@
     </div>
 
     <div class="card">
-      <div class="card-head"><span class="card-num">5</span>Video Length</div>
-      <div class="field-row">
-        <div>
-          <label for="lengthMode">Length</label>
-          <select id="lengthMode" class="drum-input">
-            <option value="midi">From the file</option>
-            <option value="fixed">Set it here</option>
-          </select>
-        </div>
-        <div>
-          <label for="lengthMinutes">Minutes &amp; seconds</label>
-          <div class="len-row">
-            <input id="lengthMinutes" class="drum-input" type="number" min="0" max="60" step="1" value="3">
-            <span class="len-colon">:</span>
-            <input id="lengthSeconds" class="drum-input" type="number" min="0" max="59" step="1" value="0">
-          </div>
-        </div>
-      </div>
-      <div class="field-hint" id="lengthHint">A MusicXML file is a list of bars, so it always says how long it is and the video matches it. A MIDI only says when it carries notes or a real end mark &mdash; one holding just a tempo and a time signature does not, and then the length is set here.</div>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><span class="card-num">6</span>Video Ratio</div>
+      <div class="card-head"><span class="card-num">5</span>Video Ratio</div>
       <label>Aspect Ratio</label>
       <div class="ratio-row">
         <div class="ratio-pill active">16:9</div>
@@ -277,7 +256,7 @@
       <div class="gen-line"><span id="genLabel">Rendering…</span><button class="btn-ghost" id="cancelBtn" type="button">Cancel</button></div>
     </div>
     <div class="cost-line" id="costLine">Estimated cost: <b>12 points</b> · You have 240</div>
-    <div class="field-hint" id="genNote">Rendered in your browser, frame by frame &mdash; not recorded, so it is usually <b>faster than the video is long</b> and every frame lands on its exact 1/30th of a second. Nothing plays and nothing is heard while it runs. The video opens on a still second, runs for the length set in card 5, and closes with the Thank You clip from the asset server.</div>
+    <div class="field-hint" id="genNote">Rendered in your browser, frame by frame &mdash; not recorded, so it is usually <b>faster than the video is long</b> and every frame lands on its exact 1/30th of a second. Nothing plays and nothing is heard while it runs. The video is one still second, then the count for the whole of the file &mdash; a ten-minute score makes a ten-minute video &mdash; and then the Thank You clip from the asset server. Nothing sets its length, because the file already has one.</div>
   </div>
 
   <div class="right">
@@ -354,10 +333,6 @@
   const clickVolume = document.getElementById('clickVolume');
   const clickVolumeOut = document.getElementById('clickVolumeOut');
   const clickSound = document.getElementById('clickSound');
-  const lengthMode = document.getElementById('lengthMode');
-  const lengthMinutes = document.getElementById('lengthMinutes');
-  const lengthSeconds = document.getElementById('lengthSeconds');
-  const lengthHint = document.getElementById('lengthHint');
   const accentOn = document.getElementById('accentOn');
 
   const PLAY_PATH = 'M8 5v14l11-7z';
@@ -441,45 +416,6 @@
     return perf ? perf.entries.length : 0;
   }
 
-  /** The length typed into card 5. */
-  function chosenSeconds() {
-    const m = Math.min(60, Math.max(0, Math.floor(Number(lengthMinutes.value) || 0)));
-    const sec = Math.min(59, Math.max(0, Math.floor(Number(lengthSeconds.value) || 0)));
-    return Math.min(FREE_RUN_SECONDS, Math.max(1, m * 60 + sec));
-  }
-
-  /**
-   * Fits card 5 to the file that is loaded.
-   *
-   * `adopt` is true only when a NEW file has just been read: that is
-   * when a file with a real length gets "From the MIDI" selected and
-   * the boxes filled in to match, so the number is visible rather than
-   * implied. Every other call leaves the choice alone -- otherwise
-   * picking "Set it here" would be undone by the very redraw that
-   * picking it triggers.
-   */
-  function refreshLengthCard(adopt = false) {
-    const declared = declaredSeconds;
-    const midiOption = lengthMode.querySelector('option[value="midi"]');
-    midiOption.disabled = declared === null;
-    if (declared === null && lengthMode.value === 'midi') lengthMode.value = 'fixed';
-    if (declared !== null && adopt) {
-      lengthMode.value = 'midi';
-      lengthMinutes.value = String(Math.floor(declared / 60));
-      lengthSeconds.value = String(Math.round(declared % 60));
-    }
-    const fromFile = lengthMode.value === 'midi' && declared !== null;
-    lengthMinutes.disabled = fromFile;
-    lengthSeconds.disabled = fromFile;
-    lengthHint.innerHTML = fromFile
-      ? `The file declares its own length, <b>${formatTime(declared)}</b>${
-          sourceKind === 'musicxml' ? ` over ${beatGrid.length ? scoreBarCount() : 0} bars` : ''
-        }, and the video is exactly that.`
-      : sourceKind === 'midi'
-        ? 'This MIDI carries a tempo and a time signature but <b>no length of its own</b> &mdash; nothing in it says when to stop. The video is as long as you set here. A MusicXML file would say, because it is a list of bars.'
-        : 'No file loaded yet. The video is as long as you set here.';
-  }
-
   /**
    * Every beat of a SCORE, walked through its performance timeline.
    *
@@ -515,7 +451,7 @@
     return out;
   }
 
-  function rebuildClock(adoptLength = false) {
+  function rebuildClock() {
     if (typeof NotationEngine === 'undefined') return;
     if (sourceKind === 'musicxml' && scorePlayback) {
       tempoMap = scorePlayback.tempoMap;
@@ -523,7 +459,6 @@
       tempoMap = NotationEngine.buildTempoMap(tempoEvents).tempoMap;
       declaredSeconds = hasMidi ? readMidiLength() : null;
     }
-    refreshLengthCard(adoptLength);
     beatGrid =
       sourceKind === 'musicxml' ? buildBeatGridFromScore(duration()) : buildBeatGrid(duration());
     showTempoBoxes();
@@ -818,14 +753,24 @@
   /**
    * How long the piece is -- and therefore how long the video is.
    *
-   * One of two answers, and card 5 says which: the length the FILE
-   * declares, or the length that was typed in. There is deliberately
-   * no third answer invented from the beat grid -- that is what used
-   * to turn a file with nothing in it into ten minutes of video.
+   * The FILE's answer, always. There used to be a card for typing a
+   * length in, and it could only ever do one of two things: agree
+   * with the file, or cut a ten-minute score down to the three
+   * minutes somebody left in the box. A score is a list of bars; it
+   * knows how long it is, and the video is exactly that.
+   *
+   * The free-run number is for the live metronome ONLY -- the page is
+   * usable as a metronome before anything is uploaded -- and a file
+   * that declares no length of its own is not generated at all
+   * rather than being given an invented one.
    */
   function duration() {
-    if (lengthMode.value === 'midi' && declaredSeconds !== null) return declaredSeconds;
-    return chosenSeconds();
+    return declaredSeconds !== null ? declaredSeconds : FREE_RUN_SECONDS;
+  }
+
+  /** Whether there is a real, declared length to render against. */
+  function hasDeclaredLength() {
+    return hasMidi && declaredSeconds !== null;
   }
 
   function running() {
@@ -1029,17 +974,6 @@
     updateDisplay();
   });
 
-  for (const control of [lengthMode, lengthMinutes, lengthSeconds]) {
-    control.addEventListener('change', () => {
-      stopPlayback(true);
-      rebuildClock();
-      updateDisplay();
-    });
-    control.addEventListener('input', () => {
-      rebuildClock();
-      updateDisplay();
-    });
-  }
 
   for (const control of [clickSound, accentOn]) {
     // A voice change should be heard now, not on the next beat after the
@@ -1092,7 +1026,7 @@
     declaredSeconds = perf.totalSeconds;
     songEndTicks = 0;
     stopPlayback(true);
-    rebuildClock(true);
+    rebuildClock();
 
     const first = scoreSignatures.get(perf.entries[0].measureNumber) ?? DEFAULT_TIME_SIGNATURES[0];
     const bpm = bpmAt(0);
@@ -1169,8 +1103,7 @@
           }
         }
         stopPlayback(true);
-        // A new file: card 5 adopts whatever length it declares.
-        rebuildClock(true);
+        rebuildClock();
 
         const bpm = bpmAt(0);
         const sig = signatureAt(0);
@@ -1179,7 +1112,7 @@
           `"${file.name}" — ${bpm ?? '?'} BPM, ${sig.numerator}/${sig.denominator}` +
             (changes > 0 ? `, ${changes} tempo change(s)` : '') +
             (declaredSeconds === null
-              ? `. This MIDI declares no length of its own, so the video is the ${formatTime(duration())} set in card 5 — a MusicXML file would say.`
+              ? '. This MIDI declares <b>no length of its own</b> — nothing in it says when to stop, so there is no video to make from it. It still runs as a metronome here. A MusicXML file would say, because it is a list of bars.'
               : `. ${beatGrid.length} beats over ${formatTime(duration())} — the video will be exactly that long.`),
           true,
         );
@@ -1510,6 +1443,18 @@
       setConfirm('Upload a file first — it is what the video is made from.', false);
       return;
     }
+    // The file's length IS the video's length, so a file that declares
+    // none has no video in it. Inventing one is what the old length
+    // card did, and it is how a ten-minute score became three minutes
+    // of video.
+    if (!hasDeclaredLength()) {
+      setConfirm(
+        'This file declares no length of its own — nothing in it says when to stop. ' +
+          'A MusicXML file does, because it is a list of bars.',
+        false,
+      );
+      return;
+    }
 
     stopPlayback(true);
     setGenerating(true);
@@ -1654,8 +1599,12 @@
   /** The button says what it needs, instead of only saying so once clicked. */
   function refreshGenerateBtn() {
     if (recording) return;
-    generateBtn.disabled = !hasMidi;
-    generateBtn.textContent = hasMidi ? 'Generate Video' : 'Generate Video \u2014 upload a MIDI first';
+    generateBtn.disabled = !hasDeclaredLength();
+    generateBtn.textContent = !hasMidi
+      ? 'Generate Video \u2014 upload a file first'
+      : hasDeclaredLength()
+        ? `Generate Video \u2014 ${formatTime(duration())}`
+        : 'Generate Video \u2014 this file declares no length';
   }
 
   fillDesigns();

@@ -121,6 +121,10 @@
   .btn-ghost{border:1.5px solid var(--border);background:#fff;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;color:#4A3F3A;cursor:pointer;font-family:'Manrope',sans-serif;}
   .btn-ghost:hover{border-color:var(--red);color:var(--red);}
   .gen-progress{display:flex;flex-direction:column;gap:8px;}
+  /* `hidden` loses to a display rule, so the progress bar and its
+     Cancel button sat under the button from the moment the page
+     opened, with nothing rendering. */
+  .gen-progress[hidden]{display:none;}
   .gen-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
   .gen-fill{height:100%;width:0;background:var(--red);border-radius:3px;transition:width .12s linear;}
   .gen-line{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted);font-weight:600;}
