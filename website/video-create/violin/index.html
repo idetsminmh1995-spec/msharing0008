@@ -214,7 +214,15 @@
      minimum is its content, and the notation's content is a whole
      score: without it the instrument would be squeezed to nothing. */
   .video-body{flex:1;display:flex;align-items:stretch;gap:1.5cqw;min-height:0;padding:0 2cqw 2.6cqw;}
-  .video-instrument{flex:0 0 var(--instrument-w,21%);position:relative;display:flex;align-items:center;justify-content:center;min-width:0;}
+  /* The drawing is WIDER than it is tall -- the bow sticks out both
+     sides of the body, so the whole picture is 431 by 369 where the
+     violin inside it is tall and narrow. That is why this column is a
+     third of the frame and not the fifth the mock-up's panel suggests:
+     the column has to hold the BOW, and the violin is what is left.
+     Sized to fit rather than to fill, because a bow that overhangs is
+     a bow cut off by the frame's edge on one side and drawn across the
+     music on the other. */
+  .video-instrument{flex:0 0 var(--instrument-w,34%);position:relative;display:flex;align-items:center;justify-content:center;min-width:0;}
   .violin-photo{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;display:block;}
   .violin-photo:not([src]){display:none;}
   .instrument-missing{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
@@ -276,8 +284,8 @@
   /* The one layout change that is not a size: in 9:16 the instrument
      goes ABOVE the music instead of beside it. */
   .video-frame.is-portrait .video-body{flex-direction:column;gap:2.5cqw;padding:2cqw 4cqw 5cqw;}
-  .video-frame.is-portrait .video-instrument{flex:0 0 46%;width:100%;}
-  .video-frame.is-square .video-body{padding:1cqw 3cqw 3.5cqw;--instrument-w:26%;}
+  .video-frame.is-portrait .video-instrument{flex:0 0 42%;width:100%;}
+  .video-frame.is-square .video-body{padding:1cqw 3cqw 3.5cqw;--instrument-w:38%;}
   .video-frame.is-portrait .instrument-missing{font-size:3.4cqw;}
   .video-frame.is-square .instrument-missing{font-size:2.6cqw;}
     /* Video Style (card 5) is a property of the whole FRAME, not of the
@@ -1214,7 +1222,7 @@
    * drawing of -- so a new violin is one line here and one file.
    */
   const VIOLINS = {
-    'violin-drawn': 'Violin',
+    violin: 'Violin',
   };
 
   function violinModel() {

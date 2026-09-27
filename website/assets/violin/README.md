@@ -1,7 +1,7 @@
 # The violin the video frame draws
 
-One file: **`violin-drawn.svg`**, and the page draws it in all three
-shapes.
+One file: **`violin.svg`**, the owner's own drawing, and the page
+draws it in all three shapes.
 
 That is the difference from the drum kits, which are photographs filed
 per shape in R2 (`drums/{Brand}/{Model}/{ratio}/`). A kit photograph
@@ -14,6 +14,23 @@ changes.
 A name with no file behind it simply reports that it has none, in the
 card, and the rest of the page keeps working. A second violin is one
 line in the page's `VIOLINS` table and one file here.
+
+## What was done to the file as sent
+
+Two things, neither of which changes a line of the artwork:
+
+**A tight `viewBox`, and a `width`/`height` to go with it.** It came
+with `viewBox="0 0 451.7 472.9"` and no size at all. Seventy-three
+units of that height were empty sky above the scroll and thirty-three
+empty below the body -- nearly a quarter of the picture -- and the
+page fits the drawing to its column, so a drawing that is a quarter
+air comes out a quarter smaller than it could be. Measured by
+rendering it transparent and reading the alpha, the ink is
+430.97 x 369.01 at `10.24, 71.70`, and that is the box now.
+
+**An intrinsic size.** An `<img>` whose SVG carries only a `viewBox`
+has no size of its own, and the canvas the video is rendered on draws
+what it is given: `width` and `height` are what stop it guessing.
 
 ## How to draw it
 
@@ -28,14 +45,8 @@ in 9:16), so it wants to be tall.
 frame is black and supplies its own. A white box behind the violin is
 a white box in the video.
 
-**Give it `width` and `height`, not just a `viewBox`.** They are what
-give the picture an intrinsic size, which is what the video canvas
-needs to draw it at.
-
-**Tighten the `viewBox` to the instrument.** Empty space around it in
-the file is empty space in the frame: the page fits the drawing to its
-column, so a drawing that is half air comes out half the size it could
-be.
+**Give it `width` and `height`, and a `viewBox` tight to the
+instrument.** See above for why, and what it cost this one.
 
 **Text to outlines**, if there is any. A font the browser does not
 have is a word in the wrong typeface, in every frame of the video —
