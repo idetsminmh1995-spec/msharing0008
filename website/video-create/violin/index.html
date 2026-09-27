@@ -222,7 +222,7 @@
      Sized to fit rather than to fill, because a bow that overhangs is
      a bow cut off by the frame's edge on one side and drawn across the
      music on the other. */
-  .video-instrument{flex:0 0 var(--instrument-w,34%);position:relative;display:flex;align-items:center;justify-content:center;min-width:0;}
+  .video-instrument{flex:0 0 var(--instrument-w,40%);position:relative;display:flex;align-items:center;justify-content:center;min-width:0;}
   .violin-photo{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;display:block;}
   .violin-photo:not([src]){display:none;}
   .instrument-missing{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
@@ -238,11 +238,12 @@
 
      So there is nothing to scroll and no scrollbar to hide, and the
      SVG is fitted to the BOX rather than given a height of its own. */
-  .video-notation{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;overflow:hidden;}
-  /* The page box was computed FROM this column's aspect, so the SVG
-     fills it exactly rather than being fitted into it: any letterboxing
-     here would mean the two disagreed about the shape. */
-  .video-notation svg{display:block;width:100%;height:100%;}
+  .video-notation{flex:1;min-width:0;display:flex;align-items:flex-start;justify-content:center;overflow:hidden;}
+  /* [VF-06] The drawing is the WHOLE piece, one column of systems, so
+     it is far taller than the box it sits in: full width, its own
+     height, and the box clips. What is on screen is the window; the
+     transform slides it. */
+  .video-notation svg{display:block;width:100%;height:auto;will-change:transform;}
 /* ---- 9:16 and 1:1 --------------------------------------------
      The mock-up draws all three panels at roughly the same shape, so
      its proportions cannot be copied -- a real 16:9 frame is half
@@ -290,8 +291,8 @@
   /* The one layout change that is not a size: in 9:16 the instrument
      goes ABOVE the music instead of beside it. */
   .video-frame.is-portrait .video-body{flex-direction:column;gap:2.5cqw;padding:2cqw 4cqw 5cqw;}
-  .video-frame.is-portrait .video-instrument{flex:0 0 42%;width:100%;}
-  .video-frame.is-square .video-body{padding:.5cqw 3cqw 3cqw;--instrument-w:42%;}
+  .video-frame.is-portrait .video-instrument{flex:0 0 50%;width:100%;}
+  .video-frame.is-square .video-body{padding:.5cqw 3cqw 3cqw;--instrument-w:47%;}
   .video-frame.is-portrait .instrument-missing{font-size:3.4cqw;}
   .video-frame.is-square .instrument-missing{font-size:2.6cqw;}
     /* Video Style (card 5) is a property of the whole FRAME, not of the
@@ -896,37 +897,45 @@
   }
 
   /**
-   * [VF-03] The page the music is wrapped onto.
+   * [VF-06] How tall the WINDOW on the music is, in staff spaces.
    *
-   * The box comes from the notation column the frame actually gives
-   * it, so a portrait frame gets a tall page with short systems and a
-   * wide one the opposite, without either being described twice.
+   * The lines the frame shows at once. Not the page: the page is one
+   * unbroken column of every system in the piece, and this is the part
+   * of it the frame is looking at.
+   */
+  function notationWindow() {
+    const margins = PAGE_MARGIN.marginTop + PAGE_MARGIN.marginBottom;
+    if (!(systemPitch > 0)) return Math.max(12, PAGE_WIDTH_SPACES / notationAspect());
+    const wanted = Number(systemsSelect?.value);
+    const lines = Number.isFinite(wanted) && wanted >= 1
+      ? wanted
+      : Math.max(1, Math.floor(
+          (Math.max(12, PAGE_WIDTH_SPACES / notationAspect()) - margins) / systemPitch));
+    return margins + lines * systemPitch;
+  }
+
+  /**
+   * [VF-06] ONE page, as tall as the piece needs.
    *
-   * And it is snapped to a WHOLE number of systems. Without that the
-   * page keeps whatever band is left over at the bottom -- a page 1.4
-   * systems tall shows one and wastes the rest, which on this frame is
-   * a third of the music's room left black. So once a first render has
-   * said how tall a system is, the page is grown or shrunk to hold as
-   * many whole ones as fit, and the width follows from the column's
-   * aspect so the page still fills it.
+   * The music does not turn pages here, it SCROLLS -- so it must not
+   * be cut into pages at all. The engine is given a page tall enough
+   * that it never breaks one, and the whole score comes back as a
+   * single column of systems; the frame then looks at a window of it
+   * and slides that window down as the music plays, which on screen is
+   * the music rising.
+   *
+   * The page's WIDTH is still the window's, because that is what
+   * decides how many bars go across a system: a window three lines
+   * tall in a wide column wants long systems, the same window in a
+   * narrow one wants short ones. Width from the window and height from
+   * the piece is the whole trick.
    */
   function notationPage() {
-    const aspect = notationAspect();
-    const margins = PAGE_MARGIN.marginTop + PAGE_MARGIN.marginBottom;
-    if (!(systemPitch > 0)) {
-      // The measuring pass: one page tall enough to hold every system,
-      // so the gap between two of them is the system's own height and
-      // not the page's. Measuring it off a page that fits only one
-      // would read the PAGE pitch instead, which is how the frame came
-      // out with a single line of music and a band of black under it.
-      return { pageWidth: PAGE_WIDTH_SPACES, pageHeight: 4000, ...PAGE_MARGIN };
-    }
-    const wanted = Number(systemsSelect?.value);
-    const systems = Number.isFinite(wanted) && wanted >= 1
-      ? wanted
-      : Math.max(1, Math.floor((Math.max(12, PAGE_WIDTH_SPACES / aspect) - margins) / systemPitch));
-    const pageHeight = margins + systems * systemPitch;
-    return { pageWidth: pageHeight * aspect, pageHeight, ...PAGE_MARGIN };
+    return {
+      pageWidth: notationWindow() * notationAspect(),
+      pageHeight: 100000,
+      ...PAGE_MARGIN,
+    };
   }
 
   function notationConfig() {
@@ -1007,7 +1016,6 @@
       }
       notationPlayback = rendered.playback;
       attachCursor(svgEl);
-      showNotationPage(0);
       updateCursor();
       void refreshNotationImage();
       if (typeof done === 'function') done();
@@ -1054,7 +1062,6 @@
     // cursor.
     notationPlayback = rendered.playback;
     attachCursor(svgEl);
-    showNotationPage(0);
     updateCursor();
     fitNotationPage();
 
@@ -1131,7 +1138,6 @@
     }
     notationPlayback = rendered.playback;
     attachCursor(svgEl);
-    showNotationPage(0);
     updateCursor();
     fitNotationPage();
     buildKeyTimeline();
@@ -1416,33 +1422,62 @@
    */
   let cursorBand = { top: 0, height: 0 };
   /**
-   * [VF-05] One page at a time, and the page turns.
+   * [VF-06] The music scrolls, from the bottom of the frame upward.
    *
-   * Page mode draws every page of the score stacked into one tall SVG.
-   * A frame wants ONE of them, so the SVG's viewBox is cut to the page
-   * the playhead is on and moved down a page at a time as the music
-   * crosses. Nothing is re-rendered to turn a page -- it is the same
-   * drawing, seen through a different window -- but the raster the
-   * video is painted from has to be taken again, which is what
-   * `refreshNotationImage` does.
+   * The whole piece is one tall column of systems and the frame is a
+   * window on it. The window slides DOWN the column as the music
+   * plays, which on screen is every line rising -- the line being
+   * played climbs to the top and the next one comes up behind it.
+   *
+   * It is done by MOVING THE DRAWING, not by re-cutting its viewBox.
+   * A viewBox that changed would mean re-rasterising the whole score
+   * every frame for the video canvas, which is the one thing the
+   * exported take cannot afford; a CSS transform costs nothing, the
+   * container clips it, and the canvas painter already draws the SVG
+   * at wherever it really is and cuts it to the container's box.
    */
-  let notationPageHeight = 0;
-  let notationPageIndex = -1;
+  let notationPageWidth = 0;
+  let notationContentHeight = 0;
+  let scrollUnits = 0;
+  let scrollTarget = 0;
 
-  function showNotationPage(index) {
+  /** Staff spaces to real pixels, for the drawing as it is shown now. */
+  function notationUnitPx() {
     const svgEl = notationContainer.querySelector('svg');
-    if (!svgEl || !(notationPageHeight > 0)) return;
-    const wanted = Math.max(0, Math.floor(index));
-    if (wanted === notationPageIndex) return;
-    notationPageIndex = wanted;
-    svgEl.setAttribute(
-      'viewBox',
-      `0 ${wanted * notationPageHeight} ${notationPageWidth} ${notationPageHeight}`,
-    );
-    void refreshNotationImage();
+    if (!svgEl || !(notationPageWidth > 0)) return 0;
+    return svgEl.getBoundingClientRect().width / notationPageWidth;
   }
 
-  let notationPageWidth = 0;
+  function applyNotationScroll() {
+    const svgEl = notationContainer.querySelector('svg');
+    if (!svgEl) return;
+    const px = scrollUnits * notationUnitPx();
+    svgEl.style.transform = `translateY(${(-px).toFixed(2)}px)`;
+  }
+
+  /**
+   * Where the window wants to be: the system being played resting at
+   * the top of it, so everything below is what is coming.
+   *
+   * Clamped at both ends -- the piece does not scroll before its first
+   * line or past its last -- and eased rather than jumped, so a line
+   * rises into place instead of snapping.
+   */
+  function setScrollTarget(systemY) {
+    const window = notationWindow();
+    const most = Math.max(0, notationContentHeight - window);
+    scrollTarget = Math.min(most, Math.max(0, systemY - PAGE_MARGIN.marginTop));
+  }
+
+  function stepNotationScroll(immediate) {
+    const gap = scrollTarget - scrollUnits;
+    if (Math.abs(gap) < 0.01) {
+      if (scrollUnits !== scrollTarget) { scrollUnits = scrollTarget; applyNotationScroll(); }
+      return;
+    }
+    scrollUnits = immediate === true ? scrollTarget : scrollUnits + gap * 0.16;
+    applyNotationScroll();
+  }
 
   function systemOrigins() {
     const seen = new Set();
@@ -1485,12 +1520,20 @@
     if (!svgEl) return;
     const viewBox = (svgEl.getAttribute('viewBox') || '').split(/\s+/).map(Number);
     const height = viewBox.length === 4 ? viewBox[3] : 20;
-    // [VF-05] The page the engine was asked for, which is the window
-    // this SVG is now seen through -- the drawing itself is every page
-    // of the score, stacked.
+    // [VF-06] The column's own size. The engine was given a page tall
+    // enough never to break, so its viewBox is that absurd height --
+    // the real content ends one system after the last origin, and the
+    // viewBox is cut to THAT so the drawing is as tall as the music
+    // and not as tall as the number it was given.
     const page = notationPage();
     notationPageWidth = viewBox.length === 4 ? viewBox[2] : page.pageWidth;
-    notationPageHeight = page.pageHeight;
+    const origins = systemOrigins();
+    const last = origins.length > 0 ? origins[origins.length - 1] : 0;
+    notationContentHeight = last + (systemPitch > 0 ? systemPitch : height) + PAGE_MARGIN.marginBottom;
+    svgEl.setAttribute('viewBox', `0 0 ${notationPageWidth} ${notationContentHeight}`);
+    scrollUnits = 0;
+    scrollTarget = 0;
+    svgEl.style.transform = 'translateY(0px)';
     cursorBand = measureSystemBand(svgEl, height);
     const staff = { top: cursorBand.top, bottom: cursorBand.top + cursorBand.height };
 
@@ -1555,8 +1598,12 @@
     cursorLine.setAttribute('x', String(x - CURSOR_WIDTH / 2));
     cursorLine.setAttribute('y', String(systemY + cursorBand.top - CURSOR_OVERHANG));
     cursorLine.style.display = '';
-    // [VF-05] And turn the page under it when the music crosses one.
-    if (notationPageHeight > 0) showNotationPage(Math.floor(systemY / notationPageHeight));
+    // [VF-06] And slide the window so that line is at the top.
+    setScrollTarget(systemY);
+    // Eased while it is playing, so a line rises into place; snapped
+    // when it is not, so a seek or a shape change lands at once
+    // instead of gliding from wherever it was.
+    stepNotationScroll(audioPlayer.paused);
   }
 
   /** While playing, follow every frame rather than only `timeupdate`'s ~4/second. */
@@ -2672,6 +2719,18 @@
     // put together.
     const clone = svgEl.cloneNode(true);
     for (const el of clone.querySelectorAll('.playback-cursor')) el.remove();
+    // [VF-06] And the SCROLL comes off it too. The transform that
+    // slides the music up the frame lives on this element, and a
+    // serialised copy carries it -- so the raster would be drawn
+    // already scrolled, and then the painter, which places the image
+    // by where the element really is, would scroll it again. Twice as
+    // far as the music had actually got, which looked like the wrong
+    // bars being on screen rather than like an offset.
+    //
+    // Stripping it also means the markup no longer changes as the
+    // music moves, so the whole score is rasterised ONCE and every
+    // later frame reuses it.
+    clone.removeAttribute('style');
     const markup = new XMLSerializer().serializeToString(clone);
     const key = String(markup.length) + '|' + currentVideoStyle();
     if (key === notationImageKey && notationImage) return;
