@@ -461,10 +461,10 @@
           </select>
         </div>
       </div>
-      <div class="field-hint" id="violinHint">The violin in the frame is a <b>photograph</b>, read from R2 at
-        <b>violins/{Model}/{ratio}/Violin.png</b> &mdash; one picture per shape, the same way the drum kits are
-        filed, because a frame half as wide wants its own crop and not the same crop shrunk. A transparent PNG
-        with the instrument and its bow and nothing else: the frame supplies its own black.</div>
+      <div class="field-hint" id="violinHint">The violin in the frame is a <b>drawing</b>, from
+        <b>website/assets/violin/</b>. One vector file serves all three shapes &mdash; there is nothing to crop
+        and nothing to re-upload when the shape changes, which is the whole reason it is not a photograph per
+        ratio the way the drum kits are. Upright, with its bow, on nothing: the frame supplies its own black.</div>
       <div class="confirm-msg" id="violinConfirm">&mdash;</div>
     </div>
 
@@ -737,7 +737,6 @@
     // is a different shape now -- so the music has to be laid out
     // again, not merely re-scaled.
     reflowNotation();
-    loadViolinPhoto();
   }
 
   for (const pill of document.querySelectorAll('.ratio-pill')) {
@@ -1187,45 +1186,44 @@
 
   // --- The violin in the frame (card 3) -----------------------------
   //
-  // A photograph, not a drawing an engine paints. Every frame before
-  // this one had an instrument the code could draw -- a kit lit by the
-  // sticking engine, a neck lit by the finger engine, a keyboard with
-  // notes falling onto it -- and a violin has none of that yet. So the
-  // frame stands a picture of one beside the music, and the picture
-  // comes out of R2 beside the drum kits:
+  // A DRAWING, from this repo, beside the guitars and the basses:
   //
-  //     violins/{Model}/{ratio}/Violin.png
+  //     website/assets/violin/{file}.svg
   //
-  // One per shape rather than one scaled three ways, for the same
-  // reason the kits are filed that way: a frame half as wide wants its
-  // own crop, and shrinking a landscape crop into a portrait frame
-  // leaves the instrument a sliver in the middle.
+  // Not a photograph per shape the way the drum kits are filed. A kit
+  // photograph has to be cropped for each frame -- a landscape crop
+  // shrunk into a portrait frame leaves the kit a sliver in the middle
+  // -- but a vector drawing of one tall instrument is the same drawing
+  // at every shape, scaled. One file, no crops, no bucket.
   //
-  // Fetched through the plain `/assets/` passthrough the drum page
-  // already uses, so adding an instrument needed no Worker change.
+  // Nothing measures it. The guitars' and basses' drawings carry
+  // measurements because the finger engine lands marks on their frets;
+  // a violin has no frets and no engine yet, so this picture is a
+  // picture. When a bowing-and-fingering engine comes, the drawing
+  // will need the same treatment theirs had, and the folder's README
+  // says what that means.
   const violinPhoto = document.getElementById('violinPhoto');
   const violinMissing = document.getElementById('violinMissing');
   const violinSelect = document.getElementById('violinModel');
   const violinConfirm = document.getElementById('violinConfirm');
 
   /**
-   * The models to look for.
-   *
-   * A hard list rather than a directory listing, because listing a
-   * bucket needs an endpoint and this needs none: a name that has no
-   * picture simply reports that it has none, which is the same thing
-   * the bass page does for a bass it has no drawing of. When there are
-   * enough of them to be worth browsing, the drum page's
-   * `/api/drum-sets` is the shape to copy.
+   * The drawings the page knows about, and what each one is called on
+   * screen. A name with no file behind it simply reports that it has
+   * none -- the same thing the bass page does for a bass it has no
+   * drawing of -- so a new violin is one line here and one file.
    */
-  const VIOLIN_MODELS = ['MSViolin'];
+  const VIOLINS = {
+    'violin-drawn': 'Violin',
+  };
 
   function violinModel() {
-    return violinSelect && violinSelect.value ? violinSelect.value : VIOLIN_MODELS[0];
+    const value = violinSelect && violinSelect.value;
+    return value && VIOLINS[value] ? value : Object.keys(VIOLINS)[0];
   }
 
-  function violinPhotoUrl(model, aspect) {
-    return `${API_BASE}/assets/violins/${encodeURIComponent(model)}/${aspect}/Violin.png`;
+  function violinPhotoUrl(file) {
+    return `../../assets/violin/${file}.svg`;
   }
 
   function setViolinConfirm(text, ok) {
@@ -1235,40 +1233,40 @@
   }
 
   /**
-   * Load the picture for the shape being made, and say so either way.
+   * Load the drawing, and say so either way.
    *
-   * `crossOrigin` because the canvas the video is drawn on has to be
-   * readable afterwards: a picture fetched without it taints the
+   * Probed with a second Image rather than loaded straight into the
+   * one on screen, so a file that is not there leaves the frame clean
+   * instead of showing a broken-image mark -- and the card can say
+   * which file is missing, which is the only place that belongs. The
+   * note is NOT painted into the video: it is a message to the person
+   * making it.
+   *
+   * No `crossOrigin` and no CORS to think about: the drawing is served
+   * from this site, so the canvas the video is rendered on stays
+   * readable. A picture from another origin without it would taint the
    * canvas, and a tainted canvas cannot be turned into a video at all.
-   * The Worker sends the CORS header, so this costs nothing and buys
-   * the export.
    */
   function loadViolinPhoto() {
     if (!violinPhoto) return;
-    const model = violinModel();
-    const aspect = currentAspect();
-    const url = violinPhotoUrl(model, aspect);
+    const file = violinModel();
+    const label = VIOLINS[file];
+    const url = violinPhotoUrl(file);
     const probe = new Image();
-    probe.crossOrigin = 'anonymous';
     probe.onload = () => {
-      violinPhoto.crossOrigin = 'anonymous';
       violinPhoto.src = url;
       violinPhoto.parentElement.classList.remove('is-missing');
       if (violinMissing) violinMissing.textContent = '';
-      setViolinConfirm(`\u2713 Loaded "${model}" for ${aspect} from R2.`, true);
-      drawStage();
+      setViolinConfirm(`\u2713 ${label} drawing loaded.`, true);
     };
     probe.onerror = () => {
       violinPhoto.removeAttribute('src');
       violinPhoto.parentElement.classList.add('is-missing');
-      if (violinMissing) {
-        violinMissing.textContent = `No ${aspect} photo for "${model}" yet`;
-      }
+      if (violinMissing) violinMissing.textContent = `No ${label} drawing yet`;
       setViolinConfirm(
-        `No picture at violins/${model}/${aspect}/Violin.png yet \u2014 everything else on this page is working.`,
+        `No drawing at website/assets/violin/${file}.svg yet \u2014 everything else on this page is working.`,
         false,
       );
-      drawStage();
     };
     probe.src = url;
   }
@@ -1285,7 +1283,9 @@
     systemsSelect.addEventListener('change', () => reflowNotation());
   }
   if (violinSelect) {
-    violinSelect.innerHTML = VIOLIN_MODELS.map((m) => `<option value="${m}">${m}</option>`).join('');
+    violinSelect.innerHTML = Object.entries(VIOLINS)
+      .map(([file, label]) => `<option value="${file}">${label}</option>`)
+      .join('');
     violinSelect.addEventListener('change', () => loadViolinPhoto());
   }
   loadViolinPhoto();
