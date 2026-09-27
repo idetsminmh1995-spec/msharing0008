@@ -419,8 +419,8 @@
            picked brings both with it. -->
       <label for="instrument">Bass</label>
       <select id="instrument" class="drum-input">
-        <option value="precision" selected>Precision Bass &mdash; 4 strings, 20 frets</option>
-        <option value="jazz">Jazz Bass &mdash; 4 strings, 20 frets</option>
+        <option value="jazz" selected>Jazz Bass &mdash; 4 strings, 20 frets</option>
+        <option value="precision">Precision Bass &mdash; 4 strings, 20 frets</option>
         <option value="acoustic">Acoustic Bass &mdash; 4 strings, 20 frets</option>
         <option value="five">Five-String Bass &mdash; 5 strings, 24 frets</option>
       </select>
@@ -594,14 +594,15 @@
            holds each one's measurements under the same name, so a mark
            lands on the real fret in the real string.
 
-           These four files do not exist yet. Until they do, the frame
-           says which one is missing rather than drawing an empty
-           black rectangle and leaving the reader to work it out.
-           `website/assets/bass/README.md` says what to put here. -->
-      <img data-stage-image data-bass-photo="precision-drawn"
-           src="../../assets/bass/precision-drawn.svg" alt="" style="display:none" decoding="async">
+           The Jazz Bass is the owner's own drawing, measured. The
+           other three are not here yet, and until they are the frame
+           says which one is missing by name rather than drawing an
+           empty black rectangle and leaving the reader to work it
+           out. `website/assets/bass/README.md` says what goes here. -->
       <img data-stage-image data-bass-photo="jazz-drawn"
            src="../../assets/bass/jazz-drawn.svg" alt="" style="display:none" decoding="async">
+      <img data-stage-image data-bass-photo="precision-drawn"
+           src="../../assets/bass/precision-drawn.svg" alt="" style="display:none" decoding="async">
       <img data-stage-image data-bass-photo="acoustic-bass-drawn"
            src="../../assets/bass/acoustic-drawn.svg" alt="" style="display:none" decoding="async">
       <img data-stage-image data-bass-photo="five-drawn"
@@ -624,7 +625,7 @@
       <div class="engine-label">Engines running for this video</div>
       <div class="engine-pills">
         <span class="engine-pill">Notation Engine</span>
-        <span class="engine-pill">Guitar Engine</span>
+        <span class="engine-pill">Bass Fretboard Engine</span>
         <span class="engine-pill">Human Finger Engine</span>
         <span class="engine-pill">Video Engine</span>
       </div>
@@ -1035,7 +1036,7 @@
     acoustic: { frets: 20, strings: 4, photo: 'acoustic-bass-drawn', label: 'Acoustic Bass' },
     five: { frets: 24, strings: 5, photo: 'five-drawn', label: 'Five-String Bass' },
   };
-  const DEFAULT_BASS = 'precision';
+  const DEFAULT_BASS = 'jazz';
 
   /**
    * Open strings, as MIDI numbers, lowest first -- which is the order

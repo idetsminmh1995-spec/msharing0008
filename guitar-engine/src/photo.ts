@@ -356,8 +356,61 @@ export const ELECTRIC_DRAWN: PhotoMeasurements = {
  * used, and using it unmeasured would put every mark in the wrong
  * place -- so an unknown name is nothing, not a guess.
  */
+/**
+ * The bass the page draws: the owner's own drawing of a Jazz Bass.
+ *
+ * FOUR strings, not six, and the engine does not care -- it reads the
+ * two outer ones off these numbers and spreads whatever is between
+ * them evenly, so a bass is a neck with two fewer lines on it.
+ *
+ * Which line is the nut is settled by the drawing rather than by
+ * counting, exactly as the README warns: a geometric fret series fits
+ * this picture equally well whether the first line is called 0, 1 or
+ * 2 (the scale length absorbs the shift, and the fit's worst residual
+ * is 1.35 either way). What settles it is that the first line is
+ * drawn as a NUT -- pale bone against the rosewood, 3.8 units wide
+ * where every fret wire is 1.3 to 1.8 -- and that the headstock's
+ * yellow stops there. Twenty frets after it, which is a Jazz Bass.
+ *
+ * The inlays do NOT agree with a real one, which is why they were not
+ * used to number it: the blocks fall in the spaces at 1, 3, 5, 7, 9,
+ * 12, 15, 17 and 19, where a Fender puts them at 3 through 21. The
+ * artist started the pattern a space early. Every check the README
+ * calls an oracle would have put every mark two frets out.
+ *
+ * The last bright line across the board, at 714, is not fret 21 -- it
+ * is the board's own end, drawn with a white edge, and the brown
+ * stops there. `boardEndX` is that number.
+ */
+export const JAZZ_BASS_DRAWN: PhotoMeasurements = {
+  width: 1009.7,
+  height: 302.1,
+  fit: 'whole',
+  frets: [
+    196.8, 240.5, 279.1, 315.9, 350.4, 383.1, 413.5, 443.2, 470, 496.2, 520.2, 544.2, 566.1, 586.8,
+    606.1, 625.1, 642.1, 658.8, 674.1, 689.1, 703.1,
+  ],
+  boardEndX: 714.1,
+  stringsAtNut: [147.65, 173.03],
+  stringsAtEnd: [135.65, 179.04],
+  boardAtNut: [145.03, 176.53],
+  boardAtEnd: [131.53, 182.54],
+  // Just before the NUT to just past the BRIDGE, the framing every
+  // guitar here uses: the headstock runs off the left edge and the
+  // rest of the body off the right. The bridge's saddles are at 930
+  // and its plate ends at 964.
+  span: [178, 985],
+  drop: 0.31,
+  // Over the black pickguard, between the end of the fretboard (714)
+  // and the neck pickup (791) -- which is where a bassist's fingers
+  // actually sit, and the one stretch along these strings that is
+  // neither a pickup nor a join between two colours.
+  pickX: 755,
+};
+
 export const PHOTOS: Readonly<Record<string, PhotoMeasurements>> = {
   'acoustic-drawn': ACOUSTIC_DRAWN,
+  'jazz-drawn': JAZZ_BASS_DRAWN,
   'classical-drawn': CLASSICAL_DRAWN,
   'electric-drawn': ELECTRIC_DRAWN,
   'strat-drawn': STRAT_DRAWN,

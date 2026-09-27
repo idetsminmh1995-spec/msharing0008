@@ -31,6 +31,7 @@ var GuitarEngine = (() => {
     FINGER_COLORS: () => FINGER_COLORS,
     FINGER_NAMES: () => FINGER_NAMES,
     HAND_PICTURE: () => HAND_PICTURE,
+    JAZZ_BASS_DRAWN: () => JAZZ_BASS_DRAWN,
     PHOTOS: () => PHOTOS,
     STANDARD_TUNING: () => STANDARD_TUNING,
     STRAT_DRAWN: () => STRAT_DRAWN,
@@ -254,8 +255,53 @@ var GuitarEngine = (() => {
     // Between the neck pickup and the bridge one.
     pickX: 1370
   };
+  var JAZZ_BASS_DRAWN = {
+    width: 1009.7,
+    height: 302.1,
+    fit: "whole",
+    frets: [
+      196.8,
+      240.5,
+      279.1,
+      315.9,
+      350.4,
+      383.1,
+      413.5,
+      443.2,
+      470,
+      496.2,
+      520.2,
+      544.2,
+      566.1,
+      586.8,
+      606.1,
+      625.1,
+      642.1,
+      658.8,
+      674.1,
+      689.1,
+      703.1
+    ],
+    boardEndX: 714.1,
+    stringsAtNut: [147.65, 173.03],
+    stringsAtEnd: [135.65, 179.04],
+    boardAtNut: [145.03, 176.53],
+    boardAtEnd: [131.53, 182.54],
+    // Just before the NUT to just past the BRIDGE, the framing every
+    // guitar here uses: the headstock runs off the left edge and the
+    // rest of the body off the right. The bridge's saddles are at 930
+    // and its plate ends at 964.
+    span: [178, 985],
+    drop: 0.31,
+    // Over the black pickguard, between the end of the fretboard (714)
+    // and the neck pickup (791) -- which is where a bassist's fingers
+    // actually sit, and the one stretch along these strings that is
+    // neither a pickup nor a join between two colours.
+    pickX: 755
+  };
   var PHOTOS = {
     "acoustic-drawn": ACOUSTIC_DRAWN,
+    "jazz-drawn": JAZZ_BASS_DRAWN,
     "classical-drawn": CLASSICAL_DRAWN,
     "electric-drawn": ELECTRIC_DRAWN,
     "strat-drawn": STRAT_DRAWN

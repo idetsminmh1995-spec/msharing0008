@@ -49,6 +49,7 @@ export {
 } from './stage.js';
 export {
   ACOUSTIC_DRAWN,
+  JAZZ_BASS_DRAWN,
   CLASSICAL_DRAWN,
   ELECTRIC_DRAWN,
   STRAT_DRAWN,

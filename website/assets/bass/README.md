@@ -54,6 +54,20 @@ well however the wires are numbered — so the nut being visibly
 thicker, or drawn in bone, is what settles it. Get it wrong and every
 mark in the video is a fret out for the whole video.
 
+The Jazz Bass proves both halves of that. Its fit is equally good
+whether the first line is called 0, 1 or 2 (worst residual 1.35 units
+over a 506-unit board, the same either way) — so the fit says
+nothing. What says it is that the first line is drawn pale and 3.8
+units wide where every fret wire is 1.3 to 1.8, and that the
+headstock's yellow stops there.
+
+**And its inlays would have lied.** The blocks fall in the spaces at
+1, 3, 5, 7, 9, 12, 15, 17 and 19; a real Fender puts them at 3
+through 21. The artist started the pattern a space early, so reading
+the drawing by its dots — the check the guitar README calls an oracle
+and warns against — would have put every mark two frets out, and the
+video would have looked entirely plausible.
+
 ## Then it has to be measured
 
 A mark has to land on the fifth fret of the second string, and only
