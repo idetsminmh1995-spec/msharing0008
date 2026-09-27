@@ -139,14 +139,28 @@ export function checkKeyframes(timeline: FingerTimeline): readonly ValidationIss
   return issues;
 }
 
-/** The schema a reader is being handed is the one it knows. */
+/** The major version this reader was written against. */
+const SCHEMA_MAJOR = TIMELINE_SCHEMA_VERSION.split('.')[0];
+
+/**
+ * The schema a reader is being handed is one it knows.
+ *
+ * [BOUT-01] A minor version is additive by policy: 1.1.0 added the
+ * bass's optional fields and took nothing away, so every field a
+ * 1.0.0 document has still means what it meant. That makes the whole
+ * 1.x family readable here, and it has to be -- a timeline written
+ * before the bass existed is not a broken timeline. A different MAJOR
+ * version is the one that changed a meaning, and that is refused
+ * rather than guessed at.
+ */
 export function checkSchema(timeline: FingerTimeline): readonly ValidationIssue[] {
-  if (timeline.schema !== TIMELINE_SCHEMA || timeline.schemaVersion !== TIMELINE_SCHEMA_VERSION) {
+  const major = String(timeline.schemaVersion).split('.')[0];
+  if (timeline.schema !== TIMELINE_SCHEMA || major !== SCHEMA_MAJOR) {
     return [
       {
         rule: 'OUT-00',
         severity: 'error',
-        message: `timeline is ${String(timeline.schema)}@${String(timeline.schemaVersion)}, expected ${TIMELINE_SCHEMA}@${TIMELINE_SCHEMA_VERSION}`,
+        message: `timeline is ${String(timeline.schema)}@${String(timeline.schemaVersion)}, expected ${TIMELINE_SCHEMA}@${SCHEMA_MAJOR}.x (this reader writes ${TIMELINE_SCHEMA_VERSION})`,
       },
     ];
   }

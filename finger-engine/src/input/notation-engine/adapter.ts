@@ -26,6 +26,8 @@ import { tempoMap, tickToSeconds, type TempoMap } from '../../core/tempo.js';
 import { notationEngineStringToInternal } from '../../core/tuning.js';
 import type { EngineWarning } from '../../core/timeline-schema.js';
 import { childNamed, childNumber, childrenNamed, parseXml } from '../musicxml/xml.js';
+import { readPartEvidence } from '../musicxml/part-evidence.js';
+import type { PartEvidence } from '../part-detect.js';
 
 /** What a notation pitch looks like: step, alteration, octave -- MusicXML's own three. */
 export interface NotationPitchLike {
@@ -104,7 +106,9 @@ export interface NotationAdapterOptions {
    *
    * It keeps `<string>`, `<fret>`, `<fingering>` and slides, but not
    * `<transpose>`, `<staff-tuning>` or `<capo>`, so those are read
-   * from the file itself and attached by part.
+   * from the file itself and attached by part. [OQ-B10] Nor does it
+   * keep the `<part-list>`, which is where a file DECLARES what
+   * instrument a part is for, so `evidence` is read from here too.
    */
   readonly musicXml?: string;
   readonly numStrings?: number;
@@ -113,6 +117,17 @@ export interface NotationAdapterOptions {
 export interface NotationAdapterResult {
   readonly parts: readonly ParsedPart[];
   readonly warnings: readonly EngineWarning[];
+  /**
+   * [BIN-02, OQ-B10] What the file says each part's instrument IS,
+   * keyed by part id.
+   *
+   * Separate from the parts themselves because it is evidence about a
+   * part rather than a property of one: the caller hands it to
+   * `detectPart` and gets to decide, and a part the file describes as
+   * a bass is still a part until something has read that description.
+   * Empty when the adapter was not given the MusicXML.
+   */
+  readonly evidence: ReadonlyMap<string, PartEvidence>;
 }
 
 const STEP_SEMITONES: Readonly<Record<string, number>> = {
@@ -277,7 +292,7 @@ export function fromNotationEngine(
   if (parts.length === 0) {
     warnings.push({ code: 'NO_PARTS', message: 'the notation score has no parts to read' });
   }
-  return { parts, warnings };
+  return { parts, warnings, evidence: readEvidence(options.musicXml) };
 }
 
 /**
@@ -401,6 +416,12 @@ function readTimeSignatures(playback: NotationPlaybackLike): readonly TimeSignat
     });
   }
   return out.sort((a, b) => a.tick - b.tick);
+}
+
+/** [OQ-B10] The `<part-list>` evidence, or nothing when there is no file to read. */
+function readEvidence(musicXml: string | undefined): ReadonlyMap<string, PartEvidence> {
+  if (musicXml === undefined || musicXml === '') return new Map();
+  return readPartEvidence(musicXml);
 }
 
 interface FileOnlyFields {

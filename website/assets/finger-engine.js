@@ -21,10 +21,16 @@ var FingerEngine = (() => {
   // src/index.ts
   var index_exports = {};
   __export(index_exports, {
+    BASS_DEFAULTS: () => BASS_DEFAULTS,
+    BASS_SCALES: () => BASS_SCALES,
+    BASS_STRING_SPREAD: () => BASS_STRING_SPREAD,
+    BASS_TUNINGS: () => BASS_TUNINGS,
     DEFAULTS: () => DEFAULTS,
+    DEFAULT_HAND_PROFILE: () => DEFAULT_HAND_PROFILE,
     ENGINE_NAME: () => ENGINE_NAME,
     ENGINE_VERSION: () => ENGINE_VERSION,
     FINGER_KEYS: () => FINGER_KEYS,
+    HAND_PROFILES: () => HAND_PROFILES,
     STANDARD_TUNING: () => STANDARD_TUNING,
     TICKS_PER_QUARTER: () => TICKS_PER_QUARTER,
     TIMELINE_SCHEMA: () => TIMELINE_SCHEMA,
@@ -32,6 +38,12 @@ var FingerEngine = (() => {
     TUNING_PRESETS: () => TUNING_PRESETS,
     allowedFingers: () => allowedFingers,
     analyzeGuitar: () => analyzeGuitar,
+    bassBottomPitch: () => bassBottomPitch,
+    bassFretDistanceMm: () => bassFretDistanceMm,
+    bassFretWidthMm: () => bassFretWidthMm,
+    bassGeometry: () => bassGeometry,
+    bassInstrument: () => bassInstrument,
+    bassTopPitch: () => bassTopPitch,
     beatTicksAt: () => beatTicksAt,
     bpmAt: () => bpmAt,
     buildDebugReport: () => buildDebugReport,
@@ -45,14 +57,17 @@ var FingerEngine = (() => {
     childrenNamed: () => childrenNamed,
     confidenceFrom: () => confidenceFrom,
     configHash: () => configHash,
+    decideOctave: () => decideOctave,
     defaultInstrument: () => defaultInstrument,
     descendants: () => descendants,
+    detectPart: () => detectPart,
     emptyFingerTracks: () => emptyFingerTracks,
     expandStage: () => expandStage,
     fingerKey: () => fingerKey,
     fingertipDistanceMm: () => fingertipDistanceMm,
     fingertipPoint: () => fingertipPoint,
     fingertipXMm: () => fingertipXMm,
+    firstFretWithin: () => firstFretWithin,
     fretDistanceMm: () => fretDistanceMm,
     fretWidthMm: () => fretWidthMm,
     fromNotationEngine: () => fromNotationEngine,
@@ -60,7 +75,9 @@ var FingerEngine = (() => {
     guitarTracks: () => guitarTracks,
     handConfigKey: () => handConfigKey,
     handPosition: () => handPosition,
+    handProfileScale: () => handProfileScale,
     infeasibleReason: () => infeasibleReason,
+    instrumentFromSuggestion: () => instrumentFromSuggestion,
     internalStringToMusicXml: () => internalStringToMusicXml,
     internalStringToRenderer: () => internalStringToRenderer,
     isLegatoTarget: () => isLegatoTarget,
@@ -73,7 +90,10 @@ var FingerEngine = (() => {
     normalizePart: () => normalizePart,
     notationEngineStringToInternal: () => notationEngineStringToInternal,
     notationNoteId: () => notationNoteId,
+    octaveFromRange: () => octaveFromRange,
+    octaveFromTab: () => octaveFromTab,
     openPitch: () => openPitch,
+    outOfRange: () => outOfRange,
     parseMidi: () => parseMidi,
     parseMusicXml: () => parseMusicXml,
     parseXml: () => parseXml,
@@ -86,11 +106,14 @@ var FingerEngine = (() => {
     placementsForPitch: () => placementsForPitch,
     planMotion: () => planMotion,
     pruneBeam: () => pruneBeam,
+    readPartEvidence: () => readPartEvidence,
     reasonsFor: () => reasonsFor,
     relaxationFor: () => relaxationFor,
     report: () => report,
     resolveInstrument: () => resolveInstrument,
     resolveMode: () => resolveMode,
+    scaleSpans: () => scaleSpans,
+    shapeSpanMm: () => shapeSpanMm,
     solveStages: () => solveStages,
     spanKey: () => spanKey,
     spanLimit: () => spanLimit,
@@ -101,6 +124,7 @@ var FingerEngine = (() => {
     stringSpacingMm: () => stringSpacingMm,
     stringYMm: () => stringYMm,
     subdivisionOfBeat: () => subdivisionOfBeat,
+    suggestBassInstrument: () => suggestBassInstrument,
     techniqueNames: () => techniqueNames,
     tempoMap: () => tempoMap,
     tickToSeconds: () => tickToSeconds,
@@ -247,7 +271,7 @@ var FingerEngine = (() => {
 
   // src/core/timeline-schema.ts
   var TIMELINE_SCHEMA = "finger-timeline";
-  var TIMELINE_SCHEMA_VERSION = "1.0.0";
+  var TIMELINE_SCHEMA_VERSION = "1.1.0";
   var ENGINE_NAME = "guitar-finger-engine";
   var ENGINE_VERSION = "1.0.0";
   var FINGER_KEYS = ["1", "2", "3", "4", "T"];
@@ -494,13 +518,15 @@ var FingerEngine = (() => {
     }
     return issues;
   }
+  var SCHEMA_MAJOR = TIMELINE_SCHEMA_VERSION.split(".")[0];
   function checkSchema(timeline) {
-    if (timeline.schema !== TIMELINE_SCHEMA || timeline.schemaVersion !== TIMELINE_SCHEMA_VERSION) {
+    const major = String(timeline.schemaVersion).split(".")[0];
+    if (timeline.schema !== TIMELINE_SCHEMA || major !== SCHEMA_MAJOR) {
       return [
         {
           rule: "OUT-00",
           severity: "error",
-          message: `timeline is ${String(timeline.schema)}@${String(timeline.schemaVersion)}, expected ${TIMELINE_SCHEMA}@${TIMELINE_SCHEMA_VERSION}`
+          message: `timeline is ${String(timeline.schema)}@${String(timeline.schemaVersion)}, expected ${TIMELINE_SCHEMA}@${SCHEMA_MAJOR}.x (this reader writes ${TIMELINE_SCHEMA_VERSION})`
         }
       ];
     }
@@ -2485,8 +2511,456 @@ measure ${measure ?? "?"}`);
     return out.sort((a, b) => a.time - b.time || a.string - b.string);
   }
 
-  // src/input/notation-engine/adapter.ts
+  // src/bass/defaults.ts
+  var BASS_DEFAULTS = {
+    instrument: {
+      /** [BG-01] */
+      kind: "bass",
+      /** [BG-02] `4-standard`. */
+      numStrings: 4,
+      tuning: [28, 33, 38, 43],
+      /** [BG-03] 34 inches, the long scale nearly every electric bass is. */
+      scaleLengthMm: 863.6,
+      /** [BG-04] Vintage basses have 20, modern ones 21 to 24. */
+      numFrets: 22,
+      /** [BG-08] Supported by the core, rare on a bass. */
+      capo: 0,
+      /** [BG-06] */
+      fretless: false,
+      /** [BIN-04c] */
+      octaveShift: 0
+    },
+    geometry: {
+      /**
+       * [BG-07] How far behind the wire the fingertip sits, as a share
+       * of the fret's width.
+       *
+       * A quarter, where a guitar's is three tenths. Teaching sources
+       * say to press as close behind the fret as possible without
+       * being on it, and a bass's frets are wide enough that the same
+       * fraction would put the fingertip further back in absolute
+       * millimetres than a bassist actually plays.
+       */
+      fingertipBehindFret: 0.25
+    },
+    hand: {
+      /** [BP-009] */
+      profile: "medium"
+    },
+    input: {
+      /**
+       * [BIN-04a] How much of a tabbed part has to agree with an
+       * octave hypothesis before it is applied to everything.
+       */
+      tabOctaveAgreement: 0.9,
+      /** [BIN-04b] The weights the two hypotheses are scored with. */
+      octaveInRangeWeight: 0.7,
+      octaveTypicalRegisterWeight: 0.3,
+      /** [BIN-04b] The bass register a bass line actually lives in. */
+      typicalRegister: [23, 55],
+      /**
+       * [BIN-04b] How far ahead the -12 hypothesis has to be before it
+       * is believed. A MIDI file normally carries sounding pitch
+       * already, so it has to win by more.
+       */
+      octaveMargin: 0.1,
+      octaveMarginMidi: 0.25,
+      /** [BIN-10] At or below this, a MIDI note is a ghost note. */
+      ghostVelocity: 45,
+      /** [BIN-10] Off by default: a short quiet note is not always dead. */
+      midiDeadNoteHeuristic: false,
+      /** [BIN-15] Overlaps shorter than this are recording slop, not held notes. */
+      legatoOverlapTrimSec: 0.03
+    }
+  };
+
+  // src/bass/instrument.ts
+  var BASS_TUNINGS = {
+    "4-standard": [28, 33, 38, 43],
+    "4-dropD": [26, 33, 38, 43],
+    "4-halfDown": [27, 32, 37, 42],
+    "4-Dstandard": [26, 31, 36, 41],
+    "5-lowB": [23, 28, 33, 38, 43],
+    "5-highC": [28, 33, 38, 43, 48],
+    "6-standard": [23, 28, 33, 38, 43, 48]
+  };
+  var BASS_SCALES = {
+    short: 762,
+    // 30"
+    medium: 812.8,
+    // 32"
+    long: 863.6,
+    // 34" -- the default, and most basses
+    extraLong: 889
+    // 35", common on five-strings for a firmer low B
+  };
+  var BASS_STRING_SPREAD = {
+    4: { nutMm: 33, bridgeMm: 57 },
+    5: { nutMm: 37, bridgeMm: 72 },
+    6: { nutMm: 44, bridgeMm: 82.5 }
+  };
+  function bassInstrument(options = {}) {
+    const tuning = resolveTuning(options);
+    const numStrings = tuning.length;
+    const spread = BASS_STRING_SPREAD[numStrings] ?? BASS_STRING_SPREAD[4];
+    const scaleLengthMm = typeof options.scaleLengthMm === "string" ? BASS_SCALES[options.scaleLengthMm] : options.scaleLengthMm ?? BASS_DEFAULTS.instrument.scaleLengthMm;
+    return {
+      kind: "bass",
+      numStrings,
+      tuning,
+      capo: options.capo ?? BASS_DEFAULTS.instrument.capo,
+      numFrets: options.numFrets ?? BASS_DEFAULTS.instrument.numFrets,
+      scaleLengthMm,
+      nutSpacingMm: options.nutSpacingMm ?? spread.nutMm,
+      bridgeSpacingMm: options.bridgeSpacingMm ?? spread.bridgeMm,
+      fretless: options.fretless ?? BASS_DEFAULTS.instrument.fretless,
+      octaveShift: options.octaveShift ?? BASS_DEFAULTS.instrument.octaveShift
+    };
+  }
+  function resolveTuning(options) {
+    const named2 = options.tuning;
+    if (typeof named2 === "string") return BASS_TUNINGS[named2];
+    if (named2 !== void 0 && named2.length > 0) return [...named2];
+    const count = options.numStrings;
+    if (count === 5) return BASS_TUNINGS["5-lowB"];
+    if (count === 6) return BASS_TUNINGS["6-standard"];
+    return BASS_DEFAULTS.instrument.tuning;
+  }
+  function bassGeometry(instrument) {
+    return {
+      fingertipBehindFret: instrument.fretless === true ? 0 : BASS_DEFAULTS.geometry.fingertipBehindFret
+    };
+  }
+  function bassTopPitch(instrument) {
+    const top = instrument.tuning[instrument.tuning.length - 1] ?? 43;
+    return top + instrument.numFrets;
+  }
+  function bassBottomPitch(instrument) {
+    return instrument.tuning[0] ?? 28;
+  }
+  function shapeSpanMm(instrument, indexFret, frets) {
+    const geometry = bassGeometry(instrument);
+    return fingertipXMm(instrument, geometry, indexFret + frets) - fingertipXMm(instrument, geometry, indexFret);
+  }
+  function firstFretWithin(instrument, frets, limitMm) {
+    for (let fret = 1; fret + frets <= instrument.numFrets; fret++) {
+      if (shapeSpanMm(instrument, fret, frets) <= limitMm) return fret;
+    }
+    return null;
+  }
+  function bassFretDistanceMm(instrument, fret) {
+    return fretDistanceMm(instrument.scaleLengthMm, fret);
+  }
+  function bassFretWidthMm(instrument, fret) {
+    return fretWidthMm(instrument.scaleLengthMm, fret);
+  }
+
+  // src/bass/octave.ts
+  function octaveFromTab(notes, tuning) {
+    if (notes.length === 0) return null;
+    let asIs = 0;
+    let down = 0;
+    let up = 0;
+    for (const note of notes) {
+      const open = tuning[note.string - 1];
+      if (open === void 0) continue;
+      const expected = open + note.fret;
+      if (expected === note.pitch) asIs += 1;
+      else if (expected === note.pitch - 12) down += 1;
+      else if (expected === note.pitch + 12) up += 1;
+    }
+    const agreement = BASS_DEFAULTS.input.tabOctaveAgreement;
+    const total = notes.length;
+    if (asIs / total >= agreement) {
+      return { shift: 0, source: "tab", confidence: asIs / total, info: [] };
+    }
+    if (down / total >= agreement) {
+      return { shift: -12, source: "tab", confidence: down / total, info: ["OCTAVE_CORRECTED"] };
+    }
+    if (up / total >= agreement) {
+      return { shift: 12, source: "tab", confidence: up / total, info: ["OCTAVE_CORRECTED"] };
+    }
+    return {
+      shift: 0,
+      source: "tab",
+      confidence: asIs / total,
+      info: ["PITCH_TAB_MISMATCH"]
+    };
+  }
+  function octaveFromRange(pitches, options) {
+    if (pitches.length === 0) return null;
+    const score = (shift) => {
+      const moved = pitches.map((p) => p + shift);
+      const inRange = moved.filter((p) => p >= options.lowestPitch && p <= options.highestPitch).length / moved.length;
+      const [low, high] = BASS_DEFAULTS.input.typicalRegister;
+      const typical = moved.filter((p) => p >= low && p <= high).length / moved.length;
+      return inRange * BASS_DEFAULTS.input.octaveInRangeWeight + typical * BASS_DEFAULTS.input.octaveTypicalRegisterWeight;
+    };
+    const asIs = score(0);
+    const down = score(-12);
+    const margin = options.fromMidi === true ? BASS_DEFAULTS.input.octaveMarginMidi : BASS_DEFAULTS.input.octaveMargin;
+    if (down - asIs >= margin) {
+      return { shift: -12, source: "range", confidence: down, info: ["OCTAVE_CORRECTED"] };
+    }
+    if (Math.abs(down - asIs) < margin) {
+      return { shift: 0, source: "range", confidence: asIs, info: ["OCTAVE_UNCERTAIN"] };
+    }
+    return { shift: 0, source: "range", confidence: asIs, info: [] };
+  }
+  function decideOctave(input) {
+    if (input.override !== void 0) {
+      return { shift: input.override, source: "override", confidence: 1, info: [] };
+    }
+    if (input.soundingFromEngine === true) {
+      return { shift: 0, source: "engine", confidence: 1, info: [] };
+    }
+    const transpose = input.transpose;
+    if (transpose !== void 0 && (transpose.chromatic !== void 0 || transpose.octaveChange !== void 0)) {
+      const shift = (transpose.chromatic ?? 0) + 12 * (transpose.octaveChange ?? 0);
+      return { shift, source: "transpose", confidence: 0.95, info: [] };
+    }
+    const tab = input.tabbed === void 0 ? null : octaveFromTab(input.tabbed, input.tuning);
+    if (tab !== null && !tab.info.includes("PITCH_TAB_MISMATCH")) return tab;
+    const range = octaveFromRange(input.pitches, input.range);
+    if (range !== null) {
+      return tab === null ? range : { ...range, info: [...tab.info, ...range.info] };
+    }
+    return tab ?? { shift: 0, source: "range", confidence: 0, info: [] };
+  }
+
+  // src/bass/suggest.ts
+  var DEFAULT_FRETS = 22;
+  function suggestBassInstrument(pitches, options = {}) {
+    const numFrets = options.numFrets ?? DEFAULT_FRETS;
+    const stated = options.stated;
+    if (stated?.tuning !== void 0 && stated.tuning.length >= 4) {
+      const tuning = [...stated.tuning];
+      return {
+        numStrings: stated.staffLines ?? tuning.length,
+        tuning,
+        tuningId: matchTuning(tuning),
+        confidence: 1,
+        reasons: ["FILE_TUNING"]
+      };
+    }
+    if (pitches.length === 0) {
+      return named("4-standard", 0.3, ["NO_NOTES"]);
+    }
+    const min = Math.min(...pitches);
+    const max = Math.max(...pitches);
+    const topOfFour = 43 + numFrets;
+    const reasons = [];
+    if (min < 23) reasons.push("BELOW_B0");
+    if (min === 26 && !pitches.includes(27) && max <= topOfFour) {
+      return named("4-dropD", 0.85, [...reasons, "LOW_D_ONLY"]);
+    }
+    if (min < 28 && max > topOfFour) {
+      return named("6-standard", 0.8, [...reasons, "WIDE_RANGE"]);
+    }
+    if (min < 28) {
+      return named("5-lowB", 0.9, [...reasons, "BELOW_E1"]);
+    }
+    if (max > topOfFour) {
+      return named("5-highC", 0.75, [...reasons, "ABOVE_G_STRING"]);
+    }
+    return named("4-standard", 0.95, [...reasons, "RANGE_FITS_4"]);
+  }
+  function named(id, confidence, reasons) {
+    const tuning = BASS_TUNINGS[id];
+    return { numStrings: tuning.length, tuning, tuningId: id, confidence, reasons };
+  }
+  function matchTuning(tuning) {
+    for (const [id, preset] of Object.entries(BASS_TUNINGS)) {
+      if (preset.length === tuning.length && preset.every((p, i) => p === tuning[i])) {
+        return id;
+      }
+    }
+    return tuning.length === 5 ? "5-lowB" : tuning.length === 6 ? "6-standard" : "4-standard";
+  }
+  function instrumentFromSuggestion(suggestion, options = {}) {
+    return bassInstrument({
+      tuning: suggestion.tuning,
+      ...options.numFrets === void 0 ? {} : { numFrets: options.numFrets },
+      ...options.scaleLengthMm === void 0 ? {} : { scaleLengthMm: options.scaleLengthMm },
+      ...options.fretless === void 0 ? {} : { fretless: options.fretless }
+    });
+  }
+  function outOfRange(pitches, instrument) {
+    const low = instrument.tuning[0] ?? 28;
+    const top = (instrument.tuning[instrument.tuning.length - 1] ?? 43) + instrument.numFrets;
+    return pitches.filter((p) => p < low || p > top);
+  }
+
+  // src/input/part-detect.ts
+  var BASS_NAME = /bass|bajo|basse|baixo|b\.?\s?gtr|e\.?\s?bass/i;
+  var UPRIGHT_NAME = /double\s?bass|contrabass|upright/i;
+  var GM_BASS = {
+    32: { hand: "fingerstyle", simandl: true },
+    // Acoustic Bass
+    33: { hand: "fingerstyle" },
+    // Electric Bass (finger)
+    34: { hand: "pick" },
+    // Electric Bass (pick)
+    35: { hand: "fingerstyle", fretless: true },
+    // Fretless Bass
+    36: { hand: "slap" },
+    // Slap Bass 1
+    37: { hand: "slap" },
+    // Slap Bass 2
+    38: { hand: "fingerstyle" },
+    // Synth Bass 1
+    39: { hand: "fingerstyle" }
+    // Synth Bass 2
+  };
+  function detectPart(evidence) {
+    const reasons = [];
+    const program = evidence.midiProgram ?? (evidence.midiProgramXml === void 0 ? void 0 : evidence.midiProgramXml - 1);
+    const named2 = `${evidence.partName ?? ""} ${evidence.partAbbreviation ?? ""} ${evidence.trackName ?? ""}`;
+    const sound = evidence.instrumentSound ?? "";
+    if (UPRIGHT_NAME.test(named2)) {
+      return { kind: "upright", confidence: 0.9, reasons: ["UPRIGHT_NAME"] };
+    }
+    if (sound === "pluck.bass.acoustic" && evidence.arco === true) {
+      return { kind: "upright", confidence: 0.8, reasons: ["ACOUSTIC_BASS_ARCO"] };
+    }
+    if (sound.startsWith("pluck.bass")) {
+      reasons.push("INSTRUMENT_SOUND");
+      return {
+        kind: "bass",
+        confidence: 0.98,
+        reasons,
+        ...sound === "pluck.bass.fretless" ? { fretlessHint: true } : {}
+      };
+    }
+    if (program !== void 0 && GM_BASS[program] !== void 0) {
+      const hint = GM_BASS[program];
+      reasons.push("GM_PROGRAM");
+      return {
+        kind: "bass",
+        confidence: 0.9,
+        reasons,
+        rightHandHint: hint.hand,
+        ...hint.fretless === true ? { fretlessHint: true } : {}
+      };
+    }
+    if (BASS_NAME.test(named2)) {
+      reasons.push("PART_NAME");
+      return { kind: "bass", confidence: 0.6, reasons };
+    }
+    const lines = evidence.staffLines;
+    const lowest = evidence.lowestStaffTuning;
+    if (lines !== void 0 && lines >= 4 && lines <= 6 && lowest !== void 0 && lowest <= 28) {
+      reasons.push(lowest <= 23 ? "TAB_TUNING_BELOW_B0" : "TAB_TUNING_BELOW_E1");
+      return { kind: "bass", confidence: 0.85, reasons };
+    }
+    if (program !== void 0 && program >= 24 && program <= 31) {
+      return { kind: "guitar", confidence: 0.85, reasons: ["GM_PROGRAM"] };
+    }
+    if (/guitar|gtr|guitarra/i.test(named2)) {
+      return { kind: "guitar", confidence: 0.6, reasons: ["PART_NAME"] };
+    }
+    return { kind: "other", confidence: 0.2, reasons: ["NO_EVIDENCE"] };
+  }
+
+  // src/input/musicxml/part-evidence.ts
   var STEP_SEMITONES = {
+    C: 0,
+    D: 2,
+    E: 4,
+    F: 5,
+    G: 7,
+    A: 9,
+    B: 11
+  };
+  function readPartEvidence(musicXml) {
+    const out = /* @__PURE__ */ new Map();
+    const root = parseXml(musicXml);
+    if (root === void 0) return out;
+    for (const [index, scorePart] of descendants(root, "score-part").entries()) {
+      const partId = scorePart.attributes["id"] ?? `P${index + 1}`;
+      const instrumentSound = firstText(
+        childrenNamed(scorePart, "score-instrument").map((el) => childText(el, "instrument-sound"))
+      );
+      const midiProgramXml = firstNumber(
+        childrenNamed(scorePart, "midi-instrument").map((el) => childNumber(el, "midi-program"))
+      );
+      const partName = childText(scorePart, "part-name");
+      const partAbbreviation = childText(scorePart, "part-abbreviation");
+      out.set(partId, {
+        ...instrumentSound !== void 0 ? { instrumentSound } : {},
+        ...midiProgramXml !== void 0 ? { midiProgramXml } : {},
+        ...partName !== void 0 && partName !== "" ? { partName } : {},
+        ...partAbbreviation !== void 0 && partAbbreviation !== "" ? { partAbbreviation } : {}
+      });
+    }
+    for (const [index, part] of childrenNamed(root, "part").entries()) {
+      const partId = part.attributes["id"] ?? `P${index + 1}`;
+      const staff = readStaffEvidence(part);
+      const arco = readArco(part);
+      const already = out.get(partId) ?? {};
+      out.set(partId, {
+        ...already,
+        ...staff,
+        ...arco ? { arco: true } : {}
+      });
+    }
+    return out;
+  }
+  function readStaffEvidence(part) {
+    for (const details of descendants(part, "staff-details")) {
+      const lines = childNumber(details, "staff-lines");
+      const tunings = [];
+      for (const line of childrenNamed(details, "staff-tuning")) {
+        const lineNumber = Number(line.attributes["line"] ?? "0");
+        const step = childNamed(line, "tuning-step")?.text.trim();
+        const octave = childNumber(line, "tuning-octave");
+        const semitone = step === void 0 ? void 0 : STEP_SEMITONES[step];
+        if (semitone === void 0 || octave === void 0 || lineNumber < 1) continue;
+        tunings.push((octave + 1) * 12 + semitone + (childNumber(line, "tuning-alter") ?? 0));
+      }
+      if (lines === void 0 && tunings.length === 0) continue;
+      return {
+        ...lines !== void 0 ? { staffLines: lines } : {},
+        ...tunings.length > 0 ? { lowestStaffTuning: Math.min(...tunings) } : {}
+      };
+    }
+    return {};
+  }
+  function readArco(part) {
+    if (descendants(part, "up-bow").length > 0 || descendants(part, "down-bow").length > 0) {
+      return true;
+    }
+    return descendants(part, "words").some((el) => /\barco\b/i.test(el.text));
+  }
+  function firstText(values) {
+    return values.find((value) => value !== void 0 && value !== "");
+  }
+  function firstNumber(values) {
+    return values.find((value) => value !== void 0);
+  }
+
+  // src/core/hand-profiles.ts
+  var HAND_PROFILES = {
+    small: 0.9,
+    medium: 1,
+    large: 1.1
+  };
+  var DEFAULT_HAND_PROFILE = "medium";
+  function handProfileScale(profile) {
+    return HAND_PROFILES[profile ?? DEFAULT_HAND_PROFILE];
+  }
+  function scaleSpans(spans, profile) {
+    const factor = handProfileScale(profile);
+    const out = {};
+    for (const key of Object.keys(spans)) {
+      const limit = spans[key];
+      out[key] = { comfort: limit.comfort * factor, max: limit.max * factor };
+    }
+    return out;
+  }
+
+  // src/input/notation-engine/adapter.ts
+  var STEP_SEMITONES2 = {
     C: 0,
     D: 2,
     E: 4,
@@ -2498,7 +2972,7 @@ measure ${measure ?? "?"}`);
   function midiOf(pitch) {
     if (pitch === void 0 || pitch.kind !== void 0 && pitch.kind !== "pitched")
       return void 0;
-    const step = pitch.step === void 0 ? void 0 : STEP_SEMITONES[pitch.step];
+    const step = pitch.step === void 0 ? void 0 : STEP_SEMITONES2[pitch.step];
     if (step === void 0 || pitch.octave === void 0) return void 0;
     return (pitch.octave + 1) * 12 + step + (pitch.alter ?? 0);
   }
@@ -2593,7 +3067,7 @@ measure ${measure ?? "?"}`);
     if (parts.length === 0) {
       warnings.push({ code: "NO_PARTS", message: "the notation score has no parts to read" });
     }
-    return { parts, warnings };
+    return { parts, warnings, evidence: readEvidence(options.musicXml) };
   }
   function notationNoteId(partId, measureNumber, voiceId, indexInVoice) {
     return `${partId}-m${measureNumber}-v${String(voiceId)}-n${indexInVoice}`;
@@ -2675,6 +3149,10 @@ measure ${measure ?? "?"}`);
     }
     return out.sort((a, b) => a.tick - b.tick);
   }
+  function readEvidence(musicXml) {
+    if (musicXml === void 0 || musicXml === "") return /* @__PURE__ */ new Map();
+    return readPartEvidence(musicXml);
+  }
   function readFileOnlyFields(musicXml) {
     const out = /* @__PURE__ */ new Map();
     if (musicXml === void 0 || musicXml === "") return out;
@@ -2699,7 +3177,7 @@ measure ${measure ?? "?"}`);
                 const lineNumber = Number(line.attributes["line"] ?? "0");
                 const step = childNamed(line, "tuning-step")?.text.trim();
                 const octave = childNumber(line, "tuning-octave");
-                const semitone = step === void 0 ? void 0 : STEP_SEMITONES[step];
+                const semitone = step === void 0 ? void 0 : STEP_SEMITONES2[step];
                 if (semitone === void 0 || octave === void 0 || lineNumber < 1) continue;
                 read[lineNumber - 1] = (octave + 1) * 12 + semitone + (childNumber(line, "tuning-alter") ?? 0);
               }
@@ -2914,8 +3392,8 @@ measure ${measure ?? "?"}`);
       (part) => part.gmProgram !== void 0 && part.gmProgram >= 24 && part.gmProgram <= 31
     );
     if (byProgram.length > 0) return byProgram;
-    const named = notDrums.filter((part) => /guitar|gtr|guit/i.test(part.name));
-    if (named.length > 0) return named;
+    const named2 = notDrums.filter((part) => /guitar|gtr|guit/i.test(part.name));
+    if (named2.length > 0) return named2;
     return notDrums.filter(
       (part) => part.gmProgram === void 0 || part.gmProgram < 32 || part.gmProgram > 39
     );

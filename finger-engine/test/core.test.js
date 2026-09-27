@@ -207,7 +207,12 @@ test('a timeline from a schema the reader does not know is refused', () => {
   const result = E.validateCore(timeline({ schemaVersion: '2.0.0' }));
   assert.equal(result.ok, false);
   assert.equal(result.issues[0].rule, 'OUT-00');
-  assert.match(result.issues[0].message, /finger-timeline@1\.0\.0/);
+  assert.match(result.issues[0].message, /expected finger-timeline@1\.x/);
+  // [BOUT-01] A minor version is additive, so the whole 1.x family reads:
+  // a timeline written before the bass existed is not a broken timeline.
+  assert.equal(E.validateCore(timeline({ schemaVersion: '1.0.0' })).ok, true);
+  assert.equal(E.validateCore(timeline({ schemaVersion: '1.1.0' })).ok, true);
+  assert.equal(E.validateCore(timeline({ schema: 'something-else' })).ok, false);
 });
 
 test('[Part 09 §3] a timeline always carries all five finger tracks', () => {

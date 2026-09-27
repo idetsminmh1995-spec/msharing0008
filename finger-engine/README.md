@@ -23,7 +23,7 @@ Phase 0 is everything the later phases stand on:
 | `src/core/geometry.ts` | Part 04 | Where a fret and a string actually are, in millimetres. |
 | `src/core/tempo.ts` | DM-07 | Ticks to seconds, through a tempo map. |
 | `src/core/rng.ts` | README rule 4 | The engine's only source of randomness — seeded. |
-| `src/core/timeline-schema.ts` | Part 09 | `finger-timeline@1.0.0`, the contract with the renderer. |
+| `src/core/timeline-schema.ts` | Part 09 | `finger-timeline@1.1.0`, the contract with the renderer. |
 | `src/core/validate-core.ts` | Part 11 §1 | The checks that do not know about guitars (V-01, V-08). |
 | `src/defaults.ts` | Part 10 | Every number the engine uses. There are no others. |
 
@@ -72,7 +72,9 @@ in the engine is allowed to do the arithmetic inline.
 4. **Deterministic.** Same input, same config, same seed → byte-identical output. There is
    no `Math.random` anywhere; `makeRng(seed)` is the only source.
 5. **The timeline is a contract.** Anything that breaks a reader needs a new major schema
-   version, and the version travels inside every timeline.
+   version, and the version travels inside every timeline. A MINOR version is additive by
+   policy — 1.1.0 added the bass's optional fields and removed nothing — so the validator
+   reads the whole 1.x family and refuses only a different major.
 
 ## Using it
 
@@ -86,7 +88,7 @@ const fromXml = FingerEngine.parseMusicXml(text).parts;
 const fromMidi = FingerEngine.parseMidi(bytes).parts;
 ```
 
-`timeline` is `finger-timeline@1.0.0` (Part 09): every note with its string, fret, finger,
+`timeline` is `finger-timeline@1.1.0` (Part 09): every note with its string, fret, finger,
 reasons and confidence; a keyframe track per finger; the picking hand's strokes; and the
 warnings. It is the only thing the renderer ever sees.
 
@@ -145,5 +147,55 @@ Read from `notation-engine/src/core/note.ts` and `src/timing/`, in Phase 0:
 | Performance order | `buildRepeatPlan` unrolls repeats and voltas; the finger engine consumes that order [IN-E01]. |
 
 Missing, so the adapter falls back to the MusicXML file itself [IN-E02]: `<pluck>`,
-hammer-on/pull-off, bend, `<staff-tuning>`, `<capo>`, `<transpose>`, and per-note stable
-IDs (derive them as `p{part}-m{measure}-v{voice}-n{index}` [DM-09]).
+hammer-on/pull-off, bend, `<staff-tuning>`, `<capo>`, `<transpose>`, the whole
+`<part-list>`, and per-note stable IDs (derive them as
+`p{part}-m{measure}-v{voice}-n{index}` [DM-09]).
+
+## The bass — Phase B0
+
+The specification is its own document,
+[`docs/finger-engine/BASS_FINGER_ENGINE_PLAN.md`](../docs/finger-engine/BASS_FINGER_ENGINE_PLAN.md),
+and it shares this package rather than getting one of its own: a bass is a fretted neck,
+and the solver, the geometry and the timeline do not care how long it is. Only the
+millimetres differ — and that is the point. **A 34-inch scale is half again a guitar's, so
+the same hand, with the same limits in millimetres, reaches far fewer frets and the engine
+chooses differently without being told to.**
+
+Phase B0 is the foundations only: what a bass IS, and reading a file correctly.
+
+| File | Plan | What it is |
+|---|---|---|
+| `src/bass/defaults.ts` | Part 10 | Every bass number. `fingertipBehindFret` is 0.25, not the guitar's 0.3. |
+| `src/bass/instrument.ts` | BG-01..08 | Seven tunings, four scale lengths, the string spreads, and the span tables. |
+| `src/bass/octave.ts` | BIN-03, BIN-04a..c | Which octave the file is really in — see below. |
+| `src/bass/suggest.ts` | BIN-05/06, BP-007 | How many strings and which tuning the part needs. |
+| `src/core/hand-profiles.ts` | BP-009 | `small` 0.9, `medium` 1.0, `large` 1.1 over every span limit. Shared with the guitar: one person, one pair of hands. |
+| `src/input/part-detect.ts` | BIN-02, BIN-02a | Is this part a bass? And is it an upright, which is out of scope? |
+| `src/input/musicxml/part-evidence.ts` | BIN-02, OQ-B10 | The `<part-list>` fields that name an instrument. |
+
+**`analyzeBass` does not exist yet** — that is Phase B1, and rule 1 above means it stays
+absent until B0 is accepted. The Bass Guitar page's third engine pill therefore still
+reads "Bass Fretboard Engine", and becomes "Bass Human Finger Engine" when there is a
+finger engine behind it.
+
+### Bass is written an octave above where it sounds
+
+This is the one thing about a bass file that will silently ruin a video, and the reason
+`octave.ts` is a whole file. Read the written pitch and the part comes out twelve frets up
+the neck: entirely playable, and entirely wrong. Files say which octave they mean in four
+different ways and programs disagree about which to use, so BIN-03 takes them strictly in
+priority — the user's override, then the engine's own sounding pitch, then `<transpose>`,
+then tab, then a range test — rather than combining them. A file that states its
+transposition is not made more trustworthy by a range test agreeing with it.
+
+The range test is the last resort and it is allowed to say it does not know: two
+hypotheses are scored, and when they land within 0.1 of each other nothing is changed and
+`OCTAVE_UNCERTAIN` is reported for the UI to ask about. A coin flip applied silently is
+the worst of the three outcomes.
+
+[`docs/finger-engine/BASS_B0_NOTATION_FIELDS.md`](../docs/finger-engine/BASS_B0_NOTATION_FIELDS.md)
+is the OQ-B10 report: every field the bass needs, whether the Notation Engine keeps it,
+and where it comes from when it does not. The short version is that the Notation Engine has
+no concept of sounding pitch and never reads `<transpose>`, so the octave check is not a
+safety net here — it is the only thing standing between the engine and a part solved an
+octave out.

@@ -160,7 +160,9 @@ test('every fixture leaves a timeline the renderer can read', () => {
   ]) {
     const timeline = analyze(name);
     assert.equal(timeline.schema, 'finger-timeline');
-    assert.equal(timeline.schemaVersion, '1.0.0');
+    // [BP-018] One contract serves both instruments; the guitar writes
+    // the current version and simply uses none of the bass's fields.
+    assert.equal(timeline.schemaVersion, '1.1.0');
     assert.equal(timeline.instrument.stringOrder, 'lowToHigh');
     assert.ok(timeline.duration > 0, `${name} has a duration`);
     assert.equal(Object.keys(timeline.leftHand.fingers).join(','), '1,2,3,4,T');

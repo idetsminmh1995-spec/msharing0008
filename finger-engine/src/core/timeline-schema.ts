@@ -10,7 +10,13 @@
 import type { LHFinger, RHFinger, Technique } from './types.js';
 
 export const TIMELINE_SCHEMA = 'finger-timeline' as const;
-export const TIMELINE_SCHEMA_VERSION = '1.0.0' as const;
+/**
+ * [BOUT-01] 1.1.0 adds the bass's optional fields and removes
+ * nothing: every 1.0.0 field keeps its meaning, so a renderer written
+ * for 1.0.0 still draws a bass timeline correctly -- it simply does
+ * not know about the things it ignores.
+ */
+export const TIMELINE_SCHEMA_VERSION = '1.1.0' as const;
 
 /** What the engine calls itself in the timeline it writes. */
 export const ENGINE_NAME = 'guitar-finger-engine' as const;
@@ -35,7 +41,30 @@ export interface TimelineNote {
   readonly reasons: readonly string[];
   /** [SV-23] 0..1. */
   readonly confidence: number;
+  /**
+   * [BOUT-04] A dead note: muted and percussive, with no real pitch.
+   * Its `fret` is where the hand happened to be touching, so the
+   * usual `tuning + fret = pitch` check does not apply to it.
+   */
+  readonly dead?: boolean;
+  /** [BOUT-04] Pitched, but played quietly under the line. */
+  readonly ghost?: boolean;
+  /** [BOUT-04] A natural harmonic; `fret` is the node, a whole number. */
+  readonly harmonic?: boolean;
+  /** [BOUT-04, BLH-04] Which fingering system the hand was in here. */
+  readonly system?: FingeringSystem;
 }
+
+/**
+ * [BLH-04] The two ways a bassist's left hand is laid out.
+ *
+ * `simandl` uses index, middle and little across two frets, with the
+ * ring finger pressing alongside the little one; `ofpf` gives each of
+ * the four fingers its own fret. Which one applies is decided by the
+ * millimetres the shape actually spans, not by the fret number, which
+ * is why it is carried per note rather than set once.
+ */
+export type FingeringSystem = 'simandl' | 'ofpf';
 
 export interface FingerKeyframe {
   readonly t: number;
@@ -50,6 +79,15 @@ export interface FingerKeyframe {
   /** [OUT-02] how to travel from THIS keyframe to the next. */
   readonly ease?: 'linear' | 'easeInOut' | 'step';
   readonly noteId?: string;
+  /**
+   * [BOUT-03] What this finger is doing, when it is not simply
+   * fretting the note: `support` is a finger pressing alongside
+   * another (the Simandl ring finger behind the little one, or a
+   * finger backing a bend), `mute` is a finger touching the string
+   * without pressing it. A `mute` keyframe is always `pressed:
+   * false`. Absent means `fret`.
+   */
+  readonly role?: 'fret' | 'support' | 'mute';
 }
 
 export interface HandKeyframe {
@@ -82,6 +120,19 @@ export interface RightHandEvent {
   readonly muted?: boolean;
   /** Why this stroke: 'GRID_DOWN', 'ECONOMY', 'LOCKED', 'HOME_STRING'. */
   readonly reason?: string;
+  /**
+   * [BOUT-06] The same finger carried on to a lower string rather
+   * than alternating -- what a bassist calls a rake, and the reason
+   * a descending line does not read as broken alternation.
+   */
+  readonly rake?: boolean;
+  /** [BOUT-06] Struck with the thumb, or hooked and pulled with a finger. */
+  readonly slap?: boolean;
+  readonly pop?: boolean;
+  /** [BOUT-06] Which way the thumb or pick travelled. */
+  readonly stroke?: 'down' | 'up';
+  readonly ghost?: boolean;
+  readonly dead?: boolean;
 }
 
 export interface EngineWarning {
@@ -95,20 +146,29 @@ export interface FingerTimeline {
   readonly schema: typeof TIMELINE_SCHEMA;
   readonly schemaVersion: typeof TIMELINE_SCHEMA_VERSION;
   readonly engine: {
-    readonly name: 'guitar-finger-engine';
+    readonly name: 'guitar-finger-engine' | 'bass-finger-engine';
     readonly version: string;
     readonly presetId: string;
     readonly seed: number;
     readonly configHash: string;
   };
   readonly instrument: {
-    readonly kind: 'guitar';
+    readonly kind: 'guitar' | 'bass';
     readonly numStrings: number;
     /** [DM-01/OUT-05] string 1 is the lowest-pitched one. */
     readonly stringOrder: 'lowToHigh';
     readonly tuning: readonly number[];
     readonly capo: number;
     readonly numFrets: number;
+    /** [BOUT-02] What was analysed, when it was not the plain default. */
+    readonly fretless?: boolean;
+    readonly octaveShift?: number;
+    /** [BOUT-02, BIN-06] What the engine read off the part, for the UI to confirm. */
+    readonly suggestion?: {
+      readonly numStrings: number;
+      readonly tuning: readonly number[];
+      readonly reasons: readonly string[];
+    };
   };
   /** Seconds, to the end of the last note. */
   readonly duration: number;
@@ -117,10 +177,28 @@ export interface FingerTimeline {
     readonly hand: readonly HandKeyframe[];
     readonly fingers: Readonly<Record<FingerKey, readonly FingerKeyframe[]>>;
     readonly barres: readonly TimelineBarre[];
+    /** [BOUT-05] Which fingering system was in use, as step segments. */
+    readonly system?: readonly { readonly t: number; readonly mode: FingeringSystem }[];
   };
   readonly rightHand: {
-    readonly mode: 'pick' | 'fingerstyle';
+    /** [BOUT-01] `thumb`, `slap` and `mixed` are 1.1.0. */
+    readonly mode: 'pick' | 'fingerstyle' | 'thumb' | 'slap' | 'mixed';
     readonly events: readonly RightHandEvent[];
+    /** [BOUT-06] When the hand changed what it was doing. */
+    readonly segments?: readonly {
+      readonly start: number;
+      readonly end: number;
+      readonly mode: string;
+    }[];
+    /**
+     * [BOUT-07] Where the plucking thumb is resting, which is what
+     * keeps the strings it is not playing quiet: a string number, the
+     * pickup, or the palm.
+     */
+    readonly thumbRest?: readonly {
+      readonly t: number;
+      readonly on: 'pickup' | 'palm' | number;
+    }[];
   };
   readonly warnings: readonly EngineWarning[];
   readonly debug?: unknown;

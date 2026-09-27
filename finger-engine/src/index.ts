@@ -27,6 +27,53 @@ export { DEFAULTS, configHash, mergeConfig } from './defaults.js';
 // ---- the public API the plan names (01 §4) --------------------------
 export { analyzeGuitar, resolveInstrument } from './guitar/index.js';
 export type { AnalyzeOptions } from './guitar/index.js';
+
+// --- The bass engine (Plan Part 01 §3), Phase B0 -------------------
+// Its own rules, the shared core underneath. `analyzeBass` lands with
+// Phase B1; what is exported now is everything that has to be decided
+// before a single fingering can be.
+export {
+  BASS_DEFAULTS,
+  BASS_SCALES,
+  BASS_STRING_SPREAD,
+  BASS_TUNINGS,
+  bassBottomPitch,
+  bassFretDistanceMm,
+  bassFretWidthMm,
+  bassGeometry,
+  bassInstrument,
+  bassTopPitch,
+  decideOctave,
+  firstFretWithin,
+  instrumentFromSuggestion,
+  octaveFromRange,
+  octaveFromTab,
+  outOfRange,
+  shapeSpanMm,
+  suggestBassInstrument,
+} from './bass/index.js';
+export type {
+  BassInstrumentOptions,
+  BassScaleId,
+  BassSuggestion,
+  BassTuningId,
+  OctaveDecision,
+  OctaveInput,
+  OctaveSource,
+  RangeOptions,
+  SuggestOptions,
+  TabbedNote,
+} from './bass/index.js';
+export { detectPart } from './input/part-detect.js';
+export { readPartEvidence } from './input/musicxml/part-evidence.js';
+export type { PartDetection, PartEvidence, PartKind } from './input/part-detect.js';
+export {
+  DEFAULT_HAND_PROFILE,
+  HAND_PROFILES,
+  handProfileScale,
+  scaleSpans,
+} from './core/hand-profiles.js';
+export type { HandProfile, SpanLimits } from './core/hand-profiles.js';
 export { fromNotationEngine, notationNoteId } from './input/notation-engine/adapter.js';
 export type {
   NotationAdapterOptions,

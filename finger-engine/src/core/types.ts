@@ -24,7 +24,16 @@ export type LHFinger = 1 | 2 | 3 | 4 | 'T';
 export type RHFinger = 'p' | 'i' | 'm' | 'a' | 'c' | 'pick';
 
 export interface InstrumentSpec {
-  readonly kind: 'guitar';
+  /**
+   * [BG-01] Which family the neck belongs to.
+   *
+   * Nothing in `core/` branches on it -- a neck is a neck, and every
+   * rule here is written in millimetres and string numbers, which is
+   * exactly why one core can serve both. It is carried so the
+   * instrument rules can be asked for and so the timeline can say
+   * what was analysed.
+   */
+  readonly kind: 'guitar' | 'bass';
   readonly numStrings: number;
   /** [DM-01] MIDI pitch of each open string; index 0 is string 1, the lowest. */
   readonly tuning: readonly number[];
@@ -35,6 +44,18 @@ export interface InstrumentSpec {
   /** [GEO-04] string 1 to string N, at each end of the neck. */
   readonly nutSpacingMm: number;
   readonly bridgeSpacingMm: number;
+  /**
+   * [BG-06] No fret wires: the fingertip sits ON the line rather than
+   * behind it, so the geometry's `fingertipBehindFret` is read as 0
+   * and a dot's fret coordinate is the whole number.
+   */
+  readonly fretless?: boolean;
+  /**
+   * [BIN-04c] The octave the file was read at, in semitones: -12, 0
+   * or +12. Applied before anything else, and carried so the timeline
+   * can say which way the decision went.
+   */
+  readonly octaveShift?: number;
 }
 
 export type Technique =
