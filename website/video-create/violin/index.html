@@ -264,13 +264,18 @@
      rule serves a 512px preview and a 1080px export. */
   .video-frame.is-portrait .video-top,
   .video-frame.is-square .video-top{flex-direction:column;align-items:flex-start;gap:1.5cqw;}
+  /* A square frame has the least room to spare of the three: the
+     header is stacked like the portrait one but the frame is not tall,
+     so every unit the header takes comes off the music. Tighter gap,
+     smaller mark, smaller boxes. */
+  .video-frame.is-square .video-top{gap:.7cqw;padding-top:1cqw;}
   .video-frame.is-portrait .video-top{align-items:center;padding:3cqw 4cqw 0;}
   .video-frame.is-portrait .video-stats,
   .video-frame.is-square .video-stats{width:100%;}
   .video-frame.is-portrait .video-stats{justify-content:center;}
   .video-frame.is-square .video-stats{justify-content:flex-end;}
   .video-frame.is-portrait .video-logo-mark{--logo-h:17cqw;}
-  .video-frame.is-square .video-logo-mark{--logo-h:12cqw;}
+  .video-frame.is-square .video-logo-mark{--logo-h:10.5cqw;}
   .video-frame.is-portrait .video-title-1,
   .video-frame.is-square .video-title-1{font-size:calc(var(--title1-num,32) * 100cqw / 560);}
   .video-frame.is-portrait .video-title-2,
@@ -279,13 +284,14 @@
   .video-frame.is-square .stat-box{border-width:.34cqw;border-radius:1.6cqw;padding:.9cqw 2cqw;min-width:11cqw;}
   .video-frame.is-portrait .stat-box .stat-label{font-size:2.3cqw;}
   .video-frame.is-portrait .stat-box .stat-value{font-size:4.6cqw;}
-  .video-frame.is-square .stat-box .stat-label{font-size:2cqw;}
-  .video-frame.is-square .stat-box .stat-value{font-size:4cqw;}
+  .video-frame.is-square .stat-box{padding:.6cqw 1.5cqw;min-width:9cqw;border-radius:1.2cqw;}
+  .video-frame.is-square .stat-box .stat-label{font-size:1.7cqw;}
+  .video-frame.is-square .stat-box .stat-value{font-size:3.2cqw;}
   /* The one layout change that is not a size: in 9:16 the instrument
      goes ABOVE the music instead of beside it. */
   .video-frame.is-portrait .video-body{flex-direction:column;gap:2.5cqw;padding:2cqw 4cqw 5cqw;}
   .video-frame.is-portrait .video-instrument{flex:0 0 42%;width:100%;}
-  .video-frame.is-square .video-body{padding:1cqw 3cqw 3.5cqw;--instrument-w:38%;}
+  .video-frame.is-square .video-body{padding:.5cqw 3cqw 3cqw;--instrument-w:42%;}
   .video-frame.is-portrait .instrument-missing{font-size:3.4cqw;}
   .video-frame.is-square .instrument-missing{font-size:2.6cqw;}
     /* Video Style (card 5) is a property of the whole FRAME, not of the
