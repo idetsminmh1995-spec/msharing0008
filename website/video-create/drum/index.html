@@ -131,7 +131,26 @@
   .cost-line{text-align:center;font-size:12px;color:var(--muted);}
   .cost-line b{color:var(--red);font-weight:700;}
 
-  .right{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px;}
+  .right{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px;--shape-w:16;--shape-h:9;--preview-w:100%;}
+  /* [PV-01] A preview you cannot see all of is not a preview.
+
+     A 16:9 frame is wider than it is tall, so the column's width has
+     always decided it and the window's height never mattered. The 1:1
+     and 9:16 frames are the other way round: at a full-width column
+     they come out 778 and 1383 pixels tall on a 1366x768 laptop, which
+     is taller than the whole browser window -- so the logo, the titles,
+     the stat boxes and the top of the notation are ALWAYS off the top
+     of the screen, whatever you scroll to. It looks exactly like the
+     frame is cutting the music off, and it is not: the window is.
+
+     So the two tall shapes take their width from the height there is
+     room for, and the aspect-ratio turns that back into a width. The
+     preview gets smaller on a short screen and whole, which is what a
+     preview is for; the exported video is 1080 wide either way. 16:9
+     keeps `100%` and is untouched. */
+  .right.is-tall{--preview-w:min(100%, calc((100vh - var(--frame-chrome,250px)) * var(--shape-w) / var(--shape-h)));}
+  .right.is-tall .video-frame,
+  .right.is-tall .transport{width:var(--preview-w);margin-inline:auto;}
   .preview-head{display:flex;justify-content:space-between;align-items:center;}
   .preview-head .title{font-weight:700;font-size:14px;}
   .preview-stats{display:flex;gap:16px;font-size:12px;color:var(--muted);}
@@ -740,12 +759,42 @@
    * different picture. Left alone they would keep showing the old
    * shape's photos.
    */
+  /**
+   * [PV-01] How much of the window is NOT the preview.
+   *
+   * Everything above the frame (the site header, the breadcrumb, the
+   * "Live Preview" line) plus the transport bar under it. Measured
+   * rather than guessed, because it differs by page and by zoom, and a
+   * guess that is 30px out is a preview 30px taller than the window --
+   * which is the whole bug. It does not depend on the frame's own
+   * height, so reading it while the frame is any size is safe.
+   */
+  function measurePreviewChrome() {
+    const right = videoFrame.parentElement;
+    if (!right) return;
+    const top = videoFrame.getBoundingClientRect().top + window.scrollY;
+    const transport = right.querySelector('.transport');
+    const below = (transport ? transport.offsetHeight : 0) + 34;
+    right.style.setProperty('--frame-chrome', `${Math.round(top + below)}px`);
+  }
+  window.addEventListener('resize', measurePreviewChrome);
+  measurePreviewChrome();
+
   function applyAspect() {
     const aspect = currentAspect();
     videoFrame.style.aspectRatio =
       aspect === '9x16' ? '9 / 16' : aspect === '1x1' ? '1 / 1' : '16 / 9';
     videoFrame.classList.toggle('is-portrait', aspect === '9x16');
     videoFrame.classList.toggle('is-square', aspect === '1x1');
+    // [PV-01] The shape the width cap is worked out from, and the class
+    // that turns the cap on: only for a frame taller than it is wide.
+    const right = videoFrame.parentElement;
+    if (right) {
+      right.style.setProperty('--shape-w', aspect === '9x16' ? '9' : aspect === '1x1' ? '1' : '16');
+      right.style.setProperty('--shape-h', aspect === '9x16' ? '16' : aspect === '1x1' ? '1' : '9');
+      right.classList.toggle('is-tall', aspect === '9x16' || aspect === '1x1');
+    }
+    measurePreviewChrome();
     videoFrame.style.backgroundImage = '';
     kitBackgroundImage = null;
     kitContentTop = null;
