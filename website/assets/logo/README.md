@@ -1,9 +1,22 @@
 # The marks the video frames burn in
 
 `sharing-drum-logo-full.webp`, `sharing-guitar-logo-full.webp`,
-`sharing-piano-logo-full.webp` — the brand mark, top-left of every
-frame. **`sharing-bass-logo-full.webp` is missing**: the Bass page
-asks for it and falls back to the guitar mark until it is here. Each file carries blank margin on all four sides, and the CSS
+`sharing-piano-logo-full.webp`, `sharing-bass-logo-full.webp` — the
+brand mark, top-left of every frame.
+
+All four are **1414x2000 with their ink in the same place**: columns
+151 to 1257, rows 333 to 1649. That is not a coincidence to be
+preserved by luck — the frame's CSS pulls the layout box onto the ink
+with negative margins written as fractions of those numbers, so a
+mark whose ink sits somewhere else in its file lands somewhere else in
+the video. A new mark gets trimmed to its own ink, scaled to
+1107x1317, and pasted at (151, 333) on a transparent 1414x2000
+canvas; then nothing in any page has to change.
+
+`bass.svg` beside them is the owner's Illustrator export, which the
+bass mark was made from: a 595pt artboard with the logo on it, 8.6MB
+of embedded fallback rasters and fonts. Nothing loads it — it is the
+source, kept the way the guitar folder keeps its upright originals. Each file carries blank margin on all four sides, and the CSS
 pulls the layout box onto the ink with negative margins written as
 fractions of the file's own pixel counts; `--logo-h` is the FILE's
 height, not the ink's. Changing the file means re-measuring the ink's
