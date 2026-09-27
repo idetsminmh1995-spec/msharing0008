@@ -1,19 +1,30 @@
 # The pictures the Bass Guitar video frame draws
 
-**This folder is waiting for four drawings.** Everything else on the
-Bass page is built and wired — the notation, the Human Finger Engine,
-the neck marks, the hand legend, the picking marks, the count voice,
-the video export. What it cannot do yet is show a bass, because there
-is no bass here to show.
+**One of four drawings is in use.** `jazz-drawn.svg` is the owner's
+own Jazz Bass, measured, and the page draws it.
+
+`precision-drawn.svg` is the owner's Precision Bass, built from the
+upright `Bass Guitar 1.svg` the same way the classical guitar was
+built from its own original: rotated a quarter turn counter-clockwise
+and its viewBox tightened onto the bass. It is not MEASURED yet, so
+the page still says it is waiting for it — a drawing being present is
+not the same as the engine knowing where its fret wires are, and a
+picture with no measurements puts every mark nowhere.
+
+`Bass Guitar 2.svg` is the same Jazz Bass the other way round: nut at
+the RIGHT, and its headstock lettering reads forwards rather than
+backwards. The engine needs the nut at the LEFT, so using it means
+mirroring it, which gives back exactly the file already in use. Kept
+and unused until the owner says which way the headstock should read.
 
 ## What to drop in, and under exactly these names
 
-| file | what it is | strings |
-| --- | --- | --- |
-| `precision-drawn.svg` | a Precision-style bass | 4 |
-| `jazz-drawn.svg` | a Jazz-style bass | 4 |
-| `acoustic-drawn.svg` | an acoustic bass | 4 |
-| `five-drawn.svg` | a five-string bass | 5 |
+| file | what it is | strings | state |
+| --- | --- | --- | --- |
+| `jazz-drawn.svg` | a Jazz-style bass | 4 | **measured, in use** |
+| `precision-drawn.svg` | a Precision-style bass | 4 | turned and cropped; not measured |
+| `acoustic-drawn.svg` | an acoustic bass | 4 | missing |
+| `five-drawn.svg` | a five-string bass | 5 | missing |
 
 The names are what the page asks for. A file under any other name is
 a file the page will not find, and the frame stays empty with a line
@@ -53,6 +64,21 @@ is fret 1 cannot be settled by counting — a fret series fits equally
 well however the wires are numbered — so the nut being visibly
 thicker, or drawn in bone, is what settles it. Get it wrong and every
 mark in the video is a fret out for the whole video.
+
+The Jazz Bass proves both halves of that. Its fit is equally good
+whether the first line is called 0, 1 or 2 — worst residual 1.35
+units over a 506-unit board, the same either way — so the fit says
+nothing. What says it is that the first line is drawn pale and 3.8
+units wide where every fret wire is 1.3 to 1.8, and that the
+headstock's yellow stops there. Twenty frets after it, which is a
+Jazz Bass.
+
+**And its inlays would have lied.** The blocks fall in the spaces at
+1, 3, 5, 7, 9, 12, 15, 17 and 19; a real Fender puts them at 3
+through 21. The artist started the pattern a space early, so reading
+the drawing by its dots — the check the guitar README calls an oracle
+and warns against — would have put every mark two frets out, and the
+video would have looked entirely plausible.
 
 The Jazz Bass proves both halves of that. Its fit is equally good
 whether the first line is called 0, 1 or 2 (worst residual 1.35 units
