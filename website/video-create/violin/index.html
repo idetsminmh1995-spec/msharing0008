@@ -156,14 +156,7 @@
   .preview-stats{display:flex;gap:16px;font-size:12px;color:var(--muted);}
   .preview-stats b{color:var(--text);}
 
-  /* [VF-01] The mock-up's frame is pure black with a thin grey line
-     drawn INSIDE it, a little in from the edge -- the line is part of
-     the picture, not the page's border round a preview, so it has to
-     be painted into the video too. An inset box-shadow would not be:
-     the canvas painter walks real elements, so the line is its own
-     element, `.frame-rule`. */
-  .video-frame{position:relative;background:#000;border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:flex-start;overflow:hidden;min-width:0;container-type:inline-size;}
-  .frame-rule{position:absolute;inset:1.6cqw;border:0.17cqw solid #808488;border-radius:0.9cqw;pointer-events:none;z-index:2;}
+    .video-frame{position:relative;background:#000;border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:flex-start;overflow:hidden;min-width:0;container-type:inline-size;}
   /* Padding here lands the logo's INK, not its image box -- the
      negative margins on .video-logo-mark have already pulled the box
      onto the artwork, so the left padding IS the ink's left edge.
@@ -598,10 +591,6 @@
     </div>
 
     <div class="video-frame style-black" id="videoFrame">
-      <!-- [VF-01] The grey line is part of the PICTURE, so it is an
-           element the canvas painter can find, not a border on the
-           preview that the exported video would lose. -->
-      <div class="frame-rule" aria-hidden="true"></div>
       <div class="video-top">
         <div class="video-logo-row">
           <img class="video-logo-mark" src="../../assets/logo/sharing-violin-logo-full.svg" alt="M Sharing Violin">
@@ -2738,29 +2727,6 @@
     ctx2d.drawImage(violinPhoto, box.x, box.y, box.w, box.h);
   }
 
-  /**
-   * [VF-01] The grey line inside the frame.
-   *
-   * Drawn from the element's own computed style rather than from
-   * numbers repeated here, so the line in the video is the line on
-   * screen even after the CSS is tuned.
-   */
-  function paintFrameRule(ctx2d, frameRect, scale) {
-    const rule = videoFrame.querySelector('.frame-rule');
-    if (!rule || !isVisible(rule)) return;
-    const box = rectIn(rule, frameRect, scale);
-    const cs = getComputedStyle(rule);
-    const width = parseFloat(cs.borderTopWidth) * scale;
-    if (!(width > 0)) return;
-    ctx2d.save();
-    ctx2d.strokeStyle = cs.borderTopColor;
-    ctx2d.lineWidth = width;
-    roundRectPath(ctx2d, box.x + width / 2, box.y + width / 2,
-                  box.w - width, box.h - width, parseFloat(cs.borderTopLeftRadius) * scale);
-    ctx2d.stroke();
-    ctx2d.restore();
-  }
-
   function drawViolinFrame(ctx2d, canvas, atSeconds = audioPlayer.currentTime) {
     const frameRect = videoFrame.getBoundingClientRect();
     if (!(frameRect.width > 0)) return;
@@ -2793,7 +2759,6 @@
 
     // The violin, standing beside the music.
     paintInstrument(ctx2d, frameRect, scale);
-    paintFrameRule(ctx2d, frameRect, scale);
 
     // The logo.
     const mark = document.querySelector('.video-logo-mark');
