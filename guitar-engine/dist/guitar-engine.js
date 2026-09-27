@@ -299,9 +299,53 @@ var GuitarEngine = (() => {
     // neither a pickup nor a join between two colours.
     pickX: 755
   };
+  var PRECISION_BASS_DRAWN = {
+    width: 1584.5,
+    height: 432,
+    fit: "whole",
+    frets: [
+      283.2,
+      353,
+      418.8,
+      480,
+      538.1,
+      591.8,
+      642.5,
+      689.9,
+      734.8,
+      776.8,
+      816.2,
+      853.8,
+      889.2,
+      922.5,
+      954,
+      984.2,
+      1012.3,
+      1039.5,
+      1064.3,
+      1089.2,
+      1111.3,
+      1132.7
+    ],
+    boardEndX: 1149.5,
+    stringsAtNut: [183.97, 224.66],
+    stringsAtEnd: [185.69, 248.07],
+    boardAtNut: [175.94, 232.74],
+    boardAtEnd: [173.69, 255.59],
+    // Just before the NUT to just past the BRIDGE, the framing every
+    // other instrument here uses. The bridge plate runs 1470 to 1542.
+    span: [253, 1560],
+    drop: 0.31,
+    // Over the white pickguard, between the end of the fretboard (1149)
+    // and the near half of the split pickup (1276). That is where a
+    // bassist's fingers actually sit, and the only stretch along these
+    // strings that is neither a pickup nor a join between two colours.
+    pickX: 1210
+  };
   var PHOTOS = {
     "acoustic-drawn": ACOUSTIC_DRAWN,
     "jazz-drawn": JAZZ_BASS_DRAWN,
+    "precision-drawn": PRECISION_BASS_DRAWN,
     "classical-drawn": CLASSICAL_DRAWN,
     "electric-drawn": ELECTRIC_DRAWN,
     "strat-drawn": STRAT_DRAWN

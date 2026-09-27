@@ -1,28 +1,22 @@
 # The pictures the Bass Guitar video frame draws
 
-**One of four drawings is in use.** `jazz-drawn.svg` is the owner's
-own Jazz Bass, measured, and the page draws it.
-
-`precision-drawn.svg` is the owner's Precision Bass, built from the
-upright `Bass Guitar 1.svg` the same way the classical guitar was
-built from its own original: rotated a quarter turn counter-clockwise
-and its viewBox tightened onto the bass. It is not MEASURED yet, so
-the page still says it is waiting for it — a drawing being present is
-not the same as the engine knowing where its fret wires are, and a
-picture with no measurements puts every mark nowhere.
+**Two of four drawings are in use, and both are measured.**
+`jazz-drawn.svg` is the owner's Jazz Bass and `precision-drawn.svg`
+the owner's Precision, turned a quarter turn out of its upright
+original and cropped to itself.
 
 `Bass Guitar 2.svg` is the same Jazz Bass the other way round: nut at
 the RIGHT, and its headstock lettering reads forwards rather than
 backwards. The engine needs the nut at the LEFT, so using it means
 mirroring it, which gives back exactly the file already in use. Kept
-and unused until the owner says which way the headstock should read.
+and unused.
 
 ## What to drop in, and under exactly these names
 
 | file | what it is | strings | state |
 | --- | --- | --- | --- |
-| `jazz-drawn.svg` | a Jazz-style bass | 4 | **measured, in use** |
-| `precision-drawn.svg` | a Precision-style bass | 4 | turned and cropped; not measured |
+| `jazz-drawn.svg` | a Jazz-style bass | 4 | **measured, 20 frets** |
+| `precision-drawn.svg` | a Precision-style bass | 4 | **measured, 21 frets** |
 | `acoustic-drawn.svg` | an acoustic bass | 4 | missing |
 | `five-drawn.svg` | a five-string bass | 5 | missing |
 
@@ -41,10 +35,11 @@ learn. That file is worth reading before drawing a new instrument.
 
 **Lying down, nut at the LEFT, body at the RIGHT.** The engine draws
 a neck horizontally, with the strings running left to right and the
-thin string at the top. A bass drawn upright has to be turned a
-quarter turn counter-clockwise first, which is how
-`classical-drawn.svg` and `strat-drawn.svg` were made from the
-owner's upright originals.
+thin string at the top — which is how tab is written and how all four
+guitars here are drawn. A bass drawn upright has to be turned a
+quarter turn counter-clockwise first, which is how `classical-drawn.svg`,
+`strat-drawn.svg` and `precision-drawn.svg` were made from the owner's
+upright originals.
 
 **Give it `width` and `height`, not just a `viewBox`.** They are what
 give the picture an intrinsic size, which is what the video canvas
@@ -65,34 +60,22 @@ well however the wires are numbered — so the nut being visibly
 thicker, or drawn in bone, is what settles it. Get it wrong and every
 mark in the video is a fret out for the whole video.
 
-The Jazz Bass proves both halves of that. Its fit is equally good
-whether the first line is called 0, 1 or 2 — worst residual 1.35
-units over a 506-unit board, the same either way — so the fit says
-nothing. What says it is that the first line is drawn pale and 3.8
-units wide where every fret wire is 1.3 to 1.8, and that the
-headstock's yellow stops there. Twenty frets after it, which is a
-Jazz Bass.
+Both basses prove it. The Jazz's fit is equally good whether the
+first line is called 0, 1 or 2 — worst residual 1.35 units over a
+506-unit board, the same either way — so the fit says nothing. What
+says it is that the first line is drawn pale and 3.8 units wide where
+every fret wire is 1.3 to 1.8, and that the headstock's yellow stops
+there. The Precision is the same story with wider margins: its nut is
+6.33 units against 1.9 for every other wire, three times over.
 
-**And its inlays would have lied.** The blocks fall in the spaces at
-1, 3, 5, 7, 9, 12, 15, 17 and 19; a real Fender puts them at 3
-through 21. The artist started the pattern a space early, so reading
-the drawing by its dots — the check the guitar README calls an oracle
-and warns against — would have put every mark two frets out, and the
-video would have looked entirely plausible.
-
-The Jazz Bass proves both halves of that. Its fit is equally good
-whether the first line is called 0, 1 or 2 (worst residual 1.35 units
-over a 506-unit board, the same either way) — so the fit says
-nothing. What says it is that the first line is drawn pale and 3.8
-units wide where every fret wire is 1.3 to 1.8, and that the
-headstock's yellow stops there.
-
-**And its inlays would have lied.** The blocks fall in the spaces at
-1, 3, 5, 7, 9, 12, 15, 17 and 19; a real Fender puts them at 3
-through 21. The artist started the pattern a space early, so reading
-the drawing by its dots — the check the guitar README calls an oracle
-and warns against — would have put every mark two frets out, and the
-video would have looked entirely plausible.
+**And the Jazz's inlays would have lied.** Its blocks fall in the
+spaces at 1, 3, 5, 7, 9, 12, 15, 17 and 19; a real Fender puts them
+at 3 through 21. The artist started the pattern a space early, so
+reading the drawing by its dots — the check the guitar README calls
+an oracle and warns against — would have put every mark two frets out,
+and the video would have looked entirely plausible. (The Precision's
+dots do agree, at 12 double, 15, 17 and so on. That is luck, not a
+method.)
 
 ## Then it has to be measured
 
@@ -126,6 +109,44 @@ the bridge, and it must be clear of a pickup rather than on one.
 document.** Opening it directly adds the body margin and stretches
 the drawing to the window: a measurement of the browser, not of the
 bass. It was worth eleven pixels on the Telecaster, a sixth of a fret.
+
+### Slanted wires, and how the Precision was read
+
+A scan down one fixed row of the picture works on a drawing whose
+fret wires are vertical. The Precision's are NOT: its neck tapers and
+each wire is drawn square to the board's own centreline, so a wire's
+x at the top of the board is a few units from its x at the bottom.
+Pick a row and every wire reads differently, and the error grows up
+the neck — the worst kind of wrong, because it looks right at the nut.
+
+So the scan follows the BOARD's centreline instead: read the board's
+own edges from the columns BETWEEN the wires (a wire column is white
+and has no edges of its own to find), then sample a band either side
+of the line halfway between them. That line is where the strings are,
+so it is the line a fret's x means.
+
+Its dot inlays sit on exactly that line — and are grey where the
+wires are white, so a threshold that takes only white takes only
+wires. Its strings are white too, but they run the length of the
+board rather than across it, so they never make a vertical band.
+
+The first scan, before any of this, reported fifteen frets and a
+board ending at 1000. Both were wrong: the window it looked in fitted
+the neck at the nut, where the board is 61 units across, and the neck
+is 92 where it meets the body — so the last six frets fell outside
+the window and were thrown away. A Precision has twenty-one, and it
+has twenty-one here.
+
+## The headstock lettering
+
+The Jazz's headstock carried "Fender JAZZ BASS" — and, because the
+drawing is a mirrored right-handed bass, it read backwards. It is
+turned off rather than deleted: the paths are still in the file,
+inside `<g id="headstock-lettering" display="none">`, and changing
+that `none` to `inline` puts it back exactly as it was. Two reasons
+for turning it off: backwards words look like a mistake in a video,
+and un-mirroring them would print another company's name legibly in
+every frame of the owner's own product.
 
 ## What the page already knows about a bass
 

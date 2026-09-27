@@ -408,9 +408,72 @@ export const JAZZ_BASS_DRAWN: PhotoMeasurements = {
   pickX: 755,
 };
 
+/**
+ * The other bass the page draws: the owner's own drawing of a
+ * Precision Bass, turned a quarter turn counter-clockwise out of the
+ * upright original and cropped to itself.
+ *
+ * It took a different scan from every other picture here, and the two
+ * reasons are worth writing down because the next drawing may have
+ * them too.
+ *
+ * ITS FRET WIRES ARE SLANTED. The neck tapers and each wire is drawn
+ * square to the board's own centreline rather than to the picture, so
+ * a wire's x at the top of the board is a few units from its x at the
+ * bottom. Scanning one fixed row of the picture reads a different
+ * number for every wire depending which row was picked, and the error
+ * grows up the neck -- the worst kind of wrong, because it looks
+ * right at the nut. So the scan follows the BOARD's centreline: the
+ * board's own edges are read from the columns between the wires, and
+ * a band is sampled either side of the line halfway between them.
+ * That line is where the strings are, so it is the line a fret's x
+ * means.
+ *
+ * ITS DOT INLAYS SIT ON EXACTLY THAT LINE. They are grey where the
+ * wires are white, which is the other half of why this works: a
+ * threshold that takes only white takes only wires.
+ *
+ * The numbering is settled by the drawing, not by counting. The first
+ * line is 6.33 units wide where every other wire is 1.9 -- three
+ * times over, drawn as a nut -- and the cream of the headstock stops
+ * there. A string leaves its FRONT edge, 283.2, which is the number
+ * used for fret 0. TWENTY-ONE wires after it, which is a Precision
+ * Bass. Fitting a geometric series to all twenty-two at once lands
+ * every one within 4.6 units over a board 849 long, and the same fit
+ * placed the twelfth fret within 1.3 of where it was measured.
+ *
+ * The board does NOT end at the last wire: the neck runs on under the
+ * body's black for another seventeen units, and `boardEndX` is where
+ * the wood stops, at 1149.5.
+ */
+export const PRECISION_BASS_DRAWN: PhotoMeasurements = {
+  width: 1584.5,
+  height: 432,
+  fit: 'whole',
+  frets: [
+    283.2, 353, 418.8, 480, 538.1, 591.8, 642.5, 689.9, 734.8, 776.8, 816.2, 853.8, 889.2, 922.5,
+    954, 984.2, 1012.3, 1039.5, 1064.3, 1089.2, 1111.3, 1132.7,
+  ],
+  boardEndX: 1149.5,
+  stringsAtNut: [183.97, 224.66],
+  stringsAtEnd: [185.69, 248.07],
+  boardAtNut: [175.94, 232.74],
+  boardAtEnd: [173.69, 255.59],
+  // Just before the NUT to just past the BRIDGE, the framing every
+  // other instrument here uses. The bridge plate runs 1470 to 1542.
+  span: [253, 1560],
+  drop: 0.31,
+  // Over the white pickguard, between the end of the fretboard (1149)
+  // and the near half of the split pickup (1276). That is where a
+  // bassist's fingers actually sit, and the only stretch along these
+  // strings that is neither a pickup nor a join between two colours.
+  pickX: 1210,
+};
+
 export const PHOTOS: Readonly<Record<string, PhotoMeasurements>> = {
   'acoustic-drawn': ACOUSTIC_DRAWN,
   'jazz-drawn': JAZZ_BASS_DRAWN,
+  'precision-drawn': PRECISION_BASS_DRAWN,
   'classical-drawn': CLASSICAL_DRAWN,
   'electric-drawn': ELECTRIC_DRAWN,
   'strat-drawn': STRAT_DRAWN,
