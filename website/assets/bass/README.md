@@ -167,7 +167,7 @@ out from the string alone, and a bassist's cannot.
 
 ## The logo
 
-`../logo/sharing-bass-logo-full.webp`, beside the drum, guitar and
+`../logo/sharing-bass-logo-full.svg`, beside the drum, guitar and
 piano marks. Same treatment: the page pulls the layout box onto the
 ink with negative margins written as fractions of the file's own
 pixel counts, so a new file means re-measuring the ink's bounding box
