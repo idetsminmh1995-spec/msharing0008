@@ -253,6 +253,7 @@ var NotationEngine = (() => {
     svgGlyphText: () => svgGlyphText,
     svgGroup: () => svgGroup,
     svgLine: () => svgLine,
+    svgNumber: () => svgNumber,
     svgPath: () => svgPath,
     svgRect: () => svgRect,
     svgText: () => svgText,
@@ -59148,26 +59149,29 @@ var NotationEngine = (() => {
   function escapeXmlAttribute(value) {
     return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
+  function svgNumber(value) {
+    return String(Number(value.toFixed(4)));
+  }
   function attrsToString(attrs) {
     if (attrs === void 0) return "";
     const parts = [];
     for (const [key, value] of Object.entries(attrs)) {
-      const stringValue = typeof value === "number" ? String(value) : escapeXmlAttribute(value);
+      const stringValue = typeof value === "number" ? svgNumber(value) : escapeXmlAttribute(value);
       parts.push(`${key}="${stringValue}"`);
     }
     return parts.length > 0 ? " " + parts.join(" ") : "";
   }
   function svgLine(x1, y1, x2, y2, attrs) {
-    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"${attrsToString(attrs)} />`;
+    return `<line x1="${svgNumber(x1)}" y1="${svgNumber(y1)}" x2="${svgNumber(x2)}" y2="${svgNumber(y2)}"${attrsToString(attrs)} />`;
   }
   function svgPath(d, attrs) {
     return `<path d="${escapeXmlAttribute(d)}"${attrsToString(attrs)} />`;
   }
   function svgRect(x2, y, width, height, attrs) {
-    return `<rect x="${x2}" y="${y}" width="${width}" height="${height}"${attrsToString(attrs)} />`;
+    return `<rect x="${svgNumber(x2)}" y="${svgNumber(y)}" width="${svgNumber(width)}" height="${svgNumber(height)}"${attrsToString(attrs)} />`;
   }
   function svgText(x2, y, content, attrs) {
-    return `<text x="${x2}" y="${y}"${attrsToString(attrs)}>${escapeXmlText(content)}</text>`;
+    return `<text x="${svgNumber(x2)}" y="${svgNumber(y)}"${attrsToString(attrs)}>${escapeXmlText(content)}</text>`;
   }
   function svgGlyphText(x2, y, char, fontFamily, attrs) {
     return svgText(x2, y, char, {
@@ -59487,11 +59491,14 @@ ${denominator}`;
         const midY = (y1 + y2) / 2;
         const bow = 0.3 * -towardNotehead;
         lines.push(
-          svgPath(`M ${shape.startX} ${y1} Q ${midX} ${midY + bow} ${shape.endX} ${y2}`, {
-            stroke: color,
-            "stroke-width": thickness,
-            fill: "none"
-          })
+          svgPath(
+            `M ${svgNumber(shape.startX)} ${svgNumber(y1)} Q ${svgNumber(midX)} ${svgNumber(midY + bow)} ${svgNumber(shape.endX)} ${svgNumber(y2)}`,
+            {
+              stroke: color,
+              "stroke-width": thickness,
+              fill: "none"
+            }
+          )
         );
       } else {
         lines.push(
@@ -59508,7 +59515,8 @@ ${denominator}`;
     const midX = (shape.startX + shape.endX) / 2;
     const innerY = shape.y + towardBulge * (shape.bulgeHeight - options.midpointThickness / 2);
     const outerY = shape.y + towardBulge * (shape.bulgeHeight + options.midpointThickness / 2);
-    const d = `M ${shape.startX} ${shape.y} Q ${midX} ${innerY} ${shape.endX} ${shape.y} Q ${midX} ${outerY} ${shape.startX} ${shape.y} Z`;
+    const n = svgNumber;
+    const d = `M ${n(shape.startX)} ${n(shape.y)} Q ${n(midX)} ${n(innerY)} ${n(shape.endX)} ${n(shape.y)} Q ${n(midX)} ${n(outerY)} ${n(shape.startX)} ${n(shape.y)} Z`;
     return svgPath(d, { fill: options.color, stroke: "none" });
   }
 
@@ -59518,7 +59526,8 @@ ${denominator}`;
     const midX = (shape.startX + shape.endX) / 2;
     const innerY = shape.y + towardBulge * (shape.bulgeHeight - options.midpointThickness / 2);
     const outerY = shape.y + towardBulge * (shape.bulgeHeight + options.midpointThickness / 2);
-    const d = `M ${shape.startX} ${shape.y} Q ${midX} ${innerY} ${shape.endX} ${shape.y} Q ${midX} ${outerY} ${shape.startX} ${shape.y} Z`;
+    const n = svgNumber;
+    const d = `M ${n(shape.startX)} ${n(shape.y)} Q ${n(midX)} ${n(innerY)} ${n(shape.endX)} ${n(shape.y)} Q ${n(midX)} ${n(outerY)} ${n(shape.startX)} ${n(shape.y)} Z`;
     return svgPath(d, { fill: options.color, stroke: "none" });
   }
 
@@ -59687,11 +59696,11 @@ ${denominator}`;
     let previous;
     for (const segment of segments) {
       if (previous === void 0 || Math.abs(previous.xEnd - segment.xStart) > 1e-9) {
-        parts.push(`M ${segment.xStart} ${segment.y}`);
+        parts.push(`M ${svgNumber(segment.xStart)} ${svgNumber(segment.y)}`);
       } else if (previous.y !== segment.y) {
-        parts.push(`L ${segment.xStart} ${segment.y}`);
+        parts.push(`L ${svgNumber(segment.xStart)} ${svgNumber(segment.y)}`);
       }
-      parts.push(`L ${segment.xEnd} ${segment.y}`);
+      parts.push(`L ${svgNumber(segment.xEnd)} ${svgNumber(segment.y)}`);
       previous = segment;
     }
     return parts.join(" ");
@@ -64320,7 +64329,11 @@ ${xrefOffset}
     const durationScale = Math.min(2, Math.max(0.35, measureTicks / (TICKS_PER_QUARTER * 4)));
     const minWidth = headerWidth + minMeasureWidth * durationScale;
     if (ticks.length === 0) {
-      return { width: Math.max(minWidth, tempoMarkMinWidth), positionsByTick: /* @__PURE__ */ new Map() };
+      return {
+        width: Math.max(minWidth, tempoMarkMinWidth),
+        positionsByTick: /* @__PURE__ */ new Map(),
+        idealSpan: 0
+      };
     }
     const spacingEvents = ticks.map((tick, i2) => {
       const nextTick = i2 + 1 < ticks.length ? ticks[i2 + 1] ?? measureTicks : measureTicks;
@@ -64336,13 +64349,18 @@ ${xrefOffset}
       positionsByTick.set(tick, enforced[i2] ?? 0);
     });
     const lastX = enforced[enforced.length - 1] ?? 0;
-    const lastWidth = spacingEvents[spacingEvents.length - 1]?.renderedWidth ?? 0;
+    const lastEvent = spacingEvents[spacingEvents.length - 1];
+    const lastWidth = lastEvent?.renderedWidth ?? 0;
     const width = Math.max(
       minWidth,
       headerWidth + lastX + lastWidth + MEASURE_TRAILING_MARGIN,
       tempoMarkMinWidth
     );
-    return { width, positionsByTick };
+    const finalSpace = lastEvent === void 0 ? 0 : Math.max(
+      computeEventSpace(lastEvent.ticks, referenceTicks, SPACING_CONFIG),
+      lastWidth + SPACING_CONFIG.minNoteDistance
+    );
+    return { width, positionsByTick, idealSpan: lastX + finalSpace };
   }
   var LEDGER_EXTENSION_FALLBACK = 0.4;
   var LEDGER_THICKNESS_FALLBACK = 0.16;
@@ -65392,6 +65410,17 @@ ${xrefOffset}
       (measureNumber) => placementByMeasureNumber.get(measureNumber)?.isSystemStart ?? false
     );
     const noteAreaXOf = (measureX, measureNumber) => measureX + (measureLayoutsByNumber.get(measureNumber)?.headerWidth ?? MEASURE_HEADER_ALLOWANCE);
+    for (const [measureNumber, layout] of measureLayoutsByNumber) {
+      if (!(layout.idealSpan > 0)) continue;
+      const width = placementByMeasureNumber.get(measureNumber)?.width ?? layout.width;
+      const room = width - layout.headerWidth;
+      if (!(room > layout.idealSpan)) continue;
+      const scale = room / layout.idealSpan;
+      const stretched = /* @__PURE__ */ new Map();
+      for (const [tick, x2] of layout.positionsByTick)
+        stretched.set(tick, Math.round(x2 * scale * 1e4) / 1e4);
+      measureLayoutsByNumber.set(measureNumber, { ...layout, positionsByTick: stretched });
+    }
     const svgParts = [];
     let totalWidth = MEASURE_WIDTH;
     for (const placement of placementByMeasureNumber.values()) {

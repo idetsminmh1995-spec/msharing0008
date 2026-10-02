@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-507 exported symbols, by module.
+508 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -1359,6 +1359,7 @@ The diagnostics `level` lets through, in their original order.
 | type | `SvgAttributes` | Attribute values as passed to the primitives below -- kept to what SVG actually accepts as attribute text. |
 | const | `SMUFL_STAFF_SPACES_PER_EM` | Per the SMuFL specification's "scoring applications" metrics (https://w3c.github.io/smufl/latest/specification/scoring-metrics-glyph-registration.html): "All glyphs should be drawn at a scale consistent with the key measurement that one staff space = 0.25 em." Bravura (Phase 5) is designed to thi... |
 | function | `escapeXmlText` | Escapes text content for safe placement inside an SVG/XML element body. |
+| function | `svgNumber` | A coordinate as it goes into the markup. |
 | function | `svgLine` | A straight line from (x1,y1) to (x2,y2). |
 | function | `svgPath` | An arbitrary path, for beams/ties/slurs/curves -- `d` is passed through as-is (it's already SVG path syntax, not staff-space coordinates this module can validate). |
 | function | `svgRect` | A rectangle -- not one of Phase 6's originally-named four primitives, but trivial and useful (e.g. solid noteheads-as-rects, backgrounds) so included alongside them. |

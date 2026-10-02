@@ -1,5 +1,5 @@
 import type { BeamShape } from '../geometry/beam-shape.js';
-import { svgGroup, svgLine, svgPath } from './svg-primitives.js';
+import { svgGroup, svgLine, svgPath, svgNumber } from './svg-primitives.js';
 
 export interface RenderBeamOptions {
   readonly lineCount: number;
@@ -44,11 +44,14 @@ export function renderBeam(shape: BeamShape, options: RenderBeamOptions): string
       // Bows gently away from the noteheads (opposite the stem direction) for a curved-style beam -- a rendering choice, not an engraving convention (see PLAN.md §9.13).
       const bow = 0.3 * -towardNotehead;
       lines.push(
-        svgPath(`M ${shape.startX} ${y1} Q ${midX} ${midY + bow} ${shape.endX} ${y2}`, {
-          stroke: color,
-          'stroke-width': thickness,
-          fill: 'none',
-        }),
+        svgPath(
+          `M ${svgNumber(shape.startX)} ${svgNumber(y1)} Q ${svgNumber(midX)} ${svgNumber(midY + bow)} ${svgNumber(shape.endX)} ${svgNumber(y2)}`,
+          {
+            stroke: color,
+            'stroke-width': thickness,
+            fill: 'none',
+          },
+        ),
       );
     } else {
       lines.push(

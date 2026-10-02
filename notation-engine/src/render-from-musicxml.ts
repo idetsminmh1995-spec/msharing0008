@@ -107,6 +107,7 @@ import { measure as makeMeasure } from './core/index.js';
 import {
   computeReferenceDuration,
   computeProportionalPositions,
+  computeEventSpace,
   applyMinimumDistance,
   type SpacingEvent,
 } from './layout/spacing.js';
@@ -481,7 +482,24 @@ function computeMeasureLayout(
   headerWidth: number,
   /** `config.spacing.minMeasureWidth` -- the note area's own floor for a whole-note-long measure. */
   minMeasureWidth: number,
-): { readonly width: number; readonly positionsByTick: ReadonlyMap<number, number> } {
+): {
+  readonly width: number;
+  readonly positionsByTick: ReadonlyMap<number, number>;
+  /**
+   * How far §14's spacing wants it to be from the first attack to the
+   * BARLINE -- the last attack's position plus the space that attack's
+   * own duration earns after it.
+   *
+   * It is not the measure's width, and the difference is the point: the
+   * measure is widened to `minMeasureWidth`'s floor here and again by
+   * `justifySystem` in page mode, and the positions have to be stretched
+   * by the same ratio or the notes stay packed at the bar's left end.
+   * Including the last attack's own trailing space is what makes the
+   * stretch even: a half note and a half rest then divide the bar in
+   * half, instead of the rest being flung towards the barline.
+   */
+  readonly idealSpan: number;
+} {
   const hasAccidentalByTick = new Map<number, boolean>();
   for (const voice of measure.voices) {
     const starts = eventStartTicks(voice.events);
@@ -552,7 +570,11 @@ function computeMeasureLayout(
     // width as a measure whose events happen to be sparse -- the reader
     // should not be able to tell "nothing written here" from "one whole
     // rest written here" by the bar's width.
-    return { width: Math.max(minWidth, tempoMarkMinWidth), positionsByTick: new Map() };
+    return {
+      width: Math.max(minWidth, tempoMarkMinWidth),
+      positionsByTick: new Map(),
+      idealSpan: 0,
+    };
   }
 
   // Sec14's "duration" for spacing purposes, generalized to multiple
@@ -578,14 +600,28 @@ function computeMeasureLayout(
   });
 
   const lastX = enforced[enforced.length - 1] ?? 0;
-  const lastWidth = spacingEvents[spacingEvents.length - 1]?.renderedWidth ?? 0;
+  const lastEvent = spacingEvents[spacingEvents.length - 1];
+  const lastWidth = lastEvent?.renderedWidth ?? 0;
   const width = Math.max(
     minWidth,
     headerWidth + lastX + lastWidth + MEASURE_TRAILING_MARGIN,
     tempoMarkMinWidth,
   );
 
-  return { width, positionsByTick };
+  // The space the last attack earns before the barline: §14.1's own
+  // duration-proportional space, floored (as §14.2 floors every other
+  // gap) at that attack's rendered width plus the minimum distance, so
+  // the last notehead can never end up touching the barline however
+  // short its written duration is.
+  const finalSpace =
+    lastEvent === undefined
+      ? 0
+      : Math.max(
+          computeEventSpace(lastEvent.ticks, referenceTicks, SPACING_CONFIG),
+          lastWidth + SPACING_CONFIG.minNoteDistance,
+        );
+
+  return { width, positionsByTick, idealSpan: lastX + finalSpace };
 }
 const LEDGER_EXTENSION_FALLBACK = 0.4;
 const LEDGER_THICKNESS_FALLBACK = 0.16;
@@ -1887,6 +1923,7 @@ export function renderParsedMusicXml(
       readonly positionsByTick: ReadonlyMap<number, number>;
       /** Seeded with the floor below, then replaced with each measure's REAL header width once system placement is known (see `resolveHeaderWidths`). */
       readonly headerWidth: number;
+      readonly idealSpan: number;
     }
   >();
   const measureTicksByNumber = new Map<number, number>();
@@ -2429,6 +2466,51 @@ export function renderParsedMusicXml(
   /** Where a measure's notes actually begin: its own left edge plus its real header. */
   const noteAreaXOf = (measureX: number, measureNumber: number): number =>
     measureX + (measureLayoutsByNumber.get(measureNumber)?.headerWidth ?? MEASURE_HEADER_ALLOWANCE);
+
+  /**
+   * §14.3, applied within the measure: stretch every measure's attacks
+   * across the width the measure really ended up with.
+   *
+   * `computeMeasureLayout` spaces the attacks proportionally against
+   * their own content, and then the measure is widened twice over: to
+   * `minMeasureWidth`'s floor, so a sparse bar is not a sliver, and
+   * again by `justifySystem` in page mode, so a system reaches the
+   * right margin. Neither widening touched the positions, so the notes
+   * stayed packed against the header with empty staff after them -- a
+   * 4/4 bar with its four quarter notes crammed into the first third
+   * and a hole before the barline, which reads as missing music rather
+   * than as spacing.
+   *
+   * The correction is one number per measure: the ratio between the run
+   * from the first attack to the barline that the measure actually has,
+   * and the one §14's spacing asked for. Every position scales by it,
+   * so the PROPORTIONS §14 computed -- a quarter twice the space of an
+   * eighth -- are kept exactly and only the scale changes, which is
+   * what an engraver does to a bar that must fill more room than its
+   * content needs.
+   *
+   * Done ONCE, here, by rewriting the shared layout map -- not at each
+   * of the places that ask for a tick's x. `computePlaybackData` is
+   * handed this same map, so the cursor reads the stretched positions
+   * too: a stretch applied only where notes are DRAWN would leave the
+   * playhead pointing at where they used to be.
+   */
+  for (const [measureNumber, layout] of measureLayoutsByNumber) {
+    if (!(layout.idealSpan > 0)) continue;
+    const width = placementByMeasureNumber.get(measureNumber)?.width ?? layout.width;
+    const room = width - layout.headerWidth;
+    if (!(room > layout.idealSpan)) continue;
+    const scale = room / layout.idealSpan;
+    const stretched = new Map<number, number>();
+    // Rounded to a ten-thousandth of a staff space -- far finer than
+    // any renderer can draw, and it keeps the ratio from writing
+    // `9.428571428571429` into every coordinate of the markup. Rounded
+    // HERE, once, so the notehead, its stem, its beam and the playback
+    // cursor all read the same number.
+    for (const [tick, x] of layout.positionsByTick)
+      stretched.set(tick, Math.round(x * scale * 1e4) / 1e4);
+    measureLayoutsByNumber.set(measureNumber, { ...layout, positionsByTick: stretched });
+  }
 
   const svgParts: string[] = [];
   let totalWidth = MEASURE_WIDTH;

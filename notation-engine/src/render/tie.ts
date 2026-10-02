@@ -1,5 +1,5 @@
 import type { TieShape } from '../geometry/tie.js';
-import { svgPath } from './svg-primitives.js';
+import { svgPath, svgNumber } from './svg-primitives.js';
 
 export interface RenderTieOptions {
   readonly color: string;
@@ -29,10 +29,11 @@ export function renderTie(shape: TieShape, options: RenderTieOptions): string {
   const innerY = shape.y + towardBulge * (shape.bulgeHeight - options.midpointThickness / 2);
   const outerY = shape.y + towardBulge * (shape.bulgeHeight + options.midpointThickness / 2);
 
+  const n = svgNumber;
   const d =
-    `M ${shape.startX} ${shape.y} ` +
-    `Q ${midX} ${innerY} ${shape.endX} ${shape.y} ` +
-    `Q ${midX} ${outerY} ${shape.startX} ${shape.y} Z`;
+    `M ${n(shape.startX)} ${n(shape.y)} ` +
+    `Q ${n(midX)} ${n(innerY)} ${n(shape.endX)} ${n(shape.y)} ` +
+    `Q ${n(midX)} ${n(outerY)} ${n(shape.startX)} ${n(shape.y)} Z`;
 
   return svgPath(d, { fill: options.color, stroke: 'none' });
 }

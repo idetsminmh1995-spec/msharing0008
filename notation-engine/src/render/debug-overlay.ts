@@ -1,4 +1,4 @@
-import { svgGroup, svgPath, svgRect } from './svg-primitives.js';
+import { svgGroup, svgPath, svgRect, svgNumber } from './svg-primitives.js';
 
 /**
  * Phase 51/§18.3: the two debug overlays, drawn from already-measured
@@ -78,11 +78,11 @@ function skylinePath(segments: readonly OverlaySkylineSegment[]): string {
     if (previous === undefined || Math.abs(previous.xEnd - segment.xStart) > 1e-9) {
       // A gap in content: start a new sub-path rather than drawing a line
       // across empty space, which would claim content that isn't there.
-      parts.push(`M ${segment.xStart} ${segment.y}`);
+      parts.push(`M ${svgNumber(segment.xStart)} ${svgNumber(segment.y)}`);
     } else if (previous.y !== segment.y) {
-      parts.push(`L ${segment.xStart} ${segment.y}`);
+      parts.push(`L ${svgNumber(segment.xStart)} ${svgNumber(segment.y)}`);
     }
-    parts.push(`L ${segment.xEnd} ${segment.y}`);
+    parts.push(`L ${svgNumber(segment.xEnd)} ${svgNumber(segment.y)}`);
     previous = segment;
   }
   return parts.join(' ');

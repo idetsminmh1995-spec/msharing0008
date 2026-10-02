@@ -62,6 +62,18 @@ function worstCursorDrift({ svg, playback }) {
 }
 
 /**
+ * How closely a cursor position can be asked to match a DRAWN one.
+ *
+ * `svgNumber` writes every coordinate to four decimal places, so a
+ * notehead's x in the markup is its real x rounded to a ten-thousandth
+ * of a staff space. Half of that is the most two agreeing numbers can
+ * ever differ by here; anything larger is real drift, which is what
+ * these tests are for. (It was 1e-9 while every coordinate happened to
+ * land on a short decimal of its own.)
+ */
+const MARKUP_PRECISION = 5e-5;
+
+/**
  * Final review: a measure's header (clef + key signature + time
  * signature) is not a constant width, and three separate things used to
  * assume it was 6.0 while the note pass alone measured the real one.
@@ -71,7 +83,7 @@ describe('a measure header wider than the constant allowance', () => {
     // Four sharps make this header 10.5 wide against a 6.0 constant, so
     // the cursor used to sit 4.5 staff spaces to the left of the note.
     assert.ok(
-      worstCursorDrift(render('wide-key-signature.musicxml')) < 1e-9,
+      worstCursorDrift(render('wide-key-signature.musicxml')) < MARKUP_PRECISION,
       'positionToX disagrees with where the notehead was drawn',
     );
   });
@@ -85,7 +97,7 @@ describe('a measure header wider than the constant allowance', () => {
       'guitar-two-part-tab.musicxml',
       'slur-tuplet.musicxml',
     ]) {
-      assert.ok(worstCursorDrift(render(name)) < 1e-9, name);
+      assert.ok(worstCursorDrift(render(name)) < MARKUP_PRECISION, name);
     }
   });
 
@@ -96,7 +108,7 @@ describe('a measure header wider than the constant allowance', () => {
           layout: { mode: 'page' },
           page: { pageWidth: 20 },
         }),
-      ) < 1e-9,
+      ) < MARKUP_PRECISION,
     );
   });
 

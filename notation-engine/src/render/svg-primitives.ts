@@ -38,11 +38,28 @@ function escapeXmlAttribute(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/**
+ * A coordinate as it goes into the markup.
+ *
+ * Every number here is a staff space, and four decimal places of one is
+ * a ten-thousandth of the gap between two staff lines -- finer than any
+ * display, printer or PDF will ever resolve. Without the rounding,
+ * binary floating point writes the full seventeen digits of a value
+ * like 12.857099999999999 into the attribute, which is both noise in
+ * the markup and, over a long score, real bytes.
+ *
+ * `Number(...)` after the rounding is what drops a trailing zero, so
+ * a whole number still reads as `6` and not `6.0000`.
+ */
+export function svgNumber(value: number): string {
+  return String(Number(value.toFixed(4)));
+}
+
 function attrsToString(attrs: SvgAttributes | undefined): string {
   if (attrs === undefined) return '';
   const parts: string[] = [];
   for (const [key, value] of Object.entries(attrs)) {
-    const stringValue = typeof value === 'number' ? String(value) : escapeXmlAttribute(value);
+    const stringValue = typeof value === 'number' ? svgNumber(value) : escapeXmlAttribute(value);
     parts.push(`${key}="${stringValue}"`);
   }
   return parts.length > 0 ? ' ' + parts.join(' ') : '';
@@ -56,7 +73,7 @@ export function svgLine(
   y2: number,
   attrs?: SvgAttributes,
 ): string {
-  return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"${attrsToString(attrs)} />`;
+  return `<line x1="${svgNumber(x1)}" y1="${svgNumber(y1)}" x2="${svgNumber(x2)}" y2="${svgNumber(y2)}"${attrsToString(attrs)} />`;
 }
 
 /** An arbitrary path, for beams/ties/slurs/curves -- `d` is passed through as-is (it's already SVG path syntax, not staff-space coordinates this module can validate). */
@@ -72,12 +89,12 @@ export function svgRect(
   height: number,
   attrs?: SvgAttributes,
 ): string {
-  return `<rect x="${x}" y="${y}" width="${width}" height="${height}"${attrsToString(attrs)} />`;
+  return `<rect x="${svgNumber(x)}" y="${svgNumber(y)}" width="${svgNumber(width)}" height="${svgNumber(height)}"${attrsToString(attrs)} />`;
 }
 
 /** Plain text -- for non-glyph labels (measure numbers, tempo text, lyrics). For SMuFL glyph characters, use svgGlyphText() instead so the font-size convention is correct. */
 export function svgText(x: number, y: number, content: string, attrs?: SvgAttributes): string {
-  return `<text x="${x}" y="${y}"${attrsToString(attrs)}>${escapeXmlText(content)}</text>`;
+  return `<text x="${svgNumber(x)}" y="${svgNumber(y)}"${attrsToString(attrs)}>${escapeXmlText(content)}</text>`;
 }
 
 /**

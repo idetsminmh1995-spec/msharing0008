@@ -36,10 +36,20 @@ describe('GM drum mapping wired into rendering (Phase 41, §13.1/§13.3)', () =>
 
   test("the kick (GM 36) renders as a plain oval, at the kick's own staff position, stem DOWN (feet convention)", () => {
     const { svg } = render();
-    assert.match(svg, /x="8\.4" y="7\.5"[^>]*>\uE0A4/);
+    // The kick is the SECOND attack. Its x is whatever §14's spacing,
+    // stretched to the bar's real width, puts it at -- read off the
+    // notehead rather than written down here, so this test keeps
+    // testing the kick's SHAPE, POSITION and STEM and does not fail
+    // again the next time the horizontal spacing changes.
+    const kick = svg.match(/x="([\d.]+)" y="7\.5"[^>]*>\uE0A4/);
+    assert.ok(kick, "expected a plain oval notehead at the kick's own y=7.5");
+    const x = kick[1];
     const stems = [
       ...svg.matchAll(
-        /<line x1="8\.4" y1="([\d.]+)" x2="8\.4" y2="([\d.]+)" stroke="#000000" stroke-width="0\.12"/g,
+        new RegExp(
+          `<line x1="${x}" y1="([\\d.]+)" x2="${x}" y2="([\\d.]+)" stroke="#000000" stroke-width="0\\.12"`,
+          'g',
+        ),
       ),
     ];
     assert.equal(stems.length, 1);
@@ -52,7 +62,7 @@ describe('GM drum mapping wired into rendering (Phase 41, §13.1/§13.3)', () =>
     // from an earlier -4 (on the top line) by the same real-file evidence
     // as the snare fix above (248/248 hi-hat notes at one consistent
     // display position).
-    assert.match(svg, /x="10\.8" y="3\.5"[^>]*>\uE0A9/);
+    assert.match(svg, /y="3\.5"[^>]*>\uE0A9/);
   });
 
   test('an explicit <notehead> override still wins over the GM-derived shape (priority order preserved)', () => {

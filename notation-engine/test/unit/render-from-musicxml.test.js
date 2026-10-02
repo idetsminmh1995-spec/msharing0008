@@ -50,14 +50,14 @@ describe('renderFromMusicXml end-to-end (Phase 21)', () => {
 
   test('every note position matches Phase 10\'s staffPositionForPitch formula exactly', () => {
     const { svg } = render('simple-single-voice.musicxml');
-    // C4 D4 E4 F4 in treble clef -> y = bottomY + {1, 0.5, 0, -0.5} (bottomY=8).
-    // X positions are Phase 43/44's real content-driven spacing (2.4sp
-    // apart for 4 equal-duration quarter notes), not the old fixed-width
-    // tick-fraction interpolation.
-    assert.match(svg, /x="6" y="9"/); // C4
-    assert.match(svg, /x="8\.4" y="8\.5"/); // D4
-    assert.match(svg, /x="10\.8" y="8"/); // E4
-    assert.match(svg, /x="13\.2" y="7\.5"/); // F4
+    // C4 D4 E4 F4 in treble clef -> y = bottomY + {1, 0.5, 0, -0.5}
+    // (bottomY=8). This test is about the VERTICAL formula alone -- the
+    // four x-positions are §14's spacing stretched to the bar's real
+    // width, and spacing-wiring.test.js owns them.
+    const ys = [...svg.matchAll(/<text x="[\d.]+" y="([\d.]+)"[^>]*>\uE0A4</g)].map((m) =>
+      Number(m[1]),
+    );
+    assert.deepEqual(ys, [9, 8.5, 8, 7.5]);
   });
 
   test('a chord renders 3 separate noteheads at one X with one shared stem', () => {
@@ -138,7 +138,10 @@ describe('renderFromMusicXml end-to-end (Phase 21)', () => {
     assert.equal(tiePaths.length, 1);
     const [, startX, startY, , endX] = tiePaths[0];
     assert.equal(Number(startX), 6 + 1.18); // notehead x (6) + noteheadBlack's own width (1.18)
-    assert.equal(Number(endX), 8.4); // the second tied note's own x (Phase 43/44 real spacing: 2.4sp on from the first)
+    // The second tied note's own x -- §14's 2.4sp, stretched by the
+    // ratio between the bar's real width and the width §14's spacing
+    // asked for (§14.3, applied within the measure).
+    assert.equal(Number(endX), 9.4286);
     assert.equal(Number(startY), 5.5); // C5's own y (bottomY 8 + position -2.5)
   });
 

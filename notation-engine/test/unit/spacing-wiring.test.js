@@ -13,12 +13,39 @@ const domParser = testDomParser();
 const load = (n) => fs.readFileSync(path.join(FIXTURES_DIR, n), 'utf8');
 
 describe('Phase 43/44 wired into rendering: real content-driven spacing', () => {
-  test("4 equal-duration quarter notes space out at exactly 2.4sp apart -- §14.1's own reference-duration space, not the old fixed-width interpolation", () => {
+  const barlineXs = (svg) =>
+    [
+      ...svg.matchAll(
+        /<line x1="([\d.]+)" y1="[\d.]+" x2="\1" y2="[\d.]+" stroke="#000000" stroke-width="0\.16"/g,
+      ),
+    ].map((m) => Number(m[1]));
+
+  test("4 equal-duration quarter notes are spaced EVENLY, and they fill the bar -- §14.1's proportional space stretched (§14.3) to the width the measure really got", () => {
     const { svg } = NE.renderFromMusicXml(load('simple-single-voice.musicxml'), { domParser });
-    assert.match(svg, /x="6" y="9"/);
-    assert.match(svg, /x="8\.4" y="8\.5"/);
-    assert.match(svg, /x="10\.8" y="8"/);
-    assert.match(svg, /x="13\.2" y="7\.5"/);
+    const xs = [...svg.matchAll(/<text x="([\d.]+)" y="[\d.]+"[^>]*>\uE0A4</g)].map((m) =>
+      Number(m[1]),
+    );
+    assert.equal(xs.length, 4);
+    // Equal durations earn equal space, and stretching the measure to
+    // its real width must not disturb that -- only its scale.
+    const gaps = xs.slice(1).map((x, i) => x - xs[i]);
+    for (const gap of gaps) assert.equal(gap, gaps[0]);
+    // And the bar is FILLED. The last quarter note is one more gap
+    // short of the barline, not left in the first third of the bar
+    // with empty staff after it -- which is what the measure's
+    // minimum-width floor used to produce, and what read on screen as
+    // missing music.
+    assert.equal(barlineXs(svg)[0] - xs[3], gaps[0]);
+  });
+
+  test('a half note and a half rest divide their bar in half -- the stretch is proportional, so the rest is not flung towards the barline', () => {
+    const { svg } = NE.renderFromMusicXml(load('simple-single-voice.musicxml'), { domParser });
+    // Measure 2 of the fixture: a half note then a half rest, in 4/4.
+    const halfNoteX = Number(svg.match(/<text x="([\d.]+)" y="[\d.]+"[^>]*>\uE0A3</)[1]);
+    const halfRestX = Number(svg.match(/<text x="([\d.]+)" y="[\d.]+"[^>]*>\uE4E4</)[1]);
+    const [firstBarline, secondBarline] = barlineXs(svg);
+    assert.ok(halfNoteX > firstBarline, 'the half note belongs to measure 2');
+    assert.equal(halfRestX - halfNoteX, secondBarline - halfRestX);
   });
 
   test("a measure's real width is now content-driven, not the old fixed MEASURE_WIDTH -- confirmed by two measures of the SAME file (different content) getting different widths", () => {
