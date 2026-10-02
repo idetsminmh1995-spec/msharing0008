@@ -67,6 +67,18 @@ export interface Palette {
   readonly accentSoft: string;
   /** Sits on top of `accent`. */
   readonly onAccent: string;
+  /**
+   * The tempo figure and the metre -- yellow, and the same yellow in
+   * every design. Unlike `accent`, this pair does NOT change with the
+   * design: the owner asked for one readout treatment across all
+   * eleven, so a viewer who has watched one of these videos knows
+   * where to look in the next. Only the ground moves it: on a light
+   * design the yellow is deepened to a gold, because #F9D100 on paper
+   * is a figure nobody can read.
+   */
+  readonly statValue: string;
+  /** The word "BPM" under the tempo -- red, by the same rule. */
+  readonly statLabel: string;
 }
 
 export interface DesignContext {

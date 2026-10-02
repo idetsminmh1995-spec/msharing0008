@@ -64,14 +64,14 @@ export function bands(canvas: Canvas): { header: Rect; stage: Rect } {
   const size = typeScale(canvas);
   const mark = logoBox(canvas).height;
   // Measured from what the header actually holds, not as a fraction of
-  // the frame. It used to be a fraction, and when the tempo readout grew
-  // the band did not -- so it landed on top of the subtitle in the two
-  // narrow ratios. Room is now reserved for the type that is really
-  // there, plus the mark, whatever the frame's shape.
+  // the frame. The header carries the title and the subtitle and the
+  // mark, and nothing else -- the tempo readout left it for its own
+  // columns (see `tempoStats`), which is why there is no `stat` term
+  // here any more.
   const headerHeight =
     canvas.isPortrait || canvas.isSquare
-      ? Math.max(size.title + size.subtitle * 1.45 + size.stat * 1.35, mark + pad)
-      : Math.max(size.title + size.subtitle * 1.5, size.stat * 1.6, mark);
+      ? Math.max(size.title + size.subtitle * 1.6, mark + pad)
+      : Math.max(size.title + size.subtitle * 1.5, mark);
   const header: Rect = {
     x: pad,
     y: pad,
@@ -79,15 +79,47 @@ export function bands(canvas: Canvas): { header: Rect; stage: Rect } {
     height: headerHeight,
   };
   const stageTop = header.y + header.height;
+  // What the readout keeps for itself, and the design must not draw
+  // into: a column down each side in landscape, a row along the bottom
+  // in the two narrow shapes. Reserved from the CANVAS alone, with no
+  // reference to the frame's own numbers, because every design asks
+  // for its stage before anything knows what the tempo is -- the
+  // readout's type is sized to fit this room rather than the other way
+  // round.
+  const sideways = statRow(canvas) ? 0 : statColumnWidth(canvas) + pad * 0.5;
+  const below = statRow(canvas) ? statRowHeight(canvas) : 0;
   return {
     header,
     stage: {
-      x: pad,
+      x: pad + sideways,
       y: stageTop,
-      width: canvas.width - pad * 2,
-      height: canvas.height - stageTop - pad,
+      width: canvas.width - (pad + sideways) * 2,
+      height: canvas.height - stageTop - pad - below,
     },
   };
+}
+
+/**
+ * True when the readout lies in a ROW along the bottom rather than in
+ * a column down each side.
+ *
+ * A 9x16 or 1x1 frame has no width to give away: two columns of type
+ * that size would leave the design a slot down the middle. Landscape
+ * has width to spare and no height to spare, so there it is the other
+ * way about.
+ */
+export function statRow(canvas: Canvas): boolean {
+  return canvas.isPortrait || canvas.isSquare;
+}
+
+/** How wide one landscape stat column is -- the room its type is fitted into. */
+export function statColumnWidth(canvas: Canvas): number {
+  return canvas.width * 0.225 - gutter(canvas);
+}
+
+/** How tall the bottom stat row is, in the two narrow shapes. */
+export function statRowHeight(canvas: Canvas): number {
+  return canvas.short * 0.2;
 }
 
 /** The type stack, scaled off the short side so it reads the same in all three shapes. */
@@ -99,10 +131,6 @@ export function typeScale(canvas: Canvas) {
     label: 26 * unit,
     readout: 88 * unit,
     huge: 420 * unit,
-    /** The tempo and the time signature. Big enough to read across a room. */
-    stat: 72 * unit,
-    /** The word "BPM" beside its number -- a unit, not a headline. */
-    statUnit: 28 * unit,
   };
 }
 
@@ -148,64 +176,112 @@ export const FONT_DISPLAY = "'Sora', 'Trebuchet MS', sans-serif";
 export const FONT_TEXT = "'Manrope', 'Segoe UI', sans-serif";
 
 /**
- * The tempo and the time signature, drawn big.
+ * The tempo and the metre, drawn big, in every design.
  *
- * Two large figures with a small unit label between them, rather than
- * one line of small type: on a lesson video the BPM is the second thing
- * a viewer looks for after the count, and it has to survive being
- * watched on a phone.
+ * Two blocks and nothing between them: the tempo figure with the word
+ * BPM under it, and the metre on its own. On a lesson video these are
+ * the two things a viewer looks for after the count, and they have to
+ * survive being watched on a phone -- which is why they are a sixth of
+ * the frame rather than a line of small type in a corner, and why they
+ * are the SAME yellow and red in all eleven designs instead of taking
+ * each design's own accent. A viewer who has watched one of these
+ * videos knows where to look in the next.
  *
- * Laid out right-to-left from `rightEdge` when `align` is 'end', which
- * is why it needs `advanceWidth` -- the pieces are at two different
- * sizes, so a single `text-anchor="end"` cannot place them.
+ * The metre's slash is drawn in the label's red while its figures stay
+ * yellow, so "4/4" reads as two numbers rather than as one word.
+ *
+ * Both blocks hang off ONE size, fitted to the room `bands` reserved
+ * for them, so a three-figure tempo and a 12/8 bar cannot push either
+ * of them into the design.
  */
-function tempoReadout(
-  context: DesignContext,
-  x: number,
-  baseline: number,
-  align: 'middle' | 'end',
-): string {
+export function tempoStats(context: DesignContext): string {
   const { canvas, palette, frame } = context;
-  const size = typeScale(canvas);
+  const pad = gutter(canvas);
+  const { stage } = bands(canvas);
   const bpm = String(frame.bpm);
-  const signature = `${frame.timeSignature.numerator}/${frame.timeSignature.denominator}`;
-  const unit = 'BPM';
-  const gap = size.statUnit * 0.5;
+  const numerator = String(frame.timeSignature.numerator);
+  const denominator = String(frame.timeSignature.denominator);
+  const metre = `${numerator}/${denominator}`;
+  const row = statRow(canvas);
 
-  const wBpm = advanceWidth(bpm, size.stat);
-  const wUnit = advanceWidth(unit, size.statUnit);
-  const wSig = advanceWidth(signature, size.stat);
-  const total = wBpm + gap + wUnit + gap * 2.2 + wSig;
+  // One size for everything here, taken from whichever of the three
+  // strings is widest -- a readout whose BPM and metre were at
+  // different sizes because one happened to have an extra digit would
+  // look like a mistake.
+  const widest = Math.max(advanceWidth(bpm, 1), advanceWidth('BPM', 1), advanceWidth(metre, 1));
+  const room = row ? (canvas.width - pad * 2) / 2 - pad : statColumnWidth(canvas);
+  const size = Math.min(canvas.short * (row ? 0.092 : 0.17), room / widest);
 
-  const left = align === 'end' ? x - total : x - total / 2;
-  const big = {
+  // Where the two blocks sit. In landscape they flank the stage, level
+  // with its middle; in the narrow shapes they share the row along the
+  // bottom, one to each half.
+  const leftCx = row ? pad + (canvas.width - pad * 2) / 4 : pad + statColumnWidth(canvas) / 2;
+  const rightCx = canvas.width - leftCx;
+  const middle = row ? canvas.height - pad - statRowHeight(canvas) / 2 : stage.y + stage.height / 2;
+
+  // The tempo is two lines and the metre is one, so they cannot share a
+  // baseline: the pair is centred on `middle` as a block, and the metre
+  // is centred on it as a single line.
+  const valueBaseline = middle - size * 0.19;
+  const labelBaseline = middle + size * 0.88;
+  const metreBaseline = middle + size * 0.36;
+
+  const figure = {
     'font-family': FONT_DISPLAY,
-    'font-size': size.stat,
+    'font-size': size,
     'font-weight': 800,
-  };
+    'text-anchor': 'middle',
+  } as const;
 
-  let cursor = left;
-  let body = text(bpm, cursor, baseline, { fill: palette.accent, ...big });
-  cursor += wBpm + gap;
-  body += text(unit, cursor, baseline, {
-    fill: palette.inkSoft,
-    'font-family': FONT_TEXT,
-    'font-size': size.statUnit,
-    'font-weight': 700,
-    'letter-spacing': n(size.statUnit * 0.1),
-  });
-  cursor += wUnit + gap * 2.2;
-  body += text(signature, cursor, baseline, { fill: palette.ink, ...big });
-  return body;
+  const tempo =
+    text(bpm, leftCx, valueBaseline, { fill: palette.statValue, ...figure }) +
+    text('BPM', leftCx, labelBaseline, {
+      fill: palette.statLabel,
+      ...figure,
+      'letter-spacing': n(size * 0.02),
+    });
+
+  // The metre is three pieces rather than one string, because its
+  // middle piece is a different colour. They are hung off the SLASH --
+  // centred on `rightCx`, with the two figures anchored against its
+  // sides -- rather than laid out left to right from an estimated
+  // total width. `advanceWidth` is a per-character estimate, and
+  // spending it on all three pieces put a visible hole between the
+  // slash and the denominator; this way the estimate is only ever used
+  // for the gap either side of one character, and a 12/8 bar stays as
+  // centred as a 4/4 one however many digits it has.
+  const halfStep = advanceWidth('/', size) * 0.5;
+  const piece = { 'font-family': FONT_DISPLAY, 'font-size': size, 'font-weight': 800 } as const;
+  const time =
+    text(numerator, rightCx - halfStep, metreBaseline, {
+      fill: palette.statValue,
+      ...piece,
+      'text-anchor': 'end',
+    }) +
+    text('/', rightCx, metreBaseline, {
+      fill: palette.statLabel,
+      ...piece,
+      'text-anchor': 'middle',
+    }) +
+    text(denominator, rightCx + halfStep, metreBaseline, {
+      fill: palette.statValue,
+      ...piece,
+      'text-anchor': 'start',
+    });
+
+  return group({}, tempo + time);
 }
 
 /**
- * Title, subtitle and the tempo readout.
+ * Title and subtitle.
  *
- * Landscape runs the title along the top with the readout right-
- * aligned against it; portrait and square stack the two centred,
- * because a narrow frame has no room beside the words and a centred
- * stack is what a phone video wants anyway.
+ * Landscape runs them along the top beside the mark; portrait and
+ * square centre them, because a narrow frame has no room beside the
+ * words and a centred stack is what a phone video wants anyway.
+ *
+ * The tempo readout is NOT here: it is `tempoStats`, drawn for every
+ * design by the renderer, so a design that owns its own header still
+ * carries the same readout as the other ten.
  *
  * The title starts clear of the logo, which always sits in the
  * top-left corner -- see `logo`.
@@ -237,7 +313,6 @@ export function header(context: DesignContext): string {
         'text-anchor': 'middle',
       });
     }
-    body += tempoReadout(context, cx, box.y + box.height, 'middle');
     return group({}, body);
   }
 
@@ -257,7 +332,6 @@ export function header(context: DesignContext): string {
       'font-weight': 600,
     });
   }
-  body += tempoReadout(context, box.x + box.width, box.y + size.stat * 0.85, 'end');
   return group({}, body);
 }
 

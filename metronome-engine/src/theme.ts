@@ -16,6 +16,18 @@ import type { Palette } from './types.js';
 /** The site's own red, for the designs that stay on brand. */
 const BRAND_RED = '#C81E2C';
 
+/**
+ * The readout's own two colours, the same in every design -- see
+ * `Palette.statValue`.
+ *
+ * On a dark ground they are the yellow and red the owner drew. On a
+ * light one the yellow becomes a gold deep enough to read against
+ * paper (the red already is), because the point of a readout is being
+ * read and #F9D100 on #FFFFFF is barely a mark at all.
+ */
+const STAT_ON_DARK = { value: '#F9D100', label: '#E40006' };
+const STAT_ON_LIGHT = { value: '#A87400', label: BRAND_RED };
+
 function dark(background: string, accent: string, accentSoft: string): Palette {
   return {
     background,
@@ -24,11 +36,22 @@ function dark(background: string, accent: string, accentSoft: string): Palette {
     accent,
     accentSoft,
     onAccent: '#FFFFFF',
+    statValue: STAT_ON_DARK.value,
+    statLabel: STAT_ON_DARK.label,
   };
 }
 
 function light(background: string, ink: string, accent: string, accentSoft: string): Palette {
-  return { background, ink, inkSoft: '#8A7C74', accent, accentSoft, onAccent: '#FFFFFF' };
+  return {
+    background,
+    ink,
+    inkSoft: '#8A7C74',
+    accent,
+    accentSoft,
+    onAccent: '#FFFFFF',
+    statValue: STAT_ON_LIGHT.value,
+    statLabel: STAT_ON_LIGHT.label,
+  };
 }
 
 /**

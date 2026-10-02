@@ -174,3 +174,82 @@ test('text is escaped, so a title cannot break the frame', () => {
   assert.ok(svg.includes('&lt;script&gt;'));
   assert.ok(svg.includes('&amp;'));
 });
+
+test('every design carries the same BPM and metre readout, in the same two colours', () => {
+  // The owner asked for ONE readout treatment across all eleven -- the
+  // tempo in yellow with BPM under it in red, and the metre's figures
+  // in the same yellow either side of a red slash. A design that drew
+  // its own, or took its own accent for it, would be the one that
+  // drifted, and that is exactly what this stops.
+  for (const design of M.listDesigns()) {
+    for (const aspect of RATIOS) {
+      const where = `${design.id}/${aspect}`;
+      const svg = M.renderMetronomeFrame({
+        design: design.id,
+        aspect,
+        frame: frame({ bpm: 96, beatsPerBar: 7, timeSignature: { numerator: 7, denominator: 8 } }),
+      });
+      const value = design.palette.statValue;
+      const label = design.palette.statLabel;
+      assert.match(svg, new RegExp(`fill="${value}"[^>]*>96<`), `${where}: no yellow tempo`);
+      assert.match(svg, new RegExp(`fill="${label}"[^>]*>BPM<`), `${where}: no red BPM label`);
+      assert.match(svg, new RegExp(`fill="${value}"[^>]*>7<`), `${where}: no yellow numerator`);
+      assert.match(svg, new RegExp(`fill="${label}"[^>]*>/<`), `${where}: no red slash`);
+      assert.match(svg, new RegExp(`fill="${value}"[^>]*>8<`), `${where}: no yellow denominator`);
+    }
+  }
+  // The two colours are a property of the GROUND, not of the design:
+  // every dark design shares one pair and every light one the other.
+  const dark = M.listDesigns().filter((d) => !d.isLight);
+  const light = M.listDesigns().filter((d) => d.isLight);
+  assert.equal(new Set(dark.map((d) => d.palette.statValue)).size, 1);
+  assert.equal(new Set(light.map((d) => d.palette.statValue)).size, 1);
+  assert.notEqual(dark[0].palette.statValue, light[0].palette.statValue);
+  for (const d of M.listDesigns()) {
+    assert.notEqual(
+      d.palette.statValue,
+      d.palette.accent,
+      `${d.id}: the readout fell back to the design's own accent`,
+    );
+  }
+});
+
+test('the readout is big enough to read across a room, in every ratio', () => {
+  // It is a sixth of the short side, give or take whatever the widest
+  // of the three strings needs -- not the line of small type in a
+  // corner it used to be. A regression here is invisible in a test
+  // that only checks the markup is well formed.
+  for (const design of M.listDesigns()) {
+    for (const aspect of RATIOS) {
+      const canvas = M.canvasFor(aspect);
+      const svg = M.renderMetronomeFrame({ design: design.id, aspect, frame: frame() });
+      const size = Number(/<text[^>]*font-size="([\d.]+)"[^>]*>BPM</.exec(svg)[1]);
+      assert.ok(
+        size > canvas.short * 0.085,
+        `${design.id}/${aspect}: the BPM label is only ${size} on a ${canvas.short} side`,
+      );
+    }
+  }
+});
+
+test('the readout keeps its own room, and no design draws into it', () => {
+  for (const aspect of RATIOS) {
+    const canvas = M.canvasFor(aspect);
+    const { stage } = M.bands(canvas);
+    if (canvas.isPortrait || canvas.isSquare) {
+      assert.ok(
+        stage.y + stage.height <= canvas.height - M.statRowHeight(canvas),
+        `${aspect}: the stage runs into the stat row along the bottom`,
+      );
+    } else {
+      assert.ok(
+        stage.x >= M.statColumnWidth(canvas),
+        `${aspect}: the stage starts inside the left stat column`,
+      );
+      assert.ok(
+        stage.x + stage.width <= canvas.width - M.statColumnWidth(canvas),
+        `${aspect}: the stage runs into the right stat column`,
+      );
+    }
+  }
+});

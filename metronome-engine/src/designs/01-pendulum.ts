@@ -20,6 +20,7 @@
 
 import {
   advanceWidth,
+  bands,
   FONT_DISPLAY,
   FONT_TEXT,
   gutter,
@@ -202,69 +203,6 @@ function arm(box: Case, turns: number, canvas: Canvas, palette: Palette): string
   );
 }
 
-/** One figure with its label under it, centred -- the landscape readout. */
-function stack(
-  value: string,
-  label: string,
-  cx: number,
-  cy: number,
-  canvas: Canvas,
-  palette: Palette,
-): string {
-  const big = canvas.short * 0.185;
-  const small = canvas.short * 0.055;
-  return (
-    text(value, cx, cy, {
-      fill: palette.ink,
-      'font-family': FONT_DISPLAY,
-      'font-size': big,
-      'font-weight': 800,
-      'text-anchor': 'middle',
-    }) +
-    text(label, cx, cy + small * 1.65, {
-      fill: palette.accent,
-      'font-family': FONT_DISPLAY,
-      'font-size': small,
-      'font-weight': 700,
-      'text-anchor': 'middle',
-      'letter-spacing': small * 0.06,
-    })
-  );
-}
-
-/** One figure with its label beside it -- the bar along the bottom. */
-function inline(
-  value: string,
-  label: string,
-  cx: number,
-  baseline: number,
-  valueFill: string,
-  canvas: Canvas,
-  palette: Palette,
-): string {
-  const big = canvas.short * 0.085;
-  const small = canvas.short * 0.032;
-  const gap = small * 0.5;
-  const valueWidth = advanceWidth(value, big);
-  const labelWidth = advanceWidth(label, small);
-  const left = cx - (valueWidth + gap + labelWidth) / 2;
-  return (
-    text(value, left, baseline, {
-      fill: valueFill,
-      'font-family': FONT_DISPLAY,
-      'font-size': big,
-      'font-weight': 800,
-    }) +
-    text(label, left + valueWidth + gap, baseline, {
-      fill: palette.inkSoft,
-      'font-family': FONT_DISPLAY,
-      'font-size': small,
-      'font-weight': 700,
-      'letter-spacing': small * 0.06,
-    })
-  );
-}
-
 export const pendulum: Design = {
   id: 'pendulum',
   name: 'Pendulum',
@@ -277,7 +215,6 @@ export const pendulum: Design = {
     const size = typeScale(canvas);
     const mark = logoBox(canvas);
     const cx = canvas.width / 2;
-    const timeSignature = `${frame.timeSignature.numerator}/${frame.timeSignature.denominator}`;
 
     // --- the bands this design lays itself out in -------------------
     const titleSize = size.title * (canvas.isPortrait || canvas.isSquare ? 1.15 : 1.3);
@@ -286,16 +223,18 @@ export const pendulum: Design = {
     const headerBottom =
       titleBaseline + titleSize * 0.4 + (hasSubtitle ? size.subtitle * 1.9 : size.subtitle * 0.5);
 
-    // Landscape flanks the instrument with the readout; the two narrow
-    // shapes put it in a bar along the bottom, because there is no room
-    // beside a case that already fills the width.
-    const barHeight = canvas.short * 0.115;
+    // The shared readout keeps a column down each side in landscape and
+    // a row along the bottom in the two narrow shapes; `stage` is what
+    // is left over, and the instrument stands in THAT. This design used
+    // to carry its own copy of that arrangement -- it does not need to
+    // any more, and a second copy is a second thing to keep in step.
+    const { stage } = bands(canvas);
     const usesBar = canvas.isPortrait || canvas.isSquare;
-    const barTop = canvas.height - pad - barHeight;
-    const footRoom = usesBar ? canvas.height - barTop + pad * 0.35 : pad;
-
-    const roomHigh = canvas.height - headerBottom - footRoom;
-    const roomWide = usesBar ? canvas.width - pad * 2 : canvas.width * 0.42;
+    // The design's own title is bigger than the shared one, so its
+    // header can reach below the shared band's bottom.
+    const top = Math.max(headerBottom, stage.y);
+    const roomHigh = stage.y + stage.height - top;
+    const roomWide = stage.width * (usesBar ? 1 : 0.75);
     // The case is sized by whichever runs out first: the height between
     // the two bands, or the width of the column it stands in. The
     // instrument is taller than its case -- a cap above it, a base and
@@ -305,7 +244,7 @@ export const pendulum: Design = {
     const caseHeight = Math.min((roomHigh / overhang) * 0.97, roomWide * 1.5);
     const box: Case = {
       cx,
-      top: headerBottom + (roomHigh - caseHeight * overhang) / 2 + caseHeight * 0.085,
+      top: top + (roomHigh - caseHeight * overhang) / 2 + caseHeight * 0.085,
       height: caseHeight,
       halfTop: caseHeight * 0.13,
       halfBottom: caseHeight * 0.36,
@@ -376,40 +315,6 @@ export const pendulum: Design = {
         'text-anchor': titleAnchor,
       });
 
-    let readout: string;
-    if (usesBar) {
-      const half = (canvas.width - pad * 2) / 2;
-      const baseline = barTop + barHeight * 0.64;
-      readout =
-        rect(pad, barTop, canvas.width - pad * 2, barHeight, {
-          fill: '#100C0E',
-          stroke: palette.accentSoft,
-          'stroke-width': canvas.short * 0.003,
-          rx: barHeight * 0.28,
-        }) +
-        line(cx, barTop + barHeight * 0.24, cx, barTop + barHeight * 0.76, {
-          stroke: palette.inkSoft,
-          'stroke-width': canvas.short * 0.002,
-          opacity: 0.5,
-        }) +
-        inline(
-          String(frame.bpm),
-          'BPM',
-          pad + half / 2,
-          baseline,
-          palette.accent,
-          canvas,
-          palette,
-        ) +
-        inline(timeSignature, 'TIME', pad + half * 1.5, baseline, palette.ink, canvas, palette);
-    } else {
-      const columnCx = (pad + (cx - box.halfBottom * 1.35)) / 2;
-      const middle = box.top + box.height * 0.42;
-      readout =
-        stack(String(frame.bpm), 'BPM', columnCx, middle, canvas, palette) +
-        stack(timeSignature, 'TIME', canvas.width - columnCx, middle, canvas, palette);
-    }
-
     const [glowX, glowY] = pointAt(box, 0.45);
     return (
       bloom(glowX, glowY, caseHeight * 1.15, palette) +
@@ -418,7 +323,6 @@ export const pendulum: Design = {
       arm(box, swing, canvas, palette) +
       beat +
       words +
-      readout +
       logo(context)
     );
   },

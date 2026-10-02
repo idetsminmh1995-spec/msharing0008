@@ -8,7 +8,7 @@
  * live preview, an exported frame and a test.
  */
 
-import { canvasFor, header } from './layout.js';
+import { canvasFor, header, tempoStats } from './layout.js';
 import { DESIGNS, designById } from './designs/index.js';
 import { escapeText, n, rect } from './svg.js';
 import { isLightPalette, paletteForDesign } from './theme.js';
@@ -25,7 +25,16 @@ import type {
 
 export { DESIGNS, DEFAULT_DESIGN_ID, designById } from './designs/index.js';
 export { ASPECT_RATIOS } from './types.js';
-export { canvasFor, bands, logoBox, LOGO_FRACTION } from './layout.js';
+export {
+  canvasFor,
+  bands,
+  logoBox,
+  LOGO_FRACTION,
+  tempoStats,
+  statRow,
+  statColumnWidth,
+  statRowHeight,
+} from './layout.js';
 export { paletteForDesign, isLightPalette } from './theme.js';
 export type {
   AspectRatio,
@@ -116,6 +125,10 @@ export function renderMetronomeFrame(input: MetronomeRenderInput): string {
     background +
     (design.ownHeader === true ? '' : header(context)) +
     body +
+    // Every design, including the one that owns its own header: the
+    // owner asked for one readout treatment across all eleven, and a
+    // design that drew its own would be the one that drifted.
+    tempoStats(context) +
     '</svg>'
   );
 }

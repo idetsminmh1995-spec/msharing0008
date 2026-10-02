@@ -32,7 +32,11 @@ var MetronomeDesigns = (() => {
     listDesigns: () => listDesigns,
     logoBox: () => logoBox,
     paletteForDesign: () => paletteForDesign,
-    renderMetronomeFrame: () => renderMetronomeFrame
+    renderMetronomeFrame: () => renderMetronomeFrame,
+    statColumnWidth: () => statColumnWidth,
+    statRow: () => statRow,
+    statRowHeight: () => statRowHeight,
+    tempoStats: () => tempoStats
   });
 
   // src/svg.ts
@@ -135,7 +139,7 @@ var MetronomeDesigns = (() => {
     const pad = gutter(canvas);
     const size = typeScale(canvas);
     const mark = logoBox(canvas).height;
-    const headerHeight = canvas.isPortrait || canvas.isSquare ? Math.max(size.title + size.subtitle * 1.45 + size.stat * 1.35, mark + pad) : Math.max(size.title + size.subtitle * 1.5, size.stat * 1.6, mark);
+    const headerHeight = canvas.isPortrait || canvas.isSquare ? Math.max(size.title + size.subtitle * 1.6, mark + pad) : Math.max(size.title + size.subtitle * 1.5, mark);
     const header2 = {
       x: pad,
       y: pad,
@@ -143,15 +147,26 @@ var MetronomeDesigns = (() => {
       height: headerHeight
     };
     const stageTop = header2.y + header2.height;
+    const sideways = statRow(canvas) ? 0 : statColumnWidth(canvas) + pad * 0.5;
+    const below = statRow(canvas) ? statRowHeight(canvas) : 0;
     return {
       header: header2,
       stage: {
-        x: pad,
+        x: pad + sideways,
         y: stageTop,
-        width: canvas.width - pad * 2,
-        height: canvas.height - stageTop - pad
+        width: canvas.width - (pad + sideways) * 2,
+        height: canvas.height - stageTop - pad - below
       }
     };
+  }
+  function statRow(canvas) {
+    return canvas.isPortrait || canvas.isSquare;
+  }
+  function statColumnWidth(canvas) {
+    return canvas.width * 0.225 - gutter(canvas);
+  }
+  function statRowHeight(canvas) {
+    return canvas.short * 0.2;
   }
   function typeScale(canvas) {
     const unit = canvas.short / 1080;
@@ -160,11 +175,7 @@ var MetronomeDesigns = (() => {
       subtitle: 34 * unit,
       label: 26 * unit,
       readout: 88 * unit,
-      huge: 420 * unit,
-      /** The tempo and the time signature. Big enough to read across a room. */
-      stat: 72 * unit,
-      /** The word "BPM" beside its number -- a unit, not a headline. */
-      statUnit: 28 * unit
+      huge: 420 * unit
     };
   }
   function advanceWidth(value, fontSize) {
@@ -187,36 +198,51 @@ var MetronomeDesigns = (() => {
   }
   var FONT_DISPLAY = "'Sora', 'Trebuchet MS', sans-serif";
   var FONT_TEXT = "'Manrope', 'Segoe UI', sans-serif";
-  function tempoReadout(context, x, baseline, align) {
+  function tempoStats(context) {
     const { canvas, palette, frame } = context;
-    const size = typeScale(canvas);
+    const pad = gutter(canvas);
+    const { stage } = bands(canvas);
     const bpm = String(frame.bpm);
-    const signature = `${frame.timeSignature.numerator}/${frame.timeSignature.denominator}`;
-    const unit = "BPM";
-    const gap = size.statUnit * 0.5;
-    const wBpm = advanceWidth(bpm, size.stat);
-    const wUnit = advanceWidth(unit, size.statUnit);
-    const wSig = advanceWidth(signature, size.stat);
-    const total = wBpm + gap + wUnit + gap * 2.2 + wSig;
-    const left = align === "end" ? x - total : x - total / 2;
-    const big = {
+    const numerator = String(frame.timeSignature.numerator);
+    const denominator = String(frame.timeSignature.denominator);
+    const metre = `${numerator}/${denominator}`;
+    const row = statRow(canvas);
+    const widest = Math.max(advanceWidth(bpm, 1), advanceWidth("BPM", 1), advanceWidth(metre, 1));
+    const room = row ? (canvas.width - pad * 2) / 2 - pad : statColumnWidth(canvas);
+    const size = Math.min(canvas.short * (row ? 0.092 : 0.17), room / widest);
+    const leftCx = row ? pad + (canvas.width - pad * 2) / 4 : pad + statColumnWidth(canvas) / 2;
+    const rightCx = canvas.width - leftCx;
+    const middle = row ? canvas.height - pad - statRowHeight(canvas) / 2 : stage.y + stage.height / 2;
+    const valueBaseline = middle - size * 0.19;
+    const labelBaseline = middle + size * 0.88;
+    const metreBaseline = middle + size * 0.36;
+    const figure = {
       "font-family": FONT_DISPLAY,
-      "font-size": size.stat,
-      "font-weight": 800
+      "font-size": size,
+      "font-weight": 800,
+      "text-anchor": "middle"
     };
-    let cursor = left;
-    let body = text(bpm, cursor, baseline, { fill: palette.accent, ...big });
-    cursor += wBpm + gap;
-    body += text(unit, cursor, baseline, {
-      fill: palette.inkSoft,
-      "font-family": FONT_TEXT,
-      "font-size": size.statUnit,
-      "font-weight": 700,
-      "letter-spacing": n(size.statUnit * 0.1)
+    const tempo = text(bpm, leftCx, valueBaseline, { fill: palette.statValue, ...figure }) + text("BPM", leftCx, labelBaseline, {
+      fill: palette.statLabel,
+      ...figure,
+      "letter-spacing": n(size * 0.02)
     });
-    cursor += wUnit + gap * 2.2;
-    body += text(signature, cursor, baseline, { fill: palette.ink, ...big });
-    return body;
+    const halfStep = advanceWidth("/", size) * 0.5;
+    const piece = { "font-family": FONT_DISPLAY, "font-size": size, "font-weight": 800 };
+    const time = text(numerator, rightCx - halfStep, metreBaseline, {
+      fill: palette.statValue,
+      ...piece,
+      "text-anchor": "end"
+    }) + text("/", rightCx, metreBaseline, {
+      fill: palette.statLabel,
+      ...piece,
+      "text-anchor": "middle"
+    }) + text(denominator, rightCx + halfStep, metreBaseline, {
+      fill: palette.statValue,
+      ...piece,
+      "text-anchor": "start"
+    });
+    return group({}, tempo + time);
   }
   function header(context) {
     const { canvas, palette, title, subtitle, logoUrl } = context;
@@ -244,7 +270,6 @@ var MetronomeDesigns = (() => {
           "text-anchor": "middle"
         });
       }
-      body2 += tempoReadout(context, cx, box.y + box.height, "middle");
       return group({}, body2);
     }
     const textLeft = hasLogo ? mark.x + mark.width + gutter(canvas) * 0.6 : box.x;
@@ -262,7 +287,6 @@ var MetronomeDesigns = (() => {
         "font-weight": 600
       });
     }
-    body += tempoReadout(context, box.x + box.width, box.y + size.stat * 0.85, "end");
     return group({}, body);
   }
   function logo(context) {
@@ -385,44 +409,6 @@ var MetronomeDesigns = (() => {
       "stroke-linecap": "round"
     }) + circle(sliderX, sliderY, box.height * 0.055, { fill: palette.accent }) + circle(sliderX, sliderY, box.height * 0.016, { fill: "#7A0A11" }) + circle(tipX, tipY, box.height * 0.045, { fill: palette.ink });
   }
-  function stack(value, label, cx, cy, canvas, palette) {
-    const big = canvas.short * 0.185;
-    const small = canvas.short * 0.055;
-    return text(value, cx, cy, {
-      fill: palette.ink,
-      "font-family": FONT_DISPLAY,
-      "font-size": big,
-      "font-weight": 800,
-      "text-anchor": "middle"
-    }) + text(label, cx, cy + small * 1.65, {
-      fill: palette.accent,
-      "font-family": FONT_DISPLAY,
-      "font-size": small,
-      "font-weight": 700,
-      "text-anchor": "middle",
-      "letter-spacing": small * 0.06
-    });
-  }
-  function inline(value, label, cx, baseline, valueFill, canvas, palette) {
-    const big = canvas.short * 0.085;
-    const small = canvas.short * 0.032;
-    const gap = small * 0.5;
-    const valueWidth = advanceWidth(value, big);
-    const labelWidth = advanceWidth(label, small);
-    const left = cx - (valueWidth + gap + labelWidth) / 2;
-    return text(value, left, baseline, {
-      fill: valueFill,
-      "font-family": FONT_DISPLAY,
-      "font-size": big,
-      "font-weight": 800
-    }) + text(label, left + valueWidth + gap, baseline, {
-      fill: palette.inkSoft,
-      "font-family": FONT_DISPLAY,
-      "font-size": small,
-      "font-weight": 700,
-      "letter-spacing": small * 0.06
-    });
-  }
   var pendulum = {
     id: "pendulum",
     name: "Pendulum",
@@ -435,22 +421,20 @@ var MetronomeDesigns = (() => {
       const size = typeScale(canvas);
       const mark = logoBox(canvas);
       const cx = canvas.width / 2;
-      const timeSignature = `${frame.timeSignature.numerator}/${frame.timeSignature.denominator}`;
       const titleSize = size.title * (canvas.isPortrait || canvas.isSquare ? 1.15 : 1.3);
       const titleBaseline = mark.y + mark.height * 0.58 + titleSize * 0.34;
       const hasSubtitle = subtitle !== "";
       const headerBottom = titleBaseline + titleSize * 0.4 + (hasSubtitle ? size.subtitle * 1.9 : size.subtitle * 0.5);
-      const barHeight = canvas.short * 0.115;
+      const { stage } = bands(canvas);
       const usesBar = canvas.isPortrait || canvas.isSquare;
-      const barTop = canvas.height - pad - barHeight;
-      const footRoom = usesBar ? canvas.height - barTop + pad * 0.35 : pad;
-      const roomHigh = canvas.height - headerBottom - footRoom;
-      const roomWide = usesBar ? canvas.width - pad * 2 : canvas.width * 0.42;
+      const top = Math.max(headerBottom, stage.y);
+      const roomHigh = stage.y + stage.height - top;
+      const roomWide = stage.width * (usesBar ? 1 : 0.75);
       const overhang = 1.22;
       const caseHeight = Math.min(roomHigh / overhang * 0.97, roomWide * 1.5);
       const box = {
         cx,
-        top: headerBottom + (roomHigh - caseHeight * overhang) / 2 + caseHeight * 0.085,
+        top: top + (roomHigh - caseHeight * overhang) / 2 + caseHeight * 0.085,
         height: caseHeight,
         halfTop: caseHeight * 0.13,
         halfBottom: caseHeight * 0.36
@@ -498,35 +482,8 @@ var MetronomeDesigns = (() => {
         "font-weight": 600,
         "text-anchor": titleAnchor
       });
-      let readout;
-      if (usesBar) {
-        const half = (canvas.width - pad * 2) / 2;
-        const baseline = barTop + barHeight * 0.64;
-        readout = rect(pad, barTop, canvas.width - pad * 2, barHeight, {
-          fill: "#100C0E",
-          stroke: palette.accentSoft,
-          "stroke-width": canvas.short * 3e-3,
-          rx: barHeight * 0.28
-        }) + line(cx, barTop + barHeight * 0.24, cx, barTop + barHeight * 0.76, {
-          stroke: palette.inkSoft,
-          "stroke-width": canvas.short * 2e-3,
-          opacity: 0.5
-        }) + inline(
-          String(frame.bpm),
-          "BPM",
-          pad + half / 2,
-          baseline,
-          palette.accent,
-          canvas,
-          palette
-        ) + inline(timeSignature, "TIME", pad + half * 1.5, baseline, palette.ink, canvas, palette);
-      } else {
-        const columnCx = (pad + (cx - box.halfBottom * 1.35)) / 2;
-        const middle = box.top + box.height * 0.42;
-        readout = stack(String(frame.bpm), "BPM", columnCx, middle, canvas, palette) + stack(timeSignature, "TIME", canvas.width - columnCx, middle, canvas, palette);
-      }
       const [glowX, glowY] = pointAt(box, 0.45);
-      return bloom(glowX, glowY, caseHeight * 1.15, palette) + fan(box, barProgress, canvas, palette) + instrument(box, canvas, palette) + arm(box, swing, canvas, palette) + beat + words + readout + logo(context);
+      return bloom(glowX, glowY, caseHeight * 1.15, palette) + fan(box, barProgress, canvas, palette) + instrument(box, canvas, palette) + arm(box, swing, canvas, palette) + beat + words + logo(context);
     }
   };
 
@@ -1223,6 +1180,8 @@ var MetronomeDesigns = (() => {
 
   // src/theme.ts
   var BRAND_RED = "#C81E2C";
+  var STAT_ON_DARK = { value: "#F9D100", label: "#E40006" };
+  var STAT_ON_LIGHT = { value: "#A87400", label: BRAND_RED };
   function dark(background, accent, accentSoft) {
     return {
       background,
@@ -1230,11 +1189,22 @@ var MetronomeDesigns = (() => {
       inkSoft: "#8A8078",
       accent,
       accentSoft,
-      onAccent: "#FFFFFF"
+      onAccent: "#FFFFFF",
+      statValue: STAT_ON_DARK.value,
+      statLabel: STAT_ON_DARK.label
     };
   }
   function light(background, ink, accent, accentSoft) {
-    return { background, ink, inkSoft: "#8A7C74", accent, accentSoft, onAccent: "#FFFFFF" };
+    return {
+      background,
+      ink,
+      inkSoft: "#8A7C74",
+      accent,
+      accentSoft,
+      onAccent: "#FFFFFF",
+      statValue: STAT_ON_LIGHT.value,
+      statLabel: STAT_ON_LIGHT.label
+    };
   }
   var PALETTES = {
     // Near-black and a neon red: the instrument lit on a dark stage.
@@ -1321,7 +1291,10 @@ var MetronomeDesigns = (() => {
     };
     const background = rect(0, 0, canvas.width, canvas.height, { fill: palette.background });
     const body = design.draw(context);
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n(canvas.width)} ${n(canvas.height)}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${escapeText(`${design.name} metronome, beat ${frame.beat} of ${frame.beatsPerBar}`)}">` + background + (design.ownHeader === true ? "" : header(context)) + body + "</svg>";
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n(canvas.width)} ${n(canvas.height)}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${escapeText(`${design.name} metronome, beat ${frame.beat} of ${frame.beatsPerBar}`)}">` + background + (design.ownHeader === true ? "" : header(context)) + body + // Every design, including the one that owns its own header: the
+    // owner asked for one readout treatment across all eleven, and a
+    // design that drew its own would be the one that drifted.
+    tempoStats(context) + "</svg>";
   }
   return __toCommonJS(index_exports);
 })();

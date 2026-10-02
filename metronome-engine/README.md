@@ -69,27 +69,39 @@ channel's worth of videos should not move them around:
   reserves room for the mark, so a size those two disagreed about would
   let a design draw underneath it. With no logo, nothing is drawn at all
   — a placeholder box in an exported video is worse than empty space.
-- **The tempo and the time signature are large.** Two big figures with a
-  small `BPM` unit between them, not a line of small type: on a lesson
-  video the tempo is the second thing a viewer looks for after the
-  count, and it has to survive being watched on a phone. The header band
-  is measured from the type it actually holds, so the readout can grow
-  without landing on the subtitle.
+- **The tempo and the metre are large, and always the same two
+  colours.** The tempo figure in yellow with `BPM` under it in red, and
+  the metre's figures in that same yellow either side of a red slash —
+  a sixth of the short side, not a line of small type in a corner. On a
+  lesson video the tempo is the second thing a viewer looks for after
+  the count, and it has to survive being watched on a phone. The pair
+  does NOT take each design's own accent: one treatment across all
+  eleven means a viewer who has watched one of these videos knows where
+  to look in the next. Only the ground moves it — on a light design the
+  yellow deepens to a gold, because `#F9D100` on paper is a figure
+  nobody can read.
 
-A design may set `ownHeader` and draw its own title, readout and mark
-instead. `pendulum` is the only one that does: its arrangement — the
-readout flanking the instrument in landscape, gathered into a bar along
-the bottom in the two narrow shapes — is the design, and the shared
-header would put a second title on top of it. The two rules above still
-hold there; it places them itself.
+  It is `tempoStats`, drawn by the renderer for every design, and it
+  keeps its own room: a column down each side in landscape, a row along
+  the bottom in the two narrow shapes, reserved out of `bands` so no
+  design can draw into it. Its type is fitted to that room rather than
+  the room to the type, so a three-figure tempo and a 12/8 bar change
+  nothing about where anything sits.
+
+A design may set `ownHeader` and draw its own title and mark instead.
+`pendulum` is the only one that does: its big title with a rule under it
+is the design, and the shared header would put a second one on top of
+it. The readout is never a design's business — `pendulum` used to carry
+its own copy of exactly this arrangement, and a second copy is a second
+thing to keep in step.
 
 ## Ratios
 
 | aspect | canvas | what changes |
 |---|---|---|
-| `16x9` | 1920×1080 | Title left, tempo right; wide designs run horizontally. |
-| `9x16` | 1080×1920 | Title centred and shallow; the stage takes far more of the frame, and horizontal runs become vertical ones. |
-| `1x1` | 1080×1080 | Centred stack; rows become arcs and loops. |
+| `16x9` | 1920×1080 | Title left; the readout flanks the stage, a column each side; wide designs run horizontally. |
+| `9x16` | 1080×1920 | Title centred and shallow; the readout is a row along the bottom; the stage takes far more of the frame, and horizontal runs become vertical ones. |
+| `1x1` | 1080×1080 | Centred stack, readout along the bottom; rows become arcs and loops. |
 
 ## Build
 
