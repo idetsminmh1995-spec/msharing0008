@@ -465,16 +465,6 @@
           <label for="violinModel">Model</label>
           <select id="violinModel" class="drum-input"></select>
         </div>
-        <div>
-          <label for="systemsOnScreen">Lines of music</label>
-          <select id="systemsOnScreen" class="drum-input">
-            <option value="auto" selected>Auto</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-          </select>
-        </div>
       </div>
       <div class="field-hint" id="violinHint">The violin in the frame is a <b>drawing</b>, from
         <b>website/assets/violin/</b>. One vector file serves all three shapes &mdash; there is nothing to crop
@@ -748,10 +738,6 @@
     videoFrame.classList.toggle('is-portrait', aspect === '9x16');
     videoFrame.classList.toggle('is-square', aspect === '1x1');
     measurePreviewChrome();
-    // [VF-03] The page is cut to the notation column, and that column
-    // is a different shape now -- so the music has to be laid out
-    // again, not merely re-scaled.
-    reflowNotation();
   }
 
   for (const pill of document.querySelectorAll('.ratio-pill')) {
@@ -858,17 +844,22 @@
    * [VF-03] The page the music is wrapped onto.
    *
    * In page mode the engine needs a BOX, in staff spaces, and it fills
-   * it with as many systems as fit. The box is taken from the notation
-   * column the frame actually gives it -- its real aspect, read off
-   * the element -- so a portrait frame gets a tall page with short
-   * systems and a wide one gets the opposite, without either being
-   * described twice.
+   * it with as many systems as fit. The box here is one unbroken
+   * column: `PAGE_WIDTH_SPACES` across and tall enough that the piece
+   * never reaches the bottom of it, so the music never turns a page --
+   * it scrolls.
    *
-   * `PAGE_WIDTH_SPACES` is the one dial: it decides how many bars go
-   * across a system, and therefore how big the notes are. Bigger
-   * number, smaller notes, more bars.
+   * `PAGE_WIDTH_SPACES` is the ONE dial, and it is the page's own
+   * width: how many bars go across a system, and therefore how big the
+   * notes are. Bigger number, smaller notes, more bars.
+   *
+   * It is a constant and not a measurement, which is what makes this a
+   * PAGE. A page of music does not re-break its bars because the thing
+   * looking at it changed shape -- a 9:16 frame is simply a taller
+   * window onto the same page, showing more of it at once at the same
+   * note size, and a 16:9 frame a shorter one.
    */
-  const PAGE_WIDTH_SPACES = 58;
+  const PAGE_WIDTH_SPACES = 44;
   const PAGE_MARGIN = { marginTop: 1.5, marginBottom: 1.5, marginLeft: 1, marginRight: 1 };
 
   /**
@@ -878,18 +869,6 @@
    * lines) and only the engine knows.
    */
   let systemPitch = 0;
-  /**
-   * [VF-03] How many lines of music are on screen at once.
-   *
-   * It has to be a control rather than a constant, and the mock-up is
-   * why: its 16:9 panel is drawn nearly square and holds four short
-   * systems, but a REAL 16:9 frame is half again as wide, and four
-   * systems in a box that shape means systems nine bars long and notes
-   * half the size. There is no one right answer -- fewer lines and
-   * bigger notes, or more of the phrase on screen at once -- so the
-   * frame offers both and starts at whatever fits at a readable size.
-   */
-  const systemsSelect = document.getElementById('systemsOnScreen');
 
   function notationAspect() {
     const box = notationContainer.getBoundingClientRect();
@@ -904,14 +883,10 @@
    * of it the frame is looking at.
    */
   function notationWindow() {
-    const margins = PAGE_MARGIN.marginTop + PAGE_MARGIN.marginBottom;
-    if (!(systemPitch > 0)) return Math.max(12, PAGE_WIDTH_SPACES / notationAspect());
-    const wanted = Number(systemsSelect?.value);
-    const lines = Number.isFinite(wanted) && wanted >= 1
-      ? wanted
-      : Math.max(1, Math.floor(
-          (Math.max(12, PAGE_WIDTH_SPACES / notationAspect()) - margins) / systemPitch));
-    return margins + lines * systemPitch;
+    // The column shows the page at its full width, so the part of the
+    // page the frame can see at once is the page's own width over the
+    // column's aspect -- nothing to choose and nothing to re-break.
+    return PAGE_WIDTH_SPACES / notationAspect();
   }
 
   /**
@@ -924,18 +899,12 @@
    * and slides that window down as the music plays, which on screen is
    * the music rising.
    *
-   * The page's WIDTH is still the window's, because that is what
-   * decides how many bars go across a system: a window three lines
-   * tall in a wide column wants long systems, the same window in a
-   * narrow one wants short ones. Width from the window and height from
-   * the piece is the whole trick.
+   * The page's WIDTH is `PAGE_WIDTH_SPACES` and nothing else, so the
+   * bars break in the same places and the notes are the same size
+   * whatever shape of video the page is being laid into.
    */
   function notationPage() {
-    return {
-      pageWidth: notationWindow() * notationAspect(),
-      pageHeight: 100000,
-      ...PAGE_MARGIN,
-    };
+    return { pageWidth: PAGE_WIDTH_SPACES, pageHeight: 100000, ...PAGE_MARGIN };
   }
 
   function notationConfig() {
@@ -969,58 +938,20 @@
   }
 
   /**
-   * [VF-03] Lay the music out again for a column that changed shape.
+   * [VF-03] How far apart two systems ended up, measured off the
+   * render.
    *
-   * Page mode decides where every system breaks from the box it is
-   * given, so a frame that switched from 16:9 to 9:16 cannot simply
-   * re-scale what it had: the bars have to be re-broken. Re-rendering
-   * from the ALREADY PARSED score, never from the text, because
-   * parsing is most of the cost and nothing about the file changed.
+   * Only the SCROLL needs this -- how far to slide the page to bring
+   * the next line into the frame, and how far down it is allowed to
+   * go. The page itself does not depend on it: its width is a
+   * constant, so nothing here can change where the bars break and
+   * there is no second pass to run.
    */
-  /**
-   * [VF-03] Measure a system, and lay the page out again if that
-   * changed what fits.
-   *
-   * One extra pass at most: the second render's systems are the same
-   * height as the first's (a system's height is its staves and what
-   * sits above them, not the page's width), so the pitch it measures
-   * is the pitch it was given and the guard stops there.
-   */
-  let fittingPage = false;
-
   function fitNotationPage() {
-    if (fittingPage) return;
     const origins = systemOrigins();
     if (origins.length < 2) return;
     const pitch = origins[1] - origins[0];
-    if (!(pitch > 0) || Math.abs(pitch - systemPitch) < 0.01) return;
-    systemPitch = pitch;
-    fittingPage = true;
-    reflowNotation(() => { fittingPage = false; });
-  }
-
-  function reflowNotation(done) {
-    if (!lastParsed || typeof NotationEngine === 'undefined') return;
-    requestAnimationFrame(() => {
-      let rendered;
-      try {
-        rendered = NotationEngine.renderParsedMusicXml(lastParsed, { config: notationConfig() });
-      } catch (err) {
-        return;
-      }
-      notationContainer.innerHTML = rendered.svg;
-      const svgEl = notationContainer.querySelector('svg');
-      if (svgEl) {
-        svgEl.removeAttribute('width');
-        svgEl.removeAttribute('height');
-      }
-      notationPlayback = rendered.playback;
-      attachCursor(svgEl);
-      updateCursor();
-      void refreshNotationImage();
-      if (typeof done === 'function') done();
-      fitNotationPage();
-    });
+    if (pitch > 0) systemPitch = pitch;
   }
 
   function renderNotation(xmlText, fileLabel) {
@@ -1061,9 +992,9 @@
     // rather than discarded, which is what left the preview without a
     // cursor.
     notationPlayback = rendered.playback;
+    fitNotationPage();
     attachCursor(svgEl);
     updateCursor();
-    fitNotationPage();
 
     // Real stats, read from the actual parsed score -- not hardcoded.
     const firstAttrs = parsed.attributes && parsed.attributes[0];
@@ -1137,9 +1068,9 @@
       svgEl.removeAttribute('height');
     }
     notationPlayback = rendered.playback;
+    fitNotationPage();
     attachCursor(svgEl);
     updateCursor();
-    fitNotationPage();
     buildKeyTimeline();
     // The re-render built a new playback; the note list is placed
     // against it, so it is rebuilt rather than left pointing at the old
@@ -1299,9 +1230,6 @@
    */
   function drawStage() {}
 
-  if (systemsSelect) {
-    systemsSelect.addEventListener('change', () => reflowNotation());
-  }
   if (violinSelect) {
     violinSelect.innerHTML = Object.entries(VIOLINS)
       .map(([file, label]) => `<option value="${file}">${label}</option>`)
@@ -1529,7 +1457,12 @@
     notationPageWidth = viewBox.length === 4 ? viewBox[2] : page.pageWidth;
     const origins = systemOrigins();
     const last = origins.length > 0 ? origins[origins.length - 1] : 0;
-    notationContentHeight = last + (systemPitch > 0 ? systemPitch : height) + PAGE_MARGIN.marginBottom;
+    // One system has no pitch to measure, so the last line's own
+    // depth stands in for it. `height` is the page the engine was
+    // given -- 100000 staff spaces -- and must never be used here.
+    const tail =
+      systemPitch > 0 ? systemPitch : Math.max(4, measureStaffExtent(svgEl, height).bottom - last);
+    notationContentHeight = last + tail + PAGE_MARGIN.marginBottom;
     svgEl.setAttribute('viewBox', `0 0 ${notationPageWidth} ${notationContentHeight}`);
     scrollUnits = 0;
     scrollTarget = 0;
