@@ -25,6 +25,35 @@
     font-style: normal;
     font-display: block;
   }
+  /* The two Burmese faces the owner supplied for these frames. Latin
+     text never reaches them -- they sit AFTER 'Baloo 2' and 'Sora' in
+     the title stack, so a Latin title is drawn by those exactly as
+     before and only the characters they have no glyph for fall
+     through to here. Without them a Burmese title is a row of boxes
+     in the preview and in the exported video alike, because the video
+     canvas paints a title with the font-family the element computes
+     to. Both are the owner's own files in ../../assets/fonts/.
+
+     Not preloaded, unlike Bravura: the notation needs Bravura on the
+     first paint, while a title face is needed only once a title has
+     Burmese in it, and the two of them together are a quarter of a
+     megabyte to hand to every visitor who types a Latin one.
+     font-display:block so a Burmese title waits for its own face
+     instead of flashing a fallback. */
+  @font-face {
+    font-family: 'Aka02';
+    src: url('../../assets/fonts/Aka02-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'AJKunheingETM04';
+    src: url('../../assets/fonts/AJKunheingETM04-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: block;
+  }
   :root{
     --red:#C81E2C; --red-dark:#A21A26; --near-black:#17110E;
     --cream:#FAF7F3; --pink:#FCEDEC; --border:#EFE6DF;
@@ -180,7 +209,7 @@
      only spaces is deliberately NOT empty -- someone indenting a title
      with spaces meant it. */
   .video-titles{display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0;}
-  .video-title{font-family:'Baloo 2','Sora',sans-serif;line-height:1.16;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .video-title{font-family:'Baloo 2','Sora','Aka02','AJKunheingETM04',sans-serif;line-height:1.16;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .video-title:empty{display:none;}
 /* [VF-04] Title 1 and the stat LABELS are the mock-up's amber; Title
      2 and the stat values are white. The amber is measured off the
@@ -2953,6 +2982,25 @@
     audioPlayer.pause();
     audioPlayer.currentTime = 0;
     setGenerating(true);
+
+    // The canvas draws a title with `ctx.font`, and `ctx.font` silently
+    // falls back to a default for a face the document has not actually
+    // loaded yet. On screen the browser loads one the moment a title
+    // needs it; a frame painted before that would carry the fallback,
+    // so both title faces are asked for by name first and nothing is
+    // painted until the document says every face it holds is ready.
+    if (document.fonts && typeof document.fonts.load === 'function') {
+      try {
+        await Promise.all([
+          document.fonts.load("700 32px 'Aka02'"),
+          document.fonts.load("700 32px 'AJKunheingETM04'"),
+          document.fonts.load("700 32px 'Baloo 2'"),
+        ]);
+        await document.fonts.ready;
+      } catch (err) {
+        console.warn('A title font did not load; the titles may be drawn in a fallback face:', err);
+      }
+    }
 
     // The SHORT side is what is capped, so every shape comes out at a
     // real delivery size: 1920x1080, 1080x1920, 1080x1080. Capping the
