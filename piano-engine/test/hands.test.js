@@ -155,7 +155,6 @@ test('a hand is five fingers, and the whole of it is one drawn shape', () => {
   // Two parts -- the hand and its thumb -- each painted twice: dark and
   // fat underneath, skin at its true size on top. What shows of the
   // dark pass is the outline of the two together, and nothing else.
-  assert.equal(shapes.length, 4, 'the hand and its thumb, each drawn twice');
   const [edgeHand, edgeThumb, skinHand, skinThumb] = shapes;
   const { edge, skin } = P.DEFAULT_HAND_COLORS.right;
   // Both dark passes come first, so neither of them can show up as a
@@ -172,6 +171,12 @@ test('a hand is five fingers, and the whole of it is one drawn shape', () => {
   // The hand's own outline is a closed path: up each finger, round its
   // tip, down into the web, and back along the heel.
   assert.match(skinHand.path, /^M [-\d.]+ [-\d.]+ .*A .* Z$/, 'closed, and with arcs in it');
+
+  // Then the creases between the fingers and a nail on each tip: the
+  // two details that tell a hand from a mitten.
+  const creases = shapes.filter((s) => s.fill === 'none' && s.path.startsWith('M') && s !== edgeThumb && s !== skinThumb);
+  assert.equal(creases.length, 3, 'three gaps between four fingers');
+  assert.equal(shapes.filter((s) => s.fill === P.darken(skin, 0.1)).length, 5, 'five nails');
 });
 
 test('the middle finger is longer than the thumb and the little finger', () => {
@@ -194,8 +199,11 @@ test('a pressing finger reaches up its own key, and only that finger', () => {
   const middleC = keys.find((k) => k.midi === 60);
   assert.ok(playing.x > middleC.x && playing.x < middleC.x + middleC.width, 'on middle C');
 
+  // A finger already over its key does not have to reach further for
+  // it -- that is the whole point of the hand being where it is -- but
+  // it never pulls BACK towards the player to play one.
   const was = resting.find((t) => t.finger === playing.finger);
-  assert.ok(playing.y < was.y, 'playing reaches further than resting');
+  assert.ok(playing.y <= was.y + 0.5, 'playing never retreats from resting');
   assert.ok(playing.y > BOARD.y, 'and never off the back of the keyboard');
 
   // Nothing is drawn ON the finger to say it is playing: the key under
@@ -450,4 +458,71 @@ test('the falling design keeps the keyboard it has always had', () => {
     P.renderPianoStage({ width: 1080, height: 1400, size: 88, seconds: 0, notes: [] }),
     'and the design is what it was before there was a design to pick',
   );
+});
+
+test('a thumb reaching a distant key moves the WHOLE hand, not just the thumb', () => {
+  // The same left hand, playing one note with its thumb and then one a
+  // fourth lower with its little finger. A hand that only stretched
+  // its thumb would leave the other four fingers where they were.
+  const high = tipsFor([note(60, 1, 'left', 2)], 1.5, 'left');
+  const low = tipsFor([note(53, 1, 'left', 2)], 1.5, 'left');
+  const moved = (finger) =>
+    Math.abs(
+      low.find((t) => t.finger === finger).x - high.find((t) => t.finger === finger).x,
+    );
+  for (const finger of [2, 3, 4, 5]) {
+    assert.ok(moved(finger) > 10, `finger ${finger} went with the hand (${moved(finger)}px)`);
+  }
+});
+
+test('the hand turns on the keys, and turns back', () => {
+  // Reading the turn off the drawing: the line from the little
+  // finger's knuckle to the index finger's IS the knuckle line, and
+  // the angle of it is the hand's turn.
+  const turnOf = (notes, seconds) => {
+    const tips = tipsFor(notes, seconds, 'left');
+    const a = tips.find((t) => t.finger === 5);
+    const b = tips.find((t) => t.finger === 2);
+    return Math.atan2(b.y - a.y, b.x - a.x);
+  };
+  // A chord that wants the thumb well past where it sits turns the
+  // hand; a comfortable five-finger position does not.
+  const easy = turnOf([48, 52, 55].map((m) => note(m, 1, 'left', 2)), 1.5);
+  const reach = turnOf([48, 64].map((m) => note(m, 1, 'left', 2)), 1.5);
+  assert.ok(Math.abs(reach - easy) > 0.04, 'reaching turns the hand');
+  // And never past what a wrist can do.
+  for (const t of [easy, reach]) assert.ok(Math.abs(t) < 0.6, 'no hand turns that far');
+});
+
+test('the fingers fan for a wide chord and close for a narrow one', () => {
+  const span = (notes) => {
+    const tips = tipsFor(notes, 1.5, 'right').filter((t) => t.finger !== 1);
+    const xs = tips.map((t) => t.x);
+    return Math.max(...xs) - Math.min(...xs);
+  };
+  const close = span([60, 62].map((m) => note(m, 1, 'right', 2)));
+  const wide = span([60, 64, 67, 72].map((m) => note(m, 1, 'right', 2)));
+  assert.ok(wide > close, 'a wider chord spreads the fingers further');
+  // But a hand is a hand: the four fingers never spread past a hand's
+  // own span, however wide the chord.
+  const unit = BOARD.width / P.whiteKeyCount(88);
+  assert.ok(wide < unit * 7, 'and never past what four fingers can cover');
+});
+
+test('a finger never swings further from the hand than a finger can', () => {
+  // An octave in one hand is the widest thing it is ever asked for.
+  const tips = tipsFor([60, 72].map((m) => note(m, 1, 'right', 2)), 1.5, 'right');
+  for (const tip of tips) {
+    assert.ok(Number.isFinite(tip.x) && Number.isFinite(tip.y), `finger ${tip.finger} is placed`);
+    assert.ok(tip.y > BOARD.y - BOARD.height, `finger ${tip.finger} is on the keyboard`);
+  }
+  // The two played keys are covered, which is the test of the whole
+  // thing: a hand that cannot reach its own chord is not a hand.
+  const keys = P.keyboardGeometry(88, BOARD);
+  for (const midi of [60, 72]) {
+    const key = keys.find((k) => k.midi === midi);
+    const tip = tips.find((t) => t.midi === midi);
+    assert.ok(tip !== undefined, `${midi} is played`);
+    assert.ok(Math.abs(tip.x - (key.x + key.width / 2)) < key.width, `${midi} is reached`);
+  }
 });

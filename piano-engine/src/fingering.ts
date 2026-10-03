@@ -98,25 +98,61 @@ function groupByStart(notes: readonly PianoNote[]): PianoNote[][] {
 }
 
 /**
+ * Five fingers spread across a chord too wide to take them in order.
+ *
+ * The outer notes get the thumb and the little finger, because those
+ * are the two that reach, and what is in between is spaced across the
+ * rest. A four-note octave chord comes out 1-2-3-5, which is what a
+ * player uses, and not 1-3-5-5, which is what counting outwards from
+ * the thumb gives you once the counting runs past five.
+ */
+function spreadFingers(count: number): Finger[] {
+  const sets: Record<number, Finger[]> = {
+    1: [3],
+    2: [1, 5],
+    3: [1, 3, 5],
+    4: [1, 2, 3, 5],
+    5: [1, 2, 3, 4, 5],
+  };
+  const set = sets[count];
+  if (set !== undefined) return set;
+  // More notes than fingers is not playable by one hand; give each
+  // what it can have and let the drawing show the pile-up rather than
+  // invent a sixth finger.
+  const out: Finger[] = [];
+  for (let i = 0; i < count; i += 1) out.push(Math.min(5, i + 1) as Finger);
+  return out;
+}
+
+/**
  * The fingers for one chord, given where the hand is.
  *
  * Notes are taken in the order the hand meets them -- low to high for
  * the right, high to low for the left -- and each is offered the finger
- * its distance from the thumb asks for. Where two notes want the same
- * finger (two black keys a semitone apart fold onto one white key) the
- * later one takes the next finger out, because a finger cannot play two
- * keys and spreading outward is what a hand actually does.
+ * its distance from the thumb asks for. No two notes may have the same
+ * finger: a finger cannot play two keys. When the chord is wider than
+ * the hand the wanted fingers run past five and the whole chord is
+ * re-spaced across the five instead, which is what a player does with
+ * an octave.
  */
 function fingersForChord(hand: Hand, anchor: number, chord: readonly PianoNote[]): Finger[] {
   const order = [...chord].sort((a, b) => (hand === 'right' ? a.midi - b.midi : b.midi - a.midi));
-  const out: Finger[] = [];
+
+  let out: Finger[] = [];
   let lowest = 0;
+  let fits = true;
   for (const note of order) {
     const wanted = fingerAt(hand, anchor, whiteIndex(note.midi));
     const finger = Math.min(5, Math.max(lowest + 1, Math.max(1, Math.round(wanted))));
+    if (finger <= lowest) {
+      fits = false;
+      break;
+    }
     out.push(finger as Finger);
     lowest = finger;
   }
+  if (!fits || out.length !== order.length) out = spreadFingers(order.length);
+
   // Read back in the order the caller gave them.
   const byNote = new Map<PianoNote, Finger>();
   order.forEach((note, i) => byNote.set(note, out[i] ?? 3));

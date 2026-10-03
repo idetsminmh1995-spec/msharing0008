@@ -146,6 +146,205 @@ PianoEngine.renderPianoStage({
 });
 ```
 
+### The hand is its own thing: `src/hand/`
+
+| File | What it is |
+|---|---|
+| `hand/anatomy.ts` | What a hand IS: every measurement, in white keys. |
+| `hand/pose.ts` | Where it puts itself to play what it is playing. |
+| `hand/draw.ts` | That pose, as one smooth shape. |
+
+None of the three knows about keyboards, notes, seconds or SVG, and
+none of them can be wrong about a hand in a way a keyboard could fix.
+`hands.ts` is the bridge: it turns a keyboard and a fingering into the
+targets the pose solver takes, and the shapes it gives back into the
+stage's own list.
+
+It is three modules rather than a fourth engine on purpose. A hand only
+means anything on top of `keyboardGeometry`, which lives here; a
+separate bundle would either copy that geometry or depend back on this
+one, and a cycle between two bundles is worse than a boundary inside
+one. The boundary is what was wanted, and this is where it is.
+
+### Everything is measured in white keys
+
+A white key is 23mm, which makes it the natural ruler for a hand on a
+keyboard: a palm is 85mm across the knuckles, so it is 3.6 keys; a hand
+spans an octave because an octave is 165mm and a stretched hand is
+200mm. Writing the hand in keys rather than in pixels is what keeps it
+in proportion to the instrument in any frame, at any size.
+
+The numbers are a real hand's with one correction: they are the lengths
+as seen FROM ABOVE of a hand that is PLAYING. A playing hand's fingers
+are curled, so an 80mm middle finger covers about 70mm of key, and that
+is the number in the table.
+
+### The hand moves and turns; the fingers follow
+
+This is the part that was missing for three attempts. A hand asked to
+play a key its thumb cannot reach does not grow a thumb: it MOVES, and
+it TURNS, and the other four fingers go with it. Everything a drawn
+hand gets wrong -- a tentacle thumb, a finger crossing its neighbour, a
+hand that slides along the keys without ever tilting -- comes from
+posing the fingers one at a time instead of posing the hand once.
+
+The hand has three numbers: where it is along the keyboard, how deep it
+sits, and how far it is turned. Depth is fixed, because a player's hand
+rests a fixed distance in from the front edge of the keys. Two are
+left, and every finger that is playing has an opinion about both:
+
+- turning the hand moves a fingertip sideways **in proportion to how
+  far forward that fingertip is**. The long fingers, well past the
+  knuckles, swing a long way; the thumb, whose tip is beside the palm
+  rather than in front of it, barely swings at all.
+- so a thumb reaching a distant key is answered mostly by MOVING the
+  hand, and a little finger reaching for one mostly by TURNING it.
+
+That relationship is linear, so the best position and turn together are
+one small least-squares fit -- two equations, solved exactly, once per
+frame. Fingers that are not playing join in with a quarter of the
+weight: they want to stay over the keys the hand is sitting on, and
+without them a hand playing one note would have nothing to say about
+where it is.
+
+Then each finger reaches from its own knuckle towards its own key, and
+what it cannot cover it does not get: it may swing so far from the
+hand's direction and stretch so far past its length, and past that it
+simply points at the key and falls short. Those two limits are per
+finger, because a thumb abducts a very long way and a middle finger
+hardly at all -- and between them, the turn and the splay are what let
+a hand span an octave, which is exactly the reach a hand is supposed to
+have and the reason an octave is as wide as music asks one hand to be.
+
+### Drawn as one closed outline
+
+Up the side of each finger, round its tip, down into the web, and back
+along the heel of the palm. No seam anywhere on it, because there is no
+join anywhere in it.
+
+- **the webs are shallow.** The notch between two fingers stops about
+  half way down them and a thin crease carries on from there into the
+  palm. Cutting the notches to the knuckles is what makes a drawn hand
+  look like a rake; a real hand is webbed, and what separates its
+  fingers lower down is a line, not a gap.
+- **the fingers taper and end in a nail.** A finger the same width from
+  knuckle to tip is a sausage, and the nail is the one detail that
+  costs nothing and is missed immediately when it is not there.
+- **the thumb is its own shape, overlapping the rest.** Its joint is
+  under the palm, not beside the index finger's, so walked as part of
+  the same outline the two cross -- and a closed path that crosses
+  itself draws the crossing as a line through the hand. The pair are
+  painted in two passes, both fat and dark then both in skin, so what
+  shows of the first pass is the outline of the union and nothing else.
+
+### Around the hand
+
+**All 88 keys.** 88 Keys means 88 keys: showing a window of the
+instrument and calling it an 88 answers a different question from the
+one the control asks. What IS capped is how long a white key is drawn
+-- a real one is 150mm long and 23mm wide, and stretched to fill a tall
+frame it is a tower of planks with a spider on it.
+
+**A strip in front of the keys.** The keyboard does not reach the
+bottom of the stage: the heel of a hand reaching the keys rests past
+their front edge, exactly as on a real piano. The strip is as wide as
+`REACH_PAST_KEYS` -- a number that belongs to the hand, not to the page
+-- so the layout cannot drift away from the anatomy.
+
+**Every C is named** on its own key, C1 to C8, because a learner
+watching a hand move cannot count 52 white keys but can see which C it
+has reached. `keyNames: false` turns them off.
+
+**Nothing is drawn ON a playing finger.** The key under it is lit, the
+finger has reached for it, and its number is on the key: three cues for
+one fact.
+
+`handFingertips(hand, options)` returns where every finger is, so a
+caller -- or a test -- can ask without reading it back out of a path
+string. Nothing in the drawing is the source of truth about the hand;
+the pose is.
+
+## Falling notes
+
+A note's distance from the keyboard is its distance in TIME, scaled by
+`leadSeconds`: a note due in one second, on a 2.5-second fall, sits 40%
+of the way down. Its bar is as tall as the note is long through the
+same scale, which is what makes a held chord read as held rather than
+as a row of dots. Anything already played, still above the stage, or
+off the chosen keyboard is dropped rather than drawn out of view.
+
+Because the scale is the FALL AREA divided by the lead time, a tall
+frame (9:16) moves notes further in the same seconds than a wide one.
+That is the same time made visible over more pixels; the page offers
+1.5s / 2.5s / 4s so a shape that feels too fast can be given a longer
+fall.
+
+## The grid the notes fall through
+
+`gridLines` is a list of `{ seconds, kind: 'bar' | 'beat' }` — the
+score's own bars and beats, in the same seconds the notes use. A
+barline is ruled a little stronger than a beat, both faint enough to
+read past, and both scroll with the music so a bar's line and that
+bar's notes arrive together.
+
+The engine does not work out where the bars are: a caller that knows
+the score hands them over, which is how a 6/8 bar rules six lines and
+a 3/4 bar three, and how a tempo change spaces them exactly as it
+spaces the notes.
+
+## Coming down out of the frame
+
+`fade` dims the top of the falling area, so a note appears faintly and
+gains its colour as it comes down instead of switching on at an edge.
+It takes the colour it fades INTO — the frame's own background, which
+only the caller knows — plus how much of the fall it covers and how
+dim a note starts:
+
+```js
+fade: { color: 'rgb(23, 17, 14)', fraction: 0.38, strength: 0.88 }
+```
+
+It is drawn as bands of that colour at falling alphas rather than as a
+gradient, because a rectangle is the one thing the SVG and the canvas
+draw identically. `strength: 1` would not be a fade but a wall, so a
+note is always at least faintly visible.
+
+## Two designs
+
+One engine, one set of facts, two pictures of them. `design` picks:
+
+- **`falling-notes`** (the default) is the stage this engine started as:
+  bars coming down a grid onto the keyboard, a line where they land.
+- **`hands`** drops every one of those -- no bars, no grid, no fade, no
+  strike line -- and puts two hands on the keyboard instead, pressing
+  the keys, with the finger's number on each key being played.
+
+The notes, the fingering and the keyboard are the same objects either
+way. Nothing is computed for one design that the other has to work
+around, and the default is the picture that shipped before there was a
+design to pick: a caller that says nothing gets the stage it had.
+
+## Hands on the keys
+
+Two hands, always both, drawn over the keyboard and pressing one finger
+per note.
+
+```js
+const plan = PianoEngine.planFingering(notes);
+
+PianoEngine.renderPianoStage({
+  size: 88, width: 1920, height: 600, seconds: 12.5, notes,
+  design: 'hands',
+  colors: { leftHand: '#FFC400', rightHand: '#4FA3FF' },
+  hands: {
+    notes: plan.notes,              // every note, now with a finger
+    anchors: plan.anchors,          // where each hand sits, over time
+    colors: PianoEngine.handColorsFor({ leftHand: '#FFC400', rightHand: '#4FA3FF' }),
+    fingerNumbers: true,            // the default
+  },
+});
+```
+
 `planFingering` is solved ONCE for the whole piece, not per frame. The
 answer cannot change between frames, and a hand that re-decided its
 fingering thirty times a second would twitch.

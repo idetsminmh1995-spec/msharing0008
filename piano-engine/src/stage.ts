@@ -10,6 +10,7 @@
  */
 import { parseColor } from './color.js';
 import { DEFAULT_HAND_COLORS, handsShapes } from './hands.js';
+import { REACH_PAST_KEYS } from './hand/anatomy.js';
 import { keyboardGeometry, pressedAt, whiteKeyCount } from './keyboard.js';
 import { n, path, rect, text, wrap } from './svg.js';
 import type {
@@ -80,11 +81,13 @@ const KEYBOARD_FRACTION = 1 / 3;
  * at the bottom of the frame -- that the keyboard does not use. It is
  * not spare room: the heel of a hand reaching the keys sits past the
  * front edge of them, exactly as it does on a real piano, and this is
- * where it sits. Without it a hand is cut off at the wrist by the
- * bottom of the frame.
+ * where it sits. Its width is the HAND's own number -- how far a hand
+ * reaches past the keys it is playing -- plus a quarter key of air, so
+ * the layout cannot drift away from the anatomy. Without it a hand is
+ * cut off at the wrist by the bottom of the frame.
  */
 const KEY_DEPTH = 7;
-const HAND_BAND = 1.3;
+const HAND_BAND = REACH_PAST_KEYS + 0.25;
 
 /** The strike line's thickness, as a fraction of the keyboard's height. */
 const LINE_FRACTION = 0.05;
