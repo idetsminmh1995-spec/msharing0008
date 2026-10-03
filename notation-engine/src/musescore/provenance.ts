@@ -9,14 +9,18 @@
  * the file and the symbol it came from, so any one of them can be
  * re-checked against the same line of MuseScore in a minute.
  *
- * Why it is a separate folder: the engine already has its own notation
- * rules, built to its own PLAN, and they are not being replaced. What
- * this layer gives is a second, independently-sourced answer to the
- * same questions -- which line a drum sits on, which glyph a notehead
- * group draws, how much room a quarter note gets -- so a score exported
- * from MuseScore can be rendered the way MuseScore itself would render
- * it, by CHOOSING these values, without the engine's own defaults
- * changing underneath anyone who has not asked for that.
+ * Why it is a separate folder: a number with a citation beside it can
+ * be re-checked in a minute, and a number scattered through a renderer
+ * cannot. It began as a second, independently-sourced answer to compare
+ * the engine's own against -- and the comparison found eighteen drums,
+ * two glyphs, a spacing law and a staff type where the two differed.
+ *
+ * The engine's defaults are these values now. The folder is still only
+ * data, still draws nothing, and is still overridable field by field
+ * through `config`; what changed is that saying nothing gets MuseScore's
+ * answer instead of an answer assembled from engraving guides. The
+ * scores being read were all written in MuseScore, and MusicXML carries
+ * almost none of this.
  *
  * ## Licensing
  *

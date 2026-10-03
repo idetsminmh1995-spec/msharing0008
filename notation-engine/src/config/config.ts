@@ -162,8 +162,42 @@ export interface KeySignatureConfig {
  * from a single universal source, and fully overridable for exactly
  * that reason. `justify` disables stretching entirely per §14.3.
  */
+/**
+ * Which law decides how much room a note's duration earns.
+ *
+ * `'musescore'` is MuseScore's: a quarter note gets `quarterNoteSpace`
+ * and every doubling MULTIPLIES that by `durationSlope`. `'increment'`
+ * is §14's own: every doubling ADDS `spacingIncrement`. They agree at
+ * the reference duration and nowhere else, and the difference is
+ * visible at a glance -- under §14 a whole note is 4.8 staff spaces,
+ * under MuseScore's 7.9.
+ *
+ * The default is `'musescore'`, because every score this engine is
+ * given was written in MuseScore and a reader comparing the two should
+ * not have to wonder which one moved the notes.
+ */
+export type SpacingLaw = 'musescore' | 'increment';
+
 export interface SpacingConfig {
+  readonly law: SpacingLaw;
+  /**
+   * `'musescore'` only: the staff spaces a quarter note is worth before
+   * any stretch. MuseScore's `DEFAULT_QUARTER_NOTE_SPACE`.
+   */
+  readonly quarterNoteSpace: number;
+  /**
+   * `'musescore'` only: the factor a note's space is multiplied by each
+   * time its duration doubles. MuseScore's `measureSpacing` style.
+   */
+  readonly durationSlope: number;
+  /**
+   * `'musescore'` only: MuseScore's `spacingDensity`, which DIVIDES.
+   * Above 1 the music is packed tighter, below 1 it is let out.
+   */
+  readonly spacingDensity: number;
+  /** `'increment'` only: the staff spaces one doubling of duration adds. */
   readonly spacingIncrement: number;
+  /** `'increment'` only: the reference duration's own space, in increments. */
   readonly shortestDurationSpace: number;
   readonly minNoteDistance: number;
   readonly justify: boolean;
@@ -181,10 +215,17 @@ export interface SpacingConfig {
    * when nothing is written in it. Engraving practice agrees; so does
    * every other notation program.
    *
-   * 12.0 is this engine's own default, chosen from its own output: a
-   * plain 4/4 bar of four quarter notes lays out at 10.2 of note area,
-   * so 12 makes the sparse bars match the ordinary ones without
-   * stretching the ordinary ones.
+   * 8.0 is MuseScore's own `minMeasureWidth`, and it is the right floor
+   * for the spacing law that now sits above it: under MuseScore's law a
+   * plain 4/4 bar of four quarter notes is 14 staff spaces of note
+   * area, so 8 lifts the sparse bars without touching the ordinary
+   * ones. (Under §14's increment law the same bar was 10.2 and the
+   * floor had to be 12. The two numbers go together; moving one without
+   * the other makes every bar the same width.)
+   *
+   * This engine scales it by the measure's own notated length, which
+   * MuseScore does not: a 2/4 bar should not be as wide as a 4/4 one.
+   * That part is ours.
    */
   readonly minMeasureWidth: number;
 }
@@ -192,16 +233,18 @@ export interface SpacingConfig {
 // ---- skyline / staff distance (Phase 44, §15) ----
 
 /**
- * §15.1's own sensible default: "around 3.5 staff spaces at minimum;
- * generous scores use more." The skyline computes the REAL distance two
- * adjacent staves need given their actual content; this is only the
- * floor that applies even when both staves are otherwise empty.
+ * The floor that applies even when both staves are otherwise empty. The
+ * skyline computes the REAL distance two adjacent staves need given
+ * their actual content; this is only what it may never go below.
  *
  * Both numbers are CLEARANCES -- the empty space between two staves, not
- * the distance between their lines. `minStaffDistance` measures from the
- * upper staff's bottom line to the lower staff's top line, and 4.0 (one
- * staff height, the upper end of §15.1's "generous scores use more") is
- * this engine's own default.
+ * the distance between their lines -- which is how MuseScore states its
+ * own, and the defaults are MuseScore's: `staffDistance` 6.5 and
+ * `minSystemDistance` 8.5. They sit above §15.1's "around 3.5 staff
+ * spaces at minimum; generous scores use more", which is where this
+ * engine's own earlier 4.0 and 6.0 came from -- MuseScore is simply the
+ * more generous of the two, and the scores being read were engraved to
+ * it.
  */
 export interface StavesConfig {
   readonly minStaffDistance: number;
@@ -256,6 +299,13 @@ export interface DrumMapEntryOverride {
   readonly name?: string;
   readonly staffPosition?: number;
   readonly noteheadShape?: string;
+  /**
+   * One exact SMuFL glyph, for a drum no shape family contains -- see
+   * `DrumMapEntry.noteheadGlyph`. Naming a `noteheadShape` and no glyph
+   * CLEARS whatever glyph the default table had for that drum, since
+   * the two say the same thing and the one the caller wrote wins.
+   */
+  readonly noteheadGlyph?: string;
   readonly stemDirection?: 'up' | 'down';
   readonly articulation?: string;
 }
@@ -379,18 +429,28 @@ export const DEFAULT_CONFIG: EngineConfig = {
     style: 'standard',
   },
   spacing: {
+    // MuseScore's horizontal law and its own numbers for it:
+    // DEFAULT_QUARTER_NOTE_SPACE 3.5, measureSpacing 1.5, spacingDensity
+    // 1.0, minNoteDistance 0.35, minMeasureWidth 8.0 -- see
+    // `musescore/style.ts` and `musescore/spacing.ts` for where each was
+    // read from. §14's own increment law is still here and still
+    // reachable by setting `law: 'increment'`.
+    law: 'musescore',
+    quarterNoteSpace: 3.5,
+    durationSlope: 1.5,
+    spacingDensity: 1.0,
     spacingIncrement: 1.2,
     shortestDurationSpace: 2.0,
-    minNoteDistance: 0.5,
+    minNoteDistance: 0.35,
     justify: true,
-    minMeasureWidth: 12.0,
+    minMeasureWidth: 8.0,
   },
   staves: {
-    minStaffDistance: 4.0,
-    // §15.2's own "systems are separated by more than staves are" -- the
-    // same kind of sensible, fully overridable default as every other
-    // number in this object.
-    minSystemDistance: 6.0,
+    // MuseScore's `staffDistance` and `minSystemDistance`. Both are
+    // clearances -- empty space between two staves, not the distance
+    // between their lines -- which is how MuseScore states them too.
+    minStaffDistance: 6.5,
+    minSystemDistance: 8.5,
   },
   page: {
     // A4 (210mm x 297mm) at roughly 7mm per staff space -- a common

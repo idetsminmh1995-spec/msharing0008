@@ -14,16 +14,22 @@
  * The staff position (Phase 9's convention: bottom line 0, negative
  * upward) of a given string on a tab staff of `numLines` lines.
  *
- * string 1 -> top line, string `numLines` -> bottom line. For a standard
- * 6-line guitar tab: string 1 -> -5, string 6 -> 0.
+ * string 1 -> top line, string `numLines` -> bottom line. `lineDistance`
+ * is how far apart the lines are, which on a MuseScore tab staff is 1.5
+ * rather than 1, so a standard 6-line guitar tab puts string 1 at -7.5
+ * and string 6 at 0.
  */
-export function tabStringPosition(stringNumber: number, numLines: number): number {
+export function tabStringPosition(
+  stringNumber: number,
+  numLines: number,
+  lineDistance = 1,
+): number {
   if (!Number.isInteger(stringNumber) || stringNumber < 1 || stringNumber > numLines) {
     throw new Error(
       `String ${stringNumber} is outside a ${numLines}-line tab staff (valid: 1..${numLines}).`,
     );
   }
-  return stringNumber - numLines;
+  return (stringNumber - numLines) * lineDistance;
 }
 
 /**

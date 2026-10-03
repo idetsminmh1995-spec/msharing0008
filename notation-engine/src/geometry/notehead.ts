@@ -64,10 +64,16 @@ const SHAPE_GLYPHS: Readonly<Record<string, Readonly<Record<NoteheadFill, string
     half: 'noteheadSquareWhite',
     black: 'noteheadSquareBlack',
   },
+  // MuseScore's HEAD_SLASH. The filled head is the one with HORIZONTAL
+  // ends -- a parallelogram leaning right, the shape a rhythm slash has
+  // in every chart written in MuseScore. This engine drew
+  // `noteheadSlashVerticalEnds`, which leans the same way but is cut
+  // square top and bottom, and against a MuseScore page it reads as a
+  // different symbol rather than a different weight of the same one.
   slash: {
     whole: 'noteheadSlashWhiteWhole',
     half: 'noteheadSlashWhiteHalf',
-    black: 'noteheadSlashVerticalEnds',
+    black: 'noteheadSlashHorizontalEnds',
   },
   slashed: {
     whole: 'noteheadSlashedWhole1',
@@ -144,10 +150,14 @@ const SHAPE_GLYPHS: Readonly<Record<string, Readonly<Record<NoteheadFill, string
     half: 'noteShapeSquareWhite',
     black: 'noteShapeSquareBlack',
   },
+  // MuseScore's HEAD_TI. Aikin's ti is a rounded triangle; the keystone
+  // this engine drew belongs to the Funk shapes, which are a different
+  // seven-shape system. Both are real notations and SMuFL has glyphs
+  // for each -- this is the one a MuseScore file means.
   ti: {
-    whole: 'noteShapeKeystoneWhite',
-    half: 'noteShapeKeystoneWhite',
-    black: 'noteShapeKeystoneBlack',
+    whole: 'noteShapeTriangleRoundWhite',
+    half: 'noteShapeTriangleRoundWhite',
+    black: 'noteShapeTriangleRoundBlack',
   },
 };
 

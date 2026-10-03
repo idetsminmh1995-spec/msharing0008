@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-575 exported symbols, by module.
+584 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -415,8 +415,9 @@ The diagnostics `level` lets through, in their original order.
 | interface | `BarNumberConfig` |  |
 | type | `KeySignatureStyle` | Only "standard" exists so far -- reserved as a union (not a bare string) so Phase 11 can add real alternatives later without a breaking type change for existing callers. |
 | interface | `KeySignatureConfig` |  |
-| interface | `SpacingConfig` | §14's own published constants (LilyPond's, used as this engine's defaults -- the product of decades of real engraving practice, not invented here). |
-| interface | `StavesConfig` | §15.1's own sensible default: "around 3.5 staff spaces at minimum; generous scores use more." The skyline computes the REAL distance two adjacent staves need given their actual content; this is only the floor that applies even when both staves are otherwise empty. |
+| type | `SpacingLaw` | Which law decides how much room a note's duration earns. |
+| interface | `SpacingConfig` |  |
+| interface | `StavesConfig` | The floor that applies even when both staves are otherwise empty. |
 | interface | `PageConfig` | §16.2's own requirement: "page geometry (size, margins) comes from `config.page`." Defaults match a standard A4 page in staff spaces at a typical engraving scale (roughly 7mm per staff space, the same scale most notation software defaults to) -- a reasonable starting point, fully overridable, the... |
 | interface | `DrumMapEntryOverride` | §13.3: every field of the default GM percussion table (`DEFAULT_DRUM_MAPPING_TABLE`, in `drums/drum-map.ts`) is overridable here, keyed by GM MIDI note number -- "the default table is a starting point, not a constraint: house styles differ on which line a tom sits on, and the user must be able to... |
 | interface | `DrumsConfig` |  |
@@ -563,9 +564,9 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | interface | `DrumMapEntry` | §13.3's own specified shape. |
 | type | `DrumMappingTable` |  |
-| const | `DEFAULT_DRUM_MAPPING_TABLE` | §13.3's default GM table, covering the standard kit it names explicitly. |
 | const | `DRUM_FALLBACK_STAFF_POSITION` | §13.3's error-condition fallback -- the middle line, a plain notehead, and a warning, never a dropped note. |
 | const | `DRUM_FALLBACK_NOTEHEAD_SHAPE` |  |
+| const | `DEFAULT_DRUM_MAPPING_TABLE` |  |
 | interface | `LookupDrumMapEntryResult` |  |
 | function | `lookupDrumMapEntry` | §13.3: looks up a GM MIDI note number in the given table (typically `DEFAULT_DRUM_MAPPING_TABLE` merged with `config.drums.mapping` overrides). |
 | function | `mergeDrumMappingTable` | §13.3: "every field is overridable via config.drums.mapping." Merges `config.drums.mapping` overrides onto `DEFAULT_DRUM_MAPPING_TABLE`, entry by entry and field by field -- a partial override for a GM note already in the default table only replaces the fields it names, keeping the default's own ... |
@@ -988,7 +989,9 @@ The diagnostics `level` lets through, in their original order.
 | interface | `SpacingEvent` | §14's own responsibility: decide the x-position of every event in a measure and the measure's total width. |
 | function | `computeReferenceDuration` | §14.1: "the most frequently occurring shortest duration per measure, NOT the globally shortest note" -- one stray 32nd note must not inflate the whole score's spacing. |
 | function | `computeEventSpace` | §14.1's duration-proportional space, in staff spaces, that a note of `ticks` is followed by relative to a system's own `referenceTicks`: doubling the duration adds exactly one `spacingIncrement` (a logarithmic relationship -- confirmed by §14's own worked example, 8th->2.4sp, quarter->3.6sp, half... |
-| function | `computeProportionalPositions` | The proportional x-position of every event in `events`, left to right, starting at 0 -- each event's own position is the running sum of every earlier event's `computeEventSpace` result. |
+| interface | `SpacingClock` | The two clocks the two laws measure against. |
+| function | `computeAttackSpace` | The room one attack is given before anything else moves it, in staff spaces -- under whichever law `config.law` names. |
+| function | `computeProportionalPositions` | The proportional x-position of every event in `events`, left to right, starting at 0 -- each event's own position is the running sum of every earlier event's `computeAttackSpace`. |
 | function | `applyMinimumDistance` | §14.2: a second pass over already-computed proportional positions, enforcing a real minimum gap for every adjacent pair -- the left element's own full rendered width plus `config.minNoteDistance`. |
 | function | `justifySystem` | §14.3: stretches a set of adjacent positions so the last one reaches `targetWidth`, distributing the added space proportionally to each gap's OWN natural size ("each spring's flexibility") -- a gap that was already wide absorbs proportionally more of the stretch than a narrow one, keeping the pie... |
 | function | `checkMeasureOverflow` | §14's own stated error condition: a measure that's wider than the available system width even after §14.2's minimum-distance pass. |
@@ -1016,6 +1019,7 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | const | `NOTEHEAD_GROUP_TO_SHAPE` | MuseScore's notehead groups, in this engine's own shape-family names. |
 | function | `noteheadForDrum` | The notehead this engine should draw for one MuseScore drum. |
+| function | `stemDirectionForDrum` | Which way one MuseScore drum's stem actually points on the page. |
 | function | `drumMappingFromMuseScore` | MuseScore's standard drumset, as `config.drums.mapping`. |
 | function | `drumVoicesFromMuseScore` | Which voice MuseScore puts each drum in, by MIDI pitch. |
 
@@ -1079,9 +1083,14 @@ The diagnostics `level` lets through, in their original order.
 | | Name | Summary |
 |---|---|---|
 | const | `SPACING_SOURCE` |  |
+| const | `SEGMENT_STRETCH_SOURCE` |  |
 | const | `QUARTER_NOTE_SPACE` | What a quarter note is worth, in staff spaces, before any stretch. |
 | function | `museScoreDurationStretch` | MuseScore's `durationStretchForTicks`: how much more (or less) room a note of `ticks` gets than a quarter note. |
 | function | `museScoreEventSpace` | The space, in staff spaces, MuseScore would give a note of `ticks` before its minimum-distance pass and before the system is justified. |
+| interface | `MuseScoreSegment` | One attack, as MuseScore's spacing sees it. |
+| function | `museScoreSegmentStretch` | MuseScore's `computeSegmentDurationStretch`: the stretch for ONE segment, which is not always the power law. |
+| interface | `MuseScoreSegmentOptions` | The knobs MuseScore's own style exposes on this law, each defaulting to what MuseScore ships. |
+| function | `museScoreSegmentSpace` | The space one segment is given, in staff spaces, before the minimum- distance pass and before the system is justified. |
 | function | `museScorePositions` | Running x positions for a measure's attacks, MuseScore's way. |
 
 ### `src/musescore/staff-position.ts`

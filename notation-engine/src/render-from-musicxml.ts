@@ -101,13 +101,14 @@ import {
   type FontSizeConfig,
   type NoteheadMappingConfig,
   type PartialEngineConfig,
+  type SpacingConfig,
 } from './config/index.js';
 import { computePageLayout, type PageMeasureInput } from './layout/index.js';
 import { measure as makeMeasure } from './core/index.js';
 import {
   computeReferenceDuration,
   computeProportionalPositions,
-  computeEventSpace,
+  computeAttackSpace,
   applyMinimumDistance,
   type SpacingEvent,
 } from './layout/spacing.js';
@@ -228,18 +229,24 @@ function buildTheme(config: EngineConfig): RenderTheme {
   };
 }
 
-// Phase 43/44 wiring: real Sec14 spacing constants, matching
-// config/config.ts's own SpacingConfig defaults, EXCEPT `justify` --
-// see the note on `pageSpacingConfig` in renderFromMusicXml for why a
-// scroll system is never justified while a page system is. These are
-// the WITHIN-measure spacing constants; Integration L's `config.spacing`
-// option feeds the between-measure justification instead.
-const SPACING_CONFIG = {
-  spacingIncrement: 1.2,
-  shortestDurationSpace: 2.0,
-  minNoteDistance: 0.5,
-  justify: false,
-};
+/**
+ * The WITHIN-measure spacing constants: the caller's own
+ * `config.spacing`, with `justify` forced off.
+ *
+ * Taken from the resolved config rather than written out again here.
+ * They WERE written out again here, and drifted: the copy still said
+ * `minNoteDistance: 0.5` after the config had moved to MuseScore's
+ * 0.35, so the measure the reader saw was spaced by a number nothing
+ * else in the engine used.
+ *
+ * `justify: false` is not a drift but a decision -- see the note on
+ * `pageSpacingConfig` in `renderFromMusicXml` for why a scroll system
+ * is never justified while a page system is. Integration L's
+ * `config.spacing` feeds the between-measure justification instead.
+ */
+function withinMeasureSpacing(spacing: SpacingConfig): SpacingConfig {
+  return { ...spacing, justify: false };
+}
 /** A rough per-note width estimate for Sec14.2's minimum-distance pass -- notehead alone, or notehead+accidental-allowance. Real per-glyph widths would need sharing the accidental-DISPLAY state (not just the pitch's own alter) between a measurement pass and the render pass; this stays a documented approximation rather than duplicating that state. */
 const ESTIMATED_NOTEHEAD_WIDTH = 1.0;
 const ESTIMATED_ACCIDENTAL_ALLOWANCE = 1.0;
@@ -249,6 +256,16 @@ const MEASURE_TRAILING_MARGIN = 2.0;
 const REST_TO_REST_CLEARANCE = 0.55;
 /** MuseScore's floor for any shorter rest against a chord. */
 const REST_TO_CHORD_CLEARANCE = 0.35;
+/**
+ * How far apart a tablature staff's lines sit, in staff spaces.
+ *
+ * MuseScore's own TAB staff types -- every one of them, from
+ * `TAB_4SIMPLE` to `TAB_6FULL` -- space their lines 1.5 apart rather
+ * than 1, and the reason is structural: a fret number is written ON a
+ * line, so the digits of two adjacent strings would touch at the
+ * ordinary spacing. See `musescore/strings.ts`.
+ */
+const TAB_LINE_DISTANCE = 1.5;
 /**
  * The small pad every measure leaves at its own left edge, before
  * anything is drawn -- so a clef, or the first notehead, is not flush
@@ -484,8 +501,8 @@ function computeMeasureLayout(
   }[],
   /** This measure's OWN header width (see `headerWidths`), not a score-wide constant. */
   headerWidth: number,
-  /** `config.spacing.minMeasureWidth` -- the note area's own floor for a whole-note-long measure. */
-  minMeasureWidth: number,
+  /** The caller's resolved `config.spacing` -- the law, its numbers, and the floors. */
+  spacingConfig: SpacingConfig,
 ): {
   readonly width: number;
   readonly positionsByTick: ReadonlyMap<number, number>;
@@ -505,6 +522,8 @@ function computeMeasureLayout(
   readonly idealSpan: number;
 } {
   const hasAccidentalByTick = new Map<number, boolean>();
+  /** MuseScore's `shortestChordRest`, per attack -- see where it is filled. */
+  const shortestStartingByTick = new Map<number, number>();
   for (const voice of measure.voices) {
     const starts = eventStartTicks(voice.events);
     voice.events.forEach((event, idx) => {
@@ -532,6 +551,15 @@ function computeMeasureLayout(
               )
             : false;
       hasAccidentalByTick.set(tick, (hasAccidentalByTick.get(tick) ?? false) || hasAccidental);
+      // MuseScore's `Segment::shortestChordRest`: the shortest thing
+      // that BEGINS at this attack, across every voice. Not the gap to
+      // the next attack -- the two are equal only while nothing longer
+      // is being held through it, and the spacing law reads both.
+      const own = event.duration.ticks;
+      const shortest = shortestStartingByTick.get(tick);
+      if (own > 0 && (shortest === undefined || own < shortest)) {
+        shortestStartingByTick.set(tick, own);
+      }
     });
   }
 
@@ -567,7 +595,7 @@ function computeMeasureLayout(
    * blank staff.
    */
   const durationScale = Math.min(2, Math.max(0.35, measureTicks / (TICKS_PER_QUARTER * 4)));
-  const minWidth = headerWidth + minMeasureWidth * durationScale;
+  const minWidth = headerWidth + spacingConfig.minMeasureWidth * durationScale;
 
   if (ticks.length === 0) {
     // A measure with no events at all gets exactly the same standard
@@ -591,12 +619,20 @@ function computeMeasureLayout(
     const width =
       ESTIMATED_NOTEHEAD_WIDTH +
       (hasAccidentalByTick.get(tick) === true ? ESTIMATED_ACCIDENTAL_ALLOWANCE : 0);
-    return { ticks: gapTicks, renderedWidth: width };
+    return {
+      ticks: gapTicks,
+      renderedWidth: width,
+      shortestSounding: shortestStartingByTick.get(tick) ?? gapTicks,
+    };
   });
 
-  const referenceTicks = computeReferenceDuration(spacingEvents, TICKS_PER_QUARTER);
-  const proportional = computeProportionalPositions(spacingEvents, referenceTicks, SPACING_CONFIG);
-  const enforced = applyMinimumDistance(proportional, spacingEvents, SPACING_CONFIG);
+  const spacing = withinMeasureSpacing(spacingConfig);
+  const clock = {
+    referenceTicks: computeReferenceDuration(spacingEvents, TICKS_PER_QUARTER),
+    ticksPerQuarter: TICKS_PER_QUARTER,
+  };
+  const proportional = computeProportionalPositions(spacingEvents, clock, spacing);
+  const enforced = applyMinimumDistance(proportional, spacingEvents, spacing);
 
   const positionsByTick = new Map<number, number>();
   ticks.forEach((tick, i) => {
@@ -606,26 +642,39 @@ function computeMeasureLayout(
   const lastX = enforced[enforced.length - 1] ?? 0;
   const lastEvent = spacingEvents[spacingEvents.length - 1];
   const lastWidth = lastEvent?.renderedWidth ?? 0;
-  const width = Math.max(
-    minWidth,
-    headerWidth + lastX + lastWidth + MEASURE_TRAILING_MARGIN,
-    tempoMarkMinWidth,
-  );
 
-  // The space the last attack earns before the barline: §14.1's own
-  // duration-proportional space, floored (as §14.2 floors every other
-  // gap) at that attack's rendered width plus the minimum distance, so
-  // the last notehead can never end up touching the barline however
-  // short its written duration is.
+  // The space the last attack earns before the barline: the same
+  // duration-proportional space every other attack gets, floored (as
+  // the minimum-distance pass floors every other gap) at that attack's
+  // rendered width plus the minimum distance, so the last notehead can
+  // never end up touching the barline however short its duration is.
   const finalSpace =
     lastEvent === undefined
       ? 0
       : Math.max(
-          computeEventSpace(lastEvent.ticks, referenceTicks, SPACING_CONFIG),
-          lastWidth + SPACING_CONFIG.minNoteDistance,
+          computeAttackSpace(lastEvent, spacingEvents[spacingEvents.length - 2], clock, spacing),
+          lastWidth + spacing.minNoteDistance,
         );
+  const idealSpan = lastX + finalSpace;
 
-  return { width, positionsByTick, idealSpan: lastX + finalSpace };
+  // The bar is at least as wide as its own spacing asked for.
+  //
+  // `headerWidth + idealSpan` was NOT in this list, and under a law
+  // where the last note's space can exceed the trailing margin that
+  // left the bar narrower than the spacing wanted: the stretch below
+  // then had nothing to stretch into, and the last note sat closer to
+  // the barline than the one before it. The other three terms are
+  // floors on top of it -- the measure's own minimum, the room a
+  // notehead needs before the barline whatever its duration, and the
+  // room a tempo mark needs.
+  const width = Math.max(
+    minWidth,
+    headerWidth + idealSpan,
+    headerWidth + lastX + lastWidth + MEASURE_TRAILING_MARGIN,
+    tempoMarkMinWidth,
+  );
+
+  return { width, positionsByTick, idealSpan };
 }
 const LEDGER_EXTENSION_FALLBACK = 0.4;
 const LEDGER_THICKNESS_FALLBACK = 0.16;
@@ -888,6 +937,19 @@ function resolveNoteRendering(
     gmNote !== undefined && drumEntry !== undefined && !positionedByFile
       ? { [String(gmNote)]: drumEntry.noteheadShape }
       : undefined;
+  // A drum the table names ONE glyph for -- the china cymbal, the slap
+  // -- cannot go through the shape-family override above, because no
+  // family contains that glyph. It travels the same road an explicit
+  // `<notehead smufl="...">` does, and loses to one: the file's own
+  // notation outranks the kit's.
+  const drumGlyph =
+    gmNote !== undefined &&
+    drumEntry?.noteheadGlyph !== undefined &&
+    !positionedByFile &&
+    note.explicitNotehead === undefined &&
+    note.explicitNoteheadSmufl === undefined
+      ? drumEntry.noteheadGlyph
+      : undefined;
   const configOverrides = ctx.theme.noteheadMapping.overridesByKey;
   const overridesByKey =
     drumOverride !== undefined || configOverrides !== undefined
@@ -901,7 +963,9 @@ function resolveNoteRendering(
     ...(note.explicitNotehead !== undefined ? { explicitNotehead: note.explicitNotehead } : {}),
     ...(note.explicitNoteheadSmufl !== undefined
       ? { explicitNoteheadSmufl: note.explicitNoteheadSmufl }
-      : {}),
+      : drumGlyph !== undefined
+        ? { explicitNoteheadSmufl: drumGlyph }
+        : {}),
     ...(gmNote !== undefined ? { midiNote: gmNote } : {}),
     ...(overridesByKey !== undefined ? { overridesByKey } : {}),
   });
@@ -2350,7 +2414,7 @@ export function renderParsedMusicXml(
       measureTicks ?? TICKS_PER_QUARTER * 4,
       tempoMarks.filter((tm) => tm.measureNumber === measureNumber),
       headerWidth,
-      config.spacing.minMeasureWidth,
+      config.spacing,
     );
     measureLayoutsByNumber.set(measureNumber, { ...layout, headerWidth });
     measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
@@ -2914,7 +2978,10 @@ export function renderParsedMusicXml(
         // staff's notes are skipped entirely (see the UNSUPPORTED_CLEF
         // diagnostic), so no note math depends on this being 6.
         const staffLines = attrs.staffLinesByStaff[staffNumber] ?? STAFF_LINES;
-        const staffGeometry = computeStaffGeometry(staffLines);
+        const staffGeometry = computeStaffGeometry(
+          staffLines,
+          clefDef.name === 'tab' ? TAB_LINE_DISTANCE : 1,
+        );
         const bottomY = staffBottomY + systemY + staffOffsetFor(partIndex, staffIndex);
         // Phase 51/§18.3: every staff line this render actually drew, for
         // the skyline overlay to hang its per-staff envelopes on.
@@ -3399,7 +3466,7 @@ export function renderParsedMusicXml(
 
               let position: number;
               try {
-                position = tabStringPosition(event.stringNumber, staffLines);
+                position = tabStringPosition(event.stringNumber, staffLines, TAB_LINE_DISTANCE);
               } catch {
                 diagnostics.push({
                   severity: 'warning',

@@ -1,11 +1,18 @@
 # `src/musescore/` — MuseScore's notation data, re-expressed
 
-A **data layer**, not an engine. Nothing in here draws anything and
-nothing in the renderer imports it. It answers, in this project's own
-shapes, the questions MuseScore answers in its source: which line a
+MuseScore's notation data, read out of its source at one pinned
+revision and re-expressed in this project's own shapes: which line a
 drum sits on, which glyph a notehead group draws, which clef a
 `<sign>G</sign>` means, how much room a quarter note gets, how thick a
 ledger line is.
+
+**It is load-bearing now.** It began as a reference to compare against,
+imported by nothing, with the engine keeping its own answers beside it —
+and the two disagreed in eighteen places. They do not any more. The
+engine's default drum kit IS `drumset.ts`, its spacing law IS
+`spacing.ts`, its engraving defaults ARE `style.ts`'s. A number here is
+not a second opinion to consult; it is the number the renderer uses,
+with a line of MuseScore behind it a reviewer can open.
 
 It exists because the scores this project renders are **exported from
 MuseScore** (every one of the owner's files says `MuseScore Studio
@@ -55,22 +62,33 @@ guitar's string pitches are the ones it sounds and a bass's are not.
 `writtenPitchFor` is that one line, and it is the difference between a
 bass fingering that is right and one that is an octave out.
 
-## Using it
+## What the engine takes from it, with no config at all
 
-Opt-in, through `adapters.ts`. Nothing changes for a caller that does
-not ask:
+| Engine default | Comes from |
+|---|---|
+| `DEFAULT_DRUM_MAPPING_TABLE` — all 61 drums | `drumset.ts` + `adapters.ts` |
+| `spacing.law: 'musescore'` — 3.5sp a quarter, ×1.5 a doubling | `spacing.ts` |
+| `minNoteDistance` 0.35, `minMeasureWidth` 8.0 | `style.ts` |
+| `minStaffDistance` 6.5, `minSystemDistance` 8.5 | `style.ts` |
+| A tab staff's lines 1.5 apart | `strings.ts` |
+| The rhythm slash, and the Aikin `ti` | `noteheads.ts` |
+
+All of it stays overridable. `spacing.law: 'increment'` puts §14's own
+law back; `config.drums.mapping` replaces any drum; every measurement in
+`config` is a number a caller may write.
+
+## Using it directly
+
+`adapters.ts` turns MuseScore's own terms into this engine's, for a
+caller building a part rather than reading one:
 
 ```ts
 import { MuseScore } from 'notation-engine';
 
-renderFromMusicXml(xml, {
-  config: { drums: { mapping: MuseScore.drumMappingFromMuseScore() } },
-});
+// Which voice MuseScore files each drum in — what puts the feet on a
+// stems-down line.
+MuseScore.drumVoicesFromMuseScore();
 ```
-
-`museScoreEventSpace(ticks, ticksPerQuarter)` is MuseScore's spacing law
-(3.5 staff spaces for a quarter note, ×1.5 per doubling) for a caller
-that wants its horizontal look rather than §14's.
 
 ## Adding the owner's own MuseScore
 
@@ -91,26 +109,34 @@ MuseScore.drumMappingFromMuseScore({
 `evidence` is required. An override with nothing behind it is the guess
 this whole layer exists to avoid.
 
-## Where this engine and MuseScore disagree today
+## Where this engine and MuseScore disagreed
 
-Found by `test/unit/musescore.test.js`, which asserts the list exactly
-so a new difference cannot appear unnoticed:
+All five are closed. `test/unit/musescore.test.js` asserts the drum
+difference list is EMPTY, so a new one cannot appear unnoticed.
 
-- **Drum table.** Kick, snare, both hi-hats and the crash agree. Toms
-  are consistently half a space apart between the two tables, the ride
-  and ride bell sit a half space lower in MuseScore, and five
-  instruments wear a different head (side stick, electric snare, open
-  hi-hat, china, tambourine, cowbell). §13.3 is explicit that real drum
-  practice varies, so these are differences rather than bugs — but they
-  are differences a MuseScore export will show.
-- **Shape-note `ti`.** This engine draws `noteShapeKeystone*`; MuseScore
-  draws `noteShapeTriangleRound*` for Aikin ti and keeps the keystone
-  for the Funk shapes.
-- **Rhythm slash.** This engine's filled slash is
-  `noteheadSlashVerticalEnds`; MuseScore's is
-  `noteheadSlashHorizontalEnds`.
-- **Horizontal spacing.** §14 adds a fixed increment per doubling;
-  MuseScore multiplies by 1.5. They agree at the reference duration and
-  nowhere else — a whole note is 7.9 spaces to MuseScore and 4.8 to §14.
-- **Tab staves.** MuseScore draws six lines a space and a half apart;
-  this engine draws five, evenly.
+- ~~**Drum table.**~~ The default kit is MuseScore's: 61 drums, every
+  one on MuseScore's line wearing MuseScore's head. The toms, the ride
+  and the ride bell moved; the side stick, hand clap, open hi-hat,
+  china cymbal and cowbell changed head. §13.3 remains right that
+  notators vary — which is why the table is still fully overridable —
+  but every file this engine is given was written in MuseScore, and
+  MusicXML carries a drum as a MIDI number and nothing else.
+- ~~**Shape-note `ti`.**~~ `noteShapeTriangleRound*`, which is Aikin's.
+  The keystone belongs to the Funk shapes, a different seven-shape
+  system.
+- ~~**Rhythm slash.**~~ `noteheadSlashHorizontalEnds`.
+- ~~**Horizontal spacing.**~~ MuseScore's power law is the default, with
+  its segment rule: a segment that a shorter note runs through is priced
+  linearly off that note rather than by the law, which is what keeps two
+  voices vertically aligned.
+- ~~**Tab staves.**~~ Lines 1.5 staff spaces apart.
+
+### One difference that is not one
+
+MuseScore's `staffLineWidth` style default is 0.11 and this engine draws
+0.13. Both are right. MuseScore LOADS a font's own `engravingDefaults`
+and lets `staffLineThickness` overwrite that style
+(`EngravingFont::loadEngravingDefaults`), and Bravura says 0.13. This
+engine reads the same font metadata, so with the same font the two
+already agree — and changing 0.13 to 0.11 here is what would make them
+differ.

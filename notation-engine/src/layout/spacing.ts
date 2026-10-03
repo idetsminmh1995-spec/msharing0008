@@ -13,8 +13,16 @@ import type { SpacingConfig } from '../config/config.js';
  */
 type SpacingAlgorithmConfig = Pick<
   SpacingConfig,
-  'spacingIncrement' | 'shortestDurationSpace' | 'minNoteDistance' | 'justify'
+  | 'law'
+  | 'quarterNoteSpace'
+  | 'durationSlope'
+  | 'spacingDensity'
+  | 'spacingIncrement'
+  | 'shortestDurationSpace'
+  | 'minNoteDistance'
+  | 'justify'
 >;
+import { museScoreSegmentSpace } from '../musescore/spacing.js';
 import { spacingDiagnostic, type SpacingDiagnostic } from './spacing-diagnostic.js';
 
 /**
@@ -27,6 +35,22 @@ import { spacingDiagnostic, type SpacingDiagnostic } from './spacing-diagnostic.
  */
 export interface SpacingEvent {
   readonly ticks: number;
+  /**
+   * The shortest note or rest STARTING at this attack, in any voice --
+   * MuseScore's `Segment::shortestChordRest`.
+   *
+   * It is NOT the same as `ticks`, and the difference is the whole of
+   * MuseScore's multi-voice spacing. `ticks` is the gap to the next
+   * attack; this is how long the shortest thing that begins here
+   * actually lasts. They are equal whenever the gap is set by a note
+   * that ends at the next attack, and they come apart the moment one
+   * voice holds a long note while another moves underneath it -- a
+   * drum chart's every other bar.
+   *
+   * Omit it and it is taken as equal to `ticks`, which is what a
+   * single-voice measure always is.
+   */
+  readonly shortestSounding?: number;
   /**
    * The event's own full rendered width (notehead + accidentals + dots
    * + any horizontally-extending articulation) -- §14.2's own minimum-
@@ -96,23 +120,82 @@ export function computeEventSpace(
 }
 
 /**
+ * The two clocks the two laws measure against.
+ *
+ * §14's law is relative: it asks how this note compares with the
+ * measure's own most common duration, so it needs `referenceTicks`.
+ * MuseScore's is absolute: every duration is priced against a quarter
+ * note, so it needs `ticksPerQuarter`. Both are carried because a
+ * caller does not have to know which law is in force -- the config
+ * does.
+ */
+export interface SpacingClock {
+  /** `'increment'` only: `computeReferenceDuration`'s answer for this measure. */
+  readonly referenceTicks: number;
+  /** `'musescore'` only: one quarter note, in this score's ticks. */
+  readonly ticksPerQuarter: number;
+}
+
+/**
+ * The room one attack is given before anything else moves it, in staff
+ * spaces -- under whichever law `config.law` names.
+ *
+ * `previous` is the attack before this one, which only MuseScore's law
+ * reads, and only for the polyrhythm case its own source calls out.
+ *
+ * The MuseScore branch is `musescore/spacing.ts`'s own function rather
+ * than a copy of its arithmetic. That folder is where the number is
+ * checked against MuseScore; having the renderer compute it a second
+ * way would mean two places to keep in step and one of them unchecked.
+ */
+export function computeAttackSpace(
+  event: SpacingEvent,
+  previous: SpacingEvent | undefined,
+  clock: SpacingClock,
+  config: SpacingAlgorithmConfig,
+): number {
+  if (config.law === 'increment') {
+    return computeEventSpace(event.ticks, clock.referenceTicks, config);
+  }
+  return museScoreSegmentSpace(
+    { ticks: event.ticks, shortestSounding: event.shortestSounding ?? event.ticks },
+    clock.ticksPerQuarter,
+    {
+      ...(previous === undefined
+        ? {}
+        : {
+            previous: {
+              ticks: previous.ticks,
+              shortestSounding: previous.shortestSounding ?? previous.ticks,
+            },
+          }),
+      slope: config.durationSlope,
+      density: config.spacingDensity,
+      quarterNoteSpace: config.quarterNoteSpace,
+    },
+  );
+}
+
+/**
  * The proportional x-position of every event in `events`, left to right,
  * starting at 0 -- each event's own position is the running sum of every
- * earlier event's `computeEventSpace` result. This is §14.1's algorithm
- * alone; §14.2's minimum-distance pass (`applyMinimumDistance`) and
- * §14.3's justification (`justifySystem`) are deliberately separate
- * functions, run afterward, matching the plan's own two-pass structure.
+ * earlier event's `computeAttackSpace`. This is the FIRST pass alone;
+ * the minimum-distance pass (`applyMinimumDistance`) and justification
+ * (`justifySystem`) are deliberately separate functions run afterward,
+ * which is how MuseScore stages it too.
  */
 export function computeProportionalPositions(
   events: readonly SpacingEvent[],
-  referenceTicks: number,
+  clock: SpacingClock,
   config: SpacingAlgorithmConfig,
 ): readonly number[] {
   const positions: number[] = [];
   let x = 0;
-  for (const e of events) {
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i];
+    if (e === undefined) continue;
     positions.push(x);
-    x += computeEventSpace(e.ticks, referenceTicks, config);
+    x += computeAttackSpace(e, events[i - 1], clock, config);
   }
   return positions;
 }

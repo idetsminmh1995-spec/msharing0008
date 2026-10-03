@@ -53,7 +53,9 @@ describe('every MusicXML notehead value, and none of them fatal (§9.7)', () => 
     // slashed and slash are DIFFERENT shapes, and getting them confused
     // is the easy mistake here.
     assert.equal(NE.selectNoteheadGlyphName({ pitch: NE.unpitchedPitch('F', 4), durationType: 'quarter', explicitNotehead: 'slashed' }), 'noteheadSlashedBlack1');
-    assert.equal(NE.selectNoteheadGlyphName({ pitch: NE.unpitchedPitch('F', 4), durationType: 'quarter', explicitNotehead: 'slash' }), 'noteheadSlashVerticalEnds');
+    // MuseScore's own HEAD_SLASH: the filled rhythm slash is the one
+    // with horizontal ends, not the square-cut vertical-ended glyph.
+    assert.equal(NE.selectNoteheadGlyphName({ pitch: NE.unpitchedPitch('F', 4), durationType: 'quarter', explicitNotehead: 'slash' }), 'noteheadSlashHorizontalEnds');
     assert.equal(NE.selectNoteheadGlyphName({ pitch: NE.unpitchedPitch('F', 4), durationType: 'quarter', explicitNotehead: 'back slashed' }), 'noteheadSlashedBlack2');
   });
 
@@ -122,11 +124,24 @@ describe('a measure has a standard minimum width (§14)', () => {
     }
   });
 
-  test('a bar with fewer notes is the same width as its fuller neighbours', () => {
-    // The user's report, comparing this engine's drum output against
+  test('a sparse bar is not left barely wider than the rest inside it', () => {
+    // The owner's report, comparing this engine's drum output against
     // MuseScore's: a bar of three quarter notes came out visibly
     // narrower than its neighbours of four, and a bar holding one whole
     // rest came out barely wider than the rest itself.
+    //
+    // The first half of that is fixed outright -- three quarters and a
+    // quarter rest is four attacks, exactly like four quarter notes, so
+    // the two bars are identical. The second half is fixed by the
+    // spacing law rather than by the floor: a whole rest's own segment
+    // is a whole note long, and under MuseScore's law that is worth
+    // 7.9 staff spaces rather than the 2.4 §14's law gave it.
+    //
+    // What is deliberately NOT asserted any more is that all three come
+    // out EQUAL. They do not in MuseScore either -- a bar's width
+    // follows what is written in it -- and the floor that used to force
+    // equality here was this engine's own invention. A caller who wants
+    // that look back has one number for it; the test below is it.
     const bars = [
       '<note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>1</duration><voice>1</voice><type>quarter</type></note>'.repeat(4),
       '<note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>1</duration><voice>1</voice><type>quarter</type></note>'.repeat(3) +
@@ -148,17 +163,46 @@ describe('a measure has a standard minimum width (§14)', () => {
         )
         .join('') +
       '</part></score-partwise>';
-    const { playback } = NE.renderFromMusicXml(xml, { domParser });
-    const noteAreas = [...playback.measureLayoutsByNumber.values()].map(
-      (l) => l.width - l.headerWidth,
+    const areasOf = (config) => {
+      const { playback } = NE.renderFromMusicXml(xml, {
+        domParser,
+        ...(config ? { config } : {}),
+      });
+      return [...playback.measureLayoutsByNumber.values()].map((l) => l.width - l.headerWidth);
+    };
+
+    const [full, mixed, wholeRest] = areasOf();
+    assert.ok(
+      Math.abs(mixed - full) < 1e-9,
+      `three quarters and a rest should match four quarters: ${mixed} vs ${full}`,
     );
-    assert.equal(noteAreas.length, 3);
-    for (const area of noteAreas) {
-      assert.ok(
-        Math.abs(area - noteAreas[0]) < 1e-9,
-        `bar widths still vary: ${noteAreas.map((a) => a.toFixed(2)).join(', ')}`,
-      );
-    }
+    // A whole rest's own glyph is about three staff spaces wide. The
+    // bar it sits in is more than twice that, and over half its fuller
+    // neighbour -- which is the complaint answered.
+    assert.ok(wholeRest > 6, `a whole-rest bar is only ${wholeRest.toFixed(2)} wide`);
+    assert.ok(wholeRest >= full * 0.5, `${wholeRest.toFixed(2)} vs ${full.toFixed(2)}`);
+  });
+
+  test('raising the floor makes every bar of a given length identical, for a caller who wants that', () => {
+    const bar = (body) => `<measure number="1">${body}</measure>`;
+    const quarter =
+      '<note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched>' +
+      '<duration>1</duration><voice>1</voice><type>quarter</type></note>';
+    const head =
+      '<attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time>' +
+      '<clef><sign>percussion</sign><line>2</line></clef></attributes>';
+    const xml =
+      '<score-partwise version="4.0"><part-list><score-part id="P1"/></part-list><part id="P1">' +
+      bar(head + quarter.repeat(4)).replace('number="1"', 'number="1"') +
+      '<measure number="2"><note><rest measure="yes"/><duration>4</duration><voice>1</voice></note></measure>' +
+      '</part></score-partwise>';
+    const { playback } = NE.renderFromMusicXml(xml, {
+      domParser,
+      config: { spacing: { minMeasureWidth: 24 } },
+    });
+    const areas = [...playback.measureLayoutsByNumber.values()].map((l) => l.width - l.headerWidth);
+    assert.equal(areas.length, 2);
+    for (const area of areas) assert.ok(Math.abs(area - 24) < 1e-9, `got ${area}`);
   });
 
   test('it is a MINIMUM, not a fixed width -- a busy bar still grows past it', () => {
@@ -185,10 +229,16 @@ describe('a measure has a standard minimum width (§14)', () => {
       '<note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched>' +
       '<duration>2</duration><voice>1</voice><type>half</type></note>' +
       '</measure></part></score-partwise>';
-    const { playback } = NE.renderFromMusicXml(shortBar, { domParser });
+    // Raised well past what the content itself asks for, so it is the
+    // FLOOR being measured and not the spacing law underneath it.
+    const floor = 40;
+    const { playback } = NE.renderFromMusicXml(shortBar, {
+      domParser,
+      config: { spacing: { minMeasureWidth: floor } },
+    });
     const layout = playback.measureLayoutsByNumber.get(1);
     const noteArea = layout.width - layout.headerWidth;
     // Half a whole note, so half the floor -- not the full 4/4 width.
-    assert.ok(Math.abs(noteArea - NE.DEFAULT_CONFIG.spacing.minMeasureWidth * 0.5) < 1e-9);
+    assert.ok(Math.abs(noteArea - floor * 0.5) < 1e-9, `got ${noteArea}`);
   });
 });

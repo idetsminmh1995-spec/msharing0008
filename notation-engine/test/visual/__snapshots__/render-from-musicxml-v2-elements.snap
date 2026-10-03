@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="520" height="320" viewBox="0 0 26 16">
 <rect x="0" y="0" width="26" height="16" fill="#ffffff" />
 <g>
-<line x1="0" y1="8" x2="20.302" y2="8" stroke="#000000" stroke-width="0.13" />
-<line x1="0" y1="7" x2="20.302" y2="7" stroke="#000000" stroke-width="0.13" />
-<line x1="0" y1="6" x2="20.302" y2="6" stroke="#000000" stroke-width="0.13" />
-<line x1="0" y1="5" x2="20.302" y2="5" stroke="#000000" stroke-width="0.13" />
-<line x1="0" y1="4" x2="20.302" y2="4" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="8" x2="21.7829" y2="8" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="7" x2="21.7829" y2="7" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="6" x2="21.7829" y2="6" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="5" x2="21.7829" y2="5" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="4" x2="21.7829" y2="4" stroke="#000000" stroke-width="0.13" />
 </g>
 <text x="0.5" y="6" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="5" font-family="Bravura" font-size="4" fill="#000000"></text>
@@ -15,34 +15,34 @@
 <line x1="7.16" y1="3.056" x2="7.16" y2="0.056" stroke="#000000" stroke-width="0.12" />
 </g>
 <g data-id="P1#m1#v1#e1">
-<text x="9.3098" y="5" font-family="Bravura" font-size="4" fill="#000000"></text>
+<text x="9.6145" y="5" font-family="Bravura" font-size="4" fill="#000000"></text>
 </g>
 <g data-id="P1#m1#v1#e2">
-<text x="9.3098" y="4.5" font-family="Bravura" font-size="4" fill="#000000"></text>
+<text x="9.6145" y="4.5" font-family="Bravura" font-size="4" fill="#000000"></text>
 </g>
 <g data-id="P1#m1#v1#e3">
-<text x="9.3098" y="5.5" font-family="Bravura" font-size="4" fill="#000000"></text>
-<line x1="9.3098" y1="5.668" x2="9.3098" y2="9" stroke="#000000" stroke-width="0.12" />
+<text x="9.6145" y="5.5" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="9.6145" y1="5.668" x2="9.6145" y2="9" stroke="#000000" stroke-width="0.12" />
 </g>
 <g data-id="P1#m1#v1#e4">
-<text x="11.8706" y="5" font-family="Bravura" font-size="4" fill="#000000"></text>
-<line x1="11.8706" y1="5.168" x2="11.8706" y2="8.5" stroke="#000000" stroke-width="0.12" />
+<text x="12.4658" y="5" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="12.4658" y1="5.168" x2="12.4658" y2="8.5" stroke="#000000" stroke-width="0.12" />
 </g>
 <g>
-<line x1="9.3098" y1="9" x2="11.8706" y2="8.5" stroke="#000000" stroke-width="0.5" />
+<line x1="9.6145" y1="9" x2="12.4658" y2="8.5" stroke="#000000" stroke-width="0.5" />
 </g>
 <g data-id="P1#m1#v1#e5">
-<text x="14.4314" y="4.5" font-family="Bravura" font-size="4" fill="#000000"></text>
-<line x1="14.4314" y1="4.668" x2="14.4314" y2="8.168" stroke="#000000" stroke-width="0.12" />
-<text x="14.4314" y="8.168" font-family="Bravura" font-size="4" fill="#000000"></text>
+<text x="15.3171" y="4.5" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="15.3171" y1="4.668" x2="15.3171" y2="8.168" stroke="#000000" stroke-width="0.12" />
+<text x="15.3171" y="8.168" font-family="Bravura" font-size="4" fill="#000000"></text>
 </g>
 <g data-id="P1#m1#v1#e6">
-<text x="16.1602" y="5.5" font-family="Bravura" font-size="4" fill="#000000"></text>
-<text x="16.9922" y="5.5" font-family="Bravura" font-size="4" fill="#000000"></text>
-<line x1="16.9922" y1="5.668" x2="16.9922" y2="9.168" stroke="#000000" stroke-width="0.12" />
+<text x="17.3364" y="5.5" font-family="Bravura" font-size="4" fill="#000000"></text>
+<text x="18.1684" y="5.5" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="18.1684" y1="5.668" x2="18.1684" y2="9.168" stroke="#000000" stroke-width="0.12" />
 </g>
 <g>
-<line x1="20.302" y1="8" x2="20.302" y2="4" stroke="#000000" stroke-width="0.16" />
+<line x1="21.7829" y1="8" x2="21.7829" y2="4" stroke="#000000" stroke-width="0.16" />
 </g>
 <text x="0" y="3" fill="#000000" font-family="Manrope, sans-serif" font-size="1.6">1</text>
 </svg>

@@ -138,10 +138,9 @@ describe('renderFromMusicXml end-to-end (Phase 21)', () => {
     assert.equal(tiePaths.length, 1);
     const [, startX, startY, , endX] = tiePaths[0];
     assert.equal(Number(startX), 6 + 1.18); // notehead x (6) + noteheadBlack's own width (1.18)
-    // The second tied note's own x -- §14's 2.4sp, stretched by the
-    // ratio between the bar's real width and the width §14's spacing
-    // asked for (§14.3, applied within the measure).
-    assert.equal(Number(endX), 9.4286);
+    // The second tied note's own x: a quarter note's 3.5 staff spaces
+    // under MuseScore's spacing law, from the first note at x=6.
+    assert.equal(Number(endX), 9.5);
     assert.equal(Number(startY), 5.5); // C5's own y (bottomY 8 + position -2.5)
   });
 

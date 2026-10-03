@@ -250,45 +250,52 @@ describe('MuseScore data layer: drumset', () => {
     }
   });
 
-  test('where the two tables DISAGREE is written down, not discovered later', () => {
-    // §13.3 is explicit that real drum practice varies and that this
-    // engine's table is a defensible default rather than a universal
-    // truth, so these differences are not bugs -- but an unrecorded
-    // difference is, because it turns into "why does my MuseScore file
-    // look wrong" months later. The list is asserted exactly: a new
-    // difference, in either table, fails here.
+  test("the engine's own default kit IS MuseScore's, drum for drum", () => {
+    // It was not. This engine shipped a hand-written table of 35 drums
+    // positioned from drum-notation guides, and the two disagreed on
+    // eighteen of them: toms half a space apart, the ride and its bell
+    // a half space low, five instruments wearing a different head. §13.3
+    // is right that notators vary -- but every file this engine is given
+    // was written in MuseScore, and MusicXML carries a drum as a MIDI
+    // number and nothing else, so varying meant drawing the owner's own
+    // chart wrong.
+    //
+    // The list below is asserted EMPTY. A difference reappearing in
+    // either table fails here, which is the only way a silent one gets
+    // caught.
     const differences = [];
     const museScoreMapping = MS.drumMappingFromMuseScore();
     for (const drum of MS.MUSESCORE_DRUMSET) {
       const mine = NE.DEFAULT_DRUM_MAPPING_TABLE[drum.pitch];
-      if (!mine) continue;
+      assert.ok(mine, `this engine is missing drum ${drum.pitch} ${drum.name}`);
       const theirs = museScoreMapping[drum.pitch];
       const fields = [];
       if (mine.staffPosition !== theirs.staffPosition) fields.push('position');
-      if (mine.noteheadShape !== theirs.noteheadShape) fields.push('notehead');
+      // MuseScore says a head either as a GROUP (which has a glyph for
+      // every duration) or as one exact glyph. This engine carries the
+      // first as a shape family and the second as `noteheadGlyph`, so
+      // the head it will actually draw is whichever of the two is set.
+      const myHead = mine.noteheadGlyph ?? mine.noteheadShape;
+      if (myHead !== theirs.noteheadShape) fields.push('notehead');
       if ((mine.stemDirection ?? 'up') !== theirs.stemDirection) fields.push('stem');
-      if (fields.length > 0) differences.push(`${drum.pitch} ${fields.join('+')}`);
+      if (fields.length > 0) differences.push(`${drum.pitch} ${drum.name}: ${fields.join('+')}`);
     }
-    assert.deepEqual(differences, [
-      '35 position+stem',
-      '37 notehead',
-      '40 notehead',
-      '41 position',
-      '43 position',
-      '44 position+stem',
-      '45 position',
-      '46 notehead',
-      '47 position',
-      '48 position',
-      '50 position',
-      '51 position',
-      '52 position+notehead',
-      '53 position',
-      '54 position+notehead',
-      '55 position',
-      '56 notehead',
-      '59 position',
-    ]);
+    assert.deepEqual(differences, []);
+  });
+
+  test('the kit is the whole of MuseScore\'s, not the 35 drums it used to be', () => {
+    assert.equal(
+      Object.keys(NE.DEFAULT_DRUM_MAPPING_TABLE).length,
+      MS.MUSESCORE_DRUMSET.length,
+    );
+    // The four MuseScore names one exact glyph for, which no shape
+    // family contains. They are real instruments a drum chart uses --
+    // 52 is the china cymbal -- so they have to draw, not throw.
+    for (const pitch of [28, 52, 62, 86]) {
+      const entry = NE.DEFAULT_DRUM_MAPPING_TABLE[pitch];
+      assert.ok(entry.noteheadGlyph, `drum ${pitch} should name a glyph`);
+      assert.ok(NE.getGlyph(entry.noteheadGlyph), `${entry.noteheadGlyph} is not in the font`);
+    }
   });
 
   test('the whole drumset converts into a drum mapping this engine can take', () => {

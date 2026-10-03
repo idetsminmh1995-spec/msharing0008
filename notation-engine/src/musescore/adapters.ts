@@ -63,6 +63,26 @@ export function noteheadForDrum(drum: MuseScoreDrum): string {
 }
 
 /**
+ * Which way one MuseScore drum's stem actually points on the page.
+ *
+ * Not `drum.stemDirection` on its own, because MuseScore's table and
+ * MuseScore's output disagree about the kick: the acoustic bass drum
+ * (35) carries `DirectionV::UP` and the electric one (36) carries
+ * `DOWN`, and both are drawn with the stem down. The reason is the
+ * other field -- both sit in `voice 1`, MuseScore's second voice, and a
+ * second-voice stem points down whatever the instrument says.
+ *
+ * So the voice decides when it is not the first, and the instrument's
+ * own direction decides otherwise. That is also, exactly, the
+ * hands-up/feet-down convention every drum-notation guide states: the
+ * three drums MuseScore files in voice 1 are the kick, the alternate
+ * kick and the hi-hat pedal -- the feet.
+ */
+export function stemDirectionForDrum(drum: MuseScoreDrum): 'up' | 'down' {
+  return drum.voice >= 1 ? 'down' : drum.stemDirection;
+}
+
+/**
  * MuseScore's standard drumset, as `config.drums.mapping`.
  *
  * Staff positions are converted out of MuseScore's top-down lines into
@@ -83,7 +103,7 @@ export function drumMappingFromMuseScore(
       name: drum.name,
       staffPosition: staffPositionFromLine(drum.line, staffLines),
       noteheadShape: noteheadForDrum(drum),
-      stemDirection: drum.stemDirection,
+      stemDirection: stemDirectionForDrum(drum),
     };
   }
   return mapping;

@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="520" height="320" viewBox="0 0 26 16">
 <rect x="0" y="0" width="26" height="16" fill="#ffffff" />
 <g>
-<line x1="0" y1="8" x2="18" y2="8" stroke="#000000" stroke-width="0.13" />
-<line x1="0" y1="7" x2="18" y2="7" stroke="#000000" stroke-width="0.13" />
-<line x1="0" y1="6" x2="18" y2="6" stroke="#000000" stroke-width="0.13" />
-<line x1="0" y1="5" x2="18" y2="5" stroke="#000000" stroke-width="0.13" />
-<line x1="0" y1="4" x2="18" y2="4" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="8" x2="20" y2="8" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="7" x2="20" y2="7" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="6" x2="20" y2="6" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="5" x2="20" y2="5" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="4" x2="20" y2="4" stroke="#000000" stroke-width="0.13" />
 </g>
 <text x="0.5" y="6" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="5" font-family="Bravura" font-size="4" fill="#000000"></text>
@@ -15,18 +15,18 @@
 <line x1="7.18" y1="5.332" x2="7.18" y2="1.832" stroke="#000000" stroke-width="0.12" />
 </g>
 <g data-id="P1#m1#v1#e1">
-<text x="9" y="7.5" font-family="Bravura" font-size="4" fill="#000000"></text>
-<line x1="9" y1="7.668" x2="9" y2="11.168" stroke="#000000" stroke-width="0.12" />
+<text x="9.5" y="7.5" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="9.5" y1="7.668" x2="9.5" y2="11.168" stroke="#000000" stroke-width="0.12" />
 </g>
 <g data-id="P1#m1#v1#e2">
-<text x="12" y="3.5" font-family="Bravura" font-size="4" fill="#000000"></text>
-<line x1="13.16" y1="3.056" x2="13.16" y2="0.056" stroke="#000000" stroke-width="0.12" />
+<text x="13" y="3.5" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="14.16" y1="3.056" x2="14.16" y2="0.056" stroke="#000000" stroke-width="0.12" />
 </g>
 <g data-id="P1#m1#v1#e3">
-<text x="15" y="6" font-family="Bravura" font-size="4" fill="#000000"></text>
+<text x="16.5" y="6" font-family="Bravura" font-size="4" fill="#000000"></text>
 </g>
 <g>
-<line x1="18" y1="8" x2="18" y2="4" stroke="#000000" stroke-width="0.16" />
+<line x1="20" y1="8" x2="20" y2="4" stroke="#000000" stroke-width="0.16" />
 </g>
 <text x="0" y="3" fill="#000000" font-family="Manrope, sans-serif" font-size="1.6">1</text>
 </svg>

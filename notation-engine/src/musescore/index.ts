@@ -76,13 +76,18 @@ export {
   QUARTER_NOTE_SPACE,
   museScoreDurationStretch,
   museScoreEventSpace,
+  museScoreSegmentStretch,
+  museScoreSegmentSpace,
   museScorePositions,
   SPACING_SOURCE,
+  SEGMENT_STRETCH_SOURCE,
 } from './spacing.js';
+export type { MuseScoreSegment, MuseScoreSegmentOptions } from './spacing.js';
 
 export {
   NOTEHEAD_GROUP_TO_SHAPE,
   noteheadForDrum,
+  stemDirectionForDrum,
   drumMappingFromMuseScore,
   drumVoicesFromMuseScore,
 } from './adapters.js';

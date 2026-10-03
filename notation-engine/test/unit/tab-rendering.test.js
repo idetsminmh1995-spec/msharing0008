@@ -98,17 +98,19 @@ describe('tab rendering end to end (Integration C)', () => {
 
   test('each fret number sits on ITS OWN string line', () => {
     const { svg } = render();
-    // 6-line staff with its bottom line at y=8 -> lines at 8,7,6,5,4,3.
-    // string 6 -> y=8, string 5 -> y=7, string 2 -> y=4, string 1 -> y=3.
+    // A tab staff's lines are 1.5 staff spaces apart, not 1 -- MuseScore's
+    // own TAB staff types, and the room a fret number needs. So a 6-line
+    // staff with its bottom line at y=8 has lines at 8, 6.5, 5, 3.5, 2
+    // and 0.5, and string 6 is the bottom one.
     assert.match(svg, /y="8"[^>]*>\uED10/); // fret 0 on string 6 (bottom line)
-    assert.match(svg, /y="7"[^>]*>\uED13/); // fret 3 on string 5
-    assert.match(svg, /y="4"[^>]*>\uED25/); // fret 7 on string 2
-    assert.match(svg, /y="3"[^>]*>\uED11/); // fret 12's "1" on string 1 (top line)
+    assert.match(svg, /y="6\.5"[^>]*>\uED13/); // fret 3 on string 5
+    assert.match(svg, /y="2"[^>]*>\uED25/); // fret 7 on string 2
+    assert.match(svg, /y="0\.5"[^>]*>\uED11/); // fret 12's "1" on string 1 (top line)
   });
 
   test('a two-digit fret draws BOTH digits, side by side rather than overprinted', () => {
     const { svg } = render();
-    const onTopLine = [...svg.matchAll(/<text x="([\d.]+)" y="3"[^>]*>(.)<\/text>/g)].filter(
+    const onTopLine = [...svg.matchAll(/<text x="([\d.]+)" y="0\.5"[^>]*>(.)<\/text>/g)].filter(
       (m) => m[2].codePointAt(0) >= 0xed10,
     );
     assert.equal(onTopLine.length, 2, 'expected both digits of fret 12');

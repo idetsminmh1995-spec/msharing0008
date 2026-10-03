@@ -139,10 +139,12 @@ describe('grand staff rendering (Integration A)', () => {
     const top = Math.min(Number(yA), Number(yB));
     const bottom = Math.max(Number(yA), Number(yB));
     // Must reach from the top staff's top line (y=4) to the bottom
-    // staff's bottom line (y=16) -- i.e. through the gap, not stopping
-    // at the first staff.
+    // staff's bottom line -- i.e. through the gap, not stopping at the
+    // first staff. The lower staff's bottom is the upper staff's bottom
+    // (8) plus MuseScore's own `staffDistance` clearance (6.5) plus the
+    // lower staff's own four spaces of height.
     assert.equal(top, 4);
-    assert.equal(bottom, 16);
+    assert.equal(bottom, 8 + NE.DEFAULT_CONFIG.staves.minStaffDistance + 4);
   });
 
   test('every note of a staff renders only once, on its own staff', () => {
@@ -163,8 +165,11 @@ describe('clef glyph placement (Integration A bug fix)', () => {
 
   test('a bass clef sits on the F line (three spaces above its own bottom line)', () => {
     const { svg } = NE.renderFromMusicXml(load('piano-grand-staff.musicxml'), { domParser });
-    // The second staff's bottom is y=16; its F line is y=13.
-    assert.match(svg, /x="0\.5" y="13"[^>]*>\uE062/);
+    // The second staff's bottom line, three spaces up. Written off the
+    // configured staff clearance rather than a literal so the two move
+    // together: 8 + 6.5 + 4 = 18.5 for the bottom line, 15.5 for F.
+    const bassBottom = 8 + NE.DEFAULT_CONFIG.staves.minStaffDistance + 4;
+    assert.match(svg, new RegExp(`x="0\\.5" y="${bassBottom - 3}"[^>]*>\uE062`));
   });
 
   test('a percussion clef is centred on the middle line, per its own symmetric SMuFL bounding box', () => {

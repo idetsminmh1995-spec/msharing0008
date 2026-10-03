@@ -61,12 +61,40 @@ export const MUSESCORE_STYLE = {
     /** From the notehead to its first augmentation dot, and between dots. */
     dotNoteDistance: 0.5,
     dotDotDistance: 0.65,
+    /** A rest's dot sits closer than a note's -- a rest has no head to clear. */
+    dotRestDistance: 0.25,
+    /** The dot itself, as a multiplier on full size. */
+    dotMag: 1.0,
     /** Between an accidental and the notehead it belongs to, and between two accidentals. */
     accidentalNoteDistance: 0.25,
     accidentalDistance: 0.25,
     /** Cue notes and grace notes, as a multiplier on full size. */
     smallNoteMag: 0.7,
     graceNoteMag: 0.7,
+    /** A cue staff, and a clef drawn mid-staff rather than at a system's head. */
+    smallStaffMag: 0.7,
+    smallClefMag: 0.8,
+  },
+
+  /**
+   * Stems.
+   *
+   * `length` and `shortest` are plain multiples of a staff space rather
+   * than `_sp` values in MuseScore's own table, which is why they are
+   * written as bare numbers there. A stem reaches `length` from the
+   * notehead and is allowed to shorten, note by note, no further than
+   * `shortest`; `shortenFrom` is how many spaces past the staff a note
+   * has to be before the shortening starts.
+   */
+  stem: {
+    length: 3.5,
+    shortest: 2.5,
+    shorten: true,
+    shortenFrom: 1,
+    /** The slash through an acciaccatura's stem. */
+    slashPosition: 2.0,
+    slashAngleDegrees: 40.0,
+    slashThickness: 0.125,
   },
 
   beam: {
@@ -107,16 +135,53 @@ export const MUSESCORE_STYLE = {
     spacingDensity: 1.0,
   },
 
+  /**
+   * What sits at the head of a system, and how far apart.
+   *
+   * A `*LeftMargin` is the gap BEFORE the thing; a `*Distance` is the
+   * gap between two of them; a `*RightMargin` is the gap after the
+   * thing before whatever follows. They are not interchangeable, and
+   * getting a clef's left margin where its right margin belongs shifts
+   * every system's first note.
+   */
   header: {
+    clefLeftMargin: 0.75,
+    keysigLeftMargin: 0.5,
+    timesigLeftMargin: 0.63,
     /** Clef to key signature, key signature to time signature, and so on. */
     clefKeyDistance: 0.75,
     clefKeyRightMargin: 0.8,
+    /** A clef or key change in the MIDDLE of a system is given more room. */
+    midClefKeyRightMargin: 1.0,
     clefTimesigDistance: 1.0,
     keyTimesigDistance: 1.0,
     clefBarlineDistance: 0.5,
+    keyBarlineDistance: 1.0,
+    timesigBarlineDistance: 0.5,
+    /** The whole header to the first note, and the least it may be. */
+    systemHeaderDistance: 2.5,
+    systemHeaderTimeSigDistance: 2.0,
+    systemHeaderMinStartOfSystemDistance: 1.25,
+    /** The closing clef/key of a system to the right-hand margin. */
+    systemTrailerRightMargin: 0.5,
     /** Between two accidentals of a key signature, and before a natural. */
     keysigAccidentalDistance: 0.3,
     keysigNaturalDistance: 0.4,
+  },
+
+  /**
+   * How close a barline and the music either side of it may come.
+   *
+   * Asymmetric on purpose: a note needs more room after it before a
+   * barline (`noteBarDistance`) than a barline needs before the next
+   * note (`barNoteDistance`), and an accidental on that next note needs
+   * more again.
+   */
+  barlineSpacing: {
+    barNoteDistance: 1.25,
+    noteBarDistance: 1.5,
+    barAccidentalDistance: 0.65,
+    beginRepeatLeftMargin: 1.0,
   },
 
   slur: {
@@ -132,6 +197,8 @@ export const MUSESCORE_STYLE = {
     minDistance: 0.4,
     distanceFromHead: 0.4,
     distanceFromStem: 0.4,
+    /** The mark itself, as a multiplier on full size. */
+    mag: 1.0,
   },
 
   rest: {

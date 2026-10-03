@@ -5,15 +5,30 @@ import { loadEngine } from '../helpers/load-engine.js';
 const NE = loadEngine();
 const TICKS_PER_QUARTER = 480;
 
+// §14's own increment law, which is no longer the default -- these
+// tests keep it honest, and the MuseScore suite below covers what the
+// engine actually ships with.
 const CONFIG = {
+  law: 'increment',
+  quarterNoteSpace: 3.5,
+  durationSlope: 1.5,
+  spacingDensity: 1.0,
   spacingIncrement: 1.2,
   shortestDurationSpace: 2.0,
   minNoteDistance: 0.5,
   justify: true,
 };
 
-function ev(ticks, renderedWidth = 0) {
-  return { ticks, renderedWidth };
+/** The shipped law, on MuseScore's own numbers. */
+const MUSESCORE_CONFIG = { ...CONFIG, law: 'musescore', minNoteDistance: 0.35 };
+
+/** `referenceTicks` is §14's; `ticksPerQuarter` is MuseScore's. */
+const clock = (referenceTicks) => ({ referenceTicks, ticksPerQuarter: TICKS_PER_QUARTER });
+
+function ev(ticks, renderedWidth = 0, shortestSounding) {
+  return shortestSounding === undefined
+    ? { ticks, renderedWidth }
+    : { ticks, renderedWidth, shortestSounding };
 }
 
 describe('computeReferenceDuration (Phase 43, §14.1)', () => {
@@ -76,7 +91,7 @@ describe('computeEventSpace (Phase 43, §14.1 ratio assertions)', () => {
 describe('computeProportionalPositions (Phase 43, §14.1)', () => {
   test('positions accumulate left to right, starting at 0', () => {
     const events = [ev(240), ev(240), ev(240)];
-    const positions = [...NE.computeProportionalPositions(events, 240, CONFIG)];
+    const positions = [...NE.computeProportionalPositions(events, clock(240), CONFIG)];
     assert.equal(positions[0], 0);
     assert.ok(Math.abs(positions[1] - 2.4) < 1e-9);
     assert.ok(Math.abs(positions[2] - 4.8) < 1e-9);
@@ -88,7 +103,7 @@ describe('applyMinimumDistance (Phase 43, §14.2)', () => {
     // A very wide first event (e.g. a chord with several accidentals)
     // whose own width exceeds the proportional gap to the next note.
     const events = [ev(240, 5.0), ev(240, 0)];
-    const proportional = [...NE.computeProportionalPositions(events, 240, CONFIG)];
+    const proportional = [...NE.computeProportionalPositions(events, clock(240), CONFIG)];
     const enforced = [...NE.applyMinimumDistance(proportional, events, CONFIG)];
     // Proportional gap here is only 2.4sp, but the first event is 5.0sp
     // wide -- the minimum-distance pass must win.
@@ -98,14 +113,14 @@ describe('applyMinimumDistance (Phase 43, §14.2)', () => {
 
   test('a narrow event does not trigger any push at all -- proportional spacing already clears the minimum', () => {
     const events = [ev(240, 0.1), ev(240, 0)];
-    const proportional = [...NE.computeProportionalPositions(events, 240, CONFIG)];
+    const proportional = [...NE.computeProportionalPositions(events, clock(240), CONFIG)];
     const enforced = [...NE.applyMinimumDistance(proportional, events, CONFIG)];
     assert.deepEqual(enforced, proportional);
   });
 
   test('a push CASCADES -- fixing one gap does not leave the next one too small', () => {
     const events = [ev(240, 8.0), ev(240, 8.0), ev(240, 0)];
-    const proportional = [...NE.computeProportionalPositions(events, 240, CONFIG)];
+    const proportional = [...NE.computeProportionalPositions(events, clock(240), CONFIG)];
     const enforced = [...NE.applyMinimumDistance(proportional, events, CONFIG)];
     // Every adjacent gap must now respect the minimum, not just the first.
     for (let i = 1; i < enforced.length; i++) {
@@ -162,5 +177,67 @@ describe('checkMeasureOverflow (Phase 43, §14 error condition)', () => {
     assert.notEqual(diagnostic, undefined);
     assert.equal(diagnostic.severity, 'warning');
     assert.equal(diagnostic.code, 'MEASURE_OVERFLOWS_SYSTEM_WIDTH');
+  });
+});
+
+describe("MuseScore's spacing law, which is the one the engine ships", () => {
+  const QUARTER = TICKS_PER_QUARTER;
+
+  test('a quarter note is worth exactly quarterNoteSpace', () => {
+    const space = NE.computeAttackSpace(ev(QUARTER), undefined, clock(QUARTER), MUSESCORE_CONFIG);
+    assert.ok(Math.abs(space - 3.5) < 1e-9, `expected 3.5, got ${space}`);
+  });
+
+  test('each doubling MULTIPLIES by the slope -- it does not add', () => {
+    const spaceOf = (ticks) =>
+      NE.computeAttackSpace(ev(ticks), undefined, clock(QUARTER), MUSESCORE_CONFIG);
+    const sixteenth = spaceOf(QUARTER / 4);
+    const eighth = spaceOf(QUARTER / 2);
+    const quarter = spaceOf(QUARTER);
+    const half = spaceOf(QUARTER * 2);
+    const whole = spaceOf(QUARTER * 4);
+    for (const [longer, shorter] of [
+      [eighth, sixteenth],
+      [quarter, eighth],
+      [half, quarter],
+      [whole, half],
+    ]) {
+      assert.ok(Math.abs(longer / shorter - 1.5) < 1e-9, `${longer} / ${shorter} should be 1.5`);
+    }
+    // The numbers MuseScore itself lays out, to two decimals.
+    assert.ok(Math.abs(whole - 7.875) < 1e-9, `a whole note should be 7.875sp, got ${whole}`);
+    assert.ok(Math.abs(sixteenth - 1.5555555555555556) < 1e-9);
+  });
+
+  test('a note that another voice runs underneath is priced off that shorter note, linearly', () => {
+    // A half note in one voice while eighths move under it: the gap to
+    // the next attack is an eighth, but the shortest thing STARTING
+    // here lasts a half. MuseScore prices it off the half and scales
+    // down by the fraction of it this segment is worth.
+    const eighth = QUARTER / 2;
+    const half = QUARTER * 2;
+    const segment = ev(eighth, 0, half);
+    const space = NE.computeAttackSpace(segment, undefined, clock(QUARTER), MUSESCORE_CONFIG);
+    const halfSpace = NE.computeAttackSpace(ev(half), undefined, clock(QUARTER), MUSESCORE_CONFIG);
+    assert.ok(Math.abs(space - halfSpace * (eighth / half)) < 1e-9);
+    // And it is LESS than the eighth would have got on its own: the
+    // segment is a fragment of a note already paid for.
+    const eighthSpace = NE.computeAttackSpace(ev(eighth), undefined, clock(QUARTER), MUSESCORE_CONFIG);
+    assert.ok(space < eighthSpace, `${space} should be under ${eighthSpace}`);
+  });
+
+  test('an ordinary single-voice measure never meets that case', () => {
+    // Every attack's shortest-sounding equals its gap, so every segment
+    // gets the plain power law and the positions are evenly spaced.
+    const events = [ev(QUARTER), ev(QUARTER), ev(QUARTER), ev(QUARTER)];
+    const positions = [...NE.computeProportionalPositions(events, clock(QUARTER), MUSESCORE_CONFIG)];
+    assert.deepEqual(positions, [0, 3.5, 7, 10.5]);
+  });
+
+  test('the two laws agree at a quarter note only by accident, and nowhere else', () => {
+    const under = (config, ticks) =>
+      NE.computeAttackSpace(ev(ticks), undefined, clock(QUARTER), config);
+    assert.ok(under(MUSESCORE_CONFIG, QUARTER * 4) > under(CONFIG, QUARTER * 4));
+    assert.ok(under(MUSESCORE_CONFIG, QUARTER / 4) > under(CONFIG, QUARTER / 4));
   });
 });

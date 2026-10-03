@@ -17,10 +17,19 @@ describe('default GM drum mapping table (Phase 41, §13.3)', () => {
     }
   });
 
-  test("every default entry's noteheadShape is a real shape family Phase 15 recognizes", () => {
+  test("every default entry draws something real -- a shape family, or one exact glyph", () => {
     for (const note of STANDARD_KIT_NOTES) {
       const entry = NE.DEFAULT_DRUM_MAPPING_TABLE[note];
-      assert.doesNotThrow(() => NE.shapeGlyphName(entry.noteheadShape, 'quarter'), entry.noteheadShape);
+      assert.doesNotThrow(
+        () => NE.shapeGlyphName(entry.noteheadShape, 'quarter'),
+        entry.noteheadShape,
+      );
+      // A drum MuseScore names one glyph for (the china cymbal, 52)
+      // keeps a plain family for anyone reading only that, and the real
+      // glyph beside it.
+      if (entry.noteheadGlyph !== undefined) {
+        assert.ok(NE.getGlyph(entry.noteheadGlyph), `${entry.noteheadGlyph} is not in the font`);
+      }
     }
   });
 
@@ -32,17 +41,28 @@ describe('default GM drum mapping table (Phase 41, §13.3)', () => {
     assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[49].stemDirection, 'up'); // Crash
   });
 
-  test('cymbals/hi-hat use the x notehead shape; drums use the plain oval; bell-type sounds use diamond', () => {
-    assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[42].noteheadShape, 'x'); // Closed Hi-Hat
-    assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[49].noteheadShape, 'x'); // Crash
-    assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[38].noteheadShape, 'normal'); // Snare
-    assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[41].noteheadShape, 'normal'); // Floor Tom
-    assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[53].noteheadShape, 'diamond'); // Ride Bell
-    assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[56].noteheadShape, 'diamond'); // Cowbell
+  test('cymbals and hi-hat use the x head; drums use the plain oval -- MuseScore for every one', () => {
+    const T = NE.DEFAULT_DRUM_MAPPING_TABLE;
+    assert.equal(T[42].noteheadShape, 'x'); // Closed Hi-Hat
+    assert.equal(T[49].noteheadShape, 'x'); // Crash
+    assert.equal(T[38].noteheadShape, 'normal'); // Snare
+    assert.equal(T[41].noteheadShape, 'normal'); // Low Floor Tom
+    assert.equal(T[53].noteheadShape, 'diamond'); // Ride Bell
+    // Where MuseScore differs from the convention this engine used to
+    // follow, MuseScore wins -- these are the heads a MuseScore file
+    // actually draws, and a reader comparing the two pages sees them.
+    assert.equal(T[56].noteheadShape, 'inverted-triangle'); // Cowbell, not a diamond
+    assert.equal(T[37].noteheadShape, 'slashed'); // Side Stick, not an x
+    assert.equal(T[39].noteheadShape, 'plus'); // Hand Clap
+    assert.equal(T[52].noteheadGlyph, 'noteheadHeavyXHat'); // Chinese Cymbal
   });
 
-  test('open hi-hat carries the open articulation marker', () => {
-    assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[46].articulation, 'open');
+  test('an open hi-hat is said by its head, the way MuseScore says it', () => {
+    // It used to be an x plus an `articulation: 'open'` marker. MuseScore
+    // draws a circled x and no marker, and drawing both would say it
+    // twice.
+    assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[46].noteheadShape, 'circle-x');
+    assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[46].articulation, undefined);
   });
 });
 
@@ -53,11 +73,25 @@ describe('lookupDrumMapEntry (Phase 41, §13.3)', () => {
     assert.deepEqual([...diagnostics], []);
   });
 
-  test('an in-range but unmapped note (e.g. 39, not a standard GM percussion sound) falls back to the middle line with a warning, never dropped', () => {
-    const { entry, diagnostics } = NE.lookupDrumMapEntry(39, NE.DEFAULT_DRUM_MAPPING_TABLE);
+  test('an in-range but unmapped note falls back to the middle line with a warning, never dropped', () => {
+    // The DEFAULT table can no longer reach this branch: it is
+    // MuseScore's drumset now, and MuseScore defines every pitch from
+    // 35 to 81. A caller's own sparse table still can, which is what
+    // this is really about -- `config.drums.mapping` is allowed to
+    // describe a kit of four drums without every other pitch becoming
+    // an error.
+    const sparse = { 38: NE.DEFAULT_DRUM_MAPPING_TABLE[38] };
+    const { entry, diagnostics } = NE.lookupDrumMapEntry(39, sparse);
     assert.equal(entry.staffPosition, -2); // the middle line
     assert.equal(entry.noteheadShape, 'normal');
     assert.ok([...diagnostics].some((d) => d.code === 'DRUM_NOTE_UNMAPPED'));
+  });
+
+  test("MuseScore's drumset leaves no gap in the GM percussion range", () => {
+    for (let note = 35; note <= 81; note++) {
+      const { diagnostics } = NE.lookupDrumMapEntry(note, NE.DEFAULT_DRUM_MAPPING_TABLE);
+      assert.deepEqual([...diagnostics], [], `GM note ${note} is unmapped`);
+    }
   });
 
   test('a note outside the 35-81 GM percussion range falls back the same way, with a distinct diagnostic code', () => {

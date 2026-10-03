@@ -1,5 +1,12 @@
 import { drumDiagnostic, type DrumDiagnostic } from './diagnostic.js';
 import type { DrumMapEntryOverride } from '../config/config.js';
+import {
+  NOTEHEAD_GROUP_TO_SHAPE,
+  noteheadForDrum,
+  stemDirectionForDrum,
+} from '../musescore/adapters.js';
+import { MUSESCORE_DRUMSET } from '../musescore/drumset.js';
+import { staffPositionFromLine } from '../musescore/staff-position.js';
 
 /**
  * §13.3's own specified shape. `staffPosition` uses the exact same
@@ -14,6 +21,16 @@ export interface DrumMapEntry {
   readonly staffPosition: number;
   /** A notehead shape family name from §9.7's SHAPE_GLYPHS (Phase 15) -- e.g. 'normal', 'x', 'diamond' -- not a raw SMuFL glyph name. */
   readonly noteheadShape: string;
+  /**
+   * One exact SMuFL glyph, for a drum no shape family contains.
+   *
+   * MuseScore's own distinction: most drums name a notehead GROUP,
+   * which has a head for every duration, but a few name a single glyph
+   * outright -- the china cymbal's `noteheadHeavyXHat`, the slap's
+   * `noteheadSlashX`. When this is set it wins over `noteheadShape`,
+   * and the note's own `<notehead>` still wins over both.
+   */
+  readonly noteheadGlyph?: string;
   readonly stemDirection?: 'up' | 'down';
   readonly articulation?: string;
 }
@@ -21,187 +38,67 @@ export interface DrumMapEntry {
 export type DrumMappingTable = Readonly<Record<number, DrumMapEntry>>;
 
 /**
- * §13.3's default GM table, covering the standard kit it names
- * explicitly. Positions are a representative, defensible default
- * ordering (low sounds low, cymbals high, feet below hands) confirmed
- * against several independent drum-notation guides -- but real practice
- * genuinely varies here ("notators vary to some degree on what
- * instrument each line represents," per one such guide), which is
- * exactly why §13.3 requires every field to be overridable via
- * `config.drums.mapping` rather than treating this table as a single
- * universal truth. Stem direction follows the hands-up/feet-down
- * convention multiple sources confirm with full agreement; notehead
- * shapes follow the equally-consistent oval=drum, x=cymbal/hi-hat,
- * diamond=bell-type-sound (ride bell, cowbell) convention.
+ * §13.3's error-condition fallback -- the middle line, a plain notehead,
+ * and a warning, never a dropped note.
+ *
+ * Declared ABOVE the table rather than beside the function that reports
+ * the diagnostic, because the table is built when this module loads and
+ * reads the fallback: a `const` declared after it is still in its
+ * temporal dead zone at that moment, and the drum that needed it came
+ * out with no notehead at all.
  */
-export const DEFAULT_DRUM_MAPPING_TABLE: DrumMappingTable = {
-  35: {
-    midiNote: 35,
-    name: 'Acoustic Bass Drum',
-    staffPosition: -0.5,
-    noteheadShape: 'normal',
-    stemDirection: 'down',
-  },
-  36: {
-    midiNote: 36,
-    name: 'Bass Drum 1',
-    staffPosition: -0.5,
-    noteheadShape: 'normal',
-    stemDirection: 'down',
-  },
-  37: {
-    midiNote: 37,
-    name: 'Side Stick',
-    staffPosition: -2.5,
-    noteheadShape: 'x',
-    stemDirection: 'up',
-  },
-  38: {
-    midiNote: 38,
-    name: 'Acoustic Snare',
-    staffPosition: -2.5,
-    noteheadShape: 'normal',
-    stemDirection: 'up',
-  },
-  40: {
-    midiNote: 40,
-    name: 'Electric Snare',
-    staffPosition: -2.5,
-    noteheadShape: 'normal',
-    stemDirection: 'up',
-  },
-  41: {
-    midiNote: 41,
-    name: 'Low Floor Tom',
-    staffPosition: 0,
-    noteheadShape: 'normal',
-    stemDirection: 'up',
-  },
-  43: {
-    midiNote: 43,
-    name: 'High Floor Tom',
-    staffPosition: -0.5,
-    noteheadShape: 'normal',
-    stemDirection: 'up',
-  },
-  45: {
-    midiNote: 45,
-    name: 'Low Tom',
-    staffPosition: -1,
-    noteheadShape: 'normal',
-    stemDirection: 'up',
-  },
-  47: {
-    midiNote: 47,
-    name: 'Low-Mid Tom',
-    staffPosition: -2,
-    noteheadShape: 'normal',
-    stemDirection: 'up',
-  },
-  48: {
-    midiNote: 48,
-    name: 'Hi-Mid Tom',
-    staffPosition: -2.5,
-    noteheadShape: 'normal',
-    stemDirection: 'up',
-  },
-  50: {
-    midiNote: 50,
-    name: 'High Tom',
-    staffPosition: -3,
-    noteheadShape: 'normal',
-    stemDirection: 'up',
-  },
-  42: {
-    midiNote: 42,
-    name: 'Closed Hi-Hat',
-    staffPosition: -4.5,
-    noteheadShape: 'x',
-    stemDirection: 'up',
-  },
-  44: {
-    midiNote: 44,
-    name: 'Pedal Hi-Hat',
-    staffPosition: -3.5,
-    noteheadShape: 'x',
-    stemDirection: 'down',
-  },
-  46: {
-    midiNote: 46,
-    name: 'Open Hi-Hat',
-    staffPosition: -4.5,
-    noteheadShape: 'x',
-    stemDirection: 'up',
-    articulation: 'open',
-  },
-  49: {
-    midiNote: 49,
-    name: 'Crash Cymbal 1',
-    staffPosition: -5,
-    noteheadShape: 'x',
-    stemDirection: 'up',
-  },
-  57: {
-    midiNote: 57,
-    name: 'Crash Cymbal 2',
-    staffPosition: -5.5,
-    noteheadShape: 'x',
-    stemDirection: 'up',
-  },
-  51: {
-    midiNote: 51,
-    name: 'Ride Cymbal 1',
-    staffPosition: -4.5,
-    noteheadShape: 'x',
-    stemDirection: 'up',
-  },
-  53: {
-    midiNote: 53,
-    name: 'Ride Bell',
-    staffPosition: -4.5,
-    noteheadShape: 'diamond',
-    stemDirection: 'up',
-  },
-  59: {
-    midiNote: 59,
-    name: 'Ride Cymbal 2 (edge)',
-    staffPosition: -4.5,
-    noteheadShape: 'x',
-    stemDirection: 'up',
-  },
-  52: {
-    midiNote: 52,
-    name: 'Chinese Cymbal',
-    staffPosition: -5,
-    noteheadShape: 'x',
-    stemDirection: 'up',
-  },
-  55: {
-    midiNote: 55,
-    name: 'Splash Cymbal',
-    staffPosition: -5.5,
-    noteheadShape: 'x',
-    stemDirection: 'up',
-  },
-  56: {
-    midiNote: 56,
-    name: 'Cowbell',
-    staffPosition: -4,
-    noteheadShape: 'diamond',
-    stemDirection: 'up',
-  },
-  54: {
-    midiNote: 54,
-    name: 'Tambourine',
-    staffPosition: -4.5,
-    noteheadShape: 'x',
-    stemDirection: 'up',
-  },
-};
-
-/** §13.3's error-condition fallback -- the middle line, a plain notehead, and a warning, never a dropped note. */
 export const DRUM_FALLBACK_STAFF_POSITION = -2;
 export const DRUM_FALLBACK_NOTEHEAD_SHAPE = 'normal';
+
+/**
+ * The kit, as MuseScore ships it.
+ *
+ * This WAS a hand-written table of 35 drums, positioned from several
+ * drum-notation guides -- a defensible default, and §13.3 says so, but
+ * a defensible default is not what a reader comparing this engine's
+ * page with MuseScore's wants. Every score this engine is given was
+ * written in MuseScore, MusicXML carries a drum note as a MIDI number
+ * and nothing else, and so the two programs drew different charts from
+ * the same file: toms half a space apart, the ride a half space low,
+ * five instruments wearing a different head.
+ *
+ * So it is MuseScore's own `Drumset::initDrumset()` now, read at the
+ * pinned revision in `musescore/provenance.ts` and converted out of
+ * MuseScore's top-down line numbers into this engine's bottom-up staff
+ * positions. 61 drums rather than 35, and every one of them where
+ * MuseScore puts it.
+ *
+ * It is still fully overridable, and that still matters: §13.3's point
+ * -- that notators genuinely vary -- is true, and a kit of the owner's
+ * own goes in `config.drums.mapping`, or through
+ * `MuseScore.drumMappingFromMuseScore({ ... })` for a customised
+ * MuseScore. What has changed is only which answer is given to someone
+ * who says nothing.
+ */
+function museScoreDrumTable(staffLines = 5): DrumMappingTable {
+  const table: Record<number, DrumMapEntry> = {};
+  for (const drum of MUSESCORE_DRUMSET) {
+    // A drum whose head is one of MuseScore's named groups maps onto a
+    // shape family this engine draws in all four fills. A HEAD_CUSTOM
+    // drum -- the slap, the china cymbal, the muted conga and surdo --
+    // names one exact SMuFL glyph instead, and no family contains it,
+    // so it is carried as a glyph and the family falls back to a plain
+    // head for any caller reading only that.
+    const shape = NOTEHEAD_GROUP_TO_SHAPE[drum.notehead];
+    const glyph = shape === undefined ? noteheadForDrum(drum) : undefined;
+    table[drum.pitch] = {
+      midiNote: drum.pitch,
+      name: drum.name,
+      staffPosition: staffPositionFromLine(drum.line, staffLines),
+      noteheadShape: shape ?? DRUM_FALLBACK_NOTEHEAD_SHAPE,
+      stemDirection: stemDirectionForDrum(drum),
+      ...(glyph !== undefined ? { noteheadGlyph: glyph } : {}),
+    };
+  }
+  return table;
+}
+
+export const DEFAULT_DRUM_MAPPING_TABLE: DrumMappingTable = museScoreDrumTable();
 
 export interface LookupDrumMapEntryResult {
   readonly entry: DrumMapEntry;
@@ -271,6 +168,11 @@ export function mergeDrumMappingTable(
         ? { stemDirection: override.stemDirection }
         : existing?.stemDirection !== undefined
           ? { stemDirection: existing.stemDirection }
+          : {}),
+      ...(override.noteheadGlyph !== undefined
+        ? { noteheadGlyph: override.noteheadGlyph }
+        : override.noteheadShape === undefined && existing?.noteheadGlyph !== undefined
+          ? { noteheadGlyph: existing.noteheadGlyph }
           : {}),
       ...(override.articulation !== undefined
         ? { articulation: override.articulation }
