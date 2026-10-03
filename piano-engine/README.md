@@ -110,6 +110,66 @@ gradient, because a rectangle is the one thing the SVG and the canvas
 draw identically. `strength: 1` would not be a fade but a wall, so a
 note is always at least faintly visible.
 
+## Hands on the keys
+
+Two hands, always both, drawn over the keyboard and pressing one finger
+per note.
+
+```js
+const plan = PianoEngine.planFingering(notes);
+
+PianoEngine.renderPianoStage({
+  size: 88, width: 1920, height: 600, seconds: 12.5, notes,
+  colors: { leftHand: '#FFC400', rightHand: '#4FA3FF' },
+  hands: {
+    notes: plan.notes,              // every note, now with a finger
+    anchors: plan.anchors,          // where each hand sits, over time
+    colors: PianoEngine.handColorsFor({ leftHand: '#FFC400', rightHand: '#4FA3FF' }),
+  },
+});
+```
+
+`planFingering` is solved ONCE for the whole piece, not per frame. The
+answer cannot change between frames, and a hand that re-decided its
+fingering thirty times a second would twitch.
+
+**A hand plays in reaches, not note by note.** It settles over the keys
+the next few chords need and stays there until the music leaves them.
+Deciding one note at a time is what makes a drawn hand crawl up the
+keyboard a key per note with the thumb on everything. The position is
+the one that puts the middle finger on the middle of the passage, and
+that single rule gives the textbook fingerings for free: a five-key
+scale comes out 1-2-3-4-5 in the right hand and 5-4-3-2-1 in the left,
+because a five-key span centred on finger 3 puts the thumb exactly on
+its near end. A stretch wider than the hand cannot be centred, so the
+hand sits on the near end and the outer fingers stretch for the rest.
+
+`anchorAt` slides a hand between positions over 0.18s, eased in and
+out, **arriving as the chord sounds** — a hand still moving when the
+note speaks looks like it missed it.
+
+Three things make it read as a hand, none of them detail:
+
+- the fingers are not the same length. Middle longest, thumb shortest
+  and off the side, little finger short AND set back. Five equal bars
+  read as a comb.
+- a pressed finger goes down and the others do not. That is the whole
+  of the animation; without it the hand is a sticker.
+- the hand leans, thumb side forward, which is what makes a left hand
+  look like a left hand rather than a mirrored right one.
+
+A finger is a stroked path with a round cap, which is the one thing the
+rectangle list could not describe before: `StageShape.path` carries SVG
+path data that an `<path d>` and a canvas `new Path2D(d)` parse
+identically, so the preview and the exported video stay one drawing.
+
+The hands wear the notes' own colours on the outline and the pressing
+fingertip, so the hand playing the amber notes is the amber-edged one
+without a legend. The skin stays neutral on both — two differently
+coloured hands read as two different people. The pressed fingertip is
+drawn in the DARK edge colour, because the key under it is lit in the
+note colour and an amber dot on an amber key is camouflage.
+
 ## Tests
 
 `npm test` runs against the BUILT bundle in a bare sandbox — the same

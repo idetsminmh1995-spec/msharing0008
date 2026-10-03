@@ -318,7 +318,7 @@
 <script src="../../assets/notation-engine.js?v=07113ca3"></script>
 <!-- The piano stage: the keyboard, and the notes falling onto it.
      piano-engine/, TypeScript + SVG, built to this bundle. -->
-<script src="../../assets/piano-engine.js?v=259a8cc8"></script>
+<script src="../../assets/piano-engine.js?v=6db1c267"></script>
 <!-- Finds the count voices in the bucket whatever they were named. -->
 <script src="../../assets/voice-samples.js?v=609facad"></script>
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
@@ -1124,6 +1124,30 @@
       }
     }
     pianoNotes.sort((a, b) => a.startSeconds - b.startSeconds);
+    buildPianoFingering();
+  }
+
+  /**
+   * Two hands on the keys, solved once for the whole piece.
+   *
+   * The engine works out which finger plays which note and where each
+   * hand sits over time (`planFingering`); the drawing then just reads
+   * that back at whatever second it is painting. Solved ONCE rather
+   * than per frame because the answer cannot change between frames --
+   * a hand that re-decided its fingering thirty times a second would
+   * twitch -- and because a frame has sixteen milliseconds to be drawn
+   * in.
+   */
+  let pianoFingering = null;
+
+  function buildPianoFingering() {
+    pianoFingering = null;
+    if (typeof PianoEngine === 'undefined' || pianoNotes.length === 0) return;
+    try {
+      pianoFingering = PianoEngine.planFingering(pianoNotes);
+    } catch (err) {
+      pianoFingering = null;
+    }
   }
 
   /**
@@ -1204,6 +1228,18 @@
       fade: { color: getComputedStyle(videoFrame).backgroundColor },
       leadSeconds: fallSeconds(),
       colors: stageColors(),
+      // The hands, when there is a piece for them to play. They take
+      // the same two colours as the falling notes, so the hand playing
+      // the amber notes is the amber-edged one.
+      ...(pianoFingering
+        ? {
+            hands: {
+              notes: pianoFingering.notes,
+              anchors: pianoFingering.anchors,
+              colors: PianoEngine.handColorsFor(stageColors()),
+            },
+          }
+        : {}),
     };
   }
 
@@ -2583,7 +2619,25 @@
     const shapes = PianoEngine.stageShapes(stageOptions(box.w, box.h, atSeconds));
     ctx2d.save();
     ctx2d.translate(box.x, box.y);
+    ctx2d.lineCap = 'round';
+    ctx2d.lineJoin = 'round';
     for (const shape of shapes) {
+      // A shape with a path is a finger: the SAME `d` the preview puts
+      // in its <path>, which a canvas parses as a Path2D, so the hands
+      // in the video are the hands that were on screen.
+      if (shape.path !== undefined) {
+        const drawn = new Path2D(shape.path);
+        if (shape.fill !== 'none') {
+          ctx2d.fillStyle = shape.fill;
+          ctx2d.fill(drawn);
+        }
+        if (shape.stroke !== undefined && shape.strokeWidth > 0) {
+          ctx2d.strokeStyle = shape.stroke;
+          ctx2d.lineWidth = shape.strokeWidth;
+          ctx2d.stroke(drawn);
+        }
+        continue;
+      }
       ctx2d.fillStyle = shape.fill;
       if (shape.radius > 0) {
         roundRectPath(ctx2d, shape.x, shape.y, shape.width, shape.height, shape.radius);
@@ -2594,7 +2648,12 @@
       if (shape.stroke !== undefined && shape.strokeWidth > 0) {
         ctx2d.strokeStyle = shape.stroke;
         ctx2d.lineWidth = shape.strokeWidth;
-        ctx2d.strokeRect(shape.x, shape.y, shape.width, shape.height);
+        if (shape.radius > 0) {
+          roundRectPath(ctx2d, shape.x, shape.y, shape.width, shape.height, shape.radius);
+          ctx2d.stroke();
+        } else {
+          ctx2d.strokeRect(shape.x, shape.y, shape.width, shape.height);
+        }
       }
     }
     ctx2d.restore();

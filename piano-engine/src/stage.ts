@@ -8,8 +8,10 @@
  * Neither renderer decides what a frame looks like, so neither can
  * drift from the other.
  */
+import { parseColor } from './color.js';
+import { DEFAULT_HAND_COLORS, handsShapes } from './hands.js';
 import { keyboardGeometry, pressedAt } from './keyboard.js';
-import { n, rect, wrap } from './svg.js';
+import { n, path, rect, wrap } from './svg.js';
 import type {
   FallingBar,
   GridLine,
@@ -190,44 +192,6 @@ export function gridShapes(
 }
 
 /**
- * `#rgb`, `#rrggbb`, `rgb(...)` or `rgba(...)` as numbers.
- *
- * Needed because a fade is the frame's OWN background at a series of
- * alphas, and a page hands that over in whatever form it reads the
- * colour in -- a computed style is `rgb(23, 17, 14)`, a stylesheet is
- * `#17110E`. Returns null for anything else rather than guessing, and
- * the fade is then simply not drawn.
- */
-export function parseColor(value: string): { r: number; g: number; b: number } | null {
-  const text = value.trim();
-  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(text);
-  if (hex) {
-    const digits = hex[1] ?? '';
-    const full =
-      digits.length === 3
-        ? digits
-            .split('')
-            .map((d) => d + d)
-            .join('')
-        : digits;
-    return {
-      r: Number.parseInt(full.slice(0, 2), 16),
-      g: Number.parseInt(full.slice(2, 4), 16),
-      b: Number.parseInt(full.slice(4, 6), 16),
-    };
-  }
-  const rgb = /^rgba?\(([^)]+)\)$/i.exec(text);
-  if (rgb) {
-    const parts = (rgb[1] ?? '').split(/[,/\s]+/).filter((p) => p.length > 0);
-    const [r, g, b] = parts.map((p) => Number.parseFloat(p));
-    if ([r, g, b].every((n) => Number.isFinite(n))) {
-      return { r: r as number, g: g as number, b: b as number };
-    }
-  }
-  return null;
-}
-
-/**
  * The fade at the top of the falling area, as bands of the frame's own
  * colour at falling alphas.
  *
@@ -356,7 +320,7 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
     });
   }
 
-  // The line the notes land on, last, so no key covers it.
+  // The line the notes land on, so no key covers it.
   shapes.push({
     x: 0,
     y: board.y - lineHeight / 2,
@@ -364,18 +328,46 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
     height: lineHeight,
     fill: colors.strikeLine,
   });
+
+  // And the hands over everything, because that is where they are.
+  // Only when a caller hands over a fingering -- the hands come from
+  // `planFingering`, not from the notes, and a page that has not asked
+  // for them gets exactly the stage it got before.
+  if (options.hands !== undefined) {
+    for (const shape of handsShapes({
+      size: options.size,
+      board,
+      seconds: options.seconds,
+      notes: options.hands.notes,
+      anchors: options.hands.anchors,
+      colors: options.hands.colors ?? DEFAULT_HAND_COLORS,
+      ...(options.hands.scale !== undefined ? { scale: options.hands.scale } : {}),
+    })) {
+      shapes.push(shape);
+    }
+  }
   return shapes;
 }
 
 function shapesToSvg(shapes: readonly StageShape[], width: number, height: number): string {
   const body = shapes
     .map((shape) =>
-      rect(shape.x, shape.y, shape.width, shape.height, {
-        fill: shape.fill,
-        ...(shape.stroke !== undefined ? { stroke: shape.stroke } : {}),
-        ...(shape.strokeWidth !== undefined ? { 'stroke-width': shape.strokeWidth } : {}),
-        ...(shape.radius !== undefined && shape.radius > 0 ? { rx: shape.radius } : {}),
-      }),
+      shape.path !== undefined
+        ? path(shape.path, {
+            fill: shape.fill,
+            ...(shape.stroke !== undefined ? { stroke: shape.stroke } : {}),
+            ...(shape.strokeWidth !== undefined ? { 'stroke-width': shape.strokeWidth } : {}),
+            // Round, because a finger ends in a fingertip. A butt cap
+            // is what makes a stroked finger read as a stick.
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round',
+          })
+        : rect(shape.x, shape.y, shape.width, shape.height, {
+            fill: shape.fill,
+            ...(shape.stroke !== undefined ? { stroke: shape.stroke } : {}),
+            ...(shape.strokeWidth !== undefined ? { 'stroke-width': shape.strokeWidth } : {}),
+            ...(shape.radius !== undefined && shape.radius > 0 ? { rx: shape.radius } : {}),
+          }),
     )
     .join('');
   return wrap(

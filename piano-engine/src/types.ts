@@ -112,6 +112,22 @@ export interface PianoStageOptions {
   /** Height of the keyboard itself. Defaults to a third of the stage, clamped so the keys stay playable-looking. */
   readonly keyboardHeight?: number;
   readonly colors?: Partial<PianoColors>;
+  /**
+   * The two hands on the keys.
+   *
+   * Absent draws none, which is the stage exactly as it was before
+   * hands existed. `notes` and `anchors` come from `planFingering` --
+   * a hand cannot be drawn from the notes alone, because where it sits
+   * depends on where it has BEEN, and that is solved once for the whole
+   * piece rather than guessed at per frame.
+   */
+  readonly hands?: {
+    readonly notes: readonly import('./fingering.js').FingeredNote[];
+    readonly anchors: Readonly<Record<Hand, readonly import('./fingering.js').HandAnchor[]>>;
+    readonly colors?: Readonly<Record<Hand, import('./hands.js').HandColors>>;
+    /** 1 is the size that fits the keys; below 1 draws smaller hands. */
+    readonly scale?: number;
+  };
 }
 
 /**
@@ -132,4 +148,17 @@ export interface StageShape {
   readonly strokeWidth?: number;
   /** Corner radius. Bars have one; keys do not. */
   readonly radius?: number;
+  /**
+   * SVG path data, for the one thing a rectangle cannot be: a finger.
+   *
+   * When this is set the x/y/width/height are ignored and the shape is
+   * the path -- filled with `fill` unless that is `'none'`, stroked
+   * with `stroke` at `strokeWidth` and round-capped, which is what
+   * makes a stroke read as a finger rather than as a line.
+   *
+   * Both renderers take the same string: an SVG `<path d>` and a
+   * canvas `new Path2D(d)` parse it identically, which is what keeps
+   * the preview and the exported video one drawing.
+   */
+  readonly path?: string;
 }

@@ -22,23 +22,33 @@ var PianoEngine = (() => {
   var index_exports = {};
   __export(index_exports, {
     DEFAULT_COLORS: () => DEFAULT_COLORS,
+    DEFAULT_HAND_COLORS: () => DEFAULT_HAND_COLORS,
     DEFAULT_LEAD_SECONDS: () => DEFAULT_LEAD_SECONDS,
+    FINGERS: () => FINGERS,
     KEYBOARD_RANGES: () => KEYBOARD_RANGES,
     KEYBOARD_SIZES: () => KEYBOARD_SIZES,
+    anchorAt: () => anchorAt,
+    darken: () => darken,
     fadeShapes: () => fadeShapes,
     fallingBars: () => fallingBars,
+    fingersDownAt: () => fingersDownAt,
     gridShapes: () => gridShapes,
     handColor: () => handColor,
+    handColorsFor: () => handColorsFor,
+    handShapes: () => handShapes,
+    handsShapes: () => handsShapes,
     isBlackKey: () => isBlackKey,
     keyboardBox: () => keyboardBox,
     keyboardGeometry: () => keyboardGeometry,
     keyboardRange: () => keyboardRange,
     parseColor: () => parseColor,
+    planFingering: () => planFingering,
     pressedAt: () => pressedAt,
     renderKeyboardSvg: () => renderKeyboardSvg,
     renderPianoStage: () => renderPianoStage,
     resolveColors: () => resolveColors,
     stageShapes: () => stageShapes,
+    whiteIndex: () => whiteIndex,
     whiteKeyCount: () => whiteKeyCount
   });
 
@@ -119,6 +129,333 @@ var PianoEngine = (() => {
     return down;
   }
 
+  // src/color.ts
+  function parseColor(value) {
+    const text = value.trim();
+    const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(text);
+    if (hex) {
+      const digits = hex[1] ?? "";
+      const full = digits.length === 3 ? digits.split("").map((d) => d + d).join("") : digits;
+      return {
+        r: Number.parseInt(full.slice(0, 2), 16),
+        g: Number.parseInt(full.slice(2, 4), 16),
+        b: Number.parseInt(full.slice(4, 6), 16)
+      };
+    }
+    const rgb = /^rgba?\(([^)]+)\)$/i.exec(text);
+    if (rgb) {
+      const parts = (rgb[1] ?? "").split(/[,/\s]+/).filter((p) => p.length > 0);
+      const [r, g, b] = parts.map((p) => Number.parseFloat(p));
+      if ([r, g, b].every((n2) => Number.isFinite(n2))) {
+        return { r, g, b };
+      }
+    }
+    return null;
+  }
+  function darken(value, amount) {
+    const rgb = parseColor(value);
+    if (rgb === null) return value;
+    const keep = Math.max(0, Math.min(1, 1 - amount));
+    const channel = (c) => Math.max(0, Math.min(255, Math.round(c * keep)));
+    return `rgb(${channel(rgb.r)}, ${channel(rgb.g)}, ${channel(rgb.b)})`;
+  }
+
+  // src/fingering.ts
+  var FINGERS = [1, 2, 3, 4, 5];
+  function whiteIndex(midi) {
+    const WHITES_BELOW_C = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
+    const octave = Math.floor(midi / 12);
+    const step = (midi % 12 + 12) % 12;
+    return octave * 7 + (WHITES_BELOW_C[step] ?? 0);
+  }
+  var SPAN = 5;
+  function fingerAt(hand, anchor, white) {
+    return hand === "right" ? white - anchor + 1 : anchor - white + 1;
+  }
+  function anchorFor(hand, white, finger) {
+    return hand === "right" ? white - finger + 1 : white + finger - 1;
+  }
+  function groupByStart(notes) {
+    const byStart = /* @__PURE__ */ new Map();
+    for (const note of notes) {
+      const key = Math.round(note.startSeconds * 100);
+      const group = byStart.get(key);
+      if (group === void 0) byStart.set(key, [note]);
+      else group.push(note);
+    }
+    return [...byStart.entries()].sort((a, b) => a[0] - b[0]).map(([, g]) => g);
+  }
+  function fingersForChord(hand, anchor, chord) {
+    const order = [...chord].sort((a, b) => hand === "right" ? a.midi - b.midi : b.midi - a.midi);
+    const out = [];
+    let lowest = 0;
+    for (const note of order) {
+      const wanted = fingerAt(hand, anchor, whiteIndex(note.midi));
+      const finger = Math.min(5, Math.max(lowest + 1, Math.max(1, Math.round(wanted))));
+      out.push(finger);
+      lowest = finger;
+    }
+    const byNote = /* @__PURE__ */ new Map();
+    order.forEach((note, i) => byNote.set(note, out[i] ?? 3));
+    return chord.map((note) => byNote.get(note) ?? 3);
+  }
+  function handSpan(chords) {
+    let low = Number.POSITIVE_INFINITY;
+    let high = Number.NEGATIVE_INFINITY;
+    for (const chord of chords) {
+      for (const note of chord) {
+        const white = whiteIndex(note.midi);
+        if (white < low) low = white;
+        if (white > high) high = white;
+      }
+    }
+    return { low, high };
+  }
+  function anchorForSpan(hand, low, high) {
+    if (high - low >= SPAN) return anchorFor(hand, hand === "right" ? low : high, 1);
+    return anchorFor(hand, (low + high) / 2, 3);
+  }
+  function planFingering(notes) {
+    const fingered = [];
+    const anchors = { left: [], right: [] };
+    for (const hand of ["left", "right"]) {
+      const mine = notes.filter((note) => note.hand === hand);
+      if (mine.length === 0) continue;
+      const groups = groupByStart(mine);
+      let from = 0;
+      while (from < groups.length) {
+        let to = from;
+        let { low, high } = handSpan([groups[from] ?? []]);
+        while (to + 1 < groups.length) {
+          const next = handSpan([groups[to + 1] ?? []]);
+          const wide = Math.max(high, next.high) - Math.min(low, next.low);
+          if (wide >= SPAN) break;
+          low = Math.min(low, next.low);
+          high = Math.max(high, next.high);
+          to += 1;
+        }
+        const anchor = anchorForSpan(hand, low, high);
+        const first = groups[from]?.[0]?.startSeconds ?? 0;
+        anchors[hand].push({ seconds: first, anchor });
+        for (let i = from; i <= to; i += 1) {
+          const chord = groups[i] ?? [];
+          const fingers = fingersForChord(hand, anchor, chord);
+          chord.forEach((note, n2) => fingered.push({ ...note, finger: fingers[n2] ?? 3 }));
+        }
+        from = to + 1;
+      }
+    }
+    fingered.sort((a, b) => a.startSeconds - b.startSeconds || a.midi - b.midi);
+    return { notes: fingered, anchors: { left: anchors.left, right: anchors.right } };
+  }
+  function anchorAt(path2, seconds, travelSeconds = 0.18) {
+    if (path2.length === 0) return void 0;
+    const first = path2[0];
+    if (first === void 0) return void 0;
+    if (seconds <= first.seconds) return first.anchor;
+    let previous = first;
+    for (const step of path2) {
+      if (step.seconds > seconds) {
+        if (step.anchor === previous.anchor) return previous.anchor;
+        const start = step.seconds - travelSeconds;
+        if (seconds <= start) return previous.anchor;
+        const t = (seconds - start) / travelSeconds;
+        const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        return previous.anchor + (step.anchor - previous.anchor) * eased;
+      }
+      previous = step;
+    }
+    return previous.anchor;
+  }
+  function fingersDownAt(notes, hand, seconds) {
+    const down = /* @__PURE__ */ new Map();
+    for (const note of notes) {
+      if (note.hand !== hand) continue;
+      if (note.startSeconds > seconds || note.endSeconds <= seconds) continue;
+      const held = down.get(note.finger);
+      if (held === void 0 || isBlackKey(note.midi) && !isBlackKey(held)) {
+        down.set(note.finger, note.midi);
+      }
+    }
+    return down;
+  }
+
+  // src/hands.ts
+  var FINGER_SHAPE = [
+    { reach: 0.62, back: 0.5, width: 1.15 },
+    // thumb -- short, thick, low
+    { reach: 0.92, back: 0.08, width: 0.95 },
+    // index
+    { reach: 1, back: 0, width: 0.95 },
+    // middle -- the longest
+    { reach: 0.94, back: 0.06, width: 0.9 },
+    // ring
+    { reach: 0.78, back: 0.22, width: 0.8 }
+    // little -- short and set back
+  ];
+  var PRESS_DROP = 0.1;
+  var DEFAULT_HAND_COLORS = {
+    left: { skin: "#E8C6A0", edge: "#B3800E", tip: "#FFC400" },
+    right: { skin: "#E8C6A0", edge: "#2E6DA8", tip: "#4FA3FF" }
+  };
+  function handColorsFor(colors) {
+    const skin = colors.skin ?? DEFAULT_HAND_COLORS.left.skin;
+    return {
+      left: { skin, edge: darken(colors.leftHand, 0.42), tip: colors.leftHand },
+      right: { skin, edge: darken(colors.rightHand, 0.42), tip: colors.rightHand }
+    };
+  }
+  function whiteKeys(keys) {
+    return keys.filter((key) => !key.black).sort((a, b) => a.x - b.x);
+  }
+  function xAtWhite(whites, index) {
+    if (whites.length === 0) return void 0;
+    const clamped = Math.max(0, Math.min(whites.length - 1, index));
+    const low = whites[Math.floor(clamped)];
+    const high = whites[Math.min(whites.length - 1, Math.ceil(clamped))];
+    if (low === void 0 || high === void 0) return void 0;
+    const t = clamped - Math.floor(clamped);
+    return low.x + low.width / 2 + (high.x + high.width / 2 - (low.x + low.width / 2)) * t;
+  }
+  function fingertips(hand, options, keys, whites) {
+    const path2 = options.anchors[hand];
+    const anchorWhite = anchorAt(path2, options.seconds);
+    if (anchorWhite === void 0) return [];
+    const firstWhite = whites[0];
+    if (firstWhite === void 0) return [];
+    const offset = whiteIndexOfKey(firstWhite.midi);
+    const down = fingersDownAt(options.notes, hand, options.seconds);
+    const byMidi = new Map(keys.map((key) => [key.midi, key]));
+    const board = options.board;
+    const tips = [];
+    for (const finger of FINGERS) {
+      const held = down.get(finger);
+      const shape = FINGER_SHAPE[finger - 1];
+      if (shape === void 0) continue;
+      let x;
+      let onBlack = false;
+      if (held !== void 0) {
+        const key = byMidi.get(held);
+        if (key !== void 0) {
+          x = key.x + key.width / 2;
+          onBlack = key.black;
+        }
+      }
+      if (x === void 0) {
+        const resting = hand === "right" ? anchorWhite + (finger - 1) : anchorWhite - (finger - 1);
+        x = xAtWhite(whites, resting - offset);
+      }
+      if (x === void 0) continue;
+      const depth = onBlack ? 0.42 : 0.66;
+      const y = board.y + board.height * depth * shape.reach + (held !== void 0 ? board.height * PRESS_DROP : 0);
+      tips.push({ finger, x, y, pressed: held !== void 0, onBlack });
+    }
+    return tips;
+  }
+  function whiteIndexOfKey(midi) {
+    const WHITES_BELOW_C = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
+    const octave = Math.floor(midi / 12);
+    const step = (midi % 12 + 12) % 12;
+    return octave * 7 + (WHITES_BELOW_C[step] ?? 0);
+  }
+  function round(value) {
+    return Math.round(value * 100) / 100;
+  }
+  function fingerPath(fromX, fromY, toX, toY) {
+    const midX = (fromX + toX) / 2 + (toX - fromX) * 0.08;
+    const midY = (fromY + toY) / 2 - Math.abs(toY - fromY) * 0.12;
+    return `M ${round(fromX)} ${round(fromY)} Q ${round(midX)} ${round(midY)} ${round(toX)} ${round(toY)}`;
+  }
+  function handShapes(hand, options) {
+    const keys = keyboardGeometry(options.size, options.board);
+    const whites = whiteKeys(keys);
+    const tips = fingertips(hand, options, keys, whites);
+    if (tips.length === 0) return [];
+    const scale = options.scale ?? 1;
+    const colors = options.colors[hand];
+    const board = options.board;
+    const whiteWidth = whites[0]?.width ?? board.width / 52;
+    const unit = whiteWidth * scale;
+    const xs = tips.map((t) => t.x);
+    const thumb = tips.find((t) => t.finger === 1);
+    const little = tips.find((t) => t.finger === 5);
+    const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const palmY = board.y - unit * 0.15;
+    const spread = Math.abs(Math.max(...xs) - Math.min(...xs));
+    const palmWidth = Math.min(unit * 4.8, Math.max(unit * 3.4, spread * 0.92));
+    const palmHeight = unit * 1.5;
+    const lean = thumb !== void 0 && little !== void 0 ? (thumb.x - little.x) * 0.06 : 0;
+    const shapes = [];
+    shapes.push({
+      x: round(centreX + lean - unit * 0.78),
+      y: round(palmY - unit * 2.9),
+      width: round(unit * 1.56),
+      height: round(unit * 3.4),
+      fill: colors.skin,
+      stroke: colors.edge,
+      strokeWidth: round(unit * 0.06),
+      radius: round(unit * 0.6)
+    });
+    for (const tip of tips) {
+      const shape = FINGER_SHAPE[tip.finger - 1];
+      if (shape === void 0) continue;
+      const reachX = (tip.x - centreX) * 0.78;
+      const limit = palmWidth * 0.42;
+      const knuckleX = centreX + lean + Math.max(-limit, Math.min(limit, reachX)) + (tip.finger === 1 ? -lean * 2 : 0);
+      const knuckleY = palmY + palmHeight * (0.22 + shape.back * 0.5);
+      const d = fingerPath(knuckleX, knuckleY, tip.x, tip.y);
+      const thickness = unit * 0.46 * shape.width;
+      shapes.push({
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        fill: "none",
+        stroke: colors.edge,
+        strokeWidth: round(thickness + unit * 0.11),
+        path: d
+      });
+      shapes.push({
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        fill: "none",
+        stroke: colors.skin,
+        strokeWidth: round(thickness),
+        path: d
+      });
+    }
+    shapes.push({
+      x: round(centreX + lean - palmWidth / 2),
+      y: round(palmY),
+      width: round(palmWidth),
+      height: round(palmHeight),
+      fill: colors.skin,
+      stroke: colors.edge,
+      strokeWidth: round(unit * 0.06),
+      radius: round(palmHeight * 0.42)
+    });
+    for (const tip of tips) {
+      if (!tip.pressed) continue;
+      const r = unit * 0.3;
+      shapes.push({
+        x: round(tip.x - r),
+        y: round(tip.y - r),
+        width: round(r * 2),
+        height: round(r * 2),
+        fill: colors.edge,
+        stroke: colors.skin,
+        strokeWidth: round(unit * 0.07),
+        radius: round(r)
+      });
+    }
+    return shapes;
+  }
+  function handsShapes(options) {
+    return [...handShapes("left", options), ...handShapes("right", options)];
+  }
+
   // src/svg.ts
   function escapeText(value) {
     return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -144,6 +481,9 @@ var PianoEngine = (() => {
   }
   function rect(x, y, w, h, values = {}) {
     return tag("rect", { x, y, width: w, height: h, ...values });
+  }
+  function path(d, values = {}) {
+    return tag("path", { d, ...values });
   }
 
   // src/stage.ts
@@ -236,28 +576,6 @@ var PianoEngine = (() => {
       });
     }
     return shapes;
-  }
-  function parseColor(value) {
-    const text = value.trim();
-    const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(text);
-    if (hex) {
-      const digits = hex[1] ?? "";
-      const full = digits.length === 3 ? digits.split("").map((d) => d + d).join("") : digits;
-      return {
-        r: Number.parseInt(full.slice(0, 2), 16),
-        g: Number.parseInt(full.slice(2, 4), 16),
-        b: Number.parseInt(full.slice(4, 6), 16)
-      };
-    }
-    const rgb = /^rgba?\(([^)]+)\)$/i.exec(text);
-    if (rgb) {
-      const parts = (rgb[1] ?? "").split(/[,/\s]+/).filter((p) => p.length > 0);
-      const [r, g, b] = parts.map((p) => Number.parseFloat(p));
-      if ([r, g, b].every((n2) => Number.isFinite(n2))) {
-        return { r, g, b };
-      }
-    }
-    return null;
   }
   function fadeShapes(options) {
     const fade = options.fade;
@@ -353,11 +671,32 @@ var PianoEngine = (() => {
       height: lineHeight,
       fill: colors.strikeLine
     });
+    if (options.hands !== void 0) {
+      for (const shape of handsShapes({
+        size: options.size,
+        board,
+        seconds: options.seconds,
+        notes: options.hands.notes,
+        anchors: options.hands.anchors,
+        colors: options.hands.colors ?? DEFAULT_HAND_COLORS,
+        ...options.hands.scale !== void 0 ? { scale: options.hands.scale } : {}
+      })) {
+        shapes.push(shape);
+      }
+    }
     return shapes;
   }
   function shapesToSvg(shapes, width, height) {
     const body = shapes.map(
-      (shape) => rect(shape.x, shape.y, shape.width, shape.height, {
+      (shape) => shape.path !== void 0 ? path(shape.path, {
+        fill: shape.fill,
+        ...shape.stroke !== void 0 ? { stroke: shape.stroke } : {},
+        ...shape.strokeWidth !== void 0 ? { "stroke-width": shape.strokeWidth } : {},
+        // Round, because a finger ends in a fingertip. A butt cap
+        // is what makes a stroked finger read as a stick.
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round"
+      }) : rect(shape.x, shape.y, shape.width, shape.height, {
         fill: shape.fill,
         ...shape.stroke !== void 0 ? { stroke: shape.stroke } : {},
         ...shape.strokeWidth !== void 0 ? { "stroke-width": shape.strokeWidth } : {},

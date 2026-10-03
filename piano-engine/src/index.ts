@@ -23,12 +23,16 @@ export {
   gridShapes,
   handColor,
   keyboardBox,
-  parseColor,
   renderKeyboardSvg,
   renderPianoStage,
   resolveColors,
   stageShapes,
 } from './stage.js';
+export { darken, parseColor } from './color.js';
+export { FINGERS, anchorAt, fingersDownAt, planFingering, whiteIndex } from './fingering.js';
+export type { FingeredNote, Finger, FingeringPlan, HandAnchor } from './fingering.js';
+export { DEFAULT_HAND_COLORS, handColorsFor, handShapes, handsShapes } from './hands.js';
+export type { HandColors, HandsOptions } from './hands.js';
 export type {
   FallingBar,
   GridLine,
