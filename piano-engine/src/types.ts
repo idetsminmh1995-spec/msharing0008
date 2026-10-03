@@ -127,8 +127,30 @@ export interface PianoStageOptions {
     readonly colors?: Readonly<Record<Hand, import('./hands.js').HandColors>>;
     /** 1 is the size that fits the keys; below 1 draws smaller hands. */
     readonly scale?: number;
+    /** A number on each key being played, as a lesson video does. Default true. */
+    readonly fingerNumbers?: boolean;
   };
+  /**
+   * Which picture this is. Defaults to `falling-notes`, which is the
+   * stage as it was before the hands design existed.
+   *
+   * The design decides what is DRAWN, not what is known: the same
+   * notes, the same fingering and the same keyboard go in either way.
+   */
+  readonly design?: PianoDesign;
 }
+
+/**
+ * Which of the two pictures a frame is.
+ *
+ * `falling-notes` is the Synthesia-style stage: bars coming down a
+ * grid onto a keyboard. `hands` drops all of that and shows the
+ * keyboard alone, with two hands on it pressing the keys -- the same
+ * music, taught the other way round. They are two DESIGNS of one
+ * video, not two engines: the notes, the fingering and the keyboard
+ * are the same objects either way.
+ */
+export type PianoDesign = 'falling-notes' | 'hands';
 
 /**
  * One rectangle of a drawn frame.
@@ -161,4 +183,19 @@ export interface StageShape {
    * the preview and the exported video one drawing.
    */
   readonly path?: string;
+  /**
+   * A short string drawn centred in this shape's box: the number of
+   * the finger playing the key it sits on.
+   *
+   * Text, not a drawn glyph, because a digit has to be legible at
+   * video size and a hand-drawn one would not be. Both renderers take
+   * it -- an SVG `<text>` centred on the box, and a canvas `fillText`
+   * with the same alignment -- so the badge in the export is the badge
+   * that was on screen.
+   */
+  readonly label?: string;
+  /** The label's size, in the same units as x/y. */
+  readonly labelSize?: number;
+  /** The label's own colour. Falls back to `fill` when it is not set. */
+  readonly labelColor?: string;
 }

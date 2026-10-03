@@ -14,6 +14,8 @@ export {
   keyboardRange,
   pressedAt,
   whiteKeyCount,
+  whiteKeysBetween,
+  whiteOutward,
 } from './keyboard.js';
 export {
   DEFAULT_COLORS,
@@ -22,6 +24,7 @@ export {
   fallingBars,
   gridShapes,
   handColor,
+  handsRange,
   keyboardBox,
   renderKeyboardSvg,
   renderPianoStage,
@@ -39,6 +42,7 @@ export type {
   Hand,
   KeyboardSize,
   PianoColors,
+  PianoDesign,
   PianoKey,
   PianoNote,
   PianoStageOptions,

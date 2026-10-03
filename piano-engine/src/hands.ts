@@ -113,6 +113,16 @@ export interface HandsOptions {
   readonly colors: Readonly<Record<Hand, HandColors>>;
   /** 1 is the size that fits the keys; below 1 draws smaller hands. */
   readonly scale?: number;
+  /**
+   * A numbered badge on each key being played. Default true.
+   *
+   * This is the one thing a hand on a keyboard cannot say by itself:
+   * you can see WHICH key is down, but not which finger a learner
+   * should use, because the hand covering it is the thing in the way.
+   * Every piano lesson video puts the number on the key for exactly
+   * that reason.
+   */
+  readonly fingerNumbers?: boolean;
 }
 
 /** Where one finger ends up, in the keyboard's own coordinates. */
@@ -122,6 +132,8 @@ interface Fingertip {
   readonly y: number;
   readonly pressed: boolean;
   readonly onBlack: boolean;
+  /** The key it is pressing, when it is pressing one. */
+  readonly midi?: number;
 }
 
 /** The white keys, in order, so a hand can be placed by counting them. */
@@ -194,12 +206,26 @@ function fingertips(
 
     // Down the key: a black key is shorter and further back, so a
     // finger on one stops higher up the board than one on a white.
+    //
+    // Capped by the HAND's own size, not just the board's. A keyboard
+    // drawn tall -- which the hands design does, having nothing else to
+    // put on the stage -- has long keys, and a finger measured as a
+    // fraction of them grows with them. A finger is about three and a
+    // half white keys long whatever the picture is; past that it stops
+    // being a hand and becomes a rake.
     const depth = onBlack ? 0.42 : 0.66;
-    const y =
-      board.y +
-      board.height * depth * shape.reach +
-      (held !== undefined ? board.height * PRESS_DROP : 0);
-    tips.push({ finger, x, y, pressed: held !== undefined, onBlack });
+    const unit = (whites[0]?.width ?? board.width / 52) * (options.scale ?? 1);
+    const reach = Math.min(board.height * depth, unit * (onBlack ? 2.6 : 3.9));
+    const drop = Math.min(board.height * PRESS_DROP, unit * 0.55);
+    const y = board.y + reach * shape.reach + (held !== undefined ? drop : 0);
+    tips.push({
+      finger,
+      x,
+      y,
+      pressed: held !== undefined,
+      onBlack,
+      ...(held !== undefined ? { midi: held } : {}),
+    });
   }
   return tips;
 }
@@ -366,6 +392,38 @@ export function handShapes(hand: Hand, options: HandsOptions): readonly StageSha
       strokeWidth: round(unit * 0.07),
       radius: round(r),
     });
+  }
+
+  // And the finger's number on the key it is playing, at the key's
+  // front edge where no hand reaches.
+  //
+  // Last of everything, so nothing can cover the one part of the
+  // picture a learner is actually reading.
+  if (options.fingerNumbers !== false) {
+    const byMidi = new Map(keys.map((key) => [key.midi, key]));
+    for (const tip of tips) {
+      if (!tip.pressed) continue;
+      const key = byMidi.get(tip.midi ?? -1);
+      if (key === undefined) continue;
+      // Sized by the key's WIDTH and placed by its LENGTH: the badge
+      // has to fit between the key's edges whatever shape the frame
+      // is, and sit the same distance up from its front in a short
+      // 16:9 keyboard and a long 9:16 one.
+      const badge = unit * 0.34;
+      shapes.push({
+        x: round(key.x + key.width / 2 - badge),
+        y: round(key.y + key.height - key.height * 0.06 - badge * 2),
+        width: round(badge * 2),
+        height: round(badge * 2),
+        fill: colors.tip,
+        stroke: colors.edge,
+        strokeWidth: round(unit * 0.06),
+        radius: round(badge),
+        label: String(tip.finger),
+        labelSize: round(badge * 1.35),
+        labelColor: colors.edge,
+      });
+    }
   }
 
   return shapes;

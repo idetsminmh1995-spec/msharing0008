@@ -35,6 +35,26 @@ export function isBlackKey(midi: number): boolean {
   return BLACK_PITCH_CLASSES.has(((midi % 12) + 12) % 12);
 }
 
+/** How many white keys lie between two MIDI numbers, both ends counted. */
+export function whiteKeysBetween(first: number, last: number): number {
+  let count = 0;
+  for (let midi = first; midi <= last; midi += 1) if (!isBlackKey(midi)) count += 1;
+  return count;
+}
+
+/**
+ * The nearest white key at or outside a MIDI number.
+ *
+ * A keyboard that starts or ends on a black key is not a keyboard --
+ * the black would hang off the end with nothing under it -- so every
+ * window is snapped to whites before it is drawn.
+ */
+export function whiteOutward(midi: number, direction: -1 | 1): number {
+  let m = midi;
+  for (let i = 0; i < 3 && isBlackKey(m); i += 1) m += direction;
+  return m;
+}
+
 export function keyboardRange(size: KeyboardSize): {
   first: number;
   last: number;
@@ -56,10 +76,13 @@ const BLACK_HEIGHT = 0.62;
  * is the order a piano is built in.
  */
 export function keyboardGeometry(
-  size: KeyboardSize,
+  size: KeyboardSize | { first: number; last: number },
   box: { x?: number; y?: number; width: number; height: number },
 ): readonly PianoKey[] {
-  const { first, last } = keyboardRange(size);
+  // A size names a whole instrument; a range names a stretch of one.
+  // The hands design shows a stretch, because 88 keys across a phone
+  // screen are four millimetres wide and the hands on them are specks.
+  const { first, last } = typeof size === 'number' ? keyboardRange(size) : size;
   const originX = box.x ?? 0;
   const originY = box.y ?? 0;
 

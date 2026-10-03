@@ -210,19 +210,98 @@ test('smaller hands are smaller, and the scale changes nothing else', () => {
   assert.ok(widest(small) < widest(full));
 });
 
-test('the stage draws hands only when it is given a fingering', () => {
+test('the stage draws hands only in the design that is about them', () => {
   const notes = [note(60, 1, 'right', 2), note(48, 1, 'left', 2)];
-  const base = { ...STAGE, seconds: 1.5, notes };
-  const without = P.renderPianoStage(base);
   const plan = P.planFingering(notes);
-  const withHands = P.renderPianoStage({
-    ...base,
+  const base = {
+    ...STAGE,
+    seconds: 1.5,
+    notes,
     hands: { notes: plan.notes, anchors: plan.anchors },
-  });
-  assert.ok(!without.includes('<path'), 'the stage without hands is the stage it always was');
-  assert.ok(withHands.includes('<path'), 'and with them it has fingers');
-  assert.ok(withHands.includes('stroke-linecap="round"'), 'round caps: a fingertip, not a stick');
-  assert.ok(withHands.length > without.length);
+  };
+  const falling = P.renderPianoStage(base);
+  const hands = P.renderPianoStage({ ...base, design: 'hands' });
+  assert.ok(!falling.includes('<path'), 'the falling design is the stage it always was');
+  assert.ok(hands.includes('<path'), 'the hands design has fingers');
+  assert.ok(hands.includes('stroke-linecap="round"'), 'round caps: a fingertip, not a stick');
+});
+
+test('a fingering offered to the falling design changes nothing at all', () => {
+  const notes = [note(60, 1, 'right', 2), note(48, 1, 'left', 2)];
+  const plan = P.planFingering(notes);
+  const base = { ...STAGE, seconds: 1.5, notes };
+  assert.equal(
+    P.renderPianoStage({ ...base, hands: { notes: plan.notes, anchors: plan.anchors } }),
+    P.renderPianoStage(base),
+    'the first design is byte-for-byte the one that was shipped',
+  );
+});
+
+test('the hands design drops the falling notes, the grid, the fade and the strike line', () => {
+  const notes = [note(60, 4, 'right', 1)]; // still falling at t=3
+  const plan = P.planFingering(notes);
+  const base = {
+    ...STAGE,
+    seconds: 3,
+    notes,
+    gridLines: [{ seconds: 3.2, kind: 'bar' }],
+    fade: { color: '#17110E' },
+    hands: { notes: plan.notes, anchors: plan.anchors },
+  };
+  const falling = P.stageShapes(base);
+  const hands = P.stageShapes({ ...base, design: 'hands' });
+
+  const red = P.DEFAULT_COLORS.strikeLine;
+  assert.ok(falling.some((s) => s.fill === red), 'the falling design lands notes on a line');
+  assert.ok(!hands.some((s) => s.fill === red), 'nothing lands in the hands design');
+
+  const blue = P.DEFAULT_COLORS.rightHand;
+  const fullWidth = (s) => s.width === STAGE.width;
+  assert.ok(
+    falling.some((s) => s.fill === blue && !fullWidth(s)),
+    'a bar is on its way down',
+  );
+  assert.ok(
+    !hands.some((s) => s.fill === blue && !fullWidth(s) && s.y < 100),
+    'no bar is on its way down in the hands design',
+  );
+  assert.ok(!hands.some((s) => s.fill === P.DEFAULT_COLORS.barLine), 'and no grid');
+});
+
+test('the hands design gives the keyboard more of the stage, and the hands room above it', () => {
+  const falling = P.keyboardBox({ width: 1920, height: 600 });
+  const hands = P.keyboardBox({ width: 1920, height: 600, design: 'hands' });
+  assert.ok(hands.height > falling.height * 2, 'much taller keys with nothing falling onto them');
+  assert.ok(hands.y > 0, 'but not the whole box: the palms sit above the keys');
+  assert.equal(hands.y + hands.height, 600, 'still along the bottom');
+});
+
+test('a pressed key wears its finger number, at the key and not on the hand', () => {
+  const notes = [note(60, 1, 'right', 2)];
+  const plan = P.planFingering(notes);
+  const base = {
+    ...STAGE,
+    seconds: 1.5,
+    notes,
+    design: 'hands',
+    hands: { notes: plan.notes, anchors: plan.anchors },
+  };
+  const badge = P.stageShapes(base).find((s) => s.label !== undefined);
+  assert.ok(badge !== undefined, 'the badge is drawn');
+  assert.equal(badge.label, String(plan.notes[0].finger));
+
+  const board = P.keyboardBox({ ...STAGE, design: 'hands' });
+  const key = P.keyboardGeometry(88, board).find((k) => k.midi === 60);
+  const centre = badge.x + badge.width / 2;
+  assert.ok(centre > key.x && centre < key.x + key.width, 'on middle C');
+  assert.ok(badge.y > key.y + key.height * 0.5, 'down at the key\'s front, clear of the hand');
+
+  const svg = P.renderPianoStage(base);
+  assert.ok(svg.includes('>' + badge.label + '<'), 'and it reaches the markup');
+  assert.ok(svg.includes('text-anchor="middle"'), 'centred on its badge');
+
+  const off = P.stageShapes({ ...base, hands: { ...base.hands, fingerNumbers: false } });
+  assert.equal(off.filter((s) => s.label !== undefined).length, 0, 'turned off when asked');
 });
 
 test('a scale longer than the hand is played in reaches, not a crawl', () => {
@@ -249,4 +328,66 @@ test('the hands wear the note colours: the tip is the hand colour, the edge a da
   assert.ok(edge.r < tip.r && edge.g < tip.g, 'the edge is darker than the colour it came from');
   // Anything unreadable comes back as it was, rather than as a guess.
   assert.equal(P.darken('var(--accent)', 0.4), 'var(--accent)');
+});
+
+/** How long the white keys are, in their own widths. */
+const keyShape = (options) => {
+  const box = P.keyboardBox(options);
+  const range = P.handsRange(options);
+  return box.height / (box.width / P.whiteKeysBetween(range.first, range.last));
+};
+
+test('a key stays a key in every frame shape, however tall the stage is', () => {
+  const piece = [60, 64, 67, 72].map((m) => note(m, 0));
+  const shapes = {
+    '16:9': { width: 1856, height: 240, design: 'hands', size: 88, notes: piece },
+    '9:16': { width: 531, height: 300, design: 'hands', size: 88, notes: piece },
+    '1:1': { width: 1856, height: 430, design: 'hands', size: 88, notes: piece },
+  };
+  for (const [name, options] of Object.entries(shapes)) {
+    const ratio = keyShape(options);
+    assert.ok(ratio > 3 && ratio < 12, `${name}: a key is ${ratio.toFixed(1)} of its own widths`);
+    const box = P.keyboardBox(options);
+    assert.ok(Math.abs(box.y + box.height - options.height) < 1e-6, `${name}: along the bottom`);
+  }
+});
+
+test('a tall frame shows a window of the keyboard, a wide one shows all of it', () => {
+  const piece = [60, 64, 67, 72].map((m) => note(m, 0));
+  const wide = P.handsRange({ width: 1856, height: 240, design: 'hands', size: 88, notes: piece });
+  const tall = P.handsRange({ width: 531, height: 300, design: 'hands', size: 88, notes: piece });
+  const wideKeys = P.whiteKeysBetween(wide.first, wide.last);
+  const tallKeys = P.whiteKeysBetween(tall.first, tall.last);
+  assert.ok(wideKeys > 2 * tallKeys, `16:9 carries most of the piano, got ${wideKeys}`);
+  assert.ok(tallKeys >= 14 && tallKeys < 32, `9:16 carries a few octaves, got ${tallKeys}`);
+
+  // Whatever the window is, it covers every note in the piece and
+  // starts and ends on a white key.
+  for (const range of [wide, tall]) {
+    assert.ok(range.first <= 60 && range.last >= 72, 'the music is inside the window');
+    assert.ok(!P.isBlackKey(range.first) && !P.isBlackKey(range.last), 'both ends are white');
+  }
+});
+
+test('a piece wider than the window widens the window, not the other way round', () => {
+  const narrow = [60, 62].map((m) => note(m, 0));
+  const wide = [28, 100].map((m) => note(m, 0));
+  const shape = { width: 531, height: 300, design: 'hands', size: 88 };
+  const small = P.handsRange({ ...shape, notes: narrow });
+  const big = P.handsRange({ ...shape, notes: wide });
+  assert.ok(
+    P.whiteKeysBetween(big.first, big.last) > P.whiteKeysBetween(small.first, small.last),
+    'a hand is never left pressing a key that is not drawn',
+  );
+  assert.ok(big.first <= 28 && big.last >= 100);
+});
+
+test('the falling design keeps the keyboard it has always had', () => {
+  const tall = { width: 1080, height: 1400, design: 'falling-notes', size: 88 };
+  assert.ok(Math.abs(P.keyboardBox(tall).height - 1400 / 3) < 1e-6);
+  assert.equal(
+    P.renderPianoStage({ ...tall, seconds: 0, notes: [] }),
+    P.renderPianoStage({ width: 1080, height: 1400, size: 88, seconds: 0, notes: [] }),
+    'and the design is what it was before there was a design to pick',
+  );
 });

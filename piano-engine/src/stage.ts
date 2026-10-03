@@ -10,13 +10,21 @@
  */
 import { parseColor } from './color.js';
 import { DEFAULT_HAND_COLORS, handsShapes } from './hands.js';
-import { keyboardGeometry, pressedAt } from './keyboard.js';
-import { n, path, rect, wrap } from './svg.js';
+import {
+  keyboardGeometry,
+  keyboardRange,
+  pressedAt,
+  whiteKeysBetween,
+  whiteOutward,
+} from './keyboard.js';
+import { n, path, rect, text, wrap } from './svg.js';
 import type {
   FallingBar,
   GridLine,
   Hand,
+  KeyboardSize,
   PianoColors,
+  PianoDesign,
   PianoKey,
   PianoNote,
   PianoStageOptions,
@@ -51,7 +59,51 @@ const BAR_LINE_FRACTION = 0.007;
 const BEAT_LINE_FRACTION = 0.0035;
 
 /** How tall the keyboard is when nothing says: a third of the stage. */
+/**
+ * The badge font.
+ *
+ * A system stack rather than a web font: a video is rendered on
+ * whatever machine the page is open on, and a font that has not
+ * finished loading draws a different frame from the one before it.
+ */
+const LABEL_FONT = 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+
 const KEYBOARD_FRACTION = 1 / 3;
+/**
+ * The keyboard's share of the stage in the hands design.
+ *
+ * Bigger than a third, because nothing else is on the stage any more
+ * -- but not the whole of it: the palms and the forearms sit ABOVE the
+ * keys, and a keyboard filling its box would leave the hands with
+ * nowhere to come from. The quarter left over is their room.
+ */
+const KEYBOARD_FRACTION_HANDS = 0.8;
+
+/**
+ * How long a white key is allowed to be, in its own widths.
+ *
+ * A keyboard stretched to whatever box it is given stops being a
+ * keyboard: in a 9:16 frame the stage is twice as tall as it is wide,
+ * and a third of it is already a tower of keys a metre long. The
+ * falling-notes design gets away with it -- the notes come down that
+ * tower and fill it -- but the hands design has hands on those keys,
+ * and a hand is as wide as five keys whatever the picture does. Let
+ * the keys grow and the hands become spiders on a wall.
+ *
+ * A real white key is about six and a half of its own widths long.
+ * Eleven is longer than real and still reads as a keyboard, which is
+ * the most a frame can be given before the drawing starts lying.
+ */
+const MAX_KEY_LENGTH = 11.2;
+
+/**
+ * The fewest white keys the hands design will ever show: two octaves.
+ *
+ * Below that the window stops being a keyboard and becomes a diagram
+ * of four notes -- and a hand spans five white keys, so two hands and
+ * the air between them need about this much to sit in at all.
+ */
+const MIN_HANDS_WHITES = 14;
 /** The strike line's thickness, as a fraction of the keyboard's height. */
 const LINE_FRACTION = 0.05;
 
@@ -59,16 +111,103 @@ export function resolveColors(colors?: Partial<PianoColors>): PianoColors {
   return { ...DEFAULT_COLORS, ...(colors ?? {}) };
 }
 
-export function keyboardBox(options: { width: number; height: number; keyboardHeight?: number }): {
+/**
+ * The stretch of keyboard the hands design shows.
+ *
+ * Two things decide it, and the answer is the larger:
+ *
+ *  - what the FRAME can show. A key has a believable length (see
+ *    `MAX_KEY_LENGTH`), so a box of a given shape can only carry so
+ *    many keys before they stop looking like keys. A 16:9 stage is
+ *    wide and shallow and carries the whole piano; a 9:16 stage is
+ *    the other way round and carries about two octaves. That is not a
+ *    compromise -- it is what a lesson video filmed in portrait shows,
+ *    because it is all that fits.
+ *  - what the PIECE needs. A hand that reaches a key outside the
+ *    window would be drawn pressing nothing, so the window always
+ *    covers every note in the score, however wide that makes it.
+ *
+ * Fixed for the whole video, centred on the music's own range: a
+ * keyboard that scrolled would move under the hands, and then neither
+ * the hands nor the keys could be read.
+ */
+export function handsRange(options: {
+  width: number;
+  height: number;
+  size?: KeyboardSize;
+  notes?: readonly PianoNote[];
+  keyboardHeight?: number;
+}): { first: number; last: number } {
+  const full = keyboardRange(options.size ?? 88);
+  const fullWhites = whiteKeysBetween(full.first, full.last);
+
+  const available =
+    options.keyboardHeight !== undefined && options.keyboardHeight > 0
+      ? Math.min(options.keyboardHeight, options.height)
+      : options.height * KEYBOARD_FRACTION_HANDS;
+  const affords =
+    available > 0 ? Math.round((options.width * MAX_KEY_LENGTH) / available) : fullWhites;
+
+  const played = (options.notes ?? [])
+    .map((note) => note.midi)
+    .filter((midi) => midi >= full.first && midi <= full.last);
+  // Nothing uploaded yet: sit on middle C, so the empty page shows a
+  // keyboard rather than a guess.
+  const low = whiteOutward(played.length > 0 ? Math.min(...played) : 60, -1);
+  const high = whiteOutward(played.length > 0 ? Math.max(...played) : 60, 1);
+  const needed = whiteKeysBetween(low, high) + 2;
+
+  const whites = Math.max(
+    MIN_HANDS_WHITES,
+    Math.min(fullWhites, Math.max(Math.min(affords, fullWhites), needed)),
+  );
+
+  // Grow outwards from the music, a white key at a time, each side in
+  // turn, so the window ends up centred on what is actually played.
+  let first = low;
+  let last = high;
+  let left = true;
+  while (whiteKeysBetween(first, last) < whites) {
+    const canLeft = first > full.first;
+    const canRight = last < full.last;
+    if (!canLeft && !canRight) break;
+    if (left && canLeft) first = whiteOutward(first - 1, -1);
+    else if (!left && canRight) last = whiteOutward(last + 1, 1);
+    else if (canLeft) first = whiteOutward(first - 1, -1);
+    else last = whiteOutward(last + 1, 1);
+    left = !left;
+  }
+  return { first: Math.max(full.first, first), last: Math.min(full.last, last) };
+}
+
+export function keyboardBox(options: {
+  width: number;
+  height: number;
+  keyboardHeight?: number;
+  design?: PianoDesign;
+  size?: KeyboardSize;
+  notes?: readonly PianoNote[];
+}): {
   x: number;
   y: number;
   width: number;
   height: number;
 } {
-  const height =
+  const hands = options.design === 'hands';
+  const share = hands ? KEYBOARD_FRACTION_HANDS : KEYBOARD_FRACTION;
+  const asked =
     options.keyboardHeight !== undefined && options.keyboardHeight > 0
       ? Math.min(options.keyboardHeight, options.height)
-      : options.height * KEYBOARD_FRACTION;
+      : options.height * share;
+  // Only the hands design is capped. The falling-notes design is the
+  // picture that shipped, and a keyboard it has always drawn tall is
+  // not something to change underneath it.
+  const window = hands ? handsRange(options) : undefined;
+  const longest =
+    window !== undefined
+      ? (options.width / whiteKeysBetween(window.first, window.last)) * MAX_KEY_LENGTH
+      : Number.POSITIVE_INFINITY;
+  const height = Math.min(asked, longest);
   return { x: 0, y: options.height - height, width: options.width, height };
 }
 
@@ -252,8 +391,14 @@ export function handColor(hand: Hand, colors: PianoColors): string {
 export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
   const colors = resolveColors(options.colors);
   const notes = options.notes ?? [];
+  // Two designs, one set of facts. `falling-notes` draws the grid, the
+  // bars and the fade; `hands` draws none of them and puts two hands on
+  // the keys instead. Everything either one needs -- the notes, the
+  // fingering, the keyboard -- is the same either way.
+  const design: PianoDesign = options.design ?? 'falling-notes';
+  const falling = design === 'falling-notes';
   const board = keyboardBox(options);
-  const keys = keyboardGeometry(options.size, board);
+  const keys = keyboardGeometry(falling ? options.size : handsRange(options), board);
   const down = pressedAt(notes, options.seconds);
   const lineHeight = Math.max(1, board.height * LINE_FRACTION);
   const edge = Math.max(0.5, board.width / 900);
@@ -269,25 +414,28 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
     });
   }
 
-  // The grid first, so the notes come out of it rather than sit on it.
-  for (const shape of gridShapes(options.gridLines ?? [], options)) shapes.push(shape);
+  if (falling) {
+    // The grid first, so the notes come out of it rather than sit on it.
+    for (const shape of gridShapes(options.gridLines ?? [], options)) shapes.push(shape);
 
-  // The falling notes go UNDER the keyboard: a bar that has landed
-  // should look like it went into the key, not over it.
-  for (const bar of fallingBars(notes, options)) {
-    shapes.push({
-      x: bar.x,
-      y: bar.y,
-      width: bar.width,
-      height: bar.height,
-      fill: handColor(bar.hand, colors),
-      radius: Math.min(bar.width, bar.height) / 4,
-    });
+    // The falling notes go UNDER the keyboard: a bar that has landed
+    // should look like it went into the key, not over it.
+    for (const bar of fallingBars(notes, options)) {
+      shapes.push({
+        x: bar.x,
+        y: bar.y,
+        width: bar.width,
+        height: bar.height,
+        fill: handColor(bar.hand, colors),
+        radius: Math.min(bar.width, bar.height) / 4,
+      });
+    }
+
+    // The fade goes over the grid and the notes, and under the
+    // keyboard: a key is a thing in the room, not something in the
+    // distance.
+    for (const shape of fadeShapes(options)) shapes.push(shape);
   }
-
-  // The fade goes over the grid and the notes, and under the keyboard:
-  // a key is a thing in the room, not something in the distance.
-  for (const shape of fadeShapes(options)) shapes.push(shape);
 
   const fillFor = (key: PianoKey): string => {
     const hand = down.get(key.midi);
@@ -320,20 +468,24 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
     });
   }
 
-  // The line the notes land on, so no key covers it.
-  shapes.push({
-    x: 0,
-    y: board.y - lineHeight / 2,
-    width: options.width,
-    height: lineHeight,
-    fill: colors.strikeLine,
-  });
+  // The line the notes land on, so no key covers it. Nothing lands in
+  // the hands design, so there is no line to land on.
+  if (falling) {
+    shapes.push({
+      x: 0,
+      y: board.y - lineHeight / 2,
+      width: options.width,
+      height: lineHeight,
+      fill: colors.strikeLine,
+    });
+  }
 
   // And the hands over everything, because that is where they are.
-  // Only when a caller hands over a fingering -- the hands come from
-  // `planFingering`, not from the notes, and a page that has not asked
-  // for them gets exactly the stage it got before.
-  if (options.hands !== undefined) {
+  // Only in the design that is about them, and only when a caller
+  // hands over a fingering -- the hands come from `planFingering`, not
+  // from the notes, and a page that has not asked for them gets
+  // exactly the stage it got before.
+  if (!falling && options.hands !== undefined) {
     for (const shape of handsShapes({
       size: options.size,
       board,
@@ -342,6 +494,9 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
       anchors: options.hands.anchors,
       colors: options.hands.colors ?? DEFAULT_HAND_COLORS,
       ...(options.hands.scale !== undefined ? { scale: options.hands.scale } : {}),
+      ...(options.hands.fingerNumbers !== undefined
+        ? { fingerNumbers: options.hands.fingerNumbers }
+        : {}),
     })) {
       shapes.push(shape);
     }
@@ -367,7 +522,20 @@ function shapesToSvg(shapes: readonly StageShape[], width: number, height: numbe
             ...(shape.stroke !== undefined ? { stroke: shape.stroke } : {}),
             ...(shape.strokeWidth !== undefined ? { 'stroke-width': shape.strokeWidth } : {}),
             ...(shape.radius !== undefined && shape.radius > 0 ? { rx: shape.radius } : {}),
-          }),
+          }) +
+          // A label is drawn ON its own shape, centred in its box, so
+          // one entry in the list is one thing on the screen rather
+          // than a badge and a number that could come apart.
+          (shape.label !== undefined
+            ? text(shape.label, shape.x + shape.width / 2, shape.y + shape.height / 2, {
+                fill: shape.labelColor ?? shape.fill,
+                'font-size': shape.labelSize ?? shape.height * 0.7,
+                'font-family': LABEL_FONT,
+                'font-weight': 700,
+                'text-anchor': 'middle',
+                'dominant-baseline': 'central',
+              })
+            : ''),
     )
     .join('');
   return wrap(

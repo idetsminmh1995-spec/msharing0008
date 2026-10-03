@@ -36,6 +36,7 @@ var PianoEngine = (() => {
     handColor: () => handColor,
     handColorsFor: () => handColorsFor,
     handShapes: () => handShapes,
+    handsRange: () => handsRange,
     handsShapes: () => handsShapes,
     isBlackKey: () => isBlackKey,
     keyboardBox: () => keyboardBox,
@@ -49,7 +50,9 @@ var PianoEngine = (() => {
     resolveColors: () => resolveColors,
     stageShapes: () => stageShapes,
     whiteIndex: () => whiteIndex,
-    whiteKeyCount: () => whiteKeyCount
+    whiteKeyCount: () => whiteKeyCount,
+    whiteKeysBetween: () => whiteKeysBetween,
+    whiteOutward: () => whiteOutward
   });
 
   // src/keyboard.ts
@@ -68,13 +71,23 @@ var PianoEngine = (() => {
   function isBlackKey(midi) {
     return BLACK_PITCH_CLASSES.has((midi % 12 + 12) % 12);
   }
+  function whiteKeysBetween(first, last) {
+    let count = 0;
+    for (let midi = first; midi <= last; midi += 1) if (!isBlackKey(midi)) count += 1;
+    return count;
+  }
+  function whiteOutward(midi, direction) {
+    let m = midi;
+    for (let i = 0; i < 3 && isBlackKey(m); i += 1) m += direction;
+    return m;
+  }
   function keyboardRange(size) {
     return KEYBOARD_RANGES[size] ?? KEYBOARD_RANGES[88];
   }
   var BLACK_WIDTH = 0.62;
   var BLACK_HEIGHT = 0.62;
   function keyboardGeometry(size, box) {
-    const { first, last } = keyboardRange(size);
+    const { first, last } = typeof size === "number" ? keyboardRange(size) : size;
     const originX = box.x ?? 0;
     const originY = box.y ?? 0;
     const whites = [];
@@ -131,8 +144,8 @@ var PianoEngine = (() => {
 
   // src/color.ts
   function parseColor(value) {
-    const text = value.trim();
-    const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(text);
+    const text2 = value.trim();
+    const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(text2);
     if (hex) {
       const digits = hex[1] ?? "";
       const full = digits.length === 3 ? digits.split("").map((d) => d + d).join("") : digits;
@@ -142,7 +155,7 @@ var PianoEngine = (() => {
         b: Number.parseInt(full.slice(4, 6), 16)
       };
     }
-    const rgb = /^rgba?\(([^)]+)\)$/i.exec(text);
+    const rgb = /^rgba?\(([^)]+)\)$/i.exec(text2);
     if (rgb) {
       const parts = (rgb[1] ?? "").split(/[,/\s]+/).filter((p) => p.length > 0);
       const [r, g, b] = parts.map((p) => Number.parseFloat(p));
@@ -347,8 +360,18 @@ var PianoEngine = (() => {
       }
       if (x === void 0) continue;
       const depth = onBlack ? 0.42 : 0.66;
-      const y = board.y + board.height * depth * shape.reach + (held !== void 0 ? board.height * PRESS_DROP : 0);
-      tips.push({ finger, x, y, pressed: held !== void 0, onBlack });
+      const unit = (whites[0]?.width ?? board.width / 52) * (options.scale ?? 1);
+      const reach = Math.min(board.height * depth, unit * (onBlack ? 2.6 : 3.9));
+      const drop = Math.min(board.height * PRESS_DROP, unit * 0.55);
+      const y = board.y + reach * shape.reach + (held !== void 0 ? drop : 0);
+      tips.push({
+        finger,
+        x,
+        y,
+        pressed: held !== void 0,
+        onBlack,
+        ...held !== void 0 ? { midi: held } : {}
+      });
     }
     return tips;
   }
@@ -450,6 +473,28 @@ var PianoEngine = (() => {
         radius: round(r)
       });
     }
+    if (options.fingerNumbers !== false) {
+      const byMidi = new Map(keys.map((key) => [key.midi, key]));
+      for (const tip of tips) {
+        if (!tip.pressed) continue;
+        const key = byMidi.get(tip.midi ?? -1);
+        if (key === void 0) continue;
+        const badge = unit * 0.34;
+        shapes.push({
+          x: round(key.x + key.width / 2 - badge),
+          y: round(key.y + key.height - key.height * 0.06 - badge * 2),
+          width: round(badge * 2),
+          height: round(badge * 2),
+          fill: colors.tip,
+          stroke: colors.edge,
+          strokeWidth: round(unit * 0.06),
+          radius: round(badge),
+          label: String(tip.finger),
+          labelSize: round(badge * 1.35),
+          labelColor: colors.edge
+        });
+      }
+    }
     return shapes;
   }
   function handsShapes(options) {
@@ -485,6 +530,10 @@ var PianoEngine = (() => {
   function path(d, values = {}) {
     return tag("path", { d, ...values });
   }
+  function text(value, x, y, values = {}) {
+    if (value === "") return "";
+    return wrap("text", { x, y, ...values }, escapeText(value));
+  }
 
   // src/stage.ts
   var DEFAULT_COLORS = {
@@ -506,13 +555,50 @@ var PianoEngine = (() => {
   var FADE_BANDS = 18;
   var BAR_LINE_FRACTION = 7e-3;
   var BEAT_LINE_FRACTION = 35e-4;
+  var LABEL_FONT = "system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
   var KEYBOARD_FRACTION = 1 / 3;
+  var KEYBOARD_FRACTION_HANDS = 0.8;
+  var MAX_KEY_LENGTH = 11.2;
+  var MIN_HANDS_WHITES = 14;
   var LINE_FRACTION = 0.05;
   function resolveColors(colors) {
     return { ...DEFAULT_COLORS, ...colors ?? {} };
   }
+  function handsRange(options) {
+    const full = keyboardRange(options.size ?? 88);
+    const fullWhites = whiteKeysBetween(full.first, full.last);
+    const available = options.keyboardHeight !== void 0 && options.keyboardHeight > 0 ? Math.min(options.keyboardHeight, options.height) : options.height * KEYBOARD_FRACTION_HANDS;
+    const affords = available > 0 ? Math.round(options.width * MAX_KEY_LENGTH / available) : fullWhites;
+    const played = (options.notes ?? []).map((note) => note.midi).filter((midi) => midi >= full.first && midi <= full.last);
+    const low = whiteOutward(played.length > 0 ? Math.min(...played) : 60, -1);
+    const high = whiteOutward(played.length > 0 ? Math.max(...played) : 60, 1);
+    const needed = whiteKeysBetween(low, high) + 2;
+    const whites = Math.max(
+      MIN_HANDS_WHITES,
+      Math.min(fullWhites, Math.max(Math.min(affords, fullWhites), needed))
+    );
+    let first = low;
+    let last = high;
+    let left = true;
+    while (whiteKeysBetween(first, last) < whites) {
+      const canLeft = first > full.first;
+      const canRight = last < full.last;
+      if (!canLeft && !canRight) break;
+      if (left && canLeft) first = whiteOutward(first - 1, -1);
+      else if (!left && canRight) last = whiteOutward(last + 1, 1);
+      else if (canLeft) first = whiteOutward(first - 1, -1);
+      else last = whiteOutward(last + 1, 1);
+      left = !left;
+    }
+    return { first: Math.max(full.first, first), last: Math.min(full.last, last) };
+  }
   function keyboardBox(options) {
-    const height = options.keyboardHeight !== void 0 && options.keyboardHeight > 0 ? Math.min(options.keyboardHeight, options.height) : options.height * KEYBOARD_FRACTION;
+    const hands = options.design === "hands";
+    const share = hands ? KEYBOARD_FRACTION_HANDS : KEYBOARD_FRACTION;
+    const asked = options.keyboardHeight !== void 0 && options.keyboardHeight > 0 ? Math.min(options.keyboardHeight, options.height) : options.height * share;
+    const window = hands ? handsRange(options) : void 0;
+    const longest = window !== void 0 ? options.width / whiteKeysBetween(window.first, window.last) * MAX_KEY_LENGTH : Number.POSITIVE_INFINITY;
+    const height = Math.min(asked, longest);
     return { x: 0, y: options.height - height, width: options.width, height };
   }
   function fallingBars(notes, options) {
@@ -610,8 +696,10 @@ var PianoEngine = (() => {
   function stageShapes(options) {
     const colors = resolveColors(options.colors);
     const notes = options.notes ?? [];
+    const design = options.design ?? "falling-notes";
+    const falling = design === "falling-notes";
     const board = keyboardBox(options);
-    const keys = keyboardGeometry(options.size, board);
+    const keys = keyboardGeometry(falling ? options.size : handsRange(options), board);
     const down = pressedAt(notes, options.seconds);
     const lineHeight = Math.max(1, board.height * LINE_FRACTION);
     const edge = Math.max(0.5, board.width / 900);
@@ -625,18 +713,20 @@ var PianoEngine = (() => {
         fill: colors.background
       });
     }
-    for (const shape of gridShapes(options.gridLines ?? [], options)) shapes.push(shape);
-    for (const bar of fallingBars(notes, options)) {
-      shapes.push({
-        x: bar.x,
-        y: bar.y,
-        width: bar.width,
-        height: bar.height,
-        fill: handColor(bar.hand, colors),
-        radius: Math.min(bar.width, bar.height) / 4
-      });
+    if (falling) {
+      for (const shape of gridShapes(options.gridLines ?? [], options)) shapes.push(shape);
+      for (const bar of fallingBars(notes, options)) {
+        shapes.push({
+          x: bar.x,
+          y: bar.y,
+          width: bar.width,
+          height: bar.height,
+          fill: handColor(bar.hand, colors),
+          radius: Math.min(bar.width, bar.height) / 4
+        });
+      }
+      for (const shape of fadeShapes(options)) shapes.push(shape);
     }
-    for (const shape of fadeShapes(options)) shapes.push(shape);
     const fillFor = (key) => {
       const hand = down.get(key.midi);
       if (hand !== void 0) return handColor(hand, colors);
@@ -664,14 +754,16 @@ var PianoEngine = (() => {
         fill: fillFor(key)
       });
     }
-    shapes.push({
-      x: 0,
-      y: board.y - lineHeight / 2,
-      width: options.width,
-      height: lineHeight,
-      fill: colors.strikeLine
-    });
-    if (options.hands !== void 0) {
+    if (falling) {
+      shapes.push({
+        x: 0,
+        y: board.y - lineHeight / 2,
+        width: options.width,
+        height: lineHeight,
+        fill: colors.strikeLine
+      });
+    }
+    if (!falling && options.hands !== void 0) {
       for (const shape of handsShapes({
         size: options.size,
         board,
@@ -679,7 +771,8 @@ var PianoEngine = (() => {
         notes: options.hands.notes,
         anchors: options.hands.anchors,
         colors: options.hands.colors ?? DEFAULT_HAND_COLORS,
-        ...options.hands.scale !== void 0 ? { scale: options.hands.scale } : {}
+        ...options.hands.scale !== void 0 ? { scale: options.hands.scale } : {},
+        ...options.hands.fingerNumbers !== void 0 ? { fingerNumbers: options.hands.fingerNumbers } : {}
       })) {
         shapes.push(shape);
       }
@@ -701,7 +794,17 @@ var PianoEngine = (() => {
         ...shape.stroke !== void 0 ? { stroke: shape.stroke } : {},
         ...shape.strokeWidth !== void 0 ? { "stroke-width": shape.strokeWidth } : {},
         ...shape.radius !== void 0 && shape.radius > 0 ? { rx: shape.radius } : {}
-      })
+      }) + // A label is drawn ON its own shape, centred in its box, so
+      // one entry in the list is one thing on the screen rather
+      // than a badge and a number that could come apart.
+      (shape.label !== void 0 ? text(shape.label, shape.x + shape.width / 2, shape.y + shape.height / 2, {
+        fill: shape.labelColor ?? shape.fill,
+        "font-size": shape.labelSize ?? shape.height * 0.7,
+        "font-family": LABEL_FONT,
+        "font-weight": 700,
+        "text-anchor": "middle",
+        "dominant-baseline": "central"
+      }) : "")
     ).join("");
     return wrap(
       "svg",

@@ -199,6 +199,26 @@
      that gets the brand colour rather than a size change alone. */
   .stat-box.on-downbeat{border-color:var(--red);background:rgba(200,30,44,.16);}
   .video-mid{flex:1;display:flex;align-items:center;justify-content:center;min-height:34%;}
+  /* The Hands design has nothing above the keyboard any more, so the
+     keys get the room the falling notes used to need. The notation
+     keeps its own cap and simply shrinks into what is left, which is
+     what a lesson video looks like: a big keyboard, the music over it. */
+  .video-frame.design-hands .video-mid{min-height:46%;}
+  /* A tall frame in the Hands design has room the keyboard cannot use.
+     A keyboard only gets so tall before its keys stop looking like
+     keys (the engine caps them), so in 9:16 and 1:1 the space left
+     over goes to the MUSIC, which is the other thing a learner is
+     reading. 16:9 is not touched: there the keyboard already fills
+     what it is given.
+
+     9:16 gets the most of it, because 9:16 has the most to give: it
+     is nearly twice as tall as it is wide, and neither a keyboard nor
+     two staves fill that on their own. */
+  .video-frame.design-hands.shape-1x1{--notation-height:430px;}
+  .video-frame.design-hands.shape-9x16{--notation-height:560px;}
+  .video-frame.design-hands.shape-1x1 .video-notation,
+  .video-frame.design-hands.shape-9x16 .video-notation{max-height:66%;}
+  .video-frame.design-hands.shape-9x16 .video-mid{min-height:30%;}
   /* The keyboard fills whatever the notation leaves: `min-height:0`
      on .video-mid lets it shrink, and the SVG stretches to the box it
      is given rather than keeping the keyboard's own ratio -- a
@@ -318,7 +338,7 @@
 <script src="../../assets/notation-engine.js?v=07113ca3"></script>
 <!-- The piano stage: the keyboard, and the notes falling onto it.
      piano-engine/, TypeScript + SVG, built to this bundle. -->
-<script src="../../assets/piano-engine.js?v=6db1c267"></script>
+<script src="../../assets/piano-engine.js?v=c9fd084d"></script>
 <!-- Finds the count voices in the bucket whatever they were named. -->
 <script src="../../assets/voice-samples.js?v=609facad"></script>
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
@@ -420,6 +440,13 @@
       <div class="card-head"><span class="card-num">3</span>Piano Keyboard</div>
       <div class="field-row">
         <div>
+          <label for="pianoDesign">Design</label>
+          <select id="pianoDesign" class="drum-input">
+            <option value="falling-notes" selected>Falling Notes</option>
+            <option value="hands">Hands</option>
+          </select>
+        </div>
+        <div>
           <label for="keyboardSize">Keys</label>
           <select id="keyboardSize" class="drum-input">
             <option value="61">61 Keys</option>
@@ -447,7 +474,7 @@
           <div class="tc-color-row"><input id="rightHandColor" type="color" value="#4FA3FF"></div>
         </div>
       </div>
-      <div class="field-hint" id="keyboardHint">Which hand plays a note comes from the score's own staves &mdash; the upper staff is the right hand, the lower the left. A note outside the keyboard you pick is not drawn, so a 61 shows less of a wide piece than an 88 does.</div>
+      <div class="field-hint" id="keyboardHint">Two designs of the same video. <strong>Falling Notes</strong> is the stage with bars coming down onto the keys. <strong>Hands</strong> drops all of that and shows the keyboard alone, with two hands on it pressing the keys and the finger number on each key being played &mdash; so Fall time does not apply to it. Which hand plays a note comes from the score's own staves &mdash; the upper staff is the right hand, the lower the left. A note outside the keyboard you pick is not drawn, so a 61 shows less of a wide piece than an 88 does.</div>
     </div>
 
     <div class="card">
@@ -705,6 +732,13 @@
       right.style.setProperty('--shape-h', aspect === '9x16' ? '16' : aspect === '1x1' ? '1' : '9');
       right.classList.toggle('is-tall', aspect === '9x16' || aspect === '1x1');
     }
+    // The frame wears its own shape too: the Hands design lays out
+    // differently in each, and a rule that says "when the frame is
+    // 9:16" is easier to be sure of than one that says "when the
+    // column its parent is in is taller than wide".
+    for (const name of ['16x9', '9x16', '1x1']) {
+      videoFrame.classList.toggle(`shape-${name}`, aspect === name);
+    }
     measurePreviewChrome();
   }
 
@@ -718,6 +752,9 @@
       applyAspect();
     });
   }
+  // Once at the start, so the frame carries its own shape from the
+  // first paint rather than only after someone clicks a pill.
+  applyAspect();
   // --- Titles (card 2) --------------------------------------------
   // Both titles live-bind to the video preview, each with its own size
   // and colour. Nothing here is a hardcoded string: the preview title
@@ -1029,6 +1066,33 @@
   const leftHandColorInput = document.getElementById('leftHandColor');
   const rightHandColorInput = document.getElementById('rightHandColor');
 
+  /**
+   * Which of the two designs the video is.
+   *
+   * It is one setting and it changes two things: what the engine draws
+   * (bars falling, or hands on the keys) and how much of the frame the
+   * keyboard gets. Both follow from this one answer, so neither can be
+   * set to the design the other is not in.
+   */
+  const pianoDesignSelect = document.getElementById('pianoDesign');
+
+  function pianoDesign() {
+    return pianoDesignSelect?.value === 'hands' ? 'hands' : 'falling-notes';
+  }
+
+  function applyPianoDesign(atSeconds) {
+    const hands = pianoDesign() === 'hands';
+    videoFrame?.classList.toggle('design-hands', hands);
+    // Fall time is how long a note takes to come down. Nothing comes
+    // down in the Hands design, so the control is not disabled for
+    // tidiness -- it has nothing to mean.
+    if (fallSecondsSelect) {
+      fallSecondsSelect.disabled = hands;
+      fallSecondsSelect.title = hands ? 'Only the Falling Notes design has falling notes.' : '';
+    }
+    drawStage(atSeconds);
+  }
+
   function keyboardSize() {
     const value = Number(keyboardSizeSelect?.value);
     return value === 61 || value === 73 || value === 76 || value === 88 ? value : 88;
@@ -1228,9 +1292,12 @@
       fade: { color: getComputedStyle(videoFrame).backgroundColor },
       leadSeconds: fallSeconds(),
       colors: stageColors(),
+      design: pianoDesign(),
       // The hands, when there is a piece for them to play. They take
       // the same two colours as the falling notes, so the hand playing
-      // the amber notes is the amber-edged one.
+      // the amber notes is the amber-edged one. The engine ignores
+      // them in the Falling Notes design, so this is handed over
+      // either way rather than being guarded twice.
       ...(pianoFingering
         ? {
             hands: {
@@ -1258,7 +1325,26 @@
     control.addEventListener('change', () => drawStage());
     control.addEventListener('input', () => drawStage());
   }
+  pianoDesignSelect?.addEventListener('change', () => applyPianoDesign());
+  // Second 0 explicitly: `drawStage` defaults to the audio element's
+  // own position, and the element is built further down the file.
+  applyPianoDesign(0);
   window.addEventListener('resize', () => drawStage());
+  /*
+   * The stage is drawn INTO the box it is given, so the drawing has to
+   * be remade whenever that box changes shape -- and the Aspect Ratio
+   * pills change it without firing a window resize.
+   *
+   * Watching the element itself rather than listening for the one event
+   * that happens to be nearby: the box also moves when the Hands design
+   * is picked, when the notation strip grows a second staff, and when
+   * the preview column is re-measured. Any of those left the old
+   * drawing stretched into the new slot -- in 9:16 that was a 16:9
+   * keyboard pulled to twice its height, fifty keys a finger wide.
+   */
+  if (typeof ResizeObserver !== 'undefined' && pianoStage) {
+    new ResizeObserver(() => drawStage()).observe(pianoStage);
+  }
   drawStage(0);
 
   document.getElementById('upload-musicxml').addEventListener('click', () => setActiveSlot('upload-musicxml'));
@@ -2613,6 +2699,9 @@
    * the SVG instead would cost more than every other part of the frame
    * put together, thirty times a second.
    */
+  /** The badge font, the same stack the engine names for its SVG. */
+  const STAGE_LABEL_FONT = 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+
   function paintStage(ctx2d, box, atSeconds) {
     if (!pianoStage || typeof PianoEngine === 'undefined') return;
     if (!(box.w > 1) || !(box.h > 1) || !isVisible(pianoStage)) return;
@@ -2654,6 +2743,17 @@
         } else {
           ctx2d.strokeRect(shape.x, shape.y, shape.width, shape.height);
         }
+      }
+      // A finger number, centred in the badge it belongs to. The same
+      // alignment the SVG asks for -- middle, central -- so the badge
+      // in the video sits exactly where the one on screen does.
+      if (shape.label !== undefined) {
+        const size = shape.labelSize ?? shape.height * 0.7;
+        ctx2d.fillStyle = shape.labelColor ?? shape.fill;
+        ctx2d.font = `700 ${size}px ${STAGE_LABEL_FONT}`;
+        ctx2d.textAlign = 'center';
+        ctx2d.textBaseline = 'middle';
+        ctx2d.fillText(shape.label, shape.x + shape.width / 2, shape.y + shape.height / 2);
       }
     }
     ctx2d.restore();

@@ -110,6 +110,21 @@ gradient, because a rectangle is the one thing the SVG and the canvas
 draw identically. `strength: 1` would not be a fade but a wall, so a
 note is always at least faintly visible.
 
+## Two designs
+
+One engine, one set of facts, two pictures of them. `design` picks:
+
+- **`falling-notes`** (the default) is the stage this engine started as:
+  bars coming down a grid onto the keyboard, a line where they land.
+- **`hands`** drops every one of those -- no bars, no grid, no fade, no
+  strike line -- and puts two hands on the keyboard instead, pressing
+  the keys, with the finger's number on each key being played.
+
+The notes, the fingering and the keyboard are the same objects either
+way. Nothing is computed for one design that the other has to work
+around, and the default is the picture that shipped before there was a
+design to pick: a caller that says nothing gets the stage it had.
+
 ## Hands on the keys
 
 Two hands, always both, drawn over the keyboard and pressing one finger
@@ -120,11 +135,13 @@ const plan = PianoEngine.planFingering(notes);
 
 PianoEngine.renderPianoStage({
   size: 88, width: 1920, height: 600, seconds: 12.5, notes,
+  design: 'hands',
   colors: { leftHand: '#FFC400', rightHand: '#4FA3FF' },
   hands: {
     notes: plan.notes,              // every note, now with a finger
     anchors: plan.anchors,          // where each hand sits, over time
     colors: PianoEngine.handColorsFor({ leftHand: '#FFC400', rightHand: '#4FA3FF' }),
+    fingerNumbers: true,            // the default
   },
 });
 ```
@@ -162,6 +179,38 @@ A finger is a stroked path with a round cap, which is the one thing the
 rectangle list could not describe before: `StageShape.path` carries SVG
 path data that an `<path d>` and a canvas `new Path2D(d)` parse
 identically, so the preview and the exported video stay one drawing.
+
+### How much keyboard the hands design shows
+
+A keyboard stretched to whatever box it is given stops being a
+keyboard. A 9:16 stage is twice as tall as it is wide, and 88 keys
+across it are four millimetres wide on a phone with hands on them that
+are specks. So the hands design shows a WINDOW, and two things decide
+how wide it is -- the answer being the larger:
+
+- **what the frame can carry.** A white key is about six and a half of
+  its own widths long; eleven is the most this engine will draw before
+  the drawing starts lying. A 16:9 stage is wide and shallow and
+  carries most of the piano; a 9:16 stage carries a few octaves. That
+  is not a compromise, it is what a lesson video filmed in portrait
+  shows, because it is all that fits.
+- **what the piece needs.** A hand reaching a key outside the window
+  would be drawn pressing nothing, so the window always covers every
+  note in the score, however wide that makes it.
+
+Fixed for the whole video and centred on the music's own range: a
+keyboard that scrolled would move under the hands, and then neither the
+hands nor the keys could be read. The `falling-notes` design is not
+windowed or capped -- it has always drawn the whole keyboard, and the
+notes coming down fill the height.
+
+### The finger numbers
+
+A hand on a keyboard cannot say which finger a learner should use: the
+hand is the thing in the way. So the number goes on the KEY, at its
+front edge where no hand reaches, in the hand's own colour. Every piano
+lesson video does this, for exactly that reason. `fingerNumbers: false`
+turns them off.
 
 The hands wear the notes' own colours on the outline and the pressing
 fingertip, so the hand playing the amber notes is the amber-edged one
