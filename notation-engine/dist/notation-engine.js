@@ -64249,6 +64249,8 @@ ${xrefOffset}
   var ESTIMATED_NOTEHEAD_WIDTH = 1;
   var ESTIMATED_ACCIDENTAL_ALLOWANCE = 1;
   var MEASURE_TRAILING_MARGIN = 2;
+  var REST_TO_REST_CLEARANCE = 0.55;
+  var REST_TO_CHORD_CLEARANCE = 0.35;
   var MEASURE_LEADING_PAD = 0.5;
   var MEASURE_HEADER_ALLOWANCE = 6;
   var TEMPO_MARK_GAP = 1.5;
@@ -64897,6 +64899,76 @@ ${xrefOffset}
       };
     }
     return { svg: parts.join("\n"), newAccidentalState: heads.newAccidentalState };
+  }
+  function computeRestClearanceOffsets(measure2, staffNumber, ctx) {
+    const pushes = /* @__PURE__ */ new Map();
+    if (measure2.voices.length < 2) return pushes;
+    const glyphExtent = (glyph, y) => {
+      const box = getGlyph(glyph)?.bBox;
+      const north = box?.bBoxNE?.[1] ?? 0.5;
+      const south = box?.bBoxSW?.[1] ?? -0.5;
+      return { top: y - north, bottom: y - south };
+    };
+    const extents = [];
+    for (const voice2 of measure2.voices) {
+      const base = voiceRestOffset(voice2.id);
+      const starts = eventStartTicks(voice2.events);
+      voice2.events.forEach((event, idx) => {
+        if ((event.staff ?? 1) !== staffNumber) return;
+        const tick = starts[idx] ?? 0;
+        if (event.kind === "rest") {
+          const y = restY(event.duration.type, STAFF_LINES, base);
+          const { top, bottom } = glyphExtent(restGlyphName(event.duration.type), y);
+          extents.push({
+            voiceId: voice2.id,
+            tick,
+            top,
+            bottom,
+            isRest: true,
+            restIsWholeOrHalf: event.duration.type === "whole" || event.duration.type === "half"
+          });
+          return;
+        }
+        const notes = event.kind === "note" ? [event] : event.kind === "chord" ? event.notes : [];
+        for (const note2 of notes) {
+          if (note2.isGrace === true) continue;
+          const { position, noteheadGlyph } = resolveNoteRendering(note2, ctx);
+          const { top, bottom } = glyphExtent(noteheadGlyph, position);
+          extents.push({
+            voiceId: voice2.id,
+            tick,
+            top,
+            bottom,
+            isRest: false,
+            restIsWholeOrHalf: false
+          });
+        }
+      });
+    }
+    const record = (voiceId, steps, up) => {
+      if (steps <= 0) return;
+      const signed = up ? -steps : steps;
+      const current = pushes.get(voiceId) ?? 0;
+      pushes.set(voiceId, Math.abs(signed) > Math.abs(current) ? signed : current);
+    };
+    for (const rest2 of extents) {
+      if (!rest2.isRest) continue;
+      for (const other of extents) {
+        if (other.voiceId === rest2.voiceId || other.tick !== rest2.tick) continue;
+        const restAbove = rest2.voiceId < other.voiceId;
+        const clearance = restAbove ? other.top - rest2.bottom : rest2.top - other.bottom;
+        const minimum = other.isRest ? REST_TO_REST_CLEARANCE : rest2.restIsWholeOrHalf ? REST_TO_REST_CLEARANCE : REST_TO_CHORD_CLEARANCE;
+        const margin = clearance - minimum;
+        if (margin >= 0) continue;
+        const steps = Math.ceil(Math.abs(margin));
+        if (other.isRest) {
+          record(rest2.voiceId, restAbove ? Math.floor(steps / 2) : Math.ceil(steps / 2), restAbove);
+        } else {
+          record(rest2.voiceId, steps, restAbove);
+        }
+      }
+    }
+    return pushes;
   }
   function computeVoiceCollisionOffsets(measure2, staffNumber, ctx) {
     const offsets = /* @__PURE__ */ new Map();
@@ -65712,9 +65784,10 @@ ${xrefOffset}
             const measureLayout = measureLayoutsByNumber.get(measure2.number);
             const isMultiVoice = measure2.voices.length > 1;
             const collisionOffsets = computeVoiceCollisionOffsets(measure2, staffNumber, ctx);
+            const restPushes = computeRestClearanceOffsets(measure2, staffNumber, ctx);
             for (const voice2 of measure2.voices) {
               const forcedDirection = isMultiVoice ? voiceForcedDirection(voice2.id) : void 0;
-              const restOffset = isMultiVoice ? voiceRestOffset(voice2.id) : 0;
+              const restOffset = isMultiVoice ? voiceRestOffset(voice2.id) + (restPushes.get(voice2.id) ?? 0) : 0;
               let pendingTie;
               const starts = eventStartTicks(voice2.events);
               const total = totalTicks(voice2.events) || 1;

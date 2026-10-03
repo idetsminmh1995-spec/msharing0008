@@ -245,6 +245,10 @@ const ESTIMATED_NOTEHEAD_WIDTH = 1.0;
 const ESTIMATED_ACCIDENTAL_ALLOWANCE = 1.0;
 /** Trailing room after a measure's last event, so it isn't flush against the barline. */
 const MEASURE_TRAILING_MARGIN = 2.0;
+/** MuseScore's `minRestToRestClearance`, also its floor for a whole or half rest against a chord. */
+const REST_TO_REST_CLEARANCE = 0.55;
+/** MuseScore's floor for any shorter rest against a chord. */
+const REST_TO_CHORD_CLEARANCE = 0.35;
 /**
  * The small pad every measure leaves at its own left edge, before
  * anything is drawn -- so a clef, or the first notehead, is not flush
@@ -1547,6 +1551,132 @@ function renderChord(
  * squeezed from both sides is not solved -- each pair is resolved
  * independently and the largest resulting shift wins for that voice.
  */
+/**
+ * Integration U: how far each voice's rests move further out of the
+ * other voice's way, in whole staff spaces.
+ *
+ * §9.14 already pushes the upper voice's rests up a space and the
+ * lower voice's down one, which is where MuseScore starts too. What it
+ * does next, and this did not, is CHECK: a rest that still runs into
+ * the other voice's notes -- or into the other voice's rest -- is moved
+ * further, a whole space at a time, until it clears.
+ *
+ * MuseScore's own clearances, from `RestLayout`: 0.55sp between a rest
+ * and another rest, 0.55sp between a whole or half rest and a chord,
+ * 0.35sp for any other rest against a chord. Where two RESTS collide
+ * the move is split between them -- the upper takes `floor(steps / 2)`
+ * and the lower `ceil(steps / 2)` -- and where a rest collides with a
+ * chord the rest moves the whole way, because the notes are where the
+ * music is and the rest is what has to get out of the way.
+ *
+ * One number per voice per measure, not per rest. That part is read off
+ * MuseScore's OUTPUT rather than its source: on a real export, a bar
+ * whose quarter rest had to move put that bar's half rest at the same
+ * new height, and rests of one voice wandering up and down within a bar
+ * would look like a mistake anyway. Said plainly here because it is the
+ * one rule in this function that was inferred rather than read.
+ */
+function computeRestClearanceOffsets(
+  measure: Measure,
+  staffNumber: number,
+  ctx: RenderCtx,
+): ReadonlyMap<number, number> {
+  const pushes = new Map<number, number>();
+  if (measure.voices.length < 2) return pushes;
+
+  /** A drawn thing's vertical extent, in this engine's own y (down is more). */
+  interface Extent {
+    readonly voiceId: number;
+    readonly tick: number;
+    readonly top: number;
+    readonly bottom: number;
+    readonly isRest: boolean;
+    readonly restIsWholeOrHalf: boolean;
+  }
+
+  const glyphExtent = (glyph: string, y: number): { top: number; bottom: number } => {
+    const box = getGlyph(glyph)?.bBox;
+    // SMuFL measures its boxes with y UP from the glyph's own origin;
+    // this engine's y goes down, so the box's north edge is the smaller
+    // number here and its south edge the larger.
+    const north = box?.bBoxNE?.[1] ?? 0.5;
+    const south = box?.bBoxSW?.[1] ?? -0.5;
+    return { top: y - north, bottom: y - south };
+  };
+
+  const extents: Extent[] = [];
+  for (const voice of measure.voices) {
+    const base = voiceRestOffset(voice.id);
+    const starts = eventStartTicks(voice.events);
+    voice.events.forEach((event, idx) => {
+      if ((event.staff ?? 1) !== staffNumber) return;
+      const tick = starts[idx] ?? 0;
+      if (event.kind === 'rest') {
+        const y = restY(event.duration.type, STAFF_LINES, base);
+        const { top, bottom } = glyphExtent(restGlyphName(event.duration.type), y);
+        extents.push({
+          voiceId: voice.id,
+          tick,
+          top,
+          bottom,
+          isRest: true,
+          restIsWholeOrHalf: event.duration.type === 'whole' || event.duration.type === 'half',
+        });
+        return;
+      }
+      const notes = event.kind === 'note' ? [event] : event.kind === 'chord' ? event.notes : [];
+      for (const note of notes) {
+        if (note.isGrace === true) continue;
+        const { position, noteheadGlyph } = resolveNoteRendering(note, ctx);
+        const { top, bottom } = glyphExtent(noteheadGlyph, position);
+        extents.push({
+          voiceId: voice.id,
+          tick,
+          top,
+          bottom,
+          isRest: false,
+          restIsWholeOrHalf: false,
+        });
+      }
+    });
+  }
+
+  const record = (voiceId: number, steps: number, up: boolean): void => {
+    if (steps <= 0) return;
+    const signed = up ? -steps : steps;
+    const current = pushes.get(voiceId) ?? 0;
+    pushes.set(voiceId, Math.abs(signed) > Math.abs(current) ? signed : current);
+  };
+
+  for (const rest of extents) {
+    if (!rest.isRest) continue;
+    for (const other of extents) {
+      if (other.voiceId === rest.voiceId || other.tick !== rest.tick) continue;
+      // The lower-numbered voice is the one that sits above.
+      const restAbove = rest.voiceId < other.voiceId;
+      const clearance = restAbove ? other.top - rest.bottom : rest.top - other.bottom;
+      const minimum = other.isRest
+        ? REST_TO_REST_CLEARANCE
+        : rest.restIsWholeOrHalf
+          ? REST_TO_REST_CLEARANCE
+          : REST_TO_CHORD_CLEARANCE;
+      const margin = clearance - minimum;
+      if (margin >= 0) continue;
+      const steps = Math.ceil(Math.abs(margin));
+      if (other.isRest) {
+        // Two rests share the move, the upper one taking the smaller
+        // half -- and each side of the pair is reached on its own turn
+        // through this loop, so only this rest's share is recorded here.
+        record(rest.voiceId, restAbove ? Math.floor(steps / 2) : Math.ceil(steps / 2), restAbove);
+      } else {
+        record(rest.voiceId, steps, restAbove);
+      }
+    }
+  }
+
+  return pushes;
+}
+
 function computeVoiceCollisionOffsets(
   measure: Measure,
   staffNumber: number,
@@ -2978,10 +3108,15 @@ export function renderParsedMusicXml(
           // because a collision is by definition a fact ABOUT two voices
           // and cannot be seen from inside either one's own loop.
           const collisionOffsets = computeVoiceCollisionOffsets(measure, staffNumber, ctx);
+          // Integration U: and the same for rests, which move out of the
+          // other voice's way vertically rather than horizontally.
+          const restPushes = computeRestClearanceOffsets(measure, staffNumber, ctx);
 
           for (const voice of measure.voices) {
             const forcedDirection = isMultiVoice ? voiceForcedDirection(voice.id) : undefined;
-            const restOffset = isMultiVoice ? voiceRestOffset(voice.id) : 0;
+            const restOffset = isMultiVoice
+              ? voiceRestOffset(voice.id) + (restPushes.get(voice.id) ?? 0)
+              : 0;
             // §9.15: tracks the most recent note that started a tie (tieStart)
             // in THIS voice, so the next note carrying tieStop can be
             // connected to it. Scoped to within one measure and to

@@ -678,6 +678,59 @@ describe('MuseScore → MusicXML → this engine, end to end', () => {
     assert.match(svg, new RegExp(`y="${yFor('B', 5)}"[^>]*>\uE0F9`), 'china cymbal');
   });
 
+  test("and so does every notehead -- checked against MuseScore's own reported layout", () => {
+    // The same `default-y` evidence, for the noteheads. The test above
+    // computes where MuseScore WOULD put them from the display
+    // positions; this one reads where MuseScore SAYS it put them. Two
+    // independent checks of the same seventeen notes, and the file
+    // itself is the witness for both.
+    const xml = load('musescore-drum-notes.musicxml');
+    const { svg } = NE.renderFromMusicXml(xml, { domParser });
+    const bottomLine = bottomLineOf(svg);
+
+    const expected = [...xml.matchAll(/<note[^>]*default-y="(-?[\d.]+)"[^>]*>\s*<unpitched>/g)]
+      .map((m) => -4 - Number(m[1]) / 10)
+      .sort((a, b) => a - b);
+    assert.equal(expected.length, 17);
+
+    const drawn = [...svg.matchAll(/<text x="[\d.]+" y="([\d.-]+)"[^>]*>(.)</g)]
+      .filter((m) => {
+        const cp = m[2].codePointAt(0);
+        return cp >= 0xe0a0 && cp <= 0xe0ff;
+      })
+      .map((m) => Number(m[1]) - bottomLine)
+      .sort((a, b) => a - b);
+
+    assert.deepEqual(drawn, expected);
+  });
+
+  test("every rest sits where MuseScore's own export says MuseScore drew it", () => {
+    // MuseScore writes `default-y` on every note and rest it exports:
+    // the element's distance ABOVE the measure's top staff line, in
+    // tenths, ten to a staff space. That is not a hint -- it is
+    // MuseScore reporting its own finished layout, which makes it the
+    // strongest check available anywhere in this suite. Nine rests
+    // across three bars, two voices, three durations.
+    const xml = load('musescore-drum-notes.musicxml');
+    const { svg } = NE.renderFromMusicXml(xml, { domParser });
+    const bottomLine = bottomLineOf(svg);
+
+    // MuseScore's tenths, in this engine's own staff positions: the top
+    // line is -4 here and every ten tenths below it is one more space.
+    const expected = [...xml.matchAll(/<note[^>]*default-y="(-?[\d.]+)"[^>]*>\s*<rest\s*\/>/g)]
+      .map((m) => -4 - Number(m[1]) / 10)
+      .sort((a, b) => a - b);
+    assert.equal(expected.length, 9, 'the fixture should hold nine rests');
+
+    const REST_GLYPHS = ['\uE4E3', '\uE4E4', '\uE4E5', '\uE4E6'];
+    const drawn = [...svg.matchAll(/<text x="[\d.]+" y="([\d.-]+)"[^>]*>(.)</g)]
+      .filter((m) => REST_GLYPHS.includes(m[2]))
+      .map((m) => Number(m[1]) - bottomLine)
+      .sort((a, b) => a - b);
+
+    assert.deepEqual(drawn, expected);
+  });
+
   test("MuseScore's spacing law and this engine's own both fill the bar, differently", () => {
     // Not a bug in either: §14 adds a fixed increment per doubling and
     // MuseScore multiplies by a factor, so a bar of mixed durations is
