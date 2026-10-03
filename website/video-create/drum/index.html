@@ -333,14 +333,19 @@
 
      The band is the owner's own: he drew the two lines this music may
      reach, measured off his frame at 44.6cqw below the stat boxes and
-     88.9cqw above the cymbals. So the box starts at the first and ends
-     at the second -- 7.7 of margin puts its top on the upper line, and
-     43cqw plus the 1.3 of padding below reaches the lower one. The
-     staff itself comes out half again the size it was, the other half
-     of which is the tempo mark and the bar numbers no longer taking
-     room above every system (see `notationConfig`). */
-  .video-frame.is-portrait .video-notation{margin-top:7.7cqw;padding:0 2.6cqw 1.3cqw;}
-  .video-frame.is-portrait .video-notation svg{height:var(--note-h,43cqw);}
+     89.0cqw above the cymbals.
+
+     What has to land on them is the INK, not the box. The box's first
+     eighth and last tenth are empty -- a system's own margin, and the
+     gap between its edge and the outermost stem -- so a box that ended
+     on the line left the music well inside it, which is what "still
+     not big enough" meant three times over. Measured off the painted
+     pixels, the ink runs 12.3% to 90.8% of the box, so the box that
+     puts those two on the lines is 56.5cqw starting at 37.7 -- 0.9 of
+     margin. It overruns the lines at both ends, and what overruns is
+     empty. */
+  .video-frame.is-portrait .video-notation{margin-top:0.9cqw;padding:0 2.6cqw 1.3cqw;}
+  .video-frame.is-portrait .video-notation svg{height:var(--note-h,56.5cqw);}
   .video-frame.is-portrait .drum-circle{height:26cqw;}
 
   /* The footer is only the portrait shape's. */
@@ -390,21 +395,18 @@
   }
   .video-frame.is-square .stat-box .stat-label{font-size:2.2cqw;}
   .video-frame.is-square .stat-box .stat-value{font-size:4.2cqw;}
-  /* The music has to END above the kit, not merely start above it.
-     A staff carries ink well below its bottom line -- the bass drum's
-     stems and their beams -- and at 28cqw those crossed the top of
-     the cymbals. The lowest ink sits three quarters of the way down
-     the box, and 40% of the frame is where the cymbals begin, so the
-     box may run to 22cqw and no further: 23.4 + 0.75 x 22 = 39.9.
-     The header above is tightened rather than the music shrunk
-     further -- every unit off the header is a unit the music keeps.
+  /* The owner drew his line on the square frame too, at 43.5cqw --
+     where its cymbals begin, measured off his own screenshot. Above it
+     there is only the stat boxes' own bottom edge at 22, so the ink
+     runs from just under that to just above the line.
 
-     The staff still grew by a third, because the box is no longer
-     mostly empty: the tempo mark and the bar numbers used to reserve a
-     quarter of its height above the staff and the frame says both in
-     its own boxes anyway (see `notationConfig`). */
-  .video-frame.is-square .video-notation{margin-top:1.4cqw;padding:0 2.4cqw 1.3cqw;}
-  .video-frame.is-square .video-notation svg{height:var(--note-h,22cqw);}
+     Same arithmetic as the portrait shape: the ink is 12.3% to 90.7%
+     of the box, so putting it on 23.5 and 43.5 wants a box of 25.5cqw
+     starting at 20.4 -- which is 1.3 ABOVE where the header ends, hence
+     the negative margin. Nothing collides: the box's first eighth is
+     empty, and the stat boxes sit in it. */
+  .video-frame.is-square .video-notation{margin-top:-1.3cqw;padding:0 2.4cqw 1.3cqw;}
+  .video-frame.is-square .video-notation svg{height:var(--note-h,25.5cqw);}
   .video-frame.is-square .drum-circle{height:26cqw;}
 
   .transport{display:flex;align-items:center;gap:14px;}
@@ -1418,6 +1420,43 @@
    * staff the size of a postage stamp, and one that is all sky does
    * not get a staff taller than the frame.
    */
+  /**
+   * The band the music really paints, as fractions of the SVG's own box.
+   *
+   * Measured from the LINES -- stems, staff lines, beams, barlines --
+   * because a notehead or a rest is a glyph, and a glyph's bounding box
+   * is its font's em square rather than its ink: asking the browser for
+   * one reports a box six staff spaces tall for a notehead one space
+   * high. Half a space is added at each end for the glyph ink that does
+   * sit outside the lines.
+   */
+  function inkBand(svgEl) {
+    const viewBox = (svgEl.getAttribute('viewBox') || '').split(/\s+/).map(Number);
+    const height = viewBox.length === 4 ? viewBox[3] : 20;
+    let top = Infinity;
+    let bottom = -Infinity;
+    for (const el of svgEl.querySelectorAll('line, rect, path')) {
+      if (el.classList.contains('playback-cursor')) continue;
+      let b;
+      try {
+        b = el.getBBox();
+      } catch (err) {
+        continue;
+      }
+      if (!(b.height >= 0)) continue;
+      top = Math.min(top, b.y);
+      bottom = Math.max(bottom, b.y + b.height);
+    }
+    if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom <= top || !(height > 0)) {
+      return { top: 0, bottom: 1 };
+    }
+    const GLYPH_MARGIN = 0.5;
+    return {
+      top: Math.max(0, top - GLYPH_MARGIN) / height,
+      bottom: Math.min(height, bottom + GLYPH_MARGIN) / height,
+    };
+  }
+
   function fitNotationToKit() {
     if (!notationContainer) return;
     videoFrame.style.removeProperty('--note-h');
@@ -1439,10 +1478,13 @@
     const top = box.top - frame.top;
     // The container's own padding, which the staff does not get.
     const padding = Math.max(0, box.height - base);
-    // The staff's ink runs most of the way down its box -- the bass
-    // drum's stems, their beams, and the R/L under them -- so the box
-    // has to stop short of the kit rather than touch it.
-    const room = kitTop - top - padding - frame.height * 0.02;
+    // What has to clear the photo is the INK, not the box. The box's
+    // last tenth is empty -- a system's own margin below its lowest
+    // stem -- so measuring the box against the kit made the music
+    // smaller than it needed to be by exactly that tenth, every time.
+    const band = inkBand(svg);
+    const clearance = frame.height * 0.02;
+    const room = (kitTop - top - clearance - padding) / Math.max(0.2, band.bottom);
     if (!(room > 0)) return;
 
     // A band, not a free hand, and it no longer reaches ABOVE the
