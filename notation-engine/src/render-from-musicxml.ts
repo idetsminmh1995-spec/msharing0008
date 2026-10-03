@@ -2047,6 +2047,16 @@ export function renderParsedMusicXml(
   } = parsed;
   const diagnostics: Diagnostic[] = [...parseDiagnostics];
   const config = resolveConfig(options?.config);
+  /**
+   * The tempo marks that are DRAWN, which is not always the ones the
+   * file carries.
+   *
+   * `tempoMarks` itself stays whole and goes to `computePlaybackData`:
+   * hiding the mark must not change when a note sounds. This is the
+   * list the layout reserves room for and the renderer draws, so the
+   * two can never disagree about whether there is a mark there.
+   */
+  const drawnTempoMarks = config.tempoMarks.display === 'off' ? [] : tempoMarks;
   // Phase 50/§8: one resolution of every user-facing drawing value, passed
   // down on RenderCtx. Everything below reads `theme`, never a constant.
   const theme = buildTheme(config);
@@ -2412,7 +2422,7 @@ export function renderParsedMusicXml(
     const layout = computeMeasureLayout(
       makeMeasure(measureNumber, combinedVoices),
       measureTicks ?? TICKS_PER_QUARTER * 4,
-      tempoMarks.filter((tm) => tm.measureNumber === measureNumber),
+      drawnTempoMarks.filter((tm) => tm.measureNumber === measureNumber),
       headerWidth,
       config.spacing,
     );
@@ -2455,7 +2465,7 @@ export function renderParsedMusicXml(
     score.parts.forEach((part, partIndex) => {
       const midi = midiInstrumentsByPartMap.get(part.id);
       part.measures.forEach((m, measureIndex) => {
-        const hasTempoMark = tempoMarks.some(
+        const hasTempoMark = drawnTempoMarks.some(
           (t) => t.partId === part.id && t.measureNumber === m.number,
         );
         // Only the top part draws bar numbers (see where they're drawn).
@@ -2911,7 +2921,7 @@ export function renderParsedMusicXml(
       // Integration D: draw this measure's own tempo marks ONCE (above the
       // topmost staff, per tempoMarkSide()), never once per staff -- a
       // tempo mark describes the whole system, not one staff of it.
-      const measureTempoMarks = tempoMarks.filter(
+      const measureTempoMarks = drawnTempoMarks.filter(
         (m) => m.partId === part.id && m.measureNumber === measure.number,
       );
       if (measureTempoMarks.length > 0) {

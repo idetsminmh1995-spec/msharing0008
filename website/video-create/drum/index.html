@@ -329,11 +329,18 @@
      portrait video is read on a phone held upright, where the staff
      gets a third of the width a laptop gives it -- so the music has to
      take the height instead, or the noteheads come out smaller than
-     the ones in the 16:9 cut. 36cqw is 389px of a 1080-wide frame,
-     which leaves the music's top at 519 and its bottom clear of where
-     the kit photo starts. */
-  .video-frame.is-portrait .video-notation{margin-top:11.5cqw;padding:0 2.6cqw 1.3cqw;}
-  .video-frame.is-portrait .video-notation svg{height:var(--note-h,36cqw);}
+     the ones in the 16:9 cut.
+
+     The band is the owner's own: he drew the two lines this music may
+     reach, measured off his frame at 44.6cqw below the stat boxes and
+     88.9cqw above the cymbals. So the box starts at the first and ends
+     at the second -- 7.7 of margin puts its top on the upper line, and
+     43cqw plus the 1.3 of padding below reaches the lower one. The
+     staff itself comes out half again the size it was, the other half
+     of which is the tempo mark and the bar numbers no longer taking
+     room above every system (see `notationConfig`). */
+  .video-frame.is-portrait .video-notation{margin-top:7.7cqw;padding:0 2.6cqw 1.3cqw;}
+  .video-frame.is-portrait .video-notation svg{height:var(--note-h,43cqw);}
   .video-frame.is-portrait .drum-circle{height:26cqw;}
 
   /* The footer is only the portrait shape's. */
@@ -386,12 +393,18 @@
   /* The music has to END above the kit, not merely start above it.
      A staff carries ink well below its bottom line -- the bass drum's
      stems and their beams -- and at 28cqw those crossed the top of
-     the cymbals. 24cqw puts the lowest ink at about 40% of the frame,
-     which leaves the bottom 55% to the photo, and the header above is
-     tightened rather than the music shrunk further: every unit off
-     the header is a unit the music keeps. */
+     the cymbals. The lowest ink sits three quarters of the way down
+     the box, and 40% of the frame is where the cymbals begin, so the
+     box may run to 22cqw and no further: 23.4 + 0.75 x 22 = 39.9.
+     The header above is tightened rather than the music shrunk
+     further -- every unit off the header is a unit the music keeps.
+
+     The staff still grew by a third, because the box is no longer
+     mostly empty: the tempo mark and the bar numbers used to reserve a
+     quarter of its height above the staff and the frame says both in
+     its own boxes anyway (see `notationConfig`). */
   .video-frame.is-square .video-notation{margin-top:1.4cqw;padding:0 2.4cqw 1.3cqw;}
-  .video-frame.is-square .video-notation svg{height:var(--note-h,21cqw);}
+  .video-frame.is-square .video-notation svg{height:var(--note-h,22cqw);}
   .video-frame.is-square .drum-circle{height:26cqw;}
 
   .transport{display:flex;align-items:center;gap:14px;}
@@ -428,7 +441,7 @@
   body.is-rendering #genNote{opacity:.38;}
 </style>
 <!-- The real Notation Engine bundle (github.com/idetsminmh1995-spec/msharing0008/notation-engine) -->
-<script src="../../assets/notation-engine.js?v=6f33000b"></script>
+<script src="../../assets/notation-engine.js?v=f0f90eed"></script>
 <!-- The Human Sticking Engine: Drum/sticking-engine-ts, a TypeScript port
      of Drum/sticking-engine (Python) that is parity-tested against it. It
      decides which limb plays every note; the R/L under the staff is its
@@ -1179,6 +1192,19 @@
         ink: currentVideoStyle() === 'black' ? '#ffffff' : '#111111',
         background: 'none',
       },
+      // The frame already says the tempo and the bar, in its own boxes,
+      // in letters a phone can read. Drawing them over the staff as
+      // well is the same fact twice -- and it is not free: the engine
+      // reserves the room above EVERY system for whichever of them is
+      // tallest, which on this score was four staff spaces of height
+      // the music could have had instead. Turning them off makes the
+      // notes a quarter bigger without moving anything else.
+      //
+      // The tempo map is untouched. `tempoMarks.display` decides what
+      // is DRAWN; playback still reads every mark the file carries, so
+      // a score that changes speed still changes speed.
+      barNumbers: { display: 'off' },
+      tempoMarks: { display: 'off' },
     };
   }
   const statBpm = document.getElementById('statBpm');
@@ -1385,13 +1411,15 @@
     const room = kitTop - top - padding - frame.height * 0.02;
     if (!(room > 0)) return;
 
-    // A band, not a free hand. The shape's own number is the
-    // intention and this moves it to fit; a photo that is all kit does
-    // not get a staff the size of a postage stamp, and one that is all
-    // sky does not get a staff so tall that a bar and a half fills the
-    // frame -- past about a third bigger, the reader loses the shape
-    // of the phrase they are meant to be following.
-    const wanted = Math.max(base * 0.75, Math.min(base * 1.35, room));
+    // A band, not a free hand, and it no longer reaches ABOVE the
+    // stylesheet's number. That number used to be a cautious guess
+    // this was allowed to grow a third past; it is the owner's own
+    // limit now -- the line he drew above the cymbals -- so growing
+    // past it would cross it. What is left is the shrink: a photo
+    // that is all kit still pulls the staff down, to three quarters
+    // of the asking size and no smaller, because a staff the size of
+    // a postage stamp is not a reading of the music either.
+    const wanted = Math.max(base * 0.75, Math.min(base, room));
     videoFrame.style.setProperty('--note-h', `${wanted}px`);
   }
 

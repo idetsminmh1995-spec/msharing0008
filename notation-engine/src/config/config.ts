@@ -130,6 +130,24 @@ export interface BeamConfig {
 
 // ---- bar/measure numbering (Phase 13) ----
 
+/**
+ * Whether the metronome mark the file carries is DRAWN.
+ *
+ * `'auto'` draws it wherever the file puts one, which is what a page of
+ * music wants. `'off'` draws none -- for a frame that already states
+ * the tempo somewhere else, where a second copy over the staff is both
+ * a repetition and, because the engine reserves the room for it above
+ * every system, four staff spaces of height the music could have had.
+ *
+ * It never changes the TIMING. The tempo map playback is driven from
+ * is built from the file either way; this decides only what is drawn.
+ */
+export type TempoMarkDisplay = 'auto' | 'off';
+
+export interface TempoMarkConfig {
+  readonly display: TempoMarkDisplay;
+}
+
 export type BarNumberDisplay = 'off' | 'everyBar' | 'everyNBars' | 'systemStart';
 
 export interface BarNumberConfig {
@@ -348,6 +366,7 @@ export interface EngineConfig {
   readonly noteheadMapping: NoteheadMappingConfig;
   readonly beam: BeamConfig;
   readonly barNumbers: BarNumberConfig;
+  readonly tempoMarks: TempoMarkConfig;
   readonly keySignature: KeySignatureConfig;
   readonly spacing: SpacingConfig;
   readonly staves: StavesConfig;
@@ -367,6 +386,7 @@ export interface PartialEngineConfig {
   readonly noteheadMapping?: Partial<NoteheadMappingConfig>;
   readonly beam?: Partial<BeamConfig>;
   readonly barNumbers?: Partial<BarNumberConfig>;
+  readonly tempoMarks?: Partial<TempoMarkConfig>;
   readonly keySignature?: Partial<KeySignatureConfig>;
   readonly spacing?: Partial<SpacingConfig>;
   readonly staves?: Partial<StavesConfig>;
@@ -424,6 +444,9 @@ export const DEFAULT_CONFIG: EngineConfig = {
   },
   barNumbers: {
     display: 'systemStart',
+  },
+  tempoMarks: {
+    display: 'auto',
   },
   keySignature: {
     style: 'standard',
@@ -501,6 +524,7 @@ export function resolveConfig(overrides?: PartialEngineConfig): EngineConfig {
     noteheadMapping: { ...DEFAULT_CONFIG.noteheadMapping, ...overrides?.noteheadMapping },
     beam: { ...DEFAULT_CONFIG.beam, ...overrides?.beam },
     barNumbers: { ...DEFAULT_CONFIG.barNumbers, ...overrides?.barNumbers },
+    tempoMarks: { ...DEFAULT_CONFIG.tempoMarks, ...overrides?.tempoMarks },
     keySignature: { ...DEFAULT_CONFIG.keySignature, ...overrides?.keySignature },
     spacing: { ...DEFAULT_CONFIG.spacing, ...overrides?.spacing },
     staves: { ...DEFAULT_CONFIG.staves, ...overrides?.staves },

@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-587 exported symbols, by module.
+589 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -411,6 +411,8 @@ The diagnostics `level` lets through, in their original order.
 | interface | `NoteheadMappingConfig` |  |
 | type | `BeamStyle` |  |
 | interface | `BeamConfig` |  |
+| type | `TempoMarkDisplay` | Whether the metronome mark the file carries is DRAWN. |
+| interface | `TempoMarkConfig` |  |
 | type | `BarNumberDisplay` |  |
 | interface | `BarNumberConfig` |  |
 | type | `KeySignatureStyle` | Only "standard" exists so far -- reserved as a union (not a bare string) so Phase 11 can add real alternatives later without a breaking type change for existing callers. |

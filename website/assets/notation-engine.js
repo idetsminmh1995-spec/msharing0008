@@ -59780,6 +59780,9 @@ ${denominator}`;
     barNumbers: {
       display: "systemStart"
     },
+    tempoMarks: {
+      display: "auto"
+    },
     keySignature: {
       style: "standard"
     },
@@ -59847,6 +59850,7 @@ ${denominator}`;
       noteheadMapping: { ...DEFAULT_CONFIG.noteheadMapping, ...overrides?.noteheadMapping },
       beam: { ...DEFAULT_CONFIG.beam, ...overrides?.beam },
       barNumbers: { ...DEFAULT_CONFIG.barNumbers, ...overrides?.barNumbers },
+      tempoMarks: { ...DEFAULT_CONFIG.tempoMarks, ...overrides?.tempoMarks },
       keySignature: { ...DEFAULT_CONFIG.keySignature, ...overrides?.keySignature },
       spacing: { ...DEFAULT_CONFIG.spacing, ...overrides?.spacing },
       staves: { ...DEFAULT_CONFIG.staves, ...overrides?.staves },
@@ -66666,6 +66670,7 @@ ${xrefOffset}
     } = parsed;
     const diagnostics = [...parseDiagnostics];
     const config = resolveConfig(options?.config);
+    const drawnTempoMarks = config.tempoMarks.display === "off" ? [] : tempoMarks;
     const theme = buildTheme(config);
     const staffBottomYs = /* @__PURE__ */ new Set();
     let reportedTransparentTabMask = false;
@@ -66863,7 +66868,7 @@ ${xrefOffset}
       const layout = computeMeasureLayout(
         measure(measureNumber, combinedVoices),
         measureTicks ?? TICKS_PER_QUARTER * 4,
-        tempoMarks.filter((tm) => tm.measureNumber === measureNumber),
+        drawnTempoMarks.filter((tm) => tm.measureNumber === measureNumber),
         headerWidth,
         config.spacing
       );
@@ -66882,7 +66887,7 @@ ${xrefOffset}
       score2.parts.forEach((part2, partIndex) => {
         const midi = midiInstrumentsByPartMap.get(part2.id);
         part2.measures.forEach((m, measureIndex) => {
-          const hasTempoMark = tempoMarks.some(
+          const hasTempoMark = drawnTempoMarks.some(
             (t) => t.partId === part2.id && t.measureNumber === m.number
           );
           const hasBarNumber = partIndex === 0 && couldCarryBarNumber(m.number, measureIndex === 0);
@@ -67126,7 +67131,7 @@ ${xrefOffset}
           }
           return northExtentCache;
         };
-        const measureTempoMarks = tempoMarks.filter(
+        const measureTempoMarks = drawnTempoMarks.filter(
           (m) => m.partId === part2.id && m.measureNumber === measure2.number
         );
         if (measureTempoMarks.length > 0) {
