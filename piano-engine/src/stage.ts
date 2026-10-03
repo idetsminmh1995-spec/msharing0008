@@ -72,12 +72,13 @@ const KEYBOARD_FRACTION = 1 / 3;
 /**
  * The keyboard's share of the stage in the hands design.
  *
- * Bigger than a third, because nothing else is on the stage any more
- * -- but not the whole of it: the palms and the forearms sit ABOVE the
- * keys, and a keyboard filling its box would leave the hands with
- * nowhere to come from. The quarter left over is their room.
+ * All of it, because nothing else is on the stage any more and the
+ * hands do not need room above the keys: the player sits at the FRONT
+ * of the keyboard, so the hands come up from the bottom of the frame
+ * and reach away from the viewer. What they need is DEPTH of key, and
+ * the way to give them that is to let the keyboard have the box.
  */
-const KEYBOARD_FRACTION_HANDS = 0.8;
+const KEYBOARD_FRACTION_HANDS = 1;
 
 /**
  * How long a white key is allowed to be, in its own widths.
@@ -488,6 +489,10 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
   if (!falling && options.hands !== undefined) {
     for (const shape of handsShapes({
       size: options.size,
+      // The window the stage actually drew, not the whole instrument:
+      // a hand laid out on 88 keys while two octaves were drawn puts
+      // every finger a third of a keyboard away from its own key.
+      range: handsRange(options),
       board,
       seconds: options.seconds,
       notes: options.hands.notes,

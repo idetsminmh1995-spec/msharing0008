@@ -6,13 +6,27 @@
  * keys it last used. Fingers press one at a time, each onto its own
  * key, and the hand slides along the board when the music asks it to.
  *
- * Drawn as PATHS rather than as rectangles, which is the one thing
- * this engine could not do before. A finger is a tapered, rounded
- * stroke and a palm is a soft shape; both come out of the same
- * description the SVG preview and the video canvas already share, so
- * the picture on the page and the picture in the file stay one
- * drawing. (A `Path2D` is what the canvas takes, and it parses the
- * same `d` the SVG does.)
+ *
+ * WHICH WAY ROUND A HAND GOES
+ *
+ * The player sits at the FRONT of the keys, which in this picture is
+ * the bottom of the frame. So the hands come up from the bottom: the
+ * heel of the palm is nearest the viewer, the fingers point away, up
+ * the keys, and a finger reaching a black key reaches FURTHER up than
+ * one on a white. Drawing it the other way round -- an arm coming down
+ * out of the sky with fingers pointing at the viewer -- is the single
+ * thing that stops a drawn hand reading as a hand.
+ *
+ *
+ * ONE SILHOUETTE, NOT SEVEN PARTS
+ *
+ * A hand is drawn twice: once in the edge colour, every part a little
+ * fatter, and then again in the skin colour at its true size. The
+ * parts overlap, so the first pass shows only where nothing covers it
+ * -- which is exactly the outline of the whole hand. There is no line
+ * between the palm and a finger, or between two fingers that touch,
+ * because there is nothing there to draw a line with. Outlining each
+ * part separately is what made the first attempt look like a rake.
  *
  *
  * WHAT MAKES IT READ AS A HAND
@@ -20,10 +34,12 @@
  * Three things, none of them detail:
  *
  *  - the fingers are not the same length. Middle is longest, thumb
- *    shortest and lowest on the hand, and the little finger is short
- *    AND set back. A row of five equal bars reads as a comb.
- *  - a pressed finger goes DOWN and the others do not. That is the
- *    whole of the animation, and without it the hand is a sticker.
+ *    shortest and off the SIDE of the palm rather than the front, and
+ *    the little finger is short AND set back. A row of five equal bars
+ *    reads as a comb.
+ *  - a finger that is playing reaches its own key and the others stay
+ *    curled over theirs. That is the whole of the animation, and
+ *    without it the hand is a sticker.
  *  - the hand leans. The thumb side sits lower and further forward
  *    than the little-finger side, which is what makes a left hand look
  *    like a left hand rather than a mirrored right one.
@@ -36,25 +52,62 @@ import type { Finger, FingeredNote, HandAnchor } from './fingering.js';
 import type { Hand, KeyboardSize, PianoKey, StageShape } from './types.js';
 
 /**
- * Each finger's length and its set-back, as fractions of the hand's
- * own size. Index 0 is the thumb.
+ * A hand's proportions, in white-key widths.
  *
- * `reach` is how far down the key the fingertip sits; `back` is how far
- * the knuckle is from the palm's front edge. The numbers are a hand's
- * real proportions rounded to something a drawing can use: the middle
- * finger is longest, the thumb is much shorter and comes off the side
- * rather than the front.
+ * A white key is 23mm and a hand is a hand, so these are real
+ * measurements rather than taste: a palm is about four keys across and
+ * three deep, and a middle finger is a bit over two long. That is why
+ * a hand covers five white keys -- not because five is a convenient
+ * number, but because a hand is 90mm wide.
+ *
+ * Everything else about the drawing is derived from these, so a hand
+ * stays the right size for the KEYS in any frame, however tall or
+ * short the keyboard has to be drawn.
  */
-const FINGER_SHAPE: readonly { reach: number; back: number; width: number }[] = [
-  { reach: 0.62, back: 0.5, width: 1.15 }, // thumb -- short, thick, low
-  { reach: 0.92, back: 0.08, width: 0.95 }, // index
-  { reach: 1.0, back: 0.0, width: 0.95 }, // middle -- the longest
-  { reach: 0.94, back: 0.06, width: 0.9 }, // ring
-  { reach: 0.78, back: 0.22, width: 0.8 }, // little -- short and set back
+const PALM_WIDTH = 3.5;
+const PALM_HEIGHT = 3.6;
+const FINGER_LENGTH = 2.55;
+const FINGER_THICK = 0.62;
+
+/**
+ * Where the knuckles sit, as a fraction of the keyboard's depth: well
+ * down the keys, towards the player, which is where a hand's knuckles
+ * are when its fingers are on the keys.
+ */
+const KNUCKLE_DEPTH = 0.58;
+
+/**
+ * How far back a finger on a BLACK key has to reach, whatever its own
+ * length. A black key is shorter and set further back, so even a thumb
+ * has to stretch for one.
+ */
+const BLACK_TIP_DEPTH = 0.16;
+
+/**
+ * Each finger's length and where it comes off the palm, as fractions
+ * of the hand's own size. Index 0 is the thumb.
+ *
+ * `reach` is its length as a share of the middle finger's; `drop` is
+ * how far below the knuckle line it starts, which is what sets the
+ * thumb off the side of the hand rather than the front; `width` is its
+ * thickness, again against the middle finger's.
+ */
+const FINGER_SHAPE: readonly { reach: number; drop: number; width: number }[] = [
+  { reach: 0.52, drop: 1.9, width: 1.5 }, // thumb -- short, thick, low, off the side
+  { reach: 0.95, drop: 0.08, width: 1.0 }, // index
+  { reach: 1.0, drop: 0.0, width: 1.0 }, // middle -- the longest
+  { reach: 0.95, drop: 0.07, width: 0.95 }, // ring
+  { reach: 0.79, drop: 0.34, width: 0.85 }, // little -- short and set back
 ];
 
-/** How far a pressed fingertip drops, as a fraction of the white key's height. */
-const PRESS_DROP = 0.1;
+/** How much a finger that is not playing curls back off its key. */
+const CURL = 0.07;
+
+/** And how far one that IS playing straightens past its easy reach. */
+const REACH = 0.03;
+
+/** How far the outline bleeds out from under the skin. */
+const OUTLINE = 0.08;
 
 export interface HandColors {
   /** The hand itself. */
@@ -104,6 +157,16 @@ export function handColorsFor(colors: {
 
 export interface HandsOptions {
   readonly size: KeyboardSize;
+  /**
+   * The stretch of keyboard actually drawn, when it is not the whole
+   * instrument.
+   *
+   * The hands design shows a window of the keyboard in a narrow frame,
+   * and a hand has to be laid out on THE KEYS THAT ARE THERE -- given
+   * the full 88 while the stage drew two octaves, every finger would
+   * be on the wrong key by a third of the keyboard.
+   */
+  readonly range?: { readonly first: number; readonly last: number };
   /** The keyboard's own box, as `keyboardGeometry` was given it. */
   readonly board: { x: number; y: number; width: number; height: number };
   readonly seconds: number;
@@ -155,19 +218,44 @@ function xAtWhite(whites: readonly PianoKey[], index: number): number | undefine
   return low.x + low.width / 2 + (high.x + high.width / 2 - (low.x + low.width / 2)) * t;
 }
 
+/** The same white-key ruler `fingering.ts` counts with. */
+function whiteIndexOfKey(midi: number): number {
+  const WHITES_BELOW_C = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
+  const octave = Math.floor(midi / 12);
+  const step = ((midi % 12) + 12) % 12;
+  return octave * 7 + (WHITES_BELOW_C[step] ?? 0);
+}
+
+function round(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/** Everything one hand's drawing is measured from. */
+interface HandFrame {
+  readonly unit: number;
+  readonly knuckleY: number;
+  readonly centreX: number;
+  readonly lean: number;
+  readonly palmWidth: number;
+  /** -1 if the thumb is on the left of this hand, +1 if on the right. */
+  readonly thumbSide: -1 | 1;
+}
+
 /**
  * Where every finger of one hand is at this moment.
  *
- * A finger that is playing goes to its OWN key, wherever that is; the
- * rest sit where the hand's position puts them. That is the difference
- * between a hand resting on the keys and a hand reaching for a chord,
- * and it comes out of the fingering rather than being posed.
+ * A finger that is playing goes to its OWN key, at the depth that key
+ * is played at; the rest stay curled over where the hand is sitting.
+ * That is the difference between a hand resting on the keys and a hand
+ * reaching for a chord, and it comes out of the fingering rather than
+ * being posed.
  */
 function fingertips(
   hand: Hand,
   options: HandsOptions,
   keys: readonly PianoKey[],
   whites: readonly PianoKey[],
+  frame: HandFrame,
 ): readonly Fingertip[] {
   const path = options.anchors[hand];
   const anchorWhite = anchorAt(path, options.seconds);
@@ -204,20 +292,33 @@ function fingertips(
     }
     if (x === undefined) continue;
 
-    // Down the key: a black key is shorter and further back, so a
-    // finger on one stops higher up the board than one on a white.
+    // How far up the key the tip goes.
     //
-    // Capped by the HAND's own size, not just the board's. A keyboard
-    // drawn tall -- which the hands design does, having nothing else to
-    // put on the stage -- has long keys, and a finger measured as a
-    // fraction of them grows with them. A finger is about three and a
-    // half white keys long whatever the picture is; past that it stops
-    // being a hand and becomes a rake.
-    const depth = onBlack ? 0.42 : 0.66;
-    const unit = (whites[0]?.width ?? board.width / 52) * (options.scale ?? 1);
-    const reach = Math.min(board.height * depth, unit * (onBlack ? 2.6 : 3.9));
-    const drop = Math.min(board.height * PRESS_DROP, unit * 0.55);
-    const y = board.y + reach * shape.reach + (held !== undefined ? drop : 0);
+    // Its OWN length decides it, not the key: that is what staggers the
+    // five tips the way a hand's are, and why the thumb plays near the
+    // front of the keys and the middle finger much further back. A
+    // finger that is not playing curls a little short of its reach,
+    // and one that is playing straightens past it, so pressing always
+    // moves a finger AWAY from the player rather than back towards
+    // them.
+    //
+    // A black key is the one thing that overrides the hand: it is
+    // shorter and set back, so a finger on one has to reach at least
+    // that far whatever its length.
+    const length = frame.unit * FINGER_LENGTH * shape.reach;
+    const from = frame.knuckleY + frame.unit * shape.drop * 0.5;
+    const resting = from - length * (1 - CURL);
+    const reaching = from - length * (1 + REACH);
+    const y =
+      held === undefined
+        ? resting
+        : onBlack
+          ? Math.min(reaching, board.y + board.height * BLACK_TIP_DEPTH)
+          : Math.max(
+              board.y + board.height * 0.14,
+              Math.min(reaching, board.y + board.height * 0.72),
+            );
+
     tips.push({
       finger,
       x,
@@ -230,32 +331,57 @@ function fingertips(
   return tips;
 }
 
-/** The same white-key ruler `fingering.ts` counts with. */
-function whiteIndexOfKey(midi: number): number {
-  const WHITES_BELOW_C = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
-  const octave = Math.floor(midi / 12);
-  const step = ((midi % 12) + 12) % 12;
-  return octave * 7 + (WHITES_BELOW_C[step] ?? 0);
-}
-
-function round(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
 /**
  * One finger, from its knuckle to its tip.
  *
- * Drawn as a stroked path rather than a filled outline: a stroke with a
- * round cap IS a finger shape -- a rounded bar that narrows where it is
- * told to -- and it costs one path instead of eight curves.
+ * Drawn as a stroked path rather than as a filled outline: a stroke
+ * with a round cap IS a finger shape -- a rounded bar -- and it costs
+ * one path instead of eight curves. The bow leans along the finger's
+ * own direction, so a finger reaching sideways for a key looks reached
+ * rather than snapped.
  */
 function fingerPath(fromX: number, fromY: number, toX: number, toY: number): string {
-  // A slight bow, so the finger curves towards the key instead of
-  // spearing it. The control point leans along the finger's own
-  // direction, which is what makes a reaching finger look reached.
-  const midX = (fromX + toX) / 2 + (toX - fromX) * 0.08;
-  const midY = (fromY + toY) / 2 - Math.abs(toY - fromY) * 0.12;
+  const midX = (fromX + toX) / 2 + (toX - fromX) * 0.06;
+  const midY = (fromY + toY) / 2 + Math.abs(toY - fromY) * 0.1;
   return `M ${round(fromX)} ${round(fromY)} Q ${round(midX)} ${round(midY)} ${round(toX)} ${round(toY)}`;
+}
+
+/** One part of a hand, before it is given a colour. */
+type Limb =
+  | { readonly box: { x: number; y: number; width: number; height: number; radius: number } }
+  | { readonly stroke: { d: string; width: number } };
+
+/**
+ * The same parts twice: fat and dark underneath, true size and skin on
+ * top. What shows of the dark pass is the silhouette's outline, and
+ * only that -- which is why the hand has no seams in it.
+ */
+function paint(limbs: readonly Limb[], fill: string, grow: number): StageShape[] {
+  const out: StageShape[] = [];
+  for (const limb of limbs) {
+    if ('box' in limb) {
+      out.push({
+        x: round(limb.box.x - grow),
+        y: round(limb.box.y - grow),
+        width: round(limb.box.width + grow * 2),
+        height: round(limb.box.height + grow * 2),
+        fill,
+        radius: round(limb.box.radius + grow),
+      });
+    } else {
+      out.push({
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        fill: 'none',
+        stroke: fill,
+        strokeWidth: round(limb.stroke.width + grow * 2),
+        path: limb.stroke.d,
+      });
+    }
+  }
+  return out;
 }
 
 /**
@@ -266,158 +392,116 @@ function fingerPath(fromX: number, fromY: number, toX: number, toY: number): str
  * player.
  */
 export function handShapes(hand: Hand, options: HandsOptions): readonly StageShape[] {
-  const keys = keyboardGeometry(options.size, options.board);
+  const keys = keyboardGeometry(options.range ?? options.size, options.board);
   const whites = whiteKeys(keys);
-  const tips = fingertips(hand, options, keys, whites);
-  if (tips.length === 0) return [];
+  if (whites.length === 0) return [];
 
+  const board = options.board;
   const scale = options.scale ?? 1;
   const colors = options.colors[hand];
-  const board = options.board;
-  const whiteWidth = whites[0]?.width ?? board.width / 52;
-  const unit = whiteWidth * scale;
+  const unit = (whites[0]?.width ?? board.width / 52) * scale;
 
-  // The palm sits behind the fingers, over the back of the keys, and
-  // leans: the thumb side forward, the little-finger side back.
+  // A first pass to find where the hand is, then the real one: the
+  // fingers decide the hand's centre, and the hand's centre decides
+  // where the fingers come off it.
+  const rough: HandFrame = {
+    unit,
+    knuckleY: board.y + board.height * KNUCKLE_DEPTH,
+    centreX: board.x + board.width / 2,
+    lean: 0,
+    palmWidth: unit * PALM_WIDTH,
+    thumbSide: hand === 'right' ? -1 : 1,
+  };
+  const tips = fingertips(hand, options, keys, whites, rough);
+  if (tips.length === 0) return [];
+
   const xs = tips.map((t) => t.x);
+  const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
   const thumb = tips.find((t) => t.finger === 1);
   const little = tips.find((t) => t.finger === 5);
-  const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
-  const palmY = board.y - unit * 0.15;
-  // The palm grows with the fingers but only so far: a hand stretching
+  // The hand leans towards its thumb, which is what tells a left hand
+  // from a right one at a glance.
+  const lean = thumb !== undefined && little !== undefined ? (thumb.x - little.x) * 0.05 : 0;
+  // The palm widens with the fingers but only so far: a hand stretching
   // two octaves does not get a two-octave palm, it keeps the same palm
-  // and spreads its fingers. Letting the palm follow the span is what
-  // turns a wide chord into a slab.
+  // and spreads its fingers.
   const spread = Math.abs(Math.max(...xs) - Math.min(...xs));
-  const palmWidth = Math.min(unit * 4.8, Math.max(unit * 3.4, spread * 0.92));
-  const palmHeight = unit * 1.5;
-  const lean = thumb !== undefined && little !== undefined ? (thumb.x - little.x) * 0.06 : 0;
+  const palmWidth = Math.min(unit * (PALM_WIDTH + 0.8), Math.max(unit * PALM_WIDTH, spread * 0.78));
+  const frame: HandFrame = { ...rough, centreX, lean, palmWidth };
 
-  const shapes: StageShape[] = [];
+  const knuckleY = frame.knuckleY;
+  const palmTop = knuckleY - unit * 0.55;
+  const palmHeight = unit * PALM_HEIGHT;
+  const limbs: Limb[] = [];
 
-  // The forearm first, running back off the top of the keyboard, so
-  // the hand is attached to someone. Narrower than the palm and long
-  // enough to read as an arm: a short wide stub behind a hand looks
-  // like a head rather than a wrist.
-  shapes.push({
-    x: round(centreX + lean - unit * 0.78),
-    y: round(palmY - unit * 2.9),
-    width: round(unit * 1.56),
-    height: round(unit * 3.4),
-    fill: colors.skin,
-    stroke: colors.edge,
-    strokeWidth: round(unit * 0.06),
-    radius: round(unit * 0.6),
-  });
-
-  // Then each finger, as a stroke from the knuckle to the tip.
+  // The fingers first, so the palm covers where they come out of it.
   for (const tip of tips) {
     const shape = FINGER_SHAPE[tip.finger - 1];
     if (shape === undefined) continue;
-    // The knuckles sit nearly as wide apart as the tips: fingers on
-    // five keys are near enough parallel, and compressing the knuckles
-    // towards the middle turns a hand into a fan.
-    // The knuckles sit nearly as wide apart as the tips, but never
-    // outside the palm they belong to: fingers on five keys are near
-    // enough parallel, and a stretched hand fans out from the palm's
-    // own edge rather than growing a wider one.
-    const reachX = (tip.x - centreX) * 0.78;
-    const limit = palmWidth * 0.42;
-    const knuckleX =
-      centreX +
-      lean +
-      Math.max(-limit, Math.min(limit, reachX)) +
-      (tip.finger === 1 ? -lean * 2 : 0);
-    const knuckleY = palmY + palmHeight * (0.22 + shape.back * 0.5);
-    const d = fingerPath(knuckleX, knuckleY, tip.x, tip.y);
-    const thickness = unit * 0.46 * shape.width;
-    // The edge first and a touch wider, so what shows of it is an
-    // outline. Per finger rather than all edges then all skins: that
-    // way the finger drawn later covers the one beside it, which is
-    // what tells five fingers apart instead of one webbed paddle.
-    shapes.push({
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0,
-      fill: 'none',
-      stroke: colors.edge,
-      strokeWidth: round(thickness + unit * 0.11),
-      path: d,
-    });
-    shapes.push({
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0,
-      fill: 'none',
-      stroke: colors.skin,
-      strokeWidth: round(thickness),
-      path: d,
+    const isThumb = tip.finger === 1;
+    // A thumb comes off the SIDE of the palm, low down; the other four
+    // come off the knuckle line, spaced across it.
+    const knuckleX = isThumb
+      ? centreX + lean + frame.thumbSide * palmWidth * 0.42
+      : centreX + lean + clamp((tip.x - centreX) * 0.74, palmWidth * 0.4);
+    const from = knuckleY + unit * shape.drop;
+    limbs.push({
+      stroke: {
+        d: fingerPath(knuckleX, from, tip.x, tip.y),
+        width: unit * FINGER_THICK * shape.width,
+      },
     });
   }
 
-  // The palm over the knuckles, so the fingers come out from under it.
-  shapes.push({
-    x: round(centreX + lean - palmWidth / 2),
-    y: round(palmY),
-    width: round(palmWidth),
-    height: round(palmHeight),
-    fill: colors.skin,
-    stroke: colors.edge,
-    strokeWidth: round(unit * 0.06),
-    radius: round(palmHeight * 0.42),
+  // The palm over the knuckles. Rounded hard at the heel, because that
+  // is the shape of the bottom of a hand.
+  limbs.push({
+    box: {
+      x: centreX + lean - palmWidth / 2,
+      y: palmTop,
+      width: palmWidth,
+      height: palmHeight,
+      radius: palmWidth * 0.4,
+    },
   });
 
-  // And a dot on each fingertip that is pressing, which is the thing a
-  // viewer is actually following.
+  const shapes: StageShape[] = [
+    ...paint(limbs, colors.edge, unit * OUTLINE),
+    ...paint(limbs, colors.skin, 0),
+  ];
+
+  // A pad on the fingertip that is pressing: inside the silhouette, so
+  // it marks the finger without breaking its outline.
   for (const tip of tips) {
     if (!tip.pressed) continue;
-    // Wider than the finger it caps, or the finger's own round end
-    // swallows it and nothing shows that this is the one playing.
-    //
-    // DARK, not the note's own colour: the key under a pressed finger
-    // is lit in that colour, so an amber dot on an amber key is
-    // camouflage. The dark edge of the same colour reads on the lit
-    // key AND on the white one next to it, and the pale ring keeps it
-    // off the finger it sits on.
-    const r = unit * 0.3;
+    const r = unit * 0.21;
     shapes.push({
       x: round(tip.x - r),
       y: round(tip.y - r),
       width: round(r * 2),
       height: round(r * 2),
-      fill: colors.edge,
-      stroke: colors.skin,
-      strokeWidth: round(unit * 0.07),
+      fill: darken(colors.skin, 0.17),
       radius: round(r),
     });
   }
 
-  // And the finger's number on the key it is playing, at the key's
-  // front edge where no hand reaches.
+  // And the finger's number on the key it is playing.
   //
-  // Last of everything, so nothing can cover the one part of the
-  // picture a learner is actually reading.
+  // Last of everything, and up at the fingertip rather than down at the
+  // key's front, because the front of the keyboard is where the palm
+  // is. A number under the hand is a number nobody reads.
   if (options.fingerNumbers !== false) {
-    const byMidi = new Map(keys.map((key) => [key.midi, key]));
     for (const tip of tips) {
       if (!tip.pressed) continue;
-      const key = byMidi.get(tip.midi ?? -1);
-      if (key === undefined) continue;
-      // Sized by the key's WIDTH and placed by its LENGTH: the badge
-      // has to fit between the key's edges whatever shape the frame
-      // is, and sit the same distance up from its front in a short
-      // 16:9 keyboard and a long 9:16 one.
       const badge = unit * 0.34;
       shapes.push({
-        x: round(key.x + key.width / 2 - badge),
-        y: round(key.y + key.height - key.height * 0.06 - badge * 2),
+        x: round(tip.x - badge),
+        y: round(tip.y + unit * 0.95 - badge),
         width: round(badge * 2),
         height: round(badge * 2),
         fill: colors.tip,
         stroke: colors.edge,
-        strokeWidth: round(unit * 0.06),
+        strokeWidth: round(unit * 0.07),
         radius: round(badge),
         label: String(tip.finger),
         labelSize: round(badge * 1.35),
@@ -427,6 +511,11 @@ export function handShapes(hand: Hand, options: HandsOptions): readonly StageSha
   }
 
   return shapes;
+}
+
+/** Keeps a finger's knuckle inside the palm it belongs to. */
+function clamp(value: number, limit: number): number {
+  return Math.max(-limit, Math.min(limit, value));
 }
 
 /** Both hands, left first so the right draws over it where they meet. */

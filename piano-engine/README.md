@@ -165,13 +165,43 @@ hand sits on the near end and the outer fingers stretch for the rest.
 out, **arriving as the chord sounds** — a hand still moving when the
 note speaks looks like it missed it.
 
-Three things make it read as a hand, none of them detail:
+**Which way round a hand goes.** The player sits at the FRONT of the
+keys, which in this picture is the bottom of the frame. So the hands
+come up from the bottom: the heel of the palm is nearest the viewer,
+the fingers point away, up the keys, and a finger reaching a black key
+reaches further than one on a white. Drawing it the other way round --
+an arm coming down out of the sky with fingers pointing at the viewer
+-- is the single thing that stops a drawn hand reading as a hand.
 
-- the fingers are not the same length. Middle longest, thumb shortest
-  and off the side, little finger short AND set back. Five equal bars
-  read as a comb.
-- a pressed finger goes down and the others do not. That is the whole
-  of the animation; without it the hand is a sticker.
+**One silhouette, not seven parts.** A hand is drawn twice: once in the
+edge colour with every part a little fatter, then again in the skin
+colour at its true size. The parts overlap, so the first pass shows
+only where nothing covers it -- which is exactly the outline of the
+whole hand. There is no line between the palm and a finger, or between
+two fingers that touch, because there is nothing there to draw a line
+with. Outlining each part separately is what made the first attempt
+look like a rake.
+
+**Measured in white keys.** A white key is 23mm and a hand is a hand,
+so the proportions are real measurements rather than taste: a palm is
+about three and a half keys across and three and a half deep, and a
+middle finger is two and a half long. That is why a hand covers five
+white keys -- not because five is convenient, but because a hand is
+90mm wide. Everything else is derived from those, so a hand stays the
+right size for the KEYS in any frame, however deep the keyboard has to
+be drawn.
+
+Three more things make it read as a hand, none of them detail:
+
+- the fingers are not the same length, and each finger's own length is
+  what decides how far up the key it reaches. That is why the thumb
+  plays near the front of the keys and the middle finger much further
+  back, and why five tips are never in a row. Five equal bars read as
+  a comb.
+- a finger that is not playing curls a little short of its reach, and
+  one that is playing straightens past it, so pressing always moves a
+  finger AWAY from the player. That is the whole of the animation;
+  without it the hand is a sticker.
 - the hand leans, thumb side forward, which is what makes a left hand
   look like a left hand rather than a mirrored right one.
 
