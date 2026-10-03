@@ -60228,6 +60228,7 @@ ${denominator}`;
     let alter;
     let octave;
     let isUnpitched2 = false;
+    let hasExplicitDisplayPosition = false;
     let instrumentId;
     if (pitchEl !== void 0) {
       const rawStep = textOf(firstChildNamed(pitchEl, "step"));
@@ -60254,14 +60255,21 @@ ${denominator}`;
     } else if (unpitchedEl !== void 0) {
       isUnpitched2 = true;
       const rawStep = textOf(firstChildNamed(unpitchedEl, "display-step"));
+      const rawOctave = textOf(firstChildNamed(unpitchedEl, "display-octave"));
+      hasExplicitDisplayPosition = rawStep !== void 0 && rawOctave !== void 0;
       if (rawStep !== void 0 && isKnownStep(rawStep)) {
         step = rawStep;
       } else {
         diagnostics.push(
-          diagnostic(
+          rawStep === void 0 ? diagnostic(
+            "info",
+            "MISSING_DISPLAY_POSITION",
+            "Unpitched note has no <display-step>; its staff position comes from the drum mapping.",
+            location
+          ) : diagnostic(
             "error",
             "INVALID_PITCH_STEP",
-            `Invalid or missing <display-step> "${rawStep ?? ""}".`,
+            `Invalid <display-step> "${rawStep}".`,
             location
           )
         );
@@ -60270,7 +60278,17 @@ ${denominator}`;
       octave = intOf(firstChildNamed(unpitchedEl, "display-octave"));
       if (octave === void 0) {
         diagnostics.push(
-          diagnostic("error", "MISSING_OCTAVE", "Unpitched note has no <display-octave>.", location)
+          rawOctave === void 0 ? diagnostic(
+            "info",
+            "MISSING_DISPLAY_POSITION",
+            "Unpitched note has no <display-octave>; its staff position comes from the drum mapping.",
+            location
+          ) : diagnostic(
+            "error",
+            "MISSING_OCTAVE",
+            `Invalid <display-octave> "${rawOctave}".`,
+            location
+          )
         );
         octave = 4;
       }
@@ -60292,6 +60310,7 @@ ${denominator}`;
       ...alter !== void 0 ? { alter } : {},
       ...octave !== void 0 ? { octave } : {},
       isUnpitched: isUnpitched2,
+      ...hasExplicitDisplayPosition ? { hasExplicitDisplayPosition: true } : {},
       ...instrumentId !== void 0 ? { instrumentId } : {},
       ...explicitNotehead !== void 0 ? { explicitNotehead } : {},
       ...explicitNoteheadSmufl !== void 0 ? { explicitNoteheadSmufl } : {},
@@ -60557,6 +60576,7 @@ ${denominator}`;
       ...ev.tieStop ? { tieStop: true } : {},
       ...ev.explicitNotehead !== void 0 ? { explicitNotehead: ev.explicitNotehead } : {},
       ...ev.explicitNoteheadSmufl !== void 0 ? { explicitNoteheadSmufl: ev.explicitNoteheadSmufl } : {},
+      ...ev.hasExplicitDisplayPosition === true ? { hasExplicitDisplayPosition: true } : {},
       ...ev.instrumentId !== void 0 ? { instrumentId: ev.instrumentId } : {},
       ...ev.stringNumber !== void 0 ? { stringNumber: ev.stringNumber } : {},
       ...ev.fret !== void 0 ? { fret: ev.fret } : {},
@@ -64450,8 +64470,9 @@ ${xrefOffset}
     const octave = isUnpitched2 ? note2.pitch.displayOctave : note2.pitch.octave;
     const gmNote = isUnpitched2 && note2.instrumentId !== void 0 ? ctx.midiInstrumentsByPart?.get(note2.instrumentId) : void 0;
     const drumEntry = gmNote !== void 0 ? lookupDrumMapEntry(gmNote, ctx.theme.drumMap).entry : void 0;
-    const position = drumEntry !== void 0 ? drumEntry.staffPosition : staffPositionForPitch(ctx.clefDef, step, octave);
-    const drumOverride = gmNote !== void 0 && drumEntry !== void 0 ? { [String(gmNote)]: drumEntry.noteheadShape } : void 0;
+    const positionedByFile = isUnpitched2 && note2.hasExplicitDisplayPosition === true;
+    const position = drumEntry !== void 0 && !positionedByFile ? drumEntry.staffPosition : staffPositionForPitch(ctx.clefDef, step, octave);
+    const drumOverride = gmNote !== void 0 && drumEntry !== void 0 && !positionedByFile ? { [String(gmNote)]: drumEntry.noteheadShape } : void 0;
     const configOverrides = ctx.theme.noteheadMapping.overridesByKey;
     const overridesByKey = drumOverride !== void 0 || configOverrides !== void 0 ? { ...drumOverride, ...configOverrides } : void 0;
     const noteheadGlyph = selectNoteheadGlyphName({

@@ -18,9 +18,18 @@ function render() {
 }
 
 describe('GM drum mapping wired into rendering (Phase 41, §13.1/§13.3)', () => {
-  test('a percussion note with an <instrument> resolving to a real GM note renders with no diagnostics', () => {
+  test('a percussion note with an <instrument> resolving to a real GM note renders with nothing worse than a note to self', () => {
     const { diagnostics } = render();
-    assert.deepEqual([...diagnostics], []);
+    // This fixture deliberately states no <display-step>/<display-octave>
+    // -- that is the case the GM drum table exists for, and the whole
+    // point of the fixture. The parser says so once per missing element
+    // at `info`, and nothing worse than that is allowed.
+    const bad = [...diagnostics].filter((d) => d.severity !== 'info');
+    assert.deepEqual(bad, []);
+    assert.ok(
+      [...diagnostics].every((d) => d.code === 'MISSING_DISPLAY_POSITION'),
+      'the only thing to report here is the absent display position',
+    );
   });
 
   test("the snare (GM 38) renders as a plain oval notehead, at the drum table's own staff position, stem up", () => {

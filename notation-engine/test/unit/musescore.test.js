@@ -52,7 +52,7 @@ describe('MuseScore data layer: clefs and staff position', () => {
     assert.equal(MS.museScoreClef('C4').pitchOffset, 37); // tenor
   });
 
-  test("middle C lands where it should under treble, bass, alto and tenor", () => {
+  test('middle C lands where it should under treble, bass, alto and tenor', () => {
     // MuseScore's own line numbers: 0 is the TOP staff line, +1 is half
     // a space down, so a five-line staff runs 0..8.
     assert.equal(MS.museScoreLine(MS.museScoreClef('G'), 'C', 4), 10); // 1st ledger below
@@ -68,7 +68,7 @@ describe('MuseScore data layer: clefs and staff position', () => {
     assert.equal(MS.absStep('C', 5), 42);
   });
 
-  test("an accidental never moves a note off its line", () => {
+  test('an accidental never moves a note off its line', () => {
     // There is no `alter` parameter, and this is the test that says so
     // on purpose: C sharp and C flat are the same line as C.
     assert.equal(MS.museScoreLine(MS.museScoreClef('G'), 'c', 4), 10);
@@ -132,7 +132,10 @@ describe('MuseScore data layer: clefs and staff position', () => {
     assert.deepEqual([...treble].slice(0, 7), [0, 3, -1, 2, 5, 1, 4]);
     assert.deepEqual([...treble].slice(7), [4, 1, 5, 2, 6, 3, 7]);
     // Bass is the same shape, two steps lower.
-    assert.deepEqual([...MS.museScoreClef('F').keySignatureLines].slice(0, 7), [2, 5, 1, 4, 7, 3, 6]);
+    assert.deepEqual(
+      [...MS.museScoreClef('F').keySignatureLines].slice(0, 7),
+      [2, 5, 1, 4, 7, 3, 6],
+    );
   });
 
   test('ledger lines start one half space outside the staff, not at its edge', () => {
@@ -189,7 +192,7 @@ describe('MuseScore data layer: noteheads', () => {
     );
   });
 
-  test("every MusicXML value MuseScore maps names a group this table has", () => {
+  test('every MusicXML value MuseScore maps names a group this table has', () => {
     for (const [value, group] of Object.entries(MS.MUSICXML_NOTEHEAD_TO_GROUP)) {
       assert.ok(
         MS.museScoreNoteheadGlyph(group, 'quarter'),
@@ -329,7 +332,10 @@ describe('MuseScore data layer: drumset', () => {
 
 describe('MuseScore data layer: strings and tab', () => {
   test('standard guitar and bass tunings are the ones everybody knows', () => {
-    assert.deepEqual([...MS.museScoreStringData('electric-guitar').openStrings], [40, 45, 50, 55, 59, 64]);
+    assert.deepEqual(
+      [...MS.museScoreStringData('electric-guitar').openStrings],
+      [40, 45, 50, 55, 59, 64],
+    );
     assert.deepEqual([...MS.museScoreStringData('electric-bass').openStrings], [40, 45, 50, 55]);
     assert.equal(MS.museScoreStringData('electric-guitar').frets, 24);
     assert.equal(MS.museScoreStringData('guitar-nylon').frets, 19);
@@ -357,7 +363,10 @@ describe('MuseScore data layer: strings and tab', () => {
     assert.equal(MS.writtenPitchFor(guitar, 64), 64);
     assert.equal(MS.fretFor(guitar, MS.writtenPitchFor(guitar, 64), 6), 0); // open high E sounds E4
     assert.equal(MS.fretFor(guitar, MS.writtenPitchFor(guitar, 40), 1), 0); // open low E sounds E2
-    assert.notEqual(guitar.transposeChromatic, MS.museScoreStringData('electric-bass').transposeChromatic);
+    assert.notEqual(
+      guitar.transposeChromatic,
+      MS.museScoreStringData('electric-bass').transposeChromatic,
+    );
   });
 
   test('a pitch that is not on a string returns nothing rather than a fret', () => {
@@ -367,7 +376,7 @@ describe('MuseScore data layer: strings and tab', () => {
     assert.equal(MS.fretFor(guitar, 40, 9), undefined); // no such string
   });
 
-  test("MuseScore numbers strings from the HIGHEST one, this project from the lowest", () => {
+  test('MuseScore numbers strings from the HIGHEST one, this project from the lowest', () => {
     // Six strings: this project's string 1 (the low E) is MuseScore's
     // string 5; its string 6 (the high E) is MuseScore's string 0.
     assert.equal(MS.stringIndexFromLowest(1, 6), 5);
@@ -454,6 +463,21 @@ describe('MuseScore → MusicXML → this engine, end to end', () => {
   const load = (name) =>
     readFileSync(new URL(`../fixtures/musicxml/${name}`, import.meta.url), 'utf8');
 
+  /**
+   * Where the staff's BOTTOM line ended up, read off the drawing.
+   *
+   * Not assumed: a tempo mark above the staff pushes the whole system
+   * down, so the only honest anchor is something actually drawn. The
+   * percussion clef is it -- its glyph origin is its own centre, which
+   * the engine places on the middle line, two staff spaces above the
+   * bottom one.
+   */
+  const bottomLineOf = (svg) => {
+    const clef = /<text x="[\d.]+" y="([\d.-]+)"[^>]*>\uE069</.exec(svg);
+    assert.ok(clef, 'no percussion clef was drawn');
+    return Number(clef[1]) + 2;
+  };
+
   test('a real MuseScore 4 export renders with nothing worse than a note to self', () => {
     for (const name of ['musescore-drum-lesson.musicxml', 'musescore-grand-staff.musicxml']) {
       const { svg, diagnostics } = NE.renderFromMusicXml(load(name), { domParser });
@@ -481,7 +505,8 @@ describe('MuseScore → MusicXML → this engine, end to end', () => {
       for (const measure of part.measures) {
         for (const voice of measure.voices) {
           for (const event of voice.events) {
-            const notes = event.kind === 'chord' ? event.notes : event.kind === 'note' ? [event] : [];
+            const notes =
+              event.kind === 'chord' ? event.notes : event.kind === 'note' ? [event] : [];
             for (const note of notes) {
               if (note.pitch.kind !== 'pitched') continue;
               const staff = note.staff === 2 ? 'bass' : 'treble';
@@ -566,6 +591,91 @@ describe('MuseScore → MusicXML → this engine, end to end', () => {
     assert.ok(drawn.has(`\uE0A4@${yOf(36)}`), 'no kick');
     assert.ok(drawn.has(`\uE0A4@${yOf(38)}`), 'no snare');
     assert.ok(drawn.has(`\uE0A9@${yOf(42)}`), 'no closed hi-hat');
+  });
+
+  test("every unpitched note in the owner's own MuseScore file lands exactly where MuseScore drew it", () => {
+    // The file that found this: five bars of drum kit, 17 unpitched
+    // notes across eight different instruments, exported from MuseScore
+    // Studio 4.7.4. Every one of them states its own
+    // <display-step>/<display-octave>, and before Integration T this
+    // engine overrode all of them with its own GM table -- the toms
+    // half a space out, the pedal hi-hat at the top of the staff
+    // instead of below it.
+    //
+    // Nothing here is hardcoded: the expected position of each note is
+    // computed from the FILE's own display position through MuseScore's
+    // own percussion clef, which is what MuseScore's importer does
+    // (xmlSetDrumsetPitch).
+    const xml = load('musescore-drum-notes.musicxml');
+    const { svg, playback } = NE.renderFromMusicXml(xml, { domParser });
+
+    // Where the staff's bottom line ended up in this render -- read off
+    // the drawing rather than assumed, since a tempo mark above the
+    // staff pushes everything down.
+    const bottomLine = bottomLineOf(svg);
+
+    const perc = MS.museScoreClef('PERC');
+    const expected = [
+      ...xml.matchAll(
+        /<display-step>(\w)<\/display-step>\s*<display-octave>(\d)<\/display-octave>/g,
+      ),
+    ].map(([, step, octave]) => ({
+      step,
+      octave: Number(octave),
+      y: bottomLine + MS.museScoreStaffPosition(perc, step, Number(octave)),
+    }));
+    assert.equal(expected.length, 17, 'the fixture should hold 17 unpitched notes');
+
+    const drawn = [...svg.matchAll(/<text x="([\d.]+)" y="([\d.-]+)"[^>]*>(.)</g)]
+      .filter((m) => {
+        const cp = m[3].codePointAt(0);
+        return cp >= 0xe0a0 && cp <= 0xe0ff;
+      })
+      .map((m) => ({ x: Number(m[1]), y: Number(m[2]) }))
+      .sort((a, b) => a.x - b.x || a.y - b.y);
+
+    assert.equal(drawn.length, expected.length, 'a notehead per unpitched note');
+
+    // Same multiset of y positions, so no note is on the wrong line --
+    // compared as a sorted list because the file's reading order is by
+    // voice and the drawing's is by x.
+    assert.deepEqual(
+      drawn.map((d) => d.y).sort((a, b) => a - b),
+      expected.map((e) => e.y).sort((a, b) => a - b),
+    );
+    assert.ok(playback !== undefined);
+  });
+
+  test('the instruments that used to be furthest wrong are now right to the half space', () => {
+    // Named one by one, because "the whole file matches" would still
+    // pass if two of them swapped. These are the ones the owner's
+    // screenshots showed in the wrong place.
+    const xml = load('musescore-drum-notes.musicxml');
+    const { svg } = NE.renderFromMusicXml(xml, { domParser });
+    const perc = MS.museScoreClef('PERC');
+    const bottomLine = bottomLineOf(svg);
+    const yFor = (step, octave) => bottomLine + MS.museScoreStaffPosition(perc, step, octave);
+
+    // Pedal hi-hat: the file puts it on D4, BELOW the staff. The GM
+    // table used to put it above the top line.
+    assert.match(svg, new RegExp(`y="${yFor('D', 4)}"[^>]*>\uE0A9`), 'pedal hi-hat');
+    // Bass drum 2 on E4, the bottom line itself.
+    assert.match(svg, new RegExp(`y="${yFor('E', 4)}"[^>]*>\uE0A4`), 'bass drum 2');
+    // The four toms, each on its own line, a half space apart.
+    for (const [step, octave] of [
+      ['E', 5],
+      ['D', 5],
+      ['B', 4],
+      ['A', 4],
+    ]) {
+      assert.match(
+        svg,
+        new RegExp(`y="${yFor(step, octave)}"[^>]*>\uE0A4`),
+        `tom on ${step}${octave}`,
+      );
+    }
+    // And the China cymbal keeps the glyph the file names outright.
+    assert.match(svg, new RegExp(`y="${yFor('B', 5)}"[^>]*>\uE0F9`), 'china cymbal');
   });
 
   test("MuseScore's spacing law and this engine's own both fill the bar, differently", () => {

@@ -87,6 +87,23 @@ export interface Note {
   readonly startTick?: number;
   readonly tieStart?: boolean;
   readonly tieStop?: boolean;
+  /**
+   * Integration T: true when an UNPITCHED note's `<unpitched>` carried
+   * BOTH a `<display-step>` and a `<display-octave>`, i.e. the file
+   * stated where on the staff it wants the notehead.
+   *
+   * It decides which of two sources positions the note. A file that
+   * says where a drum goes has already made the decision -- that is
+   * what the elements are for, and it is what MuseScore's own importer
+   * does with them -- so the drum table must not move it somewhere
+   * else. A file that says nothing leaves the drum table as the only
+   * answer there is.
+   *
+   * Optional, and absent means "not stated": a hand-built `Score` and
+   * a file that omits the elements are the same case, and both want
+   * the table.
+   */
+  readonly hasExplicitDisplayPosition?: boolean;
   /** Phase 35/§10.4: the <instrument id="..."> this note references, if any -- how a drum file distinguishes kick from snare from hi-hat, and (Phase 41) the key into a part's own GM note mapping. */
   readonly instrumentId?: string;
   /** Phase 35/§10.4: an explicit <notehead> override from the file (e.g. "x", "diamond") -- Phase 15's selectNoteheadGlyphName's highest-priority tier. */

@@ -835,9 +835,7 @@ function resolveNoteRendering(
 
   // Phase 41/§13.3: an unpitched note whose <instrument id> resolves to a
   // known GM percussion note (via Phase 35's parsed <midi-instrument> map)
-  // uses the real drum mapping table's own staff position -- GM numbers
-  // are unambiguous (§13.1's own authority rule for "which drum sound"),
-  // while a file's own display-step/octave is only ever a rendering hint.
+  // can be positioned from the drum mapping table.
   const gmNote =
     isUnpitched && note.instrumentId !== undefined
       ? ctx.midiInstrumentsByPart?.get(note.instrumentId)
@@ -845,8 +843,27 @@ function resolveNoteRendering(
   const drumEntry =
     gmNote !== undefined ? lookupDrumMapEntry(gmNote, ctx.theme.drumMap).entry : undefined;
 
+  /**
+   * Integration T: the FILE decides, where the file has said anything.
+   *
+   * `<display-step>`/`<display-octave>` are not a hint -- they are
+   * MusicXML's own way of saying which line a percussion note goes on,
+   * and MuseScore's importer treats them as final: it computes the
+   * line from them and the clef, then looks for a drum in its own
+   * drumset already on that line, and ADDS one when it finds none
+   * (`MusicXmlParserPass2::xmlSetDrumsetPitch`). The drumset adapts to
+   * the file; the file is never moved to suit the drumset.
+   *
+   * This engine used to do the opposite, and every unpitched note in a
+   * real MuseScore export landed wherever this project's own GM table
+   * happened to put that drum -- the toms half a space out, the pedal
+   * hi-hat at the top of the staff instead of below it, the acoustic
+   * bass drum a line high. The table is still the answer for a file
+   * that states no position, which is the only case left for it.
+   */
+  const positionedByFile = isUnpitched && note.hasExplicitDisplayPosition === true;
   const position =
-    drumEntry !== undefined
+    drumEntry !== undefined && !positionedByFile
       ? drumEntry.staffPosition
       : staffPositionForPitch(ctx.clefDef, step, octave);
 
@@ -856,8 +873,15 @@ function resolveNoteRendering(
   // is the USER's -- so the user's entry for the same key wins. (A user
   // who sets `{ "38": "diamond" }` means it for the snare whether or not
   // the drum table already had an opinion about the snare.)
+  //
+  // The table's opinion is withheld for a note the FILE placed, for the
+  // same reason its position is: MuseScore reads the head from the
+  // note's own `<notehead>` and defaults to a plain one, so a file that
+  // wants an X on the hi-hat line says so, and one that says nothing
+  // means a plain oval. Substituting a shape there is this engine
+  // disagreeing with the file about its own notation.
   const drumOverride =
-    gmNote !== undefined && drumEntry !== undefined
+    gmNote !== undefined && drumEntry !== undefined && !positionedByFile
       ? { [String(gmNote)]: drumEntry.noteheadShape }
       : undefined;
   const configOverrides = ctx.theme.noteheadMapping.overridesByKey;

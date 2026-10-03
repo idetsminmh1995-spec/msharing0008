@@ -89,12 +89,28 @@ describe('cross-software compatibility corpus (Phase 37, §10.8)', () => {
 
   test('a percussion note with no <display-step>/<display-octave> recovers via the documented fallback, not silently wrong', () => {
     const result = parse('percussion-no-display-step.musicxml');
-    const codes = [...result.diagnostics].map((d) => d.code);
-    assert.ok(codes.includes('INVALID_PITCH_STEP'));
-    assert.ok(codes.includes('MISSING_OCTAVE'));
+    const reported = [...result.diagnostics].filter(
+      (d) => d.code === 'MISSING_DISPLAY_POSITION',
+    );
+    // Reported, but as INFORMATION rather than as an error: MusicXML's
+    // own DTD makes both elements optional inside <unpitched>, so a
+    // file that leaves them out is not malformed -- it has simply left
+    // the placing to the drum mapping, which is what that table is for.
+    assert.equal(reported.length, 2, 'both the step and the octave should be reported');
+    for (const d of reported) assert.equal(d.severity, 'info');
+    assert.equal(
+      [...result.diagnostics].filter((d) => d.severity === 'error').length,
+      0,
+      'a legal file must not produce an error',
+    );
     const event = result.score.parts[0].measures[0].voices[0].events[0];
     assert.equal(event.pitch.displayStep, 'B'); // the documented neutral fallback
     assert.equal(event.pitch.displayOctave, 4);
+    assert.equal(
+      event.hasExplicitDisplayPosition,
+      undefined,
+      'and the note must not claim a position it was never given',
+    );
   });
 
   test('<print> break hints are ignored gracefully (info-level UNKNOWN_ELEMENT), never an error', () => {

@@ -49,6 +49,8 @@ export interface ParsedNoteEvent {
   readonly octave?: number;
   /** True when this note came from <unpitched> rather than <pitch> -- percussion, where step/octave are a STAFF POSITION, not a sounding pitch. */
   readonly isUnpitched: boolean;
+  /** True when that `<unpitched>` carried both a `<display-step>` and a `<display-octave>` -- see `Note.hasExplicitDisplayPosition`. */
+  readonly hasExplicitDisplayPosition?: boolean;
   /** The <instrument id="..."> this note references, if any -- how a drum file distinguishes kick from snare from hi-hat. */
   readonly instrumentId?: string;
   /** §10.4/Phase 35: an explicit <notehead> override (e.g. "x", "diamond") -- feeds Phase 15's selectNoteheadGlyphName as its highest-priority tier. */
@@ -275,6 +277,7 @@ export function parseNoteElement(
   let alter: number | undefined;
   let octave: number | undefined;
   let isUnpitched = false;
+  let hasExplicitDisplayPosition = false;
   let instrumentId: string | undefined;
   if (pitchEl !== undefined) {
     const rawStep = textOf(firstChildNamed(pitchEl, 'step'));
@@ -305,23 +308,53 @@ export function parseNoteElement(
     // note so a malformed drum file degrades identically.
     isUnpitched = true;
     const rawStep = textOf(firstChildNamed(unpitchedEl, 'display-step'));
+    const rawOctave = textOf(firstChildNamed(unpitchedEl, 'display-octave'));
+    // Both, or neither: half a position is not a position, and a file
+    // that gives one and not the other has not said where it wants the
+    // note any more than a file that gives nothing has.
+    hasExplicitDisplayPosition = rawStep !== undefined && rawOctave !== undefined;
     if (rawStep !== undefined && isKnownStep(rawStep)) {
       step = rawStep;
     } else {
+      // ABSENT and WRONG are two different things here. MusicXML's own
+      // DTD makes `<display-step>` optional inside `<unpitched>`, and a
+      // file that leaves it out has simply not placed the note -- the
+      // drum table will, which is exactly the case it exists for. A
+      // value that IS there and is not a step name is a real defect in
+      // the file and still an error.
       diagnostics.push(
-        diagnostic(
-          'error',
-          'INVALID_PITCH_STEP',
-          `Invalid or missing <display-step> "${rawStep ?? ''}".`,
-          location,
-        ),
+        rawStep === undefined
+          ? diagnostic(
+              'info',
+              'MISSING_DISPLAY_POSITION',
+              'Unpitched note has no <display-step>; its staff position comes from the drum mapping.',
+              location,
+            )
+          : diagnostic(
+              'error',
+              'INVALID_PITCH_STEP',
+              `Invalid <display-step> "${rawStep}".`,
+              location,
+            ),
       );
       step = 'B'; // middle line of a treble-referenced staff -- a neutral fallback
     }
     octave = intOf(firstChildNamed(unpitchedEl, 'display-octave'));
     if (octave === undefined) {
       diagnostics.push(
-        diagnostic('error', 'MISSING_OCTAVE', 'Unpitched note has no <display-octave>.', location),
+        rawOctave === undefined
+          ? diagnostic(
+              'info',
+              'MISSING_DISPLAY_POSITION',
+              'Unpitched note has no <display-octave>; its staff position comes from the drum mapping.',
+              location,
+            )
+          : diagnostic(
+              'error',
+              'MISSING_OCTAVE',
+              `Invalid <display-octave> "${rawOctave}".`,
+              location,
+            ),
       );
       octave = 4;
     }
@@ -348,6 +381,7 @@ export function parseNoteElement(
     ...(alter !== undefined ? { alter } : {}),
     ...(octave !== undefined ? { octave } : {}),
     isUnpitched,
+    ...(hasExplicitDisplayPosition ? { hasExplicitDisplayPosition: true } : {}),
     ...(instrumentId !== undefined ? { instrumentId } : {}),
     ...(explicitNotehead !== undefined ? { explicitNotehead } : {}),
     ...(explicitNoteheadSmufl !== undefined ? { explicitNoteheadSmufl } : {}),

@@ -242,6 +242,7 @@ function buildSingle(ev: ParsedNoteEvent): Note | Rest {
     ...(ev.explicitNoteheadSmufl !== undefined
       ? { explicitNoteheadSmufl: ev.explicitNoteheadSmufl }
       : {}),
+    ...(ev.hasExplicitDisplayPosition === true ? { hasExplicitDisplayPosition: true } : {}),
     ...(ev.instrumentId !== undefined ? { instrumentId: ev.instrumentId } : {}),
     ...(ev.stringNumber !== undefined ? { stringNumber: ev.stringNumber } : {}),
     ...(ev.fret !== undefined ? { fret: ev.fret } : {}),
