@@ -34,6 +34,7 @@ var NotationEngine = (() => {
     ENGINE_VERSION: () => ENGINE_VERSION,
     FLAT_ORDER: () => FLAT_ORDER,
     MAX_BEAM_SLOPE: () => MAX_BEAM_SLOPE,
+    MuseScore: () => musescore_exports,
     PERCUSSION_CLEF: () => PERCUSSION_CLEF,
     SHARP_ORDER: () => SHARP_ORDER,
     SMUFL_STAFF_SPACES_PER_EM: () => SMUFL_STAFF_SPACES_PER_EM,
@@ -66110,6 +66111,1821 @@ ${xrefOffset}
   }
   function renderFromMusicXml(xmlText, options) {
     return renderParsedMusicXml(parseMusicXml(xmlText, options), options);
+  }
+
+  // src/musescore/index.ts
+  var musescore_exports = {};
+  __export(musescore_exports, {
+    ABS_STEP_SOURCE: () => ABS_STEP_SOURCE,
+    BEAM_SPACING_SOURCE: () => BEAM_SPACING_SOURCE,
+    CLEF_TABLE_SOURCE: () => CLEF_TABLE_SOURCE,
+    DRUMSET_SOURCE: () => DRUMSET_SOURCE,
+    DRUM_NAME_SOURCE: () => DRUM_NAME_SOURCE,
+    LEDGER_LINE_SOURCE: () => LEDGER_LINE_SOURCE,
+    MUSESCORE_CLEFS: () => MUSESCORE_CLEFS,
+    MUSESCORE_DRUMSET: () => MUSESCORE_DRUMSET,
+    MUSESCORE_GUITAR_TUNINGS: () => MUSESCORE_GUITAR_TUNINGS,
+    MUSESCORE_NOTEHEAD_GROUPS: () => MUSESCORE_NOTEHEAD_GROUPS,
+    MUSESCORE_REVISION: () => MUSESCORE_REVISION,
+    MUSESCORE_STAFF_TYPES: () => MUSESCORE_STAFF_TYPES,
+    MUSESCORE_STRING_DATA: () => MUSESCORE_STRING_DATA,
+    MUSESCORE_STYLE: () => MUSESCORE_STYLE,
+    MUSICXML_CLEF_SOURCE: () => MUSICXML_CLEF_SOURCE,
+    MUSICXML_NOTEHEAD_SOURCE: () => MUSICXML_NOTEHEAD_SOURCE,
+    MUSICXML_NOTEHEAD_TO_GROUP: () => MUSICXML_NOTEHEAD_TO_GROUP,
+    NOTEHEAD_ENUM_SOURCE: () => NOTEHEAD_ENUM_SOURCE,
+    NOTEHEAD_GROUP_SOURCE: () => NOTEHEAD_GROUP_SOURCE,
+    NOTEHEAD_GROUP_TO_SHAPE: () => NOTEHEAD_GROUP_TO_SHAPE,
+    QUARTER_NOTE_SPACE: () => QUARTER_NOTE_SPACE,
+    REL_STEP_SOURCE: () => REL_STEP_SOURCE,
+    SPACING_SOURCE: () => SPACING_SOURCE,
+    STAFF_POSITION_SOURCE: () => STAFF_POSITION_SOURCE,
+    STRING_DATA_SOURCE: () => STRING_DATA_SOURCE,
+    STRING_INDEX_SOURCE: () => STRING_INDEX_SOURCE,
+    STYLE_SOURCE: () => STYLE_SOURCE,
+    TAB_STAFF_SOURCE: () => TAB_STAFF_SOURCE,
+    TUNING_PRESET_SOURCE: () => TUNING_PRESET_SOURCE,
+    absStep: () => absStep,
+    applyDrumOverrides: () => applyDrumOverrides,
+    blobUrl: () => blobUrl,
+    drumMappingFromMuseScore: () => drumMappingFromMuseScore,
+    drumVoicesFromMuseScore: () => drumVoicesFromMuseScore,
+    fretFor: () => fretFor,
+    lineFromStaffPosition: () => lineFromStaffPosition,
+    museScoreClef: () => museScoreClef,
+    museScoreClefForMusicXml: () => museScoreClefForMusicXml,
+    museScoreDrum: () => museScoreDrum,
+    museScoreDurationStretch: () => museScoreDurationStretch,
+    museScoreEventSpace: () => museScoreEventSpace,
+    museScoreGroupForMusicXmlNotehead: () => museScoreGroupForMusicXmlNotehead,
+    museScoreLine: () => museScoreLine,
+    museScoreNoteheadGlyph: () => museScoreNoteheadGlyph,
+    museScorePositions: () => museScorePositions,
+    museScoreStaffPosition: () => museScoreStaffPosition,
+    museScoreStringData: () => museScoreStringData,
+    museScoreTuningsForStrings: () => museScoreTuningsForStrings,
+    needsLedgerLines: () => needsLedgerLines,
+    noteheadForDrum: () => noteheadForDrum,
+    pitchedClefs: () => pitchedClefs,
+    staffPositionFromLine: () => staffPositionFromLine,
+    stringIndexFromLowest: () => stringIndexFromLowest,
+    writtenPitchFor: () => writtenPitchFor
+  });
+
+  // src/musescore/provenance.ts
+  var MUSESCORE_REVISION = {
+    repository: "https://github.com/musescore/MuseScore",
+    commit: "9140c5e4b7b5b48357b8d38dfebd0dd979653d21",
+    committed: "2026-10-02",
+    license: "GPL-3.0-only"
+  };
+  function blobUrl(source) {
+    return `${MUSESCORE_REVISION.repository}/blob/${MUSESCORE_REVISION.commit}/${source.path}`;
+  }
+
+  // src/musescore/clefs.ts
+  var CLEF_TABLE_SOURCE = {
+    path: "src/engraving/dom/clef.cpp",
+    symbol: "ClefInfo::clefTable[]",
+    what: "every clef's staff line, pitch offset, SMuFL symbol, staff group and key-signature accidental lines"
+  };
+  var STAFF_POSITION_SOURCE = {
+    path: "src/engraving/dom/utils.cpp",
+    symbol: "absStep(int tpc, int pitch) / relStep(int line, ClefType clef)",
+    what: "the two-line rule that turns a pitch into a staff line under a clef"
+  };
+  var MUSICXML_CLEF_SOURCE = {
+    path: "src/importexport/musicxml/internal/import/importmusicxmlpass2.cpp",
+    symbol: "MusicXmlParserPass2::clef()",
+    what: "which ClefType MuseScore picks for a MusicXML <sign>/<line>/<clef-octave-change>"
+  };
+  var MUSESCORE_CLEFS = [
+    {
+      type: "G",
+      line: 2,
+      pitchOffset: 45,
+      symId: "gClef",
+      staffGroup: "STANDARD",
+      keySignatureLines: [0, 3, -1, 2, 5, 1, 4, 4, 1, 5, 2, 6, 3, 7]
+    },
+    {
+      type: "G15_MB",
+      line: 2,
+      pitchOffset: 31,
+      symId: "gClef15mb",
+      staffGroup: "STANDARD",
+      keySignatureLines: [0, 3, -1, 2, 5, 1, 4, 4, 1, 5, 2, 6, 3, 7]
+    },
+    {
+      type: "G8_VB",
+      line: 2,
+      pitchOffset: 38,
+      symId: "gClef8vb",
+      staffGroup: "STANDARD",
+      keySignatureLines: [0, 3, -1, 2, 5, 1, 4, 4, 1, 5, 2, 6, 3, 7]
+    },
+    {
+      type: "G8_VA",
+      line: 2,
+      pitchOffset: 52,
+      symId: "gClef8va",
+      staffGroup: "STANDARD",
+      keySignatureLines: [0, 3, -1, 2, 5, 1, 4, 4, 1, 5, 2, 6, 3, 7]
+    },
+    {
+      type: "G15_MA",
+      line: 2,
+      pitchOffset: 59,
+      symId: "gClef15ma",
+      staffGroup: "STANDARD",
+      keySignatureLines: [0, 3, -1, 2, 5, 1, 4, 4, 1, 5, 2, 6, 3, 7]
+    },
+    {
+      type: "G8_VB_O",
+      line: 2,
+      pitchOffset: 38,
+      symId: "gClef8vbOld",
+      staffGroup: "STANDARD",
+      keySignatureLines: [0, 3, -1, 2, 5, 1, 4, 4, 1, 5, 2, 6, 3, 7]
+    },
+    {
+      type: "G8_VB_P",
+      line: 2,
+      pitchOffset: 45,
+      symId: "gClef8vbParens",
+      staffGroup: "STANDARD",
+      keySignatureLines: [0, 3, -1, 2, 5, 1, 4, 4, 1, 5, 2, 6, 3, 7]
+    },
+    {
+      type: "G_1",
+      line: 1,
+      pitchOffset: 47,
+      symId: "gClef",
+      staffGroup: "STANDARD",
+      keySignatureLines: [2, 5, 1, 4, 7, 3, 6, 6, 3, 7, 4, 8, 5, 9]
+    },
+    {
+      type: "C1",
+      line: 1,
+      pitchOffset: 43,
+      symId: "cClef",
+      staffGroup: "STANDARD",
+      keySignatureLines: [5, 1, 4, 0, 3, -1, 2, 2, 6, 3, 7, 4, 8, 5]
+    },
+    {
+      type: "C2",
+      line: 2,
+      pitchOffset: 41,
+      symId: "cClef",
+      staffGroup: "STANDARD",
+      keySignatureLines: [3, 6, 2, 5, 1, 4, 0, 0, 4, 1, 5, 2, 6, 3]
+    },
+    {
+      type: "C3",
+      line: 3,
+      pitchOffset: 39,
+      symId: "cClef",
+      staffGroup: "STANDARD",
+      keySignatureLines: [1, 4, 0, 3, 6, 2, 5, 5, 2, 6, 3, 7, 4, 8]
+    },
+    {
+      type: "C4",
+      line: 4,
+      pitchOffset: 37,
+      symId: "cClef",
+      staffGroup: "STANDARD",
+      keySignatureLines: [6, 2, 5, 1, 4, 0, 3, 3, 0, 4, 1, 5, 2, 6]
+    },
+    {
+      type: "C5",
+      line: 5,
+      pitchOffset: 35,
+      symId: "cClef",
+      staffGroup: "STANDARD",
+      keySignatureLines: [4, 0, 3, -1, 2, 5, 1, 1, 5, 2, 6, 3, 7, 4]
+    },
+    {
+      type: "C_19C",
+      line: 2,
+      pitchOffset: 45,
+      symId: "cClefSquare",
+      staffGroup: "STANDARD",
+      keySignatureLines: [0, 3, -1, 2, 5, 1, 4, 4, 1, 5, 2, 6, 3, 7]
+    },
+    {
+      type: "C1_F18C",
+      line: 1,
+      pitchOffset: 43,
+      symId: "cClefFrench",
+      staffGroup: "STANDARD",
+      keySignatureLines: [5, 1, 4, 0, 3, -1, 2, 2, 6, 3, 7, 4, 8, 5]
+    },
+    {
+      type: "C3_F18C",
+      line: 3,
+      pitchOffset: 39,
+      symId: "cClefFrench",
+      staffGroup: "STANDARD",
+      keySignatureLines: [1, 4, 0, 3, 6, 2, 5, 5, 2, 6, 3, 7, 4, 8]
+    },
+    {
+      type: "C4_F18C",
+      line: 4,
+      pitchOffset: 37,
+      symId: "cClefFrench",
+      staffGroup: "STANDARD",
+      keySignatureLines: [6, 2, 5, 1, 4, 0, 3, 3, 0, 4, 1, 5, 2, 6]
+    },
+    {
+      type: "C1_F20C",
+      line: 1,
+      pitchOffset: 43,
+      symId: "cClefFrench20C",
+      staffGroup: "STANDARD",
+      keySignatureLines: [5, 1, 4, 0, 3, -1, 2, 2, 6, 3, 7, 4, 8, 5]
+    },
+    {
+      type: "C3_F20C",
+      line: 3,
+      pitchOffset: 39,
+      symId: "cClefFrench20C",
+      staffGroup: "STANDARD",
+      keySignatureLines: [1, 4, 0, 3, 6, 2, 5, 5, 2, 6, 3, 7, 4, 8]
+    },
+    {
+      type: "C4_F20C",
+      line: 4,
+      pitchOffset: 37,
+      symId: "cClefFrench20C",
+      staffGroup: "STANDARD",
+      keySignatureLines: [6, 2, 5, 1, 4, 0, 3, 3, 0, 4, 1, 5, 2, 6]
+    },
+    {
+      type: "F",
+      line: 4,
+      pitchOffset: 33,
+      symId: "fClef",
+      staffGroup: "STANDARD",
+      keySignatureLines: [2, 5, 1, 4, 7, 3, 6, 6, 3, 7, 4, 8, 5, 9]
+    },
+    {
+      type: "F15_MB",
+      line: 4,
+      pitchOffset: 19,
+      symId: "fClef15mb",
+      staffGroup: "STANDARD",
+      keySignatureLines: [2, 5, 1, 4, 7, 3, 6, 6, 3, 7, 4, 8, 5, 9]
+    },
+    {
+      type: "F8_VB",
+      line: 4,
+      pitchOffset: 26,
+      symId: "fClef8vb",
+      staffGroup: "STANDARD",
+      keySignatureLines: [2, 5, 1, 4, 7, 3, 6, 6, 3, 7, 4, 8, 5, 9]
+    },
+    {
+      type: "F_8VA",
+      line: 4,
+      pitchOffset: 40,
+      symId: "fClef8va",
+      staffGroup: "STANDARD",
+      keySignatureLines: [2, 5, 1, 4, 7, 3, 6, 6, 3, 7, 4, 8, 5, 9]
+    },
+    {
+      type: "F_15MA",
+      line: 4,
+      pitchOffset: 47,
+      symId: "fClef15ma",
+      staffGroup: "STANDARD",
+      keySignatureLines: [2, 5, 1, 4, 7, 3, 6, 6, 3, 7, 4, 8, 5, 9]
+    },
+    {
+      type: "F_B",
+      line: 3,
+      pitchOffset: 35,
+      symId: "fClef",
+      staffGroup: "STANDARD",
+      keySignatureLines: [4, 0, 3, -1, 2, 5, 1, 1, 5, 2, 6, 3, 7, 4]
+    },
+    {
+      type: "F_C",
+      line: 5,
+      pitchOffset: 31,
+      symId: "fClef",
+      staffGroup: "STANDARD",
+      keySignatureLines: [0, 3, -1, 2, 5, 1, 4, 4, 1, 5, 2, 6, 3, 7]
+    },
+    {
+      type: "F_F18C",
+      line: 4,
+      pitchOffset: 33,
+      symId: "fClefFrench",
+      staffGroup: "STANDARD",
+      keySignatureLines: [2, 5, 1, 4, 7, 3, 6, 6, 3, 7, 4, 8, 5, 9]
+    },
+    {
+      type: "F_19C",
+      line: 4,
+      pitchOffset: 33,
+      symId: "fClef19thCentury",
+      staffGroup: "STANDARD",
+      keySignatureLines: [2, 5, 1, 4, 7, 3, 6, 6, 3, 7, 4, 8, 5, 9]
+    },
+    {
+      type: "PERC",
+      line: 2,
+      pitchOffset: 45,
+      symId: "unpitchedPercussionClef1",
+      staffGroup: "PERCUSSION",
+      keySignatureLines: [0, 3, -1, 2, 5, 1, 4, 4, 1, 5, 2, 6, 3, 7]
+    },
+    {
+      type: "PERC2",
+      line: 2,
+      pitchOffset: 45,
+      symId: "unpitchedPercussionClef2",
+      staffGroup: "PERCUSSION",
+      keySignatureLines: [0, 3, -1, 2, 5, 1, 4, 4, 1, 5, 2, 6, 3, 7]
+    },
+    {
+      type: "TAB",
+      line: 5,
+      pitchOffset: 45,
+      symId: "sixStringTabClef",
+      staffGroup: "TAB",
+      keySignatureLines: [0, 3, -1, 2, 5, 1, 4, 4, 1, 5, 2, 6, 3, 7]
+    },
+    {
+      type: "TAB4",
+      line: 5,
+      pitchOffset: 45,
+      symId: "fourStringTabClef",
+      staffGroup: "TAB",
+      keySignatureLines: [0, 3, -1, 2, 5, 1, 4, 4, 1, 5, 2, 6, 3, 7]
+    },
+    {
+      type: "TAB_SERIF",
+      line: 5,
+      pitchOffset: 45,
+      symId: "sixStringTabClefSerif",
+      staffGroup: "TAB",
+      keySignatureLines: [0, 3, -1, 2, 5, 1, 4, 4, 1, 5, 2, 6, 3, 7]
+    },
+    {
+      type: "TAB4_SERIF",
+      line: 5,
+      pitchOffset: 45,
+      symId: "fourStringTabClefSerif",
+      staffGroup: "TAB",
+      keySignatureLines: [0, 3, -1, 2, 5, 1, 4, 4, 1, 5, 2, 6, 3, 7]
+    },
+    {
+      type: "C4_8VB",
+      line: 4,
+      pitchOffset: 30,
+      symId: "cClef8vb",
+      staffGroup: "STANDARD",
+      keySignatureLines: [6, 2, 5, 1, 4, 0, 3, 3, 0, 4, 1, 5, 2, 6]
+    },
+    {
+      type: "G8_VB_C",
+      line: 2,
+      pitchOffset: 38,
+      symId: "gClef8vbCClef",
+      staffGroup: "STANDARD",
+      keySignatureLines: [0, 3, -1, 2, 5, 1, 4, 4, 1, 5, 2, 6, 3, 7]
+    }
+  ];
+  var BY_TYPE = new Map(MUSESCORE_CLEFS.map((c) => [c.type, c]));
+  function museScoreClef(type) {
+    return BY_TYPE.get(type);
+  }
+  function museScoreClefForMusicXml(sign, line, octaveChange = 0) {
+    const s = sign;
+    const i2 = octaveChange;
+    let l = line;
+    if (l === void 0) {
+      if (s === "G") l = 2;
+      else if (s === "F") l = 4;
+      else if (s === "C") l = 3;
+    }
+    let type;
+    if (s === "G" && l === 2) {
+      type = i2 === 0 ? "G" : i2 === 1 ? "G8_VA" : i2 === 2 ? "G15_MA" : i2 === -1 ? "G8_VB" : i2 === -2 ? "G15_MB" : void 0;
+    } else if (s === "G" && l === 1 && i2 === 0) {
+      type = "G_1";
+    } else if (s === "F" && l === 3 && i2 === 0) {
+      type = "F_B";
+    } else if (s === "F" && l === 4) {
+      type = i2 === 0 ? "F" : i2 === 1 ? "F_8VA" : i2 === 2 ? "F_15MA" : i2 === -1 ? "F8_VB" : i2 === -2 ? "F15_MB" : void 0;
+    } else if (s === "F" && l === 5 && i2 === 0) {
+      type = "F_C";
+    } else if (s === "C") {
+      type = l === 5 ? "C5" : l === 4 ? i2 === -1 ? "C4_8VB" : "C4" : l === 3 ? "C3" : l === 2 ? "C2" : l === 1 ? "C1" : void 0;
+    } else if (s === "percussion") {
+      type = "PERC";
+    } else if (s === "TAB") {
+      type = "TAB";
+    }
+    return type === void 0 ? void 0 : BY_TYPE.get(type);
+  }
+
+  // src/musescore/staff-position.ts
+  var ABS_STEP_SOURCE = {
+    path: "src/engraving/dom/utils.cpp",
+    symbol: "absStep(int tpc, int pitch)",
+    what: "the absolute diatonic step of a pitch, counted from C-1 = 0"
+  };
+  var REL_STEP_SOURCE = {
+    path: "src/engraving/dom/utils.cpp",
+    symbol: "relStep(int line, ClefType clef)",
+    what: "absolute step to staff line, under a clef"
+  };
+  var STEP_INDEX = {
+    C: 0,
+    D: 1,
+    E: 2,
+    F: 3,
+    G: 4,
+    A: 5,
+    B: 6
+  };
+  function absStep(step, octave) {
+    const index = STEP_INDEX[step.toUpperCase()];
+    if (index === void 0) {
+      throw new Error(`absStep: "${step}" is not a diatonic step name (C..B).`);
+    }
+    return index + (octave + 1) * 7;
+  }
+  function museScoreLine(clef2, step, octave) {
+    return clef2.pitchOffset - absStep(step, octave);
+  }
+  function staffPositionFromLine(line, staffLines = 5) {
+    return line * 0.5 - (staffLines - 1);
+  }
+  function lineFromStaffPosition(staffPosition, staffLines = 5) {
+    return (staffPosition + (staffLines - 1)) * 2;
+  }
+  function museScoreStaffPosition(clef2, step, octave, staffLines = 5) {
+    return staffPositionFromLine(museScoreLine(clef2, step, octave), staffLines);
+  }
+  function needsLedgerLines(line, staffLines = 5) {
+    const lineBelow = (staffLines - 1) * 2;
+    return line > lineBelow + 1 || line < -1;
+  }
+  var LEDGER_LINE_SOURCE = {
+    path: "src/engraving/rendering/score/chordlayout.cpp",
+    symbol: "ChordLayout::layoutLedgerLines",
+    what: "when a note needs ledger lines, and how far they extend past the notehead"
+  };
+  function pitchedClefs() {
+    return MUSESCORE_CLEFS.filter((c) => c.staffGroup !== "TAB");
+  }
+
+  // src/musescore/noteheads.ts
+  var NOTEHEAD_GROUP_SOURCE = {
+    path: "src/engraving/dom/note.cpp",
+    symbol: "static const SymId noteHeads[2][...][...]",
+    what: "the SMuFL glyph per notehead group, head type and stem direction"
+  };
+  var NOTEHEAD_ENUM_SOURCE = {
+    path: "src/engraving/types/types.h",
+    symbol: "enum class NoteHeadGroup / enum class NoteHeadType",
+    what: "the group and head-type names, and their order"
+  };
+  var MUSICXML_NOTEHEAD_SOURCE = {
+    path: "src/importexport/musicxml/internal/import/importmusicxmlpass2.cpp",
+    symbol: "convertNotehead(String mxmlName)",
+    what: "MusicXML <notehead> value to MuseScore notehead group"
+  };
+  var MUSESCORE_NOTEHEAD_GROUPS = [
+    {
+      group: "HEAD_NORMAL",
+      glyphs: {
+        whole: "noteheadWhole",
+        half: "noteheadHalf",
+        quarter: "noteheadBlack",
+        breve: "noteheadDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_CROSS",
+      glyphs: {
+        whole: "noteheadXWhole",
+        half: "noteheadXHalf",
+        quarter: "noteheadXBlack",
+        breve: "noteheadXDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_PLUS",
+      glyphs: {
+        whole: "noteheadPlusWhole",
+        half: "noteheadPlusHalf",
+        quarter: "noteheadPlusBlack",
+        breve: "noteheadPlusDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_XCIRCLE",
+      glyphs: {
+        whole: "noteheadCircleXWhole",
+        half: "noteheadCircleXHalf",
+        quarter: "noteheadCircleX",
+        breve: "noteheadCircleXDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_WITHX",
+      glyphs: {
+        whole: "noteheadWholeWithX",
+        half: "noteheadHalfWithX",
+        quarter: "noteheadVoidWithX",
+        breve: "noteheadDoubleWholeWithX"
+      }
+    },
+    {
+      group: "HEAD_TRIANGLE_UP",
+      glyphs: {
+        whole: "noteheadTriangleUpWhole",
+        half: "noteheadTriangleUpHalf",
+        quarter: "noteheadTriangleUpBlack",
+        breve: "noteheadTriangleUpDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_TRIANGLE_DOWN",
+      glyphs: {
+        whole: "noteheadTriangleDownWhole",
+        half: "noteheadTriangleDownHalf",
+        quarter: "noteheadTriangleDownBlack",
+        breve: "noteheadTriangleDownDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_SLASHED1",
+      glyphs: {
+        whole: "noteheadSlashedWhole1",
+        half: "noteheadSlashedHalf1",
+        quarter: "noteheadSlashedBlack1",
+        breve: "noteheadSlashedDoubleWhole1"
+      }
+    },
+    {
+      group: "HEAD_SLASHED2",
+      glyphs: {
+        whole: "noteheadSlashedWhole2",
+        half: "noteheadSlashedHalf2",
+        quarter: "noteheadSlashedBlack2",
+        breve: "noteheadSlashedDoubleWhole2"
+      }
+    },
+    {
+      group: "HEAD_DIAMOND",
+      glyphs: {
+        whole: "noteheadDiamondWhole",
+        half: "noteheadDiamondHalf",
+        quarter: "noteheadDiamondBlack",
+        breve: "noteheadDiamondDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_DIAMOND_OLD",
+      glyphs: {
+        whole: "noteheadDiamondWholeOld",
+        half: "noteheadDiamondHalfOld",
+        quarter: "noteheadDiamondBlackOld",
+        breve: "noteheadDiamondDoubleWholeOld"
+      }
+    },
+    {
+      group: "HEAD_CIRCLED",
+      glyphs: {
+        whole: "noteheadCircledWhole",
+        half: "noteheadCircledHalf",
+        quarter: "noteheadCircledBlack",
+        breve: "noteheadCircledDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_CIRCLED_LARGE",
+      glyphs: {
+        whole: "noteheadCircledWholeLarge",
+        half: "noteheadCircledHalfLarge",
+        quarter: "noteheadCircledBlackLarge",
+        breve: "noteheadCircledDoubleWholeLarge"
+      }
+    },
+    {
+      group: "HEAD_LARGE_ARROW",
+      glyphs: {
+        whole: "noteheadLargeArrowUpWhole",
+        half: "noteheadLargeArrowUpHalf",
+        quarter: "noteheadLargeArrowUpBlack",
+        breve: "noteheadLargeArrowUpDoubleWhole"
+      },
+      upStem: {
+        whole: "noteheadLargeArrowDownWhole",
+        half: "noteheadLargeArrowDownHalf",
+        quarter: "noteheadLargeArrowDownBlack",
+        breve: "noteheadLargeArrowDownDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_BREVIS_ALT",
+      glyphs: {
+        whole: "noteheadWhole",
+        half: "noteheadHalf",
+        quarter: "noteheadBlack",
+        breve: "noteheadDoubleWholeSquare"
+      }
+    },
+    {
+      group: "HEAD_SLASH",
+      glyphs: {
+        whole: "noteheadSlashWhiteWhole",
+        half: "noteheadSlashWhiteHalf",
+        quarter: "noteheadSlashHorizontalEnds",
+        breve: "noteheadSlashWhiteWhole"
+      },
+      upStem: {
+        whole: "noteheadSlashWhiteWhole",
+        half: "noteheadSlashWhiteHalf",
+        quarter: "noteheadSlashHorizontalEnds",
+        breve: "noteheadSlashWhiteDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_LARGE_DIAMOND",
+      glyphs: {
+        whole: "noteheadSlashDiamondWhite",
+        half: "noteheadSlashDiamondWhite",
+        quarter: "noteheadSlashHorizontalEnds",
+        breve: "noteheadSlashWhiteWhole"
+      },
+      upStem: {
+        whole: "noteheadSlashDiamondWhite",
+        half: "noteheadSlashDiamondWhite",
+        quarter: "noteheadSlashHorizontalEnds",
+        breve: "noteheadSlashWhiteDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_SOL",
+      glyphs: {
+        whole: "noteShapeRoundWhite",
+        half: "noteShapeRoundWhite",
+        quarter: "noteShapeRoundBlack",
+        breve: "noteShapeRoundDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_LA",
+      glyphs: {
+        whole: "noteShapeSquareWhite",
+        half: "noteShapeSquareWhite",
+        quarter: "noteShapeSquareBlack",
+        breve: "noteShapeSquareDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_FA",
+      glyphs: {
+        whole: "noteShapeTriangleRightWhite",
+        half: "noteShapeTriangleRightWhite",
+        quarter: "noteShapeTriangleRightBlack",
+        breve: "noteShapeTriangleRightDoubleWhole"
+      },
+      upStem: {
+        whole: "noteShapeTriangleLeftWhite",
+        half: "noteShapeTriangleLeftWhite",
+        quarter: "noteShapeTriangleLeftBlack",
+        breve: "noteShapeTriangleLeftDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_MI",
+      glyphs: {
+        whole: "noteShapeDiamondWhite",
+        half: "noteShapeDiamondWhite",
+        quarter: "noteShapeDiamondBlack",
+        breve: "noteShapeDiamondDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_DO",
+      glyphs: {
+        whole: "noteShapeTriangleUpWhite",
+        half: "noteShapeTriangleUpWhite",
+        quarter: "noteShapeTriangleUpBlack",
+        breve: "noteShapeTriangleUpDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_RE",
+      glyphs: {
+        whole: "noteShapeMoonWhite",
+        half: "noteShapeMoonWhite",
+        quarter: "noteShapeMoonBlack",
+        breve: "noteShapeMoonDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_TI",
+      glyphs: {
+        whole: "noteShapeTriangleRoundWhite",
+        half: "noteShapeTriangleRoundWhite",
+        quarter: "noteShapeTriangleRoundBlack",
+        breve: "noteShapeTriangleRoundDoubleWhole"
+      }
+    },
+    {
+      group: "HEAD_HEAVY_CROSS",
+      glyphs: {
+        whole: "noteheadHeavyX",
+        half: "noteheadHeavyX",
+        quarter: "noteheadHeavyX",
+        breve: "noteheadHeavyX"
+      }
+    },
+    {
+      group: "HEAD_HEAVY_CROSS_HAT",
+      glyphs: {
+        whole: "noteheadHeavyXHat",
+        half: "noteheadHeavyXHat",
+        quarter: "noteheadHeavyXHat",
+        breve: "noteheadHeavyXHat"
+      }
+    }
+  ];
+  var BY_GROUP = new Map(MUSESCORE_NOTEHEAD_GROUPS.map((g) => [g.group, g]));
+  function museScoreNoteheadGlyph(group, headType, stem = "down") {
+    const row = BY_GROUP.get(group);
+    if (row === void 0) return void 0;
+    return (stem === "up" ? row.upStem ?? row.glyphs : row.glyphs)[headType];
+  }
+  var MUSICXML_NOTEHEAD_TO_GROUP = {
+    slash: "HEAD_SLASH",
+    triangle: "HEAD_TRIANGLE_UP",
+    diamond: "HEAD_DIAMOND",
+    cross: "HEAD_PLUS",
+    x: "HEAD_CROSS",
+    "circle-x": "HEAD_XCIRCLE",
+    "inverted triangle": "HEAD_TRIANGLE_DOWN",
+    slashed: "HEAD_SLASHED1",
+    "back slashed": "HEAD_SLASHED2",
+    normal: "HEAD_NORMAL",
+    do: "HEAD_DO",
+    re: "HEAD_RE",
+    mi: "HEAD_MI",
+    fa: "HEAD_FA",
+    "fa up": "HEAD_FA",
+    so: "HEAD_SOL",
+    la: "HEAD_LA",
+    ti: "HEAD_TI"
+  };
+  function museScoreGroupForMusicXmlNotehead(value) {
+    return MUSICXML_NOTEHEAD_TO_GROUP[value.trim().toLowerCase()];
+  }
+
+  // src/musescore/drumset.ts
+  var DRUMSET_SOURCE = {
+    path: "src/engraving/dom/drumset.cpp",
+    symbol: "Drumset::initDrumset()",
+    what: "the standard MIDI drumset: notehead group, staff line, stem direction and voice per MIDI pitch"
+  };
+  var DRUM_NAME_SOURCE = {
+    path: "src/engraving/types/typesconv.cpp",
+    symbol: "DRUMNUMS (TConv::userName(DrumNum))",
+    what: "each drum's displayed name, in English"
+  };
+  var MUSESCORE_DRUMSET = [
+    {
+      pitch: 27,
+      name: "High Q",
+      notehead: "HEAD_SLASH",
+      line: 8,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 28,
+      name: "Slap",
+      notehead: "HEAD_CUSTOM",
+      customNotehead: "noteheadSlashX",
+      line: 4,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 29,
+      name: "Scratch Push",
+      notehead: "HEAD_SLASH",
+      line: 6,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 30,
+      name: "Scratch Pull",
+      notehead: "HEAD_SLASH",
+      line: 6,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 31,
+      name: "Sticks",
+      notehead: "HEAD_PLUS",
+      line: -1,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 32,
+      name: "Square Click",
+      notehead: "HEAD_PLUS",
+      line: 10,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 33,
+      name: "Metronome Click",
+      notehead: "HEAD_CROSS",
+      line: 10,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 34,
+      name: "Metronome Bell",
+      notehead: "HEAD_TRIANGLE_UP",
+      line: 10,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 35,
+      name: "Acoustic Bass Drum",
+      notehead: "HEAD_NORMAL",
+      line: 8,
+      stemDirection: "up",
+      voice: 1
+    },
+    {
+      pitch: 36,
+      name: "Bass Drum 1",
+      notehead: "HEAD_NORMAL",
+      line: 7,
+      stemDirection: "down",
+      voice: 1
+    },
+    {
+      pitch: 37,
+      name: "Side Stick",
+      notehead: "HEAD_SLASHED1",
+      line: 3,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 38,
+      name: "Acoustic Snare",
+      notehead: "HEAD_NORMAL",
+      line: 3,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 39,
+      name: "Hand Clap",
+      notehead: "HEAD_PLUS",
+      line: -2,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 40,
+      name: "Electric Snare",
+      notehead: "HEAD_SLASH",
+      line: 3,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 41,
+      name: "Low Floor Tom",
+      notehead: "HEAD_NORMAL",
+      line: 6,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 42,
+      name: "Closed Hi-Hat",
+      notehead: "HEAD_CROSS",
+      line: -1,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 43,
+      name: "High Floor Tom",
+      notehead: "HEAD_NORMAL",
+      line: 5,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 44,
+      name: "Pedal Hi-Hat",
+      notehead: "HEAD_CROSS",
+      line: 9,
+      stemDirection: "up",
+      voice: 1
+    },
+    {
+      pitch: 45,
+      name: "Low Tom",
+      notehead: "HEAD_NORMAL",
+      line: 4,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 46,
+      name: "Open Hi-Hat",
+      notehead: "HEAD_XCIRCLE",
+      line: -1,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 47,
+      name: "Low-Mid Tom",
+      notehead: "HEAD_NORMAL",
+      line: 2,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 48,
+      name: "Hi-Mid Tom",
+      notehead: "HEAD_NORMAL",
+      line: 1,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 49,
+      name: "Crash Cymbal 1",
+      notehead: "HEAD_CROSS",
+      line: -2,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 50,
+      name: "High Tom",
+      notehead: "HEAD_NORMAL",
+      line: 0,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 51,
+      name: "Ride Cymbal 1",
+      notehead: "HEAD_CROSS",
+      line: 0,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 52,
+      name: "Chinese Cymbal",
+      notehead: "HEAD_CUSTOM",
+      customNotehead: "noteheadHeavyXHat",
+      line: -3,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 53,
+      name: "Ride Bell",
+      notehead: "HEAD_DIAMOND",
+      line: 0,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 54,
+      name: "Tambourine",
+      notehead: "HEAD_DIAMOND",
+      line: 6,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 55,
+      name: "Splash Cymbal",
+      notehead: "HEAD_CROSS",
+      line: -4,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 56,
+      name: "Cowbell",
+      notehead: "HEAD_TRIANGLE_DOWN",
+      line: 0,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 57,
+      name: "Crash Cymbal 2",
+      notehead: "HEAD_CROSS",
+      line: -3,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 58,
+      name: "Vibraslap",
+      notehead: "HEAD_TI",
+      line: 0,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 59,
+      name: "Ride Cymbal 2",
+      notehead: "HEAD_CROSS",
+      line: 2,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 60,
+      name: "Hi Bongo",
+      notehead: "HEAD_NORMAL",
+      line: -1,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 61,
+      name: "Low Bongo",
+      notehead: "HEAD_NORMAL",
+      line: 0,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 62,
+      name: "Mute Hi Conga",
+      notehead: "HEAD_CUSTOM",
+      customNotehead: "noteheadXOrnate",
+      line: 1,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 63,
+      name: "Open Hi Conga",
+      notehead: "HEAD_NORMAL",
+      line: 1,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 64,
+      name: "Low Conga",
+      notehead: "HEAD_NORMAL",
+      line: 2,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 65,
+      name: "High Timbale",
+      notehead: "HEAD_NORMAL",
+      line: 5,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 66,
+      name: "Low Timbale",
+      notehead: "HEAD_NORMAL",
+      line: 7,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 67,
+      name: "High Agogo",
+      notehead: "HEAD_TRIANGLE_DOWN",
+      line: -2,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 68,
+      name: "Low Agogo",
+      notehead: "HEAD_TRIANGLE_DOWN",
+      line: -1,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 69,
+      name: "Cabasa",
+      notehead: "HEAD_DIAMOND",
+      line: 2,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 70,
+      name: "Maracas",
+      notehead: "HEAD_DIAMOND",
+      line: 4,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 71,
+      name: "Short Whistle",
+      notehead: "HEAD_CROSS",
+      line: -3,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 72,
+      name: "Long Whistle",
+      notehead: "HEAD_TI",
+      line: -3,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 73,
+      name: "Short G\xFCiro",
+      notehead: "HEAD_CROSS",
+      line: -1,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 74,
+      name: "Long G\xFCiro",
+      notehead: "HEAD_SLASHED1",
+      line: -1,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 75,
+      name: "Claves",
+      notehead: "HEAD_LA",
+      line: 0,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 76,
+      name: "Hi Wood Block",
+      notehead: "HEAD_LA",
+      line: 5,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 77,
+      name: "Low Wood Block",
+      notehead: "HEAD_LA",
+      line: 7,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 78,
+      name: "Mute Cuica",
+      notehead: "HEAD_CROSS",
+      line: 8,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 79,
+      name: "Open Cuica",
+      notehead: "HEAD_SLASHED2",
+      line: 8,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 80,
+      name: "Mute Triangle",
+      notehead: "HEAD_CROSS",
+      line: 0,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 81,
+      name: "Open Triangle",
+      notehead: "HEAD_TRIANGLE_UP",
+      line: 0,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 82,
+      name: "Shaker",
+      notehead: "HEAD_DIAMOND",
+      line: 5,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 83,
+      name: "Sleigh Bell",
+      notehead: "HEAD_TRIANGLE_DOWN",
+      line: 3,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 84,
+      name: "Mark Tree",
+      notehead: "HEAD_TI",
+      line: 2,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 85,
+      name: "Castanets",
+      notehead: "HEAD_LA",
+      line: 2,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 86,
+      name: "Mute Surdo",
+      notehead: "HEAD_CUSTOM",
+      customNotehead: "noteheadSlashX",
+      line: 4,
+      stemDirection: "up",
+      voice: 0
+    },
+    {
+      pitch: 87,
+      name: "Open Surdo",
+      notehead: "HEAD_SLASH",
+      line: 4,
+      stemDirection: "up",
+      voice: 0
+    }
+  ];
+  var BY_PITCH = new Map(MUSESCORE_DRUMSET.map((d) => [d.pitch, d]));
+  function museScoreDrum(pitch) {
+    return BY_PITCH.get(pitch);
+  }
+
+  // src/musescore/strings.ts
+  var STRING_DATA_SOURCE = {
+    path: "share/instruments/instruments.xml",
+    symbol: "<Instrument><StringData>",
+    what: "open-string pitches and fret count per fretted instrument"
+  };
+  var STRING_INDEX_SOURCE = {
+    path: "src/engraving/dom/stringdata.cpp",
+    symbol: "StringData::fret() / StringData::convertPitch()",
+    what: "the reversed string index, and that a fret is (pitch - transpose) - openString"
+  };
+  var TUNING_PRESET_SOURCE = {
+    path: "share/instruments/string_tunings_presets.json",
+    symbol: '"guitars" family',
+    what: "the named alternate tunings MuseScore offers for guitars"
+  };
+  var TAB_STAFF_SOURCE = {
+    path: "src/engraving/dom/stafftype.cpp",
+    symbol: "StaffType::initStaffTypes()",
+    what: "line count and line distance for every standard, percussion and tab staff preset"
+  };
+  var MUSESCORE_STRING_DATA = [
+    {
+      id: "electric-guitar",
+      name: "Electric Guitar",
+      frets: 24,
+      openStrings: [40, 45, 50, 55, 59, 64],
+      concertClef: "G8vb",
+      transposingClef: "G8vb",
+      transposeChromatic: 0
+    },
+    {
+      id: "guitar-steel",
+      name: "Acoustic Guitar",
+      frets: 20,
+      openStrings: [40, 45, 50, 55, 59, 64],
+      concertClef: "G8vb",
+      transposingClef: "G8vb",
+      transposeChromatic: 0
+    },
+    {
+      id: "guitar-nylon",
+      name: "Classical Guitar",
+      frets: 19,
+      openStrings: [40, 45, 50, 55, 59, 64],
+      concertClef: "G8vb",
+      transposingClef: "G8vb",
+      transposeChromatic: 0
+    },
+    {
+      id: "baritone-guitar",
+      name: "Baritone Guitar",
+      frets: 19,
+      openStrings: [35, 40, 45, 50, 54, 59],
+      concertClef: "G8vb",
+      transposingClef: "G8vb",
+      transposeChromatic: 0
+    },
+    {
+      id: "7-string-guitar",
+      name: "7-string Guitar",
+      frets: 19,
+      openStrings: [35, 40, 45, 50, 55, 59, 64],
+      concertClef: "G8vb",
+      transposingClef: "G8vb",
+      transposeChromatic: 0
+    },
+    {
+      id: "12-string-guitar",
+      name: "12-string Guitar",
+      frets: 21,
+      openStrings: [40, 45, 50, 55, 59, 64],
+      concertClef: "G8vb",
+      transposingClef: "G8vb",
+      transposeChromatic: 0
+    },
+    {
+      id: "bass-guitar",
+      name: "Bass Guitar",
+      frets: 24,
+      openStrings: [40, 45, 50, 55],
+      concertClef: "F8vb",
+      transposingClef: "F",
+      transposeChromatic: -12
+    },
+    {
+      id: "electric-bass",
+      name: "Electric Bass",
+      frets: 24,
+      openStrings: [40, 45, 50, 55],
+      concertClef: "F8vb",
+      transposingClef: "F",
+      transposeChromatic: -12
+    },
+    {
+      id: "acoustic-bass",
+      name: "Acoustic Bass",
+      frets: 24,
+      openStrings: [40, 45, 50, 55],
+      concertClef: "F8vb",
+      transposingClef: "F",
+      transposeChromatic: -12
+    },
+    {
+      id: "fretless-electric-bass",
+      name: "Fretless Electric Bass",
+      frets: 24,
+      openStrings: [28, 33, 38, 43],
+      concertClef: "F8vb",
+      transposingClef: "F",
+      transposeChromatic: -12
+    },
+    {
+      id: "5-string-electric-bass",
+      name: "5-str. Electric Bass",
+      frets: 24,
+      openStrings: [35, 40, 45, 50, 55],
+      concertClef: "F8vb",
+      transposingClef: "F",
+      transposeChromatic: -12
+    },
+    {
+      id: "5-string-electric-bass-high-c",
+      name: "5-str. Electric Bass (high C/tenor)",
+      frets: 24,
+      openStrings: [40, 45, 50, 55, 60],
+      concertClef: "F8vb",
+      transposingClef: "F",
+      transposeChromatic: -12
+    },
+    {
+      id: "6-string-electric-bass",
+      name: "6-str. Electric Bass",
+      frets: 24,
+      openStrings: [35, 40, 45, 50, 55, 60],
+      concertClef: "F8vb",
+      transposingClef: "F",
+      transposeChromatic: -12
+    },
+    {
+      id: "ukulele",
+      name: "Ukulele",
+      frets: 18,
+      openStrings: [67, 60, 64, 69],
+      concertClef: "G",
+      transposingClef: "G",
+      transposeChromatic: 0
+    },
+    {
+      id: "ukulele-low-g",
+      name: "Ukulele (low G)",
+      frets: 18,
+      openStrings: [55, 60, 64, 69],
+      concertClef: "G",
+      transposingClef: "G",
+      transposeChromatic: 0
+    },
+    {
+      id: "baritone-ukulele",
+      name: "Baritone Ukulele",
+      frets: 18,
+      openStrings: [50, 55, 59, 64],
+      concertClef: "G8vb",
+      transposingClef: "G8vb",
+      transposeChromatic: 0
+    },
+    {
+      id: "tenor-ukulele",
+      name: "Tenor Ukulele",
+      frets: 18,
+      openStrings: [67, 60, 64, 69],
+      concertClef: "G",
+      transposingClef: "G",
+      transposeChromatic: 0
+    },
+    {
+      id: "mandolin",
+      name: "Mandolin",
+      frets: 24,
+      openStrings: [55, 62, 69, 76],
+      concertClef: "G",
+      transposingClef: "G",
+      transposeChromatic: 0
+    },
+    {
+      id: "banjo",
+      name: "Banjo",
+      frets: 19,
+      openStrings: [67, 50, 55, 59, 62],
+      concertClef: "G8vb",
+      transposingClef: "G8vb",
+      transposeChromatic: 0
+    },
+    {
+      id: "tenor-banjo",
+      name: "Tenor Banjo",
+      frets: 19,
+      openStrings: [48, 55, 62, 69],
+      concertClef: "G8vb",
+      transposingClef: "G8vb",
+      transposeChromatic: 0
+    },
+    {
+      id: "irish-tenor-banjo",
+      name: "Irish Tenor Banjo",
+      frets: 19,
+      openStrings: [43, 50, 57, 64],
+      concertClef: "G8vb",
+      transposingClef: "G8vb",
+      transposeChromatic: 0
+    }
+  ];
+  var BY_ID = new Map(MUSESCORE_STRING_DATA.map((s) => [s.id, s]));
+  function museScoreStringData(id) {
+    return BY_ID.get(id);
+  }
+  function stringIndexFromLowest(stringFromLowest, stringCount) {
+    return stringCount - stringFromLowest;
+  }
+  function writtenPitchFor(data, soundingPitch) {
+    return soundingPitch - data.transposeChromatic;
+  }
+  function fretFor(data, writtenPitch, stringFromLowest) {
+    const open = data.openStrings[stringFromLowest - 1];
+    if (open === void 0) return void 0;
+    const fret = writtenPitch - open;
+    return fret < 0 || fret > data.frets ? void 0 : fret;
+  }
+  var MUSESCORE_GUITAR_TUNINGS = [
+    { strings: 5, name: "Standard", pitches: [40, 45, 50, 55, 59] },
+    { strings: 5, name: "Hi C", pitches: [40, 45, 50, 55, 60] },
+    { strings: 5, name: "Baritone", pitches: [36, 43, 50, 57, 64] },
+    { strings: 5, name: "Open G", pitches: [43, 50, 55, 59, 62] },
+    { strings: 6, name: "Standard", pitches: [40, 45, 50, 55, 59, 64] },
+    { strings: 6, name: "Tune down 1/2 step", pitches: [39, 44, 49, 54, 58, 63] },
+    { strings: 6, name: "Tune down 1 step", pitches: [38, 43, 48, 53, 57, 62] },
+    { strings: 6, name: "Tune down 2 step", pitches: [36, 41, 46, 51, 55, 60] },
+    { strings: 6, name: "Dropped D", pitches: [38, 45, 50, 55, 59, 64] },
+    { strings: 6, name: "Dropped D tune down 1/2 step", pitches: [37, 44, 49, 54, 58, 63] },
+    { strings: 6, name: "Dropped D Variant", pitches: [38, 45, 50, 55, 57, 64] },
+    { strings: 6, name: "Double Dropped D", pitches: [38, 45, 50, 55, 59, 62] },
+    { strings: 6, name: "Dropped C", pitches: [36, 43, 48, 53, 57, 62] },
+    { strings: 6, name: "Dropped E", pitches: [40, 47, 52, 57, 61, 66] },
+    { strings: 6, name: "Dropped B", pitches: [35, 42, 47, 52, 56, 61] },
+    { strings: 6, name: "Baritone", pitches: [35, 40, 45, 50, 54, 59] },
+    { strings: 6, name: "Open C", pitches: [36, 43, 48, 55, 60, 64] },
+    { strings: 6, name: "Open Cm", pitches: [36, 43, 48, 55, 60, 63] },
+    { strings: 6, name: "Open C6", pitches: [36, 43, 48, 55, 57, 64] },
+    { strings: 6, name: "Open CM7", pitches: [36, 43, 52, 55, 59, 64] },
+    { strings: 6, name: "Open D", pitches: [38, 45, 50, 54, 57, 62] },
+    { strings: 6, name: "Open Dm", pitches: [38, 45, 50, 53, 57, 62] },
+    { strings: 6, name: "Open D5", pitches: [38, 45, 50, 50, 57, 62] },
+    { strings: 6, name: "Open D6", pitches: [38, 45, 50, 54, 59, 62] },
+    { strings: 6, name: "Open Dsus4", pitches: [38, 45, 50, 55, 57, 62] },
+    { strings: 6, name: "Open E", pitches: [40, 47, 52, 56, 59, 64] },
+    { strings: 6, name: "Open Em", pitches: [40, 47, 52, 55, 59, 64] },
+    { strings: 6, name: "Open Esus11", pitches: [40, 45, 52, 55, 59, 64] },
+    { strings: 6, name: "Open F", pitches: [41, 45, 48, 53, 60, 65] },
+    { strings: 6, name: "Open G", pitches: [38, 43, 50, 55, 59, 62] },
+    { strings: 6, name: "Open Gm", pitches: [38, 43, 50, 55, 58, 62] },
+    { strings: 6, name: "Open Gsus4", pitches: [38, 43, 50, 55, 60, 62] },
+    { strings: 6, name: "Open G6", pitches: [38, 43, 50, 55, 59, 64] },
+    { strings: 6, name: "Open A", pitches: [40, 45, 52, 57, 61, 64] },
+    { strings: 6, name: "Open Am", pitches: [40, 45, 52, 57, 60, 64] },
+    { strings: 6, name: "Dobro Open G", pitches: [43, 47, 50, 55, 59, 62] },
+    { strings: 6, name: "Lute or Vihuela", pitches: [40, 45, 50, 54, 59, 64] },
+    { strings: 6, name: "Nashville", pitches: [52, 57, 62, 67, 59, 64] },
+    { strings: 7, name: "Standard", pitches: [35, 40, 45, 50, 55, 59, 64] },
+    { strings: 7, name: "Drop D", pitches: [33, 38, 45, 50, 55, 59, 64] },
+    { strings: 7, name: "Tune down 1/2 step", pitches: [34, 39, 44, 49, 54, 58, 63] },
+    { strings: 7, name: "Tune down 1 step", pitches: [33, 38, 43, 48, 53, 57, 62] },
+    { strings: 7, name: "Tune down 2 step", pitches: [31, 36, 41, 46, 51, 55, 60] },
+    { strings: 8, name: "Standard", pitches: [30, 35, 40, 45, 50, 55, 59, 64] },
+    { strings: 8, name: "Tune down 1/2 step", pitches: [29, 34, 39, 44, 49, 54, 58, 63] },
+    { strings: 8, name: "Tune down 1 step", pitches: [28, 33, 38, 43, 48, 53, 57, 62] },
+    { strings: 8, name: "Tune down 2 step", pitches: [27, 32, 36, 41, 46, 51, 55, 60] },
+    { strings: 9, name: "Standard", pitches: [25, 30, 35, 40, 45, 50, 55, 59, 64] },
+    { strings: 10, name: "Standard", pitches: [30, 32, 34, 36, 40, 45, 57, 62, 67, 76] },
+    { strings: 10, name: "Baroque", pitches: [45, 47, 48, 50, 52, 57, 62, 67, 71, 76] }
+  ];
+  function museScoreTuningsForStrings(strings) {
+    return MUSESCORE_GUITAR_TUNINGS.filter((t) => t.strings === strings);
+  }
+  var MUSESCORE_STAFF_TYPES = [
+    { type: "STANDARD", group: "STANDARD", lines: 5, lineDistance: 1 },
+    { type: "PERC_1LINE", group: "PERCUSSION", lines: 1, lineDistance: 1 },
+    { type: "PERC_2LINE", group: "PERCUSSION", lines: 2, lineDistance: 1 },
+    { type: "PERC_3LINE", group: "PERCUSSION", lines: 3, lineDistance: 1 },
+    { type: "PERC_5LINE", group: "PERCUSSION", lines: 5, lineDistance: 1 },
+    { type: "TAB_4SIMPLE", group: "TAB", lines: 4, lineDistance: 1.5 },
+    { type: "TAB_4COMMON", group: "TAB", lines: 4, lineDistance: 1.5 },
+    { type: "TAB_4FULL", group: "TAB", lines: 4, lineDistance: 1.5 },
+    { type: "TAB_5SIMPLE", group: "TAB", lines: 5, lineDistance: 1.5 },
+    { type: "TAB_5COMMON", group: "TAB", lines: 5, lineDistance: 1.5 },
+    { type: "TAB_5FULL", group: "TAB", lines: 5, lineDistance: 1.5 },
+    { type: "TAB_6SIMPLE", group: "TAB", lines: 6, lineDistance: 1.5 },
+    { type: "TAB_6COMMON", group: "TAB", lines: 6, lineDistance: 1.5 },
+    { type: "TAB_6FULL", group: "TAB", lines: 6, lineDistance: 1.5 },
+    { type: "TAB_7COMMON", group: "TAB", lines: 7, lineDistance: 1.5 },
+    { type: "TAB_UKULELE", group: "TAB", lines: 4, lineDistance: 1.5 }
+  ];
+
+  // src/musescore/style.ts
+  var STYLE_SOURCE = {
+    path: "src/engraving/style/styledef.cpp",
+    symbol: "StyleDef::styleValues[]",
+    what: "every default engraving measurement"
+  };
+  var BEAM_SPACING_SOURCE = {
+    path: "src/engraving/rendering/score/beamtremololayout.cpp",
+    symbol: "BeamTremoloLayout::setupLData",
+    what: "beam spacing in quarter-spaces (3 normal, 4 wide) and the distance it becomes"
+  };
+  var MUSESCORE_STYLE = {
+    /** One staff space, in millimetres: MuseScore's default page scale. */
+    spatiumMm: 1.75,
+    staff: {
+      /** Thickness of a staff line. */
+      lineWidth: 0.11,
+      /** Between the staves of two different instruments. */
+      staffDistance: 6.5,
+      /** Between the two staves of one grand staff. */
+      braceDistance: 6.5,
+      minSystemDistance: 8.5,
+      maxSystemDistance: 15
+    },
+    note: {
+      stemWidth: 0.1,
+      /** The smallest gap MuseScore will leave between two adjacent notes. */
+      minNoteDistance: 0.35,
+      /** Ledger lines: thickness, and how far they run past the notehead on EACH side. */
+      ledgerLineWidth: 0.16,
+      ledgerLineLength: 0.33,
+      /** From the notehead to its first augmentation dot, and between dots. */
+      dotNoteDistance: 0.5,
+      dotDotDistance: 0.65,
+      /** Between an accidental and the notehead it belongs to, and between two accidentals. */
+      accidentalNoteDistance: 0.25,
+      accidentalDistance: 0.25,
+      /** Cue notes and grace notes, as a multiplier on full size. */
+      smallNoteMag: 0.7,
+      graceNoteMag: 0.7
+    },
+    beam: {
+      /** Thickness of one beam. */
+      width: 0.5,
+      /**
+       * Between the centre lines of two stacked beams. MuseScore stores
+       * it as 3 quarter-spaces (4 when `useWideBeams` is on) and divides
+       * by four; this is that division done once.
+       */
+      distance: 0.75,
+      wideDistance: 1,
+      useWideBeams: false,
+      /** The shortest a beam may be. */
+      minLength: 1.1
+    },
+    barline: {
+      /** A normal barline, and one line of a double barline. */
+      width: 0.18,
+      doubleWidth: 0.18,
+      /** The thick line of a final or repeat barline. */
+      endWidth: 0.55,
+      /** The gap inside a double barline, and before a final one's thick line. */
+      doubleDistance: 0.37,
+      endDistance: 0.37
+    },
+    measure: {
+      /** The narrowest a measure may be drawn. */
+      minWidth: 8,
+      /**
+       * The spacing SLOPE -- see `spacing.ts`. Not a width: it is the
+       * factor a note's space is multiplied by each time its duration
+       * doubles.
+       */
+      spacing: 1.5,
+      spacingDensity: 1
+    },
+    header: {
+      /** Clef to key signature, key signature to time signature, and so on. */
+      clefKeyDistance: 0.75,
+      clefKeyRightMargin: 0.8,
+      clefTimesigDistance: 1,
+      keyTimesigDistance: 1,
+      clefBarlineDistance: 0.5,
+      /** Between two accidentals of a key signature, and before a natural. */
+      keysigAccidentalDistance: 0.3,
+      keysigNaturalDistance: 0.4
+    },
+    slur: {
+      endWidth: 0.05,
+      midWidth: 0.21,
+      tieEndWidth: 0.05,
+      tieMidWidth: 0.21,
+      minTieLength: 1
+    },
+    articulation: {
+      /** Between an articulation and whatever it is placed against. */
+      minDistance: 0.4,
+      distanceFromHead: 0.4,
+      distanceFromStem: 0.4
+    },
+    rest: {
+      /**
+       * Where a rest sits with no other voice in the way, as a count of
+       * whole staff spaces DOWN from the top line. MuseScore computes it
+       * as `lines % 2 ? floor(lines / 2) : ceil(lines / 2)`, which on a
+       * five-line staff is 2 -- the middle line.
+       */
+      naturalLineForFiveLineStaff: 2,
+      /**
+       * A whole rest moves one space UP from that, so it hangs under the
+       * second line from the top.
+       */
+      wholeRestLineOffset: -1,
+      /**
+       * How far a rest moves out of the way when the staff has more than
+       * one voice: up for voices 1 and 3, down for 2 and 4, by this many
+       * whole spaces.
+       */
+      multiVoiceOffset: 1,
+      multiVoiceTwoSpaceOffset: false
+    }
+  };
+
+  // src/musescore/spacing.ts
+  var SPACING_SOURCE = {
+    path: "src/engraving/rendering/score/horizontalspacing.cpp",
+    symbol: "HorizontalSpacing::durationStretchForTicks / chordRestSegmentNaturalWidth",
+    what: "the duration-to-width law, and the 3.5sp a quarter note starts from"
+  };
+  var QUARTER_NOTE_SPACE = 3.5;
+  function museScoreDurationStretch(ticks, ticksPerQuarter, slope = MUSESCORE_STYLE.measure.spacing) {
+    if (!(ticks > 0) || !(ticksPerQuarter > 0)) return 1;
+    return Math.pow(slope, Math.log2(ticks / ticksPerQuarter));
+  }
+  function museScoreEventSpace(ticks, ticksPerQuarter, slope = MUSESCORE_STYLE.measure.spacing) {
+    return QUARTER_NOTE_SPACE * museScoreDurationStretch(ticks, ticksPerQuarter, slope);
+  }
+  function museScorePositions(gapTicks, ticksPerQuarter, slope = MUSESCORE_STYLE.measure.spacing) {
+    const positions = [];
+    let x2 = 0;
+    for (const gap of gapTicks) {
+      positions.push(x2);
+      x2 += museScoreEventSpace(gap, ticksPerQuarter, slope);
+    }
+    positions.push(x2);
+    return positions;
+  }
+
+  // src/musescore/overrides.ts
+  function applyDrumOverrides(base, overrides) {
+    const list = overrides?.drums;
+    if (list === void 0 || list.length === 0) return base;
+    const byPitch = new Map(base.map((d) => [d.pitch, d]));
+    for (const over of list) {
+      const existing = byPitch.get(over.pitch);
+      if (existing === void 0) {
+        if (over.line === void 0 || over.notehead === void 0) continue;
+        byPitch.set(over.pitch, {
+          pitch: over.pitch,
+          name: over.name ?? `Drum ${over.pitch}`,
+          notehead: over.notehead,
+          ...over.customNotehead === void 0 ? {} : { customNotehead: over.customNotehead },
+          line: over.line,
+          stemDirection: over.stemDirection ?? "up",
+          voice: over.voice ?? 0
+        });
+        continue;
+      }
+      byPitch.set(over.pitch, {
+        ...existing,
+        ...over.name === void 0 ? {} : { name: over.name },
+        ...over.notehead === void 0 ? {} : { notehead: over.notehead },
+        ...over.customNotehead === void 0 ? {} : { customNotehead: over.customNotehead },
+        ...over.line === void 0 ? {} : { line: over.line },
+        ...over.stemDirection === void 0 ? {} : { stemDirection: over.stemDirection },
+        ...over.voice === void 0 ? {} : { voice: over.voice }
+      });
+    }
+    return [...byPitch.values()].sort((a, b) => a.pitch - b.pitch);
+  }
+
+  // src/musescore/adapters.ts
+  var NOTEHEAD_GROUP_TO_SHAPE = {
+    HEAD_NORMAL: "normal",
+    HEAD_CROSS: "x",
+    HEAD_PLUS: "plus",
+    HEAD_XCIRCLE: "circle-x",
+    HEAD_TRIANGLE_UP: "triangle",
+    HEAD_TRIANGLE_DOWN: "inverted-triangle",
+    HEAD_SLASHED1: "slashed",
+    HEAD_SLASHED2: "back-slashed",
+    HEAD_DIAMOND: "diamond",
+    HEAD_CIRCLED: "circled",
+    HEAD_LARGE_ARROW: "arrow-up",
+    HEAD_SLASH: "slash",
+    HEAD_DO: "do",
+    HEAD_RE: "re",
+    HEAD_MI: "mi",
+    HEAD_FA: "fa",
+    HEAD_SOL: "so",
+    HEAD_LA: "la",
+    HEAD_TI: "ti"
+  };
+  function noteheadForDrum(drum) {
+    if (drum.customNotehead !== void 0) return drum.customNotehead;
+    const shape = NOTEHEAD_GROUP_TO_SHAPE[drum.notehead];
+    if (shape !== void 0) return shape;
+    return museScoreNoteheadGlyph(drum.notehead, "quarter") ?? "normal";
+  }
+  function drumMappingFromMuseScore(overrides, staffLines = 5) {
+    const mapping = {};
+    for (const drum of applyDrumOverrides(MUSESCORE_DRUMSET, overrides)) {
+      mapping[drum.pitch] = {
+        name: drum.name,
+        staffPosition: staffPositionFromLine(drum.line, staffLines),
+        noteheadShape: noteheadForDrum(drum),
+        stemDirection: drum.stemDirection
+      };
+    }
+    return mapping;
+  }
+  function drumVoicesFromMuseScore() {
+    const voices = {};
+    for (const drum of MUSESCORE_DRUMSET) voices[drum.pitch] = drum.voice;
+    return voices;
   }
 
   // src/index.ts

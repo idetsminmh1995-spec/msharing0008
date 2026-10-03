@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-508 exported symbols, by module.
+575 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -1009,6 +1009,123 @@ The diagnostics `level` lets through, in their original order.
 | interface | `SystemLayout` |  |
 | function | `computeSystemLayout` | §9.18's vertical stacking: every part's own staff (or staves, for a braced multi-staff part -- geometry's `needsBrace`) gets a distinct, non-overlapping Y, parts stacked top to bottom in score order. |
 | function | `computeSystemLayoutVariableGaps` | Phase 44 wiring: the same vertical stacking as `computeSystemLayout`, but the gap AFTER a given staff (before the next staff within the same part) is supplied per-pair by `staffGapForPair`, rather than one fixed value applied everywhere. |
+
+### `src/musescore/adapters.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `NOTEHEAD_GROUP_TO_SHAPE` | MuseScore's notehead groups, in this engine's own shape-family names. |
+| function | `noteheadForDrum` | The notehead this engine should draw for one MuseScore drum. |
+| function | `drumMappingFromMuseScore` | MuseScore's standard drumset, as `config.drums.mapping`. |
+| function | `drumVoicesFromMuseScore` | Which voice MuseScore puts each drum in, by MIDI pitch. |
+
+### `src/musescore/clefs.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `CLEF_TABLE_SOURCE` |  |
+| const | `STAFF_POSITION_SOURCE` |  |
+| const | `MUSICXML_CLEF_SOURCE` |  |
+| type | `MuseScoreStaffGroup` | Which kind of staff a clef belongs on -- MuseScore's own StaffGroup. |
+| interface | `MuseScoreClef` |  |
+| const | `MUSESCORE_CLEFS` | Every clef MuseScore knows, in its own enum order. |
+| function | `museScoreClef` | One clef by its MuseScore enumerator name, or undefined. |
+| function | `museScoreClefForMusicXml` | Which clef MuseScore picks for a MusicXML `<clef>`. |
+
+### `src/musescore/drumset.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `DRUMSET_SOURCE` |  |
+| const | `DRUM_NAME_SOURCE` |  |
+| type | `MuseScoreStemDirection` | MuseScore's `DirectionV`, for the two values a drumset ever uses. |
+| interface | `MuseScoreDrum` |  |
+| const | `MUSESCORE_DRUMSET` | The 61 instruments MuseScore's standard drumset defines, by MIDI pitch. |
+| function | `museScoreDrum` | One drum by MIDI pitch, or undefined where MuseScore defines none. |
+
+### `src/musescore/noteheads.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `NOTEHEAD_GROUP_SOURCE` |  |
+| const | `NOTEHEAD_ENUM_SOURCE` |  |
+| const | `MUSICXML_NOTEHEAD_SOURCE` |  |
+| type | `MuseScoreHeadType` | MuseScore's `NoteHeadType`: which of a group's four glyphs to take. |
+| interface | `MuseScoreNoteheadGroup` |  |
+| const | `MUSESCORE_NOTEHEAD_GROUPS` | Every notehead group a MusicXML file or a drumset can reach. |
+| function | `museScoreNoteheadGlyph` | The glyph MuseScore draws for one group, head type and stem. |
+| const | `MUSICXML_NOTEHEAD_TO_GROUP` | MusicXML's `<notehead>` values, as MuseScore reads them. |
+| function | `museScoreGroupForMusicXmlNotehead` | MuseScore's notehead group for a MusicXML `<notehead>` value, or undefined. |
+
+### `src/musescore/overrides.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `DrumOverride` | One drum's worth of difference from MuseScore's standard drumset. |
+| interface | `MuseScoreOverrides` |  |
+| function | `applyDrumOverrides` | MuseScore's drumset with a set of overrides folded in. |
+
+### `src/musescore/provenance.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `MUSESCORE_REVISION` | The exact MuseScore revision every table here was read from. |
+| interface | `MuseScoreSource` | Where one table (or one field of one) was read from. |
+| function | `blobUrl` | A link straight to the file this revision read, for a reviewer. |
+| type | `Confidence` | How confident this project is in a value. |
+
+### `src/musescore/spacing.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `SPACING_SOURCE` |  |
+| const | `QUARTER_NOTE_SPACE` | What a quarter note is worth, in staff spaces, before any stretch. |
+| function | `museScoreDurationStretch` | MuseScore's `durationStretchForTicks`: how much more (or less) room a note of `ticks` gets than a quarter note. |
+| function | `museScoreEventSpace` | The space, in staff spaces, MuseScore would give a note of `ticks` before its minimum-distance pass and before the system is justified. |
+| function | `museScorePositions` | Running x positions for a measure's attacks, MuseScore's way. |
+
+### `src/musescore/staff-position.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `ABS_STEP_SOURCE` |  |
+| const | `REL_STEP_SOURCE` |  |
+| function | `absStep` | MuseScore's `absStep`, in MusicXML's own terms. |
+| function | `museScoreLine` | MuseScore's `relStep`: which staff line a pitch lands on, counted from the TOP line downward in half spaces. |
+| function | `staffPositionFromLine` | A MuseScore line, in this engine's own y units. |
+| function | `lineFromStaffPosition` | The inverse, for reading this engine's own numbers back into MuseScore's. |
+| function | `museScoreStaffPosition` | Where MuseScore would put a pitch, in this engine's y units. |
+| function | `needsLedgerLines` | Whether a note at `line` needs ledger lines on a staff of `staffLines`. |
+| const | `LEDGER_LINE_SOURCE` |  |
+| function | `pitchedClefs` | Every clef in the table that positions notes by pitch (i.e. not TAB). |
+
+### `src/musescore/strings.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `STRING_DATA_SOURCE` |  |
+| const | `STRING_INDEX_SOURCE` |  |
+| const | `TUNING_PRESET_SOURCE` |  |
+| const | `TAB_STAFF_SOURCE` |  |
+| interface | `MuseScoreStringData` |  |
+| const | `MUSESCORE_STRING_DATA` | The fretted instruments this project plays: guitars, basses, ukuleles, mandolin and banjos. |
+| function | `museScoreStringData` | One instrument's string data by MuseScore instrument id. |
+| function | `stringIndexFromLowest` | MuseScore's own string index (0 = highest string, the tab staff's top line) for a string counted from the lowest, 1-based -- which is how this project's finger engines count. |
+| function | `writtenPitchFor` | The WRITTEN pitch of a sounding pitch on this instrument. |
+| function | `fretFor` | The fret a WRITTEN pitch lands on, on one string, or undefined where it does not reach -- MuseScore's own arithmetic, minus its capo and banjo-fifth-string special cases, which this project has no caller for yet and which are not guessed at here. |
+| interface | `MuseScoreTuningPreset` |  |
+| const | `MUSESCORE_GUITAR_TUNINGS` | MuseScore's named guitar tunings, as its own tuning dialog offers them. |
+| function | `museScoreTuningsForStrings` | Every preset for a given string count. |
+| interface | `MuseScoreStaffTypePreset` |  |
+| const | `MUSESCORE_STAFF_TYPES` | The staff presets this project draws for: the standard staff, the four percussion staves, and the tab staves it has instruments for. |
+
+### `src/musescore/style.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `STYLE_SOURCE` |  |
+| const | `BEAM_SPACING_SOURCE` |  |
+| const | `MUSESCORE_STYLE` | The defaults, grouped the way a renderer asks for them rather than the way MuseScore's own table is ordered. |
 
 ### `src/parser/midi/byte-reader.ts`
 
