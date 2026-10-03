@@ -428,7 +428,7 @@
   body.is-rendering #genNote{opacity:.38;}
 </style>
 <!-- The real Notation Engine bundle (github.com/idetsminmh1995-spec/msharing0008/notation-engine) -->
-<script src="../../assets/notation-engine.js?v=8f53f84c"></script>
+<script src="../../assets/notation-engine.js?v=6f33000b"></script>
 <!-- The Human Sticking Engine: Drum/sticking-engine-ts, a TypeScript port
      of Drum/sticking-engine (Python) that is parity-tested against it. It
      decides which limb plays every note; the R/L under the staff is its
@@ -1511,13 +1511,13 @@
 
   /**
    * The solved performance as a list of hits to light: when, and which
-   * R2 image. See `stickingImageCandidates` for how a stroke becomes a
+   * R2 image. See `photoForStroke` for how a stroke becomes a
    * filename.
    */
   let hitTimeline = [];
 
   /**
-   * The R2 filenames that could hold this stroke's photo, best first.
+   * The R2 filenames that could hold a photo of ONE drum, best first.
    *
    * R2 names hands and feet differently, and the difference is real
    * rather than an inconsistency. A HAND photo shows a stick coming in
@@ -1527,22 +1527,47 @@
    * so the kick and the hi-hat pedal are just `36.png`, `35.png`,
    * `44.png`.
    *
-   * The GM note number is NEVER swapped for another one. 35 and 36 are
-   * both "kick" to General MIDI, but they are two different kick
-   * photos in R2, and lighting 36 for a written 35 would be lighting
-   * the wrong drum. A stroke whose own number has no photo stays dark
-   * and gets reported, which is the honest answer.
-   *
    * The opposite naming is kept as a last resort -- same note number,
    * only the side prefix differs -- so a kit that named one file the
    * other way still lights instead of going dark.
    */
-  function stickingImageCandidates(limb, midiNote) {
+  function drumImageNames(limb, midiNote) {
     const side = limb === 'RH' || limb === 'RF' ? 'R' : 'L';
     const isFoot = limb === 'RF' || limb === 'LF';
     return isFoot
       ? [`${midiNote}.png`, `${side}${midiNote}.png`]
       : [`${side}${midiNote}.png`, `${midiNote}.png`];
+  }
+
+  /**
+   * The photo to light for one stroke, and which drum it is really of.
+   *
+   * Kits are not the same instrument as each other. A chart written on
+   * five toms, played on a kit photographed with two, used to leave
+   * three of them dark for the whole video -- the music played, the
+   * notation moved, and the picture did not answer, which reads as
+   * broken rather than as missing.
+   *
+   * So the WRITTEN drum is tried first, every naming of it, and only
+   * when this kit genuinely has no photograph of it does the engine's
+   * `drumChoiceOrder` offer the ones a player would reach for instead:
+   * the nearer tom, the one kick the kit has, the ride for its own
+   * bell. Never across families -- a tom fill lighting the ride would
+   * be worse than nothing, because a viewer would believe it.
+   *
+   * Returns `{ file, note }`, where `note` is the drum actually lit, so
+   * a caller can say when it was not the one written.
+   */
+  function photoForStroke(limb, midiNote) {
+    const order =
+      typeof NotationEngine !== 'undefined' && NotationEngine.drumChoiceOrder
+        ? NotationEngine.drumChoiceOrder(midiNote)
+        : [midiNote];
+    for (const note of order) {
+      const file = drumImageNames(limb, note).find((name) => currentKit.files.has(name));
+      if (file !== undefined) return { file, note };
+    }
+    return null;
   }
 
   function hitImageUrl(fileName) {
@@ -1632,37 +1657,46 @@
 
     let missing = 0;
     const missingNotes = new Set();
+    /** written drum -> the one standing in for it, for the status line. */
+    const standIns = new Map();
     for (const ev of performance.events) {
       const source = notes[sourceIndex(ev.sourceId)];
       if (source === undefined) continue;
-      const file = stickingImageCandidates(ev.limb, source.note).find((name) =>
-        currentKit.files.has(name),
-      );
-      if (file === undefined) {
+      const photo = photoForStroke(ev.limb, source.note);
+      if (photo === null) {
         missing++;
         missingNotes.add(`${ev.limb} ${ev.instrument} (${source.note})`);
         continue;
       }
-      hitTimeline.push({ time: ev.timeSeconds, file, limb: ev.limb });
+      if (photo.note !== source.note) standIns.set(source.note, photo.note);
+      hitTimeline.push({ time: ev.timeSeconds, file: photo.file, limb: ev.limb });
     }
     hitTimeline.sort((a, b) => a.time - b.time);
     preloadHitImages();
 
     const issues = performance.validation.issues.length;
+    const standInList = [...standIns].map(([wrote, lit]) => `${wrote}\u2192${lit}`).join(', ');
     stickingStatus(
       currentKit.path === null
         ? `${performance.events.length} strokes solved; no drum kit loaded yet to light them.`
         : `${hitTimeline.length} of ${performance.events.length} strokes have a photo in "${currentKit.label}"` +
           (missing > 0 ? ` -- no image for ${[...missingNotes].join(', ')}.` : '.') +
+          (standIns.size > 0
+            ? ` This kit has no ${standIns.size === 1 ? 'photo' : 'photos'} for ${standInList}, so the nearest drum it does have is lit instead.`
+            : '') +
           (issues > 0 ? ` ${issues} physical issue(s).` : ''),
     );
     if (missing > 0) {
       console.log(
-        'Sticking: no R2 image for these strokes. Hands are named ' +
-          'R38.png / L38.png, feet 36.png / 35.png / 44.png, and the note ' +
-          'number is never substituted -- 35 and 36 are two different kicks:',
+        'Sticking: no R2 image for these strokes, and no near enough drum to ' +
+          'stand in. Hands are named R38.png / L38.png, feet 36.png / 35.png / 44.png:',
         [...missingNotes],
       );
+    }
+    if (standIns.size > 0) {
+      console.log('Sticking: drums this kit does not have, and what was lit for them:', [
+        ...standIns,
+      ]);
     }
     if (issues > 0) console.log('Sticking Engine validation:', performance.validation.issues);
   }

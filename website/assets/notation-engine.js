@@ -112,7 +112,10 @@ var NotationEngine = (() => {
     denominatorText: () => denominatorText,
     diagnostic: () => diagnostic,
     diatonicIndex: () => diatonicIndex,
+    drumChoiceOrder: () => drumChoiceOrder,
     drumDiagnostic: () => drumDiagnostic,
+    drumStandIns: () => drumStandIns,
+    drumToLight: () => drumToLight,
     duration: () => duration,
     durationDefaultNotehead: () => durationDefaultNotehead,
     durationTypeAndDotsFromTicks: () => durationTypeAndDotsFromTicks,
@@ -64616,6 +64619,57 @@ ${denominator}`;
       };
     }
     return merged;
+  }
+
+  // src/drums/stand-ins.ts
+  var STAND_INS = {
+    // Kick. One kit, one kick pedal -- whichever of the two numbers it
+    // was photographed under.
+    35: [36],
+    36: [35],
+    // Snare. A side stick is played ON the snare, so the snare is the
+    // right thing to light when the kit has no rim-click photograph of
+    // its own; the picture shows a plain hit, which is the one liberty
+    // taken here.
+    37: [38, 40],
+    38: [40],
+    40: [38],
+    // Toms, low to high: 41 low floor, 43 high floor, 45 low, 47 low-mid,
+    // 48 hi-mid, 50 high.
+    41: [43, 45, 47, 48, 50],
+    43: [41, 45, 47, 48, 50],
+    45: [47, 43, 48, 41, 50],
+    47: [48, 45, 50, 43, 41],
+    48: [47, 50, 45, 43, 41],
+    50: [48, 47, 45, 43, 41],
+    // Hi-hat: one pair of cymbals, three ways of striking it.
+    42: [46, 44],
+    44: [42, 46],
+    46: [42, 44],
+    // Rides. The bell is a part of the ride, so a kit with no bell shot
+    // lights the ride itself.
+    51: [59, 53],
+    53: [51, 59],
+    59: [51, 53],
+    // Crashes. A splash and a china are their own sounds, but they are
+    // crash-shaped gestures and a kit without them is better lighting a
+    // crash than nothing.
+    49: [57, 55, 52],
+    52: [57, 49],
+    55: [49, 57],
+    57: [49, 55, 52]
+  };
+  function drumStandIns(midiNote) {
+    return STAND_INS[midiNote] ?? [];
+  }
+  function drumChoiceOrder(midiNote) {
+    return [midiNote, ...drumStandIns(midiNote)];
+  }
+  function drumToLight(midiNote, available) {
+    for (const candidate of drumChoiceOrder(midiNote)) {
+      if (available.has(candidate)) return candidate;
+    }
+    return void 0;
   }
 
   // src/playback/event-stream.ts

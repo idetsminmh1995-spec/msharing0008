@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-584 exported symbols, by module.
+587 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -570,6 +570,14 @@ The diagnostics `level` lets through, in their original order.
 | interface | `LookupDrumMapEntryResult` |  |
 | function | `lookupDrumMapEntry` | §13.3: looks up a GM MIDI note number in the given table (typically `DEFAULT_DRUM_MAPPING_TABLE` merged with `config.drums.mapping` overrides). |
 | function | `mergeDrumMappingTable` | §13.3: "every field is overridable via config.drums.mapping." Merges `config.drums.mapping` overrides onto `DEFAULT_DRUM_MAPPING_TABLE`, entry by entry and field by field -- a partial override for a GM note already in the default table only replaces the fields it names, keeping the default's own ... |
+
+### `src/drums/stand-ins.ts`
+
+| | Name | Summary |
+|---|---|---|
+| function | `drumStandIns` | The drums that may stand in for `midiNote`, nearest first. |
+| function | `drumChoiceOrder` | The written drum, then every stand-in: the whole order to try. |
+| function | `drumToLight` | The drum from `available` that should be lit for a written `midiNote`, or undefined when the kit has nothing near enough. |
 
 ### `src/export/pdf.ts`
 
