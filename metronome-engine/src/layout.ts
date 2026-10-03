@@ -70,7 +70,7 @@ export function bands(canvas: Canvas): { header: Rect; stage: Rect } {
   // here any more.
   const headerHeight =
     canvas.isPortrait || canvas.isSquare
-      ? Math.max(size.title + size.subtitle * 1.6, mark + pad)
+      ? Math.max(size.title + size.subtitle * 1.6, mark + pad * 0.35)
       : Math.max(size.title + size.subtitle * 1.5, mark);
   const header: Rect = {
     x: pad,
@@ -78,23 +78,27 @@ export function bands(canvas: Canvas): { header: Rect; stage: Rect } {
     width: canvas.width - pad * 2,
     height: headerHeight,
   };
-  const stageTop = header.y + header.height;
   // What the readout keeps for itself, and the design must not draw
-  // into: a column down each side in landscape, a row along the bottom
-  // in the two narrow shapes. Reserved from the CANVAS alone, with no
-  // reference to the frame's own numbers, because every design asks
-  // for its stage before anything knows what the tempo is -- the
-  // readout's type is sized to fit this room rather than the other way
-  // round.
+  // into: a column down each side in landscape, a row straight under
+  // the title in the two narrow shapes. Reserved from the CANVAS
+  // alone, with no reference to the frame's own numbers, because every
+  // design asks for its stage before anything knows what the tempo is
+  // -- the readout's type is sized to fit this room rather than the
+  // other way round.
+  //
+  // Under the title, and not along the bottom, because that is where
+  // the owner drew it: on a phone the eye goes top-down, and a tempo
+  // parked at the foot of a 9x16 frame is the last thing read rather
+  // than the second.
   const sideways = statRow(canvas) ? 0 : statColumnWidth(canvas) + pad * 0.5;
-  const below = statRow(canvas) ? statRowHeight(canvas) : 0;
+  const stageTop = header.y + header.height + (statRow(canvas) ? statRowHeight(canvas) : 0);
   return {
     header,
     stage: {
       x: pad + sideways,
       y: stageTop,
       width: canvas.width - (pad + sideways) * 2,
-      height: canvas.height - stageTop - pad - below,
+      height: canvas.height - stageTop - pad,
     },
   };
 }
@@ -117,9 +121,9 @@ export function statColumnWidth(canvas: Canvas): number {
   return canvas.width * 0.225 - gutter(canvas);
 }
 
-/** How tall the bottom stat row is, in the two narrow shapes. */
+/** How tall the stat row under the title is, in the two narrow shapes. */
 export function statRowHeight(canvas: Canvas): number {
-  return canvas.short * 0.2;
+  return canvas.short * 0.25;
 }
 
 /** The type stack, scaled off the short side so it reads the same in all three shapes. */
@@ -163,7 +167,7 @@ export function advanceWidth(value: string, fontSize: number): number {
  * reserves room for the mark, so a size the two disagreed about would
  * put a design's drawing under the logo.
  */
-export const LOGO_FRACTION = 0.2;
+export const LOGO_FRACTION = 0.16;
 
 /** Where the mark goes. Top-left, always -- see `logo`. */
 export function logoBox(canvas: Canvas): Rect {
@@ -210,14 +214,14 @@ export function tempoStats(context: DesignContext): string {
   // look like a mistake.
   const widest = Math.max(advanceWidth(bpm, 1), advanceWidth('BPM', 1), advanceWidth(metre, 1));
   const room = row ? (canvas.width - pad * 2) / 2 - pad : statColumnWidth(canvas);
-  const size = Math.min(canvas.short * (row ? 0.092 : 0.17), room / widest);
+  const size = Math.min(canvas.short * (row ? 0.1 : 0.17), room / widest);
 
   // Where the two blocks sit. In landscape they flank the stage, level
-  // with its middle; in the narrow shapes they share the row along the
-  // bottom, one to each half.
-  const leftCx = row ? pad + (canvas.width - pad * 2) / 4 : pad + statColumnWidth(canvas) / 2;
+  // with its middle; in the narrow shapes they share the row between
+  // the title and the stage, one to each quarter of the width.
+  const leftCx = row ? canvas.width * 0.25 : pad + statColumnWidth(canvas) / 2;
   const rightCx = canvas.width - leftCx;
-  const middle = row ? canvas.height - pad - statRowHeight(canvas) / 2 : stage.y + stage.height / 2;
+  const middle = row ? stage.y - statRowHeight(canvas) / 2 : stage.y + stage.height / 2;
 
   // The tempo is two lines and the metre is one, so they cannot share a
   // baseline: the pair is centred on `middle` as a block, and the metre

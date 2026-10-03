@@ -82,9 +82,12 @@ channel's worth of videos should not move them around:
   nobody can read.
 
   It is `tempoStats`, drawn by the renderer for every design, and it
-  keeps its own room: a column down each side in landscape, a row along
-  the bottom in the two narrow shapes, reserved out of `bands` so no
-  design can draw into it. Its type is fitted to that room rather than
+  keeps its own room: a column down each side in landscape, a row
+  directly under the title in the two narrow shapes, reserved out of
+  `bands` so no design can draw into it. Under the title, and not along
+  the bottom, because on a phone the eye goes top-down and a tempo
+  parked at the foot of a 9x16 frame is the last thing read rather than
+  the second. Its type is fitted to that room rather than
   the room to the type, so a three-figure tempo and a 12/8 bar change
   nothing about where anything sits.
 
@@ -100,8 +103,8 @@ thing to keep in step.
 | aspect | canvas | what changes |
 |---|---|---|
 | `16x9` | 1920×1080 | Title left; the readout flanks the stage, a column each side; wide designs run horizontally. |
-| `9x16` | 1080×1920 | Title centred and shallow; the readout is a row along the bottom; the stage takes far more of the frame, and horizontal runs become vertical ones. |
-| `1x1` | 1080×1080 | Centred stack, readout along the bottom; rows become arcs and loops. |
+| `9x16` | 1080×1920 | Title centred and shallow; the readout is a row under it; the stage takes far more of the frame, and horizontal runs become vertical ones. |
+| `1x1` | 1080×1080 | Centred stack, readout under the title; rows become arcs and loops. |
 
 ## Build
 

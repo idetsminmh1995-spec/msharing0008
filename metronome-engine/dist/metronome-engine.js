@@ -139,23 +139,22 @@ var MetronomeDesigns = (() => {
     const pad = gutter(canvas);
     const size = typeScale(canvas);
     const mark = logoBox(canvas).height;
-    const headerHeight = canvas.isPortrait || canvas.isSquare ? Math.max(size.title + size.subtitle * 1.6, mark + pad) : Math.max(size.title + size.subtitle * 1.5, mark);
+    const headerHeight = canvas.isPortrait || canvas.isSquare ? Math.max(size.title + size.subtitle * 1.6, mark + pad * 0.35) : Math.max(size.title + size.subtitle * 1.5, mark);
     const header2 = {
       x: pad,
       y: pad,
       width: canvas.width - pad * 2,
       height: headerHeight
     };
-    const stageTop = header2.y + header2.height;
     const sideways = statRow(canvas) ? 0 : statColumnWidth(canvas) + pad * 0.5;
-    const below = statRow(canvas) ? statRowHeight(canvas) : 0;
+    const stageTop = header2.y + header2.height + (statRow(canvas) ? statRowHeight(canvas) : 0);
     return {
       header: header2,
       stage: {
         x: pad + sideways,
         y: stageTop,
         width: canvas.width - (pad + sideways) * 2,
-        height: canvas.height - stageTop - pad - below
+        height: canvas.height - stageTop - pad
       }
     };
   }
@@ -166,7 +165,7 @@ var MetronomeDesigns = (() => {
     return canvas.width * 0.225 - gutter(canvas);
   }
   function statRowHeight(canvas) {
-    return canvas.short * 0.2;
+    return canvas.short * 0.25;
   }
   function typeScale(canvas) {
     const unit = canvas.short / 1080;
@@ -190,7 +189,7 @@ var MetronomeDesigns = (() => {
     }
     return units * fontSize;
   }
-  var LOGO_FRACTION = 0.2;
+  var LOGO_FRACTION = 0.16;
   function logoBox(canvas) {
     const size = canvas.short * LOGO_FRACTION;
     const pad = gutter(canvas);
@@ -209,10 +208,10 @@ var MetronomeDesigns = (() => {
     const row = statRow(canvas);
     const widest = Math.max(advanceWidth(bpm, 1), advanceWidth("BPM", 1), advanceWidth(metre, 1));
     const room = row ? (canvas.width - pad * 2) / 2 - pad : statColumnWidth(canvas);
-    const size = Math.min(canvas.short * (row ? 0.092 : 0.17), room / widest);
-    const leftCx = row ? pad + (canvas.width - pad * 2) / 4 : pad + statColumnWidth(canvas) / 2;
+    const size = Math.min(canvas.short * (row ? 0.1 : 0.17), room / widest);
+    const leftCx = row ? canvas.width * 0.25 : pad + statColumnWidth(canvas) / 2;
     const rightCx = canvas.width - leftCx;
-    const middle = row ? canvas.height - pad - statRowHeight(canvas) / 2 : stage.y + stage.height / 2;
+    const middle = row ? stage.y - statRowHeight(canvas) / 2 : stage.y + stage.height / 2;
     const valueBaseline = middle - size * 0.19;
     const labelBaseline = middle + size * 0.88;
     const metreBaseline = middle + size * 0.36;
@@ -431,7 +430,8 @@ var MetronomeDesigns = (() => {
       const roomHigh = stage.y + stage.height - top;
       const roomWide = stage.width * (usesBar ? 1 : 0.75);
       const overhang = 1.22;
-      const caseHeight = Math.min(roomHigh / overhang * 0.97, roomWide * 1.5);
+      const caseCap = usesBar ? canvas.short * 0.5 : Infinity;
+      const caseHeight = Math.min(roomHigh / overhang * 0.97, roomWide * 1.5, caseCap);
       const box = {
         cx,
         top: top + (roomHigh - caseHeight * overhang) / 2 + caseHeight * 0.085,
@@ -488,63 +488,101 @@ var MetronomeDesigns = (() => {
   };
 
   // src/designs/02-beat-dots.ts
+  var RING = {
+    outer: 1,
+    coarseTicksOuter: 0.96,
+    coarseTicksInner: 0.8,
+    middle: 0.73,
+    fineTicksOuter: 0.69,
+    fineTicksInner: 0.6,
+    innerOuter: 0.57,
+    inner: 0.51,
+    /** The count's type size. */
+    numeral: 0.65
+  };
+  var DOTS = {
+    radius: 0.176,
+    spacing: 0.578,
+    /** How far below the medallion's centre the row sits. */
+    drop: 1.67
+  };
+  function tickRing(cx, cy, radius, count, from, to) {
+    const parts = [];
+    for (let i = 0; i < count; i++) {
+      const turns = i / count;
+      const [x1, y1] = polar(cx, cy, radius * from, turns);
+      const [x2, y2] = polar(cx, cy, radius * to, turns);
+      parts.push(`M ${n(x1)} ${n(y1)} L ${n(x2)} ${n(y2)}`);
+    }
+    return parts.join(" ");
+  }
+  function medallion(cx, cy, radius, canvas, palette) {
+    const hairline = Math.max(canvas.short * 22e-4, radius * 0.018);
+    const ring = (r, width, opacity) => circle(cx, cy, radius * r, {
+      fill: "none",
+      stroke: palette.inkSoft,
+      "stroke-width": width,
+      opacity
+    });
+    return group(
+      {},
+      ring(RING.outer, hairline, 0.9) + path(tickRing(cx, cy, radius, 84, RING.coarseTicksInner, RING.coarseTicksOuter), {
+        stroke: palette.inkSoft,
+        "stroke-width": hairline * 0.7,
+        opacity: 0.75,
+        fill: "none"
+      }) + ring(RING.middle, hairline * 0.8, 0.8) + path(tickRing(cx, cy, radius, 120, RING.fineTicksInner, RING.fineTicksOuter), {
+        stroke: palette.inkSoft,
+        "stroke-width": hairline * 0.55,
+        opacity: 0.55,
+        fill: "none"
+      }) + ring(RING.innerOuter, hairline * 0.9, 0.85) + ring(RING.inner, hairline * 0.7, 0.65)
+    );
+  }
   var beatDots = {
     id: "beat-dots",
     name: "Beat Dots",
-    description: "One dot per beat, the current one lit \u2014 a row, a column or an arc.",
+    description: "A machined medallion with the count inside it, and one dot per beat below.",
     look: "Black & red",
     draw(context) {
       const { canvas, palette, frame } = context;
       const { stage } = bands(canvas);
-      const [cx, cy] = centreOf(stage);
-      const size = typeScale(canvas);
       const count = Math.max(1, frame.beatsPerBar);
-      const settle = easeOut(Math.min(1, frame.phase * 3));
-      const litScale = lerp(1.9, 1.45, settle);
-      const dots = [];
-      const radius = Math.min(
-        canvas.short * 0.055,
-        (canvas.isPortrait ? stage.height : stage.width) / (count * 3.4)
+      const groupHeight = 1 + DOTS.drop + DOTS.radius;
+      const radius = Math.min(canvas.short * 0.27, stage.width * 0.42, stage.height / groupHeight);
+      const cx = stage.x + stage.width / 2;
+      const cy = stage.y + (stage.height - radius * groupHeight) / 2 + radius;
+      const ping = 1 - easeOut(Math.min(1, frame.phase * 1.6));
+      const pulse = ping <= 0.02 ? "" : circle(cx, cy, radius * lerp(1, 1.14, 1 - ping), {
+        fill: "none",
+        stroke: palette.accent,
+        "stroke-width": Math.max(canvas.short * 2e-3, radius * 0.016),
+        opacity: ping * 0.55
+      });
+      const numeral = text(String(frame.beat), cx, cy + radius * RING.numeral * 0.35, {
+        fill: palette.accent,
+        "font-family": FONT_DISPLAY,
+        "font-size": radius * RING.numeral,
+        "font-weight": 800,
+        "text-anchor": "middle"
+      });
+      const dotRadius = radius * DOTS.radius;
+      const spacing = Math.min(
+        radius * DOTS.spacing,
+        count > 1 ? (stage.width * 0.92 - dotRadius * 2) / (count - 1) : radius * DOTS.spacing
       );
-      const gap = radius * 3.2;
+      const dotY = cy + radius * DOTS.drop;
+      const swell = lerp(1.45, 1, easeOut(Math.min(1, frame.phase * 2.6)));
+      const dots = [];
       for (let i = 0; i < count; i++) {
-        const isLit = i === frame.beat - 1;
-        const offset = (i - (count - 1) / 2) * gap;
-        let x = cx;
-        let y = cy;
-        if (canvas.isSquare) {
-          const spread = Math.min(0.3, count * 0.07);
-          const turns = 0.5 + (count === 1 ? 0 : (i / (count - 1) - 0.5) * -spread);
-          [x, y] = polar(cx, cy - stage.height * 0.34, stage.height * 0.55, turns);
-        } else if (canvas.isPortrait) {
-          y = cy + offset;
-        } else {
-          x = cx + offset;
-        }
+        const isCurrent = i === frame.beat - 1;
         dots.push(
-          circle(x, y, radius * (isLit ? litScale : 1), {
-            fill: isLit ? palette.accent : "none",
-            stroke: isLit ? "none" : palette.inkSoft,
-            "stroke-width": radius * 0.22,
-            opacity: isLit ? 1 : 0.5
+          circle(cx + (i - (count - 1) / 2) * spacing, dotY, dotRadius * (isCurrent ? swell : 1), {
+            fill: palette.ink
           })
         );
       }
-      const number = canvas.isSquare ? text(String(frame.beat), cx, cy - stage.height * 0.06, {
-        fill: palette.ink,
-        "font-family": FONT_DISPLAY,
-        "font-size": size.readout * 1.3,
-        "font-weight": 800,
-        "text-anchor": "middle"
-      }) : text(String(frame.beat), cx, cy + size.huge * 0.33, {
-        fill: palette.ink,
-        "font-family": FONT_DISPLAY,
-        "font-size": size.huge * 0.42,
-        "font-weight": 800,
-        "text-anchor": "middle",
-        opacity: 0.12
-      });
-      return number + group({}, dots.join("")) + logo(context);
+      return medallion(cx, cy, radius, canvas, palette) + pulse + numeral + group({}, dots.join("")) + logo(context);
     }
   };
 
@@ -1209,8 +1247,8 @@ var MetronomeDesigns = (() => {
   var PALETTES = {
     // Near-black and a neon red: the instrument lit on a dark stage.
     pendulum: dark("#070506", "#E4141F", "#2A0A0D"),
-    // The house black-and-red.
-    "beat-dots": dark("#17110E", BRAND_RED, "#5A1218"),
+    // The charcoal the owner drew the medallion on, and the house red.
+    "beat-dots": dark("#1C1C1C", "#E90006", "#5A1218"),
     // Night blue: rings on water.
     "pulse-ring": dark("#0E1628", "#4EA8DE", "#14283F"),
     // Paper, for the one design you read like a chart.

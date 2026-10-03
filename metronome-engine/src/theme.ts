@@ -62,8 +62,8 @@ function light(background: string, ink: string, accent: string, accentSoft: stri
 const PALETTES: Readonly<Record<string, Palette>> = {
   // Near-black and a neon red: the instrument lit on a dark stage.
   pendulum: dark('#070506', '#E4141F', '#2A0A0D'),
-  // The house black-and-red.
-  'beat-dots': dark('#17110E', BRAND_RED, '#5A1218'),
+  // The charcoal the owner drew the medallion on, and the house red.
+  'beat-dots': dark('#1C1C1C', '#E90006', '#5A1218'),
   // Night blue: rings on water.
   'pulse-ring': dark('#0E1628', '#4EA8DE', '#14283F'),
   // Paper, for the one design you read like a chart.

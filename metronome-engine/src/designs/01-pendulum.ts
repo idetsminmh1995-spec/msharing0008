@@ -241,7 +241,12 @@ export const pendulum: Design = {
     // the glow it throws below -- so the fit is measured on the WHOLE
     // of it, or the base lands on the bar along the bottom.
     const overhang = 1.22;
-    const caseHeight = Math.min((roomHigh / overhang) * 0.97, roomWide * 1.5);
+    // The narrow shapes also cap it. A 9x16 stage is tall enough to
+    // make the case nine tenths of the frame's short side, which is not
+    // an instrument on a stage any more -- it is an instrument wearing
+    // the frame. Half the short side is what the owner drew.
+    const caseCap = usesBar ? canvas.short * 0.5 : Infinity;
+    const caseHeight = Math.min((roomHigh / overhang) * 0.97, roomWide * 1.5, caseCap);
     const box: Case = {
       cx,
       top: top + (roomHigh - caseHeight * overhang) / 2 + caseHeight * 0.085,

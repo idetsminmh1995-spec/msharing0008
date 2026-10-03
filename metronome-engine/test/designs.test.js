@@ -237,10 +237,12 @@ test('the readout keeps its own room, and no design draws into it', () => {
     const canvas = M.canvasFor(aspect);
     const { stage } = M.bands(canvas);
     if (canvas.isPortrait || canvas.isSquare) {
+      const { header } = M.bands(canvas);
       assert.ok(
-        stage.y + stage.height <= canvas.height - M.statRowHeight(canvas),
-        `${aspect}: the stage runs into the stat row along the bottom`,
+        stage.y >= header.y + header.height + M.statRowHeight(canvas) - 0.5,
+        `${aspect}: the stage starts inside the stat row under the title`,
       );
+      assert.ok(stage.height > canvas.height * 0.3, `${aspect}: the stage has almost no room left`);
     } else {
       assert.ok(
         stage.x >= M.statColumnWidth(canvas),
@@ -251,5 +253,77 @@ test('the readout keeps its own room, and no design draws into it', () => {
         `${aspect}: the stage runs into the right stat column`,
       );
     }
+  }
+});
+
+test('Beat Dots draws the medallion, the count inside it, and one dot per beat', () => {
+  // The owner drew this one: a machined ring with the count in red
+  // standing in its middle, and a row of white dots underneath, one
+  // per beat of the bar. All three have to be there, and the dot count
+  // has to follow the metre rather than being four forever.
+  for (const aspect of RATIOS) {
+    for (const beatsPerBar of [2, 4, 7]) {
+      const svg = M.renderMetronomeFrame({
+        design: 'beat-dots',
+        aspect,
+        frame: frame({ beatsPerBar, beat: 2, bpm: 96 }),
+      });
+      const where = `beat-dots/${aspect}/${beatsPerBar}`;
+      const palette = M.listDesigns().find((d) => d.id === 'beat-dots').palette;
+
+      // The count, in the medallion's own red.
+      assert.match(svg, new RegExp(`fill="${palette.accent}"[^>]*>2<`), `${where}: no count`);
+
+      // One dot per beat, every one of them the same ink.
+      const dots = [...svg.matchAll(new RegExp(`<circle[^>]*fill="${palette.ink}"`, 'g'))];
+      assert.equal(dots.length, beatsPerBar, `${where}: wrong number of dots`);
+
+      // And the rings: five concentric circles plus the two tick bands,
+      // which are paths of many subpaths rather than many elements.
+      const rings = [...svg.matchAll(/<circle[^>]*fill="none"/g)];
+      assert.ok(rings.length >= 5, `${where}: the medallion lost its rings`);
+      const tickBands = [...svg.matchAll(/<path d="M [^"]*L [^"]*"/g)];
+      assert.ok(tickBands.length >= 2, `${where}: the medallion lost its hatching`);
+    }
+  }
+});
+
+test('Beat Dots settles to its drawn shape between beats', () => {
+  // The drawing it came from is a still: four equal dots and no ping.
+  // Right after a beat the current dot is swollen and a ring is on its
+  // way out; by the time the next beat is near, the frame is the still
+  // again. A design that never settled would never look like what was
+  // drawn.
+  const at = (phase) =>
+    M.renderMetronomeFrame({
+      design: 'beat-dots',
+      aspect: '16x9',
+      frame: frame({ beat: 2, beatsPerBar: 4, phase }),
+    });
+  const radii = (svg) =>
+    [...svg.matchAll(/<circle[^>]*r="([\d.]+)"[^>]*fill="#FFFFFF"/g)].map((m) => Number(m[1]));
+
+  const onTheBeat = radii(at(0));
+  const between = radii(at(0.9));
+  assert.equal(onTheBeat.length, 4);
+  assert.equal(new Set(between.map((r) => r.toFixed(3))).size, 1, 'the dots should be equal again');
+  assert.ok(Math.max(...onTheBeat) > Math.max(...between), 'the beat should swell its own dot');
+  // The ping ring is drawn on the beat and gone well before the next.
+  assert.ok(at(0).length > at(0.9).length, 'the ping should have faded out');
+});
+
+test('the readout sits under the title in the narrow shapes, not along the bottom', () => {
+  // The owner drew 9x16 and 1x1 with the tempo directly under the
+  // title and the instrument below it: on a phone the eye goes
+  // top-down, and a tempo parked at the foot of the frame is the last
+  // thing read rather than the second.
+  for (const aspect of ['9x16', '1x1']) {
+    const canvas = M.canvasFor(aspect);
+    const { header, stage } = M.bands(canvas);
+    const svg = M.renderMetronomeFrame({ design: 'pendulum', aspect, frame: frame() });
+    const bpmY = Number(/<text[^>]*y="([\d.]+)"[^>]*>BPM</.exec(svg)[1]);
+    assert.ok(bpmY > header.y + header.height, `${aspect}: the readout is inside the title band`);
+    assert.ok(bpmY < stage.y, `${aspect}: the readout is inside the stage`);
+    assert.ok(stage.y + stage.height > canvas.height * 0.9, `${aspect}: the stage stops short`);
   }
 });
