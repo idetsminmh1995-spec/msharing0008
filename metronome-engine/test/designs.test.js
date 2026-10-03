@@ -274,9 +274,12 @@ test('Beat Dots draws the medallion, the count inside it, and one dot per beat',
       // The count, in the medallion's own red.
       assert.match(svg, new RegExp(`fill="${palette.accent}"[^>]*>2<`), `${where}: no count`);
 
-      // One dot per beat, every one of them the same ink.
-      const dots = [...svg.matchAll(new RegExp(`<circle[^>]*fill="${palette.ink}"`, 'g'))];
-      assert.equal(dots.length, beatsPerBar, `${where}: wrong number of dots`);
+      // One dot per beat: the one whose turn it is in the count's own
+      // red, the rest white.
+      const waiting = [...svg.matchAll(new RegExp(`<circle[^>]*fill="${palette.ink}"`, 'g'))];
+      const current = [...svg.matchAll(new RegExp(`<circle[^>]*fill="${palette.accent}"`, 'g'))];
+      assert.equal(waiting.length, beatsPerBar - 1, `${where}: wrong number of waiting dots`);
+      assert.equal(current.length, 1, `${where}: the beat's own dot is not lit`);
 
       // And the rings: five concentric circles plus the two tick bands,
       // which are paths of many subpaths rather than many elements.
@@ -300,14 +303,19 @@ test('Beat Dots settles to its drawn shape between beats', () => {
       aspect: '16x9',
       frame: frame({ beat: 2, beatsPerBar: 4, phase }),
     });
-  const radii = (svg) =>
+  const litRadius = (svg) =>
+    Number(/<circle[^>]*r="([\d.]+)"[^>]*fill="#E90006"/.exec(svg)[1]);
+  const waitingRadii = (svg) =>
     [...svg.matchAll(/<circle[^>]*r="([\d.]+)"[^>]*fill="#FFFFFF"/g)].map((m) => Number(m[1]));
 
-  const onTheBeat = radii(at(0));
-  const between = radii(at(0.9));
-  assert.equal(onTheBeat.length, 4);
-  assert.equal(new Set(between.map((r) => r.toFixed(3))).size, 1, 'the dots should be equal again');
-  assert.ok(Math.max(...onTheBeat) > Math.max(...between), 'the beat should swell its own dot');
+  const resting = waitingRadii(at(0.9));
+  assert.equal(resting.length, 3, 'three dots are waiting their turn');
+  assert.equal(new Set(resting.map((r) => r.toFixed(3))).size, 1, 'and are all one size');
+  assert.ok(litRadius(at(0)) > litRadius(at(0.9)), 'the beat should swell its own dot');
+  assert.ok(
+    Math.abs(litRadius(at(0.9)) - resting[0]) < 0.001,
+    'and settle back to the size of the others',
+  );
   // The ping ring is drawn on the beat and gone well before the next.
   assert.ok(at(0).length > at(0.9).length, 'the ping should have faded out');
 });

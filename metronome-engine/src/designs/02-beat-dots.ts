@@ -15,10 +15,15 @@
  * because a video paints this thirty times a second and the difference
  * is a hundred and fifty elements a frame.
  *
- * What moves: the number, the dot under it, and a ring that pings
- * outward from the medallion's edge and is gone by the next beat. The
- * drawing it came from is a still, so between beats this looks exactly
- * like that still -- which is the point.
+ * What moves: the number, the dot whose turn it is, and a ring that
+ * pings outward from the medallion's edge and is gone by the next beat.
+ *
+ * The drawing shows every dot white, because a drawing has no moment in
+ * it. On a running metronome the dot whose beat has arrived turns the
+ * same red as the count above it and swells, then settles back to the
+ * size of the others -- so the row reads as a bar being counted through
+ * rather than as four lamps that are always on. The owner asked for
+ * exactly that after seeing the still version play.
  */
 
 import { bands, FONT_DISPLAY, logo } from '../layout.js';
@@ -173,7 +178,7 @@ export const beatDots: Design = {
       const isCurrent = i === frame.beat - 1;
       dots.push(
         circle(cx + (i - (count - 1) / 2) * spacing, dotY, dotRadius * (isCurrent ? swell : 1), {
-          fill: palette.ink,
+          fill: isCurrent ? palette.accent : palette.ink,
         }),
       );
     }

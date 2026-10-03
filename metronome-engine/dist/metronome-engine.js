@@ -578,7 +578,7 @@ var MetronomeDesigns = (() => {
         const isCurrent = i === frame.beat - 1;
         dots.push(
           circle(cx + (i - (count - 1) / 2) * spacing, dotY, dotRadius * (isCurrent ? swell : 1), {
-            fill: palette.ink
+            fill: isCurrent ? palette.accent : palette.ink
           })
         );
       }
