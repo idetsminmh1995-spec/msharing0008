@@ -302,7 +302,7 @@
 <script src="../../assets/voice-samples.js?v=609facad"></script>
 <script src="../../assets/outro-video.js?v=521fc4cb"></script>
 <!-- The video engine: renders frames rather than recording them. -->
-<script src="../../assets/video-engine.js?v=8ccc011e"></script>
+<script src="../../assets/video-engine.js?v=78e37162"></script>
 <script>
   // The metronome reads its tempo and time signature from the uploaded
   // MIDI file and clicks along with the uploaded audio. Everything it
@@ -1319,7 +1319,7 @@
 
   let recording = null;
   let downloadUrl = null;
-  let downloadName = 'metronome.webm';
+  let downloadName = 'metronome.mp4';
 
   /** One frame of the chosen design, rasterised into the canvas. */
   async function drawToCanvas(ctx2d, canvas, at) {
@@ -1545,6 +1545,9 @@
           (result.path === 'mediarecorder'
             ? `. ${result.frames} frames, recorded in real time because this browser has no WebCodecs — some may have been dropped.`
             : `. ${result.frames} frames, every one of them exact.`) +
+          (result.container === 'mp4'
+            ? ' MP4, H.264 video and AAC sound.'
+            : ' WebM \u2014 this browser will not encode H.264, so it is not an MP4.') +
           ' Press Download Video to save it.',
         true,
       );

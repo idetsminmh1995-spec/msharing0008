@@ -55,6 +55,20 @@ of the file it points at: a bundle that changed gets a URL that changed,
 one that did not keeps its URL and stays cached. `--check` writes
 nothing and exits non-zero if a page is pointing at a stale bundle.
 
+### The video engine
+
+`assets/video-engine.js` is the only thing here that turns frames into a
+file, and it is hand-written rather than built: it writes an MP4 around
+H.264 and AAC chunks that WebCodecs hands it, box by box. The container
+is pure arithmetic, so it is tested:
+
+```
+node tools/test-video-engine.mjs
+```
+
+That reads a file the muxer wrote back from its first byte -- every box,
+every sample table, every offset -- and compares it with what went in.
+
 ## Status
 
 This is a **visual mockup / static prototype**, converted from a design
