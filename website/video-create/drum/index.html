@@ -405,6 +405,27 @@
   .engine-label{font-size:12px;color:var(--muted);}
   .engine-pills{display:flex;gap:8px;flex-wrap:wrap;}
   .engine-pill{background:var(--pink);color:var(--red);font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;}
+
+  /* --- while a take is rendering ---------------------------------------
+     Everything but the progress block is put out of reach: a click that
+     changes the design, the tempo or the uploaded file halfway through a
+     render changes what the REST of the video is made of, and the file
+     that comes out is half one thing and half another.
+
+     `inert` is what takes a subtree out of reach -- clicks, focus, Tab
+     and a screen reader's cursor, all at once. The `pointer-events` here
+     is the belt to its braces, for a browser too old to know the
+     attribute, and the dimming is so the reason is visible rather than
+     mysterious. Cancel is deliberately still live. */
+  body.is-rendering [inert]{opacity:.38;pointer-events:none;user-select:none;}
+  body.is-rendering [inert],
+  body.is-rendering{transition:opacity .18s ease;}
+  body.is-rendering .gen-progress{outline:2px solid rgba(200,30,44,.18);outline-offset:6px;border-radius:10px;}
+  /* The note under the button is not clickable, so it needs no `inert` --
+     but left at full strength it ends up the brightest thing on a dimmed
+     page, which points the eye at a paragraph rather than at the
+     progress bar. */
+  body.is-rendering #genNote{opacity:.38;}
 </style>
 <!-- The real Notation Engine bundle (github.com/idetsminmh1995-spec/msharing0008/notation-engine) -->
 <script src="../../assets/notation-engine.js?v=8f53f84c"></script>
@@ -3179,7 +3200,43 @@
     }
   }
 
+  /**
+   * Everything that must not be touched while a take renders.
+   *
+   * `inert` rather than a pile of `disabled` flags: it takes a whole
+   * subtree out of reach at once, and a control that was ALREADY
+   * disabled is still disabled when it lifts -- which a loop over
+   * `disabled` would have to remember and would eventually get wrong.
+   *
+   * The progress block is deliberately not in the list. Cancel is the
+   * one thing a person must still be able to press: a render of a long
+   * file takes minutes, and a page that cannot be stopped is worse than
+   * one that can be misclicked.
+   */
+  function lockedRegions() {
+    return [
+      document.querySelector('header'),
+      document.querySelector('.crumbbar'),
+      ...document.querySelectorAll('.left .card'),
+      document.querySelector('.right'),
+      document.getElementById('downloadBtn'),
+      document.getElementById('generateBtn'),
+    ].filter(Boolean);
+  }
+
+  function setPageLocked(on) {
+    document.body.classList.toggle('is-rendering', on);
+    for (const region of lockedRegions()) {
+      // The attribute, not the property: it is what the CSS selector
+      // matches, and it works the same on a browser that implements
+      // `inert` and one that only gets the dimming.
+      if (on) region.setAttribute('inert', '');
+      else region.removeAttribute('inert');
+    }
+  }
+
   function setGenerating(on) {
+    setPageLocked(on);
     generateBtn.disabled = on;
     generateBtn.textContent = on ? 'Rendering…' : 'Generate Video';
     genProgress.hidden = !on;
