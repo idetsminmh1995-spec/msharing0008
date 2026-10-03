@@ -1358,18 +1358,38 @@
   /**
    * Which instrument's Thank You clip a design closes with.
    *
-   * Not every design has an ending of its own yet, so this names the
-   * ones that are spoken for and everything else falls through to the
-   * default. The Pendulum closes with the DRUM clip: it is the drum
-   * ending that was made for it.
+   * Not a second list of designs: the design already says which
+   * instrument it is -- that is what picks its logo -- and the ending
+   * follows the same answer. Pendulum is the drum, so it closes on the
+   * drum clip; Beat Dots is the piano, so it closes on the piano one.
+   * A design whose mark changes takes its ending with it, with nothing
+   * else to remember.
    *
-   * Adding a design's own clip later is one line here -- the folder
-   * and file naming are `OutroVideo`'s business, and the walk outward
-   * it does means a name added before the file is uploaded still
-   * closes a video.
+   * What is mapped here is the instrument to the BUCKET FOLDER, and
+   * only the folders that exist. The spellings are the bucket's own
+   * (its piano folder is "paino"), and an instrument with no clip yet
+   * is deliberately absent so it falls through to the metronome
+   * ending rather than to `OutroVideo`'s own last resort, which is the
+   * drum clip -- a violin design closing on a drum would look like a
+   * mistake, and the metronome ending is never wrong for a metronome.
+   *
+   * Uploading a clip for one of the missing ones is one line here.
    */
-  const OUTRO_KIND = { pendulum: 'drum' };
+  const OUTRO_FOLDER_FOR_LOGO = {
+    drum: 'drum',
+    piano: 'paino',
+    guitar: 'guitar',
+    // What the Bass Guitar page itself closes with.
+    bass: 'guitar',
+  };
   const OUTRO_KIND_DEFAULT = 'metronome';
+
+  /** The bucket folder this design's ending lives in. */
+  function outroKindForDesign(designId) {
+    if (typeof MetronomeDesigns === 'undefined') return OUTRO_KIND_DEFAULT;
+    const logo = MetronomeDesigns.metronomeLogoName(designId);
+    return OUTRO_FOLDER_FOR_LOGO[logo] ?? OUTRO_KIND_DEFAULT;
+  }
   /**
    * A still second before the count starts.
    *
@@ -1676,7 +1696,7 @@
     try {
       return await OutroVideo.loadOutro(API_BASE, {
         aspect: currentAspect(),
-        kind: OUTRO_KIND[designSelect.value] ?? OUTRO_KIND_DEFAULT,
+        kind: outroKindForDesign(designSelect.value),
         style: light ? 'white' : 'black',
       });
     } catch (err) {
