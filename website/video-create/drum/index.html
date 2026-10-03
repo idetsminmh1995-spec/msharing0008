@@ -441,7 +441,7 @@
   body.is-rendering #genNote{opacity:.38;}
 </style>
 <!-- The real Notation Engine bundle (github.com/idetsminmh1995-spec/msharing0008/notation-engine) -->
-<script src="../../assets/notation-engine.js?v=f0f90eed"></script>
+<script src="../../assets/notation-engine.js?v=07113ca3"></script>
 <!-- The Human Sticking Engine: Drum/sticking-engine-ts, a TypeScript port
      of Drum/sticking-engine (Python) that is parity-tested against it. It
      decides which limb plays every note; the R/L under the staff is its
@@ -1205,6 +1205,17 @@
       // a score that changes speed still changes speed.
       barNumbers: { display: 'off' },
       tempoMarks: { display: 'off' },
+      // And the system stops where the music does. A system reserves
+      // eight staff spaces below the bottom line for everything a score
+      // MAY carry there; this one carries a kick's down stem and
+      // nothing else, so the rest was height the notes did not get.
+      //
+      // It gives as well as takes: the four spaces above the top line
+      // are not enough for a china cymbal's up stem, which is a space
+      // and a half higher than that -- the tempo mark's own padding
+      // used to hide it, and turning the mark off cut the stem off at
+      // the top of the picture until this grew the room back.
+      layout: { fitSystemHeight: true },
     };
   }
   const statBpm = document.getElementById('statBpm');

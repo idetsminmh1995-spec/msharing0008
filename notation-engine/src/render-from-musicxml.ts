@@ -2459,7 +2459,7 @@ export function renderParsedMusicXml(
    * nothing needs more room than the existing headroom, which is what
    * keeps most fixtures byte-identical.
    */
-  const aboveStaffPadding = (() => {
+  const aboveStaff = (() => {
     const existingHeadroom = STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
     let needed = 0;
     score.parts.forEach((part, partIndex) => {
@@ -2519,10 +2519,96 @@ export function renderParsedMusicXml(
           (raisedCount ? theme.sizes.barNumber + VOLTA_BAR_NUMBER_CLEARANCE : 0),
       );
     }
-    return Math.max(0, needed - existingHeadroom);
+    return { needed, padding: Math.max(0, needed - existingHeadroom) };
   })();
+  const aboveStaffPadding = aboveStaff.padding;
+
+  /**
+   * How far the notes themselves reach past the staff, with their stems
+   * and beams, or undefined on a score this cannot honestly measure.
+   *
+   * `config.layout.fitSystemHeight` asks for the system to stop where
+   * the music does. Only notes can be measured from here. A dynamic, a
+   * lyric, a slur, a tuplet bracket, an articulation or an ornament is
+   * placed by a pass that runs after this and would be trimmed off, so
+   * a score carrying any of them keeps the full reserve and this
+   * returns undefined. That is the whole safety of it -- the trim never
+   * guesses, and the list is deliberately a list of what is DRAWN
+   * rather than of what reaches far: a staccato dot is small, but it is
+   * placed outside the notehead by a rule this does not know.
+   */
+  const contentReach = ((): { north: number; south: number } | undefined => {
+    if (config.layout.fitSystemHeight !== true) return undefined;
+    if (directions.length > 0) return undefined;
+    let north = 0;
+    let south = 0;
+    for (const part of score.parts) {
+      const staffCount = Math.max(
+        1,
+        ...attributes
+          .filter((a) => a.partId === part.id)
+          .map((a) => Object.keys(a.staffLinesByStaff).length || 1),
+      );
+      for (const measure of part.measures) {
+        for (const voice of measure.voices) {
+          for (const event of voice.events) {
+            const notes =
+              event.kind === 'chord' ? event.notes : event.kind === 'note' ? [event] : [];
+            for (const note of notes) {
+              if (
+                (note.lyrics?.length ?? 0) > 0 ||
+                (note.slurStarts?.length ?? 0) > 0 ||
+                (note.slurStops?.length ?? 0) > 0 ||
+                (note.articulations?.length ?? 0) > 0 ||
+                (note.ornaments?.length ?? 0) > 0 ||
+                note.tupletStart === true ||
+                note.tupletStop === true
+              ) {
+                return undefined;
+              }
+            }
+          }
+        }
+      }
+      for (let staffNumber = 1; staffNumber <= staffCount; staffNumber++) {
+        north = Math.max(north, worstCaseStaffExtent(part, staffNumber, attributes, 'north'));
+        south = Math.max(south, worstCaseStaffExtent(part, staffNumber, attributes, 'south'));
+      }
+    }
+    return { north: north + STEM_AND_BEAM_ALLOWANCE, south: south + STEM_AND_BEAM_ALLOWANCE };
+  })();
+
+  /** A space of air between the outermost ink and the edge of the system. */
+  const FIT_MARGIN = 1;
+  /** The room a system reserves above its top line and below its bottom one before any fitting. */
+  const BASE_ABOVE = STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
+  const BASE_BELOW = SYSTEM_HEIGHT - STAFF_BOTTOM_Y;
+
+  /**
+   * How much each end MOVES when the system is fitted. Positive takes
+   * room away, negative gives it.
+   *
+   * It gives as well as takes, and that is not symmetry for its own
+   * sake. The four spaces reserved above the top line are not always
+   * enough: a drum chart's china cymbal sits a space and a half above
+   * the staff and its stem goes three and a half higher again, which is
+   * a space and a half MORE than the reserve. On an ordinary score the
+   * tempo mark's own padding happened to cover that; on a score with no
+   * tempo mark drawn, the stem was cut off at the top of the picture.
+   * A fit that only ever shrank would have left that cut in place.
+   */
+  const fitAbove =
+    contentReach === undefined
+      ? 0
+      : BASE_ABOVE +
+        aboveStaffPadding -
+        Math.max(contentReach.north + FIT_MARGIN, aboveStaff.needed);
+  const fitBelow = contentReach === undefined ? 0 : BASE_BELOW - (contentReach.south + FIT_MARGIN);
+  const trimAbove = fitAbove;
+  const trimBelow = fitBelow;
+
   /** Every staff's bottom line sits this far down, above-staff headroom included. */
-  const staffBottomY = STAFF_BOTTOM_Y + aboveStaffPadding;
+  const staffBottomY = STAFF_BOTTOM_Y + aboveStaffPadding - trimAbove;
 
   // Integration B: every part is rendered, each offset vertically below
   // the one before it. Phase 29's computeSystemLayout already handles
@@ -2595,7 +2681,8 @@ export function renderParsedMusicXml(
   // score (every part, every staff) plus the room STAFF_BOTTOM_Y already
   // reserves above the first staff.
   const lowestStaffOffset = scoreLayout.positions[scoreLayout.positions.length - 1]?.y ?? 0;
-  const systemHeight = SYSTEM_HEIGHT + aboveStaffPadding + lowestStaffOffset;
+  const systemHeight =
+    SYSTEM_HEIGHT + aboveStaffPadding + lowestStaffOffset - trimAbove - trimBelow;
 
   const widthOf = (measureNumber: number): number =>
     measureLayoutsByNumber.get(measureNumber)?.width ?? MEASURE_WIDTH;

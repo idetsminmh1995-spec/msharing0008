@@ -66881,7 +66881,7 @@ ${xrefOffset}
       }
       return shouldShowBarNumber(measureNumber, config.barNumbers, false);
     };
-    const aboveStaffPadding = (() => {
+    const aboveStaff = (() => {
       const existingHeadroom = STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
       let needed = 0;
       score2.parts.forEach((part2, partIndex) => {
@@ -66922,9 +66922,46 @@ ${xrefOffset}
           voltaGapAboveStaff(theme.sizes) + theme.sizes.barNumber + (raisedCount ? theme.sizes.barNumber + VOLTA_BAR_NUMBER_CLEARANCE : 0)
         );
       }
-      return Math.max(0, needed - existingHeadroom);
+      return { needed, padding: Math.max(0, needed - existingHeadroom) };
     })();
-    const staffBottomY = STAFF_BOTTOM_Y + aboveStaffPadding;
+    const aboveStaffPadding = aboveStaff.padding;
+    const contentReach = (() => {
+      if (config.layout.fitSystemHeight !== true) return void 0;
+      if (directions.length > 0) return void 0;
+      let north = 0;
+      let south = 0;
+      for (const part2 of score2.parts) {
+        const staffCount = Math.max(
+          1,
+          ...attributes.filter((a) => a.partId === part2.id).map((a) => Object.keys(a.staffLinesByStaff).length || 1)
+        );
+        for (const measure2 of part2.measures) {
+          for (const voice2 of measure2.voices) {
+            for (const event of voice2.events) {
+              const notes = event.kind === "chord" ? event.notes : event.kind === "note" ? [event] : [];
+              for (const note2 of notes) {
+                if ((note2.lyrics?.length ?? 0) > 0 || (note2.slurStarts?.length ?? 0) > 0 || (note2.slurStops?.length ?? 0) > 0 || (note2.articulations?.length ?? 0) > 0 || (note2.ornaments?.length ?? 0) > 0 || note2.tupletStart === true || note2.tupletStop === true) {
+                  return void 0;
+                }
+              }
+            }
+          }
+        }
+        for (let staffNumber = 1; staffNumber <= staffCount; staffNumber++) {
+          north = Math.max(north, worstCaseStaffExtent(part2, staffNumber, attributes, "north"));
+          south = Math.max(south, worstCaseStaffExtent(part2, staffNumber, attributes, "south"));
+        }
+      }
+      return { north: north + STEM_AND_BEAM_ALLOWANCE, south: south + STEM_AND_BEAM_ALLOWANCE };
+    })();
+    const FIT_MARGIN = 1;
+    const BASE_ABOVE = STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
+    const BASE_BELOW = SYSTEM_HEIGHT - STAFF_BOTTOM_Y;
+    const fitAbove = contentReach === void 0 ? 0 : BASE_ABOVE + aboveStaffPadding - Math.max(contentReach.north + FIT_MARGIN, aboveStaff.needed);
+    const fitBelow = contentReach === void 0 ? 0 : BASE_BELOW - (contentReach.south + FIT_MARGIN);
+    const trimAbove = fitAbove;
+    const trimBelow = fitBelow;
+    const staffBottomY = STAFF_BOTTOM_Y + aboveStaffPadding - trimAbove;
     const staffDistanceForPair = (partIndex, staffIndexInPart) => {
       const part2 = score2.parts[partIndex];
       if (part2 === void 0) return 8;
@@ -66949,7 +66986,7 @@ ${xrefOffset}
     const placementByMeasureNumber = /* @__PURE__ */ new Map();
     const systemOrigins = [];
     const lowestStaffOffset = scoreLayout.positions[scoreLayout.positions.length - 1]?.y ?? 0;
-    const systemHeight = SYSTEM_HEIGHT + aboveStaffPadding + lowestStaffOffset;
+    const systemHeight = SYSTEM_HEIGHT + aboveStaffPadding + lowestStaffOffset - trimAbove - trimBelow;
     const widthOf = (measureNumber) => measureLayoutsByNumber.get(measureNumber)?.width ?? MEASURE_WIDTH;
     let pageCount = 1;
     if (config.layout.mode === "page") {

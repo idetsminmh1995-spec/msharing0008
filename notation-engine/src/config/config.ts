@@ -41,6 +41,28 @@ export type LayoutMode = 'scroll' | 'page';
 export interface LayoutConfig {
   readonly mode: LayoutMode;
   /**
+   * Shrink a system's height to what its music actually reaches.
+   *
+   * A system reserves four staff spaces above the top line and eight
+   * below the bottom one, for everything a score may carry there. Most
+   * scores carry far less, and on a PAGE that reserve is just margin --
+   * but in a video frame, where the staff is given a fixed band of the
+   * picture, every space of it is height the notes did not get. A drum
+   * chart spent half its box on room nothing was drawn in.
+   *
+   * With this on, the reserve becomes the real reach of the notes, their
+   * stems and their beams, plus a space of margin. The STAFF does not
+   * change size in staff spaces -- nothing about the engraving moves --
+   * the box around it just stops being bigger than the music, so a host
+   * scaling that box to a fixed height gets bigger notes for free.
+   *
+   * It is off by default, and it refuses itself on a score it cannot
+   * measure: anything with dynamics, lyrics, slurs or tuplets keeps the
+   * full reserve, because those are placed by passes that run after this
+   * is decided and trimming to the notes alone would cut them off.
+   */
+  readonly fitSystemHeight?: boolean;
+  /**
    * Real CSS pixels per staff space -- the single number Phase 44's
    * arbitrary-width/height resize changes (see Phase 6's
    * createSvgDocument, which takes exactly this value).
