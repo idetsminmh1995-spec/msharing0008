@@ -37,6 +37,24 @@ declaring itself as a static-assets Worker. Settings in the dashboard:
 
 Every push to `main` will redeploy automatically once connected.
 
+### After changing an engine bundle
+
+The pages load the engines straight from `assets/`, so a browser that
+already has one keeps running the OLD bundle until its cache lets go —
+long enough for a change to look like it simply did not work. The
+filenames cannot carry a hash (these pages are hand-written and there is
+no build step), so the query string does it instead. After copying a
+`dist/` bundle into `website/assets/`, run:
+
+```
+node tools/stamp-assets.mjs
+```
+
+It rewrites every `<script src=".../assets/*.js?v=...">` to a short hash
+of the file it points at: a bundle that changed gets a URL that changed,
+one that did not keeps its URL and stays cached. `--check` writes
+nothing and exits non-zero if a page is pointing at a stale bundle.
+
 ## Status
 
 This is a **visual mockup / static prototype**, converted from a design
