@@ -35,6 +35,23 @@ const handsFor = (notes, seconds, over = {}) => {
   });
 };
 
+/** Where the fingers are, straight from the engine. */
+const tipsFor = (notes, seconds, hand = 'right', over = {}) => {
+  const plan = P.planFingering(notes);
+  return P.handFingertips(hand, {
+    size: 88,
+    board: BOARD,
+    seconds,
+    notes: plan.notes,
+    anchors: plan.anchors,
+    colors: P.DEFAULT_HAND_COLORS,
+    ...over,
+  });
+};
+
+/** Every fingertip's y. */
+const tipYs = (tips) => tips.map((t) => t.y);
+
 test('every note gets a finger, and only ever one of the five', () => {
   const notes = [
     note(60, 0),
@@ -125,71 +142,84 @@ test('both hands are drawn, left first, and a hand with no notes is not invented
   );
 });
 
-test('a hand is five fingers: five strokes a side, each a drawn path', () => {
-  const shapes = handsFor([note(60, 0)], 0);
-  const fingers = shapes.filter((s) => s.path !== undefined && s.fill === 'none');
-  // Each finger is an edge stroke and a skin stroke over it.
-  assert.equal(fingers.length, 10);
-  for (const f of fingers) {
-    assert.match(f.path, /^M [-\d.]+ [-\d.]+ Q [-\d.]+ [-\d.]+ [-\d.]+ [-\d.]+$/);
-    assert.ok(f.strokeWidth > 0);
-  }
+test('a hand is five fingers, and the whole of it is one drawn shape', () => {
+  const tips = tipsFor([note(60, 0)], 0);
+  assert.equal(tips.length, 5, 'five fingers');
+  assert.deepEqual(
+    [...tips].map((t) => t.finger).sort(),
+    [1, 2, 3, 4, 5],
+    'one of each, no finger used twice',
+  );
+
+  const shapes = handsFor([note(60, 0)], 0).filter((s) => s.path !== undefined);
+  // Two parts -- the hand and its thumb -- each painted twice: dark and
+  // fat underneath, skin at its true size on top. What shows of the
+  // dark pass is the outline of the two together, and nothing else.
+  assert.equal(shapes.length, 4, 'the hand and its thumb, each drawn twice');
+  const [edgeHand, edgeThumb, skinHand, skinThumb] = shapes;
+  const { edge, skin } = P.DEFAULT_HAND_COLORS.right;
+  // Both dark passes come first, so neither of them can show up as a
+  // seam inside the skin that is painted over them.
+  assert.equal(edgeHand.fill, edge);
+  assert.equal(edgeThumb.stroke, edge);
+  assert.equal(skinHand.fill, skin);
+  assert.equal(skinThumb.stroke, skin);
+  assert.equal(edgeHand.path, skinHand.path, 'the same shape, twice');
+  assert.equal(edgeThumb.path, skinThumb.path);
+  assert.ok(edgeHand.strokeWidth > 0, 'the dark pass is the fatter one');
+  assert.equal(skinHand.stroke, undefined, 'and the skin pass is not stroked at all');
+  assert.ok(edgeThumb.strokeWidth > skinThumb.strokeWidth);
+  // The hand's own outline is a closed path: up each finger, round its
+  // tip, down into the web, and back along the heel.
+  assert.match(skinHand.path, /^M [-\d.]+ [-\d.]+ .*A .* Z$/, 'closed, and with arcs in it');
 });
 
 test('the middle finger is longer than the thumb and the little finger', () => {
-  // At rest, every finger hangs from the same palm, so the tip's depth
-  // down the key IS the finger's length.
-  const shapes = handsFor([note(60, 0)], 5); // long after the note: resting
-  const tips = shapes
-    .filter((s) => s.path !== undefined)
-    .map((s) => Number(s.path.split(' ').at(-1)));
-  const deepest = Math.max(...tips);
-  const shallowest = Math.min(...tips);
-  assert.ok(deepest - shallowest > 1, 'the fingers are not a row of equal bars');
+  const by = new Map(tipsFor([note(60, 0)], 5).map((t) => [t.finger, t.y]));
+  assert.ok(by.get(3) < by.get(2), 'middle reaches past index');
+  assert.ok(by.get(2) < by.get(5), 'index reaches past the little finger');
+  assert.ok(by.get(5) < by.get(1), 'and every finger reaches past the thumb');
 });
-
-/** The pad drawn on a fingertip that is pressing. */
-const padColor = (hand = 'right') => P.darken(P.DEFAULT_HAND_COLORS[hand].skin, 0.17);
-const pad = (set, hand = 'right') => set.find((s) => s.fill === padColor(hand));
-/** Every fingertip's y, read back off the drawn finger paths. */
-const tipYs = (set) =>
-  set.filter((s) => s.path !== undefined).map((s) => Number(s.path.split(' ').at(-1)));
 
 test('a pressing finger reaches up its own key, and only that finger', () => {
   const notes = [note(60, 1, 'right', 2)];
-  const resting = handsFor(notes, 0.2);
-  const pressing = handsFor(notes, 1.5);
-
-  const mark = pad(pressing);
-  assert.ok(mark !== undefined, 'the pressing fingertip is marked');
-  assert.equal(pad(resting), undefined, 'nothing is marked when nothing is playing');
+  const resting = tipsFor(notes, 0.2);
+  const pressing = tipsFor(notes, 1.5);
+  const playing = pressing.find((t) => t.pressed);
+  assert.ok(playing !== undefined, 'one finger is playing');
+  assert.equal(pressing.filter((t) => t.pressed).length, 1, 'and only one');
+  assert.equal(playing.midi, 60);
 
   const keys = P.keyboardGeometry(88, BOARD);
   const middleC = keys.find((k) => k.midi === 60);
-  const centre = mark.x + mark.width / 2;
-  assert.ok(
-    centre > middleC.x && centre < middleC.x + middleC.width,
-    'the fingertip is on middle C, not near it',
-  );
+  assert.ok(playing.x > middleC.x && playing.x < middleC.x + middleC.width, 'on middle C');
 
-  // Up the key, away from the player: a smaller y than the knuckles.
-  assert.ok(mark.y + mark.height / 2 < BOARD.y + BOARD.height * 0.5, 'well up the key');
-  // A single note is played with the middle finger, which is the
-  // longest -- so its tip is the furthest up in both poses, and
-  // playing has to take it further still.
-  assert.ok(mark.y + mark.height / 2 < Math.min(...tipYs(resting)), 'further than at rest');
+  const was = resting.find((t) => t.finger === playing.finger);
+  assert.ok(playing.y < was.y, 'playing reaches further than resting');
+  assert.ok(playing.y > BOARD.y, 'and never off the back of the keyboard');
+
+  // Nothing is drawn ON the finger to say it is playing: the key under
+  // it is lit, the finger has reached for it, and the number is on the
+  // key. Three cues for one fact, and a grey dot would be a fourth.
+  const numbered = handsFor(notes, 1.5).filter((s) => s.label !== undefined);
+  assert.equal(numbered.length, 1, 'one badge, for the one finger playing');
+  assert.equal(numbered[0].label, String(playing.finger));
+  assert.equal(handsFor(notes, 0.2).filter((s) => s.label !== undefined).length, 0, 'none at rest');
 });
 
-test('the hand points away from the player: fingertips above the palm', () => {
-  const shapes = handsFor([note(60, 1, 'right', 2)], 1.5);
-  const palm = shapes.filter((s) => s.path === undefined && s.label === undefined && s.radius > 0);
-  // The palm is the widest box in the hand.
-  const widest = palm.reduce((a, b) => (b.width > a.width ? b : a));
-  assert.ok(
-    Math.max(...tipYs(shapes)) < widest.y + widest.height,
-    'every fingertip is above the bottom of the palm',
+test('the hand points away from the player: the heel is at the front of the keys', () => {
+  const tips = tipsFor([note(60, 1, 'right', 2)], 1.5);
+  // Every fingertip is up the keyboard, away from the player.
+  for (const tip of tips) {
+    assert.ok(tip.y < BOARD.y + BOARD.height, `finger ${tip.finger} is on the keys`);
+  }
+  // And the hand's own drawing reaches past the front edge of the keys,
+  // because that is where the heel of a palm rests.
+  const shapes = handsFor([note(60, 1, 'right', 2)], 1.5).filter((s) => s.path !== undefined);
+  const lowest = Math.max(
+    ...shapes[0].path.match(/-?\d+(\.\d+)?/g).filter((_, i) => i % 2 === 1).map(Number),
   );
-  assert.ok(widest.y + widest.height > BOARD.y + BOARD.height * 0.8, 'the heel is down at the front');
+  assert.ok(lowest > BOARD.y + BOARD.height, 'the heel is past the front edge of the keys');
 });
 
 test('a finger on a black key never reaches past the end of it', () => {
@@ -197,18 +227,17 @@ test('a finger on a black key never reaches past the end of it', () => {
   // is why a player leaves them there. It is the THUMB, which plays
   // out at the front, that a black key has to pull back -- and the
   // hand with it, because a finger can only stretch so far.
-  const chord = (top) => [48, top].map((m) => note(m, 1, 'left', 2));
-  const plan = P.planFingering(chord(61));
+  const chord = [48, 61].map((m) => note(m, 1, 'left', 2));
+  const plan = P.planFingering(chord);
   assert.equal(
     plan.notes.find((n) => n.midi === 61).finger,
     1,
     'this chord really is played with the thumb on the black key',
   );
 
-  // Across every keyboard depth the design can be given.
   for (const height of [120, 200, 320, 480]) {
     const board = P.keyboardBox({ size: 88, width: 1920, height, design: 'hands' });
-    const shapes = P.handsShapes({
+    const tips = P.handFingertips('left', {
       size: 88,
       board,
       seconds: 1.5,
@@ -216,12 +245,12 @@ test('a finger on a black key never reaches past the end of it', () => {
       anchors: plan.anchors,
       colors: P.DEFAULT_HAND_COLORS,
     });
-    const black = shapes.find((s) => s.fill === padColor('left'));
-    assert.ok(black !== undefined, `${height}: the thumb is marked`);
+    const thumb = tips.find((t) => t.finger === 1);
+    assert.ok(thumb.pressed && thumb.onBlack, `${height}: the thumb is on the black key`);
     // A black key ends 62% of the way down the board. A finger on one
     // cannot be out in front of the key it is pressing.
     assert.ok(
-      black.y + black.height / 2 < board.y + board.height * 0.62,
+      thumb.y < board.y + board.height * 0.62,
       `${height}: the thumb stays on the black key`,
     );
   }
@@ -229,33 +258,18 @@ test('a finger on a black key never reaches past the end of it', () => {
 
 test('three fingers down at once are three separate keys', () => {
   const chord = [60, 64, 67].map((m) => note(m, 1, 'right', 2));
-  const shapes = handsFor(chord, 1.5);
-  const pads = shapes.filter((s) => s.fill === padColor());
-  assert.equal(pads.length, 3);
-  const keys = P.keyboardGeometry(88, BOARD);
-  for (const midi of [60, 64, 67]) {
-    const key = keys.find((k) => k.midi === midi);
-    assert.ok(
-      pads.some((d) => d.x + d.width / 2 > key.x && d.x + d.width / 2 < key.x + key.width),
-      `a finger is on ${midi}`,
-    );
-  }
-});
+  const down = tipsFor(chord, 1.5).filter((t) => t.pressed);
+  assert.equal(down.length, 3);
+  assert.deepEqual([...down].map((t) => t.midi).sort((a, b) => a - b), [60, 64, 67]);
 
-test('the hand is one silhouette: an outline pass under a skin pass, no seams', () => {
-  const shapes = handsFor([note(60, 0)], 0);
-  const fingers = shapes.filter((s) => s.path !== undefined);
-  const edge = fingers.filter((s) => s.stroke === P.DEFAULT_HAND_COLORS.right.edge);
-  const skin = fingers.filter((s) => s.stroke === P.DEFAULT_HAND_COLORS.right.skin);
-  assert.equal(edge.length, skin.length, 'every part is drawn twice');
-  assert.ok(edge.length >= 5, 'five fingers at least');
-  // The dark pass comes first and is fatter, so what shows of it is the
-  // outline and nothing else.
-  assert.ok(shapes.indexOf(edge[0]) < shapes.indexOf(skin[0]));
-  for (let i = 0; i < edge.length; i += 1) {
-    assert.ok(edge[i].strokeWidth > skin[i].strokeWidth, 'the outline pass is the fatter one');
-    assert.equal(edge[i].path, skin[i].path, 'and the same shape');
+  const keys = P.keyboardGeometry(88, BOARD);
+  for (const tip of down) {
+    const key = keys.find((k) => k.midi === tip.midi);
+    assert.ok(tip.x > key.x && tip.x < key.x + key.width, `finger ${tip.finger} is on its key`);
   }
+  // And each one is numbered, on its own key.
+  const badges = handsFor(chord, 1.5).filter((s) => s.label !== undefined);
+  assert.equal(badges.length, 3);
 });
 
 test('smaller hands are smaller, and the scale changes nothing else', () => {
@@ -332,9 +346,11 @@ test('the hands design keeps a strip in FRONT of the keys for the hands', () => 
   // Not flush with the bottom any more: the heel of a palm rests past
   // the front edge of the keys, and that is where it goes.
   assert.ok(hands.y + hands.height < 600, 'the strip in front is left empty of keyboard');
-  const range = P.handsRange({ ...box, design: 'hands' });
-  const unit = 1920 / P.whiteKeysBetween(range.first, range.last);
+  const unit = 1920 / P.whiteKeyCount(88);
   assert.ok(600 - (hands.y + hands.height) > unit, 'and it is wide enough for a heel');
+  // A white key is 150mm long and 23mm wide, and is never drawn much
+  // longer than that however much room the frame has.
+  assert.ok(hands.height / unit < 8, 'a key stays a key');
 });
 
 test('a pressed key wears its finger number, up where the hand is not', () => {
@@ -353,9 +369,7 @@ test('a pressed key wears its finger number, up where the hand is not', () => {
   assert.equal(badge.label, String(plan.notes[0].finger));
 
   const board = P.keyboardBox({ ...STAGE, design: 'hands', notes });
-  const key = P.keyboardGeometry(P.handsRange({ ...STAGE, design: 'hands', notes }), board).find(
-    (k) => k.midi === 60,
-  );
+  const key = P.keyboardGeometry(88, board).find((k) => k.midi === 60);
   const centre = badge.x + badge.width / 2;
   assert.ok(centre > key.x && centre < key.x + key.width, 'on middle C');
   // The palm is at the front of the keyboard, so the number is not.
@@ -404,58 +418,28 @@ test('the hands wear the note colours: the tip is the hand colour, the edge a da
   assert.equal(P.darken('var(--accent)', 0.4), 'var(--accent)');
 });
 
-/** How long the white keys are, in their own widths. */
-const keyShape = (options) => {
-  const box = P.keyboardBox(options);
-  const range = P.handsRange(options);
-  return box.height / (box.width / P.whiteKeysBetween(range.first, range.last));
-};
-
-test('a key stays a key in every frame shape, however tall the stage is', () => {
+test('88 Keys means 88 keys, in every frame shape', () => {
   const piece = [60, 64, 67, 72].map((m) => note(m, 0));
-  const shapes = {
+  for (const [name, options] of Object.entries({
     '16:9': { width: 1856, height: 240, design: 'hands', size: 88, notes: piece },
     '9:16': { width: 531, height: 300, design: 'hands', size: 88, notes: piece },
     '1:1': { width: 1856, height: 430, design: 'hands', size: 88, notes: piece },
-  };
-  for (const [name, options] of Object.entries(shapes)) {
-    const ratio = keyShape(options);
-    // A real white key is 150mm long and 23mm wide. The hands design
-    // never draws one longer than that, whatever shape the frame is.
-    assert.ok(ratio > 2.5 && ratio < 5.6, `${name}: a key is ${ratio.toFixed(1)} of its own widths`);
+  })) {
     const box = P.keyboardBox(options);
-    assert.ok(box.y >= 0 && box.y + box.height <= options.height, `${name}: inside the stage`);
+    const keys = P.keyboardGeometry(88, box);
+    assert.equal(keys.filter((k) => !k.black).length, 52, `${name}: all 52 white keys`);
+    assert.equal(keys.length, 88, `${name}: all 88`);
+    // A white key is 150mm long and 23mm wide. Never drawn much longer
+    // than that, however tall the stage is -- past that it stops being
+    // a keyboard and the hand on it stops being a hand.
+    const ratio = box.height / (box.width / 52);
+    assert.ok(ratio > 2 && ratio < 8, `${name}: a key is ${ratio.toFixed(1)} of its own widths`);
+    assert.ok(box.y >= 0 && box.y + box.height < options.height, `${name}: inside, with a strip`);
   }
-});
 
-test('a tall frame shows a window of the keyboard, a wide one shows all of it', () => {
-  const piece = [60, 64, 67, 72].map((m) => note(m, 0));
-  const wide = P.handsRange({ width: 1856, height: 240, design: 'hands', size: 88, notes: piece });
-  const tall = P.handsRange({ width: 531, height: 300, design: 'hands', size: 88, notes: piece });
-  const wideKeys = P.whiteKeysBetween(wide.first, wide.last);
-  const tallKeys = P.whiteKeysBetween(tall.first, tall.last);
-  assert.ok(wideKeys > 2 * tallKeys, `16:9 carries most of the piano, got ${wideKeys}`);
-  assert.ok(tallKeys >= 14 && tallKeys < 32, `9:16 carries a few octaves, got ${tallKeys}`);
-
-  // Whatever the window is, it covers every note in the piece and
-  // starts and ends on a white key.
-  for (const range of [wide, tall]) {
-    assert.ok(range.first <= 60 && range.last >= 72, 'the music is inside the window');
-    assert.ok(!P.isBlackKey(range.first) && !P.isBlackKey(range.last), 'both ends are white');
-  }
-});
-
-test('a piece wider than the window widens the window, not the other way round', () => {
-  const narrow = [60, 62].map((m) => note(m, 0));
-  const wide = [28, 100].map((m) => note(m, 0));
-  const shape = { width: 531, height: 300, design: 'hands', size: 88 };
-  const small = P.handsRange({ ...shape, notes: narrow });
-  const big = P.handsRange({ ...shape, notes: wide });
-  assert.ok(
-    P.whiteKeysBetween(big.first, big.last) > P.whiteKeysBetween(small.first, small.last),
-    'a hand is never left pressing a key that is not drawn',
-  );
-  assert.ok(big.first <= 28 && big.last >= 100);
+  // A smaller instrument is a smaller instrument, not a window on a big one.
+  const sixtyOne = P.keyboardGeometry(61, P.keyboardBox({ width: 1856, height: 240, size: 61 }));
+  assert.equal(sixtyOne.length, 61);
 });
 
 test('the falling design keeps the keyboard it has always had', () => {

@@ -203,7 +203,13 @@
      keys get the room the falling notes used to need. The notation
      keeps its own cap and simply shrinks into what is left, which is
      what a lesson video looks like: a big keyboard, the music over it. */
-  .video-frame.design-hands .video-mid{min-height:46%;}
+  .video-frame.design-hands .video-mid{min-height:20%;}
+  /* A real keyboard is only so deep for its key width, so with all 88
+     keys across a wide frame the keyboard is a shallow strip. The room
+     that leaves goes to the MUSIC -- which is the other thing a learner
+     is reading -- rather than sitting as a black band between the two. */
+  .video-frame.design-hands{--notation-height:270px;}
+  .video-frame.design-hands .video-notation{max-height:58%;}
   /* A tall frame in the Hands design has room the keyboard cannot use.
      A keyboard only gets so tall before its keys stop looking like
      keys (the engine caps them), so in 9:16 and 1:1 the space left
@@ -338,7 +344,7 @@
 <script src="../../assets/notation-engine.js?v=07113ca3"></script>
 <!-- The piano stage: the keyboard, and the notes falling onto it.
      piano-engine/, TypeScript + SVG, built to this bundle. -->
-<script src="../../assets/piano-engine.js?v=ffd2a2d4"></script>
+<script src="../../assets/piano-engine.js?v=ae0ad250"></script>
 <!-- Finds the count voices in the bucket whatever they were named. -->
 <script src="../../assets/voice-samples.js?v=609facad"></script>
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->

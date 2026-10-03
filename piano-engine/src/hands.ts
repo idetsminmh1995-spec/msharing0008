@@ -71,14 +71,21 @@ const FINGER_LENGTH = 2.35;
 const FINGER_THICK = 0.64;
 
 /**
- * Where a resting middle fingertip sits, down the key.
+ * How far behind the FRONT EDGE of the keys the knuckles sit, in white
+ * keys.
  *
- * A fraction of the keyboard's DEPTH, because that is a fact about
- * keys rather than about hands: a player's fingers sit up among the
- * black keys, not out at the front edge, so that the black ones are
- * there to be reached without moving the hand.
+ * Measured from the front rather than as a fraction of the keyboard's
+ * depth, because that is what it is: a player's hand rests where their
+ * arm reaches, a fixed distance in from the edge of the instrument,
+ * and the keys being long or short behind it changes nothing. Taking
+ * it as a fraction is what slid the whole hand down the keys and
+ * stretched it as the keyboard was drawn deeper.
+ *
+ * 1.75 keys puts the knuckles about 40mm in, the fingertips up among
+ * the black keys, and the heel of the palm just past the front edge --
+ * which is where a hand on a piano is.
  */
-const TIP_DEPTH = 0.29;
+const KNUCKLE_FROM_FRONT = 1.75;
 
 /**
  * The furthest forward a finger on a BLACK key may be, down the key.
@@ -112,7 +119,7 @@ const MAX_STRETCH = 1.3;
  * well down towards the heel, rather than off the front with the rest.
  */
 const FINGER_SHAPE: readonly { reach: number; drop: number; width: number }[] = [
-  { reach: 0.9, drop: 1.6, width: 1.42 }, // thumb -- short, thick, low, off the side
+  { reach: 1.0, drop: 2.4, width: 1.3 }, // thumb -- thick, low, off the side of the palm
   { reach: 0.93, drop: 0.1, width: 1.0 }, // index
   { reach: 1.0, drop: 0.0, width: 1.0 }, // middle -- the longest
   { reach: 0.94, drop: 0.08, width: 0.96 }, // ring
@@ -124,9 +131,6 @@ const CURL = 0.07;
 
 /** And how far one that IS playing straightens past its easy reach. */
 const REACH = 0.03;
-
-/** How far the outline bleeds out from under the skin. */
-const OUTLINE = 0.08;
 
 export interface HandColors {
   /** The hand itself. */
@@ -176,16 +180,6 @@ export function handColorsFor(colors: {
 
 export interface HandsOptions {
   readonly size: KeyboardSize;
-  /**
-   * The stretch of keyboard actually drawn, when it is not the whole
-   * instrument.
-   *
-   * The hands design shows a window of the keyboard in a narrow frame,
-   * and a hand has to be laid out on THE KEYS THAT ARE THERE -- given
-   * the full 88 while the stage drew two octaves, every finger would
-   * be on the wrong key by a third of the keyboard.
-   */
-  readonly range?: { readonly first: number; readonly last: number };
   /** The keyboard's own box, as `keyboardGeometry` was given it. */
   readonly board: { x: number; y: number; width: number; height: number };
   readonly seconds: number;
@@ -208,7 +202,7 @@ export interface HandsOptions {
 }
 
 /** Where one finger ends up, in the keyboard's own coordinates. */
-interface Fingertip {
+export interface Fingertip {
   readonly finger: Finger;
   readonly x: number;
   readonly y: number;
@@ -384,56 +378,145 @@ function blackKeyShift(
 }
 
 /**
- * One finger, from its knuckle to its tip.
+ * Where each finger of one hand is at this moment.
  *
- * Drawn as a stroked path rather than as a filled outline: a stroke
- * with a round cap IS a finger shape -- a rounded bar -- and it costs
- * one path instead of eight curves. The bow leans along the finger's
- * own direction, so a finger reaching sideways for a key looks reached
- * rather than snapped.
+ * The same answer `handShapes` draws from, offered on its own so that
+ * a caller -- or a test -- can ask where a finger IS without reading
+ * it back out of a path string. Nothing in the drawing is the source
+ * of truth about the hand; this is.
  */
-function fingerPath(fromX: number, fromY: number, toX: number, toY: number): string {
-  const midX = (fromX + toX) / 2 + (toX - fromX) * 0.06;
-  const midY = (fromY + toY) / 2 + Math.abs(toY - fromY) * 0.1;
-  return `M ${round(fromX)} ${round(fromY)} Q ${round(midX)} ${round(midY)} ${round(toX)} ${round(toY)}`;
+export function handFingertips(hand: Hand, options: HandsOptions): readonly Fingertip[] {
+  const keys = keyboardGeometry(options.size, options.board);
+  const whites = whiteKeys(keys);
+  if (whites.length === 0) return [];
+  const unit = (whites[0]?.width ?? options.board.width / 52) * (options.scale ?? 1);
+  const rough: HandFrame = {
+    unit,
+    knuckleY: options.board.y + options.board.height - unit * KNUCKLE_FROM_FRONT,
+    centreX: options.board.x + options.board.width / 2,
+    lean: 0,
+    palmWidth: unit * PALM_WIDTH,
+    thumbSide: hand === 'right' ? -1 : 1,
+  };
+  const knuckleY = rough.knuckleY - blackKeyShift(hand, options, keys, whites, rough);
+  return fingertips(hand, options, keys, whites, { ...rough, knuckleY });
 }
 
-/** One part of a hand, before it is given a colour. */
-type Limb =
-  | { readonly box: { x: number; y: number; width: number; height: number; radius: number } }
-  | { readonly stroke: { d: string; width: number } };
+/** One finger as the outline needs it: where it starts, ends and how thick. */
+interface Digit {
+  readonly base: { x: number; y: number };
+  readonly tip: { x: number; y: number };
+  readonly halfBase: number;
+  readonly halfTip: number;
+}
+
+/** A point, rounded, as SVG path data. */
+function at(x: number, y: number): string {
+  return `${round(x)} ${round(y)}`;
+}
 
 /**
- * The same parts twice: fat and dark underneath, true size and skin on
- * top. What shows of the dark pass is the silhouette's outline, and
- * only that -- which is why the hand has no seams in it.
+ * The direction across a finger -- its own left-to-right.
+ *
+ * A finger reaching sideways for a key is not vertical, and its sides
+ * have to stay parallel to IT, not to the frame. Getting this wrong is
+ * what makes a reaching finger look snapped rather than reached.
  */
-function paint(limbs: readonly Limb[], fill: string, grow: number): StageShape[] {
-  const out: StageShape[] = [];
-  for (const limb of limbs) {
-    if ('box' in limb) {
-      out.push({
-        x: round(limb.box.x - grow),
-        y: round(limb.box.y - grow),
-        width: round(limb.box.width + grow * 2),
-        height: round(limb.box.height + grow * 2),
-        fill,
-        radius: round(limb.box.radius + grow),
-      });
-    } else {
-      out.push({
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-        fill: 'none',
-        stroke: fill,
-        strokeWidth: round(limb.stroke.width + grow * 2),
-        path: limb.stroke.d,
-      });
+function across(digit: Digit): { x: number; y: number } {
+  const dx = digit.tip.x - digit.base.x;
+  const dy = digit.tip.y - digit.base.y;
+  const length = Math.hypot(dx, dy) || 1;
+  return { x: -dy / length, y: dx / length };
+}
+
+/**
+ * The whole hand as ONE closed outline.
+ *
+ * Not a palm with fingers laid on top of it: a single path that goes
+ * up the side of each finger, round its tip, down the other side, dips
+ * into the web, and comes back along the heel of the palm. That is the
+ * difference between a drawing of a hand and a drawing of a hand's
+ * parts -- there is no seam anywhere on it, because there is no join
+ * anywhere in it, and the one stroke around it is a real outline
+ * rather than five outlines that happen to touch.
+ *
+ * `digits` must be in drawn order, left to right.
+ */
+function handOutline(
+  digits: readonly Digit[],
+  palm: { left: number; right: number; bottom: number; heel: number },
+  web: number,
+): string {
+  const first = digits[0];
+  const last = digits[digits.length - 1];
+  if (first === undefined || last === undefined) return '';
+
+  const side = digits.map(across);
+  const left = (i: number, which: 'base' | 'tip'): { x: number; y: number } => {
+    const d = digits[i] as Digit;
+    const n = side[i] as { x: number; y: number };
+    const h = which === 'base' ? d.halfBase : d.halfTip;
+    const p = which === 'base' ? d.base : d.tip;
+    return { x: p.x - n.x * h, y: p.y - n.y * h };
+  };
+  const right = (i: number, which: 'base' | 'tip'): { x: number; y: number } => {
+    const d = digits[i] as Digit;
+    const n = side[i] as { x: number; y: number };
+    const h = which === 'base' ? d.halfBase : d.halfTip;
+    const p = which === 'base' ? d.base : d.tip;
+    return { x: p.x + n.x * h, y: p.y + n.y * h };
+  };
+
+  // Each side of a finger bows out a little, so a finger is a soft
+  // barrel rather than a pair of rails.
+  const bow = (
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    n: { x: number; y: number },
+    amount: number,
+  ): string =>
+    `Q ${at((from.x + to.x) / 2 + n.x * amount, (from.y + to.y) / 2 + n.y * amount)} ${at(to.x, to.y)}`;
+
+  const parts: string[] = [];
+  const start = left(0, 'base');
+  parts.push(`M ${at(start.x, start.y)}`);
+
+  digits.forEach((digit, i) => {
+    const n = side[i] as { x: number; y: number };
+    const lb = left(i, 'base');
+    const lt = left(i, 'tip');
+    const rt = right(i, 'tip');
+    const rb = right(i, 'base');
+    if (i > 0) {
+      // The web: a soft valley between two fingers, dipping into the
+      // hand rather than cutting into it.
+      const previous = right(i - 1, 'base');
+      parts.push(
+        `Q ${at((previous.x + lb.x) / 2, Math.max(previous.y, lb.y) + web)} ${at(lb.x, lb.y)}`,
+      );
     }
-  }
-  return out;
+    parts.push(bow(lb, lt, n, -digit.halfBase * 0.1));
+    // Over the tip. A real fingertip is a touch flatter than a circle,
+    // so the arc is slightly wider than it is tall.
+    parts.push(`A ${round(digit.halfTip * 1.05)} ${round(digit.halfTip)} 0 0 1 ${at(rt.x, rt.y)}`);
+    parts.push(bow(rt, rb, n, digit.halfBase * 0.1));
+  });
+
+  // Down the outside of the hand, round the heel, and back up.
+  const rb = right(digits.length - 1, 'base');
+  const lb = left(0, 'base');
+  const rightX = Math.max(palm.right, rb.x);
+  const leftX = Math.min(palm.left, lb.x);
+  const arcY = palm.bottom - palm.heel;
+  parts.push(
+    `C ${at(rightX, rb.y + (arcY - rb.y) * 0.22)} ${at(rightX, arcY - (arcY - rb.y) * 0.3)} ${at(rightX, arcY)}`,
+  );
+  parts.push(`A ${round((rightX - leftX) / 2)} ${round(palm.heel)} 0 0 1 ${at(leftX, arcY)}`);
+  parts.push(
+    `C ${at(leftX, arcY - (arcY - lb.y) * 0.3)} ${at(leftX, lb.y + (arcY - lb.y) * 0.22)} ${at(lb.x, lb.y)}`,
+  );
+  parts.push('Z');
+  return parts.join(' ');
 }
 
 /**
@@ -444,7 +527,7 @@ function paint(limbs: readonly Limb[], fill: string, grow: number): StageShape[]
  * player.
  */
 export function handShapes(hand: Hand, options: HandsOptions): readonly StageShape[] {
-  const keys = keyboardGeometry(options.range ?? options.size, options.board);
+  const keys = keyboardGeometry(options.size, options.board);
   const whites = whiteKeys(keys);
   if (whites.length === 0) return [];
 
@@ -455,29 +538,26 @@ export function handShapes(hand: Hand, options: HandsOptions): readonly StageSha
 
   // Where the knuckles sit.
   //
-  // Measured back from the FINGERTIPS, not forward from the top of the
-  // keys: a resting middle finger lies among the black keys, and the
-  // knuckles are one finger-length behind that. Taking it the other way
-  // round -- knuckles at some fraction of the keyboard -- is what made
-  // the hand stretch out of shape when the keyboard was drawn deep.
-  const naturalKnuckle = board.y + board.height * TIP_DEPTH + unit * FINGER_LENGTH * (1 - CURL);
-
+  // Measured in from the FRONT EDGE of the keys, where the player is,
+  // not as a fraction of a keyboard whose depth is a drawing decision.
+  // A hand rests where an arm reaches; the keys being long or short
+  // behind it changes nothing about the hand.
+  //
+  // A hand reaching a black key moves BACK rather than growing the
+  // finger past what a finger can do, so the knuckle line is settled
+  // before anything is drawn -- every finger moves together, because a
+  // hand is one object.
   const rough: HandFrame = {
     unit,
-    knuckleY: naturalKnuckle,
+    knuckleY: board.y + board.height - unit * KNUCKLE_FROM_FRONT,
     centreX: board.x + board.width / 2,
     lean: 0,
     palmWidth: unit * PALM_WIDTH,
     thumbSide: hand === 'right' ? -1 : 1,
   };
-  // A hand reaching a black key moves BACK rather than growing the
-  // finger past what a finger can do. Worked out from the rough pose
-  // and then applied to the real one, so every finger moves together --
-  // a hand is one object.
-  const shift = blackKeyShift(hand, options, keys, whites, rough);
-  const knuckleY = naturalKnuckle - shift;
+  const knuckleY = rough.knuckleY - blackKeyShift(hand, options, keys, whites, rough);
 
-  const tips = fingertips(hand, options, keys, whites, { ...rough, knuckleY });
+  const tips = handFingertips(hand, options);
   if (tips.length === 0) return [];
 
   // The palm sits behind the FOUR fingers, not behind all five: a thumb
@@ -487,88 +567,97 @@ export function handShapes(hand: Hand, options: HandsOptions): readonly StageSha
   const fourX = tips.filter((t) => t.finger !== 1).map((t) => t.x);
   const xs = fourX.length > 0 ? fourX : tips.map((t) => t.x);
   const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
-  const thumb = tips.find((t) => t.finger === 1);
-  const little = tips.find((t) => t.finger === 5);
+  const thumbAt = tips.find((t) => t.finger === 1);
+  const littleAt = tips.find((t) => t.finger === 5);
   // The hand leans towards its thumb, which is what tells a left hand
   // from a right one at a glance.
-  const lean = thumb !== undefined && little !== undefined ? (thumb.x - little.x) * 0.05 : 0;
+  const lean =
+    thumbAt !== undefined && littleAt !== undefined ? (thumbAt.x - littleAt.x) * 0.05 : 0;
   // The palm widens with the fingers but only so far: a hand stretching
   // two octaves does not get a two-octave palm, it keeps the same palm
   // and spreads its fingers.
   const spread = Math.abs(Math.max(...xs) - Math.min(...xs));
   const palmWidth = Math.min(unit * (PALM_WIDTH + 0.7), Math.max(unit * PALM_WIDTH, spread * 0.98));
 
-  // The palm's top edge sits just behind the knuckles, not well behind
-  // them: every bit of palm drawn past the knuckle line is a bit of
-  // finger swallowed, and a hand whose fingers are shorter than its
-  // palm is wide reads as a mitten.
-  const palmTop = knuckleY - unit * 0.3;
-  const palmHeight = unit * PALM_LENGTH;
-  const limbs: Limb[] = [];
-
-  // The fingers first, so the palm covers where they come out of it.
-  for (const tip of tips) {
+  const digit = (tip: Fingertip): Digit | undefined => {
     const shape = FINGER_SHAPE[tip.finger - 1];
-    if (shape === undefined) continue;
+    if (shape === undefined) return undefined;
     const isThumb = tip.finger === 1;
     // A thumb comes off the SIDE of the palm, low down; the other four
     // come off the knuckle line, spaced across it.
-    const knuckleX = isThumb
-      ? centreX + lean + rough.thumbSide * palmWidth * 0.44
-      : centreX + lean + clamp((tip.x - centreX) * 0.76, palmWidth * 0.38);
-    const from = knuckleY + unit * shape.drop * 0.5;
-    limbs.push({
-      stroke: {
-        d: fingerPath(knuckleX, from, tip.x, tip.y),
-        width: unit * FINGER_THICK * shape.width,
-      },
-    });
-  }
+    const baseX = isThumb
+      ? centreX + lean + rough.thumbSide * palmWidth * 0.48
+      : centreX + lean + clamp((tip.x - centreX) * 0.8, palmWidth * 0.4);
+    const half = (unit * FINGER_THICK * shape.width) / 2;
+    return {
+      base: { x: baseX, y: knuckleY + unit * shape.drop * 0.5 },
+      tip: { x: tip.x, y: tip.y },
+      // A finger is a little thicker at the knuckle than at the tip.
+      halfBase: half * 1.1,
+      halfTip: half * 0.92,
+    };
+  };
 
-  // The palm over the knuckles, as two boxes that overlap: the back of
-  // a hand is nearly square across the knuckles and round at the heel,
-  // and one rounded rectangle can only be one of those. Two of them
-  // union into the right shape, because the whole hand is painted as
-  // one silhouette anyway.
-  const palmX = centreX + lean - palmWidth / 2;
-  limbs.push({
-    box: {
-      x: palmX,
-      y: palmTop,
-      width: palmWidth,
-      height: palmHeight * 0.62,
-      radius: palmWidth * 0.16,
+  const fingers = tips
+    .filter((tip) => tip.finger !== 1)
+    .map(digit)
+    .filter((d): d is Digit => d !== undefined)
+    .sort((a, b) => a.base.x - b.base.x);
+  const thumb = thumbAt === undefined ? undefined : digit(thumbAt);
+
+  // The thumb is drawn as its OWN shape rather than as a sixth bump on
+  // the hand's outline.
+  //
+  // On a real hand the thumb's knuckle is under the palm, not beside
+  // the index finger's: walked as one outline the two cross, and a
+  // closed path that crosses itself shows the crossing as a line
+  // through the drawing. Two shapes that OVERLAP have no such line,
+  // because the hand is painted in two passes -- every part in the
+  // edge colour and a little fatter, then every part in skin at its
+  // true size -- and what shows of the first pass is the outline of
+  // the union and nothing else.
+  const outline = handOutline(
+    fingers,
+    {
+      left: centreX + lean - palmWidth / 2,
+      right: centreX + lean + palmWidth / 2,
+      bottom: knuckleY - unit * 0.3 + unit * PALM_LENGTH,
+      heel: palmWidth * 0.46,
     },
-  });
-  limbs.push({
-    box: {
-      x: palmX + palmWidth * 0.02,
-      y: palmTop + palmHeight * 0.3,
-      width: palmWidth * 0.96,
-      height: palmHeight * 0.7,
-      radius: palmWidth * 0.42,
-    },
-  });
-
-  const shapes: StageShape[] = [
-    ...paint(limbs, colors.edge, unit * OUTLINE),
-    ...paint(limbs, colors.skin, 0),
-  ];
-
-  // A pad on the fingertip that is pressing: inside the silhouette, so
-  // it marks the finger without breaking its outline.
-  for (const tip of tips) {
-    if (!tip.pressed) continue;
-    const r = unit * 0.21;
+    unit * 0.22,
+  );
+  if (outline === '') return [];
+  const grow = unit * 0.075;
+  const thumbWidth = thumb === undefined ? 0 : thumb.halfBase * 2;
+  const shapes: StageShape[] = [];
+  const pass = (fill: string, extra: number): void => {
     shapes.push({
-      x: round(tip.x - r),
-      y: round(tip.y - r),
-      width: round(r * 2),
-      height: round(r * 2),
-      fill: darken(colors.skin, 0.17),
-      radius: round(r),
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      fill,
+      ...(extra > 0 ? { stroke: fill, strokeWidth: round(extra * 2) } : {}),
+      path: outline,
     });
-  }
+    if (thumb !== undefined) {
+      shapes.push({
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        fill: 'none',
+        stroke: fill,
+        strokeWidth: round(thumbWidth + extra * 2),
+        path: `M ${at(thumb.base.x, thumb.base.y)} Q ${at(
+          (thumb.base.x + thumb.tip.x) / 2 + (thumb.tip.x - thumb.base.x) * 0.1,
+          (thumb.base.y + thumb.tip.y) / 2 + unit * 0.1,
+        )} ${at(thumb.tip.x, thumb.tip.y)}`,
+      });
+    }
+  };
+  pass(colors.edge, grow);
+  pass(colors.skin, 0);
 
   // And the finger's number on the key it is playing.
   //
@@ -578,10 +667,12 @@ export function handShapes(hand: Hand, options: HandsOptions): readonly StageSha
   if (options.fingerNumbers !== false) {
     for (const tip of tips) {
       if (!tip.pressed) continue;
+      // Sized by the key's WIDTH so it fits between a key's edges
+      // whatever shape the frame is.
       const badge = unit * 0.34;
       shapes.push({
         x: round(tip.x - badge),
-        y: round(tip.y + unit * 0.95 - badge),
+        y: round(tip.y + unit * 0.92 - badge),
         width: round(badge * 2),
         height: round(badge * 2),
         fill: colors.tip,

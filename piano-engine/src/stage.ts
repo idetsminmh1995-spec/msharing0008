@@ -10,13 +10,7 @@
  */
 import { parseColor } from './color.js';
 import { DEFAULT_HAND_COLORS, handsShapes } from './hands.js';
-import {
-  keyboardGeometry,
-  keyboardRange,
-  pressedAt,
-  whiteKeysBetween,
-  whiteOutward,
-} from './keyboard.js';
+import { keyboardGeometry, pressedAt, whiteKeyCount } from './keyboard.js';
 import { n, path, rect, text, wrap } from './svg.js';
 import type {
   FallingBar,
@@ -89,92 +83,14 @@ const KEYBOARD_FRACTION = 1 / 3;
  * where it sits. Without it a hand is cut off at the wrist by the
  * bottom of the frame.
  */
-const KEY_DEPTH = 5.4;
+const KEY_DEPTH = 7;
 const HAND_BAND = 1.3;
-
-/**
- * The fewest white keys the hands design will ever show: two octaves.
- *
- * Below that the window stops being a keyboard and becomes a diagram
- * of four notes -- and a hand spans five white keys, so two hands and
- * the air between them need about this much to sit in at all.
- */
-const MIN_HANDS_WHITES = 14;
 
 /** The strike line's thickness, as a fraction of the keyboard's height. */
 const LINE_FRACTION = 0.05;
 
 export function resolveColors(colors?: Partial<PianoColors>): PianoColors {
   return { ...DEFAULT_COLORS, ...(colors ?? {}) };
-}
-
-/**
- * The stretch of keyboard the hands design shows.
- *
- * Two things decide it, and the answer is the larger:
- *
- *  - what the FRAME can show. A key has a believable length (see
- *    `MAX_KEY_LENGTH`), so a box of a given shape can only carry so
- *    many keys before they stop looking like keys. A 16:9 stage is
- *    wide and shallow and carries the whole piano; a 9:16 stage is
- *    the other way round and carries about two octaves. That is not a
- *    compromise -- it is what a lesson video filmed in portrait shows,
- *    because it is all that fits.
- *  - what the PIECE needs. A hand that reaches a key outside the
- *    window would be drawn pressing nothing, so the window always
- *    covers every note in the score, however wide that makes it.
- *
- * Fixed for the whole video, centred on the music's own range: a
- * keyboard that scrolled would move under the hands, and then neither
- * the hands nor the keys could be read.
- */
-export function handsRange(options: {
-  width: number;
-  height: number;
-  size?: KeyboardSize;
-  notes?: readonly PianoNote[];
-  keyboardHeight?: number;
-}): { first: number; last: number } {
-  const full = keyboardRange(options.size ?? 88);
-  const fullWhites = whiteKeysBetween(full.first, full.last);
-
-  const available =
-    options.keyboardHeight !== undefined && options.keyboardHeight > 0
-      ? Math.min(options.keyboardHeight, options.height)
-      : options.height;
-  const affords =
-    available > 0 ? Math.round((options.width * (KEY_DEPTH + HAND_BAND)) / available) : fullWhites;
-
-  const played = (options.notes ?? [])
-    .map((note) => note.midi)
-    .filter((midi) => midi >= full.first && midi <= full.last);
-  // Nothing uploaded yet: sit on middle C, so the empty page shows a
-  // keyboard rather than a guess.
-  const low = whiteOutward(played.length > 0 ? Math.min(...played) : 60, -1);
-  const high = whiteOutward(played.length > 0 ? Math.max(...played) : 60, 1);
-  const needed = whiteKeysBetween(low, high) + 2;
-
-  const whites = Math.max(
-    MIN_HANDS_WHITES,
-    Math.min(fullWhites, Math.max(Math.min(affords, fullWhites), needed)),
-  );
-
-  // Grow outwards from the music, a white key at a time, each side in
-  // turn, so the window ends up centred on what is actually played.
-  let first = low;
-  let last = high;
-  let left = true;
-  while (whiteKeysBetween(first, last) < whites) {
-    const canLeft = first > full.first;
-    const canRight = last < full.last;
-    if (!canLeft && !canRight) break;
-    if (left && canLeft) first = whiteOutward(first - 1, -1);
-    else if (!left && canRight) last = whiteOutward(last + 1, 1);
-    else if (canLeft) first = whiteOutward(first - 1, -1);
-    else last = whiteOutward(last + 1, 1);
-    left = !left;
-  }
-  return { first: Math.max(full.first, first), last: Math.min(full.last, last) };
 }
 
 export function keyboardBox(options: {
@@ -219,18 +135,24 @@ function handsKeyboardBox(options: {
   size?: KeyboardSize;
   notes?: readonly PianoNote[];
 }): { x: number; y: number; width: number; height: number } {
-  const range = handsRange(options);
-  const unit = options.width / Math.max(1, whiteKeysBetween(range.first, range.last));
+  // The whole instrument the caller asked for. 88 Keys means 88 keys:
+  // showing a window of it and calling it an 88 is answering a
+  // different question from the one the control asks.
+  const unit = options.width / whiteKeyCount(options.size ?? 88);
   const band = unit * HAND_BAND;
   const asked =
     options.keyboardHeight !== undefined && options.keyboardHeight > 0
       ? Math.min(options.keyboardHeight, options.height)
       : Math.max(options.height * 0.55, options.height - band);
   const depth = Math.max(1, Math.min(unit * KEY_DEPTH, asked, options.height));
+  // Along the BOTTOM of the stage, with the hands' strip under it: the
+  // keyboard is the nearest thing to the player, so whatever room is
+  // left over belongs above it, with the music, and not split either
+  // side of it as a pair of black bands.
   const group = Math.min(options.height, depth + band);
   return {
     x: 0,
-    y: Math.max(0, (options.height - group) / 2),
+    y: Math.max(0, options.height - group),
     width: options.width,
     height: depth,
   };
@@ -423,7 +345,7 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
   const design: PianoDesign = options.design ?? 'falling-notes';
   const falling = design === 'falling-notes';
   const board = keyboardBox(options);
-  const keys = keyboardGeometry(falling ? options.size : handsRange(options), board);
+  const keys = keyboardGeometry(options.size, board);
   const down = pressedAt(notes, options.seconds);
   const lineHeight = Math.max(1, board.height * LINE_FRACTION);
   const edge = Math.max(0.5, board.width / 900);
@@ -533,10 +455,6 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
   if (!falling && options.hands !== undefined) {
     for (const shape of handsShapes({
       size: options.size,
-      // The window the stage actually drew, not the whole instrument:
-      // a hand laid out on 88 keys while two octaves were drawn puts
-      // every finger a third of a keyboard away from its own key.
-      range: handsRange(options),
       board,
       seconds: options.seconds,
       notes: options.hands.notes,

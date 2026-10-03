@@ -14,8 +14,6 @@ export {
   keyboardRange,
   pressedAt,
   whiteKeyCount,
-  whiteKeysBetween,
-  whiteOutward,
 } from './keyboard.js';
 export {
   DEFAULT_COLORS,
@@ -24,7 +22,6 @@ export {
   fallingBars,
   gridShapes,
   handColor,
-  handsRange,
   keyboardBox,
   renderKeyboardSvg,
   renderPianoStage,
@@ -34,8 +31,14 @@ export {
 export { darken, parseColor } from './color.js';
 export { FINGERS, anchorAt, fingersDownAt, planFingering, whiteIndex } from './fingering.js';
 export type { FingeredNote, Finger, FingeringPlan, HandAnchor } from './fingering.js';
-export { DEFAULT_HAND_COLORS, handColorsFor, handShapes, handsShapes } from './hands.js';
-export type { HandColors, HandsOptions } from './hands.js';
+export {
+  DEFAULT_HAND_COLORS,
+  handColorsFor,
+  handFingertips,
+  handShapes,
+  handsShapes,
+} from './hands.js';
+export type { Fingertip, HandColors, HandsOptions } from './hands.js';
 export type {
   FallingBar,
   GridLine,

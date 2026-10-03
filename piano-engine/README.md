@@ -173,14 +173,21 @@ reaches further than one on a white. Drawing it the other way round --
 an arm coming down out of the sky with fingers pointing at the viewer
 -- is the single thing that stops a drawn hand reading as a hand.
 
-**One silhouette, not seven parts.** A hand is drawn twice: once in the
-edge colour with every part a little fatter, then again in the skin
-colour at its true size. The parts overlap, so the first pass shows
-only where nothing covers it -- which is exactly the outline of the
-whole hand. There is no line between the palm and a finger, or between
-two fingers that touch, because there is nothing there to draw a line
-with. Outlining each part separately is what made the first attempt
-look like a rake.
+**One closed outline, not a palm with fingers laid on it.** The hand is
+a single path that goes up the side of each finger, round its tip, down
+into the web, and back along the heel of the palm. There is no seam
+anywhere on it because there is no join anywhere in it, and the one
+stroke around it is a real outline rather than five outlines that
+happen to touch.
+
+The thumb is the exception, and has to be: its knuckle is under the
+palm, not beside the index finger's, so walked as part of the same
+outline the two cross -- and a closed path that crosses itself draws
+the crossing as a line through the hand. So the thumb is its own shape
+OVERLAPPING the rest, and the pair are painted in two passes: both of
+them in the edge colour and a little fatter, then both in skin at true
+size. What shows of the first pass is the outline of the union and
+nothing else.
 
 **Measured in white keys.** A white key is 23mm and a hand is a hand,
 so the proportions are real measurements rather than taste: a palm is
@@ -188,13 +195,12 @@ so the proportions are real measurements rather than taste: a palm is
 finger reaches 2.35. That is why a hand covers five white keys -- not
 because five is convenient, but because a hand is 90mm wide.
 
-**Measured back from the fingertips, too.** A resting middle finger
-lies up among the black keys, and the knuckles are one finger-length
-behind it; the palm follows the knuckles. Taking it the other way
-round -- knuckles at some fraction of the keyboard -- is what made the
-hand stretch out of shape when the keyboard was drawn deep, and it is
-why a white key is now never drawn longer than a white key really is
-(`KEY_DEPTH`): past that, the hand on it stops being a hand.
+**Placed from the front edge of the keys**, not at some fraction of the
+keyboard's depth. A hand rests where an arm reaches -- a fixed distance
+in from the edge of the instrument -- and the keys being long or short
+behind it changes nothing about the hand. Taking it as a fraction slid
+the whole hand down the keys and stretched it as the keyboard was drawn
+deeper.
 
 **A strip in front of the keys.** The keyboard does not reach the
 bottom of the stage. The heel of a hand reaching the keys rests past
@@ -202,9 +208,18 @@ their front edge, exactly as it does on a real piano, and `HAND_BAND`
 is where it rests. Drawing keyboard into it cuts every hand off at the
 wrist.
 
-**Every C is named** on its own key -- C2, C3, C4 -- because a learner
+**Every C is named** on its own key -- C1 to C8 -- because a learner
 watching a hand move cannot count 52 white keys but can see which C it
 has reached. `keyNames: false` turns them off.
+
+**Nothing is drawn ON a playing finger.** The key under it is lit, the
+finger has reached for it, and its number is on the key: three cues for
+one fact, and a marker on the fingertip would be a fourth smudging the
+silhouette.
+
+`handFingertips(hand, options)` returns where every finger is, so a
+caller -- or a test -- can ask without reading it back out of a path
+string. Nothing in the drawing is the source of truth about the hand.
 
 Three more things make it read as a hand, none of them detail:
 
@@ -233,27 +248,16 @@ identically, so the preview and the exported video stay one drawing.
 
 ### How much keyboard the hands design shows
 
-A keyboard stretched to whatever box it is given stops being a
-keyboard. A 9:16 stage is twice as tall as it is wide, and 88 keys
-across it are four millimetres wide on a phone with hands on them that
-are specks. So the hands design shows a WINDOW, and two things decide
-how wide it is -- the answer being the larger:
+All of it. 88 Keys means 88 keys: showing a window of the instrument
+and calling it an 88 answers a different question from the one the
+control asks.
 
-- **what the frame can carry.** A white key is about six and a half of
-  its own widths long; eleven is the most this engine will draw before
-  the drawing starts lying. A 16:9 stage is wide and shallow and
-  carries most of the piano; a 9:16 stage carries a few octaves. That
-  is not a compromise, it is what a lesson video filmed in portrait
-  shows, because it is all that fits.
-- **what the piece needs.** A hand reaching a key outside the window
-  would be drawn pressing nothing, so the window always covers every
-  note in the score, however wide that makes it.
-
-Fixed for the whole video and centred on the music's own range: a
-keyboard that scrolled would move under the hands, and then neither the
-hands nor the keys could be read. The `falling-notes` design is not
-windowed or capped -- it has always drawn the whole keyboard, and the
-notes coming down fill the height.
+What the design does cap is how LONG a white key is drawn. A real one
+is 150mm long and 23mm wide; a keyboard stretched to fill a tall frame
+is a tower of planks, and a hand correctly sized for its keys becomes a
+spider on it. So the keys stop at `KEY_DEPTH` of their own widths and
+whatever room is left over goes to the music above them, not to a black
+band between the two.
 
 ### The finger numbers
 
