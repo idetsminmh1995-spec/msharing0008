@@ -11,6 +11,7 @@
 import { canvasFor, header, tempoStats } from './layout.js';
 import { DESIGNS, designById } from './designs/index.js';
 import { escapeText, n, rect } from './svg.js';
+import { metronomeLogoName } from './logos.js';
 import { isLightPalette, paletteForDesign } from './theme.js';
 import { ASPECT_RATIOS } from './types.js';
 import type {
@@ -36,6 +37,7 @@ export {
   statRowHeight,
 } from './layout.js';
 export { paletteForDesign, isLightPalette } from './theme.js';
+export { metronomeLogoName, DEFAULT_LOGO_NAME } from './logos.js';
 export type {
   AspectRatio,
   Canvas,
@@ -57,6 +59,12 @@ export interface DesignSummary {
   readonly palette: Palette;
   /** True when the design's ground is light -- a host may need to know. */
   readonly isLight: boolean;
+  /**
+   * The mark this design carries, as a NAME -- 'drum', 'piano',
+   * 'sharing' -- for a host to resolve to one of its own files. See
+   * `logos.ts`.
+   */
+  readonly logo: string;
 }
 
 export function listDesigns(): readonly DesignSummary[] {
@@ -69,6 +77,7 @@ export function listDesigns(): readonly DesignSummary[] {
       look: design.look,
       palette,
       isLight: isLightPalette(palette),
+      logo: metronomeLogoName(design.id),
     };
   });
 }

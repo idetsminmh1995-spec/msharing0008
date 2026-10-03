@@ -23,6 +23,7 @@ var MetronomeDesigns = (() => {
   __export(index_exports, {
     ASPECT_RATIOS: () => ASPECT_RATIOS,
     DEFAULT_DESIGN_ID: () => DEFAULT_DESIGN_ID,
+    DEFAULT_LOGO_NAME: () => DEFAULT_LOGO_NAME,
     DESIGNS: () => DESIGNS,
     LOGO_FRACTION: () => LOGO_FRACTION,
     bands: () => bands,
@@ -31,6 +32,7 @@ var MetronomeDesigns = (() => {
     isLightPalette: () => isLightPalette,
     listDesigns: () => listDesigns,
     logoBox: () => logoBox,
+    metronomeLogoName: () => metronomeLogoName,
     paletteForDesign: () => paletteForDesign,
     renderMetronomeFrame: () => renderMetronomeFrame,
     statColumnWidth: () => statColumnWidth,
@@ -1216,6 +1218,25 @@ var MetronomeDesigns = (() => {
     return DESIGNS.find((design) => design.id === id);
   }
 
+  // src/logos.ts
+  var LOGOS = {
+    pendulum: "drum",
+    "beat-dots": "piano",
+    "pulse-ring": "guitar",
+    "bar-meter": "bass",
+    "sweep-dial": "violin",
+    "big-number": "cello",
+    "segment-ring": "vocal",
+    "travel-line": "sharing",
+    "flash-frame": "sharing",
+    "bounce-ball": "sharing",
+    "stack-blocks": "sharing"
+  };
+  var DEFAULT_LOGO_NAME = "sharing";
+  function metronomeLogoName(designId) {
+    return LOGOS[designId] ?? DEFAULT_LOGO_NAME;
+  }
+
   // src/theme.ts
   var BRAND_RED = "#C81E2C";
   var STAT_ON_DARK = { value: "#F9D100", label: "#E40006" };
@@ -1294,7 +1315,8 @@ var MetronomeDesigns = (() => {
         description: design.description,
         look: design.look,
         palette,
-        isLight: isLightPalette(palette)
+        isLight: isLightPalette(palette),
+        logo: metronomeLogoName(design.id)
       };
     });
   }

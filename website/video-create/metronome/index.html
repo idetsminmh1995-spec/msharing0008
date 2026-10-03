@@ -297,7 +297,7 @@
 </div>
 
 <script src="../../assets/notation-engine.js?v=8f53f84c"></script>
-<script src="../../assets/metronome-engine.js?v=bb4ff4cb"></script>
+<script src="../../assets/metronome-engine.js?v=1d5533ff"></script>
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
 <script src="../../assets/voice-samples.js?v=609facad"></script>
 <script src="../../assets/outro-video.js?v=521fc4cb"></script>
@@ -1170,8 +1170,34 @@
   const logoPreview = document.getElementById('logoPreview');
   const logoClear = document.getElementById('logoClear');
   const logoName = document.getElementById('logoName');
-  const BUILT_IN_LOGO = '../../assets/logo/sharing-piano-logo-full.svg';
-  let frameLogoUrl = BUILT_IN_LOGO;
+  /**
+   * The mark each design carries, by the NAME the engine gives it.
+   *
+   * The engine decides which design wears which instrument (see its
+   * `logos.ts`); this is the only place that knows where the files
+   * are. A name with no file here falls back to the house mark rather
+   * than leaving the corner empty.
+   */
+  const LOGO_FILES = {
+    drum: '../../assets/logo/sharing-drum-logo-full.svg',
+    piano: '../../assets/logo/sharing-piano-logo-full.svg',
+    guitar: '../../assets/logo/sharing-guitar-logo-full.svg',
+    bass: '../../assets/logo/sharing-bass-logo-full.svg',
+    violin: '../../assets/logo/sharing-violin-logo-full.svg',
+    cello: '../../assets/logo/sharing-cello-logo-full.svg',
+    vocal: '../../assets/logo/sharing-vocal-logo-full.svg',
+    sharing: '../../assets/logo/sharing-logo-full.svg',
+  };
+  const HOUSE_LOGO = LOGO_FILES.sharing;
+
+  /** The chosen design's own mark, or the house one if it has no file. */
+  function designLogoUrl() {
+    if (typeof MetronomeDesigns === 'undefined') return HOUSE_LOGO;
+    const name = MetronomeDesigns.metronomeLogoName(designSelect.value);
+    return LOGO_FILES[name] ?? HOUSE_LOGO;
+  }
+
+  let frameLogoUrl = HOUSE_LOGO;
   let chosenLogoUrl = null;
 
   /**
@@ -1198,10 +1224,18 @@
     }
   }
 
+  /**
+   * Shows `url` as the frame's mark, or the design's own when it is null.
+   *
+   * Called again whenever the DESIGN changes, not only when the person
+   * picks a file: with no file chosen the mark belongs to the design,
+   * so switching from Pendulum to Beat Dots has to swap the drum for
+   * the piano. An uploaded file still wins over all of it.
+   */
   function showLogo(url, name) {
-    if (chosenLogoUrl) URL.revokeObjectURL(chosenLogoUrl);
+    if (url !== chosenLogoUrl && chosenLogoUrl) URL.revokeObjectURL(chosenLogoUrl);
     chosenLogoUrl = url;
-    frameLogoUrl = url ?? BUILT_IN_LOGO;
+    frameLogoUrl = url ?? designLogoUrl();
     frameLogoDataUrl = undefined;
     void toDataUrl(frameLogoUrl).then((data) => {
       frameLogoDataUrl = data;
@@ -1213,8 +1247,14 @@
     logoPreview.appendChild(img);
     logoClear.hidden = url === null;
     logoName.textContent =
-      url === null ? 'No logo chosen \u2014 the built-in mark is used.' : name;
+      url === null ? "No logo chosen \u2014 the design's own mark is used." : name;
     drawFrame();
+  }
+
+  /** Re-reads the design's mark, for when the design changed under it. */
+  function refreshDesignLogo() {
+    if (chosenLogoUrl !== null) return; // the person's own file wins
+    showLogo(null, '');
   }
 
   logoInput.addEventListener('change', (e) => {
@@ -1256,6 +1296,7 @@
 
   designSelect.addEventListener('change', () => {
     showDesignHint();
+    refreshDesignLogo();
     drawFrame();
   });
 

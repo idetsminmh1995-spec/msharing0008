@@ -342,10 +342,14 @@ export function header(context: DesignContext): string {
 /**
  * The mark, always in the TOP-LEFT corner.
  *
- * Always, and not per design: a logo that moves between designs is a
- * logo the eye has to hunt for, and on a channel's worth of videos the
- * corner it sits in IS the branding. `header` reserves room for it, so
- * nothing is drawn over it.
+ * Always the same CORNER, whichever design is drawing: a mark that
+ * moves about is one the eye has to hunt for, and on a channel's worth
+ * of videos the corner it sits in IS the branding. `header` reserves
+ * room for it, so nothing is drawn over it.
+ *
+ * WHICH mark does vary -- see `logos.ts`. The design decides, the page
+ * resolves the name to a file, and this draws whatever URL it is
+ * handed.
  *
  * Nothing is drawn when there is no logo: a placeholder box in an
  * exported video is worse than empty space.

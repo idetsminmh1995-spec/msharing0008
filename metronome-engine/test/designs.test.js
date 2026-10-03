@@ -335,3 +335,31 @@ test('the readout sits under the title in the narrow shapes, not along the botto
     assert.ok(stage.y + stage.height > canvas.height * 0.9, `${aspect}: the stage stops short`);
   }
 });
+
+test('each design carries its own mark: the two the owner named', () => {
+  assert.equal(M.metronomeLogoName('pendulum'), 'drum');
+  assert.equal(M.metronomeLogoName('beat-dots'), 'piano');
+});
+
+test('every design has a mark, and it is in the summary a picker reads', () => {
+  for (const design of M.listDesigns()) {
+    assert.equal(typeof design.logo, 'string');
+    assert.ok(design.logo.length > 0, `${design.id} has no mark`);
+    assert.equal(design.logo, M.metronomeLogoName(design.id));
+  }
+});
+
+test('a design nobody has heard of gets the house mark, never an empty corner', () => {
+  assert.equal(M.metronomeLogoName('no-such-design'), M.DEFAULT_LOGO_NAME);
+  assert.equal(M.DEFAULT_LOGO_NAME, 'sharing');
+});
+
+test('the seven instruments are spread one per design, not repeated', () => {
+  // Eleven designs, seven instruments: each instrument is used once and
+  // the four left over take the house mark. A repeat would say something
+  // untrue about a design rather than nothing.
+  const used = M.listDesigns()
+    .map((d) => d.logo)
+    .filter((name) => name !== M.DEFAULT_LOGO_NAME);
+  assert.equal(new Set(used).size, used.length, `an instrument is used twice: ${used.join(', ')}`);
+});
