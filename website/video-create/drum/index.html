@@ -832,6 +832,11 @@
     videoFrame.style.backgroundImage = '';
     kitBackgroundImage = null;
     kitContentTop = null;
+    // The shape decides what the notation is drawn WITH, so it has to
+    // be drawn again -- after the classes above, which is what
+    // `notationConfig` reads, and before `fitNotationToKit`, which
+    // measures what came out.
+    redrawNotation();
     fitNotationToKit();
     if (hitLayer) hitLayer.innerHTML = '';
     if (currentKit.path) {
@@ -1182,7 +1187,22 @@
   let lastParsed = null;
   let lastFileLabel = '';
 
+  /**
+   * True for the two shapes where the music and the drum kit compete
+   * for the same height.
+   *
+   * 16:9 is wide enough that the staff has never been the thing in the
+   * way, and its look is settled -- so everything below that trades
+   * something away to make the notes bigger is asked for ONLY here.
+   */
+  function isNarrowShape() {
+    return (
+      videoFrame.classList.contains('is-portrait') || videoFrame.classList.contains('is-square')
+    );
+  }
+
   function notationConfig() {
+    const narrow = isNarrowShape();
     return {
       colors: {
         // White notation on the video's own dark frame; near-black on
@@ -1192,30 +1212,38 @@
         ink: currentVideoStyle() === 'black' ? '#ffffff' : '#111111',
         background: 'none',
       },
-      // The frame already says the tempo and the bar, in its own boxes,
-      // in letters a phone can read. Drawing them over the staff as
-      // well is the same fact twice -- and it is not free: the engine
-      // reserves the room above EVERY system for whichever of them is
-      // tallest, which on this score was four staff spaces of height
-      // the music could have had instead. Turning them off makes the
-      // notes a quarter bigger without moving anything else.
+      // NARROW SHAPES ONLY, all three of these. 16:9 keeps the tempo
+      // mark, the bar numbers and the engine's full system height --
+      // the look it already had.
       //
-      // The tempo map is untouched. `tempoMarks.display` decides what
-      // is DRAWN; playback still reads every mark the file carries, so
-      // a score that changes speed still changes speed.
-      barNumbers: { display: 'off' },
-      tempoMarks: { display: 'off' },
-      // And the system stops where the music does. A system reserves
-      // eight staff spaces below the bottom line for everything a score
-      // MAY carry there; this one carries a kick's down stem and
-      // nothing else, so the rest was height the notes did not get.
+      // On a phone the frame already says the tempo and the bar, in its
+      // own boxes, in letters a reader can see. Drawing them over the
+      // staff as well is the same fact twice -- and it is not free: the
+      // engine reserves the room above EVERY system for whichever of
+      // them is tallest, which on this score was four staff spaces of
+      // height the music could have had instead.
       //
-      // It gives as well as takes: the four spaces above the top line
-      // are not enough for a china cymbal's up stem, which is a space
-      // and a half higher than that -- the tempo mark's own padding
-      // used to hide it, and turning the mark off cut the stem off at
-      // the top of the picture until this grew the room back.
-      layout: { fitSystemHeight: true },
+      // The tempo map is untouched either way. `tempoMarks.display`
+      // decides what is DRAWN; playback still reads every mark the file
+      // carries, so a score that changes speed still changes speed.
+      ...(narrow
+        ? {
+            barNumbers: { display: 'off' },
+            tempoMarks: { display: 'off' },
+            // And the system stops where the music does. It reserves
+            // eight staff spaces below the bottom line for everything a
+            // score MAY carry there; this one carries a kick's down
+            // stem and nothing else.
+            //
+            // It gives as well as takes: the four spaces above the top
+            // line are not enough for a china cymbal's up stem, which
+            // is a space and a half higher than that -- the tempo
+            // mark's own padding used to hide it, and turning the mark
+            // off cut the stem off at the top of the picture until this
+            // grew the room back.
+            layout: { fitSystemHeight: true },
+          }
+        : {}),
     };
   }
   const statBpm = document.getElementById('statBpm');
@@ -1393,13 +1421,8 @@
   function fitNotationToKit() {
     if (!notationContainer) return;
     videoFrame.style.removeProperty('--note-h');
-    // 16:9 only, deliberately: that frame is wide enough that the
-    // staff has never been the thing in the way, and it is the one
-    // shape whose look is already settled. The two narrow shapes are
-    // where the music and the kit compete for the same height.
-    const narrow =
-      videoFrame.classList.contains('is-portrait') || videoFrame.classList.contains('is-square');
-    if (!narrow) return;
+    // The two narrow shapes only -- see `isNarrowShape`.
+    if (!isNarrowShape()) return;
     const svg = notationContainer.querySelector('svg');
     const img = kitBackgroundImage;
     if (!svg || kitContentTop === null || !img || !(img.naturalHeight > 0)) return;
@@ -1807,12 +1830,30 @@
     }
     // A title still following the style has to move with it.
     syncTitles();
+    redrawNotation();
+  }
+
+  /**
+   * Re-draws the notation from the score already parsed -- no file is
+   * re-read and nothing is re-parsed.
+   *
+   * Called for a style change AND for a shape change, because both move
+   * `notationConfig`: the ink colour follows the style, and whether the
+   * tempo mark is drawn at all follows the shape. Missing the second
+   * was how the 16:9 frame ended up with the narrow shapes' notation.
+   *
+   * The whole SVG is replaced (the config is baked into every element),
+   * so the cursor goes with it and has to be re-attached and put back
+   * where the audio is. Skipping that is how a switch mid-playback
+   * would leave the marker behind.
+   */
+  function redrawNotation() {
     if (lastParsed === null || typeof NotationEngine === 'undefined') return;
     let rendered;
     try {
       rendered = NotationEngine.renderParsedMusicXml(lastParsed, { config: notationConfig() });
     } catch (err) {
-      console.error('Notation Engine failed re-rendering in the ' + style + ' style:', err);
+      console.error('Notation Engine failed re-rendering:', err);
       return;
     }
     notationContainer.innerHTML = rendered.svg;
