@@ -77,6 +77,8 @@ export interface PianoColors {
   readonly rightHand: string;
   /** Behind the falling notes. `'none'` draws nothing, which is what a video frame wants. */
   readonly background: string;
+  /** The note name printed on a C key in the hands design. */
+  readonly keyName: string;
 }
 
 export interface PianoStageOptions {
@@ -138,6 +140,15 @@ export interface PianoStageOptions {
    * notes, the same fingering and the same keyboard go in either way.
    */
   readonly design?: PianoDesign;
+  /**
+   * Print each C's name on its key: C3, C4, and so on.
+   *
+   * On by default in the hands design and never drawn in the other
+   * one. It is the keyboard's ruler: a learner watching a hand move
+   * cannot count 52 white keys, but they can see which C it has
+   * reached, and every piano lesson video marks them for that reason.
+   */
+  readonly keyNames?: boolean;
 }
 
 /**

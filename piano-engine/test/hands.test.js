@@ -192,10 +192,39 @@ test('the hand points away from the player: fingertips above the palm', () => {
   assert.ok(widest.y + widest.height > BOARD.y + BOARD.height * 0.8, 'the heel is down at the front');
 });
 
-test('a finger on a black key reaches further up the board than one on a white', () => {
-  const white = handsFor([note(60, 1, 'right', 2)], 1.5);
-  const black = handsFor([note(61, 1, 'right', 2)], 1.5);
-  assert.ok(pad(black).y < pad(white).y, 'the black key is shorter, so the finger reaches past it');
+test('a finger on a black key never reaches past the end of it', () => {
+  // The four long fingers already rest up among the black keys, which
+  // is why a player leaves them there. It is the THUMB, which plays
+  // out at the front, that a black key has to pull back -- and the
+  // hand with it, because a finger can only stretch so far.
+  const chord = (top) => [48, top].map((m) => note(m, 1, 'left', 2));
+  const plan = P.planFingering(chord(61));
+  assert.equal(
+    plan.notes.find((n) => n.midi === 61).finger,
+    1,
+    'this chord really is played with the thumb on the black key',
+  );
+
+  // Across every keyboard depth the design can be given.
+  for (const height of [120, 200, 320, 480]) {
+    const board = P.keyboardBox({ size: 88, width: 1920, height, design: 'hands' });
+    const shapes = P.handsShapes({
+      size: 88,
+      board,
+      seconds: 1.5,
+      notes: plan.notes,
+      anchors: plan.anchors,
+      colors: P.DEFAULT_HAND_COLORS,
+    });
+    const black = shapes.find((s) => s.fill === padColor('left'));
+    assert.ok(black !== undefined, `${height}: the thumb is marked`);
+    // A black key ends 62% of the way down the board. A finger on one
+    // cannot be out in front of the key it is pressing.
+    assert.ok(
+      black.y + black.height / 2 < board.y + board.height * 0.62,
+      `${height}: the thumb stays on the black key`,
+    );
+  }
 });
 
 test('three fingers down at once are three separate keys', () => {
@@ -295,12 +324,17 @@ test('the hands design drops the falling notes, the grid, the fade and the strik
   assert.ok(!hands.some((s) => s.fill === P.DEFAULT_COLORS.barLine), 'and no grid');
 });
 
-test('the hands design gives the keyboard more of the stage, and the hands room above it', () => {
-  const falling = P.keyboardBox({ width: 1920, height: 600 });
-  const hands = P.keyboardBox({ width: 1920, height: 600, design: 'hands' });
-  assert.ok(hands.height > falling.height * 2, 'much taller keys with nothing falling onto them');
-  assert.ok(hands.y > 0, 'but not the whole box: the palms sit above the keys');
-  assert.equal(hands.y + hands.height, 600, 'still along the bottom');
+test('the hands design keeps a strip in FRONT of the keys for the hands', () => {
+  const box = { width: 1920, height: 600, size: 88 };
+  const falling = P.keyboardBox(box);
+  const hands = P.keyboardBox({ ...box, design: 'hands' });
+  assert.ok(hands.height > falling.height, 'deeper keys with nothing falling onto them');
+  // Not flush with the bottom any more: the heel of a palm rests past
+  // the front edge of the keys, and that is where it goes.
+  assert.ok(hands.y + hands.height < 600, 'the strip in front is left empty of keyboard');
+  const range = P.handsRange({ ...box, design: 'hands' });
+  const unit = 1920 / P.whiteKeysBetween(range.first, range.last);
+  assert.ok(600 - (hands.y + hands.height) > unit, 'and it is wide enough for a heel');
 });
 
 test('a pressed key wears its finger number, up where the hand is not', () => {
@@ -314,7 +348,7 @@ test('a pressed key wears its finger number, up where the hand is not', () => {
     hands: { notes: plan.notes, anchors: plan.anchors },
   };
   const shapes = P.stageShapes(base);
-  const badge = shapes.find((s) => s.label !== undefined);
+  const badge = shapes.filter((s) => s.label !== undefined).at(-1);
   assert.ok(badge !== undefined, 'the badge is drawn');
   assert.equal(badge.label, String(plan.notes[0].finger));
 
@@ -333,7 +367,15 @@ test('a pressed key wears its finger number, up where the hand is not', () => {
   assert.ok(svg.includes('text-anchor="middle"'), 'centred on its badge');
 
   const off = P.stageShapes({ ...base, hands: { ...base.hands, fingerNumbers: false } });
-  assert.equal(off.filter((s) => s.label !== undefined).length, 0, 'turned off when asked');
+  assert.equal(
+    off.filter((s) => s.labelColor === badge.labelColor).length,
+    0,
+    'turned off when asked',
+  );
+  // The keyboard's own C marks are a separate thing and stay.
+  assert.ok(off.some((s) => /^C-?\d$/.test(s.label ?? '')), 'the C names are not finger numbers');
+  const quiet = P.stageShapes({ ...base, keyNames: false });
+  assert.equal(quiet.filter((s) => /^C-?\d$/.test(s.label ?? '')).length, 0, 'and can be hidden');
 });
 
 test('a scale longer than the hand is played in reaches, not a crawl', () => {
@@ -378,9 +420,11 @@ test('a key stays a key in every frame shape, however tall the stage is', () => 
   };
   for (const [name, options] of Object.entries(shapes)) {
     const ratio = keyShape(options);
-    assert.ok(ratio > 3 && ratio < 12, `${name}: a key is ${ratio.toFixed(1)} of its own widths`);
+    // A real white key is 150mm long and 23mm wide. The hands design
+    // never draws one longer than that, whatever shape the frame is.
+    assert.ok(ratio > 2.5 && ratio < 5.6, `${name}: a key is ${ratio.toFixed(1)} of its own widths`);
     const box = P.keyboardBox(options);
-    assert.ok(Math.abs(box.y + box.height - options.height) < 1e-6, `${name}: along the bottom`);
+    assert.ok(box.y >= 0 && box.y + box.height <= options.height, `${name}: inside the stage`);
   }
 });
 

@@ -294,22 +294,23 @@ var PianoEngine = (() => {
   }
 
   // src/hands.ts
-  var PALM_WIDTH = 3.5;
-  var PALM_HEIGHT = 3.6;
-  var FINGER_LENGTH = 2.55;
-  var FINGER_THICK = 0.62;
-  var KNUCKLE_DEPTH = 0.58;
-  var BLACK_TIP_DEPTH = 0.16;
+  var PALM_WIDTH = 3.3;
+  var PALM_LENGTH = 3;
+  var FINGER_LENGTH = 2.35;
+  var FINGER_THICK = 0.64;
+  var TIP_DEPTH = 0.29;
+  var BLACK_TIP_DEPTH = 0.45;
+  var MAX_STRETCH = 1.3;
   var FINGER_SHAPE = [
-    { reach: 0.52, drop: 1.9, width: 1.5 },
+    { reach: 0.9, drop: 1.6, width: 1.42 },
     // thumb -- short, thick, low, off the side
-    { reach: 0.95, drop: 0.08, width: 1 },
+    { reach: 0.93, drop: 0.1, width: 1 },
     // index
     { reach: 1, drop: 0, width: 1 },
     // middle -- the longest
-    { reach: 0.95, drop: 0.07, width: 0.95 },
+    { reach: 0.94, drop: 0.08, width: 0.96 },
     // ring
-    { reach: 0.79, drop: 0.34, width: 0.85 }
+    { reach: 0.72, drop: 0.4, width: 0.86 }
     // little -- short and set back
   ];
   var CURL = 0.07;
@@ -380,10 +381,7 @@ var PianoEngine = (() => {
       const from = frame.knuckleY + frame.unit * shape.drop * 0.5;
       const resting = from - length * (1 - CURL);
       const reaching = from - length * (1 + REACH);
-      const y = held === void 0 ? resting : onBlack ? Math.min(reaching, board.y + board.height * BLACK_TIP_DEPTH) : Math.max(
-        board.y + board.height * 0.14,
-        Math.min(reaching, board.y + board.height * 0.72)
-      );
+      const y = held === void 0 ? resting : onBlack ? Math.min(reaching, board.y + board.height * BLACK_TIP_DEPTH) : reaching;
       tips.push({
         finger,
         x,
@@ -394,6 +392,23 @@ var PianoEngine = (() => {
       });
     }
     return tips;
+  }
+  function blackKeyShift(hand, options, keys, whites, frame) {
+    const board = options.board;
+    const black = new Set(keys.filter((key) => key.black).map((key) => key.midi));
+    const down = fingersDownAt(options.notes, hand, options.seconds);
+    let shift = 0;
+    for (const [finger, midi] of down) {
+      if (!black.has(midi)) continue;
+      const shape = FINGER_SHAPE[finger - 1];
+      if (shape === void 0) continue;
+      const length = frame.unit * FINGER_LENGTH * shape.reach;
+      const from = frame.knuckleY + frame.unit * shape.drop * 0.5;
+      const target = board.y + board.height * BLACK_TIP_DEPTH;
+      shift = Math.max(shift, from - target - length * MAX_STRETCH);
+    }
+    void whites;
+    return Math.max(0, Math.min(shift, board.height * 0.22));
   }
   function fingerPath(fromX, fromY, toX, toY) {
     const midX = (fromX + toX) / 2 + (toX - fromX) * 0.06;
@@ -435,34 +450,36 @@ var PianoEngine = (() => {
     const scale = options.scale ?? 1;
     const colors = options.colors[hand];
     const unit = (whites[0]?.width ?? board.width / 52) * scale;
+    const naturalKnuckle = board.y + board.height * TIP_DEPTH + unit * FINGER_LENGTH * (1 - CURL);
     const rough = {
       unit,
-      knuckleY: board.y + board.height * KNUCKLE_DEPTH,
+      knuckleY: naturalKnuckle,
       centreX: board.x + board.width / 2,
       lean: 0,
       palmWidth: unit * PALM_WIDTH,
       thumbSide: hand === "right" ? -1 : 1
     };
-    const tips = fingertips(hand, options, keys, whites, rough);
+    const shift = blackKeyShift(hand, options, keys, whites, rough);
+    const knuckleY = naturalKnuckle - shift;
+    const tips = fingertips(hand, options, keys, whites, { ...rough, knuckleY });
     if (tips.length === 0) return [];
-    const xs = tips.map((t) => t.x);
+    const fourX = tips.filter((t) => t.finger !== 1).map((t) => t.x);
+    const xs = fourX.length > 0 ? fourX : tips.map((t) => t.x);
     const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
     const thumb = tips.find((t) => t.finger === 1);
     const little = tips.find((t) => t.finger === 5);
     const lean = thumb !== void 0 && little !== void 0 ? (thumb.x - little.x) * 0.05 : 0;
     const spread = Math.abs(Math.max(...xs) - Math.min(...xs));
-    const palmWidth = Math.min(unit * (PALM_WIDTH + 0.8), Math.max(unit * PALM_WIDTH, spread * 0.78));
-    const frame = { ...rough, centreX, lean, palmWidth };
-    const knuckleY = frame.knuckleY;
-    const palmTop = knuckleY - unit * 0.55;
-    const palmHeight = unit * PALM_HEIGHT;
+    const palmWidth = Math.min(unit * (PALM_WIDTH + 0.7), Math.max(unit * PALM_WIDTH, spread * 0.98));
+    const palmTop = knuckleY - unit * 0.3;
+    const palmHeight = unit * PALM_LENGTH;
     const limbs = [];
     for (const tip of tips) {
       const shape = FINGER_SHAPE[tip.finger - 1];
       if (shape === void 0) continue;
       const isThumb = tip.finger === 1;
-      const knuckleX = isThumb ? centreX + lean + frame.thumbSide * palmWidth * 0.42 : centreX + lean + clamp((tip.x - centreX) * 0.74, palmWidth * 0.4);
-      const from = knuckleY + unit * shape.drop;
+      const knuckleX = isThumb ? centreX + lean + rough.thumbSide * palmWidth * 0.44 : centreX + lean + clamp((tip.x - centreX) * 0.76, palmWidth * 0.38);
+      const from = knuckleY + unit * shape.drop * 0.5;
       limbs.push({
         stroke: {
           d: fingerPath(knuckleX, from, tip.x, tip.y),
@@ -470,13 +487,23 @@ var PianoEngine = (() => {
         }
       });
     }
+    const palmX = centreX + lean - palmWidth / 2;
     limbs.push({
       box: {
-        x: centreX + lean - palmWidth / 2,
+        x: palmX,
         y: palmTop,
         width: palmWidth,
-        height: palmHeight,
-        radius: palmWidth * 0.4
+        height: palmHeight * 0.62,
+        radius: palmWidth * 0.16
+      }
+    });
+    limbs.push({
+      box: {
+        x: palmX + palmWidth * 0.02,
+        y: palmTop + palmHeight * 0.3,
+        width: palmWidth * 0.96,
+        height: palmHeight * 0.7,
+        radius: palmWidth * 0.42
       }
     });
     const shapes = [
@@ -569,7 +596,10 @@ var PianoEngine = (() => {
     beatLine: "rgba(255,255,255,0.16)",
     leftHand: "#FFC400",
     rightHand: "#4FA3FF",
-    background: "none"
+    background: "none",
+    // Dark on a white key, and faint: it is a ruler mark, not a label to
+    // be read instead of the music.
+    keyName: "rgba(30,21,18,0.38)"
   };
   var DEFAULT_LEAD_SECONDS = 2.5;
   var FADE_FRACTION = 0.38;
@@ -579,8 +609,8 @@ var PianoEngine = (() => {
   var BEAT_LINE_FRACTION = 35e-4;
   var LABEL_FONT = "system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
   var KEYBOARD_FRACTION = 1 / 3;
-  var KEYBOARD_FRACTION_HANDS = 1;
-  var MAX_KEY_LENGTH = 11.2;
+  var KEY_DEPTH = 5.4;
+  var HAND_BAND = 1.3;
   var MIN_HANDS_WHITES = 14;
   var LINE_FRACTION = 0.05;
   function resolveColors(colors) {
@@ -589,8 +619,8 @@ var PianoEngine = (() => {
   function handsRange(options) {
     const full = keyboardRange(options.size ?? 88);
     const fullWhites = whiteKeysBetween(full.first, full.last);
-    const available = options.keyboardHeight !== void 0 && options.keyboardHeight > 0 ? Math.min(options.keyboardHeight, options.height) : options.height * KEYBOARD_FRACTION_HANDS;
-    const affords = available > 0 ? Math.round(options.width * MAX_KEY_LENGTH / available) : fullWhites;
+    const available = options.keyboardHeight !== void 0 && options.keyboardHeight > 0 ? Math.min(options.keyboardHeight, options.height) : options.height;
+    const affords = available > 0 ? Math.round(options.width * (KEY_DEPTH + HAND_BAND) / available) : fullWhites;
     const played = (options.notes ?? []).map((note) => note.midi).filter((midi) => midi >= full.first && midi <= full.last);
     const low = whiteOutward(played.length > 0 ? Math.min(...played) : 60, -1);
     const high = whiteOutward(played.length > 0 ? Math.max(...played) : 60, 1);
@@ -615,13 +645,23 @@ var PianoEngine = (() => {
     return { first: Math.max(full.first, first), last: Math.min(full.last, last) };
   }
   function keyboardBox(options) {
-    const hands = options.design === "hands";
-    const share = hands ? KEYBOARD_FRACTION_HANDS : KEYBOARD_FRACTION;
-    const asked = options.keyboardHeight !== void 0 && options.keyboardHeight > 0 ? Math.min(options.keyboardHeight, options.height) : options.height * share;
-    const window = hands ? handsRange(options) : void 0;
-    const longest = window !== void 0 ? options.width / whiteKeysBetween(window.first, window.last) * MAX_KEY_LENGTH : Number.POSITIVE_INFINITY;
-    const height = Math.min(asked, longest);
+    if (options.design === "hands") return handsKeyboardBox(options);
+    const height = options.keyboardHeight !== void 0 && options.keyboardHeight > 0 ? Math.min(options.keyboardHeight, options.height) : options.height * KEYBOARD_FRACTION;
     return { x: 0, y: options.height - height, width: options.width, height };
+  }
+  function handsKeyboardBox(options) {
+    const range = handsRange(options);
+    const unit = options.width / Math.max(1, whiteKeysBetween(range.first, range.last));
+    const band = unit * HAND_BAND;
+    const asked = options.keyboardHeight !== void 0 && options.keyboardHeight > 0 ? Math.min(options.keyboardHeight, options.height) : Math.max(options.height * 0.55, options.height - band);
+    const depth = Math.max(1, Math.min(unit * KEY_DEPTH, asked, options.height));
+    const group = Math.min(options.height, depth + band);
+    return {
+      x: 0,
+      y: Math.max(0, (options.height - group) / 2),
+      width: options.width,
+      height: depth
+    };
   }
   function fallingBars(notes, options) {
     const lead = options.leadSeconds !== void 0 && options.leadSeconds > 0 ? options.leadSeconds : DEFAULT_LEAD_SECONDS;
@@ -776,6 +816,23 @@ var PianoEngine = (() => {
         fill: fillFor(key)
       });
     }
+    if (!falling && options.keyNames !== false) {
+      const unit = board.width / Math.max(1, keys.filter((key) => !key.black).length);
+      const size = Math.max(6, unit * 0.46);
+      for (const key of keys) {
+        if (key.black || key.midi % 12 !== 0) continue;
+        shapes.push({
+          x: key.x,
+          y: key.y + key.height - size * 2.1,
+          width: key.width,
+          height: size * 1.4,
+          fill: "none",
+          label: `C${Math.floor(key.midi / 12) - 1}`,
+          labelSize: round2(size),
+          labelColor: colors.keyName
+        });
+      }
+    }
     if (falling) {
       shapes.push({
         x: 0,
@@ -804,6 +861,9 @@ var PianoEngine = (() => {
       }
     }
     return shapes;
+  }
+  function round2(value) {
+    return Math.round(value * 100) / 100;
   }
   function shapesToSvg(shapes, width, height) {
     const body = shapes.map(

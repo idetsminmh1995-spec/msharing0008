@@ -184,12 +184,27 @@ look like a rake.
 
 **Measured in white keys.** A white key is 23mm and a hand is a hand,
 so the proportions are real measurements rather than taste: a palm is
-about three and a half keys across and three and a half deep, and a
-middle finger is two and a half long. That is why a hand covers five
-white keys -- not because five is convenient, but because a hand is
-90mm wide. Everything else is derived from those, so a hand stays the
-right size for the KEYS in any frame, however deep the keyboard has to
-be drawn.
+3.3 keys across and 3.0 deep as seen from above, and a curled middle
+finger reaches 2.35. That is why a hand covers five white keys -- not
+because five is convenient, but because a hand is 90mm wide.
+
+**Measured back from the fingertips, too.** A resting middle finger
+lies up among the black keys, and the knuckles are one finger-length
+behind it; the palm follows the knuckles. Taking it the other way
+round -- knuckles at some fraction of the keyboard -- is what made the
+hand stretch out of shape when the keyboard was drawn deep, and it is
+why a white key is now never drawn longer than a white key really is
+(`KEY_DEPTH`): past that, the hand on it stops being a hand.
+
+**A strip in front of the keys.** The keyboard does not reach the
+bottom of the stage. The heel of a hand reaching the keys rests past
+their front edge, exactly as it does on a real piano, and `HAND_BAND`
+is where it rests. Drawing keyboard into it cuts every hand off at the
+wrist.
+
+**Every C is named** on its own key -- C2, C3, C4 -- because a learner
+watching a hand move cannot count 52 white keys but can see which C it
+has reached. `keyNames: false` turns them off.
 
 Three more things make it read as a hand, none of them detail:
 
@@ -202,6 +217,12 @@ Three more things make it read as a hand, none of them detail:
   one that is playing straightens past it, so pressing always moves a
   finger AWAY from the player. That is the whole of the animation;
   without it the hand is a sticker.
+- a black key is shorter and set back, so a finger cannot play one from
+  out in front of it. The four long fingers already rest up there --
+  which is why a player leaves them there -- so it is the thumb a black
+  key pulls back, and when a thumb has stretched as far as a thumb can,
+  the whole HAND moves instead. One finger on a black key takes the
+  other four with it, because that is what a hand is.
 - the hand leans, thumb side forward, which is what makes a left hand
   look like a left hand rather than a mirrored right one.
 

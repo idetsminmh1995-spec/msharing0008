@@ -43,6 +43,9 @@ export const DEFAULT_COLORS: PianoColors = {
   leftHand: '#FFC400',
   rightHand: '#4FA3FF',
   background: 'none',
+  // Dark on a white key, and faint: it is a ruler mark, not a label to
+  // be read instead of the music.
+  keyName: 'rgba(30,21,18,0.38)',
 };
 
 /** A note falls for this long before it is played, unless the caller says otherwise. */
@@ -70,32 +73,24 @@ const LABEL_FONT = 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
 
 const KEYBOARD_FRACTION = 1 / 3;
 /**
- * The keyboard's share of the stage in the hands design.
+ * How deep a keyboard is drawn in the hands design, and how much room
+ * is kept in front of it for the hands. Both in white-key widths.
  *
- * All of it, because nothing else is on the stage any more and the
- * hands do not need room above the keys: the player sits at the FRONT
- * of the keyboard, so the hands come up from the bottom of the frame
- * and reach away from the viewer. What they need is DEPTH of key, and
- * the way to give them that is to let the keyboard have the box.
+ * A white key is 23mm wide and 150mm long, so a keyboard is about six
+ * and a half of its own key widths deep. Drawn much deeper than that
+ * it stops being a keyboard: in a 9:16 frame the stage is twice as
+ * tall as it is wide, and a keyboard stretched to fill it is a tower
+ * of planks with hands the size of specks on it.
+ *
+ * `HAND_BAND` is the strip in FRONT of the keys -- nearest the player,
+ * at the bottom of the frame -- that the keyboard does not use. It is
+ * not spare room: the heel of a hand reaching the keys sits past the
+ * front edge of them, exactly as it does on a real piano, and this is
+ * where it sits. Without it a hand is cut off at the wrist by the
+ * bottom of the frame.
  */
-const KEYBOARD_FRACTION_HANDS = 1;
-
-/**
- * How long a white key is allowed to be, in its own widths.
- *
- * A keyboard stretched to whatever box it is given stops being a
- * keyboard: in a 9:16 frame the stage is twice as tall as it is wide,
- * and a third of it is already a tower of keys a metre long. The
- * falling-notes design gets away with it -- the notes come down that
- * tower and fill it -- but the hands design has hands on those keys,
- * and a hand is as wide as five keys whatever the picture does. Let
- * the keys grow and the hands become spiders on a wall.
- *
- * A real white key is about six and a half of its own widths long.
- * Eleven is longer than real and still reads as a keyboard, which is
- * the most a frame can be given before the drawing starts lying.
- */
-const MAX_KEY_LENGTH = 11.2;
+const KEY_DEPTH = 5.4;
+const HAND_BAND = 1.3;
 
 /**
  * The fewest white keys the hands design will ever show: two octaves.
@@ -105,6 +100,7 @@ const MAX_KEY_LENGTH = 11.2;
  * the air between them need about this much to sit in at all.
  */
 const MIN_HANDS_WHITES = 14;
+
 /** The strike line's thickness, as a fraction of the keyboard's height. */
 const LINE_FRACTION = 0.05;
 
@@ -145,9 +141,9 @@ export function handsRange(options: {
   const available =
     options.keyboardHeight !== undefined && options.keyboardHeight > 0
       ? Math.min(options.keyboardHeight, options.height)
-      : options.height * KEYBOARD_FRACTION_HANDS;
+      : options.height;
   const affords =
-    available > 0 ? Math.round((options.width * MAX_KEY_LENGTH) / available) : fullWhites;
+    available > 0 ? Math.round((options.width * (KEY_DEPTH + HAND_BAND)) / available) : fullWhites;
 
   const played = (options.notes ?? [])
     .map((note) => note.midi)
@@ -194,22 +190,50 @@ export function keyboardBox(options: {
   width: number;
   height: number;
 } {
-  const hands = options.design === 'hands';
-  const share = hands ? KEYBOARD_FRACTION_HANDS : KEYBOARD_FRACTION;
+  if (options.design === 'hands') return handsKeyboardBox(options);
+  const height =
+    options.keyboardHeight !== undefined && options.keyboardHeight > 0
+      ? Math.min(options.keyboardHeight, options.height)
+      : options.height * KEYBOARD_FRACTION;
+  return { x: 0, y: options.height - height, width: options.width, height };
+}
+
+/**
+ * The keyboard in the hands design: as deep as a real one, with the
+ * hands' own strip kept in front of it.
+ *
+ * NOT flush with the bottom of the stage, which is where every other
+ * keyboard in this engine sits. The hands come up from the front of
+ * the keys -- the bottom of the frame -- and the heel of a palm rests
+ * past the keys' front edge. That strip is `HAND_BAND`, and drawing
+ * keyboard into it is what cut the hands off at the wrist.
+ *
+ * The keyboard and its strip are one group, centred in whatever box
+ * the page gives: a very tall stage gets a real keyboard with space
+ * above and below it rather than a stretched one.
+ */
+function handsKeyboardBox(options: {
+  width: number;
+  height: number;
+  keyboardHeight?: number;
+  size?: KeyboardSize;
+  notes?: readonly PianoNote[];
+}): { x: number; y: number; width: number; height: number } {
+  const range = handsRange(options);
+  const unit = options.width / Math.max(1, whiteKeysBetween(range.first, range.last));
+  const band = unit * HAND_BAND;
   const asked =
     options.keyboardHeight !== undefined && options.keyboardHeight > 0
       ? Math.min(options.keyboardHeight, options.height)
-      : options.height * share;
-  // Only the hands design is capped. The falling-notes design is the
-  // picture that shipped, and a keyboard it has always drawn tall is
-  // not something to change underneath it.
-  const window = hands ? handsRange(options) : undefined;
-  const longest =
-    window !== undefined
-      ? (options.width / whiteKeysBetween(window.first, window.last)) * MAX_KEY_LENGTH
-      : Number.POSITIVE_INFINITY;
-  const height = Math.min(asked, longest);
-  return { x: 0, y: options.height - height, width: options.width, height };
+      : Math.max(options.height * 0.55, options.height - band);
+  const depth = Math.max(1, Math.min(unit * KEY_DEPTH, asked, options.height));
+  const group = Math.min(options.height, depth + band);
+  return {
+    x: 0,
+    y: Math.max(0, (options.height - group) / 2),
+    width: options.width,
+    height: depth,
+  };
 }
 
 /**
@@ -469,6 +493,26 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
     });
   }
 
+  // Every C's name on its own key, so a hand moving along the keyboard
+  // can be placed at a glance. Under the hands, which pass over them.
+  if (!falling && options.keyNames !== false) {
+    const unit = board.width / Math.max(1, keys.filter((key) => !key.black).length);
+    const size = Math.max(6, unit * 0.46);
+    for (const key of keys) {
+      if (key.black || key.midi % 12 !== 0) continue;
+      shapes.push({
+        x: key.x,
+        y: key.y + key.height - size * 2.1,
+        width: key.width,
+        height: size * 1.4,
+        fill: 'none',
+        label: `C${Math.floor(key.midi / 12) - 1}`,
+        labelSize: round2(size),
+        labelColor: colors.keyName,
+      });
+    }
+  }
+
   // The line the notes land on, so no key covers it. Nothing lands in
   // the hands design, so there is no line to land on.
   if (falling) {
@@ -507,6 +551,11 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
     }
   }
   return shapes;
+}
+
+/** Two decimals: a font size does not need six. */
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 function shapesToSvg(shapes: readonly StageShape[], width: number, height: number): string {

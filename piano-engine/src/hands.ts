@@ -54,50 +54,69 @@ import type { Hand, KeyboardSize, PianoKey, StageShape } from './types.js';
 /**
  * A hand's proportions, in white-key widths.
  *
- * A white key is 23mm and a hand is a hand, so these are real
- * measurements rather than taste: a palm is about four keys across and
- * three deep, and a middle finger is a bit over two long. That is why
- * a hand covers five white keys -- not because five is a convenient
- * number, but because a hand is 90mm wide.
+ * Measured, not chosen. A white key is 23mm wide, so everything a hand
+ * does on a keyboard can be stated in those: a palm is about three and
+ * a third keys across and three deep as seen from above, and a curled
+ * middle finger reaches two. That is why a hand covers five white keys
+ * -- not because five is a convenient number, but because a hand is
+ * 90mm wide.
  *
- * Everything else about the drawing is derived from these, so a hand
- * stays the right size for the KEYS in any frame, however tall or
- * short the keyboard has to be drawn.
+ * Driving the drawing from these rather than from the box it is in is
+ * what keeps a hand a hand when the keyboard has to be drawn deeper or
+ * shallower than a real one.
  */
-const PALM_WIDTH = 3.5;
-const PALM_HEIGHT = 3.6;
-const FINGER_LENGTH = 2.55;
-const FINGER_THICK = 0.62;
+const PALM_WIDTH = 3.3;
+const PALM_LENGTH = 3.0;
+const FINGER_LENGTH = 2.35;
+const FINGER_THICK = 0.64;
 
 /**
- * Where the knuckles sit, as a fraction of the keyboard's depth: well
- * down the keys, towards the player, which is where a hand's knuckles
- * are when its fingers are on the keys.
- */
-const KNUCKLE_DEPTH = 0.58;
-
-/**
- * How far back a finger on a BLACK key has to reach, whatever its own
- * length. A black key is shorter and set further back, so even a thumb
- * has to stretch for one.
- */
-const BLACK_TIP_DEPTH = 0.16;
-
-/**
- * Each finger's length and where it comes off the palm, as fractions
- * of the hand's own size. Index 0 is the thumb.
+ * Where a resting middle fingertip sits, down the key.
  *
- * `reach` is its length as a share of the middle finger's; `drop` is
- * how far below the knuckle line it starts, which is what sets the
- * thumb off the side of the hand rather than the front; `width` is its
- * thickness, again against the middle finger's.
+ * A fraction of the keyboard's DEPTH, because that is a fact about
+ * keys rather than about hands: a player's fingers sit up among the
+ * black keys, not out at the front edge, so that the black ones are
+ * there to be reached without moving the hand.
+ */
+const TIP_DEPTH = 0.29;
+
+/**
+ * The furthest forward a finger on a BLACK key may be, down the key.
+ *
+ * A ceiling rather than a target: a black key ENDS part way down the
+ * board, so a finger on one cannot be out in front of it. For the four
+ * long fingers this never binds -- their natural reach is already up
+ * among the black keys, which is why a player leaves them there. It is
+ * the thumb, which plays out at the front, that has to come back for a
+ * black key, and the hand with it.
+ */
+const BLACK_TIP_DEPTH = 0.45;
+
+/**
+ * How far a finger may be stretched past its own length before the
+ * HAND moves instead.
+ *
+ * A finger reaching a black key does stretch -- but only so far, and
+ * then the player moves their whole hand back rather than growing a
+ * finger. Without this the one rule "a black key is played up there"
+ * turns a thumb into a tentacle on a deep keyboard.
+ */
+const MAX_STRETCH = 1.3;
+
+/**
+ * Each finger's length, where it comes off the palm, and how thick it
+ * is -- all as fractions of the middle finger's. Index 0 is the thumb.
+ *
+ * `drop` is how far below the knuckle line a finger starts, in half
+ * white keys: it is what sets the thumb off the SIDE of the hand,
+ * well down towards the heel, rather than off the front with the rest.
  */
 const FINGER_SHAPE: readonly { reach: number; drop: number; width: number }[] = [
-  { reach: 0.52, drop: 1.9, width: 1.5 }, // thumb -- short, thick, low, off the side
-  { reach: 0.95, drop: 0.08, width: 1.0 }, // index
+  { reach: 0.9, drop: 1.6, width: 1.42 }, // thumb -- short, thick, low, off the side
+  { reach: 0.93, drop: 0.1, width: 1.0 }, // index
   { reach: 1.0, drop: 0.0, width: 1.0 }, // middle -- the longest
-  { reach: 0.95, drop: 0.07, width: 0.95 }, // ring
-  { reach: 0.79, drop: 0.34, width: 0.85 }, // little -- short and set back
+  { reach: 0.94, drop: 0.08, width: 0.96 }, // ring
+  { reach: 0.72, drop: 0.4, width: 0.86 }, // little -- short and set back
 ];
 
 /** How much a finger that is not playing curls back off its key. */
@@ -296,15 +315,15 @@ function fingertips(
     //
     // Its OWN length decides it, not the key: that is what staggers the
     // five tips the way a hand's are, and why the thumb plays near the
-    // front of the keys and the middle finger much further back. A
-    // finger that is not playing curls a little short of its reach,
-    // and one that is playing straightens past it, so pressing always
-    // moves a finger AWAY from the player rather than back towards
-    // them.
+    // front of the keys and the middle finger further back. A finger
+    // that is not playing curls a little short of its reach, and one
+    // that is playing straightens past it, so pressing always moves a
+    // finger AWAY from the player rather than back towards them.
     //
     // A black key is the one thing that overrides the hand: it is
     // shorter and set back, so a finger on one has to reach at least
-    // that far whatever its length.
+    // that far. How much of that reach is the finger's and how much is
+    // the whole hand moving back is settled by `blackKeyShift`.
     const length = frame.unit * FINGER_LENGTH * shape.reach;
     const from = frame.knuckleY + frame.unit * shape.drop * 0.5;
     const resting = from - length * (1 - CURL);
@@ -314,10 +333,7 @@ function fingertips(
         ? resting
         : onBlack
           ? Math.min(reaching, board.y + board.height * BLACK_TIP_DEPTH)
-          : Math.max(
-              board.y + board.height * 0.14,
-              Math.min(reaching, board.y + board.height * 0.72),
-            );
+          : reaching;
 
     tips.push({
       finger,
@@ -329,6 +345,42 @@ function fingertips(
     });
   }
   return tips;
+}
+
+/**
+ * How far back the whole hand has to move for its black keys.
+ *
+ * A finger reaching a black key stretches, but a finger can only
+ * stretch so far; past that a player moves their hand instead. This
+ * asks every finger that is playing a black key how much more than its
+ * own stretch it would need, and gives the hand the largest answer --
+ * so one finger on a black key takes the other four with it, which is
+ * what a hand does and what keeps the five of them a hand.
+ */
+function blackKeyShift(
+  hand: Hand,
+  options: HandsOptions,
+  keys: readonly PianoKey[],
+  whites: readonly PianoKey[],
+  frame: HandFrame,
+): number {
+  const board = options.board;
+  const black = new Set(keys.filter((key) => key.black).map((key) => key.midi));
+  const down = fingersDownAt(options.notes, hand, options.seconds);
+  let shift = 0;
+  for (const [finger, midi] of down) {
+    if (!black.has(midi)) continue;
+    const shape = FINGER_SHAPE[finger - 1];
+    if (shape === undefined) continue;
+    const length = frame.unit * FINGER_LENGTH * shape.reach;
+    const from = frame.knuckleY + frame.unit * shape.drop * 0.5;
+    const target = board.y + board.height * BLACK_TIP_DEPTH;
+    shift = Math.max(shift, from - target - length * MAX_STRETCH);
+  }
+  // Never so far back that the hand leaves the keyboard: a hand that
+  // has run out of key has run out of key.
+  void whites;
+  return Math.max(0, Math.min(shift, board.height * 0.22));
 }
 
 /**
@@ -401,21 +453,39 @@ export function handShapes(hand: Hand, options: HandsOptions): readonly StageSha
   const colors = options.colors[hand];
   const unit = (whites[0]?.width ?? board.width / 52) * scale;
 
-  // A first pass to find where the hand is, then the real one: the
-  // fingers decide the hand's centre, and the hand's centre decides
-  // where the fingers come off it.
+  // Where the knuckles sit.
+  //
+  // Measured back from the FINGERTIPS, not forward from the top of the
+  // keys: a resting middle finger lies among the black keys, and the
+  // knuckles are one finger-length behind that. Taking it the other way
+  // round -- knuckles at some fraction of the keyboard -- is what made
+  // the hand stretch out of shape when the keyboard was drawn deep.
+  const naturalKnuckle = board.y + board.height * TIP_DEPTH + unit * FINGER_LENGTH * (1 - CURL);
+
   const rough: HandFrame = {
     unit,
-    knuckleY: board.y + board.height * KNUCKLE_DEPTH,
+    knuckleY: naturalKnuckle,
     centreX: board.x + board.width / 2,
     lean: 0,
     palmWidth: unit * PALM_WIDTH,
     thumbSide: hand === 'right' ? -1 : 1,
   };
-  const tips = fingertips(hand, options, keys, whites, rough);
+  // A hand reaching a black key moves BACK rather than growing the
+  // finger past what a finger can do. Worked out from the rough pose
+  // and then applied to the real one, so every finger moves together --
+  // a hand is one object.
+  const shift = blackKeyShift(hand, options, keys, whites, rough);
+  const knuckleY = naturalKnuckle - shift;
+
+  const tips = fingertips(hand, options, keys, whites, { ...rough, knuckleY });
   if (tips.length === 0) return [];
 
-  const xs = tips.map((t) => t.x);
+  // The palm sits behind the FOUR fingers, not behind all five: a thumb
+  // is attached to the side of a hand, not to the front of it. Centring
+  // on all five drags the palm a half key towards the thumb and leaves
+  // the little finger reaching back across the hand for its own key.
+  const fourX = tips.filter((t) => t.finger !== 1).map((t) => t.x);
+  const xs = fourX.length > 0 ? fourX : tips.map((t) => t.x);
   const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
   const thumb = tips.find((t) => t.finger === 1);
   const little = tips.find((t) => t.finger === 5);
@@ -426,12 +496,14 @@ export function handShapes(hand: Hand, options: HandsOptions): readonly StageSha
   // two octaves does not get a two-octave palm, it keeps the same palm
   // and spreads its fingers.
   const spread = Math.abs(Math.max(...xs) - Math.min(...xs));
-  const palmWidth = Math.min(unit * (PALM_WIDTH + 0.8), Math.max(unit * PALM_WIDTH, spread * 0.78));
-  const frame: HandFrame = { ...rough, centreX, lean, palmWidth };
+  const palmWidth = Math.min(unit * (PALM_WIDTH + 0.7), Math.max(unit * PALM_WIDTH, spread * 0.98));
 
-  const knuckleY = frame.knuckleY;
-  const palmTop = knuckleY - unit * 0.55;
-  const palmHeight = unit * PALM_HEIGHT;
+  // The palm's top edge sits just behind the knuckles, not well behind
+  // them: every bit of palm drawn past the knuckle line is a bit of
+  // finger swallowed, and a hand whose fingers are shorter than its
+  // palm is wide reads as a mitten.
+  const palmTop = knuckleY - unit * 0.3;
+  const palmHeight = unit * PALM_LENGTH;
   const limbs: Limb[] = [];
 
   // The fingers first, so the palm covers where they come out of it.
@@ -442,9 +514,9 @@ export function handShapes(hand: Hand, options: HandsOptions): readonly StageSha
     // A thumb comes off the SIDE of the palm, low down; the other four
     // come off the knuckle line, spaced across it.
     const knuckleX = isThumb
-      ? centreX + lean + frame.thumbSide * palmWidth * 0.42
-      : centreX + lean + clamp((tip.x - centreX) * 0.74, palmWidth * 0.4);
-    const from = knuckleY + unit * shape.drop;
+      ? centreX + lean + rough.thumbSide * palmWidth * 0.44
+      : centreX + lean + clamp((tip.x - centreX) * 0.76, palmWidth * 0.38);
+    const from = knuckleY + unit * shape.drop * 0.5;
     limbs.push({
       stroke: {
         d: fingerPath(knuckleX, from, tip.x, tip.y),
@@ -453,15 +525,28 @@ export function handShapes(hand: Hand, options: HandsOptions): readonly StageSha
     });
   }
 
-  // The palm over the knuckles. Rounded hard at the heel, because that
-  // is the shape of the bottom of a hand.
+  // The palm over the knuckles, as two boxes that overlap: the back of
+  // a hand is nearly square across the knuckles and round at the heel,
+  // and one rounded rectangle can only be one of those. Two of them
+  // union into the right shape, because the whole hand is painted as
+  // one silhouette anyway.
+  const palmX = centreX + lean - palmWidth / 2;
   limbs.push({
     box: {
-      x: centreX + lean - palmWidth / 2,
+      x: palmX,
       y: palmTop,
       width: palmWidth,
-      height: palmHeight,
-      radius: palmWidth * 0.4,
+      height: palmHeight * 0.62,
+      radius: palmWidth * 0.16,
+    },
+  });
+  limbs.push({
+    box: {
+      x: palmX + palmWidth * 0.02,
+      y: palmTop + palmHeight * 0.3,
+      width: palmWidth * 0.96,
+      height: palmHeight * 0.7,
+      radius: palmWidth * 0.42,
     },
   });
 
