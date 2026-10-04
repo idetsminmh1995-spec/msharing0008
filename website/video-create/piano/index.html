@@ -297,9 +297,17 @@
      
      So the keyboard stops short and the band below it stays the
      frame's own colour. The music does not get smaller for it: the
-     band comes out of the runway, which had room to spare. */
+     band comes out of the runway, which had room to spare.
+
+     A SQUARE FRAME IS NOT A REEL, though, and 14cqh of an 844px one
+     is 118px of nothing under the keys. 1:1 is the feed post -- the
+     app puts its caption BELOW the picture, not over it -- so the band
+     there is only what keeps the keys off the rounded corner, and the
+     keyboard sits 59px lower for it. 9:16 keeps the full band, because
+     in 9:16 the buttons really are drawn on top of the picture. */
   .video-frame.shape-9x16 .video-mid,
   .video-frame.shape-1x1 .video-mid{margin-bottom:var(--safe-bottom,14cqh);}
+  .video-frame.shape-1x1 .video-mid{margin-bottom:var(--safe-bottom-square,7cqh);}
 
   /* THE TOP BAND STACKS IN A TALL FRAME.
      
@@ -349,10 +357,12 @@
      A share of the FRAME was the wrong thing to measure against. In
      the stacked header the logo's room is the row it shares with the
      titles, and that row is as tall as the titles make it. So size the
-     mark from the titles: ink height == title block height, and the
-     two stand level. It costs the music nothing, because the row was
-     already that tall and the logo was simply leaving part of it
-     empty.
+     mark from the titles -- and by the same 1.16 that 16:9 already
+     uses, where the mark's ink is 68.6px against a 59px title block.
+     The mark leads the titles rather than standing level with them,
+     which is what gives the logo-and-title band the bit more room it
+     was asked for: the row goes 59px -> 68.6px and the header 14.3%
+     -> 15.4% of a tall frame.
 
      The title block is line-height 1.16 on each line plus the 1px gap
      .video-titles sets, and --logo-h is the ink divided by the
@@ -364,12 +374,13 @@
      a line with no text in it is not in the row and must not be
      counted. `:has()` asks the row which lines it is actually showing:
      two, one (and then no 1px gap either), or none. With none there is
-     nothing to stand level with, and the mark goes back to a share of
-     the frame -- 8.5cqh, which is what it was before.
+     no title to lead, and the mark goes back to a share of the frame
+     -- 10cqh, a sixth of a tall frame's height, which is the same bit
+     more read onto the one case that has no titles to read it from.
 
      The clamp is the sanity either side. The size sliders reach 72px
-     and 56px, which would ask for a 227px mark; 13cqh stops the ink at
-     8.6% of the frame, and the header is tall there because the TITLES
+     and 56px, which would ask for a 263px mark; 15cqh stops the ink at
+     9.9% of the frame, and the header is tall there because the TITLES
      are, not the logo. At the bottom they reach 12px and 10px, and
      5cqh keeps the mark legible rather than letting it vanish with the
      text. 16:9 keeps its fixed 104px: it has the width for a mark that
@@ -388,11 +399,12 @@
   }
   .video-frame.shape-9x16 .video-logo-mark,
   .video-frame.shape-1x1 .video-logo-mark{
-    --logo-h:clamp(5cqh, calc(var(--titles-h) * 2000 / 1319), 13cqh);
+    --logo-lead:1.16;
+    --logo-h:clamp(5cqh, calc(var(--titles-h) * var(--logo-lead) * 2000 / 1319), 15cqh);
   }
   .video-frame.shape-9x16 .video-logo-row:has(.video-title-1:empty):has(.video-title-2:empty) .video-logo-mark,
   .video-frame.shape-1x1 .video-logo-row:has(.video-title-1:empty):has(.video-title-2:empty) .video-logo-mark{
-    --logo-h:8.5cqh;
+    --logo-h:10cqh;
   }
   /* The keyboard fills whatever the notation leaves: `min-height:0`
      on .video-mid lets it shrink, and the SVG stretches to the box it
