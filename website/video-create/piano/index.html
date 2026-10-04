@@ -162,7 +162,34 @@
      which made the bottom safe band 14% of the frame's width and so
      only 8% of a 9:16 frame's height, where 14% of the height was the
      whole point. `cqh` is the height, said plainly. */
-  .video-frame{container-type:size;position:relative;background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-width:0;}
+  /* ONE PIXEL OF THE FRAME, NOT ONE PIXEL OF THE SCREEN.
+     
+     The exported video is composed from this very DOM -- every element
+     is measured where it sits and drawn into the canvas at
+     `canvas.width / frame.width`. So the preview's proportions ARE the
+     video's proportions, and anything inside the frame written in
+     SCREEN pixels is a thing whose share of the picture depends on how
+     wide the person's browser window happens to be.
+     
+     That was really happening. The header is text, and text was the
+     one thing still in px: on a 744px-tall preview it took 17% of the
+     frame, and on a 188px-tall one -- a narrow window, which is what a
+     phone or a side-by-side panel gives -- it took 46%, and the music
+     was crushed into what was left. Both of those exported.
+     
+     `--u` is one pixel OF THE FRAME: 100cqh over the frame height each
+     shape was tuned at. At that size it is exactly 1px and nothing
+     moves; at any other size every px below scales with the picture.
+     The two reference numbers are the preview heights the 16:9 and the
+     portrait layouts were judged at, so the figures in the comments
+     below still read in the units they were measured in.
+     
+     cqh is the frame's own height -- a `container-type:size` element
+     does not query itself, so `--u` is only ever USED on descendants,
+     which is where it resolves. */
+  .video-frame{container-type:size;--frame-ref:522;--u:calc(100cqh / var(--frame-ref));--title1-size:calc(var(--title1-px, 32) * var(--u));--title2-size:calc(var(--title2-px, 18) * var(--u));position:relative;background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-width:0;}
+  .video-frame.shape-1x1,
+  .video-frame.shape-9x16{--frame-ref:844;}
   /* Padding here lands the logo's INK, not its image box -- the
      negative margins on .video-logo-mark have already pulled the box
      onto the artwork, so the left padding IS the ink's left edge.
@@ -174,8 +201,8 @@
      That offset moves if the titles are resized -- which is correct,
      because the mark is meant to stay on the stat boxes' centreline
      rather than at a fixed height. */
-  .video-top{padding:4px 20px 0 15px;display:flex;justify-content:space-between;align-items:center;gap:16px;}
-  .video-logo-row{display:flex;align-items:center;gap:10px;min-width:0;}
+  .video-top{padding:calc(4 * var(--u)) calc(20 * var(--u)) 0 calc(15 * var(--u));display:flex;justify-content:space-between;align-items:center;gap:calc(16 * var(--u));}
+  .video-logo-row{display:flex;align-items:center;gap:calc(10 * var(--u));min-width:0;}
   /* The title block sits beside the logo, stacked: Title 1 over Title
      2. Both lines read their size and colour from CSS variables set on
      .video-frame, so card 2's controls change one property in one place
@@ -185,15 +212,15 @@
      element with no text, and CSS already knows that. A title that is
      only spaces is deliberately NOT empty -- someone indenting a title
      with spaces meant it. */
-  .video-titles{display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0;}
+  .video-titles{display:flex;flex-direction:column;justify-content:center;gap:var(--u);min-width:0;}
   .video-title{font-family:'Baloo 2','Sora',sans-serif;line-height:1.16;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .video-title:empty{display:none;}
-  .video-title-1{font-weight:700;font-size:var(--title1-size,32px);color:var(--title1-color,#fff);}
-  .video-title-2{font-weight:600;font-size:var(--title2-size,18px);color:var(--title2-color,#fff);}
-  .video-stats{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
-  .stat-box{border:1.5px solid var(--red);border-radius:8px;padding:4px 12px;text-align:center;min-width:52px;}
-  .stat-box .stat-label{color:#D8AE7A;font-size:8px;font-weight:700;letter-spacing:.05em;display:block;}
-  .stat-box .stat-value{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:16px;display:block;}
+  .video-title-1{font-weight:700;font-size:var(--title1-size);color:var(--title1-color,#fff);}
+  .video-title-2{font-weight:600;font-size:var(--title2-size);color:var(--title2-color,#fff);}
+  .video-stats{display:flex;gap:calc(8 * var(--u));flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
+  .stat-box{border:calc(1.5 * var(--u)) solid var(--red);border-radius:calc(8 * var(--u));padding:calc(4 * var(--u)) calc(12 * var(--u));text-align:center;min-width:calc(52 * var(--u));}
+  .stat-box .stat-label{color:#D8AE7A;font-size:calc(8 * var(--u));font-weight:700;letter-spacing:.05em;display:block;}
+  .stat-box .stat-value{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:calc(16 * var(--u));display:block;}
   /* The COUNT box ticks through the Beat Label while the count-in and
      the music play. The pulse is re-triggered by removing and re-adding
      the class, which needs a reflow between the two -- see `beat()`. */
@@ -223,7 +250,7 @@
      top edge at 18.2% of the frame, which is the line the owner drew on
      the screenshot. The rest of the box is the runway the notes fall
      down. */
-  .video-mid{flex:0 0 43.5%;max-height:calc(100% - 96px);display:flex;align-items:center;justify-content:center;}
+  .video-mid{flex:0 0 43.5%;max-height:calc(100% - 96 * var(--u));display:flex;align-items:center;justify-content:center;}
   /* The titles and the stat boxes are text: they are as tall as they
      are, and squashing them is never the right way to find room. So
      the keyboard's share has a ceiling as well -- 96px is the title
@@ -242,7 +269,7 @@
      keys across a wide frame the keyboard is a shallow strip. The room
      that leaves goes to the MUSIC -- which is the other thing a learner
      is reading -- rather than sitting as a black band between the two. */
-  .video-frame.design-hands{--notation-height:270px;}
+  .video-frame.design-hands{--notation-height:calc(270 * var(--u));}
   .video-frame.design-hands .video-notation{flex:0 1 auto;max-height:58%;}
   /* A tall frame in the Hands design has room the keyboard cannot use.
      A keyboard only gets so tall before its keys stop looking like
@@ -254,8 +281,8 @@
      9:16 gets the most of it, because 9:16 has the most to give: it
      is nearly twice as tall as it is wide, and neither a keyboard nor
      two staves fill that on their own. */
-  .video-frame.design-hands.shape-1x1{--notation-height:430px;}
-  .video-frame.design-hands.shape-9x16{--notation-height:560px;}
+  .video-frame.design-hands.shape-1x1{--notation-height:calc(430 * var(--u));}
+  .video-frame.design-hands.shape-9x16{--notation-height:calc(560 * var(--u));}
   .video-frame.design-hands.shape-1x1 .video-notation,
   .video-frame.design-hands.shape-9x16 .video-notation{flex:0 1 auto;max-height:66%;}
   .video-frame.design-hands.shape-9x16 .video-mid{flex:1 1 auto;min-height:30%;}
@@ -280,11 +307,18 @@
      RUNWAY: how far a note falls before it lands, which is how much
      warning a player gets.
 
+     33% of it was more warning than anyone wanted: the runway ran a
+     fifth of the frame in 1:1 and over a fifth in 9:16, and all of it
+     empty except for the second or two before a note lands. 26% now,
+     with `keyboardHeight` handed to the engine so the keys keep their
+     depth as the band comes in -- the runway gives up the 7%, not the
+     keyboard.
+
      Falling Notes only. The Hands design has its own portrait rules
      above and its own problem to solve -- it has no falling notes, so
      nothing fills a tall frame -- and that is not this change. */
-  .video-frame.shape-9x16:not(.design-hands) .video-mid{flex:0 0 33%;}
-  .video-frame.shape-1x1:not(.design-hands) .video-mid{flex:0 0 33%;}
+  .video-frame.shape-9x16:not(.design-hands) .video-mid{flex:0 0 26%;}
+  .video-frame.shape-1x1:not(.design-hands) .video-mid{flex:0 0 26%;}
 
   /* A TALL FRAME KEEPS ITS LAST BAND EMPTY.
      
@@ -299,15 +333,12 @@
      frame's own colour. The music does not get smaller for it: the
      band comes out of the runway, which had room to spare.
 
-     A SQUARE FRAME IS NOT A REEL, though, and 14cqh of an 844px one
-     is 118px of nothing under the keys. 1:1 is the feed post -- the
-     app puts its caption BELOW the picture, not over it -- so the band
-     there is only what keeps the keys off the rounded corner, and the
-     keyboard sits 59px lower for it. 9:16 keeps the full band, because
-     in 9:16 the buttons really are drawn on top of the picture. */
-  .video-frame.shape-9x16 .video-mid,
-  .video-frame.shape-1x1 .video-mid{margin-bottom:var(--safe-bottom,14cqh);}
-  .video-frame.shape-1x1 .video-mid{margin-bottom:var(--safe-bottom-square,7cqh);}
+     A SQUARE FRAME IS NOT A REEL, though. 1:1 is the feed post -- the
+     app puts its caption BELOW the picture, not over it -- so there is
+     nothing to keep the keys clear of, and the keyboard goes right to
+     the bottom edge the way it does in 16:9. Only 9:16 keeps the band,
+     because only in 9:16 are the buttons drawn on top of the picture. */
+  .video-frame.shape-9x16 .video-mid{margin-bottom:var(--safe-bottom,14cqh);}
 
   /* THE TOP BAND STACKS IN A TALL FRAME.
      
@@ -319,7 +350,7 @@
      One under the other instead -- the name of the piece, then what it
      is in. Which is the order they are read in. */
   .video-frame.shape-9x16 .video-top,
-  .video-frame.shape-1x1 .video-top{flex-direction:column;align-items:stretch;gap:9px;padding-bottom:4px;}
+  .video-frame.shape-1x1 .video-top{flex-direction:column;align-items:stretch;gap:calc(9 * var(--u));padding-bottom:calc(4 * var(--u));}
   .video-frame.shape-9x16 .video-stats,
   .video-frame.shape-1x1 .video-stats{justify-content:flex-start;flex-wrap:nowrap;}
   /* Every box, in full, whatever the frame is.
@@ -423,7 +454,7 @@
      keyboard out of it -- and the exported video is laid out from
      THIS box, so a keyboard missing here is a keyboard missing in the
      file. The notation gives way; the keyboard keeps its share. */
-  .video-notation{padding:0 20px 14px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;min-height:0;flex:1 1 auto;scrollbar-width:none;-ms-overflow-style:none;}
+  .video-notation{padding:0 calc(20 * var(--u)) calc(14 * var(--u));overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;min-height:0;flex:1 1 auto;scrollbar-width:none;-ms-overflow-style:none;}
   .video-notation::-webkit-scrollbar{display:none;width:0;height:0;}
   /* How tall the staff is drawn, and therefore how big the notes
      are: the SVG keeps its own ratio, so height is the only dial.
@@ -482,7 +513,7 @@
      go wrong. Nothing is clipped -- everything outside the margin box
      is the blank part of the image. */
   .video-logo-mark{
-    --logo-h:104px;
+    --logo-h:calc(104 * var(--u));
     --logo-w:calc(var(--logo-h) * 1414 / 2000);
     height:var(--logo-h);width:auto;flex-shrink:0;
     margin-top:calc(var(--logo-h) * -329 / 2000);
@@ -989,7 +1020,12 @@
       f.sizeOut.textContent = `${f.size.value}px`;
       if (f.following) f.color.value = TITLE_AUTO_COLOR[style];
       f.auto.dataset.following = f.following ? 'yes' : 'no';
-      videoFrame.style.setProperty(`--title${f.n}-size`, `${f.size.value}px`);
+      // Unitless, because the frame turns it into a length itself:
+      // `--titleN-size` is this number times --u, one pixel OF THE
+      // FRAME. The slider still says 32px and still means 32px in the
+      // picture; what it no longer means is 32px of whatever size the
+      // preview happens to be on this screen.
+      videoFrame.style.setProperty(`--title${f.n}-px`, f.size.value);
       videoFrame.style.setProperty(`--title${f.n}-color`, f.color.value);
     }
   }
@@ -1602,11 +1638,28 @@
   }
 
   /** What the engine is being asked to draw, for a box of this size. */
+  /**
+   * How deep the keys are drawn, as a share of the stage.
+   *
+   * The engine's own default is 0.42, which leaves the rest as runway.
+   * That is the right split in 16:9, where the stage is nearly half
+   * the frame. A tall frame gives the stage 26% -- the runway above
+   * the keys was empty and the notation wanted the room -- and 0.42 of
+   * 26% is a keyboard you cannot see the keys of. Half of a smaller
+   * band is the same keyboard and a shorter runway, which is the trade
+   * that was asked for.
+   *
+   * The engine still caps the depth at a real key's proportions on top
+   * of this, so a narrow frame cannot turn the keys into spaghetti.
+   */
+  const TALL_KEYBOARD_FRACTION = 0.5;
+
   function stageOptions(width, height, atSeconds) {
     return {
       size: keyboardSpan(),
       width,
       height,
+      ...(currentAspect() === '16x9' ? {} : { keyboardHeight: height * TALL_KEYBOARD_FRACTION }),
       seconds: stageSeconds(atSeconds),
       notes: pianoNotes,
       gridLines,
