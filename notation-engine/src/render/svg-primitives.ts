@@ -129,6 +129,15 @@ export interface SvgDocumentOptions {
   /** Height of the drawing, in staff-space units -- becomes the viewBox height. */
   readonly viewBoxHeight: number;
   /**
+   * Where the top of the picture sits in the coordinates the music was
+   * drawn in. Zero, except where `config.layout.fitSystemHeight` has
+   * trimmed the empty air off a system: the trim moves the BOX, never
+   * the music, so every y in the markup still means what it meant --
+   * which is what lets a host find the staff lines in the output and
+   * put a playhead on them.
+   */
+  readonly viewBoxMinY?: number;
+  /**
    * How many real CSS pixels one staff space should occupy. This is the
    * SINGLE number Phase 44's arbitrary-resize requirement changes -- every
    * other coordinate in the document stays in staff-space units and the
@@ -158,14 +167,15 @@ export function createSvgDocument(
   children: readonly string[],
 ): string {
   const { viewBoxWidth, viewBoxHeight, pxPerStaffSpace, backgroundColor } = options;
+  const minY = options.viewBoxMinY ?? 0;
   const pxWidth = viewBoxWidth * pxPerStaffSpace;
   const pxHeight = viewBoxHeight * pxPerStaffSpace;
   const background = hasBackground(backgroundColor)
-    ? svgRect(0, 0, viewBoxWidth, viewBoxHeight, { fill: backgroundColor })
+    ? svgRect(0, minY, viewBoxWidth, viewBoxHeight, { fill: backgroundColor })
     : '';
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${pxWidth}" height="${pxHeight}" ` +
-    `viewBox="0 0 ${viewBoxWidth} ${viewBoxHeight}">\n` +
+    `viewBox="0 ${svgNumber(minY)} ${viewBoxWidth} ${viewBoxHeight}">\n` +
     (background !== '' ? background + '\n' : '') +
     children.join('\n') +
     `\n</svg>`

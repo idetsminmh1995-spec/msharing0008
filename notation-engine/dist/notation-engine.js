@@ -298,6 +298,7 @@ var NotationEngine = (() => {
     tupletSide: () => tupletSide,
     unpitchedPitch: () => unpitchedPitch,
     unzipMxl: () => unzipMxl,
+    verticalInkSpan: () => verticalInkSpan,
     voice: () => voice,
     voiceForcedDirection: () => voiceForcedDirection,
     voiceRestOffset: () => voiceRestOffset,
@@ -59592,10 +59593,11 @@ ${children.join("\n")}
   }
   function createSvgDocument(options, children) {
     const { viewBoxWidth, viewBoxHeight, pxPerStaffSpace, backgroundColor } = options;
+    const minY = options.viewBoxMinY ?? 0;
     const pxWidth = viewBoxWidth * pxPerStaffSpace;
     const pxHeight = viewBoxHeight * pxPerStaffSpace;
-    const background = hasBackground(backgroundColor) ? svgRect(0, 0, viewBoxWidth, viewBoxHeight, { fill: backgroundColor }) : "";
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${pxWidth}" height="${pxHeight}" viewBox="0 0 ${viewBoxWidth} ${viewBoxHeight}">
+    const background = hasBackground(backgroundColor) ? svgRect(0, minY, viewBoxWidth, viewBoxHeight, { fill: backgroundColor }) : "";
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${pxWidth}" height="${pxHeight}" viewBox="0 ${svgNumber(minY)} ${viewBoxWidth} ${viewBoxHeight}">
 ` + (background !== "" ? background + "\n" : "") + children.join("\n") + `
 </svg>`;
   }
@@ -65575,12 +65577,38 @@ ${denominator}`;
   }
 
   // src/debug/measure.ts
-  function boxFrom(b, kind, id, approximate) {
+  var IDENTITY = { tx: 0, ty: 0, sx: 1, sy: 1 };
+  function parseTransform(value) {
+    if (value === void 0 || value === "") return IDENTITY;
+    let t = IDENTITY;
+    const re = /(translate|scale)\(\s*(-?[\d.]+)(?:[\s,]+(-?[\d.]+))?\s*\)/g;
+    let m;
+    while ((m = re.exec(value)) !== null) {
+      const a = Number(m[2]);
+      const b = m[3] === void 0 ? m[1] === "scale" ? a : 0 : Number(m[3]);
+      if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+      t = m[1] === "translate" ? compose(t, { tx: a, ty: b, sx: 1, sy: 1 }) : compose(t, { tx: 0, ty: 0, sx: a, sy: b });
+    }
+    return t;
+  }
+  function compose(outer, inner) {
     return {
-      x: b.minX,
-      y: b.minY,
-      width: b.maxX - b.minX,
-      height: b.maxY - b.minY,
+      tx: outer.tx + outer.sx * inner.tx,
+      ty: outer.ty + outer.sy * inner.ty,
+      sx: outer.sx * inner.sx,
+      sy: outer.sy * inner.sy
+    };
+  }
+  function boxFrom(b, kind, id, approximate, into = IDENTITY) {
+    const x1 = into.tx + into.sx * b.minX;
+    const x2 = into.tx + into.sx * b.maxX;
+    const y1 = into.ty + into.sy * b.minY;
+    const y2 = into.ty + into.sy * b.maxY;
+    return {
+      x: Math.min(x1, x2),
+      y: Math.min(y1, y2),
+      width: Math.abs(x2 - x1),
+      height: Math.abs(y2 - y1),
       kind,
       ...id !== void 0 ? { id } : {},
       ...approximate ? { approximate: true } : {}
@@ -65606,6 +65634,8 @@ ${denominator}`;
       }
       return void 0;
     };
+    const transformStack = [];
+    const currentTransform = () => transformStack[transformStack.length - 1] ?? IDENTITY;
     const tagRe = /<(\/?)([a-zA-Z]+)([^>]*)>([^<]*)/g;
     let m;
     while ((m = tagRe.exec(svg)) !== null) {
@@ -65615,12 +65645,18 @@ ${denominator}`;
       const text = m[4] ?? "";
       const tag = ` ${rest2}`;
       if (name === "g") {
-        if (closing) idStack.pop();
-        else if (!rest2.endsWith("/")) idStack.push(attr(tag, "data-id"));
+        if (closing) {
+          idStack.pop();
+          transformStack.pop();
+        } else if (!rest2.endsWith("/")) {
+          idStack.push(attr(tag, "data-id"));
+          transformStack.push(compose(currentTransform(), parseTransform(attr(tag, "transform"))));
+        }
         continue;
       }
       if (closing) continue;
       const id = currentId();
+      const into = currentTransform();
       switch (name) {
         case "line": {
           const x1 = num(tag, "x1");
@@ -65638,7 +65674,8 @@ ${denominator}`;
               },
               "line",
               id,
-              false
+              false,
+              into
             )
           );
           break;
@@ -65651,7 +65688,8 @@ ${denominator}`;
               { minX: x2, minY: y, maxX: x2 + num(tag, "width"), maxY: y + num(tag, "height") },
               "rect",
               id,
-              false
+              false,
+              into
             )
           );
           break;
@@ -65670,7 +65708,7 @@ ${denominator}`;
             b.minY = Math.min(b.minY, y);
             b.maxY = Math.max(b.maxY, y);
           }
-          if (Number.isFinite(b.minX)) boxes.push(boxFrom(b, "path", id, true));
+          if (Number.isFinite(b.minX)) boxes.push(boxFrom(b, "path", id, true, into));
           break;
         }
         case "text": {
@@ -65690,7 +65728,8 @@ ${denominator}`;
                 },
                 "glyph",
                 id,
-                false
+                false,
+                into
               )
             );
           } else if (text.length > 0) {
@@ -65704,7 +65743,8 @@ ${denominator}`;
                 },
                 "text",
                 id,
-                true
+                true,
+                into
               )
             );
           }
@@ -65715,6 +65755,15 @@ ${denominator}`;
       }
     }
     return boxes;
+  }
+  function verticalInkSpan(svg) {
+    let top = Infinity;
+    let bottom = -Infinity;
+    for (const box of measureSvgBoxes(svg)) {
+      top = Math.min(top, box.y);
+      bottom = Math.max(bottom, box.y + box.height);
+    }
+    return Number.isFinite(top) && Number.isFinite(bottom) ? { top, bottom } : void 0;
   }
 
   // src/debug/skyline.ts
@@ -66165,6 +66214,8 @@ ${xrefOffset}
 
   // src/render-from-musicxml.ts
   var STAFF_LINES = 5;
+  var FIT_MARGIN = 1;
+  var PLAYHEAD_OVERHANG = 1.25;
   var STAFF_BOTTOM_Y = 8;
   var SYSTEM_HEIGHT = 16;
   var MEASURE_WIDTH = 24;
@@ -67525,42 +67576,8 @@ ${xrefOffset}
       return { needed, padding: Math.max(0, needed - existingHeadroom) };
     })();
     const aboveStaffPadding = aboveStaff.padding;
-    const contentReach = (() => {
-      if (config.layout.fitSystemHeight !== true) return void 0;
-      if (directions.length > 0) return void 0;
-      let north = 0;
-      let south = 0;
-      for (const part2 of score2.parts) {
-        const staffCount = Math.max(
-          1,
-          ...attributes.filter((a) => a.partId === part2.id).map((a) => Object.keys(a.staffLinesByStaff).length || 1)
-        );
-        for (const measure2 of part2.measures) {
-          for (const voice2 of measure2.voices) {
-            for (const event of voice2.events) {
-              const notes = event.kind === "chord" ? event.notes : event.kind === "note" ? [event] : [];
-              for (const note2 of notes) {
-                if ((note2.lyrics?.length ?? 0) > 0 || (note2.slurStarts?.length ?? 0) > 0 || (note2.slurStops?.length ?? 0) > 0 || (note2.articulations?.length ?? 0) > 0 || (note2.ornaments?.length ?? 0) > 0 || note2.tupletStart === true || note2.tupletStop === true) {
-                  return void 0;
-                }
-              }
-            }
-          }
-        }
-        for (let staffNumber = 1; staffNumber <= staffCount; staffNumber++) {
-          north = Math.max(north, worstCaseStaffExtent(part2, staffNumber, attributes, "north"));
-          south = Math.max(south, worstCaseStaffExtent(part2, staffNumber, attributes, "south"));
-        }
-      }
-      return { north: north + STEM_AND_BEAM_ALLOWANCE, south: south + STEM_AND_BEAM_ALLOWANCE };
-    })();
-    const FIT_MARGIN = 1;
-    const BASE_ABOVE = STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
-    const BASE_BELOW = SYSTEM_HEIGHT - STAFF_BOTTOM_Y;
-    const fitAbove = contentReach === void 0 ? 0 : BASE_ABOVE + aboveStaffPadding - Math.max(contentReach.north + FIT_MARGIN, aboveStaff.needed);
-    const fitBelow = contentReach === void 0 ? 0 : BASE_BELOW - (contentReach.south + FIT_MARGIN);
-    const trimAbove = fitAbove;
-    const trimBelow = fitBelow;
+    const trimAbove = 0;
+    const trimBelow = 0;
     const staffBottomY = STAFF_BOTTOM_Y + aboveStaffPadding - trimAbove;
     const staffDistanceForPair = (partIndex, staffIndexInPart) => {
       const part2 = score2.parts[partIndex];
@@ -68341,6 +68358,19 @@ ${xrefOffset}
         svgParts.push(renderSkylineOverlay(skylines, { color: config.debug.skylineColor }));
       }
     }
+    const fitted = (() => {
+      if (config.layout.fitSystemHeight !== true) return void 0;
+      if (config.layout.mode === "page") return void 0;
+      const ink = verticalInkSpan(svgParts.join("\n"));
+      if (ink === void 0) return void 0;
+      const lines = [...staffBottomYs];
+      const staffTop = Math.min(...lines) - computeStaffGeometry(STAFF_LINES).height;
+      const staffBottom = Math.max(...lines);
+      const top = Math.min(ink.top, staffTop - PLAYHEAD_OVERHANG) - FIT_MARGIN;
+      const bottom = Math.max(ink.bottom, staffBottom + PLAYHEAD_OVERHANG) + FIT_MARGIN;
+      if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom <= top) return void 0;
+      return { minY: top, height: bottom - top };
+    })();
     const svg = createSvgDocument(
       {
         // §16.2: page mode's canvas is the PAGE, however much or little of
@@ -68349,7 +68379,8 @@ ${xrefOffset}
         // Integration A/B: the viewBox must fit EVERY staff of EVERY part,
         // or the lower ones are simply clipped out of the rendered image.
         // In page mode that means every page, stacked.
-        viewBoxHeight: config.layout.mode === "page" ? pageCount * config.page.pageHeight : systemHeight,
+        viewBoxHeight: fitted?.height ?? (config.layout.mode === "page" ? pageCount * config.page.pageHeight : systemHeight),
+        ...fitted !== void 0 ? { viewBoxMinY: fitted.minY } : {},
         pxPerStaffSpace: config.layout.pxPerStaffSpace,
         backgroundColor: theme.background
       },

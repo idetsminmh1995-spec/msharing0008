@@ -94,7 +94,12 @@ import {
 } from './playback/index.js';
 import { renderTabNumber, svgGroup } from './render/index.js';
 import { renderBoundingBoxOverlay, renderSkylineOverlay } from './render/debug-overlay.js';
-import { computeDebugSkylines, filterDiagnostics, measureSvgBoxes } from './debug/index.js';
+import {
+  computeDebugSkylines,
+  filterDiagnostics,
+  measureSvgBoxes,
+  verticalInkSpan,
+} from './debug/index.js';
 import { computeBraceShape, needsBrace, needsContinuousBarline } from './geometry/index.js';
 import { renderBrace } from './render/index.js';
 import type { Diagnostic, MeasureAttributes } from './parser/index.js';
@@ -146,6 +151,21 @@ import {
 
 const STAFF_LINES = 5;
 /** How far down from the SVG's top the staff's BOTTOM line sits -- leaves room above for stems/ledger lines/accidentals in this deliberately naive layout. */
+/** A staff space of air between the outermost ink and the edge of a fitted picture. */
+const FIT_MARGIN = 1;
+/**
+ * How far past the staff's own lines a fitted box always reaches, top
+ * and bottom, even on a score whose ink does not.
+ *
+ * §17.3 leaves drawing the playhead to the host, and a host draws it
+ * around the staff rather than around the notes -- the piano page's
+ * capsule overhangs by 1.1 staff spaces. A box trimmed to the ink of a
+ * score that never leaves the staff would cut that marker in half, so
+ * this is the floor the trim never goes under. A shade more than 1.1,
+ * because the number belongs to the host and this is the engine
+ * leaving room for it rather than knowing it.
+ */
+const PLAYHEAD_OVERHANG = 1.25;
 const STAFF_BOTTOM_Y = 8;
 const SYSTEM_HEIGHT = 16;
 const MEASURE_WIDTH = 24;
@@ -2840,88 +2860,28 @@ export function renderParsedMusicXml(
   const aboveStaffPadding = aboveStaff.padding;
 
   /**
-   * How far the notes themselves reach past the staff, with their stems
-   * and beams, or undefined on a score this cannot honestly measure.
+   * `config.layout.fitSystemHeight` asks for the picture to stop where
+   * the music does, and the only honest way to know where that is, is
+   * to look at what was DRAWN. So nothing is decided here: the system
+   * is laid out at its full reserve, rendered, and the finished markup
+   * measured at the bottom of this function (`verticalInkSpan`), where
+   * the box -- and only the box -- is trimmed to fit.
    *
-   * `config.layout.fitSystemHeight` asks for the system to stop where
-   * the music does. Only notes can be measured from here. A dynamic, a
-   * lyric, a slur, a tuplet bracket, an articulation or an ornament is
-   * placed by a pass that runs after this and would be trimmed off, so
-   * a score carrying any of them keeps the full reserve and this
-   * returns undefined. That is the whole safety of it -- the trim never
-   * guesses, and the list is deliberately a list of what is DRAWN
-   * rather than of what reaches far: a staccato dot is small, but it is
-   * placed outside the notehead by a rule this does not know.
-   */
-  const contentReach = ((): { north: number; south: number } | undefined => {
-    if (config.layout.fitSystemHeight !== true) return undefined;
-    if (directions.length > 0) return undefined;
-    let north = 0;
-    let south = 0;
-    for (const part of score.parts) {
-      const staffCount = Math.max(
-        1,
-        ...attributes
-          .filter((a) => a.partId === part.id)
-          .map((a) => Object.keys(a.staffLinesByStaff).length || 1),
-      );
-      for (const measure of part.measures) {
-        for (const voice of measure.voices) {
-          for (const event of voice.events) {
-            const notes =
-              event.kind === 'chord' ? event.notes : event.kind === 'note' ? [event] : [];
-            for (const note of notes) {
-              if (
-                (note.lyrics?.length ?? 0) > 0 ||
-                (note.slurStarts?.length ?? 0) > 0 ||
-                (note.slurStops?.length ?? 0) > 0 ||
-                (note.articulations?.length ?? 0) > 0 ||
-                (note.ornaments?.length ?? 0) > 0 ||
-                note.tupletStart === true ||
-                note.tupletStop === true
-              ) {
-                return undefined;
-              }
-            }
-          }
-        }
-      }
-      for (let staffNumber = 1; staffNumber <= staffCount; staffNumber++) {
-        north = Math.max(north, worstCaseStaffExtent(part, staffNumber, attributes, 'north'));
-        south = Math.max(south, worstCaseStaffExtent(part, staffNumber, attributes, 'south'));
-      }
-    }
-    return { north: north + STEM_AND_BEAM_ALLOWANCE, south: south + STEM_AND_BEAM_ALLOWANCE };
-  })();
-
-  /** A space of air between the outermost ink and the edge of the system. */
-  const FIT_MARGIN = 1;
-  /** The room a system reserves above its top line and below its bottom one before any fitting. */
-  const BASE_ABOVE = STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
-  const BASE_BELOW = SYSTEM_HEIGHT - STAFF_BOTTOM_Y;
-
-  /**
-   * How much each end MOVES when the system is fitted. Positive takes
-   * room away, negative gives it.
+   * It used to be decided here, by predicting how far the notes would
+   * reach. That prediction could see notes and nothing else, so a score
+   * carrying a dynamic, a lyric, a slur, a tuplet bracket, an
+   * articulation or an ornament -- any of which is placed by a pass
+   * that runs long after this point -- had to decline to fit at all
+   * rather than risk trimming one off. Which is to say it declined on
+   * very nearly every real score: the owner's own piano export is a
+   * grand staff 28.8 staff spaces tall holding 21 spaces of music, and
+   * the fit had nothing to say about the other 7.8.
    *
-   * It gives as well as takes, and that is not symmetry for its own
-   * sake. The four spaces reserved above the top line are not always
-   * enough: a drum chart's china cymbal sits a space and a half above
-   * the staff and its stem goes three and a half higher again, which is
-   * a space and a half MORE than the reserve. On an ordinary score the
-   * tempo mark's own padding happened to cover that; on a score with no
-   * tempo mark drawn, the stem was cut off at the top of the picture.
-   * A fit that only ever shrank would have left that cut in place.
+   * Measuring the output cannot be wrong about what the output
+   * contains, so there is nothing left for it to decline over.
    */
-  const fitAbove =
-    contentReach === undefined
-      ? 0
-      : BASE_ABOVE +
-        aboveStaffPadding -
-        Math.max(contentReach.north + FIT_MARGIN, aboveStaff.needed);
-  const fitBelow = contentReach === undefined ? 0 : BASE_BELOW - (contentReach.south + FIT_MARGIN);
-  const trimAbove = fitAbove;
-  const trimBelow = fitBelow;
+  const trimAbove = 0;
+  const trimBelow = 0;
 
   /** Every staff's bottom line sits this far down, above-staff headroom included. */
   const staffBottomY = STAFF_BOTTOM_Y + aboveStaffPadding - trimAbove;
@@ -4255,6 +4215,51 @@ export function renderParsedMusicXml(
     }
   }
 
+  /**
+   * §16.2/`config.layout.fitSystemHeight`: the box, trimmed to the ink.
+   *
+   * A system reserves four staff spaces above its top line and eight
+   * below its bottom one, whatever is actually drawn there, because the
+   * reserve has to be decided before anything is placed. On the owner's
+   * own piano export that leaves 7.8 of 28.8 staff spaces empty -- and
+   * since the page gives the strip a fixed height, every empty space is
+   * one the notes are not drawn at. The music comes out a quarter
+   * smaller than the same strip could hold.
+   *
+   * So the finished markup is measured and the box pulled in to what is
+   * in it. Three things make this safe to do at the very end:
+   *
+   *  - It moves the BOX, not the music. Every y in the markup still
+   *    means what it meant, so a host that finds the staff lines in the
+   *    output to hang a playhead on them still finds them where they
+   *    are. Nothing is re-laid out and nothing is rendered twice.
+   *  - It GROWS as readily as it shrinks. A drum chart's china cymbal
+   *    and its stem reach higher than the four-space reserve and used
+   *    to be cut off at the top of the picture; measured ink is still
+   *    ink, and the box now opens up to hold it.
+   *  - It keeps the staff's own lines plus a playhead's overhang
+   *    whatever the measurement says, so a score whose every note sits
+   *    inside the staff cannot end up with a box too tight for the
+   *    marker a host draws on it.
+   *
+   * Scroll mode only. Page mode's canvas is the PAGE -- a fixed sheet
+   * the music is placed on, not a box drawn around it -- and its
+   * systems are stacked at a pitch computed long before here.
+   */
+  const fitted = ((): { minY: number; height: number } | undefined => {
+    if (config.layout.fitSystemHeight !== true) return undefined;
+    if (config.layout.mode === 'page') return undefined;
+    const ink = verticalInkSpan(svgParts.join('\n'));
+    if (ink === undefined) return undefined;
+    const lines = [...staffBottomYs];
+    const staffTop = Math.min(...lines) - computeStaffGeometry(STAFF_LINES).height;
+    const staffBottom = Math.max(...lines);
+    const top = Math.min(ink.top, staffTop - PLAYHEAD_OVERHANG) - FIT_MARGIN;
+    const bottom = Math.max(ink.bottom, staffBottom + PLAYHEAD_OVERHANG) + FIT_MARGIN;
+    if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom <= top) return undefined;
+    return { minY: top, height: bottom - top };
+  })();
+
   const svg = createSvgDocument(
     {
       // §16.2: page mode's canvas is the PAGE, however much or little of
@@ -4264,7 +4269,9 @@ export function renderParsedMusicXml(
       // or the lower ones are simply clipped out of the rendered image.
       // In page mode that means every page, stacked.
       viewBoxHeight:
-        config.layout.mode === 'page' ? pageCount * config.page.pageHeight : systemHeight,
+        fitted?.height ??
+        (config.layout.mode === 'page' ? pageCount * config.page.pageHeight : systemHeight),
+      ...(fitted !== undefined ? { viewBoxMinY: fitted.minY } : {}),
       pxPerStaffSpace: config.layout.pxPerStaffSpace,
       backgroundColor: theme.background,
     },

@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-619 exported symbols, by module.
+620 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -541,8 +541,9 @@ The diagnostics `level` lets through, in their original order.
 
 | | Name | Summary |
 |---|---|---|
-| interface | `DebugBox` | Phase 51/§18.3: "`config.debug.drawBoundingBoxes` overlays every element's computed bounding box on the SVG -- the fastest way to diagnose a layout bug." The boxes are measured FROM THE EMITTED SVG rather than collected as the renderer draws. |
+| interface | `DebugBox` | Phase 51/§18.3: "`config.debug.drawBoundingBoxes` overlays every element's computed bounding box on the SVG -- the fastest way to diagnose a layout bug." No longer only a debug tool. |
 | **API** | `measureSvgBoxes` | Every drawn element in `svg`, as a bounding box in staff-space units. |
+| function | `verticalInkSpan` | The topmost and bottommost ink in a rendered system, in staff-space units -- what `config.layout.fitSystemHeight` sizes the picture from. |
 
 ### `src/debug/skyline.ts`
 

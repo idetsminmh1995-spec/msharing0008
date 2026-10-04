@@ -15,7 +15,15 @@ const load = (n) => fs.readFileSync(path.join(FIXTURES, n), 'utf8');
 const render = (name, config) =>
   NE.renderFromMusicXml(load(name), { domParser, ...(config ? { config } : {}) }).svg;
 
-const boxHeight = (svg) => Number((svg.match(/viewBox="([^"]+)"/)[1].split(/\s+/))[3]);
+const viewBox = (svg) => svg.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number);
+const boxHeight = (svg) => viewBox(svg)[3];
+/**
+ * Where the top of the picture sits. The fit moves the BOX and never
+ * the music, so a fitted render's viewBox starts at the ink rather than
+ * at zero -- and a NEGATIVE value is the fit having GROWN the picture
+ * upward to hold something the old fixed reserve was cutting off.
+ */
+const boxTop = (svg) => viewBox(svg)[1];
 
 /** Every y the markup draws at, so "is anything outside the box" is answerable. */
 function drawnYs(svg) {
@@ -71,12 +79,19 @@ describe('config.layout.fitSystemHeight', () => {
       'simple-single-voice.musicxml',
       'two-voice-drum-groove.musicxml',
       'beamed-eighths.musicxml',
+      // The three the old predictive fit had to decline on, because it
+      // could see notes and nothing else. Measuring the finished markup
+      // sees all of them, so these are now the same case as the rest.
+      'dynamics-hairpin.musicxml',
+      'slur-tuplet.musicxml',
+      'articulations-ornaments.musicxml',
     ]) {
       const svg = render(file, { ...QUIET, ...FIT });
-      const box = boxHeight(svg);
+      const top = boxTop(svg);
+      const bottom = top + boxHeight(svg);
       const ys = drawnYs(svg);
-      assert.ok(Math.min(...ys) >= -0.001, `${file}: ${Math.min(...ys)} is above the box`);
-      assert.ok(Math.max(...ys) <= box + 0.001, `${file}: ${Math.max(...ys)} is below ${box}`);
+      assert.ok(Math.min(...ys) >= top - 0.001, `${file}: ${Math.min(...ys)} is above ${top}`);
+      assert.ok(Math.max(...ys) <= bottom + 0.001, `${file}: ${Math.max(...ys)} is below ${bottom}`);
     }
   });
 
@@ -88,23 +103,28 @@ describe('config.layout.fitSystemHeight', () => {
     const clipped = render('musescore-drum-notes.musicxml', QUIET);
     assert.ok(Math.min(...drawnYs(clipped)) < 0, 'the fixture should still show the old clipping');
     const fitted = render('musescore-drum-notes.musicxml', { ...QUIET, ...FIT });
-    assert.ok(Math.min(...drawnYs(fitted)) >= 0, 'the fit should have grown the room back');
+    // The box opens upward to hold it, rather than the music moving down.
+    assert.ok(boxTop(fitted) < 0, `the box should start above zero, got ${boxTop(fitted)}`);
+    assert.ok(
+      Math.min(...drawnYs(fitted)) >= boxTop(fitted) - 0.001,
+      'and everything drawn should now be inside it',
+    );
   });
 
-  test('a score it cannot measure keeps the full reserve rather than guessing', () => {
-    // Dynamics, slurs and tuplets are placed by passes that run after
-    // the height is decided, so trimming to the notes alone would cut
-    // them off. The fit declines instead.
+  test('a dynamic, a slur or an ornament is fitted around, not declined over', () => {
+    // These are placed by passes that run long after the height used to
+    // be decided, so the old predictive fit had to decline on all three
+    // rather than risk trimming one off -- which meant declining on
+    // very nearly every real score. The measurement happens after every
+    // pass has drawn, so there is nothing left to decline over.
     for (const file of [
       'dynamics-hairpin.musicxml',
       'slur-tuplet.musicxml',
       'articulations-ornaments.musicxml',
     ]) {
-      assert.equal(
-        boxHeight(render(file, { ...QUIET, ...FIT })),
-        boxHeight(render(file, QUIET)),
-        `${file} should not have been fitted`,
-      );
+      const fitted = boxHeight(render(file, { ...QUIET, ...FIT }));
+      const plain = boxHeight(render(file, QUIET));
+      assert.ok(fitted < plain, `${file}: ${fitted} should be under ${plain}`);
     }
   });
 
