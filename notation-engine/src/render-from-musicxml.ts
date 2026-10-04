@@ -243,6 +243,8 @@ interface RenderTheme {
    * it sits in the order of precedence.
    */
   readonly fileLineWidths: ScoreLineWidths;
+  /** `config.layout.minStrokeWidth`: the thinnest any line may be drawn, in staff spaces. */
+  readonly minStrokeWidth: number;
 }
 
 /**
@@ -268,7 +270,11 @@ function lineWidth(
   fallback: number,
 ): number {
   const stated = fileKey === undefined ? undefined : theme.fileLineWidths[fileKey];
-  return stated ?? getEngravingDefault(smuflKey) ?? fallback;
+  const width = stated ?? getEngravingDefault(smuflKey) ?? fallback;
+  // Every stroke in the engine comes through here, which is what makes
+  // `minStrokeWidth` one line rather than thirty. See its own comment
+  // in `config.ts` for why a floor and not a multiplier.
+  return Math.max(width, theme.minStrokeWidth);
 }
 
 function buildTheme(config: EngineConfig, fileDefaults: ScoreDefaults | undefined): RenderTheme {
@@ -284,6 +290,7 @@ function buildTheme(config: EngineConfig, fileDefaults: ScoreDefaults | undefine
     noteheadMapping: config.noteheadMapping,
     colorOf: (category) => overrides?.[category] ?? config.colors.ink,
     fileLineWidths: fileDefaults?.lineWidths ?? {},
+    minStrokeWidth: Math.max(0, config.layout.minStrokeWidth ?? 0),
   };
 }
 

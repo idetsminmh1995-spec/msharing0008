@@ -340,7 +340,7 @@
   body.is-rendering #genNote{opacity:.38;}
 </style>
 <!-- The real Notation Engine bundle (github.com/idetsminmh1995-spec/msharing0008/notation-engine) -->
-<script src="../../assets/notation-engine.js?v=bf80b847"></script>
+<script src="../../assets/notation-engine.js?v=61752db3"></script>
 <!-- The guitar stage: the neck, and the strings lit where they are
      played. guitar-engine/, TypeScript + SVG, built to this bundle. -->
 <script src="../../assets/guitar-engine.js?v=4d6c51ea"></script>
@@ -856,6 +856,86 @@
    */
   let lastXmlText = '';
 
+  /**
+   * The thinnest line the notation may be drawn with, in staff spaces.
+   *
+   * Engraving weights are PRINT weights: a staff line is 0.11 staff
+   * spaces and a stem is 0.10 because at 1.75mm to the space on paper
+   * that is a crisp hairline. On a screen the ratio still holds and the
+   * hairline does not -- this frame draws about 7 pixels to the staff
+   * space, which makes a staff line 0.75 of a pixel and a stem 0.68.
+   * A line narrower than a pixel is not drawn as a thin line; it is
+   * drawn as a grey smear across two rows at part opacity, and white on
+   * black it reads as a ghost. That is why the notes stopped standing
+   * out from the staff.
+   *
+   * So the engine is told how thin this page can actually draw, and
+   * nothing goes under it. Measured from the SVG that was just
+   * rendered, because the strip's height is the frame's and the frame's
+   * is the window's -- there is no constant to put here.
+   *
+   * Capped, because a floor that is too high stops being a floor and
+   * starts being a style: past about a fifth of a staff space the staff
+   * itself begins to read as heavy. A preview small enough to need more
+   * than that is a preview too small to read anyway.
+   */
+  const MIN_INK_PX = 1;
+  const MAX_INK_FLOOR_SPACES = 0.2;
+  let notationInkFloor = 0;
+
+  /** What the floor SHOULD be for the SVG now on the page, or null if it cannot be measured. */
+  function measuredInkFloor() {
+    const svg = notationContainer.querySelector('svg');
+    if (!svg) return null;
+    const viewBox = (svg.getAttribute('viewBox') || '').split(/\s+/).map(Number);
+    const boxHeight = viewBox.length === 4 ? viewBox[3] : 0;
+    const drawnHeight = svg.getBoundingClientRect().height;
+    if (!(boxHeight > 0) || !(drawnHeight > 0)) return null;
+    const pxPerStaffSpace = drawnHeight / boxHeight;
+    return Math.min(MAX_INK_FLOOR_SPACES, MIN_INK_PX / pxPerStaffSpace);
+  }
+
+  /**
+   * Draw it again if the floor it was drawn with is wrong for the size
+   * it ended up at.
+   *
+   * The floor cannot be known before the render, because it is measured
+   * from the finished SVG: how tall the strip is depends on the frame,
+   * the frame depends on the window, and the staff's own height in
+   * staff spaces depends on the music. So the first pass goes out with
+   * whatever the last one used and this corrects it.
+   *
+   * At most ONE extra pass. A thicker stem moves the fitted box by a
+   * hair, which moves the scale, which moves the floor -- it converges
+   * immediately, and the epsilon below stops it chasing its own tail
+   * for a hundredth of a staff space nobody can see.
+   */
+  let tuningNotationInk = false;
+
+  function tuneNotationInk() {
+    if (tuningNotationInk || lastParsed === null || typeof NotationEngine === 'undefined') return;
+    const wanted = measuredInkFloor();
+    if (wanted === null || Math.abs(wanted - notationInkFloor) < 0.01) return;
+    notationInkFloor = wanted;
+    tuningNotationInk = true;
+    try {
+      const rendered = NotationEngine.renderParsedMusicXml(lastParsed, { config: notationConfig() });
+      notationContainer.innerHTML = rendered.svg;
+      const svgEl = notationContainer.querySelector('svg');
+      if (svgEl) {
+        svgEl.removeAttribute('width');
+        svgEl.removeAttribute('height');
+      }
+      notationPlayback = rendered.playback;
+      attachCursor(svgEl);
+      updateCursor();
+    } catch (err) {
+      console.error('Notation Engine failed re-rendering for the ink floor:', err);
+    } finally {
+      tuningNotationInk = false;
+    }
+  }
+
   function notationConfig() {
     return {
       // The staff stops where the music does. A system otherwise
@@ -864,7 +944,7 @@
       // the strip is a fixed height -- so every reserved space nothing
       // is drawn in is a space the notes are not drawn at. The engine
       // measures its own finished markup and pulls the box in to it.
-      layout: { fitSystemHeight: true },
+      layout: { fitSystemHeight: true, minStrokeWidth: notationInkFloor },
       colors: {
         // White notation on the video's own dark frame; near-black on
         // the white strip. `background:'none'` means the engine draws
@@ -932,6 +1012,7 @@
     notationPlayback = rendered.playback;
     attachCursor(svgEl);
     updateCursor();
+    tuneNotationInk();
 
     // Real stats, read from the actual parsed score -- not hardcoded.
     const firstAttrs = parsed.attributes && parsed.attributes[0];
@@ -1008,6 +1089,7 @@
     notationPlayback = rendered.playback;
     attachCursor(svgEl);
     updateCursor();
+    tuneNotationInk();
     buildKeyTimeline();
     // The re-render built a new playback; the note list is placed
     // against it, so it is rebuilt rather than left pointing at the old

@@ -66344,7 +66344,8 @@ ${xrefOffset}
   var MEASURE_WIDTH = 24;
   function lineWidth(theme, fileKey, smuflKey, fallback) {
     const stated = fileKey === void 0 ? void 0 : theme.fileLineWidths[fileKey];
-    return stated ?? getEngravingDefault(smuflKey) ?? fallback;
+    const width = stated ?? getEngravingDefault(smuflKey) ?? fallback;
+    return Math.max(width, theme.minStrokeWidth);
   }
   function buildTheme(config, fileDefaults) {
     const overrides = config.colors.overrides;
@@ -66358,7 +66359,8 @@ ${xrefOffset}
       drumMap: mergeDrumMappingTable(config.drums.mapping),
       noteheadMapping: config.noteheadMapping,
       colorOf: (category) => overrides?.[category] ?? config.colors.ink,
-      fileLineWidths: fileDefaults?.lineWidths ?? {}
+      fileLineWidths: fileDefaults?.lineWidths ?? {},
+      minStrokeWidth: Math.max(0, config.layout.minStrokeWidth ?? 0)
     };
   }
   function withinMeasureSpacing(spacing) {

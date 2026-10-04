@@ -68,6 +68,32 @@ export interface LayoutConfig {
    * createSvgDocument, which takes exactly this value).
    */
   readonly pxPerStaffSpace: number;
+  /**
+   * The thinnest any line is drawn, in staff spaces. A FLOOR, not a
+   * multiplier, and zero by default.
+   *
+   * Engraving weights are print weights. A staff line is 0.11 staff
+   * spaces and a stem 0.10 because at 1.75mm to the space on paper that
+   * is a crisp hairline, and the ratio is what makes the page look
+   * right. On a screen the ratio still holds and the hairline does not:
+   * at the size a video frame draws this -- about 7 pixels to the staff
+   * space in the piano page's preview -- a staff line is 0.75 of a
+   * pixel and a stem is 0.68, and a line narrower than a pixel is not
+   * drawn as a thin line. It is drawn as a grey smear across two rows
+   * of pixels at part opacity. White on black, it reads as a ghost, and
+   * the notes stop standing out from the staff at all.
+   *
+   * So the host says how thin it can actually draw, and nothing goes
+   * under it. A floor rather than a multiplier because it must do
+   * NOTHING at a size that does not need it: at 1920 the natural 0.11
+   * is already two pixels, the floor sits below it, and the engraving
+   * is MuseScore's untouched.
+   *
+   * Beams, barlines and ledger lines are thicker than the floor at any
+   * realistic size, so in practice this moves the staff lines and the
+   * stems -- which are exactly the two the eye loses first.
+   */
+  readonly minStrokeWidth?: number;
 }
 
 // ---- fonts (Phase 50/§8.2: the music font, the text font, and every text size) ----
