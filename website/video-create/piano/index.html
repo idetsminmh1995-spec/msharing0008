@@ -283,8 +283,8 @@
      Falling Notes only. The Hands design has its own portrait rules
      above and its own problem to solve -- it has no falling notes, so
      nothing fills a tall frame -- and that is not this change. */
-  .video-frame.shape-9x16:not(.design-hands) .video-mid{flex:0 0 44%;}
-  .video-frame.shape-1x1:not(.design-hands) .video-mid{flex:0 0 44%;}
+  .video-frame.shape-9x16:not(.design-hands) .video-mid{flex:0 0 33%;}
+  .video-frame.shape-1x1:not(.design-hands) .video-mid{flex:0 0 33%;}
 
   /* A TALL FRAME KEEPS ITS LAST BAND EMPTY.
      
@@ -314,10 +314,40 @@
   .video-frame.shape-1x1 .video-top{flex-direction:column;align-items:stretch;gap:9px;padding-bottom:4px;}
   .video-frame.shape-9x16 .video-stats,
   .video-frame.shape-1x1 .video-stats{justify-content:flex-start;flex-wrap:nowrap;}
-  /* At their own width, from the left, under the logo -- not stretched
-     across the row. Four boxes pulled to a quarter of the frame each
-     are four labels in a lot of empty border; at their own size they
-     read as four small facts, which is what they are. */
+  /* Every box, in full, whatever the frame is.
+     
+     They used to take their own width, which meant four of them wanted
+     more room than a narrow frame has and the last one was cut off at
+     the edge -- COUNT showing as a C. An equal share each cannot
+     overflow, because a share is of what there IS.
+     
+     And sized from the frame's own WIDTH rather than in pixels, so the
+     row is the same thing in a 250-pixel preview and a 1080-pixel
+     export. A fixed pixel size looks right at exactly one preview
+     width and wrong at every other. */
+  .video-frame.shape-9x16 .stat-box,
+  .video-frame.shape-1x1 .stat-box{
+    flex:1 1 0;min-width:0;overflow:hidden;
+    padding:min(1.1cqw, 0.66cqh) min(1.4cqw, 0.85cqh);
+    border-radius:min(1.7cqw, 1cqh);border-width:min(0.32cqw, 0.19cqh);
+  }
+  .video-frame.shape-9x16 .stat-box .stat-label,
+  .video-frame.shape-1x1 .stat-box .stat-label{font-size:min(1.9cqw, 1.15cqh);}
+  .video-frame.shape-9x16 .stat-box .stat-value,
+  .video-frame.shape-1x1 .stat-box .stat-value{font-size:min(4cqw, 2.4cqh);}
+  .video-frame.shape-9x16 .video-stats,
+  .video-frame.shape-1x1 .video-stats{gap:min(1.7cqw, 1cqh);}
+
+  /* The logo is smaller in a tall frame, and said as a share of the
+     frame rather than in pixels.
+     
+     104px is a fifth of a 16:9 frame's height and more than a quarter
+     of a small 9:16 preview's, which is a brand mark wearing the
+     header. A share keeps it the same size relative to the picture
+     whatever the preview happens to be -- and keeps the preview and
+     the export showing the same thing. */
+  .video-frame.shape-9x16 .video-logo-mark,
+  .video-frame.shape-1x1 .video-logo-mark{--logo-h:8.5cqh;}
   /* The keyboard fills whatever the notation leaves: `min-height:0`
      on .video-mid lets it shrink, and the SVG stretches to the box it
      is given rather than keeping the keyboard's own ratio -- a
