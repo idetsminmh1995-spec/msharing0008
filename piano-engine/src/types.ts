@@ -13,6 +13,28 @@ export type Hand = 'left' | 'right';
 /** The four keyboards people actually own. */
 export type KeyboardSize = 61 | 73 | 76 | 88;
 
+/**
+ * A stretch of keyboard, by MIDI note, rather than a whole instrument.
+ *
+ * Because a portrait frame cannot show a whole one. Eighty-eight keys
+ * across a phone screen is nine pixels a key, and a falling note landing
+ * on a nine-pixel key is a note nobody can follow -- the keyboard stops
+ * being an instrument and becomes a texture. A piece that lives between
+ * C3 and C6 is better drawn as the three octaves it uses, where the keys
+ * are wide enough to read and the note that lands is on a key you can
+ * point at.
+ *
+ * `first` and `last` are inclusive, and both are keys that exist: a
+ * range is a WINDOW onto a real keyboard, not a keyboard of its own.
+ */
+export interface KeyRange {
+  readonly first: number;
+  readonly last: number;
+}
+
+/** A whole instrument, or a window onto one. */
+export type KeyboardSpan = KeyboardSize | KeyRange;
+
 /** One note, in the same seconds the audio is counted in. */
 export interface PianoNote {
   /** MIDI note number: 60 is middle C. */
@@ -84,7 +106,7 @@ export interface PianoColors {
 }
 
 export interface PianoStageOptions {
-  readonly size: KeyboardSize;
+  readonly size: KeyboardSpan;
   /** The whole stage box: falling notes above, keyboard along the bottom. */
   readonly width: number;
   readonly height: number;

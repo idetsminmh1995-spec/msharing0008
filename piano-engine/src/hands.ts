@@ -35,7 +35,7 @@ import { darken } from './color.js';
 import { keyboardGeometry, noteName } from './keyboard.js';
 import { ALL_FINGERS, anchorAt, fingersDownAt } from './fingering.js';
 import type { Finger, FingeredNote, HandAnchor } from './fingering.js';
-import type { Hand, KeyboardSize, PianoKey, StageShape } from './types.js';
+import type { Hand, KeyboardSpan, PianoKey, StageShape } from './types.js';
 import { ARTWORK_TIPS, HAND_LENGTH } from './hand/artwork.js';
 import { placeHand, placedTip, transformPoint } from './hand/place.js';
 import type { FingerTarget, HandPlacement } from './hand/place.js';
@@ -165,7 +165,7 @@ export function handColorsFor(colors: {
 }
 
 export interface HandsOptions {
-  readonly size: KeyboardSize;
+  readonly size: KeyboardSpan;
   /** The keyboard's own box, as `keyboardGeometry` was given it. */
   readonly board: { x: number; y: number; width: number; height: number };
   readonly seconds: number;

@@ -15,6 +15,8 @@ export {
   noteName,
   pressedAt,
   whiteKeyCount,
+  rangeForNotes,
+  spanRange,
 } from './keyboard.js';
 export {
   DEFAULT_COLORS,
@@ -45,7 +47,9 @@ export type {
   FallingBar,
   GridLine,
   Hand,
+  KeyRange,
   KeyboardSize,
+  KeyboardSpan,
   PianoColors,
   PianoDesign,
   PianoKey,

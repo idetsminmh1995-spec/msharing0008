@@ -47,9 +47,11 @@ var PianoEngine = (() => {
     parseColor: () => parseColor,
     planFingering: () => planFingering,
     pressedAt: () => pressedAt,
+    rangeForNotes: () => rangeForNotes,
     renderKeyboardSvg: () => renderKeyboardSvg,
     renderPianoStage: () => renderPianoStage,
     resolveColors: () => resolveColors,
+    spanRange: () => spanRange,
     stageShapes: () => stageShapes,
     whiteIndex: () => whiteIndex,
     whiteKeyCount: () => whiteKeyCount
@@ -93,10 +95,31 @@ var PianoEngine = (() => {
   function keyboardRange(size) {
     return KEYBOARD_RANGES[size] ?? KEYBOARD_RANGES[88];
   }
+  function spanRange(span) {
+    return typeof span === "number" ? keyboardRange(span) : span;
+  }
+  function rangeForNotes(notes, options = {}) {
+    const whole = keyboardRange(options.size ?? 88);
+    if (notes.length === 0) return whole;
+    const lowest = Math.min(...notes.map((note) => note.midi));
+    const highest = Math.max(...notes.map((note) => note.midi));
+    let first = Math.floor(lowest / 12) * 12;
+    let last = Math.floor(highest / 12) * 12 + 11;
+    const minOctaves = Math.max(1, options.minOctaves ?? 2);
+    let growUpward = true;
+    while ((last + 1 - first) / 12 < minOctaves) {
+      if (growUpward && last + 12 <= whole.last) last += 12;
+      else if (first - 12 >= whole.first) first -= 12;
+      else if (last + 12 <= whole.last) last += 12;
+      else break;
+      growUpward = !growUpward;
+    }
+    return { first: Math.max(whole.first, first), last: Math.min(whole.last, last) };
+  }
   var BLACK_WIDTH = 0.62;
   var BLACK_HEIGHT = 0.62;
   function keyboardGeometry(size, box) {
-    const { first, last } = typeof size === "number" ? keyboardRange(size) : size;
+    const { first, last } = spanRange(size);
     const originX = box.x ?? 0;
     const originY = box.y ?? 0;
     const whites = [];
@@ -135,7 +158,7 @@ var PianoEngine = (() => {
     return keys;
   }
   function whiteKeyCount(size) {
-    const { first, last } = keyboardRange(size);
+    const { first, last } = spanRange(size);
     let count = 0;
     for (let midi = first; midi <= last; midi++) {
       if (!isBlackKey(midi)) count++;
@@ -813,7 +836,9 @@ var PianoEngine = (() => {
   }
   function keyboardBox(options) {
     if (options.design === "hands") return handsKeyboardBox(options);
-    const height = options.keyboardHeight !== void 0 && options.keyboardHeight > 0 ? Math.min(options.keyboardHeight, options.height) : options.height * KEYBOARD_FRACTION;
+    const asked = options.keyboardHeight !== void 0 && options.keyboardHeight > 0 ? Math.min(options.keyboardHeight, options.height) : options.height * KEYBOARD_FRACTION;
+    const unit = options.width / Math.max(1, whiteKeyCount(options.size ?? 88));
+    const height = Math.max(1, Math.min(asked, unit * KEY_DEPTH));
     return { x: 0, y: options.height - height, width: options.width, height };
   }
   function handsKeyboardBox(options) {
@@ -918,7 +943,7 @@ var PianoEngine = (() => {
     }
     return shapes;
   }
-  var NAME_MIN_SIZE = 7;
+  var NAME_MIN_SIZE = 6;
   function barNameShape(bar, unit, colors) {
     const size = Math.min(unit * 0.5, bar.height * 0.6);
     if (size < NAME_MIN_SIZE) return [];
@@ -1024,7 +1049,7 @@ var PianoEngine = (() => {
       });
     }
     if (options.keyNames !== false) {
-      const cSize = Math.max(6, whiteUnit * 0.46);
+      const cSize = Math.max(NAME_MIN_SIZE, whiteUnit * 0.46);
       for (const key of keys) {
         if (key.black || key.midi % 12 !== 0) continue;
         if (down.has(key.midi)) continue;

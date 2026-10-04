@@ -17,7 +17,7 @@ import type {
   FallingBar,
   GridLine,
   Hand,
-  KeyboardSize,
+  KeyboardSpan,
   PianoColors,
   PianoDesign,
   PianoKey,
@@ -114,7 +114,7 @@ export function keyboardBox(options: {
   height: number;
   keyboardHeight?: number;
   design?: PianoDesign;
-  size?: KeyboardSize;
+  size?: KeyboardSpan;
   notes?: readonly PianoNote[];
 }): {
   x: number;
@@ -123,10 +123,25 @@ export function keyboardBox(options: {
   height: number;
 } {
   if (options.design === 'hands') return handsKeyboardBox(options);
-  const height =
+  const asked =
     options.keyboardHeight !== undefined && options.keyboardHeight > 0
       ? Math.min(options.keyboardHeight, options.height)
       : options.height * KEYBOARD_FRACTION;
+  // A key is only so deep for its width. A real white key is 23.5mm
+  // across and 150mm front to back, so it is about six and a half times
+  // longer than it is wide -- and a keyboard drawn any longer than that
+  // stops reading as keys. In a 9:16 frame it was 17 times, which is
+  // what made the keyboard look like a bundle of spaghetti: the frame
+  // is narrow, so the keys are narrow, and the band's share of the
+  // height did not know that.
+  //
+  // The Hands design has always capped it this way (`handsKeyboardBox`
+  // below). This is the same cap for the design that does not put hands
+  // on the keys, and it does nothing in a wide frame: at 1280 across,
+  // 88 keys are 24px wide and the cap is 172px, which is more than the
+  // band ever gets.
+  const unit = options.width / Math.max(1, whiteKeyCount(options.size ?? 88));
+  const height = Math.max(1, Math.min(asked, unit * KEY_DEPTH));
   return { x: 0, y: options.height - height, width: options.width, height };
 }
 
@@ -148,7 +163,7 @@ function handsKeyboardBox(options: {
   width: number;
   height: number;
   keyboardHeight?: number;
-  size?: KeyboardSize;
+  size?: KeyboardSpan;
   notes?: readonly PianoNote[];
 }): { x: number; y: number; width: number; height: number } {
   // The whole instrument the caller asked for. 88 Keys means 88 keys:
@@ -189,7 +204,7 @@ function handsKeyboardBox(options: {
 export function fallingBars(
   notes: readonly PianoNote[],
   options: {
-    size: PianoStageOptions['size'];
+    size: KeyboardSpan;
     width: number;
     height: number;
     seconds: number;
@@ -341,14 +356,26 @@ export function fadeShapes(options: {
 }
 
 /**
- * The least a note name may be drawn at, in pixels of the frame.
+ * The least a note name may be drawn at, in pixels of the stage it is
+ * drawn on.
  *
  * Below this it is a smudge, and a smudge on every bar is worse than no
- * name at all -- so a bar too small for its name goes without one. At
- * 1920 wide an 88-key white key is 37px and a black one 22px, so this
- * only bites on a narrow frame or a very short note.
+ * name at all -- so a bar too small for its name goes without one.
+ *
+ * SIX and not seven, which it was. Seven is a sound threshold for a
+ * name a reader has to pick out of a moving stripe, and it was wrong
+ * here for a reason that has nothing to do with legibility: the stage
+ * is drawn at the size of the box it is GIVEN, and the preview's box is
+ * a fraction of the exported video's. A 9:16 preview 475 pixels wide
+ * suppressed every name; the same frame exported at 1080 drew them at
+ * fourteen pixels. The preview was telling the owner the names were
+ * gone when the video would have had them.
+ *
+ * Six is the same floor the C names already use, so all three kinds of
+ * name now appear and disappear together instead of at three different
+ * sizes.
  */
-const NAME_MIN_SIZE = 7;
+const NAME_MIN_SIZE = 6;
 
 /**
  * A falling bar's own note name: 'D' on a D, 'D#' on the black key
@@ -556,7 +583,7 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
   // top of each other, and the one that is sounding is the one being
   // read.
   if (options.keyNames !== false) {
-    const cSize = Math.max(6, whiteUnit * 0.46);
+    const cSize = Math.max(NAME_MIN_SIZE, whiteUnit * 0.46);
     for (const key of keys) {
       if (key.black || key.midi % 12 !== 0) continue;
       if (down.has(key.midi)) continue;

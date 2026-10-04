@@ -253,6 +253,32 @@
   .video-frame.design-hands.shape-1x1 .video-notation,
   .video-frame.design-hands.shape-9x16 .video-notation{flex:0 1 auto;max-height:66%;}
   .video-frame.design-hands.shape-9x16 .video-mid{flex:1 1 auto;min-height:30%;}
+  /* A PORTRAIT frame is not a wide one stood on its end.
+     
+     In 16:9 the notation gets whatever the keyboard leaves, and that
+     is about half the frame -- enough for six or seven bars across,
+     which is a line of music a reader can follow. Turn the frame on
+     its side and the same share buys ONE AND A THIRD BARS: the staff
+     is drawn at twice the size, because its height is the band's and
+     its width follows, and the frame is half as wide to put it in.
+     A bar and a third is not a line of music. It is a close-up.
+     
+     So in 9:16 the shares swap round. The keyboard and the falling
+     notes take most of the frame -- which is what a portrait piano
+     video IS, a long runway with the keys at the bottom -- and the
+     notation keeps a strip at the top. Two bars at a size worth
+     reading beats one bar at twice that size.
+     
+     The keyboard's own share of the mid is the engine's, and it caps
+     itself at a real key's proportions, so this number is about the
+     RUNWAY: how far a note falls before it lands, which is how much
+     warning a player gets.
+
+     Falling Notes only. The Hands design has its own portrait rules
+     above and its own problem to solve -- it has no falling notes, so
+     nothing fills a tall frame -- and that is not this change. */
+  .video-frame.shape-9x16:not(.design-hands) .video-mid{flex:0 0 62%;}
+  .video-frame.shape-1x1:not(.design-hands) .video-mid{flex:0 0 52%;}
   /* The keyboard fills whatever the notation leaves: `min-height:0`
      on .video-mid lets it shrink, and the SVG stretches to the box it
      is given rather than keeping the keyboard's own ratio -- a
@@ -376,7 +402,7 @@
 <script src="../../assets/notation-engine.js?v=61752db3"></script>
 <!-- The piano stage: the keyboard, and the notes falling onto it.
      piano-engine/, TypeScript + SVG, built to this bundle. -->
-<script src="../../assets/piano-engine.js?v=54866d0f"></script>
+<script src="../../assets/piano-engine.js?v=6a641f50"></script>
 <!-- Finds the count voices in the bucket whatever they were named. -->
 <script src="../../assets/voice-samples.js?v=609facad"></script>
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
@@ -1245,6 +1271,30 @@
     return value === 61 || value === 73 || value === 76 || value === 88 ? value : 88;
   }
 
+  /**
+   * How much keyboard the frame shows: the whole instrument, or the
+   * stretch of it this piece uses.
+   *
+   * A portrait frame cannot show a whole one. Eighty-eight keys across
+   * a phone screen is nine pixels a key, and a note landing on a
+   * nine-pixel key is a note nobody can follow -- the keyboard stops
+   * being an instrument and becomes a texture. It also makes the keys
+   * seventeen times longer than they are wide, where a real one is six
+   * and a half, so the whole thing reads as a bundle of spaghetti.
+   *
+   * So in 9:16 and 1:1 the frame shows the octaves the music actually
+   * uses (whole ones, C to B, so every C stays where a C is). 16:9 is
+   * wide enough for all 88 and keeps them: the instrument is the point
+   * when there is room for it.
+   *
+   * The SIZE control still decides the instrument. This is a window
+   * onto whichever one was picked, never a different one.
+   */
+  function keyboardSpan() {
+    if (currentAspect() === '16x9' || typeof PianoEngine === 'undefined') return keyboardSize();
+    return PianoEngine.rangeForNotes(pianoNotes, { size: keyboardSize(), minOctaves: 3 });
+  }
+
   function fallSeconds() {
     const value = Number(fallSecondsSelect?.value);
     return Number.isFinite(value) && value > 0 ? value : 2.5;
@@ -1427,7 +1477,7 @@
   /** What the engine is being asked to draw, for a box of this size. */
   function stageOptions(width, height, atSeconds) {
     return {
-      size: keyboardSize(),
+      size: keyboardSpan(),
       width,
       height,
       seconds: stageSeconds(atSeconds),

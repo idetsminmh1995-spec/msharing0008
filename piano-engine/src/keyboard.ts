@@ -8,7 +8,7 @@
  * sits a pixel left of its own key is exactly the kind of thing
  * nobody notices until it is in a published video.
  */
-import type { Hand, KeyboardSize, PianoKey, PianoNote } from './types.js';
+import type { Hand, KeyRange, KeyboardSize, KeyboardSpan, PianoKey, PianoNote } from './types.js';
 
 /**
  * The four sizes, as the ranges those instruments really have.
@@ -99,6 +99,56 @@ export function keyboardRange(size: KeyboardSize): {
   return KEYBOARD_RANGES[size] ?? KEYBOARD_RANGES[88];
 }
 
+/** A whole instrument or a window onto one, as the two notes it runs between. */
+export function spanRange(span: KeyboardSpan): KeyRange {
+  return typeof span === 'number' ? keyboardRange(span) : span;
+}
+
+/**
+ * The stretch of keyboard a piece actually uses, for a frame too narrow
+ * to show a whole one.
+ *
+ * Whole OCTAVES, C to B, and never fewer than two of them. Three
+ * reasons, and the first is the one that matters: a keyboard that
+ * started in the middle of an octave would have its C in a different
+ * place for every piece, and the C is the one landmark a learner has.
+ * Second, a window that hugged the notes exactly would jump about
+ * between pieces that are nearly the same. Third, two octaves is the
+ * least that still looks like a piano rather than like a row of
+ * switches.
+ *
+ * Clamped to the instrument, so the window is always keys that exist.
+ */
+export function rangeForNotes(
+  notes: readonly PianoNote[],
+  options: { readonly size?: KeyboardSize; readonly minOctaves?: number } = {},
+): KeyRange {
+  const whole = keyboardRange(options.size ?? 88);
+  if (notes.length === 0) return whole;
+
+  const lowest = Math.min(...notes.map((note) => note.midi));
+  const highest = Math.max(...notes.map((note) => note.midi));
+  // Out to the C at or below the lowest note, and the B at or above the
+  // highest: whole octaves, so every C sits where a C sits.
+  let first = Math.floor(lowest / 12) * 12;
+  let last = Math.floor(highest / 12) * 12 + 11;
+
+  const minOctaves = Math.max(1, options.minOctaves ?? 2);
+  // Grown a whole octave at a time, alternating sides, so a piece that
+  // sits in one octave comes out centred rather than hard against one
+  // end of its own window.
+  let growUpward = true;
+  while ((last + 1 - first) / 12 < minOctaves) {
+    if (growUpward && last + 12 <= whole.last) last += 12;
+    else if (first - 12 >= whole.first) first -= 12;
+    else if (last + 12 <= whole.last) last += 12;
+    else break;
+    growUpward = !growUpward;
+  }
+
+  return { first: Math.max(whole.first, first), last: Math.min(whole.last, last) };
+}
+
 /** How wide a black key is, as a fraction of a white one. */
 const BLACK_WIDTH = 0.62;
 /** How far down the keyboard a black key reaches. */
@@ -113,13 +163,13 @@ const BLACK_HEIGHT = 0.62;
  * is the order a piano is built in.
  */
 export function keyboardGeometry(
-  size: KeyboardSize | { first: number; last: number },
+  size: KeyboardSpan,
   box: { x?: number; y?: number; width: number; height: number },
 ): readonly PianoKey[] {
   // A size names a whole instrument; a range names a stretch of one.
   // The hands design shows a stretch, because 88 keys across a phone
   // screen are four millimetres wide and the hands on them are specks.
-  const { first, last } = typeof size === 'number' ? keyboardRange(size) : size;
+  const { first, last } = spanRange(size);
   const originX = box.x ?? 0;
   const originY = box.y ?? 0;
 
@@ -165,8 +215,8 @@ export function keyboardGeometry(
 }
 
 /** The white keys of a size, which is what decides how wide a key is. */
-export function whiteKeyCount(size: KeyboardSize): number {
-  const { first, last } = keyboardRange(size);
+export function whiteKeyCount(size: KeyboardSpan): number {
+  const { first, last } = spanRange(size);
   let count = 0;
   for (let midi = first; midi <= last; midi++) {
     if (!isBlackKey(midi)) count++;

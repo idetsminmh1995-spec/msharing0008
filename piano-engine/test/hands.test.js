@@ -503,16 +503,68 @@ test('88 Keys means 88 keys, in every frame shape', () => {
   assert.equal(sixtyOne.length, 61);
 });
 
-test('the falling design keeps its own plain keyboard, the full share of the stage', () => {
-  const tall = { width: 1080, height: 1400, design: 'falling-notes', size: 88 };
-  // No strip in front of it: nothing reaches past the keys in this
-  // design, because there are no hands in it.
-  assert.ok(Math.abs(P.keyboardBox(tall).height - 1400 * 0.42) < 1e-6);
+test('the falling design keeps its own plain keyboard, with no strip in front of it', () => {
+  const wide = { width: 1920, height: 600, design: 'falling-notes', size: 88 };
+  // Nothing reaches past the keys in this design, because there are no
+  // hands in it: the keyboard runs to the bottom of the stage and takes
+  // its plain share of the height.
+  const box = P.keyboardBox(wide);
+  assert.ok(Math.abs(box.height - 600 * 0.42) < 1e-6);
+  assert.ok(Math.abs(box.y + box.height - 600) < 1e-6, 'flush with the bottom');
   assert.equal(
-    P.renderPianoStage({ ...tall, seconds: 0, notes: [] }),
-    P.renderPianoStage({ width: 1080, height: 1400, size: 88, seconds: 0, notes: [] }),
+    P.renderPianoStage({ ...wide, seconds: 0, notes: [] }),
+    P.renderPianoStage({ width: 1920, height: 600, size: 88, seconds: 0, notes: [] }),
     'and the design is what it was before there was a design to pick',
   );
+});
+
+test('a key is only so deep for its width, whatever share of the stage it is given', () => {
+  // A real white key is 23.5mm across and 150mm front to back, so it is
+  // about six and a half times longer than it is wide. A portrait frame
+  // gives the band a huge share of a narrow stage, and without the cap
+  // the keys came out seventeen times longer than wide -- a bundle of
+  // spaghetti rather than a keyboard.
+  const tall = { width: 1080, height: 1400, design: 'falling-notes', size: 88 };
+  const box = P.keyboardBox(tall);
+  const whiteWidth = 1080 / 52;
+  assert.ok(box.height < 1400 * 0.42, 'the share alone would be far deeper');
+  assert.ok(box.height / whiteWidth <= 7.001, `${box.height / whiteWidth} key lengths is too deep`);
+  assert.ok(box.height / whiteWidth > 6, 'and it is not shortened past a real key either');
+
+  // In a WIDE frame the cap is above the share and does nothing at all.
+  const wide = P.keyboardBox({ width: 1920, height: 600, design: 'falling-notes', size: 88 });
+  assert.ok(Math.abs(wide.height - 600 * 0.42) < 1e-6, 'untouched where it is not needed');
+});
+
+test('a narrow frame can show the stretch of keyboard the music uses, not all 88', () => {
+  // Eighty-eight keys across a phone is nine pixels a key, and a note
+  // landing on a nine-pixel key is a note nobody can follow.
+  const notes = [
+    { midi: 55, startSeconds: 0, endSeconds: 1, hand: 'left' },
+    { midi: 76, startSeconds: 1, endSeconds: 2, hand: 'right' },
+  ];
+  const range = P.rangeForNotes(notes);
+  // Whole octaves, C to B, so every C sits where a C sits.
+  assert.equal(range.first % 12, 0, `first ${range.first} should be a C`);
+  assert.equal(range.last % 12, 11, `last ${range.last} should be a B`);
+  assert.ok(range.first <= 55 && range.last >= 76, 'and it holds every note');
+  assert.ok(P.whiteKeyCount(range) < 52, 'fewer keys than the whole instrument');
+
+  // Which makes the keys wider, and the keyboard deeper for it.
+  const full = P.keyboardBox({ width: 500, height: 900, design: 'falling-notes', size: 88 });
+  const windowed = P.keyboardBox({ width: 500, height: 900, design: 'falling-notes', size: range });
+  assert.ok(windowed.height > full.height * 1.8, `${windowed.height} vs ${full.height}`);
+});
+
+test('a short piece still gets a keyboard, not a pair of keys', () => {
+  const oneNote = [{ midi: 60, startSeconds: 0, endSeconds: 1, hand: 'right' }];
+  const range = P.rangeForNotes(oneNote);
+  assert.ok((range.last + 1 - range.first) / 12 >= 2, 'never fewer than two octaves');
+  assert.ok(range.first <= 60 && range.last >= 60);
+  // And no notes at all is the whole instrument, not an empty window.
+  const empty = P.rangeForNotes([]);
+  assert.equal(empty.first, P.KEYBOARD_RANGES[88].first);
+  assert.equal(empty.last, P.KEYBOARD_RANGES[88].last);
 });
 
 test('a thumb reaching a distant key moves the WHOLE hand, not just the thumb', () => {
