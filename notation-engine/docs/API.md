@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-620 exported symbols, by module.
+622 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -892,6 +892,8 @@ The diagnostics `level` lets through, in their original order.
 | const | `DEFAULT_ADVANCE_PER_EM` | The fallback for any character with no entry above -- the widest digit measured, which is also a fair over-estimate for mixed-case words (lower case runs narrower than a digit in every face checked, upper case about the same). |
 | function | `estimateCharWidth` | One character's estimated advance, in the same units as `fontSize`. |
 | function | `estimateTextWidth` | A whole text run's estimated width, in the same units as `fontSize` (staff spaces, everywhere in this engine). |
+| const | `TEXT_ASCENT_PER_EM` | How far a line of text reaches above its own baseline, as a fraction of the font size, and how far below. |
+| const | `TEXT_DESCENT_PER_EM` |  |
 
 ### `src/geometry/tie.ts`
 

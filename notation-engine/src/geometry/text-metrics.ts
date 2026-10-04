@@ -71,3 +71,21 @@ export function estimateTextWidth(text: string, fontSize: number): number {
   for (const ch of text) total += estimateCharWidth(ch, fontSize);
   return total;
 }
+
+/**
+ * How far a line of text reaches above its own baseline, as a fraction
+ * of the font size, and how far below.
+ *
+ * The same kind of estimate as the widths above and generous for the
+ * same reason, but the DESCENT matters in a way the widths do not. A
+ * box drawn too wide is invisible; a box drawn with no room under the
+ * baseline says a 'g' or a ',' is not there, and anything sizing a
+ * picture from these boxes will cut the tail off. The old reading --
+ * from `y - fontSize` to `y` exactly -- made both mistakes at once: too
+ * much room above the cap line, none at all under the baseline.
+ *
+ * 0.78 and 0.22 are an ordinary Latin face's ascender and descender,
+ * which together make one em.
+ */
+export const TEXT_ASCENT_PER_EM = 0.78;
+export const TEXT_DESCENT_PER_EM = 0.22;

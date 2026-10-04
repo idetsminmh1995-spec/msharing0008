@@ -47,6 +47,8 @@ var NotationEngine = (() => {
     TAB_CLEF: () => TAB_CLEF,
     TENOR_CLEF: () => TENOR_CLEF,
     TENTHS_PER_STAFF_SPACE: () => TENTHS_PER_STAFF_SPACE,
+    TEXT_ASCENT_PER_EM: () => TEXT_ASCENT_PER_EM,
+    TEXT_DESCENT_PER_EM: () => TEXT_DESCENT_PER_EM,
     TICKS_PER_QUARTER: () => TICKS_PER_QUARTER,
     TREBLE_8VA_CLEF: () => TREBLE_8VA_CLEF,
     TREBLE_8VB_CLEF: () => TREBLE_8VB_CLEF,
@@ -59502,6 +59504,8 @@ var NotationEngine = (() => {
     for (const ch of text) total += estimateCharWidth(ch, fontSize);
     return total;
   }
+  var TEXT_ASCENT_PER_EM = 0.78;
+  var TEXT_DESCENT_PER_EM = 0.22;
 
   // src/geometry/augmentation-dot.ts
   function augmentationDotGlyphName() {
@@ -65697,18 +65701,10 @@ ${denominator}`;
         case "path": {
           const d = attr(tag, "d");
           if (d === void 0) break;
-          const nums = d.match(/-?\d+(?:\.\d+)?(?:e-?\d+)?/g);
-          if (nums === null || nums.length < 2) break;
-          const b = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-          for (let i2 = 0; i2 + 1 < nums.length; i2 += 2) {
-            const x2 = Number(nums[i2]);
-            const y = Number(nums[i2 + 1]);
-            b.minX = Math.min(b.minX, x2);
-            b.maxX = Math.max(b.maxX, x2);
-            b.minY = Math.min(b.minY, y);
-            b.maxY = Math.max(b.maxY, y);
+          const measured = pathBounds(d);
+          if (measured !== void 0) {
+            boxes.push(boxFrom(measured.bounds, "path", id, measured.approximate, into));
           }
-          if (Number.isFinite(b.minX)) boxes.push(boxFrom(b, "path", id, true, into));
           break;
         }
         case "text": {
@@ -65738,8 +65734,10 @@ ${denominator}`;
                 {
                   minX: x2,
                   maxX: x2 + estimateTextWidth(text, fontSize),
-                  minY: y - fontSize,
-                  maxY: y
+                  // A baseline is not the bottom of a line of text: a
+                  // 'g' hangs below it. See `TEXT_DESCENT_PER_EM`.
+                  minY: y - fontSize * TEXT_ASCENT_PER_EM,
+                  maxY: y + fontSize * TEXT_DESCENT_PER_EM
                 },
                 "text",
                 id,
@@ -65755,6 +65753,131 @@ ${denominator}`;
       }
     }
     return boxes;
+  }
+  function pathBounds(d) {
+    const tokens = d.match(/[A-Za-z]|-?\d+(?:\.\d+)?(?:e-?\d+)?/g);
+    if (tokens === null) return void 0;
+    const b = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    const include = (x3, y2) => {
+      b.minX = Math.min(b.minX, x3);
+      b.maxX = Math.max(b.maxX, x3);
+      b.minY = Math.min(b.minY, y2);
+      b.maxY = Math.max(b.maxY, y2);
+    };
+    let i2 = 0;
+    let command = "";
+    let x2 = 0;
+    let y = 0;
+    let startX = 0;
+    let startY = 0;
+    const next = () => Number(tokens[i2++]);
+    while (i2 < tokens.length) {
+      const token = tokens[i2] ?? "";
+      if (/[A-Za-z]/.test(token)) {
+        command = token;
+        i2++;
+        if (command === "Z" || command === "z") {
+          x2 = startX;
+          y = startY;
+          continue;
+        }
+      }
+      switch (command) {
+        case "M":
+          x2 = next();
+          y = next();
+          startX = x2;
+          startY = y;
+          include(x2, y);
+          command = "L";
+          break;
+        case "L":
+          x2 = next();
+          y = next();
+          include(x2, y);
+          break;
+        case "H":
+          x2 = next();
+          include(x2, y);
+          break;
+        case "V":
+          y = next();
+          include(x2, y);
+          break;
+        case "Q": {
+          const cx = next();
+          const cy = next();
+          const ex = next();
+          const ey = next();
+          include(ex, ey);
+          include(quadraticExtreme(x2, cx, ex), y);
+          include(x2, quadraticExtreme(y, cy, ey));
+          x2 = ex;
+          y = ey;
+          break;
+        }
+        case "C": {
+          const c1x = next();
+          const c1y = next();
+          const c2x = next();
+          const c2y = next();
+          const ex = next();
+          const ey = next();
+          include(ex, ey);
+          for (const px of cubicExtremes(x2, c1x, c2x, ex)) include(px, y);
+          for (const py of cubicExtremes(y, c1y, c2y, ey)) include(x2, py);
+          x2 = ex;
+          y = ey;
+          break;
+        }
+        default: {
+          const nums = d.match(/-?\d+(?:\.\d+)?(?:e-?\d+)?/g);
+          if (nums === null || nums.length < 2) return void 0;
+          const hull = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+          for (let k = 0; k + 1 < nums.length; k += 2) {
+            const hx = Number(nums[k]);
+            const hy = Number(nums[k + 1]);
+            hull.minX = Math.min(hull.minX, hx);
+            hull.maxX = Math.max(hull.maxX, hx);
+            hull.minY = Math.min(hull.minY, hy);
+            hull.maxY = Math.max(hull.maxY, hy);
+          }
+          return Number.isFinite(hull.minX) ? { bounds: hull, approximate: true } : void 0;
+        }
+      }
+      if (!Number.isFinite(x2) || !Number.isFinite(y)) return void 0;
+    }
+    return Number.isFinite(b.minX) ? { bounds: b, approximate: false } : void 0;
+  }
+  function quadraticExtreme(p0, p1, p2) {
+    const denominator = p0 - 2 * p1 + p2;
+    if (denominator === 0) return p0;
+    const t = (p0 - p1) / denominator;
+    if (!(t > 0 && t < 1)) return p0;
+    const u = 1 - t;
+    return u * u * p0 + 2 * u * t * p1 + t * t * p2;
+  }
+  function cubicExtremes(p0, p1, p2, p3) {
+    const a = -p0 + 3 * p1 - 3 * p2 + p3;
+    const bq = 2 * (p0 - 2 * p1 + p2);
+    const c = p1 - p0;
+    const at = (t) => {
+      const u = 1 - t;
+      return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
+    };
+    const inside = (t) => t > 0 && t < 1;
+    const out = [p0];
+    if (a === 0) {
+      if (bq !== 0 && inside(-c / bq)) out.push(at(-c / bq));
+      return out;
+    }
+    const disc = bq * bq - 4 * a * c;
+    if (disc < 0) return out;
+    const root = Math.sqrt(disc);
+    for (const t of [(-bq + root) / (2 * a), (-bq - root) / (2 * a)]) {
+      if (inside(t)) out.push(at(t));
+    }
+    return out;
   }
   function verticalInkSpan(svg) {
     let top = Infinity;

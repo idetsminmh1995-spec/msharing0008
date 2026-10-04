@@ -178,22 +178,34 @@ describe('Phase 51: debug overlays and the diagnostics surface (§18.3)', () => 
       );
     });
 
-    test('a path is an over-estimate from every coordinate, and says so', () => {
+    test('a curve is measured by where it goes, not by its control points', () => {
       const [box] = NE.measureSvgBoxes('<path d="M 0 10 Q 5 2 10 10 Z" />');
       assert.equal(box.kind, 'path');
-      assert.equal(box.approximate, true);
+      assert.equal(box.approximate, undefined, 'a solved curve is exact, not an estimate');
       assert.equal(box.x, 0);
       assert.equal(box.width, 10);
-      // The control point at y=2 is included -- the curve itself never
-      // reaches it, which is exactly what `approximate` is declaring.
-      assert.equal(box.y, 2);
+      // A quadratic peaks halfway to its control point: with the ends at
+      // 10 and the control at 2, the curve turns at 6 and never gets
+      // near the 2 the old reading reported.
+      assert.equal(box.y, 6);
+      assert.equal(box.height, 4);
     });
 
-    test('plain text is measured from its font size, and says so', () => {
+    test('a path command the engine never emits falls back to the control-point hull', () => {
+      // Loose is a nuisance; wrong is a clipped note. An arc is not
+      // parsed, so the whole path reverts to every coordinate in it.
+      const [box] = NE.measureSvgBoxes('<path d="M 0 10 A 5 5 0 0 1 10 10 Z" />');
+      assert.equal(box.kind, 'path');
+      assert.equal(box.approximate, true);
+    });
+
+    test('plain text leaves room under its baseline for a descender, and says so', () => {
       const [box] = NE.measureSvgBoxes('<text x="0" y="3" font-size="2">12</text>');
       assert.equal(box.kind, 'text');
       assert.equal(box.approximate, true);
-      assert.equal(box.y, 1);
+      // A baseline is not the bottom of a line of text.
+      assert.ok(box.y < 3 && box.y > 1, `top ${String(box.y)} should sit between the two`);
+      assert.ok(box.y + box.height > 3, 'and the box should reach past the baseline');
       assert.ok(box.width > 0);
     });
 

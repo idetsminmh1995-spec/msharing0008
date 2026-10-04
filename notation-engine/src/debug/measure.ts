@@ -1,5 +1,9 @@
 import { getGlyphByChar } from '../glyphs/index.js';
-import { estimateTextWidth } from '../geometry/text-metrics.js';
+import {
+  TEXT_ASCENT_PER_EM,
+  TEXT_DESCENT_PER_EM,
+  estimateTextWidth,
+} from '../geometry/text-metrics.js';
 
 /**
  * Phase 51/§18.3: "`config.debug.drawBoundingBoxes` overlays every
@@ -227,21 +231,10 @@ export function measureSvgBoxes(svg: string): readonly DebugBox[] {
       case 'path': {
         const d = attr(tag, 'd');
         if (d === undefined) break;
-        // Every coordinate in the path, as (x, y) pairs. Control points
-        // are included, so a curve's box is a correct over-estimate --
-        // see this module's own header.
-        const nums = d.match(/-?\d+(?:\.\d+)?(?:e-?\d+)?/g);
-        if (nums === null || nums.length < 2) break;
-        const b: Bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-        for (let i = 0; i + 1 < nums.length; i += 2) {
-          const x = Number(nums[i]);
-          const y = Number(nums[i + 1]);
-          b.minX = Math.min(b.minX, x);
-          b.maxX = Math.max(b.maxX, x);
-          b.minY = Math.min(b.minY, y);
-          b.maxY = Math.max(b.maxY, y);
+        const measured = pathBounds(d);
+        if (measured !== undefined) {
+          boxes.push(boxFrom(measured.bounds, 'path', id, measured.approximate, into));
         }
-        if (Number.isFinite(b.minX)) boxes.push(boxFrom(b, 'path', id, true, into));
         break;
       }
       case 'text': {
@@ -278,8 +271,10 @@ export function measureSvgBoxes(svg: string): readonly DebugBox[] {
               {
                 minX: x,
                 maxX: x + estimateTextWidth(text, fontSize),
-                minY: y - fontSize,
-                maxY: y,
+                // A baseline is not the bottom of a line of text: a
+                // 'g' hangs below it. See `TEXT_DESCENT_PER_EM`.
+                minY: y - fontSize * TEXT_ASCENT_PER_EM,
+                maxY: y + fontSize * TEXT_DESCENT_PER_EM,
               },
               'text',
               id,
@@ -295,6 +290,174 @@ export function measureSvgBoxes(svg: string): readonly DebugBox[] {
     }
   }
   return boxes;
+}
+
+/**
+ * A path's real bounding box: where the curve GOES, not where its
+ * control points are.
+ *
+ * The difference is not academic. A tie is two quadratics whose control
+ * points stand twice as far out as the curve ever reaches (see
+ * `render/tie.ts`), so measuring the control points called a tie 0.58
+ * staff spaces deep 1.15 deep. As a debug overlay that was a loose box
+ * around a curve; as the input to `fitSystemHeight`, which sizes the
+ * picture from these boxes, it was half a staff space of height the
+ * music did not get.
+ *
+ * A Bezier's extremes are its endpoints plus wherever its derivative
+ * crosses zero -- one candidate per axis for a quadratic, two for a
+ * cubic -- which is a closed form, not a sampling.
+ *
+ * Absolute `M L H V Q C Z` only, which is every command this engine
+ * emits. Anything else falls back to the old control-point hull for the
+ * whole path and says so through `approximate`: a box that is loose is
+ * a nuisance, a box that is wrong is a clipped note.
+ */
+function pathBounds(
+  d: string,
+): { readonly bounds: Bounds; readonly approximate: boolean } | undefined {
+  const tokens = d.match(/[A-Za-z]|-?\d+(?:\.\d+)?(?:e-?\d+)?/g);
+  if (tokens === null) return undefined;
+
+  const b: Bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  const include = (x: number, y: number): void => {
+    b.minX = Math.min(b.minX, x);
+    b.maxX = Math.max(b.maxX, x);
+    b.minY = Math.min(b.minY, y);
+    b.maxY = Math.max(b.maxY, y);
+  };
+
+  let i = 0;
+  let command = '';
+  let x = 0;
+  let y = 0;
+  let startX = 0;
+  let startY = 0;
+  const next = (): number => Number(tokens[i++]);
+
+  while (i < tokens.length) {
+    const token = tokens[i] ?? '';
+    if (/[A-Za-z]/.test(token)) {
+      command = token;
+      i++;
+      // Z carries no coordinates and closes back to the subpath's start,
+      // which is already included.
+      if (command === 'Z' || command === 'z') {
+        x = startX;
+        y = startY;
+        continue;
+      }
+    }
+    switch (command) {
+      case 'M':
+        x = next();
+        y = next();
+        startX = x;
+        startY = y;
+        include(x, y);
+        // A repeated coordinate pair after M is an implicit L.
+        command = 'L';
+        break;
+      case 'L':
+        x = next();
+        y = next();
+        include(x, y);
+        break;
+      case 'H':
+        x = next();
+        include(x, y);
+        break;
+      case 'V':
+        y = next();
+        include(x, y);
+        break;
+      case 'Q': {
+        const cx = next();
+        const cy = next();
+        const ex = next();
+        const ey = next();
+        include(ex, ey);
+        // Each axis turns at its own t, so each is offered against the
+        // box on its own. Pairing the two would name a point the curve
+        // never passes through.
+        include(quadraticExtreme(x, cx, ex), y);
+        include(x, quadraticExtreme(y, cy, ey));
+        x = ex;
+        y = ey;
+        break;
+      }
+      case 'C': {
+        const c1x = next();
+        const c1y = next();
+        const c2x = next();
+        const c2y = next();
+        const ex = next();
+        const ey = next();
+        include(ex, ey);
+        for (const px of cubicExtremes(x, c1x, c2x, ex)) include(px, y);
+        for (const py of cubicExtremes(y, c1y, c2y, ey)) include(x, py);
+        x = ex;
+        y = ey;
+        break;
+      }
+      default: {
+        // A command this engine does not emit. Rather than guess at how
+        // many numbers it takes and lose the rest of the path, fall back
+        // to every coordinate in the whole `d`.
+        const nums = d.match(/-?\d+(?:\.\d+)?(?:e-?\d+)?/g);
+        if (nums === null || nums.length < 2) return undefined;
+        const hull: Bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+        for (let k = 0; k + 1 < nums.length; k += 2) {
+          const hx = Number(nums[k]);
+          const hy = Number(nums[k + 1]);
+          hull.minX = Math.min(hull.minX, hx);
+          hull.maxX = Math.max(hull.maxX, hx);
+          hull.minY = Math.min(hull.minY, hy);
+          hull.maxY = Math.max(hull.maxY, hy);
+        }
+        return Number.isFinite(hull.minX) ? { bounds: hull, approximate: true } : undefined;
+      }
+    }
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return undefined;
+  }
+
+  return Number.isFinite(b.minX) ? { bounds: b, approximate: false } : undefined;
+}
+
+/** Where a quadratic turns on one axis, or its start when it never does. */
+function quadraticExtreme(p0: number, p1: number, p2: number): number {
+  const denominator = p0 - 2 * p1 + p2;
+  if (denominator === 0) return p0;
+  const t = (p0 - p1) / denominator;
+  if (!(t > 0 && t < 1)) return p0;
+  const u = 1 - t;
+  return u * u * p0 + 2 * u * t * p1 + t * t * p2;
+}
+
+/** Where a cubic turns on one axis -- up to two places, and neither need exist. */
+function cubicExtremes(p0: number, p1: number, p2: number, p3: number): readonly number[] {
+  const a = -p0 + 3 * p1 - 3 * p2 + p3;
+  const bq = 2 * (p0 - 2 * p1 + p2);
+  const c = p1 - p0;
+  const at = (t: number): number => {
+    const u = 1 - t;
+    return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
+  };
+  const inside = (t: number): boolean => t > 0 && t < 1;
+  const out: number[] = [p0];
+  // The derivative is 3*(a t^2 + bq t + c)/... -- the 3 cancels, so this
+  // is just where a t^2 + bq t + c crosses zero.
+  if (a === 0) {
+    if (bq !== 0 && inside(-c / bq)) out.push(at(-c / bq));
+    return out;
+  }
+  const disc = bq * bq - 4 * a * c;
+  if (disc < 0) return out;
+  const root = Math.sqrt(disc);
+  for (const t of [(-bq + root) / (2 * a), (-bq - root) / (2 * a)]) {
+    if (inside(t)) out.push(at(t));
+  }
+  return out;
 }
 
 /**
