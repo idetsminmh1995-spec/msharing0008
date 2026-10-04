@@ -198,18 +198,46 @@
   /* A downbeat is the one the reader is counting FROM, so it is the one
      that gets the brand colour rather than a size change alone. */
   .stat-box.on-downbeat{border-color:var(--red);background:rgba(200,30,44,.16);}
-  .video-mid{flex:1;display:flex;align-items:center;justify-content:center;min-height:34%;}
+  /* The keyboard's share of the frame, and the one number that decides
+     how high the piano sits.
+
+     It is a SHARE and not a leftover, which is the whole repair here.
+     The frame used to hand the notation a fixed 225px and give the
+     keyboard whatever survived -- so the keyboard's share of the frame
+     depended on how big the browser window happened to be: 16.5% of a
+     wide window, under 10% of a narrow one. And because the exported
+     video is composed from THIS box (`rectIn` measures these very
+     elements), the window the owner happened to have open decided the
+     proportions of the file. Now the keyboard takes its share first and
+     the notation fills what is left, so the preview and the video look
+     the same at any size.
+
+     43.5% of the frame, because `piano-engine` draws the keys across
+     the bottom 42% of the box it is given: 0.42 x 0.435 puts the keys'
+     top edge at 18.2% of the frame, which is the line the owner drew on
+     the screenshot. The rest of the box is the runway the notes fall
+     down. */
+  .video-mid{flex:0 0 43.5%;max-height:calc(100% - 96px);display:flex;align-items:center;justify-content:center;}
+  /* The titles and the stat boxes are text: they are as tall as they
+     are, and squashing them is never the right way to find room. So
+     the keyboard's share has a ceiling as well -- 96px is the title
+     row plus the notation's own bottom padding, the two things in the
+     frame that do not scale with it. It only ever bites on a preview
+     under about 220px tall, where there is no good answer and the
+     least bad one is keys that are short rather than keys with their
+     front edge cut off. */
+  .video-top{flex-shrink:0;}
   /* The Hands design has nothing above the keyboard any more, so the
      keys get the room the falling notes used to need. The notation
      keeps its own cap and simply shrinks into what is left, which is
      what a lesson video looks like: a big keyboard, the music over it. */
-  .video-frame.design-hands .video-mid{min-height:20%;}
+  .video-frame.design-hands .video-mid{flex:1 1 auto;min-height:20%;}
   /* A real keyboard is only so deep for its key width, so with all 88
      keys across a wide frame the keyboard is a shallow strip. The room
      that leaves goes to the MUSIC -- which is the other thing a learner
      is reading -- rather than sitting as a black band between the two. */
   .video-frame.design-hands{--notation-height:270px;}
-  .video-frame.design-hands .video-notation{max-height:58%;}
+  .video-frame.design-hands .video-notation{flex:0 1 auto;max-height:58%;}
   /* A tall frame in the Hands design has room the keyboard cannot use.
      A keyboard only gets so tall before its keys stop looking like
      keys (the engine caps them), so in 9:16 and 1:1 the space left
@@ -223,8 +251,8 @@
   .video-frame.design-hands.shape-1x1{--notation-height:430px;}
   .video-frame.design-hands.shape-9x16{--notation-height:560px;}
   .video-frame.design-hands.shape-1x1 .video-notation,
-  .video-frame.design-hands.shape-9x16 .video-notation{max-height:66%;}
-  .video-frame.design-hands.shape-9x16 .video-mid{min-height:30%;}
+  .video-frame.design-hands.shape-9x16 .video-notation{flex:0 1 auto;max-height:66%;}
+  .video-frame.design-hands.shape-9x16 .video-mid{flex:1 1 auto;min-height:30%;}
   /* The keyboard fills whatever the notation leaves: `min-height:0`
      on .video-mid lets it shrink, and the SVG stretches to the box it
      is given rather than keeping the keyboard's own ratio -- a
@@ -242,7 +270,7 @@
      keyboard out of it -- and the exported video is laid out from
      THIS box, so a keyboard missing here is a keyboard missing in the
      file. The notation gives way; the keyboard keeps its share. */
-  .video-notation{padding:0 20px 14px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;max-height:52%;flex-shrink:1;scrollbar-width:none;-ms-overflow-style:none;}
+  .video-notation{padding:0 20px 14px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;min-height:0;flex:1 1 auto;scrollbar-width:none;-ms-overflow-style:none;}
   .video-notation::-webkit-scrollbar{display:none;width:0;height:0;}
   /* How tall the staff is drawn, and therefore how big the notes
      are: the SVG keeps its own ratio, so height is the only dial.
@@ -250,10 +278,14 @@
      fewer bars across the frame, and where that balance sits is a
      judgement, not a constant to hunt for in a rule.
 
-     A piano frame can afford more than a drum one: there is no kit
-     photo under the staff, only the brand mark, so the middle of the
-     frame was empty space. */
-  :root{--notation-height:225px;}
+     In the falling-notes design the dial is now the BAND, not a
+     number of pixels: the notation fills whatever the keyboard leaves,
+     so the staff grows and shrinks with the frame instead of staying
+     225px tall in a frame half that size. `--notation-height` stays as
+     the Hands design's own cap, where the keyboard is sized from the
+     width of a key rather than from a share of the box and the room
+     left over genuinely is spare. */
+  :root{--notation-height:100%;}
   .video-notation svg{display:block;height:var(--notation-height);max-height:100%;width:auto;max-width:none;}
   /* Video Style (card 5) is a property of the whole FRAME, not of the
      notation strip. The strip itself is never painted -- and neither is
@@ -344,7 +376,7 @@
 <script src="../../assets/notation-engine.js?v=0aa61773"></script>
 <!-- The piano stage: the keyboard, and the notes falling onto it.
      piano-engine/, TypeScript + SVG, built to this bundle. -->
-<script src="../../assets/piano-engine.js?v=630bb46b"></script>
+<script src="../../assets/piano-engine.js?v=e48793a0"></script>
 <!-- Finds the count voices in the bucket whatever they were named. -->
 <script src="../../assets/voice-samples.js?v=609facad"></script>
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
@@ -2733,12 +2765,23 @@
         }
         continue;
       }
-      ctx2d.fillStyle = shape.fill;
-      if (shape.radius > 0) {
-        roundRectPath(ctx2d, shape.x, shape.y, shape.width, shape.height, shape.radius);
-        ctx2d.fill();
-      } else {
-        ctx2d.fillRect(shape.x, shape.y, shape.width, shape.height);
+      // `fill:'none'` means DRAW NOTHING, the way it does in SVG --
+      // which is what a shape carrying only a label is: a box whose
+      // one job is to say where the text goes. Canvas has no such
+      // value: assigning an invalid colour to `fillStyle` is silently
+      // ignored and the previous one stays, so every one of those
+      // boxes came out painted in whatever colour the last key had
+      // been. On screen the names sat on the music; in the exported
+      // video each one wore a grey or coloured tile. The preview was
+      // right and the file was wrong, which is the worst way round.
+      if (shape.fill !== 'none') {
+        ctx2d.fillStyle = shape.fill;
+        if (shape.radius > 0) {
+          roundRectPath(ctx2d, shape.x, shape.y, shape.width, shape.height, shape.radius);
+          ctx2d.fill();
+        } else {
+          ctx2d.fillRect(shape.x, shape.y, shape.width, shape.height);
+        }
       }
       if (shape.stroke !== undefined && shape.strokeWidth > 0) {
         ctx2d.strokeStyle = shape.stroke;
@@ -2755,7 +2798,9 @@
       // in the video sits exactly where the one on screen does.
       if (shape.label !== undefined) {
         const size = shape.labelSize ?? shape.height * 0.7;
-        ctx2d.fillStyle = shape.labelColor ?? shape.fill;
+        // A label on an unpainted box has no fill colour to fall back
+        // on, so it says so rather than inheriting whatever was last set.
+        ctx2d.fillStyle = shape.labelColor ?? (shape.fill === 'none' ? '#000' : shape.fill);
         ctx2d.font = `700 ${size}px ${STAGE_LABEL_FONT}`;
         ctx2d.textAlign = 'center';
         ctx2d.textBaseline = 'middle';

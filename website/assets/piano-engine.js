@@ -896,6 +896,25 @@ var PianoEngine = (() => {
       }
     ];
   }
+  function playedNameShape(key, whiteUnit, colors) {
+    const label = noteName(key.midi);
+    const CHAR_WIDTH = 0.62;
+    const size = Math.min(whiteUnit * 0.46, key.width * 0.92 / (CHAR_WIDTH * label.length));
+    if (size < NAME_MIN_SIZE) return [];
+    const box = size * 1.4;
+    return [
+      {
+        x: key.x,
+        y: round22(key.y + key.height - box - size * 0.25),
+        width: key.width,
+        height: round22(box),
+        fill: "none",
+        label,
+        labelSize: round22(size),
+        labelColor: colors.noteName
+      }
+    ];
+  }
   function handColor(hand, colors) {
     return hand === "left" ? colors.leftHand : colors.rightHand;
   }
@@ -963,19 +982,24 @@ var PianoEngine = (() => {
       });
     }
     if (options.keyNames !== false) {
-      const size = Math.max(6, whiteUnit * 0.46);
+      const cSize = Math.max(6, whiteUnit * 0.46);
       for (const key of keys) {
         if (key.black || key.midi % 12 !== 0) continue;
+        if (down.has(key.midi)) continue;
         shapes.push({
           x: key.x,
-          y: key.y + key.height - size * 2.1,
+          y: key.y + key.height - cSize * 2.1,
           width: key.width,
-          height: size * 1.4,
+          height: cSize * 1.4,
           fill: "none",
           label: `C${Math.floor(key.midi / 12) - 1}`,
-          labelSize: round22(size),
+          labelSize: round22(cSize),
           labelColor: colors.keyName
         });
+      }
+      for (const key of keys) {
+        if (!down.has(key.midi)) continue;
+        for (const shape of playedNameShape(key, whiteUnit, colors)) shapes.push(shape);
       }
     }
     if (falling) {

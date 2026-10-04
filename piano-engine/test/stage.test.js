@@ -95,20 +95,22 @@ test('the stage SVG draws the bars, the keys and the strike line, in that order'
   assert.ok(svg.includes('viewBox="0 0 1920 600"'));
   const rects = svg.match(/<rect/g) ?? [];
   // 88 keys, one falling bar, that bar's own note name, the strike
-  // line, and the eight C names (C1 to C8). A label is drawn on a rect
-  // with no fill, which is why the names are counted here too.
+  // line, seven standing C names, and the name on the key that is
+  // down. A label is drawn on a rect with no fill, which is why the
+  // names are counted here too. Seven and not eight because the key
+  // held here IS a C: while it sounds it says 'C', not 'C4'.
   assert.equal(
     rects.length,
-    88 + 1 + 1 + 1 + 8,
-    '88 keys, one bar, its name, one strike line, eight C names',
+    88 + 1 + 1 + 1 + 7 + 1,
+    '88 keys, one bar, its name, one strike line, seven C names, one held key named',
   );
   // The held key is painted in the left hand's colour -- twice over:
   // once as the falling bar, once as the key itself.
   assert.equal((svg.match(/#AA0011/g) ?? []).length, 2);
-  // And the bar says what it is: middle C, named on the bar, and C4
-  // named on the key it is about to land on.
-  assert.ok(svg.includes('>C</text>'), 'the bar carries its note name');
-  assert.ok(svg.includes('>C4</text>'), 'and the key carries its own');
+  // And both say what it is: middle C on the bar, and C on the key it
+  // has landed on.
+  assert.equal((svg.match(/>C<\/text>/g) ?? []).length, 2, 'the bar and the key both say C');
+  assert.ok(!svg.includes('>C4</text>'), 'a sounding C says C, not C4 -- one name per key');
 });
 
 test('the empty keyboard is the same keys with nothing lit', () => {
@@ -309,8 +311,14 @@ test('every falling bar says which note it is: D on a D, D# on the black key abo
       { midi: 63, startSeconds: 1, endSeconds: 2, hand: 'left' },
     ],
   });
-  const onBars = shapes.filter((s) => s.label === 'D' || s.label === 'D#');
+  // Both keys are down at this moment, so each name appears twice: once
+  // on the bar still in the air, once on the key under it. The bars are
+  // the ones above the keyboard.
+  const board = P.keyboardBox({ width: STAGE.width, height: STAGE.height });
+  const named = shapes.filter((s) => s.label === 'D' || s.label === 'D#');
+  const onBars = named.filter((s) => s.y < board.y);
   assert.equal(onBars.length, 2, 'one name per bar');
+  assert.equal(named.length - onBars.length, 2, 'and one on each key being held');
   for (const name of onBars) {
     assert.equal(name.fill, 'none', 'the name is drawn on the bar, not over it in a box');
     assert.equal(name.labelColor, P.DEFAULT_COLORS.noteName);
@@ -327,7 +335,11 @@ test('a bar too small for its name goes without one, rather than carrying a smud
     seconds: 1,
     notes: [{ midi: 62, startSeconds: 1, endSeconds: 1.02, hand: 'right' }],
   });
-  assert.equal(tiny.filter((s) => s.label === 'D').length, 0);
+  // The KEY is still named -- a key's name is sized from the key, which
+  // has not got any shorter -- so it is the bar's name that is counted
+  // here, by looking above the keyboard.
+  const tinyBoard = P.keyboardBox({ width: 300, height: 200 });
+  assert.equal(tiny.filter((s) => s.label === 'D' && s.y < tinyBoard.y).length, 0);
 
   // The same note, with room for the name, gets it.
   const roomy = P.stageShapes({
@@ -337,7 +349,8 @@ test('a bar too small for its name goes without one, rather than carrying a smud
     seconds: 1,
     notes: [{ midi: 62, startSeconds: 1, endSeconds: 1.6, hand: 'right' }],
   });
-  assert.equal(roomy.filter((s) => s.label === 'D').length, 1);
+  const roomyBoard = P.keyboardBox({ width: 1920, height: 1080 });
+  assert.equal(roomy.filter((s) => s.label === 'D' && s.y < roomyBoard.y).length, 1);
 });
 
 test('the name sits at the BOTTOM of its bar, the end that lands', () => {
@@ -379,4 +392,72 @@ test('every C is named on its own key in BOTH designs, not only where the hands 
     ).length,
     0,
   );
+});
+
+test('a key says its own name for as long as it is held, and goes quiet again after', () => {
+  const held = {
+    size: 88,
+    width: 1920,
+    height: 600,
+    notes: [
+      { midi: 62, startSeconds: 1, endSeconds: 2, hand: 'right' },
+      { midi: 63, startSeconds: 1, endSeconds: 2, hand: 'left' },
+    ],
+  };
+  const board = P.keyboardBox({ width: held.width, height: held.height });
+  const onKeys = (seconds) =>
+    P.stageShapes({ ...held, seconds })
+      .filter((s) => s.label !== undefined && s.y >= board.y)
+      .map((s) => s.label);
+
+  // While they sound: the natural and the sharp, each on its own key.
+  const during = onKeys(1.5);
+  assert.ok(during.includes('D'), 'the white key says D');
+  assert.ok(during.includes('D#'), 'the black key says D#');
+
+  // After they stop, the keyboard is back to its standing C names only.
+  const after = onKeys(2.5);
+  assert.ok(!after.includes('D'), 'a key that is not down says nothing');
+  assert.ok(!after.includes('D#'));
+  assert.ok(
+    after.every((label) => /^C-?\d$/.test(label)),
+    `only the Cs are left, got ${after.join(',')}`,
+  );
+});
+
+test("a held key's name sits at the front edge, where a hand reaching over it does not cover it", () => {
+  const shapes = P.stageShapes({
+    size: 88,
+    width: 1920,
+    height: 600,
+    seconds: 1.5,
+    notes: [{ midi: 62, startSeconds: 1, endSeconds: 2, hand: 'right' }],
+  });
+  const board = P.keyboardBox({ width: 1920, height: 600 });
+  const name = shapes.find((s) => s.label === 'D' && s.y >= board.y);
+  assert.ok(name, 'the key is named');
+  const whiteBottom = board.y + board.height;
+  // Inside the key, in its front quarter.
+  assert.ok(name.y + name.height <= whiteBottom, 'the name stays on the key');
+  assert.ok(name.y > whiteBottom - board.height * 0.25, 'and down at the front of it');
+  assert.equal(name.fill, 'none', 'drawn on the key, not as a box over it');
+  assert.equal(name.labelColor, P.DEFAULT_COLORS.noteName);
+});
+
+test('a sharp fits on its own black key rather than overhanging onto the whites either side', () => {
+  const shapes = P.stageShapes({
+    size: 88,
+    width: 1920,
+    height: 600,
+    seconds: 1.5,
+    notes: [{ midi: 63, startSeconds: 1, endSeconds: 2, hand: 'left' }],
+  });
+  const board = P.keyboardBox({ width: 1920, height: 600 });
+  const name = shapes.find((s) => s.label === 'D#' && s.y >= board.y);
+  assert.ok(name, 'the black key is named');
+  const key = P.keyboardGeometry(88, board).find((k) => k.midi === 63);
+  assert.equal(name.x, key.x);
+  assert.equal(name.width, key.width);
+  // Two characters at roughly 0.62 em each have to fit the key's width.
+  assert.ok(name.labelSize * 0.62 * 2 <= key.width, 'the name fits the key it is on');
 });

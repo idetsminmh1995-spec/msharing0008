@@ -399,6 +399,50 @@ function barNameShape(bar: FallingBar, unit: number, colors: PianoColors): reado
   ];
 }
 
+/**
+ * The name of a key that is being held, drawn on the key itself.
+ *
+ * Right at the FRONT edge -- the part of a key nearest the player, and
+ * the part a hand reaching over the keyboard does not cover. The C
+ * names sit further back for the same reason in reverse: they are read
+ * between notes, not during them.
+ *
+ * Sized to its own key rather than to the white one, because a sharp
+ * has to fit on a black key: two characters across six tenths of a
+ * white key's width. That makes a sharp's name a little smaller than a
+ * natural's, which is right -- the key is smaller.
+ *
+ * In `colors.noteName`, the same ink the falling bar used on the way
+ * down, because it is the same situation: dark lettering on a key
+ * flooded with a bright hand colour. The name the bar carried is the
+ * name the key now shows, in the same hand, so the eye follows one
+ * thing landing rather than two things appearing.
+ */
+function playedNameShape(
+  key: PianoKey,
+  whiteUnit: number,
+  colors: PianoColors,
+): readonly StageShape[] {
+  const label = noteName(key.midi);
+  /** Roughly how wide one character is, as a fraction of the font size, in the label font. */
+  const CHAR_WIDTH = 0.62;
+  const size = Math.min(whiteUnit * 0.46, (key.width * 0.92) / (CHAR_WIDTH * label.length));
+  if (size < NAME_MIN_SIZE) return [];
+  const box = size * 1.4;
+  return [
+    {
+      x: key.x,
+      y: round2(key.y + key.height - box - size * 0.25),
+      width: key.width,
+      height: round2(box),
+      fill: 'none',
+      label,
+      labelSize: round2(size),
+      labelColor: colors.noteName,
+    },
+  ];
+}
+
 export function handColor(hand: Hand, colors: PianoColors): string {
   return hand === 'left' ? colors.leftHand : colors.rightHand;
 }
@@ -493,25 +537,43 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
     });
   }
 
-  // Every C's name on its own key, so a hand moving along the keyboard
-  // can be placed at a glance. In BOTH designs: a falling bar says
-  // WHICH note it is, and a C on the key is what says where on the
-  // instrument that note lives. Drawn here, under the hands and under
-  // the strike line, which both pass over them.
+  // Names on the keys. Two different jobs, drawn here under the hands
+  // and under the strike line, which both pass over them.
+  //
+  // Every C is named all the time, so a hand moving along the keyboard
+  // can be placed at a glance -- a falling bar says WHICH note it is,
+  // and a C on the key is what says where on the instrument that note
+  // lives.
+  //
+  // And every key that is DOWN says its own name for as long as it is
+  // held. A bar carries its name on the way down, but the moment it
+  // lands the bar is gone and the name with it -- which is the moment
+  // the player is actually looking at the keyboard, pressing the key.
+  // So the name does not disappear at the strike line; it moves onto
+  // the key and stays there while the note sounds.
+  //
+  // A lit key's own name wins over the standing C: they would land on
+  // top of each other, and the one that is sounding is the one being
+  // read.
   if (options.keyNames !== false) {
-    const size = Math.max(6, whiteUnit * 0.46);
+    const cSize = Math.max(6, whiteUnit * 0.46);
     for (const key of keys) {
       if (key.black || key.midi % 12 !== 0) continue;
+      if (down.has(key.midi)) continue;
       shapes.push({
         x: key.x,
-        y: key.y + key.height - size * 2.1,
+        y: key.y + key.height - cSize * 2.1,
         width: key.width,
-        height: size * 1.4,
+        height: cSize * 1.4,
         fill: 'none',
         label: `C${Math.floor(key.midi / 12) - 1}`,
-        labelSize: round2(size),
+        labelSize: round2(cSize),
         labelColor: colors.keyName,
       });
+    }
+    for (const key of keys) {
+      if (!down.has(key.midi)) continue;
+      for (const shape of playedNameShape(key, whiteUnit, colors)) shapes.push(shape);
     }
   }
 
