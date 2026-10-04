@@ -35,6 +35,43 @@ export function isBlackKey(midi: number): boolean {
   return BLACK_PITCH_CLASSES.has(((midi % 12) + 12) % 12);
 }
 
+/**
+ * The twelve note names, sharps throughout.
+ *
+ * Sharps and not flats because a keyboard has no key signature: the
+ * black key between D and E is one key, and a learner looking for it on
+ * the instrument is looking for "the one above D". Which of its two
+ * names the SCORE uses is the score's business, and the notation engine
+ * answers that; this is the name of a key.
+ */
+const NOTE_NAMES: readonly string[] = [
+  'C',
+  'C#',
+  'D',
+  'D#',
+  'E',
+  'F',
+  'F#',
+  'G',
+  'G#',
+  'A',
+  'A#',
+  'B',
+];
+
+/**
+ * What a key is called: 'D', 'D#', or with `octave`, 'C4'.
+ *
+ * The octave is MIDI's own, where 60 is C4 -- the convention every
+ * piano app and every teacher uses, and the one already written on the
+ * keyboard's own C keys.
+ */
+export function noteName(midi: number, options?: { readonly octave?: boolean }): string {
+  const name = NOTE_NAMES[((midi % 12) + 12) % 12] ?? '';
+  if (options?.octave !== true) return name;
+  return `${name}${Math.floor(midi / 12) - 1}`;
+}
+
 /** How many white keys lie between two MIDI numbers, both ends counted. */
 export function whiteKeysBetween(first: number, last: number): number {
   let count = 0;

@@ -11,7 +11,7 @@
 import { parseColor } from './color.js';
 import { DEFAULT_HAND_COLORS, handsShapes } from './hands.js';
 import { HAND_REACH_PAST_KEYS } from './hands.js';
-import { keyboardGeometry, pressedAt, whiteKeyCount } from './keyboard.js';
+import { keyboardGeometry, noteName, pressedAt, whiteKeyCount } from './keyboard.js';
 import { n, path, rect, text, wrap } from './svg.js';
 import type {
   FallingBar,
@@ -41,6 +41,10 @@ export const DEFAULT_COLORS: PianoColors = {
   // Dark on a white key, and faint: it is a ruler mark, not a label to
   // be read instead of the music.
   keyName: 'rgba(30,21,18,0.38)',
+  // On the bar itself, which is always a bright hand colour, so the
+  // name is dark and nearly solid -- it has to be read in the half
+  // second the bar is on its way down.
+  noteName: 'rgba(22,16,13,0.82)',
 };
 
 /** A note falls for this long before it is played, unless the caller says otherwise. */
@@ -56,7 +60,16 @@ const FADE_BANDS = 18;
 const BAR_LINE_FRACTION = 0.007;
 const BEAT_LINE_FRACTION = 0.0035;
 
-/** How tall the keyboard is when nothing says: a third of the stage. */
+/**
+ * How tall the keyboard is when nothing says.
+ *
+ * Was a third. A keyboard is the thing a viewer is actually looking at
+ * -- it is where the note lands, where the key lights up, and now where
+ * every C is named -- and a third of the stage left those names too
+ * small to read at video size. The fall above it loses the same room,
+ * which costs nothing: a note's distance from the keys is TIME, so a
+ * shorter fall is the same seconds drawn closer together.
+ */
 /**
  * The badge font.
  *
@@ -66,7 +79,7 @@ const BEAT_LINE_FRACTION = 0.0035;
  */
 const LABEL_FONT = 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
 
-const KEYBOARD_FRACTION = 1 / 3;
+const KEYBOARD_FRACTION = 0.42;
 /**
  * How deep a keyboard is drawn in the hands design, and how much room
  * is kept in front of it for the hands. Both in white-key widths.
@@ -327,6 +340,65 @@ export function fadeShapes(options: {
   return shapes;
 }
 
+/**
+ * The least a note name may be drawn at, in pixels of the frame.
+ *
+ * Below this it is a smudge, and a smudge on every bar is worse than no
+ * name at all -- so a bar too small for its name goes without one. At
+ * 1920 wide an 88-key white key is 37px and a black one 22px, so this
+ * only bites on a narrow frame or a very short note.
+ */
+const NAME_MIN_SIZE = 7;
+
+/**
+ * A falling bar's own note name: 'D' on a D, 'D#' on the black key
+ * above it.
+ *
+ * Sharps throughout, because this names a KEY and not a note in a
+ * score: the black key between D and E is one key, and a learner
+ * looking for it is looking for "the one above D". Whether the music
+ * calls it D# or Eb is the score's business, and the notation above the
+ * keyboard already answers it.
+ *
+ * Drawn at the BOTTOM of the bar, which is the end that lands: on a
+ * long held note the name then sits where the eye already is, just
+ * above the key it is about to light, instead of floating half a screen
+ * up in the middle of a stripe.
+ *
+ * Returns nothing at all when the bar is too small to hold a legible
+ * name, which is the case this has to get right -- a run of
+ * sixteenths is a row of short bars, and a row of smudges would be
+ * worse than the bars alone.
+ */
+function barNameShape(bar: FallingBar, unit: number, colors: PianoColors): readonly StageShape[] {
+  // Sized from the WHITE key and not from the bar. A black key is two
+  // thirds the width of a white one, and sizing each name to its own
+  // bar would have made every sharp -- the names a learner most needs,
+  // because a sharp is the key they cannot find -- the first to shrink
+  // below legibility and vanish. They are all one size, and a 'D#' on
+  // a black key simply overhangs it a little onto the dark behind.
+  const size = Math.min(unit * 0.5, bar.height * 0.6);
+  if (size < NAME_MIN_SIZE) return [];
+  const label = noteName(bar.midi);
+  const box = size * 1.5;
+  // Wide enough for the text, centred on the bar: the box is only ever
+  // used to centre the label in, so letting it out past a narrow bar
+  // costs nothing and keeps a two-character name from being cramped.
+  const width = Math.max(bar.width, size * label.length * 0.78);
+  return [
+    {
+      x: round2(bar.x + bar.width / 2 - width / 2),
+      y: round2(bar.y + bar.height - box),
+      width: round2(width),
+      height: round2(box),
+      fill: 'none',
+      label,
+      labelSize: round2(size),
+      labelColor: colors.noteName,
+    },
+  ];
+}
+
 export function handColor(hand: Hand, colors: PianoColors): string {
   return hand === 'left' ? colors.leftHand : colors.rightHand;
 }
@@ -352,6 +424,8 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
   const down = pressedAt(notes, options.seconds);
   const lineHeight = Math.max(1, board.height * LINE_FRACTION);
   const edge = Math.max(0.5, board.width / 900);
+  /** One white key: the ruler every label on this frame is sized from. */
+  const whiteUnit = board.width / Math.max(1, keys.filter((key) => !key.black).length);
 
   const shapes: StageShape[] = [];
   if (colors.background !== 'none') {
@@ -379,6 +453,7 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
         fill: handColor(bar.hand, colors),
         radius: Math.min(bar.width, bar.height) / 4,
       });
+      for (const shape of barNameShape(bar, whiteUnit, colors)) shapes.push(shape);
     }
 
     // The fade goes over the grid and the notes, and under the
@@ -419,10 +494,12 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
   }
 
   // Every C's name on its own key, so a hand moving along the keyboard
-  // can be placed at a glance. Under the hands, which pass over them.
-  if (!falling && options.keyNames !== false) {
-    const unit = board.width / Math.max(1, keys.filter((key) => !key.black).length);
-    const size = Math.max(6, unit * 0.46);
+  // can be placed at a glance. In BOTH designs: a falling bar says
+  // WHICH note it is, and a C on the key is what says where on the
+  // instrument that note lives. Drawn here, under the hands and under
+  // the strike line, which both pass over them.
+  if (options.keyNames !== false) {
+    const size = Math.max(6, whiteUnit * 0.46);
     for (const key of keys) {
       if (key.black || key.midi % 12 !== 0) continue;
       shapes.push({

@@ -79,6 +79,8 @@ export interface PianoColors {
   readonly background: string;
   /** The note name printed on a C key in the hands design. */
   readonly keyName: string;
+  /** The note name drawn on a falling bar. Dark, because a bar is always a bright hand colour. */
+  readonly noteName: string;
 }
 
 export interface PianoStageOptions {

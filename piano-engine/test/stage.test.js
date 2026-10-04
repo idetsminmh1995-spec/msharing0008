@@ -11,10 +11,13 @@ const P = sandbox.PianoEngine;
 const STAGE = { size: 88, width: 1920, height: 600, seconds: 0 };
 const note = (over = {}) => ({ midi: 60, startSeconds: 2, endSeconds: 2.5, hand: 'right', ...over });
 
-test('the keyboard sits along the bottom, a third of the stage tall by default', () => {
+test('the keyboard sits along the bottom, and is the taller share of the stage it was raised to', () => {
+  // It was a third. The keys are what a viewer actually watches -- the
+  // note lands there, the key lights there, every C is named there --
+  // and a third left those names too small to read at video size.
   const box = P.keyboardBox({ width: 1920, height: 600 });
-  assert.equal(box.height, 200);
-  assert.equal(box.y, 400);
+  assert.equal(box.height, 252);
+  assert.equal(box.y, 348);
   assert.equal(box.width, 1920);
   const asked = P.keyboardBox({ width: 1920, height: 600, keyboardHeight: 120 });
   assert.equal(asked.height, 120);
@@ -91,15 +94,28 @@ test('the stage SVG draws the bars, the keys and the strike line, in that order'
   assert.ok(svg.startsWith('<svg'), 'an SVG document');
   assert.ok(svg.includes('viewBox="0 0 1920 600"'));
   const rects = svg.match(/<rect/g) ?? [];
-  assert.equal(rects.length, 88 + 1 + 1, '88 keys, one bar, one strike line');
+  // 88 keys, one falling bar, that bar's own note name, the strike
+  // line, and the eight C names (C1 to C8). A label is drawn on a rect
+  // with no fill, which is why the names are counted here too.
+  assert.equal(
+    rects.length,
+    88 + 1 + 1 + 1 + 8,
+    '88 keys, one bar, its name, one strike line, eight C names',
+  );
   // The held key is painted in the left hand's colour -- twice over:
   // once as the falling bar, once as the key itself.
   assert.equal((svg.match(/#AA0011/g) ?? []).length, 2);
+  // And the bar says what it is: middle C, named on the bar, and C4
+  // named on the key it is about to land on.
+  assert.ok(svg.includes('>C</text>'), 'the bar carries its note name');
+  assert.ok(svg.includes('>C4</text>'), 'and the key carries its own');
 });
 
 test('the empty keyboard is the same keys with nothing lit', () => {
   const svg = P.renderKeyboardSvg({ size: 61, width: 1080, height: 300 });
-  assert.equal((svg.match(/<rect/g) ?? []).length, 61 + 1);
+  // 61 keys, the strike line, and a name on each of the six Cs a
+  // 61-key board spans.
+  assert.equal((svg.match(/<rect/g) ?? []).length, 61 + 1 + 6);
   assert.ok(!svg.includes(P.DEFAULT_COLORS.leftHand));
   assert.ok(!svg.includes(P.DEFAULT_COLORS.rightHand));
   assert.ok(svg.includes(P.DEFAULT_COLORS.strikeLine), 'the line is part of the still half');
@@ -115,10 +131,11 @@ test('a background of none paints nothing behind the stage', () => {
 test('the shape list is what both renderers draw, in paint order', () => {
   const notes = [{ midi: 60, startSeconds: 1, endSeconds: 2, hand: 'left' }];
   const shapes = P.stageShapes({ ...STAGE, seconds: 1, notes });
-  // one bar, 88 keys, one strike line
-  assert.equal(shapes.length, 1 + 88 + 1);
+  // one bar, its note name, 88 keys, eight C names, one strike line
+  assert.equal(shapes.length, 1 + 1 + 88 + 8 + 1);
   assert.ok(shapes[0].radius > 0, 'the bar has rounded corners');
-  const firstKey = shapes[1];
+  assert.equal(shapes[1].label, 'C', "and its own name right behind it");
+  const firstKey = shapes[2];
   assert.equal(firstKey.radius, undefined, 'keys are square');
   assert.ok(firstKey.stroke !== undefined, 'white keys carry their edge');
   const line = shapes[shapes.length - 1];
@@ -128,7 +145,7 @@ test('the shape list is what both renderers draw, in paint order', () => {
 
   // Black keys come after every white one, and the lit key carries the
   // hand's colour in BOTH the bar and the key.
-  const keys = shapes.slice(1, 1 + 88);
+  const keys = shapes.slice(2, 2 + 88);
   const lastWhite = keys.map((s) => s.stroke !== undefined).lastIndexOf(true);
   const firstBlack = keys.findIndex((s) => s.stroke === undefined);
   assert.ok(firstBlack > lastWhite);
@@ -267,4 +284,99 @@ test('the fade dims the notes and the grid, never the keyboard', () => {
   assert.ok(noteAt < fadeAt, 'the note is behind the fade');
   assert.ok(fadeAt < keyAt, 'the keyboard is in front of it');
   assert.ok(keyAt < lineAt, 'and the strike line in front of that');
+});
+
+test('every falling bar says which note it is: D on a D, D# on the black key above it', () => {
+  assert.equal(P.noteName(62), 'D');
+  assert.equal(P.noteName(63), 'D#');
+  assert.equal(P.noteName(60), 'C');
+  assert.equal(P.noteName(71), 'B');
+  // Sharps throughout, because this names a KEY and not a note in a
+  // score: the black key between D and E is one key.
+  for (let midi = 21; midi <= 108; midi += 1) {
+    assert.ok(!P.noteName(midi).includes('b'), `${midi} is named with a sharp or not at all`);
+  }
+  // And with the octave, it is what is written on the keyboard's own Cs.
+  assert.equal(P.noteName(60, { octave: true }), 'C4');
+  assert.equal(P.noteName(48, { octave: true }), 'C3');
+  assert.equal(P.noteName(63, { octave: true }), 'D#4');
+
+  const shapes = P.stageShapes({
+    ...STAGE,
+    seconds: 1,
+    notes: [
+      { midi: 62, startSeconds: 1, endSeconds: 2, hand: 'right' },
+      { midi: 63, startSeconds: 1, endSeconds: 2, hand: 'left' },
+    ],
+  });
+  const onBars = shapes.filter((s) => s.label === 'D' || s.label === 'D#');
+  assert.equal(onBars.length, 2, 'one name per bar');
+  for (const name of onBars) {
+    assert.equal(name.fill, 'none', 'the name is drawn on the bar, not over it in a box');
+    assert.equal(name.labelColor, P.DEFAULT_COLORS.noteName);
+  }
+});
+
+test('a bar too small for its name goes without one, rather than carrying a smudge', () => {
+  // A run of sixteenths in a narrow frame is a row of short bars, and a
+  // row of smudges would read worse than the bars alone.
+  const tiny = P.stageShapes({
+    size: 88,
+    width: 300,
+    height: 200,
+    seconds: 1,
+    notes: [{ midi: 62, startSeconds: 1, endSeconds: 1.02, hand: 'right' }],
+  });
+  assert.equal(tiny.filter((s) => s.label === 'D').length, 0);
+
+  // The same note, with room for the name, gets it.
+  const roomy = P.stageShapes({
+    size: 88,
+    width: 1920,
+    height: 1080,
+    seconds: 1,
+    notes: [{ midi: 62, startSeconds: 1, endSeconds: 1.6, hand: 'right' }],
+  });
+  assert.equal(roomy.filter((s) => s.label === 'D').length, 1);
+});
+
+test('the name sits at the BOTTOM of its bar, the end that lands', () => {
+  const shapes = P.stageShapes({
+    size: 88,
+    width: 1920,
+    height: 1080,
+    seconds: 1,
+    // A long held note: a name centred in this would float half a
+    // screen above the key it is about to light.
+    notes: [{ midi: 62, startSeconds: 0.5, endSeconds: 3, hand: 'right' }],
+  });
+  const bar = shapes.find((s) => s.radius !== undefined && s.label === undefined);
+  const name = shapes.find((s) => s.label === 'D');
+  assert.ok(bar !== undefined && name !== undefined);
+  // Centred on its own bar. The box may be WIDER than a narrow bar --
+  // it exists only to centre the label in, and a sharp's two
+  // characters would otherwise be cramped onto a black key.
+  assert.ok(Math.abs(name.x + name.width / 2 - (bar.x + bar.width / 2)) < 0.02, 'over its own bar');
+  assert.ok(name.width >= bar.width - 0.02);
+  assert.ok(name.y + name.height <= bar.y + bar.height + 0.02, 'inside the bar');
+  assert.ok(
+    name.y > bar.y + bar.height / 2,
+    'in the lower half of it, not centred in the whole stripe',
+  );
+});
+
+test('every C is named on its own key in BOTH designs, not only where the hands are', () => {
+  const falling = P.stageShapes({ ...STAGE, notes: [] });
+  const named = falling.filter((s) => /^C\d$/.test(s.label ?? ''));
+  assert.deepEqual(
+    [...named].map((s) => s.label),
+    ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8'],
+  );
+  // Still switchable off, and still off in the same way in both.
+  assert.equal(
+    P.stageShapes({ ...STAGE, notes: [], keyNames: false }).filter((s) =>
+      /^C\d$/.test(s.label ?? ''),
+    ).length,
+    0,
+  );
 });

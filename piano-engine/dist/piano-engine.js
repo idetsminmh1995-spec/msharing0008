@@ -42,6 +42,7 @@ var PianoEngine = (() => {
     keyboardBox: () => keyboardBox,
     keyboardGeometry: () => keyboardGeometry,
     keyboardRange: () => keyboardRange,
+    noteName: () => noteName,
     parseColor: () => parseColor,
     planFingering: () => planFingering,
     pressedAt: () => pressedAt,
@@ -68,6 +69,25 @@ var PianoEngine = (() => {
   var BLACK_PITCH_CLASSES = /* @__PURE__ */ new Set([1, 3, 6, 8, 10]);
   function isBlackKey(midi) {
     return BLACK_PITCH_CLASSES.has((midi % 12 + 12) % 12);
+  }
+  var NOTE_NAMES = [
+    "C",
+    "C#",
+    "D",
+    "D#",
+    "E",
+    "F",
+    "F#",
+    "G",
+    "G#",
+    "A",
+    "A#",
+    "B"
+  ];
+  function noteName(midi, options) {
+    const name = NOTE_NAMES[(midi % 12 + 12) % 12] ?? "";
+    if (options?.octave !== true) return name;
+    return `${name}${Math.floor(midi / 12) - 1}`;
   }
   function keyboardRange(size) {
     return KEYBOARD_RANGES[size] ?? KEYBOARD_RANGES[88];
@@ -729,7 +749,11 @@ var PianoEngine = (() => {
     background: "none",
     // Dark on a white key, and faint: it is a ruler mark, not a label to
     // be read instead of the music.
-    keyName: "rgba(30,21,18,0.38)"
+    keyName: "rgba(30,21,18,0.38)",
+    // On the bar itself, which is always a bright hand colour, so the
+    // name is dark and nearly solid -- it has to be read in the half
+    // second the bar is on its way down.
+    noteName: "rgba(22,16,13,0.82)"
   };
   var DEFAULT_LEAD_SECONDS = 2.5;
   var FADE_FRACTION = 0.38;
@@ -738,7 +762,7 @@ var PianoEngine = (() => {
   var BAR_LINE_FRACTION = 7e-3;
   var BEAT_LINE_FRACTION = 35e-4;
   var LABEL_FONT = "system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
-  var KEYBOARD_FRACTION = 1 / 3;
+  var KEYBOARD_FRACTION = 0.42;
   var KEY_DEPTH = 7;
   var HAND_BAND = HAND_REACH_PAST_KEYS;
   var LINE_FRACTION = 0.05;
@@ -852,6 +876,26 @@ var PianoEngine = (() => {
     }
     return shapes;
   }
+  var NAME_MIN_SIZE = 7;
+  function barNameShape(bar, unit, colors) {
+    const size = Math.min(unit * 0.5, bar.height * 0.6);
+    if (size < NAME_MIN_SIZE) return [];
+    const label = noteName(bar.midi);
+    const box = size * 1.5;
+    const width = Math.max(bar.width, size * label.length * 0.78);
+    return [
+      {
+        x: round22(bar.x + bar.width / 2 - width / 2),
+        y: round22(bar.y + bar.height - box),
+        width: round22(width),
+        height: round22(box),
+        fill: "none",
+        label,
+        labelSize: round22(size),
+        labelColor: colors.noteName
+      }
+    ];
+  }
   function handColor(hand, colors) {
     return hand === "left" ? colors.leftHand : colors.rightHand;
   }
@@ -865,6 +909,7 @@ var PianoEngine = (() => {
     const down = pressedAt(notes, options.seconds);
     const lineHeight = Math.max(1, board.height * LINE_FRACTION);
     const edge = Math.max(0.5, board.width / 900);
+    const whiteUnit = board.width / Math.max(1, keys.filter((key) => !key.black).length);
     const shapes = [];
     if (colors.background !== "none") {
       shapes.push({
@@ -886,6 +931,7 @@ var PianoEngine = (() => {
           fill: handColor(bar.hand, colors),
           radius: Math.min(bar.width, bar.height) / 4
         });
+        for (const shape of barNameShape(bar, whiteUnit, colors)) shapes.push(shape);
       }
       for (const shape of fadeShapes(options)) shapes.push(shape);
     }
@@ -916,9 +962,8 @@ var PianoEngine = (() => {
         fill: fillFor(key)
       });
     }
-    if (!falling && options.keyNames !== false) {
-      const unit = board.width / Math.max(1, keys.filter((key) => !key.black).length);
-      const size = Math.max(6, unit * 0.46);
+    if (options.keyNames !== false) {
+      const size = Math.max(6, whiteUnit * 0.46);
       for (const key of keys) {
         if (key.black || key.midi % 12 !== 0) continue;
         shapes.push({

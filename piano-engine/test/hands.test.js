@@ -458,9 +458,11 @@ test('88 Keys means 88 keys, in every frame shape', () => {
   assert.equal(sixtyOne.length, 61);
 });
 
-test('the falling design keeps the keyboard it has always had', () => {
+test('the falling design keeps its own plain keyboard, the full share of the stage', () => {
   const tall = { width: 1080, height: 1400, design: 'falling-notes', size: 88 };
-  assert.ok(Math.abs(P.keyboardBox(tall).height - 1400 / 3) < 1e-6);
+  // No strip in front of it: nothing reaches past the keys in this
+  // design, because there are no hands in it.
+  assert.ok(Math.abs(P.keyboardBox(tall).height - 1400 * 0.42) < 1e-6);
   assert.equal(
     P.renderPianoStage({ ...tall, seconds: 0, notes: [] }),
     P.renderPianoStage({ width: 1080, height: 1400, size: 88, seconds: 0, notes: [] }),

@@ -12,6 +12,7 @@ export {
   isBlackKey,
   keyboardGeometry,
   keyboardRange,
+  noteName,
   pressedAt,
   whiteKeyCount,
 } from './keyboard.js';
