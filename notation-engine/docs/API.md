@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-589 exported symbols, by module.
+591 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -790,8 +790,7 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | function | `metronomeNoteGlyphName` | The note-value glyph for a metronome mark's beat unit. |
 | function | `metronomeDotGlyphName` | The augmentation dot for a dotted beat unit (e.g. a dotted quarter = 120). |
-| function | `metronomeEqualsGlyphName` | The glyph for the "=" in a metronome mark. |
-| function | `metronomeBpmDigitGlyphNames` |  |
+| function | `metronomeTempoText` | The TEXT half of a metronome mark -- "= 120" -- to be set in `config.fonts.textFont`, not in the music font. |
 
 ### `src/geometry/notehead.ts`
 
@@ -867,6 +866,14 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | function | `tabStringPosition` | The staff position (Phase 9's convention: bottom line 0, negative upward) of a given string on a tab staff of `numLines` lines. |
 | function | `fretDigitGlyphNames` | The glyph names spelling out a fret number, most significant digit first. |
+
+### `src/geometry/text-metrics.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `DEFAULT_ADVANCE_PER_EM` | The fallback for any character with no entry above -- the widest digit measured, which is also a fair over-estimate for mixed-case words (lower case runs narrower than a digit in every face checked, upper case about the same). |
+| function | `estimateCharWidth` | One character's estimated advance, in the same units as `fontSize`. |
+| function | `estimateTextWidth` | A whole text run's estimated width, in the same units as `fontSize` (staff spaces, everywhere in this engine). |
 
 ### `src/geometry/tie.ts`
 
@@ -1449,8 +1456,8 @@ The diagnostics `level` lets through, in their original order.
 | | Name | Summary |
 |---|---|---|
 | interface | `RenderMetronomeMarkOptions` |  |
-| function | `metronomeMarkWidth` | The full metronome mark's own total rendered width -- note glyph (+dot, if any) + noteToEqualsGap + equals sign + noteToEqualsGap + every BPM digit. |
-| function | `renderMetronomeMark` | Draws a full metronome mark -- note glyph, an optional augmentation dot, "=", then every BPM digit -- left to right along one shared baseline. |
+| function | `metronomeMarkWidth` | The full metronome mark's total rendered width -- note glyph (+dot, if any), the gap, then the "= 120" text. |
+| function | `renderMetronomeMark` | Draws a full metronome mark: the note glyph (plus an augmentation dot for a dotted beat unit) from the music font, then "= 120" as ordinary text, all on one shared baseline. |
 
 ### `src/render/notehead.ts`
 

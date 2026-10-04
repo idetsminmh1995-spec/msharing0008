@@ -447,7 +447,10 @@ export const DEFAULT_CONFIG: EngineConfig = {
       barNumber: 1.6,
       lyric: 1.8,
       dynamic: 2.2,
-      tempo: 1.8,
+      // MuseScore's own Tempo text style is 12pt, and its default
+      // spatium is 1.75mm; 12pt is 4.2336mm, so one staff space is
+      // 2.42 of them. Rounded to 2.4.
+      tempo: 2.4,
       chordSymbol: 1.8,
     },
   },

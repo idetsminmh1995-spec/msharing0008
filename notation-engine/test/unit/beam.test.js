@@ -22,15 +22,62 @@ describe('beam grouping (Phase 23)', () => {
     assert.equal(NE.beamBeatTicks(3, 8), 240); // plain eighth beat, not a dotted-quarter
   });
 
-  test('8 plain eighth notes in 4/4 with no override group strictly by beat: four groups of 2', () => {
+  test('8 eighth notes in 4/4 beam as a published edition does: two groups of four', () => {
+    // The rule every edition follows and the one difference you see
+    // first on a page: eighths in 4/4 are beamed by the HALF BAR, not by
+    // the beat. Four beams of two is correct by the textbook and wrong
+    // on paper.
     const events = Array.from({ length: 8 }, () => ({ durationType: 'eighth', isRest: false }));
     const starts = events.map((_, i) => i * 240);
     const groups = NE.groupBeams(events, starts, 4, 4);
-    assert.equal(groups.length, 4);
-    for (const g of groups) assert.equal(g.eventIndices.length, 2);
+    assert.equal(groups.length, 2);
+    assert.deepEqual([...groups[0].eventIndices], [0, 1, 2, 3]);
+    assert.deepEqual([...groups[1].eventIndices], [4, 5, 6, 7]);
   });
 
-  test('the same 8 eighth notes WITH a 2-quarter-note override group into two groups of 4', () => {
+  test('2/4 pairs its two beats; 3/4 has an odd number of them and does not', () => {
+    const eighths = (n) => Array.from({ length: n }, () => ({ durationType: 'eighth', isRest: false }));
+    const starts = (n) => Array.from({ length: n }, (_, i) => i * 240);
+    const twoFour = NE.groupBeams(eighths(4), starts(4), 2, 4);
+    assert.equal(twoFour.length, 1, '2/4: one group of four');
+    const threeFour = NE.groupBeams(eighths(6), starts(6), 3, 4);
+    assert.equal(threeFour.length, 3, '3/4: 2+2+2, never 4+2');
+    for (const g of threeFour) assert.equal(g.eventIndices.length, 2);
+  });
+
+  test('anything shorter than an eighth beams a beat at a time', () => {
+    // A beat carrying sixteenths is beamed on its own, so the beat stays
+    // visible -- that is what the reader is counting.
+    const events = Array.from({ length: 8 }, () => ({ durationType: '16th', isRest: false }));
+    const starts = events.map((_, i) => i * 120);
+    const groups = NE.groupBeams(events, starts, 4, 4);
+    assert.equal(groups.length, 2);
+    for (const g of groups) assert.equal(g.eventIndices.length, 4);
+  });
+
+  test('the pairing is decided per beat pair, not once for the whole run', () => {
+    // Four eighths then eight sixteenths, all in one unbroken run: the
+    // eighths take the half bar, the sixteenths go a beat at a time.
+    const events = [
+      ...Array.from({ length: 4 }, () => ({ durationType: 'eighth', isRest: false })),
+      ...Array.from({ length: 8 }, () => ({ durationType: '16th', isRest: false })),
+    ];
+    const starts = [0, 240, 480, 720, 960, 1080, 1200, 1320, 1440, 1560, 1680, 1800];
+    const groups = NE.groupBeams(events, starts, 4, 4);
+    assert.equal(groups.length, 3);
+    assert.deepEqual([...groups].map((g) => g.eventIndices.length), [4, 4, 4]);
+    assert.deepEqual([...groups[0].eventIndices], [0, 1, 2, 3]);
+  });
+
+  test('2/2 beats in half notes, so its eighths are four to a beam already', () => {
+    const events = Array.from({ length: 8 }, () => ({ durationType: 'eighth', isRest: false }));
+    const starts = events.map((_, i) => i * 240);
+    const groups = NE.groupBeams(events, starts, 2, 2);
+    assert.equal(groups.length, 2, 'a beam a beat, not one of eight');
+    for (const g of groups) assert.equal(g.eventIndices.length, 4);
+  });
+
+  test('an override is the last word: the engine does not pair its beats back up', () => {
     const events = Array.from({ length: 8 }, () => ({ durationType: 'eighth', isRest: false }));
     const starts = events.map((_, i) => i * 240);
     const groups = NE.groupBeams(events, starts, 4, 4, 960); // 960 ticks = 4 eighth notes' worth

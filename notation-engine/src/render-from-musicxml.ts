@@ -73,12 +73,7 @@ import {
   computeStaffDistance,
 } from './layout/index.js';
 import { fretDigitGlyphNames, tabStringPosition } from './geometry/index.js';
-import {
-  metronomeNoteGlyphName,
-  metronomeDotGlyphName,
-  metronomeEqualsGlyphName,
-  metronomeBpmDigitGlyphNames,
-} from './geometry/metronome.js';
+import { metronomeNoteGlyphName, metronomeDotGlyphName } from './geometry/metronome.js';
 import { renderMetronomeMark, metronomeMarkWidth } from './render/metronome.js';
 import { TICKS_PER_QUARTER } from './core/duration-math.js';
 import {
@@ -303,8 +298,15 @@ const MEASURE_HEADER_ALLOWANCE = 6.0;
  * beams. These are the clearances measured from the real content instead.
  */
 const TEMPO_MARK_GAP = 1.5;
-/** The metNote* glyphs are tall (the stem reaches well above the anchor), so the mark needs this much room above its own baseline. */
-const TEMPO_MARK_HEIGHT = 2.0;
+/**
+ * The metNote* glyphs are tall -- the stem reaches well above the shared
+ * baseline -- so the mark needs this much room above it. The tallest of
+ * the family this engine can draw is `metNote8thUp`, whose bounding box
+ * reaches 2.784sp; this is that, rounded up.
+ */
+const TEMPO_MARK_HEIGHT = 2.8;
+/** Between a tempo mark's note glyph (and its dot) and the "= 120" that follows it. */
+const TEMPO_NOTE_TO_EQUALS_GAP = 0.75;
 /** Phase 50: a bar number's own clearance above whatever its measure reaches -- smaller than a tempo mark's, since plain digits have no tall stem to keep clear of the staff. */
 const BAR_NUMBER_GAP = 1.0;
 /**
@@ -503,6 +505,8 @@ function computeMeasureLayout(
   headerWidth: number,
   /** The caller's resolved `config.spacing` -- the law, its numbers, and the floors. */
   spacingConfig: SpacingConfig,
+  /** `config.fonts.sizes.tempo`: how wide a tempo mark's "= 120" will be depends on the size it is set at, so the measure cannot be made wide enough for it without knowing that. */
+  tempoFontSize: number,
 ): {
   readonly width: number;
   readonly positionsByTick: ReadonlyMap<number, number>;
@@ -575,9 +579,9 @@ function computeMeasureLayout(
     const markWidth = metronomeMarkWidth(
       metronomeNoteGlyphName(tm.beatUnit as DurationType),
       dotGlyph,
-      metronomeEqualsGlyphName(),
-      metronomeBpmDigitGlyphNames(tm.perMinute),
-      1.0,
+      tm.perMinute,
+      tempoFontSize,
+      TEMPO_NOTE_TO_EQUALS_GAP,
     );
     return Math.max(max, headerWidth + markWidth + MEASURE_TRAILING_MARGIN);
   }, 0);
@@ -2425,6 +2429,7 @@ export function renderParsedMusicXml(
       drawnTempoMarks.filter((tm) => tm.measureNumber === measureNumber),
       headerWidth,
       config.spacing,
+      config.fonts.sizes.tempo,
     );
     measureLayoutsByNumber.set(measureNumber, { ...layout, headerWidth });
     measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
@@ -3035,23 +3040,19 @@ export function renderParsedMusicXml(
           const dotGlyph = mark.beatUnitDots > 0 ? metronomeDotGlyphName() : undefined;
           const eventX = noteAreaX + (mark.tick / (measureTotalTicks || 1)) * noteAreaWidth;
           svgParts.push(
-            renderMetronomeMark(
-              metronomeNoteGlyphName(mark.beatUnit),
-              dotGlyph,
-              metronomeEqualsGlyphName(),
-              metronomeBpmDigitGlyphNames(mark.perMinute),
-              {
-                x: eventX,
-                // tempoMarkSide() is always 'above'. The clearance is
-                // measured from whatever this measure's content actually
-                // reaches (stems and beams included), not from the staff
-                // line -- see the note where northExtent is computed.
-                y: topStaffY - northExtent - TEMPO_MARK_GAP,
-                color: theme.colorOf('tempo'),
-                fontFamily: theme.musicFont,
-                noteToEqualsGap: 1.0,
-              },
-            ),
+            renderMetronomeMark(metronomeNoteGlyphName(mark.beatUnit), dotGlyph, mark.perMinute, {
+              x: eventX,
+              // tempoMarkSide() is always 'above'. The clearance is
+              // measured from whatever this measure's content actually
+              // reaches (stems and beams included), not from the staff
+              // line -- see the note where northExtent is computed.
+              y: topStaffY - northExtent - TEMPO_MARK_GAP,
+              color: theme.colorOf('tempo'),
+              musicFont: theme.musicFont,
+              textFont: theme.textFont,
+              fontSize: theme.sizes.tempo,
+              noteToEqualsGap: TEMPO_NOTE_TO_EQUALS_GAP,
+            }),
           );
         }
       }

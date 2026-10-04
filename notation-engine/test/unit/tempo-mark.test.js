@@ -37,35 +37,54 @@ describe('metronome geometry (Integration D)', () => {
     assert.equal(seen.size, types.length);
   });
 
-  test('the augmentation dot and equals-sign glyphs are both real', () => {
+  test('the augmentation dot glyph is real', () => {
     assert.notEqual(NE.getGlyph(NE.metronomeDotGlyphName()), undefined);
-    assert.notEqual(NE.getGlyph(NE.metronomeEqualsGlyphName()), undefined);
   });
 
-  test("every digit 0-9 resolves to a real, distinct glyph, matching Integration C's fingering digits", () => {
-    const seen = new Set();
-    for (let n = 0; n <= 9; n++) {
-      const [glyph] = NE.metronomeBpmDigitGlyphNames(n);
-      assert.equal(glyph, NE.fretDigitGlyphNames(n)[0], 'should reuse the same digit family as tab frets');
-      seen.add(glyph);
-    }
-    assert.equal(seen.size, 10);
-  });
-
-  test("digits 6-9 resolve correctly despite the underlying glyph set's non-contiguous codepoints", () => {
-    for (const n of [6, 7, 8, 9]) {
-      const [glyph] = NE.metronomeBpmDigitGlyphNames(n);
-      assert.equal(glyph, `fingering${n}`);
-    }
-  });
-
-  test('a multi-digit BPM returns multiple glyphs, most significant first', () => {
-    assert.deepEqual([...NE.metronomeBpmDigitGlyphNames(120)], ['fingering1', 'fingering2', 'fingering0']);
+  test('the BPM half of the mark is TEXT, not glyph names -- "= 120", ready for the text font', () => {
+    assert.equal(NE.metronomeTempoText(120), '= 120');
+    assert.equal(NE.metronomeTempoText(96), '= 96');
+    assert.equal(NE.metronomeTempoText(0), '= 0');
   });
 
   test('a negative or non-integer BPM throws rather than rendering nonsense', () => {
-    assert.throws(() => NE.metronomeBpmDigitGlyphNames(-1), /non-negative integer/);
-    assert.throws(() => NE.metronomeBpmDigitGlyphNames(1.5), /non-negative integer/);
+    assert.throws(() => NE.metronomeTempoText(-1), /non-negative integer/);
+    assert.throws(() => NE.metronomeTempoText(1.5), /non-negative integer/);
+  });
+
+  test('the SMuFL fingering digits are NOT what a BPM is drawn with any more -- the real defect this replaced', () => {
+    // fingering1's ink is 0.468sp wide and it carries a 0.08sp left side
+    // bearing that no bounding box reports, so advancing digit-by-digit
+    // by bounding-box width overlapped them. The numbers that proved it:
+    const one = NE.getGlyph('fingering1');
+    const inkWidth = one.bBox.bBoxNE[0] - one.bBox.bBoxSW[0];
+    assert.ok(inkWidth < 0.5, 'a fingering digit really is under half a staff space wide');
+    assert.ok(one.bBox.bBoxSW[0] > 0, 'and really does start right of its own origin');
+    // So the engine must no longer offer a per-digit glyph route at all.
+    assert.equal(NE.metronomeBpmDigitGlyphNames, undefined);
+    assert.equal(NE.metronomeEqualsGlyphName, undefined);
+  });
+});
+
+describe('plain-text width estimation (geometry/text-metrics.ts)', () => {
+  test('a run is the sum of its characters, scaled by the font size', () => {
+    const atOne = NE.estimateTextWidth('= 120', 1);
+    assert.equal(NE.estimateTextWidth('= 120', 2), atOne * 2);
+    assert.equal(NE.estimateTextWidth('', 10), 0);
+  });
+
+  test('it OVER-estimates every ordinary sans-serif face, which is the direction that is safe', () => {
+    // Measured in Chromium with measureText at 100px: the widest digit
+    // across Arial, Helvetica, Liberation Sans and DejaVu Sans at
+    // weights 400 and 700 is DejaVu Sans Bold's 0.6958em.
+    const widestRealDigit = 0.6958;
+    assert.ok(NE.estimateTextWidth('0', 1) >= widestRealDigit);
+    // Arial's own "= 120" is 2.5303em; the estimate must leave room for it.
+    assert.ok(NE.estimateTextWidth('= 120', 1) >= 2.5303);
+  });
+
+  test('an unknown character still has a width -- it is never silently zero', () => {
+    assert.equal(NE.estimateTextWidth('\u00e9', 1), NE.DEFAULT_ADVANCE_PER_EM);
   });
 });
 
@@ -125,15 +144,17 @@ describe('metronome rendering end to end (Integration D)', () => {
     assert.ok(Number(noteMatch[1]) < 4, 'expected the mark above the staff top (y=4)');
   });
 
-  test('every component -- note, dot, equals, both BPM digits -- shares the SAME baseline y', () => {
+  test('the note glyph, its dot and the "= 96" text all share ONE baseline', () => {
     const { svg } = render();
     const ys = new Set();
-    for (const cp of [0xeca5, 0xecb7, 0xe08f, 0xed24, 0xed27]) {
-      const ch = String.fromCodePoint(cp);
+    for (const ch of ['\uECA5', '\uECB7']) {
       const m = svg.match(new RegExp(`x="[\\d.]+" y="([\\d.]+)"[^>]*>${ch}`));
-      assert.notEqual(m, null, `glyph U+${cp.toString(16)} not found`);
+      assert.notEqual(m, null, `glyph ${ch} not found`);
       ys.add(m[1]);
     }
+    const textMatch = svg.match(/x="[\d.]+" y="([\d.]+)"[^>]*>= 96</);
+    assert.notEqual(textMatch, null, 'the "= 96" text was not drawn');
+    ys.add(textMatch[1]);
     assert.equal(ys.size, 1, 'every metronome-mark component should share one baseline');
   });
 
@@ -144,24 +165,32 @@ describe('metronome rendering end to end (Integration D)', () => {
     assert.ok(dotX > noteX, 'the augmentation dot should follow the note glyph');
   });
 
-  test('the BPM "96" renders as two separate, correctly-ordered digit glyphs', () => {
+  test('the BPM is ONE text element in the TEXT font, so the font spaces its own digits', () => {
     const { svg } = render();
-    const nineX = Number(svg.match(/x="([\d.]+)" y="[\d.]+"[^>]*>\uED27/)[1]); // fingering9
-    const sixX = Number(svg.match(/x="([\d.]+)" y="[\d.]+"[^>]*>\uED24/)[1]); // fingering6
-    assert.ok(sixX > nineX, 'the "6" must follow the "9"');
+    const marks = [...svg.matchAll(/<text [^>]*>= 96<\/text>/g)];
+    assert.equal(marks.length, 1, 'exactly one tempo text run');
+    const tag = marks[0][0];
+    assert.match(tag, /font-family="Manrope, sans-serif"/);
+    assert.match(tag, /font-size="2.4"/);
+    assert.match(tag, /font-weight="bold"/);
+    // And the old per-digit glyph route really is gone from the output.
+    assert.doesNotMatch(svg, /[\uED10-\uED19]/, 'no fingering digits anywhere');
+    assert.doesNotMatch(svg, /\uE08F/, 'no timeSigEquals glyph either');
   });
 
-  test('the equals sign sits between the note/dot and the digits', () => {
+  test('the "= 96" starts clear to the RIGHT of the note and its dot', () => {
     const { svg } = render();
     const dotX = Number(svg.match(/x="([\d.]+)" y="[\d.]+"[^>]*>\uECB7/)[1]);
-    const equalsX = Number(svg.match(/x="([\d.]+)" y="[\d.]+"[^>]*>\uE08F/)[1]);
-    const nineX = Number(svg.match(/x="([\d.]+)" y="[\d.]+"[^>]*>\uED27/)[1]);
-    assert.ok(equalsX > dotX && nineX > equalsX);
+    const textX = Number(svg.match(/x="([\d.]+)" y="[\d.]+"[^>]*>= 96</)[1]);
+    const dot = NE.getGlyph('metAugmentationDot');
+    const dotWidth = dot.bBox.bBoxNE[0] - dot.bBox.bBoxSW[0];
+    assert.ok(textX >= dotX + dotWidth, 'the text must not sit on top of the dot');
   });
 
   test('a measure with no tempo mark draws nothing extra above the staff', () => {
     const { svg } = NE.renderFromMusicXml(load('simple-single-voice.musicxml'), { domParser });
-    assert.doesNotMatch(svg, /\uECA5|\uECB7|\uE08F/);
+    assert.doesNotMatch(svg, /\uECA5|\uECB7/);
+    assert.doesNotMatch(svg, />= \d/);
   });
 
   test('the tempo mark visually ALIGNS with the first note of the same measure -- both use the same noteAreaX (real bug: they used to use two different formulas)', () => {
@@ -173,10 +202,8 @@ describe('metronome rendering end to end (Integration D)', () => {
 
   test("the measure holding the tempo mark is wide enough for it -- the barline lands clear past the mark's own right edge, never overlapping it", () => {
     const { svg } = render();
-    const markGlyphXs = [
-      ...svg.matchAll(/<text x="([\d.]+)" y="[\d.]+"[^>]*>[\uECA0-\uED30]/g),
-    ].map((m) => Number(m[1]));
-    const markRightEdge = Math.max(...markGlyphXs) + 1; // +1sp: a loose upper bound on any single glyph's own width
+    const textX = Number(svg.match(/x="([\d.]+)" y="[\d.]+"[^>]*>= 96</)[1]);
+    const markRightEdge = textX + NE.estimateTextWidth('= 96', 2.4);
     const barlineX = Number(svg.match(/<line x1="([\d.]+)" y1="[\d.]+" x2="\1" y2="[\d.]+" stroke="#000000" stroke-width="0\.16"/)[1]);
     assert.ok(barlineX > markRightEdge, `expected the barline (${barlineX}) clear past the tempo mark's own right edge (${markRightEdge})`);
   });

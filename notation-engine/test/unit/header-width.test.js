@@ -147,16 +147,35 @@ describe('a measure header wider than the constant allowance', () => {
 
   test('the tempo mark clears the key signature instead of overprinting it', () => {
     const { svg } = render('wide-key-signature.musicxml');
-    const boxes = [...NE.measureSvgBoxes(svg)].filter((b) => b.kind === 'glyph');
-    // The sharps are the four glyphs that sit in the header, left of the
-    // note area; the metronome note is the one glyph that reaches ABOVE
-    // the staff (y < 0 with this fixture's own staff at y=8).
-    const sharps = boxes.filter((b) => b.x < 8 && b.y > 1);
-    const tempoGlyphs = boxes.filter((b) => b.y < 0);
-    assert.ok(sharps.length >= 4, `expected the key signature, found ${sharps.length} glyphs`);
-    assert.ok(tempoGlyphs.length > 0, 'expected a metronome mark above the staff');
-    const rightmostSharp = Math.max(...sharps.map((b) => b.x + b.width));
-    const leftmostTempo = Math.min(...tempoGlyphs.map((b) => b.x));
+
+    // Found by the glyph each one is actually drawn with, so neither
+    // side of the comparison depends on where the staff happened to
+    // land vertically.
+    const xsOf = (char) =>
+      [...svg.matchAll(new RegExp(`<text x="([\\d.-]+)" y="[\\d.-]+"[^>]*>${char}<`, 'g'))].map(
+        (m) => Number(m[1]),
+      );
+    const widthOf = (char) => {
+      const { bBox } = NE.getGlyphByChar(char);
+      return bBox.bBoxNE[0] - bBox.bBoxSW[0];
+    };
+
+    const sharp = '\uE262';
+    const sharpXs = xsOf(sharp);
+    assert.ok(sharpXs.length >= 4, `expected the key signature, found ${sharpXs.length} sharps`);
+
+    const metNote = NE.getGlyph(NE.metronomeNoteGlyphName('quarter')).char;
+    const noteXs = xsOf(metNote);
+    assert.equal(noteXs.length, 1, 'expected one metronome note glyph');
+
+    // The BPM half is a text run, not glyphs -- and it has to clear the
+    // key signature too, so it is checked here rather than assumed to
+    // follow the note.
+    const bpm = svg.match(/<text x="([\d.-]+)" y="[\d.-]+"[^>]*>= (\d+)</);
+    assert.notEqual(bpm, null, 'expected the BPM text above the staff');
+
+    const rightmostSharp = Math.max(...sharpXs) + widthOf(sharp);
+    const leftmostTempo = Math.min(noteXs[0], Number(bpm[1]));
     assert.ok(
       leftmostTempo >= rightmostSharp,
       `the tempo mark starts at x=${leftmostTempo} but the key signature runs to x=${rightmostSharp}`,

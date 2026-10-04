@@ -24,6 +24,7 @@ var NotationEngine = (() => {
     ALTO_CLEF: () => ALTO_CLEF,
     BASS_CLEF: () => BASS_CLEF,
     ByteReader: () => ByteReader,
+    DEFAULT_ADVANCE_PER_EM: () => DEFAULT_ADVANCE_PER_EM,
     DEFAULT_CONFIG: () => DEFAULT_CONFIG,
     DEFAULT_CURSOR_FIXED_FRACTION: () => DEFAULT_CURSOR_FIXED_FRACTION,
     DEFAULT_DRUM_MAPPING_TABLE: () => DEFAULT_DRUM_MAPPING_TABLE,
@@ -126,6 +127,8 @@ var NotationEngine = (() => {
     encodePdf: () => encodePdf,
     encodePng: () => encodePng,
     escapeXmlText: () => escapeXmlText,
+    estimateCharWidth: () => estimateCharWidth,
+    estimateTextWidth: () => estimateTextWidth,
     evaluateAccidental: () => evaluateAccidental,
     exportPdf: () => exportPdf,
     exportPng: () => exportPng,
@@ -163,11 +166,10 @@ var NotationEngine = (() => {
     measure: () => measure,
     measureSvgBoxes: () => measureSvgBoxes,
     mergeDrumMappingTable: () => mergeDrumMappingTable,
-    metronomeBpmDigitGlyphNames: () => metronomeBpmDigitGlyphNames,
     metronomeDotGlyphName: () => metronomeDotGlyphName,
-    metronomeEqualsGlyphName: () => metronomeEqualsGlyphName,
     metronomeMarkWidth: () => metronomeMarkWidth,
     metronomeNoteGlyphName: () => metronomeNoteGlyphName,
+    metronomeTempoText: () => metronomeTempoText,
     middleLineY: () => middleLineY,
     midiDiagnostic: () => midiDiagnostic,
     minDistance: () => minDistance,
@@ -58753,32 +58755,82 @@ var NotationEngine = (() => {
     }
     return TICKS_PER_QUARTER * (4 / denominator);
   }
+  function pairsBeats(numerator, denominator) {
+    return beamBeatTicks(numerator, denominator) === TICKS_PER_QUARTER && numerator % 2 === 0;
+  }
+  function beatsPerGroup(numerator, denominator, shortest) {
+    if (shortest !== "eighth") return 1;
+    return pairsBeats(numerator, denominator) ? 2 : 1;
+  }
+  function shorterOf(a, b) {
+    if (a === void 0) return b;
+    return beamLevels(b) > beamLevels(a) ? b : a;
+  }
+  function beamLevels(type) {
+    switch (type) {
+      case "eighth":
+        return 1;
+      case "16th":
+        return 2;
+      case "32nd":
+        return 3;
+      case "64th":
+        return 4;
+      case "128th":
+        return 5;
+      case "256th":
+        return 6;
+      case "512th":
+        return 7;
+      case "1024th":
+        return 8;
+      default:
+        return 0;
+    }
+  }
   function groupBeams(events, startTicks, numerator, denominator, groupTicks) {
-    const unit = groupTicks ?? beamBeatTicks(numerator, denominator);
+    const beat = groupTicks ?? beamBeatTicks(numerator, denominator);
+    const pairing = groupTicks === void 0;
     const groups = [];
-    let current = [];
-    let currentUnitIndex;
-    const flush = () => {
-      if (current.length >= 2) {
-        groups.push({ eventIndices: current });
+    let run = [];
+    const flushRun = () => {
+      if (run.length === 0) return;
+      const beats = [];
+      for (const i2 of run) {
+        const tick = startTicks[i2] ?? 0;
+        const beatIndex = beat > 0 ? Math.floor(tick / beat) : 0;
+        const last = beats[beats.length - 1];
+        if (last !== void 0 && last.index === beatIndex) last.events.push(i2);
+        else beats.push({ index: beatIndex, events: [i2] });
       }
-      current = [];
-      currentUnitIndex = void 0;
+      const shortestIn = (one) => {
+        let shortest;
+        for (const i2 of one.events) {
+          const event = events[i2];
+          if (event !== void 0) shortest = shorterOf(shortest, event.durationType);
+        }
+        return shortest;
+      };
+      let at = 0;
+      while (at < beats.length) {
+        const first = beats[at];
+        const next = beats[at + 1];
+        const span = pairing ? beatsPerGroup(numerator, denominator, shortestIn(first)) : 1;
+        const joins = span === 2 && next !== void 0 && next.index === first.index + 1 && first.index % 2 === 0 && beatsPerGroup(numerator, denominator, shortestIn(next)) === 2;
+        const merged = joins && next !== void 0 ? [...first.events, ...next.events] : first.events;
+        if (merged.length >= 2) groups.push({ eventIndices: merged });
+        at += joins ? 2 : 1;
+      }
+      run = [];
     };
     events.forEach((event, i2) => {
-      const tick = startTicks[i2] ?? 0;
       if (event.isRest || !isBeamable(event.durationType)) {
-        flush();
+        flushRun();
         return;
       }
-      const unitIndex = unit > 0 ? Math.floor(tick / unit) : 0;
-      if (currentUnitIndex !== void 0 && unitIndex !== currentUnitIndex) {
-        flush();
-      }
-      current.push(i2);
-      currentUnitIndex = unitIndex;
+      run.push(i2);
     });
-    flush();
+    flushRun();
     return groups;
   }
   function beamedEventIndices(groups) {
@@ -59044,8 +59096,24 @@ var NotationEngine = (() => {
     const startY = naturalStemTipY(firstPos, direction, stemLength);
     const naturalEndY = naturalStemTipY(lastPos, direction, stemLength);
     const diff = naturalEndY - startY;
-    const endY = Math.abs(diff) > MAX_BEAM_SLOPE ? startY + Math.sign(diff) * MAX_BEAM_SLOPE : naturalEndY;
-    return { direction, style, startX: firstX, startY, endX: lastX, endY };
+    const slanted = Math.abs(diff) > MAX_BEAM_SLOPE ? startY + Math.sign(diff) * MAX_BEAM_SLOPE : naturalEndY;
+    const span = lastX - firstX;
+    const shortest = notePositions.reduce((least, position, i2) => {
+      const x2 = noteXs[i2] ?? firstX;
+      const t = span === 0 ? 0 : (x2 - firstX) / span;
+      const beamY = startY + t * (slanted - startY);
+      const length = direction === "up" ? position - beamY : beamY - position;
+      return Math.min(least, length);
+    }, Number.POSITIVE_INFINITY);
+    const lift = Number.isFinite(shortest) && shortest < stemLength ? (stemLength - shortest) * (direction === "up" ? -1 : 1) : 0;
+    return {
+      direction,
+      style,
+      startX: firstX,
+      startY: startY + lift,
+      endX: lastX,
+      endY: slanted + lift
+    };
   }
   function beamYAtX(shape, x2) {
     if (shape.endX === shape.startX) return shape.startY;
@@ -59131,32 +59199,38 @@ var NotationEngine = (() => {
   function metronomeDotGlyphName() {
     return "metAugmentationDot";
   }
-  function metronomeEqualsGlyphName() {
-    return "timeSigEquals";
-  }
-  var BPM_DIGIT_GLYPHS = [
-    "fingering0",
-    "fingering1",
-    "fingering2",
-    "fingering3",
-    "fingering4",
-    "fingering5",
-    "fingering6",
-    "fingering7",
-    "fingering8",
-    "fingering9"
-  ];
-  function metronomeBpmDigitGlyphNames(beatsPerMinute) {
+  function metronomeTempoText(beatsPerMinute) {
     if (!Number.isInteger(beatsPerMinute) || beatsPerMinute < 0) {
       throw new Error(`Metronome BPM must be a non-negative integer, got ${beatsPerMinute}.`);
     }
-    return String(beatsPerMinute).split("").map((d) => {
-      const glyph = BPM_DIGIT_GLYPHS[Number(d)];
-      if (glyph === void 0) {
-        throw new Error(`No digit glyph for "${d}".`);
-      }
-      return glyph;
-    });
+    return `= ${String(beatsPerMinute)}`;
+  }
+
+  // src/geometry/text-metrics.ts
+  var ADVANCE_PER_EM = {
+    "0": 0.7,
+    "1": 0.7,
+    "2": 0.7,
+    "3": 0.7,
+    "4": 0.7,
+    "5": 0.7,
+    "6": 0.7,
+    "7": 0.7,
+    "8": 0.7,
+    "9": 0.7,
+    "=": 0.84,
+    " ": 0.38,
+    ".": 0.38,
+    ",": 0.38
+  };
+  var DEFAULT_ADVANCE_PER_EM = 0.7;
+  function estimateCharWidth(ch, fontSize) {
+    return (ADVANCE_PER_EM[ch] ?? DEFAULT_ADVANCE_PER_EM) * fontSize;
+  }
+  function estimateTextWidth(text, fontSize) {
+    let total = 0;
+    for (const ch of text) total += estimateCharWidth(ch, fontSize);
+    return total;
   }
 
   // src/render/svg-primitives.ts
@@ -59649,29 +59723,35 @@ ${denominator}`;
     const bbox = getGlyph(glyphName)?.bBox;
     return bbox !== void 0 ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
   }
-  function metronomeMarkWidth(noteGlyphName, dotGlyphName, equalsGlyphName, bpmDigitGlyphNames, noteToEqualsGap) {
+  var DOT_GAP = 0.25;
+  function metronomeMarkWidth(noteGlyphName, dotGlyphName, beatsPerMinute, fontSize, noteToEqualsGap) {
     let width = glyphWidth(noteGlyphName);
-    if (dotGlyphName !== void 0) width += glyphWidth(dotGlyphName);
-    width += noteToEqualsGap + glyphWidth(equalsGlyphName) + noteToEqualsGap;
-    for (const d of bpmDigitGlyphNames) width += glyphWidth(d);
+    if (dotGlyphName !== void 0) width += DOT_GAP + glyphWidth(dotGlyphName);
+    width += noteToEqualsGap;
+    width += estimateTextWidth(metronomeTempoText(beatsPerMinute), fontSize);
     return width;
   }
-  function renderMetronomeMark(noteGlyphName, dotGlyphName, equalsGlyphName, bpmDigitGlyphNames, options) {
-    const sequence = [noteGlyphName];
-    if (dotGlyphName !== void 0) sequence.push(dotGlyphName);
+  function renderMetronomeMark(noteGlyphName, dotGlyphName, beatsPerMinute, options) {
     const parts = [];
     let cursorX = options.x;
-    for (const name of sequence) {
-      parts.push(drawGlyph(name, cursorX, options));
-      cursorX += glyphWidth(name);
+    parts.push(drawGlyph(noteGlyphName, cursorX, options));
+    cursorX += glyphWidth(noteGlyphName);
+    if (dotGlyphName !== void 0) {
+      cursorX += DOT_GAP;
+      parts.push(drawGlyph(dotGlyphName, cursorX, options));
+      cursorX += glyphWidth(dotGlyphName);
     }
     cursorX += options.noteToEqualsGap;
-    parts.push(drawGlyph(equalsGlyphName, cursorX, options));
-    cursorX += glyphWidth(equalsGlyphName) + options.noteToEqualsGap;
-    for (const name of bpmDigitGlyphNames) {
-      parts.push(drawGlyph(name, cursorX, options));
-      cursorX += glyphWidth(name);
-    }
+    parts.push(
+      svgText(cursorX, options.y, metronomeTempoText(beatsPerMinute), {
+        fill: options.color,
+        "font-family": options.textFont,
+        "font-size": options.fontSize,
+        // MuseScore's Tempo text style is bold, and a tempo mark reads as
+        // an instruction to the player rather than as part of the music.
+        "font-weight": "bold"
+      })
+    );
     return parts.join("\n");
   }
   function drawGlyph(name, x2, options) {
@@ -59679,7 +59759,7 @@ ${denominator}`;
     if (glyph === void 0) {
       throw new Error(`No glyph found for metronome mark component "${name}"`);
     }
-    return svgGlyphText(x2, options.y, glyph.char, options.fontFamily, { fill: options.color });
+    return svgGlyphText(x2, options.y, glyph.char, options.musicFont, { fill: options.color });
   }
 
   // src/render/cursor.ts
@@ -59760,7 +59840,10 @@ ${denominator}`;
         barNumber: 1.6,
         lyric: 1.8,
         dynamic: 2.2,
-        tempo: 1.8,
+        // MuseScore's own Tempo text style is 12pt, and its default
+        // spatium is 1.75mm; 12pt is 4.2336mm, so one staff space is
+        // 2.42 of them. Rounded to 2.4.
+        tempo: 2.4,
         chordSymbol: 1.8
       }
     },
@@ -65125,7 +65208,6 @@ ${denominator}`;
   }
 
   // src/debug/measure.ts
-  var TEXT_ADVANCE_RATIO = 0.62;
   function boxFrom(b, kind, id, approximate) {
     return {
       x: b.minX,
@@ -65249,7 +65331,7 @@ ${denominator}`;
               boxFrom(
                 {
                   minX: x2,
-                  maxX: x2 + text.length * fontSize * TEXT_ADVANCE_RATIO,
+                  maxX: x2 + estimateTextWidth(text, fontSize),
                   minY: y - fontSize,
                   maxY: y
                 },
@@ -65745,7 +65827,8 @@ ${xrefOffset}
   var MEASURE_LEADING_PAD = 0.5;
   var MEASURE_HEADER_ALLOWANCE = 6;
   var TEMPO_MARK_GAP = 1.5;
-  var TEMPO_MARK_HEIGHT = 2;
+  var TEMPO_MARK_HEIGHT = 2.8;
+  var TEMPO_NOTE_TO_EQUALS_GAP = 0.75;
   var BAR_NUMBER_GAP = 1;
   var VOLTA_HOOK_DEPTH = 1;
   var VOLTA_BAR_NUMBER_CLEARANCE = 0.4;
@@ -65815,7 +65898,7 @@ ${xrefOffset}
     if (worst === void 0) return 0;
     return side === "south" ? Math.max(0, worst) : Math.max(0, topLineY - worst);
   }
-  function computeMeasureLayout(measure2, measureTicks, measureTempoMarks, headerWidth, spacingConfig) {
+  function computeMeasureLayout(measure2, measureTicks, measureTempoMarks, headerWidth, spacingConfig, tempoFontSize) {
     const hasAccidentalByTick = /* @__PURE__ */ new Map();
     const shortestStartingByTick = /* @__PURE__ */ new Map();
     for (const voice2 of measure2.voices) {
@@ -65840,9 +65923,9 @@ ${xrefOffset}
       const markWidth = metronomeMarkWidth(
         metronomeNoteGlyphName(tm.beatUnit),
         dotGlyph,
-        metronomeEqualsGlyphName(),
-        metronomeBpmDigitGlyphNames(tm.perMinute),
-        1
+        tm.perMinute,
+        tempoFontSize,
+        TEMPO_NOTE_TO_EQUALS_GAP
       );
       return Math.max(max2, headerWidth + markWidth + MEASURE_TRAILING_MARGIN);
     }, 0);
@@ -66870,7 +66953,8 @@ ${xrefOffset}
         measureTicks ?? TICKS_PER_QUARTER * 4,
         drawnTempoMarks.filter((tm) => tm.measureNumber === measureNumber),
         headerWidth,
-        config.spacing
+        config.spacing,
+        config.fonts.sizes.tempo
       );
       measureLayoutsByNumber.set(measureNumber, { ...layout, headerWidth });
       measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
@@ -67181,23 +67265,19 @@ ${xrefOffset}
             const dotGlyph = mark.beatUnitDots > 0 ? metronomeDotGlyphName() : void 0;
             const eventX = noteAreaX + mark.tick / (measureTotalTicks || 1) * noteAreaWidth;
             svgParts.push(
-              renderMetronomeMark(
-                metronomeNoteGlyphName(mark.beatUnit),
-                dotGlyph,
-                metronomeEqualsGlyphName(),
-                metronomeBpmDigitGlyphNames(mark.perMinute),
-                {
-                  x: eventX,
-                  // tempoMarkSide() is always 'above'. The clearance is
-                  // measured from whatever this measure's content actually
-                  // reaches (stems and beams included), not from the staff
-                  // line -- see the note where northExtent is computed.
-                  y: topStaffY - northExtent - TEMPO_MARK_GAP,
-                  color: theme.colorOf("tempo"),
-                  fontFamily: theme.musicFont,
-                  noteToEqualsGap: 1
-                }
-              )
+              renderMetronomeMark(metronomeNoteGlyphName(mark.beatUnit), dotGlyph, mark.perMinute, {
+                x: eventX,
+                // tempoMarkSide() is always 'above'. The clearance is
+                // measured from whatever this measure's content actually
+                // reaches (stems and beams included), not from the staff
+                // line -- see the note where northExtent is computed.
+                y: topStaffY - northExtent - TEMPO_MARK_GAP,
+                color: theme.colorOf("tempo"),
+                musicFont: theme.musicFont,
+                textFont: theme.textFont,
+                fontSize: theme.sizes.tempo,
+                noteToEqualsGap: TEMPO_NOTE_TO_EQUALS_GAP
+              })
             );
           }
         }

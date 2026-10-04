@@ -66,20 +66,33 @@ describe('cross-software compatibility corpus (Phase 37, §10.8)', () => {
     assert.match(result.svg, /\uE0A4/); // noteheadBlack -- the real notes still rendered
 
     // The fixture writes its four eighth notes as ONE beam group across
-    // the half-bar; Phase 23's inference would make TWO (one per beat).
-    // A beam line is the only thing drawn at Bravura's beamThickness, so
-    // counting those lines distinguishes the two outcomes directly.
+    // the half-bar. A beam line is the only thing drawn at Bravura's
+    // beamThickness, so counting those lines reads the grouping back.
     const beamLines = (result.svg.match(/stroke-width="0.5"/g) ?? []).length;
     assert.equal(beamLines, 1);
 
-    // Proof this is the HINTS deciding, not a coincidence: the identical
-    // music with the <beam> elements stripped falls back to inference and
-    // produces two groups instead.
-    const stripped = fs
-      .readFileSync(path.join(CORPUS_DIR, 'explicit-beam-hints.musicxml'), 'utf8')
-      .replace(/<beam[^>]*>[^<]*<\/beam>/g, '');
+    // Inference now reaches the same answer on its own, which is the
+    // point of the grouping rule -- so proving the HINTS decide needs a
+    // hint pattern inference would never produce. Rewriting the file's
+    // own hints to beam the four eighths 2+2 must give two beams, where
+    // inference gives one.
+    const source = fs.readFileSync(path.join(CORPUS_DIR, 'explicit-beam-hints.musicxml'), 'utf8');
+    const split = source
+      .replace(/<beam number="1">continue<\/beam>/, '<beam number="1">end</beam>')
+      .replace(/<beam number="1">continue<\/beam>/, '<beam number="1">begin</beam>');
+    assert.notEqual(split, source, 'the fixture really does carry level-1 hints');
+    const hinted = NE.renderFromMusicXml(split, { domParser });
+    assert.equal(
+      (hinted.svg.match(/stroke-width="0.5"/g) ?? []).length,
+      2,
+      'the file said 2+2, so 2+2 is what is drawn',
+    );
+
+    // And with the hints stripped entirely, inference takes over and
+    // beams the half bar as one group again.
+    const stripped = source.replace(/<beam[^>]*>[^<]*<\/beam>/g, '');
     const inferred = NE.renderFromMusicXml(stripped, { domParser });
-    assert.equal((inferred.svg.match(/stroke-width="0.5"/g) ?? []).length, 2);
+    assert.equal((inferred.svg.match(/stroke-width="0.5"/g) ?? []).length, 1);
   });
 
   test('<attributes> appearing mid-measure (a clef change partway through) does not throw', () => {

@@ -1,4 +1,5 @@
 import { getGlyphByChar } from '../glyphs/index.js';
+import { estimateTextWidth } from '../geometry/text-metrics.js';
 
 /**
  * Phase 51/§18.3: "`config.debug.drawBoundingBoxes` overlays every
@@ -18,7 +19,8 @@ import { getGlyphByChar } from '../glyphs/index.js';
  * `d`, CONTROL POINTS INCLUDED, so a curved tie or slur gets a box that
  * is correct but not tight. Plain (non-SMuFL) text is measured from its
  * font size rather than real font metrics, which this module cannot know
- * without a DOM. Both are noted on each box's `approximate` flag rather
+ * without a DOM (`geometry/text-metrics.ts` is the shared estimate, and
+ * deliberately a generous one). Both are noted on each box's `approximate` flag rather
  * than hidden.
  */
 export interface DebugBox {
@@ -33,9 +35,6 @@ export interface DebugBox {
   /** True when the box is a correct over-estimate rather than a tight fit (curves, plain text). */
   readonly approximate?: boolean;
 }
-
-/** A conservative width-per-character for plain text, as a fraction of the font size. */
-const TEXT_ADVANCE_RATIO = 0.62;
 
 interface Bounds {
   minX: number;
@@ -201,7 +200,7 @@ export function measureSvgBoxes(svg: string): readonly DebugBox[] {
             boxFrom(
               {
                 minX: x,
-                maxX: x + text.length * fontSize * TEXT_ADVANCE_RATIO,
+                maxX: x + estimateTextWidth(text, fontSize),
                 minY: y - fontSize,
                 maxY: y,
               },

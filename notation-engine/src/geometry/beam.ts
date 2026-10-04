@@ -47,15 +47,93 @@ export interface BeamGroup {
 }
 
 /**
+ * Whether this meter beams its eighth notes TWO BEATS at a time.
+ *
+ * This is the rule that separates a page of real music from a page of
+ * correct-but-wrong music, and it is the one difference you see first:
+ * eight eighth notes in 4/4 are engraved as two beams of four, not four
+ * beams of two. Every published edition does it, and so does MuseScore.
+ *
+ * It only applies where the beat is a QUARTER and the bar divides into
+ * whole pairs of beats:
+ *
+ *  - 4/4 -> two groups of four eighths. 2/4 -> one group of four.
+ *  - 3/4 has an odd number of beats, so its eighths stay in threes of
+ *    twos: 2+2+2, never 4+2.
+ *  - 2/2's beat is already a half note, so a beat is four eighths and
+ *    pairing them would give eight to a beam.
+ *  - 6/8 and the other compound meters beat in dotted quarters, which
+ *    is three eighths, and pairing those is not a thing anyone does.
+ */
+function pairsBeats(numerator: number, denominator: number): boolean {
+  return beamBeatTicks(numerator, denominator) === TICKS_PER_QUARTER && numerator % 2 === 0;
+}
+
+/**
+ * How many beats one beam group spans, for a run of notes this short.
+ *
+ * Only EIGHTH notes pair up. The moment anything shorter is in the
+ * group, the group goes back to one beat -- which is the other half of
+ * the same convention: a beat carrying sixteenths is beamed on its own
+ * so that the beat stays visible, because that is what the reader is
+ * counting.
+ */
+function beatsPerGroup(
+  numerator: number,
+  denominator: number,
+  shortest: DurationType | undefined,
+): number {
+  if (shortest !== 'eighth') return 1;
+  return pairsBeats(numerator, denominator) ? 2 : 1;
+}
+
+/** Of two durations, the shorter -- by beam count, which is what decides grouping. */
+function shorterOf(a: DurationType | undefined, b: DurationType): DurationType {
+  if (a === undefined) return b;
+  return beamLevels(b) > beamLevels(a) ? b : a;
+}
+
+/** How many beams a duration needs; 0 for anything never beamed. */
+function beamLevels(type: DurationType): number {
+  switch (type) {
+    case 'eighth':
+      return 1;
+    case '16th':
+      return 2;
+    case '32nd':
+      return 3;
+    case '64th':
+      return 4;
+    case '128th':
+      return 5;
+    case '256th':
+      return 6;
+    case '512th':
+      return 7;
+    case '1024th':
+      return 8;
+    default:
+      return 0;
+  }
+}
+
+/**
  * §9.12's full grouping algorithm: walks a voice's events (with their
  * already-known start ticks -- the same reconstruction Phase 21's
  * `eventStartTicks` already does) and returns which ones share a beam.
  *
- * `groupTicks` overrides the computed beat length -- e.g. passing
- * `TICKS_PER_QUARTER` (one full quarter's worth) in 4/4 produces the
- * common real-world "groups of 4 eighth notes" convention instead of the
- * textbook-strict groups of 2; omitting it uses the plain beat-based
- * default.
+ * The run of beamable notes is split at BEATS, and then adjacent beats
+ * are joined back together where the meter and the note values allow it
+ * (see `pairsBeats`): in 4/4 that turns four beams of two eighths into
+ * two beams of four, which is what the music is actually engraved as.
+ * The decision is taken per pair of beats rather than per run, so a bar
+ * of four eighths followed by eight sixteenths beams the eighths in one
+ * group of four and the sixteenths a beat at a time -- which is again
+ * what an edition does.
+ *
+ * `groupTicks` overrides the whole calculation with a fixed group
+ * length, for a caller that knows better (a drum chart with its own
+ * house grouping, or a test pinning one number).
  */
 export function groupBeams(
   events: readonly BeamableEvent[],
@@ -64,33 +142,68 @@ export function groupBeams(
   denominator: number,
   groupTicks?: number,
 ): readonly BeamGroup[] {
-  const unit = groupTicks ?? beamBeatTicks(numerator, denominator);
+  const beat = groupTicks ?? beamBeatTicks(numerator, denominator);
+  // An override is the last word: a caller who names a group length has
+  // already decided, and pairing its beats back up would be the engine
+  // overruling them with the very convention they overrode.
+  const pairing = groupTicks === undefined;
   const groups: BeamGroup[] = [];
-  let current: number[] = [];
-  let currentUnitIndex: number | undefined;
 
-  const flush = (): void => {
-    if (current.length >= 2) {
-      groups.push({ eventIndices: current });
+  // One run of consecutive beamable notes. A rest, or anything longer
+  // than an eighth, ends the run -- neither is ever beamed.
+  let run: number[] = [];
+
+  const flushRun = (): void => {
+    if (run.length === 0) return;
+
+    // Split the run at beats first.
+    const beats: { index: number; events: number[] }[] = [];
+    for (const i of run) {
+      const tick = startTicks[i] ?? 0;
+      const beatIndex = beat > 0 ? Math.floor(tick / beat) : 0;
+      const last = beats[beats.length - 1];
+      if (last !== undefined && last.index === beatIndex) last.events.push(i);
+      else beats.push({ index: beatIndex, events: [i] });
     }
-    current = [];
-    currentUnitIndex = undefined;
+
+    // Then join adjacent beats back up where the meter pairs them and
+    // every note in both is an eighth. Pairs are counted from the bar's
+    // own start, so a group never straddles the middle of the bar.
+    const shortestIn = (one: { events: number[] }): DurationType | undefined => {
+      let shortest: DurationType | undefined;
+      for (const i of one.events) {
+        const event = events[i];
+        if (event !== undefined) shortest = shorterOf(shortest, event.durationType);
+      }
+      return shortest;
+    };
+
+    let at = 0;
+    while (at < beats.length) {
+      const first = beats[at] as (typeof beats)[number];
+      const next = beats[at + 1];
+      const span = pairing ? beatsPerGroup(numerator, denominator, shortestIn(first)) : 1;
+      const joins =
+        span === 2 &&
+        next !== undefined &&
+        next.index === first.index + 1 &&
+        first.index % 2 === 0 &&
+        beatsPerGroup(numerator, denominator, shortestIn(next)) === 2;
+      const merged = joins && next !== undefined ? [...first.events, ...next.events] : first.events;
+      if (merged.length >= 2) groups.push({ eventIndices: merged });
+      at += joins ? 2 : 1;
+    }
+    run = [];
   };
 
   events.forEach((event, i) => {
-    const tick = startTicks[i] ?? 0;
     if (event.isRest || !isBeamable(event.durationType)) {
-      flush();
+      flushRun();
       return;
     }
-    const unitIndex = unit > 0 ? Math.floor(tick / unit) : 0;
-    if (currentUnitIndex !== undefined && unitIndex !== currentUnitIndex) {
-      flush();
-    }
-    current.push(i);
-    currentUnitIndex = unitIndex;
+    run.push(i);
   });
-  flush();
+  flushRun();
 
   return groups;
 }

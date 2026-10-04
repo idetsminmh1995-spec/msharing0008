@@ -23,16 +23,33 @@ describe('beam shape geometry (Phase 24)', () => {
   test('straight style with a large interval gets its slope clamped to exactly 1.0sp', () => {
     // positions [0, -5] (a large interval) -- natural tips -3.5, -8.5 (a 5sp difference).
     const shape = NE.computeBeamShape([0, -5], [0, 10], 'up', 'straight', 3.5);
-    assert.equal(shape.startY, -3.5);
-    assert.equal(shape.endY, -4.5); // clamped to exactly startY - 1.0
-    assert.ok(Math.abs(shape.endY - shape.startY) <= 1.0 + 1e-9);
+    assert.ok(Math.abs(shape.endY - shape.startY) <= 1.0 + 1e-9, 'the SLOPE is clamped');
+    // And the beam still clears the high note by a full stem: anchored
+    // on the note NEAREST it, which for a rising run is the last one.
+    assert.equal(shape.endY, -8.5);
+    assert.equal(shape.startY, -7.5);
   });
 
   test('a downward-sloping straight beam clamps in the correct (positive) direction', () => {
     const shape = NE.computeBeamShape([0, 5], [0, 10], 'down', 'straight', 3.5);
-    // Natural tips: 3.5, 8.5 (a 5sp difference) -- clamped to +1.0 from start.
-    assert.equal(shape.startY, 3.5);
-    assert.equal(shape.endY, 4.5);
+    assert.ok(shape.endY > shape.startY, 'sloping the right way');
+    assert.ok(Math.abs(shape.endY - shape.startY) <= 1.0 + 1e-9);
+    // Clearing the LOWEST note by a full stem, the mirror of the rule above.
+    assert.equal(shape.endY, 8.5);
+    assert.equal(shape.startY, 7.5);
+  });
+
+  test('every stem in a beamed group is at least a full stem long', () => {
+    // A rising run anchored on its first note used to leave its last
+    // note with almost no stem; the beam is anchored on whichever note
+    // is nearest it instead.
+    const positions = [0, -1, -2, -3];
+    const xs = [0, 3, 6, 9];
+    const shape = NE.computeBeamShape(positions, xs, 'up', 'straight', 3.5);
+    positions.forEach((position, i) => {
+      const length = position - NE.beamYAtX(shape, xs[i]);
+      assert.ok(length >= 3.5 - 1e-9, `stem ${i} is ${length.toFixed(2)}sp, under a full stem`);
+    });
   });
 
   test('curved style has EXACTLY the same endpoints as straight (only the drawing differs)', () => {

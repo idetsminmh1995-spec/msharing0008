@@ -78,10 +78,40 @@ export function computeBeamShape(
   const startY = naturalStemTipY(firstPos, direction, stemLength);
   const naturalEndY = naturalStemTipY(lastPos, direction, stemLength);
   const diff = naturalEndY - startY;
-  const endY =
+  const slanted =
     Math.abs(diff) > MAX_BEAM_SLOPE ? startY + Math.sign(diff) * MAX_BEAM_SLOPE : naturalEndY;
 
-  return { direction, style, startX: firstX, startY, endX: lastX, endY };
+  // Then lift the whole beam clear of every note under it.
+  //
+  // The slope above is taken from the FIRST and LAST notes, which says
+  // nothing about the ones in between or about how far the beam ends up
+  // from the highest of them. A rising run anchored on its first note
+  // leaves its last note with almost no stem at all -- the note nearest
+  // the beam is the one that decides, so the beam is moved until THAT
+  // note has a full-length stem and every other note has more. This is
+  // what stops a beamed passage looking like it is sliding off its own
+  // noteheads.
+  const span = lastX - firstX;
+  const shortest = notePositions.reduce((least, position, i) => {
+    const x = noteXs[i] ?? firstX;
+    const t = span === 0 ? 0 : (x - firstX) / span;
+    const beamY = startY + t * (slanted - startY);
+    const length = direction === 'up' ? position - beamY : beamY - position;
+    return Math.min(least, length);
+  }, Number.POSITIVE_INFINITY);
+  const lift =
+    Number.isFinite(shortest) && shortest < stemLength
+      ? (stemLength - shortest) * (direction === 'up' ? -1 : 1)
+      : 0;
+
+  return {
+    direction,
+    style,
+    startX: firstX,
+    startY: startY + lift,
+    endX: lastX,
+    endY: slanted + lift,
+  };
 }
 
 /** The beam's Y at any X along its span (linear interpolation) -- used to find where an individual note's stem should actually end once the beam's own slope is known. */

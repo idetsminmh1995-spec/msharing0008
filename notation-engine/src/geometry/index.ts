@@ -28,3 +28,4 @@ export * from './grace-note.js';
 export * from './beam-shape.js';
 export * from './tab.js';
 export * from './metronome.js';
+export * from './text-metrics.js';

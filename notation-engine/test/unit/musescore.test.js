@@ -485,6 +485,16 @@ describe('MuseScore → MusicXML → this engine, end to end', () => {
     return Number(clef[1]) + 2;
   };
 
+  /**
+   * A y as the SVG itself spells it. `svgNumber` rounds every coordinate
+   * to four decimals before writing it, so a y computed here has to go
+   * through the same rounding before it can be compared to the drawing
+   * -- otherwise 8.8 + -2 reads as 6.800000000000001 against a drawn
+   * 6.8, and the test fails over binary floating point rather than over
+   * a note being in the wrong place.
+   */
+  const asDrawn = (y) => Number(Number(y).toFixed(4));
+
   test('a real MuseScore 4 export renders with nothing worse than a note to self', () => {
     for (const name of ['musescore-drum-lesson.musicxml', 'musescore-grand-staff.musicxml']) {
       const { svg, diagnostics } = NE.renderFromMusicXml(load(name), { domParser });
@@ -566,10 +576,12 @@ describe('MuseScore → MusicXML → this engine, end to end', () => {
       [],
     );
 
-    // Every notehead the chart actually drew, as a (glyph, y) pair. The
-    // staff's bottom line is y = 8 in the emitted SVG (Phase 9's own
-    // convention), so a MuseScore line converts to a y by the two steps
-    // the layer documents and nothing else.
+    // Every notehead the chart actually drew, as a (glyph, y) pair. A
+    // MuseScore line converts to a y by the two steps the layer
+    // documents and nothing else, measured from wherever the staff's
+    // bottom line actually landed -- read off the drawing rather than
+    // assumed, since a tempo mark above the staff pushes it down.
+    const bottomLine = bottomLineOf(svg);
     const GLYPH_FOR_SHAPE = { normal: '\uE0A4', x: '\uE0A9', 'circle-x': '\uE0B3' };
     const drawn = new Set(
       [...svg.matchAll(/<text x="[\d.]+" y="([\d.-]+)"[^>]*>(.)</g)]
@@ -585,7 +597,7 @@ describe('MuseScore → MusicXML → this engine, end to end', () => {
       const [glyph, y] = pair.split('@');
       const match = MS.MUSESCORE_DRUMSET.find(
         (d) =>
-          8 + MS.staffPositionFromLine(d.line) === Number(y) &&
+          asDrawn(bottomLine + MS.staffPositionFromLine(d.line)) === Number(y) &&
           GLYPH_FOR_SHAPE[mapping[d.pitch].noteheadShape] === glyph,
       );
       assert.ok(match, `nothing in MuseScore's drumset is drawn as ${pair}`);
@@ -594,7 +606,7 @@ describe('MuseScore → MusicXML → this engine, end to end', () => {
     // And the three a groove is built from are all there, each on its
     // own line: kick at the bottom, snare in the middle, hi-hat above
     // the staff.
-    const yOf = (pitch) => 8 + MS.staffPositionFromLine(MS.museScoreDrum(pitch).line);
+    const yOf = (pitch) => asDrawn(bottomLine + MS.staffPositionFromLine(MS.museScoreDrum(pitch).line));
     assert.ok(drawn.has(`\uE0A4@${yOf(36)}`), 'no kick');
     assert.ok(drawn.has(`\uE0A4@${yOf(38)}`), 'no snare');
     assert.ok(drawn.has(`\uE0A9@${yOf(42)}`), 'no closed hi-hat');
@@ -629,7 +641,7 @@ describe('MuseScore → MusicXML → this engine, end to end', () => {
     ].map(([, step, octave]) => ({
       step,
       octave: Number(octave),
-      y: bottomLine + MS.museScoreStaffPosition(perc, step, Number(octave)),
+      y: asDrawn(bottomLine + MS.museScoreStaffPosition(perc, step, Number(octave))),
     }));
     assert.equal(expected.length, 17, 'the fixture should hold 17 unpitched notes');
 
@@ -661,7 +673,8 @@ describe('MuseScore → MusicXML → this engine, end to end', () => {
     const { svg } = NE.renderFromMusicXml(xml, { domParser });
     const perc = MS.museScoreClef('PERC');
     const bottomLine = bottomLineOf(svg);
-    const yFor = (step, octave) => bottomLine + MS.museScoreStaffPosition(perc, step, octave);
+    const yFor = (step, octave) =>
+      asDrawn(bottomLine + MS.museScoreStaffPosition(perc, step, octave));
 
     // Pedal hi-hat: the file puts it on D4, BELOW the staff. The GM
     // table used to put it above the top line.
@@ -705,7 +718,7 @@ describe('MuseScore → MusicXML → this engine, end to end', () => {
         const cp = m[2].codePointAt(0);
         return cp >= 0xe0a0 && cp <= 0xe0ff;
       })
-      .map((m) => Number(m[1]) - bottomLine)
+      .map((m) => asDrawn(Number(m[1]) - bottomLine))
       .sort((a, b) => a - b);
 
     assert.deepEqual(drawn, expected);
@@ -732,7 +745,7 @@ describe('MuseScore → MusicXML → this engine, end to end', () => {
     const REST_GLYPHS = ['\uE4E3', '\uE4E4', '\uE4E5', '\uE4E6'];
     const drawn = [...svg.matchAll(/<text x="[\d.]+" y="([\d.-]+)"[^>]*>(.)</g)]
       .filter((m) => REST_GLYPHS.includes(m[2]))
-      .map((m) => Number(m[1]) - bottomLine)
+      .map((m) => asDrawn(Number(m[1]) - bottomLine))
       .sort((a, b) => a - b);
 
     assert.deepEqual(drawn, expected);
