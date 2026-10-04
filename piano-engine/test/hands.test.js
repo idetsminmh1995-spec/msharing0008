@@ -203,24 +203,48 @@ test('a pressing finger reaches up its own key, and only that finger', () => {
 
   // The hand is one artist's outline and cannot bend a single finger,
   // so the one thing it cannot say by itself is WHICH finger is down.
-  // Two marks say it instead: the pressing fingertip in the hand's own
-  // note colour, and the finger's number on the key.
+  // Two marks say it instead: a ring round the pressing finger in the
+  // hand's own colour, and the finger's number on the key.
   const playingShapes = handsFor(notes, 1.5);
   const numbered = playingShapes.filter((s) => s.label !== undefined);
   assert.equal(numbered.length, 1, 'one badge, for the one finger playing');
   assert.equal(numbered[0].label, String(playing.finger));
-  const dots = playingShapes.filter(
-    (s) => s.fill === P.DEFAULT_HAND_COLORS.right.tip && s.label === undefined,
+  const ringed = playingShapes.filter(
+    (s) => s.path !== undefined && s.fill === P.DEFAULT_FINGER_COLORS[playing.finger],
   );
-  assert.equal(dots.length, 1, 'one fingertip marked, for the one finger playing');
+  assert.equal(ringed.length, 1, 'the playing finger is drawn once, in its own colour');
+  assert.equal(ringed[0].stroke, P.DEFAULT_HAND_COLORS.right.edge, 'and ringed in the hand colour');
 
   const restingShapes = handsFor(notes, 0.2);
   assert.equal(restingShapes.filter((s) => s.label !== undefined).length, 0, 'no badge at rest');
-  assert.equal(
-    restingShapes.filter((s) => s.fill === P.DEFAULT_HAND_COLORS.right.tip).length,
-    0,
-    'and no marked fingertip either',
+  const restingFinger = restingShapes.filter(
+    (s) => s.path !== undefined && s.fill === P.DEFAULT_FINGER_COLORS[playing.finger],
   );
+  assert.equal(restingFinger.length, 1, 'the finger is still drawn');
+  assert.equal(restingFinger[0].stroke, undefined, 'but no ring when nothing is pressed');
+});
+
+test('every finger is drawn in its own colour, and the five are all different', () => {
+  const shapes = handsFor([note(60, 1, 'right', 2)], 1.5);
+  const fingerFills = shapes
+    .filter((s) => s.path !== undefined)
+    .map((s) => s.fill)
+    .filter((fill) => Object.values(P.DEFAULT_FINGER_COLORS).includes(fill));
+  // One hand's worth: five fingers, five colours, none repeated. Five
+  // shades of one thing is the hardest possible way to ask "which of
+  // these five", which is the only question the colours are for.
+  assert.equal(fingerFills.length, 5);
+  assert.equal(new Set(fingerFills).size, 5);
+
+  // And the same five in the other hand, not a second palette: a
+  // learner thinks "finger 3", not "the right hand's finger 3".
+  const both = handsFor([note(60, 1, 'right', 2), note(48, 1, 'left', 2)], 1.5);
+  const all = both
+    .filter((s) => s.path !== undefined)
+    .map((s) => s.fill)
+    .filter((fill) => Object.values(P.DEFAULT_FINGER_COLORS).includes(fill));
+  assert.equal(all.length, 10, 'two hands, five fingers each');
+  assert.equal(new Set(all).size, 5, 'and one palette between them');
 });
 
 test('the hand points away from the player: the heel is at the front of the keys', () => {

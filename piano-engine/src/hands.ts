@@ -39,7 +39,7 @@ import type { Hand, KeyboardSize, PianoKey, StageShape } from './types.js';
 import { ARTWORK_TIPS, HAND_LENGTH } from './hand/artwork.js';
 import { placeHand, placedTip, transformPoint } from './hand/place.js';
 import type { FingerTarget, HandPlacement } from './hand/place.js';
-import { handPath } from './hand/draw.js';
+import { fingerPath, handPath } from './hand/draw.js';
 
 /**
  * The furthest forward a finger on a BLACK key may be, down the key.
@@ -88,7 +88,41 @@ export interface HandColors {
   readonly edge: string;
   /** A pressed fingertip, so the finger doing the work is readable. */
   readonly tip: string;
+  /**
+   * One colour per finger, drawn on the fingers themselves.
+   *
+   * Five fingers in one skin colour is a mitten. A learner reading a
+   * "3" over a note has to find the third finger, and on a silhouette
+   * that means counting across from the thumb every single time -- at
+   * video speed, every time. A colour answers it before the counting
+   * starts, which is the whole reason to draw a hand rather than name
+   * a key.
+   *
+   * The SAME five colours in both hands, deliberately. A learner
+   * thinks "that is finger 3", not "that is the right hand's finger
+   * 3", and two sets of five colours is ten things to learn instead of
+   * five. What tells the hands apart is the outline and the badge,
+   * which are already each hand's own colour.
+   */
+  readonly fingers: Readonly<Record<Finger, string>>;
 }
+
+/**
+ * The five finger colours.
+ *
+ * Spread right round the wheel rather than through one family, because
+ * the question they answer is "which of these five", and five shades of
+ * one hue is the hardest possible way to ask it. Each is dark enough to
+ * read on a cream white key and bright enough to read on a black one,
+ * since a hand spans both.
+ */
+export const DEFAULT_FINGER_COLORS: Readonly<Record<Finger, string>> = {
+  1: '#E2574C',
+  2: '#F0A030',
+  3: '#43B97F',
+  4: '#3C8DDE',
+  5: '#9B6BD6',
+};
 
 /**
  * The hands as they are drawn unless a caller says otherwise.
@@ -100,8 +134,8 @@ export interface HandColors {
  * reads the amber-edged hand as the left one without being told.
  */
 export const DEFAULT_HAND_COLORS: Readonly<Record<Hand, HandColors>> = {
-  left: { skin: '#E8C6A0', edge: '#B3800E', tip: '#FFC400' },
-  right: { skin: '#E8C6A0', edge: '#2E6DA8', tip: '#4FA3FF' },
+  left: { skin: '#E8C6A0', edge: '#B3800E', tip: '#FFC400', fingers: DEFAULT_FINGER_COLORS },
+  right: { skin: '#E8C6A0', edge: '#2E6DA8', tip: '#4FA3FF', fingers: DEFAULT_FINGER_COLORS },
 };
 
 /**
@@ -119,11 +153,14 @@ export function handColorsFor(colors: {
   readonly rightHand: string;
   /** The hands themselves, when the default does not suit the frame. */
   readonly skin?: string;
+  /** The five finger colours, when the default does not suit the frame. */
+  readonly fingers?: Readonly<Record<Finger, string>>;
 }): Readonly<Record<Hand, HandColors>> {
   const skin = colors.skin ?? DEFAULT_HAND_COLORS.left.skin;
+  const fingers = colors.fingers ?? DEFAULT_FINGER_COLORS;
   return {
-    left: { skin, edge: darken(colors.leftHand, 0.42), tip: colors.leftHand },
-    right: { skin, edge: darken(colors.rightHand, 0.42), tip: colors.rightHand },
+    left: { skin, edge: darken(colors.leftHand, 0.42), tip: colors.leftHand, fingers },
+    right: { skin, edge: darken(colors.rightHand, 0.42), tip: colors.rightHand, fingers },
   };
 }
 
@@ -337,6 +374,36 @@ export function handShapes(hand: Hand, options: HandsOptions): readonly StageSha
     path: handPath(placement),
   });
 
+  // Each finger, in its own colour, over the hand it belongs to.
+  //
+  // The SAME curves as the outline above -- `fingerPath` walks the
+  // stretch of the drawing that traces that finger and closes it across
+  // the base -- so a coloured finger cannot sit a hair off the hand: it
+  // IS the hand's own edge. The base chord is hidden under the palm,
+  // which is why these are drawn over the silhouette rather than
+  // instead of it: the hand is still one shape, with five of its parts
+  // picked out.
+  //
+  // No outline of their own, EXCEPT on the one that is pressing. The
+  // hand already has an outline, and ringing each finger separately at
+  // video size turns a hand into a diagram -- but the finger doing the
+  // work has to be findable in the half-second it is down, and a ring
+  // round it in the hand's own colour is the quietest way to say so.
+  const pressing = new Set(setting.targets.filter((t) => t.playing).map((t) => t.finger));
+  for (const finger of ALL_FINGERS) {
+    const path = fingerPath(placement, finger);
+    if (path === '') continue;
+    shapes.push({
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      fill: colors.fingers[finger],
+      ...(pressing.has(finger) ? { stroke: colors.edge, strokeWidth: round(unit * 0.11) } : {}),
+      path,
+    });
+  }
+
   // The knuckle creases. The drawing has none -- it is a silhouette --
   // and a silhouette on a keyboard reads as a glove. Three short marks
   // at the BASE of the long fingers, where a hand creases when it
@@ -360,22 +427,12 @@ export function handShapes(hand: Hand, options: HandsOptions): readonly StageSha
     });
   }
 
-  // The finger doing the work. A silhouette cannot press a key, so the
-  // pressing fingertip is marked instead -- in the hand's own note
-  // colour, which is the colour of the bar that fell onto that key.
-  for (const target of setting.targets) {
-    if (!target.playing) continue;
-    const tip = placedTip(placement, target.finger);
-    const r = unit * 0.3;
-    shapes.push({
-      x: round(tip.x - r),
-      y: round(tip.y - r),
-      width: round(r * 2),
-      height: round(r * 2),
-      fill: colors.tip,
-      radius: round(r),
-    });
-  }
+  // A dot used to be painted on the pressing fingertip, in the hand's
+  // note colour, because a one-colour silhouette had no other way to
+  // say which finger was working. It is gone: the finger is now its own
+  // colour, and a blue dot on an orange finger was a second answer to a
+  // question the ring above already answers -- and the wrong colour for
+  // the finger it was on.
 
   // The finger's number on the key it is playing.
   //

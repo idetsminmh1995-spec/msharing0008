@@ -33,6 +33,7 @@ export { darken, parseColor } from './color.js';
 export { FINGERS, anchorAt, fingersDownAt, planFingering, whiteIndex } from './fingering.js';
 export type { FingeredNote, Finger, FingeringPlan, HandAnchor } from './fingering.js';
 export {
+  DEFAULT_FINGER_COLORS,
   DEFAULT_HAND_COLORS,
   handColorsFor,
   handFingertips,

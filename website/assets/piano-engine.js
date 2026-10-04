@@ -22,6 +22,7 @@ var PianoEngine = (() => {
   var index_exports = {};
   __export(index_exports, {
     DEFAULT_COLORS: () => DEFAULT_COLORS,
+    DEFAULT_FINGER_COLORS: () => DEFAULT_FINGER_COLORS,
     DEFAULT_HAND_COLORS: () => DEFAULT_HAND_COLORS,
     DEFAULT_LEAD_SECONDS: () => DEFAULT_LEAD_SECONDS,
     FINGERS: () => FINGERS,
@@ -369,6 +370,13 @@ var PianoEngine = (() => {
     4: { x: -2.2667, y: -7.2 },
     5: { x: -3.3333, y: -5.675 }
   };
+  var FINGER_SPANS = {
+    1: { from: 11, to: 14 },
+    2: { from: 2, to: 7 },
+    3: { from: 33, to: 36 },
+    4: { from: 27, to: 32 },
+    5: { from: 23, to: 25 }
+  };
   var ARTWORK_BOX = { minX: -3.58, maxX: 3.42, minY: -8.13, maxY: 2.6 };
   var PLAY_SCALE_X = 0.72;
   var PLAY_SCALE_Y = 0.5;
@@ -507,20 +515,49 @@ var PianoEngine = (() => {
     parts.push("Z");
     return parts.join(" ");
   }
+  function fingerPath(placement, finger) {
+    const span = FINGER_SPANS[finger];
+    const previous = HAND_OUTLINE[span.from - 1];
+    if (previous === void 0 || previous[0] === "Z") return "";
+    const startX = previous[0] === "M" ? previous[1] : previous[5];
+    const startY = previous[0] === "M" ? previous[2] : previous[6];
+    const start = transformPoint(placement, startX, startY);
+    const parts = [`M ${round(start.x)} ${round(start.y)}`];
+    for (let i = span.from; i <= span.to; i++) {
+      const command = HAND_OUTLINE[i];
+      if (command === void 0 || command[0] !== "C") continue;
+      const c1 = transformPoint(placement, command[1], command[2]);
+      const c2 = transformPoint(placement, command[3], command[4]);
+      const to = transformPoint(placement, command[5], command[6]);
+      parts.push(
+        `C ${round(c1.x)} ${round(c1.y)} ${round(c2.x)} ${round(c2.y)} ${round(to.x)} ${round(to.y)}`
+      );
+    }
+    parts.push("Z");
+    return parts.join(" ");
+  }
 
   // src/hands.ts
   var BLACK_TIP_DEPTH = 0.45;
   var TIP_INSIDE_FRONT = 0.3;
   var WRIST_IN_FRONT = 1.5;
+  var DEFAULT_FINGER_COLORS = {
+    1: "#E2574C",
+    2: "#F0A030",
+    3: "#43B97F",
+    4: "#3C8DDE",
+    5: "#9B6BD6"
+  };
   var DEFAULT_HAND_COLORS = {
-    left: { skin: "#E8C6A0", edge: "#B3800E", tip: "#FFC400" },
-    right: { skin: "#E8C6A0", edge: "#2E6DA8", tip: "#4FA3FF" }
+    left: { skin: "#E8C6A0", edge: "#B3800E", tip: "#FFC400", fingers: DEFAULT_FINGER_COLORS },
+    right: { skin: "#E8C6A0", edge: "#2E6DA8", tip: "#4FA3FF", fingers: DEFAULT_FINGER_COLORS }
   };
   function handColorsFor(colors) {
     const skin = colors.skin ?? DEFAULT_HAND_COLORS.left.skin;
+    const fingers = colors.fingers ?? DEFAULT_FINGER_COLORS;
     return {
-      left: { skin, edge: darken(colors.leftHand, 0.42), tip: colors.leftHand },
-      right: { skin, edge: darken(colors.rightHand, 0.42), tip: colors.rightHand }
+      left: { skin, edge: darken(colors.leftHand, 0.42), tip: colors.leftHand, fingers },
+      right: { skin, edge: darken(colors.rightHand, 0.42), tip: colors.rightHand, fingers }
     };
   }
   function whiteKeys(keys) {
@@ -642,6 +679,20 @@ var PianoEngine = (() => {
       strokeWidth: round2(unit * 0.09),
       path: handPath(placement)
     });
+    const pressing = new Set(setting.targets.filter((t) => t.playing).map((t) => t.finger));
+    for (const finger of ALL_FINGERS) {
+      const path2 = fingerPath(placement, finger);
+      if (path2 === "") continue;
+      shapes.push({
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        fill: colors.fingers[finger],
+        ...pressing.has(finger) ? { stroke: colors.edge, strokeWidth: round2(unit * 0.11) } : {},
+        path: path2
+      });
+    }
     for (const finger of [2, 3, 4]) {
       const tip = ARTWORK_TIPS[finger];
       const from = transformPoint(placement, tip.x * 0.74, tip.y * 0.52);
@@ -655,19 +706,6 @@ var PianoEngine = (() => {
         stroke: darken(colors.skin, 0.13),
         strokeWidth: round2(unit * 0.045),
         path: `M ${round2(from.x)} ${round2(from.y)} L ${round2(to.x)} ${round2(to.y)}`
-      });
-    }
-    for (const target of setting.targets) {
-      if (!target.playing) continue;
-      const tip = placedTip(placement, target.finger);
-      const r = unit * 0.3;
-      shapes.push({
-        x: round2(tip.x - r),
-        y: round2(tip.y - r),
-        width: round2(r * 2),
-        height: round2(r * 2),
-        fill: colors.tip,
-        radius: round2(r)
       });
     }
     if (options.fingerNumbers !== false) {

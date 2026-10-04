@@ -117,6 +117,37 @@ export const ARTWORK_TIPS: Readonly<Record<Finger, { readonly x: number; readonl
   5: { x: -3.3333, y: -5.675 },
 };
 
+/**
+ * Which stretch of the outline traces each finger.
+ *
+ * The drawing is one closed path and it is traced in a known order: up
+ * and down the index finger, out around the thumb, down the thumb side
+ * of the palm, across the wrist, up the other side, then the little
+ * finger, the ring finger and the middle finger in turn. Each finger is
+ * therefore a CONTIGUOUS RUN of commands, and `from`/`to` are that run
+ * (inclusive). The run starts wherever the command before it ended,
+ * which is one base corner of the finger, and ends at the other -- so
+ * closing the two with a straight line gives the finger on its own.
+ *
+ * Read off the endpoints rather than guessed at, and the base chords
+ * were chosen where the outline actually turns the corner into the
+ * palm, not at an even spacing: the thumb comes off the SIDE of the
+ * hand and its base is nowhere near the other four.
+ *
+ * This is here and not in `draw.ts` because it is a fact about the
+ * owner's drawing, like the fingertips above. If the drawing is ever
+ * replaced, these move with it.
+ */
+export const FINGER_SPANS: Readonly<
+  Record<Finger, { readonly from: number; readonly to: number }>
+> = {
+  1: { from: 11, to: 14 },
+  2: { from: 2, to: 7 },
+  3: { from: 33, to: 36 },
+  4: { from: 27, to: 32 },
+  5: { from: 23, to: 25 },
+};
+
 /** The outline's own bounding box, for anything that needs the hand's extent without walking every curve. */
 export const ARTWORK_BOX = { minX: -3.58, maxX: 3.42, minY: -8.13, maxY: 2.6 } as const;
 
