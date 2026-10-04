@@ -65,4 +65,34 @@ describe('slurs (Phase 27)', () => {
     const shape = NE.computeSlurShape(0, 100, 8, 'above');
     assert.equal(shape.endX - shape.startX, 100);
   });
+  /**
+   * MuseScore shapes a slur from its LENGTH -- a short one's shoulder
+   * rises straight with the span, a longer one's logarithmically, and
+   * the rise is capped so a slur across a system is not a dome. The
+   * engine used to give every slur the same half-space arc regardless.
+   */
+  test('a slur over half a bar arcs higher than one over two notes', () => {
+    const twoNotes = NE.computeSlurShape(0, 3, 8, 'above').bulgeHeight;
+    const halfBar = NE.computeSlurShape(0, 16, 8, 'above').bulgeHeight;
+    assert.ok(halfBar > twoNotes * 1.5, `${String(halfBar)} vs ${String(twoNotes)}`);
+  });
+
+  test('the arc stops growing rather than running away on a system-long slur', () => {
+    // The log term reaches its cap at about 63 staff spaces -- past that
+    // a longer slur is no taller, which is what keeps a slur across a
+    // whole system a curve rather than a dome over the staff above.
+    const long = NE.arcHeightForSpan(100);
+    const absurd = NE.arcHeightForSpan(1000);
+    assert.equal(long, absurd);
+    assert.ok(absurd < 3, `capped height ${String(absurd)} should stay inside a staff`);
+  });
+
+  test('the drawn curve reaches the stated height and thickness, not half of each', () => {
+    const shape = NE.computeSlurShape(5, 20, 8, 'above');
+    const svg = NE.renderSlur(shape, { color: '#000000', midpointThickness: 0.21 });
+    const peaks = [...svg.matchAll(/Q [\d.-]+ (-?[\d.]+)/g)].map((m) => (8 + Number(m[1])) / 2);
+    const centre = (peaks[0] + peaks[1]) / 2;
+    assert.ok(Math.abs(8 - centre - shape.bulgeHeight) < 1e-4);
+    assert.ok(Math.abs(Math.abs(peaks[0] - peaks[1]) - 0.21) < 1e-4);
+  });
 });

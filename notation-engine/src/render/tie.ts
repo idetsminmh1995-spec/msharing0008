@@ -8,26 +8,42 @@ export interface RenderTieOptions {
 }
 
 /**
+ * A quadratic Bezier reaches HALF the height its control point is at:
+ * B(0.5) = (P0 + 2*P1 + P2)/4, and with both endpoints on the baseline
+ * that is half of P1. So a control point put at the height the curve is
+ * meant to reach draws a curve half that high.
+ *
+ * That was this engine's tie and slur for a long time, and it is what
+ * the owner saw: a tie stated at Bravura's 0.21 staff spaces thick and
+ * arcing half a space came out 0.105 thick and 0.25 high -- a hairline
+ * between two noteheads, next to invisible at video size. Doubling the
+ * control offsets is all it takes: the shape's own numbers were right,
+ * only the drawing of them was not.
+ */
+const CONTROL_POINT_REACH = 2;
+
+/**
  * Draws a tie as a filled, tapered lens shape rather than a single
  * uniform-width stroke: two quadratic Béziers sharing the same two
- * endpoints, one curving to `bulgeHeight - midpointThickness/2` and the
- * other to `bulgeHeight + midpointThickness/2`, so the shape is thinnest
- * at its very tips and thickest at its peak -- matching Bravura's own
- * distinction between `tieEndpointThickness` and `tieMidpointThickness`
- * (a beam, by contrast, is uniform thickness throughout, which is why
- * Phase 24's beam rendering is a plain stroked line/path instead).
+ * endpoints, one peaking `midpointThickness` below the other, so the
+ * shape is thinnest at its very tips and thickest at its peak --
+ * matching Bravura's own distinction between `tieEndpointThickness` and
+ * `tieMidpointThickness` (a beam, by contrast, is uniform thickness
+ * throughout, which is why Phase 24's beam rendering is a plain
+ * stroked line/path instead).
  *
  * Simplification, stated rather than silently exact: the two curves meet
  * at the SAME endpoints, tapering fully to a point rather than to
- * Bravura's real (small but nonzero) `tieEndpointThickness`. Visually
- * close at this engine's scale; a future refinement could offset the tips
- * by half that thickness for full fidelity.
+ * Bravura's real `tieEndpointThickness` -- which is 0.05 staff spaces,
+ * under half a pixel at the sizes this engine draws at, so the tips
+ * would look no different for the extra geometry.
  */
 export function renderTie(shape: TieShape, options: RenderTieOptions): string {
   const towardBulge = shape.side === 'above' ? -1 : 1;
   const midX = (shape.startX + shape.endX) / 2;
-  const innerY = shape.y + towardBulge * (shape.bulgeHeight - options.midpointThickness / 2);
-  const outerY = shape.y + towardBulge * (shape.bulgeHeight + options.midpointThickness / 2);
+  const half = options.midpointThickness / 2;
+  const innerY = shape.y + towardBulge * (shape.bulgeHeight - half) * CONTROL_POINT_REACH;
+  const outerY = shape.y + towardBulge * (shape.bulgeHeight + half) * CONTROL_POINT_REACH;
 
   const n = svgNumber;
   const d =

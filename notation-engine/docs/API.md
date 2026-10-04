@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-618 exported symbols, by module.
+619 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -844,6 +844,7 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | type | `SlurSide` |  |
 | function | `slurSide` | §9.16's rule -- one decision for the WHOLE span, confirmed identically across Wikipedia's "Slur (music)" and Dorico's own published engraving conventions: all up-stem notes -> below; anything else (all down-stem, or a mix of both) -> above. |
+| function | `arcHeightForSpan` | How high a slur or tie arcs over its own span, in staff spaces. |
 | interface | `SlurShape` |  |
 | function | `computeSlurShape` | A slur's endpoints and curve height -- structurally the same shape as Phase 26's `TieShape` (both render via the same tapered-lens Bezier primitive), kept as a separate type and function because a slur and a tie remain different musical concepts even where the geometry coincides. |
 
@@ -1521,7 +1522,7 @@ The diagnostics `level` lets through, in their original order.
 | | Name | Summary |
 |---|---|---|
 | interface | `RenderSlurOptions` |  |
-| function | `renderSlur` | Draws a slur as a filled, tapered lens shape -- the identical technique to Phase 26's `renderTie` (two quadratic Béziers sharing the same two endpoints, one bulging to `bulgeHeight - midpointThickness/2` and the other to `bulgeHeight + midpointThickness/2`), kept as its own function rather than s... |
+| function | `renderSlur` | Draws a slur as a filled, tapered lens shape -- the identical technique to Phase 26's `renderTie` (two quadratic Béziers sharing the same two endpoints, one peaking `midpointThickness` below the other), kept as its own function rather than shared code because a slur and a tie are different musica... |
 
 ### `src/render/staff.ts`
 
@@ -1574,7 +1575,7 @@ The diagnostics `level` lets through, in their original order.
 | | Name | Summary |
 |---|---|---|
 | interface | `RenderTieOptions` |  |
-| function | `renderTie` | Draws a tie as a filled, tapered lens shape rather than a single uniform-width stroke: two quadratic Béziers sharing the same two endpoints, one curving to `bulgeHeight - midpointThickness/2` and the other to `bulgeHeight + midpointThickness/2`, so the shape is thinnest at its very tips and thick... |
+| function | `renderTie` | Draws a tie as a filled, tapered lens shape rather than a single uniform-width stroke: two quadratic Béziers sharing the same two endpoints, one peaking `midpointThickness` below the other, so the shape is thinnest at its very tips and thickest at its peak -- matching Bravura's own distinction be... |
 
 ### `src/render/time-signature.ts`
 

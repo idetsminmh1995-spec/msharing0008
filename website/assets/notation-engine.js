@@ -59,6 +59,7 @@ var NotationEngine = (() => {
     alignmentDiagnostic: () => alignmentDiagnostic,
     applyMinimumDistance: () => applyMinimumDistance,
     applyTuplet: () => applyTuplet,
+    arcHeightForSpan: () => arcHeightForSpan,
     articulationGlyphName: () => articulationGlyphName,
     articulationSide: () => articulationSide,
     assignAccidentalColumns: () => assignAccidentalColumns,
@@ -58912,14 +58913,212 @@ var NotationEngine = (() => {
     return { offsetA: noteheadWidth2, offsetB: 0 };
   }
 
-  // src/geometry/tie.ts
-  function tieSide(stemDirection) {
-    return stemDirection === "down" ? "above" : "below";
-  }
-  var TIE_BULGE_HEIGHT = 0.5;
-  function computeTieShape(startX, endX, y, side) {
-    return { startX, endX, y, side, bulgeHeight: TIE_BULGE_HEIGHT };
-  }
+  // src/musescore/style.ts
+  var STYLE_SOURCE = {
+    path: "src/engraving/style/styledef.cpp",
+    symbol: "StyleDef::styleValues[]",
+    what: "every default engraving measurement"
+  };
+  var BEAM_SPACING_SOURCE = {
+    path: "src/engraving/rendering/score/beamtremololayout.cpp",
+    symbol: "BeamTremoloLayout::setupLData",
+    what: "beam spacing in quarter-spaces (3 normal, 4 wide) and the distance it becomes"
+  };
+  var MUSESCORE_STYLE = {
+    /** One staff space, in millimetres: MuseScore's default page scale. */
+    spatiumMm: 1.75,
+    staff: {
+      /** Thickness of a staff line. */
+      lineWidth: 0.11,
+      /** Between the staves of two different instruments. */
+      staffDistance: 6.5,
+      /** Between the two staves of one grand staff. */
+      braceDistance: 6.5,
+      minSystemDistance: 8.5,
+      maxSystemDistance: 15
+    },
+    note: {
+      stemWidth: 0.1,
+      /** The smallest gap MuseScore will leave between two adjacent notes. */
+      minNoteDistance: 0.35,
+      /** Ledger lines: thickness, and how far they run past the notehead on EACH side. */
+      ledgerLineWidth: 0.16,
+      ledgerLineLength: 0.33,
+      /** From the notehead to its first augmentation dot, and between dots. */
+      dotNoteDistance: 0.5,
+      dotDotDistance: 0.65,
+      /** A rest's dot sits closer than a note's -- a rest has no head to clear. */
+      dotRestDistance: 0.25,
+      /** The dot itself, as a multiplier on full size. */
+      dotMag: 1,
+      /** Between an accidental and the notehead it belongs to, and between two accidentals. */
+      accidentalNoteDistance: 0.25,
+      accidentalDistance: 0.25,
+      /** Cue notes and grace notes, as a multiplier on full size. */
+      smallNoteMag: 0.7,
+      graceNoteMag: 0.7,
+      /** A cue staff, and a clef drawn mid-staff rather than at a system's head. */
+      smallStaffMag: 0.7,
+      smallClefMag: 0.8
+    },
+    /**
+     * Stems.
+     *
+     * `length` and `shortest` are plain multiples of a staff space rather
+     * than `_sp` values in MuseScore's own table, which is why they are
+     * written as bare numbers there. A stem reaches `length` from the
+     * notehead and is allowed to shorten, note by note, no further than
+     * `shortest`; `shortenFrom` is how many spaces past the staff a note
+     * has to be before the shortening starts.
+     */
+    stem: {
+      length: 3.5,
+      shortest: 2.5,
+      shorten: true,
+      shortenFrom: 1,
+      /** The slash through an acciaccatura's stem. */
+      slashPosition: 2,
+      slashAngleDegrees: 40,
+      slashThickness: 0.125
+    },
+    beam: {
+      /** Thickness of one beam. */
+      width: 0.5,
+      /**
+       * Between the centre lines of two stacked beams. MuseScore stores
+       * it as 3 quarter-spaces (4 when `useWideBeams` is on) and divides
+       * by four; this is that division done once.
+       */
+      distance: 0.75,
+      wideDistance: 1,
+      useWideBeams: false,
+      /** The shortest a beam may be. */
+      minLength: 1.1
+    },
+    barline: {
+      /** A normal barline, and one line of a double barline. */
+      width: 0.18,
+      doubleWidth: 0.18,
+      /** The thick line of a final or repeat barline. */
+      endWidth: 0.55,
+      /** The gap inside a double barline, and before a final one's thick line. */
+      doubleDistance: 0.37,
+      endDistance: 0.37
+    },
+    measure: {
+      /** The narrowest a measure may be drawn. */
+      minWidth: 8,
+      /**
+       * The spacing SLOPE -- see `spacing.ts`. Not a width: it is the
+       * factor a note's space is multiplied by each time its duration
+       * doubles.
+       */
+      spacing: 1.5,
+      spacingDensity: 1
+    },
+    /**
+     * What sits at the head of a system, and how far apart.
+     *
+     * A `*LeftMargin` is the gap BEFORE the thing; a `*Distance` is the
+     * gap between two of them; a `*RightMargin` is the gap after the
+     * thing before whatever follows. They are not interchangeable, and
+     * getting a clef's left margin where its right margin belongs shifts
+     * every system's first note.
+     */
+    header: {
+      clefLeftMargin: 0.75,
+      keysigLeftMargin: 0.5,
+      timesigLeftMargin: 0.63,
+      /** Clef to key signature, key signature to time signature, and so on. */
+      clefKeyDistance: 0.75,
+      clefKeyRightMargin: 0.8,
+      /** A clef or key change in the MIDDLE of a system is given more room. */
+      midClefKeyRightMargin: 1,
+      clefTimesigDistance: 1,
+      keyTimesigDistance: 1,
+      clefBarlineDistance: 0.5,
+      keyBarlineDistance: 1,
+      timesigBarlineDistance: 0.5,
+      /** The whole header to the first note, and the least it may be. */
+      systemHeaderDistance: 2.5,
+      systemHeaderTimeSigDistance: 2,
+      systemHeaderMinStartOfSystemDistance: 1.25,
+      /** The closing clef/key of a system to the right-hand margin. */
+      systemTrailerRightMargin: 0.5,
+      /** Between two accidentals of a key signature, and before a natural. */
+      keysigAccidentalDistance: 0.3,
+      keysigNaturalDistance: 0.4
+    },
+    /**
+     * How close a barline and the music either side of it may come.
+     *
+     * Asymmetric on purpose: a note needs more room after it before a
+     * barline (`noteBarDistance`) than a barline needs before the next
+     * note (`barNoteDistance`), and an accidental on that next note needs
+     * more again.
+     */
+    barlineSpacing: {
+      barNoteDistance: 1.25,
+      noteBarDistance: 1.5,
+      barAccidentalDistance: 0.65,
+      beginRepeatLeftMargin: 1
+    },
+    slur: {
+      endWidth: 0.05,
+      midWidth: 0.21,
+      tieEndWidth: 0.05,
+      tieMidWidth: 0.21,
+      minTieLength: 1,
+      /**
+       * How high a slur (or tie) arcs, as a function of how long it is.
+       *
+       * MuseScore does not carry one number for this: it shapes the curve
+       * from the span. A short curve's shoulder rises straight with its
+       * length; past two staff spaces it rises logarithmically, so a slur
+       * over half a bar is taller than one over two notes without a slur
+       * over a whole system becoming a dome. The three numbers here are
+       * that rule's own:
+       *
+       *   span <= 2 spaces:  shoulder = span * shortSlope
+       *   span >  2 spaces:  shoulder = min(log10(1 + (span-2)/2) * 2, logCap) + base
+       *
+       * `shoulder` is where the curve's two inner control points go, not
+       * where the curve itself reaches -- see `arcHeightForSpan`.
+       */
+      shoulderShortSlope: 0.25,
+      shoulderBase: 0.5,
+      shoulderLogCap: 3
+    },
+    articulation: {
+      /** Between an articulation and whatever it is placed against. */
+      minDistance: 0.4,
+      distanceFromHead: 0.4,
+      distanceFromStem: 0.4,
+      /** The mark itself, as a multiplier on full size. */
+      mag: 1
+    },
+    rest: {
+      /**
+       * Where a rest sits with no other voice in the way, as a count of
+       * whole staff spaces DOWN from the top line. MuseScore computes it
+       * as `lines % 2 ? floor(lines / 2) : ceil(lines / 2)`, which on a
+       * five-line staff is 2 -- the middle line.
+       */
+      naturalLineForFiveLineStaff: 2,
+      /**
+       * A whole rest moves one space UP from that, so it hangs under the
+       * second line from the top.
+       */
+      wholeRestLineOffset: -1,
+      /**
+       * How far a rest moves out of the way when the staff has more than
+       * one voice: up for voices 1 and 3, down for 2 and 4, by this many
+       * whole spaces.
+       */
+      multiVoiceOffset: 1,
+      multiVoiceTwoSpaceOffset: false
+    }
+  };
 
   // src/geometry/slur.ts
   function slurSide(stemDirections) {
@@ -58929,9 +59128,24 @@ var NotationEngine = (() => {
     const allUp = stemDirections.every((d) => d === "up");
     return allUp ? "below" : "above";
   }
-  var SLUR_BULGE_HEIGHT = 0.5;
+  var MINIMUM_ARC_HEIGHT = MUSESCORE_STYLE.slur.midWidth * 2;
+  function arcHeightForSpan(span) {
+    const { shoulderShortSlope, shoulderBase, shoulderLogCap } = MUSESCORE_STYLE.slur;
+    const length = Math.abs(span);
+    const shoulder = length <= 2 ? length * shoulderShortSlope : Math.min(Math.log10(1 + (length - 2) / 2) * 2, shoulderLogCap) + shoulderBase;
+    const CUBIC_APEX_OF_SHOULDER = 0.75;
+    return Math.max(shoulder * CUBIC_APEX_OF_SHOULDER, MINIMUM_ARC_HEIGHT);
+  }
   function computeSlurShape(startX, endX, y, side) {
-    return { startX, endX, y, side, bulgeHeight: SLUR_BULGE_HEIGHT };
+    return { startX, endX, y, side, bulgeHeight: arcHeightForSpan(endX - startX) };
+  }
+
+  // src/geometry/tie.ts
+  function tieSide(stemDirection) {
+    return stemDirection === "down" ? "above" : "below";
+  }
+  function computeTieShape(startX, endX, y, side) {
+    return { startX, endX, y, side, bulgeHeight: arcHeightForSpan(endX - startX) };
   }
 
   // src/geometry/tuplet.ts
@@ -59287,194 +59501,6 @@ var NotationEngine = (() => {
     for (const ch of text) total += estimateCharWidth(ch, fontSize);
     return total;
   }
-
-  // src/musescore/style.ts
-  var STYLE_SOURCE = {
-    path: "src/engraving/style/styledef.cpp",
-    symbol: "StyleDef::styleValues[]",
-    what: "every default engraving measurement"
-  };
-  var BEAM_SPACING_SOURCE = {
-    path: "src/engraving/rendering/score/beamtremololayout.cpp",
-    symbol: "BeamTremoloLayout::setupLData",
-    what: "beam spacing in quarter-spaces (3 normal, 4 wide) and the distance it becomes"
-  };
-  var MUSESCORE_STYLE = {
-    /** One staff space, in millimetres: MuseScore's default page scale. */
-    spatiumMm: 1.75,
-    staff: {
-      /** Thickness of a staff line. */
-      lineWidth: 0.11,
-      /** Between the staves of two different instruments. */
-      staffDistance: 6.5,
-      /** Between the two staves of one grand staff. */
-      braceDistance: 6.5,
-      minSystemDistance: 8.5,
-      maxSystemDistance: 15
-    },
-    note: {
-      stemWidth: 0.1,
-      /** The smallest gap MuseScore will leave between two adjacent notes. */
-      minNoteDistance: 0.35,
-      /** Ledger lines: thickness, and how far they run past the notehead on EACH side. */
-      ledgerLineWidth: 0.16,
-      ledgerLineLength: 0.33,
-      /** From the notehead to its first augmentation dot, and between dots. */
-      dotNoteDistance: 0.5,
-      dotDotDistance: 0.65,
-      /** A rest's dot sits closer than a note's -- a rest has no head to clear. */
-      dotRestDistance: 0.25,
-      /** The dot itself, as a multiplier on full size. */
-      dotMag: 1,
-      /** Between an accidental and the notehead it belongs to, and between two accidentals. */
-      accidentalNoteDistance: 0.25,
-      accidentalDistance: 0.25,
-      /** Cue notes and grace notes, as a multiplier on full size. */
-      smallNoteMag: 0.7,
-      graceNoteMag: 0.7,
-      /** A cue staff, and a clef drawn mid-staff rather than at a system's head. */
-      smallStaffMag: 0.7,
-      smallClefMag: 0.8
-    },
-    /**
-     * Stems.
-     *
-     * `length` and `shortest` are plain multiples of a staff space rather
-     * than `_sp` values in MuseScore's own table, which is why they are
-     * written as bare numbers there. A stem reaches `length` from the
-     * notehead and is allowed to shorten, note by note, no further than
-     * `shortest`; `shortenFrom` is how many spaces past the staff a note
-     * has to be before the shortening starts.
-     */
-    stem: {
-      length: 3.5,
-      shortest: 2.5,
-      shorten: true,
-      shortenFrom: 1,
-      /** The slash through an acciaccatura's stem. */
-      slashPosition: 2,
-      slashAngleDegrees: 40,
-      slashThickness: 0.125
-    },
-    beam: {
-      /** Thickness of one beam. */
-      width: 0.5,
-      /**
-       * Between the centre lines of two stacked beams. MuseScore stores
-       * it as 3 quarter-spaces (4 when `useWideBeams` is on) and divides
-       * by four; this is that division done once.
-       */
-      distance: 0.75,
-      wideDistance: 1,
-      useWideBeams: false,
-      /** The shortest a beam may be. */
-      minLength: 1.1
-    },
-    barline: {
-      /** A normal barline, and one line of a double barline. */
-      width: 0.18,
-      doubleWidth: 0.18,
-      /** The thick line of a final or repeat barline. */
-      endWidth: 0.55,
-      /** The gap inside a double barline, and before a final one's thick line. */
-      doubleDistance: 0.37,
-      endDistance: 0.37
-    },
-    measure: {
-      /** The narrowest a measure may be drawn. */
-      minWidth: 8,
-      /**
-       * The spacing SLOPE -- see `spacing.ts`. Not a width: it is the
-       * factor a note's space is multiplied by each time its duration
-       * doubles.
-       */
-      spacing: 1.5,
-      spacingDensity: 1
-    },
-    /**
-     * What sits at the head of a system, and how far apart.
-     *
-     * A `*LeftMargin` is the gap BEFORE the thing; a `*Distance` is the
-     * gap between two of them; a `*RightMargin` is the gap after the
-     * thing before whatever follows. They are not interchangeable, and
-     * getting a clef's left margin where its right margin belongs shifts
-     * every system's first note.
-     */
-    header: {
-      clefLeftMargin: 0.75,
-      keysigLeftMargin: 0.5,
-      timesigLeftMargin: 0.63,
-      /** Clef to key signature, key signature to time signature, and so on. */
-      clefKeyDistance: 0.75,
-      clefKeyRightMargin: 0.8,
-      /** A clef or key change in the MIDDLE of a system is given more room. */
-      midClefKeyRightMargin: 1,
-      clefTimesigDistance: 1,
-      keyTimesigDistance: 1,
-      clefBarlineDistance: 0.5,
-      keyBarlineDistance: 1,
-      timesigBarlineDistance: 0.5,
-      /** The whole header to the first note, and the least it may be. */
-      systemHeaderDistance: 2.5,
-      systemHeaderTimeSigDistance: 2,
-      systemHeaderMinStartOfSystemDistance: 1.25,
-      /** The closing clef/key of a system to the right-hand margin. */
-      systemTrailerRightMargin: 0.5,
-      /** Between two accidentals of a key signature, and before a natural. */
-      keysigAccidentalDistance: 0.3,
-      keysigNaturalDistance: 0.4
-    },
-    /**
-     * How close a barline and the music either side of it may come.
-     *
-     * Asymmetric on purpose: a note needs more room after it before a
-     * barline (`noteBarDistance`) than a barline needs before the next
-     * note (`barNoteDistance`), and an accidental on that next note needs
-     * more again.
-     */
-    barlineSpacing: {
-      barNoteDistance: 1.25,
-      noteBarDistance: 1.5,
-      barAccidentalDistance: 0.65,
-      beginRepeatLeftMargin: 1
-    },
-    slur: {
-      endWidth: 0.05,
-      midWidth: 0.21,
-      tieEndWidth: 0.05,
-      tieMidWidth: 0.21,
-      minTieLength: 1
-    },
-    articulation: {
-      /** Between an articulation and whatever it is placed against. */
-      minDistance: 0.4,
-      distanceFromHead: 0.4,
-      distanceFromStem: 0.4,
-      /** The mark itself, as a multiplier on full size. */
-      mag: 1
-    },
-    rest: {
-      /**
-       * Where a rest sits with no other voice in the way, as a count of
-       * whole staff spaces DOWN from the top line. MuseScore computes it
-       * as `lines % 2 ? floor(lines / 2) : ceil(lines / 2)`, which on a
-       * five-line staff is 2 -- the middle line.
-       */
-      naturalLineForFiveLineStaff: 2,
-      /**
-       * A whole rest moves one space UP from that, so it hangs under the
-       * second line from the top.
-       */
-      wholeRestLineOffset: -1,
-      /**
-       * How far a rest moves out of the way when the staff has more than
-       * one voice: up for voices 1 and 3, down for 2 and 4, by this many
-       * whole spaces.
-       */
-      multiVoiceOffset: 1,
-      multiVoiceTwoSpaceOffset: false
-    }
-  };
 
   // src/geometry/augmentation-dot.ts
   function augmentationDotGlyphName() {
@@ -59894,22 +59920,26 @@ ${denominator}`;
   }
 
   // src/render/tie.ts
+  var CONTROL_POINT_REACH = 2;
   function renderTie(shape, options) {
     const towardBulge = shape.side === "above" ? -1 : 1;
     const midX = (shape.startX + shape.endX) / 2;
-    const innerY = shape.y + towardBulge * (shape.bulgeHeight - options.midpointThickness / 2);
-    const outerY = shape.y + towardBulge * (shape.bulgeHeight + options.midpointThickness / 2);
+    const half = options.midpointThickness / 2;
+    const innerY = shape.y + towardBulge * (shape.bulgeHeight - half) * CONTROL_POINT_REACH;
+    const outerY = shape.y + towardBulge * (shape.bulgeHeight + half) * CONTROL_POINT_REACH;
     const n = svgNumber;
     const d = `M ${n(shape.startX)} ${n(shape.y)} Q ${n(midX)} ${n(innerY)} ${n(shape.endX)} ${n(shape.y)} Q ${n(midX)} ${n(outerY)} ${n(shape.startX)} ${n(shape.y)} Z`;
     return svgPath(d, { fill: options.color, stroke: "none" });
   }
 
   // src/render/slur.ts
+  var CONTROL_POINT_REACH2 = 2;
   function renderSlur(shape, options) {
     const towardBulge = shape.side === "above" ? -1 : 1;
     const midX = (shape.startX + shape.endX) / 2;
-    const innerY = shape.y + towardBulge * (shape.bulgeHeight - options.midpointThickness / 2);
-    const outerY = shape.y + towardBulge * (shape.bulgeHeight + options.midpointThickness / 2);
+    const half = options.midpointThickness / 2;
+    const innerY = shape.y + towardBulge * (shape.bulgeHeight - half) * CONTROL_POINT_REACH2;
+    const outerY = shape.y + towardBulge * (shape.bulgeHeight + half) * CONTROL_POINT_REACH2;
     const n = svgNumber;
     const d = `M ${n(shape.startX)} ${n(shape.y)} Q ${n(midX)} ${n(innerY)} ${n(shape.endX)} ${n(shape.y)} Q ${n(midX)} ${n(outerY)} ${n(shape.startX)} ${n(shape.y)} Z`;
     return svgPath(d, { fill: options.color, stroke: "none" });

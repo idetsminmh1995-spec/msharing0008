@@ -1,3 +1,4 @@
+import { arcHeightForSpan } from './slur.js';
 import type { StemDirection } from './stem.js';
 
 export type TieSide = 'above' | 'below';
@@ -16,13 +17,12 @@ export function tieSide(stemDirection: StemDirection): TieSide {
   return stemDirection === 'down' ? 'above' : 'below';
 }
 
-const TIE_BULGE_HEIGHT = 0.5;
-
 export interface TieShape {
   readonly startX: number;
   readonly endX: number;
   readonly y: number;
   readonly side: TieSide;
+  /** How far the drawn curve's peak stands off `y` -- the height it REACHES, not a control-point height. */
   readonly bulgeHeight: number;
 }
 
@@ -32,7 +32,12 @@ export interface TieShape {
  * bulges away from `y` by `bulgeHeight` toward whichever `side` -- 'above'
  * bulges to more-negative Y, 'below' to more-positive Y, matching this
  * engine's Y-down convention throughout.
+ *
+ * The height comes from the tie's own LENGTH (`arcHeightForSpan`), not
+ * from a constant: a tie between two notes a space apart and a tie
+ * across half a bar are not the same shape, and drawing them as though
+ * they were made the short ones look like scratches.
  */
 export function computeTieShape(startX: number, endX: number, y: number, side: TieSide): TieShape {
-  return { startX, endX, y, side, bulgeHeight: TIE_BULGE_HEIGHT };
+  return { startX, endX, y, side, bulgeHeight: arcHeightForSpan(endX - startX) };
 }

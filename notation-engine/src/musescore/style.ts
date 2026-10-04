@@ -190,6 +190,25 @@ export const MUSESCORE_STYLE = {
     tieEndWidth: 0.05,
     tieMidWidth: 0.21,
     minTieLength: 1.0,
+    /**
+     * How high a slur (or tie) arcs, as a function of how long it is.
+     *
+     * MuseScore does not carry one number for this: it shapes the curve
+     * from the span. A short curve's shoulder rises straight with its
+     * length; past two staff spaces it rises logarithmically, so a slur
+     * over half a bar is taller than one over two notes without a slur
+     * over a whole system becoming a dome. The three numbers here are
+     * that rule's own:
+     *
+     *   span <= 2 spaces:  shoulder = span * shortSlope
+     *   span >  2 spaces:  shoulder = min(log10(1 + (span-2)/2) * 2, logCap) + base
+     *
+     * `shoulder` is where the curve's two inner control points go, not
+     * where the curve itself reaches -- see `arcHeightForSpan`.
+     */
+    shoulderShortSlope: 0.25,
+    shoulderBase: 0.5,
+    shoulderLogCap: 3.0,
   },
 
   articulation: {
