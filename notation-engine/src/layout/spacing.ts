@@ -52,14 +52,48 @@ export interface SpacingEvent {
    */
   readonly shortestSounding?: number;
   /**
-   * The event's own full rendered width (notehead + accidentals + dots
-   * + any horizontally-extending articulation) -- §14.2's own minimum-
-   * distance floor is measured from this, not from the notehead alone.
-   * A caller with nothing more specific may pass 0 here and rely on
-   * proportional spacing alone (matching the pre-Phase-43 renderer's
-   * own approximation).
+   * How far this attack's own ink reaches to the RIGHT of its x: the
+   * notehead, and its augmentation dots. §14.2's minimum-distance floor
+   * is measured from this, not from the notehead alone. A caller with
+   * nothing more specific may pass 0 here and rely on proportional
+   * spacing alone (matching the pre-Phase-43 renderer's own
+   * approximation).
    */
   readonly renderedWidth: number;
+  /**
+   * How far it reaches to the LEFT of its x: its accidental, and the
+   * gap between that and the notehead. 0 when there is none.
+   *
+   * It is a separate number from `renderedWidth` because an accidental
+   * is drawn BEFORE its notehead, so it widens the gap that comes
+   * INTO this attack and not the one that leaves it. Folding it into
+   * the width pushed the following note away instead of this one,
+   * which puts the accidental's room on the wrong side of the note
+   * that needs it.
+   */
+  readonly leadingWidth?: number;
+  /**
+   * The same width, but PER STAFF -- keyed by whatever the caller calls
+   * a staff (`"P1:1"`, say). Only the staves that actually draw
+   * something at this attack appear.
+   *
+   * This is what makes the minimum-distance pass behave like
+   * MuseScore's, and the difference is a cross-staff one. A dotted note
+   * low in the bass staff is wide, and the attack after it may be in
+   * the TREBLE staff, half a stave away -- nothing can collide, and
+   * MuseScore (which spaces by each element's real shape) lets them sit
+   * close. The old pass took one width per attack, the widest anywhere
+   * on the system, and pushed the next attack clear of it whatever
+   * staff that was: on a grand staff where the two hands alternate,
+   * which is most piano music, that inflated the gap after every wide
+   * thing in either staff.
+   *
+   * Omit it and `renderedWidth` is used for one anonymous staff, which
+   * is exactly the old behaviour and right for a single-staff part.
+   */
+  readonly widthsByStaff?: ReadonlyMap<string, number>;
+  /** `leadingWidth`, per staff, keyed exactly as `widthsByStaff` is. */
+  readonly leadingByStaff?: ReadonlyMap<string, number>;
 }
 
 /**
@@ -216,12 +250,40 @@ export function applyMinimumDistance(
 ): readonly number[] {
   if (positions.length === 0) return positions;
   const result: number[] = [positions[0] ?? 0];
+
+  /**
+   * Per staff, the last attack that staff drew at and what it needs
+   * before whatever it draws NEXT. A staff constrains the attack it
+   * next appears at, not simply the one after it -- see
+   * `SpacingEvent.widthsByStaff`.
+   */
+  const pending = new Map<string, { readonly x: number; readonly width: number }>();
+  const widthsOf = (event: SpacingEvent | undefined): ReadonlyMap<string, number> =>
+    event?.widthsByStaff ?? new Map([['', event?.renderedWidth ?? 0]]);
+  const leadingOf = (event: SpacingEvent | undefined, staff: string): number =>
+    event?.leadingByStaff?.get(staff) ??
+    (event?.widthsByStaff === undefined ? (event?.leadingWidth ?? 0) : 0);
+
+  for (const [staff, width] of widthsOf(events[0])) {
+    pending.set(staff, { x: result[0] ?? 0, width });
+  }
+
   for (let i = 1; i < positions.length; i++) {
-    const previousPosition = result[i - 1] ?? 0;
-    const previousWidth = events[i - 1]?.renderedWidth ?? 0;
-    const minimumX = previousPosition + previousWidth + config.minNoteDistance;
-    const proportionalX = positions[i] ?? 0;
-    result.push(Math.max(proportionalX, minimumX));
+    const widths = widthsOf(events[i]);
+    let minimumX = result[i - 1] ?? 0;
+    for (const staff of widths.keys()) {
+      const previous = pending.get(staff);
+      if (previous === undefined) continue;
+      // The accidental belongs to THIS attack and is drawn before its
+      // notehead, so it is added here, to the gap coming in.
+      minimumX = Math.max(
+        minimumX,
+        previous.x + previous.width + config.minNoteDistance + leadingOf(events[i], staff),
+      );
+    }
+    const x = Math.max(positions[i] ?? 0, minimumX);
+    result.push(x);
+    for (const [staff, width] of widths) pending.set(staff, { x, width });
   }
   return result;
 }

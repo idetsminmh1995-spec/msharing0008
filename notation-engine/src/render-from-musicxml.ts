@@ -75,7 +75,13 @@ import {
 } from './layout/index.js';
 import { fretDigitGlyphNames, tabStringPosition } from './geometry/index.js';
 import { metronomeNoteGlyphName, metronomeDotGlyphName } from './geometry/metronome.js';
-import { dotPlacements, chordDotPlacements } from './geometry/augmentation-dot.js';
+import {
+  dotPlacements,
+  chordDotPlacements,
+  DOT_NOTE_DISTANCE,
+  DOT_DOT_DISTANCE,
+} from './geometry/augmentation-dot.js';
+import { MUSESCORE_STYLE } from './musescore/style.js';
 import { renderAugmentationDots } from './render/augmentation-dot.js';
 import { renderMetronomeMark, metronomeMarkWidth } from './render/metronome.js';
 import { TICKS_PER_QUARTER } from './core/duration-math.js';
@@ -279,9 +285,51 @@ function buildTheme(config: EngineConfig, fileDefaults: ScoreDefaults | undefine
 function withinMeasureSpacing(spacing: SpacingConfig): SpacingConfig {
   return { ...spacing, justify: false };
 }
-/** A rough per-note width estimate for Sec14.2's minimum-distance pass -- notehead alone, or notehead+accidental-allowance. Real per-glyph widths would need sharing the accidental-DISPLAY state (not just the pitch's own alter) between a measurement pass and the render pass; this stays a documented approximation rather than duplicating that state. */
-const ESTIMATED_NOTEHEAD_WIDTH = 1.0;
-const ESTIMATED_ACCIDENTAL_ALLOWANCE = 1.0;
+/**
+ * What one attack is WIDE, for §14.2's minimum-distance floor.
+ *
+ * This used to be an approximation, and said so: a flat 1.0 for the
+ * notehead, plus a flat 1.0 whenever the note's own `alter` was
+ * non-zero. Both halves were wrong, and the second one was wrong in a
+ * way that showed.
+ *
+ * `alter !== 0` is not "an accidental is drawn". In five sharps every
+ * F, C, G, D and A in the piece has `alter: 1` and NO accidental --
+ * the key signature has already said so. The old estimate reserved a
+ * full staff space for an accidental on nearly every note of such a
+ * score, and since that allowance becomes the segment's own minimum
+ * width, the floor then bound on nearly every segment and flattened
+ * the spacing: on the owner's own file a sixteenth's segment came out
+ * exactly as wide as an eighth's, where MuseScore makes it half.
+ *
+ * So the measurement pass now runs the SAME accidental state machine
+ * the renderer runs (`drawnAccidentalTicks`), and these are real glyph
+ * widths rather than round numbers.
+ */
+const NOTEHEAD_WIDTH_FALLBACK = 1.18;
+/** Between an accidental and the notehead it belongs to -- MuseScore's `accidentalNoteDistance`. */
+const ACCIDENTAL_NOTE_DISTANCE = MUSESCORE_STYLE.note.accidentalNoteDistance;
+
+/** How far one attack's ink reaches RIGHT of its x: the notehead, and its augmentation dots. */
+function attackWidth(dots: number): number {
+  const notehead = glyphWidthOf('noteheadBlack') || NOTEHEAD_WIDTH_FALLBACK;
+  if (dots <= 0) return notehead;
+  return notehead + DOT_NOTE_DISTANCE + dots * DOT_DOT_DISTANCE;
+}
+
+/**
+ * How far it reaches LEFT of its x: its accidental, and the gap between
+ * that and the notehead.
+ *
+ * Its own number because an accidental is drawn BEFORE its notehead. It
+ * widens the gap coming INTO this attack, not the one leaving it, and
+ * folding it into the width put that room after the note that needed
+ * it instead of before.
+ */
+function attackLeading(accidental: number | undefined): number {
+  if (accidental === undefined) return 0;
+  return glyphWidthOf(accidentalGlyphName(accidental)) + ACCIDENTAL_NOTE_DISTANCE;
+}
 /** Trailing room after a measure's last event, so it isn't flush against the barline. */
 const MEASURE_TRAILING_MARGIN = 2.0;
 /** MuseScore's `minRestToRestClearance`, also its floor for a whole or half rest against a chord. */
@@ -518,6 +566,85 @@ function worstCaseStaffExtent(
 }
 
 /**
+ * Which attacks of a measure really have an accidental drawn, and which
+ * one -- the measurement pass's answer to the question the RENDERER
+ * answers a second time, with the same state machine, a few hundred
+ * lines below.
+ *
+ * It has to be the state machine and not `note.pitch.alter`, because
+ * those are different questions. `alter` says what the note sounds; an
+ * accidental is drawn only when that disagrees with what the key
+ * signature (or an earlier note at the same step and octave, in the
+ * same measure) already said. In five sharps almost every note of a
+ * piece has `alter: 1` and no accidental at all.
+ *
+ * Three details make this the same answer the renderer reaches:
+ *
+ *  - state is PER STAFF. A sharp on the treble staff does not carry
+ *    down to the bass.
+ *  - state resets at every barline, which is why nothing is threaded
+ *    between measures: a fresh state from this measure's own `fifths`
+ *    is exactly what `resetMeasure` would have produced.
+ *  - voices are walked in the order the renderer walks them, because
+ *    the state threads through that order and a different order gives
+ *    a different answer on the second note of a pair.
+ *
+ * A staff whose clef does not place notes by pitch (a tab staff) is
+ * skipped: it draws fret numbers, which carry no accidentals.
+ */
+function drawnAccidentalTicks(
+  parts: readonly {
+    readonly measure: Measure;
+    readonly fifths: number;
+    readonly isPitched: (staffNumber: number) => boolean;
+  }[],
+): ReadonlyMap<number, number> {
+  const drawn = new Map<number, number>();
+  for (const part of parts) {
+    const staffNumbers = new Set<number>();
+    for (const voice of part.measure.voices) {
+      for (const event of voice.events) staffNumbers.add(event.staff ?? 1);
+    }
+    for (const staffNumber of staffNumbers) {
+      if (!part.isPitched(staffNumber)) continue;
+      let state = createAccidentalState(part.fifths);
+      for (const voice of part.measure.voices) {
+        const starts = eventStartTicks(voice.events);
+        voice.events.forEach((event, idx) => {
+          if ((event.staff ?? 1) !== staffNumber) return;
+          const notes = event.kind === 'chord' ? event.notes : event.kind === 'note' ? [event] : [];
+          const tick = starts[idx] ?? 0;
+          for (const note of notes) {
+            if (note.pitch.kind !== 'pitched') continue;
+            const decision = evaluateAccidental(
+              state,
+              note.pitch.step,
+              note.pitch.octave,
+              note.pitch.alter,
+              note.hasExplicitAccidental ?? false,
+            );
+            state = decision.newState;
+            if (!decision.shouldDraw) continue;
+            // A chord's widest accidental is the one the attack has to
+            // make room for, and a wider glyph means a bigger `alter`
+            // in absolute terms -- a double flat is the widest of them.
+            const previous = drawn.get(tick);
+            if (
+              previous === undefined ||
+              glyphWidthOf(accidentalGlyphName(note.pitch.alter)) >
+                glyphWidthOf(accidentalGlyphName(previous))
+            ) {
+              drawn.set(tick, note.pitch.alter);
+            }
+          }
+        });
+      }
+    }
+  }
+  return drawn;
+}
+
+/**
  * Phase 43/44 wiring: a measure's REAL, content-driven width and the
  * real x-position of every distinct tick within it -- replacing
  * Phase 21's fixed MEASURE_WIDTH and the old tick-fraction interpolation
@@ -544,6 +671,12 @@ function computeMeasureLayout(
   spacingConfig: SpacingConfig,
   /** `config.fonts.sizes.tempo`: how wide a tempo mark's "= 120" will be depends on the size it is set at, so the measure cannot be made wide enough for it without knowing that. */
   tempoFontSize: number,
+  /**
+   * Which attacks really have an accidental drawn, and which one --
+   * from `drawnAccidentalTicks`, which runs the renderer's own
+   * accidental state machine rather than reading each note's `alter`.
+   */
+  accidentals: ReadonlyMap<number, number>,
 ): {
   readonly width: number;
   readonly positionsByTick: ReadonlyMap<number, number>;
@@ -562,7 +695,22 @@ function computeMeasureLayout(
    */
   readonly idealSpan: number;
 } {
-  const hasAccidentalByTick = new Map<number, boolean>();
+  /**
+   * Every attack in the measure, whether or not anything is drawn at
+   * it. A `Map` only to keep the old insertion-ordered key set; the
+   * value is unused and the accidentals now come from `accidentals`.
+   */
+  const attacks = new Set<number>();
+  /**
+   * The widest thing drawn at each attack, PER STAFF.
+   *
+   * Per staff and not per attack, because a wide thing in one staff
+   * cannot collide with anything in another -- see
+   * `SpacingEvent.widthsByStaff`, which is what reads this.
+   */
+  const widthByTickAndStaff = new Map<number, Map<string, number>>();
+  /** The same, for what reaches LEFT of each attack -- its accidental. */
+  const leadingByTickAndStaff = new Map<number, Map<string, number>>();
   /** MuseScore's `shortestChordRest`, per attack -- see where it is filled. */
   const shortestStartingByTick = new Map<number, number>();
   for (const voice of measure.voices) {
@@ -580,18 +728,18 @@ function computeMeasureLayout(
       // falling back to the old formula.
       if (event.kind !== 'note' && event.kind !== 'chord' && event.kind !== 'rest') return;
       const tick = starts[idx] ?? 0;
-      const hasAccidental =
-        event.kind === 'note'
-          ? (event.pitch.kind === 'pitched' && event.pitch.alter !== 0) ||
-            event.hasExplicitAccidental === true
-          : event.kind === 'chord'
-            ? event.notes.some(
-                (n) =>
-                  (n.pitch.kind === 'pitched' && n.pitch.alter !== 0) ||
-                  n.hasExplicitAccidental === true,
-              )
-            : false;
-      hasAccidentalByTick.set(tick, (hasAccidentalByTick.get(tick) ?? false) || hasAccidental);
+      attacks.add(tick);
+      const staff = String(event.staff ?? 1);
+      const put = (into: Map<number, Map<string, number>>, value: number): void => {
+        let perStaff = into.get(tick);
+        if (perStaff === undefined) {
+          perStaff = new Map();
+          into.set(tick, perStaff);
+        }
+        perStaff.set(staff, Math.max(perStaff.get(staff) ?? 0, value));
+      };
+      put(widthByTickAndStaff, attackWidth(event.duration.dots));
+      put(leadingByTickAndStaff, attackLeading(accidentals.get(tick)));
       // MuseScore's `Segment::shortestChordRest`: the shortest thing
       // that BEGINS at this attack, across every voice. Not the gap to
       // the next attack -- the two are equal only while nothing longer
@@ -604,7 +752,7 @@ function computeMeasureLayout(
     });
   }
 
-  const ticks = [...hasAccidentalByTick.keys()].sort((a, b) => a - b);
+  const ticks = [...attacks].sort((a, b) => a - b);
 
   // Phase 43/44 wiring: a measure holding a tempo mark must be wide
   // enough for it -- the notes' own widths alone don't guarantee this
@@ -657,12 +805,14 @@ function computeMeasureLayout(
   const spacingEvents: SpacingEvent[] = ticks.map((tick, i) => {
     const nextTick = i + 1 < ticks.length ? (ticks[i + 1] ?? measureTicks) : measureTicks;
     const gapTicks = Math.max(1, nextTick - tick);
-    const width =
-      ESTIMATED_NOTEHEAD_WIDTH +
-      (hasAccidentalByTick.get(tick) === true ? ESTIMATED_ACCIDENTAL_ALLOWANCE : 0);
+    const widthsByStaff = widthByTickAndStaff.get(tick) ?? new Map<string, number>();
+    const leadingByStaff = leadingByTickAndStaff.get(tick) ?? new Map<string, number>();
     return {
       ticks: gapTicks,
-      renderedWidth: width,
+      widthsByStaff,
+      leadingByStaff,
+      renderedWidth: Math.max(0, ...widthsByStaff.values()),
+      leadingWidth: Math.max(0, ...leadingByStaff.values()),
       shortestSounding: shortestStartingByTick.get(tick) ?? gapTicks,
     };
   });
@@ -1391,7 +1541,21 @@ function renderBeamGroup(
   // not just one per event -- a chord's own spread is exactly the kind of
   // thing that decides which way a beam should go.
   const allPositions = members.flatMap((m) => [...m.positions]);
-  const direction = forcedDirection ?? beamDirection(allPositions, middle);
+  // §10.8 again: when the FILE states a `<stem>` on every note of the
+  // group and they agree, that is the group's direction. A beam has one
+  // direction and the file has already chosen it; re-deriving it from
+  // the noteheads overruled the file on three of this piece's own
+  // groups, where MuseScore had decided for reasons -- a voice's shape
+  // across the whole phrase -- that one bar's noteheads do not show.
+  // A group whose members disagree, or where any of them says nothing,
+  // falls back to §9.13's own rule.
+  const statedDirections = new Set(
+    events.map((event) =>
+      event.kind === 'chord' ? event.notes[0]?.explicitStemDirection : event.explicitStemDirection,
+    ),
+  );
+  const stated = statedDirections.size === 1 ? [...statedDirections][0] : undefined;
+  const direction = forcedDirection ?? stated ?? beamDirection(allPositions, middle);
 
   /** The notehead nearest the beam: the beam must clear it. */
   const beamPositionOf = (m: BeamMember): number =>
@@ -2518,6 +2682,36 @@ export function renderParsedMusicXml(
   }
   const predictedHeaderWidths = headerWidths((n) => predictedSystemStarts.has(n));
 
+  /**
+   * This measure's parts, in the shape `drawnAccidentalTicks` needs:
+   * each part's own measure, its own key signature, and which of its
+   * staves place notes by pitch at all.
+   */
+  const accidentalParts = (
+    measureNumber: number,
+  ): readonly {
+    readonly measure: Measure;
+    readonly fifths: number;
+    readonly isPitched: (staffNumber: number) => boolean;
+  }[] => {
+    const out = [];
+    for (const part of score.parts) {
+      const m = measureByPartAndNumber.get(`${part.id}:${measureNumber}`);
+      const attrs = attributesByPartAndMeasure.get(`${part.id}:${measureNumber}`);
+      if (m === undefined || attrs === undefined) continue;
+      out.push({
+        measure: m,
+        fifths: attrs.fifths,
+        isPitched: (staffNumber: number): boolean => {
+          const spec = attrs.clefsByStaff[staffNumber] ?? attrs.clefsByStaff[1];
+          const { clefDef } = mapClef(spec?.sign ?? attrs.clefSign, spec?.line ?? attrs.clefLine);
+          return clefDef.positionsByPitch === true;
+        },
+      });
+    }
+    return out;
+  };
+
   for (const measureNumber of measureNumbersInOrder) {
     const combinedVoices = [];
     let measureTicks: number | undefined;
@@ -2546,6 +2740,7 @@ export function renderParsedMusicXml(
       headerWidth,
       config.spacing,
       config.fonts.sizes.tempo,
+      drawnAccidentalTicks(accidentalParts(measureNumber)),
     );
     measureLayoutsByNumber.set(measureNumber, { ...layout, headerWidth });
     measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
@@ -3407,7 +3602,23 @@ export function renderParsedMusicXml(
           // has multiple voices sharing it -- a single voice keeps ordinary
           // automatic direction (renderNoteOrRest/renderChord/renderBeamGroup
           // all fall back to automatic when this is undefined).
-          const isMultiVoice = measure.voices.length > 1;
+          //
+          // Counted on THIS STAFF, not across the measure. A grand staff
+          // is one Measure with two voices in it -- the right hand's and
+          // the left hand's -- and they share no staff at all, so
+          // nothing about them is a two-voice situation. Counting the
+          // measure's voices instead forced every treble stem up and
+          // every bass stem down, overriding the <stem> the file itself
+          // states for each note, and pushed every rest a staff space
+          // off the middle line, where MuseScore's own `default-y` says
+          // it belongs. Two voices on one staff still get the rule,
+          // which is the case the rule is for.
+          const voicesOnThisStaff = new Set(
+            measure.voices
+              .filter((v) => v.events.some((e) => (e.staff ?? 1) === staffNumber))
+              .map((v) => v.id),
+          );
+          const isMultiVoice = voicesOnThisStaff.size > 1;
           // Integration K/§9.14: computed once per (measure, staff),
           // because a collision is by definition a fact ABOUT two voices
           // and cannot be seen from inside either one's own loop.

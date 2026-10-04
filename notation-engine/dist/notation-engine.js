@@ -63064,12 +63064,26 @@ ${denominator}`;
   function applyMinimumDistance(positions, events, config) {
     if (positions.length === 0) return positions;
     const result = [positions[0] ?? 0];
+    const pending = /* @__PURE__ */ new Map();
+    const widthsOf = (event) => event?.widthsByStaff ?? /* @__PURE__ */ new Map([["", event?.renderedWidth ?? 0]]);
+    const leadingOf = (event, staff) => event?.leadingByStaff?.get(staff) ?? (event?.widthsByStaff === void 0 ? event?.leadingWidth ?? 0 : 0);
+    for (const [staff, width] of widthsOf(events[0])) {
+      pending.set(staff, { x: result[0] ?? 0, width });
+    }
     for (let i2 = 1; i2 < positions.length; i2++) {
-      const previousPosition = result[i2 - 1] ?? 0;
-      const previousWidth = events[i2 - 1]?.renderedWidth ?? 0;
-      const minimumX = previousPosition + previousWidth + config.minNoteDistance;
-      const proportionalX = positions[i2] ?? 0;
-      result.push(Math.max(proportionalX, minimumX));
+      const widths = widthsOf(events[i2]);
+      let minimumX = result[i2 - 1] ?? 0;
+      for (const staff of widths.keys()) {
+        const previous = pending.get(staff);
+        if (previous === void 0) continue;
+        minimumX = Math.max(
+          minimumX,
+          previous.x + previous.width + config.minNoteDistance + leadingOf(events[i2], staff)
+        );
+      }
+      const x2 = Math.max(positions[i2] ?? 0, minimumX);
+      result.push(x2);
+      for (const [staff, width] of widths) pending.set(staff, { x: x2, width });
     }
     return result;
   }
@@ -66146,8 +66160,17 @@ ${xrefOffset}
   function withinMeasureSpacing(spacing) {
     return { ...spacing, justify: false };
   }
-  var ESTIMATED_NOTEHEAD_WIDTH = 1;
-  var ESTIMATED_ACCIDENTAL_ALLOWANCE = 1;
+  var NOTEHEAD_WIDTH_FALLBACK = 1.18;
+  var ACCIDENTAL_NOTE_DISTANCE = MUSESCORE_STYLE.note.accidentalNoteDistance;
+  function attackWidth(dots) {
+    const notehead = glyphWidthOf("noteheadBlack") || NOTEHEAD_WIDTH_FALLBACK;
+    if (dots <= 0) return notehead;
+    return notehead + DOT_NOTE_DISTANCE + dots * DOT_DOT_DISTANCE;
+  }
+  function attackLeading(accidental) {
+    if (accidental === void 0) return 0;
+    return glyphWidthOf(accidentalGlyphName(accidental)) + ACCIDENTAL_NOTE_DISTANCE;
+  }
   var MEASURE_TRAILING_MARGIN = 2;
   var REST_TO_REST_CLEARANCE = 0.55;
   var REST_TO_CHORD_CLEARANCE = 0.35;
@@ -66226,18 +66249,66 @@ ${xrefOffset}
     if (worst === void 0) return 0;
     return side === "south" ? Math.max(0, worst) : Math.max(0, topLineY - worst);
   }
-  function computeMeasureLayout(measure2, measureTicks, measureTempoMarks, headerWidth, spacingConfig, tempoFontSize) {
-    const hasAccidentalByTick = /* @__PURE__ */ new Map();
+  function drawnAccidentalTicks(parts) {
+    const drawn = /* @__PURE__ */ new Map();
+    for (const part2 of parts) {
+      const staffNumbers = /* @__PURE__ */ new Set();
+      for (const voice2 of part2.measure.voices) {
+        for (const event of voice2.events) staffNumbers.add(event.staff ?? 1);
+      }
+      for (const staffNumber of staffNumbers) {
+        if (!part2.isPitched(staffNumber)) continue;
+        let state = createAccidentalState(part2.fifths);
+        for (const voice2 of part2.measure.voices) {
+          const starts = eventStartTicks(voice2.events);
+          voice2.events.forEach((event, idx) => {
+            if ((event.staff ?? 1) !== staffNumber) return;
+            const notes = event.kind === "chord" ? event.notes : event.kind === "note" ? [event] : [];
+            const tick = starts[idx] ?? 0;
+            for (const note2 of notes) {
+              if (note2.pitch.kind !== "pitched") continue;
+              const decision = evaluateAccidental(
+                state,
+                note2.pitch.step,
+                note2.pitch.octave,
+                note2.pitch.alter,
+                note2.hasExplicitAccidental ?? false
+              );
+              state = decision.newState;
+              if (!decision.shouldDraw) continue;
+              const previous = drawn.get(tick);
+              if (previous === void 0 || glyphWidthOf(accidentalGlyphName(note2.pitch.alter)) > glyphWidthOf(accidentalGlyphName(previous))) {
+                drawn.set(tick, note2.pitch.alter);
+              }
+            }
+          });
+        }
+      }
+    }
+    return drawn;
+  }
+  function computeMeasureLayout(measure2, measureTicks, measureTempoMarks, headerWidth, spacingConfig, tempoFontSize, accidentals) {
+    const attacks = /* @__PURE__ */ new Set();
+    const widthByTickAndStaff = /* @__PURE__ */ new Map();
+    const leadingByTickAndStaff = /* @__PURE__ */ new Map();
     const shortestStartingByTick = /* @__PURE__ */ new Map();
     for (const voice2 of measure2.voices) {
       const starts = eventStartTicks(voice2.events);
       voice2.events.forEach((event, idx) => {
         if (event.kind !== "note" && event.kind !== "chord" && event.kind !== "rest") return;
         const tick = starts[idx] ?? 0;
-        const hasAccidental = event.kind === "note" ? event.pitch.kind === "pitched" && event.pitch.alter !== 0 || event.hasExplicitAccidental === true : event.kind === "chord" ? event.notes.some(
-          (n) => n.pitch.kind === "pitched" && n.pitch.alter !== 0 || n.hasExplicitAccidental === true
-        ) : false;
-        hasAccidentalByTick.set(tick, (hasAccidentalByTick.get(tick) ?? false) || hasAccidental);
+        attacks.add(tick);
+        const staff = String(event.staff ?? 1);
+        const put = (into, value) => {
+          let perStaff = into.get(tick);
+          if (perStaff === void 0) {
+            perStaff = /* @__PURE__ */ new Map();
+            into.set(tick, perStaff);
+          }
+          perStaff.set(staff, Math.max(perStaff.get(staff) ?? 0, value));
+        };
+        put(widthByTickAndStaff, attackWidth(event.duration.dots));
+        put(leadingByTickAndStaff, attackLeading(accidentals.get(tick)));
         const own = event.duration.ticks;
         const shortest = shortestStartingByTick.get(tick);
         if (own > 0 && (shortest === void 0 || own < shortest)) {
@@ -66245,7 +66316,7 @@ ${xrefOffset}
         }
       });
     }
-    const ticks = [...hasAccidentalByTick.keys()].sort((a, b) => a - b);
+    const ticks = [...attacks].sort((a, b) => a - b);
     const tempoMarkMinWidth = measureTempoMarks.reduce((max2, tm) => {
       const dotGlyph = tm.beatUnitDots > 0 ? metronomeDotGlyphName() : void 0;
       const markWidth = metronomeMarkWidth(
@@ -66269,10 +66340,14 @@ ${xrefOffset}
     const spacingEvents = ticks.map((tick, i2) => {
       const nextTick = i2 + 1 < ticks.length ? ticks[i2 + 1] ?? measureTicks : measureTicks;
       const gapTicks = Math.max(1, nextTick - tick);
-      const width2 = ESTIMATED_NOTEHEAD_WIDTH + (hasAccidentalByTick.get(tick) === true ? ESTIMATED_ACCIDENTAL_ALLOWANCE : 0);
+      const widthsByStaff = widthByTickAndStaff.get(tick) ?? /* @__PURE__ */ new Map();
+      const leadingByStaff = leadingByTickAndStaff.get(tick) ?? /* @__PURE__ */ new Map();
       return {
         ticks: gapTicks,
-        renderedWidth: width2,
+        widthsByStaff,
+        leadingByStaff,
+        renderedWidth: Math.max(0, ...widthsByStaff.values()),
+        leadingWidth: Math.max(0, ...leadingByStaff.values()),
         shortestSounding: shortestStartingByTick.get(tick) ?? gapTicks
       };
     });
@@ -66641,7 +66716,13 @@ ${xrefOffset}
     });
     const middle = middleLineY(STAFF_LINES);
     const allPositions = members.flatMap((m) => [...m.positions]);
-    const direction = forcedDirection ?? beamDirection(allPositions, middle);
+    const statedDirections = new Set(
+      events.map(
+        (event) => event.kind === "chord" ? event.notes[0]?.explicitStemDirection : event.explicitStemDirection
+      )
+    );
+    const stated = statedDirections.size === 1 ? [...statedDirections][0] : void 0;
+    const direction = forcedDirection ?? stated ?? beamDirection(allPositions, middle);
     const beamPositionOf = (m) => direction === "up" ? Math.min(...m.positions) : Math.max(...m.positions);
     const attachPositionOf = (m) => direction === "up" ? Math.max(...m.positions) : Math.min(...m.positions);
     const beamPositions = members.map(beamPositionOf);
@@ -67315,6 +67396,24 @@ ${xrefOffset}
       }
     }
     const predictedHeaderWidths = headerWidths((n) => predictedSystemStarts.has(n));
+    const accidentalParts = (measureNumber) => {
+      const out = [];
+      for (const part2 of score2.parts) {
+        const m = measureByPartAndNumber.get(`${part2.id}:${measureNumber}`);
+        const attrs = attributesByPartAndMeasure.get(`${part2.id}:${measureNumber}`);
+        if (m === void 0 || attrs === void 0) continue;
+        out.push({
+          measure: m,
+          fifths: attrs.fifths,
+          isPitched: (staffNumber) => {
+            const spec = attrs.clefsByStaff[staffNumber] ?? attrs.clefsByStaff[1];
+            const { clefDef } = mapClef(spec?.sign ?? attrs.clefSign, spec?.line ?? attrs.clefLine);
+            return clefDef.positionsByPitch === true;
+          }
+        });
+      }
+      return out;
+    };
     for (const measureNumber of measureNumbersInOrder) {
       const combinedVoices = [];
       let measureTicks;
@@ -67340,7 +67439,8 @@ ${xrefOffset}
         drawnTempoMarks.filter((tm) => tm.measureNumber === measureNumber),
         headerWidth,
         config.spacing,
-        config.fonts.sizes.tempo
+        config.fonts.sizes.tempo,
+        drawnAccidentalTicks(accidentalParts(measureNumber))
       );
       measureLayoutsByNumber.set(measureNumber, { ...layout, headerWidth });
       measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
@@ -67812,7 +67912,10 @@ ${xrefOffset}
             const ctx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart, theme };
             const noteAreaX = Math.max(noteAreaXOf(layout.x, measure2.number), cursorX);
             const measureLayout = measureLayoutsByNumber.get(measure2.number);
-            const isMultiVoice = measure2.voices.length > 1;
+            const voicesOnThisStaff = new Set(
+              measure2.voices.filter((v) => v.events.some((e) => (e.staff ?? 1) === staffNumber)).map((v) => v.id)
+            );
+            const isMultiVoice = voicesOnThisStaff.size > 1;
             const collisionOffsets = computeVoiceCollisionOffsets(measure2, staffNumber, ctx);
             const restPushes = computeRestClearanceOffsets(measure2, staffNumber, ctx);
             for (const voice2 of measure2.voices) {
