@@ -606,6 +606,10 @@ export function stageShapes(options: PianoStageOptions): readonly StageShape[] {
       ...(options.hands.fingerNumbers !== undefined
         ? { fingerNumbers: options.hands.fingerNumbers }
         : {}),
+      // The stage's own `keyNames` straight through, so one control on
+      // the page turns every name off at once rather than leaving this
+      // design's name on after the others have gone.
+      ...(options.keyNames !== undefined ? { keyNames: options.keyNames } : {}),
     })) {
       shapes.push(shape);
     }

@@ -370,13 +370,6 @@ var PianoEngine = (() => {
     4: { x: -2.2667, y: -7.2 },
     5: { x: -3.3333, y: -5.675 }
   };
-  var FINGER_SPANS = {
-    1: { from: 11, to: 14 },
-    2: { from: 2, to: 7 },
-    3: { from: 33, to: 36 },
-    4: { from: 27, to: 32 },
-    5: { from: 23, to: 25 }
-  };
   var ARTWORK_BOX = { minX: -3.58, maxX: 3.42, minY: -8.13, maxY: 2.6 };
   var PLAY_SCALE_X = 0.72;
   var PLAY_SCALE_Y = 0.5;
@@ -511,27 +504,6 @@ var PianoEngine = (() => {
       } else {
         parts.push("Z");
       }
-    }
-    parts.push("Z");
-    return parts.join(" ");
-  }
-  function fingerPath(placement, finger) {
-    const span = FINGER_SPANS[finger];
-    const previous = HAND_OUTLINE[span.from - 1];
-    if (previous === void 0 || previous[0] === "Z") return "";
-    const startX = previous[0] === "M" ? previous[1] : previous[5];
-    const startY = previous[0] === "M" ? previous[2] : previous[6];
-    const start = transformPoint(placement, startX, startY);
-    const parts = [`M ${round(start.x)} ${round(start.y)}`];
-    for (let i = span.from; i <= span.to; i++) {
-      const command = HAND_OUTLINE[i];
-      if (command === void 0 || command[0] !== "C") continue;
-      const c1 = transformPoint(placement, command[1], command[2]);
-      const c2 = transformPoint(placement, command[3], command[4]);
-      const to = transformPoint(placement, command[5], command[6]);
-      parts.push(
-        `C ${round(c1.x)} ${round(c1.y)} ${round(c2.x)} ${round(c2.y)} ${round(to.x)} ${round(to.y)}`
-      );
     }
     parts.push("Z");
     return parts.join(" ");
@@ -679,20 +651,6 @@ var PianoEngine = (() => {
       strokeWidth: round2(unit * 0.09),
       path: handPath(placement)
     });
-    const pressing = new Set(setting.targets.filter((t) => t.playing).map((t) => t.finger));
-    for (const finger of ALL_FINGERS) {
-      const path2 = fingerPath(placement, finger);
-      if (path2 === "") continue;
-      shapes.push({
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-        fill: colors.fingers[finger],
-        ...pressing.has(finger) ? { stroke: colors.edge, strokeWidth: round2(unit * 0.11) } : {},
-        path: path2
-      });
-    }
     for (const finger of [2, 3, 4]) {
       const tip = ARTWORK_TIPS[finger];
       const from = transformPoint(placement, tip.x * 0.74, tip.y * 0.52);
@@ -709,10 +667,26 @@ var PianoEngine = (() => {
       });
     }
     if (options.fingerNumbers !== false) {
+      const pressing = new Set(setting.targets.filter((t) => t.playing).map((t) => t.finger));
+      for (const finger of ALL_FINGERS) {
+        for (const shape of fingerNumberShape(
+          placement,
+          finger,
+          unit,
+          colors,
+          pressing.has(finger)
+        )) {
+          shapes.push(shape);
+        }
+      }
+    }
+    if (options.keyNames !== false) {
       for (const target of setting.targets) {
         if (!target.playing) continue;
+        if (target.midi === void 0) continue;
         const tip = placedTip(placement, target.finger);
-        const badge = unit * 0.34;
+        const badge = unit * 0.38;
+        const label = noteName(target.midi);
         shapes.push({
           x: round2(tip.x - badge),
           // Above the fingertip, where the hand is not -- but never off
@@ -725,14 +699,44 @@ var PianoEngine = (() => {
           stroke: colors.edge,
           strokeWidth: round2(unit * 0.07),
           radius: round2(badge),
-          label: String(target.finger),
-          labelSize: round2(badge * 1.35),
+          label,
+          // A sharp is two characters in the width a natural needs one,
+          // so it is set smaller rather than allowed to spill off its
+          // own badge.
+          labelSize: round2(badge * (label.length > 1 ? 0.95 : 1.35)),
           labelColor: colors.edge
         });
       }
     }
     return shapes;
   }
+  function fingerNumberShape(placement, finger, unit, colors, pressing) {
+    const size = unit * (pressing ? 0.46 : 0.38);
+    if (size < NUMBER_MIN_SIZE) return [];
+    const tip = ARTWORK_TIPS[finger];
+    const inset = finger === 1 ? { x: 0.78, y: 0.9 } : { x: 0.92, y: 0.84 };
+    const at = transformPoint(placement, tip.x * inset.x, tip.y * inset.y);
+    const box = size * 1.25;
+    return [
+      {
+        x: round2(at.x - box),
+        y: round2(at.y - box),
+        width: round2(box * 2),
+        height: round2(box * 2),
+        // The finger doing the work wears its number in a filled badge;
+        // the other four carry theirs on the skin. One mark doing two
+        // jobs -- which finger, and which one is down -- where a ring or
+        // a dot would have been a second mark saying the same thing.
+        fill: pressing ? colors.tip : "none",
+        ...pressing ? { stroke: colors.edge, strokeWidth: round2(unit * 0.06) } : {},
+        radius: round2(box),
+        label: String(finger),
+        labelSize: round2(size),
+        labelColor: colors.edge
+      }
+    ];
+  }
+  var NUMBER_MIN_SIZE = 6;
   function handsShapes(options) {
     return [...handShapes("left", options), ...handShapes("right", options)];
   }
@@ -1058,7 +1062,11 @@ var PianoEngine = (() => {
         anchors: options.hands.anchors,
         colors: options.hands.colors ?? DEFAULT_HAND_COLORS,
         ...options.hands.scale !== void 0 ? { scale: options.hands.scale } : {},
-        ...options.hands.fingerNumbers !== void 0 ? { fingerNumbers: options.hands.fingerNumbers } : {}
+        ...options.hands.fingerNumbers !== void 0 ? { fingerNumbers: options.hands.fingerNumbers } : {},
+        // The stage's own `keyNames` straight through, so one control on
+        // the page turns every name off at once rather than leaving this
+        // design's name on after the others have gone.
+        ...options.keyNames !== void 0 ? { keyNames: options.keyNames } : {}
       })) {
         shapes.push(shape);
       }

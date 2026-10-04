@@ -203,48 +203,46 @@ test('a pressing finger reaches up its own key, and only that finger', () => {
 
   // The hand is one artist's outline and cannot bend a single finger,
   // so the one thing it cannot say by itself is WHICH finger is down.
-  // Two marks say it instead: a ring round the pressing finger in the
-  // hand's own colour, and the finger's number on the key.
+  // The numbers say it: all five are drawn, and the one that is
+  // pressing wears its number in a FILLED badge where the other four
+  // carry theirs on the skin.
   const playingShapes = handsFor(notes, 1.5);
-  const numbered = playingShapes.filter((s) => s.label !== undefined);
-  assert.equal(numbered.length, 1, 'one badge, for the one finger playing');
-  assert.equal(numbered[0].label, String(playing.finger));
-  const ringed = playingShapes.filter(
-    (s) => s.path !== undefined && s.fill === P.DEFAULT_FINGER_COLORS[playing.finger],
-  );
-  assert.equal(ringed.length, 1, 'the playing finger is drawn once, in its own colour');
-  assert.equal(ringed[0].stroke, P.DEFAULT_HAND_COLORS.right.edge, 'and ringed in the hand colour');
+  const numbers = playingShapes.filter((s) => /^[1-5]$/.test(String(s.label)));
+  assert.equal(numbers.length, 5, 'every finger is numbered');
+  const filled = numbers.filter((s) => s.fill !== 'none');
+  assert.equal(filled.length, 1, 'and exactly one of them is the finger playing');
+  assert.equal(filled[0].label, String(playing.finger));
 
+  // At rest the five numbers are still there -- a learner reading the
+  // hand needs them whether or not a note is sounding -- but none of
+  // them is badged, because nothing is down.
   const restingShapes = handsFor(notes, 0.2);
-  assert.equal(restingShapes.filter((s) => s.label !== undefined).length, 0, 'no badge at rest');
-  const restingFinger = restingShapes.filter(
-    (s) => s.path !== undefined && s.fill === P.DEFAULT_FINGER_COLORS[playing.finger],
-  );
-  assert.equal(restingFinger.length, 1, 'the finger is still drawn');
-  assert.equal(restingFinger[0].stroke, undefined, 'but no ring when nothing is pressed');
+  const restingNumbers = restingShapes.filter((s) => /^[1-5]$/.test(String(s.label)));
+  assert.equal(restingNumbers.length, 5);
+  assert.equal(restingNumbers.filter((s) => s.fill !== 'none').length, 0, 'nothing is pressed');
 });
 
-test('every finger is drawn in its own colour, and the five are all different', () => {
+test('the fingers are not coloured in -- a hand is a hand, not a diagram of one', () => {
+  // They were, briefly. Five colours answer "which finger" faster than
+  // a number does, and the owner's call was that they turn a hand into
+  // a chart. The number is the smaller mark, it is the same symbol the
+  // notation uses, and it needs no key.
   const shapes = handsFor([note(60, 1, 'right', 2)], 1.5);
-  const fingerFills = shapes
-    .filter((s) => s.path !== undefined)
-    .map((s) => s.fill)
-    .filter((fill) => Object.values(P.DEFAULT_FINGER_COLORS).includes(fill));
-  // One hand's worth: five fingers, five colours, none repeated. Five
-  // shades of one thing is the hardest possible way to ask "which of
-  // these five", which is the only question the colours are for.
-  assert.equal(fingerFills.length, 5);
-  assert.equal(new Set(fingerFills).size, 5);
+  const fills = new Set(shapes.filter((s) => s.path !== undefined).map((s) => s.fill));
+  assert.equal(fills.size, 2, `one skin and one crease, got ${[...fills].join(',')}`);
+  assert.ok(fills.has(P.DEFAULT_HAND_COLORS.right.skin));
+});
 
-  // And the same five in the other hand, not a second palette: a
-  // learner thinks "finger 3", not "the right hand's finger 3".
-  const both = handsFor([note(60, 1, 'right', 2), note(48, 1, 'left', 2)], 1.5);
-  const all = both
-    .filter((s) => s.path !== undefined)
-    .map((s) => s.fill)
-    .filter((fill) => Object.values(P.DEFAULT_FINGER_COLORS).includes(fill));
-  assert.equal(all.length, 10, 'two hands, five fingers each');
-  assert.equal(new Set(all).size, 5, 'and one palette between them');
+test('every finger carries its own number, and all five are one size', () => {
+  const shapes = handsFor([note(60, 1, 'right', 2)], 0.2);
+  const numbers = shapes.filter((s) => /^[1-5]$/.test(String(s.label)));
+  assert.deepEqual(
+    [...numbers.map((s) => String(s.label))].sort(),
+    ['1', '2', '3', '4', '5'],
+    'one each, no repeats',
+  );
+  // Five numbers at five sizes read as a ranking rather than as labels.
+  assert.equal(new Set(numbers.map((s) => s.labelSize)).size, 1);
 });
 
 test('the hand points away from the player: the heel is at the front of the keys', () => {
@@ -307,9 +305,9 @@ test('three fingers down at once are three separate keys', () => {
     const key = keys.find((k) => k.midi === tip.midi);
     assert.ok(tip.x > key.x && tip.x < key.x + key.width, `finger ${tip.finger} is on its key`);
   }
-  // And each one is numbered, on its own key.
-  const badges = handsFor(chord, 1.5).filter((s) => s.label !== undefined);
-  assert.equal(badges.length, 3);
+  // And each one says WHICH NOTE it is, above its own key.
+  const named = handsFor(chord, 1.5).filter((s) => !/^[1-5]$/.test(String(s.label)) && s.label);
+  assert.deepEqual([...named.map((s) => String(s.label))].sort(), ['C', 'E', 'G']);
 });
 
 test('smaller hands are smaller, and the scale changes nothing else', () => {
@@ -393,7 +391,10 @@ test('the hands design keeps a strip in FRONT of the keys for the hands', () => 
   assert.ok(hands.height / unit < 8, 'a key stays a key');
 });
 
-test('a pressed key wears its finger number, up where the hand is not', () => {
+test('a pressed key says which note it is, up where the hand is not', () => {
+  // Every other design in this engine names a key at its front edge.
+  // Here a hand is in the way: the front of the keyboard is where the
+  // palm sits, and a name under a palm is a name nobody reads.
   const notes = [note(60, 1, 'right', 2)];
   const plan = P.planFingering(notes);
   const base = {
@@ -404,32 +405,52 @@ test('a pressed key wears its finger number, up where the hand is not', () => {
     hands: { notes: plan.notes, anchors: plan.anchors },
   };
   const shapes = P.stageShapes(base);
-  const badge = shapes.filter((s) => s.label !== undefined).at(-1);
+  const badge = shapes.at(-1);
   assert.ok(badge !== undefined, 'the badge is drawn');
-  assert.equal(badge.label, String(plan.notes[0].finger));
+  assert.equal(badge.label, 'C', 'middle C says C');
 
   const board = P.keyboardBox({ ...STAGE, design: 'hands', notes });
   const key = P.keyboardGeometry(88, board).find((k) => k.midi === 60);
   const centre = badge.x + badge.width / 2;
   assert.ok(centre > key.x && centre < key.x + key.width, 'on middle C');
-  // The palm is at the front of the keyboard, so the number is not.
+  // The palm is at the front of the keyboard, so the name is not.
   assert.ok(badge.y < board.y + board.height * 0.65, 'up the key, clear of the hand');
   assert.equal(shapes.at(-1), badge, 'and drawn last, so nothing covers it');
+});
 
-  const svg = P.renderPianoStage(base);
-  assert.ok(svg.includes('>' + badge.label + '<'), 'and it reaches the markup');
-  assert.ok(svg.includes('text-anchor="middle"'), 'centred on its badge');
+test('a sharp fits its own badge rather than spilling off it', () => {
+  const notes = [note(61, 1, 'right', 2)];
+  const plan = P.planFingering(notes);
+  const shapes = P.stageShapes({
+    ...STAGE,
+    seconds: 1.5,
+    notes,
+    design: 'hands',
+    hands: { notes: plan.notes, anchors: plan.anchors },
+  });
+  const badge = shapes.at(-1);
+  assert.equal(badge.label, 'C#');
+  // Two characters at roughly 0.62 em each, inside the badge's width.
+  assert.ok(badge.labelSize * 0.62 * 2 <= badge.width, 'the name fits the badge it is in');
+});
 
-  const off = P.stageShapes({ ...base, hands: { ...base.hands, fingerNumbers: false } });
-  assert.equal(
-    off.filter((s) => s.labelColor === badge.labelColor).length,
-    0,
-    'turned off when asked',
-  );
-  // The keyboard's own C marks are a separate thing and stay.
-  assert.ok(off.some((s) => /^C-?\d$/.test(s.label ?? '')), 'the C names are not finger numbers');
-  const quiet = P.stageShapes({ ...base, keyNames: false });
-  assert.equal(quiet.filter((s) => /^C-?\d$/.test(s.label ?? '')).length, 0, 'and can be hidden');
+test('turning the names off turns off this one too, not just the others', () => {
+  const notes = [note(60, 1, 'right', 2)];
+  const plan = P.planFingering(notes);
+  const shapes = P.stageShapes({
+    ...STAGE,
+    seconds: 1.5,
+    notes,
+    design: 'hands',
+    keyNames: false,
+    hands: { notes: plan.notes, anchors: plan.anchors },
+  });
+  const named = shapes.filter((s) => s.label !== undefined && !/^[1-5]$/.test(String(s.label)));
+  assert.equal(named.length, 0, 'no names anywhere');
+  // The finger numbers are a different control and are untouched. One
+  // hand here, because a piece with only right-hand notes gives the
+  // left hand nowhere to be.
+  assert.equal(shapes.filter((s) => /^[1-5]$/.test(String(s.label))).length, 5);
 });
 
 test('a scale longer than the hand is played in reaches, not a crawl', () => {

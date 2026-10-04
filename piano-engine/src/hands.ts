@@ -32,14 +32,14 @@
  */
 
 import { darken } from './color.js';
-import { keyboardGeometry } from './keyboard.js';
+import { keyboardGeometry, noteName } from './keyboard.js';
 import { ALL_FINGERS, anchorAt, fingersDownAt } from './fingering.js';
 import type { Finger, FingeredNote, HandAnchor } from './fingering.js';
 import type { Hand, KeyboardSize, PianoKey, StageShape } from './types.js';
 import { ARTWORK_TIPS, HAND_LENGTH } from './hand/artwork.js';
 import { placeHand, placedTip, transformPoint } from './hand/place.js';
 import type { FingerTarget, HandPlacement } from './hand/place.js';
-import { fingerPath, handPath } from './hand/draw.js';
+import { handPath } from './hand/draw.js';
 
 /**
  * The furthest forward a finger on a BLACK key may be, down the key.
@@ -185,6 +185,15 @@ export interface HandsOptions {
    * that reason.
    */
   readonly fingerNumbers?: boolean;
+  /**
+   * Whether a played key says which note it is. Default true.
+   *
+   * The stage passes its own `keyNames` straight through, so the one
+   * control on the page turns the names off everywhere at once: the
+   * standing C names, the name a falling bar carries down, and the name
+   * this design puts above the key being played.
+   */
+  readonly keyNames?: boolean;
 }
 
 /** Where one finger ends up, in the keyboard's own coordinates. */
@@ -374,36 +383,6 @@ export function handShapes(hand: Hand, options: HandsOptions): readonly StageSha
     path: handPath(placement),
   });
 
-  // Each finger, in its own colour, over the hand it belongs to.
-  //
-  // The SAME curves as the outline above -- `fingerPath` walks the
-  // stretch of the drawing that traces that finger and closes it across
-  // the base -- so a coloured finger cannot sit a hair off the hand: it
-  // IS the hand's own edge. The base chord is hidden under the palm,
-  // which is why these are drawn over the silhouette rather than
-  // instead of it: the hand is still one shape, with five of its parts
-  // picked out.
-  //
-  // No outline of their own, EXCEPT on the one that is pressing. The
-  // hand already has an outline, and ringing each finger separately at
-  // video size turns a hand into a diagram -- but the finger doing the
-  // work has to be findable in the half-second it is down, and a ring
-  // round it in the hand's own colour is the quietest way to say so.
-  const pressing = new Set(setting.targets.filter((t) => t.playing).map((t) => t.finger));
-  for (const finger of ALL_FINGERS) {
-    const path = fingerPath(placement, finger);
-    if (path === '') continue;
-    shapes.push({
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0,
-      fill: colors.fingers[finger],
-      ...(pressing.has(finger) ? { stroke: colors.edge, strokeWidth: round(unit * 0.11) } : {}),
-      path,
-    });
-  }
-
   // The knuckle creases. The drawing has none -- it is a silhouette --
   // and a silhouette on a keyboard reads as a glove. Three short marks
   // at the BASE of the long fingers, where a hand creases when it
@@ -427,23 +406,56 @@ export function handShapes(hand: Hand, options: HandsOptions): readonly StageSha
     });
   }
 
-  // A dot used to be painted on the pressing fingertip, in the hand's
-  // note colour, because a one-colour silhouette had no other way to
-  // say which finger was working. It is gone: the finger is now its own
-  // colour, and a blue dot on an orange finger was a second answer to a
-  // question the ring above already answers -- and the wrong colour for
-  // the finger it was on.
-
-  // The finger's number on the key it is playing.
+  // The number on each finger.
   //
-  // Last of everything, and up at the fingertip rather than down at the
-  // key's front, because the front of the keyboard is where the palm
-  // is. A number under the hand is a number nobody reads.
+  // Which is the thing the hand is drawn FOR. A learner reading a "3"
+  // over a note has to find the third finger, and on a bare silhouette
+  // that means counting across from the thumb -- at video speed, every
+  // time. The number says it outright.
+  //
+  // The fingers were briefly drawn in five different colours instead,
+  // which answers the same question and answers it faster. The owner's
+  // call was that a hand is a hand: five colours make it a diagram of
+  // one. A number is the smaller mark, it is the same symbol the
+  // notation above uses, and it needs no key.
+  //
+  // The one that is PRESSING gets a filled badge; the rest are plain.
+  // That is one mark doing two jobs -- which finger, and which one is
+  // working -- where a ring or a dot would have been a second.
   if (options.fingerNumbers !== false) {
+    const pressing = new Set(setting.targets.filter((t) => t.playing).map((t) => t.finger));
+    for (const finger of ALL_FINGERS) {
+      for (const shape of fingerNumberShape(
+        placement,
+        finger,
+        unit,
+        colors,
+        pressing.has(finger),
+      )) {
+        shapes.push(shape);
+      }
+    }
+  }
+
+  // And the NAME of the note being played, above the key it is on.
+  //
+  // Every other design in this engine names a key at its front edge,
+  // which is the right place when nothing is in the way. Here a hand
+  // is: the front of the keyboard is where the palm sits, and a name
+  // under a palm is a name nobody reads. So in this design it goes
+  // above the fingertip instead, on the key's own colour, which is the
+  // one piece of the key a hand never covers.
+  //
+  // The finger's number used to be here. It is on the finger now, where
+  // it belongs -- a number floating over a key never said WHICH finger
+  // without the reader tracing a line down to the hand.
+  if (options.keyNames !== false) {
     for (const target of setting.targets) {
       if (!target.playing) continue;
+      if (target.midi === undefined) continue;
       const tip = placedTip(placement, target.finger);
-      const badge = unit * 0.34;
+      const badge = unit * 0.38;
+      const label = noteName(target.midi);
       shapes.push({
         x: round(tip.x - badge),
         // Above the fingertip, where the hand is not -- but never off
@@ -456,8 +468,11 @@ export function handShapes(hand: Hand, options: HandsOptions): readonly StageSha
         stroke: colors.edge,
         strokeWidth: round(unit * 0.07),
         radius: round(badge),
-        label: String(target.finger),
-        labelSize: round(badge * 1.35),
+        label,
+        // A sharp is two characters in the width a natural needs one,
+        // so it is set smaller rather than allowed to spill off its
+        // own badge.
+        labelSize: round(badge * (label.length > 1 ? 0.95 : 1.35)),
         labelColor: colors.edge,
       });
     }
@@ -465,6 +480,65 @@ export function handShapes(hand: Hand, options: HandsOptions): readonly StageSha
 
   return shapes;
 }
+
+/**
+ * One finger's number, drawn on the finger itself.
+ *
+ * Just back from the fingertip -- on the last segment, where the finger
+ * is at its widest and where nothing else is drawn. Struck from the
+ * artwork's own fingertip rather than from an invented point, so it
+ * moves with the hand's spread and turn exactly as the finger does.
+ *
+ * Sized from the WHITE KEY and not from the finger, so all five are one
+ * size: five numbers at five sizes read as a ranking rather than as
+ * labels. Below `NUMBER_MIN_SIZE` they are dropped altogether -- a row
+ * of smudges on a hand is worse than a hand.
+ */
+function fingerNumberShape(
+  placement: HandPlacement,
+  finger: Finger,
+  unit: number,
+  colors: HandColors,
+  pressing: boolean,
+): readonly StageShape[] {
+  const size = unit * (pressing ? 0.46 : 0.38);
+  if (size < NUMBER_MIN_SIZE) return [];
+  const tip = ARTWORK_TIPS[finger];
+  // Back from the tip along the finger, far enough in that the digit
+  // sits ON the finger rather than half off its end. The thumb needs
+  // more: its recorded tip is the outline's extreme in X -- a thumb
+  // points sideways, so its "tip" is a corner rather than the middle of
+  // a rounded end -- and 0.92 of that is still on the edge.
+  const inset = finger === 1 ? { x: 0.78, y: 0.9 } : { x: 0.92, y: 0.84 };
+  const at = transformPoint(placement, tip.x * inset.x, tip.y * inset.y);
+  const box = size * 1.25;
+  return [
+    {
+      x: round(at.x - box),
+      y: round(at.y - box),
+      width: round(box * 2),
+      height: round(box * 2),
+      // The finger doing the work wears its number in a filled badge;
+      // the other four carry theirs on the skin. One mark doing two
+      // jobs -- which finger, and which one is down -- where a ring or
+      // a dot would have been a second mark saying the same thing.
+      fill: pressing ? colors.tip : 'none',
+      ...(pressing ? { stroke: colors.edge, strokeWidth: round(unit * 0.06) } : {}),
+      radius: round(box),
+      label: String(finger),
+      labelSize: round(size),
+      labelColor: colors.edge,
+    },
+  ];
+}
+
+/**
+ * The least a finger number may be drawn at, in pixels of the frame.
+ *
+ * Below this it is a mark rather than a digit, and five marks on a hand
+ * say less than a hand with nothing on it.
+ */
+const NUMBER_MIN_SIZE = 6;
 
 /** Both hands, left first so the right draws over it where they meet. */
 export function handsShapes(options: HandsOptions): readonly StageShape[] {
