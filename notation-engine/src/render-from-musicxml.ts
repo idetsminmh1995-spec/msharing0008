@@ -21,6 +21,7 @@ import {
   computeVoltaGeometry,
   voltaLabel,
   computeBeamShape,
+  computeBeamSegments,
   graceNoteGlyphName,
   computeLedgerLines,
   computeStemLength,
@@ -74,6 +75,8 @@ import {
 } from './layout/index.js';
 import { fretDigitGlyphNames, tabStringPosition } from './geometry/index.js';
 import { metronomeNoteGlyphName, metronomeDotGlyphName } from './geometry/metronome.js';
+import { dotPlacements, chordDotPlacements } from './geometry/augmentation-dot.js';
+import { renderAugmentationDots } from './render/augmentation-dot.js';
 import { renderMetronomeMark, metronomeMarkWidth } from './render/metronome.js';
 import { TICKS_PER_QUARTER } from './core/duration-math.js';
 import {
@@ -90,6 +93,7 @@ import { computeBraceShape, needsBrace, needsContinuousBarline } from './geometr
 import { renderBrace } from './render/index.js';
 import type { Diagnostic, MeasureAttributes } from './parser/index.js';
 import { parseMusicXml, type ParseMusicXmlOptions, type ParseResult } from './parser/index.js';
+import type { ScoreDefaults, ScoreLineWidths } from './parser/musicxml/defaults.js';
 import {
   resolveConfig,
   type EngineConfig,
@@ -207,9 +211,41 @@ interface RenderTheme {
   readonly noteheadMapping: NoteheadMappingConfig;
   /** `config.colors.overrides[category]`, falling back to `config.colors.ink`. */
   readonly colorOf: (category: ColorCategory) => string;
+  /**
+   * Integration W: the FILE's own `<defaults><appearance><line-width>`,
+   * in staff spaces. See `lineWidth` below for what it is for and where
+   * it sits in the order of precedence.
+   */
+  readonly fileLineWidths: ScoreLineWidths;
 }
 
-function buildTheme(config: EngineConfig): RenderTheme {
+/**
+ * How thick to draw a line, resolved in the order that is actually
+ * right:
+ *
+ *  1. the FILE's own `<defaults><appearance><line-width>`, because a
+ *     file that states the engraving it was written with is the
+ *     authority on it -- the same §10.8 rule the beam hints already
+ *     follow;
+ *  2. the music font's own SMuFL engraving default;
+ *  3. a hardcoded fallback, for a font whose metadata omits the metric.
+ *
+ * `fileKey` is undefined for the handful of widths MusicXML has no
+ * `<line-width>` type for at all (beam SPACING, a barline's separation,
+ * a dashed barline's dashes), which then resolve from the font as
+ * before.
+ */
+function lineWidth(
+  theme: RenderTheme,
+  fileKey: keyof ScoreLineWidths | undefined,
+  smuflKey: string,
+  fallback: number,
+): number {
+  const stated = fileKey === undefined ? undefined : theme.fileLineWidths[fileKey];
+  return stated ?? getEngravingDefault(smuflKey) ?? fallback;
+}
+
+function buildTheme(config: EngineConfig, fileDefaults: ScoreDefaults | undefined): RenderTheme {
   const overrides = config.colors.overrides;
   return {
     ink: config.colors.ink,
@@ -221,6 +257,7 @@ function buildTheme(config: EngineConfig): RenderTheme {
     drumMap: mergeDrumMappingTable(config.drums.mapping),
     noteheadMapping: config.noteheadMapping,
     colorOf: (category) => overrides?.[category] ?? config.colors.ink,
+    fileLineWidths: fileDefaults?.lineWidths ?? {},
   };
 }
 
@@ -1085,14 +1122,28 @@ function renderNoteheadPart(
         noteheadWidth: noteheadWidth(noteheadGlyph),
         staffBottomY: ctx.measureBottomY,
         extension: getEngravingDefault('legerLineExtension') ?? LEDGER_EXTENSION_FALLBACK,
-        thickness: getEngravingDefault('legerLineThickness') ?? LEDGER_THICKNESS_FALLBACK,
+        thickness: lineWidth(ctx.theme, 'leger', 'legerLineThickness', LEDGER_THICKNESS_FALLBACK),
         color: ctx.theme.colorOf('ledger'),
       }),
     );
   }
 
+  // Integration W: the dots of a dotted note. `duration.dots` reached
+  // the tick maths, the beaming and the playback timeline and was then
+  // dropped on the floor here, so a dotted quarter drew as a quarter.
+  parts.push(
+    renderAugmentationDots(
+      dotPlacements(note.duration.dots, x + noteheadWidth(noteheadGlyph), position),
+      {
+        staffBottomY: ctx.measureBottomY,
+        color: ctx.theme.colorOf('notehead'),
+        fontFamily: ctx.theme.musicFont,
+      },
+    ),
+  );
+
   return {
-    svg: parts.join('\n'),
+    svg: parts.filter((p) => p !== '').join('\n'),
     position,
     noteheadGlyph,
     newAccidentalState: state,
@@ -1114,13 +1165,29 @@ function renderNoteOrRest(
   tieAnchor?: { direction: StemDirection; position: number; noteheadGlyph: string };
 } {
   if (ev.kind === 'rest') {
-    const y = ctx.measureBottomY + restY(ev.duration.type, STAFF_LINES, restOffset);
-    const svg = renderRest(restGlyphName(ev.duration.type), {
-      x,
-      y,
-      color: ctx.theme.colorOf('rest'),
-      fontFamily: ctx.theme.musicFont,
-    });
+    const restPosition = restY(ev.duration.type, STAFF_LINES, restOffset);
+    const y = ctx.measureBottomY + restPosition;
+    const restGlyph = restGlyphName(ev.duration.type);
+    const svg = [
+      renderRest(restGlyph, {
+        x,
+        y,
+        color: ctx.theme.colorOf('rest'),
+        fontFamily: ctx.theme.musicFont,
+      }),
+      // A dotted rest is as real as a dotted note, and gets its dots the
+      // same way -- closer in, since there is no notehead to clear.
+      renderAugmentationDots(
+        dotPlacements(ev.duration.dots, x + glyphWidthOf(restGlyph), restPosition, 'rest'),
+        {
+          staffBottomY: ctx.measureBottomY,
+          color: ctx.theme.colorOf('rest'),
+          fontFamily: ctx.theme.musicFont,
+        },
+      ),
+    ]
+      .filter((part) => part !== '')
+      .join('\n');
     return { svg, newAccidentalState: accidentalState };
   }
 
@@ -1214,7 +1281,7 @@ function renderNoteOrRest(
         noteY: y,
         direction,
         length,
-        thickness: getEngravingDefault('stemThickness') ?? STEM_THICKNESS_FALLBACK,
+        thickness: lineWidth(ctx.theme, 'stem', 'stemThickness', STEM_THICKNESS_FALLBACK),
         color: ctx.theme.colorOf('stem'),
       }),
     );
@@ -1375,7 +1442,7 @@ function renderBeamGroup(
         // beam. Measured from the ATTACH notehead, so a chord's stem
         // spans the whole chord and still ends exactly on the beam.
         length: Math.abs(beamY - (y - anchor[1])),
-        thickness: getEngravingDefault('stemThickness') ?? STEM_THICKNESS_FALLBACK,
+        thickness: lineWidth(ctx.theme, 'stem', 'stemThickness', STEM_THICKNESS_FALLBACK),
         color: ctx.theme.colorOf('stem'),
       }),
     );
@@ -1407,12 +1474,21 @@ function renderBeamGroup(
     noteheadGlyph: m.glyph,
   }));
 
-  // §9.13's documented simplification: line count is the MAX across every
-  // event in the group (whichever duration needs the most beam lines --
-  // the finest subdivision present), not just the first one's own
-  // duration. A group like [eighth, 16th, 16th] needs 2 lines throughout,
-  // not 1.
-  const lineCount = Math.max(1, ...events.map((e) => numBeamLines(e.duration.type)));
+  // Every member's own beam count, which is what decides where the
+  // SECONDARY lines run. This used to be one number for the whole group
+  // -- the max across its members -- and that is exactly the bug a
+  // dotted eighth followed by a sixteenth shows: it gave the dotted
+  // eighth a sixteenth beam it does not have. `computeBeamSegments`
+  // turns these per-note counts into the lines actually engraved: the
+  // primary across the group, then a line per run of consecutive notes
+  // that need each further level, and a hook where such a run is one
+  // note long.
+  const beamLevels = events.map((e) => Math.max(1, numBeamLines(e.duration.type)));
+  // §10.8: the file's own <beam number="N">, which states outright which
+  // way a hook points. A chord's hints live on its first note, where
+  // MusicXML puts them.
+  const beamHints = events.map((e) => (e.kind === 'chord' ? e.notes[0]?.beams : e.beams));
+  const segments = computeBeamSegments(beamLevels, beamHints);
   // `shape`'s Y values are in staff-position-RELATIVE units (matching
   // `positions`, which came straight from staffPositionForPitch with no
   // offset) -- renderBeam draws in absolute SVG space, so the beam's own
@@ -1424,8 +1500,9 @@ function renderBeamGroup(
     endY: shape.endY + ctx.measureBottomY,
   };
   const beamSvg = renderBeam(offsetShape, {
-    lineCount,
-    thickness: getEngravingDefault('beamThickness') ?? BEAM_THICKNESS_FALLBACK,
+    segments,
+    stemXs,
+    thickness: lineWidth(ctx.theme, 'beam', 'beamThickness', BEAM_THICKNESS_FALLBACK),
     spacing: getEngravingDefault('beamSpacing') ?? BEAM_SPACING_FALLBACK,
     color: ctx.theme.colorOf('beam'),
   });
@@ -1470,7 +1547,18 @@ function renderChordHeadsPart(
   const alters: number[] = [];
   for (const n of chord.notes) {
     if (n.pitch.kind === 'pitched') {
-      const decision = evaluateAccidental(state, n.pitch.step, n.pitch.octave, n.pitch.alter);
+      // Integration W: `hasExplicitAccidental` was passed on the single-
+      // note path and forgotten here, so a courtesy accidental written
+      // on a CHORD member was silently dropped -- which is where real
+      // files put most of them, and exactly what the owner's own file
+      // does with its cautionary natural.
+      const decision = evaluateAccidental(
+        state,
+        n.pitch.step,
+        n.pitch.octave,
+        n.pitch.alter,
+        n.hasExplicitAccidental ?? false,
+      );
       state = decision.newState;
       drawFlags.push(decision.shouldDraw);
       alters.push(n.pitch.alter);
@@ -1527,15 +1615,34 @@ function renderChordHeadsPart(
           noteheadWidth: noteheadWidth(glyphName),
           staffBottomY: ctx.measureBottomY,
           extension: getEngravingDefault('legerLineExtension') ?? LEDGER_EXTENSION_FALLBACK,
-          thickness: getEngravingDefault('legerLineThickness') ?? LEDGER_THICKNESS_FALLBACK,
+          thickness: lineWidth(ctx.theme, 'leger', 'legerLineThickness', LEDGER_THICKNESS_FALLBACK),
           color: ctx.theme.colorOf('ledger'),
         }),
       );
     }
   });
 
+  // Integration W: every member's dots, in one shared column measured
+  // from the chord's widest notehead -- a chord's dots line up, and two
+  // members a second apart have theirs separated rather than printed on
+  // top of each other.
+  parts.push(
+    renderAugmentationDots(
+      chordDotPlacements(
+        chord.duration.dots,
+        x + noteheadWidth(widestGlyph ?? 'noteheadBlack'),
+        positions,
+      ),
+      {
+        staffBottomY: ctx.measureBottomY,
+        color: ctx.theme.colorOf('notehead'),
+        fontFamily: ctx.theme.musicFont,
+      },
+    ),
+  );
+
   return {
-    svg: parts.join('\n'),
+    svg: parts.filter((part) => part !== '').join('\n'),
     positions,
     glyphs,
     widestGlyph: widestGlyph ?? 'noteheadBlack',
@@ -1567,7 +1674,7 @@ function renderChord(
           noteY: ctx.measureBottomY + outermost,
           direction,
           length,
-          thickness: getEngravingDefault('stemThickness') ?? STEM_THICKNESS_FALLBACK,
+          thickness: lineWidth(ctx.theme, 'stem', 'stemThickness', STEM_THICKNESS_FALLBACK),
           color: ctx.theme.colorOf('stem'),
         }),
       );
@@ -1894,8 +2001,12 @@ function renderSpans(
       parts.push(
         renderSlur(shape, {
           color: ctx.theme.colorOf('slur'),
-          midpointThickness:
-            getEngravingDefault('slurMidpointThickness') ?? SLUR_MIDPOINT_THICKNESS_FALLBACK,
+          midpointThickness: lineWidth(
+            ctx.theme,
+            'slurMiddle',
+            'slurMidpointThickness',
+            SLUR_MIDPOINT_THICKNESS_FALLBACK,
+          ),
         }),
       );
     }
@@ -1979,8 +2090,12 @@ function renderSpans(
     if (tupletBracketNeeded(allMembersBeamed)) {
       parts.push(
         renderTupletBracket(computeTupletBracketShape(first.x, last.x, absoluteY, side), {
-          thickness:
-            getEngravingDefault('tupletBracketThickness') ?? TUPLET_BRACKET_THICKNESS_FALLBACK,
+          thickness: lineWidth(
+            ctx.theme,
+            'tupletBracket',
+            'tupletBracketThickness',
+            TUPLET_BRACKET_THICKNESS_FALLBACK,
+          ),
           color: ctx.theme.colorOf('tuplet'),
         }),
       );
@@ -2048,6 +2163,7 @@ export function renderParsedMusicXml(
     midiInstrumentsByPart: midiInstrumentsByPartMap,
     directions,
     prints,
+    defaults: fileDefaults,
   } = parsed;
   const diagnostics: Diagnostic[] = [...parseDiagnostics];
   const config = resolveConfig(options?.config);
@@ -2063,7 +2179,7 @@ export function renderParsedMusicXml(
   const drawnTempoMarks = config.tempoMarks.display === 'off' ? [] : tempoMarks;
   // Phase 50/§8: one resolution of every user-facing drawing value, passed
   // down on RenderCtx. Everything below reads `theme`, never a constant.
-  const theme = buildTheme(config);
+  const theme = buildTheme(config, fileDefaults);
   /** Phase 51/§18.3: the absolute y of every staff bottom line drawn, for the skyline overlay. */
   const staffBottomYs = new Set<number>();
   /** Whether this render has already said that a tab mask cannot work on a transparent background. */
@@ -2165,8 +2281,8 @@ export function renderParsedMusicXml(
     { readonly numerator: number; readonly denominator: number }
   >();
   const BARLINE_METRICS = {
-    thinThickness: getEngravingDefault('thinBarlineThickness') ?? 0.16,
-    thickThickness: getEngravingDefault('thickBarlineThickness') ?? 0.5,
+    thinThickness: lineWidth(theme, 'lightBarline', 'thinBarlineThickness', 0.16),
+    thickThickness: lineWidth(theme, 'heavyBarline', 'thickBarlineThickness', 0.5),
     separation: getEngravingDefault('barlineSeparation') ?? 0.4,
     dotWidth: 0.4,
     dashLength: getEngravingDefault('dashedBarlineDashLength') ?? 0.5,
@@ -2652,9 +2768,27 @@ export function renderParsedMusicXml(
       attributes.find((a) => a.partId === part.id)?.staffLinesByStaff[lowerStaffNumber] ??
       STAFF_LINES;
     const lowerStaffHeight = computeStaffGeometry(lowerStaffLines).height;
+    // Integration W: a `<print><staff-layout number="N"><staff-distance>`
+    // is the exporting program stating the gap it drew above staff N --
+    // measured, as MusicXML defines it, from the previous staff's bottom
+    // line to this one's top line, which is exactly the clearance
+    // `computeStaffDistance` floors. It is taken as a FLOOR rather than
+    // as the answer: the file's number was computed for the file's own
+    // engraving, and if this engine's skyline needs MORE room than that,
+    // giving it less would put a chord through a staff line.
+    const statedDistance = prints.reduce<number | undefined>((best, print) => {
+      if (print.partId !== part.id) return best;
+      const stated = print.layout?.staffDistances?.[lowerStaffNumber];
+      if (stated === undefined) return best;
+      return best === undefined ? stated : Math.max(best, stated);
+    }, undefined);
     return (
       lowerStaffHeight +
-      computeStaffDistance(upperSouth, lowerNorth, config.staves.minStaffDistance)
+      computeStaffDistance(
+        upperSouth,
+        lowerNorth,
+        Math.max(config.staves.minStaffDistance, statedDistance ?? 0),
+      )
     );
   };
 
@@ -3091,7 +3225,7 @@ export function renderParsedMusicXml(
             y: bottomY,
             width: layout.width,
             color: theme.colorOf('staff'),
-            lineThickness: getEngravingDefault('staffLineThickness') ?? 0.13,
+            lineThickness: lineWidth(theme, 'staff', 'staffLineThickness', 0.13),
           }),
         );
 
@@ -3137,7 +3271,12 @@ export function renderParsedMusicXml(
               renderHairpin(
                 computeHairpinShape(span.startX, span.endX, markY(dynamicSide()), span.kind),
                 {
-                  thickness: getEngravingDefault('hairpinThickness') ?? HAIRPIN_THICKNESS_FALLBACK,
+                  thickness: lineWidth(
+                    theme,
+                    'wedge',
+                    'hairpinThickness',
+                    HAIRPIN_THICKNESS_FALLBACK,
+                  ),
                   color: theme.colorOf('hairpin'),
                 },
               ),
@@ -3480,9 +3619,12 @@ export function renderParsedMusicXml(
                   svgParts.push(
                     renderTie(shape, {
                       color: theme.colorOf('tie'),
-                      midpointThickness:
-                        getEngravingDefault('tieMidpointThickness') ??
+                      midpointThickness: lineWidth(
+                        ctx.theme,
+                        'tieMiddle',
+                        'tieMidpointThickness',
                         TIE_MIDPOINT_THICKNESS_FALLBACK,
+                      ),
                     }),
                   );
                 }
@@ -3649,8 +3791,8 @@ export function renderParsedMusicXml(
         (nextStartsSystem ? undefined : nextAttrs?.leftRepeatDirection) ?? attrs.repeatDirection,
       );
       const barlineMetrics = {
-        thinThickness: getEngravingDefault('thinBarlineThickness') ?? 0.16,
-        thickThickness: getEngravingDefault('thickBarlineThickness') ?? 0.5,
+        thinThickness: lineWidth(theme, 'lightBarline', 'thinBarlineThickness', 0.16),
+        thickThickness: lineWidth(theme, 'heavyBarline', 'thickBarlineThickness', 0.5),
         separation: getEngravingDefault('barlineSeparation') ?? 0.4,
         dotWidth: 0.4,
         dashLength: getEngravingDefault('dashedBarlineDashLength') ?? 0.5,
@@ -3803,7 +3945,7 @@ export function renderParsedMusicXml(
         return staffBottomY + placement.systemY - topStaffHeight - voltaGap;
       };
       const metrics = {
-        thickness: getEngravingDefault('repeatEndingLineThickness') ?? 0.16,
+        thickness: lineWidth(theme, 'ending', 'repeatEndingLineThickness', 0.16),
         hookDepth: VOLTA_HOOK_DEPTH,
       };
 

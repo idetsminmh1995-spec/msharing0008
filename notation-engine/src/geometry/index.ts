@@ -29,3 +29,4 @@ export * from './beam-shape.js';
 export * from './tab.js';
 export * from './metronome.js';
 export * from './text-metrics.js';
+export * from './augmentation-dot.js';

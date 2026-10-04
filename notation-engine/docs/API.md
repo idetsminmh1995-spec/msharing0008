@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-591 exported symbols, by module.
+618 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -650,6 +650,19 @@ The diagnostics `level` lets through, in their original order.
 | function | `articulationSide` | §9.19's default rule ("notehead side") is the exact same relationship ties already use (§9.15): opposite the stem. |
 | function | `articulationGlyphName` | The real, pre-drawn SMuFL glyph for this articulation+side -- every articulation has its own separate Above/Below variant (confirmed against glyphnames.json before assuming a single glyph needing a transform), so this is a lookup, not a computed rotation. |
 
+### `src/geometry/augmentation-dot.ts`
+
+| | Name | Summary |
+|---|---|---|
+| function | `augmentationDotGlyphName` | The SMuFL glyph for one augmentation dot. |
+| const | `DOT_NOTE_DISTANCE` | From the notehead's right edge to the first dot. |
+| const | `DOT_DOT_DISTANCE` | Between one dot and the next. |
+| const | `DOT_REST_DISTANCE` | From a REST's right edge to its first dot -- closer, since a rest has no notehead to clear. |
+| interface | `DotPlacement` |  |
+| function | `dotPosition` | The staff position a dot takes for a note (or rest) sitting at `position`. |
+| function | `dotPlacements` | Every dot for one note or rest, left to right. |
+| function | `chordDotPlacements` | A chord's dots. |
+
 ### `src/geometry/barline.ts`
 
 | | Name | Summary |
@@ -686,6 +699,9 @@ The diagnostics `level` lets through, in their original order.
 | function | `computeBeamShape` | Computes the beam's two endpoints for a group. |
 | function | `beamYAtX` | The beam's Y at any X along its span (linear interpolation) -- used to find where an individual note's stem should actually end once the beam's own slope is known. |
 | function | `numBeamLines` | How many parallel beam lines a duration needs -- the same count §9.9's flag glyphs already use (1 for eighth, up to 8 for 1024th), since a beam is visually just "the flags joined together." |
+| const | `BEAM_HOOK_LENGTH` | The shortest a beam line may be drawn -- MuseScore's own `Sid::beamMinLen`, and the length a HOOK is given, since a hook is exactly "a beam with nothing on its other end." |
+| interface | `BeamSegment` | One drawn beam line: which level it is, and which notes of the group it runs between. |
+| function | `computeBeamSegments` | Which beam lines a group actually gets. |
 
 ### `src/geometry/chord-symbol.ts`
 
@@ -1199,6 +1215,24 @@ The diagnostics `level` lets through, in their original order.
 | interface | `AttributesUpdate` | The running per-part state an `<attributes>` element updates. |
 | function | `parseAttributesElement` | Parses one `<attributes>` element. |
 
+### `src/parser/musicxml/defaults.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `TENTHS_PER_STAFF_SPACE` | How many MusicXML tenths make one staff space. |
+| function | `tenthsToStaffSpaces` | Tenths to staff spaces. |
+| interface | `ScoreLineWidths` | The `<line-width type="...">` values this engine can actually use, mapped to the name it knows them by. |
+| interface | `ScoreScaling` |  |
+| interface | `ScorePageLayout` | A `<page-layout>`, in staff spaces. |
+| interface | `ScoreFont` |  |
+| interface | `ScoreDefaults` |  |
+| interface | `ScoreIdentity` | What the score calls itself: `<work>` and `<identification><creator>`. |
+| interface | `ScoreCredit` | One `<credit>` -- a piece of text the file places on the page itself (its title block, as the exporting program laid it out). |
+| function | `parseDefaults` | Parses `<defaults>`, or returns undefined when the file has none (most hand-written files do not). |
+| function | `parseIdentity` | Parses `<work>` and `<identification>` -- what the score calls itself and who wrote it. |
+| function | `parseCredits` | Parses every `<credit>` -- the text the file places on its own title page. |
+| function | `parsePrintLayout` | The `<system-layout>`/`<staff-layout>` one `<print>` carries, in staff spaces. |
+
 ### `src/parser/musicxml/diagnostic.ts`
 
 | | Name | Summary |
@@ -1278,6 +1312,7 @@ The diagnostics `level` lets through, in their original order.
 | interface | `DirectionEvent` | Phase 35 Tier 2/§10.4: one `<direction>`'s recognized content at the measure-local tick it appeared at. |
 | interface | `HarmonyEvent` | Phase 35 Tier 2/§10.4: one `<harmony>` (chord symbol) at a measure-local tick. |
 | interface | `PrintEvent` | Phase 35 Tier 2/§10.4: one `<print>`'s system/page break request. |
+| interface | `PrintLayout` | The layout hints one `<print>` carries, in staff spaces. |
 | interface | `ParseResult` |  |
 | interface | `DomParserLike` | Minimal shape of what a DOMParser needs to provide -- lets tests inject jsdom's (or any other) implementation, per §10's "tests inject a parser so Node can run them." */ |
 | interface | `ParseMusicXmlOptions` |  |
@@ -1365,6 +1400,13 @@ The diagnostics `level` lets through, in their original order.
 | interface | `RenderAccidentalOptions` |  |
 | function | `renderAccidental` | Draws one accidental glyph (from geometry's accidentalGlyphName) at the given position. |
 
+### `src/render/augmentation-dot.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `RenderDotsOptions` |  |
+| function | `renderAugmentationDots` | Draws one note's (or chord's, or rest's) augmentation dots. |
+
 ### `src/render/barline.ts`
 
 | | Name | Summary |
@@ -1379,7 +1421,7 @@ The diagnostics `level` lets through, in their original order.
 | | Name | Summary |
 |---|---|---|
 | interface | `RenderBeamOptions` |  |
-| function | `renderBeam` | Draws every parallel line for a beam group. |
+| function | `renderBeam` | Draws every beam line a group gets. |
 
 ### `src/render/clef.ts`
 

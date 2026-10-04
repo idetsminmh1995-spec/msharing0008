@@ -23,6 +23,7 @@ var NotationEngine = (() => {
   __export(index_exports, {
     ALTO_CLEF: () => ALTO_CLEF,
     BASS_CLEF: () => BASS_CLEF,
+    BEAM_HOOK_LENGTH: () => BEAM_HOOK_LENGTH,
     ByteReader: () => ByteReader,
     DEFAULT_ADVANCE_PER_EM: () => DEFAULT_ADVANCE_PER_EM,
     DEFAULT_CONFIG: () => DEFAULT_CONFIG,
@@ -30,6 +31,9 @@ var NotationEngine = (() => {
     DEFAULT_DRUM_MAPPING_TABLE: () => DEFAULT_DRUM_MAPPING_TABLE,
     DEFAULT_REPEAT_TIMES: () => DEFAULT_REPEAT_TIMES,
     DEFAULT_STEM_LENGTH: () => DEFAULT_STEM_LENGTH,
+    DOT_DOT_DISTANCE: () => DOT_DOT_DISTANCE,
+    DOT_NOTE_DISTANCE: () => DOT_NOTE_DISTANCE,
+    DOT_REST_DISTANCE: () => DOT_REST_DISTANCE,
     DRUM_FALLBACK_NOTEHEAD_SHAPE: () => DRUM_FALLBACK_NOTEHEAD_SHAPE,
     DRUM_FALLBACK_STAFF_POSITION: () => DRUM_FALLBACK_STAFF_POSITION,
     ENGINE_VERSION: () => ENGINE_VERSION,
@@ -42,6 +46,7 @@ var NotationEngine = (() => {
     SOPRANO_CLEF: () => SOPRANO_CLEF,
     TAB_CLEF: () => TAB_CLEF,
     TENOR_CLEF: () => TENOR_CLEF,
+    TENTHS_PER_STAFF_SPACE: () => TENTHS_PER_STAFF_SPACE,
     TICKS_PER_QUARTER: () => TICKS_PER_QUARTER,
     TREBLE_8VA_CLEF: () => TREBLE_8VA_CLEF,
     TREBLE_8VB_CLEF: () => TREBLE_8VB_CLEF,
@@ -57,6 +62,7 @@ var NotationEngine = (() => {
     articulationGlyphName: () => articulationGlyphName,
     articulationSide: () => articulationSide,
     assignAccidentalColumns: () => assignAccidentalColumns,
+    augmentationDotGlyphName: () => augmentationDotGlyphName,
     automaticStemDirection: () => automaticStemDirection,
     baseTicksForType: () => baseTicksForType,
     beamBeatTicks: () => beamBeatTicks,
@@ -73,6 +79,7 @@ var NotationEngine = (() => {
     charAdvance: () => charAdvance,
     checkMeasureOverflow: () => checkMeasureOverflow,
     chord: () => chord,
+    chordDotPlacements: () => chordDotPlacements,
     chordStemDirection: () => chordStemDirection,
     chordSymbolAccidentalGlyphName: () => chordSymbolAccidentalGlyphName,
     chordSymbolQualityGlyphName: () => chordSymbolQualityGlyphName,
@@ -81,6 +88,7 @@ var NotationEngine = (() => {
     codepointToChar: () => codepointToChar,
     computeAttackSpace: () => computeAttackSpace,
     computeBarlineGeometry: () => computeBarlineGeometry,
+    computeBeamSegments: () => computeBeamSegments,
     computeBeamShape: () => computeBeamShape,
     computeBraceShape: () => computeBraceShape,
     computeCursorPlacement: () => computeCursorPlacement,
@@ -113,6 +121,8 @@ var NotationEngine = (() => {
     denominatorText: () => denominatorText,
     diagnostic: () => diagnostic,
     diatonicIndex: () => diatonicIndex,
+    dotPlacements: () => dotPlacements,
+    dotPosition: () => dotPosition,
     drumChoiceOrder: () => drumChoiceOrder,
     drumDiagnostic: () => drumDiagnostic,
     drumStandIns: () => drumStandIns,
@@ -187,9 +197,13 @@ var NotationEngine = (() => {
     numBeamLines: () => numBeamLines,
     numeratorText: () => numeratorText,
     ornamentGlyphName: () => ornamentGlyphName,
+    parseCredits: () => parseCredits,
+    parseDefaults: () => parseDefaults,
+    parseIdentity: () => parseIdentity,
     parseMidiFile: () => parseMidiFile,
     parseMidiInstrumentMap: () => parseMidiInstrumentMap,
     parseMusicXml: () => parseMusicXml,
+    parsePrintLayout: () => parsePrintLayout,
     part: () => part,
     performanceSecondsToWritten: () => performanceSecondsToWritten,
     performanceTickToWritten: () => performanceTickToWritten,
@@ -202,6 +216,7 @@ var NotationEngine = (() => {
     readVariableLengthQuantity: () => readVariableLengthQuantity,
     rehearsalMarkSide: () => rehearsalMarkSide,
     renderAccidental: () => renderAccidental,
+    renderAugmentationDots: () => renderAugmentationDots,
     renderBarNumber: () => renderBarNumber,
     renderBarline: () => renderBarline,
     renderBeam: () => renderBeam,
@@ -267,6 +282,7 @@ var NotationEngine = (() => {
     svgToDataUri: () => svgToDataUri,
     tabStringPosition: () => tabStringPosition,
     tempoMarkSide: () => tempoMarkSide,
+    tenthsToStaffSpaces: () => tenthsToStaffSpaces,
     textWidth: () => textWidth,
     tickToPosition: () => tickToPosition,
     tickToSeconds: () => tickToSeconds,
@@ -59144,6 +59160,45 @@ var NotationEngine = (() => {
         );
     }
   }
+  var BEAM_HOOK_LENGTH = 1.1;
+  function computeBeamSegments(beamLevels2, hints) {
+    const count = beamLevels2.length;
+    if (count === 0) return [];
+    const maxLevel = Math.max(...beamLevels2);
+    if (maxLevel < 1) return [];
+    const segments = [];
+    segments.push({ level: 1, fromIndex: 0, toIndex: count - 1 });
+    for (let level = 2; level <= maxLevel; level++) {
+      let runStart;
+      for (let i2 = 0; i2 <= count; i2++) {
+        const needs = i2 < count && (beamLevels2[i2] ?? 0) >= level;
+        if (needs) {
+          if (runStart === void 0) runStart = i2;
+          continue;
+        }
+        if (runStart === void 0) continue;
+        const runEnd = i2 - 1;
+        if (runEnd > runStart) {
+          segments.push({ level, fromIndex: runStart, toIndex: runEnd });
+        } else {
+          segments.push({
+            level,
+            fromIndex: runStart,
+            toIndex: runStart,
+            hook: hookDirection(runStart, count, hints?.[runStart], level)
+          });
+        }
+        runStart = void 0;
+      }
+    }
+    return segments;
+  }
+  function hookDirection(index, count, hintsForNote, level) {
+    const stated = hintsForNote?.find((h) => h.number === level)?.value;
+    if (stated === "forward hook") return "forward";
+    if (stated === "backward hook") return "backward";
+    return index === 0 && count > 1 ? "forward" : "backward";
+  }
 
   // src/geometry/tab.ts
   function tabStringPosition(stringNumber, numLines, lineDistance = 1) {
@@ -59231,6 +59286,235 @@ var NotationEngine = (() => {
     let total = 0;
     for (const ch of text) total += estimateCharWidth(ch, fontSize);
     return total;
+  }
+
+  // src/musescore/style.ts
+  var STYLE_SOURCE = {
+    path: "src/engraving/style/styledef.cpp",
+    symbol: "StyleDef::styleValues[]",
+    what: "every default engraving measurement"
+  };
+  var BEAM_SPACING_SOURCE = {
+    path: "src/engraving/rendering/score/beamtremololayout.cpp",
+    symbol: "BeamTremoloLayout::setupLData",
+    what: "beam spacing in quarter-spaces (3 normal, 4 wide) and the distance it becomes"
+  };
+  var MUSESCORE_STYLE = {
+    /** One staff space, in millimetres: MuseScore's default page scale. */
+    spatiumMm: 1.75,
+    staff: {
+      /** Thickness of a staff line. */
+      lineWidth: 0.11,
+      /** Between the staves of two different instruments. */
+      staffDistance: 6.5,
+      /** Between the two staves of one grand staff. */
+      braceDistance: 6.5,
+      minSystemDistance: 8.5,
+      maxSystemDistance: 15
+    },
+    note: {
+      stemWidth: 0.1,
+      /** The smallest gap MuseScore will leave between two adjacent notes. */
+      minNoteDistance: 0.35,
+      /** Ledger lines: thickness, and how far they run past the notehead on EACH side. */
+      ledgerLineWidth: 0.16,
+      ledgerLineLength: 0.33,
+      /** From the notehead to its first augmentation dot, and between dots. */
+      dotNoteDistance: 0.5,
+      dotDotDistance: 0.65,
+      /** A rest's dot sits closer than a note's -- a rest has no head to clear. */
+      dotRestDistance: 0.25,
+      /** The dot itself, as a multiplier on full size. */
+      dotMag: 1,
+      /** Between an accidental and the notehead it belongs to, and between two accidentals. */
+      accidentalNoteDistance: 0.25,
+      accidentalDistance: 0.25,
+      /** Cue notes and grace notes, as a multiplier on full size. */
+      smallNoteMag: 0.7,
+      graceNoteMag: 0.7,
+      /** A cue staff, and a clef drawn mid-staff rather than at a system's head. */
+      smallStaffMag: 0.7,
+      smallClefMag: 0.8
+    },
+    /**
+     * Stems.
+     *
+     * `length` and `shortest` are plain multiples of a staff space rather
+     * than `_sp` values in MuseScore's own table, which is why they are
+     * written as bare numbers there. A stem reaches `length` from the
+     * notehead and is allowed to shorten, note by note, no further than
+     * `shortest`; `shortenFrom` is how many spaces past the staff a note
+     * has to be before the shortening starts.
+     */
+    stem: {
+      length: 3.5,
+      shortest: 2.5,
+      shorten: true,
+      shortenFrom: 1,
+      /** The slash through an acciaccatura's stem. */
+      slashPosition: 2,
+      slashAngleDegrees: 40,
+      slashThickness: 0.125
+    },
+    beam: {
+      /** Thickness of one beam. */
+      width: 0.5,
+      /**
+       * Between the centre lines of two stacked beams. MuseScore stores
+       * it as 3 quarter-spaces (4 when `useWideBeams` is on) and divides
+       * by four; this is that division done once.
+       */
+      distance: 0.75,
+      wideDistance: 1,
+      useWideBeams: false,
+      /** The shortest a beam may be. */
+      minLength: 1.1
+    },
+    barline: {
+      /** A normal barline, and one line of a double barline. */
+      width: 0.18,
+      doubleWidth: 0.18,
+      /** The thick line of a final or repeat barline. */
+      endWidth: 0.55,
+      /** The gap inside a double barline, and before a final one's thick line. */
+      doubleDistance: 0.37,
+      endDistance: 0.37
+    },
+    measure: {
+      /** The narrowest a measure may be drawn. */
+      minWidth: 8,
+      /**
+       * The spacing SLOPE -- see `spacing.ts`. Not a width: it is the
+       * factor a note's space is multiplied by each time its duration
+       * doubles.
+       */
+      spacing: 1.5,
+      spacingDensity: 1
+    },
+    /**
+     * What sits at the head of a system, and how far apart.
+     *
+     * A `*LeftMargin` is the gap BEFORE the thing; a `*Distance` is the
+     * gap between two of them; a `*RightMargin` is the gap after the
+     * thing before whatever follows. They are not interchangeable, and
+     * getting a clef's left margin where its right margin belongs shifts
+     * every system's first note.
+     */
+    header: {
+      clefLeftMargin: 0.75,
+      keysigLeftMargin: 0.5,
+      timesigLeftMargin: 0.63,
+      /** Clef to key signature, key signature to time signature, and so on. */
+      clefKeyDistance: 0.75,
+      clefKeyRightMargin: 0.8,
+      /** A clef or key change in the MIDDLE of a system is given more room. */
+      midClefKeyRightMargin: 1,
+      clefTimesigDistance: 1,
+      keyTimesigDistance: 1,
+      clefBarlineDistance: 0.5,
+      keyBarlineDistance: 1,
+      timesigBarlineDistance: 0.5,
+      /** The whole header to the first note, and the least it may be. */
+      systemHeaderDistance: 2.5,
+      systemHeaderTimeSigDistance: 2,
+      systemHeaderMinStartOfSystemDistance: 1.25,
+      /** The closing clef/key of a system to the right-hand margin. */
+      systemTrailerRightMargin: 0.5,
+      /** Between two accidentals of a key signature, and before a natural. */
+      keysigAccidentalDistance: 0.3,
+      keysigNaturalDistance: 0.4
+    },
+    /**
+     * How close a barline and the music either side of it may come.
+     *
+     * Asymmetric on purpose: a note needs more room after it before a
+     * barline (`noteBarDistance`) than a barline needs before the next
+     * note (`barNoteDistance`), and an accidental on that next note needs
+     * more again.
+     */
+    barlineSpacing: {
+      barNoteDistance: 1.25,
+      noteBarDistance: 1.5,
+      barAccidentalDistance: 0.65,
+      beginRepeatLeftMargin: 1
+    },
+    slur: {
+      endWidth: 0.05,
+      midWidth: 0.21,
+      tieEndWidth: 0.05,
+      tieMidWidth: 0.21,
+      minTieLength: 1
+    },
+    articulation: {
+      /** Between an articulation and whatever it is placed against. */
+      minDistance: 0.4,
+      distanceFromHead: 0.4,
+      distanceFromStem: 0.4,
+      /** The mark itself, as a multiplier on full size. */
+      mag: 1
+    },
+    rest: {
+      /**
+       * Where a rest sits with no other voice in the way, as a count of
+       * whole staff spaces DOWN from the top line. MuseScore computes it
+       * as `lines % 2 ? floor(lines / 2) : ceil(lines / 2)`, which on a
+       * five-line staff is 2 -- the middle line.
+       */
+      naturalLineForFiveLineStaff: 2,
+      /**
+       * A whole rest moves one space UP from that, so it hangs under the
+       * second line from the top.
+       */
+      wholeRestLineOffset: -1,
+      /**
+       * How far a rest moves out of the way when the staff has more than
+       * one voice: up for voices 1 and 3, down for 2 and 4, by this many
+       * whole spaces.
+       */
+      multiVoiceOffset: 1,
+      multiVoiceTwoSpaceOffset: false
+    }
+  };
+
+  // src/geometry/augmentation-dot.ts
+  function augmentationDotGlyphName() {
+    return "augmentationDot";
+  }
+  var DOT_NOTE_DISTANCE = MUSESCORE_STYLE.note.dotNoteDistance;
+  var DOT_DOT_DISTANCE = MUSESCORE_STYLE.note.dotDotDistance;
+  var DOT_REST_DISTANCE = MUSESCORE_STYLE.note.dotRestDistance;
+  function dotPosition(position) {
+    return Number.isInteger(position) ? position - 0.5 : position;
+  }
+  function dotPlacements(dots, rightEdge, position, kind = "note") {
+    if (dots <= 0) return [];
+    const first = rightEdge + (kind === "rest" ? DOT_REST_DISTANCE : DOT_NOTE_DISTANCE);
+    const y = dotPosition(position);
+    const placements = [];
+    for (let i2 = 0; i2 < dots; i2++) {
+      placements.push({ x: first + i2 * DOT_DOT_DISTANCE, position: y });
+    }
+    return placements;
+  }
+  function chordDotPlacements(dots, rightEdge, positions) {
+    if (dots <= 0 || positions.length === 0) return [];
+    const ordered = [...positions].sort((a, b) => a - b);
+    const taken = /* @__PURE__ */ new Set();
+    const rows = [];
+    for (const position of ordered) {
+      let y = dotPosition(position);
+      while (taken.has(y)) y += 1;
+      taken.add(y);
+      rows.push(y);
+    }
+    const first = rightEdge + DOT_NOTE_DISTANCE;
+    const placements = [];
+    for (const y of rows) {
+      for (let i2 = 0; i2 < dots; i2++) {
+        placements.push({ x: first + i2 * DOT_DOT_DISTANCE, position: y });
+      }
+    }
+    return placements;
   }
 
   // src/render/svg-primitives.ts
@@ -59570,21 +59854,31 @@ ${denominator}`;
 
   // src/render/beam.ts
   function renderBeam(shape, options) {
-    const { lineCount, thickness, spacing, color } = options;
+    const { segments, stemXs, thickness, spacing, color } = options;
     const towardNotehead = shape.direction === "up" ? 1 : -1;
     const centerStep = thickness + spacing;
     const lines = [];
-    for (let i2 = 0; i2 < lineCount; i2++) {
-      const offset = i2 * centerStep * towardNotehead;
-      const y1 = shape.startY + offset;
-      const y2 = shape.endY + offset;
+    for (const segment of segments) {
+      const anchorX = stemXs[segment.fromIndex];
+      if (anchorX === void 0) continue;
+      let x1 = anchorX;
+      let x2 = stemXs[segment.toIndex] ?? anchorX;
+      if (segment.hook === "backward") {
+        x2 = anchorX;
+        x1 = anchorX - BEAM_HOOK_LENGTH;
+      } else if (segment.hook === "forward") {
+        x2 = anchorX + BEAM_HOOK_LENGTH;
+      }
+      const offset = (segment.level - 1) * centerStep * towardNotehead;
+      const y1 = beamYAtX(shape, x1) + offset;
+      const y2 = beamYAtX(shape, x2) + offset;
       if (shape.style === "curved") {
-        const midX = (shape.startX + shape.endX) / 2;
+        const midX = (x1 + x2) / 2;
         const midY = (y1 + y2) / 2;
         const bow = 0.3 * -towardNotehead;
         lines.push(
           svgPath(
-            `M ${svgNumber(shape.startX)} ${svgNumber(y1)} Q ${svgNumber(midX)} ${svgNumber(midY + bow)} ${svgNumber(shape.endX)} ${svgNumber(y2)}`,
+            `M ${svgNumber(x1)} ${svgNumber(y1)} Q ${svgNumber(midX)} ${svgNumber(midY + bow)} ${svgNumber(x2)} ${svgNumber(y2)}`,
             {
               stroke: color,
               "stroke-width": thickness,
@@ -59593,9 +59887,7 @@ ${denominator}`;
           )
         );
       } else {
-        lines.push(
-          svgLine(shape.startX, y1, shape.endX, y2, { stroke: color, "stroke-width": thickness })
-        );
+        lines.push(svgLine(x1, y1, x2, y2, { stroke: color, "stroke-width": thickness }));
       }
     }
     return svgGroup(lines);
@@ -59814,6 +60106,20 @@ ${denominator}`;
       }
     }
     return svgGroup(paths, { class: "debug-skyline" });
+  }
+
+  // src/render/augmentation-dot.ts
+  function renderAugmentationDots(placements, options) {
+    if (placements.length === 0) return "";
+    const glyph = getGlyph(augmentationDotGlyphName());
+    if (glyph === void 0) {
+      throw new Error("No glyph found for the augmentation dot.");
+    }
+    return placements.map(
+      (p) => svgGlyphText(p.x, options.staffBottomY + p.position, glyph.char, options.fontFamily, {
+        fill: options.color
+      })
+    ).join("\n");
   }
 
   // src/config/config.ts
@@ -60502,6 +60808,198 @@ ${denominator}`;
     return partwiseRoot;
   }
 
+  // src/parser/musicxml/defaults.ts
+  var TENTHS_PER_STAFF_SPACE = 10;
+  function tenthsToStaffSpaces(tenths) {
+    return tenths / TENTHS_PER_STAFF_SPACE;
+  }
+  var LINE_WIDTH_NAMES = {
+    staff: "staff",
+    stem: "stem",
+    beam: "beam",
+    leger: "leger",
+    "light barline": "lightBarline",
+    "heavy barline": "heavyBarline",
+    "slur middle": "slurMiddle",
+    "slur tip": "slurTip",
+    "tie middle": "tieMiddle",
+    "tie tip": "tieTip",
+    "tuplet bracket": "tupletBracket",
+    wedge: "wedge",
+    ending: "ending",
+    bracket: "bracket"
+  };
+  function numberOf(el) {
+    const text = textOf(el);
+    if (text === void 0) return void 0;
+    const n = Number(text);
+    return Number.isFinite(n) ? n : void 0;
+  }
+  function numberAttrOf(el, name) {
+    const raw = attrOf(el, name);
+    if (raw === void 0) return void 0;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : void 0;
+  }
+  function tenthsAttr(el, name) {
+    const n = numberAttrOf(el, name);
+    return n === void 0 ? void 0 : tenthsToStaffSpaces(n);
+  }
+  function tenthsChild(parent, name) {
+    const n = numberOf(firstChildNamed(parent, name));
+    return n === void 0 ? void 0 : tenthsToStaffSpaces(n);
+  }
+  function parseFont(el) {
+    if (el === void 0) return void 0;
+    const family = attrOf(el, "font-family");
+    const size = numberAttrOf(el, "font-size");
+    if (family === void 0 && size === void 0) return void 0;
+    return { ...family !== void 0 ? { family } : {}, ...size !== void 0 ? { size } : {} };
+  }
+  function parseDefaults(root) {
+    const el = firstChildNamed(root, "defaults");
+    if (el === void 0) return void 0;
+    let scaling;
+    const scalingEl = firstChildNamed(el, "scaling");
+    if (scalingEl !== void 0) {
+      const millimetres = numberOf(firstChildNamed(scalingEl, "millimeters"));
+      const tenths = numberOf(firstChildNamed(scalingEl, "tenths"));
+      if (millimetres !== void 0 && tenths !== void 0 && tenths > 0) {
+        scaling = {
+          millimetres,
+          tenths,
+          staffSpaceMm: millimetres / tenths * TENTHS_PER_STAFF_SPACE
+        };
+      }
+    }
+    let pageLayout;
+    const pageEl = firstChildNamed(el, "page-layout");
+    if (pageEl !== void 0) {
+      const marginsEl = firstChildNamed(pageEl, "page-margins");
+      pageLayout = {
+        ...optional("width", tenthsChild(pageEl, "page-width")),
+        ...optional("height", tenthsChild(pageEl, "page-height")),
+        ...marginsEl !== void 0 ? {
+          ...optional("leftMargin", tenthsChild(marginsEl, "left-margin")),
+          ...optional("rightMargin", tenthsChild(marginsEl, "right-margin")),
+          ...optional("topMargin", tenthsChild(marginsEl, "top-margin")),
+          ...optional("bottomMargin", tenthsChild(marginsEl, "bottom-margin"))
+        } : {}
+      };
+    }
+    const lineWidths = {};
+    const noteSizes = {};
+    const appearanceEl = firstChildNamed(el, "appearance");
+    if (appearanceEl !== void 0) {
+      for (const widthEl of childrenNamed(appearanceEl, "line-width")) {
+        const type = attrOf(widthEl, "type");
+        const value = numberOf(widthEl);
+        if (type === void 0 || value === void 0) continue;
+        const name = LINE_WIDTH_NAMES[type];
+        if (name !== void 0) lineWidths[name] = tenthsToStaffSpaces(value);
+      }
+      for (const sizeEl of childrenNamed(appearanceEl, "note-size")) {
+        const type = attrOf(sizeEl, "type");
+        const value = numberOf(sizeEl);
+        if (type !== void 0 && value !== void 0) noteSizes[type] = value / 100;
+      }
+    }
+    return {
+      ...scaling !== void 0 ? { scaling } : {},
+      ...pageLayout !== void 0 ? { pageLayout } : {},
+      lineWidths,
+      noteSizes,
+      ...optional("musicFont", parseFont(firstChildNamed(el, "music-font"))),
+      ...optional("wordFont", parseFont(firstChildNamed(el, "word-font"))),
+      ...optional("lyricFont", parseFont(firstChildNamed(el, "lyric-font")))
+    };
+  }
+  function parseIdentity(root) {
+    const creators = {};
+    const rights = [];
+    const software = [];
+    const workEl = firstChildNamed(root, "work");
+    const identificationEl = firstChildNamed(root, "identification");
+    if (identificationEl !== void 0) {
+      for (const creatorEl of childrenNamed(identificationEl, "creator")) {
+        const type = attrOf(creatorEl, "type") ?? "composer";
+        const text = textOf(creatorEl);
+        if (text !== void 0 && text !== "") creators[type] = text;
+      }
+      for (const rightsEl of childrenNamed(identificationEl, "rights")) {
+        const text = textOf(rightsEl);
+        if (text !== void 0 && text !== "") rights.push(text);
+      }
+      const encodingEl = firstChildNamed(identificationEl, "encoding");
+      if (encodingEl !== void 0) {
+        for (const softwareEl of childrenNamed(encodingEl, "software")) {
+          const text = textOf(softwareEl);
+          if (text !== void 0 && text !== "") software.push(text);
+        }
+      }
+    }
+    return {
+      ...optional("workTitle", nonEmpty(textOf(firstChildNamed(workEl ?? root, "work-title")))),
+      ...optional("workNumber", nonEmpty(textOf(firstChildNamed(workEl ?? root, "work-number")))),
+      ...optional("movementTitle", nonEmpty(textOf(firstChildNamed(root, "movement-title")))),
+      ...optional("movementNumber", nonEmpty(textOf(firstChildNamed(root, "movement-number")))),
+      creators,
+      rights,
+      software
+    };
+  }
+  function parseCredits(root) {
+    const credits = [];
+    for (const el of childrenNamed(root, "credit")) {
+      const types = childrenNamed(el, "credit-type").map((t) => textOf(t)).filter((t) => t !== void 0 && t !== "");
+      const wordsEls = childrenNamed(el, "credit-words");
+      const words = wordsEls.map((w) => textOf(w) ?? "").filter((w) => w !== "").join(" ");
+      if (words === "") continue;
+      const first = wordsEls[0];
+      credits.push({
+        page: (first !== void 0 ? numberAttrOf(el, "page") : void 0) ?? 1,
+        types,
+        words,
+        ...first !== void 0 ? {
+          ...optional("x", tenthsAttr(first, "default-x")),
+          ...optional("y", tenthsAttr(first, "default-y")),
+          ...optional("justify", attrOf(first, "justify")),
+          ...optional("valign", attrOf(first, "valign")),
+          ...optional("fontSize", numberAttrOf(first, "font-size"))
+        } : {}
+      });
+    }
+    return credits;
+  }
+  function nonEmpty(text) {
+    return text === void 0 || text === "" ? void 0 : text;
+  }
+  function optional(key, value) {
+    return value === void 0 ? {} : { [key]: value };
+  }
+  function parsePrintLayout(printEl) {
+    const staffDistances = {};
+    for (const staffEl of childrenNamed(printEl, "staff-layout")) {
+      const number = numberAttrOf(staffEl, "number") ?? 1;
+      const distance = tenthsChild(staffEl, "staff-distance");
+      if (distance !== void 0) staffDistances[number] = distance;
+    }
+    const systemEl = firstChildNamed(printEl, "system-layout");
+    const marginsEl = systemEl === void 0 ? void 0 : firstChildNamed(systemEl, "system-margins");
+    const layout = {
+      ...Object.keys(staffDistances).length > 0 ? { staffDistances } : {},
+      ...systemEl !== void 0 ? {
+        ...optional("systemDistance", tenthsChild(systemEl, "system-distance")),
+        ...optional("topSystemDistance", tenthsChild(systemEl, "top-system-distance"))
+      } : {},
+      ...marginsEl !== void 0 ? {
+        ...optional("systemLeftMargin", tenthsChild(marginsEl, "left-margin")),
+        ...optional("systemRightMargin", tenthsChild(marginsEl, "right-margin"))
+      } : {}
+    };
+    return Object.keys(layout).length > 0 ? layout : void 0;
+  }
+
   // src/parser/musicxml/direction.ts
   var DYNAMIC_ELEMENTS = {
     ppp: "ppp",
@@ -60782,7 +61280,9 @@ ${denominator}`;
         midiInstrumentsByPart: /* @__PURE__ */ new Map(),
         directions: [],
         harmonies: [],
-        prints: []
+        prints: [],
+        identity: { creators: {}, rights: [], software: [] },
+        credits: []
       };
     }
     const partListEl = firstChildNamed(root, "part-list");
@@ -61017,10 +61517,17 @@ ${denominator}`;
           } else if (child.tagName === "print") {
             const newSystem = child.getAttribute("new-system") === "yes";
             const newPage = child.getAttribute("new-page") === "yes";
-            if (newSystem || newPage) {
-              prints.push({ partId, measureNumber, newSystem, newPage });
+            const layout = parsePrintLayout(child);
+            if (newSystem || newPage || layout !== void 0) {
+              prints.push({
+                partId,
+                measureNumber,
+                newSystem,
+                newPage,
+                ...layout !== void 0 ? { layout } : {}
+              });
             }
-            const ignoredPrintChildren = Array.from(child.children).map((c) => c.tagName);
+            const ignoredPrintChildren = Array.from(child.children).map((c) => c.tagName).filter((name) => name !== "system-layout" && name !== "staff-layout");
             if (ignoredPrintChildren.length > 0) {
               diagnostics.push(
                 diagnostic(
@@ -61139,6 +61646,7 @@ ${denominator}`;
         )
       );
     }
+    const fileDefaults = parseDefaults(root);
     return {
       score: score({ parts }),
       attributes: allAttributes,
@@ -61147,7 +61655,10 @@ ${denominator}`;
       midiInstrumentsByPart: midiInstrumentMaps,
       directions,
       harmonies,
-      prints
+      prints,
+      ...fileDefaults !== void 0 ? { defaults: fileDefaults } : {},
+      identity: parseIdentity(root),
+      credits: parseCredits(root)
     };
   }
 
@@ -62439,194 +62950,6 @@ ${denominator}`;
     });
     return { positions };
   }
-
-  // src/musescore/style.ts
-  var STYLE_SOURCE = {
-    path: "src/engraving/style/styledef.cpp",
-    symbol: "StyleDef::styleValues[]",
-    what: "every default engraving measurement"
-  };
-  var BEAM_SPACING_SOURCE = {
-    path: "src/engraving/rendering/score/beamtremololayout.cpp",
-    symbol: "BeamTremoloLayout::setupLData",
-    what: "beam spacing in quarter-spaces (3 normal, 4 wide) and the distance it becomes"
-  };
-  var MUSESCORE_STYLE = {
-    /** One staff space, in millimetres: MuseScore's default page scale. */
-    spatiumMm: 1.75,
-    staff: {
-      /** Thickness of a staff line. */
-      lineWidth: 0.11,
-      /** Between the staves of two different instruments. */
-      staffDistance: 6.5,
-      /** Between the two staves of one grand staff. */
-      braceDistance: 6.5,
-      minSystemDistance: 8.5,
-      maxSystemDistance: 15
-    },
-    note: {
-      stemWidth: 0.1,
-      /** The smallest gap MuseScore will leave between two adjacent notes. */
-      minNoteDistance: 0.35,
-      /** Ledger lines: thickness, and how far they run past the notehead on EACH side. */
-      ledgerLineWidth: 0.16,
-      ledgerLineLength: 0.33,
-      /** From the notehead to its first augmentation dot, and between dots. */
-      dotNoteDistance: 0.5,
-      dotDotDistance: 0.65,
-      /** A rest's dot sits closer than a note's -- a rest has no head to clear. */
-      dotRestDistance: 0.25,
-      /** The dot itself, as a multiplier on full size. */
-      dotMag: 1,
-      /** Between an accidental and the notehead it belongs to, and between two accidentals. */
-      accidentalNoteDistance: 0.25,
-      accidentalDistance: 0.25,
-      /** Cue notes and grace notes, as a multiplier on full size. */
-      smallNoteMag: 0.7,
-      graceNoteMag: 0.7,
-      /** A cue staff, and a clef drawn mid-staff rather than at a system's head. */
-      smallStaffMag: 0.7,
-      smallClefMag: 0.8
-    },
-    /**
-     * Stems.
-     *
-     * `length` and `shortest` are plain multiples of a staff space rather
-     * than `_sp` values in MuseScore's own table, which is why they are
-     * written as bare numbers there. A stem reaches `length` from the
-     * notehead and is allowed to shorten, note by note, no further than
-     * `shortest`; `shortenFrom` is how many spaces past the staff a note
-     * has to be before the shortening starts.
-     */
-    stem: {
-      length: 3.5,
-      shortest: 2.5,
-      shorten: true,
-      shortenFrom: 1,
-      /** The slash through an acciaccatura's stem. */
-      slashPosition: 2,
-      slashAngleDegrees: 40,
-      slashThickness: 0.125
-    },
-    beam: {
-      /** Thickness of one beam. */
-      width: 0.5,
-      /**
-       * Between the centre lines of two stacked beams. MuseScore stores
-       * it as 3 quarter-spaces (4 when `useWideBeams` is on) and divides
-       * by four; this is that division done once.
-       */
-      distance: 0.75,
-      wideDistance: 1,
-      useWideBeams: false,
-      /** The shortest a beam may be. */
-      minLength: 1.1
-    },
-    barline: {
-      /** A normal barline, and one line of a double barline. */
-      width: 0.18,
-      doubleWidth: 0.18,
-      /** The thick line of a final or repeat barline. */
-      endWidth: 0.55,
-      /** The gap inside a double barline, and before a final one's thick line. */
-      doubleDistance: 0.37,
-      endDistance: 0.37
-    },
-    measure: {
-      /** The narrowest a measure may be drawn. */
-      minWidth: 8,
-      /**
-       * The spacing SLOPE -- see `spacing.ts`. Not a width: it is the
-       * factor a note's space is multiplied by each time its duration
-       * doubles.
-       */
-      spacing: 1.5,
-      spacingDensity: 1
-    },
-    /**
-     * What sits at the head of a system, and how far apart.
-     *
-     * A `*LeftMargin` is the gap BEFORE the thing; a `*Distance` is the
-     * gap between two of them; a `*RightMargin` is the gap after the
-     * thing before whatever follows. They are not interchangeable, and
-     * getting a clef's left margin where its right margin belongs shifts
-     * every system's first note.
-     */
-    header: {
-      clefLeftMargin: 0.75,
-      keysigLeftMargin: 0.5,
-      timesigLeftMargin: 0.63,
-      /** Clef to key signature, key signature to time signature, and so on. */
-      clefKeyDistance: 0.75,
-      clefKeyRightMargin: 0.8,
-      /** A clef or key change in the MIDDLE of a system is given more room. */
-      midClefKeyRightMargin: 1,
-      clefTimesigDistance: 1,
-      keyTimesigDistance: 1,
-      clefBarlineDistance: 0.5,
-      keyBarlineDistance: 1,
-      timesigBarlineDistance: 0.5,
-      /** The whole header to the first note, and the least it may be. */
-      systemHeaderDistance: 2.5,
-      systemHeaderTimeSigDistance: 2,
-      systemHeaderMinStartOfSystemDistance: 1.25,
-      /** The closing clef/key of a system to the right-hand margin. */
-      systemTrailerRightMargin: 0.5,
-      /** Between two accidentals of a key signature, and before a natural. */
-      keysigAccidentalDistance: 0.3,
-      keysigNaturalDistance: 0.4
-    },
-    /**
-     * How close a barline and the music either side of it may come.
-     *
-     * Asymmetric on purpose: a note needs more room after it before a
-     * barline (`noteBarDistance`) than a barline needs before the next
-     * note (`barNoteDistance`), and an accidental on that next note needs
-     * more again.
-     */
-    barlineSpacing: {
-      barNoteDistance: 1.25,
-      noteBarDistance: 1.5,
-      barAccidentalDistance: 0.65,
-      beginRepeatLeftMargin: 1
-    },
-    slur: {
-      endWidth: 0.05,
-      midWidth: 0.21,
-      tieEndWidth: 0.05,
-      tieMidWidth: 0.21,
-      minTieLength: 1
-    },
-    articulation: {
-      /** Between an articulation and whatever it is placed against. */
-      minDistance: 0.4,
-      distanceFromHead: 0.4,
-      distanceFromStem: 0.4,
-      /** The mark itself, as a multiplier on full size. */
-      mag: 1
-    },
-    rest: {
-      /**
-       * Where a rest sits with no other voice in the way, as a count of
-       * whole staff spaces DOWN from the top line. MuseScore computes it
-       * as `lines % 2 ? floor(lines / 2) : ceil(lines / 2)`, which on a
-       * five-line staff is 2 -- the middle line.
-       */
-      naturalLineForFiveLineStaff: 2,
-      /**
-       * A whole rest moves one space UP from that, so it hangs under the
-       * second line from the top.
-       */
-      wholeRestLineOffset: -1,
-      /**
-       * How far a rest moves out of the way when the staff has more than
-       * one voice: up for voices 1 and 3, down for 2 and 4, by this many
-       * whole spaces.
-       */
-      multiVoiceOffset: 1,
-      multiVoiceTwoSpaceOffset: false
-    }
-  };
 
   // src/musescore/spacing.ts
   var SPACING_SOURCE = {
@@ -65801,7 +66124,11 @@ ${xrefOffset}
   var STAFF_BOTTOM_Y = 8;
   var SYSTEM_HEIGHT = 16;
   var MEASURE_WIDTH = 24;
-  function buildTheme(config) {
+  function lineWidth(theme, fileKey, smuflKey, fallback) {
+    const stated = fileKey === void 0 ? void 0 : theme.fileLineWidths[fileKey];
+    return stated ?? getEngravingDefault(smuflKey) ?? fallback;
+  }
+  function buildTheme(config, fileDefaults) {
     const overrides = config.colors.overrides;
     return {
       ink: config.colors.ink,
@@ -65812,7 +66139,8 @@ ${xrefOffset}
       beamStyle: config.beam.style,
       drumMap: mergeDrumMappingTable(config.drums.mapping),
       noteheadMapping: config.noteheadMapping,
-      colorOf: (category) => overrides?.[category] ?? config.colors.ink
+      colorOf: (category) => overrides?.[category] ?? config.colors.ink,
+      fileLineWidths: fileDefaults?.lineWidths ?? {}
     };
   }
   function withinMeasureSpacing(spacing) {
@@ -66146,13 +66474,23 @@ ${xrefOffset}
           noteheadWidth: noteheadWidth(noteheadGlyph),
           staffBottomY: ctx.measureBottomY,
           extension: getEngravingDefault("legerLineExtension") ?? LEDGER_EXTENSION_FALLBACK,
-          thickness: getEngravingDefault("legerLineThickness") ?? LEDGER_THICKNESS_FALLBACK,
+          thickness: lineWidth(ctx.theme, "leger", "legerLineThickness", LEDGER_THICKNESS_FALLBACK),
           color: ctx.theme.colorOf("ledger")
         })
       );
     }
+    parts.push(
+      renderAugmentationDots(
+        dotPlacements(note2.duration.dots, x2 + noteheadWidth(noteheadGlyph), position),
+        {
+          staffBottomY: ctx.measureBottomY,
+          color: ctx.theme.colorOf("notehead"),
+          fontFamily: ctx.theme.musicFont
+        }
+      )
+    );
     return {
-      svg: parts.join("\n"),
+      svg: parts.filter((p) => p !== "").join("\n"),
       position,
       noteheadGlyph,
       newAccidentalState: state,
@@ -66161,13 +66499,27 @@ ${xrefOffset}
   }
   function renderNoteOrRest(ev, x2, ctx, accidentalState, forcedDirection, restOffset) {
     if (ev.kind === "rest") {
-      const y2 = ctx.measureBottomY + restY(ev.duration.type, STAFF_LINES, restOffset);
-      const svg = renderRest(restGlyphName(ev.duration.type), {
-        x: x2,
-        y: y2,
-        color: ctx.theme.colorOf("rest"),
-        fontFamily: ctx.theme.musicFont
-      });
+      const restPosition = restY(ev.duration.type, STAFF_LINES, restOffset);
+      const y2 = ctx.measureBottomY + restPosition;
+      const restGlyph = restGlyphName(ev.duration.type);
+      const svg = [
+        renderRest(restGlyph, {
+          x: x2,
+          y: y2,
+          color: ctx.theme.colorOf("rest"),
+          fontFamily: ctx.theme.musicFont
+        }),
+        // A dotted rest is as real as a dotted note, and gets its dots the
+        // same way -- closer in, since there is no notehead to clear.
+        renderAugmentationDots(
+          dotPlacements(ev.duration.dots, x2 + glyphWidthOf(restGlyph), restPosition, "rest"),
+          {
+            staffBottomY: ctx.measureBottomY,
+            color: ctx.theme.colorOf("rest"),
+            fontFamily: ctx.theme.musicFont
+          }
+        )
+      ].filter((part2) => part2 !== "").join("\n");
       return { svg, newAccidentalState: accidentalState };
     }
     if (ev.isGrace) {
@@ -66237,7 +66589,7 @@ ${xrefOffset}
           noteY: y,
           direction,
           length,
-          thickness: getEngravingDefault("stemThickness") ?? STEM_THICKNESS_FALLBACK,
+          thickness: lineWidth(ctx.theme, "stem", "stemThickness", STEM_THICKNESS_FALLBACK),
           color: ctx.theme.colorOf("stem")
         })
       );
@@ -66322,7 +66674,7 @@ ${xrefOffset}
           // beam. Measured from the ATTACH notehead, so a chord's stem
           // spans the whole chord and still ends exactly on the beam.
           length: Math.abs(beamY - (y - anchor[1])),
-          thickness: getEngravingDefault("stemThickness") ?? STEM_THICKNESS_FALLBACK,
+          thickness: lineWidth(ctx.theme, "stem", "stemThickness", STEM_THICKNESS_FALLBACK),
           color: ctx.theme.colorOf("stem")
         })
       );
@@ -66347,15 +66699,18 @@ ${xrefOffset}
       direction,
       noteheadGlyph: m.glyph
     }));
-    const lineCount = Math.max(1, ...events.map((e) => numBeamLines(e.duration.type)));
+    const beamLevels2 = events.map((e) => Math.max(1, numBeamLines(e.duration.type)));
+    const beamHints = events.map((e) => e.kind === "chord" ? e.notes[0]?.beams : e.beams);
+    const segments = computeBeamSegments(beamLevels2, beamHints);
     const offsetShape = {
       ...shape,
       startY: shape.startY + ctx.measureBottomY,
       endY: shape.endY + ctx.measureBottomY
     };
     const beamSvg = renderBeam(offsetShape, {
-      lineCount,
-      thickness: getEngravingDefault("beamThickness") ?? BEAM_THICKNESS_FALLBACK,
+      segments,
+      stemXs,
+      thickness: lineWidth(ctx.theme, "beam", "beamThickness", BEAM_THICKNESS_FALLBACK),
       spacing: getEngravingDefault("beamSpacing") ?? BEAM_SPACING_FALLBACK,
       color: ctx.theme.colorOf("beam")
     });
@@ -66375,7 +66730,13 @@ ${xrefOffset}
     const alters = [];
     for (const n of chord2.notes) {
       if (n.pitch.kind === "pitched") {
-        const decision = evaluateAccidental(state, n.pitch.step, n.pitch.octave, n.pitch.alter);
+        const decision = evaluateAccidental(
+          state,
+          n.pitch.step,
+          n.pitch.octave,
+          n.pitch.alter,
+          n.hasExplicitAccidental ?? false
+        );
         state = decision.newState;
         drawFlags.push(decision.shouldDraw);
         alters.push(n.pitch.alter);
@@ -66430,14 +66791,28 @@ ${xrefOffset}
             noteheadWidth: noteheadWidth(glyphName),
             staffBottomY: ctx.measureBottomY,
             extension: getEngravingDefault("legerLineExtension") ?? LEDGER_EXTENSION_FALLBACK,
-            thickness: getEngravingDefault("legerLineThickness") ?? LEDGER_THICKNESS_FALLBACK,
+            thickness: lineWidth(ctx.theme, "leger", "legerLineThickness", LEDGER_THICKNESS_FALLBACK),
             color: ctx.theme.colorOf("ledger")
           })
         );
       }
     });
+    parts.push(
+      renderAugmentationDots(
+        chordDotPlacements(
+          chord2.duration.dots,
+          x2 + noteheadWidth(widestGlyph ?? "noteheadBlack"),
+          positions
+        ),
+        {
+          staffBottomY: ctx.measureBottomY,
+          color: ctx.theme.colorOf("notehead"),
+          fontFamily: ctx.theme.musicFont
+        }
+      )
+    );
     return {
-      svg: parts.join("\n"),
+      svg: parts.filter((part2) => part2 !== "").join("\n"),
       positions,
       glyphs,
       widestGlyph: widestGlyph ?? "noteheadBlack",
@@ -66460,7 +66835,7 @@ ${xrefOffset}
             noteY: ctx.measureBottomY + outermost,
             direction,
             length,
-            thickness: getEngravingDefault("stemThickness") ?? STEM_THICKNESS_FALLBACK,
+            thickness: lineWidth(ctx.theme, "stem", "stemThickness", STEM_THICKNESS_FALLBACK),
             color: ctx.theme.colorOf("stem")
           })
         );
@@ -66656,7 +67031,12 @@ ${xrefOffset}
         parts.push(
           renderSlur(shape, {
             color: ctx.theme.colorOf("slur"),
-            midpointThickness: getEngravingDefault("slurMidpointThickness") ?? SLUR_MIDPOINT_THICKNESS_FALLBACK
+            midpointThickness: lineWidth(
+              ctx.theme,
+              "slurMiddle",
+              "slurMidpointThickness",
+              SLUR_MIDPOINT_THICKNESS_FALLBACK
+            )
           })
         );
       }
@@ -66721,7 +67101,12 @@ ${xrefOffset}
       if (tupletBracketNeeded(allMembersBeamed)) {
         parts.push(
           renderTupletBracket(computeTupletBracketShape(first.x, last.x, absoluteY, side), {
-            thickness: getEngravingDefault("tupletBracketThickness") ?? TUPLET_BRACKET_THICKNESS_FALLBACK,
+            thickness: lineWidth(
+              ctx.theme,
+              "tupletBracket",
+              "tupletBracketThickness",
+              TUPLET_BRACKET_THICKNESS_FALLBACK
+            ),
             color: ctx.theme.colorOf("tuplet")
           })
         );
@@ -66749,12 +67134,13 @@ ${xrefOffset}
       tempoMarks,
       midiInstrumentsByPart: midiInstrumentsByPartMap,
       directions,
-      prints
+      prints,
+      defaults: fileDefaults
     } = parsed;
     const diagnostics = [...parseDiagnostics];
     const config = resolveConfig(options?.config);
     const drawnTempoMarks = config.tempoMarks.display === "off" ? [] : tempoMarks;
-    const theme = buildTheme(config);
+    const theme = buildTheme(config, fileDefaults);
     const staffBottomYs = /* @__PURE__ */ new Set();
     let reportedTransparentTabMask = false;
     const pageSpacingConfig = config.spacing;
@@ -66808,8 +67194,8 @@ ${xrefOffset}
     const measureTicksByNumber = /* @__PURE__ */ new Map();
     const timeSignatureByMeasure = /* @__PURE__ */ new Map();
     const BARLINE_METRICS = {
-      thinThickness: getEngravingDefault("thinBarlineThickness") ?? 0.16,
-      thickThickness: getEngravingDefault("thickBarlineThickness") ?? 0.5,
+      thinThickness: lineWidth(theme, "lightBarline", "thinBarlineThickness", 0.16),
+      thickThickness: lineWidth(theme, "heavyBarline", "thickBarlineThickness", 0.5),
       separation: getEngravingDefault("barlineSeparation") ?? 0.4,
       dotWidth: 0.4,
       dashLength: getEngravingDefault("dashedBarlineDashLength") ?? 0.5,
@@ -67057,7 +67443,17 @@ ${xrefOffset}
       const lowerNorth = addToSkyline(emptySkyline("north"), { xStart: 0, xEnd: 1, y: lowerExtent });
       const lowerStaffLines = attributes.find((a) => a.partId === part2.id)?.staffLinesByStaff[lowerStaffNumber] ?? STAFF_LINES;
       const lowerStaffHeight = computeStaffGeometry(lowerStaffLines).height;
-      return lowerStaffHeight + computeStaffDistance(upperSouth, lowerNorth, config.staves.minStaffDistance);
+      const statedDistance = prints.reduce((best, print) => {
+        if (print.partId !== part2.id) return best;
+        const stated = print.layout?.staffDistances?.[lowerStaffNumber];
+        if (stated === void 0) return best;
+        return best === void 0 ? stated : Math.max(best, stated);
+      }, void 0);
+      return lowerStaffHeight + computeStaffDistance(
+        upperSouth,
+        lowerNorth,
+        Math.max(config.staves.minStaffDistance, statedDistance ?? 0)
+      );
     };
     const partStaffCounts = score2.parts.map((p) => {
       const a = firstAttributesByPart.get(p.id);
@@ -67300,7 +67696,7 @@ ${xrefOffset}
               y: bottomY,
               width: layout.width,
               color: theme.colorOf("staff"),
-              lineThickness: getEngravingDefault("staffLineThickness") ?? 0.13
+              lineThickness: lineWidth(theme, "staff", "staffLineThickness", 0.13)
             })
           );
           {
@@ -67332,7 +67728,12 @@ ${xrefOffset}
                 renderHairpin(
                   computeHairpinShape(span.startX, span.endX, markY(dynamicSide()), span.kind),
                   {
-                    thickness: getEngravingDefault("hairpinThickness") ?? HAIRPIN_THICKNESS_FALLBACK,
+                    thickness: lineWidth(
+                      theme,
+                      "wedge",
+                      "hairpinThickness",
+                      HAIRPIN_THICKNESS_FALLBACK
+                    ),
                     color: theme.colorOf("hairpin")
                   }
                 )
@@ -67517,7 +67918,12 @@ ${xrefOffset}
                     svgParts.push(
                       renderTie(shape, {
                         color: theme.colorOf("tie"),
-                        midpointThickness: getEngravingDefault("tieMidpointThickness") ?? TIE_MIDPOINT_THICKNESS_FALLBACK
+                        midpointThickness: lineWidth(
+                          ctx.theme,
+                          "tieMiddle",
+                          "tieMidpointThickness",
+                          TIE_MIDPOINT_THICKNESS_FALLBACK
+                        )
                       })
                     );
                   }
@@ -67625,8 +68031,8 @@ ${xrefOffset}
           (nextStartsSystem ? void 0 : nextAttrs?.leftRepeatDirection) ?? attrs.repeatDirection
         );
         const barlineMetrics = {
-          thinThickness: getEngravingDefault("thinBarlineThickness") ?? 0.16,
-          thickThickness: getEngravingDefault("thickBarlineThickness") ?? 0.5,
+          thinThickness: lineWidth(theme, "lightBarline", "thinBarlineThickness", 0.16),
+          thickThickness: lineWidth(theme, "heavyBarline", "thickBarlineThickness", 0.5),
           separation: getEngravingDefault("barlineSeparation") ?? 0.4,
           dotWidth: 0.4,
           dashLength: getEngravingDefault("dashedBarlineDashLength") ?? 0.5,
@@ -67725,7 +68131,7 @@ ${xrefOffset}
           return staffBottomY + placement.systemY - topStaffHeight - voltaGap;
         };
         const metrics = {
-          thickness: getEngravingDefault("repeatEndingLineThickness") ?? 0.16,
+          thickness: lineWidth(theme, "ending", "repeatEndingLineThickness", 0.16),
           hookDepth: VOLTA_HOOK_DEPTH
         };
         for (const span of spans) {

@@ -13,3 +13,4 @@ export type {
   ParsedWedgeType,
 } from './direction.js';
 export type { ParsedHarmony } from './harmony.js';
+export * from './defaults.js';

@@ -1,8 +1,14 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadEngine } from '../helpers/load-engine.js';
+import { testDomParser } from '../helpers/dom.js';
 
 const NE = loadEngine();
+const __dirname2 = path.dirname(fileURLToPath(import.meta.url));
+const domParser2 = testDomParser();
 
 describe('beam grouping (Phase 23)', () => {
   test('beamBeatTicks: simple meters use one denominator-note as the beat', () => {
@@ -205,5 +211,73 @@ describe('explicit <beam> hints (§10.4/§10.8)', () => {
     assert.equal(groups.length, 2);
     assert.deepEqual([...groups[0].eventIndices], [0, 1]);
     assert.deepEqual([...groups[1].eventIndices], [2, 3]);
+  });
+});
+
+describe('partial beams and hooks, end to end (Integration W)', () => {
+  const NE2 = NE;
+  const load = (n) =>
+    fs.readFileSync(
+      path.join(__dirname2, '..', 'fixtures', 'musicxml', n),
+      'utf8',
+    );
+
+  /** Every beam line actually drawn, as [x1, x2, y1, y2], left to right. */
+  const beamLines = (svg) =>
+    [
+      ...svg.matchAll(
+        /<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)" stroke="[^"]*" stroke-width="0\.5" \/>/g,
+      ),
+    ].map((m) => ({ x1: Number(m[1]), y1: Number(m[2]), x2: Number(m[3]), y2: Number(m[4]) }));
+
+  const render = () =>
+    NE2.renderFromMusicXml(load('dotted-eighth-sixteenth.musicxml'), { domParser: domParser2 });
+
+  test('renders with no diagnostics at all', () => {
+    assert.deepEqual([...render().diagnostics], []);
+  });
+
+  test('a dotted eighth beamed to a sixteenth gets ONE full beam and one short hook', () => {
+    const lines = beamLines(render().svg);
+    // Three groups in the bar; the first is the dotted eighth + 16th.
+    const first = lines.filter((l) => l.x1 < 11);
+    assert.equal(first.length, 2, 'one primary beam and one hook');
+    const [primary, hook] = first.sort((a, b) => b.x2 - b.x1 - (a.x2 - a.x1));
+    assert.ok(
+      primary.x2 - primary.x1 > hook.x2 - hook.x1,
+      'the primary beam is the longer of the two',
+    );
+    // The hook is a stub of exactly BEAM_HOOK_LENGTH, ending on the
+    // sixteenth's own stem (the group's right-hand end).
+    assert.ok(Math.abs(hook.x2 - hook.x1 - NE2.BEAM_HOOK_LENGTH) < 1e-9);
+    assert.ok(Math.abs(hook.x2 - primary.x2) < 1e-9, 'the hook ends on the last stem');
+  });
+
+  test('four sixteenths share two beams of the SAME full length', () => {
+    const lines = beamLines(render().svg).filter((l) => l.x1 > 11 && l.x1 < 17);
+    assert.equal(lines.length, 2);
+    assert.equal(lines[0].x1, lines[1].x1);
+    assert.equal(lines[0].x2, lines[1].x2);
+  });
+
+  test('two sixteenths inside a group of eighths share a real second line, not two hooks', () => {
+    const lines = beamLines(render().svg).filter((l) => l.x1 > 17);
+    assert.equal(lines.length, 2);
+    const secondary = lines.reduce((a, b) => (b.x2 - b.x1 < a.x2 - a.x1 ? b : a));
+    assert.ok(
+      secondary.x2 - secondary.x1 > NE2.BEAM_HOOK_LENGTH,
+      'two sixteenths in a row reach each other, so this is a line and not a stub',
+    );
+  });
+
+  test("the dotted eighth does NOT get the sixteenth's beam -- the defect this closes", () => {
+    // Before Integration W the line count was the MAX across the group,
+    // so BOTH lines ran the group's full width and the dotted eighth
+    // read as a sixteenth. The hook being shorter than the primary is
+    // exactly that difference, asserted on the drawing itself.
+    const first = beamLines(render().svg).filter((l) => l.x1 < 11);
+    const widths = first.map((l) => l.x2 - l.x1).sort((a, b) => a - b);
+    assert.equal(widths.length, 2);
+    assert.ok(widths[0] < widths[1] / 2, 'the second line must be a stub, not a full beam');
   });
 });

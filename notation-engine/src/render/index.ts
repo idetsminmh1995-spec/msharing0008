@@ -23,3 +23,4 @@ export * from './tab.js';
 export * from './metronome.js';
 export * from './cursor.js';
 export * from './debug-overlay.js';
+export * from './augmentation-dot.js';

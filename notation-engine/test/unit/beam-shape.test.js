@@ -85,23 +85,114 @@ describe('beam shape geometry (Phase 24)', () => {
   });
 });
 
+describe('beam segments -- which lines a group actually gets (Integration W)', () => {
+  // The engine runs in a vm sandbox, so the objects it returns carry
+  // that realm's Object.prototype and deepStrictEqual refuses them even
+  // when every field matches. Copied into this realm first.
+  const plain = (segments) => [...segments].map((s) => ({ ...s }));
+  const levels = (...n) => plain(NE.computeBeamSegments(n));
+
+  test('a group of plain eighths gets ONE line, running the whole group', () => {
+    assert.deepEqual(levels(1, 1, 1, 1), [{ level: 1, fromIndex: 0, toIndex: 3 }]);
+  });
+
+  test('a group of sixteenths gets two full lines', () => {
+    assert.deepEqual(levels(2, 2, 2, 2), [
+      { level: 1, fromIndex: 0, toIndex: 3 },
+      { level: 2, fromIndex: 0, toIndex: 3 },
+    ]);
+  });
+
+  test('a dotted eighth + a sixteenth: ONE full beam and a BACKWARD hook, not two full beams', () => {
+    // The real defect this closes. The engine used to draw as many full
+    // lines as the group's shortest note needed, which put a sixteenth
+    // beam across the dotted eighth as well.
+    assert.deepEqual(levels(1, 2), [
+      { level: 1, fromIndex: 0, toIndex: 1 },
+      { level: 2, fromIndex: 1, toIndex: 1, hook: 'backward' },
+    ]);
+  });
+
+  test('a sixteenth + a dotted eighth: the hook points FORWARD, since nothing is behind it', () => {
+    assert.deepEqual(levels(2, 1), [
+      { level: 1, fromIndex: 0, toIndex: 1 },
+      { level: 2, fromIndex: 0, toIndex: 0, hook: 'forward' },
+    ]);
+  });
+
+  test("the file's own <beam> wins over the inferred hook direction (Sec10.8)", () => {
+    const hints = [undefined, [{ number: 2, value: 'forward hook' }]];
+    assert.deepEqual(plain(NE.computeBeamSegments([1, 2], hints)), [
+      { level: 1, fromIndex: 0, toIndex: 1 },
+      { level: 2, fromIndex: 1, toIndex: 1, hook: 'forward' },
+    ]);
+  });
+
+  test('two sixteenths inside a group of eighths share a real second line, not two hooks', () => {
+    assert.deepEqual(levels(1, 2, 2, 1), [
+      { level: 1, fromIndex: 0, toIndex: 3 },
+      { level: 2, fromIndex: 1, toIndex: 2 },
+    ]);
+  });
+
+  test('separate runs at the same level each get their own line', () => {
+    assert.deepEqual(levels(2, 2, 1, 2, 2), [
+      { level: 1, fromIndex: 0, toIndex: 4 },
+      { level: 2, fromIndex: 0, toIndex: 1 },
+      { level: 2, fromIndex: 3, toIndex: 4 },
+    ]);
+  });
+
+  test('a 32nd in a group of eighths stacks a hook at every level it needs', () => {
+    assert.deepEqual(levels(1, 3), [
+      { level: 1, fromIndex: 0, toIndex: 1 },
+      { level: 2, fromIndex: 1, toIndex: 1, hook: 'backward' },
+      { level: 3, fromIndex: 1, toIndex: 1, hook: 'backward' },
+    ]);
+  });
+
+  test('an empty group draws nothing rather than throwing', () => {
+    assert.deepEqual(levels(), []);
+  });
+});
+
 describe('beam rendering (Phase 24)', () => {
-  test('renderBeam draws exactly lineCount lines for a straight/flat beam', () => {
+  const full = (count, level = 1) => [{ level, fromIndex: 0, toIndex: count - 1 }];
+
+  test('renderBeam draws one line per segment for a straight/flat beam', () => {
     const shape = NE.computeBeamShape([0, -1], [0, 10], 'up', 'straight', 3.5);
-    const svg = NE.renderBeam(shape, { lineCount: 2, thickness: 0.5, spacing: 0.25, color: '#000000' });
+    const svg = NE.renderBeam(shape, {
+      segments: [...full(2), ...full(2, 2)],
+      stemXs: [0, 10],
+      thickness: 0.5,
+      spacing: 0.25,
+      color: '#000000',
+    });
     assert.equal((svg.match(/<line/g) || []).length, 2);
   });
 
   test('renderBeam draws paths (not lines) for a curved beam', () => {
     const shape = NE.computeBeamShape([0, -1], [0, 10], 'up', 'curved', 3.5);
-    const svg = NE.renderBeam(shape, { lineCount: 1, thickness: 0.5, spacing: 0.25, color: '#000000' });
+    const svg = NE.renderBeam(shape, {
+      segments: full(2),
+      stemXs: [0, 10],
+      thickness: 0.5,
+      spacing: 0.25,
+      color: '#000000',
+    });
     assert.equal((svg.match(/<path/g) || []).length, 1);
     assert.equal((svg.match(/<line/g) || []).length, 0);
   });
 
   test('secondary beam centres are thickness+spacing apart, NOT spacing alone (they must not overlap)', () => {
     const shape = NE.computeBeamShape([0, 0], [0, 10], 'up', 'flat', 3.5); // flat at y=-3.5
-    const svg = NE.renderBeam(shape, { lineCount: 2, thickness: 0.5, spacing: 0.25, color: '#000000' });
+    const svg = NE.renderBeam(shape, {
+      segments: [...full(2), ...full(2, 2)],
+      stemXs: [0, 10],
+      thickness: 0.5,
+      spacing: 0.25,
+      color: '#000000',
+    });
     // SMuFL's beamSpacing is the GAP between beams, not their centre-to-
     // centre distance, so with thickness 0.5 the centres sit 0.75 apart.
     // Up-stem: primary at y=-3.5, secondary toward the notehead at y=-2.75.
@@ -117,5 +208,27 @@ describe('beam rendering (Phase 24)', () => {
     const ys = [...svg.matchAll(/y1="(-?[\d.]+)"/g)].map((m) => Number(m[1]));
     assert.equal(ys.length, 2);
     assert.ok(Math.abs(ys[0] - ys[1]) >= 0.5, 'beam centres must be at least one thickness apart');
+  });
+
+  test('a hook is drawn as a stub of its own, on the correct side of its stem', () => {
+    const shape = NE.computeBeamShape([0, 0], [0, 10], 'up', 'flat', 3.5);
+    const svg = NE.renderBeam(shape, {
+      segments: [
+        { level: 1, fromIndex: 0, toIndex: 1 },
+        { level: 2, fromIndex: 1, toIndex: 1, hook: 'backward' },
+      ],
+      stemXs: [0, 10],
+      thickness: 0.5,
+      spacing: 0.25,
+      color: '#000000',
+    });
+    const lines = [...svg.matchAll(/<line x1="([-\d.]+)" y1="[-\d.]+" x2="([-\d.]+)"/g)].map(
+      (m) => [Number(m[1]), Number(m[2])],
+    );
+    assert.equal(lines.length, 2);
+    assert.deepEqual(lines[0], [0, 10], 'the primary beam spans both stems');
+    // The hook ends ON its own stem and runs back toward the previous one.
+    assert.equal(lines[1][1], 10);
+    assert.equal(lines[1][0], 10 - NE.BEAM_HOOK_LENGTH);
   });
 });

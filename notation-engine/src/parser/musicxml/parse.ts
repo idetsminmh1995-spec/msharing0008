@@ -18,6 +18,15 @@ import { attrOf, childrenNamed, firstChildNamed, intOf, textOf } from './dom-hel
 import { parseMidiInstrumentMap } from './instrument.js';
 import { convertTimewiseToPartwise } from './timewise.js';
 import {
+  parseCredits,
+  parseDefaults,
+  parseIdentity,
+  parsePrintLayout,
+  type ScoreCredit,
+  type ScoreDefaults,
+  type ScoreIdentity,
+} from './defaults.js';
+import {
   directionPlacement,
   directionStaff,
   parseDirectionElement,
@@ -162,6 +171,24 @@ export interface PrintEvent {
   readonly measureNumber: number;
   readonly newSystem: boolean;
   readonly newPage: boolean;
+  /**
+   * Integration W: the layout this `<print>` carries, in staff spaces
+   * (the file writes tenths). Every field is optional because a
+   * `<print>` states only what it wants to change.
+   */
+  readonly layout?: PrintLayout;
+}
+
+/** The layout hints one `<print>` carries, in staff spaces. */
+export interface PrintLayout {
+  /** `<staff-layout number="N"><staff-distance>`, by staff number: the gap ABOVE that staff. */
+  readonly staffDistances?: Readonly<Record<number, number>>;
+  /** `<system-layout><system-distance>` -- between this system and the one before it. */
+  readonly systemDistance?: number;
+  /** `<system-layout><top-system-distance>` -- from the page's top margin to the first system. */
+  readonly topSystemDistance?: number;
+  readonly systemLeftMargin?: number;
+  readonly systemRightMargin?: number;
 }
 
 export interface ParseResult {
@@ -189,6 +216,16 @@ export interface ParseResult {
   readonly harmonies: readonly HarmonyEvent[];
   /** Phase 35 Tier 2/§10.4: every `<print>` that asks for a system or page break, in document order. */
   readonly prints: readonly PrintEvent[];
+  /**
+   * Integration W/§10.4: `<defaults>` -- the engraving the EXPORTING
+   * program used, in staff spaces. Undefined when the file carries no
+   * `<defaults>` at all, which most hand-written ones do not.
+   */
+  readonly defaults?: ScoreDefaults;
+  /** Integration W: `<work>` and `<identification>` -- what the score calls itself and who wrote it. */
+  readonly identity: ScoreIdentity;
+  /** Integration W: every `<credit>` the file places on its own title page, in document order. */
+  readonly credits: readonly ScoreCredit[];
 }
 
 /** Minimal shape of what a DOMParser needs to provide -- lets tests inject jsdom's (or any other) implementation, per §10's "tests inject a parser so Node can run them." */
@@ -386,6 +423,8 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
       directions: [],
       harmonies: [],
       prints: [],
+      identity: { creators: {}, rights: [], software: [] },
+      credits: [],
     };
   }
 
@@ -704,15 +743,26 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           // merely carries layout hints is not a break request.
           const newSystem = child.getAttribute('new-system') === 'yes';
           const newPage = child.getAttribute('new-page') === 'yes';
-          if (newSystem || newPage) {
-            prints.push({ partId, measureNumber, newSystem, newPage });
+          // Integration W: <system-layout> and <staff-layout> are read
+          // now rather than reported as dropped -- the staff distance a
+          // grand staff was exported with is the file telling this
+          // engine how far apart it drew the two staves.
+          const layout = parsePrintLayout(child);
+          if (newSystem || newPage || layout !== undefined) {
+            prints.push({
+              partId,
+              measureNumber,
+              newSystem,
+              newPage,
+              ...(layout !== undefined ? { layout } : {}),
+            });
           }
-          // A <print> also legally carries page/system/staff LAYOUT hints
-          // (<system-layout>, <staff-layout>, ...). Those are genuinely
-          // not read by this parser, and §10.7's no-silent-loss rule means
-          // saying so beats going quiet just because the same element's
-          // break attributes happen to be understood now.
-          const ignoredPrintChildren = Array.from(child.children).map((c) => c.tagName);
+          // Whatever is left under <print> genuinely is not read, and
+          // §10.7's no-silent-loss rule means saying so beats going
+          // quiet just because the rest of the element is understood.
+          const ignoredPrintChildren = Array.from(child.children)
+            .map((c) => c.tagName)
+            .filter((name) => name !== 'system-layout' && name !== 'staff-layout');
           if (ignoredPrintChildren.length > 0) {
             diagnostics.push(
               diagnostic(
@@ -866,6 +916,8 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
     );
   }
 
+  const fileDefaults = parseDefaults(root);
+
   return {
     score: makeScore({ parts }),
     attributes: allAttributes,
@@ -875,5 +927,8 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
     directions,
     harmonies,
     prints,
+    ...(fileDefaults !== undefined ? { defaults: fileDefaults } : {}),
+    identity: parseIdentity(root),
+    credits: parseCredits(root),
   };
 }

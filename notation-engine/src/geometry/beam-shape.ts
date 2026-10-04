@@ -150,3 +150,111 @@ export function numBeamLines(durationType: DurationType): number {
       );
   }
 }
+
+/**
+ * The shortest a beam line may be drawn -- MuseScore's own
+ * `Sid::beamMinLen`, and the length a HOOK is given, since a hook is
+ * exactly "a beam with nothing on its other end."
+ */
+export const BEAM_HOOK_LENGTH = 1.1;
+
+/** One drawn beam line: which level it is, and which notes of the group it runs between. */
+export interface BeamSegment {
+  /** 1 = the primary (eighth) beam, 2 = the sixteenth beam, and so on. */
+  readonly level: number;
+  /** Index into the group, of the note this line starts at. */
+  readonly fromIndex: number;
+  /** Index into the group, of the note this line ends at. Equal to `fromIndex` for a hook. */
+  readonly toIndex: number;
+  /**
+   * Set only on a HOOK -- a level that only one note of the group needs,
+   * drawn as a stub off that note's stem rather than as a line between
+   * two stems. 'backward' points left (toward the previous note),
+   * 'forward' points right.
+   */
+  readonly hook?: 'forward' | 'backward';
+}
+
+/**
+ * Which beam lines a group actually gets.
+ *
+ * This is the rule a dotted eighth followed by a sixteenth makes
+ * visible, and the one this engine used to get wrong: it drew as many
+ * parallel beams as the group's SHORTEST note needed, across the whole
+ * group, so the dotted eighth came out with a sixteenth beam it does not
+ * have. What is actually engraved is one full beam over both, plus a
+ * short hook on the sixteenth alone.
+ *
+ * The rule, level by level:
+ *
+ * - Level 1 always runs the length of the group -- that is what makes it
+ *   one group.
+ * - At level 2 and above, each maximal run of CONSECUTIVE notes that
+ *   need that level gets its own line. A run of two or more is drawn
+ *   between their stems; a run of exactly one has no other stem to reach
+ *   and becomes a hook.
+ *
+ * `hints` is the file's own `<beam number="N">` for each note, when it
+ * wrote them: MusicXML states a hook outright ("forward hook" /
+ * "backward hook"), and a file that says which way its hook points is
+ * the authority on it (§10.8). Where it says nothing, a hook points
+ * BACKWARD -- toward the note it shares its beat with -- except on the
+ * group's first note, which has nothing behind it.
+ */
+export function computeBeamSegments(
+  beamLevels: readonly number[],
+  hints?: readonly (readonly { readonly number: number; readonly value: string }[] | undefined)[],
+): readonly BeamSegment[] {
+  const count = beamLevels.length;
+  if (count === 0) return [];
+  const maxLevel = Math.max(...beamLevels);
+  if (maxLevel < 1) return [];
+
+  const segments: BeamSegment[] = [];
+
+  // Level 1 is the group itself, whatever the individual notes need --
+  // an eighth and a sixteenth beamed together still share one primary
+  // beam from the first stem to the last.
+  segments.push({ level: 1, fromIndex: 0, toIndex: count - 1 });
+
+  for (let level = 2; level <= maxLevel; level++) {
+    let runStart: number | undefined;
+    for (let i = 0; i <= count; i++) {
+      const needs = i < count && (beamLevels[i] ?? 0) >= level;
+      if (needs) {
+        if (runStart === undefined) runStart = i;
+        continue;
+      }
+      if (runStart === undefined) continue;
+      const runEnd = i - 1;
+      if (runEnd > runStart) {
+        segments.push({ level, fromIndex: runStart, toIndex: runEnd });
+      } else {
+        segments.push({
+          level,
+          fromIndex: runStart,
+          toIndex: runStart,
+          hook: hookDirection(runStart, count, hints?.[runStart], level),
+        });
+      }
+      runStart = undefined;
+    }
+  }
+
+  return segments;
+}
+
+function hookDirection(
+  index: number,
+  count: number,
+  hintsForNote: readonly { readonly number: number; readonly value: string }[] | undefined,
+  level: number,
+): 'forward' | 'backward' {
+  const stated = hintsForNote?.find((h) => h.number === level)?.value;
+  if (stated === 'forward hook') return 'forward';
+  if (stated === 'backward hook') return 'backward';
+  // Nothing stated: a lone short note hooks back toward the note it
+  // belongs with, which is the previous one -- unless it is the group's
+  // first note, where there is no previous one to point at.
+  return index === 0 && count > 1 ? 'forward' : 'backward';
+}
