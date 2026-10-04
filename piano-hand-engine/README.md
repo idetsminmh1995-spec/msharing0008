@@ -19,15 +19,19 @@ asset from any other product is used. The research below is read for
 
 ## Status
 
-**Phases 1 and 2 are built.** Everything after them is deliberately
+**Phases 1 to 3 are built.** Everything after them is deliberately
 absent rather than stubbed — an engine full of functions that return
 zero is an engine nobody can tell is unfinished.
+
+On the owner's own piano export: 185 notes, all placed on keys, split
+by staff, both hands fingered in 21ms with nothing strained and nothing
+left unfingered.
 
 | Phase | What it is | State |
 |---|---|---|
 | 1 | 88-key geometry, one rigged hand, static poses | **built** |
 | 2 | Notes to exact key positions | **built** |
-| 3 | Hand split, then fingering | — |
+| 3 | Hand split, then fingering | **built** |
 | 4 | Finger target to an IK pose | — |
 | 5 | Wrist trajectory | — |
 | 6 | Chords as one shape | — |
@@ -46,6 +50,11 @@ zero is an engine nobody can tell is unfinished.
 | `src/keyboard/pianoGeometry.ts` | 1 | A real piano in millimetres: 88 keys, black keys proud and short. |
 | `src/keyboard/keyPosition.ts` | 1 | A note to the point a fingertip touches, and how far a key is down. |
 | `src/kinematics/handPose.ts` | 6 | Bones, joints, joint limits, hand sizes, forward kinematics, static poses. |
+| `src/core/solver.ts` | 3 | A Viterbi with a beam. Knows nothing about pianos. |
+| `src/fingering/handSpan.ts` | 3 | How far apart two fingers can be — the one measurement the search turns on. |
+| `src/fingering/handSplit.ts` | 2 | Which hand, from the evidence, in order. |
+| `src/fingering/fingeringCost.ts` | 3 | What a fingering costs a player. |
+| `src/fingering/fingeringSolver.ts` | 3 | The candidates, the locks, and the answer. |
 
 ## The coordinate system
 
@@ -129,15 +138,66 @@ than `PianoNote` for exactly that reason.
 maps dynamics to a velocity, so `PerformanceNote.velocity` is optional
 and Phase 3 will have to decide what a missing one means.
 
-### What this engine will reuse rather than rebuild
+### Why nothing is shared with `finger-engine`
 
-`finger-engine/src/core/solver/` is a **generic shortest-path over
-stages** that already knows nothing about guitars: it is handed stages,
-a way to expand them, and two cost functions. That is exactly the shape
-of Module 3's fingering search. `finger-engine/src/core/hand-profiles.ts`
-already says in its own header that hand size belongs to the *person*,
-not the instrument. Phase 3 lifts both rather than writing a second
-Viterbi.
+`finger-engine` is the guitar and bass engine, and it stays that way.
+The owner's instruction is that the instruments stay apart — a guitar
+and a bass already finger differently enough to need their own rules,
+and a piano is not a fretted instrument at all.
+
+It is worth saying what is NOT shared and why, because the shapes look
+alike from a distance. `finger-engine` has a generic shortest-path over
+stages, and so does this; they are both a Viterbi, because "the cheapest
+way through time" is the same problem wherever it turns up. But the
+things either side of the search have nothing in common:
+
+- A guitar's candidate is a **string and a fret**; a piano's is a
+  **finger**. One note can be played at four places on a guitar and at
+  exactly one on a piano — the whole search is a different shape.
+- A guitar hand's cost is a **barre, a stretch across frets, a finger
+  per string**; a piano hand's is a **span in millimetres, a thumb
+  passing under, a black key under a short finger**.
+- A guitar's left hand does not move the way a piano's does. A fret is a
+  discrete position; a keyboard is 1220mm of continuous travel.
+
+So the search is written here, for the piano, and the two engines never
+import from one another.
+
+## How the fingering is decided
+
+Not note by note. The finger that plays this note is the one that
+leaves the hand able to play the next four, and a solver that answers
+one note at a time cannot know that — it is why an automatic fingering
+puts the thumb somewhere a player never would and then has to leap.
+
+So the whole phrase is one search. Every onset offers several shapes,
+holding one costs something, moving between two costs something, and
+the cheapest path through the lot is the fingering. It is a Viterbi
+with a beam, so the whole piece is affordable: PianoPlayer looks 5 to 9
+notes ahead because it searches combinations, and a lattice does not
+have to.
+
+What a shape costs to **hold**: the span between every pair of fingers
+in it against what that pair reaches, the thumb on a black key, the
+little finger on a black key, a long finger threading between two
+blacks. Fingers that cross inside one chord, or two notes on one
+finger, are refused outright.
+
+What it costs to **move**: how far the hand travelled — measured from
+where the *thumb* would sit, not from the notes, because a run up a
+scale under one hand position moves the hand not at all — how little
+time it had to do it in, whether a repeated note changed finger
+pointlessly or kept a finger it cannot re-strike in time, and what
+crossed. A thumb passing under while the music keeps going the same way
+is the ordinary way a scale continues and is cheap; one that happens
+and turns straight back is the search finding a cheap move rather than
+a musical one, and costs more than not doing it. Any other crossing is
+a player doing something they would rather not.
+
+Three sources of fingering, in order: a **caller override** beats the
+**file's own `<fingering>`**, which beats the **search**. A stated
+finger becomes the only candidate for its note, so the notes around it
+are planned to fit it rather than fought against it.
 
 ## Rules
 
@@ -151,6 +211,10 @@ Viterbi.
 4. **Say what was inferred.** Every solved event carries a confidence:
    1 where the file stated the answer, lower where the engine guessed.
 5. **No placeholders.** A phase that is not built is absent.
+6. **A refusal is a refusal.** An impossible shape costs infinity and
+   is kept out of the search, so the solver asks for its rules to be
+   relaxed instead of carrying the impossible shape forward and calling
+   the stage solved.
 
 ## Build
 

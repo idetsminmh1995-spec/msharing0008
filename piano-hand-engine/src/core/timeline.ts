@@ -129,3 +129,38 @@ export function nextAfter<T extends Timed>(
   }
   return undefined;
 }
+
+/**
+ * Notes that sound together, grouped.
+ *
+ * A chord is one thing a hand does, not three things three fingers do,
+ * and every stage of the fingering search is an ONSET rather than a
+ * note. The tolerance is what makes a chord a chord: a MusicXML export
+ * and a MIDI file both put a chord's members at the same tick, but a
+ * performance captured from a keyboard spreads them over a few
+ * milliseconds and they are still one chord.
+ */
+export interface OnsetGroup<T extends Timed> {
+  readonly timeMs: number;
+  readonly notes: readonly T[];
+}
+
+/** Two onsets closer together than this are the same moment. */
+export const ONSET_TOLERANCE_MS = 12;
+
+export function groupByOnset<T extends Timed>(
+  events: readonly T[],
+  toleranceMs = ONSET_TOLERANCE_MS,
+): readonly OnsetGroup<T>[] {
+  const sorted = [...events].sort((a, b) => a.timeMs - b.timeMs);
+  const groups: { timeMs: number; notes: T[] }[] = [];
+  for (const event of sorted) {
+    const current = groups[groups.length - 1];
+    if (current !== undefined && event.timeMs - current.timeMs <= toleranceMs) {
+      current.notes.push(event);
+    } else {
+      groups.push({ timeMs: event.timeMs, notes: [event] });
+    }
+  }
+  return groups;
+}
