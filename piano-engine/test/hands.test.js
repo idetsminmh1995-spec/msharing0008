@@ -142,7 +142,7 @@ test('both hands are drawn, left first, and a hand with no notes is not invented
   );
 });
 
-test('a hand is five fingers, and the whole of it is one drawn shape', () => {
+test('a hand is five fingers, and the whole of it is ONE drawn shape', () => {
   const tips = tipsFor([note(60, 0)], 0);
   assert.equal(tips.length, 5, 'five fingers');
   assert.deepEqual(
@@ -152,31 +152,24 @@ test('a hand is five fingers, and the whole of it is one drawn shape', () => {
   );
 
   const shapes = handsFor([note(60, 0)], 0).filter((s) => s.path !== undefined);
-  // Two parts -- the hand and its thumb -- each painted twice: dark and
-  // fat underneath, skin at its true size on top. What shows of the
-  // dark pass is the outline of the two together, and nothing else.
-  const [edgeHand, edgeThumb, skinHand, skinThumb] = shapes;
   const { edge, skin } = P.DEFAULT_HAND_COLORS.right;
-  // Both dark passes come first, so neither of them can show up as a
-  // seam inside the skin that is painted over them.
-  assert.equal(edgeHand.fill, edge);
-  assert.equal(edgeThumb.stroke, edge);
-  assert.equal(skinHand.fill, skin);
-  assert.equal(skinThumb.stroke, skin);
-  assert.equal(edgeHand.path, skinHand.path, 'the same shape, twice');
-  assert.equal(edgeThumb.path, skinThumb.path);
-  assert.ok(edgeHand.strokeWidth > 0, 'the dark pass is the fatter one');
-  assert.equal(skinHand.stroke, undefined, 'and the skin pass is not stroked at all');
-  assert.ok(edgeThumb.strokeWidth > skinThumb.strokeWidth);
-  // The hand's own outline is a closed path: up each finger, round its
-  // tip, down into the web, and back along the heel.
-  assert.match(skinHand.path, /^M [-\d.]+ [-\d.]+ .*A .* Z$/, 'closed, and with arcs in it');
 
-  // Then the creases between the fingers and a nail on each tip: the
-  // two details that tell a hand from a mitten.
-  const creases = shapes.filter((s) => s.fill === 'none' && s.path.startsWith('M') && s !== edgeThumb && s !== skinThumb);
-  assert.equal(creases.length, 3, 'three gaps between four fingers');
-  assert.equal(shapes.filter((s) => s.fill === P.darken(skin, 0.1)).length, 5, 'five nails');
+  // The hand is the owner's own outline, drawn once: filled in skin and
+  // stroked in the hand's own colour. It is not assembled from parts
+  // any more, so there is no second pass to hide a seam between them,
+  // and no seam to hide.
+  const hand = shapes[0];
+  assert.equal(hand.fill, skin);
+  assert.equal(hand.stroke, edge);
+  assert.ok(hand.strokeWidth > 0);
+  assert.match(hand.path, /^M [-\d.]+ [-\d.]+ (C [-\d.]+ .*)Z$/, 'one closed path of cubics');
+  // Every curve of the artwork survives the move: 36 of them, and the
+  // close.
+  assert.equal((hand.path.match(/C /g) ?? []).length, 36);
+
+  // Then the knuckle creases, which are what tell a hand from a mitten.
+  const creases = shapes.filter((s) => s.fill === 'none');
+  assert.equal(creases.length, 3, 'three, across the base of the long fingers');
 });
 
 test('the middle finger is longer than the thumb and the little finger', () => {
@@ -199,20 +192,35 @@ test('a pressing finger reaches up its own key, and only that finger', () => {
   const middleC = keys.find((k) => k.midi === 60);
   assert.ok(playing.x > middleC.x && playing.x < middleC.x + middleC.width, 'on middle C');
 
-  // A finger already over its key does not have to reach further for
-  // it -- that is the whole point of the hand being where it is -- but
-  // it never pulls BACK towards the player to play one.
+  // The hand turns and slides to reach the key, so the playing finger's
+  // DEPTH is not fixed -- a turned hand's fingers really do sit at
+  // different depths. What must hold is that the finger is on the
+  // keyboard at all: between its front edge and its back.
   const was = resting.find((t) => t.finger === playing.finger);
-  assert.ok(playing.y <= was.y + 0.5, 'playing never retreats from resting');
-  assert.ok(playing.y > BOARD.y, 'and never off the back of the keyboard');
+  assert.ok(Number.isFinite(was.y));
+  assert.ok(playing.y > BOARD.y, 'not off the back of the keyboard');
+  assert.ok(playing.y < BOARD.y + BOARD.height, 'nor off the front of it');
 
-  // Nothing is drawn ON the finger to say it is playing: the key under
-  // it is lit, the finger has reached for it, and the number is on the
-  // key. Three cues for one fact, and a grey dot would be a fourth.
-  const numbered = handsFor(notes, 1.5).filter((s) => s.label !== undefined);
+  // The hand is one artist's outline and cannot bend a single finger,
+  // so the one thing it cannot say by itself is WHICH finger is down.
+  // Two marks say it instead: the pressing fingertip in the hand's own
+  // note colour, and the finger's number on the key.
+  const playingShapes = handsFor(notes, 1.5);
+  const numbered = playingShapes.filter((s) => s.label !== undefined);
   assert.equal(numbered.length, 1, 'one badge, for the one finger playing');
   assert.equal(numbered[0].label, String(playing.finger));
-  assert.equal(handsFor(notes, 0.2).filter((s) => s.label !== undefined).length, 0, 'none at rest');
+  const dots = playingShapes.filter(
+    (s) => s.fill === P.DEFAULT_HAND_COLORS.right.tip && s.label === undefined,
+  );
+  assert.equal(dots.length, 1, 'one fingertip marked, for the one finger playing');
+
+  const restingShapes = handsFor(notes, 0.2);
+  assert.equal(restingShapes.filter((s) => s.label !== undefined).length, 0, 'no badge at rest');
+  assert.equal(
+    restingShapes.filter((s) => s.fill === P.DEFAULT_HAND_COLORS.right.tip).length,
+    0,
+    'and no marked fingertip either',
+  );
 });
 
 test('the hand points away from the player: the heel is at the front of the keys', () => {

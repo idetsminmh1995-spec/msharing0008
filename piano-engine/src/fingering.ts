@@ -29,6 +29,9 @@ import type { Hand, PianoNote } from './types.js';
 /** Thumb, index, middle, ring, little. */
 export type Finger = 1 | 2 | 3 | 4 | 5;
 
+/** Thumb to little finger, in the order a player counts them. */
+export const ALL_FINGERS: readonly Finger[] = [1, 2, 3, 4, 5];
+
 export const FINGERS: readonly Finger[] = [1, 2, 3, 4, 5];
 
 /**

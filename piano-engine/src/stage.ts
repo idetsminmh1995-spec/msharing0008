@@ -10,7 +10,7 @@
  */
 import { parseColor } from './color.js';
 import { DEFAULT_HAND_COLORS, handsShapes } from './hands.js';
-import { REACH_PAST_KEYS } from './hand/anatomy.js';
+import { HAND_REACH_PAST_KEYS } from './hands.js';
 import { keyboardGeometry, pressedAt, whiteKeyCount } from './keyboard.js';
 import { n, path, rect, text, wrap } from './svg.js';
 import type {
@@ -87,7 +87,7 @@ const KEYBOARD_FRACTION = 1 / 3;
  * cut off at the wrist by the bottom of the frame.
  */
 const KEY_DEPTH = 7;
-const HAND_BAND = REACH_PAST_KEYS + 0.25;
+const HAND_BAND = HAND_REACH_PAST_KEYS;
 
 /** The strike line's thickness, as a fraction of the keyboard's height. */
 const LINE_FRACTION = 0.05;

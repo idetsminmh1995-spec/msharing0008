@@ -2,27 +2,29 @@
  * hands.ts — two hands on the keys.
  *
  * This file is the BRIDGE and nothing else: it turns a keyboard and a
- * fingering into the targets `hand/pose.ts` solves, and turns the
- * shapes `hand/draw.ts` gives back into the stage's own rectangles and
- * paths. The hand itself lives in `hand/`:
+ * fingering into the targets `hand/place.ts` fits, and turns what
+ * `hand/draw.ts` gives back into the stage's own shapes. The hand
+ * itself lives in `hand/`:
  *
- *   hand/anatomy.ts  what a hand is, measured in white keys
- *   hand/pose.ts     where it puts itself to play what it is playing
- *   hand/draw.ts     that pose, as one smooth shape
+ *   hand/artwork.ts  the owner's own drawing, in white keys
+ *   hand/place.ts    where it goes to play what it is playing
+ *   hand/draw.ts     that drawing, moved there
  *
- * None of those three know about keyboards, notes, seconds or SVG, and
- * none of them can be wrong about a hand in a way a keyboard could
+ * None of those three knows about keyboards, notes, seconds or SVG,
+ * and none of them can be wrong about a hand in a way a keyboard could
  * fix. That is the whole reason they are separate.
  *
  *
- * WHAT A HAND DOES THAT THE FIRST VERSIONS DID NOT
+ * THE HAND IS DRAWN, NOT ASSEMBLED
  *
- * It MOVES AND TURNS to play. A hand asked for a key its thumb cannot
- * reach does not grow a thumb -- it shifts along the keys and tilts,
- * and the other four fingers go with it, because a hand is one object.
- * Posing fingers one at a time is what produced a tentacle thumb and
- * fingers crossing their neighbours; posing the HAND once and letting
- * the fingers follow is what a player does.
+ * It used to be built here out of five posed fingers, and it looked
+ * built. It is now one outline the owner drew, and the engine's job is
+ * the part a program can do well: deciding where that outline goes.
+ *
+ * It MOVES, TURNS and OPENS to play. A hand asked for a key its thumb
+ * cannot reach does not grow a thumb -- it shifts along the keys,
+ * tilts, and spreads, and the other four fingers go with it, because a
+ * hand is one object.
  *
  * Both hands are on the keyboard the whole time, the way a player's
  * are: the one that is not playing does not leave, it waits over the
@@ -31,13 +33,13 @@
 
 import { darken } from './color.js';
 import { keyboardGeometry } from './keyboard.js';
-import { anchorAt, fingersDownAt } from './fingering.js';
+import { ALL_FINGERS, anchorAt, fingersDownAt } from './fingering.js';
 import type { Finger, FingeredNote, HandAnchor } from './fingering.js';
 import type { Hand, KeyboardSize, PianoKey, StageShape } from './types.js';
-import { ALL_FINGERS, KNUCKLE_FROM_FRONT, PALM_LENGTH } from './hand/anatomy.js';
-import { poseFingers, solvePose } from './hand/pose.js';
-import type { FingerTarget, PosedFinger } from './hand/pose.js';
-import { drawHand } from './hand/draw.js';
+import { ARTWORK_TIPS, HAND_LENGTH } from './hand/artwork.js';
+import { placeHand, placedTip, transformPoint } from './hand/place.js';
+import type { FingerTarget, HandPlacement } from './hand/place.js';
+import { handPath } from './hand/draw.js';
 
 /**
  * The furthest forward a finger on a BLACK key may be, down the key.
@@ -49,6 +51,35 @@ import { drawHand } from './hand/draw.js';
  * front, that has to come back for a black key, and the hand with it.
  */
 const BLACK_TIP_DEPTH = 0.45;
+
+/**
+ * How far inside the keyboard's front edge every fingertip must stay,
+ * in white keys.
+ *
+ * The drawing holds its thumb low and out to the side -- a flat hand's
+ * thumb, not a playing one's -- so it is the finger that falls off the
+ * front of the keys first, and this is what stops it. The hand draws
+ * itself back until the thumb is on the keyboard, exactly as it does
+ * for a black key, and for the same reason: a fingertip pressing the
+ * air in front of the keys is not playing anything.
+ */
+const TIP_INSIDE_FRONT = 0.3;
+
+/**
+ * How far in FRONT of the keys the wrist sits, in white keys.
+ *
+ * A hand at a keyboard does not have its wrist on the keys. Its
+ * fingertips rest about 40mm up a white key and its wrist is about
+ * 105mm forward of them, which is 65mm -- near enough three key widths
+ * -- out over the key slip.
+ *
+ * 1.5 rather than 3 because `PLAY_SCALE_Y` has already foreshortened
+ * the drawing, and because the number that has to come out right is
+ * where the fingertips land: the long fingers at about a third of the
+ * way up a white key, and the THUMB, which this drawing holds low and
+ * out to the side, still on the key rather than off the front of it.
+ */
+const WRIST_IN_FRONT = 1.5;
 
 export interface HandColors {
   /** The hand itself. */
@@ -167,6 +198,8 @@ interface HandSetting {
   readonly unit: number;
   readonly centreY: number;
   readonly side: -1 | 1;
+  /** The keyboard's own top edge, so a badge cannot be pushed off it. */
+  readonly boardTop: number;
 }
 
 /**
@@ -200,33 +233,54 @@ function settingFor(hand: Hand, options: HandsOptions): HandSetting | undefined 
         midi: held as number,
         onBlack: key.black,
         // A black key is shorter and set further back: a finger on one
-        // has to be ON it, not out in front of where it ends.
-        ...(key.black ? { depth: board.y + board.height * BLACK_TIP_DEPTH } : {}),
+        // has to be ON it, not out in front of where it ends. A white
+        // key only has to keep its finger on the keyboard at all.
+        depth: key.black
+          ? board.y + board.height * BLACK_TIP_DEPTH
+          : board.y + board.height - unit * TIP_INSIDE_FRONT,
       });
       continue;
     }
     const resting = hand === 'right' ? anchorWhite + (finger - 1) : anchorWhite - (finger - 1);
     const x = xAtWhite(whites, resting - offset);
     if (x === undefined) continue;
-    targets.push({ finger, x, playing: false });
+    targets.push({
+      finger,
+      x,
+      playing: false,
+      depth: board.y + board.height - unit * TIP_INSIDE_FRONT,
+    });
   }
   if (targets.length === 0) return undefined;
 
   return {
     targets,
     unit,
-    // A player's hand rests a fixed distance in from the front edge of
-    // the keys. The keys being long or short behind it changes nothing.
-    centreY: board.y + board.height - unit * KNUCKLE_FROM_FRONT,
+    // Where the WRIST sits.
+    //
+    // NOT at the front edge of the keys, which is where this first put
+    // it and which is wrong by about 65mm: a player's fingertips rest
+    // roughly 40mm up a white key and their wrist is about 105mm
+    // forward of those fingertips, so the wrist is out IN FRONT of the
+    // keyboard, over the key slip. `WRIST_IN_FRONT` is that gap, and
+    // it is what puts the fingertips on the front third of the keys
+    // instead of up among the black ones.
+    centreY: board.y + board.height + unit * WRIST_IN_FRONT,
     side: hand === 'right' ? -1 : 1,
+    boardTop: board.y,
   };
 }
 
-function posedFor(hand: Hand, options: HandsOptions): readonly PosedFinger[] {
+function placementFor(
+  hand: Hand,
+  options: HandsOptions,
+): { readonly placement: HandPlacement; readonly setting: HandSetting } | undefined {
   const setting = settingFor(hand, options);
-  if (setting === undefined) return [];
-  const pose = solvePose(setting.targets, setting.side, setting.unit, setting.centreY);
-  return poseFingers(pose, setting.targets);
+  if (setting === undefined) return undefined;
+  return {
+    placement: placeHand(setting.targets, setting.side, setting.unit, setting.centreY),
+    setting,
+  };
 }
 
 /**
@@ -238,14 +292,19 @@ function posedFor(hand: Hand, options: HandsOptions): readonly PosedFinger[] {
  * of truth about the hand; the pose is.
  */
 export function handFingertips(hand: Hand, options: HandsOptions): readonly Fingertip[] {
-  return posedFor(hand, options).map((finger) => ({
-    finger: finger.finger,
-    x: finger.tip.x,
-    y: finger.tip.y,
-    pressed: finger.playing,
-    onBlack: finger.onBlack ?? false,
-    ...(finger.midi !== undefined ? { midi: finger.midi } : {}),
-  }));
+  const placed = placementFor(hand, options);
+  if (placed === undefined) return [];
+  return placed.setting.targets.map((target) => {
+    const tip = placedTip(placed.placement, target.finger);
+    return {
+      finger: target.finger,
+      x: tip.x,
+      y: tip.y,
+      pressed: target.playing,
+      onBlack: target.onBlack ?? false,
+      ...(target.midi !== undefined ? { midi: target.midi } : {}),
+    };
+  });
 }
 
 /**
@@ -256,77 +315,65 @@ export function handFingertips(hand: Hand, options: HandsOptions): readonly Fing
  * player.
  */
 export function handShapes(hand: Hand, options: HandsOptions): readonly StageShape[] {
-  const setting = settingFor(hand, options);
-  if (setting === undefined) return [];
-  const pose = solvePose(setting.targets, setting.side, setting.unit, setting.centreY);
-  const fingers = poseFingers(pose, setting.targets);
-  if (fingers.length === 0) return [];
-
-  const drawing = drawHand(pose, fingers);
-  if (drawing.outline === '') return [];
+  const placed = placementFor(hand, options);
+  if (placed === undefined) return [];
+  const { placement, setting } = placed;
 
   const colors = options.colors[hand];
   const unit = setting.unit;
-  const grow = unit * 0.07;
   const shapes: StageShape[] = [];
 
-  // The hand is painted in two passes: every part in the edge colour
-  // and a little fatter, then every part in skin at its true size.
-  // What shows of the first pass is the outline of the two together,
-  // and nothing else -- so the thumb can overlap the palm without a
-  // seam where it meets it.
-  const pass = (fill: string, extra: number): void => {
-    shapes.push({
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0,
-      fill,
-      ...(extra > 0 ? { stroke: fill, strokeWidth: round(extra * 2) } : {}),
-      path: drawing.outline,
-    });
-    if (drawing.thumb !== undefined) {
-      shapes.push({
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-        fill: 'none',
-        stroke: fill,
-        strokeWidth: round(drawing.thumb.width + extra * 2),
-        path: drawing.thumb.path,
-      });
-    }
-  };
-  pass(colors.edge, grow);
-  pass(colors.skin, 0);
+  // The hand itself: one path, filled in skin and outlined in the
+  // hand's own colour so the left and the right read apart at a glance
+  // without being two different people's hands.
+  shapes.push({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    fill: colors.skin,
+    stroke: colors.edge,
+    strokeWidth: round(unit * 0.09),
+    path: handPath(placement),
+  });
 
-  // The creases: what separates two fingers below the point where the
-  // gap between them closes. A hand is webbed, and what tells its
-  // fingers apart lower down is a line, not a hole.
-  for (const crease of drawing.creases) {
+  // The knuckle creases. The drawing has none -- it is a silhouette --
+  // and a silhouette on a keyboard reads as a glove. Three short marks
+  // at the BASE of the long fingers, where a hand creases when it
+  // curls, is the least that says "there are joints here". They are
+  // struck from the artwork's own fingertip positions rather than
+  // invented, so they move with the hand's spread and turn exactly as
+  // the fingers do.
+  for (const finger of [2, 3, 4] as const) {
+    const tip = ARTWORK_TIPS[finger];
+    const from = transformPoint(placement, tip.x * 0.74, tip.y * 0.52);
+    const to = transformPoint(placement, tip.x * 0.74, tip.y * 0.42);
     shapes.push({
       x: 0,
       y: 0,
       width: 0,
       height: 0,
       fill: 'none',
-      stroke: darken(colors.skin, 0.2),
+      stroke: darken(colors.skin, 0.13),
       strokeWidth: round(unit * 0.045),
-      path: crease,
+      path: `M ${round(from.x)} ${round(from.y)} L ${round(to.x)} ${round(to.y)}`,
     });
   }
 
-  // And a nail on each fingertip, which is the one detail nobody
-  // notices until it is missing.
-  for (const nail of drawing.nails) {
+  // The finger doing the work. A silhouette cannot press a key, so the
+  // pressing fingertip is marked instead -- in the hand's own note
+  // colour, which is the colour of the bar that fell onto that key.
+  for (const target of setting.targets) {
+    if (!target.playing) continue;
+    const tip = placedTip(placement, target.finger);
+    const r = unit * 0.3;
     shapes.push({
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0,
-      fill: darken(colors.skin, 0.1),
-      path: nail.path,
+      x: round(tip.x - r),
+      y: round(tip.y - r),
+      width: round(r * 2),
+      height: round(r * 2),
+      fill: colors.tip,
+      radius: round(r),
     });
   }
 
@@ -336,19 +383,23 @@ export function handShapes(hand: Hand, options: HandsOptions): readonly StageSha
   // key's front, because the front of the keyboard is where the palm
   // is. A number under the hand is a number nobody reads.
   if (options.fingerNumbers !== false) {
-    for (const finger of fingers) {
-      if (!finger.playing) continue;
+    for (const target of setting.targets) {
+      if (!target.playing) continue;
+      const tip = placedTip(placement, target.finger);
       const badge = unit * 0.34;
       shapes.push({
-        x: round(finger.tip.x - badge),
-        y: round(finger.tip.y + unit * 0.95 - badge),
+        x: round(tip.x - badge),
+        // Above the fingertip, where the hand is not -- but never off
+        // the back of the keyboard, which is where a finger playing a
+        // key near the top would otherwise push it.
+        y: round(Math.max(setting.boardTop + badge * 0.2, tip.y - unit * 1.05 - badge)),
         width: round(badge * 2),
         height: round(badge * 2),
         fill: colors.tip,
         stroke: colors.edge,
         strokeWidth: round(unit * 0.07),
         radius: round(badge),
-        label: String(finger.finger),
+        label: String(target.finger),
         labelSize: round(badge * 1.35),
         labelColor: colors.edge,
       });
@@ -363,5 +414,14 @@ export function handsShapes(options: HandsOptions): readonly StageShape[] {
   return [...handShapes('left', options), ...handShapes('right', options)];
 }
 
-/** How far past the front edge of the keys a hand's heel reaches. */
-export const HAND_REACH_PAST_KEYS = PALM_LENGTH - KNUCKLE_FROM_FRONT;
+/**
+ * The strip the stage keeps in FRONT of the keys for the hands, in
+ * white keys: the wrist, which sits out there, plus enough forearm
+ * behind it that the hand is not cut off at the wrist. The rest of the
+ * arm runs off the bottom of the frame, which is where an arm comes
+ * from.
+ */
+export const HAND_REACH_PAST_KEYS = WRIST_IN_FRONT + 0.6;
+
+/** How far UP the keys a hand covers, wrist to fingertip, in white keys. */
+export const HAND_REACH_UP_KEYS = HAND_LENGTH;

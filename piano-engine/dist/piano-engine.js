@@ -162,6 +162,7 @@ var PianoEngine = (() => {
   }
 
   // src/fingering.ts
+  var ALL_FINGERS = [1, 2, 3, 4, 5];
   var FINGERS = [1, 2, 3, 4, 5];
   function whiteIndex(midi) {
     const WHITES_BELOW_C = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
@@ -301,250 +302,196 @@ var PianoEngine = (() => {
     return down;
   }
 
-  // src/hand/anatomy.ts
-  var PALM_WIDTH = 3.6;
-  var PALM_LENGTH = 3.3;
-  var KNUCKLE_FROM_FRONT = 1.95;
-  var HEEL_BULGE = 0.75;
-  var REACH_PAST_KEYS = PALM_LENGTH - KNUCKLE_FROM_FRONT + HEEL_BULGE;
-  var FINGERS2 = {
-    1: { length: 2.5, thick: 0.86, curl: 0.1, stretch: 1.3, splay: 0.8 },
-    // thumb
-    2: { length: 2.75, thick: 0.66, curl: 0.08, stretch: 1.18, splay: 0.4 },
-    // index
-    3: { length: 3, thick: 0.68, curl: 0.08, stretch: 1.18, splay: 0.34 },
-    // middle
-    4: { length: 2.85, thick: 0.64, curl: 0.09, stretch: 1.18, splay: 0.4 },
-    // ring
-    5: { length: 2.35, thick: 0.58, curl: 0.1, stretch: 1.2, splay: 0.52 }
-    // little
+  // src/hand/artwork.ts
+  var HAND_OUTLINE = [
+    ["M", -0.2133, -4.3908],
+    ["C", -0.2133, -4.3908, -0.0117, -4.4083, -0.0117, -4.4083],
+    ["C", -92e-4, -4.5483, 0.1292, -5.0967, 0.1567, -5.4525],
+    ["C", 0.1825, -5.7908, 0.3158, -6.1208, 0.3558, -6.465],
+    ["C", 0.3967, -6.815, 0.4, -7.2592, 0.5875, -7.4675],
+    ["C", 0.7017, -7.595, 0.8983, -7.6433, 1.0575, -7.5317],
+    ["C", 1.2083, -7.4258, 1.2033, -7.2475, 1.1992, -6.9925],
+    ["C", 1.1858, -6.2392, 1.0142, -5.2992, 0.9192, -4.5433],
+    ["C", 0.9108, -4.4733, 0.8908, -4.3875, 0.8925, -4.2767],
+    ["C", 0.895, -4.0525, 1.0108, -3.4733, 1.0858, -3.2733],
+    ["C", 1.2908, -2.7258, 1.59, -3.2642, 1.6967, -3.5258],
+    ["C", 1.9333, -4.1083, 2.3783, -4.7092, 3.0825, -4.645],
+    ["C", 3.1817, -4.6358, 3.2825, -4.6117, 3.3225, -4.5042],
+    ["C", 3.4158, -4.2517, 3.2783, -4.0508, 3.12, -3.865],
+    ["C", 2.4475, -3.0742, 2.455, -3.1258, 2.2467, -2.1375],
+    ["C", 2.1142, -1.6367, 1.6967, -1.2492, 1.355, -0.8292],
+    ["C", 1.15, -0.5767, 1.0858, -0.6058, 1.1583, -0.1825],
+    ["C", 1.1892, -33e-4, 1.45, 1.4067, 1.6667, 2.5967],
+    ["C", 1.6667, 2.5967, -0.9975, 2.5967, -0.9975, 2.5967],
+    ["C", -1.0808, 1.395, -1.1817, -0.0425, -1.265, -0.2133],
+    ["C", -1.265, -0.2133, -2.0725, -1.69, -2.0725, -1.69],
+    ["C", -2.1883, -1.9458, -2.2908, -2.2792, -2.3542, -2.5592],
+    ["C", -2.3542, -2.5592, -2.8558, -3.7583, -2.8558, -3.7583],
+    ["C", -3.0583, -4.1125, -3.5733, -5.035, -3.5758, -5.35],
+    ["C", -3.5783, -5.7033, -3.255, -5.7767, -3.0783, -5.5183],
+    ["C", -2.7375, -5.02, -2.1317, -4.1683, -1.9592, -3.7708],
+    ["C", -1.8183, -3.7858, -1.9592, -3.7667, -1.825, -3.8383],
+    ["C", -1.825, -3.8383, -2.0142, -4.405, -2.0142, -4.405],
+    ["C", -2.205, -4.9667, -2.3175, -5.6408, -2.49, -6.2817],
+    ["C", -2.5525, -6.5142, -2.6683, -7.0533, -2.4217, -7.1667],
+    ["C", -2.2742, -7.235, -2.0817, -7.1858, -1.9933, -7.095],
+    ["C", -1.9042, -7.0033, -1.8642, -6.8375, -1.8317, -6.7],
+    ["C", -1.6308, -5.8617, -1.3308, -5.1683, -1.1208, -4.3417],
+    ["C", -1.1017, -4.3758, -1.1883, -6.9042, -1.2075, -7.0325],
+    ["C", -1.37, -8.12, -0.5967, -8.1317, -0.485, -7.3108],
+    ["C", -0.4308, -6.9142, -0.2792, -5.73, -0.2817, -5.3833],
+    ["C", -0.2825, -5.0217, -0.2767, -4.685, -0.2133, -4.3908]
+  ];
+  var ARTWORK_TIPS = {
+    1: { x: 3.35, y: -4.4167 },
+    2: { x: 0.8667, y: -7.5917 },
+    3: { x: -0.9, y: -7.8917 },
+    4: { x: -2.2667, y: -7.2 },
+    5: { x: -3.3333, y: -5.675 }
   };
-  var ALL_FINGERS = [1, 2, 3, 4, 5];
-  var MAX_TURN = 0.32;
-  function knuckle(finger, side2) {
-    if (finger === 1) return { x: side2 * (PALM_WIDTH * 0.5 + 0.05), y: 1.35 };
-    const spacing = PALM_WIDTH * 0.86 / 3;
-    const across = -side2 * (finger - 3.5) * spacing;
-    const arch = -0.16 * (1 - Math.abs(finger - 3.5) / 1.5);
-    return { x: across, y: arch };
-  }
+  var ARTWORK_BOX = { minX: -3.58, maxX: 3.42, minY: -8.13, maxY: 2.6 };
+  var PLAY_SCALE_X = 0.72;
+  var PLAY_SCALE_Y = 0.5;
+  var REACH_PAST_KEYS = ARTWORK_BOX.maxY * PLAY_SCALE_Y;
+  var HAND_LENGTH = -ARTWORK_BOX.minY * PLAY_SCALE_Y;
 
-  // src/hand/pose.ts
-  var PLAYING_WEIGHT = 4;
-  function rotate(point, turn) {
-    const cos = Math.cos(turn);
-    const sin = Math.sin(turn);
-    return { x: point.x * cos - point.y * sin, y: point.x * sin + point.y * cos };
+  // src/hand/place.ts
+  var PLAYING_WEIGHT = 10;
+  var MAX_TURN = 0.32;
+  var MIN_SPREAD = 0.8;
+  var MAX_SPREAD = 1.45;
+  function clamp(value, low, high) {
+    return Math.max(low, Math.min(high, value));
   }
-  function restingTip(finger, side2) {
-    const base = knuckle(finger, side2);
-    const shape = FINGERS2[finger];
-    if (finger === 1) {
-      return { x: base.x + side2 * shape.length * 0.28, y: base.y - shape.length * 0.9 };
-    }
-    return { x: base.x * 0.93, y: base.y - shape.length * (1 - shape.curl) };
-  }
-  function solvePose(targets, side2, unit2, centreY) {
-    let sw = 0;
-    let swPy = 0;
-    let swPyPy = 0;
-    let swA = 0;
-    let swPyA = 0;
+  function placeHand(targets, side, unit, centreY) {
+    const rows = [];
     for (const target of targets) {
-      const tip = restingTip(target.finger, side2);
-      const px = tip.x * unit2;
-      const py = tip.y * unit2;
-      const a = target.x - px;
-      const w = target.playing ? PLAYING_WEIGHT : 1;
-      sw += w;
-      swPy += w * py;
-      swPyPy += w * py * py;
-      swA += w * a;
-      swPyA += w * py * a;
-    }
-    if (sw === 0) return { x: 0, y: centreY, turn: 0, unit: unit2, side: side2 };
-    const det = sw * swPyPy - swPy * swPy;
-    let x = swA / sw;
-    let turn = 0;
-    if (Math.abs(det) > 1e-9) {
-      x = (swA * swPyPy - swPy * swPyA) / det;
-      turn = (sw * -swPyA + swPy * swA) / det;
-    }
-    return { x, y: centreY, turn: Math.max(-MAX_TURN, Math.min(MAX_TURN, turn)), unit: unit2, side: side2 };
-  }
-  function poseFingers(pose, targets) {
-    const byFinger = new Map(targets.map((t) => [t.finger, t]));
-    const out = [];
-    for (const finger of ALL_FINGERS) {
-      const target = byFinger.get(finger);
-      if (target === void 0) continue;
-      const shape = FINGERS2[finger];
-      const base = rotate(knuckle(finger, pose.side), pose.turn);
-      const origin = {
-        x: pose.x + base.x * pose.unit,
-        y: pose.y + base.y * pose.unit
-      };
-      const rest = rotate(restingTip(finger, pose.side), pose.turn);
-      const restAt = { x: pose.x + rest.x * pose.unit, y: pose.y + rest.y * pose.unit };
-      const own = Math.atan2(restAt.y - origin.y, restAt.x - origin.x);
-      const ownLength = Math.hypot(restAt.x - origin.x, restAt.y - origin.y);
-      const wantY = target.depth ?? restAt.y;
-      let angle = Math.atan2(wantY - origin.y, target.x - origin.x);
-      let length = Math.hypot(target.x - origin.x, wantY - origin.y);
-      let swing = angle - own;
-      while (swing > Math.PI) swing -= Math.PI * 2;
-      while (swing < -Math.PI) swing += Math.PI * 2;
-      angle = own + Math.max(-shape.splay, Math.min(shape.splay, swing));
-      const full = shape.length * pose.unit;
-      length = Math.max(
-        full * (1 - shape.curl * 1.6),
-        Math.min(length, Math.max(ownLength, full * shape.stretch))
-      );
-      out.push({
-        finger,
-        knuckle: origin,
-        tip: { x: origin.x + Math.cos(angle) * length, y: origin.y + Math.sin(angle) * length },
-        thick: shape.thick * pose.unit,
-        playing: target.playing,
-        ...target.midi !== void 0 ? { midi: target.midi } : {},
-        ...target.onBlack !== void 0 ? { onBlack: target.onBlack } : {}
+      const tip = ARTWORK_TIPS[target.finger];
+      rows.push({
+        b: [1, side * tip.x * PLAY_SCALE_X * unit, -tip.y * PLAY_SCALE_Y * unit],
+        v: target.x,
+        w: target.playing ? PLAYING_WEIGHT : 1
       });
     }
-    return out;
+    if (rows.length === 0) {
+      return { x: 0, y: centreY, turn: 0, spread: 1, unit, side };
+    }
+    const a = [
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0]
+    ];
+    const rhs = [0, 0, 0];
+    for (const row of rows) {
+      for (let i = 0; i < 3; i++) {
+        const bi = row.b[i] ?? 0;
+        for (let j = 0; j < 3; j++) {
+          const bj = row.b[j] ?? 0;
+          a[i][j] = (a[i]?.[j] ?? 0) + row.w * bi * bj;
+        }
+        rhs[i] = (rhs[i] ?? 0) + row.w * bi * row.v;
+      }
+    }
+    const solved = solve3(a, rhs);
+    const spread = clamp(solved?.[1] ?? 1, MIN_SPREAD, MAX_SPREAD);
+    const turn = clamp(solved?.[2] ?? 0, -MAX_TURN, MAX_TURN);
+    let sw = 0;
+    let sr = 0;
+    for (const row of rows) {
+      sw += row.w;
+      sr += row.w * (row.v - spread * (row.b[1] ?? 0) - turn * (row.b[2] ?? 0));
+    }
+    const x = sw === 0 ? 0 : sr / sw;
+    let y = centreY;
+    for (const target of targets) {
+      if (target.depth === void 0) continue;
+      const tip = ARTWORK_TIPS[target.finger];
+      y = Math.min(y, target.depth - tipOffsetY(tip, spread, turn, side, unit));
+    }
+    return { x, y, turn, spread, unit, side };
   }
-  function poseHeel(pose, length) {
-    const point = rotate({ x: 0, y: length }, pose.turn);
-    return { x: pose.x + point.x * pose.unit, y: pose.y + point.y * pose.unit };
+  function tipOffsetY(tip, spread, turn, side, unit) {
+    const px = side * spread * tip.x * PLAY_SCALE_X * unit;
+    const py = tip.y * PLAY_SCALE_Y * unit;
+    return px * Math.sin(turn) + py * Math.cos(turn);
   }
-  function poseAxis(pose) {
-    return { x: Math.sin(pose.turn), y: -Math.cos(pose.turn) };
+  function solve3(a, b) {
+    const m = [
+      [a[0]?.[0] ?? 0, a[0]?.[1] ?? 0, a[0]?.[2] ?? 0, b[0] ?? 0],
+      [a[1]?.[0] ?? 0, a[1]?.[1] ?? 0, a[1]?.[2] ?? 0, b[1] ?? 0],
+      [a[2]?.[0] ?? 0, a[2]?.[1] ?? 0, a[2]?.[2] ?? 0, b[2] ?? 0]
+    ];
+    for (let col = 0; col < 3; col++) {
+      let pivot = col;
+      for (let row = col + 1; row < 3; row++) {
+        if (Math.abs(m[row]?.[col] ?? 0) > Math.abs(m[pivot]?.[col] ?? 0)) pivot = row;
+      }
+      if (Math.abs(m[pivot]?.[col] ?? 0) < 1e-9) return void 0;
+      const tmp = m[col];
+      m[col] = m[pivot];
+      m[pivot] = tmp;
+      const pivotRow = m[col];
+      const pivotValue = pivotRow[col];
+      for (let row = 0; row < 3; row++) {
+        if (row === col) continue;
+        const target = m[row];
+        const factor = target[col] / pivotValue;
+        for (let k = col; k < 4; k++) {
+          target[k] = target[k] - factor * pivotRow[k];
+        }
+      }
+    }
+    return [
+      (m[0]?.[3] ?? 0) / (m[0]?.[0] ?? 1),
+      (m[1]?.[3] ?? 0) / (m[1]?.[1] ?? 1),
+      (m[2]?.[3] ?? 0) / (m[2]?.[2] ?? 1)
+    ];
+  }
+  function placedTip(placement, finger) {
+    const tip = ARTWORK_TIPS[finger];
+    return transformPoint(placement, tip.x, tip.y);
+  }
+  function transformPoint(placement, x, y) {
+    const { unit, side, spread, turn } = placement;
+    const px = side * spread * x * PLAY_SCALE_X * unit;
+    const py = y * PLAY_SCALE_Y * unit;
+    const cos = Math.cos(turn);
+    const sin = Math.sin(turn);
+    return {
+      x: placement.x + px * cos - py * sin,
+      y: placement.y + px * sin + py * cos
+    };
   }
 
   // src/hand/draw.ts
-  function sub(a, b) {
-    return { x: a.x - b.x, y: a.y - b.y };
+  function round(value) {
+    return Math.round(value * 100) / 100;
   }
-  function add(a, b) {
-    return { x: a.x + b.x, y: a.y + b.y };
-  }
-  function mul(a, k) {
-    return { x: a.x * k, y: a.y * k };
-  }
-  function unit(a) {
-    const n2 = Math.hypot(a.x, a.y) || 1;
-    return { x: a.x / n2, y: a.y / n2 };
-  }
-  function perp(a) {
-    return { x: -a.y, y: a.x };
-  }
-  function lerp(a, b, t) {
-    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-  }
-  function at(p) {
-    return `${round(p.x)} ${round(p.y)}`;
-  }
-  function round(v) {
-    return Math.round(v * 100) / 100;
-  }
-  function shaft(finger) {
-    const along = unit(sub(finger.tip, finger.knuckle));
-    return {
-      from: finger.knuckle,
-      to: finger.tip,
-      along,
-      across: perp(along),
-      // A finger is widest at the knuckle and narrowest at the nail.
-      halfBase: finger.thick / 2 * 1.08,
-      halfTip: finger.thick / 2 * 0.84
-    };
-  }
-  var side = (s, which, end) => add(s[end], mul(s.across, which * (end === "from" ? s.halfBase : s.halfTip)));
-  var WEB = 0.46;
-  var NAIL_FROM_TIP = 0.3;
-  var NAIL_WIDTH = 0.62;
-  function drawHand(pose, fingers, options = {}) {
-    const four = fingers.filter((f) => f.finger !== 1).map((f) => ({ finger: f, shaft: shaft(f) })).sort((a, b) => a.shaft.to.x - b.shaft.to.x);
-    if (four.length === 0) return { outline: "", thumb: void 0, creases: [], nails: [] };
-    const axis = poseAxis(pose);
-    const heel = poseHeel(pose, PALM_LENGTH);
-    const half = PALM_WIDTH / 2 * pose.unit;
-    const sideways = perp(axis);
+  function handPath(placement) {
     const parts = [];
-    const creases = [];
-    const first = four[0];
-    const last = four[four.length - 1];
-    const startPoint = side(first.shaft, -1, "from");
-    parts.push(`M ${at(startPoint)}`);
-    four.forEach((entry, i) => {
-      const s = entry.shaft;
-      const leftBase = side(s, -1, "from");
-      const leftTip = side(s, -1, "to");
-      const rightTip = side(s, 1, "to");
-      const rightBase = side(s, 1, "from");
-      if (i > 0) {
-        const previous = four[i - 1];
-        const fromSide = side(previous.shaft, 1, "from");
-        const toSide = leftBase;
-        const depth = Math.min(
-          Math.hypot(
-            previous.shaft.to.x - previous.shaft.from.x,
-            previous.shaft.to.y - previous.shaft.from.y
-          ),
-          Math.hypot(s.to.x - s.from.x, s.to.y - s.from.y)
+    for (const command of HAND_OUTLINE) {
+      if (command[0] === "M") {
+        const p = transformPoint(placement, command[1], command[2]);
+        parts.push(`M ${round(p.x)} ${round(p.y)}`);
+      } else if (command[0] === "C") {
+        const c1 = transformPoint(placement, command[1], command[2]);
+        const c2 = transformPoint(placement, command[3], command[4]);
+        const to = transformPoint(placement, command[5], command[6]);
+        parts.push(
+          `C ${round(c1.x)} ${round(c1.y)} ${round(c2.x)} ${round(c2.y)} ${round(to.x)} ${round(to.y)}`
         );
-        const webFrom = add(side(previous.shaft, 1, "from"), mul(previous.shaft.along, depth * WEB));
-        const webTo = add(leftBase, mul(s.along, depth * WEB));
-        const valley = lerp(webFrom, webTo, 0.5);
-        parts.push(`L ${at(webFrom)}`);
-        parts.push(`Q ${at(valley)} ${at(webTo)}`);
-        if (options.creases !== false) {
-          const end = add(lerp(fromSide, toSide, 0.5), mul(axis, -depth * 0.12));
-          creases.push(`M ${at(valley)} Q ${at(lerp(valley, end, 0.55))} ${at(end)}`);
-        }
+      } else {
+        parts.push("Z");
       }
-      parts.push(i === 0 ? `L ${at(leftTip)}` : `L ${at(leftTip)}`);
-      parts.push(`A ${round(s.halfTip * 1.08)} ${round(s.halfTip)} 0 0 1 ${at(rightTip)}`);
-      if (i === four.length - 1) parts.push(`L ${at(rightBase)}`);
-    });
-    const rightEdge = add(heel, mul(sideways, half * 0.82));
-    const leftEdge = add(heel, mul(sideways, -half * 0.82));
-    const rightShoulder = add(
-      add(last.shaft.from, mul(sideways, half * 0.18)),
-      mul(axis, -pose.unit * 0.1)
-    );
-    const leftShoulder = add(
-      add(first.shaft.from, mul(sideways, -half * 0.18)),
-      mul(axis, -pose.unit * 0.1)
-    );
-    parts.push(
-      `C ${at(rightShoulder)} ${at(add(rightEdge, mul(axis, half * 0.5)))} ${at(rightEdge)}`
-    );
-    const bulge = mul(axis, -HEEL_BULGE * pose.unit * 1.34);
-    parts.push(`C ${at(add(rightEdge, bulge))} ${at(add(leftEdge, bulge))} ${at(leftEdge)}`);
-    parts.push(`C ${at(add(leftEdge, mul(axis, half * 0.5)))} ${at(leftShoulder)} ${at(startPoint)}`);
+    }
     parts.push("Z");
-    const thumbFinger = fingers.find((f) => f.finger === 1);
-    const thumb = thumbFinger === void 0 ? void 0 : (() => {
-      const s = shaft(thumbFinger);
-      const bend = add(lerp(s.from, s.to, 0.5), mul(s.across, s.halfBase * 0.5));
-      return { path: `M ${at(s.from)} Q ${at(bend)} ${at(s.to)}`, width: thumbFinger.thick };
-    })();
-    const nails = options.nails === false ? [] : fingers.map((finger) => {
-      const s = shaft(finger);
-      const centre = add(s.to, mul(s.along, -s.halfTip * NAIL_FROM_TIP * 2));
-      const w = s.halfTip * NAIL_WIDTH;
-      const h = s.halfTip * 0.95;
-      const a = add(centre, mul(s.across, -w));
-      const b = add(centre, mul(s.across, w));
-      return {
-        path: `M ${at(a)} A ${round(w)} ${round(h)} 0 0 1 ${at(b)} A ${round(w)} ${round(h)} 0 0 1 ${at(a)} Z`
-      };
-    });
-    return { outline: parts.join(" "), thumb, creases, nails };
+    return parts.join(" ");
   }
 
   // src/hands.ts
   var BLACK_TIP_DEPTH = 0.45;
+  var TIP_INSIDE_FRONT = 0.3;
+  var WRIST_IN_FRONT = 1.5;
   var DEFAULT_HAND_COLORS = {
     left: { skin: "#E8C6A0", edge: "#B3800E", tip: "#FFC400" },
     right: { skin: "#E8C6A0", edge: "#2E6DA8", tip: "#4FA3FF" }
@@ -586,7 +533,7 @@ var PianoEngine = (() => {
     if (anchorWhite === void 0) return void 0;
     const offset = whiteIndexOfKey(firstWhite.midi);
     const board = options.board;
-    const unit2 = firstWhite.width * (options.scale ?? 1);
+    const unit = firstWhite.width * (options.scale ?? 1);
     const down = fingersDownAt(options.notes, hand, options.seconds);
     const byMidi = new Map(keys.map((key) => [key.midi, key]));
     const targets = [];
@@ -601,115 +548,126 @@ var PianoEngine = (() => {
           midi: held,
           onBlack: key.black,
           // A black key is shorter and set further back: a finger on one
-          // has to be ON it, not out in front of where it ends.
-          ...key.black ? { depth: board.y + board.height * BLACK_TIP_DEPTH } : {}
+          // has to be ON it, not out in front of where it ends. A white
+          // key only has to keep its finger on the keyboard at all.
+          depth: key.black ? board.y + board.height * BLACK_TIP_DEPTH : board.y + board.height - unit * TIP_INSIDE_FRONT
         });
         continue;
       }
       const resting = hand === "right" ? anchorWhite + (finger - 1) : anchorWhite - (finger - 1);
       const x = xAtWhite(whites, resting - offset);
       if (x === void 0) continue;
-      targets.push({ finger, x, playing: false });
+      targets.push({
+        finger,
+        x,
+        playing: false,
+        depth: board.y + board.height - unit * TIP_INSIDE_FRONT
+      });
     }
     if (targets.length === 0) return void 0;
     return {
       targets,
-      unit: unit2,
-      // A player's hand rests a fixed distance in from the front edge of
-      // the keys. The keys being long or short behind it changes nothing.
-      centreY: board.y + board.height - unit2 * KNUCKLE_FROM_FRONT,
-      side: hand === "right" ? -1 : 1
+      unit,
+      // Where the WRIST sits.
+      //
+      // NOT at the front edge of the keys, which is where this first put
+      // it and which is wrong by about 65mm: a player's fingertips rest
+      // roughly 40mm up a white key and their wrist is about 105mm
+      // forward of those fingertips, so the wrist is out IN FRONT of the
+      // keyboard, over the key slip. `WRIST_IN_FRONT` is that gap, and
+      // it is what puts the fingertips on the front third of the keys
+      // instead of up among the black ones.
+      centreY: board.y + board.height + unit * WRIST_IN_FRONT,
+      side: hand === "right" ? -1 : 1,
+      boardTop: board.y
     };
   }
-  function posedFor(hand, options) {
+  function placementFor(hand, options) {
     const setting = settingFor(hand, options);
-    if (setting === void 0) return [];
-    const pose = solvePose(setting.targets, setting.side, setting.unit, setting.centreY);
-    return poseFingers(pose, setting.targets);
+    if (setting === void 0) return void 0;
+    return {
+      placement: placeHand(setting.targets, setting.side, setting.unit, setting.centreY),
+      setting
+    };
   }
   function handFingertips(hand, options) {
-    return posedFor(hand, options).map((finger) => ({
-      finger: finger.finger,
-      x: finger.tip.x,
-      y: finger.tip.y,
-      pressed: finger.playing,
-      onBlack: finger.onBlack ?? false,
-      ...finger.midi !== void 0 ? { midi: finger.midi } : {}
-    }));
+    const placed = placementFor(hand, options);
+    if (placed === void 0) return [];
+    return placed.setting.targets.map((target) => {
+      const tip = placedTip(placed.placement, target.finger);
+      return {
+        finger: target.finger,
+        x: tip.x,
+        y: tip.y,
+        pressed: target.playing,
+        onBlack: target.onBlack ?? false,
+        ...target.midi !== void 0 ? { midi: target.midi } : {}
+      };
+    });
   }
   function handShapes(hand, options) {
-    const setting = settingFor(hand, options);
-    if (setting === void 0) return [];
-    const pose = solvePose(setting.targets, setting.side, setting.unit, setting.centreY);
-    const fingers = poseFingers(pose, setting.targets);
-    if (fingers.length === 0) return [];
-    const drawing = drawHand(pose, fingers);
-    if (drawing.outline === "") return [];
+    const placed = placementFor(hand, options);
+    if (placed === void 0) return [];
+    const { placement, setting } = placed;
     const colors = options.colors[hand];
-    const unit2 = setting.unit;
-    const grow = unit2 * 0.07;
+    const unit = setting.unit;
     const shapes = [];
-    const pass = (fill, extra) => {
-      shapes.push({
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-        fill,
-        ...extra > 0 ? { stroke: fill, strokeWidth: round2(extra * 2) } : {},
-        path: drawing.outline
-      });
-      if (drawing.thumb !== void 0) {
-        shapes.push({
-          x: 0,
-          y: 0,
-          width: 0,
-          height: 0,
-          fill: "none",
-          stroke: fill,
-          strokeWidth: round2(drawing.thumb.width + extra * 2),
-          path: drawing.thumb.path
-        });
-      }
-    };
-    pass(colors.edge, grow);
-    pass(colors.skin, 0);
-    for (const crease of drawing.creases) {
+    shapes.push({
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      fill: colors.skin,
+      stroke: colors.edge,
+      strokeWidth: round2(unit * 0.09),
+      path: handPath(placement)
+    });
+    for (const finger of [2, 3, 4]) {
+      const tip = ARTWORK_TIPS[finger];
+      const from = transformPoint(placement, tip.x * 0.74, tip.y * 0.52);
+      const to = transformPoint(placement, tip.x * 0.74, tip.y * 0.42);
       shapes.push({
         x: 0,
         y: 0,
         width: 0,
         height: 0,
         fill: "none",
-        stroke: darken(colors.skin, 0.2),
-        strokeWidth: round2(unit2 * 0.045),
-        path: crease
+        stroke: darken(colors.skin, 0.13),
+        strokeWidth: round2(unit * 0.045),
+        path: `M ${round2(from.x)} ${round2(from.y)} L ${round2(to.x)} ${round2(to.y)}`
       });
     }
-    for (const nail of drawing.nails) {
+    for (const target of setting.targets) {
+      if (!target.playing) continue;
+      const tip = placedTip(placement, target.finger);
+      const r = unit * 0.3;
       shapes.push({
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-        fill: darken(colors.skin, 0.1),
-        path: nail.path
+        x: round2(tip.x - r),
+        y: round2(tip.y - r),
+        width: round2(r * 2),
+        height: round2(r * 2),
+        fill: colors.tip,
+        radius: round2(r)
       });
     }
     if (options.fingerNumbers !== false) {
-      for (const finger of fingers) {
-        if (!finger.playing) continue;
-        const badge = unit2 * 0.34;
+      for (const target of setting.targets) {
+        if (!target.playing) continue;
+        const tip = placedTip(placement, target.finger);
+        const badge = unit * 0.34;
         shapes.push({
-          x: round2(finger.tip.x - badge),
-          y: round2(finger.tip.y + unit2 * 0.95 - badge),
+          x: round2(tip.x - badge),
+          // Above the fingertip, where the hand is not -- but never off
+          // the back of the keyboard, which is where a finger playing a
+          // key near the top would otherwise push it.
+          y: round2(Math.max(setting.boardTop + badge * 0.2, tip.y - unit * 1.05 - badge)),
           width: round2(badge * 2),
           height: round2(badge * 2),
           fill: colors.tip,
           stroke: colors.edge,
-          strokeWidth: round2(unit2 * 0.07),
+          strokeWidth: round2(unit * 0.07),
           radius: round2(badge),
-          label: String(finger.finger),
+          label: String(target.finger),
           labelSize: round2(badge * 1.35),
           labelColor: colors.edge
         });
@@ -720,7 +678,7 @@ var PianoEngine = (() => {
   function handsShapes(options) {
     return [...handShapes("left", options), ...handShapes("right", options)];
   }
-  var HAND_REACH_PAST_KEYS = PALM_LENGTH - KNUCKLE_FROM_FRONT;
+  var HAND_REACH_PAST_KEYS = WRIST_IN_FRONT + 0.6;
 
   // src/svg.ts
   function escapeText(value) {
@@ -782,7 +740,7 @@ var PianoEngine = (() => {
   var LABEL_FONT = "system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
   var KEYBOARD_FRACTION = 1 / 3;
   var KEY_DEPTH = 7;
-  var HAND_BAND = REACH_PAST_KEYS + 0.25;
+  var HAND_BAND = HAND_REACH_PAST_KEYS;
   var LINE_FRACTION = 0.05;
   function resolveColors(colors) {
     return { ...DEFAULT_COLORS, ...colors ?? {} };
@@ -793,10 +751,10 @@ var PianoEngine = (() => {
     return { x: 0, y: options.height - height, width: options.width, height };
   }
   function handsKeyboardBox(options) {
-    const unit2 = options.width / whiteKeyCount(options.size ?? 88);
-    const band = unit2 * HAND_BAND;
+    const unit = options.width / whiteKeyCount(options.size ?? 88);
+    const band = unit * HAND_BAND;
     const asked = options.keyboardHeight !== void 0 && options.keyboardHeight > 0 ? Math.min(options.keyboardHeight, options.height) : Math.max(options.height * 0.55, options.height - band);
-    const depth = Math.max(1, Math.min(unit2 * KEY_DEPTH, asked, options.height));
+    const depth = Math.max(1, Math.min(unit * KEY_DEPTH, asked, options.height));
     const group = Math.min(options.height, depth + band);
     return {
       x: 0,
@@ -959,8 +917,8 @@ var PianoEngine = (() => {
       });
     }
     if (!falling && options.keyNames !== false) {
-      const unit2 = board.width / Math.max(1, keys.filter((key) => !key.black).length);
-      const size = Math.max(6, unit2 * 0.46);
+      const unit = board.width / Math.max(1, keys.filter((key) => !key.black).length);
+      const size = Math.max(6, unit * 0.46);
       for (const key of keys) {
         if (key.black || key.midi % 12 !== 0) continue;
         shapes.push({

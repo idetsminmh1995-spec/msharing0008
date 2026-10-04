@@ -146,19 +146,19 @@ PianoEngine.renderPianoStage({
 });
 ```
 
-### The hand is its own thing: `src/hand/`
+### The hand is the owner's own drawing: `src/hand/`
 
 | File | What it is |
 |---|---|
-| `hand/anatomy.ts` | What a hand IS: every measurement, in white keys. |
-| `hand/pose.ts` | Where it puts itself to play what it is playing. |
-| `hand/draw.ts` | That pose, as one smooth shape. |
+| `hand/artwork.ts` | The owner's `Hands.svg`, converted once into white keys. |
+| `hand/place.ts` | Where that drawing goes to play what it is playing. |
+| `hand/draw.ts` | The drawing, moved there. |
 
 None of the three knows about keyboards, notes, seconds or SVG, and
 none of them can be wrong about a hand in a way a keyboard could fix.
 `hands.ts` is the bridge: it turns a keyboard and a fingering into the
-targets the pose solver takes, and the shapes it gives back into the
-stage's own list.
+targets the placement fit takes, and what comes back into the stage's
+own list of shapes.
 
 It is three modules rather than a fourth engine on purpose. A hand only
 means anything on top of `keyboardGeometry`, which lives here; a
@@ -166,76 +166,108 @@ separate bundle would either copy that geometry or depend back on this
 one, and a cycle between two bundles is worse than a boundary inside
 one. The boundary is what was wanted, and this is where it is.
 
-### Everything is measured in white keys
+### The hand is drawn, not assembled
 
-A white key is 23mm, which makes it the natural ruler for a hand on a
-keyboard: a palm is 85mm across the knuckles, so it is 3.6 keys; a hand
-spans an octave because an octave is 165mm and a stretched hand is
-200mm. Writing the hand in keys rather than in pixels is what keeps it
-in proportion to the instrument in any frame, at any size.
+Three earlier attempts built the hand here, out of five posed fingers
+walked into one outline, with a separate thumb overlaid and creases
+drawn afterwards. Every one of them looked built. The owner drew a hand
+instead, and that drawing is what is on the keys now.
 
-The numbers are a real hand's with one correction: they are the lengths
-as seen FROM ABOVE of a hand that is PLAYING. A playing hand's fingers
-are curled, so an 80mm middle finger covers about 70mm of key, and that
-is the number in the table.
+A shape built from parts can always come apart, and no amount of
+solving stops a drawn thumb from looking drawn. An artist's outline
+cannot come apart, so the engine's job shrinks to the one thing a
+program does well: deciding where the outline goes.
 
-### The hand moves and turns; the fingers follow
+**The numbers were taken from the file, not guessed.** The SVG was
+rendered in a real browser and its outline sampled with
+`getPointAtLength`, 4000 points around a 5715-unit path. The four long
+fingertips are the local minima of that outline's top profile; the
+THUMB's is the outline's extreme in X instead, because a thumb points
+sideways rather than up the keys. The wrist is where the forearm's two
+edges stop narrowing. One white key is 120 of the drawing's own units,
+taken from the hand's LENGTH -- wrist crease to middle fingertip is 947
+units here and about 7.9 white keys on a real hand -- because this hand
+is drawn SPLAYED, which stretches every width measurement and leaves
+the length alone.
 
-This is the part that was missing for three attempts. A hand asked to
-play a key its thumb cannot reach does not grow a thumb: it MOVES, and
-it TURNS, and the other four fingers go with it. Everything a drawn
-hand gets wrong -- a tentacle thumb, a finger crossing its neighbour, a
-hand that slides along the keys without ever tilting -- comes from
-posing the fingers one at a time instead of posing the hand once.
+**The right hand is the left one mirrored**, which is what the file
+itself does, so only one outline is stored.
 
-The hand has three numbers: where it is along the keyboard, how deep it
-sits, and how far it is turned. Depth is fixed, because a player's hand
-rests a fixed distance in from the front edge of the keys. Two are
-left, and every finger that is playing has an opinion about both:
+### Two corrections before it touches the keys
+
+The drawing is a FLAT hand, held open. A hand at a keyboard is neither.
+
+- **`PLAY_SCALE_Y` (0.5) is foreshortening**, and it is real geometry: a
+  flat hand measures about 185mm from the wrist crease to the middle
+  fingertip, and the same hand curved over the keys puts that fingertip
+  only about 105mm FORWARD of the wrist. Seen from above -- which is
+  how this stage sees it -- that is all the length there is.
+- **`PLAY_SCALE_X` (0.72) closes the splay.** The drawing's thumb and
+  little finger are six white keys apart, which is a hand reaching for
+  a tenth. Closing it all the way to a real playing span would mean
+  0.63, and that is where a rigid outline stops being able to tell the
+  truth: it would narrow the FINGERS by the same factor as the gaps
+  between them, and a hand with 13mm fingers reads as a rake.
+
+### The hand moves, turns and opens; the fingers follow
+
+A hand asked to play a key its thumb cannot reach does not grow a
+thumb: it MOVES, it TURNS, and it OPENS, and the other four fingers go
+with it. Those are the three numbers the fit solves for, plus the
+depth, which the keyboard decides rather than the music:
 
 - turning the hand moves a fingertip sideways **in proportion to how
   far forward that fingertip is**. The long fingers, well past the
   knuckles, swing a long way; the thumb, whose tip is beside the palm
   rather than in front of it, barely swings at all.
 - so a thumb reaching a distant key is answered mostly by MOVING the
-  hand, and a little finger reaching for one mostly by TURNING it.
+  hand, a little finger reaching one mostly by TURNING it, and a chord
+  wider than the drawing's own splay by OPENING it.
 
-That relationship is linear, so the best position and turn together are
-one small least-squares fit -- two equations, solved exactly, once per
-frame. Fingers that are not playing join in with a quarter of the
-weight: they want to stay over the keys the hand is sitting on, and
-without them a hand playing one note would have nothing to say about
-where it is.
+That relationship is linear for small turns, so position, turn and
+spread together are one weighted least-squares fit -- a 3x3 system,
+solved exactly, once per frame. Fingers that are not playing join in at
+a tenth of the weight: they want to stay over the keys the hand is
+sitting on, and without them a hand playing one note would have nothing
+to say about where it is. They must never outvote a finger that IS
+playing, which at an octave -- two playing, three resting -- is exactly
+what a lighter ratio let them do.
 
-Then each finger reaches from its own knuckle towards its own key, and
-what it cannot cover it does not get: it may swing so far from the
-hand's direction and stretch so far past its length, and past that it
-simply points at the key and falls short. Those two limits are per
-finger, because a thumb abducts a very long way and a middle finger
-hardly at all -- and between them, the turn and the splay are what let
-a hand span an octave, which is exactly the reach a hand is supposed to
-have and the reason an octave is as wide as music asks one hand to be.
+`spread` is clamped to 0.8--1.45 and `turn` to about 18 degrees, and
+the position is then re-solved against the values actually used: a
+clamped hand that kept the unclamped position sits beside the keys it
+is playing.
 
-### Drawn as one closed outline
+### Depth: where the wrist really is
 
-Up the side of each finger, round its tip, down into the web, and back
-along the heel of the palm. No seam anywhere on it, because there is no
-join anywhere in it.
+Not on the keys. A player's fingertips rest about 40mm up a white key
+and their wrist is about 105mm forward of them, so the wrist is out in
+FRONT of the keyboard, over the key slip. `WRIST_IN_FRONT` is that gap,
+and it is what puts the fingertips on the front third of the keys
+instead of up among the black ones.
 
-- **the webs are shallow.** The notch between two fingers stops about
-  half way down them and a thin crease carries on from there into the
-  palm. Cutting the notches to the knuckles is what makes a drawn hand
-  look like a rake; a real hand is webbed, and what separates its
-  fingers lower down is a line, not a gap.
-- **the fingers taper and end in a nail.** A finger the same width from
-  knuckle to tip is a sausage, and the nail is the one detail that
-  costs nothing and is missed immediately when it is not there.
-- **the thumb is its own shape, overlapping the rest.** Its joint is
-  under the palm, not beside the index finger's, so walked as part of
-  the same outline the two cross -- and a closed path that crosses
-  itself draws the crossing as a line through the hand. The pair are
-  painted in two passes, both fat and dark then both in skin, so what
-  shows of the first pass is the outline of the union and nothing else.
+Two rules pull the whole hand back from there, and only ever back:
+
+- a finger on a **black key** cannot be out in front of where that key
+  ends, because a black key stops part way down the board;
+- **every** fingertip has to stay on the keyboard at all. This drawing
+  holds its thumb low and out to the side -- a flat hand's thumb, not a
+  playing one's -- so it is the finger that falls off the front first.
+
+### What the drawing cannot say, and what says it instead
+
+One outline cannot bend a single finger, so it cannot show WHICH finger
+is down. Two marks do that:
+
+- the pressing fingertip, dotted in the hand's own note colour -- the
+  colour of the bar that fell onto that key;
+- the finger's NUMBER, on the key, which is what every piano lesson
+  video puts there because the hand is the thing in the way.
+
+And three short creases at the base of the long fingers, struck from
+the artwork's own fingertip positions so they move with the hand's
+spread and turn. A silhouette with no creases on a keyboard reads as a
+glove.
 
 ### Around the hand
 
@@ -246,23 +278,21 @@ one the control asks. What IS capped is how long a white key is drawn
 frame it is a tower of planks with a spider on it.
 
 **A strip in front of the keys.** The keyboard does not reach the
-bottom of the stage: the heel of a hand reaching the keys rests past
-their front edge, exactly as on a real piano. The strip is as wide as
-`REACH_PAST_KEYS` -- a number that belongs to the hand, not to the page
--- so the layout cannot drift away from the anatomy.
+bottom of the stage: the wrist sits out in front of the keys, exactly
+as on a real piano. The strip is as wide as `HAND_REACH_PAST_KEYS` -- a
+number that belongs to the hand, not to the page -- so the layout
+cannot drift away from where the hand actually is. The rest of the
+forearm runs off the bottom of the frame, which is where an arm comes
+from.
 
 **Every C is named** on its own key, C1 to C8, because a learner
 watching a hand move cannot count 52 white keys but can see which C it
 has reached. `keyNames: false` turns them off.
 
-**Nothing is drawn ON a playing finger.** The key under it is lit, the
-finger has reached for it, and its number is on the key: three cues for
-one fact.
-
 `handFingertips(hand, options)` returns where every finger is, so a
 caller -- or a test -- can ask without reading it back out of a path
 string. Nothing in the drawing is the source of truth about the hand;
-the pose is.
+the placement is.
 
 ## Falling notes
 
