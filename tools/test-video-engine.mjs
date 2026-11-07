@@ -295,6 +295,37 @@ test('the timing tables say the length the frames actually are', async () => {
   assert.ok(Math.abs(movieDuration / movieTimescale - longest) < 0.001);
 });
 
+test('fractional frame rates keep the ideal duration without cumulative drift', async () => {
+  const fps = 29.97;
+  const count = 997;
+  const chunks = Array.from({ length: count }, (_, i) => ({
+    us: Math.round((i * 1e6) / fps),
+    key: i === 0,
+    data: payload(i + 7, 180),
+  }));
+  const file = new Uint8Array(
+    await muxMp4({
+      width: 1280,
+      height: 720,
+      fps,
+      video: { chunks, description: AVCC },
+      audio: null,
+    }).arrayBuffer(),
+  );
+  const trak = find(file, 'moov/trak');
+  const clock = reader(file, find(file, 'mdia/mdhd', trak.body, trak.end));
+  clock.skip(1 + 3 + 4 + 4);
+  const timescale = clock.u32();
+  const duration = clock.u32();
+  assert.ok(
+    Math.abs(duration / timescale - count / fps) < 1 / timescale,
+    'fractional-FPS duration accumulated rounding drift',
+  );
+  const table = sampleTables(file, find(file, 'mdia/minf/stbl', trak.body, trak.end));
+  assert.equal(durations(table.stts).length, count);
+  assert.ok(new Set(durations(table.stts)).size > 1, 'fractional frame durations were not preserved');
+});
+
 test('the keyframes are the ones that were marked, and only those', async () => {
   const file = await build();
   const moov = find(file, 'moov');

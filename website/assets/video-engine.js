@@ -436,9 +436,10 @@
     const videoDelta = Math.round(VIDEO_TIMESCALE / fps);
     const videoSamples = video.chunks.map((chunk, i) => ({
       track: 1,
-      dts: i * videoDelta,
+      // Round each ideal timestamp instead of accumulating one rounded delta.
+      dts: Math.round((i * VIDEO_TIMESCALE) / fps),
       pts: Math.round((chunk.us * VIDEO_TIMESCALE) / 1e6),
-      seconds: (i * videoDelta) / VIDEO_TIMESCALE,
+      seconds: i / fps,
       key: chunk.key,
       data: chunk.data,
     }));
@@ -484,7 +485,15 @@
     /** How long a track runs, in its own clock. */
     const spanOf = (samples, lastDelta) =>
       samples.length === 0 ? 0 : samples[samples.length - 1].dts - samples[0].dts + lastDelta;
-    const videoSpan = spanOf(videoSamples, videoDelta);
+    const videoLastDelta =
+      videoSamples.length > 0
+        ? Math.max(
+            1,
+            Math.round((videoSamples.length * VIDEO_TIMESCALE) / fps) -
+              videoSamples[videoSamples.length - 1].dts,
+          )
+        : videoDelta;
+    const videoSpan = spanOf(videoSamples, videoLastDelta);
     const audioSpan = spanOf(audioSamples, audioDelta);
     const asMs = (ticks, timescale) => Math.round((ticks / timescale) * MOVIE_TIMESCALE);
     const videoMs = asMs(videoSpan, VIDEO_TIMESCALE);
@@ -657,7 +666,7 @@
       {
         id: 1, handler: 'vide', label: 'VideoHandler',
         timescale: VIDEO_TIMESCALE, span: videoSpan, trackMs: videoMs,
-        samples: videoSamples, lastDelta: videoDelta, entry: avc1,
+        samples: videoSamples, lastDelta: videoLastDelta, entry: avc1,
       },
     ];
     if (audio) {
@@ -697,13 +706,12 @@
   // Encoding.
   // ---------------------------------------------------------------
 
-  function hasWebCodecs() {
-    return (
-      typeof window.VideoEncoder === 'function' &&
-      typeof window.VideoFrame === 'function' &&
-      typeof window.AudioEncoder === 'function' &&
-      typeof window.AudioData === 'function'
-    );
+  function hasWebCodecs(audioRequired = true) {
+    const videoReady =
+      typeof window.VideoEncoder === 'function' && typeof window.VideoFrame === 'function';
+    const audioReady =
+      typeof window.AudioEncoder === 'function' && typeof window.AudioData === 'function';
+    return videoReady && (!audioRequired || audioReady);
   }
 
   /**
@@ -824,6 +832,7 @@
   async function encodeAudio(buffer, format, shouldStop) {
     const chunks = [];
     let description;
+    let encoderError = null;
     const encoder = new window.AudioEncoder({
       output: (chunk, metadata) => {
         if (metadata && metadata.decoderConfig && metadata.decoderConfig.description) {
@@ -833,7 +842,10 @@
         chunk.copyTo(data);
         chunks.push({ us: chunk.timestamp, data });
       },
-      error: (err) => console.error('Audio encoder:', err),
+      error: (err) => {
+        encoderError = err;
+        console.error('Audio encoder:', err);
+      },
     });
     const channels = Math.min(2, buffer.numberOfChannels);
     encoder.configure({
@@ -869,6 +881,7 @@
     }
     await encoder.flush();
     encoder.close();
+    if (encoderError) throw new Error(`Audio encoding failed: ${encoderError.message || encoderError}`);
     return {
       chunks,
       description:
@@ -942,6 +955,7 @@
     // is -- come alongside the first frame rather than inside it, and
     // an MP4 cannot be written without them.
     let videoDescription;
+    let encoderError = null;
     const encoder = new window.VideoEncoder({
       output: (chunk, metadata) => {
         if (metadata && metadata.decoderConfig && metadata.decoderConfig.description) {
@@ -951,7 +965,10 @@
         chunk.copyTo(data);
         videoChunks.push({ us: chunk.timestamp, key: chunk.type === 'key', data });
       },
-      error: (err) => console.error('Video encoder:', err),
+      error: (err) => {
+        encoderError = err;
+        console.error('Video encoder:', err);
+      },
     });
     encoder.configure({
       codec,
@@ -1016,10 +1033,14 @@
 
     await encoder.flush();
     encoder.close();
+    if (encoderError) throw new Error(`Video encoding failed: ${encoderError.message || encoderError}`);
 
     if (onProgress) onProgress(1, 'Encoding the sound');
     let audio = null;
-    const joined = await joinAudio(segments, totalSeconds);
+    // A cancelled render must not append the original full-length soundtrack
+    // to the shorter video that was actually encoded.
+    const renderedSeconds = frameIndex / fps;
+    const joined = await joinAudio(segments, renderedSeconds);
     if (joined) audio = await encodeAudio(joined, format, shouldStop);
 
     if (onProgress) onProgress(1, 'Writing the file');
@@ -1027,7 +1048,9 @@
     // reports alongside its first frame. A browser that encoded H.264
     // and then did not describe it has given us something we cannot
     // put in a file, so say so rather than write a broken one.
-    if (format.container === 'mp4' && !videoDescription) return null;
+    if (format.container === 'mp4' && !videoDescription) {
+      throw new Error('H.264 encoder did not provide decoder configuration');
+    }
     const blob =
       format.container === 'mp4'
         ? muxMp4({
@@ -1158,7 +1181,8 @@
   }
 
   async function render(options) {
-    if (hasWebCodecs()) {
+    const hasAudio = options.segments.some((segment) => segment.audio);
+    if (hasWebCodecs(hasAudio)) {
       const result = await renderWithWebCodecs(options);
       if (result) return result;
     }
