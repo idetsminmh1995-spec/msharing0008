@@ -282,52 +282,53 @@ describe('partial beams and hooks, end to end (Integration W)', () => {
   });
 });
 
-describe('MusicXML chorded percussion eighth-note groove (44130 regression)', () => {
+describe('MusicXML whole-score percussion eighth-note groove (44130 regression)', () => {
   const source = fs.readFileSync(
     path.join(__dirname2, '..', 'fixtures', 'musicxml', '44130-drum-eighths.musicxml'),
     'utf8',
   );
 
-  test('measure 2 is eight eighth-note onsets with explicit beam groups and no overrun', () => {
+  test('all 88 measures have eight eighth-note hi-hats in two explicit beam groups', () => {
     const parsed = NE.parseMusicXml(source, { domParser: domParser2 });
-    const measure = parsed.score.parts[0].measures.find((candidate) => candidate.number === 2);
-    assert.ok(measure, 'measure 2 exists');
-    const events = measure.voices[0].events;
-    assert.equal(events.length, 8);
-    assert.ok(
-      events.every((event) => event.duration.type === 'eighth'),
-      'every onset has eighth-note duration',
-    );
-    assert.equal(
-      events.reduce((total, event) => total + event.duration.ticks, 0),
-      1920,
-      'the 8 eighth-note onsets fill exactly four quarter-note beats',
-    );
-    const beamValues = Array.from(events, (event) => {
-      const firstChordNote = event.kind === 'chord' ? event.notes[0] : event;
-      return firstChordNote.beams.find((beam) => beam.number === 1)?.value;
-    });
-    assert.deepEqual(beamValues, [
+    const measures = parsed.score.parts[0].measures;
+    assert.equal(measures.length, 88);
+    const expectedBeamValues = [
       'begin', 'continue', 'continue', 'end',
       'begin', 'continue', 'continue', 'end',
-    ]);
+    ];
+    for (const measure of measures) {
+      const hatVoice = measure.voices.find((voice) => voice.id === 3);
+      assert.ok(hatVoice, `measure ${measure.number} has the hi-hat voice`);
+      const events = hatVoice.events;
+      assert.equal(events.length, 8, `measure ${measure.number} has 8 hi-hats`);
+      assert.ok(events.every((event) => event.duration.type === 'eighth'));
+      assert.equal(
+        events.reduce((total, event) => total + event.duration.ticks, 0),
+        1920,
+        `measure ${measure.number} has exactly four quarter-note beats of hi-hats`,
+      );
+      const beamValues = Array.from(events, (event) =>
+        event.beams.find((beam) => beam.number === 1)?.value,
+      );
+      assert.deepEqual(beamValues, expectedBeamValues, `measure ${measure.number} beam groups`);
+    }
     assert.equal(
       parsed.diagnostics.some(
         (diagnostic) =>
           diagnostic.code === 'MEASURE_OVERRUN' &&
-          diagnostic.location?.measureNumber === 2,
+          diagnostic.location?.measureNumber !== 88,
       ),
       false,
     );
   });
 
-  test('the MusicXML render draws the two primary beam groups in measure 2', () => {
+  test('the MusicXML render draws two primary beam groups per measure', () => {
     const result = NE.renderFromMusicXml(source, { domParser: domParser2 });
     const primaryBeamLines = [
       ...result.svg.matchAll(
         /<line x1="[-\d.]+" y1="[-\d.]+" x2="[-\d.]+" y2="[-\d.]+" stroke="[^"]*" stroke-width="0\.5" \/>/g,
       ),
     ];
-    assert.equal(primaryBeamLines.length, 2);
+    assert.equal(primaryBeamLines.length, 176);
   });
 });
