@@ -74,6 +74,10 @@ The seekable MP4 can also be delivered incrementally to a browser
 stream writer does not call `arrayBuffer()` or create a second full-file
 contiguous copy.
 
+The complete design for true fragment-at-a-time streaming, random-access flat
+MP4 patching, sink contracts, recovery, and browser tests is documented in
+[`VIDEO-ENGINE-STREAMING-MUXER.md`](VIDEO-ENGINE-STREAMING-MUXER.md).
+
 ## 5. Timing model and recent fixes
 
 ### 5.1 Fractional frame rates
@@ -148,6 +152,7 @@ Completed in the current update:
 - Root README status and this technical document kept in sync with the implementation.
 - Grouped MP4 media chunks with validated `stsc` and `stco`/`co64` tables.
 - Chromium WebCodecs smoke test with `ffprobe` validation and incremental `WritableStream` output API.
+- Detailed fully-streaming/seekable muxer strategy in `VIDEO-ENGINE-STREAMING-MUXER.md`.
 
 ## 9. Long-video memory update
 
