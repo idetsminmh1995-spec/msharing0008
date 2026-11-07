@@ -131,9 +131,8 @@ The following items are not yet complete and should be handled as separate updat
 1. Add a real-browser integration test that encodes a short MP4 in Chromium, validates it with `ffprobe`, and decodes the first and last frames.
 2. Run the same compatibility matrix on Chromium, Safari, and Firefox, including portrait and square resolutions.
 3. Add browser-level cancellation tests that exercise both WebCodecs and MediaRecorder with a multi-segment render.
-4. Group encoded samples into larger MP4 chunks to reduce `moov` size and offset-table overhead on long videos.
-5. Add browser-level memory-pressure instrumentation and a quality preset for low-memory devices.
-6. Make the MediaRecorder fallback trim its live audio source when cancellation occurs.
+4. Add browser-level memory-pressure instrumentation and a quality preset for low-memory devices.
+5. Make the MediaRecorder fallback trim its live audio source when cancellation occurs.
 
 Completed in the current update:
 
@@ -141,6 +140,7 @@ Completed in the current update:
 - Bounded WebCodecs progress phases: rendering (0–75%), audio/file work (75–90%), and complete (100%).
 - Global multi-segment timing and accurate MediaRecorder cancellation state.
 - Root README status and this technical document kept in sync with the implementation.
+- Grouped MP4 media chunks with validated `stsc` and `stco`/`co64` tables.
 
 ## 9. Long-video memory update
 
@@ -164,11 +164,12 @@ adds three further safeguards:
 These changes reduce transient memory and make long renders observable, but
 they do not make the output fully streaming: encoded video samples must still
 remain available until the MP4 offset tables are written. The next substantial
-optimization is sample-grouped or seekable streaming muxing, which should be
-implemented only with browser integration tests because it changes the file
-layout and offset-table behavior.
+optimization is a seekable streaming muxer, which should be implemented only
+with browser integration tests because it changes the file layout and offset-
+table behavior.
 
 ## 10. Change history
 
 - `b9e794d` — fractional-FPS timing, cancellation-safe audio duration, silent-video WebCodecs detection, encoder error propagation, and muxer regression coverage.
 - Current follow-up — global multi-segment frame timeline and accurate MediaRecorder cancellation state.
+- Current follow-up — grouped MP4 chunks and lower offset-table overhead for long videos.

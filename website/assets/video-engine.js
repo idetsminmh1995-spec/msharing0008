@@ -465,13 +465,33 @@
         ? audioSamples[audioSamples.length - 1].dts - audioSamples[audioSamples.length - 2].dts
         : 1024;
 
-    const ordered = [...videoSamples, ...audioSamples].sort(
+    const timestampOrder = [...videoSamples, ...audioSamples].sort(
       (a, b) => a.seconds - b.seconds || a.track - b.track,
     );
+    // Group samples per track before writing mdat. One sample per chunk made
+    // stco/co64 and stsc grow linearly with every frame; fixed-size groups
+    // preserve decode order while reducing offset-table entries dramatically.
+    const SAMPLES_PER_CHUNK = 16;
+    const chunksByTrack = new Map();
+    for (const samples of [videoSamples, audioSamples]) {
+      if (samples.length === 0) continue;
+      const chunks = [];
+      for (let at = 0; at < samples.length; at += SAMPLES_PER_CHUNK) {
+        chunks.push({ track: samples[0].track, samples: samples.slice(at, at + SAMPLES_PER_CHUNK) });
+      }
+      chunksByTrack.set(samples[0].track, chunks);
+    }
+    const mediaChunks = [...chunksByTrack.values()]
+      .flat()
+      .sort((a, b) => a.samples[0].seconds - b.samples[0].seconds || a.track - b.track);
+    const ordered = mediaChunks.flatMap((chunk) => chunk.samples);
     let mdatBytes = 0;
-    for (const sample of ordered) {
-      sample.offset = mdatBytes;
-      mdatBytes += sample.data.length;
+    for (const chunk of mediaChunks) {
+      chunk.offset = mdatBytes;
+      for (const sample of chunk.samples) {
+        sample.offset = mdatBytes;
+        mdatBytes += sample.data.length;
+      }
     }
 
     // Past about 3.75GB both the offset table and `mdat`'s own length
@@ -501,7 +521,7 @@
     const movieMs = Math.max(videoMs, audioMs);
 
     /** The sample tables for one track, in that track's decode order. */
-    const sampleTable = (entry, samples, lastDelta, base) => {
+    const sampleTable = (entry, samples, lastDelta, base, chunks) => {
       const stts = [];
       for (let i = 0; i < samples.length; i++) {
         const delta = i + 1 < samples.length ? samples[i + 1].dts - samples[i].dts : lastDelta;
@@ -545,24 +565,26 @@
         ...(syncs.length === samples.length
           ? []
           : [fullBox('stss', 0, 0, [u32(syncs.length), ...syncs.map((n) => u32(n))])]),
-        // One sample to a chunk. The offset table then names every
-        // sample outright, which is what lets the two tracks be
-        // interleaved sample by sample rather than in blocks.
-        fullBox('stsc', 0, 0, [u32(1), u32(1), u32(1), u32(1)]),
+        fullBox('stsc', 0, 0, [
+          u32(chunks.length === 0 ? 0 : chunks.reduce((count, chunk, index) => {
+            const previous = chunks[index - 1];
+            return count + (!previous || previous.samples.length !== chunk.samples.length ? 1 : 0);
+          }, 0)),
+          ...chunks.flatMap((chunk, index) => {
+            const previous = chunks[index - 1];
+            return !previous || previous.samples.length !== chunk.samples.length
+              ? [u32(index + 1), u32(chunk.samples.length), u32(1)]
+              : [];
+          }),
+        ]),
         fullBox('stsz', 0, 0, [
           u32(0),
           u32(samples.length),
           ...samples.map((sample) => u32(sample.data.length)),
         ]),
         wide
-          ? fullBox('co64', 0, 0, [
-              u32(samples.length),
-              ...samples.map((sample) => u64(base + sample.offset)),
-            ])
-          : fullBox('stco', 0, 0, [
-              u32(samples.length),
-              ...samples.map((sample) => u32(base + sample.offset)),
-            ]),
+          ? fullBox('co64', 0, 0, [u32(chunks.length), ...chunks.map((chunk) => u64(base + chunk.offset))])
+          : fullBox('stco', 0, 0, [u32(chunks.length), ...chunks.map((chunk) => u32(base + chunk.offset))]),
       ]);
     };
 
@@ -656,7 +678,7 @@
               ? fullBox('vmhd', 0, 1, [u16(0), u16(0), u16(0), u16(0)])
               : fullBox('smhd', 0, 0, [u16(0), u16(0)]),
             box('dinf', [fullBox('dref', 0, 0, [u32(1), fullBox('url ', 0, 1, [])])]),
-            sampleTable(entry, samples, lastDelta, base),
+            sampleTable(entry, samples, lastDelta, base, chunksByTrack.get(id) ?? []),
           ]),
         ]),
       ]);

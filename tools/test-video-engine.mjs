@@ -220,13 +220,23 @@ test('the offset table points at the bytes that went in', async () => {
 
   for (const [index, chunks] of [[0, videoChunks], [1, audioChunks]]) {
     const stbl = find(file, 'mdia/minf/stbl', traks[index].body, traks[index].end);
-    const { stsz, stco } = sampleTables(file, stbl);
-    assert.equal(stsz.length, chunks.length, 'one entry per sample');
-    assert.equal(stco.length, chunks.length, 'one chunk per sample');
+    const { stsz, stco, stsc } = sampleTables(file, stbl);
+    assert.equal(stsz.length, chunks.length, 'one size entry per sample');
+    assert.ok(stco.length < chunks.length, 'sample grouping did not reduce chunk count');
+    const offsets = [];
+    for (let chunkIndex = 0; chunkIndex < stco.length; chunkIndex++) {
+      const mapping = [...stsc].reverse().find((entry) => entry.first <= chunkIndex + 1);
+      let at = stco[chunkIndex];
+      for (let i = 0; i < mapping.per; i++) {
+        offsets.push(at);
+        at += stsz[offsets.length - 1];
+      }
+    }
+    assert.equal(offsets.length, chunks.length, 'stsc does not cover every sample');
     for (let i = 0; i < chunks.length; i++) {
       assert.equal(stsz[i], chunks[i].data.length, `sample ${i} is the wrong length`);
       assert.deepEqual(
-        [...file.subarray(stco[i], stco[i] + stsz[i])],
+        [...file.subarray(offsets[i], offsets[i] + stsz[i])],
         [...chunks[i].data],
         `sample ${i} of track ${index + 1} is not where the table says`,
       );
@@ -234,13 +244,15 @@ test('the offset table points at the bytes that went in', async () => {
   }
 });
 
-test('one sample to a chunk, so the two tracks interleave', async () => {
+test('grouped chunks keep the two tracks interleaved', async () => {
   const file = await build();
   const moov = find(file, 'moov');
   const traks = findAll(file, 'trak', moov.body, moov.end);
   for (const trak of traks) {
     const { stsc } = sampleTables(file, find(file, 'mdia/minf/stbl', trak.body, trak.end));
-    assert.deepEqual(stsc, [{ first: 1, per: 1, desc: 1 }]);
+    assert.ok(stsc.length >= 1);
+    assert.equal(stsc[0].first, 1);
+    assert.ok(stsc.every((entry) => entry.per > 1 || stsc.length > 1));
   }
   // Interleaved means the sound for a second sits beside the picture
   // for it, not in a block of its own at one end of the file.
