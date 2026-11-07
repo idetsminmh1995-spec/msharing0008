@@ -7,7 +7,7 @@
   "main": "dist/notation-engine.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --outfile=dist/notation-engine.js --format=iife --global-name=NotationEngine --sourcemap",
+    "build": "esbuild src/index.ts --bundle --outfile=dist/notation-engine.js --format=iife --global-name=NotationEngine --sourcemap && node scripts/sync-website-bundle.mjs",
     "typecheck": "tsc --noEmit",
     "declarations": "tsc --emitDeclarationOnly",
     "lint": "eslint src",
