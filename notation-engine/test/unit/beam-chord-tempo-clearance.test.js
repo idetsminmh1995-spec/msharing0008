@@ -132,6 +132,30 @@ describe('a chord inside a beam group (Integration M, §9.13)', () => {
     assert.ok(longest > shortest, "the chord's stem spans further than a single note's");
   });
 
+  test('a mixed-shape chord anchors its stem to the far notehead, not the widest glyph', () => {
+    const { svg } = render(
+      measure(
+        eighth('C', 5, 'begin') +
+          '<note><chord/><pitch><step>A</step><octave>5</octave></pitch>' +
+          '<duration>1</duration><voice>1</voice><type>eighth</type>' +
+          '<notehead>x</notehead><beam number="1">continue</beam></note>' +
+          eighth('D', 5, 'end') +
+          '<note><rest/><duration>5</duration><voice>1</voice><type>half</type></note>',
+      ),
+    );
+    const chordX = glyphPlacements(svg, 'noteheadXBlack')[0]?.x;
+    assert.notEqual(chordX, undefined, 'the mixed-shape chord must draw its X head');
+    const stemAnchor = NE.getGlyph('noteheadXBlack').anchors.stemDownNW[0];
+    const chordStemX = chordX + stemAnchor;
+    const stemXs = lines(svg)
+      .filter((line) => line.w === '0.12')
+      .map((line) => line.x1);
+    assert.ok(
+      stemXs.some((x) => Math.abs(x - chordStemX) < 1e-4),
+      `the chord stem must use the far X-head anchor at ${chordStemX}; got ${stemXs.join(', ')}`,
+    );
+  });
+
   test("the project's own drum chart draws zero stray flags (it drew 62 before)", () => {
     const xml = fs.readFileSync(
       path.join(__dirname, '..', '..', '..', 'website', 'assets', 'Drum_Lesson_5.musicxml'),

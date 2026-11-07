@@ -77460,12 +77460,24 @@ ${xrefOffset}
         const heads = renderChordHeadsPart(event, x2, ctx, state);
         memberParts.push([heads.svg]);
         state = heads.newAccidentalState;
-        members.push({ x: x2, positions: heads.positions, glyph: heads.widestGlyph, source: event });
+        members.push({
+          x: x2,
+          positions: heads.positions,
+          glyphs: heads.glyphs,
+          widestGlyph: heads.widestGlyph,
+          source: event
+        });
       } else {
         const head = renderNoteheadPart(event, x2, ctx, state);
         memberParts.push([head.svg]);
         state = head.newAccidentalState;
-        members.push({ x: x2, positions: [head.position], glyph: head.noteheadGlyph, source: event });
+        members.push({
+          x: x2,
+          positions: [head.position],
+          glyphs: [head.noteheadGlyph],
+          widestGlyph: head.noteheadGlyph,
+          source: event
+        });
       }
     });
     const middle = middleLineY(STAFF_LINES);
@@ -77479,6 +77491,11 @@ ${xrefOffset}
     const direction = forcedDirection ?? stated ?? beamDirection(allPositions, middle);
     const beamPositionOf = (m) => direction === "up" ? Math.min(...m.positions) : Math.max(...m.positions);
     const attachPositionOf = (m) => direction === "up" ? Math.max(...m.positions) : Math.min(...m.positions);
+    const attachGlyphOf = (m) => {
+      const attachPosition = attachPositionOf(m);
+      const attachIndex = m.positions.findIndex((position) => position === attachPosition);
+      return m.glyphs[attachIndex] ?? m.widestGlyph;
+    };
     const beamPositions = members.map(beamPositionOf);
     const naturalLength = Math.max(
       DEFAULT_UNBEAMED_STEM_LENGTH,
@@ -77486,7 +77503,7 @@ ${xrefOffset}
     );
     const anchorName = direction === "up" ? "stemUpSE" : "stemDownNW";
     const stemXs = members.map((m) => {
-      const anchor = getGlyph(m.glyph)?.anchors?.[anchorName];
+      const anchor = getGlyph(attachGlyphOf(m))?.anchors?.[anchorName];
       return m.x + (anchor?.[0] ?? 0);
     });
     const shape = computeBeamShape(beamPositions, stemXs, direction, beamStyle, naturalLength);
@@ -77495,11 +77512,12 @@ ${xrefOffset}
       const y = ctx.measureBottomY + attachPosition;
       const stemX = stemXs[i2] ?? m.x;
       const beamY = ctx.measureBottomY + beamYAtX(shape, stemX);
-      const anchor = getGlyph(m.glyph)?.anchors?.[anchorName];
+      const stemGlyph = attachGlyphOf(m);
+      const anchor = getGlyph(stemGlyph)?.anchors?.[anchorName];
       if (anchor === void 0) return;
       memberParts[i2]?.push(
         renderStem({
-          noteheadGlyphName: m.glyph,
+          noteheadGlyphName: stemGlyph,
           noteX: m.x,
           noteY: y,
           direction,
@@ -77532,7 +77550,7 @@ ${xrefOffset}
       topPosition: Math.min(...m.positions),
       bottomPosition: Math.max(...m.positions),
       direction,
-      noteheadGlyph: m.glyph
+      noteheadGlyph: attachGlyphOf(m)
     }));
     const beamLevels2 = events.map((e) => Math.max(1, numBeamLines(e.duration.type)));
     const beamHints = events.map((e) => e.kind === "chord" ? e.notes[0]?.beams : e.beams);
@@ -77668,13 +77686,23 @@ ${xrefOffset}
     const parts = [heads.svg];
     const positions = heads.positions;
     if (positions.length > 0) {
-      const direction = forcedDirection ?? chordStemDirection([...positions], middleLineY(STAFF_LINES));
+      const explicitDirection = chord2.notes.find(
+        (note2) => note2.explicitStemDirection !== void 0
+      )?.explicitStemDirection;
+      const direction = resolveStemDirection({
+        positions,
+        numLines: STAFF_LINES,
+        ...forcedDirection !== void 0 ? { forcedDirection } : {},
+        ...explicitDirection !== void 0 ? { explicitDirection } : {}
+      });
       if (chord2.duration.type !== "whole") {
         const outermost = direction === "up" ? Math.max(...positions) : Math.min(...positions);
+        const outermostIndex = positions.findIndex((position) => position === outermost);
+        const stemGlyph = heads.glyphs[outermostIndex] ?? heads.widestGlyph;
         const length = computeStemLength(outermost, middleLineY(STAFF_LINES), direction);
         parts.push(
           renderStem({
-            noteheadGlyphName: heads.widestGlyph,
+            noteheadGlyphName: stemGlyph,
             noteX: x2,
             noteY: ctx.measureBottomY + outermost,
             direction,

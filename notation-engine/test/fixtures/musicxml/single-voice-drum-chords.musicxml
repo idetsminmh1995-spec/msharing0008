@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Chord stem direction on a drum staff (Step 1 of the notation-accuracy work).
+  Shaped like a real MuseScore export of a hi-hat + snare groove:
+    m1  ONE voice, hi-hat+snare chords, every note carries <stem>up</stem>
+        (MuseScore's own choice - the case the engine used to draw DOWN).
+    m2  ONE voice, kick+snare chords carrying <stem>down</stem>
+        (the automatic direction for these would be up, so the file must win).
+    m3  ONE voice, hi-hat+snare chords with NO <stem> element
+        (automatic direction - unchanged behaviour).
+    m4  TWO voices: voice 1 hi-hat+snare chords <stem>up</stem>, voice 2 kick
+        <stem>down</stem> (the per-voice hands-up / feet-down split).
+-->
+<score-partwise version="4.0">
+  <part-list>
+    <score-part id="P1">
+      <part-name>Drum Kit</part-name>
+      <score-instrument id="P1-KICK"><instrument-name>Bass Drum 1</instrument-name></score-instrument>
+      <score-instrument id="P1-SNARE"><instrument-name>Acoustic Snare</instrument-name></score-instrument>
+      <score-instrument id="P1-HH"><instrument-name>Closed Hi-Hat</instrument-name></score-instrument>
+      <midi-instrument id="P1-KICK"><midi-channel>10</midi-channel><midi-unpitched>37</midi-unpitched></midi-instrument>
+      <midi-instrument id="P1-SNARE"><midi-channel>10</midi-channel><midi-unpitched>39</midi-unpitched></midi-instrument>
+      <midi-instrument id="P1-HH"><midi-channel>10</midi-channel><midi-unpitched>43</midi-unpitched></midi-instrument>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>1</divisions>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>percussion</sign><line>2</line></clef>
+      </attributes>
+      <note>
+        <unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-HH"/><voice>1</voice><type>quarter</type><stem>up</stem><notehead>x</notehead>
+      </note>
+      <note>
+        <chord/><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-SNARE"/><voice>1</voice><type>quarter</type><stem>up</stem>
+      </note>
+      <note>
+        <unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-HH"/><voice>1</voice><type>quarter</type><stem>up</stem><notehead>x</notehead>
+      </note>
+      <note>
+        <chord/><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-SNARE"/><voice>1</voice><type>quarter</type><stem>up</stem>
+      </note>
+      <note>
+        <unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-HH"/><voice>1</voice><type>quarter</type><stem>up</stem><notehead>x</notehead>
+      </note>
+      <note>
+        <chord/><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-SNARE"/><voice>1</voice><type>quarter</type><stem>up</stem>
+      </note>
+      <note>
+        <unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-HH"/><voice>1</voice><type>quarter</type><stem>up</stem><notehead>x</notehead>
+      </note>
+      <note>
+        <chord/><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-SNARE"/><voice>1</voice><type>quarter</type><stem>up</stem>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-KICK"/><voice>1</voice><type>quarter</type><stem>down</stem>
+      </note>
+      <note>
+        <chord/><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-SNARE"/><voice>1</voice><type>quarter</type><stem>down</stem>
+      </note>
+      <note>
+        <unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-KICK"/><voice>1</voice><type>quarter</type><stem>down</stem>
+      </note>
+      <note>
+        <chord/><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-SNARE"/><voice>1</voice><type>quarter</type><stem>down</stem>
+      </note>
+      <note>
+        <unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-KICK"/><voice>1</voice><type>quarter</type><stem>down</stem>
+      </note>
+      <note>
+        <chord/><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-SNARE"/><voice>1</voice><type>quarter</type><stem>down</stem>
+      </note>
+      <note>
+        <unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-KICK"/><voice>1</voice><type>quarter</type><stem>down</stem>
+      </note>
+      <note>
+        <chord/><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-SNARE"/><voice>1</voice><type>quarter</type><stem>down</stem>
+      </note>
+    </measure>
+    <measure number="3">
+      <note>
+        <unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-HH"/><voice>1</voice><type>quarter</type><notehead>x</notehead>
+      </note>
+      <note>
+        <chord/><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-SNARE"/><voice>1</voice><type>quarter</type>
+      </note>
+      <note>
+        <unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-HH"/><voice>1</voice><type>quarter</type><notehead>x</notehead>
+      </note>
+      <note>
+        <chord/><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-SNARE"/><voice>1</voice><type>quarter</type>
+      </note>
+      <note>
+        <unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-HH"/><voice>1</voice><type>quarter</type><notehead>x</notehead>
+      </note>
+      <note>
+        <chord/><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-SNARE"/><voice>1</voice><type>quarter</type>
+      </note>
+      <note>
+        <unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-HH"/><voice>1</voice><type>quarter</type><notehead>x</notehead>
+      </note>
+      <note>
+        <chord/><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-SNARE"/><voice>1</voice><type>quarter</type>
+      </note>
+    </measure>
+    <measure number="4">
+      <note>
+        <unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-HH"/><voice>1</voice><type>quarter</type><stem>up</stem><notehead>x</notehead>
+      </note>
+      <note>
+        <chord/><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-SNARE"/><voice>1</voice><type>quarter</type><stem>up</stem>
+      </note>
+      <note>
+        <unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-HH"/><voice>1</voice><type>quarter</type><stem>up</stem><notehead>x</notehead>
+      </note>
+      <note>
+        <chord/><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-SNARE"/><voice>1</voice><type>quarter</type><stem>up</stem>
+      </note>
+      <note>
+        <unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-HH"/><voice>1</voice><type>quarter</type><stem>up</stem><notehead>x</notehead>
+      </note>
+      <note>
+        <chord/><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-SNARE"/><voice>1</voice><type>quarter</type><stem>up</stem>
+      </note>
+      <note>
+        <unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-HH"/><voice>1</voice><type>quarter</type><stem>up</stem><notehead>x</notehead>
+      </note>
+      <note>
+        <chord/><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-SNARE"/><voice>1</voice><type>quarter</type><stem>up</stem>
+      </note>
+      <backup><duration>4</duration></backup>
+      <note>
+        <unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-KICK"/><voice>2</voice><type>quarter</type><stem>down</stem>
+      </note>
+      <note>
+        <unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-KICK"/><voice>2</voice><type>quarter</type><stem>down</stem>
+      </note>
+      <note>
+        <unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-KICK"/><voice>2</voice><type>quarter</type><stem>down</stem>
+      </note>
+      <note>
+        <unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched>
+        <duration>1</duration><instrument id="P1-KICK"/><voice>2</voice><type>quarter</type><stem>down</stem>
+      </note>
+    </measure>
+  </part>
+</score-partwise>

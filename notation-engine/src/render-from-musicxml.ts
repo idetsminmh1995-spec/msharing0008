@@ -16,7 +16,6 @@ import {
   assignAccidentalColumns,
   beamDirection,
   beamYAtX,
-  chordStemDirection,
   computeBarlineGeometry,
   computeVoltaGeometry,
   voltaLabel,
@@ -1730,8 +1729,10 @@ function renderBeamGroup(
   interface BeamMember {
     readonly x: number;
     readonly positions: readonly number[];
-    /** The widest notehead, whose anchor the stem is measured from. */
-    readonly glyph: string;
+    /** Every chord member's glyph, so the stem can use the actual outermost head. */
+    readonly glyphs: readonly string[];
+    /** The widest notehead, used for the shared dot column. */
+    readonly widestGlyph: string;
     readonly source: Note | Chord;
   }
 
@@ -1747,12 +1748,24 @@ function renderBeamGroup(
       const heads = renderChordHeadsPart(event, x, ctx, state);
       memberParts.push([heads.svg]);
       state = heads.newAccidentalState;
-      members.push({ x, positions: heads.positions, glyph: heads.widestGlyph, source: event });
+      members.push({
+        x,
+        positions: heads.positions,
+        glyphs: heads.glyphs,
+        widestGlyph: heads.widestGlyph,
+        source: event,
+      });
     } else {
       const head = renderNoteheadPart(event, x, ctx, state);
       memberParts.push([head.svg]);
       state = head.newAccidentalState;
-      members.push({ x, positions: [head.position], glyph: head.noteheadGlyph, source: event });
+      members.push({
+        x,
+        positions: [head.position],
+        glyphs: [head.noteheadGlyph],
+        widestGlyph: head.noteheadGlyph,
+        source: event,
+      });
     }
   });
 
@@ -1783,6 +1796,11 @@ function renderBeamGroup(
   /** The notehead the stem attaches to: the far end of the chord from the beam. */
   const attachPositionOf = (m: BeamMember): number =>
     direction === 'up' ? Math.max(...m.positions) : Math.min(...m.positions);
+  const attachGlyphOf = (m: BeamMember): string => {
+    const attachPosition = attachPositionOf(m);
+    const attachIndex = m.positions.findIndex((position) => position === attachPosition);
+    return m.glyphs[attachIndex] ?? m.widestGlyph;
+  };
 
   const beamPositions = members.map(beamPositionOf);
   const naturalLength = Math.max(
@@ -1802,7 +1820,7 @@ function renderBeamGroup(
   // different defect from Integration O's stem-length fix, and the one
   // the user's own reference-image comparison was actually showing).
   const stemXs = members.map((m) => {
-    const anchor = getGlyph(m.glyph)?.anchors?.[anchorName];
+    const anchor = getGlyph(attachGlyphOf(m))?.anchors?.[anchorName];
     return m.x + (anchor?.[0] ?? 0);
   });
   const shape = computeBeamShape(beamPositions, stemXs, direction, beamStyle, naturalLength);
@@ -1812,11 +1830,12 @@ function renderBeamGroup(
     const y = ctx.measureBottomY + attachPosition;
     const stemX = stemXs[i] ?? m.x;
     const beamY = ctx.measureBottomY + beamYAtX(shape, stemX);
-    const anchor = getGlyph(m.glyph)?.anchors?.[anchorName];
+    const stemGlyph = attachGlyphOf(m);
+    const anchor = getGlyph(stemGlyph)?.anchors?.[anchorName];
     if (anchor === undefined) return;
     memberParts[i]?.push(
       renderStem({
-        noteheadGlyphName: m.glyph,
+        noteheadGlyphName: stemGlyph,
         noteX: m.x,
         noteY: y,
         direction,
@@ -1855,7 +1874,7 @@ function renderBeamGroup(
     topPosition: Math.min(...m.positions),
     bottomPosition: Math.max(...m.positions),
     direction,
-    noteheadGlyph: m.glyph,
+    noteheadGlyph: attachGlyphOf(m),
   }));
 
   // Every member's own beam count, which is what decides where the
@@ -2055,14 +2074,27 @@ function renderChord(
   const positions = heads.positions;
 
   if (positions.length > 0) {
-    const direction =
-      forcedDirection ?? chordStemDirection([...positions], middleLineY(STAFF_LINES));
+    // Use the same §9.8 priority chain as a single note: a per-voice forced
+    // direction wins, then the file's own <stem>, then automatic direction.
+    // MusicXML attaches <stem> to every note of a chord, so the first member
+    // that states one is the chord's explicit direction.
+    const explicitDirection = chord.notes.find(
+      (note) => note.explicitStemDirection !== undefined,
+    )?.explicitStemDirection;
+    const direction = resolveStemDirection({
+      positions,
+      numLines: STAFF_LINES,
+      ...(forcedDirection !== undefined ? { forcedDirection } : {}),
+      ...(explicitDirection !== undefined ? { explicitDirection } : {}),
+    });
     if (chord.duration.type !== 'whole') {
       const outermost = direction === 'up' ? Math.max(...positions) : Math.min(...positions);
+      const outermostIndex = positions.findIndex((position) => position === outermost);
+      const stemGlyph = heads.glyphs[outermostIndex] ?? heads.widestGlyph;
       const length = computeStemLength(outermost, middleLineY(STAFF_LINES), direction);
       parts.push(
         renderStem({
-          noteheadGlyphName: heads.widestGlyph,
+          noteheadGlyphName: stemGlyph,
           noteX: x,
           noteY: ctx.measureBottomY + outermost,
           direction,
