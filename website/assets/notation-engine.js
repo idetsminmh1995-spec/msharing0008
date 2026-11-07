@@ -147,6 +147,7 @@ var NotationEngine = (() => {
     exportPng: () => exportPng,
     exportSvg: () => exportSvg,
     extractViewBox: () => extractViewBox,
+    fermataGlyphName: () => fermataGlyphName,
     filterDiagnostics: () => filterDiagnostics,
     flagGlyphName: () => flagGlyphName,
     flatsForCount: () => flatsForCount,
@@ -160,6 +161,7 @@ var NotationEngine = (() => {
     getGlyph: () => getGlyph,
     getGlyphByChar: () => getGlyphByChar,
     getKeySignaturePositions: () => getKeySignaturePositions,
+    getTrackEventStream: () => getTrackEventStream,
     glyphForTimeSigChar: () => glyphForTimeSigChar,
     glyphNameForTimeSigChar: () => glyphNameForTimeSigChar,
     graceNoteGlyphName: () => graceNoteGlyphName,
@@ -69415,6 +69417,9 @@ var NotationEngine = (() => {
     return "below";
   }
   var GLYPH_NAMES3 = {
+    pppppp: "dynamicPPPPPP",
+    ppppp: "dynamicPPPPP",
+    pppp: "dynamicPPPP",
     ppp: "dynamicPPP",
     pp: "dynamicPP",
     p: "dynamicPiano",
@@ -69423,7 +69428,20 @@ var NotationEngine = (() => {
     f: "dynamicForte",
     ff: "dynamicFF",
     fff: "dynamicFFF",
-    sfz: "dynamicSforzato"
+    ffff: "dynamicFFFF",
+    fffff: "dynamicFFFFF",
+    ffffff: "dynamicFFFFFF",
+    sf: "dynamicSforzando",
+    sfp: "dynamicSforzandoPiano",
+    sfpp: "dynamicSforzandoPianissimo",
+    fp: "dynamicFortePiano",
+    rf: "dynamicRinforzando",
+    sfz: "dynamicSforzato",
+    sffz: "dynamicSforzatoFF",
+    fz: "dynamicForzando",
+    n: "dynamicNiente",
+    pf: "dynamicPF",
+    sfzp: "dynamicSforzatoPiano"
   };
   function dynamicGlyphName(level) {
     return GLYPH_NAMES3[level];
@@ -69747,6 +69765,14 @@ var NotationEngine = (() => {
       }
     }
     return placements;
+  }
+
+  // src/geometry/fermata.ts
+  var GLYPHS = {
+    normal: { above: "fermataAbove", below: "fermataBelow" }
+  };
+  function fermataGlyphName(shape, placement) {
+    return GLYPHS[shape ?? "normal"][placement ?? "above"];
   }
 
   // src/render/svg-primitives.ts
@@ -70675,6 +70701,8 @@ ${denominator}`;
     const slurStarts = [];
     const slurStops = [];
     let hasFermata = false;
+    let fermataPlacement;
+    let fermataShape;
     let tupletStart = false;
     let tupletStop = false;
     for (const el of childElements(notationsEl)) {
@@ -70691,9 +70719,36 @@ ${denominator}`;
           else if (type === "stop") tupletStop = true;
           break;
         }
-        case "fermata":
+        case "fermata": {
           hasFermata = true;
+          const type = attrOf(el, "type");
+          if (type === void 0 || type === "upright") fermataPlacement = "above";
+          else if (type === "inverted") fermataPlacement = "below";
+          else {
+            fermataPlacement = "above";
+            diagnostics.push(
+              diagnostic(
+                "info",
+                "UNSUPPORTED_FERMATA_TYPE",
+                `Unsupported fermata type "${type}"; using the MusicXML default upright orientation.`,
+                location
+              )
+            );
+          }
+          const shape = textOf(el)?.trim();
+          if (shape === "normal") fermataShape = "normal";
+          else if (shape !== void 0 && shape !== "") {
+            diagnostics.push(
+              diagnostic(
+                "info",
+                "UNSUPPORTED_FERMATA_SHAPE",
+                `Unsupported fermata shape "${shape}"; using the normal fermata glyph.`,
+                location
+              )
+            );
+          }
           break;
+        }
         case "articulations":
           for (const child of childElements(el)) {
             const mapped = ARTICULATION_BY_ELEMENT[child.tagName];
@@ -70747,6 +70802,8 @@ ${denominator}`;
         articulations,
         ornaments,
         hasFermata,
+        ...fermataPlacement !== void 0 ? { fermataPlacement } : {},
+        ...fermataShape !== void 0 ? { fermataShape } : {},
         slurStarts,
         slurStops,
         tupletStart,
@@ -71438,6 +71495,9 @@ ${denominator}`;
 
   // src/parser/musicxml/direction.ts
   var DYNAMIC_ELEMENTS = {
+    pppppp: "pppppp",
+    ppppp: "ppppp",
+    pppp: "pppp",
     ppp: "ppp",
     pp: "pp",
     p: "p",
@@ -71446,7 +71506,20 @@ ${denominator}`;
     f: "f",
     ff: "ff",
     fff: "fff",
-    sfz: "sfz"
+    ffff: "ffff",
+    fffff: "fffff",
+    ffffff: "ffffff",
+    sf: "sf",
+    sfp: "sfp",
+    sfpp: "sfpp",
+    fp: "fp",
+    rf: "rf",
+    sfz: "sfz",
+    sffz: "sffz",
+    fz: "fz",
+    n: "n",
+    pf: "pf",
+    sfzp: "sfzp"
   };
   var WEDGE_TYPES = {
     crescendo: "crescendo",
@@ -71487,7 +71560,7 @@ ${denominator}`;
                   diagnostic(
                     "info",
                     "UNSUPPORTED_DYNAMIC",
-                    `Ignored <dynamics><${child.tagName}>; \xA79.21 supports ppp, pp, p, mp, mf, f, ff, fff and sfz.`,
+                    `Ignored <dynamics><${child.tagName}>; no exact Bravura dynamic glyph mapping is available.`,
                     location
                   )
                 );
@@ -71613,7 +71686,9 @@ ${denominator}`;
         ...ev.restDisplayStep !== void 0 ? { displayStep: ev.restDisplayStep } : {},
         ...ev.restDisplayOctave !== void 0 ? { displayOctave: ev.restDisplayOctave } : {},
         // A rest can carry a fermata exactly as a note can (§10.4).
-        ...ev.notations.hasFermata ? { hasFermata: true } : {}
+        ...ev.notations.hasFermata ? { hasFermata: true } : {},
+        ...ev.notations.fermataPlacement !== void 0 ? { fermataPlacement: ev.notations.fermataPlacement } : {},
+        ...ev.notations.fermataShape !== void 0 ? { fermataShape: ev.notations.fermataShape } : {}
       });
     }
     const pitch = ev.isUnpitched ? unpitchedPitch(ev.step, ev.octave) : pitchedPitch(ev.step, ev.alter ?? 0, ev.octave);
@@ -71649,6 +71724,8 @@ ${denominator}`;
       ...ev.notations.articulations.length > 0 ? { articulations: ev.notations.articulations } : {},
       ...ev.notations.ornaments.length > 0 ? { ornaments: ev.notations.ornaments } : {},
       ...ev.notations.hasFermata ? { hasFermata: true } : {},
+      ...ev.notations.fermataPlacement !== void 0 ? { fermataPlacement: ev.notations.fermataPlacement } : {},
+      ...ev.notations.fermataShape !== void 0 ? { fermataShape: ev.notations.fermataShape } : {},
       ...ev.notations.slurStarts.length > 0 ? { slurStarts: ev.notations.slurStarts } : {},
       ...ev.notations.slurStops.length > 0 ? { slurStops: ev.notations.slurStops } : {},
       ...ev.notations.tupletStart ? { tupletStart: true } : {},
@@ -75571,6 +75648,7 @@ ${denominator}`;
               events.push({
                 tick,
                 seconds: tickToSeconds(tempoMap, tick),
+                partId: part2.id,
                 noteIds,
                 measureNumber: measure2.number
               });
@@ -75585,6 +75663,9 @@ ${denominator}`;
   }
   function getEventStream(playback) {
     return playback.events;
+  }
+  function getTrackEventStream(playback, partId) {
+    return playback.events.filter((event) => event.partId === partId);
   }
 
   // src/playback/position.ts
@@ -75935,6 +76016,9 @@ ${denominator}`;
       measureHeaderAllowance: input.measureHeaderAllowance,
       tempoMap,
       events,
+      tracks: input.score.parts.map(
+        (part2) => part2.name === void 0 ? { id: part2.id } : { id: part2.id, name: part2.name }
+      ),
       performance: plan,
       repeatDiagnostics
     };
@@ -76868,6 +76952,7 @@ ${xrefOffset}
   var STEM_AND_BEAM_ALLOWANCE = 3.5 + 0.5;
   var ARTICULATION_GAP = 1;
   var ORNAMENT_GAP = 1.5;
+  var FERMATA_GAP = 1.5;
   var SLUR_GAP = 1.2;
   var TUPLET_GAP = 1.8;
   var SLUR_MIDPOINT_THICKNESS_FALLBACK = 0.22;
@@ -77162,7 +77247,8 @@ ${xrefOffset}
   function renderNoteMarks(source, x2, topPosition, bottomPosition, direction, ctx) {
     const articulations = source.articulations ?? [];
     const ornaments = source.ornaments ?? [];
-    if (articulations.length === 0 && ornaments.length === 0) return "";
+    const hasFermata = source.hasFermata === true;
+    if (articulations.length === 0 && ornaments.length === 0 && !hasFermata) return "";
     const parts = [];
     const topLine = -(STAFF_LINES - 1);
     let aboveStaff = Math.min(topPosition, topLine);
@@ -77194,6 +77280,15 @@ ${xrefOffset}
     for (const type of ornaments) {
       aboveStaff -= ORNAMENT_GAP;
       place(ornamentGlyphName(type), aboveStaff);
+    }
+    if (hasFermata) {
+      if ((source.fermataPlacement ?? "above") === "above") {
+        aboveStaff -= FERMATA_GAP;
+        place(fermataGlyphName(source.fermataShape, "above"), aboveStaff);
+      } else {
+        belowNote += FERMATA_GAP;
+        place(fermataGlyphName(source.fermataShape, "below"), belowNote);
+      }
     }
     return parts.join("\n");
   }
@@ -77341,7 +77436,13 @@ ${xrefOffset}
             color: ctx.theme.colorOf("rest"),
             fontFamily: ctx.theme.musicFont
           }
-        )
+        ),
+        ev.hasFermata === true ? renderMark(fermataGlyphName(ev.fermataShape, ev.fermataPlacement), {
+          x: x2,
+          y: y2 + ((ev.fermataPlacement ?? "above") === "above" ? -FERMATA_GAP : FERMATA_GAP),
+          color: ctx.theme.colorOf("mark"),
+          fontFamily: ctx.theme.musicFont
+        }) : ""
       ].filter((part2) => part2 !== "").join("\n");
       return { svg, newAccidentalState: accidentalState };
     }

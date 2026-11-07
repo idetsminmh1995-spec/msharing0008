@@ -6,12 +6,13 @@ A+B+C corrective work** (making notes actually visible in the web app).
 Numbering is **`PLAN.md` §22's phase numbering** — deliberately not a second
 numbering system. Say a number from §B below and that's the phase to build.
 
-**Last audited:** against the code in `src/` and the **864-test** suite,
-after the "read any drum notation" round
-([`any-drum-notation.md`](./any-drum-notation.md)). Stages 0-10 are
+**Last audited:** against the code in `src/` and the **1,049-test** suite,
+after the multi-track playback stream follow-up
+([`playback-track-streams.md`](./playback-track-streams.md)). Stages 0-10 are
 complete: every phase numbered 1-54 is built AND wired, including the
 full playback surface (§17.1's position API and event stream, §17.2's
-cursor and repeat unfolding). What remains is the named gaps in §C and
+cursor and repeat unfolding) and host-selectable part-specific event streams.
+What remains is the named gaps in §C and
 §F, not roadmap work.
 
 ---
@@ -19,7 +20,7 @@ cursor and repeat unfolding). What remains is the named gaps in §C and
 ## A. DONE — Phases 1–54 ✅ (**every stage complete**) + Integration Passes A–Q
 
 All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
-`npm run verify` passes **864/864** across them.
+`npm run verify` passes **1,049/1,049** across them.
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -100,6 +101,7 @@ All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
 | — | **Integration Y** (not a numbered phase) | The owner's three red circles, run down: a tie and a slur were drawn at half their own stated thickness and arc; a system's box now stops where its ink does, measured from the finished markup rather than predicted from the notes alone (28.8 staff spaces to 24.8 on his file); and the video frame gives the keyboard a share of itself rather than whatever a fixed-pixel staff left over | [`integration-y`](./integration-y-seen-from-across-the-room.md) |
 | 49 | Cursor, both sync modes | Full §17.2 in one module (`computeCursorPlacement` + `renderCursor`), both modes built on the same `positionToX`; repeat handling stays the host's, per §17.2 | [`phase-49`](./phase-49-cursor.md) |
 | 48 | Playback position API + event stream | Full §17.1 (`positionToX`/`xToPosition`/`getEventStream`/`resolvePosition`), wired into `renderFromMusicXml`'s own result from the exact layout that produced its SVG; deletes the superseded `src/cursor/` placeholder | [`phase-48`](./phase-48-playback-position-api.md) |
+| — | **Multi-track playback stream follow-up** | Playback data exposes score-ordered part IDs/names; each note event carries its part ID and can be selected through `getTrackEventStream`; host-routed events, not built-in audio synthesis | [`playback-track-streams`](./playback-track-streams.md) |
 | 50 | Full theming API (§8) | Every config section is now LIVE in the renderer: colours (incl. per-category `colors.overrides`), fonts, bar numbers (drawn at last), beam style, notehead mapping, drum mapping, staff distance, pixel scale. Six hardcoded constants deleted. Found and fixed two real bugs -- a tab staff crashed anything drawn above it, and grand-staff distance was short by one staff height | [`phase-50`](./phase-50-theming-api.md) |
 | 51 | Debug overlays + diagnostics surface (§18.3) | All four §18.3 bullets: `config.debug` (logLevel, drawBoundingBoxes, drawSkyline), a `data-id` on every note/chord/rest built by the SAME function the playback event stream uses, and both overlays measured from the emitted SVG so they cannot disagree with what was drawn | [`phase-51`](./phase-51-debug-overlays.md) |
 | 52 | Export: SVG, PNG, PDF (§3) | Standalone SVG with the font embedded; a real PNG encoder (IHDR/IDAT/IEND, Sub filter, fflate zlib); a real PDF writer (one Flate-compressed RGB image per page, correct xref). Rasterizing is BORROWED from the host via an injected backend, so everything either side of it is pure and testable without a browser. Found and fixed the grand-staff brace being drawn above the music instead of beside it | [`phase-52`](./phase-52-export.md) |

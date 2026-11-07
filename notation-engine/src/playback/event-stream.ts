@@ -14,6 +14,8 @@ import type { TempoMap } from '../timing/tempo-map.js';
 export interface NotationEvent {
   readonly tick: number;
   readonly seconds: number;
+  /** MusicXML part ID for selecting or routing this event as one playback track. */
+  readonly partId: string;
   /**
    * One id per notehead sounding at this tick in this (part, voice) --
    * length 1 for a bare note, one per member for a chord. Built as
@@ -109,6 +111,7 @@ export function buildEventStream(
             events.push({
               tick,
               seconds: tickToSeconds(tempoMap, tick),
+              partId: part.id,
               noteIds,
               measureNumber: measure.number,
             });
@@ -127,4 +130,12 @@ export function getEventStream(playback: {
   readonly events: readonly NotationEvent[];
 }): readonly NotationEvent[] {
   return playback.events;
+}
+
+/** Return the score-wide event stream for one MusicXML part/track, preserving the original tick order. */
+export function getTrackEventStream(
+  playback: { readonly events: readonly NotationEvent[] },
+  partId: string,
+): readonly NotationEvent[] {
+  return playback.events.filter((event) => event.partId === partId);
 }

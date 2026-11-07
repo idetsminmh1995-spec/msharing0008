@@ -161,6 +161,7 @@ var NotationEngine = (() => {
     getGlyph: () => getGlyph,
     getGlyphByChar: () => getGlyphByChar,
     getKeySignaturePositions: () => getKeySignaturePositions,
+    getTrackEventStream: () => getTrackEventStream,
     glyphForTimeSigChar: () => glyphForTimeSigChar,
     glyphNameForTimeSigChar: () => glyphNameForTimeSigChar,
     graceNoteGlyphName: () => graceNoteGlyphName,
@@ -75647,6 +75648,7 @@ ${denominator}`;
               events.push({
                 tick,
                 seconds: tickToSeconds(tempoMap, tick),
+                partId: part2.id,
                 noteIds,
                 measureNumber: measure2.number
               });
@@ -75661,6 +75663,9 @@ ${denominator}`;
   }
   function getEventStream(playback) {
     return playback.events;
+  }
+  function getTrackEventStream(playback, partId) {
+    return playback.events.filter((event) => event.partId === partId);
   }
 
   // src/playback/position.ts
@@ -76011,6 +76016,9 @@ ${denominator}`;
       measureHeaderAllowance: input.measureHeaderAllowance,
       tempoMap,
       events,
+      tracks: input.score.parts.map(
+        (part2) => part2.name === void 0 ? { id: part2.id } : { id: part2.id, name: part2.name }
+      ),
       performance: plan,
       repeatDiagnostics
     };

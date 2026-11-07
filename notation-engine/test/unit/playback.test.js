@@ -50,6 +50,25 @@ describe('playback (Phase 48, PLAN.md §17.1)', () => {
     }
   });
 
+  test('multi-part scores expose named tracks and independently selectable event streams', () => {
+    const { playback } = renderFixture('multi-part.musicxml');
+    const tracks = Array.from(playback.tracks, (track) => ({ id: track.id, name: track.name }));
+    assert.deepEqual(tracks, [
+      { id: 'P1', name: 'Violin' },
+      { id: 'P2', name: 'Cello' },
+    ]);
+
+    const allEvents = NE.getEventStream(playback);
+    const violinEvents = NE.getTrackEventStream(playback, 'P1');
+    const celloEvents = NE.getTrackEventStream(playback, 'P2');
+    assert.equal(allEvents.length, 2);
+    assert.equal(violinEvents.length, 1);
+    assert.equal(celloEvents.length, 1);
+    assert.equal(violinEvents[0].partId, 'P1');
+    assert.equal(celloEvents[0].partId, 'P2');
+    assert.deepEqual([...NE.getTrackEventStream(playback, 'missing')], []);
+  });
+
   test('a chord is ONE event carrying several noteIds; a rest produces no event at all', () => {
     const { playback } = renderFixture('chord.musicxml');
     const events = NE.getEventStream(playback);

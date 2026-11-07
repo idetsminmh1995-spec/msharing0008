@@ -38,7 +38,7 @@ const ENTRY_POINTS = [
   ['Configuration', ['resolveConfig', 'DEFAULT_CONFIG']],
   [
     'Playback and cursor',
-    ['getEventStream', 'positionToX', 'playheadX', 'xToPosition', 'resolvePosition', 'computeCursorPlacement', 'renderCursor', 'notationEventId', 'elementIdForNoteId'],
+    ['getEventStream', 'getTrackEventStream', 'positionToX', 'playheadX', 'xToPosition', 'resolvePosition', 'computeCursorPlacement', 'renderCursor', 'notationEventId', 'elementIdForNoteId'],
   ],
   [
     'Repeats (playback order)',

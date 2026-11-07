@@ -4,7 +4,12 @@ import type { TempoMarkEvent } from '../parser/musicxml/parse.js';
 import { buildTempoMap, type RawTempoEvent } from '../timing/tempo-map.js';
 import { buildEventStream } from './event-stream.js';
 import { buildRepeatPlan, type RepeatMeasureSpec } from './repeats.js';
-import type { PlaybackData, PlaybackMeasureLayout, PlaybackMeasurePlacement } from './position.js';
+import type {
+  PlaybackData,
+  PlaybackMeasureLayout,
+  PlaybackMeasurePlacement,
+  PlaybackTrack,
+} from './position.js';
 
 const DEFAULT_MEASURE_TICKS = TICKS_PER_QUARTER * 4;
 /** §11.1's own MIDI default, matching `timing/tempo-map.ts`'s own fallback: no tempo stated at all means 120 BPM. */
@@ -98,6 +103,9 @@ export function computePlaybackData(input: ComputePlaybackDataInput): PlaybackDa
     measureHeaderAllowance: input.measureHeaderAllowance,
     tempoMap,
     events,
+    tracks: input.score.parts.map((part): PlaybackTrack =>
+      part.name === undefined ? { id: part.id } : { id: part.id, name: part.name },
+    ),
     performance: plan,
     repeatDiagnostics,
   };

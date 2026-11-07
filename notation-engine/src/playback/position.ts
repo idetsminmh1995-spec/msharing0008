@@ -55,6 +55,12 @@ export interface EventPosition {
   readonly systemY: number;
 }
 
+/** One score part exposed as a named playback track for host-side selection and routing. */
+export interface PlaybackTrack {
+  readonly id: string;
+  readonly name?: string;
+}
+
 /**
  * PLAN.md §17.1's full "what the engine provides" for one rendered score,
  * computed ONCE by `computePlaybackData` (called from `renderFromMusicXml`
@@ -84,6 +90,8 @@ export interface PlaybackData {
   readonly measureHeaderAllowance: number;
   readonly tempoMap: TempoMap;
   readonly events: readonly NotationEvent[];
+  /** Every MusicXML part, in score order, with its stable ID and optional display name. */
+  readonly tracks: readonly PlaybackTrack[];
   /**
    * The score's repeats, unfolded into the order it is actually played
    * (`playback/repeats.ts`). For a score with no repeat marks this is

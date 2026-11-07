@@ -95,6 +95,16 @@ export function getEventStream(playback:
 
 *(`src/playback/event-stream.ts`)*
 
+#### `getTrackEventStream`
+
+```ts
+export function getTrackEventStream(playback:
+```
+
+Return the score-wide event stream for one MusicXML part/track, preserving the original tick order.
+
+*(`src/playback/event-stream.ts`)*
+
 #### `positionToX`
 
 ```ts
@@ -395,7 +405,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-630 exported symbols, by module.
+632 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -1366,6 +1376,7 @@ The diagnostics `level` lets through, in their original order.
 | **API** | `elementIdForNoteId` | The rendered element a `noteId` belongs to: a chord member's `...#e3#n1` lives inside the chord's own `...#e3` group, since a chord is drawn as one element with several noteheads. |
 | function | `buildEventStream` | Builds the full, score-wide, tick-sorted event stream. |
 | **API** | `getEventStream` | §17.1's own `getEventStream()` -- a plain accessor kept as an exported function (rather than reading `playback.events` directly) so the public shape matches the spec's own pseudocode exactly. |
+| **API** | `getTrackEventStream` | Return the score-wide event stream for one MusicXML part/track, preserving the original tick order. |
 
 ### `src/playback/position.ts`
 
@@ -1375,6 +1386,7 @@ The diagnostics `level` lets through, in their original order.
 | interface | `PlaybackMeasureLayout` | The one piece of a measure's rendered layout `positionToX`/`xToPosition` need -- the exact same shape `renderFromMusicXml`'s own internal `computeMeasureLayout` already produces. |
 | interface | `PlaybackMeasurePlacement` | Where one measure sits on the page -- the playback-relevant slice of `renderFromMusicXml`'s own internal `MeasurePlacement`. |
 | interface | `EventPosition` |  |
+| interface | `PlaybackTrack` | One score part exposed as a named playback track for host-side selection and routing. |
 | interface | `PlaybackData` | PLAN.md §17.1's full "what the engine provides" for one rendered score, computed ONCE by `computePlaybackData` (called from `renderFromMusicXml` itself, from the exact layout maps that produced the SVG) -- never a second, independently-computed layout that could drift from what was actually drawn. |
 | **API** | `resolvePosition` | §17.1's `PlaybackPosition` for an arbitrary tick -- tick, real seconds (§12's tempo map) and measure+beat, all three views of the same instant. |
 | **API** | `positionToX` | §17.1: time -> where on the page. |

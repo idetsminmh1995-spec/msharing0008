@@ -89,6 +89,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 | [`integration-i-slur-tuplet-wiring.md`](./integration-i-slur-tuplet-wiring.md) | Integration I: §9.16 slurs + §9.17 tuplets drawn via a span pass over captured anchors; fixed a latent beam-group index/x misalignment |
 | [`integration-j-dynamics-hairpins.md`](./integration-j-dynamics-hairpins.md) | Integration J: §9.21 dynamics + hairpins drawn, incl. wedges spanning measures |
 | [`dynamics-coverage-extension.md`](./dynamics-coverage-extension.md) | Static MusicXML dynamic levels extended to exact Bravura glyphs, with unsupported forms diagnosed |
+| [`playback-track-streams.md`](./playback-track-streams.md) | Score parts exposed as selectable playback tracks with part-filtered event streams for host routing |
 | [`integration-k-voice-collision.md`](./integration-k-voice-collision.md) | Integration K: §9.14 multi-voice notehead collision offsetting wired -- completes Phase 25 |
 | [`integration-l-page-layout-and-score-wide-spacing.md`](./integration-l-page-layout-and-score-wide-spacing.md) | Integration L: §16.2 page mode wired (completes Phase 46) + fixed parts laying themselves out independently, so a score now shares ONE horizontal timeline |
 | [`integration-m-drum-chart-defects.md`](./integration-m-drum-chart-defects.md) | Integration M: the three defects a real drum chart exposed -- the deployed site served no music font, every chord broke its beam (62 stray flags), and the tempo mark was drawn through the notes |
