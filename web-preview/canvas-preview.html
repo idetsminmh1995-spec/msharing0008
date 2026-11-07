@@ -214,7 +214,7 @@
            NOTE: the SVG uses SMuFL glyphs, so a Bravura webfont must be
            available for the noteheads/clefs to appear as music rather than
            blank boxes -- see the @font-face rule in this file's <style>. -->
-      <div id="notationEngineContainer" style="background:#fff; margin-top:10px; overflow-x:auto; border-radius:8px;"></div>
+      <div id="notationEngineContainer" style="background:#fff; margin-top:10px; max-height:420px; overflow:auto; border-radius:8px;"></div>
       <div class="player-bar">
         <button id="playBtn" class="icon-btn" disabled>▶</button>
         <button id="pauseBtn" class="icon-btn" disabled>⏸</button>
@@ -240,7 +240,8 @@
 <!-- The Notation Engine's built bundle (committed to the repo -- GitHub Pages
      has no build step; see notation-engine/.gitignore). Exposes the global
      `NotationEngine`, including renderFromMusicXml(). -->
-<script src="../notation-engine/dist/notation-engine.js?v=11"></script>
+<script src="../notation-engine/dist/notation-engine.js?v=12"></script>
+<script src="notation-overlay.js?v=1"></script>
 <script>
   // Self-diagnosis: if the browser served a stale cached page, or the bundle
   // failed to load at all, the notation panel would silently show nothing and
@@ -314,7 +315,18 @@
   document.getElementById('title1Color').addEventListener('input', (e) => { titleAndDisplaySettings.title1.color = e.target.value; });
   document.getElementById('title2Color').addEventListener('input', (e) => { titleAndDisplaySettings.title2.color = e.target.value; });
   document.getElementById('countsVocalSelect').addEventListener('change', (e) => { titleAndDisplaySettings.countsVocal = e.target.value; });
-  document.querySelectorAll('input[name="videoColor"]').forEach((r) => r.addEventListener('change', () => { if (r.checked) titleAndDisplaySettings.videoColor = r.value; }));
+  document.querySelectorAll('input[name="videoColor"]').forEach((r) => r.addEventListener('change', () => {
+    if (!r.checked) return;
+    titleAndDisplaySettings.videoColor = r.value;
+    if (notationXmlSource) {
+      notationScore = null;
+      updateGenerateAvailability();
+      drawFrame();
+      renderNotationScore(notationSourceFileName).catch((err) => console.error('Notation color update failed:', err));
+    } else {
+      drawFrame();
+    }
+  }));
 
   const MAX_MIDI_DURATION_SECONDS = 10 * 60;
   const HIT_VISUAL_DURATION = 0.15; // seconds a hit stays composited — configurable per spec
@@ -653,6 +665,11 @@
 
   let currentDrumSet = null, currentAspect = '16x9';
   let backgroundImg = null;
+  let notationXmlSource = null;
+  let notationSourceFileName = '';
+  let notationScore = null;
+  let notationRenderGeneration = 0;
+  let bravuraFontDataUrlPromise = null;
   let noteAssets = new Map(); // midiNote -> { R: HTMLImageElement|null, L: HTMLImageElement|null }
   let availableNoteSet = new Set();
 
@@ -715,6 +732,13 @@
   els.notationFile.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    notationXmlSource = null;
+    notationSourceFileName = '';
+    notationScore = null;
+    notationRenderGeneration++;
+    document.getElementById('notationEngineContainer').innerHTML = '';
+    drawFrame();
+    updateGenerateAvailability();
     els.notationStatus.className = 'status loading';
     els.notationStatus.textContent = 'Loading…';
     els.notationStatus.classList.remove('hidden');
@@ -736,47 +760,132 @@
         xmlText = await file.text();
       }
 
-      // The real Notation Engine. In a browser the engine uses the native
-      // DOMParser automatically, so no domParser option is needed here --
-      // that option exists for Node/tests, which have no global DOMParser.
-      const result = NotationEngine.renderFromMusicXml(xmlText);
-
-      const newEngineContainer = document.getElementById('notationEngineContainer');
-      newEngineContainer.innerHTML = result.svg;
-
-      // Count what actually got drawn. "0 noteheads" and "the engine wasn't
-      // called at all" look identical on screen, so report the number
-      // explicitly rather than just saying "rendered".
-      const noteheadCount = (result.svg.match(/<text/g) || []).length;
-      const notable = result.diagnostics.filter((d) => d.severity !== 'info');
-
-      if (notable.length > 0) {
-        els.notationStatus.className = 'status err';
-        els.notationStatus.textContent =
-          `Loaded "${file.name}" with ${notable.length} issue(s): ` +
-          notable.slice(0, 3).map((d) => d.code).join(', ') +
-          (notable.length > 3 ? '…' : '') + ' — see the browser console for detail.';
-        console.warn('Notation Engine diagnostics:', result.diagnostics);
-      } else if (noteheadCount === 0) {
-        els.notationStatus.className = 'status err';
-        els.notationStatus.textContent =
-          `Loaded "${file.name}" but drew 0 symbols — the file parsed with no ` +
-          `errors yet produced nothing. See the console for the parsed result.`;
-        console.warn('Notation Engine: rendered SVG contains no glyphs.', result);
-      } else {
-        els.notationStatus.className = 'status ok';
-        els.notationStatus.textContent =
-          `Loaded "${file.name}" — ${noteheadCount} symbols rendered.`;
-      }
-      if (result.diagnostics.length > 0) {
-        console.info('Notation Engine diagnostics:', result.diagnostics);
-      }
+      notationXmlSource = xmlText;
+      notationSourceFileName = file.name;
+      notationScore = null;
+      await renderNotationScore(file.name);
     } catch (err) {
+      notationXmlSource = null;
+      notationSourceFileName = '';
+      notationScore = null;
+      notationRenderGeneration++;
+      document.getElementById('notationEngineContainer').innerHTML = '';
+      drawFrame();
+      updateGenerateAvailability();
       console.error('Notation Engine error:', err);
       els.notationStatus.className = 'status err';
       els.notationStatus.textContent = 'Could not load this notation file: ' + (err.message || err);
     }
   });
+
+
+  function bytesToBase64(bytes) {
+    let binary = '';
+    const chunkSize = 0x4000;
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+    }
+    return btoa(binary);
+  }
+
+  async function getBravuraFontDataUrl() {
+    if (!bravuraFontDataUrlPromise) {
+      bravuraFontDataUrlPromise = (async () => {
+        const fontUrl = new URL('../notation-engine/dist/fonts/Bravura.woff2', document.baseURI);
+        const response = await fetch(fontUrl);
+        if (!response.ok) throw new Error(`Could not load the Bravura music font (${response.status}).`);
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        return `data:font/woff2;base64,${bytesToBase64(bytes)}`;
+      })().catch((err) => {
+        bravuraFontDataUrlPromise = null;
+        throw err;
+      });
+    }
+    return bravuraFontDataUrlPromise;
+  }
+
+  async function loadNotationImage(svg) {
+    const fontDataUrl = await getBravuraFontDataUrl();
+    const svgWithFont = NotationOverlay.withEmbeddedBravura(svg, fontDataUrl);
+    const objectUrl = URL.createObjectURL(new Blob([svgWithFont], { type: 'image/svg+xml;charset=utf-8' }));
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        if (!image.naturalWidth || !image.naturalHeight) {
+          reject(new Error('The browser could not rasterize the MusicXML SVG.'));
+          return;
+        }
+        resolve(image);
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('The browser could not load the Bravura-embedded MusicXML SVG.'));
+      };
+      image.src = objectUrl;
+    });
+  }
+
+  async function renderNotationScore(fileName) {
+    if (!notationXmlSource) return;
+    const requestGeneration = ++notationRenderGeneration;
+    els.notationStatus.className = 'status loading';
+    els.notationStatus.textContent = `Engraving "${fileName}" with Bravura…`;
+    els.notationStatus.classList.remove('hidden');
+
+    try {
+      const darkBackground = titleAndDisplaySettings.videoColor !== 'white';
+      const result = NotationEngine.renderFromMusicXml(notationXmlSource, {
+        config: {
+          colors: { ink: darkBackground ? '#f7f7f7' : '#111111', background: 'transparent' },
+          layout: { mode: 'page', pxPerStaffSpace: 10, fitSystemHeight: true },
+          page: { pageWidth: els.canvas.width / 10 },
+        },
+      });
+      const metrics = NotationOverlay.parseSvgMetrics(result.svg);
+      const image = await loadNotationImage(result.svg);
+      if (requestGeneration !== notationRenderGeneration) return;
+
+      notationScore = { image, metrics, playback: result.playback, fileName };
+      const container = document.getElementById('notationEngineContainer');
+      container.style.background = darkBackground ? '#161313' : '#ffffff';
+      container.innerHTML = result.svg;
+
+      const glyphCount = (result.svg.match(/<text\b/g) || []).length;
+      const notable = result.diagnostics.filter((diagnostic) => diagnostic.severity !== 'info');
+      if (notable.length > 0) {
+        const warningDetails = notable.slice(0, 3).map((diagnostic) => {
+          const measure = diagnostic.location?.measureNumber;
+          return `${diagnostic.code}${measure ? ` at measure ${measure}` : ''}: ${diagnostic.message}`;
+        });
+        els.notationStatus.className = 'status err';
+        els.notationStatus.textContent =
+          `Rendered "${fileName}" on the preview and export (${glyphCount} glyph elements); ` +
+          `${notable.length} notation warning(s): ${warningDetails.join(' | ')}` +
+          (notable.length > 3 ? '…' : '');
+        console.warn('Notation Engine diagnostics:', result.diagnostics);
+      } else if (glyphCount === 0) {
+        notationScore = null;
+        els.notationStatus.className = 'status err';
+        els.notationStatus.textContent = `"${fileName}" parsed but produced no notation glyphs.`;
+      } else {
+        els.notationStatus.className = 'status ok';
+        els.notationStatus.textContent =
+          `Rendered "${fileName}" with ${glyphCount} glyph elements on the preview and exported video.`;
+      }
+      updateGenerateAvailability();
+      if (result.diagnostics.length > 0) console.info('Notation Engine diagnostics:', result.diagnostics);
+      drawFrame();
+    } catch (err) {
+      if (requestGeneration === notationRenderGeneration) {
+        notationScore = null;
+        document.getElementById('notationEngineContainer').innerHTML = '';
+        drawFrame();
+        updateGenerateAvailability();
+      }
+      throw err;
+    }
+  }
 
 
   function setStatus(kind, message) {
@@ -818,6 +927,10 @@
 
     const [w, h] = ASPECT_SIZES[currentAspect] || [1280, 720];
     els.canvas.width = w; els.canvas.height = h;
+    if (notationXmlSource) {
+      notationScore = null;
+      updateGenerateAvailability();
+    }
 
     setStatus('loading', `Loading manifest for ${currentDrumSet} (${currentAspect})…`);
     
@@ -877,6 +990,13 @@
       }
 
       await Promise.all(loadPromises);
+      if (notationXmlSource) {
+        try {
+          await renderNotationScore(notationSourceFileName);
+        } catch (err) {
+          console.error('Could not resize MusicXML notation for the selected video aspect:', err);
+        }
+      }
       setStatus('ok', `Loaded ${currentDrumSet} (${currentAspect}) — background: ${manifest.hasBackground ? 'yes' : 'no'}, note assets: ${[...availableNoteSet].sort((a,b)=>a-b).join(', ') || 'none'}.`);
       renderAssetChips();
       drawFrame();
@@ -1025,7 +1145,9 @@
   }
 
   function updateGenerateAvailability() {
-    els.generateBtn.disabled = !(parsedMidi && currentDrumSet);
+    const notationSelected = els.notationFile.files.length > 0;
+    const notationReady = !notationSelected || Boolean(notationScore);
+    els.generateBtn.disabled = !(parsedMidi && currentDrumSet && notationReady);
   }
 
   els.loadDemoBtn.addEventListener('click', () => loadParsed(loadDemoParsedMidi()));
@@ -1200,10 +1322,39 @@
 
   // ===================================================================
   // Canvas compositing — background, then any currently-active hit layers,
-  // then the timing overlay on top.
+  // then the canonical MusicXML engraving and timing overlay on top.
   // Assets are drawn full-canvas at (0,0): they're pre-aligned/pre-composed,
   // so no dynamic positioning/scaling logic per spec section 5.
   // ===================================================================
+  function notationTickAt(seconds) {
+    if (!parsedMidi || !notationScore) return 0;
+    const safeTime = Math.max(0, Math.min(seconds, parsedMidi.durationSeconds));
+    const midiTick = currentTickAt(safeTime);
+    const midiPpq = parsedMidi.ppq || 480;
+    return Math.max(0, Math.round(midiTick * 480 / midiPpq));
+  }
+
+  function drawNotationOverlay(targetCtx, w, h, seconds) {
+    if (!notationScore || !notationScore.image.complete || !notationScore.image.naturalWidth) return;
+    const darkBackground = titleAndDisplaySettings.videoColor !== 'white';
+    const bandY = h * 0.2;
+    const bandHeight = h * 0.28;
+    targetCtx.save();
+    targetCtx.fillStyle = darkBackground ? '#161313' : '#ffffff';
+    targetCtx.fillRect(0, Math.floor(bandY) - 1, w, Math.ceil(bandHeight) + 2);
+    const tick = notationTickAt(seconds);
+    const position = NotationEngine.playheadX(notationScore.playback, tick);
+    const viewport = NotationOverlay.computeSystemViewport(notationScore.metrics, w, h, position.systemY);
+    targetCtx.imageSmoothingEnabled = true;
+    targetCtx.imageSmoothingQuality = 'high';
+    targetCtx.drawImage(
+      notationScore.image,
+      viewport.sourceX, viewport.sourceY, viewport.sourceWidth, viewport.sourceHeight,
+      viewport.destinationX, viewport.destinationY, viewport.destinationWidth, viewport.destinationHeight,
+    );
+    targetCtx.restore();
+  }
+
   function drawFrame() {
     const w = els.canvas.width, h = els.canvas.height;
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
@@ -1216,6 +1367,7 @@
         ctx.drawImage(img, 0, 0, w, h);
       }
     }
+    drawNotationOverlay(ctx, w, h, Math.max(0, currentTime));
     drawHeaderRow(ctx, w, h, Math.max(0, currentTime));
   }
 
@@ -1349,6 +1501,7 @@
     if (backgroundImg && backgroundImg.complete && backgroundImg.naturalWidth) {
       renderCtx.drawImage(backgroundImg, 0, 0, w, h);
     }
+    drawNotationOverlay(renderCtx, w, h, 0);
     drawHeaderRow(renderCtx, w, h, 0);
     const beatIndex = Math.min(countInBeatCount - 1, Math.floor(realT / countInSecPerBeat));
     renderCtx.save();
@@ -1370,6 +1523,7 @@
         renderCtx.drawImage(img, 0, 0, w, h);
       }
     }
+    drawNotationOverlay(renderCtx, w, h, Math.min(t, parsedMidi.durationSeconds));
     drawHeaderRow(renderCtx, w, h, Math.min(t, parsedMidi.durationSeconds));
   }
 
