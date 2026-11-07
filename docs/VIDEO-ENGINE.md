@@ -122,7 +122,7 @@ node --check tools/test-video-engine.mjs
 git diff --check
 ```
 
-The latest completed update passed **14/14** muxer tests. The subsequent segment-timeline and fallback-cancellation changes must pass the same suite before release.
+The latest completed update passed **14/14** muxer tests. Static checks also cover JavaScript syntax and patch whitespace.
 
 ## 8. Remaining work
 
@@ -130,11 +130,17 @@ The following items are not yet complete and should be handled as separate updat
 
 1. Add a real-browser integration test that encodes a short MP4 in Chromium, validates it with `ffprobe`, and decodes the first and last frames.
 2. Run the same compatibility matrix on Chromium, Safari, and Firefox, including portrait and square resolutions.
-3. Add cancellation tests that exercise both WebCodecs and MediaRecorder with a multi-segment render.
+3. Add browser-level cancellation tests that exercise both WebCodecs and MediaRecorder with a multi-segment render.
 4. Group encoded samples into larger MP4 chunks to reduce `moov` size and offset-table overhead on long videos.
 5. Add memory-pressure instrumentation and a quality preset for low-memory devices.
-6. Improve progress reporting so the UI distinguishes rendering, audio encoding, and file writing without reporting `1.0` before the phase is actually complete.
-7. Update the root project README so its status reflects that WebCodecs, MP4 muxing, and MediaRecorder fallback are implemented.
+6. Make the MediaRecorder fallback trim its live audio source when cancellation occurs.
+
+Completed in the current update:
+
+- Render input validation for dimensions, FPS, segment duration, draw callbacks, and audio buffers.
+- Bounded WebCodecs progress phases: rendering (0–75%), audio/file work (75–90%), and complete (100%).
+- Global multi-segment timing and accurate MediaRecorder cancellation state.
+- Root README status and this technical document kept in sync with the implementation.
 
 ## 9. Change history
 

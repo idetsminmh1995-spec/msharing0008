@@ -985,6 +985,7 @@
     });
 
     const totalSeconds = segments.reduce((sum, s) => sum + s.seconds, 0);
+    const totalFrames = Math.max(1, Math.round(totalSeconds * fps));
     const frameDuration = 1e6 / fps;
     const keyEvery = Math.max(1, Math.round(fps * 2));
     let frameIndex = 0;
@@ -1029,7 +1030,7 @@
           }
         }
         if (onProgress && frameIndex % 10 === 0) {
-          onProgress(frameIndex / Math.max(1, Math.round(totalSeconds * fps)), 'Rendering');
+          onProgress((frameIndex / totalFrames) * 0.75, 'Rendering');
         }
       }
       if (segment.onEnd) await segment.onEnd();
@@ -1040,15 +1041,16 @@
     encoder.close();
     if (encoderError) throw new Error(`Video encoding failed: ${encoderError.message || encoderError}`);
 
-    if (onProgress) onProgress(1, 'Encoding the sound');
+    if (onProgress) onProgress(0.75, 'Encoding the sound');
     let audio = null;
     // A cancelled render must not append the original full-length soundtrack
     // to the shorter video that was actually encoded.
     const renderedSeconds = frameIndex / fps;
     const joined = await joinAudio(segments, renderedSeconds);
     if (joined) audio = await encodeAudio(joined, format, shouldStop);
+    else if (onProgress) onProgress(0.9, 'Writing the file');
 
-    if (onProgress) onProgress(1, 'Writing the file');
+    if (onProgress) onProgress(0.9, 'Writing the file');
     // An MP4 cannot be written without the parameter sets the encoder
     // reports alongside its first frame. A browser that encoded H.264
     // and then did not describe it has given us something we cannot
@@ -1073,6 +1075,7 @@
             audio,
             durationMs: (frameIndex / fps) * 1000,
           });
+    if (onProgress) onProgress(1, 'Complete');
     return {
       blob,
       extension: format.container,
@@ -1190,7 +1193,32 @@
     };
   }
 
+  function validateRenderOptions(options) {
+    if (!options || !Number.isFinite(options.width) || options.width <= 0 ||
+        !Number.isFinite(options.height) || options.height <= 0) {
+      throw new TypeError('Video render width and height must be positive numbers');
+    }
+    if (!Number.isFinite(options.fps) || options.fps <= 0 || options.fps > 120) {
+      throw new RangeError('Video render fps must be between 0 and 120');
+    }
+    if (!Array.isArray(options.segments) || options.segments.length === 0) {
+      throw new TypeError('Video render requires at least one segment');
+    }
+    for (const [index, segment] of options.segments.entries()) {
+      if (!segment || !Number.isFinite(segment.seconds) || segment.seconds < 0) {
+        throw new TypeError(`Video segment ${index} has an invalid duration`);
+      }
+      if (typeof segment.draw !== 'function') {
+        throw new TypeError(`Video segment ${index} is missing a draw function`);
+      }
+      if (segment.audio && (!Number.isFinite(segment.audio.duration) || segment.audio.duration < 0)) {
+        throw new TypeError(`Video segment ${index} has invalid audio`);
+      }
+    }
+  }
+
   async function render(options) {
+    validateRenderOptions(options);
     const hasAudio = options.segments.some((segment) => segment.audio);
     if (hasWebCodecs(hasAudio)) {
       const result = await renderWithWebCodecs(options);
