@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-622 exported symbols, by module.
+626 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -628,7 +628,10 @@ The diagnostics `level` lets through, in their original order.
 
 | | Name | Summary |
 |---|---|---|
-| function | `accidentalGlyphName` | The real SMuFL accidental glyph for an alter value. |
+| function | `musicXmlAccidentalGlyphName` | Resolve a MusicXML accidental value to the exact SMuFL glyph used by MusicXML 4.0. |
+| function | `isKnownAccidentalGlyphName` | True when the SMuFL canonical glyph name is present in the bundled glyph table. |
+| function | `tryAccidentalGlyphName` | Return a drawable glyph for an alteration, preferring a source-preserved MusicXML/SMuFL glyph. |
+| function | `accidentalGlyphName` | Strict public lookup retained for callers that require a drawable glyph. |
 | interface | `AccidentalPlacement` |  |
 | function | `assignAccidentalColumns` | §9.11's stacking rule for a chord's several accidentals: sort by pitch descending (highest Y magnitude toward the top first -- i.e. most negative Y first, since higher pitch = more negative Y), then place each in the leftmost column where it doesn't vertically collide (within 2.5sp) with an alrea... |
 | function | `accidentalX` | §9.11's horizontal placement: immediately left of the notehead's own left edge (`noteX` -- the same drawing-origin convention as every other glyph in this engine, confirmed against noteheadBlack's own bounding box having its left edge at x=0), with a 0.16sp gap, and each additional column (from a... |
@@ -1268,6 +1271,7 @@ The diagnostics `level` lets through, in their original order.
 | function | `childrenNamed` | Every child element with a given tag name, in document order. |
 | function | `textOf` | Trimmed text content of an element, or undefined if the element itself is undefined. |
 | function | `intOf` | Text content parsed as an integer, or undefined if missing/unparseable. |
+| function | `numberOf` | Text content parsed as an XML decimal, including fractional semitone values. |
 | function | `attrOf` | An attribute's value, or undefined if absent. |
 
 ### `src/parser/musicxml/harmony.ts`

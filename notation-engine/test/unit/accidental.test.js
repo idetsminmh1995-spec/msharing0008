@@ -90,7 +90,8 @@ describe('accidental glyph selection (Phase 19)', () => {
   });
 
   test('an out-of-range alter throws', () => {
-    assert.throws(() => NE.accidentalGlyphName(3), /No accidental glyph/);
+    assert.equal(NE.accidentalGlyphName(3), 'accidentalTripleSharp');
+    assert.throws(() => NE.accidentalGlyphName(4), /No accidental glyph/);
   });
 });
 

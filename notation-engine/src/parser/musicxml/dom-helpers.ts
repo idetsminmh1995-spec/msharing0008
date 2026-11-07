@@ -35,6 +35,14 @@ export function intOf(el: Element | undefined): number | undefined {
   return Number.isNaN(n) ? undefined : n;
 }
 
+/** Text content parsed as an XML decimal, including fractional semitone values. */
+export function numberOf(el: Element | undefined): number | undefined {
+  const text = textOf(el);
+  if (text === undefined || !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) return undefined;
+  const value = Number(text);
+  return Number.isFinite(value) ? value : undefined;
+}
+
 /** An attribute's value, or undefined if absent. */
 export function attrOf(el: Element, name: string): string | undefined {
   return el.hasAttribute(name) ? (el.getAttribute(name) ?? undefined) : undefined;

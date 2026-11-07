@@ -116,8 +116,10 @@ export interface Note {
   readonly graceSlash?: boolean;
   /** Phase 35/§10.4: an explicit <stem> direction from the file -- Phase 16's resolveStemDirection explicitDirection tier. */
   readonly explicitStemDirection?: 'up' | 'down';
-  /** Phase 35/§10.4: an explicit <accidental> element's presence -- Phase 19's evaluateAccidental hasExplicitAccidental (courtesy-accidental) parameter. */
+  /** Phase 35/§10.4: an explicit <accidental> element's presence -- Phase 19's evaluateAccidental hasExplicitAccidental parameter. */
   readonly hasExplicitAccidental?: boolean;
+  /** MusicXML <accidental smufl="..."> glyph, or its exact accidental-value mapping. */
+  readonly accidentalGlyphName?: string;
   /** Integration C: which string a tablature note is played on (1 = highest-pitched string, drawn on the TOP line). */
   readonly stringNumber?: number;
   /** Integration C: which fret, 0 meaning an open string. */
@@ -162,6 +164,7 @@ export interface NoteInit {
   graceSlash?: boolean;
   explicitStemDirection?: 'up' | 'down';
   hasExplicitAccidental?: boolean;
+  accidentalGlyphName?: string;
   stringNumber?: number;
   fret?: number;
   fingering?: number;

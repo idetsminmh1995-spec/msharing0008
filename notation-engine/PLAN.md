@@ -162,13 +162,19 @@ signatures (including additive/irregular), barlines and repeats, noteheads
 (all standard shapes), stems, flags, beams, rests, accidentals, ties, slurs,
 tuplets, articulations, ornaments, dynamics, hairpins, tempo marks, multiple
 voices per staff, grand staff / multi-part scores, lyrics, chord symbols,
-grace notes, ledger lines, percussion/drum notation, measure numbering.
+grace notes, ledger lines, percussion/drum notation, measure numbering,
+and note-level MusicXML 4.0 named accidentals with fractional semitone
+alterations when the source or bundled SMuFL profile supplies a matching glyph.
 
-**Out of scope for now:** cross-staff beaming, microtonal accidentals,
-figured bass, mensural/early notation, jianpu. (Tablature *rendering* was
-on this list and is no longer — Integration C draws fret numbers on their
-own string lines. Lyrics and chord symbols are parsed and have geometry
-modules, but have no text renderer yet.)
+**Out of scope for now:** cross-staff beaming, pitch alterations without a
+matching accidental glyph, non-staff notation families (including Jianpu,
+Hindustani swaralipi, Kepatihan cipher notation, and Byzantine neumes),
+figured bass, and mensural/early notation. (Tablature *rendering* was on
+this list and is no longer — Integration C draws fret numbers on their own
+string lines. Lyrics and chord symbols are parsed and have geometry modules,
+but have no text renderer yet. The international-notation boundary and
+recommended profile architecture are documented in
+[`Doc/international-notation-support.md`](./Doc/international-notation-support.md).)
 
 ---
 
@@ -2338,7 +2344,14 @@ API can be designed *then*, informed by what that extension actually needs.
    refusal. See Doc/phase-54-public-api.md §3.
 2. **Cross-staff beaming is not supported** (piano passages where a beam
    spans both staves). Deferred as rare and expensive.
-3. **Microtonal accidentals** are not rendered, though SMuFL has the glyphs.
+3. **Not every microtonal pitch alteration has a drawable glyph.** MusicXML
+   decimal `<alter>` values are preserved. The 40 named MusicXML 4.0
+   accidental values map to bundled SMuFL glyphs, including Turkish makam,
+   Turkish folk, and Persian signs. Alterations outside the bundled numeric
+   defaults need an explicit supported accidental glyph; otherwise the pitch
+   remains in the score and `UNSUPPORTED_PITCH_ALTER` warns that its accidental
+   could not be drawn. This is not complete support for any non-Western tuning
+   or notation system. See `Doc/international-notation-support.md`.
 4. **Durations finer than a 128th note** produce non-integer ticks at
    `TICKS_PER_QUARTER = 480`. Legal but inexact; vanishingly rare in practice.
 5. **MIDI format 2** files are rejected with a diagnostic.
@@ -2388,6 +2401,12 @@ API can be designed *then*, informed by what that extension actually needs.
     starts, so the two would collide on precisely the measures a volta
     cares about. Correct would be to move the bar number above the
     bracket, which is a bar-number-placement change, not a volta one.
+18. **Non-staff notation families are not native profiles.** Jianpu,
+    Hindustani swaralipi, Kepatihan cipher notation, and Byzantine neumes
+    carry pitch, rhythm, or modal structure that cannot be recovered from
+    ordinary staff positions or glyphs alone. They need separate parsers,
+    semantic data, layout rules, and tradition-specific test scores; the
+    representative design boundary is in `Doc/international-notation-support.md`.
 
 ---
 

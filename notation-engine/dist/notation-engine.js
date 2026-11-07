@@ -167,6 +167,7 @@ var NotationEngine = (() => {
     groupBeamsFromHints: () => groupBeamsFromHints,
     hasBackground: () => hasBackground,
     hasExplicitBeams: () => hasExplicitBeams,
+    isKnownAccidentalGlyphName: () => isKnownAccidentalGlyphName,
     isKnownMusicXmlNotehead: () => isKnownMusicXmlNotehead,
     isPitched: () => isPitched,
     isUnpitched: () => isUnpitched,
@@ -187,6 +188,7 @@ var NotationEngine = (() => {
     midiDiagnostic: () => midiDiagnostic,
     minDistance: () => minDistance,
     multiMeasureRestGlyphName: () => multiMeasureRestGlyphName,
+    musicXmlAccidentalGlyphName: () => musicXmlAccidentalGlyphName,
     musicXmlNoteheadToShape: () => musicXmlNoteheadToShape,
     naiveMeasureLayout: () => naiveMeasureLayout,
     needsBrace: () => needsBrace,
@@ -295,6 +297,7 @@ var NotationEngine = (() => {
     tieSide: () => tieSide,
     timeSignature: () => timeSignature,
     timingDiagnostic: () => timingDiagnostic,
+    tryAccidentalGlyphName: () => tryAccidentalGlyphName,
     tupletBracketNeeded: () => tupletBracketNeeded,
     tupletDigitGlyphName: () => tupletDigitGlyphName,
     tupletSide: () => tupletSide,
@@ -58703,21 +58706,82 @@ var NotationEngine = (() => {
   }
 
   // src/geometry/accidental.ts
-  function accidentalGlyphName(alter) {
-    switch (alter) {
-      case -2:
-        return "accidentalDoubleFlat";
-      case -1:
-        return "accidentalFlat";
-      case 0:
-        return "accidentalNatural";
-      case 1:
-        return "accidentalSharp";
-      case 2:
-        return "accidentalDoubleSharp";
-      default:
-        throw new Error(`No accidental glyph for alter=${alter} (only -2..2 are supported).`);
+  var MUSICXML_ACCIDENTAL_GLYPHS = {
+    sharp: "accidentalSharp",
+    natural: "accidentalNatural",
+    flat: "accidentalFlat",
+    "double-sharp": "accidentalDoubleSharp",
+    "sharp-sharp": "accidentalSharpSharp",
+    "flat-flat": "accidentalDoubleFlat",
+    "natural-sharp": "accidentalNaturalSharp",
+    "natural-flat": "accidentalNaturalFlat",
+    "quarter-flat": "accidentalQuarterToneFlatStein",
+    "quarter-sharp": "accidentalQuarterToneSharpStein",
+    "three-quarters-flat": "accidentalThreeQuarterTonesFlatZimmermann",
+    "three-quarters-sharp": "accidentalThreeQuarterTonesSharpStein",
+    "sharp-down": "accidentalQuarterToneSharpArrowDown",
+    "sharp-up": "accidentalThreeQuarterTonesSharpArrowUp",
+    "natural-down": "accidentalQuarterToneFlatNaturalArrowDown",
+    "natural-up": "accidentalQuarterToneSharpNaturalArrowUp",
+    "flat-down": "accidentalThreeQuarterTonesFlatArrowDown",
+    "flat-up": "accidentalQuarterToneFlatArrowUp",
+    "double-sharp-down": "accidentalThreeQuarterTonesSharpArrowDown",
+    "double-sharp-up": "accidentalFiveQuarterTonesSharpArrowUp",
+    "flat-flat-down": "accidentalFiveQuarterTonesFlatArrowDown",
+    "flat-flat-up": "accidentalThreeQuarterTonesFlatArrowUp",
+    "arrow-down": "accidentalArrowDown",
+    "arrow-up": "accidentalArrowUp",
+    "triple-sharp": "accidentalTripleSharp",
+    "triple-flat": "accidentalTripleFlat",
+    "slash-quarter-sharp": "accidentalKucukMucennebSharp",
+    "slash-sharp": "accidentalBuyukMucennebSharp",
+    "slash-flat": "accidentalBakiyeFlat",
+    "double-slash-flat": "accidentalBuyukMucennebFlat",
+    "sharp-1": "accidental1CommaSharp",
+    "sharp-2": "accidental2CommaSharp",
+    "sharp-3": "accidental3CommaSharp",
+    "sharp-5": "accidental5CommaSharp",
+    "flat-1": "accidental1CommaFlat",
+    "flat-2": "accidental2CommaFlat",
+    "flat-3": "accidental3CommaFlat",
+    "flat-4": "accidental4CommaFlat",
+    sori: "accidentalSori",
+    koron: "accidentalKoron"
+  };
+  function musicXmlAccidentalGlyphName(value) {
+    return Object.prototype.hasOwnProperty.call(MUSICXML_ACCIDENTAL_GLYPHS, value) ? MUSICXML_ACCIDENTAL_GLYPHS[value] : void 0;
+  }
+  function isKnownAccidentalGlyphName(name) {
+    return /^(?:acc|medRenFla|medRenNatura|medRenShar|kievanAccidental)/.test(name) && getGlyph(name) !== void 0;
+  }
+  var ALTER_GLYPHS = /* @__PURE__ */ new Map([
+    [-3, "accidentalTripleFlat"],
+    [-2.5, "accidentalFiveQuarterTonesFlatArrowDown"],
+    [-2, "accidentalDoubleFlat"],
+    [-1.5, "accidentalThreeQuarterTonesFlatZimmermann"],
+    [-1, "accidentalFlat"],
+    [-0.5, "accidentalQuarterToneFlatStein"],
+    [0, "accidentalNatural"],
+    [0.5, "accidentalQuarterToneSharpStein"],
+    [1, "accidentalSharp"],
+    [1.5, "accidentalThreeQuarterTonesSharpStein"],
+    [2, "accidentalDoubleSharp"],
+    [2.5, "accidentalFiveQuarterTonesSharpArrowUp"],
+    [3, "accidentalTripleSharp"]
+  ]);
+  function tryAccidentalGlyphName(alter, preferredGlyphName) {
+    if (preferredGlyphName !== void 0 && isKnownAccidentalGlyphName(preferredGlyphName)) {
+      return preferredGlyphName;
     }
+    const key = Number.isFinite(alter) ? Object.is(alter, -0) ? 0 : alter : Number.NaN;
+    return ALTER_GLYPHS.get(key);
+  }
+  function accidentalGlyphName(alter, preferredGlyphName) {
+    const name = tryAccidentalGlyphName(alter, preferredGlyphName);
+    if (name === void 0) {
+      throw new Error(`No accidental glyph for alter=${alter} in the bundled SMuFL mapping.`);
+    }
+    return name;
   }
   function assignAccidentalColumns(positions) {
     const COLLISION_DISTANCE = 2.5;
@@ -60318,6 +60382,12 @@ ${denominator}`;
     const n = Number.parseInt(text, 10);
     return Number.isNaN(n) ? void 0 : n;
   }
+  function numberOf(el) {
+    const text = textOf(el);
+    if (text === void 0 || !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) return void 0;
+    const value = Number(text);
+    return Number.isFinite(value) ? value : void 0;
+  }
   function attrOf(el, name) {
     return el.hasAttribute(name) ? el.getAttribute(name) ?? void 0 : void 0;
   }
@@ -60674,7 +60744,50 @@ ${denominator}`;
     const tupletNormalNotes = timeModEl !== void 0 ? intOf(firstChildNamed(timeModEl, "normal-notes")) : void 0;
     const rawStemText = textOf(firstChildNamed(noteEl, "stem"));
     const explicitStemDirection = rawStemText === "up" || rawStemText === "down" ? rawStemText : void 0;
-    const hasExplicitAccidental = firstChildNamed(noteEl, "accidental") !== void 0;
+    const accidentalEl = firstChildNamed(noteEl, "accidental");
+    const hasExplicitAccidental = accidentalEl !== void 0;
+    let accidentalGlyphName2;
+    if (accidentalEl !== void 0) {
+      const accidentalValue = textOf(accidentalEl);
+      const sourceAccidentalSmufl = attrOf(accidentalEl, "smufl");
+      if (sourceAccidentalSmufl !== void 0) {
+        if (isKnownAccidentalGlyphName(sourceAccidentalSmufl)) {
+          accidentalGlyphName2 = sourceAccidentalSmufl;
+        } else {
+          diagnostics.push(
+            diagnostic(
+              "warning",
+              "UNKNOWN_ACCIDENTAL_SMUFL",
+              `Unknown SMuFL accidental glyph "${sourceAccidentalSmufl}"; falling back to the MusicXML accidental value or pitch alteration.`,
+              location
+            )
+          );
+        }
+      }
+      if (accidentalGlyphName2 === void 0 && accidentalValue !== void 0) {
+        accidentalGlyphName2 = musicXmlAccidentalGlyphName(accidentalValue);
+        if (accidentalGlyphName2 === void 0) {
+          diagnostics.push(
+            diagnostic(
+              "warning",
+              "UNSUPPORTED_ACCIDENTAL",
+              `Unsupported or incomplete <accidental>${accidentalValue}</accidental>; using a supported pitch-alteration glyph when possible.`,
+              location
+            )
+          );
+        }
+      }
+      if (accidentalValue === void 0 && sourceAccidentalSmufl === void 0) {
+        diagnostics.push(
+          diagnostic(
+            "warning",
+            "UNSUPPORTED_ACCIDENTAL",
+            "An empty <accidental> has no symbol value; using a supported pitch-alteration glyph when possible.",
+            location
+          )
+        );
+      }
+    }
     const { notations, diagnostics: notationDiags } = parseNotations(noteEl, location);
     diagnostics.push(...notationDiags);
     const { beams, diagnostics: beamDiags } = parseBeamHints(noteEl, location);
@@ -60700,7 +60813,29 @@ ${denominator}`;
           )
         );
       }
-      alter = intOf(firstChildNamed(pitchEl, "alter")) ?? 0;
+      const alterEl = firstChildNamed(pitchEl, "alter");
+      const parsedAlter = numberOf(alterEl);
+      if (alterEl !== void 0 && parsedAlter === void 0) {
+        diagnostics.push(
+          diagnostic(
+            "warning",
+            "INVALID_PITCH_ALTER",
+            `Invalid decimal <alter>${textOf(alterEl) ?? ""}</alter>; assuming 0 semitones.`,
+            location
+          )
+        );
+      }
+      alter = parsedAlter ?? 0;
+      if (alterEl !== void 0 && parsedAlter !== void 0 && !hasExplicitAccidental && tryAccidentalGlyphName(alter) === void 0) {
+        diagnostics.push(
+          diagnostic(
+            "warning",
+            "UNSUPPORTED_PITCH_ALTER",
+            `Pitch alteration ${alter} semitones is preserved, but no bundled accidental glyph is available; provide a supported MusicXML accidental with a SMuFL glyph.`,
+            location
+          )
+        );
+      }
       octave = intOf(firstChildNamed(pitchEl, "octave"));
       if (octave === void 0) {
         diagnostics.push(
@@ -60776,6 +60911,7 @@ ${denominator}`;
       ...tupletNormalNotes !== void 0 ? { tupletNormalNotes } : {},
       ...explicitStemDirection !== void 0 ? { explicitStemDirection } : {},
       hasExplicitAccidental,
+      ...accidentalGlyphName2 !== void 0 ? { accidentalGlyphName: accidentalGlyphName2 } : {},
       ...stringNumber !== void 0 ? { stringNumber } : {},
       ...fingering !== void 0 ? { fingering } : {},
       ...slideStart ? { slideStart: true } : {},
@@ -60865,7 +61001,7 @@ ${denominator}`;
     ending: "ending",
     bracket: "bracket"
   };
-  function numberOf(el) {
+  function numberOf2(el) {
     const text = textOf(el);
     if (text === void 0) return void 0;
     const n = Number(text);
@@ -60882,7 +61018,7 @@ ${denominator}`;
     return n === void 0 ? void 0 : tenthsToStaffSpaces(n);
   }
   function tenthsChild(parent, name) {
-    const n = numberOf(firstChildNamed(parent, name));
+    const n = numberOf2(firstChildNamed(parent, name));
     return n === void 0 ? void 0 : tenthsToStaffSpaces(n);
   }
   function parseFont(el) {
@@ -60898,8 +61034,8 @@ ${denominator}`;
     let scaling;
     const scalingEl = firstChildNamed(el, "scaling");
     if (scalingEl !== void 0) {
-      const millimetres = numberOf(firstChildNamed(scalingEl, "millimeters"));
-      const tenths = numberOf(firstChildNamed(scalingEl, "tenths"));
+      const millimetres = numberOf2(firstChildNamed(scalingEl, "millimeters"));
+      const tenths = numberOf2(firstChildNamed(scalingEl, "tenths"));
       if (millimetres !== void 0 && tenths !== void 0 && tenths > 0) {
         scaling = {
           millimetres,
@@ -60929,14 +61065,14 @@ ${denominator}`;
     if (appearanceEl !== void 0) {
       for (const widthEl of childrenNamed(appearanceEl, "line-width")) {
         const type = attrOf(widthEl, "type");
-        const value = numberOf(widthEl);
+        const value = numberOf2(widthEl);
         if (type === void 0 || value === void 0) continue;
         const name = LINE_WIDTH_NAMES[type];
         if (name !== void 0) lineWidths[name] = tenthsToStaffSpaces(value);
       }
       for (const sizeEl of childrenNamed(appearanceEl, "note-size")) {
         const type = attrOf(sizeEl, "type");
-        const value = numberOf(sizeEl);
+        const value = numberOf2(sizeEl);
         if (type !== void 0 && value !== void 0) noteSizes[type] = value / 100;
       }
     }
@@ -61234,6 +61370,7 @@ ${denominator}`;
       ...ev.isGrace ? { isGrace: true, graceSlash: ev.graceSlash } : {},
       ...ev.explicitStemDirection !== void 0 ? { explicitStemDirection: ev.explicitStemDirection } : {},
       ...ev.hasExplicitAccidental ? { hasExplicitAccidental: true } : {},
+      ...ev.accidentalGlyphName !== void 0 ? { accidentalGlyphName: ev.accidentalGlyphName } : {},
       // Phase 35 Tier 2/§10.4. Every one of these is omitted entirely when
       // empty rather than set to an empty array, so a note from a file
       // with no notations at all produces a byte-identical object to the
@@ -66373,9 +66510,9 @@ ${xrefOffset}
     if (dots <= 0) return notehead;
     return notehead + DOT_NOTE_DISTANCE + dots * DOT_DOT_DISTANCE;
   }
-  function attackLeading(accidental) {
-    if (accidental === void 0) return 0;
-    return glyphWidthOf(accidentalGlyphName(accidental)) + ACCIDENTAL_NOTE_DISTANCE;
+  function attackLeading(accidentalGlyph) {
+    if (accidentalGlyph === void 0) return 0;
+    return glyphWidthOf(accidentalGlyph) + ACCIDENTAL_NOTE_DISTANCE;
   }
   var MEASURE_TRAILING_MARGIN = 2;
   var REST_TO_REST_CLEARANCE = 0.55;
@@ -66481,10 +66618,11 @@ ${xrefOffset}
                 note2.hasExplicitAccidental ?? false
               );
               state = decision.newState;
-              if (!decision.shouldDraw) continue;
+              const glyphName = tryAccidentalGlyphName(note2.pitch.alter, note2.accidentalGlyphName);
+              if (!decision.shouldDraw || glyphName === void 0) continue;
               const previous = drawn.get(tick);
-              if (previous === void 0 || glyphWidthOf(accidentalGlyphName(note2.pitch.alter)) > glyphWidthOf(accidentalGlyphName(previous))) {
-                drawn.set(tick, note2.pitch.alter);
+              if (previous === void 0 || glyphWidthOf(glyphName) > glyphWidthOf(previous)) {
+                drawn.set(tick, glyphName);
               }
             }
           });
@@ -66726,8 +66864,8 @@ ${xrefOffset}
         note2.hasExplicitAccidental ?? false
       );
       state = decision.newState;
-      if (decision.shouldDraw) {
-        const glyphName = accidentalGlyphName(note2.pitch.alter);
+      const glyphName = tryAccidentalGlyphName(note2.pitch.alter, note2.accidentalGlyphName);
+      if (decision.shouldDraw && glyphName !== void 0) {
         const width = glyphWidthOf(glyphName);
         parts.push(
           renderAccidental(glyphName, {
@@ -66820,8 +66958,8 @@ ${xrefOffset}
           ev.hasExplicitAccidental ?? false
         );
         state = decision.newState;
-        if (decision.shouldDraw) {
-          const glyphName = accidentalGlyphName(ev.pitch.alter);
+        const glyphName = tryAccidentalGlyphName(ev.pitch.alter, ev.accidentalGlyphName);
+        if (decision.shouldDraw && glyphName !== void 0) {
           const width = glyphWidthOf(glyphName);
           parts2.push(
             renderAccidental(glyphName, {
@@ -67014,7 +67152,7 @@ ${xrefOffset}
     const positions = resolved.map((r) => r.position);
     let state = accidentalState;
     const drawFlags = [];
-    const alters = [];
+    const accidentalGlyphs = [];
     for (const n of chord2.notes) {
       if (n.pitch.kind === "pitched") {
         const decision = evaluateAccidental(
@@ -67025,11 +67163,12 @@ ${xrefOffset}
           n.hasExplicitAccidental ?? false
         );
         state = decision.newState;
-        drawFlags.push(decision.shouldDraw);
-        alters.push(n.pitch.alter);
+        const glyphName = tryAccidentalGlyphName(n.pitch.alter, n.accidentalGlyphName);
+        drawFlags.push(decision.shouldDraw && glyphName !== void 0);
+        accidentalGlyphs.push(glyphName);
       } else {
         drawFlags.push(false);
-        alters.push(0);
+        accidentalGlyphs.push(void 0);
       }
     }
     const positionsNeedingAccidentals = positions.filter((_, i2) => drawFlags[i2] === true);
@@ -67040,8 +67179,8 @@ ${xrefOffset}
       const placement = placements[placementIndex];
       placementIndex += 1;
       if (placement === void 0) return;
-      const alter = alters[i2] ?? 0;
-      const glyphName = accidentalGlyphName(alter);
+      const glyphName = accidentalGlyphs[i2];
+      if (glyphName === void 0) return;
       const width = glyphWidthOf(glyphName);
       parts.push(
         renderAccidental(glyphName, {

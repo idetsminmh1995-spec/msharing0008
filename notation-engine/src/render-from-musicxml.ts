@@ -11,8 +11,8 @@ import {
   TREBLE_CLEF,
   type ClefDefinition,
   type StemDirection,
-  accidentalGlyphName,
   accidentalX,
+  tryAccidentalGlyphName,
   assignAccidentalColumns,
   beamDirection,
   beamYAtX,
@@ -353,9 +353,9 @@ function attackWidth(dots: number): number {
  * folding it into the width put that room after the note that needed
  * it instead of before.
  */
-function attackLeading(accidental: number | undefined): number {
-  if (accidental === undefined) return 0;
-  return glyphWidthOf(accidentalGlyphName(accidental)) + ACCIDENTAL_NOTE_DISTANCE;
+function attackLeading(accidentalGlyph: string | undefined): number {
+  if (accidentalGlyph === undefined) return 0;
+  return glyphWidthOf(accidentalGlyph) + ACCIDENTAL_NOTE_DISTANCE;
 }
 /** Trailing room after a measure's last event, so it isn't flush against the barline. */
 const MEASURE_TRAILING_MARGIN = 2.0;
@@ -625,8 +625,8 @@ function drawnAccidentalTicks(
     readonly fifths: number;
     readonly isPitched: (staffNumber: number) => boolean;
   }[],
-): ReadonlyMap<number, number> {
-  const drawn = new Map<number, number>();
+): ReadonlyMap<number, string> {
+  const drawn = new Map<number, string>();
   for (const part of parts) {
     const staffNumbers = new Set<number>();
     for (const voice of part.measure.voices) {
@@ -651,17 +651,14 @@ function drawnAccidentalTicks(
               note.hasExplicitAccidental ?? false,
             );
             state = decision.newState;
-            if (!decision.shouldDraw) continue;
+            const glyphName = tryAccidentalGlyphName(note.pitch.alter, note.accidentalGlyphName);
+            if (!decision.shouldDraw || glyphName === undefined) continue;
             // A chord's widest accidental is the one the attack has to
-            // make room for, and a wider glyph means a bigger `alter`
-            // in absolute terms -- a double flat is the widest of them.
+            // make room for. Use the actual source-selected glyph width:
+            // Turkish/Persian and microtonal signs are not interchangeable.
             const previous = drawn.get(tick);
-            if (
-              previous === undefined ||
-              glyphWidthOf(accidentalGlyphName(note.pitch.alter)) >
-                glyphWidthOf(accidentalGlyphName(previous))
-            ) {
-              drawn.set(tick, note.pitch.alter);
+            if (previous === undefined || glyphWidthOf(glyphName) > glyphWidthOf(previous)) {
+              drawn.set(tick, glyphName);
             }
           }
         });
@@ -703,7 +700,7 @@ function computeMeasureLayout(
    * from `drawnAccidentalTicks`, which runs the renderer's own
    * accidental state machine rather than reading each note's `alter`.
    */
-  accidentals: ReadonlyMap<number, number>,
+  accidentals: ReadonlyMap<number, string>,
 ): {
   readonly width: number;
   readonly positionsByTick: ReadonlyMap<number, number>;
@@ -1268,8 +1265,8 @@ function renderNoteheadPart(
       note.hasExplicitAccidental ?? false,
     );
     state = decision.newState;
-    if (decision.shouldDraw) {
-      const glyphName = accidentalGlyphName(note.pitch.alter);
+    const glyphName = tryAccidentalGlyphName(note.pitch.alter, note.accidentalGlyphName);
+    if (decision.shouldDraw && glyphName !== undefined) {
       const width = glyphWidthOf(glyphName);
       parts.push(
         renderAccidental(glyphName, {
@@ -1391,8 +1388,8 @@ function renderNoteOrRest(
         ev.hasExplicitAccidental ?? false,
       );
       state = decision.newState;
-      if (decision.shouldDraw) {
-        const glyphName = accidentalGlyphName(ev.pitch.alter);
+      const glyphName = tryAccidentalGlyphName(ev.pitch.alter, ev.accidentalGlyphName);
+      if (decision.shouldDraw && glyphName !== undefined) {
         const width = glyphWidthOf(glyphName);
         parts.push(
           renderAccidental(glyphName, {
@@ -1735,7 +1732,7 @@ function renderChordHeadsPart(
 
   let state = accidentalState;
   const drawFlags: boolean[] = [];
-  const alters: number[] = [];
+  const accidentalGlyphs: Array<string | undefined> = [];
   for (const n of chord.notes) {
     if (n.pitch.kind === 'pitched') {
       // Integration W: `hasExplicitAccidental` was passed on the single-
@@ -1751,11 +1748,12 @@ function renderChordHeadsPart(
         n.hasExplicitAccidental ?? false,
       );
       state = decision.newState;
-      drawFlags.push(decision.shouldDraw);
-      alters.push(n.pitch.alter);
+      const glyphName = tryAccidentalGlyphName(n.pitch.alter, n.accidentalGlyphName);
+      drawFlags.push(decision.shouldDraw && glyphName !== undefined);
+      accidentalGlyphs.push(glyphName);
     } else {
       drawFlags.push(false);
-      alters.push(0);
+      accidentalGlyphs.push(undefined);
     }
   }
 
@@ -1767,8 +1765,8 @@ function renderChordHeadsPart(
     const placement = placements[placementIndex];
     placementIndex += 1;
     if (placement === undefined) return;
-    const alter = alters[i] ?? 0;
-    const glyphName = accidentalGlyphName(alter);
+    const glyphName = accidentalGlyphs[i];
+    if (glyphName === undefined) return;
     const width = glyphWidthOf(glyphName);
     parts.push(
       renderAccidental(glyphName, {

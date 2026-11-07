@@ -13,8 +13,8 @@ export interface PitchedPitch {
   kind: 'pitched';
   step: PitchStep;
   /** Alteration in semitones: 1 = sharp, -1 = flat, 2 = double-sharp, 0 =
-   * natural/unaltered. Fractional values (e.g. 0.5) are reserved for
-   * microtonal notation later; not used by any current phase. */
+   * natural/unaltered. MusicXML decimal values (e.g. 0.5) are preserved for
+   * microtonal pitch; drawing uses the source SMuFL accidental when present. */
   alter: number;
   /** Scientific pitch notation octave number -- middle C is C4. */
   octave: number;

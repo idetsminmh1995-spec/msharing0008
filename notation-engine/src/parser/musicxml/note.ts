@@ -3,8 +3,13 @@ import type { BeamHint, LyricSyllable } from '../../core/note.js';
 import { durationTypeAndDotsFromTicks, xmlDivisionsToTicks } from '../../core/duration-math.js';
 import type { PitchStep } from '../../core/pitch.js';
 import { diagnostic, type Diagnostic, type DiagnosticLocation } from './diagnostic.js';
-import { childrenNamed, firstChildNamed, intOf, textOf } from './dom-helpers.js';
+import { attrOf, childrenNamed, firstChildNamed, intOf, numberOf, textOf } from './dom-helpers.js';
 import { parseBeamHints, parseLyrics, parseNotations, type ParsedNotations } from './notations.js';
+import {
+  isKnownAccidentalGlyphName,
+  musicXmlAccidentalGlyphName,
+  tryAccidentalGlyphName,
+} from '../../geometry/accidental.js';
 import { isKnownMusicXmlNotehead } from '../../geometry/notehead.js';
 
 const KNOWN_DURATION_TYPES: ReadonlySet<string> = new Set([
@@ -67,6 +72,8 @@ export interface ParsedNoteEvent {
   readonly explicitStemDirection?: 'up' | 'down';
   /** §10.4/Phase 35: an explicit <accidental> element's presence -- feeds Phase 19's evaluateAccidental hasExplicitAccidental (courtesy-accidental) parameter. */
   readonly hasExplicitAccidental: boolean;
+  /** Exact bundled SMuFL glyph selected by MusicXML's accidental value or smufl attribute. */
+  readonly accidentalGlyphName?: string;
   /** Integration C: <notations><technical><string> -- which string a tab note is played on (1 = highest-pitched). */
   readonly stringNumber?: number;
   /** Integration C: <notations><technical><fret> -- which fret, 0 meaning an open string. */
@@ -260,7 +267,50 @@ export function parseNoteElement(
   const rawStemText = textOf(firstChildNamed(noteEl, 'stem'));
   const explicitStemDirection =
     rawStemText === 'up' || rawStemText === 'down' ? rawStemText : undefined;
-  const hasExplicitAccidental = firstChildNamed(noteEl, 'accidental') !== undefined;
+  const accidentalEl = firstChildNamed(noteEl, 'accidental');
+  const hasExplicitAccidental = accidentalEl !== undefined;
+  let accidentalGlyphName: string | undefined;
+  if (accidentalEl !== undefined) {
+    const accidentalValue = textOf(accidentalEl);
+    const sourceAccidentalSmufl = attrOf(accidentalEl, 'smufl');
+    if (sourceAccidentalSmufl !== undefined) {
+      if (isKnownAccidentalGlyphName(sourceAccidentalSmufl)) {
+        accidentalGlyphName = sourceAccidentalSmufl;
+      } else {
+        diagnostics.push(
+          diagnostic(
+            'warning',
+            'UNKNOWN_ACCIDENTAL_SMUFL',
+            `Unknown SMuFL accidental glyph "${sourceAccidentalSmufl}"; falling back to the MusicXML accidental value or pitch alteration.`,
+            location,
+          ),
+        );
+      }
+    }
+    if (accidentalGlyphName === undefined && accidentalValue !== undefined) {
+      accidentalGlyphName = musicXmlAccidentalGlyphName(accidentalValue);
+      if (accidentalGlyphName === undefined) {
+        diagnostics.push(
+          diagnostic(
+            'warning',
+            'UNSUPPORTED_ACCIDENTAL',
+            `Unsupported or incomplete <accidental>${accidentalValue}</accidental>; using a supported pitch-alteration glyph when possible.`,
+            location,
+          ),
+        );
+      }
+    }
+    if (accidentalValue === undefined && sourceAccidentalSmufl === undefined) {
+      diagnostics.push(
+        diagnostic(
+          'warning',
+          'UNSUPPORTED_ACCIDENTAL',
+          'An empty <accidental> has no symbol value; using a supported pitch-alteration glyph when possible.',
+          location,
+        ),
+      );
+    }
+  }
 
   // §10.4 Tier 2: the rest of <notations>, plus <beam> and <lyric>.
   // Every one of these is independent of whether the note is pitched,
@@ -293,7 +343,34 @@ export function parseNoteElement(
         ),
       );
     }
-    alter = intOf(firstChildNamed(pitchEl, 'alter')) ?? 0;
+    const alterEl = firstChildNamed(pitchEl, 'alter');
+    const parsedAlter = numberOf(alterEl);
+    if (alterEl !== undefined && parsedAlter === undefined) {
+      diagnostics.push(
+        diagnostic(
+          'warning',
+          'INVALID_PITCH_ALTER',
+          `Invalid decimal <alter>${textOf(alterEl) ?? ''}</alter>; assuming 0 semitones.`,
+          location,
+        ),
+      );
+    }
+    alter = parsedAlter ?? 0;
+    if (
+      alterEl !== undefined &&
+      parsedAlter !== undefined &&
+      !hasExplicitAccidental &&
+      tryAccidentalGlyphName(alter) === undefined
+    ) {
+      diagnostics.push(
+        diagnostic(
+          'warning',
+          'UNSUPPORTED_PITCH_ALTER',
+          `Pitch alteration ${alter} semitones is preserved, but no bundled accidental glyph is available; provide a supported MusicXML accidental with a SMuFL glyph.`,
+          location,
+        ),
+      );
+    }
     octave = intOf(firstChildNamed(pitchEl, 'octave'));
     if (octave === undefined) {
       diagnostics.push(
@@ -391,6 +468,7 @@ export function parseNoteElement(
     ...(tupletNormalNotes !== undefined ? { tupletNormalNotes } : {}),
     ...(explicitStemDirection !== undefined ? { explicitStemDirection } : {}),
     hasExplicitAccidental,
+    ...(accidentalGlyphName !== undefined ? { accidentalGlyphName } : {}),
     ...(stringNumber !== undefined ? { stringNumber } : {}),
     ...(fingering !== undefined ? { fingering } : {}),
     ...(slideStart ? { slideStart: true } : {}),

@@ -291,6 +291,9 @@ function buildSingle(ev: ParsedNoteEvent): Note | Rest {
       ? { explicitStemDirection: ev.explicitStemDirection }
       : {}),
     ...(ev.hasExplicitAccidental ? { hasExplicitAccidental: true } : {}),
+    ...(ev.accidentalGlyphName !== undefined
+      ? { accidentalGlyphName: ev.accidentalGlyphName }
+      : {}),
     // Phase 35 Tier 2/§10.4. Every one of these is omitted entirely when
     // empty rather than set to an empty array, so a note from a file
     // with no notations at all produces a byte-identical object to the
