@@ -41,6 +41,23 @@ describe('metronome geometry (Integration D)', () => {
     assert.notEqual(NE.getGlyph(NE.metronomeDotGlyphName()), undefined);
   });
 
+  test('rendered dotted tempo mark advances note and dot by Bravura metrics', () => {
+    const { svg } = NE.renderFromMusicXml(load('tempo-mark.musicxml'), { domParser });
+    const text = [...svg.matchAll(/<text x="([\d.]+)" y="([\d.-]+)"[^>]*>([^<]*)<\/text>/g)];
+    const tempoText = text.find((match) => match[3] === '= 96');
+    assert.ok(tempoText, 'the fixture contains its expected tempo text');
+    const noteGlyph = NE.getGlyph(NE.metronomeNoteGlyphName('quarter'));
+    const dotGlyph = NE.getGlyph(NE.metronomeDotGlyphName());
+    const note = text.find((match) => match[2] === tempoText[2] && match[3] === noteGlyph.char);
+    const dot = text.find((match) => match[2] === tempoText[2] && match[3] === dotGlyph.char);
+    assert.ok(note, 'the metronome note glyph is on the tempo text baseline');
+    assert.ok(dot, 'the metronome dot glyph is on the tempo text baseline');
+    assert.ok(Math.abs(Number(dot[1]) - Number(note[1]) - (noteGlyph.advanceWidth + 0.25)) < 1e-9);
+    assert.ok(
+      Math.abs(Number(tempoText[1]) - Number(dot[1]) - (dotGlyph.advanceWidth + 0.75)) < 1e-9,
+    );
+  });
+
   test('the BPM half of the mark is TEXT, not glyph names -- "= 120", ready for the text font', () => {
     assert.equal(NE.metronomeTempoText(120), '= 120');
     assert.equal(NE.metronomeTempoText(96), '= 96');
@@ -204,7 +221,14 @@ describe('metronome rendering end to end (Integration D)', () => {
     const { svg } = render();
     const textX = Number(svg.match(/x="([\d.]+)" y="[\d.]+"[^>]*>= 96</)[1]);
     const markRightEdge = textX + NE.estimateTextWidth('= 96', 2.4);
-    const barlineX = Number(svg.match(/<line x1="([\d.]+)" y1="[\d.]+" x2="\1" y2="[\d.]+" stroke="#000000" stroke-width="0\.16"/)[1]);
-    assert.ok(barlineX > markRightEdge, `expected the barline (${barlineX}) clear past the tempo mark's own right edge (${markRightEdge})`);
+    const barlineX = Number(
+      svg.match(
+        /<line x1="([\d.]+)" y1="[\d.]+" x2="\1" y2="[\d.]+" stroke="#000000" stroke-width="0\.16"/,
+      )[1],
+    );
+    assert.ok(
+      barlineX > markRightEdge,
+      `expected the barline (${barlineX}) clear past the tempo mark's own right edge (${markRightEdge})`,
+    );
   });
 });

@@ -10,7 +10,7 @@ import {
   musicXmlAccidentalGlyphName,
   tryAccidentalGlyphName,
 } from '../../geometry/accidental.js';
-import { isKnownMusicXmlNotehead } from '../../geometry/notehead.js';
+import { isKnownMusicXmlNotehead, isKnownSmuflNoteheadGlyphName } from '../../geometry/notehead.js';
 
 const KNOWN_DURATION_TYPES: ReadonlySet<string> = new Set([
   'whole',
@@ -62,6 +62,8 @@ export interface ParsedNoteEvent {
   readonly explicitNotehead?: string;
   /** That <notehead>'s own `smufl` attribute -- what MusicXML's `other` value carries its real shape in (`<notehead smufl="noteheadHeavyXHat">other</notehead>`). */
   readonly explicitNoteheadSmufl?: string;
+  readonly noteheadFilled?: boolean;
+  readonly noteheadParentheses?: boolean;
   /** §10.4/Phase 35: <grace/> presence and its slash attribute -- true for an acciaccatura (slash="yes"), false for an appoggiatura. */
   readonly isGrace: boolean;
   readonly graceSlash: boolean;
@@ -74,6 +76,10 @@ export interface ParsedNoteEvent {
   readonly hasExplicitAccidental: boolean;
   /** Exact bundled SMuFL glyph selected by MusicXML's accidental value or smufl attribute. */
   readonly accidentalGlyphName?: string;
+  readonly accidentalParentheses?: boolean;
+  readonly accidentalBracket?: boolean;
+  readonly restDisplayStep?: PitchStep;
+  readonly restDisplayOctave?: number;
   /** Integration C: <notations><technical><string> -- which string a tab note is played on (1 = highest-pitched). */
   readonly stringNumber?: number;
   /** Integration C: <notations><technical><fret> -- which fret, 0 meaning an open string. */
@@ -242,6 +248,47 @@ export function parseNoteElement(
   const noteheadEl = firstChildNamed(noteEl, 'notehead');
   const explicitNotehead = textOf(noteheadEl);
   const explicitNoteheadSmufl = noteheadEl?.getAttribute('smufl') ?? undefined;
+  if (
+    explicitNoteheadSmufl !== undefined &&
+    !isKnownSmuflNoteheadGlyphName(explicitNoteheadSmufl)
+  ) {
+    diagnostics.push(
+      diagnostic(
+        'warning',
+        'UNKNOWN_NOTEHEAD_SMUFL',
+        `Unknown or non-notehead SMuFL glyph "${explicitNoteheadSmufl}"; falling back to the MusicXML notehead value or duration default.`,
+        location,
+      ),
+    );
+  }
+  const parseYesNo = (
+    raw: string | undefined,
+    attribute: string,
+    elementName: string,
+  ): boolean | undefined => {
+    if (raw === undefined) return undefined;
+    if (raw === 'yes') return true;
+    if (raw === 'no') return false;
+    diagnostics.push(
+      diagnostic(
+        'warning',
+        'INVALID_BOOLEAN_ATTRIBUTE',
+        `Invalid ${elementName} ${attribute}="${raw}"; ignoring the attribute.`,
+        location,
+      ),
+    );
+    return undefined;
+  };
+  const noteheadFilled = parseYesNo(
+    noteheadEl === undefined ? undefined : attrOf(noteheadEl, 'filled'),
+    'filled',
+    '<notehead>',
+  );
+  const noteheadParentheses = parseYesNo(
+    noteheadEl === undefined ? undefined : attrOf(noteheadEl, 'parentheses'),
+    'parentheses',
+    '<notehead>',
+  );
   if (explicitNotehead !== undefined && !isKnownMusicXmlNotehead(explicitNotehead)) {
     // §10.7: report, never refuse. This exact check is what a real
     // MuseScore drum chart needed -- it writes `slashed` and
@@ -269,6 +316,28 @@ export function parseNoteElement(
     rawStemText === 'up' || rawStemText === 'down' ? rawStemText : undefined;
   const accidentalEl = firstChildNamed(noteEl, 'accidental');
   const hasExplicitAccidental = accidentalEl !== undefined;
+  let accidentalParentheses = parseYesNo(
+    accidentalEl === undefined ? undefined : attrOf(accidentalEl, 'parentheses'),
+    'parentheses',
+    '<accidental>',
+  );
+  let accidentalBracket = parseYesNo(
+    accidentalEl === undefined ? undefined : attrOf(accidentalEl, 'bracket'),
+    'bracket',
+    '<accidental>',
+  );
+  if (accidentalParentheses === true && accidentalBracket === true) {
+    diagnostics.push(
+      diagnostic(
+        'warning',
+        'CONTRADICTORY_ACCIDENTAL_WRAPPERS',
+        '<accidental> cannot request both parentheses and brackets; drawing the accidental without a wrapper.',
+        location,
+      ),
+    );
+    accidentalParentheses = undefined;
+    accidentalBracket = undefined;
+  }
   let accidentalGlyphName: string | undefined;
   if (accidentalEl !== undefined) {
     const accidentalValue = textOf(accidentalEl);
@@ -329,6 +398,37 @@ export function parseNoteElement(
   let isUnpitched = false;
   let hasExplicitDisplayPosition = false;
   let instrumentId: string | undefined;
+  let restDisplayStep: PitchStep | undefined;
+  let restDisplayOctave: number | undefined;
+  if (isRest) {
+    const restEl = firstChildNamed(noteEl, 'rest');
+    const stepEl = restEl === undefined ? undefined : firstChildNamed(restEl, 'display-step');
+    const octaveEl = restEl === undefined ? undefined : firstChildNamed(restEl, 'display-octave');
+    if (stepEl !== undefined || octaveEl !== undefined) {
+      const rawStep = textOf(stepEl);
+      const rawOctave = textOf(octaveEl);
+      const octave = intOf(octaveEl);
+      if (
+        rawStep !== undefined &&
+        isKnownStep(rawStep) &&
+        rawOctave !== undefined &&
+        /^[-+]?\d+$/.test(rawOctave) &&
+        octave !== undefined
+      ) {
+        restDisplayStep = rawStep;
+        restDisplayOctave = octave;
+      } else {
+        diagnostics.push(
+          diagnostic(
+            'warning',
+            'INVALID_REST_DISPLAY_POSITION',
+            'A rest display position requires a valid <display-step> and integer <display-octave>; using its duration-based default.',
+            location,
+          ),
+        );
+      }
+    }
+  }
   if (pitchEl !== undefined) {
     const rawStep = textOf(firstChildNamed(pitchEl, 'step'));
     if (rawStep !== undefined && isKnownStep(rawStep)) {
@@ -386,10 +486,16 @@ export function parseNoteElement(
     isUnpitched = true;
     const rawStep = textOf(firstChildNamed(unpitchedEl, 'display-step'));
     const rawOctave = textOf(firstChildNamed(unpitchedEl, 'display-octave'));
+    const parsedOctave = intOf(firstChildNamed(unpitchedEl, 'display-octave'));
     // Both, or neither: half a position is not a position, and a file
     // that gives one and not the other has not said where it wants the
     // note any more than a file that gives nothing has.
-    hasExplicitDisplayPosition = rawStep !== undefined && rawOctave !== undefined;
+    hasExplicitDisplayPosition =
+      rawStep !== undefined &&
+      isKnownStep(rawStep) &&
+      rawOctave !== undefined &&
+      /^[-+]?\d+$/.test(rawOctave) &&
+      parsedOctave !== undefined;
     if (rawStep !== undefined && isKnownStep(rawStep)) {
       step = rawStep;
     } else {
@@ -416,7 +522,7 @@ export function parseNoteElement(
       );
       step = 'B'; // middle line of a treble-referenced staff -- a neutral fallback
     }
-    octave = intOf(firstChildNamed(unpitchedEl, 'display-octave'));
+    octave = parsedOctave;
     if (octave === undefined) {
       diagnostics.push(
         rawOctave === undefined
@@ -462,6 +568,8 @@ export function parseNoteElement(
     ...(instrumentId !== undefined ? { instrumentId } : {}),
     ...(explicitNotehead !== undefined ? { explicitNotehead } : {}),
     ...(explicitNoteheadSmufl !== undefined ? { explicitNoteheadSmufl } : {}),
+    ...(noteheadFilled !== undefined ? { noteheadFilled } : {}),
+    ...(noteheadParentheses !== undefined ? { noteheadParentheses } : {}),
     isGrace,
     graceSlash,
     ...(tupletActualNotes !== undefined ? { tupletActualNotes } : {}),
@@ -469,6 +577,10 @@ export function parseNoteElement(
     ...(explicitStemDirection !== undefined ? { explicitStemDirection } : {}),
     hasExplicitAccidental,
     ...(accidentalGlyphName !== undefined ? { accidentalGlyphName } : {}),
+    ...(accidentalParentheses !== undefined ? { accidentalParentheses } : {}),
+    ...(accidentalBracket !== undefined ? { accidentalBracket } : {}),
+    ...(restDisplayStep !== undefined ? { restDisplayStep } : {}),
+    ...(restDisplayOctave !== undefined ? { restDisplayOctave } : {}),
     ...(stringNumber !== undefined ? { stringNumber } : {}),
     ...(fingering !== undefined ? { fingering } : {}),
     ...(slideStart ? { slideStart: true } : {}),

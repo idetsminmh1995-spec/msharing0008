@@ -52,10 +52,21 @@ describe('time signature engine (Phase 12)', () => {
     assert.equal(NE.denominatorText(sig), '8'); // denominator display is never overridden
   });
 
-  test('textWidth uses each character\'s real glyph width, so "10" is wider than "7"', () => {
+  test('textWidth uses each character\'s real Bravura advance, so "10" is wider than "7"', () => {
     const w7 = NE.textWidth('7');
     const w10 = NE.textWidth('10');
     assert.ok(w10 > w7, `expected "10" (${w10}) to be wider than "7" (${w7})`);
+  });
+
+  test('digit cursor movement uses the published Bravura advance, not the glyph ink box', () => {
+    const one = NE.getGlyph('timeSig1');
+    assert.equal(NE.charAdvance('1'), one.advanceWidth);
+    assert.equal(NE.charAdvance('1'), 1.336);
+    assert.notEqual(
+      NE.charAdvance('1'),
+      one.bBox.bBoxNE[0] - one.bBox.bBoxSW[0],
+      'the font advance and visible ink width are distinct metrics',
+    );
   });
 
   test('textWidth handles the "+" character used in additive meters', () => {

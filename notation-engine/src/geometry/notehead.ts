@@ -5,7 +5,9 @@ import { getGlyph } from '../glyphs/index.js';
 type NoteheadFill = 'whole' | 'half' | 'black';
 
 /** Which fill variant a duration type normally uses -- whole/half stay open, everything shorter is filled. */
-function fillForDuration(type: DurationType): NoteheadFill {
+function fillForDuration(type: DurationType, explicitlyFilled?: boolean): NoteheadFill {
+  if (explicitlyFilled === true) return 'black';
+  if (explicitlyFilled === false) return type === 'whole' ? 'whole' : 'half';
   if (type === 'whole') return 'whole';
   if (type === 'half') return 'half';
   return 'black';
@@ -209,6 +211,22 @@ export function isKnownMusicXmlNotehead(value: string): boolean {
   return Object.prototype.hasOwnProperty.call(MUSICXML_NOTEHEAD_SHAPES, value);
 }
 
+/** True only for bundled glyphs in SMuFL's notehead blocks, not a clef or a parenthesis wrapper. */
+export function isKnownSmuflNoteheadGlyphName(name: string): boolean {
+  const glyph = getGlyph(name);
+  if (
+    glyph === undefined ||
+    name === 'noteheadParenthesisLeft' ||
+    name === 'noteheadParenthesisRight'
+  ) {
+    return false;
+  }
+  const codepoint = Number.parseInt(glyph.codepoint.slice(2), 16);
+  return (
+    (codepoint >= 0xe0a0 && codepoint <= 0xe0ff) || (codepoint >= 0xeea0 && codepoint <= 0xeedf)
+  );
+}
+
 /** Every `<notehead>` value this engine understands, for a diagnostic's own message. */
 export function supportedMusicXmlNoteheads(): readonly string[] {
   return Object.keys(MUSICXML_NOTEHEAD_SHAPES);
@@ -222,8 +240,9 @@ export function supportedMusicXmlNoteheads(): readonly string[] {
 export function shapeGlyphNameOrUndefined(
   shape: string,
   durationType: DurationType,
+  explicitlyFilled?: boolean,
 ): string | undefined {
-  return SHAPE_GLYPHS[shape]?.[fillForDuration(durationType)];
+  return SHAPE_GLYPHS[shape]?.[fillForDuration(durationType, explicitlyFilled)];
 }
 
 /**
@@ -236,8 +255,12 @@ export function shapeGlyphNameOrUndefined(
  * a file is input, not a program, and bad input is reported as a
  * diagnostic and drawn as best we can.
  */
-export function shapeGlyphName(shape: string, durationType: DurationType): string {
-  const glyph = shapeGlyphNameOrUndefined(shape, durationType);
+export function shapeGlyphName(
+  shape: string,
+  durationType: DurationType,
+  explicitlyFilled?: boolean,
+): string {
+  const glyph = shapeGlyphNameOrUndefined(shape, durationType, explicitlyFilled);
   if (glyph === undefined) {
     throw new Error(
       `Unknown notehead shape "${shape}". Supported: ${Object.keys(SHAPE_GLYPHS).join(', ')}.`,
@@ -316,6 +339,8 @@ export interface NoteheadSelectionInput {
    * tiers below.
    */
   readonly explicitNoteheadSmufl?: string;
+  /** MusicXML `<notehead filled="yes|no">`; overrides the duration's usual open/filled variant. */
+  readonly filled?: boolean;
   /** GM MIDI note number, if known (unpitched notes only -- see noteheadMappingKey). */
   readonly midiNote?: number;
   /** `config.noteheadMapping.overridesByKey`, if a config is in effect. */
@@ -342,14 +367,14 @@ export function selectNoteheadGlyphName(input: NoteheadSelectionInput): string {
   // not in the enumeration, read the attribute".
   if (
     input.explicitNoteheadSmufl !== undefined &&
-    getGlyph(input.explicitNoteheadSmufl) !== undefined
+    isKnownSmuflNoteheadGlyphName(input.explicitNoteheadSmufl)
   ) {
     return input.explicitNoteheadSmufl;
   }
   if (input.explicitNotehead !== undefined) {
     const shape = musicXmlNoteheadToShape(input.explicitNotehead);
     if (shape !== undefined) {
-      const glyph = shapeGlyphNameOrUndefined(shape, input.durationType);
+      const glyph = shapeGlyphNameOrUndefined(shape, input.durationType, input.filled);
       if (glyph !== undefined) return glyph;
     }
     // 'normal', 'other' with no usable `smufl`, or a value we do not
@@ -360,11 +385,11 @@ export function selectNoteheadGlyphName(input: NoteheadSelectionInput): string {
   const key = noteheadMappingKey(input.pitch, input.midiNote);
   const override = input.overridesByKey?.[key];
   if (override !== undefined) {
-    return shapeGlyphName(override, input.durationType);
+    return shapeGlyphName(override, input.durationType, input.filled);
   }
 
   if (input.defaultShape !== undefined) {
-    return shapeGlyphName(input.defaultShape, input.durationType);
+    return shapeGlyphName(input.defaultShape, input.durationType, input.filled);
   }
-  return durationDefaultNotehead(input.durationType);
+  return shapeGlyphName('normal', input.durationType, input.filled);
 }

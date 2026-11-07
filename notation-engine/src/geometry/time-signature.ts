@@ -97,17 +97,21 @@ export function glyphForTimeSigChar(ch: string): GlyphInfo {
   return glyph;
 }
 
-/** Advance width (staff-space units) of one time-signature character, from its real glyph bounding box. */
+/** Bravura advance width (staff-space units) of one time-signature character. */
 export function charAdvance(ch: string): number {
-  const bbox = glyphForTimeSigChar(ch).bBox;
-  return bbox !== undefined ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
+  const advance = glyphForTimeSigChar(ch).advanceWidth;
+  if (advance === undefined) {
+    throw new Error(`No Bravura advance width is available for time-signature character "${ch}"`);
+  }
+  return advance;
 }
 
 /**
  * Total width (staff-space units) a display string (e.g. "12", "3+2+2")
- * would take, using each character's real glyph bounding-box width. Bravura's
- * time-signature digits are NOT uniform width ("1" is 1.176 units, "0"/"4"
- * are 1.72), so this cannot be a per-character constant.
+ * would take, using each character's real Bravura advance width. Advances
+ * include the font's designed side bearings; visible ink bounds are not a
+ * substitute for cursor movement. Bravura's time-signature digits are NOT
+ * uniform width, so this cannot be a per-character constant.
  */
 export function textWidth(text: string): number {
   let total = 0;

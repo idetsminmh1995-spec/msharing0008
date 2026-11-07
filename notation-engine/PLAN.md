@@ -2431,6 +2431,13 @@ API can be designed *then*, informed by what that extension actually needs.
     ordinary staff positions or glyphs alone. They need separate parsers,
     semantic data, layout rules, and tradition-specific test scores; the
     representative design boundary is in `Doc/international-notation-support.md`.
+19. **Pinned Bravura metrics do not make all engraving exact.** The font,
+    metadata, codepoint coverage, advance widths, and ink bounds are version-
+    matched and tested, and selected MusicXML notehead/rest/accidental
+    presentation details are preserved. The custom layout engine still does
+    not implement every MusicXML placement or collision rule. In particular,
+    `clef-octave-change` and general note-level `default-x/default-y` are not
+    yet rendered from source. See `Doc/bravura-engraving-accuracy.md`.
 
 ---
 

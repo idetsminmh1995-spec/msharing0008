@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MusicNote — Piano Video Create</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=Baloo+2:wght@600;700&display=swap">
-<link rel="preload" href="../../assets/fonts/Bravura.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../../assets/fonts/Bravura.woff2?v=1.482" as="font" type="font/woff2" crossorigin>
 <style>
   /* Bravura is the SMuFL music font the Notation Engine's glyph metrics
      come from (notation-engine/src/glyphs/data/bravura_metadata.json).
@@ -15,12 +15,12 @@
      renders as an empty box, even though the SVG itself is perfectly
      correct. (That is exactly what happened: the rule existed in the old
      web-preview page and was lost when this site was built.)
-     SIL OFL 1.1, from steinbergmedia/bravura tag bravura-1.380 -- see
+     SIL OFL 1.1, from steinbergmedia/bravura tag bravura-1.482 -- see
      ../../assets/fonts/LICENSE.md. font-display:block so the notation
      waits for the real glyphs rather than flashing boxes first. */
   @font-face {
     font-family: 'Bravura';
-    src: url('../../assets/fonts/Bravura.woff2') format('woff2');
+    src: url('../../assets/fonts/Bravura.woff2?v=1.482') format('woff2');
     font-weight: normal;
     font-style: normal;
     font-display: block;
@@ -2915,13 +2915,20 @@
   async function loadBravura() {
     if (bravuraBase64 !== null) return bravuraBase64;
     try {
-      const res = await fetch('../../assets/fonts/Bravura.woff2');
+      const res = await fetch('../../assets/fonts/Bravura.woff2?v=1.482');
+      if (!res.ok) throw new Error(`Bravura font request failed (${res.status}).`);
       const bytes = new Uint8Array(await res.arrayBuffer());
+      if (bytes.length === 0) throw new Error('Bravura font file is empty.');
       let binary = '';
       for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
       bravuraBase64 = btoa(binary);
     } catch (err) {
-      bravuraBase64 = '';
+      // Do not produce an SVG whose Bravura glyphs silently become boxes.
+      // Leave the cache empty so a transient request failure can be retried.
+      bravuraBase64 = null;
+      throw new Error('Could not load Bravura; notation export was stopped to avoid missing glyphs.', {
+        cause: err,
+      });
     }
     return bravuraBase64;
   }

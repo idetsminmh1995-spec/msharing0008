@@ -28,10 +28,24 @@ export interface RenderTabNumberOptions {
   readonly fontFamily: string;
 }
 
-/** A digit's own drawn width, from the real font metrics -- the same bBox-derived measure the rest of the renderer uses for glyph widths. */
-function digitWidth(glyphName: string): number {
-  const bbox = getGlyph(glyphName)?.bBox;
-  return bbox !== undefined ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
+interface TabGlyphMetrics {
+  readonly advanceWidth: number;
+  readonly inkLeft: number;
+  readonly inkRight: number;
+}
+
+/** Both font advance and ink bounds are required; one must not be inferred from the other. */
+function tabGlyphMetrics(glyphName: string): TabGlyphMetrics {
+  const glyph = getGlyph(glyphName);
+  if (glyph === undefined) throw new Error(`No glyph found for tab digit "${glyphName}"`);
+  if (glyph.advanceWidth === undefined || glyph.bBox === undefined) {
+    throw new Error(`Incomplete Bravura metrics for tab digit "${glyphName}"`);
+  }
+  return {
+    advanceWidth: glyph.advanceWidth,
+    inkLeft: glyph.bBox.bBoxSW[0],
+    inkRight: glyph.bBox.bBoxNE[0],
+  };
 }
 
 /** Vertical half-height of the mask, in staff spaces -- enough to clear the digits without eating the neighbouring lines. */
@@ -41,30 +55,40 @@ const MASK_PADDING = 0.12;
 
 /**
  * Draws a fret number on its string's line: a background-coloured mask
- * to interrupt the line, then the digit glyphs centred over it. Digit
- * advance widths come from the real font metrics, so a two-digit fret
- * (e.g. 12) is spaced and centred correctly rather than overprinted.
+ * to interrupt the line, then the digit glyphs centred over it. Glyph origins
+ * advance by Bravura's actual hmtx-derived advance widths; centring and the
+ * mask use the combined ink bounds, which are a different metric.
  */
 export function renderTabNumber(
   glyphNames: readonly string[],
   options: RenderTabNumberOptions,
 ): string {
-  const widths = glyphNames.map(digitWidth);
-  const totalWidth = widths.reduce((sum, w) => sum + w, 0);
+  if (glyphNames.length === 0) return '';
+  const metrics = glyphNames.map(tabGlyphMetrics);
+  let pen = 0;
+  let inkLeft = Number.POSITIVE_INFINITY;
+  let inkRight = Number.NEGATIVE_INFINITY;
+  for (const metric of metrics) {
+    inkLeft = Math.min(inkLeft, pen + metric.inkLeft);
+    inkRight = Math.max(inkRight, pen + metric.inkRight);
+    pen += metric.advanceWidth;
+  }
+  const inkWidth = inkRight - inkLeft;
+  const originX = options.x - (inkLeft + inkRight) / 2;
 
   const parts: string[] = hasBackground(options.backgroundColor)
     ? [
         svgRect(
-          options.x - totalWidth / 2 - MASK_PADDING,
+          originX + inkLeft - MASK_PADDING,
           options.y - MASK_HALF_HEIGHT,
-          totalWidth + MASK_PADDING * 2,
+          inkWidth + MASK_PADDING * 2,
           MASK_HALF_HEIGHT * 2,
           { fill: options.backgroundColor },
         ),
       ]
     : [];
 
-  let cursorX = options.x - totalWidth / 2;
+  let cursorX = originX;
   glyphNames.forEach((name, i) => {
     const glyph = getGlyph(name);
     if (glyph === undefined) {
@@ -73,7 +97,7 @@ export function renderTabNumber(
     parts.push(
       svgGlyphText(cursorX, options.y, glyph.char, options.fontFamily, { fill: options.color }),
     );
-    cursorX += widths[i] ?? 0;
+    cursorX += metrics[i]?.advanceWidth ?? 0;
   });
 
   return parts.join('\n');

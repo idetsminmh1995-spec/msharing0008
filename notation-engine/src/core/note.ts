@@ -110,6 +110,10 @@ export interface Note {
   readonly explicitNotehead?: string;
   /** The same `<notehead>`'s `smufl` attribute -- MusicXML's `other` value names its shape there instead of in the enumeration. Used as a glyph name directly. */
   readonly explicitNoteheadSmufl?: string;
+  /** MusicXML `<notehead filled="yes|no">`; overrides the duration-based fill variant. */
+  readonly noteheadFilled?: boolean;
+  /** MusicXML `<notehead parentheses="yes">`; rendered with SMuFL left/right wrappers. */
+  readonly noteheadParentheses?: boolean;
   /** Phase 35/§10.4: true if this note is a <grace/> note. */
   readonly isGrace?: boolean;
   /** Phase 35/§10.4: the grace note's slash attribute -- true for an acciaccatura, false for an appoggiatura. Meaningless unless isGrace is true. */
@@ -120,6 +124,10 @@ export interface Note {
   readonly hasExplicitAccidental?: boolean;
   /** MusicXML <accidental smufl="..."> glyph, or its exact accidental-value mapping. */
   readonly accidentalGlyphName?: string;
+  /** MusicXML `<accidental parentheses="yes">` wrapper request. */
+  readonly accidentalParentheses?: boolean;
+  /** MusicXML `<accidental bracket="yes">` wrapper request. */
+  readonly accidentalBracket?: boolean;
   /** Integration C: which string a tablature note is played on (1 = highest-pitched string, drawn on the TOP line). */
   readonly stringNumber?: number;
   /** Integration C: which fret, 0 meaning an open string. */
@@ -159,12 +167,16 @@ export interface NoteInit {
   tieStop?: boolean;
   explicitNotehead?: string;
   explicitNoteheadSmufl?: string;
+  noteheadFilled?: boolean;
+  noteheadParentheses?: boolean;
   instrumentId?: string;
   isGrace?: boolean;
   graceSlash?: boolean;
   explicitStemDirection?: 'up' | 'down';
   hasExplicitAccidental?: boolean;
   accidentalGlyphName?: string;
+  accidentalParentheses?: boolean;
+  accidentalBracket?: boolean;
   stringNumber?: number;
   fret?: number;
   fingering?: number;

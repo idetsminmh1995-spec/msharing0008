@@ -1,4 +1,5 @@
-import { childrenNamed, firstChildNamed, intOf } from './dom-helpers.js';
+import { diagnostic, type Diagnostic, type DiagnosticLocation } from './diagnostic.js';
+import { childrenNamed, firstChildNamed, textOf } from './dom-helpers.js';
 
 /**
  * Parses one `<score-part>`'s `<midi-instrument>` children into a map from
@@ -9,13 +10,32 @@ import { childrenNamed, firstChildNamed, intOf } from './dom-helpers.js';
  * `<midi-unpitched>` is **1-based** while GM note numbers are 0-based --
  * subtract 1. Confirmed by the MusicXML spec itself, not assumed.
  */
-export function parseMidiInstrumentMap(scorePartEl: Element): ReadonlyMap<string, number> {
+export function parseMidiInstrumentMap(
+  scorePartEl: Element,
+  diagnostics?: Diagnostic[],
+  location?: DiagnosticLocation,
+): ReadonlyMap<string, number> {
   const map = new Map<string, number>();
   for (const midiInstrumentEl of childrenNamed(scorePartEl, 'midi-instrument')) {
     const id = midiInstrumentEl.getAttribute('id');
-    const rawUnpitched = intOf(firstChildNamed(midiInstrumentEl, 'midi-unpitched'));
-    if (id !== null && rawUnpitched !== undefined) {
-      map.set(id, rawUnpitched - 1);
+    const midiUnpitchedEl = firstChildNamed(midiInstrumentEl, 'midi-unpitched');
+    if (midiUnpitchedEl === undefined) continue;
+    const rawUnpitched = textOf(midiUnpitchedEl);
+    const value =
+      rawUnpitched !== undefined && /^\d+$/.test(rawUnpitched) ? Number(rawUnpitched) : undefined;
+    if (value === undefined || !Number.isSafeInteger(value) || value < 1 || value > 128) {
+      diagnostics?.push(
+        diagnostic(
+          'warning',
+          'INVALID_MIDI_UNPITCHED',
+          `Invalid <midi-unpitched> "${rawUnpitched ?? ''}"; expected an integer from 1 to 128, so this instrument has no GM mapping.`,
+          location,
+        ),
+      );
+      continue;
+    }
+    if (id !== null) {
+      map.set(id, value - 1);
     }
   }
   return map;

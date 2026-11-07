@@ -18,10 +18,17 @@ export interface RenderMetronomeMarkOptions {
   readonly noteToEqualsGap: number;
 }
 
-/** One glyph's own width, from its bounding box -- Bravura's metadata carries no advance widths, so this is as close as a glyph's advance gets here. Fine for the metNote family, whose ink runs the full width of the glyph from x=0. */
-function glyphWidth(glyphName: string): number {
-  const bbox = getGlyph(glyphName)?.bBox;
-  return bbox !== undefined ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
+/** Bravura's published font advance; ink bounds are not used as cursor movement. */
+function glyphAdvanceWidth(glyphName: string): number {
+  const glyph = getGlyph(glyphName);
+  if (glyph === undefined)
+    throw new Error(`No glyph found for metronome mark component "${glyphName}"`);
+  if (glyph.advanceWidth === undefined) {
+    throw new Error(
+      `No Bravura advance width is available for metronome mark component "${glyphName}"`,
+    );
+  }
+  return glyph.advanceWidth;
 }
 
 /**
@@ -56,8 +63,8 @@ export function metronomeMarkWidth(
   fontSize: number,
   noteToEqualsGap: number,
 ): number {
-  let width = glyphWidth(noteGlyphName);
-  if (dotGlyphName !== undefined) width += DOT_GAP + glyphWidth(dotGlyphName);
+  let width = glyphAdvanceWidth(noteGlyphName);
+  if (dotGlyphName !== undefined) width += DOT_GAP + glyphAdvanceWidth(dotGlyphName);
   width += noteToEqualsGap;
   width += estimateTextWidth(metronomeTempoText(beatsPerMinute), fontSize);
   return width;
@@ -84,12 +91,12 @@ export function renderMetronomeMark(
   let cursorX = options.x;
 
   parts.push(drawGlyph(noteGlyphName, cursorX, options));
-  cursorX += glyphWidth(noteGlyphName);
+  cursorX += glyphAdvanceWidth(noteGlyphName);
 
   if (dotGlyphName !== undefined) {
     cursorX += DOT_GAP;
     parts.push(drawGlyph(dotGlyphName, cursorX, options));
-    cursorX += glyphWidth(dotGlyphName);
+    cursorX += glyphAdvanceWidth(dotGlyphName);
   }
 
   cursorX += options.noteToEqualsGap;

@@ -353,9 +353,80 @@ function attackWidth(dots: number): number {
  * folding it into the width put that room after the note that needed
  * it instead of before.
  */
-function attackLeading(accidentalGlyph: string | undefined): number {
-  if (accidentalGlyph === undefined) return 0;
-  return glyphWidthOf(accidentalGlyph) + ACCIDENTAL_NOTE_DISTANCE;
+interface AccidentalRunMetrics {
+  readonly left: number;
+  readonly right: number;
+  readonly centerGlyphOffset: number;
+  readonly rightGlyphOffset: number;
+  readonly leftWrapper?: string;
+  readonly rightWrapper?: string;
+}
+
+function glyphInkBoundsX(glyphName: string): { readonly left: number; readonly right: number } {
+  const box = getGlyph(glyphName)?.bBox;
+  return box === undefined ? { left: 0, right: 0 } : { left: box.bBoxSW[0], right: box.bBoxNE[0] };
+}
+
+/** Compose accidental and optional wrapper ink using each glyph's real x-bearing. */
+function accidentalRunMetrics(
+  glyphName: string,
+  parentheses = false,
+  bracket = false,
+): AccidentalRunMetrics {
+  const leftWrapper = parentheses
+    ? 'accidentalParensLeft'
+    : bracket
+      ? 'accidentalBracketLeft'
+      : undefined;
+  if (leftWrapper === undefined) {
+    const bounds = glyphInkBoundsX(glyphName);
+    return { ...bounds, centerGlyphOffset: 0, rightGlyphOffset: 0 };
+  }
+
+  const rightWrapper = parentheses ? 'accidentalParensRight' : 'accidentalBracketRight';
+  const gap = 0.06;
+  const leftBounds = glyphInkBoundsX(leftWrapper);
+  const accidentalBounds = glyphInkBoundsX(glyphName);
+  const rightBounds = glyphInkBoundsX(rightWrapper);
+  const centerGlyphOffset = leftBounds.right + gap - accidentalBounds.left;
+  const rightGlyphOffset = centerGlyphOffset + accidentalBounds.right + gap - rightBounds.left;
+  return {
+    left: Math.min(
+      leftBounds.left,
+      centerGlyphOffset + accidentalBounds.left,
+      rightGlyphOffset + rightBounds.left,
+    ),
+    right: Math.max(
+      leftBounds.right,
+      centerGlyphOffset + accidentalBounds.right,
+      rightGlyphOffset + rightBounds.right,
+    ),
+    centerGlyphOffset,
+    rightGlyphOffset,
+    leftWrapper,
+    rightWrapper,
+  };
+}
+
+function accidentalDrawingWidth(glyphName: string, parentheses = false, bracket = false): number {
+  const metrics = accidentalRunMetrics(glyphName, parentheses, bracket);
+  return metrics.right - metrics.left;
+}
+
+function accidentalGroupOriginX(
+  noteX: number,
+  glyphName: string,
+  column: number,
+  parentheses = false,
+  bracket = false,
+): number {
+  const metrics = accidentalRunMetrics(glyphName, parentheses, bracket);
+  return accidentalX(noteX, metrics.right - metrics.left, column) - metrics.left;
+}
+
+function attackLeading(accidentalWidth: number | undefined): number {
+  if (accidentalWidth === undefined) return 0;
+  return accidentalWidth + ACCIDENTAL_NOTE_DISTANCE;
 }
 /** Trailing room after a measure's last event, so it isn't flush against the barline. */
 const MEASURE_TRAILING_MARGIN = 2.0;
@@ -529,30 +600,13 @@ const HAIRPIN_THICKNESS_FALLBACK = 0.16;
  * wiring accepts the small inaccuracy rather than re-deriving clefs per
  * measure just for this estimate.
  */
-/**
- * One note's staff position from its pitch OR its unpitched display
- * position -- the two are the same kind of answer (§4.3's invariant: no
- * code path branches on "is this a drum"), and every caller must treat
- * them identically.
- *
- * Extracted because `worstCaseStaffExtent` below handled unpitched notes
- * in its single-note branch but silently SKIPPED them in its chord
- * branch. A drum chart legitimately writes kick+hi-hat as one chord, so
- * on a multi-staff percussion part every chord contributed nothing to
- * §15's staff-distance estimate, understating the gap the staves need.
- */
-function staffPositionOfNote(note: Note, clefDef: ClefDefinition): number {
-  const p = note.pitch;
-  return p.kind === 'pitched'
-    ? staffPositionForPitch(clefDef, p.step, p.octave)
-    : staffPositionForPitch(clefDef, p.displayStep, p.displayOctave);
-}
-
 function worstCaseStaffExtent(
   part: { readonly id: string; readonly measures: readonly Measure[] },
   staffNumber: number,
   allAttributes: readonly MeasureAttributes[],
   side: 'north' | 'south',
+  theme: RenderTheme,
+  midiInstrumentsByPart: ReadonlyMap<string, number> | undefined,
 ): number {
   const firstAttrs = allAttributes.find((a) => a.partId === part.id);
   const clefSpec = firstAttrs?.clefsByStaff[staffNumber];
@@ -578,10 +632,24 @@ function worstCaseStaffExtent(
       for (const event of voice.events) {
         if ((event.staff ?? 1) !== staffNumber) continue;
         if (event.kind === 'note') {
-          consider(staffPositionOfNote(event, clefDef));
+          consider(
+            resolveNoteRendering(event, {
+              clefDef,
+              measureBottomY: 0,
+              theme,
+              midiInstrumentsByPart,
+            }).position,
+          );
         } else if (event.kind === 'chord') {
           for (const n of event.notes) {
-            consider(staffPositionOfNote(n, clefDef));
+            consider(
+              resolveNoteRendering(n, {
+                clefDef,
+                measureBottomY: 0,
+                theme,
+                midiInstrumentsByPart,
+              }).position,
+            );
           }
         }
       }
@@ -625,8 +693,8 @@ function drawnAccidentalTicks(
     readonly fifths: number;
     readonly isPitched: (staffNumber: number) => boolean;
   }[],
-): ReadonlyMap<number, string> {
-  const drawn = new Map<number, string>();
+): ReadonlyMap<number, number> {
+  const drawn = new Map<number, number>();
   for (const part of parts) {
     const staffNumbers = new Set<number>();
     for (const voice of part.measure.voices) {
@@ -656,9 +724,14 @@ function drawnAccidentalTicks(
             // A chord's widest accidental is the one the attack has to
             // make room for. Use the actual source-selected glyph width:
             // Turkish/Persian and microtonal signs are not interchangeable.
+            const width = accidentalDrawingWidth(
+              glyphName,
+              note.accidentalParentheses === true,
+              note.accidentalBracket === true,
+            );
             const previous = drawn.get(tick);
-            if (previous === undefined || glyphWidthOf(glyphName) > glyphWidthOf(previous)) {
-              drawn.set(tick, glyphName);
+            if (previous === undefined || width > previous) {
+              drawn.set(tick, width);
             }
           }
         });
@@ -700,7 +773,7 @@ function computeMeasureLayout(
    * from `drawnAccidentalTicks`, which runs the renderer's own
    * accidental state machine rather than reading each note's `alter`.
    */
-  accidentals: ReadonlyMap<number, string>,
+  accidentals: ReadonlyMap<number, number>,
 ): {
   readonly width: number;
   readonly positionsByTick: ReadonlyMap<number, number>;
@@ -980,6 +1053,89 @@ function glyphWidthOf(glyphName: string): number {
   return bbox !== undefined ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
 }
 
+/** Draw a notehead together with the SMuFL left/right notehead-parenthesis glyph pair. */
+function renderNoteheadWithParentheses(
+  glyphName: string,
+  x: number,
+  y: number,
+  options: { readonly color: string; readonly fontFamily: string; readonly parentheses: boolean },
+): string {
+  if (!options.parentheses) {
+    return renderNotehead(glyphName, {
+      x,
+      y,
+      color: options.color,
+      fontFamily: options.fontFamily,
+    });
+  }
+  const headBox = getGlyph(glyphName)?.bBox;
+  const leftBox = getGlyph('noteheadParenthesisLeft')?.bBox;
+  const rightBox = getGlyph('noteheadParenthesisRight')?.bBox;
+  const gap = 0.04;
+  const headLeft = x + (headBox?.bBoxSW[0] ?? 0);
+  const headRight = x + (headBox?.bBoxNE[0] ?? glyphWidthOf(glyphName));
+  const leftX = headLeft - (leftBox?.bBoxNE[0] ?? glyphWidthOf('noteheadParenthesisLeft')) - gap;
+  const rightX = headRight + gap - (rightBox?.bBoxSW[0] ?? 0);
+  return [
+    renderNotehead('noteheadParenthesisLeft', {
+      x: leftX,
+      y,
+      color: options.color,
+      fontFamily: options.fontFamily,
+    }),
+    renderNotehead('noteheadParenthesisRight', {
+      x: rightX,
+      y,
+      color: options.color,
+      fontFamily: options.fontFamily,
+    }),
+    renderNotehead(glyphName, { x, y, color: options.color, fontFamily: options.fontFamily }),
+  ].join('\n');
+}
+
+/** Draw an accidental, with optional SMuFL parentheses or square-bracket glyphs. */
+function renderAccidentalWithWrapper(
+  glyphName: string,
+  x: number,
+  y: number,
+  options: {
+    readonly color: string;
+    readonly fontFamily: string;
+    readonly parentheses: boolean;
+    readonly bracket: boolean;
+  },
+): string {
+  const metrics = accidentalRunMetrics(glyphName, options.parentheses, options.bracket);
+  if (metrics.leftWrapper === undefined || metrics.rightWrapper === undefined) {
+    return renderAccidental(glyphName, {
+      x,
+      y,
+      color: options.color,
+      fontFamily: options.fontFamily,
+    });
+  }
+  return [
+    renderAccidental(metrics.leftWrapper, {
+      x,
+      y,
+      color: options.color,
+      fontFamily: options.fontFamily,
+    }),
+    renderAccidental(glyphName, {
+      x: x + metrics.centerGlyphOffset,
+      y,
+      color: options.color,
+      fontFamily: options.fontFamily,
+    }),
+    renderAccidental(metrics.rightWrapper, {
+      x: x + metrics.rightGlyphOffset,
+      y,
+      color: options.color,
+      fontFamily: options.fontFamily,
+    }),
+  ].join('\n');
+}
+
 /**
  * Integration H: draws a note's §9.19 articulations and §9.20 ornaments.
  *
@@ -1174,6 +1330,7 @@ function resolveNoteRendering(
   const noteheadGlyph = selectNoteheadGlyphName({
     pitch: note.pitch,
     durationType: note.duration.type,
+    ...(note.noteheadFilled !== undefined ? { filled: note.noteheadFilled } : {}),
     defaultShape: ctx.theme.noteheadMapping.defaultShape,
     ...(note.explicitNotehead !== undefined ? { explicitNotehead: note.explicitNotehead } : {}),
     ...(note.explicitNoteheadSmufl !== undefined
@@ -1267,24 +1424,33 @@ function renderNoteheadPart(
     state = decision.newState;
     const glyphName = tryAccidentalGlyphName(note.pitch.alter, note.accidentalGlyphName);
     if (decision.shouldDraw && glyphName !== undefined) {
-      const width = glyphWidthOf(glyphName);
       parts.push(
-        renderAccidental(glyphName, {
-          x: accidentalX(x, width, 0),
+        renderAccidentalWithWrapper(
+          glyphName,
+          accidentalGroupOriginX(
+            x,
+            glyphName,
+            0,
+            note.accidentalParentheses === true,
+            note.accidentalBracket === true,
+          ),
           y,
-          color: ctx.theme.colorOf('accidental'),
-          fontFamily: ctx.theme.musicFont,
-        }),
+          {
+            color: ctx.theme.colorOf('accidental'),
+            fontFamily: ctx.theme.musicFont,
+            parentheses: note.accidentalParentheses === true,
+            bracket: note.accidentalBracket === true,
+          },
+        ),
       );
     }
   }
 
   parts.push(
-    renderNotehead(noteheadGlyph, {
-      x,
-      y,
+    renderNoteheadWithParentheses(noteheadGlyph, x, y, {
       color: ctx.theme.colorOf('notehead'),
       fontFamily: ctx.theme.musicFont,
+      parentheses: note.noteheadParentheses === true,
     }),
   );
 
@@ -1339,7 +1505,10 @@ function renderNoteOrRest(
   tieAnchor?: { direction: StemDirection; position: number; noteheadGlyph: string };
 } {
   if (ev.kind === 'rest') {
-    const restPosition = restY(ev.duration.type, STAFF_LINES, restOffset);
+    const restPosition =
+      ev.displayStep !== undefined && ev.displayOctave !== undefined && ctx.clefDef.positionsByPitch
+        ? staffPositionForPitch(ctx.clefDef, ev.displayStep, ev.displayOctave) + restOffset
+        : restY(ev.duration.type, STAFF_LINES, restOffset);
     const y = ctx.measureBottomY + restPosition;
     const restGlyph = restGlyphName(ev.duration.type);
     const svg = [
@@ -1390,14 +1559,20 @@ function renderNoteOrRest(
       state = decision.newState;
       const glyphName = tryAccidentalGlyphName(ev.pitch.alter, ev.accidentalGlyphName);
       if (decision.shouldDraw && glyphName !== undefined) {
-        const width = glyphWidthOf(glyphName);
+        const parentheses = ev.accidentalParentheses === true;
+        const bracket = ev.accidentalBracket === true;
         parts.push(
-          renderAccidental(glyphName, {
-            x: accidentalX(x, width, 0),
-            y: graceY,
-            color: ctx.theme.colorOf('accidental'),
-            fontFamily: ctx.theme.musicFont,
-          }),
+          renderAccidentalWithWrapper(
+            glyphName,
+            accidentalGroupOriginX(x, glyphName, 0, parentheses, bracket),
+            graceY,
+            {
+              color: ctx.theme.colorOf('accidental'),
+              fontFamily: ctx.theme.musicFont,
+              parentheses,
+              bracket,
+            },
+          ),
         );
       }
     }
@@ -1767,14 +1942,22 @@ function renderChordHeadsPart(
     if (placement === undefined) return;
     const glyphName = accidentalGlyphs[i];
     if (glyphName === undefined) return;
-    const width = glyphWidthOf(glyphName);
+    const member = chord.notes[i];
+    if (member === undefined) return;
+    const parentheses = member.accidentalParentheses === true;
+    const bracket = member.accidentalBracket === true;
     parts.push(
-      renderAccidental(glyphName, {
-        x: accidentalX(x, width, placement.column),
-        y: ctx.measureBottomY + placement.y,
-        color: ctx.theme.colorOf('accidental'),
-        fontFamily: ctx.theme.musicFont,
-      }),
+      renderAccidentalWithWrapper(
+        glyphName,
+        accidentalGroupOriginX(x, glyphName, placement.column, parentheses, bracket),
+        ctx.measureBottomY + placement.y,
+        {
+          color: ctx.theme.colorOf('accidental'),
+          fontFamily: ctx.theme.musicFont,
+          parentheses,
+          bracket,
+        },
+      ),
     );
   });
 
@@ -1788,12 +1971,12 @@ function renderChordHeadsPart(
     }
     const position = positions[i] ?? 0;
     const y = ctx.measureBottomY + position;
+    const note = chord.notes[i];
     parts.push(
-      renderNotehead(glyphName, {
-        x,
-        y,
+      renderNoteheadWithParentheses(glyphName, x, y, {
         color: ctx.theme.colorOf('notehead'),
         fontFamily: ctx.theme.musicFont,
+        parentheses: note?.noteheadParentheses === true,
       }),
     );
     const ledgerLines = computeLedgerLines(position, STAFF_LINES);
@@ -1976,7 +2159,12 @@ function computeRestClearanceOffsets(
       if ((event.staff ?? 1) !== staffNumber) return;
       const tick = starts[idx] ?? 0;
       if (event.kind === 'rest') {
-        const y = restY(event.duration.type, STAFF_LINES, base);
+        const y =
+          event.displayStep !== undefined &&
+          event.displayOctave !== undefined &&
+          ctx.clefDef.positionsByPitch
+            ? staffPositionForPitch(ctx.clefDef, event.displayStep, event.displayOctave) + base
+            : restY(event.duration.type, STAFF_LINES, base);
         const { top, bottom } = glyphExtent(restGlyphName(event.duration.type), y);
         extents.push({
           voiceId: voice.id,
@@ -2369,6 +2557,32 @@ export function renderParsedMusicXml(
   // Phase 50/§8: one resolution of every user-facing drawing value, passed
   // down on RenderCtx. Everything below reads `theme`, never a constant.
   const theme = buildTheme(config, fileDefaults);
+  // Collect lookup warnings once per score event instead of in the shared
+  // resolver, which is called by layout and drawing. This also gives each
+  // warning its source measure even when layout performs the first lookup.
+  for (const part of score.parts) {
+    const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part.id);
+    for (const measure of part.measures) {
+      for (const voice of measure.voices) {
+        for (const event of voice.events) {
+          const notes = event.kind === 'note' ? [event] : event.kind === 'chord' ? event.notes : [];
+          for (const note of notes) {
+            if (note.pitch.kind !== 'unpitched' || note.instrumentId === undefined) continue;
+            const gmNote = midiInstrumentsByPart?.get(note.instrumentId);
+            if (gmNote === undefined) continue;
+            for (const d of lookupDrumMapEntry(gmNote, theme.drumMap).diagnostics) {
+              diagnostics.push({
+                severity: d.severity,
+                code: d.code,
+                message: d.message,
+                location: { partId: part.id, measureNumber: measure.number },
+              });
+            }
+          }
+        }
+      }
+    }
+  }
   /** Phase 51/§18.3: the absolute y of every staff bottom line drawn, for the skyline overlay. */
   const staffBottomYs = new Set<number>();
   /** Whether this render has already said that a tab mask cannot work on a transparent background. */
@@ -2909,8 +3123,23 @@ export function renderParsedMusicXml(
     if (part === undefined) return 8;
     const upperStaffNumber = staffIndexInPart + 1;
     const lowerStaffNumber = staffIndexInPart + 2;
-    const upperExtent = worstCaseStaffExtent(part, upperStaffNumber, attributes, 'south');
-    const lowerExtent = worstCaseStaffExtent(part, lowerStaffNumber, attributes, 'north');
+    const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part.id);
+    const upperExtent = worstCaseStaffExtent(
+      part,
+      upperStaffNumber,
+      attributes,
+      'south',
+      theme,
+      midiInstrumentsByPart,
+    );
+    const lowerExtent = worstCaseStaffExtent(
+      part,
+      lowerStaffNumber,
+      attributes,
+      'north',
+      theme,
+      midiInstrumentsByPart,
+    );
     const upperSouth = addToSkyline(emptySkyline('south'), { xStart: 0, xEnd: 1, y: upperExtent });
     const lowerNorth = addToSkyline(emptySkyline('north'), { xStart: 0, xEnd: 1, y: lowerExtent });
     // §15.1's distance is a CLEARANCE: from the upper staff's bottom line

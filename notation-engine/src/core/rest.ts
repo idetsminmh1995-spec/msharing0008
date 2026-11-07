@@ -1,5 +1,6 @@
 import type { Duration } from './duration.js';
 import type { VoiceId } from './note.js';
+import type { PitchStep } from './pitch.js';
 
 /** A silence -- has a Duration and a Voice, but no Pitch at all (not even an unpitched display position). */
 export interface Rest {
@@ -7,6 +8,10 @@ export interface Rest {
   readonly duration: Duration;
   readonly voice: VoiceId;
   readonly staff?: number;
+  /** MusicXML `<rest><display-step>` paired with displayOctave when explicitly positioned. */
+  readonly displayStep?: PitchStep;
+  /** MusicXML `<rest><display-octave>` paired with displayStep when explicitly positioned. */
+  readonly displayOctave?: number;
   /**
    * Where this event starts within its measure, in ticks.
    *
@@ -33,6 +38,8 @@ export interface RestInit {
   duration: Duration;
   voice: VoiceId;
   staff?: number;
+  displayStep?: PitchStep;
+  displayOctave?: number;
   hasFermata?: boolean;
 }
 

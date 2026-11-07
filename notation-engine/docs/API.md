@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-626 exported symbols, by module.
+627 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -817,6 +817,7 @@ The diagnostics `level` lets through, in their original order.
 | | Name | Summary |
 |---|---|---|
 | function | `isKnownMusicXmlNotehead` | Whether `value` is a `<notehead>` value MusicXML actually defines -- what separates "the file asked for the ordinary head" from "the file said something we have never heard of". |
+| function | `isKnownSmuflNoteheadGlyphName` | True only for bundled glyphs in SMuFL's notehead blocks, not a clef or a parenthesis wrapper. |
 | function | `supportedMusicXmlNoteheads` | Every `<notehead>` value this engine understands, for a diagnostic's own message. |
 | function | `shapeGlyphNameOrUndefined` | The duration-appropriate glyph name for a shape family (e.g. 'x' + a quarter note -> 'noteheadXBlack'), or `undefined` for a family this engine has no glyphs for. |
 | function | `shapeGlyphName` | The same lookup, throwing on an unknown family. |
@@ -918,8 +919,8 @@ The diagnostics `level` lets through, in their original order.
 | function | `denominatorText` | The exact text to render for the denominator -- always the plain number (additive/irregular display only ever applies to the numerator). |
 | function | `glyphNameForTimeSigChar` | Maps a single character ('0'-'9' or '+') from a time-signature display string to its SMuFL glyph name. |
 | function | `glyphForTimeSigChar` | Looks up the glyph for one time-signature character, throwing if it isn't a real SMuFL glyph. |
-| function | `charAdvance` | Advance width (staff-space units) of one time-signature character, from its real glyph bounding box. |
-| function | `textWidth` | Total width (staff-space units) a display string (e.g. "12", "3+2+2") would take, using each character's real glyph bounding-box width. |
+| function | `charAdvance` | Bravura advance width (staff-space units) of one time-signature character. |
+| function | `textWidth` | Total width (staff-space units) a display string (e.g. "12", "3+2+2") would take, using each character's real Bravura advance width. |
 
 ### `src/geometry/tuplet.ts`
 
@@ -956,12 +957,12 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | interface | `GlyphBBox` | A glyph's bounding box, in staff-space units relative to its origin. |
 | type | `GlyphAnchors` | A named anchor point on a glyph -- e.g. a notehead's `stemUpSE` anchor is where an upward stem should attach. |
-| interface | `GlyphInfo` | Everything the engine knows about one glyph: its SMuFL name and codepoint (font-independent) plus whatever Bravura-specific bounding-box and anchor data exists for it (font-specific -- a different SMuFL font would supply different bBox/anchors for the same name+codepoint). |
+| interface | `GlyphInfo` | Everything the engine knows about one glyph: its SMuFL name and codepoint (font-independent) plus any Bravura-specific advance-width, bounding-box and anchor data (font-specific -- a different SMuFL font would supply different metrics for the same name+codepoint). |
 | function | `codepointToChar` | "U+E0A4" -> the actual JS string character at that codepoint. |
 | function | `getGlyph` | Looks up one glyph by its SMuFL name (e.g. "noteheadBlack", "gClef", "accidentalSharp"). |
 | function | `getEngravingDefault` | One Bravura-specific engraving-default metric (e.g. "stemThickness", "beamThickness", "staffLineThickness") in staff-space units. |
 | function | `getEngravingDefaults` | The full engraving-defaults table, for callers that want to enumerate every metric. |
-| function | `getFontInfo` | Which font this metadata actually describes -- e.g. "Bravura 1.38". |
+| function | `getFontInfo` | Which font this metadata actually describes -- e.g. "Bravura 1.482". |
 | function | `getGlyphByChar` |  |
 
 ### `src/layout/naive.ts`

@@ -2,18 +2,11 @@
 
 `Bravura.woff2` is the reference SMuFL music font, by Steinberg.
 
-- **Source:** https://github.com/steinbergmedia/bravura, tag
-  `bravura-1.380`, file `redist/woff/Bravura.woff2`
-- **License:** SIL Open Font License 1.1 (see that repository's
-  `LICENSE.txt`)
+- **Source:** Bravura 1.482, tag `bravura-1.482`,
+  <https://raw.githubusercontent.com/steinbergmedia/bravura/bravura-1.482/redist/woff/Bravura.woff2>
+- **License:** SIL Open Font License 1.1, as stated in the release-tagged
+  <https://github.com/steinbergmedia/bravura/blob/bravura-1.482/LICENSE.txt>.
 
-**Why it is committed here rather than downloaded at build time:** the
-drum-video web app is served as static files from GitHub Pages, which has
-no build step. The Notation Engine emits `font-family="Bravura"` in its
-SVG output (the glyph metrics in
-`src/glyphs/data/bravura_metadata.json` are Bravura's own), so without
-this file in the repo every notehead, clef, rest and accidental renders
-as a blank box in the browser.
-
-The version here must stay in sync with the metadata JSON's version —
-both currently come from tag `bravura-1.380`.
+The matching Bravura-specific metadata is
+`src/glyphs/data/bravura_metadata.json` from the same tag. Keep this font in
+sync with that metadata and with `website/assets/fonts/Bravura.woff2`.

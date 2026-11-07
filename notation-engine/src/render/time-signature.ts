@@ -9,7 +9,7 @@ import {
 import { getGlyph } from '../glyphs/glyph-table.js';
 import { svgGlyphText } from './svg-primitives.js';
 
-/** Draws a display string's characters left to right, each immediately after the previous one's real width, starting at `x`. Returns the markup only -- see textWidth() to know how much horizontal space it used. */
+/** Draws a display string left to right using each glyph's Bravura advance width. Returns markup only -- see textWidth() for total horizontal advance. */
 function renderDigitString(
   text: string,
   x: number,

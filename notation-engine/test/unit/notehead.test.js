@@ -18,13 +18,77 @@ describe('notehead selection (Phase 15)', () => {
     const g = NE.selectNoteheadGlyphName({ pitch, durationType: 'quarter', explicitNotehead: 'x' });
     assert.equal(g, 'noteheadXBlack');
     // and it respects duration fill too, not just the shape:
-    const gWhole = NE.selectNoteheadGlyphName({ pitch, durationType: 'whole', explicitNotehead: 'x' });
+    const gWhole = NE.selectNoteheadGlyphName({
+      pitch,
+      durationType: 'whole',
+      explicitNotehead: 'x',
+    });
     assert.equal(gWhole, 'noteheadXWhole');
   });
 
-  test("explicit XML <notehead>normal</notehead> is NOT an override -- falls through to duration default", () => {
+  test('MusicXML filled=yes/no overrides duration-based notehead fill', () => {
     const pitch = NE.pitchedPitch('C', 0, 4);
-    const g = NE.selectNoteheadGlyphName({ pitch, durationType: 'quarter', explicitNotehead: 'normal' });
+    assert.equal(
+      NE.selectNoteheadGlyphName({
+        pitch,
+        durationType: 'quarter',
+        explicitNotehead: 'x',
+        filled: false,
+      }),
+      'noteheadXHalf',
+    );
+    assert.equal(
+      NE.selectNoteheadGlyphName({
+        pitch,
+        durationType: 'whole',
+        explicitNotehead: 'x',
+        filled: true,
+      }),
+      'noteheadXBlack',
+    );
+    // `normal` is still a shape fallback, but its explicit fill directive
+    // must survive that fallback instead of being lost with the value.
+    assert.equal(
+      NE.selectNoteheadGlyphName({
+        pitch,
+        durationType: 'half',
+        explicitNotehead: 'normal',
+        filled: true,
+      }),
+      'noteheadBlack',
+    );
+  });
+
+  test('SMuFL notehead overrides stay inside the official notehead blocks', () => {
+    const pitch = NE.pitchedPitch('C', 0, 4);
+    assert.equal(NE.isKnownSmuflNoteheadGlyphName('noteheadHeavyXHat'), true);
+    assert.equal(NE.isKnownSmuflNoteheadGlyphName('gClef'), false);
+    assert.equal(NE.isKnownSmuflNoteheadGlyphName('noteheadParenthesisLeft'), false);
+    assert.equal(
+      NE.selectNoteheadGlyphName({
+        pitch,
+        durationType: 'quarter',
+        explicitNoteheadSmufl: 'noteheadHeavyXHat',
+      }),
+      'noteheadHeavyXHat',
+    );
+    assert.equal(
+      NE.selectNoteheadGlyphName({
+        pitch,
+        durationType: 'quarter',
+        explicitNoteheadSmufl: 'gClef',
+      }),
+      'noteheadBlack',
+    );
+  });
+
+  test('explicit XML <notehead>normal</notehead> is NOT an override -- falls through to duration default', () => {
+    const pitch = NE.pitchedPitch('C', 0, 4);
+    const g = NE.selectNoteheadGlyphName({
+      pitch,
+      durationType: 'quarter',
+      explicitNotehead: 'normal',
+    });
     assert.equal(g, 'noteheadBlack');
   });
 

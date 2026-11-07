@@ -9,10 +9,10 @@
      from (notation-engine/src/glyphs/data/bravura_metadata.json). The engine
      emits font-family="Bravura", so without this the noteheads, clefs, rests
      and accidentals all render as blank boxes. SIL Open Font License 1.1,
-     from steinbergmedia/bravura (tag bravura-1.380). */
+     pinned release: steinbergmedia/bravura tag bravura-1.482. */
   @font-face {
     font-family: 'Bravura';
-    src: url('../notation-engine/dist/fonts/Bravura.woff2?v=1') format('woff2');
+    src: url('../notation-engine/dist/fonts/Bravura.woff2?v=1.482') format('woff2');
     font-display: block;
   }
   :root {
@@ -791,7 +791,7 @@
   async function getBravuraFontDataUrl() {
     if (!bravuraFontDataUrlPromise) {
       bravuraFontDataUrlPromise = (async () => {
-        const fontUrl = new URL('../notation-engine/dist/fonts/Bravura.woff2', document.baseURI);
+        const fontUrl = new URL('../notation-engine/dist/fonts/Bravura.woff2?v=1.482', document.baseURI);
         const response = await fetch(fontUrl);
         if (!response.ok) throw new Error(`Could not load the Bravura music font (${response.status}).`);
         const bytes = new Uint8Array(await response.arrayBuffer());

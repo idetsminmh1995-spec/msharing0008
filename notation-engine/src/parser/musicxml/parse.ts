@@ -258,6 +258,8 @@ function buildSingle(ev: ParsedNoteEvent): Note | Rest {
       duration: buildDuration(ev),
       voice: ev.voice,
       ...(ev.staff !== undefined ? { staff: ev.staff } : {}),
+      ...(ev.restDisplayStep !== undefined ? { displayStep: ev.restDisplayStep } : {}),
+      ...(ev.restDisplayOctave !== undefined ? { displayOctave: ev.restDisplayOctave } : {}),
       // A rest can carry a fermata exactly as a note can (§10.4).
       ...(ev.notations.hasFermata ? { hasFermata: true } : {}),
     });
@@ -279,6 +281,10 @@ function buildSingle(ev: ParsedNoteEvent): Note | Rest {
     ...(ev.explicitNoteheadSmufl !== undefined
       ? { explicitNoteheadSmufl: ev.explicitNoteheadSmufl }
       : {}),
+    ...(ev.noteheadFilled !== undefined ? { noteheadFilled: ev.noteheadFilled } : {}),
+    ...(ev.noteheadParentheses !== undefined
+      ? { noteheadParentheses: ev.noteheadParentheses }
+      : {}),
     ...(ev.hasExplicitDisplayPosition === true ? { hasExplicitDisplayPosition: true } : {}),
     ...(ev.instrumentId !== undefined ? { instrumentId: ev.instrumentId } : {}),
     ...(ev.stringNumber !== undefined ? { stringNumber: ev.stringNumber } : {}),
@@ -294,6 +300,10 @@ function buildSingle(ev: ParsedNoteEvent): Note | Rest {
     ...(ev.accidentalGlyphName !== undefined
       ? { accidentalGlyphName: ev.accidentalGlyphName }
       : {}),
+    ...(ev.accidentalParentheses !== undefined
+      ? { accidentalParentheses: ev.accidentalParentheses }
+      : {}),
+    ...(ev.accidentalBracket !== undefined ? { accidentalBracket: ev.accidentalBracket } : {}),
     // Phase 35 Tier 2/§10.4. Every one of these is omitted entirely when
     // empty rather than set to an empty array, so a note from a file
     // with no notations at all produces a byte-identical object to the
@@ -440,7 +450,10 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
       const name = textOf(firstChildNamed(scorePartEl, 'part-name'));
       if (id !== undefined) {
         partNames.set(id, name ?? id);
-        midiInstrumentMaps.set(id, parseMidiInstrumentMap(scorePartEl));
+        midiInstrumentMaps.set(
+          id,
+          parseMidiInstrumentMap(scorePartEl, diagnostics, { partId: id }),
+        );
       }
     }
   }

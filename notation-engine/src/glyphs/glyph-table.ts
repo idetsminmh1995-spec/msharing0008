@@ -1,5 +1,6 @@
 import glyphnamesData from './data/glyphnames.json' with { type: 'json' };
 import bravuraMetadataData from './data/bravura_metadata.json' with { type: 'json' };
+import bravuraFontMetricsData from './data/bravura_font_metrics.json' with { type: 'json' };
 
 /** One entry from the SMuFL spec's font-independent glyphnames.json. */
 interface SmuflGlyphNameEntry {
@@ -24,9 +25,9 @@ export type GlyphAnchors = Readonly<Record<string, readonly [number, number]>>;
 
 /**
  * Everything the engine knows about one glyph: its SMuFL name and
- * codepoint (font-independent) plus whatever Bravura-specific bounding-box
- * and anchor data exists for it (font-specific -- a different SMuFL font
- * would supply different bBox/anchors for the same name+codepoint).
+ * codepoint (font-independent) plus any Bravura-specific advance-width,
+ * bounding-box and anchor data (font-specific -- a different SMuFL font
+ * would supply different metrics for the same name+codepoint).
  */
 export interface GlyphInfo {
   readonly name: string;
@@ -34,6 +35,8 @@ export interface GlyphInfo {
   /** The actual glyph character, ready to use in an SVG <text>/<tspan>. */
   readonly char: string;
   readonly description: string;
+  /** Bravura's horizontal advance in staff spaces; never inferred from bBox. */
+  readonly advanceWidth?: number;
   readonly bBox?: GlyphBBox;
   readonly anchors?: GlyphAnchors;
 }
@@ -42,13 +45,29 @@ const glyphnames = glyphnamesData as unknown as Readonly<Record<string, SmuflGly
 
 interface BravuraMetadataFile {
   readonly fontName: string;
-  readonly fontVersion: string;
+  readonly fontVersion: number;
   readonly engravingDefaults: Readonly<Record<string, number>>;
+  readonly glyphAdvanceWidths: Readonly<Record<string, number>>;
   readonly glyphBBoxes: Readonly<Record<string, GlyphBBox>>;
   readonly glyphsWithAnchors: Readonly<Record<string, GlyphAnchors>>;
 }
 
 const bravuraMetadata = bravuraMetadataData as unknown as BravuraMetadataFile;
+
+interface BravuraFontMetricsFile {
+  readonly fontName: string;
+  readonly fontVersion: number;
+  readonly fontSha256: string;
+  readonly unitsPerEm: number;
+  readonly staffSpaceUnits: number;
+  readonly cmapAdvanceWidths: Readonly<Record<string, number>>;
+}
+
+const bravuraFontMetrics = bravuraFontMetricsData as unknown as BravuraFontMetricsFile;
+
+function hasFontCoverage(codepoint: string): boolean {
+  return Object.prototype.hasOwnProperty.call(bravuraFontMetrics.cmapAdvanceWidths, codepoint);
+}
 
 /** "U+E0A4" -> the actual JS string character at that codepoint. */
 export function codepointToChar(codepoint: string): string {
@@ -59,18 +78,20 @@ export function codepointToChar(codepoint: string): string {
 /**
  * Looks up one glyph by its SMuFL name (e.g. "noteheadBlack",
  * "gClef", "accidentalSharp"). Returns undefined for an unrecognized name
- * rather than throwing -- callers decide whether a missing glyph is fatal.
+ * or a codepoint absent from the bundled Bravura cmap rather than throwing.
  */
 export function getGlyph(name: string): GlyphInfo | undefined {
   const entry = glyphnames[name];
-  if (entry === undefined) return undefined;
+  if (entry === undefined || !hasFontCoverage(entry.codepoint)) return undefined;
   const bBox = bravuraMetadata.glyphBBoxes[name];
   const anchors = bravuraMetadata.glyphsWithAnchors[name];
+  const advanceWidth = bravuraMetadata.glyphAdvanceWidths[name];
   return {
     name,
     codepoint: entry.codepoint,
     char: codepointToChar(entry.codepoint),
     description: entry.description,
+    ...(advanceWidth !== undefined ? { advanceWidth } : {}),
     ...(bBox !== undefined ? { bBox } : {}),
     ...(anchors !== undefined ? { anchors } : {}),
   };
@@ -90,9 +111,9 @@ export function getEngravingDefaults(): Readonly<Record<string, number>> {
   return bravuraMetadata.engravingDefaults;
 }
 
-/** Which font this metadata actually describes -- e.g. "Bravura 1.38". Useful for diagnostics/attribution. */
+/** Which font this metadata actually describes -- e.g. "Bravura 1.482". Useful for diagnostics/attribution. */
 export function getFontInfo(): { readonly name: string; readonly version: string } {
-  return { name: bravuraMetadata.fontName, version: bravuraMetadata.fontVersion };
+  return { name: bravuraMetadata.fontName, version: String(bravuraMetadata.fontVersion) };
 }
 
 /**
@@ -113,6 +134,7 @@ export function getGlyphByChar(char: string): GlyphInfo | undefined {
   if (charIndex === undefined) {
     charIndex = new Map();
     for (const [name, entry] of Object.entries(glyphnames)) {
+      if (!hasFontCoverage(entry.codepoint)) continue;
       const c = codepointToChar(entry.codepoint);
       if (!charIndex.has(c)) charIndex.set(c, name);
     }

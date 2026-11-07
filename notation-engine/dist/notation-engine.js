@@ -169,6 +169,7 @@ var NotationEngine = (() => {
     hasExplicitBeams: () => hasExplicitBeams,
     isKnownAccidentalGlyphName: () => isKnownAccidentalGlyphName,
     isKnownMusicXmlNotehead: () => isKnownMusicXmlNotehead,
+    isKnownSmuflNoteheadGlyphName: () => isKnownSmuflNoteheadGlyphName,
     isPitched: () => isPitched,
     isUnpitched: () => isUnpitched,
     justifySystem: () => justifySystem,
@@ -11899,41 +11900,9 @@ var NotationEngine = (() => {
       codepoint: "U+E889",
       description: "Tuplet 9"
     },
-    tupletBracketLeftItalic: {
-      codepoint: "U+EF14",
-      description: "Opening bracket italic"
-    },
-    tupletBracketLeftRoman: {
-      codepoint: "U+EF16",
-      description: "Opening bracket roman"
-    },
-    tupletBracketRightItalic: {
-      codepoint: "U+EF15",
-      description: "Closing bracket italic"
-    },
-    tupletBracketRightRoman: {
-      codepoint: "U+EF17",
-      description: "Closing bracket roman"
-    },
     tupletColon: {
       codepoint: "U+E88A",
       description: "Tuplet colon"
-    },
-    tupletParenthesisLeftItalic: {
-      codepoint: "U+EF10",
-      description: "Opening parenthesis italic"
-    },
-    tupletParenthesisLeftRoman: {
-      codepoint: "U+EF12",
-      description: "Opening parenthesis roman"
-    },
-    tupletParenthesisRightItalic: {
-      codepoint: "U+EF11",
-      description: "Closing parenthesis italic"
-    },
-    tupletParenthesisRightRoman: {
-      codepoint: "U+EF13",
-      description: "Closing parenthesis roman"
     },
     unmeasuredTremolo: {
       codepoint: "U+E22C",
@@ -12445,8 +12414,6 @@ var NotationEngine = (() => {
 
   // src/glyphs/data/bravura_metadata.json
   var bravura_metadata_default = {
-    fontName: "Bravura",
-    fontVersion: 1.38,
     engravingDefaults: {
       arrowShaftThickness: 0.16,
       barlineSeparation: 0.4,
@@ -12456,6 +12423,7 @@ var NotationEngine = (() => {
       dashedBarlineDashLength: 0.5,
       dashedBarlineGapLength: 0.25,
       dashedBarlineThickness: 0.16,
+      hBarThickness: 1,
       hairpinThickness: 0.16,
       legerLineExtension: 0.4,
       legerLineThickness: 0.16,
@@ -12470,11 +12438,3489 @@ var NotationEngine = (() => {
       stemThickness: 0.12,
       subBracketThickness: 0.16,
       textEnclosureThickness: 0.16,
+      textFontFamily: [
+        "Academico",
+        "Century Schoolbook",
+        "Edwin",
+        "serif"
+      ],
       thickBarlineThickness: 0.5,
       thinBarlineThickness: 0.16,
+      thinThickBarlineSeparation: 0.4,
       tieEndpointThickness: 0.1,
       tieMidpointThickness: 0.22,
       tupletBracketThickness: 0.16
+    },
+    fontName: "Bravura",
+    fontVersion: 1.482,
+    glyphAdvanceWidths: {
+      "4stringTabClef": 1.084,
+      "4stringTabClefSerif": 1.296,
+      "4stringTabClefTall": 1.272,
+      "6stringTabClef": 1.636,
+      "6stringTabClefSerif": 1.948,
+      "6stringTabClefTall": 2.064,
+      accSagittal11LargeDiesisDown: 1.376,
+      accSagittal11LargeDiesisUp: 1.376,
+      accSagittal11MediumDiesisDown: 1.376,
+      accSagittal11MediumDiesisUp: 1.376,
+      accSagittal11v19LargeDiesisDown: 1.248,
+      accSagittal11v19LargeDiesisUp: 1.248,
+      accSagittal11v19MediumDiesisDown: 1.376,
+      accSagittal11v19MediumDiesisUp: 1.376,
+      accSagittal11v49CommaDown: 0.752,
+      accSagittal11v49CommaUp: 0.752,
+      accSagittal143CommaDown: 0.624,
+      accSagittal143CommaUp: 0.624,
+      accSagittal17CommaDown: 1.124,
+      accSagittal17CommaUp: 1.124,
+      accSagittal17KleismaDown: 0.624,
+      accSagittal17KleismaUp: 0.624,
+      accSagittal19CommaDown: 1.124,
+      accSagittal19CommaUp: 1.124,
+      accSagittal19SchismaDown: 0.5,
+      accSagittal19SchismaUp: 0.5,
+      accSagittal1MinaDown: 0.752,
+      accSagittal1MinaUp: 0.752,
+      accSagittal1TinaDown: 0.624,
+      accSagittal1TinaUp: 0.624,
+      accSagittal23CommaDown: 0.752,
+      accSagittal23CommaUp: 0.752,
+      accSagittal23SmallDiesisDown: 1.376,
+      accSagittal23SmallDiesisUp: 1.376,
+      accSagittal25SmallDiesisDown: 1,
+      accSagittal25SmallDiesisUp: 1,
+      accSagittal2MinasDown: 1.124,
+      accSagittal2MinasUp: 1.124,
+      accSagittal2TinasDown: 0.624,
+      accSagittal2TinasUp: 0.624,
+      accSagittal35LargeDiesisDown: 1.5,
+      accSagittal35LargeDiesisUp: 1.5,
+      accSagittal35MediumDiesisDown: 1.124,
+      accSagittal35MediumDiesisUp: 1.124,
+      accSagittal3TinasDown: 0.752,
+      accSagittal3TinasUp: 0.752,
+      accSagittal49LargeDiesisDown: 1.124,
+      accSagittal49LargeDiesisUp: 1.124,
+      accSagittal49MediumDiesisDown: 1,
+      accSagittal49MediumDiesisUp: 1,
+      accSagittal49SmallDiesisDown: 1.124,
+      accSagittal49SmallDiesisUp: 1.124,
+      accSagittal4TinasDown: 1,
+      accSagittal4TinasUp: 1,
+      accSagittal55CommaDown: 0.876,
+      accSagittal55CommaUp: 0.876,
+      accSagittal5CommaDown: 0.624,
+      accSagittal5CommaUp: 0.624,
+      accSagittal5TinasDown: 1.124,
+      accSagittal5TinasUp: 1.124,
+      accSagittal5v11SmallDiesisDown: 1.248,
+      accSagittal5v11SmallDiesisUp: 1.248,
+      accSagittal5v13LargeDiesisDown: 1.752,
+      accSagittal5v13LargeDiesisUp: 1.752,
+      accSagittal5v13MediumDiesisDown: 1,
+      accSagittal5v13MediumDiesisUp: 1,
+      accSagittal5v19CommaDown: 0.624,
+      accSagittal5v19CommaUp: 0.624,
+      accSagittal5v23SmallDiesisDown: 1.248,
+      accSagittal5v23SmallDiesisUp: 1.248,
+      accSagittal5v49MediumDiesisDown: 1.376,
+      accSagittal5v49MediumDiesisUp: 1.376,
+      accSagittal5v7KleismaDown: 0.624,
+      accSagittal5v7KleismaUp: 0.624,
+      accSagittal6TinasDown: 1.124,
+      accSagittal6TinasUp: 1.124,
+      accSagittal7CommaDown: 0.624,
+      accSagittal7CommaUp: 0.624,
+      accSagittal7TinasDown: 1.376,
+      accSagittal7TinasUp: 1.376,
+      accSagittal7v11CommaDown: 0.752,
+      accSagittal7v11CommaUp: 0.752,
+      accSagittal7v11KleismaDown: 0.876,
+      accSagittal7v11KleismaUp: 0.876,
+      accSagittal7v19CommaDown: 1,
+      accSagittal7v19CommaUp: 1,
+      accSagittal8TinasDown: 1.5,
+      accSagittal8TinasUp: 1.5,
+      accSagittal9TinasDown: 1.5,
+      accSagittal9TinasUp: 1.5,
+      accSagittalAcute: 0.752,
+      accSagittalDoubleFlat: 1.876,
+      accSagittalDoubleFlat11v49CUp: 1.624,
+      accSagittalDoubleFlat143CUp: 1.876,
+      accSagittalDoubleFlat17CUp: 1.752,
+      accSagittalDoubleFlat17kUp: 1.752,
+      accSagittalDoubleFlat19CUp: 1.624,
+      accSagittalDoubleFlat19sUp: 1.752,
+      accSagittalDoubleFlat23CUp: 1.624,
+      accSagittalDoubleFlat23SUp: 1.5,
+      accSagittalDoubleFlat25SUp: 1.624,
+      accSagittalDoubleFlat49SUp: 1.5,
+      accSagittalDoubleFlat55CUp: 1.5,
+      accSagittalDoubleFlat5CUp: 1.624,
+      accSagittalDoubleFlat5v11SUp: 1.624,
+      accSagittalDoubleFlat5v19CUp: 1.5,
+      accSagittalDoubleFlat5v23SUp: 1.624,
+      accSagittalDoubleFlat5v7kUp: 1.624,
+      accSagittalDoubleFlat7CUp: 1.5,
+      accSagittalDoubleFlat7v11CUp: 1.5,
+      accSagittalDoubleFlat7v11kUp: 1.752,
+      accSagittalDoubleFlat7v19CUp: 1.5,
+      accSagittalDoubleSharp: 1.876,
+      accSagittalDoubleSharp11v49CDown: 1.624,
+      accSagittalDoubleSharp143CDown: 1.876,
+      accSagittalDoubleSharp17CDown: 1.752,
+      accSagittalDoubleSharp17kDown: 1.752,
+      accSagittalDoubleSharp19CDown: 1.624,
+      accSagittalDoubleSharp19sDown: 1.752,
+      accSagittalDoubleSharp23CDown: 1.624,
+      accSagittalDoubleSharp23SDown: 1.5,
+      accSagittalDoubleSharp25SDown: 1.624,
+      accSagittalDoubleSharp49SDown: 1.5,
+      accSagittalDoubleSharp55CDown: 1.5,
+      accSagittalDoubleSharp5CDown: 1.624,
+      accSagittalDoubleSharp5v11SDown: 1.624,
+      accSagittalDoubleSharp5v19CDown: 1.5,
+      accSagittalDoubleSharp5v23SDown: 1.624,
+      accSagittalDoubleSharp5v7kDown: 1.624,
+      accSagittalDoubleSharp7CDown: 1.5,
+      accSagittalDoubleSharp7v11CDown: 1.5,
+      accSagittalDoubleSharp7v11kDown: 1.752,
+      accSagittalDoubleSharp7v19CDown: 1.5,
+      accSagittalFlat: 1.624,
+      accSagittalFlat11LDown: 1.876,
+      accSagittalFlat11MDown: 1.876,
+      accSagittalFlat11v19LDown: 1.752,
+      accSagittalFlat11v19MDown: 1.752,
+      accSagittalFlat11v49CDown: 1.248,
+      accSagittalFlat11v49CUp: 1.376,
+      accSagittalFlat143CDown: 1.248,
+      accSagittalFlat143CUp: 1.624,
+      accSagittalFlat17CDown: 1.624,
+      accSagittalFlat17CUp: 1.5,
+      accSagittalFlat17kDown: 1.248,
+      accSagittalFlat17kUp: 1.248,
+      accSagittalFlat19CDown: 1.5,
+      accSagittalFlat19CUp: 1.124,
+      accSagittalFlat19sDown: 1.124,
+      accSagittalFlat19sUp: 1.624,
+      accSagittalFlat23CDown: 1.376,
+      accSagittalFlat23CUp: 1.5,
+      accSagittalFlat23SDown: 1.876,
+      accSagittalFlat23SUp: 1,
+      accSagittalFlat25SDown: 1.5,
+      accSagittalFlat25SUp: 1.376,
+      accSagittalFlat35LDown: 2,
+      accSagittalFlat35MDown: 1.624,
+      accSagittalFlat49LDown: 1.624,
+      accSagittalFlat49MDown: 1.5,
+      accSagittalFlat49SDown: 1.624,
+      accSagittalFlat49SUp: 1,
+      accSagittalFlat55CDown: 1.376,
+      accSagittalFlat55CUp: 1,
+      accSagittalFlat5CDown: 1.248,
+      accSagittalFlat5CUp: 1.124,
+      accSagittalFlat5v11SDown: 1.752,
+      accSagittalFlat5v11SUp: 1.376,
+      accSagittalFlat5v13LDown: 2,
+      accSagittalFlat5v13MDown: 1.5,
+      accSagittalFlat5v19CDown: 1.248,
+      accSagittalFlat5v19CUp: 1.248,
+      accSagittalFlat5v23SDown: 1.624,
+      accSagittalFlat5v23SUp: 1.124,
+      accSagittalFlat5v49MDown: 1.876,
+      accSagittalFlat5v7kDown: 1.248,
+      accSagittalFlat5v7kUp: 1.376,
+      accSagittalFlat7CDown: 1.248,
+      accSagittalFlat7CUp: 1,
+      accSagittalFlat7v11CDown: 1.376,
+      accSagittalFlat7v11CUp: 1.376,
+      accSagittalFlat7v11kDown: 1.624,
+      accSagittalFlat7v11kUp: 1.248,
+      accSagittalFlat7v19CDown: 1.5,
+      accSagittalFlat7v19CUp: 1,
+      accSagittalFractionalTinaDown: 0.376,
+      accSagittalFractionalTinaUp: 0.376,
+      accSagittalGrave: 0.752,
+      accSagittalShaftDown: 0.124,
+      accSagittalShaftUp: 0.124,
+      accSagittalSharp: 1.624,
+      accSagittalSharp11LUp: 1.876,
+      accSagittalSharp11MUp: 1.876,
+      accSagittalSharp11v19LUp: 1.752,
+      accSagittalSharp11v19MUp: 1.752,
+      accSagittalSharp11v49CDown: 1.376,
+      accSagittalSharp11v49CUp: 1.248,
+      accSagittalSharp143CDown: 1.624,
+      accSagittalSharp143CUp: 1.248,
+      accSagittalSharp17CDown: 1.5,
+      accSagittalSharp17CUp: 1.624,
+      accSagittalSharp17kDown: 1.248,
+      accSagittalSharp17kUp: 1.248,
+      accSagittalSharp19CDown: 1.124,
+      accSagittalSharp19CUp: 1.5,
+      accSagittalSharp19sDown: 1.624,
+      accSagittalSharp19sUp: 1.124,
+      accSagittalSharp23CDown: 1.5,
+      accSagittalSharp23CUp: 1.376,
+      accSagittalSharp23SDown: 1,
+      accSagittalSharp23SUp: 1.876,
+      accSagittalSharp25SDown: 1.376,
+      accSagittalSharp25SUp: 1.5,
+      accSagittalSharp35LUp: 2,
+      accSagittalSharp35MUp: 1.624,
+      accSagittalSharp49LUp: 1.624,
+      accSagittalSharp49MUp: 1.5,
+      accSagittalSharp49SDown: 1,
+      accSagittalSharp49SUp: 1.624,
+      accSagittalSharp55CDown: 1,
+      accSagittalSharp55CUp: 1.376,
+      accSagittalSharp5CDown: 1.124,
+      accSagittalSharp5CUp: 1.248,
+      accSagittalSharp5v11SDown: 1.376,
+      accSagittalSharp5v11SUp: 1.752,
+      accSagittalSharp5v13LUp: 2,
+      accSagittalSharp5v13MUp: 1.5,
+      accSagittalSharp5v19CDown: 1.248,
+      accSagittalSharp5v19CUp: 1.248,
+      accSagittalSharp5v23SDown: 1.124,
+      accSagittalSharp5v23SUp: 1.624,
+      accSagittalSharp5v49MUp: 1.876,
+      accSagittalSharp5v7kDown: 1.376,
+      accSagittalSharp5v7kUp: 1.248,
+      accSagittalSharp7CDown: 1,
+      accSagittalSharp7CUp: 1.248,
+      accSagittalSharp7v11CDown: 1.376,
+      accSagittalSharp7v11CUp: 1.376,
+      accSagittalSharp7v11kDown: 1.248,
+      accSagittalSharp7v11kUp: 1.624,
+      accSagittalSharp7v19CDown: 1,
+      accSagittalSharp7v19CUp: 1.5,
+      accSagittalUnused1: 0,
+      accSagittalUnused2: 0,
+      accSagittalUnused3: 0,
+      accSagittalUnused4: 0,
+      accdnCombDot: 0.496,
+      accdnCombLH2RanksEmpty: 3.128,
+      accdnCombLH3RanksEmptySquare: 2.552,
+      accdnCombRH3RanksEmpty: 3.128,
+      accdnCombRH4RanksEmpty: 3.128,
+      accdnDiatonicClef: 1.136,
+      accdnLH2Ranks16Round: 3.132,
+      accdnLH2Ranks8Plus16Round: 3.14,
+      accdnLH2Ranks8Round: 3.124,
+      accdnLH2RanksFullMasterRound: 3.128,
+      accdnLH2RanksMasterPlus16Round: 3.128,
+      accdnLH2RanksMasterRound: 3.124,
+      accdnLH3Ranks2Plus8Square: 2.568,
+      accdnLH3Ranks2Square: 2.568,
+      accdnLH3Ranks8Square: 2.556,
+      accdnLH3RanksDouble8Square: 2.568,
+      accdnLH3RanksTuttiSquare: 2.568,
+      accdnPull: 0.92,
+      accdnPush: 0.92,
+      accdnPushAlt: 0.776,
+      accdnRH3RanksAccordion: 3.124,
+      accdnRH3RanksAuthenticMusette: 3.124,
+      accdnRH3RanksBandoneon: 3.124,
+      accdnRH3RanksBassoon: 3.124,
+      accdnRH3RanksClarinet: 3.124,
+      accdnRH3RanksDoubleTremoloLower8ve: 3.128,
+      accdnRH3RanksDoubleTremoloUpper8ve: 3.128,
+      accdnRH3RanksFullFactory: 3.128,
+      accdnRH3RanksHarmonium: 3.136,
+      accdnRH3RanksImitationMusette: 3.124,
+      accdnRH3RanksLowerTremolo8: 3.136,
+      accdnRH3RanksMaster: 3.124,
+      accdnRH3RanksOboe: 3.136,
+      accdnRH3RanksOrgan: 3.136,
+      accdnRH3RanksPiccolo: 3.124,
+      accdnRH3RanksTremoloLower8ve: 3.128,
+      accdnRH3RanksTremoloUpper8ve: 3.128,
+      accdnRH3RanksTwoChoirs: 3.124,
+      accdnRH3RanksUpperTremolo8: 3.136,
+      accdnRH3RanksViolin: 3.136,
+      accdnRH4RanksAlto: 3.136,
+      accdnRH4RanksBassAlto: 3.164,
+      accdnRH4RanksMaster: 3.128,
+      accdnRH4RanksSoftBass: 3.128,
+      accdnRH4RanksSoftTenor: 3.124,
+      accdnRH4RanksSoprano: 3.124,
+      accdnRH4RanksTenor: 3.124,
+      accdnRicochet2: 1.552,
+      accdnRicochet3: 1.832,
+      accdnRicochet4: 2.512,
+      accdnRicochet5: 3.072,
+      accdnRicochet6: 3.752,
+      accdnRicochetStem2: 0.752,
+      accdnRicochetStem3: 0.776,
+      accdnRicochetStem4: 0.776,
+      accdnRicochetStem5: 0.776,
+      accdnRicochetStem6: 0.768,
+      accidental1CommaFlat: 1.008,
+      accidental1CommaSharp: 1.536,
+      accidental2CommaFlat: 1.284,
+      accidental2CommaSharp: 1.812,
+      accidental3CommaFlat: 1.208,
+      accidental3CommaSharp: 1.736,
+      accidental4CommaFlat: 1.284,
+      accidental5CommaSharp: 1.788,
+      accidentalArrowDown: 0.74,
+      accidentalArrowUp: 0.74,
+      accidentalBakiyeFlat: 1.148,
+      accidentalBakiyeSharp: 1,
+      accidentalBracketLeft: 0.308,
+      accidentalBracketRight: 0.308,
+      accidentalBuyukMucennebFlat: 1.148,
+      accidentalBuyukMucennebSharp: 1.372,
+      accidentalCombiningCloseCurlyBrace: 0.552,
+      accidentalCombiningLower17Schisma: 0.796,
+      accidentalCombiningLower19Schisma: 0.796,
+      accidentalCombiningLower23Limit29LimitComma: 0.98,
+      accidentalCombiningLower29LimitComma: 1.424,
+      accidentalCombiningLower31Schisma: 1.168,
+      accidentalCombiningLower37Quartertone: 1.196,
+      accidentalCombiningLower41Comma: 1.188,
+      accidentalCombiningLower43Comma: 1.416,
+      accidentalCombiningLower47Quartertone: 0.96,
+      accidentalCombiningLower53LimitComma: 0.792,
+      accidentalCombiningOpenCurlyBrace: 0.552,
+      accidentalCombiningRaise17Schisma: 0.796,
+      accidentalCombiningRaise19Schisma: 0.796,
+      accidentalCombiningRaise23Limit29LimitComma: 0.98,
+      accidentalCombiningRaise29LimitComma: 1.424,
+      accidentalCombiningRaise31Schisma: 1.18,
+      accidentalCombiningRaise37Quartertone: 1.196,
+      accidentalCombiningRaise41Comma: 1.188,
+      accidentalCombiningRaise43Comma: 1.424,
+      accidentalCombiningRaise47Quartertone: 0.96,
+      accidentalCombiningRaise53LimitComma: 0.792,
+      accidentalCommaSlashDown: 1.204,
+      accidentalCommaSlashUp: 1.204,
+      accidentalDoubleFlat: 1.652,
+      accidentalDoubleFlatArabic: 1.652,
+      accidentalDoubleFlatEqualTempered: 1.664,
+      accidentalDoubleFlatJoinedStems: 1.644,
+      accidentalDoubleFlatOneArrowDown: 1.676,
+      accidentalDoubleFlatOneArrowUp: 1.664,
+      accidentalDoubleFlatParens: 2.772,
+      accidentalDoubleFlatReversed: 1.652,
+      accidentalDoubleFlatThreeArrowsDown: 1.676,
+      accidentalDoubleFlatThreeArrowsUp: 1.664,
+      accidentalDoubleFlatTurned: 1.664,
+      accidentalDoubleFlatTwoArrowsDown: 1.676,
+      accidentalDoubleFlatTwoArrowsUp: 1.664,
+      accidentalDoubleSharp: 1,
+      accidentalDoubleSharpArabic: 1,
+      accidentalDoubleSharpEqualTempered: 0.984,
+      accidentalDoubleSharpOneArrowDown: 0.988,
+      accidentalDoubleSharpOneArrowUp: 0.992,
+      accidentalDoubleSharpParens: 1.992,
+      accidentalDoubleSharpThreeArrowsDown: 0.988,
+      accidentalDoubleSharpThreeArrowsUp: 0.988,
+      accidentalDoubleSharpTwoArrowsDown: 0.988,
+      accidentalDoubleSharpTwoArrowsUp: 0.992,
+      accidentalEnharmonicAlmostEqualTo: 1.736,
+      accidentalEnharmonicEquals: 1.796,
+      accidentalEnharmonicTilde: 1.736,
+      accidentalFilledReversedFlatAndFlat: 1.46,
+      accidentalFilledReversedFlatAndFlatArrowDown: 1.46,
+      accidentalFilledReversedFlatAndFlatArrowUp: 1.46,
+      accidentalFilledReversedFlatArrowDown: 1.216,
+      accidentalFilledReversedFlatArrowUp: 1.24,
+      accidentalFiveQuarterTonesFlatArrowDown: 1.652,
+      accidentalFiveQuarterTonesSharpArrowUp: 0.992,
+      accidentalFlat: 0.904,
+      accidentalFlatArabic: 0.904,
+      accidentalFlatEqualTempered: 0.904,
+      accidentalFlatJohnstonDown: 1.192,
+      accidentalFlatJohnstonEl: 0.908,
+      accidentalFlatJohnstonElDown: 1.184,
+      accidentalFlatJohnstonUp: 1.2,
+      accidentalFlatJohnstonUpEl: 1.184,
+      accidentalFlatLoweredStockhausen: 0.912,
+      accidentalFlatOneArrowDown: 0.912,
+      accidentalFlatOneArrowUp: 0.904,
+      accidentalFlatParens: 2.024,
+      accidentalFlatRaisedStockhausen: 0.904,
+      accidentalFlatRepeatedLineStockhausen: 0.904,
+      accidentalFlatRepeatedSpaceStockhausen: 0.904,
+      accidentalFlatSmall: 1.052,
+      accidentalFlatThreeArrowsDown: 0.912,
+      accidentalFlatThreeArrowsUp: 0.904,
+      accidentalFlatTurned: 0.916,
+      accidentalFlatTwoArrowsDown: 0.912,
+      accidentalFlatTwoArrowsUp: 0.904,
+      accidentalHabaFlatQuarterToneHigher: 0.888,
+      accidentalHabaFlatThreeQuarterTonesLower: 0.892,
+      accidentalHabaQuarterToneHigher: 0.84,
+      accidentalHabaQuarterToneLower: 0.892,
+      accidentalHabaSharpQuarterToneLower: 0.996,
+      accidentalHabaSharpThreeQuarterTonesHigher: 0.996,
+      accidentalHalfSharpArrowDown: 0.924,
+      accidentalHalfSharpArrowUp: 0.928,
+      accidentalJohnston13: 0.8,
+      accidentalJohnston31: 0.8,
+      accidentalJohnstonDown: 0.72,
+      accidentalJohnstonDownEl: 0.94,
+      accidentalJohnstonEl: 0.64,
+      accidentalJohnstonMinus: 0.6,
+      accidentalJohnstonPlus: 0.6,
+      accidentalJohnstonSeven: 0.64,
+      accidentalJohnstonSevenDown: 0.948,
+      accidentalJohnstonSevenFlat: 1.38,
+      accidentalJohnstonSevenFlatDown: 1.38,
+      accidentalJohnstonSevenFlatUp: 1.396,
+      accidentalJohnstonSevenSharp: 1.32,
+      accidentalJohnstonSevenSharpDown: 1.32,
+      accidentalJohnstonSevenSharpUp: 1.412,
+      accidentalJohnstonSevenUp: 0.94,
+      accidentalJohnstonUp: 0.72,
+      accidentalJohnstonUpEl: 0.94,
+      accidentalKomaFlat: 0.916,
+      accidentalKomaSharp: 0.924,
+      accidentalKoron: 1.208,
+      accidentalKucukMucennebFlat: 0.908,
+      accidentalKucukMucennebSharp: 1.356,
+      accidentalLargeDoubleSharp: 1.376,
+      accidentalLowerOneSeptimalComma: 0.688,
+      accidentalLowerOneTridecimalQuartertone: 0.86,
+      accidentalLowerOneUndecimalQuartertone: 0.908,
+      accidentalLowerTwoSeptimalCommas: 0.688,
+      accidentalLoweredStockhausen: 0.4,
+      accidentalNarrowReversedFlat: 0.656,
+      accidentalNarrowReversedFlatAndFlat: 1.656,
+      accidentalNatural: 0.672,
+      accidentalNaturalArabic: 0.672,
+      accidentalNaturalEqualTempered: 0.672,
+      accidentalNaturalFlat: 1.836,
+      accidentalNaturalLoweredStockhausen: 0.676,
+      accidentalNaturalOneArrowDown: 0.676,
+      accidentalNaturalOneArrowUp: 0.676,
+      accidentalNaturalParens: 2.16,
+      accidentalNaturalRaisedStockhausen: 0.676,
+      accidentalNaturalReversed: 0.672,
+      accidentalNaturalSharp: 1.92,
+      accidentalNaturalSmall: 0.76,
+      accidentalNaturalThreeArrowsDown: 0.676,
+      accidentalNaturalThreeArrowsUp: 0.676,
+      accidentalNaturalTwoArrowsDown: 0.676,
+      accidentalNaturalTwoArrowsUp: 0.676,
+      accidentalOneAndAHalfSharpsArrowDown: 1.268,
+      accidentalOneAndAHalfSharpsArrowUp: 1.476,
+      accidentalOneQuarterToneFlatFerneyhough: 0.872,
+      accidentalOneQuarterToneFlatStockhausen: 1.148,
+      accidentalOneQuarterToneSharpFerneyhough: 0.796,
+      accidentalOneQuarterToneSharpStockhausen: 0.668,
+      accidentalOneThirdToneFlatFerneyhough: 0.752,
+      accidentalOneThirdToneSharpFerneyhough: 0.764,
+      accidentalParensLeft: 0.564,
+      accidentalParensRight: 0.564,
+      accidentalQuarterFlatEqualTempered: 0.904,
+      accidentalQuarterSharpEqualTempered: 1.08,
+      accidentalQuarterToneFlat4: 1.672,
+      accidentalQuarterToneFlatArabic: 1.148,
+      accidentalQuarterToneFlatArrowUp: 0.992,
+      accidentalQuarterToneFlatFilledReversed: 0.908,
+      accidentalQuarterToneFlatNaturalArrowDown: 0.684,
+      accidentalQuarterToneFlatPenderecki: 0.908,
+      accidentalQuarterToneFlatStein: 0.908,
+      accidentalQuarterToneFlatVanBlankenburg: 0.94,
+      accidentalQuarterToneSharp4: 1.576,
+      accidentalQuarterToneSharpArabic: 0.652,
+      accidentalQuarterToneSharpArrowDown: 0.996,
+      accidentalQuarterToneSharpBusotti: 0.668,
+      accidentalQuarterToneSharpNaturalArrowUp: 0.848,
+      accidentalQuarterToneSharpStein: 0.716,
+      accidentalQuarterToneSharpWiggle: 2.2,
+      accidentalRaiseOneSeptimalComma: 0.688,
+      accidentalRaiseOneTridecimalQuartertone: 1.08,
+      accidentalRaiseOneUndecimalQuartertone: 1.084,
+      accidentalRaiseTwoSeptimalCommas: 0.688,
+      accidentalRaisedStockhausen: 0.4,
+      accidentalReversedFlatAndFlatArrowDown: 1.54,
+      accidentalReversedFlatAndFlatArrowUp: 1.54,
+      accidentalReversedFlatArrowDown: 1.22,
+      accidentalReversedFlatArrowUp: 1.248,
+      accidentalSharp: 0.996,
+      accidentalSharpArabic: 0.996,
+      accidentalSharpEqualTempered: 1,
+      accidentalSharpJohnstonDown: 1.092,
+      accidentalSharpJohnstonDownEl: 1.412,
+      accidentalSharpJohnstonEl: 1.328,
+      accidentalSharpJohnstonUp: 1.092,
+      accidentalSharpJohnstonUpEl: 1.312,
+      accidentalSharpLoweredStockhausen: 1,
+      accidentalSharpOneArrowDown: 1,
+      accidentalSharpOneArrowUp: 1,
+      accidentalSharpOneHorizontalStroke: 0.996,
+      accidentalSharpParens: 2.244,
+      accidentalSharpRaisedStockhausen: 1,
+      accidentalSharpRepeatedLineStockhausen: 0.996,
+      accidentalSharpRepeatedSpaceStockhausen: 1,
+      accidentalSharpReversed: 0.996,
+      accidentalSharpSharp: 2.076,
+      accidentalSharpSmall: 1.044,
+      accidentalSharpThreeArrowsDown: 1,
+      accidentalSharpThreeArrowsUp: 1,
+      accidentalSharpTwoArrowsDown: 1,
+      accidentalSharpTwoArrowsUp: 1,
+      accidentalSims12Down: 1.212,
+      accidentalSims12Up: 1.212,
+      accidentalSims4Down: 1.284,
+      accidentalSims4Up: 1.088,
+      accidentalSims6Down: 1.088,
+      accidentalSims6Up: 1.088,
+      accidentalSori: 1.684,
+      accidentalTavenerFlat: 1.9,
+      accidentalTavenerSharp: 1.604,
+      accidentalThreeQuarterTonesFlatArabic: 1.128,
+      accidentalThreeQuarterTonesFlatArrowDown: 1.004,
+      accidentalThreeQuarterTonesFlatArrowUp: 1.644,
+      accidentalThreeQuarterTonesFlatCouper: 1.64,
+      accidentalThreeQuarterTonesFlatGrisey: 0.9,
+      accidentalThreeQuarterTonesFlatTartini: 1.376,
+      accidentalThreeQuarterTonesFlatZimmermann: 1.864,
+      accidentalThreeQuarterTonesSharpArabic: 1.268,
+      accidentalThreeQuarterTonesSharpArrowDown: 0.992,
+      accidentalThreeQuarterTonesSharpArrowUp: 0.996,
+      accidentalThreeQuarterTonesSharpBusotti: 1.472,
+      accidentalThreeQuarterTonesSharpStein: 1.268,
+      accidentalThreeQuarterTonesSharpStockhausen: 0.996,
+      accidentalTripleFlat: 2.4,
+      accidentalTripleFlatJoinedStems: 2.384,
+      accidentalTripleSharp: 2.052,
+      accidentalTwoThirdTonesFlatFerneyhough: 0.796,
+      accidentalTwoThirdTonesSharpFerneyhough: 0.772,
+      accidentalUpsAndDownsDown: 0.964,
+      accidentalUpsAndDownsLess: 0.836,
+      accidentalUpsAndDownsMore: 0.82,
+      accidentalUpsAndDownsUp: 0.972,
+      accidentalWilsonMinus: 1.124,
+      accidentalWilsonPlus: 1.124,
+      accidentalWyschnegradsky10TwelfthsFlat: 1.656,
+      accidentalWyschnegradsky10TwelfthsSharp: 1.58,
+      accidentalWyschnegradsky11TwelfthsFlat: 1.656,
+      accidentalWyschnegradsky11TwelfthsSharp: 1.572,
+      accidentalWyschnegradsky1TwelfthsFlat: 0.852,
+      accidentalWyschnegradsky1TwelfthsSharp: 0.648,
+      accidentalWyschnegradsky2TwelfthsFlat: 0.852,
+      accidentalWyschnegradsky2TwelfthsSharp: 0.648,
+      accidentalWyschnegradsky3TwelfthsFlat: 0.852,
+      accidentalWyschnegradsky3TwelfthsSharp: 0.652,
+      accidentalWyschnegradsky4TwelfthsFlat: 0.904,
+      accidentalWyschnegradsky4TwelfthsSharp: 0.904,
+      accidentalWyschnegradsky5TwelfthsFlat: 0.904,
+      accidentalWyschnegradsky5TwelfthsSharp: 0.9,
+      accidentalWyschnegradsky6TwelfthsFlat: 0.908,
+      accidentalWyschnegradsky6TwelfthsSharp: 1,
+      accidentalWyschnegradsky7TwelfthsFlat: 1.664,
+      accidentalWyschnegradsky7TwelfthsSharp: 1.324,
+      accidentalWyschnegradsky8TwelfthsFlat: 1.664,
+      accidentalWyschnegradsky8TwelfthsSharp: 1.324,
+      accidentalWyschnegradsky9TwelfthsFlat: 1.664,
+      accidentalWyschnegradsky9TwelfthsSharp: 1.256,
+      accidentalXenakisOneThirdToneSharp: 0.984,
+      accidentalXenakisTwoThirdTonesSharp: 1.224,
+      analyticsChoralmelodie: 5.008,
+      analyticsEndStimme: 1.188,
+      analyticsHauptrhythmus: 5.056,
+      analyticsHauptrhythmusR: 2.84,
+      analyticsHauptstimme: 2.824,
+      analyticsInversion1: 1.7,
+      analyticsNebenstimme: 2.836,
+      analyticsStartStimme: 1.188,
+      analyticsTheme: 2.972,
+      analyticsTheme1: 1.7,
+      analyticsThemeInversion: 2.972,
+      analyticsThemeRetrograde: 2.972,
+      analyticsThemeRetrogradeInversion: 2.972,
+      arpeggiato: 0.488,
+      arpeggiatoDown: 0.912,
+      arpeggiatoUp: 0.912,
+      arrowBlackDown: 0.912,
+      arrowBlackDownLeft: 1.536,
+      arrowBlackDownRight: 1.536,
+      arrowBlackLeft: 2.108,
+      arrowBlackRight: 2.108,
+      arrowBlackUp: 0.912,
+      arrowBlackUpLeft: 1.536,
+      arrowBlackUpRight: 1.536,
+      arrowOpenDown: 0.836,
+      arrowOpenDownLeft: 1.544,
+      arrowOpenDownRight: 1.544,
+      arrowOpenLeft: 2.112,
+      arrowOpenRight: 2.112,
+      arrowOpenUp: 0.836,
+      arrowOpenUpLeft: 1.544,
+      arrowOpenUpRight: 1.544,
+      arrowWhiteDown: 0.912,
+      arrowWhiteDownLeft: 1.536,
+      arrowWhiteDownRight: 1.536,
+      arrowWhiteLeft: 2.104,
+      arrowWhiteRight: 2.104,
+      arrowWhiteUp: 0.912,
+      arrowWhiteUpLeft: 1.536,
+      arrowWhiteUpRight: 1.536,
+      arrowheadBlackDown: 0.912,
+      arrowheadBlackDownLeft: 1.156,
+      arrowheadBlackDownRight: 1.156,
+      arrowheadBlackLeft: 1.196,
+      arrowheadBlackRight: 1.196,
+      arrowheadBlackUp: 0.912,
+      arrowheadBlackUpLeft: 1.156,
+      arrowheadBlackUpRight: 1.156,
+      arrowheadOpenDown: 0.836,
+      arrowheadOpenDownLeft: 1.044,
+      arrowheadOpenDownRight: 1.044,
+      arrowheadOpenLeft: 1.116,
+      arrowheadOpenRight: 1.116,
+      arrowheadOpenUp: 0.836,
+      arrowheadOpenUpLeft: 1.044,
+      arrowheadOpenUpRight: 1.044,
+      arrowheadWhiteDown: 0.912,
+      arrowheadWhiteDownLeft: 1.152,
+      arrowheadWhiteDownRight: 1.152,
+      arrowheadWhiteLeft: 1.196,
+      arrowheadWhiteRight: 1.196,
+      arrowheadWhiteUp: 0.912,
+      arrowheadWhiteUpLeft: 1.152,
+      arrowheadWhiteUpRight: 1.152,
+      articAccentAbove: 1.356,
+      articAccentAboveLarge: 1.724,
+      articAccentAboveRossini: 1.356,
+      articAccentAboveSmall: 1.332,
+      articAccentBelow: 1.356,
+      articAccentBelowLarge: 1.724,
+      articAccentBelowRossini: 1.356,
+      articAccentBelowSmall: 1.332,
+      articAccentStaccatoAbove: 1.36,
+      articAccentStaccatoAboveSmall: 1.332,
+      articAccentStaccatoBelow: 1.356,
+      articAccentStaccatoBelowSmall: 1.332,
+      articLaissezVibrerAbove: 1.468,
+      articLaissezVibrerBelow: 1.46,
+      articMarcatoAbove: 0.944,
+      articMarcatoAboveSmall: 0.944,
+      articMarcatoBelow: 0.944,
+      articMarcatoBelowSmall: 0.944,
+      articMarcatoStaccatoAbove: 0.944,
+      articMarcatoStaccatoAboveSmall: 0.944,
+      articMarcatoStaccatoBelow: 0.944,
+      articMarcatoStaccatoBelowSmall: 0.944,
+      articMarcatoTenutoAbove: 1.352,
+      articMarcatoTenutoBelow: 1.352,
+      articSoftAccentAbove: 2.832,
+      articSoftAccentBelow: 2.832,
+      articSoftAccentStaccatoAbove: 3.512,
+      articSoftAccentStaccatoBelow: 3.512,
+      articSoftAccentTenutoAbove: 3.832,
+      articSoftAccentTenutoBelow: 3.832,
+      articSoftAccentTenutoStaccatoAbove: 3.832,
+      articSoftAccentTenutoStaccatoBelow: 3.832,
+      articStaccatissimoAbove: 0.408,
+      articStaccatissimoAboveSmall: 0.528,
+      articStaccatissimoBelow: 0.408,
+      articStaccatissimoBelowSmall: 0.528,
+      articStaccatissimoStrokeAbove: 0.192,
+      articStaccatissimoStrokeAboveSmall: 0.256,
+      articStaccatissimoStrokeBelow: 0.192,
+      articStaccatissimoStrokeBelowSmall: 0.256,
+      articStaccatissimoWedgeAbove: 0.356,
+      articStaccatissimoWedgeAboveSmall: 0.468,
+      articStaccatissimoWedgeBelow: 0.356,
+      articStaccatissimoWedgeBelowSmall: 0.468,
+      articStaccatoAbove: 0.336,
+      articStaccatoAboveSmall: 0.492,
+      articStaccatoBelow: 0.336,
+      articStaccatoBelowSmall: 0.492,
+      articStressAbove: 0.94,
+      articStressBelow: 0.952,
+      articTenutoAbove: 1.352,
+      articTenutoAboveSmall: 1.356,
+      articTenutoAccentAbove: 1.356,
+      articTenutoAccentAboveSmall: 1.356,
+      articTenutoAccentBelow: 1.356,
+      articTenutoAccentBelowSmall: 1.356,
+      articTenutoBelow: 1.352,
+      articTenutoBelowSmall: 1.356,
+      articTenutoStaccatoAbove: 1.356,
+      articTenutoStaccatoAboveSmall: 1.356,
+      articTenutoStaccatoBelow: 1.352,
+      articTenutoStaccatoBelowSmall: 1.356,
+      articUnstressAbove: 1.528,
+      articUnstressBelow: 1.532,
+      augmentationDot: 0.4,
+      barlineDashed: 0.16,
+      barlineDotted: 0.196,
+      barlineDouble: 0.72,
+      barlineFinal: 1.06,
+      barlineHeavy: 0.5,
+      barlineHeavyHeavy: 1.4,
+      barlineReverseFinal: 1.06,
+      barlineShort: 0.16,
+      barlineSingle: 0.16,
+      barlineTick: 0.16,
+      beamAccelRit1: 4.736,
+      beamAccelRit10: 2.116,
+      beamAccelRit11: 1.816,
+      beamAccelRit12: 1.516,
+      beamAccelRit13: 1.216,
+      beamAccelRit14: 0.916,
+      beamAccelRit15: 0.616,
+      beamAccelRit2: 4.436,
+      beamAccelRit3: 4.136,
+      beamAccelRit4: 3.916,
+      beamAccelRit5: 3.616,
+      beamAccelRit6: 3.316,
+      beamAccelRit7: 3.016,
+      beamAccelRit8: 2.716,
+      beamAccelRit9: 2.416,
+      beamAccelRitFinal: 0.128,
+      brace: 0.28,
+      braceFlat: 0.228,
+      braceLarge: 0.268,
+      braceLarger: 0.244,
+      braceSmall: 0.412,
+      bracket: 2.232,
+      bracketBottom: 1.876,
+      bracketTop: 1.876,
+      brassBend: 1.572,
+      brassDoitLong: 4.6,
+      brassDoitMedium: 1.96,
+      brassDoitShort: 1.272,
+      brassFallLipLong: 4.6,
+      brassFallLipMedium: 1.96,
+      brassFallLipShort: 1.172,
+      brassFallRoughLong: 4.788,
+      brassFallRoughMedium: 3.248,
+      brassFallRoughShort: 1.7,
+      brassFallSmoothLong: 5.48,
+      brassFallSmoothMedium: 3.644,
+      brassFallSmoothShort: 1.632,
+      brassFlip: 1.516,
+      brassHarmonMuteClosed: 1.16,
+      brassHarmonMuteStemHalfLeft: 1.212,
+      brassHarmonMuteStemHalfRight: 1.212,
+      brassHarmonMuteStemOpen: 1.2,
+      brassJazzTurn: 2.48,
+      brassLiftLong: 4.788,
+      brassLiftMedium: 3.248,
+      brassLiftShort: 1.7,
+      brassLiftSmoothLong: 5.48,
+      brassLiftSmoothMedium: 3.644,
+      brassLiftSmoothShort: 1.632,
+      brassMuteClosed: 1.088,
+      brassMuteHalfClosed: 1.22,
+      brassMuteOpen: 1.22,
+      brassPlop: 1.172,
+      brassScoop: 1.272,
+      brassSmear: 1.228,
+      brassValveTrill: 1.22,
+      breathMarkComma: 0.612,
+      breathMarkSalzedo: 2.1,
+      breathMarkTick: 2,
+      breathMarkUpbow: 1,
+      bridgeClef: 3.448,
+      buzzRoll: 0.624,
+      cClef: 2.796,
+      cClef8vb: 2.796,
+      cClefArrowDown: 2.8,
+      cClefArrowUp: 2.796,
+      cClefChange: 2.024,
+      cClefCombining: 0.932,
+      cClefFrench: 3.452,
+      cClefFrench20C: 2.572,
+      cClefFrench20CChange: 1.888,
+      cClefReversed: 2.796,
+      cClefSmall: 3.064,
+      cClefSquare: 2.336,
+      caesura: 1.54,
+      caesuraCurved: 1.492,
+      caesuraShort: 0.74,
+      caesuraSingleStroke: 0.896,
+      caesuraThick: 2.652,
+      chantAccentusAbove: 0.292,
+      chantAccentusBelow: 0.296,
+      chantAuctumAsc: 0.616,
+      chantAuctumDesc: 0.616,
+      chantAugmentum: 0.264,
+      chantCaesura: 0.572,
+      chantCclef: 0.536,
+      chantCclefHufnagel: 1.144,
+      chantCirculusAbove: 0.376,
+      chantCirculusBelow: 0.376,
+      chantConnectingLineAsc2nd: 0.056,
+      chantConnectingLineAsc3rd: 0.056,
+      chantConnectingLineAsc4th: 0.056,
+      chantConnectingLineAsc5th: 0.056,
+      chantConnectingLineAsc6th: 0.056,
+      chantCustosStemDownPosHigh: 0.24,
+      chantCustosStemDownPosHighest: 0.24,
+      chantCustosStemDownPosMiddle: 0.24,
+      chantCustosStemUpPosLow: 0.24,
+      chantCustosStemUpPosLowest: 0.24,
+      chantCustosStemUpPosMiddle: 0.24,
+      chantDeminutumLower: 0.056,
+      chantDeminutumUpper: 0.056,
+      chantDivisioFinalis: 0.476,
+      chantDivisioMaior: 0.064,
+      chantDivisioMaxima: 0.064,
+      chantDivisioMinima: 0.064,
+      chantEntryLineAsc2nd: 0.056,
+      chantEntryLineAsc3rd: 0.056,
+      chantEntryLineAsc4th: 0.056,
+      chantEntryLineAsc5th: 0.056,
+      chantEntryLineAsc6th: 0.056,
+      chantEpisema: 0.656,
+      chantFclef: 1.056,
+      chantFclefHufnagel: 1.156,
+      chantIctusAbove: 0.128,
+      chantIctusBelow: 0.128,
+      chantLigaturaDesc2nd: 1.86,
+      chantLigaturaDesc3rd: 2.316,
+      chantLigaturaDesc4th: 2.316,
+      chantLigaturaDesc5th: 2.316,
+      chantOriscusAscending: 0.616,
+      chantOriscusDescending: 0.616,
+      chantOriscusLiquescens: 0.612,
+      chantPodatusLower: 0.556,
+      chantPodatusUpper: 0,
+      chantPunctum: 0.64,
+      chantPunctumCavum: 0.64,
+      chantPunctumDeminutum: 0.364,
+      chantPunctumInclinatum: 0.6,
+      chantPunctumInclinatumAuctum: 0.648,
+      chantPunctumInclinatumDeminutum: 0.36,
+      chantPunctumLinea: 1.064,
+      chantPunctumLineaCavum: 1.064,
+      chantPunctumVirga: 0.64,
+      chantPunctumVirgaReversed: 0.64,
+      chantQuilisma: 0.616,
+      chantSemicirculusAbove: 0.376,
+      chantSemicirculusBelow: 0.376,
+      chantStaff: 2,
+      chantStaffNarrow: 1,
+      chantStaffWide: 3,
+      chantStrophicus: 0.496,
+      chantStrophicusAuctus: 0.608,
+      chantStrophicusLiquescens2nd: 0.644,
+      chantStrophicusLiquescens3rd: 0.652,
+      chantStrophicusLiquescens4th: 0.676,
+      chantStrophicusLiquescens5th: 0.712,
+      chantVirgula: 0.364,
+      clef15: 1.436,
+      clef8: 0.82,
+      clefChangeCombining: 0,
+      coda: 3.816,
+      codaJapanese: 3.816,
+      codaSquare: 3.276,
+      conductorBeat2Compound: 2.876,
+      conductorBeat2Simple: 2.868,
+      conductorBeat3Compound: 2.448,
+      conductorBeat3Simple: 2.456,
+      conductorBeat4Compound: 2.02,
+      conductorBeat4Simple: 2.024,
+      conductorLeftBeat: 0.796,
+      conductorRightBeat: 0.796,
+      conductorStrongBeat: 1.596,
+      conductorUnconducted: 1.6,
+      conductorWeakBeat: 1.6,
+      controlBeginBeam: 0,
+      controlBeginPhrase: 0,
+      controlBeginSlur: 0,
+      controlBeginTie: 0,
+      controlEndBeam: 0,
+      controlEndPhrase: 0,
+      controlEndSlur: 0,
+      controlEndTie: 0,
+      csymAccidentalDoubleFlat: 2.096,
+      csymAccidentalDoubleFlatSmall: 1.136,
+      csymAccidentalDoubleSharp: 1.776,
+      csymAccidentalDoubleSharpSmall: 1.776,
+      csymAccidentalFlat: 1.136,
+      csymAccidentalFlatSmall: 1.136,
+      csymAccidentalNatural: 0.736,
+      csymAccidentalNaturalSmall: 0.836,
+      csymAccidentalSharp: 1.24,
+      csymAccidentalSharpSmall: 1.4,
+      csymAccidentalTripleFlat: 3.056,
+      csymAccidentalTripleFlatSmall: 2.848,
+      csymAccidentalTripleSharp: 2.348,
+      csymAccidentalTripleSharpSmall: 2.9,
+      csymAlteredBassSlash: 1.256,
+      csymAugmented: 1.58,
+      csymAugmentedSmall: 1.9,
+      csymBracketLeftTall: 0.62,
+      csymBracketRightTall: 0.62,
+      csymDiagonalArrangementSlash: 3.996,
+      csymDiminished: 1.892,
+      csymDiminishedSmall: 1.892,
+      csymHalfDiminished: 1.896,
+      csymHalfDiminishedSmall: 1.892,
+      csymMajorSeventh: 2.236,
+      csymMajorSeventhSmall: 2.228,
+      csymMinor: 1.3,
+      csymMinorSmall: 1.9,
+      csymParensLeftTall: 0.66,
+      csymParensLeftVeryTall: 0.428,
+      csymParensRightTall: 0.656,
+      csymParensRightVeryTall: 0.428,
+      curlewSign: 2.808,
+      daCapo: 4.332,
+      dalSegno: 4.328,
+      daseianExcellentes1: 2.616,
+      daseianExcellentes2: 2.412,
+      daseianExcellentes3: 2.272,
+      daseianExcellentes4: 2.436,
+      daseianFinales1: 2.616,
+      daseianFinales2: 2.412,
+      daseianFinales3: 1.26,
+      daseianFinales4: 2.436,
+      daseianGraves1: 2.616,
+      daseianGraves2: 2.412,
+      daseianGraves3: 2.66,
+      daseianGraves4: 2.436,
+      daseianResidua1: 3.02,
+      daseianResidua2: 2.292,
+      daseianSuperiores1: 2.616,
+      daseianSuperiores2: 2.412,
+      daseianSuperiores3: 1.072,
+      daseianSuperiores4: 2.436,
+      doubleLateralRollStevens: 0.516,
+      doubleTongueAbove: 1.78,
+      doubleTongueAboveNoSlur: 1,
+      doubleTongueBelow: 1.78,
+      doubleTongueBelowNoSlur: 1,
+      dynamicCombinedSeparatorColon: 0.684,
+      dynamicCombinedSeparatorHyphen: 1.112,
+      dynamicCombinedSeparatorSlash: 0.892,
+      dynamicCombinedSeparatorSpace: 0.7,
+      dynamicCrescendoHairpin: 3,
+      dynamicDiminuendoHairpin: 3,
+      dynamicFF: 2.436,
+      dynamicFFF: 3.324,
+      dynamicFFFF: 4.28,
+      dynamicFFFFF: 5.24,
+      dynamicFFFFFF: 6.2,
+      dynamicForte: 1.456,
+      dynamicFortePiano: 2.476,
+      dynamicForteSmall: 1.78,
+      dynamicForzando: 1.988,
+      dynamicHairpinBracketLeft: 0.308,
+      dynamicHairpinBracketRight: 0.308,
+      dynamicHairpinParenthesisLeft: 0.44,
+      dynamicHairpinParenthesisRight: 0.44,
+      dynamicMF: 3.188,
+      dynamicMP: 3.304,
+      dynamicMessaDiVoce: 6.22,
+      dynamicMezzo: 1.748,
+      dynamicMezzoSmall: 2.168,
+      dynamicNiente: 1.232,
+      dynamicNienteForHairpin: 0.536,
+      dynamicNienteSmall: 1.336,
+      dynamicPF: 3.08,
+      dynamicPP: 2.908,
+      dynamicPPP: 4.288,
+      dynamicPPPP: 5.668,
+      dynamicPPPPP: 7.104,
+      dynamicPPPPPP: 8.496,
+      dynamicPiano: 1.46,
+      dynamicPianoSmall: 1.74,
+      dynamicRinforzando: 1.108,
+      dynamicRinforzando1: 2.5,
+      dynamicRinforzando2: 2.976,
+      dynamicRinforzandoSmall: 1.436,
+      dynamicSforzando: 0.916,
+      dynamicSforzando1: 2.416,
+      dynamicSforzandoPianissimo: 4.792,
+      dynamicSforzandoPiano: 3.384,
+      dynamicSforzandoSmall: 0.9,
+      dynamicSforzato: 2.928,
+      dynamicSforzatoFF: 3.856,
+      dynamicSforzatoPiano: 4.3,
+      dynamicZ: 0.976,
+      dynamicZSmall: 1.168,
+      elecAudioChannelsEight: 4.004,
+      elecAudioChannelsFive: 4.004,
+      elecAudioChannelsFour: 4.004,
+      elecAudioChannelsOne: 4.004,
+      elecAudioChannelsSeven: 4.004,
+      elecAudioChannelsSix: 4.004,
+      elecAudioChannelsThreeFrontal: 4.004,
+      elecAudioChannelsThreeSurround: 4.004,
+      elecAudioChannelsTwo: 4.004,
+      elecAudioIn: 4.008,
+      elecAudioMono: 2.692,
+      elecAudioOut: 4.008,
+      elecAudioStereo: 3.996,
+      elecCamera: 4,
+      elecDataIn: 4.252,
+      elecDataOut: 4.252,
+      elecDisc: 4,
+      elecDownload: 2.172,
+      elecEject: 2.148,
+      elecFastForward: 3.604,
+      elecHeadphones: 3.528,
+      elecHeadset: 3.528,
+      elecLineIn: 3.284,
+      elecLineOut: 3.284,
+      elecLoop: 3,
+      elecLoudspeaker: 2.656,
+      elecMIDIController0: 2.192,
+      elecMIDIController100: 2.192,
+      elecMIDIController20: 2.192,
+      elecMIDIController40: 2.192,
+      elecMIDIController60: 2.192,
+      elecMIDIController80: 2.192,
+      elecMIDIIn: 2.148,
+      elecMIDIOut: 2.148,
+      elecMicrophone: 2.192,
+      elecMicrophoneMute: 2.192,
+      elecMicrophoneUnmute: 2.288,
+      elecMixingConsole: 3.448,
+      elecMonitor: 4.012,
+      elecMute: 4.388,
+      elecPause: 1.984,
+      elecPlay: 1.872,
+      elecPowerOnOff: 2.7,
+      elecProjector: 3.996,
+      elecReplay: 2.644,
+      elecRewind: 3.604,
+      elecShuffle: 4.572,
+      elecSkipBackwards: 3.928,
+      elecSkipForwards: 3.928,
+      elecStop: 2.136,
+      elecTape: 4.004,
+      elecUSB: 1.776,
+      elecUnmute: 3.836,
+      elecUpload: 2.172,
+      elecVideoCamera: 3.788,
+      elecVideoIn: 3.268,
+      elecVideoOut: 3.268,
+      elecVolumeFader: 0.1,
+      elecVolumeFaderThumb: 0.844,
+      elecVolumeLevel0: 0.944,
+      elecVolumeLevel100: 0.944,
+      elecVolumeLevel20: 0.944,
+      elecVolumeLevel40: 0.944,
+      elecVolumeLevel60: 0.944,
+      elecVolumeLevel80: 0.944,
+      fClef: 2.736,
+      fClef15ma: 2.736,
+      fClef15mb: 2.736,
+      fClef19thCentury: 4.164,
+      fClef5Below: 2.736,
+      fClef8va: 2.736,
+      fClef8vb: 2.736,
+      fClefArrowDown: 2.72,
+      fClefArrowUp: 2.736,
+      fClefChange: 1.848,
+      fClefFrench: 3.404,
+      fClefReversed: 2.756,
+      fClefSmall: 2.8,
+      fClefTurned: 2.736,
+      fermataAbove: 2.42,
+      fermataBelow: 2.42,
+      fermataLongAbove: 2.42,
+      fermataLongBelow: 2.42,
+      fermataLongHenzeAbove: 2.944,
+      fermataLongHenzeBelow: 2.944,
+      fermataShortAbove: 2.412,
+      fermataShortBelow: 2.412,
+      fermataShortHenzeAbove: 1.736,
+      fermataShortHenzeBelow: 1.736,
+      fermataVeryLongAbove: 2.864,
+      fermataVeryLongBelow: 2.864,
+      fermataVeryShortAbove: 2.94,
+      fermataVeryShortBelow: 2.94,
+      figbass0: 1.02,
+      figbass1: 0.628,
+      figbass2: 0.968,
+      figbass2Raised: 1.032,
+      figbass3: 0.9,
+      figbass4: 0.944,
+      figbass4Raised: 1.28,
+      figbass5: 0.9,
+      figbass5Raised1: 0.912,
+      figbass5Raised2: 0.912,
+      figbass5Raised3: 0.912,
+      figbass6: 0.944,
+      figbass6Raised: 0.944,
+      figbass6Raised2: 0.784,
+      figbass7: 0.948,
+      figbass7Diminished: 0.948,
+      figbass7Raised1: 0.948,
+      figbass7Raised2: 0.948,
+      figbass8: 0.928,
+      figbass9: 0.944,
+      figbass9Raised: 0.948,
+      figbassBracketLeft: 0.272,
+      figbassBracketRight: 0.276,
+      figbassCombiningLowering: 1.648,
+      figbassCombiningRaising: 1.648,
+      figbassDoubleFlat: 1.092,
+      figbassDoubleFlatLongerStem: 1.172,
+      figbassDoubleSharp: 0.952,
+      figbassDoubleSharpLongerStem: 0.948,
+      figbassFlat: 0.708,
+      figbassFlatLongerStem: 0.672,
+      figbassNatural: 0.536,
+      figbassNaturalLongerStem: 0.528,
+      figbassParensLeft: 0.34,
+      figbassParensRight: 0.352,
+      figbassPlus: 0.54,
+      figbassSharp: 0.764,
+      figbassSharpLongerStem: 0.744,
+      figbassTripleFlat: 1.496,
+      figbassTripleFlatLongerStem: 1.62,
+      figbassTripleSharp: 1.416,
+      figbassTripleSharpLongerStem: 1.632,
+      fingering0: 1.02,
+      fingering0Italic: 0.924,
+      fingering1: 0.628,
+      fingering1Italic: 0.772,
+      fingering2: 0.968,
+      fingering2Italic: 0.968,
+      fingering3: 0.9,
+      fingering3Italic: 0.908,
+      fingering4: 0.944,
+      fingering4Italic: 0.948,
+      fingering5: 0.9,
+      fingering5Italic: 0.984,
+      fingering6: 0.948,
+      fingering6Italic: 0.94,
+      fingering7: 0.968,
+      fingering7Italic: 0.96,
+      fingering8: 0.924,
+      fingering8Italic: 0.968,
+      fingering9: 0.94,
+      fingering9Italic: 0.94,
+      fingeringALower: 1.068,
+      fingeringCLower: 0.888,
+      fingeringELower: 0.8,
+      fingeringILower: 0.656,
+      fingeringLeftBracket: 0.268,
+      fingeringLeftBracketItalic: 0.436,
+      fingeringLeftParenthesis: 0.356,
+      fingeringLeftParenthesisItalic: 0.412,
+      fingeringMLower: 1.66,
+      fingeringMultipleNotes: 0.628,
+      fingeringOLower: 0.924,
+      fingeringPLower: 1.088,
+      fingeringQLower: 0.996,
+      fingeringRightBracket: 0.268,
+      fingeringRightBracketItalic: 0.428,
+      fingeringRightParenthesis: 0.36,
+      fingeringRightParenthesisItalic: 0.404,
+      fingeringSLower: 0.84,
+      fingeringSeparatorMiddleDot: 0.588,
+      fingeringSeparatorMiddleDotWhite: 0.588,
+      fingeringSeparatorSlash: 0.656,
+      fingeringSubstitutionAbove: 1.12,
+      fingeringSubstitutionBelow: 1.12,
+      fingeringSubstitutionDash: 0.792,
+      fingeringTLower: 0.604,
+      fingeringTUpper: 0.984,
+      fingeringXLower: 1.14,
+      flag1024thDown: 1.24,
+      flag1024thDownSmall: 1.272,
+      flag1024thDownStraight: 1.204,
+      flag1024thUp: 1.088,
+      flag1024thUpShort: 1.088,
+      flag1024thUpSmall: 1.148,
+      flag1024thUpStraight: 1.204,
+      flag128thDown: 1.1,
+      flag128thDownSmall: 1.268,
+      flag128thDownStraight: 1.1,
+      flag128thUp: 1.036,
+      flag128thUpShort: 1.036,
+      flag128thUpSmall: 1.148,
+      flag128thUpStraight: 1.056,
+      flag16thDown: 1.168,
+      flag16thDownSmall: 1.268,
+      flag16thDownStraight: 1.116,
+      flag16thUp: 1.116,
+      flag16thUpShort: 1.056,
+      flag16thUpSmall: 1.144,
+      flag16thUpStraight: 1.048,
+      flag256thDown: 1.204,
+      flag256thDownSmall: 1.268,
+      flag256thDownStraight: 1.204,
+      flag256thUp: 1.072,
+      flag256thUpShort: 1.06,
+      flag256thUpSmall: 1.148,
+      flag256thUpStraight: 1.072,
+      flag32ndDown: 1.096,
+      flag32ndDownSmall: 1.268,
+      flag32ndDownStraight: 1.104,
+      flag32ndUp: 1.048,
+      flag32ndUpShort: 1.06,
+      flag32ndUpSmall: 1.144,
+      flag32ndUpStraight: 1.048,
+      flag512thDown: 1.204,
+      flag512thDownSmall: 1.268,
+      flag512thDownStraight: 1.204,
+      flag512thUp: 1.072,
+      flag512thUpShort: 1.072,
+      flag512thUpSmall: 1.148,
+      flag512thUpStraight: 1.072,
+      flag64thDown: 1.1,
+      flag64thDownSmall: 1.272,
+      flag64thDownStraight: 1.1,
+      flag64thUp: 1.048,
+      flag64thUpShort: 1.048,
+      flag64thUpSmall: 1.148,
+      flag64thUpStraight: 1.048,
+      flag8thDown: 1.224,
+      flag8thDownSmall: 1.076,
+      flag8thDownStraight: 1.048,
+      flag8thUp: 1.056,
+      flag8thUpShort: 1.068,
+      flag8thUpSmall: 1.072,
+      flag8thUpStraight: 1,
+      flagInternalDown: 1.2,
+      flagInternalUp: 1.064,
+      fretboard3String: 1.44,
+      fretboard3StringNut: 1.452,
+      fretboard4String: 2.124,
+      fretboard4StringNut: 2.12,
+      fretboard5String: 2.796,
+      fretboard5StringNut: 2.792,
+      fretboard6String: 3.46,
+      fretboard6StringNut: 3.448,
+      fretboardFilledCircle: 0.284,
+      fretboardO: 0.284,
+      fretboardX: 0.3,
+      functionAngleLeft: 1.76,
+      functionAngleRight: 1.76,
+      functionBracketLeft: 0.744,
+      functionBracketRight: 0.744,
+      functionDD: 3.328,
+      functionDLower: 2.036,
+      functionDUpper: 2.472,
+      functionEight: 2.064,
+      functionFUpper: 2.084,
+      functionFive: 2.072,
+      functionFour: 2.128,
+      functionGLower: 2,
+      functionGUpper: 2.82,
+      functionGreaterThan: 2.152,
+      functionILower: 0.892,
+      functionIUpper: 0.728,
+      functionKLower: 1.916,
+      functionKUpper: 2.472,
+      functionLLower: 0.876,
+      functionLUpper: 1.972,
+      functionLessThan: 2.148,
+      functionMLower: 2.928,
+      functionMUpper: 2.944,
+      functionMinus: 1.112,
+      functionNLower: 1.828,
+      functionNUpper: 2.44,
+      functionNUpperSuperscript: 1.488,
+      functionNine: 2.044,
+      functionOne: 1.14,
+      functionPLower: 2.032,
+      functionPUpper: 2.264,
+      functionParensLeft: 0.904,
+      functionParensRight: 0.892,
+      functionPlus: 1.54,
+      functionRLower: 1.244,
+      functionRepetition1: 1.864,
+      functionRepetition2: 2.16,
+      functionRing: 1.536,
+      functionSLower: 1.86,
+      functionSSLower: 2.472,
+      functionSSUpper: 3.248,
+      functionSUpper: 2.452,
+      functionSeven: 2.056,
+      functionSix: 2.04,
+      functionSlashedDD: 3.328,
+      functionTLower: 1.12,
+      functionTUpper: 2.448,
+      functionThree: 2.056,
+      functionTwo: 2.068,
+      functionVLower: 2.064,
+      functionVUpper: 2.62,
+      functionZero: 2.016,
+      gClef: 2.684,
+      gClef0Below: 2.684,
+      gClef10Below: 3.024,
+      gClef11Below: 2.768,
+      gClef12Below: 2.864,
+      gClef13Below: 2.784,
+      gClef14Below: 2.924,
+      gClef15Below: 2.852,
+      gClef15ma: 2.684,
+      gClef15mb: 2.684,
+      gClef16Below: 2.948,
+      gClef17Below: 2.9,
+      gClef2Above: 2.696,
+      gClef2Below: 2.696,
+      gClef3Above: 2.696,
+      gClef3Below: 2.696,
+      gClef4Above: 2.696,
+      gClef4Below: 2.696,
+      gClef5Above: 2.696,
+      gClef5Below: 2.696,
+      gClef6Above: 2.696,
+      gClef6Below: 2.696,
+      gClef7Above: 2.696,
+      gClef7Below: 2.696,
+      gClef8Above: 2.68,
+      gClef8Below: 2.696,
+      gClef8va: 2.684,
+      gClef8vb: 2.656,
+      gClef8vbCClef: 3.368,
+      gClef8vbFrench: 2.68,
+      gClef8vbOld: 4.176,
+      gClef8vbParens: 2.656,
+      gClef9Above: 2.696,
+      gClef9Below: 2.696,
+      gClefArrowDown: 2.692,
+      gClefArrowUp: 2.676,
+      gClefChange: 1.76,
+      gClefFlat10Below: 3.024,
+      gClefFlat11Below: 2.752,
+      gClefFlat13Below: 2.776,
+      gClefFlat14Below: 2.924,
+      gClefFlat15Below: 2.852,
+      gClefFlat16Below: 2.948,
+      gClefFlat1Below: 2.684,
+      gClefFlat2Above: 2.696,
+      gClefFlat2Below: 2.696,
+      gClefFlat3Above: 2.696,
+      gClefFlat3Below: 2.696,
+      gClefFlat4Below: 2.856,
+      gClefFlat5Above: 2.696,
+      gClefFlat6Above: 2.696,
+      gClefFlat6Below: 2.84,
+      gClefFlat7Above: 2.696,
+      gClefFlat7Below: 2.684,
+      gClefFlat8Above: 2.696,
+      gClefFlat9Above: 2.696,
+      gClefFlat9Below: 2.796,
+      gClefLigatedNumberAbove: 2.684,
+      gClefLigatedNumberBelow: 2.768,
+      gClefNat2Below: 2.684,
+      gClefNatural10Below: 3.024,
+      gClefNatural13Below: 2.828,
+      gClefNatural17Below: 2.9,
+      gClefNatural2Above: 2.696,
+      gClefNatural3Above: 2.696,
+      gClefNatural3Below: 2.684,
+      gClefNatural6Above: 2.696,
+      gClefNatural6Below: 2.728,
+      gClefNatural7Above: 2.696,
+      gClefNatural9Above: 2.696,
+      gClefNatural9Below: 2.696,
+      gClefReversed: 2.696,
+      gClefSharp12Below: 2.876,
+      gClefSharp1Above: 2.696,
+      gClefSharp4Above: 2.696,
+      gClefSharp5Below: 2.804,
+      gClefSmall: 2.664,
+      gClefTurned: 2.696,
+      glissandoDown: 4.352,
+      glissandoUp: 4.352,
+      graceNoteAcciaccaturaStemDown: 0.78,
+      graceNoteAcciaccaturaStemUp: 1.428,
+      graceNoteAppoggiaturaStemDown: 0.78,
+      graceNoteAppoggiaturaStemUp: 1.292,
+      graceNoteSlashStemDown: 2.02,
+      graceNoteSlashStemUp: 2.02,
+      guitarBarreFull: 1.572,
+      guitarBarreHalf: 3.336,
+      guitarBarreHalfHorizontalFractionSlash: 2.336,
+      guitarClosePedal: 1.144,
+      guitarFadeIn: 1.448,
+      guitarFadeOut: 1.448,
+      guitarGolpe: 1.08,
+      guitarGolpeFlamenco: 1.552,
+      guitarHalfOpenPedal: 1.144,
+      guitarLeftHandTapping: 1.588,
+      guitarOpenPedal: 1.144,
+      guitarRightHandTapping: 0.788,
+      guitarShake: 4.576,
+      guitarString0: 2.168,
+      guitarString1: 2.16,
+      guitarString10: 2.16,
+      guitarString11: 2.16,
+      guitarString12: 2.16,
+      guitarString13: 2.188,
+      guitarString2: 2.16,
+      guitarString3: 2.16,
+      guitarString4: 2.172,
+      guitarString5: 2.164,
+      guitarString6: 2.16,
+      guitarString7: 2.16,
+      guitarString8: 2.16,
+      guitarString9: 2.16,
+      guitarStrumDown: 0.912,
+      guitarStrumUp: 0.912,
+      guitarVibratoBarDip: 2.136,
+      guitarVibratoBarScoop: 2.036,
+      guitarVibratoBarScoopCurved: 3.136,
+      guitarVibratoStroke: 0.608,
+      guitarVolumeSwell: 2.896,
+      guitarWideVibratoStroke: 0.82,
+      handbellsBelltree: 2.132,
+      handbellsDamp3: 2.568,
+      handbellsEcho1: 1.316,
+      handbellsEcho2: 0.516,
+      handbellsGyro: 3.124,
+      handbellsHandMartellato: 1.036,
+      handbellsMalletBellOnTable: 1.132,
+      handbellsMalletBellSuspended: 1.128,
+      handbellsMalletLft: 1.744,
+      handbellsMartellato: 1.032,
+      handbellsMartellatoLift: 1.656,
+      handbellsMutedMartellato: 1.916,
+      handbellsPluckLift: 0.924,
+      handbellsSwing: 1.228,
+      handbellsSwingDown: 0.512,
+      handbellsSwingUp: 0.512,
+      handbellsTablePairBells: 3.12,
+      handbellsTableSingleBell: 2.928,
+      harpMetalRod: 2.808,
+      harpMetalRodAlt: 4.496,
+      harpPedalCentered: 1,
+      harpPedalDivider: 1,
+      harpPedalLowered: 1,
+      harpPedalRaised: 1,
+      harpSalzedoAeolianAscending: 1.924,
+      harpSalzedoAeolianDescending: 1.924,
+      harpSalzedoDampAbove: 1.136,
+      harpSalzedoDampBelow: 1.136,
+      harpSalzedoDampBothHands: 2.544,
+      harpSalzedoDampLowStrings: 1.136,
+      harpSalzedoFluidicSoundsLeft: 0.896,
+      harpSalzedoFluidicSoundsRight: 1.384,
+      harpSalzedoIsolatedSounds: 2.156,
+      harpSalzedoMetallicSounds: 1.644,
+      harpSalzedoMetallicSoundsOneString: 1.644,
+      harpSalzedoMuffleTotally: 2.132,
+      harpSalzedoOboicFlux: 5.528,
+      harpSalzedoPlayUpperEnd: 3.432,
+      harpSalzedoSlideWithSuppleness: 2.284,
+      harpSalzedoSnareDrum: 2,
+      harpSalzedoTamTamSounds: 2.256,
+      harpSalzedoThunderEffect: 3.204,
+      harpSalzedoTimpanicSounds: 2.252,
+      harpSalzedoWhistlingSounds: 2.14,
+      harpStringNoiseStem: 0.724,
+      harpTuningKey: 3.004,
+      harpTuningKeyAlt: 3.924,
+      harpTuningKeyGlissando: 3.276,
+      harpTuningKeyHandle: 3.86,
+      harpTuningKeyShank: 2.9,
+      indianDrumClef: 2.588,
+      kahnBackChug: 2.36,
+      kahnBackFlap: 0.78,
+      kahnBackRiff: 2.312,
+      kahnBackRip: 1.832,
+      kahnBallChange: 1.632,
+      kahnBallDig: 1.78,
+      kahnBrushBackward: 1.128,
+      kahnBrushForward: 1.128,
+      kahnChug: 2.36,
+      kahnClap: 1.144,
+      kahnDoubleSnap: 1.152,
+      kahnDoubleWing: 2.428,
+      kahnDrawStep: 2.624,
+      kahnDrawTap: 3.456,
+      kahnFlam: 1.748,
+      kahnFlap: 1.328,
+      kahnFlapStep: 1.372,
+      kahnFlat: 0.848,
+      kahnFleaHop: 3.604,
+      kahnFleaTap: 2.22,
+      kahnGraceTap: 1.084,
+      kahnGraceTapChange: 1.612,
+      kahnGraceTapHop: 1.612,
+      kahnGraceTapStamp: 1.696,
+      kahnHeel: 0.772,
+      kahnHeelChange: 1.444,
+      kahnHeelClick: 1.94,
+      kahnHeelDrop: 1.228,
+      kahnHeelStep: 1.2,
+      kahnHeelTap: 2.08,
+      kahnHop: 1.112,
+      kahnJumpApart: 2.076,
+      kahnJumpTogether: 0.976,
+      kahnKneeInward: 0.548,
+      kahnKneeOutward: 0.548,
+      kahnLeap: 1.612,
+      kahnLeapFlatFoot: 1.724,
+      kahnLeapHeelClick: 1.612,
+      kahnLeftCatch: 1.716,
+      kahnLeftCross: 1.716,
+      kahnLeftFoot: 0.688,
+      kahnLeftToeStrike: 1.94,
+      kahnLeftTurn: 2.296,
+      kahnOverTheTop: 1.696,
+      kahnOverTheTopTap: 1.624,
+      kahnPull: 2.372,
+      kahnPush: 2.372,
+      kahnRiff: 3.32,
+      kahnRiffle: 1.168,
+      kahnRightCatch: 1.716,
+      kahnRightCross: 1.716,
+      kahnRightFoot: 0.756,
+      kahnRightToeStrike: 1.94,
+      kahnRightTurn: 2.296,
+      kahnRip: 1.22,
+      kahnRipple: 1.184,
+      kahnScrape: 0.908,
+      kahnScuff: 2.124,
+      kahnScuffle: 1.268,
+      kahnShuffle: 1.144,
+      kahnSlam: 2.604,
+      kahnSlap: 0.78,
+      kahnSlideStep: 3.456,
+      kahnSlideTap: 2.624,
+      kahnSnap: 1.336,
+      kahnStamp: 1.276,
+      kahnStampStamp: 1.528,
+      kahnStep: 1.112,
+      kahnStepStamp: 1.572,
+      kahnStomp: 1.78,
+      kahnStompBrush: 1.976,
+      kahnTap: 1.112,
+      kahnToe: 0.772,
+      kahnToeClick: 1.832,
+      kahnToeDrop: 0.992,
+      kahnToeStep: 1.284,
+      kahnToeTap: 2.164,
+      kahnTrench: 2.236,
+      kahnWing: 2.296,
+      kahnWingChange: 1.832,
+      kahnZank: 2.472,
+      kahnZink: 2.792,
+      keyboardBebung2DotsAbove: 1.78,
+      keyboardBebung2DotsBelow: 1.78,
+      keyboardBebung3DotsAbove: 2.3,
+      keyboardBebung3DotsBelow: 2.3,
+      keyboardBebung4DotsAbove: 2.852,
+      keyboardBebung4DotsBelow: 2.852,
+      keyboardLeftPedalPictogram: 1.688,
+      keyboardMiddlePedalPictogram: 1.704,
+      keyboardPedalD: 0.988,
+      keyboardPedalDot: 0.344,
+      keyboardPedalE: 0.848,
+      keyboardPedalHalf: 3,
+      keyboardPedalHalf2: 1.8,
+      keyboardPedalHalf3: 1.804,
+      keyboardPedalHeel1: 1.704,
+      keyboardPedalHeel2: 1.704,
+      keyboardPedalHeel3: 2,
+      keyboardPedalHeelToToe: 3.552,
+      keyboardPedalHeelToe: 1.704,
+      keyboardPedalHookEnd: 0.816,
+      keyboardPedalHookStart: 0.816,
+      keyboardPedalHyphen: 1.184,
+      keyboardPedalP: 1.972,
+      keyboardPedalParensLeft: 0.66,
+      keyboardPedalParensRight: 0.668,
+      keyboardPedalPed: 4.076,
+      keyboardPedalPedNoDot: 3.688,
+      keyboardPedalS: 1.676,
+      keyboardPedalSost: 4.428,
+      keyboardPedalSostNoDot: 4.056,
+      keyboardPedalToe1: 1.752,
+      keyboardPedalToe2: 1.752,
+      keyboardPedalToeToHeel: 3.552,
+      keyboardPedalUp: 1.8,
+      keyboardPedalUpNotch: 1.16,
+      keyboardPedalUpSpecial: 1.668,
+      keyboardPlayWithLH: 1.564,
+      keyboardPlayWithLHEnd: 1.564,
+      keyboardPlayWithRH: 1.564,
+      keyboardPlayWithRHEnd: 1.564,
+      keyboardPluckInside: 1.98,
+      keyboardRightPedalPictogram: 1.688,
+      kievanAccidentalFlat: 0.808,
+      kievanAccidentalSharp: 1.504,
+      kievanAugmentationDot: 0.8,
+      kievanCClef: 1.348,
+      kievanEndingSymbol: 1.412,
+      kievanNote8thStemDown: 1.136,
+      kievanNote8thStemUp: 0.92,
+      kievanNoteBeam: 2,
+      kievanNoteHalfStaffLine: 0.964,
+      kievanNoteHalfStaffSpace: 1.064,
+      kievanNoteQuarterStemDown: 0.932,
+      kievanNoteQuarterStemUp: 0.932,
+      kievanNoteReciting: 4.644,
+      kievanNoteWhole: 0.888,
+      kievanNoteWholeFinal: 1.196,
+      kodalyHandDo: 3.944,
+      kodalyHandFa: 4.144,
+      kodalyHandLa: 4.428,
+      kodalyHandMi: 4.996,
+      kodalyHandRe: 4.4,
+      kodalyHandSo: 4.648,
+      kodalyHandTi: 4.204,
+      leftRepeatSmall: 1.484,
+      legerLine: 1.328,
+      legerLineNarrow: 0.528,
+      legerLineWide: 2.128,
+      luteBarlineEndRepeat: 1.5,
+      luteBarlineFinal: 0.912,
+      luteBarlineStartRepeat: 1.5,
+      luteDuration16th: 0.912,
+      luteDuration32nd: 0.912,
+      luteDuration8th: 0.912,
+      luteDurationDoubleWhole: 0.596,
+      luteDurationHalf: 0.912,
+      luteDurationQuarter: 0.912,
+      luteDurationWhole: 0.144,
+      luteFingeringRHFirst: 0.288,
+      luteFingeringRHSecond: 0.824,
+      luteFingeringRHThird: 1.364,
+      luteFingeringRHThirdAlt: 1.204,
+      luteFingeringRHThumb: 0.128,
+      luteFrench10thCourse: 2.716,
+      luteFrench10thCourseRight: 3.012,
+      luteFrench10thCourseStrikethru: 3.68,
+      luteFrench10thCourseUnderline: 2.716,
+      luteFrench7thCourse: 1.104,
+      luteFrench7thCourseRight: 1.104,
+      luteFrench7thCourseStrikethru: 2.096,
+      luteFrench7thCourseUnderline: 1.104,
+      luteFrench8thCourse: 1.836,
+      luteFrench8thCourseRight: 2.12,
+      luteFrench8thCourseStrikethru: 2.804,
+      luteFrench8thCourseUnderline: 1.836,
+      luteFrench9thCourse: 2.276,
+      luteFrench9thCourseRight: 2.56,
+      luteFrench9thCourseStrikethru: 3.244,
+      luteFrench9thCourseUnderline: 2.276,
+      luteFrenchAppoggiaturaAbove: 0.512,
+      luteFrenchAppoggiaturaBelow: 0.58,
+      luteFrenchFretA: 1.104,
+      luteFrenchFretB: 0.876,
+      luteFrenchFretC: 1.168,
+      luteFrenchFretCAlt: 1.164,
+      luteFrenchFretD: 1.716,
+      luteFrenchFretE: 1.252,
+      luteFrenchFretF: 1.004,
+      luteFrenchFretG: 1.616,
+      luteFrenchFretH: 0.936,
+      luteFrenchFretI: 0.496,
+      luteFrenchFretK: 0.856,
+      luteFrenchFretL: 0.524,
+      luteFrenchFretM: 1.644,
+      luteFrenchFretN: 1.284,
+      luteFrenchMordentInverted: 0.748,
+      luteFrenchMordentLower: 1.588,
+      luteFrenchMordentUpper: 1.088,
+      luteGermanALower: 1.112,
+      luteGermanAUpper: 1.916,
+      luteGermanBLower: 1.192,
+      luteGermanBUpper: 2.244,
+      luteGermanCLower: 0.804,
+      luteGermanCUpper: 1.652,
+      luteGermanDLower: 1.152,
+      luteGermanDUpper: 2.24,
+      luteGermanELower: 0.852,
+      luteGermanEUpper: 2.012,
+      luteGermanFLower: 0.984,
+      luteGermanFUpper: 1.608,
+      luteGermanGLower: 1.38,
+      luteGermanGUpper: 2.18,
+      luteGermanHLower: 1.216,
+      luteGermanHUpper: 1.892,
+      luteGermanILower: 0.536,
+      luteGermanIUpper: 2.1,
+      luteGermanKLower: 0.992,
+      luteGermanKUpper: 2.096,
+      luteGermanLLower: 0.672,
+      luteGermanLUpper: 1.688,
+      luteGermanMLower: 1.932,
+      luteGermanMUpper: 2.884,
+      luteGermanNLower: 1.256,
+      luteGermanNUpper: 2.428,
+      luteGermanOLower: 1.256,
+      luteGermanPLower: 1.316,
+      luteGermanQLower: 1.26,
+      luteGermanRLower: 0.964,
+      luteGermanSLower: 0.984,
+      luteGermanTLower: 0.908,
+      luteGermanVLower: 1.34,
+      luteGermanXLower: 1.028,
+      luteGermanYLower: 1.216,
+      luteGermanZLower: 0.852,
+      luteItalianClefCSolFaUt: 1.904,
+      luteItalianClefFFaUt: 3.156,
+      luteItalianFret0: 1.024,
+      luteItalianFret1: 0.552,
+      luteItalianFret2: 0.956,
+      luteItalianFret3: 0.88,
+      luteItalianFret4: 0.936,
+      luteItalianFret5: 0.864,
+      luteItalianFret6: 0.944,
+      luteItalianFret7: 0.968,
+      luteItalianFret8: 0.92,
+      luteItalianFret9: 0.94,
+      luteItalianHoldFinger: 2.692,
+      luteItalianHoldNote: 1.228,
+      luteItalianReleaseFinger: 1.392,
+      luteItalianTempoFast: 4.508,
+      luteItalianTempoNeitherFastNorSlow: 3.908,
+      luteItalianTempoSlow: 3.916,
+      luteItalianTempoSomewhatFast: 4.5,
+      luteItalianTempoVerySlow: 3.908,
+      luteItalianTimeTriple: 2.652,
+      luteItalianTremolo: 0.824,
+      luteItalianVibrato: 1.588,
+      luteStaff6Lines: 2,
+      luteStaff6LinesNarrow: 1,
+      luteStaff6LinesWide: 3,
+      lyricsElision: 1.86,
+      lyricsElisionNarrow: 1.46,
+      lyricsElisionWide: 2.664,
+      lyricsHyphenBaseline: 1.34,
+      lyricsHyphenBaselineNonBreaking: 1.34,
+      lyricsTextRepeat: 1.616,
+      medRenFlatHardB: 0.744,
+      medRenFlatSoftB: 0.82,
+      medRenFlatSoftBHufnagel: 0.672,
+      medRenFlatSoftBOld: 0.58,
+      medRenFlatWithDot: 0.904,
+      medRenGClefCMN: 1.504,
+      medRenLiquescenceCMN: 1.32,
+      medRenLiquescentAscCMN: 1.1,
+      medRenLiquescentDescCMN: 1.1,
+      medRenNatural: 0.408,
+      medRenNaturalWithCross: 0.672,
+      medRenOriscusCMN: 1.276,
+      medRenPlicaCMN: 1.2,
+      medRenPunctumCMN: 1.096,
+      medRenQuilismaCMN: 1.612,
+      medRenSharpCroix: 1.72,
+      medRenStrophicusCMN: 0.736,
+      mensuralAlterationSign: 1.2,
+      mensuralBlackBrevis: 1.328,
+      mensuralBlackBrevisVoid: 1.328,
+      mensuralBlackDragma: 1.128,
+      mensuralBlackLonga: 1.328,
+      mensuralBlackMaxima: 3.128,
+      mensuralBlackMinima: 1.128,
+      mensuralBlackMinimaVoid: 1.128,
+      mensuralBlackSemibrevis: 1.128,
+      mensuralBlackSemibrevisCaudata: 1.128,
+      mensuralBlackSemibrevisOblique: 2.044,
+      mensuralBlackSemibrevisVoid: 1.132,
+      mensuralBlackSemiminima: 1.38,
+      mensuralCclef: 2.6,
+      mensuralCclefBlack: 1.136,
+      mensuralCclefPetrucciPosHigh: 0.976,
+      mensuralCclefPetrucciPosHighest: 0.976,
+      mensuralCclefPetrucciPosLow: 0.976,
+      mensuralCclefPetrucciPosLowest: 0.976,
+      mensuralCclefPetrucciPosMiddle: 0.976,
+      mensuralCclefVoid: 1.136,
+      mensuralColorationEndRound: 0.728,
+      mensuralColorationEndSquare: 0.728,
+      mensuralColorationStartRound: 0.728,
+      mensuralColorationStartSquare: 0.728,
+      mensuralCombStemDiagonal: 4e-3,
+      mensuralCombStemDown: 0.128,
+      mensuralCombStemDownFlagExtended: 0.876,
+      mensuralCombStemDownFlagFlared: 0.924,
+      mensuralCombStemDownFlagFusa: 0.876,
+      mensuralCombStemDownFlagLeft: 0.128,
+      mensuralCombStemDownFlagRight: 0.88,
+      mensuralCombStemDownFlagSemiminima: 0.876,
+      mensuralCombStemUp: 0.128,
+      mensuralCombStemUpFlagExtended: 0.876,
+      mensuralCombStemUpFlagFlared: 0.924,
+      mensuralCombStemUpFlagFusa: 0.876,
+      mensuralCombStemUpFlagLeft: 0.128,
+      mensuralCombStemUpFlagRight: 0.88,
+      mensuralCombStemUpFlagSemiminima: 0.876,
+      mensuralCustosCheckmark: 2.232,
+      mensuralCustosDown: 2.46,
+      mensuralCustosTurn: 1.868,
+      mensuralCustosUp: 2.46,
+      mensuralFclef: 1.192,
+      mensuralFclefPetrucci: 1.952,
+      mensuralFusaBlackStemDown: 1.376,
+      mensuralFusaBlackStemUp: 1.376,
+      mensuralFusaBlackVoidStemDown: 1.38,
+      mensuralFusaBlackVoidStemUp: 1.38,
+      mensuralFusaVoidStemDown: 1.372,
+      mensuralFusaVoidStemUp: 1.372,
+      mensuralGclef: 1.584,
+      mensuralGclefPetrucci: 1.356,
+      mensuralLongaBlackStemDownLeft: 1.328,
+      mensuralLongaBlackStemDownRight: 1.328,
+      mensuralLongaBlackStemUpLeft: 1.324,
+      mensuralLongaBlackStemUpRight: 1.328,
+      mensuralLongaBlackVoidStemDownLeft: 1.332,
+      mensuralLongaBlackVoidStemDownRight: 1.332,
+      mensuralLongaBlackVoidStemUpLeft: 1.332,
+      mensuralLongaBlackVoidStemUpRight: 1.332,
+      mensuralLongaVoidStemDownLeft: 1.328,
+      mensuralLongaVoidStemDownRight: 1.328,
+      mensuralLongaVoidStemUpLeft: 1.328,
+      mensuralLongaVoidStemUpRight: 1.328,
+      mensuralMaximaBlackStemDownLeft: 3.128,
+      mensuralMaximaBlackStemDownRight: 3.124,
+      mensuralMaximaBlackStemUpLeft: 3.124,
+      mensuralMaximaBlackStemUpRight: 3.128,
+      mensuralMaximaBlackVoidStemDownLeft: 3.16,
+      mensuralMaximaBlackVoidStemDownRight: 3.132,
+      mensuralMaximaBlackVoidStemUpLeft: 3.132,
+      mensuralMaximaBlackVoidStemUpRight: 3.132,
+      mensuralMaximaVoidStemDownLeft: 3.128,
+      mensuralMaximaVoidStemDownRight: 3.128,
+      mensuralMaximaVoidStemUpLeft: 3.128,
+      mensuralMaximaVoidStemUpRight: 3.128,
+      mensuralMinimaBlackStemDown: 1.128,
+      mensuralMinimaBlackStemDownExtendedFlag: 1.38,
+      mensuralMinimaBlackStemDownFlagLeft: 1.128,
+      mensuralMinimaBlackStemDownFlagRight: 1.38,
+      mensuralMinimaBlackStemDownFlaredFlag: 1.424,
+      mensuralMinimaBlackStemUp: 1.128,
+      mensuralMinimaBlackStemUpExtendedFlag: 1.38,
+      mensuralMinimaBlackStemUpFlagLeft: 1.128,
+      mensuralMinimaBlackStemUpFlagRight: 1.38,
+      mensuralMinimaBlackStemUpFlaredFlag: 1.424,
+      mensuralMinimaBlackVoidStemDown: 1.128,
+      mensuralMinimaBlackVoidStemDownExtendedFlag: 1.376,
+      mensuralMinimaBlackVoidStemDownFlagLeft: 1.128,
+      mensuralMinimaBlackVoidStemDownFlagRight: 1.376,
+      mensuralMinimaBlackVoidStemDownFlaredFlag: 1.428,
+      mensuralMinimaBlackVoidStemUp: 1.128,
+      mensuralMinimaBlackVoidStemUpExtendedFlag: 1.376,
+      mensuralMinimaBlackVoidStemUpFlagLeft: 1.128,
+      mensuralMinimaBlackVoidStemUpFlagRight: 1.376,
+      mensuralMinimaBlackVoidStemUpFlaredFlag: 1.428,
+      mensuralMinimaVoidStemDown: 1.128,
+      mensuralMinimaVoidStemDownExtendedFlag: 1.372,
+      mensuralMinimaVoidStemDownFlagLeft: 1.128,
+      mensuralMinimaVoidStemDownFlagRight: 1.376,
+      mensuralMinimaVoidStemDownFlaredFlag: 1.428,
+      mensuralMinimaVoidStemUp: 1.128,
+      mensuralMinimaVoidStemUpExtendedFlag: 1.372,
+      mensuralMinimaVoidStemUpFlagLeft: 1.128,
+      mensuralMinimaVoidStemUpFlagRight: 1.376,
+      mensuralMinimaVoidStemUpFlaredFlag: 1.428,
+      mensuralModusImperfectumVert: 4.192,
+      mensuralModusPerfectumVert: 4.192,
+      mensuralNoteheadLongaBlack: 1.328,
+      mensuralNoteheadLongaBlackVoid: 1.328,
+      mensuralNoteheadLongaVoid: 1.328,
+      mensuralNoteheadLongaWhite: 1.3,
+      mensuralNoteheadMaximaBlack: 3.128,
+      mensuralNoteheadMaximaBlackVoid: 3.132,
+      mensuralNoteheadMaximaVoid: 3.128,
+      mensuralNoteheadMaximaWhite: 2.5,
+      mensuralNoteheadMinimaWhite: 1.28,
+      mensuralNoteheadSemibrevisBlack: 1.128,
+      mensuralNoteheadSemibrevisBlackVoid: 1.128,
+      mensuralNoteheadSemibrevisBlackVoidTurned: 1.128,
+      mensuralNoteheadSemibrevisVoid: 1.132,
+      mensuralNoteheadSemiminimaWhite: 1.28,
+      mensuralObliqueAsc2ndBlack: 3.128,
+      mensuralObliqueAsc2ndBlackVoid: 3.132,
+      mensuralObliqueAsc2ndVoid: 3.128,
+      mensuralObliqueAsc2ndWhite: 3.124,
+      mensuralObliqueAsc3rdBlack: 3.128,
+      mensuralObliqueAsc3rdBlackVoid: 3.132,
+      mensuralObliqueAsc3rdVoid: 3.128,
+      mensuralObliqueAsc3rdWhite: 3.124,
+      mensuralObliqueAsc4thBlack: 3.128,
+      mensuralObliqueAsc4thBlackVoid: 3.132,
+      mensuralObliqueAsc4thVoid: 3.128,
+      mensuralObliqueAsc4thWhite: 3.124,
+      mensuralObliqueAsc5thBlack: 3.128,
+      mensuralObliqueAsc5thBlackVoid: 3.132,
+      mensuralObliqueAsc5thVoid: 3.128,
+      mensuralObliqueAsc5thWhite: 3.124,
+      mensuralObliqueDesc2ndBlack: 3.128,
+      mensuralObliqueDesc2ndBlackVoid: 3.132,
+      mensuralObliqueDesc2ndVoid: 3.128,
+      mensuralObliqueDesc2ndWhite: 3.124,
+      mensuralObliqueDesc3rdBlack: 3.128,
+      mensuralObliqueDesc3rdBlackVoid: 3.132,
+      mensuralObliqueDesc3rdVoid: 3.128,
+      mensuralObliqueDesc3rdWhite: 3.124,
+      mensuralObliqueDesc4thBlack: 3.128,
+      mensuralObliqueDesc4thBlackVoid: 3.132,
+      mensuralObliqueDesc4thVoid: 3.128,
+      mensuralObliqueDesc4thWhite: 3.124,
+      mensuralObliqueDesc5thBlack: 3.128,
+      mensuralObliqueDesc5thBlackVoid: 3.132,
+      mensuralObliqueDesc5thVoid: 3.128,
+      mensuralObliqueDesc5thWhite: 3.124,
+      mensuralProlation1: 2.128,
+      mensuralProlation10: 2,
+      mensuralProlation11: 1.976,
+      mensuralProlation2: 2.128,
+      mensuralProlation3: 2.128,
+      mensuralProlation4: 2.124,
+      mensuralProlation5: 1.98,
+      mensuralProlation6: 1.98,
+      mensuralProlation7: 1.968,
+      mensuralProlation8: 1.972,
+      mensuralProlation9: 1.98,
+      mensuralProlationCombiningDot: 0.5,
+      mensuralProlationCombiningDotVoid: 1.296,
+      mensuralProlationCombiningStroke: 0.192,
+      mensuralProlationCombiningThreeDots: 1.448,
+      mensuralProlationCombiningThreeDotsTri: 1.064,
+      mensuralProlationCombiningTwoDots: 1.064,
+      mensuralProportion1: 0.996,
+      mensuralProportion2: 1.324,
+      mensuralProportion3: 1.172,
+      mensuralProportion4: 1.516,
+      mensuralProportion4Old: 1.82,
+      mensuralProportion5: 1.26,
+      mensuralProportion6: 1.296,
+      mensuralProportion7: 1.352,
+      mensuralProportion8: 1.3,
+      mensuralProportion9: 1.296,
+      mensuralProportionMajor: 0.888,
+      mensuralProportionMinor: 0.888,
+      mensuralProportionProportioDupla1: 2.972,
+      mensuralProportionProportioDupla2: 2.16,
+      mensuralProportionProportioQuadrupla: 2.156,
+      mensuralProportionProportioTripla: 2.16,
+      mensuralProportionTempusPerfectum: 2.188,
+      mensuralRestBrevis: 0.192,
+      mensuralRestFusa: 0.556,
+      mensuralRestLongaImperfecta: 0.192,
+      mensuralRestLongaPerfecta: 0.192,
+      mensuralRestMaxima: 0.588,
+      mensuralRestMinima: 0.192,
+      mensuralRestSemibrevis: 0.192,
+      mensuralRestSemifusa: 0.552,
+      mensuralRestSemiminima: 0.556,
+      mensuralSemiminimaBlackStemDown: 1.372,
+      mensuralSemiminimaBlackStemUp: 1.372,
+      mensuralSemiminimaBlackVoidStemDown: 1.372,
+      mensuralSemiminimaBlackVoidStemUp: 1.368,
+      mensuralSemiminimaVoidStemDown: 1.368,
+      mensuralSemiminimaVoidStemUp: 1.368,
+      mensuralSignumDown: 1.14,
+      mensuralSignumUp: 1.14,
+      mensuralTempusImperfectumHoriz: 4.192,
+      mensuralTempusPerfectumHoriz: 4.192,
+      mensuralWhiteBrevis: 1.3,
+      mensuralWhiteFusa: 1.392,
+      mensuralWhiteLonga: 1.3,
+      mensuralWhiteMaxima: 2.5,
+      mensuralWhiteMinima: 1.28,
+      mensuralWhiteSemibrevis: 1.28,
+      mensuralWhiteSemiminima: 1.28,
+      metAugmentationDot: 0.4,
+      metNote1024thDown: 1.328,
+      metNote1024thUp: 2.164,
+      metNote128thDown: 1.328,
+      metNote128thUp: 2.148,
+      metNote16thDown: 1.328,
+      metNote16thUp: 2.088,
+      metNote256thDown: 1.328,
+      metNote256thUp: 2.164,
+      metNote32ndDown: 1.328,
+      metNote32ndUp: 2.152,
+      metNote512thDown: 1.328,
+      metNote512thUp: 2.168,
+      metNote64thDown: 1.328,
+      metNote64thUp: 2.148,
+      metNote8thDown: 1.328,
+      metNote8thUp: 2.136,
+      metNoteDoubleWhole: 2.62,
+      metNoteDoubleWholeSquare: 2.132,
+      metNoteHalfDown: 1.364,
+      metNoteHalfUp: 1.364,
+      metNoteQuarterDown: 1.328,
+      metNoteQuarterUp: 1.328,
+      metNoteWhole: 1.836,
+      metricModulationArrowLeft: 3.308,
+      metricModulationArrowRight: 3.308,
+      miscDoNotCopy: 4.52,
+      miscDoNotPhotocopy: 4.344,
+      miscEyeglasses: 4.652,
+      note1024thDown: 1.328,
+      note1024thUp: 2.268,
+      note128thDown: 1.328,
+      note128thUp: 2.252,
+      note16thDown: 1.328,
+      note16thUp: 2.324,
+      note256thDown: 1.328,
+      note256thUp: 2.264,
+      note32ndDown: 1.328,
+      note32ndUp: 2.252,
+      note512thDown: 1.328,
+      note512thUp: 2.272,
+      note64thDown: 1.328,
+      note64thUp: 2.252,
+      note8thDown: 1.328,
+      note8thUp: 2.264,
+      noteABlack: 1.432,
+      noteAFlatBlack: 1.432,
+      noteAFlatHalf: 1.444,
+      noteAFlatWhole: 1.944,
+      noteAHalf: 1.444,
+      noteASharpBlack: 1.432,
+      noteASharpHalf: 1.444,
+      noteASharpWhole: 1.944,
+      noteAWhole: 1.944,
+      noteBBlack: 1.428,
+      noteBFlatBlack: 1.428,
+      noteBFlatHalf: 1.444,
+      noteBFlatWhole: 1.944,
+      noteBHalf: 1.444,
+      noteBSharpBlack: 1.428,
+      noteBSharpHalf: 1.444,
+      noteBSharpWhole: 1.944,
+      noteBWhole: 1.944,
+      noteCBlack: 1.432,
+      noteCFlatBlack: 1.428,
+      noteCFlatHalf: 1.44,
+      noteCFlatWhole: 1.944,
+      noteCHalf: 1.444,
+      noteCSharpBlack: 1.428,
+      noteCSharpHalf: 1.444,
+      noteCSharpWhole: 1.944,
+      noteCWhole: 1.944,
+      noteDBlack: 1.428,
+      noteDFlatBlack: 1.428,
+      noteDFlatHalf: 1.444,
+      noteDFlatWhole: 1.944,
+      noteDHalf: 1.444,
+      noteDSharpBlack: 1.428,
+      noteDSharpHalf: 1.444,
+      noteDSharpWhole: 1.944,
+      noteDWhole: 1.944,
+      noteDiBlack: 1.432,
+      noteDiHalf: 1.44,
+      noteDiWhole: 1.948,
+      noteDoBlack: 1.432,
+      noteDoHalf: 1.44,
+      noteDoWhole: 1.944,
+      noteDoubleWhole: 2.62,
+      noteDoubleWholeAlt: 2.116,
+      noteDoubleWholeSquare: 2.132,
+      noteEBlack: 1.432,
+      noteEFlatBlack: 1.428,
+      noteEFlatHalf: 1.444,
+      noteEFlatWhole: 1.948,
+      noteEHalf: 1.444,
+      noteESharpBlack: 1.428,
+      noteESharpHalf: 1.444,
+      noteESharpWhole: 1.944,
+      noteEWhole: 1.944,
+      noteEmptyBlack: 1.432,
+      noteEmptyHalf: 1.444,
+      noteEmptyWhole: 1.944,
+      noteFBlack: 1.432,
+      noteFFlatBlack: 1.428,
+      noteFFlatHalf: 1.444,
+      noteFFlatWhole: 1.944,
+      noteFHalf: 1.444,
+      noteFSharpBlack: 1.428,
+      noteFSharpHalf: 1.444,
+      noteFSharpWhole: 1.944,
+      noteFWhole: 1.944,
+      noteFaBlack: 1.432,
+      noteFaHalf: 1.44,
+      noteFaWhole: 1.944,
+      noteFiBlack: 1.432,
+      noteFiHalf: 1.44,
+      noteFiWhole: 1.944,
+      noteGBlack: 1.432,
+      noteGFlatBlack: 1.432,
+      noteGFlatHalf: 1.444,
+      noteGFlatWhole: 1.944,
+      noteGHalf: 1.44,
+      noteGSharpBlack: 1.428,
+      noteGSharpHalf: 1.444,
+      noteGSharpWhole: 1.944,
+      noteGWhole: 1.944,
+      noteHBlack: 1.432,
+      noteHHalf: 1.444,
+      noteHSharpBlack: 1.432,
+      noteHSharpHalf: 1.444,
+      noteHSharpWhole: 1.944,
+      noteHWhole: 1.944,
+      noteHalfDown: 1.364,
+      noteHalfUp: 1.364,
+      noteLaBlack: 1.432,
+      noteLaHalf: 1.444,
+      noteLaWhole: 1.944,
+      noteLeBlack: 1.432,
+      noteLeHalf: 1.444,
+      noteLeWhole: 1.948,
+      noteLiBlack: 1.436,
+      noteLiHalf: 1.444,
+      noteLiWhole: 1.948,
+      noteLoBlack: 1.436,
+      noteLoHalf: 1.444,
+      noteLoWhole: 1.948,
+      noteMaBlack: 1.436,
+      noteMaHalf: 0,
+      noteMaWhole: 1.948,
+      noteMeBlack: 1.436,
+      noteMeHalf: 1.444,
+      noteMeWhole: 1.948,
+      noteMiBlack: 1.432,
+      noteMiHalf: 1.44,
+      noteMiWhole: 1.944,
+      noteQuarterDown: 1.328,
+      noteQuarterUp: 1.328,
+      noteRaBlack: 1.436,
+      noteRaHalf: 1.444,
+      noteRaWhole: 1.948,
+      noteReBlack: 1.432,
+      noteReHalf: 1.444,
+      noteReWhole: 1.944,
+      noteRiBlack: 1.436,
+      noteRiHalf: 1.44,
+      noteRiWhole: 1.948,
+      noteSeBlack: 1.436,
+      noteSeHalf: 1.444,
+      noteSeWhole: 1.948,
+      noteShapeArrowheadLeftBlack: 1.124,
+      noteShapeArrowheadLeftDoubleWhole: 1.908,
+      noteShapeArrowheadLeftWhite: 1.12,
+      noteShapeDiamondBlack: 1.444,
+      noteShapeDiamondDoubleWhole: 2.04,
+      noteShapeDiamondWhite: 1.436,
+      noteShapeIsoscelesTriangleBlack: 1.124,
+      noteShapeIsoscelesTriangleDoubleWhole: 1.928,
+      noteShapeIsoscelesTriangleWhite: 1.124,
+      noteShapeKeystoneBlack: 1.176,
+      noteShapeKeystoneDoubleWhole: 1.988,
+      noteShapeKeystoneWhite: 1.172,
+      noteShapeMoonBlack: 1.444,
+      noteShapeMoonDoubleWhole: 2.336,
+      noteShapeMoonLeftBlack: 1.04,
+      noteShapeMoonLeftDoubleWhole: 1.836,
+      noteShapeMoonLeftWhite: 1.04,
+      noteShapeMoonWhite: 1.444,
+      noteShapeQuarterMoonBlack: 1.036,
+      noteShapeQuarterMoonDoubleWhole: 1.84,
+      noteShapeQuarterMoonWhite: 1.036,
+      noteShapeRoundBlack: 1.444,
+      noteShapeRoundDoubleWhole: 2.396,
+      noteShapeRoundWhite: 1.456,
+      noteShapeSquareBlack: 1.44,
+      noteShapeSquareDoubleWhole: 2.324,
+      noteShapeSquareWhite: 1.44,
+      noteShapeTriangleLeftBlack: 1.44,
+      noteShapeTriangleLeftDoubleWhole: 2.316,
+      noteShapeTriangleLeftWhite: 1.44,
+      noteShapeTriangleRightBlack: 1.44,
+      noteShapeTriangleRightDoubleWhole: 2.3,
+      noteShapeTriangleRightWhite: 1.44,
+      noteShapeTriangleRoundBlack: 1.424,
+      noteShapeTriangleRoundDoubleWhole: 2.152,
+      noteShapeTriangleRoundLeftBlack: 1.292,
+      noteShapeTriangleRoundLeftDoubleWhole: 2.088,
+      noteShapeTriangleRoundLeftWhite: 1.292,
+      noteShapeTriangleRoundWhite: 1.424,
+      noteShapeTriangleUpBlack: 1.424,
+      noteShapeTriangleUpDoubleWhole: 2.148,
+      noteShapeTriangleUpWhite: 1.424,
+      noteSiBlack: 1.432,
+      noteSiHalf: 1.44,
+      noteSiWhole: 1.948,
+      noteSoBlack: 1.432,
+      noteSoHalf: 1.444,
+      noteSoWhole: 1.944,
+      noteTaBlack: 1.436,
+      noteTaHalf: 1.444,
+      noteTaWhole: 1.948,
+      noteTeBlack: 1.436,
+      noteTeHalf: 1.444,
+      noteTeWhole: 1.948,
+      noteTiBlack: 1.432,
+      noteTiHalf: 1.44,
+      noteTiWhole: 1.944,
+      noteWhole: 1.836,
+      noteheadBlack: 1.18,
+      noteheadBlackOversized: 1.316,
+      noteheadBlackParens: 1.832,
+      noteheadBlackSmall: 1.408,
+      noteheadCircleSlash: 1,
+      noteheadCircleX: 0.996,
+      noteheadCircleXDoubleWhole: 1.688,
+      noteheadCircleXHalf: 1,
+      noteheadCircleXWhole: 0.996,
+      noteheadCircledBlack: 1.18,
+      noteheadCircledBlackLarge: 1.176,
+      noteheadCircledDoubleWhole: 2.412,
+      noteheadCircledDoubleWholeLarge: 2.216,
+      noteheadCircledHalf: 1.172,
+      noteheadCircledHalfLarge: 1.18,
+      noteheadCircledWhole: 1.748,
+      noteheadCircledWholeLarge: 2.164,
+      noteheadCircledXLarge: 1.828,
+      noteheadClusterDoubleWhole2nd: 2.428,
+      noteheadClusterDoubleWhole3rd: 2.424,
+      noteheadClusterDoubleWholeBottom: 2.392,
+      noteheadClusterDoubleWholeMiddle: 2.392,
+      noteheadClusterDoubleWholeTop: 2.392,
+      noteheadClusterHalf2nd: 1.24,
+      noteheadClusterHalf3rd: 1.264,
+      noteheadClusterHalfBottom: 1.196,
+      noteheadClusterHalfMiddle: 1.2,
+      noteheadClusterHalfTop: 1.2,
+      noteheadClusterQuarter2nd: 1.308,
+      noteheadClusterQuarter3rd: 1.44,
+      noteheadClusterQuarterBottom: 1.18,
+      noteheadClusterQuarterMiddle: 1.18,
+      noteheadClusterQuarterTop: 1.18,
+      noteheadClusterRoundBlack: 1.328,
+      noteheadClusterRoundWhite: 1.496,
+      noteheadClusterSquareBlack: 1.328,
+      noteheadClusterSquareWhite: 1.328,
+      noteheadClusterWhole2nd: 1.728,
+      noteheadClusterWhole3rd: 1.7,
+      noteheadClusterWholeBottom: 1.696,
+      noteheadClusterWholeMiddle: 1.696,
+      noteheadClusterWholeTop: 1.696,
+      noteheadCowellEleventhNoteSeriesHalf: 1.172,
+      noteheadCowellEleventhNoteSeriesWhole: 1.672,
+      noteheadCowellEleventhSeriesBlack: 1.18,
+      noteheadCowellFifteenthNoteSeriesBlack: 1,
+      noteheadCowellFifteenthNoteSeriesHalf: 1,
+      noteheadCowellFifteenthNoteSeriesWhole: 1,
+      noteheadCowellFifthNoteSeriesBlack: 1,
+      noteheadCowellFifthNoteSeriesHalf: 1,
+      noteheadCowellFifthNoteSeriesWhole: 1,
+      noteheadCowellNinthNoteSeriesBlack: 1.3,
+      noteheadCowellNinthNoteSeriesHalf: 1.3,
+      noteheadCowellNinthNoteSeriesWhole: 1.3,
+      noteheadCowellSeventhNoteSeriesBlack: 1.016,
+      noteheadCowellSeventhNoteSeriesHalf: 1.016,
+      noteheadCowellSeventhNoteSeriesWhole: 1.008,
+      noteheadCowellThirdNoteSeriesBlack: 1.172,
+      noteheadCowellThirdNoteSeriesHalf: 1.14,
+      noteheadCowellThirdNoteSeriesWhole: 1.276,
+      noteheadCowellThirteenthNoteSeriesBlack: 1.172,
+      noteheadCowellThirteenthNoteSeriesHalf: 1.14,
+      noteheadCowellThirteenthNoteSeriesWhole: 1.276,
+      noteheadDiamondBlack: 0.98,
+      noteheadDiamondBlackOld: 1.16,
+      noteheadDiamondBlackWide: 1.36,
+      noteheadDiamondClusterBlack2nd: 1.068,
+      noteheadDiamondClusterBlack3rd: 1.096,
+      noteheadDiamondClusterBlackBottom: 1.184,
+      noteheadDiamondClusterBlackMiddle: 1.184,
+      noteheadDiamondClusterBlackTop: 1.184,
+      noteheadDiamondClusterWhite2nd: 1.06,
+      noteheadDiamondClusterWhite3rd: 1.092,
+      noteheadDiamondClusterWhiteBottom: 1.164,
+      noteheadDiamondClusterWhiteMiddle: 1.164,
+      noteheadDiamondClusterWhiteTop: 1.164,
+      noteheadDiamondDoubleWhole: 2.304,
+      noteheadDiamondDoubleWholeOld: 1.8,
+      noteheadDiamondHalf: 0.98,
+      noteheadDiamondHalfFilled: 1.156,
+      noteheadDiamondHalfOld: 1.164,
+      noteheadDiamondHalfWide: 1.372,
+      noteheadDiamondOpen: 1.152,
+      noteheadDiamondWhite: 1.128,
+      noteheadDiamondWhiteWide: 1.612,
+      noteheadDiamondWhole: 1.664,
+      noteheadDiamondWholeOld: 1.172,
+      noteheadDoubleWhole: 2.396,
+      noteheadDoubleWholeAlt: 2.116,
+      noteheadDoubleWholeOversized: 2.628,
+      noteheadDoubleWholeParens: 3.456,
+      noteheadDoubleWholeSmall: 2.732,
+      noteheadDoubleWholeSquare: 1.664,
+      noteheadDoubleWholeSquareOversized: 2.132,
+      noteheadDoubleWholeWithX: 2.388,
+      noteheadHalf: 1.18,
+      noteheadHalfFilled: 1.18,
+      noteheadHalfOversized: 1.316,
+      noteheadHalfParens: 1.864,
+      noteheadHalfSmall: 1.364,
+      noteheadHalfWithX: 1.176,
+      noteheadHeavyX: 1.54,
+      noteheadHeavyXHat: 1.54,
+      noteheadLargeArrowDownBlack: 1.328,
+      noteheadLargeArrowDownDoubleWhole: 2.204,
+      noteheadLargeArrowDownHalf: 1.44,
+      noteheadLargeArrowDownWhole: 1.44,
+      noteheadLargeArrowUpBlack: 1.328,
+      noteheadLargeArrowUpDoubleWhole: 2.2,
+      noteheadLargeArrowUpHalf: 1.44,
+      noteheadLargeArrowUpWhole: 1.44,
+      noteheadMoonBlack: 1.26,
+      noteheadMoonWhite: 1.26,
+      noteheadNancarrowSine: 1.396,
+      noteheadNull: 1.18,
+      noteheadParenthesis: 1.18,
+      noteheadParenthesisLeft: 0.292,
+      noteheadParenthesisRight: 0.292,
+      noteheadPlusBlack: 0.996,
+      noteheadPlusDoubleWhole: 1.892,
+      noteheadPlusHalf: 1.044,
+      noteheadPlusWhole: 1.14,
+      noteheadRectangularClusterBlackBottom: 1.376,
+      noteheadRectangularClusterBlackMiddle: 1.376,
+      noteheadRectangularClusterBlackTop: 1.376,
+      noteheadRectangularClusterWhiteBottom: 1.376,
+      noteheadRectangularClusterWhiteMiddle: 1.376,
+      noteheadRectangularClusterWhiteTop: 1.376,
+      noteheadRoundBlack: 1.004,
+      noteheadRoundBlackDoubleSlashed: 1,
+      noteheadRoundBlackLarge: 2,
+      noteheadRoundBlackSlashed: 0.996,
+      noteheadRoundBlackSlashedLarge: 2.004,
+      noteheadRoundWhite: 1.004,
+      noteheadRoundWhiteDoubleSlashed: 1,
+      noteheadRoundWhiteLarge: 2,
+      noteheadRoundWhiteSlashed: 0.996,
+      noteheadRoundWhiteSlashedLarge: 2.004,
+      noteheadRoundWhiteWithDot: 1.004,
+      noteheadRoundWhiteWithDotLarge: 2.004,
+      noteheadSlashDiamondWhite: 2,
+      noteheadSlashDiamondWhiteOversized: 2.4,
+      noteheadSlashHorizontalEnds: 2.124,
+      noteheadSlashHorizontalEndsMuted: 2.12,
+      noteheadSlashHorizontalEndsMutedOversized: 2.544,
+      noteheadSlashHorizontalEndsOversized: 2.544,
+      noteheadSlashVerticalEnds: 1.46,
+      noteheadSlashVerticalEndsMuted: 1.46,
+      noteheadSlashVerticalEndsMutedOversized: 1.756,
+      noteheadSlashVerticalEndsOversized: 1.84,
+      noteheadSlashVerticalEndsSmall: 0.732,
+      noteheadSlashVerticalEndsSmallOversized: 1.044,
+      noteheadSlashWhiteDoubleWhole: 4.644,
+      noteheadSlashWhiteDoubleWholeOversized: 5.576,
+      noteheadSlashWhiteHalf: 3.12,
+      noteheadSlashWhiteHalfOversized: 3.744,
+      noteheadSlashWhiteMuted: 3.124,
+      noteheadSlashWhiteMutedOversized: 3.744,
+      noteheadSlashWhiteWhole: 3.92,
+      noteheadSlashWhiteWholeOversized: 4.704,
+      noteheadSlashX: 2.124,
+      noteheadSlashXOversized: 2.544,
+      noteheadSlashedBlack1: 1.18,
+      noteheadSlashedBlack2: 1.18,
+      noteheadSlashedDoubleWhole1: 2.384,
+      noteheadSlashedDoubleWhole2: 2.384,
+      noteheadSlashedHalf1: 1.168,
+      noteheadSlashedHalf2: 1.172,
+      noteheadSlashedWhole1: 1.672,
+      noteheadSlashedWhole2: 1.672,
+      noteheadSquareBlack: 1.252,
+      noteheadSquareBlackLarge: 2.004,
+      noteheadSquareBlackWhite: 2.004,
+      noteheadSquareWhite: 1.252,
+      noteheadTriangleDownBlack: 1.168,
+      noteheadTriangleDownDoubleWhole: 1.932,
+      noteheadTriangleDownHalf: 1.14,
+      noteheadTriangleDownWhite: 1.172,
+      noteheadTriangleDownWhole: 1.276,
+      noteheadTriangleLeftBlack: 1.356,
+      noteheadTriangleLeftWhite: 1.356,
+      noteheadTriangleRightBlack: 1.356,
+      noteheadTriangleRightWhite: 1.356,
+      noteheadTriangleRoundDownBlack: 1.112,
+      noteheadTriangleRoundDownWhite: 1.112,
+      noteheadTriangleUpBlack: 1.172,
+      noteheadTriangleUpDoubleWhole: 1.932,
+      noteheadTriangleUpHalf: 1.14,
+      noteheadTriangleUpRightBlack: 1.356,
+      noteheadTriangleUpRightWhite: 1.356,
+      noteheadTriangleUpWhite: 1.172,
+      noteheadTriangleUpWhole: 1.276,
+      noteheadVoidWithX: 1.156,
+      noteheadWhole: 1.688,
+      noteheadWholeFilled: 1.688,
+      noteheadWholeOversized: 1.836,
+      noteheadWholeParens: 2.288,
+      noteheadWholeSmall: 1.836,
+      noteheadWholeWithX: 1.68,
+      noteheadXBlack: 1.16,
+      noteheadXDoubleWhole: 2.184,
+      noteheadXHalf: 1.336,
+      noteheadXOrnate: 0.992,
+      noteheadXOrnateEllipse: 1,
+      noteheadXWhole: 1.508,
+      octaveBaselineA: 0.968,
+      octaveBaselineB: 0.8,
+      octaveBaselineM: 1.524,
+      octaveBaselineV: 0.856,
+      octaveBassa: 4.252,
+      octaveLoco: 3.012,
+      octaveParensLeft: 0.548,
+      octaveParensRight: 0.548,
+      octaveSuperscriptA: 0.968,
+      octaveSuperscriptB: 0.8,
+      octaveSuperscriptM: 1.524,
+      octaveSuperscriptV: 0.856,
+      oneHandedRollStevens: 1.084,
+      organGerman2Fusae: 4,
+      organGerman2Minimae: 4,
+      organGerman2OctaveUp: 0,
+      organGerman2Semifusae: 4,
+      organGerman2Semiminimae: 4,
+      organGerman3Fusae: 6,
+      organGerman3Minimae: 6,
+      organGerman3Semifusae: 6,
+      organGerman3Semiminimae: 6,
+      organGerman4Fusae: 8,
+      organGerman4Minimae: 8,
+      organGerman4Semifusae: 8,
+      organGerman4Semiminimae: 8,
+      organGerman5Fusae: 10,
+      organGerman5Minimae: 10,
+      organGerman5Semifusae: 10,
+      organGerman5Semiminimae: 10,
+      organGerman6Fusae: 12,
+      organGerman6Minimae: 12,
+      organGerman6Semifusae: 12,
+      organGerman6Semiminimae: 12,
+      organGermanALower: 2,
+      organGermanAUpper: 2,
+      organGermanAugmentationDot: 0,
+      organGermanBLower: 2,
+      organGermanBUpper: 2,
+      organGermanBuxheimerBrevis2: 2,
+      organGermanBuxheimerBrevis3: 2,
+      organGermanBuxheimerMinimaRest: 2,
+      organGermanBuxheimerSemibrevis: 2,
+      organGermanBuxheimerSemibrevisRest: 2,
+      organGermanCLower: 2,
+      organGermanCUpper: 2,
+      organGermanCisLower: 2,
+      organGermanCisUpper: 2,
+      organGermanDLower: 2,
+      organGermanDUpper: 2,
+      organGermanDisLower: 2,
+      organGermanDisUpper: 2,
+      organGermanELower: 2,
+      organGermanEUpper: 2,
+      organGermanFLower: 2,
+      organGermanFUpper: 2,
+      organGermanFisLower: 2,
+      organGermanFisUpper: 2,
+      organGermanFusa: 2,
+      organGermanFusaRest: 2,
+      organGermanGLower: 2,
+      organGermanGUpper: 2,
+      organGermanGisLower: 2,
+      organGermanGisUpper: 2,
+      organGermanHLower: 2,
+      organGermanHUpper: 2,
+      organGermanMinima: 2,
+      organGermanMinimaRest: 2,
+      organGermanOctaveDown: 0,
+      organGermanOctaveUp: 0,
+      organGermanSemibrevis: 2,
+      organGermanSemibrevisRest: 2,
+      organGermanSemifusa: 2,
+      organGermanSemifusaRest: 2,
+      organGermanSemiminima: 2,
+      organGermanSemiminimaRest: 2,
+      organGermanTie: 0,
+      ornamentBottomLeftConcaveStroke: 0.46,
+      ornamentBottomLeftConcaveStrokeLarge: 1.912,
+      ornamentBottomLeftConvexStroke: 1.624,
+      ornamentBottomRightConcaveStroke: 1.108,
+      ornamentBottomRightConvexStroke: 2.208,
+      ornamentComma: 0.56,
+      ornamentDoubleObliqueLinesAfterNote: 2.076,
+      ornamentDoubleObliqueLinesBeforeNote: 2,
+      ornamentDownCurve: 1.568,
+      ornamentHaydn: 2,
+      ornamentHighLeftConcaveStroke: 1.716,
+      ornamentHighLeftConvexStroke: 1.112,
+      ornamentHighRightConcaveStroke: 2.14,
+      ornamentHighRightConvexStroke: 1.6,
+      ornamentHookAfterNote: 2,
+      ornamentHookBeforeNote: 1.5,
+      ornamentLeftFacingHalfCircle: 0.636,
+      ornamentLeftFacingHook: 0.884,
+      ornamentLeftPlus: 2.784,
+      ornamentLeftShakeT: 0.924,
+      ornamentLeftVerticalStroke: 0.74,
+      ornamentLeftVerticalStrokeWithCross: 1.152,
+      ornamentLowLeftConcaveStroke: 1.532,
+      ornamentLowLeftConvexStroke: 1.344,
+      ornamentLowRightConcaveStroke: 1.304,
+      ornamentLowRightConvexStroke: 1.916,
+      ornamentMiddleVerticalStroke: 4e-3,
+      ornamentMordent: 2.916,
+      ornamentObliqueLineAfterNote: 1.252,
+      ornamentObliqueLineBeforeNote: 1.256,
+      ornamentObliqueLineHorizAfterNote: 1.94,
+      ornamentObliqueLineHorizBeforeNote: 1.94,
+      ornamentOriscus: 2,
+      ornamentPinceCouperin: 2.344,
+      ornamentPortDeVoixV: 1.776,
+      ornamentPrecompAppoggTrill: 4.476,
+      ornamentPrecompAppoggTrillSuffix: 3.504,
+      ornamentPrecompCadence: 4.424,
+      ornamentPrecompCadenceUpperPrefix: 4.052,
+      ornamentPrecompCadenceUpperPrefixTurn: 4.052,
+      ornamentPrecompCadenceWithTurn: 4.424,
+      ornamentPrecompDescendingSlide: 4.512,
+      ornamentPrecompDoubleCadenceLowerPrefix: 5.476,
+      ornamentPrecompDoubleCadenceUpperPrefix: 5.112,
+      ornamentPrecompDoubleCadenceUpperPrefixTurn: 5.108,
+      ornamentPrecompInvertedMordentUpperPrefix: 4.888,
+      ornamentPrecompMordentRelease: 2.772,
+      ornamentPrecompMordentUpperPrefix: 4.892,
+      ornamentPrecompPortDeVoixMordent: 5.224,
+      ornamentPrecompSlide: 4.432,
+      ornamentPrecompSlideTrillBach: 4.192,
+      ornamentPrecompSlideTrillDAnglebert: 4.6,
+      ornamentPrecompSlideTrillMarpurg: 4.448,
+      ornamentPrecompSlideTrillMuffat: 5.64,
+      ornamentPrecompSlideTrillSuffixMuffat: 4.328,
+      ornamentPrecompTrillLowerSuffix: 3.436,
+      ornamentPrecompTrillSuffixDandrieu: 3.796,
+      ornamentPrecompTrillWithMordent: 3.96,
+      ornamentPrecompTurnTrillBach: 5.892,
+      ornamentPrecompTurnTrillDAnglebert: 5.98,
+      ornamentQuilisma: 1.664,
+      ornamentRightFacingHalfCircle: 0.648,
+      ornamentRightFacingHook: 0.872,
+      ornamentRightVerticalStroke: 0.668,
+      ornamentSchleifer: 4.572,
+      ornamentShake3: 1.132,
+      ornamentShakeMuffat1: 0.876,
+      ornamentShortObliqueLineAfterNote: 0.804,
+      ornamentShortObliqueLineBeforeNote: 0.804,
+      ornamentShortTrill: 2.92,
+      ornamentTopLeftConcaveStroke: 1.396,
+      ornamentTopLeftConvexStroke: 1.132,
+      ornamentTopRightConcaveStroke: 1.752,
+      ornamentTopRightConvexStroke: 0.46,
+      ornamentTremblement: 3.94,
+      ornamentTremblementCouperin: 2.44,
+      ornamentTrill: 2.084,
+      ornamentTrillFlatAbove: 2.084,
+      ornamentTrillNaturalAbove: 2.084,
+      ornamentTrillSharpAbove: 2.084,
+      ornamentTurn: 1.84,
+      ornamentTurnFlatAbove: 1.84,
+      ornamentTurnFlatAboveSharpBelow: 1.84,
+      ornamentTurnFlatBelow: 1.84,
+      ornamentTurnInverted: 1.828,
+      ornamentTurnNaturalAbove: 1.84,
+      ornamentTurnNaturalBelow: 1.84,
+      ornamentTurnSharpAbove: 1.84,
+      ornamentTurnSharpAboveFlatBelow: 1.84,
+      ornamentTurnSharpBelow: 1.84,
+      ornamentTurnSlash: 1.84,
+      ornamentTurnUp: 0.872,
+      ornamentTurnUpS: 0.868,
+      ornamentUpCurve: 1.568,
+      ornamentVerticalLine: 0.108,
+      ornamentZigZagLineNoRightEnd: 1.048,
+      ornamentZigZagLineWithRightEnd: 1.428,
+      ottava: 1.544,
+      ottavaAlta: 3.54,
+      ottavaBassa: 3.356,
+      ottavaBassaBa: 3.5,
+      ottavaBassaVb: 3.184,
+      pendereckiTremolo: 0.684,
+      pictAgogo: 1.764,
+      pictAlmglocken: 1.844,
+      pictAnvil: 3.908,
+      pictBambooChimes: 4.08,
+      pictBambooScraper: 3.576,
+      pictBassDrum: 1.54,
+      pictBassDrumOnSide: 3.108,
+      pictBassDrumPeinkofer: 3.352,
+      pictBeaterBow: 0.38,
+      pictBeaterBox: 1.572,
+      pictBeaterBrassMalletsDown: 1.184,
+      pictBeaterBrassMalletsLeft: 2.108,
+      pictBeaterBrassMalletsRight: 2.108,
+      pictBeaterBrassMalletsUp: 1.184,
+      pictBeaterCombiningDashedCircle: 1.608,
+      pictBeaterCombiningParentheses: 1.884,
+      pictBeaterDoubleBassDrumDown: 1.284,
+      pictBeaterDoubleBassDrumUp: 1.284,
+      pictBeaterFinger: 2.076,
+      pictBeaterFingernails: 1.224,
+      pictBeaterFist: 2.044,
+      pictBeaterGuiroScraper: 1.596,
+      pictBeaterHammer: 2.228,
+      pictBeaterHammerMetalDown: 2.24,
+      pictBeaterHammerMetalUp: 2.24,
+      pictBeaterHammerPlasticDown: 2.24,
+      pictBeaterHammerPlasticUp: 2.24,
+      pictBeaterHammerWoodDown: 2.24,
+      pictBeaterHammerWoodUp: 2.24,
+      pictBeaterHand: 2.076,
+      pictBeaterHardBassDrumDown: 1.288,
+      pictBeaterHardBassDrumUp: 1.288,
+      pictBeaterHardGlockenspielDown: 0.436,
+      pictBeaterHardGlockenspielLeft: 1.596,
+      pictBeaterHardGlockenspielRight: 1.596,
+      pictBeaterHardGlockenspielUp: 0.436,
+      pictBeaterHardTimpaniDown: 0.872,
+      pictBeaterHardTimpaniLeft: 1.892,
+      pictBeaterHardTimpaniRight: 1.896,
+      pictBeaterHardTimpaniUp: 0.872,
+      pictBeaterHardXylophoneDown: 0.92,
+      pictBeaterHardXylophoneLeft: 1.74,
+      pictBeaterHardXylophoneRight: 1.74,
+      pictBeaterHardXylophoneUp: 0.92,
+      pictBeaterHardYarnDown: 1.1,
+      pictBeaterHardYarnLeft: 1.828,
+      pictBeaterHardYarnRight: 1.84,
+      pictBeaterHardYarnUp: 1.1,
+      pictBeaterJazzSticksDown: 0.58,
+      pictBeaterJazzSticksUp: 0.58,
+      pictBeaterKnittingNeedle: 1.14,
+      pictBeaterMallet: 1.62,
+      pictBeaterMalletDown: 1.62,
+      pictBeaterMediumBassDrumDown: 1.28,
+      pictBeaterMediumBassDrumUp: 1.28,
+      pictBeaterMediumTimpaniDown: 0.88,
+      pictBeaterMediumTimpaniLeft: 1.896,
+      pictBeaterMediumTimpaniRight: 1.9,
+      pictBeaterMediumTimpaniUp: 0.88,
+      pictBeaterMediumXylophoneDown: 0.936,
+      pictBeaterMediumXylophoneLeft: 1.748,
+      pictBeaterMediumXylophoneRight: 1.764,
+      pictBeaterMediumXylophoneUp: 0.936,
+      pictBeaterMediumYarnDown: 1.104,
+      pictBeaterMediumYarnLeft: 1.824,
+      pictBeaterMediumYarnRight: 1.832,
+      pictBeaterMediumYarnUp: 1.104,
+      pictBeaterMetalBassDrumDown: 1.28,
+      pictBeaterMetalBassDrumUp: 1.28,
+      pictBeaterMetalDown: 0.92,
+      pictBeaterMetalHammer: 1.608,
+      pictBeaterMetalLeft: 1.744,
+      pictBeaterMetalRight: 1.748,
+      pictBeaterMetalUp: 0.92,
+      pictBeaterSnareSticksDown: 0.568,
+      pictBeaterSnareSticksUp: 0.568,
+      pictBeaterSoftBassDrumDown: 1.28,
+      pictBeaterSoftBassDrumUp: 1.28,
+      pictBeaterSoftGlockenspielDown: 0.552,
+      pictBeaterSoftGlockenspielLeft: 1.652,
+      pictBeaterSoftGlockenspielRight: 1.664,
+      pictBeaterSoftGlockenspielUp: 0.552,
+      pictBeaterSoftTimpaniDown: 0.88,
+      pictBeaterSoftTimpaniLeft: 1.896,
+      pictBeaterSoftTimpaniRight: 1.904,
+      pictBeaterSoftTimpaniUp: 0.88,
+      pictBeaterSoftXylophone: 2.184,
+      pictBeaterSoftXylophoneDown: 0.92,
+      pictBeaterSoftXylophoneLeft: 1.744,
+      pictBeaterSoftXylophoneRight: 1.748,
+      pictBeaterSoftXylophoneUp: 0.92,
+      pictBeaterSoftYarnDown: 1.096,
+      pictBeaterSoftYarnLeft: 1.816,
+      pictBeaterSoftYarnRight: 1.816,
+      pictBeaterSoftYarnUp: 1.096,
+      pictBeaterSpoonWoodenMallet: 1.776,
+      pictBeaterSuperballDown: 0.92,
+      pictBeaterSuperballLeft: 1.524,
+      pictBeaterSuperballRight: 1.524,
+      pictBeaterSuperballUp: 0.92,
+      pictBeaterTriangleDown: 1.628,
+      pictBeaterTrianglePlain: 1.52,
+      pictBeaterTriangleUp: 1.628,
+      pictBeaterWireBrushesDown: 1.64,
+      pictBeaterWireBrushesUp: 1.64,
+      pictBeaterWoodTimpaniDown: 0.88,
+      pictBeaterWoodTimpaniLeft: 1.9,
+      pictBeaterWoodTimpaniRight: 1.92,
+      pictBeaterWoodTimpaniUp: 0.88,
+      pictBeaterWoodXylophoneDown: 0.92,
+      pictBeaterWoodXylophoneLeft: 1.748,
+      pictBeaterWoodXylophoneRight: 1.752,
+      pictBeaterWoodXylophoneUp: 0.92,
+      pictBell: 2.72,
+      pictBellOfCymbal: 3.484,
+      pictBellPlate: 2.156,
+      pictBellTree: 2.152,
+      pictBirdWhistle: 2.844,
+      pictBoardClapper: 3.64,
+      pictBongos: 4.912,
+      pictBongosPeinkofer: 3.792,
+      pictBrakeDrum: 3.148,
+      pictCabasa: 1.62,
+      pictCannon: 3.38,
+      pictCarHorn: 3.876,
+      pictCastanets: 2.144,
+      pictCastanetsSmithBrindle: 1.3,
+      pictCastanetsWithHandle: 1.188,
+      pictCelesta: 4.784,
+      pictCencerro: 1.004,
+      pictCenter1: 2.136,
+      pictCenter2: 2.136,
+      pictCenter3: 2.144,
+      pictChainRattle: 3.396,
+      pictChimes: 4.196,
+      pictChineseCymbal: 5.048,
+      pictChokeCymbal: 0.612,
+      pictClaves: 2.484,
+      pictCoins: 5.476,
+      pictConga: 2.36,
+      pictCongaPeinkofer: 1.592,
+      pictCowBell: 1.8,
+      pictCowBellBerio: 2.94,
+      pictCrashCymbals: 0.852,
+      pictCrotales: 4.704,
+      pictCrushStem: 1.012,
+      pictCuica: 2.7,
+      pictCymbalTongs: 3.184,
+      pictDamp1: 1.136,
+      pictDamp2: 2.828,
+      pictDamp3: 2.828,
+      pictDamp4: 2.836,
+      pictDeadNoteStem: 0.644,
+      pictDrumStick: 0.224,
+      pictDuckCall: 4.464,
+      pictEdgeOfCymbal: 4.82,
+      pictEmptyTrap: 4.804,
+      pictFingerCymbals: 1,
+      pictFlexatone: 1.448,
+      pictFlexatonePeinkofer: 3.136,
+      pictFootballRatchet: 4.804,
+      pictGlassHarmonica: 3.64,
+      pictGlassHarp: 2.66,
+      pictGlassPlateChimes: 4.08,
+      pictGlassTubeChimes: 4.08,
+      pictGlsp: 4.796,
+      pictGlspPeinkofer: 4.784,
+      pictGlspSmithBrindle: 5.012,
+      pictGobletDrum: 2.928,
+      pictGong: 2.744,
+      pictGongWithButton: 2.744,
+      pictGuiro: 4,
+      pictGuiroPeinkofer: 5.448,
+      pictGuiroSevsay: 4.256,
+      pictGumHardDown: 1.008,
+      pictGumHardLeft: 1.972,
+      pictGumHardRight: 1.972,
+      pictGumHardUp: 1.008,
+      pictGumMediumDown: 1.008,
+      pictGumMediumLeft: 1.972,
+      pictGumMediumRight: 1.972,
+      pictGumMediumUp: 1.008,
+      pictGumSoftDown: 1.008,
+      pictGumSoftLeft: 1.972,
+      pictGumSoftRight: 2.004,
+      pictGumSoftUp: 1.008,
+      pictHalfOpen1: 1.144,
+      pictHalfOpen2: 1.148,
+      pictHandbell: 2.72,
+      pictHiHat: 3.136,
+      pictHiHatOnStand: 3.14,
+      pictJawHarp: 2,
+      pictJingleBells: 3.56,
+      pictKlaxonHorn: 3.216,
+      pictLeftHandCircle: 0.5,
+      pictLionsRoar: 2.856,
+      pictLithophone: 4.536,
+      pictLithophonePeinkofer: 4.536,
+      pictLogDrum: 4.68,
+      pictLotusFlute: 3.512,
+      pictLotusFlutePeinkofer: 4.46,
+      pictMar: 4.8,
+      pictMarPeinkofer: 4.804,
+      pictMarSmithBrindle: 6.288,
+      pictMaraca: 1.624,
+      pictMaracaSmithBrindle: 1.384,
+      pictMaracas: 4.116,
+      pictMegaphone: 4.096,
+      pictMetalPlateChimes: 4.08,
+      pictMetalTubeChimes: 4.08,
+      pictMusicalSaw: 3.448,
+      pictMusicalSawPeinkofer: 4.848,
+      pictNormalPosition: 2.136,
+      pictOnRim: 2.02,
+      pictOpen: 1.144,
+      pictOpenRimShot: 1.144,
+      pictPistolShot: 5.088,
+      pictPoliceWhistle: 3.96,
+      pictQuijada: 4.312,
+      pictRainstick: 1.032,
+      pictRatchet: 2.796,
+      pictRecoReco: 4.004,
+      pictRightHandSquare: 1.128,
+      pictRim1: 2.52,
+      pictRim2: 2.136,
+      pictRim3: 2.136,
+      pictRimShotOnStem: 0.492,
+      pictSandpaperBlocks: 3.74,
+      pictScrapeAroundRim: 3.124,
+      pictScrapeAroundRimClockwise: 3.124,
+      pictScrapeCenterToEdge: 3.124,
+      pictScrapeEdgeToCenter: 3.112,
+      pictShellBells: 2,
+      pictShellChimes: 4.08,
+      pictSiren: 3.492,
+      pictSistrum: 2.916,
+      pictSizzleCymbal: 3.128,
+      pictSleighBell: 5.356,
+      pictSleighBellSmithBrindle: 3.448,
+      pictSlideBrushOnGong: 3.392,
+      pictSlideWhistle: 3.9,
+      pictSlitDrum: 4.152,
+      pictSnareDrum: 3.944,
+      pictSnareDrumMilitary: 1.664,
+      pictSnareDrumSnaresOff: 3.944,
+      pictSteelDrums: 4.212,
+      pictStickShot: 1.776,
+      pictSuperball: 0.924,
+      pictSuspendedCymbal: 3.14,
+      pictSwishStem: 0.988,
+      pictTabla: 3.06,
+      pictTamTam: 4.084,
+      pictTamTamWithBeater: 3.936,
+      pictTambourine: 3.644,
+      pictTambourineStockhausen: 7.26,
+      pictTempleBlocks: 3.724,
+      pictTenorDrum: 1.656,
+      pictThundersheet: 4.096,
+      pictTimbales: 4.452,
+      pictTimbalesPeinkofer: 3.792,
+      pictTimpani: 3.784,
+      pictTimpaniPeinkofer: 2.472,
+      pictTomTom: 2.156,
+      pictTomTomChinese: 5.096,
+      pictTomTomChinesePeinkofer: 2.996,
+      pictTomTomIndoAmerican: 5.096,
+      pictTomTomJapanese: 5.1,
+      pictTomTomPeinkofer: 5.748,
+      pictTriangle: 4.144,
+      pictTubaphone: 4.784,
+      pictTubaphonePeinkofer: 4.784,
+      pictTubularBells: 3.74,
+      pictTurnLeftStem: 1.736,
+      pictTurnRightLeftStem: 1.708,
+      pictTurnRightStem: 1.736,
+      pictVib: 4.788,
+      pictVibMotorOff: 4.784,
+      pictVibMotorOffPeinkofer: 4.784,
+      pictVibPeinkofer: 4.784,
+      pictVibSmithBrindle: 5.864,
+      pictVibraslap: 2.94,
+      pictVietnameseHat: 3.876,
+      pictWhip: 2.8,
+      pictWindChimesGlass: 3.484,
+      pictWindMachine: 5.576,
+      pictWindWhistle: 4.888,
+      pictWoodBlock: 3.148,
+      pictWoundHardDown: 0.92,
+      pictWoundHardLeft: 1.748,
+      pictWoundHardRight: 1.752,
+      pictWoundHardUp: 0.92,
+      pictWoundSoftDown: 0.92,
+      pictWoundSoftLeft: 1.748,
+      pictWoundSoftRight: 1.752,
+      pictWoundSoftUp: 0.92,
+      pictXyl: 4.792,
+      pictXylBass: 4.784,
+      pictXylBassPeinkofer: 3.464,
+      pictXylPeinkofer: 4.784,
+      pictXylSmithBrindle: 5.868,
+      pictXylTenor: 4.784,
+      pictXylTenorPeinkofer: 3.224,
+      pictXylTenorTrough: 4.784,
+      pictXylTrough: 4.784,
+      pluckedBuzzPizzicato: 1.2,
+      pluckedDamp: 1.3,
+      pluckedDampAll: 1.388,
+      pluckedDampOnStem: 0.864,
+      pluckedFingernailFlick: 1,
+      pluckedLeftHandPizzicato: 1.088,
+      pluckedPlectrum: 1.776,
+      pluckedSnapPizzicatoAbove: 0.8,
+      pluckedSnapPizzicatoAboveGerman: 0.8,
+      pluckedSnapPizzicatoBelow: 0.8,
+      pluckedSnapPizzicatoBelowGerman: 0.8,
+      pluckedWithFingernails: 1.592,
+      quindicesima: 2.668,
+      quindicesimaAlta: 5.26,
+      quindicesimaBassa: 5.14,
+      quindicesimaBassaMb: 4.924,
+      repeat1Bar: 2.132,
+      repeat2Bars: 3.044,
+      repeat4Bars: 4.932,
+      repeatBarLowerDot: 0.496,
+      repeatBarSlash: 2.128,
+      repeatBarUpperDot: 0.5,
+      repeatDot: 0.4,
+      repeatDots: 0.4,
+      repeatLeft: 1.472,
+      repeatRight: 1.468,
+      repeatRightLeft: 2.432,
+      repeatRightLeftThick: 2.432,
+      rest1024th: 2.672,
+      rest128th: 1.94,
+      rest16th: 1.28,
+      rest256th: 2.164,
+      rest32nd: 1.452,
+      rest512th: 2.416,
+      rest64th: 1.696,
+      rest8th: 1,
+      restDoubleWhole: 0.504,
+      restDoubleWholeLegerLine: 1.176,
+      restHBar: 3.136,
+      restHBarLeft: 1.508,
+      restHBarMiddle: 1.312,
+      restHBarRight: 1.508,
+      restHalf: 1.132,
+      restHalfLegerLine: 1.128,
+      restLonga: 0.5,
+      restMaxima: 1.524,
+      restQuarter: 1.08,
+      restQuarterOld: 1,
+      restQuarterZ: 1,
+      restWhole: 1.132,
+      restWholeLegerLine: 1.128,
+      reversedBrace: 0.28,
+      reversedBracketBottom: 1.876,
+      reversedBracketTop: 1.876,
+      rightRepeatSmall: 1.484,
+      scaleDegree1: 1.14,
+      scaleDegree2: 2.068,
+      scaleDegree3: 2.056,
+      scaleDegree4: 2.128,
+      scaleDegree5: 2.072,
+      scaleDegree6: 2.04,
+      scaleDegree7: 2.056,
+      scaleDegree8: 2.064,
+      scaleDegree9: 2.044,
+      schaefferClef: 1.232,
+      schaefferFClefToGClef: 2.464,
+      schaefferGClefToFClef: 2.472,
+      schaefferPreviousClef: 1.236,
+      sedicesima: 2.584,
+      sedicesimaAlta: 5.264,
+      sedicesimaBassa: 5.144,
+      sedicesimaBassaMb: 4.924,
+      segno: 2.228,
+      segnoJapanese: 3.108,
+      segnoSerpent1: 1.608,
+      segnoSerpent2: 1.608,
+      semipitchedPercussionClef1: 1.004,
+      semipitchedPercussionClef2: 1.852,
+      smnFlat: 1.576,
+      smnFlatWhite: 1.576,
+      smnHistoryDoubleFlat: 2.168,
+      smnHistoryDoubleSharp: 1.764,
+      smnHistoryFlat: 2.168,
+      smnHistorySharp: 1.28,
+      smnNatural: 0.908,
+      smnSharp: 1.548,
+      smnSharpDown: 1.548,
+      smnSharpWhite: 1.548,
+      smnSharpWhiteDown: 1.548,
+      splitBarDivider: 1.2,
+      staff1Line: 2,
+      staff1LineNarrow: 1,
+      staff1LineWide: 3,
+      staff2Lines: 2,
+      staff2LinesNarrow: 1,
+      staff2LinesWide: 3,
+      staff3Lines: 2,
+      staff3LinesNarrow: 1,
+      staff3LinesWide: 3,
+      staff4Lines: 2,
+      staff4LinesNarrow: 1,
+      staff4LinesWide: 3,
+      staff5Lines: 2,
+      staff5LinesNarrow: 1,
+      staff5LinesWide: 3,
+      staff6Lines: 2,
+      staff6LinesNarrow: 1,
+      staff6LinesWide: 3,
+      staffDivideArrowDown: 2.104,
+      staffDivideArrowUp: 2.104,
+      staffDivideArrowUpDown: 2.104,
+      staffPosLower1: 0,
+      staffPosLower2: 0,
+      staffPosLower3: 0,
+      staffPosLower4: 0,
+      staffPosLower5: 0,
+      staffPosLower6: 0,
+      staffPosLower7: 0,
+      staffPosLower8: 0,
+      staffPosRaise1: 0,
+      staffPosRaise2: 0,
+      staffPosRaise3: 0,
+      staffPosRaise4: 0,
+      staffPosRaise5: 0,
+      staffPosRaise6: 0,
+      staffPosRaise7: 0,
+      staffPosRaise8: 0,
+      stem: 0.06,
+      stemBowOnBridge: 0.06,
+      stemBowOnTailpiece: 0.056,
+      stemBuzzRoll: 0.06,
+      stemDamp: 0.06,
+      stemHarpStringNoise: 0.06,
+      stemMultiphonicsBlack: 0.06,
+      stemMultiphonicsBlackWhite: 0.06,
+      stemMultiphonicsWhite: 0.06,
+      stemPendereckiTremolo: 0.06,
+      stemRimShot: 0.06,
+      stemSprechgesang: 0.06,
+      stemSulPonticello: 0.06,
+      stemSussurando: 0.06,
+      stemSwished: 0.06,
+      stemVibratoPulse: 0.06,
+      stockhausenTremolo: 0.588,
+      stringsBowBehindBridge: 0.856,
+      stringsBowBehindBridgeFourStrings: 0.856,
+      stringsBowBehindBridgeOneString: 0.856,
+      stringsBowBehindBridgeThreeStrings: 0.856,
+      stringsBowBehindBridgeTwoStrings: 0.856,
+      stringsBowOnBridge: 0.788,
+      stringsBowOnTailpiece: 0.792,
+      stringsChangeBowDirection: 3.788,
+      stringsChangeBowDirectionImposed: 1.488,
+      stringsChangeBowDirectionLiga: 2.404,
+      stringsDownBow: 1.248,
+      stringsDownBowAwayFromBody: 1.248,
+      stringsDownBowBeyondBridge: 1.248,
+      stringsDownBowTowardsBody: 1.248,
+      stringsDownBowTurned: 1.248,
+      stringsFouette: 0.644,
+      stringsHalfHarmonic: 0.8,
+      stringsHarmonic: 0.8,
+      stringsJeteAbove: 2.852,
+      stringsJeteBelow: 2.852,
+      stringsMuteOff: 1.552,
+      stringsMuteOn: 1.552,
+      stringsOverpressureDownBow: 1.256,
+      stringsOverpressureNoDirection: 1.256,
+      stringsOverpressurePossibileDownBow: 1.256,
+      stringsOverpressurePossibileUpBow: 1.088,
+      stringsOverpressureUpBow: 1,
+      stringsScrapeCircularClockwise: 1.28,
+      stringsScrapeCircularCounterclockwise: 1.28,
+      stringsScrapeParallelInward: 1.888,
+      stringsScrapeParallelOutward: 1.888,
+      stringsThumbPosition: 0.688,
+      stringsThumbPositionTurned: 0.688,
+      stringsTripleChopInward: 1.888,
+      stringsTripleChopOutward: 1.888,
+      stringsUpBow: 1,
+      stringsUpBowAwayFromBody: 1.2,
+      stringsUpBowBeyondBridge: 1,
+      stringsUpBowTowardsBody: 0.992,
+      stringsUpBowTurned: 1,
+      stringsVibratoPulse: 1.068,
+      swissRudimentsNoteheadBlackDouble: 1.66,
+      swissRudimentsNoteheadBlackFlam: 1.18,
+      swissRudimentsNoteheadHalfDouble: 1.66,
+      swissRudimentsNoteheadHalfFlam: 1.18,
+      systemDivider: 4.232,
+      systemDividerExtraLong: 9.276,
+      systemDividerLong: 6.244,
+      textAugmentationDot: 0.4,
+      textBlackNoteFrac16thLongStem: 1.368,
+      textBlackNoteFrac16thShortStem: 1.368,
+      textBlackNoteFrac32ndLongStem: 1.368,
+      textBlackNoteFrac8thLongStem: 1.368,
+      textBlackNoteFrac8thShortStem: 1.368,
+      textBlackNoteLongStem: 1.328,
+      textBlackNoteShortStem: 1.328,
+      textCont16thBeamLongStem: 1.368,
+      textCont16thBeamShortStem: 1.368,
+      textCont32ndBeamLongStem: 1.368,
+      textCont8thBeamLongStem: 1.368,
+      textCont8thBeamShortStem: 1.368,
+      textHeadlessBlackNoteFrac16thLongStem: 1.368,
+      textHeadlessBlackNoteFrac16thShortStem: 1.368,
+      textHeadlessBlackNoteFrac32ndLongStem: 1.368,
+      textHeadlessBlackNoteFrac8thLongStem: 1.368,
+      textHeadlessBlackNoteFrac8thShortStem: 1.368,
+      textHeadlessBlackNoteLongStem: 1.328,
+      textHeadlessBlackNoteShortStem: 1.328,
+      textTie: 1.46,
+      textTuplet3LongStem: 0.944,
+      textTuplet3ShortStem: 0.944,
+      textTupletBracketEndLongStem: 1.272,
+      textTupletBracketEndShortStem: 1.272,
+      textTupletBracketStartLongStem: 1.272,
+      textTupletBracketStartShortStem: 1.272,
+      timeSig0: 1.88,
+      timeSig0Denominator: 1.716,
+      timeSig0Large: 0.504,
+      timeSig0Narrow: 1.032,
+      timeSig0Numerator: 1.72,
+      timeSig0Reversed: 1.88,
+      timeSig0Small: 1.88,
+      timeSig0Turned: 1.88,
+      timeSig1: 1.336,
+      timeSig12over8: 2.968,
+      timeSig1Denominator: 1.172,
+      timeSig1Large: 0.284,
+      timeSig1Narrow: 0.708,
+      timeSig1Numerator: 1.172,
+      timeSig1Reversed: 1.336,
+      timeSig1Small: 1.444,
+      timeSig1Turned: 1.336,
+      timeSig2: 1.784,
+      timeSig2Denominator: 1.664,
+      timeSig2Large: 0.528,
+      timeSig2Narrow: 0.976,
+      timeSig2Numerator: 1.656,
+      timeSig2Reversed: 1.784,
+      timeSig2Small: 1.784,
+      timeSig2Turned: 1.784,
+      timeSig2over2: 1.78,
+      timeSig2over4: 1.848,
+      timeSig3: 1.684,
+      timeSig3Denominator: 1.544,
+      timeSig3Large: 0.52,
+      timeSig3Narrow: 0.916,
+      timeSig3Numerator: 1.54,
+      timeSig3Reversed: 1.684,
+      timeSig3Small: 1.684,
+      timeSig3Turned: 1.684,
+      timeSig3over2: 1.756,
+      timeSig3over4: 1.864,
+      timeSig3over8: 1.74,
+      timeSig4: 1.88,
+      timeSig4Denominator: 1.732,
+      timeSig4Large: 0.528,
+      timeSig4Narrow: 1.032,
+      timeSig4Numerator: 1.728,
+      timeSig4Reversed: 1.88,
+      timeSig4Small: 1.932,
+      timeSig4Turned: 1.88,
+      timeSig4over4: 1.856,
+      timeSig5: 1.612,
+      timeSig5Denominator: 1.612,
+      timeSig5Large: 0.512,
+      timeSig5Narrow: 0.876,
+      timeSig5Numerator: 1.612,
+      timeSig5Reversed: 1.612,
+      timeSig5Small: 1.612,
+      timeSig5Turned: 1.612,
+      timeSig5over4: 1.848,
+      timeSig5over8: 1.732,
+      timeSig6: 1.736,
+      timeSig6Denominator: 1.736,
+      timeSig6Large: 0.512,
+      timeSig6Narrow: 0.948,
+      timeSig6Numerator: 1.736,
+      timeSig6Reversed: 1.736,
+      timeSig6Small: 1.736,
+      timeSig6Turned: 1.736,
+      timeSig6over4: 1.88,
+      timeSig6over8: 1.724,
+      timeSig7: 1.764,
+      timeSig7Denominator: 1.764,
+      timeSig7Large: 0.512,
+      timeSig7Narrow: 0.968,
+      timeSig7Numerator: 1.764,
+      timeSig7Reversed: 1.764,
+      timeSig7Small: 1.764,
+      timeSig7Turned: 1.764,
+      timeSig7over8: 1.664,
+      timeSig8: 1.744,
+      timeSig8Denominator: 1.744,
+      timeSig8Large: 0.52,
+      timeSig8Narrow: 0.96,
+      timeSig8Numerator: 1.744,
+      timeSig8Reversed: 1.744,
+      timeSig8Small: 1.744,
+      timeSig8Turned: 1.744,
+      timeSig9: 1.736,
+      timeSig9Denominator: 1.736,
+      timeSig9Large: 0.512,
+      timeSig9Narrow: 0.948,
+      timeSig9Numerator: 1.736,
+      timeSig9Reversed: 1.736,
+      timeSig9Small: 1.736,
+      timeSig9Turned: 1.736,
+      timeSig9over8: 1.672,
+      timeSigBracketLeft: 0.472,
+      timeSigBracketLeftLarge: 0.2,
+      timeSigBracketLeftNarrow: 0.472,
+      timeSigBracketLeftSmall: 0.472,
+      timeSigBracketLeftSmallLarge: 0.2,
+      timeSigBracketLeftSmallNarrow: 0.472,
+      timeSigBracketRight: 0.472,
+      timeSigBracketRightLarge: 0.2,
+      timeSigBracketRightNarrow: 0.472,
+      timeSigBracketRightSmall: 0.472,
+      timeSigBracketRightSmallLarge: 0.2,
+      timeSigBracketRightSmallNarrow: 0.472,
+      timeSigCombDenominator: 0,
+      timeSigCombNumerator: 0,
+      timeSigComma: 0.792,
+      timeSigCommaLarge: 0.108,
+      timeSigCommaNarrow: 0.464,
+      timeSigCommon: 1.696,
+      timeSigCommonLarge: 0.556,
+      timeSigCommonNarrow: 1.008,
+      timeSigCommonReversed: 1.696,
+      timeSigCommonTurned: 1.696,
+      timeSigCut2: 1.784,
+      timeSigCut2Large: 0.476,
+      timeSigCut2Narrow: 1.024,
+      timeSigCut3: 1.592,
+      timeSigCut3Large: 0.472,
+      timeSigCut3Narrow: 1,
+      timeSigCutCommon: 1.668,
+      timeSigCutCommonLarge: 0.556,
+      timeSigCutCommonNarrow: 1.008,
+      timeSigCutCommonReversed: 1.668,
+      timeSigCutCommonTurned: 1.668,
+      timeSigEquals: 1.792,
+      timeSigEqualsLarge: 0.444,
+      timeSigEqualsNarrow: 1.076,
+      timeSigFractionHalf: 1.696,
+      timeSigFractionHalfLarge: 0.596,
+      timeSigFractionHalfNarrow: 1.696,
+      timeSigFractionOneThird: 1.764,
+      timeSigFractionOneThirdLarge: 0.596,
+      timeSigFractionOneThirdNarrow: 1.764,
+      timeSigFractionQuarter: 1.66,
+      timeSigFractionQuarterLarge: 0.576,
+      timeSigFractionQuarterNarrow: 1.66,
+      timeSigFractionThreeQuarters: 1.796,
+      timeSigFractionThreeQuartersLarge: 0.632,
+      timeSigFractionThreeQuartersNarrow: 1.796,
+      timeSigFractionTwoThirds: 1.784,
+      timeSigFractionTwoThirdsLarge: 0.68,
+      timeSigFractionTwoThirdsNarrow: 1.784,
+      timeSigFractionalSlash: 2.008,
+      timeSigFractionalSlashLarge: 0.296,
+      timeSigFractionalSlashNarrow: 0.908,
+      timeSigMinus: 1.792,
+      timeSigMinusLarge: 0.444,
+      timeSigMinusNarrow: 1.076,
+      timeSigMultiply: 1.584,
+      timeSigMultiplyLarge: 0.368,
+      timeSigMultiplyNarrow: 0.948,
+      timeSigOpenPenderecki: 3.38,
+      timeSigOpenPendereckiLarge: 0.508,
+      timeSigOpenPendereckiNarrow: 2.036,
+      timeSigParensLeft: 0.736,
+      timeSigParensLeftLarge: 0.204,
+      timeSigParensLeftNarrow: 0.736,
+      timeSigParensLeftSmall: 0.44,
+      timeSigParensLeftSmallLarge: 0.176,
+      timeSigParensLeftSmallNarrow: 0.44,
+      timeSigParensRight: 0.736,
+      timeSigParensRightLarge: 0.204,
+      timeSigParensRightNarrow: 0.736,
+      timeSigParensRightSmall: 0.44,
+      timeSigParensRightSmallLarge: 0.176,
+      timeSigParensRightSmallNarrow: 0.44,
+      timeSigPlus: 2,
+      timeSigPlusLarge: 0.32,
+      timeSigPlusNarrow: 1.192,
+      timeSigPlusSmall: 1.016,
+      timeSigPlusSmallLarge: 0.444,
+      timeSigPlusSmallNarrow: 0.604,
+      timeSigSlash: 1.308,
+      timeSigSlashLarge: 0.444,
+      timeSigSlashNarrow: 1.308,
+      timeSigX: 1.62,
+      timeSigXLarge: 0.404,
+      timeSigXNarrow: 0.984,
+      tremolo1: 0.6,
+      tremolo2: 0.596,
+      tremolo3: 0.6,
+      tremolo4: 0.596,
+      tremolo5: 0.596,
+      tremoloDivisiDots2: 1,
+      tremoloDivisiDots3: 1.6,
+      tremoloDivisiDots4: 2.2,
+      tremoloDivisiDots6: 1.6,
+      tremoloFingered1: 0.6,
+      tremoloFingered2: 0.596,
+      tremoloFingered3: 0.6,
+      tremoloFingered4: 0.596,
+      tremoloFingered5: 0.596,
+      tripleTongueAbove: 2.3,
+      tripleTongueAboveNoSlur: 1.536,
+      tripleTongueBelow: 2.3,
+      tripleTongueBelowNoSlur: 1.536,
+      tuplet0: 1.276,
+      tuplet0Light: 1.016,
+      tuplet1: 0.984,
+      tuplet1Light: 0.824,
+      tuplet2: 1.276,
+      tuplet2Light: 1.124,
+      tuplet3: 1.184,
+      tuplet3Light: 1.06,
+      tuplet4: 1.212,
+      tuplet4Light: 1.052,
+      tuplet5: 1.268,
+      tuplet5Light: 1.092,
+      tuplet6: 1.216,
+      tuplet6Light: 1.044,
+      tuplet7: 1.212,
+      tuplet7Light: 0.94,
+      tuplet8: 1.252,
+      tuplet8Light: 1.076,
+      tuplet9: 1.216,
+      tuplet9Light: 1.06,
+      tupletBracketLeftItalic: 0.668,
+      tupletBracketLeftItalicLight: 0.6,
+      tupletBracketLeftRoman: 0.668,
+      tupletBracketLeftRomanLight: 0.6,
+      tupletBracketRightItalic: 0.668,
+      tupletBracketRightItalicLight: 1.332,
+      tupletBracketRightRoman: 0.668,
+      tupletBracketRightRomanLight: 0.6,
+      tupletColon: 0.444,
+      tupletColonLight: 0.536,
+      tupletParenthesisLeftItalic: 0.668,
+      tupletParenthesisLeftItalicLight: 0.6,
+      tupletParenthesisLeftRoman: 0.668,
+      tupletParenthesisLeftRomanLight: 0.6,
+      tupletParenthesisRightItalic: 0.668,
+      tupletParenthesisRightItalicLight: 0.6,
+      tupletParenthesisRightRoman: 0.668,
+      tupletParenthesisRightRomanLight: 0.6,
+      unmeasuredTremolo: 0.64,
+      unmeasuredTremoloSimple: 0.768,
+      unpitchedPercussionClef1: 1.528,
+      unpitchedPercussionClef1Alt: 1.188,
+      unpitchedPercussionClef2: 1.248,
+      ventiduesima: 3,
+      ventiduesimaAlta: 5.712,
+      ventiduesimaBassa: 5.512,
+      ventiduesimaBassaMb: 5.34,
+      ventiquattresima: 3.028,
+      ventiquattresimaAlta: 5.78,
+      ventiquattresimaBassa: 5.78,
+      ventiquattresimaBassaMb: 5.608,
+      vocalFingerClickStockhausen: 2.68,
+      vocalHalbGesungen: 0.296,
+      vocalMouthClosed: 1.5,
+      vocalMouthOpen: 1.5,
+      vocalMouthPursed: 1,
+      vocalMouthSlightlyOpen: 1.5,
+      vocalMouthWideOpen: 1.504,
+      vocalNasalVoice: 1.38,
+      vocalSprechgesang: 0.644,
+      vocalTongueClickStockhausen: 2.72,
+      vocalTongueFingerClickStockhausen: 2.664,
+      vocalsSussurando: 0.516,
+      wiggleArpeggiatoDown: 1.02,
+      wiggleArpeggiatoDownArrow: 2.064,
+      wiggleArpeggiatoDownSwash: 1.784,
+      wiggleArpeggiatoDownSwashCouperin: 1.308,
+      wiggleArpeggiatoUp: 1.02,
+      wiggleArpeggiatoUpArrow: 2.104,
+      wiggleArpeggiatoUpSwash: 2.116,
+      wiggleArpeggiatoUpSwashCouperin: 2.132,
+      wiggleCircular: 1.836,
+      wiggleCircularConstant: 1.072,
+      wiggleCircularConstantFlipped: 1.072,
+      wiggleCircularConstantFlippedLarge: 2.184,
+      wiggleCircularConstantLarge: 2.184,
+      wiggleCircularEnd: 0.648,
+      wiggleCircularLarge: 1.724,
+      wiggleCircularLarger: 2.332,
+      wiggleCircularLargerStill: 2.964,
+      wiggleCircularLargest: 4.592,
+      wiggleCircularSmall: 1.34,
+      wiggleCircularStart: 1.92,
+      wiggleGlissando: 0.96,
+      wiggleGlissandoGroup1: 1.224,
+      wiggleGlissandoGroup2: 0.5,
+      wiggleGlissandoGroup3: 0.5,
+      wiggleRandom1: 7.976,
+      wiggleRandom2: 7.976,
+      wiggleRandom3: 7.976,
+      wiggleRandom4: 7.976,
+      wiggleSawtooth: 2.992,
+      wiggleSawtoothNarrow: 1.996,
+      wiggleSawtoothWide: 4,
+      wiggleSquareWave: 3,
+      wiggleSquareWaveNarrow: 2,
+      wiggleSquareWaveWide: 4,
+      wiggleTrill: 0.948,
+      wiggleTrillFast: 0.804,
+      wiggleTrillFaster: 0.688,
+      wiggleTrillFasterStill: 0.564,
+      wiggleTrillFastest: 0.548,
+      wiggleTrillSlow: 1.112,
+      wiggleTrillSlower: 1.36,
+      wiggleTrillSlowerStill: 1.592,
+      wiggleTrillSlowest: 1.976,
+      wiggleVIbratoLargestSlower: 3.828,
+      wiggleVIbratoMediumSlower: 1.688,
+      wiggleVibrato: 0.608,
+      wiggleVibratoLargeFast: 1.76,
+      wiggleVibratoLargeFaster: 1.504,
+      wiggleVibratoLargeFasterStill: 1.264,
+      wiggleVibratoLargeFastest: 1.044,
+      wiggleVibratoLargeSlow: 2.156,
+      wiggleVibratoLargeSlower: 2.592,
+      wiggleVibratoLargeSlowest: 3.052,
+      wiggleVibratoLargestFast: 2.656,
+      wiggleVibratoLargestFaster: 2.244,
+      wiggleVibratoLargestFasterStill: 1.884,
+      wiggleVibratoLargestFastest: 1.54,
+      wiggleVibratoLargestSlow: 3.164,
+      wiggleVibratoLargestSlowest: 4.536,
+      wiggleVibratoMediumFast: 1.18,
+      wiggleVibratoMediumFaster: 0.968,
+      wiggleVibratoMediumFasterStill: 0.828,
+      wiggleVibratoMediumFastest: 0.74,
+      wiggleVibratoMediumSlow: 1.384,
+      wiggleVibratoMediumSlowest: 2,
+      wiggleVibratoSmallFast: 0.86,
+      wiggleVibratoSmallFaster: 0.716,
+      wiggleVibratoSmallFasterStill: 0.62,
+      wiggleVibratoSmallFastest: 0.544,
+      wiggleVibratoSmallSlow: 1.008,
+      wiggleVibratoSmallSlower: 1.164,
+      wiggleVibratoSmallSlowest: 1.5,
+      wiggleVibratoSmallestFast: 0.7,
+      wiggleVibratoSmallestFaster: 0.584,
+      wiggleVibratoSmallestFasterStill: 0.536,
+      wiggleVibratoSmallestFastest: 0.48,
+      wiggleVibratoSmallestSlow: 0.832,
+      wiggleVibratoSmallestSlower: 0.988,
+      wiggleVibratoSmallestSlowest: 1.148,
+      wiggleVibratoStart: 1.808,
+      wiggleVibratoWide: 0.82,
+      wiggleWavy: 3,
+      wiggleWavyNarrow: 2,
+      wiggleWavyWide: 4,
+      windClosedHole: 1.216,
+      windFlatEmbouchure: 1.5,
+      windHalfClosedHole1: 1.22,
+      windHalfClosedHole2: 1.22,
+      windHalfClosedHole3: 1.22,
+      windLessRelaxedEmbouchure: 1.892,
+      windLessTightEmbouchure: 1.92,
+      windMouthpiecePop: 1.548,
+      windMultiphonicsBlackStem: 1.112,
+      windMultiphonicsBlackWhiteStem: 1.196,
+      windMultiphonicsWhiteStem: 1.196,
+      windOpenHole: 1.216,
+      windReedPositionIn: 0.796,
+      windReedPositionNormal: 0.796,
+      windReedPositionOut: 0.796,
+      windRelaxedEmbouchure: 1.892,
+      windRimOnly: 1.22,
+      windSharpEmbouchure: 1.5,
+      windStrongAirPressure: 2.216,
+      windThreeQuartersClosedHole: 1.216,
+      windTightEmbouchure: 1.752,
+      windTrillKey: 2.828,
+      windVeryTightEmbouchure: 1.888,
+      windWeakAirPressure: 2.352
     },
     glyphBBoxes: {
       "4stringTabClef": {
@@ -12619,17 +16065,17 @@ var NotationEngine = (() => {
       },
       accSagittal11v49CommaDown: {
         bBoxNE: [
-          0.748,
+          0.752,
           1.436
         ],
         bBoxSW: [
-          -4e-3,
+          0,
           -0.688
         ]
       },
       accSagittal11v49CommaUp: {
         bBoxNE: [
-          0.748,
+          0.752,
           0.688
         ],
         bBoxSW: [
@@ -12659,11 +16105,11 @@ var NotationEngine = (() => {
       },
       accSagittal17CommaDown: {
         bBoxNE: [
-          1.128,
+          1.124,
           1.436
         ],
         bBoxSW: [
-          4e-3,
+          0,
           -0.688
         ]
       },
@@ -12699,12 +16145,12 @@ var NotationEngine = (() => {
       },
       accSagittal19CommaDown: {
         bBoxNE: [
-          1.128,
-          1.44
+          1.124,
+          1.436
         ],
         bBoxSW: [
           0,
-          -0.684
+          -0.688
         ]
       },
       accSagittal19CommaUp: {
@@ -12724,7 +16170,7 @@ var NotationEngine = (() => {
         ],
         bBoxSW: [
           0,
-          -0.684
+          -0.688
         ]
       },
       accSagittal19SchismaUp: {
@@ -12737,9 +16183,49 @@ var NotationEngine = (() => {
           -1.436
         ]
       },
+      accSagittal1MinaDown: {
+        bBoxNE: [
+          0.496,
+          -0.064
+        ],
+        bBoxSW: [
+          -0.028,
+          -0.428
+        ]
+      },
+      accSagittal1MinaUp: {
+        bBoxNE: [
+          0.496,
+          0.428
+        ],
+        bBoxSW: [
+          -0.028,
+          0.064
+        ]
+      },
+      accSagittal1TinaDown: {
+        bBoxNE: [
+          0.372,
+          -0.064
+        ],
+        bBoxSW: [
+          0,
+          -0.428
+        ]
+      },
+      accSagittal1TinaUp: {
+        bBoxNE: [
+          0.372,
+          0.428
+        ],
+        bBoxSW: [
+          0,
+          0.064
+        ]
+      },
       accSagittal23CommaDown: {
         bBoxNE: [
-          0.748,
+          0.752,
           1.436
         ],
         bBoxSW: [
@@ -12749,7 +16235,7 @@ var NotationEngine = (() => {
       },
       accSagittal23CommaUp: {
         bBoxNE: [
-          0.748,
+          0.752,
           0.688
         ],
         bBoxSW: [
@@ -12797,6 +16283,46 @@ var NotationEngine = (() => {
           -1.436
         ]
       },
+      accSagittal2MinasDown: {
+        bBoxNE: [
+          0.872,
+          -0.064
+        ],
+        bBoxSW: [
+          -0.028,
+          -0.428
+        ]
+      },
+      accSagittal2MinasUp: {
+        bBoxNE: [
+          0.872,
+          0.428
+        ],
+        bBoxSW: [
+          -0.028,
+          0.064
+        ]
+      },
+      accSagittal2TinasDown: {
+        bBoxNE: [
+          0.376,
+          -0.064
+        ],
+        bBoxSW: [
+          0,
+          -0.428
+        ]
+      },
+      accSagittal2TinasUp: {
+        bBoxNE: [
+          0.376,
+          0.428
+        ],
+        bBoxSW: [
+          0,
+          0.064
+        ]
+      },
       accSagittal35LargeDiesisDown: {
         bBoxNE: [
           1.5,
@@ -12835,6 +16361,26 @@ var NotationEngine = (() => {
         bBoxSW: [
           0,
           -1.436
+        ]
+      },
+      accSagittal3TinasDown: {
+        bBoxNE: [
+          0.496,
+          -0.064
+        ],
+        bBoxSW: [
+          -0.028,
+          -0.428
+        ]
+      },
+      accSagittal3TinasUp: {
+        bBoxNE: [
+          0.496,
+          0.428
+        ],
+        bBoxSW: [
+          -0.028,
+          0.064
         ]
       },
       accSagittal49LargeDiesisDown: {
@@ -12897,6 +16443,26 @@ var NotationEngine = (() => {
           -1.436
         ]
       },
+      accSagittal4TinasDown: {
+        bBoxNE: [
+          0.748,
+          -0.064
+        ],
+        bBoxSW: [
+          0,
+          -0.428
+        ]
+      },
+      accSagittal4TinasUp: {
+        bBoxNE: [
+          0.748,
+          0.428
+        ],
+        bBoxSW: [
+          0,
+          0.064
+        ]
+      },
       accSagittal55CommaDown: {
         bBoxNE: [
           0.876,
@@ -12937,9 +16503,29 @@ var NotationEngine = (() => {
           -1.436
         ]
       },
+      accSagittal5TinasDown: {
+        bBoxNE: [
+          0.872,
+          -0.064
+        ],
+        bBoxSW: [
+          0,
+          -0.428
+        ]
+      },
+      accSagittal5TinasUp: {
+        bBoxNE: [
+          0.872,
+          0.428
+        ],
+        bBoxSW: [
+          0,
+          0.064
+        ]
+      },
       accSagittal5v11SmallDiesisDown: {
         bBoxNE: [
-          1.252,
+          1.248,
           1.436
         ],
         bBoxSW: [
@@ -12960,16 +16546,16 @@ var NotationEngine = (() => {
       accSagittal5v13LargeDiesisDown: {
         bBoxNE: [
           1.752,
-          1.44
+          1.436
         ],
         bBoxSW: [
           0,
-          -0.684
+          -0.688
         ]
       },
       accSagittal5v13LargeDiesisUp: {
         bBoxNE: [
-          1.748,
+          1.752,
           0.688
         ],
         bBoxSW: [
@@ -13040,11 +16626,11 @@ var NotationEngine = (() => {
       accSagittal5v49MediumDiesisDown: {
         bBoxNE: [
           1.376,
-          1.44
+          1.436
         ],
         bBoxSW: [
           0,
-          -0.684
+          -0.688
         ]
       },
       accSagittal5v49MediumDiesisUp: {
@@ -13059,7 +16645,7 @@ var NotationEngine = (() => {
       },
       accSagittal5v7KleismaDown: {
         bBoxNE: [
-          0.628,
+          0.624,
           1.436
         ],
         bBoxSW: [
@@ -13070,11 +16656,31 @@ var NotationEngine = (() => {
       accSagittal5v7KleismaUp: {
         bBoxNE: [
           0.624,
-          0.684
+          0.688
         ],
         bBoxSW: [
           0,
-          -1.44
+          -1.436
+        ]
+      },
+      accSagittal6TinasDown: {
+        bBoxNE: [
+          0.872,
+          -0.064
+        ],
+        bBoxSW: [
+          -0.028,
+          -0.428
+        ]
+      },
+      accSagittal6TinasUp: {
+        bBoxNE: [
+          0.872,
+          0.428
+        ],
+        bBoxSW: [
+          -0.028,
+          0.064
         ]
       },
       accSagittal7CommaDown: {
@@ -13097,9 +16703,29 @@ var NotationEngine = (() => {
           -1.436
         ]
       },
+      accSagittal7TinasDown: {
+        bBoxNE: [
+          1.124,
+          -0.064
+        ],
+        bBoxSW: [
+          0,
+          -0.428
+        ]
+      },
+      accSagittal7TinasUp: {
+        bBoxNE: [
+          1.124,
+          0.428
+        ],
+        bBoxSW: [
+          0,
+          0.064
+        ]
+      },
       accSagittal7v11CommaDown: {
         bBoxNE: [
-          0.748,
+          0.752,
           1.436
         ],
         bBoxSW: [
@@ -13109,7 +16735,7 @@ var NotationEngine = (() => {
       },
       accSagittal7v11CommaUp: {
         bBoxNE: [
-          0.748,
+          0.752,
           0.688
         ],
         bBoxSW: [
@@ -13119,32 +16745,32 @@ var NotationEngine = (() => {
       },
       accSagittal7v11KleismaDown: {
         bBoxNE: [
-          0.88,
+          0.876,
           1.436
         ],
         bBoxSW: [
           0,
-          -0.684
+          -0.688
         ]
       },
       accSagittal7v11KleismaUp: {
         bBoxNE: [
           0.876,
-          0.684
+          0.688
         ],
         bBoxSW: [
-          -4e-3,
+          0,
           -1.436
         ]
       },
       accSagittal7v19CommaDown: {
         bBoxNE: [
           1,
-          1.44
+          1.436
         ],
         bBoxSW: [
           0,
-          -0.684
+          -0.688
         ]
       },
       accSagittal7v19CommaUp: {
@@ -13155,6 +16781,46 @@ var NotationEngine = (() => {
         bBoxSW: [
           0,
           -1.436
+        ]
+      },
+      accSagittal8TinasDown: {
+        bBoxNE: [
+          1.248,
+          -0.064
+        ],
+        bBoxSW: [
+          0,
+          -0.428
+        ]
+      },
+      accSagittal8TinasUp: {
+        bBoxNE: [
+          1.248,
+          0.428
+        ],
+        bBoxSW: [
+          0,
+          0.064
+        ]
+      },
+      accSagittal9TinasDown: {
+        bBoxNE: [
+          1.248,
+          -0.064
+        ],
+        bBoxSW: [
+          -0.028,
+          -0.428
+        ]
+      },
+      accSagittal9TinasUp: {
+        bBoxNE: [
+          1.248,
+          0.428
+        ],
+        bBoxSW: [
+          -0.028,
+          0.064
         ]
       },
       accSagittalAcute: {
@@ -13199,7 +16865,7 @@ var NotationEngine = (() => {
       },
       accSagittalDoubleFlat17CUp: {
         bBoxNE: [
-          1.748,
+          1.752,
           1.436
         ],
         bBoxSW: [
@@ -13209,7 +16875,7 @@ var NotationEngine = (() => {
       },
       accSagittalDoubleFlat17kUp: {
         bBoxNE: [
-          1.748,
+          1.752,
           1.436
         ],
         bBoxSW: [
@@ -13229,7 +16895,7 @@ var NotationEngine = (() => {
       },
       accSagittalDoubleFlat19sUp: {
         bBoxNE: [
-          1.748,
+          1.752,
           1.436
         ],
         bBoxSW: [
@@ -13259,12 +16925,12 @@ var NotationEngine = (() => {
       },
       accSagittalDoubleFlat25SUp: {
         bBoxNE: [
-          1.62,
+          1.624,
           1.436
         ],
         bBoxSW: [
           0,
-          -0.684
+          -0.688
         ]
       },
       accSagittalDoubleFlat49SUp: {
@@ -13324,7 +16990,7 @@ var NotationEngine = (() => {
         ],
         bBoxSW: [
           0,
-          -0.684
+          -0.688
         ]
       },
       accSagittalDoubleFlat5v7kUp: {
@@ -13359,7 +17025,7 @@ var NotationEngine = (() => {
       },
       accSagittalDoubleFlat7v11kUp: {
         bBoxNE: [
-          1.748,
+          1.752,
           1.436
         ],
         bBoxSW: [
@@ -13409,8 +17075,8 @@ var NotationEngine = (() => {
       },
       accSagittalDoubleSharp17CDown: {
         bBoxNE: [
-          1.748,
-          0.684
+          1.752,
+          0.688
         ],
         bBoxSW: [
           0,
@@ -13419,7 +17085,7 @@ var NotationEngine = (() => {
       },
       accSagittalDoubleSharp17kDown: {
         bBoxNE: [
-          1.748,
+          1.752,
           0.688
         ],
         bBoxSW: [
@@ -13439,7 +17105,7 @@ var NotationEngine = (() => {
       },
       accSagittalDoubleSharp19sDown: {
         bBoxNE: [
-          1.748,
+          1.752,
           0.688
         ],
         bBoxSW: [
@@ -13470,21 +17136,21 @@ var NotationEngine = (() => {
       accSagittalDoubleSharp25SDown: {
         bBoxNE: [
           1.624,
-          0.684
+          0.688
         ],
         bBoxSW: [
-          4e-3,
+          0,
           -1.436
         ]
       },
       accSagittalDoubleSharp49SDown: {
         bBoxNE: [
           1.5,
-          0.684
+          0.688
         ],
         bBoxSW: [
-          4e-3,
-          -1.44
+          0,
+          -1.436
         ]
       },
       accSagittalDoubleSharp55CDown: {
@@ -13569,7 +17235,7 @@ var NotationEngine = (() => {
       },
       accSagittalDoubleSharp7v11kDown: {
         bBoxNE: [
-          1.748,
+          1.752,
           0.688
         ],
         bBoxSW: [
@@ -13619,7 +17285,7 @@ var NotationEngine = (() => {
       },
       accSagittalFlat11v19LDown: {
         bBoxNE: [
-          1.748,
+          1.752,
           1.436
         ],
         bBoxSW: [
@@ -13629,7 +17295,7 @@ var NotationEngine = (() => {
       },
       accSagittalFlat11v19MDown: {
         bBoxNE: [
-          1.748,
+          1.752,
           1.436
         ],
         bBoxSW: [
@@ -13664,7 +17330,7 @@ var NotationEngine = (() => {
         ],
         bBoxSW: [
           0,
-          -0.684
+          -0.688
         ]
       },
       accSagittalFlat143CUp: {
@@ -13739,12 +17405,12 @@ var NotationEngine = (() => {
       },
       accSagittalFlat19sDown: {
         bBoxNE: [
-          1.128,
+          1.124,
           1.436
         ],
         bBoxSW: [
           0,
-          -0.684
+          -0.688
         ]
       },
       accSagittalFlat19sUp: {
@@ -13809,12 +17475,12 @@ var NotationEngine = (() => {
       },
       accSagittalFlat25SUp: {
         bBoxNE: [
-          1.38,
+          1.376,
           1.436
         ],
         bBoxSW: [
           0,
-          -0.684
+          -0.688
         ]
       },
       accSagittalFlat35LDown: {
@@ -13919,7 +17585,7 @@ var NotationEngine = (() => {
       },
       accSagittalFlat5v11SDown: {
         bBoxNE: [
-          1.748,
+          1.752,
           1.436
         ],
         bBoxSW: [
@@ -13940,11 +17606,11 @@ var NotationEngine = (() => {
       accSagittalFlat5v13LDown: {
         bBoxNE: [
           2,
-          1.44
+          1.436
         ],
         bBoxSW: [
           0,
-          -0.684
+          -0.688
         ]
       },
       accSagittalFlat5v13MDown: {
@@ -13969,12 +17635,12 @@ var NotationEngine = (() => {
       },
       accSagittalFlat5v19CUp: {
         bBoxNE: [
-          1.252,
+          1.248,
           1.436
         ],
         bBoxSW: [
           0,
-          -0.684
+          -0.688
         ]
       },
       accSagittalFlat5v23SDown: {
@@ -14010,10 +17676,10 @@ var NotationEngine = (() => {
       accSagittalFlat5v7kDown: {
         bBoxNE: [
           1.248,
-          1.436
+          1.444
         ],
         bBoxSW: [
-          -4e-3,
+          0,
           -0.688
         ]
       },
@@ -14030,11 +17696,11 @@ var NotationEngine = (() => {
       accSagittalFlat7CDown: {
         bBoxNE: [
           1.248,
-          1.44
+          1.436
         ],
         bBoxSW: [
           0,
-          -0.684
+          -0.688
         ]
       },
       accSagittalFlat7CUp: {
@@ -14069,12 +17735,12 @@ var NotationEngine = (() => {
       },
       accSagittalFlat7v11kDown: {
         bBoxNE: [
-          1.62,
+          1.624,
           1.436
         ],
         bBoxSW: [
           0,
-          -0.684
+          -0.688
         ]
       },
       accSagittalFlat7v11kUp: {
@@ -14105,6 +17771,26 @@ var NotationEngine = (() => {
         bBoxSW: [
           0,
           -0.688
+        ]
+      },
+      accSagittalFractionalTinaDown: {
+        bBoxNE: [
+          0.152,
+          -0.28
+        ],
+        bBoxSW: [
+          -0.024,
+          -0.456
+        ]
+      },
+      accSagittalFractionalTinaUp: {
+        bBoxNE: [
+          0.152,
+          0.456
+        ],
+        bBoxSW: [
+          -0.024,
+          0.28
         ]
       },
       accSagittalGrave: {
@@ -14169,7 +17855,7 @@ var NotationEngine = (() => {
       },
       accSagittalSharp11v19LUp: {
         bBoxNE: [
-          1.748,
+          1.752,
           0.688
         ],
         bBoxSW: [
@@ -14179,7 +17865,7 @@ var NotationEngine = (() => {
       },
       accSagittalSharp11v19MUp: {
         bBoxNE: [
-          1.748,
+          1.752,
           0.688
         ],
         bBoxSW: [
@@ -14230,7 +17916,7 @@ var NotationEngine = (() => {
       accSagittalSharp17CDown: {
         bBoxNE: [
           1.5,
-          0.684
+          0.688
         ],
         bBoxSW: [
           0,
@@ -14269,7 +17955,7 @@ var NotationEngine = (() => {
       },
       accSagittalSharp19CDown: {
         bBoxNE: [
-          1.128,
+          1.124,
           0.688
         ],
         bBoxSW: [
@@ -14334,7 +18020,7 @@ var NotationEngine = (() => {
         ],
         bBoxSW: [
           0,
-          -1.44
+          -1.436
         ]
       },
       accSagittalSharp23SUp: {
@@ -14350,10 +18036,10 @@ var NotationEngine = (() => {
       accSagittalSharp25SDown: {
         bBoxNE: [
           1.376,
-          0.684
+          0.688
         ],
         bBoxSW: [
-          -4e-3,
+          0,
           -1.436
         ]
       },
@@ -14413,7 +18099,7 @@ var NotationEngine = (() => {
           0.688
         ],
         bBoxSW: [
-          -4e-3,
+          0,
           -1.436
         ]
       },
@@ -14470,17 +18156,17 @@ var NotationEngine = (() => {
       accSagittalSharp5v11SDown: {
         bBoxNE: [
           1.376,
-          0.684
+          0.688
         ],
         bBoxSW: [
           0,
-          -1.44
+          -1.436
         ]
       },
       accSagittalSharp5v11SUp: {
         bBoxNE: [
-          1.748,
-          0.684
+          1.752,
+          0.688
         ],
         bBoxSW: [
           0,
@@ -14504,7 +18190,7 @@ var NotationEngine = (() => {
         ],
         bBoxSW: [
           0,
-          -1.44
+          -1.436
         ]
       },
       accSagittalSharp5v19CDown: {
@@ -14570,7 +18256,7 @@ var NotationEngine = (() => {
       accSagittalSharp5v7kUp: {
         bBoxNE: [
           1.248,
-          0.684
+          0.688
         ],
         bBoxSW: [
           0,
@@ -14630,10 +18316,10 @@ var NotationEngine = (() => {
       accSagittalSharp7v11kUp: {
         bBoxNE: [
           1.624,
-          0.684
+          0.688
         ],
         bBoxSW: [
-          4e-3,
+          0,
           -1.436
         ]
       },
@@ -15419,22 +19105,72 @@ var NotationEngine = (() => {
       },
       accidentalCombiningLower23Limit29LimitComma: {
         bBoxNE: [
-          0.989496,
-          1.1792960000000001
+          0.988,
+          0.5
         ],
         bBoxSW: [
           0,
-          -0.5004
+          -1.18
+        ]
+      },
+      accidentalCombiningLower29LimitComma: {
+        bBoxNE: [
+          1.016,
+          0.312
+        ],
+        bBoxSW: [
+          0,
+          -1.36
         ]
       },
       accidentalCombiningLower31Schisma: {
         bBoxNE: [
-          1.188,
-          0.332
+          0.832,
+          0.74
         ],
         bBoxSW: [
           0,
-          0.152
+          -1.664
+        ]
+      },
+      accidentalCombiningLower37Quartertone: {
+        bBoxNE: [
+          0.852,
+          1.508
+        ],
+        bBoxSW: [
+          0,
+          -1.352
+        ]
+      },
+      accidentalCombiningLower41Comma: {
+        bBoxNE: [
+          0.848,
+          -0.18
+        ],
+        bBoxSW: [
+          0,
+          -0.308
+        ]
+      },
+      accidentalCombiningLower43Comma: {
+        bBoxNE: [
+          1.008,
+          0.436
+        ],
+        bBoxSW: [
+          4e-3,
+          -0.432
+        ]
+      },
+      accidentalCombiningLower47Quartertone: {
+        bBoxNE: [
+          0.684,
+          1.368
+        ],
+        bBoxSW: [
+          0,
+          -0.944
         ]
       },
       accidentalCombiningLower53LimitComma: {
@@ -15479,32 +19215,82 @@ var NotationEngine = (() => {
       },
       accidentalCombiningRaise23Limit29LimitComma: {
         bBoxNE: [
-          0.989496,
-          0.5004
+          0.988,
+          1.18
         ],
         bBoxSW: [
           0,
-          -1.1792960000000001
+          -0.5
+        ]
+      },
+      accidentalCombiningRaise29LimitComma: {
+        bBoxNE: [
+          1.016,
+          1.368
+        ],
+        bBoxSW: [
+          0,
+          -0.304
         ]
       },
       accidentalCombiningRaise31Schisma: {
         bBoxNE: [
-          1.188,
-          0.836
+          0.84016,
+          1.309778
+        ],
+        bBoxSW: [
+          4e-3,
+          -1.308
+        ]
+      },
+      accidentalCombiningRaise37Quartertone: {
+        bBoxNE: [
+          0.852,
+          1.368
         ],
         bBoxSW: [
           0,
-          -0.352
+          -1.492
+        ]
+      },
+      accidentalCombiningRaise41Comma: {
+        bBoxNE: [
+          0.848,
+          0.18
+        ],
+        bBoxSW: [
+          0,
+          -0.668
+        ]
+      },
+      accidentalCombiningRaise43Comma: {
+        bBoxNE: [
+          1.016,
+          0.428
+        ],
+        bBoxSW: [
+          4e-3,
+          -0.44
+        ]
+      },
+      accidentalCombiningRaise47Quartertone: {
+        bBoxNE: [
+          0.684,
+          0.94
+        ],
+        bBoxSW: [
+          0,
+          -1.372
         ]
       },
       accidentalCombiningRaise53LimitComma: {
         bBoxNE: [
           0.792,
-          0.994404
+          0.996
         ],
         bBoxSW: [
           0,
-          -0.9966228
+          -0.996
         ]
       },
       accidentalCommaSlashDown: {
@@ -16067,6 +19853,66 @@ var NotationEngine = (() => {
           -0.728
         ]
       },
+      accidentalHabaFlatQuarterToneHigher: {
+        bBoxNE: [
+          0.888,
+          1.696
+        ],
+        bBoxSW: [
+          0,
+          -0.683148
+        ]
+      },
+      accidentalHabaFlatThreeQuarterTonesLower: {
+        bBoxNE: [
+          0.896,
+          1.856
+        ],
+        bBoxSW: [
+          -0.692,
+          -0.687026
+        ]
+      },
+      accidentalHabaQuarterToneHigher: {
+        bBoxNE: [
+          0.837149,
+          1.739
+        ],
+        bBoxSW: [
+          0,
+          -0.719335
+        ]
+      },
+      accidentalHabaQuarterToneLower: {
+        bBoxNE: [
+          0.888,
+          1.797541
+        ],
+        bBoxSW: [
+          0,
+          -0.611148
+        ]
+      },
+      accidentalHabaSharpQuarterToneLower: {
+        bBoxNE: [
+          0.996,
+          1.4
+        ],
+        bBoxSW: [
+          -0.328,
+          -2.092
+        ]
+      },
+      accidentalHabaSharpThreeQuarterTonesHigher: {
+        bBoxNE: [
+          1.163,
+          1.4
+        ],
+        bBoxSW: [
+          0,
+          -1.605873
+        ]
+      },
       accidentalHalfSharpArrowDown: {
         bBoxNE: [
           0.924,
@@ -16330,11 +20176,11 @@ var NotationEngine = (() => {
       accidentalLowerOneSeptimalComma: {
         bBoxNE: [
           0.684,
-          1.656
+          1.736
         ],
         bBoxSW: [
           0,
-          -0.46
+          -0.38
         ]
       },
       accidentalLowerOneTridecimalQuartertone: {
@@ -16344,7 +20190,7 @@ var NotationEngine = (() => {
         ],
         bBoxSW: [
           0,
-          -0.6923333333333334
+          -0.692
         ]
       },
       accidentalLowerOneUndecimalQuartertone: {
@@ -16829,12 +20675,12 @@ var NotationEngine = (() => {
       },
       accidentalRaiseOneSeptimalComma: {
         bBoxNE: [
-          0.752,
-          0.4172972
+          0.688,
+          0.432
         ],
         bBoxSW: [
-          0.068,
-          -1.6987028
+          4e-3,
+          -1.684
         ]
       },
       accidentalRaiseOneTridecimalQuartertone: {
@@ -17417,6 +21263,46 @@ var NotationEngine = (() => {
           -0.496
         ]
       },
+      accidentalUpsAndDownsDown: {
+        bBoxNE: [
+          0.958977,
+          0.413149
+        ],
+        bBoxSW: [
+          0.013023,
+          -0.411
+        ]
+      },
+      accidentalUpsAndDownsLess: {
+        bBoxNE: [
+          0.833149,
+          0.474977
+        ],
+        bBoxSW: [
+          9e-3,
+          -0.470977
+        ]
+      },
+      accidentalUpsAndDownsMore: {
+        bBoxNE: [
+          0.823,
+          0.474977
+        ],
+        bBoxSW: [
+          -1149e-6,
+          -0.470977
+        ]
+      },
+      accidentalUpsAndDownsUp: {
+        bBoxNE: [
+          0.958977,
+          0.415
+        ],
+        bBoxSW: [
+          0.013023,
+          -0.409149
+        ]
+      },
       accidentalWilsonMinus: {
         bBoxNE: [
           1.124,
@@ -17805,6 +21691,16 @@ var NotationEngine = (() => {
         bBoxSW: [
           0,
           0
+        ]
+      },
+      arpeggiato: {
+        bBoxNE: [
+          0.484,
+          5.468
+        ],
+        bBoxSW: [
+          0,
+          0.036
         ]
       },
       arpeggiatoDown: {
@@ -18327,6 +22223,16 @@ var NotationEngine = (() => {
           4e-3
         ]
       },
+      articAccentAboveRossini: {
+        bBoxNE: [
+          1.356,
+          0.982567
+        ],
+        bBoxSW: [
+          0,
+          4878e-6
+        ]
+      },
       articAccentAboveSmall: {
         bBoxNE: [
           1.332,
@@ -18355,6 +22261,16 @@ var NotationEngine = (() => {
         bBoxSW: [
           0,
           -1.216
+        ]
+      },
+      articAccentBelowRossini: {
+        bBoxNE: [
+          1.356,
+          0.022567
+        ],
+        bBoxSW: [
+          0,
+          -0.955122
         ]
       },
       articAccentBelowSmall: {
@@ -18459,11 +22375,11 @@ var NotationEngine = (() => {
       },
       articMarcatoBelowSmall: {
         bBoxNE: [
-          0.944,
+          0.936,
           0
         ],
         bBoxSW: [
-          0,
+          -8e-3,
           -1.016
         ]
       },
@@ -18499,11 +22415,11 @@ var NotationEngine = (() => {
       },
       articMarcatoStaccatoBelowSmall: {
         bBoxNE: [
-          0.944,
+          0.936,
           -4e-3
         ],
         bBoxSW: [
-          0,
+          -8e-3,
           -2.036
         ]
       },
@@ -18939,12 +22855,12 @@ var NotationEngine = (() => {
       },
       barlineDashed: {
         bBoxNE: [
-          0.144,
-          4
+          0.16,
+          3.7
         ],
         bBoxSW: [
           0,
-          0
+          0.2
         ]
       },
       barlineDotted: {
@@ -18959,7 +22875,7 @@ var NotationEngine = (() => {
       },
       barlineDouble: {
         bBoxNE: [
-          0.576,
+          0.72,
           4
         ],
         bBoxSW: [
@@ -18969,7 +22885,7 @@ var NotationEngine = (() => {
       },
       barlineFinal: {
         bBoxNE: [
-          0.912,
+          1.06,
           4
         ],
         bBoxSW: [
@@ -18989,7 +22905,7 @@ var NotationEngine = (() => {
       },
       barlineHeavyHeavy: {
         bBoxNE: [
-          1.372,
+          1.4,
           4
         ],
         bBoxSW: [
@@ -18999,7 +22915,7 @@ var NotationEngine = (() => {
       },
       barlineReverseFinal: {
         bBoxNE: [
-          0.912,
+          1.06,
           4
         ],
         bBoxSW: [
@@ -19009,17 +22925,17 @@ var NotationEngine = (() => {
       },
       barlineShort: {
         bBoxNE: [
-          0.148,
+          0.16,
           4
         ],
         bBoxSW: [
-          4e-3,
+          0,
           2
         ]
       },
       barlineSingle: {
         bBoxNE: [
-          0.144,
+          0.16,
           4
         ],
         bBoxSW: [
@@ -19029,7 +22945,7 @@ var NotationEngine = (() => {
       },
       barlineTick: {
         bBoxNE: [
-          0.144,
+          0.16,
           4.48
         ],
         bBoxSW: [
@@ -19199,12 +23115,12 @@ var NotationEngine = (() => {
       },
       brace: {
         bBoxNE: [
-          0.328,
-          3.988
+          0.277415,
+          4.00244
         ],
         bBoxSW: [
-          8e-3,
-          0
+          0,
+          -2531e-6
         ]
       },
       braceFlat: {
@@ -20309,12 +24225,12 @@ var NotationEngine = (() => {
       },
       chantPunctumDeminutum: {
         bBoxNE: [
-          0.36416,
-          0.23133599999999999
+          0.364,
+          0.232
         ],
         bBoxSW: [
           0,
-          -0.229068
+          -0.228
         ]
       },
       chantPunctumInclinatum: {
@@ -22700,11 +26616,11 @@ var NotationEngine = (() => {
       figbass2Raised: {
         bBoxNE: [
           0.964,
-          1.0240000546975676
+          1.024
         ],
         bBoxSW: [
           0.08,
-          -0.1345988858063968
+          -0.135066
         ]
       },
       figbass3: {
@@ -22919,18 +26835,38 @@ var NotationEngine = (() => {
       },
       figbassDoubleFlat: {
         bBoxNE: [
-          0.987936,
-          1.237652
+          0.988,
+          1.236
         ],
         bBoxSW: [
           0.088,
-          -17520258105108154e-23
+          -1443e-6
+        ]
+      },
+      figbassDoubleFlatLongerStem: {
+        bBoxNE: [
+          1.096,
+          1.48
+        ],
+        bBoxSW: [
+          0.096,
+          -8e-3
         ]
       },
       figbassDoubleSharp: {
         bBoxNE: [
-          0.86936,
-          0.78808
+          0.868,
+          0.788
+        ],
+        bBoxSW: [
+          0.08,
+          -0.02
+        ]
+      },
+      figbassDoubleSharpLongerStem: {
+        bBoxNE: [
+          0.868,
+          0.788
         ],
         bBoxSW: [
           0.08,
@@ -22939,22 +26875,42 @@ var NotationEngine = (() => {
       },
       figbassFlat: {
         bBoxNE: [
-          0.631152,
-          1.237652
+          0.632,
+          1.236
         ],
         bBoxSW: [
           0.084,
-          -6432840367054382e-24
+          -1443e-6
+        ]
+      },
+      figbassFlatLongerStem: {
+        bBoxNE: [
+          0.608,
+          1.456
+        ],
+        bBoxSW: [
+          0.064,
+          -0.012
         ]
       },
       figbassNatural: {
         bBoxNE: [
-          0.45127999999999996,
-          1.0513599999999999
+          0.452,
+          1.052
         ],
         bBoxSW: [
           0.08,
           -0.2
+        ]
+      },
+      figbassNaturalLongerStem: {
+        bBoxNE: [
+          0.448,
+          1.172
+        ],
+        bBoxSW: [
+          0.076,
+          -0.32
         ]
       },
       figbassParensLeft: {
@@ -22970,7 +26926,7 @@ var NotationEngine = (() => {
       figbassParensRight: {
         bBoxNE: [
           0.352,
-          1.0840110803324101
+          1.084011
         ],
         bBoxSW: [
           -0.036,
@@ -22989,32 +26945,62 @@ var NotationEngine = (() => {
       },
       figbassSharp: {
         bBoxNE: [
-          0.675496,
-          1.219252
+          0.676,
+          1.22
         ],
         bBoxSW: [
-          0.0764548,
-          -0.2192004
+          0.076,
+          -0.22
+        ]
+      },
+      figbassSharpLongerStem: {
+        bBoxNE: [
+          0.68,
+          1.256
+        ],
+        bBoxSW: [
+          0.08,
+          -0.424
         ]
       },
       figbassTripleFlat: {
         bBoxNE: [
-          1.43248,
-          1.237652
+          1.432,
+          1.236
         ],
         bBoxSW: [
           0.088,
-          -17520258105108154e-23
+          -1443e-6
+        ]
+      },
+      figbassTripleFlatLongerStem: {
+        bBoxNE: [
+          1.544,
+          1.456
+        ],
+        bBoxSW: [
+          0.064,
+          -0.012
         ]
       },
       figbassTripleSharp: {
         bBoxNE: [
-          1.3532711760000002,
-          1.219252
+          1.352,
+          1.22
         ],
         bBoxSW: [
-          0.0764548,
-          -0.2192004
+          0.076,
+          -0.22
+        ]
+      },
+      figbassTripleSharpLongerStem: {
+        bBoxNE: [
+          1.536,
+          1.256
+        ],
+        bBoxSW: [
+          0.08,
+          -0.424
         ]
       },
       fingering0: {
@@ -23029,12 +27015,12 @@ var NotationEngine = (() => {
       },
       fingering0Italic: {
         bBoxNE: [
-          0.8675176820831069,
-          0.975
+          0.868,
+          0.976
         ],
         bBoxSW: [
-          0.03921718538708474,
-          -0.0208
+          0.04,
+          -0.02
         ]
       },
       fingering1: {
@@ -23049,11 +27035,11 @@ var NotationEngine = (() => {
       },
       fingering1Italic: {
         bBoxNE: [
-          0.7056,
-          0.9672000000000001
+          0.704,
+          0.968
         ],
         bBoxSW: [
-          0.066,
+          0.068,
           0
         ]
       },
@@ -23069,12 +27055,12 @@ var NotationEngine = (() => {
       },
       fingering2Italic: {
         bBoxNE: [
-          0.8954,
-          0.975
+          0.896,
+          0.976
         ],
         bBoxSW: [
-          0.066,
-          -0.015600000000000001
+          0.068,
+          -0.016
         ]
       },
       fingering3: {
@@ -23089,12 +27075,12 @@ var NotationEngine = (() => {
       },
       fingering3Italic: {
         bBoxNE: [
-          0.8356,
-          0.975
+          0.836,
+          0.976
         ],
         bBoxSW: [
-          0.066,
-          -0.0208
+          0.068,
+          -0.02
         ]
       },
       fingering4: {
@@ -23109,11 +27095,11 @@ var NotationEngine = (() => {
       },
       fingering4Italic: {
         bBoxNE: [
-          0.8538000000000001,
-          0.9672000000000001
+          0.852,
+          0.968
         ],
         bBoxSW: [
-          0.066,
+          0.068,
           0
         ]
       },
@@ -23129,12 +27115,12 @@ var NotationEngine = (() => {
       },
       fingering5Italic: {
         bBoxNE: [
-          0.8902,
-          0.9698000000000001
+          0.892,
+          0.968
         ],
         bBoxSW: [
-          0.066,
-          -0.0208
+          0.068,
+          -0.02
         ]
       },
       fingering6: {
@@ -23149,12 +27135,12 @@ var NotationEngine = (() => {
       },
       fingering6Italic: {
         bBoxNE: [
-          0.8563999999999999,
-          0.975
+          0.856,
+          0.976
         ],
         bBoxSW: [
-          0.06668883168563493,
-          -0.02080000000000007
+          0.068,
+          -0.02
         ]
       },
       fingering7: {
@@ -23169,12 +27155,12 @@ var NotationEngine = (() => {
       },
       fingering7Italic: {
         bBoxNE: [
-          0.8658,
-          0.9672000000000001
+          0.864,
+          0.968
         ],
         bBoxSW: [
-          0.078,
-          -0.0104
+          0.08,
+          -0.012
         ]
       },
       fingering8: {
@@ -23189,12 +27175,12 @@ var NotationEngine = (() => {
       },
       fingering8Italic: {
         bBoxNE: [
-          0.8798,
-          0.975
+          0.88,
+          0.976
         ],
         bBoxSW: [
-          0.066,
-          -0.0208
+          0.068,
+          -0.02
         ]
       },
       fingering9: {
@@ -23209,12 +27195,12 @@ var NotationEngine = (() => {
       },
       fingering9Italic: {
         bBoxNE: [
-          0.8557111683143651,
-          0.975
+          0.856,
+          0.976
         ],
         bBoxSW: [
-          0.066,
-          -0.0208
+          0.068,
+          -0.02
         ]
       },
       fingeringALower: {
@@ -23340,10 +27326,10 @@ var NotationEngine = (() => {
       fingeringQLower: {
         bBoxNE: [
           0.996,
-          1.0291394250872739
+          1.029139
         ],
         bBoxSW: [
-          7355693565577148e-19,
+          0,
           -0.552
         ]
       },
@@ -23370,7 +27356,7 @@ var NotationEngine = (() => {
       fingeringRightParenthesis: {
         bBoxNE: [
           0.352,
-          1.0840110803324101
+          1.084011
         ],
         bBoxSW: [
           -0.036,
@@ -23380,7 +27366,7 @@ var NotationEngine = (() => {
       fingeringRightParenthesisItalic: {
         bBoxNE: [
           0.392,
-          1.0840110803324101
+          1.084011
         ],
         bBoxSW: [
           -0.116,
@@ -23389,12 +27375,12 @@ var NotationEngine = (() => {
       },
       fingeringSLower: {
         bBoxNE: [
-          0.8385360711926255,
-          1.0499349999999998
+          0.84,
+          1.048
         ],
         bBoxSW: [
-          -4143900075908036e-22,
-          -0.02763194183171871
+          377e-6,
+          -0.028
         ]
       },
       fingeringSeparatorMiddleDot: {
@@ -23629,8 +27615,8 @@ var NotationEngine = (() => {
       },
       flag16thDown: {
         bBoxNE: [
-          1.1635806326044895,
-          3.2480256
+          1.164,
+          3.248026
         ],
         bBoxSW: [
           0,
@@ -23873,7 +27859,7 @@ var NotationEngine = (() => {
           3.564
         ],
         bBoxSW: [
-          -4e-3,
+          0,
           -3.248
         ]
       },
@@ -23980,7 +27966,7 @@ var NotationEngine = (() => {
       flag8thDown: {
         bBoxNE: [
           1.224,
-          3.232896633157715
+          3.232
         ],
         bBoxSW: [
           0,
@@ -23990,7 +27976,7 @@ var NotationEngine = (() => {
       flag8thDownSmall: {
         bBoxNE: [
           1.076,
-          3.233452248097471
+          3.233452
         ],
         bBoxSW: [
           4e-3,
@@ -24014,7 +28000,7 @@ var NotationEngine = (() => {
         ],
         bBoxSW: [
           0,
-          -3.240768470618394
+          -3.24
         ]
       },
       flag8thUpShort: {
@@ -24149,32 +28135,32 @@ var NotationEngine = (() => {
       },
       fretboardFilledCircle: {
         bBoxNE: [
-          0.564,
-          0.564
+          0.284,
+          0.284
         ],
         bBoxSW: [
-          0,
-          0
+          -0.28,
+          -0.28
         ]
       },
       fretboardO: {
         bBoxNE: [
-          0.564,
-          0.564
+          0.284,
+          0.28
         ],
         bBoxSW: [
-          0,
-          0
+          -0.28,
+          -0.284
         ]
       },
       fretboardX: {
         bBoxNE: [
-          0.596,
-          0.596
+          0.3,
+          0.3
         ],
         bBoxSW: [
-          0,
-          0
+          -0.296,
+          -0.296
         ]
       },
       functionAngleLeft: {
@@ -24987,6 +28973,16 @@ var NotationEngine = (() => {
           -2.632
         ]
       },
+      gClef8vbFrench: {
+        bBoxNE: [
+          2.684,
+          4.392
+        ],
+        bBoxSW: [
+          0,
+          -3.512
+        ]
+      },
       gClef8vbOld: {
         bBoxNE: [
           4.176,
@@ -25009,7 +29005,7 @@ var NotationEngine = (() => {
       },
       gClef9Above: {
         bBoxNE: [
-          3.1314576221852275,
+          3.132,
           4.908
         ],
         bBoxSW: [
@@ -25034,13 +29030,13 @@ var NotationEngine = (() => {
         ],
         bBoxSW: [
           0,
-          -2.8647752591831397
+          -2.864775
         ]
       },
       gClefArrowUp: {
         bBoxNE: [
           2.684,
-          4.804775259183139
+          4.804775
         ],
         bBoxSW: [
           0,
@@ -25459,12 +29455,12 @@ var NotationEngine = (() => {
       },
       gClefTurned: {
         bBoxNE: [
-          2.708,
-          4.616
+          2.68,
+          2.664
         ],
         bBoxSW: [
-          0.024,
-          -2.408
+          -4e-3,
+          -4.36
         ]
       },
       glissandoDown: {
@@ -25697,6 +29693,46 @@ var NotationEngine = (() => {
           0
         ]
       },
+      guitarString10: {
+        bBoxNE: [
+          2.16,
+          2.156
+        ],
+        bBoxSW: [
+          0,
+          0
+        ]
+      },
+      guitarString11: {
+        bBoxNE: [
+          2.16,
+          2.156
+        ],
+        bBoxSW: [
+          0,
+          0
+        ]
+      },
+      guitarString12: {
+        bBoxNE: [
+          2.16,
+          2.156
+        ],
+        bBoxSW: [
+          0,
+          0
+        ]
+      },
+      guitarString13: {
+        bBoxNE: [
+          2.188,
+          2.156
+        ],
+        bBoxSW: [
+          0.028,
+          0
+        ]
+      },
       guitarString2: {
         bBoxNE: [
           2.16,
@@ -25815,6 +29851,16 @@ var NotationEngine = (() => {
         bBoxSW: [
           0,
           4e-3
+        ]
+      },
+      guitarVibratoBarScoopCurved: {
+        bBoxNE: [
+          3.14,
+          2.508
+        ],
+        bBoxSW: [
+          0,
+          0.020826
         ]
       },
       guitarVibratoStroke: {
@@ -26479,17 +30525,17 @@ var NotationEngine = (() => {
       },
       kahnDrawStep: {
         bBoxNE: [
-          2.626086956521739,
+          2.628,
           2.668
         ],
         bBoxSW: [
-          64e-4,
+          8e-3,
           4e-3
         ]
       },
       kahnDrawTap: {
         bBoxNE: [
-          3.4541,
+          3.456,
           2.548
         ],
         bBoxSW: [
@@ -26549,7 +30595,7 @@ var NotationEngine = (() => {
       },
       kahnFleaTap: {
         bBoxNE: [
-          2.2114285714285717,
+          2.212,
           2.54
         ],
         bBoxSW: [
@@ -26559,7 +30605,7 @@ var NotationEngine = (() => {
       },
       kahnGraceTap: {
         bBoxNE: [
-          1.0744615384615386,
+          1.076,
           1.48
         ],
         bBoxSW: [
@@ -26579,7 +30625,7 @@ var NotationEngine = (() => {
       },
       kahnGraceTapHop: {
         bBoxNE: [
-          1.6085,
+          1.608,
           2.812
         ],
         bBoxSW: [
@@ -26610,7 +30656,7 @@ var NotationEngine = (() => {
       kahnHeelChange: {
         bBoxNE: [
           1.444,
-          2.5362
+          2.536
         ],
         bBoxSW: [
           0,
@@ -26629,18 +30675,18 @@ var NotationEngine = (() => {
       },
       kahnHeelDrop: {
         bBoxNE: [
-          1.2243333333333333,
-          1.38072
+          1.224,
+          1.38
         ],
         bBoxSW: [
-          0.01128,
+          0.012,
           0.168
         ]
       },
       kahnHeelStep: {
         bBoxNE: [
-          1.2044848484848485,
-          2.8004848484848486
+          1.204,
+          2.8
         ],
         bBoxSW: [
           0,
@@ -26649,8 +30695,8 @@ var NotationEngine = (() => {
       },
       kahnHeelTap: {
         bBoxNE: [
-          2.080125,
-          2.788457142857143
+          2.08,
+          2.788
         ],
         bBoxSW: [
           0,
@@ -26840,11 +30886,11 @@ var NotationEngine = (() => {
       kahnRiffle: {
         bBoxNE: [
           1.168,
-          2.7392
+          2.74
         ],
         bBoxSW: [
-          0.005454545454545455,
-          0.07248275862068965
+          4e-3,
+          0.072
         ]
       },
       kahnRightCatch: {
@@ -26910,11 +30956,11 @@ var NotationEngine = (() => {
       kahnRipple: {
         bBoxNE: [
           1.184,
-          2.6995789473684213
+          2.7
         ],
         bBoxSW: [
-          0.005454545454545455,
-          0.07464406779661018
+          4e-3,
+          0.076
         ]
       },
       kahnScrape: {
@@ -26939,22 +30985,22 @@ var NotationEngine = (() => {
       },
       kahnScuffle: {
         bBoxNE: [
-          1.277037037037037,
-          2.5953846153846154
+          1.276,
+          2.596
         ],
         bBoxSW: [
           4e-3,
-          0.03493333333333334
+          0.036
         ]
       },
       kahnShuffle: {
         bBoxNE: [
           1.14,
-          2.6858
+          2.684
         ],
         bBoxSW: [
-          48e-4,
-          0.07248275862068965
+          4e-3,
+          0.072
         ]
       },
       kahnSlam: {
@@ -26983,17 +31029,17 @@ var NotationEngine = (() => {
           2.548
         ],
         bBoxSW: [
-          19e-4,
+          0,
           0
         ]
       },
       kahnSlideTap: {
         bBoxNE: [
-          2.6215238095238096,
+          2.62,
           2.668
         ],
         bBoxSW: [
-          0.0019130434782608696,
+          0,
           4e-3
         ]
       },
@@ -27099,17 +31145,17 @@ var NotationEngine = (() => {
       },
       kahnToeDrop: {
         bBoxNE: [
-          0.9884,
-          1.1964000000000001
+          0.988,
+          1.196
         ],
         bBoxSW: [
-          76e-4,
+          8e-3,
           0.216
         ]
       },
       kahnToeStep: {
         bBoxNE: [
-          1.2884444444444443,
+          1.288,
           2.792
         ],
         bBoxSW: [
@@ -27119,8 +31165,8 @@ var NotationEngine = (() => {
       },
       kahnToeTap: {
         bBoxNE: [
-          2.1564444444444444,
-          2.8004324324324323
+          2.156,
+          2.8
         ],
         bBoxSW: [
           0,
@@ -27780,7 +31826,7 @@ var NotationEngine = (() => {
       kodalyHandMi: {
         bBoxNE: [
           4.996,
-          1.6801804709185104
+          1.68
         ],
         bBoxSW: [
           0,
@@ -28169,12 +32215,12 @@ var NotationEngine = (() => {
       },
       luteFrenchAppoggiaturaAbove: {
         bBoxNE: [
-          0.5120435999999999,
-          1.43602
+          0.512,
+          1.436
         ],
         bBoxSW: [
           0,
-          9440000000006422e-20
+          0
         ]
       },
       luteFrenchAppoggiaturaBelow: {
@@ -28739,101 +32785,101 @@ var NotationEngine = (() => {
       },
       luteItalianFret0: {
         bBoxNE: [
-          1.123582,
-          1.1991776
+          1.124,
+          1.2
         ],
         bBoxSW: [
-          0.095624,
-          -47776e-7
+          0.096,
+          -4e-3
         ]
       },
       luteItalianFret1: {
         bBoxNE: [
-          0.646366,
-          1.1999976
+          0.648,
+          1.2
         ],
         bBoxSW: [
-          0.09436,
+          0.096,
           0
         ]
       },
       luteItalianFret2: {
         bBoxNE: [
-          1.0506816,
-          1.2018032
+          1.052,
+          1.2
         ],
         bBoxSW: [
-          0.094656,
-          -0.010203199999999999
+          0.096,
+          -0.012
         ]
       },
       luteItalianFret3: {
         bBoxNE: [
-          0.975144,
-          1.200024
+          0.976,
+          1.2
         ],
         bBoxSW: [
-          0.095136,
+          0.096,
           0
         ]
       },
       luteItalianFret4: {
         bBoxNE: [
-          1.0271232,
-          1.204786
+          1.028,
+          1.204
         ],
         bBoxSW: [
-          0.09510400000000001,
-          4762e-6
+          0.096,
+          4e-3
         ]
       },
       luteItalianFret5: {
         bBoxNE: [
-          0.9530039999999999,
-          1.2000096
+          0.952,
+          1.2
         ],
         bBoxSW: [
-          0.092976,
+          0.092,
           0
         ]
       },
       luteItalianFret6: {
         bBoxNE: [
-          1.0359360000000002,
+          1.036,
           1.2
         ],
         bBoxSW: [
-          0.09592,
+          0.096,
           0
         ]
       },
       luteItalianFret7: {
         bBoxNE: [
-          1.0662512,
-          1.204028
+          1.068,
+          1.204
         ],
         bBoxSW: [
-          0.098272,
+          0.1,
           0
         ]
       },
       luteItalianFret8: {
         bBoxNE: [
-          1.0158192,
-          1.2039968
+          1.016,
+          1.204
         ],
         bBoxSW: [
-          0.095832,
+          0.096,
           0
         ]
       },
       luteItalianFret9: {
         bBoxNE: [
-          1.0359360000000002,
+          1.036,
           1.2
         ],
         bBoxSW: [
-          0.09592,
+          0.096,
           0
         ]
       },
@@ -30987,6 +35033,56 @@ var NotationEngine = (() => {
           -1.004
         ]
       },
+      mensuralProportion5: {
+        bBoxNE: [
+          1.256,
+          1.036
+        ],
+        bBoxSW: [
+          2642e-6,
+          -1.04
+        ]
+      },
+      mensuralProportion6: {
+        bBoxNE: [
+          1.296,
+          1.108
+        ],
+        bBoxSW: [
+          0,
+          -1.04
+        ]
+      },
+      mensuralProportion7: {
+        bBoxNE: [
+          1.348,
+          1.036
+        ],
+        bBoxSW: [
+          0,
+          -1
+        ]
+      },
+      mensuralProportion8: {
+        bBoxNE: [
+          1.3,
+          1.088
+        ],
+        bBoxSW: [
+          0,
+          -1.04
+        ]
+      },
+      mensuralProportion9: {
+        bBoxNE: [
+          1.292,
+          1.056
+        ],
+        bBoxSW: [
+          0,
+          -1.092
+        ]
+      },
       mensuralProportionMajor: {
         bBoxNE: [
           0.888,
@@ -31291,6 +35387,16 @@ var NotationEngine = (() => {
         bBoxNE: [
           1.28,
           3.544
+        ],
+        bBoxSW: [
+          0,
+          -0.736
+        ]
+      },
+      mensuralWhiteSemibrevis: {
+        bBoxNE: [
+          1.28,
+          0.74
         ],
         bBoxSW: [
           0,
@@ -32117,6 +36223,36 @@ var NotationEngine = (() => {
           -0.588
         ]
       },
+      noteDiBlack: {
+        bBoxNE: [
+          1.432,
+          0.564
+        ],
+        bBoxSW: [
+          0,
+          -0.564
+        ]
+      },
+      noteDiHalf: {
+        bBoxNE: [
+          1.44,
+          0.58
+        ],
+        bBoxSW: [
+          0,
+          -0.58
+        ]
+      },
+      noteDiWhole: {
+        bBoxNE: [
+          1.944,
+          0.576
+        ],
+        bBoxSW: [
+          0,
+          -0.584
+        ]
+      },
       noteDoBlack: {
         bBoxNE: [
           1.432,
@@ -32417,6 +36553,36 @@ var NotationEngine = (() => {
           -0.584
         ]
       },
+      noteFiBlack: {
+        bBoxNE: [
+          1.432,
+          0.564
+        ],
+        bBoxSW: [
+          0,
+          -0.564
+        ]
+      },
+      noteFiHalf: {
+        bBoxNE: [
+          1.44,
+          0.58
+        ],
+        bBoxSW: [
+          0,
+          -0.58
+        ]
+      },
+      noteFiWhole: {
+        bBoxNE: [
+          1.944,
+          0.564
+        ],
+        bBoxSW: [
+          0,
+          -0.596
+        ]
+      },
       noteGBlack: {
         bBoxNE: [
           1.432,
@@ -32617,6 +36783,156 @@ var NotationEngine = (() => {
           -0.584
         ]
       },
+      noteLeBlack: {
+        bBoxNE: [
+          1.432,
+          0.564
+        ],
+        bBoxSW: [
+          0,
+          -0.564
+        ]
+      },
+      noteLeHalf: {
+        bBoxNE: [
+          1.44,
+          0.58
+        ],
+        bBoxSW: [
+          0,
+          -0.58
+        ]
+      },
+      noteLeWhole: {
+        bBoxNE: [
+          1.944,
+          0.576
+        ],
+        bBoxSW: [
+          0,
+          -0.584
+        ]
+      },
+      noteLiBlack: {
+        bBoxNE: [
+          1.432,
+          0.564
+        ],
+        bBoxSW: [
+          0,
+          -0.564
+        ]
+      },
+      noteLiHalf: {
+        bBoxNE: [
+          1.44,
+          0.58
+        ],
+        bBoxSW: [
+          0,
+          -0.58
+        ]
+      },
+      noteLiWhole: {
+        bBoxNE: [
+          1.948,
+          0.572
+        ],
+        bBoxSW: [
+          4e-3,
+          -0.588
+        ]
+      },
+      noteLoBlack: {
+        bBoxNE: [
+          1.436,
+          0.564
+        ],
+        bBoxSW: [
+          4e-3,
+          -0.564
+        ]
+      },
+      noteLoHalf: {
+        bBoxNE: [
+          1.444,
+          0.58
+        ],
+        bBoxSW: [
+          4e-3,
+          -0.58
+        ]
+      },
+      noteLoWhole: {
+        bBoxNE: [
+          1.944,
+          0.576
+        ],
+        bBoxSW: [
+          0,
+          -0.584
+        ]
+      },
+      noteMaBlack: {
+        bBoxNE: [
+          1.436,
+          0.564
+        ],
+        bBoxSW: [
+          4e-3,
+          -0.564
+        ]
+      },
+      noteMaHalf: {
+        bBoxNE: [
+          1.44,
+          0.58
+        ],
+        bBoxSW: [
+          0,
+          -0.58
+        ]
+      },
+      noteMaWhole: {
+        bBoxNE: [
+          1.948,
+          0.576
+        ],
+        bBoxSW: [
+          4e-3,
+          -0.584
+        ]
+      },
+      noteMeBlack: {
+        bBoxNE: [
+          1.432,
+          0.564
+        ],
+        bBoxSW: [
+          0,
+          -0.564
+        ]
+      },
+      noteMeHalf: {
+        bBoxNE: [
+          1.44,
+          0.58
+        ],
+        bBoxSW: [
+          0,
+          -0.58
+        ]
+      },
+      noteMeWhole: {
+        bBoxNE: [
+          1.944,
+          0.576
+        ],
+        bBoxSW: [
+          0,
+          -0.584
+        ]
+      },
       noteMiBlack: {
         bBoxNE: [
           1.432,
@@ -32667,6 +36983,36 @@ var NotationEngine = (() => {
           -0.564
         ]
       },
+      noteRaBlack: {
+        bBoxNE: [
+          1.432,
+          0.564
+        ],
+        bBoxSW: [
+          0,
+          -0.564
+        ]
+      },
+      noteRaHalf: {
+        bBoxNE: [
+          1.44,
+          0.58
+        ],
+        bBoxSW: [
+          0,
+          -0.58
+        ]
+      },
+      noteRaWhole: {
+        bBoxNE: [
+          1.948,
+          0.572
+        ],
+        bBoxSW: [
+          4e-3,
+          -0.588
+        ]
+      },
       noteReBlack: {
         bBoxNE: [
           1.432,
@@ -32688,6 +37034,66 @@ var NotationEngine = (() => {
         ]
       },
       noteReWhole: {
+        bBoxNE: [
+          1.944,
+          0.576
+        ],
+        bBoxSW: [
+          0,
+          -0.584
+        ]
+      },
+      noteRiBlack: {
+        bBoxNE: [
+          1.432,
+          0.564
+        ],
+        bBoxSW: [
+          0,
+          -0.564
+        ]
+      },
+      noteRiHalf: {
+        bBoxNE: [
+          1.44,
+          0.58
+        ],
+        bBoxSW: [
+          0,
+          -0.58
+        ]
+      },
+      noteRiWhole: {
+        bBoxNE: [
+          1.948,
+          0.576
+        ],
+        bBoxSW: [
+          4e-3,
+          -0.584
+        ]
+      },
+      noteSeBlack: {
+        bBoxNE: [
+          1.432,
+          0.564
+        ],
+        bBoxSW: [
+          0,
+          -0.564
+        ]
+      },
+      noteSeHalf: {
+        bBoxNE: [
+          1.44,
+          0.58
+        ],
+        bBoxSW: [
+          0,
+          -0.58
+        ]
+      },
+      noteSeWhole: {
         bBoxNE: [
           1.944,
           0.576
@@ -33177,6 +37583,66 @@ var NotationEngine = (() => {
           -0.584
         ]
       },
+      noteTaBlack: {
+        bBoxNE: [
+          1.432,
+          0.564
+        ],
+        bBoxSW: [
+          0,
+          -0.564
+        ]
+      },
+      noteTaHalf: {
+        bBoxNE: [
+          1.444,
+          0.58
+        ],
+        bBoxSW: [
+          4e-3,
+          -0.58
+        ]
+      },
+      noteTaWhole: {
+        bBoxNE: [
+          1.944,
+          0.576
+        ],
+        bBoxSW: [
+          0,
+          -0.584
+        ]
+      },
+      noteTeBlack: {
+        bBoxNE: [
+          1.432,
+          0.564
+        ],
+        bBoxSW: [
+          0,
+          -0.564
+        ]
+      },
+      noteTeHalf: {
+        bBoxNE: [
+          1.44,
+          0.58
+        ],
+        bBoxSW: [
+          0,
+          -0.58
+        ]
+      },
+      noteTeWhole: {
+        bBoxNE: [
+          1.948,
+          0.576
+        ],
+        bBoxSW: [
+          4e-3,
+          -0.584
+        ]
+      },
       noteTiBlack: {
         bBoxNE: [
           1.432,
@@ -33637,7 +38103,67 @@ var NotationEngine = (() => {
           -0.84
         ]
       },
-      noteheadDiamondBlack: {
+      noteheadCowellEleventhNoteSeriesHalf: {
+        bBoxNE: [
+          1.52,
+          0.672
+        ],
+        bBoxSW: [
+          -0.292,
+          -0.536
+        ]
+      },
+      noteheadCowellEleventhNoteSeriesWhole: {
+        bBoxNE: [
+          1.744,
+          0.604
+        ],
+        bBoxSW: [
+          -0.072,
+          -0.616
+        ]
+      },
+      noteheadCowellEleventhSeriesBlack: {
+        bBoxNE: [
+          1.504,
+          0.672
+        ],
+        bBoxSW: [
+          -0.316,
+          -0.656
+        ]
+      },
+      noteheadCowellFifteenthNoteSeriesBlack: {
+        bBoxNE: [
+          1.13,
+          0.653513
+        ],
+        bBoxSW: [
+          -0.137513,
+          -0.613
+        ]
+      },
+      noteheadCowellFifteenthNoteSeriesHalf: {
+        bBoxNE: [
+          1.13,
+          0.653513
+        ],
+        bBoxSW: [
+          -0.137513,
+          -0.613
+        ]
+      },
+      noteheadCowellFifteenthNoteSeriesWhole: {
+        bBoxNE: [
+          1.13,
+          0.653513
+        ],
+        bBoxSW: [
+          -0.137513,
+          -0.613
+        ]
+      },
+      noteheadCowellFifthNoteSeriesBlack: {
         bBoxNE: [
           1,
           0.5
@@ -33645,6 +38171,156 @@ var NotationEngine = (() => {
         bBoxSW: [
           0,
           -0.5
+        ]
+      },
+      noteheadCowellFifthNoteSeriesHalf: {
+        bBoxNE: [
+          1,
+          0.5
+        ],
+        bBoxSW: [
+          0,
+          -0.5
+        ]
+      },
+      noteheadCowellFifthNoteSeriesWhole: {
+        bBoxNE: [
+          1,
+          0.5
+        ],
+        bBoxSW: [
+          0,
+          -0.5
+        ]
+      },
+      noteheadCowellNinthNoteSeriesBlack: {
+        bBoxNE: [
+          1.3,
+          0.5
+        ],
+        bBoxSW: [
+          0,
+          -0.5
+        ]
+      },
+      noteheadCowellNinthNoteSeriesHalf: {
+        bBoxNE: [
+          1.3,
+          0.5
+        ],
+        bBoxSW: [
+          0,
+          -0.5
+        ]
+      },
+      noteheadCowellNinthNoteSeriesWhole: {
+        bBoxNE: [
+          1.3,
+          0.5
+        ],
+        bBoxSW: [
+          0,
+          -0.5
+        ]
+      },
+      noteheadCowellSeventhNoteSeriesBlack: {
+        bBoxNE: [
+          0.99,
+          0.481
+        ],
+        bBoxSW: [
+          0.027,
+          -0.482
+        ]
+      },
+      noteheadCowellSeventhNoteSeriesHalf: {
+        bBoxNE: [
+          0.99,
+          0.481
+        ],
+        bBoxSW: [
+          0.027,
+          -0.482
+        ]
+      },
+      noteheadCowellSeventhNoteSeriesWhole: {
+        bBoxNE: [
+          0.986,
+          0.481
+        ],
+        bBoxSW: [
+          0.023,
+          -0.482
+        ]
+      },
+      noteheadCowellThirdNoteSeriesBlack: {
+        bBoxNE: [
+          1.172,
+          0.5
+        ],
+        bBoxSW: [
+          0,
+          -0.5
+        ]
+      },
+      noteheadCowellThirdNoteSeriesHalf: {
+        bBoxNE: [
+          1.14,
+          0.5
+        ],
+        bBoxSW: [
+          0,
+          -0.5
+        ]
+      },
+      noteheadCowellThirdNoteSeriesWhole: {
+        bBoxNE: [
+          1.276,
+          0.5
+        ],
+        bBoxSW: [
+          0,
+          -0.5
+        ]
+      },
+      noteheadCowellThirteenthNoteSeriesBlack: {
+        bBoxNE: [
+          1.37,
+          0.5
+        ],
+        bBoxSW: [
+          0,
+          -0.773
+        ]
+      },
+      noteheadCowellThirteenthNoteSeriesHalf: {
+        bBoxNE: [
+          1.386,
+          0.501513
+        ],
+        bBoxSW: [
+          0,
+          -0.765
+        ]
+      },
+      noteheadCowellThirteenthNoteSeriesWhole: {
+        bBoxNE: [
+          1.386,
+          0.501513
+        ],
+        bBoxSW: [
+          0,
+          -0.765
+        ]
+      },
+      noteheadDiamondBlack: {
+        bBoxNE: [
+          0.98,
+          0.564
+        ],
+        bBoxSW: [
+          0,
+          -0.564
         ]
       },
       noteheadDiamondBlackOld: {
@@ -33659,12 +38335,12 @@ var NotationEngine = (() => {
       },
       noteheadDiamondBlackWide: {
         bBoxNE: [
-          1.4,
-          0.5
+          1.36,
+          0.564
         ],
         bBoxSW: [
           0,
-          -0.5
+          -0.564
         ]
       },
       noteheadDiamondClusterBlack2nd: {
@@ -33769,7 +38445,7 @@ var NotationEngine = (() => {
       },
       noteheadDiamondDoubleWhole: {
         bBoxNE: [
-          1.728,
+          2.304,
           0.62
         ],
         bBoxSW: [
@@ -33789,12 +38465,12 @@ var NotationEngine = (() => {
       },
       noteheadDiamondHalf: {
         bBoxNE: [
-          1.004,
-          0.5
+          0.98,
+          0.564
         ],
         bBoxSW: [
           0,
-          -0.5
+          -0.564
         ]
       },
       noteheadDiamondHalfFilled: {
@@ -33819,12 +38495,12 @@ var NotationEngine = (() => {
       },
       noteheadDiamondHalfWide: {
         bBoxNE: [
-          1.404,
-          0.5
+          1.372,
+          0.564
         ],
         bBoxSW: [
           0,
-          -0.5
+          -0.564
         ]
       },
       noteheadDiamondOpen: {
@@ -33839,32 +38515,32 @@ var NotationEngine = (() => {
       },
       noteheadDiamondWhite: {
         bBoxNE: [
-          1,
-          0.5
+          1.128,
+          0.564
         ],
         bBoxSW: [
           0,
-          -0.5
+          -0.564
         ]
       },
       noteheadDiamondWhiteWide: {
         bBoxNE: [
-          1.4,
-          0.5
+          1.612,
+          0.564
         ],
         bBoxSW: [
           0,
-          -0.5
+          -0.564
         ]
       },
       noteheadDiamondWhole: {
         bBoxNE: [
-          1.08,
-          0.5
+          1.666,
+          0.564
         ],
         bBoxSW: [
-          0,
-          -0.5
+          1e-3,
+          -0.564
         ]
       },
       noteheadDiamondWholeOld: {
@@ -34130,6 +38806,16 @@ var NotationEngine = (() => {
       noteheadMoonWhite: {
         bBoxNE: [
           1.26,
+          0.5
+        ],
+        bBoxSW: [
+          0,
+          -0.5
+        ]
+      },
+      noteheadNancarrowSine: {
+        bBoxNE: [
+          1.396,
           0.5
         ],
         bBoxSW: [
@@ -35100,7 +39786,7 @@ var NotationEngine = (() => {
       octaveParensLeft: {
         bBoxNE: [
           0.652,
-          1.94
+          1.936
         ],
         bBoxSW: [
           0,
@@ -35110,7 +39796,7 @@ var NotationEngine = (() => {
       octaveParensRight: {
         bBoxNE: [
           0.548,
-          1.94
+          1.936
         ],
         bBoxSW: [
           -0.104,
@@ -35169,22 +39855,22 @@ var NotationEngine = (() => {
       },
       organGerman2Fusae: {
         bBoxNE: [
-          2.7942369558876776,
-          1.5440861399092378
+          2.794237,
+          1.544086
         ],
         bBoxSW: [
           1.208,
-          -0.7440861399092378
+          -0.744086
         ]
       },
       organGerman2Minimae: {
         bBoxNE: [
-          2.7942369558876776,
-          1.5480861399092378
+          2.794237,
+          1.548086
         ],
         bBoxSW: [
-          1.2081480574010786,
-          -0.7400861399092378
+          1.208,
+          -0.740086
         ]
       },
       organGerman2OctaveUp: {
@@ -35199,112 +39885,112 @@ var NotationEngine = (() => {
       },
       organGerman2Semifusae: {
         bBoxNE: [
-          2.7942369558876776,
-          1.5440861399092378
+          2.794237,
+          1.544086
         ],
         bBoxSW: [
           1.208,
-          -0.7440861399092378
+          -0.744086
         ]
       },
       organGerman2Semiminimae: {
         bBoxNE: [
-          2.7942369558876776,
-          1.5440861399092378
+          2.794237,
+          1.544086
         ],
         bBoxSW: [
           1.208,
-          -0.7440861399092378
+          -0.744086
         ]
       },
       organGerman3Fusae: {
         bBoxNE: [
-          3.8182369558876776,
-          1.5440861399092378
+          3.818237,
+          1.544086
         ],
         bBoxSW: [
           2.184,
-          -0.7440861399092378
+          -0.744086
         ]
       },
       organGerman3Minimae: {
         bBoxNE: [
-          3.8182369558876776,
-          1.5480861399092378
+          3.818237,
+          1.548086
         ],
         bBoxSW: [
-          2.184148057401079,
-          -0.7440861399092378
+          2.184,
+          -0.744086
         ]
       },
       organGerman3Semifusae: {
         bBoxNE: [
-          3.8182369558876776,
-          1.5440861399092378
+          3.818237,
+          1.544086
         ],
         bBoxSW: [
           2.18,
-          -0.7440861399092378
+          -0.744086
         ]
       },
       organGerman3Semiminimae: {
         bBoxNE: [
-          3.8182369558876776,
-          1.5440861399092378
+          3.818237,
+          1.544086
         ],
         bBoxSW: [
           2.184,
-          -0.7440861399092378
+          -0.744086
         ]
       },
       organGerman4Fusae: {
         bBoxNE: [
-          5.078236955887678,
-          1.5440861399092378
+          5.078237,
+          1.544086
         ],
         bBoxSW: [
           2.92,
-          -0.7440861399092378
+          -0.744086
         ]
       },
       organGerman4Minimae: {
         bBoxNE: [
-          5.078236955887678,
-          1.5480861399092378
+          5.078237,
+          1.548086
         ],
         bBoxSW: [
-          2.9201480574010787,
-          -0.7440861399092378
+          2.92,
+          -0.744086
         ]
       },
       organGerman4Semifusae: {
         bBoxNE: [
-          5.078236955887678,
-          1.5440861399092378
+          5.078237,
+          1.544086
         ],
         bBoxSW: [
           2.92,
-          -0.7480861399092378
+          -0.748086
         ]
       },
       organGerman4Semiminimae: {
         bBoxNE: [
-          5.078236955887678,
-          1.5440861399092378
+          5.078237,
+          1.544086
         ],
         bBoxSW: [
           2.92,
-          -0.7440861399092378
+          -0.744086
         ]
       },
       organGerman5Fusae: {
         bBoxNE: [
-          6.330236955887678,
-          1.5440861399092378
+          6.330237,
+          1.544086
         ],
         bBoxSW: [
           3.66,
-          -0.7440861399092378
+          -0.744086
         ]
       },
       organGerman5Minimae: {
@@ -35339,12 +40025,12 @@ var NotationEngine = (() => {
       },
       organGerman6Fusae: {
         bBoxNE: [
-          7.514236955887678,
-          1.5440861399092378
+          7.514237,
+          1.544086
         ],
         bBoxSW: [
           4.476,
-          -0.7440861399092378
+          -0.744086
         ]
       },
       organGerman6Minimae: {
@@ -35700,7 +40386,7 @@ var NotationEngine = (() => {
       organGermanMinima: {
         bBoxNE: [
           1.276,
-          1.5440861399092378
+          1.544086
         ],
         bBoxSW: [
           0.72,
@@ -36479,22 +41165,22 @@ var NotationEngine = (() => {
       },
       ornamentShortObliqueLineAfterNote: {
         bBoxNE: [
-          0.792516,
-          1.205232
+          0.792,
+          1.204
         ],
         bBoxSW: [
           0,
-          -2532e-6
+          -4e-3
         ]
       },
       ornamentShortObliqueLineBeforeNote: {
         bBoxNE: [
-          0.790024,
-          1.201424
+          0.792,
+          1.2
         ],
         bBoxSW: [
-          2516e-6,
-          -2524e-6
+          4e-3,
+          -4e-3
         ]
       },
       ornamentShortTrill: {
@@ -36580,7 +41266,7 @@ var NotationEngine = (() => {
       ornamentTrillFlatAbove: {
         bBoxNE: [
           2.996,
-          3.2535296
+          3.252
         ],
         bBoxSW: [
           0.912,
@@ -36590,7 +41276,7 @@ var NotationEngine = (() => {
       ornamentTrillNaturalAbove: {
         bBoxNE: [
           2.956,
-          3.3828188
+          3.384
         ],
         bBoxSW: [
           0.872,
@@ -36600,7 +41286,7 @@ var NotationEngine = (() => {
       ornamentTrillSharpAbove: {
         bBoxNE: [
           2.908,
-          3.5244400000000002
+          3.524
         ],
         bBoxSW: [
           0.824,
@@ -36620,7 +41306,7 @@ var NotationEngine = (() => {
       ornamentTurnFlatAbove: {
         bBoxNE: [
           1.84,
-          2.6935295999999997
+          2.692
         ],
         bBoxSW: [
           0,
@@ -36630,11 +41316,11 @@ var NotationEngine = (() => {
       ornamentTurnFlatAboveSharpBelow: {
         bBoxNE: [
           1.84,
-          2.6935295999999997
+          2.692
         ],
         bBoxSW: [
           0,
-          -1.97956
+          -1.98
         ]
       },
       ornamentTurnFlatBelow: {
@@ -36644,7 +41330,7 @@ var NotationEngine = (() => {
         ],
         bBoxSW: [
           0,
-          -1.7065344
+          -1.708
         ]
       },
       ornamentTurnInverted: {
@@ -36660,7 +41346,7 @@ var NotationEngine = (() => {
       ornamentTurnNaturalAbove: {
         bBoxNE: [
           1.84,
-          2.8228188
+          2.824
         ],
         bBoxSW: [
           0,
@@ -36674,13 +41360,13 @@ var NotationEngine = (() => {
         ],
         bBoxSW: [
           0,
-          -1.9892712000000001
+          -1.988
         ]
       },
       ornamentTurnSharpAbove: {
         bBoxNE: [
           1.84,
-          2.80844
+          2.808
         ],
         bBoxSW: [
           0,
@@ -36690,11 +41376,11 @@ var NotationEngine = (() => {
       ornamentTurnSharpAboveFlatBelow: {
         bBoxNE: [
           1.84,
-          2.80844
+          2.808
         ],
         bBoxSW: [
           0,
-          -1.7065344
+          -1.708
         ]
       },
       ornamentTurnSharpBelow: {
@@ -36704,7 +41390,7 @@ var NotationEngine = (() => {
         ],
         bBoxSW: [
           0,
-          -1.97956
+          -1.98
         ]
       },
       ornamentTurnSlash: {
@@ -40389,12 +45075,12 @@ var NotationEngine = (() => {
       },
       reversedBrace: {
         bBoxNE: [
-          0.352,
-          3.988
+          0.276,
+          4.00244
         ],
         bBoxSW: [
-          0.032,
-          0
+          -1415e-6,
+          -2531e-6
         ]
       },
       reversedBracketBottom: {
@@ -40425,6 +45111,96 @@ var NotationEngine = (() => {
         bBoxSW: [
           0,
           0.5
+        ]
+      },
+      scaleDegree1: {
+        bBoxNE: [
+          1.424,
+          4.016
+        ],
+        bBoxSW: [
+          -0.228,
+          0
+        ]
+      },
+      scaleDegree2: {
+        bBoxNE: [
+          1.988,
+          4.016
+        ],
+        bBoxSW: [
+          0.08,
+          0
+        ]
+      },
+      scaleDegree3: {
+        bBoxNE: [
+          1.976,
+          4.016
+        ],
+        bBoxSW: [
+          0.08,
+          -0.06
+        ]
+      },
+      scaleDegree4: {
+        bBoxNE: [
+          2.048,
+          4.016
+        ],
+        bBoxSW: [
+          0.08,
+          0
+        ]
+      },
+      scaleDegree5: {
+        bBoxNE: [
+          1.992,
+          4.016
+        ],
+        bBoxSW: [
+          0.08,
+          -0.06
+        ]
+      },
+      scaleDegree6: {
+        bBoxNE: [
+          1.96,
+          4.016
+        ],
+        bBoxSW: [
+          0.08,
+          -0.06
+        ]
+      },
+      scaleDegree7: {
+        bBoxNE: [
+          1.976,
+          4.016
+        ],
+        bBoxSW: [
+          0.08,
+          0
+        ]
+      },
+      scaleDegree8: {
+        bBoxNE: [
+          1.984,
+          4.016
+        ],
+        bBoxSW: [
+          0.08,
+          -0.06
+        ]
+      },
+      scaleDegree9: {
+        bBoxNE: [
+          1.964,
+          4.016
+        ],
+        bBoxSW: [
+          0.08,
+          -0.06
         ]
       },
       schaefferClef: {
@@ -41140,7 +45916,7 @@ var NotationEngine = (() => {
       stringsChangeBowDirection: {
         bBoxNE: [
           3.784,
-          1.708
+          1.704
         ],
         bBoxSW: [
           0,
@@ -41168,6 +45944,36 @@ var NotationEngine = (() => {
         ]
       },
       stringsDownBow: {
+        bBoxNE: [
+          1.248,
+          1.272
+        ],
+        bBoxSW: [
+          0,
+          0
+        ]
+      },
+      stringsDownBowAwayFromBody: {
+        bBoxNE: [
+          1.248,
+          1.272
+        ],
+        bBoxSW: [
+          0,
+          0
+        ]
+      },
+      stringsDownBowBeyondBridge: {
+        bBoxNE: [
+          1.248,
+          1.272
+        ],
+        bBoxSW: [
+          0,
+          0
+        ]
+      },
+      stringsDownBowTowardsBody: {
         bBoxNE: [
           1.248,
           1.272
@@ -41307,6 +46113,46 @@ var NotationEngine = (() => {
           4e-3
         ]
       },
+      stringsScrapeCircularClockwise: {
+        bBoxNE: [
+          1.28,
+          1.817719
+        ],
+        bBoxSW: [
+          -4e-3,
+          0
+        ]
+      },
+      stringsScrapeCircularCounterclockwise: {
+        bBoxNE: [
+          1.284,
+          1.817719
+        ],
+        bBoxSW: [
+          0,
+          0
+        ]
+      },
+      stringsScrapeParallelInward: {
+        bBoxNE: [
+          1.888,
+          0.637255
+        ],
+        bBoxSW: [
+          0,
+          0
+        ]
+      },
+      stringsScrapeParallelOutward: {
+        bBoxNE: [
+          1.888,
+          0.637255
+        ],
+        bBoxSW: [
+          0,
+          0
+        ]
+      },
       stringsThumbPosition: {
         bBoxNE: [
           0.688,
@@ -41327,6 +46173,26 @@ var NotationEngine = (() => {
           0
         ]
       },
+      stringsTripleChopInward: {
+        bBoxNE: [
+          1.888,
+          2.517255
+        ],
+        bBoxSW: [
+          0,
+          0
+        ]
+      },
+      stringsTripleChopOutward: {
+        bBoxNE: [
+          1.888,
+          2.517255
+        ],
+        bBoxSW: [
+          0,
+          0
+        ]
+      },
       stringsUpBow: {
         bBoxNE: [
           0.996,
@@ -41334,6 +46200,36 @@ var NotationEngine = (() => {
         ],
         bBoxSW: [
           4e-3,
+          4e-3
+        ]
+      },
+      stringsUpBowAwayFromBody: {
+        bBoxNE: [
+          1.199127,
+          2.318375
+        ],
+        bBoxSW: [
+          0.025625,
+          4e-3
+        ]
+      },
+      stringsUpBowBeyondBridge: {
+        bBoxNE: [
+          0.994364,
+          2.348
+        ],
+        bBoxSW: [
+          2752e-6,
+          4e-3
+        ]
+      },
+      stringsUpBowTowardsBody: {
+        bBoxNE: [
+          0.992,
+          1.996
+        ],
+        bBoxSW: [
+          0,
           4e-3
         ]
       },
@@ -41355,6 +46251,46 @@ var NotationEngine = (() => {
         bBoxSW: [
           -1.068,
           -1.28
+        ]
+      },
+      swissRudimentsNoteheadBlackDouble: {
+        bBoxNE: [
+          1.66,
+          1.816
+        ],
+        bBoxSW: [
+          0,
+          -0.5
+        ]
+      },
+      swissRudimentsNoteheadBlackFlam: {
+        bBoxNE: [
+          1.18,
+          1.5
+        ],
+        bBoxSW: [
+          0,
+          -0.5
+        ]
+      },
+      swissRudimentsNoteheadHalfDouble: {
+        bBoxNE: [
+          1.66,
+          1.816
+        ],
+        bBoxSW: [
+          0,
+          -0.5
+        ]
+      },
+      swissRudimentsNoteheadHalfFlam: {
+        bBoxNE: [
+          1.18,
+          1.5
+        ],
+        bBoxSW: [
+          0,
+          -0.5
         ]
       },
       systemDivider: {
@@ -41515,6 +46451,76 @@ var NotationEngine = (() => {
         bBoxSW: [
           0,
           2.252
+        ]
+      },
+      textHeadlessBlackNoteFrac16thLongStem: {
+        bBoxNE: [
+          1.368,
+          3.512
+        ],
+        bBoxSW: [
+          0,
+          0.188
+        ]
+      },
+      textHeadlessBlackNoteFrac16thShortStem: {
+        bBoxNE: [
+          1.368,
+          2.752
+        ],
+        bBoxSW: [
+          0,
+          0.188
+        ]
+      },
+      textHeadlessBlackNoteFrac32ndLongStem: {
+        bBoxNE: [
+          1.368,
+          3.512
+        ],
+        bBoxSW: [
+          0,
+          0.188
+        ]
+      },
+      textHeadlessBlackNoteFrac8thLongStem: {
+        bBoxNE: [
+          1.368,
+          3.512
+        ],
+        bBoxSW: [
+          0,
+          0.188
+        ]
+      },
+      textHeadlessBlackNoteFrac8thShortStem: {
+        bBoxNE: [
+          1.368,
+          2.752
+        ],
+        bBoxSW: [
+          0,
+          0.184
+        ]
+      },
+      textHeadlessBlackNoteLongStem: {
+        bBoxNE: [
+          1.328,
+          3.512
+        ],
+        bBoxSW: [
+          1.208,
+          0.184
+        ]
+      },
+      textHeadlessBlackNoteShortStem: {
+        bBoxNE: [
+          1.328,
+          2.752
+        ],
+        bBoxSW: [
+          1.208,
+          0.184
         ]
       },
       textTie: {
@@ -42859,12 +47865,12 @@ var NotationEngine = (() => {
       },
       timeSigFractionHalf: {
         bBoxNE: [
-          1.6214720000000002,
-          0.9909764
+          2.096,
+          1.1
         ],
         bBoxSW: [
-          0.077552,
-          -0.9911599999999999
+          0.076,
+          -0.992
         ]
       },
       timeSigFractionHalfLarge: {
@@ -42879,22 +47885,22 @@ var NotationEngine = (() => {
       },
       timeSigFractionHalfNarrow: {
         bBoxNE: [
-          1.6214720000000002,
-          0.9909764
+          1.62,
+          0.992
         ],
         bBoxSW: [
-          0.077552,
-          -0.9911599999999999
+          0.076,
+          -0.992
         ]
       },
       timeSigFractionOneThird: {
         bBoxNE: [
-          1.6882556,
-          0.9989764
+          2.084,
+          1.072
         ],
         bBoxSW: [
-          0.077552,
-          -0.9980160000000001
+          0.076,
+          -1
         ]
       },
       timeSigFractionOneThirdLarge: {
@@ -42909,22 +47915,22 @@ var NotationEngine = (() => {
       },
       timeSigFractionOneThirdNarrow: {
         bBoxNE: [
-          1.6882556,
-          0.9989764
+          1.688,
+          1
         ],
         bBoxSW: [
-          0.077552,
-          -0.9980160000000001
+          0.076,
+          -1
         ]
       },
       timeSigFractionQuarter: {
         bBoxNE: [
-          1.592,
-          1.0029764
+          2.072,
+          1.076
         ],
         bBoxSW: [
-          0.068,
-          -0.991
+          0.072,
+          -0.992
         ]
       },
       timeSigFractionQuarterLarge: {
@@ -42940,21 +47946,21 @@ var NotationEngine = (() => {
       timeSigFractionQuarterNarrow: {
         bBoxNE: [
           1.592,
-          1.0029764
+          1.004
         ],
         bBoxSW: [
-          0.077552,
-          -0.991
+          0.076,
+          -0.992
         ]
       },
       timeSigFractionThreeQuarters: {
         bBoxNE: [
-          1.724,
-          1.001984
+          2.144,
+          1.016
         ],
         bBoxSW: [
-          0.072312,
-          -0.999
+          0.072,
+          -1
         ]
       },
       timeSigFractionThreeQuartersLarge: {
@@ -42970,21 +47976,21 @@ var NotationEngine = (() => {
       timeSigFractionThreeQuartersNarrow: {
         bBoxNE: [
           1.724,
-          1.001984
+          1
         ],
         bBoxSW: [
-          0.072312,
-          -0.999
+          0.072,
+          -1
         ]
       },
       timeSigFractionTwoThirds: {
         bBoxNE: [
-          1.7282556,
-          1.0012152
+          2.12,
+          1.02
         ],
         bBoxSW: [
-          0.06144,
-          -0.9980160000000001
+          0.06,
+          -1
         ]
       },
       timeSigFractionTwoThirdsLarge: {
@@ -42999,22 +48005,22 @@ var NotationEngine = (() => {
       },
       timeSigFractionTwoThirdsNarrow: {
         bBoxNE: [
-          1.7282556,
-          1.0012152
+          1.728,
+          1
         ],
         bBoxSW: [
-          0.06144,
-          -0.9980160000000001
+          0.06,
+          -1
         ]
       },
       timeSigFractionalSlash: {
         bBoxNE: [
-          1.512,
-          0.756
+          2.004,
+          1
         ],
         bBoxSW: [
-          0,
-          -0.76
+          4e-3,
+          -1.004
         ]
       },
       timeSigFractionalSlashLarge: {
@@ -43279,12 +48285,12 @@ var NotationEngine = (() => {
       },
       timeSigPlusSmall: {
         bBoxNE: [
-          1.01796,
-          0.49
+          1.016,
+          0.492
         ],
         bBoxSW: [
-          -204e-5,
-          -0.53
+          -4e-3,
+          -0.528
         ]
       },
       timeSigPlusSmallLarge: {
@@ -43299,12 +48305,12 @@ var NotationEngine = (() => {
       },
       timeSigPlusSmallNarrow: {
         bBoxNE: [
-          0.6099600000000001,
-          0.49
+          0.608,
+          0.492
         ],
         bBoxSW: [
-          -204e-5,
-          -0.53
+          -4e-3,
+          -0.528
         ]
       },
       timeSigSlash: {
@@ -43549,11 +48555,11 @@ var NotationEngine = (() => {
       },
       tuplet0: {
         bBoxNE: [
-          1.2731041262817027,
+          1.272,
           1.5
         ],
         bBoxSW: [
-          -0.001204330173715796,
+          0,
           -0.032
         ]
       },
@@ -43673,7 +48679,7 @@ var NotationEngine = (() => {
           1.5
         ],
         bBoxSW: [
-          0.04105974105482295,
+          0.04,
           -0.032
         ]
       },
@@ -43729,7 +48735,7 @@ var NotationEngine = (() => {
       },
       tuplet9: {
         bBoxNE: [
-          1.254940258945177,
+          1.256,
           1.5
         ],
         bBoxSW: [
@@ -43745,6 +48751,86 @@ var NotationEngine = (() => {
         bBoxSW: [
           0.04,
           -0.032
+        ]
+      },
+      tupletBracketLeftItalic: {
+        bBoxNE: [
+          0.836,
+          1.72
+        ],
+        bBoxSW: [
+          -0.124,
+          -0.156
+        ]
+      },
+      tupletBracketLeftItalicLight: {
+        bBoxNE: [
+          0.736,
+          1.588
+        ],
+        bBoxSW: [
+          -0.096,
+          -0.104
+        ]
+      },
+      tupletBracketLeftRoman: {
+        bBoxNE: [
+          0.536,
+          1.72
+        ],
+        bBoxSW: [
+          0.052,
+          -0.156
+        ]
+      },
+      tupletBracketLeftRomanLight: {
+        bBoxNE: [
+          0.456,
+          1.588
+        ],
+        bBoxSW: [
+          0.072,
+          -0.104
+        ]
+      },
+      tupletBracketRightItalic: {
+        bBoxNE: [
+          0.764,
+          1.72
+        ],
+        bBoxSW: [
+          -0.2,
+          -0.156
+        ]
+      },
+      tupletBracketRightItalicLight: {
+        bBoxNE: [
+          0.752,
+          1.596
+        ],
+        bBoxSW: [
+          -0.08,
+          -0.092
+        ]
+      },
+      tupletBracketRightRoman: {
+        bBoxNE: [
+          0.536,
+          1.72
+        ],
+        bBoxSW: [
+          0.052,
+          -0.156
+        ]
+      },
+      tupletBracketRightRomanLight: {
+        bBoxNE: [
+          0.456,
+          1.588
+        ],
+        bBoxSW: [
+          0.072,
+          -0.104
         ]
       },
       tupletColon: {
@@ -43765,6 +48851,86 @@ var NotationEngine = (() => {
         bBoxSW: [
           0.04,
           -0.016
+        ]
+      },
+      tupletParenthesisLeftItalic: {
+        bBoxNE: [
+          0.776,
+          1.68
+        ],
+        bBoxSW: [
+          0.068,
+          -0.26
+        ]
+      },
+      tupletParenthesisLeftItalicLight: {
+        bBoxNE: [
+          0.7,
+          1.592
+        ],
+        bBoxSW: [
+          0.028,
+          -0.152
+        ]
+      },
+      tupletParenthesisLeftRoman: {
+        bBoxNE: [
+          0.696,
+          1.728
+        ],
+        bBoxSW: [
+          0.092,
+          -0.288
+        ]
+      },
+      tupletParenthesisLeftRomanLight: {
+        bBoxNE: [
+          0.608,
+          1.62
+        ],
+        bBoxSW: [
+          0.108,
+          -0.164
+        ]
+      },
+      tupletParenthesisRightItalic: {
+        bBoxNE: [
+          0.688,
+          1.6
+        ],
+        bBoxSW: [
+          -0.024,
+          -0.34
+        ]
+      },
+      tupletParenthesisRightItalicLight: {
+        bBoxNE: [
+          0.588,
+          1.572
+        ],
+        bBoxSW: [
+          -0.116,
+          -0.164
+        ]
+      },
+      tupletParenthesisRightRoman: {
+        bBoxNE: [
+          0.648,
+          1.74
+        ],
+        bBoxSW: [
+          0.04,
+          -0.276
+        ]
+      },
+      tupletParenthesisRightRomanLight: {
+        bBoxNE: [
+          0.516,
+          1.628
+        ],
+        bBoxSW: [
+          0.02,
+          -0.152
         ]
       },
       unmeasuredTremolo: {
@@ -44029,22 +49195,22 @@ var NotationEngine = (() => {
       },
       wiggleArpeggiatoDownArrow: {
         bBoxNE: [
-          2.256,
-          0.68
+          2.216,
+          0.768
         ],
         bBoxSW: [
-          4e-3,
-          -0.26
+          -0.036,
+          -0.172
         ]
       },
       wiggleArpeggiatoDownSwash: {
         bBoxNE: [
-          1.9503119999999998,
-          0.585712
+          1.896,
+          0.58
         ],
         bBoxSW: [
-          -0.0056897599999999994,
-          571188e-8
+          -0.06,
+          0
         ]
       },
       wiggleArpeggiatoDownSwashCouperin: {
@@ -44069,22 +49235,22 @@ var NotationEngine = (() => {
       },
       wiggleArpeggiatoUpArrow: {
         bBoxNE: [
-          2.064,
-          0.62
+          2.104,
+          0.708
         ],
         bBoxSW: [
-          -0.188,
-          -0.32
+          -0.148,
+          -0.232
         ]
       },
       wiggleArpeggiatoUpSwash: {
         bBoxNE: [
-          2.308,
-          0.56
+          2.2,
+          0.48
         ],
         bBoxSW: [
-          0,
-          0
+          -0.108,
+          -0.08
         ]
       },
       wiggleArpeggiatoUpSwashCouperin: {
@@ -45188,6 +50354,10 @@ var NotationEngine = (() => {
           {
             codepoint: "U+F475",
             name: "articAccentAboveSmall"
+          },
+          {
+            codepoint: "U+F532",
+            name: "articAccentAboveRossini"
           }
         ]
       },
@@ -45200,6 +50370,10 @@ var NotationEngine = (() => {
           {
             codepoint: "U+F476",
             name: "articAccentBelowSmall"
+          },
+          {
+            codepoint: "U+F533",
+            name: "articAccentBelowRossini"
           }
         ]
       },
@@ -45911,6 +51085,14 @@ var NotationEngine = (() => {
           }
         ]
       },
+      gClef8vb: {
+        alternates: [
+          {
+            codepoint: "U+F53D",
+            name: "gClef8vbFrench"
+          }
+        ]
+      },
       guitarBarreHalf: {
         alternates: [
           {
@@ -45924,6 +51106,14 @@ var NotationEngine = (() => {
           {
             codepoint: "U+F4B8",
             name: "guitarGolpeFlamenco"
+          }
+        ]
+      },
+      guitarVibratoBarScoop: {
+        alternates: [
+          {
+            codepoint: "U+F546",
+            name: "guitarVibratoBarScoopCurved"
           }
         ]
       },
@@ -46076,6 +51266,78 @@ var NotationEngine = (() => {
           {
             codepoint: "U+F40E",
             name: "noteDoubleWholeAlt"
+          }
+        ]
+      },
+      noteLeBlack: {
+        alternates: [
+          {
+            codepoint: "U+F539",
+            name: "noteLoBlack"
+          }
+        ]
+      },
+      noteLeHalf: {
+        alternates: [
+          {
+            codepoint: "U+F538",
+            name: "noteLoHalf"
+          }
+        ]
+      },
+      noteLeWhole: {
+        alternates: [
+          {
+            codepoint: "U+F537",
+            name: "noteLoWhole"
+          }
+        ]
+      },
+      noteMeBlack: {
+        alternates: [
+          {
+            codepoint: "U+F536",
+            name: "noteMaBlack"
+          }
+        ]
+      },
+      noteMeHalf: {
+        alternates: [
+          {
+            codepoint: "U+F535",
+            name: "noteMaHalf"
+          }
+        ]
+      },
+      noteMeWhole: {
+        alternates: [
+          {
+            codepoint: "U+F534",
+            name: "noteMaWhole"
+          }
+        ]
+      },
+      noteTeBlack: {
+        alternates: [
+          {
+            codepoint: "U+F53C",
+            name: "noteTaBlack"
+          }
+        ]
+      },
+      noteTeHalf: {
+        alternates: [
+          {
+            codepoint: "U+F53B",
+            name: "noteTaHalf"
+          }
+        ]
+      },
+      noteTeWhole: {
+        alternates: [
+          {
+            codepoint: "U+F53A",
+            name: "noteTaWhole"
           }
         ]
       },
@@ -47087,11 +52349,75 @@ var NotationEngine = (() => {
           }
         ]
       },
+      tupletBracketLeftItalic: {
+        alternates: [
+          {
+            codepoint: "U+F542",
+            name: "tupletBracketLeftItalicLight"
+          }
+        ]
+      },
+      tupletBracketLeftRoman: {
+        alternates: [
+          {
+            codepoint: "U+F544",
+            name: "tupletBracketLeftRomanLight"
+          }
+        ]
+      },
+      tupletBracketRightItalic: {
+        alternates: [
+          {
+            codepoint: "U+F543",
+            name: "tupletBracketRightItalicLight"
+          }
+        ]
+      },
+      tupletBracketRightRoman: {
+        alternates: [
+          {
+            codepoint: "U+F545",
+            name: "tupletBracketRightRomanLight"
+          }
+        ]
+      },
       tupletColon: {
         alternates: [
           {
             codepoint: "U+F4D6",
             name: "tupletColonLight"
+          }
+        ]
+      },
+      tupletParenthesisLeftItalic: {
+        alternates: [
+          {
+            codepoint: "U+F53E",
+            name: "tupletParenthesisLeftItalicLight"
+          }
+        ]
+      },
+      tupletParenthesisLeftRoman: {
+        alternates: [
+          {
+            codepoint: "U+F540",
+            name: "tupletParenthesisLeftRomanLight"
+          }
+        ]
+      },
+      tupletParenthesisRightItalic: {
+        alternates: [
+          {
+            codepoint: "U+F53F",
+            name: "tupletParenthesisRightItalicLight"
+          }
+        ]
+      },
+      tupletParenthesisRightRoman: {
+        alternates: [
+          {
+            codepoint: "U+F541",
+            name: "tupletParenthesisRightRomanLight"
           }
         ]
       },
@@ -47315,6 +52641,112 @@ var NotationEngine = (() => {
         cutOutSW: [
           0.264,
           -0.956
+        ]
+      },
+      accidentalCombiningLower29LimitComma: {
+        cutOutNE: [
+          0.856,
+          -0.496
+        ],
+        cutOutNW: [
+          0.136,
+          -0.496
+        ],
+        cutOutSE: [
+          0.836,
+          -1.132
+        ],
+        cutOutSW: [
+          0.136,
+          -1.132
+        ]
+      },
+      accidentalCombiningLower37Quartertone: {
+        cutOutNW: [
+          0.6,
+          0.64
+        ],
+        cutOutSW: [
+          0.6,
+          -0.964
+        ]
+      },
+      accidentalCombiningLower43Comma: {
+        cutOutSE: [
+          0.764,
+          -0.092
+        ],
+        cutOutSW: [
+          0.236,
+          -0.092
+        ]
+      },
+      accidentalCombiningLower47Quartertone: {
+        cutOutNW: [
+          0.456,
+          0.064
+        ]
+      },
+      accidentalCombiningRaise29LimitComma: {
+        cutOutNE: [
+          0.824,
+          1.12
+        ],
+        cutOutNW: [
+          0.204,
+          1.12
+        ],
+        cutOutSE: [
+          0.824,
+          0.528
+        ],
+        cutOutSW: [
+          0.204,
+          0.528
+        ]
+      },
+      accidentalCombiningRaise37Quartertone: {
+        cutOutNW: [
+          0.592,
+          1.012
+        ],
+        cutOutSW: [
+          0.592,
+          -0.648
+        ]
+      },
+      accidentalCombiningRaise41Comma: {
+        cutOutNE: [
+          0.624,
+          -0.024
+        ],
+        cutOutNW: [
+          0.208,
+          -0.024
+        ],
+        cutOutSE: [
+          0.624,
+          -0.46
+        ],
+        cutOutSW: [
+          0.208,
+          -0.456
+        ]
+      },
+      accidentalCombiningRaise43Comma: {
+        cutOutNE: [
+          0.768,
+          0.108
+        ],
+        cutOutNW: [
+          0.216,
+          0.108
+        ]
+      },
+      accidentalCombiningRaise47Quartertone: {
+        cutOutSW: [
+          0.46,
+          -0.084
         ]
       },
       accidentalDoubleFlat: {
@@ -47619,6 +53051,74 @@ var NotationEngine = (() => {
         cutOutSE: [
           0.568,
           -0.432
+        ]
+      },
+      accidentalHabaFlatQuarterToneHigher: {
+        cutOutNE: [
+          0.448,
+          1.492
+        ],
+        cutOutSE: [
+          0.616,
+          -0.348
+        ]
+      },
+      accidentalHabaFlatThreeQuarterTonesLower: {
+        cutOutNE: [
+          0.276,
+          0.688
+        ],
+        cutOutSE: [
+          0.592,
+          -0.372
+        ]
+      },
+      accidentalHabaQuarterToneHigher: {
+        cutOutNE: [
+          0.296,
+          0.516
+        ],
+        cutOutSE: [
+          0.54,
+          -0.384
+        ]
+      },
+      accidentalHabaQuarterToneLower: {
+        cutOutNW: [
+          0.556,
+          0.768
+        ],
+        cutOutSW: [
+          0.24,
+          -0.252
+        ]
+      },
+      accidentalHabaSharpQuarterToneLower: {
+        cutOutNE: [
+          0.856,
+          0.916
+        ],
+        cutOutNW: [
+          0.128,
+          0.612
+        ],
+        cutOutSE: [
+          0.876,
+          -0.6
+        ]
+      },
+      accidentalHabaSharpThreeQuarterTonesHigher: {
+        cutOutNW: [
+          0.108,
+          0.62
+        ],
+        cutOutSE: [
+          0.872,
+          0.924
+        ],
+        cutOutSW: [
+          0.108,
+          -0.904
         ]
       },
       accidentalHalfSharpArrowDown: {
@@ -48573,6 +54073,46 @@ var NotationEngine = (() => {
         cutOutSW: [
           0.12,
           -0.9
+        ]
+      },
+      accidentalUpsAndDownsDown: {
+        cutOutSE: [
+          0.792,
+          -0.1
+        ],
+        cutOutSW: [
+          0.172,
+          -0.1
+        ]
+      },
+      accidentalUpsAndDownsLess: {
+        cutOutNW: [
+          0.34,
+          0.34
+        ],
+        cutOutSW: [
+          0.34,
+          -0.332
+        ]
+      },
+      accidentalUpsAndDownsMore: {
+        cutOutNE: [
+          0.536,
+          0.296
+        ],
+        cutOutSE: [
+          0.536,
+          -0.28
+        ]
+      },
+      accidentalUpsAndDownsUp: {
+        cutOutNE: [
+          0.74,
+          0.184
+        ],
+        cutOutNW: [
+          0.204,
+          0.188
         ]
       },
       accidentalWyschnegradsky10TwelfthsFlat: {
@@ -49777,6 +55317,26 @@ var NotationEngine = (() => {
           0.196
         ]
       },
+      noteDiBlack: {
+        stemDownNW: [
+          0,
+          -0.188
+        ],
+        stemUpSE: [
+          1.432,
+          0.188
+        ]
+      },
+      noteDiHalf: {
+        stemDownNW: [
+          0,
+          -0.192
+        ],
+        stemUpSE: [
+          1.44,
+          0.192
+        ]
+      },
       noteDoBlack: {
         stemDownNW: [
           0,
@@ -49963,6 +55523,26 @@ var NotationEngine = (() => {
           0.196
         ]
       },
+      noteFiBlack: {
+        stemDownNW: [
+          0,
+          -0.188
+        ],
+        stemUpSE: [
+          1.432,
+          0.188
+        ]
+      },
+      noteFiHalf: {
+        stemDownNW: [
+          0,
+          -0.192
+        ],
+        stemUpSE: [
+          1.44,
+          0.192
+        ]
+      },
       noteGBlack: {
         stemDownNW: [
           0,
@@ -50083,6 +55663,66 @@ var NotationEngine = (() => {
           0.196
         ]
       },
+      noteLeBlack: {
+        stemDownNW: [
+          0,
+          -0.188
+        ],
+        stemUpSE: [
+          1.432,
+          0.188
+        ]
+      },
+      noteLeHalf: {
+        stemDownNW: [
+          0,
+          -0.192
+        ],
+        stemUpSE: [
+          1.44,
+          0.192
+        ]
+      },
+      noteLiBlack: {
+        stemDownNW: [
+          0,
+          -0.188
+        ],
+        stemUpSE: [
+          1.432,
+          0.188
+        ]
+      },
+      noteLiHalf: {
+        stemDownNW: [
+          0,
+          -0.192
+        ],
+        stemUpSE: [
+          1.44,
+          0.192
+        ]
+      },
+      noteMeBlack: {
+        stemDownNW: [
+          0,
+          -0.188
+        ],
+        stemUpSE: [
+          1.432,
+          0.188
+        ]
+      },
+      noteMeHalf: {
+        stemDownNW: [
+          0,
+          -0.192
+        ],
+        stemUpSE: [
+          1.44,
+          0.192
+        ]
+      },
       noteMiBlack: {
         stemDownNW: [
           0,
@@ -50097,6 +55737,26 @@ var NotationEngine = (() => {
         stemDownNW: [
           0,
           -0.188
+        ],
+        stemUpSE: [
+          1.44,
+          0.192
+        ]
+      },
+      noteRaBlack: {
+        stemDownNW: [
+          0,
+          -0.188
+        ],
+        stemUpSE: [
+          1.432,
+          0.188
+        ]
+      },
+      noteRaHalf: {
+        stemDownNW: [
+          0,
+          -0.192
         ],
         stemUpSE: [
           1.44,
@@ -50121,6 +55781,46 @@ var NotationEngine = (() => {
         stemUpSE: [
           1.444,
           0.196
+        ]
+      },
+      noteRiBlack: {
+        stemDownNW: [
+          0,
+          -0.188
+        ],
+        stemUpSE: [
+          1.432,
+          0.188
+        ]
+      },
+      noteRiHalf: {
+        stemDownNW: [
+          0,
+          -0.192
+        ],
+        stemUpSE: [
+          1.44,
+          0.192
+        ]
+      },
+      noteSeBlack: {
+        stemDownNW: [
+          0,
+          -0.188
+        ],
+        stemUpSE: [
+          1.432,
+          0.188
+        ]
+      },
+      noteSeHalf: {
+        stemDownNW: [
+          0,
+          -0.192
+        ],
+        stemUpSE: [
+          1.44,
+          0.192
         ]
       },
       noteShapeArrowheadLeftBlack: {
@@ -50527,6 +56227,26 @@ var NotationEngine = (() => {
           0.196
         ]
       },
+      noteTeBlack: {
+        stemDownNW: [
+          0,
+          -0.188
+        ],
+        stemUpSE: [
+          1.432,
+          0.188
+        ]
+      },
+      noteTeHalf: {
+        stemDownNW: [
+          0,
+          -0.192
+        ],
+        stemUpSE: [
+          1.44,
+          0.192
+        ]
+      },
       noteTiBlack: {
         stemDownNW: [
           0,
@@ -50845,13 +56565,153 @@ var NotationEngine = (() => {
           3
         ]
       },
+      noteheadCowellEleventhNoteSeriesHalf: {
+        stemDownNW: [
+          0,
+          -0.164
+        ],
+        stemUpSE: [
+          1.172,
+          0.176
+        ]
+      },
+      noteheadCowellEleventhSeriesBlack: {
+        stemDownNW: [
+          0,
+          -0.184
+        ],
+        stemUpSE: [
+          1.18,
+          0.164
+        ]
+      },
+      noteheadCowellFifteenthNoteSeriesBlack: {
+        stemDownNW: [
+          0,
+          -0.46
+        ],
+        stemUpSE: [
+          1,
+          0.44
+        ]
+      },
+      noteheadCowellFifteenthNoteSeriesHalf: {
+        stemDownNW: [
+          0,
+          -0.46
+        ],
+        stemUpSE: [
+          1,
+          0.44
+        ]
+      },
+      noteheadCowellFifthNoteSeriesBlack: {
+        stemDownNW: [
+          0,
+          -0.44
+        ],
+        stemUpSE: [
+          1,
+          0.44
+        ]
+      },
+      noteheadCowellFifthNoteSeriesHalf: {
+        stemDownNW: [
+          0,
+          -0.44
+        ],
+        stemUpSE: [
+          1,
+          0.44
+        ]
+      },
+      noteheadCowellNinthNoteSeriesBlack: {
+        stemDownNW: [
+          0,
+          -0.44
+        ],
+        stemUpSE: [
+          1.3,
+          0.44
+        ]
+      },
+      noteheadCowellNinthNoteSeriesHalf: {
+        stemDownNW: [
+          0,
+          -0.44
+        ],
+        stemUpSE: [
+          1.3,
+          0.44
+        ]
+      },
+      noteheadCowellSeventhNoteSeriesBlack: {
+        stemDownNW: [
+          0.028,
+          0
+        ],
+        stemUpSE: [
+          0.988,
+          0
+        ]
+      },
+      noteheadCowellSeventhNoteSeriesHalf: {
+        stemDownNW: [
+          0.028,
+          0
+        ],
+        stemUpSE: [
+          0.988,
+          0
+        ]
+      },
+      noteheadCowellThirdNoteSeriesBlack: {
+        stemDownNW: [
+          0,
+          -0.5
+        ],
+        stemUpSE: [
+          1.172,
+          -0.5
+        ]
+      },
+      noteheadCowellThirdNoteSeriesHalf: {
+        stemDownNW: [
+          0,
+          -0.468
+        ],
+        stemUpSE: [
+          1.14,
+          -0.46
+        ]
+      },
+      noteheadCowellThirteenthNoteSeriesBlack: {
+        stemDownNW: [
+          0,
+          -0.5
+        ],
+        stemUpSE: [
+          1.172,
+          -0.5
+        ]
+      },
+      noteheadCowellThirteenthNoteSeriesHalf: {
+        stemDownNW: [
+          0,
+          -0.46
+        ],
+        stemUpSE: [
+          1.14,
+          -0.468
+        ]
+      },
       noteheadDiamondBlack: {
         stemDownNW: [
           0,
           0
         ],
         stemUpSE: [
-          1,
+          0.978212,
           0
         ]
       },
@@ -50871,7 +56731,7 @@ var NotationEngine = (() => {
           0
         ],
         stemUpSE: [
-          1.4,
+          1.361796,
           0
         ]
       },
@@ -50941,7 +56801,7 @@ var NotationEngine = (() => {
       },
       noteheadDiamondDoubleWhole: {
         noteheadOrigin: [
-          0.324,
+          0.292008,
           0
         ]
       },
@@ -50957,7 +56817,7 @@ var NotationEngine = (() => {
           0
         ],
         stemUpSE: [
-          1.004,
+          0.978212,
           0
         ]
       },
@@ -50987,7 +56847,7 @@ var NotationEngine = (() => {
           0
         ],
         stemUpSE: [
-          1.404,
+          1.370356,
           0
         ]
       },
@@ -51007,24 +56867,32 @@ var NotationEngine = (() => {
           0
         ],
         stemUpSE: [
-          1,
-          0
+          1.128,
+          3724e-6
         ]
       },
       noteheadDiamondWhiteWide: {
         stemDownNW: [
           0,
-          4e-3
+          362e-5
         ],
         stemUpSE: [
-          1.4,
-          0
+          1.61196,
+          3724e-6
         ]
       },
       noteheadDoubleWhole: {
         noteheadOrigin: [
           0.36,
           0
+        ],
+        stemDownNW: [
+          0.36,
+          4e-3
+        ],
+        stemUpSE: [
+          2.036,
+          4e-3
         ]
       },
       noteheadDoubleWholeAlt: {
@@ -51043,6 +56911,16 @@ var NotationEngine = (() => {
         noteheadOrigin: [
           0.444,
           0
+        ]
+      },
+      noteheadDoubleWholeSquare: {
+        stemDownNW: [
+          0,
+          -0.248
+        ],
+        stemUpSE: [
+          1.664,
+          0.252
         ]
       },
       noteheadDoubleWholeWithX: {
@@ -51221,6 +57099,16 @@ var NotationEngine = (() => {
         stemUpSE: [
           1.26,
           0
+        ]
+      },
+      noteheadNancarrowSine: {
+        stemDownNW: [
+          0,
+          0.032
+        ],
+        stemUpSE: [
+          1.396,
+          -0.028
         ]
       },
       noteheadPlusBlack: {
@@ -52001,7 +57889,7 @@ var NotationEngine = (() => {
       },
       wiggleArpeggiatoUpSwash: {
         repeatOffset: [
-          2.116,
+          0,
           0
         ]
       },
@@ -52464,7 +58352,7 @@ var NotationEngine = (() => {
     },
     ligatures: {
       accidentalDoubleFlatParens: {
-        codepoint: "U+F5D9",
+        codepoint: "U+F5EE",
         componentGlyphs: [
           "accidentalParensLeft",
           "accidentalDoubleFlat",
@@ -52473,7 +58361,7 @@ var NotationEngine = (() => {
         description: "Parenthesised double flat"
       },
       accidentalDoubleSharpParens: {
-        codepoint: "U+F5D8",
+        codepoint: "U+F5ED",
         componentGlyphs: [
           "accidentalParensLeft",
           "accidentalDoubleSharp",
@@ -52482,7 +58370,7 @@ var NotationEngine = (() => {
         description: "Parenthesised double sharp"
       },
       accidentalFlatJohnstonDown: {
-        codepoint: "U+F5DF",
+        codepoint: "U+F5F4",
         componentGlyphs: [
           "accidentalFlat",
           "accidentalJohnstonDown"
@@ -52490,7 +58378,7 @@ var NotationEngine = (() => {
         description: "Flat-down arrow"
       },
       accidentalFlatJohnstonEl: {
-        codepoint: "U+F5DD",
+        codepoint: "U+F5F2",
         componentGlyphs: [
           "accidentalFlat",
           "accidentalJohnstonEl"
@@ -52498,7 +58386,7 @@ var NotationEngine = (() => {
         description: "Flat-inverted seven"
       },
       accidentalFlatJohnstonElDown: {
-        codepoint: "U+F5EB",
+        codepoint: "U+F600",
         componentGlyphs: [
           "accidentalFlat",
           "accidentalJohnstonEl",
@@ -52507,7 +58395,7 @@ var NotationEngine = (() => {
         description: "Flat-inverted seven-down arrow"
       },
       accidentalFlatJohnstonUp: {
-        codepoint: "U+F5DE",
+        codepoint: "U+F5F3",
         componentGlyphs: [
           "accidentalFlat",
           "accidentalJohnstonUp"
@@ -52515,7 +58403,7 @@ var NotationEngine = (() => {
         description: "Flat-up arrow"
       },
       accidentalFlatJohnstonUpEl: {
-        codepoint: "U+F5EA",
+        codepoint: "U+F5FF",
         componentGlyphs: [
           "accidentalFlat",
           "accidentalJohnstonUp",
@@ -52524,7 +58412,7 @@ var NotationEngine = (() => {
         description: "Flat-up arrow-inverted seven"
       },
       accidentalFlatParens: {
-        codepoint: "U+F5D5",
+        codepoint: "U+F5EA",
         componentGlyphs: [
           "accidentalParensLeft",
           "accidentalFlat",
@@ -52533,7 +58421,7 @@ var NotationEngine = (() => {
         description: "Parenthesised flat"
       },
       accidentalJohnstonDownEl: {
-        codepoint: "U+F5E5",
+        codepoint: "U+F5FA",
         componentGlyphs: [
           "accidentalJohnstonDown",
           "accidentalJohnstonEl"
@@ -52541,7 +58429,7 @@ var NotationEngine = (() => {
         description: "Down arrow-inverted seven"
       },
       accidentalJohnstonSevenDown: {
-        codepoint: "U+F5E3",
+        codepoint: "U+F5F8",
         componentGlyphs: [
           "accidentalJohnstonSeven",
           "accidentalJohnstonDown"
@@ -52549,7 +58437,7 @@ var NotationEngine = (() => {
         description: "Seven-down arrow"
       },
       accidentalJohnstonSevenFlat: {
-        codepoint: "U+F5E1",
+        codepoint: "U+F5F6",
         componentGlyphs: [
           "accidentalJohnstonSeven",
           "accidentalFlat"
@@ -52557,7 +58445,7 @@ var NotationEngine = (() => {
         description: "Seven-flat"
       },
       accidentalJohnstonSevenFlatDown: {
-        codepoint: "U+F5ED",
+        codepoint: "U+F602",
         componentGlyphs: [
           "accidentalJohnstonSeven",
           "accidentalFlat",
@@ -52566,7 +58454,7 @@ var NotationEngine = (() => {
         description: "Seven-flat-down arrow"
       },
       accidentalJohnstonSevenFlatUp: {
-        codepoint: "U+F5EC",
+        codepoint: "U+F601",
         componentGlyphs: [
           "accidentalJohnstonSeven",
           "accidentalFlat",
@@ -52575,7 +58463,7 @@ var NotationEngine = (() => {
         description: "Seven-flat-up arrow"
       },
       accidentalJohnstonSevenSharp: {
-        codepoint: "U+F5E0",
+        codepoint: "U+F5F5",
         componentGlyphs: [
           "accidentalJohnstonSeven",
           "accidentalSharp"
@@ -52583,7 +58471,7 @@ var NotationEngine = (() => {
         description: "Seven-sharp"
       },
       accidentalJohnstonSevenSharpDown: {
-        codepoint: "U+F5E9",
+        codepoint: "U+F5FE",
         componentGlyphs: [
           "accidentalJohnstonSeven",
           "accidentalSharp",
@@ -52592,7 +58480,7 @@ var NotationEngine = (() => {
         description: "Seven-sharp-down arrow"
       },
       accidentalJohnstonSevenSharpUp: {
-        codepoint: "U+F5E8",
+        codepoint: "U+F5FD",
         componentGlyphs: [
           "accidentalJohnstonSeven",
           "accidentalSharp",
@@ -52601,7 +58489,7 @@ var NotationEngine = (() => {
         description: "Seven-sharp-up arrow"
       },
       accidentalJohnstonSevenUp: {
-        codepoint: "U+F5E2",
+        codepoint: "U+F5F7",
         componentGlyphs: [
           "accidentalJohnstonSeven",
           "accidentalJohnstonUp"
@@ -52609,7 +58497,7 @@ var NotationEngine = (() => {
         description: "Seven-up arrow"
       },
       accidentalJohnstonUpEl: {
-        codepoint: "U+F5E4",
+        codepoint: "U+F5F9",
         componentGlyphs: [
           "accidentalJohnstonUp",
           "accidentalJohnstonEl"
@@ -52617,7 +58505,7 @@ var NotationEngine = (() => {
         description: "Up arrow-inverted seven"
       },
       accidentalNaturalParens: {
-        codepoint: "U+F5D6",
+        codepoint: "U+F5EB",
         componentGlyphs: [
           "accidentalParensLeft",
           "accidentalNatural",
@@ -52626,7 +58514,7 @@ var NotationEngine = (() => {
         description: "Parenthesised natural"
       },
       accidentalSharpJohnstonDown: {
-        codepoint: "U+F5DC",
+        codepoint: "U+F5F1",
         componentGlyphs: [
           "accidentalSharp",
           "accidentalJohnstonDown"
@@ -52634,7 +58522,7 @@ var NotationEngine = (() => {
         description: "Sharp-down arrow"
       },
       accidentalSharpJohnstonDownEl: {
-        codepoint: "U+F5E7",
+        codepoint: "U+F5FC",
         componentGlyphs: [
           "accidentalSharp",
           "accidentalJohnstonDown",
@@ -52643,7 +58531,7 @@ var NotationEngine = (() => {
         description: "Sharp-down arrow-inverted seven"
       },
       accidentalSharpJohnstonEl: {
-        codepoint: "U+F5DA",
+        codepoint: "U+F5EF",
         componentGlyphs: [
           "accidentalSharp",
           "accidentalJohnstonEl"
@@ -52651,7 +58539,7 @@ var NotationEngine = (() => {
         description: "Sharp-inverted seven"
       },
       accidentalSharpJohnstonUp: {
-        codepoint: "U+F5DB",
+        codepoint: "U+F5F0",
         componentGlyphs: [
           "accidentalSharp",
           "accidentalJohnstonUp"
@@ -52659,7 +58547,7 @@ var NotationEngine = (() => {
         description: "Sharp-up arrow"
       },
       accidentalSharpJohnstonUpEl: {
-        codepoint: "U+F5E6",
+        codepoint: "U+F5FB",
         componentGlyphs: [
           "accidentalSharp",
           "accidentalJohnstonUp",
@@ -52668,7 +58556,7 @@ var NotationEngine = (() => {
         description: "Sharp-up arrow-inverted seven"
       },
       accidentalSharpParens: {
-        codepoint: "U+F5D7",
+        codepoint: "U+F5EC",
         componentGlyphs: [
           "accidentalParensLeft",
           "accidentalSharp",
@@ -52677,7 +58565,7 @@ var NotationEngine = (() => {
         description: "Parenthesised sharp"
       },
       fClef5Below: {
-        codepoint: "U+F532",
+        codepoint: "U+F547",
         componentGlyphs: [
           "fClef",
           "tuplet5"
@@ -52685,7 +58573,7 @@ var NotationEngine = (() => {
         description: "F clef, 5 below"
       },
       gClef0Below: {
-        codepoint: "U+F533",
+        codepoint: "U+F548",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet0"
@@ -52693,7 +58581,7 @@ var NotationEngine = (() => {
         description: "G clef, 0 below"
       },
       gClef10Below: {
-        codepoint: "U+F534",
+        codepoint: "U+F549",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -52702,7 +58590,7 @@ var NotationEngine = (() => {
         description: "G clef, 10 below"
       },
       gClef11Below: {
-        codepoint: "U+F535",
+        codepoint: "U+F54A",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -52711,7 +58599,7 @@ var NotationEngine = (() => {
         description: "G clef, 11 below"
       },
       gClef12Below: {
-        codepoint: "U+F536",
+        codepoint: "U+F54B",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -52720,7 +58608,7 @@ var NotationEngine = (() => {
         description: "G clef, 12 below"
       },
       gClef13Below: {
-        codepoint: "U+F537",
+        codepoint: "U+F54C",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -52729,7 +58617,7 @@ var NotationEngine = (() => {
         description: "G clef, 13 below"
       },
       gClef14Below: {
-        codepoint: "U+F538",
+        codepoint: "U+F54D",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -52738,7 +58626,7 @@ var NotationEngine = (() => {
         description: "G clef, 14 below"
       },
       gClef15Below: {
-        codepoint: "U+F539",
+        codepoint: "U+F54E",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -52747,7 +58635,7 @@ var NotationEngine = (() => {
         description: "G clef, 15 below"
       },
       gClef16Below: {
-        codepoint: "U+F53A",
+        codepoint: "U+F54F",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -52756,7 +58644,7 @@ var NotationEngine = (() => {
         description: "G clef, 16 below"
       },
       gClef17Below: {
-        codepoint: "U+F53B",
+        codepoint: "U+F550",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -52765,7 +58653,7 @@ var NotationEngine = (() => {
         description: "G clef, 17 below"
       },
       gClef2Above: {
-        codepoint: "U+F53C",
+        codepoint: "U+F551",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet2"
@@ -52773,7 +58661,7 @@ var NotationEngine = (() => {
         description: "G clef, 2 above"
       },
       gClef2Below: {
-        codepoint: "U+F53D",
+        codepoint: "U+F552",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet2"
@@ -52781,7 +58669,7 @@ var NotationEngine = (() => {
         description: "G clef, 2 below"
       },
       gClef3Above: {
-        codepoint: "U+F53E",
+        codepoint: "U+F553",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet3"
@@ -52789,7 +58677,7 @@ var NotationEngine = (() => {
         description: "G clef, 3 above"
       },
       gClef3Below: {
-        codepoint: "U+F53F",
+        codepoint: "U+F554",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet3"
@@ -52797,7 +58685,7 @@ var NotationEngine = (() => {
         description: "G clef, 3 below"
       },
       gClef4Above: {
-        codepoint: "U+F540",
+        codepoint: "U+F555",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet4"
@@ -52805,7 +58693,7 @@ var NotationEngine = (() => {
         description: "G clef, 4 above"
       },
       gClef4Below: {
-        codepoint: "U+F541",
+        codepoint: "U+F556",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet4"
@@ -52813,7 +58701,7 @@ var NotationEngine = (() => {
         description: "G clef, 4 below"
       },
       gClef5Above: {
-        codepoint: "U+F542",
+        codepoint: "U+F557",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet5"
@@ -52821,7 +58709,7 @@ var NotationEngine = (() => {
         description: "G clef, 5 above"
       },
       gClef5Below: {
-        codepoint: "U+F543",
+        codepoint: "U+F558",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet5"
@@ -52829,7 +58717,7 @@ var NotationEngine = (() => {
         description: "G clef, 5 below"
       },
       gClef6Above: {
-        codepoint: "U+F544",
+        codepoint: "U+F559",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet6"
@@ -52837,7 +58725,7 @@ var NotationEngine = (() => {
         description: "G clef, 6 above"
       },
       gClef6Below: {
-        codepoint: "U+F545",
+        codepoint: "U+F55A",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet6"
@@ -52845,7 +58733,7 @@ var NotationEngine = (() => {
         description: "G clef, 6 below"
       },
       gClef7Above: {
-        codepoint: "U+F546",
+        codepoint: "U+F55B",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet7"
@@ -52853,7 +58741,7 @@ var NotationEngine = (() => {
         description: "G clef, 7 above"
       },
       gClef7Below: {
-        codepoint: "U+F547",
+        codepoint: "U+F55C",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet7"
@@ -52861,7 +58749,7 @@ var NotationEngine = (() => {
         description: "G clef, 7 below"
       },
       gClef8Above: {
-        codepoint: "U+F548",
+        codepoint: "U+F55D",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet8"
@@ -52869,7 +58757,7 @@ var NotationEngine = (() => {
         description: "G clef, 8 above"
       },
       gClef8Below: {
-        codepoint: "U+F549",
+        codepoint: "U+F55E",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet8"
@@ -52877,7 +58765,7 @@ var NotationEngine = (() => {
         description: "G clef, 8 below"
       },
       gClef9Above: {
-        codepoint: "U+F54A",
+        codepoint: "U+F55F",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet9"
@@ -52885,7 +58773,7 @@ var NotationEngine = (() => {
         description: "G clef, 9 above"
       },
       gClef9Below: {
-        codepoint: "U+F54B",
+        codepoint: "U+F560",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet9"
@@ -52893,7 +58781,7 @@ var NotationEngine = (() => {
         description: "G clef, 9 below"
       },
       gClefFlat10Below: {
-        codepoint: "U+F54C",
+        codepoint: "U+F561",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -52903,7 +58791,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 10 below"
       },
       gClefFlat11Below: {
-        codepoint: "U+F54D",
+        codepoint: "U+F562",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -52913,7 +58801,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 11 below"
       },
       gClefFlat13Below: {
-        codepoint: "U+F54E",
+        codepoint: "U+F563",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -52923,7 +58811,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 13 below"
       },
       gClefFlat14Below: {
-        codepoint: "U+F54F",
+        codepoint: "U+F564",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -52933,7 +58821,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 14 below"
       },
       gClefFlat15Below: {
-        codepoint: "U+F550",
+        codepoint: "U+F565",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -52943,7 +58831,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 15 below"
       },
       gClefFlat16Below: {
-        codepoint: "U+F551",
+        codepoint: "U+F566",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -52953,7 +58841,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 16 below"
       },
       gClefFlat1Below: {
-        codepoint: "U+F552",
+        codepoint: "U+F567",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "accidentalFlat",
@@ -52962,7 +58850,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 1 below"
       },
       gClefFlat2Above: {
-        codepoint: "U+F553",
+        codepoint: "U+F568",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet2",
@@ -52971,7 +58859,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 2 above"
       },
       gClefFlat2Below: {
-        codepoint: "U+F554",
+        codepoint: "U+F569",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "accidentalFlat",
@@ -52980,7 +58868,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 2 below"
       },
       gClefFlat3Above: {
-        codepoint: "U+F555",
+        codepoint: "U+F56A",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet3",
@@ -52989,7 +58877,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 3 above"
       },
       gClefFlat3Below: {
-        codepoint: "U+F556",
+        codepoint: "U+F56B",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "accidentalFlat",
@@ -52998,7 +58886,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 3 below"
       },
       gClefFlat4Below: {
-        codepoint: "U+F557",
+        codepoint: "U+F56C",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "accidentalFlat",
@@ -53007,7 +58895,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 4 below"
       },
       gClefFlat5Above: {
-        codepoint: "U+F558",
+        codepoint: "U+F56D",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet5",
@@ -53016,7 +58904,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 5 above"
       },
       gClefFlat6Above: {
-        codepoint: "U+F559",
+        codepoint: "U+F56E",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet6",
@@ -53025,7 +58913,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 6 above"
       },
       gClefFlat6Below: {
-        codepoint: "U+F55A",
+        codepoint: "U+F56F",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "accidentalFlat",
@@ -53034,7 +58922,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 6 below"
       },
       gClefFlat7Above: {
-        codepoint: "U+F55B",
+        codepoint: "U+F570",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet7",
@@ -53043,7 +58931,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 7 above"
       },
       gClefFlat7Below: {
-        codepoint: "U+F55C",
+        codepoint: "U+F571",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "accidentalFlat",
@@ -53052,7 +58940,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 7 below"
       },
       gClefFlat8Above: {
-        codepoint: "U+F55D",
+        codepoint: "U+F572",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet8",
@@ -53061,7 +58949,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 8 above"
       },
       gClefFlat9Above: {
-        codepoint: "U+F55E",
+        codepoint: "U+F573",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet9",
@@ -53070,7 +58958,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 9 above"
       },
       gClefFlat9Below: {
-        codepoint: "U+F55F",
+        codepoint: "U+F574",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "accidentalFlat",
@@ -53079,7 +58967,7 @@ var NotationEngine = (() => {
         description: "G clef, flat 9 below"
       },
       gClefNat2Below: {
-        codepoint: "U+F560",
+        codepoint: "U+F575",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "accidentalNatural",
@@ -53088,7 +58976,7 @@ var NotationEngine = (() => {
         description: "G clef, natural 2 below"
       },
       gClefNatural10Below: {
-        codepoint: "U+F561",
+        codepoint: "U+F576",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -53098,7 +58986,7 @@ var NotationEngine = (() => {
         description: "G clef, natural 10 below"
       },
       gClefNatural13Below: {
-        codepoint: "U+F562",
+        codepoint: "U+F577",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -53108,7 +58996,7 @@ var NotationEngine = (() => {
         description: "G clef, natural 13 below"
       },
       gClefNatural17Below: {
-        codepoint: "U+F563",
+        codepoint: "U+F578",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -53118,7 +59006,7 @@ var NotationEngine = (() => {
         description: "G clef, natural 17 below"
       },
       gClefNatural2Above: {
-        codepoint: "U+F564",
+        codepoint: "U+F579",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet2",
@@ -53127,7 +59015,7 @@ var NotationEngine = (() => {
         description: "G clef, natural 2 above"
       },
       gClefNatural3Above: {
-        codepoint: "U+F565",
+        codepoint: "U+F57A",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet3",
@@ -53136,7 +59024,7 @@ var NotationEngine = (() => {
         description: "G clef, natural 3 above"
       },
       gClefNatural3Below: {
-        codepoint: "U+F566",
+        codepoint: "U+F57B",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "accidentalNatural",
@@ -53145,7 +59033,7 @@ var NotationEngine = (() => {
         description: "G clef, natural 3 below"
       },
       gClefNatural6Above: {
-        codepoint: "U+F567",
+        codepoint: "U+F57C",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet6",
@@ -53154,7 +59042,7 @@ var NotationEngine = (() => {
         description: "G clef, natural 6 above"
       },
       gClefNatural6Below: {
-        codepoint: "U+F568",
+        codepoint: "U+F57D",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "accidentalNatural",
@@ -53163,7 +59051,7 @@ var NotationEngine = (() => {
         description: "G clef, natural 6 below"
       },
       gClefNatural7Above: {
-        codepoint: "U+F569",
+        codepoint: "U+F57E",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet7",
@@ -53172,7 +59060,7 @@ var NotationEngine = (() => {
         description: "G clef, natural 7 above"
       },
       gClefNatural9Above: {
-        codepoint: "U+F56A",
+        codepoint: "U+F57F",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet9",
@@ -53181,7 +59069,7 @@ var NotationEngine = (() => {
         description: "G clef, natural 9 above"
       },
       gClefNatural9Below: {
-        codepoint: "U+F56B",
+        codepoint: "U+F580",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "accidentalNatural",
@@ -53190,7 +59078,7 @@ var NotationEngine = (() => {
         description: "G clef, natural 9 below"
       },
       gClefSharp12Below: {
-        codepoint: "U+F56C",
+        codepoint: "U+F581",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "tuplet1",
@@ -53200,7 +59088,7 @@ var NotationEngine = (() => {
         description: "G clef, sharp 12 below"
       },
       gClefSharp1Above: {
-        codepoint: "U+F56D",
+        codepoint: "U+F582",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet1",
@@ -53209,7 +59097,7 @@ var NotationEngine = (() => {
         description: "G clef, sharp 1 above"
       },
       gClefSharp4Above: {
-        codepoint: "U+F56E",
+        codepoint: "U+F583",
         componentGlyphs: [
           "gClefLigatedNumberAbove",
           "tuplet4",
@@ -53218,7 +59106,7 @@ var NotationEngine = (() => {
         description: "G clef, sharp 4 above"
       },
       gClefSharp5Below: {
-        codepoint: "U+F56F",
+        codepoint: "U+F584",
         componentGlyphs: [
           "gClefLigatedNumberBelow",
           "accidentalSharp",
@@ -53227,7 +59115,7 @@ var NotationEngine = (() => {
         description: "G clef, sharp 5 below"
       },
       mensuralFusaBlackStemDown: {
-        codepoint: "U+F570",
+        codepoint: "U+F585",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlack",
           "mensuralCombStemDownFlagFusa"
@@ -53235,7 +59123,7 @@ var NotationEngine = (() => {
         description: "Fusa black, stem down"
       },
       mensuralFusaBlackStemUp: {
-        codepoint: "U+F571",
+        codepoint: "U+F586",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlack",
           "mensuralCombStemUpFlagFusa"
@@ -53243,7 +59131,7 @@ var NotationEngine = (() => {
         description: "Fusa black, stem up"
       },
       mensuralFusaBlackVoidStemDown: {
-        codepoint: "U+F572",
+        codepoint: "U+F587",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlackVoid",
           "mensuralCombStemDownFlagFusa"
@@ -53251,7 +59139,7 @@ var NotationEngine = (() => {
         description: "Fusa black and void, stem down"
       },
       mensuralFusaBlackVoidStemUp: {
-        codepoint: "U+F573",
+        codepoint: "U+F588",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlackVoid",
           "mensuralCombStemUpFlagFusa"
@@ -53259,7 +59147,7 @@ var NotationEngine = (() => {
         description: "Fusa black and void, stem up"
       },
       mensuralFusaVoidStemDown: {
-        codepoint: "U+F574",
+        codepoint: "U+F589",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisVoid",
           "mensuralCombStemDownFlagFusa"
@@ -53267,7 +59155,7 @@ var NotationEngine = (() => {
         description: "Fusa void, stem down"
       },
       mensuralFusaVoidStemUp: {
-        codepoint: "U+F575",
+        codepoint: "U+F58A",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisVoid",
           "mensuralCombStemUpFlagFusa"
@@ -53275,7 +59163,7 @@ var NotationEngine = (() => {
         description: "Fusa void, stem up"
       },
       mensuralLongaBlackStemDownLeft: {
-        codepoint: "U+F576",
+        codepoint: "U+F58B",
         componentGlyphs: [
           "mensuralCombStemDown",
           "mensuralNoteheadLongaBlack"
@@ -53283,7 +59171,7 @@ var NotationEngine = (() => {
         description: "Longa black, stem down left"
       },
       mensuralLongaBlackStemDownRight: {
-        codepoint: "U+F577",
+        codepoint: "U+F58C",
         componentGlyphs: [
           "mensuralNoteheadLongaBlack",
           "mensuralCombStemDown"
@@ -53291,7 +59179,7 @@ var NotationEngine = (() => {
         description: "Longa black, stem down right"
       },
       mensuralLongaBlackStemUpLeft: {
-        codepoint: "U+F578",
+        codepoint: "U+F58D",
         componentGlyphs: [
           "mensuralCombStemUp",
           "mensuralNoteheadLongaBlack"
@@ -53299,7 +59187,7 @@ var NotationEngine = (() => {
         description: "Longa black, stem up left"
       },
       mensuralLongaBlackStemUpRight: {
-        codepoint: "U+F579",
+        codepoint: "U+F58E",
         componentGlyphs: [
           "mensuralNoteheadLongaBlack",
           "mensuralCombStemUp"
@@ -53307,7 +59195,7 @@ var NotationEngine = (() => {
         description: "Longa black, stem up right"
       },
       mensuralLongaBlackVoidStemDownLeft: {
-        codepoint: "U+F57A",
+        codepoint: "U+F58F",
         componentGlyphs: [
           "mensuralCombStemDown",
           "mensuralNoteheadLongaBlackVoid"
@@ -53315,7 +59203,7 @@ var NotationEngine = (() => {
         description: "Longa black and void, stem down left"
       },
       mensuralLongaBlackVoidStemDownRight: {
-        codepoint: "U+F57B",
+        codepoint: "U+F590",
         componentGlyphs: [
           "mensuralNoteheadLongaBlackVoid",
           "mensuralCombStemDown"
@@ -53323,7 +59211,7 @@ var NotationEngine = (() => {
         description: "Longa black and void, stem down right"
       },
       mensuralLongaBlackVoidStemUpLeft: {
-        codepoint: "U+F57C",
+        codepoint: "U+F591",
         componentGlyphs: [
           "mensuralCombStemUp",
           "mensuralNoteheadLongaBlackVoid"
@@ -53331,7 +59219,7 @@ var NotationEngine = (() => {
         description: "Longa black and void, stem up left"
       },
       mensuralLongaBlackVoidStemUpRight: {
-        codepoint: "U+F57D",
+        codepoint: "U+F592",
         componentGlyphs: [
           "mensuralNoteheadLongaBlackVoid",
           "mensuralCombStemUp"
@@ -53339,7 +59227,7 @@ var NotationEngine = (() => {
         description: "Longa black and void, stem up right"
       },
       mensuralLongaVoidStemDownLeft: {
-        codepoint: "U+F57E",
+        codepoint: "U+F593",
         componentGlyphs: [
           "mensuralCombStemDown",
           "mensuralNoteheadLongaVoid"
@@ -53347,7 +59235,7 @@ var NotationEngine = (() => {
         description: "Longa void, stem down left"
       },
       mensuralLongaVoidStemDownRight: {
-        codepoint: "U+F57F",
+        codepoint: "U+F594",
         componentGlyphs: [
           "mensuralNoteheadLongaVoid",
           "mensuralCombStemDown"
@@ -53355,7 +59243,7 @@ var NotationEngine = (() => {
         description: "Longa void, stem down right"
       },
       mensuralLongaVoidStemUpLeft: {
-        codepoint: "U+F580",
+        codepoint: "U+F595",
         componentGlyphs: [
           "mensuralCombStemUp",
           "mensuralNoteheadLongaVoid"
@@ -53363,7 +59251,7 @@ var NotationEngine = (() => {
         description: "Longa void, stem up left"
       },
       mensuralLongaVoidStemUpRight: {
-        codepoint: "U+F581",
+        codepoint: "U+F596",
         componentGlyphs: [
           "mensuralNoteheadLongaVoid",
           "mensuralCombStemUp"
@@ -53371,7 +59259,7 @@ var NotationEngine = (() => {
         description: "Longa void, stem up right"
       },
       mensuralMaximaBlackStemDownLeft: {
-        codepoint: "U+F582",
+        codepoint: "U+F597",
         componentGlyphs: [
           "mensuralCombStemDown",
           "mensuralNoteheadMaximaBlack"
@@ -53379,7 +59267,7 @@ var NotationEngine = (() => {
         description: "Maxima black, stem down left"
       },
       mensuralMaximaBlackStemDownRight: {
-        codepoint: "U+F583",
+        codepoint: "U+F598",
         componentGlyphs: [
           "mensuralNoteheadMaximaBlack",
           "mensuralCombStemDown"
@@ -53387,7 +59275,7 @@ var NotationEngine = (() => {
         description: "Maxima black, stem down right"
       },
       mensuralMaximaBlackStemUpLeft: {
-        codepoint: "U+F584",
+        codepoint: "U+F599",
         componentGlyphs: [
           "mensuralCombStemUp",
           "mensuralNoteheadMaximaBlack"
@@ -53395,7 +59283,7 @@ var NotationEngine = (() => {
         description: "Maxima black, stem up left"
       },
       mensuralMaximaBlackStemUpRight: {
-        codepoint: "U+F585",
+        codepoint: "U+F59A",
         componentGlyphs: [
           "mensuralNoteheadMaximaBlack",
           "mensuralCombStemUp"
@@ -53403,7 +59291,7 @@ var NotationEngine = (() => {
         description: "Maxima black, stem up right"
       },
       mensuralMaximaBlackVoidStemDownLeft: {
-        codepoint: "U+F586",
+        codepoint: "U+F59B",
         componentGlyphs: [
           "mensuralCombStemDown",
           "mensuralNoteheadMaximaBlackVoid"
@@ -53411,7 +59299,7 @@ var NotationEngine = (() => {
         description: "Maxima black and void, stem down left"
       },
       mensuralMaximaBlackVoidStemDownRight: {
-        codepoint: "U+F587",
+        codepoint: "U+F59C",
         componentGlyphs: [
           "mensuralNoteheadMaximaBlackVoid",
           "mensuralCombStemDown"
@@ -53419,7 +59307,7 @@ var NotationEngine = (() => {
         description: "Maxima black and void, stem down right"
       },
       mensuralMaximaBlackVoidStemUpLeft: {
-        codepoint: "U+F588",
+        codepoint: "U+F59D",
         componentGlyphs: [
           "mensuralCombStemUp",
           "mensuralNoteheadMaximaBlackVoid"
@@ -53427,7 +59315,7 @@ var NotationEngine = (() => {
         description: "Maxima black and void, stem up left"
       },
       mensuralMaximaBlackVoidStemUpRight: {
-        codepoint: "U+F589",
+        codepoint: "U+F59E",
         componentGlyphs: [
           "mensuralNoteheadMaximaBlackVoid",
           "mensuralCombStemUp"
@@ -53435,7 +59323,7 @@ var NotationEngine = (() => {
         description: "Maxima black and void, stem up right"
       },
       mensuralMaximaVoidStemDownLeft: {
-        codepoint: "U+F58A",
+        codepoint: "U+F59F",
         componentGlyphs: [
           "mensuralCombStemDown",
           "mensuralNoteheadMaximaVoid"
@@ -53443,7 +59331,7 @@ var NotationEngine = (() => {
         description: "Maxima void, stem down left"
       },
       mensuralMaximaVoidStemDownRight: {
-        codepoint: "U+F58B",
+        codepoint: "U+F5A0",
         componentGlyphs: [
           "mensuralNoteheadMaximaVoid",
           "mensuralCombStemDown"
@@ -53451,7 +59339,7 @@ var NotationEngine = (() => {
         description: "Maxima void, stem down right"
       },
       mensuralMaximaVoidStemUpLeft: {
-        codepoint: "U+F58C",
+        codepoint: "U+F5A1",
         componentGlyphs: [
           "mensuralCombStemUp",
           "mensuralNoteheadMaximaVoid"
@@ -53459,7 +59347,7 @@ var NotationEngine = (() => {
         description: "Maxima void, stem up left"
       },
       mensuralMaximaVoidStemUpRight: {
-        codepoint: "U+F58D",
+        codepoint: "U+F5A2",
         componentGlyphs: [
           "mensuralNoteheadMaximaVoid",
           "mensuralCombStemUp"
@@ -53467,7 +59355,7 @@ var NotationEngine = (() => {
         description: "Maxima void, stem up right"
       },
       mensuralMinimaBlackStemDown: {
-        codepoint: "U+F58E",
+        codepoint: "U+F5A3",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlack",
           "mensuralCombStemDown"
@@ -53475,7 +59363,7 @@ var NotationEngine = (() => {
         description: "Minima black, stem down"
       },
       mensuralMinimaBlackStemDownExtendedFlag: {
-        codepoint: "U+F58F",
+        codepoint: "U+F5A4",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlack",
           "mensuralCombStemDownFlagExtended"
@@ -53483,7 +59371,7 @@ var NotationEngine = (() => {
         description: "Minima black, stem down with extended flag"
       },
       mensuralMinimaBlackStemDownFlagLeft: {
-        codepoint: "U+F590",
+        codepoint: "U+F5A5",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlack",
           "mensuralCombStemDownFlagLeft"
@@ -53491,7 +59379,7 @@ var NotationEngine = (() => {
         description: "Minima black, stem down with flag left"
       },
       mensuralMinimaBlackStemDownFlagRight: {
-        codepoint: "U+F591",
+        codepoint: "U+F5A6",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlack",
           "mensuralCombStemDownFlagRight"
@@ -53499,7 +59387,7 @@ var NotationEngine = (() => {
         description: "Minima black, stem down with flag right"
       },
       mensuralMinimaBlackStemDownFlaredFlag: {
-        codepoint: "U+F592",
+        codepoint: "U+F5A7",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlack",
           "mensuralCombStemDownFlagFlared"
@@ -53507,7 +59395,7 @@ var NotationEngine = (() => {
         description: "Minima black, stem down with flared flag"
       },
       mensuralMinimaBlackStemUp: {
-        codepoint: "U+F593",
+        codepoint: "U+F5A8",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlack",
           "mensuralCombStemUp"
@@ -53515,7 +59403,7 @@ var NotationEngine = (() => {
         description: "Minima black, stem up"
       },
       mensuralMinimaBlackStemUpExtendedFlag: {
-        codepoint: "U+F594",
+        codepoint: "U+F5A9",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlack",
           "mensuralCombStemUpFlagExtended"
@@ -53523,7 +59411,7 @@ var NotationEngine = (() => {
         description: "Minima black, stem up with extended flag"
       },
       mensuralMinimaBlackStemUpFlagLeft: {
-        codepoint: "U+F595",
+        codepoint: "U+F5AA",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlack",
           "mensuralCombStemUpFlagLeft"
@@ -53531,7 +59419,7 @@ var NotationEngine = (() => {
         description: "Minima black, stem up with flag left"
       },
       mensuralMinimaBlackStemUpFlagRight: {
-        codepoint: "U+F596",
+        codepoint: "U+F5AB",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlack",
           "mensuralCombStemUpFlagRight"
@@ -53539,7 +59427,7 @@ var NotationEngine = (() => {
         description: "Minima black, stem up with flag right"
       },
       mensuralMinimaBlackStemUpFlaredFlag: {
-        codepoint: "U+F597",
+        codepoint: "U+F5AC",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlack",
           "mensuralCombStemUpFlagFlared"
@@ -53547,7 +59435,7 @@ var NotationEngine = (() => {
         description: "Minima black, stem up with flared flag"
       },
       mensuralMinimaBlackVoidStemDown: {
-        codepoint: "U+F598",
+        codepoint: "U+F5AD",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlackVoid",
           "mensuralCombStemDown"
@@ -53555,7 +59443,7 @@ var NotationEngine = (() => {
         description: "Minima black and void, stem down"
       },
       mensuralMinimaBlackVoidStemDownExtendedFlag: {
-        codepoint: "U+F599",
+        codepoint: "U+F5AE",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlackVoid",
           "mensuralCombStemDownFlagExtended"
@@ -53563,7 +59451,7 @@ var NotationEngine = (() => {
         description: "Minima black and void, stem down with extended flag"
       },
       mensuralMinimaBlackVoidStemDownFlagLeft: {
-        codepoint: "U+F59A",
+        codepoint: "U+F5AF",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlackVoid",
           "mensuralCombStemDownFlagLeft"
@@ -53571,7 +59459,7 @@ var NotationEngine = (() => {
         description: "Minima black and void, stem down with flag left"
       },
       mensuralMinimaBlackVoidStemDownFlagRight: {
-        codepoint: "U+F59B",
+        codepoint: "U+F5B0",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlackVoid",
           "mensuralCombStemDownFlagRight"
@@ -53579,7 +59467,7 @@ var NotationEngine = (() => {
         description: "Minima black and void, stem down with flag right"
       },
       mensuralMinimaBlackVoidStemDownFlaredFlag: {
-        codepoint: "U+F59C",
+        codepoint: "U+F5B1",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlackVoid",
           "mensuralCombStemDownFlagFlared"
@@ -53587,7 +59475,7 @@ var NotationEngine = (() => {
         description: "Minima black and void, stem down with flared flag"
       },
       mensuralMinimaBlackVoidStemUp: {
-        codepoint: "U+F59D",
+        codepoint: "U+F5B2",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlackVoid",
           "mensuralCombStemUp"
@@ -53595,7 +59483,7 @@ var NotationEngine = (() => {
         description: "Minima black and void, stem up"
       },
       mensuralMinimaBlackVoidStemUpExtendedFlag: {
-        codepoint: "U+F59E",
+        codepoint: "U+F5B3",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlackVoid",
           "mensuralCombStemUpFlagExtended"
@@ -53603,7 +59491,7 @@ var NotationEngine = (() => {
         description: "Minima black and void, stem up with extended flag"
       },
       mensuralMinimaBlackVoidStemUpFlagLeft: {
-        codepoint: "U+F59F",
+        codepoint: "U+F5B4",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlackVoid",
           "mensuralCombStemUpFlagLeft"
@@ -53611,7 +59499,7 @@ var NotationEngine = (() => {
         description: "Minima black and void, stem up with flag left"
       },
       mensuralMinimaBlackVoidStemUpFlagRight: {
-        codepoint: "U+F5A0",
+        codepoint: "U+F5B5",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlackVoid",
           "mensuralCombStemUpFlagRight"
@@ -53619,7 +59507,7 @@ var NotationEngine = (() => {
         description: "Minima black and void, stem up with flag right"
       },
       mensuralMinimaBlackVoidStemUpFlaredFlag: {
-        codepoint: "U+F5A1",
+        codepoint: "U+F5B6",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlackVoid",
           "mensuralCombStemUpFlagFlared"
@@ -53627,7 +59515,7 @@ var NotationEngine = (() => {
         description: "Minima black and void, stem up with flared flag"
       },
       mensuralMinimaVoidStemDown: {
-        codepoint: "U+F5A2",
+        codepoint: "U+F5B7",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisVoid",
           "mensuralCombStemDown"
@@ -53635,7 +59523,7 @@ var NotationEngine = (() => {
         description: "Minima void, stem down"
       },
       mensuralMinimaVoidStemDownExtendedFlag: {
-        codepoint: "U+F5A3",
+        codepoint: "U+F5B8",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisVoid",
           "mensuralCombStemDownFlagExtended"
@@ -53643,7 +59531,7 @@ var NotationEngine = (() => {
         description: "Minima void, stem down with extended flag"
       },
       mensuralMinimaVoidStemDownFlagLeft: {
-        codepoint: "U+F5A4",
+        codepoint: "U+F5B9",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisVoid",
           "mensuralCombStemDownFlagLeft"
@@ -53651,7 +59539,7 @@ var NotationEngine = (() => {
         description: "Minima void, stem down with flag left"
       },
       mensuralMinimaVoidStemDownFlagRight: {
-        codepoint: "U+F5A5",
+        codepoint: "U+F5BA",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisVoid",
           "mensuralCombStemDownFlagRight"
@@ -53659,7 +59547,7 @@ var NotationEngine = (() => {
         description: "Minima void, stem down with flag right"
       },
       mensuralMinimaVoidStemDownFlaredFlag: {
-        codepoint: "U+F5A6",
+        codepoint: "U+F5BB",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisVoid",
           "mensuralCombStemDownFlagFlared"
@@ -53667,7 +59555,7 @@ var NotationEngine = (() => {
         description: "Minima void, stem down with flared flag"
       },
       mensuralMinimaVoidStemUp: {
-        codepoint: "U+F5A8",
+        codepoint: "U+F5BD",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisVoid",
           "mensuralCombStemUp"
@@ -53675,7 +59563,7 @@ var NotationEngine = (() => {
         description: "Minima void, stem up"
       },
       mensuralMinimaVoidStemUpExtendedFlag: {
-        codepoint: "U+F5A7",
+        codepoint: "U+F5BC",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisVoid",
           "mensuralCombStemUpFlagExtended"
@@ -53683,7 +59571,7 @@ var NotationEngine = (() => {
         description: "Minima void, stem up with extended flag"
       },
       mensuralMinimaVoidStemUpFlagLeft: {
-        codepoint: "U+F5A9",
+        codepoint: "U+F5BE",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisVoid",
           "mensuralCombStemUpFlagLeft"
@@ -53691,7 +59579,7 @@ var NotationEngine = (() => {
         description: "Minima void, stem up with flag left"
       },
       mensuralMinimaVoidStemUpFlagRight: {
-        codepoint: "U+F5AA",
+        codepoint: "U+F5BF",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisVoid",
           "mensuralCombStemUpFlagRight"
@@ -53699,7 +59587,7 @@ var NotationEngine = (() => {
         description: "Minima void, stem up with flag right"
       },
       mensuralMinimaVoidStemUpFlaredFlag: {
-        codepoint: "U+F5AB",
+        codepoint: "U+F5C0",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisVoid",
           "mensuralCombStemUpFlagFlared"
@@ -53707,7 +59595,7 @@ var NotationEngine = (() => {
         description: "Minima void, stem up with flared flag"
       },
       mensuralSemiminimaBlackStemDown: {
-        codepoint: "U+F5AC",
+        codepoint: "U+F5C1",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlack",
           "mensuralCombStemDownFlagSemiminima"
@@ -53715,7 +59603,7 @@ var NotationEngine = (() => {
         description: "Semiminima black, stem down"
       },
       mensuralSemiminimaBlackStemUp: {
-        codepoint: "U+F5AD",
+        codepoint: "U+F5C2",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlack",
           "mensuralCombStemUpFlagSemiminima"
@@ -53723,7 +59611,7 @@ var NotationEngine = (() => {
         description: "Semiminima black, stem up"
       },
       mensuralSemiminimaBlackVoidStemDown: {
-        codepoint: "U+F5AE",
+        codepoint: "U+F5C3",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlackVoid",
           "mensuralCombStemDownFlagSemiminima"
@@ -53731,7 +59619,7 @@ var NotationEngine = (() => {
         description: "Semiminima black and void, stem down"
       },
       mensuralSemiminimaBlackVoidStemUp: {
-        codepoint: "U+F5AF",
+        codepoint: "U+F5C4",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisBlackVoid",
           "mensuralCombStemUpFlagSemiminima"
@@ -53739,7 +59627,7 @@ var NotationEngine = (() => {
         description: "Semiminima black and void, stem up"
       },
       mensuralSemiminimaVoidStemDown: {
-        codepoint: "U+F5B0",
+        codepoint: "U+F5C5",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisVoid",
           "mensuralCombStemDownFlagSemiminima"
@@ -53747,7 +59635,7 @@ var NotationEngine = (() => {
         description: "Semiminima void, stem down"
       },
       mensuralSemiminimaVoidStemUp: {
-        codepoint: "U+F5B1",
+        codepoint: "U+F5C6",
         componentGlyphs: [
           "mensuralNoteheadSemibrevisVoid",
           "mensuralCombStemUpFlagSemiminima"
@@ -53755,7 +59643,7 @@ var NotationEngine = (() => {
         description: "Semiminima void, stem up"
       },
       noteheadBlackParens: {
-        codepoint: "U+F5D1",
+        codepoint: "U+F5E6",
         componentGlyphs: [
           "noteheadParenthesisLeft",
           "noteheadBlack",
@@ -53764,7 +59652,7 @@ var NotationEngine = (() => {
         description: "Parenthesised black notehead"
       },
       noteheadDoubleWholeParens: {
-        codepoint: "U+F5D4",
+        codepoint: "U+F5E9",
         componentGlyphs: [
           "noteheadParenthesisLeft",
           "noteheadDoubleWhole",
@@ -53773,7 +59661,7 @@ var NotationEngine = (() => {
         description: "Parenthesised double whole (breve) notehead"
       },
       noteheadHalfParens: {
-        codepoint: "U+F5D2",
+        codepoint: "U+F5E7",
         componentGlyphs: [
           "noteheadParenthesisLeft",
           "noteheadHalf",
@@ -53782,7 +59670,7 @@ var NotationEngine = (() => {
         description: "Parenthesised half notehead"
       },
       noteheadWholeParens: {
-        codepoint: "U+F5D3",
+        codepoint: "U+F5E8",
         componentGlyphs: [
           "noteheadParenthesisLeft",
           "noteheadWhole",
@@ -53791,7 +59679,7 @@ var NotationEngine = (() => {
         description: "Parenthesised whole (semibreve) notehead"
       },
       ornamentTrillFlatAbove: {
-        codepoint: "U+F5B2",
+        codepoint: "U+F5C7",
         componentGlyphs: [
           "accidentalFlat",
           "ornamentTrill"
@@ -53799,7 +59687,7 @@ var NotationEngine = (() => {
         description: "Trill, flat above"
       },
       ornamentTrillNaturalAbove: {
-        codepoint: "U+F5B3",
+        codepoint: "U+F5C8",
         componentGlyphs: [
           "accidentalNatural",
           "ornamentTrill"
@@ -53807,7 +59695,7 @@ var NotationEngine = (() => {
         description: "Trill, natural above"
       },
       ornamentTrillSharpAbove: {
-        codepoint: "U+F5B4",
+        codepoint: "U+F5C9",
         componentGlyphs: [
           "accidentalSharp",
           "ornamentTrill"
@@ -53815,7 +59703,7 @@ var NotationEngine = (() => {
         description: "Trill, sharp above"
       },
       ornamentTurnFlatAbove: {
-        codepoint: "U+F5B5",
+        codepoint: "U+F5CA",
         componentGlyphs: [
           "accidentalFlat",
           "ornamentTurn"
@@ -53823,7 +59711,7 @@ var NotationEngine = (() => {
         description: "Turn, flat above"
       },
       ornamentTurnFlatAboveSharpBelow: {
-        codepoint: "U+F5B6",
+        codepoint: "U+F5CB",
         componentGlyphs: [
           "accidentalFlat",
           "ornamentTurn",
@@ -53832,7 +59720,7 @@ var NotationEngine = (() => {
         description: "Turn, flat above, sharp below"
       },
       ornamentTurnFlatBelow: {
-        codepoint: "U+F5B7",
+        codepoint: "U+F5CC",
         componentGlyphs: [
           "ornamentTurn",
           "accidentalFlat"
@@ -53840,7 +59728,7 @@ var NotationEngine = (() => {
         description: "Turn, flat below"
       },
       ornamentTurnNaturalAbove: {
-        codepoint: "U+F5B8",
+        codepoint: "U+F5CD",
         componentGlyphs: [
           "accidentalNatural",
           "ornamentTurn"
@@ -53848,7 +59736,7 @@ var NotationEngine = (() => {
         description: "Turn, natural above"
       },
       ornamentTurnNaturalBelow: {
-        codepoint: "U+F5B9",
+        codepoint: "U+F5CE",
         componentGlyphs: [
           "ornamentTurn",
           "accidentalNatural"
@@ -53856,7 +59744,7 @@ var NotationEngine = (() => {
         description: "Turn, natural below"
       },
       ornamentTurnSharpAbove: {
-        codepoint: "U+F5BA",
+        codepoint: "U+F5CF",
         componentGlyphs: [
           "accidentalSharp",
           "ornamentTurn"
@@ -53864,7 +59752,7 @@ var NotationEngine = (() => {
         description: "Turn, sharp above"
       },
       ornamentTurnSharpAboveFlatBelow: {
-        codepoint: "U+F5BB",
+        codepoint: "U+F5D0",
         componentGlyphs: [
           "accidentalSharp",
           "ornamentTurn",
@@ -53873,7 +59761,7 @@ var NotationEngine = (() => {
         description: "Turn, sharp above, flat below"
       },
       ornamentTurnSharpBelow: {
-        codepoint: "U+F5BC",
+        codepoint: "U+F5D1",
         componentGlyphs: [
           "ornamentTurn",
           "accidentalSharp"
@@ -53881,7 +59769,7 @@ var NotationEngine = (() => {
         description: "Turn, sharp below"
       },
       timeSig0Denominator: {
-        codepoint: "U+F5BD",
+        codepoint: "U+F5D2",
         componentGlyphs: [
           "timeSigCombDenominator",
           "timeSig0"
@@ -53889,7 +59777,7 @@ var NotationEngine = (() => {
         description: "Time signature 0 (denominator)"
       },
       timeSig0Numerator: {
-        codepoint: "U+F5BE",
+        codepoint: "U+F5D3",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig0"
@@ -53897,7 +59785,7 @@ var NotationEngine = (() => {
         description: "Time signature 0 (numerator)"
       },
       timeSig12over8: {
-        codepoint: "U+F5FA",
+        codepoint: "U+F60F",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig1",
@@ -53909,7 +59797,7 @@ var NotationEngine = (() => {
         description: "12/8 time signature"
       },
       timeSig1Denominator: {
-        codepoint: "U+F5BF",
+        codepoint: "U+F5D4",
         componentGlyphs: [
           "timeSigCombDenominator",
           "timeSig1"
@@ -53917,7 +59805,7 @@ var NotationEngine = (() => {
         description: "Time signature 1 (denominator)"
       },
       timeSig1Numerator: {
-        codepoint: "U+F5C0",
+        codepoint: "U+F5D5",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig1"
@@ -53925,7 +59813,7 @@ var NotationEngine = (() => {
         description: "Time signature 1 (numerator)"
       },
       timeSig2Denominator: {
-        codepoint: "U+F5C1",
+        codepoint: "U+F5D6",
         componentGlyphs: [
           "timeSigCombDenominator",
           "timeSig2"
@@ -53933,7 +59821,7 @@ var NotationEngine = (() => {
         description: "Time signature 2 (denominator)"
       },
       timeSig2Numerator: {
-        codepoint: "U+F5C2",
+        codepoint: "U+F5D7",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig2"
@@ -53941,7 +59829,7 @@ var NotationEngine = (() => {
         description: "Time signature 2 (numerator)"
       },
       timeSig2over2: {
-        codepoint: "U+F5EF",
+        codepoint: "U+F604",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig2",
@@ -53951,7 +59839,7 @@ var NotationEngine = (() => {
         description: "2/2 time signature"
       },
       timeSig2over4: {
-        codepoint: "U+F5EE",
+        codepoint: "U+F603",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig2",
@@ -53961,7 +59849,7 @@ var NotationEngine = (() => {
         description: "2/4 time signature"
       },
       timeSig3Denominator: {
-        codepoint: "U+F5C3",
+        codepoint: "U+F5D8",
         componentGlyphs: [
           "timeSigCombDenominator",
           "timeSig3"
@@ -53969,7 +59857,7 @@ var NotationEngine = (() => {
         description: "Time signature 3 (denominator)"
       },
       timeSig3Numerator: {
-        codepoint: "U+F5C4",
+        codepoint: "U+F5D9",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig3"
@@ -53977,7 +59865,7 @@ var NotationEngine = (() => {
         description: "Time signature 3 (numerator)"
       },
       timeSig3over2: {
-        codepoint: "U+F5F0",
+        codepoint: "U+F605",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig3",
@@ -53987,7 +59875,7 @@ var NotationEngine = (() => {
         description: "3/2 time signature"
       },
       timeSig3over4: {
-        codepoint: "U+F5F1",
+        codepoint: "U+F606",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig3",
@@ -53997,7 +59885,7 @@ var NotationEngine = (() => {
         description: "3/4 time signature"
       },
       timeSig3over8: {
-        codepoint: "U+F5F2",
+        codepoint: "U+F607",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig3",
@@ -54007,7 +59895,7 @@ var NotationEngine = (() => {
         description: "3/8 time signature"
       },
       timeSig4Denominator: {
-        codepoint: "U+F5C5",
+        codepoint: "U+F5DA",
         componentGlyphs: [
           "timeSigCombDenominator",
           "timeSig4"
@@ -54015,7 +59903,7 @@ var NotationEngine = (() => {
         description: "Time signature 4 (denominator)"
       },
       timeSig4Numerator: {
-        codepoint: "U+F5C6",
+        codepoint: "U+F5DB",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig4"
@@ -54023,7 +59911,7 @@ var NotationEngine = (() => {
         description: "Time signature 4 (numerator)"
       },
       timeSig4over4: {
-        codepoint: "U+F5F3",
+        codepoint: "U+F608",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig4",
@@ -54033,7 +59921,7 @@ var NotationEngine = (() => {
         description: "4/4 time signature"
       },
       timeSig5Denominator: {
-        codepoint: "U+F5C7",
+        codepoint: "U+F5DC",
         componentGlyphs: [
           "timeSigCombDenominator",
           "timeSig5"
@@ -54041,7 +59929,7 @@ var NotationEngine = (() => {
         description: "Time signature 5 (denominator)"
       },
       timeSig5Numerator: {
-        codepoint: "U+F5C8",
+        codepoint: "U+F5DD",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig5"
@@ -54049,7 +59937,7 @@ var NotationEngine = (() => {
         description: "Time signature 5 (numerator)"
       },
       timeSig5over4: {
-        codepoint: "U+F5F4",
+        codepoint: "U+F609",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig5",
@@ -54059,7 +59947,7 @@ var NotationEngine = (() => {
         description: "5/4 time signature"
       },
       timeSig5over8: {
-        codepoint: "U+F5F5",
+        codepoint: "U+F60A",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig5",
@@ -54069,7 +59957,7 @@ var NotationEngine = (() => {
         description: "5/8 time signature"
       },
       timeSig6Denominator: {
-        codepoint: "U+F5C9",
+        codepoint: "U+F5DE",
         componentGlyphs: [
           "timeSigCombDenominator",
           "timeSig6"
@@ -54077,7 +59965,7 @@ var NotationEngine = (() => {
         description: "Time signature 6 (denominator)"
       },
       timeSig6Numerator: {
-        codepoint: "U+F5CA",
+        codepoint: "U+F5DF",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig6"
@@ -54085,7 +59973,7 @@ var NotationEngine = (() => {
         description: "Time signature 6 (numerator)"
       },
       timeSig6over4: {
-        codepoint: "U+F5F6",
+        codepoint: "U+F60B",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig6",
@@ -54095,7 +59983,7 @@ var NotationEngine = (() => {
         description: "6/4 time signature"
       },
       timeSig6over8: {
-        codepoint: "U+F5F7",
+        codepoint: "U+F60C",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig6",
@@ -54105,7 +59993,7 @@ var NotationEngine = (() => {
         description: "6/8 time signature"
       },
       timeSig7Denominator: {
-        codepoint: "U+F5CB",
+        codepoint: "U+F5E0",
         componentGlyphs: [
           "timeSigCombDenominator",
           "timeSig7"
@@ -54113,7 +60001,7 @@ var NotationEngine = (() => {
         description: "Time signature 7 (denominator)"
       },
       timeSig7Numerator: {
-        codepoint: "U+F5CC",
+        codepoint: "U+F5E1",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig7"
@@ -54121,7 +60009,7 @@ var NotationEngine = (() => {
         description: "Time signature 7 (numerator)"
       },
       timeSig7over8: {
-        codepoint: "U+F5F8",
+        codepoint: "U+F60D",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig7",
@@ -54131,7 +60019,7 @@ var NotationEngine = (() => {
         description: "7/8 time signature"
       },
       timeSig8Denominator: {
-        codepoint: "U+F5CD",
+        codepoint: "U+F5E2",
         componentGlyphs: [
           "timeSigCombDenominator",
           "timeSig8"
@@ -54139,7 +60027,7 @@ var NotationEngine = (() => {
         description: "Time signature 8 (denominator)"
       },
       timeSig8Numerator: {
-        codepoint: "U+F5CE",
+        codepoint: "U+F5E3",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig8"
@@ -54147,7 +60035,7 @@ var NotationEngine = (() => {
         description: "Time signature 8 (numerator)"
       },
       timeSig9Denominator: {
-        codepoint: "U+F5CF",
+        codepoint: "U+F5E4",
         componentGlyphs: [
           "timeSigCombDenominator",
           "timeSig9"
@@ -54155,7 +60043,7 @@ var NotationEngine = (() => {
         description: "Time signature 9 (denominator)"
       },
       timeSig9Numerator: {
-        codepoint: "U+F5D0",
+        codepoint: "U+F5E5",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig9"
@@ -54163,7 +60051,7 @@ var NotationEngine = (() => {
         description: "Time signature 9 (numerator)"
       },
       timeSig9over8: {
-        codepoint: "U+F5F9",
+        codepoint: "U+F60E",
         componentGlyphs: [
           "timeSigCombNumerator",
           "timeSig9",
@@ -54203,7 +60091,9 @@ var NotationEngine = (() => {
         description: "6-string tab clef (tall)"
       },
       accdnPushAlt: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F45B",
         description: "Push (Draugsvoll & H\xF8jsgaard)"
       },
@@ -54218,28 +60108,36 @@ var NotationEngine = (() => {
         description: "Double flat (joined stems)"
       },
       accidentalDoubleFlatParens: {
-        codepoint: "U+F5D9"
+        codepoint: "U+F5EE",
+        description: "Parenthesised double flat"
       },
       accidentalDoubleSharpParens: {
-        codepoint: "U+F5D8"
+        codepoint: "U+F5ED",
+        description: "Parenthesised double sharp"
       },
       accidentalFlatJohnstonDown: {
-        codepoint: "U+F5DF"
+        codepoint: "U+F5F4",
+        description: "Flat-down arrow"
       },
       accidentalFlatJohnstonEl: {
-        codepoint: "U+F5DD"
+        codepoint: "U+F5F2",
+        description: "Flat-inverted seven"
       },
       accidentalFlatJohnstonElDown: {
-        codepoint: "U+F5EB"
+        codepoint: "U+F600",
+        description: "Flat-inverted seven-down arrow"
       },
       accidentalFlatJohnstonUp: {
-        codepoint: "U+F5DE"
+        codepoint: "U+F5F3",
+        description: "Flat-up arrow"
       },
       accidentalFlatJohnstonUpEl: {
-        codepoint: "U+F5EA"
+        codepoint: "U+F5FF",
+        description: "Flat-up arrow-inverted seven"
       },
       accidentalFlatParens: {
-        codepoint: "U+F5D5"
+        codepoint: "U+F5EA",
+        description: "Parenthesised flat"
       },
       accidentalFlatSmall: {
         classes: [
@@ -54252,37 +60150,48 @@ var NotationEngine = (() => {
         description: "Flat (for small staves)"
       },
       accidentalJohnstonDownEl: {
-        codepoint: "U+F5E5"
+        codepoint: "U+F5FA",
+        description: "Down arrow-inverted seven"
       },
       accidentalJohnstonSevenDown: {
-        codepoint: "U+F5E3"
+        codepoint: "U+F5F8",
+        description: "Seven-down arrow"
       },
       accidentalJohnstonSevenFlat: {
-        codepoint: "U+F5E1"
+        codepoint: "U+F5F6",
+        description: "Seven-flat"
       },
       accidentalJohnstonSevenFlatDown: {
-        codepoint: "U+F5ED"
+        codepoint: "U+F602",
+        description: "Seven-flat-down arrow"
       },
       accidentalJohnstonSevenFlatUp: {
-        codepoint: "U+F5EC"
+        codepoint: "U+F601",
+        description: "Seven-flat-up arrow"
       },
       accidentalJohnstonSevenSharp: {
-        codepoint: "U+F5E0"
+        codepoint: "U+F5F5",
+        description: "Seven-sharp"
       },
       accidentalJohnstonSevenSharpDown: {
-        codepoint: "U+F5E9"
+        codepoint: "U+F5FE",
+        description: "Seven-sharp-down arrow"
       },
       accidentalJohnstonSevenSharpUp: {
-        codepoint: "U+F5E8"
+        codepoint: "U+F5FD",
+        description: "Seven-sharp-up arrow"
       },
       accidentalJohnstonSevenUp: {
-        codepoint: "U+F5E2"
+        codepoint: "U+F5F7",
+        description: "Seven-up arrow"
       },
       accidentalJohnstonUpEl: {
-        codepoint: "U+F5E4"
+        codepoint: "U+F5F9",
+        description: "Up arrow-inverted seven"
       },
       accidentalNaturalParens: {
-        codepoint: "U+F5D6"
+        codepoint: "U+F5EB",
+        description: "Parenthesised natural"
       },
       accidentalNaturalSmall: {
         classes: [
@@ -54296,22 +60205,28 @@ var NotationEngine = (() => {
         description: "Natural (for small staves)"
       },
       accidentalSharpJohnstonDown: {
-        codepoint: "U+F5DC"
+        codepoint: "U+F5F1",
+        description: "Sharp-down arrow"
       },
       accidentalSharpJohnstonDownEl: {
-        codepoint: "U+F5E7"
+        codepoint: "U+F5FC",
+        description: "Sharp-down arrow-inverted seven"
       },
       accidentalSharpJohnstonEl: {
-        codepoint: "U+F5DA"
+        codepoint: "U+F5EF",
+        description: "Sharp-inverted seven"
       },
       accidentalSharpJohnstonUp: {
-        codepoint: "U+F5DB"
+        codepoint: "U+F5F0",
+        description: "Sharp-up arrow"
       },
       accidentalSharpJohnstonUpEl: {
-        codepoint: "U+F5E6"
+        codepoint: "U+F5FB",
+        description: "Sharp-up arrow-inverted seven"
       },
       accidentalSharpParens: {
-        codepoint: "U+F5D7"
+        codepoint: "U+F5EC",
+        description: "Parenthesised sharp"
       },
       accidentalSharpSmall: {
         classes: [
@@ -54346,6 +60261,15 @@ var NotationEngine = (() => {
         codepoint: "U+F42A",
         description: "Large accent above"
       },
+      articAccentAboveRossini: {
+        classes: [
+          "articulations",
+          "articulationsAbove",
+          "combiningStaffPositions"
+        ],
+        codepoint: "U+F532",
+        description: "Accent above (Rossini)"
+      },
       articAccentAboveSmall: {
         classes: [
           "articulations",
@@ -54363,6 +60287,15 @@ var NotationEngine = (() => {
         ],
         codepoint: "U+F42B",
         description: "Large accent below"
+      },
+      articAccentBelowRossini: {
+        classes: [
+          "articulations",
+          "articulationsBelow",
+          "combiningStaffPositions"
+        ],
+        codepoint: "U+F533",
+        description: "Accent below (Rossini)"
       },
       articAccentBelowSmall: {
         classes: [
@@ -54632,62 +60565,86 @@ var NotationEngine = (() => {
         description: "Coda (Japanese style, serif)"
       },
       csymAccidentalDoubleFlatSmall: {
-        classes: [],
+        classes: [
+          "tf_chordSymbolAccidentals"
+        ],
         codepoint: "U+F4E0",
         description: "Double flat (superscript or subscript)"
       },
       csymAccidentalDoubleSharpSmall: {
-        classes: [],
+        classes: [
+          "tf_chordSymbolAccidentals"
+        ],
         codepoint: "U+F4DF",
         description: "Double sharp (superscript or subscript)"
       },
       csymAccidentalFlatSmall: {
-        classes: [],
+        classes: [
+          "tf_chordSymbolAccidentals"
+        ],
         codepoint: "U+F4DC",
         description: "Flat (superscript or subscript)"
       },
       csymAccidentalNaturalSmall: {
-        classes: [],
+        classes: [
+          "tf_chordSymbolAccidentals"
+        ],
         codepoint: "U+F4DD",
         description: "Natural (superscript or subscript)"
       },
       csymAccidentalSharpSmall: {
-        classes: [],
+        classes: [
+          "tf_chordSymbolAccidentals"
+        ],
         codepoint: "U+F4DE",
         description: "Sharp (superscript or subscript)"
       },
       csymAccidentalTripleFlatSmall: {
-        classes: [],
+        classes: [
+          "tf_chordSymbolAccidentals"
+        ],
         codepoint: "U+F4E2",
         description: "Triple flat (superscript or subscript)"
       },
       csymAccidentalTripleSharpSmall: {
-        classes: [],
+        classes: [
+          "tf_chordSymbolAccidentals"
+        ],
         codepoint: "U+F4E1",
         description: "Triple sharp (superscript or subscript)"
       },
       csymAugmentedSmall: {
-        classes: [],
+        classes: [
+          "tf_chordSymbols"
+        ],
         codepoint: "U+F4D9",
         description: "Augmented (subscript or superscript)"
       },
       csymDiminishedSmall: {
-        classes: [],
+        classes: [
+          "tf_chordSymbols"
+        ],
         codepoint: "U+F4D8",
         description: "Diminished (subscript or superscript)"
       },
       csymHalfDiminishedSmall: {
-        classes: [],
+        classes: [
+          "tf_chordSymbols"
+        ],
         codepoint: "U+F4D7",
         description: "Half-diminished (subscript or superscript)"
       },
       csymMajorSeventhSmall: {
-        classes: [],
+        classes: [
+          "tf_chordSymbols"
+        ],
         codepoint: "U+F4DA",
         description: "Major seventh (subscript or superscript)"
       },
       csymMinorSmall: {
-        classes: [],
+        classes: [
+          "tf_chordSymbols"
+        ],
         codepoint: "U+F4DB",
         description: "Minor (subscript or superscript)"
       },
@@ -54759,7 +60716,8 @@ var NotationEngine = (() => {
         description: "F clef (19th century)"
       },
       fClef5Below: {
-        codepoint: "U+F532"
+        codepoint: "U+F547",
+        description: "F clef, 5 below"
       },
       fClefFrench: {
         classes: [
@@ -54779,35 +60737,40 @@ var NotationEngine = (() => {
       },
       figbassDoubleFlatLongerStem: {
         classes: [
-          "figuredBass"
+          "figuredBass",
+          "tf_figuredBass"
         ],
         codepoint: "U+F52B",
         description: "Figured bass double flat (longer stem)"
       },
       figbassDoubleSharpLongerStem: {
         classes: [
-          "figuredBass"
+          "figuredBass",
+          "tf_figuredBass"
         ],
         codepoint: "U+F52F",
         description: "Figured bass double sharp (longer stem)"
       },
       figbassFlatLongerStem: {
         classes: [
-          "figuredBass"
+          "figuredBass",
+          "tf_figuredBass"
         ],
         codepoint: "U+F52C",
         description: "Figured bass flat (longer stem)"
       },
       figbassNaturalLongerStem: {
         classes: [
-          "figuredBass"
+          "figuredBass",
+          "tf_figuredBass"
         ],
         codepoint: "U+F52D",
         description: "Figured bass natural (longer stem)"
       },
       figbassSharpLongerStem: {
         classes: [
-          "figuredBass"
+          "figuredBass",
+          "tf_figuredBass"
         ],
         codepoint: "U+F52E",
         description: "Figured bass sharp (longer stem)"
@@ -55107,187 +61070,256 @@ var NotationEngine = (() => {
         description: "Combining flag 1 (8th) above (straight)"
       },
       gClef0Below: {
-        codepoint: "U+F533"
+        codepoint: "U+F548",
+        description: "G clef, 0 below"
       },
       gClef10Below: {
-        codepoint: "U+F534"
+        codepoint: "U+F549",
+        description: "G clef, 10 below"
       },
       gClef11Below: {
-        codepoint: "U+F535"
+        codepoint: "U+F54A",
+        description: "G clef, 11 below"
       },
       gClef12Below: {
-        codepoint: "U+F536"
+        codepoint: "U+F54B",
+        description: "G clef, 12 below"
       },
       gClef13Below: {
-        codepoint: "U+F537"
+        codepoint: "U+F54C",
+        description: "G clef, 13 below"
       },
       gClef14Below: {
-        codepoint: "U+F538"
+        codepoint: "U+F54D",
+        description: "G clef, 14 below"
       },
       gClef15Below: {
-        codepoint: "U+F539"
+        codepoint: "U+F54E",
+        description: "G clef, 15 below"
       },
       gClef16Below: {
-        codepoint: "U+F53A"
+        codepoint: "U+F54F",
+        description: "G clef, 16 below"
       },
       gClef17Below: {
-        codepoint: "U+F53B"
+        codepoint: "U+F550",
+        description: "G clef, 17 below"
       },
       gClef2Above: {
-        codepoint: "U+F53C"
+        codepoint: "U+F551",
+        description: "G clef, 2 above"
       },
       gClef2Below: {
-        codepoint: "U+F53D"
+        codepoint: "U+F552",
+        description: "G clef, 2 below"
       },
       gClef3Above: {
-        codepoint: "U+F53E"
+        codepoint: "U+F553",
+        description: "G clef, 3 above"
       },
       gClef3Below: {
-        codepoint: "U+F53F"
+        codepoint: "U+F554",
+        description: "G clef, 3 below"
       },
       gClef4Above: {
-        codepoint: "U+F540"
+        codepoint: "U+F555",
+        description: "G clef, 4 above"
       },
       gClef4Below: {
-        codepoint: "U+F541"
+        codepoint: "U+F556",
+        description: "G clef, 4 below"
       },
       gClef5Above: {
-        codepoint: "U+F542"
+        codepoint: "U+F557",
+        description: "G clef, 5 above"
       },
       gClef5Below: {
-        codepoint: "U+F543"
+        codepoint: "U+F558",
+        description: "G clef, 5 below"
       },
       gClef6Above: {
-        codepoint: "U+F544"
+        codepoint: "U+F559",
+        description: "G clef, 6 above"
       },
       gClef6Below: {
-        codepoint: "U+F545"
+        codepoint: "U+F55A",
+        description: "G clef, 6 below"
       },
       gClef7Above: {
-        codepoint: "U+F546"
+        codepoint: "U+F55B",
+        description: "G clef, 7 above"
       },
       gClef7Below: {
-        codepoint: "U+F547"
+        codepoint: "U+F55C",
+        description: "G clef, 7 below"
       },
       gClef8Above: {
-        codepoint: "U+F548"
+        codepoint: "U+F55D",
+        description: "G clef, 8 above"
       },
       gClef8Below: {
-        codepoint: "U+F549"
+        codepoint: "U+F55E",
+        description: "G clef, 8 below"
+      },
+      gClef8vbFrench: {
+        classes: [
+          "clefs",
+          "clefsG"
+        ],
+        codepoint: "U+F53D",
+        description: "G clef ottava bassa (French, 18th century)"
       },
       gClef9Above: {
-        codepoint: "U+F54A"
+        codepoint: "U+F55F",
+        description: "G clef, 9 above"
       },
       gClef9Below: {
-        codepoint: "U+F54B"
+        codepoint: "U+F560",
+        description: "G clef, 9 below"
       },
       gClefFlat10Below: {
-        codepoint: "U+F54C"
+        codepoint: "U+F561",
+        description: "G clef, flat 10 below"
       },
       gClefFlat11Below: {
-        codepoint: "U+F54D"
+        codepoint: "U+F562",
+        description: "G clef, flat 11 below"
       },
       gClefFlat13Below: {
-        codepoint: "U+F54E"
+        codepoint: "U+F563",
+        description: "G clef, flat 13 below"
       },
       gClefFlat14Below: {
-        codepoint: "U+F54F"
+        codepoint: "U+F564",
+        description: "G clef, flat 14 below"
       },
       gClefFlat15Below: {
-        codepoint: "U+F550"
+        codepoint: "U+F565",
+        description: "G clef, flat 15 below"
       },
       gClefFlat16Below: {
-        codepoint: "U+F551"
+        codepoint: "U+F566",
+        description: "G clef, flat 16 below"
       },
       gClefFlat1Below: {
-        codepoint: "U+F552"
+        codepoint: "U+F567",
+        description: "G clef, flat 1 below"
       },
       gClefFlat2Above: {
-        codepoint: "U+F553"
+        codepoint: "U+F568",
+        description: "G clef, flat 2 above"
       },
       gClefFlat2Below: {
-        codepoint: "U+F554"
+        codepoint: "U+F569",
+        description: "G clef, flat 2 below"
       },
       gClefFlat3Above: {
-        codepoint: "U+F555"
+        codepoint: "U+F56A",
+        description: "G clef, flat 3 above"
       },
       gClefFlat3Below: {
-        codepoint: "U+F556"
+        codepoint: "U+F56B",
+        description: "G clef, flat 3 below"
       },
       gClefFlat4Below: {
-        codepoint: "U+F557"
+        codepoint: "U+F56C",
+        description: "G clef, flat 4 below"
       },
       gClefFlat5Above: {
-        codepoint: "U+F558"
+        codepoint: "U+F56D",
+        description: "G clef, flat 5 above"
       },
       gClefFlat6Above: {
-        codepoint: "U+F559"
+        codepoint: "U+F56E",
+        description: "G clef, flat 6 above"
       },
       gClefFlat6Below: {
-        codepoint: "U+F55A"
+        codepoint: "U+F56F",
+        description: "G clef, flat 6 below"
       },
       gClefFlat7Above: {
-        codepoint: "U+F55B"
+        codepoint: "U+F570",
+        description: "G clef, flat 7 above"
       },
       gClefFlat7Below: {
-        codepoint: "U+F55C"
+        codepoint: "U+F571",
+        description: "G clef, flat 7 below"
       },
       gClefFlat8Above: {
-        codepoint: "U+F55D"
+        codepoint: "U+F572",
+        description: "G clef, flat 8 above"
       },
       gClefFlat9Above: {
-        codepoint: "U+F55E"
+        codepoint: "U+F573",
+        description: "G clef, flat 9 above"
       },
       gClefFlat9Below: {
-        codepoint: "U+F55F"
+        codepoint: "U+F574",
+        description: "G clef, flat 9 below"
       },
       gClefNat2Below: {
-        codepoint: "U+F560"
+        codepoint: "U+F575",
+        description: "G clef, natural 2 below"
       },
       gClefNatural10Below: {
-        codepoint: "U+F561"
+        codepoint: "U+F576",
+        description: "G clef, natural 10 below"
       },
       gClefNatural13Below: {
-        codepoint: "U+F562"
+        codepoint: "U+F577",
+        description: "G clef, natural 13 below"
       },
       gClefNatural17Below: {
-        codepoint: "U+F563"
+        codepoint: "U+F578",
+        description: "G clef, natural 17 below"
       },
       gClefNatural2Above: {
-        codepoint: "U+F564"
+        codepoint: "U+F579",
+        description: "G clef, natural 2 above"
       },
       gClefNatural3Above: {
-        codepoint: "U+F565"
+        codepoint: "U+F57A",
+        description: "G clef, natural 3 above"
       },
       gClefNatural3Below: {
-        codepoint: "U+F566"
+        codepoint: "U+F57B",
+        description: "G clef, natural 3 below"
       },
       gClefNatural6Above: {
-        codepoint: "U+F567"
+        codepoint: "U+F57C",
+        description: "G clef, natural 6 above"
       },
       gClefNatural6Below: {
-        codepoint: "U+F568"
+        codepoint: "U+F57D",
+        description: "G clef, natural 6 below"
       },
       gClefNatural7Above: {
-        codepoint: "U+F569"
+        codepoint: "U+F57E",
+        description: "G clef, natural 7 above"
       },
       gClefNatural9Above: {
-        codepoint: "U+F56A"
+        codepoint: "U+F57F",
+        description: "G clef, natural 9 above"
       },
       gClefNatural9Below: {
-        codepoint: "U+F56B"
+        codepoint: "U+F580",
+        description: "G clef, natural 9 below"
       },
       gClefSharp12Below: {
-        codepoint: "U+F56C"
+        codepoint: "U+F581",
+        description: "G clef, sharp 12 below"
       },
       gClefSharp1Above: {
-        codepoint: "U+F56D"
+        codepoint: "U+F582",
+        description: "G clef, sharp 1 above"
       },
       gClefSharp4Above: {
-        codepoint: "U+F56E"
+        codepoint: "U+F583",
+        description: "G clef, sharp 4 above"
       },
       gClefSharp5Below: {
-        codepoint: "U+F56F"
+        codepoint: "U+F584",
+        description: "G clef, sharp 5 below"
       },
       gClefSmall: {
         classes: [
@@ -55307,6 +61339,11 @@ var NotationEngine = (() => {
         codepoint: "U+F4B8",
         description: "Golpe (tapping the pick guard) (Vounelakos)"
       },
+      guitarVibratoBarScoopCurved: {
+        classes: [],
+        codepoint: "U+F546",
+        description: "Guitar vibrato bar scoop (curved)"
+      },
       harpMetalRodAlt: {
         classes: [],
         codepoint: "U+F436",
@@ -55318,12 +61355,16 @@ var NotationEngine = (() => {
         description: "Tuning key pictogram (alternative)"
       },
       keyboardPedalPedNoDot: {
-        classes: [],
+        classes: [
+          "tf_pedals"
+        ],
         codepoint: "U+F434",
         description: "Pedal mark (no dot)"
       },
       keyboardPedalSostNoDot: {
-        classes: [],
+        classes: [
+          "tf_pedals"
+        ],
         codepoint: "U+F435",
         description: "Sostenuto pedal mark (no dot)"
       },
@@ -55422,184 +61463,244 @@ var NotationEngine = (() => {
         description: "Void mensural C clef"
       },
       mensuralFusaBlackStemDown: {
-        codepoint: "U+F570"
+        codepoint: "U+F585",
+        description: "Fusa black, stem down"
       },
       mensuralFusaBlackStemUp: {
-        codepoint: "U+F571"
+        codepoint: "U+F586",
+        description: "Fusa black, stem up"
       },
       mensuralFusaBlackVoidStemDown: {
-        codepoint: "U+F572"
+        codepoint: "U+F587",
+        description: "Fusa black and void, stem down"
       },
       mensuralFusaBlackVoidStemUp: {
-        codepoint: "U+F573"
+        codepoint: "U+F588",
+        description: "Fusa black and void, stem up"
       },
       mensuralFusaVoidStemDown: {
-        codepoint: "U+F574"
+        codepoint: "U+F589",
+        description: "Fusa void, stem down"
       },
       mensuralFusaVoidStemUp: {
-        codepoint: "U+F575"
+        codepoint: "U+F58A",
+        description: "Fusa void, stem up"
       },
       mensuralLongaBlackStemDownLeft: {
-        codepoint: "U+F576"
+        codepoint: "U+F58B",
+        description: "Longa black, stem down left"
       },
       mensuralLongaBlackStemDownRight: {
-        codepoint: "U+F577"
+        codepoint: "U+F58C",
+        description: "Longa black, stem down right"
       },
       mensuralLongaBlackStemUpLeft: {
-        codepoint: "U+F578"
+        codepoint: "U+F58D",
+        description: "Longa black, stem up left"
       },
       mensuralLongaBlackStemUpRight: {
-        codepoint: "U+F579"
+        codepoint: "U+F58E",
+        description: "Longa black, stem up right"
       },
       mensuralLongaBlackVoidStemDownLeft: {
-        codepoint: "U+F57A"
+        codepoint: "U+F58F",
+        description: "Longa black and void, stem down left"
       },
       mensuralLongaBlackVoidStemDownRight: {
-        codepoint: "U+F57B"
+        codepoint: "U+F590",
+        description: "Longa black and void, stem down right"
       },
       mensuralLongaBlackVoidStemUpLeft: {
-        codepoint: "U+F57C"
+        codepoint: "U+F591",
+        description: "Longa black and void, stem up left"
       },
       mensuralLongaBlackVoidStemUpRight: {
-        codepoint: "U+F57D"
+        codepoint: "U+F592",
+        description: "Longa black and void, stem up right"
       },
       mensuralLongaVoidStemDownLeft: {
-        codepoint: "U+F57E"
+        codepoint: "U+F593",
+        description: "Longa void, stem down left"
       },
       mensuralLongaVoidStemDownRight: {
-        codepoint: "U+F57F"
+        codepoint: "U+F594",
+        description: "Longa void, stem down right"
       },
       mensuralLongaVoidStemUpLeft: {
-        codepoint: "U+F580"
+        codepoint: "U+F595",
+        description: "Longa void, stem up left"
       },
       mensuralLongaVoidStemUpRight: {
-        codepoint: "U+F581"
+        codepoint: "U+F596",
+        description: "Longa void, stem up right"
       },
       mensuralMaximaBlackStemDownLeft: {
-        codepoint: "U+F582"
+        codepoint: "U+F597",
+        description: "Maxima black, stem down left"
       },
       mensuralMaximaBlackStemDownRight: {
-        codepoint: "U+F583"
+        codepoint: "U+F598",
+        description: "Maxima black, stem down right"
       },
       mensuralMaximaBlackStemUpLeft: {
-        codepoint: "U+F584"
+        codepoint: "U+F599",
+        description: "Maxima black, stem up left"
       },
       mensuralMaximaBlackStemUpRight: {
-        codepoint: "U+F585"
+        codepoint: "U+F59A",
+        description: "Maxima black, stem up right"
       },
       mensuralMaximaBlackVoidStemDownLeft: {
-        codepoint: "U+F586"
+        codepoint: "U+F59B",
+        description: "Maxima black and void, stem down left"
       },
       mensuralMaximaBlackVoidStemDownRight: {
-        codepoint: "U+F587"
+        codepoint: "U+F59C",
+        description: "Maxima black and void, stem down right"
       },
       mensuralMaximaBlackVoidStemUpLeft: {
-        codepoint: "U+F588"
+        codepoint: "U+F59D",
+        description: "Maxima black and void, stem up left"
       },
       mensuralMaximaBlackVoidStemUpRight: {
-        codepoint: "U+F589"
+        codepoint: "U+F59E",
+        description: "Maxima black and void, stem up right"
       },
       mensuralMaximaVoidStemDownLeft: {
-        codepoint: "U+F58A"
+        codepoint: "U+F59F",
+        description: "Maxima void, stem down left"
       },
       mensuralMaximaVoidStemDownRight: {
-        codepoint: "U+F58B"
+        codepoint: "U+F5A0",
+        description: "Maxima void, stem down right"
       },
       mensuralMaximaVoidStemUpLeft: {
-        codepoint: "U+F58C"
+        codepoint: "U+F5A1",
+        description: "Maxima void, stem up left"
       },
       mensuralMaximaVoidStemUpRight: {
-        codepoint: "U+F58D"
+        codepoint: "U+F5A2",
+        description: "Maxima void, stem up right"
       },
       mensuralMinimaBlackStemDown: {
-        codepoint: "U+F58E"
+        codepoint: "U+F5A3",
+        description: "Minima black, stem down"
       },
       mensuralMinimaBlackStemDownExtendedFlag: {
-        codepoint: "U+F58F"
+        codepoint: "U+F5A4",
+        description: "Minima black, stem down with extended flag"
       },
       mensuralMinimaBlackStemDownFlagLeft: {
-        codepoint: "U+F590"
+        codepoint: "U+F5A5",
+        description: "Minima black, stem down with flag left"
       },
       mensuralMinimaBlackStemDownFlagRight: {
-        codepoint: "U+F591"
+        codepoint: "U+F5A6",
+        description: "Minima black, stem down with flag right"
       },
       mensuralMinimaBlackStemDownFlaredFlag: {
-        codepoint: "U+F592"
+        codepoint: "U+F5A7",
+        description: "Minima black, stem down with flared flag"
       },
       mensuralMinimaBlackStemUp: {
-        codepoint: "U+F593"
+        codepoint: "U+F5A8",
+        description: "Minima black, stem up"
       },
       mensuralMinimaBlackStemUpExtendedFlag: {
-        codepoint: "U+F594"
+        codepoint: "U+F5A9",
+        description: "Minima black, stem up with extended flag"
       },
       mensuralMinimaBlackStemUpFlagLeft: {
-        codepoint: "U+F595"
+        codepoint: "U+F5AA",
+        description: "Minima black, stem up with flag left"
       },
       mensuralMinimaBlackStemUpFlagRight: {
-        codepoint: "U+F596"
+        codepoint: "U+F5AB",
+        description: "Minima black, stem up with flag right"
       },
       mensuralMinimaBlackStemUpFlaredFlag: {
-        codepoint: "U+F597"
+        codepoint: "U+F5AC",
+        description: "Minima black, stem up with flared flag"
       },
       mensuralMinimaBlackVoidStemDown: {
-        codepoint: "U+F598"
+        codepoint: "U+F5AD",
+        description: "Minima black and void, stem down"
       },
       mensuralMinimaBlackVoidStemDownExtendedFlag: {
-        codepoint: "U+F599"
+        codepoint: "U+F5AE",
+        description: "Minima black and void, stem down with extended flag"
       },
       mensuralMinimaBlackVoidStemDownFlagLeft: {
-        codepoint: "U+F59A"
+        codepoint: "U+F5AF",
+        description: "Minima black and void, stem down with flag left"
       },
       mensuralMinimaBlackVoidStemDownFlagRight: {
-        codepoint: "U+F59B"
+        codepoint: "U+F5B0",
+        description: "Minima black and void, stem down with flag right"
       },
       mensuralMinimaBlackVoidStemDownFlaredFlag: {
-        codepoint: "U+F59C"
+        codepoint: "U+F5B1",
+        description: "Minima black and void, stem down with flared flag"
       },
       mensuralMinimaBlackVoidStemUp: {
-        codepoint: "U+F59D"
+        codepoint: "U+F5B2",
+        description: "Minima black and void, stem up"
       },
       mensuralMinimaBlackVoidStemUpExtendedFlag: {
-        codepoint: "U+F59E"
+        codepoint: "U+F5B3",
+        description: "Minima black and void, stem up with extended flag"
       },
       mensuralMinimaBlackVoidStemUpFlagLeft: {
-        codepoint: "U+F59F"
+        codepoint: "U+F5B4",
+        description: "Minima black and void, stem up with flag left"
       },
       mensuralMinimaBlackVoidStemUpFlagRight: {
-        codepoint: "U+F5A0"
+        codepoint: "U+F5B5",
+        description: "Minima black and void, stem up with flag right"
       },
       mensuralMinimaBlackVoidStemUpFlaredFlag: {
-        codepoint: "U+F5A1"
+        codepoint: "U+F5B6",
+        description: "Minima black and void, stem up with flared flag"
       },
       mensuralMinimaVoidStemDown: {
-        codepoint: "U+F5A2"
+        codepoint: "U+F5B7",
+        description: "Minima void, stem down"
       },
       mensuralMinimaVoidStemDownExtendedFlag: {
-        codepoint: "U+F5A3"
+        codepoint: "U+F5B8",
+        description: "Minima void, stem down with extended flag"
       },
       mensuralMinimaVoidStemDownFlagLeft: {
-        codepoint: "U+F5A4"
+        codepoint: "U+F5B9",
+        description: "Minima void, stem down with flag left"
       },
       mensuralMinimaVoidStemDownFlagRight: {
-        codepoint: "U+F5A5"
+        codepoint: "U+F5BA",
+        description: "Minima void, stem down with flag right"
       },
       mensuralMinimaVoidStemDownFlaredFlag: {
-        codepoint: "U+F5A6"
+        codepoint: "U+F5BB",
+        description: "Minima void, stem down with flared flag"
       },
       mensuralMinimaVoidStemUp: {
-        codepoint: "U+F5A8"
+        codepoint: "U+F5BD",
+        description: "Minima void, stem up"
       },
       mensuralMinimaVoidStemUpExtendedFlag: {
-        codepoint: "U+F5A7"
+        codepoint: "U+F5BC",
+        description: "Minima void, stem up with extended flag"
       },
       mensuralMinimaVoidStemUpFlagLeft: {
-        codepoint: "U+F5A9"
+        codepoint: "U+F5BE",
+        description: "Minima void, stem up with flag left"
       },
       mensuralMinimaVoidStemUpFlagRight: {
-        codepoint: "U+F5AA"
+        codepoint: "U+F5BF",
+        description: "Minima void, stem up with flag right"
       },
       mensuralMinimaVoidStemUpFlaredFlag: {
-        codepoint: "U+F5AB"
+        codepoint: "U+F5C0",
+        description: "Minima void, stem up with flared flag"
       },
       mensuralProportion4Old: {
         classes: [
@@ -55609,22 +61710,28 @@ var NotationEngine = (() => {
         description: "Mensural proportion 4 (old)"
       },
       mensuralSemiminimaBlackStemDown: {
-        codepoint: "U+F5AC"
+        codepoint: "U+F5C1",
+        description: "Semiminima black, stem down"
       },
       mensuralSemiminimaBlackStemUp: {
-        codepoint: "U+F5AD"
+        codepoint: "U+F5C2",
+        description: "Semiminima black, stem up"
       },
       mensuralSemiminimaBlackVoidStemDown: {
-        codepoint: "U+F5AE"
+        codepoint: "U+F5C3",
+        description: "Semiminima black and void, stem down"
       },
       mensuralSemiminimaBlackVoidStemUp: {
-        codepoint: "U+F5AF"
+        codepoint: "U+F5C4",
+        description: "Semiminima black and void, stem up"
       },
       mensuralSemiminimaVoidStemDown: {
-        codepoint: "U+F5B0"
+        codepoint: "U+F5C5",
+        description: "Semiminima void, stem down"
       },
       mensuralSemiminimaVoidStemUp: {
-        codepoint: "U+F5B1"
+        codepoint: "U+F5C6",
+        description: "Semiminima void, stem up"
       },
       noteDoubleWholeAlt: {
         classes: [
@@ -55634,23 +61741,69 @@ var NotationEngine = (() => {
         codepoint: "U+F40E",
         description: "Double whole note (breve), single vertical strokes"
       },
+      noteLoBlack: {
+        classes: [],
+        codepoint: "U+F539",
+        description: "Lo (black note)"
+      },
+      noteLoHalf: {
+        classes: [],
+        codepoint: "U+F538",
+        description: "Lo (half note)"
+      },
+      noteLoWhole: {
+        classes: [],
+        codepoint: "U+F537",
+        description: "Lo (whole note)"
+      },
+      noteMaBlack: {
+        classes: [],
+        codepoint: "U+F536",
+        description: "Ma (black note)"
+      },
+      noteMaHalf: {
+        classes: [],
+        codepoint: "U+F535",
+        description: "Ma (half note)"
+      },
+      noteMaWhole: {
+        classes: [],
+        codepoint: "U+F534",
+        description: "Ma (whole note)"
+      },
+      noteTaBlack: {
+        classes: [],
+        codepoint: "U+F53C",
+        description: "Ta (black note)"
+      },
+      noteTaHalf: {
+        classes: [],
+        codepoint: "U+F53B",
+        description: "Ta (half note)"
+      },
+      noteTaWhole: {
+        classes: [],
+        codepoint: "U+F53A",
+        description: "Ta (whole note)"
+      },
       noteheadBlackOversized: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
-          "noteheadSetDefault"
+          "noteheadSetDefault",
+          "noteheads"
         ],
         codepoint: "U+F4BE",
         description: "Black notehead (oversized)"
       },
       noteheadBlackParens: {
-        codepoint: "U+F5D1"
+        codepoint: "U+F5E6",
+        description: "Parenthesised black notehead"
       },
       noteheadBlackSmall: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
-          "noteheadSetDefault"
+          "noteheadSetDefault",
+          "noteheads"
         ],
         codepoint: "U+F46A",
         description: "Black notehead (small staff)"
@@ -55658,8 +61811,8 @@ var NotationEngine = (() => {
       noteheadDoubleWholeAlt: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
-          "noteheadSetDefault"
+          "noteheadSetDefault",
+          "noteheads"
         ],
         codepoint: "U+F43F",
         description: "Double whole note (breve), single vertical strokes"
@@ -55667,20 +61820,21 @@ var NotationEngine = (() => {
       noteheadDoubleWholeOversized: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
-          "noteheadSetDefault"
+          "noteheadSetDefault",
+          "noteheads"
         ],
         codepoint: "U+F4BA",
         description: "Double whole note (breve) (oversized)"
       },
       noteheadDoubleWholeParens: {
-        codepoint: "U+F5D4"
+        codepoint: "U+F5E9",
+        description: "Parenthesised double whole (breve) notehead"
       },
       noteheadDoubleWholeSmall: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
-          "noteheadSetDefault"
+          "noteheadSetDefault",
+          "noteheads"
         ],
         codepoint: "U+F467",
         description: "Double whole note (breve) (small staff)"
@@ -55688,8 +61842,8 @@ var NotationEngine = (() => {
       noteheadDoubleWholeSquareOversized: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
-          "noteheadSetDefault"
+          "noteheadSetDefault",
+          "noteheads"
         ],
         codepoint: "U+F4BB",
         description: "Double whole note (breve) notehead (square) (oversized)"
@@ -55697,20 +61851,21 @@ var NotationEngine = (() => {
       noteheadHalfOversized: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
-          "noteheadSetDefault"
+          "noteheadSetDefault",
+          "noteheads"
         ],
         codepoint: "U+F4BD",
         description: "Half (minim) notehead (oversized)"
       },
       noteheadHalfParens: {
-        codepoint: "U+F5D2"
+        codepoint: "U+F5E7",
+        description: "Parenthesised half notehead"
       },
       noteheadHalfSmall: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
-          "noteheadSetDefault"
+          "noteheadSetDefault",
+          "noteheads"
         ],
         codepoint: "U+F469",
         description: "Half (minim) notehead (small staff)"
@@ -55718,9 +61873,9 @@ var NotationEngine = (() => {
       noteheadSlashDiamondWhiteOversized: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
           "noteheadSetSlashHorizontalEnds",
-          "noteheadSetSlashVerticalEnds"
+          "noteheadSetSlashVerticalEnds",
+          "noteheads"
         ],
         codepoint: "U+F4E7",
         description: "Oversized large white diamond"
@@ -55728,8 +61883,8 @@ var NotationEngine = (() => {
       noteheadSlashHorizontalEndsMutedOversized: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
-          "noteheadSetSlashHorizontalEnds"
+          "noteheadSetSlashHorizontalEnds",
+          "noteheads"
         ],
         codepoint: "U+F4EB",
         description: "Oversized muted slash with horizontal ends"
@@ -55737,8 +61892,8 @@ var NotationEngine = (() => {
       noteheadSlashHorizontalEndsOversized: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
-          "noteheadSetSlashHorizontalEnds"
+          "noteheadSetSlashHorizontalEnds",
+          "noteheads"
         ],
         codepoint: "U+F4E4",
         description: "Oversized slash with horizontal ends"
@@ -55746,8 +61901,8 @@ var NotationEngine = (() => {
       noteheadSlashVerticalEndsMutedOversized: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
-          "noteheadSetSlashVerticalEnds"
+          "noteheadSetSlashVerticalEnds",
+          "noteheads"
         ],
         codepoint: "U+F4EA",
         description: "Oversized muted slash with vertical ends"
@@ -55755,8 +61910,8 @@ var NotationEngine = (() => {
       noteheadSlashVerticalEndsOversized: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
-          "noteheadSetSlashVerticalEnds"
+          "noteheadSetSlashVerticalEnds",
+          "noteheads"
         ],
         codepoint: "U+F4E3",
         description: "Oversized slash with vertical ends"
@@ -55764,16 +61919,16 @@ var NotationEngine = (() => {
       noteheadSlashVerticalEndsSmallOversized: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
-          "noteheadSetSlashVerticalEnds"
+          "noteheadSetSlashVerticalEnds",
+          "noteheads"
         ],
         codepoint: "U+F4E8",
         description: "Oversized small slash with vertical ends"
       },
       noteheadSlashWhiteDoubleWholeOversized: {
         classes: [
-          "noteheads",
-          "noteheadSetSlashHorizontalEnds"
+          "noteheadSetSlashHorizontalEnds",
+          "noteheads"
         ],
         codepoint: "U+F4ED",
         description: "Oversized white slash double whole"
@@ -55781,9 +61936,9 @@ var NotationEngine = (() => {
       noteheadSlashWhiteHalfOversized: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
           "noteheadSetSlashHorizontalEnds",
-          "noteheadSetSlashVerticalEnds"
+          "noteheadSetSlashVerticalEnds",
+          "noteheads"
         ],
         codepoint: "U+F4E6",
         description: "Oversized white slash half"
@@ -55791,9 +61946,9 @@ var NotationEngine = (() => {
       noteheadSlashWhiteMutedOversized: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
           "noteheadSetSlashHorizontalEnds",
-          "noteheadSetSlashVerticalEnds"
+          "noteheadSetSlashVerticalEnds",
+          "noteheads"
         ],
         codepoint: "U+F4EC",
         description: "Oversized muted white slash"
@@ -55809,8 +61964,8 @@ var NotationEngine = (() => {
       noteheadSlashXOversized: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
-          "noteheadSetSlashHorizontalEnds"
+          "noteheadSetSlashHorizontalEnds",
+          "noteheads"
         ],
         codepoint: "U+F4E9",
         description: "Oversized large X notehead"
@@ -55818,184 +61973,248 @@ var NotationEngine = (() => {
       noteheadWholeOversized: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
-          "noteheadSetDefault"
+          "noteheadSetDefault",
+          "noteheads"
         ],
         codepoint: "U+F4BC",
         description: "Whole notehead (oversized)"
       },
       noteheadWholeParens: {
-        codepoint: "U+F5D3"
+        codepoint: "U+F5E8",
+        description: "Parenthesised whole (semibreve) notehead"
       },
       noteheadWholeSmall: {
         classes: [
           "combiningStaffPositions",
-          "noteheads",
-          "noteheadSetDefault"
+          "noteheadSetDefault",
+          "noteheads"
         ],
         codepoint: "U+F468",
         description: "Whole notehead (small staff)"
       },
       ornamentTrillFlatAbove: {
-        codepoint: "U+F5B2"
+        codepoint: "U+F5C7",
+        description: "Trill, flat above"
       },
       ornamentTrillNaturalAbove: {
-        codepoint: "U+F5B3"
+        codepoint: "U+F5C8",
+        description: "Trill, natural above"
       },
       ornamentTrillSharpAbove: {
-        codepoint: "U+F5B4"
+        codepoint: "U+F5C9",
+        description: "Trill, sharp above"
       },
       ornamentTurnFlatAbove: {
-        codepoint: "U+F5B5"
+        codepoint: "U+F5CA",
+        description: "Turn, flat above"
       },
       ornamentTurnFlatAboveSharpBelow: {
-        codepoint: "U+F5B6"
+        codepoint: "U+F5CB",
+        description: "Turn, flat above, sharp below"
       },
       ornamentTurnFlatBelow: {
-        codepoint: "U+F5B7"
+        codepoint: "U+F5CC",
+        description: "Turn, flat below"
       },
       ornamentTurnNaturalAbove: {
-        codepoint: "U+F5B8"
+        codepoint: "U+F5CD",
+        description: "Turn, natural above"
       },
       ornamentTurnNaturalBelow: {
-        codepoint: "U+F5B9"
+        codepoint: "U+F5CE",
+        description: "Turn, natural below"
       },
       ornamentTurnSharpAbove: {
-        codepoint: "U+F5BA"
+        codepoint: "U+F5CF",
+        description: "Turn, sharp above"
       },
       ornamentTurnSharpAboveFlatBelow: {
-        codepoint: "U+F5BB"
+        codepoint: "U+F5D0",
+        description: "Turn, sharp above, flat below"
       },
       ornamentTurnSharpBelow: {
-        codepoint: "U+F5BC"
+        codepoint: "U+F5D1",
+        description: "Turn, sharp below"
       },
       pictBassDrumPeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4AF",
         description: "Bass drum (Peinkofer/Tannigel)"
       },
       pictBongosPeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4B0",
         description: "Bongos (Peinkofer/Tannigel)"
       },
       pictCastanetsSmithBrindle: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F439",
         description: "Castanets (Smith Brindle)"
       },
       pictCongaPeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4B1",
         description: "Conga (Peinkofer/Tannigel)"
       },
       pictCowBellBerio: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F43B",
         description: "Cow bell (Berio)"
       },
       pictFlexatonePeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4B6",
         description: "Flexatone (Peinkofer/Tannigel)"
       },
       pictGlspPeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4AA",
         description: "Glockenspiel (Peinkofer/Tannigel)"
       },
       pictGuiroPeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4B5",
         description: "Guiro (Peinkofer/Tannigel)"
       },
       pictGuiroSevsay: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4B4",
         description: "Guiro (Sevsay)"
       },
       pictLithophonePeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4A7",
         description: "Lithophone (Peinkofer/Tannigel)"
       },
       pictLotusFlutePeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4AC",
         description: "Lotus flute (Peinkofer/Tannigel)"
       },
       pictMarPeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4AB",
         description: "Marimba (Peinkofer/Tannigel)"
       },
       pictMaracaSmithBrindle: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F43C",
         description: "Maraca (Smith Brindle)"
       },
       pictMusicalSawPeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4B7",
         description: "Musical saw (Peinkofer/Tannigel)"
       },
       pictSleighBellSmithBrindle: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F43A",
         description: "Sleigh bell (Smith Brindle)"
       },
       pictTambourineStockhausen: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F438",
         description: "Tambourine (Stockhausen)"
       },
       pictTimbalesPeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4B3",
         description: "Timbales (Peinkofer/Tannigel)"
       },
       pictTimpaniPeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4AE",
         description: "Timpani (Peinkofer/Tannigel)"
       },
       pictTomTomChinesePeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4AD",
         description: "Chinese tom-tom (Peinkofer/Tannigel)"
       },
       pictTomTomPeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4B2",
         description: "Tom-tom (Peinkofer/Tannigel)"
       },
       pictTubaphonePeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4A8",
         description: "Tubaphone (Peinkofer/Tannigel)"
       },
       pictVibMotorOffPeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4A6",
         description: "Metallophone (vibraphone motor off) (Peinkofer/Tannigel)"
       },
       pictVibPeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4A5",
         description: "Vibraphone (Peinkofer/Tannigel)"
       },
       pictXylBassPeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4A3",
         description: "Bass xylophone (Peinkofer/Tannigel)"
       },
       pictXylPeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4A9",
         description: "Xylophone (Peinkofer/Tannigel)"
       },
       pictXylTenorPeinkofer: {
-        classes: [],
+        classes: [
+          "tf_pictograms"
+        ],
         codepoint: "U+F4A4",
         description: "Tenor xylophone (Peinkofer/Tannigel)"
       },
@@ -56060,253 +62279,346 @@ var NotationEngine = (() => {
         description: "Change bow direction, indeterminate (Pricope)"
       },
       timeSig0Denominator: {
-        codepoint: "U+F5BD"
+        codepoint: "U+F5D2",
+        description: "Time signature 0 (denominator)"
       },
       timeSig0Large: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F440",
         description: "Time signature 0 (outside staff)"
       },
       timeSig0Narrow: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F506",
         description: "Time signature 0 (large, narrow)"
       },
       timeSig0Numerator: {
-        codepoint: "U+F5BE"
+        codepoint: "U+F5D3",
+        description: "Time signature 0 (numerator)"
       },
       timeSig0Small: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F45D",
         description: "Time signature 0 (small staff)"
       },
       timeSig12over8: {
-        codepoint: "U+F5FA"
+        codepoint: "U+F60F",
+        description: "12/8 time signature"
       },
       timeSig1Denominator: {
-        codepoint: "U+F5BF"
+        codepoint: "U+F5D4",
+        description: "Time signature 1 (denominator)"
       },
       timeSig1Large: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F441",
         description: "Time signature 1 (outside staff)"
       },
       timeSig1Narrow: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F507",
         description: "Time signature 1 (large, narrow)"
       },
       timeSig1Numerator: {
-        codepoint: "U+F5C0"
+        codepoint: "U+F5D5",
+        description: "Time signature 1 (numerator)"
       },
       timeSig1Small: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F45E",
         description: "Time signature 1 (small staff)"
       },
       timeSig2Denominator: {
-        codepoint: "U+F5C1"
+        codepoint: "U+F5D6",
+        description: "Time signature 2 (denominator)"
       },
       timeSig2Large: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F442",
         description: "Time signature 2 (outside staff)"
       },
       timeSig2Narrow: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F508",
         description: "Time signature 2 (large, narrow)"
       },
       timeSig2Numerator: {
-        codepoint: "U+F5C2"
+        codepoint: "U+F5D7",
+        description: "Time signature 2 (numerator)"
       },
       timeSig2Small: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F45F",
         description: "Time signature 2 (small staff)"
       },
       timeSig2over2: {
-        codepoint: "U+F5EF"
+        codepoint: "U+F604",
+        description: "2/2 time signature"
       },
       timeSig2over4: {
-        codepoint: "U+F5EE"
+        codepoint: "U+F603",
+        description: "2/4 time signature"
       },
       timeSig3Denominator: {
-        codepoint: "U+F5C3"
+        codepoint: "U+F5D8",
+        description: "Time signature 3 (denominator)"
       },
       timeSig3Large: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F443",
         description: "Time signature 3 (outside staff)"
       },
       timeSig3Narrow: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F509",
         description: "Time signature 3 (large, narrow)"
       },
       timeSig3Numerator: {
-        codepoint: "U+F5C4"
+        codepoint: "U+F5D9",
+        description: "Time signature 3 (numerator)"
       },
       timeSig3Small: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F460",
         description: "Time signature 3 (small staff)"
       },
       timeSig3over2: {
-        codepoint: "U+F5F0"
+        codepoint: "U+F605",
+        description: "3/2 time signature"
       },
       timeSig3over4: {
-        codepoint: "U+F5F1"
+        codepoint: "U+F606",
+        description: "3/4 time signature"
       },
       timeSig3over8: {
-        codepoint: "U+F5F2"
+        codepoint: "U+F607",
+        description: "3/8 time signature"
       },
       timeSig4Denominator: {
-        codepoint: "U+F5C5"
+        codepoint: "U+F5DA",
+        description: "Time signature 4 (denominator)"
       },
       timeSig4Large: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F444",
         description: "Time signature 4 (outside staff)"
       },
       timeSig4Narrow: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F50A",
         description: "Time signature 4 (large, narrow)"
       },
       timeSig4Numerator: {
-        codepoint: "U+F5C6"
+        codepoint: "U+F5DB",
+        description: "Time signature 4 (numerator)"
       },
       timeSig4Small: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F461",
         description: "Time signature 4 (small staff)"
       },
       timeSig4over4: {
-        codepoint: "U+F5F3"
+        codepoint: "U+F608",
+        description: "4/4 time signature"
       },
       timeSig5Denominator: {
-        codepoint: "U+F5C7"
+        codepoint: "U+F5DC",
+        description: "Time signature 5 (denominator)"
       },
       timeSig5Large: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F445",
         description: "Time signature 5 (outside staff)"
       },
       timeSig5Narrow: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F50B",
         description: "Time signature 5 (large, narrow)"
       },
       timeSig5Numerator: {
-        codepoint: "U+F5C8"
+        codepoint: "U+F5DD",
+        description: "Time signature 5 (numerator)"
       },
       timeSig5Small: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F462",
         description: "Time signature 5 (small staff)"
       },
       timeSig5over4: {
-        codepoint: "U+F5F4"
+        codepoint: "U+F609",
+        description: "5/4 time signature"
       },
       timeSig5over8: {
-        codepoint: "U+F5F5"
+        codepoint: "U+F60A",
+        description: "5/8 time signature"
       },
       timeSig6Denominator: {
-        codepoint: "U+F5C9"
+        codepoint: "U+F5DE",
+        description: "Time signature 6 (denominator)"
       },
       timeSig6Large: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F446",
         description: "Time signature 6 (outside staff)"
       },
       timeSig6Narrow: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F50C",
         description: "Time signature 6 (large, narrow)"
       },
       timeSig6Numerator: {
-        codepoint: "U+F5CA"
+        codepoint: "U+F5DF",
+        description: "Time signature 6 (numerator)"
       },
       timeSig6Small: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F463",
         description: "Time signature 6 (small staff)"
       },
       timeSig6over4: {
-        codepoint: "U+F5F6"
+        codepoint: "U+F60B",
+        description: "6/4 time signature"
       },
       timeSig6over8: {
-        codepoint: "U+F5F7"
+        codepoint: "U+F60C",
+        description: "6/8 time signature"
       },
       timeSig7Denominator: {
-        codepoint: "U+F5CB"
+        codepoint: "U+F5E0",
+        description: "Time signature 7 (denominator)"
       },
       timeSig7Large: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F447",
         description: "Time signature 7 (outside staff)"
       },
       timeSig7Narrow: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F50D",
         description: "Time signature 7 (large, narrow)"
       },
       timeSig7Numerator: {
-        codepoint: "U+F5CC"
+        codepoint: "U+F5E1",
+        description: "Time signature 7 (numerator)"
       },
       timeSig7Small: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F464",
         description: "Time signature 7 (small staff)"
       },
       timeSig7over8: {
-        codepoint: "U+F5F8"
+        codepoint: "U+F60D",
+        description: "7/8 time signature"
       },
       timeSig8Denominator: {
-        codepoint: "U+F5CD"
+        codepoint: "U+F5E2",
+        description: "Time signature 8 (denominator)"
       },
       timeSig8Large: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F448",
         description: "Time signature 8 (outside staff)"
       },
       timeSig8Narrow: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F50E",
         description: "Time signature 8 (large, narrow)"
       },
       timeSig8Numerator: {
-        codepoint: "U+F5CE"
+        codepoint: "U+F5E3",
+        description: "Time signature 8 (numerator)"
       },
       timeSig8Small: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F465",
         description: "Time signature 8 (small staff)"
       },
       timeSig9Denominator: {
-        codepoint: "U+F5CF"
+        codepoint: "U+F5E4",
+        description: "Time signature 9 (denominator)"
       },
       timeSig9Large: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F449",
         description: "Time signature 9 (outside staff)"
       },
       timeSig9Narrow: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F50F",
         description: "Time signature 9 (large, narrow)"
       },
       timeSig9Numerator: {
-        codepoint: "U+F5D0"
+        codepoint: "U+F5E5",
+        description: "Time signature 9 (numerator)"
       },
       timeSig9Small: {
-        classes: [],
+        classes: [
+          "tf_zeroWidth"
+        ],
         codepoint: "U+F466",
         description: "Time signature 9 (small staff)"
       },
       timeSig9over8: {
-        codepoint: "U+F5F9"
+        codepoint: "U+F60E",
+        description: "9/8 time signature"
       },
       timeSigBracketLeftLarge: {
         classes: [],
@@ -56638,10 +62950,50 @@ var NotationEngine = (() => {
         codepoint: "U+F4D5",
         description: "Tuplet 9 (light)"
       },
+      tupletBracketLeftItalicLight: {
+        classes: [],
+        codepoint: "U+F542",
+        description: "Opening bracket italic (light)"
+      },
+      tupletBracketLeftRomanLight: {
+        classes: [],
+        codepoint: "U+F544",
+        description: "Opening bracket roman (light)"
+      },
+      tupletBracketRightItalicLight: {
+        classes: [],
+        codepoint: "U+F543",
+        description: "Closing bracket italic (light)"
+      },
+      tupletBracketRightRomanLight: {
+        classes: [],
+        codepoint: "U+F545",
+        description: "Closing bracket roman (light)"
+      },
       tupletColonLight: {
         classes: [],
         codepoint: "U+F4D6",
         description: "Tuplet colon (light)"
+      },
+      tupletParenthesisLeftItalicLight: {
+        classes: [],
+        codepoint: "U+F53E",
+        description: "Opening parenthesis italic (light)"
+      },
+      tupletParenthesisLeftRomanLight: {
+        classes: [],
+        codepoint: "U+F540",
+        description: "Opening parenthesis roman (light)"
+      },
+      tupletParenthesisRightItalicLight: {
+        classes: [],
+        codepoint: "U+F53F",
+        description: "Closing parenthesis italic (light)"
+      },
+      tupletParenthesisRightRomanLight: {
+        classes: [],
+        codepoint: "U+F541",
+        description: "Closing parenthesis roman (light)"
       },
       unpitchedPercussionClef1Alt: {
         classes: [
@@ -56996,7 +63348,7 @@ var NotationEngine = (() => {
             name: "articTenutoAccentBelowSmall"
           }
         ],
-        type: "opticalVariantsSmall"
+        type: "ss01"
       },
       ss02: {
         description: "Short flags (to avoid augmentation dots)",
@@ -57050,7 +63402,7 @@ var NotationEngine = (() => {
             name: "flag1024thUpShort"
           }
         ],
-        type: "flagsShort"
+        type: "ss02"
       },
       ss03: {
         description: "Straight flags",
@@ -57152,7 +63504,7 @@ var NotationEngine = (() => {
             name: "flag1024thDownStraight"
           }
         ],
-        type: "flagsStraight"
+        type: "ss03"
       },
       ss04: {
         description: "Large time signatures",
@@ -57380,43 +63732,7 @@ var NotationEngine = (() => {
             name: "timeSigCut3Large"
           }
         ],
-        type: "timeSigsLarge"
-      },
-      ss05: {
-        description: "Noteheads at larger optical size ",
-        glyphs: [
-          {
-            alternateFor: "noteheadDoubleWhole",
-            codepoint: "U+F4BA",
-            description: "Double whole note (breve) (oversized)",
-            name: "noteheadDoubleWholeOversized"
-          },
-          {
-            alternateFor: "noteheadDoubleWholeSquare",
-            codepoint: "U+F4BB",
-            description: "Double whole note (breve) notehead (square) (oversized)",
-            name: "noteheadDoubleWholeSquareOversized"
-          },
-          {
-            alternateFor: "noteheadWhole",
-            codepoint: "U+F4BC",
-            description: "Whole notehead (oversized)",
-            name: "noteheadWholeOversized"
-          },
-          {
-            alternateFor: "noteheadHalf",
-            codepoint: "U+F4BD",
-            description: "Half (minim) notehead (oversized)",
-            name: "noteheadHalfOversized"
-          },
-          {
-            alternateFor: "noteheadBlack",
-            codepoint: "U+F4BE",
-            description: "Black notehead (oversized)",
-            name: "noteheadBlackOversized"
-          }
-        ],
-        type: "noteheadsLarge"
+        type: "ss04"
       },
       ss06: {
         description: "Tuplet numbers at a lighter weight",
@@ -57486,9 +63802,57 @@ var NotationEngine = (() => {
             codepoint: "U+F4D6",
             description: "Tuplet colon (light)",
             name: "tupletColonLight"
+          },
+          {
+            alternateFor: "tupletParenthesisLeftItalic",
+            codepoint: "U+F53E",
+            description: "Opening parenthesis italic (light)",
+            name: "tupletParenthesisLeftItalicLight"
+          },
+          {
+            alternateFor: "tupletParenthesisRightItalic",
+            codepoint: "U+F53F",
+            description: "Closing parenthesis italic (light)",
+            name: "tupletParenthesisRightItalicLight"
+          },
+          {
+            alternateFor: "tupletParenthesisLeftRoman",
+            codepoint: "U+F540",
+            description: "Opening parenthesis roman (light)",
+            name: "tupletParenthesisLeftRomanLight"
+          },
+          {
+            alternateFor: "tupletParenthesisRightRoman",
+            codepoint: "U+F541",
+            description: "Closing parenthesis roman (light)",
+            name: "tupletParenthesisRightRomanLight"
+          },
+          {
+            alternateFor: "tupletBracketLeftItalic",
+            codepoint: "U+F542",
+            description: "Opening bracket italic (light)",
+            name: "tupletBracketLeftItalicLight"
+          },
+          {
+            alternateFor: "tupletBracketRightItalic",
+            codepoint: "U+F543",
+            description: "Closing bracket italic (light)",
+            name: "tupletBracketRightItalicLight"
+          },
+          {
+            alternateFor: "tupletBracketLeftRoman",
+            codepoint: "U+F544",
+            description: "Opening bracket roman (light)",
+            name: "tupletBracketLeftRomanLight"
+          },
+          {
+            alternateFor: "tupletBracketRightRoman",
+            codepoint: "U+F545",
+            description: "Closing bracket roman (light)",
+            name: "tupletBracketRightRomanLight"
           }
         ],
-        type: "tupletsLight"
+        type: "ss06"
       },
       ss07: {
         description: "Smaller optical size for subscript and superscript placement",
@@ -57566,11 +63930,41 @@ var NotationEngine = (() => {
             name: "csymAccidentalTripleFlatSmall"
           }
         ],
-        type: "chordSymbolsOpticalVariants"
+        type: "ss07"
       },
       ss08: {
-        description: "Oversized slash noteheads",
+        description: "Oversized noteheads and slash noteheads",
         glyphs: [
+          {
+            alternateFor: "noteheadDoubleWhole",
+            codepoint: "U+F4BA",
+            description: "Double whole note (breve) (oversized)",
+            name: "noteheadDoubleWholeOversized"
+          },
+          {
+            alternateFor: "noteheadDoubleWholeSquare",
+            codepoint: "U+F4BB",
+            description: "Double whole note (breve) notehead (square) (oversized)",
+            name: "noteheadDoubleWholeSquareOversized"
+          },
+          {
+            alternateFor: "noteheadWhole",
+            codepoint: "U+F4BC",
+            description: "Whole notehead (oversized)",
+            name: "noteheadWholeOversized"
+          },
+          {
+            alternateFor: "noteheadHalf",
+            codepoint: "U+F4BD",
+            description: "Half (minim) notehead (oversized)",
+            name: "noteheadHalfOversized"
+          },
+          {
+            alternateFor: "noteheadBlack",
+            codepoint: "U+F4BE",
+            description: "Black notehead (oversized)",
+            name: "noteheadBlackOversized"
+          },
           {
             alternateFor: "noteheadSlashVerticalEnds",
             codepoint: "U+F4E3",
@@ -57638,7 +64032,7 @@ var NotationEngine = (() => {
             name: "noteheadSlashWhiteDoubleWholeOversized"
           }
         ],
-        type: "slashesOversized"
+        type: "ss08"
       },
       ss09: {
         description: "Large, narrow time signatures",
@@ -57866,7 +64260,7 @@ var NotationEngine = (() => {
             name: "timeSigCut3Narrow"
           }
         ],
-        type: "timeSigsLargeNarrow"
+        type: "ss09"
       },
       ss10: {
         description: "Accidentals for figured bass with longer stems",
@@ -57914,28 +64308,3757 @@ var NotationEngine = (() => {
             name: "figbassTripleSharpLongerStem"
           }
         ],
-        type: "figbassAccidentalsLongerStems"
+        type: "ss10"
       }
+    }
+  };
+
+  // src/glyphs/data/bravura_font_metrics.json
+  var bravura_font_metrics_default = {
+    fontName: "Bravura",
+    fontVersion: 1.482,
+    fontSha256: "e68df66446e3ffa6f474ce9eb2949e938102406f12d8f40ad8754398c50f55d4",
+    unitsPerEm: 1e3,
+    staffSpaceUnits: 250,
+    cmapAdvanceWidths: {
+      "U+0000": 0,
+      "U+0020": 100,
+      "U+00BC": 631,
+      "U+00BD": 652,
+      "U+00BE": 639,
+      "U+215B": 644,
+      "U+2669": 332,
+      "U+266A": 553,
+      "U+266B": 962,
+      "U+266C": 963,
+      "U+266D": 226,
+      "U+266E": 169,
+      "U+266F": 249,
+      "U+E000": 70,
+      "U+E001": 70,
+      "U+E002": 558,
+      "U+E003": 469,
+      "U+E004": 469,
+      "U+E005": 469,
+      "U+E006": 469,
+      "U+E007": 1058,
+      "U+E008": 1561,
+      "U+E009": 2319,
+      "U+E00A": 300,
+      "U+E00B": 526,
+      "U+E00C": 526,
+      "U+E00D": 526,
+      "U+E010": 500,
+      "U+E011": 500,
+      "U+E012": 500,
+      "U+E013": 500,
+      "U+E014": 500,
+      "U+E015": 500,
+      "U+E016": 750,
+      "U+E017": 750,
+      "U+E018": 750,
+      "U+E019": 750,
+      "U+E01A": 750,
+      "U+E01B": 750,
+      "U+E01C": 250,
+      "U+E01D": 250,
+      "U+E01E": 250,
+      "U+E01F": 250,
+      "U+E020": 250,
+      "U+E021": 250,
+      "U+E022": 332,
+      "U+E023": 532,
+      "U+E024": 132,
+      "U+E030": 40,
+      "U+E031": 180,
+      "U+E032": 265,
+      "U+E033": 265,
+      "U+E034": 125,
+      "U+E035": 350,
+      "U+E036": 40,
+      "U+E037": 49,
+      "U+E038": 40,
+      "U+E039": 40,
+      "U+E040": 368,
+      "U+E041": 367,
+      "U+E042": 608,
+      "U+E043": 100,
+      "U+E044": 100,
+      "U+E045": 1082,
+      "U+E046": 1083,
+      "U+E047": 557,
+      "U+E048": 954,
+      "U+E049": 819,
+      "U+E04A": 402,
+      "U+E04B": 402,
+      "U+E04C": 371,
+      "U+E04D": 371,
+      "U+E050": 671,
+      "U+E051": 671,
+      "U+E052": 664,
+      "U+E053": 671,
+      "U+E054": 671,
+      "U+E055": 1044,
+      "U+E056": 842,
+      "U+E057": 664,
+      "U+E058": 692,
+      "U+E059": 671,
+      "U+E05A": 669,
+      "U+E05B": 673,
+      "U+E05C": 699,
+      "U+E05D": 699,
+      "U+E05E": 699,
+      "U+E05F": 700,
+      "U+E060": 584,
+      "U+E061": 233,
+      "U+E062": 684,
+      "U+E063": 684,
+      "U+E064": 684,
+      "U+E065": 684,
+      "U+E066": 684,
+      "U+E067": 684,
+      "U+E068": 680,
+      "U+E069": 382,
+      "U+E06A": 312,
+      "U+E06B": 251,
+      "U+E06C": 463,
+      "U+E06D": 409,
+      "U+E06E": 271,
+      "U+E06F": 308,
+      "U+E070": 309,
+      "U+E071": 618,
+      "U+E072": 616,
+      "U+E073": 674,
+      "U+E074": 674,
+      "U+E075": 699,
+      "U+E076": 689,
+      "U+E077": 684,
+      "U+E078": 862,
+      "U+E079": 284,
+      "U+E07A": 440,
+      "U+E07B": 506,
+      "U+E07C": 462,
+      "U+E07D": 205,
+      "U+E07E": 359,
+      "U+E07F": 0,
+      "U+E080": 470,
+      "U+E081": 334,
+      "U+E082": 446,
+      "U+E083": 421,
+      "U+E084": 470,
+      "U+E085": 403,
+      "U+E086": 434,
+      "U+E087": 441,
+      "U+E088": 436,
+      "U+E089": 434,
+      "U+E08A": 424,
+      "U+E08B": 417,
+      "U+E08C": 500,
+      "U+E08D": 254,
+      "U+E08E": 502,
+      "U+E08F": 448,
+      "U+E090": 448,
+      "U+E091": 396,
+      "U+E092": 110,
+      "U+E093": 110,
+      "U+E094": 184,
+      "U+E095": 184,
+      "U+E096": 198,
+      "U+E097": 415,
+      "U+E098": 424,
+      "U+E099": 449,
+      "U+E09A": 441,
+      "U+E09B": 446,
+      "U+E09C": 405,
+      "U+E09D": 845,
+      "U+E09E": 0,
+      "U+E09F": 0,
+      "U+E0A0": 599,
+      "U+E0A1": 416,
+      "U+E0A2": 422,
+      "U+E0A3": 295,
+      "U+E0A4": 295,
+      "U+E0A5": 295,
+      "U+E0A6": 546,
+      "U+E0A7": 377,
+      "U+E0A8": 334,
+      "U+E0A9": 290,
+      "U+E0AA": 248,
+      "U+E0AB": 250,
+      "U+E0AC": 473,
+      "U+E0AD": 285,
+      "U+E0AE": 261,
+      "U+E0AF": 249,
+      "U+E0B0": 422,
+      "U+E0B1": 249,
+      "U+E0B2": 250,
+      "U+E0B3": 249,
+      "U+E0B4": 597,
+      "U+E0B5": 420,
+      "U+E0B6": 294,
+      "U+E0B7": 289,
+      "U+E0B8": 313,
+      "U+E0B9": 313,
+      "U+E0BA": 483,
+      "U+E0BB": 319,
+      "U+E0BC": 285,
+      "U+E0BD": 293,
+      "U+E0BE": 293,
+      "U+E0BF": 339,
+      "U+E0C0": 339,
+      "U+E0C1": 339,
+      "U+E0C2": 339,
+      "U+E0C3": 483,
+      "U+E0C4": 319,
+      "U+E0C5": 285,
+      "U+E0C6": 293,
+      "U+E0C7": 292,
+      "U+E0C8": 339,
+      "U+E0C9": 339,
+      "U+E0CA": 315,
+      "U+E0CB": 315,
+      "U+E0CC": 278,
+      "U+E0CD": 278,
+      "U+E0CE": 295,
+      "U+E0CF": 295,
+      "U+E0D0": 295,
+      "U+E0D1": 292,
+      "U+E0D2": 293,
+      "U+E0D3": 418,
+      "U+E0D4": 418,
+      "U+E0D5": 596,
+      "U+E0D6": 596,
+      "U+E0D7": 576,
+      "U+E0D8": 416,
+      "U+E0D9": 245,
+      "U+E0DA": 343,
+      "U+E0DB": 245,
+      "U+E0DC": 340,
+      "U+E0DD": 282,
+      "U+E0DE": 403,
+      "U+E0DF": 450,
+      "U+E0E0": 293,
+      "U+E0E1": 291,
+      "U+E0E2": 290,
+      "U+E0E3": 289,
+      "U+E0E4": 295,
+      "U+E0E5": 293,
+      "U+E0E6": 437,
+      "U+E0E7": 603,
+      "U+E0E8": 294,
+      "U+E0E9": 295,
+      "U+E0EA": 541,
+      "U+E0EB": 554,
+      "U+E0EC": 457,
+      "U+E0ED": 550,
+      "U+E0EE": 360,
+      "U+E0EF": 360,
+      "U+E0F0": 332,
+      "U+E0F1": 551,
+      "U+E0F2": 360,
+      "U+E0F3": 360,
+      "U+E0F4": 332,
+      "U+E0F5": 73,
+      "U+E0F6": 73,
+      "U+E0F7": 250,
+      "U+E0F8": 385,
+      "U+E0F9": 385,
+      "U+E0FA": 422,
+      "U+E0FB": 295,
+      "U+E0FC": 288,
+      "U+E100": 365,
+      "U+E101": 531,
+      "U+E102": 980,
+      "U+E103": 780,
+      "U+E104": 500,
+      "U+E105": 183,
+      "U+E106": 531,
+      "U+E107": 365,
+      "U+E108": 530,
+      "U+E109": 781,
+      "U+E10A": 1161,
+      "U+E110": 500,
+      "U+E111": 500,
+      "U+E112": 501,
+      "U+E113": 251,
+      "U+E114": 251,
+      "U+E115": 251,
+      "U+E116": 501,
+      "U+E117": 501,
+      "U+E118": 249,
+      "U+E119": 249,
+      "U+E11A": 501,
+      "U+E11B": 501,
+      "U+E11C": 250,
+      "U+E11D": 250,
+      "U+E120": 332,
+      "U+E121": 332,
+      "U+E122": 374,
+      "U+E123": 332,
+      "U+E124": 607,
+      "U+E125": 432,
+      "U+E126": 310,
+      "U+E127": 327,
+      "U+E128": 606,
+      "U+E129": 425,
+      "U+E12A": 316,
+      "U+E12B": 360,
+      "U+E12C": 598,
+      "U+E12D": 598,
+      "U+E12E": 598,
+      "U+E12F": 424,
+      "U+E130": 424,
+      "U+E131": 424,
+      "U+E132": 300,
+      "U+E133": 300,
+      "U+E134": 299,
+      "U+E135": 295,
+      "U+E136": 295,
+      "U+E137": 295,
+      "U+E138": 265,
+      "U+E139": 267,
+      "U+E13A": 273,
+      "U+E13B": 274,
+      "U+E13C": 291,
+      "U+E13D": 291,
+      "U+E13E": 291,
+      "U+E13F": 296,
+      "U+E140": 296,
+      "U+E141": 296,
+      "U+E142": 344,
+      "U+E143": 344,
+      "U+E144": 344,
+      "U+E145": 344,
+      "U+E146": 344,
+      "U+E147": 344,
+      "U+E150": 486,
+      "U+E151": 486,
+      "U+E152": 486,
+      "U+E153": 486,
+      "U+E154": 486,
+      "U+E155": 486,
+      "U+E156": 486,
+      "U+E157": 487,
+      "U+E158": 360,
+      "U+E159": 361,
+      "U+E15A": 360,
+      "U+E15B": 360,
+      "U+E15C": 361,
+      "U+E15D": 361,
+      "U+E15E": 360,
+      "U+E15F": 360,
+      "U+E160": 358,
+      "U+E161": 358,
+      "U+E162": 358,
+      "U+E163": 358,
+      "U+E164": 358,
+      "U+E165": 358,
+      "U+E166": 358,
+      "U+E167": 358,
+      "U+E168": 486,
+      "U+E169": 486,
+      "U+E16A": 486,
+      "U+E16B": 486,
+      "U+E16C": 486,
+      "U+E16D": 486,
+      "U+E16E": 486,
+      "U+E16F": 486,
+      "U+E170": 486,
+      "U+E171": 486,
+      "U+E172": 486,
+      "U+E173": 486,
+      "U+E174": 487,
+      "U+E175": 486,
+      "U+E176": 486,
+      "U+E177": 486,
+      "U+E178": 486,
+      "U+E179": 486,
+      "U+E17A": 486,
+      "U+E17B": 486,
+      "U+E17C": 486,
+      "U+E17D": 486,
+      "U+E17E": 486,
+      "U+E17F": 361,
+      "U+E180": 361,
+      "U+E181": 361,
+      "U+E182": 361,
+      "U+E183": 361,
+      "U+E184": 361,
+      "U+E185": 360,
+      "U+E186": 361,
+      "U+E187": 361,
+      "U+E188": 361,
+      "U+E189": 361,
+      "U+E18A": 361,
+      "U+E18B": 361,
+      "U+E18C": 361,
+      "U+E18D": 361,
+      "U+E18E": 361,
+      "U+E18F": 361,
+      "U+E190": 361,
+      "U+E191": 361,
+      "U+E192": 360,
+      "U+E193": 361,
+      "U+E194": 361,
+      "U+E195": 361,
+      "U+E196": 358,
+      "U+E197": 358,
+      "U+E198": 358,
+      "U+E199": 357,
+      "U+E19A": 357,
+      "U+E19B": 357,
+      "U+E19C": 357,
+      "U+E19D": 358,
+      "U+E19E": 357,
+      "U+E19F": 357,
+      "U+E1A0": 357,
+      "U+E1A1": 357,
+      "U+E1A2": 357,
+      "U+E1A3": 358,
+      "U+E1A4": 357,
+      "U+E1A5": 357,
+      "U+E1A6": 358,
+      "U+E1A7": 357,
+      "U+E1A8": 358,
+      "U+E1A9": 358,
+      "U+E1AA": 357,
+      "U+E1AB": 358,
+      "U+E1AC": 358,
+      "U+E1AD": 486,
+      "U+E1AE": 361,
+      "U+E1AF": 358,
+      "U+E1B0": 364,
+      "U+E1B1": 361,
+      "U+E1B2": 360,
+      "U+E1B3": 360,
+      "U+E1B4": 360,
+      "U+E1B5": 360,
+      "U+E1B6": 360,
+      "U+E1B7": 360,
+      "U+E1B8": 359,
+      "U+E1B9": 361,
+      "U+E1BA": 356,
+      "U+E1BB": 356,
+      "U+E1BC": 361,
+      "U+E1BD": 361,
+      "U+E1BE": 356,
+      "U+E1BF": 356,
+      "U+E1C0": 293,
+      "U+E1C1": 294,
+      "U+E1C2": 259,
+      "U+E1C3": 259,
+      "U+E1C4": 281,
+      "U+E1C5": 281,
+      "U+E1C6": 260,
+      "U+E1C7": 260,
+      "U+E1C8": 280,
+      "U+E1C9": 281,
+      "U+E1CA": 323,
+      "U+E1CB": 323,
+      "U+E1D0": 655,
+      "U+E1D1": 533,
+      "U+E1D2": 459,
+      "U+E1D3": 341,
+      "U+E1D4": 341,
+      "U+E1D5": 332,
+      "U+E1D6": 332,
+      "U+E1D7": 566,
+      "U+E1D8": 332,
+      "U+E1D9": 581,
+      "U+E1DA": 332,
+      "U+E1DB": 563,
+      "U+E1DC": 332,
+      "U+E1DD": 563,
+      "U+E1DE": 332,
+      "U+E1DF": 563,
+      "U+E1E0": 332,
+      "U+E1E1": 566,
+      "U+E1E2": 332,
+      "U+E1E3": 568,
+      "U+E1E4": 332,
+      "U+E1E5": 567,
+      "U+E1E6": 332,
+      "U+E1E7": 100,
+      "U+E1F0": 332,
+      "U+E1F1": 332,
+      "U+E1F2": 342,
+      "U+E1F3": 342,
+      "U+E1F4": 342,
+      "U+E1F5": 342,
+      "U+E1F6": 342,
+      "U+E1F7": 342,
+      "U+E1F8": 342,
+      "U+E1F9": 342,
+      "U+E1FA": 342,
+      "U+E1FB": 342,
+      "U+E1FC": 100,
+      "U+E1FD": 365,
+      "U+E1FE": 318,
+      "U+E1FF": 236,
+      "U+E200": 318,
+      "U+E201": 318,
+      "U+E202": 236,
+      "U+E203": 318,
+      "U+E204": 332,
+      "U+E205": 332,
+      "U+E206": 342,
+      "U+E207": 342,
+      "U+E208": 342,
+      "U+E209": 342,
+      "U+E20A": 342,
+      "U+E210": 15,
+      "U+E211": 15,
+      "U+E212": 15,
+      "U+E213": 15,
+      "U+E214": 15,
+      "U+E215": 15,
+      "U+E216": 14,
+      "U+E217": 15,
+      "U+E218": 15,
+      "U+E219": 15,
+      "U+E21A": 15,
+      "U+E21B": 15,
+      "U+E21C": 15,
+      "U+E21D": 15,
+      "U+E21E": 15,
+      "U+E21F": 15,
+      "U+E220": 150,
+      "U+E221": 149,
+      "U+E222": 150,
+      "U+E223": 149,
+      "U+E224": 149,
+      "U+E225": 150,
+      "U+E226": 149,
+      "U+E227": 150,
+      "U+E228": 149,
+      "U+E229": 149,
+      "U+E22A": 156,
+      "U+E22B": 171,
+      "U+E22C": 160,
+      "U+E22D": 192,
+      "U+E22E": 250,
+      "U+E22F": 400,
+      "U+E230": 550,
+      "U+E231": 400,
+      "U+E232": 147,
+      "U+E233": 271,
+      "U+E234": 129,
+      "U+E240": 264,
+      "U+E241": 306,
+      "U+E242": 279,
+      "U+E243": 292,
+      "U+E244": 262,
+      "U+E245": 274,
+      "U+E246": 262,
+      "U+E247": 275,
+      "U+E248": 259,
+      "U+E249": 275,
+      "U+E24A": 268,
+      "U+E24B": 301,
+      "U+E24C": 268,
+      "U+E24D": 301,
+      "U+E24E": 272,
+      "U+E24F": 310,
+      "U+E250": 266,
+      "U+E251": 300,
+      "U+E260": 226,
+      "U+E261": 168,
+      "U+E262": 249,
+      "U+E263": 250,
+      "U+E264": 413,
+      "U+E265": 513,
+      "U+E266": 600,
+      "U+E267": 459,
+      "U+E268": 480,
+      "U+E269": 519,
+      "U+E26A": 141,
+      "U+E26B": 141,
+      "U+E26C": 77,
+      "U+E26D": 77,
+      "U+E270": 248,
+      "U+E271": 251,
+      "U+E272": 212,
+      "U+E273": 171,
+      "U+E274": 249,
+      "U+E275": 249,
+      "U+E276": 248,
+      "U+E277": 248,
+      "U+E278": 411,
+      "U+E279": 413,
+      "U+E27A": 185,
+      "U+E27B": 185,
+      "U+E280": 227,
+      "U+E281": 466,
+      "U+E282": 179,
+      "U+E283": 317,
+      "U+E284": 164,
+      "U+E285": 414,
+      "U+E290": 312,
+      "U+E291": 305,
+      "U+E292": 310,
+      "U+E293": 304,
+      "U+E294": 385,
+      "U+E295": 385,
+      "U+E296": 365,
+      "U+E297": 365,
+      "U+E298": 365,
+      "U+E299": 232,
+      "U+E29A": 231,
+      "U+E29B": 369,
+      "U+E29C": 317,
+      "U+E2A0": 303,
+      "U+E2A1": 272,
+      "U+E2A2": 321,
+      "U+E2A3": 303,
+      "U+E2A4": 272,
+      "U+E2A5": 272,
+      "U+E2B0": 150,
+      "U+E2B1": 150,
+      "U+E2B2": 160,
+      "U+E2B3": 160,
+      "U+E2B4": 180,
+      "U+E2B5": 180,
+      "U+E2B6": 200,
+      "U+E2B7": 200,
+      "U+E2C0": 419,
+      "U+E2C1": 228,
+      "U+E2C2": 169,
+      "U+E2C3": 250,
+      "U+E2C4": 247,
+      "U+E2C5": 416,
+      "U+E2C6": 226,
+      "U+E2C7": 169,
+      "U+E2C8": 250,
+      "U+E2C9": 248,
+      "U+E2CA": 419,
+      "U+E2CB": 228,
+      "U+E2CC": 169,
+      "U+E2CD": 250,
+      "U+E2CE": 247,
+      "U+E2CF": 416,
+      "U+E2D0": 226,
+      "U+E2D1": 169,
+      "U+E2D2": 250,
+      "U+E2D3": 248,
+      "U+E2D4": 419,
+      "U+E2D5": 228,
+      "U+E2D6": 169,
+      "U+E2D7": 250,
+      "U+E2D8": 247,
+      "U+E2D9": 416,
+      "U+E2DA": 226,
+      "U+E2DB": 169,
+      "U+E2DC": 250,
+      "U+E2DD": 247,
+      "U+E2DE": 172,
+      "U+E2DF": 172,
+      "U+E2E0": 172,
+      "U+E2E1": 172,
+      "U+E2E2": 227,
+      "U+E2E3": 271,
+      "U+E2E4": 215,
+      "U+E2E5": 270,
+      "U+E2E6": 199,
+      "U+E2E7": 199,
+      "U+E2E8": 199,
+      "U+E2E9": 199,
+      "U+E2EA": 245,
+      "U+E2EB": 245,
+      "U+E2EC": 292,
+      "U+E2ED": 295,
+      "U+E2EE": 138,
+      "U+E2EF": 138,
+      "U+E2F0": 416,
+      "U+E2F1": 226,
+      "U+E2F2": 168,
+      "U+E2F3": 250,
+      "U+E2F4": 246,
+      "U+E2F5": 226,
+      "U+E2F6": 270,
+      "U+E2F7": 198,
+      "U+E2F8": 198,
+      "U+E2F9": 434,
+      "U+E2FA": 434,
+      "U+E2FB": 449,
+      "U+E300": 156,
+      "U+E301": 156,
+      "U+E302": 156,
+      "U+E303": 156,
+      "U+E304": 156,
+      "U+E305": 156,
+      "U+E306": 250,
+      "U+E307": 250,
+      "U+E308": 281,
+      "U+E309": 281,
+      "U+E30A": 344,
+      "U+E30B": 344,
+      "U+E30C": 344,
+      "U+E30D": 344,
+      "U+E30E": 375,
+      "U+E30F": 375,
+      "U+E310": 344,
+      "U+E311": 344,
+      "U+E312": 250,
+      "U+E313": 250,
+      "U+E314": 281,
+      "U+E315": 281,
+      "U+E316": 344,
+      "U+E317": 344,
+      "U+E318": 406,
+      "U+E319": 406,
+      "U+E31A": 0,
+      "U+E31B": 0,
+      "U+E31C": 312,
+      "U+E31D": 312,
+      "U+E31E": 312,
+      "U+E31F": 312,
+      "U+E320": 312,
+      "U+E321": 312,
+      "U+E322": 375,
+      "U+E323": 375,
+      "U+E324": 406,
+      "U+E325": 406,
+      "U+E326": 469,
+      "U+E327": 469,
+      "U+E328": 469,
+      "U+E329": 469,
+      "U+E32A": 500,
+      "U+E32B": 500,
+      "U+E32C": 406,
+      "U+E32D": 406,
+      "U+E32E": 375,
+      "U+E32F": 375,
+      "U+E330": 406,
+      "U+E331": 406,
+      "U+E332": 406,
+      "U+E333": 406,
+      "U+E334": 469,
+      "U+E335": 469,
+      "U+E340": 219,
+      "U+E341": 219,
+      "U+E342": 281,
+      "U+E343": 281,
+      "U+E344": 219,
+      "U+E345": 219,
+      "U+E346": 188,
+      "U+E347": 188,
+      "U+E348": 312,
+      "U+E349": 312,
+      "U+E34A": 344,
+      "U+E34B": 344,
+      "U+E34C": 344,
+      "U+E34D": 344,
+      "U+E34E": 250,
+      "U+E34F": 250,
+      "U+E350": 375,
+      "U+E351": 375,
+      "U+E352": 312,
+      "U+E353": 312,
+      "U+E354": 406,
+      "U+E355": 406,
+      "U+E356": 406,
+      "U+E357": 406,
+      "U+E358": 344,
+      "U+E359": 344,
+      "U+E35A": 344,
+      "U+E35B": 344,
+      "U+E35C": 438,
+      "U+E35D": 438,
+      "U+E35E": 406,
+      "U+E35F": 406,
+      "U+E360": 375,
+      "U+E361": 375,
+      "U+E362": 375,
+      "U+E363": 375,
+      "U+E364": 438,
+      "U+E365": 438,
+      "U+E366": 438,
+      "U+E367": 438,
+      "U+E370": 188,
+      "U+E371": 188,
+      "U+E372": 156,
+      "U+E373": 156,
+      "U+E374": 312,
+      "U+E375": 312,
+      "U+E376": 281,
+      "U+E377": 281,
+      "U+E378": 312,
+      "U+E379": 312,
+      "U+E37A": 375,
+      "U+E37B": 375,
+      "U+E37C": 344,
+      "U+E37D": 344,
+      "U+E37E": 312,
+      "U+E37F": 312,
+      "U+E380": 406,
+      "U+E381": 406,
+      "U+E382": 406,
+      "U+E383": 406,
+      "U+E384": 375,
+      "U+E385": 375,
+      "U+E386": 406,
+      "U+E387": 406,
+      "U+E390": 125,
+      "U+E391": 125,
+      "U+E392": 156,
+      "U+E393": 156,
+      "U+E394": 156,
+      "U+E395": 156,
+      "U+E396": 188,
+      "U+E397": 188,
+      "U+E398": 281,
+      "U+E399": 281,
+      "U+E39A": 250,
+      "U+E39B": 250,
+      "U+E39C": 281,
+      "U+E39D": 281,
+      "U+E39E": 344,
+      "U+E39F": 344,
+      "U+E3A0": 250,
+      "U+E3A1": 250,
+      "U+E3A2": 344,
+      "U+E3A3": 344,
+      "U+E3A4": 250,
+      "U+E3A5": 250,
+      "U+E3A6": 344,
+      "U+E3A7": 344,
+      "U+E3A8": 281,
+      "U+E3A9": 281,
+      "U+E3AA": 312,
+      "U+E3AB": 312,
+      "U+E3AC": 438,
+      "U+E3AD": 438,
+      "U+E3B0": 250,
+      "U+E3B1": 250,
+      "U+E3B2": 250,
+      "U+E3B3": 250,
+      "U+E3B4": 250,
+      "U+E3B5": 250,
+      "U+E3B6": 281,
+      "U+E3B7": 281,
+      "U+E3B8": 344,
+      "U+E3B9": 344,
+      "U+E3BA": 406,
+      "U+E3BB": 406,
+      "U+E3BC": 312,
+      "U+E3BD": 312,
+      "U+E3BE": 406,
+      "U+E3BF": 406,
+      "U+E3C0": 281,
+      "U+E3C1": 281,
+      "U+E3C2": 312,
+      "U+E3C3": 312,
+      "U+E3C4": 312,
+      "U+E3C5": 312,
+      "U+E3C6": 312,
+      "U+E3C7": 312,
+      "U+E3C8": 375,
+      "U+E3C9": 375,
+      "U+E3CA": 375,
+      "U+E3CB": 375,
+      "U+E3CC": 406,
+      "U+E3CD": 406,
+      "U+E3CE": 469,
+      "U+E3CF": 469,
+      "U+E3D0": 375,
+      "U+E3D1": 375,
+      "U+E3D2": 438,
+      "U+E3D3": 438,
+      "U+E3D4": 375,
+      "U+E3D5": 375,
+      "U+E3D6": 469,
+      "U+E3D7": 469,
+      "U+E3D8": 406,
+      "U+E3D9": 406,
+      "U+E3DA": 438,
+      "U+E3DB": 438,
+      "U+E3DC": 500,
+      "U+E3DD": 500,
+      "U+E3DE": 0,
+      "U+E3DF": 0,
+      "U+E3E0": 375,
+      "U+E3E1": 375,
+      "U+E3E2": 375,
+      "U+E3E3": 375,
+      "U+E3E4": 375,
+      "U+E3E5": 375,
+      "U+E3E6": 406,
+      "U+E3E7": 406,
+      "U+E3E8": 406,
+      "U+E3E9": 406,
+      "U+E3EA": 469,
+      "U+E3EB": 469,
+      "U+E3EC": 438,
+      "U+E3ED": 438,
+      "U+E3EE": 438,
+      "U+E3EF": 438,
+      "U+E3F0": 31,
+      "U+E3F1": 31,
+      "U+E3F2": 188,
+      "U+E3F3": 188,
+      "U+E3F4": 188,
+      "U+E3F5": 188,
+      "U+E3F6": 281,
+      "U+E3F7": 281,
+      "U+E3F8": 156,
+      "U+E3F9": 156,
+      "U+E3FA": 156,
+      "U+E3FB": 156,
+      "U+E3FC": 188,
+      "U+E3FD": 188,
+      "U+E3FE": 250,
+      "U+E3FF": 250,
+      "U+E400": 281,
+      "U+E401": 281,
+      "U+E402": 281,
+      "U+E403": 281,
+      "U+E404": 344,
+      "U+E405": 344,
+      "U+E406": 375,
+      "U+E407": 375,
+      "U+E408": 375,
+      "U+E409": 375,
+      "U+E40A": 94,
+      "U+E40B": 94,
+      "U+E420": 162,
+      "U+E421": 162,
+      "U+E422": 163,
+      "U+E423": 226,
+      "U+E424": 225,
+      "U+E425": 250,
+      "U+E426": 331,
+      "U+E427": 331,
+      "U+E428": 314,
+      "U+E429": 395,
+      "U+E42A": 393,
+      "U+E42B": 213,
+      "U+E42C": 213,
+      "U+E42D": 213,
+      "U+E42E": 226,
+      "U+E42F": 226,
+      "U+E430": 227,
+      "U+E431": 416,
+      "U+E432": 416,
+      "U+E433": 416,
+      "U+E434": 414,
+      "U+E435": 414,
+      "U+E440": 287,
+      "U+E441": 227,
+      "U+E442": 287,
+      "U+E443": 229,
+      "U+E444": 231,
+      "U+E445": 250,
+      "U+E446": 339,
+      "U+E447": 343,
+      "U+E450": 384,
+      "U+E451": 453,
+      "U+E452": 434,
+      "U+E453": 447,
+      "U+E454": 252,
+      "U+E455": 321,
+      "U+E456": 302,
+      "U+E457": 321,
+      "U+E460": 302,
+      "U+E461": 421,
+      "U+E470": 246,
+      "U+E471": 306,
+      "U+E472": 167,
+      "U+E473": 249,
+      "U+E474": 368,
+      "U+E475": 550,
+      "U+E476": 401,
+      "U+E477": 475,
+      "U+E478": 227,
+      "U+E479": 301,
+      "U+E47A": 301,
+      "U+E47B": 281,
+      "U+E47C": 281,
+      "U+E47D": 344,
+      "U+E47E": 394,
+      "U+E47F": 418,
+      "U+E480": 227,
+      "U+E481": 249,
+      "U+E482": 168,
+      "U+E483": 413,
+      "U+E484": 229,
+      "U+E485": 416,
+      "U+E486": 225,
+      "U+E487": 344,
+      "U+E488": 235,
+      "U+E489": 410,
+      "U+E48A": 191,
+      "U+E48B": 188,
+      "U+E48C": 193,
+      "U+E48D": 199,
+      "U+E48E": 199,
+      "U+E48F": 218,
+      "U+E4A0": 339,
+      "U+E4A1": 339,
+      "U+E4A2": 84,
+      "U+E4A3": 84,
+      "U+E4A4": 338,
+      "U+E4A5": 338,
+      "U+E4A6": 102,
+      "U+E4A7": 102,
+      "U+E4A8": 89,
+      "U+E4A9": 89,
+      "U+E4AA": 48,
+      "U+E4AB": 48,
+      "U+E4AC": 236,
+      "U+E4AD": 236,
+      "U+E4AE": 236,
+      "U+E4AF": 236,
+      "U+E4B0": 340,
+      "U+E4B1": 339,
+      "U+E4B2": 339,
+      "U+E4B3": 338,
+      "U+E4B4": 339,
+      "U+E4B5": 339,
+      "U+E4B6": 235,
+      "U+E4B7": 238,
+      "U+E4B8": 382,
+      "U+E4B9": 383,
+      "U+E4BA": 367,
+      "U+E4BB": 365,
+      "U+E4BC": 338,
+      "U+E4BD": 338,
+      "U+E4C0": 605,
+      "U+E4C1": 605,
+      "U+E4C2": 735,
+      "U+E4C3": 735,
+      "U+E4C4": 603,
+      "U+E4C5": 603,
+      "U+E4C6": 605,
+      "U+E4C7": 605,
+      "U+E4C8": 716,
+      "U+E4C9": 716,
+      "U+E4CA": 736,
+      "U+E4CB": 736,
+      "U+E4CC": 434,
+      "U+E4CD": 434,
+      "U+E4CE": 153,
+      "U+E4CF": 500,
+      "U+E4D0": 250,
+      "U+E4D1": 385,
+      "U+E4D2": 663,
+      "U+E4D3": 185,
+      "U+E4D4": 373,
+      "U+E4D5": 525,
+      "U+E4D6": 702,
+      "U+E4D7": 51,
+      "U+E4E0": 381,
+      "U+E4E1": 125,
+      "U+E4E2": 126,
+      "U+E4E3": 283,
+      "U+E4E4": 283,
+      "U+E4E5": 270,
+      "U+E4E6": 250,
+      "U+E4E7": 320,
+      "U+E4E8": 363,
+      "U+E4E9": 424,
+      "U+E4EA": 485,
+      "U+E4EB": 541,
+      "U+E4EC": 604,
+      "U+E4ED": 668,
+      "U+E4EE": 784,
+      "U+E4EF": 377,
+      "U+E4F0": 328,
+      "U+E4F1": 377,
+      "U+E4F2": 250,
+      "U+E4F3": 294,
+      "U+E4F4": 282,
+      "U+E4F5": 282,
+      "U+E4F6": 250,
+      "U+E500": 533,
+      "U+E501": 761,
+      "U+E502": 1233,
+      "U+E503": 125,
+      "U+E504": 532,
+      "U+E505": 124,
+      "U+E510": 386,
+      "U+E511": 885,
+      "U+E512": 839,
+      "U+E513": 875,
+      "U+E514": 667,
+      "U+E515": 1315,
+      "U+E516": 1285,
+      "U+E517": 750,
+      "U+E518": 1428,
+      "U+E519": 1378,
+      "U+E51A": 137,
+      "U+E51B": 137,
+      "U+E51C": 796,
+      "U+E51D": 1231,
+      "U+E51E": 1335,
+      "U+E51F": 1063,
+      "U+E520": 365,
+      "U+E521": 437,
+      "U+E522": 364,
+      "U+E523": 277,
+      "U+E524": 229,
+      "U+E525": 244,
+      "U+E526": 308,
+      "U+E527": 2124,
+      "U+E528": 1776,
+      "U+E529": 1417,
+      "U+E52A": 1072,
+      "U+E52B": 727,
+      "U+E52C": 826,
+      "U+E52D": 797,
+      "U+E52E": 770,
+      "U+E52F": 609,
+      "U+E530": 831,
+      "U+E531": 1070,
+      "U+E532": 1310,
+      "U+E533": 1550,
+      "U+E534": 619,
+      "U+E535": 497,
+      "U+E536": 604,
+      "U+E537": 846,
+      "U+E538": 1198,
+      "U+E539": 732,
+      "U+E53A": 1075,
+      "U+E53B": 964,
+      "U+E53C": 625,
+      "U+E53D": 744,
+      "U+E53E": 750,
+      "U+E53F": 750,
+      "U+E540": 1555,
+      "U+E541": 134,
+      "U+E542": 110,
+      "U+E543": 110,
+      "U+E544": 77,
+      "U+E545": 77,
+      "U+E546": 171,
+      "U+E547": 278,
+      "U+E548": 175,
+      "U+E549": 223,
+      "U+E550": 365,
+      "U+E551": 465,
+      "U+E552": 666,
+      "U+E553": 335,
+      "U+E554": 335,
+      "U+E555": 404,
+      "U+E560": 357,
+      "U+E561": 195,
+      "U+E562": 323,
+      "U+E563": 195,
+      "U+E564": 505,
+      "U+E565": 505,
+      "U+E566": 521,
+      "U+E567": 460,
+      "U+E568": 457,
+      "U+E569": 460,
+      "U+E56A": 218,
+      "U+E56B": 217,
+      "U+E56C": 730,
+      "U+E56D": 729,
+      "U+E56E": 985,
+      "U+E56F": 500,
+      "U+E570": 444,
+      "U+E571": 162,
+      "U+E572": 159,
+      "U+E573": 218,
+      "U+E574": 221,
+      "U+E575": 375,
+      "U+E576": 500,
+      "U+E577": 392,
+      "U+E578": 392,
+      "U+E579": 201,
+      "U+E57A": 201,
+      "U+E57B": 314,
+      "U+E57C": 313,
+      "U+E57D": 500,
+      "U+E57E": 519,
+      "U+E57F": 485,
+      "U+E580": 485,
+      "U+E581": 140,
+      "U+E582": 283,
+      "U+E583": 27,
+      "U+E584": 219,
+      "U+E585": 1088,
+      "U+E586": 1088,
+      "U+E587": 1143,
+      "U+E588": 586,
+      "U+E589": 610,
+      "U+E590": 349,
+      "U+E591": 283,
+      "U+E592": 429,
+      "U+E593": 278,
+      "U+E594": 185,
+      "U+E595": 288,
+      "U+E596": 231,
+      "U+E597": 696,
+      "U+E598": 383,
+      "U+E599": 336,
+      "U+E59A": 115,
+      "U+E59B": 478,
+      "U+E59C": 406,
+      "U+E59D": 262,
+      "U+E59E": 357,
+      "U+E59F": 1,
+      "U+E5A0": 438,
+      "U+E5A1": 115,
+      "U+E5A2": 535,
+      "U+E5A3": 400,
+      "U+E5A4": 167,
+      "U+E5A5": 326,
+      "U+E5A6": 479,
+      "U+E5A7": 277,
+      "U+E5A8": 552,
+      "U+E5B0": 1108,
+      "U+E5B1": 1128,
+      "U+E5B2": 1119,
+      "U+E5B3": 876,
+      "U+E5B4": 1495,
+      "U+E5B5": 1150,
+      "U+E5B6": 1112,
+      "U+E5B7": 1473,
+      "U+E5B8": 1048,
+      "U+E5B9": 1410,
+      "U+E5BA": 1082,
+      "U+E5BB": 949,
+      "U+E5BC": 1306,
+      "U+E5BD": 990,
+      "U+E5BE": 1106,
+      "U+E5BF": 1106,
+      "U+E5C0": 1369,
+      "U+E5C1": 1013,
+      "U+E5C2": 1013,
+      "U+E5C3": 1278,
+      "U+E5C4": 1277,
+      "U+E5C5": 693,
+      "U+E5C6": 1223,
+      "U+E5C7": 1222,
+      "U+E5C8": 859,
+      "U+E5D0": 318,
+      "U+E5D1": 425,
+      "U+E5D2": 812,
+      "U+E5D3": 1197,
+      "U+E5D4": 318,
+      "U+E5D5": 490,
+      "U+E5D6": 1150,
+      "U+E5D7": 293,
+      "U+E5D8": 490,
+      "U+E5D9": 1150,
+      "U+E5DA": 408,
+      "U+E5DB": 911,
+      "U+E5DC": 1370,
+      "U+E5DD": 425,
+      "U+E5DE": 812,
+      "U+E5DF": 1197,
+      "U+E5E0": 293,
+      "U+E5E1": 379,
+      "U+E5E2": 307,
+      "U+E5E3": 393,
+      "U+E5E4": 620,
+      "U+E5E5": 272,
+      "U+E5E6": 305,
+      "U+E5E7": 305,
+      "U+E5E8": 290,
+      "U+E5E9": 303,
+      "U+E5EA": 303,
+      "U+E5EB": 300,
+      "U+E5EC": 408,
+      "U+E5ED": 911,
+      "U+E5EE": 1370,
+      "U+E5EF": 305,
+      "U+E5F0": 445,
+      "U+E5F1": 445,
+      "U+E5F2": 575,
+      "U+E5F3": 575,
+      "U+E5F4": 304,
+      "U+E5F5": 304,
+      "U+E5F6": 305,
+      "U+E5F7": 305,
+      "U+E5F8": 305,
+      "U+E5F9": 304,
+      "U+E5FA": 707,
+      "U+E5FB": 375,
+      "U+E5FC": 375,
+      "U+E5FD": 473,
+      "U+E5FE": 473,
+      "U+E5FF": 438,
+      "U+E600": 480,
+      "U+E601": 472,
+      "U+E602": 588,
+      "U+E603": 554,
+      "U+E604": 199,
+      "U+E605": 199,
+      "U+E606": 199,
+      "U+E607": 278,
+      "U+E608": 299,
+      "U+E609": 299,
+      "U+E60A": 387,
+      "U+E60B": 305,
+      "U+E610": 312,
+      "U+E611": 312,
+      "U+E612": 250,
+      "U+E613": 250,
+      "U+E614": 200,
+      "U+E615": 200,
+      "U+E616": 388,
+      "U+E617": 388,
+      "U+E618": 214,
+      "U+E619": 197,
+      "U+E61A": 198,
+      "U+E61B": 314,
+      "U+E61C": 250,
+      "U+E61D": 314,
+      "U+E61E": 272,
+      "U+E61F": 314,
+      "U+E620": 713,
+      "U+E621": 713,
+      "U+E622": 161,
+      "U+E623": 267,
+      "U+E624": 172,
+      "U+E625": 172,
+      "U+E626": 947,
+      "U+E627": 214,
+      "U+E628": 214,
+      "U+E629": 214,
+      "U+E62A": 214,
+      "U+E630": 200,
+      "U+E631": 200,
+      "U+E632": 300,
+      "U+E633": 272,
+      "U+E634": 228,
+      "U+E635": 228,
+      "U+E636": 398,
+      "U+E637": 250,
+      "U+E638": 325,
+      "U+E639": 347,
+      "U+E63A": 444,
+      "U+E63B": 216,
+      "U+E63C": 122,
+      "U+E640": 375,
+      "U+E641": 375,
+      "U+E642": 375,
+      "U+E643": 376,
+      "U+E644": 250,
+      "U+E645": 161,
+      "U+E646": 129,
+      "U+E647": 345,
+      "U+E648": 680,
+      "U+E649": 670,
+      "U+E64A": 666,
+      "U+E64B": 74,
+      "U+E650": 1019,
+      "U+E651": 493,
+      "U+E652": 212,
+      "U+E653": 247,
+      "U+E654": 86,
+      "U+E655": 450,
+      "U+E656": 750,
+      "U+E657": 290,
+      "U+E658": 296,
+      "U+E659": 1107,
+      "U+E65A": 419,
+      "U+E65B": 450,
+      "U+E65C": 451,
+      "U+E65D": 417,
+      "U+E65E": 422,
+      "U+E65F": 426,
+      "U+E660": 422,
+      "U+E661": 426,
+      "U+E662": 426,
+      "U+E663": 500,
+      "U+E664": 438,
+      "U+E665": 438,
+      "U+E666": 426,
+      "U+E667": 495,
+      "U+E668": 445,
+      "U+E669": 445,
+      "U+E66A": 575,
+      "U+E66B": 575,
+      "U+E66C": 713,
+      "U+E66D": 713,
+      "U+E66E": 391,
+      "U+E66F": 391,
+      "U+E670": 391,
+      "U+E671": 391,
+      "U+E672": 204,
+      "U+E673": 204,
+      "U+E674": 888,
+      "U+E675": 888,
+      "U+E676": 165,
+      "U+E677": 167,
+      "U+E680": 250,
+      "U+E681": 250,
+      "U+E682": 250,
+      "U+E683": 250,
+      "U+E684": 571,
+      "U+E685": 1382,
+      "U+E686": 801,
+      "U+E687": 535,
+      "U+E688": 411,
+      "U+E689": 564,
+      "U+E68A": 858,
+      "U+E68B": 563,
+      "U+E68C": 533,
+      "U+E68D": 224,
+      "U+E68E": 346,
+      "U+E68F": 702,
+      "U+E690": 751,
+      "U+E691": 965,
+      "U+E692": 725,
+      "U+E693": 819,
+      "U+E694": 181,
+      "U+E695": 481,
+      "U+E696": 481,
+      "U+E697": 284,
+      "U+E698": 636,
+      "U+E699": 284,
+      "U+E69A": 284,
+      "U+E69B": 411,
+      "U+E69C": 539,
+      "U+E69D": 500,
+      "U+E6A0": 1199,
+      "U+E6A1": 1198,
+      "U+E6A2": 1196,
+      "U+E6A3": 1196,
+      "U+E6A4": 1196,
+      "U+E6A5": 1196,
+      "U+E6A6": 1200,
+      "U+E6A7": 1197,
+      "U+E6A8": 1196,
+      "U+E6A9": 1201,
+      "U+E6AA": 1253,
+      "U+E6AB": 1467,
+      "U+E6AC": 1572,
+      "U+E6AD": 1466,
+      "U+E6AE": 1176,
+      "U+E6AF": 1053,
+      "U+E6B0": 1196,
+      "U+E6B1": 1134,
+      "U+E6B2": 1196,
+      "U+E6C0": 935,
+      "U+E6C1": 871,
+      "U+E6C2": 1049,
+      "U+E6C3": 1020,
+      "U+E6C4": 1020,
+      "U+E6C5": 1020,
+      "U+E6C6": 1020,
+      "U+E6C7": 1020,
+      "U+E6C8": 1020,
+      "U+E6D0": 946,
+      "U+E6D1": 986,
+      "U+E6D2": 986,
+      "U+E6D3": 416,
+      "U+E6D4": 385,
+      "U+E6D5": 777,
+      "U+E6D6": 414,
+      "U+E6D7": 539,
+      "U+E6D8": 1274,
+      "U+E6D9": 1275,
+      "U+E6DA": 1274,
+      "U+E6DB": 911,
+      "U+E6DC": 1113,
+      "U+E6DD": 1228,
+      "U+E6DE": 590,
+      "U+E6DF": 1170,
+      "U+E6E0": 1038,
+      "U+E6E1": 787,
+      "U+E6E2": 732,
+      "U+E6E3": 765,
+      "U+E6E4": 675,
+      "U+E6F0": 787,
+      "U+E6F1": 931,
+      "U+E6F2": 621,
+      "U+E6F3": 1e3,
+      "U+E6F4": 699,
+      "U+E6F5": 1201,
+      "U+E6F6": 700,
+      "U+E6F7": 910,
+      "U+E6F8": 536,
+      "U+E6F9": 297,
+      "U+E6FA": 1078,
+      "U+E6FB": 894,
+      "U+E6FC": 1001,
+      "U+E700": 1036,
+      "U+E701": 977,
+      "U+E710": 1339,
+      "U+E711": 450,
+      "U+E712": 461,
+      "U+E713": 539,
+      "U+E714": 680,
+      "U+E715": 680,
+      "U+E716": 251,
+      "U+E717": 441,
+      "U+E718": 500,
+      "U+E719": 890,
+      "U+E71A": 538,
+      "U+E720": 213,
+      "U+E721": 785,
+      "U+E722": 784,
+      "U+E723": 785,
+      "U+E724": 782,
+      "U+E725": 969,
+      "U+E726": 1262,
+      "U+E727": 250,
+      "U+E728": 796,
+      "U+E729": 1205,
+      "U+E72A": 871,
+      "U+E730": 1021,
+      "U+E731": 984,
+      "U+E732": 686,
+      "U+E733": 686,
+      "U+E734": 848,
+      "U+E740": 362,
+      "U+E741": 406,
+      "U+E742": 1029,
+      "U+E743": 405,
+      "U+E744": 1024,
+      "U+E745": 735,
+      "U+E746": 729,
+      "U+E747": 258,
+      "U+E748": 849,
+      "U+E750": 975,
+      "U+E751": 711,
+      "U+E752": 990,
+      "U+E753": 873,
+      "U+E754": 1394,
+      "U+E755": 969,
+      "U+E756": 804,
+      "U+E757": 1116,
+      "U+E758": 1222,
+      "U+E759": 1024,
+      "U+E75A": 878,
+      "U+E760": 1272,
+      "U+E761": 845,
+      "U+E762": 935,
+      "U+E763": 714,
+      "U+E764": 665,
+      "U+E765": 910,
+      "U+E766": 862,
+      "U+E767": 500,
+      "U+E770": 230,
+      "U+E771": 230,
+      "U+E772": 437,
+      "U+E773": 436,
+      "U+E774": 234,
+      "U+E775": 234,
+      "U+E776": 441,
+      "U+E777": 437,
+      "U+E778": 230,
+      "U+E779": 230,
+      "U+E77A": 435,
+      "U+E77B": 435,
+      "U+E77C": 230,
+      "U+E77D": 230,
+      "U+E77E": 438,
+      "U+E77F": 437,
+      "U+E780": 138,
+      "U+E781": 138,
+      "U+E782": 416,
+      "U+E783": 413,
+      "U+E784": 109,
+      "U+E785": 109,
+      "U+E786": 399,
+      "U+E787": 399,
+      "U+E788": 220,
+      "U+E789": 220,
+      "U+E78A": 476,
+      "U+E78B": 474,
+      "U+E78C": 220,
+      "U+E78D": 220,
+      "U+E78E": 475,
+      "U+E78F": 474,
+      "U+E790": 218,
+      "U+E791": 218,
+      "U+E792": 474,
+      "U+E793": 473,
+      "U+E794": 220,
+      "U+E795": 220,
+      "U+E796": 480,
+      "U+E797": 475,
+      "U+E798": 320,
+      "U+E799": 320,
+      "U+E79A": 320,
+      "U+E79B": 320,
+      "U+E79C": 322,
+      "U+E79D": 322,
+      "U+E79E": 320,
+      "U+E79F": 320,
+      "U+E7A0": 321,
+      "U+E7A1": 321,
+      "U+E7A2": 274,
+      "U+E7A3": 274,
+      "U+E7A4": 454,
+      "U+E7A5": 454,
+      "U+E7A6": 276,
+      "U+E7A7": 276,
+      "U+E7A8": 458,
+      "U+E7A9": 456,
+      "U+E7AA": 275,
+      "U+E7AB": 275,
+      "U+E7AC": 460,
+      "U+E7AD": 457,
+      "U+E7AE": 230,
+      "U+E7AF": 230,
+      "U+E7B0": 381,
+      "U+E7B1": 381,
+      "U+E7B2": 231,
+      "U+E7B3": 230,
+      "U+E7B4": 230,
+      "U+E7B5": 438,
+      "U+E7B6": 437,
+      "U+E7B7": 230,
+      "U+E7B8": 230,
+      "U+E7B9": 438,
+      "U+E7BA": 437,
+      "U+E7BB": 252,
+      "U+E7BC": 252,
+      "U+E7BD": 501,
+      "U+E7BE": 493,
+      "U+E7BF": 252,
+      "U+E7C0": 252,
+      "U+E7C1": 493,
+      "U+E7C2": 493,
+      "U+E7C3": 252,
+      "U+E7C4": 252,
+      "U+E7C5": 493,
+      "U+E7C6": 493,
+      "U+E7C7": 230,
+      "U+E7C8": 230,
+      "U+E7C9": 437,
+      "U+E7CA": 436,
+      "U+E7CB": 560,
+      "U+E7CC": 560,
+      "U+E7CD": 560,
+      "U+E7CE": 560,
+      "U+E7CF": 560,
+      "U+E7D0": 560,
+      "U+E7D1": 142,
+      "U+E7D2": 142,
+      "U+E7D3": 145,
+      "U+E7D4": 145,
+      "U+E7D5": 407,
+      "U+E7D6": 407,
+      "U+E7D7": 410,
+      "U+E7D8": 410,
+      "U+E7D9": 296,
+      "U+E7DA": 296,
+      "U+E7DB": 546,
+      "U+E7DC": 444,
+      "U+E7DD": 399,
+      "U+E7DE": 95,
+      "U+E7DF": 405,
+      "U+E7E0": 402,
+      "U+E7E1": 557,
+      "U+E7E2": 285,
+      "U+E7E3": 519,
+      "U+E7E4": 519,
+      "U+E7E5": 511,
+      "U+E7E6": 306,
+      "U+E7E7": 1369,
+      "U+E7E8": 56,
+      "U+E7E9": 471,
+      "U+E7EA": 402,
+      "U+E7EB": 393,
+      "U+E7EC": 405,
+      "U+E7ED": 527,
+      "U+E7EE": 527,
+      "U+E7EF": 380,
+      "U+E7F0": 444,
+      "U+E7F1": 781,
+      "U+E7F2": 778,
+      "U+E7F3": 781,
+      "U+E7F4": 505,
+      "U+E7F5": 286,
+      "U+E7F6": 286,
+      "U+E7F7": 287,
+      "U+E7F8": 286,
+      "U+E7F9": 284,
+      "U+E7FA": 707,
+      "U+E7FB": 707,
+      "U+E7FC": 709,
+      "U+E7FD": 123,
+      "U+E7FE": 534,
+      "U+E7FF": 534,
+      "U+E800": 536,
+      "U+E801": 630,
+      "U+E802": 534,
+      "U+E803": 534,
+      "U+E804": 534,
+      "U+E805": 153,
+      "U+E806": 282,
+      "U+E807": 125,
+      "U+E808": 247,
+      "U+E809": 434,
+      "U+E80A": 434,
+      "U+E80B": 427,
+      "U+E80C": 253,
+      "U+E80D": 161,
+      "U+E80E": 781,
+      "U+E810": 258,
+      "U+E811": 414,
+      "U+E812": 259,
+      "U+E813": 479,
+      "U+E814": 282,
+      "U+E815": 283,
+      "U+E816": 436,
+      "U+E817": 231,
+      "U+E818": 128,
+      "U+E819": 128,
+      "U+E81A": 307,
+      "U+E81B": 329,
+      "U+E81C": 129,
+      "U+E81D": 781,
+      "U+E81E": 642,
+      "U+E81F": 533,
+      "U+E820": 732,
+      "U+E821": 780,
+      "U+E830": 509,
+      "U+E831": 534,
+      "U+E832": 1144,
+      "U+E833": 542,
+      "U+E834": 540,
+      "U+E835": 540,
+      "U+E836": 540,
+      "U+E837": 543,
+      "U+E838": 541,
+      "U+E839": 540,
+      "U+E83A": 540,
+      "U+E83B": 540,
+      "U+E83C": 540,
+      "U+E83D": 286,
+      "U+E83E": 286,
+      "U+E83F": 286,
+      "U+E840": 397,
+      "U+E841": 197,
+      "U+E842": 270,
+      "U+E843": 362,
+      "U+E844": 362,
+      "U+E845": 724,
+      "U+E846": 228,
+      "U+E847": 228,
+      "U+E848": 393,
+      "U+E849": 834,
+      "U+E84A": 540,
+      "U+E84B": 540,
+      "U+E84C": 540,
+      "U+E84D": 547,
+      "U+E850": 360,
+      "U+E851": 363,
+      "U+E852": 531,
+      "U+E853": 530,
+      "U+E854": 699,
+      "U+E855": 698,
+      "U+E856": 865,
+      "U+E857": 862,
+      "U+E858": 71,
+      "U+E859": 75,
+      "U+E85A": 71,
+      "U+E860": 706,
+      "U+E861": 709,
+      "U+E862": 297,
+      "U+E863": 297,
+      "U+E864": 743,
+      "U+E865": 743,
+      "U+E866": 743,
+      "U+E867": 743,
+      "U+E868": 425,
+      "U+E869": 425,
+      "U+E86A": 1252,
+      "U+E86B": 1264,
+      "U+E870": 473,
+      "U+E871": 474,
+      "U+E872": 395,
+      "U+E873": 559,
+      "U+E874": 325,
+      "U+E875": 165,
+      "U+E876": 164,
+      "U+E877": 155,
+      "U+E878": 155,
+      "U+E879": 107,
+      "U+E87A": 107,
+      "U+E87B": 314,
+      "U+E87C": 999,
+      "U+E880": 319,
+      "U+E881": 246,
+      "U+E882": 319,
+      "U+E883": 296,
+      "U+E884": 303,
+      "U+E885": 317,
+      "U+E886": 304,
+      "U+E887": 303,
+      "U+E888": 313,
+      "U+E889": 304,
+      "U+E88A": 111,
+      "U+E890": 399,
+      "U+E891": 199,
+      "U+E892": 199,
+      "U+E893": 400,
+      "U+E894": 717,
+      "U+E895": 614,
+      "U+E896": 506,
+      "U+E897": 719,
+      "U+E898": 612,
+      "U+E899": 505,
+      "U+E89A": 400,
+      "U+E8A0": 781,
+      "U+E8A1": 781,
+      "U+E8A2": 784,
+      "U+E8A3": 784,
+      "U+E8A4": 781,
+      "U+E8A5": 784,
+      "U+E8A6": 784,
+      "U+E8A7": 781,
+      "U+E8A8": 781,
+      "U+E8A9": 784,
+      "U+E8AA": 784,
+      "U+E8AB": 781,
+      "U+E8AC": 781,
+      "U+E8AD": 781,
+      "U+E8AE": 781,
+      "U+E8AF": 782,
+      "U+E8B0": 782,
+      "U+E8B1": 782,
+      "U+E8B2": 782,
+      "U+E8B3": 782,
+      "U+E8B4": 781,
+      "U+E8B5": 784,
+      "U+E8B6": 781,
+      "U+E8B7": 782,
+      "U+E8B8": 782,
+      "U+E8B9": 781,
+      "U+E8BA": 791,
+      "U+E8BB": 781,
+      "U+E8BC": 783,
+      "U+E8BD": 785,
+      "U+E8BE": 781,
+      "U+E8BF": 782,
+      "U+E8C0": 782,
+      "U+E8C1": 639,
+      "U+E8C2": 642,
+      "U+E8C3": 642,
+      "U+E8C4": 642,
+      "U+E8C5": 642,
+      "U+E8C6": 782,
+      "U+E8C7": 782,
+      "U+E8C8": 782,
+      "U+E8C9": 638,
+      "U+E8CA": 124,
+      "U+E8CB": 230,
+      "U+E8CC": 230,
+      "U+E8CD": 388,
+      "U+E8CE": 458,
+      "U+E8CF": 628,
+      "U+E8D0": 768,
+      "U+E8D1": 938,
+      "U+E8D2": 188,
+      "U+E8D3": 194,
+      "U+E8D4": 194,
+      "U+E8D5": 194,
+      "U+E8D6": 192,
+      "U+E8E0": 0,
+      "U+E8E1": 0,
+      "U+E8E2": 0,
+      "U+E8E3": 0,
+      "U+E8E4": 0,
+      "U+E8E5": 0,
+      "U+E8E6": 0,
+      "U+E8E7": 0,
+      "U+E8F0": 500,
+      "U+E8F1": 750,
+      "U+E8F2": 250,
+      "U+E8F3": 16,
+      "U+E8F4": 16,
+      "U+E8F5": 16,
+      "U+E8F6": 119,
+      "U+E8F7": 91,
+      "U+E8F8": 143,
+      "U+E900": 396,
+      "U+E901": 339,
+      "U+E902": 264,
+      "U+E903": 298,
+      "U+E904": 488,
+      "U+E905": 650,
+      "U+E906": 134,
+      "U+E907": 244,
+      "U+E908": 244,
+      "U+E909": 244,
+      "U+E90A": 244,
+      "U+E90B": 244,
+      "U+E910": 532,
+      "U+E911": 532,
+      "U+E912": 532,
+      "U+E913": 531,
+      "U+E914": 495,
+      "U+E915": 495,
+      "U+E916": 492,
+      "U+E917": 493,
+      "U+E918": 495,
+      "U+E919": 500,
+      "U+E91A": 494,
+      "U+E91B": 547,
+      "U+E91C": 743,
+      "U+E91D": 540,
+      "U+E91E": 540,
+      "U+E91F": 539,
+      "U+E920": 125,
+      "U+E921": 266,
+      "U+E922": 362,
+      "U+E923": 266,
+      "U+E924": 324,
+      "U+E925": 48,
+      "U+E926": 249,
+      "U+E927": 331,
+      "U+E928": 293,
+      "U+E929": 379,
+      "U+E92A": 222,
+      "U+E92B": 222,
+      "U+E92C": 1048,
+      "U+E92D": 1048,
+      "U+E92E": 1048,
+      "U+E92F": 1048,
+      "U+E930": 782,
+      "U+E931": 782,
+      "U+E932": 783,
+      "U+E933": 625,
+      "U+E934": 332,
+      "U+E935": 332,
+      "U+E936": 332,
+      "U+E937": 325,
+      "U+E938": 282,
+      "U+E939": 283,
+      "U+E93A": 282,
+      "U+E93B": 282,
+      "U+E93C": 320,
+      "U+E93D": 320,
+      "U+E93E": 32,
+      "U+E93F": 32,
+      "U+E940": 1,
+      "U+E941": 220,
+      "U+E942": 220,
+      "U+E943": 32,
+      "U+E944": 32,
+      "U+E945": 231,
+      "U+E946": 231,
+      "U+E947": 219,
+      "U+E948": 219,
+      "U+E949": 219,
+      "U+E94A": 219,
+      "U+E94B": 219,
+      "U+E94C": 219,
+      "U+E950": 782,
+      "U+E951": 332,
+      "U+E952": 332,
+      "U+E953": 282,
+      "U+E954": 282,
+      "U+E955": 345,
+      "U+E956": 332,
+      "U+E957": 283,
+      "U+E958": 282,
+      "U+E959": 282,
+      "U+E95A": 282,
+      "U+E95B": 511,
+      "U+E95C": 625,
+      "U+E95D": 325,
+      "U+E95E": 325,
+      "U+E95F": 320,
+      "U+E960": 320,
+      "U+E961": 348,
+      "U+E962": 320,
+      "U+E970": 782,
+      "U+E971": 782,
+      "U+E972": 783,
+      "U+E973": 781,
+      "U+E974": 782,
+      "U+E975": 782,
+      "U+E976": 783,
+      "U+E977": 781,
+      "U+E978": 782,
+      "U+E979": 782,
+      "U+E97A": 783,
+      "U+E97B": 781,
+      "U+E97C": 782,
+      "U+E97D": 782,
+      "U+E97E": 783,
+      "U+E97F": 781,
+      "U+E980": 782,
+      "U+E981": 782,
+      "U+E982": 783,
+      "U+E983": 781,
+      "U+E984": 782,
+      "U+E985": 782,
+      "U+E986": 783,
+      "U+E987": 781,
+      "U+E988": 782,
+      "U+E989": 782,
+      "U+E98A": 783,
+      "U+E98B": 781,
+      "U+E98C": 782,
+      "U+E98D": 782,
+      "U+E98E": 783,
+      "U+E98F": 781,
+      "U+E990": 160,
+      "U+E991": 150,
+      "U+E992": 162,
+      "U+E993": 90,
+      "U+E994": 154,
+      "U+E995": 154,
+      "U+E996": 160,
+      "U+E997": 160,
+      "U+E998": 160,
+      "U+E999": 266,
+      "U+E99A": 266,
+      "U+E99B": 154,
+      "U+E99C": 154,
+      "U+E99D": 154,
+      "U+E99E": 153,
+      "U+E99F": 124,
+      "U+E9A0": 152,
+      "U+E9A1": 91,
+      "U+E9B0": 139,
+      "U+E9B1": 0,
+      "U+E9B2": 14,
+      "U+E9B3": 14,
+      "U+E9B4": 14,
+      "U+E9B5": 14,
+      "U+E9B6": 14,
+      "U+E9B7": 14,
+      "U+E9B8": 14,
+      "U+E9B9": 465,
+      "U+E9BA": 579,
+      "U+E9BB": 579,
+      "U+E9BC": 579,
+      "U+E9BD": 14,
+      "U+E9BE": 14,
+      "U+E9BF": 14,
+      "U+E9C0": 14,
+      "U+E9C1": 14,
+      "U+E9C2": 161,
+      "U+E9C3": 163,
+      "U+E9C4": 169,
+      "U+E9C5": 178,
+      "U+E9D0": 32,
+      "U+E9D1": 32,
+      "U+E9D2": 94,
+      "U+E9D3": 94,
+      "U+E9D4": 94,
+      "U+E9D5": 94,
+      "U+E9D6": 73,
+      "U+E9D7": 74,
+      "U+E9D8": 164,
+      "U+E9D9": 66,
+      "U+E9E0": 205,
+      "U+E9E1": 186,
+      "U+E9E2": 102,
+      "U+E9E3": 430,
+      "U+E9E4": 226,
+      "U+E9E5": 168,
+      "U+E9F0": 147,
+      "U+E9F1": 48,
+      "U+E9F2": 48,
+      "U+E9F3": 48,
+      "U+E9F4": 48,
+      "U+E9F5": 48,
+      "U+E9F6": 139,
+      "U+E9F7": 139,
+      "U+E9F8": 138,
+      "U+EA00": 285,
+      "U+EA01": 285,
+      "U+EA02": 615,
+      "U+EA03": 615,
+      "U+EA04": 60,
+      "U+EA05": 60,
+      "U+EA06": 60,
+      "U+EA07": 60,
+      "U+EA08": 60,
+      "U+EA09": 60,
+      "U+EA0A": 558,
+      "U+EA0B": 467,
+      "U+EA0C": 182,
+      "U+EA0D": 182,
+      "U+EA0E": 182,
+      "U+EA0F": 182,
+      "U+EA10": 300,
+      "U+EA20": 416,
+      "U+EA21": 500,
+      "U+EA22": 330,
+      "U+EA23": 300,
+      "U+EA24": 376,
+      "U+EA25": 274,
+      "U+EA26": 275,
+      "U+EA27": 275,
+      "U+EA28": 403,
+      "U+EA29": 184,
+      "U+EA2A": 319,
+      "U+EA30": 654,
+      "U+EA31": 603,
+      "U+EA32": 665,
+      "U+EA33": 609,
+      "U+EA34": 654,
+      "U+EA35": 603,
+      "U+EA36": 315,
+      "U+EA37": 609,
+      "U+EA38": 654,
+      "U+EA39": 603,
+      "U+EA3A": 268,
+      "U+EA3B": 609,
+      "U+EA3C": 654,
+      "U+EA3D": 603,
+      "U+EA3E": 568,
+      "U+EA3F": 609,
+      "U+EA40": 755,
+      "U+EA41": 573,
+      "U+EA50": 255,
+      "U+EA51": 157,
+      "U+EA52": 242,
+      "U+EA53": 258,
+      "U+EA54": 225,
+      "U+EA55": 236,
+      "U+EA56": 320,
+      "U+EA57": 225,
+      "U+EA58": 228,
+      "U+EA59": 228,
+      "U+EA5A": 228,
+      "U+EA5B": 236,
+      "U+EA5C": 236,
+      "U+EA5D": 237,
+      "U+EA5E": 237,
+      "U+EA5F": 237,
+      "U+EA60": 232,
+      "U+EA61": 236,
+      "U+EA62": 237,
+      "U+EA63": 273,
+      "U+EA64": 177,
+      "U+EA65": 134,
+      "U+EA66": 191,
+      "U+EA67": 238,
+      "U+EA68": 68,
+      "U+EA69": 69,
+      "U+EA6A": 85,
+      "U+EA6B": 88,
+      "U+EA6C": 135,
+      "U+EA6D": 412,
+      "U+EA6E": 412,
+      "U+EA6F": 196,
+      "U+EA70": 504,
+      "U+EA71": 285,
+      "U+EA72": 517,
+      "U+EA73": 514,
+      "U+EA74": 532,
+      "U+EA75": 518,
+      "U+EA76": 510,
+      "U+EA77": 514,
+      "U+EA78": 516,
+      "U+EA79": 511,
+      "U+EA7A": 537,
+      "U+EA7B": 278,
+      "U+EA7C": 538,
+      "U+EA7D": 812,
+      "U+EA7E": 618,
+      "U+EA7F": 618,
+      "U+EA80": 509,
+      "U+EA81": 832,
+      "U+EA82": 832,
+      "U+EA83": 705,
+      "U+EA84": 500,
+      "U+EA85": 610,
+      "U+EA86": 457,
+      "U+EA87": 566,
+      "U+EA88": 508,
+      "U+EA89": 613,
+      "U+EA8A": 465,
+      "U+EA8B": 612,
+      "U+EA8C": 280,
+      "U+EA8D": 655,
+      "U+EA8E": 516,
+      "U+EA8F": 186,
+      "U+EA90": 186,
+      "U+EA91": 226,
+      "U+EA92": 223,
+      "U+EA93": 440,
+      "U+EA94": 440,
+      "U+EA95": 466,
+      "U+EA96": 540,
+      "U+EA97": 384,
+      "U+EA98": 385,
+      "U+EA99": 521,
+      "U+EA9A": 182,
+      "U+EA9B": 223,
+      "U+EA9C": 618,
+      "U+EA9D": 479,
+      "U+EA9E": 493,
+      "U+EA9F": 219,
+      "U+EAA0": 137,
+      "U+EAA1": 141,
+      "U+EAA2": 172,
+      "U+EAA3": 201,
+      "U+EAA4": 237,
+      "U+EAA5": 278,
+      "U+EAA6": 340,
+      "U+EAA7": 398,
+      "U+EAA8": 494,
+      "U+EAA9": 255,
+      "U+EAAA": 255,
+      "U+EAAB": 529,
+      "U+EAAC": 446,
+      "U+EAAD": 526,
+      "U+EAAE": 516,
+      "U+EAAF": 240,
+      "U+EAB0": 152,
+      "U+EAB1": 205,
+      "U+EAB2": 152,
+      "U+EAB3": 205,
+      "U+EAB4": 500,
+      "U+EAB5": 750,
+      "U+EAB6": 1e3,
+      "U+EAB7": 500,
+      "U+EAB8": 750,
+      "U+EAB9": 1e3,
+      "U+EABA": 499,
+      "U+EABB": 748,
+      "U+EABC": 1e3,
+      "U+EABD": 306,
+      "U+EABE": 125,
+      "U+EABF": 125,
+      "U+EAC0": 268,
+      "U+EAC1": 268,
+      "U+EAC2": 546,
+      "U+EAC3": 546,
+      "U+EAC4": 480,
+      "U+EAC5": 1148,
+      "U+EAC6": 741,
+      "U+EAC7": 583,
+      "U+EAC8": 431,
+      "U+EAC9": 459,
+      "U+EACA": 335,
+      "U+EACB": 162,
+      "U+EACC": 452,
+      "U+EACD": 120,
+      "U+EACE": 134,
+      "U+EACF": 146,
+      "U+EAD0": 175,
+      "U+EAD1": 208,
+      "U+EAD2": 247,
+      "U+EAD3": 287,
+      "U+EAD4": 136,
+      "U+EAD5": 155,
+      "U+EAD6": 179,
+      "U+EAD7": 215,
+      "U+EAD8": 252,
+      "U+EAD9": 291,
+      "U+EADA": 375,
+      "U+EADB": 185,
+      "U+EADC": 207,
+      "U+EADD": 242,
+      "U+EADE": 295,
+      "U+EADF": 346,
+      "U+EAE0": 422,
+      "U+EAE1": 500,
+      "U+EAE2": 261,
+      "U+EAE3": 316,
+      "U+EAE4": 376,
+      "U+EAE5": 440,
+      "U+EAE6": 539,
+      "U+EAE7": 648,
+      "U+EAE8": 763,
+      "U+EAE9": 385,
+      "U+EAEA": 471,
+      "U+EAEB": 561,
+      "U+EAEC": 664,
+      "U+EAED": 791,
+      "U+EAEE": 957,
+      "U+EAEF": 1134,
+      "U+EAF0": 1994,
+      "U+EAF1": 1994,
+      "U+EAF2": 1994,
+      "U+EAF3": 1994,
+      "U+EAF4": 1184,
+      "U+EAF5": 1109,
+      "U+EAF6": 1034,
+      "U+EAF7": 979,
+      "U+EAF8": 904,
+      "U+EAF9": 829,
+      "U+EAFA": 754,
+      "U+EAFB": 679,
+      "U+EAFC": 604,
+      "U+EAFD": 529,
+      "U+EAFE": 454,
+      "U+EAFF": 379,
+      "U+EB00": 304,
+      "U+EB01": 229,
+      "U+EB02": 154,
+      "U+EB03": 32,
+      "U+EB10": 548,
+      "U+EB11": 882,
+      "U+EB12": 882,
+      "U+EB13": 1e3,
+      "U+EB14": 1001,
+      "U+EB15": 862,
+      "U+EB16": 444,
+      "U+EB17": 947,
+      "U+EB18": 1003,
+      "U+EB19": 999,
+      "U+EB1A": 664,
+      "U+EB1B": 1e3,
+      "U+EB1C": 468,
+      "U+EB1D": 534,
+      "U+EB1E": 496,
+      "U+EB1F": 901,
+      "U+EB20": 901,
+      "U+EB21": 982,
+      "U+EB22": 982,
+      "U+EB23": 750,
+      "U+EB24": 661,
+      "U+EB25": 1143,
+      "U+EB26": 1097,
+      "U+EB27": 959,
+      "U+EB28": 548,
+      "U+EB29": 572,
+      "U+EB2A": 675,
+      "U+EB2B": 537,
+      "U+EB2C": 25,
+      "U+EB2D": 211,
+      "U+EB2E": 236,
+      "U+EB2F": 236,
+      "U+EB30": 236,
+      "U+EB31": 236,
+      "U+EB32": 236,
+      "U+EB33": 236,
+      "U+EB34": 537,
+      "U+EB35": 537,
+      "U+EB36": 548,
+      "U+EB37": 548,
+      "U+EB38": 548,
+      "U+EB39": 548,
+      "U+EB3A": 548,
+      "U+EB3B": 548,
+      "U+EB3C": 673,
+      "U+EB3D": 999,
+      "U+EB3E": 1001,
+      "U+EB3F": 1001,
+      "U+EB40": 1001,
+      "U+EB41": 1001,
+      "U+EB42": 1001,
+      "U+EB43": 1001,
+      "U+EB44": 1001,
+      "U+EB45": 1001,
+      "U+EB46": 1001,
+      "U+EB47": 821,
+      "U+EB48": 821,
+      "U+EB49": 1002,
+      "U+EB4A": 1002,
+      "U+EB4B": 817,
+      "U+EB4C": 817,
+      "U+EB4D": 1063,
+      "U+EB4E": 1063,
+      "U+EB4F": 543,
+      "U+EB50": 543,
+      "U+EB60": 228,
+      "U+EB61": 384,
+      "U+EB62": 527,
+      "U+EB63": 384,
+      "U+EB64": 228,
+      "U+EB65": 384,
+      "U+EB66": 527,
+      "U+EB67": 384,
+      "U+EB68": 228,
+      "U+EB69": 384,
+      "U+EB6A": 526,
+      "U+EB6B": 384,
+      "U+EB6C": 228,
+      "U+EB6D": 384,
+      "U+EB6E": 526,
+      "U+EB6F": 384,
+      "U+EB70": 209,
+      "U+EB71": 386,
+      "U+EB72": 528,
+      "U+EB73": 386,
+      "U+EB74": 209,
+      "U+EB75": 386,
+      "U+EB76": 528,
+      "U+EB77": 386,
+      "U+EB78": 228,
+      "U+EB79": 289,
+      "U+EB7A": 299,
+      "U+EB7B": 289,
+      "U+EB7C": 228,
+      "U+EB7D": 289,
+      "U+EB7E": 299,
+      "U+EB7F": 289,
+      "U+EB80": 228,
+      "U+EB81": 288,
+      "U+EB82": 299,
+      "U+EB83": 288,
+      "U+EB84": 228,
+      "U+EB85": 288,
+      "U+EB86": 299,
+      "U+EB87": 288,
+      "U+EB88": 209,
+      "U+EB89": 261,
+      "U+EB8A": 279,
+      "U+EB8B": 261,
+      "U+EB8C": 209,
+      "U+EB8D": 261,
+      "U+EB8E": 279,
+      "U+EB8F": 261,
+      "U+EB90": 0,
+      "U+EB91": 0,
+      "U+EB92": 0,
+      "U+EB93": 0,
+      "U+EB94": 0,
+      "U+EB95": 0,
+      "U+EB96": 0,
+      "U+EB97": 0,
+      "U+EB98": 0,
+      "U+EB99": 0,
+      "U+EB9A": 0,
+      "U+EB9B": 0,
+      "U+EB9C": 0,
+      "U+EB9D": 0,
+      "U+EB9E": 0,
+      "U+EB9F": 0,
+      "U+EBA0": 500,
+      "U+EBA1": 750,
+      "U+EBA2": 250,
+      "U+EBA3": 375,
+      "U+EBA4": 375,
+      "U+EBA5": 228,
+      "U+EBA6": 149,
+      "U+EBA7": 36,
+      "U+EBA8": 228,
+      "U+EBA9": 228,
+      "U+EBAA": 228,
+      "U+EBAB": 228,
+      "U+EBAC": 228,
+      "U+EBAD": 32,
+      "U+EBAE": 72,
+      "U+EBAF": 206,
+      "U+EBB0": 341,
+      "U+EBC0": 276,
+      "U+EBC1": 219,
+      "U+EBC2": 292,
+      "U+EBC3": 429,
+      "U+EBC4": 313,
+      "U+EBC5": 251,
+      "U+EBC6": 404,
+      "U+EBC7": 234,
+      "U+EBC8": 124,
+      "U+EBC9": 214,
+      "U+EBCA": 131,
+      "U+EBCB": 411,
+      "U+EBCC": 321,
+      "U+EBCD": 276,
+      "U+EBCE": 459,
+      "U+EBCF": 569,
+      "U+EBD0": 679,
+      "U+EBD1": 272,
+      "U+EBD2": 397,
+      "U+EBD3": 187,
+      "U+EBD4": 145,
+      "U+EBD5": 128,
+      "U+EBE0": 256,
+      "U+EBE1": 138,
+      "U+EBE2": 239,
+      "U+EBE3": 220,
+      "U+EBE4": 234,
+      "U+EBE5": 216,
+      "U+EBE6": 236,
+      "U+EBE7": 242,
+      "U+EBE8": 230,
+      "U+EBE9": 235,
+      "U+EBEA": 1127,
+      "U+EBEB": 1125,
+      "U+EBEC": 977,
+      "U+EBED": 979,
+      "U+EBEE": 977,
+      "U+EBEF": 663,
+      "U+EBF0": 789,
+      "U+EBF1": 476,
+      "U+EBF2": 206,
+      "U+EBF3": 307,
+      "U+EBF4": 673,
+      "U+EBF5": 348,
+      "U+EBF6": 397,
+      "U+EC00": 278,
+      "U+EC01": 298,
+      "U+EC02": 201,
+      "U+EC03": 288,
+      "U+EC04": 213,
+      "U+EC05": 246,
+      "U+EC06": 345,
+      "U+EC07": 304,
+      "U+EC08": 134,
+      "U+EC09": 248,
+      "U+EC0A": 168,
+      "U+EC0B": 483,
+      "U+EC0C": 314,
+      "U+EC0D": 314,
+      "U+EC0E": 329,
+      "U+EC0F": 315,
+      "U+EC10": 241,
+      "U+EC11": 246,
+      "U+EC12": 227,
+      "U+EC13": 335,
+      "U+EC14": 257,
+      "U+EC15": 304,
+      "U+EC16": 213,
+      "U+EC17": 479,
+      "U+EC18": 561,
+      "U+EC19": 413,
+      "U+EC1A": 560,
+      "U+EC1B": 503,
+      "U+EC1C": 402,
+      "U+EC1D": 545,
+      "U+EC1E": 473,
+      "U+EC1F": 525,
+      "U+EC20": 524,
+      "U+EC21": 422,
+      "U+EC22": 721,
+      "U+EC23": 607,
+      "U+EC30": 337,
+      "U+EC31": 353,
+      "U+EC32": 1161,
+      "U+EC33": 222,
+      "U+EC34": 299,
+      "U+EC35": 241,
+      "U+EC36": 266,
+      "U+EC37": 233,
+      "U+EC38": 233,
+      "U+EC39": 230,
+      "U+EC3A": 284,
+      "U+EC3B": 500,
+      "U+EC3C": 200,
+      "U+EC3D": 376,
+      "U+EC3E": 202,
+      "U+EC40": 986,
+      "U+EC41": 1100,
+      "U+EC42": 1249,
+      "U+EC43": 1036,
+      "U+EC44": 1162,
+      "U+EC45": 1107,
+      "U+EC46": 1051,
+      "U+EC50": 387,
+      "U+EC51": 387,
+      "U+EC52": 394,
+      "U+EC53": 394,
+      "U+EC54": 320,
+      "U+EC55": 441,
+      "U+EC56": 542,
+      "U+EC57": 542,
+      "U+EC58": 227,
+      "U+EC59": 387,
+      "U+EC5A": 387,
+      "U+EC60": 1086,
+      "U+EC61": 1130,
+      "U+EC62": 1163,
+      "U+EC63": 827,
+      "U+EC64": 827,
+      "U+EC80": 118,
+      "U+EC81": 118,
+      "U+EC82": 118,
+      "U+EC83": 118,
+      "U+EC84": 327,
+      "U+EC85": 446,
+      "U+EC86": 398,
+      "U+EC90": 753,
+      "U+EC91": 242,
+      "U+EC92": 242,
+      "U+EC93": 200,
+      "U+EC94": 200,
+      "U+EC95": 381,
+      "U+EC96": 381,
+      "U+EC97": 214,
+      "U+EC98": 214,
+      "U+ECA0": 655,
+      "U+ECA1": 533,
+      "U+ECA2": 459,
+      "U+ECA3": 341,
+      "U+ECA4": 341,
+      "U+ECA5": 332,
+      "U+ECA6": 332,
+      "U+ECA7": 534,
+      "U+ECA8": 332,
+      "U+ECA9": 522,
+      "U+ECAA": 332,
+      "U+ECAB": 538,
+      "U+ECAC": 332,
+      "U+ECAD": 537,
+      "U+ECAE": 332,
+      "U+ECAF": 537,
+      "U+ECB0": 332,
+      "U+ECB1": 541,
+      "U+ECB2": 332,
+      "U+ECB3": 542,
+      "U+ECB4": 332,
+      "U+ECB5": 541,
+      "U+ECB6": 332,
+      "U+ECB7": 100,
+      "U+ECC0": 237,
+      "U+ECC1": 374,
+      "U+ECC2": 354,
+      "U+ECD0": 599,
+      "U+ECD1": 581,
+      "U+ECD2": 575,
+      "U+ECD3": 579,
+      "U+ECD4": 510,
+      "U+ECD5": 537,
+      "U+ECD6": 584,
+      "U+ECD7": 538,
+      "U+ECD8": 497,
+      "U+ECD9": 460,
+      "U+ECDA": 482,
+      "U+ECDB": 459,
+      "U+ECDC": 477,
+      "U+ECDD": 522,
+      "U+ECE0": 470,
+      "U+ECE1": 334,
+      "U+ECE2": 446,
+      "U+ECE3": 421,
+      "U+ECE4": 470,
+      "U+ECE5": 403,
+      "U+ECE6": 434,
+      "U+ECE7": 441,
+      "U+ECE8": 436,
+      "U+ECE9": 434,
+      "U+ECEA": 424,
+      "U+ECEB": 417,
+      "U+ECF0": 470,
+      "U+ECF1": 334,
+      "U+ECF2": 446,
+      "U+ECF3": 421,
+      "U+ECF4": 470,
+      "U+ECF5": 403,
+      "U+ECF6": 434,
+      "U+ECF7": 441,
+      "U+ECF8": 436,
+      "U+ECF9": 434,
+      "U+ECFA": 424,
+      "U+ECFB": 417,
+      "U+ED00": 736,
+      "U+ED01": 732,
+      "U+ED02": 372,
+      "U+ED03": 311,
+      "U+ED10": 255,
+      "U+ED11": 157,
+      "U+ED12": 242,
+      "U+ED13": 225,
+      "U+ED14": 236,
+      "U+ED15": 225,
+      "U+ED16": 246,
+      "U+ED17": 272,
+      "U+ED18": 151,
+      "U+ED19": 164,
+      "U+ED1A": 415,
+      "U+ED1B": 267,
+      "U+ED1C": 222,
+      "U+ED1D": 285,
+      "U+ED1E": 200,
+      "U+ED1F": 231,
+      "U+ED20": 280,
+      "U+ED21": 280,
+      "U+ED22": 198,
+      "U+ED23": 157,
+      "U+ED24": 237,
+      "U+ED25": 242,
+      "U+ED26": 231,
+      "U+ED27": 235,
+      "U+ED28": 89,
+      "U+ED29": 90,
+      "U+ED2A": 67,
+      "U+ED2B": 67,
+      "U+ED2C": 147,
+      "U+ED2D": 147,
+      "U+ED2E": 164,
+      "U+ED30": 413,
+      "U+ED31": 282,
+      "U+ED32": 226,
+      "U+ED33": 287,
+      "U+ED34": 168,
+      "U+ED35": 163,
+      "U+ED36": 249,
+      "U+ED37": 317,
+      "U+ED38": 250,
+      "U+ED40": 708,
+      "U+ED41": 708,
+      "U+ED42": 878,
+      "U+ED43": 878,
+      "U+ED44": 958,
+      "U+ED45": 958,
+      "U+ED46": 958,
+      "U+ED47": 958,
+      "U+ED50": 100,
+      "U+ED51": 100,
+      "U+ED52": 226,
+      "U+ED53": 228,
+      "U+ED54": 169,
+      "U+ED55": 169,
+      "U+ED56": 250,
+      "U+ED57": 250,
+      "U+ED58": 167,
+      "U+ED59": 287,
+      "U+ED5A": 249,
+      "U+ED5B": 226,
+      "U+ED5C": 226,
+      "U+ED5D": 250,
+      "U+ED5E": 249,
+      "U+ED60": 284,
+      "U+ED61": 184,
+      "U+ED62": 310,
+      "U+ED63": 444,
+      "U+ED64": 524,
+      "U+ED65": 587,
+      "U+ED66": 764,
+      "U+ED70": 647,
+      "U+ED80": 231,
+      "U+ED81": 193,
+      "U+ED82": 242,
+      "U+ED83": 227,
+      "U+ED84": 237,
+      "U+ED85": 246,
+      "U+ED86": 235,
+      "U+ED87": 240,
+      "U+ED88": 242,
+      "U+ED89": 235,
+      "U+ED8A": 103,
+      "U+ED8B": 101,
+      "U+ED8C": 109,
+      "U+ED8D": 107,
+      "U+ED8E": 249,
+      "U+ED8F": 210,
+      "U+EDA0": 278,
+      "U+EDA1": 278,
+      "U+EDA2": 278,
+      "U+EDA3": 403,
+      "U+EDA4": 244,
+      "U+EDA5": 519,
+      "U+EDA6": 282,
+      "U+EDA7": 282,
+      "U+EDA8": 271,
+      "U+EDA9": 212,
+      "U+EDAA": 193,
+      "U+EDAB": 193,
+      "U+EDAC": 137,
+      "U+EDAD": 137,
+      "U+EDAE": 227,
+      "U+EDAF": 559,
+      "U+EDB0": 901,
+      "U+EDB1": 555,
+      "U+EDB2": 656,
+      "U+EDB3": 864,
+      "U+EDB4": 864,
+      "U+EDB5": 656,
+      "U+EDB6": 307,
+      "U+EDB7": 248,
+      "U+EDB8": 286,
+      "U+EDB9": 334,
+      "U+EDBA": 288,
+      "U+EDBB": 485,
+      "U+EDBC": 458,
+      "U+EDBD": 429,
+      "U+EDBE": 429,
+      "U+EDBF": 429,
+      "U+EDC0": 429,
+      "U+EDC1": 485,
+      "U+EDC2": 485,
+      "U+EDC3": 319,
+      "U+EDC4": 300,
+      "U+EDC5": 321,
+      "U+EDC6": 408,
+      "U+EDC7": 393,
+      "U+EDC8": 382,
+      "U+EDC9": 361,
+      "U+EDCA": 445,
+      "U+EDCB": 520,
+      "U+EDCC": 541,
+      "U+EDCD": 445,
+      "U+EDCE": 651,
+      "U+EDCF": 437,
+      "U+EDD0": 403,
+      "U+EDD1": 403,
+      "U+EDD2": 431,
+      "U+EDD3": 424,
+      "U+EDD4": 403,
+      "U+EDD5": 332,
+      "U+EDD6": 305,
+      "U+EDD7": 343,
+      "U+EDD8": 195,
+      "U+EDD9": 195,
+      "U+EDDA": 458,
+      "U+EDDB": 494,
+      "U+EDDC": 531,
+      "U+EDDD": 590,
+      "U+EDDE": 593,
+      "U+EDDF": 698,
+      "U+EDE0": 830,
+      "U+EDE1": 578,
+      "U+EDE2": 590,
+      "U+EDE3": 593,
+      "U+EDE4": 618,
+      "U+EDE5": 286,
+      "U+EDE6": 317,
+      "U+EDE7": 292,
+      "U+EDE8": 296,
+      "U+EDE9": 574,
+      "U+EDEA": 458,
+      "U+EDEB": 607,
+      "U+EDEC": 424,
+      "U+EDED": 406,
+      "U+EDEE": 172,
+      "U+EDEF": 189,
+      "U+EDF0": 574,
+      "U+EDF1": 574,
+      "U+EE00": 500,
+      "U+EE01": 500,
+      "U+EE02": 500,
+      "U+EE03": 500,
+      "U+EE04": 500,
+      "U+EE05": 500,
+      "U+EE06": 500,
+      "U+EE07": 500,
+      "U+EE08": 500,
+      "U+EE09": 500,
+      "U+EE0A": 500,
+      "U+EE0B": 500,
+      "U+EE0C": 500,
+      "U+EE0D": 500,
+      "U+EE0E": 500,
+      "U+EE0F": 500,
+      "U+EE10": 500,
+      "U+EE11": 500,
+      "U+EE12": 500,
+      "U+EE13": 500,
+      "U+EE14": 500,
+      "U+EE15": 500,
+      "U+EE16": 500,
+      "U+EE17": 500,
+      "U+EE18": 0,
+      "U+EE19": 0,
+      "U+EE1A": 0,
+      "U+EE1B": 0,
+      "U+EE1C": 0,
+      "U+EE1D": 500,
+      "U+EE1E": 500,
+      "U+EE1F": 500,
+      "U+EE20": 500,
+      "U+EE21": 500,
+      "U+EE22": 500,
+      "U+EE23": 500,
+      "U+EE24": 500,
+      "U+EE25": 500,
+      "U+EE26": 500,
+      "U+EE27": 500,
+      "U+EE28": 500,
+      "U+EE29": 500,
+      "U+EE2A": 500,
+      "U+EE2B": 500,
+      "U+EE2C": 1e3,
+      "U+EE2D": 1e3,
+      "U+EE2E": 1e3,
+      "U+EE2F": 1e3,
+      "U+EE30": 1500,
+      "U+EE31": 1500,
+      "U+EE32": 1500,
+      "U+EE33": 1500,
+      "U+EE34": 2e3,
+      "U+EE35": 2e3,
+      "U+EE36": 2e3,
+      "U+EE37": 2e3,
+      "U+EE38": 2500,
+      "U+EE39": 2500,
+      "U+EE3A": 2500,
+      "U+EE3B": 2500,
+      "U+EE3C": 3e3,
+      "U+EE3D": 3e3,
+      "U+EE3E": 3e3,
+      "U+EE3F": 3e3,
+      "U+EE50": 356,
+      "U+EE51": 356,
+      "U+EE52": 299,
+      "U+EE53": 299,
+      "U+EE54": 297,
+      "U+EE55": 297,
+      "U+EE56": 354,
+      "U+EE57": 356,
+      "U+EE58": 240,
+      "U+EE59": 240,
+      "U+EE60": 243,
+      "U+EE61": 241,
+      "U+EE62": 205,
+      "U+EE63": 209,
+      "U+EE64": 210,
+      "U+EE65": 222,
+      "U+EE66": 249,
+      "U+EE67": 223,
+      "U+EE68": 249,
+      "U+EE69": 223,
+      "U+EE70": 295,
+      "U+EE71": 295,
+      "U+EE72": 415,
+      "U+EE73": 415,
+      "U+EE80": 312,
+      "U+EE81": 248,
+      "U+EE82": 312,
+      "U+EE83": 300,
+      "U+EE84": 312,
+      "U+EE85": 250,
+      "U+EE86": 472,
+      "U+EE87": 472,
+      "U+EE88": 320,
+      "U+EE89": 320,
+      "U+EE8A": 472,
+      "U+EE8B": 472,
+      "U+EE90": 315,
+      "U+EE91": 324,
+      "U+EE92": 338,
+      "U+EE93": 325,
+      "U+EE94": 324,
+      "U+EEA0": 349,
+      "U+EEA1": 319,
+      "U+EEA2": 285,
+      "U+EEA3": 293,
+      "U+EEA4": 250,
+      "U+EEA5": 250,
+      "U+EEA6": 250,
+      "U+EEA7": 252,
+      "U+EEA8": 254,
+      "U+EEA9": 254,
+      "U+EEAA": 325,
+      "U+EEAB": 325,
+      "U+EEAC": 325,
+      "U+EEAD": 418,
+      "U+EEAE": 293,
+      "U+EEAF": 295,
+      "U+EEB0": 319,
+      "U+EEB1": 285,
+      "U+EEB2": 293,
+      "U+EEB3": 250,
+      "U+EEB4": 250,
+      "U+EEB5": 250,
+      "U+EEE0": 487,
+      "U+EEE1": 487,
+      "U+EEE2": 487,
+      "U+EEE3": 487,
+      "U+EEE4": 486,
+      "U+EEE5": 487,
+      "U+EEE6": 487,
+      "U+EEE7": 487,
+      "U+EEE8": 487,
+      "U+EEE9": 360,
+      "U+EEEA": 360,
+      "U+EEEB": 361,
+      "U+EEEC": 361,
+      "U+EEED": 360,
+      "U+EEEE": 361,
+      "U+EEEF": 361,
+      "U+EEF0": 361,
+      "U+EEF1": 361,
+      "U+EEF2": 358,
+      "U+EEF3": 359,
+      "U+EEF4": 359,
+      "U+EEF5": 359,
+      "U+EEF6": 358,
+      "U+EEF7": 359,
+      "U+EEF8": 359,
+      "U+EEF9": 358,
+      "U+EEFA": 359,
+      "U+EF00": 285,
+      "U+EF01": 517,
+      "U+EF02": 514,
+      "U+EF03": 532,
+      "U+EF04": 518,
+      "U+EF05": 510,
+      "U+EF06": 514,
+      "U+EF07": 516,
+      "U+EF08": 511,
+      "U+EF10": 167,
+      "U+EF11": 167,
+      "U+EF12": 167,
+      "U+EF13": 167,
+      "U+EF14": 167,
+      "U+EF15": 167,
+      "U+EF16": 167,
+      "U+EF17": 167,
+      "U+F400": 103,
+      "U+F401": 67,
+      "U+F402": 61,
+      "U+F403": 57,
+      "U+F404": 777,
+      "U+F405": 954,
+      "U+F406": 851,
+      "U+F407": 1041,
+      "U+F408": 863,
+      "U+F409": 297,
+      "U+F40A": 516,
+      "U+F40B": 487,
+      "U+F40C": 318,
+      "U+F40D": 324,
+      "U+F40E": 529,
+      "U+F40F": 250,
+      "U+F410": 267,
+      "U+F411": 262,
+      "U+F412": 262,
+      "U+F413": 264,
+      "U+F414": 279,
+      "U+F415": 262,
+      "U+F416": 265,
+      "U+F417": 276,
+      "U+F418": 262,
+      "U+F419": 262,
+      "U+F41A": 275,
+      "U+F41B": 264,
+      "U+F41C": 259,
+      "U+F41D": 275,
+      "U+F41E": 268,
+      "U+F41F": 265,
+      "U+F420": 301,
+      "U+F421": 268,
+      "U+F422": 268,
+      "U+F423": 301,
+      "U+F424": 301,
+      "U+F425": 272,
+      "U+F426": 301,
+      "U+F427": 263,
+      "U+F428": 190,
+      "U+F429": 261,
+      "U+F42A": 431,
+      "U+F42B": 431,
+      "U+F42C": 224,
+      "U+F42D": 250,
+      "U+F42E": 250,
+      "U+F42F": 384,
+      "U+F430": 384,
+      "U+F431": 601,
+      "U+F432": 200,
+      "U+F433": 200,
+      "U+F434": 922,
+      "U+F435": 1014,
+      "U+F436": 1124,
+      "U+F437": 981,
+      "U+F438": 1815,
+      "U+F439": 325,
+      "U+F43A": 862,
+      "U+F43B": 735,
+      "U+F43C": 346,
+      "U+F43D": 455,
+      "U+F43E": 372,
+      "U+F43F": 529,
+      "U+F440": 126,
+      "U+F441": 71,
+      "U+F442": 132,
+      "U+F443": 130,
+      "U+F444": 132,
+      "U+F445": 128,
+      "U+F446": 128,
+      "U+F447": 128,
+      "U+F448": 130,
+      "U+F449": 128,
+      "U+F44A": 139,
+      "U+F44B": 139,
+      "U+F44C": 80,
+      "U+F44D": 301,
+      "U+F44E": 524,
+      "U+F44F": 276,
+      "U+F450": 276,
+      "U+F451": 701,
+      "U+F452": 459,
+      "U+F453": 530,
+      "U+F454": 811,
+      "U+F455": 569,
+      "U+F456": 640,
+      "U+F457": 920,
+      "U+F458": 679,
+      "U+F459": 753,
+      "U+F45A": 291,
+      "U+F45B": 194,
+      "U+F45C": 608,
+      "U+F45D": 470,
+      "U+F45E": 361,
+      "U+F45F": 446,
+      "U+F460": 421,
+      "U+F461": 483,
+      "U+F462": 403,
+      "U+F463": 434,
+      "U+F464": 441,
+      "U+F465": 436,
+      "U+F466": 434,
+      "U+F467": 683,
+      "U+F468": 459,
+      "U+F469": 341,
+      "U+F46A": 352,
+      "U+F46B": 435,
+      "U+F46C": 542,
+      "U+F46D": 445,
+      "U+F46E": 359,
+      "U+F46F": 225,
+      "U+F470": 292,
+      "U+F471": 334,
+      "U+F472": 666,
+      "U+F473": 766,
+      "U+F474": 700,
+      "U+F475": 333,
+      "U+F476": 333,
+      "U+F477": 123,
+      "U+F478": 123,
+      "U+F479": 339,
+      "U+F47A": 339,
+      "U+F47B": 132,
+      "U+F47C": 132,
+      "U+F47D": 117,
+      "U+F47E": 117,
+      "U+F47F": 64,
+      "U+F480": 64,
+      "U+F481": 236,
+      "U+F482": 236,
+      "U+F483": 236,
+      "U+F484": 236,
+      "U+F485": 333,
+      "U+F486": 333,
+      "U+F487": 339,
+      "U+F488": 339,
+      "U+F489": 339,
+      "U+F48A": 339,
+      "U+F48B": 268,
+      "U+F48C": 269,
+      "U+F48D": 286,
+      "U+F48E": 317,
+      "U+F48F": 286,
+      "U+F490": 317,
+      "U+F491": 287,
+      "U+F492": 318,
+      "U+F493": 287,
+      "U+F494": 317,
+      "U+F495": 287,
+      "U+F496": 317,
+      "U+F497": 287,
+      "U+F498": 317,
+      "U+F499": 287,
+      "U+F49A": 318,
+      "U+F49B": 284,
+      "U+F49C": 284,
+      "U+F49D": 289,
+      "U+F49E": 286,
+      "U+F49F": 145,
+      "U+F4A0": 168,
+      "U+F4A1": 411,
+      "U+F4A2": 596,
+      "U+F4A3": 866,
+      "U+F4A4": 806,
+      "U+F4A5": 1196,
+      "U+F4A6": 1196,
+      "U+F4A7": 1134,
+      "U+F4A8": 1196,
+      "U+F4A9": 1196,
+      "U+F4AA": 1196,
+      "U+F4AB": 1201,
+      "U+F4AC": 1115,
+      "U+F4AD": 749,
+      "U+F4AE": 618,
+      "U+F4AF": 838,
+      "U+F4B0": 948,
+      "U+F4B1": 398,
+      "U+F4B2": 1437,
+      "U+F4B3": 948,
+      "U+F4B4": 1064,
+      "U+F4B5": 1362,
+      "U+F4B6": 784,
+      "U+F4B7": 1212,
+      "U+F4B8": 388,
+      "U+F4B9": 710,
+      "U+F4BA": 657,
+      "U+F4BB": 533,
+      "U+F4BC": 459,
+      "U+F4BD": 329,
+      "U+F4BE": 329,
+      "U+F4BF": 643,
+      "U+F4C0": 472,
+      "U+F4C1": 584,
+      "U+F4C2": 646,
+      "U+F4C3": 1316,
+      "U+F4C4": 1286,
+      "U+F4C5": 757,
+      "U+F4C6": 1445,
+      "U+F4C7": 1445,
+      "U+F4C8": 1231,
+      "U+F4C9": 1402,
+      "U+F4CA": 533,
+      "U+F4CB": 327,
+      "U+F4CC": 254,
+      "U+F4CD": 206,
+      "U+F4CE": 281,
+      "U+F4CF": 265,
+      "U+F4D0": 263,
+      "U+F4D1": 273,
+      "U+F4D2": 261,
+      "U+F4D3": 235,
+      "U+F4D4": 269,
+      "U+F4D5": 265,
+      "U+F4D6": 134,
+      "U+F4D7": 473,
+      "U+F4D8": 473,
+      "U+F4D9": 475,
+      "U+F4DA": 557,
+      "U+F4DB": 475,
+      "U+F4DC": 284,
+      "U+F4DD": 209,
+      "U+F4DE": 350,
+      "U+F4DF": 444,
+      "U+F4E0": 284,
+      "U+F4E1": 725,
+      "U+F4E2": 712,
+      "U+F4E3": 460,
+      "U+F4E4": 636,
+      "U+F4E5": 1176,
+      "U+F4E6": 936,
+      "U+F4E7": 600,
+      "U+F4E8": 261,
+      "U+F4E9": 636,
+      "U+F4EA": 439,
+      "U+F4EB": 636,
+      "U+F4EC": 936,
+      "U+F4ED": 1394,
+      "U+F4EE": 111,
+      "U+F4EF": 74,
+      "U+F4F0": 111,
+      "U+F4F1": 111,
+      "U+F4F2": 92,
+      "U+F4F3": 44,
+      "U+F4F4": 44,
+      "U+F4F5": 51,
+      "U+F4F6": 51,
+      "U+F4F7": 27,
+      "U+F4F8": 144,
+      "U+F4F9": 149,
+      "U+F4FA": 158,
+      "U+F4FB": 149,
+      "U+F4FC": 170,
+      "U+F4FD": 101,
+      "U+F4FE": 127,
+      "U+F4FF": 50,
+      "U+F500": 50,
+      "U+F501": 50,
+      "U+F502": 50,
+      "U+F503": 111,
+      "U+F504": 119,
+      "U+F505": 118,
+      "U+F506": 258,
+      "U+F507": 177,
+      "U+F508": 244,
+      "U+F509": 229,
+      "U+F50A": 258,
+      "U+F50B": 219,
+      "U+F50C": 237,
+      "U+F50D": 242,
+      "U+F50E": 240,
+      "U+F50F": 237,
+      "U+F510": 252,
+      "U+F511": 252,
+      "U+F512": 298,
+      "U+F513": 151,
+      "U+F514": 227,
+      "U+F515": 269,
+      "U+F516": 269,
+      "U+F517": 237,
+      "U+F518": 110,
+      "U+F519": 110,
+      "U+F51A": 184,
+      "U+F51B": 184,
+      "U+F51C": 116,
+      "U+F51D": 415,
+      "U+F51E": 424,
+      "U+F51F": 449,
+      "U+F520": 441,
+      "U+F521": 446,
+      "U+F522": 246,
+      "U+F523": 509,
+      "U+F524": 118,
+      "U+F525": 118,
+      "U+F526": 118,
+      "U+F527": 118,
+      "U+F528": 327,
+      "U+F529": 256,
+      "U+F52A": 250,
+      "U+F52B": 293,
+      "U+F52C": 168,
+      "U+F52D": 132,
+      "U+F52E": 186,
+      "U+F52F": 237,
+      "U+F530": 405,
+      "U+F531": 408,
+      "U+F532": 339,
+      "U+F533": 339,
+      "U+F534": 487,
+      "U+F535": 0,
+      "U+F536": 359,
+      "U+F537": 487,
+      "U+F538": 361,
+      "U+F539": 359,
+      "U+F53A": 487,
+      "U+F53B": 361,
+      "U+F53C": 359,
+      "U+F53D": 670,
+      "U+F53E": 150,
+      "U+F53F": 150,
+      "U+F540": 150,
+      "U+F541": 150,
+      "U+F542": 150,
+      "U+F543": 333,
+      "U+F544": 150,
+      "U+F545": 150,
+      "U+F546": 784,
+      "U+F547": 684,
+      "U+F548": 671,
+      "U+F549": 756,
+      "U+F54A": 692,
+      "U+F54B": 716,
+      "U+F54C": 696,
+      "U+F54D": 731,
+      "U+F54E": 713,
+      "U+F54F": 737,
+      "U+F550": 725,
+      "U+F551": 674,
+      "U+F552": 674,
+      "U+F553": 674,
+      "U+F554": 674,
+      "U+F555": 674,
+      "U+F556": 674,
+      "U+F557": 674,
+      "U+F558": 674,
+      "U+F559": 674,
+      "U+F55A": 674,
+      "U+F55B": 674,
+      "U+F55C": 674,
+      "U+F55D": 670,
+      "U+F55E": 674,
+      "U+F55F": 674,
+      "U+F560": 674,
+      "U+F561": 756,
+      "U+F562": 688,
+      "U+F563": 694,
+      "U+F564": 731,
+      "U+F565": 713,
+      "U+F566": 737,
+      "U+F567": 671,
+      "U+F568": 674,
+      "U+F569": 674,
+      "U+F56A": 674,
+      "U+F56B": 674,
+      "U+F56C": 714,
+      "U+F56D": 674,
+      "U+F56E": 674,
+      "U+F56F": 710,
+      "U+F570": 674,
+      "U+F571": 671,
+      "U+F572": 674,
+      "U+F573": 674,
+      "U+F574": 699,
+      "U+F575": 671,
+      "U+F576": 756,
+      "U+F577": 707,
+      "U+F578": 725,
+      "U+F579": 674,
+      "U+F57A": 674,
+      "U+F57B": 671,
+      "U+F57C": 674,
+      "U+F57D": 682,
+      "U+F57E": 674,
+      "U+F57F": 674,
+      "U+F580": 674,
+      "U+F581": 719,
+      "U+F582": 674,
+      "U+F583": 674,
+      "U+F584": 701,
+      "U+F585": 344,
+      "U+F586": 344,
+      "U+F587": 345,
+      "U+F588": 345,
+      "U+F589": 343,
+      "U+F58A": 343,
+      "U+F58B": 332,
+      "U+F58C": 332,
+      "U+F58D": 331,
+      "U+F58E": 332,
+      "U+F58F": 333,
+      "U+F590": 333,
+      "U+F591": 333,
+      "U+F592": 333,
+      "U+F593": 332,
+      "U+F594": 332,
+      "U+F595": 332,
+      "U+F596": 332,
+      "U+F597": 782,
+      "U+F598": 781,
+      "U+F599": 781,
+      "U+F59A": 782,
+      "U+F59B": 790,
+      "U+F59C": 783,
+      "U+F59D": 783,
+      "U+F59E": 783,
+      "U+F59F": 782,
+      "U+F5A0": 782,
+      "U+F5A1": 782,
+      "U+F5A2": 782,
+      "U+F5A3": 282,
+      "U+F5A4": 345,
+      "U+F5A5": 282,
+      "U+F5A6": 345,
+      "U+F5A7": 356,
+      "U+F5A8": 282,
+      "U+F5A9": 345,
+      "U+F5AA": 282,
+      "U+F5AB": 345,
+      "U+F5AC": 356,
+      "U+F5AD": 282,
+      "U+F5AE": 344,
+      "U+F5AF": 282,
+      "U+F5B0": 344,
+      "U+F5B1": 357,
+      "U+F5B2": 282,
+      "U+F5B3": 344,
+      "U+F5B4": 282,
+      "U+F5B5": 344,
+      "U+F5B6": 357,
+      "U+F5B7": 282,
+      "U+F5B8": 343,
+      "U+F5B9": 282,
+      "U+F5BA": 344,
+      "U+F5BB": 357,
+      "U+F5BC": 343,
+      "U+F5BD": 282,
+      "U+F5BE": 282,
+      "U+F5BF": 344,
+      "U+F5C0": 357,
+      "U+F5C1": 343,
+      "U+F5C2": 343,
+      "U+F5C3": 343,
+      "U+F5C4": 342,
+      "U+F5C5": 342,
+      "U+F5C6": 342,
+      "U+F5C7": 521,
+      "U+F5C8": 521,
+      "U+F5C9": 521,
+      "U+F5CA": 460,
+      "U+F5CB": 460,
+      "U+F5CC": 460,
+      "U+F5CD": 460,
+      "U+F5CE": 460,
+      "U+F5CF": 460,
+      "U+F5D0": 460,
+      "U+F5D1": 460,
+      "U+F5D2": 429,
+      "U+F5D3": 430,
+      "U+F5D4": 293,
+      "U+F5D5": 293,
+      "U+F5D6": 416,
+      "U+F5D7": 414,
+      "U+F5D8": 386,
+      "U+F5D9": 385,
+      "U+F5DA": 433,
+      "U+F5DB": 432,
+      "U+F5DC": 403,
+      "U+F5DD": 403,
+      "U+F5DE": 434,
+      "U+F5DF": 434,
+      "U+F5E0": 441,
+      "U+F5E1": 441,
+      "U+F5E2": 436,
+      "U+F5E3": 436,
+      "U+F5E4": 434,
+      "U+F5E5": 434,
+      "U+F5E6": 458,
+      "U+F5E7": 466,
+      "U+F5E8": 572,
+      "U+F5E9": 864,
+      "U+F5EA": 506,
+      "U+F5EB": 540,
+      "U+F5EC": 561,
+      "U+F5ED": 498,
+      "U+F5EE": 693,
+      "U+F5EF": 332,
+      "U+F5F0": 273,
+      "U+F5F1": 273,
+      "U+F5F2": 227,
+      "U+F5F3": 300,
+      "U+F5F4": 298,
+      "U+F5F5": 330,
+      "U+F5F6": 345,
+      "U+F5F7": 235,
+      "U+F5F8": 237,
+      "U+F5F9": 235,
+      "U+F5FA": 235,
+      "U+F5FB": 328,
+      "U+F5FC": 353,
+      "U+F5FD": 353,
+      "U+F5FE": 330,
+      "U+F5FF": 296,
+      "U+F600": 296,
+      "U+F601": 349,
+      "U+F602": 345,
+      "U+F603": 462,
+      "U+F604": 445,
+      "U+F605": 439,
+      "U+F606": 466,
+      "U+F607": 435,
+      "U+F608": 464,
+      "U+F609": 462,
+      "U+F60A": 433,
+      "U+F60B": 470,
+      "U+F60C": 431,
+      "U+F60D": 416,
+      "U+F60E": 418,
+      "U+F60F": 742,
+      "U+1D100": 37,
+      "U+1D101": 146,
+      "U+1D102": 229,
+      "U+1D103": 229,
+      "U+1D104": 37,
+      "U+1D105": 39,
+      "U+1D106": 368,
+      "U+1D107": 368,
+      "U+1D108": 102,
+      "U+1D109": 1082,
+      "U+1D10A": 1083,
+      "U+1D10B": 551,
+      "U+1D10C": 956,
+      "U+1D10D": 532,
+      "U+1D10E": 534,
+      "U+1D10F": 764,
+      "U+1D110": 607,
+      "U+1D111": 607,
+      "U+1D112": 156,
+      "U+1D113": 385,
+      "U+1D114": 88,
+      "U+1D115": 551,
+      "U+1D116": 500,
+      "U+1D117": 500,
+      "U+1D118": 500,
+      "U+1D119": 500,
+      "U+1D11A": 500,
+      "U+1D11B": 500,
+      "U+1D11C": 861,
+      "U+1D11D": 525,
+      "U+1D11E": 678,
+      "U+1D11F": 676,
+      "U+1D120": 673,
+      "U+1D121": 700,
+      "U+1D122": 681,
+      "U+1D123": 682,
+      "U+1D124": 682,
+      "U+1D125": 381,
+      "U+1D126": 314,
+      "U+1D129": 783,
+      "U+1D12A": 251,
+      "U+1D12B": 410,
+      "U+1D12C": 249,
+      "U+1D12D": 253,
+      "U+1D12E": 212,
+      "U+1D12F": 171,
+      "U+1D130": 247,
+      "U+1D131": 251,
+      "U+1D132": 393,
+      "U+1D133": 419,
+      "U+1D134": 422,
+      "U+1D135": 422,
+      "U+1D136": 885,
+      "U+1D137": 846,
+      "U+1D138": 1314,
+      "U+1D139": 1273,
+      "U+1D13A": 127,
+      "U+1D13B": 283,
+      "U+1D13C": 281,
+      "U+1D13D": 269,
+      "U+1D13E": 247,
+      "U+1D13F": 322,
+      "U+1D140": 364,
+      "U+1D141": 424,
+      "U+1D142": 486,
+      "U+1D143": 334,
+      "U+1D144": 281,
+      "U+1D145": 283,
+      "U+1D146": 354,
+      "U+1D147": 356,
+      "U+1D148": 331,
+      "U+1D149": 327,
+      "U+1D14A": 380,
+      "U+1D14B": 378,
+      "U+1D14C": 381,
+      "U+1D14D": 383,
+      "U+1D14E": 327,
+      "U+1D14F": 327,
+      "U+1D150": 380,
+      "U+1D151": 381,
+      "U+1D152": 356,
+      "U+1D153": 356,
+      "U+1D154": 314,
+      "U+1D155": 317,
+      "U+1D156": 320,
+      "U+1D157": 342,
+      "U+1D158": 332,
+      "U+1D159": 0,
+      "U+1D15A": 334,
+      "U+1D15B": 334,
+      "U+1D15C": 654,
+      "U+1D15D": 461,
+      "U+1D15E": 332,
+      "U+1D15F": 327,
+      "U+1D160": 539,
+      "U+1D161": 553,
+      "U+1D162": 559,
+      "U+1D163": 556,
+      "U+1D164": 568,
+      "U+1D165": 41,
+      "U+1D166": 42,
+      "U+1D167": 300,
+      "U+1D168": 300,
+      "U+1D169": 300,
+      "U+1D16A": 300,
+      "U+1D16B": 302,
+      "U+1D16C": 300,
+      "U+1D16D": 142,
+      "U+1D16E": 253,
+      "U+1D16F": 268,
+      "U+1D170": 264,
+      "U+1D171": 258,
+      "U+1D172": 259,
+      "U+1D173": 0,
+      "U+1D174": 0,
+      "U+1D175": 0,
+      "U+1D176": 0,
+      "U+1D177": 0,
+      "U+1D178": 0,
+      "U+1D179": 0,
+      "U+1D17A": 0,
+      "U+1D17B": 342,
+      "U+1D17C": 124,
+      "U+1D17D": 336,
+      "U+1D17E": 102,
+      "U+1D17F": 236,
+      "U+1D180": 236,
+      "U+1D181": 340,
+      "U+1D182": 339,
+      "U+1D183": 229,
+      "U+1D184": 228,
+      "U+1D185": 318,
+      "U+1D186": 295,
+      "U+1D187": 381,
+      "U+1D188": 307,
+      "U+1D189": 395,
+      "U+1D18A": 446,
+      "U+1D18B": 575,
+      "U+1D18C": 308,
+      "U+1D18D": 222,
+      "U+1D18E": 248,
+      "U+1D18F": 388,
+      "U+1D190": 434,
+      "U+1D191": 394,
+      "U+1D192": 736,
+      "U+1D193": 734,
+      "U+1D194": 358,
+      "U+1D195": 324,
+      "U+1D196": 539,
+      "U+1D197": 456,
+      "U+1D198": 459,
+      "U+1D199": 458,
+      "U+1D19A": 217,
+      "U+1D19B": 166,
+      "U+1D19C": 337,
+      "U+1D19D": 458,
+      "U+1D19E": 142,
+      "U+1D19F": 141,
+      "U+1D1A0": 32,
+      "U+1D1A1": 529,
+      "U+1D1A2": 314,
+      "U+1D1A3": 398,
+      "U+1D1A4": 398,
+      "U+1D1A5": 258,
+      "U+1D1A6": 707,
+      "U+1D1A7": 707,
+      "U+1D1A8": 297,
+      "U+1D1A9": 474,
+      "U+1D1AA": 314,
+      "U+1D1AB": 249,
+      "U+1D1AC": 200,
+      "U+1D1AD": 202,
+      "U+1D1AE": 1012,
+      "U+1D1AF": 442,
+      "U+1D1B0": 751,
+      "U+1D1B1": 1108,
+      "U+1D1B2": 1100,
+      "U+1D1B3": 398,
+      "U+1D1B4": 324,
+      "U+1D1B5": 346,
+      "U+1D1B6": 782,
+      "U+1D1B7": 532,
+      "U+1D1B8": 532,
+      "U+1D1B9": 283,
+      "U+1D1BA": 293,
+      "U+1D1BB": 282,
+      "U+1D1BC": 282,
+      "U+1D1BD": 342,
+      "U+1D1BE": 343,
+      "U+1D1BF": 343,
+      "U+1D1C0": 344,
+      "U+1D1C1": 47,
+      "U+1D1C2": 49,
+      "U+1D1C3": 47,
+      "U+1D1C4": 49,
+      "U+1D1C5": 47,
+      "U+1D1C6": 154,
+      "U+1D1C7": 532,
+      "U+1D1C8": 532,
+      "U+1D1C9": 532,
+      "U+1D1CA": 492,
+      "U+1D1CB": 492,
+      "U+1D1CC": 493,
+      "U+1D1CD": 498,
+      "U+1D1CE": 495,
+      "U+1D1CF": 430,
+      "U+1D1D0": 136,
+      "U+1D1D1": 266,
+      "U+1D1D2": 134,
+      "U+1D1D3": 134,
+      "U+1D1D4": 129,
+      "U+1D1D5": 255,
+      "U+1D1D6": 259,
+      "U+1D1D7": 310,
+      "U+1D1D8": 392,
+      "U+1D1D9": 407,
+      "U+1D1DA": 663,
+      "U+1D1DB": 419,
+      "U+1D1DC": 531,
+      "U+1D1DD": 315,
+      "U+1D1DE": 500,
+      "U+1D1DF": 500,
+      "U+1D1E0": 500,
+      "U+1D1E1": 500,
+      "U+1D1E2": 500,
+      "U+1D1E3": 500,
+      "U+1D1E4": 500,
+      "U+1D1E5": 500,
+      "U+1D1E6": 500,
+      "U+1D1E7": 500,
+      "U+1D1E8": 500
     }
   };
 
   // src/glyphs/glyph-table.ts
   var glyphnames = glyphnames_default;
   var bravuraMetadata = bravura_metadata_default;
+  var bravuraFontMetrics = bravura_font_metrics_default;
+  function hasFontCoverage(codepoint) {
+    return Object.prototype.hasOwnProperty.call(bravuraFontMetrics.cmapAdvanceWidths, codepoint);
+  }
   function codepointToChar(codepoint) {
     const hex = codepoint.replace(/^U\+/, "");
     return String.fromCodePoint(parseInt(hex, 16));
   }
   function getGlyph(name) {
     const entry = glyphnames[name];
-    if (entry === void 0) return void 0;
+    if (entry === void 0 || !hasFontCoverage(entry.codepoint)) return void 0;
     const bBox = bravuraMetadata.glyphBBoxes[name];
     const anchors = bravuraMetadata.glyphsWithAnchors[name];
+    const advanceWidth = bravuraMetadata.glyphAdvanceWidths[name];
     return {
       name,
       codepoint: entry.codepoint,
       char: codepointToChar(entry.codepoint),
       description: entry.description,
+      ...advanceWidth !== void 0 ? { advanceWidth } : {},
       ...bBox !== void 0 ? { bBox } : {},
       ...anchors !== void 0 ? { anchors } : {}
     };
@@ -57947,13 +68070,14 @@ var NotationEngine = (() => {
     return bravuraMetadata.engravingDefaults;
   }
   function getFontInfo() {
-    return { name: bravuraMetadata.fontName, version: bravuraMetadata.fontVersion };
+    return { name: bravuraMetadata.fontName, version: String(bravuraMetadata.fontVersion) };
   }
   var charIndex;
   function getGlyphByChar(char) {
     if (charIndex === void 0) {
       charIndex = /* @__PURE__ */ new Map();
       for (const [name2, entry] of Object.entries(glyphnames)) {
+        if (!hasFontCoverage(entry.codepoint)) continue;
         const c = codepointToChar(entry.codepoint);
         if (!charIndex.has(c)) charIndex.set(c, name2);
       }
@@ -58184,8 +68308,11 @@ var NotationEngine = (() => {
     return glyph;
   }
   function charAdvance(ch) {
-    const bbox = glyphForTimeSigChar(ch).bBox;
-    return bbox !== void 0 ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
+    const advance = glyphForTimeSigChar(ch).advanceWidth;
+    if (advance === void 0) {
+      throw new Error(`No Bravura advance width is available for time-signature character "${ch}"`);
+    }
+    return advance;
   }
   function textWidth(text) {
     let total = 0;
@@ -58336,7 +68463,9 @@ var NotationEngine = (() => {
   }
 
   // src/geometry/notehead.ts
-  function fillForDuration(type) {
+  function fillForDuration(type, explicitlyFilled) {
+    if (explicitlyFilled === true) return "black";
+    if (explicitlyFilled === false) return type === "whole" ? "whole" : "half";
     if (type === "whole") return "whole";
     if (type === "half") return "half";
     return "black";
@@ -58514,14 +68643,22 @@ var NotationEngine = (() => {
   function isKnownMusicXmlNotehead(value) {
     return Object.prototype.hasOwnProperty.call(MUSICXML_NOTEHEAD_SHAPES, value);
   }
+  function isKnownSmuflNoteheadGlyphName(name) {
+    const glyph = getGlyph(name);
+    if (glyph === void 0 || name === "noteheadParenthesisLeft" || name === "noteheadParenthesisRight") {
+      return false;
+    }
+    const codepoint = Number.parseInt(glyph.codepoint.slice(2), 16);
+    return codepoint >= 57504 && codepoint <= 57599 || codepoint >= 61088 && codepoint <= 61151;
+  }
   function supportedMusicXmlNoteheads() {
     return Object.keys(MUSICXML_NOTEHEAD_SHAPES);
   }
-  function shapeGlyphNameOrUndefined(shape, durationType) {
-    return SHAPE_GLYPHS[shape]?.[fillForDuration(durationType)];
+  function shapeGlyphNameOrUndefined(shape, durationType, explicitlyFilled) {
+    return SHAPE_GLYPHS[shape]?.[fillForDuration(durationType, explicitlyFilled)];
   }
-  function shapeGlyphName(shape, durationType) {
-    const glyph = shapeGlyphNameOrUndefined(shape, durationType);
+  function shapeGlyphName(shape, durationType, explicitlyFilled) {
+    const glyph = shapeGlyphNameOrUndefined(shape, durationType, explicitlyFilled);
     if (glyph === void 0) {
       throw new Error(
         `Unknown notehead shape "${shape}". Supported: ${Object.keys(SHAPE_GLYPHS).join(", ")}.`
@@ -58545,25 +68682,25 @@ var NotationEngine = (() => {
     return `${pitch.step}${pitch.octave}`;
   }
   function selectNoteheadGlyphName(input) {
-    if (input.explicitNoteheadSmufl !== void 0 && getGlyph(input.explicitNoteheadSmufl) !== void 0) {
+    if (input.explicitNoteheadSmufl !== void 0 && isKnownSmuflNoteheadGlyphName(input.explicitNoteheadSmufl)) {
       return input.explicitNoteheadSmufl;
     }
     if (input.explicitNotehead !== void 0) {
       const shape = musicXmlNoteheadToShape(input.explicitNotehead);
       if (shape !== void 0) {
-        const glyph = shapeGlyphNameOrUndefined(shape, input.durationType);
+        const glyph = shapeGlyphNameOrUndefined(shape, input.durationType, input.filled);
         if (glyph !== void 0) return glyph;
       }
     }
     const key = noteheadMappingKey(input.pitch, input.midiNote);
     const override = input.overridesByKey?.[key];
     if (override !== void 0) {
-      return shapeGlyphName(override, input.durationType);
+      return shapeGlyphName(override, input.durationType, input.filled);
     }
     if (input.defaultShape !== void 0) {
-      return shapeGlyphName(input.defaultShape, input.durationType);
+      return shapeGlyphName(input.defaultShape, input.durationType, input.filled);
     }
-    return durationDefaultNotehead(input.durationType);
+    return shapeGlyphName("normal", input.durationType, input.filled);
   }
 
   // src/geometry/stem.ts
@@ -60078,25 +70215,43 @@ ${denominator}`;
   }
 
   // src/render/tab.ts
-  function digitWidth(glyphName) {
-    const bbox = getGlyph(glyphName)?.bBox;
-    return bbox !== void 0 ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
+  function tabGlyphMetrics(glyphName) {
+    const glyph = getGlyph(glyphName);
+    if (glyph === void 0) throw new Error(`No glyph found for tab digit "${glyphName}"`);
+    if (glyph.advanceWidth === void 0 || glyph.bBox === void 0) {
+      throw new Error(`Incomplete Bravura metrics for tab digit "${glyphName}"`);
+    }
+    return {
+      advanceWidth: glyph.advanceWidth,
+      inkLeft: glyph.bBox.bBoxSW[0],
+      inkRight: glyph.bBox.bBoxNE[0]
+    };
   }
   var MASK_HALF_HEIGHT = 0.42;
   var MASK_PADDING = 0.12;
   function renderTabNumber(glyphNames, options) {
-    const widths = glyphNames.map(digitWidth);
-    const totalWidth = widths.reduce((sum, w) => sum + w, 0);
+    if (glyphNames.length === 0) return "";
+    const metrics = glyphNames.map(tabGlyphMetrics);
+    let pen = 0;
+    let inkLeft = Number.POSITIVE_INFINITY;
+    let inkRight = Number.NEGATIVE_INFINITY;
+    for (const metric of metrics) {
+      inkLeft = Math.min(inkLeft, pen + metric.inkLeft);
+      inkRight = Math.max(inkRight, pen + metric.inkRight);
+      pen += metric.advanceWidth;
+    }
+    const inkWidth = inkRight - inkLeft;
+    const originX = options.x - (inkLeft + inkRight) / 2;
     const parts = hasBackground(options.backgroundColor) ? [
       svgRect(
-        options.x - totalWidth / 2 - MASK_PADDING,
+        originX + inkLeft - MASK_PADDING,
         options.y - MASK_HALF_HEIGHT,
-        totalWidth + MASK_PADDING * 2,
+        inkWidth + MASK_PADDING * 2,
         MASK_HALF_HEIGHT * 2,
         { fill: options.backgroundColor }
       )
     ] : [];
-    let cursorX = options.x - totalWidth / 2;
+    let cursorX = originX;
     glyphNames.forEach((name, i2) => {
       const glyph = getGlyph(name);
       if (glyph === void 0) {
@@ -60105,20 +70260,27 @@ ${denominator}`;
       parts.push(
         svgGlyphText(cursorX, options.y, glyph.char, options.fontFamily, { fill: options.color })
       );
-      cursorX += widths[i2] ?? 0;
+      cursorX += metrics[i2]?.advanceWidth ?? 0;
     });
     return parts.join("\n");
   }
 
   // src/render/metronome.ts
-  function glyphWidth(glyphName) {
-    const bbox = getGlyph(glyphName)?.bBox;
-    return bbox !== void 0 ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
+  function glyphAdvanceWidth(glyphName) {
+    const glyph = getGlyph(glyphName);
+    if (glyph === void 0)
+      throw new Error(`No glyph found for metronome mark component "${glyphName}"`);
+    if (glyph.advanceWidth === void 0) {
+      throw new Error(
+        `No Bravura advance width is available for metronome mark component "${glyphName}"`
+      );
+    }
+    return glyph.advanceWidth;
   }
   var DOT_GAP = 0.25;
   function metronomeMarkWidth(noteGlyphName, dotGlyphName, beatsPerMinute, fontSize, noteToEqualsGap) {
-    let width = glyphWidth(noteGlyphName);
-    if (dotGlyphName !== void 0) width += DOT_GAP + glyphWidth(dotGlyphName);
+    let width = glyphAdvanceWidth(noteGlyphName);
+    if (dotGlyphName !== void 0) width += DOT_GAP + glyphAdvanceWidth(dotGlyphName);
     width += noteToEqualsGap;
     width += estimateTextWidth(metronomeTempoText(beatsPerMinute), fontSize);
     return width;
@@ -60127,11 +70289,11 @@ ${denominator}`;
     const parts = [];
     let cursorX = options.x;
     parts.push(drawGlyph(noteGlyphName, cursorX, options));
-    cursorX += glyphWidth(noteGlyphName);
+    cursorX += glyphAdvanceWidth(noteGlyphName);
     if (dotGlyphName !== void 0) {
       cursorX += DOT_GAP;
       parts.push(drawGlyph(dotGlyphName, cursorX, options));
-      cursorX += glyphWidth(dotGlyphName);
+      cursorX += glyphAdvanceWidth(dotGlyphName);
     }
     cursorX += options.noteToEqualsGap;
     parts.push(
@@ -60727,6 +70889,40 @@ ${denominator}`;
     const noteheadEl = firstChildNamed(noteEl, "notehead");
     const explicitNotehead = textOf(noteheadEl);
     const explicitNoteheadSmufl = noteheadEl?.getAttribute("smufl") ?? void 0;
+    if (explicitNoteheadSmufl !== void 0 && !isKnownSmuflNoteheadGlyphName(explicitNoteheadSmufl)) {
+      diagnostics.push(
+        diagnostic(
+          "warning",
+          "UNKNOWN_NOTEHEAD_SMUFL",
+          `Unknown or non-notehead SMuFL glyph "${explicitNoteheadSmufl}"; falling back to the MusicXML notehead value or duration default.`,
+          location
+        )
+      );
+    }
+    const parseYesNo = (raw, attribute, elementName) => {
+      if (raw === void 0) return void 0;
+      if (raw === "yes") return true;
+      if (raw === "no") return false;
+      diagnostics.push(
+        diagnostic(
+          "warning",
+          "INVALID_BOOLEAN_ATTRIBUTE",
+          `Invalid ${elementName} ${attribute}="${raw}"; ignoring the attribute.`,
+          location
+        )
+      );
+      return void 0;
+    };
+    const noteheadFilled = parseYesNo(
+      noteheadEl === void 0 ? void 0 : attrOf(noteheadEl, "filled"),
+      "filled",
+      "<notehead>"
+    );
+    const noteheadParentheses = parseYesNo(
+      noteheadEl === void 0 ? void 0 : attrOf(noteheadEl, "parentheses"),
+      "parentheses",
+      "<notehead>"
+    );
     if (explicitNotehead !== void 0 && !isKnownMusicXmlNotehead(explicitNotehead)) {
       diagnostics.push(
         diagnostic(
@@ -60746,6 +70942,28 @@ ${denominator}`;
     const explicitStemDirection = rawStemText === "up" || rawStemText === "down" ? rawStemText : void 0;
     const accidentalEl = firstChildNamed(noteEl, "accidental");
     const hasExplicitAccidental = accidentalEl !== void 0;
+    let accidentalParentheses = parseYesNo(
+      accidentalEl === void 0 ? void 0 : attrOf(accidentalEl, "parentheses"),
+      "parentheses",
+      "<accidental>"
+    );
+    let accidentalBracket = parseYesNo(
+      accidentalEl === void 0 ? void 0 : attrOf(accidentalEl, "bracket"),
+      "bracket",
+      "<accidental>"
+    );
+    if (accidentalParentheses === true && accidentalBracket === true) {
+      diagnostics.push(
+        diagnostic(
+          "warning",
+          "CONTRADICTORY_ACCIDENTAL_WRAPPERS",
+          "<accidental> cannot request both parentheses and brackets; drawing the accidental without a wrapper.",
+          location
+        )
+      );
+      accidentalParentheses = void 0;
+      accidentalBracket = void 0;
+    }
     let accidentalGlyphName2;
     if (accidentalEl !== void 0) {
       const accidentalValue = textOf(accidentalEl);
@@ -60799,6 +71017,31 @@ ${denominator}`;
     let isUnpitched2 = false;
     let hasExplicitDisplayPosition = false;
     let instrumentId;
+    let restDisplayStep;
+    let restDisplayOctave;
+    if (isRest) {
+      const restEl = firstChildNamed(noteEl, "rest");
+      const stepEl = restEl === void 0 ? void 0 : firstChildNamed(restEl, "display-step");
+      const octaveEl = restEl === void 0 ? void 0 : firstChildNamed(restEl, "display-octave");
+      if (stepEl !== void 0 || octaveEl !== void 0) {
+        const rawStep = textOf(stepEl);
+        const rawOctave = textOf(octaveEl);
+        const octave2 = intOf(octaveEl);
+        if (rawStep !== void 0 && isKnownStep(rawStep) && rawOctave !== void 0 && /^[-+]?\d+$/.test(rawOctave) && octave2 !== void 0) {
+          restDisplayStep = rawStep;
+          restDisplayOctave = octave2;
+        } else {
+          diagnostics.push(
+            diagnostic(
+              "warning",
+              "INVALID_REST_DISPLAY_POSITION",
+              "A rest display position requires a valid <display-step> and integer <display-octave>; using its duration-based default.",
+              location
+            )
+          );
+        }
+      }
+    }
     if (pitchEl !== void 0) {
       const rawStep = textOf(firstChildNamed(pitchEl, "step"));
       if (rawStep !== void 0 && isKnownStep(rawStep)) {
@@ -60847,7 +71090,8 @@ ${denominator}`;
       isUnpitched2 = true;
       const rawStep = textOf(firstChildNamed(unpitchedEl, "display-step"));
       const rawOctave = textOf(firstChildNamed(unpitchedEl, "display-octave"));
-      hasExplicitDisplayPosition = rawStep !== void 0 && rawOctave !== void 0;
+      const parsedOctave = intOf(firstChildNamed(unpitchedEl, "display-octave"));
+      hasExplicitDisplayPosition = rawStep !== void 0 && isKnownStep(rawStep) && rawOctave !== void 0 && /^[-+]?\d+$/.test(rawOctave) && parsedOctave !== void 0;
       if (rawStep !== void 0 && isKnownStep(rawStep)) {
         step = rawStep;
       } else {
@@ -60866,7 +71110,7 @@ ${denominator}`;
         );
         step = "B";
       }
-      octave = intOf(firstChildNamed(unpitchedEl, "display-octave"));
+      octave = parsedOctave;
       if (octave === void 0) {
         diagnostics.push(
           rawOctave === void 0 ? diagnostic(
@@ -60905,6 +71149,8 @@ ${denominator}`;
       ...instrumentId !== void 0 ? { instrumentId } : {},
       ...explicitNotehead !== void 0 ? { explicitNotehead } : {},
       ...explicitNoteheadSmufl !== void 0 ? { explicitNoteheadSmufl } : {},
+      ...noteheadFilled !== void 0 ? { noteheadFilled } : {},
+      ...noteheadParentheses !== void 0 ? { noteheadParentheses } : {},
       isGrace,
       graceSlash,
       ...tupletActualNotes !== void 0 ? { tupletActualNotes } : {},
@@ -60912,6 +71158,10 @@ ${denominator}`;
       ...explicitStemDirection !== void 0 ? { explicitStemDirection } : {},
       hasExplicitAccidental,
       ...accidentalGlyphName2 !== void 0 ? { accidentalGlyphName: accidentalGlyphName2 } : {},
+      ...accidentalParentheses !== void 0 ? { accidentalParentheses } : {},
+      ...accidentalBracket !== void 0 ? { accidentalBracket } : {},
+      ...restDisplayStep !== void 0 ? { restDisplayStep } : {},
+      ...restDisplayOctave !== void 0 ? { restDisplayOctave } : {},
       ...stringNumber !== void 0 ? { stringNumber } : {},
       ...fingering !== void 0 ? { fingering } : {},
       ...slideStart ? { slideStart: true } : {},
@@ -60925,13 +71175,27 @@ ${denominator}`;
   }
 
   // src/parser/musicxml/instrument.ts
-  function parseMidiInstrumentMap(scorePartEl) {
+  function parseMidiInstrumentMap(scorePartEl, diagnostics, location) {
     const map = /* @__PURE__ */ new Map();
     for (const midiInstrumentEl of childrenNamed(scorePartEl, "midi-instrument")) {
       const id = midiInstrumentEl.getAttribute("id");
-      const rawUnpitched = intOf(firstChildNamed(midiInstrumentEl, "midi-unpitched"));
-      if (id !== null && rawUnpitched !== void 0) {
-        map.set(id, rawUnpitched - 1);
+      const midiUnpitchedEl = firstChildNamed(midiInstrumentEl, "midi-unpitched");
+      if (midiUnpitchedEl === void 0) continue;
+      const rawUnpitched = textOf(midiUnpitchedEl);
+      const value = rawUnpitched !== void 0 && /^\d+$/.test(rawUnpitched) ? Number(rawUnpitched) : void 0;
+      if (value === void 0 || !Number.isSafeInteger(value) || value < 1 || value > 128) {
+        diagnostics?.push(
+          diagnostic(
+            "warning",
+            "INVALID_MIDI_UNPITCHED",
+            `Invalid <midi-unpitched> "${rawUnpitched ?? ""}"; expected an integer from 1 to 128, so this instrument has no GM mapping.`,
+            location
+          )
+        );
+        continue;
+      }
+      if (id !== null) {
+        map.set(id, value - 1);
       }
     }
     return map;
@@ -61346,6 +71610,8 @@ ${denominator}`;
         duration: buildDuration(ev),
         voice: ev.voice,
         ...ev.staff !== void 0 ? { staff: ev.staff } : {},
+        ...ev.restDisplayStep !== void 0 ? { displayStep: ev.restDisplayStep } : {},
+        ...ev.restDisplayOctave !== void 0 ? { displayOctave: ev.restDisplayOctave } : {},
         // A rest can carry a fermata exactly as a note can (§10.4).
         ...ev.notations.hasFermata ? { hasFermata: true } : {}
       });
@@ -61360,6 +71626,8 @@ ${denominator}`;
       ...ev.tieStop ? { tieStop: true } : {},
       ...ev.explicitNotehead !== void 0 ? { explicitNotehead: ev.explicitNotehead } : {},
       ...ev.explicitNoteheadSmufl !== void 0 ? { explicitNoteheadSmufl: ev.explicitNoteheadSmufl } : {},
+      ...ev.noteheadFilled !== void 0 ? { noteheadFilled: ev.noteheadFilled } : {},
+      ...ev.noteheadParentheses !== void 0 ? { noteheadParentheses: ev.noteheadParentheses } : {},
       ...ev.hasExplicitDisplayPosition === true ? { hasExplicitDisplayPosition: true } : {},
       ...ev.instrumentId !== void 0 ? { instrumentId: ev.instrumentId } : {},
       ...ev.stringNumber !== void 0 ? { stringNumber: ev.stringNumber } : {},
@@ -61371,6 +71639,8 @@ ${denominator}`;
       ...ev.explicitStemDirection !== void 0 ? { explicitStemDirection: ev.explicitStemDirection } : {},
       ...ev.hasExplicitAccidental ? { hasExplicitAccidental: true } : {},
       ...ev.accidentalGlyphName !== void 0 ? { accidentalGlyphName: ev.accidentalGlyphName } : {},
+      ...ev.accidentalParentheses !== void 0 ? { accidentalParentheses: ev.accidentalParentheses } : {},
+      ...ev.accidentalBracket !== void 0 ? { accidentalBracket: ev.accidentalBracket } : {},
       // Phase 35 Tier 2/§10.4. Every one of these is omitted entirely when
       // empty rather than set to an empty array, so a note from a file
       // with no notations at all produces a byte-identical object to the
@@ -61467,7 +71737,10 @@ ${denominator}`;
         const name = textOf(firstChildNamed(scorePartEl, "part-name"));
         if (id !== void 0) {
           partNames.set(id, name ?? id);
-          midiInstrumentMaps.set(id, parseMidiInstrumentMap(scorePartEl));
+          midiInstrumentMaps.set(
+            id,
+            parseMidiInstrumentMap(scorePartEl, diagnostics, { partId: id })
+          );
         }
       }
     }
@@ -66510,9 +76783,51 @@ ${xrefOffset}
     if (dots <= 0) return notehead;
     return notehead + DOT_NOTE_DISTANCE + dots * DOT_DOT_DISTANCE;
   }
-  function attackLeading(accidentalGlyph) {
-    if (accidentalGlyph === void 0) return 0;
-    return glyphWidthOf(accidentalGlyph) + ACCIDENTAL_NOTE_DISTANCE;
+  function glyphInkBoundsX(glyphName) {
+    const box = getGlyph(glyphName)?.bBox;
+    return box === void 0 ? { left: 0, right: 0 } : { left: box.bBoxSW[0], right: box.bBoxNE[0] };
+  }
+  function accidentalRunMetrics(glyphName, parentheses = false, bracket = false) {
+    const leftWrapper = parentheses ? "accidentalParensLeft" : bracket ? "accidentalBracketLeft" : void 0;
+    if (leftWrapper === void 0) {
+      const bounds = glyphInkBoundsX(glyphName);
+      return { ...bounds, centerGlyphOffset: 0, rightGlyphOffset: 0 };
+    }
+    const rightWrapper = parentheses ? "accidentalParensRight" : "accidentalBracketRight";
+    const gap = 0.06;
+    const leftBounds = glyphInkBoundsX(leftWrapper);
+    const accidentalBounds = glyphInkBoundsX(glyphName);
+    const rightBounds = glyphInkBoundsX(rightWrapper);
+    const centerGlyphOffset = leftBounds.right + gap - accidentalBounds.left;
+    const rightGlyphOffset = centerGlyphOffset + accidentalBounds.right + gap - rightBounds.left;
+    return {
+      left: Math.min(
+        leftBounds.left,
+        centerGlyphOffset + accidentalBounds.left,
+        rightGlyphOffset + rightBounds.left
+      ),
+      right: Math.max(
+        leftBounds.right,
+        centerGlyphOffset + accidentalBounds.right,
+        rightGlyphOffset + rightBounds.right
+      ),
+      centerGlyphOffset,
+      rightGlyphOffset,
+      leftWrapper,
+      rightWrapper
+    };
+  }
+  function accidentalDrawingWidth(glyphName, parentheses = false, bracket = false) {
+    const metrics = accidentalRunMetrics(glyphName, parentheses, bracket);
+    return metrics.right - metrics.left;
+  }
+  function accidentalGroupOriginX(noteX, glyphName, column, parentheses = false, bracket = false) {
+    const metrics = accidentalRunMetrics(glyphName, parentheses, bracket);
+    return accidentalX(noteX, metrics.right - metrics.left, column) - metrics.left;
+  }
+  function attackLeading(accidentalWidth) {
+    if (accidentalWidth === void 0) return 0;
+    return accidentalWidth + ACCIDENTAL_NOTE_DISTANCE;
   }
   var MEASURE_TRAILING_MARGIN = 2;
   var REST_TO_REST_CLEARANCE = 0.55;
@@ -66559,11 +76874,7 @@ ${xrefOffset}
   var TUPLET_BRACKET_THICKNESS_FALLBACK = 0.16;
   var DYNAMIC_GAP = 2.5;
   var HAIRPIN_THICKNESS_FALLBACK = 0.16;
-  function staffPositionOfNote(note2, clefDef) {
-    const p = note2.pitch;
-    return p.kind === "pitched" ? staffPositionForPitch(clefDef, p.step, p.octave) : staffPositionForPitch(clefDef, p.displayStep, p.displayOctave);
-  }
-  function worstCaseStaffExtent(part2, staffNumber, allAttributes, side) {
+  function worstCaseStaffExtent(part2, staffNumber, allAttributes, side, theme, midiInstrumentsByPart) {
     const firstAttrs = allAttributes.find((a) => a.partId === part2.id);
     const clefSpec = firstAttrs?.clefsByStaff[staffNumber];
     if (clefSpec === void 0) return 0;
@@ -66580,10 +76891,24 @@ ${xrefOffset}
         for (const event of voice2.events) {
           if ((event.staff ?? 1) !== staffNumber) continue;
           if (event.kind === "note") {
-            consider(staffPositionOfNote(event, clefDef));
+            consider(
+              resolveNoteRendering(event, {
+                clefDef,
+                measureBottomY: 0,
+                theme,
+                midiInstrumentsByPart
+              }).position
+            );
           } else if (event.kind === "chord") {
             for (const n of event.notes) {
-              consider(staffPositionOfNote(n, clefDef));
+              consider(
+                resolveNoteRendering(n, {
+                  clefDef,
+                  measureBottomY: 0,
+                  theme,
+                  midiInstrumentsByPart
+                }).position
+              );
             }
           }
         }
@@ -66620,9 +76945,14 @@ ${xrefOffset}
               state = decision.newState;
               const glyphName = tryAccidentalGlyphName(note2.pitch.alter, note2.accidentalGlyphName);
               if (!decision.shouldDraw || glyphName === void 0) continue;
+              const width = accidentalDrawingWidth(
+                glyphName,
+                note2.accidentalParentheses === true,
+                note2.accidentalBracket === true
+              );
               const previous = drawn.get(tick);
-              if (previous === void 0 || glyphWidthOf(glyphName) > glyphWidthOf(previous)) {
-                drawn.set(tick, glyphName);
+              if (previous === void 0 || width > previous) {
+                drawn.set(tick, width);
               }
             }
           });
@@ -66765,6 +77095,70 @@ ${xrefOffset}
     const bbox = getGlyph(glyphName)?.bBox;
     return bbox !== void 0 ? bbox.bBoxNE[0] - bbox.bBoxSW[0] : 0;
   }
+  function renderNoteheadWithParentheses(glyphName, x2, y, options) {
+    if (!options.parentheses) {
+      return renderNotehead(glyphName, {
+        x: x2,
+        y,
+        color: options.color,
+        fontFamily: options.fontFamily
+      });
+    }
+    const headBox = getGlyph(glyphName)?.bBox;
+    const leftBox = getGlyph("noteheadParenthesisLeft")?.bBox;
+    const rightBox = getGlyph("noteheadParenthesisRight")?.bBox;
+    const gap = 0.04;
+    const headLeft = x2 + (headBox?.bBoxSW[0] ?? 0);
+    const headRight = x2 + (headBox?.bBoxNE[0] ?? glyphWidthOf(glyphName));
+    const leftX = headLeft - (leftBox?.bBoxNE[0] ?? glyphWidthOf("noteheadParenthesisLeft")) - gap;
+    const rightX = headRight + gap - (rightBox?.bBoxSW[0] ?? 0);
+    return [
+      renderNotehead("noteheadParenthesisLeft", {
+        x: leftX,
+        y,
+        color: options.color,
+        fontFamily: options.fontFamily
+      }),
+      renderNotehead("noteheadParenthesisRight", {
+        x: rightX,
+        y,
+        color: options.color,
+        fontFamily: options.fontFamily
+      }),
+      renderNotehead(glyphName, { x: x2, y, color: options.color, fontFamily: options.fontFamily })
+    ].join("\n");
+  }
+  function renderAccidentalWithWrapper(glyphName, x2, y, options) {
+    const metrics = accidentalRunMetrics(glyphName, options.parentheses, options.bracket);
+    if (metrics.leftWrapper === void 0 || metrics.rightWrapper === void 0) {
+      return renderAccidental(glyphName, {
+        x: x2,
+        y,
+        color: options.color,
+        fontFamily: options.fontFamily
+      });
+    }
+    return [
+      renderAccidental(metrics.leftWrapper, {
+        x: x2,
+        y,
+        color: options.color,
+        fontFamily: options.fontFamily
+      }),
+      renderAccidental(glyphName, {
+        x: x2 + metrics.centerGlyphOffset,
+        y,
+        color: options.color,
+        fontFamily: options.fontFamily
+      }),
+      renderAccidental(metrics.rightWrapper, {
+        x: x2 + metrics.rightGlyphOffset,
+        y,
+        color: options.color,
+        fontFamily: options.fontFamily
+      })
+    ].join("\n");
+  }
   function renderNoteMarks(source, x2, topPosition, bottomPosition, direction, ctx) {
     const articulations = source.articulations ?? [];
     const ornaments = source.ornaments ?? [];
@@ -66818,6 +77212,7 @@ ${xrefOffset}
     const noteheadGlyph = selectNoteheadGlyphName({
       pitch: note2.pitch,
       durationType: note2.duration.type,
+      ...note2.noteheadFilled !== void 0 ? { filled: note2.noteheadFilled } : {},
       defaultShape: ctx.theme.noteheadMapping.defaultShape,
       ...note2.explicitNotehead !== void 0 ? { explicitNotehead: note2.explicitNotehead } : {},
       ...note2.explicitNoteheadSmufl !== void 0 ? { explicitNoteheadSmufl: note2.explicitNoteheadSmufl } : drumGlyph !== void 0 ? { explicitNoteheadSmufl: drumGlyph } : {},
@@ -66866,23 +77261,32 @@ ${xrefOffset}
       state = decision.newState;
       const glyphName = tryAccidentalGlyphName(note2.pitch.alter, note2.accidentalGlyphName);
       if (decision.shouldDraw && glyphName !== void 0) {
-        const width = glyphWidthOf(glyphName);
         parts.push(
-          renderAccidental(glyphName, {
-            x: accidentalX(x2, width, 0),
+          renderAccidentalWithWrapper(
+            glyphName,
+            accidentalGroupOriginX(
+              x2,
+              glyphName,
+              0,
+              note2.accidentalParentheses === true,
+              note2.accidentalBracket === true
+            ),
             y,
-            color: ctx.theme.colorOf("accidental"),
-            fontFamily: ctx.theme.musicFont
-          })
+            {
+              color: ctx.theme.colorOf("accidental"),
+              fontFamily: ctx.theme.musicFont,
+              parentheses: note2.accidentalParentheses === true,
+              bracket: note2.accidentalBracket === true
+            }
+          )
         );
       }
     }
     parts.push(
-      renderNotehead(noteheadGlyph, {
-        x: x2,
-        y,
+      renderNoteheadWithParentheses(noteheadGlyph, x2, y, {
         color: ctx.theme.colorOf("notehead"),
-        fontFamily: ctx.theme.musicFont
+        fontFamily: ctx.theme.musicFont,
+        parentheses: note2.noteheadParentheses === true
       })
     );
     const ledgerLines = computeLedgerLines(position, STAFF_LINES);
@@ -66918,7 +77322,7 @@ ${xrefOffset}
   }
   function renderNoteOrRest(ev, x2, ctx, accidentalState, forcedDirection, restOffset) {
     if (ev.kind === "rest") {
-      const restPosition = restY(ev.duration.type, STAFF_LINES, restOffset);
+      const restPosition = ev.displayStep !== void 0 && ev.displayOctave !== void 0 && ctx.clefDef.positionsByPitch ? staffPositionForPitch(ctx.clefDef, ev.displayStep, ev.displayOctave) + restOffset : restY(ev.duration.type, STAFF_LINES, restOffset);
       const y2 = ctx.measureBottomY + restPosition;
       const restGlyph = restGlyphName(ev.duration.type);
       const svg = [
@@ -66960,14 +77364,20 @@ ${xrefOffset}
         state = decision.newState;
         const glyphName = tryAccidentalGlyphName(ev.pitch.alter, ev.accidentalGlyphName);
         if (decision.shouldDraw && glyphName !== void 0) {
-          const width = glyphWidthOf(glyphName);
+          const parentheses = ev.accidentalParentheses === true;
+          const bracket = ev.accidentalBracket === true;
           parts2.push(
-            renderAccidental(glyphName, {
-              x: accidentalX(x2, width, 0),
-              y: graceY,
-              color: ctx.theme.colorOf("accidental"),
-              fontFamily: ctx.theme.musicFont
-            })
+            renderAccidentalWithWrapper(
+              glyphName,
+              accidentalGroupOriginX(x2, glyphName, 0, parentheses, bracket),
+              graceY,
+              {
+                color: ctx.theme.colorOf("accidental"),
+                fontFamily: ctx.theme.musicFont,
+                parentheses,
+                bracket
+              }
+            )
           );
         }
       }
@@ -67181,14 +77591,22 @@ ${xrefOffset}
       if (placement === void 0) return;
       const glyphName = accidentalGlyphs[i2];
       if (glyphName === void 0) return;
-      const width = glyphWidthOf(glyphName);
+      const member = chord2.notes[i2];
+      if (member === void 0) return;
+      const parentheses = member.accidentalParentheses === true;
+      const bracket = member.accidentalBracket === true;
       parts.push(
-        renderAccidental(glyphName, {
-          x: accidentalX(x2, width, placement.column),
-          y: ctx.measureBottomY + placement.y,
-          color: ctx.theme.colorOf("accidental"),
-          fontFamily: ctx.theme.musicFont
-        })
+        renderAccidentalWithWrapper(
+          glyphName,
+          accidentalGroupOriginX(x2, glyphName, placement.column, parentheses, bracket),
+          ctx.measureBottomY + placement.y,
+          {
+            color: ctx.theme.colorOf("accidental"),
+            fontFamily: ctx.theme.musicFont,
+            parentheses,
+            bracket
+          }
+        )
       );
     });
     let widestGlyph;
@@ -67201,12 +77619,12 @@ ${xrefOffset}
       }
       const position = positions[i2] ?? 0;
       const y = ctx.measureBottomY + position;
+      const note2 = chord2.notes[i2];
       parts.push(
-        renderNotehead(glyphName, {
-          x: x2,
-          y,
+        renderNoteheadWithParentheses(glyphName, x2, y, {
           color: ctx.theme.colorOf("notehead"),
-          fontFamily: ctx.theme.musicFont
+          fontFamily: ctx.theme.musicFont,
+          parentheses: note2?.noteheadParentheses === true
         })
       );
       const ledgerLines = computeLedgerLines(position, STAFF_LINES);
@@ -67309,7 +77727,7 @@ ${xrefOffset}
         if ((event.staff ?? 1) !== staffNumber) return;
         const tick = starts[idx] ?? 0;
         if (event.kind === "rest") {
-          const y = restY(event.duration.type, STAFF_LINES, base);
+          const y = event.displayStep !== void 0 && event.displayOctave !== void 0 && ctx.clefDef.positionsByPitch ? staffPositionForPitch(ctx.clefDef, event.displayStep, event.displayOctave) + base : restY(event.duration.type, STAFF_LINES, base);
           const { top, bottom } = glyphExtent(restGlyphName(event.duration.type), y);
           extents.push({
             voiceId: voice2.id,
@@ -67567,6 +77985,29 @@ ${xrefOffset}
     const config = resolveConfig(options?.config);
     const drawnTempoMarks = config.tempoMarks.display === "off" ? [] : tempoMarks;
     const theme = buildTheme(config, fileDefaults);
+    for (const part2 of score2.parts) {
+      const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part2.id);
+      for (const measure2 of part2.measures) {
+        for (const voice2 of measure2.voices) {
+          for (const event of voice2.events) {
+            const notes = event.kind === "note" ? [event] : event.kind === "chord" ? event.notes : [];
+            for (const note2 of notes) {
+              if (note2.pitch.kind !== "unpitched" || note2.instrumentId === void 0) continue;
+              const gmNote = midiInstrumentsByPart?.get(note2.instrumentId);
+              if (gmNote === void 0) continue;
+              for (const d of lookupDrumMapEntry(gmNote, theme.drumMap).diagnostics) {
+                diagnostics.push({
+                  severity: d.severity,
+                  code: d.code,
+                  message: d.message,
+                  location: { partId: part2.id, measureNumber: measure2.number }
+                });
+              }
+            }
+          }
+        }
+      }
+    }
     const staffBottomYs = /* @__PURE__ */ new Set();
     let reportedTransparentTabMask = false;
     const pageSpacingConfig = config.spacing;
@@ -67848,8 +78289,23 @@ ${xrefOffset}
       if (part2 === void 0) return 8;
       const upperStaffNumber = staffIndexInPart + 1;
       const lowerStaffNumber = staffIndexInPart + 2;
-      const upperExtent = worstCaseStaffExtent(part2, upperStaffNumber, attributes, "south");
-      const lowerExtent = worstCaseStaffExtent(part2, lowerStaffNumber, attributes, "north");
+      const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part2.id);
+      const upperExtent = worstCaseStaffExtent(
+        part2,
+        upperStaffNumber,
+        attributes,
+        "south",
+        theme,
+        midiInstrumentsByPart
+      );
+      const lowerExtent = worstCaseStaffExtent(
+        part2,
+        lowerStaffNumber,
+        attributes,
+        "north",
+        theme,
+        midiInstrumentsByPart
+      );
       const upperSouth = addToSkyline(emptySkyline("south"), { xStart: 0, xEnd: 1, y: upperExtent });
       const lowerNorth = addToSkyline(emptySkyline("north"), { xStart: 0, xEnd: 1, y: lowerExtent });
       const lowerStaffLines = attributes.find((a) => a.partId === part2.id)?.staffLinesByStaff[lowerStaffNumber] ?? STAFF_LINES;

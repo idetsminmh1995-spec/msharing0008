@@ -18,6 +18,50 @@ function render() {
 }
 
 describe('GM drum mapping wired into rendering (Phase 41, §13.1/§13.3)', () => {
+  test('malformed display coordinates fall back to the valid GM position, and lookup warnings reach render diagnostics with location', () => {
+    const xml = fs.readFileSync(path.join(FIXTURES_DIR, 'gm-drum-correctness.musicxml'), 'utf8');
+    const { svg, diagnostics } = NE.renderFromMusicXml(xml, { domParser });
+
+    // The first note's invalid H/not-a-number display position recovers as
+    // B4, but that recovery must not suppress the known snare mapping.
+    assert.match(svg, /y="5\.5"[^>]*>\uE0A4/);
+
+    const outOfRange = [...diagnostics].filter((d) => d.code === 'DRUM_NOTE_OUT_OF_RANGE');
+    assert.equal(outOfRange.length, 1);
+    assert.equal(outOfRange[0].location.partId, 'P1');
+    assert.equal(outOfRange[0].location.measureNumber, 1);
+    assert.ok(
+      ![...diagnostics].some((d) => d.code === 'DRUM_NOTE_UNMAPPED'),
+      'invalid midi-unpitched values must not create a GM mapping and a second lookup warning',
+    );
+  });
+
+  test('multi-staff extent uses the GM-resolved position when display coordinates are omitted', () => {
+    const xml = fs.readFileSync(
+      path.join(FIXTURES_DIR, 'gm-drum-two-staff-extent.musicxml'),
+      'utf8',
+    );
+    const { svg } = NE.renderFromMusicXml(xml, {
+      domParser,
+      config: { drums: { mapping: { 36: { staffPosition: 8 } } } },
+    });
+    const staffLineYs = [
+      ...svg.matchAll(
+        /<line x1="0" y1="([\d.]+)" x2="[\d.]+" y2="\1" stroke="#000000" stroke-width="0\.13"/g,
+      ),
+    ]
+      .map((match) => Number(match[1]))
+      .sort((a, b) => a - b);
+    assert.equal(staffLineYs.length, 10);
+    const upperBottom = staffLineYs[4];
+    const lowerBottom = staffLineYs[9];
+    assert.ok(upperBottom !== undefined && lowerBottom !== undefined);
+    assert.ok(
+      lowerBottom - upperBottom > NE.DEFAULT_CONFIG.staves.minStaffDistance + 4,
+      'the extreme GM position on the upper staff must increase the staff gap',
+    );
+  });
+
   test('a percussion note with an <instrument> resolving to a real GM note renders with nothing worse than a note to self', () => {
     const { diagnostics } = render();
     // This fixture deliberately states no <display-step>/<display-octave>

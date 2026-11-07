@@ -115,7 +115,15 @@ describe('tab rendering end to end (Integration C)', () => {
     );
     assert.equal(onTopLine.length, 2, 'expected both digits of fret 12');
     assert.notEqual(onTopLine[0][1], onTopLine[1][1], 'digits must not share an x position');
-    assert.ok(Number(onTopLine[1][1]) > Number(onTopLine[0][1]), 'second digit must follow the first');
+    assert.ok(
+      Number(onTopLine[1][1]) > Number(onTopLine[0][1]),
+      'second digit must follow the first',
+    );
+    const firstDigitAdvance = NE.getGlyph('fingering1').advanceWidth;
+    assert.ok(
+      Math.abs(Number(onTopLine[1][1]) - Number(onTopLine[0][1]) - firstDigitAdvance) < 1e-9,
+      "the second glyph origin must use the first glyph's Bravura advance, not its ink-box width",
+    );
   });
 
   test('each number masks the staff line behind it', () => {
@@ -126,7 +134,9 @@ describe('tab rendering end to end (Integration C)', () => {
   });
 
   test('a tab note with no <string>/<fret> is reported, not silently dropped', () => {
-    const { diagnostics } = NE.renderFromMusicXml(load('guitar-two-part-tab.musicxml'), { domParser });
+    const { diagnostics } = NE.renderFromMusicXml(load('guitar-two-part-tab.musicxml'), {
+      domParser,
+    });
     assert.ok([...diagnostics].some((d) => d.code === 'TAB_NOTE_MISSING_STRING_OR_FRET'));
   });
 });
