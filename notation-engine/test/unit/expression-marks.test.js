@@ -10,7 +10,11 @@ describe('dynamics (Phase 31)', () => {
   });
 
   test('every dynamic level resolves to its own real, distinct glyph', () => {
-    const levels = ['ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff', 'sfz'];
+    const levels = [
+      'pppppp', 'ppppp', 'pppp', 'ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff',
+      'ffff', 'fffff', 'ffffff', 'sf', 'sfp', 'sfpp', 'fp', 'rf', 'sfz', 'sffz',
+      'fz', 'n', 'pf', 'sfzp',
+    ];
     const seen = new Set();
     for (const level of levels) {
       const name = NE.dynamicGlyphName(level);

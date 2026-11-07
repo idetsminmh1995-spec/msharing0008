@@ -248,8 +248,12 @@ describe('MusicXML parser v2 Tier 2/3 -- <beam> and <lyric> (Phase 35, §10.4/§
 });
 
 describe('MusicXML parser v2 Tier 2/3 -- <direction> content (Phase 35, §10.4)', () => {
-  test('every one of §9.21\'s nine dynamic levels parses', () => {
-    const levels = ['ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff', 'sfz'];
+  test('every exact-mapped MusicXML dynamic level parses', () => {
+    const levels = [
+      'pppppp', 'ppppp', 'pppp', 'ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff',
+      'ffff', 'fffff', 'ffffff', 'sf', 'sfp', 'sfpp', 'fp', 'rf', 'sfz', 'sffz',
+      'fz', 'n', 'pf', 'sfzp',
+    ];
     const result = parse(
       score(
         `<direction><direction-type><dynamics>${levels
@@ -260,10 +264,10 @@ describe('MusicXML parser v2 Tier 2/3 -- <direction> content (Phase 35, §10.4)'
     assert.deepEqual([...result.directions[0].dynamics], levels);
   });
 
-  test('a dynamic §9.21 does not support is dropped WITH an UNSUPPORTED_DYNAMIC diagnostic', () => {
+  test('a dynamic without an exact glyph mapping is dropped WITH an UNSUPPORTED_DYNAMIC diagnostic', () => {
     const result = parse(
       score(
-        `<direction><direction-type><dynamics><f/><fp/></dynamics></direction-type></direction><note>${C4}<type>quarter</type></note>`,
+        `<direction><direction-type><dynamics><f/><rfz/></dynamics></direction-type></direction><note>${C4}<type>quarter</type></note>`,
       ),
     );
     assert.deepEqual([...result.directions[0].dynamics], ['f']);

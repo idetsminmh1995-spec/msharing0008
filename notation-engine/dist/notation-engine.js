@@ -69416,6 +69416,9 @@ var NotationEngine = (() => {
     return "below";
   }
   var GLYPH_NAMES3 = {
+    pppppp: "dynamicPPPPPP",
+    ppppp: "dynamicPPPPP",
+    pppp: "dynamicPPPP",
     ppp: "dynamicPPP",
     pp: "dynamicPP",
     p: "dynamicPiano",
@@ -69424,7 +69427,20 @@ var NotationEngine = (() => {
     f: "dynamicForte",
     ff: "dynamicFF",
     fff: "dynamicFFF",
-    sfz: "dynamicSforzato"
+    ffff: "dynamicFFFF",
+    fffff: "dynamicFFFFF",
+    ffffff: "dynamicFFFFFF",
+    sf: "dynamicSforzando",
+    sfp: "dynamicSforzandoPiano",
+    sfpp: "dynamicSforzandoPianissimo",
+    fp: "dynamicFortePiano",
+    rf: "dynamicRinforzando",
+    sfz: "dynamicSforzato",
+    sffz: "dynamicSforzatoFF",
+    fz: "dynamicForzando",
+    n: "dynamicNiente",
+    pf: "dynamicPF",
+    sfzp: "dynamicSforzatoPiano"
   };
   function dynamicGlyphName(level) {
     return GLYPH_NAMES3[level];
@@ -71478,6 +71494,9 @@ ${denominator}`;
 
   // src/parser/musicxml/direction.ts
   var DYNAMIC_ELEMENTS = {
+    pppppp: "pppppp",
+    ppppp: "ppppp",
+    pppp: "pppp",
     ppp: "ppp",
     pp: "pp",
     p: "p",
@@ -71486,7 +71505,20 @@ ${denominator}`;
     f: "f",
     ff: "ff",
     fff: "fff",
-    sfz: "sfz"
+    ffff: "ffff",
+    fffff: "fffff",
+    ffffff: "ffffff",
+    sf: "sf",
+    sfp: "sfp",
+    sfpp: "sfpp",
+    fp: "fp",
+    rf: "rf",
+    sfz: "sfz",
+    sffz: "sffz",
+    fz: "fz",
+    n: "n",
+    pf: "pf",
+    sfzp: "sfzp"
   };
   var WEDGE_TYPES = {
     crescendo: "crescendo",
@@ -71527,7 +71559,7 @@ ${denominator}`;
                   diagnostic(
                     "info",
                     "UNSUPPORTED_DYNAMIC",
-                    `Ignored <dynamics><${child.tagName}>; \xA79.21 supports ppp, pp, p, mp, mf, f, ff, fff and sfz.`,
+                    `Ignored <dynamics><${child.tagName}>; no exact Bravura dynamic glyph mapping is available.`,
                     location
                   )
                 );

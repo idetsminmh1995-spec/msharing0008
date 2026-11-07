@@ -32,6 +32,10 @@ Several `<dynamics>` children in one element are ONE compound marking
 (`<sf/><p/>` is "sfp"), so they lay out left to right by glyph width rather
 than stacking on one spot.
 
+The original nine-level mapping was later expanded to additional MusicXML
+dynamic names with exact bundled Bravura glyphs; see the
+[static dynamic coverage follow-up](./dynamics-coverage-extension.md).
+
 ### Hairpins
 
 A wedge's two ends can sit in **different measures**, so spans are resolved

@@ -26,7 +26,32 @@ import {
  */
 
 /** Structurally identical to `geometry/dynamic.ts`'s `DynamicLevel` -- see this file's header. */
-export type ParsedDynamicLevel = 'ppp' | 'pp' | 'p' | 'mp' | 'mf' | 'f' | 'ff' | 'fff' | 'sfz';
+export type ParsedDynamicLevel =
+  | 'pppppp'
+  | 'ppppp'
+  | 'pppp'
+  | 'ppp'
+  | 'pp'
+  | 'p'
+  | 'mp'
+  | 'mf'
+  | 'f'
+  | 'ff'
+  | 'fff'
+  | 'ffff'
+  | 'fffff'
+  | 'ffffff'
+  | 'sf'
+  | 'sfp'
+  | 'sfpp'
+  | 'fp'
+  | 'rf'
+  | 'sfz'
+  | 'sffz'
+  | 'fz'
+  | 'n'
+  | 'pf'
+  | 'sfzp';
 
 /** 'crescendo'/'decrescendo' are structurally identical to `geometry/hairpin.ts`'s `HairpinKind`; 'stop' is this parser's own marker for the wedge's closing element, which has no geometry of its own. */
 export type ParsedWedgeType = 'crescendo' | 'decrescendo' | 'stop';
@@ -49,6 +74,9 @@ export interface ParsedDirectionContent {
 }
 
 const DYNAMIC_ELEMENTS: Readonly<Record<string, ParsedDynamicLevel>> = {
+  pppppp: 'pppppp',
+  ppppp: 'ppppp',
+  pppp: 'pppp',
   ppp: 'ppp',
   pp: 'pp',
   p: 'p',
@@ -57,7 +85,20 @@ const DYNAMIC_ELEMENTS: Readonly<Record<string, ParsedDynamicLevel>> = {
   f: 'f',
   ff: 'ff',
   fff: 'fff',
+  ffff: 'ffff',
+  fffff: 'fffff',
+  ffffff: 'ffffff',
+  sf: 'sf',
+  sfp: 'sfp',
+  sfpp: 'sfpp',
+  fp: 'fp',
+  rf: 'rf',
   sfz: 'sfz',
+  sffz: 'sffz',
+  fz: 'fz',
+  n: 'n',
+  pf: 'pf',
+  sfzp: 'sfzp',
 };
 
 const WEDGE_TYPES: Readonly<Record<string, ParsedWedgeType>> = {
@@ -112,7 +153,7 @@ export function parseDirectionElement(
                 diagnostic(
                   'info',
                   'UNSUPPORTED_DYNAMIC',
-                  `Ignored <dynamics><${child.tagName}>; §9.21 supports ppp, pp, p, mp, mf, f, ff, fff and sfz.`,
+                  `Ignored <dynamics><${child.tagName}>; no exact Bravura dynamic glyph mapping is available.`,
                   location,
                 ),
               );

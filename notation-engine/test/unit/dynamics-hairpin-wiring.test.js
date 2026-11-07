@@ -147,6 +147,20 @@ describe('dynamics + hairpin wiring (Integration J, §9.21)', () => {
     assert.equal(p.y, sfz.y);
   });
 
+  test('extended MusicXML levels render with their exact Bravura glyphs in a compound mark', () => {
+    const { svg, diagnostics } = render(
+      '<direction><direction-type><dynamics><ffff/><fp/></dynamics></direction-type></direction>' +
+        half('C') +
+        half('D'),
+    );
+    const [ffff] = glyphPlacements(svg, 'dynamicFFFF');
+    const [fp] = glyphPlacements(svg, 'dynamicFortePiano');
+    assert.deepEqual([...diagnostics], []);
+    assert.ok(ffff !== undefined && fp !== undefined);
+    assert.ok(fp.x > ffff.x, 'the forte-piano glyph must advance past the ffff glyph');
+    assert.equal(fp.y, ffff.y);
+  });
+
   test('a wedge that never stops reports UNMATCHED_WEDGE and draws nothing', () => {
     const { svg, diagnostics } = render(
       '<direction><direction-type><wedge type="crescendo"/></direction-type></direction>' +
