@@ -132,7 +132,7 @@ The following items are not yet complete and should be handled as separate updat
 2. Run the same compatibility matrix on Chromium, Safari, and Firefox, including portrait and square resolutions.
 3. Add browser-level cancellation tests that exercise both WebCodecs and MediaRecorder with a multi-segment render.
 4. Group encoded samples into larger MP4 chunks to reduce `moov` size and offset-table overhead on long videos.
-5. Add memory-pressure instrumentation and a quality preset for low-memory devices.
+5. Add browser-level memory-pressure instrumentation and a quality preset for low-memory devices.
 6. Make the MediaRecorder fallback trim its live audio source when cancellation occurs.
 
 Completed in the current update:
@@ -142,7 +142,33 @@ Completed in the current update:
 - Global multi-segment timing and accurate MediaRecorder cancellation state.
 - Root README status and this technical document kept in sync with the implementation.
 
-## 9. Change history
+## 9. Long-video memory update
+
+The render path already closes every `VideoFrame` and `AudioData` immediately,
+and the MP4 muxer passes encoded frame arrays to `Blob` without first joining
+all video bytes into another large contiguous array. The new memory update
+adds three further safeguards:
+
+1. **Device-aware encoder backpressure.** `navigator.deviceMemory` selects a
+   smaller encoder queue on 2 GB and 4 GB devices. This limits transient codec
+   queue memory while preserving the larger queue on desktop devices.
+2. **PCM release after audio encoding.** The joined `AudioBuffer` is retained
+   only until `AudioEncoder.flush()` completes. Its reference is then cleared
+   before final muxing, allowing the browser to reclaim the large Float32 PCM
+   backing store.
+3. **Memory telemetry.** WebCodecs results now include encoded video bytes,
+   encoded audio bytes, the temporary PCM byte estimate, an estimated peak,
+   and the device-class budget. The values are diagnostic and do not claim to
+   measure the entire JavaScript heap.
+
+These changes reduce transient memory and make long renders observable, but
+they do not make the output fully streaming: encoded video samples must still
+remain available until the MP4 offset tables are written. The next substantial
+optimization is sample-grouped or seekable streaming muxing, which should be
+implemented only with browser integration tests because it changes the file
+layout and offset-table behavior.
+
+## 10. Change history
 
 - `b9e794d` — fractional-FPS timing, cancellation-safe audio duration, silent-video WebCodecs detection, encoder error propagation, and muxer regression coverage.
 - Current follow-up — global multi-segment frame timeline and accurate MediaRecorder cancellation state.

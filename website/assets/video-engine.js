@@ -821,6 +821,27 @@
   }
 
   /**
+   * Keep encoder backpressure conservative on small devices. Encoded chunks
+   * still have to remain available until muxing, so queue memory is only one
+   * part of the peak; this helper deliberately does not pretend to be a
+   * complete browser heap measurement.
+   */
+  function renderMemoryPolicy() {
+    const deviceMemory = typeof navigator !== 'undefined' ? Number(navigator.deviceMemory) : 0;
+    if (deviceMemory > 0 && deviceMemory <= 2) {
+      return { highWater: 6, lowWater: 3, budgetBytes: 256 * 1024 * 1024 };
+    }
+    if (deviceMemory > 0 && deviceMemory <= 4) {
+      return { highWater: 8, lowWater: 4, budgetBytes: 512 * 1024 * 1024 };
+    }
+    return { highWater: 12, lowWater: 6, budgetBytes: 1024 * 1024 * 1024 };
+  }
+
+  function bytesOfAudioBuffer(buffer) {
+    return buffer ? buffer.length * buffer.numberOfChannels * 4 : 0;
+  }
+
+  /**
    * The chosen codec, from one AudioBuffer covering the whole video.
    *
    * Handed over in 20ms slices, which is what Opus encodes in and a
@@ -944,6 +965,7 @@
     const format = await pickFormat(width, height, fps, bitrate, audioChannels);
     if (!format) return null;
     const codec = format.video;
+    const memoryPolicy = renderMemoryPolicy();
 
     const canvas = document.createElement('canvas');
     canvas.width = width;
@@ -956,6 +978,7 @@
     // an MP4 cannot be written without them.
     let videoDescription;
     let encoderError = null;
+    let encodedVideoBytes = 0;
     const encoder = new window.VideoEncoder({
       output: (chunk, metadata) => {
         if (metadata && metadata.decoderConfig && metadata.decoderConfig.description) {
@@ -963,6 +986,7 @@
         }
         const data = new Uint8Array(chunk.byteLength);
         chunk.copyTo(data);
+        encodedVideoBytes += data.byteLength;
         videoChunks.push({ us: chunk.timestamp, key: chunk.type === 'key', data });
       },
       error: (err) => {
@@ -1024,8 +1048,8 @@
         // hold every frame in memory at once. Waiting here is exactly
         // the thing MediaRecorder could not do, and why this never
         // drops one.
-        if (encoder.encodeQueueSize > 12) {
-          while (encoder.encodeQueueSize > 6) {
+        if (encoder.encodeQueueSize > memoryPolicy.highWater) {
+          while (encoder.encodeQueueSize > memoryPolicy.lowWater) {
             await new Promise((resolve) => setTimeout(resolve, 1));
           }
         }
@@ -1046,9 +1070,13 @@
     // A cancelled render must not append the original full-length soundtrack
     // to the shorter video that was actually encoded.
     const renderedSeconds = frameIndex / fps;
-    const joined = await joinAudio(segments, renderedSeconds);
+    let joined = await joinAudio(segments, renderedSeconds);
+    const pcmAudioBytes = bytesOfAudioBuffer(joined);
     if (joined) audio = await encodeAudio(joined, format, shouldStop);
     else if (onProgress) onProgress(0.9, 'Writing the file');
+    // The encoded audio chunks are now independent of the PCM render. Drop
+    // the large Float32 backing store before constructing the final Blob.
+    joined = null;
 
     if (onProgress) onProgress(0.9, 'Writing the file');
     // An MP4 cannot be written without the parameter sets the encoder
@@ -1076,6 +1104,10 @@
             durationMs: (frameIndex / fps) * 1000,
           });
     if (onProgress) onProgress(1, 'Complete');
+    const encodedAudioBytes = audio
+      ? audio.chunks.reduce((sum, chunk) => sum + chunk.data.byteLength, 0)
+      : 0;
+    const estimatedPeakBytes = encodedVideoBytes + Math.max(pcmAudioBytes, encodedAudioBytes);
     return {
       blob,
       extension: format.container,
@@ -1088,6 +1120,14 @@
       seconds: frameIndex / fps,
       path: 'webcodecs',
       cancelled: stopped,
+      memory: {
+        encodedVideoBytes,
+        encodedAudioBytes,
+        pcmAudioBytes,
+        estimatedPeakBytes,
+        budgetBytes: memoryPolicy.budgetBytes,
+        withinBudget: estimatedPeakBytes <= memoryPolicy.budgetBytes,
+      },
     };
   }
 
