@@ -66,7 +66,13 @@ Putting `moov` before `mdat` enables fast start. The muxer writes:
 - `stsc`, `stsz`, and `stco`/`co64` sample locations;
 - edit lists for encoder priming or audio that begins after video.
 
-The current implementation uses one sample per chunk. This is straightforward and makes offsets easy to validate, but grouping samples into larger chunks remains a performance optimization for future long renders.
+Samples are grouped into fixed-size media chunks (currently up to 16 samples
+per track chunk). `stsc` records the samples-per-chunk runs and `stco`/`co64`
+stores one offset per media chunk, reducing `moov` metadata for long renders.
+The seekable MP4 can also be delivered incrementally to a browser
+`WritableStream` with `VideoEngine.muxMp4ToStream(options, writable)`. The
+stream writer does not call `arrayBuffer()` or create a second full-file
+contiguous copy.
 
 ## 5. Timing model and recent fixes
 
@@ -128,7 +134,7 @@ The latest completed update passed **14/14** muxer tests. Static checks also cov
 
 The following items are not yet complete and should be handled as separate updates:
 
-1. Add a real-browser integration test that encodes a short MP4 in Chromium, validates it with `ffprobe`, and decodes the first and last frames.
+1. Extend the Chromium integration test to exercise a writable file sink and decode the first and last frames.
 2. Run the same compatibility matrix on Chromium, Safari, and Firefox, including portrait and square resolutions.
 3. Add browser-level cancellation tests that exercise both WebCodecs and MediaRecorder with a multi-segment render.
 4. Add browser-level memory-pressure instrumentation and a quality preset for low-memory devices.
@@ -141,6 +147,7 @@ Completed in the current update:
 - Global multi-segment timing and accurate MediaRecorder cancellation state.
 - Root README status and this technical document kept in sync with the implementation.
 - Grouped MP4 media chunks with validated `stsc` and `stco`/`co64` tables.
+- Chromium WebCodecs smoke test with `ffprobe` validation and incremental `WritableStream` output API.
 
 ## 9. Long-video memory update
 

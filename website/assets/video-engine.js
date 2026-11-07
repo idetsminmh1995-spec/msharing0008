@@ -724,6 +724,36 @@
     return new Blob(parts, { type: 'video/mp4' });
   }
 
+  /**
+   * Write a fast-start, seekable MP4 to any WritableStream sink. The muxer
+   * still computes the moov offsets before writing (MP4 requires that), but
+   * Blob.stream() lets the sink receive the final file incrementally instead
+   * of forcing callers to call arrayBuffer() and duplicate the whole file.
+   */
+  async function muxMp4ToStream(options, writable) {
+    if (!writable || typeof writable.getWriter !== 'function') {
+      throw new TypeError('muxMp4ToStream requires a WritableStream');
+    }
+    const blob = muxMp4(options);
+    const reader = blob.stream().getReader();
+    const writer = writable.getWriter();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        await writer.write(value);
+      }
+      await writer.close();
+    } catch (error) {
+      await writer.abort(error).catch(() => {});
+      throw error;
+    } finally {
+      reader.releaseLock();
+      writer.releaseLock();
+    }
+    return { bytes: blob.size, type: blob.type };
+  }
+
   // ---------------------------------------------------------------
   // Encoding.
   // ---------------------------------------------------------------
@@ -1289,5 +1319,5 @@
     return await recordInRealTime(options);
   }
 
-  window.VideoEngine = { render, isRenderable: hasWebCodecs, muxMp4, muxWebM };
+  window.VideoEngine = { render, isRenderable: hasWebCodecs, muxMp4, muxMp4ToStream, muxWebM };
 })();

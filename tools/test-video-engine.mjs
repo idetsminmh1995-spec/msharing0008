@@ -22,11 +22,11 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const sandbox = { console, Blob, DataView, Uint8Array, Math, Number, String, Array };
+const sandbox = { console, Blob, WritableStream, DataView, Uint8Array, Math, Number, String, Array };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
 vm.runInContext(readFileSync(join(ROOT, 'website/assets/video-engine.js'), 'utf8'), sandbox);
-const { muxMp4 } = sandbox.window.VideoEngine;
+const { muxMp4, muxMp4ToStream } = sandbox.window.VideoEngine;
 
 // ---------------------------------------------------------------
 // A reader, written against the specification rather than against the
@@ -201,6 +201,25 @@ test('the file is ftyp, then moov, then mdat -- a player can start on it', async
   );
   const ftyp = top[0];
   assert.equal(String.fromCharCode(...file.subarray(ftyp.body, ftyp.body + 4)), 'isom');
+});
+
+test('seekable MP4 can be delivered incrementally to a WritableStream', async () => {
+  const parts = [];
+  const info = await muxMp4ToStream(
+    {
+      width: 1920,
+      height: 1080,
+      fps: FPS,
+      video: { chunks: videoChunks, description: AVCC },
+      audio: null,
+    },
+    new WritableStream({ write(chunk) { parts.push(new Uint8Array(chunk)); } }),
+  );
+  const streamedSize = parts.reduce((sum, part) => sum + part.byteLength, 0);
+  assert.equal(info.type, 'video/mp4');
+  assert.equal(info.bytes, streamedSize);
+  assert.ok(parts.length > 1, 'the WritableStream did not receive incremental chunks');
+  assert.equal(String.fromCharCode(...parts[0].subarray(4, 8)), 'ftyp');
 });
 
 test('every box fills its parent exactly, all the way down', async () => {

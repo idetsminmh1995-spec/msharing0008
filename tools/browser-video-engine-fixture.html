@@ -1,0 +1,38 @@
+<!doctype html>
+<meta charset="utf-8">
+<script src="/website/assets/video-engine.js"></script>
+<script>
+  window.runVideoEngineBrowserTest = async function () {
+    if (!VideoEngine.isRenderable()) throw new Error('WebCodecs video APIs are unavailable');
+    const result = await VideoEngine.render({
+      width: 320,
+      height: 180,
+      fps: 30,
+      segments: [{
+        seconds: 1,
+        draw(ctx, at) {
+          ctx.fillStyle = at < 0.5 ? '#102a43' : '#d64545';
+          ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '24px sans-serif';
+          ctx.fillText(`frame ${Math.round(at * 30)}`, 24, 96);
+        },
+      }],
+    });
+    if (result.container !== 'mp4') throw new Error(`expected MP4, got ${result.container}`);
+    return {
+      container: result.container,
+      path: result.path,
+      frames: result.frames,
+      seconds: result.seconds,
+      bytes: result.blob.size,
+      base64: await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(result.blob);
+      }),
+      streamApiPresent: typeof VideoEngine.muxMp4ToStream === 'function',
+    };
+  };
+</script>
