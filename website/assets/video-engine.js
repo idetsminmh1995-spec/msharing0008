@@ -988,12 +988,16 @@
     const frameDuration = 1e6 / fps;
     const keyEvery = Math.max(1, Math.round(fps * 2));
     let frameIndex = 0;
+    let segmentStartFrame = 0;
     let stopped = false;
 
     for (const segment of segments) {
       if (stopped) break;
       if (segment.onStart) await segment.onStart();
-      const count = Math.max(0, Math.round(segment.seconds * fps));
+      // Derive both ends from one global timeline. Rounding each segment
+      // independently can create a frame gap or overlap across many clips.
+      const segmentEndFrame = Math.round((segmentStartFrame / fps + segment.seconds) * fps);
+      const count = Math.max(0, segmentEndFrame - segmentStartFrame);
       for (let i = 0; i < count; i++) {
         if (shouldStop && shouldStop()) {
           stopped = true;
@@ -1029,6 +1033,7 @@
         }
       }
       if (segment.onEnd) await segment.onEnd();
+      segmentStartFrame = segmentEndFrame;
     }
 
     await encoder.flush();
@@ -1146,12 +1151,17 @@
     }
 
     let frameIndex = 0;
+    let cancelled = false;
     const startedAt = performance.now();
     for (const segment of segments) {
+      if (cancelled) break;
       if (segment.onStart) await segment.onStart();
       const count = Math.max(0, Math.round(segment.seconds * fps));
       for (let i = 0; i < count; i++) {
-        if (shouldStop && shouldStop()) break;
+        if (shouldStop && shouldStop()) {
+          cancelled = true;
+          break;
+        }
         const due = startedAt + (frameIndex / fps) * 1000;
         const wait = due - performance.now();
         if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
@@ -1176,7 +1186,7 @@
       fps,
       seconds: frameIndex / fps,
       path: 'mediarecorder',
-      cancelled: false,
+      cancelled,
     };
   }
 

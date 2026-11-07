@@ -64,11 +64,18 @@ once the Cloudflare R2 drum sets are ready).
 - [x] Browser-based interactive preview (placeholder pads)
 - [x] Cloudflare R2 bucket created (`msharing0008`)
 - [x] Cloudflare Worker for R2 asset discovery/proxying (not yet deployed)
+- [x] Deterministic WebCodecs video renderer with MP4/WebM muxing
+- [x] MediaRecorder compatibility fallback
+- [x] Video Engine timing and container regression tests
 - [ ] Real pre-designed drum PNG assets uploaded to R2
 - [ ] Canvas-based preview using real drum set assets
-- [ ] WebCodecs (+ ffmpeg.wasm fallback) final video rendering
+- [ ] Browser integration tests for real encoded output
 - [ ] SoundFont-based audio synthesis for the final MP4
 - [ ] Cloudflare Pages deployment
+
+See [`docs/VIDEO-ENGINE.md`](docs/VIDEO-ENGINE.md) for the render contract,
+codec/container choices, timing model, cancellation behavior, test commands,
+and remaining production work.
 
 This project is being planned/built with Claude and Manus AI in parallel for
 comparison on key modules before committing to a full build.
