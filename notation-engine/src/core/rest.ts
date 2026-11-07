@@ -1,5 +1,5 @@
 import type { Duration } from './duration.js';
-import type { VoiceId } from './note.js';
+import type { FermataPlacement, FermataShape, VoiceId } from './note.js';
 import type { PitchStep } from './pitch.js';
 
 /** A silence -- has a Duration and a Voice, but no Pitch at all (not even an unpitched display position). */
@@ -30,8 +30,12 @@ export interface Rest {
    * right for a voice with no gaps.
    */
   readonly startTick?: number;
-  /** Phase 35 Tier 2/§10.4: `<notations><fermata>` -- a rest can carry one exactly as a note can. Parsed and preserved; §9 has no fermata placement section yet, so nothing draws it. */
+  /** MusicXML `<notations><fermata>` presence; rests can carry a fermata exactly as notes can. */
   readonly hasFermata?: boolean;
+  /** MusicXML's upright/inverted fermata orientation; omitted means upright. */
+  readonly fermataPlacement?: FermataPlacement;
+  /** MusicXML fermata shape when a matching Bravura glyph exists; omitted means normal. */
+  readonly fermataShape?: FermataShape;
 }
 
 export interface RestInit {
@@ -41,6 +45,8 @@ export interface RestInit {
   displayStep?: PitchStep;
   displayOctave?: number;
   hasFermata?: boolean;
+  fermataPlacement?: FermataPlacement;
+  fermataShape?: FermataShape;
 }
 
 export function rest(init: RestInit): Rest {

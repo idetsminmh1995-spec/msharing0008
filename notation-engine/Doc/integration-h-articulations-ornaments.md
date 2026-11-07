@@ -58,9 +58,10 @@ already documented.
 
 ## 3. What this pass deliberately did NOT do
 
-- **Fermata.** Parsed (§10.4 requires it) and carried on `Note`/`Rest`, but
-  **not drawn**: §9 has no fermata placement section, and inventing one here
-  would be guessing at a spec rather than implementing it.
+- **Fermata was deferred in this pass** because the project had no placement
+  rule recorded at the time. It is now rendered in the separate
+  [fermata follow-up](./fermata-rendering.md), using MusicXML's upright or
+  inverted type and the exact supported Bravura shape glyphs.
 - **§9.19's multi-voice exception**, where marks move to the STEM side to keep
   each voice's marks unambiguous. §9.19 states this as a known limitation and
   it stays one.

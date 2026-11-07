@@ -262,6 +262,12 @@ function buildSingle(ev: ParsedNoteEvent): Note | Rest {
       ...(ev.restDisplayOctave !== undefined ? { displayOctave: ev.restDisplayOctave } : {}),
       // A rest can carry a fermata exactly as a note can (§10.4).
       ...(ev.notations.hasFermata ? { hasFermata: true } : {}),
+      ...(ev.notations.fermataPlacement !== undefined
+        ? { fermataPlacement: ev.notations.fermataPlacement }
+        : {}),
+      ...(ev.notations.fermataShape !== undefined
+        ? { fermataShape: ev.notations.fermataShape }
+        : {}),
     });
   }
   // Percussion (<unpitched>) and pitched notes use the SAME Note type --
@@ -312,6 +318,10 @@ function buildSingle(ev: ParsedNoteEvent): Note | Rest {
     ...(ev.notations.articulations.length > 0 ? { articulations: ev.notations.articulations } : {}),
     ...(ev.notations.ornaments.length > 0 ? { ornaments: ev.notations.ornaments } : {}),
     ...(ev.notations.hasFermata ? { hasFermata: true } : {}),
+    ...(ev.notations.fermataPlacement !== undefined
+      ? { fermataPlacement: ev.notations.fermataPlacement }
+      : {}),
+    ...(ev.notations.fermataShape !== undefined ? { fermataShape: ev.notations.fermataShape } : {}),
     ...(ev.notations.slurStarts.length > 0 ? { slurStarts: ev.notations.slurStarts } : {}),
     ...(ev.notations.slurStops.length > 0 ? { slurStops: ev.notations.slurStops } : {}),
     ...(ev.notations.tupletStart ? { tupletStart: true } : {}),

@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-627 exported symbols, by module.
+630 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -480,6 +480,8 @@ The diagnostics `level` lets through, in their original order.
 | type | `VoiceId` | Voice number within a Part -- matches MusicXML's <voice> element. |
 | type | `ArticulationType` | §9.19's five articulation types. |
 | type | `OrnamentType` | §9.20's ornament types -- declared here for the same reason as ArticulationType above. |
+| type | `FermataPlacement` | Orientation of a fermata relative to its note or rest. |
+| type | `FermataShape` | MusicXML fermata shapes with an exact bundled Bravura glyph mapping. |
 | interface | `BeamHint` | One `<beam number="N">` hint exactly as the file wrote it (§10.4). |
 | interface | `LyricSyllable` | One `<lyric>` syllable attached to a note (§9.22/§10.4). |
 | interface | `Note` | A single sounding note -- pitched or unpitched, doesn't matter, both use this same type (see pitch.ts). |
@@ -747,6 +749,12 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | function | `tempoMarkSide` | §9.21's placement rule -- confirmed directly (Finale's own tutorial: "common practice to place the tempo marking above only the top staff"). |
 | function | `rehearsalMarkSide` | §9.21's placement rule for rehearsal marks -- near-universal convention (boxed or circled letter/number, above the staff). |
+
+### `src/geometry/fermata.ts`
+
+| | Name | Summary |
+|---|---|---|
+| function | `fermataGlyphName` | Return the bundled SMuFL glyph for the requested fermata shape and orientation. |
 
 ### `src/geometry/flag.ts`
 

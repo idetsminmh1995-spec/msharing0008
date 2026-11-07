@@ -29,6 +29,7 @@ import {
   evaluateAccidental,
   articulationGlyphName,
   articulationSide,
+  fermataGlyphName,
   beamedEventIndices,
   groupBeams,
   groupBeamsFromHints,
@@ -564,6 +565,7 @@ const STEM_AND_BEAM_ALLOWANCE = 3.5 + 0.5;
  */
 const ARTICULATION_GAP = 1.0;
 const ORNAMENT_GAP = 1.5;
+const FERMATA_GAP = 1.5;
 
 /**
  * Integration I: how far a slur's endpoints and a tuplet's bracket sit
@@ -1137,7 +1139,7 @@ function renderAccidentalWithWrapper(
 }
 
 /**
- * Integration H: draws a note's §9.19 articulations and §9.20 ornaments.
+ * Integration H: draws a note's articulations, ornaments and fermata.
  *
  * Placement follows each section's own rule exactly, and they are
  * genuinely different rules -- which is why this cannot be one shared
@@ -1172,7 +1174,8 @@ function renderNoteMarks(
 ): string {
   const articulations = source.articulations ?? [];
   const ornaments = source.ornaments ?? [];
-  if (articulations.length === 0 && ornaments.length === 0) return '';
+  const hasFermata = source.hasFermata === true;
+  if (articulations.length === 0 && ornaments.length === 0 && !hasFermata) return '';
 
   const parts: string[] = [];
   const topLine = -(STAFF_LINES - 1);
@@ -1209,6 +1212,16 @@ function renderNoteMarks(
   for (const type of ornaments) {
     aboveStaff -= ORNAMENT_GAP;
     place(ornamentGlyphName(type), aboveStaff);
+  }
+
+  if (hasFermata) {
+    if ((source.fermataPlacement ?? 'above') === 'above') {
+      aboveStaff -= FERMATA_GAP;
+      place(fermataGlyphName(source.fermataShape, 'above'), aboveStaff);
+    } else {
+      belowNote += FERMATA_GAP;
+      place(fermataGlyphName(source.fermataShape, 'below'), belowNote);
+    }
   }
 
   return parts.join('\n');
@@ -1528,6 +1541,14 @@ function renderNoteOrRest(
           fontFamily: ctx.theme.musicFont,
         },
       ),
+      ev.hasFermata === true
+        ? renderMark(fermataGlyphName(ev.fermataShape, ev.fermataPlacement), {
+            x,
+            y: y + ((ev.fermataPlacement ?? 'above') === 'above' ? -FERMATA_GAP : FERMATA_GAP),
+            color: ctx.theme.colorOf('mark'),
+            fontFamily: ctx.theme.musicFont,
+          })
+        : '',
     ]
       .filter((part) => part !== '')
       .join('\n');

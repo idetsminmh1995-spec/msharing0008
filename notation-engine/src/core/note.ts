@@ -21,6 +21,12 @@ export type ArticulationType = 'accent' | 'staccato' | 'tenuto' | 'marcato' | 's
 /** §9.20's ornament types -- declared here for the same reason as ArticulationType above. */
 export type OrnamentType = 'trill' | 'mordent' | 'turn' | 'turnInverted';
 
+/** Orientation of a fermata relative to its note or rest. */
+export type FermataPlacement = 'above' | 'below';
+
+/** MusicXML fermata shapes with an exact bundled Bravura glyph mapping. */
+export type FermataShape = 'normal';
+
 /**
  * One `<beam number="N">` hint exactly as the file wrote it (§10.4).
  * §10.8 names "beams given explicitly via `<beam>` vs. left for the
@@ -142,8 +148,12 @@ export interface Note {
   readonly articulations?: readonly ArticulationType[];
   /** Phase 35 Tier 2/§10.4: `<notations><ornaments>` -- §9.20's marks, in document order. Absent means none. */
   readonly ornaments?: readonly OrnamentType[];
-  /** Phase 35 Tier 2/§10.4: `<notations><fermata>`. Parsed and preserved; §9 has no fermata placement section yet, so nothing draws it (see Doc/phase-35-musicxml-parser-v2-tier23.md). */
+  /** MusicXML `<notations><fermata>` presence. */
   readonly hasFermata?: boolean;
+  /** MusicXML's upright/inverted fermata orientation; omitted means upright. */
+  readonly fermataPlacement?: FermataPlacement;
+  /** MusicXML fermata shape when a matching Bravura glyph exists; omitted means normal. */
+  readonly fermataShape?: FermataShape;
   /** Phase 35 Tier 2/§10.4: the `<slur type="start">` numbers beginning at this note (§9.16). */
   readonly slurStarts?: readonly number[];
   /** Phase 35 Tier 2/§10.4: the `<slur type="stop">` numbers ending at this note (§9.16). */
@@ -185,6 +195,8 @@ export interface NoteInit {
   articulations?: readonly ArticulationType[];
   ornaments?: readonly OrnamentType[];
   hasFermata?: boolean;
+  fermataPlacement?: FermataPlacement;
+  fermataShape?: FermataShape;
   slurStarts?: readonly number[];
   slurStops?: readonly number[];
   tupletStart?: boolean;

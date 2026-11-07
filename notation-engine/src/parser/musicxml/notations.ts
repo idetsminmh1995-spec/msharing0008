@@ -1,4 +1,11 @@
-import type { ArticulationType, BeamHint, LyricSyllable, OrnamentType } from '../../core/note.js';
+import type {
+  ArticulationType,
+  BeamHint,
+  FermataPlacement,
+  FermataShape,
+  LyricSyllable,
+  OrnamentType,
+} from '../../core/note.js';
 import { diagnostic, type Diagnostic, type DiagnosticLocation } from './diagnostic.js';
 import { attrOf, childElements, childrenNamed, firstChildNamed, textOf } from './dom-helpers.js';
 
@@ -60,6 +67,8 @@ export interface ParsedNotations {
   readonly articulations: readonly ArticulationType[];
   readonly ornaments: readonly OrnamentType[];
   readonly hasFermata: boolean;
+  readonly fermataPlacement?: FermataPlacement;
+  readonly fermataShape?: FermataShape;
   /** `<slur type="start">` numbers beginning at this note. A slur with no `number` attribute is number 1, per MusicXML's own default. */
   readonly slurStarts: readonly number[];
   readonly slurStops: readonly number[];
@@ -107,6 +116,8 @@ export function parseNotations(
   const slurStarts: number[] = [];
   const slurStops: number[] = [];
   let hasFermata = false;
+  let fermataPlacement: FermataPlacement | undefined;
+  let fermataShape: FermataShape | undefined;
   let tupletStart = false;
   let tupletStop = false;
 
@@ -126,9 +137,36 @@ export function parseNotations(
         else if (type === 'stop') tupletStop = true;
         break;
       }
-      case 'fermata':
+      case 'fermata': {
         hasFermata = true;
+        const type = attrOf(el, 'type');
+        if (type === undefined || type === 'upright') fermataPlacement = 'above';
+        else if (type === 'inverted') fermataPlacement = 'below';
+        else {
+          fermataPlacement = 'above';
+          diagnostics.push(
+            diagnostic(
+              'info',
+              'UNSUPPORTED_FERMATA_TYPE',
+              `Unsupported fermata type "${type}"; using the MusicXML default upright orientation.`,
+              location,
+            ),
+          );
+        }
+        const shape = textOf(el)?.trim();
+        if (shape === 'normal') fermataShape = 'normal';
+        else if (shape !== undefined && shape !== '') {
+          diagnostics.push(
+            diagnostic(
+              'info',
+              'UNSUPPORTED_FERMATA_SHAPE',
+              `Unsupported fermata shape "${shape}"; using the normal fermata glyph.`,
+              location,
+            ),
+          );
+        }
         break;
+      }
       case 'articulations':
         for (const child of childElements(el)) {
           const mapped = ARTICULATION_BY_ELEMENT[child.tagName];
@@ -186,6 +224,8 @@ export function parseNotations(
       articulations,
       ornaments,
       hasFermata,
+      ...(fermataPlacement !== undefined ? { fermataPlacement } : {}),
+      ...(fermataShape !== undefined ? { fermataShape } : {}),
       slurStarts,
       slurStops,
       tupletStart,

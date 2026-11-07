@@ -99,6 +99,7 @@ describe('MusicXML parser v2 Tier 2/3 -- <notations> (Phase 35, §10.4)', () => 
       score(`<note>${C4}<type>quarter</type><notations><fermata/></notations></note>`),
     );
     assert.equal(firstEvent(noteResult).hasFermata, true);
+    assert.equal(firstEvent(noteResult).fermataPlacement, 'above');
 
     const restResult = parse(
       score(
@@ -109,6 +110,30 @@ describe('MusicXML parser v2 Tier 2/3 -- <notations> (Phase 35, §10.4)', () => 
     const rest = firstEvent(restResult);
     assert.equal(rest.kind, 'rest');
     assert.equal(rest.hasFermata, true);
+    assert.equal(rest.fermataPlacement, 'above');
+  });
+
+  test('fermata orientation and the exact normal shape are preserved; unsupported types and shapes are diagnosed', () => {
+    const inverted = parse(
+      score(
+        `<note>${C4}<type>quarter</type><notations><fermata type="inverted">normal</fermata></notations></note>`,
+      ),
+    );
+    assert.equal(firstEvent(inverted).fermataPlacement, 'below');
+    assert.equal(firstEvent(inverted).fermataShape, 'normal');
+
+    const unsupported = parse(
+      score(`<note>${C4}<type>quarter</type><notations><fermata>angled</fermata></notations></note>`),
+    );
+    assert.equal(firstEvent(unsupported).hasFermata, true);
+    assert.equal(firstEvent(unsupported).fermataShape, undefined);
+    assert.ok(codes(unsupported).includes('UNSUPPORTED_FERMATA_SHAPE'));
+
+    const unknownType = parse(
+      score(`<note>${C4}<type>quarter</type><notations><fermata type="sideways"/></notations></note>`),
+    );
+    assert.equal(firstEvent(unknownType).fermataPlacement, 'above');
+    assert.ok(codes(unknownType).includes('UNSUPPORTED_FERMATA_TYPE'));
   });
 
   test('slur start/stop carry their own numbers, defaulting to 1 when the attribute is absent', () => {

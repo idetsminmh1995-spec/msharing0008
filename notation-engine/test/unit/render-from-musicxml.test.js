@@ -48,6 +48,23 @@ describe('renderFromMusicXml end-to-end (Phase 21)', () => {
     assert.deepEqual(codes.slice(3), ['U+E0A4', 'U+E0A4', 'U+E0A4', 'U+E0A4', 'U+E0A3', 'U+E4E4']);
   });
 
+  test('renders upright and inverted fermatas on notes and rests with the requested Bravura glyphs', () => {
+    const xml =
+      '<score-partwise><part-list><score-part id="P1"/></part-list><part id="P1">' +
+      '<measure number="1"><attributes><divisions>1</divisions></attributes>' +
+      '<note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type>' +
+      '<notations><fermata/></notations></note>' +
+      '<note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type>' +
+      '<notations><fermata type="inverted">normal</fermata></notations></note>' +
+      '<note><rest/><duration>1</duration><type>quarter</type><notations><fermata type="inverted"/></notations></note>' +
+      '</measure></part></score-partwise>';
+    const { svg, diagnostics } = NE.renderFromMusicXml(xml, { domParser });
+    const codes = glyphCodepoints(svg);
+    assert.deepEqual([...diagnostics], []);
+    assert.equal(codes.filter((code) => code === 'U+E4C0').length, 1, 'normal upright fermata');
+    assert.equal(codes.filter((code) => code === 'U+E4C1').length, 2, 'normal inverted fermatas');
+  });
+
   test('every note position matches Phase 10\'s staffPositionForPitch formula exactly', () => {
     const { svg } = render('simple-single-voice.musicxml');
     // C4 D4 E4 F4 in treble clef -> y = bottomY + {1, 0.5, 0, -0.5}
