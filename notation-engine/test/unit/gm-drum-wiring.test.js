@@ -83,4 +83,59 @@ describe('GM drum mapping wired into rendering (Phase 41, §13.1/§13.3)', () =>
     const { svg } = NE.renderFromMusicXml(xml, { domParser });
     assert.match(svg, /\uE0A9/); // noteheadXBlack, matching the file's own explicit override
   });
+
+  test('a two-voice MuseScore-style groove preserves GM IDs, written positions, stems and aligned beats', () => {
+    const xml = fs.readFileSync(
+      path.join(FIXTURES_DIR, 'musescore-two-voice-drum-groove.musicxml'),
+      'utf8',
+    );
+    const parsed = NE.parseMusicXml(xml, { domParser });
+    const part = parsed.score.parts[0];
+    assert.ok(part);
+    const gmByInstrument = parsed.midiInstrumentsByPart.get(part.id);
+    assert.ok(gmByInstrument);
+    assert.equal(gmByInstrument.get('P1-KICK'), 36, 'MusicXML midi-unpitched 37 maps to GM 36');
+    assert.equal(gmByInstrument.get('P1-SNARE'), 38, 'MusicXML midi-unpitched 39 maps to GM 38');
+    assert.equal(gmByInstrument.get('P1-HH'), 42, 'MusicXML midi-unpitched 43 maps to GM 42');
+
+    const measure = part.measures[0];
+    assert.ok(measure);
+    const attacks = measure.voices.flatMap((voice) =>
+      voice.events.flatMap((event) => {
+        const notes = event.kind === 'chord' ? event.notes : event.kind === 'note' ? [event] : [];
+        return notes.map((note) => ({ tick: event.startTick, voice: voice.id, note }));
+      }),
+    );
+    assert.equal(attacks.length, 10);
+    const gmOf = (attack) => gmByInstrument.get(attack.note.instrumentId);
+    const positionOf = (note) => `${note.pitch.displayStep}${note.pitch.displayOctave}`;
+    const hats = attacks.filter((attack) => gmOf(attack) === 42);
+    const snares = attacks.filter((attack) => gmOf(attack) === 38);
+    const kicks = attacks.filter((attack) => gmOf(attack) === 36);
+    assert.deepEqual(
+      Array.from(hats, (attack) => attack.tick),
+      [0, 480, 960, 1440],
+    );
+    assert.deepEqual(
+      Array.from(snares, (attack) => attack.tick),
+      [480, 1440],
+    );
+    assert.deepEqual(
+      Array.from(kicks, (attack) => attack.tick),
+      [0, 480, 960, 1440],
+    );
+    assert.ok(hats.every(({ note }) => positionOf(note) === 'G5' && note.explicitNotehead === 'x'));
+    assert.ok(hats.every(({ note }) => note.explicitStemDirection === 'up'));
+    assert.ok(snares.every(({ note }) => positionOf(note) === 'C5'));
+    assert.ok(kicks.every(({ note }) => positionOf(note) === 'F4'));
+    assert.ok(kicks.every(({ note }) => note.explicitStemDirection === 'down'));
+    assert.equal(parsed.attributes[0].timeNumerator, 4);
+    assert.equal(parsed.attributes[0].timeDenominator, 4);
+
+    const rendered = NE.renderFromMusicXml(xml, { domParser });
+    assert.deepEqual(Array.from(rendered.diagnostics), []);
+    assert.ok(rendered.svg.includes('\uE0A9'), 'closed hi-hats use the X notehead glyph');
+    assert.ok(rendered.svg.includes('\uE0A4'), 'kick/snare notes use the standard filled oval');
+    assert.ok(rendered.svg.includes('130'), 'the quarter-note tempo marking is rendered');
+  });
 });

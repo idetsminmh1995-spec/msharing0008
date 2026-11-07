@@ -1701,6 +1701,30 @@ stem direction from `DEFAULT_DRUM_MAPPING_TABLE` (§13.3). A hi-hat draws a
 real ✕. The absent-display-step case recovers via a documented fallback with
 a diagnostic, never silently.
 
+**Real-file validation (2026-11-07).** Checked the supplied MuseScore Studio
+4.7.4 drum-kit MusicXML (without adding the full user file to this public
+repository) through both `parseMusicXml` and `renderFromMusicXml`. Its first
+4/4 bar at quarter = 130 contains four closed-hi-hat attacks (`GM 42`, `G5`,
+`x` heads, stems up) and four bass-drum attacks (`GM 36`, `F4`, stems down);
+the screenshot's 4/4, tempo and simultaneous upper/lower hits agree with that
+source bar. Across all 88 measures, the parser retained 794 drum notes and
+resolved the file's instrument IDs to GM 35, 36, 38 and 42. This confirms the
+1-based MusicXML `<midi-unpitched>` to 0-based GM conversion and confirms that
+explicit `<display-step>` / `<display-octave>` positions are honored as written
+([MusicXML display-step](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/display-step/),
+[MusicXML midi-unpitched](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/midi-unpitched/));
+MuseScore also documents that percussion-kit placement and noteheads come from
+the configured instrument mapping ([MuseScore percussion handbook](https://handbook.musescore.org/idiomatic-notation/percussion/inputting-percussion-notation)).
+
+The only warnings are the two `MEASURE_OVERRUN` diagnostics in measure 88:
+both voices extend to 2,400 ticks although 4/4 at the file's divisions permits
+1,920 ticks. The source measure contains five quarter-note beats in each voice.
+Keep all notes and report this source-data error; do not silently truncate or
+shift the final beat. A compact two-voice drum-groove fixture protects the
+verified mapping, display positions, noteheads, stems and beat alignment. The
+test scripts serialize suites (`--test-concurrency=1`) so parallel tests do not
+distort the parser's strict performance-budget measurements.
+
 ### 10.6 `<score-timewise>` `[BUILT]`
 
 The rarely-used alternative document order. Convert to partwise on load

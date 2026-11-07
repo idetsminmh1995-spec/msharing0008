@@ -13,8 +13,8 @@
     "lint": "eslint src",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
-    "test": "npm run build && node --test",
-    "test:update-snapshots": "npm run build && UPDATE_SNAPSHOTS=1 node --test",
+    "test": "npm run build && node --test --test-concurrency=1",
+    "test:update-snapshots": "npm run build && UPDATE_SNAPSHOTS=1 node --test --test-concurrency=1",
     "verify": "npm run typecheck && npm run lint && npm run format:check && npm run docs:check && npm run test",
     "docs": "npm run declarations && node scripts/generate-api-docs.mjs",
     "docs:check": "npm run declarations && node scripts/generate-api-docs.mjs --check"
