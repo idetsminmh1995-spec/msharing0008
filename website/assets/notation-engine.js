@@ -69019,7 +69019,11 @@ var NotationEngine = (() => {
     const flushRun = () => {
       if (run.length === 0) return;
       if (run.every((i2) => events[i2]?.forceBeam === true)) {
-        if (run.length >= 2) groups.push({ eventIndices: [...run] });
+        const groupSize = Math.max(2, numerator);
+        for (let start = 0; start < run.length; start += groupSize) {
+          const group = run.slice(start, start + groupSize);
+          if (group.length >= 2) groups.push({ eventIndices: group });
+        }
         run = [];
         return;
       }

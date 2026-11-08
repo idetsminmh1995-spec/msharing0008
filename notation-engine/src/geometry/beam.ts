@@ -163,7 +163,15 @@ export function groupBeams(
     // Keep this override local to the marked run; ordinary pitched quarters
     // still follow the normal duration-based engraving rule below.
     if (run.every((i) => events[i]?.forceBeam === true)) {
-      if (run.length >= 2) groups.push({ eventIndices: [...run] });
+      // Drum house styles commonly show one beam per beat-group. For a
+      // 4/4 quarter-note hand pattern that means four attacks per group;
+      // importantly, an eight-event run must not become one bar-spanning
+      // beam just because the source omitted <beam> hints.
+      const groupSize = Math.max(2, numerator);
+      for (let start = 0; start < run.length; start += groupSize) {
+        const group = run.slice(start, start + groupSize);
+        if (group.length >= 2) groups.push({ eventIndices: group });
+      }
       run = [];
       return;
     }
