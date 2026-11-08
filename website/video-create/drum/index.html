@@ -490,11 +490,6 @@
           <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l1-.2M9 5v13"/><circle cx="7" cy="18" r="3"/></svg></div>
           <div class="label">MusicXML</div>
         </label>
-        <label class="upload-slot" for="upload-midi">
-          <input id="upload-midi" type="file" accept=".mid,.midi" style="display:none;">
-          <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 15V6l12-2v11"/></svg></div>
-          <div class="label">MIDI</div>
-        </label>
         <label class="upload-slot" for="upload-audio">
           <input id="upload-audio" type="file" accept="audio/*" style="display:none;">
           <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v10.5a3.5 3.5 0 1 1-2-3.16"/><path d="M12 3c3 0 5 2 5 5"/></svg></div>
@@ -2038,17 +2033,11 @@
     reader.readAsText(file);
   });
 
-  // MIDI/Audio slots: switch which slot looks "active" so the person
-  // gets visible feedback that a file was picked at all (previously
-  // these two inputs had no listener whatsoever -- selecting a file
-  // did nothing visible, which is what was reported as "doesn't
-  // work"). MIDI is genuinely parsed (the engine's own real MIDI
-  // parser, Phase 39) and its real stats are reported; full notation
-  // RENDERING from MIDI isn't wired into this page, so that limit is
-  // stated plainly rather than pretended away. Audio has no NOTATION
-  // parsing path in this engine (nothing turns a waveform into notes) --
-  // but the file itself now plays for real through the transport bar
-  // below, which is what "isn't supported yet" used to block entirely.
+  // Audio has no notation parsing path in this engine (nothing turns a
+  // waveform into notes), but the file itself plays through the transport
+  // bar below. Notation is intentionally MusicXML-only: MusicXML carries
+  // the score's timing, voices, drum instruments, display positions, beams,
+  // stems, tempo, and other engraving instructions.
   function setActiveSlot(inputId) {
     document.querySelectorAll('.upload-slot').forEach((slot) => {
       slot.classList.toggle('active', slot.getAttribute('for') === inputId);
@@ -2056,40 +2045,7 @@
   }
 
   document.getElementById('upload-musicxml').addEventListener('click', () => setActiveSlot('upload-musicxml'));
-  document.getElementById('upload-midi').addEventListener('click', () => setActiveSlot('upload-midi'));
   document.getElementById('upload-audio').addEventListener('click', () => setActiveSlot('upload-audio'));
-
-  document.getElementById('upload-midi').addEventListener('change', (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    setActiveSlot('upload-midi');
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const bytes = new Uint8Array(reader.result);
-        const result = NotationEngine.parseMidiFile(bytes);
-        if (result.midiFile === undefined) {
-          const reason = result.diagnostics[0]?.message ?? 'Unknown error.';
-          setUploadConfirm(`Could not read "${file.name}": ${reason}`, false);
-          return;
-        }
-        const noteCount = result.midiFile.tracks.reduce((sum, t) => sum + t.notes.length, 0);
-        const firstTempo = result.midiFile.tempoEvents[0];
-        const bpm = firstTempo ? Math.round(60000000 / firstTempo.microsecondsPerQuarter) : undefined;
-        setUploadConfirm(
-          `Parsed "${file.name}" -- ${result.midiFile.tracks.length} track(s), ${noteCount} notes` +
-            (bpm ? `, ${bpm} BPM` : '') +
-            '. Notation rendering from MIDI isn\u2019t wired into this preview yet -- upload a MusicXML/MXL file to see notation.',
-          true,
-        );
-      } catch (err) {
-        console.error('MIDI parse failed:', err);
-        setUploadConfirm(`Could not read "${file.name}" as a MIDI file.`, false);
-      }
-    };
-    reader.onerror = () => setUploadConfirm(`Could not read "${file.name}".`, false);
-    reader.readAsArrayBuffer(file);
-  });
 
   document.getElementById('upload-audio').addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];
