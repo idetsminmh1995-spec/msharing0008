@@ -3949,10 +3949,16 @@ export function renderParsedMusicXml(
               const isUnpitchedDrumEvent =
                 event.duration.type === 'quarter' &&
                 (event.kind === 'note'
-                  ? event.pitch.kind === 'unpitched'
+                  ? event.pitch.kind === 'unpitched' &&
+                    event.voice % 2 === 1 &&
+                    event.explicitStemDirection !== 'down'
                   : event.kind === 'chord'
                     ? event.notes.length > 0 &&
-                      event.notes.every((note) => note.pitch.kind === 'unpitched')
+                      event.voice % 2 === 1 &&
+                      event.notes.every(
+                        (note) =>
+                          note.pitch.kind === 'unpitched' && note.explicitStemDirection !== 'down',
+                      )
                     : false);
               return {
                 durationType: event.duration.type,

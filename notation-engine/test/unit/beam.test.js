@@ -331,6 +331,6 @@ describe('MusicXML whole-score percussion eighth-note groove (44130 regression)'
     ];
     // The drum chart's quarter-note hand runs now receive the intentional
     // house-style shared beam in addition to the ordinary eighth-note beams.
-    assert.equal(primaryBeamLines.length, 330);
+    assert.equal(primaryBeamLines.length, 253);
   });
 });
