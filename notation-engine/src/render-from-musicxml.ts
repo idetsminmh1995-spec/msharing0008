@@ -3955,24 +3955,19 @@ export function renderParsedMusicXml(
               // one. A chord's <beam> lives on its first note, exactly
               // where MusicXML puts it.
               const level1 = isRest ? undefined : beamSource?.beams?.find((b) => b.number === 1);
-              // 44130 and similar drum exports use quarter durations for a
-              // continuous hi-hat hand pattern but the target engraving
-              // still draws one shared beam over that run. This marker is
-              // intentionally restricted to unpitched quarter events; a
-              // pitched quarter-note passage remains standard notation.
+              // 44130 and similar drum exports use quarter durations for
+              // continuous drum patterns but the target engraving still
+              // draws shared beams over those runs. Apply this only to
+              // unpitched drum events; pitched quarter-note passages remain
+              // standard notation. This deliberately covers both hand and
+              // foot voices, including kick and left-foot hi-hat.
               const isUnpitchedDrumEvent =
                 event.duration.type === 'quarter' &&
                 (event.kind === 'note'
-                  ? event.pitch.kind === 'unpitched' &&
-                    event.voice % 2 === 1 &&
-                    event.explicitStemDirection !== 'down'
+                  ? event.pitch.kind === 'unpitched'
                   : event.kind === 'chord'
                     ? event.notes.length > 0 &&
-                      event.voice % 2 === 1 &&
-                      event.notes.every(
-                        (note) =>
-                          note.pitch.kind === 'unpitched' && note.explicitStemDirection !== 'down',
-                      )
+                      event.notes.every((note) => note.pitch.kind === 'unpitched')
                     : false);
               return {
                 durationType: event.duration.type,

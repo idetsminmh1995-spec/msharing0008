@@ -78963,9 +78963,7 @@ ${xrefOffset}
                 const beamSource = event.kind === "chord" ? event.notes[0] : event.kind === "note" ? event : void 0;
                 const isRest = event.kind === "rest" || event.kind === "note" && event.isGrace === true;
                 const level1 = isRest ? void 0 : beamSource?.beams?.find((b) => b.number === 1);
-                const isUnpitchedDrumEvent = event.duration.type === "quarter" && (event.kind === "note" ? event.pitch.kind === "unpitched" && event.voice % 2 === 1 && event.explicitStemDirection !== "down" : event.kind === "chord" ? event.notes.length > 0 && event.voice % 2 === 1 && event.notes.every(
-                  (note2) => note2.pitch.kind === "unpitched" && note2.explicitStemDirection !== "down"
-                ) : false);
+                const isUnpitchedDrumEvent = event.duration.type === "quarter" && (event.kind === "note" ? event.pitch.kind === "unpitched" : event.kind === "chord" ? event.notes.length > 0 && event.notes.every((note2) => note2.pitch.kind === "unpitched") : false);
                 return {
                   durationType: event.duration.type,
                   isRest,

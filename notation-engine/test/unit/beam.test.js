@@ -42,7 +42,8 @@ describe('beam grouping (Phase 23)', () => {
   });
 
   test('2/4 pairs its two beats; 3/4 has an odd number of them and does not', () => {
-    const eighths = (n) => Array.from({ length: n }, () => ({ durationType: 'eighth', isRest: false }));
+    const eighths = (n) =>
+      Array.from({ length: n }, () => ({ durationType: 'eighth', isRest: false }));
     const starts = (n) => Array.from({ length: n }, (_, i) => i * 240);
     const twoFour = NE.groupBeams(eighths(4), starts(4), 2, 4);
     assert.equal(twoFour.length, 1, '2/4: one group of four');
@@ -71,7 +72,10 @@ describe('beam grouping (Phase 23)', () => {
     const starts = [0, 240, 480, 720, 960, 1080, 1200, 1320, 1440, 1560, 1680, 1800];
     const groups = NE.groupBeams(events, starts, 4, 4);
     assert.equal(groups.length, 3);
-    assert.deepEqual([...groups].map((g) => g.eventIndices.length), [4, 4, 4]);
+    assert.deepEqual(
+      [...groups].map((g) => g.eventIndices.length),
+      [4, 4, 4],
+    );
     assert.deepEqual([...groups[0].eventIndices], [0, 1, 2, 3]);
   });
 
@@ -139,7 +143,10 @@ describe('beam grouping (Phase 23)', () => {
     const starts = events.map((_, i) => i * 240);
     const groups = NE.groupBeams(events, starts, 4, 4, 480);
     const indices = NE.beamedEventIndices(groups);
-    assert.deepEqual([...indices].sort((a, b) => a - b), [0, 1, 2, 3, 4, 5, 6, 7]);
+    assert.deepEqual(
+      [...indices].sort((a, b) => a - b),
+      [0, 1, 2, 3, 4, 5, 6, 7],
+    );
   });
 });
 
@@ -159,12 +166,7 @@ describe('explicit <beam> hints (§10.4/§10.8)', () => {
   });
 
   test('begin/continue/end forms one group spanning exactly those events', () => {
-    const groups = NE.groupBeamsFromHints([
-      ev('begin'),
-      ev('continue'),
-      ev('continue'),
-      ev('end'),
-    ]);
+    const groups = NE.groupBeamsFromHints([ev('begin'), ev('continue'), ev('continue'), ev('end')]);
     assert.equal(groups.length, 1);
     assert.deepEqual([...groups[0].eventIndices], [0, 1, 2, 3]);
   });
@@ -217,10 +219,7 @@ describe('explicit <beam> hints (§10.4/§10.8)', () => {
 describe('partial beams and hooks, end to end (Integration W)', () => {
   const NE2 = NE;
   const load = (n) =>
-    fs.readFileSync(
-      path.join(__dirname2, '..', 'fixtures', 'musicxml', n),
-      'utf8',
-    );
+    fs.readFileSync(path.join(__dirname2, '..', 'fixtures', 'musicxml', n), 'utf8');
 
   /** Every beam line actually drawn, as [x1, x2, y1, y2], left to right. */
   const beamLines = (svg) =>
@@ -293,8 +292,14 @@ describe('MusicXML whole-score percussion eighth-note groove (44130 regression)'
     const measures = parsed.score.parts[0].measures;
     assert.equal(measures.length, 88);
     const expectedBeamValues = [
-      'begin', 'continue', 'continue', 'end',
-      'begin', 'continue', 'continue', 'end',
+      'begin',
+      'continue',
+      'continue',
+      'end',
+      'begin',
+      'continue',
+      'continue',
+      'end',
     ];
     for (const measure of measures) {
       const hatVoice = measure.voices.find((voice) => voice.id === 3);
@@ -307,16 +312,16 @@ describe('MusicXML whole-score percussion eighth-note groove (44130 regression)'
         1920,
         `measure ${measure.number} has exactly four quarter-note beats of hi-hats`,
       );
-      const beamValues = Array.from(events, (event) =>
-        event.beams.find((beam) => beam.number === 1)?.value,
+      const beamValues = Array.from(
+        events,
+        (event) => event.beams.find((beam) => beam.number === 1)?.value,
       );
       assert.deepEqual(beamValues, expectedBeamValues, `measure ${measure.number} beam groups`);
     }
     assert.equal(
       parsed.diagnostics.some(
         (diagnostic) =>
-          diagnostic.code === 'MEASURE_OVERRUN' &&
-          diagnostic.location?.measureNumber !== 88,
+          diagnostic.code === 'MEASURE_OVERRUN' && diagnostic.location?.measureNumber !== 88,
       ),
       false,
     );
@@ -331,6 +336,6 @@ describe('MusicXML whole-score percussion eighth-note groove (44130 regression)'
     ];
     // The drum chart's quarter-note hand runs now receive the intentional
     // house-style shared beam in addition to the ordinary eighth-note beams.
-    assert.equal(primaryBeamLines.length, 253);
+    assert.equal(primaryBeamLines.length, 330);
   });
 });
