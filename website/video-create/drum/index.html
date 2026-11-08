@@ -905,6 +905,32 @@
    * browser serves the second from cache.
    */
   let kitBackgroundImage = null;
+  let kitBackgroundReady = null;
+  const hitImageReady = new Map();
+
+  function waitForImage(img, label) {
+    if (img.complete && img.naturalWidth > 0) return Promise.resolve(img);
+    return new Promise((resolve, reject) => {
+      const onLoad = () => {
+        cleanup();
+        resolve(img);
+      };
+      const onError = () => {
+        cleanup();
+        reject(new Error(`Could not load ${label}.`));
+      };
+      const cleanup = () => {
+        img.removeEventListener('load', onLoad);
+        img.removeEventListener('error', onError);
+      };
+      img.addEventListener('load', onLoad, { once: true });
+      img.addEventListener('error', onError, { once: true });
+      if (img.complete) {
+        if (img.naturalWidth > 0) onLoad();
+        else onError();
+      }
+    });
+  }
 
   async function loadKitPreview(kitPath) {
     const label = kitLabel(kitPath);
@@ -926,20 +952,29 @@
         videoFrame.style.backgroundPosition = 'center';
         const bg = new Image();
         bg.crossOrigin = 'anonymous';
-        bg.addEventListener('load', () => {
-          if (kitBackgroundImage !== bg) return;
-          kitContentTop = measureKitTop(bg);
-          fitNotationToKit();
-        });
         bg.src = imgUrl;
         kitBackgroundImage = bg;
+        kitBackgroundReady = waitForImage(bg, `the ${label} kit background`)
+          .then(() => {
+            if (kitBackgroundImage !== bg) return bg;
+            kitContentTop = measureKitTop(bg);
+            fitNotationToKit();
+            return bg;
+          })
+          .catch((err) => {
+            if (kitBackgroundImage === bg) {
+              kitBackgroundImage = null;
+              kitBackgroundReady = null;
+              if (drumCircle) drumCircle.style.display = '';
+            }
+            throw err;
+          });
         kitContentTop = null;
         if (drumCircle) drumCircle.style.display = 'none';
-        setKitStatus(
-          `\u2713 Loaded "${label}" background + ${manifest.files.length} note images from R2.`,
-          true,
-        );
+        await kitBackgroundReady;
+        setKitStatus(`\u2713 Loaded "${label}" background + ${manifest.files.length} note images from R2.`, true);
       } else {
+        kitBackgroundReady = null;
         setKitStatus(`"${label}" has no background image for ${currentAspect()} yet.`, false);
       }
     } catch (err) {
@@ -1777,7 +1812,10 @@
     if (!hitLayer) return;
     const wanted = new Set(hitTimeline.map((h) => h.file));
     for (const img of [...hitLayer.children]) {
-      if (!wanted.has(img.dataset.file)) img.remove();
+      if (!wanted.has(img.dataset.file)) {
+        hitImageReady.delete(img.dataset.file);
+        img.remove();
+      }
     }
     const have = new Set([...hitLayer.children].map((img) => img.dataset.file));
     for (const file of wanted) {
@@ -1788,8 +1826,24 @@
       // Fetched with CORS so the recorder can draw it: a photo pulled
       // without it still SHOWS, but taints the capture canvas.
       img.crossOrigin = 'anonymous';
+      const ready = waitForImage(img, `hit image ${file}`);
+      hitImageReady.set(file, ready);
       img.src = hitImageUrl(file);
       hitLayer.appendChild(img);
+    }
+  }
+
+  async function ensureHitImagesReady() {
+    const wanted = new Set(hitTimeline.map((h) => h.file));
+    if (wanted.size === 0) return;
+    const missing = [...wanted].filter((file) => !hitImageReady.has(file));
+    if (missing.length > 0) {
+      throw new Error(`Hit images are not ready: ${missing.join(', ')}`);
+    }
+    try {
+      await Promise.all([...wanted].map((file) => hitImageReady.get(file)));
+    } catch (err) {
+      throw new Error(`A drum-kit hit image failed before export. ${err?.message ?? err}`);
     }
   }
 
@@ -3267,9 +3321,20 @@
       notationImageKey = key;
     } catch (err) {
       notationImage = null;
+      notationImageKey = '';
+      throw new Error('Could not rasterize the MusicXML notation for export.', { cause: err });
     } finally {
       URL.revokeObjectURL(url);
     }
+  }
+
+  async function ensureExportAssets() {
+    if (!kitBackgroundImage || !kitBackgroundReady) {
+      throw new Error('The drum-kit background is not ready. Choose a kit and wait for it to finish loading.');
+    }
+    await kitBackgroundReady;
+    await ensureHitImagesReady();
+    await refreshNotationImage();
   }
 
   /**
@@ -3555,7 +3620,7 @@
         source.connect(offline.destination);
         source.start(0);
       } catch (err) {
-        console.error('The uploaded audio could not be decoded for rendering:', err);
+        throw new Error('The uploaded audio could not be decoded for rendering.', { cause: err });
       }
     }
 
@@ -3610,6 +3675,8 @@
     };
 
     try {
+      genLabel.textContent = 'Checking export assets…';
+      await ensureExportAssets();
       genLabel.textContent = 'Fetching the Thank You clip…';
       const outro =
         typeof OutroVideo === 'undefined'
@@ -3618,7 +3685,7 @@
               aspect: currentAspect(),
               kind: 'drum',
               style: currentVideoStyle(),
-            }).catch(() => null);
+            });
 
       genLabel.textContent = 'Preparing the notation…';
       await refreshNotationImage();
