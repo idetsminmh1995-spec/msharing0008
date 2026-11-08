@@ -39,6 +39,8 @@ export interface BeamableEvent {
   readonly durationType: DurationType;
   /** Whether this event is a rest -- a rest is never itself beamed, and breaks a run of beamable notes (§9.12). */
   readonly isRest: boolean;
+  /** House-style override used only by the renderer for selected drum runs. */
+  readonly forceBeam?: boolean;
 }
 
 /** One group of 2+ consecutive event indices sharing a beam. A solitary beamable note (nothing grouped with it) never appears in the output -- it keeps its individual flag instead. */
@@ -156,6 +158,16 @@ export function groupBeams(
   const flushRun = (): void => {
     if (run.length === 0) return;
 
+    // Some drum charts deliberately show a continuous hand pattern with a
+    // shared beam even when the MusicXML writer labels each hit as a quarter.
+    // Keep this override local to the marked run; ordinary pitched quarters
+    // still follow the normal duration-based engraving rule below.
+    if (run.every((i) => events[i]?.forceBeam === true)) {
+      if (run.length >= 2) groups.push({ eventIndices: [...run] });
+      run = [];
+      return;
+    }
+
     // Split the run at beats first.
     const beats: { index: number; events: number[] }[] = [];
     for (const i of run) {
@@ -197,7 +209,7 @@ export function groupBeams(
   };
 
   events.forEach((event, i) => {
-    if (event.isRest || !isBeamable(event.durationType)) {
+    if (event.isRest || (!isBeamable(event.durationType) && event.forceBeam !== true)) {
       flushRun();
       return;
     }

@@ -1886,7 +1886,14 @@ function renderBeamGroup(
   // primary across the group, then a line per run of consecutive notes
   // that need each further level, and a hook where such a run is one
   // note long.
-  const beamLevels = events.map((e) => Math.max(1, numBeamLines(e.duration.type)));
+  const beamLevels = events.map((e) => {
+    const isUnpitchedDrumQuarter =
+      e.duration.type === 'quarter' &&
+      (e.kind === 'note'
+        ? e.pitch.kind === 'unpitched'
+        : e.notes.length > 0 && e.notes.every((note) => note.pitch.kind === 'unpitched'));
+    return isUnpitchedDrumQuarter ? 1 : Math.max(1, numBeamLines(e.duration.type));
+  });
   // §10.8: the file's own <beam number="N">, which states outright which
   // way a hook points. A chord's hints live on its first note, where
   // MusicXML puts them.
@@ -3934,10 +3941,24 @@ export function renderParsedMusicXml(
               // one. A chord's <beam> lives on its first note, exactly
               // where MusicXML puts it.
               const level1 = isRest ? undefined : beamSource?.beams?.find((b) => b.number === 1);
+              // 44130 and similar drum exports use quarter durations for a
+              // continuous hi-hat hand pattern but the target engraving
+              // still draws one shared beam over that run. This marker is
+              // intentionally restricted to unpitched quarter events; a
+              // pitched quarter-note passage remains standard notation.
+              const isUnpitchedDrumEvent =
+                event.duration.type === 'quarter' &&
+                (event.kind === 'note'
+                  ? event.pitch.kind === 'unpitched'
+                  : event.kind === 'chord'
+                    ? event.notes.length > 0 &&
+                      event.notes.every((note) => note.pitch.kind === 'unpitched')
+                    : false);
               return {
                 durationType: event.duration.type,
                 isRest,
                 ...(level1 !== undefined ? { beamValue: level1.value } : {}),
+                ...(isUnpitchedDrumEvent ? { forceBeam: true } : {}),
               };
             });
             // §10.8: a file that states its own beaming is the authority
