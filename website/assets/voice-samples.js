@@ -83,15 +83,45 @@
     );
   }
 
-  function get(address) {
-    return fetch(address).then(
-      function (res) {
-        return res.ok ? res.arrayBuffer() : null;
-      },
-      function () {
+  function requestBytes(address, timeoutMs) {
+    var controller = new AbortController();
+    var timer = setTimeout(function () {
+      controller.abort();
+    }, timeoutMs || 12000);
+    return fetch(address, {
+      mode: 'cors',
+      credentials: 'omit',
+      signal: controller.signal,
+    })
+      .then(function (res) {
+        if (!res.ok) return { bytes: null, status: res.status, network: false };
+        return res.arrayBuffer().then(function (bytes) {
+          return { bytes: bytes.byteLength > 0 ? bytes : null, status: res.status, network: false };
+        });
+      })
+      .catch(function () {
+        return { bytes: null, status: 0, network: true };
+      })
+      .finally(function () {
+        clearTimeout(timer);
+      });
+  }
+
+  function get(address, timeoutMs, retryLimit) {
+    var attempts = 0;
+    var retries = retryLimit === undefined ? 1 : retryLimit;
+    function attempt() {
+      return requestBytes(address, timeoutMs).then(function (result) {
+        if (result.bytes) return result.bytes;
+        var transient = result.network || result.status === 408 || result.status === 429 || result.status >= 500;
+        if (transient && attempts < retries) {
+          attempts += 1;
+          return attempt();
+        }
         return null;
-      },
-    );
+      });
+    }
+    return attempt();
   }
 
   /**
@@ -133,11 +163,11 @@
     // that is a visible pause before the page can say so.
     function round() {
       if (at >= list.length) return Promise.resolve(null);
-      var batch = list.slice(at, at + 8);
+      var batch = list.slice(at, at + 24);
       at += batch.length;
       return Promise.all(
         batch.map(function (attempt) {
-          return get(attempt.url);
+          return get(attempt.url, 3000, 0);
         }),
       ).then(function (results) {
         for (var i = 0; i < results.length; i++) {
@@ -170,7 +200,16 @@
     var spec = KINDS[kind];
     if (!spec) return Promise.resolve(null);
     var known = resolved[kind];
-    if (known) return get(url(apiBase, known.folder, known.prefix + id, known.extension));
+    if (known) {
+      return get(url(apiBase, known.folder, known.prefix + id, known.extension)).then(function (bytes) {
+        if (bytes) return bytes;
+        if (resolved[kind] === known) delete resolved[kind];
+        // Individual uploads sometimes mix M1.wav with 2.wave or omit
+        // the M prefix. Search the alternatives for this id instead of
+        // leaving one beat silent because an earlier beat found a format.
+        return find(apiBase, kind, id);
+      });
+    }
 
     if (!searching[kind]) {
       var pending = { id: String(id), promise: null };
@@ -225,28 +264,21 @@
     var at = 0;
     function round() {
       if (at >= list.length) return Promise.resolve({ found: null, bytes: null, tried: tried });
-      var batch = list.slice(at, at + 8);
+      var batch = list.slice(at, at + 24);
       at += batch.length;
       return Promise.all(
         batch.map(function (attempt) {
-          return fetch(attempt.url).then(
-            function (res) {
-              return res.ok ? res.arrayBuffer() : null;
-            },
-            function () {
-              return 'error';
-            },
-          );
+          return requestBytes(attempt.url, 3000);
         }),
       ).then(function (results) {
         for (var i = 0; i < results.length; i++) {
           var label = batch[i].folder + '/' + batch[i].name + '.' + batch[i].extension;
-          if (results[i] === null || results[i] === 'error') {
-            tried.push({ path: label, ok: false, network: results[i] === 'error' });
+          if (results[i].bytes === null) {
+            tried.push({ path: label, ok: false, network: results[i].network });
             continue;
           }
           tried.push({ path: label, ok: true, network: false });
-          return { found: label, bytes: results[i], tried: tried };
+          return { found: label, bytes: results[i].bytes, tried: tried };
         }
         return round();
       });

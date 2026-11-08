@@ -920,49 +920,62 @@
         console.error('Audio encoder:', err);
       },
     });
-    const channels = Math.min(2, buffer.numberOfChannels);
-    encoder.configure({
-      codec: format.audio,
-      sampleRate: buffer.sampleRate,
-      numberOfChannels: channels,
-      bitrate: format.audioBitrate,
-    });
-
-    const SLICE = Math.round(buffer.sampleRate * 0.02);
-    const planes = [];
-    for (let c = 0; c < channels; c++) planes.push(buffer.getChannelData(c));
-    for (let start = 0; start < buffer.length; start += SLICE) {
-      if (shouldStop && shouldStop()) break;
-      const count = Math.min(SLICE, buffer.length - start);
-      const interleaved = new Float32Array(count * channels);
-      for (let c = 0; c < channels; c++) {
-        interleaved.set(planes[c].subarray(start, start + count), c * count);
-      }
-      const data = new window.AudioData({
-        format: 'f32-planar',
+    try {
+      const channels = Math.min(2, buffer.numberOfChannels);
+      encoder.configure({
+        codec: format.audio,
         sampleRate: buffer.sampleRate,
-        numberOfFrames: count,
         numberOfChannels: channels,
-        timestamp: Math.round((start / buffer.sampleRate) * 1e6),
-        data: interleaved,
+        bitrate: format.audioBitrate,
       });
-      encoder.encode(data);
-      data.close();
-      if (encoder.encodeQueueSize > 40) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const SLICE = Math.round(buffer.sampleRate * 0.02);
+      const planes = [];
+      for (let c = 0; c < channels; c++) planes.push(buffer.getChannelData(c));
+      for (let start = 0; start < buffer.length; start += SLICE) {
+        if (shouldStop && shouldStop()) break;
+        const count = Math.min(SLICE, buffer.length - start);
+        const planar = new Float32Array(count * channels);
+        for (let c = 0; c < channels; c++) {
+          planar.set(planes[c].subarray(start, start + count), c * count);
+        }
+        const data = new window.AudioData({
+          format: 'f32-planar',
+          sampleRate: buffer.sampleRate,
+          numberOfFrames: count,
+          numberOfChannels: channels,
+          timestamp: Math.round((start / buffer.sampleRate) * 1e6),
+          data: planar,
+        });
+        try {
+          encoder.encode(data);
+        } finally {
+          data.close();
+        }
+        if (encoder.encodeQueueSize > 40) {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+        if (encoderError) throw encoderError;
+      }
+      await encoder.flush();
+      if (encoderError) throw new Error(`Audio encoding failed: ${encoderError.message || encoderError}`);
+      return {
+        chunks,
+        description:
+          description ?? (format.audio === AAC ? aacConfigFor(buffer.sampleRate, channels) : undefined),
+        sampleRate: buffer.sampleRate,
+        channels,
+        bitrate: format.audioBitrate,
+      };
+    } finally {
+      if (encoder.state !== 'closed') {
+        try {
+          encoder.close();
+        } catch (error) {
+          console.warn('Audio encoder cleanup failed:', error);
+        }
       }
     }
-    await encoder.flush();
-    encoder.close();
-    if (encoderError) throw new Error(`Audio encoding failed: ${encoderError.message || encoderError}`);
-    return {
-      chunks,
-      description:
-        description ?? (format.audio === AAC ? aacConfigFor(buffer.sampleRate, channels) : undefined),
-      sampleRate: buffer.sampleRate,
-      channels,
-      bitrate: format.audioBitrate,
-    };
   }
 
   /**
@@ -1018,12 +1031,29 @@
     if (!format) return null;
     const codec = format.video;
     const memoryPolicy = renderMemoryPolicy();
+    const totalSeconds = segments.reduce((sum, segment) => sum + segment.seconds, 0);
+    const projectedVideoBytes = (bitrate * totalSeconds) / 8;
+    const projectedPcmBytes = audioChannels > 0 ? totalSeconds * AUDIO_SAMPLE_RATE * audioChannels * 4 : 0;
+    const projectedAudioBytes = audioChannels > 0 ? (format.audioBitrate * totalSeconds) / 8 : 0;
+    // The encoded samples remain live while the fast-start Blob is built.
+    // Reserve a second video-sized copy for muxing, plus whichever audio
+    // representation is larger. Reject before allocating full-frame or
+    // encoder buffers rather than risking a tab crash on a long take.
+    const projectedPeakBytes = Math.ceil(
+      projectedVideoBytes * 2 + Math.max(projectedPcmBytes, projectedAudioBytes),
+    );
+    if (projectedPeakBytes > memoryPolicy.budgetBytes) {
+      throw new RangeError(
+        `This video is estimated to need ${(projectedPeakBytes / 1048576).toFixed(0)} MB during export, ` +
+          `above this device's ${(memoryPolicy.budgetBytes / 1048576).toFixed(0)} MB safety budget. ` +
+          'Shorten the video or use a smaller output size.',
+      );
+    }
 
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d', { alpha: false });
-
+    let canvas = null;
+    let encoder = null;
+    let joined = null;
+    let audio = null;
     const videoChunks = [];
     // The parameter sets -- the few bytes saying what shape the stream
     // is -- come alongside the first frame rather than inside it, and
@@ -1031,156 +1061,177 @@
     let videoDescription;
     let encoderError = null;
     let encodedVideoBytes = 0;
-    const encoder = new window.VideoEncoder({
-      output: (chunk, metadata) => {
-        if (metadata && metadata.decoderConfig && metadata.decoderConfig.description) {
-          videoDescription = new Uint8Array(metadata.decoderConfig.description);
-        }
-        const data = new Uint8Array(chunk.byteLength);
-        chunk.copyTo(data);
-        encodedVideoBytes += data.byteLength;
-        videoChunks.push({ us: chunk.timestamp, key: chunk.type === 'key', data });
-      },
-      error: (err) => {
-        encoderError = err;
-        console.error('Video encoder:', err);
-      },
-    });
-    encoder.configure({
-      codec,
-      width,
-      height,
-      bitrate,
-      framerate: fps,
-      latencyMode: 'quality',
-      // `avc` format means every chunk arrives as length-prefixed NAL
-      // units with the stream's parameter sets handed over separately,
-      // which is the only shape an MP4 can hold them in. Without it the
-      // encoder emits Annex B, which is a different file format.
-      ...(codec.startsWith('avc1') ? { avc: { format: 'avc' } } : {}),
-    });
-
-    const totalSeconds = segments.reduce((sum, s) => sum + s.seconds, 0);
-    const totalFrames = Math.max(1, Math.round(totalSeconds * fps));
-    const frameDuration = 1e6 / fps;
-    const keyEvery = Math.max(1, Math.round(fps * 2));
+    let pcmAudioBytes = 0;
     let frameIndex = 0;
-    let segmentStartFrame = 0;
     let stopped = false;
+    try {
+      canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d', { alpha: false });
+      if (!ctx) throw new Error('Could not allocate a 2D canvas for video export');
 
-    for (const segment of segments) {
-      if (stopped) break;
-      if (segment.onStart) await segment.onStart();
-      // Derive both ends from one global timeline. Rounding each segment
-      // independently can create a frame gap or overlap across many clips.
-      const segmentEndFrame = Math.round((segmentStartFrame / fps + segment.seconds) * fps);
-      const count = Math.max(0, segmentEndFrame - segmentStartFrame);
-      for (let i = 0; i < count; i++) {
-        if (shouldStop && shouldStop()) {
-          stopped = true;
-          break;
-        }
-        const at = i / fps;
-        // Every segment is drawn as fast as the machine manages, and
-        // nothing waits on a clock. A segment reading a <video> used
-        // to be paced in real time and photographed as it played,
-        // which meant the encoder's own backpressure could make it
-        // copy one frame twice and miss the next. A source that has
-        // to be waited for waits inside its own `draw` -- for the
-        // frame it was actually asked for.
-        await segment.draw(ctx, at, i);
-        const frame = new window.VideoFrame(canvas, {
-          timestamp: Math.round(frameIndex * frameDuration),
-          duration: Math.round(frameDuration),
-        });
-        encoder.encode(frame, { keyFrame: frameIndex % keyEvery === 0 });
-        frame.close();
-        frameIndex += 1;
-        // Encoding is asynchronous; letting its queue run away would
-        // hold every frame in memory at once. Waiting here is exactly
-        // the thing MediaRecorder could not do, and why this never
-        // drops one.
-        if (encoder.encodeQueueSize > memoryPolicy.highWater) {
-          while (encoder.encodeQueueSize > memoryPolicy.lowWater) {
-            await new Promise((resolve) => setTimeout(resolve, 1));
+      encoder = new window.VideoEncoder({
+        output: (chunk, metadata) => {
+          if (metadata && metadata.decoderConfig && metadata.decoderConfig.description) {
+            videoDescription = new Uint8Array(metadata.decoderConfig.description);
           }
+          const data = new Uint8Array(chunk.byteLength);
+          chunk.copyTo(data);
+          encodedVideoBytes += data.byteLength;
+          videoChunks.push({ us: chunk.timestamp, key: chunk.type === 'key', data });
+          const liveEstimate = encodedVideoBytes * 2 + Math.max(pcmAudioBytes, projectedAudioBytes);
+          if (liveEstimate > memoryPolicy.budgetBytes) {
+            encoderError = new RangeError('Encoded video exceeded the device memory safety budget');
+          }
+        },
+        error: (err) => {
+          encoderError = err;
+          console.error('Video encoder:', err);
+        },
+      });
+      encoder.configure({
+        codec,
+        width,
+        height,
+        bitrate,
+        framerate: fps,
+        latencyMode: 'quality',
+        // `avc` format means every chunk arrives as length-prefixed NAL
+        // units with the stream's parameter sets handed over separately,
+        // which is the only shape an MP4 can hold them in. Without it the
+        // encoder emits Annex B, which is a different file format.
+        ...(codec.startsWith('avc1') ? { avc: { format: 'avc' } } : {}),
+      });
+
+      const totalFrames = Math.max(1, Math.round(totalSeconds * fps));
+      const frameDuration = 1e6 / fps;
+      const keyEvery = Math.max(1, Math.round(fps * 2));
+      let segmentStartFrame = 0;
+
+      for (const segment of segments) {
+        if (stopped) break;
+        if (segment.onStart) await segment.onStart();
+        // Derive both ends from one global timeline. Rounding each segment
+        // independently can create a frame gap or overlap across many clips.
+        const segmentEndFrame = Math.round((segmentStartFrame / fps + segment.seconds) * fps);
+        const count = Math.max(0, segmentEndFrame - segmentStartFrame);
+        try {
+          for (let i = 0; i < count; i++) {
+            if (shouldStop && shouldStop()) {
+              stopped = true;
+              break;
+            }
+            const at = i / fps;
+            // A source that needs waiting waits inside its own draw callback.
+            await segment.draw(ctx, at, i);
+            const frame = new window.VideoFrame(canvas, {
+              timestamp: Math.round(frameIndex * frameDuration),
+              duration: Math.round(frameDuration),
+            });
+            try {
+              encoder.encode(frame, { keyFrame: frameIndex % keyEvery === 0 });
+            } finally {
+              frame.close();
+            }
+            frameIndex += 1;
+            if (encoder.encodeQueueSize > memoryPolicy.highWater) {
+              while (encoder.encodeQueueSize > memoryPolicy.lowWater) {
+                if (encoderError) throw encoderError;
+                await new Promise((resolve) => setTimeout(resolve, 1));
+              }
+            }
+            if (encoderError) throw encoderError;
+            if (onProgress && frameIndex % 10 === 0) {
+              onProgress((frameIndex / totalFrames) * 0.75, 'Rendering');
+            }
+          }
+        } finally {
+          if (segment.onEnd) await segment.onEnd();
         }
-        if (onProgress && frameIndex % 10 === 0) {
-          onProgress((frameIndex / totalFrames) * 0.75, 'Rendering');
+        segmentStartFrame = segmentEndFrame;
+      }
+
+      await encoder.flush();
+      if (encoderError) throw new Error(`Video encoding failed: ${encoderError.message || encoderError}`);
+      encoder.close();
+      encoder = null;
+
+      if (onProgress) onProgress(0.75, 'Encoding the sound');
+      // A cancelled render must not append the original full-length soundtrack
+      // to the shorter video that was actually encoded.
+      const renderedSeconds = frameIndex / fps;
+      joined = await joinAudio(segments, renderedSeconds);
+      pcmAudioBytes = bytesOfAudioBuffer(joined);
+      if (joined) audio = await encodeAudio(joined, format, shouldStop);
+      else if (onProgress) onProgress(0.9, 'Writing the file');
+      // Encoded sound is now independent of the potentially large PCM buffer.
+      joined = null;
+
+      if (onProgress) onProgress(0.9, 'Writing the file');
+      if (format.container === 'mp4' && !videoDescription) {
+        throw new Error('H.264 encoder did not provide decoder configuration');
+      }
+      const blob =
+        format.container === 'mp4'
+          ? muxMp4({
+              width,
+              height,
+              fps,
+              video: { chunks: videoChunks, description: videoDescription },
+              audio,
+            })
+          : muxWebM({
+              videoCodec: codec,
+              width,
+              height,
+              videoChunks,
+              audio,
+              durationMs: (frameIndex / fps) * 1000,
+            });
+      if (onProgress) onProgress(1, 'Complete');
+      const encodedAudioBytes = audio
+        ? audio.chunks.reduce((sum, chunk) => sum + chunk.data.byteLength, 0)
+        : 0;
+      const estimatedPeakBytes = encodedVideoBytes * 2 + Math.max(pcmAudioBytes, encodedAudioBytes);
+      return {
+        blob,
+        extension: format.container,
+        container: format.container,
+        videoCodec: codec,
+        audioCodec: audio ? format.audio : null,
+        bitrate,
+        frames: frameIndex,
+        fps,
+        seconds: frameIndex / fps,
+        path: 'webcodecs',
+        cancelled: stopped,
+        memory: {
+          encodedVideoBytes,
+          encodedAudioBytes,
+          pcmAudioBytes,
+          estimatedPeakBytes,
+          budgetBytes: memoryPolicy.budgetBytes,
+          withinBudget: estimatedPeakBytes <= memoryPolicy.budgetBytes,
+        },
+      };
+    } finally {
+      if (encoder && encoder.state !== 'closed') {
+        try {
+          encoder.close();
+        } catch (error) {
+          console.warn('Video encoder cleanup failed:', error);
         }
       }
-      if (segment.onEnd) await segment.onEnd();
-      segmentStartFrame = segmentEndFrame;
+      if (canvas) {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+      videoChunks.length = 0;
+      if (audio && Array.isArray(audio.chunks)) audio.chunks.length = 0;
+      joined = null;
+      audio = null;
     }
-
-    await encoder.flush();
-    encoder.close();
-    if (encoderError) throw new Error(`Video encoding failed: ${encoderError.message || encoderError}`);
-
-    if (onProgress) onProgress(0.75, 'Encoding the sound');
-    let audio = null;
-    // A cancelled render must not append the original full-length soundtrack
-    // to the shorter video that was actually encoded.
-    const renderedSeconds = frameIndex / fps;
-    let joined = await joinAudio(segments, renderedSeconds);
-    const pcmAudioBytes = bytesOfAudioBuffer(joined);
-    if (joined) audio = await encodeAudio(joined, format, shouldStop);
-    else if (onProgress) onProgress(0.9, 'Writing the file');
-    // The encoded audio chunks are now independent of the PCM render. Drop
-    // the large Float32 backing store before constructing the final Blob.
-    joined = null;
-
-    if (onProgress) onProgress(0.9, 'Writing the file');
-    // An MP4 cannot be written without the parameter sets the encoder
-    // reports alongside its first frame. A browser that encoded H.264
-    // and then did not describe it has given us something we cannot
-    // put in a file, so say so rather than write a broken one.
-    if (format.container === 'mp4' && !videoDescription) {
-      throw new Error('H.264 encoder did not provide decoder configuration');
-    }
-    const blob =
-      format.container === 'mp4'
-        ? muxMp4({
-            width,
-            height,
-            fps,
-            video: { chunks: videoChunks, description: videoDescription },
-            audio,
-          })
-        : muxWebM({
-            videoCodec: codec,
-            width,
-            height,
-            videoChunks,
-            audio,
-            durationMs: (frameIndex / fps) * 1000,
-          });
-    if (onProgress) onProgress(1, 'Complete');
-    const encodedAudioBytes = audio
-      ? audio.chunks.reduce((sum, chunk) => sum + chunk.data.byteLength, 0)
-      : 0;
-    const estimatedPeakBytes = encodedVideoBytes + Math.max(pcmAudioBytes, encodedAudioBytes);
-    return {
-      blob,
-      extension: format.container,
-      container: format.container,
-      videoCodec: codec,
-      audioCodec: audio ? format.audio : null,
-      bitrate,
-      frames: frameIndex,
-      fps,
-      seconds: frameIndex / fps,
-      path: 'webcodecs',
-      cancelled: stopped,
-      memory: {
-        encodedVideoBytes,
-        encodedAudioBytes,
-        pcmAudioBytes,
-        estimatedPeakBytes,
-        budgetBytes: memoryPolicy.budgetBytes,
-        withinBudget: estimatedPeakBytes <= memoryPolicy.budgetBytes,
-      },
-    };
   }
 
   // ---------------------------------------------------------------
@@ -1201,6 +1252,22 @@
     return '';
   }
 
+  function waitForRecorderDone(done, timeoutMs) {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('MediaRecorder did not stop within the allowed time')), timeoutMs);
+      done.then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (error) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      );
+    });
+  }
+
   /**
    * Real-time capture, frame by frame, as good as that can be made.
    *
@@ -1212,77 +1279,179 @@
     const { width, height, fps, segments, onProgress, shouldStop } = options;
     const mimeType = pickRecorderMime();
     if (mimeType === '' || !window.AudioContext) return null;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d', { alpha: false });
-
-    const audioCtx = new AudioContext();
-    const dest = audioCtx.createMediaStreamDestination();
-    const totalSeconds = segments.reduce((sum, s) => sum + s.seconds, 0);
-    const joined = await joinAudio(segments, totalSeconds);
-
-    const stream = canvas.captureStream(fps);
-    for (const track of dest.stream.getAudioTracks()) stream.addTrack(track);
-    const chunks = [];
-    const recorder = new MediaRecorder(stream, {
-      mimeType,
-      videoBitsPerSecond: options.bitrate ?? defaultBitrate(width, height, fps),
-    });
-    recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) chunks.push(e.data);
-    };
-    const done = new Promise((resolve) => {
-      recorder.onstop = resolve;
-    });
-    recorder.start(1000);
-
-    if (joined) {
-      const source = audioCtx.createBufferSource();
-      source.buffer = joined;
-      source.connect(dest);
-      source.start();
+    const totalSeconds = segments.reduce((sum, segment) => sum + segment.seconds, 0);
+    const audioChannels = segments.some((segment) => segment.audio)
+      ? Math.max(1, Math.min(2, ...segments.filter((segment) => segment.audio).map((segment) => segment.audio.numberOfChannels)))
+      : 0;
+    const bitrate = options.bitrate ?? defaultBitrate(width, height, fps);
+    const budgetBytes = renderMemoryPolicy().budgetBytes;
+    const estimatedBytes = Math.ceil(
+      ((bitrate * totalSeconds) / 8) * 2 +
+        (audioChannels > 0 ? totalSeconds * AUDIO_SAMPLE_RATE * audioChannels * 4 : 0),
+    );
+    if (estimatedBytes > budgetBytes) {
+      throw new RangeError(
+        `This video is estimated to need ${(estimatedBytes / 1048576).toFixed(0)} MB during export, ` +
+          `above this device's ${(budgetBytes / 1048576).toFixed(0)} MB safety budget. ` +
+          'Shorten the video or use a smaller output size.',
+      );
     }
-
+    let canvas = null;
+    let audioCtx = null;
+    let dest = null;
+    let stream = null;
+    let recorder = null;
+    let source = null;
+    let joined = null;
+    const chunks = [];
     let frameIndex = 0;
     let cancelled = false;
-    const startedAt = performance.now();
-    for (const segment of segments) {
-      if (cancelled) break;
-      if (segment.onStart) await segment.onStart();
-      const count = Math.max(0, Math.round(segment.seconds * fps));
-      for (let i = 0; i < count; i++) {
-        if (shouldStop && shouldStop()) {
-          cancelled = true;
-          break;
-        }
-        const due = startedAt + (frameIndex / fps) * 1000;
-        const wait = due - performance.now();
-        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-        await segment.draw(ctx, i / fps, i);
-        frameIndex += 1;
-        if (onProgress && frameIndex % 10 === 0) {
-          onProgress(frameIndex / Math.max(1, Math.round(totalSeconds * fps)), 'Recording');
+    let recorderStarted = false;
+    let recorderFinished = false;
+    let doneResolve;
+    let doneReject;
+    const done = new Promise((resolve, reject) => {
+      doneResolve = resolve;
+      doneReject = reject;
+    });
+    // Keep an immediate rejection handler attached while frame drawing is
+    // in progress; the awaited call below still receives the same failure.
+    done.catch(() => {});
+
+    try {
+      canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d', { alpha: false });
+      if (!ctx) throw new Error('Could not allocate a 2D canvas for video export');
+
+      audioCtx = new AudioContext();
+      dest = audioCtx.createMediaStreamDestination();
+      joined = await joinAudio(segments, totalSeconds);
+
+      stream = canvas.captureStream(fps);
+      for (const track of dest.stream.getAudioTracks()) stream.addTrack(track);
+      recorder = new MediaRecorder(stream, {
+        mimeType,
+        videoBitsPerSecond: bitrate,
+      });
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) chunks.push(event.data);
+      };
+      recorder.onstop = () => {
+        recorderFinished = true;
+        doneResolve();
+      };
+      recorder.onerror = (event) => doneReject(event.error || new Error('MediaRecorder failed'));
+      recorder.start(1000);
+      recorderStarted = true;
+
+      if (joined) {
+        source = audioCtx.createBufferSource();
+        source.buffer = joined;
+        source.connect(dest);
+        source.start();
+      }
+
+      const startedAt = performance.now();
+      for (const segment of segments) {
+        if (cancelled) break;
+        if (segment.onStart) await segment.onStart();
+        const count = Math.max(0, Math.round(segment.seconds * fps));
+        try {
+          for (let i = 0; i < count; i++) {
+            if (shouldStop && shouldStop()) {
+              cancelled = true;
+              break;
+            }
+            const due = startedAt + (frameIndex / fps) * 1000;
+            const wait = due - performance.now();
+            if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+            await segment.draw(ctx, i / fps, i);
+            frameIndex += 1;
+            if (onProgress && frameIndex % 10 === 0) {
+              onProgress(frameIndex / Math.max(1, Math.round(totalSeconds * fps)), 'Recording');
+            }
+          }
+        } finally {
+          if (segment.onEnd) await segment.onEnd();
         }
       }
-      if (segment.onEnd) await segment.onEnd();
+      if (recorder.state !== 'inactive') recorder.stop();
+      await waitForRecorderDone(done, 5000);
+      const container = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
+      const blob = new Blob(chunks, { type: mimeType });
+      return {
+        blob,
+        extension: container,
+        container,
+        frames: frameIndex,
+        fps,
+        seconds: frameIndex / fps,
+        path: 'mediarecorder',
+        cancelled,
+      };
+    } finally {
+      if (recorderStarted && recorder && recorder.state !== 'inactive') {
+        try {
+          recorder.stop();
+        } catch (error) {
+          console.warn('MediaRecorder stop during cleanup failed:', error);
+        }
+      }
+      if (recorderStarted && !recorderFinished) {
+        try {
+          await waitForRecorderDone(done, 2000);
+        } catch (error) {
+          // The original recording error is already being propagated.
+        }
+      }
+      if (recorder) {
+        recorder.ondataavailable = null;
+        recorder.onstop = null;
+        recorder.onerror = null;
+      }
+      if (source) {
+        try {
+          source.stop();
+        } catch (error) {
+          // It may already have reached the end of the soundtrack.
+        }
+      }
+      const tracks = new Set();
+      if (stream && typeof stream.getTracks === 'function') {
+        for (const track of stream.getTracks()) tracks.add(track);
+      }
+      if (dest && dest.stream && typeof dest.stream.getTracks === 'function') {
+        for (const track of dest.stream.getTracks()) tracks.add(track);
+      }
+      for (const track of tracks) {
+        try {
+          track.stop();
+        } catch (error) {
+          console.warn('Media stream track cleanup failed:', error);
+        }
+      }
+      if (audioCtx && audioCtx.state !== 'closed') {
+        try {
+          await audioCtx.close();
+        } catch (error) {
+          console.warn('AudioContext cleanup failed:', error);
+        }
+      }
+      if (canvas) {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+      chunks.length = 0;
+      joined = null;
+      source = null;
+      dest = null;
+      stream = null;
+      recorder = null;
+      audioCtx = null;
+      canvas = null;
     }
-    recorder.stop();
-    await done;
-    for (const track of stream.getTracks()) track.stop();
-    await audioCtx.close();
-    const container = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
-    return {
-      blob: new Blob(chunks, { type: mimeType }),
-      extension: container,
-      container,
-      frames: frameIndex,
-      fps,
-      seconds: frameIndex / fps,
-      path: 'mediarecorder',
-      cancelled,
-    };
   }
 
   function validateRenderOptions(options) {

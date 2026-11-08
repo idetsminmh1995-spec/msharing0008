@@ -450,11 +450,13 @@
      output. -->
 <script src="../../assets/sticking-engine.js?v=3907faf4"></script>
 <!-- Finds the count voices in the bucket whatever they were named. -->
-<script src="../../assets/voice-samples.js?v=609facad"></script>
+<script src="../../assets/voice-samples.js?v=799d655d"></script>
+<!-- CORS-safe R2 image fetch/decode barrier used by drum-kit assets. -->
+<script src="../../assets/r2-image-loader.js?v=b047595f"></script>
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
-<script src="../../assets/outro-video.js?v=521fc4cb"></script>
+<script src="../../assets/outro-video.js?v=92356be8"></script>
 <!-- The video engine: renders frames rather than recording them. -->
-<script src="../../assets/video-engine.js?v=9c8e90f0"></script>
+<script src="../../assets/video-engine.js?v=2ce0bcd8"></script>
 </head>
 <body>
 
@@ -831,8 +833,7 @@
       right.classList.toggle('is-tall', aspect === '9x16' || aspect === '1x1');
     }
     measurePreviewChrome();
-    videoFrame.style.backgroundImage = '';
-    kitBackgroundImage = null;
+    clearKitBackground();
     kitContentTop = null;
     // The shape decides what the notation is drawn WITH, so it has to
     // be drawn again -- after the classes above, which is what
@@ -840,7 +841,7 @@
     // measures what came out.
     redrawNotation();
     fitNotationToKit();
-    if (hitLayer) hitLayer.innerHTML = '';
+    clearHitImages();
     if (currentKit.path) {
       void loadKitPreview(currentKit.path);
     } else {
@@ -910,55 +911,97 @@
    * browser serves the second from cache.
    */
   let kitBackgroundImage = null;
+  let kitBackgroundExpected = false;
+  let kitLoadGeneration = 0;
+  let kitAssetController = null;
+  let kitLoadPromise = Promise.resolve(true);
+  let kitBackgroundPromise = Promise.resolve();
+  let hitImagePreloadPromise = Promise.resolve([]);
+  let missingHitAssets = new Set();
 
-  async function loadKitPreview(kitPath) {
+  function clearKitBackground() {
+    if (kitBackgroundImage) R2ImageLoader.release(kitBackgroundImage);
+    kitBackgroundImage = null;
+    kitBackgroundExpected = false;
+    if (videoFrame) videoFrame.style.backgroundImage = '';
+  }
+
+  function loadKitPreview(kitPath) {
+    const generation = ++kitLoadGeneration;
+    const aspect = currentAspect();
     const label = kitLabel(kitPath);
-    try {
-      const res = await fetch(
-        `${API_BASE}/api/drum-sets/${kitUrlPath(kitPath)}/${currentAspect()}/manifest`,
-      );
-      if (!res.ok) throw new Error(`manifest request failed (${res.status})`);
-      const manifest = await res.json();
-      currentKit = { path: kitPath, label, files: new Set(manifest.files ?? []) };
-      // Rebuild against THIS kit's files. Which strokes have a photo is
-      // a property of the kit, not of the score, so switching kits has
-      // to re-answer it -- and the kit commonly loads after the score.
-      renderSticking();
-      if (manifest.hasBackground) {
-        const imgUrl = `${API_BASE}/assets/${kitUrlPath(kitPath)}/${currentAspect()}/${encodeURIComponent(manifest.backgroundFile)}`;
-        videoFrame.style.backgroundImage = `url("${imgUrl}")`;
+    if (kitAssetController) kitAssetController.abort();
+    kitAssetController = new AbortController();
+    const controller = kitAssetController;
+    const signal = controller.signal;
+    clearKitBackground();
+    clearHitImages();
+    kitBackgroundPromise = Promise.resolve();
+
+    const request = (async () => {
+      try {
+        const manifestUrl = `${API_BASE}/api/drum-sets/${kitUrlPath(kitPath)}/${aspect}/manifest`;
+        const manifestTimer = setTimeout(() => controller.abort(), 15_000);
+        let manifest;
+        try {
+          const response = await fetch(manifestUrl, { signal, mode: 'cors', credentials: 'omit' });
+          if (!response.ok) throw new Error(`manifest request failed (${response.status})`);
+          manifest = await response.json();
+        } finally {
+          clearTimeout(manifestTimer);
+        }
+        if (generation !== kitLoadGeneration) return false;
+        if (!Array.isArray(manifest.files)) throw new Error('asset manifest has no file list');
+
+        currentKit = { path: kitPath, label, files: new Set(manifest.files) };
+        kitBackgroundExpected = Boolean(manifest.hasBackground);
+        // Rebuild against THIS kit's manifest. Hit-image fetching can
+        // continue while the background is fetched and decoded below.
+        renderSticking();
+        if (!manifest.hasBackground) {
+          if (drumCircle) drumCircle.style.display = '';
+          setKitStatus(`"${label}" has no background for ${aspect}; using the built-in background.`, false);
+          return true;
+        }
+
+        if (!manifest.backgroundFile) throw new Error('manifest says the background exists but gives no filename');
+        const imageUrl = `${API_BASE}/assets/${kitUrlPath(kitPath)}/${aspect}/${encodeURIComponent(manifest.backgroundFile)}`;
+        const background = new Image();
+        const loading = R2ImageLoader.loadIntoImage(background, imageUrl, { signal });
+        kitBackgroundPromise = loading;
+        setKitStatus(`Loading background; ${manifest.files.length} note-image files are listed in R2…`, true);
+        const result = await loading;
+        if (generation !== kitLoadGeneration || signal.aborted) {
+          R2ImageLoader.release(background);
+          return false;
+        }
+        kitBackgroundImage = background;
+        videoFrame.style.backgroundImage = `url("${result.objectUrl}")`;
         videoFrame.style.backgroundSize = 'cover';
         videoFrame.style.backgroundPosition = 'center';
-        const bg = new Image();
-        bg.crossOrigin = 'anonymous';
-        bg.addEventListener('load', () => {
-          if (kitBackgroundImage !== bg) return;
-          kitContentTop = measureKitTop(bg);
-          fitNotationToKit();
-        });
-        bg.src = imgUrl;
-        kitBackgroundImage = bg;
-        kitContentTop = null;
+        kitContentTop = measureKitTop(background);
+        fitNotationToKit();
         if (drumCircle) drumCircle.style.display = 'none';
         setKitStatus(
-          `\u2713 Loaded "${label}" background + ${manifest.files.length} note images from R2.`,
+          `\u2713 R2 background downloaded and decoded; ${manifest.files.length} note-image files are available.`,
           true,
         );
-      } else {
-        setKitStatus(`"${label}" has no background image for ${currentAspect()} yet.`, false);
+        return true;
+      } catch (err) {
+        if (generation !== kitLoadGeneration) return false;
+        console.error('Drum kit preview failed to load:', err);
+        setKitStatus(
+          `Could not load the selected kit from R2: ${err && err.message ? err.message : err}.` +
+            (legacyKitServer
+              ? ' The asset server may be an older version that lists only one folder level.'
+              : ''),
+          false,
+        );
+        return false;
       }
-    } catch (err) {
-      console.error('Drum kit preview failed to load:', err);
-      setKitStatus(
-        `Could not load "${label}" from the asset server.` +
-          (legacyKitServer
-            ? ' The asset server is still the older version: it lists one folder level,' +
-              ' so it offers drums/{Brand}/ as a kit and finds no photos inside. Deploy the' +
-              ' updated Worker and this becomes Brand + Drum Kit.'
-            : ''),
-        false,
-      );
-    }
+    })();
+    kitLoadPromise = request;
+    return request;
   }
 
   /**
@@ -1762,9 +1805,9 @@
     return null;
   }
 
-  function hitImageUrl(fileName) {
+  function hitImageUrl(fileName, kitPath = currentKit.path, aspect = currentAspect()) {
     return (
-      `${API_BASE}/assets/${kitUrlPath(currentKit.path)}/${currentAspect()}/` +
+      `${API_BASE}/assets/${kitUrlPath(kitPath)}/${aspect}/` +
       encodeURIComponent(fileName)
     );
   }
@@ -1778,24 +1821,96 @@
    * 120bpm is four images a second, and a browser will not keep up with
    * that by URL alone.
    */
-  function preloadHitImages() {
+  function releaseHitImage(img) {
+    R2ImageLoader.release(img);
+    img.remove();
+  }
+
+  function clearHitImages() {
     if (!hitLayer) return;
-    const wanted = new Set(hitTimeline.map((h) => h.file));
+    for (const img of [...hitLayer.children]) releaseHitImage(img);
+    litFiles = new Set();
+    hitImagePreloadPromise = Promise.resolve([]);
+  }
+
+  /**
+   * Load every distinct hit image used by this timeline. The same file
+   * is shared across all of its hits, but a file from one kit/aspect is
+   * never reused for another. Callers may await this promise before
+   * exporting; a failed fetch/decode rejects instead of silently leaving
+   * a blank hit in the captured frame.
+   */
+  function preloadHitImages() {
+    if (!hitLayer || currentKit.path === null) {
+      hitImagePreloadPromise = Promise.resolve([]);
+      return hitImagePreloadPromise;
+    }
+
+    const kitPath = currentKit.path;
+    const aspect = currentAspect();
+    const signal = kitAssetController ? kitAssetController.signal : undefined;
+    const wanted = new Set(hitTimeline.map((hit) => hit.file));
+    const wantedKeys = new Set([...wanted].map((file) => `${kitPath}|${aspect}|${file}`));
     for (const img of [...hitLayer.children]) {
-      if (!wanted.has(img.dataset.file)) img.remove();
+      if (!wantedKeys.has(img.dataset.assetKey)) releaseHitImage(img);
     }
-    const have = new Set([...hitLayer.children].map((img) => img.dataset.file));
+
+    const existing = new Map([...hitLayer.children].map((img) => [img.dataset.assetKey, img]));
+    const pending = [];
+    const sharedPromises = [];
     for (const file of wanted) {
-      if (have.has(file) || currentKit.path === null) continue;
-      const img = document.createElement('img');
-      img.dataset.file = file;
-      img.alt = '';
-      // Fetched with CORS so the recorder can draw it: a photo pulled
-      // without it still SHOWS, but taints the capture canvas.
-      img.crossOrigin = 'anonymous';
-      img.src = hitImageUrl(file);
-      hitLayer.appendChild(img);
+      const key = `${kitPath}|${aspect}|${file}`;
+      let img = existing.get(key);
+      if (!img) {
+        img = document.createElement('img');
+        img.dataset.file = file;
+        img.dataset.assetKey = key;
+        img.alt = '';
+        img.crossOrigin = 'anonymous';
+        hitLayer.appendChild(img);
+      }
+      if (img.dataset.r2Ready === 'true' && img.complete && img.naturalWidth > 0) continue;
+      if (img._r2ReadyPromise) {
+        sharedPromises.push(img._r2ReadyPromise);
+        continue;
+      }
+      pending.push({ img, file });
     }
+
+    let next = 0;
+    const loadWorker = async () => {
+      while (next < pending.length) {
+        const entry = pending[next++];
+        const promise = R2ImageLoader.loadIntoImage(entry.img, hitImageUrl(entry.file, kitPath, aspect), {
+          signal,
+          timeoutMs: 15_000,
+          retries: 2,
+        });
+        entry.img._r2ReadyPromise = promise;
+        promise.catch(() => {
+          if (entry.img._r2ReadyPromise === promise) delete entry.img._r2ReadyPromise;
+        });
+        await promise;
+        if (entry.img._r2ReadyPromise === promise) delete entry.img._r2ReadyPromise;
+      }
+    };
+    const workers = Array.from({ length: Math.min(6, pending.length) }, () => loadWorker());
+    hitImagePreloadPromise = Promise.all([...sharedPromises, ...workers]).then(() => {
+      if (kitPath !== currentKit.path || aspect !== currentAspect()) {
+        throw new Error('The drum kit or aspect ratio changed while R2 images were loading.');
+      }
+      for (const key of wantedKeys) {
+        const img = [...hitLayer.children].find((candidate) => candidate.dataset.assetKey === key);
+        if (!img || img.dataset.r2Ready !== 'true' || !img.complete || img.naturalWidth === 0) {
+          throw new Error(`A required R2 hit image is not ready: ${key.split('|').at(-1)}`);
+        }
+      }
+      return [...wanted];
+    });
+    // Rendering during live preview is not blocked by an unused image;
+    // export awaits the same promise and surfaces its exact failure.
+    hitImagePreloadPromise.catch((error) => console.warn('R2 hit image preload failed:', error));
+    return hitImagePreloadPromise;
   }
 
   /**
@@ -1809,6 +1924,7 @@
    */
   function renderSticking() {
     hitTimeline = [];
+    missingHitAssets = new Set();
     clearLitHits();
     if (lastParsed === null || notationPlayback === null) {
       preloadHitImages();
@@ -1857,7 +1973,9 @@
       const photo = photoForStroke(ev.limb, source.note);
       if (photo === null) {
         missing++;
-        missingNotes.add(`${ev.limb} ${ev.instrument} (${source.note})`);
+        const missingDescription = `${ev.limb} ${ev.instrument} (${source.note})`;
+        missingNotes.add(missingDescription);
+        missingHitAssets.add(missingDescription);
         continue;
       }
       if (photo.note !== source.note) standIns.set(source.note, photo.note);
@@ -3356,6 +3474,10 @@
     ctx2d.fillRect(0, 0, canvas.width, canvas.height);
 
     // The kit photo, painted as `cover` exactly as the CSS does.
+    if (kitBackgroundExpected &&
+        (!kitBackgroundImage || kitBackgroundImage.dataset.r2Ready !== 'true' || !kitBackgroundImage.complete || kitBackgroundImage.naturalWidth === 0)) {
+      throw new Error('The selected kit background from R2 is not ready for export.');
+    }
     if (kitBackgroundImage && kitBackgroundImage.complete && kitBackgroundImage.naturalWidth > 0) {
       const fit = coverRect(
         kitBackgroundImage.naturalWidth,
@@ -3446,7 +3568,10 @@
     // The lit hit photos, last -- the hit layer is positioned, so the
     // browser paints it above everything in flow.
     for (const img of hitLayer.children) {
-      if (!img.classList.contains('lit') || !img.complete || img.naturalWidth === 0) continue;
+      if (!img.classList.contains('lit')) continue;
+      if (img.dataset.r2Ready !== 'true' || !img.complete || img.naturalWidth === 0) {
+        throw new Error(`The R2 hit image "${img.dataset.file}" is not ready for this video frame.`);
+      }
       const fit = coverRect(img.naturalWidth, img.naturalHeight, canvas.width, canvas.height);
       ctx2d.drawImage(img, fit.x, fit.y, fit.w, fit.h);
     }
@@ -3654,6 +3779,28 @@
     };
 
     try {
+      const selectedKitPath = kitSelect.value;
+      const selectedAspect = currentAspect();
+      if (selectedKitPath && currentKit.path !== selectedKitPath) {
+        genLabel.textContent = 'Loading the selected drum kit from R2…';
+        await loadKitPreview(selectedKitPath);
+      }
+      if (selectedKitPath) {
+        genLabel.textContent = 'Waiting for R2 kit images…';
+        const loaded = await kitLoadPromise;
+        if (!loaded || currentKit.path !== selectedKitPath || currentAspect() !== selectedAspect) {
+          throw new Error('The selected drum kit or aspect could not be loaded from R2. Please retry.');
+        }
+        await kitBackgroundPromise;
+        genLabel.textContent = 'Downloading and decoding every drum image used in the score…';
+        await preloadHitImages();
+        if (missingHitAssets.size > 0) {
+          throw new Error(
+            `The selected kit has no R2 photo for: ${[...missingHitAssets].join(', ')}. ` +
+              'Choose a kit with those images before exporting.',
+          );
+        }
+      }
       genLabel.textContent = 'Fetching the Thank You clip…';
       const outro =
         typeof OutroVideo === 'undefined'

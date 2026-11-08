@@ -66,6 +66,42 @@
   /** key -> {video, key, seconds} | null, so a second take reuses the download. */
   const cache = new Map();
 
+  function releaseClip(clip) {
+    if (!clip) return;
+    try {
+      clip.video.pause();
+      clip.video.removeAttribute('src');
+      clip.video.load();
+    } catch (err) {
+      /* a partially loaded element may not have anything to release */
+    }
+    if (clip.objectUrl) URL.revokeObjectURL(clip.objectUrl);
+  }
+
+  function waitForMetadata(video, timeoutMs) {
+    return new Promise((resolve, reject) => {
+      const cleanup = () => {
+        clearTimeout(timer);
+        video.removeEventListener('loadedmetadata', onLoaded);
+        video.removeEventListener('error', onError);
+      };
+      const onLoaded = () => {
+        cleanup();
+        resolve();
+      };
+      const onError = () => {
+        cleanup();
+        reject(new Error('R2 video did not decode'));
+      };
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error('Timed out waiting for R2 video metadata'));
+      }, timeoutMs);
+      video.addEventListener('loadedmetadata', onLoaded, { once: true });
+      video.addEventListener('error', onError, { once: true });
+    });
+  }
+
   /**
    * Downloads the first clip that exists and returns it ready to play.
    *
@@ -79,25 +115,38 @@
     if (cache.has(cacheKey)) return cache.get(cacheKey);
     let found = null;
     for (const key of keys) {
+      let video = null;
+      let objectUrl = null;
       try {
-        const res = await fetch(sharedUrl(apiBase, key));
-        if (!res.ok) continue;
-        const bytes = new Uint8Array(await res.arrayBuffer());
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10_000);
+        let res;
+        let bytes;
+        try {
+          res = await fetch(sharedUrl(apiBase, key), {
+            mode: 'cors',
+            credentials: 'omit',
+            signal: controller.signal,
+          });
+          if (!res.ok) continue;
+          bytes = new Uint8Array(await res.arrayBuffer());
+        } finally {
+          clearTimeout(timeout);
+        }
         if (bytes.length === 0) continue;
         const blob = new Blob([bytes], { type: res.headers.get('content-type') || 'video/mp4' });
-        const video = document.createElement('video');
+        video = document.createElement('video');
         video.preload = 'auto';
         video.playsInline = true;
-        video.src = URL.createObjectURL(blob);
-        await new Promise((resolve, reject) => {
-          video.onloadedmetadata = resolve;
-          video.onerror = () => reject(new Error('not playable'));
-          setTimeout(resolve, 8000);
-        });
-        if (!(video.videoWidth > 0)) continue;
+        objectUrl = URL.createObjectURL(blob);
+        const metadataReady = waitForMetadata(video, 8000);
+        video.src = objectUrl;
+        await metadataReady;
+        if (!(video.videoWidth > 0)) throw new Error('R2 video has no decodable picture dimensions');
         found = {
           video,
           key,
+          objectUrl,
           seconds: Number.isFinite(video.duration) ? video.duration : 0,
           /**
            * The clip's own sound, as a buffer.
@@ -119,10 +168,18 @@
         };
         break;
       } catch (err) {
-        /* try the next candidate */
+        releaseClip({ video, objectUrl });
       }
     }
-    cache.set(cacheKey, found);
+    if (found) {
+      for (const [oldKey, oldClip] of cache) {
+        if (oldKey !== cacheKey) {
+          releaseClip(oldClip);
+          cache.delete(oldKey);
+        }
+      }
+      cache.set(cacheKey, found);
+    }
     return found;
   }
 
