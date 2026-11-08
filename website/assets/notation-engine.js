@@ -69018,6 +69018,11 @@ var NotationEngine = (() => {
     let run = [];
     const flushRun = () => {
       if (run.length === 0) return;
+      if (run.every((i2) => events[i2]?.forceBeam === true)) {
+        if (run.length >= 2) groups.push({ eventIndices: [...run] });
+        run = [];
+        return;
+      }
       const beats = [];
       for (const i2 of run) {
         const tick = startTicks[i2] ?? 0;
@@ -69047,7 +69052,7 @@ var NotationEngine = (() => {
       run = [];
     };
     events.forEach((event, i2) => {
-      if (event.isRest || !isBeamable(event.durationType)) {
+      if (event.isRest || !isBeamable(event.durationType) && event.forceBeam !== true) {
         flushRun();
         return;
       }
@@ -77653,7 +77658,10 @@ ${xrefOffset}
       direction,
       noteheadGlyph: attachGlyphOf(m)
     }));
-    const beamLevels2 = events.map((e) => Math.max(1, numBeamLines(e.duration.type)));
+    const beamLevels2 = events.map((e) => {
+      const isUnpitchedDrumQuarter = e.duration.type === "quarter" && (e.kind === "note" ? e.pitch.kind === "unpitched" : e.notes.length > 0 && e.notes.every((note2) => note2.pitch.kind === "unpitched"));
+      return isUnpitchedDrumQuarter ? 1 : Math.max(1, numBeamLines(e.duration.type));
+    });
     const beamHints = events.map((e) => e.kind === "chord" ? e.notes[0]?.beams : e.beams);
     const segments = computeBeamSegments(beamLevels2, beamHints);
     const offsetShape = {
@@ -78831,10 +78839,14 @@ ${xrefOffset}
                 const beamSource = event.kind === "chord" ? event.notes[0] : event.kind === "note" ? event : void 0;
                 const isRest = event.kind === "rest" || event.kind === "note" && event.isGrace === true;
                 const level1 = isRest ? void 0 : beamSource?.beams?.find((b) => b.number === 1);
+                const isUnpitchedDrumEvent = event.duration.type === "quarter" && (event.kind === "note" ? event.pitch.kind === "unpitched" && event.voice % 2 === 1 && event.explicitStemDirection !== "down" : event.kind === "chord" ? event.notes.length > 0 && event.voice % 2 === 1 && event.notes.every(
+                  (note2) => note2.pitch.kind === "unpitched" && note2.explicitStemDirection !== "down"
+                ) : false);
                 return {
                   durationType: event.duration.type,
                   isRest,
-                  ...level1 !== void 0 ? { beamValue: level1.value } : {}
+                  ...level1 !== void 0 ? { beamValue: level1.value } : {},
+                  ...isUnpitchedDrumEvent ? { forceBeam: true } : {}
                 };
               });
               const groups = hasExplicitBeams(beamableEvents) ? groupBeamsFromHints(beamableEvents) : groupBeams(beamableEvents, starts, attrs.timeNumerator, attrs.timeDenominator);
