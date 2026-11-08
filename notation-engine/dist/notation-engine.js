@@ -143,6 +143,7 @@ var NotationEngine = (() => {
     estimateCharWidth: () => estimateCharWidth,
     estimateTextWidth: () => estimateTextWidth,
     evaluateAccidental: () => evaluateAccidental,
+    expandClosedHiHatQuarterNotesToEighthPulse: () => expandClosedHiHatQuarterNotesToEighthPulse,
     exportPdf: () => exportPdf,
     exportPng: () => exportPng,
     exportSvg: () => exportSvg,
@@ -75624,6 +75625,120 @@ ${denominator}`;
     return void 0;
   }
 
+  // src/drums/hi-hat-pulse.ts
+  var GM_CLOSED_HI_HAT = 42;
+  var QUARTER_TICKS = TICKS_PER_QUARTER;
+  var EIGHTH_TICKS = TICKS_PER_QUARTER / 2;
+  var FOUR_FOUR_BAR_TICKS = 4 * TICKS_PER_QUARTER;
+  var EIGHTH_DURATION = duration("eighth", 0, EIGHTH_TICKS);
+  function eventNotes(event) {
+    if (event.kind === "note") return [event];
+    if (event.kind === "chord") return event.notes;
+    return [];
+  }
+  function eventStartTick(event, fallback) {
+    return event.startTick ?? fallback;
+  }
+  function isClosedHiHat(note2, midiInstruments) {
+    if (note2.pitch.kind !== "unpitched" || note2.instrumentId === void 0) return false;
+    return midiInstruments?.get(note2.instrumentId) === GM_CLOSED_HI_HAT;
+  }
+  function isOnBeatQuarterHiHat(note2, startTick, midiInstruments) {
+    return isClosedHiHat(note2, midiInstruments) && note2.duration.type === "quarter" && note2.duration.ticks === QUARTER_TICKS && startTick >= 0 && startTick < FOUR_FOUR_BAR_TICKS && startTick % QUARTER_TICKS === 0;
+  }
+  function moveHat(note2, voiceId, startTick) {
+    return { ...note2, voice: voiceId, startTick };
+  }
+  function pulseHat(note2, voiceId, startTick) {
+    return {
+      ...note2,
+      voice: voiceId,
+      startTick,
+      duration: EIGHTH_DURATION,
+      // Quarter-note source notes have no beam hints. Keep inference in charge
+      // so the meter groups eight hats in 4/4 as two beams of four.
+      beams: []
+    };
+  }
+  function measureHasConvertibleHat(measure2, midiInstruments, isFourFour) {
+    if (!isFourFour) return false;
+    for (const voice2 of measure2.voices) {
+      let cursor = 0;
+      for (const event of voice2.events) {
+        const start = eventStartTick(event, cursor);
+        if (eventNotes(event).some((note2) => isOnBeatQuarterHiHat(note2, start, midiInstruments))) {
+          return true;
+        }
+        cursor = Math.max(cursor, start + event.duration.ticks);
+      }
+    }
+    return false;
+  }
+  function expandClosedHiHatQuarterNotesToEighthPulse(score2, attributes, midiInstrumentsByPart) {
+    let scoreChanged = false;
+    const parts = score2.parts.map((part2) => {
+      const midiInstruments = midiInstrumentsByPart.get(part2.id);
+      const maxVoiceId = part2.measures.reduce(
+        (max2, measure2) => Math.max(max2, ...measure2.voices.map((voice2) => voice2.id)),
+        0
+      );
+      const pulseVoiceId = maxVoiceId + 1;
+      let partChanged = false;
+      const measures = part2.measures.map((measure2) => {
+        const meter = attributes.find(
+          (entry) => entry.partId === part2.id && entry.measureNumber === measure2.number
+        );
+        const isFourFour = meter?.timeNumerator === 4 && meter.timeDenominator === 4;
+        if (!measureHasConvertibleHat(measure2, midiInstruments, isFourFour)) return measure2;
+        const pulseEvents = [];
+        const voices = measure2.voices.map((voice2) => {
+          const remainingEvents = [];
+          let cursor = 0;
+          for (const event of voice2.events) {
+            const start = eventStartTick(event, cursor);
+            cursor = Math.max(cursor, start + event.duration.ticks);
+            if (event.kind === "rest") {
+              remainingEvents.push(event);
+              continue;
+            }
+            const notes = eventNotes(event);
+            const hats = notes.filter((note2) => isClosedHiHat(note2, midiInstruments));
+            if (hats.length === 0) {
+              remainingEvents.push(event);
+              continue;
+            }
+            for (const hat of hats) {
+              if (isOnBeatQuarterHiHat(hat, start, midiInstruments)) {
+                pulseEvents.push(pulseHat(hat, pulseVoiceId, start));
+                pulseEvents.push(pulseHat(hat, pulseVoiceId, start + EIGHTH_TICKS));
+              } else {
+                pulseEvents.push(moveHat(hat, pulseVoiceId, start));
+              }
+            }
+            const retained = notes.filter((note2) => !isClosedHiHat(note2, midiInstruments));
+            if (retained.length === 1) {
+              remainingEvents.push({ ...retained[0], startTick: start });
+            } else if (retained.length > 1) {
+              remainingEvents.push({ ...chord(retained), startTick: start });
+            }
+          }
+          return remainingEvents.length > 0 ? [{ ...voice2, events: remainingEvents }] : [];
+        }).flat();
+        if (pulseEvents.length === 0) return measure2;
+        pulseEvents.sort((a, b) => (a.startTick ?? 0) - (b.startTick ?? 0));
+        partChanged = true;
+        return {
+          ...measure2,
+          voices: [...voices, { id: pulseVoiceId, events: pulseEvents }].sort((a, b) => a.id - b.id)
+        };
+      });
+      if (!partChanged) return part2;
+      scoreChanged = true;
+      return { ...part2, measures };
+    });
+    return scoreChanged ? { ...score2, parts } : score2;
+  }
+
   // src/playback/event-stream.ts
   function notationEventId(partId, measureNumber, voiceId, eventIndex) {
     return `${partId}#m${measureNumber}#v${voiceId}#e${eventIndex}`;
@@ -78109,7 +78224,7 @@ ${xrefOffset}
   }
   function renderParsedMusicXml(parsed, options) {
     const {
-      score: score2,
+      score: parsedScore,
       attributes,
       diagnostics: parseDiagnostics,
       tempoMarks,
@@ -78120,6 +78235,11 @@ ${xrefOffset}
     } = parsed;
     const diagnostics = [...parseDiagnostics];
     const config = resolveConfig(options?.config);
+    const score2 = config.drums.closedHiHatPulse === "quarter-to-eighths" ? expandClosedHiHatQuarterNotesToEighthPulse(
+      parsedScore,
+      attributes,
+      midiInstrumentsByPartMap
+    ) : parsedScore;
     const drawnTempoMarks = config.tempoMarks.display === "off" ? [] : tempoMarks;
     const theme = buildTheme(config, fileDefaults);
     for (const part2 of score2.parts) {

@@ -378,6 +378,11 @@ export interface DrumMapEntryOverride {
 
 export interface DrumsConfig {
   readonly mapping?: Readonly<Record<number, DrumMapEntryOverride>>;
+  /**
+   * Optional display-only normalization for a steady 4/4 closed-hi-hat
+   * quarter-note pulse. The default is faithful to the source MusicXML.
+   */
+  readonly closedHiHatPulse?: 'as-written' | 'quarter-to-eighths';
 }
 
 // ---- debug (Phase 51, §18.3) ----

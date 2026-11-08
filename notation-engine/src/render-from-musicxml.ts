@@ -65,7 +65,12 @@ import {
   type BarlineType,
   type BeamStyle as BeamStyleOption,
 } from './geometry/index.js';
-import { lookupDrumMapEntry, mergeDrumMappingTable, type DrumMappingTable } from './drums/index.js';
+import {
+  expandClosedHiHatQuarterNotesToEighthPulse,
+  lookupDrumMapEntry,
+  mergeDrumMappingTable,
+  type DrumMappingTable,
+} from './drums/index.js';
 import {
   computeSystemLayoutVariableGaps,
   computeScrollLayout,
@@ -2594,7 +2599,7 @@ export function renderParsedMusicXml(
   options?: RenderParsedMusicXmlOptions,
 ): RenderFromMusicXmlResult {
   const {
-    score,
+    score: parsedScore,
     attributes,
     diagnostics: parseDiagnostics,
     tempoMarks,
@@ -2605,6 +2610,14 @@ export function renderParsedMusicXml(
   } = parsed;
   const diagnostics: Diagnostic[] = [...parseDiagnostics];
   const config = resolveConfig(options?.config);
+  const score =
+    config.drums.closedHiHatPulse === 'quarter-to-eighths'
+      ? expandClosedHiHatQuarterNotesToEighthPulse(
+          parsedScore,
+          attributes,
+          midiInstrumentsByPartMap,
+        )
+      : parsedScore;
   /**
    * The tempo marks that are DRAWN, which is not always the ones the
    * file carries.

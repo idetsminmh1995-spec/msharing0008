@@ -405,7 +405,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-632 exported symbols, by module.
+634 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -585,6 +585,13 @@ The diagnostics `level` lets through, in their original order.
 | interface | `LookupDrumMapEntryResult` |  |
 | function | `lookupDrumMapEntry` | §13.3: looks up a GM MIDI note number in the given table (typically `DEFAULT_DRUM_MAPPING_TABLE` merged with `config.drums.mapping` overrides). |
 | function | `mergeDrumMappingTable` | §13.3: "every field is overridable via config.drums.mapping." Merges `config.drums.mapping` overrides onto `DEFAULT_DRUM_MAPPING_TABLE`, entry by entry and field by field -- a partial override for a GM note already in the default table only replaces the fields it names, keeping the default's own ... |
+
+### `src/drums/hi-hat-pulse.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `HiHatPulseMeasureAttributes` | MusicXML's per-measure meter metadata, kept structural to avoid a parser dependency. |
+| function | `expandClosedHiHatQuarterNotesToEighthPulse` | Optional display normalization for drum charts whose written closed-hi-hat quarter notes are intended as a steady eighth-note pulse. |
 
 ### `src/drums/stand-ins.ts`
 
