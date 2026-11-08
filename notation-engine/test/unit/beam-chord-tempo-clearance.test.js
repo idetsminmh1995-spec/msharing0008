@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadEngine } from '../helpers/load-engine.js';
 import { testDomParser } from '../helpers/dom.js';
+import { eventGeometry } from '../helpers/svg-geometry.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NE = loadEngine();
@@ -47,8 +48,9 @@ function lines(svg) {
 const render = (xml) => NE.renderFromMusicXml(xml, { domParser });
 
 /** An eighth note, optionally a chord continuation, with an explicit beam value. */
-const eighth = (step, octave, beam, chord = '') =>
+const eighth = (step, octave, beam, chord = '', stem = '') =>
   `<note>${chord}<pitch><step>${step}</step><octave>${octave}</octave></pitch>` +
+  (stem ? `<stem>${stem}</stem>` : '') +
   '<duration>1</duration><voice>1</voice><type>eighth</type>' +
   (beam ? `<beam number="1">${beam}</beam>` : '') +
   '</note>';
@@ -154,6 +156,31 @@ describe('a chord inside a beam group (Integration M, §9.13)', () => {
       stemXs.some((x) => Math.abs(x - chordStemX) < 1e-4),
       `the chord stem must use the far X-head anchor at ${chordStemX}; got ${stemXs.join(', ')}`,
     );
+  });
+
+  test('a beamed chord honors <stem> on a continuation member when other events omit it', () => {
+    const { svg, diagnostics } = render(
+      measure(
+        eighth('C', 5, 'begin') +
+          eighth('E', 5, 'continue') +
+          eighth('G', 5, 'continue', '<chord/>', 'up') +
+          eighth('D', 5, 'end') +
+          '<note><rest/><duration>5</duration><voice>1</voice><type>half</type></note>',
+      ),
+    );
+    assert.deepEqual([...diagnostics], []);
+    const chord = eventGeometry(svg, 'P1#m1#v1#e1');
+    assert.equal(chord?.heads.length, 2, 'both chord noteheads must render');
+    assert.equal(chord?.stem.direction, 'up', 'the later chord member states <stem>up</stem>');
+    for (const event of [0, 1, 2]) {
+      assert.equal(
+        eventGeometry(svg, `P1#m1#v1#e${event}`)?.stem.direction,
+        'up',
+        `the unanimous file direction controls beamed event ${event}`,
+      );
+    }
+    assert.equal(glyphCount(svg, 'flag8thUp') + glyphCount(svg, 'flag8thDown'), 0);
+    assert.equal(lines(svg).filter((line) => line.w === '0.5').length, 1);
   });
 
   test("the project's own drum chart draws zero stray flags (it drew 62 before)", () => {

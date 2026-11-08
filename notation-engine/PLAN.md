@@ -780,9 +780,20 @@ back cleanly.
 1. explicit per-voice forced direction from config or from the parser
    (this is what makes the drum hand/foot split work — hands up, feet down);
 2. explicit `<stem>` element from MusicXML;
-3. automatic: notes **above** the middle line get stems **down**, notes on or
+3. mapped drum convention where available for a single note;
+4. automatic: notes **above** the middle line get stems **down**, notes on or
    below get stems **up**; for a chord, the note furthest from the middle line
    decides.
+
+For an unbeamed chord, the first chord member in MusicXML order that states
+`<stem>` supplies the file direction. A beamed chord uses that same member-level
+lookup; a beam group follows the stated direction when all events that provide
+one agree. Unstated neighboring events do not veto it; conflicting stated
+directions fall back to the group rule. The applicable
+per-voice forced direction remains higher priority than file notation. Drum-map
+stem direction is currently a single-note fallback between file-stated and
+automatic direction; propagation to chords and beam groups is an open item in
+§19.
 
 **Length.** Default 3.5sp from the notehead. Extended so the stem reaches at
 least the middle line when the note is far outside the staff. Shortened never
@@ -844,6 +855,12 @@ one (that is what courtesy accidentals are).
 measure share one beam, and which stand alone with an individual flag
 (§9.9). Grouping only — the beam's actual line geometry (straight/flat/
 curved) is a separate concern, §9.13.
+
+**Drum house-style exception (built).** Qualifying unpitched quarter-note
+runs in odd-numbered hand voices are marked beamable for the 44130-style drum
+chart when events are not explicitly down-stemmed. This localized exception
+does not change pitched-quarter notation; its reliance on voice-number parity
+is a known follow-up in §19.
 
 **Which notes are even eligible.** Only notes of eighth duration or shorter
 (the exact same set §9.9 would otherwise give an individual flag). A rest
@@ -1684,7 +1701,8 @@ violate §1's independence requirement.
 
 Per the spec text quoted in §9.2: `<unpitched>` with `<display-step>` +
 `<display-octave>` positions as if treble clef. **If those children are
-absent, the note goes on the staff's middle line** — the one-line-staff case.
+absent, use the configured drum-map staff position when a GM instrument is
+resolved; otherwise use the documented middle-line fallback and diagnostic.
 `<midi-unpitched>` from the part's `<midi-instrument>` gives the GM note
 number, which becomes the notehead-mapping key (§9.7) and the drum-mapping key
 (§13).
@@ -1696,10 +1714,15 @@ Note: MusicXML's `<midi-unpitched>` is **1-based** while GM note numbers are
 (display-step/display-octave → staff position); each note's
 `<instrument id="...">` is captured; and Phase 41's
 `<midi-instrument>`/`<midi-unpitched>` lookup turns that id into a GM note
-number, which drives the notehead shape (§9.7), the staff position and the
-stem direction from `DEFAULT_DRUM_MAPPING_TABLE` (§13.3). A hi-hat draws a
-real ✕. The absent-display-step case recovers via a documented fallback with
-a diagnostic, never silently.
+number, which selects drum defaults (§13.3). A complete file-stated
+`<display-step>`/`<display-octave>` position and explicit `<notehead>` take
+precedence over mapped position and notehead defaults; the drum map supplies
+fallbacks when the file omits them. Single-note stem precedence is forced
+voice direction, file `<stem>`, mapped drum convention, then automatic.
+Chord/beam stem-map propagation and percussion grace-note fallback remain open
+items in §19. A hi-hat draws a real ✕. Missing file positions recover through
+the applicable mapped/fallback position, with diagnostics where resolution
+fails, never silently.
 
 **Real-file validation (2026-11-07).** Checked the supplied MuseScore Studio
 4.7.4 drum-kit MusicXML (without adding the full user file to this public
@@ -1928,6 +1951,9 @@ each other.
 | What is **drawn** (pitches, spelling, voices, beaming, ties, articulations) | **MusicXML** | MIDI has no enharmonic spelling, no voices, no beams |
 | **Tempo**, and therefore all wall-clock timing | **MIDI**, if present; else MusicXML `<sound tempo>`; else 120 BPM | MIDI tempo maps are usually more detailed and are what the audio was rendered from |
 | **Which drum sound** a note is | MIDI note number, via `<midi-unpitched>` when the XML declares it | GM numbers are unambiguous; display positions are not |
+| **Where a percussion note is drawn** | Complete MusicXML `<display-step>` + `<display-octave>`; else configured drum-map staff position; else documented fallback | GM identifies the sound, not the author's written position |
+| **Drum notehead** | Explicit MusicXML `<notehead>`; else configured/default drum map | Preserve file-stated engraving before instrument defaults |
+| **Stem direction** | Per-voice forced direction > explicit MusicXML `<stem>` > mapped drum convention where supported > automatic | A file-stated direction wins over geometric inference; see §9.8 and §19 |
 
 ### 13.2 Note matching
 
@@ -1949,21 +1975,22 @@ the thing that gets *drawn*; the MIDI note supplies its *sounding time*.
 
 ```ts
 interface DrumMapEntry {
-  midiNote: number;          // GM number, 35-81
+  midiNote: number;          // GM pitch; default source includes entries 27-87
   name: string;              // 'Snare', 'Closed Hi-Hat', ...
   staffPosition: number;     // in the engine's y units (§4.2)
-  noteheadShape: string;     // SMuFL glyph name
+  noteheadShape: string;     // shape family, e.g. 'normal', 'x', 'diamond'
+  noteheadGlyph?: string;    // exact SMuFL glyph when no family represents the drum
   stemDirection?: 'up'|'down';   // hands up / feet down convention
-  articulation?: string;     // e.g. open-hi-hat circle
+  articulation?: string;     // exposed override; semantics/rendering remain to be resolved
 }
 type DrumMappingTable = Record<number, DrumMapEntry>;
 ```
 
-A **default GM table** ships with the engine covering the standard kit —
-bass drum (35, 36), side stick (37), snare (38, 40), toms (41, 43, 45, 47,
-48, 50), hi-hat closed/pedal/open (42, 44, 46), crashes (49, 57), ride /
-bell / edge (51, 53, 59), china (52), splash (55), cowbell (56), tambourine
-(54) — and the full 35–81 GM range is representable.
+The built-in default is derived from the pinned MuseScore drumset data layer
+(61 entries, including entries outside the standard 35–81 GM percussion range
+where MuseScore defines them). `noteheadShape` is a family;
+`noteheadGlyph` is an exact custom glyph. The supported pitch/domain diagnostic
+policy and table invariants are tracked in §19.
 
 **Every field is overridable via `config.drums.mapping`.** The default table
 is a starting point, not a constraint: house styles differ on which line a
@@ -1972,14 +1999,22 @@ use `noteheadXBlack`, drums use `noteheadBlack`, and feet (bass drum, hi-hat
 pedal) take stems down while hands take stems up — but all of that is table
 data, not code.
 
+`config.drums.mapping` overrides are merged and consumed by the renderer
+(Phase 50); explicit file positions and noteheads still win. Exact-glyph
+adapter conversion, articulation semantics, and multi-line staff behavior are
+tracked as follow-up items in §19.
+
 **Error conditions.** A MIDI note outside 35–81 on channel 10, or a note with
 no table entry → render on the middle line with the default notehead and
-record a warning, rather than dropping it.
+record a warning, rather than dropping it. A pitch outside 35–81 that is
+explicitly present in the pinned MuseScore table is still mapped; the boundary
+policy and tests must distinguish a known table entry from an unmapped pitch.
 
 **Tests.** GM number → staff position for every default entry; a config
 override replacing an entry; an unmapped note falling back with a diagnostic;
-`<midi-unpitched>` 1-based → 0-based conversion; the four matching strategies
-each exercised with a purpose-built fixture pair.
+`<midi-unpitched>` 1-based → 0-based conversion; boundary cases for mapped
+27/34/35/81/82/87 and unmapped values; the four matching strategies each
+exercised with a purpose-built fixture pair.
 
 ---
 
@@ -2439,6 +2474,28 @@ API can be designed *then*, informed by what that extension actually needs.
     `clef-octave-change` and general note-level `default-x/default-y` are not
     yet rendered from source. See `Doc/bravura-engraving-accuracy.md`.
 
+### Drum-notation follow-up backlog (audit: 2026-11-08)
+
+No P0 issue was established by the audit. P1 denotes the first work to verify;
+P2 denotes confirmed implementation or contract gaps; P3 denotes design and
+coverage follow-ups. Do not claim the user's named source examples are fixed
+until those original files are available and rendered.
+
+| Priority | Open item | Required update / acceptance |
+|---|---|---|
+| P1 | Recover the user-reported `44_150` and `44_120_1` MusicXML cases; neither name nor content exists in this checkout. | Add the original files (or record their actual names), preserve `<stem>`, chord membership, instrument and beam data, and assert source-vs-rendered event geometry. No synthetic substitute proves those two reports. |
+| P2 | Drum-map stem convention is used for single notes but dropped for chords and beam groups. | After voice forcing and file-stated `<stem>`, apply the mapped direction when group members agree; specify and test mixed-direction groups. |
+| P2 | `drumMappingFromMuseScore` can place exact custom SMuFL glyph names in `noteheadShape`, although the config API separates shape families from `noteheadGlyph`. | Emit custom glyphs in the exact-glyph field and render GM 28, 52, 62 and 86 through merged config without throwing; retain family mapping behavior. |
+| P2 | Unpitched grace notes bypass GM drum-map fallback for position and stem; Phase 41's grace limitation remains open. | Preserve explicit file position, use configured mapping when display coordinates are absent, and document/diagnose grace glyphs that cannot represent a mapped custom head. |
+| P2 | The 44130 quarter-note hand-beaming exception classifies hands by odd voice-number parity. | Replace or configure semantic hand/foot classification; test equivalent odd/even hand voices and a foot voice without an explicit down stem. |
+| P2 | Horizontal attack spacing reserves `noteheadBlack` width even for wider mapped drum glyphs such as `noteheadHeavyXHat`. | Measure the selected glyph and chord-member extents; verify close-spaced SVG ink does not overlap. |
+| P2 | Default non-fitted viewBox can clip the top of a high hi-hat beam by 0.25sp; the drum web page currently avoids this with fitted height. | Include resolved glyph/stem/beam bounds in the default viewBox and retain fitted-height regression coverage. |
+| P2 | `DrumMapEntry.articulation` is accepted and retained but has no rendering effect. | Define its meaning and precedence against MusicXML marks and implement it, or remove/deprecate the field and diagnose its use. |
+| P2 | Multi-voice articulation placement is explicitly unimplemented and can collide in hand/foot layouts. | Pass staff-local voice context into placement; assert simultaneous hand/foot marks are distinct and collision-free. |
+| P3 | Supported pitch domain, mapped entries outside 35–81, non-five-line staves, and table-wide glyph/provenance invariants are not a single explicit contract. | Choose/document the supported domain; add boundary tests, generated checks for all 61 rows, and support or reject non-five-line mapping explicitly. |
+| P3 | Collision resolution is pairwise; browser tests are coarse/optional and do not establish dense 3–4-voice percussion clearance. | Decide whether denser percussion is in scope, then add structural SVG checks and targeted browser assertions with explicit environment skips. |
+| P3 | `Doc/STATUS.md` test totals predate recent drum/chord commits; Integration Y also records excess fit space around the metronome glyph. | Refresh status from a clean current test run and retain the metronome-fit caveat as a separate visual follow-up. |
+
 ---
 
 ## 20. Acceptance Criteria
@@ -2602,6 +2659,24 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 | 52 | Export: SVG, PNG, PDF (§3, §16.2) | ✅ (built -- see Doc/phase-52-export.md) |
 | 53 | Performance pass against §18.1's budgets | ✅ (built -- see Doc/phase-53-performance.md) |
 | 54 | Public API surface + generated reference docs into `docs/` | ✅ (built -- see Doc/phase-54-public-api.md) |
+
+### Drum and chord completion ledger (updated 2026-11-08)
+
+These are shipped implementation changes, not open backlog items. Detailed
+design and historical verification remain in the cited integration/phase
+documents; §19 tracks the remaining gaps.
+
+| Completed work | Evidence |
+|---|---|
+| GM percussion mapping and MusicXML instrument-ID wiring; mapped staff positions, noteheads and single-note stems | Phase 41; `Doc/phase-41-drum-mapping.md` |
+| Drum-chart font delivery, chord participation in beams, removal of stray flags, and tempo clearance | Integration M; `Doc/integration-m-drum-chart-defects.md` |
+| Drum staff-position corrections from the supplied lesson score | Integration N; `Doc/integration-n-drum-position-corrections.md` |
+| Away-pointing stem shortening and beam endpoints anchored to actual notehead stem anchors | Integrations O/P; `Doc/integration-o-stem-shortening.md`, `Doc/integration-p-beam-endpoint-anchor.md` |
+| Explicit MusicXML display position/notehead wins over drum-map defaults; engraving defaults and dots/secondary beams are wired | Integrations T/W; `Doc/integration-t-display-position-wins.md`, `Doc/integration-w-file-stated-engraving.md` |
+| Drum mapping configuration overrides are consumed by the renderer | Phase 50; `Doc/phase-50-theming-api.md` (supersedes the historical Phase 41 override limitation) |
+| Chord file-stated stem direction and glyph-anchor alignment, with voice forcing retained above file direction | Commit `e17647f`; `test/unit/chord-stem-direction.test.js` |
+| 44130-style continuous quarter-note hand-pattern beaming and subsequent restriction to hand voices | Commits `85dee0e`, `96113b8`; `website/assets/44130-drum-eighths.musicxml`; `test/unit/beam.test.js` |
+| Beamed chords now use the first explicit `<stem>` on any chord member, matching unbeamed chord behavior; continuation-member regression checks rendered event geometry | This update; `src/render-from-musicxml.ts`, `test/unit/beam-chord-tempo-clearance.test.js` |
 
 ### Sequencing rules
 

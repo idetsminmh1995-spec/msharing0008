@@ -77555,6 +77555,10 @@ ${xrefOffset}
       tieAnchor: { direction, position: head.position, noteheadGlyph: head.noteheadGlyph }
     };
   }
+  function explicitStemDirectionOf(event) {
+    if (event.kind !== "chord") return event.explicitStemDirection;
+    return event.notes.find((note2) => note2.explicitStemDirection !== void 0)?.explicitStemDirection;
+  }
   function renderBeamGroup(events, xs, ctx, accidentalState, beamStyle, forcedDirection) {
     const memberParts = [];
     let state = accidentalState;
@@ -77589,9 +77593,7 @@ ${xrefOffset}
     const middle = middleLineY(STAFF_LINES);
     const allPositions = members.flatMap((m) => [...m.positions]);
     const statedDirections = new Set(
-      events.map(
-        (event) => event.kind === "chord" ? event.notes[0]?.explicitStemDirection : event.explicitStemDirection
-      )
+      events.map(explicitStemDirectionOf).filter((value) => value !== void 0)
     );
     const stated = statedDirections.size === 1 ? [...statedDirections][0] : void 0;
     const direction = forcedDirection ?? stated ?? beamDirection(allPositions, middle);
@@ -77795,9 +77797,7 @@ ${xrefOffset}
     const parts = [heads.svg];
     const positions = heads.positions;
     if (positions.length > 0) {
-      const explicitDirection = chord2.notes.find(
-        (note2) => note2.explicitStemDirection !== void 0
-      )?.explicitStemDirection;
+      const explicitDirection = explicitStemDirectionOf(chord2);
       const direction = resolveStemDirection({
         positions,
         numLines: STAFF_LINES,

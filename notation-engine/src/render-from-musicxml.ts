@@ -1687,6 +1687,13 @@ function renderNoteOrRest(
   };
 }
 
+/** Return the first explicit MusicXML stem direction stated on an event. */
+function explicitStemDirectionOf(event: Note | Chord): StemDirection | undefined {
+  if (event.kind !== 'chord') return event.explicitStemDirection;
+  return event.notes.find((note) => note.explicitStemDirection !== undefined)
+    ?.explicitStemDirection;
+}
+
 /**
  * Draws a full beam group (Phase 23's grouping + Phase 24's shape):
  * every member note's accidental/notehead/ledger-lines (via
@@ -1774,18 +1781,14 @@ function renderBeamGroup(
   // not just one per event -- a chord's own spread is exactly the kind of
   // thing that decides which way a beam should go.
   const allPositions = members.flatMap((m) => [...m.positions]);
-  // §10.8 again: when the FILE states a `<stem>` on every note of the
-  // group and they agree, that is the group's direction. A beam has one
-  // direction and the file has already chosen it; re-deriving it from
-  // the noteheads overruled the file on three of this piece's own
-  // groups, where MuseScore had decided for reasons -- a voice's shape
-  // across the whole phrase -- that one bar's noteheads do not show.
-  // A group whose members disagree, or where any of them says nothing,
-  // falls back to §9.13's own rule.
+  // §10.8 again: if the FILE states a `<stem>` on any group member and
+  // all stated directions agree, that is the group's direction. Omitted
+  // stems on neighboring events do not veto an explicit choice. A group
+  // with conflicting stated directions falls back to §9.13's own rule.
   const statedDirections = new Set(
-    events.map((event) =>
-      event.kind === 'chord' ? event.notes[0]?.explicitStemDirection : event.explicitStemDirection,
-    ),
+    events
+      .map(explicitStemDirectionOf)
+      .filter((value): value is StemDirection => value !== undefined),
   );
   const stated = statedDirections.size === 1 ? [...statedDirections][0] : undefined;
   const direction = forcedDirection ?? stated ?? beamDirection(allPositions, middle);
@@ -2083,11 +2086,9 @@ function renderChord(
   if (positions.length > 0) {
     // Use the same §9.8 priority chain as a single note: a per-voice forced
     // direction wins, then the file's own <stem>, then automatic direction.
-    // MusicXML attaches <stem> to every note of a chord, so the first member
-    // that states one is the chord's explicit direction.
-    const explicitDirection = chord.notes.find(
-      (note) => note.explicitStemDirection !== undefined,
-    )?.explicitStemDirection;
+    // MusicXML attaches <stem> to chord members; use the first member that
+    // states one, consistently with the shared beam-group direction rule.
+    const explicitDirection = explicitStemDirectionOf(chord);
     const direction = resolveStemDirection({
       positions,
       numLines: STAFF_LINES,
