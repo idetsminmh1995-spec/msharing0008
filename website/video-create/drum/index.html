@@ -204,6 +204,13 @@
   @keyframes beat-pulse{0%{transform:scale(1.32);color:var(--red);}100%{transform:scale(1);}}
   .video-frame.style-white .stat-box .stat-value.beat-pulse{animation-name:beat-pulse-light;}
   @keyframes beat-pulse-light{0%{transform:scale(1.32);color:var(--red);}100%{transform:scale(1);}}
+  /* Export is frame-addressed, not wall-clock-addressed. Keep CSS motion
+     out of the captured subtree so the same score renders identically. */
+  .video-frame.is-exporting,
+  .video-frame.is-exporting *{
+    animation:none !important;
+    transition:none !important;
+  }
   /* A downbeat is the one the reader is counting FROM, so it is the one
      that gets the brand colour rather than a size change alone. */
   .stat-box.on-downbeat{border-color:var(--red);background:rgba(200,30,44,.16);}
@@ -3166,6 +3173,8 @@
   const CAPTURE_FPS = 30;
   /** 1080 on the short side, whichever shape is being made. */
   const CAPTURE_SHORT_SIDE = 1080;
+  /** Reference preview widths used while exporting, independent of the window. */
+  const EXPORT_FRAME_WIDTH = Object.freeze({ '16x9': 960, '9x16': 540, '1x1': 720 });
   /**
    * A still second before the count-in starts.
    *
@@ -3178,6 +3187,80 @@
   let recording = null;
   let downloadUrl = null;
   let downloadName = 'drum.mp4';
+  let exportInterruptReason = null;
+
+  function pinExportFrame() {
+    const originalRect = videoFrame.getBoundingClientRect();
+    const aspect = currentAspect();
+    const width = EXPORT_FRAME_WIDTH[aspect] ?? EXPORT_FRAME_WIDTH['16x9'];
+    const height = aspect === '9x16' ? width * (16 / 9) : aspect === '1x1' ? width : width * (9 / 16);
+    const placeholder = document.createElement('div');
+    placeholder.setAttribute('aria-hidden', 'true');
+    Object.assign(placeholder.style, {
+      width: `${originalRect.width}px`,
+      height: `${originalRect.height}px`,
+      flex: '0 0 auto',
+    });
+    videoFrame.before(placeholder);
+    const previousStyle = videoFrame.getAttribute('style');
+    const hadExportClass = videoFrame.classList.contains('is-exporting');
+    const onResize = () => {
+      exportInterruptReason = `Window resized during export; pinned frame was ${width}px wide.`;
+    };
+    const onVisibility = () => {
+      if (document.hidden) exportInterruptReason = 'The page became hidden during export.';
+    };
+    exportInterruptReason = null;
+    window.removeEventListener('resize', measurePreviewChrome);
+    window.addEventListener('resize', onResize);
+    document.addEventListener('visibilitychange', onVisibility);
+    videoFrame.classList.add('is-exporting');
+    Object.assign(videoFrame.style, {
+      position: 'fixed',
+      left: '-100000px',
+      top: '0px',
+      width: `${width}px`,
+      height: `${height}px`,
+      minWidth: `${width}px`,
+      maxWidth: `${width}px`,
+      margin: '0',
+      transform: 'none',
+    });
+    const release = () => {
+      window.removeEventListener('resize', onResize);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.addEventListener('resize', measurePreviewChrome);
+      if (previousStyle === null) videoFrame.removeAttribute('style');
+      else videoFrame.setAttribute('style', previousStyle);
+      if (!hadExportClass) videoFrame.classList.remove('is-exporting');
+      placeholder.remove();
+      exportInterruptReason = null;
+      measurePreviewChrome();
+    };
+    const pinned = videoFrame.getBoundingClientRect();
+    if (Math.abs(pinned.width - width) > 1 || Math.abs(pinned.height - height) > 1) {
+      release();
+      throw new Error(
+        `Could not pin the export frame at ${width}×${height}px; browser reported ${Math.round(pinned.width)}×${Math.round(pinned.height)}px.`,
+      );
+    }
+    return {
+      width,
+      height,
+      rect: pinned,
+      release,
+    };
+  }
+
+  function assertPinnedFrame(pinned) {
+    if (exportInterruptReason) throw new Error(exportInterruptReason);
+    const current = videoFrame.getBoundingClientRect();
+    if (Math.abs(current.width - pinned.width) > 1 || Math.abs(current.height - pinned.height) > 1) {
+      throw new Error(
+        `Frame size changed during export: expected ${Math.round(pinned.width)}×${Math.round(pinned.height)}px but got ${Math.round(current.width)}×${Math.round(current.height)}px.`,
+      );
+    }
+  }
 
   /**
    * Bravura, base64, fetched once.
@@ -3333,6 +3416,16 @@
       throw new Error('The drum-kit background is not ready. Choose a kit and wait for it to finish loading.');
     }
     await kitBackgroundReady;
+    if (document.fonts) {
+      await Promise.all([
+        document.fonts.load('800 16px Sora'),
+        document.fonts.load('400 16px Manrope'),
+        document.fonts.load('600 16px "Baloo 2"'),
+        document.fonts.load('400 16px Bravura'),
+      ]);
+      await document.fonts.ready;
+    }
+    preloadHitImages();
     await ensureHitImagesReady();
     await refreshNotationImage();
   }
@@ -3367,10 +3460,10 @@
    * positioned hit layer on top -- which is where the browser puts it,
    * and why a lit R2 photo sits over the notation rather than under it.
    */
-  function drawDrumFrame(ctx2d, canvas) {
-    const frameRect = videoFrame.getBoundingClientRect();
+  function drawDrumFrame(ctx2d, canvas, pinnedFrameRect = null, pinnedScale = null) {
+    const frameRect = pinnedFrameRect ?? videoFrame.getBoundingClientRect();
     if (!(frameRect.width > 0)) return;
-    const scale = canvas.width / frameRect.width;
+    const scale = pinnedScale ?? canvas.width / frameRect.width;
     const cs = getComputedStyle(videoFrame);
 
     ctx2d.fillStyle = cs.backgroundColor;
@@ -3656,17 +3749,10 @@
     audioPlayer.pause();
     audioPlayer.currentTime = 0;
     setGenerating(true);
-
-    // The SHORT side is what is capped, so every shape comes out at a
-    // real delivery size: 1920x1080, 1080x1920, 1080x1080. Capping the
-    // long side instead would make a portrait video 1920 wide and
-    // 3413 tall, which no encoder wants.
-    const frameRect = videoFrame.getBoundingClientRect();
-    const scale = CAPTURE_SHORT_SIDE / Math.max(1, Math.min(frameRect.width, frameRect.height));
-    const even = (value) => Math.max(2, Math.round(value / 2) * 2);
-    const width = even(frameRect.width * scale);
-    const height = even(frameRect.height * scale);
-
+    let exportFrame = null;
+    let scale = 1;
+    let width = 0;
+    let height = 0;
     let cancelled = false;
     recording = {
       cancel() {
@@ -3675,6 +3761,11 @@
     };
 
     try {
+      exportFrame = pinExportFrame();
+      const even = (value) => Math.max(2, Math.round(value / 2) * 2);
+      width = even((CAPTURE_SHORT_SIDE / Math.min(exportFrame.width, exportFrame.height)) * exportFrame.width);
+      scale = width / exportFrame.width;
+      height = even(exportFrame.height * scale);
       genLabel.textContent = 'Checking export assets…';
       await ensureExportAssets();
       genLabel.textContent = 'Fetching the Thank You clip…';
@@ -3697,10 +3788,11 @@
       // this frame is composed from the live DOM, so the cursor, the
       // COUNT box and the lit photos have to be where they would be.
       const drawAt = (ctx, seconds) => {
+        assertPinnedFrame(exportFrame.rect);
         updateCursor(seconds);
         updateBeatDisplay(seconds);
         updateHitLayer(seconds);
-        drawDrumFrame(ctx, ctx.canvas);
+        drawDrumFrame(ctx, ctx.canvas, exportFrame.rect, scale);
       };
 
       const segments = [
@@ -3714,6 +3806,7 @@
           seconds: countIn.seconds,
           audio: countIn.buffer,
           draw: (ctx, at) => {
+            assertPinnedFrame(exportFrame.rect);
             // The count-in counts; the notation has not started.
             const index = Math.min(
               countIn.beatsPerBar - 1,
@@ -3722,7 +3815,7 @@
             showBeatLabel(String(index + 1), index === 0);
             updateCursor(0);
             updateHitLayer(0);
-            drawDrumFrame(ctx, ctx.canvas);
+            drawDrumFrame(ctx, ctx.canvas, exportFrame.rect, scale);
           },
         });
       }
@@ -3784,6 +3877,8 @@
       setGenerating(false);
       console.error('Rendering failed:', err);
       setUploadConfirm(`Rendering stopped: ${err && err.message ? err.message : err}`, false);
+    } finally {
+      if (exportFrame) exportFrame.release();
     }
   }
 
