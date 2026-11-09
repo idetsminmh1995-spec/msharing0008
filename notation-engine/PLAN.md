@@ -2988,3 +2988,53 @@ scripts and every video-create page, then map each public behavior/assertion to
 its owning area plan. Treat omitted plan sections, stale prose, generated
 bundle drift and failed/blocked test commands as separate findings rather than
 assuming a passing README claim proves implementation.
+
+
+### 24.8 Piano Blender/Three.js implementation added on origin/main
+
+A later `origin/main` update added `piano-engine/BLENDER-3D-PLAN.md`, a rigged
+hand asset, a standalone `/hand-demo/`, and the production `Hands` design
+renderer in `website/assets/piano-hand-3d.js`. These were not present in the
+first repository inventory; this register now distinguishes them from the
+existing TypeScript/SVG piano engine and from `piano-hand-engine`'s geometry and
+fingering primitives.
+
+| Area | Verified implementation to carry into the plan |
+|---|---|
+| Hand asset and demo | `website/assets/hand/hand_model.glb` and its `.blend` source provide a skinned, 21-bone hand with `Pose_OK`/`RigAction` clips. `/hand-demo/` loads it with Three.js, exposes the bone/animation inventory, provides keyboard/pointer note triggering, and maps MIDI 60/62/64/65/67 to five adjacent white keys and thumb/index/middle/ring/little fingers. The asset is CC BY-NC 4.0: non-commercial evaluation only; commercial distribution requires replacement or an appropriately licensed/original model and attribution. |
+| Production hands renderer | `PianoHand3D` loads the GLB hand, creates named procedural WebGL key meshes for the selected MIDI range, mirrors the hand for left/right, applies per-hand colors, maps active/fingered notes to key presses and finger-bone curls, and exposes `mount`, `update`, and `renderToCanvas`. |
+| Piano-page wiring | `website/video-create/piano/index.html` computes MusicXML-derived notes, staves/hand labels, written-time playback and a whole-piece `PianoEngine.planFingering()` result; it sends notes, fingered notes and colors to `PianoHand3D.update()` for the interactive Hands preview and calls `PianoHand3D.renderToCanvas()` from the video frame compositor. The Hands design disables falling-time controls; the falling-notes design remains on the existing PianoEngine SVG/shape path. |
+| Planned renderer boundary | Preserve the renderer-independent keyboard, timing and fingering APIs. Do not describe this browser-side prototype as a production Blender piano GLB, calibrated inverse-kinematics system, or completed 3D falling-note renderer: the keys are built procedurally in JavaScript and the GLB is the hand asset. |
+
+The existing `piano-engine/BLENDER-3D-PLAN.md` defines the target pipeline and
+migration phases; its explicit phase status is now recorded in that file. The
+hand asset/mapping and partial WebGL Hands integration exist, but the piano GLB
+with independently addressable production key objects, calibrated IK/wrist
+motion, 3D falling-note bars, chord/visual/performance acceptance and removal
+of SVG from the production path remain future work.
+
+**Frame determinism is an acceptance gap.** The production renderer's
+`animate()` loop advances hand position and key presses using `THREE.Clock`
+and `requestAnimationFrame` deltas, while `renderToCanvas()` updates state and
+renders immediately. Therefore identical scene inputs are not yet proven to
+produce the same completed animation pose at each video timestamp; preview and
+export share the renderer but can sample different interpolation states. The
+3D plan's “same scene state” and timing criteria need a deterministic
+`updateAtTime`/frame-sampling contract (or explicit settled-state capture),
+including repeated-frame and seek-order tests, before claiming identical
+preview/export output.
+
+No dedicated automated test for `piano-hand-3d.js`, the loaded GLB bone map,
+key/finger mapping, renderer failure path, or preview-to-video scene parity was
+found in the tracked tests during this follow-up. The existing piano-engine
+unit tests cover its separate checked-in SVG bundle, not this Three.js module.
+Add browser tests for GLB loading and representative MIDI/finger mapping,
+left/right colors and key press intervals, camera/range selection, WebGL/asset
+failure behavior, and deterministic canvas capture. Verify that the
+non-commercial asset restriction is respected by any deployment or reuse.
+
+The website row in §24.1 should now be read with this piano-page-specific
+renderer exception: this Hands route is a Three.js/WebGL scene rather than the
+shared SVG shape-list renderer. Its implementation and its remaining roadmap
+items must not be conflated with either `piano-engine`'s old SVG bundle or
+`piano-hand-engine`'s solver-only Phase 1–3.
