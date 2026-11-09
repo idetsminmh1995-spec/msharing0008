@@ -1,0 +1,125 @@
+{
+  "pages": [
+    "guitar",
+    "bass-guitar",
+    "piano",
+    "violin"
+  ],
+  "viewports": [
+    500,
+    800,
+    1400
+  ],
+  "results": [
+    {
+      "instrument": "guitar",
+      "width": 500,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "guitar",
+      "width": 800,
+      "layout": {
+        "width": 213,
+        "height": 120,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "guitar",
+      "width": 1400,
+      "layout": {
+        "width": 813,
+        "height": 457,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "bass-guitar",
+      "width": 500,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "bass-guitar",
+      "width": 800,
+      "layout": {
+        "width": 213,
+        "height": 120,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "bass-guitar",
+      "width": 1400,
+      "layout": {
+        "width": 813,
+        "height": 457,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 500,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 800,
+      "layout": {
+        "width": 213,
+        "height": 120,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 1400,
+      "layout": {
+        "width": 813,
+        "height": 457,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "violin",
+      "width": 500,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "violin",
+      "width": 800,
+      "layout": {
+        "width": 213,
+        "height": 120,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "violin",
+      "width": 1400,
+      "layout": {
+        "width": 813,
+        "height": 457,
+        "cqw": "calc(100cqw / 960)"
+      }
+    }
+  ],
+  "resizeGuard": "passed",
+  "status": "passed"
+}

@@ -1,6 +1,6 @@
 {
   "phase": "A0-A4 / B / C / D browser acceptance",
-  "generatedAt": "2026-11-09T21:04:09.871Z",
+  "generatedAt": "2026-11-09T21:30:30.855Z",
   "page": "http://127.0.0.1:8777/website/video-create/drum/?debug=1&test=1",
   "viewports": [
     500,
@@ -47,7 +47,7 @@
         "label": "Drum Bg.png",
         "status": 500,
         "attempts": 4,
-        "ms": 6106,
+        "ms": 6449,
         "bytes": 0,
         "error": "Drum Bg.png returned HTTP 500."
       }

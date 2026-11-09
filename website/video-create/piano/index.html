@@ -555,6 +555,23 @@
      page, which points the eye at a paragraph rather than at the
      progress bar. */
   body.is-rendering #genNote{opacity:.38;}
+
+  /* Shared export contract: all frame geometry is relative to the frame. */
+  .video-frame{container-type:inline-size;--frame-u:calc(100cqw / 960);}
+  .video-frame .video-top{padding:calc(4 * var(--frame-u)) calc(20 * var(--frame-u)) 0 calc(15 * var(--frame-u));gap:calc(16 * var(--frame-u));}
+  .video-frame .video-logo-row{gap:calc(10 * var(--frame-u));}
+  .video-frame .video-title-1{font-size:calc(var(--title1-num,32) * var(--frame-u));}
+  .video-frame .video-title-2{font-size:calc(var(--title2-num,18) * var(--frame-u));}
+  .video-frame .video-stats{gap:calc(8 * var(--frame-u));}
+  .video-frame .stat-box{border-width:calc(1.5 * var(--frame-u));border-radius:calc(8 * var(--frame-u));padding:calc(4 * var(--frame-u)) calc(12 * var(--frame-u));min-width:calc(52 * var(--frame-u));}
+  .video-frame .stat-box .stat-label{font-size:calc(8 * var(--frame-u));}
+  .video-frame .stat-box .stat-value{font-size:calc(16 * var(--frame-u));}
+  .video-frame.export-freeze,.video-frame.export-freeze *{animation:none!important;transition:none!important;}
+  .asset-gate-panel{margin-top:12px;padding:10px 12px;border:1px solid var(--border,#efe6df);border-radius:10px;background:#fff;font-size:11px;}
+  .asset-gate-head,.asset-gate-row,.asset-gate-actions{display:flex;align-items:center;gap:8px;}
+  .asset-gate-head{justify-content:space-between;margin-bottom:7px;}
+  .asset-gate-row{padding:3px 0;min-width:0;}.asset-gate-icon{width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;flex:0 0 auto;}.asset-gate-icon.ok{color:#168246;background:#e8f7ed}.asset-gate-icon.fail{color:#a21d2a;background:#fce7e9}.asset-gate-label{font-weight:700;min-width:88px}.asset-gate-reason{color:var(--muted,#756b65);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.asset-gate-actions{margin-top:8px;}
+  #assetGatePanel[data-status="error"]{border-color:#e3a4aa;background:#fff8f8;}
 </style>
 <!-- The real Notation Engine bundle (github.com/idetsminmh1995-spec/msharing0008/notation-engine) -->
 <script src="../../assets/notation-engine.js?v=cdcd608daae4"></script>
@@ -566,6 +583,9 @@
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
 <script src="../../assets/outro-video.js?v=521fc4cb"></script>
 <!-- The video engine: renders frames rather than recording them. -->
+<script src="../../assets/asset-loader.js?v=20261110"></script>
+<script src="../../assets/render-report.js?v=1"></script>
+<script src="../../assets/video-export-stability.js?v=1"></script>
 <script src="../../assets/video-engine.js?v=9c8e90f0"></script>
 <!-- Physical piano geometry, hand splitting and fingering for the Hands renderer. -->
 <script src="../../assets/piano-hand-engine.js?v=0.1.0"></script>
@@ -3504,7 +3524,7 @@
     return await offline.startRendering();
   }
 
-  async function generateVideo() {
+  async function generateVideoCore() {
     if (typeof VideoEngine === 'undefined') return;
     if (!audioPlayer.src) {
       setUploadConfirm('Upload an audio file first — it is what the video plays.', false);
@@ -3619,7 +3639,7 @@
           genFill.style.width = `${(Math.min(1, fraction) * 100).toFixed(1)}%`;
           genLabel.textContent = `${label}… ${(Math.min(1, fraction) * 100).toFixed(0)}%`;
         },
-        shouldStop: () => cancelled,
+        shouldStop: () => cancelled || __videoExportStability.interrupted(),
       });
 
       // Put the page back where it was: rendering moved it about.
@@ -3662,7 +3682,13 @@
     // own rejection, and the only sign left is a button that says
     // "Generating…" for ever. A take that breaks says what broke and
     // gives the button back.
-    generateVideo().catch((err) => {
+    const __videoExportStability = VideoExportStability.create({
+    page: 'piano',
+    frame: videoFrame,
+    render: () => generateVideoCore(),
+  });
+  async function generateVideo() { return __videoExportStability.run(); }
+  generateVideo().catch((err) => {
       console.error('Generate failed:', err);
       if (recording) recording.cancel();
       setGenerating(false);
