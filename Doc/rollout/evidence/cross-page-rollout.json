@@ -14,6 +14,7 @@
     {
       "instrument": "guitar",
       "width": 500,
+      "zoom": 1,
       "layout": {
         "width": 0,
         "height": 0,
@@ -23,6 +24,7 @@
     {
       "instrument": "guitar",
       "width": 800,
+      "zoom": 1,
       "layout": {
         "width": 213,
         "height": 120,
@@ -32,6 +34,7 @@
     {
       "instrument": "guitar",
       "width": 1400,
+      "zoom": 1,
       "layout": {
         "width": 813,
         "height": 457,
@@ -39,8 +42,69 @@
       }
     },
     {
+      "instrument": "guitar",
+      "width": 500,
+      "zoom": 1.5,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "guitar",
+      "width": 800,
+      "zoom": 1.5,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "guitar",
+      "width": 1400,
+      "zoom": 1.5,
+      "layout": {
+        "width": 527,
+        "height": 296,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "guitar",
+      "width": 500,
+      "zoom": 2,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "guitar",
+      "width": 800,
+      "zoom": 2,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "guitar",
+      "width": 1400,
+      "zoom": 2,
+      "layout": {
+        "width": 241,
+        "height": 136,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
       "instrument": "bass-guitar",
       "width": 500,
+      "zoom": 1,
       "layout": {
         "width": 0,
         "height": 0,
@@ -50,6 +114,7 @@
     {
       "instrument": "bass-guitar",
       "width": 800,
+      "zoom": 1,
       "layout": {
         "width": 213,
         "height": 120,
@@ -59,6 +124,7 @@
     {
       "instrument": "bass-guitar",
       "width": 1400,
+      "zoom": 1,
       "layout": {
         "width": 813,
         "height": 457,
@@ -66,8 +132,69 @@
       }
     },
     {
+      "instrument": "bass-guitar",
+      "width": 500,
+      "zoom": 1.5,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "bass-guitar",
+      "width": 800,
+      "zoom": 1.5,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "bass-guitar",
+      "width": 1400,
+      "zoom": 1.5,
+      "layout": {
+        "width": 527,
+        "height": 296,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "bass-guitar",
+      "width": 500,
+      "zoom": 2,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "bass-guitar",
+      "width": 800,
+      "zoom": 2,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "bass-guitar",
+      "width": 1400,
+      "zoom": 2,
+      "layout": {
+        "width": 241,
+        "height": 136,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
       "instrument": "piano",
       "width": 500,
+      "zoom": 1,
       "layout": {
         "width": 0,
         "height": 0,
@@ -77,6 +204,7 @@
     {
       "instrument": "piano",
       "width": 800,
+      "zoom": 1,
       "layout": {
         "width": 213,
         "height": 120,
@@ -86,6 +214,7 @@
     {
       "instrument": "piano",
       "width": 1400,
+      "zoom": 1,
       "layout": {
         "width": 813,
         "height": 457,
@@ -93,8 +222,69 @@
       }
     },
     {
+      "instrument": "piano",
+      "width": 500,
+      "zoom": 1.5,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 800,
+      "zoom": 1.5,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 1400,
+      "zoom": 1.5,
+      "layout": {
+        "width": 527,
+        "height": 296,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 500,
+      "zoom": 2,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 800,
+      "zoom": 2,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 1400,
+      "zoom": 2,
+      "layout": {
+        "width": 241,
+        "height": 136,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
       "instrument": "violin",
       "width": 500,
+      "zoom": 1,
       "layout": {
         "width": 0,
         "height": 0,
@@ -104,6 +294,7 @@
     {
       "instrument": "violin",
       "width": 800,
+      "zoom": 1,
       "layout": {
         "width": 213,
         "height": 120,
@@ -113,9 +304,70 @@
     {
       "instrument": "violin",
       "width": 1400,
+      "zoom": 1,
       "layout": {
         "width": 813,
         "height": 457,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "violin",
+      "width": 500,
+      "zoom": 1.5,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "violin",
+      "width": 800,
+      "zoom": 1.5,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "violin",
+      "width": 1400,
+      "zoom": 1.5,
+      "layout": {
+        "width": 527,
+        "height": 296,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "violin",
+      "width": 500,
+      "zoom": 2,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "violin",
+      "width": 800,
+      "zoom": 2,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "violin",
+      "width": 1400,
+      "zoom": 2,
+      "layout": {
+        "width": 241,
+        "height": 136,
         "cqw": "calc(100cqw / 960)"
       }
     }

@@ -42,18 +42,21 @@ try {
       const wav = new Uint8Array([82,73,70,70,38,0,0,0,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,68,172,0,0,136,88,1,0,2,0,16,0,100,97,116,97,2,0,0,0,0,0]);
       const dt = new DataTransfer(); dt.items.add(new File([wav], 'fixture.wav', { type: 'audio/wav' })); input.files = dt.files;
       const stability = window.VideoExportStability.create({ page: 'cross-page-test', frame, render: async () => new Promise((resolve) => setTimeout(resolve, 60)) });
-      const running = stability.run().then(() => ({ status: 'unexpected-success' })).catch((error) => ({ status: 'guarded', message: error.message }));
+      const running = stability.run().then(() => ({ status: 'unexpected-success' })).catch((error) => ({ status: 'guarded', message: error.message, cleaned: frame.style.position === '' && !frame.classList.contains('export-freeze') && !document.body.classList.contains('is-rendering') }));
       setTimeout(() => window.dispatchEvent(new Event('resize')), 15);
       return await running;
     })()`, true);
     assert.equal(guard.status, 'guarded', `${instrument}: resize guard did not stop export`);
     assert.match(guard.message, /resized during export/i);
-    for (const width of viewports) {
+    assert.equal(guard.cleaned, true, `${instrument}: pin cleanup did not run in finally`);
+    for (const zoom of [1, 1.5, 2]) for (const width of viewports) {
       await cdp.call('Emulation.setDeviceMetricsOverride', { width, height: Math.max(700, Math.round(width * 0.7)), deviceScaleFactor: 1, mobile: false });
+      await evalPage(`document.documentElement.style.zoom = '${zoom}'`);
       await sleep(100);
       const layout = await evalPage('(() => { const frame=document.querySelector("#videoFrame"); return { width:Math.round(frame.getBoundingClientRect().width), height:Math.round(frame.getBoundingClientRect().height), cqw:getComputedStyle(frame).getPropertyValue("--frame-u").trim() }; })()');
-      results.push({ instrument, width, layout });
+      results.push({ instrument, width, zoom, layout });
     }
+    await evalPage("document.documentElement.style.zoom = ''");
   }
   cdp.close();
 } finally { browser.kill('SIGTERM'); server.kill('SIGTERM'); }

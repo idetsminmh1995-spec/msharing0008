@@ -1,6 +1,6 @@
 # Video export rollout acceptance
 
-Updated 2026-11-10 after commit `f3ec56e` and the cross-page migration.
+Updated 2026-11-10 after commit `8b79d76` and the final Definition-of-Done checks.
 
 ## Phase 0 — A0 baseline
 
@@ -62,6 +62,19 @@ Each page has a pinned export wrapper, render-time resize/visibility guard, requ
 All four migrated pages have the shared landscape frame-relative override using `cqw`, including title, logo row, statistics, stat-box dimensions and frame spacing. Their frame declares `container-type: inline-size` and `--frame-u: calc(100cqw / 960)`. Portrait/square page-specific rules remain intact.
 
 The cross-page evidence records successful layout inspection at 500, 800 and 1400 CSS-pixel viewports and confirms the frame-relative variable is present on every page.
+
+## Definition-of-Done checklist
+
+- Pin release is in `finally`, including resize/cancel failure; no `display:none` or `visibility:hidden` is used. The browser harness asserts inline-style, freeze-class and body-lock cleanup.
+- Blob URLs are revoked only after the render path finishes. Unique frame images are deduplicated in the gate, and the shared loader owns object-URL cleanup.
+- Loader requests remain CORS fetches; the worker/bucket CORS configuration is not changed by this rollout.
+- Sora, Manrope, Baloo 2 and Bravura are actively requested and checked in the font gate.
+- Resize/zoom coverage runs at 500, 800 and 1400 CSS pixels with 100%, 150% and 200% page zoom in the cross-page Chromium harness.
+- 404/no-retry and 5xx/timeout/three-retry behavior is covered by the loader tests.
+- Audio decode failures block export; missing outro/count assets remain classified as warnings or unavailable assets instead of silent success.
+- Report download is wired on Drum and on all four migrated pages.
+- Unit, browser and notation verification tests run in CI.
+- All five production pages in this rollout (Drum, Guitar, Bass Guitar, Piano and Violin) now share the same export stability contract.
 
 ## Evidence
 

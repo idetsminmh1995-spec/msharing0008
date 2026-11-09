@@ -46,7 +46,7 @@
         add('audio upload', true);
       } catch (error) { add('audio upload', false, `Audio decode failed: ${error.message}`); }
     }
-    const frameImages = [...frame.querySelectorAll('img')].filter((img) => img.getAttribute('src'));
+    const frameImages = [...new Set([...frame.querySelectorAll('img')].filter((img) => img.getAttribute('src')))];
     for (const img of frameImages) {
       const label = img.alt || img.className || 'frame image';
       try {
@@ -59,7 +59,10 @@
     }
     try {
       await document.fonts?.ready;
-      add('fonts', true);
+      const requiredFonts = ['Sora', 'Manrope', 'Baloo 2', 'Bravura'];
+      await Promise.all(requiredFonts.map((font) => document.fonts.load(`16px "${font}"`)));
+      const missingFonts = requiredFonts.filter((font) => !document.fonts?.check(`16px "${font}"`));
+      add('fonts', missingFonts.length === 0, missingFonts.length ? `Not loaded: ${missingFonts.join(', ')}` : '');
     } catch (error) { add('fonts', false, error.message); }
     return { ok: rows.every((row) => row.ok), rows };
   }
