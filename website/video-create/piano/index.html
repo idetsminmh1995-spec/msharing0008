@@ -576,7 +576,7 @@
 }
 </script>
 <!-- The Hands design's production renderer: Blender GLB hands + WebGL keys. -->
-<script type="module" src="../../assets/piano-hand-3d.js?v=6"></script>
+<script type="module" src="../../assets/piano-hand-3d.js?v=7"></script>
 </head>
 <body>
 
@@ -698,14 +698,15 @@
       </div>
       <div class="field-row">
         <div>
-          <label for="leftHandColor">Left hand</label>
+          <label for="leftHandColor">Left-hand notes</label>
           <div class="tc-color-row"><input id="leftHandColor" type="color" value="#FFC400"></div>
         </div>
         <div>
-          <label for="rightHandColor">Right hand</label>
+          <label for="rightHandColor">Right-hand notes</label>
           <div class="tc-color-row"><input id="rightHandColor" type="color" value="#4FA3FF"></div>
         </div>
       </div>
+      <div class="field-hint">These colors highlight played notes and keys; both hands keep the same natural skin and nail textures.</div>
       <div class="field-hint" id="keyboardHint">Two designs of the same video. <strong>Falling Notes</strong> is the stage with bars coming down onto the keys. <strong>Hands</strong> drops all of that and shows the keyboard alone, with two hands on it pressing the keys and the finger number on each key being played &mdash; so Fall time does not apply to it. Which hand plays a note comes from the score's own staves &mdash; the upper staff is the right hand, the lower the left. A note outside the keyboard you pick is not drawn, so a 61 shows less of a wide piece than an 88 does.</div>
     </div>
 

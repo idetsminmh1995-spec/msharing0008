@@ -122,18 +122,26 @@ class PianoHand3DRenderer {
     root.scale.x *= mirror ? -1 : 1;
     // The source mesh's fingers point toward the player. Turn the whole
     // hand around the world-up axis so wrists stay near the player and
-    // fingers reach forward onto the keys; X is reversed for both hands.
+    // fingers reach forward onto the keys.
     root.quaternion.premultiply(
       new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI),
     );
+    // Roll around the wrist-to-fingertip axis to show the dorsal side. The
+    // half-turn reverses horizontal spread, so flip X to keep thumb placement
+    // correct for each hand over its keyboard range.
+    root.quaternion.premultiply(
+      new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI),
+    );
+    root.scale.x *= -1;
     root.position.x = mirror ? -1.35 : 1.35;
-    root.position.y = 0.08;
+    root.position.y = 0.35;
     root.position.z = 0.75;
     root.userData.side = side;
+    // Keep the GLB's same natural skin and nail textures on both hands; the
+    // left/right colors are reserved for note and key highlights.
     root.traverse((object) => {
       if (object.isMesh) {
         object.material = object.material.clone();
-        object.material.color = new THREE.Color(side === 'right' ? 0x4fa3ff : 0xffc400);
       }
     });
     this.scene.add(root);

@@ -122,7 +122,9 @@ still remain future work.
   preview and video capture use the same framing.
 - Hand span, hand length, key width and key depth use consistent real-world
   proportions instead of enlarging either the hands or keyboard to fill the view.
-- Left/right hand colours and finger assignments are deterministic.
+- Both hands show their dorsal surfaces and retain the same un-tinted source
+  skin/nail textures; left/right note colours do not tint hand materials.
+- Left/right note/key highlight colours and finger assignments are deterministic.
 - The same scene state can drive browser preview and video export.
 - The scene remains usable on the target mobile and desktop browsers at the
   intended frame rate.
