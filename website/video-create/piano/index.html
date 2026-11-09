@@ -567,6 +567,16 @@
 <script src="../../assets/outro-video.js?v=521fc4cb"></script>
 <!-- The video engine: renders frames rather than recording them. -->
 <script src="../../assets/video-engine.js?v=9c8e90f0"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+<!-- The Hands design's production renderer: Blender GLB hands + WebGL keys. -->
+<script type="module" src="../../assets/piano-hand-3d.js?v=3"></script>
 </head>
 <body>
 
@@ -1385,17 +1395,13 @@
 
 
   // --- The piano stage (card 3) -------------------------------------
-  // piano-engine/ draws it: a keyboard of 61, 73, 76 or 88 keys, the
-  // notes falling onto it, and a colour per hand. This block is the
-  // BRIDGE and nothing else -- turning a parsed score into notes in
-  // seconds, and handing the engine the box it is drawing into.
+  // piano-engine/ supplies the note timing and fingering. Falling Notes
+  // remains SVG for now; the Hands design is handed to the production
+  // Blender/GLB WebGL renderer loaded above.
   //
   // The engine is asked for the same frame twice over, in two forms:
-  // `renderPianoStage` writes SVG for the preview, `stageShapes` hands
-  // back the same rectangles for the canvas the video is rendered on.
-  // Rasterising an SVG thirty times a second would cost more than the
-  // rest of the frame together, and two hand-written drawings would
-  // drift apart.
+      // `renderPianoStage` writes SVG for Falling Notes. Hands uses the
+      // same note/fingering state to update the 3D key and hand scene.
   const pianoStage = document.getElementById('pianoStage');
   const keyboardSizeSelect = document.getElementById('keyboardSize');
   const fallSecondsSelect = document.getElementById('fallSeconds');
@@ -1682,6 +1688,7 @@
               anchors: pianoFingering.anchors,
               colors: PianoEngine.handColorsFor(stageColors()),
             },
+            fingeredNotes: pianoFingering.notes,
           }
         : {}),
     };
@@ -1694,7 +1701,14 @@
     const width = Math.max(1, Math.round(box.width));
     const height = Math.max(1, Math.round(box.height));
     if (!(width > 1) || !(height > 1)) return;
-    pianoStage.innerHTML = PianoEngine.renderPianoStage(stageOptions(width, height, atSeconds));
+    const options = stageOptions(width, height, atSeconds);
+    if (pianoDesign() === 'hands' && window.PianoHand3D?.update) {
+      window.PianoHand3D.update({ ...options, container: pianoStage });
+      pianoStage.dataset.renderer = 'blender-3d';
+      return;
+    }
+    pianoStage.dataset.renderer = 'svg';
+    pianoStage.innerHTML = PianoEngine.renderPianoStage(options);
   }
 
   for (const control of [keyboardSizeSelect, fallSecondsSelect, leftHandColorInput, rightHandColorInput]) {
@@ -1722,6 +1736,7 @@
   if (typeof ResizeObserver !== 'undefined' && pianoStage) {
     new ResizeObserver(() => drawStage()).observe(pianoStage);
   }
+  window.addEventListener('piano-hand-3d-ready', () => drawStage());
   drawStage(0);
 
   document.getElementById('upload-musicxml').addEventListener('click', () => setActiveSlot('upload-musicxml'));
@@ -3089,7 +3104,12 @@
   function paintStage(ctx2d, box, atSeconds) {
     if (!pianoStage || typeof PianoEngine === 'undefined') return;
     if (!(box.w > 1) || !(box.h > 1) || !isVisible(pianoStage)) return;
-    const shapes = PianoEngine.stageShapes(stageOptions(box.w, box.h, atSeconds));
+    const options = stageOptions(box.w, box.h, atSeconds);
+    if (pianoDesign() === 'hands' && window.PianoHand3D?.renderToCanvas) {
+      window.PianoHand3D.renderToCanvas({ ...options, container: pianoStage }, ctx2d, box);
+      return;
+    }
+    const shapes = PianoEngine.stageShapes(options);
     ctx2d.save();
     ctx2d.translate(box.x, box.y);
     ctx2d.lineCap = 'round';
