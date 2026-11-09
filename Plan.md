@@ -1,3 +1,19 @@
+# msharing0008 လက်ရှိ Master Plan Index
+
+## လက်ရှိ အတည်ပြုထားသော အလုပ်မှတ်တမ်း
+
+Repository တစ်ခုလုံးအတွက် Notation Engine၊ Drum Video export stability၊ Guitar/Bass/Piano/Violin propagation၊ asset gate၊ render report၊ browser evidence၊ CI နှင့် Definition of Done အားလုံးကို စုစည်းထားသော authoritative delivery plan သည် [`Doc/CONSOLIDATED-PLAN-2026-11-10.md`](./Doc/CONSOLIDATED-PLAN-2026-11-10.md) ဖြစ်သည်။ Code ထဲတွင် ရှိသော်လည်း ယခင် plan များတွင် မပါသေးသော အလုပ်များကို အဲဒီစာတမ်း၏ Sections 2–8 တွင် မှတ်တမ်းတင်ထားသည်။
+
+## Plan ခွဲခြားဖတ်ရန်
+
+- **Repository delivery / export rollout:** [`Doc/CONSOLIDATED-PLAN-2026-11-10.md`](./Doc/CONSOLIDATED-PLAN-2026-11-10.md)
+- **Drum နှင့် instrument video acceptance:** [`Doc/rollout/README.md`](./Doc/rollout/README.md)
+- **Notation Engine architecture and roadmap:** [`notation-engine/PLAN.md`](./notation-engine/PLAN.md)
+- **Notation Engine actual build status:** [`notation-engine/Doc/STATUS.md`](./notation-engine/Doc/STATUS.md)
+- **Piano Hand / GLB contact work:** ဤဖိုင်၏ အောက်ပါ piano-specific plan
+
+---
+
 # Piano Video လက်ချောင်း–ခလုတ် တိကျမှု စီမံချက်
 
 ## ရည်မှန်းချက်
