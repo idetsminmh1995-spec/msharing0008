@@ -19,9 +19,11 @@ asset from any other product is used. The research below is read for
 
 ## Status
 
-**Phases 1 to 3 are built.** Everything after them is deliberately
-absent rather than stubbed — an engine full of functions that return
-zero is an engine nobody can tell is unfinished.
+**Phases 1 to 3 are built. Phase 4 has an experimental, bounded IK solver
+for the synthetic Engine hand rig.** That solver does not yet use calibrated
+measurements from the website's skinned GLB, so it does not prove visible
+fingertip-to-key contact. Wrist motion planning and later phases remain
+unfinished rather than stubbed.
 
 On the owner's own piano export: 185 notes, all placed on keys, split
 by staff, both hands fingered in 21ms with nothing strained and nothing
@@ -32,7 +34,7 @@ left unfingered.
 | 1 | 88-key geometry, one rigged hand, static poses | **built** |
 | 2 | Notes to exact key positions | **built** |
 | 3 | Hand split, then fingering | **built** |
-| 4 | Finger target to an IK pose | — |
+| 4 | Finger target to an IK pose on the synthetic hand rig | **partial** |
 | 5 | Wrist trajectory | — |
 | 6 | Chords as one shape | — |
 | 7 | Scales, arpeggios, thumb-under, crossings | — |
@@ -50,6 +52,7 @@ left unfingered.
 | `src/keyboard/pianoGeometry.ts` | 1 | A real piano in millimetres: 88 keys, black keys proud and short. |
 | `src/keyboard/keyPosition.ts` | 1 | A note to the point a fingertip touches, and how far a key is down. |
 | `src/kinematics/handPose.ts` | 6 | Bones, joints, joint limits, hand sizes, forward kinematics, static poses. |
+| `src/kinematics/inverseKinematics.ts` | 4 | Bounded damped-least-squares finger IK with per-target residuals. |
 | `src/core/solver.ts` | 3 | A Viterbi with a beam. Knows nothing about pianos. |
 | `src/fingering/handSpan.ts` | 3 | How far apart two fingers can be — the one measurement the search turns on. |
 | `src/fingering/handSplit.ts` | 2 | Which hand, from the evidence, in order. |
@@ -109,14 +112,21 @@ with:
   exact strike and approach point for each note;
 - `solveHandSkeleton()` static-pose fingertip offsets, which the 3D
   renderer uses to place the assigned finger over its key;
+- `solveFingerTargets()` bounded finger IK on the synthetic Engine rig;
+  its residual is not a calibrated measurement of the GLB's visible contact;
 - `keyPressDepthMm()` key travel at the same written-time instant.
+- `isKeyContactActive()` so the renderer keeps the finger/key contact through
+  the 70 ms release envelope.
 
 The 3D renderer builds its white and black keys from the same millimetre
 geometry, maps the key strike and hand targets into its scene, and uses
-the same `stageOptions()` data for the live preview and every exported
-frame. The browser bundle is regenerated with `npm run browser:build`
-from this package; `npm run verify` checks the package and refreshes that
-static-site artifact.
+`solveFingerTargets()` for each assigned finger. It now retains contact
+through the 70 ms key-release envelope. The live preview still smooths wrist
+translation while export snaps to requested timestamps, so preview/export
+parity remains unverified. GLB bone, wrist, fingertip, and joint-axis
+calibration is still required before claiming visible contact accuracy. The
+browser bundle is regenerated with `npm run browser:build` from this package;
+`npm run verify` checks the package and refreshes that static-site artifact.
 
 The Notation Engine remains unchanged. The **Falling Notes** SVG design
 continues to use `piano-engine`; the **Hands** design now consumes this

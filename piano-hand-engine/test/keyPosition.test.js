@@ -118,4 +118,14 @@ describe('Phase 2: a note becomes a place on the instrument', () => {
       last = depth;
     }
   });
+
+  test('finger/key contact remains active for the complete release envelope only', () => {
+    const n = { timeMs: 1000, durationMs: 500 };
+    assert.equal(E.isKeyContactActive(999, n), false, 'before onset');
+    assert.equal(E.isKeyContactActive(1000, n), true, 'at onset');
+    assert.equal(E.isKeyContactActive(1500, n), true, 'at note-off');
+    assert.equal(E.isKeyContactActive(1569, n), true, 'during the 70ms release');
+    assert.equal(E.isKeyContactActive(1570, n), false, 'once the release is complete');
+    assert.equal(E.isKeyContactActive(1550, n, { releaseMs: 100 }), true, 'custom release');
+  });
 });

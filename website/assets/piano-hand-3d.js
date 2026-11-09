@@ -328,6 +328,14 @@ class PianoHand3DRenderer {
     );
   }
 
+  worldToEngineWrist(world) {
+    return {
+      x: world.x / this.unitsPerMm + this.keyboardWidthMm / 2,
+      y: world.y / this.unitsPerMm,
+      z: (this.frontEdgeWorldZ - world.z) / this.unitsPerMm,
+    };
+  }
+
   restHandTarget(side, pose) {
     if (HAND_ENGINE && this.keyboard?.byMidi) {
       const midi = side === 'left' ? 48 : 72;
@@ -400,41 +408,95 @@ class PianoHand3DRenderer {
     const notes = Array.isArray(options.notes) ? options.notes : [];
     const fingered = Array.isArray(options.fingeredNotes) ? options.fingeredNotes : [];
     const active = notes.filter((note) => midiInRange(note.midi, span) && note.startSeconds <= seconds && note.endSeconds > seconds);
-    const activeFingered = fingered.filter((note) => midiInRange(note.midi, span) && note.startSeconds <= seconds && note.endSeconds > seconds);
-    const fingerById = new Map(activeFingered.filter((note) => note.id !== undefined).map((note) => [note.id, note.finger]));
-    const fingerByMidi = new Map(activeFingered.map((note) => [note.midi, note.finger]));
-    const activeWithFinger = active.map((note) => ({
+    const contact = notes.filter((note) => {
+      if (!midiInRange(note.midi, span)) return false;
+      const interval = {
+        timeMs: note.startSeconds * 1000,
+        durationMs: Math.max(1, (note.endSeconds - note.startSeconds) * 1000),
+      };
+      return HAND_ENGINE?.isKeyContactActive
+        ? HAND_ENGINE.isKeyContactActive(timeMs, interval)
+        : timeMs >= interval.timeMs && timeMs < interval.timeMs + interval.durationMs + 70;
+    });
+    const fingerById = new Map(fingered.filter((note) => note.id !== undefined).map((note) => [note.id, note.finger]));
+    const fingerByMidi = new Map(fingered.map((note) => [note.midi, note.finger]));
+    const attachFinger = (note) => ({
       ...note,
       finger: note.finger ?? fingerById.get(note.id) ?? fingerByMidi.get(note.midi),
-    }));
+    });
+    const activeWithFinger = active.map(attachFinger);
+    const contactWithFinger = contact.map(attachFinger);
     const activeByMidi = new Map();
     for (const note of activeWithFinger) {
       const list = activeByMidi.get(note.midi) || [];
       list.push(note);
       activeByMidi.set(note.midi, list);
     }
+    const contactByMidi = new Map();
+    for (const note of contactWithFinger) {
+      const list = contactByMidi.get(note.midi) || [];
+      list.push(note);
+      contactByMidi.set(note.midi, list);
+    }
 
     for (const [midi, key] of this.keys) {
-      const keyNotes = activeByMidi.get(midi) || [];
-      const note = keyNotes[0];
+      const soundingNotes = activeByMidi.get(midi) || [];
+      const contactNotes = contactByMidi.get(midi) || [];
+      const note = soundingNotes[0];
       const hand = note?.hand === 'left' ? 'left' : 'right';
       const color = hand === 'left' ? colors.leftHand : colors.rightHand;
-      const press = keyNotes.reduce((deepest, item) => Math.max(deepest, this.pressDepthMm(item, timeMs)), 0);
+      const press = contactNotes.reduce((deepest, item) => Math.max(deepest, this.pressDepthMm(item, timeMs)), 0);
       key.userData.press = HAND_ENGINE ? press * this.unitsPerMm : press;
       key.position.y = key.userData.baseY - key.userData.press;
       key.material.color.set(note ? color : key.userData.baseColor);
     }
 
     for (const side of ['left', 'right']) {
+      delete this.container.dataset[`${side}EngineIkErrorMm`];
+      delete this.container.dataset[`${side}EngineIkConverged`];
       const root = this.hands[side];
       if (!root) continue;
-      const sideNotes = activeWithFinger.filter((note) => note.hand === side);
-      const { pose, depthByFinger } = this.poseForSide(sideNotes, timeMs);
-      this.applyHandPose(root, pose);
+      const sideNotes = contactWithFinger.filter((note) => note.hand === side);
+      const { pose } = this.poseForSide(sideNotes, timeMs);
       const target = this.handTarget(side, sideNotes, pose, timeMs);
+      const ik = this.solveFingerTargets(side, sideNotes, target, pose, timeMs);
+      this.applyHandPose(root, ik?.fingers || pose);
+      if (ik) {
+        this.container.dataset[`${side}EngineIkErrorMm`] = ik.maxErrorMm.toFixed(2);
+        this.container.dataset[`${side}EngineIkConverged`] = String(ik.converged);
+      }
       this.targetHandPositions[side].copy(target);
       if (snap) root.position.copy(target);
     }
+  }
+
+  solveFingerTargets(side, sideNotes, wristWorld, pose, timeMs) {
+    if (!HAND_ENGINE?.solveFingerTargets || !this.handRig || sideNotes.length === 0) return null;
+    const targets = sideNotes.flatMap((note) => {
+      const finger = this.fingerNumber(note);
+      if (!finger || !note.keyPosition) return [];
+      return [{
+        finger,
+        target: {
+          x: note.keyPosition.x,
+          y: note.keyPosition.y - this.pressDepthMm(note, timeMs),
+          z: note.keyPosition.z,
+        },
+      }];
+    });
+    if (targets.length === 0) return null;
+    return HAND_ENGINE.solveFingerTargets({
+      hand: side,
+      rig: this.handRig,
+      wrist: this.worldToEngineWrist(wristWorld),
+      wristRotation: { x: 0, y: 0, z: 0 },
+      fingers: pose,
+      targets,
+      // The current GLB mapping has no verified spread-axis calibration;
+      // do not let the solver use motion the renderer cannot yet reproduce.
+      allowSpread: false,
+      toleranceMm: 1.5,
+    });
   }
 
   keyX(midi) { return this.keys.get(midi)?.position.x || 0; }

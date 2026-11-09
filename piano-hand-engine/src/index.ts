@@ -1,12 +1,11 @@
 /**
  * piano-hand-engine — MusicXML/MIDI to a pair of hands playing.
  *
- * Phases 1 to 3 are built: the instrument's geometry in millimetres,
- * one rigged hand with real bone lengths and joint limits, every note
- * placed on an exact key, and both hands' fingering solved as a search
- * over the whole phrase. Everything after that -- the IK, the motion
- * planner and the renderer -- is deliberately absent rather than
- * stubbed.
+ * Phases 1 to 3 are built: piano geometry in millimetres, a parametric
+ * hand skeleton with segment lengths and joint limits, exact key targets,
+ * and phrase-level fingering. A bounded finger-target IK solver is now
+ * included for the synthetic Engine rig; it is not yet calibrated to the
+ * website's skinned GLB. Wrist motion planning remains unfinished.
  *
  * See `README.md` for the pipeline and what each phase adds.
  */
@@ -18,6 +17,7 @@ export * from './core/timeline.js';
 export * from './keyboard/pianoGeometry.js';
 export * from './keyboard/keyPosition.js';
 export * from './kinematics/handPose.js';
+export * from './kinematics/inverseKinematics.js';
 export * from './core/solver.js';
 export * from './fingering/handSpan.js';
 export * from './fingering/handSplit.js';

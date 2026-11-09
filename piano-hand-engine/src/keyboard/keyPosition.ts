@@ -201,6 +201,16 @@ export function keyPositionsFor(
   return { positions, outOfRange };
 }
 
+/** Whether a finger/key contact should remain in the rendered state. */
+export function isKeyContactActive(
+  timeMs: number,
+  note: { readonly timeMs: number; readonly durationMs: number },
+  options: { readonly releaseMs?: number } = {},
+): boolean {
+  const release = options.releaseMs ?? 70;
+  return timeMs >= note.timeMs && timeMs < note.timeMs + note.durationMs + release;
+}
+
 /**
  * How far down a key is at one instant, in millimetres.
  *
