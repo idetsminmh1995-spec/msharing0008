@@ -18,11 +18,18 @@ deploy directly to Cloudflare Pages from this repo.
 | `/video-create/cello/` | Cello upload &amp; create page |
 | `/video-create/bass-cello/` | Bass Cello upload &amp; create page |
 | `/video-create/vocal/` | Vocal upload &amp; create page |
+| `/hand-demo/` | Blender GLB rigged human hand test page |
 
 Every instrument box on `/video-create/` now links to its own real
 page — each with an Upload File area (MusicXML / MIDI / Audio), so the
 full navigation flow (Home → Video Create → pick an instrument → reach
 the upload area) can be clicked through end to end once deployed.
+
+The `/hand-demo/` page is a working Three.js proof of concept for the new
+Blender-first piano direction. It loads `assets/hand/hand_model.glb`, shows
+the 21-bone armature, plays the embedded `Pose_OK` and `RigAction` clips, and
+includes a direct index-finger curl test. The asset source and CC BY-NC 4.0
+terms are documented in `assets/hand/README.md`.
 
 ## Cloudflare deployment settings
 

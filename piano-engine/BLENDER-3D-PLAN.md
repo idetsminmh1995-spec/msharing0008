@@ -71,6 +71,17 @@ The exact filenames may change during implementation, but the boundary is
 intentional: core logic produces note/key/hand state and the 3D renderer
 turns that state into scene transforms and materials.
 
+## First asset proof of concept
+
+The first realistic hand asset is now checked into
+`website/assets/hand/`. It includes the source `.blend`, a browser-ready
+`.glb`, skinning, a 21-bone armature, and the `Pose_OK` / `RigAction` clips.
+The working test page is `/hand-demo/`; it loads the GLB with Three.js,
+plays both clips, lists the bones, and directly curls the index finger.
+The asset is CC BY-NC 4.0, so it is suitable for non-commercial evaluation
+only until replaced by a compatible asset or an original model. Full source,
+license, and attribution details live in `website/assets/hand/README.md`.
+
 ## Migration phases
 
 1. Freeze and identify the renderer-independent keyboard, timing, and
