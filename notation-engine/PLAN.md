@@ -2793,3 +2793,198 @@ transposition controls.
   piano engines, a browser integration test for web-preview and instrument
   pages, synchronization of generated bundle URL stamps, and a repository
   README/index that accurately maps packages to their plans and test commands.
+
+
+### 24.5 Second-pass detail: runtime contracts to carry into sibling plans
+
+The entries below were verified against implementation source and tests during
+the deeper follow-up. They refine the component summaries in §24.1; they do
+not claim that all sibling modules have already received their own detailed
+plan documents. When the referenced area plan is created or reconciled, treat
+these as implemented behavior to preserve and as candidate acceptance cases.
+
+#### Metronome design contracts
+
+`metronome-engine/src/designs/` contains eleven distinct deterministic,
+frame-state-driven visual behaviors; the picker order in `designs/index.ts` is
+itself stable API. The area plan and design tests should preserve these
+per-design contracts, not just the total design count:
+
+| Design | Implemented state/visual behavior to specify and test |
+|---|---|
+| Pendulum | Alternates swing with beat phase and shows bar progress as a fan. |
+| Beat Dots | Shows one dot per beat; the current beat swells and its ping decays. |
+| Pulse Ring | Rings age with phase and give the downbeat stronger emphasis. |
+| Bar Meter | Distinguishes played/current/unplayed beats and rotates for portrait layout. |
+| Sweep Dial | Sweeps continuously through the bar and marks individual beats. |
+| Big Number | Settles after beat landing, emphasizes downbeat color and shows a bar rail. |
+| Segment Ring | Divides the bar into beat wedges and animates the current wedge settling. |
+| Travel Line | Moves a bar-progress marker on ratio-dependent line or loop tracks. |
+| Flash Frame | Decays a frame flash with beat phase and washes the downbeat. |
+| Bounce Ball | Uses phase-driven arc and landing squash; its run remains horizontal in all aspect ratios. |
+| Stack Blocks | Accumulates blocks through beats, resets at the bar and varies orientation by aspect. |
+
+The shared frame contract is 1-based `beat` and `bar`, `beatsPerBar`, a
+0-to-1 `phase` (0 at beat onset), BPM and time-signature numerator/denominator;
+designs are pure per-frame SVG renderers with no private clock, audio or DOM
+state. Tests should assert each design's state transition/output behavior, all
+three aspect ratios and the stable picker ordering. Existing source tests give
+general cross-design coverage but focused design-specific assertions are not
+equally complete across all eleven designs.
+
+The current source also has a package-contract reconciliation item: README
+shows a named ESM package import, while `package.json` marks the package
+private, points `main` at an IIFE bundle/global, points `types` at a file not
+produced by the default build, and exposes declarations through a separate
+script. Specify whether the supported contract is browser-global-only or add a
+real ESM/declaration entry; keep README, package metadata and generated
+artifacts consistent. (Evidence: `metronome-engine/README.md`,
+`metronome-engine/package.json`, `metronome-engine/src/index.ts`.)
+
+#### Piano keyboard range contract
+
+Add the implemented automatic viewport selection to the future piano-engine
+area plan: `rangeForNotes(notes, {size, minOctaves})` selects whole C-to-B
+octave boundaries around the lowest/highest supplied MIDI note, targets at
+least two octaves by default, grows by whole octaves with alternating sides
+where the chosen instrument permits, clamps to that instrument's endpoints,
+and returns the entire selected instrument range for empty input. This is not
+the same as drawing the full keyboard or accepting an arbitrary range. Preserve
+acceptance cases for empty input, one-octave pieces, notes at instrument ends,
+and each supported 61/73/76/88-key range. Evidence:
+`piano-engine/src/keyboard.ts` (`rangeForNotes`), its public export in
+`piano-engine/src/index.ts`, and `piano-engine/test/hands.test.js`.
+
+#### Piano-hand clock, geometry, split and fingering contracts
+
+When writing the area plan requested in §24.1, preserve these specific shipped
+contracts rather than describing the module only as a generic solver:
+
+- **Clock and sounding events:** timeline values are milliseconds; frame time
+  samples the start of each frame at 24/25/30/50/60 fps; sounding intervals
+  are half-open `[start, end)`; onset groups sort input and combine events
+  within 12 ms of each group's first onset; the cursor detects backwards seeks
+  and scans no more than 30 seconds into the past. The 30-second cap means a
+  note held longer than that is not returned as sounding and should remain an
+  explicit accepted limitation or be changed with a regression test.
+  Evidence: `piano-hand-engine/src/core/timeline.ts`.
+- **Physical keyboard and contact geometry:** supported ranges are MIDI 36–96,
+  28–100, 28–103 and 21–108 for 61/73/76/88-key instruments. Geometry uses a
+  165 mm octave (23.571 mm per white key), 150 mm white-key depth, 11 mm-wide,
+  95 mm-deep black keys raised 11 mm, and 10 mm key dip. Black keys are
+  intentionally centered on white-key boundaries (all modeled offsets are
+  currently zero). White/black strike points use 0.3/0.4 of key depth;
+  approach height is black-key rise plus 4 mm (15 mm); default key attack and
+  release are 28/70 ms. Out-of-range notes are reported rather than clamped
+  into playable positions, while distance calculations have a white-key-ruler
+  fallback for absent keys. Evidence: `piano-hand-engine/src/keyboard/`.
+- **Hand split:** actual implementation precedence is explicit `statedHand`,
+  then staff mapping only when exactly two distinct staves exist (lower-numbered
+  staff right, other staff left), then track mapping only when exactly two
+  tracks exist and their mean pitches differ by at least seven semitones, then
+  onset-local inferred assignment based on span and travel cost. Crossings are
+  reported, not forbidden. Although source comments and `HandReason` describe
+  voice evidence, `statedEvidence()` does not currently inspect a voice field;
+  plan and README must not claim voice-based assignment until it is implemented
+  and tested. Evidence: `piano-hand-engine/src/fingering/handSplit.ts`.
+- **Fingering:** onset/chord stages are solved as ordered finger assignments;
+  a finger cannot be reused within a chord, finger order must follow hand and
+  pitch direction, and every finger-pair span is checked against comfort and
+  hard maximum reach. The score penalizes stretches, thumb/pinky-on-black,
+  long fingers between black keys, travel and rushed movement, pointless
+  changes on repeated notes, fast repeated strikes with the same finger, and
+  awkward crossings; thumb-under and finger-over-thumb are allowed at lower
+  cost. A repeated single note can reuse its finger when the onset gap is at
+  least 140 ms; faster repeats penalize reuse. Infeasible choices are refused
+  and the search relaxes/continues instead of silently discarding the rest of
+  the phrase. Evidence: `piano-hand-engine/src/fingering/fingeringCost.ts`,
+  `fingeringSolver.ts`, `handSpan.ts`, and `core/solver.ts`.
+- **Pose:** small/medium/large profiles uniformly scale the medium hand by
+  0.9/1.0/1.1; joint angles are radians and are clamped to explicit MCP/PIP/DIP
+  and spread limits; left-hand forward kinematics mirrors the right hand in X;
+  Euler rotation is X then Y then Z; supported static shapes are rest,
+  five-finger and octave, with `pressedPose()` adjusting one selected finger.
+  Evidence: `piano-hand-engine/src/kinematics/handPose.ts`.
+
+These are geometry, event, hand-label and fingering primitives, not a complete
+note-to-animation pipeline. The README/package description's “MusicXML or MIDI
+in” claim is not borne out by the public API/source: callers supply
+`PerformanceNote[]`; no parser/adapter, integrated solve orchestration, wrist
+trajectory, renderer or two-hand motion planner is present. Clarify that a
+simultaneous chord can already receive a static multi-finger fingering even
+though continuous chord-shape/motion planning remains deferred.
+
+#### Standalone MIDI animation grouping contract
+
+Keep the app's `midi-parser-module` contract distinct from notation-engine §11:
+it returns seconds-based flattened note events and tempo/time-signature
+metadata for a drum-animation consumer, while §11 specifies the notation
+engine's tick/track/channel parser contract. Its animation builder sorts notes
+before assigning alternating R/L strokes independently per MIDI pitch. The
+separate `groupSimultaneous()` helper assumes its input is already time-sorted,
+uses a default 10 ms tolerance, and compares each candidate to the first event
+in the current group (not transitively to the immediately preceding event).
+Callers must either pass the builder-sorted timeline or the helper should sort
+or validate input; add tests for unsorted input and tolerance-boundary/chain
+cases. Evidence: `midi-parser-module/src/timelineBuilder.ts`.
+
+### 24.6 Newly confirmed discrepancies and verification work
+
+- **Metronome validation boundary:** the renderer's numeric normalization does
+  not sanitize non-finite `beat`, `beatsPerBar`, `bar`, BPM or time-signature
+  fields; NaN/Infinity can propagate to SVG or invalid iteration/count logic.
+  Logo URLs escape quotes but not all XML attribute metacharacters, unlike
+  ordinary SVG text. The initial §24.1 follow-up is retained; add NaN/Infinity
+  and hostile URL tests before treating the frame API as robust for arbitrary
+  caller input. Evidence: `metronome-engine/src/index.ts`, `layout.ts`,
+  `svg.ts`, and `test/designs.test.js`.
+- **Hand evidence mismatch:** `piano-hand-engine/src/fingering/handSplit.ts`
+  declares a priority for voice evidence and a `voice` reason, but the
+  implementation skips from staff directly to track. Either implement the
+  planned voice-to-hand rule and tests or remove that claim from comments,
+  types and README. This is a code/documentation contract mismatch, not a
+  shipped voice-inference feature.
+- **Key-range and artwork documentation:** `piano-engine/README.md` should
+  specify `rangeForNotes()` as in §24.5. Its hands-design prose also says finger
+  numbers are put on played keys and that both hands are always drawn; source
+  places finger-number badges on hand artwork and omits a hand with no notes.
+  Correct README wording to match `piano-engine/src/hands.ts` and its tests.
+- **Guitar README details:** clarify that the guitar renderer's palette has
+  overridable defaults and its fallback hand legend uses vector paths, not
+  rectangles. Evidence: `guitar-engine/src/colors.ts`, `src/hand.ts`, and
+  `guitar-engine/README.md`.
+- **Generated video URL stamps and recorded test counts:** the read-only stamp
+  checker still reports 24 stale references across six website pages; the
+  video-engine document records 14/14 tests while the current tools suite
+  contains 15 passing tests. Refresh stamps only as a deliberate source change
+  and update the recorded count. Add focused tests for the stamp checker's
+  quoting/query/missing-asset boundaries. Evidence: `tools/stamp-assets.mjs`,
+  `tools/test-video-engine.mjs`, `docs/VIDEO-ENGINE.md`.
+- **Clean verification remains unestablished for several components:** tests
+  that require rebuilding bundles could not be run in this environment because
+  `esbuild`/other locked dependencies are absent; some packages also stop at
+  missing `eslint`, `fflate`, `tsx` or `mido`. Passing direct Node tests against
+  checked-in bundles validates those bundle snapshots, not necessarily that
+  source and bundle are synchronized. Re-run clean installs and each component
+  `verify` after the dependency/toolchain issues are resolved.
+
+### 24.7 Second-pass coverage boundary (do not interpret as exhaustive sign-off)
+
+A second-pass inventory found 499 tracked code/config-like files, but this did
+not amount to a complete manual line-by-line audit of all 499. Generated
+bundles, source maps, font binaries and test data were intentionally not read
+as source. In particular, the workflow's own coverage report marked the large
+`notation-engine/src/` and `notation-engine/test/` reviews incomplete; the Drum
+and website code reviews were also incomplete, and the root/shared-document
+subtask failed before returning results. The small component audits did read
+more of their implementation and tests, but generated outputs and some fixtures
+were excluded. Therefore this section records omissions positively
+verified during review and the concrete follow-up contracts above; it does not
+certify that no other code-to-plan gap exists.
+
+To close that boundary, finish a file-by-file map for the remaining
+notation-engine source and test helpers, Drum source/tests, website runtime
+scripts and every video-create page, then map each public behavior/assertion to
+its owning area plan. Treat omitted plan sections, stale prose, generated
+bundle drift and failed/blocked test commands as separate findings rather than
+assuming a passing README claim proves implementation.
