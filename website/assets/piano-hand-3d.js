@@ -11,9 +11,9 @@ const KEY_RANGES = {
 const KEYBOARD_WORLD_WIDTH = 8;
 const STANDARD_WHITE_KEY_COUNT = 52;
 const WHITE_KEY_WORLD_WIDTH = KEYBOARD_WORLD_WIDTH / STANDARD_WHITE_KEY_COUNT;
+const FALLBACK_MM_PER_WHITE_KEY = 165 / 7;
 const WHITE_PITCHES = new Set([0, 2, 4, 5, 7, 9, 11]);
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const FINGER_NAMES = ['thumb', 'index', 'middle', 'ring', 'little'];
 const FINGER_BONES = {
   1: ['thumb_trapez', 'thumb_meta', 'thumb_prox', 'thumb_dist'],
   2: ['index_meta', 'index_prox', 'index_midd', 'index_dist'],
@@ -21,7 +21,8 @@ const FINGER_BONES = {
   4: ['ring_meta', 'ring_prox', 'ring_midd', 'ring_dist'],
   5: ['pinky_meta', 'pinky_prox', 'pinky_midd', 'pinky_dist'],
 };
-const HAND_OFFSETS = { 1: -0.48, 2: -0.18, 3: 0.08, 4: 0.34, 5: 0.60 };
+const HAND_ENGINE = window.PianoHandEngine || null;
+const FALLBACK_UNITS_PER_MM = KEYBOARD_WORLD_WIDTH / (52 * FALLBACK_MM_PER_WHITE_KEY);
 
 let instance;
 
@@ -60,8 +61,15 @@ class PianoHand3DRenderer {
     this.initialQuaternions = new Map();
     this.activeOptions = null;
     this.currentSpan = null;
-    this.targetHandX = { right: 0, left: 0 };
-    this.handX = { right: 0, left: 0 };
+    this.keyboard = null;
+    this.keyboardWidthMm = HAND_ENGINE ? HAND_ENGINE.keyboardWidthMm(88) : 52 * FALLBACK_MM_PER_WHITE_KEY;
+    this.unitsPerMm = HAND_ENGINE ? KEYBOARD_WORLD_WIDTH / this.keyboardWidthMm : FALLBACK_UNITS_PER_MM;
+    this.frontEdgeWorldZ = HAND_ENGINE ? HAND_ENGINE.WHITE_KEY_DEPTH_MM * this.unitsPerMm / 2 : 0.525;
+    this.handRig = HAND_ENGINE ? HAND_ENGINE.handRigFor('medium') : null;
+    this.targetHandPositions = {
+      right: new THREE.Vector3(1.35, 0.35, 0.75),
+      left: new THREE.Vector3(-1.35, 0.35, 0.75),
+    };
     this.clock = new THREE.Clock();
 
     this.scene.add(new THREE.HemisphereLight(0xe8f3ff, 0x26303b, 2.4));
@@ -92,11 +100,8 @@ class PianoHand3DRenderer {
     try {
       const gltf = await new GLTFLoader().loadAsync('../../assets/hand/hand_model.glb');
       this.handTemplate = gltf.scene;
-      // Player POV: the imported hand is laid over the keyboard so the
-      // wrist enters from the player's side and the fingers point toward
-      // the keys, instead of presenting a front-facing floating hand.
-      // Calibrated to an open hand of about 21 cm span, 19 cm length and
-      // 6 cm thickness when an 88-key keyboard is 122 cm wide.
+      // Calibrated to an open adult hand of about 21 cm span and 19 cm
+      // length when an 88-key keyboard is 122 cm wide.
       this.handTemplate.scale.set(0.075, 0.05, 0.05);
       this.handTemplate.rotation.set(-Math.PI / 2, 0.1, Math.PI + 0.08);
       this.handTemplate.position.set(0, 0.08, 0.75);
@@ -110,7 +115,7 @@ class PianoHand3DRenderer {
       this.createHand('right', false);
       this.createHand('left', true);
       this.handReady = true;
-      this.update(this.activeOptions || {});
+      this.update(this.activeOptions || {}, { snap: true });
     } catch (error) {
       console.error('Piano hand GLB failed to load:', error);
       this.container.dataset.handError = 'true';
@@ -120,32 +125,24 @@ class PianoHand3DRenderer {
   createHand(side, mirror) {
     const root = SkeletonUtils.clone(this.handTemplate);
     root.scale.x *= mirror ? -1 : 1;
-    // The source mesh's fingers point toward the player. Turn the whole
-    // hand around the world-up axis so wrists stay near the player and
-    // fingers reach forward onto the keys.
+    // Player POV: wrists are near the player and fingers point toward the
+    // keys. The second roll presents the dorsal side, with matching natural
+    // materials on both hands.
     root.quaternion.premultiply(
       new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI),
     );
-    // Roll around the wrist-to-fingertip axis to show the dorsal side. The
-    // half-turn reverses horizontal spread, so flip X to keep thumb placement
-    // correct for each hand over its keyboard range.
     root.quaternion.premultiply(
       new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI),
     );
     root.scale.x *= -1;
-    root.position.x = mirror ? -1.35 : 1.35;
-    root.position.y = 0.35;
-    root.position.z = 0.75;
+    root.position.set(side === 'left' ? -1.35 : 1.35, 0.35, 0.75);
     root.userData.side = side;
-    // Keep the GLB's same natural skin and nail textures on both hands; the
-    // left/right colors are reserved for note and key highlights.
     root.traverse((object) => {
-      if (object.isMesh) {
-        object.material = object.material.clone();
-      }
+      if (object.isMesh) object.material = object.material.clone();
     });
     this.scene.add(root);
     this.hands[side] = root;
+    this.targetHandPositions[side].copy(root.position);
   }
 
   resize() {
@@ -168,34 +165,75 @@ class PianoHand3DRenderer {
   clearKeys() {
     this.keys.clear();
     this.keyGroup.clear();
+    this.keyboard = null;
   }
 
-  buildKeys(span, colors) {
-    if (this.currentSpan && this.currentSpan.first === span.first && this.currentSpan.last === span.last) return;
-    this.currentSpan = span;
+  buildKeys(span, colors, handEngineData) {
+    const range = spanFor(span);
+    if (this.currentSpan && this.currentSpan.first === range.first && this.currentSpan.last === range.last) return;
+    this.currentSpan = { first: range.first, last: range.last };
     this.clearKeys();
-    const whiteMidi = [];
-    for (let midi = span.first; midi <= span.last; midi += 1) if (isWhite(midi)) whiteMidi.push(midi);
-    const whiteWidth = WHITE_KEY_WORLD_WIDTH;
-    this.cameraViewWidth = whiteMidi.length * whiteWidth + 0.5;
-    const startX = -whiteMidi.length * whiteWidth / 2;
-    const xByMidi = new Map();
-    whiteMidi.forEach((midi, index) => xByMidi.set(midi, startX + (index + 0.5) * whiteWidth));
-    for (const midi of whiteMidi) this.addKey(midi, xByMidi.get(midi), false, whiteWidth, colors);
-    for (let midi = span.first; midi <= span.last; midi += 1) {
-      if (isWhite(midi)) continue;
-      const before = midi - 1;
-      const after = midi + 1;
-      const left = xByMidi.get(before);
-      const right = xByMidi.get(after);
-      if (left === undefined || right === undefined) continue;
-      this.addKey(midi, (left + right) / 2, true, whiteWidth, colors);
+
+    if (HAND_ENGINE) {
+      const keyboard = handEngineData?.keyboard || HAND_ENGINE.buildKeyboard(range);
+      this.keyboard = keyboard;
+      this.keyboardWidthMm = HAND_ENGINE.keyboardWidthMm(range);
+      this.unitsPerMm = KEYBOARD_WORLD_WIDTH / HAND_ENGINE.keyboardWidthMm(88);
+      this.frontEdgeWorldZ = HAND_ENGINE.WHITE_KEY_DEPTH_MM * this.unitsPerMm / 2;
+      this.cameraViewWidth = this.keyboardWidthMm * this.unitsPerMm + 0.5;
+      for (const key of keyboard.keys) {
+        const height = key.isBlack ? 0.22 : 0.14;
+        const visualWidthMm = Math.max(1, key.width - (key.isBlack ? 0.3 : 0.8));
+        const x = (key.x + key.width / 2 - this.keyboardWidthMm / 2) * this.unitsPerMm;
+        const y = key.y * this.unitsPerMm - height / 2;
+        const z = this.frontEdgeWorldZ - (key.z + key.depth / 2) * this.unitsPerMm;
+        this.addPhysicalKey(key, x, y, z, visualWidthMm * this.unitsPerMm, key.depth * this.unitsPerMm, height);
+      }
+    } else {
+      const whiteMidi = [];
+      for (let midi = range.first; midi <= range.last; midi += 1) if (isWhite(midi)) whiteMidi.push(midi);
+      const whiteWidth = WHITE_KEY_WORLD_WIDTH;
+      this.cameraViewWidth = whiteMidi.length * whiteWidth + 0.5;
+      const startX = -whiteMidi.length * whiteWidth / 2;
+      const xByMidi = new Map();
+      whiteMidi.forEach((midi, index) => xByMidi.set(midi, startX + (index + 0.5) * whiteWidth));
+      for (const midi of whiteMidi) this.addKey(midi, xByMidi.get(midi), false, whiteWidth, colors);
+      for (let midi = range.first; midi <= range.last; midi += 1) {
+        if (isWhite(midi)) continue;
+        const left = xByMidi.get(midi - 1);
+        const right = xByMidi.get(midi + 1);
+        if (left !== undefined && right !== undefined) this.addKey(midi, (left + right) / 2, true, whiteWidth, colors);
+      }
     }
-    // Exact overhead view: the camera looks straight down the Y axis, with
-    // the far edge of the keyboard at the top and wrists at the near edge.
+
+    // Exact overhead view: the far edge of the keyboard is at the top;
+    // the engine's z=0 key edge and hands are toward the player.
     this.camera.up.set(0, 0, -1);
     this.camera.position.set(0, 10, 0.2);
     this.camera.lookAt(0, 0.05, 0.2);
+  }
+
+  addPhysicalKey(key, x, y, z, width, depth, height) {
+    const material = new THREE.MeshStandardMaterial({
+      color: key.isBlack ? 0x10151b : 0xe7ebef,
+      roughness: 0.34,
+      metalness: 0.05,
+    });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.userData = {
+      midi: key.midi,
+      baseY: y,
+      press: 0,
+      baseColor: material.color.clone(),
+      black: key.isBlack,
+      physicalKey: key,
+    };
+    mesh.name = `key_${key.midi}_${noteName(key.midi)}`;
+    this.keyGroup.add(mesh);
+    this.keys.set(key.midi, mesh);
   }
 
   addKey(midi, x, black, whiteWidth, colors) {
@@ -217,74 +255,192 @@ class PianoHand3DRenderer {
     this.keys.set(midi, mesh);
   }
 
-  setFingerPose(root, finger, pressed) {
-    const boneNames = FINGER_BONES[finger];
-    if (!boneNames) return;
-    for (const [index, name] of boneNames.entries()) {
-      const bone = root.getObjectByName(name);
-      if (!bone) continue;
-      const initial = this.initialQuaternions.get(name);
-      if (initial) bone.quaternion.copy(initial);
-      if (pressed) bone.rotation.x = -(0.20 + index * 0.07);
-    }
-  }
-
-  resetHand(root) {
-    for (const name of Object.keys(FINGER_BONES).flatMap((finger) => FINGER_BONES[finger])) {
-      const bone = root.getObjectByName(name);
-      const initial = this.initialQuaternions.get(name);
-      if (bone && initial) bone.quaternion.copy(initial);
-    }
-  }
-
   fingerNumber(note) {
     const finger = Number(note?.finger);
     return finger >= 1 && finger <= 5 ? finger : undefined;
   }
 
-  update(options) {
+  pressDepthMm(note, timeMs) {
+    if (!HAND_ENGINE || !Number.isFinite(note?.startSeconds) || !Number.isFinite(note?.endSeconds)) {
+      return note && note.startSeconds <= timeMs / 1000 && note.endSeconds > timeMs / 1000 ? 0.12 : 0;
+    }
+    return HAND_ENGINE.keyPressDepthMm(timeMs, {
+      timeMs: note.startSeconds * 1000,
+      durationMs: Math.max(1, (note.endSeconds - note.startSeconds) * 1000),
+    });
+  }
+
+  poseForSide(sideNotes, timeMs) {
+    if (!HAND_ENGINE) return { pose: null, depthByFinger: new Map() };
+    const pose = { ...HAND_ENGINE.POSES.fiveFinger };
+    const depthByFinger = new Map();
+    for (const note of sideNotes) {
+      const finger = this.fingerNumber(note);
+      if (!finger) continue;
+      const depth = this.pressDepthMm(note, timeMs);
+      depthByFinger.set(finger, Math.max(depthByFinger.get(finger) || 0, depth));
+    }
+    for (const [finger, depth] of depthByFinger) {
+      const amount = clamp(depth / HAND_ENGINE.KEY_DIP_MM, 0, 1);
+      const pressed = HAND_ENGINE.pressedPose(HAND_ENGINE.POSES.fiveFinger, finger, amount);
+      pose[finger] = pressed[finger];
+    }
+    return { pose, depthByFinger };
+  }
+
+  applyHandPose(root, pose) {
+    if (!pose) {
+      this.resetHand(root);
+      return;
+    }
+    for (const [finger, names] of Object.entries(FINGER_BONES)) {
+      const state = pose[finger];
+      const angles = state ? [state.mcp, state.pip, state.dip] : [0, 0, 0];
+      names.forEach((name, index) => {
+        const bone = root.getObjectByName(name);
+        if (!bone) return;
+        const initial = this.initialQuaternions.get(name);
+        if (initial) bone.quaternion.copy(initial);
+        if (index === 0) return;
+        const angle = angles[index - 1] || 0;
+        if (angle) bone.quaternion.multiply(
+          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -angle),
+        );
+      });
+    }
+  }
+
+  resetHand(root) {
+    for (const names of Object.values(FINGER_BONES)) {
+      for (const name of names) {
+        const bone = root.getObjectByName(name);
+        const initial = this.initialQuaternions.get(name);
+        if (bone && initial) bone.quaternion.copy(initial);
+      }
+    }
+  }
+
+  engineWristToWorld(wrist) {
+    return new THREE.Vector3(
+      (wrist.x - this.keyboardWidthMm / 2) * this.unitsPerMm,
+      wrist.y * this.unitsPerMm,
+      this.frontEdgeWorldZ - wrist.z * this.unitsPerMm,
+    );
+  }
+
+  restHandTarget(side, pose) {
+    if (HAND_ENGINE && this.keyboard?.byMidi) {
+      const midi = side === 'left' ? 48 : 72;
+      const key = this.keyboard.byMidi.get(midi) || this.keyboard.keys[0];
+      if (key) {
+        const strike = HAND_ENGINE.keyStrikePoint(key);
+        const skeleton = HAND_ENGINE.solveHandSkeleton({
+          hand: side,
+          rig: this.handRig,
+          wrist: { x: 0, y: 0, z: 0 },
+          wristRotation: { x: 0, y: 0, z: 0 },
+          fingers: pose || HAND_ENGINE.POSES.fiveFinger,
+        });
+        const tip = skeleton.fingers[3].tip;
+        return this.engineWristToWorld({
+          x: strike.x - tip.x,
+          y: strike.y - tip.y,
+          z: strike.z - tip.z,
+        });
+      }
+    }
+    return new THREE.Vector3(side === 'left' ? -1.35 : 1.35, 0.35, 0.75);
+  }
+
+  handTarget(side, sideNotes, pose, timeMs) {
+    if (HAND_ENGINE && this.keyboard && sideNotes.length && pose) {
+      const skeleton = HAND_ENGINE.solveHandSkeleton({
+        hand: side,
+        rig: this.handRig,
+        wrist: { x: 0, y: 0, z: 0 },
+        wristRotation: { x: 0, y: 0, z: 0 },
+        fingers: pose,
+      });
+      const wristTargets = [];
+      for (const note of sideNotes) {
+        const finger = this.fingerNumber(note);
+        const tip = finger ? skeleton.fingers[finger]?.tip : undefined;
+        if (!tip || !note.keyPosition) continue;
+        const press = this.pressDepthMm(note, timeMs);
+        wristTargets.push(this.engineWristToWorld({
+          x: note.keyPosition.x - tip.x,
+          y: note.keyPosition.y - press - tip.y,
+          z: note.keyPosition.z - tip.z,
+        }));
+      }
+      if (wristTargets.length) {
+        const target = wristTargets.reduce((sum, item) => sum.add(item), new THREE.Vector3());
+        return target.multiplyScalar(1 / wristTargets.length);
+      }
+    }
+    if (sideNotes.length) {
+      const baseX = side === 'left' ? -1.35 : 1.35;
+      const averageKeyX = sideNotes.reduce((sum, note) => sum + this.keyX(note.midi), 0) / sideNotes.length;
+      return new THREE.Vector3(clamp(averageKeyX, baseX - 2.5, baseX + 2.5), 0.35, 0.75);
+    }
+    return this.restHandTarget(side, pose);
+  }
+
+  update(options, { snap = false } = {}) {
     this.activeOptions = options;
     if (!options || !options.width || !options.height) return;
     const span = spanFor(options.size);
     const colors = options.colors || { leftHand: '#FFC400', rightHand: '#4FA3FF' };
-    this.buildKeys(span, colors);
+    const handEngineData = options.handEngineData || null;
+    this.buildKeys(span, colors, handEngineData);
     this.resize();
 
     const seconds = Number.isFinite(options.seconds) ? options.seconds : 0;
+    const timeMs = seconds * 1000;
     const notes = Array.isArray(options.notes) ? options.notes : [];
     const fingered = Array.isArray(options.fingeredNotes) ? options.fingeredNotes : [];
     const active = notes.filter((note) => midiInRange(note.midi, span) && note.startSeconds <= seconds && note.endSeconds > seconds);
     const activeFingered = fingered.filter((note) => midiInRange(note.midi, span) && note.startSeconds <= seconds && note.endSeconds > seconds);
-    const byMidi = new Map(activeFingered.map((note) => [note.midi, note]));
+    const fingerById = new Map(activeFingered.filter((note) => note.id !== undefined).map((note) => [note.id, note.finger]));
+    const fingerByMidi = new Map(activeFingered.map((note) => [note.midi, note.finger]));
+    const activeWithFinger = active.map((note) => ({
+      ...note,
+      finger: note.finger ?? fingerById.get(note.id) ?? fingerByMidi.get(note.midi),
+    }));
+    const activeByMidi = new Map();
+    for (const note of activeWithFinger) {
+      const list = activeByMidi.get(note.midi) || [];
+      list.push(note);
+      activeByMidi.set(note.midi, list);
+    }
 
     for (const [midi, key] of this.keys) {
-      const note = active.find((item) => item.midi === midi);
+      const keyNotes = activeByMidi.get(midi) || [];
+      const note = keyNotes[0];
       const hand = note?.hand === 'left' ? 'left' : 'right';
       const color = hand === 'left' ? colors.leftHand : colors.rightHand;
-      key.userData.press = note ? 0.12 : 0;
+      const press = keyNotes.reduce((deepest, item) => Math.max(deepest, this.pressDepthMm(item, timeMs)), 0);
+      key.userData.press = HAND_ENGINE ? press * this.unitsPerMm : press;
+      key.position.y = key.userData.baseY - key.userData.press;
       key.material.color.set(note ? color : key.userData.baseColor);
     }
 
     for (const side of ['left', 'right']) {
       const root = this.hands[side];
       if (!root) continue;
-      this.resetHand(root);
-      const sideNotes = active.filter((note) => (note.hand === 'left') === (side === 'left'));
-      const baseX = side === 'left' ? -1.35 : 1.35;
-      const target = sideNotes.length ? sideNotes.reduce((sum, note) => sum + this.keyX(note.midi), 0) / sideNotes.length : baseX;
-      this.targetHandX[side] = clamp(target - baseX, -2.5, 2.5);
-      for (const note of sideNotes) {
-        const detail = byMidi.get(note.midi);
-        const finger = this.fingerNumber(detail);
-        if (finger) this.setFingerPose(root, finger, true);
-      }
+      const sideNotes = activeWithFinger.filter((note) => note.hand === side);
+      const { pose, depthByFinger } = this.poseForSide(sideNotes, timeMs);
+      this.applyHandPose(root, pose);
+      const target = this.handTarget(side, sideNotes, pose, timeMs);
+      this.targetHandPositions[side].copy(target);
+      if (snap) root.position.copy(target);
     }
   }
 
   keyX(midi) { return this.keys.get(midi)?.position.x || 0; }
 
   renderToCanvas(options, context, box) {
-    this.update(options);
+    this.update(options, { snap: true });
     const width = Math.max(1, Math.round(box.w));
     const height = Math.max(1, Math.round(box.h));
     this.renderer.setSize(width, height, false);
@@ -299,11 +455,7 @@ class PianoHand3DRenderer {
     for (const side of ['left', 'right']) {
       const root = this.hands[side];
       if (!root) continue;
-      this.handX[side] = THREE.MathUtils.lerp(this.handX[side], this.targetHandX[side], Math.min(1, delta * 9));
-      root.position.x = (side === 'left' ? -1.35 : 1.35) + this.handX[side];
-    }
-    for (const key of this.keys.values()) {
-      key.position.y = THREE.MathUtils.lerp(key.position.y, key.userData.baseY - key.userData.press, Math.min(1, delta * 14));
+      root.position.lerp(this.targetHandPositions[side], Math.min(1, delta * 9));
     }
     this.renderer.render(this.scene, this.camera);
   }

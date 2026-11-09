@@ -138,34 +138,36 @@ and acceptance criteria below are not all complete.
 
 | Migration phase | Current status | Evidence / remaining work |
 |---|---|---|
-| 1. Freeze renderer-independent APIs | Partial | Existing PianoEngine supplies keyboard, note timing, fingering and shape APIs; the new website renderer duplicates keyboard-range and scene mapping logic rather than consuming a dedicated shared 3D state contract. Define and test that boundary. |
+| 1. Freeze renderer-independent APIs | Partial | `piano-hand-engine` now supplies physical keyboard dimensions, key/strike positions, score-aware hand splits and phrase fingering to the Hands renderer. A typed renderer-independent frame/scene-state contract and its browser tests are still needed. |
 | 2. Author production piano model | Not complete | `piano-hand-3d.js` builds procedural box keys; no production Blender piano GLB with stable per-key MIDI objects is checked in. |
 | 3. Load piano GLB | Not complete | The checked-in GLB is the hand asset only. The piano keys are procedural. |
-| 4. Key press/release and hand colors | Partial | The website renderer colors active keys by hand and eases key meshes down/up, but interpolation is wall-clock/requestAnimationFrame-driven, not yet tied deterministically to the note/frame timestamp. |
+| 4. Key press/release and hand colors | Partial | `keyPressDepthMm()` now drives each key's exact millimetre travel directly from the frame timestamp; active keys retain the selected hand highlight. Preview hand-root smoothing still uses requestAnimationFrame, while export snaps to the calculated target. |
 | 5. 3D falling-note bars | Not complete | The Falling Notes design still uses the existing SVG/shape renderer; the GLB/WebGL module serves the Hands design. |
-| 6. Rigged hand and finger mapping | Partial | A 21-bone hand GLB and finger-bone/key mappings are present. The production mapping curls fingers and moves hands, but this is not calibrated inverse kinematics or a full motion solution. |
-| 7. Hand/wrist/finger/chord motion and tests | Partial | Hand translation and selected-finger curling exist. Wrist trajectory/rotation planning, robust chord handling and dedicated automated browser tests for the GLB renderer are not complete. |
-| 8. Website preview/video integration | Partial, wired | The Piano page calls `PianoHand3D.update()` for Hands preview and `PianoHand3D.renderToCanvas()` during video composition. Preview/export parity is not yet proven because animation advances independently using `THREE.Clock` and `requestAnimationFrame`. |
+| 6. Rigged hand and finger mapping | Partial | The 21-bone GLB now receives Piano Hand Engine fingering, five-finger/pressed joint poses, and static fingertip targets derived from the same physical key positions. The mapping remains a static-pose fit, not inverse kinematics or a continuous hand-motion solution. |
+| 7. Hand/wrist/finger/chord motion and tests | Partial | Per-note wrist targets use the assigned finger's engine fingertip and key strike; simultaneous targets are averaged, and the matching finger pose is applied. Wrist rotation/trajectory, inter-hand collision handling, and dedicated automated browser tests are still missing. |
+| 8. Website preview/video integration | Partial, wired | Preview and export share `stageOptions()` and the same Piano Hand Engine keyboard/events. `renderToCanvas()` snaps the hand root and key state to the requested timestamp; live preview still smooths hand translation asynchronously, and browser parity tests are not yet present. |
 | 9. Remove SVG production path | Not complete | SVG remains the Falling Notes implementation and the renderer-independent contract. Do not remove it until the 3D paths pass functional, visual, deterministic-frame and performance checks. |
 
 `website/hand-demo/index.html` is a 13-white-key procedural mapping demo with
 five explicit white-key MIDI/finger assignments (60/62/64/65/67), embedded GLB
 animation controls, pointer/computer-keyboard interaction, and a bone listing.
 The production renderer is `website/assets/piano-hand-3d.js`; it loads the
-hand GLB, creates procedural keys for the selected keyboard span, applies
-left/right colours and finger poses, and supports canvas capture. These are
-working prototype capabilities; do not describe the piano GLB, 3D falling
-bars, IK, or deterministic export as shipped.
+hand GLB, builds procedural key meshes from `PianoHandEngine.buildKeyboard()`,
+and consumes `keyPositionsFor()`, `splitHands()`, `solveFingering()`,
+`solveHandSkeleton()`, and `keyPressDepthMm()` through the Piano page adapter.
+The static browser bundle is `website/assets/piano-hand-engine.js`. These are
+working integration capabilities; the piano GLB, 3D falling bars, full IK,
+continuous motion planning, and automated deterministic-export proof remain
+unfinished.
 
 ### Required follow-up before marking the 3D path production-ready
 
 - Replace duplicate/procedural production key meshes with the planned
   addressable piano GLB, or explicitly revise this asset requirement.
-- Make scene updates a pure function of musical/video time (including seeks
-  and repeated timestamps), rather than the `THREE.Clock` interpolation used
-  by the current animation loop. Test that rendering the same timestamp twice
-  yields equivalent pixels/state and that a timestamp can be rendered in any
-  order.
+- Keep preview/export state parity explicit: test repeated and out-of-order
+  `renderToCanvas()` timestamps, seeks, and note releases. Export currently
+  snaps to the timestamp; live preview still smooths hand-root movement with
+  `requestAnimationFrame` and must be checked against the exported frames.
 - Add browser tests for GLB loading and missing-bone behavior, MIDI-to-key
   mapping, per-hand colors, finger pose selection, key press/release intervals,
   keyboard-span changes, and preview-versus-video canvas output.

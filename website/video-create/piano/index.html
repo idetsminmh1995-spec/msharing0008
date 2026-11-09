@@ -567,6 +567,8 @@
 <script src="../../assets/outro-video.js?v=521fc4cb"></script>
 <!-- The video engine: renders frames rather than recording them. -->
 <script src="../../assets/video-engine.js?v=9c8e90f0"></script>
+<!-- Physical piano geometry, hand splitting and fingering for the Hands renderer. -->
+<script src="../../assets/piano-hand-engine.js?v=0.1.0"></script>
 <script type="importmap">
 {
   "imports": {
@@ -576,7 +578,7 @@
 }
 </script>
 <!-- The Hands design's production renderer: Blender GLB hands + WebGL keys. -->
-<script type="module" src="../../assets/piano-hand-3d.js?v=7"></script>
+<script type="module" src="../../assets/piano-hand-3d.js?v=9"></script>
 </head>
 <body>
 
@@ -1396,13 +1398,9 @@
 
 
   // --- The piano stage (card 3) -------------------------------------
-  // piano-engine/ supplies the note timing and fingering. Falling Notes
-  // remains SVG for now; the Hands design is handed to the production
-  // Blender/GLB WebGL renderer loaded above.
-  //
-  // The engine is asked for the same frame twice over, in two forms:
-      // `renderPianoStage` writes SVG for Falling Notes. Hands uses the
-      // same note/fingering state to update the 3D key and hand scene.
+  // piano-engine/ draws Falling Notes as SVG. Piano Hand Engine supplies
+  // physical key geometry, score-aware hand splits, fingering and strike
+  // points to the Hands design; the GLB/WebGL renderer consumes that data.
   const pianoStage = document.getElementById('pianoStage');
   const keyboardSizeSelect = document.getElementById('keyboardSize');
   const fallSecondsSelect = document.getElementById('fallSeconds');
@@ -1494,30 +1492,96 @@
   }
 
   /**
-   * Every note of the score, in WRITTEN seconds, with the hand that
-   * plays it.
-   *
-   * Written seconds, not performance seconds, for the same reason the
-   * drum page lit its photos that way: a repeat plays the same written
-   * bar again, and mapping the audio's moment back to a written tick is
-   * what makes the second pass light up like the first.
-   *
-   * The hand is the score's own answer. A piano part is written on two
-   * staves and MusicXML says which one every note is on: staff 1 is the
-   * upper one, played by the right hand, staff 2 the lower, played by
-   * the left. A part with one staff has no such answer, so its notes go
-   * to the right hand rather than being split by pitch -- guessing
-   * would put a left-hand melody in the wrong colour and look like a
-   * bug in the engine.
+   * Keep the notation engine's full note evidence until Piano Hand Engine
+   * has made its decisions. Written seconds are used so repeats map back
+   * to the same score positions and stay on the same timeline as the SVG.
    */
   let pianoNotes = [];
+  let pianoPerformanceNotes = [];
+  let pianoHandCache = { source: null, spanKey: '', value: null };
+
+  function pianoSpanKey(size) {
+    return typeof size === 'number' ? `size:${size}` : `range:${size.first}-${size.last}`;
+  }
+
+  function getPianoHandPerformance(size = keyboardSpan()) {
+    const engine = window.PianoHandEngine;
+    if (!engine || pianoPerformanceNotes.length === 0) return null;
+    const spanKey = pianoSpanKey(size);
+    if (pianoHandCache.source === pianoPerformanceNotes && pianoHandCache.spanKey === spanKey) {
+      return pianoHandCache.value;
+    }
+
+    try {
+      const keyboard = engine.buildKeyboard(size);
+      const split = engine.splitHands(pianoPerformanceNotes, { keyboard });
+      const positions = engine.keyPositionsFor(pianoPerformanceNotes, keyboard);
+      const assignments = [];
+      for (const hand of ['left', 'right']) {
+        const handNotes = pianoPerformanceNotes.filter((note) => split.byNoteId.get(note.id)?.hand === hand);
+        if (handNotes.length) {
+          assignments.push(...engine.solveFingering(handNotes, hand, { keyboard }).assignments);
+        }
+      }
+
+      const assignmentById = new Map(assignments.map((assignment) => [assignment.noteId, assignment]));
+      const sourceById = new Map(pianoPerformanceNotes.map((note) => [note.id, note]));
+      const events = positions.positions.map((position) => {
+        const source = sourceById.get(position.id);
+        const decision = split.byNoteId.get(position.id);
+        const assignment = assignmentById.get(position.id);
+        if (!source || !decision) return null;
+        return {
+          id: position.id,
+          midi: position.midi,
+          startSeconds: position.timeMs / 1000,
+          endSeconds: (position.timeMs + position.durationMs) / 1000,
+          hand: decision.hand,
+          ...(assignment ? { finger: assignment.finger } : {}),
+          key: position.key,
+          keyPosition: position.strike,
+          approachPosition: position.approach,
+        };
+      }).filter(Boolean);
+
+      const value = { keyboard, events, split, assignments, positions };
+      pianoHandCache = { source: pianoPerformanceNotes, spanKey, value };
+
+      const nextNotes = pianoPerformanceNotes.map((note) => ({
+        id: note.id,
+        midi: note.midi,
+        startSeconds: note.timeMs / 1000,
+        endSeconds: (note.timeMs + note.durationMs) / 1000,
+        hand: split.byNoteId.get(note.id)?.hand ?? 'right',
+      }));
+      const handAssignmentsChanged = nextNotes.length !== pianoNotes.length || nextNotes.some((note, index) =>
+        note.id !== pianoNotes[index]?.id || note.hand !== pianoNotes[index]?.hand,
+      );
+      if (handAssignmentsChanged) {
+        pianoNotes = nextNotes;
+        buildPianoFingering();
+      } else if (!pianoFingering) {
+        buildPianoFingering();
+      }
+      return value;
+    } catch (err) {
+      console.error('Piano Hand Engine could not solve this score:', err);
+      pianoHandCache = { source: pianoPerformanceNotes, spanKey, value: null };
+      return null;
+    }
+  }
 
   function buildPianoNotes() {
     pianoNotes = [];
+    pianoPerformanceNotes = [];
+    pianoFingering = null;
+    pianoHandCache = { source: null, spanKey: '', value: null };
     const parsed = lastParsed;
     const playback = notationPlayback;
     if (!parsed || !parsed.score || !playback || typeof NotationEngine === 'undefined') return;
 
+    let partIndex = 0;
+    let sourceNoteIndex = 0;
     for (const part of parsed.score.parts) {
       for (const measure of part.measures) {
         const measureOffset = playback.globalTickOffsetByMeasure?.get(measure.number) ?? 0;
@@ -1543,31 +1607,47 @@
               } catch (err) {
                 continue;
               }
+              const id = `p${partIndex}-m${measure.number}-n${sourceNoteIndex++}`;
+              const staff = Number(note.staff ?? event.staff);
+              const voiceNumber = Number(note.voice ?? event.voice ?? voice.id);
+              const statedFinger = Number(note.fingering);
+              const chordId = event.kind === 'chord'
+                ? `p${partIndex}-m${measure.number}-v${Number.isFinite(voiceNumber) ? voiceNumber : 0}-t${startTick}`
+                : undefined;
+              const performanceNote = {
+                id,
+                midi,
+                timeMs: startSeconds * 1000,
+                durationMs: Math.max(1, (endSeconds - startSeconds) * 1000),
+                track: partIndex,
+                ...(Number.isFinite(staff) ? { staff } : {}),
+                ...(Number.isFinite(voiceNumber) ? { voice: voiceNumber } : {}),
+                ...(statedFinger >= 1 && statedFinger <= 5 ? { statedFinger } : {}),
+                ...(chordId ? { chordId } : {}),
+              };
+              pianoPerformanceNotes.push(performanceNote);
               pianoNotes.push({
+                id,
                 midi,
                 startSeconds,
                 endSeconds,
-                hand: (note.staff ?? 1) >= 2 ? 'left' : 'right',
+                hand: Number.isFinite(staff) && staff >= 2 ? 'left' : 'right',
               });
             }
           }
         }
       }
+      partIndex += 1;
     }
+    pianoPerformanceNotes.sort((a, b) => a.timeMs - b.timeMs);
     pianoNotes.sort((a, b) => a.startSeconds - b.startSeconds);
-    buildPianoFingering();
+    if (!getPianoHandPerformance(keyboardSpan())) buildPianoFingering();
   }
 
   /**
-   * Two hands on the keys, solved once for the whole piece.
-   *
-   * The engine works out which finger plays which note and where each
-   * hand sits over time (`planFingering`); the drawing then just reads
-   * that back at whatever second it is painting. Solved ONCE rather
-   * than per frame because the answer cannot change between frames --
-   * a hand that re-decided its fingering thirty times a second would
-   * twitch -- and because a frame has sixteen milliseconds to be drawn
-   * in.
+   * Legacy SVG fingering, solved once for the Falling Notes design.
+   * The Hands design instead uses Piano Hand Engine's staff-aware,
+   * geometry-based phrase solution from `getPianoHandPerformance()`.
    */
   let pianoFingering = null;
 
@@ -1662,13 +1742,15 @@
   const TALL_KEYBOARD_FRACTION = 0.5;
 
   function stageOptions(width, height, atSeconds) {
+    const size = keyboardSpan();
+    const handEngineData = pianoDesign() === 'hands' ? getPianoHandPerformance(size) : null;
     return {
-      size: keyboardSpan(),
+      size,
       width,
       height,
       ...(currentAspect() === '16x9' ? {} : { keyboardHeight: height * TALL_KEYBOARD_FRACTION }),
       seconds: stageSeconds(atSeconds),
-      notes: pianoNotes,
+      notes: handEngineData?.events ?? pianoNotes,
       gridLines,
       // Notes and grid come down OUT OF the frame: the fade is the
       // frame's own background colour, read from the frame itself, so
@@ -1677,11 +1759,9 @@
       leadSeconds: fallSeconds(),
       colors: stageColors(),
       design: pianoDesign(),
-      // The hands, when there is a piece for them to play. They take
-      // the same two colours as the falling notes, so the hand playing
-      // the amber notes is the amber-edged one. The engine ignores
-      // them in the Falling Notes design, so this is handed over
-      // either way rather than being guarded twice.
+      // Legacy SVG fingering remains available to the Falling Notes
+      // renderer. The Hands design overrides its note/finger events
+      // below with Piano Hand Engine results; skin textures stay natural.
       ...(pianoFingering
         ? {
             hands: {
@@ -1690,6 +1770,12 @@
               colors: PianoEngine.handColorsFor(stageColors()),
             },
             fingeredNotes: pianoFingering.notes,
+          }
+        : {}),
+      ...(handEngineData
+        ? {
+            handEngineData,
+            fingeredNotes: handEngineData.events,
           }
         : {}),
     };

@@ -88,32 +88,39 @@ real offsets go, and nothing else would change.
 
 ## How this fits the repository
 
-### Where the existing pipeline ends
+### Production connection
 
-`website/video-create/piano/index.html` → **`buildPianoNotes()`**. It
-walks the Notation Engine's parsed score, turns ticks into seconds
-through `playback.tempoMap`, and emits
+The integration point is `website/video-create/piano/index.html` →
+`buildPianoNotes()`. The adapter converts written MusicXML time to
+milliseconds and preserves stable note IDs, MIDI pitch, staff, voice,
+source part/track, stated `<fingering>`, and chord membership in
+`PerformanceNote[]`. Written time is retained so repeats line up with
+the same notation and audio cursor.
 
-```js
-{ midi, startSeconds, endSeconds, hand: (note.staff ?? 1) >= 2 ? 'left' : 'right' }
-```
+For the **Hands** design, the browser bundle
+`website/assets/piano-hand-engine.js` supplies the production renderer
+with:
 
-then hands that to `piano-engine`'s `planFingering`, which walks the
-notes in time order keeping a five-finger anchor per hand. That is a
-good greedy answer and it is not a search: it cannot look ahead, so it
-cannot plan a thumb-under three notes early, and it has no geometry — it
-counts white keys, not millimetres.
+- `splitHands()` decisions, using staff/track evidence and the engine's
+  hand-position inference instead of a fixed pitch split;
+- `solveFingering()` assignments for each hand across the phrase,
+  including stated MusicXML fingering;
+- `buildKeyboard()` / `keyPositionsFor()` physical key geometry and the
+  exact strike and approach point for each note;
+- `solveHandSkeleton()` static-pose fingertip offsets, which the 3D
+  renderer uses to place the assigned finger over its key;
+- `keyPressDepthMm()` key travel at the same written-time instant.
 
-### The integration point
+The 3D renderer builds its white and black keys from the same millimetre
+geometry, maps the key strike and hand targets into its scene, and uses
+the same `stageOptions()` data for the live preview and every exported
+frame. The browser bundle is regenerated with `npm run browser:build`
+from this package; `npm run verify` checks the package and refreshes that
+static-site artifact.
 
-**Exactly at `buildPianoNotes()`'s output.** It is the one place in the
-project where a score has become timed MIDI notes and nothing has been
-drawn yet. This engine takes `PerformanceNote[]` there and returns a
-solved timeline; `piano-engine` reads that back per frame instead of
-calling `planFingering`.
-
-Nothing else moves. The notation engine is untouched, `piano-engine`
-keeps drawing, and the two stay in step through one shared clock.
+The Notation Engine remains unchanged. The **Falling Notes** SVG design
+continues to use `piano-engine`; the **Hands** design now consumes this
+engine's physical keyboard, split, fingering, and static-pose data.
 
 ### What already exists, and what does not
 
@@ -125,14 +132,12 @@ millimetres, no depth, no black-key rise, and its black keys are a drawn
 0.62 × white in both width and length. The ranges and `isBlackKey` are
 the same arithmetic here; the physical model is new.
 
-**The metadata exists upstream and is thrown away at the boundary.**
-The Notation Engine's note carries `staff`, its voice, `<technical>
-<fingering>` (parsed since Integration W, never drawn), ties, and chord
-grouping. `buildPianoNotes` keeps pitch, time and a hand derived from
-the staff alone. So Module 2's evidence order — staff first, then stated
-fingering, then track, then inference — is implementable, but the
-adapter has to stop discarding. `PerformanceNote` is deliberately wider
-than `PianoNote` for exactly that reason.
+**Score evidence now reaches the hand engine.** The adapter passes staff,
+voice and source-part identity through to `PerformanceNote`, and converts
+valid MusicXML finger numbers 1–5 to `statedFinger`. It also assigns one
+shared `chordId` to chord members. This lets the built hand-split and
+fingering stages use the parsed evidence rather than recovering it from
+pitch or throwing it away at the drawing boundary.
 
 **MIDI velocity is not carried at all.** Nothing in the current path
 maps dynamics to a velocity, so `PerformanceNote.velocity` is optional
