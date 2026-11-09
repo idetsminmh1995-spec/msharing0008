@@ -36,7 +36,7 @@ class PianoHand3DRenderer {
     this.container = container;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x11151b);
-    this.camera = new THREE.PerspectiveCamera(28, 1, 0.01, 100);
+    this.camera = new THREE.PerspectiveCamera(22, 1, 0.01, 100);
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -47,6 +47,8 @@ class PianoHand3DRenderer {
     this.controls = null;
     this.keys = new Map();
     this.keyGroup = new THREE.Group();
+    // The prototype key bed needs more front-to-back presence in a wide video crop.
+    this.keyGroup.scale.z = 1.8;
     this.scene.add(this.keyGroup);
     this.hands = { right: null, left: null };
     this.handTemplate = null;
@@ -90,9 +92,9 @@ class PianoHand3DRenderer {
       // Player POV: the imported hand is laid over the keyboard so the
       // wrist enters from the player's side and the fingers point toward
       // the keys, instead of presenting a front-facing floating hand.
-      this.handTemplate.scale.setScalar(0.11);
+      this.handTemplate.scale.setScalar(0.13);
       this.handTemplate.rotation.set(-Math.PI / 2, 0.1, Math.PI + 0.08);
-      this.handTemplate.position.set(0, 0.92, 0.88);
+      this.handTemplate.position.set(0, 0.15, 1.5);
       this.handTemplate.traverse((object) => {
         if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; }
         if (object.isBone) {
@@ -113,8 +115,15 @@ class PianoHand3DRenderer {
   createHand(side, mirror) {
     const root = SkeletonUtils.clone(this.handTemplate);
     root.scale.x *= mirror ? -1 : 1;
+    // The source mesh's fingers point toward the player. Turn the whole
+    // hand around the world-up axis so wrists stay near the player and
+    // fingers reach forward onto the keys; X is reversed for both hands.
+    root.quaternion.premultiply(
+      new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI),
+    );
     root.position.x = mirror ? -1.35 : 1.35;
-    root.position.z = 0.88;
+    root.position.y = 0.15;
+    root.position.z = 1.5;
     root.userData.side = side;
     root.traverse((object) => {
       if (object.isMesh) {
@@ -159,10 +168,10 @@ class PianoHand3DRenderer {
       if (left === undefined || right === undefined) continue;
       this.addKey(midi, (left + right) / 2, true, whiteWidth, colors);
     }
-    // Sit behind the keyboard and look down toward the keys, like the
-    // performer seeing their own hands while playing.
-    this.camera.position.set(0, 3.55, Math.max(6.4, whiteMidi.length * 0.105));
-    this.camera.lookAt(0, 0.05, -0.10);
+    // Performer-side overhead view (~68 degrees above the key plane): the
+    // keys sit toward the far edge and the wrists enter from the near edge.
+    this.camera.position.set(0, 7.5, 3.5);
+    this.camera.lookAt(0, 0.05, 0.55);
   }
 
   addKey(midi, x, black, whiteWidth, colors) {
