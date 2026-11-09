@@ -165,7 +165,7 @@
      `inline-size` rather than `size`: the frame's width comes from the
      column it sits in, but its HEIGHT still comes from its contents and
      its aspect-ratio, and size containment would cut that off. */
-  .video-frame{position:relative;background:var(--near-black);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-width:0;container-type:inline-size;}
+  .video-frame{position:relative;background:var(--near-black);border-radius:calc(14 * 100cqw / 960);aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-width:0;container-type:inline-size;}
   /* Padding here lands the logo's INK, not its image box -- the
      negative margins on .video-logo-mark have already pulled the box
      onto the artwork, so the left padding IS the ink's left edge.
@@ -177,8 +177,8 @@
      That offset moves if the titles are resized -- which is correct,
      because the mark is meant to stay on the stat boxes' centreline
      rather than at a fixed height. */
-  .video-top{padding:4px 20px 0 15px;display:flex;justify-content:space-between;align-items:center;gap:16px;}
-  .video-logo-row{display:flex;align-items:center;gap:10px;min-width:0;}
+  .video-top{padding:calc(4 * 100cqw / 960) calc(20 * 100cqw / 960) 0 calc(15 * 100cqw / 960);display:flex;justify-content:space-between;align-items:center;gap:calc(16 * 100cqw / 960);}
+  .video-logo-row{display:flex;align-items:center;gap:calc(10 * 100cqw / 960);min-width:0;}
   /* The title block sits beside the logo, stacked: Title 1 over Title
      2. Both lines read their size and colour from CSS variables set on
      .video-frame, so card 2's controls change one property in one place
@@ -188,15 +188,15 @@
      element with no text, and CSS already knows that. A title that is
      only spaces is deliberately NOT empty -- someone indenting a title
      with spaces meant it. */
-  .video-titles{display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0;}
+  .video-titles{display:flex;flex-direction:column;justify-content:center;gap:calc(1 * 100cqw / 960);min-width:0;}
   .video-title{font-family:'Baloo 2','Sora',sans-serif;line-height:1.16;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .video-title:empty{display:none;}
-  .video-title-1{font-weight:700;font-size:var(--title1-size,32px);color:var(--title1-color,#fff);}
-  .video-title-2{font-weight:600;font-size:var(--title2-size,18px);color:var(--title2-color,#fff);}
-  .video-stats{display:flex;gap:8px;flex-shrink:0;}
-  .stat-box{border:1.5px solid var(--red);border-radius:8px;padding:4px 12px;text-align:center;min-width:52px;}
-  .stat-box .stat-label{color:#D8AE7A;font-size:8px;font-weight:700;letter-spacing:.05em;display:block;}
-  .stat-box .stat-value{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:16px;display:block;}
+  .video-title-1{font-weight:700;font-size:calc(var(--title1-num,32) * 100cqw / 960);color:var(--title1-color,#fff);}
+  .video-title-2{font-weight:600;font-size:calc(var(--title2-num,18) * 100cqw / 960);color:var(--title2-color,#fff);}
+  .video-stats{display:flex;gap:calc(8 * 100cqw / 960);flex-shrink:0;}
+  .stat-box{border:calc(1.5 * 100cqw / 960) solid var(--red);border-radius:calc(8 * 100cqw / 960);padding:calc(4 * 100cqw / 960) calc(12 * 100cqw / 960);text-align:center;min-width:calc(52 * 100cqw / 960);}
+  .stat-box .stat-label{color:#D8AE7A;font-size:calc(8 * 100cqw / 960);font-weight:700;letter-spacing:.05em;display:block;}
+  .stat-box .stat-value{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:calc(16 * 100cqw / 960);display:block;}
   /* The COUNT box ticks through the Beat Label while the count-in and
      the music play. The pulse is re-triggered by removing and re-adding
      the class, which needs a reflow between the two -- see `beat()`. */
@@ -225,19 +225,19 @@
      of 1414, both within half a percent of centre), so unlike the
      header mark this one needs no margin correction to sit in the
      middle of the frame. */
-  .drum-circle{height:150px;width:auto;display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,.45));}
+  .drum-circle{height:calc(150 * 100cqw / 960);width:auto;display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,.45));}
   .video-frame.style-white .drum-circle{filter:none;}
   /* The strip still SCROLLS -- the cursor drives `scrollLeft` to keep
      itself in view -- it just doesn't draw a scrollbar. The bar and its
      two arrows are browser chrome, and this strip is a preview of a
      VIDEO frame: nothing in the exported video has a scrollbar in it. */
-  .video-notation{padding:0 20px 14px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;flex-shrink:0;scrollbar-width:none;-ms-overflow-style:none;}
+  .video-notation{padding:0 calc(20 * 100cqw / 960) calc(14 * 100cqw / 960);overflow-x:auto;overflow-y:hidden;white-space:nowrap;min-width:0;max-width:100%;flex-shrink:0;scrollbar-width:none;-ms-overflow-style:none;}
   .video-notation::-webkit-scrollbar{display:none;width:0;height:0;}
   /* `--note-h` is set by the page once it has read the kit photo and
      knows how much room the music actually has above the drums; the
      value here is what each shape asks for when there is no photo to
      read, or when a cross-origin one cannot be measured. */
-  .video-notation svg{display:block;height:var(--note-h,170px);width:auto;max-width:none;}
+  .video-notation svg{display:block;height:var(--note-h,calc(170 * 100cqw / 960));width:auto;max-width:none;}
   /* The R2 hit images. Each is a FULL-FRAME overlay -- a stick or a
      limb drawn in position over the kit photo -- so they stack on the
      frame at its own size rather than being placed per-drum. They sit
@@ -290,7 +290,7 @@
      go wrong. Nothing is clipped -- everything outside the margin box
      is the blank part of the image. */
   .video-logo-mark{
-    --logo-h:104px;
+    --logo-h:calc(104 * 100cqw / 960);
     --logo-w:calc(var(--logo-h) * 1414 / 2000);
     height:var(--logo-h);width:auto;flex-shrink:0;
     margin-top:calc(var(--logo-h) * -329 / 2000);
@@ -1621,7 +1621,7 @@
     // of the asking size and no smaller, because a staff the size of
     // a postage stamp is not a reading of the music either.
     const wanted = Math.max(base * 0.75, Math.min(base, room));
-    videoFrame.style.setProperty('--note-h', `${wanted}px`);
+    videoFrame.style.setProperty('--note-h', `${((wanted * 100) / Math.max(1, frame.width)).toFixed(4)}cqw`);
   }
 
   // --- Human Sticking Engine -----------------------------------------
@@ -3766,6 +3766,7 @@
       width = even((CAPTURE_SHORT_SIDE / Math.min(exportFrame.width, exportFrame.height)) * exportFrame.width);
       scale = width / exportFrame.width;
       height = even(exportFrame.height * scale);
+      fitNotationToKit();
       genLabel.textContent = 'Checking export assets…';
       await ensureExportAssets();
       genLabel.textContent = 'Fetching the Thank You clip…';
