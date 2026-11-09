@@ -834,7 +834,9 @@
     }
     measurePreviewChrome();
     videoFrame.style.backgroundImage = '';
+    releaseAssetImage(kitBackgroundImage);
     kitBackgroundImage = null;
+    kitBackgroundReady = null;
     kitContentTop = null;
     // The shape decides what the notation is drawn WITH, so it has to
     // be drawn again -- after the classes above, which is what
@@ -842,7 +844,11 @@
     // measures what came out.
     redrawNotation();
     fitNotationToKit();
-    if (hitLayer) hitLayer.innerHTML = '';
+    if (hitLayer) {
+      for (const img of [...hitLayer.children]) releaseAssetImage(img);
+      hitLayer.innerHTML = '';
+      hitImageReady.clear();
+    }
     if (currentKit.path) {
       void loadKitPreview(currentKit.path);
     } else {
@@ -914,10 +920,167 @@
   let kitBackgroundImage = null;
   let kitBackgroundReady = null;
   const hitImageReady = new Map();
+  const assetObjectUrls = new Map();
+  const assetQueue = [];
+  let activeAssetLoads = 0;
+  const ASSET_CONCURRENCY = 6;
+  const ASSET_TIMEOUT_MS = 20_000;
+  const ASSET_GATE_TIMEOUT_MS = 120_000;
+
+  function releaseAssetImage(img) {
+    const objectUrl = assetObjectUrls.get(img);
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+      assetObjectUrls.delete(img);
+    }
+    if (img) img.removeAttribute('src');
+  }
+
+  function revokeAssetObjectUrlsAfterRender() {
+    for (const [img, objectUrl] of assetObjectUrls) {
+      URL.revokeObjectURL(objectUrl);
+      assetObjectUrls.delete(img);
+    }
+  }
+
+  function releaseAssetQueue() {
+    while (assetQueue.length > 0) {
+      const queued = assetQueue.shift();
+      queued.reject(new Error('Asset gate was cancelled before this asset started.'));
+    }
+  }
+
+  function takeAssetSlot() {
+    if (activeAssetLoads < ASSET_CONCURRENCY) {
+      activeAssetLoads += 1;
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => assetQueue.push({ resolve, reject }));
+  }
+
+  function releaseAssetSlot() {
+    activeAssetLoads = Math.max(0, activeAssetLoads - 1);
+    const next = assetQueue.shift();
+    if (next) {
+      activeAssetLoads += 1;
+      next.resolve();
+    }
+  }
+
+  function assetDelay(attempt) {
+    const base = [500, 1500, 4000][Math.min(attempt, 2)];
+    return base + Math.floor(Math.random() * 250);
+  }
+
+  function isRetryableAssetError(err) {
+    return err?.retryable === true;
+  }
+
+  async function fetchAssetBlob(url, label, gateSignal) {
+    let lastError = null;
+    for (let attempt = 0; attempt <= 3; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ASSET_TIMEOUT_MS);
+      const abortFromGate = () => controller.abort();
+      gateSignal?.addEventListener('abort', abortFromGate, { once: true });
+      try {
+        const separator = url.includes('?') ? '&' : '?';
+        const response = await fetch(`${url}${separator}assetAttempt=${attempt}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          const err = new Error(`${label} returned HTTP ${response.status}.`);
+          err.status = response.status;
+          err.retryable = response.status === 429 || response.status >= 500;
+          throw err;
+        }
+        const blob = await response.blob();
+        if (blob.size === 0) throw new Error(`${label} returned an empty response.`);
+        return blob;
+      } catch (err) {
+        lastError = err?.name === 'AbortError'
+          ? Object.assign(new Error(`${label} timed out after ${ASSET_TIMEOUT_MS / 1000}s.`), { retryable: true })
+          : err;
+        if (gateSignal?.aborted) throw new Error(`Asset gate timed out while loading ${label}.`);
+        if (!isRetryableAssetError(lastError) || attempt === 3) throw lastError;
+        await new Promise((resolve) => setTimeout(resolve, assetDelay(attempt)));
+      } finally {
+        clearTimeout(timer);
+        gateSignal?.removeEventListener('abort', abortFromGate);
+      }
+    }
+    throw lastError ?? new Error(`Could not load ${label}.`);
+  }
+
+  async function fetchAssetJson(url, label) {
+    const blob = await fetchAssetBlob(url, label);
+    try {
+      return JSON.parse(await blob.text());
+    } catch (err) {
+      throw new Error(`${label} returned invalid JSON. ${err?.message ?? err}`);
+    }
+  }
+
+  async function loadAssetImage(url, img, label, gateSignal) {
+    await takeAssetSlot();
+    try {
+      let lastError = null;
+      for (let decodeAttempt = 0; decodeAttempt < 2; decodeAttempt++) {
+        let objectUrl = null;
+        try {
+          const blob = await fetchAssetBlob(url, label, gateSignal);
+          objectUrl = URL.createObjectURL(blob);
+          img.src = objectUrl;
+          await img.decode();
+          if (!(img.naturalWidth > 0) || !(img.naturalHeight > 0)) {
+            throw new Error(`${label} decoded to an empty image.`);
+          }
+          const previous = assetObjectUrls.get(img);
+          if (previous) URL.revokeObjectURL(previous);
+          assetObjectUrls.set(img, objectUrl);
+          return img;
+        } catch (err) {
+          lastError = err;
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          img.removeAttribute('src');
+          if (decodeAttempt === 0 && !err?.status) continue;
+          throw new Error(`${label} could not be decoded. ${err?.message ?? err}`);
+        }
+      }
+      throw lastError ?? new Error(`${label} could not be decoded.`);
+    } finally {
+      releaseAssetSlot();
+    }
+  }
+
+  async function withAssetGateTimeout(work) {
+    const controller = new AbortController();
+    let timer;
+    try {
+      return await Promise.race([
+        work(controller.signal),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            controller.abort();
+            reject(new Error(`Asset gate exceeded ${ASSET_GATE_TIMEOUT_MS / 1000}s.`));
+          }, ASSET_GATE_TIMEOUT_MS);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+      controller.abort();
+      releaseAssetQueue();
+    }
+  }
 
   function waitForImage(img, label) {
     if (img.complete && img.naturalWidth > 0) return Promise.resolve(img);
     return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error(`${label} timed out after ${ASSET_TIMEOUT_MS / 1000}s.`));
+      }, ASSET_TIMEOUT_MS);
       const onLoad = () => {
         cleanup();
         resolve(img);
@@ -927,6 +1090,7 @@
         reject(new Error(`Could not load ${label}.`));
       };
       const cleanup = () => {
+        clearTimeout(timeout);
         img.removeEventListener('load', onLoad);
         img.removeEventListener('error', onError);
       };
@@ -942,11 +1106,10 @@
   async function loadKitPreview(kitPath) {
     const label = kitLabel(kitPath);
     try {
-      const res = await fetch(
+      const manifest = await fetchAssetJson(
         `${API_BASE}/api/drum-sets/${kitUrlPath(kitPath)}/${currentAspect()}/manifest`,
+        `the ${label} kit manifest`,
       );
-      if (!res.ok) throw new Error(`manifest request failed (${res.status})`);
-      const manifest = await res.json();
       currentKit = { path: kitPath, label, files: new Set(manifest.files ?? []) };
       // Rebuild against THIS kit's files. Which strokes have a photo is
       // a property of the kit, not of the score, so switching kits has
@@ -954,16 +1117,19 @@
       renderSticking();
       if (manifest.hasBackground) {
         const imgUrl = `${API_BASE}/assets/${kitUrlPath(kitPath)}/${currentAspect()}/${encodeURIComponent(manifest.backgroundFile)}`;
-        videoFrame.style.backgroundImage = `url("${imgUrl}")`;
-        videoFrame.style.backgroundSize = 'cover';
-        videoFrame.style.backgroundPosition = 'center';
+        releaseAssetImage(kitBackgroundImage);
         const bg = new Image();
-        bg.crossOrigin = 'anonymous';
-        bg.src = imgUrl;
         kitBackgroundImage = bg;
-        kitBackgroundReady = waitForImage(bg, `the ${label} kit background`)
+        kitBackgroundReady = loadAssetImage(imgUrl, bg, `the ${label} kit background`)
           .then(() => {
-            if (kitBackgroundImage !== bg) return bg;
+            if (kitBackgroundImage !== bg) {
+              releaseAssetImage(bg);
+              return bg;
+            }
+            const objectUrl = assetObjectUrls.get(bg);
+            videoFrame.style.backgroundImage = objectUrl ? `url("${objectUrl}")` : '';
+            videoFrame.style.backgroundSize = 'cover';
+            videoFrame.style.backgroundPosition = 'center';
             kitContentTop = measureKitTop(bg);
             fitNotationToKit();
             return bg;
@@ -981,13 +1147,20 @@
         await kitBackgroundReady;
         setKitStatus(`\u2713 Loaded "${label}" background + ${manifest.files.length} note images from R2.`, true);
       } else {
+        releaseAssetImage(kitBackgroundImage);
+        kitBackgroundImage = null;
         kitBackgroundReady = null;
         setKitStatus(`"${label}" has no background image for ${currentAspect()} yet.`, false);
       }
     } catch (err) {
       console.error('Drum kit preview failed to load:', err);
+      const reason =
+        err?.status === 404 || err?.status === 403
+          ? ` ${err.message} Check that the kit file exists and the Worker allows this origin.`
+          : ` ${err?.message ?? err}`;
       setKitStatus(
         `Could not load "${label}" from the asset server.` +
+          reason +
           (legacyKitServer
             ? ' The asset server is still the older version: it lists one folder level,' +
               ' so it offers drums/{Brand}/ as a kit and finds no photos inside. Deploy the' +
@@ -1815,12 +1988,13 @@
    * 120bpm is four images a second, and a browser will not keep up with
    * that by URL alone.
    */
-  function preloadHitImages() {
+  function preloadHitImages(gateSignal) {
     if (!hitLayer) return;
     const wanted = new Set(hitTimeline.map((h) => h.file));
     for (const img of [...hitLayer.children]) {
       if (!wanted.has(img.dataset.file)) {
         hitImageReady.delete(img.dataset.file);
+        releaseAssetImage(img);
         img.remove();
       }
     }
@@ -1833,9 +2007,8 @@
       // Fetched with CORS so the recorder can draw it: a photo pulled
       // without it still SHOWS, but taints the capture canvas.
       img.crossOrigin = 'anonymous';
-      const ready = waitForImage(img, `hit image ${file}`);
+      const ready = loadAssetImage(hitImageUrl(file), img, `hit image ${file}`, gateSignal);
       hitImageReady.set(file, ready);
-      img.src = hitImageUrl(file);
       hitLayer.appendChild(img);
     }
   }
@@ -3411,7 +3584,7 @@
     }
   }
 
-  async function ensureExportAssets() {
+  async function ensureExportAssets(gateSignal) {
     const warnings = [];
     if (!kitBackgroundImage || !kitBackgroundReady) {
       throw new Error('The drum-kit background is not ready. Choose a kit and wait for it to finish loading.');
@@ -3433,8 +3606,16 @@
     } catch (err) {
       throw new Error(`A required logo/stick asset is not ready. ${err?.message ?? err}`);
     }
-    preloadHitImages();
+    preloadHitImages(gateSignal);
     await ensureHitImagesReady();
+    const backgroundRatio = kitBackgroundImage.naturalWidth / kitBackgroundImage.naturalHeight;
+    const aspectMismatches = [...hitLayer.children]
+      .filter((img) => img.naturalWidth > 0 && img.naturalHeight > 0)
+      .filter((img) => Math.abs(img.naturalWidth / img.naturalHeight - backgroundRatio) > 0.02)
+      .map((img) => img.dataset.file);
+    if (aspectMismatches.length > 0) {
+      warnings.push(`Hit-image aspect differs from the kit background: ${aspectMismatches.join(', ')}. Overlay alignment may not match.`);
+    }
     await refreshNotationImage();
     if (!notationImage) throw new Error('MusicXML notation is not ready for export.');
 
@@ -3810,7 +3991,7 @@
       height = even(exportFrame.height * scale);
       fitNotationToKit();
       genLabel.textContent = 'Checking export assets…';
-      const assetReport = await ensureExportAssets();
+      const assetReport = await withAssetGateTimeout((gateSignal) => ensureExportAssets(gateSignal));
       exportWarnings.push(...assetReport.warnings);
       genLabel.textContent = 'Fetching the Thank You clip…';
       let outro = null;
@@ -3928,6 +4109,7 @@
       setUploadConfirm(`Rendering stopped: ${err && err.message ? err.message : err}`, false);
     } finally {
       if (exportFrame) exportFrame.release();
+      revokeAssetObjectUrlsAfterRender();
     }
   }
 
