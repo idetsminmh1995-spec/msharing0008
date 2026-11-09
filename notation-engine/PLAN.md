@@ -2223,8 +2223,15 @@ interface NotationEvent {
   noteIds: readonly string[];
   midiNotes?: readonly number[];    // present when MIDI alignment ran (§13)
   measureNumber: number;
+  partId: string;                  // stable MusicXML part ID
 }
+interface PlaybackTrack { id: string; name?: string }
+interface PlaybackData { tracks: readonly PlaybackTrack[] }
+
 getEventStream(): readonly NotationEvent[]   // sorted by tick
+getTrackEventStream(playback: PlaybackData, partId: string): readonly NotationEvent[]
+// Part-filtered stream; unknown partId returns an empty array. Existing
+// score-wide consumers can continue using getEventStream() unchanged.
 ```
 
 ### 17.2 Cursor
@@ -2706,3 +2713,83 @@ documents; §19 tracks the remaining gaps.
 - When a phase completes, update its row in §22 and, if the module's
   specification changed during implementation, update its section in §6–§17
   to match what was actually built.
+
+
+## 24. Repository-wide implementation register (audit: 2026-11-09)
+
+This section records implemented sibling components in this repository that
+were not represented in this notation-engine plan or in another applicable
+plan. It does not replace the component READMEs, detailed phase records, or
+area plans linked below. The repository has no root `Plan.md`; this existing
+file remains the master plan being updated. Keep the boundaries explicit:
+notation-engine renders notation; sibling engines and website pages consume or
+produce other data and visuals.
+
+### 24.1 Shipped sibling components not yet covered by an applicable plan
+
+| Component | Implemented scope to preserve in planning | Evidence / plan action |
+|---|---|---|
+| `midi-parser-module` | Parses MIDI note events, tempo and time-signature changes into seconds-based notes and metadata; rejects empty/invalid and over-duration files; builds a deterministic animation timeline with independent R/L alternation per MIDI pitch and simultaneous-event grouping. | `midi-parser-module/src/`; README. Record the parser/timeline contract and acceptance fixtures in an app-level plan. Add assertions for malformed/oversized input and event grouping; current package has a demo but no tracked unit-test suite. |
+| `cloudflare-worker` | R2 read-only proxy with drum-set discovery, manifest and asset routes, shared-asset reads, pagination, CORS, cache validators, JSON errors and missing-object handling. The checked-in source lists immediate `drums/` prefixes and returns `{ drumSets }`; it does not implement the nested `{ kits, drumSets }` route contract described by its README. | `cloudflare-worker/src/index.ts`, `README.md`, `wrangler.toml`. Specify the actual route/response contract and reconcile source, README and deployment instructions; add route tests, malformed-URL handling, and explicit disallowed-origin behavior. Do not treat README-only route claims as implemented. |
+| `guitar-engine` | Renderer/geometry layer for measured string/fret coordinates and instrument profiles; time-varying note/finger overlays, slides, finger colors, fret labels, hand artwork/legend and picking marks; renderer-neutral ordered shapes plus deterministic SVG output. It consumes supplied note positions and does not assign fingerings or parse MIDI/MusicXML. | `guitar-engine/src/`, README and tests. Extend the guitar-fingering plan or its integration section with this separate measured-instrument renderer contract, its source-coordinate requirements and presentation features. |
+| `metronome-engine` | Pure frame-state-to-SVG/browser-bundle API with 11 visual designs, three aspect ratios (16:9, 9:16, 1:1), per-design palettes/metadata, shared title/logo/readout layout, and caller-supplied timing state. | `metronome-engine/src/`, README and tests. Add an area plan covering its API and page integration. Follow up on non-finite numeric inputs and SVG escaping of logo URLs. |
+| `piano-engine` | Falling-note visualization for 61/73/76/88-key layouts, caller-supplied beat grid and note timing, active-key/highlight rendering, plus an alternate hand-artwork/fingering view. Exposes a shared shape-list/SVG rendering boundary for downstream canvas/video use. Fingering is heuristic and does not parse score/MIDI or encode audio/video. | `piano-engine/src/`, README and tests. Add an area plan for the two designs, input contract, rendering boundary, supported key spans and explicitly heuristic limitations. |
+| `piano-hand-engine` | Phase-1-to-3 foundations: physical keyboard geometry, event timeline and seeking, parametric five-finger hand poses/kinematics, hand assignment, hand-span constraints, and scored Viterbi/beam-search fingering with infeasible-note reporting. Input notes and metadata are supplied by callers. | `piano-hand-engine/src/`, README and tests. Add an area plan that marks these foundations as implemented and phases 4–11 as deferred; do not imply an integrated MIDI/MusicXML-to-motion pipeline, wrist trajectory, inverse kinematics, renderer, or two-hand motion planner exists. |
+| `web-preview` | Browser app combines MusicXML/MXL import, notation-engine diagnostics, Bravura-font embedding, synchronized notation-system cropping and canvas composition with MIDI position/timing and video rendering. The reusable SVG geometry/font helper has focused Node tests. | `web-preview/canvas-preview.html`, `notation-overlay.js`, tests. Add the concrete notation-to-preview/video integration contract and browser-level acceptance coverage; the root README's description is stale relative to this implementation. |
+| `website` | Static home/instrument hub and instrument-specific video-create pages connect upload/preview/render/download flows to shared browser engines; shared assets include R2 image retry/decode handling and voice-sample loading. Website tests cover image loader, voice samples and video-engine cleanup. | `website/`, `docs/VIDEO-ENGINE.md`. Add a website integration/status map. Separate working video-create flows from placeholder storefront commerce; reconcile `website/README.md`, root README and Wrangler deployment instructions. |
+| `tools` | `stamp-assets.mjs` synchronizes in-site bundle hash query parameters and offers non-writing `--check`; video tests cover MP4 structure/timing/stream copying, and a Chromium WebCodecs smoke test validates an encoded MP4 with ffprobe. | `tools/`, `docs/VIDEO-ENGINE.md`. Add the stamp/check step to the developer release workflow and define when browser smoke tests run. At audit time `node tools/stamp-assets.mjs --check` reported 24 stale references on six website pages. |
+
+### 24.2 Existing plans that need synchronization rather than duplicate feature entries
+
+- Drum's Python reference and TypeScript port, 40-rule pipeline, deterministic
+  parity strategy, and known limitations are already described in
+  `Drum/INTEGRATION-PLAN.md`, `Drum/sticking-engine-ts/PORT.md`, and related
+  rule documents; no additional shipped feature was found to be absent from
+  those plans. Reconcile the integration page-stage wording with the later
+  timestamped-image bridge and preserve the listed parity/verification limits.
+- Guitar and bass fingering work is already described in
+  `docs/finger-engine/GUITAR_FINGER_ENGINE_PLAN.md` and
+  `docs/finger-engine/BASS_FINGER_ENGINE_PLAN.md`. Synchronize their `DRAFT`
+  statuses/changelogs with the shipped guitar Phase 0/1 and bass B0 code; keep
+  advanced guitar techniques and bass `analyzeBass` marked as not shipped.
+- Video-engine implementation and its remaining streaming/browser work are
+  already tracked in `docs/VIDEO-ENGINE.md` and
+  `docs/VIDEO-ENGINE-STREAMING-MUXER.md`; retain that distinction. The current
+  muxer copies a completed seekable MP4 incrementally and is not true
+  fragment-at-a-time streaming.
+
+### 24.3 Notation playback-track contract added to §17.1
+
+The §17.1 API now includes the implemented multi-track playback surface:
+`PlaybackData.tracks`, `NotationEvent.partId`, and
+`getTrackEventStream(playback, partId)`, alongside the score-wide
+`getEventStream()`. The contract and behavior are recorded in
+`Doc/playback-track-streams.md` and covered by multi-part playback tests. This
+is a data/API layer only; it does not add audio mixing, mute, solo, volume or
+transposition controls.
+
+### 24.4 Repository-wide audit findings and validation limits
+
+- There is no root `Plan.md`; this section is deliberately added to the existing
+  notation-engine master plan rather than creating another plan file. The
+  sibling-area actions above are concise plan entries/pointers, not a claim
+  that this notation engine owns those components.
+- Root `README.md` is still primarily a Drum MIDI application overview and
+  omits multiple implemented sibling packages. `website/README.md` describes
+  the site as a mockup despite interactive video-create pages, and
+  `cloudflare-worker/README.md` differs from the checked-in Worker route
+  implementation. Update these documents alongside the corresponding plan
+  work so documented behavior is not mistaken for shipped behavior.
+- Read-only validation during this audit produced mixed results: Node suites
+  passed for `guitar-engine` (37), `metronome-engine` (20), `piano-engine`
+  (73), `web-preview/notation-overlay` (5), `website` (9), and the video
+  muxer (15). Other verification was blocked by unavailable dependencies or
+  incompatible toolchain settings: missing `eslint`/`fflate`/`tsx`/`mido`, or
+  TypeScript config diagnostics. These are audit-environment observations,
+  not blanket claims that the source is failing or passing; run each package's
+  documented clean verification after installing its locked dependencies.
+- Follow-up acceptance should include automated route tests for the Worker,
+  module-specific plans and contract tests for the standalone MIDI/metronome/
+  piano engines, a browser integration test for web-preview and instrument
+  pages, synchronization of generated bundle URL stamps, and a repository
+  README/index that accurately maps packages to their plans and test commands.
