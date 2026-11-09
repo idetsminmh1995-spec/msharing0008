@@ -82,6 +82,13 @@ The asset is CC BY-NC 4.0, so it is suitable for non-commercial evaluation
 only until replaced by a compatible asset or an original model. Full source,
 license, and attribution details live in `website/assets/hand/README.md`.
 
+The first piano mapping slice is also live in the demo. It creates named
+procedural key meshes, maps MIDI 60/62/64/65/67 to C4/D4/E4/F4/G4, moves the
+hand to the selected target, curls the corresponding thumb/index/middle/ring/
+little finger chain, and animates the key press/release. This is a mapping
+prototype; the production piano GLB and calibrated inverse-kinematics solver
+still remain future work.
+
 ## Migration phases
 
 1. Freeze and identify the renderer-independent keyboard, timing, and

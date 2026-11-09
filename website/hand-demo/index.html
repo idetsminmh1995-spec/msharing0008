@@ -3,58 +3,65 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Rigged Human Hand — Blender / Three.js Test</title>
+  <title>Rigged Human Hand — Piano Key Mapping</title>
   <style>
     :root { color-scheme: dark; font-family: system-ui, sans-serif; }
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; background: #11151b; color: #eaf0f7; }
-    main { display: grid; grid-template-columns: minmax(0, 1fr) 310px; min-height: 100vh; }
-    #stage { position: relative; min-height: 620px; background: radial-gradient(circle at 50% 42%, #293241, #101318 70%); }
-    canvas { display: block; width: 100%; height: 100%; min-height: 620px; }
-    aside { padding: 22px; border-left: 1px solid #2a3441; background: #171c23; }
+    main { display: grid; grid-template-columns: minmax(0, 1fr) 330px; min-height: 100vh; }
+    #stage { position: relative; min-height: 670px; background: radial-gradient(circle at 50% 42%, #293241, #101318 70%); }
+    canvas { display: block; width: 100%; height: 100%; min-height: 670px; }
+    aside { padding: 20px; border-left: 1px solid #2a3441; background: #171c23; overflow: auto; }
     h1 { margin: 0 0 8px; font-size: 21px; }
     p { color: #aeb9c8; line-height: 1.5; font-size: 14px; }
-    .group { margin: 20px 0; }
+    .group { margin: 18px 0; }
     .group-title { margin-bottom: 8px; color: #7ed6ff; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
-    button { margin: 0 6px 8px 0; padding: 9px 11px; border: 1px solid #415166; border-radius: 7px; color: #edf5ff; background: #263244; cursor: pointer; }
+    button { margin: 0 5px 7px 0; padding: 8px 10px; border: 1px solid #415166; border-radius: 7px; color: #edf5ff; background: #263244; cursor: pointer; }
     button:hover { background: #33445c; }
     button.active { border-color: #70d3ff; background: #1d637c; }
-    #status { padding: 10px; border-radius: 7px; background: #10151b; color: #aeb9c8; font: 12px/1.5 ui-monospace, monospace; white-space: pre-wrap; }
-    #bones { max-height: 205px; overflow: auto; padding: 10px; border-radius: 7px; background: #10151b; color: #9daabd; font: 11px/1.55 ui-monospace, monospace; }
+    #status, #mapping, #bones { padding: 9px; border-radius: 7px; background: #10151b; color: #aeb9c8; font: 11px/1.5 ui-monospace, monospace; white-space: pre-wrap; }
+    #bones { max-height: 150px; overflow: auto; color: #9daabd; }
     .credit { position: absolute; left: 14px; bottom: 12px; padding: 7px 9px; border-radius: 5px; background: #10151bcc; color: #b8c5d4; font-size: 11px; }
+    .hint { color: #91a0b2; font-size: 12px; }
     a { color: #83d8ff; }
-    @media (max-width: 800px) { main { grid-template-columns: 1fr; } aside { border-left: 0; border-top: 1px solid #2a3441; } }
+    @media (max-width: 850px) { main { grid-template-columns: 1fr; } aside { border-left: 0; border-top: 1px solid #2a3441; } }
   </style>
 </head>
 <body>
 <main>
   <section id="stage">
-    <div class="credit">CC BY-NC 4.0 model · Three.js GLB test</div>
+    <div class="credit">CC BY-NC 4.0 model · Three.js · Piano mapping prototype</div>
   </section>
   <aside>
-    <h1>Rigged human hand</h1>
-    <p>This test loads the Blender model, its skin, 21-bone armature, and embedded animation clips. Drag to orbit; scroll to zoom.</p>
+    <h1>Hand → piano key mapping</h1>
+    <p>The hand is positioned over a procedural piano keyboard. Each mapped MIDI note selects a key, moves the hand target, curls the assigned finger chain, and animates the key down.</p>
+
+    <div class="group">
+      <div class="group-title">Play the mapped keys</div>
+      <p class="hint">Click a key in the scene or use A W S E D F T G Y H U J.</p>
+      <button data-note="60">C4 / A</button>
+      <button data-note="62">D4 / S</button>
+      <button data-note="64">E4 / D</button>
+      <button data-note="65">F4 / F</button>
+      <button data-note="67">G4 / G</button>
+      <button id="release">Release all</button>
+    </div>
 
     <div class="group">
       <div class="group-title">Embedded poses</div>
       <button data-clip="neutral">Neutral</button>
       <button data-clip="Pose_OK">OK gesture</button>
       <button data-clip="RigAction">Rig action</button>
-      <button id="stop">Stop</button>
     </div>
 
     <div class="group">
-      <div class="group-title">Direct bone test</div>
-      <button id="curl">Curl index finger</button>
-      <button id="uncurl">Release index finger</button>
-      <button id="reset">Reset pose</button>
+      <div class="group-title">Current mapping</div>
+      <div id="mapping">Waiting for model…</div>
     </div>
-
     <div class="group">
       <div class="group-title">Load status</div>
       <div id="status">Loading hand_model.glb…</div>
     </div>
-
     <div class="group">
       <div class="group-title">Armature bones</div>
       <pre id="bones">Waiting for model…</pre>
@@ -76,49 +83,66 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const stage = document.querySelector('#stage');
 const status = document.querySelector('#status');
+const mappingOutput = document.querySelector('#mapping');
 const bonesOutput = document.querySelector('#bones');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x11151b);
 
-const camera = new THREE.PerspectiveCamera(32, 1, 0.01, 100);
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+const camera = new THREE.PerspectiveCamera(31, 1, 0.01, 100);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 stage.appendChild(renderer.domElement);
-
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.target.set(0, 0.1, 0);
+controls.target.set(0, -0.1, 0);
 
-scene.add(new THREE.HemisphereLight(0xe8f3ff, 0x26303b, 2.2));
-const key = new THREE.DirectionalLight(0xffffff, 3.2);
-key.position.set(3, 5, 4);
-key.castShadow = true;
-scene.add(key);
-const rim = new THREE.DirectionalLight(0x6cb9ff, 1.4);
+scene.add(new THREE.HemisphereLight(0xe8f3ff, 0x26303b, 2.3));
+const keyLight = new THREE.DirectionalLight(0xffffff, 3.4);
+keyLight.position.set(3, 5, 4);
+keyLight.castShadow = true;
+scene.add(keyLight);
+const rim = new THREE.DirectionalLight(0x6cb9ff, 1.5);
 rim.position.set(-4, 2, -3);
 scene.add(rim);
-
 const floor = new THREE.Mesh(
-  new THREE.CircleGeometry(3, 64),
+  new THREE.CircleGeometry(4, 64),
   new THREE.MeshStandardMaterial({ color: 0x1a222d, roughness: 0.82, metalness: 0.05 })
 );
 floor.rotation.x = -Math.PI / 2;
-floor.position.y = -1.3;
+floor.position.y = -1.65;
 floor.receiveShadow = true;
 scene.add(floor);
 
-let root;
+const WHITE_MIDI = [60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81];
+const BLACK_MIDI = [61, 63, 66, 68, 70, 73, 75, 78, 80];
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const KEYBOARD_Y = -1.35;
+const KEY_WIDTH = 0.34;
+const fingerMap = new Map([
+  [60, { finger: 'thumb', restX: -0.52, bones: ['thumb_trapez', 'thumb_meta', 'thumb_prox', 'thumb_dist'] }],
+  [62, { finger: 'index', restX: -0.18, bones: ['index_meta', 'index_prox', 'index_midd', 'index_dist'] }],
+  [64, { finger: 'middle', restX: 0.08, bones: ['midd_meta', 'midd_prox', 'midd_midd', 'midd_dist'] }],
+  [65, { finger: 'ring', restX: 0.34, bones: ['ring_meta', 'ring_prox', 'ring_midd', 'ring_dist'] }],
+  [67, { finger: 'little', restX: 0.60, bones: ['pinky_meta', 'pinky_prox', 'pinky_midd', 'pinky_dist'] }],
+]);
+const computerMap = new Map([['a', 60], ['w', 61], ['s', 62], ['e', 63], ['d', 64], ['f', 65], ['t', 66], ['g', 67], ['y', 68], ['h', 69], ['u', 70], ['j', 71]]);
+const pianoKeys = new Map();
+const activeNotes = new Map();
+const handGroup = new THREE.Group();
+scene.add(handGroup);
+let handRoot;
 let mixer;
 let clips = [];
-let initialQuaternions = new Map();
 let boneMap = new Map();
-let activeAction;
+let initialQuaternions = new Map();
+let neutralX = 0;
+let targetHandX = 0;
 
 function resize() {
   const width = stage.clientWidth;
-  const height = Math.max(stage.clientHeight, 620);
+  const height = Math.max(stage.clientHeight, 670);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height, false);
@@ -126,93 +150,174 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
-function fitCamera(object) {
-  const box = new THREE.Box3().setFromObject(object);
+function noteName(midi) {
+  return `${NOTE_NAMES[midi % 12]}${Math.floor(midi / 12) - 1}`;
+}
+function makeKey(midi, x, isBlack) {
+  const geometry = new THREE.BoxGeometry(isBlack ? KEY_WIDTH * 0.58 : KEY_WIDTH * 0.94, isBlack ? 0.25 : 0.18, isBlack ? 0.92 : 1.48);
+  const material = new THREE.MeshStandardMaterial({ color: isBlack ? 0x151a21 : 0xe9edf2, roughness: 0.32, metalness: 0.08 });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.set(x, KEYBOARD_Y, isBlack ? -0.18 : 0);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData = { midi, baseY: KEYBOARD_Y, press: 0, isBlack, baseColor: material.color.clone() };
+  mesh.name = `key_${midi}_${noteName(midi)}`;
+  pianoKeys.set(midi, mesh);
+  scene.add(mesh);
+  return mesh;
+}
+
+function createKeyboard() {
+  const startX = -(WHITE_MIDI.length - 1) * KEY_WIDTH / 2;
+  WHITE_MIDI.forEach((midi, index) => makeKey(midi, startX + index * KEY_WIDTH, false));
+  const blackAfterWhite = new Map([[61, 0], [63, 1], [66, 3], [68, 4], [70, 5], [73, 7], [75, 8], [78, 10], [80, 11]]);
+  blackAfterWhite.forEach((whiteIndex, midi) => makeKey(midi, startX + (whiteIndex + 0.5) * KEY_WIDTH, true));
+}
+createKeyboard();
+
+function fitCamera() {
+  const box = new THREE.Box3().setFromObject(scene);
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
-  const radius = Math.max(size.x, size.y, size.z) * 0.62;
-  camera.position.set(center.x + radius * 0.55, center.y + radius * 0.38, center.z + radius * 2.8);
+  const radius = Math.max(size.x, size.y, size.z) * 0.55;
+  camera.position.set(center.x, center.y + radius * 0.18, center.z + radius * 2.85);
   camera.near = Math.max(radius / 100, 0.001);
   camera.far = radius * 20;
   camera.updateProjectionMatrix();
-  controls.target.copy(center);
-  controls.target.y -= size.y * 0.04;
+  controls.target.set(center.x, center.y - 0.12, center.z);
   controls.update();
 }
 
-function stopActions() {
-  if (!mixer) return;
-  mixer.stopAllAction();
-  activeAction = undefined;
-  document.querySelectorAll('[data-clip]').forEach((button) => button.classList.remove('active'));
-}
-
-function playClip(name) {
-  if (name === 'neutral') {
-    stopActions();
-    if (root) root.rotation.set(0, 0, 0);
-    status.textContent = `Neutral pose\nBones: ${boneMap.size}\nAnimations: ${clips.map((clip) => clip.name).join(', ') || 'none'}`;
-    return;
-  }
-  const clip = clips.find((item) => item.name === name);
-  if (!clip) return;
-  stopActions();
-  activeAction = mixer.clipAction(clip);
-  activeAction.reset().setLoop(THREE.LoopRepeat, Infinity).fadeIn(0.25).play();
-  document.querySelector(`[data-clip="${CSS.escape(name)}"]`)?.classList.add('active');
-  status.textContent = `Playing ${name}\nBones: ${boneMap.size}\nDuration: ${clip.duration.toFixed(2)}s`;
-}
-
-document.querySelectorAll('[data-clip]').forEach((button) => {
-  button.addEventListener('click', () => playClip(button.dataset.clip));
-});
-document.querySelector('#stop').addEventListener('click', () => { stopActions(); status.textContent = 'Animation stopped; current pose is preserved.'; });
-document.querySelector('#reset').addEventListener('click', () => {
-  stopActions();
+function resetBones() {
   boneMap.forEach((bone, name) => {
     const initial = initialQuaternions.get(name);
     if (initial) bone.quaternion.copy(initial);
   });
-  status.textContent = 'All bones reset to the imported neutral pose.';
-});
-document.querySelector('#curl').addEventListener('click', () => {
-  stopActions();
-  ['index_meta', 'index_prox', 'index_midd', 'index_dist'].forEach((name, index) => {
+}
+function stopClips() {
+  if (mixer) mixer.stopAllAction();
+}
+function setFingerPose(info, pressed) {
+  if (!info) return;
+  info.bones.forEach((name, index) => {
     const bone = boneMap.get(name);
-    if (bone) bone.rotation.x = -(0.35 + index * 0.08);
+    if (!bone) return;
+    const initial = initialQuaternions.get(name);
+    if (initial) bone.quaternion.copy(initial);
+    if (pressed) bone.rotation.x = -(0.23 + index * 0.075);
   });
-  status.textContent = 'Direct bone test: index finger curled for a piano-key target.';
+}
+function updateMappingStatus(midi, info) {
+  const key = pianoKeys.get(midi);
+  const keyText = key ? key.name : 'not in keyboard';
+  mappingOutput.textContent = `MIDI ${midi} (${noteName(midi)})\n` +
+    `→ ${keyText}\n` +
+    `→ ${info ? `${info.finger} finger` : 'no finger assigned'}\n` +
+    `→ target x: ${key ? key.position.x.toFixed(3) : '—'}`;
+}
+function pressNote(midi, pressed = true) {
+  const key = pianoKeys.get(midi);
+  if (!key) return;
+  const info = fingerMap.get(midi);
+  if (pressed) {
+    stopClips();
+    if (info) {
+      const targetX = key.position.x - info.restX;
+      targetHandX = targetX;
+      setFingerPose(info, true);
+    }
+    key.material.color.set(info ? 0x55c9ff : 0xffb84f);
+    key.userData.press = 0.11;
+    activeNotes.set(midi, info);
+    updateMappingStatus(midi, info);
+  } else {
+    key.userData.press = 0;
+    key.material.color.copy(key.userData.baseColor);
+    activeNotes.delete(midi);
+    if (info) setFingerPose(info, false);
+    if (activeNotes.size === 0) {
+      targetHandX = neutralX;
+      mappingOutput.textContent = 'No active note';
+    }
+  }
+}
+function releaseAll() {
+  [...activeNotes.keys()].forEach((midi) => pressNote(midi, false));
+  resetBones();
+  targetHandX = neutralX;
+}
+
+for (const button of document.querySelectorAll('[data-note]')) {
+  const midi = Number(button.dataset.note);
+  button.addEventListener('pointerdown', () => pressNote(midi, true));
+  button.addEventListener('pointerup', () => pressNote(midi, false));
+  button.addEventListener('pointerleave', () => pressNote(midi, false));
+}
+document.querySelector('#release').addEventListener('click', releaseAll);
+for (const button of document.querySelectorAll('[data-clip]')) {
+  button.addEventListener('click', () => {
+    releaseAll();
+    const name = button.dataset.clip;
+    if (name === 'neutral') { resetBones(); return; }
+    const clip = clips.find((item) => item.name === name);
+    if (!clip || !mixer) return;
+    mixer.stopAllAction();
+    mixer.clipAction(clip).reset().setLoop(THREE.LoopRepeat, Infinity).fadeIn(0.25).play();
+    status.textContent = `Playing ${name}\nBones: ${boneMap.size}\nDuration: ${clip.duration.toFixed(2)}s`;
+  });
+}
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+renderer.domElement.addEventListener('pointerdown', (event) => {
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hit = raycaster.intersectObjects([...pianoKeys.values()])[0];
+  if (hit) {
+    const midi = hit.object.userData.midi;
+    pressNote(midi, true);
+    setTimeout(() => pressNote(midi, false), 260);
+  }
 });
-document.querySelector('#uncurl').addEventListener('click', () => {
-  ['index_meta', 'index_prox', 'index_midd', 'index_dist'].forEach((name) => {
-    const bone = boneMap.get(name);
-    if (bone) bone.rotation.x = 0;
-  });
-  status.textContent = 'Direct bone test: index finger released.';
+
+addEventListener('keydown', (event) => {
+  if (event.repeat) return;
+  const midi = computerMap.get(event.key.toLowerCase());
+  if (midi !== undefined) pressNote(midi, true);
+  if (event.key === ' ') releaseAll();
+});
+addEventListener('keyup', (event) => {
+  const midi = computerMap.get(event.key.toLowerCase());
+  if (midi !== undefined) pressNote(midi, false);
 });
 
 new GLTFLoader().load(
   '../assets/hand/hand_model.glb',
   (gltf) => {
-    root = gltf.scene;
-    root.scale.setScalar(1.45);
-    root.rotation.set(-0.18, 0.1, 0.08);
-    root.traverse((object) => {
-      if (object.isMesh) {
-        object.castShadow = true;
-        object.receiveShadow = true;
-      }
+    handRoot = gltf.scene;
+    // The source GLB is authored in centimetre-like units; this scale makes
+    // the palm and the 13-key test keyboard share a useful scene size.
+    handRoot.scale.setScalar(0.18);
+    // The imported palm faces the camera; rotate it so fingertips point toward the keys.
+    handRoot.rotation.set(-0.18, 0.1, Math.PI + 0.08);
+    handRoot.position.set(0, 2.72, 0.32);
+    neutralX = handRoot.position.x;
+    handRoot.traverse((object) => {
+      if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; }
       if (object.isBone) {
         boneMap.set(object.name, object);
         initialQuaternions.set(object.name, object.quaternion.clone());
       }
     });
-    scene.add(root);
-    fitCamera(root);
+    handGroup.add(handRoot);
+    mixer = new THREE.AnimationMixer(handRoot);
     clips = gltf.animations;
-    mixer = new THREE.AnimationMixer(root);
     bonesOutput.textContent = [...boneMap.keys()].join('\n');
-    status.textContent = `Loaded hand_model.glb\nBones: ${boneMap.size}\nAnimations: ${clips.map((clip) => clip.name).join(', ') || 'none'}`;
+    status.textContent = `Loaded hand_model.glb\nBones: ${boneMap.size}\nAnimations: ${clips.map((clip) => clip.name).join(', ')}`;
+    mappingOutput.textContent = 'MIDI 60 (C4) → key_60_C4 → thumb finger';
+    fitCamera();
   },
   (event) => {
     if (event.total) status.textContent = `Loading hand_model.glb… ${Math.round(event.loaded / event.total * 100)}%`;
@@ -228,6 +333,11 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
   if (mixer) mixer.update(delta);
+  if (handRoot) handRoot.position.x = THREE.MathUtils.lerp(handRoot.position.x, targetHandX, Math.min(1, delta * 10));
+  pianoKeys.forEach((key) => {
+    const target = key.userData.press;
+    key.position.y = THREE.MathUtils.lerp(key.position.y, key.userData.baseY - target, Math.min(1, delta * 16));
+  });
   controls.update();
   renderer.render(scene, camera);
 }
