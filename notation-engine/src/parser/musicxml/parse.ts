@@ -105,6 +105,30 @@ export interface MeasureAttributes {
 }
 
 /**
+ * The effective notational state immediately after an `<attributes>`
+ * element at its real measure-local cursor position. `MeasureAttributes`
+ * remains the bar-level summary used by existing callers; this timeline
+ * preserves mid-measure changes instead of collapsing them into the final
+ * state for the whole bar.
+ */
+export interface PositionedAttributeChange {
+  readonly partId: string;
+  readonly measureNumber: number;
+  readonly tick: number;
+  readonly divisions: number;
+  readonly fifths: number;
+  readonly mode?: string;
+  readonly timeNumerator: number;
+  readonly timeDenominator: number;
+  readonly timeNumeratorDisplay?: string;
+  readonly clefSign: string;
+  readonly clefLine?: number;
+  readonly staves: number;
+  readonly clefsByStaff: Readonly<Record<number, ClefSpec>>;
+  readonly staffLinesByStaff: Readonly<Record<number, number>>;
+}
+
+/**
  * `<ending number="...">` is a comma-separated list of volta numbers
  * ("1", or "1,2", or "1, 3"). Anything non-numeric in it is dropped
  * rather than rejected -- MusicXML also allows a purely textual ending
@@ -194,6 +218,8 @@ export interface PrintLayout {
 export interface ParseResult {
   readonly score: Score;
   readonly attributes: readonly MeasureAttributes[];
+  /** Effective clef/key/time state at each in-measure `<attributes>` cursor position. */
+  readonly attributeChanges: readonly PositionedAttributeChange[];
   readonly diagnostics: readonly Diagnostic[];
   /** Integration D: every real <direction><direction-type><metronome> found, in document order. A separate side-table for the same reason midiInstrumentsByPart is -- a rendering-relevant fact Phase 3 deliberately keeps off the core Score/Note types. */
   readonly tempoMarks: readonly TempoMarkEvent[];
@@ -440,6 +466,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
     return {
       score: makeScore({ parts: [] }),
       attributes: [],
+      attributeChanges: [],
       diagnostics,
       tempoMarks: [],
       midiInstrumentsByPart: new Map(),
@@ -470,6 +497,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
 
   const parts: Part[] = [];
   const allAttributes: MeasureAttributes[] = [];
+  const allAttributeChanges: PositionedAttributeChange[] = [];
   const tempoMarks: TempoMarkEvent[] = [];
   const directions: DirectionEvent[] = [];
   const harmonies: HarmonyEvent[] = [];
@@ -514,6 +542,27 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
 
       const records: TickRecord[] = [];
       let tick = 0;
+      let measureStartTimeNumerator = currentTimeNumerator;
+      let measureStartTimeDenominator = currentTimeDenominator;
+      const snapshotAttributes = (atTick: number): PositionedAttributeChange => ({
+        partId,
+        measureNumber,
+        tick: atTick,
+        divisions: currentDivisions ?? DEFAULT_DIVISIONS,
+        fifths: currentFifths,
+        ...(currentMode !== undefined ? { mode: currentMode } : {}),
+        timeNumerator: currentTimeNumerator,
+        timeDenominator: currentTimeDenominator,
+        ...(currentTimeNumeratorDisplay !== undefined
+          ? { timeNumeratorDisplay: currentTimeNumeratorDisplay }
+          : {}),
+        clefSign: currentClefSign,
+        ...(currentClefLine !== undefined ? { clefLine: currentClefLine } : {}),
+        staves: currentStaves,
+        clefsByStaff: { ...currentClefsByStaff },
+        staffLinesByStaff: { ...currentStaffLinesByStaff },
+      });
+      const measureAttributeChanges: PositionedAttributeChange[] = [snapshotAttributes(0)];
       // The ticks the most recently processed NON-chord note advanced the
       // cursor by -- a <chord/> continuation note must be recorded at the
       // BASE note's tick (tick - lastAdvance), never at the current
@@ -551,6 +600,10 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
             currentTimeNumeratorDisplay = update.timeNumeratorDisplay;
           }
           if (update.timeDenominator !== undefined) currentTimeDenominator = update.timeDenominator;
+          if (tick === 0) {
+            measureStartTimeNumerator = currentTimeNumerator;
+            measureStartTimeDenominator = currentTimeDenominator;
+          }
           if (update.clefSign !== undefined) currentClefSign = update.clefSign;
           if (update.clefLine !== undefined) currentClefLine = update.clefLine;
           if (update.staves !== undefined) currentStaves = update.staves;
@@ -562,6 +615,13 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
               ...currentStaffLinesByStaff,
               ...update.staffLinesByStaff,
             };
+          }
+          const snapshot = snapshotAttributes(tick);
+          const previousAtSameTick = measureAttributeChanges[measureAttributeChanges.length - 1];
+          if (previousAtSameTick?.tick === tick) {
+            measureAttributeChanges[measureAttributeChanges.length - 1] = snapshot;
+          } else {
+            measureAttributeChanges.push(snapshot);
           }
         } else if (child.tagName === 'note') {
           if (currentDivisions === undefined) {
@@ -878,14 +938,14 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
         if (lastRecord !== undefined) {
           const voiceEndTick = lastRecord.tick + lastRecord.ev.ticks;
           const expectedTicks =
-            currentTimeNumerator * (4 / currentTimeDenominator) * TICKS_PER_QUARTER;
+            measureStartTimeNumerator * (4 / measureStartTimeDenominator) * TICKS_PER_QUARTER;
           const TICK_EPSILON = 1e-6;
           if (voiceEndTick > expectedTicks + TICK_EPSILON) {
             diagnostics.push(
               diagnostic(
                 'warning',
                 'MEASURE_OVERRUN',
-                `Voice ${voiceId} has ${voiceEndTick} ticks, more than the ${currentTimeNumerator}/${currentTimeDenominator} time signature implies (${expectedTicks}). Keeping the events; layout will handle the overflow.`,
+                `Voice ${voiceId} has ${voiceEndTick} ticks, more than the ${measureStartTimeNumerator}/${measureStartTimeDenominator} time signature at the start of the measure implies (${expectedTicks}). Keeping the events; layout will handle the overflow.`,
                 location,
               ),
             );
@@ -894,6 +954,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
       }
 
       measures.push(makeMeasure(measureNumber, voices));
+      allAttributeChanges.push(...measureAttributeChanges);
 
       allAttributes.push({
         partId,
@@ -947,6 +1008,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
   return {
     score: makeScore({ parts }),
     attributes: allAttributes,
+    attributeChanges: allAttributeChanges,
     diagnostics,
     tempoMarks,
     midiInstrumentsByPart: midiInstrumentMaps,

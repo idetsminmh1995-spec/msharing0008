@@ -71805,6 +71805,7 @@ ${denominator}`;
       return {
         score: score({ parts: [] }),
         attributes: [],
+        attributeChanges: [],
         diagnostics,
         tempoMarks: [],
         midiInstrumentsByPart: /* @__PURE__ */ new Map(),
@@ -71833,6 +71834,7 @@ ${denominator}`;
     }
     const parts = [];
     const allAttributes = [];
+    const allAttributeChanges = [];
     const tempoMarks = [];
     const directions = [];
     const harmonies = [];
@@ -71861,6 +71863,25 @@ ${denominator}`;
         const location = { partId, measureNumber };
         const records = [];
         let tick = 0;
+        let measureStartTimeNumerator = currentTimeNumerator;
+        let measureStartTimeDenominator = currentTimeDenominator;
+        const snapshotAttributes = (atTick) => ({
+          partId,
+          measureNumber,
+          tick: atTick,
+          divisions: currentDivisions ?? DEFAULT_DIVISIONS,
+          fifths: currentFifths,
+          ...currentMode !== void 0 ? { mode: currentMode } : {},
+          timeNumerator: currentTimeNumerator,
+          timeDenominator: currentTimeDenominator,
+          ...currentTimeNumeratorDisplay !== void 0 ? { timeNumeratorDisplay: currentTimeNumeratorDisplay } : {},
+          clefSign: currentClefSign,
+          ...currentClefLine !== void 0 ? { clefLine: currentClefLine } : {},
+          staves: currentStaves,
+          clefsByStaff: { ...currentClefsByStaff },
+          staffLinesByStaff: { ...currentStaffLinesByStaff }
+        });
+        const measureAttributeChanges = [snapshotAttributes(0)];
         let lastAdvance = 0;
         let barlineStyle;
         let repeatDirection;
@@ -71883,6 +71904,10 @@ ${denominator}`;
               currentTimeNumeratorDisplay = update.timeNumeratorDisplay;
             }
             if (update.timeDenominator !== void 0) currentTimeDenominator = update.timeDenominator;
+            if (tick === 0) {
+              measureStartTimeNumerator = currentTimeNumerator;
+              measureStartTimeDenominator = currentTimeDenominator;
+            }
             if (update.clefSign !== void 0) currentClefSign = update.clefSign;
             if (update.clefLine !== void 0) currentClefLine = update.clefLine;
             if (update.staves !== void 0) currentStaves = update.staves;
@@ -71894,6 +71919,13 @@ ${denominator}`;
                 ...currentStaffLinesByStaff,
                 ...update.staffLinesByStaff
               };
+            }
+            const snapshot = snapshotAttributes(tick);
+            const previousAtSameTick = measureAttributeChanges[measureAttributeChanges.length - 1];
+            if (previousAtSameTick?.tick === tick) {
+              measureAttributeChanges[measureAttributeChanges.length - 1] = snapshot;
+            } else {
+              measureAttributeChanges.push(snapshot);
             }
           } else if (child.tagName === "note") {
             if (currentDivisions === void 0) {
@@ -72126,14 +72158,14 @@ ${denominator}`;
           const lastRecord = sorted[sorted.length - 1];
           if (lastRecord !== void 0) {
             const voiceEndTick = lastRecord.tick + lastRecord.ev.ticks;
-            const expectedTicks = currentTimeNumerator * (4 / currentTimeDenominator) * TICKS_PER_QUARTER;
+            const expectedTicks = measureStartTimeNumerator * (4 / measureStartTimeDenominator) * TICKS_PER_QUARTER;
             const TICK_EPSILON2 = 1e-6;
             if (voiceEndTick > expectedTicks + TICK_EPSILON2) {
               diagnostics.push(
                 diagnostic(
                   "warning",
                   "MEASURE_OVERRUN",
-                  `Voice ${voiceId} has ${voiceEndTick} ticks, more than the ${currentTimeNumerator}/${currentTimeDenominator} time signature implies (${expectedTicks}). Keeping the events; layout will handle the overflow.`,
+                  `Voice ${voiceId} has ${voiceEndTick} ticks, more than the ${measureStartTimeNumerator}/${measureStartTimeDenominator} time signature at the start of the measure implies (${expectedTicks}). Keeping the events; layout will handle the overflow.`,
                   location
                 )
               );
@@ -72141,6 +72173,7 @@ ${denominator}`;
           }
         }
         measures.push(measure(measureNumber, voices));
+        allAttributeChanges.push(...measureAttributeChanges);
         allAttributes.push({
           partId,
           measureNumber,
@@ -72183,6 +72216,7 @@ ${denominator}`;
     return {
       score: score({ parts }),
       attributes: allAttributes,
+      attributeChanges: allAttributeChanges,
       diagnostics,
       tempoMarks,
       midiInstrumentsByPart: midiInstrumentMaps,
@@ -77084,12 +77118,9 @@ ${xrefOffset}
   var TUPLET_BRACKET_THICKNESS_FALLBACK = 0.16;
   var DYNAMIC_GAP = 2.5;
   var HAIRPIN_THICKNESS_FALLBACK = 0.16;
-  function worstCaseStaffExtent(part2, staffNumber, allAttributes, side, theme, midiInstrumentsByPart) {
+  function worstCaseStaffExtent(part2, staffNumber, allAttributes, side, theme, midiInstrumentsByPart, attributeTimelines) {
     const firstAttrs = allAttributes.find((a) => a.partId === part2.id);
-    const clefSpec = firstAttrs?.clefsByStaff[staffNumber];
-    if (clefSpec === void 0) return 0;
-    const { clefDef } = mapClef(clefSpec.sign, clefSpec.line);
-    if (!clefDef.positionsByPitch) return 0;
+    if (firstAttrs === void 0) return 0;
     const staffLines = firstAttrs?.staffLinesByStaff[staffNumber] ?? STAFF_LINES;
     const topLineY = -(staffLines - 1);
     let worst;
@@ -77097,31 +77128,27 @@ ${xrefOffset}
       worst = worst === void 0 ? position : side === "south" ? Math.max(worst, position) : Math.min(worst, position);
     };
     for (const measure2 of part2.measures) {
+      const timeline = attributeTimelines.get(`${part2.id}:${measure2.number}`) ?? [];
       for (const voice2 of measure2.voices) {
-        for (const event of voice2.events) {
-          if ((event.staff ?? 1) !== staffNumber) continue;
+        const starts = eventStartTicks(voice2.events);
+        voice2.events.forEach((event, index) => {
+          if ((event.staff ?? 1) !== staffNumber) return;
+          const state = attributeStateAt(timeline, starts[index] ?? 0);
+          const clefSpec = state !== void 0 ? clefSpecAt(state, staffNumber) : firstAttrs.clefsByStaff[staffNumber] ?? firstAttrs.clefsByStaff[1];
+          const { clefDef } = mapClef(
+            clefSpec?.sign ?? firstAttrs.clefSign,
+            clefSpec?.line ?? firstAttrs.clefLine
+          );
+          if (!clefDef.positionsByPitch) return;
+          const ctx = { clefDef, measureBottomY: 0, theme, midiInstrumentsByPart };
           if (event.kind === "note") {
-            consider(
-              resolveNoteRendering(event, {
-                clefDef,
-                measureBottomY: 0,
-                theme,
-                midiInstrumentsByPart
-              }).position
-            );
+            consider(resolveNoteRendering(event, ctx).position);
           } else if (event.kind === "chord") {
             for (const n of event.notes) {
-              consider(
-                resolveNoteRendering(n, {
-                  clefDef,
-                  measureBottomY: 0,
-                  theme,
-                  midiInstrumentsByPart
-                }).position
-              );
+              consider(resolveNoteRendering(n, ctx).position);
             }
           }
-        }
+        });
       }
     }
     if (worst === void 0) return 0;
@@ -77135,14 +77162,20 @@ ${xrefOffset}
         for (const event of voice2.events) staffNumbers.add(event.staff ?? 1);
       }
       for (const staffNumber of staffNumbers) {
-        if (!part2.isPitched(staffNumber)) continue;
         let state = createAccidentalState(part2.fifths);
+        let activeFifths = part2.fifths;
         for (const voice2 of part2.measure.voices) {
           const starts = eventStartTicks(voice2.events);
           voice2.events.forEach((event, idx) => {
             if ((event.staff ?? 1) !== staffNumber) return;
             const notes = event.kind === "chord" ? event.notes : event.kind === "note" ? [event] : [];
             const tick = starts[idx] ?? 0;
+            const attributes = part2.stateAtTick(tick);
+            if (attributes.fifths !== activeFifths) {
+              activeFifths = attributes.fifths;
+              state = createAccidentalState(activeFifths);
+            }
+            if (!part2.isPitched(staffNumber, tick)) return;
             for (const note2 of notes) {
               if (note2.pitch.kind !== "pitched") continue;
               const decision = evaluateAccidental(
@@ -77171,7 +77204,7 @@ ${xrefOffset}
     }
     return drawn;
   }
-  function computeMeasureLayout(measure2, measureTicks, measureTempoMarks, headerWidth, spacingConfig, tempoFontSize, accidentals) {
+  function computeMeasureLayout(measure2, measureTicks, measureTempoMarks, headerWidth, spacingConfig, tempoFontSize, accidentals, attributeTransitions) {
     const attacks = /* @__PURE__ */ new Set();
     const widthByTickAndStaff = /* @__PURE__ */ new Map();
     const leadingByTickAndStaff = /* @__PURE__ */ new Map();
@@ -77199,6 +77232,36 @@ ${xrefOffset}
           shortestStartingByTick.set(tick, own);
         }
       });
+    }
+    const transitionLeadingByTickAndStaff = /* @__PURE__ */ new Map();
+    for (const transition of attributeTransitions) {
+      if (transition.tick <= 0) continue;
+      const width2 = attributeTransitionWidth(transition);
+      if (width2 <= 0) continue;
+      attacks.add(transition.tick);
+      const staff = String(transition.staffNumber);
+      let transitionWidths = transitionLeadingByTickAndStaff.get(transition.tick);
+      if (transitionWidths === void 0) {
+        transitionWidths = /* @__PURE__ */ new Map();
+        transitionLeadingByTickAndStaff.set(transition.tick, transitionWidths);
+      }
+      transitionWidths.set(staff, Math.max(transitionWidths.get(staff) ?? 0, width2 + 0.5));
+      let widths = widthByTickAndStaff.get(transition.tick);
+      if (widths === void 0) {
+        widths = /* @__PURE__ */ new Map();
+        widthByTickAndStaff.set(transition.tick, widths);
+      }
+      widths.set(staff, Math.max(widths.get(staff) ?? 0, 0.01));
+    }
+    for (const [tick, transitionWidths] of transitionLeadingByTickAndStaff) {
+      let leading = leadingByTickAndStaff.get(tick);
+      if (leading === void 0) {
+        leading = /* @__PURE__ */ new Map();
+        leadingByTickAndStaff.set(tick, leading);
+      }
+      for (const [staff, width2] of transitionWidths) {
+        leading.set(staff, (leading.get(staff) ?? 0) + width2);
+      }
     }
     const ticks = [...attacks].sort((a, b) => a - b);
     const tempoMarkMinWidth = measureTempoMarks.reduce((max2, tm) => {
@@ -77278,6 +77341,159 @@ ${xrefOffset}
     if (sign === "percussion") return { clefDef: PERCUSSION_CLEF, keySigClefName: "treble" };
     if (sign === "TAB") return { clefDef: TAB_CLEF, keySigClefName: "treble" };
     return { clefDef: TREBLE_CLEF, keySigClefName: "treble" };
+  }
+  function clefSpecAt(state, staffNumber) {
+    return state.clefsByStaff[staffNumber] ?? state.clefsByStaff[1] ?? {
+      sign: state.clefSign,
+      ...state.clefLine !== void 0 ? { line: state.clefLine } : {}
+    };
+  }
+  function positionedAttributeTransitions(changes) {
+    const transitions = [];
+    for (let index = 1; index < changes.length; index++) {
+      const previous = changes[index - 1];
+      const current = changes[index];
+      if (previous === void 0 || current === void 0 || current.tick <= 0) continue;
+      const staffNumbers = /* @__PURE__ */ new Set([
+        ...Object.keys(previous.clefsByStaff).map(Number),
+        ...Object.keys(current.clefsByStaff).map(Number),
+        ...Array.from({ length: Math.max(previous.staves, current.staves) }, (_, i2) => i2 + 1)
+      ]);
+      for (const staffNumber of staffNumbers) {
+        const oldClef = clefSpecAt(previous, staffNumber);
+        const newClef = clefSpecAt(current, staffNumber);
+        const clefChanged = oldClef.sign !== newClef.sign || oldClef.line !== newClef.line;
+        const keyChanged = previous.fifths !== current.fifths;
+        const timeChanged = previous.timeNumerator !== current.timeNumerator || previous.timeDenominator !== current.timeDenominator || previous.timeNumeratorDisplay !== current.timeNumeratorDisplay;
+        if (clefChanged || keyChanged || timeChanged) {
+          transitions.push({
+            partId: current.partId,
+            measureNumber: current.measureNumber,
+            tick: current.tick,
+            staffNumber,
+            previous,
+            current,
+            clefChanged,
+            keyChanged,
+            timeChanged
+          });
+        }
+      }
+    }
+    return transitions;
+  }
+  function attributeStateAt(changes, tick) {
+    let active;
+    for (const change of changes) {
+      if (change.tick > tick) break;
+      active = change;
+    }
+    return active ?? changes[0];
+  }
+  function attributesAtMeasureStart(summary, state) {
+    return {
+      partId: summary.partId,
+      measureNumber: summary.measureNumber,
+      divisions: state.divisions,
+      fifths: state.fifths,
+      ...state.mode !== void 0 ? { mode: state.mode } : {},
+      timeNumerator: state.timeNumerator,
+      timeDenominator: state.timeDenominator,
+      ...state.timeNumeratorDisplay !== void 0 ? { timeNumeratorDisplay: state.timeNumeratorDisplay } : {},
+      clefSign: state.clefSign,
+      ...state.clefLine !== void 0 ? { clefLine: state.clefLine } : {},
+      staves: state.staves,
+      clefsByStaff: state.clefsByStaff,
+      staffLinesByStaff: state.staffLinesByStaff,
+      ...summary.barlineStyle !== void 0 ? { barlineStyle: summary.barlineStyle } : {},
+      ...summary.repeatDirection !== void 0 ? { repeatDirection: summary.repeatDirection } : {},
+      ...summary.repeatTimes !== void 0 ? { repeatTimes: summary.repeatTimes } : {},
+      ...summary.endingNumbers !== void 0 ? { endingNumbers: summary.endingNumbers } : {},
+      ...summary.endingType !== void 0 ? { endingType: summary.endingType } : {},
+      ...summary.leftBarlineStyle !== void 0 ? { leftBarlineStyle: summary.leftBarlineStyle } : {},
+      ...summary.leftRepeatDirection !== void 0 ? { leftRepeatDirection: summary.leftRepeatDirection } : {},
+      ...summary.leftRepeatTimes !== void 0 ? { leftRepeatTimes: summary.leftRepeatTimes } : {},
+      ...summary.leftEndingNumbers !== void 0 ? { leftEndingNumbers: summary.leftEndingNumbers } : {},
+      ...summary.leftEndingType !== void 0 ? { leftEndingType: summary.leftEndingType } : {}
+    };
+  }
+  function attributeTransitionWidth(transition) {
+    let width = transition.clefChanged ? 3 : 0;
+    const clefSpec = clefSpecAt(transition.current, transition.staffNumber);
+    const { clefDef, keySigClefName } = mapClef(clefSpec.sign, clefSpec.line);
+    if (transition.keyChanged && clefDef.takesKeySignature) {
+      try {
+        const naturals = cancellationNaturals(
+          transition.previous.fifths,
+          transition.current.fifths,
+          keySigClefName
+        );
+        const accidentals = keySignatureAccidentals(transition.current.fifths, keySigClefName);
+        if (naturals.length > 0) width += naturals.length + 0.5;
+        if (accidentals.length > 0) width += accidentals.length + 0.5;
+      } catch {
+      }
+    }
+    if (transition.timeChanged) width += 2.5;
+    return width;
+  }
+  function groupBeamsWithAttributeChanges(events, startTicks, transitions, stateAtTick) {
+    const explicit = hasExplicitBeams(events);
+    const boundaryAtIndex = /* @__PURE__ */ new Map();
+    for (const transition of transitions) {
+      if (!transition.clefChanged && !(transition.timeChanged && !explicit)) continue;
+      const index = startTicks.findIndex((tick) => tick >= transition.tick);
+      if (index <= 0) continue;
+      boundaryAtIndex.set(index, Math.max(boundaryAtIndex.get(index) ?? 0, transition.tick));
+    }
+    const boundaries = [...boundaryAtIndex].sort((a, b) => a[0] - b[0]);
+    if (explicit) {
+      const split = [];
+      for (const group of groupBeamsFromHints(events)) {
+        let members = [];
+        let previousIndex;
+        const flush = () => {
+          if (members.length >= 2) split.push({ eventIndices: members });
+          members = [];
+        };
+        for (const index of group.eventIndices) {
+          const priorIndex = previousIndex;
+          if (priorIndex !== void 0 && boundaries.some(([boundaryIndex]) => priorIndex < boundaryIndex && boundaryIndex <= index)) {
+            flush();
+          }
+          members.push(index);
+          previousIndex = index;
+        }
+        flush();
+      }
+      return split;
+    }
+    const groups = [];
+    let segmentStart = 0;
+    let segmentOriginTick = 0;
+    const flushSegment = (segmentEnd) => {
+      if (segmentEnd <= segmentStart) return;
+      const state = stateAtTick(segmentOriginTick);
+      const localEvents = events.slice(segmentStart, segmentEnd);
+      const localTicks = startTicks.slice(segmentStart, segmentEnd).map((tick) => tick - segmentOriginTick);
+      for (const group of groupBeams(
+        localEvents,
+        localTicks,
+        state.timeNumerator,
+        state.timeDenominator
+      )) {
+        groups.push({
+          eventIndices: group.eventIndices.map((index) => index + segmentStart)
+        });
+      }
+    };
+    for (const [boundaryIndex, boundaryTick] of boundaries) {
+      flushSegment(boundaryIndex);
+      segmentStart = boundaryIndex;
+      segmentOriginTick = boundaryTick;
+    }
+    flushSegment(events.length);
+    return groups;
   }
   function mapBarline(style, repeatDirection) {
     if (repeatDirection === "forward") return "repeatBegin";
@@ -77452,8 +77668,7 @@ ${xrefOffset}
       ...drumEntry?.stemDirection !== void 0 ? { drumStemDirection: drumEntry.stemDirection } : {}
     };
   }
-  function measureNorthExtent(measure2, staffNumber, ctx) {
-    if (!ctx.clefDef.positionsByPitch) return 0;
+  function measureNorthExtent(measure2, staffNumber, ctxAtTick) {
     const topLineY = -(STAFF_LINES - 1);
     let highest;
     const consider = (position) => {
@@ -77461,13 +77676,16 @@ ${xrefOffset}
       highest = highest === void 0 ? reach : Math.min(highest, reach);
     };
     for (const voice2 of measure2.voices) {
-      for (const event of voice2.events) {
-        if ((event.staff ?? 1) !== staffNumber) continue;
+      const starts = eventStartTicks(voice2.events);
+      voice2.events.forEach((event, index) => {
+        if ((event.staff ?? 1) !== staffNumber) return;
+        const ctx = ctxAtTick(starts[index] ?? 0);
+        if (!ctx.clefDef.positionsByPitch) return;
         if (event.kind === "note") consider(resolveNoteRendering(event, ctx).position);
         else if (event.kind === "chord") {
           for (const n of event.notes) consider(resolveNoteRendering(n, ctx).position);
         }
-      }
+      });
     }
     if (highest === void 0) return 0;
     return Math.max(0, topLineY - highest);
@@ -77687,13 +77905,19 @@ ${xrefOffset}
     if (event.kind !== "chord") return event.explicitStemDirection;
     return event.notes.find((note2) => note2.explicitStemDirection !== void 0)?.explicitStemDirection;
   }
-  function renderBeamGroup(events, xs, ctx, accidentalState, beamStyle, forcedDirection) {
+  function renderBeamGroup(events, xs, ctx, accidentalState, initialFifths, memberFifths, beamStyle, forcedDirection) {
     const memberParts = [];
     let state = accidentalState;
+    let activeFifths = initialFifths;
     const members = [];
     events.forEach((event, i2) => {
       const x2 = xs[i2];
       if (x2 === void 0) return;
+      const memberFifthsAtIndex = memberFifths[i2] ?? activeFifths;
+      if (memberFifthsAtIndex !== activeFifths) {
+        activeFifths = memberFifthsAtIndex;
+        state = createAccidentalState(activeFifths);
+      }
       if (event.kind === "chord") {
         const heads = renderChordHeadsPart(event, x2, ctx, state);
         memberParts.push([heads.svg]);
@@ -77979,7 +78203,7 @@ ${xrefOffset}
     }
     return { svg: parts.join("\n"), newAccidentalState: heads.newAccidentalState };
   }
-  function computeRestClearanceOffsets(measure2, staffNumber, ctx) {
+  function computeRestClearanceOffsets(measure2, staffNumber, ctxAtTick) {
     const pushes = /* @__PURE__ */ new Map();
     if (measure2.voices.length < 2) return pushes;
     const glyphExtent = (glyph, y) => {
@@ -77995,6 +78219,7 @@ ${xrefOffset}
       voice2.events.forEach((event, idx) => {
         if ((event.staff ?? 1) !== staffNumber) return;
         const tick = starts[idx] ?? 0;
+        const ctx = ctxAtTick(tick);
         if (event.kind === "rest") {
           const y = event.displayStep !== void 0 && event.displayOctave !== void 0 && ctx.clefDef.positionsByPitch ? staffPositionForPitch(ctx.clefDef, event.displayStep, event.displayOctave) + base : restY(event.duration.type, STAFF_LINES, base);
           const { top, bottom } = glyphExtent(restGlyphName(event.duration.type), y);
@@ -78049,7 +78274,7 @@ ${xrefOffset}
     }
     return pushes;
   }
-  function computeVoiceCollisionOffsets(measure2, staffNumber, ctx) {
+  function computeVoiceCollisionOffsets(measure2, staffNumber, ctxAtTick) {
     const offsets = /* @__PURE__ */ new Map();
     const entries = [];
     for (const voice2 of measure2.voices) {
@@ -78057,6 +78282,7 @@ ${xrefOffset}
       voice2.events.forEach((event, idx) => {
         if ((event.staff ?? 1) !== staffNumber) return;
         const tick = starts[idx] ?? 0;
+        const ctx = ctxAtTick(tick);
         const notes = event.kind === "note" ? [event] : event.kind === "chord" ? event.notes : [];
         for (const note2 of notes) {
           if (note2.isGrace === true) continue;
@@ -78243,6 +78469,7 @@ ${xrefOffset}
     const {
       score: parsedScore,
       attributes,
+      attributeChanges,
       diagnostics: parseDiagnostics,
       tempoMarks,
       midiInstrumentsByPart: midiInstrumentsByPartMap,
@@ -78323,12 +78550,47 @@ ${xrefOffset}
         }
       }
     }
+    const attributeChangesByPartAndMeasure = /* @__PURE__ */ new Map();
+    for (const change of attributeChanges) {
+      const key = `${change.partId}:${change.measureNumber}`;
+      const timeline = attributeChangesByPartAndMeasure.get(key);
+      if (timeline === void 0) attributeChangesByPartAndMeasure.set(key, [change]);
+      else timeline.push(change);
+    }
+    for (const [key, timeline] of attributeChangesByPartAndMeasure) {
+      timeline.sort((a, b) => a.tick - b.tick);
+      const normalized = [];
+      for (const change of timeline) {
+        const previous = normalized[normalized.length - 1];
+        if (previous?.tick === change.tick) normalized[normalized.length - 1] = change;
+        else normalized.push(change);
+      }
+      attributeChangesByPartAndMeasure.set(key, normalized);
+    }
+    const attributeTransitionsByPartAndMeasure = /* @__PURE__ */ new Map();
+    for (const [key, timeline] of attributeChangesByPartAndMeasure) {
+      attributeTransitionsByPartAndMeasure.set(key, positionedAttributeTransitions(timeline));
+    }
+    const attributeTransitionsByMeasure = /* @__PURE__ */ new Map();
+    for (const transitions of attributeTransitionsByPartAndMeasure.values()) {
+      for (const transition of transitions) {
+        const list = attributeTransitionsByMeasure.get(transition.measureNumber);
+        if (list === void 0)
+          attributeTransitionsByMeasure.set(transition.measureNumber, [transition]);
+        else list.push(transition);
+      }
+    }
     const attributesByPartAndMeasure = /* @__PURE__ */ new Map();
     for (const a of attributes) {
-      attributesByPartAndMeasure.set(`${a.partId}:${a.measureNumber}`, a);
+      const key = `${a.partId}:${a.measureNumber}`;
+      const startState = attributeStateAt(attributeChangesByPartAndMeasure.get(key) ?? [], 0);
+      attributesByPartAndMeasure.set(
+        key,
+        startState !== void 0 ? attributesAtMeasureStart(a, startState) : a
+      );
     }
     const firstAttributesByPart = /* @__PURE__ */ new Map();
-    for (const a of attributes) {
+    for (const a of attributesByPartAndMeasure.values()) {
       if (!firstAttributesByPart.has(a.partId)) firstAttributesByPart.set(a.partId, a);
     }
     const measureLayoutsByNumber = /* @__PURE__ */ new Map();
@@ -78462,12 +78724,31 @@ ${xrefOffset}
         const m = measureByPartAndNumber.get(`${part2.id}:${measureNumber}`);
         const attrs = attributesByPartAndMeasure.get(`${part2.id}:${measureNumber}`);
         if (m === void 0 || attrs === void 0) continue;
+        const timeline = attributeChangesByPartAndMeasure.get(`${part2.id}:${measureNumber}`) ?? [];
+        const stateAtTick = (tick) => attributeStateAt(timeline, tick) ?? {
+          partId: part2.id,
+          measureNumber,
+          tick: 0,
+          divisions: attrs.divisions,
+          fifths: attrs.fifths,
+          ...attrs.mode !== void 0 ? { mode: attrs.mode } : {},
+          timeNumerator: attrs.timeNumerator,
+          timeDenominator: attrs.timeDenominator,
+          ...attrs.timeNumeratorDisplay !== void 0 ? { timeNumeratorDisplay: attrs.timeNumeratorDisplay } : {},
+          clefSign: attrs.clefSign,
+          ...attrs.clefLine !== void 0 ? { clefLine: attrs.clefLine } : {},
+          staves: attrs.staves,
+          clefsByStaff: attrs.clefsByStaff,
+          staffLinesByStaff: attrs.staffLinesByStaff
+        };
         out.push({
           measure: m,
           fifths: attrs.fifths,
-          isPitched: (staffNumber) => {
-            const spec = attrs.clefsByStaff[staffNumber] ?? attrs.clefsByStaff[1];
-            const { clefDef } = mapClef(spec?.sign ?? attrs.clefSign, spec?.line ?? attrs.clefLine);
+          stateAtTick,
+          isPitched: (staffNumber, tick) => {
+            const state = stateAtTick(tick);
+            const spec = clefSpecAt(state, staffNumber);
+            const { clefDef } = mapClef(spec.sign, spec.line);
             return clefDef.positionsByPitch === true;
           }
         });
@@ -78500,7 +78781,8 @@ ${xrefOffset}
         headerWidth,
         config.spacing,
         config.fonts.sizes.tempo,
-        drawnAccidentalTicks(accidentalParts(measureNumber))
+        drawnAccidentalTicks(accidentalParts(measureNumber)),
+        attributeTransitionsByMeasure.get(measureNumber) ?? []
       );
       measureLayoutsByNumber.set(measureNumber, { ...layout, headerWidth });
       measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
@@ -78526,13 +78808,12 @@ ${xrefOffset}
           }
           if (!hasTempoMark) return;
           const a = attributesByPartAndMeasure.get(`${part2.id}:${m.number}`);
-          const spec = a?.clefsByStaff[1];
-          const { clefDef } = mapClef(spec?.sign ?? a?.clefSign ?? "G", spec?.line ?? a?.clefLine);
-          const extent = measureNorthExtent(m, 1, {
-            clefDef,
-            measureBottomY: 0,
-            midiInstrumentsByPart: midi,
-            theme
+          const timeline = attributeChangesByPartAndMeasure.get(`${part2.id}:${m.number}`) ?? [];
+          const extent = measureNorthExtent(m, 1, (tick) => {
+            const state = attributeStateAt(timeline, tick);
+            const spec = state !== void 0 ? clefSpecAt(state, 1) : void 0;
+            const { clefDef } = mapClef(spec?.sign ?? a?.clefSign ?? "G", spec?.line ?? a?.clefLine);
+            return { clefDef, measureBottomY: 0, midiInstrumentsByPart: midi, theme };
           });
           needed = Math.max(needed, extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
         });
@@ -78570,7 +78851,8 @@ ${xrefOffset}
         attributes,
         "south",
         theme,
-        midiInstrumentsByPart
+        midiInstrumentsByPart,
+        attributeChangesByPartAndMeasure
       );
       const lowerExtent = worstCaseStaffExtent(
         part2,
@@ -78578,7 +78860,8 @@ ${xrefOffset}
         attributes,
         "north",
         theme,
-        midiInstrumentsByPart
+        midiInstrumentsByPart,
+        attributeChangesByPartAndMeasure
       );
       const upperSouth = addToSkyline(emptySkyline("south"), { xStart: 0, xEnd: 1, y: upperExtent });
       const lowerNorth = addToSkyline(emptySkyline("north"), { xStart: 0, xEnd: 1, y: lowerExtent });
@@ -78752,12 +79035,30 @@ ${xrefOffset}
         }
       }
       const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part2.id);
-      const accidentalStateByStaff = /* @__PURE__ */ new Map();
       let previousAttrs;
       part2.measures.forEach((measure2, i2) => {
         const attrs = attributesByPartAndMeasure.get(`${part2.id}:${measure2.number}`);
         const layout = placementByMeasureNumber.get(measure2.number);
         if (attrs === void 0 || layout === void 0) return;
+        const measureKey = `${part2.id}:${measure2.number}`;
+        const stateTimeline = attributeChangesByPartAndMeasure.get(measureKey) ?? [];
+        const stateAtTick = (tick) => attributeStateAt(stateTimeline, tick) ?? {
+          partId: part2.id,
+          measureNumber: measure2.number,
+          tick: 0,
+          divisions: attrs.divisions,
+          fifths: attrs.fifths,
+          ...attrs.mode !== void 0 ? { mode: attrs.mode } : {},
+          timeNumerator: attrs.timeNumerator,
+          timeDenominator: attrs.timeDenominator,
+          ...attrs.timeNumeratorDisplay !== void 0 ? { timeNumeratorDisplay: attrs.timeNumeratorDisplay } : {},
+          clefSign: attrs.clefSign,
+          ...attrs.clefLine !== void 0 ? { clefLine: attrs.clefLine } : {},
+          staves: attrs.staves,
+          clefsByStaff: attrs.clefsByStaff,
+          staffLinesByStaff: attrs.staffLinesByStaff
+        };
+        const attributeTransitions = attributeTransitionsByPartAndMeasure.get(measureKey) ?? [];
         const systemY = layout.systemY;
         const isSystemStart = layout.isSystemStart;
         const staffNumbers = Array.from({ length: Math.max(1, attrs.staves) }, (_, n) => n + 1);
@@ -78775,16 +79076,16 @@ ${xrefOffset}
         let northExtentCache;
         const topStaffNorthExtent = () => {
           if (northExtentCache === void 0) {
-            const topClefSpec = attrs.clefsByStaff[1];
-            const { clefDef: topClefDef } = mapClef(
-              topClefSpec?.sign ?? attrs.clefSign,
-              topClefSpec?.line ?? attrs.clefLine
-            );
-            northExtentCache = measureNorthExtent(measure2, 1, {
-              clefDef: topClefDef,
-              measureBottomY: 0,
-              midiInstrumentsByPart: midiInstrumentsByPartMap.get(part2.id),
-              theme
+            northExtentCache = measureNorthExtent(measure2, 1, (tick) => {
+              const state = stateAtTick(tick);
+              const spec = clefSpecAt(state, 1);
+              const { clefDef } = mapClef(spec.sign, spec.line);
+              return {
+                clefDef,
+                measureBottomY: 0,
+                midiInstrumentsByPart: midiInstrumentsByPartMap.get(part2.id),
+                theme
+              };
             });
           }
           return northExtentCache;
@@ -78819,11 +79120,9 @@ ${xrefOffset}
           }
         }
         staffNumbers.forEach((staffNumber, staffIndex) => {
-          const staffClef = attrs.clefsByStaff[staffNumber] ?? attrs.clefsByStaff[1];
-          const { clefDef, keySigClefName } = mapClef(
-            staffClef?.sign ?? attrs.clefSign,
-            staffClef?.line ?? attrs.clefLine
-          );
+          const startState = stateAtTick(0);
+          const staffClef = clefSpecAt(startState, staffNumber);
+          const { clefDef, keySigClefName } = mapClef(staffClef.sign, staffClef.line);
           const staffLines = attrs.staffLinesByStaff[staffNumber] ?? STAFF_LINES;
           const staffGeometry = computeStaffGeometry(
             staffLines,
@@ -78946,19 +79245,119 @@ ${xrefOffset}
               });
             }
           }
-          const previousStaffState = accidentalStateByStaff.get(staffNumber);
-          let accidentalState = previousStaffState === void 0 || keyChanged ? createAccidentalState(attrs.fifths) : resetMeasure(previousStaffState);
-          accidentalStateByStaff.set(staffNumber, accidentalState);
+          let accidentalState = createAccidentalState(attrs.fifths);
+          let activeFifths = attrs.fifths;
           if (clefDef.positionsByPitch) {
             const ctx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart, theme };
             const noteAreaX = Math.max(noteAreaXOf(layout.x, measure2.number), cursorX);
             const measureLayout = measureLayoutsByNumber.get(measure2.number);
+            const ctxAtTick = (tick) => {
+              const state = stateAtTick(tick);
+              const spec = clefSpecAt(state, staffNumber);
+              return {
+                clefDef: mapClef(spec.sign, spec.line).clefDef,
+                measureBottomY: bottomY,
+                midiInstrumentsByPart,
+                theme
+              };
+            };
+            for (const transition of attributeTransitions) {
+              if (transition.staffNumber !== staffNumber) continue;
+              const tickX = measureLayout?.positionsByTick.get(transition.tick);
+              if (tickX === void 0) continue;
+              const changeWidth = attributeTransitionWidth(transition);
+              if (changeWidth <= 0) continue;
+              let changeX = noteAreaX + tickX - changeWidth - 0.5;
+              const newClefSpec = clefSpecAt(transition.current, staffNumber);
+              const newClef = mapClef(newClefSpec.sign, newClefSpec.line);
+              if (transition.clefChanged) {
+                svgParts.push(
+                  renderClef(newClef.clefDef, {
+                    x: changeX,
+                    y: bottomY + newClef.clefDef.glyphY,
+                    color: theme.colorOf("clef"),
+                    fontFamily: theme.musicFont
+                  })
+                );
+                changeX += 3;
+              }
+              if (transition.keyChanged && newClef.clefDef.takesKeySignature) {
+                try {
+                  const naturals = cancellationNaturals(
+                    transition.previous.fifths,
+                    transition.current.fifths,
+                    newClef.keySigClefName
+                  );
+                  if (naturals.length > 0) {
+                    svgParts.push(
+                      renderCancellationNaturals(naturals, {
+                        x: changeX,
+                        spacing: 1,
+                        staffBottomY: bottomY,
+                        color: theme.colorOf("keySignature"),
+                        fontFamily: theme.musicFont
+                      })
+                    );
+                    changeX += naturals.length + 0.5;
+                  }
+                  const accidentals = keySignatureAccidentals(
+                    transition.current.fifths,
+                    newClef.keySigClefName
+                  );
+                  if (accidentals.length > 0) {
+                    svgParts.push(
+                      renderKeySignature(accidentals, {
+                        x: changeX,
+                        spacing: 1,
+                        staffBottomY: bottomY,
+                        color: theme.colorOf("keySignature"),
+                        fontFamily: theme.musicFont
+                      })
+                    );
+                    changeX += accidentals.length + 0.5;
+                  }
+                } catch (err2) {
+                  diagnostics.push({
+                    severity: "warning",
+                    code: "UNSUPPORTED_KEY_SIGNATURE_CLEF",
+                    message: err2 instanceof Error ? err2.message : String(err2),
+                    location: { partId: part2.id, measureNumber: measure2.number }
+                  });
+                }
+              }
+              if (transition.timeChanged) {
+                try {
+                  const sig = timeSignature(
+                    transition.current.timeNumerator,
+                    transition.current.timeDenominator,
+                    {
+                      ...transition.current.timeNumeratorDisplay !== void 0 ? { numeratorDisplay: transition.current.timeNumeratorDisplay } : {}
+                    }
+                  );
+                  svgParts.push(
+                    renderTimeSignature(sig, {
+                      x: changeX,
+                      staffBottomY: bottomY,
+                      color: theme.colorOf("timeSignature"),
+                      fontFamily: theme.musicFont
+                    })
+                  );
+                } catch (err2) {
+                  diagnostics.push({
+                    severity: "warning",
+                    code: "INVALID_TIME_SIGNATURE",
+                    message: err2 instanceof Error ? err2.message : String(err2),
+                    location: { partId: part2.id, measureNumber: measure2.number }
+                  });
+                }
+              }
+            }
             const voicesOnThisStaff = new Set(
               measure2.voices.filter((v) => v.events.some((e) => (e.staff ?? 1) === staffNumber)).map((v) => v.id)
             );
             const isMultiVoice = voicesOnThisStaff.size > 1;
-            const collisionOffsets = computeVoiceCollisionOffsets(measure2, staffNumber, ctx);
-            const restPushes = computeRestClearanceOffsets(measure2, staffNumber, ctx);
+            const collisionOffsets = computeVoiceCollisionOffsets(measure2, staffNumber, ctxAtTick);
+            const restPushes = computeRestClearanceOffsets(measure2, staffNumber, ctxAtTick);
             for (const voice2 of measure2.voices) {
               const forcedDirection = isMultiVoice ? voiceForcedDirection(voice2.id) : void 0;
               const restOffset = isMultiVoice ? voiceRestOffset(voice2.id) + (restPushes.get(voice2.id) ?? 0) : 0;
@@ -78984,7 +79383,12 @@ ${xrefOffset}
                   ...isUnpitchedDrumEvent ? { forceBeam: true } : {}
                 };
               });
-              const groups = hasExplicitBeams(beamableEvents) ? groupBeamsFromHints(beamableEvents) : groupBeams(beamableEvents, starts, attrs.timeNumerator, attrs.timeDenominator);
+              const groups = groupBeamsWithAttributeChanges(
+                beamableEvents,
+                starts,
+                attributeTransitions,
+                stateAtTick
+              );
               const beamedIndices = beamedEventIndices(groups);
               const groupByFirstIndex = /* @__PURE__ */ new Map();
               for (const group of groups) {
@@ -78999,6 +79403,14 @@ ${xrefOffset}
                 const eventStaff = event.staff ?? 1;
                 if (eventStaff !== staffNumber) return;
                 const eventX = eventXs[idx] ?? 0;
+                const eventTick = starts[idx] ?? 0;
+                const eventAttributes = stateAtTick(eventTick);
+                if (eventAttributes.fifths !== activeFifths) {
+                  activeFifths = eventAttributes.fifths;
+                  accidentalState = createAccidentalState(activeFifths);
+                }
+                const eventCtx = ctxAtTick(eventTick);
+                if (!eventCtx.clefDef.positionsByPitch) return;
                 const isGraceNote = event.kind === "note" && event.isGrace === true;
                 if (!isGraceNote && beamedIndices.has(idx)) {
                   const group = groupByFirstIndex.get(idx);
@@ -79019,8 +79431,10 @@ ${xrefOffset}
                   } = renderBeamGroup(
                     groupNotes,
                     groupXs,
-                    ctx,
+                    eventCtx,
                     accidentalState,
+                    activeFifths,
+                    groupIndices.map((groupIndex) => stateAtTick(starts[groupIndex] ?? 0).fifths),
                     theme.beamStyle,
                     forcedDirection
                   );
@@ -79035,13 +79449,17 @@ ${xrefOffset}
                   });
                   svgParts.push(beamSvg);
                   accidentalState = newAccidentalState;
+                  const lastGroupIndex = groupIndices[groupIndices.length - 1];
+                  if (lastGroupIndex !== void 0) {
+                    activeFifths = stateAtTick(starts[lastGroupIndex] ?? 0).fifths;
+                  }
                   return;
                 }
                 if (event.kind === "chord") {
                   const { svg: svg2, newAccidentalState, anchor } = renderChord(
                     event,
                     eventX,
-                    ctx,
+                    eventCtx,
                     accidentalState,
                     forcedDirection
                   );
@@ -79052,7 +79470,7 @@ ${xrefOffset}
                   const { svg: svg2, newAccidentalState, tieAnchor } = renderNoteOrRest(
                     event,
                     eventX,
-                    ctx,
+                    eventCtx,
                     accidentalState,
                     forcedDirection,
                     restOffset

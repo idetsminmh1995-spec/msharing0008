@@ -100,6 +100,19 @@ describe('cross-software compatibility corpus (Phase 37, §10.8)', () => {
     assert.deepEqual([...diagnostics], []);
   });
 
+  test('mid-measure attributes retain their effective state and cursor tick', () => {
+    const result = parse('attributes-mid-measure.musicxml');
+    const changes = result.attributeChanges.filter(
+      (change) => change.partId === 'P1' && change.measureNumber === 1,
+    );
+    assert.equal(changes.length, 2);
+    assert.equal(changes[0].tick, 0);
+    assert.equal(changes[0].clefsByStaff[1].sign, 'G');
+    assert.equal(changes[1].tick, 960, 'the second half begins after the first half note');
+    assert.equal(changes[1].clefsByStaff[1].sign, 'F');
+    assert.equal(result.attributes[0].clefsByStaff[1].sign, 'F');
+  });
+
   test('a percussion note with no <display-step>/<display-octave> recovers via the documented fallback, not silently wrong', () => {
     const result = parse('percussion-no-display-step.musicxml');
     const reported = [...result.diagnostics].filter(

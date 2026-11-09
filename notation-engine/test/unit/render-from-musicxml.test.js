@@ -48,6 +48,71 @@ describe('renderFromMusicXml end-to-end (Phase 21)', () => {
     assert.deepEqual(codes.slice(3), ['U+E0A4', 'U+E0A4', 'U+E0A4', 'U+E0A4', 'U+E0A3', 'U+E4E4']);
   });
 
+  test('mid-measure clef change draws the new clef and applies its pitch mapping to later notes', () => {
+    const xml =
+      '<score-partwise><part-list><score-part id="P1"/></part-list><part id="P1">' +
+      '<measure number="1"><attributes><divisions>2</divisions>' +
+      '<time><beats>4</beats><beat-type>4</beat-type></time>' +
+      '<clef><sign>G</sign><line>2</line></clef></attributes>' +
+      '<note><pitch><step>C</step><octave>5</octave></pitch><duration>4</duration><type>half</type></note>' +
+      '<attributes><clef><sign>F</sign><line>4</line></clef></attributes>' +
+      '<note><pitch><step>C</step><octave>3</octave></pitch><duration>4</duration><type>half</type></note>' +
+      '</measure></part></score-partwise>';
+    const { svg, diagnostics } = NE.renderFromMusicXml(xml, { domParser });
+    assert.deepEqual([...diagnostics], []);
+    const codes = glyphCodepoints(svg);
+    assert.equal(codes.filter((code) => code === 'U+E050').length, 1, 'initial treble clef');
+    assert.equal(codes.filter((code) => code === 'U+E062').length, 1, 'mid-measure bass clef');
+    const ys = [...svg.matchAll(/<text x="[\d.]+" y="([\d.]+)"[^>]*>\uE0A3<\/text>/g)].map((m) =>
+      Number(m[1]),
+    );
+    assert.equal(ys.length, 2);
+    assert.notEqual(ys[0], ys[1], 'the second C is positioned from the new bass clef');
+  });
+
+  test('mid-measure key and meter changes draw cancellation naturals and the new time signature', () => {
+    const xml =
+      '<score-partwise><part-list><score-part id="P1"/></part-list><part id="P1">' +
+      '<measure number="1"><attributes><divisions>1</divisions>' +
+      '<key><fifths>2</fifths><mode>major</mode></key>' +
+      '<time><beats>4</beats><beat-type>4</beat-type></time>' +
+      '<clef><sign>G</sign><line>2</line></clef></attributes>' +
+      '<note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>' +
+      '<attributes><key><fifths>0</fifths><mode>major</mode></key>' +
+      '<time><beats>3</beats><beat-type>4</beat-type></time></attributes>' +
+      '<note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>' +
+      '<note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>' +
+      '<note><pitch><step>F</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>' +
+      '</measure></part></score-partwise>';
+    const { svg, diagnostics } = NE.renderFromMusicXml(xml, { domParser });
+    assert.deepEqual([...diagnostics], []);
+    const codes = glyphCodepoints(svg);
+    assert.equal(
+      codes.filter((code) => code === 'U+E261').length,
+      3,
+      'one C-natural in D major plus two key-cancellation naturals',
+    );
+    assert.equal(codes.filter((code) => code === 'U+E083').length, 1, 'draw the new 3/4 numerator');
+    assert.equal(codes.filter((code) => code === 'U+E084').length, 3, 'two initial 4s and one new denominator');
+  });
+
+  test('inferred beams restart with the active mid-measure meter', () => {
+    const xml =
+      '<score-partwise><part-list><score-part id="P1"/></part-list><part id="P1">' +
+      '<measure number="1"><attributes><divisions>2</divisions>' +
+      '<time><beats>4</beats><beat-type>4</beat-type></time>' +
+      '<clef><sign>G</sign><line>2</line></clef></attributes>' +
+      '<note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><type>eighth</type></note>' +
+      '<note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration><type>eighth</type></note>' +
+      '<attributes><time><beats>3</beats><beat-type>8</beat-type></time></attributes>' +
+      '<note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration><type>eighth</type></note>' +
+      '<note><pitch><step>F</step><octave>4</octave></pitch><duration>1</duration><type>eighth</type></note>' +
+      '</measure></part></score-partwise>';
+    const { svg, diagnostics } = NE.renderFromMusicXml(xml, { domParser });
+    assert.deepEqual([...diagnostics], []);
+    assert.equal((svg.match(/stroke-width="0\.5"/g) ?? []).length, 1);
+  });
+
   test('renders upright and inverted fermatas on notes and rests with the requested Bravura glyphs', () => {
     const xml =
       '<score-partwise><part-list><score-part id="P1"/></part-list><part id="P1">' +

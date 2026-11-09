@@ -405,7 +405,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-634 exported symbols, by module.
+635 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -1342,6 +1342,7 @@ The diagnostics `level` lets through, in their original order.
 | | Name | Summary |
 |---|---|---|
 | interface | `MeasureAttributes` | The per-(part, measure) clef/key/time/barline side-table §10 asks for -- separate from the core `Score`, which never knows about clefs or key/time signatures at all (those are notational, not musical, per Phase 3). |
+| interface | `PositionedAttributeChange` | The effective notational state immediately after an `<attributes>` element at its real measure-local cursor position. |
 | interface | `TempoMarkEvent` |  |
 | interface | `DirectionEvent` | Phase 35 Tier 2/§10.4: one `<direction>`'s recognized content at the measure-local tick it appeared at. |
 | interface | `HarmonyEvent` | Phase 35 Tier 2/§10.4: one `<harmony>` (chord symbol) at a measure-local tick. |
