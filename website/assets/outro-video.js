@@ -65,6 +65,8 @@
 
   /** key -> {video, key, seconds} | null, so a second take reuses the download. */
   const cache = new Map();
+  const failureCache = new Map();
+  const FAILURE_CACHE_MS = 30_000;
 
   function releaseClip(clip) {
     if (!clip) return;
@@ -113,6 +115,9 @@
     const keys = outroKeys(options);
     const cacheKey = keys.join('|');
     if (cache.has(cacheKey)) return cache.get(cacheKey);
+    const failedAt = failureCache.get(cacheKey);
+    if (failedAt && Date.now() - failedAt < FAILURE_CACHE_MS) return null;
+    failureCache.delete(cacheKey);
     let found = null;
     for (const key of keys) {
       let video = null;
@@ -172,6 +177,7 @@
       }
     }
     if (found) {
+      failureCache.delete(cacheKey);
       for (const [oldKey, oldClip] of cache) {
         if (oldKey !== cacheKey) {
           releaseClip(oldClip);
@@ -179,6 +185,8 @@
         }
       }
       cache.set(cacheKey, found);
+    } else {
+      failureCache.set(cacheKey, Date.now());
     }
     return found;
   }
