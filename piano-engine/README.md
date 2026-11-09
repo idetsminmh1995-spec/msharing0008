@@ -3,9 +3,18 @@
 The keyboard under the music on the Piano video page: 61, 73, 76 or 88
 keys, the notes falling onto it, and a colour per hand.
 
-TypeScript in, SVG out. It knows nothing about scores, files or pages —
-notes arrive as MIDI numbers in seconds with a hand attached, and this
-draws them.
+## Rendering direction: Blender models first
+
+The product direction is now a Blender-based 3D renderer rather than an
+SVG-based final renderer. Blender will provide the piano and rigged hand
+models, exported as GLB/glTF assets; TypeScript will continue to own MIDI
+timing, keyboard geometry, fingering, and animation state; and a WebGL
+renderer (planned: Three.js) will display the scene in the browser.
+
+The current files are the existing SVG implementation and are retained
+only as migration reference until the 3D renderer is working. New piano
+visual work should target the 3D architecture described in
+[`BLENDER-3D-PLAN.md`](./BLENDER-3D-PLAN.md), not extend the SVG design.
 
 ```bash
 npm run build     # -> dist/piano-engine.js  (global: PianoEngine)
