@@ -3412,6 +3412,7 @@
   }
 
   async function ensureExportAssets() {
+    const warnings = [];
     if (!kitBackgroundImage || !kitBackgroundReady) {
       throw new Error('The drum-kit background is not ready. Choose a kit and wait for it to finish loading.');
     }
@@ -3425,9 +3426,49 @@
       ]);
       await document.fonts.ready;
     }
+    const frameImages = [...videoFrame.querySelectorAll('.video-logo-mark, .video-stick, .drum-circle')];
+    if (frameImages.length === 0) throw new Error('Required logo/stick assets are missing from the video frame.');
+    try {
+      await Promise.all(frameImages.map((img) => waitForImage(img, img.alt || img.className)));
+    } catch (err) {
+      throw new Error(`A required logo/stick asset is not ready. ${err?.message ?? err}`);
+    }
     preloadHitImages();
     await ensureHitImagesReady();
     await refreshNotationImage();
+    if (!notationImage) throw new Error('MusicXML notation is not ready for export.');
+
+    const audioFile = document.getElementById('upload-audio').files?.[0];
+    if (!audioFile) throw new Error('The uploaded audio file is missing.');
+    try {
+      const probe = new OfflineAudioContext(1, 1, 48000);
+      const decoded = await probe.decodeAudioData((await audioFile.arrayBuffer()).slice(0));
+      if (!(decoded.duration > 0)) throw new Error('decoded duration is zero');
+    } catch (err) {
+      throw new Error(`The uploaded audio is not decodable. ${err?.message ?? err}`);
+    }
+
+    const bars = Number(countInBarsSelect.value);
+    if (Number.isFinite(bars) && bars > 0) {
+      const { beatsPerBar } = scoreBeat();
+      const wanted = Array.from({ length: Math.max(1, beatsPerBar) }, (_, i) => i + 1);
+      const samples = await Promise.all(
+        wanted.map((beat) =>
+          countInStyle() === 'measures' ? measureSample(beat) : countSample(String(beat)),
+        ),
+      );
+      const missing = wanted.filter((_, i) => !samples[i]);
+      if (missing.length > 0) {
+        warnings.push(`Count-in voice samples missing for beat(s): ${summariseNumbers(missing)}. Synth fallback will be used.`);
+      }
+    }
+    if (countVoiceEnabled()) {
+      const report = await preloadMeasureSamples();
+      if (report.missing.length > 0) {
+        warnings.push(`Count-voice samples missing for beat(s): ${summariseNumbers(report.missing)}. Those announcements may be silent.`);
+      }
+    }
+    return { warnings };
   }
 
   /**
@@ -3753,6 +3794,7 @@
     let scale = 1;
     let width = 0;
     let height = 0;
+    const exportWarnings = [];
     let cancelled = false;
     recording = {
       cancel() {
@@ -3768,16 +3810,21 @@
       height = even(exportFrame.height * scale);
       fitNotationToKit();
       genLabel.textContent = 'Checking export assets…';
-      await ensureExportAssets();
+      const assetReport = await ensureExportAssets();
+      exportWarnings.push(...assetReport.warnings);
       genLabel.textContent = 'Fetching the Thank You clip…';
-      const outro =
-        typeof OutroVideo === 'undefined'
-          ? null
-          : await OutroVideo.loadOutro(API_BASE, {
-              aspect: currentAspect(),
-              kind: 'drum',
-              style: currentVideoStyle(),
-            });
+      let outro = null;
+      if (typeof OutroVideo !== 'undefined') {
+        try {
+          outro = await OutroVideo.loadOutro(API_BASE, {
+            aspect: currentAspect(),
+            kind: 'drum',
+            style: currentVideoStyle(),
+          });
+        } catch (err) {
+          exportWarnings.push(`Outro clip unavailable; video will export without it. ${err?.message ?? err}`);
+        }
+      }
 
       genLabel.textContent = 'Preparing the notation…';
       await refreshNotationImage();
@@ -3870,6 +3917,7 @@
           (result.container === 'mp4'
             ? ' MP4, H.264 video and AAC sound.'
             : ' WebM \u2014 this browser will not encode H.264, so it is not an MP4.') +
+          (exportWarnings.length > 0 ? ` Warnings: ${exportWarnings.join(' ')}` : '') +
           ' Press Download Video to save it.',
         true,
       );
