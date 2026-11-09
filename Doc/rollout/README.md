@@ -1,6 +1,6 @@
 # Video export rollout acceptance
 
-Updated 2026-11-10 after commit `8b79d76` and the final Definition-of-Done checks.
+Updated 2026-11-10 after commit `b05ee67` and the final Definition-of-Done checks.
 
 ## Phase 0 — A0 baseline
 
@@ -44,7 +44,7 @@ Drum rollout browser acceptance: passed
 Cross-page rollout browser acceptance: passed
 ```
 
-GitHub Actions run `42699278917` passed on Node 22 with loader, outro-cache, notation, Chromium smoke and Drum rollout checks. The next push includes the cross-page acceptance step as well.
+GitHub Actions run `42705666741` passed on Node 22 with loader, outro-cache, notation, Chromium smoke, Drum rollout, and cross-page rollout checks.
 
 ## Phase 6 — Shared module propagation: complete
 

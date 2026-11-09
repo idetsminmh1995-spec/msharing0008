@@ -79,3 +79,7 @@ and remaining production work.
 
 This project is being planned/built with Claude and Manus AI in parallel for
 comparison on key modules before committing to a full build.
+
+## Current delivery status — 2026-11-10
+
+The original sections above describe the legacy MIDI prototype and remain as historical context. The current production delivery also includes the MusicXML-first notation engine and five-page video export rollout documented in [`Doc/CONSOLIDATED-PLAN-2026-11-10.md`](Doc/CONSOLIDATED-PLAN-2026-11-10.md). The notation engine currently verifies 1,054 tests. Drum, Guitar, Bass Guitar, Piano, and Violin share pinned export composition, asset gating, render reports, font/audio preflight, and frame-relative layout. Latest CI run: `42705666741`.
