@@ -1,11 +1,10 @@
 # Realistic Rigged Human Hand Asset
 
-This directory contains the hand asset used by the Blender/Three.js proof of
-concept:
+This directory contains the browser-ready hand asset used by the Three.js proof
+of concept:
 
 - `hand_model.glb` — browser-ready glTF binary with the mesh, skin, armature,
   materials, and animation clips.
-- `hand_model.blend` — the source Blender file.
 
 ## Source and license
 

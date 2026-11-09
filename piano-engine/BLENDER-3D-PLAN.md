@@ -74,8 +74,9 @@ turns that state into scene transforms and materials.
 ## First asset proof of concept
 
 The first realistic hand asset is now checked into
-`website/assets/hand/`. It includes the source `.blend`, a browser-ready
-`.glb`, skinning, a 21-bone armature, and the `Pose_OK` / `RigAction` clips.
+`website/assets/hand/` as a browser-ready `.glb`, with skinning, a 21-bone
+armature, and the `Pose_OK` / `RigAction` clips. The GLB is the retained asset;
+the Blender source file is not kept in the repository.
 The working test page is `/hand-demo/`; it loads the GLB with Three.js,
 plays both clips, lists the bones, and directly curls the index finger.
 The asset is CC BY-NC 4.0, so it is suitable for non-commercial evaluation
