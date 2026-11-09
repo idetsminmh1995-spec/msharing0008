@@ -41,9 +41,8 @@ try {
       const input = document.querySelector('#upload-audio');
       const wav = new Uint8Array([82,73,70,70,38,0,0,0,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,68,172,0,0,136,88,1,0,2,0,16,0,100,97,116,97,2,0,0,0,0,0]);
       const dt = new DataTransfer(); dt.items.add(new File([wav], 'fixture.wav', { type: 'audio/wav' })); input.files = dt.files;
-      const stability = window.VideoExportStability.create({ page: 'cross-page-test', frame, render: async () => new Promise((resolve) => setTimeout(resolve, 60)) });
+      const stability = window.VideoExportStability.create({ page: 'cross-page-test', frame, render: async () => { window.dispatchEvent(new Event('resize')); await new Promise((resolve) => setTimeout(resolve, 60)); } });
       const running = stability.run().then(() => ({ status: 'unexpected-success' })).catch((error) => ({ status: 'guarded', message: error.message, cleaned: frame.style.position === '' && !frame.classList.contains('export-freeze') && !document.body.classList.contains('is-rendering') }));
-      setTimeout(() => window.dispatchEvent(new Event('resize')), 15);
       return await running;
     })()`, true);
     assert.equal(guard.status, 'guarded', `${instrument}: resize guard did not stop export`);
