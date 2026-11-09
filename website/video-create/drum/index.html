@@ -3432,6 +3432,9 @@
       );
     }
   }
+  if (new URLSearchParams(location.search).get('test') === '1') {
+    window.__DrumExportTest = Object.freeze({ pinExportFrame, assertPinnedFrame });
+  }
 
   /**
    * Bravura, base64, fetched once.

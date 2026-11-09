@@ -16,6 +16,8 @@ jobs:
         run: npm ci --prefix notation-engine
       - name: Test shared asset loader
         run: node tools/test-asset-loader.mjs
+      - name: Test outro failure cache
+        run: node tools/test-outro-video.mjs
       - name: Verify notation engine
         run: npm run verify --prefix notation-engine
       - name: Install Chromium and ffprobe
@@ -24,3 +26,5 @@ jobs:
           sudo apt-get install -y chromium-browser ffmpeg || sudo apt-get install -y chromium ffmpeg
       - name: Browser video-engine smoke test
         run: node tools/test-video-engine-browser.mjs
+      - name: Browser Drum rollout acceptance
+        run: node tools/test-drum-rollout-browser.mjs

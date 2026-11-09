@@ -63,7 +63,7 @@
     return `${apiBase}/assets/shared/` + key.split('/').map(encodeURIComponent).join('/');
   }
 
-  /** key -> {video, key, seconds} | null, so a second take reuses the download. */
+  /** Successful clips are cached; failures are remembered for 30 seconds only. */
   const cache = new Map();
   const failureCache = new Map();
   const FAILURE_CACHE_MS = 30_000;
@@ -117,7 +117,7 @@
     const cacheKey = keys.join('|');
     if (cache.has(cacheKey)) return cache.get(cacheKey);
     const failedAt = failureCache.get(cacheKey);
-    if (failedAt && Date.now() - failedAt < FAILURE_CACHE_MS) {
+    if (failedAt && Date.now() - failedAt.at < FAILURE_CACHE_MS) {
       lastFailure = failedAt.info;
       return null;
     }

@@ -1,0 +1,65 @@
+{
+  "phase": "A0-A4 / B / C / D browser acceptance",
+  "generatedAt": "2026-11-09T21:04:09.871Z",
+  "page": "http://127.0.0.1:8777/website/video-create/drum/?debug=1&test=1",
+  "viewports": [
+    500,
+    800,
+    1400
+  ],
+  "screenshots": [
+    "drum-500.png",
+    "drum-800.png",
+    "drum-1400.png"
+  ],
+  "pageState": {
+    "title": "MusicNote — Drum Video Create",
+    "hasGatePanel": true,
+    "hasCopyReport": true,
+    "hasDownloadReport": true,
+    "hasRetryButton": true,
+    "hasAssetLoader": true,
+    "hasRenderReport": true,
+    "hasExportTestHook": true,
+    "debugQuery": "1",
+    "viewport": {
+      "width": 800,
+      "height": 900
+    }
+  },
+  "failureTest": {
+    "missing": "R38.png could not be decoded. R38.png returned HTTP 404.",
+    "server": "Drum Bg.png could not be decoded. Drum Bg.png returned HTTP 500.",
+    "attempts404": 1,
+    "attempts500": 4,
+    "records": [
+      {
+        "url": "/missing",
+        "label": "R38.png",
+        "status": 404,
+        "attempts": 1,
+        "ms": 0,
+        "bytes": 0,
+        "error": "R38.png returned HTTP 404."
+      },
+      {
+        "url": "/server-500",
+        "label": "Drum Bg.png",
+        "status": 500,
+        "attempts": 4,
+        "ms": 6106,
+        "bytes": 0,
+        "error": "Drum Bg.png returned HTTP 500."
+      }
+    ]
+  },
+  "pinTest": {
+    "size": {
+      "width": 960,
+      "height": 540
+    },
+    "guard": "Window resized during export; pinned frame was 960px wide."
+  },
+  "deterministic": true,
+  "status": "passed"
+}
