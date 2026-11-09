@@ -87,9 +87,12 @@ class PianoHand3DRenderer {
     try {
       const gltf = await new GLTFLoader().loadAsync('../../assets/hand/hand_model.glb');
       this.handTemplate = gltf.scene;
-      this.handTemplate.scale.setScalar(0.18);
-      this.handTemplate.rotation.set(-0.18, 0.1, Math.PI + 0.08);
-      this.handTemplate.position.set(0, 1.48, 0.26);
+      // Player POV: the imported hand is laid over the keyboard so the
+      // wrist enters from the player's side and the fingers point toward
+      // the keys, instead of presenting a front-facing floating hand.
+      this.handTemplate.scale.setScalar(0.11);
+      this.handTemplate.rotation.set(-Math.PI / 2, 0.1, Math.PI + 0.08);
+      this.handTemplate.position.set(0, 0.92, 0.88);
       this.handTemplate.traverse((object) => {
         if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; }
         if (object.isBone) {
@@ -111,7 +114,7 @@ class PianoHand3DRenderer {
     const root = SkeletonUtils.clone(this.handTemplate);
     root.scale.x *= mirror ? -1 : 1;
     root.position.x = mirror ? -1.35 : 1.35;
-    root.position.z = side === 'right' ? 0.38 : 0.50;
+    root.position.z = 0.88;
     root.userData.side = side;
     root.traverse((object) => {
       if (object.isMesh) {
@@ -156,8 +159,10 @@ class PianoHand3DRenderer {
       if (left === undefined || right === undefined) continue;
       this.addKey(midi, (left + right) / 2, true, whiteWidth, colors);
     }
-    this.camera.position.set(0, 0.55, Math.max(8.5, whiteMidi.length * 0.14));
-    this.camera.lookAt(0, 0.0, 0);
+    // Sit behind the keyboard and look down toward the keys, like the
+    // performer seeing their own hands while playing.
+    this.camera.position.set(0, 3.55, Math.max(6.4, whiteMidi.length * 0.105));
+    this.camera.lookAt(0, 0.05, -0.10);
   }
 
   addKey(midi, x, black, whiteWidth, colors) {
