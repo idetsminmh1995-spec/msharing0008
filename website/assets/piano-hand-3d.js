@@ -419,10 +419,12 @@ class PianoHand3DRenderer {
         : timeMs >= interval.timeMs && timeMs < interval.timeMs + interval.durationMs + 70;
     });
     const fingerById = new Map(fingered.filter((note) => note.id !== undefined).map((note) => [note.id, note.finger]));
-    const fingerByMidi = new Map(fingered.map((note) => [note.midi, note.finger]));
     const attachFinger = (note) => ({
       ...note,
-      finger: note.finger ?? fingerById.get(note.id) ?? fingerByMidi.get(note.midi),
+      // Note IDs are the only stable identity. A MIDI pitch can occur many
+      // times in a phrase, so a pitch fallback can put a repeated note's
+      // finger on the wrong event.
+      finger: note.finger ?? fingerById.get(note.id),
     });
     const activeWithFinger = active.map(attachFinger);
     const contactWithFinger = contact.map(attachFinger);

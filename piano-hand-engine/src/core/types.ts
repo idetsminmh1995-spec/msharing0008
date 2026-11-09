@@ -186,6 +186,36 @@ export interface PerformanceNote {
   readonly chordId?: string;
 }
 
+/** Where a solved finger assignment came from. */
+export type FingerSource = 'override' | 'stated' | 'automatic';
+
+/** Why the engine chose a hand for a solved note. */
+export type HandReason = 'stated' | 'staff' | 'voice' | 'track' | 'inferred';
+
+/** A note after hand and finger decisions, but before motion planning. */
+export interface SolvedPerformanceNote extends PerformanceNote {
+  readonly hand: Hand;
+  readonly handReason: HandReason;
+  readonly handConfidence: number;
+  /** Undefined only when the fingering solver could not place the note. */
+  readonly finger?: Finger;
+  readonly fingerSource?: FingerSource;
+  readonly fingerConfidence: number;
+  /** Exact millimetre key position; absent when the note is outside the keyboard. */
+  readonly keyPosition?: Vec3;
+  readonly diagnostics: readonly SolvedNoteDiagnostic[];
+}
+
+export type SolvedNoteDiagnostic = 'out-of-range' | 'unfingered' | 'strained-fingering';
+
+/** The serialisable Phase 1–3 output consumed by later motion/render phases. */
+export interface PianoPerformancePlan {
+  readonly version: 1;
+  readonly notes: readonly SolvedPerformanceNote[];
+  readonly handCrossingsMs: readonly number[];
+  readonly incomplete: boolean;
+}
+
 /**
  * One note, fully solved: which hand, which finger, where that key is,
  * and where the hand has to be for the finger to reach it.

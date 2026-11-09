@@ -20,14 +20,12 @@
  *   5. inference from where the hands are  confidence 0.5
  */
 
-import type { Hand, PerformanceNote } from '../core/types.js';
+import type { Hand, HandReason, PerformanceNote } from '../core/types.js';
 import { groupByOnset, type OnsetGroup } from '../core/timeline.js';
 import { keyDistanceMm, type Keyboard } from '../keyboard/keyPosition.js';
 import { WHITE_KEY_WIDTH_MM } from '../keyboard/pianoGeometry.js';
 import { spansFor } from './handSpan.js';
 import type { HandProfile } from '../kinematics/handPose.js';
-
-export type HandReason = 'stated' | 'staff' | 'voice' | 'track' | 'inferred';
 
 export interface HandDecision {
   readonly noteId: string;

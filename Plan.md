@@ -20,6 +20,119 @@ Repository တစ်ခုလုံးအတွက် Notation Engine၊ Drum Vi
 
 Piano Video ရဲ့ **Hands** mode မှာ Piano Hand Engine က သတ်မှတ်ပေးတဲ့ ဘယ်/ညာလက်နဲ့ လက်ချောင်း ၁ မှ ၅ တို့က သတ်မှတ်ထားတဲ့ MIDI ခလုတ်ကို တိတိကျကျထိ၊ မှန်ကန်တဲ့ note-on အချိန်မှာဖိပြီး note-off ပြီးနောက် သဘာဝကျကျလွှတ်နိုင်ရပါမယ်။ လက်မော်ဒယ်အဖြစ် 12.3 MB `website/assets/hand/hand_model.glb` ကို ဆက်သုံးပါမယ်။ Preview နဲ့ export နှစ်ခုလုံးမှာ အချိန်တစ်ခုချင်းစီအတွက် တူညီတဲ့ လက်နဲ့ခလုတ်အခြေအနေကို အသုံးပြုရပါမယ်။
 
+## 2026-11-10 — မပြင်မီ အတည်ပြုထားသော update plan
+
+အောက်ပါအချက်များကို အရင် plan ထဲတွင် မှတ်တမ်းတင်ပြီးမှ code ပြင်မည်။ ပထမအကြိမ်တွင် data contract၊ finger assignment ချိတ်ဆက်မှုနှင့် deterministic sampling အခြေခံကို အရင်တည်ဆောက်မည်။ GLB ၏ တကယ့် bone axis/landmark တိုင်းတာမှု မပြီးမချင်း မြင်ရသော fingertip contact ကို အတည်ပြုပြီးပြီဟု မမှတ်သားရ။
+
+### ပြင်မည့်အချက်များ
+
+1. `PerformanceNote → hand decision → finger assignment → key strike point` ကို တစ်ခုတည်းသော serialisable `PianoPerformancePlan` အဖြစ် ချိတ်ဆက်မည်။ Finger source ကို `override`, `stated`, `automatic` ဟူ၍ ခွဲပြီး confidence နှင့် diagnostics ထည့်မည်။
+2. Hands renderer သည် MIDI pitch ဖြင့် finger ပြန်ရှာခြင်း မလုပ်ဘဲ stable note ID နှင့်သာ assignment ချိတ်မည်။ ထပ်တူ pitch note များတွင် finger မှားချိတ်နိုင်သော fallback ကို ဖယ်ရှားမည်။
+3. Motion state အတွက် `REST → PREPARE → TRAVEL → ALIGN → PRESS → HOLD → RELEASE → SHIFT/CROSS` phases နှင့် timestamp-based sampling contract သတ်မှတ်မည်။ Preview နှင့် export က sampler တစ်ခုတည်းကို သုံးနိုင်အောင် ပြင်ဆင်မည်။
+4. Chord ကို wrist target များ၏ ပျမ်းမျှတန်ဖိုးဖြင့် မဖြေရှင်းဘဲ assigned fingertip targets အားလုံး၊ wrist position/rotation နှင့် diagnostics ကို တစ်ပြိုင်နက်ဖြေရှင်းနိုင်သော coupled-IK interface ပြင်ဆင်မည်။
+5. GLB calibration အတွက် wrist/palm anchor, bone length, fingertip landmark, joint axis, scale/rotation/translation နှင့် joint limits ပါသော versioned calibration manifest ပုံစံ သတ်မှတ်မည်။
+6. Single note, chord, scale/thumb-under, repeated note, octave, crossing, left/right hand နှင့် preview/export parity အတွက် automated acceptance tests ထည့်မည်။
+7. Velocity, articulation, pedal နှင့် dynamics ကို motion/render stage သို့ သယ်ဆောင်နိုင်ရန် data model ချဲ့မည်။ Contact time ကို note-on အတိုင်း မပြောင်းဘဲ preparation height, press speed နှင့် release behavior ကိုသာ ပြောင်းမည်။
+
+### အဆင့်လိုက် အကောင်အထည်ဖော်မည့်အစီအစဉ်
+
+- **A — Data contract:** solved performance plan, stable note-ID mapping, provenance, diagnostics.
+- **B — Calibration:** GLB bind-pose measurement နှင့် Engine millimetre space transform.
+- **C — Contact:** calibrated single-finger target နှင့် residual/collision report.
+- **D — Coupled hand motion:** chord IK, wrist rotation, palm motion, hand-position trajectory.
+- **E — Technique:** scales, thumb-under, crossings, arpeggios, repeated notes, octaves.
+- **F — Humanisation:** coarticulation, velocity/dynamics, minimum-jerk motion, controlled anticipation.
+- **G — Acceptance:** browser contact tests, seek/repeated frame tests, preview/export parity, golden clips.
+
+### လက်ခံစံနှုန်း
+
+- Note တစ်ခုချင်းစီတွင် stable ID, hand, finger, source, confidence နှင့် key target ပါရမည်။
+- Finger assignment သည် repeated MIDI pitch ကြောင့် မမှားရ။
+- တူညီသော `timestampMs` အတွက် preview နှင့် export က တူညီသော hand/key state ထုတ်ရမည်။
+- Chord တစ်ခုတွင် assigned finger အားလုံးအတွက် residual နှင့် failure reason ကို ဖော်ပြရမည်။
+- GLB calibration မပြီးမချင်း synthetic IK residual ကို visible GLB contact accuracy ဟု မဆိုရ။
+- Reachable synthetic target များအတွက် residual ≤ 2 mm၊ joint limit မချိုးရ။
+
+## 2026-11-10 — Phase A ပြင်ဆင်ပြီးမှု မှတ်တမ်း
+
+### ပြင်ပြီးသောအချက်များ
+
+- `piano-hand-engine/src/core/performancePlan.ts` ကို ထည့်ပြီး `PerformanceNote → hand split → fingering → key position` ကို `PianoPerformancePlan` တစ်ခုတည်းအဖြစ် ထုတ်ပေးနိုင်အောင် ပြင်ထားသည်။
+- `SolvedPerformanceNote` data model တွင် `handReason`, `handConfidence`, `fingerSource`, `fingerConfidence`, `keyPosition` နှင့် `diagnostics` ထည့်ထားသည်။
+- Piano page ၏ `getPianoHandPerformance()` သည် သီးခြား split/fingering result ကို ပြန်တည်ဆောက်မည့်အစား `solvePerformancePlan()` ကို အသုံးပြုကာ event များထဲသို့ finger provenance နှင့် diagnostics သယ်ပေးသည်။
+- 3D renderer သည် repeated MIDI pitch များကို မှားယွင်းချိတ်နိုင်သည့် `fingerByMidi` fallback ကို ဖယ်ပြီး stable note ID ဖြင့်သာ finger assignment ချိတ်သည်။
+- Phase A အတွက် `performancePlan.test.js` ထည့်ထားပြီး stated finger, manual override, automatic finger confidence နှင့် out-of-range diagnostic ကို စမ်းသပ်ထားသည်။
+
+### စမ်းသပ်မှုရလဒ်
+
+- `piano-hand-engine`: **77/77 tests passed**
+- TypeScript typecheck: passed
+- ESLint: passed
+- Prettier format check: passed
+- Browser bundle build: passed
+- `website/assets/piano-hand-3d.js` syntax check: passed
+- `git diff --check`: passed
+
+### မပြီးသေးသောအချက်များ
+
+- GLB bind-pose calibration manifest နှင့် actual bone-axis measurement မပြီးသေးပါ။
+- Chord wrist target ကို average မယူဘဲ coupled wrist/finger IK ဖြင့် ဖြေရှင်းခြင်း မပြီးသေးပါ။
+- Wrist rotation, palm trajectory, prepare/travel/align/press/hold/release sampler မပြီးသေးပါ။
+- Collision/clearance validation၊ browser-level fingertip contact test နှင့် preview/export parity test မပြီးသေးပါ။
+- Velocity/dynamics, coarticulation, thumb-under, crossings, arpeggios နှင့် octave-specific motion မပြီးသေးပါ။
+
+Phase A သည် data contract နှင့် stable event identity ကိုသာ production path ထဲ ချိတ်ထားခြင်းဖြစ်ပြီး GLB fingertip contact တိကျမှုကို အတည်ပြုပြီးပြီဟု မဆိုလိုပါ။
+
+## 2026-11-10 — Phase B မပြင်မီ အတည်ပြုထားသော motion-plan update
+
+Phase A ရဲ့ note-level hand/finger mapping အပေါ်မှာ ဆက်လက်တည်ဆောက်ရန် အောက်ပါ motion contract ကို အရင်ထည့်ပြီးမှ code ပြင်မည်။ ဒီအဆင့်သည် GLB bone calibration သို့မဟုတ် coupled IK ကို ပြီးစီးပြီဟု မဆိုလိုဘဲ၊ နောက်အဆင့်များက အသုံးပြုမည့် deterministic time-based input/output ကိုသာ တည်ဆောက်မည်။
+
+### ပြင်မည့်အချက်များ
+
+1. Hand trajectory ကို `REST`, `PREPARE`, `TRAVEL`, `ALIGN`, `PRESS`, `HOLD`, `RELEASE`, `SHIFT`, `CROSS` phases နှင့် serialisable `PianoMotionPlan` အဖြစ် သတ်မှတ်မည်။
+2. လက်တစ်ဖက်စီအတွက် wrist position, wrist rotation, anchor key, technique နှင့် start/end timestamp ကို သိမ်းမည်။
+3. Note တစ်ခုချင်းစီအတွက် finger contact schedule တွင် `approachStartMs`, `contactMs`, `holdEndMs`, `releaseEndMs`, fingertip target နှင့် target key ကို သိမ်းမည်။
+4. `sampleHandMotion(plan, timestampMs)` pure function ထည့်ပြီး preview/export/seek အားလုံးက timestamp တစ်ခုတည်းမှ တူညီတဲ့ hand state ပြန်ရမည်။ Frame delta သို့မဟုတ် `requestAnimationFrame` timing ကို state source အဖြစ် မသုံးရ။
+5. Segment ကြား position/rotation ကို deterministic easing ဖြင့် interpolate လုပ်မည်။ Contact schedule ကို note-on boundary နှင့် release boundary များမှာ ပြတ်သားစွာ စစ်မည်။
+6. Motion sampler အတွက် rest, travel, hold, release, seek-backward, repeated timestamp နှင့် left/right independence tests ထည့်မည်။
+
+### Phase B လက်ခံစံနှုန်း
+
+- တူညီသော `timestampMs` နှင့် တူညီသော plan ကို နှစ်ကြိမ် sample လုပ်လျှင် result တူရမည်။
+- `contactMs` မတိုင်မီ contact မဖြစ်ရ၊ `releaseEndMs` ပြီးနောက် active contact မရှိရ။
+- Segment အစ/အဆုံးတွင် wrist position/rotation မခုန်ရ။
+- Left နှင့် right hand trajectory များသည် တစ်ဖက်ကြောင့် တစ်ဖက် state မပြောင်းရ။
+- Motion sampler သည် GLB joint axis မတိုင်းညှိရသေးသည့်အတွက် world-space GLB pose ကို မဖန်တီးသေးဘဲ calibrated renderer အတွက် input contract သာ ပြန်ပေးရမည်။
+
+## 2026-11-10 — Phase B ပြင်ဆင်ပြီးမှု မှတ်တမ်း
+
+### ပြင်ပြီးသောအချက်များ
+
+- `piano-hand-engine/src/core/motionPlan.ts` ကို ထည့်ပြီး `PianoMotionPlan`, `HandTrajectorySegment`, `FingerContactPlan`, `SampledHandMotion` data model များ တည်ဆောက်ထားသည်။
+- `sampleHandMotion(plan, timestampMs)` pure sampler ထည့်ထားပြီး frame delta မသုံးဘဲ absolute timestamp မှ hand state ကို ပြန်ပေးသည်။
+- Wrist position နှင့် rotation ကို segment အတွင်း deterministic smoothstep interpolation ဖြင့် sample လုပ်နိုင်သည်။
+- Contact schedule တွင် `APPROACH`, `CONTACT`, `RELEASE` boundaries ကို ခွဲပြီး `releaseEndMs` ပြီးနောက် contact မပြန်ပေးတော့ပါ။
+- Left/right hand trajectory ကို သီးခြား sample လုပ်ထားသဖြင့် တစ်ဖက်၏ state က တစ်ဖက်ကို မပြောင်းစေပါ။
+- Phase B အတွက် rest state, travel interpolation, repeated timestamp/seek-backward, contact boundary နှင့် left/right independence tests ထည့်ထားသည်။
+
+### စမ်းသပ်မှုရလဒ်
+
+- `piano-hand-engine`: **81/81 tests passed**
+- TypeScript typecheck: passed
+- ESLint: passed
+- Prettier format check: passed
+- Browser bundle build: passed
+- `website/assets/piano-hand-3d.js` syntax check: passed
+- `git diff --check`: passed
+
+### မပြီးသေးသောအချက်များ
+
+- Phase B sampler ကို GLB renderer ရဲ့ live preview/export path ထဲ တစ်ခုတည်းသော source အဖြစ် မချိတ်ရသေးပါ။
+- Sampler က wrist trajectory input ကို sample ပေးနိုင်သော်လည်း trajectory ကို score/fingering မှ အလိုအလျောက် generate လုပ်ပေးသော planner မပြီးသေးပါ။
+- GLB calibration, fingertip world pose, coupled chord IK, collision/clearance နှင့် technique-specific trajectory မပြီးသေးပါ။
+
+Phase B သည် deterministic motion-plan contract နှင့် sampler ကို ထည့်ထားခြင်းဖြစ်ပြီး GLB လက်ဖျားမှန်ကန်မှု သို့မဟုတ် လူတကယ်တီးသလို motion အားလုံး ပြီးစီးပြီဟု မဆိုလိုပါ။
+
 ## စစ်ဆေးတွေ့ရှိချက်
 
 - GLB ထဲမှာ rig ပါတဲ့ hand mesh နဲ့ joint ၂၁ ခုရှိပြီး လက်ချောင်း bone အမည်တွေက renderer ရဲ့ mapping နဲ့ ကိုက်ညီပါတယ်။

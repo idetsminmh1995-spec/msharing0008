@@ -70,10 +70,12 @@ var PianoHandEngine = (() => {
     nextAfter: () => nextAfter,
     pitchClass: () => pitchClass,
     pressedPose: () => pressedPose,
+    sampleHandMotion: () => sampleHandMotion,
     solveFingerTarget: () => solveFingerTarget,
     solveFingerTargets: () => solveFingerTargets,
     solveFingering: () => solveFingering,
     solveHandSkeleton: () => solveHandSkeleton,
+    solvePerformancePlan: () => solvePerformancePlan,
     solveStages: () => solveStages,
     spanStrain: () => spanStrain,
     spansFor: () => spansFor,
@@ -348,6 +350,90 @@ var PianoHandEngine = (() => {
     return Math.min(high, Math.max(low, value));
   }
 
+  // src/core/solver.ts
+  var DEFAULT_BEAM_WIDTH = 64;
+  var DEFAULT_MAX_RELAX = 3;
+  function solveStages(input) {
+    const beamWidth = input.beamWidth ?? DEFAULT_BEAM_WIDTH;
+    const maxRelax = input.maxRelax ?? DEFAULT_MAX_RELAX;
+    const relaxedStages = [];
+    let beam = [];
+    const skippedStages = [];
+    for (let index = 0; index < input.stages.length; index++) {
+      const stage = input.stages[index];
+      if (stage === void 0) continue;
+      const previousStage = index > 0 ? input.stages[index - 1] : void 0;
+      const next = /* @__PURE__ */ new Map();
+      let relax = 0;
+      while (next.size === 0 && relax <= maxRelax) {
+        if (beam.length === 0) {
+          for (const state of input.expand(void 0, stage, index, relax)) {
+            offer(
+              next,
+              {
+                state,
+                cost: input.stateCost(state, stage, index),
+                stageIndex: index,
+                previous: void 0
+              },
+              input.stateKey
+            );
+          }
+        } else {
+          for (const node of beam) {
+            for (const state of input.expand(node.state, stage, index, relax)) {
+              const cost = node.cost + input.stateCost(state, stage, index) + (previousStage === void 0 ? 0 : input.transitionCost(node.state, state, previousStage, stage));
+              offer(next, { state, cost, stageIndex: index, previous: node }, input.stateKey);
+            }
+          }
+        }
+        if (next.size === 0) relax++;
+      }
+      if (next.size === 0) {
+        skippedStages.push(index);
+        continue;
+      }
+      if (relax > 0) relaxedStages.push(index);
+      beam = prune([...next.values()], beamWidth);
+    }
+    const best = beam.reduce(
+      (lowest, node) => lowest === void 0 || node.cost < lowest.cost ? node : lowest,
+      void 0
+    );
+    const path = new Array(input.stages.length).fill(
+      void 0
+    );
+    if (best === void 0) {
+      return {
+        path,
+        totalCost: 0,
+        relaxedStages,
+        skippedStages: input.stages.map((_, index) => index),
+        incomplete: input.stages.length > 0
+      };
+    }
+    for (let node = best; node !== void 0; node = node.previous) {
+      path[node.stageIndex] = node.state;
+    }
+    return {
+      path,
+      totalCost: best.cost,
+      relaxedStages,
+      skippedStages,
+      incomplete: skippedStages.length > 0
+    };
+  }
+  function offer(into, node, stateKey) {
+    if (!Number.isFinite(node.cost)) return;
+    const key = stateKey(node.state);
+    const existing = into.get(key);
+    if (existing === void 0 || node.cost < existing.cost) into.set(key, node);
+  }
+  function prune(nodes, width) {
+    if (nodes.length <= width) return [...nodes];
+    return [...nodes].sort((a, b) => a.cost - b.cost).slice(0, width);
+  }
+
   // src/kinematics/handPose.ts
   var MEDIUM_HAND_RIG = {
     palmLength: 95,
@@ -536,262 +622,6 @@ var PianoHandEngine = (() => {
     };
   }
 
-  // src/kinematics/inverseKinematics.ts
-  var JOINTS = ["mcp", "pip", "dip", "spread"];
-  function solveFingerTarget(input) {
-    const toleranceMm = input.toleranceMm ?? 1;
-    const maxIterations = input.maxIterations ?? 40;
-    let state = clampFingerState(input.fingers[input.finger]);
-    let damping = 0.25;
-    let iterations = 0;
-    let tip = tipFor(input, state);
-    let error = distance(tip, input.target);
-    const activeJoints = input.allowSpread === false ? JOINTS.slice(0, 3) : JOINTS;
-    for (; iterations < maxIterations && error > toleranceMm; iterations += 1) {
-      const residual = subtract(input.target, tip);
-      const jacobian = jacobianFor(input, state, activeJoints);
-      const normal = gramMatrix(jacobian, damping);
-      const dual = solve3(normal, [residual.x, residual.y, residual.z]);
-      if (!dual) break;
-      const step = jacobian.map(
-        (column) => column.x * (dual[0] ?? 0) + column.y * (dual[1] ?? 0) + column.z * (dual[2] ?? 0)
-      );
-      const largest = Math.max(...step.map(Math.abs));
-      const scale2 = largest > 0.2 ? 0.2 / largest : 1;
-      const candidate = clampFingerState({
-        mcp: state.mcp + (step[0] ?? 0) * scale2,
-        pip: state.pip + (step[1] ?? 0) * scale2,
-        dip: state.dip + (step[2] ?? 0) * scale2,
-        spread: state.spread + (activeJoints.includes("spread") ? (step[3] ?? 0) * scale2 : 0)
-      });
-      const candidateTip = tipFor(input, candidate);
-      const candidateError = distance(candidateTip, input.target);
-      if (candidateError + 1e-7 < error) {
-        state = candidate;
-        tip = candidateTip;
-        error = candidateError;
-        damping = Math.max(0.025, damping * 0.7);
-      } else {
-        damping = Math.min(8, damping * 2);
-        if (damping === 8) break;
-      }
-    }
-    return {
-      finger: input.finger,
-      state,
-      tip,
-      errorMm: error,
-      converged: error <= toleranceMm,
-      iterations
-    };
-  }
-  function solveFingerTargets(input) {
-    const targetsByFinger = /* @__PURE__ */ new Map();
-    for (const target of input.targets) {
-      const targets = targetsByFinger.get(target.finger) ?? [];
-      targets.push(target.target);
-      targetsByFinger.set(target.finger, targets);
-    }
-    const fingers = { ...input.fingers };
-    const results = [];
-    for (const finger of ALL_FINGERS) {
-      const targets = targetsByFinger.get(finger);
-      if (!targets?.length) continue;
-      const centroid = mean(targets);
-      const result = solveFingerTarget({
-        hand: input.hand,
-        rig: input.rig,
-        wrist: input.wrist,
-        wristRotation: input.wristRotation,
-        fingers,
-        finger,
-        target: centroid,
-        ...input.allowSpread === void 0 ? {} : { allowSpread: input.allowSpread },
-        ...input.toleranceMm === void 0 ? {} : { toleranceMm: input.toleranceMm },
-        ...input.maxIterations === void 0 ? {} : { maxIterations: input.maxIterations }
-      });
-      fingers[finger] = result.state;
-      const worstTargetError = Math.max(...targets.map((target) => distance(result.tip, target)));
-      results.push({
-        ...result,
-        errorMm: worstTargetError,
-        converged: worstTargetError <= (input.toleranceMm ?? 1)
-      });
-    }
-    return {
-      fingers,
-      results,
-      maxErrorMm: results.reduce((max, result) => Math.max(max, result.errorMm), 0),
-      converged: results.every((result) => result.converged)
-    };
-  }
-  function tipFor(input, state) {
-    const fingers = { ...input.fingers, [input.finger]: state };
-    return solveHandSkeleton({
-      hand: input.hand,
-      rig: input.rig,
-      wrist: input.wrist,
-      wristRotation: input.wristRotation,
-      fingers
-    }).fingers[input.finger].tip;
-  }
-  function jacobianFor(input, state, joints) {
-    const epsilon = 1e-3;
-    return joints.map((joint) => {
-      const value = state[joint];
-      const plus = clampFingerState({ ...state, [joint]: value + epsilon });
-      const plusDelta = plus[joint] - value;
-      if (Math.abs(plusDelta) > 1e-9) {
-        return scale(subtract(tipFor(input, plus), tipFor(input, state)), 1 / plusDelta);
-      }
-      const minus = clampFingerState({ ...state, [joint]: value - epsilon });
-      const minusDelta = value - minus[joint];
-      if (minusDelta > 1e-9) {
-        return scale(subtract(tipFor(input, state), tipFor(input, minus)), 1 / minusDelta);
-      }
-      return { x: 0, y: 0, z: 0 };
-    });
-  }
-  function gramMatrix(jacobian, damping) {
-    const columns = [
-      jacobian.map((column) => column.x),
-      jacobian.map((column) => column.y),
-      jacobian.map((column) => column.z)
-    ];
-    return columns.map(
-      (row, i) => columns.map(
-        (column, j) => row.reduce(
-          (sum, value, k) => sum + value * (column[k] ?? 0),
-          i === j ? damping * damping : 0
-        )
-      )
-    );
-  }
-  function solve3(matrix, vector) {
-    const rows = matrix.map((row, i) => [...row, vector[i] ?? 0]);
-    for (let column = 0; column < 3; column += 1) {
-      let pivot = column;
-      for (let row = column + 1; row < 3; row += 1) {
-        if (Math.abs(rows[row]?.[column] ?? 0) > Math.abs(rows[pivot]?.[column] ?? 0)) pivot = row;
-      }
-      const pivotValue = rows[pivot]?.[column] ?? 0;
-      if (Math.abs(pivotValue) < 1e-12) return null;
-      [rows[column], rows[pivot]] = [rows[pivot] ?? [], rows[column] ?? []];
-      const pivotRow = rows[column];
-      if (!pivotRow) return null;
-      for (let j = column; j < 4; j += 1) pivotRow[j] = (pivotRow[j] ?? 0) / pivotValue;
-      for (let row = 0; row < 3; row += 1) {
-        if (row === column) continue;
-        const factor = rows[row]?.[column] ?? 0;
-        for (let j = column; j < 4; j += 1) {
-          const target = rows[row];
-          if (target) target[j] = (target[j] ?? 0) - factor * (pivotRow[j] ?? 0);
-        }
-      }
-    }
-    return rows.map((row) => row[3] ?? 0);
-  }
-  function mean(points) {
-    const sum = points.reduce((value, point) => add2(value, point), { x: 0, y: 0, z: 0 });
-    return scale(sum, 1 / points.length);
-  }
-  function add2(a, b) {
-    return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z };
-  }
-  function subtract(a, b) {
-    return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
-  }
-  function scale(point, amount) {
-    return { x: point.x * amount, y: point.y * amount, z: point.z * amount };
-  }
-  function distance(a, b) {
-    return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
-  }
-
-  // src/core/solver.ts
-  var DEFAULT_BEAM_WIDTH = 64;
-  var DEFAULT_MAX_RELAX = 3;
-  function solveStages(input) {
-    const beamWidth = input.beamWidth ?? DEFAULT_BEAM_WIDTH;
-    const maxRelax = input.maxRelax ?? DEFAULT_MAX_RELAX;
-    const relaxedStages = [];
-    let beam = [];
-    const skippedStages = [];
-    for (let index = 0; index < input.stages.length; index++) {
-      const stage = input.stages[index];
-      if (stage === void 0) continue;
-      const previousStage = index > 0 ? input.stages[index - 1] : void 0;
-      const next = /* @__PURE__ */ new Map();
-      let relax = 0;
-      while (next.size === 0 && relax <= maxRelax) {
-        if (beam.length === 0) {
-          for (const state of input.expand(void 0, stage, index, relax)) {
-            offer(
-              next,
-              {
-                state,
-                cost: input.stateCost(state, stage, index),
-                stageIndex: index,
-                previous: void 0
-              },
-              input.stateKey
-            );
-          }
-        } else {
-          for (const node of beam) {
-            for (const state of input.expand(node.state, stage, index, relax)) {
-              const cost = node.cost + input.stateCost(state, stage, index) + (previousStage === void 0 ? 0 : input.transitionCost(node.state, state, previousStage, stage));
-              offer(next, { state, cost, stageIndex: index, previous: node }, input.stateKey);
-            }
-          }
-        }
-        if (next.size === 0) relax++;
-      }
-      if (next.size === 0) {
-        skippedStages.push(index);
-        continue;
-      }
-      if (relax > 0) relaxedStages.push(index);
-      beam = prune([...next.values()], beamWidth);
-    }
-    const best = beam.reduce(
-      (lowest, node) => lowest === void 0 || node.cost < lowest.cost ? node : lowest,
-      void 0
-    );
-    const path = new Array(input.stages.length).fill(
-      void 0
-    );
-    if (best === void 0) {
-      return {
-        path,
-        totalCost: 0,
-        relaxedStages,
-        skippedStages: input.stages.map((_, index) => index),
-        incomplete: input.stages.length > 0
-      };
-    }
-    for (let node = best; node !== void 0; node = node.previous) {
-      path[node.stageIndex] = node.state;
-    }
-    return {
-      path,
-      totalCost: best.cost,
-      relaxedStages,
-      skippedStages,
-      incomplete: skippedStages.length > 0
-    };
-  }
-  function offer(into, node, stateKey) {
-    if (!Number.isFinite(node.cost)) return;
-    const key = stateKey(node.state);
-    const existing = into.get(key);
-    if (existing === void 0 || node.cost < existing.cost) into.set(key, node);
-  }
-  function prune(nodes, width) {
-    if (nodes.length <= width) return [...nodes];
-    return [...nodes].sort((a, b) => a.cost - b.cost).slice(0, width);
-  }
-
   // src/fingering/handSpan.ts
   function fingerPair(a, b) {
     return a < b ? `${a}-${b}` : `${b}-${a}`;
@@ -837,175 +667,6 @@ var PianoHandEngine = (() => {
   }
   function maxReachMm(spans) {
     return spans["1-5"]?.max ?? 0;
-  }
-
-  // src/fingering/handSplit.ts
-  var CONFIDENCE = {
-    stated: 1,
-    staff: 0.95,
-    voice: 0.8,
-    track: 0.7,
-    inferred: 0.5
-  };
-  function splitHands(notes, options) {
-    const spans = spansFor(options.profile);
-    const fallback = options.fallback ?? "right";
-    const decisions = /* @__PURE__ */ new Map();
-    const undecided = [];
-    const staffMap = staffToHand(notes);
-    const trackMap = trackToHand(notes);
-    for (const note of notes) {
-      const direct = statedEvidence(note, staffMap, trackMap);
-      if (direct !== void 0) decisions.set(note.id, { noteId: note.id, ...direct });
-      else undecided.push(note);
-    }
-    if (undecided.length > 0) {
-      for (const decision of inferFromPosition(
-        undecided,
-        decisions,
-        options.keyboard,
-        spans,
-        fallback
-      )) {
-        decisions.set(decision.noteId, decision);
-      }
-    }
-    const ordered = notes.map((note) => decisions.get(note.id)).filter((d) => d !== void 0);
-    return {
-      decisions: ordered,
-      byNoteId: decisions,
-      crossings: findCrossings(notes, decisions)
-    };
-  }
-  function statedEvidence(note, staffMap, trackMap) {
-    if (note.statedHand !== void 0) {
-      return { hand: note.statedHand, reason: "stated", confidence: CONFIDENCE.stated };
-    }
-    if (note.staff !== void 0 && staffMap !== void 0) {
-      const hand = staffMap.get(note.staff);
-      if (hand !== void 0) return { hand, reason: "staff", confidence: CONFIDENCE.staff };
-    }
-    if (note.track !== void 0 && trackMap !== void 0) {
-      const hand = trackMap.get(note.track);
-      if (hand !== void 0) return { hand, reason: "track", confidence: CONFIDENCE.track };
-    }
-    return void 0;
-  }
-  function staffToHand(notes) {
-    const staves = /* @__PURE__ */ new Set();
-    for (const note of notes) if (note.staff !== void 0) staves.add(note.staff);
-    if (staves.size !== 2) return void 0;
-    const sorted = [...staves].sort((a, b) => a - b);
-    const upper = sorted[0];
-    const lower = sorted[1];
-    if (upper === void 0 || lower === void 0) return void 0;
-    return /* @__PURE__ */ new Map([
-      [upper, "right"],
-      [lower, "left"]
-    ]);
-  }
-  function trackToHand(notes) {
-    const byTrack = /* @__PURE__ */ new Map();
-    for (const note of notes) {
-      if (note.track === void 0) continue;
-      const list = byTrack.get(note.track) ?? [];
-      list.push(note.midi);
-      byTrack.set(note.track, list);
-    }
-    if (byTrack.size !== 2) return void 0;
-    const entries = [...byTrack.entries()].map(([track, pitches]) => ({
-      track,
-      mean: pitches.reduce((sum, p) => sum + p, 0) / pitches.length
-    }));
-    entries.sort((a, b) => a.mean - b.mean);
-    const low = entries[0];
-    const high = entries[1];
-    if (low === void 0 || high === void 0) return void 0;
-    if (high.mean - low.mean < 7) return void 0;
-    return /* @__PURE__ */ new Map([
-      [low.track, "left"],
-      [high.track, "right"]
-    ]);
-  }
-  function inferFromPosition(notes, already, keyboard, spans, fallback) {
-    const out = [];
-    const groups = groupByOnset(notes);
-    const last = {
-      left: void 0,
-      right: void 0
-    };
-    for (const note of notes) {
-      const decided = already.get(note.id);
-      if (decided === void 0) continue;
-      last[decided.hand] = { midi: note.midi, timeMs: note.timeMs };
-    }
-    for (const group of groups) {
-      const sorted = [...group.notes].sort((a, b) => a.midi - b.midi);
-      let best;
-      for (let cut2 = 0; cut2 <= sorted.length; cut2++) {
-        const lower2 = sorted.slice(0, cut2);
-        const upper2 = sorted.slice(cut2);
-        const cost = handCost("left", lower2, last.left, group, keyboard, spans, fallback) + handCost("right", upper2, last.right, group, keyboard, spans, fallback);
-        if (best === void 0 || cost < best.cost) best = { cut: cut2, cost };
-      }
-      const cut = best?.cut ?? sorted.length;
-      sorted.forEach((note, index) => {
-        const hand = index < cut ? "left" : "right";
-        out.push({ noteId: note.id, hand, reason: "inferred", confidence: CONFIDENCE.inferred });
-      });
-      const lower = sorted.slice(0, cut);
-      const upper = sorted.slice(cut);
-      if (lower.length > 0) last.left = centreOf(lower, group.timeMs);
-      if (upper.length > 0) last.right = centreOf(upper, group.timeMs);
-    }
-    return out;
-  }
-  function centreOf(notes, timeMs) {
-    const sum = notes.reduce((total, note) => total + note.midi, 0);
-    return { midi: sum / notes.length, timeMs };
-  }
-  var ENGAGE_HAND = 0.6;
-  var NOT_THE_FALLBACK_HAND = 0.05;
-  function handCost(hand, notes, last, group, keyboard, spans, fallback) {
-    if (notes.length === 0) return 0;
-    const low = notes[0];
-    const high = notes[notes.length - 1];
-    if (low === void 0 || high === void 0) return 0;
-    let cost = ENGAGE_HAND;
-    if (hand !== fallback) cost += NOT_THE_FALLBACK_HAND;
-    const spanMm = Math.abs(keyDistanceMm(keyboard, low.midi, high.midi));
-    const reach = spans["1-5"];
-    if (reach !== void 0) {
-      if (spanMm > reach.max) return Number.POSITIVE_INFINITY;
-      if (spanMm > reach.comfort) {
-        const range = Math.max(1e-6, reach.max - reach.comfort);
-        cost += (spanMm - reach.comfort) / range * 2;
-      }
-    }
-    if (last !== void 0) {
-      const travelMm = Math.abs(
-        keyDistanceMm(keyboard, Math.round(last.midi), Math.round(centreOf(notes, 0).midi))
-      );
-      const gapMs = Math.max(1, group.timeMs - last.timeMs);
-      cost += travelMm / (4 * WHITE_KEY_WIDTH_MM);
-      const speedMmPerMs = travelMm / gapMs;
-      if (speedMmPerMs > 1) cost += (speedMmPerMs - 1) * 6;
-    }
-    return cost;
-  }
-  function findCrossings(notes, decisions) {
-    const crossings = [];
-    for (const group of groupByOnset(notes)) {
-      let lowestRight = Number.POSITIVE_INFINITY;
-      let highestLeft = Number.NEGATIVE_INFINITY;
-      for (const note of group.notes) {
-        const hand = decisions.get(note.id)?.hand;
-        if (hand === "right") lowestRight = Math.min(lowestRight, note.midi);
-        if (hand === "left") highestLeft = Math.max(highestLeft, note.midi);
-      }
-      if (highestLeft > lowestRight) crossings.push(group.timeMs);
-    }
-    return crossings;
   }
 
   // src/fingering/fingeringCost.ts
@@ -1252,6 +913,474 @@ var PianoHandEngine = (() => {
       return [{ fingers: stage.notes.map((_, i) => ALL_FINGERS[i % 5] ?? 1) }];
     }
     return out;
+  }
+
+  // src/fingering/handSplit.ts
+  var CONFIDENCE = {
+    stated: 1,
+    staff: 0.95,
+    voice: 0.8,
+    track: 0.7,
+    inferred: 0.5
+  };
+  function splitHands(notes, options) {
+    const spans = spansFor(options.profile);
+    const fallback = options.fallback ?? "right";
+    const decisions = /* @__PURE__ */ new Map();
+    const undecided = [];
+    const staffMap = staffToHand(notes);
+    const trackMap = trackToHand(notes);
+    for (const note of notes) {
+      const direct = statedEvidence(note, staffMap, trackMap);
+      if (direct !== void 0) decisions.set(note.id, { noteId: note.id, ...direct });
+      else undecided.push(note);
+    }
+    if (undecided.length > 0) {
+      for (const decision of inferFromPosition(
+        undecided,
+        decisions,
+        options.keyboard,
+        spans,
+        fallback
+      )) {
+        decisions.set(decision.noteId, decision);
+      }
+    }
+    const ordered = notes.map((note) => decisions.get(note.id)).filter((d) => d !== void 0);
+    return {
+      decisions: ordered,
+      byNoteId: decisions,
+      crossings: findCrossings(notes, decisions)
+    };
+  }
+  function statedEvidence(note, staffMap, trackMap) {
+    if (note.statedHand !== void 0) {
+      return { hand: note.statedHand, reason: "stated", confidence: CONFIDENCE.stated };
+    }
+    if (note.staff !== void 0 && staffMap !== void 0) {
+      const hand = staffMap.get(note.staff);
+      if (hand !== void 0) return { hand, reason: "staff", confidence: CONFIDENCE.staff };
+    }
+    if (note.track !== void 0 && trackMap !== void 0) {
+      const hand = trackMap.get(note.track);
+      if (hand !== void 0) return { hand, reason: "track", confidence: CONFIDENCE.track };
+    }
+    return void 0;
+  }
+  function staffToHand(notes) {
+    const staves = /* @__PURE__ */ new Set();
+    for (const note of notes) if (note.staff !== void 0) staves.add(note.staff);
+    if (staves.size !== 2) return void 0;
+    const sorted = [...staves].sort((a, b) => a - b);
+    const upper = sorted[0];
+    const lower = sorted[1];
+    if (upper === void 0 || lower === void 0) return void 0;
+    return /* @__PURE__ */ new Map([
+      [upper, "right"],
+      [lower, "left"]
+    ]);
+  }
+  function trackToHand(notes) {
+    const byTrack = /* @__PURE__ */ new Map();
+    for (const note of notes) {
+      if (note.track === void 0) continue;
+      const list = byTrack.get(note.track) ?? [];
+      list.push(note.midi);
+      byTrack.set(note.track, list);
+    }
+    if (byTrack.size !== 2) return void 0;
+    const entries = [...byTrack.entries()].map(([track, pitches]) => ({
+      track,
+      mean: pitches.reduce((sum, p) => sum + p, 0) / pitches.length
+    }));
+    entries.sort((a, b) => a.mean - b.mean);
+    const low = entries[0];
+    const high = entries[1];
+    if (low === void 0 || high === void 0) return void 0;
+    if (high.mean - low.mean < 7) return void 0;
+    return /* @__PURE__ */ new Map([
+      [low.track, "left"],
+      [high.track, "right"]
+    ]);
+  }
+  function inferFromPosition(notes, already, keyboard, spans, fallback) {
+    const out = [];
+    const groups = groupByOnset(notes);
+    const last = {
+      left: void 0,
+      right: void 0
+    };
+    for (const note of notes) {
+      const decided = already.get(note.id);
+      if (decided === void 0) continue;
+      last[decided.hand] = { midi: note.midi, timeMs: note.timeMs };
+    }
+    for (const group of groups) {
+      const sorted = [...group.notes].sort((a, b) => a.midi - b.midi);
+      let best;
+      for (let cut2 = 0; cut2 <= sorted.length; cut2++) {
+        const lower2 = sorted.slice(0, cut2);
+        const upper2 = sorted.slice(cut2);
+        const cost = handCost("left", lower2, last.left, group, keyboard, spans, fallback) + handCost("right", upper2, last.right, group, keyboard, spans, fallback);
+        if (best === void 0 || cost < best.cost) best = { cut: cut2, cost };
+      }
+      const cut = best?.cut ?? sorted.length;
+      sorted.forEach((note, index) => {
+        const hand = index < cut ? "left" : "right";
+        out.push({ noteId: note.id, hand, reason: "inferred", confidence: CONFIDENCE.inferred });
+      });
+      const lower = sorted.slice(0, cut);
+      const upper = sorted.slice(cut);
+      if (lower.length > 0) last.left = centreOf(lower, group.timeMs);
+      if (upper.length > 0) last.right = centreOf(upper, group.timeMs);
+    }
+    return out;
+  }
+  function centreOf(notes, timeMs) {
+    const sum = notes.reduce((total, note) => total + note.midi, 0);
+    return { midi: sum / notes.length, timeMs };
+  }
+  var ENGAGE_HAND = 0.6;
+  var NOT_THE_FALLBACK_HAND = 0.05;
+  function handCost(hand, notes, last, group, keyboard, spans, fallback) {
+    if (notes.length === 0) return 0;
+    const low = notes[0];
+    const high = notes[notes.length - 1];
+    if (low === void 0 || high === void 0) return 0;
+    let cost = ENGAGE_HAND;
+    if (hand !== fallback) cost += NOT_THE_FALLBACK_HAND;
+    const spanMm = Math.abs(keyDistanceMm(keyboard, low.midi, high.midi));
+    const reach = spans["1-5"];
+    if (reach !== void 0) {
+      if (spanMm > reach.max) return Number.POSITIVE_INFINITY;
+      if (spanMm > reach.comfort) {
+        const range = Math.max(1e-6, reach.max - reach.comfort);
+        cost += (spanMm - reach.comfort) / range * 2;
+      }
+    }
+    if (last !== void 0) {
+      const travelMm = Math.abs(
+        keyDistanceMm(keyboard, Math.round(last.midi), Math.round(centreOf(notes, 0).midi))
+      );
+      const gapMs = Math.max(1, group.timeMs - last.timeMs);
+      cost += travelMm / (4 * WHITE_KEY_WIDTH_MM);
+      const speedMmPerMs = travelMm / gapMs;
+      if (speedMmPerMs > 1) cost += (speedMmPerMs - 1) * 6;
+    }
+    return cost;
+  }
+  function findCrossings(notes, decisions) {
+    const crossings = [];
+    for (const group of groupByOnset(notes)) {
+      let lowestRight = Number.POSITIVE_INFINITY;
+      let highestLeft = Number.NEGATIVE_INFINITY;
+      for (const note of group.notes) {
+        const hand = decisions.get(note.id)?.hand;
+        if (hand === "right") lowestRight = Math.min(lowestRight, note.midi);
+        if (hand === "left") highestLeft = Math.max(highestLeft, note.midi);
+      }
+      if (highestLeft > lowestRight) crossings.push(group.timeMs);
+    }
+    return crossings;
+  }
+
+  // src/core/performancePlan.ts
+  function solvePerformancePlan(notes, options) {
+    const handSplit = splitHands(notes, options);
+    const positions = keyPositionsFor(notes, options.keyboard);
+    const positionById = new Map(positions.positions.map((position) => [position.id, position]));
+    const notesByHand = /* @__PURE__ */ new Map([
+      ["left", []],
+      ["right", []]
+    ]);
+    for (const note of notes) {
+      const decision = handSplit.byNoteId.get(note.id);
+      if (decision === void 0) continue;
+      notesByHand.get(decision.hand)?.push(note);
+    }
+    const left = solveFingering(notesByHand.get("left") ?? [], "left", options);
+    const right = solveFingering(notesByHand.get("right") ?? [], "right", options);
+    const assignments = new Map([
+      ...left.assignments.map((assignment) => [assignment.noteId, assignment]),
+      ...right.assignments.map((assignment) => [assignment.noteId, assignment])
+    ]);
+    const strainedTimes = /* @__PURE__ */ new Set([...left.strainedOnsets, ...right.strainedOnsets]);
+    const incomplete = left.incomplete || right.incomplete || positions.outOfRange.length > 0;
+    const outOfRange = new Set(positions.outOfRange.map((note) => note.id));
+    const solvedNotes = notes.map((note) => {
+      const handDecision = handSplit.byNoteId.get(note.id);
+      const assignment = assignments.get(note.id);
+      const position = positionById.get(note.id);
+      const fingerSource = sourceOf(note.id, note, options.overrides);
+      const diagnostics = [
+        ...outOfRange.has(note.id) ? ["out-of-range"] : [],
+        ...assignment === void 0 ? ["unfingered"] : [],
+        ...strainedTimes.has(note.timeMs) ? ["strained-fingering"] : []
+      ];
+      return {
+        ...note,
+        hand: handDecision?.hand ?? "right",
+        handReason: handDecision?.reason ?? "inferred",
+        handConfidence: handDecision?.confidence ?? 0,
+        fingerConfidence: assignment === void 0 ? 0 : fingerSource === "automatic" ? 0.6 : 1,
+        diagnostics,
+        ...assignment === void 0 ? {} : { finger: assignment.finger, fingerSource },
+        ...position === void 0 ? {} : { keyPosition: position.strike }
+      };
+    });
+    return {
+      version: 1,
+      notes: solvedNotes,
+      handCrossingsMs: handSplit.crossings,
+      incomplete
+    };
+  }
+  function sourceOf(noteId, note, overrides) {
+    if (overrides?.has(noteId)) return "override";
+    if (note.statedFinger !== void 0) return "stated";
+    return "automatic";
+  }
+
+  // src/core/motionPlan.ts
+  function sampleHandMotion(plan, timestampMs) {
+    const timestamp = Number.isFinite(timestampMs) ? timestampMs : 0;
+    return {
+      timestampMs: timestamp,
+      hands: {
+        left: sampleHand("left", plan.trajectories, timestamp),
+        right: sampleHand("right", plan.trajectories, timestamp)
+      },
+      contacts: plan.contacts.filter((contact) => timestamp >= contact.approachStartMs && timestamp < contact.releaseEndMs).map((contact) => ({ ...contact, state: contactState(contact, timestamp) }))
+    };
+  }
+  function sampleHand(hand, trajectories, timestampMs) {
+    const segments = trajectories.filter((segment2) => segment2.hand === hand);
+    if (segments.length === 0) return restState();
+    const first = segments[0];
+    const last = segments[segments.length - 1];
+    if (first === void 0 || last === void 0) return restState();
+    const segment = segments.find(
+      (candidate) => timestampMs >= candidate.startMs && timestampMs < candidate.endMs
+    ) ?? (timestampMs < first.startMs ? first : last);
+    const duration = Math.max(1, segment.endMs - segment.startMs);
+    const progress = clamp01((timestampMs - segment.startMs) / duration);
+    const eased = smoothstep(progress);
+    return {
+      phase: segment.phase,
+      anchorKey: segment.anchorKey,
+      technique: segment.technique,
+      wristPosition: lerpVec3(segment.wristPosition, segment.targetWristPosition, eased),
+      wristRotation: lerpEuler(segment.wristRotation, segment.targetWristRotation, eased),
+      progress
+    };
+  }
+  function contactState(contact, timestampMs) {
+    if (timestampMs < contact.contactMs) return "APPROACH";
+    if (timestampMs < contact.holdEndMs) return "CONTACT";
+    return "RELEASE";
+  }
+  function restState() {
+    return {
+      phase: "REST",
+      anchorKey: null,
+      technique: "NORMAL",
+      wristPosition: { x: 0, y: 0, z: 0 },
+      wristRotation: { x: 0, y: 0, z: 0 },
+      progress: 0
+    };
+  }
+  function lerpVec3(a, b, t) {
+    return {
+      x: a.x + (b.x - a.x) * t,
+      y: a.y + (b.y - a.y) * t,
+      z: a.z + (b.z - a.z) * t
+    };
+  }
+  function lerpEuler(a, b, t) {
+    return {
+      x: a.x + (b.x - a.x) * t,
+      y: a.y + (b.y - a.y) * t,
+      z: a.z + (b.z - a.z) * t
+    };
+  }
+  function smoothstep(t) {
+    const u = clamp01(t);
+    return u * u * (3 - 2 * u);
+  }
+  function clamp01(value) {
+    return Math.min(1, Math.max(0, value));
+  }
+
+  // src/kinematics/inverseKinematics.ts
+  var JOINTS = ["mcp", "pip", "dip", "spread"];
+  function solveFingerTarget(input) {
+    const toleranceMm = input.toleranceMm ?? 1;
+    const maxIterations = input.maxIterations ?? 40;
+    let state = clampFingerState(input.fingers[input.finger]);
+    let damping = 0.25;
+    let iterations = 0;
+    let tip = tipFor(input, state);
+    let error = distance(tip, input.target);
+    const activeJoints = input.allowSpread === false ? JOINTS.slice(0, 3) : JOINTS;
+    for (; iterations < maxIterations && error > toleranceMm; iterations += 1) {
+      const residual = subtract(input.target, tip);
+      const jacobian = jacobianFor(input, state, activeJoints);
+      const normal = gramMatrix(jacobian, damping);
+      const dual = solve3(normal, [residual.x, residual.y, residual.z]);
+      if (!dual) break;
+      const step = jacobian.map(
+        (column) => column.x * (dual[0] ?? 0) + column.y * (dual[1] ?? 0) + column.z * (dual[2] ?? 0)
+      );
+      const largest = Math.max(...step.map(Math.abs));
+      const scale2 = largest > 0.2 ? 0.2 / largest : 1;
+      const candidate = clampFingerState({
+        mcp: state.mcp + (step[0] ?? 0) * scale2,
+        pip: state.pip + (step[1] ?? 0) * scale2,
+        dip: state.dip + (step[2] ?? 0) * scale2,
+        spread: state.spread + (activeJoints.includes("spread") ? (step[3] ?? 0) * scale2 : 0)
+      });
+      const candidateTip = tipFor(input, candidate);
+      const candidateError = distance(candidateTip, input.target);
+      if (candidateError + 1e-7 < error) {
+        state = candidate;
+        tip = candidateTip;
+        error = candidateError;
+        damping = Math.max(0.025, damping * 0.7);
+      } else {
+        damping = Math.min(8, damping * 2);
+        if (damping === 8) break;
+      }
+    }
+    return {
+      finger: input.finger,
+      state,
+      tip,
+      errorMm: error,
+      converged: error <= toleranceMm,
+      iterations
+    };
+  }
+  function solveFingerTargets(input) {
+    const targetsByFinger = /* @__PURE__ */ new Map();
+    for (const target of input.targets) {
+      const targets = targetsByFinger.get(target.finger) ?? [];
+      targets.push(target.target);
+      targetsByFinger.set(target.finger, targets);
+    }
+    const fingers = { ...input.fingers };
+    const results = [];
+    for (const finger of ALL_FINGERS) {
+      const targets = targetsByFinger.get(finger);
+      if (!targets?.length) continue;
+      const centroid = mean(targets);
+      const result = solveFingerTarget({
+        hand: input.hand,
+        rig: input.rig,
+        wrist: input.wrist,
+        wristRotation: input.wristRotation,
+        fingers,
+        finger,
+        target: centroid,
+        ...input.allowSpread === void 0 ? {} : { allowSpread: input.allowSpread },
+        ...input.toleranceMm === void 0 ? {} : { toleranceMm: input.toleranceMm },
+        ...input.maxIterations === void 0 ? {} : { maxIterations: input.maxIterations }
+      });
+      fingers[finger] = result.state;
+      const worstTargetError = Math.max(...targets.map((target) => distance(result.tip, target)));
+      results.push({
+        ...result,
+        errorMm: worstTargetError,
+        converged: worstTargetError <= (input.toleranceMm ?? 1)
+      });
+    }
+    return {
+      fingers,
+      results,
+      maxErrorMm: results.reduce((max, result) => Math.max(max, result.errorMm), 0),
+      converged: results.every((result) => result.converged)
+    };
+  }
+  function tipFor(input, state) {
+    const fingers = { ...input.fingers, [input.finger]: state };
+    return solveHandSkeleton({
+      hand: input.hand,
+      rig: input.rig,
+      wrist: input.wrist,
+      wristRotation: input.wristRotation,
+      fingers
+    }).fingers[input.finger].tip;
+  }
+  function jacobianFor(input, state, joints) {
+    const epsilon = 1e-3;
+    return joints.map((joint) => {
+      const value = state[joint];
+      const plus = clampFingerState({ ...state, [joint]: value + epsilon });
+      const plusDelta = plus[joint] - value;
+      if (Math.abs(plusDelta) > 1e-9) {
+        return scale(subtract(tipFor(input, plus), tipFor(input, state)), 1 / plusDelta);
+      }
+      const minus = clampFingerState({ ...state, [joint]: value - epsilon });
+      const minusDelta = value - minus[joint];
+      if (minusDelta > 1e-9) {
+        return scale(subtract(tipFor(input, state), tipFor(input, minus)), 1 / minusDelta);
+      }
+      return { x: 0, y: 0, z: 0 };
+    });
+  }
+  function gramMatrix(jacobian, damping) {
+    const columns = [
+      jacobian.map((column) => column.x),
+      jacobian.map((column) => column.y),
+      jacobian.map((column) => column.z)
+    ];
+    return columns.map(
+      (row, i) => columns.map(
+        (column, j) => row.reduce(
+          (sum, value, k) => sum + value * (column[k] ?? 0),
+          i === j ? damping * damping : 0
+        )
+      )
+    );
+  }
+  function solve3(matrix, vector) {
+    const rows = matrix.map((row, i) => [...row, vector[i] ?? 0]);
+    for (let column = 0; column < 3; column += 1) {
+      let pivot = column;
+      for (let row = column + 1; row < 3; row += 1) {
+        if (Math.abs(rows[row]?.[column] ?? 0) > Math.abs(rows[pivot]?.[column] ?? 0)) pivot = row;
+      }
+      const pivotValue = rows[pivot]?.[column] ?? 0;
+      if (Math.abs(pivotValue) < 1e-12) return null;
+      [rows[column], rows[pivot]] = [rows[pivot] ?? [], rows[column] ?? []];
+      const pivotRow = rows[column];
+      if (!pivotRow) return null;
+      for (let j = column; j < 4; j += 1) pivotRow[j] = (pivotRow[j] ?? 0) / pivotValue;
+      for (let row = 0; row < 3; row += 1) {
+        if (row === column) continue;
+        const factor = rows[row]?.[column] ?? 0;
+        for (let j = column; j < 4; j += 1) {
+          const target = rows[row];
+          if (target) target[j] = (target[j] ?? 0) - factor * (pivotRow[j] ?? 0);
+        }
+      }
+    }
+    return rows.map((row) => row[3] ?? 0);
+  }
+  function mean(points) {
+    const sum = points.reduce((value, point) => add2(value, point), { x: 0, y: 0, z: 0 });
+    return scale(sum, 1 / points.length);
+  }
+  function add2(a, b) {
+    return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z };
+  }
+  function subtract(a, b) {
+    return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
+  }
+  function scale(point, amount) {
+    return { x: point.x * amount, y: point.y * amount, z: point.z * amount };
+  }
+  function distance(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
   }
 
   // src/index.ts

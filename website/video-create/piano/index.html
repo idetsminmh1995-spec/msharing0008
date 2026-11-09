@@ -1534,37 +1534,33 @@
 
     try {
       const keyboard = engine.buildKeyboard(size);
+      const plan = engine.solvePerformancePlan(pianoPerformanceNotes, { keyboard });
       const split = engine.splitHands(pianoPerformanceNotes, { keyboard });
       const positions = engine.keyPositionsFor(pianoPerformanceNotes, keyboard);
-      const assignments = [];
-      for (const hand of ['left', 'right']) {
-        const handNotes = pianoPerformanceNotes.filter((note) => split.byNoteId.get(note.id)?.hand === hand);
-        if (handNotes.length) {
-          assignments.push(...engine.solveFingering(handNotes, hand, { keyboard }).assignments);
-        }
-      }
-
-      const assignmentById = new Map(assignments.map((assignment) => [assignment.noteId, assignment]));
-      const sourceById = new Map(pianoPerformanceNotes.map((note) => [note.id, note]));
-      const events = positions.positions.map((position) => {
-        const source = sourceById.get(position.id);
-        const decision = split.byNoteId.get(position.id);
-        const assignment = assignmentById.get(position.id);
-        if (!source || !decision) return null;
+      const positionById = new Map(positions.positions.map((position) => [position.id, position]));
+      const events = plan.notes.map((solved) => {
+        const position = positionById.get(solved.id);
+        if (!position) return null;
         return {
-          id: position.id,
-          midi: position.midi,
-          startSeconds: position.timeMs / 1000,
-          endSeconds: (position.timeMs + position.durationMs) / 1000,
-          hand: decision.hand,
-          ...(assignment ? { finger: assignment.finger } : {}),
+          id: solved.id,
+          midi: solved.midi,
+          startSeconds: solved.timeMs / 1000,
+          endSeconds: (solved.timeMs + solved.durationMs) / 1000,
+          hand: solved.hand,
+          ...(solved.finger !== undefined ? { finger: solved.finger } : {}),
+          fingerSource: solved.fingerSource,
+          fingerConfidence: solved.fingerConfidence,
+          diagnostics: solved.diagnostics,
           key: position.key,
           keyPosition: position.strike,
           approachPosition: position.approach,
         };
       }).filter(Boolean);
 
-      const value = { keyboard, events, split, assignments, positions };
+      const assignments = plan.notes
+        .filter((note) => note.finger !== undefined)
+        .map((note) => ({ noteId: note.id, hand: note.hand, finger: note.finger }));
+      const value = { keyboard, events, plan, split, assignments, positions };
       pianoHandCache = { source: pianoPerformanceNotes, spanKey, value };
 
       const nextNotes = pianoPerformanceNotes.map((note) => ({
