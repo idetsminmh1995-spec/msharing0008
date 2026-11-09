@@ -8,6 +8,9 @@ const KEY_RANGES = {
   76: { first: 28, last: 103 },
   88: { first: 21, last: 108 },
 };
+const KEYBOARD_WORLD_WIDTH = 8;
+const STANDARD_WHITE_KEY_COUNT = 52;
+const WHITE_KEY_WORLD_WIDTH = KEYBOARD_WORLD_WIDTH / STANDARD_WHITE_KEY_COUNT;
 const WHITE_PITCHES = new Set([0, 2, 4, 5, 7, 9, 11]);
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const FINGER_NAMES = ['thumb', 'index', 'middle', 'ring', 'little'];
@@ -36,7 +39,9 @@ class PianoHand3DRenderer {
     this.container = container;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x11151b);
-    this.camera = new THREE.PerspectiveCamera(22, 1, 0.01, 100);
+    this.cameraViewWidth = KEYBOARD_WORLD_WIDTH + 0.5;
+    this.camera = new THREE.OrthographicCamera(-4.25, 4.25, 2, -2, 0.01, 100);
+    this.camera.up.set(0, 0, -1);
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -47,8 +52,6 @@ class PianoHand3DRenderer {
     this.controls = null;
     this.keys = new Map();
     this.keyGroup = new THREE.Group();
-    // The prototype key bed needs more front-to-back presence in a wide video crop.
-    this.keyGroup.scale.z = 1.8;
     this.scene.add(this.keyGroup);
     this.hands = { right: null, left: null };
     this.handTemplate = null;
@@ -92,9 +95,11 @@ class PianoHand3DRenderer {
       // Player POV: the imported hand is laid over the keyboard so the
       // wrist enters from the player's side and the fingers point toward
       // the keys, instead of presenting a front-facing floating hand.
-      this.handTemplate.scale.setScalar(0.13);
+      // Calibrated to an open hand of about 21 cm span, 19 cm length and
+      // 6 cm thickness when an 88-key keyboard is 122 cm wide.
+      this.handTemplate.scale.set(0.075, 0.05, 0.05);
       this.handTemplate.rotation.set(-Math.PI / 2, 0.1, Math.PI + 0.08);
-      this.handTemplate.position.set(0, 0.15, 1.5);
+      this.handTemplate.position.set(0, 0.08, 0.75);
       this.handTemplate.traverse((object) => {
         if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; }
         if (object.isBone) {
@@ -122,8 +127,8 @@ class PianoHand3DRenderer {
       new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI),
     );
     root.position.x = mirror ? -1.35 : 1.35;
-    root.position.y = 0.15;
-    root.position.z = 1.5;
+    root.position.y = 0.08;
+    root.position.z = 0.75;
     root.userData.side = side;
     root.traverse((object) => {
       if (object.isMesh) {
@@ -138,9 +143,18 @@ class PianoHand3DRenderer {
   resize() {
     const width = Math.max(1, this.container.clientWidth);
     const height = Math.max(1, this.container.clientHeight);
-    this.camera.aspect = width / height;
-    this.camera.updateProjectionMatrix();
+    this.setCameraViewport(width, height);
     this.renderer.setSize(width, height, false);
+  }
+
+  setCameraViewport(width, height) {
+    const viewWidth = this.cameraViewWidth;
+    const viewHeight = viewWidth * height / width;
+    this.camera.left = -viewWidth / 2;
+    this.camera.right = viewWidth / 2;
+    this.camera.top = viewHeight / 2;
+    this.camera.bottom = -viewHeight / 2;
+    this.camera.updateProjectionMatrix();
   }
 
   clearKeys() {
@@ -154,7 +168,8 @@ class PianoHand3DRenderer {
     this.clearKeys();
     const whiteMidi = [];
     for (let midi = span.first; midi <= span.last; midi += 1) if (isWhite(midi)) whiteMidi.push(midi);
-    const whiteWidth = 8 / Math.max(whiteMidi.length, 1);
+    const whiteWidth = WHITE_KEY_WORLD_WIDTH;
+    this.cameraViewWidth = whiteMidi.length * whiteWidth + 0.5;
     const startX = -whiteMidi.length * whiteWidth / 2;
     const xByMidi = new Map();
     whiteMidi.forEach((midi, index) => xByMidi.set(midi, startX + (index + 0.5) * whiteWidth));
@@ -168,10 +183,11 @@ class PianoHand3DRenderer {
       if (left === undefined || right === undefined) continue;
       this.addKey(midi, (left + right) / 2, true, whiteWidth, colors);
     }
-    // Performer-side overhead view (~68 degrees above the key plane): the
-    // keys sit toward the far edge and the wrists enter from the near edge.
-    this.camera.position.set(0, 7.5, 3.5);
-    this.camera.lookAt(0, 0.05, 0.55);
+    // Exact overhead view: the camera looks straight down the Y axis, with
+    // the far edge of the keyboard at the top and wrists at the near edge.
+    this.camera.up.set(0, 0, -1);
+    this.camera.position.set(0, 10, 0.2);
+    this.camera.lookAt(0, 0.05, 0.2);
   }
 
   addKey(midi, x, black, whiteWidth, colors) {
@@ -264,8 +280,7 @@ class PianoHand3DRenderer {
     const width = Math.max(1, Math.round(box.w));
     const height = Math.max(1, Math.round(box.h));
     this.renderer.setSize(width, height, false);
-    this.camera.aspect = width / height;
-    this.camera.updateProjectionMatrix();
+    this.setCameraViewport(width, height);
     this.renderer.render(this.scene, this.camera);
     context.drawImage(this.renderer.domElement, box.x, box.y, width, height);
   }

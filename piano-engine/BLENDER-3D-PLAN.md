@@ -117,9 +117,11 @@ still remain future work.
 
 - MIDI note 60 consistently activates the intended C4 key in the GLB model.
 - Key press/release timing matches the TypeScript note interval.
-- The Hands camera uses a high performer-side overhead angle like the supplied
-  reference, with the keyboard toward the far edge and wrists entering from
-  the near edge; preview and video capture use the same framing.
+- The Hands camera is orthographic and exactly 90° above the key plane, with
+  the keyboard's far edge at the top and wrists entering from the near edge;
+  preview and video capture use the same framing.
+- Hand span, hand length, key width and key depth use consistent real-world
+  proportions instead of enlarging either the hands or keyboard to fill the view.
 - Left/right hand colours and finger assignments are deterministic.
 - The same scene state can drive browser preview and video export.
 - The scene remains usable on the target mobile and desktop browsers at the
