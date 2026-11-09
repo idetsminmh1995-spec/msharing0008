@@ -67,6 +67,7 @@
   const cache = new Map();
   const failureCache = new Map();
   const FAILURE_CACHE_MS = 30_000;
+  let lastFailure = null;
 
   function releaseClip(clip) {
     if (!clip) return;
@@ -116,9 +117,13 @@
     const cacheKey = keys.join('|');
     if (cache.has(cacheKey)) return cache.get(cacheKey);
     const failedAt = failureCache.get(cacheKey);
-    if (failedAt && Date.now() - failedAt < FAILURE_CACHE_MS) return null;
+    if (failedAt && Date.now() - failedAt < FAILURE_CACHE_MS) {
+      lastFailure = failedAt.info;
+      return null;
+    }
     failureCache.delete(cacheKey);
     let found = null;
+    let failureKind = 'not-found';
     for (const key of keys) {
       let video = null;
       let objectUrl = null;
@@ -133,7 +138,11 @@
             credentials: 'omit',
             signal: controller.signal,
           });
-          if (!res.ok) continue;
+          if (!res.ok) {
+            if (res.status !== 404) failureKind = 'unavailable';
+            lastFailure = { kind: res.status === 404 ? 'not-found' : 'unavailable', status: res.status, key };
+            continue;
+          }
           bytes = new Uint8Array(await res.arrayBuffer());
         } finally {
           clearTimeout(timeout);
@@ -173,10 +182,13 @@
         };
         break;
       } catch (err) {
+        failureKind = 'unavailable';
+        lastFailure = { kind: 'unavailable', key, message: err?.message || String(err) };
         releaseClip({ video, objectUrl });
       }
     }
     if (found) {
+      lastFailure = null;
       failureCache.delete(cacheKey);
       for (const [oldKey, oldClip] of cache) {
         if (oldKey !== cacheKey) {
@@ -186,7 +198,9 @@
       }
       cache.set(cacheKey, found);
     } else {
-      failureCache.set(cacheKey, Date.now());
+      const info = lastFailure || { kind: failureKind, key: keys[keys.length - 1] };
+      failureCache.set(cacheKey, { at: Date.now(), info });
+      lastFailure = info;
     }
     return found;
   }
@@ -355,6 +369,7 @@
     outroKeys,
     sharedUrl,
     loadOutro,
+    lastFailure: () => lastFailure,
     outroSource,
     drawCover,
     frameAt,

@@ -5,6 +5,7 @@
   const GATE_TIMEOUT_MS = 120_000;
   const objectUrls = new Map();
   const queue = [];
+  const records = [];
   let active = 0;
 
   function release(img) {
@@ -50,6 +51,7 @@
 
   async function fetchBlob(url, label, gateSignal) {
     let lastError;
+    const startedAt = performance.now();
     for (let attempt = 0; attempt <= 3; attempt += 1) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -71,6 +73,7 @@
         }
         const blob = await response.blob();
         if (!blob.size) throw new Error(`${label} returned an empty response.`);
+        records.push({ url, label, status: 'ok', attempts: attempt + 1, ms: Math.round(performance.now() - startedAt), bytes: blob.size });
         return blob;
       } catch (error) {
         const message = String(error?.message || error);
@@ -78,10 +81,13 @@
         lastError = error?.name === 'AbortError'
           ? Object.assign(new Error(`${label} timed out after ${REQUEST_TIMEOUT_MS / 1000}s.`), { retryable: true })
           : Object.assign(error instanceof Error ? error : new Error(message), {
-              retryable: !corsLike && error?.name === 'TypeError',
+              retryable: error?.retryable ?? (!corsLike && error?.name === 'TypeError'),
             });
         if (gateSignal?.aborted) throw new Error(`Asset gate timed out while loading ${label}.`);
-        if (!lastError.retryable || attempt === 3) throw lastError;
+        if (!lastError.retryable || attempt === 3) {
+          records.push({ url, label, status: lastError.status || (lastError.name === 'AbortError' ? 'timeout' : 'error'), attempts: attempt + 1, ms: Math.round(performance.now() - startedAt), bytes: 0, error: lastError.message });
+          throw lastError;
+        }
         await new Promise((resolve) => setTimeout(resolve, retryDelay(attempt)));
       } finally {
         clearTimeout(timer);
@@ -161,6 +167,9 @@
     }
   }
 
+  function clearRecords() { records.length = 0; }
+  function getRecords() { return records.map((record) => ({ ...record })); }
+
   window.AssetLoader = Object.freeze({
     MAX_CONCURRENCY,
     REQUEST_TIMEOUT_MS,
@@ -169,6 +178,8 @@
     fetchJson,
     waitForImage,
     objectUrlFor: (img) => objectUrls.get(img) || null,
+    clearRecords,
+    getRecords,
     withGateTimeout,
     release,
     revokeAfterRender,

@@ -108,6 +108,14 @@
   .field-row > div{flex:1;min-width:0;}
   .field-hint{margin-top:8px;font-size:10.5px;line-height:1.5;color:var(--muted);}
   .field-hint b{color:var(--text);font-weight:700;}
+  .asset-gate-panel{margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:11px;}
+  .asset-gate-head{display:flex;align-items:center;justify-content:space-between;font-weight:800;color:var(--text);}
+  .asset-gate-rows{margin-top:6px;display:grid;gap:3px;}
+  .asset-gate-row{display:flex;gap:6px;align-items:baseline;line-height:1.35;}
+  .asset-gate-row .state{width:14px;font-weight:900;}
+  .asset-gate-row.ok .state{color:#22864a;}.asset-gate-row.retry .state{color:#b57900;}.asset-gate-row.fail .state{color:var(--red);}
+  .asset-gate-reason{color:var(--muted);overflow-wrap:anywhere;}
+  .asset-gate-actions{display:flex;gap:6px;margin-top:7px;}
 
   .radio-row{display:flex;gap:16px;margin-bottom:14px;font-size:13px;}
   .radio-row label{display:flex;align-items:center;gap:6px;font-weight:400;color:var(--text);}
@@ -460,6 +468,7 @@
   <script src="../../assets/voice-samples.js?v=609facad"></script>
   <!-- Shared fetch/blob/decode loader used by preview and export. -->
   <script src="../../assets/asset-loader.js?v=20261110"></script>
+  <script src="../../assets/render-report.js?v=1"></script>
   <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
 <script src="../../assets/outro-video.js?v=521fc4cb"></script>
 <!-- The video engine: renders frames rather than recording them. -->
@@ -677,6 +686,11 @@
       <div class="gen-line"><span id="genLabel">Rendering…</span><button class="btn-ghost" id="cancelBtn" type="button">Cancel</button></div>
     </div>
     <div class="cost-line" id="costLine">Estimated cost: <b>18 points</b> · You have 240</div>
+    <div class="asset-gate-panel" id="assetGatePanel" aria-live="polite">
+      <div class="asset-gate-head"><span>Asset gate</span><span id="assetGateSummary">Not checked</span></div>
+      <div class="asset-gate-rows" id="assetGateRows"></div>
+      <div class="asset-gate-actions"><button class="btn-ghost" id="copyAssetReport" type="button">Copy report</button><button class="btn-ghost" id="downloadAssetReport" type="button">Download report</button></div>
+    </div>
     <div class="field-hint" id="genNote">Rendered in your browser, frame by frame &mdash; not recorded, so it is usually <b>faster than the video is long</b> and every frame lands on its exact 1/30th of a second. Nothing plays and nothing is heard while it runs. The file is a WebM of the frame exactly as you see it: a still second, the count-in, the audio, and the Thank You clip from the asset server at the end.</div>
   </div>
 
@@ -935,6 +949,7 @@
   const hitImageReady = new Map();
   const AssetLoader = window.AssetLoader;
   if (!AssetLoader) throw new Error('The shared asset loader failed to load.');
+  const DEBUG_ASSETS = new URLSearchParams(location.search).get('debug') === '1';
   const assetObjectUrls = new Map();
 
   function releaseAssetImage(img) {
@@ -957,6 +972,21 @@
 
   function withAssetGateTimeout(work) {
     return AssetLoader.withGateTimeout(work);
+  }
+
+  function drawDebugMissing(ctx, frameRect, scale, label, element = null) {
+    if (!DEBUG_ASSETS) return;
+    const box = element ? rectIn(element, frameRect, scale) : { x: 0, y: 0, w: frameRect.width * scale, h: frameRect.height * scale };
+    ctx.save();
+    ctx.strokeStyle = '#ff2346';
+    ctx.fillStyle = 'rgba(255,35,70,.18)';
+    ctx.lineWidth = Math.max(2, 2 * scale);
+    ctx.fillRect(box.x, box.y, box.w, box.h);
+    ctx.strokeRect(box.x, box.y, box.w, box.h);
+    ctx.font = `${Math.max(12, 12 * scale)}px sans-serif`;
+    ctx.fillStyle = '#ff2346';
+    ctx.fillText(`MISSING: ${label}`, box.x + 4 * scale, box.y + 16 * scale);
+    ctx.restore();
   }
   let previewAbortController = null;
 
@@ -3229,6 +3259,68 @@
   const genLabel = document.getElementById('genLabel');
   const cancelBtn = document.getElementById('cancelBtn');
   const costLine = document.getElementById('costLine');
+  const assetGateSummary = document.getElementById('assetGateSummary');
+  const assetGateRows = document.getElementById('assetGateRows');
+  const copyAssetReport = document.getElementById('copyAssetReport');
+  const downloadAssetReport = document.getElementById('downloadAssetReport');
+  let currentRenderReport = null;
+
+  const GATE_GROUPS = [
+    ['kit-background', 'kit'], ['hit-images', 'hit'], ['notation', 'notation'], ['audio', 'audio'],
+    ['fonts', 'font'], ['frame-assets', 'logo'], ['count', 'count'], ['outro', 'outro'],
+  ];
+
+  function showGateResult(result) {
+    const required = new Map((result?.required || []).map((entry) => [entry.id, entry]));
+    assetGateRows.innerHTML = '';
+    for (const [id, label] of GATE_GROUPS) {
+      const entry = required.get(id) || (result?.optional || []).find((item) => item.id === id);
+      const state = entry?.status === 'ok' ? 'ok' : entry?.status === 'retrying' ? 'retry' : entry?.status === 'failed' ? 'fail' : 'fail';
+      const row = document.createElement('div');
+      row.className = `asset-gate-row ${state}`;
+      row.innerHTML = `<span class="state">${state === 'ok' ? '✓' : state === 'retry' ? '⟳' : '✗'}</span><b>${label}</b><span class="asset-gate-reason"></span>`;
+      row.querySelector('.asset-gate-reason').textContent = entry?.message || (state === 'ok' ? 'ready' : 'not checked');
+      assetGateRows.append(row);
+    }
+    assetGateSummary.textContent = result?.ok ? 'Ready' : 'Blocked';
+  }
+
+  function setGateRetrying(label, message = 'loading…') {
+    showGateResult({ ok: false, required: [{ id: label, status: 'retrying', message }] });
+    assetGateSummary.textContent = 'Checking…';
+  }
+
+  function makeRenderReport(width, height, pinnedFrame) {
+    return RenderReport.create({
+      aspect: currentAspect(),
+      kitPath: currentKit.path,
+      canvas: { width, height },
+      pinnedFrame: { width: pinnedFrame.width, height: pinnedFrame.height },
+      window: { innerWidth: window.innerWidth, innerHeight: window.innerHeight },
+      devicePixelRatio: window.devicePixelRatio,
+      userAgent: navigator.userAgent,
+      workerUrl: API_BASE,
+      assetStamp: 'asset-loader.js?v=20261110',
+    });
+  }
+
+  function finishCurrentReport(status, result = {}) {
+    if (!currentRenderReport) return;
+    for (const record of AssetLoader.getRecords()) RenderReport.addAsset(currentRenderReport, record);
+    for (const warning of result.warnings || []) RenderReport.addWarning(currentRenderReport, warning);
+    RenderReport.finish(currentRenderReport, { status, ...result });
+    console.info('[Drum render report]', currentRenderReport);
+  }
+
+  copyAssetReport.addEventListener('click', async () => {
+    if (!currentRenderReport) return;
+    await navigator.clipboard?.writeText(RenderReport.stringify(currentRenderReport));
+    copyAssetReport.textContent = 'Copied';
+    setTimeout(() => { copyAssetReport.textContent = 'Copy report'; }, 1200);
+  });
+  downloadAssetReport.addEventListener('click', () => {
+    if (currentRenderReport) RenderReport.download(currentRenderReport);
+  });
   let optionalDecisionResolver = null;
 
   function askOptionalRender(warnings) {
@@ -3566,7 +3658,9 @@
         { id: 'fonts', status: 'ok', files: ['Sora', 'Manrope', 'Baloo 2', 'Bravura'] },
         { id: 'frame-assets', status: 'ok', files: frameImages.map((img) => img.alt || img.className) },
       ],
-      optional: warnings.map((message) => ({ status: 'warning', message })),
+      optional: [
+        { id: 'count', status: warnings.some((message) => message.includes('Count-')) ? 'failed' : 'ok', message: warnings.find((message) => message.includes('Count-')) || 'optional count voice available or synth fallback ready' },
+      ],
       timings: { totalMs: Math.round(performance.now() - startedAt) },
       warnings,
     };
@@ -3726,6 +3820,18 @@
       if (!img.classList.contains('lit') || !img.complete || img.naturalWidth === 0) continue;
       const fit = coverRect(img.naturalWidth, img.naturalHeight, canvas.width, canvas.height);
       ctx2d.drawImage(img, fit.x, fit.y, fit.w, fit.h);
+    }
+    if (DEBUG_ASSETS) {
+      if (!kitBackgroundImage?.complete || !(kitBackgroundImage?.naturalWidth > 0)) drawDebugMissing(ctx2d, frameRect, scale, 'kit background');
+      if (!notationImage?.complete || !(notationImage?.naturalWidth > 0)) drawDebugMissing(ctx2d, frameRect, scale, 'MusicXML notation');
+      const logo = document.querySelector('.video-logo-mark');
+      if (!logo?.complete || !(logo.naturalWidth > 0)) drawDebugMissing(ctx2d, frameRect, scale, 'logo', logo);
+      for (const stick of videoFrame.querySelectorAll('.video-stick')) {
+        if (!stick.complete || !(stick.naturalWidth > 0)) drawDebugMissing(ctx2d, frameRect, scale, stick.alt || stick.className, stick);
+      }
+      for (const img of hitLayer.children) {
+        if (img.dataset.state === 'failed') drawDebugMissing(ctx2d, frameRect, scale, `hit ${img.dataset.file}`);
+      }
     }
   }
 
@@ -3917,6 +4023,7 @@
     let width = 0;
     let height = 0;
     const exportWarnings = [];
+    let renderStartedAt = performance.now();
     let cancelled = false;
     recording = {
       cancel() {
@@ -3931,6 +4038,10 @@
       scale = width / exportFrame.width;
       height = even(exportFrame.height * scale);
       fitNotationToKit();
+      AssetLoader.clearRecords();
+      currentRenderReport = makeRenderReport(width, height, exportFrame);
+      renderStartedAt = performance.now();
+      setGateRetrying('kit-background');
       genLabel.textContent = 'Checking export assets…';
       let assetReport;
       const gateStartedAt = performance.now();
@@ -3938,6 +4049,7 @@
         assetReport = await withAssetGateTimeout((gateSignal) => ensureExportAssets(gateSignal));
         assetReport.timings.totalWithGateMs = Math.round(performance.now() - gateStartedAt);
         lastAssetGateResult = assetReport;
+        showGateResult(assetReport);
       } catch (err) {
         lastAssetGateResult = {
           ok: false,
@@ -3945,6 +4057,7 @@
           optional: [],
           timings: { totalMs: Math.round(performance.now() - gateStartedAt) },
         };
+        showGateResult(lastAssetGateResult);
         throw err;
       }
       exportWarnings.push(...assetReport.warnings);
@@ -3957,12 +4070,26 @@
             kind: 'drum',
             style: currentVideoStyle(),
           });
+          if (!outro) {
+            const failure = OutroVideo.lastFailure?.() || { kind: 'not-found' };
+            exportWarnings.push(
+              failure.kind === 'not-found'
+                ? 'Outro clip not found (404); video will render without the Thank You clip.'
+                : `Outro clip unavailable (${failure.status || 'timeout/5xx'}); video will render without the Thank You clip.`,
+            );
+          }
         } catch (err) {
-          exportWarnings.push(`Outro clip unavailable; video will export without it. ${err?.message ?? err}`);
+          exportWarnings.push(`Outro clip unavailable (timeout/5xx); video will render without the Thank You clip. ${err?.message ?? err}`);
         }
+      } else {
+        exportWarnings.push('Outro clip unavailable: OutroVideo loader is missing.');
       }
       await askOptionalRender(exportWarnings);
-      assetReport.optional = exportWarnings.map((message) => ({ status: 'warning', message }));
+      assetReport.optional = [
+        { id: 'count', status: exportWarnings.some((message) => message.includes('Count-')) ? 'failed' : 'ok', message: exportWarnings.find((message) => message.includes('Count-')) || 'optional count voice available or synth fallback ready' },
+        { id: 'outro', status: outro ? 'ok' : 'failed', message: outro ? 'outro ready' : exportWarnings.find((message) => message.includes('Outro')) || 'outro unavailable' },
+      ];
+      showGateResult(assetReport);
 
       genLabel.textContent = 'Preparing the notation…';
       await refreshNotationImage();
@@ -4039,17 +4166,24 @@
       recording = null;
       setGenerating(false);
       if (!result) {
+        finishCurrentReport('error', { durationMs: Math.round(performance.now() - renderStartedAt), warnings: exportWarnings });
         setUploadConfirm('This browser can neither render nor record video.', false);
         return;
       }
       if (cancelled) {
+        finishCurrentReport('aborted', { durationMs: Math.round(performance.now() - renderStartedAt), frames: result.frames, warnings: exportWarnings });
         setUploadConfirm('Rendering cancelled.', false);
         return;
       }
+      finishCurrentReport('ok', { durationMs: Math.round(performance.now() - renderStartedAt), frames: result.frames, fps: result.fps, path: result.path, container: result.container, extension: result.extension, canvas: { width, height }, warnings: exportWarnings });
       offerDownload(result.blob, result.extension);
       setUploadConfirm(
         `\u2713 Video ready — ${width}×${height} at ${result.fps}fps, opening on a ${HOLD_SECONDS}s still` +
-          (outro ? ' and closing with the Thank You clip' : ' (no Thank You clip in the bucket)') +
+          (outro
+            ? ' and closing with the Thank You clip'
+            : exportWarnings.some((warning) => warning.includes('404'))
+              ? ' (Thank You clip not found: 404)'
+              : ' (Thank You clip unavailable: timeout/5xx)') +
           (result.path === 'mediarecorder'
             ? `. ${result.frames} frames, recorded in real time because this browser has no WebCodecs — some may have been dropped.`
             : `. ${result.frames} frames, every one of them exact.`) +
@@ -4068,6 +4202,11 @@
       const gateDetail = lastAssetGateResult?.ok === false
         ? ` Asset gate failed after ${lastAssetGateResult.timings.totalMs}ms.`
         : '';
+      finishCurrentReport(cancelled ? 'aborted' : 'error', {
+        durationMs: Math.round(performance.now() - renderStartedAt),
+        warnings: [...exportWarnings, ...(exportInterruptReason ? [exportInterruptReason] : [])],
+        error: err?.message || String(err),
+      });
       setUploadConfirm(`Rendering stopped: ${err && err.message ? err.message : err}.${gateDetail}`, false);
     } finally {
       exportDrawing = false;

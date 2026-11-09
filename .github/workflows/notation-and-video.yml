@@ -1,0 +1,26 @@
+name: notation-and-video
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install notation dependencies
+        run: npm ci --prefix notation-engine
+      - name: Test shared asset loader
+        run: node tools/test-asset-loader.mjs
+      - name: Verify notation engine
+        run: npm run verify --prefix notation-engine
+      - name: Install Chromium and ffprobe
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser ffmpeg || sudo apt-get install -y chromium ffmpeg
+      - name: Browser video-engine smoke test
+        run: node tools/test-video-engine-browser.mjs
