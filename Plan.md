@@ -756,3 +756,42 @@ Before marking this plan complete, the following evidence must exist and be link
 ### Current plan status
 
 Sections 15–23 complete the remaining written specification. The plan is now implementation-ready but remains **not started** until the approval gate in Section 14 is satisfied. The next action after approval is S0 diagnosis, not S1 coding.
+
+
+## 24. S0 Diagnosis ပြီးစီးမှု မှတ်တမ်း — 2026-11-11
+
+S0 ကို coding မပြုဘဲ live Worker/R2 probe၊ repository source inspection၊ representative clip download နှင့် `ffprobe` ဖြင့် ပြီးစီးအောင် စစ်ဆေးခဲ့သည်။ Evidence အပြည့်အစုံကို [`Doc/rollout/evidence/outro-diagnosis.json`](./Doc/rollout/evidence/outro-diagnosis.json) တွင် သိမ်းထားသည်။ စစ်ဆေးမှုသည် repository commit `3b08d4a` အပေါ် လုပ်ထားပြီး runtime code မပြောင်းပါ။
+
+### အတည်ပြုရလဒ်
+
+- Known Drum clips သုံးခုသည် live Worker မှ `200 video/mp4` ပြန်ပြီး CORS သည် `Access-Control-Allow-Origin: *` ဖြစ်သည်။
+- `16x9 Black Drum` သည် 1,173,124 bytes၊ 6.0 seconds ဖြစ်ပြီး H.264 High/yuv420p 1920×1080/30fps + AAC-LC audio ဖြစ်သည်။
+- `16x9 White Drum` သည် 5,427,103 bytes၊ 6.016 seconds ဖြစ်ပြီး codec သည် browser-compatible sample နှင့် ကိုက်ညီသည်။
+- `9x16 White Drum` သည် 5,431,237 bytes၊ 6.016 seconds ဖြစ်ပြီး H.264/yuv420p 1080×1920/30fps + AAC-LC ဖြစ်သည်။
+- Missing key သည် `404` နှင့် JSON error body ပြန်သည်။ 404 retry မလုပ်သင့်ကြောင်း အတည်ပြုနိုင်သည်။
+- `Range: bytes=0-1023` ကို live Worker က `206` မပြန်ဘဲ `200` နှင့် full object ပြန်သည်။ `Content-Range` မရှိပါ။
+- Valid `If-None-Match` ဖြင့်လည်း `304` မပြန်ဘဲ `200` နှင့် full body ပြန်သည်။
+- `16x9 Black Drum` timing sample တွင် total download 5.02 seconds ဖြစ်ပြီး 1.17 MB အတွက် လက်ရှိ 10-second client abort အောက်တွင်ပြီးနိုင်သည်။
+- 5 MB ကျော်သော clips များသည် representative 20-second controlled probes တွင် partial bytes ဖြင့် timeout ဖြစ်နိုင်ကြောင်း ပြသသည်။ `16x9 White Drum` သည် 20 seconds အတွင်း 1,892,334/5,427,103 bytes သာ ရပြီး curl exit 28 ဖြစ်သည်။ အခြား 5 MB guitar/paino/violin samples များလည်း partial timeout တွေ့ရသည်။
+- Sampled key matrix တွင် `paino` path သည် အချို့နေရာတွင် ရှိပြီး `piano` path သည် 404 ဖြစ်သည်။ Metronome path များသည် sampled combinations တွင် 404 ဖြစ်သည်။ ထို့ကြောင့် alias/fallback kind ကို report တွင် ဖော်ပြရန်လိုသည်။
+- Downloaded clips များတွင် codec failure ကို မတွေ့ရသေးပါ။ H4 မအတည်ပြုနိုင်သေးသော်လည်း လက်ရှိ evidence အရ H1/H6 နှင့် H2 က ပိုအလေးထားရမည့်အကြောင်းရင်းများ ဖြစ်သည်။
+
+### S0 diagnosis ဆုံးဖြတ်ချက်
+
+S0 result သည် **H1/H6 transport/timeout risk ကို confirmed**, **H2 naming mismatch ကို confirmed**, **H3 GitHub Pages origin အတွက် မပျက်သော်လည်း wildcard CORS ကို confirmed**, **H4 codec failure မတွေ့**, **H5 deployed source အတည်မပြုနိုင်သော်လည်း live Worker သည် repository ၏ no-Range/no-304 behavior နှင့် ကိုက်** ဟု သတ်မှတ်သည်။
+
+ထို့ကြောင့် နောက်တစ်ဆင့်သည် S1 loader hardening နှင့် S2 built-in ending ဖြစ်ရမည်။ Current 10-second full-body fetch ကို အားကိုးပြီး S3 page policy မပြင်ရ။ Worker Range/304/requestId ပြင်ဆင်မှုသည် အကျိုးရှိသော်လည်း S4 အဖြစ် client fallback နှင့် သီးခြားထားရမည်။
+
+### မပြီးသေးသော S0 အကန့်အသတ်
+
+Cloudflare dashboard/Worker observability မရသဖြင့် live deployment commit၊ R2 origin log နှင့် server-side intermittent error ကို မအတည်ပြုနိုင်သေးပါ။ Arbitrary Origin probe သည် connection ပိတ်သွားသဖြင့် origin rejection ဟု မဆုံးဖြတ်ထားပါ။ ffprobe တွင် faststart/moov placement ကို သီးခြားမစစ်ရသေးသောကြောင့် S5 asset verification ထဲတွင် ထည့်ရမည်။
+
+### Work log update
+
+| ရက်စွဲ | အဆင့် | ဘာလုပ်ခဲ့လဲ | ရလဒ် / ဆုံးဖြတ်ချက် |
+|---|---|---|---|
+| 2026-11-11 | S0 | Live Worker/R2 known key, missing key, OPTIONS, Range, If-None-Match, CORS, timing, clip download နှင့် ffprobe စစ်ဆေးပြီး JSON evidence သိမ်းခဲ့သည်။ | **ပြီး** — H1/H6 risk နှင့် H2 naming mismatch အတည်ပြု; S1/S2 ကို ဆက်သင့် |
+| 2026-11-11 | S0 | `outro-diagnosis.json` ထဲတွင် source inspection, live probes, media metadata, matrix samples, limitations နှင့် recommendation မှတ်တမ်းတင်ခဲ့သည်။ | **ပြီး** |
+| — | S1/S2 | Loader hardening နှင့် built-in ending | S0 result အပေါ်မူတည်၍ နောက်တစ်ဆင့် |
+
+S0 diagnosis evidence ဖိုင်ကို ပြင်ပြီးသောအခါ plan ၏ S0 status သည် **complete** ဖြစ်သည်။ S1/S2 ကို စတင်ခြင်းသည် S0 ပြီးကြောင်းကို အတည်ပြုပြီးမှသာ လုပ်ရမည့် သီးခြားအဆင့် ဖြစ်သည်။
