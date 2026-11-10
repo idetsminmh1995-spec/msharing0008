@@ -461,3 +461,116 @@ User က သီးခြားပြောင်းလဲမပြောသေ�
 ### 9.6 Plan boundary
 
 ဒီ plan သည် R2 clip ကို ပို့တင်မည့် cache/custom-domain architecture၊ general export pinning၊ GLB license နှင့် Piano hand calibration ကို မပြောင်းပါ။ Built-in ending ၏ network-independent guarantee ကိုပဲ အဓိကထားမည်။ User က `ready` ဟု အတည်ပြုပြီးမှ S0 evidence စုဆောင်းခြင်း၊ ထို့နောက် S1/S2 ကို တစ်ဆင့်ချင်း စတင်မည်။
+
+
+## 10. မရေးရသေးသော technical contract များ
+
+### 10.1 Outro state machine
+
+Outro selection ကို page တစ်ခုချင်းစီက ကိုယ်ပိုင်ဆုံးဖြတ်ခြင်းမပြုဘဲ shared module က state machine တစ်ခုတည်းဖြင့် ဆုံးဖြတ်ရမည်။ အစအခြေအနေသည် `idle` ဖြစ်ပြီး preload စတင်လျှင် `loading`၊ valid R2 clip နှင့် metadata ရလျှင် `r2-ready`၊ 404/403 သို့မဟုတ် retry မကျန်တော့သော unavailable ဖြစ်လျှင် `builtin-ready`၊ built-in resource မရလျှင် `failed` ဖြစ်ရမည်။ Render စတင်ချိန်တွင် `r2-ready` သို့မဟုတ် `builtin-ready` မဟုတ်ပါက gate က state ကို စောင့်ပြီး timeout ပြည့်လျှင် built-in path သို့ တစ်ကြိမ်တည်း fallback လုပ်ရမည်။ `failed` သာလျှင် render မစရ။
+
+State transition များသည် တစ်ကြောင်းတည်းဖြစ်ရမည်။ `r2-ready → builtin-ready` သည် R2 decode/seek ပျက်မှသာ ခွင့်ပြုမည်။ `builtin-ready → r2-ready` ကို render အလယ်တွင် မလုပ်ရ။ Render စတင်ပြီးသောအခါ outro source ကို lock လုပ်ထားရမည်၊ ဒါမှ frame တစ်ခုနှင့်တစ်ခု source မပြောင်းနိုင်တော့ဘဲ encoded output deterministic ဖြစ်မည်။
+
+### 10.2 Shared result contract
+
+`loadOutro()` နှင့် built-in factory နှစ်ခုစလုံးသည် အောက်ပါပုံစံနှင့် သဟဇာတဖြစ်သော object ပြန်ပေးရမည်။
+
+```js
+{
+  source: 'r2' | 'builtin',
+  key: string | null,
+  seconds: number,
+  bytes: number,
+  ms: number,
+  attempts: number,
+  reason: null | 'not-found' | 'forbidden' | 'timeout' | 'http-5xx' |
+    'http-429' | 'network' | 'cors' | 'codec' | 'builtin-fallback',
+  video: HTMLVideoElement | null,
+  audio: (offlineContext) => Promise<AudioBuffer | null>,
+  draw: (ctx, canvas, seconds) => boolean
+}
+```
+
+R2 result တွင် `video` နှင့် object URL ရှိနိုင်သော်လည်း built-in result တွင် `video: null` ဖြစ်ရမည်။ `draw()` သည် canvas ကို clear မလုပ်ဘဲ caller က frame policy ကို ထိန်းထားရမည်။ Built-in audio မပါသည့်အတွက် `audio()` သည် `null` ပြန်နိုင်ပြီး `VideoEngine.joinAudio()` က အဲဒီ segment ကို အလိုအလျောက်ကျော်နိုင်ရမည်။
+
+### 10.3 Report schema တိုးချဲ့မှု
+
+လက်ရှိ render report ထဲတွင် outro အတွက် အောက်ပါ nested object ကို ထည့်ရမည်။
+
+```json
+{
+  "outro": {
+    "source": "r2",
+    "key": "Thank Video/16x9/drum/16x9 Black Drum.mp4",
+    "seconds": 3.0,
+    "bytes": 7340032,
+    "ms": 842,
+    "attempts": 1,
+    "reason": null,
+    "fallback": false,
+    "state": "r2-ready"
+  }
+}
+```
+
+R2 မရ၍ built-in သုံးသောအခါ `source: "builtin"`, `key: null`, `fallback: true` နှင့် မူလ failure ကို `reason` တွင် ထားရမည်။ Built-in ကိုယ်တိုင် failure ဖြစ်ပါက `outro` မဖျောက်ဘဲ `state: "failed"` နှင့် failure reason ကို report လုပ်ပြီး render မစရ။ UI တွင် `R2 clip loaded`, `R2 unavailable — built-in ending used`, သို့မဟုတ် `Ending unavailable — render blocked` ဟူသော အခြေအနေသုံးမျိုးကိုသာ ပြရမည်။
+
+### 10.4 Cache ownership နှင့် cleanup
+
+R2 blob/object URL၊ decoded audio buffer နှင့် built-in image/font resource တို့၏ owner သည် shared outro module ဖြစ်ရမည်။ Page call-site များက object URL ကို ကိုယ်တိုင် revoke မလုပ်ရ။ Aspect/style/kind ပြောင်းလဲသည့်အခါ မသုံးတော့သော R2 clip ကို release လုပ်ပြီး၊ render ပြီးဆုံးသောအခါ သို့မဟုတ် cancel လုပ်သောအခါ locked source ကို `finally` မှာ release လုပ်ရမည်။ Success cache ကိုသာ ပြန်သုံးခွင့်ရှိပြီး failure cache သည် diagnosis အတွက် 30 seconds ထက် မကျော်ရ။
+
+## 11. မရေးရသေးသော test matrix
+
+### 11.1 Loader unit matrix
+
+| Case | Expected request behavior | Expected result |
+|---|---|---|
+| exact R2 200 | one request, metadata decode | `source: r2` |
+| first key 404, alias 200 | no retry on 404; next key only | `source: r2`, attempts recorded |
+| 403 | no retry of same key | alias/next key or builtin |
+| 429 | two retries with backoff | R2 or builtin with `http-429` |
+| 500/502 | two retries with backoff | R2 or builtin with `http-5xx` |
+| slow steady stream | no stall failure while bytes arrive | R2 if total limit allows |
+| stalled stream | abort at stall timeout | builtin with `timeout` |
+| CORS rejection | no blind retry | builtin with `cors` |
+| valid bytes, undecodable video | release object URL | builtin with `codec` |
+| repeated same request | success cache hit | no duplicate network request |
+| repeated failure | short failure-cache hit | no permanent failure cache |
+
+### 11.2 Built-in rendering matrix
+
+Built-in ending ကို `16x9`, `9x16`, `1x1` aspect သုံးမျိုး၊ `black`, `white` style နှစ်မျိုး၊ `drum`, `guitar`, `piano`, `violin`, `bass-guitar`, `metronome` kind များဖြင့် စမ်းရမည်။ စမ်းသပ်မှုသည် exception မပစ်ခြင်းသာမက canvas အလွတ်မဖြစ်ခြင်း၊ logo/text bounds သတ်မှတ်ထားသော safe area အတွင်းရှိခြင်း၊ fade-in frame 0 တွင် alpha နည်းခြင်းနှင့် final frame တွင် alpha အပြည့်ရှိခြင်းကို စစ်ရမည်။ Golden image သည် exact pixel equality မလိုသော်လည်း logo/text bounding box နှင့် background color ကို သတ်မှတ်ထားသော tolerance အတွင်း စစ်ရမည်။
+
+### 11.3 Browser export matrix
+
+| Environment event | Required behavior |
+|---|---|
+| R2 host blocked before render | gate chooses builtin; export succeeds |
+| Worker returns 404 | alias/search completes; builtin if none |
+| Worker returns 500 | retry policy visible; builtin fallback |
+| network offline after preload | cached source locks; export succeeds |
+| network offline before preload | builtin fallback; export succeeds |
+| resize during outro render | pin guard stops clearly or output remains stable; no silent missing ending |
+| cancel during outro | cleanup runs; next export can load a fresh ending |
+| second export on same page | no duplicate media-element-source error; ending present |
+| 150%/200% browser zoom | built-in geometry follows pinned frame, not window |
+
+## 12. Rollout checkpoints နှင့် အထောက်အထား
+
+Checkpoint တစ်ခုချင်းစီတွင် code commit, test command, result JSON နှင့် short human-readable note လေးခု ရှိရမည်။ S0 တွင် `outro-diagnosis.json` နှင့် direct-response notes၊ S1 တွင် `outro-loader-unit.json`၊ S2 တွင် `builtin-ending-golden.json` နှင့် sample PNG များ၊ S3 တွင် page-by-page fallback JSON၊ S4 တွင် Worker curl output၊ S5 တွင် `r2-outro-manifest.json`၊ S6 တွင် browser matrix JSON နှင့် S7 တွင် final CI URL ကို သိမ်းရမည်။
+
+Drum ကို reference page အဖြစ် စမ်းသပ်ရာတွင် R2 success path နှင့် R2 blocked path နှစ်ခုလုံး pass ပြီးမှ guitar/bass-guitar/piano/violin သို့ ကူးရမည်။ Metronome page သည် S0 inventory ပြီးမှ scope ထဲ ထည့်/မထည့်ကို အတည်ပြုမည်။ Page တစ်ခုချင်းစီအတွက် `outro.source`, `outro.reason`, ending duration နှင့် final frame status ကို evidence table ထဲတွင် တစ်ကြောင်းစီ မှတ်ရမည်။
+
+## 13. Rollback နှင့် failure containment
+
+Loader hardening သည် built-in fallback မပါသေးချိန်တွင် production page behavior ကို မပြောင်းရ။ S1 commit ကို S2 မပြီးမချင်း feature flag သို့မဟုတ် `OUTRO_FALLBACK_ENABLED` configuration ဖြင့် ပိတ်နိုင်ရမည်။ S3 integration တွင် page တစ်ခုက error ပြလျှင် အခြား page များကို မထိခိုက်စေရန် shared module API ကို backward-compatible ထားပြီး၊ page migration ကို page တစ်ခုချင်း commit ခွဲထားရမည်။
+
+Built-in renderer တွင် exception ဖြစ်လျှင် R2 path ကို ဖျက်မပစ်ရ။ R2 valid ဖြစ်နေသော်လည်း built-in test မစိမ်းလျှင် S2/S3 release မပြုရ။ Worker Range/304 ပြင်ဆင်မှုသည် R2 fallback နှင့် မသက်ဆိုင်သဖြင့် Worker deploy ပြဿနာဖြစ်လျှင် client-side built-in ending path ကို rollback မလုပ်ဘဲ Worker-only change ကို ပြန်လှန်နိုင်ရမည်။
+
+## 14. User approval gate နှင့် လက်ရှိအခြေအနေ
+
+လက်ရှိအခြေအနေမှာ plan နှင့် technical continuation သာ ပြီးထားပြီး coding မစရသေးပါ။ အောက်ပါ approval တစ်ကြောင်းရမှ S0 diagnosis ကို စတင်မည်။
+
+> **“Thank You outro plan အတိုင်း S0 ကို စပါ”**
+
+အတည်ပြုချက်ရပြီးနောက် S0 diagnosis ကို အရင်လုပ်ပြီး result ကို plan work log ထဲ ဖြည့်မည်။ S0 ပြီးလျှင် loader hardening သို့ တန်းမသွားဘဲ diagnosis result နှင့် အညီ လိုအပ်သည့် S1/S2 order ကို ပြန်တင်ပြမည်။
