@@ -33,6 +33,21 @@ function spanFor(value) {
 }
 function noteName(midi) { return `${NOTE_NAMES[midi % 12]}${Math.floor(midi / 12) - 1}`; }
 function midiInRange(midi, span) { return midi >= span.first && midi <= span.last; }
+function validatePairAnchors(manifest, leftRoot, rightRoot) {
+  if (!(manifest?.metersPerSourceUnit > 0) || !manifest?.tips) {
+    return { valid: false, reason: 'missing-anchor-scale' };
+  }
+  if (!leftRoot || !rightRoot) return { valid: false, reason: 'missing-wrist-root' };
+  for (const side of ['left', 'right']) {
+    for (const finger of ['1', '2', '3', '4', '5']) {
+      const tip = manifest.tips[side]?.[finger];
+      if (!Array.isArray(tip) || tip.length !== 3 || tip.some((value) => !Number.isFinite(value))) {
+        return { valid: false, reason: `missing-${side}-finger-${finger}-tip` };
+      }
+    }
+  }
+  return { valid: true, reason: 'measured-fingertip-anchors' };
+}
 
 class PianoHand3DRenderer {
   constructor(container) {
@@ -60,6 +75,7 @@ class PianoHand3DRenderer {
     this.handTipOffsets = { right: null, left: null };
     this.handTipBoneOffsets = { right: new Map(), left: new Map() };
     this.handModelScale = 1;
+    this.calibrationValidation = null;
     this.activeOptions = null;
     this.currentSpan = null;
     this.keyboard = null;
@@ -110,7 +126,12 @@ class PianoHand3DRenderer {
       this.handModelScale = this.unitsPerMm * anchorsResponse.metersPerSourceUnit * 1000;
       const leftRoot = gltf.scene.getObjectByName('PianoHandLeftRoot');
       const rightRoot = gltf.scene.getObjectByName('PianoHandRightRoot');
-      if (!leftRoot || !rightRoot) throw new Error('Bilateral GLB must contain distinct left and right wrist roots.');
+      if (!leftRoot || !rightRoot) throw new Error('Bilateral GLB must contain distinct left/right wrist roots.');
+      this.calibrationValidation = validatePairAnchors(anchorsResponse, leftRoot, rightRoot);
+      this.container.dataset.glbCalibration = this.calibrationValidation.valid ? 'anchor-calibrated' : 'invalid';
+      if (!this.calibrationValidation.valid) {
+        this.container.dataset.glbCalibrationError = this.calibrationValidation.reason;
+      }
       this.createHand('left', leftRoot);
       this.createHand('right', rightRoot);
       this.handReady = true;

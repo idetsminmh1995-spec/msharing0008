@@ -133,6 +133,110 @@ Phase A ရဲ့ note-level hand/finger mapping အပေါ်မှာ ဆက
 
 Phase B သည် deterministic motion-plan contract နှင့် sampler ကို ထည့်ထားခြင်းဖြစ်ပြီး GLB လက်ဖျားမှန်ကန်မှု သို့မဟုတ် လူတကယ်တီးသလို motion အားလုံး ပြီးစီးပြီဟု မဆိုလိုပါ။
 
+## 2026-11-10 — Phase C မပြင်မီ အတည်ပြုထားသော GLB/contact update
+
+Phase C တွင် numeric calibration တန်ဖိုးများကို မခန့်မှန်းဘဲ GLB asset ကို စစ်ဆေးနိုင်သော manifest နှင့် transform contract ကို အရင်တည်ဆောက်မည်။ GLB ၏ actual bone axis, fingertip surface landmark နှင့် Engine-to-GLB scale/rotation/translation တို့ကို တိုင်းတာအတည်ပြုမပြီးမချင်း manifest ကို `calibrated: false` အဖြစ်သာ သတ်မှတ်မည်။
+
+### ပြင်မည့်အချက်များ
+
+1. GLB skeleton audit result အတွက် model path, joint count, bone chains, animation clip names နှင့် source/license metadata ပါသော versioned calibration manifest ထည့်မည်။
+2. Calibration transform ကို Engine millimetre space ↔ GLB local/world space အဖြစ် သီးခြား API ဖြင့် သတ်မှတ်မည်။ Transform မပြည့်စုံလျှင် fail-closed ဖြစ်ပြီး visible contact accuracy ဟု မကြေညာရ။
+3. Single-finger contact solver ထည့်မည်။ Note တစ်ခု၏ assigned hand/finger/strike target နှင့် fixed wrist pose ကို အသုံးပြုပြီး calibrated transform ဖြင့် fingertip target ကို solve လုပ်မည်။
+4. Solver result တွင် `converged`, `residualMm`, `targetKeyMidi`, `finger`, `hand`, `calibrationVersion` နှင့် failure reason ကို ပြန်ပေးမည်။
+5. Reachable synthetic target, unreachable target, left/right mirror, calibration missing နှင့် note-on contact boundary tests ထည့်မည်။
+6. GLB manifest ကို renderer က load/validate လုပ်နိုင်ရန် browser asset path ကို သတ်မှတ်မည်။ Manifest validated မဖြစ်လျှင် renderer သည် diagnostic ပြပြီး calibrated contact အဖြစ် မဆက်လုပ်ရ။
+
+### Phase C လက်ခံစံနှုန်း
+
+- Manifest သည် GLB ၏ 21-bone skeleton နှင့် finger bone chain mapping ကို အတည်ပြုနိုင်ရမည်။
+- Calibration မရှိသေးချိန်တွင် solver သည် result ကို `calibration-required` အဖြစ် ပြန်ပေးရမည်။
+- Calibrated transform ဖြင့် reachable single-finger target သည် သတ်မှတ် tolerance အတွင်း residual ပြန်ပေးရမည်။
+- Unreachable target ကို converged ဟု မပြောရ၊ failure reason နှင့် residual ကို ဖော်ပြရမည်။
+- Left/right mirror transform သည် တူညီသော Engine target convention ကို ထိန်းရမည်။
+- Note-on timestamp သည် contact schedule ထဲတွင် မပြောင်းရ။
+
+## 2026-11-10 — Phase C ပြင်ဆင်ပြီးမှု မှတ်တမ်း
+
+### ပြင်ပြီးသောအချက်များ
+
+- `piano-hand-engine/src/calibration/glbCalibration.ts` ကို ထည့်ပြီး GLB calibration manifest, expected 21-bone finger-chain mapping, manifest validation နှင့် Engine↔GLB point transform API တည်ဆောက်ထားသည်။
+- `website/assets/hand/hand-calibration.json` ကို actual `hand_model.glb` skeleton audit အပေါ်အခြေခံ၍ ထည့်ထားသည်။ Manifest တွင် `radius_ulna`, thumb/index/middle/ring/pinky chains နှင့် `Pose_OK`/`RigAction` clips ပါဝင်သည်။
+- Manifest ကို လက်ရှိ `calibrated: false` ထားထားပြီး bone length, fingertip landmark, joint axis နှင့် Engine-to-GLB transform မတိုင်းညှိရသေးကြောင်း asset ထဲတွင် ရှင်းလင်းမှတ်သားထားသည်။
+- `piano-hand-engine/src/calibration/singleFingerContact.ts` ကို ထည့်ပြီး hand, finger, wrist pose, key strike target နှင့် calibration manifest ကို အသုံးပြုသော single-finger contact solver ထည့်ထားသည်။
+- Calibration မပြည့်စုံလျှင် solver သည် `calibration-required`/validation failure ဖြင့် fail-closed လုပ်ပြီး synthetic residual ကို visible GLB contact ဟု မကြေညာပါ။
+- Calibrated transform ရှိသောအခါ reachable target ကို residual နှင့် GLB tip position ပြန်ပေးပြီး unreachable target ကို `unreachable` reason ဖြင့် ပြန်ပေးသည်။
+- Phase C အတွက် calibration-required, reachable identity-transform contact, unreachable target, left-hand convention နှင့် changed bone-chain validation tests ထည့်ထားသည်။
+
+### စမ်းသပ်မှုရလဒ်
+
+- `piano-hand-engine`: **86/86 tests passed**
+- TypeScript typecheck: passed
+- ESLint: passed
+- Prettier format check: passed
+- Browser bundle build: passed
+- `website/assets/piano-hand-3d.js` syntax check: passed
+- `hand-calibration.json` JSON validation: passed
+- `git diff --check`: passed
+
+### မပြီးသေးသောအချက်များ
+
+- GLB ၏ actual bone lengths, fingertip surface landmarks, local joint axes နှင့် Engine-to-GLB numeric transform ကို မတိုင်းညှိရသေးပါ။
+- `hand-calibration.json` ကို renderer က runtime load/validate လုပ်ပြီး 3D GLB pose သို့ တိုက်ရိုက်သုံးခြင်း မပြီးသေးပါ။
+- Single-finger solver ကို live preview/export path ထဲ မချိတ်ရသေးပါ။
+- Key/hand collision, black-key clearance, wrist rotation trajectory နှင့် coupled chord IK မပြီးသေးပါ။
+
+Phase C သည် skeleton audit, calibration contract နှင့် fail-closed single-finger solver ကို ပြီးစီးစေသည်။ Actual GLB fingertip contact accuracy ကို calibrated numeric manifest မထည့်မချင်း အတည်ပြုပြီးပြီဟု မဆိုရ။
+
+## 2026-11-10 — Phase C.1 ဆက်လက်လုပ်ဆောင်မည့် GLB audit plan
+
+လက်ရှိ manifest သည် skeleton names နှင့် clip names ကို မှန်ကန်စွာ မှတ်တမ်းတင်ထားသော်လည်း numeric bind-pose measurements မပါသေးပါ။ ထို့ကြောင့် နောက်တစ်ဆင့်တွင် GLB binary ကို တိုက်ရိုက်ဖတ်ပြီး reproducible audit report/manifest ထုတ်မည်။ Numeric measurements ရရှိသော်လည်း fingertip surface offset နှင့် Engine-to-GLB transform ကို visual calibration မလုပ်မချင်း `calibrated: false` ကို ဆက်ထားမည်။
+
+### ပြင်မည့်အချက်များ
+
+1. `tools/audit-glb-calibration.mjs` ဖြင့် GLB JSON chunk ကိုဖတ်ကာ joint names, parent-child chain, local translation, bind-pose bone length နှင့် animation clips ကို deterministic ထုတ်မည်။
+2. Audit tool ထုတ်ပေးသော measurement data ကို `website/assets/hand/hand-calibration.json` ထဲ embed လုပ်မည်။ Source GLB ပြောင်းလဲလျှင် audit result ပြန်ထုတ်နိုင်ရမည်။
+3. Browser 3D renderer တွင် calibration manifest ကို load/validate လုပ်ပြီး skeleton mismatch သို့မဟုတ် uncalibrated state ကို diagnostic အဖြစ် ထုတ်မည်။
+4. Single-finger contact result ကို manifest version နှင့် audit measurements များနှင့် ချိတ်ထားမည်။ မတိုင်းရသေးသော surface landmark/transform များကို contact success ဟု မပြောရ။
+5. Audit output consistency, parent-chain mismatch, manifest loading နှင့် uncalibrated renderer behavior ကို test လုပ်မည်။
+
+### Phase C.1 လက်ခံစံနှုန်း
+
+- Audit tool သည် source GLB မှ joint count, chain names, parent relationships, local translations နှင့် bone lengths ကို ထပ်ခါထပ်ခါ run လုပ်လျှင် တူညီစွာ ထုတ်ပေးရမည်။
+- Manifest ထဲက measured skeleton data သည် source GLB နဲ့ မကိုက်လျှင် validation fail ရမည်။
+- Renderer သည် `calibrated: false` အချိန်တွင် GLB ကို render လုပ်နိုင်သော်လည်း visible fingertip contact ကို calibrated success ဟု မပြရ။
+- Surface landmark နှင့် Engine↔GLB transform မတိုင်းရသေးသည့်အချက်ကို report ထဲတွင် အတိအကျ ဖော်ပြရမည်။
+
+## 2026-11-11 — Phase C.1 ပြင်ဆင်ပြီးမှု မှတ်တမ်း
+
+### ပြင်ပြီးသောအချက်များ
+
+- `tools/audit-glb-calibration.mjs` ကို ထည့်ပြီး source `hand_model.glb` ကို တိုက်ရိုက်ဖတ်ကာ joint names, parent relationships, local translations, bind-pose local bone lengths နှင့် animation clips ကို deterministic JSON အဖြစ် ထုတ်နိုင်အောင် ပြင်ထားသည်။
+- `website/assets/hand/hand-calibration.json` ကို audit output ဖြင့် ပြန်ထုတ်ထားပြီး actual source GLB မှ **21 joints**, **5 finger chains**, **2 animation clips** (`Pose_OK`, `RigAction`) နှင့် bone-length measurements ပါဝင်သည်။
+- Finger-tip surface landmark, local joint axis နှင့် Engine↔GLB transform မတိုင်းညှိရသေးသောကြောင့် manifest ၏ `calibrated` ကို `false` အဖြစ် မပြောင်းထားပါ။
+- `website/assets/piano-hand-3d.js` သည် GLB load အချိန် calibration manifest ကို fetch/validate လုပ်ပြီး `data-glb-calibration`, status/error နှင့် missing-bone diagnostics ထုတ်ပေးသည်။ Manifest မရလျှင် GLB preview မပျက်ဘဲ calibration status ကို `unknown` အဖြစ် ပြသည်။
+- `tools/test-glb-calibration.mjs` ကို ထည့်ပြီး audit output deterministic ဖြစ်မှု၊ joint/chain count၊ parent data နှင့် positive bone lengths ကို regression test လုပ်ထားသည်။
+
+### စမ်းသပ်မှုရလဒ်
+
+- GLB audit regression: passed
+- `piano-hand-engine`: **86/86 tests passed**
+- TypeScript typecheck: passed
+- ESLint: passed
+- Prettier format check: passed
+- Browser bundle build: passed
+- `website/assets/piano-hand-3d.js` syntax check: passed
+- `hand-calibration.json` JSON validation: passed
+- `git diff --check`: passed
+
+### မပြီးသေးသောအချက်များ
+
+- Audit လုပ်ထားသော local bone lengths များကို mesh surface fingertip landmarks အဖြစ် မသတ်မှတ်ရသေးပါ။
+- Joint local rotation axes နှင့် Engine↔GLB numeric transform ကို Blender/Three.js visual calibration ဖြင့် မအတည်ပြုရသေးပါ။
+- Renderer သည် manifest ကို validate လုပ်နေသော်လည်း calibrated transform ဖြင့် GLB bones ကို actual key strike point သို့ မချိတ်ရသေးပါ။
+- Single-finger solver ကို live GLB pose path ထဲ မချိတ်ရသေးပါ။
+
+Phase C.1 သည် reproducible GLB audit နှင့် runtime manifest validation ကို ပြီးစီးစေသည်။ Visible fingertip contact accuracy ကို surface landmark နှင့် transform calibration ပြီးမှသာ အတည်ပြုမည်။
+
 ## စစ်ဆေးတွေ့ရှိချက်
 
 - GLB ထဲမှာ rig ပါတဲ့ hand mesh နဲ့ joint ၂၁ ခုရှိပြီး လက်ချောင်း bone အမည်တွေက renderer ရဲ့ mapping နဲ့ ကိုက်ညီပါတယ်။

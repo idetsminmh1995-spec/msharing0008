@@ -26,7 +26,9 @@ var PianoHandEngine = (() => {
     BLACK_KEY_OFFSETS: () => BLACK_KEY_OFFSETS,
     BLACK_KEY_RISE_MM: () => BLACK_KEY_RISE_MM,
     BLACK_KEY_WIDTH_MM: () => BLACK_KEY_WIDTH_MM,
+    DEFAULT_GLB_CALIBRATION: () => DEFAULT_GLB_CALIBRATION,
     ENGINE_VERSION: () => ENGINE_VERSION,
+    EXPECTED_GLB_BONE_CHAINS: () => EXPECTED_GLB_BONE_CHAINS,
     FINGERING_WEIGHTS: () => WEIGHT,
     FINGER_NAMES: () => FINGER_NAMES,
     HAND_PROFILES: () => HAND_PROFILES,
@@ -76,12 +78,16 @@ var PianoHandEngine = (() => {
     solveFingering: () => solveFingering,
     solveHandSkeleton: () => solveHandSkeleton,
     solvePerformancePlan: () => solvePerformancePlan,
+    solveSingleFingerContact: () => solveSingleFingerContact,
     solveStages: () => solveStages,
     spanStrain: () => spanStrain,
     spansFor: () => spansFor,
     splitHands: () => splitHands,
     stageCost: () => stageCost,
+    transformEngineToGlb: () => transformEngineToGlb,
+    transformGlbToEngine: () => transformGlbToEngine,
     transitionCost: () => transitionCost,
+    validateGlbCalibration: () => validateGlbCalibration,
     whiteIndex: () => whiteIndex,
     whiteKeyCount: () => whiteKeyCount
   });
@@ -1211,6 +1217,92 @@ var PianoHandEngine = (() => {
     return Math.min(1, Math.max(0, value));
   }
 
+  // src/calibration/glbCalibration.ts
+  var EXPECTED_GLB_BONE_CHAINS = {
+    1: ["thumb_trapez", "thumb_meta", "thumb_prox", "thumb_dist"],
+    2: ["index_meta", "index_prox", "index_midd", "index_dist"],
+    3: ["midd_meta", "midd_prox", "midd_midd", "midd_dist"],
+    4: ["ring_meta", "ring_prox", "ring_midd", "ring_dist"],
+    5: ["pinky_meta", "pinky_prox", "pinky_midd", "pinky_dist"]
+  };
+  var DEFAULT_GLB_CALIBRATION = {
+    version: 1,
+    model: "hand_model.glb",
+    calibrated: false,
+    skeleton: {
+      jointCount: 21,
+      wristBone: "radius_ulna",
+      boneChains: EXPECTED_GLB_BONE_CHAINS,
+      animationClips: ["Pose_OK", "RigAction"]
+    }
+  };
+  function validateGlbCalibration(manifest) {
+    if (manifest.version !== 1 || !manifest.model || !manifest.skeleton) {
+      return { valid: false, calibrated: false, reason: "invalid-manifest" };
+    }
+    if (!skeletonMatches(manifest.skeleton)) {
+      return { valid: false, calibrated: false, reason: "skeleton-mismatch" };
+    }
+    if (!manifest.calibrated) {
+      return { valid: true, calibrated: false, reason: "calibration-required" };
+    }
+    if (!manifest.engineToGlb || !manifest.glbToEngine) {
+      return { valid: false, calibrated: false, reason: "missing-transform" };
+    }
+    return { valid: true, calibrated: true };
+  }
+  function transformEngineToGlb(manifest, point) {
+    const transform = manifest.engineToGlb;
+    if (!transform) throw new Error("GLB calibration transform is not available");
+    return applyTransform(transform, point);
+  }
+  function transformGlbToEngine(manifest, point) {
+    const transform = manifest.glbToEngine;
+    if (!transform) throw new Error("GLB calibration transform is not available");
+    return applyTransform(transform, point);
+  }
+  function skeletonMatches(skeleton) {
+    if (skeleton.jointCount !== 21 || skeleton.wristBone !== "radius_ulna") return false;
+    for (const finger of [1, 2, 3, 4, 5]) {
+      const expected = EXPECTED_GLB_BONE_CHAINS[finger];
+      const actual = skeleton.boneChains[finger];
+      if (!actual || actual.length !== expected.length || actual.some((name, i) => name !== expected[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+  function applyTransform(transform, point) {
+    const scaled = {
+      x: point.x * transform.scale.x,
+      y: point.y * transform.scale.y,
+      z: point.z * transform.scale.z
+    };
+    const rotated = rotateXYZ(scaled, transform.rotation);
+    return {
+      x: rotated.x + transform.translation.x,
+      y: rotated.y + transform.translation.y,
+      z: rotated.z + transform.translation.z
+    };
+  }
+  function rotateXYZ(point, rotation) {
+    const cx = Math.cos(rotation.x);
+    const sx = Math.sin(rotation.x);
+    const cy = Math.cos(rotation.y);
+    const sy = Math.sin(rotation.y);
+    const cz = Math.cos(rotation.z);
+    const sz = Math.sin(rotation.z);
+    const y1 = point.y * cx - point.z * sx;
+    const z1 = point.y * sx + point.z * cx;
+    const x2 = point.x * cy + z1 * sy;
+    const z2 = -point.x * sy + z1 * cy;
+    return {
+      x: x2 * cz - y1 * sz,
+      y: x2 * sz + y1 * cz,
+      z: z2
+    };
+  }
+
   // src/kinematics/inverseKinematics.ts
   var JOINTS = ["mcp", "pip", "dip", "spread"];
   function solveFingerTarget(input) {
@@ -1381,6 +1473,58 @@ var PianoHandEngine = (() => {
   }
   function distance(a, b) {
     return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+  }
+
+  // src/calibration/singleFingerContact.ts
+  function solveSingleFingerContact(input) {
+    const validation = validateGlbCalibration(input.calibration);
+    if (!validation.valid || !validation.calibrated) {
+      return {
+        hand: input.hand,
+        finger: input.finger,
+        targetKeyMidi: input.targetKeyMidi,
+        calibrationVersion: 1,
+        converged: false,
+        residualMm: Number.POSITIVE_INFINITY,
+        reason: validation.reason ?? "calibration-required"
+      };
+    }
+    const ik = solveFingerTarget({
+      hand: input.hand,
+      rig: input.rig,
+      wrist: input.wrist,
+      wristRotation: input.wristRotation,
+      fingers: input.fingers,
+      finger: input.finger,
+      target: input.targetEngine,
+      ...input.toleranceMm === void 0 ? {} : { toleranceMm: input.toleranceMm }
+    });
+    if (!ik.converged) {
+      return {
+        hand: input.hand,
+        finger: input.finger,
+        targetKeyMidi: input.targetKeyMidi,
+        calibrationVersion: 1,
+        converged: false,
+        residualMm: ik.errorMm,
+        state: ik.state,
+        tipEngine: ik.tip,
+        ik,
+        reason: "unreachable"
+      };
+    }
+    return {
+      hand: input.hand,
+      finger: input.finger,
+      targetKeyMidi: input.targetKeyMidi,
+      calibrationVersion: 1,
+      converged: true,
+      residualMm: ik.errorMm,
+      state: ik.state,
+      tipEngine: ik.tip,
+      tipGlb: transformEngineToGlb(input.calibration, ik.tip),
+      ik
+    };
   }
 
   // src/index.ts

@@ -1,0 +1,302 @@
+{
+  "version": 1,
+  "model": "hand_model.glb",
+  "calibrated": false,
+  "skeleton": {
+    "jointCount": 21,
+    "wristBone": "radius_ulna",
+    "boneChains": {
+      "1": [
+        "thumb_trapez",
+        "thumb_meta",
+        "thumb_prox",
+        "thumb_dist"
+      ],
+      "2": [
+        "index_meta",
+        "index_prox",
+        "index_midd",
+        "index_dist"
+      ],
+      "3": [
+        "midd_meta",
+        "midd_prox",
+        "midd_midd",
+        "midd_dist"
+      ],
+      "4": [
+        "ring_meta",
+        "ring_prox",
+        "ring_midd",
+        "ring_dist"
+      ],
+      "5": [
+        "pinky_meta",
+        "pinky_prox",
+        "pinky_midd",
+        "pinky_dist"
+      ]
+    },
+    "animationClips": [
+      "Pose_OK",
+      "RigAction"
+    ]
+  },
+  "audit": {
+    "source": "website/assets/hand/hand_model.glb",
+    "gltfVersion": "2.0",
+    "generator": "Khronos glTF Blender I/O v4.5.49",
+    "rootNode": "Rig",
+    "jointNames": [
+      "pinky_dist",
+      "pinky_midd",
+      "pinky_prox",
+      "pinky_meta",
+      "ring_dist",
+      "ring_midd",
+      "ring_prox",
+      "ring_meta",
+      "midd_dist",
+      "midd_midd",
+      "midd_prox",
+      "midd_meta",
+      "index_dist",
+      "index_midd",
+      "index_prox",
+      "index_meta",
+      "thumb_dist",
+      "thumb_prox",
+      "thumb_meta",
+      "thumb_trapez",
+      "radius_ulna"
+    ],
+    "wrist": {
+      "parent": "Rig",
+      "localTranslation": {
+        "x": 0.6640555262565613,
+        "y": 0.30166447162628174,
+        "z": -2.9026789860608915e-8
+      }
+    },
+    "chains": {
+      "1": [
+        {
+          "name": "thumb_trapez",
+          "parent": "radius_ulna",
+          "localTranslation": {
+            "x": -1.4901161193847656e-8,
+            "y": 3.5634188652038574,
+            "z": -1.6880221664905548e-7
+          },
+          "localBoneLength": 3.5634188652038614
+        },
+        {
+          "name": "thumb_meta",
+          "parent": "thumb_trapez",
+          "localTranslation": {
+            "x": 0,
+            "y": 5.773857593536377,
+            "z": -5.010515451431274e-7
+          },
+          "localBoneLength": 5.773857593536399
+        },
+        {
+          "name": "thumb_prox",
+          "parent": "thumb_meta",
+          "localTranslation": {
+            "x": -3.203749656677246e-7,
+            "y": 3.1519052982330322,
+            "z": 9.12696123123169e-8
+          },
+          "localBoneLength": 3.1519052982330495
+        },
+        {
+          "name": "thumb_dist",
+          "parent": "thumb_prox",
+          "localTranslation": {
+            "x": 2.980232238769531e-7,
+            "y": 3.1192874908447266,
+            "z": -3.8743019104003906e-7
+          },
+          "localBoneLength": 3.1192874908447648
+        }
+      ],
+      "2": [
+        {
+          "name": "index_meta",
+          "parent": "radius_ulna",
+          "localTranslation": {
+            "x": -1.4901161193847656e-8,
+            "y": 3.5634188652038574,
+            "z": -1.6880221664905548e-7
+          },
+          "localBoneLength": 3.5634188652038614
+        },
+        {
+          "name": "index_prox",
+          "parent": "index_meta",
+          "localTranslation": {
+            "x": -2.9802322387695312e-8,
+            "y": 8.759413719177246,
+            "z": 5.066394805908203e-7
+          },
+          "localBoneLength": 8.75941371917726
+        },
+        {
+          "name": "index_midd",
+          "parent": "index_prox",
+          "localTranslation": {
+            "x": -6.332993507385254e-8,
+            "y": 5.167908668518066,
+            "z": 5.208421498537064e-7
+          },
+          "localBoneLength": 5.167908668518093
+        },
+        {
+          "name": "index_dist",
+          "parent": "index_midd",
+          "localTranslation": {
+            "x": -1.1175870895385742e-7,
+            "y": 2.734678268432617,
+            "z": 2.3672328097745776e-7
+          },
+          "localBoneLength": 2.73467826843263
+        }
+      ],
+      "3": [
+        {
+          "name": "midd_meta",
+          "parent": "radius_ulna",
+          "localTranslation": {
+            "x": -1.4901161193847656e-8,
+            "y": 3.5634188652038574,
+            "z": -1.6880221664905548e-7
+          },
+          "localBoneLength": 3.5634188652038614
+        },
+        {
+          "name": "midd_prox",
+          "parent": "midd_meta",
+          "localTranslation": {
+            "x": -2.9802322387695312e-8,
+            "y": 8.272099494934082,
+            "z": 1.1920928955078125e-7
+          },
+          "localBoneLength": 8.272099494934082
+        },
+        {
+          "name": "midd_midd",
+          "parent": "midd_prox",
+          "localTranslation": {
+            "x": -1.341104507446289e-7,
+            "y": 5.39655876159668,
+            "z": -1.234002411365509e-8
+          },
+          "localBoneLength": 5.396558761596681
+        },
+        {
+          "name": "midd_dist",
+          "parent": "midd_midd",
+          "localTranslation": {
+            "x": 1.8719583749771118e-7,
+            "y": 3.2104010581970215,
+            "z": -3.3318065106868744e-7
+          },
+          "localBoneLength": 3.210401058197044
+        }
+      ],
+      "4": [
+        {
+          "name": "ring_meta",
+          "parent": "radius_ulna",
+          "localTranslation": {
+            "x": -1.4901161193847656e-8,
+            "y": 3.5634188652038574,
+            "z": -1.6880221664905548e-7
+          },
+          "localBoneLength": 3.5634188652038614
+        },
+        {
+          "name": "ring_prox",
+          "parent": "ring_meta",
+          "localTranslation": {
+            "x": 5.029141902923584e-8,
+            "y": 7.821215629577637,
+            "z": -1.30385160446167e-7
+          },
+          "localBoneLength": 7.821215629577637
+        },
+        {
+          "name": "ring_midd",
+          "parent": "ring_prox",
+          "localTranslation": {
+            "x": -2.0227162167429924e-8,
+            "y": 4.912558078765869,
+            "z": 9.11718416318763e-8
+          },
+          "localBoneLength": 4.91255807876587
+        },
+        {
+          "name": "ring_dist",
+          "parent": "ring_midd",
+          "localTranslation": {
+            "x": 5.291076377034187e-8,
+            "y": 2.791468381881714,
+            "z": 8.102506399154663e-8
+          },
+          "localBoneLength": 2.7914683818817156
+        }
+      ],
+      "5": [
+        {
+          "name": "pinky_meta",
+          "parent": "radius_ulna",
+          "localTranslation": {
+            "x": -1.4901161193847656e-8,
+            "y": 3.5634188652038574,
+            "z": -1.6880221664905548e-7
+          },
+          "localBoneLength": 3.5634188652038614
+        },
+        {
+          "name": "pinky_prox",
+          "parent": "pinky_meta",
+          "localTranslation": {
+            "x": 8.940696716308594e-8,
+            "y": 7.905612945556641,
+            "z": 1.9371509552001953e-7
+          },
+          "localBoneLength": 7.905612945556644
+        },
+        {
+          "name": "pinky_midd",
+          "parent": "pinky_prox",
+          "localTranslation": {
+            "x": 4.470348358154297e-8,
+            "y": 3.437495470046997,
+            "z": 8.568167686462402e-8
+          },
+          "localBoneLength": 3.4374954700469984
+        },
+        {
+          "name": "pinky_dist",
+          "parent": "pinky_midd",
+          "localTranslation": {
+            "x": -2.9802322387695312e-8,
+            "y": 1.8295929431915283,
+            "z": 3.5762786865234375e-7
+          },
+          "localBoneLength": 1.8295929431915632
+        }
+      ]
+    }
+  },
+  "status": {
+    "skeletonAudited": true,
+    "parentChainsAudited": true,
+    "boneLengthsMeasured": true,
+    "fingertipLandmarksMeasured": false,
+    "jointAxesMeasured": false,
+    "engineToGlbTransformMeasured": false
+  }
+}

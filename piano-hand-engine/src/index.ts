@@ -16,6 +16,8 @@ export * from './core/types.js';
 export * from './core/timeline.js';
 export * from './core/performancePlan.js';
 export * from './core/motionPlan.js';
+export * from './calibration/glbCalibration.js';
+export * from './calibration/singleFingerContact.js';
 export * from './keyboard/pianoGeometry.js';
 export * from './keyboard/keyPosition.js';
 export * from './kinematics/handPose.js';
