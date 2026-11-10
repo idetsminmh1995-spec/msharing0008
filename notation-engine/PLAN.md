@@ -1056,7 +1056,7 @@ stacking) — noted as future work, not implemented here.
 
 ---
 
-### 9.15 Ties `[BUILT for the common case -- see Doc/phase-26-ties.md for the cross-barline/beam/chord limitations]`
+### 9.15 Ties `[BUILT for same-staff single-note ties within one system, including cross-barline ties -- see Doc/phase-26-ties.md for system-break/cross-staff/beam/chord limitations]`
 
 **Responsibility.** A curved line connecting two noteheads of the **same
 pitch**, indicating the second continues the first's sound rather than
@@ -1095,14 +1095,18 @@ universal number, the same situation Phase 24's slope cap and this
 section's own rest-offset already handled the same way) — `0.5`sp of
 vertical clearance from the endpoint to the peak.
 
-**Known limitation, stated rather than silently wrong.** For a tied
-*chord* (2+ simultaneous notes all tied to their next occurrence), real
-notation individually decides each member's side — outermost notes curve
-away from the chord (topmost up, bottommost down), only the innermost
-member(s) get a free choice. This section specifies and implements only
-the single-note case (by far the common one); the chord-tie refinement is
-future work, the same kind of explicitly-scoped gap as Phase 25's
-notehead-collision offsetting.
+**Known limitations, stated rather than silently wrong.** A tie whose
+endpoints fall on different systems is not drawn as one curve; the renderer
+reports `TIE_CROSSES_SYSTEM` until system-edge continuation geometry is
+implemented. Cross-staff ties, ties touching beamed notes, and ties on
+*chords* are also not drawn yet. For a tied chord (2+ simultaneous notes
+all tied to their next occurrence), real notation individually decides
+each member's side — outermost notes curve away from the chord (topmost up,
+bottommost down), only the innermost member(s) get a free choice. The
+renderer also reports `TIE_PITCH_MISMATCH` rather than joining different
+notated pitches. This section implements same-staff single-note ties within
+one system, including across barlines; chord-member and beam-anchor
+refinements remain future work.
 
 **Interfaces.**
 ```ts

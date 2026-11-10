@@ -1,9 +1,9 @@
 # Phase 26 — Ties
 
-**Status:** complete and wired end to end for the common (single-voice,
-same-measure, non-beamed, non-chord) case (237/237 tests pass). Cross-
-measure, beamed, and chord ties are documented limitations, not gaps
-silently left unaddressed — see §3.
+**Status:** complete for single-staff, single-note ties within one system,
+including ties across measure barlines. System-break continuations,
+cross-staff ties, beamed-note ties, and chord-member ties remain documented
+limitations, not gaps silently left unaddressed — see §3.
 
 Same pattern as the two prior phases: another `§9.X` specification gap
 found and fixed before writing any code.
@@ -51,11 +51,13 @@ scale, noted as a future refinement rather than silently claimed exact.
 `renderNoteOrRest` now computes its note's resolved stem direction
 *unconditionally* (previously only computed when actually drawing a real
 stem, i.e. never for whole notes) and returns it, along with the
-notehead's position and glyph, as a `tieAnchor`. The per-voice render loop
-tracks one `pendingTie` slot: when a note has `tieStart`, its anchor is
-remembered; when a later note in the same voice has `tieStop`, a tie
-is drawn from the remembered anchor's right edge to the new note's own X,
-using the first note's resolved direction to pick the side.
+notehead's position and glyph, as a `tieAnchor`. A per-part map keyed by
+staff and voice carries a `pendingTie` anchor across measures: when a note
+has `tieStart`, its anchor is remembered; when a later note in that voice
+has `tieStop`, a tie is drawn from the remembered anchor's right edge to
+the new note's own X, using the first note's resolved direction to pick
+the side. The endpoints must share a system; a system break receives an
+explicit diagnostic instead of an invalid diagonal curve.
 
 ## 2. How this was verified
 
@@ -80,10 +82,15 @@ coordinates rather than assumed):
 
 ## 3. Known limitations (stated, not silently missing)
 
-- **Ties never span a barline.** `pendingTie` is a per-measure, per-voice
-  local variable with no cross-measure state carried in
-  `renderFromMusicXml` at all yet. A note tied into the next measure (a
-  very common syncopation pattern) currently draws nothing for that tie.
+- **A tie that crosses a system break is not drawn.** A tie between measures
+  on the same system is now engraved across their shared barline. When the
+  measures are on different systems, one continuous curve would be
+  geometrically wrong; the renderer reports `TIE_CROSSES_SYSTEM` instead of
+  drawing a diagonal across the page. Splitting the tie into system-edge
+  continuations remains future work.
+- **A tie between different staves is not drawn.** Pending anchors are
+  keyed by staff and voice; the renderer does not yet position a cross-staff
+  tie around the intervening staff content.
 - **Ties into or out of a beamed note aren't drawn.** `renderBeamGroup`
   doesn't expose a `tieAnchor` the way `renderNoteOrRest` now does, so a
   tie touching a beamed member is silently skipped rather than drawn
@@ -100,11 +107,9 @@ rather than silently left unaddressed.
 ## 4. How to modify it
 
 - **Change the bulge height** — `TIE_BULGE_HEIGHT` in `geometry/tie.ts`.
-- **Support cross-barline ties** — would need `renderFromMusicXml` to
-  carry `pendingTie` state (keyed per voice ID, since voice identity is
-  what persists across measures, not array index) from one measure
-  iteration into the next, rather than declaring it fresh inside the
-  per-measure loop.
+- **Support ties across system breaks** — split the tie into outgoing and
+  incoming system-edge continuations with independent geometry rather than
+  connecting coordinates from two systems with one curve.
 - **Support chord/beam ties** — extend `renderChord`/`renderBeamGroup` to
   also return a `tieAnchor`-shaped value per member note, then extend the
   render loop's `pendingTie` bookkeeping to track one per relevant note

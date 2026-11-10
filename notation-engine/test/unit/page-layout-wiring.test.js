@@ -122,6 +122,24 @@ describe('page layout wiring (Integration L, §16.2)', () => {
     assert.ok([...diagnostics].some((d) => d.code === 'WEDGE_CROSSES_SYSTEM'));
   });
 
+  test('a tie spanning a system break reports TIE_CROSSES_SYSTEM rather than drawing a diagonal', () => {
+    const tieNote = (type) =>
+      '<note><pitch><step>C</step><octave>5</octave></pitch>' +
+      '<duration>8</duration><voice>1</voice><type>whole</type>' +
+      `<tie type="${type}"/></note>`;
+    const tied =
+      '<score-partwise><part-list><score-part id="P1"/></part-list><part id="P1">' +
+      `<measure number="1">${ATTRS}${tieNote('start')}</measure>` +
+      `<measure number="2"><print new-system="yes"/>${tieNote('stop')}</measure>` +
+      '</part></score-partwise>';
+    const { svg, diagnostics } = render(tied, {
+      layout: { mode: 'page' },
+      page: { pageWidth: 120 },
+    });
+    assert.ok([...diagnostics].some((d) => d.code === 'TIE_CROSSES_SYSTEM'));
+    assert.doesNotMatch(svg, /<path d="M [^"]* Q /, 'no tie path should run diagonally between systems');
+  });
+
   test('the same hairpin in SCROLL mode draws normally -- there is only one system to cross', () => {
     const wedged =
       '<score-partwise><part-list><score-part id="P1"/></part-list><part id="P1">' +

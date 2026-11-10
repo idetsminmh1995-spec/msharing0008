@@ -218,6 +218,36 @@ describe('renderFromMusicXml end-to-end (Phase 21)', () => {
     assert.equal(Number(startY), 5.5); // C5's own y (bottomY 8 + position -2.5)
   });
 
+  test('a tie continues across a barline when both measures share one system', () => {
+    const { svg, diagnostics } = render('tie-across-measure.musicxml');
+    assert.deepEqual([...diagnostics], []);
+    const tiePaths = [...svg.matchAll(/<path d="M ([\d.]+) ([\d.]+) Q [\d.]+ [-\d.]+ ([\d.]+) [-\d.]+ Q/g)];
+    assert.equal(tiePaths.length, 1);
+    const [, startX, startY, endX] = tiePaths[0];
+    assert.ok(Number(endX) > Number(startX), 'tie extends forward from measure 1 to measure 2');
+    assert.ok(Number.isFinite(Number(startY)));
+    const crossesBarline = [...svg.matchAll(/<line x1="([\d.]+)" y1="[\d.]+" x2="([\d.]+)" y2="[\d.]+" stroke="#000000" stroke-width="0.16"/g)].some(
+      (match) => Number(match[1]) === Number(match[2]) && Number(startX) < Number(match[1]) && Number(endX) > Number(match[1]),
+    );
+    assert.ok(crossesBarline, 'tie curve crosses the barline between the two measures');
+  });
+
+  test('a tie stop on a different notated pitch is diagnosed and not drawn', () => {
+    const xml =
+      '<score-partwise><part-list><score-part id="P1"/></part-list><part id="P1">' +
+      '<measure number="1"><attributes><divisions>2</divisions>' +
+      '<time><beats>4</beats><beat-type>4</beat-type></time>' +
+      '<clef><sign>G</sign><line>2</line></clef></attributes>' +
+      '<note><pitch><step>C</step><octave>5</octave></pitch>' +
+      '<duration>2</duration><voice>1</voice><type>quarter</type><tie type="start"/></note>' +
+      '<note><pitch><step>D</step><octave>5</octave></pitch>' +
+      '<duration>2</duration><voice>1</voice><type>quarter</type><tie type="stop"/></note>' +
+      '</measure></part></score-partwise>';
+    const { svg, diagnostics } = NE.renderFromMusicXml(xml, { domParser });
+    assert.ok([...diagnostics].some((d) => d.code === 'TIE_PITCH_MISMATCH'));
+    assert.doesNotMatch(svg, /<path d="M [^\"]* Q /, 'mismatched notes must not be connected by a tie');
+  });
+
   test("Phase 26: the tie curves ABOVE for a high note (C5, automatic direction 'down')", () => {
     const { svg } = render('tied-note.musicxml');
     const controlYs = [...svg.matchAll(/<path d="M [\d.]+ ([\d.]+) Q [\d.]+ (-?[\d.]+)/g)].map((m) => [

@@ -2670,9 +2670,9 @@ function spanSourceNote(event: MeasureEvent): Note | undefined {
  *
  * Scope, stated rather than implied: a span is resolved only WITHIN one
  * voice of one measure. A slur or tuplet that crosses a barline is left
- * undrawn with a diagnostic -- the same honest boundary Phase 26's ties
- * already draw at, and for the same reason (nothing here can see the next
- * measure's x positions).
+ * undrawn with a diagnostic. Unlike simple-note ties, which carry their
+ * anchors across measures within one system, this pass has no access to the
+ * next measure's anchors or x positions.
  */
 function renderSpans(
   events: readonly MeasureEvent[],
@@ -3880,6 +3880,36 @@ export function renderParsedMusicXml(
     // up a real drum-table entry for an unpitched note whose <instrument
     // id> resolves to a known GM percussion note number.
     const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part.id);
+    // §9.15: tie anchors survive measure boundaries within a part. A single
+    // SVG curve is valid only while both measures share one system; page-mode
+    // system breaks are diagnosed below rather than joined with a diagonal.
+    const pendingTiesByVoiceAndStaff = new Map<
+      string,
+      {
+        x: number;
+        y: number;
+        direction: StemDirection;
+        noteheadGlyph: string;
+        pitch: Note['pitch'];
+        measureNumber: number;
+        systemIndex: number;
+      }
+    >();
+    const tiePitchesMatch = (first: Note['pitch'], second: Note['pitch']): boolean => {
+      if (first.kind === 'pitched' && second.kind === 'pitched') {
+        return (
+          first.step === second.step &&
+          first.alter === second.alter &&
+          first.octave === second.octave
+        );
+      }
+      if (first.kind === 'unpitched' && second.kind === 'unpitched') {
+        return (
+          first.displayStep === second.displayStep && first.displayOctave === second.displayOctave
+        );
+      }
+      return false;
+    };
 
     // Integration A: accidental state is per STAFF -- a measure-local accidental
     // on the treble staff must not carry over onto the bass staff, and each
@@ -4370,16 +4400,10 @@ export function renderParsedMusicXml(
 
           for (const voice of measure.voices) {
             const forcedDirection = isMultiVoice ? voiceForcedDirection(voice.id) : undefined;
+            const tieKey = `${staffNumber}:${voice.id}`;
             const restOffset = isMultiVoice
               ? voiceRestOffset(voice.id) + (restPushes.get(voice.id) ?? 0)
               : 0;
-            // §9.15: tracks the most recent note that started a tie (tieStart)
-            // in THIS voice, so the next note carrying tieStop can be
-            // connected to it. Scoped to within one measure and to
-            // non-beamed, non-chord notes only -- a tie spanning a barline,
-            // or into/out of a beamed or chord note, is documented as not yet
-            // drawn (see Doc/phase-26).
-            let pendingTie: { x: number; y: number; direction: StemDirection } | undefined;
             const starts = eventStartTicks(voice.events);
             const total = totalTicks(voice.events) || 1;
             // Phase 43/44 wiring: a real, content-driven position for every
@@ -4515,6 +4539,10 @@ export function renderParsedMusicXml(
               const isGraceNote = event.kind === 'note' && event.isGrace === true;
 
               if (!isGraceNote && beamedIndices.has(idx)) {
+                // Beam-group anchors currently do not expose member tie
+                // geometry. Do not let an earlier single-note tie skip over
+                // this unsupported event and attach to a later note.
+                pendingTiesByVoiceAndStaff.delete(tieKey);
                 const group = groupByFirstIndex.get(idx);
                 if (group === undefined) return; // a non-first member of an already-rendered group
                 // The indices, the notes and the x positions are all
@@ -4575,6 +4603,9 @@ export function renderParsedMusicXml(
               }
 
               if (event.kind === 'chord') {
+                // Chord-member ties need independent anchors and side rules;
+                // keep the supported single-note tie from jumping across it.
+                pendingTiesByVoiceAndStaff.delete(tieKey);
                 const { svg, newAccidentalState, anchor } = renderChord(
                   event,
                   eventX,
@@ -4595,31 +4626,65 @@ export function renderParsedMusicXml(
                   restOffset,
                 );
 
+                const pendingTie = pendingTiesByVoiceAndStaff.get(tieKey);
                 if (event.kind === 'note' && event.tieStop && pendingTie !== undefined) {
-                  const side = tieSide(pendingTie.direction);
-                  const startX =
-                    pendingTie.x + noteheadWidth(tieAnchor?.noteheadGlyph ?? 'noteheadBlack');
-                  const shape = computeTieShape(startX, eventX, pendingTie.y, side);
-                  svgParts.push(
-                    renderTie(shape, {
-                      color: theme.colorOf('tie'),
-                      midpointThickness: lineWidth(
-                        ctx.theme,
-                        'tieMiddle',
-                        'tieMidpointThickness',
-                        TIE_MIDPOINT_THICKNESS_FALLBACK,
-                      ),
-                    }),
-                  );
+                  if (!tiePitchesMatch(pendingTie.pitch, event.pitch)) {
+                    diagnostics.push({
+                      severity: 'warning',
+                      code: 'TIE_PITCH_MISMATCH',
+                      message:
+                        'A <tie type="stop"> does not match the preceding tie start pitch; no tie was drawn.',
+                      location: { partId: part.id, measureNumber: measure.number },
+                    });
+                  } else if (pendingTie.systemIndex === layout.systemIndex) {
+                    const side = tieSide(pendingTie.direction);
+                    const startX = pendingTie.x + noteheadWidth(pendingTie.noteheadGlyph);
+                    const shape = computeTieShape(startX, eventX, pendingTie.y, side);
+                    svgParts.push(
+                      renderTie(shape, {
+                        color: theme.colorOf('tie'),
+                        midpointThickness: lineWidth(
+                          ctx.theme,
+                          'tieMiddle',
+                          'tieMidpointThickness',
+                          TIE_MIDPOINT_THICKNESS_FALLBACK,
+                        ),
+                      }),
+                    );
+                  } else {
+                    diagnostics.push({
+                      severity: 'info',
+                      code: 'TIE_CROSSES_SYSTEM',
+                      message:
+                        'A tie spans a system break; system-to-system tie continuation is not implemented, so no diagonal tie was drawn.',
+                      location: { partId: part.id, measureNumber: pendingTie.measureNumber },
+                    });
+                  }
+                  pendingTiesByVoiceAndStaff.delete(tieKey);
+                } else if (event.kind === 'rest') {
+                  pendingTiesByVoiceAndStaff.delete(tieKey);
+                } else if (
+                  event.kind === 'note' &&
+                  !event.tieStart &&
+                  !event.tieStop &&
+                  pendingTie !== undefined
+                ) {
+                  // A tie must join the immediately following note in its
+                  // voice; discard an unmatched anchor instead of attaching
+                  // it to a later unrelated note.
+                  pendingTiesByVoiceAndStaff.delete(tieKey);
                 }
-                pendingTie =
-                  event.kind === 'note' && event.tieStart && tieAnchor !== undefined
-                    ? {
-                        x: eventX,
-                        y: ctx.measureBottomY + tieAnchor.position,
-                        direction: tieAnchor.direction,
-                      }
-                    : undefined;
+                if (event.kind === 'note' && event.tieStart && tieAnchor !== undefined) {
+                  pendingTiesByVoiceAndStaff.set(tieKey, {
+                    x: eventX,
+                    y: ctx.measureBottomY + tieAnchor.position,
+                    direction: tieAnchor.direction,
+                    noteheadGlyph: tieAnchor.noteheadGlyph,
+                    pitch: event.pitch,
+                    measureNumber: measure.number,
+                    systemIndex: layout.systemIndex,
+                  });
+                }
 
                 if (event.kind === 'note' && tieAnchor !== undefined) {
                   anchorByIndex.set(idx, {

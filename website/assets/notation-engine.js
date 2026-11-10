@@ -79055,6 +79055,16 @@ ${xrefOffset}
         }
       }
       const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part2.id);
+      const pendingTiesByVoiceAndStaff = /* @__PURE__ */ new Map();
+      const tiePitchesMatch = (first, second) => {
+        if (first.kind === "pitched" && second.kind === "pitched") {
+          return first.step === second.step && first.alter === second.alter && first.octave === second.octave;
+        }
+        if (first.kind === "unpitched" && second.kind === "unpitched") {
+          return first.displayStep === second.displayStep && first.displayOctave === second.displayOctave;
+        }
+        return false;
+      };
       let previousAttrs;
       part2.measures.forEach((measure2, i2) => {
         const attrs = attributesByPartAndMeasure.get(`${part2.id}:${measure2.number}`);
@@ -79380,8 +79390,8 @@ ${xrefOffset}
             const restPushes = computeRestClearanceOffsets(measure2, staffNumber, ctxAtTick);
             for (const voice2 of measure2.voices) {
               const forcedDirection = isMultiVoice ? voiceForcedDirection(voice2.id) : void 0;
+              const tieKey = `${staffNumber}:${voice2.id}`;
               const restOffset = isMultiVoice ? voiceRestOffset(voice2.id) + (restPushes.get(voice2.id) ?? 0) : 0;
-              let pendingTie;
               const starts = eventStartTicks(voice2.events);
               const total = totalTicks(voice2.events) || 1;
               const fallbackNoteAreaWidth = layout.x + layout.width - noteAreaX;
@@ -79433,6 +79443,7 @@ ${xrefOffset}
                 if (!eventCtx.clefDef.positionsByPitch) return;
                 const isGraceNote = event.kind === "note" && event.isGrace === true;
                 if (!isGraceNote && beamedIndices.has(idx)) {
+                  pendingTiesByVoiceAndStaff.delete(tieKey);
                   const group = groupByFirstIndex.get(idx);
                   if (group === void 0) return;
                   const groupIndices = group.eventIndices.filter((i3) => {
@@ -79476,6 +79487,7 @@ ${xrefOffset}
                   return;
                 }
                 if (event.kind === "chord") {
+                  pendingTiesByVoiceAndStaff.delete(tieKey);
                   const { svg: svg2, newAccidentalState, anchor } = renderChord(
                     event,
                     eventX,
@@ -79495,27 +79507,55 @@ ${xrefOffset}
                     forcedDirection,
                     restOffset
                   );
+                  const pendingTie = pendingTiesByVoiceAndStaff.get(tieKey);
                   if (event.kind === "note" && event.tieStop && pendingTie !== void 0) {
-                    const side = tieSide(pendingTie.direction);
-                    const startX = pendingTie.x + noteheadWidth(tieAnchor?.noteheadGlyph ?? "noteheadBlack");
-                    const shape = computeTieShape(startX, eventX, pendingTie.y, side);
-                    svgParts.push(
-                      renderTie(shape, {
-                        color: theme.colorOf("tie"),
-                        midpointThickness: lineWidth(
-                          ctx.theme,
-                          "tieMiddle",
-                          "tieMidpointThickness",
-                          TIE_MIDPOINT_THICKNESS_FALLBACK
-                        )
-                      })
-                    );
+                    if (!tiePitchesMatch(pendingTie.pitch, event.pitch)) {
+                      diagnostics.push({
+                        severity: "warning",
+                        code: "TIE_PITCH_MISMATCH",
+                        message: 'A <tie type="stop"> does not match the preceding tie start pitch; no tie was drawn.',
+                        location: { partId: part2.id, measureNumber: measure2.number }
+                      });
+                    } else if (pendingTie.systemIndex === layout.systemIndex) {
+                      const side = tieSide(pendingTie.direction);
+                      const startX = pendingTie.x + noteheadWidth(pendingTie.noteheadGlyph);
+                      const shape = computeTieShape(startX, eventX, pendingTie.y, side);
+                      svgParts.push(
+                        renderTie(shape, {
+                          color: theme.colorOf("tie"),
+                          midpointThickness: lineWidth(
+                            ctx.theme,
+                            "tieMiddle",
+                            "tieMidpointThickness",
+                            TIE_MIDPOINT_THICKNESS_FALLBACK
+                          )
+                        })
+                      );
+                    } else {
+                      diagnostics.push({
+                        severity: "info",
+                        code: "TIE_CROSSES_SYSTEM",
+                        message: "A tie spans a system break; system-to-system tie continuation is not implemented, so no diagonal tie was drawn.",
+                        location: { partId: part2.id, measureNumber: pendingTie.measureNumber }
+                      });
+                    }
+                    pendingTiesByVoiceAndStaff.delete(tieKey);
+                  } else if (event.kind === "rest") {
+                    pendingTiesByVoiceAndStaff.delete(tieKey);
+                  } else if (event.kind === "note" && !event.tieStart && !event.tieStop && pendingTie !== void 0) {
+                    pendingTiesByVoiceAndStaff.delete(tieKey);
                   }
-                  pendingTie = event.kind === "note" && event.tieStart && tieAnchor !== void 0 ? {
-                    x: eventX,
-                    y: ctx.measureBottomY + tieAnchor.position,
-                    direction: tieAnchor.direction
-                  } : void 0;
+                  if (event.kind === "note" && event.tieStart && tieAnchor !== void 0) {
+                    pendingTiesByVoiceAndStaff.set(tieKey, {
+                      x: eventX,
+                      y: ctx.measureBottomY + tieAnchor.position,
+                      direction: tieAnchor.direction,
+                      noteheadGlyph: tieAnchor.noteheadGlyph,
+                      pitch: event.pitch,
+                      measureNumber: measure2.number,
+                      systemIndex: layout.systemIndex
+                    });
+                  }
                   if (event.kind === "note" && tieAnchor !== void 0) {
                     anchorByIndex.set(idx, {
                       x: eventX,
