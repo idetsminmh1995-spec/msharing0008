@@ -1179,6 +1179,7 @@ function renderNoteMarks(
   const articulations = source.articulations ?? [];
   const ornaments = source.ornaments ?? [];
   const hasFermata = source.hasFermata === true;
+  const isDrum = source.pitch.kind === 'unpitched';
   if (articulations.length === 0 && ornaments.length === 0 && !hasFermata) return '';
 
   const parts: string[] = [];
@@ -1201,7 +1202,14 @@ function renderNoteMarks(
 
   for (const type of articulations) {
     const side = articulationSide(type, direction);
-    if (type === 'marcato') {
+    if (isDrum) {
+      // Drum accents belong to the shared upper clearance area. Keeping
+      // them above the staff avoids a kick's lower voice placing a `>` or
+      // `^` inside the note/beam pattern and makes the kick + hi-hat groove
+      // read as one clean percussion figure.
+      aboveStaff -= ARTICULATION_GAP;
+      place(articulationGlyphName(type, 'above'), aboveStaff);
+    } else if (type === 'marcato') {
       aboveStaff -= ARTICULATION_GAP;
       place(articulationGlyphName(type, side), aboveStaff);
     } else if (side === 'above') {

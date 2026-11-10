@@ -54,6 +54,12 @@ const note = (step, octave, type, notations = '', extra = '') =>
   (notations === '' ? '' : `<notations>${notations}</notations>`) +
   '</note>';
 
+const drumNote = (notations = '') =>
+  '<note><unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched>' +
+  `<duration>2</duration><voice>1</voice><type>quarter</type>` +
+  (notations === '' ? '' : `<notations>${notations}</notations>`) +
+  '</note>';
+
 describe('articulation + ornament wiring (Integration H, §9.19/§9.20)', () => {
   test('the fixture renders with no diagnostics at all', () => {
     const { diagnostics } = renderFixture('articulations-ornaments.musicxml');
@@ -64,6 +70,22 @@ describe('articulation + ornament wiring (Integration H, §9.19/§9.20)', () => 
     const { svg } = renderFixture('articulations-ornaments.musicxml');
     assert.equal(glyphPlacements(svg, 'articAccentAbove').length, 1);
     assert.equal(glyphPlacements(svg, 'articAccentBelow').length, 1);
+  });
+
+  test('drum accent and strong-accent marks always use the upper staff clearance area', () => {
+    const { svg } = renderInline(
+      drumNote('<articulations><accent/></articulations>') +
+        drumNote('<articulations><strong-accent/></articulations>'),
+    );
+    const noteheads = glyphPlacements(svg, 'noteheadBlack');
+    const accents = glyphPlacements(svg, 'articAccentAbove');
+    const marcatos = glyphPlacements(svg, 'articMarcatoAbove');
+    assert.equal(accents.length, 1);
+    assert.equal(marcatos.length, 1);
+    assert.equal(glyphPlacements(svg, 'articAccentBelow').length, 0);
+    assert.equal(glyphPlacements(svg, 'articMarcatoBelow').length, 0);
+    assert.ok(accents[0].y < noteheads[0].y, 'drum accent should sit above its notehead');
+    assert.ok(marcatos[0].y < noteheads[1].y, 'drum strong accent should sit above its notehead');
   });
 
   test('marcato is above even on an UP-stem note -- §9.19\'s one named exception', () => {

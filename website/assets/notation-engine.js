@@ -77372,6 +77372,7 @@ ${xrefOffset}
     const articulations = source.articulations ?? [];
     const ornaments = source.ornaments ?? [];
     const hasFermata = source.hasFermata === true;
+    const isDrum = source.pitch.kind === "unpitched";
     if (articulations.length === 0 && ornaments.length === 0 && !hasFermata) return "";
     const parts = [];
     const topLine = -(STAFF_LINES - 1);
@@ -77390,7 +77391,10 @@ ${xrefOffset}
     };
     for (const type of articulations) {
       const side = articulationSide(type, direction);
-      if (type === "marcato") {
+      if (isDrum) {
+        aboveStaff -= ARTICULATION_GAP;
+        place(articulationGlyphName(type, "above"), aboveStaff);
+      } else if (type === "marcato") {
         aboveStaff -= ARTICULATION_GAP;
         place(articulationGlyphName(type, side), aboveStaff);
       } else if (side === "above") {
