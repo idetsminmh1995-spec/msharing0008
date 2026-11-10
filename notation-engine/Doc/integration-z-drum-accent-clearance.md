@@ -35,3 +35,12 @@ The articulation wiring suite now covers both:
   marks have a smaller SVG `y` than the rendered beam.
 
 The complete repository verification suite passed with 1057 tests.
+
+## Drum chords and connected beams
+
+The same drum house style applies when one onset contains one, two, or three
+simultaneous notes. A chord is rendered with one upward stem attached to its
+outermost notehead, and a beamed run uses one shared upward beam across the
+events. Chord continuations do not create extra stems or flags. Regression
+coverage now renders two three-note chords in one beamed run and checks all
+noteheads, stems, beam connectivity, and the absence of stray flags.

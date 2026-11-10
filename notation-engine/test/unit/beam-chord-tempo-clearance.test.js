@@ -55,6 +55,13 @@ const eighth = (step, octave, beam, chord = '', stem = '') =>
   (beam ? `<beam number="1">${beam}</beam>` : '') +
   '</note>';
 
+const drumEighth = (displayStep, displayOctave, beam, chord = '') =>
+  `<note>${chord}<unpitched><display-step>${displayStep}</display-step>` +
+  `<display-octave>${displayOctave}</display-octave></unpitched>` +
+  '<duration>1</duration><voice>1</voice><type>eighth</type>' +
+  (beam ? `<beam number="1">${beam}</beam>` : '') +
+  '</note>';
+
 function measure(body, attrs = '') {
   return (
     '<score-partwise><part-list><score-part id="P1"/></part-list><part id="P1">' +
@@ -67,6 +74,40 @@ function measure(body, attrs = '') {
 }
 
 describe('a chord inside a beam group (Integration M, §9.13)', () => {
+  test('a 1/2/3-note drum chord uses one upward stem and stays connected to one shared beam', () => {
+    const { svg, diagnostics } = render(
+      measure(
+        drumEighth('G', 5, 'begin') +
+          drumEighth('C', 5, 'continue', '<chord/>') +
+          drumEighth('F', 4, 'continue', '<chord/>') +
+          drumEighth('G', 5, 'continue') +
+          drumEighth('C', 5, 'continue', '<chord/>') +
+          drumEighth('F', 4, 'continue', '<chord/>') +
+          drumEighth('G', 5, 'end') +
+          '<note><rest/><duration>5</duration><voice>1</voice><type>half</type></note>',
+      ),
+    );
+    assert.deepEqual([...diagnostics], []);
+    assert.equal(glyphPlacements(svg, 'noteheadBlack').length, 7);
+    assert.equal(glyphPlacements(svg, 'noteheadXBlack').length, 0);
+    assert.equal(lines(svg).filter((line) => line.w === '0.5').length, 1);
+    assert.equal(glyphCount(svg, 'flag8thUp') + glyphCount(svg, 'flag8thDown'), 0);
+
+    const stems = lines(svg).filter((line) => line.w === '0.12');
+    assert.equal(stems.length, 3, 'each beamed event must draw one shared-direction stem');
+    assert.ok(stems.every((stem) => stem.y2 < stem.y1), 'all drum stems must point upward');
+    const beam = lines(svg).find((line) => line.w === '0.5');
+    assert.ok(beam !== undefined);
+    for (const stem of stems) {
+      const beamY =
+        beam.y1 + ((beam.y2 - beam.y1) * (stem.x1 - beam.x1)) / (beam.x2 - beam.x1 || 1);
+      assert.ok(
+        Math.abs(stem.y2 - beamY) < 0.3 || Math.abs(stem.y1 - beamY) < 0.3,
+        `each chord stem must meet the shared beam at its own x (beam=${beamY}, stem=${stem.y1}->${stem.y2})`,
+      );
+    }
+  });
+
   test('a beam spanning [note, chord, note] draws ONE beam and NO flags', () => {
     const { svg, diagnostics } = render(
       measure(
