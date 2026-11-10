@@ -18,6 +18,8 @@ jobs:
         run: node tools/test-asset-loader.mjs
       - name: Test outro failure cache
         run: node tools/test-outro-video.mjs
+      - name: Test Piano MusicXML-only flow
+        run: node tools/test-piano-musicxml-only.mjs
       - name: Verify notation engine
         run: npm run verify --prefix notation-engine
       - name: Install Chromium and ffprobe

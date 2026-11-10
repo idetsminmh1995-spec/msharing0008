@@ -103,6 +103,16 @@ The shared modules are wired into all five production pages:
 
 Portrait and square page-specific layout rules remain intact. This rollout intentionally does not migrate every other repository page (metronome, vocal, cello, viola, bass-cello) because they are outside the five-page acceptance scope.
 
+### 4.1 Piano score-input correction — complete
+
+The Piano Video page is now MusicXML/MXL-only for score input. The MIDI file
+slot, `.mid`/`.midi` accept filter, `parseMidiFile()` handler, and MIDI upload
+status messaging were removed. MusicXML parsing now remains the single source
+for notation, tempo map, playback events, piano notes, and hand targets; the
+separate audio upload supplies the sound track. Export is disabled until both
+MusicXML playback and audio are available. `tools/test-piano-musicxml-only.mjs`
+guards this contract and runs in CI.
+
 ## 5. Tests, CI, and evidence
 
 ### 5.1 Automated tests
