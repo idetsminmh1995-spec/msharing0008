@@ -1,4 +1,5 @@
 import type { Duration } from './duration.js';
+import { assertValidStartTick } from './event-position.js';
 import type { Note, VoiceId } from './note.js';
 
 /**
@@ -34,7 +35,13 @@ export interface Chord {
   readonly startTick?: number;
 }
 
-export function chord(notes: readonly Note[]): Chord {
+export interface ChordInit {
+  /** Optional onset from the beginning of the containing measure, in ticks. */
+  readonly startTick?: number;
+}
+
+export function chord(notes: readonly Note[], init: ChordInit = {}): Chord {
+  assertValidStartTick(init.startTick);
   const [firstNote, ...otherNotes] = notes;
   if (firstNote === undefined || otherNotes.length === 0) {
     throw new Error('A Chord needs at least 2 notes -- use note() directly for a single notehead.');
@@ -50,13 +57,12 @@ export function chord(notes: readonly Note[]): Chord {
       throw new Error('All notes in a Chord must share the same staff.');
     }
   }
-  return firstNote.staff === undefined
-    ? { kind: 'chord', notes, duration: firstNote.duration, voice: firstNote.voice }
-    : {
-        kind: 'chord',
-        notes,
-        duration: firstNote.duration,
-        voice: firstNote.voice,
-        staff: firstNote.staff,
-      };
+  return {
+    kind: 'chord',
+    notes,
+    duration: firstNote.duration,
+    voice: firstNote.voice,
+    ...(firstNote.staff !== undefined ? { staff: firstNote.staff } : {}),
+    ...(init.startTick !== undefined ? { startTick: init.startTick } : {}),
+  };
 }

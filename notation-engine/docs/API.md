@@ -405,7 +405,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-635 exported symbols, by module.
+637 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -445,6 +445,7 @@ The diagnostics `level` lets through, in their original order.
 | | Name | Summary |
 |---|---|---|
 | interface | `Chord` | Two or more Notes sounding together at the same tick, in the same voice. |
+| interface | `ChordInit` |  |
 | function | `chord` |  |
 
 ### `src/core/duration.ts`
@@ -469,6 +470,12 @@ The diagnostics `level` lets through, in their original order.
 | function | `xmlDivisionsToTicks` | Converts a raw MusicXML <duration> value into the engine's normalized ticks (see TICKS_PER_QUARTER above), given that XML file's own <divisions> (ticks-per-quarter-note in ITS units, which the parser reads per-part and which can even change mid-piece in a pathological file). |
 | function | `ticksToXmlDivisions` | The inverse of xmlDivisionsToTicks() -- e.g. useful later for Phase 49's export. |
 | function | `sumTicks` | Sums a sequence of Durations' authoritative tick lengths -- e.g. a chain of tied notes' total sounding length. |
+
+### `src/core/event-position.ts`
+
+| | Name | Summary |
+|---|---|---|
+| function | `assertValidStartTick` | Validate an optional event onset measured from the start of its containing measure. |
 
 ### `src/core/measure.ts`
 

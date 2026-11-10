@@ -278,12 +278,13 @@ function buildDuration(ev: ParsedNoteEvent): Duration {
   return makeDuration(ev.durationType, ev.dots, ev.ticks, tuplet);
 }
 
-function buildSingle(ev: ParsedNoteEvent): Note | Rest {
+function buildSingle(ev: ParsedNoteEvent, startTick?: number): Note | Rest {
   if (ev.isRest || ev.step === undefined || ev.octave === undefined) {
     return makeRest({
       duration: buildDuration(ev),
       voice: ev.voice,
       ...(ev.staff !== undefined ? { staff: ev.staff } : {}),
+      ...(startTick !== undefined ? { startTick } : {}),
       ...(ev.restDisplayStep !== undefined ? { displayStep: ev.restDisplayStep } : {}),
       ...(ev.restDisplayOctave !== undefined ? { displayOctave: ev.restDisplayOctave } : {}),
       // A rest can carry a fermata exactly as a note can (§10.4).
@@ -307,6 +308,7 @@ function buildSingle(ev: ParsedNoteEvent): Note | Rest {
     duration: buildDuration(ev),
     voice: ev.voice,
     ...(ev.staff !== undefined ? { staff: ev.staff } : {}),
+    ...(startTick !== undefined ? { startTick } : {}),
     ...(ev.tieStart ? { tieStart: true } : {}),
     ...(ev.tieStop ? { tieStop: true } : {}),
     ...(ev.explicitNotehead !== undefined ? { explicitNotehead: ev.explicitNotehead } : {}),
@@ -370,13 +372,14 @@ function buildEvent(
   group: readonly ParsedNoteEvent[],
   location: DiagnosticLocation,
   diagnostics: Diagnostic[],
+  startTick: number,
 ): MeasureEvent {
   const first = group[0];
   if (first === undefined) {
     throw new Error('Internal error: empty event group passed to buildEvent');
   }
   if (group.length === 1) {
-    return buildSingle(first);
+    return buildSingle(first, startTick);
   }
 
   const built = group.map((ev) => buildSingle(ev));
@@ -390,10 +393,10 @@ function buildEvent(
         location,
       ),
     );
-    return buildSingle(first);
+    return buildSingle(first, startTick);
   }
   try {
-    return makeChord(notesOnly);
+    return makeChord(notesOnly, { startTick });
   } catch (err) {
     diagnostics.push(
       diagnostic(
@@ -407,7 +410,7 @@ function buildEvent(
     if (firstNote === undefined) {
       throw new Error('Internal error: empty notesOnly after length check');
     }
-    return firstNote;
+    return buildSingle(first, startTick);
   }
 }
 
@@ -924,7 +927,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           // before it, which is wrong for any voice with a `<forward>`
           // gap or one that starts partway into the measure -- see
           // `startTick`'s own comment in core/note.ts.
-          events.push({ ...buildEvent(group, location, diagnostics), startTick: head.tick });
+          events.push(buildEvent(group, location, diagnostics, head.tick));
           i = j;
         }
         voices.push(makeVoice(voiceId, events));
@@ -1004,9 +1007,16 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
   }
 
   const fileDefaults = parseDefaults(root);
+  const identity = parseIdentity(root);
+  const title = identity.workTitle ?? identity.movementTitle;
+  const composer = identity.creators.composer;
 
   return {
-    score: makeScore({ parts }),
+    score: makeScore({
+      parts,
+      ...(title !== undefined ? { title } : {}),
+      ...(composer !== undefined ? { composer } : {}),
+    }),
     attributes: allAttributes,
     attributeChanges: allAttributeChanges,
     diagnostics,
@@ -1016,7 +1026,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
     harmonies,
     prints,
     ...(fileDefaults !== undefined ? { defaults: fileDefaults } : {}),
-    identity: parseIdentity(root),
+    identity,
     credits: parseCredits(root),
   };
 }

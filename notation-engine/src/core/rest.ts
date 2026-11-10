@@ -1,4 +1,5 @@
 import type { Duration } from './duration.js';
+import { assertValidStartTick } from './event-position.js';
 import type { FermataPlacement, FermataShape, VoiceId } from './note.js';
 import type { PitchStep } from './pitch.js';
 
@@ -15,7 +16,8 @@ export interface Rest {
   /**
    * Where this event starts within its measure, in ticks.
    *
-   * Set by the parser from §10.1's own cursor, which honours `<backup>`
+   * Set by the parser from §10.1's own cursor, or directly by a caller
+   * constructing a score. The cursor honours `<backup>`
    * and `<forward>`. It is NOT redundant with summing the durations
    * before it: a voice can legitimately have GAPS (a `<forward>` skips
    * time without writing a rest, which is how MuseScore writes a kick
@@ -42,6 +44,7 @@ export interface RestInit {
   duration: Duration;
   voice: VoiceId;
   staff?: number;
+  startTick?: number;
   displayStep?: PitchStep;
   displayOctave?: number;
   hasFermata?: boolean;
@@ -50,5 +53,6 @@ export interface RestInit {
 }
 
 export function rest(init: RestInit): Rest {
+  assertValidStartTick(init.startTick);
   return { kind: 'rest', ...init };
 }

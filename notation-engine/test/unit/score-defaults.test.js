@@ -13,10 +13,10 @@ const domParser = testDomParser();
 const load = (n) => fs.readFileSync(path.join(FIXTURES, n), 'utf8');
 const FIXTURE = 'musescore-piano-defaults.musicxml';
 
-describe("<defaults>: the engraving the FILE says it used (Integration W)", () => {
+describe('<defaults>: the engraving the FILE says it used (Integration W)', () => {
   const parsed = () => NE.parseMusicXml(load(FIXTURE), { domParser });
 
-  test('tenths convert to staff spaces by the format\'s own fixed ratio, ten to one', () => {
+  test("tenths convert to staff spaces by the format's own fixed ratio, ten to one", () => {
     assert.equal(NE.TENTHS_PER_STAFF_SPACE, 10);
     assert.equal(NE.tenthsToStaffSpaces(65), 6.5);
     assert.ok(Math.abs(NE.tenthsToStaffSpaces(1.1) - 0.11) < 1e-9);
@@ -51,7 +51,7 @@ describe("<defaults>: the engraving the FILE says it used (Integration W)", () =
     assert.equal(wordFont.size, 10);
   });
 
-  test("a file with no <defaults> at all leaves it undefined rather than inventing one", () => {
+  test('a file with no <defaults> at all leaves it undefined rather than inventing one', () => {
     const plain = NE.parseMusicXml(load('simple-single-voice.musicxml'), { domParser });
     assert.equal(plain.defaults, undefined);
   });
@@ -67,17 +67,31 @@ describe("<defaults>: the engraving the FILE says it used (Integration W)", () =
   });
 });
 
-describe("<work>, <identification> and <credit>: what the score calls itself (Integration W)", () => {
+describe('<work>, <identification> and <credit>: what the score calls itself (Integration W)', () => {
   const parsed = () => NE.parseMusicXml(load(FIXTURE), { domParser });
 
   test('the work title and the composer are kept, not dropped', () => {
-    const { identity } = parsed();
+    const { score, identity } = parsed();
     assert.equal(identity.workTitle, 'Untitled score');
     assert.equal(identity.creators.composer, 'Composer / arranger');
+    assert.equal(score.title, 'Untitled score');
+    assert.equal(score.composer, 'Composer / arranger');
     assert.deepEqual([...identity.software], ['MuseScore Studio 4.7.4']);
   });
 
-  test("every <credit> is kept with its type and its stated place on the page", () => {
+  test('movement title becomes the Score title when no work title is given', () => {
+    const xml = `<?xml version="1.0"?>
+      <score-partwise version="4.0">
+        <movement-title>Movement Only</movement-title>
+        <part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+        <part id="P1"><measure number="1"/></part>
+      </score-partwise>`;
+    const result = NE.parseMusicXml(xml, { domParser });
+    assert.equal(result.score.title, 'Movement Only');
+    assert.equal(result.identity.movementTitle, 'Movement Only');
+  });
+
+  test('every <credit> is kept with its type and its stated place on the page', () => {
     const credits = [...parsed().credits];
     assert.equal(credits.length, 3);
     const title = credits.find((c) => c.types.includes('title'));
@@ -92,6 +106,8 @@ describe("<work>, <identification> and <credit>: what the score calls itself (In
     const plain = NE.parseMusicXml(load('simple-single-voice.musicxml'), { domParser });
     assert.equal(plain.identity.workTitle, undefined);
     assert.deepEqual({ ...plain.identity.creators }, {});
+    assert.equal(plain.score.title, undefined);
+    assert.equal(plain.score.composer, undefined);
     assert.deepEqual([...plain.credits], []);
   });
 });

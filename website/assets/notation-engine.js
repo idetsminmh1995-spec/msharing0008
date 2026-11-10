@@ -405,18 +405,28 @@ var NotationEngine = (() => {
     return durations.reduce((total, d) => total + d.ticks, 0);
   }
 
+  // src/core/event-position.ts
+  function assertValidStartTick(startTick) {
+    if (startTick !== void 0 && (!Number.isFinite(startTick) || startTick < 0)) {
+      throw new RangeError(`startTick must be a finite non-negative number, got ${startTick}`);
+    }
+  }
+
   // src/core/note.ts
   function note(init) {
+    assertValidStartTick(init.startTick);
     return { kind: "note", ...init };
   }
 
   // src/core/rest.ts
   function rest(init) {
+    assertValidStartTick(init.startTick);
     return { kind: "rest", ...init };
   }
 
   // src/core/chord.ts
-  function chord(notes) {
+  function chord(notes, init = {}) {
+    assertValidStartTick(init.startTick);
     const [firstNote, ...otherNotes] = notes;
     if (firstNote === void 0 || otherNotes.length === 0) {
       throw new Error("A Chord needs at least 2 notes -- use note() directly for a single notehead.");
@@ -432,12 +442,13 @@ var NotationEngine = (() => {
         throw new Error("All notes in a Chord must share the same staff.");
       }
     }
-    return firstNote.staff === void 0 ? { kind: "chord", notes, duration: firstNote.duration, voice: firstNote.voice } : {
+    return {
       kind: "chord",
       notes,
       duration: firstNote.duration,
       voice: firstNote.voice,
-      staff: firstNote.staff
+      ...firstNote.staff !== void 0 ? { staff: firstNote.staff } : {},
+      ...init.startTick !== void 0 ? { startTick: init.startTick } : {}
     };
   }
 
@@ -71687,12 +71698,13 @@ ${denominator}`;
     const tuplet = ev.tupletActualNotes !== void 0 && ev.tupletNormalNotes !== void 0 ? { actualNotes: ev.tupletActualNotes, normalNotes: ev.tupletNormalNotes } : void 0;
     return duration(ev.durationType, ev.dots, ev.ticks, tuplet);
   }
-  function buildSingle(ev) {
+  function buildSingle(ev, startTick) {
     if (ev.isRest || ev.step === void 0 || ev.octave === void 0) {
       return rest({
         duration: buildDuration(ev),
         voice: ev.voice,
         ...ev.staff !== void 0 ? { staff: ev.staff } : {},
+        ...startTick !== void 0 ? { startTick } : {},
         ...ev.restDisplayStep !== void 0 ? { displayStep: ev.restDisplayStep } : {},
         ...ev.restDisplayOctave !== void 0 ? { displayOctave: ev.restDisplayOctave } : {},
         // A rest can carry a fermata exactly as a note can (§10.4).
@@ -71707,6 +71719,7 @@ ${denominator}`;
       duration: buildDuration(ev),
       voice: ev.voice,
       ...ev.staff !== void 0 ? { staff: ev.staff } : {},
+      ...startTick !== void 0 ? { startTick } : {},
       ...ev.tieStart ? { tieStart: true } : {},
       ...ev.tieStop ? { tieStop: true } : {},
       ...ev.explicitNotehead !== void 0 ? { explicitNotehead: ev.explicitNotehead } : {},
@@ -71744,13 +71757,13 @@ ${denominator}`;
       ...ev.lyrics.length > 0 ? { lyrics: ev.lyrics } : {}
     });
   }
-  function buildEvent(group, location, diagnostics) {
+  function buildEvent(group, location, diagnostics, startTick) {
     const first = group[0];
     if (first === void 0) {
       throw new Error("Internal error: empty event group passed to buildEvent");
     }
     if (group.length === 1) {
-      return buildSingle(first);
+      return buildSingle(first, startTick);
     }
     const built = group.map((ev) => buildSingle(ev));
     const notesOnly = built.filter((n) => n.kind === "note");
@@ -71763,10 +71776,10 @@ ${denominator}`;
           location
         )
       );
-      return buildSingle(first);
+      return buildSingle(first, startTick);
     }
     try {
-      return chord(notesOnly);
+      return chord(notesOnly, { startTick });
     } catch (err2) {
       diagnostics.push(
         diagnostic(
@@ -71780,7 +71793,7 @@ ${denominator}`;
       if (firstNote === void 0) {
         throw new Error("Internal error: empty notesOnly after length check");
       }
-      return firstNote;
+      return buildSingle(first, startTick);
     }
   }
   function parseMusicXml(xmlText, options) {
@@ -72151,7 +72164,7 @@ ${denominator}`;
               group.push(next.ev);
               j++;
             }
-            events.push({ ...buildEvent(group, location, diagnostics), startTick: head.tick });
+            events.push(buildEvent(group, location, diagnostics, head.tick));
             i2 = j;
           }
           voices.push(voice(voiceId, events));
@@ -72213,8 +72226,15 @@ ${denominator}`;
       );
     }
     const fileDefaults = parseDefaults(root);
+    const identity = parseIdentity(root);
+    const title = identity.workTitle ?? identity.movementTitle;
+    const composer = identity.creators.composer;
     return {
-      score: score({ parts }),
+      score: score({
+        parts,
+        ...title !== void 0 ? { title } : {},
+        ...composer !== void 0 ? { composer } : {}
+      }),
       attributes: allAttributes,
       attributeChanges: allAttributeChanges,
       diagnostics,
@@ -72224,7 +72244,7 @@ ${denominator}`;
       harmonies,
       prints,
       ...fileDefaults !== void 0 ? { defaults: fileDefaults } : {},
-      identity: parseIdentity(root),
+      identity,
       credits: parseCredits(root)
     };
   }
