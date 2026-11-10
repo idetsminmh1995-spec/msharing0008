@@ -314,9 +314,17 @@ class PianoHand3DRenderer {
         if (initial) bone.quaternion.copy(initial);
         if (index === 0) return;
         const angle = angles[index - 1] || 0;
-        if (angle) bone.quaternion.multiply(
-          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -angle),
-        );
+        // The root's Z reflection turns both palms toward the piano and thumbs
+        // inward; compensate its handedness so positive flexion bends down to
+        // the key surface instead of curling the fingers back toward the wrist.
+        if (angle) {
+          const thumbMcp = finger === '1' && index === 1;
+          const axis = thumbMcp
+            ? new THREE.Vector3(0, 0, side === 'left' ? 1 : -1)
+            : new THREE.Vector3(1, 0, 0);
+          const modelAngle = thumbMcp ? angle * 3.3 : angle;
+          bone.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(axis, modelAngle));
+        }
       });
     }
   }
