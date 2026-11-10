@@ -177,4 +177,15 @@ describe('GM drum mapping wired into rendering (Phase 41, §13.1/§13.3)', () =>
     assert.ok(rendered.svg.includes('\uE0A4'), 'kick/snare notes use the standard filled oval');
     assert.ok(rendered.svg.includes('130'), 'the quarter-note tempo marking is rendered');
   });
+
+  test('the kick/hi-hat groove uses two clean linked beams without kick curves', () => {
+    const xml = fs.readFileSync(
+      path.join(FIXTURES_DIR, 'musescore-two-voice-drum-groove.musicxml'),
+      'utf8',
+    );
+    const { svg } = NE.renderFromMusicXml(xml, { domParser });
+    const beams = [...svg.matchAll(/<line x1="[\d.]+" y1="[\d.]+" x2="[\d.]+" y2="[\d.]+" stroke="#000000" stroke-width="0\.5"\s*\/>/g)];
+    assert.equal(beams.length, 2, 'expected one clean beam for the hi-hat voice and one for the kick voice');
+    assert.equal((svg.match(/<path\b/g) || []).length, 0, 'the kick voice must not add slur or curve paths');
+  });
 });
