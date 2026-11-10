@@ -574,3 +574,185 @@ Built-in renderer တွင် exception ဖြစ်လျှင် R2 path က
 > **“Thank You outro plan အတိုင်း S0 ကို စပါ”**
 
 အတည်ပြုချက်ရပြီးနောက် S0 diagnosis ကို အရင်လုပ်ပြီး result ကို plan work log ထဲ ဖြည့်မည်။ S0 ပြီးလျှင် loader hardening သို့ တန်းမသွားဘဲ diagnosis result နှင့် အညီ လိုအပ်သည့် S1/S2 order ကို ပြန်တင်ပြမည်။
+
+
+## 15. File-by-file implementation map
+
+ဒီအပိုင်းသည် S1–S7 တစ်ခုချင်းစီတွင် ဘယ်ဖိုင်ကို ဘာကြောင့်ပြင်ရမည်ဆိုတာ သတ်မှတ်ပေးသည်။ တူညီသော logic ကို instrument page ခြောက်ခုထဲတွင် copy/paste မလုပ်ရ။
+
+| ဖိုင် | တာဝန် | ပြင်ဆင်ရမည့်အကြောင်းအရာ |
+|---|---|---|
+| `website/assets/outro-video.js` | shared loader/segment adapter | retry, timeout, alias, structured result, progress, fallback handoff, release |
+| `website/assets/builtin-ending.js` | offline fallback | deterministic canvas ending, logo selection, text, fade, segment contract |
+| `website/assets/render-report.js` | diagnostics | `outro` object, source/reason, fallback warning and timings |
+| `website/assets/video-engine.js` | render boundary | zero-audio segment, segment duration, final-frame sampling and cancellation behavior ကို အတည်ပြုရန်သာ; မလိုလျှင် မပြင် |
+| `website/video-create/drum/index.html` | reference integration | preload/gate/policy/report ကို ပထမဆုံးချိတ်မည့် page |
+| `website/video-create/guitar/index.html` | page integration | drum pattern အတိုင်း call-site သေးသေးပဲ ပြင် |
+| `website/video-create/bass-guitar/index.html` | page integration | guitar နှင့်တူညီသော kind mapping ကို အတည်ပြု |
+| `website/video-create/piano/index.html` | page integration | MusicXML-only flow မပျက်စေဘဲ outro fallback ချိတ် |
+| `website/video-create/violin/index.html` | page integration | `paino` legacy key နှင့် UI instrument name မရောစေ |
+| `website/video-create/metronome/index.html` | scope decision | S0 inventory ပြီးမှ existing call-site ရှိပါက ချိတ်; မရှိပါက plan မှာ excluded အဖြစ်မှတ် |
+| `cloudflare-worker/src/index.ts` | transport | S0 က issue ပြမှ Range/304/CORS ပြင် |
+| `cloudflare-worker/README.md` | deployment contract | route, cache, CORS, R2 key encoding နှင့် deploy source မှတ်တမ်း |
+| `docs/VIDEO-ENGINE.md` | public render contract | R2-first/builtin-second behavior နှင့် report schema |
+| `tools/test-outro-video.mjs` | unit | loader state/retry/cache/failure tests |
+| `tools/test-builtin-ending.mjs` | unit/visual | six style/aspect combinations and deterministic frame tests |
+| `tools/test-outro-rollout-browser.mjs` | browser | blocked R2 and fallback ending output across pages |
+| `.github/workflows/notation-and-video.yml` | CI | new unit/browser/evidence checks |
+| `Doc/rollout/evidence/` | evidence | diagnosis, fallback, Worker and final matrix artifacts |
+
+Shared modules must expose browser-safe APIs only. They must not import page DOM IDs, instrument-specific CSS classes, or the Piano/MIDI/notation engines.
+
+## 16. Exact API surface to freeze before coding
+
+### 16.1 Key and URL helpers
+
+```js
+OutroVideo.keys({ aspect, kind, style, aliases })
+// returns ordered, de-duplicated R2 keys
+
+OutroVideo.url(apiBase, key)
+// returns encoded /assets/shared/<key> URL
+```
+
+The key helper must preserve spaces as URL-encoded path components, preserve case in the filename, and never concatenate a raw user-provided path without segment encoding. The ordered list must be visible in the diagnostic result so a 404 can say which keys were tried.
+
+### 16.2 R2 loader
+
+```js
+await OutroVideo.loadOutro(apiBase, {
+  aspect,
+  kind,
+  style,
+  signal,
+  onProgress,
+  timeout,
+  retry
+})
+```
+
+`signal` must cancel fetch, metadata wait, and any pending retry. Cancellation is not classified as a server outage; the caller receives an aborted result or exception that the export controller can handle. `onProgress` receives `{ loaded, total, attempt, key }`, with `total: null` when the server does not send Content-Length.
+
+### 16.3 Built-in factory
+
+```js
+await OutroVideo.createBuiltin({
+  aspect,
+  kind,
+  style,
+  siteUrl,
+  duration: 3,
+  fadeIn: 0.4
+})
+```
+
+The built-in factory must not call fetch. It may wait for already-declared same-origin fonts, but a missing optional font must fall back to a system font rather than making a network request. The returned segment must implement the same `seconds`, `draw`, and optional `audio` contract accepted by `VideoEngine.render`.
+
+### 16.4 Policy helper
+
+```js
+await OutroVideo.resolve(apiBase, {
+  aspect,
+  kind,
+  style,
+  siteUrl,
+  signal,
+  onState,
+  onProgress
+})
+```
+
+`resolve()` is the only function page call-sites should use. It tries R2, records the failure if needed, creates the built-in segment, and returns a source-locked result. Page code must not call `loadOutro()` and `createBuiltin()` separately because that would allow inconsistent fallback decisions.
+
+## 17. Asset naming and alias matrix
+
+| UI kind | Primary folder | Primary filename word | Legacy/alternate lookup | Note |
+|---|---|---|---|---|
+| drum | `drum` | `Drum` | none | reference asset |
+| guitar | `guitar` | `Guitar` | drum fallback only if policy permits | guitar page |
+| bass-guitar | `guitar` | `Guitar` | `bass-guitar` only if separately uploaded | attached plan's existing behavior |
+| piano | `paino` | `Paino` | `piano` / `Piano` | preserve current R2 spelling, alias in loader |
+| violin | `paino` | `Paino` | `violin` / `Violin` | verify whether shared piano outro is intentional |
+| metronome | `metronome` | `Metronome` | drum fallback only if approved | S0 scope check |
+
+Fallback to another instrument's clip must be recorded as `fallbackKind` in the result. It must not be silently presented as the requested instrument's branded clip. If the product decision is that only same-kind clips are acceptable, the key list must stop after same-kind aliases and proceed directly to built-in.
+
+Before S3, the plan must resolve whether `bass-guitar` may use the `guitar` clip and whether `violin` may use the `paino` clip. The current code does this by outward key search; the new report must make that choice visible.
+
+## 18. Built-in ending visual and typography specification
+
+The built-in ending must be a product fallback, not a debug card. The frame background uses the selected style's same background color as the page. The logo is centered on the primary axis, preserves its intrinsic aspect ratio, and occupies no more than 42% of the shorter frame side. The text block begins below the logo with a safe gap of at least 4% of the shorter side.
+
+The title text is exactly `Thank you for watching` unless a future product decision changes it. The site URL is a separate smaller line and must be supplied from configuration; a fake or stale URL must never be hard-coded into the fallback. Until the owner supplies the production URL, the plan records `siteUrl: null` and the URL line is omitted rather than showing a placeholder.
+
+Black style uses light logo/text; white style uses dark logo/text. The logo asset mapping must be explicit and same-origin. If a requested instrument logo does not exist, the fallback must use the shared site logo and report `logoFallback: true`. The built-in frame must not depend on R2 kit assets, uploaded MusicXML, uploaded audio, or a cross-origin image.
+
+The fade function is deterministic: for `at < fadeIn`, alpha is `smoothstep(0, fadeIn, at)`; for later frames alpha is 1. The frame at `at = 0` and the frame at `at = duration - 1/fps` are golden fixtures. Canvas coordinates are derived from the supplied canvas dimensions, never from `window.innerWidth`, CSS pixels, or the live preview rectangle.
+
+## 19. Worker request/response contract
+
+For a successful full response, the Worker must return the R2 object's content type, a stable `ETag`, `Last-Modified` when available, `Content-Length` when known, `Accept-Ranges: bytes`, and an explicit `Access-Control-Allow-Origin` matching the requesting site origin. `Vary: Origin` is required when the response varies by origin.
+
+For a valid Range request, the Worker must return `206 Partial Content`, `Content-Range`, the requested byte length, and the same CORS/cache policy. For `If-None-Match` with a matching tag, it must return `304` with no body. A missing object must return JSON containing `{ error: "not-found", key, requestId }`; upstream or R2 failures must return `{ error: "unavailable", key, requestId }` without leaking credentials or bucket internals.
+
+The Worker must reject path traversal, decode keys once only, and avoid turning `%2F` inside a filename into an unintended folder separator. Logs must include requestId, key hash or safe key, status, duration, bytes, cache outcome and failure category. Raw user file names and authorization headers must not be logged.
+
+## 20. Performance, memory and security budgets
+
+- Built-in ending creation: under 50 ms for a single frame on the acceptance browser.
+- Built-in per-frame draw: under 2 ms at 1920×1080 after logo/font preparation.
+- R2 clip target: approximately 8 MB or less per asset; the loader must not keep more than the current source plus one replacement source alive.
+- Object URL lifetime: from successful blob creation until render completion/cancellation; revoke in `finally`.
+- Retry budget: two retries for each candidate key; total resolve time must respect the configured 30-second preload deadline and 120-second absolute gate deadline.
+- Built-in path must work with network disabled after page assets have loaded.
+- Do not place R2 secrets, Worker tokens, signed URLs, or raw upload bytes in the report or console.
+- Do not use `innerHTML` with the site URL or server-provided error text; set text through DOM text APIs.
+- A user cancellation must abort pending fetches and release video/audio resources without leaving a permanent failure cache entry.
+
+## 21. Accessibility and UI behavior
+
+The Asset Gate panel must expose status through text, not color alone. Each state needs a stable label and optional detail: `Loading`, `Ready — R2`, `Fallback — built-in`, or `Blocked`. Retry progress must not make the Render button appear enabled before the source is locked.
+
+When built-in fallback is selected, the UI should show a non-blocking warning near the Generate button and include the same warning in the report. The warning must not require a confirmation dialog under the default D1 decision. Keyboard users must be able to reach Copy report, Download report, Retry, Generate, and Cancel controls in that order. The panel must not shift the pinned export frame geometry.
+
+Screen-reader status updates should use one `aria-live="polite"` region and should not announce every downloaded byte. Announce only state transitions and final reason. The error message must name the category and next action, for example: `R2 outro unavailable (500); built-in ending selected.`
+
+## 22. Migration order and commit boundaries
+
+1. **Plan-only checkpoint:** freeze decisions and obtain `ready` approval. No runtime behavior changes.
+2. **S0 diagnosis commit:** evidence and read-only diagnostic scripts only.
+3. **S1 loader commit:** shared loader tests must pass; pages still use the old optional policy.
+4. **S2 built-in commit:** built-in unit/golden tests must pass with no page call-site changes.
+5. **S3 Drum commit:** Drum is the only page switched to required outro with automatic fallback.
+6. **S3 remaining-page commits:** Guitar, Bass Guitar, Piano, Violin, and Metronome only after their page-specific inventory passes.
+7. **S4 Worker commit:** transport changes separate from client fallback.
+8. **S5 asset/evidence commit:** manifest, ffprobe output, and naming corrections.
+9. **S6 CI commit:** browser matrix and encoded-output assertions.
+10. **S7 docs/release commit:** public docs, plan status, stamp check, and final links.
+
+Every commit must leave the repository runnable. A commit that changes the result schema must update its unit fixture in the same commit. A page migration must include that page in the browser matrix in the same commit.
+
+## 23. Final sign-off checklist
+
+Before marking this plan complete, the following evidence must exist and be linked from the work log:
+
+- [ ] S0 diagnosis identifies the actual current R2/Worker behavior.
+- [ ] All open decisions D1–D6 have a recorded choice or an explicit owner-provided value.
+- [ ] `siteUrl` is either supplied and tested or intentionally omitted from the built-in card.
+- [ ] Loader API and result schema are frozen and unit-tested.
+- [ ] Built-in ending golden frames exist for all six aspect/style combinations.
+- [ ] Same-kind/alias/fallback-kind behavior is visible in reports.
+- [ ] Drum fallback path passes with R2 blocked.
+- [ ] Every in-scope page passes fallback and R2-success paths.
+- [ ] Metronome scope is resolved from actual code, not assumed from the attachment.
+- [ ] Worker Range/304/CORS behavior is evidenced if S4 is implemented.
+- [ ] R2 clip manifest and ffprobe results are committed or linked.
+- [ ] Memory/object URL/cancellation tests pass.
+- [ ] Accessibility status and keyboard path are checked.
+- [ ] CI runs every new unit/browser test.
+- [ ] `docs/VIDEO-ENGINE.md`, `Doc/rollout/README.md`, `Doc/PLAN-thank-you-outro.md`, and root `Plan.md` agree.
+- [ ] Final output always contains a visible Thank You ending or render is explicitly blocked; there is no silent no-outro success.
+
+### Current plan status
+
+Sections 15–23 complete the remaining written specification. The plan is now implementation-ready but remains **not started** until the approval gate in Section 14 is satisfied. The next action after approval is S0 diagnosis, not S1 coding.
