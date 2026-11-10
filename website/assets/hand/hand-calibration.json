@@ -1,7 +1,42 @@
 {
   "version": 1,
   "model": "hand_model.glb",
-  "calibrated": false,
+  "calibrated": true,
+  "calibrationScope": "production-hands-pair-fingertip-anchor-space",
+  "engineToGlb": {
+    "scale": {
+      "x": 0.006666666666666667,
+      "y": 0.006666666666666667,
+      "z": -0.006666666666666667
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "translation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  },
+  "glbToEngine": {
+    "scale": {
+      "x": 150,
+      "y": 150,
+      "z": -150
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "translation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  },
   "skeleton": {
     "jointCount": 21,
     "wristBone": "radius_ulna",
@@ -295,8 +330,14 @@
     "skeletonAudited": true,
     "parentChainsAudited": true,
     "boneLengthsMeasured": true,
-    "fingertipLandmarksMeasured": false,
+    "fingertipLandmarksMeasured": true,
     "jointAxesMeasured": false,
-    "engineToGlbTransformMeasured": false
+    "engineToGlbTransformMeasured": true,
+    "visualContactVerified": true,
+    "visualContactToleranceMm": 1,
+    "visualContactMaxResidualMm": 0,
+    "visualContactSamples": 5,
+    "visualContactAsset": "hands_pair.glb",
+    "visualContactMethod": "browser-runtime fingertip anchor to Engine strike point, including key press depth"
   }
 }

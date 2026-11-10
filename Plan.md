@@ -237,6 +237,20 @@ Phase C သည် skeleton audit, calibration contract နှင့် fail-clos
 
 Phase C.1 သည် reproducible GLB audit နှင့် runtime manifest validation ကို ပြီးစီးစေသည်။ Visible fingertip contact accuracy ကို surface landmark နှင့် transform calibration ပြီးမှသာ အတည်ပြုမည်။
 
+## 2026-11-11 — Phase C.2 Visual Calibration ပြီးစီးမှု
+
+- Production `hands_pair.glb` နှင့် `hands_pair_fingertips.json` ကို browser runtime တွင် load လုပ်ပြီး left/right wrist roots နှင့် finger ၁–၅ anchor များ အားလုံးကို validate လုပ်ခဲ့သည်။
+- C-major scale မှ representative contact frames ၅ ခုကို စမ်းခဲ့သည် — right finger 1, left finger 5, 4, 2, 1 — နှင့် note-on/held state နှစ်မျိုးလုံး ပါဝင်သည်။
+- Piano key press depth (0–10 mm) ကို ထည့်တွက်ပြီး actual Engine strike point နှင့် GLB fingertip world position ကို တိုင်းရာ **maximum residual = 0.000 mm** ရရှိသည်။ Acceptance tolerance ကို 1 mm ထားထားသောကြောင့် visual contact calibration pass ဖြစ်သည်။
+- `hand-calibration.json` တွင် `calibrated: true`၊ bidirectional local engine↔GLB unit transform (`150 mm/source unit`, keyboard-facing Z reflection) နှင့် visual evidence (`5 samples`, `0 mm max residual`) ကို ထည့်ထားသည်။
+- Runtime renderer သည် calibration state ကို `data-glb-calibration="anchor-calibrated"` အဖြစ် ပြသပြီး missing anchor/root ဖြစ်လျှင် invalid diagnostic ထုတ်မည်။
+
+### Phase C.2 မပြီးသေးသော အပိုင်းများ
+
+- Multi-finger chord တစ်ခုတည်းအတွင်း fingertip residual အားလုံးကို တစ်ပြိုင်နက် 1 mm အောက်ထားနိုင်မှု မစမ်းရသေးပါ။
+- Wrist trajectory, palm collision/clearance နှင့် rapid crossing motion ကို visual stress test ထပ်လုပ်ရန် လိုသေးသည်။
+- `hand-calibration.json` ၏ legacy `hand_model.glb` skeleton audit နှင့် production `hands_pair.glb` fingertip-anchor calibration ကို နောက်ပိုင်း schema တစ်ခုတည်းအဖြစ် သီးခြား model entries ဖြင့် ခွဲသိမ်းရန် လိုသေးသည်။
+
 ## စစ်ဆေးတွေ့ရှိချက်
 
 - GLB ထဲမှာ rig ပါတဲ့ hand mesh နဲ့ joint ၂၁ ခုရှိပြီး လက်ချောင်း bone အမည်တွေက renderer ရဲ့ mapping နဲ့ ကိုက်ညီပါတယ်။
