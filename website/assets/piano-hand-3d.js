@@ -34,7 +34,7 @@ function spanFor(value) {
 function noteName(midi) { return `${NOTE_NAMES[midi % 12]}${Math.floor(midi / 12) - 1}`; }
 function midiInRange(midi, span) { return midi >= span.first && midi <= span.last; }
 function validatePairAnchors(manifest, leftRoot, rightRoot) {
-  if (!(manifest?.metersPerSourceUnit > 0) || !manifest?.tips) {
+  if (!Number.isFinite(manifest?.metersPerSourceUnit) || manifest.metersPerSourceUnit <= 0 || !manifest?.tips) {
     return { valid: false, reason: 'missing-anchor-scale' };
   }
   if (!leftRoot || !rightRoot) return { valid: false, reason: 'missing-wrist-root' };
@@ -53,6 +53,44 @@ function validatePairAnchors(manifest, leftRoot, rightRoot) {
     }
   }
   return { valid: true, reason: 'anchors-and-distal-bones-present' };
+}
+function validateVisualContactCalibration(manifest, anchors) {
+  const status = manifest?.status;
+  if (manifest?.calibrated !== true || manifest.calibrationScope !== 'production-hands-pair-fingertip-anchor-space') {
+    return { valid: false, reason: 'missing-production-hand-calibration' };
+  }
+  if (status?.visualContactVerified !== true || status.visualContactAsset !== 'hands_pair.glb') {
+    return { valid: false, reason: 'production-hand-contact-not-verified' };
+  }
+  const tolerance = status.visualContactToleranceMm;
+  const residual = status.visualContactMaxResidualMm;
+  if (
+    !Number.isFinite(tolerance) || tolerance <= 0 || !Number.isFinite(residual) || residual < 0 || residual > tolerance ||
+    !Number.isInteger(status.visualContactSamples) || status.visualContactSamples < 5
+  ) {
+    return { valid: false, reason: 'invalid-production-hand-contact-evidence' };
+  }
+  const expectedScale = 1 / (anchors.metersPerSourceUnit * 1000);
+  const transform = manifest.engineToGlb;
+  const scale = transform?.scale;
+  const rotation = transform?.rotation;
+  const translation = transform?.translation;
+  const scaleValues = [scale?.x, scale?.y, scale?.z];
+  const identityValues = [rotation?.x, rotation?.y, rotation?.z, translation?.x, translation?.y, translation?.z];
+  if (
+    !scaleValues.every(Number.isFinite) || Math.abs(scale.x - expectedScale) > 1e-12 ||
+    Math.abs(scale.y - expectedScale) > 1e-12 || Math.abs(scale.z + expectedScale) > 1e-12 ||
+    !identityValues.every((value) => Number.isFinite(value) && Math.abs(value) <= 1e-12)
+  ) {
+    return { valid: false, reason: 'calibration-transform-does-not-match-runtime-scale' };
+  }
+  return {
+    valid: true,
+    reason: 'visual-contact-verified',
+    samples: status.visualContactSamples,
+    toleranceMm: tolerance,
+    maxResidualMm: residual,
+  };
 }
 
 class PianoHand3DRenderer {
@@ -121,10 +159,14 @@ class PianoHand3DRenderer {
 
   async loadHand() {
     try {
-      const [gltf, anchorsResponse] = await Promise.all([
+      const [gltf, anchorsResponse, calibrationManifest] = await Promise.all([
         new GLTFLoader().loadAsync('../../assets/hand/hands_pair.glb?v=3'),
         fetch('../../assets/hand/hands_pair_fingertips.json?v=2').then((response) => {
           if (!response.ok) throw new Error(`Hand fingertip anchor data returned HTTP ${response.status}.`);
+          return response.json();
+        }),
+        fetch('../../assets/hand/hand-calibration.json?v=2').then((response) => {
+          if (!response.ok) throw new Error(`Hand calibration manifest returned HTTP ${response.status}.`);
           return response.json();
         }),
       ]);
@@ -133,11 +175,17 @@ class PianoHand3DRenderer {
       const leftRoot = gltf.scene.getObjectByName('PianoHandLeftRoot');
       const rightRoot = gltf.scene.getObjectByName('PianoHandRightRoot');
       if (!leftRoot || !rightRoot) throw new Error('Bilateral GLB must contain distinct left/right wrist roots.');
-      this.calibrationValidation = validatePairAnchors(anchorsResponse, leftRoot, rightRoot);
-      this.container.dataset.glbAnchorValidation = this.calibrationValidation.valid ? 'anchors-and-distal-bones-present' : 'invalid';
+      const anchorValidation = validatePairAnchors(anchorsResponse, leftRoot, rightRoot);
+      this.container.dataset.glbAnchorValidation = anchorValidation.valid ? 'anchors-and-distal-bones-present' : 'invalid';
+      if (!anchorValidation.valid) {
+        this.container.dataset.glbAnchorValidationError = anchorValidation.reason;
+        throw new Error(`Piano hand GLB validation failed: ${anchorValidation.reason}.`);
+      }
+      this.calibrationValidation = validateVisualContactCalibration(calibrationManifest, anchorsResponse);
+      this.container.dataset.glbCalibration = this.calibrationValidation.valid ? 'anchor-calibrated' : 'invalid';
       if (!this.calibrationValidation.valid) {
-        this.container.dataset.glbAnchorValidationError = this.calibrationValidation.reason;
-        throw new Error(`Piano hand GLB validation failed: ${this.calibrationValidation.reason}.`);
+        this.container.dataset.glbCalibrationError = this.calibrationValidation.reason;
+        throw new Error(`Piano hand visual-contact calibration failed: ${this.calibrationValidation.reason}.`);
       }
       this.createHand('left', leftRoot);
       this.createHand('right', rightRoot);
@@ -147,6 +195,7 @@ class PianoHand3DRenderer {
     } catch (error) {
       console.error('Piano hand GLB failed to load:', error);
       this.handReady = false;
+      this.container.dataset.glbCalibration = 'invalid';
       this.container.dataset.handError = 'true';
       this.container.dataset.handErrorMessage = error instanceof Error ? error.message : String(error);
       return false;

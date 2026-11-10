@@ -136,7 +136,12 @@ try {
       return {
         ready,
         anchorValidation: stage.dataset.glbAnchorValidation || null,
+        calibration: stage.dataset.glbCalibration || null,
+        calibrationError: stage.dataset.glbCalibrationError || null,
         error: stage.dataset.handErrorMessage || null,
+        calibrationSamples: renderer?.calibrationValidation?.samples ?? null,
+        calibrationToleranceMm: renderer?.calibrationValidation?.toleranceMm ?? null,
+        calibrationMaxResidualMm: renderer?.calibrationValidation?.maxResidualMm ?? null,
         leftRoot: Boolean(renderer?.hands?.left),
         rightRoot: Boolean(renderer?.hands?.right),
         leftFingerAnchors: renderer?.handTipBoneOffsets?.left?.size || 0,
@@ -152,6 +157,10 @@ try {
   const result = evaluation.result.value;
   assert.equal(result.ready, true, result.error || 'Production piano hand scene did not become ready.');
   assert.equal(result.anchorValidation, 'anchors-and-distal-bones-present');
+  assert.equal(result.calibration, 'anchor-calibrated', result.calibrationError || 'production calibration manifest was rejected');
+  assert.ok(result.calibrationSamples >= 5, 'fewer than five visual contact samples are recorded');
+  assert.ok(result.calibrationToleranceMm > 0, 'calibration tolerance is missing');
+  assert.ok(result.calibrationMaxResidualMm >= 0 && result.calibrationMaxResidualMm <= result.calibrationToleranceMm, 'contact residual exceeds the recorded tolerance');
   assert.equal(result.leftRoot, true, 'left-hand GLB root is missing');
   assert.equal(result.rightRoot, true, 'right-hand GLB root is missing');
   assert.equal(result.leftFingerAnchors, 5, 'all five left fingertip-to-bone mappings must be present');
