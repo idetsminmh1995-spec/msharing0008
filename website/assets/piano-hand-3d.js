@@ -38,15 +38,21 @@ function validatePairAnchors(manifest, leftRoot, rightRoot) {
     return { valid: false, reason: 'missing-anchor-scale' };
   }
   if (!leftRoot || !rightRoot) return { valid: false, reason: 'missing-wrist-root' };
+  const roots = { left: leftRoot, right: rightRoot };
   for (const side of ['left', 'right']) {
     for (const finger of ['1', '2', '3', '4', '5']) {
       const tip = manifest.tips[side]?.[finger];
       if (!Array.isArray(tip) || tip.length !== 3 || tip.some((value) => !Number.isFinite(value))) {
         return { valid: false, reason: `missing-${side}-finger-${finger}-tip` };
       }
+      const distalName = FINGER_BONES[finger]?.at(-1);
+      const boneName = side === 'right' ? `${distalName}_1` : distalName;
+      if (!distalName || !roots[side].getObjectByName(boneName)?.isBone) {
+        return { valid: false, reason: `missing-${side}-finger-${finger}-distal-bone` };
+      }
     }
   }
-  return { valid: true, reason: 'measured-fingertip-anchors' };
+  return { valid: true, reason: 'anchors-and-distal-bones-present' };
 }
 
 class PianoHand3DRenderer {
@@ -107,7 +113,7 @@ class PianoHand3DRenderer {
     floor.receiveShadow = true;
     this.scene.add(floor);
 
-    this.loadHand();
+    this.readyPromise = this.loadHand();
     this.resize();
     window.addEventListener('resize', () => this.resize());
     this.animate();
@@ -128,17 +134,22 @@ class PianoHand3DRenderer {
       const rightRoot = gltf.scene.getObjectByName('PianoHandRightRoot');
       if (!leftRoot || !rightRoot) throw new Error('Bilateral GLB must contain distinct left/right wrist roots.');
       this.calibrationValidation = validatePairAnchors(anchorsResponse, leftRoot, rightRoot);
-      this.container.dataset.glbCalibration = this.calibrationValidation.valid ? 'anchor-calibrated' : 'invalid';
+      this.container.dataset.glbAnchorValidation = this.calibrationValidation.valid ? 'anchors-and-distal-bones-present' : 'invalid';
       if (!this.calibrationValidation.valid) {
-        this.container.dataset.glbCalibrationError = this.calibrationValidation.reason;
+        this.container.dataset.glbAnchorValidationError = this.calibrationValidation.reason;
+        throw new Error(`Piano hand GLB validation failed: ${this.calibrationValidation.reason}.`);
       }
       this.createHand('left', leftRoot);
       this.createHand('right', rightRoot);
       this.handReady = true;
       this.update(this.activeOptions || {}, { snap: true });
+      return true;
     } catch (error) {
       console.error('Piano hand GLB failed to load:', error);
+      this.handReady = false;
       this.container.dataset.handError = 'true';
+      this.container.dataset.handErrorMessage = error instanceof Error ? error.message : String(error);
+      return false;
     }
   }
 
@@ -589,6 +600,10 @@ window.PianoHand3D = {
     if (!this.renderer || this.renderer.container !== container) this.renderer = new PianoHand3DRenderer(container);
     else if (this.renderer.renderer.domElement.parentElement !== container) container.replaceChildren(this.renderer.renderer.domElement);
     return this.renderer;
+  },
+  async ready(container) {
+    const renderer = this.mount(container);
+    return await renderer.readyPromise;
   },
   update(options) {
     if (!options?.container) return;
