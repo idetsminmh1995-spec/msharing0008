@@ -1632,17 +1632,22 @@ function renderNoteOrRest(
   // Computed unconditionally (even for a whole note, which draws no real
   // stem) because §9.15's tie side needs SOME resolved direction even
   // then -- "imagine where the stem would go if there was one."
-  // Phase 41: a drum-table stem-direction convention (hands up / feet
-  // down, §13.3) sits between an explicit file <stem> and automatic
-  // placement -- the file's own explicit direction for this specific
-  // note still wins if present; only when it's absent does the drum
-  // table's own convention apply, ahead of ordinary automatic placement.
-  const explicitDirection = ev.explicitStemDirection ?? head.drumStemDirection;
+  // Drum notation is the exception to the general voice rule: when kick,
+  // hi-hat and other percussion notes share a beat, keep every unpitched
+  // drum stem up for one consistent visual direction.
+  const isDrum = ev.pitch.kind === 'unpitched';
+  const explicitDirection = isDrum
+    ? undefined
+    : (ev.explicitStemDirection ?? head.drumStemDirection);
 
   const direction = resolveStemDirection({
     positions: [head.position],
     numLines: STAFF_LINES,
-    ...(forcedDirection !== undefined ? { forcedDirection } : {}),
+    ...(isDrum
+      ? { forcedDirection: 'up' as const }
+      : forcedDirection !== undefined
+        ? { forcedDirection }
+        : {}),
     ...(explicitDirection !== undefined ? { explicitDirection } : {}),
   });
 
@@ -1796,7 +1801,14 @@ function renderBeamGroup(
       .filter((value): value is StemDirection => value !== undefined),
   );
   const stated = statedDirections.size === 1 ? [...statedDirections][0] : undefined;
-  const direction = forcedDirection ?? stated ?? beamDirection(allPositions, middle);
+  const isDrumBeam = events.some((event) =>
+    event.kind === 'chord'
+      ? event.notes.some((note) => note.pitch.kind === 'unpitched')
+      : event.pitch.kind === 'unpitched',
+  );
+  const direction = isDrumBeam
+    ? 'up'
+    : (forcedDirection ?? stated ?? beamDirection(allPositions, middle));
 
   /** The notehead nearest the beam: the beam must clear it. */
   const beamPositionOf = (m: BeamMember): number =>
@@ -2093,11 +2105,16 @@ function renderChord(
     // direction wins, then the file's own <stem>, then automatic direction.
     // MusicXML attaches <stem> to chord members; use the first member that
     // states one, consistently with the shared beam-group direction rule.
-    const explicitDirection = explicitStemDirectionOf(chord);
+    const isDrumChord = chord.notes.some((note) => note.pitch.kind === 'unpitched');
+    const explicitDirection = isDrumChord ? undefined : explicitStemDirectionOf(chord);
     const direction = resolveStemDirection({
       positions,
       numLines: STAFF_LINES,
-      ...(forcedDirection !== undefined ? { forcedDirection } : {}),
+      ...(isDrumChord
+        ? { forcedDirection: 'up' as const }
+        : forcedDirection !== undefined
+          ? { forcedDirection }
+          : {}),
       ...(explicitDirection !== undefined ? { explicitDirection } : {}),
     });
     if (chord.duration.type !== 'whole') {

@@ -26,7 +26,7 @@ function directions(measure, voice) {
   return out;
 }
 
-describe('a chord\'s drawn stem direction follows the file (§9.8: forced > <stem> > automatic)', () => {
+describe('a drum chord\'s drawn stem direction stays up for a unified percussion pattern', () => {
   test('the fixture renders without diagnostics and every event is drawn', () => {
     assert.deepEqual([...diagnostics], []);
     assert.equal(directions(1, 1).length, 4);
@@ -39,19 +39,16 @@ describe('a chord\'s drawn stem direction follows the file (§9.8: forced > <ste
     assert.deepEqual(directions(1, 1), ['up', 'up', 'up', 'up']);
   });
 
-  test('ONE voice, chords carrying <stem>down</stem> are drawn stem DOWN even where the automatic rule says up', () => {
-    // Kick (F4) + snare (C5): the kick is furthest from the middle line and
-    // sits below it, so automatic would be UP. The file says down and wins.
-    assert.deepEqual(directions(2, 1), ['down', 'down', 'down', 'down']);
+  test('ONE voice, kick+snare chords carrying <stem>down</stem> are normalized to stem UP', () => {
+    assert.deepEqual(directions(2, 1), ['up', 'up', 'up', 'up']);
   });
 
-  test('a chord with NO <stem> element still falls back to the automatic direction', () => {
-    // Hi-hat (G5) is furthest from the middle line and above it -> down.
-    assert.deepEqual(directions(3, 1), ['down', 'down', 'down', 'down']);
+  test('a drum chord with NO <stem> element still uses the all-up drum direction', () => {
+    assert.deepEqual(directions(3, 1), ['up', 'up', 'up', 'up']);
   });
 
-  test('TWO voices keep the per-voice split: voice 1 up, voice 2 down', () => {
+  test('TWO drum voices both keep stems up', () => {
     assert.deepEqual(directions(4, 1), ['up', 'up', 'up', 'up']);
-    assert.deepEqual(directions(4, 2), ['down', 'down', 'down', 'down']);
+    assert.deepEqual(directions(4, 2), ['up', 'up', 'up', 'up']);
   });
 });

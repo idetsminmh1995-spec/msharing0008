@@ -75500,8 +75500,8 @@ ${denominator}`;
     if (shape !== void 0) return shape;
     return museScoreNoteheadGlyph(drum.notehead, "quarter") ?? "normal";
   }
-  function stemDirectionForDrum(drum) {
-    return drum.voice >= 1 ? "down" : drum.stemDirection;
+  function stemDirectionForDrum(_drum) {
+    return "up";
   }
   function drumMappingFromMuseScore(overrides, staffLines = 5) {
     const mapping = {};
@@ -77627,11 +77627,12 @@ ${xrefOffset}
     const head = renderNoteheadPart(ev, x2, ctx, accidentalState);
     parts.push(head.svg);
     const y = ctx.measureBottomY + head.position;
-    const explicitDirection = ev.explicitStemDirection ?? head.drumStemDirection;
+    const isDrum = ev.pitch.kind === "unpitched";
+    const explicitDirection = isDrum ? void 0 : ev.explicitStemDirection ?? head.drumStemDirection;
     const direction = resolveStemDirection({
       positions: [head.position],
       numLines: STAFF_LINES,
-      ...forcedDirection !== void 0 ? { forcedDirection } : {},
+      ...isDrum ? { forcedDirection: "up" } : forcedDirection !== void 0 ? { forcedDirection } : {},
       ...explicitDirection !== void 0 ? { explicitDirection } : {}
     });
     if (ev.duration.type !== "whole") {
@@ -77715,7 +77716,10 @@ ${xrefOffset}
       events.map(explicitStemDirectionOf).filter((value) => value !== void 0)
     );
     const stated = statedDirections.size === 1 ? [...statedDirections][0] : void 0;
-    const direction = forcedDirection ?? stated ?? beamDirection(allPositions, middle);
+    const isDrumBeam = events.some(
+      (event) => event.kind === "chord" ? event.notes.some((note2) => note2.pitch.kind === "unpitched") : event.pitch.kind === "unpitched"
+    );
+    const direction = isDrumBeam ? "up" : forcedDirection ?? stated ?? beamDirection(allPositions, middle);
     const beamPositionOf = (m) => direction === "up" ? Math.min(...m.positions) : Math.max(...m.positions);
     const attachPositionOf = (m) => direction === "up" ? Math.max(...m.positions) : Math.min(...m.positions);
     const attachGlyphOf = (m) => {
@@ -77916,11 +77920,12 @@ ${xrefOffset}
     const parts = [heads.svg];
     const positions = heads.positions;
     if (positions.length > 0) {
-      const explicitDirection = explicitStemDirectionOf(chord2);
+      const isDrumChord = chord2.notes.some((note2) => note2.pitch.kind === "unpitched");
+      const explicitDirection = isDrumChord ? void 0 : explicitStemDirectionOf(chord2);
       const direction = resolveStemDirection({
         positions,
         numLines: STAFF_LINES,
-        ...forcedDirection !== void 0 ? { forcedDirection } : {},
+        ...isDrumChord ? { forcedDirection: "up" } : forcedDirection !== void 0 ? { forcedDirection } : {},
         ...explicitDirection !== void 0 ? { explicitDirection } : {}
       });
       if (chord2.duration.type !== "whole") {

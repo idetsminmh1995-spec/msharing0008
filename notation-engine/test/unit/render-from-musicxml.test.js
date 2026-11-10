@@ -115,21 +115,13 @@ describe('renderFromMusicXml end-to-end (Phase 21)', () => {
     assert.equal(svg, before);
   });
 
-  test('Phase 25: a real 2-voice drum groove (hi-hat=voice 1, kick+snare=voice 2) gets up stems in voice 1 and down stems in voice 2, with no exceptions', () => {
+  test('Drum voices keep every kick, snare and hi-hat stem up even when the MusicXML puts them in separate voices', () => {
     const { svg, diagnostics } = render('two-voice-drum-groove.musicxml');
     assert.deepEqual([...diagnostics], []);
     const stems = [...svg.matchAll(/<line x1="([\d.]+)" y1="([\d.]+)" x2="\1" y2="([\d.]+)" stroke="#000000" stroke-width="0\.12"/g)];
     assert.ok(stems.length >= 10, `expected at least 10 stems, got ${stems.length}`);
-    // Every stem's x-position tells us which voice it belongs to: voice 1's
-    // 8 eighth notes are evenly spaced across the whole measure, voice 2's
-    // 2 stemmed notes (the quarter note and the eighth note) sit at the
-    // measure's very start and near its end respectively. Rather than
-    // hardcoding those x-values, just confirm both directions appear at
-    // least once AND that direction is consistent for whichever notes are
-    // clearly voice 1 (the eight regularly-spaced, closely-packed ones).
     const directions = stems.map((m) => (Number(m[3]) < Number(m[2]) ? 'up' : 'down'));
-    assert.ok(directions.includes('up'), 'expected at least one up stem (voice 1)');
-    assert.ok(directions.includes('down'), 'expected at least one down stem (voice 2)');
+    assert.ok(directions.every((d) => d === 'up'), 'expected every drum stem to point up');
   });
 
   test('an unsupported clef (e.g. from an unrecognized sign) does not crash -- notes are skipped with a diagnostic', () => {

@@ -63,23 +63,16 @@ export function noteheadForDrum(drum: MuseScoreDrum): string {
 }
 
 /**
- * Which way one MuseScore drum's stem actually points on the page.
+ * Which way a drum stem points in this engine's chart.
  *
- * Not `drum.stemDirection` on its own, because MuseScore's table and
- * MuseScore's output disagree about the kick: the acoustic bass drum
- * (35) carries `DirectionV::UP` and the electric one (36) carries
- * `DOWN`, and both are drawn with the stem down. The reason is the
- * other field -- both sit in `voice 1`, MuseScore's second voice, and a
- * second-voice stem points down whatever the instrument says.
- *
- * So the voice decides when it is not the first, and the instrument's
- * own direction decides otherwise. That is also, exactly, the
- * hands-up/feet-down convention every drum-notation guide states: the
- * three drums MuseScore files in voice 1 are the kick, the alternate
- * kick and the hi-hat pedal -- the feet.
+ * Drum files commonly place kick and hi-hat in separate voices and write
+ * the kick with `<stem>down</stem>`. That makes a simultaneous kick/hi-hat
+ * pattern visually split in two. This engine uses the chart convention the
+ * product needs instead: percussion stems always point up, so a kick,
+ * hi-hat and any other drum struck together read as one upright pattern.
  */
-export function stemDirectionForDrum(drum: MuseScoreDrum): 'up' | 'down' {
-  return drum.voice >= 1 ? 'down' : drum.stemDirection;
+export function stemDirectionForDrum(_drum: MuseScoreDrum): 'up' | 'down' {
+  return 'up';
 }
 
 /**
@@ -113,10 +106,9 @@ export function drumMappingFromMuseScore(
  * Which voice MuseScore puts each drum in, by MIDI pitch.
  *
  * Separate from the mapping above because this engine's drum config has
- * no voice field: voice is decided by the file, not by the kit. It is
- * exposed so a host that BUILDS a drum part (rather than reading one)
- * can put the feet in voice 2 the way MuseScore does -- which is what
- * gives a drum chart its stems-down kick line.
+ * no voice field: voice is decided by the file, not by the kit. It remains
+ * exposed for hosts that need the source file's voice assignments, while
+ * stem rendering itself keeps percussion stems upright.
  */
 export function drumVoicesFromMuseScore(): Readonly<Record<number, number>> {
   const voices: Record<number, number> = {};

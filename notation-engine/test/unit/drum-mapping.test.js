@@ -33,10 +33,10 @@ describe('default GM drum mapping table (Phase 41, §13.3)', () => {
     }
   });
 
-  test('feet (kick, hi-hat pedal) get stems down; everything else gets stems up, per the hands-up/feet-down convention', () => {
-    assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[36].stemDirection, 'down'); // Bass Drum
-    assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[35].stemDirection, 'down'); // Bass Drum (alt)
-    assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[44].stemDirection, 'down'); // Pedal Hi-Hat
+  test('all default drum entries use up stems so kick and hi-hat attacks stay visually unified', () => {
+    assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[36].stemDirection, 'up'); // Bass Drum
+    assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[35].stemDirection, 'up'); // Bass Drum (alt)
+    assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[44].stemDirection, 'up'); // Pedal Hi-Hat
     assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[38].stemDirection, 'up'); // Snare
     assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[49].stemDirection, 'up'); // Crash
   });

@@ -87,7 +87,7 @@ describe('GM drum mapping wired into rendering (Phase 41, §13.1/§13.3)', () =>
     assert.match(svg, /x="6" y="5\.5"[^>]*>\uE0A4/);
   });
 
-  test("the kick (GM 36) renders as a plain oval, at the kick's own staff position, stem DOWN (feet convention)", () => {
+  test("the kick (GM 36) renders as a plain oval, at the kick's own staff position, stem UP with the rest of the drum chart", () => {
     const { svg } = render();
     // The kick is the SECOND attack. Its x is whatever §14's spacing,
     // stretched to the bar's real width, puts it at -- read off the
@@ -97,16 +97,11 @@ describe('GM drum mapping wired into rendering (Phase 41, §13.1/§13.3)', () =>
     const kick = svg.match(/x="([\d.]+)" y="7\.5"[^>]*>\uE0A4/);
     assert.ok(kick, "expected a plain oval notehead at the kick's own y=7.5");
     const x = kick[1];
-    const stems = [
-      ...svg.matchAll(
-        new RegExp(
-          `<line x1="${x}" y1="([\\d.]+)" x2="${x}" y2="([\\d.]+)" stroke="#000000" stroke-width="0\\.12"`,
-          'g',
-        ),
-      ),
-    ];
+    const stems = [...svg.matchAll(/<line x1="([\d.]+)" y1="([\d.]+)" x2="[\d.]+" y2="([\d.]+)" stroke="#000000" stroke-width="0\.12"\s*\/>/g)].filter(
+      (match) => Math.abs(Number(match[1]) - Number(x)) < 2,
+    );
     assert.equal(stems.length, 1);
-    assert.ok(Number(stems[0][2]) > Number(stems[0][1]), 'expected a down stem for the kick');
+    assert.ok(Number(stems[0][3]) < Number(stems[0][2]), 'expected an up stem for the kick');
   });
 
   test("the closed hi-hat (GM 42) renders as an X notehead, at the hi-hat's own (much higher) staff position, stem up", () => {

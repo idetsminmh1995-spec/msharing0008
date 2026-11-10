@@ -536,7 +536,7 @@ describe('visual regression (Phase 8)', () => {
     matchSnapshot('render-from-musicxml-beamed', svg, SNAPSHOT_DIR);
   });
 
-  test('Phase 25: a real 2-voice drum groove renders identically to the saved snapshot (hi-hat up, kick/snare down)', () => {
+  test('Phase 25: a real 2-voice drum groove renders identically to the saved snapshot (all drum stems up)', () => {
     const xml = fs.readFileSync(
       path.join(__dirname, '..', 'fixtures', 'musicxml', 'two-voice-drum-groove.musicxml'),
       'utf8',
