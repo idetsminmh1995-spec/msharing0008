@@ -568,6 +568,8 @@ const STEM_AND_BEAM_ALLOWANCE = 3.5 + 0.5;
  * which sit clear of the staff rather than next to the notehead.
  */
 const ARTICULATION_GAP = 1.0;
+/** Drum accents must clear the highest possible stem/beam, not just the staff. */
+const DRUM_ARTICULATION_BEAM_CLEARANCE = STEM_AND_BEAM_ALLOWANCE;
 const ORNAMENT_GAP = 1.5;
 const FERMATA_GAP = 1.5;
 
@@ -1189,6 +1191,13 @@ function renderNoteMarks(
   let aboveNote = topPosition;
   let belowNote = bottomPosition;
 
+  if (isDrum && articulations.length > 0) {
+    // In a drum chart, an accent belongs to the shared hand-pattern lane.
+    // Reserve the same stem+beam reach used by the skyline/tempo clearance
+    // code before placing the mark, otherwise an up-stem beam can cover it.
+    aboveStaff -= DRUM_ARTICULATION_BEAM_CLEARANCE;
+  }
+
   const place = (glyphName: string, position: number): void => {
     parts.push(
       renderMark(glyphName, {
@@ -1204,9 +1213,8 @@ function renderNoteMarks(
     const side = articulationSide(type, direction);
     if (isDrum) {
       // Drum accents belong to the shared upper clearance area. Keeping
-      // them above the staff avoids a kick's lower voice placing a `>` or
-      // `^` inside the note/beam pattern and makes the kick + hi-hat groove
-      // read as one clean percussion figure.
+      // them above the stem/beam reach avoids a kick's lower voice placing
+      // a `>` or `^` inside the note/beam pattern.
       aboveStaff -= ARTICULATION_GAP;
       place(articulationGlyphName(type, 'above'), aboveStaff);
     } else if (type === 'marcato') {

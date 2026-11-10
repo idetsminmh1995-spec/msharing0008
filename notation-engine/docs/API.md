@@ -1085,7 +1085,7 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | const | `NOTEHEAD_GROUP_TO_SHAPE` | MuseScore's notehead groups, in this engine's own shape-family names. |
 | function | `noteheadForDrum` | The notehead this engine should draw for one MuseScore drum. |
-| function | `stemDirectionForDrum` | Which way one MuseScore drum's stem actually points on the page. |
+| function | `stemDirectionForDrum` | Which way a drum stem points in this engine's chart. |
 | function | `drumMappingFromMuseScore` | MuseScore's standard drumset, as `config.drums.mapping`. |
 | function | `drumVoicesFromMuseScore` | Which voice MuseScore puts each drum in, by MIDI pitch. |
 

@@ -77075,6 +77075,7 @@ ${xrefOffset}
   }
   var STEM_AND_BEAM_ALLOWANCE = 3.5 + 0.5;
   var ARTICULATION_GAP = 1;
+  var DRUM_ARTICULATION_BEAM_CLEARANCE = STEM_AND_BEAM_ALLOWANCE;
   var ORNAMENT_GAP = 1.5;
   var FERMATA_GAP = 1.5;
   var SLUR_GAP = 1.2;
@@ -77379,6 +77380,9 @@ ${xrefOffset}
     let aboveStaff = Math.min(topPosition, topLine);
     let aboveNote = topPosition;
     let belowNote = bottomPosition;
+    if (isDrum && articulations.length > 0) {
+      aboveStaff -= DRUM_ARTICULATION_BEAM_CLEARANCE;
+    }
     const place = (glyphName, position) => {
       parts.push(
         renderMark(glyphName, {

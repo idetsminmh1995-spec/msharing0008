@@ -59,6 +59,11 @@ const drumNote = (notations = '') =>
   `<duration>2</duration><voice>1</voice><type>quarter</type>` +
   (notations === '' ? '' : `<notations>${notations}</notations>`) +
   '</note>';
+const beamedDrumNote = (beam, notations = '') =>
+  '<note><unpitched><display-step>G</display-step><display-octave>5</display-octave></unpitched>' +
+  `<duration>1</duration><voice>1</voice><type>eighth</type><beam number="1">${beam}</beam>` +
+  (notations === '' ? '' : `<notations>${notations}</notations>`) +
+  '</note>';
 
 describe('articulation + ornament wiring (Integration H, §9.19/§9.20)', () => {
   test('the fixture renders with no diagnostics at all', () => {
@@ -86,6 +91,32 @@ describe('articulation + ornament wiring (Integration H, §9.19/§9.20)', () => 
     assert.equal(glyphPlacements(svg, 'articMarcatoBelow').length, 0);
     assert.ok(accents[0].y < noteheads[0].y, 'drum accent should sit above its notehead');
     assert.ok(marcatos[0].y < noteheads[1].y, 'drum strong accent should sit above its notehead');
+  });
+
+  test('drum accent and strong-accent marks clear an actual beamed hand pattern', () => {
+    const { svg } = renderInline(
+      beamedDrumNote('begin', '<articulations><accent/></articulations>') +
+        beamedDrumNote('continue', '<articulations><strong-accent/></articulations>') +
+        beamedDrumNote('continue') +
+        beamedDrumNote('end'),
+    );
+    const accents = glyphPlacements(svg, 'articAccentAbove');
+    const marcatos = glyphPlacements(svg, 'articMarcatoAbove');
+    assert.equal(accents.length, 1);
+    assert.equal(marcatos.length, 1);
+    const beamY = [...svg.matchAll(/<line([^>]*)\/>/g)]
+      .map((match) => ({
+        x1: Number(/x1="([^"]+)"/.exec(match[1])?.[1]),
+        x2: Number(/x2="([^"]+)"/.exec(match[1])?.[1]),
+        y1: Number(/y1="([^"]+)"/.exec(match[1])?.[1]),
+        y2: Number(/y2="([^"]+)"/.exec(match[1])?.[1]),
+      }))
+      .filter((line) => Math.abs(line.x2 - line.x1) > 5)
+      .map((line) => Math.min(line.y1, line.y2))
+      .reduce((minimum, y) => Math.min(minimum, y), Number.POSITIVE_INFINITY);
+    assert.ok(Number.isFinite(beamY), 'expected a rendered beam');
+    assert.ok(accents[0].y < beamY, 'accent should be above the beam');
+    assert.ok(marcatos[0].y < beamY, 'strong accent should be above the beam');
   });
 
   test('marcato is above even on an UP-stem note -- §9.19\'s one named exception', () => {
