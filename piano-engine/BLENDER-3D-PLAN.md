@@ -73,15 +73,15 @@ turns that state into scene transforms and materials.
 
 ## First asset proof of concept
 
-The first realistic hand asset is now checked into
-`website/assets/hand/` as a browser-ready `.glb`, with skinning, a 21-bone
-armature, and the `Pose_OK` / `RigAction` clips. The GLB is the retained asset;
-the Blender source file is not kept in the repository.
-The working test page is `/hand-demo/`; it loads the GLB with Three.js,
-plays both clips, lists the bones, and directly curls the index finger.
-The asset is CC BY-NC 4.0, so it is suitable for non-commercial evaluation
-only until replaced by a compatible asset or an original model. Full source,
-license, and attribution details live in `website/assets/hand/README.md`.
+Two hand assets are retained under `website/assets/hand/`. `hand_model.glb`
+is the earlier one-hand demo asset. The production Hands renderer selects the
+user-provided `hands_pair.glb`, exported from `hands_pair_source.blend`, with
+separate `PianoHandLeftRoot` and `PianoHandRightRoot` armatures. The runtime
+keeps the source hands separate and uses `hands_pair_fingertips.json` for
+wrist-relative fingertip anchors, remapped onto each distal finger bone so
+the tip position is recomputed after articulation. The source/license/export
+details are documented in `website/assets/hand/README.md`; the earlier
+`hand_model.glb` remains in the demo under its separate CC BY-NC 4.0 terms.
 
 The first piano mapping slice is also live in the demo. It creates named
 procedural key meshes, maps MIDI 60/62/64/65/67 to C4/D4/E4/F4/G4, moves the
@@ -123,15 +123,16 @@ still remain future work.
   preview and video capture use the same framing.
 - Hand span, hand length, key width and key depth use consistent real-world
   proportions instead of enlarging either the hands or keyboard to fill the view.
-- Both hands show their dorsal surfaces and retain the same un-tinted source
-  skin/nail textures; left/right note colours do not tint hand materials.
+- Both hands show their dorsal surfaces in a palm-down playing pose. The
+  selected source has no skin/nail textures, so the renderer uses one natural
+  skin-tone material; left/right note colours do not tint the hand material.
 - Left/right note/key highlight colours and finger assignments are deterministic.
 - The same scene state can drive browser preview and video export.
 - The scene remains usable on the target mobile and desktop browsers at the
   intended frame rate.
 
 
-## Current implementation status (verified against source, 2026-11-09)
+## Current implementation status (verified against source, 2026-11-10)
 
 The migration is in progress. The repository contains a working rigged-hand
 asset and a partial Three.js piano scene, but the target production pipeline
@@ -144,32 +145,33 @@ and acceptance criteria below are not all complete.
 | 3. Load piano GLB | Not complete | The checked-in GLB is the hand asset only. The piano keys are procedural. |
 | 4. Key press/release and hand colors | Partial | `keyPressDepthMm()` now drives each key's exact millimetre travel directly from the frame timestamp; active keys retain the selected hand highlight. Preview hand-root smoothing still uses requestAnimationFrame, while export snaps to the calculated target. |
 | 5. 3D falling-note bars | Not complete | The Falling Notes design still uses the existing SVG/shape renderer; the GLB/WebGL module serves the Hands design. |
-| 6. Rigged hand and finger mapping | Partial | The 21-bone GLB receives Piano Hand Engine fingering, joint poses, and targets from the physical key positions. A bounded damped-least-squares IK solver now fits individual fingers to targets on the synthetic Engine rig, and the renderer applies its solved finger angles. GLB joint-axis, bone-length, wrist-anchor and fingertip-surface calibration is not done, so visible fingertip contact accuracy is not yet verified. |
-| 7. Hand/wrist/finger/chord motion and tests | Partial | The renderer now solves each assigned finger against its key target after choosing a shared wrist target. Chord wrist targets are still averaged rather than jointly optimized; wrist rotation/trajectory, inter-hand collision handling, and browser-level contact tests are still missing. |
+| 6. Rigged hand and finger mapping | Partial | The production renderer loads separate rigs from `hands_pair.glb`, uses the measured wrist-relative fingertip anchors in `hands_pair_fingertips.json`, remaps them to distal bones, and accounts for GLTFLoader name sanitization and `_1` suffixes. The palm-down orientation and both separate roots are in place. A browser test on the superseded raw export showed a visible fingertip/key offset; the latest anchor-based asset has not yet passed an end-to-end measured contact test. Synthetic Engine IK residuals are not visible GLB accuracy. |
+| 7. Hand/wrist/finger/chord motion and tests | Partial | The earlier raw export rendered left MIDI 48/finger 5 and right MIDI 64/finger 3 simultaneously, but its fingertips did not align to target key centers. That export was superseded by the anchor-based `hands_pair.glb`; repeat the browser test on this active asset and measure fingertip-to-key distance. Chord wrist targets are still averaged rather than jointly optimized; wrist rotation/trajectory and inter-hand collision handling are still missing. |
 | 8. Website preview/video integration | Partial, wired | Preview and export share `stageOptions()` and the same Piano Hand Engine keyboard/events. The renderer now retains finger/key contact through the 70 ms key-release envelope and reports synthetic Engine-rig IK residuals. `renderToCanvas()` snaps the hand root while live preview still smooths translation asynchronously; browser parity tests remain outstanding. |
 | 9. Remove SVG production path | Not complete | SVG remains the Falling Notes implementation and the renderer-independent contract. Do not remove it until the 3D paths pass functional, visual, deterministic-frame and performance checks. |
 
 `website/hand-demo/index.html` is a 13-white-key procedural mapping demo with
 five explicit white-key MIDI/finger assignments (60/62/64/65/67), embedded GLB
 animation controls, pointer/computer-keyboard interaction, and a bone listing.
-The production renderer is `website/assets/piano-hand-3d.js`; it loads the
-hand GLB, builds procedural key meshes from `PianoHandEngine.buildKeyboard()`,
+The production renderer is `website/assets/piano-hand-3d.js`; it loads
+`website/assets/hand/hands_pair.glb` and `hands_pair_fingertips.json`, builds procedural key meshes from `PianoHandEngine.buildKeyboard()`,
 and consumes `keyPositionsFor()`, `splitHands()`, `solveFingering()`,
 `solveHandSkeleton()`, `solveFingerTargets()`, `isKeyContactActive()`, and
 `keyPressDepthMm()` through the Piano page adapter. The static browser bundle is
 `website/assets/piano-hand-engine.js`. The numerical IK is tested against the
 Engine's synthetic hand rig only; it is not a measurement of the skinned GLB's
-visible fingertip contact. The piano GLB, 3D falling bars, GLB calibration,
-continuous wrist motion planning, and automated deterministic-export proof
-remain unfinished.
+visible fingertip contact. The piano GLB, 3D falling bars, new hand-rig
+calibration, continuous wrist motion planning, and automated
+deterministic-export proof remain unfinished.
 
 ### Required follow-up before marking the 3D path production-ready
 
 - Replace duplicate/procedural production key meshes with the planned
   addressable piano GLB, or explicitly revise this asset requirement.
-- Calibrate the Engine hand rig from the actual GLB bind pose, joint axes,
-  segment lengths, wrist anchor, and fingertip surface landmarks. Do not treat
-  synthetic-rig IK residuals as visible GLB contact error before this is done.
+- Validate `hands_pair.glb` and `hands_pair_fingertips.json` in the production
+  browser renderer by measuring target-to-fingertip error through articulation;
+  then calibrate joint axes/limits and Engine millimetre transforms. Do not treat
+  synthetic-rig IK residuals as visible GLB contact error before validation.
 - Jointly plan chord wrist pose and individual fingertip targets, then add a
   time-based wrist trajectory with approach, travel, press, hold, and release.
 - Keep preview/export state parity explicit: test repeated and out-of-order
@@ -184,6 +186,6 @@ remain unfinished.
   WebGL-unavailable behavior and asset-load failure. The existing
   `piano-engine` Node tests target the separate SVG bundle and do not validate
   this module.
-- The included hand asset is CC BY-NC 4.0 (see
-  `website/assets/hand/README.md`); replace it or obtain a compatible/original
-  asset before commercial distribution.
+- The active `hands_pair.glb` source is identified as CC0 in the retained
+  `website/assets/hand/LICENSE.html`. The demo's old `hand_model.glb` is
+  CC BY-NC 4.0 and remains non-commercial only; see `README.md`.

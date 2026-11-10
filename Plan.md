@@ -18,7 +18,7 @@ Repository တစ်ခုလုံးအတွက် Notation Engine၊ Drum Vi
 
 ## ရည်မှန်းချက်
 
-Piano Video ရဲ့ **Hands** mode မှာ Piano Hand Engine က သတ်မှတ်ပေးတဲ့ ဘယ်/ညာလက်နဲ့ လက်ချောင်း ၁ မှ ၅ တို့က သတ်မှတ်ထားတဲ့ MIDI ခလုတ်ကို တိတိကျကျထိ၊ မှန်ကန်တဲ့ note-on အချိန်မှာဖိပြီး note-off ပြီးနောက် သဘာဝကျကျလွှတ်နိုင်ရပါမယ်။ လက်မော်ဒယ်အဖြစ် 12.3 MB `website/assets/hand/hand_model.glb` ကို ဆက်သုံးပါမယ်။ Preview နဲ့ export နှစ်ခုလုံးမှာ အချိန်တစ်ခုချင်းစီအတွက် တူညီတဲ့ လက်နဲ့ခလုတ်အခြေအနေကို အသုံးပြုရပါမယ်။
+Piano Video ရဲ့ **Hands** mode မှာ Piano Hand Engine က သတ်မှတ်ပေးတဲ့ ဘယ်/ညာလက်နဲ့ လက်ချောင်း ၁ မှ ၅ တို့က သတ်မှတ်ထားတဲ့ MIDI ခလုတ်ကို တိတိကျကျထိ၊ မှန်ကန်တဲ့ note-on အချိန်မှာဖိပြီး note-off ပြီးနောက် သဘာဝကျကျလွှတ်နိုင်ရပါမယ်။ လက်ရှိ production model သည် `website/assets/hand/hands_pair.glb` ဖြစ်ပြီး တစ်ဖက်စီ သီးခြား rig၊ wrist root နှင့် measured fingertip anchors ကို သုံးသည်။ လက်ဖဝါးကို ခလုတ်ဘက်မှောက်၊ လက်ဖမိုးကို အပေါ်စီးကမြင်ရတဲ့ပုံစံ ဖြစ်ရပါမယ်။ ယခင် `hand_model.glb` ကို demo အတွက် သီးခြားထိန်းထားသည်။ Preview နဲ့ export နှစ်ခုလုံးမှာ အချိန်တစ်ခုချင်းစီအတွက် တူညီတဲ့ လက်နဲ့ခလုတ်အခြေအနေကို အသုံးပြုရပါမယ်။
 
 ## 2026-11-10 — မပြင်မီ အတည်ပြုထားသော update plan
 
@@ -181,3 +181,11 @@ Phase B သည် deterministic motion-plan contract နှင့် sampler က
 **စမ်းသပ်မှုရလဒ်။** `piano-hand-engine` ထဲမှာ `npm run verify` အောင်မြင်ခဲ့ပါတယ်။ TypeScript typecheck, ESLint, Prettier format check, **73/73 unit test** နဲ့ `website/assets/piano-hand-engine.js` browser bundle build အားလုံး pass ဖြစ်ခဲ့ပါတယ်။ `website/assets/piano-hand-3d.js` ကိုလည်း JavaScript syntax check လုပ်ပြီးပါပြီ။
 
 **မပြီးသေးသောအလုပ်။** လက်ရှိ IK က Engine ရဲ့ synthetic hand rig ပေါ်မှာသာ တွက်ချက်ပါတယ်။ GLB scale, bind-pose transform နဲ့ joint axis တွေကို ကယ်လီဘရေးရှင်းမလုပ်ရသေးလို့ 3D model ရဲ့ လက်ဖျားက ခလုတ်ကို တကယ်တိကျစွာထိနေတယ်လို့ မအတည်ပြုနိုင်သေးပါ။ Chord အတွက် wrist target ကို ပျမ်းမျှယူနေဆဲဖြစ်ပြီး wrist rotation/trajectory, collision/clearance, preview/export တူညီမှုနဲ့ browser-level contact test တွေ ဆက်လုပ်ရန်ကျန်ပါသေးတယ်။
+
+### 2026-11-10 — လက်နှစ်ဖက် model အတွက် လက်ရှိအခြေအနေ
+
+GitHub ၏ လက်ရှိ production asset သည် `website/assets/hand/hands_pair.glb` ဖြစ်ပြီး၊ `hands_pair_source.blend` မှ သီးခြား `PianoHandLeftRoot` နှင့် `PianoHandRightRoot` ကို အသုံးပြုသည်။ `hands_pair_fingertips.json` ထဲတွင် Blender မှတိုင်းထားသော wrist-relative fingertip anchor များ ပါဝင်ပြီး renderer က distal finger bone များနှင့် ချိတ်ကာ လက်ချောင်းကွေးသည့် frame တိုင်းတွင် tip world-position ကို ပြန်တွက်သည်။ Three.js `GLTFLoader` ၏ bone-name sanitize လုပ်ပုံနှင့် right-hand duplicate name များအတွက် `_1` suffix ကိုလည်း mapping ထဲတွင် ထည့်ထားသည်။ Model ၏ source/license/export အသေးစိတ်ကို `website/assets/hand/README.md`၊ `LICENSE.html` နှင့် export script တွင် မှတ်တမ်းတင်ထားသည်။
+
+ကျွန်ုပ်၏ browser test သည် နောက်ပိုင်း အစားထိုးသွားသော raw GLB export ကို စမ်းသပ်ခဲ့ခြင်းဖြစ်သည်။ ထိုစမ်းသပ်မှုတွင် ဘယ်လက် MIDI 48/finger 5 နှင့် ညာလက် MIDI 64/finger 3 ကို တစ်ပြိုင်နက်ပြနိုင်ပြီး၊ လက်ဖျား–ခလုတ် offset ရှိနေကြောင်း တွေ့ခဲ့သည်။ ယခု active ဖြစ်သော `hands_pair.glb` နှင့် measured fingertip anchors ကို သုံးပြီး end-to-end browser test ဖြင့် tip–key အကွာအဝေးကို မတိုင်းတာရသေးသောကြောင့် **တိကျသော contact ကို အောင်မြင်ပြီးဟု မဆိုရသေးပါ**။ Chord coupled IK၊ collision/clearance၊ wrist trajectory နှင့် preview/export parity ကိုလည်း ဆက်စစ်ရန် ကျန်ရှိသည်။
+
+နောက်ဆုံး source အပေါ် `npm run verify` အောင်မြင်ခဲ့သည် (**81/81 tests**); TypeScript, ESLint, Prettier, browser bundle build နှင့် `piano-hand-3d.js` syntax check လည်း pass ဖြစ်သည်။ ဤ suite သည် current GLB ပေါ်က fingertip–key အကွာအဝေးကို မတိုင်းတာသဖြင့် အပေါ်က contact လက်ခံစံကို အစားမထိုးပါ။
