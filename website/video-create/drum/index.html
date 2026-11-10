@@ -461,9 +461,9 @@
 <script src="../../assets/notation-engine.js?v=7d4c19cffd3a"></script>
 <!-- The Human Sticking Engine: Drum/sticking-engine-ts, a TypeScript port
      of Drum/sticking-engine (Python) that is parity-tested against it. It
-     decides which limb plays every note; the R/L under the staff is its
-     output. -->
-<script src="../../assets/sticking-engine.js?v=3907faf4"></script>
+     decides which limb plays every note and therefore which R/L kit photo
+     lights up during playback. -->
+<script src="../../assets/sticking-engine.js?v=3308077d"></script>
 <!-- Finds the count voices in the bucket whatever they were named. -->
   <script src="../../assets/voice-samples.js?v=609facad"></script>
   <!-- Shared fetch/blob/decode loader used by preview and export. -->
@@ -1749,8 +1749,8 @@
    * worse answer than no answer.
    */
   function buildDrumNoteList(parsed, playback) {
-    const notes = [];
-    if (!parsed || !parsed.score) return { notes };
+    const writtenNotes = [];
+    if (!parsed || !parsed.score) return { notes: [] };
 
     for (const part of parsed.score.parts) {
       const instrumentMidi = parsed.midiInstrumentsByPart?.get(part.id);
@@ -1793,8 +1793,8 @@
               );
               const velocity = Math.max(1, Math.min(127, currentVelocity + (accented ? ACCENT_BOOST : 0)));
 
-              notes.push({
-                time: NotationEngine.tickToSeconds(playback.tempoMap, measureOffset + startTick),
+              writtenNotes.push({
+                writtenTick: measureOffset + startTick,
                 note: midiNote,
                 velocity,
               });
@@ -1803,6 +1803,11 @@
         }
       }
     }
+    const notes = StickingEngine.expandWrittenNoteList(
+      writtenNotes,
+      playback.performance?.entries ?? [],
+      (writtenTick) => NotationEngine.tickToSeconds(playback.tempoMap, writtenTick),
+    );
     return { notes };
   }
 

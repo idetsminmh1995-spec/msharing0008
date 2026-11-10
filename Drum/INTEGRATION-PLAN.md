@@ -77,7 +77,9 @@ on every malformed file is not a promise worth making.
 4. **Parity.** Golden JSON from the Python over a spread of fixtures;
    the TypeScript asserted against it.
 5. **The page.** Feed the sticking engine from the score the notation
-   engine has already parsed, and draw **R / L** under the notes.
+   engine has already parsed; unfold note events through the same repeat
+   performance plan as playback; use the solved limb to light the matching
+   R/L kit photo during the video rather than drawing sticking letters.
 
 ## How it reaches the page
 
@@ -90,12 +92,14 @@ either of them learning about the other's internals:
 MusicXML ──notation-engine──▶ playback events {tick, midiNote, velocity}
                                       │
                                       ▼
+                    written notes + repeat performance plan
+                                       │
                            note list {time, note, velocity}
                                       │
                             sticking-engine (this port)
                                       │
                                       ▼
-                     per-note limb ──▶ R / L drawn under the staff
+                      per-note limb ──▶ R / L kit-photo hit
 ```
 
 The drum-kit animation the Worker's PNGs are for is the same data one

@@ -74,6 +74,7 @@ var StickingEngine = (() => {
     drummerState: () => drummerState,
     drummerStyle: () => drummerStyle,
     engineConfig: () => engineConfig,
+    expandWrittenNoteList: () => expandWrittenNoteList,
     fatigueAdjustedStyle: () => fatigueAdjustedStyle,
     fatigueState: () => fatigueState,
     findOstinatoRuns: () => findOstinatoRuns,
@@ -627,6 +628,42 @@ var StickingEngine = (() => {
       ticksPerBeat: 960,
       malformedEventCount: 0
     };
+  }
+
+  // src/repeat-adapter.ts
+  function asNoteListEntry(note, time) {
+    return {
+      time,
+      note: note.note,
+      ...note.velocity !== void 0 ? { velocity: note.velocity } : {},
+      ...note.channel !== void 0 ? { channel: note.channel } : {},
+      ...note.trackName !== void 0 ? { trackName: note.trackName } : {}
+    };
+  }
+  function expandWrittenNoteList(notes, performanceEntries, tickToSeconds) {
+    const orderedNotes = notes.map((note, sourceOrder) => ({ note, sourceOrder })).sort((a, b) => a.note.writtenTick - b.note.writtenTick || a.sourceOrder - b.sourceOrder);
+    if (performanceEntries.length === 0) {
+      return orderedNotes.map(({ note }) => asNoteListEntry(note, tickToSeconds(note.writtenTick)));
+    }
+    const occurrences = [];
+    const orderedEntries = [...performanceEntries].sort(
+      (a, b) => a.performanceTick - b.performanceTick
+    );
+    const writtenSeconds = orderedNotes.map(({ note }) => tickToSeconds(note.writtenTick));
+    for (const entry of orderedEntries) {
+      for (let index = 0; index < orderedNotes.length; index++) {
+        const item = orderedNotes[index];
+        const noteSeconds = writtenSeconds[index];
+        if (item === void 0 || noteSeconds === void 0) continue;
+        const { note } = item;
+        if (note.writtenTick < entry.writtenTick || note.writtenTick >= entry.writtenTick + entry.ticks) {
+          continue;
+        }
+        const time = entry.startSeconds + (noteSeconds - entry.writtenStartSeconds);
+        occurrences.push(asNoteListEntry(note, time));
+      }
+    }
+    return occurrences.sort((a, b) => a.time - b.time);
   }
 
   // src/rule02-mapping.ts
@@ -1617,7 +1654,7 @@ var StickingEngine = (() => {
   }
 
   // src/rule09-technique.ts
-  var RIM_CAPABLE = /* @__PURE__ */ new Set(["snare"]);
+  var RIM_CAPABLE = /* @__PURE__ */ new Set(["snare", "snare_rim"]);
   var CHOKE_CAPABLE = /* @__PURE__ */ new Set([
     "crash_1",
     "crash_2",

@@ -1,9 +1,11 @@
 # RULE MAP — which file implements which of Rules 1–40
 
-Every rule from `Sticking_Engine_Rules_01-40_41-files.zip` is implemented.
-Related rules that form one algorithm or one data layer are grouped into a
-single module (documented in that file's own docstring), rather than split
-into 40 near-empty files.
+The sticking decisions described by the rules are implemented in the Python
+reference and TypeScript port, with grouped modules for related rules. Scope
+exceptions are explicit: the TypeScript port accepts note lists rather than
+parsing `.mid` files itself, and the motion modules do not include a full
+IK/FK skeletal drummer rig. See `Drum/sticking-engine-ts/PORT.md` for these
+boundaries and the browser integration contract.
 
 | Rule(s) | Title | Module |
 |---|---|---|

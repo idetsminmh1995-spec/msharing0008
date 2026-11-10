@@ -12,10 +12,10 @@
  * reads `.mid` with `mido`; this port's caller (the drum page) already
  * has a parsed score and feeds a note list, and reimplementing a second
  * MIDI parser inside this module would be a second place for MIDI bugs
- * to live when the repo already has two. `midi-adapter.ts` builds a note
- * list from `notation-engine`'s own `parseMidiFile` instead, and is
- * documented as EQUIVALENT rather than byte-identical -- see
- * `Drum/INTEGRATION-PLAN.md`.
+ * to live when the repo already has two. A future `midi-adapter.ts` can
+ * build a note list from `notation-engine`'s own `parseMidiFile`; that
+ * adapter is documented as EQUIVALENT rather than byte-identical, but is
+ * not implemented yet -- see `Drum/INTEGRATION-PLAN.md`.
  */
 
 import type { NormalizedMidiData, SourceMidiEvent } from './datamodel.js';

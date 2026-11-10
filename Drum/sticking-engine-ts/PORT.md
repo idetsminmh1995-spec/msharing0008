@@ -99,10 +99,12 @@ Hand photos are named `R{gmNote}.png` / `L{gmNote}.png` and foot photos
 both of them a kick.
 
 The bridge lives in the page, not in either engine: it builds the note
-list from the parsed score (time from the tempo map, GM number from
+list from the parsed score (written tick, GM number from
 `<midi-unpitched>`, velocity derived from the notated dynamic plus the
-note's own accent), runs the engine, and turns each solved event into a
-timestamped image name.
+note's own accent). `expandWrittenNoteList()` unfolds each written event
+through the notation engine's performance entries, so repeated measures
+are supplied to the solver in playback order at performance seconds. The
+page then turns each solved event into a timestamped image name.
 
 Three details worth knowing before changing it:
 
@@ -114,18 +116,50 @@ Three details worth knowing before changing it:
 - **The side, not the limb, is the filename.** A kick is `R36.png`
   because it is the right FOOT. RH and RF both map to `R`.
 - **The lit state is driven through the repeat-unfolded timeline**, the
-  same one the playhead uses, so the kit lights up again on a repeat's
-  second pass instead of going quiet.
+  same notation performance plan the playhead uses, so the kit lights up
+  again on a repeat's second pass and later measures are not shifted early.
 
 ## What is deliberately not ported
 
 `rule01`'s **MIDI-file** path. The Python reads `.mid` with `mido`; the
 page feeds a note list built from a score `notation-engine` has already
 parsed. Reimplementing a MIDI parser here would be a third one in this
-repo. A `.mid` adapter on top of `notation-engine`'s own `parseMidiFile`
-is the right home for that, and would be *equivalent*, not
-byte-identical — two independent MIDI parsers agreeing on every
-malformed file is not a promise worth making.
+repo. A TypeScript `.mid` adapter on top of `notation-engine`'s own
+`parseMidiFile` is still a follow-up; it should be *equivalent*, not
+byte-identical — two independent MIDI parsers agreeing on every malformed
+file is not a promise worth making.
+
+The full IK/FK skeletal drummer rig described by Rules 13–19 is also not
+implemented here. The sticking solver assigns limbs and produces target
+motion/timeline data; a production character rig is a separate renderer.
+
+## Rule audit: confirmed work and remaining priorities
+
+The drum-page bridge now expands written note events through the notation
+engine's repeat-unfolded performance plan before solving. A repeat-adapter
+unit suite covers straight-through playback, repeated measures, tempo changes
+within a measure, and omitted ending measures. Rule 09 now treats the mapped
+`SNARE_RIM` instrument as rim-capable in both the Python reference and the
+TypeScript port; accent-level hits select `rim_shot` rather than falling
+through to `accent`.
+
+The rule-by-rule audit found few TypeScript-only behavior differences. Its
+highest-priority shared gaps are broader architectural work, not quick port
+fixes: Rule 10 recovery readiness does not constrain solver reachability,
+unreachable fallback assignments are not rejected by Rule 25, and Rule 39
+solver state is committed before validation rather than atomically afterward.
+Next, address these together with direct tests, then improve Rule 11
+simultaneous foot/hand coupling and Rule 06's unspecified reach envelope.
+Other confirmed follow-ups include Rule 03–04 musical timing/density context,
+Rule 20/31/33 memory counting and cross-run retrieval, Rule 12/09 technique
+alternatives, and direct tests for rule-level contracts. The full ordered
+backlog is tracked in `../sticking-engine/AUDIT-PLAN.md`. Avoid treating
+Python/TypeScript parity as proof that both implementations satisfy every
+original rule specification.
+
+The audit also confirmed that `.mid` parsing is an explicitly scoped TypeScript
+non-port and that a full IK/FK character rig remains out of scope; these are
+not newly discovered regressions.
 
 `notation.print_table`'s stdout formatting is a text helper, not a rule;
 `src/notation.ts` returns the lines instead of printing them.

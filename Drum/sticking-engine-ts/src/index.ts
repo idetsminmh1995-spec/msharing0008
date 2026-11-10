@@ -8,6 +8,7 @@ export * from './core/ids.js';
 export * from './core/geometry.js';
 export * from './datamodel.js';
 export * from './rule01-input.js';
+export * from './repeat-adapter.js';
 export * from './rule02-mapping.js';
 export * from './rule03-04-timing-density.js';
 export * from './rule05-pattern.js';

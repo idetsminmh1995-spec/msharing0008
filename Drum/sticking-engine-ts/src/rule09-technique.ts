@@ -14,7 +14,7 @@ import type {
   TechniquePlan,
 } from './datamodel.js';
 
-const RIM_CAPABLE: ReadonlySet<Instrument> = new Set<Instrument>(['snare']);
+const RIM_CAPABLE: ReadonlySet<Instrument> = new Set<Instrument>(['snare', 'snare_rim']);
 const CHOKE_CAPABLE: ReadonlySet<Instrument> = new Set<Instrument>([
   'crash_1',
   'crash_2',

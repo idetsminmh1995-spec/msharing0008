@@ -14,7 +14,7 @@ from .datamodel import (
     DrummerStyleProfile, Instrument
 )
 
-RIM_CAPABLE = {Instrument.SNARE}
+RIM_CAPABLE = {Instrument.SNARE, Instrument.SNARE_RIM}
 CHOKE_CAPABLE = {Instrument.CRASH_1, Instrument.CRASH_2, Instrument.HIHAT_OPEN}
 
 
