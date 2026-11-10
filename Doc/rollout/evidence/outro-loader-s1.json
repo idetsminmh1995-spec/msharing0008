@@ -1,0 +1,83 @@
+{
+  "schema": "outro-loader-s1.v1",
+  "completedAt": "2026-11-10T18:49:39Z",
+  "repository": "idetsminmh1995-spec/msharing0008",
+  "scope": "S1 loader hardening; built-in ending S2 is not implemented yet",
+  "implementation": {
+    "file": "website/assets/outro-video.js",
+    "firstByteTimeoutMs": 15000,
+    "stallTimeoutMs": 15000,
+    "totalTimeoutMs": 120000,
+    "metadataTimeoutMs": 15000,
+    "retriesAfterInitial": 2,
+    "retryDelaysMs": [
+      500,
+      1500
+    ],
+    "retryable": [
+      408,
+      429,
+      "5xx",
+      "network",
+      "timeout",
+      "unavailable"
+    ],
+    "notRetriedSameKey": [
+      403,
+      404,
+      "codec"
+    ],
+    "retryCacheMode": "reload",
+    "initialCacheMode": "no-store",
+    "failureCacheMs": 30000,
+    "aliases": {
+      "piano": [
+        "piano",
+        "paino"
+      ],
+      "paino": [
+        "paino",
+        "piano"
+      ]
+    },
+    "progress": "onProgress({ loaded, total, attempt, key })",
+    "structuredSuccess": [
+      "source",
+      "key",
+      "bytes",
+      "ms",
+      "attempts",
+      "reason",
+      "seconds"
+    ],
+    "structuredFailure": "lastFailure() includes kind, status, key, attempts, ms, and message"
+  },
+  "tests": {
+    "command": "node tools/test-outro-video.mjs",
+    "result": "passed",
+    "covered": [
+      "404 advances through unique candidates without retrying the same key",
+      "403 advances without same-key retry",
+      "500 retries twice and then succeeds",
+      "network failure retries and then succeeds",
+      "streamed response progress callback",
+      "piano/paino key aliases",
+      "first-byte timeout classification",
+      "structured successful R2 result",
+      "short-lived failure cache"
+    ]
+  },
+  "regressions": {
+    "syntax": "node --check passed for loader and test",
+    "drumBrowserAcceptance": "passed",
+    "crossPageBrowserAcceptance": "passed",
+    "pageCallSiteCompatibility": "loadOutro null/success and outroSegment API preserved"
+  },
+  "notImplementedInS1": [
+    "builtin-ending.js or automatic R2-to-built-in resolution",
+    "page policy that blocks no-outro success",
+    "Worker Range/304/requestId changes",
+    "complete R2 key manifest"
+  ],
+  "nextStep": "S2 built-in ending can start; S3 page policy must wait until the built-in segment exists"
+}

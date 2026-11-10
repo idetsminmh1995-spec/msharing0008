@@ -795,3 +795,47 @@ Cloudflare dashboard/Worker observability မရသဖြင့် live deployme
 | — | S1/S2 | Loader hardening နှင့် built-in ending | S0 result အပေါ်မူတည်၍ နောက်တစ်ဆင့် |
 
 S0 diagnosis evidence ဖိုင်ကို ပြင်ပြီးသောအခါ plan ၏ S0 status သည် **complete** ဖြစ်သည်။ S1/S2 ကို စတင်ခြင်းသည် S0 ပြီးကြောင်းကို အတည်ပြုပြီးမှသာ လုပ်ရမည့် သီးခြားအဆင့် ဖြစ်သည်။
+
+
+## 25. S1 Loader Hardening ပြီးစီးမှု မှတ်တမ်း — 2026-11-11
+
+S1 ကို `website/assets/outro-video.js` တွင် shared loader တစ်ခုတည်းအဖြစ် အကောင်အထည်ဖော်ပြီးပါပြီ။ Page call-site များကို မပြောင်းဘဲ `loadOutro()` ၏ null/success behavior ကို ထိန်းထားပြီး success result နှင့် `lastFailure()` diagnostics ကို တိုးချဲ့ထားသည်။
+
+### အကောင်အထည်ဖော်ပြီးသောအချက်များ
+
+- First-byte timeout 15 seconds
+- Byte မလာတော့သော stall timeout 15 seconds
+- Candidate keys/retries အားလုံးအတွက် total deadline 120 seconds
+- Metadata timeout 15 seconds
+- HTTP 408/429/5xx၊ network၊ timeout၊ unavailable failure များကို initial attempt ပြီးနောက် retry နှစ်ကြိမ်
+- Retry delay 0.5s/1.5s + jitter နှင့် retry request တွင် `cache: reload`
+- Initial request တွင် `cache: no-store`
+- 403/404/codec failure တွင် same key retry မလုပ်ဘဲ နောက် candidate သို့ ဆက်ခြင်း
+- `response.body.getReader()` ရှိလျှင် streaming bytes ဖတ်ပြီး `onProgress({ loaded, total, attempt, key })` ပေးခြင်း
+- Stream မရသော environment များအတွက် `arrayBuffer()` fallback
+- `piano` ↔ `paino` alias ကို shared key helper တစ်နေရာတည်းတွင် ထည့်ခြင်း
+- Success result တွင် `source: 'r2'`, `bytes`, `ms`, `attempts`, `reason` ထည့်ခြင်း
+- Failure report တွင် `kind`, `status`, `key`, `attempts`, `ms`, `message` ထည့်ခြင်း
+- Existing 30-second failure cache နှင့် successful cache behavior ထိန်းသိမ်းခြင်း
+
+### စမ်းသပ်မှုရလဒ်
+
+- `node --check website/assets/outro-video.js` — passed
+- `node --check tools/test-outro-video.mjs` — passed
+- `node tools/test-outro-video.mjs` — passed
+- 404/403 no-retry — passed
+- 500/network retry — passed
+- streaming progress — passed
+- piano/paino alias — passed
+- first-byte timeout — passed
+- structured success metadata — passed
+- Drum browser acceptance — passed
+- Cross-page browser acceptance — passed
+
+အထောက်အထားကို [`Doc/rollout/evidence/outro-loader-s1.json`](./Doc/rollout/evidence/outro-loader-s1.json) တွင် သိမ်းထားသည်။ `docs/VIDEO-ENGINE.md` နှင့် `Doc/rollout/README.md` တွင် S1 contract ကို update လုပ်ထားသည်။
+
+### S1 အပြီး မပြီးသေးသောအရာ
+
+S1 သည် loader ကိုသာ ခိုင်မာစေခြင်းဖြစ်ပြီး R2 မရသောအခါ built-in Thank You ending အလိုအလျောက် ထုတ်ပေးခြင်း မပါသေးပါ။ ထို့ကြောင့် လက်ရှိ pages များတွင် R2 failure သည် optional/no-outro path အဖြစ် ရှိနေဆဲဖြစ်သည်။ အဲဒီအပိုင်းသည် S2 built-in ending နှင့် S3 page policy တွင် ဆက်လုပ်ရမည်။
+
+S1 status: **complete**. Next planned step: **S2 — Built-in ending**.

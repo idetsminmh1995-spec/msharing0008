@@ -185,3 +185,16 @@ table behavior.
 - `b9e794d` — fractional-FPS timing, cancellation-safe audio duration, silent-video WebCodecs detection, encoder error propagation, and muxer regression coverage.
 - Current follow-up — global multi-segment frame timeline and accurate MediaRecorder cancellation state.
 - Current follow-up — grouped MP4 chunks and lower offset-table overhead for long videos.
+
+
+## 10. Thank You outro loader — S1 hardening
+
+`website/assets/outro-video.js` keeps the existing fetch → bytes → Blob → same-origin object URL path, but now bounds the download and reports the outcome. The defaults are a 15-second first-byte timeout, a 15-second stall timeout, a 120-second total deadline, and a 15-second metadata timeout. The total deadline covers all candidate keys and retries.
+
+HTTP 408, 429, 5xx, network failures, timeouts, and generic unavailable responses may retry twice after the initial attempt. Retry delays are 0.5 seconds and 1.5 seconds with small jitter, and retry requests use `cache: 'reload'`. HTTP 403 and 404 do not retry the same key; the loader advances to the next de-duplicated candidate. Codec/decode failure is classified as `codec` and advances without a blind retry.
+
+The loader reads a streaming response when `response.body.getReader()` is available and reports progress through `onProgress({ loaded, total, attempt, key })`. Environments without a readable stream use the existing `arrayBuffer()` fallback. Piano/paino aliases are generated in the shared key helper rather than in page code.
+
+Successful results now include `source: 'r2'`, `bytes`, `ms`, `attempts`, and `reason: null` while preserving `video`, `key`, `seconds`, and `audio`. Failed optional loads still return `null` for backward compatibility with the current pages; `OutroVideo.lastFailure()` contains the structured `kind`, status, key, attempts, elapsed time, and message needed by the gate/report. Automatic built-in fallback is intentionally S2 work and is not claimed here.
+
+S1 verification is recorded in [`Doc/rollout/evidence/outro-loader-s1.json`](../Doc/rollout/evidence/outro-loader-s1.json). It covers 404/403 no-retry, 500/network retry, stream progress, piano/paino aliases, first-byte timeout, structured success metadata, and failure caching. Drum and cross-page Chromium acceptance tests remain green.

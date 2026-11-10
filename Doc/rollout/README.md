@@ -85,3 +85,11 @@ The cross-page evidence records successful layout inspection at 500, 800 and 140
 - [1400px Drum screenshot](evidence/drum-1400.png)
 - [Cross-page browser test](../../tools/test-cross-page-rollout-browser.mjs)
 - [Shared stability module](../../website/assets/video-export-stability.js)
+
+## Phase 8 — S1 outro loader hardening: complete
+
+The shared `outro-video.js` loader now has 15-second first-byte and stall limits, a 120-second total deadline, two retries for 408/429/5xx/network/timeout failures, and no same-key retry for 403/404/codec failures. It reads streaming responses when available, reports byte progress, uses `cache: reload` for retries, and generates `piano`/`paino` aliases in one shared key helper. Existing page compatibility is preserved: optional failure still returns `null` until the S2 built-in ending is integrated.
+
+The S1 unit suite covers 404/403 policy, 500 and network retry, progress, aliases, timeout classification, structured success metadata and short-lived failure caching. Drum and cross-page Chromium acceptance remain passed after the loader change.
+
+Evidence: [S1 outro loader JSON](evidence/outro-loader-s1.json).

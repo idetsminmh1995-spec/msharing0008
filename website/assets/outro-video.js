@@ -44,13 +44,16 @@
     const kind = options.kind || 'drum';
     const style = options.style === 'white' ? 'White' : 'Black';
     const other = style === 'White' ? 'Black' : 'White';
-    const wanted = [
-      [aspect, kind, style],
-      [aspect, kind, other],
+    const kindAliases = kind === 'paino' ? ['paino', 'piano'] : kind === 'piano' ? ['piano', 'paino'] : [kind];
+    const wanted = [];
+    for (const candidate of kindAliases) {
+      wanted.push([aspect, candidate, style], [aspect, candidate, other]);
+    }
+    wanted.push(
       [aspect, 'drum', style],
       [aspect, 'drum', 'Black'],
       ['16x9', 'drum', 'Black'],
-    ];
+    );
     const keys = [];
     for (const [a, k, s] of wanted) {
       const key = `${ROOT}/${a}/${k}/${a} ${s} ${titleCase(k)}.mp4`;
@@ -67,6 +70,11 @@
   const cache = new Map();
   const failureCache = new Map();
   const FAILURE_CACHE_MS = 30_000;
+  const DEFAULT_FIRST_BYTE_TIMEOUT_MS = 15_000;
+  const DEFAULT_STALL_TIMEOUT_MS = 15_000;
+  const DEFAULT_TOTAL_TIMEOUT_MS = 120_000;
+  const DEFAULT_RETRIES = 2;
+  const RETRY_DELAYS_MS = [500, 1500];
   let lastFailure = null;
 
   function releaseClip(clip) {
@@ -81,12 +89,13 @@
     if (clip.objectUrl) URL.revokeObjectURL(clip.objectUrl);
   }
 
-  function waitForMetadata(video, timeoutMs) {
+  function waitForMetadata(video, timeoutMs, signal) {
     return new Promise((resolve, reject) => {
       const cleanup = () => {
         clearTimeout(timer);
         video.removeEventListener('loadedmetadata', onLoaded);
         video.removeEventListener('error', onError);
+        signal?.removeEventListener('abort', onAbort);
       };
       const onLoaded = () => {
         cleanup();
@@ -96,13 +105,161 @@
         cleanup();
         reject(new Error('R2 video did not decode'));
       };
+      const onAbort = () => {
+        cleanup();
+        reject(new Error('Outro load aborted'));
+      };
       const timer = setTimeout(() => {
         cleanup();
         reject(new Error('Timed out waiting for R2 video metadata'));
       }, timeoutMs);
       video.addEventListener('loadedmetadata', onLoaded, { once: true });
       video.addEventListener('error', onError, { once: true });
+      signal?.addEventListener('abort', onAbort, { once: true });
+      if (signal?.aborted) onAbort();
     });
+  }
+
+  function abortError(message) {
+    const error = new Error(message);
+    error.code = 'OUTRO_TIMEOUT';
+    return error;
+  }
+
+  function isRetryableStatus(status) {
+    return status === 408 || status === 429 || status >= 500;
+  }
+
+  function failureKindForStatus(status) {
+    if (status === 403) return 'forbidden';
+    if (status === 404) return 'not-found';
+    if (status === 408 || status === 429) return status === 429 ? 'http-429' : 'timeout';
+    if (status >= 500) return 'http-5xx';
+    return 'unavailable';
+  }
+
+  function sleep(ms, signal) {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(new Error('Outro load aborted'));
+        return;
+      }
+      const timer = setTimeout(() => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+      const onAbort = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        reject(new Error('Outro load aborted'));
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  function readWithTimeout(reader, timeoutMs, signal, first) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => finishReject(abortError(first ? 'Outro first-byte timeout' : 'Outro stalled while downloading')), timeoutMs);
+      const onAbort = () => finishReject(new Error('Outro load aborted'));
+      const cleanup = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+      };
+      const finishResolve = (value) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(value);
+      };
+      const finishReject = (error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+      reader.read().then(finishResolve, finishReject);
+    });
+  }
+
+  async function readResponseBytes(response, signal, options, onProgress) {
+    const total = Number(response.headers?.get?.('content-length')) || null;
+    if (!response.body?.getReader) {
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      onProgress?.({ loaded: bytes.length, total, attempt: options.attempt, key: options.key });
+      return bytes;
+    }
+    const reader = response.body.getReader();
+    const chunks = [];
+    let loaded = 0;
+    let first = true;
+    try {
+      while (true) {
+        let result;
+        try {
+          result = await readWithTimeout(reader, first ? options.firstByteTimeoutMs : options.stallTimeoutMs, signal, first);
+        } catch (error) {
+          try { await reader.cancel(); } catch (cancelError) { /* best effort */ }
+          throw error;
+        }
+        if (result.done) break;
+        if (result.value) {
+          const chunk = result.value instanceof Uint8Array ? result.value : new Uint8Array(result.value);
+          chunks.push(chunk);
+          loaded += chunk.byteLength;
+          first = false;
+          onProgress?.({ loaded, total, attempt: options.attempt, key: options.key });
+        }
+      }
+    } finally {
+      try { reader.releaseLock(); } catch (error) { /* best effort */ }
+    }
+    const bytes = new Uint8Array(loaded);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return bytes;
+  }
+
+  async function fetchCandidate(apiBase, key, options, onProgress) {
+    const controller = new AbortController();
+    const onAbort = () => controller.abort();
+    options.signal?.addEventListener('abort', onAbort, { once: true });
+    const timeout = setTimeout(() => controller.abort(), Math.max(1, options.deadline - Date.now()));
+    try {
+      const response = await fetch(sharedUrl(apiBase, key), {
+        mode: 'cors',
+        credentials: 'omit',
+        cache: options.attempt > 0 ? 'reload' : 'no-store',
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const error = new Error(`Outro request returned HTTP ${response.status}`);
+        error.status = response.status;
+        error.kind = failureKindForStatus(response.status);
+        throw error;
+      }
+      const bytes = await readResponseBytes(response, controller.signal, options, onProgress);
+      if (bytes.length === 0) {
+        const error = new Error('Outro response was empty');
+        error.kind = 'unavailable';
+        throw error;
+      }
+      return { response, bytes };
+    } catch (error) {
+      if (controller.signal.aborted && !options.signal?.aborted) {
+        const timeoutError = abortError('Outro download timeout');
+        timeoutError.cause = error;
+        throw timeoutError;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+      options.signal?.removeEventListener('abort', onAbort);
+    }
   }
 
   /**
@@ -112,7 +269,7 @@
    * nobody uploaded is not a failed video, and the caller says so and
    * writes the take without it.
    */
-  async function loadOutro(apiBase, options) {
+  async function loadOutro(apiBase, options = {}) {
     const keys = outroKeys(options);
     const cacheKey = keys.join('|');
     if (cache.has(cacheKey)) return cache.get(cacheKey);
@@ -122,70 +279,84 @@
       return null;
     }
     failureCache.delete(cacheKey);
+    const startedAt = Date.now();
+    const totalTimeoutMs = options.totalTimeoutMs || DEFAULT_TOTAL_TIMEOUT_MS;
+    const deadline = startedAt + totalTimeoutMs;
+    const firstByteTimeoutMs = options.firstByteTimeoutMs || DEFAULT_FIRST_BYTE_TIMEOUT_MS;
+    const stallTimeoutMs = options.stallTimeoutMs || DEFAULT_STALL_TIMEOUT_MS;
+    const retries = Number.isInteger(options.retries) ? Math.max(0, options.retries) : DEFAULT_RETRIES;
+    const retryDelay = options.retryDelayMs ?? RETRY_DELAYS_MS;
+    let attempts = 0;
     let found = null;
     let failureKind = 'not-found';
     for (const key of keys) {
-      let video = null;
-      let objectUrl = null;
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10_000);
-        let res;
-        let bytes;
-        try {
-          res = await fetch(sharedUrl(apiBase, key), {
-            mode: 'cors',
-            credentials: 'omit',
-            signal: controller.signal,
-          });
-          if (!res.ok) {
-            if (res.status !== 404) failureKind = 'unavailable';
-            lastFailure = { kind: res.status === 404 ? 'not-found' : 'unavailable', status: res.status, key };
-            continue;
-          }
-          bytes = new Uint8Array(await res.arrayBuffer());
-        } finally {
-          clearTimeout(timeout);
+      for (let retry = 0; retry <= retries; retry += 1) {
+        if (Date.now() >= deadline) {
+          failureKind = 'timeout';
+          lastFailure = { kind: failureKind, key, attempts, ms: Date.now() - startedAt };
+          break;
         }
-        if (bytes.length === 0) continue;
-        const blob = new Blob([bytes], { type: res.headers.get('content-type') || 'video/mp4' });
-        video = document.createElement('video');
-        video.preload = 'auto';
-        video.playsInline = true;
-        objectUrl = URL.createObjectURL(blob);
-        const metadataReady = waitForMetadata(video, 8000);
-        video.src = objectUrl;
-        await metadataReady;
-        if (!(video.videoWidth > 0)) throw new Error('R2 video has no decodable picture dimensions');
-        found = {
-          video,
-          key,
-          objectUrl,
-          seconds: Number.isFinite(video.duration) ? video.duration : 0,
-          /**
-           * The clip's own sound, as a buffer.
-           *
-           * A rendered video mixes its audio offline, so the clip
-           * cannot simply be played into a live graph -- its samples
-           * have to be handed over. Decoded from a COPY of the bytes,
-           * because decodeAudioData takes ownership of what it is
-           * given and a second take would find an empty buffer.
-           */
-          async audio(ctx) {
-            try {
-              return await ctx.decodeAudioData(bytes.slice().buffer);
-            } catch (err) {
-              console.error('The Thank You clip has no sound this browser can read:', err);
-              return null;
-            }
-          },
-        };
-        break;
-      } catch (err) {
-        failureKind = 'unavailable';
-        lastFailure = { kind: 'unavailable', key, message: err?.message || String(err) };
-        releaseClip({ video, objectUrl });
+        attempts += 1;
+        let video = null;
+        let objectUrl = null;
+        try {
+          const { response, bytes } = await fetchCandidate(apiBase, key, {
+            attempt: retry,
+            deadline,
+            firstByteTimeoutMs,
+            stallTimeoutMs,
+            signal: options.signal,
+          }, options.onProgress);
+          const blob = new Blob([bytes], { type: response.headers?.get?.('content-type') || 'video/mp4' });
+          video = document.createElement('video');
+          video.preload = 'auto';
+          video.playsInline = true;
+          objectUrl = URL.createObjectURL(blob);
+          const metadataReady = waitForMetadata(video, options.metadataTimeoutMs || 15_000, options.signal);
+          video.src = objectUrl;
+          await metadataReady;
+          if (!(video.videoWidth > 0)) {
+            const error = new Error('R2 video has no decodable picture dimensions');
+            error.kind = 'codec';
+            throw error;
+          }
+          found = {
+            source: 'r2',
+            video,
+            key,
+            objectUrl,
+            bytes: bytes.length,
+            ms: Date.now() - startedAt,
+            attempts,
+            reason: null,
+            seconds: Number.isFinite(video.duration) ? video.duration : 0,
+            async audio(ctx) {
+              try {
+                return await ctx.decodeAudioData(bytes.slice().buffer);
+              } catch (err) {
+                console.error('The Thank You clip has no sound this browser can read:', err);
+                return null;
+              }
+            },
+          };
+          break;
+        } catch (err) {
+          releaseClip({ video, objectUrl });
+          const status = err?.status;
+          const kind = err?.kind || (err?.code === 'OUTRO_TIMEOUT' ? 'timeout' : 'network');
+          failureKind = kind;
+          lastFailure = { kind, status, key, attempts, message: err?.message || String(err), ms: Date.now() - startedAt };
+          if (options.signal?.aborted) throw err;
+          if (status === 404 || status === 403 || kind === 'codec') break;
+          if (!isRetryableStatus(status || 0) && !['timeout', 'network', 'unavailable'].includes(kind)) break;
+          if (retry >= retries || Date.now() >= deadline) break;
+          const baseDelay = Array.isArray(retryDelay) ? retryDelay[Math.min(retry, retryDelay.length - 1)] : retryDelay;
+          const jitter = options.jitterMs === 0 ? 0 : Math.floor(Math.random() * (options.jitterMs ?? 100));
+          await sleep(Math.min(baseDelay + jitter, Math.max(0, deadline - Date.now())), options.signal);
+        }
+        if (found) break;
       }
+      if (found) break;
     }
     if (found) {
       lastFailure = null;
@@ -200,7 +371,7 @@
     } else {
       const info = lastFailure || { kind: failureKind, key: keys[keys.length - 1] };
       failureCache.set(cacheKey, { at: Date.now(), info });
-      lastFailure = info;
+      lastFailure = { ...info, attempts, ms: Date.now() - startedAt };
     }
     return found;
   }
