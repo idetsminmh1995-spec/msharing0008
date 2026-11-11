@@ -8,7 +8,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "esbuild src/index.ts --bundle --outfile=dist/piano-hand-engine.js --format=iife --global-name=PianoHandEngine --sourcemap",
-    "browser:build": "esbuild src/index.ts --bundle --outfile=../website/assets/piano-hand-engine.js --format=iife --global-name=PianoHandEngine",
+    "browser:build": "esbuild src/index.ts --bundle --outfile=../../website/assets/piano-hand-engine.js --format=iife --global-name=PianoHandEngine",
     "typecheck": "tsc --noEmit",
     "declarations": "tsc --emitDeclarationOnly",
     "lint": "eslint src",
