@@ -12,7 +12,7 @@ Each instrument keeps its own musical and ergonomic rules. A shared 3D scene hos
 
 | Instrument | What the video currently renders | Data already available | Confirmed gap |
 |---|---|---|---|
-| Piano | `PianoHand3D` renders a procedural keyboard and two rigged hands in the Hands design. This is a partial 3D scene, not a complete piano model. | `Engine/piano-hand-engine` supplies physical key positions, hand splits, finger assignments, contact timing and synthetic IK. The active CC0 `hands_pair.glb` has measured wrist-relative fingertip anchors. The 2026-11-11 Phase C.2 record reports five single-finger browser contact samples with a 0.000 mm maximum residual against a 1 mm tolerance. | Runtime validation checks anchors, expected distal bones and the production contact-calibration manifest; export waits for the rig. The recorded calibration does not cover multi-finger chords, wrist trajectories, palm clearance/collision or the complete instrument scene. No production piano body model exists. |
+| Piano | Falling Notes is the only active video design. The former Hands scene and its GLB models have been retired for a clean rebuild; no 3D piano body model was present. | `Engine/piano-hand-engine` remains as a source of keyboard geometry, hand splits, fingering and synthetic IK. Prior GLB calibration files are historical evidence only, not an active runtime asset. | Rebuild and validate the piano body, hand rigs, contact/calibration pipeline and preview/export integration before re-enabling Hands mode. |
 | Guitar | 2D fretboard and note markers in preview/export; the hand illustration is a static SVG legend. | `Engine/finger-engine` computes guitar string/fret/finger assignments and left-hand movement keyframes. The page consumes note assignments but discards the left-hand keyframe tracks. | No 3D instrument or hand rig, no fretboard-space pose adapter, and no instrument-contact validation. Chords/barres and several techniques are outside the finger engine's current phase. |
 | Bass Guitar | 2D fretboard and markers; no 3D hands. | The page has bass tunings, scale overrides, picking colors and slap/finger/pick UI behavior. | It calls `analyzeGuitar` rather than a bass analysis API, bypasses the authoritative bass geometry, and does not pass left-hand motion to a 3D rig. Five-string geometry needs a single source of truth. |
 | Violin | Static SVG illustration, including a static bow; no animated hands. | MusicXML notation timing and playback cursor are available. | No violin fingering/string-position solver, measured string/neck geometry, left-hand poses, bow-motion events, 3D instrument or bow-hand renderer. |
@@ -21,7 +21,7 @@ Evidence and existing source plans: `Plan/Piano Plan/BLENDER-3D-PLAN.md`, `Plan/
 
 ## Asset and licensing policy
 
-The production hand-pair asset `website/assets/hand/hands_pair.glb` is the current reusable rig candidate and is documented as CC0. Reuse across instruments is conditional on measuring its bone axes, fingertip anchors, scale and wrist rotations for each instrument-specific pose; its current piano mapping is not proof of guitar, bass or violin accuracy. Do not substitute the older `hand_model.glb` into production: its documented CC BY-NC 4.0 license restricts commercial use. Each new instrument model, bow and pick must have a recorded source/license or be generated procedurally in the repository.
+On 2026-11-12, the user requested a clean reset. The prior `hand_model.glb`, `hands_pair.glb` and `hands_pair_source.blend` files are removed from the current tree; the old single-hand asset's CC BY-NC 4.0 license and the pair model's CC0 provenance are retained only in the historical records. No hand rig is currently approved for runtime reuse. Every new piano or instrument model, bow and pick must have a recorded source/license before it is added, and its measurements and runtime suitability must be verified independently.
 
 ## Implementation phases
 
@@ -32,14 +32,14 @@ The production hand-pair asset `website/assets/hand/hands_pair.glb` is the curre
 - Make 3D assets explicitly ready before export starts; fail clearly if a required model or rig cannot load.
 - Use this contract to keep preview, seek, repeated/out-of-order frame sampling and export deterministic.
 
-### Phase 1 — make the existing piano 3D base trustworthy
+### Phase 1 — establish a clean Piano 3D base
 
-- Validate that both GLB wrist roots, all five measured fingertip anchors and all required distal finger bones are present.
-- Distinguish “anchor data is present” from “visible contact is calibrated.” Do not label presence checks as a completed calibration.
-- Add a real-browser smoke test using the checked-in GLB, anchor JSON and production calibration manifest.
-- Preserve the recorded 1 mm acceptance tolerance and five-sample single-finger baseline in `Plan.md` / `website/assets/hand/hand-calibration.json`; extend it to multi-finger chords, broader white/black-key coverage, articulation, wrist travel and independent visual evidence.
-- Test exact-time rendering, out-of-order timestamps, keyboard-span changes and WebGL/asset failures.
-- Add a full piano case/body model and establish its transform from the measured keyboard; retain the current key meshes until the model passes MIDI-to-key and contact tests.
+- Start from the empty runtime-asset state created by the 2026-11-12 reset; do not restore the retired GLBs as production assets.
+- Select and add a properly licensed piano body model and new hand rig under the organized `3D model/` folders. Record source, license, scale, axes and physical dimensions.
+- Build a renderer-independent timestamped scene state before adding a new model loader.
+- Distinguish “asset and anchors loaded” from “visible contact is calibrated.” Require measured instrument contact and disclose the tested tolerance.
+- Add browser tests for model loading, exact-time rendering, out-of-order timestamps, key-span changes and WebGL/asset failures.
+- Keep the existing Falling Notes mode until the replacement 3D piano and hands pass contact, motion and preview/export tests.
 
 ### Phase 2 — reusable 3D scene host and Guitar
 
@@ -71,13 +71,17 @@ The production hand-pair asset `website/assets/hand/hands_pair.glb` is the curre
 - Record model provenance, calibration results, measured error, browser performance and known musical limitations for every instrument.
 - Remove a 2D production path only after the instrument's complete 3D scene, both hand roles, score mapping and exported video pass the agreed criteria.
 
-## First implementation slice
+## Reset log (2026-11-12)
+
+The user requested that all checked-in 3D model files, including the piano hand models, be removed so the model work can restart without the previous assets. Repository inventory found three model files, all under `website/assets/hand/`; `3D model/Piano/` contained only its README and no piano body model. This reset removes those three files, disables the old Hands renderer and interactive hand demo, and keeps Piano video export on Falling Notes. Historical JSON calibration and license records remain for provenance. The replacement CC0 Baby Grand model is intentionally not part of this reset; it will be added only after the asset-removal change is published.
+
+## Historical first implementation slice (2026-11-11)
 
 The first piano safety slice makes the current scene expose an awaitable readiness result, rejects incomplete finger-rig mappings, and makes video export wait for the rig, anchors and current production calibration manifest instead of silently recording a keyboard without hands. The separate Phase C.2 record reports five single-finger contact samples with a maximum 0.000 mm residual against a 1 mm tolerance; this is a bounded calibration, not proof for chords, wrist motion, collisions or other instruments. Guitar, Bass Guitar and Violin scenes remain future phases.
 
 
-## Progress (2026-11-11)
+## Historical progress (2026-11-11; superseded by the reset)
 
-The first safety slice is implemented on this branch: the piano renderer exposes an awaitable `ready(container)` API; startup validation checks both wrist roots, all ten fingertip anchors, the expected distal finger bones and the production calibration manifest; the video export waits for that readiness and stops with an explicit error if the 3D hands cannot load; the static renderer URL has a cache-version bump; and `tools/test-piano-hand-3d-browser.mjs` exercises the actual checked-in GLB, anchors and manifest in Chromium. The browser smoke test passes with two roots, five anchor-to-bone mappings per hand and the recorded 1 mm calibration tolerance.
+The previous implementation exposed an awaitable `ready(container)` API and checked the two wrist roots, ten fingertip anchors, distal finger bones and calibration manifest before export. `tools/test-piano-3d-reset-browser.mjs` replaces the old GLB-loading smoke test and now verifies the retired renderer is not loaded and Hands mode remains unavailable. The earlier browser calibration values describe only the removed asset and must not be reused as validation of future models.
 
-This browser smoke test verifies loading and rig integrity; it does not itself measure contact residuals. The separate Phase C.2 calibration record covers five single-finger samples, while the full piano body and new Guitar, Bass Guitar and Violin scenes, instrument-specific motion adapters, and their rendered-contact tests remain future phases.
+The old smoke test verified loading and rig integrity, not general contact accuracy. Its five-sample Phase C.2 record is retained as history only. A new piano body, replacement hand rig, instrument-specific motion adapters and all rendered-contact tests remain future work.

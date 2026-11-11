@@ -18,21 +18,18 @@ deploy directly to Cloudflare Pages from this repo.
 | `/video-create/cello/` | Cello upload &amp; create page |
 | `/video-create/bass-cello/` | Bass Cello upload &amp; create page |
 | `/video-create/vocal/` | Vocal upload &amp; create page |
-| `/hand-demo/` | Blender GLB rigged human hand test page |
+| `/hand-demo/` | Temporary notice while the 3D hand models are rebuilt |
 
 Every instrument box on `/video-create/` now links to its own real
 page — each with an Upload File area (MusicXML / MIDI / Audio), so the
 full navigation flow (Home → Video Create → pick an instrument → reach
 the upload area) can be clicked through end to end once deployed.
 
-The `/hand-demo/` page is a working Three.js proof of concept for the new
-Blender-first piano direction. It loads `assets/hand/hand_model.glb`, shows
-the 21-bone armature, plays the embedded `Pose_OK` and `RigAction` clips, and
-includes a piano-key mapping prototype. MIDI notes map to named key meshes,
-the mapped hand moves to the key target, the assigned finger chain curls, and
-the key animates down. Click the keys, use the A/W/S/E/D/F/T/G/Y/H/U/J
-keyboard mapping, or use the five mapped note buttons. The asset source and
-CC BY-NC 4.0 terms are documented in `assets/hand/README.md`.
+The previous hand models and interactive `/hand-demo/` were retired as part
+of the 2026-11-12 3D model reset. The Piano page currently offers Falling
+Notes only; Hands mode remains disabled until replacement assets and their
+calibration tests are ready. See `assets/hand/README.md` for the retained
+historical provenance.
 
 ## Cloudflare deployment settings
 

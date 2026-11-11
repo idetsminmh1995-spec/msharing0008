@@ -308,6 +308,12 @@ GitHub ၏ လက်ရှိ production asset သည် `website/assets/hand/ha
 
 2026-11-10 အချိန်က `npm run verify` **81/81 tests** pass ဖြစ်ခဲ့သည်; TypeScript, ESLint, Prettier, browser bundle build နှင့် `piano-hand-3d.js` syntax check လည်း pass ဖြစ်သည်။ ဤ package verification suite တစ်ခုတည်းက GLB fingertip–key အကွာအဝေးကို မတိုင်းတာပါ။ သီးခြား Phase C.2 browser calibration မှတ်တမ်းက sample ၅ ခု၏ baseline ကို တိုင်းတာထားသော်လည်း chord များ သို့မဟုတ် လှုပ်ရှားမှုအမျိုးမျိုးအတွက် အထောက်အထားအဖြစ် မသတ်မှတ်နိုင်ပါ။
 
+## 2026-11-12 — Piano 3D model reset
+
+အသုံးပြုသူ၏ အတည်ပြုချက်ဖြင့် ရှိပြီးသား 3D model ဖိုင်များကို အသစ်ပြန်စနိုင်ရန် ရှင်းလင်းခဲ့သည်။ GitHub `main` တွင် model extension စစ်ဆေးရာ `website/assets/hand/hand_model.glb`, `website/assets/hand/hands_pair.glb`, `website/assets/hand/hands_pair_source.blend` ဟူသော hand model ဖိုင် ၃ ခုသာ တွေ့ရပြီး `3D model/Piano/` ထဲတွင် `README.md` သာရှိခဲ့သည်—Piano body/keyboard model မရှိခဲ့ပါ။
+
+Reset အဖြစ် ဟောင်း hand renderer နှင့် `/hand-demo/` ကို ယာယီပိတ်ပြီး Piano Video ကို Falling Notes mode တစ်ခုတည်းဖြင့် အသုံးပြုနိုင်ရန် စီစဉ်ထားသည်။ ဟောင်း calibration နှင့် license ဖိုင်များကို သမိုင်းမှတ်တမ်းအဖြစ် ထားရှိပြီး commit history ကို မပြောင်းပါ။ အစားထိုး model ကို 3D model ဖိုင်များ GitHub `main` မှ ဖယ်ရှားပြီးမှသာ ဒေါင်းလုပ်လုပ်မည်။
+
 
 # Thank You (Outro) ending ကို အမြဲပါအောင် လုပ်ခြင်း — Integrated Plan
 
