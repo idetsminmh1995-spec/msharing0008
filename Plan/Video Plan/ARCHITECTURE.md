@@ -4,7 +4,7 @@
 
 Video Engine is the shared export boundary for every instrument page. Piano, guitar, bass guitar, drum, metronome, violin, and future exporters provide timed render segments; Video Engine owns deterministic frame timing, audio joining, codec selection, cancellation, progress reporting, MP4/WebM muxing, and result metadata. Instrument pages must not implement their own encoder or muxer.
 
-The canonical implementation is under [`../../Engine/video-engine/`](../../Engine/video-engine/). The browser compatibility import at `website/assets/video-engine.js` points to that implementation. Technical details of the current implementation and the future streaming muxer are in [`docs/VIDEO-ENGINE.md`](docs/VIDEO-ENGINE.md) and [`docs/VIDEO-ENGINE-STREAMING-MUXER.md`](docs/VIDEO-ENGINE-STREAMING-MUXER.md).
+The canonical implementation is under [`../../Engine/video-engine/`](../../Engine/video-engine/). The browser compatibility import at `website/assets/video-engine.js` points to that implementation. Technical details of the current implementation, the future streaming muxer, and the outro ending fallback architecture are in [`Documentation/VIDEO-ENGINE.md`](Documentation/VIDEO-ENGINE.md), [`Documentation/VIDEO-ENGINE-STREAMING-MUXER.md`](Documentation/VIDEO-ENGINE-STREAMING-MUXER.md), and [`Documentation/PLAN-THANK-YOU-OUTRO.md`](Documentation/PLAN-THANK-YOU-OUTRO.md).
 
 ## System architecture
 
