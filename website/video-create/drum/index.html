@@ -3275,7 +3275,7 @@
     { id: 'fonts', label: 'Fonts', required: true },
     { id: 'frame-assets', label: 'Frame assets', required: true },
     { id: 'count', label: 'Count-in voices', required: false },
-    { id: 'outro', label: 'R2 outro video', required: false },
+    { id: 'outro', label: 'Thank You ending', required: true },
   ];
   const videoAssetGate = VideoAssetGate.create({
     page: 'drum',
@@ -4066,7 +4066,7 @@
       let outro = null;
       if (typeof OutroVideo !== 'undefined') {
         try {
-          outro = await OutroVideo.loadOutro(API_BASE, {
+          outro = await OutroVideo.resolve(API_BASE, {
             aspect: currentAspect(),
             kind: 'drum',
             style: currentVideoStyle(),
@@ -4088,7 +4088,7 @@
       await askOptionalRender(exportWarnings);
       assetReport.optional = [
         { id: 'count', status: exportWarnings.some((message) => message.includes('Count-')) ? 'failed' : 'ok', message: exportWarnings.find((message) => message.includes('Count-')) || 'optional count voice available or synth fallback ready' },
-        { id: 'outro', status: outro ? 'ok' : 'failed', message: outro ? 'outro ready' : exportWarnings.find((message) => message.includes('Outro')) || 'outro unavailable' },
+        { id: 'outro', status: outro ? 'ok' : 'failed', message: outro?.source === 'builtin' ? 'built-in ending ready' : 'R2 ending ready' },
       ];
       showGateResult(assetReport);
 

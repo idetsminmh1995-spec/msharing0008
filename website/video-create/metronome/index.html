@@ -1360,7 +1360,7 @@
       { id: 'audio', label: 'Audio mix', required: true },
       { id: 'score', label: 'Notation / score overlay', required: false },
       { id: 'count', label: 'Count-in / voice samples', required: false },
-      { id: 'outro', label: 'R2 outro video', required: false },
+      { id: 'outro', label: 'Thank You ending', required: true },
     ],
   });
 
@@ -1622,7 +1622,7 @@
     try {
       genLabel.textContent = 'Fetching the Thank You clip…';
       const outro = await loadOutroClip();
-      videoAssetGate.set('outro', outro ? 'ok' : 'failed', outro ? 'R2 clip ready' : 'R2 clip unavailable; continue without it');
+      videoAssetGate.set('outro', outro ? 'ok' : 'failed', outro?.source === 'builtin' ? 'built-in ending ready' : 'R2 ending ready');
       genLabel.textContent = 'Mixing the count…';
       const countAudio = await renderCountAudio(total);
       if (!countAudio || !(countAudio.duration > 0)) throw new Error('The metronome audio could not be prepared.');
@@ -1717,7 +1717,7 @@
       /* an unknown design id is a dark one */
     }
     try {
-      return await OutroVideo.loadOutro(API_BASE, {
+      return await OutroVideo.resolve(API_BASE, {
         aspect: currentAspect(),
         kind: outroKindForDesign(designSelect.value),
         style: light ? 'white' : 'black',

@@ -215,4 +215,34 @@ function loadApi(fetch, options) {
   assert.ok(Date.now() - started < 1000);
 }
 
-console.log('outro-video S1 tests passed');
+// Built-in ending is deterministic, network-independent, and uses the shared segment contract.
+{
+  const api = loadApi(async () => { throw new Error('network must not be used'); }, { createVideo: false });
+  const ending = api.createBuiltin({ aspect: '9x16', kind: 'piano', style: 'white', siteUrl: null });
+  assert.equal(ending.source, 'builtin');
+  assert.equal(ending.seconds, 3);
+  assert.equal(ending.state, 'builtin-ready');
+  assert.equal(ending.fallback, true);
+  assert.equal(await ending.audio({}), null);
+  const calls = [];
+  const ctx = {
+    save() {}, restore() {}, fillRect(...args) { calls.push(['fillRect', ...args]); }, fillText(...args) { calls.push(['fillText', ...args]); },
+  };
+  assert.equal(ending.draw(ctx, { width: 1080, height: 1920 }, 0), true);
+  assert.ok(calls.some(([name]) => name === 'fillRect'));
+  assert.ok(calls.filter(([name]) => name === 'fillText').length >= 3);
+}
+
+// resolve() source-locks an R2 failure to the built-in segment instead of returning null.
+{
+  const api = loadApi(async () => makeResponse({ status: 404 }), { createVideo: false });
+  const result = await api.resolve('https://fallback.test', {
+    aspect: 'resolve-test', kind: 'drum', retries: 0, retryDelayMs: 0, jitterMs: 0,
+  });
+  assert.equal(result.source, 'builtin');
+  assert.equal(result.state, 'builtin-ready');
+  assert.equal(result.reason, 'not-found');
+  assert.equal(api.outroSegment(result, null, 30).seconds, 3);
+}
+
+console.log('outro-video S1-S3 tests passed');

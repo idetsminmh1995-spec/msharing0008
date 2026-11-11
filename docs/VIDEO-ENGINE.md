@@ -207,6 +207,11 @@ HTTP 408, 429, 5xx, network failures, timeouts, and generic unavailable response
 
 The loader reads a streaming response when `response.body.getReader()` is available and reports progress through `onProgress({ loaded, total, attempt, key })`. Environments without a readable stream use the existing `arrayBuffer()` fallback. Piano/paino aliases are generated in the shared key helper rather than in page code.
 
-Successful results now include `source: 'r2'`, `bytes`, `ms`, `attempts`, and `reason: null` while preserving `video`, `key`, `seconds`, and `audio`. Failed optional loads return `null`, preserve diagnostic details in `OutroVideo.lastFailure()`, and do not poison VideoEngine's required-asset gate. Passing `required: true` opts into fail-closed gate reporting for workflows where the outro is mandatory. Automatic built-in fallback is intentionally S2 work and is not claimed here.
-
+Successful results now include `source: 'r2'`, `bytes`, `ms`, `attempts`, and `reason: null` while preserving `video`, `key`, `seconds`, and `audio`. `OutroVideo.createBuiltin()` provides a deterministic three-second, network-independent canvas ending, and `OutroVideo.resolve()` source-locks either the R2 result or the built-in fallback. Active video pages use the resolver and require the ending through the shared asset gate.
 S1 verification is recorded in [`Doc/rollout/evidence/outro-loader-s1.json`](../Doc/rollout/evidence/outro-loader-s1.json). It covers 404/403 no-retry, 500/network retry, stream progress, piano/paino aliases, first-byte timeout, structured success metadata, and failure caching. Drum and cross-page Chromium acceptance tests remain green.
+
+## 11. Thank You outro — S2/S3 implementation status
+
+Drum, Guitar, Bass Guitar, Piano, Violin, and Metronome now use `OutroVideo.resolve()` and mark the Thank You ending as a required asset-gate group. `OutroVideo.outroSegment()` supports both seeked R2 video and built-in canvas sources. Evidence is recorded in [`outro-s2-s3.json`](../Doc/rollout/evidence/outro-s2-s3.json).
+
+Still open: nested render-report `outro` metadata on every page, golden-frame and encoded-last-frame browser assertions, Worker Range/304 behavior, complete R2 manifest, cross-browser evidence, and final CI/release checks.

@@ -210,3 +210,11 @@ The loader reads a streaming response when `response.body.getReader()` is availa
 Successful results now include `source: 'r2'`, `bytes`, `ms`, `attempts`, and `reason: null` while preserving `video`, `key`, `seconds`, and `audio`. Failed optional loads return `null`, preserve diagnostic details in `OutroVideo.lastFailure()`, and do not poison VideoEngine's required-asset gate. Passing `required: true` opts into fail-closed gate reporting for workflows where the outro is mandatory. Automatic built-in fallback is intentionally S2 work and is not claimed here.
 
 S1 verification is recorded in [`Doc/rollout/evidence/outro-loader-s1.json`](../../../Doc/rollout/evidence/outro-loader-s1.json). It covers 404/403 no-retry, 500/network retry, stream progress, piano/paino aliases, first-byte timeout, structured success metadata, and failure caching. Drum and cross-page Chromium acceptance tests remain green.
+
+## 11. Thank You outro — S2/S3 implementation status
+
+`OutroVideo.createBuiltin()` now creates a deterministic three-second, 0.4-second fade-in canvas segment without a network fetch. `OutroVideo.resolve()` tries the R2 loader first and source-locks a built-in segment when R2 candidates fail. `OutroVideo.outroSegment()` accepts both R2 video and built-in canvas sources.
+
+Drum, Guitar, Bass Guitar, Piano, Violin, and Metronome now use `resolve()` and mark the Thank You ending as a required asset-gate group. Evidence is recorded in [`outro-s2-s3.json`](../../../Doc/rollout/evidence/outro-s2-s3.json).
+
+Still open: nested render-report `outro` metadata on every page, golden-frame and encoded-last-frame browser assertions, Worker Range/304 behavior, complete R2 manifest, cross-browser evidence, and final CI/release checks.

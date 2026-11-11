@@ -2601,7 +2601,7 @@
       { id: 'audio', label: 'Audio mix', required: true },
       { id: 'score', label: 'Notation / score overlay', required: false },
       { id: 'count', label: 'Count-in / voice samples', required: false },
-      { id: 'outro', label: 'R2 outro video', required: false },
+      { id: 'outro', label: 'Thank You ending', required: true },
     ],
   });
 
@@ -3124,7 +3124,7 @@
       const outro =
         typeof OutroVideo === 'undefined'
           ? null
-          : await OutroVideo.loadOutro(API_BASE, {
+          : await OutroVideo.resolve(API_BASE, {
               aspect: currentAspect(),
               // "paino", not "piano": the folder and the file name in
               // the bucket are spelled that way, and outro-video.js
@@ -3136,8 +3136,8 @@
               // clip of the same shape if these are missing.
               kind: 'paino',
               style: currentVideoStyle(),
-            }).catch(() => null);
-      videoAssetGate.set('outro', outro ? 'ok' : 'failed', outro ? 'R2 clip ready' : 'R2 clip unavailable; continue without it');
+            });
+      videoAssetGate.set('outro', outro ? 'ok' : 'failed', outro?.source === 'builtin' ? 'built-in ending ready' : 'R2 ending ready');
 
       genLabel.textContent = 'Preparing the notation…';
       await refreshNotationImage();
