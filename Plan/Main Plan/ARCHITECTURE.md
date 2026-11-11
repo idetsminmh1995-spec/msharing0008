@@ -214,3 +214,57 @@ The repository is release-ready when every browser-loaded bundle maps to one can
 6. Add encoded first/last-frame and golden-frame evidence before enabling new visual modes.
 7. Restrict Worker origins and document R2 production behavior.
 8. Keep Piano Hands disabled until its calibration and browser evidence are complete.
+
+## 12. Multi-contributor operating model
+
+This repository is developed by multiple people and agents. Main Plan is therefore also the team control layer: it defines who owns a boundary, how work is split, how changes are handed off, and what evidence is required before integration. The detailed daily protocol is [`TEAM-WORKFLOW.md`](TEAM-WORKFLOW.md).
+
+The non-negotiable rules are: plan before implementation; work only in the canonical source; keep one owner for each cross-engine contract; make small reviewable changes; treat tests, generated bundles, status, and evidence as part of the change; never overwrite another contributor's work; and keep `main` releasable.
+
+### 12.1 Ownership map
+
+| Area | Owning plan/boundary | Consult before changing |
+|---|---|---|
+| MusicXML/MXL parser, engraving, playback | Notation Plan / Notation Engine | Pages and engines consuming playback |
+| Encoding, audio, muxing | Video Plan / Video Engine | Every export route |
+| Shared page lifecycle and state | Main Plan / website host layer | Every route owner |
+| Asset gate, loader, report, cache | Main Plan / shared website assets | Worker/R2 and route owners |
+| Piano visual stage | Piano Plan | Piano Hand owner if hand mode changes |
+| Piano physical hand/GLB/IK | Piano Hand Plan | Piano page and 3D asset owners |
+| Guitar/fretboard presentation | Guitar Plan | Finger owner when fingering changes |
+| Finger candidate assignment | Finger Plan | Guitar/Piano consumers |
+| Drum sticking/performance | Drum Plan | Notation and Drum page owners |
+| Metronome timing/design | Metronome Plan | Notation and Video owners |
+| CI, build, release, deployment | Main Plan | All package owners |
+
+If ownership is unclear, the work is blocked until an owner is recorded. Ownership must not be inferred from whichever contributor edited a file last.
+
+### 12.2 Plan hierarchy and work item control
+
+Main Plan owns cross-engine contracts, release sequencing, CI, deployment, and team rules. An Engine Plan owns one engine's behavior and roadmap. An integration record owns one completed change, defect, experiment, or evidence result. A work item owns one small implementation slice with an owner, reviewer, files, dependencies, tests, and acceptance criteria.
+
+Every non-trivial task should record an ID, title, owner, reviewer, status, scope, out-of-scope boundary, canonical files, affected contracts, dependencies, required evidence, rollback, and plan links. A lower-level plan may not silently contradict Main Plan; a contract conflict must be resolved and documented before implementation continues.
+
+### 12.3 Collision control
+
+The highest-collision files are `instrument-video-core.js`, shared gate/stability modules, Video Engine source, bespoke route HTML, Notation Engine rendering code, committed browser bundles, and plan/status indexes. Before starting work, contributors must inspect the current branch and active changes. If two tasks touch the same high-collision file, split them into ordered checkpoints or assign one contributor to integrate both changes. Two independent rewrites of a shared module are not an acceptable parallel strategy.
+
+Generated browser bundles are changed only by the build/sync path. If a bundle is committed, its canonical source, generated output, and asset stamp belong to the same logical change.
+
+### 12.4 Branch, commit, review, and handoff rules
+
+`main` must remain releasable. Before review or push, contributors fetch and rebase from `origin/main`, run affected verification, inspect the diff, and check whitespace. Force-pushing shared `main` is prohibited. A commit should describe one outcome and include the relevant tests and plan/status update.
+
+A handoff must identify the commit or branch, changed and intentionally untouched files, commands and results, known failures, next safe action, and whether generated bundles or documentation still need synchronization. A handoff is incomplete when the next contributor has to guess whether a failure is expected or whether an API changed.
+
+### 12.5 Conflict and decision protocol
+
+When contributors disagree about behavior, the decision is recorded in an integration record with alternatives, affected contracts, evidence, and a decision owner. The result is not determined by whichever branch was pushed last. Rebase conflicts in generated files are resolved by rebuilding from canonical source, not by manually editing bundled output. Shared contract changes update Main Plan and the affected Engine Plans in the same logical change.
+
+### 12.6 Shared status vocabulary
+
+Plans must use explicit status labels: `Proposed`, `Ready`, `In progress`, `Blocked`, `Implemented`, `Verified`, `Released`, `Experimental`, `Disabled`, or `Legacy`. The word `complete` is not sufficient on its own; a feature must say whether it is implemented, verified, or released.
+
+### 12.7 Team Definition of Done
+
+A multi-contributor change is done only when the owning plan is updated, the canonical source is clear, the public contract is documented, focused tests pass, generated bundles are synchronized, browser evidence is recorded when applicable, handoff/review information is complete, and the branch can be rebased onto current `main` without unresolved conflicts.
