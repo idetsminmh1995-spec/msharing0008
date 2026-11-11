@@ -5,7 +5,7 @@ Notation Engine. It lives at `PLAN.md` — the single plan file for this
 project. Read this one.
 
 **Version:** 2.0 · **Supersedes:** the original 50-phase roadmap, now kept at
-[`Doc/PLAN-v1-historical.md`](./Doc/PLAN-v1-historical.md) as a read-only
+[`Documentation/PLAN-v1-historical.md`](./Documentation/PLAN-v1-historical.md) as a read-only
 historical record (see §2 for exactly what changed and why).
 **Last full review:** this document was produced by merging v1 with the
 `PLAN__V1.md` requirements update, auditing them both against the code that
@@ -174,7 +174,7 @@ this list and is no longer — Integration C draws fret numbers on their own
 string lines. Lyrics and chord symbols are parsed and have geometry modules,
 but have no text renderer yet. The international-notation boundary and
 recommended profile architecture are documented in
-[`Doc/international-notation-support.md`](./Doc/international-notation-support.md).)
+[`Documentation/international-notation-support.md`](./Documentation/international-notation-support.md).)
 
 ---
 
@@ -290,7 +290,7 @@ testing (§18.2) viable.
 ```
 notation-engine/
   PLAN.md                 <- this file (authoritative spec, v2)
-  Doc/                    <- per-phase build records (what/how-to-change/how-to-revert)
+  Documentation/                    <- per-phase build records (what/how-to-change/how-to-revert)
     PLAN-v1-historical.md <- the superseded v1 roadmap, read-only
   docs/                   <- generated API reference (Phase: Public API)
   package.json  tsconfig.json  eslint.config.js  .prettierrc.json
@@ -311,7 +311,7 @@ notation-engine/
     layout/       [BUILT]  spacing, skyline, scroll, page, resize, system
     playback/     [BUILT]  position API + event stream + repeat
                            unfolding (§17) -- Phases 48/49, repeats by
-                           Doc/any-drum-notation.md
+                           Documentation/any-drum-notation.md
     debug/        [BUILT]  log-level filter + bounding-box/skyline measurement -- Phase 51
     export/       [BUILT]  SVG/PNG/PDF output -- Phase 52
     index.ts      [BUILT]  public API barrel
@@ -547,7 +547,7 @@ away: `keySignature.style` has exactly one member, so there is nothing to
 branch on until a second one exists; and four of the five `fonts.sizes`
 (`lyric`, `dynamic`, `tempo`, `chordSymbol`) belong to elements drawn from
 fixed-size SMuFL glyphs or not drawn as text at all yet. See
-`Doc/phase-50-theming-api.md` §4.
+`Documentation/phase-50-theming-api.md` §4.
 
 The `debug` section in the list above landed with **Phase 51**, together
 with the overlays it switches on — `logLevel` filters the diagnostics a
@@ -849,7 +849,7 @@ MusicXML complication: a file may supply an explicit `<accidental>` element,
 which must be honoured even when our own state machine would not have drawn
 one (that is what courtesy accidentals are).
 
-### 9.12 Beam grouping `[BUILT and WIRED (chords included since Integration M) -- inference by Phase 23, and the file's own explicit <beam> hints (§10.8) take precedence over it since Phase 35 Tier 2. See Doc/phase-23-beam-grouping.md and Doc/phase-35-musicxml-parser-v2-tier23.md]`
+### 9.12 Beam grouping `[BUILT and WIRED (chords included since Integration M) -- inference by Phase 23, and the file's own explicit <beam> hints (§10.8) take precedence over it since Phase 35 Tier 2. See Documentation/phase-23-beam-grouping.md and Documentation/phase-35-musicxml-parser-v2-tier23.md]`
 
 **Responsibility.** Decide which consecutive eighth-or-shorter notes within a
 measure share one beam, and which stand alone with an individual flag
@@ -990,7 +990,7 @@ endpoints exactly match what the equivalent straight group would produce.
 
 ---
 
-### 9.14 Multi-voice per staff `[BUILT and WIRED -- stem direction + rest separation by Phase 25, notehead-collision offsetting by Integration Pass K. See Doc/integration-k-voice-collision.md. The 3-or-4-voice pile-up remains a stated limitation below]`
+### 9.14 Multi-voice per staff `[BUILT and WIRED -- stem direction + rest separation by Phase 25, notehead-collision offsetting by Integration Pass K. See Documentation/integration-k-voice-collision.md. The 3-or-4-voice pile-up remains a stated limitation below]`
 
 **Responsibility.** When two (or more) voices share one staff — the drum
 hand/foot split, a piano's LH/RH split-voice passages, an SATB pair — decide
@@ -1056,7 +1056,7 @@ stacking) — noted as future work, not implemented here.
 
 ---
 
-### 9.15 Ties `[BUILT for same-staff single-note ties within one system, including cross-barline ties -- see Doc/phase-26-ties.md for system-break/cross-staff/beam/chord limitations]`
+### 9.15 Ties `[BUILT for same-staff single-note ties within one system, including cross-barline ties -- see Documentation/phase-26-ties.md for system-break/cross-staff/beam/chord limitations]`
 
 **Responsibility.** A curved line connecting two noteheads of the **same
 pitch**, indicating the second continues the first's sound rather than
@@ -1123,7 +1123,7 @@ inside them.
 
 ---
 
-### 9.16 Slurs `[BUILT and WIRED -- geometry by Phase 27, parsing by Phase 35 Tier 2, drawing by Integration Pass I. See Doc/integration-i-slur-tuplet-wiring.md. A slur crossing a barline is not drawn (diagnostic, not silence)]`
+### 9.16 Slurs `[BUILT and WIRED -- geometry by Phase 27, parsing by Phase 35 Tier 2, drawing by Integration Pass I. See Documentation/integration-i-slur-tuplet-wiring.md. A slur crossing a barline is not drawn (diagnostic, not silence)]`
 
 **Responsibility.** A curved line spanning **2 or more notes of
 potentially different pitches**, indicating legato phrasing (unlike a tie,
@@ -1180,7 +1180,7 @@ notehead-collision offsetting.
 
 ---
 
-### 9.17 Tuplets `[BUILT and WIRED -- geometry by Phase 28, parsing by Phase 35 Tier 2, drawing by Integration Pass I. See Doc/integration-i-slur-tuplet-wiring.md]`
+### 9.17 Tuplets `[BUILT and WIRED -- geometry by Phase 28, parsing by Phase 35 Tier 2, drawing by Integration Pass I. See Documentation/integration-i-slur-tuplet-wiring.md]`
 
 **Responsibility.** The bracket + number marking an irregular grouping
 (a triplet, quintuplet, etc.) — the tick MATH already exists (Phase 4's
@@ -1244,7 +1244,7 @@ per the number-format note above.
 
 ---
 
-### 9.18 Grand staff / multi-part systems `[BUILT and WIRED -- multi-STAFF by Integration Pass A (brace, per-staff clefs, continuous barline), multi-PART by Integration Pass B (every part renders, stacked; per-staff line counts). <part-group> BRACKETS across different instruments remain unparsed -- note that §10.4's own element list never included <part-group>, so this is its own outstanding item, not part of the now-complete v2 parser work. One score-wide horizontal timeline (so every part's barlines actually align) by Integration Pass L. See Doc/integration-a-grand-staff.md, Doc/integration-b-multi-part.md and Doc/integration-l-page-layout-and-score-wide-spacing.md]`
+### 9.18 Grand staff / multi-part systems `[BUILT and WIRED -- multi-STAFF by Integration Pass A (brace, per-staff clefs, continuous barline), multi-PART by Integration Pass B (every part renders, stacked; per-staff line counts). <part-group> BRACKETS across different instruments remain unparsed -- note that §10.4's own element list never included <part-group>, so this is its own outstanding item, not part of the now-complete v2 parser work. One score-wide horizontal timeline (so every part's barlines actually align) by Integration Pass L. See Documentation/integration-a-grand-staff.md, Documentation/integration-b-multi-part.md and Documentation/integration-l-page-layout-and-score-wide-spacing.md]`
 
 **Responsibility.** Render every part of a score, not just the first
 (§21's own stated limitation), stacking multiple staves vertically into
@@ -1306,11 +1306,11 @@ instruments is not parsed (§10.4), so several *different* parts are
 stacked without a bracket. Skyline-based staff distance is no longer a
 gap: §15 is built and Integration F wired it, so the gap between a grand
 staff's two staves is content-aware (Phase 50 also corrected the frame it
-was applied in — see Doc/phase-50-theming-api.md §2).
+was applied in — see Documentation/phase-50-theming-api.md §2).
 
 ---
 
-### 9.19 Articulations `[BUILT and WIRED -- geometry by Phase 30, parsing by Phase 35 Tier 2, drawing by Integration Pass H. See Doc/integration-h-articulations-ornaments.md]`
+### 9.19 Articulations `[BUILT and WIRED -- geometry by Phase 30, parsing by Phase 35 Tier 2, drawing by Integration Pass H. See Documentation/integration-h-articulations-ornaments.md]`
 
 **Responsibility.** The small marks attached directly to a note —
 staccato, accent, tenuto, marcato, staccatissimo — indicating how it
@@ -1361,7 +1361,7 @@ note above.
 
 ---
 
-### 9.20 Ornaments `[BUILT and WIRED -- geometry by Phase 30, parsing by Phase 35 Tier 2, drawing by Integration Pass H. See Doc/integration-h-articulations-ornaments.md]`
+### 9.20 Ornaments `[BUILT and WIRED -- geometry by Phase 30, parsing by Phase 35 Tier 2, drawing by Integration Pass H. See Documentation/integration-h-articulations-ornaments.md]`
 
 **Responsibility.** Trill, mordent, turn — symbols indicating a rapid
 melodic decoration around the written note. `<ornaments>` under
@@ -1405,7 +1405,7 @@ similar compound ornaments.
 
 ---
 
-### 9.21 Dynamics, hairpins, tempo marks, rehearsal marks `[PARTIAL -- dynamics/hairpins BUILT and WIRED (Integration Pass J); tempo marks drawn since Integration Pass D and given real content-aware clearance by Integration Pass M; rehearsal marks remain placement-only (they need arbitrary text, which this engine still has no font for). See Doc/integration-j-dynamics-hairpins.md]`
+### 9.21 Dynamics, hairpins, tempo marks, rehearsal marks `[PARTIAL -- dynamics/hairpins BUILT and WIRED (Integration Pass J); tempo marks drawn since Integration Pass D and given real content-aware clearance by Integration Pass M; rehearsal marks remain placement-only (they need arbitrary text, which this engine still has no font for). See Documentation/integration-j-dynamics-hairpins.md]`
 
 **Responsibility.** Four distinct expression-mark categories, bundled in
 one phase per the roadmap but researched and scoped separately, since
@@ -1691,7 +1691,7 @@ violate §1's independence requirement.
 `<note>` (`<pitch>`, `<rest>`, `<duration>`, `<type>`, `<dot>`, `<voice>`,
 `<staff>`, `<chord>`, `<tie>`), `<backup>`, `<forward>`, `<barline>`.
 
-### 10.4 Elements parsed — v2 (full) `[BUILT -- Tier 1 by Phase 35, Tier 2/3 by its completion pass (notations sub-elements, beam, lyric, harmony, direction sub-elements, print, sound tempo). Every element listed below is now parsed; what is DRAWN with each is Integration Passes H-L, and <lyric>/<harmony> text is deliberately preserved-but-undrawn (no text font). See Doc/phase-35-musicxml-parser-v2-tier23.md]`
+### 10.4 Elements parsed — v2 (full) `[BUILT -- Tier 1 by Phase 35, Tier 2/3 by its completion pass (notations sub-elements, beam, lyric, harmony, direction sub-elements, print, sound tempo). Every element listed below is now parsed; what is DRAWN with each is Integration Passes H-L, and <lyric>/<harmony> text is deliberately preserved-but-undrawn (no text font). See Documentation/phase-35-musicxml-parser-v2-tier23.md]`
 
 `<unpitched>`, `<instrument>`, `<notehead>`, `<time-modification>`
 (tuplets), `<notations>` (`<tied>`, `<slur>`, `<tuplet>`, `<articulations>`,
@@ -1758,7 +1758,7 @@ The rarely-used alternative document order. Convert to partwise on load
 (a mechanical transposition of the measure/part nesting) so the rest of the
 parser sees only one shape.
 
-### 10.7 Error conditions and partial rendering `[BUILT -- extended to all elements through Phase 37 by Phase 38's hardening pass, which also fixed 2 real crash bugs; see Doc/phase-38-diagnostics-hardening.md]`
+### 10.7 Error conditions and partial rendering `[BUILT -- extended to all elements through Phase 37 by Phase 38's hardening pass, which also fixed 2 real crash bugs; see Documentation/phase-38-diagnostics-hardening.md]`
 
 The parser **never throws on malformed input**. It records a `Diagnostic`
 and continues:
@@ -1779,7 +1779,7 @@ ignore and record `info`. A file that produces zero parseable measures is the
 only case that yields an empty `Score` — and even then the caller gets
 diagnostics, not an exception.
 
-### 10.8 Cross-software compatibility — a hard requirement `[PARTIAL -- Phase 37 covers all 7 named divergences via representative fixtures (real program access unavailable in this environment, see Doc/phase-37-cross-software-corpus.md); a real tied-only-tie bug found and fixed]`
+### 10.8 Cross-software compatibility — a hard requirement `[PARTIAL -- Phase 37 covers all 7 named divergences via representative fixtures (real program access unavailable in this environment, see Documentation/phase-37-cross-software-corpus.md); a real tied-only-tie bug found and fixed]`
 
 Every major program emits *valid but differently-shaped* MusicXML. Known
 divergences the parser must absorb:
@@ -1803,7 +1803,7 @@ exact `Diagnostic.code` emitted.
 
 ---
 
-## 11. Module: `parser/midi/` — Standard MIDI File Parser `[BUILT -- see Doc/phase-39-midi-parser.md]`
+## 11. Module: `parser/midi/` — Standard MIDI File Parser `[BUILT -- see Documentation/phase-39-midi-parser.md]`
 
 *This module does not exist in v1 of the plan at all — see §2.1.*
 
@@ -1870,7 +1870,7 @@ rather than an exception.
 
 ---
 
-## 12. Module: `timing/` — Musical Timing Engine `[BUILT -- see Doc/phase-40-timing-engine.md]`
+## 12. Module: `timing/` — Musical Timing Engine `[BUILT -- see Documentation/phase-40-timing-engine.md]`
 
 **Responsibility.** Convert between the three time domains that must stay
 consistent: **ticks** (musical), **seconds** (wall clock), and
@@ -1942,7 +1942,7 @@ points, asserting max round-trip error < 1 ms; boundary clamping.
 
 ---
 
-## 13. Module: `timing/alignment` + `drums/` — MIDI ↔ MusicXML Sync and Drum Mapping `[BUILT -- §13.3 by Phase 41, §13.1/§13.2 by Phase 42, see Doc/phase-42-midi-musicxml-alignment.md]`
+## 13. Module: `timing/alignment` + `drums/` — MIDI ↔ MusicXML Sync and Drum Mapping `[BUILT -- §13.3 by Phase 41, §13.1/§13.2 by Phase 42, see Documentation/phase-42-midi-musicxml-alignment.md]`
 
 **Responsibility.** When both a MusicXML file and a MIDI file describe the
 same piece, decide which is authoritative for what, and match their notes to
@@ -2022,7 +2022,7 @@ exercised with a purpose-built fixture pair.
 
 ---
 
-## 14. Module: `layout/spacing` — Horizontal Spacing `[BUILT and WIRED into rendering by Integration E -- see Doc/integration-e-spacing-wiring.md]`
+## 14. Module: `layout/spacing` — Horizontal Spacing `[BUILT and WIRED into rendering by Integration E -- see Documentation/integration-e-spacing-wiring.md]`
 
 **Responsibility.** Decide the x-position of every event in a measure, and
 the measure's total width. Pure math; produces numbers, not SVG.
@@ -2101,7 +2101,7 @@ in for a wide chord; justification summing exactly to the target width.
 
 ---
 
-## 15. Module: `layout/skyline` — Collision Avoidance `[BUILT for the full algorithm; grand-staff distance WIRED into rendering by Integration F -- see Doc/integration-f-skyline-wiring.md]`
+## 15. Module: `layout/skyline` — Collision Avoidance `[BUILT for the full algorithm; grand-staff distance WIRED into rendering by Integration F -- see Documentation/integration-f-skyline-wiring.md]`
 
 **Responsibility.** Prevent overlaps *vertically*, between the staff's own
 contents and everything placed above/below it (dynamics, lyrics, chord
@@ -2159,13 +2159,13 @@ low-hanging content.
 
 ## 16. Module: `layout/` — System, Page and Resize `[BUILT and WIRED -- §16.1 by Phase 45, §16.2 by Phase 46 + Integration Pass L, §16.3 by Phase 47]`
 
-### 16.1 Scroll mode `[BUILT and WIRED into rendering by Phase 45 -- see Doc/phase-45-scroll-layout.md]`
+### 16.1 Scroll mode `[BUILT and WIRED into rendering by Phase 45 -- see Documentation/phase-45-scroll-layout.md]`
 
 One unbroken system, arbitrarily wide. Measures are laid out left to right at
 their natural (unjustified) widths. This is the mode a video/cursor use case
 wants.
 
-### 16.2 Page mode `[BUILT and WIRED -- algorithm by Phase 46, wired into rendering by Integration Pass L via `config.layout.mode = 'page'`. See Doc/integration-l-page-layout-and-score-wide-spacing.md]`
+### 16.2 Page mode `[BUILT and WIRED -- algorithm by Phase 46, wired into rendering by Integration Pass L via `config.layout.mode = 'page'`. See Documentation/integration-l-page-layout-and-score-wide-spacing.md]`
 
 Measures are packed into systems until the next measure would exceed the
 usable width, then a system break occurs and the completed system is
@@ -2175,7 +2175,7 @@ exceed usable height, then a page break occurs.
 Respects explicit `<print new-system="yes">` / `new-page="yes"` from MusicXML.
 Page geometry (size, margins) comes from `config.page`.
 
-### 16.3 Arbitrary width × height resize — a hard requirement `[BUILT and directly usable -- see Doc/phase-47-arbitrary-resize.md]`
+### 16.3 Arbitrary width × height resize — a hard requirement `[BUILT and directly usable -- see Documentation/phase-47-arbitrary-resize.md]`
 
 ```ts
 engine.resize(widthPx: number, heightPx: number): void
@@ -2204,7 +2204,7 @@ to the original (determinism, §4.4).
 
 ---
 
-## 17. Module: `playback/` — Position API and Event Stream `[BUILT -- §17.1 by Phase 48, §17.2 by Phase 49, repeat unfolding by Doc/any-drum-notation.md. See Doc/phase-48-playback-position-api.md and Doc/phase-49-cursor.md]`
+## 17. Module: `playback/` — Position API and Event Stream `[BUILT -- §17.1 by Phase 48, §17.2 by Phase 49, repeat unfolding by Documentation/any-drum-notation.md. See Documentation/phase-48-playback-position-api.md and Documentation/phase-49-cursor.md]`
 
 **This is the boundary between the engine and any host application.** The
 engine has **no** knowledge of audio, video, or animation — see §2.3.
@@ -2359,7 +2359,7 @@ those same boxes, so the two overlays can never contradict each other.
 The `data-id` is `notationEventId(...)` — the exact function §17.1's
 event stream builds its `noteIds` from, so a host can turn "the note
 sounding now" into a DOM node with one `querySelector` and no second id
-scheme. See `Doc/phase-51-debug-overlays.md`.
+scheme. See `Documentation/phase-51-debug-overlays.md`.
 
 ### 18.4 Error handling philosophy
 
@@ -2411,7 +2411,7 @@ API can be designed *then*, informed by what that extension actually needs.
    treble/bass/alto rows exactly.) Soprano stays open because no source
    consulted describes its shape and the construction is genuinely
    ambiguous for it — a silently wrong key signature is worse than a
-   refusal. See Doc/phase-54-public-api.md §3.
+   refusal. See Documentation/phase-54-public-api.md §3.
 2. **Cross-staff beaming is not supported** (piano passages where a beam
    spans both staves). Deferred as rare and expensive.
 3. **Not every microtonal pitch alteration has a drawable glyph.** MusicXML
@@ -2421,7 +2421,7 @@ API can be designed *then*, informed by what that extension actually needs.
    defaults need an explicit supported accidental glyph; otherwise the pitch
    remains in the score and `UNSUPPORTED_PITCH_ALTER` warns that its accidental
    could not be drawn. This is not complete support for any non-Western tuning
-   or notation system. See `Doc/international-notation-support.md`.
+   or notation system. See `Documentation/international-notation-support.md`.
 4. **Durations finer than a 128th note** produce non-integer ticks at
    `TICKS_PER_QUARTER = 480`. Legal but inexact; vanishingly rare in practice.
 5. **MIDI format 2** files are rejected with a diagnostic.
@@ -2476,14 +2476,14 @@ API can be designed *then*, informed by what that extension actually needs.
     carry pitch, rhythm, or modal structure that cannot be recovered from
     ordinary staff positions or glyphs alone. They need separate parsers,
     semantic data, layout rules, and tradition-specific test scores; the
-    representative design boundary is in `Doc/international-notation-support.md`.
+    representative design boundary is in `Documentation/international-notation-support.md`.
 19. **Pinned Bravura metrics do not make all engraving exact.** The font,
     metadata, codepoint coverage, advance widths, and ink bounds are version-
     matched and tested, and selected MusicXML notehead/rest/accidental
     presentation details are preserved. The custom layout engine still does
     not implement every MusicXML placement or collision rule. In particular,
     `clef-octave-change` and general note-level `default-x/default-y` are not
-    yet rendered from source. See `Doc/bravura-engraving-accuracy.md`.
+    yet rendered from source. See `Documentation/bravura-engraving-accuracy.md`.
 
 ### Drum-notation follow-up backlog (audit: 2026-11-08)
 
@@ -2505,7 +2505,7 @@ until those original files are available and rendered.
 | P2 | Multi-voice articulation placement is explicitly unimplemented and can collide in hand/foot layouts. | Pass staff-local voice context into placement; assert simultaneous hand/foot marks are distinct and collision-free. |
 | P3 | Supported pitch domain, mapped entries outside 35–81, non-five-line staves, and table-wide glyph/provenance invariants are not a single explicit contract. | Choose/document the supported domain; add boundary tests, generated checks for all 61 rows, and support or reject non-five-line mapping explicitly. |
 | P3 | Collision resolution is pairwise; browser tests are coarse/optional and do not establish dense 3–4-voice percussion clearance. | Decide whether denser percussion is in scope, then add structural SVG checks and targeted browser assertions with explicit environment skips. |
-| P3 | `Doc/STATUS.md` test totals predate recent drum/chord commits; Integration Y also records excess fit space around the metronome glyph. | Refresh status from a clean current test run and retain the metronome-fit caveat as a separate visual follow-up. |
+| P3 | `Documentation/STATUS.md` test totals predate recent drum/chord commits; Integration Y also records excess fit space around the metronome glyph. | Refresh status from a clean current test run and retain the metronome-fit caveat as a separate visual follow-up. |
 
 ---
 
@@ -2553,14 +2553,14 @@ The engine is "done" for its intended purpose when all of the following hold:
 | R5 | **Skyline collision avoidance produces ugly-but-legal results** | Medium | Low | It is *correct* first (no overlaps) and *pretty* second. `drawSkyline` debug overlay makes tuning tractable |
 | R6 | **Scope creep back toward "clone MuseScore"** | Medium | High | §1.1 non-goals and §19 limitations are explicit and are meant to be pointed at. §2.4 already deleted four v1 items on these grounds |
 | R7 | **Font licensing** | Low | Medium | Bravura is SIL OFL 1.1; attribution is committed in `src/glyphs/data/SOURCES.md`. Any added font needs the same check |
-| R8 | **Bravura metadata URL breaks** (it already required a release tag rather than a branch to fetch) | Low | Low | The metadata is **committed to the repo**, not fetched at build time. Documented in `Doc/phase-05-*.md` |
+| R8 | **Bravura metadata URL breaks** (it already required a release tag rather than a branch to fetch) | Low | Low | The metadata is **committed to the repo**, not fetched at build time. Documented in `Documentation/phase-05-*.md` |
 
 ---
 
 ## 22. Implementation Roadmap
 
 Numbering continues from the phases already built — **completed phases are
-not renumbered**, so existing `Doc/` records and commit history stay valid.
+not renumbered**, so existing `Documentation/` records and commit history stay valid.
 
 ### Stage 0 — Foundation `[COMPLETE]`
 
@@ -2658,18 +2658,18 @@ not renumbered**, so existing `Doc/` records and commit history stay valid.
 
 | Phase | What | Status |
 |---|---|---|
-| 48 | Position API + event stream (§17.1) | ✅ (built + wired into `renderFromMusicXml`'s own result -- see Doc/phase-48-playback-position-api.md) |
-| 49 | Cursor, both modes (§17.2) | ✅ (built -- see Doc/phase-49-cursor.md) |
+| 48 | Position API + event stream (§17.1) | ✅ (built + wired into `renderFromMusicXml`'s own result -- see Documentation/phase-48-playback-position-api.md) |
+| 49 | Cursor, both modes (§17.2) | ✅ (built -- see Documentation/phase-49-cursor.md) |
 
 ### Stage 10 — Polish and delivery `[COMPLETE]`
 
 | Phase | What | Status |
 |---|---|---|
-| 50 | Full theming API — unify every config section (§8) | ✅ (built -- see Doc/phase-50-theming-api.md) |
-| 51 | Debug overlays and diagnostics surface (§18.3) | ✅ (built -- see Doc/phase-51-debug-overlays.md) |
-| 52 | Export: SVG, PNG, PDF (§3, §16.2) | ✅ (built -- see Doc/phase-52-export.md) |
-| 53 | Performance pass against §18.1's budgets | ✅ (built -- see Doc/phase-53-performance.md) |
-| 54 | Public API surface + generated reference docs into `docs/` | ✅ (built -- see Doc/phase-54-public-api.md) |
+| 50 | Full theming API — unify every config section (§8) | ✅ (built -- see Documentation/phase-50-theming-api.md) |
+| 51 | Debug overlays and diagnostics surface (§18.3) | ✅ (built -- see Documentation/phase-51-debug-overlays.md) |
+| 52 | Export: SVG, PNG, PDF (§3, §16.2) | ✅ (built -- see Documentation/phase-52-export.md) |
+| 53 | Performance pass against §18.1's budgets | ✅ (built -- see Documentation/phase-53-performance.md) |
+| 54 | Public API surface + generated reference docs into `Documentation/` | ✅ (built -- see Documentation/phase-54-public-api.md) |
 
 ### Drum and chord completion ledger (updated 2026-11-08)
 
@@ -2679,12 +2679,12 @@ documents; §19 tracks the remaining gaps.
 
 | Completed work | Evidence |
 |---|---|
-| GM percussion mapping and MusicXML instrument-ID wiring; mapped staff positions, noteheads and single-note stems | Phase 41; `Doc/phase-41-drum-mapping.md` |
-| Drum-chart font delivery, chord participation in beams, removal of stray flags, and tempo clearance | Integration M; `Doc/integration-m-drum-chart-defects.md` |
-| Drum staff-position corrections from the supplied lesson score | Integration N; `Doc/integration-n-drum-position-corrections.md` |
-| Away-pointing stem shortening and beam endpoints anchored to actual notehead stem anchors | Integrations O/P; `Doc/integration-o-stem-shortening.md`, `Doc/integration-p-beam-endpoint-anchor.md` |
-| Explicit MusicXML display position/notehead wins over drum-map defaults; engraving defaults and dots/secondary beams are wired | Integrations T/W; `Doc/integration-t-display-position-wins.md`, `Doc/integration-w-file-stated-engraving.md` |
-| Drum mapping configuration overrides are consumed by the renderer | Phase 50; `Doc/phase-50-theming-api.md` (supersedes the historical Phase 41 override limitation) |
+| GM percussion mapping and MusicXML instrument-ID wiring; mapped staff positions, noteheads and single-note stems | Phase 41; `Documentation/phase-41-drum-mapping.md` |
+| Drum-chart font delivery, chord participation in beams, removal of stray flags, and tempo clearance | Integration M; `Documentation/integration-m-drum-chart-defects.md` |
+| Drum staff-position corrections from the supplied lesson score | Integration N; `Documentation/integration-n-drum-position-corrections.md` |
+| Away-pointing stem shortening and beam endpoints anchored to actual notehead stem anchors | Integrations O/P; `Documentation/integration-o-stem-shortening.md`, `Documentation/integration-p-beam-endpoint-anchor.md` |
+| Explicit MusicXML display position/notehead wins over drum-map defaults; engraving defaults and dots/secondary beams are wired | Integrations T/W; `Documentation/integration-t-display-position-wins.md`, `Documentation/integration-w-file-stated-engraving.md` |
+| Drum mapping configuration overrides are consumed by the renderer | Phase 50; `Documentation/phase-50-theming-api.md` (supersedes the historical Phase 41 override limitation) |
 | Chord file-stated stem direction and glyph-anchor alignment, with voice forcing retained above file direction | Commit `e17647f`; `test/unit/chord-stem-direction.test.js` |
 | 44130-style continuous quarter-note hand-pattern beaming and subsequent restriction to hand voices | Commits `85dee0e`, `96113b8`; `website/assets/44130-drum-eighths.musicxml`; `test/unit/beam.test.js` |
 | Beamed chords now use the first explicit `<stem>` on any chord member, matching unbeamed chord behavior; continuation-member regression checks rendered event geometry | This update; `src/render-from-musicxml.ts`, `test/unit/beam-chord-tempo-clearance.test.js` |
@@ -2700,7 +2700,7 @@ documents; §19 tracks the remaining gaps.
 - Stage 9 depends on Stage 8 (it needs real x-positions) and Stage 7 (it
   needs real times).
 - **Every phase follows the established working rule:** implement → run
-  `npm run verify` clean → write the `Doc/phase-NN-*.md` record (what was
+  `npm run verify` clean → write the `Documentation/phase-NN-*.md` record (what was
   written / how to modify / how to revert) → commit → push.
 
 ---
@@ -2709,9 +2709,9 @@ documents; §19 tracks the remaining gaps.
 
 - **This file is authoritative.** When reality and this document disagree,
   fix whichever is wrong — but do not leave them disagreeing.
-- `Doc/PLAN-v1-historical.md` is **historical reference only** and should not
+- `Documentation/PLAN-v1-historical.md` is **historical reference only** and should not
   be edited further.
-- `Doc/phase-NN-*.md` records remain the per-phase source of truth for *what
+- `Documentation/phase-NN-*.md` records remain the per-phase source of truth for *what
   was actually built and how to change or revert it*; this file is the source
   of truth for *architecture and intent*.
 - When a phase completes, update its row in §22 and, if the module's
@@ -2768,7 +2768,7 @@ The §17.1 API now includes the implemented multi-track playback surface:
 `PlaybackData.tracks`, `NotationEvent.partId`, and
 `getTrackEventStream(playback, partId)`, alongside the score-wide
 `getEventStream()`. The contract and behavior are recorded in
-`Doc/playback-track-streams.md` and covered by multi-part playback tests. This
+`Documentation/playback-track-streams.md` and covered by multi-part playback tests. This
 is a data/API layer only; it does not add audio mixing, mute, solo, volume or
 transposition controls.
 

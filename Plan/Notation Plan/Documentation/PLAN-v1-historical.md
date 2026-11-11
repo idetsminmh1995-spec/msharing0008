@@ -3,7 +3,7 @@
 > This is **v1** of the roadmap. It has been superseded by
 > [`../PLAN.md`](../PLAN.md), which is the current **authoritative**
 > specification. (v2 now occupies the `PLAN.md` filename; this v1 file was
-> moved here into `Doc/` so the project has exactly one plan file at the top
+> moved here into `Documentation/` so the project has exactly one plan file at the top
 > level and no ambiguity about which to read.)
 >
 > This file is retained unedited below so the project's reasoning history

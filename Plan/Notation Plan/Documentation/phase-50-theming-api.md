@@ -2,7 +2,7 @@
 
 **Status:** complete. `npm run verify` clean (704/704 tests, 25 of them
 new). Opens **Stage 10** (Polish & public API) and closes
-`Doc/STATUS.md` §C2.
+`Documentation/STATUS.md` §C2.
 
 ## 0. The gap this closes, in §8's own words
 

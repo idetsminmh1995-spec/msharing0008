@@ -26,7 +26,7 @@ whole engine's build history, not just the plan (`../PLAN.md`) for what's
 |---|---|
 | [`final-review.md`](./final-review.md) | **The final end-to-end review**, after Phase 54 completed the roadmap: how it was reviewed, the four real bugs it found (a key signature on tab/percussion staves, a playback cursor 4.5 staff spaces off its note, click-to-seek landing on the previous note, the brace drawn above the music), what it checked and did NOT find, and the two gaps confirmed still open |
 | [`forward-gaps-and-playback-cursor.md`](./forward-gaps-and-playback-cursor.md) | A voice that SKIPS time (`<forward>`) had every later event pulled early -- 31 of the drum file's 342 notes, which is why our render disagreed with MuseScore; plus a malformed `<backup>` it surfaced, and the playback cursor wired into the drum page |
-| [`phase-01-folder-structure.md`](./phase-01-folder-structure.md) | Phase 1 folder skeleton (`src/`, `test/`, `docs/`) |
+| [`phase-01-folder-structure.md`](./phase-01-folder-structure.md) | Phase 1 folder skeleton (`src/`, `test/`, `Documentation/`) |
 | [`phase-02-toolchain.md`](./phase-02-toolchain.md) | Phase 2 toolchain (TypeScript, esbuild, ESLint, Prettier) |
 | [`phase-03-core-data-model.md`](./phase-03-core-data-model.md) | Phase 3 core data model (`Pitch`, `Note`, `Chord`, `Voice`, `Measure`, `Part`, `Score`) |
 | [`phase-04-duration-tick-math.md`](./phase-04-duration-tick-math.md) | Phase 4 duration/tick math (dots, tuplets, divisions conversion) |
@@ -124,3 +124,7 @@ Every doc file answers three questions for the code it covers:
 3. **How to revert/remove it** — which files to delete and which other
    files reference it (so removing it cleanly doesn't leave dangling
    references, the way the old VexFlow engine's removal needed care).
+
+## Generated public API reference
+
+[`API.md`](./API.md) is generated from the declaration files emitted by the Notation Engine build. Do not edit it by hand. Run `npm run docs` from `Engine/notation-engine` to regenerate it, or `npm run docs:check` to verify that it matches the current public declarations. The generator writes here so the complete Notation documentation has one canonical home.

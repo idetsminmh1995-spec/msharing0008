@@ -9,7 +9,7 @@ Repository တစ်ခုလုံးအတွက် Notation Engine၊ Drum Vi
 - **Repository delivery / export rollout:** [`Doc/CONSOLIDATED-PLAN-2026-11-10.md`](./Doc/CONSOLIDATED-PLAN-2026-11-10.md)
 - **Drum နှင့် instrument video acceptance:** [`Doc/rollout/README.md`](./Doc/rollout/README.md)
 - **Notation Engine architecture and roadmap:** [`Plan/Notation Plan/PLAN.md`](./Plan/Notation%20Plan/PLAN.md)
-- **Notation Engine actual build status:** [`Plan/Notation Plan/Doc/STATUS.md`](./Plan/Notation%20Plan/Doc/STATUS.md)
+- **Notation Engine actual build status:** [`Plan/Notation Plan/Documentation/STATUS.md`](./Plan/Notation%20Plan/Documentation/STATUS.md)
 - **Piano Hand / GLB contact work:** ဤဖိုင်၏ အောက်ပါ piano-specific plan
 
 ---

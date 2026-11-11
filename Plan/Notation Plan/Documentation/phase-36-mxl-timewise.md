@@ -21,9 +21,9 @@ existing `parseMusicXml`/`renderFromMusicXml`.
 > each real failure mode. Phase 38's hardening pass found this
 > inconsistent with `§10.7`'s own "never throws on malformed input"
 > philosophy and changed `unzipMxl` to return `{ xmlText, diagnostics }`
-> instead — see `Doc/phase-38-diagnostics-hardening.md` for the full
+> instead — see `Documentation/phase-38-diagnostics-hardening.md` for the full
 > story. The description below is kept as a historical record of what
-> this phase originally built; treat `Doc/phase-38-diagnostics-hardening.md`
+> this phase originally built; treat `Documentation/phase-38-diagnostics-hardening.md`
 > as authoritative for `unzipMxl`'s current behavior.
 
 Throws a clear, specific

@@ -3,7 +3,7 @@
 **Status:** the full `§14` algorithm is built and tested against every
 requirement `§14` itself names. 486/486 tests pass at the time this
 phase was built. **Wired into `renderFromMusicXml` by Integration Pass
-E** — see `Doc/integration-e-spacing-wiring.md` for the wiring itself,
+E** — see `Documentation/integration-e-spacing-wiring.md` for the wiring itself,
 the real bug it found and fixed (chord events silently excluded from
 spacing), and its own stated limitations (approximate note widths, no
 justification without Phase 46's page breaking).
@@ -113,7 +113,7 @@ Also extended Phase 38's dynamic diagnostic-coverage checker to scan
 
 The reasoning below explains why wiring was deliberately deferred when
 this phase was first built. It has since been done — see
-`Doc/integration-e-spacing-wiring.md`. In the end the "genuinely
+`Documentation/integration-e-spacing-wiring.md`. In the end the "genuinely
 different rendering architecture" concern was resolved with a lighter
 touch than expected: rather than a full two-pass render with exact
 glyph widths known ahead of drawing, a single pre-pass per measure

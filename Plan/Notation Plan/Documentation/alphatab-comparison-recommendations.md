@@ -82,7 +82,7 @@ AlphaTab မှာ Page၊ Horizontal နဲ့ Parchment layout mode သုံ�
 
 ## အရေးကြီးဆုံး gap ၄ — Text rendering system
 
-AlphaTab ရဲ့ display resources ထဲမှာ music fonts, text fonts, colors နဲ့ rendering style ကို configuration အဖြစ် ထားပါတယ်။ [4] သင့် engine မှာ lyrics နဲ့ chord symbol geometry ရှိပေမယ့် syllable/root letter text rendering က အဓိကကျန်နေတဲ့ gap ဖြစ်နေပါတယ်။ `Doc/STATUS.md` မှာလည်း lyrics syllable text နဲ့ chord root/bass text ကို deferred လုပ်ထားကြောင်း ဖော်ပြထားပါတယ်။
+AlphaTab ရဲ့ display resources ထဲမှာ music fonts, text fonts, colors နဲ့ rendering style ကို configuration အဖြစ် ထားပါတယ်။ [4] သင့် engine မှာ lyrics နဲ့ chord symbol geometry ရှိပေမယ့် syllable/root letter text rendering က အဓိကကျန်နေတဲ့ gap ဖြစ်နေပါတယ်။ `Documentation/STATUS.md` မှာလည်း lyrics syllable text နဲ့ chord root/bass text ကို deferred လုပ်ထားကြောင်း ဖော်ပြထားပါတယ်။
 
 ဒီ gap ကို glyph တစ်ခုချင်းစီနဲ့ ဖြေရှင်းရန် မကြိုးစားသင့်ပါ။ အောက်ပါ first-class text layer ထည့်ပါ။
 

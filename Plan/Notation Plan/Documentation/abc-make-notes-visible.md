@@ -117,4 +117,4 @@ This work makes drum notes *appear*. It does not make them *correct* as
 drum notation — notehead shapes still come from the duration-based
 default, so a hi-hat renders as a round notehead rather than an ✕. That
 and the rest of real percussion support remain Phase 35's job; see
-`Doc/STATUS.md` §F for the full list raised by this work.
+`Documentation/STATUS.md` §F for the full list raised by this work.

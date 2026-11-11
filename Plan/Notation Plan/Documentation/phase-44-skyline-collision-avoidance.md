@@ -4,7 +4,7 @@
 requirement `§15` itself names. 505/505 tests pass. **Not yet consumed
 by rendering** — Integration Pass E wired Phase 43's spacing (horizontal)
 into `renderFromMusicXml`, but this phase's skyline (vertical collision
-avoidance) remains unwired; see `Doc/integration-e-spacing-wiring.md`
+avoidance) remains unwired; see `Documentation/integration-e-spacing-wiring.md`
 §4/§5 for the current state and what wiring it in next would involve.
 
 Continues Stage 8 (Real layout), following Phase 43's spacing algorithm.

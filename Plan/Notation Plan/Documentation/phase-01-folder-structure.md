@@ -22,13 +22,13 @@ anything). Each README states, in one short paragraph: what belongs in that
 folder, which PLAN.md phase(s) it corresponds to, and confirms nothing real
 has been written there yet.
 
-`docs/` (lowercase, from the plan's Phase 1 listing) and `Doc/` (this folder,
+`Documentation/` (lowercase, from the plan's Phase 1 listing) and `Documentation/` (this folder,
 capitalized, created earlier at the user's request) are two **different**
 things and both are kept:
-- `Doc/` — hand-written build history: this file, `phase-09-staff-lines.md`,
+- `Documentation/` — hand-written build history: this file, `phase-09-staff-lines.md`,
   and everything that follows the "what was written / how to modify /
-  how to revert" convention from `Doc/README.md`.
-- `docs/` — reserved for Phase 50's *generated* API reference (built from
+  how to revert" convention from `Documentation/README.md`.
+- `Documentation/` — reserved for Phase 50's *generated* API reference (built from
   the engine's TypeScript types once there are types to generate from).
 
 `notation-engine/quick-demo/` and `notation-engine/PLAN.md` are unaffected —
@@ -42,8 +42,8 @@ Phase 9 implementation.
   `README.md` following the same one-paragraph pattern (purpose + PLAN.md
   phase reference). Update the folder-tree diagram in `PLAN.md`'s Phase 1
   section to match, so the plan never drifts out of sync with reality.
-- **`docs/` vs `Doc/` naming** — if this still reads as confusing later,
-  the cleanest fix would be renaming `Doc/` to something more distinct (e.g.
+- **`Documentation/` vs `Documentation/` naming** — if this still reads as confusing later,
+  the cleanest fix would be renaming `Documentation/` to something more distinct (e.g.
   `CHANGES/` or `history/`) — flag this to revisit once real Phase 2+ code
   exists and the two folders' contents actually diverge.
 

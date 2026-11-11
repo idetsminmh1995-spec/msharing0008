@@ -6,7 +6,7 @@
 ## 0. Scope
 
 §22's line for Phase 54 is "Public API surface + generated reference docs
-into `docs/`". Three open items in `Doc/STATUS.md` belonged here too, and
+into `Documentation/`". Three open items in `Documentation/STATUS.md` belonged here too, and
 are closed:
 
 - **§C1's tenor half** — tenor-clef key signatures, which used to throw.

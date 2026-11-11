@@ -101,7 +101,7 @@ coordinates rather than assumed):
 
 None of these were rushed to completion under time pressure — each is the
 same class of honestly-scoped gap as Phase 23's beam-drawing deferral or
-Phase 25's notehead-collision wiring, tracked here and in `Doc/STATUS.md`
+Phase 25's notehead-collision wiring, tracked here and in `Documentation/STATUS.md`
 rather than silently left unaddressed.
 
 ## 4. How to modify it

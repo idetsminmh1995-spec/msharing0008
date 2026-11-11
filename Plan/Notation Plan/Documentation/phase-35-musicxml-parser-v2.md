@@ -23,7 +23,7 @@ elements immediately activates real, already-tested rendering behavior
 rather than adding inert data. Each was chosen deliberately:
 
 - `<midi-instrument>` (with `<midi-unpitched>`) is exactly what the A+B+C
-  work's own `Doc/STATUS.md` §F1/§F2 items were waiting on for correct
+  work's own `Documentation/STATUS.md` §F1/§F2 items were waiting on for correct
   drum notehead shapes.
 - `<notehead>`, `<grace>`, `<time-modification>`, `<stem>`, `<accidental>`
   each activate a specific piece of already-built, already-tested

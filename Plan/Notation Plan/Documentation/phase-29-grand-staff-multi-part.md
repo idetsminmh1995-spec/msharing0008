@@ -14,7 +14,7 @@ see §3.
 > predicted that `<staves>` parsing and a render-loop restructure were
 > both needed) was worked through exactly as written. Multi-PART
 > rendering is still outstanding. See
-> `Doc/integration-a-grand-staff.md`.
+> `Documentation/integration-a-grand-staff.md`.
 
 Completes Stage 4 (Phases 23-29). Sixth consecutive phase where the same
 pattern held: another specification gap found and fixed before writing
@@ -93,7 +93,7 @@ freshly-sorted copy and failed with "same structure but not
 reference-equal" — a VM-sandbox realm-boundary quirk, not a real bug.
 Fixed by spreading the sandboxed array into the main realm
 (`[...layout.positions]`) before deriving values from it, exactly the
-precedent already recorded in `Doc/STATUS.md`'s testing-harness notes.
+precedent already recorded in `Documentation/STATUS.md`'s testing-harness notes.
 
 ## 3. Known limitation: not wired into `renderFromMusicXml`
 

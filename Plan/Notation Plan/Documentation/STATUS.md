@@ -19,7 +19,7 @@ What remains is the named gaps in §C and
 
 ## A. DONE — Phases 1–54 ✅ (**every stage complete**) + Integration Passes A–Q
 
-All of these are implemented, tested, and have a `Doc/phase-NN-*.md` record.
+All of these are implemented, tested, and have a `Documentation/phase-NN-*.md` record.
 `npm run verify` passes **1,054/1,054** across them.
 
 | # | Phase | What exists | Record |
@@ -312,7 +312,7 @@ new instrument branching or unordered-iteration-affecting-output crept in.
 1. Pick a number from §B.
 2. Build it per its `PLAN.md` section.
 3. `npm run verify` must pass clean.
-4. Write `Doc/phase-NN-*.md` (what was written / how to modify / how to
+4. Write `Documentation/phase-NN-*.md` (what was written / how to modify / how to
    revert).
 5. Commit, push, and move that row from §B to §A here.
 
@@ -355,7 +355,7 @@ piecemeal as each new phase changes what's possible.
 
 **Until that final pass:** keep building phases in order; keep noting any
 deferred/incomplete piece in this file (§F, and each phase's own
-`Doc/phase-NN-*.md`) exactly as already practiced, so nothing gets
+`Documentation/phase-NN-*.md`) exactly as already practiced, so nothing gets
 forgotten by the time that final review happens. Do not treat "the drum
 notation doesn't look right yet" as a signal to stop and restyle now —
 that is expected and already accounted for.
@@ -364,7 +364,7 @@ that is expected and already accounted for.
 ---
 ## H. Latest host-integration audit — 2026-11-10
 
-The previous §F entries are historical findings from the earlier web-app state. The current repository now has a separate host-side delivery record in [`../../../Doc/CONSOLIDATED-PLAN-2026-11-10.md`](../../../Doc/CONSOLIDATED-PLAN-2026-11-10.md). The following reconciliation is intentional:
+The previous §F entries are historical findings from the earlier web-app state. The current repository now has a separate host-side delivery record in [`../../../Documentation/CONSOLIDATED-PLAN-2026-11-10.md`](../../../Documentation/CONSOLIDATED-PLAN-2026-11-10.md). The following reconciliation is intentional:
 
 - **F4 browser coverage:** closed for the current five-page export scope. `tools/test-drum-rollout-browser.mjs` and `tools/test-cross-page-rollout-browser.mjs` run Chromium acceptance checks, and `.github/workflows/notation-and-video.yml` runs them in CI. This is host/browser verification rather than a new notation-core phase.
 - **F6 decorative notation/export wiring:** closed for Drum and the four migrated instrument pages in the current rollout. The host pages use the notation bundle, pinned export composition, asset gate, render report, and deterministic frame path. A true perceptual golden-image comparison against the user's final reference remains a separate future test, not silently marked complete.
