@@ -226,7 +226,7 @@ describe('a chord inside a beam group (Integration M, §9.13)', () => {
 
   test("the project's own drum chart draws zero stray flags (it drew 62 before)", () => {
     const xml = fs.readFileSync(
-      path.join(__dirname, '..', '..', '..', 'website', 'assets', 'Drum_Lesson_5.musicxml'),
+      path.join(__dirname, '..', '..', '..', '..', 'website', 'assets', 'Drum_Lesson_5.musicxml'),
       'utf8',
     );
     const { svg } = render(xml);
