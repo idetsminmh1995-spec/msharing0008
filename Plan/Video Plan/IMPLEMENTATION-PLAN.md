@@ -35,7 +35,7 @@ node --check website/assets/video-asset-gate.js
 node --check Engine/video-engine/source/website/assets/video-engine.js
 ```
 
-The current pure muxer suite is **15/15 passed**. Cleanup tests are **4/4 passed** and the S1 outro loader test passes.
+The current pure muxer suite is **15/15 passed**. Cleanup tests are **5/5 passed** and the S1 outro loader test passes.
 
 ## 2. Known gaps — code not yet implemented
 
@@ -51,6 +51,41 @@ These are intentionally not marked complete:
 8. Low-memory quality presets and browser-level memory-pressure instrumentation.
 9. Built-in Thank You ending and automatic R2-to-built-in resolution. Current S1 loader failure remains optional/no-outro unless a caller explicitly requests `required: true`.
 10. Complete page-level fallback policy, nested `outro` report schema, six-style golden frames, blocked-R2 output assertions, and final release evidence.
+
+### 2.1 Exact code-gap register
+
+The following planned symbols and artifacts were checked against the current engine source. They are listed here so a future implementation cannot be mistaken for documentation-only progress.
+
+| Planned capability | Expected artifact/API | Current source result | Next implementation location |
+|---|---|---|---|
+| Mirror protection | `tools/test-video-engine-mirror.mjs` or equivalent | **Missing**; canonical and mirror currently compare equal manually, but CI does not enforce it | `Engine/video-engine/source/tools/` and CI |
+| Browser cancellation | Multi-segment WebCodecs and MediaRecorder scenarios | **Missing**; current cleanup tests use mocks and failure paths, not real browser cancellation | `Engine/video-engine/source/tools/test-video-engine-browser.mjs` |
+| Slow sink backpressure | Delayed `WritableStream.write()` fixture and evidence | **Missing**; `muxMp4ToStream()` exists, but only immediate writes are tested | `Engine/video-engine/source/tools/test-video-engine.mjs` |
+| Fragmented MP4 | `VideoEngine.createFragmentedMp4Writer()` | **Missing**; only `muxMp4()` and completed-Blob `muxMp4ToStream()` are exported | `website/assets/video-engine.js` and mirrored source |
+| Random-access flat MP4 | `VideoEngine.createFlatMp4Patcher()` | **Missing**; no `writeAt/append/truncate` sink contract exists in runtime | `website/assets/video-engine.js` and mirrored source |
+| Sink recovery | Structured sink errors and abort state | **Missing**; no fragment/patch sink state machine or error codes exists | New muxer module plus browser/Node tests |
+| MediaRecorder audio trim | Cancelled output audio limited to rendered duration | **Missing** in fallback; current explicit trim is implemented only in WebCodecs path | `renderWithMediaRecorder()` and browser test |
+| Low-memory quality presets | Device-class preset selection exposed to callers | **Missing**; current code has queue/memory guards but no caller-selectable quality preset | Render options contract and docs |
+| Cross-browser matrix | Chromium/Safari/Firefox × 16:9/9:16/1:1 | **Missing**; Chromium smoke/rollout evidence exists, Safari/Firefox evidence does not | Browser test runner and evidence directory |
+| Built-in ending | `builtin-ending.js`, `OutroVideo.createBuiltin()` | **Missing**; no offline canvas segment factory exists | `website/assets/` and mirrored page tests |
+| Source-locked outro policy | `OutroVideo.resolve()` and `outro.source` report object | **Missing**; pages call optional `loadOutro()` and can export without an outro | `website/assets/outro-video.js`, gate, six active pages |
+| Final-ending evidence | Golden frames and encoded last-frame assertion | **Missing**; current evidence validates layout/assets, not a guaranteed Thank You ending | `tools/` and `Doc/rollout/evidence/` |
+
+No row in this register should be changed to **implemented** until its runtime artifact, automated test, and evidence file exist together.
+
+### 2.2 Dependency order for the missing work
+
+The missing work must proceed in this order:
+
+1. Add the mirror-drift guard and real-browser cancellation/sink fixtures without changing the current render contract.
+2. Add the fragmented writer behind a new API; retain `muxMp4()` and `muxMp4ToStream()` as compatibility paths until playback evidence is green.
+3. Add the random-access patcher only after the sink capability contract and failure codes are tested.
+4. Add MediaRecorder audio trimming and low-memory presets as isolated render-path changes.
+5. Implement the offline built-in ending before changing any page to required-outro behavior.
+6. Add `OutroVideo.resolve()`, migrate Drum, then migrate the remaining five active routes one at a time.
+7. Finish R2/Worker, cross-browser, encoded-ending, accessibility, CI, and release evidence.
+
+The fragmented writer, flat patcher, and built-in ending are independent deliverables. A failure in one must not silently activate or replace another output path.
 
 ## 3. Implementation order
 
