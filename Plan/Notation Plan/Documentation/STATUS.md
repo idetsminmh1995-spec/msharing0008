@@ -20,7 +20,7 @@ What remains is the named gaps in §C and
 ## A. DONE — Phases 1–54 ✅ (**every stage complete**) + Integration Passes A–Q
 
 All of these are implemented, tested, and have a `Documentation/phase-NN-*.md` record.
-`npm run verify` passes **1,054/1,054** across them.
+`npm run verify` passes **1,070/1,070** across them (verified 2026-11-12).
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -372,3 +372,22 @@ The previous §F entries are historical findings from the earlier web-app state.
 - **New notation-specific behavior:** continuous drum hand/lower-voice beam rules, meter-aware drum grouping, chord-stem anchor corrections, and the published website notation bundle are recorded in the consolidated delivery plan and in the existing integration-v/w/x/y records where applicable.
 
 The engine remains instrument-agnostic. Export stability, asset loading, and browser composition are host concerns and must not be moved into `notation-engine/src/`.
+
+## I. Drum Note audit and fix — 2026-11-12
+
+The audit found that percussion grace notes without MusicXML display coordinates
+were rendered at the parser's neutral fallback position instead of the GM
+instrument's mapped staff position. `Engine/notation-engine/src/render-from-musicxml.ts`
+now resolves their position through the same GM-aware helper as ordinary notes;
+complete file-stated positions still take precedence, and percussion grace stems
+follow the existing forced-up convention. Two regression tests cover mapped
+position parity and explicit-position precedence.
+
+The current repository had moved the package under `Engine/notation-engine/`
+while several build/test paths still assumed the former location. The bundle
+publisher and the Bravura, project Drum chart, browser-render, and website-bundle
+tests now resolve repository-root assets correctly. The rebuilt bundle and
+cache keys are synchronized. `npm run verify --prefix Engine/notation-engine`
+passed **1,070 tests with 0 failures**, including four real-browser rendering
+checks. Mapped custom grace-notehead shapes and mapped stem direction for drum
+chords/beams remain open items in `Plan/Notation Plan/PLAN.md`.

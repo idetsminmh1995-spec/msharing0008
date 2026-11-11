@@ -1721,12 +1721,14 @@ Note: MusicXML's `<midi-unpitched>` is **1-based** while GM note numbers are
 number, which selects drum defaults (§13.3). A complete file-stated
 `<display-step>`/`<display-octave>` position and explicit `<notehead>` take
 precedence over mapped position and notehead defaults; the drum map supplies
-fallbacks when the file omits them. Single-note stem precedence is forced
-voice direction, file `<stem>`, mapped drum convention, then automatic.
-Chord/beam stem-map propagation and percussion grace-note fallback remain open
-items in §19. A hi-hat draws a real ✕. Missing file positions recover through
-the applicable mapped/fallback position, with diagnostics where resolution
-fails, never silently.
+fallbacks when the file omits them. Unpitched ordinary and grace notes use the
+renderer’s consistent forced-up stem convention. Map/file-specific stem
+direction for chords and beam groups remains an open item in §19. Percussion
+grace notes now use the shared GM-aware position resolver; mapped custom
+notehead shapes remain unavailable for the precomposed grace glyph. A hi-hat
+draws a real ✕. Missing file positions recover through the applicable
+mapped/fallback position, with diagnostics where resolution fails, never
+silently.
 
 **Real-file validation (2026-11-07).** Checked the supplied MuseScore Studio
 4.7.4 drum-kit MusicXML (without adding the full user file to this public
@@ -2497,7 +2499,8 @@ until those original files are available and rendered.
 | P1 | Recover the user-reported `44_150` and `44_120_1` MusicXML cases; neither name nor content exists in this checkout. | Add the original files (or record their actual names), preserve `<stem>`, chord membership, instrument and beam data, and assert source-vs-rendered event geometry. No synthetic substitute proves those two reports. |
 | P2 | Drum-map stem convention is used for single notes but dropped for chords and beam groups. | After voice forcing and file-stated `<stem>`, apply the mapped direction when group members agree; specify and test mixed-direction groups. |
 | P2 | `drumMappingFromMuseScore` can place exact custom SMuFL glyph names in `noteheadShape`, although the config API separates shape families from `noteheadGlyph`. | Emit custom glyphs in the exact-glyph field and render GM 28, 52, 62 and 86 through merged config without throwing; retain family mapping behavior. |
-| P2 | Unpitched grace notes bypass GM drum-map fallback for position and stem; Phase 41's grace limitation remains open. | Preserve explicit file position, use configured mapping when display coordinates are absent, and document/diagnose grace glyphs that cannot represent a mapped custom head. |
+| CLOSED 2026-11-12 | Unpitched grace-note position bypassed GM drum-map fallback when display coordinates were absent. | The renderer now uses the shared note-position resolver, preserving a complete file-stated position and using configured GM mapping otherwise. Regression tests compare the grace position with an ordinary mapped hi-hat and confirm explicit-position precedence; unpitched grace stems follow the existing forced-up convention. |
+| P2 | Precomposed percussion grace glyphs cannot represent mapped/custom notehead shapes (for example, an X hi-hat head). | Decide whether to add a diagnostic or dedicated mapped grace glyphs; preserve the existing precomposed SMuFL articulation and add shape-specific rendering tests if support is implemented. |
 | P2 | The 44130 quarter-note hand-beaming exception classifies hands by odd voice-number parity. | Replace or configure semantic hand/foot classification; test equivalent odd/even hand voices and a foot voice without an explicit down stem. |
 | P2 | Horizontal attack spacing reserves `noteheadBlack` width even for wider mapped drum glyphs such as `noteheadHeavyXHat`. | Measure the selected glyph and chord-member extents; verify close-spaced SVG ink does not overlap. |
 | P2 | Default non-fitted viewBox can clip the top of a high hi-hat beam by 0.25sp; the drum web page currently avoids this with fitted height. | Include resolved glyph/stem/beam bounds in the default viewBox and retain fitted-height regression coverage. |
@@ -2505,7 +2508,34 @@ until those original files are available and rendered.
 | P2 | Multi-voice articulation placement is explicitly unimplemented and can collide in hand/foot layouts. | Pass staff-local voice context into placement; assert simultaneous hand/foot marks are distinct and collision-free. |
 | P3 | Supported pitch domain, mapped entries outside 35–81, non-five-line staves, and table-wide glyph/provenance invariants are not a single explicit contract. | Choose/document the supported domain; add boundary tests, generated checks for all 61 rows, and support or reject non-five-line mapping explicitly. |
 | P3 | Collision resolution is pairwise; browser tests are coarse/optional and do not establish dense 3–4-voice percussion clearance. | Decide whether denser percussion is in scope, then add structural SVG checks and targeted browser assertions with explicit environment skips. |
-| P3 | `Documentation/STATUS.md` test totals predate recent drum/chord commits; Integration Y also records excess fit space around the metronome glyph. | Refresh status from a clean current test run and retain the metronome-fit caveat as a separate visual follow-up. |
+| P3 | Integration Y records excess fit space around the metronome glyph. | Keep the metronome-fit caveat as a separate visual follow-up; refresh test totals in `Documentation/STATUS.md` after each full verification. |
+
+### Drum Note audit and implementation log — 2026-11-12
+
+The audit found that `src/render-from-musicxml.ts` resolved ordinary
+unpitched notes through the GM drum map, but its grace-note branch computed
+staff position only from display-step/octave. When both were absent, a GM
+hi-hat or kick grace note rendered at the parser’s neutral fallback position
+instead of alongside the same instrument’s ordinary notes. This was reproduced
+before the fix: the test expected the mapped hi-hat grace glyph at `y=3.5`,
+but the renderer placed it at `y=6`.
+
+The grace branch now calls `resolveNoteRendering`, so complete MusicXML display
+coordinates still win and the configured GM table supplies the position only
+when the file omits it. Percussion grace stems use the renderer’s existing
+forced-up convention, matching ordinary percussion notes. Added
+`test/unit/drum-grace-note.test.js` coverage for mapped-position parity and
+explicit-position precedence. The pre-change full-suite baseline was **1,068
+passed, 0 failed**. Final `npm run verify --prefix Engine/notation-engine`
+passed **1,070 tests, 0 failed**, including typecheck, lint, formatting,
+generated-doc checks, unit tests, and all four real-browser rendering tests.
+After the repository moved the package under `Engine/notation-engine`, the
+bundle-sync script and tests were corrected to resolve root `website/`,
+`web-preview/`, the real Drum chart, and Bravura font paths. The build now
+publishes the compiled engine, source map, and matching cache keys across the
+six active video-create pages and canvas preview. Mapped X/diamond grace heads
+and mapped stem-direction behavior for percussion chords/beams remain separate
+items in the table above.
 
 ---
 

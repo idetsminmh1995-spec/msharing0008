@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const packageDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const repoDir = path.resolve(packageDir, '..');
+const repoDir = path.resolve(packageDir, '..', '..');
 const sourceBundle = path.join(packageDir, 'dist', 'notation-engine.js');
 const sourceMap = `${sourceBundle}.map`;
 const publicAssetsDir = path.join(repoDir, 'website', 'assets');

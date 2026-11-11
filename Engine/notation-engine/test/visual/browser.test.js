@@ -12,7 +12,7 @@ import { testDomParser } from '../helpers/dom.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..', '..');
 const FIXTURES_DIR = path.join(ROOT, 'test', 'fixtures', 'musicxml');
-const FONT = path.join(ROOT, '..', 'website', 'assets', 'fonts', 'Bravura.woff2');
+const FONT = path.join(ROOT, '..', '..', 'website', 'assets', 'fonts', 'Bravura.woff2');
 
 /**
  * Phase 54/§F4: the browser-level visual check, in the automated suite.

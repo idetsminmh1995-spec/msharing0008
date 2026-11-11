@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 
 const packageDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const repoDir = path.resolve(packageDir, '..');
+const repoDir = path.resolve(packageDir, '..', '..');
 const builtBundle = fs.readFileSync(path.join(packageDir, 'dist', 'notation-engine.js'));
 const productionBundle = fs.readFileSync(path.join(repoDir, 'website', 'assets', 'notation-engine.js'));
 const expectedCacheVersion = createHash('sha256').update(builtBundle).digest('hex').slice(0, 12);

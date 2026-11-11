@@ -77860,9 +77860,7 @@ ${xrefOffset}
     }
     if (ev.isGrace) {
       const isUnpitchedGrace = ev.pitch.kind === "unpitched";
-      const graceStep = isUnpitchedGrace ? ev.pitch.displayStep : ev.pitch.step;
-      const graceOctave = isUnpitchedGrace ? ev.pitch.displayOctave : ev.pitch.octave;
-      const gracePosition = staffPositionForPitch(ctx.clefDef, graceStep, graceOctave);
+      const gracePosition = isUnpitchedGrace ? resolveNoteRendering(ev, ctx).position : staffPositionForPitch(ctx.clefDef, ev.pitch.step, ev.pitch.octave);
       const graceY = ctx.measureBottomY + gracePosition;
       const parts2 = [];
       let state = accidentalState;
@@ -77897,8 +77895,8 @@ ${xrefOffset}
       const graceDirection = resolveStemDirection({
         positions: [gracePosition],
         numLines: STAFF_LINES,
-        ...forcedDirection !== void 0 ? { forcedDirection } : {},
-        ...ev.explicitStemDirection !== void 0 ? { explicitDirection: ev.explicitStemDirection } : {}
+        ...isUnpitchedGrace ? { forcedDirection: "up" } : forcedDirection !== void 0 ? { forcedDirection } : {},
+        ...!isUnpitchedGrace && ev.explicitStemDirection !== void 0 ? { explicitDirection: ev.explicitStemDirection } : {}
       });
       const kind = ev.graceSlash ? "acciaccatura" : "appoggiatura";
       parts2.push(

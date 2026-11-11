@@ -24,7 +24,7 @@ describe('SMuFL glyph table (Phase 5)', () => {
     assert.equal(bravuraMetadata.fontVersion, fontMetrics.fontVersion);
     for (const relativePath of [
       '../../dist/fonts/Bravura.woff2',
-      '../../../website/assets/fonts/Bravura.woff2',
+      '../../../../website/assets/fonts/Bravura.woff2',
     ]) {
       const bytes = readFileSync(new URL(relativePath, import.meta.url));
       const sha256 = createHash('sha256').update(bytes).digest('hex');

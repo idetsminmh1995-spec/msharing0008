@@ -1890,9 +1890,12 @@ function renderNoteOrRest(
     // normal state machine, since a grace note's own pitch can still need
     // one drawn.
     const isUnpitchedGrace = ev.pitch.kind === 'unpitched';
-    const graceStep = isUnpitchedGrace ? ev.pitch.displayStep : ev.pitch.step;
-    const graceOctave = isUnpitchedGrace ? ev.pitch.displayOctave : ev.pitch.octave;
-    const gracePosition = staffPositionForPitch(ctx.clefDef, graceStep, graceOctave);
+    // Percussion grace notes share the same display-position precedence as
+    // ordinary notes: a complete MusicXML position wins, otherwise the GM
+    // drum map supplies the staff position when this note has an instrument.
+    const gracePosition = isUnpitchedGrace
+      ? resolveNoteRendering(ev, ctx).position
+      : staffPositionForPitch(ctx.clefDef, ev.pitch.step, ev.pitch.octave);
     const graceY = ctx.measureBottomY + gracePosition;
     const parts: string[] = [];
     let state = accidentalState;
@@ -1927,8 +1930,12 @@ function renderNoteOrRest(
     const graceDirection = resolveStemDirection({
       positions: [gracePosition],
       numLines: STAFF_LINES,
-      ...(forcedDirection !== undefined ? { forcedDirection } : {}),
-      ...(ev.explicitStemDirection !== undefined
+      ...(isUnpitchedGrace
+        ? { forcedDirection: 'up' as const }
+        : forcedDirection !== undefined
+          ? { forcedDirection }
+          : {}),
+      ...(!isUnpitchedGrace && ev.explicitStemDirection !== undefined
         ? { explicitDirection: ev.explicitStemDirection }
         : {}),
     });
