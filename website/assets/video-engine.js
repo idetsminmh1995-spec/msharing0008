@@ -1480,6 +1480,12 @@
 
   async function render(options) {
     validateRenderOptions(options);
+    // Every instrument page shares this gate. R2 photos and the Thank You
+    // video are prepared by the page, but the encoder is the final authority:
+    // never write a video after an asset failure was swallowed upstream.
+    if (window.AssetLoader && typeof window.AssetLoader.assertReady === 'function') {
+      window.AssetLoader.assertReady();
+    }
     const hasAudio = options.segments.some((segment) => segment.audio);
     if (hasWebCodecs(hasAudio)) {
       const result = await renderWithWebCodecs(options);

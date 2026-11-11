@@ -272,10 +272,20 @@
   async function loadOutro(apiBase, options = {}) {
     const keys = outroKeys(options);
     const cacheKey = keys.join('|');
-    if (cache.has(cacheKey)) return cache.get(cacheKey);
+    const requirementLabel = `Thank You video (${options.aspect || '16x9'} / ${options.kind || 'drum'})`;
+    const assetLoader = typeof window !== 'undefined' ? window.AssetLoader : null;
+    assetLoader?.requireAsset?.(requirementLabel);
+    if (cache.has(cacheKey)) {
+      assetLoader?.resolveRequired?.(requirementLabel, { source: 'r2', cached: true });
+      return cache.get(cacheKey);
+    }
     const failedAt = failureCache.get(cacheKey);
     if (failedAt && Date.now() - failedAt.at < FAILURE_CACHE_MS) {
       lastFailure = failedAt.info;
+      assetLoader?.rejectRequired?.(
+        requirementLabel,
+        new Error(lastFailure.message || `No R2 clip found for ${requirementLabel}`),
+      );
       return null;
     }
     failureCache.delete(cacheKey);
@@ -368,10 +378,19 @@
         }
       }
       cache.set(cacheKey, found);
+      assetLoader?.resolveRequired?.(requirementLabel, {
+        source: 'r2',
+        key: found.key,
+        bytes: found.bytes,
+      });
     } else {
       const info = lastFailure || { kind: failureKind, key: keys[keys.length - 1] };
       failureCache.set(cacheKey, { at: Date.now(), info });
       lastFailure = { ...info, attempts, ms: Date.now() - startedAt };
+      assetLoader?.rejectRequired?.(
+        requirementLabel,
+        new Error(lastFailure.message || `No R2 clip found for ${requirementLabel}`),
+      );
     }
     return found;
   }
