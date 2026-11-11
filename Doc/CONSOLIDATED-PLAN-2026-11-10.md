@@ -1,9 +1,9 @@
 # msharing0008 Consolidated Delivery Plan
 
-**Last audited:** 2026-11-10  
+**Last audited:** 2026-11-12
 **Repository:** `idetsminmh1995-spec/msharing0008`  
-**Current HEAD:** `b05ee67`  
-**Purpose:** This is the implementation ledger for the work completed across the Notation Engine and the five instrument video pages. It records code that exists, tests that prove it, evidence produced, and work intentionally still outside the current delivery.
+**Current branch:** `main`
+**Purpose:** This is the implementation ledger for the work completed across the Notation Engine and the production video pages. It records code that exists, tests that prove it, evidence produced, and work intentionally still outside the current delivery.
 
 ## 1. Delivery goals
 
@@ -42,7 +42,7 @@
 
 ### 2.4 Verification
 
-- Current local Notation Engine verification: **1054 passed, 0 failed**.
+- Current local Notation Engine verification: **1068 passed, 0 failed**.
 - The engine source, compiled distribution, and website bundle are kept aligned by the notation verification/build workflow.
 - Existing visual snapshots and fixture-based tests remain the source of truth for SVG geometry; browser acceptance is used for the host video composition.
 
@@ -82,7 +82,7 @@
 - Count-voice omissions and optional asset skips are surfaced rather than silently ignored.
 - `?debug=1` support makes missing assets visually obvious for QA.
 
-## 4. Propagation to the other instrument pages — complete
+## 4. Propagation to the other instrument pages — complete for the production scope
 
 The shared modules are wired into all five production pages:
 
@@ -101,9 +101,19 @@ The shared modules are wired into all five production pages:
 - grouped gate panel and report actions;
 - frame-relative landscape CSS using `container-type: inline-size` and `--frame-u: calc(100cqw / 960)`.
 
-Portrait and square page-specific layout rules remain intact. This rollout intentionally does not migrate every other repository page (metronome, vocal, cello, viola, bass-cello) because they are outside the five-page acceptance scope.
+Portrait and square page-specific layout rules remain intact. This rollout intentionally does not migrate every other repository page (vocal, cello, viola, bass-cello) because they are outside the five-page acceptance scope. Metronome is separately connected to the Notation Engine for score timing and to VideoEngine for export, but it intentionally renders its metronome design rather than exporting the notation SVG.
 
-### 4.1 Piano score-input correction — complete
+### 4.1 Notation → Video Engine integration audit — 2026-11-12
+
+The connection was checked page by page instead of assuming that Drum's working path automatically covered the other pages:
+
+- **Full notation video export:** Drum, Guitar, Bass Guitar, Piano, and Violin each load the shared `notation-engine.js`, parse MusicXML/MXL, call `renderParsedMusicXml`, retain the returned playback/timing contract, create the export-ready notation SVG through `NotationEngine.exportSvg`, and pass frame segments to the shared `VideoEngine.render`.
+- **Timing-only notation integration:** Metronome loads Notation Engine, uses its parsed MusicXML/MXL playback, tempo, and timeline data, and exports through `VideoEngine.render`. It does not call `exportSvg` because its intended video surface is the metronome design, not a score display.
+- **Not connected yet:** Bass Cello, Cello, Viola, and Vocal remain scaffold pages. They have upload/layout placeholders and engine labels, but do not yet load the notation bundle, call `VideoEngine.render`, or produce an encoded video. They are explicitly not marked complete by this audit.
+
+The shared export boundary is therefore verified for all currently implemented notation-video pages: page-specific engines prepare score and animation state, while `VideoEngine` owns frame-addressed encoding, audio/video segments, cancellation, and final asset checks. No new instrument implementation was started during this audit.
+
+### 4.2 Piano score-input correction — complete
 
 The Piano Video page is now MusicXML/MXL-only for score input. The MIDI file
 slot, `.mid`/`.midi` accept filter, `parseMidiFile()` handler, and MIDI upload
@@ -123,7 +133,7 @@ guards this contract and runs in CI.
 - `tools/test-cross-page-rollout-browser.mjs`: Guitar/Bass/Piano/Violin module loading, audio gate, resize guard, cleanup, 500/800/1400 CSS-pixel viewports, and 100%/150%/200% zoom.
 - `tools/test-video-engine-browser.mjs`: Chromium encoded-output smoke test.
 - `tools/test-video-engine.mjs`: video engine timing/container regression tests.
-- `npm run verify --prefix Engine/notation-engine`: current result 1054 passed, 0 failed.
+- `npm run verify --prefix notation-engine`: current local result **1068 passed, 0 failed**.
 
 ### 5.2 CI
 
