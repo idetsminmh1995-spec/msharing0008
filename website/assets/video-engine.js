@@ -1510,9 +1510,10 @@
 
   async function render(options) {
     validateRenderOptions(options);
-    // Every instrument page shares this gate. R2 photos and the Thank You
-    // video are prepared by the page, but the encoder is the final authority:
-    // never write a video after an asset failure was swallowed upstream.
+    // Every instrument page shares this gate. Pages register mandatory R2
+    // assets here; optional media such as the Thank You clip must not block
+    // export when unavailable. Never write a video after a required-asset
+    // failure was swallowed upstream.
     assertAssetsReady();
     const hasAudio = options.segments.some((segment) => segment.audio);
     if (hasWebCodecs(hasAudio)) {

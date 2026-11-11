@@ -274,18 +274,25 @@
     const cacheKey = keys.join('|');
     const requirementLabel = `Thank You video (${options.aspect || '16x9'} / ${options.kind || 'drum'})`;
     const videoEngine = typeof window !== 'undefined' ? window.VideoEngine : null;
-    videoEngine?.requireAsset?.(requirementLabel);
+    // Outro clips are explicitly optional in the page contract: missing
+    // bucket files must not prevent the main instrument take from exporting.
+    // Callers may opt into the engine's fail-closed gate when an outro is
+    // mandatory for a particular workflow.
+    const isRequired = options.required === true;
+    if (isRequired) videoEngine?.requireAsset?.(requirementLabel);
     if (cache.has(cacheKey)) {
-      videoEngine?.resolveRequired?.(requirementLabel, { source: 'r2', cached: true });
+      if (isRequired) videoEngine?.resolveRequired?.(requirementLabel, { source: 'r2', cached: true });
       return cache.get(cacheKey);
     }
     const failedAt = failureCache.get(cacheKey);
     if (failedAt && Date.now() - failedAt.at < FAILURE_CACHE_MS) {
       lastFailure = failedAt.info;
-      videoEngine?.rejectRequired?.(
-        requirementLabel,
-        new Error(lastFailure.message || `No R2 clip found for ${requirementLabel}`),
-      );
+      if (isRequired) {
+        videoEngine?.rejectRequired?.(
+          requirementLabel,
+          new Error(lastFailure.message || `No R2 clip found for ${requirementLabel}`),
+        );
+      }
       return null;
     }
     failureCache.delete(cacheKey);
@@ -378,19 +385,23 @@
         }
       }
       cache.set(cacheKey, found);
-      videoEngine?.resolveRequired?.(requirementLabel, {
-        source: 'r2',
-        key: found.key,
-        bytes: found.bytes,
-      });
+      if (isRequired) {
+        videoEngine?.resolveRequired?.(requirementLabel, {
+          source: 'r2',
+          key: found.key,
+          bytes: found.bytes,
+        });
+      }
     } else {
       const info = lastFailure || { kind: failureKind, key: keys[keys.length - 1] };
       failureCache.set(cacheKey, { at: Date.now(), info });
       lastFailure = { ...info, attempts, ms: Date.now() - startedAt };
-      videoEngine?.rejectRequired?.(
-        requirementLabel,
-        new Error(lastFailure.message || `No R2 clip found for ${requirementLabel}`),
-      );
+      if (isRequired) {
+        videoEngine?.rejectRequired?.(
+          requirementLabel,
+          new Error(lastFailure.message || `No R2 clip found for ${requirementLabel}`),
+        );
+      }
     }
     return found;
   }

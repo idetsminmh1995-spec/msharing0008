@@ -6,6 +6,8 @@
 
 The companion `website/assets/outro-video.js` adapts a Thank You clip into a render segment. It downloads the clip as a same-origin `Blob`, decodes its audio, seeks each requested video frame, and hands both streams to `VideoEngine.render`.
 
+The Thank You clip is optional by default: if no matching R2 object can be loaded, the page may omit that segment and still export the instrument take. A caller that truly requires an outro can pass `required: true` to `OutroVideo.loadOutro`; only that mode registers the clip with VideoEngine's fail-closed asset gate. Other assets explicitly registered as required continue to block export until ready.
+
 ## 2. Render contract
 
 A page calls the engine with the following shape:
@@ -120,6 +122,7 @@ The pure muxer regression suite is:
 
 ```bash
 node tools/test-video-engine.mjs
+node tools/test-outro-video.mjs
 ```
 
 The suite validates box structure, fast-start ordering, sample offsets, interleaving, timing tables, keyframes, composition offsets, codec descriptions, dimensions, silent video, and edit lists. It also includes a `29.97fps` regression test that verifies no cumulative duration drift.
@@ -132,7 +135,7 @@ node --check tools/test-video-engine.mjs
 git diff --check
 ```
 
-The latest completed update passed **14/14** muxer tests. Static checks also cover JavaScript syntax and patch whitespace.
+The muxer suite currently passes **15/15** tests. The outro suite covers optional-versus-required asset-gate behavior, retry/fallback handling, piano/paino aliases, and streamed response progress. Static checks also cover JavaScript syntax and patch whitespace.
 
 ## 8. Remaining work
 
@@ -195,6 +198,6 @@ HTTP 408, 429, 5xx, network failures, timeouts, and generic unavailable response
 
 The loader reads a streaming response when `response.body.getReader()` is available and reports progress through `onProgress({ loaded, total, attempt, key })`. Environments without a readable stream use the existing `arrayBuffer()` fallback. Piano/paino aliases are generated in the shared key helper rather than in page code.
 
-Successful results now include `source: 'r2'`, `bytes`, `ms`, `attempts`, and `reason: null` while preserving `video`, `key`, `seconds`, and `audio`. Failed optional loads still return `null` for backward compatibility with the current pages; `OutroVideo.lastFailure()` contains the structured `kind`, status, key, attempts, elapsed time, and message needed by the gate/report. Automatic built-in fallback is intentionally S2 work and is not claimed here.
+Successful results now include `source: 'r2'`, `bytes`, `ms`, `attempts`, and `reason: null` while preserving `video`, `key`, `seconds`, and `audio`. Failed optional loads return `null`, preserve diagnostic details in `OutroVideo.lastFailure()`, and do not poison VideoEngine's required-asset gate. Passing `required: true` opts into fail-closed gate reporting for workflows where the outro is mandatory. Automatic built-in fallback is intentionally S2 work and is not claimed here.
 
 S1 verification is recorded in [`Doc/rollout/evidence/outro-loader-s1.json`](../Doc/rollout/evidence/outro-loader-s1.json). It covers 404/403 no-retry, 500/network retry, stream progress, piano/paino aliases, first-byte timeout, structured success metadata, and failure caching. Drum and cross-page Chromium acceptance tests remain green.

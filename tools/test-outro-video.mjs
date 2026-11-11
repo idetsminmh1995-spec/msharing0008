@@ -67,7 +67,7 @@ function makeResponse({ status = 200, bytes = Uint8Array.from([0, 1, 2, 3]), str
   };
 }
 
-function makeContext(fetch, { createVideo = true } = {}) {
+function makeContext(fetch, { createVideo = true, videoEngine = null } = {}) {
   return {
     console,
     setTimeout,
@@ -82,7 +82,7 @@ function makeContext(fetch, { createVideo = true } = {}) {
       if (!createVideo) throw new Error('video should not be created');
       return new FakeVideo();
     } },
-    window: {},
+    window: videoEngine ? { VideoEngine: videoEngine } : {},
     fetch,
   };
 }
@@ -91,6 +91,46 @@ function loadApi(fetch, options) {
   const context = makeContext(fetch, options);
   vm.runInNewContext(source, context, { filename: 'outro-video.js' });
   return context.window.OutroVideo;
+}
+
+// An unavailable outro is optional by default and must not block the main take.
+{
+  const calls = [];
+  const videoEngine = {
+    requireAsset: (...args) => calls.push(['require', ...args]),
+    resolveRequired: (...args) => calls.push(['resolve', ...args]),
+    rejectRequired: (...args) => calls.push(['reject', ...args]),
+  };
+  const api = loadApi(async () => makeResponse({ status: 404 }), {
+    createVideo: false,
+    videoEngine,
+  });
+  const result = await api.loadOutro('https://optional.test', {
+    aspect: 'optional-test', kind: 'drum', retries: 0, retryDelayMs: 0, jitterMs: 0,
+  });
+  assert.equal(result, null);
+  assert.deepEqual(calls, [], 'optional missing outro must not alter the required-assets gate');
+}
+
+// Workflows may explicitly require an outro and retain the fail-closed behavior.
+{
+  const calls = [];
+  const videoEngine = {
+    requireAsset: (...args) => calls.push(['require', ...args]),
+    resolveRequired: (...args) => calls.push(['resolve', ...args]),
+    rejectRequired: (...args) => calls.push(['reject', ...args]),
+  };
+  const api = loadApi(async () => makeResponse({ status: 404 }), {
+    createVideo: false,
+    videoEngine,
+  });
+  const result = await api.loadOutro('https://required.test', {
+    aspect: 'required-test', kind: 'drum', required: true,
+    retries: 0, retryDelayMs: 0, jitterMs: 0,
+  });
+  assert.equal(result, null);
+  assert.equal(calls[0][0], 'require');
+  assert.equal(calls.at(-1)[0], 'reject');
 }
 
 // 404/403 are not retried for the same candidate, and failed results are short-lived cached.
