@@ -273,16 +273,16 @@
     const keys = outroKeys(options);
     const cacheKey = keys.join('|');
     const requirementLabel = `Thank You video (${options.aspect || '16x9'} / ${options.kind || 'drum'})`;
-    const assetLoader = typeof window !== 'undefined' ? window.AssetLoader : null;
-    assetLoader?.requireAsset?.(requirementLabel);
+    const videoEngine = typeof window !== 'undefined' ? window.VideoEngine : null;
+    videoEngine?.requireAsset?.(requirementLabel);
     if (cache.has(cacheKey)) {
-      assetLoader?.resolveRequired?.(requirementLabel, { source: 'r2', cached: true });
+      videoEngine?.resolveRequired?.(requirementLabel, { source: 'r2', cached: true });
       return cache.get(cacheKey);
     }
     const failedAt = failureCache.get(cacheKey);
     if (failedAt && Date.now() - failedAt.at < FAILURE_CACHE_MS) {
       lastFailure = failedAt.info;
-      assetLoader?.rejectRequired?.(
+      videoEngine?.rejectRequired?.(
         requirementLabel,
         new Error(lastFailure.message || `No R2 clip found for ${requirementLabel}`),
       );
@@ -378,7 +378,7 @@
         }
       }
       cache.set(cacheKey, found);
-      assetLoader?.resolveRequired?.(requirementLabel, {
+      videoEngine?.resolveRequired?.(requirementLabel, {
         source: 'r2',
         key: found.key,
         bytes: found.bytes,
@@ -387,7 +387,7 @@
       const info = lastFailure || { kind: failureKind, key: keys[keys.length - 1] };
       failureCache.set(cacheKey, { at: Date.now(), info });
       lastFailure = { ...info, attempts, ms: Date.now() - startedAt };
-      assetLoader?.rejectRequired?.(
+      videoEngine?.rejectRequired?.(
         requirementLabel,
         new Error(lastFailure.message || `No R2 clip found for ${requirementLabel}`),
       );

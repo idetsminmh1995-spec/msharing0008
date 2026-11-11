@@ -1454,6 +1454,36 @@
     }
   }
 
+  // The encoder owns the final asset contract. Pages may fetch photos or the
+  // R2 Thank You clip through helper modules, but only this engine decides
+  // whether an export is allowed to start.
+  const requiredAssets = new Map();
+
+  function requireAsset(label) {
+    if (typeof label !== 'string' || label.length === 0) {
+      throw new TypeError('An asset label is required');
+    }
+    requiredAssets.set(label, { status: 'pending' });
+    return label;
+  }
+
+  function resolveRequired(label, details = {}) {
+    if (!requiredAssets.has(label)) requireAsset(label);
+    requiredAssets.set(label, { status: 'ok', ...details });
+  }
+
+  function rejectRequired(label, error) {
+    if (!requiredAssets.has(label)) requireAsset(label);
+    requiredAssets.set(label, { status: 'error', error: error?.message || String(error) });
+  }
+
+  function assertAssetsReady() {
+    const blocked = [...requiredAssets.entries()].filter(([, item]) => item.status !== 'ok');
+    if (blocked.length === 0) return;
+    const reason = blocked.map(([label, item]) => `${label}: ${item.error || 'not ready'}`).join('; ');
+    throw new Error(`Video export blocked by required assets — ${reason}`);
+  }
+
   function validateRenderOptions(options) {
     if (!options || !Number.isFinite(options.width) || options.width <= 0 ||
         !Number.isFinite(options.height) || options.height <= 0) {
@@ -1483,9 +1513,7 @@
     // Every instrument page shares this gate. R2 photos and the Thank You
     // video are prepared by the page, but the encoder is the final authority:
     // never write a video after an asset failure was swallowed upstream.
-    if (window.AssetLoader && typeof window.AssetLoader.assertReady === 'function') {
-      window.AssetLoader.assertReady();
-    }
+    assertAssetsReady();
     const hasAudio = options.segments.some((segment) => segment.audio);
     if (hasWebCodecs(hasAudio)) {
       const result = await renderWithWebCodecs(options);
@@ -1494,5 +1522,15 @@
     return await recordInRealTime(options);
   }
 
-  window.VideoEngine = { render, isRenderable: hasWebCodecs, muxMp4, muxMp4ToStream, muxWebM };
+  window.VideoEngine = {
+    render,
+    isRenderable: hasWebCodecs,
+    muxMp4,
+    muxMp4ToStream,
+    muxWebM,
+    requireAsset,
+    resolveRequired,
+    rejectRequired,
+    assertAssetsReady,
+  };
 })();

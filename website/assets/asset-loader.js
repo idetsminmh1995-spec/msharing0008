@@ -6,7 +6,6 @@
   const objectUrls = new Map();
   const queue = [];
   const records = [];
-  const required = new Map();
   let active = 0;
 
   function release(img) {
@@ -171,35 +170,6 @@
   function clearRecords() { records.length = 0; }
   function getRecords() { return records.map((record) => ({ ...record })); }
 
-  /**
-   * A page may finish preparing an R2 video/photo and then hand control to
-   * VideoEngine. These marks make that hand-off explicit, so a swallowed
-   * optional-looking fetch failure cannot silently produce a video without
-   * its required visual asset.
-   */
-  function requireAsset(label) {
-    if (typeof label !== 'string' || label.length === 0) throw new TypeError('An asset label is required');
-    required.set(label, { status: 'pending' });
-    return label;
-  }
-
-  function resolveRequired(label, details = {}) {
-    if (!required.has(label)) requireAsset(label);
-    required.set(label, { status: 'ok', ...details });
-  }
-
-  function rejectRequired(label, error) {
-    if (!required.has(label)) requireAsset(label);
-    required.set(label, { status: 'error', error: error?.message || String(error) });
-  }
-
-  function assertReady() {
-    const blocked = [...required.entries()].filter(([, item]) => item.status !== 'ok');
-    if (blocked.length === 0) return;
-    const reason = blocked.map(([label, item]) => `${label}: ${item.error || 'not ready'}`).join('; ');
-    throw new Error(`Video export blocked by required assets — ${reason}`);
-  }
-
   window.AssetLoader = Object.freeze({
     MAX_CONCURRENCY,
     REQUEST_TIMEOUT_MS,
@@ -210,10 +180,6 @@
     objectUrlFor: (img) => objectUrls.get(img) || null,
     clearRecords,
     getRecords,
-    requireAsset,
-    resolveRequired,
-    rejectRequired,
-    assertReady,
     withGateTimeout,
     release,
     revokeAfterRender,
