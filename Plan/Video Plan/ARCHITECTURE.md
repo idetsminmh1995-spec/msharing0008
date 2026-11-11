@@ -90,7 +90,12 @@ node --check Engine/video-engine/source/website/assets/video-engine.js
 
 ### Completed baseline
 
-The current baseline includes strict input validation, deterministic fractional-FPS timing, global multi-segment frame accounting, WebCodecs and MediaRecorder paths, cancellation-safe audio duration, progress phases, device-aware queue limits, grouped MP4 chunks, seekable WritableStream delivery, encoder error propagation, and a Chromium/ffprobe smoke test.
+The current baseline includes:
+- Strict input validation, deterministic fractional-FPS timing, global multi-segment frame accounting.
+- WebCodecs and MediaRecorder paths with cancellation-safe audio duration.
+- Progress phases, device-aware queue limits, grouped MP4 chunks, seekable WritableStream delivery.
+- Encoder error propagation, and a Chromium/ffprobe smoke test.
+- Hardened Outro loader (S0 diagnosis and S1 streaming/retry loader completed in `website/assets/outro-video.js`).
 
 ### Next implementation order
 
