@@ -8,8 +8,8 @@ Repository တစ်ခုလုံးအတွက် Notation Engine၊ Drum Vi
 
 - **Repository delivery / export rollout:** [`Doc/CONSOLIDATED-PLAN-2026-11-10.md`](./Doc/CONSOLIDATED-PLAN-2026-11-10.md)
 - **Drum နှင့် instrument video acceptance:** [`Doc/rollout/README.md`](./Doc/rollout/README.md)
-- **Notation Engine architecture and roadmap:** [`notation-engine/PLAN.md`](./notation-engine/PLAN.md)
-- **Notation Engine actual build status:** [`notation-engine/Doc/STATUS.md`](./notation-engine/Doc/STATUS.md)
+- **Notation Engine architecture and roadmap:** [`Plan/Notation Plan/PLAN.md`](./Plan/Notation%20Plan/PLAN.md)
+- **Notation Engine actual build status:** [`Plan/Notation Plan/Documentation/STATUS.md`](./Plan/Notation%20Plan/Documentation/STATUS.md)
 - **Piano Hand / GLB contact work:** ဤဖိုင်၏ အောက်ပါ piano-specific plan
 
 ---
@@ -57,7 +57,7 @@ Piano Video ရဲ့ **Hands** mode မှာ Piano Hand Engine က သတ်�
 
 ### ပြင်ပြီးသောအချက်များ
 
-- `piano-hand-engine/src/core/performancePlan.ts` ကို ထည့်ပြီး `PerformanceNote → hand split → fingering → key position` ကို `PianoPerformancePlan` တစ်ခုတည်းအဖြစ် ထုတ်ပေးနိုင်အောင် ပြင်ထားသည်။
+- `Engine/piano-hand-engine/src/core/performancePlan.ts` ကို ထည့်ပြီး `PerformanceNote → hand split → fingering → key position` ကို `PianoPerformancePlan` တစ်ခုတည်းအဖြစ် ထုတ်ပေးနိုင်အောင် ပြင်ထားသည်။
 - `SolvedPerformanceNote` data model တွင် `handReason`, `handConfidence`, `fingerSource`, `fingerConfidence`, `keyPosition` နှင့် `diagnostics` ထည့်ထားသည်။
 - Piano page ၏ `getPianoHandPerformance()` သည် သီးခြား split/fingering result ကို ပြန်တည်ဆောက်မည့်အစား `solvePerformancePlan()` ကို အသုံးပြုကာ event များထဲသို့ finger provenance နှင့် diagnostics သယ်ပေးသည်။
 - 3D renderer သည် repeated MIDI pitch များကို မှားယွင်းချိတ်နိုင်သည့် `fingerByMidi` fallback ကို ဖယ်ပြီး stable note ID ဖြင့်သာ finger assignment ချိတ်သည်။
@@ -108,7 +108,7 @@ Phase A ရဲ့ note-level hand/finger mapping အပေါ်မှာ ဆက
 
 ### ပြင်ပြီးသောအချက်များ
 
-- `piano-hand-engine/src/core/motionPlan.ts` ကို ထည့်ပြီး `PianoMotionPlan`, `HandTrajectorySegment`, `FingerContactPlan`, `SampledHandMotion` data model များ တည်ဆောက်ထားသည်။
+- `Engine/piano-hand-engine/src/core/motionPlan.ts` ကို ထည့်ပြီး `PianoMotionPlan`, `HandTrajectorySegment`, `FingerContactPlan`, `SampledHandMotion` data model များ တည်ဆောက်ထားသည်။
 - `sampleHandMotion(plan, timestampMs)` pure sampler ထည့်ထားပြီး frame delta မသုံးဘဲ absolute timestamp မှ hand state ကို ပြန်ပေးသည်။
 - Wrist position နှင့် rotation ကို segment အတွင်း deterministic smoothstep interpolation ဖြင့် sample လုပ်နိုင်သည်။
 - Contact schedule တွင် `APPROACH`, `CONTACT`, `RELEASE` boundaries ကို ခွဲပြီး `releaseEndMs` ပြီးနောက် contact မပြန်ပေးတော့ပါ။
@@ -159,10 +159,10 @@ Phase C တွင် numeric calibration တန်ဖိုးများကိ
 
 ### ပြင်ပြီးသောအချက်များ
 
-- `piano-hand-engine/src/calibration/glbCalibration.ts` ကို ထည့်ပြီး GLB calibration manifest, expected 21-bone finger-chain mapping, manifest validation နှင့် Engine↔GLB point transform API တည်ဆောက်ထားသည်။
+- `Engine/piano-hand-engine/src/calibration/glbCalibration.ts` ကို ထည့်ပြီး GLB calibration manifest, expected 21-bone finger-chain mapping, manifest validation နှင့် Engine↔GLB point transform API တည်ဆောက်ထားသည်။
 - `website/assets/hand/hand-calibration.json` ကို actual `hand_model.glb` skeleton audit အပေါ်အခြေခံ၍ ထည့်ထားသည်။ Manifest တွင် `radius_ulna`, thumb/index/middle/ring/pinky chains နှင့် `Pose_OK`/`RigAction` clips ပါဝင်သည်။
 - Manifest ကို လက်ရှိ `calibrated: false` ထားထားပြီး bone length, fingertip landmark, joint axis နှင့် Engine-to-GLB transform မတိုင်းညှိရသေးကြောင်း asset ထဲတွင် ရှင်းလင်းမှတ်သားထားသည်။
-- `piano-hand-engine/src/calibration/singleFingerContact.ts` ကို ထည့်ပြီး hand, finger, wrist pose, key strike target နှင့် calibration manifest ကို အသုံးပြုသော single-finger contact solver ထည့်ထားသည်။
+- `Engine/piano-hand-engine/src/calibration/singleFingerContact.ts` ကို ထည့်ပြီး hand, finger, wrist pose, key strike target နှင့် calibration manifest ကို အသုံးပြုသော single-finger contact solver ထည့်ထားသည်။
 - Calibration မပြည့်စုံလျှင် solver သည် `calibration-required`/validation failure ဖြင့် fail-closed လုပ်ပြီး synthetic residual ကို visible GLB contact ဟု မကြေညာပါ။
 - Calibrated transform ရှိသောအခါ reachable target ကို residual နှင့် GLB tip position ပြန်ပေးပြီး unreachable target ကို `unreachable` reason ဖြင့် ပြန်ပေးသည်။
 - Phase C အတွက် calibration-required, reachable identity-transform contact, unreachable target, left-hand convention နှင့် changed bone-chain validation tests ထည့်ထားသည်။
@@ -266,7 +266,7 @@ Phase C.1 သည် reproducible GLB audit နှင့် runtime manifest vali
 3. Wrist target သတ်မှတ်ပြီးနောက် assigned finger တစ်ချောင်းစီရဲ့ pose ကို Engine IK နဲ့ ဖြေရှင်းပါမယ်။ GLB ပေါ်မှာ လှုပ်ရှားမှုကို မတိုင်းညှိရသေးတဲ့ `spread` joint ကို လက်ရှိ IK မှာ အသုံးမပြုပါ။
 4. Chord အတွင်း အမှားရှိလျှင် မဖုံးကွယ်ဘဲ Engine rig ရဲ့ residual နဲ့ အောင်မြင်/မအောင်မြင် အခြေအနေကို diagnostic အဖြစ် ဖော်ပြပါမယ်။
 5. Engine browser bundle ကို source ကနေ ပြန်တည်ဆောက်ပြီး typecheck, lint, format check နဲ့ test အားလုံးကို လုပ်ပါမယ်။
-6. ပြင်ဆင်ထားတဲ့ code၊ စမ်းသပ်မှုရလဒ်နဲ့ မပြီးသေးတဲ့အလုပ်တွေကို ဒီ `Plan.md` နဲ့ `piano-engine/BLENDER-3D-PLAN.md` နှစ်ခုလုံးမှာ မှတ်တမ်းတင်ပါမယ်။
+6. ပြင်ဆင်ထားတဲ့ code၊ စမ်းသပ်မှုရလဒ်နဲ့ မပြီးသေးတဲ့အလုပ်တွေကို ဒီ `Plan.md` နဲ့ `Engine/piano-engine/BLENDER-3D-PLAN.md` နှစ်ခုလုံးမှာ မှတ်တမ်းတင်ပါမယ်။
 
 ## GLB ပေါ်က တိကျတဲ့ contact ကို အတည်ပြုဖို့ ကျန်ရှိသောအလုပ်
 
@@ -290,9 +290,9 @@ Phase C.1 သည် reproducible GLB audit နှင့် runtime manifest vali
 
 **စစ်ဆေးမှု။** GitHub `msharing0008` ထဲက Piano Video page, `piano-hand-3d.js`, `piano-hand-engine` source/test နဲ့ GLB metadata ကို စစ်ဆေးခဲ့ပါတယ်။ 12.3 MB GLB ရဲ့ joint ၂၁ ခုနဲ့ renderer ရဲ့ finger-bone mapping အမည်တွေ ကိုက်ညီတာကို အတည်ပြုခဲ့ပါတယ်။ GLB ရဲ့ wrist anchor, fingertip surface, bone length နဲ့ local rotation axis တွေကို Engine rig နဲ့တော့ မတိုင်းညှိရသေးပါ။
 
-**Engine ပြင်ဆင်မှု။** `piano-hand-engine/src/kinematics/inverseKinematics.ts` ကို ထည့်ခဲ့ပါတယ်။ Joint limit မကျော်စေတဲ့ damped-least-squares နည်းလမ်းနဲ့ finger target တစ်ခု သို့မဟုတ် finger target အများအပြားကို wrist pose တစ်ခုအပေါ်မှာ ဖြေရှင်းပြီး mm residual နဲ့ converged အခြေအနေကို ပြန်ပေးပါတယ်။ `src/index.ts` ကနေ API ကို ဖော်ထုတ်ပြီး synthetic rig ပေါ်မှာ လက်လှမ်းမီ/မမီ target, chord လက်ချောင်းများ, တစ်လက်ချောင်းအတွက် ပဋိပက္ခဖြစ်တဲ့ target, spread joint ပိတ်ထားမှု, ဘယ်လက်ပြောင်းပြန်မှုနဲ့ joint limit အတွက် test ထည့်ခဲ့ပါတယ်။ `src/index.ts` ထဲက overview နဲ့ README ထဲက phase status ကို IK အသစ်နဲ့ GLB ကယ်လီဘရေးရှင်း မပြီးသေးကြောင်း ဖော်ပြနိုင်အောင် ပြင်ဆင်ခဲ့ပါတယ်။
+**Engine ပြင်ဆင်မှု။** `Engine/piano-hand-engine/src/kinematics/inverseKinematics.ts` ကို ထည့်ခဲ့ပါတယ်။ Joint limit မကျော်စေတဲ့ damped-least-squares နည်းလမ်းနဲ့ finger target တစ်ခု သို့မဟုတ် finger target အများအပြားကို wrist pose တစ်ခုအပေါ်မှာ ဖြေရှင်းပြီး mm residual နဲ့ converged အခြေအနေကို ပြန်ပေးပါတယ်။ `src/index.ts` ကနေ API ကို ဖော်ထုတ်ပြီး synthetic rig ပေါ်မှာ လက်လှမ်းမီ/မမီ target, chord လက်ချောင်းများ, တစ်လက်ချောင်းအတွက် ပဋိပက္ခဖြစ်တဲ့ target, spread joint ပိတ်ထားမှု, ဘယ်လက်ပြောင်းပြန်မှုနဲ့ joint limit အတွက် test ထည့်ခဲ့ပါတယ်။ `src/index.ts` ထဲက overview နဲ့ README ထဲက phase status ကို IK အသစ်နဲ့ GLB ကယ်လီဘရေးရှင်း မပြီးသေးကြောင်း ဖော်ပြနိုင်အောင် ပြင်ဆင်ခဲ့ပါတယ်။
 
-**Key release ပြင်ဆင်မှု။** `piano-hand-engine/src/keyboard/keyPosition.ts` မှာ `isKeyContactActive()` ထည့်ခဲ့ပါတယ်။ Note event ကို note end ပြီးနောက် release 70 ms ပြည့်တဲ့အထိ renderer ထဲမှာ ဆက်ထားနိုင်ပါတယ်။ Note onset, note-off နဲ့ release အဆုံး boundary တွေအတွက် test တွေထည့်ခဲ့ပါတယ်။
+**Key release ပြင်ဆင်မှု။** `Engine/piano-hand-engine/src/keyboard/keyPosition.ts` မှာ `isKeyContactActive()` ထည့်ခဲ့ပါတယ်။ Note event ကို note end ပြီးနောက် release 70 ms ပြည့်တဲ့အထိ renderer ထဲမှာ ဆက်ထားနိုင်ပါတယ်။ Note onset, note-off နဲ့ release အဆုံး boundary တွေအတွက် test တွေထည့်ခဲ့ပါတယ်။
 
 **3D renderer ပြင်ဆင်မှု။** `website/assets/piano-hand-3d.js` က အသံထွက်နေတဲ့ note ရဲ့အရောင်နဲ့ release ဆက်ဖြစ်နေတဲ့ contact event ကို သီးခြားတွက်ပါတယ်။ Wrist target ကို Engine coordinate အဖြစ်ပြောင်းပြီး assigned finger တစ်ချောင်းစီအတွက် Engine IK လုပ်ပါတယ်။ GLB ရဲ့ spread axis ကို မကယ်လီဘရေးရှင်းရသေးလို့ solver မှာ spread ကို အသုံးမပြုပါ။ HTML `data-*` field တွေမှာ Engine rig ရဲ့ IK residual/converged အခြေအနေကိုသာ ရေးပြီး လက်အတွက် IK target မရှိတဲ့ frame တိုင်းမှာ ဖျက်ပေးပါတယ်။ အဲဒီတန်ဖိုးတွေကို GLB ပေါ်က မြင်ရတဲ့ contact တိုင်းတာချက်လို့ မယူဆရပါ။
 
@@ -573,12 +573,42 @@ User က သီးခြားပြောင်းလဲမပြောသေ�
 | ရက်စွဲ | အဆင့် | မှတ်တမ်း | အခြေအနေ |
 |---|---|---|---|
 | 2026-11-11 | Plan integration | User ပေးထားသော `PLAN-thank-you-outro.md` ကို `Plan.md` နှင့် `Doc/PLAN-thank-you-outro.md` ထဲ ပေါင်းစည်းပြီး repository-specific continuation ထည့်ထားသည်။ | ပြီး |
-| 2026-11-11 | S0 | လက်ရှိ `outro-video.js`, page call-sites, existing outro unit test နှင့် five-page rollout ကို code-level inventory လုပ်ထားသည်။ Live Worker/R2 diagnosis မစရသေး။ | တစ်စိတ်တစ်ပိုင်း |
-| — | S1–S7 | Loader hardening, built-in ending, page policy, Worker, R2 assets, browser tests, release docs | `ready` အတည်ပြုချက် စောင့်နေ |
+| 2026-11-11 | S0 | `outro-video.js`, page call-sites, Worker source, live Worker/R2 probes, clip metadata နှင့် failure classifications ကို `Doc/rollout/evidence/outro-diagnosis.json` ထဲ မှတ်တမ်းတင်ထားသည်။ | ပြီး |
+| 2026-11-10 | S1 | `outro-video.js` တွင် first-byte/stall/total/metadata timeout၊ retry/backoff၊ aliases၊ streaming progress၊ structured success/failure နှင့် short failure cache ထည့်ပြီး `outro-loader-s1.json` ဖြင့် အထောက်အထားပြထားသည်။ | ပြီး |
+| 2026-11-12 | Video Engine implementation audit | Core `video-engine.js` တွင် Plan မှ မဖော်ပြထားသေးသော WebCodecs/MediaRecorder paths၊ MP4/WebM muxing၊ fractional-FPS timing၊ multi-segment clock၊ cancellation-safe audio၊ memory budget၊ grouped chunks နှင့် `WritableStream` API ရှိကြောင်း စစ်ဆေးပြီး မှတ်တမ်းတင်သည်။ | ပြီး |
+| 2026-11-12 | S2–S7 gap audit | Built-in ending, automatic fallback policy, complete page report schema, Worker Range/304, full R2 manifest, six-style golden frames, fallback browser matrix, stamp/CI release evidence မပြီးသေးကြောင်း အတည်ပြုသည်။ | မပြီးသေး |
 
 ### 9.6 Plan boundary
 
 ဒီ plan သည် R2 clip ကို ပို့တင်မည့် cache/custom-domain architecture၊ general export pinning၊ GLB license နှင့် Piano hand calibration ကို မပြောင်းပါ။ Built-in ending ၏ network-independent guarantee ကိုပဲ အဓိကထားမည်။ User က `ready` ဟု အတည်ပြုပြီးမှ S0 evidence စုဆောင်းခြင်း၊ ထို့နောက် S1/S2 ကို တစ်ဆင့်ချင်း စတင်မည်။
+
+### 9.7 2026-11-12 — Video Plan ↔ Code implementation audit
+
+#### Plan ထဲရှိပြီး code အကောင်အထည်ဖော်ထားသောအချက်များ
+
+- `website/assets/video-engine.js` သည် single render boundary အဖြစ် segment timeline၊ async frame drawing၊ WebCodecs render path နှင့် MediaRecorder fallback ကို အကောင်အထည်ဖော်ထားသည်။
+- WebCodecs path တွင် codec probing၊ H.264/AAC → MP4 နှင့် VP8/VP9/Opus → WebM fallback၊ encoder backpressure၊ frame/audio resource cleanup၊ encoder error propagation နှင့် cancellation-safe audio duration ပါဝင်သည်။
+- MP4 muxer တွင် `moov`-before-`mdat` fast-start၊ `stts`/`ctts`/`stss`/`stsc`/`stsz`/`stco`/`co64` tables၊ edit lists၊ grouped media chunks နှင့် `muxMp4ToStream()` ပါဝင်သည်။
+- Fractional FPS global timestamp၊ multiple-segment frame cursor၊ device-memory budget၊ PCM release နှင့် memory telemetry ကို code/documentation/test ဖြင့် ထည့်ထားသည်။
+- S0/S1 loader အတွက် `outro-video.js`, `tools/test-outro-video.mjs`, `outro-diagnosis.json` နှင့် `outro-loader-s1.json` ရှိပြီး loader tests pass ဖြစ်သည်။
+
+#### Plan ရှိသော်လည်း code မပြီးသေးသောအချက်များ
+
+- `builtin-ending.js` သို့မဟုတ် equivalent built-in Thank You canvas segment မရှိသေးပါ။ R2 ပျက်လျှင် automatic built-in fallback မဖြစ်သေးပါ။
+- Drum, Guitar, Bass Guitar, Piano, Violin နှင့် Metronome call-sites များသည် `loadOutro()` null ပြန်လျှင် outro မပါဘဲ ဆက် export နိုင်သေးသည်။ `outro.source: 'builtin'` policy နှင့် render-blocking rule မချိတ်ရသေးပါ။
+- `render-report.js` နှင့် page gate များတွင် Plan သတ်မှတ်ထားသော nested `outro` schema (`source`, `key`, `seconds`, `bytes`, `ms`, `attempts`, `reason`, `fallback`, `state`) ကို page အားလုံးအတွက် မပြည့်စုံသေးပါ။
+- Worker တွင် current source inspection အရ Range request/206, `If-None-Match`/304, request ID error shape နှင့် origin allow-list enforcement မရှိသေးပါ။
+- R2 naming/codec manifest အပြည့်အစုံ၊ six aspect/style built-in golden frames၊ blocked-R2 fallback browser matrix နှင့် encoded final-ending assertions မရှိသေးပါ။
+- CI/release checklist တွင် S2–S7 evidence အပြည့်အစုံ မချိတ်ရသေးပါ။
+
+#### Code ရှိသော်လည်း Plan ထဲတွင် ယခင်က မပြည့်စုံသောအချက်များ
+
+- Core Video Engine ၏ MP4/WebM container writers၊ streaming sink၊ fractional-FPS timing၊ cancellation audio trim၊ memory policy/telemetry နှင့် encoder failure propagation ကို အထက်ပါ implementation record တွင် ထည့်ပြီးဖြစ်သည်။
+- လက်ရှိ implementation verification ကို `node tools/test-video-engine.mjs` (**15/15**), `node --test website/tests/video-engine-cleanup.test.mjs` (**4/4**), `node tools/test-outro-video.mjs` (pass) နှင့် JS syntax checks ဖြင့် အတည်ပြုထားသည်။
+
+#### လက်ရှိအလုပ်အစီအစဉ်
+
+နောက်တစ်ဆင့်သည် S2 built-in ending ကို သီးခြား implement/test လုပ်ခြင်းဖြစ်ပြီး၊ ထို့နောက် S3 ကို Drum reference page မှ စတင်ကာ remaining five call-sites သို့ ကူးမည်။ S4 Worker changes သည် S0 evidence နှင့် ခွဲထားသော commit ဖြစ်ရမည်။ S2/S3 မပြီးမချင်း video export ကို “ending အမြဲပါသည်” ဟု မမှတ်သားရ။
 
 
 ## 10. မရေးရသေးသော technical contract များ
@@ -687,11 +717,11 @@ Built-in renderer တွင် exception ဖြစ်လျှင် R2 path က
 
 ## 14. User approval gate နှင့် လက်ရှိအခြေအနေ
 
-လက်ရှိအခြေအနေမှာ plan နှင့် technical continuation သာ ပြီးထားပြီး coding မစရသေးပါ။ အောက်ပါ approval တစ်ကြောင်းရမှ S0 diagnosis ကို စတင်မည်။
+S0 diagnosis နှင့် S1 loader hardening ကို repository ထဲတွင် အကောင်အထည်ဖော်ပြီး evidence/test ဖြင့် အတည်ပြုထားသည်။ S2 built-in ending နှင့် S3 page fallback policy သည် မစရသေးသော next implementation scope ဖြစ်သည်။ S2/S3 runtime behavior ကို ပြောင်းမည့်အချိန်တွင် user approval gate ကို ဆက်လက်လေးစားမည်။
 
-> **“Thank You outro plan အတိုင်း S0 ကို စပါ”**
+> **နောက်တစ်ဆင့် approval စာသား:** “Thank You outro plan အတိုင်း S2 built-in ending ကို စပါ”
 
-အတည်ပြုချက်ရပြီးနောက် S0 diagnosis ကို အရင်လုပ်ပြီး result ကို plan work log ထဲ ဖြည့်မည်။ S0 ပြီးလျှင် loader hardening သို့ တန်းမသွားဘဲ diagnosis result နှင့် အညီ လိုအပ်သည့် S1/S2 order ကို ပြန်တင်ပြမည်။
+S0/S1 ကို ပြန်မစဘဲ S2 implementation ကို သီးခြား commit/test/evidence checkpoint ဖြင့် စရမည်။ S2 ပြီးလျှင်သာ S3 Drum reference page integration ကို စမည်။
 
 
 ## 15. File-by-file implementation map
@@ -873,7 +903,7 @@ Before marking this plan complete, the following evidence must exist and be link
 
 ### Current plan status
 
-Sections 15–23 complete the remaining written specification. The plan is now implementation-ready but remains **not started** until the approval gate in Section 14 is satisfied. The next action after approval is S0 diagnosis, not S1 coding.
+Sections 15–23 complete the remaining written specification. S0 diagnosis and S1 loader hardening are now **complete** with evidence and passing tests. S2 built-in ending is the next implementation checkpoint; S3–S7 remain open.
 
 
 ## 24. S0 Diagnosis ပြီးစီးမှု မှတ်တမ်း — 2026-11-11
@@ -898,7 +928,7 @@ S0 ကို coding မပြုဘဲ live Worker/R2 probe၊ repository source
 
 S0 result သည် **H1/H6 transport/timeout risk ကို confirmed**, **H2 naming mismatch ကို confirmed**, **H3 GitHub Pages origin အတွက် မပျက်သော်လည်း wildcard CORS ကို confirmed**, **H4 codec failure မတွေ့**, **H5 deployed source အတည်မပြုနိုင်သော်လည်း live Worker သည် repository ၏ no-Range/no-304 behavior နှင့် ကိုက်** ဟု သတ်မှတ်သည်။
 
-ထို့ကြောင့် နောက်တစ်ဆင့်သည် S1 loader hardening နှင့် S2 built-in ending ဖြစ်ရမည်။ Current 10-second full-body fetch ကို အားကိုးပြီး S3 page policy မပြင်ရ။ Worker Range/304/requestId ပြင်ဆင်မှုသည် အကျိုးရှိသော်လည်း S4 အဖြစ် client fallback နှင့် သီးခြားထားရမည်။
+ထို့ကြောင့် S1 loader hardening သည် ပြီးစီးပြီးဖြစ်သောကြောင့် နောက်တစ်ဆင့်သည် S2 built-in ending ဖြစ်ရမည်။ Current full-body fetch ကို အားကိုးပြီး S3 page policy မပြင်ရ။ Worker Range/304/requestId ပြင်ဆင်မှုသည် အကျိုးရှိသော်လည်း S4 အဖြစ် client fallback နှင့် သီးခြားထားရမည်။
 
 ### မပြီးသေးသော S0 အကန့်အသတ်
 
@@ -910,7 +940,8 @@ Cloudflare dashboard/Worker observability မရသဖြင့် live deployme
 |---|---|---|---|
 | 2026-11-11 | S0 | Live Worker/R2 known key, missing key, OPTIONS, Range, If-None-Match, CORS, timing, clip download နှင့် ffprobe စစ်ဆေးပြီး JSON evidence သိမ်းခဲ့သည်။ | **ပြီး** — H1/H6 risk နှင့် H2 naming mismatch အတည်ပြု; S1/S2 ကို ဆက်သင့် |
 | 2026-11-11 | S0 | `outro-diagnosis.json` ထဲတွင် source inspection, live probes, media metadata, matrix samples, limitations နှင့် recommendation မှတ်တမ်းတင်ခဲ့သည်။ | **ပြီး** |
-| — | S1/S2 | Loader hardening နှင့် built-in ending | S0 result အပေါ်မူတည်၍ နောက်တစ်ဆင့် |
+| 2026-11-10 | S1 | Loader hardening, retry/timeout/alias/progress နှင့် structured result ကို implement/test လုပ်ခဲ့သည်။ | **ပြီး** — S2 built-in ending ကို ဆက်လုပ်ရန် |
+| — | S2 | Built-in ending နှင့် automatic fallback | **မစရသေး** |
 
 S0 diagnosis evidence ဖိုင်ကို ပြင်ပြီးသောအခါ plan ၏ S0 status သည် **complete** ဖြစ်သည်။ S1/S2 ကို စတင်ခြင်းသည် S0 ပြီးကြောင်းကို အတည်ပြုပြီးမှသာ လုပ်ရမည့် သီးခြားအဆင့် ဖြစ်သည်။
 

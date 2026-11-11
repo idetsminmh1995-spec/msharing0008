@@ -272,10 +272,27 @@
   async function loadOutro(apiBase, options = {}) {
     const keys = outroKeys(options);
     const cacheKey = keys.join('|');
-    if (cache.has(cacheKey)) return cache.get(cacheKey);
+    const requirementLabel = `Thank You video (${options.aspect || '16x9'} / ${options.kind || 'drum'})`;
+    const videoEngine = typeof window !== 'undefined' ? window.VideoEngine : null;
+    // Outro clips are explicitly optional in the page contract: missing
+    // bucket files must not prevent the main instrument take from exporting.
+    // Callers may opt into the engine's fail-closed gate when an outro is
+    // mandatory for a particular workflow.
+    const isRequired = options.required === true;
+    if (isRequired) videoEngine?.requireAsset?.(requirementLabel);
+    if (cache.has(cacheKey)) {
+      if (isRequired) videoEngine?.resolveRequired?.(requirementLabel, { source: 'r2', cached: true });
+      return cache.get(cacheKey);
+    }
     const failedAt = failureCache.get(cacheKey);
     if (failedAt && Date.now() - failedAt.at < FAILURE_CACHE_MS) {
       lastFailure = failedAt.info;
+      if (isRequired) {
+        videoEngine?.rejectRequired?.(
+          requirementLabel,
+          new Error(lastFailure.message || `No R2 clip found for ${requirementLabel}`),
+        );
+      }
       return null;
     }
     failureCache.delete(cacheKey);
@@ -368,10 +385,23 @@
         }
       }
       cache.set(cacheKey, found);
+      if (isRequired) {
+        videoEngine?.resolveRequired?.(requirementLabel, {
+          source: 'r2',
+          key: found.key,
+          bytes: found.bytes,
+        });
+      }
     } else {
       const info = lastFailure || { kind: failureKind, key: keys[keys.length - 1] };
       failureCache.set(cacheKey, { at: Date.now(), info });
       lastFailure = { ...info, attempts, ms: Date.now() - startedAt };
+      if (isRequired) {
+        videoEngine?.rejectRequired?.(
+          requirementLabel,
+          new Error(lastFailure.message || `No R2 clip found for ${requirementLabel}`),
+        );
+      }
     }
     return found;
   }
@@ -497,6 +527,82 @@
     await presented(video);
   }
 
+  const BUILTIN_DURATION = 3;
+  const BUILTIN_FADE_IN = 0.4;
+
+  function smoothstep(value) {
+    const t = Math.max(0, Math.min(1, value));
+    return t * t * (3 - 2 * t);
+  }
+
+  function displayKind(kind) {
+    return String(kind || 'instrument')
+      .replace(/[-_]+/g, ' ')
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
+  /** Creates a deterministic, network-independent ending card. */
+  function createBuiltin(options = {}) {
+    const style = options.style === 'white' ? 'white' : 'black';
+    const kind = options.kind || 'instrument';
+    const duration = Number.isFinite(options.duration) && options.duration > 0 ? options.duration : BUILTIN_DURATION;
+    const fadeIn = Number.isFinite(options.fadeIn) && options.fadeIn >= 0 ? options.fadeIn : BUILTIN_FADE_IN;
+    const background = style === 'white' ? '#fbfaf8' : '#111318';
+    const foreground = style === 'white' ? '#17191f' : '#f8f4ed';
+    return {
+      source: 'builtin',
+      key: null,
+      seconds: duration,
+      bytes: 0,
+      ms: 0,
+      attempts: Number.isFinite(options.attempts) ? options.attempts : 0,
+      reason: options.reason || 'builtin-fallback',
+      fallback: true,
+      state: 'builtin-ready',
+      fallbackKind: null,
+      video: null,
+      logoFallback: true,
+      async audio() { return null; },
+      draw(ctx, canvas, at) {
+        if (!ctx || !canvas) return false;
+        const alpha = fadeIn === 0 ? 1 : smoothstep(at / fadeIn);
+        const shortSide = Math.max(1, Math.min(canvas.width, canvas.height));
+        ctx.save?.();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = background;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = foreground;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = `700 ${Math.max(18, Math.round(shortSide * 0.075))}px sans-serif`;
+        ctx.fillText('MusicNote', canvas.width / 2, canvas.height * 0.38);
+        ctx.font = `600 ${Math.max(14, Math.round(shortSide * 0.035))}px sans-serif`;
+        ctx.fillText('Thank you for watching', canvas.width / 2, canvas.height * 0.54);
+        ctx.font = `500 ${Math.max(11, Math.round(shortSide * 0.022))}px sans-serif`;
+        ctx.fillText(displayKind(kind), canvas.width / 2, canvas.height * 0.63);
+        if (options.siteUrl) {
+          ctx.font = `400 ${Math.max(10, Math.round(shortSide * 0.018))}px sans-serif`;
+          ctx.fillText(String(options.siteUrl), canvas.width / 2, canvas.height * 0.72);
+        }
+        ctx.restore?.();
+        return true;
+      },
+    };
+  }
+
+  /** Resolves one source so pages cannot silently omit the ending. */
+  async function resolve(apiBase, options = {}) {
+    const r2 = await loadOutro(apiBase, { ...options, required: false });
+    if (r2) return { ...r2, fallback: false, state: 'r2-ready', fallbackKind: null };
+    const failure = lastFailure || {};
+    return createBuiltin({
+      ...options,
+      reason: failure.kind || 'builtin-fallback',
+      attempts: failure.attempts || 0,
+    });
+  }
+
   /**
    * The clip as a segment of a render: its own length, its own sound,
    * and one seeked frame per frame of video.
@@ -505,6 +611,13 @@
    * same way and there is one place this has to be right.
    */
   function outroSegment(outro, audio, fps) {
+    if (outro.source === 'builtin') {
+      return {
+        seconds: outro.seconds,
+        ...(audio ? { audio } : {}),
+        draw: async (ctx, at) => { outro.draw(ctx, ctx.canvas, at); },
+      };
+    }
     const rate = Number.isFinite(fps) && fps > 0 ? fps : DEFAULT_FPS;
     // Each frame is asked for in the MIDDLE of its own slice of time,
     // not on the edge of it. A clip's frames begin where its container
@@ -540,6 +653,8 @@
     outroKeys,
     sharedUrl,
     loadOutro,
+    createBuiltin,
+    resolve,
     lastFailure: () => lastFailure,
     outroSource,
     drawCover,

@@ -6,13 +6,13 @@
 <title>Drum MIDI → Video</title>
 <style>
   /* Bravura is the SMuFL music font the Notation Engine's glyph metrics come
-     from (notation-engine/src/glyphs/data/bravura_metadata.json). The engine
+     from (Engine/notation-engine/src/glyphs/data/bravura_metadata.json). The engine
      emits font-family="Bravura", so without this the noteheads, clefs, rests
      and accidentals all render as blank boxes. SIL Open Font License 1.1,
      pinned release: steinbergmedia/bravura tag bravura-1.482. */
   @font-face {
     font-family: 'Bravura';
-    src: url('../notation-engine/dist/fonts/Bravura.woff2?v=1.482') format('woff2');
+    src: url('../Engine/notation-engine/dist/fonts/Bravura.woff2?v=1.482') format('woff2');
     font-display: block;
   }
   :root {
@@ -208,7 +208,7 @@
       <div class="canvas-wrap">
         <canvas id="canvas" width="1280" height="720"></canvas>
       </div>
-      <!-- The Notation Engine (TypeScript+SVG, from-scratch, notation-engine/
+      <!-- The Notation Engine (TypeScript+SVG, from-scratch, Engine/notation-engine/
            folder) renders here. The old VexFlow-based "Notation Engine 2" was
            removed entirely; this is the only notation renderer in the app.
            NOTE: the SVG uses SMuFL glyphs, so a Bravura webfont must be
@@ -238,9 +238,9 @@
 </div>
 
 <!-- The Notation Engine's built bundle (committed to the repo -- GitHub Pages
-     has no build step; see notation-engine/.gitignore). Exposes the global
+     has no build step; see Engine/notation-engine/.gitignore). Exposes the global
      `NotationEngine`, including renderFromMusicXml(). -->
-<script src="../notation-engine/dist/notation-engine.js?v=7d4c19cffd3a"></script>
+<script src="../Engine/notation-engine/dist/notation-engine.js?v=776487a38102"></script>
 <script src="notation-overlay.js?v=1"></script>
 <script>
   // Self-diagnosis: if the browser served a stale cached page, or the bundle
@@ -251,7 +251,7 @@
     if (typeof NotationEngine === 'undefined') {
       console.error(
         '[Notation Engine] FAILED TO LOAD. The <script> tag did not define the ' +
-        'NotationEngine global -- check that notation-engine/dist/notation-engine.js ' +
+        'NotationEngine global -- check that Engine/notation-engine/dist/notation-engine.js ' +
         'is reachable (404?) from this page.'
       );
       return;
@@ -791,7 +791,7 @@
   async function getBravuraFontDataUrl() {
     if (!bravuraFontDataUrlPromise) {
       bravuraFontDataUrlPromise = (async () => {
-        const fontUrl = new URL('../notation-engine/dist/fonts/Bravura.woff2?v=1.482', document.baseURI);
+        const fontUrl = new URL('../Engine/notation-engine/dist/fonts/Bravura.woff2?v=1.482', document.baseURI);
         const response = await fetch(fontUrl);
         if (!response.ok) throw new Error(`Could not load the Bravura music font (${response.status}).`);
         const bytes = new Uint8Array(await response.arrayBuffer());

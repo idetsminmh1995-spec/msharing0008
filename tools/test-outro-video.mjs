@@ -67,7 +67,7 @@ function makeResponse({ status = 200, bytes = Uint8Array.from([0, 1, 2, 3]), str
   };
 }
 
-function makeContext(fetch, { createVideo = true } = {}) {
+function makeContext(fetch, { createVideo = true, videoEngine = null } = {}) {
   return {
     console,
     setTimeout,
@@ -82,7 +82,7 @@ function makeContext(fetch, { createVideo = true } = {}) {
       if (!createVideo) throw new Error('video should not be created');
       return new FakeVideo();
     } },
-    window: {},
+    window: videoEngine ? { VideoEngine: videoEngine } : {},
     fetch,
   };
 }
@@ -91,6 +91,46 @@ function loadApi(fetch, options) {
   const context = makeContext(fetch, options);
   vm.runInNewContext(source, context, { filename: 'outro-video.js' });
   return context.window.OutroVideo;
+}
+
+// An unavailable outro is optional by default and must not block the main take.
+{
+  const calls = [];
+  const videoEngine = {
+    requireAsset: (...args) => calls.push(['require', ...args]),
+    resolveRequired: (...args) => calls.push(['resolve', ...args]),
+    rejectRequired: (...args) => calls.push(['reject', ...args]),
+  };
+  const api = loadApi(async () => makeResponse({ status: 404 }), {
+    createVideo: false,
+    videoEngine,
+  });
+  const result = await api.loadOutro('https://optional.test', {
+    aspect: 'optional-test', kind: 'drum', retries: 0, retryDelayMs: 0, jitterMs: 0,
+  });
+  assert.equal(result, null);
+  assert.deepEqual(calls, [], 'optional missing outro must not alter the required-assets gate');
+}
+
+// Workflows may explicitly require an outro and retain the fail-closed behavior.
+{
+  const calls = [];
+  const videoEngine = {
+    requireAsset: (...args) => calls.push(['require', ...args]),
+    resolveRequired: (...args) => calls.push(['resolve', ...args]),
+    rejectRequired: (...args) => calls.push(['reject', ...args]),
+  };
+  const api = loadApi(async () => makeResponse({ status: 404 }), {
+    createVideo: false,
+    videoEngine,
+  });
+  const result = await api.loadOutro('https://required.test', {
+    aspect: 'required-test', kind: 'drum', required: true,
+    retries: 0, retryDelayMs: 0, jitterMs: 0,
+  });
+  assert.equal(result, null);
+  assert.equal(calls[0][0], 'require');
+  assert.equal(calls.at(-1)[0], 'reject');
 }
 
 // 404/403 are not retried for the same candidate, and failed results are short-lived cached.
@@ -175,4 +215,34 @@ function loadApi(fetch, options) {
   assert.ok(Date.now() - started < 1000);
 }
 
-console.log('outro-video S1 tests passed');
+// Built-in ending is deterministic, network-independent, and uses the shared segment contract.
+{
+  const api = loadApi(async () => { throw new Error('network must not be used'); }, { createVideo: false });
+  const ending = api.createBuiltin({ aspect: '9x16', kind: 'piano', style: 'white', siteUrl: null });
+  assert.equal(ending.source, 'builtin');
+  assert.equal(ending.seconds, 3);
+  assert.equal(ending.state, 'builtin-ready');
+  assert.equal(ending.fallback, true);
+  assert.equal(await ending.audio({}), null);
+  const calls = [];
+  const ctx = {
+    save() {}, restore() {}, fillRect(...args) { calls.push(['fillRect', ...args]); }, fillText(...args) { calls.push(['fillText', ...args]); },
+  };
+  assert.equal(ending.draw(ctx, { width: 1080, height: 1920 }, 0), true);
+  assert.ok(calls.some(([name]) => name === 'fillRect'));
+  assert.ok(calls.filter(([name]) => name === 'fillText').length >= 3);
+}
+
+// resolve() source-locks an R2 failure to the built-in segment instead of returning null.
+{
+  const api = loadApi(async () => makeResponse({ status: 404 }), { createVideo: false });
+  const result = await api.resolve('https://fallback.test', {
+    aspect: 'resolve-test', kind: 'drum', retries: 0, retryDelayMs: 0, jitterMs: 0,
+  });
+  assert.equal(result.source, 'builtin');
+  assert.equal(result.state, 'builtin-ready');
+  assert.equal(result.reason, 'not-found');
+  assert.equal(api.outroSegment(result, null, 30).seconds, 3);
+}
+
+console.log('outro-video S1-S3 tests passed');

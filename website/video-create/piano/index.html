@@ -8,7 +8,7 @@
 <link rel="preload" href="../../assets/fonts/Bravura.woff2?v=1.482" as="font" type="font/woff2" crossorigin>
 <style>
   /* Bravura is the SMuFL music font the Notation Engine's glyph metrics
-     come from (notation-engine/src/glyphs/data/bravura_metadata.json).
+     come from (Engine/notation-engine/src/glyphs/data/bravura_metadata.json).
      The engine emits font-family="Bravura" on every notehead, clef, rest,
      flag, accidental and time-signature digit it draws -- so WITHOUT this
      rule the browser has nothing to draw them with and every one of them
@@ -574,19 +574,20 @@
   #assetGatePanel[data-status="error"]{border-color:#e3a4aa;background:#fff8f8;}
 </style>
 <!-- The real Notation Engine bundle (github.com/idetsminmh1995-spec/msharing0008/notation-engine) -->
-<script src="../../assets/notation-engine.js?v=7d4c19cffd3a"></script>
+<script src="../../assets/notation-engine.js?v=776487a38102"></script>
 <!-- The piano stage: the keyboard, and the notes falling onto it.
-     piano-engine/, TypeScript + SVG, built to this bundle. -->
+     Engine/piano-engine/, TypeScript + SVG, built to this bundle. -->
 <script src="../../assets/piano-engine.js?v=6a641f50"></script>
 <!-- Finds the count voices in the bucket whatever they were named. -->
 <script src="../../assets/voice-samples.js?v=609facad"></script>
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
-<script src="../../assets/outro-video.js?v=521fc4cb"></script>
+<script src="../../assets/outro-video.js?v=optional-outro-20261111"></script>
 <!-- The video engine: renders frames rather than recording them. -->
-<script src="../../assets/asset-loader.js?v=20261110"></script>
+<script src="../../assets/asset-loader.js?v=20261111"></script>
 <script src="../../assets/render-report.js?v=1"></script>
 <script src="../../assets/video-export-stability.js?v=1"></script>
-<script src="../../assets/video-engine.js?v=9c8e90f0"></script>
+<script src="../../assets/video-engine.js?v=r2gate1"></script>
+<script src="../../assets/video-asset-gate.js?v=shared-gate-20261111"></script>
 <!-- Physical piano geometry, hand splitting and fingering for the Hands renderer. -->
 <script src="../../assets/piano-hand-engine.js?v=0.1.1"></script>
 <script type="importmap">
@@ -1074,7 +1075,7 @@
 
   // --- Real Notation Engine wiring -----------------------------------
   // Renders actual notation via the same notation-engine.js this repo
-  // builds and tests (notation-engine/), not a static mockup. Nothing
+  // builds and tests (Engine/notation-engine/), not a static mockup. Nothing
   // loads until the person actually picks a file via the Upload File
   // card above -- there used to be a demo file auto-loaded on every
   // page open, which made a plain refresh look like an uploaded file
@@ -1406,7 +1407,7 @@
 
 
   // --- The piano stage (card 3) -------------------------------------
-  // piano-engine/ draws Falling Notes as SVG. Piano Hand Engine supplies
+  // Engine/piano-engine/ draws Falling Notes as SVG. Piano Hand Engine supplies
   // physical key geometry, score-aware hand splits, fingering and strike
   // points to the Hands design; the GLB/WebGL renderer consumes that data.
   const pianoStage = document.getElementById('pianoStage');
@@ -2986,6 +2987,17 @@
   const genLabel = document.getElementById('genLabel');
   const cancelBtn = document.getElementById('cancelBtn');
   const costLine = document.getElementById('costLine');
+  const videoAssetGate = VideoAssetGate.create({
+    page: 'piano',
+    groups: [
+      { id: 'source', label: 'Source file', required: true },
+      { id: 'scene', label: 'Video frame', required: true },
+      { id: 'audio', label: 'Audio mix', required: true },
+      { id: 'score', label: 'Notation / score overlay', required: true },
+      { id: 'count', label: 'Count-in / voice samples', required: false },
+      { id: 'outro', label: 'Thank You ending', required: true },
+    ],
+  });
 
   const CAPTURE_FPS = 30;
   /** 1080 on the short side, whichever shape is being made. */
@@ -3524,6 +3536,8 @@
     audioPlayer.pause();
     audioPlayer.currentTime = 0;
     setGenerating(true);
+    videoAssetGate.start();
+    videoAssetGate.set('source', 'ok', audioPlayer.currentSrc || 'local upload ready');
 
     // The SHORT side is what is capped, so every shape comes out at a
     // real delivery size: 1920x1080, 1080x1920, 1080x1080. Capping the
@@ -3551,7 +3565,7 @@
       const outro =
         typeof OutroVideo === 'undefined'
           ? null
-          : await OutroVideo.loadOutro(API_BASE, {
+          : await OutroVideo.resolve(API_BASE, {
               aspect: currentAspect(),
               // "paino", not "piano": the folder and the file name in
               // the bucket are spelled that way, and outro-video.js
@@ -3563,13 +3577,19 @@
               // clip of the same shape if these are missing.
               kind: 'paino',
               style: currentVideoStyle(),
-            }).catch(() => null);
+            });
+      videoAssetGate.set('outro', outro ? 'ok' : 'failed', outro?.source === 'builtin' ? 'built-in ending ready' : 'R2 ending ready');
 
       genLabel.textContent = 'Preparing the notation…';
       await refreshNotationImage();
+      if (!notationImage) throw new Error('Notation image is not ready for export.');
+      videoAssetGate.set('score', 'ok', 'notation image ready');
       genLabel.textContent = 'Mixing the sound…';
       const countIn = await renderCountInAudio();
+      videoAssetGate.set('count', countIn ? 'ok' : 'skipped', countIn ? 'count-in audio ready' : 'count-in disabled or not needed');
       const takeAudio = await renderTakeAudio(takeSeconds);
+      if (!takeAudio || !(takeAudio.duration > 0)) throw new Error('The take audio could not be prepared.');
+      videoAssetGate.set('audio', 'ok', 'source audio decoded and mixed', { seconds: takeAudio.duration });
 
       // Drawing the frame means moving the PAGE to that moment first:
       // this frame is composed from the live DOM, so the cursor and the
@@ -3619,6 +3639,9 @@
         segments.push(OutroVideo.outroSegment(outro, outroAudio, CAPTURE_FPS));
       }
 
+      if (!(frameRect.width > 0 && frameRect.height > 0 && width > 0 && height > 0)) throw new Error('The video frame has no exportable dimensions. Resize the preview and try again.');
+      videoAssetGate.set('scene', 'ok', `${width}×${height} frame ready`);
+      videoAssetGate.assertReady();
       const result = await VideoEngine.render({
         width,
         height,
@@ -3661,6 +3684,7 @@
     } catch (err) {
       recording = null;
       setGenerating(false);
+      videoAssetGate.failPending(err);
       console.error('Rendering failed:', err);
       setUploadConfirm(`Rendering stopped: ${err && err.message ? err.message : err}`, false);
     }

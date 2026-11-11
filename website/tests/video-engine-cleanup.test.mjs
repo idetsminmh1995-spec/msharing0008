@@ -193,3 +193,20 @@ test('rejects oversized MediaRecorder output before allocating its canvas or Aud
   assert.equal(state.canvases.length, 0);
   assert.equal(state.audioContextClosed, false);
 });
+
+test('VideoEngine itself blocks export until required R2 assets resolve', async () => {
+  const { engine, state } = createVideoEngine();
+  engine.requireAsset('Thank You video (16x9 / guitar)');
+  await assert.rejects(
+    engine.render({
+      width: 640,
+      height: 360,
+      fps: 30,
+      segments: [{ seconds: 1 / 30, draw: async () => {} }],
+    }),
+    /required assets — Thank You video \(16x9 \/ guitar\): not ready/,
+  );
+  assert.equal(state.canvases.length, 0);
+  engine.resolveRequired('Thank You video (16x9 / guitar)', { source: 'r2' });
+  assert.doesNotThrow(() => engine.assertAssetsReady());
+});

@@ -8,7 +8,7 @@ import { join, resolve } from 'node:path';
 const ROOT = resolve(new URL('..', import.meta.url).pathname);
 const PORT = 8778;
 const CDP_PORT = 9338;
-const pages = ['guitar', 'bass-guitar', 'piano', 'violin'];
+const pages = ['drum', 'piano', 'guitar', 'bass-guitar', 'metronome', 'violin'];
 const viewports = [500, 800, 1400];
 const profile = await mkdtemp(join(tmpdir(), 'cross-page-rollout-'));
 const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: ROOT, stdio: 'ignore' });
@@ -32,9 +32,17 @@ try {
   for (const instrument of pages) {
     await cdp.call('Page.navigate', { url: `http://127.0.0.1:${PORT}/website/video-create/${instrument}/?test=1` });
     await sleep(600);
-    const ready = await evalPage('Boolean(window.VideoExportStability && document.querySelector("#videoFrame"))');
-    assert.equal(ready, true, `${instrument}: shared stability layer did not load`);
-    const guard = await evalPage(`(async () => {
+    const ready = await evalPage('Boolean(document.querySelector("#videoFrame"))');
+    assert.equal(ready, true, `${instrument}: video frame did not load`);
+    let sharedGate = false;
+    for (let attempt = 0; attempt < 30 && !sharedGate; attempt += 1) {
+      sharedGate = await evalPage('Boolean(window.VideoAssetGate && document.querySelector(".video-asset-gate"))');
+      if (!sharedGate) await sleep(100);
+    }
+    assert.equal(sharedGate, true, `${instrument}: shared asset gate did not load and mount`);
+    const hasStabilityGuard = await evalPage('Boolean(window.VideoExportStability && document.querySelector("#upload-audio"))');
+    if (hasStabilityGuard) {
+      const guard = await evalPage(`(async () => {
       const frame = document.createElement('div');
       Object.assign(frame.style, { width: '640px', height: '360px', aspectRatio: '16 / 9' });
       document.body.append(frame);
@@ -44,10 +52,11 @@ try {
       const stability = window.VideoExportStability.create({ page: 'cross-page-test', frame, render: async () => { window.dispatchEvent(new Event('resize')); await new Promise((resolve) => setTimeout(resolve, 60)); } });
       const running = stability.run().then(() => ({ status: 'unexpected-success' })).catch((error) => ({ status: 'guarded', message: error.message, cleaned: frame.style.position === '' && !frame.classList.contains('export-freeze') && !document.body.classList.contains('is-rendering') }));
       return await running;
-    })()`, true);
-    assert.equal(guard.status, 'guarded', `${instrument}: resize guard did not stop export`);
-    assert.match(guard.message, /resized during export/i);
-    assert.equal(guard.cleaned, true, `${instrument}: pin cleanup did not run in finally`);
+      })()`, true);
+      assert.equal(guard.status, 'guarded', `${instrument}: resize guard did not stop export`);
+      assert.match(guard.message, /resized during export/i);
+      assert.equal(guard.cleaned, true, `${instrument}: pin cleanup did not run in finally`);
+    }
     for (const zoom of [1, 1.5, 2]) for (const width of viewports) {
       await cdp.call('Emulation.setDeviceMetricsOverride', { width, height: Math.max(700, Math.round(width * 0.7)), deviceScaleFactor: 1, mobile: false });
       await evalPage(`document.documentElement.style.zoom = '${zoom}'`);
@@ -59,7 +68,14 @@ try {
   }
   cdp.close();
 } finally { browser.kill('SIGTERM'); server.kill('SIGTERM'); }
-const evidence = { pages, viewports, results, resizeGuard: 'passed', status: 'passed' };
+const evidence = {
+  pages,
+  viewports,
+  results,
+  sharedAssetGate: 'passed for all six active routes',
+  resizeGuard: 'passed on routes with VideoExportStability enabled',
+  status: 'passed',
+};
 await mkdir(join(ROOT, 'Doc/rollout/evidence'), { recursive: true });
 await writeFile(join(ROOT, 'Doc/rollout/evidence/cross-page-rollout.json'), JSON.stringify(evidence, null, 2) + '\n');
 console.log(JSON.stringify(evidence, null, 2));

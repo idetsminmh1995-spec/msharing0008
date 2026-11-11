@@ -8,5 +8,5 @@
   <https://github.com/steinbergmedia/bravura/blob/bravura-1.482/LICENSE.txt>.
 
 The matching Bravura-specific metadata is kept in
-`notation-engine/src/glyphs/data/bravura_metadata.json`. Keep this font in
-sync with that metadata and with `notation-engine/dist/fonts/Bravura.woff2`.
+`Engine/notation-engine/src/glyphs/data/bravura_metadata.json`. Keep this font in
+sync with that metadata and with `Engine/notation-engine/dist/fonts/Bravura.woff2`.

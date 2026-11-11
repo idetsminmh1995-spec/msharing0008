@@ -6,6 +6,14 @@
 
 The companion `website/assets/outro-video.js` adapts a Thank You clip into a render segment. It downloads the clip as a same-origin `Blob`, decodes its audio, seeks each requested video frame, and hands both streams to `VideoEngine.render`.
 
+The Thank You clip is optional by default: if no matching R2 object can be loaded, the page may omit that segment and still export the instrument take. A caller that truly requires an outro can pass `required: true` to `OutroVideo.loadOutro`; only that mode registers the clip with VideoEngine's fail-closed asset gate. Other assets explicitly registered as required continue to block export until ready.
+
+### Shared Asset Gate
+
+`website/assets/video-asset-gate.js` supplies the common gate lifecycle and panel for the active Drum, Piano, Guitar, Bass Guitar, Metronome, and Violin exporters. A route declares its required and optional groups with `VideoAssetGate.create({ page, groups })`, calls `start()` for an export attempt, updates each group with `set(id, status, message)`, and calls `assertReady()` immediately before `VideoEngine.render`. Required groups are synchronized to the engine's fail-closed gate; optional failures appear as warnings and do not block encoding. All routes use the same status rows and JSON copy/download report UI. Drum retains its instrument-specific R2 kit/hit-image preflight, but delegates presentation, reporting, and the final required-asset state to the shared gate. Requirements can differ by instrument; the status contract and enforcement are shared.
+
+The static Viola, Cello, Bass Cello, and Vocal placeholder pages do not yet have a VideoEngine export pipeline, so they are not listed as gate-enabled routes.
+
 ## 2. Render contract
 
 A page calls the engine with the following shape:
@@ -120,6 +128,9 @@ The pure muxer regression suite is:
 
 ```bash
 node tools/test-video-engine.mjs
+node tools/test-outro-video.mjs
+node website/tests/video-asset-gate.test.mjs
+node tools/test-cross-page-rollout-browser.mjs
 ```
 
 The suite validates box structure, fast-start ordering, sample offsets, interleaving, timing tables, keyframes, composition offsets, codec descriptions, dimensions, silent video, and edit lists. It also includes a `29.97fps` regression test that verifies no cumulative duration drift.
@@ -128,11 +139,12 @@ Additional static checks:
 
 ```bash
 node --check website/assets/video-engine.js
+node --check website/assets/video-asset-gate.js
 node --check tools/test-video-engine.mjs
 git diff --check
 ```
 
-The latest completed update passed **14/14** muxer tests. Static checks also cover JavaScript syntax and patch whitespace.
+The muxer suite currently passes **15/15** tests. The outro suite covers optional-versus-required asset-gate behavior, retry/fallback handling, piano/paino aliases, and streamed response progress. The shared-gate suite checks required/optional parity and engine synchronization; the Chromium cross-page test verifies all six active routes mount the gate and preserves the responsive-frame and stability checks where enabled. Static checks also cover JavaScript syntax and patch whitespace.
 
 ## 8. Remaining work
 
@@ -195,6 +207,11 @@ HTTP 408, 429, 5xx, network failures, timeouts, and generic unavailable response
 
 The loader reads a streaming response when `response.body.getReader()` is available and reports progress through `onProgress({ loaded, total, attempt, key })`. Environments without a readable stream use the existing `arrayBuffer()` fallback. Piano/paino aliases are generated in the shared key helper rather than in page code.
 
-Successful results now include `source: 'r2'`, `bytes`, `ms`, `attempts`, and `reason: null` while preserving `video`, `key`, `seconds`, and `audio`. Failed optional loads still return `null` for backward compatibility with the current pages; `OutroVideo.lastFailure()` contains the structured `kind`, status, key, attempts, elapsed time, and message needed by the gate/report. Automatic built-in fallback is intentionally S2 work and is not claimed here.
-
+Successful results now include `source: 'r2'`, `bytes`, `ms`, `attempts`, and `reason: null` while preserving `video`, `key`, `seconds`, and `audio`. `OutroVideo.createBuiltin()` provides a deterministic three-second, network-independent canvas ending, and `OutroVideo.resolve()` source-locks either the R2 result or the built-in fallback. Active video pages use the resolver and require the ending through the shared asset gate.
 S1 verification is recorded in [`Doc/rollout/evidence/outro-loader-s1.json`](../Doc/rollout/evidence/outro-loader-s1.json). It covers 404/403 no-retry, 500/network retry, stream progress, piano/paino aliases, first-byte timeout, structured success metadata, and failure caching. Drum and cross-page Chromium acceptance tests remain green.
+
+## 11. Thank You outro — S2/S3 implementation status
+
+Drum, Guitar, Bass Guitar, Piano, Violin, and Metronome now use `OutroVideo.resolve()` and mark the Thank You ending as a required asset-gate group. `OutroVideo.outroSegment()` supports both seeked R2 video and built-in canvas sources. Evidence is recorded in [`outro-s2-s3.json`](../Doc/rollout/evidence/outro-s2-s3.json).
+
+Still open: nested render-report `outro` metadata on every page, golden-frame and encoded-last-frame browser assertions, Worker Range/304 behavior, complete R2 manifest, cross-browser evidence, and final CI/release checks.

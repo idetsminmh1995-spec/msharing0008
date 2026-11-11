@@ -8,7 +8,7 @@
 <link rel="preload" href="../../assets/fonts/Bravura.woff2?v=1.482" as="font" type="font/woff2" crossorigin>
 <style>
   /* Bravura is the SMuFL music font the Notation Engine's glyph metrics
-     come from (notation-engine/src/glyphs/data/bravura_metadata.json).
+     come from (Engine/notation-engine/src/glyphs/data/bravura_metadata.json).
      The engine emits font-family="Bravura" on every notehead, clef, rest,
      flag, accidental and time-signature digit it draws -- so WITHOUT this
      rule the browser has nothing to draw them with and every one of them
@@ -458,21 +458,22 @@
   body.is-rendering #genNote{opacity:.38;}
 </style>
 <!-- The real Notation Engine bundle (github.com/idetsminmh1995-spec/msharing0008/notation-engine) -->
-<script src="../../assets/notation-engine.js?v=7d4c19cffd3a"></script>
-<!-- The Human Sticking Engine: Drum/sticking-engine-ts, a TypeScript port
-     of Drum/sticking-engine (Python) that is parity-tested against it. It
+<script src="../../assets/notation-engine.js?v=776487a38102"></script>
+<!-- The Human Sticking Engine: Engine/drum-engine/sticking-engine-ts, a TypeScript port
+     of Engine/drum-engine/sticking-engine (Python) that is parity-tested against it. It
      decides which limb plays every note and therefore which R/L kit photo
      lights up during playback. -->
 <script src="../../assets/sticking-engine.js?v=3308077d"></script>
 <!-- Finds the count voices in the bucket whatever they were named. -->
   <script src="../../assets/voice-samples.js?v=609facad"></script>
   <!-- Shared fetch/blob/decode loader used by preview and export. -->
-  <script src="../../assets/asset-loader.js?v=20261110"></script>
+  <script src="../../assets/asset-loader.js?v=20261111"></script>
   <script src="../../assets/render-report.js?v=1"></script>
   <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
-<script src="../../assets/outro-video.js?v=521fc4cb"></script>
+<script src="../../assets/outro-video.js?v=optional-outro-20261111"></script>
 <!-- The video engine: renders frames rather than recording them. -->
-<script src="../../assets/video-engine.js?v=9c8e90f0"></script>
+<script src="../../assets/video-engine.js?v=r2gate1"></script>
+<script src="../../assets/video-asset-gate.js?v=shared-gate-20261111"></script>
 </head>
 <body>
 
@@ -1282,7 +1283,7 @@
 
   // --- Real Notation Engine wiring -----------------------------------
   // Renders actual notation via the same notation-engine.js this repo
-  // builds and tests (notation-engine/), not a static mockup. Nothing
+  // builds and tests (Engine/notation-engine/), not a static mockup. Nothing
   // loads until the person actually picks a file via the Upload File
   // card above -- there used to be a demo file auto-loaded on every
   // page open, which made a plain refresh look like an uploaded file
@@ -1699,8 +1700,8 @@
   }
 
   // --- Human Sticking Engine -----------------------------------------
-  // Drum/sticking-engine-ts, the TypeScript port of the Python engine in
-  // Drum/sticking-engine, parity-tested against it. It takes a note list
+  // Engine/drum-engine/sticking-engine-ts, the TypeScript port of the Python engine in
+  // Engine/drum-engine/sticking-engine, parity-tested against it. It takes a note list
   // -- time, GM drum number, velocity -- and decides which limb plays
   // each one. The R / L drawn under the staff is that decision.
   //
@@ -3264,35 +3265,34 @@
   const genLabel = document.getElementById('genLabel');
   const cancelBtn = document.getElementById('cancelBtn');
   const costLine = document.getElementById('costLine');
-  const assetGateSummary = document.getElementById('assetGateSummary');
-  const assetGateRows = document.getElementById('assetGateRows');
-  const copyAssetReport = document.getElementById('copyAssetReport');
-  const downloadAssetReport = document.getElementById('downloadAssetReport');
   let currentRenderReport = null;
 
   const GATE_GROUPS = [
-    ['kit-background', 'kit'], ['hit-images', 'hit'], ['notation', 'notation'], ['audio', 'audio'],
-    ['fonts', 'font'], ['frame-assets', 'logo'], ['count', 'count'], ['outro', 'outro'],
+    { id: 'kit-background', label: 'Kit background', required: true },
+    { id: 'hit-images', label: 'Hit images', required: true },
+    { id: 'notation', label: 'Notation', required: true },
+    { id: 'audio', label: 'Source audio', required: true },
+    { id: 'fonts', label: 'Fonts', required: true },
+    { id: 'frame-assets', label: 'Frame assets', required: true },
+    { id: 'count', label: 'Count-in voices', required: false },
+    { id: 'outro', label: 'Thank You ending', required: true },
   ];
+  const videoAssetGate = VideoAssetGate.create({
+    page: 'drum',
+    panel: document.getElementById('assetGatePanel'),
+    groups: GATE_GROUPS,
+    getReport: () => currentRenderReport,
+    serializeReport: (report) => RenderReport.stringify(report),
+    reportName: 'drum-render-report.json',
+  });
 
   function showGateResult(result) {
-    const required = new Map((result?.required || []).map((entry) => [entry.id, entry]));
-    assetGateRows.innerHTML = '';
-    for (const [id, label] of GATE_GROUPS) {
-      const entry = required.get(id) || (result?.optional || []).find((item) => item.id === id);
-      const state = entry?.status === 'ok' ? 'ok' : entry?.status === 'retrying' ? 'retry' : entry?.status === 'failed' ? 'fail' : 'fail';
-      const row = document.createElement('div');
-      row.className = `asset-gate-row ${state}`;
-      row.innerHTML = `<span class="state">${state === 'ok' ? '✓' : state === 'retry' ? '⟳' : '✗'}</span><b>${label}</b><span class="asset-gate-reason"></span>`;
-      row.querySelector('.asset-gate-reason').textContent = entry?.message || (state === 'ok' ? 'ready' : 'not checked');
-      assetGateRows.append(row);
-    }
-    assetGateSummary.textContent = result?.ok ? 'Ready' : 'Blocked';
+    lastAssetGateResult = videoAssetGate.apply(result);
+    return lastAssetGateResult;
   }
 
   function setGateRetrying(label, message = 'loading…') {
-    showGateResult({ ok: false, required: [{ id: label, status: 'retrying', message }] });
-    assetGateSummary.textContent = 'Checking…';
+    videoAssetGate.set(label, 'retrying', message);
   }
 
   function makeRenderReport(width, height, pinnedFrame) {
@@ -3305,7 +3305,7 @@
       devicePixelRatio: window.devicePixelRatio,
       userAgent: navigator.userAgent,
       workerUrl: API_BASE,
-      assetStamp: 'asset-loader.js?v=20261110',
+      assetStamp: 'asset-loader.js?v=20261111',
     });
   }
 
@@ -3317,15 +3317,6 @@
     console.info('[Drum render report]', currentRenderReport);
   }
 
-  copyAssetReport.addEventListener('click', async () => {
-    if (!currentRenderReport) return;
-    await navigator.clipboard?.writeText(RenderReport.stringify(currentRenderReport));
-    copyAssetReport.textContent = 'Copied';
-    setTimeout(() => { copyAssetReport.textContent = 'Copy report'; }, 1200);
-  });
-  downloadAssetReport.addEventListener('click', () => {
-    if (currentRenderReport) RenderReport.download(currentRenderReport);
-  });
   let optionalDecisionResolver = null;
 
   function askOptionalRender(warnings) {
@@ -4049,6 +4040,7 @@
       AssetLoader.clearRecords();
       currentRenderReport = makeRenderReport(width, height, exportFrame);
       renderStartedAt = performance.now();
+      videoAssetGate.start();
       setGateRetrying('kit-background');
       genLabel.textContent = 'Checking export assets…';
       let assetReport;
@@ -4066,6 +4058,7 @@
           timings: { totalMs: Math.round(performance.now() - gateStartedAt) },
         };
         showGateResult(lastAssetGateResult);
+        videoAssetGate.failPending(err);
         throw err;
       }
       exportWarnings.push(...assetReport.warnings);
@@ -4073,7 +4066,7 @@
       let outro = null;
       if (typeof OutroVideo !== 'undefined') {
         try {
-          outro = await OutroVideo.loadOutro(API_BASE, {
+          outro = await OutroVideo.resolve(API_BASE, {
             aspect: currentAspect(),
             kind: 'drum',
             style: currentVideoStyle(),
@@ -4095,7 +4088,7 @@
       await askOptionalRender(exportWarnings);
       assetReport.optional = [
         { id: 'count', status: exportWarnings.some((message) => message.includes('Count-')) ? 'failed' : 'ok', message: exportWarnings.find((message) => message.includes('Count-')) || 'optional count voice available or synth fallback ready' },
-        { id: 'outro', status: outro ? 'ok' : 'failed', message: outro ? 'outro ready' : exportWarnings.find((message) => message.includes('Outro')) || 'outro unavailable' },
+        { id: 'outro', status: outro ? 'ok' : 'failed', message: outro?.source === 'builtin' ? 'built-in ending ready' : 'R2 ending ready' },
       ];
       showGateResult(assetReport);
 
@@ -4155,6 +4148,7 @@
         segments.push(OutroVideo.outroSegment(outro, outroAudio, CAPTURE_FPS));
       }
 
+      videoAssetGate.assertReady();
       const result = await VideoEngine.render({
         width,
         height,

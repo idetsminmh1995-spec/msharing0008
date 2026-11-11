@@ -317,13 +317,15 @@
 
 </div>
 
-<script src="../../assets/notation-engine.js?v=7d4c19cffd3a"></script>
+<script src="../../assets/notation-engine.js?v=776487a38102"></script>
 <script src="../../assets/metronome-engine.js?v=1d5533ff"></script>
 <!-- The Thank You clip that closes a take, and the R2 naming rule for it. -->
 <script src="../../assets/voice-samples.js?v=609facad"></script>
-<script src="../../assets/outro-video.js?v=521fc4cb"></script>
+<script src="../../assets/asset-loader.js?v=20261111"></script>
+<script src="../../assets/outro-video.js?v=optional-outro-20261111"></script>
 <!-- The video engine: renders frames rather than recording them. -->
-<script src="../../assets/video-engine.js?v=9c8e90f0"></script>
+<script src="../../assets/video-engine.js?v=r2gate1"></script>
+<script src="../../assets/video-asset-gate.js?v=shared-gate-20261111"></script>
 <script>
   // The metronome reads its tempo and time signature from the uploaded
   // MIDI file and clicks along with the uploaded audio. Everything it
@@ -1350,6 +1352,17 @@
   const genLabel = document.getElementById('genLabel');
   const cancelBtn = document.getElementById('cancelBtn');
   const costLine = document.getElementById('costLine');
+  const videoAssetGate = VideoAssetGate.create({
+    page: 'metronome',
+    groups: [
+      { id: 'source', label: 'Source file', required: true },
+      { id: 'scene', label: 'Video frame', required: true },
+      { id: 'audio', label: 'Audio mix', required: true },
+      { id: 'score', label: 'Notation / score overlay', required: false },
+      { id: 'count', label: 'Count-in / voice samples', required: false },
+      { id: 'outro', label: 'Thank You ending', required: true },
+    ],
+  });
 
   const CAPTURE_FPS = 30;
   /** 1080p: the engine renders rather than records, so this is a size, not a race. */
@@ -1588,11 +1601,15 @@
 
     stopPlayback(true);
     setGenerating(true);
+    videoAssetGate.start();
+    videoAssetGate.set('source', 'ok', 'MIDI / score timeline loaded');
+    videoAssetGate.set('score', 'ok', 'beat grid ready');
 
     const shape = MetronomeDesigns.canvasFor(currentAspect());
     const scale = Math.min(1, MAX_CAPTURE_LONG_SIDE / Math.max(shape.width, shape.height));
     const width = Math.round(shape.width * scale);
     const height = Math.round(shape.height * scale);
+    if (width > 0 && height > 0) videoAssetGate.set('scene', 'ok', `${width}×${height} frame ready`);
     const total = duration();
 
     let cancelled = false;
@@ -1605,8 +1622,12 @@
     try {
       genLabel.textContent = 'Fetching the Thank You clip…';
       const outro = await loadOutroClip();
+      videoAssetGate.set('outro', outro ? 'ok' : 'failed', outro?.source === 'builtin' ? 'built-in ending ready' : 'R2 ending ready');
       genLabel.textContent = 'Mixing the count…';
       const countAudio = await renderCountAudio(total);
+      if (!countAudio || !(countAudio.duration > 0)) throw new Error('The metronome audio could not be prepared.');
+      videoAssetGate.set('audio', 'ok', 'click audio prepared', { seconds: countAudio.duration });
+      videoAssetGate.set('count', 'skipped', 'voice samples are optional; click fallback is ready');
 
       // Three stretches of one video: a still second, the count for
       // the whole of the file, and the Thank You clip. None of them
@@ -1633,6 +1654,7 @@
         segments.push(OutroVideo.outroSegment(outro, outroAudio, CAPTURE_FPS));
       }
 
+      videoAssetGate.assertReady();
       const result = await VideoEngine.render({
         width,
         height,
@@ -1672,6 +1694,7 @@
     } catch (err) {
       recording = null;
       setGenerating(false);
+      videoAssetGate.failPending(err);
       console.error('Rendering failed:', err);
       setConfirm(`Rendering stopped: ${err && err.message ? err.message : err}`, false);
     }
@@ -1694,7 +1717,7 @@
       /* an unknown design id is a dark one */
     }
     try {
-      return await OutroVideo.loadOutro(API_BASE, {
+      return await OutroVideo.resolve(API_BASE, {
         aspect: currentAspect(),
         kind: outroKindForDesign(designSelect.value),
         style: light ? 'white' : 'black',
