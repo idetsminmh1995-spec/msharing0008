@@ -30,7 +30,11 @@ describe('a drum chord\'s drawn stem direction stays up for a unified percussion
   test('the fixture renders without diagnostics and every event is drawn', () => {
     assert.deepEqual([...diagnostics], []);
     assert.equal(directions(1, 1).length, 4);
-    assert.equal(directions(4, 2).length, 4);
+    // Measure 4 is intentionally merged across voices: its four kick events
+    // now share the hi-hat voice's four stems instead of being rendered twice.
+    assert.equal(directions(4, 1).length, 0);
+    assert.equal(directions(4, 2).length, 0);
+    assert.equal((svg.match(/stroke-width="0\.5"/g) || []).length, 4);
   });
 
   test('ONE voice, hi-hat+snare chords carrying <stem>up</stem> are drawn stem UP (MuseScore\'s own choice)', () => {
@@ -47,8 +51,9 @@ describe('a drum chord\'s drawn stem direction stays up for a unified percussion
     assert.deepEqual(directions(3, 1), ['up', 'up', 'up', 'up']);
   });
 
-  test('TWO drum voices both keep stems up', () => {
-    assert.deepEqual(directions(4, 1), ['up', 'up', 'up', 'up']);
-    assert.deepEqual(directions(4, 2), ['up', 'up', 'up', 'up']);
+  test('TWO drum voices merge into one shared stem/beam pattern', () => {
+    assert.equal(directions(4, 1).length, 0);
+    assert.equal(directions(4, 2).length, 0);
+    assert.equal((svg.match(/stroke-width="0\.5"/g) || []).length, 4);
   });
 });

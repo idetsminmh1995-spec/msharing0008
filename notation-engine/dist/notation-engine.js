@@ -77533,6 +77533,48 @@ ${xrefOffset}
     }
     return starts;
   }
+  function collectSharedDrumEvents(measure2, staffNumber) {
+    const byTick = /* @__PURE__ */ new Map();
+    for (const voice2 of measure2.voices) {
+      const starts = eventStartTicks(voice2.events);
+      voice2.events.forEach((event, index) => {
+        if ((event.staff ?? 1) !== staffNumber || event.kind !== "note" && event.kind !== "chord")
+          return;
+        const notes = event.kind === "chord" ? event.notes : [event];
+        if (notes.length === 0 || !notes.every((note2) => note2.pitch.kind === "unpitched")) return;
+        const tick = starts[index] ?? 0;
+        const bucket = byTick.get(tick) ?? [];
+        bucket.push({ voiceId: voice2.id, index, event });
+        byTick.set(tick, bucket);
+      });
+    }
+    const shared = [];
+    for (const [tick, bucket] of byTick) {
+      const voiceIds = new Set(bucket.map((member) => member.voiceId));
+      if (voiceIds.size < 2) continue;
+      const durationTicks = bucket[0]?.event.duration.ticks;
+      if (durationTicks === void 0 || !bucket.every((member) => member.event.duration.ticks === durationTicks))
+        continue;
+      const notes = bucket.flatMap(
+        (member) => member.event.kind === "chord" ? [...member.event.notes] : [member.event]
+      );
+      const first = bucket[0]?.event;
+      if (first === void 0 || notes.length < 2) continue;
+      shared.push({
+        tick,
+        event: {
+          kind: "chord",
+          notes,
+          duration: first.duration,
+          voice: bucket[0]?.voiceId ?? 1,
+          ...first.staff !== void 0 ? { staff: first.staff } : {},
+          startTick: tick
+        },
+        members: bucket.map(({ voiceId, index }) => ({ voiceId, index }))
+      });
+    }
+    return shared.sort((a, b) => a.tick - b.tick);
+  }
   function totalTicks(events) {
     const starts = eventStartTicks(events);
     return events.reduce((end, ev, i2) => Math.max(end, (starts[i2] ?? 0) + ev.duration.ticks), 0);
@@ -79390,6 +79432,74 @@ ${xrefOffset}
             const isMultiVoice = voicesOnThisStaff.size > 1;
             const collisionOffsets = computeVoiceCollisionOffsets(measure2, staffNumber, ctxAtTick);
             const restPushes = computeRestClearanceOffsets(measure2, staffNumber, ctxAtTick);
+            const sharedDrumEvents = collectSharedDrumEvents(measure2, staffNumber);
+            const sharedDrumEventKeys = new Set(
+              sharedDrumEvents.flatMap(
+                (group) => group.members.map((member) => `${member.voiceId}:${member.index}`)
+              )
+            );
+            if (sharedDrumEvents.length > 0) {
+              const sharedTotalTicks = Math.max(
+                1,
+                ...measure2.voices.map((voice2) => totalTicks(voice2.events))
+              );
+              const sharedXs = sharedDrumEvents.map((group) => {
+                const realX = measureLayout?.positionsByTick.get(group.tick);
+                return realX !== void 0 ? noteAreaX + realX : noteAreaX + group.tick / sharedTotalTicks * (layout.x + layout.width - noteAreaX);
+              });
+              const sharedBeamableEvents = sharedDrumEvents.map((group) => ({
+                durationType: group.event.duration.type,
+                isRest: false,
+                ...group.event.duration.type === "quarter" ? { forceBeam: true } : {}
+              }));
+              const sharedGroups = groupBeams(
+                sharedBeamableEvents,
+                sharedDrumEvents.map((group) => group.tick),
+                attrs.timeNumerator,
+                attrs.timeDenominator
+              );
+              const sharedBeamedIndices = beamedEventIndices(sharedGroups);
+              const sharedGroupByFirstIndex = /* @__PURE__ */ new Map();
+              for (const group of sharedGroups) {
+                const firstIndex = group.eventIndices[0];
+                if (firstIndex !== void 0) sharedGroupByFirstIndex.set(firstIndex, group);
+              }
+              sharedDrumEvents.forEach((group, index) => {
+                if (sharedBeamedIndices.has(index)) {
+                  const beamGroup = sharedGroupByFirstIndex.get(index);
+                  if (beamGroup === void 0) return;
+                  const groupEvents = beamGroup.eventIndices.map((memberIndex) => sharedDrumEvents[memberIndex]?.event).filter((event) => event !== void 0);
+                  const groupXs = beamGroup.eventIndices.map(
+                    (memberIndex) => sharedXs[memberIndex] ?? 0
+                  );
+                  const firstIndex = beamGroup.eventIndices[0] ?? index;
+                  const firstTick = sharedDrumEvents[firstIndex]?.tick ?? group.tick;
+                  const fifths2 = stateAtTick(firstTick).fifths;
+                  const { memberSvgs, beamSvg } = renderBeamGroup(
+                    groupEvents,
+                    groupXs,
+                    ctxAtTick(firstTick),
+                    createAccidentalState(fifths2),
+                    fifths2,
+                    groupEvents.map(() => fifths2),
+                    theme.beamStyle,
+                    "up"
+                  );
+                  memberSvgs.forEach((memberSvg) => svgParts.push(memberSvg));
+                  svgParts.push(beamSvg);
+                  return;
+                }
+                const fifths = stateAtTick(group.tick).fifths;
+                const { svg: svg2 } = renderChord(
+                  group.event,
+                  sharedXs[index] ?? 0,
+                  ctxAtTick(group.tick),
+                  createAccidentalState(fifths),
+                  "up"
+                );
+                svgParts.push(svg2);
+              });
+            }
             for (const voice2 of measure2.voices) {
               const forcedDirection = isMultiVoice ? voiceForcedDirection(voice2.id) : void 0;
               const tieKey = `${staffNumber}:${voice2.id}`;
@@ -79434,6 +79544,7 @@ ${xrefOffset}
               voice2.events.forEach((event, idx) => {
                 const eventStaff = event.staff ?? 1;
                 if (eventStaff !== staffNumber) return;
+                if (sharedDrumEventKeys.has(`${voice2.id}:${idx}`)) return;
                 const eventX = eventXs[idx] ?? 0;
                 const eventTick = starts[idx] ?? 0;
                 const eventAttributes = stateAtTick(eventTick);

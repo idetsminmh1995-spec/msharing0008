@@ -1293,6 +1293,67 @@ function eventStartTicks(events: readonly MeasureEvent[]): readonly number[] {
   return starts;
 }
 
+interface SharedDrumEvent {
+  readonly tick: number;
+  readonly event: Chord;
+  readonly members: readonly { readonly voiceId: number; readonly index: number }[];
+}
+
+/**
+ * MusicXML commonly writes a drum kit's hands and feet in separate voices.
+ * At one tick that is still one engraved attack: every notehead shares one
+ * stem/beam. Collect those cross-voice attacks before the normal voice pass;
+ * same-voice `<chord/>` events already follow this rule in their own path.
+ */
+function collectSharedDrumEvents(
+  measure: Measure,
+  staffNumber: number,
+): readonly SharedDrumEvent[] {
+  const byTick = new Map<number, { voiceId: number; index: number; event: Note | Chord }[]>();
+  for (const voice of measure.voices) {
+    const starts = eventStartTicks(voice.events);
+    voice.events.forEach((event, index) => {
+      if ((event.staff ?? 1) !== staffNumber || (event.kind !== 'note' && event.kind !== 'chord'))
+        return;
+      const notes = event.kind === 'chord' ? event.notes : [event];
+      if (notes.length === 0 || !notes.every((note) => note.pitch.kind === 'unpitched')) return;
+      const tick = starts[index] ?? 0;
+      const bucket = byTick.get(tick) ?? [];
+      bucket.push({ voiceId: voice.id, index, event });
+      byTick.set(tick, bucket);
+    });
+  }
+  const shared: SharedDrumEvent[] = [];
+  for (const [tick, bucket] of byTick) {
+    const voiceIds = new Set(bucket.map((member) => member.voiceId));
+    if (voiceIds.size < 2) continue;
+    const durationTicks = bucket[0]?.event.duration.ticks;
+    if (
+      durationTicks === undefined ||
+      !bucket.every((member) => member.event.duration.ticks === durationTicks)
+    )
+      continue;
+    const notes = bucket.flatMap((member) =>
+      member.event.kind === 'chord' ? [...member.event.notes] : [member.event],
+    );
+    const first = bucket[0]?.event;
+    if (first === undefined || notes.length < 2) continue;
+    shared.push({
+      tick,
+      event: {
+        kind: 'chord',
+        notes,
+        duration: first.duration,
+        voice: bucket[0]?.voiceId ?? 1,
+        ...(first.staff !== undefined ? { staff: first.staff } : {}),
+        startTick: tick,
+      },
+      members: bucket.map(({ voiceId, index }) => ({ voiceId, index })),
+    });
+  }
+  return shared.sort((a, b) => a.tick - b.tick);
+}
+
 /** How far into the measure this voice's last event ENDS -- not the sum of its durations, which ignores any gap between them. */
 function totalTicks(events: readonly MeasureEvent[]): number {
   const starts = eventStartTicks(events);
@@ -4400,6 +4461,79 @@ export function renderParsedMusicXml(
           // Integration U: and the same for rests, which move out of the
           // other voice's way vertically rather than horizontally.
           const restPushes = computeRestClearanceOffsets(measure, staffNumber, ctxAtTick);
+          const sharedDrumEvents = collectSharedDrumEvents(measure, staffNumber);
+          const sharedDrumEventKeys = new Set(
+            sharedDrumEvents.flatMap((group) =>
+              group.members.map((member) => `${member.voiceId}:${member.index}`),
+            ),
+          );
+          if (sharedDrumEvents.length > 0) {
+            const sharedTotalTicks = Math.max(
+              1,
+              ...measure.voices.map((voice) => totalTicks(voice.events)),
+            );
+            const sharedXs = sharedDrumEvents.map((group) => {
+              const realX = measureLayout?.positionsByTick.get(group.tick);
+              return realX !== undefined
+                ? noteAreaX + realX
+                : noteAreaX +
+                    (group.tick / sharedTotalTicks) * (layout.x + layout.width - noteAreaX);
+            });
+            const sharedBeamableEvents = sharedDrumEvents.map((group) => ({
+              durationType: group.event.duration.type,
+              isRest: false,
+              ...(group.event.duration.type === 'quarter' ? { forceBeam: true } : {}),
+            }));
+            const sharedGroups = groupBeams(
+              sharedBeamableEvents,
+              sharedDrumEvents.map((group) => group.tick),
+              attrs.timeNumerator,
+              attrs.timeDenominator,
+            );
+            const sharedBeamedIndices = beamedEventIndices(sharedGroups);
+            const sharedGroupByFirstIndex = new Map<number, (typeof sharedGroups)[number]>();
+            for (const group of sharedGroups) {
+              const firstIndex = group.eventIndices[0];
+              if (firstIndex !== undefined) sharedGroupByFirstIndex.set(firstIndex, group);
+            }
+            sharedDrumEvents.forEach((group, index) => {
+              if (sharedBeamedIndices.has(index)) {
+                const beamGroup = sharedGroupByFirstIndex.get(index);
+                if (beamGroup === undefined) return;
+                const groupEvents = beamGroup.eventIndices
+                  .map((memberIndex) => sharedDrumEvents[memberIndex]?.event)
+                  .filter((event): event is Chord => event !== undefined);
+                const groupXs = beamGroup.eventIndices.map(
+                  (memberIndex) => sharedXs[memberIndex] ?? 0,
+                );
+                const firstIndex = beamGroup.eventIndices[0] ?? index;
+                const firstTick = sharedDrumEvents[firstIndex]?.tick ?? group.tick;
+                const fifths = stateAtTick(firstTick).fifths;
+                const { memberSvgs, beamSvg } = renderBeamGroup(
+                  groupEvents,
+                  groupXs,
+                  ctxAtTick(firstTick),
+                  createAccidentalState(fifths),
+                  fifths,
+                  groupEvents.map(() => fifths),
+                  theme.beamStyle,
+                  'up',
+                );
+                memberSvgs.forEach((memberSvg) => svgParts.push(memberSvg));
+                svgParts.push(beamSvg);
+                return;
+              }
+              const fifths = stateAtTick(group.tick).fifths;
+              const { svg } = renderChord(
+                group.event,
+                sharedXs[index] ?? 0,
+                ctxAtTick(group.tick),
+                createAccidentalState(fifths),
+                'up',
+              );
+              svgParts.push(svg);
+            });
+          }
 
           for (const voice of measure.voices) {
             const forcedDirection = isMultiVoice ? voiceForcedDirection(voice.id) : undefined;
@@ -4524,6 +4658,7 @@ export function renderParsedMusicXml(
               // it sounds with.
               const eventStaff = event.staff ?? 1;
               if (eventStaff !== staffNumber) return;
+              if (sharedDrumEventKeys.has(`${voice.id}:${idx}`)) return;
               const eventX = eventXs[idx] ?? 0;
               const eventTick = starts[idx] ?? 0;
               const eventAttributes = stateAtTick(eventTick);
