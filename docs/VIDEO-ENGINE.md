@@ -8,6 +8,12 @@ The companion `website/assets/outro-video.js` adapts a Thank You clip into a ren
 
 The Thank You clip is optional by default: if no matching R2 object can be loaded, the page may omit that segment and still export the instrument take. A caller that truly requires an outro can pass `required: true` to `OutroVideo.loadOutro`; only that mode registers the clip with VideoEngine's fail-closed asset gate. Other assets explicitly registered as required continue to block export until ready.
 
+### Shared Asset Gate
+
+`website/assets/video-asset-gate.js` supplies the common gate lifecycle and panel for the active Drum, Piano, Guitar, Bass Guitar, Metronome, and Violin exporters. A route declares its required and optional groups with `VideoAssetGate.create({ page, groups })`, calls `start()` for an export attempt, updates each group with `set(id, status, message)`, and calls `assertReady()` immediately before `VideoEngine.render`. Required groups are synchronized to the engine's fail-closed gate; optional failures appear as warnings and do not block encoding. All routes use the same status rows and JSON copy/download report UI. Drum retains its instrument-specific R2 kit/hit-image preflight, but delegates presentation, reporting, and the final required-asset state to the shared gate. Requirements can differ by instrument; the status contract and enforcement are shared.
+
+The static Viola, Cello, Bass Cello, and Vocal placeholder pages do not yet have a VideoEngine export pipeline, so they are not listed as gate-enabled routes.
+
 ## 2. Render contract
 
 A page calls the engine with the following shape:
@@ -123,6 +129,8 @@ The pure muxer regression suite is:
 ```bash
 node tools/test-video-engine.mjs
 node tools/test-outro-video.mjs
+node website/tests/video-asset-gate.test.mjs
+node tools/test-cross-page-rollout-browser.mjs
 ```
 
 The suite validates box structure, fast-start ordering, sample offsets, interleaving, timing tables, keyframes, composition offsets, codec descriptions, dimensions, silent video, and edit lists. It also includes a `29.97fps` regression test that verifies no cumulative duration drift.
@@ -131,11 +139,12 @@ Additional static checks:
 
 ```bash
 node --check website/assets/video-engine.js
+node --check website/assets/video-asset-gate.js
 node --check tools/test-video-engine.mjs
 git diff --check
 ```
 
-The muxer suite currently passes **15/15** tests. The outro suite covers optional-versus-required asset-gate behavior, retry/fallback handling, piano/paino aliases, and streamed response progress. Static checks also cover JavaScript syntax and patch whitespace.
+The muxer suite currently passes **15/15** tests. The outro suite covers optional-versus-required asset-gate behavior, retry/fallback handling, piano/paino aliases, and streamed response progress. The shared-gate suite checks required/optional parity and engine synchronization; the Chromium cross-page test verifies all six active routes mount the gate and preserves the responsive-frame and stability checks where enabled. Static checks also cover JavaScript syntax and patch whitespace.
 
 ## 8. Remaining work
 

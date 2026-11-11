@@ -1,8 +1,10 @@
 {
   "pages": [
+    "drum",
+    "piano",
     "guitar",
     "bass-guitar",
-    "piano",
+    "metronome",
     "violin"
   ],
   "viewports": [
@@ -12,6 +14,186 @@
   ],
   "results": [
     {
+      "instrument": "drum",
+      "width": 500,
+      "zoom": 1,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": ""
+      }
+    },
+    {
+      "instrument": "drum",
+      "width": 800,
+      "zoom": 1,
+      "layout": {
+        "width": 213,
+        "height": 120,
+        "cqw": ""
+      }
+    },
+    {
+      "instrument": "drum",
+      "width": 1400,
+      "zoom": 1,
+      "layout": {
+        "width": 813,
+        "height": 457,
+        "cqw": ""
+      }
+    },
+    {
+      "instrument": "drum",
+      "width": 500,
+      "zoom": 1.5,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": ""
+      }
+    },
+    {
+      "instrument": "drum",
+      "width": 800,
+      "zoom": 1.5,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": ""
+      }
+    },
+    {
+      "instrument": "drum",
+      "width": 1400,
+      "zoom": 1.5,
+      "layout": {
+        "width": 527,
+        "height": 296,
+        "cqw": ""
+      }
+    },
+    {
+      "instrument": "drum",
+      "width": 500,
+      "zoom": 2,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": ""
+      }
+    },
+    {
+      "instrument": "drum",
+      "width": 800,
+      "zoom": 2,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": ""
+      }
+    },
+    {
+      "instrument": "drum",
+      "width": 1400,
+      "zoom": 2,
+      "layout": {
+        "width": 241,
+        "height": 136,
+        "cqw": ""
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 500,
+      "zoom": 1,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 800,
+      "zoom": 1,
+      "layout": {
+        "width": 213,
+        "height": 120,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 1400,
+      "zoom": 1,
+      "layout": {
+        "width": 813,
+        "height": 457,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 500,
+      "zoom": 1.5,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 800,
+      "zoom": 1.5,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 1400,
+      "zoom": 1.5,
+      "layout": {
+        "width": 527,
+        "height": 296,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 500,
+      "zoom": 2,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 800,
+      "zoom": 2,
+      "layout": {
+        "width": 0,
+        "height": 0,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
+      "instrument": "piano",
+      "width": 1400,
+      "zoom": 2,
+      "layout": {
+        "width": 241,
+        "height": 136,
+        "cqw": "calc(100cqw / 960)"
+      }
+    },
+    {
       "instrument": "guitar",
       "width": 500,
       "zoom": 1,
@@ -192,93 +374,93 @@
       }
     },
     {
-      "instrument": "piano",
+      "instrument": "metronome",
       "width": 500,
       "zoom": 1,
       "layout": {
-        "width": 0,
-        "height": 0,
-        "cqw": "calc(100cqw / 960)"
+        "width": 185,
+        "height": 104,
+        "cqw": ""
       }
     },
     {
-      "instrument": "piano",
+      "instrument": "metronome",
       "width": 800,
       "zoom": 1,
       "layout": {
         "width": 213,
         "height": 120,
-        "cqw": "calc(100cqw / 960)"
+        "cqw": ""
       }
     },
     {
-      "instrument": "piano",
+      "instrument": "metronome",
       "width": 1400,
       "zoom": 1,
       "layout": {
         "width": 813,
         "height": 457,
-        "cqw": "calc(100cqw / 960)"
+        "cqw": ""
       }
     },
     {
-      "instrument": "piano",
+      "instrument": "metronome",
       "width": 500,
       "zoom": 1.5,
       "layout": {
-        "width": 0,
-        "height": 0,
-        "cqw": "calc(100cqw / 960)"
+        "width": 278,
+        "height": 156,
+        "cqw": ""
       }
     },
     {
-      "instrument": "piano",
+      "instrument": "metronome",
       "width": 800,
       "zoom": 1.5,
       "layout": {
-        "width": 0,
-        "height": 0,
-        "cqw": "calc(100cqw / 960)"
+        "width": 278,
+        "height": 156,
+        "cqw": ""
       }
     },
     {
-      "instrument": "piano",
+      "instrument": "metronome",
       "width": 1400,
       "zoom": 1.5,
       "layout": {
         "width": 527,
         "height": 296,
-        "cqw": "calc(100cqw / 960)"
+        "cqw": ""
       }
     },
     {
-      "instrument": "piano",
+      "instrument": "metronome",
       "width": 500,
       "zoom": 2,
       "layout": {
-        "width": 0,
-        "height": 0,
-        "cqw": "calc(100cqw / 960)"
+        "width": 370,
+        "height": 208,
+        "cqw": ""
       }
     },
     {
-      "instrument": "piano",
+      "instrument": "metronome",
       "width": 800,
       "zoom": 2,
       "layout": {
-        "width": 0,
-        "height": 0,
-        "cqw": "calc(100cqw / 960)"
+        "width": 370,
+        "height": 208,
+        "cqw": ""
       }
     },
     {
-      "instrument": "piano",
+      "instrument": "metronome",
       "width": 1400,
       "zoom": 2,
       "layout": {
-        "width": 241,
-        "height": 136,
-        "cqw": "calc(100cqw / 960)"
+        "width": 370,
+        "height": 208,
+        "cqw": ""
       }
     },
     {
@@ -372,6 +554,7 @@
       }
     }
   ],
-  "resizeGuard": "passed",
+  "sharedAssetGate": "passed for all six active routes",
+  "resizeGuard": "passed on routes with VideoExportStability enabled",
   "status": "passed"
 }
