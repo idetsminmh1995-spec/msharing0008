@@ -84,13 +84,17 @@
 
 ## 4. Propagation to the other instrument pages — complete for the production scope
 
-The shared modules are wired into all five production pages:
+The shared modules are wired into all nine full notation-video production pages:
 
 - `website/video-create/drum/index.html`
 - `website/video-create/guitar/index.html`
 - `website/video-create/bass-guitar/index.html`
 - `website/video-create/piano/index.html`
 - `website/video-create/violin/index.html`
+- `website/video-create/bass-cello/index.html`
+- `website/video-create/cello/index.html`
+- `website/video-create/viola/index.html`
+- `website/video-create/vocal/index.html`
 
 `website/assets/video-export-stability.js` provides the common wrapper for the four migrated non-drum pages. Each page receives:
 
@@ -101,7 +105,7 @@ The shared modules are wired into all five production pages:
 - grouped gate panel and report actions;
 - frame-relative landscape CSS using `container-type: inline-size` and `--frame-u: calc(100cqw / 960)`.
 
-Portrait and square page-specific layout rules remain intact. This rollout intentionally does not migrate every other repository page (vocal, cello, viola, bass-cello) because they are outside the five-page acceptance scope. Metronome is separately connected to the Notation Engine for score timing and to VideoEngine for export, but it intentionally renders its metronome design rather than exporting the notation SVG.
+Portrait and square page-specific layout rules remain intact. Metronome is separately connected to the Notation Engine for score timing and to VideoEngine for export, but it intentionally renders its metronome design rather than exporting the notation SVG.
 
 ### 4.1 Notation → Video Engine integration audit — 2026-11-12
 
@@ -109,11 +113,24 @@ The connection was checked page by page instead of assuming that Drum's working 
 
 - **Full notation video export:** Drum, Guitar, Bass Guitar, Piano, and Violin each load the shared `notation-engine.js`, parse MusicXML/MXL, call `renderParsedMusicXml`, retain the returned playback/timing contract, create the export-ready notation SVG through `NotationEngine.exportSvg`, and pass frame segments to the shared `VideoEngine.render`.
 - **Timing-only notation integration:** Metronome loads Notation Engine, uses its parsed MusicXML/MXL playback, tempo, and timeline data, and exports through `VideoEngine.render`. It does not call `exportSvg` because its intended video surface is the metronome design, not a score display.
-- **Not connected yet:** Bass Cello, Cello, Viola, and Vocal remain scaffold pages. They have upload/layout placeholders and engine labels, but do not yet load the notation bundle, call `VideoEngine.render`, or produce an encoded video. They are explicitly not marked complete by this audit.
+- **Now connected:** Bass Cello, Cello, Viola, and Vocal no longer use scaffold-only behavior. They share `website/assets/instrument-video-core.js`, which owns MusicXML/MXL parsing, notation SVG preview, Bravura-embedded SVG rasterisation for export, audio decode/mix, preview transport, aspect/style controls, asset-gate reporting, and `VideoEngine.render` segment composition.
 
-The shared export boundary is therefore verified for all currently implemented notation-video pages: page-specific engines prepare score and animation state, while `VideoEngine` owns frame-addressed encoding, audio/video segments, cancellation, and final asset checks. No new instrument implementation was started during this audit.
+The shared export boundary is therefore verified for all currently implemented notation-video pages: page-specific configuration prepares the instrument presentation, the shared core prepares score/audio state, and `VideoEngine` owns frame-addressed encoding, audio/video segments, cancellation, and final asset checks.
 
-### 4.2 Piano score-input correction — complete
+### 4.2 Remaining instrument integration — complete
+
+The four former scaffold pages now follow the same explicit source contract: upload a MusicXML/MXL score and an audio take; the score is parsed once by Notation Engine; the returned SVG and playback metadata populate the live preview; the audio duration determines the take segment; and the generated frame is encoded by VideoEngine. The export includes a one-second opening hold followed by the decoded audio take and the rendered notation/instrument frame.
+
+Each page also has a page-specific identity/configuration while reusing the same implementation boundary:
+
+- **Bass Cello:** `bass-cello` config and Bass Cello performance presentation.
+- **Cello:** `cello` config and Cello performance presentation.
+- **Viola:** `viola` config and Viola performance presentation.
+- **Vocal:** `vocal` config and Vocal performance presentation.
+
+The shared `VideoAssetGate` tracks MusicXML source, notation SVG, audio mix, and video-frame readiness. Missing or undecodable inputs block export with a visible reason; successful export exposes a browser download. The Vocal page was exercised end to end with a MusicXML fixture and a one-second WAV fixture: notation rendered, the gate reached Ready, VideoEngine encoded a 1920×1080 WebM, and the Download Video action appeared.
+
+### 4.3 Piano score-input correction — complete
 
 The Piano Video page is now MusicXML/MXL-only for score input. The MIDI file
 slot, `.mid`/`.midi` accept filter, `parseMidiFile()` handler, and MIDI upload
@@ -131,6 +148,7 @@ guards this contract and runs in CI.
 - `tools/test-outro-video.mjs`: failed 404 is classified and not permanently cached.
 - `tools/test-drum-rollout-browser.mjs`: Drum pin, resize guard, deterministic capture, viewport evidence, 404/500 behavior, and report UI.
 - `tools/test-cross-page-rollout-browser.mjs`: Guitar/Bass/Piano/Violin module loading, audio gate, resize guard, cleanup, 500/800/1400 CSS-pixel viewports, and 100%/150%/200% zoom.
+- Remaining-page smoke coverage: Bass Cello/Cello/Viola/Vocal load the shared core and asset gate; Vocal has an end-to-end MusicXML + WAV VideoEngine encode smoke test.
 - `tools/test-video-engine-browser.mjs`: Chromium encoded-output smoke test.
 - `tools/test-video-engine.mjs`: video engine timing/container regression tests.
 - `npm run verify --prefix notation-engine`: current local result **1068 passed, 0 failed**.
@@ -196,14 +214,15 @@ Latest successful CI run: `42705666741`.
 - [x] Outro/count failures are classified or warned about.
 - [x] JSON report can be copied and downloaded.
 - [x] Unit, browser, notation, and CI checks are green.
-- [x] Five-page export contract is consistent.
+- [x] Nine-page notation-video export contract is consistent for Drum, Guitar, Bass Guitar, Piano, Violin, Bass Cello, Cello, Viola, and Vocal.
+- [x] Metronome timing-only Notation Engine contract remains connected to VideoEngine.
 
 ## 8. Explicit remaining work / not silently marked complete
 
 1. A real encoded golden-frame pixel-diff suite against the user's final reference image is not yet committed. Current browser evidence proves layout/guard determinism, not musical-image perceptual equality across every instrument.
 2. R2/custom-domain cache policy and Worker deployment/observability are intentionally outside this rollout. CORS behavior is preserved but bucket/cache changes are a separate plan.
 3. The Piano GLB hand-contact plan remains partially open: synthetic IK and 73 piano-hand tests are documented, but GLB bind-pose calibration, measured fingertip contact, collision/clearance, and browser-level contact verification remain future work.
-4. Other video pages (metronome, vocal, cello, viola, bass-cello) are not part of the five-page acceptance scope.
+4. The remaining unconnected video pages are now outside this list; Metronome remains timing-only by design and the nine full notation-video pages are connected.
 5. Existing legacy MIDI parser and web-preview documentation still describes the original MIDI-first prototype. It is not the same as the migrated MusicXML video-page export contract and should be retired or rewritten in a separate product-documentation task.
 
 ## 9. Source documents
