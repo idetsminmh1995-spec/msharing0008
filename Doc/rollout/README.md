@@ -38,7 +38,7 @@ Local checks:
 ```text
 asset-loader tests passed; maxActive: 6; records: 20
 outro-video tests passed; requests: 2; failure: not-found/404
-notation-engine: 1054 passed, 0 failed
+Engine/notation-engine: 1054 passed, 0 failed
 Chromium Video Engine smoke: MP4, H.264, 320×180, 30 frames, 1 second
 Drum rollout browser acceptance: passed
 Cross-page rollout browser acceptance: passed

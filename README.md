@@ -36,14 +36,14 @@ deploy instructions.
 ## `/Drum`
 
 Drum-specific work, kept apart from the instrument-agnostic modules above.
-Holds the **sticking engine** in two forms: `Drum/sticking-engine`
+Holds the **sticking engine** in two forms: `Engine/drum-engine/sticking-engine`
 (Python, the reference implementation, all 40 rules with the rule
-documents beside the code) and `Drum/sticking-engine-ts` (a TypeScript
+documents beside the code) and `Engine/drum-engine/sticking-engine-ts` (a TypeScript
 port, parity-tested against it event by event, bundled for the browser).
 It decides which limb plays every note of a drum part, what technique
 each stroke uses, and whether the limb can physically get there in time
 — and the drum video page draws its answer as R / L under the staff.
-See `Drum/README.md` and `Drum/INTEGRATION-PLAN.md`.
+See `Engine/drum-engine/README.md` and `Engine/drum-engine/INTEGRATION-PLAN.md`.
 
 ## `/web-preview`
 

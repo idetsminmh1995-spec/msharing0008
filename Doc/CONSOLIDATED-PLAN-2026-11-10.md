@@ -28,7 +28,7 @@
 
 ### 2.2 MusicXML and percussion behavior
 
-- MusicXML parser v1/v2, `.mxl`, timewise scores, cross-software fixtures, diagnostics hardening, directions, tempo, dynamics, lyrics/harmony parsing, tuplets, slurs, articulations, ornaments, fermatas, and print/layout data are already recorded in `notation-engine/Doc/` and wired in the engine.
+- MusicXML parser v1/v2, `.mxl`, timewise scores, cross-software fixtures, diagnostics hardening, directions, tempo, dynamics, lyrics/harmony parsing, tuplets, slurs, articulations, ornaments, fermatas, and print/layout data are already recorded in `Engine/notation-engine/Doc/` and wired in the engine.
 - For percussion, a note's MusicXML `<display-step>` / `<display-octave>` takes precedence over the GM table. The GM mapping is the fallback when the file does not state a display position.
 - Drum mapping includes notehead, staff position, stem direction, voice, and instrument metadata using the standard GM table and MuseScore reference data.
 - Drum house-style beaming now covers continuous hand patterns such as hi-hat eighth-note pulses even when source MusicXML writes quarter-note durations. Lower-voice kick/left-foot patterns are also beamed when the continuous pattern qualifies.
@@ -123,7 +123,7 @@ guards this contract and runs in CI.
 - `tools/test-cross-page-rollout-browser.mjs`: Guitar/Bass/Piano/Violin module loading, audio gate, resize guard, cleanup, 500/800/1400 CSS-pixel viewports, and 100%/150%/200% zoom.
 - `tools/test-video-engine-browser.mjs`: Chromium encoded-output smoke test.
 - `tools/test-video-engine.mjs`: video engine timing/container regression tests.
-- `npm run verify --prefix notation-engine`: current result 1054 passed, 0 failed.
+- `npm run verify --prefix Engine/notation-engine`: current result 1054 passed, 0 failed.
 
 ### 5.2 CI
 
@@ -199,7 +199,7 @@ Latest successful CI run: `42705666741`.
 ## 9. Source documents
 
 - [Video rollout acceptance](./rollout/README.md)
-- [Notation Engine authoritative plan](../notation-engine/PLAN.md)
-- [Notation Engine status](../notation-engine/Doc/STATUS.md)
+- [Notation Engine authoritative plan](../Engine/notation-engine/PLAN.md)
+- [Notation Engine status](../Engine/notation-engine/Doc/STATUS.md)
 - [Piano hand plan](../Plan.md)
 - [Video Engine contract](../docs/VIDEO-ENGINE.md)

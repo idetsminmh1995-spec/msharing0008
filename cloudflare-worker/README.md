@@ -75,7 +75,7 @@ brand when the brand is a folder of its own.
 Each of these is a **full-frame overlay** of the stick or foot that
 plays that drum, composited over `Drum Bg.png`. The drum page lights one
 as each note is played, and which side it picks comes from the sticking
-engine (`Drum/`).
+engine (`Engine/drum-engine/`).
 
 Hands carry a side, feet do not:
 

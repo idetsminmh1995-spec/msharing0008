@@ -204,7 +204,7 @@ Each numbered box is a separate module with its own unit tests: `output = step(i
 ### 2. Folder layout
 
 ```
-src/finger-engine/
+src/Engine/finger-engine/
   core/                          // SHARED with the Guitar engine (Part 02)
     types.ts  tuning.ts  geometry.ts  tempo.ts  rng.ts
     hand-profiles.ts             // BP-009: small / medium / large span limits
@@ -212,7 +212,7 @@ src/finger-engine/
     timeline-schema.ts           // version constant → '1.1.0' (Part 09)
     validate-core.ts
   input/                         // SHARED
-    notation-engine/adapter.ts
+    Engine/notation-engine/adapter.ts
     musicxml/read-mxl.ts  musicxml/technical.ts  musicxml/parse.ts
     musicxml/bass-marks.ts       // BIN-07: slap/pop/dead/ghost/palm-mute detection
     midi/parse.ts  midi/track-select.ts  midi/string-channels.ts

@@ -81,7 +81,7 @@ method.)
 
 A mark has to land on the fifth fret of the second string, and only
 the file knows where that is. So each drawing gets one entry in
-`guitar-engine/src/photo.ts` — the same file the four guitars use,
+`Engine/guitar-engine/src/photo.ts` — the same file the four guitars use,
 because a bass is a fretted neck and the engine does not care how
 many strings it has:
 

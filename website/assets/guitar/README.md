@@ -3,7 +3,7 @@
 ## The hand
 
 There is no hand FILE any more. The engine carries the drawing itself,
-in `guitar-engine/src/hand.ts`: the owner's own silhouette — palm on,
+in `Engine/guitar-engine/src/hand.ts`: the owner's own silhouette — palm on,
 four fingers up, the thumb out to the left — **traced** off their
 artwork rather than approximated from it. The outline is walked along
 the pixel lattice of the 165×196 drawing and then thinned until no
@@ -14,7 +14,7 @@ the card beside the controls — because the card has to teach exactly
 what the video will show.
 
 Every digit is painted, **thumb included**, and those five colours are
-the engine's own (`FINGER_COLORS` in `guitar-engine/src/colors.ts`):
+the engine's own (`FINGER_COLORS` in `Engine/guitar-engine/src/colors.ts`):
 
 ```
 thumb  #FFC93C amber    index  #FF725F red
@@ -191,7 +191,7 @@ Both were measured off their files — the fret wires as the bright
 lines across the dark board, the strings as the bright lines along
 it, fitted across the whole run rather than read off two points. The
 strings land within half a pixel of their fits, where a string gap is
-about twenty. The numbers live in `guitar-engine/src/photo.ts`.
+about twenty. The numbers live in `Engine/guitar-engine/src/photo.ts`.
 
 **A photograph for one of the other three goes in the same way.** It
 wants to be shot along the neck, nut at the left, body at the right,
@@ -201,7 +201,7 @@ with the same script that measured this one.
 ## It is measured, and the measurements live in the engine
 
 A mark has to land on the fifth fret of the second string, and only
-the file knows where that is. So `guitar-engine/src/photo.ts` carries
+the file knows where that is. So `Engine/guitar-engine/src/photo.ts` carries
 one set of measurements per drawing — `ACOUSTIC_DRAWN`,
 `CLASSICAL_DRAWN`, `ELECTRIC_DRAWN`, `STRAT_DRAWN` — in that file's
 own pixels:

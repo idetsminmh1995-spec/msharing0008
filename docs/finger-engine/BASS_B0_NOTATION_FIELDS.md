@@ -3,7 +3,7 @@
 Phase B0 of `BASS_FINGER_ENGINE_PLAN.md` is done only when "the
 Notation Engine's fields for bass have been checked and reported".
 This is that report. It was written by reading
-`notation-engine/src/parser/musicxml/` rather than by asking the
+`Engine/notation-engine/src/parser/musicxml/` rather than by asking the
 plan, so it says what the code does today.
 
 **The headline**: the Notation Engine has no concept of sounding

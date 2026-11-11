@@ -180,7 +180,7 @@ Keeping this separation makes the guitar rules easy to change without touching t
 ### 3. Proposed folder layout
 
 ```
-src/finger-engine/
+src/Engine/finger-engine/
   index.ts                     // public API: analyzeGuitar(), parse*(), types
   defaults.ts                  // ALL default numbers (see Part 10)
   core/
@@ -194,7 +194,7 @@ src/finger-engine/
     timeline-schema.ts         // FingerTimeline types + version constant
     validate-core.ts           // generic checks (pitch correctness, ranges)
   input/
-    notation-engine/adapter.ts // IN-E* rules: Notation Engine score -> ParsedPart
+    Engine/notation-engine/adapter.ts // IN-E* rules: Notation Engine score -> ParsedPart
     musicxml/read-mxl.ts       // reuse existing ZIP reader if present
     musicxml/technical.ts      // string/fret/fingering/pluck/techniques (IN-X*)
     musicxml/parse.ts          // only what the Notation Engine does not provide
@@ -247,8 +247,8 @@ analyzeGuitar(part: ParsedPart, options?: {
 | Point | Rule |
 |---|---|
 | Time base | Engine times are seconds from content start (P-011). The Video Engine adds the count-in pre-roll it already computes. |
-| Notation Engine (D-011) | The owner's own Notation Engine is the **single source of note order and timing** (unrolled repeats/voltas, tempo map). The finger engine consumes its score through `input/notation-engine/adapter.ts` so finger dots, the notation cursor and the audio can never drift apart. See OQ-06, OQ-11. |
-| Notation Engine data model | **Read in Phase 0** (`notation-engine/src/core/note.ts`, `src/timing/`, `src/playback/repeats.ts`). **Present on a note:** `stringNumber`, `fret`, `fingering` (`<technical><fingering>`, 0 = open), `slideStart`/`slideStop` (from `<slide>` and `<glissando>`), plus `voice`, `startTick`, `durationTicks` and the pitch. **String numbering:** MusicXML's — **1 = highest-pitched string**, drawn on the top tab line — so it is converted with `notationEngineStringToInternal` (IN-E04). **Time unit:** ticks at `TICKS_PER_QUARTER = 480`, turned into seconds by `buildTempoMap` + `tickToSeconds`; `buildRepeatPlan` gives the unrolled performance order the video plays (IN-E01, OQ-06). **Note IDs:** none — the adapter derives `p{part}-m{measure}-v{voice}-n{index}` (DM-09). **Missing, so read from the MusicXML file itself (IN-E02):** `<pluck>`, hammer-on/pull-off, bend, `<staff-tuning>`, `<capo>`, `<transpose>`. |
+| Notation Engine (D-011) | The owner's own Notation Engine is the **single source of note order and timing** (unrolled repeats/voltas, tempo map). The finger engine consumes its score through `input/Engine/notation-engine/adapter.ts` so finger dots, the notation cursor and the audio can never drift apart. See OQ-06, OQ-11. |
+| Notation Engine data model | **Read in Phase 0** (`Engine/notation-engine/src/core/note.ts`, `src/timing/`, `src/playback/repeats.ts`). **Present on a note:** `stringNumber`, `fret`, `fingering` (`<technical><fingering>`, 0 = open), `slideStart`/`slideStop` (from `<slide>` and `<glissando>`), plus `voice`, `startTick`, `durationTicks` and the pitch. **String numbering:** MusicXML's — **1 = highest-pitched string**, drawn on the top tab line — so it is converted with `notationEngineStringToInternal` (IN-E04). **Time unit:** ticks at `TICKS_PER_QUARTER = 480`, turned into seconds by `buildTempoMap` + `tickToSeconds`; `buildRepeatPlan` gives the unrolled performance order the video plays (IN-E01, OQ-06). **Note IDs:** none — the adapter derives `p{part}-m{measure}-v{voice}-n{index}` (DM-09). **Missing, so read from the MusicXML file itself (IN-E02):** `<pluck>`, hammer-on/pull-off, bend, `<staff-tuning>`, `<capo>`, `<transpose>`. |
 | Rendering | The SVG fretboard reads `FingerTimeline` (09) and interpolates keyframes each frame. |
 
 
@@ -1151,7 +1151,7 @@ Status: OPEN — answers move into Part 00 as D-xxx
 | OQ-06 | Repeats/voltas/D.S.: does the Notation Engine already produce the unrolled performance order and tempo map that the video uses? The finger engine will consume exactly that (IN-E01). | Yes — Notation Engine is the single timing source | IN-E01, IN-X26, 01 §6 |
 | OQ-07 | Open strings have no finger dot. Should the video show something for them (string highlight, "0" marker at the nut)? This is renderer-side, but the timeline already provides the data (`notes` with `finger: null`). | Renderer decides | SVG layer |
 | OQ-08 | Which style should the `default` preset aim at first — pop/rock with a pick, or acoustic fingerstyle? | Pop/rock with pick | 10 §2, Phase 1 |
-| OQ-09 | Where should these plan files live? Suggested: `docs/finger-engine/` in the MusicNote repository, next to the code in `src/finger-engine/`. | `docs/finger-engine/` | Repo |
+| OQ-09 | Where should these plan files live? Suggested: `docs/Engine/finger-engine/` in the MusicNote repository, next to the code in `src/Engine/finger-engine/`. | `docs/Engine/finger-engine/` | Repo |
 | OQ-10 | Guitar dimensions: one fixed guitar (648 mm, 22 frets) for all videos, or selectable per video (e.g. classical 650 mm / 19 frets, 24-fret electric, 7-string)? | Fixed default, selectable later | 04, UI |
 | OQ-11 | Does your Notation Engine's score keep the guitar data from MusicXML — `<string>`, `<fret>`, `<fingering>`, `<pluck>`, hammer-on/pull-off, slide, bend, tuning, capo, transpose? Which string numbering does it use, and does every note have a stable ID? (If some fields are missing, the finger engine reads them from the MusicXML file itself — IN-E02.) | **Answered in Phase 0.** It keeps `<string>`, `<fret>`, `<fingering>` and slide (`slideStart`/`slideStop`, from `<slide>` and `<glissando>`). It does **not** keep `<pluck>`, hammer-on/pull-off, bend, `<staff-tuning>`, `<capo>` or `<transpose>` — those come from the MusicXML file (IN-E02). String numbering is MusicXML's, 1 = highest (IN-E04). Notes have no stable ID; the adapter derives one (DM-09). See 01 §6. | IN-E02..04, P-006, P-007 |
 | OQ-12 | Should the finger engine's chosen string/fret be sent back to the Notation Engine so a TAB staff drawn on screen shows the same fingering as the dots? | Later integration; not in Phases 0–1 | Notation Engine |
@@ -1191,7 +1191,7 @@ strum spread, weights) are **engineering estimates**, not values from these pape
 Format: `## [plan version] — date` then the changed rule IDs.
 
 ### [0.2.3] — 2026-09-25
-- **Phase 1 implemented** in `finger-engine/`: the Notation Engine adapter (IN-E01..06), the
+- **Phase 1 implemented** in `Engine/finger-engine/`: the Notation Engine adapter (IN-E01..06), the
   standalone MusicXML (IN-X01..04, 06, 10–13, 20, 22–25) and MIDI (IN-M01..05, 07) readers,
   the normalizer (IN-N*), stages (SV-01..04), candidates (SV-10..14), the left-hand cost
   model and beam/Viterbi solver (SV-20..24), pick-mode right hand (RH-01, RH-P01, P03, P04),
@@ -1221,12 +1221,12 @@ Format: `## [plan version] — date` then the changed rule IDs.
 
 ### [0.2.2] — 2026-09-25
 - **OQ-11 answered** and the "Notation Engine data model" row of 01 §6 filled in, by reading
-  `notation-engine/src/core/note.ts`, `src/timing/` and `src/playback/repeats.ts`:
+  `Engine/notation-engine/src/core/note.ts`, `src/timing/` and `src/playback/repeats.ts`:
   `stringNumber` (MusicXML numbering, 1 = highest), `fret`, `fingering`, `slideStart`/`slideStop`
   are kept; `<pluck>`, hammer-on/pull-off, bend, `<staff-tuning>`, `<capo>` and `<transpose>`
   are not, so the adapter reads those from the MusicXML file (IN-E02). Time is ticks at 480 per
   quarter with a tempo map; notes have no stable ID, so DM-09 derives one.
-- No rule changed. Phase 0 implemented in `finger-engine/`.
+- No rule changed. Phase 0 implemented in `Engine/finger-engine/`.
 
 ### [0.2.1] — 2026-09-25
 - Packaging only: all Parts merged into one file `GUITAR_FINGER_ENGINE_PLAN.md` so the owner and the coding tool read a single document. No rule changed.

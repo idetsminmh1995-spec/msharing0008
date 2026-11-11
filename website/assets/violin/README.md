@@ -63,7 +63,7 @@ music floating on black and no violin beside it.
 ## What is NOT needed yet, and what would change that
 
 Nothing measures this drawing. The guitars and basses carry
-measurements in `guitar-engine/src/photo.ts` — every fret wire, the
+measurements in `Engine/guitar-engine/src/photo.ts` — every fret wire, the
 outer strings at each end of the board — because the finger engine
 lands marks on real frets. A violin has no frets, and no engine yet.
 

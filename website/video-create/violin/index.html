@@ -8,7 +8,7 @@
 <link rel="preload" href="../../assets/fonts/Bravura.woff2?v=1.482" as="font" type="font/woff2" crossorigin>
 <style>
   /* Bravura is the SMuFL music font the Notation Engine's glyph metrics
-     come from (notation-engine/src/glyphs/data/bravura_metadata.json).
+     come from (Engine/notation-engine/src/glyphs/data/bravura_metadata.json).
      The engine emits font-family="Bravura" on every notehead, clef, rest,
      flag, accidental and time-signature digit it draws -- so WITHOUT this
      rule the browser has nothing to draw them with and every one of them
@@ -893,7 +893,7 @@
 
   // --- Real Notation Engine wiring -----------------------------------
   // Renders actual notation via the same notation-engine.js this repo
-  // builds and tests (notation-engine/), not a static mockup. Nothing
+  // builds and tests (Engine/notation-engine/), not a static mockup. Nothing
   // loads until the person actually picks a file via the Upload File
   // card above -- there used to be a demo file auto-loaded on every
   // page open, which made a plain refresh look like an uploaded file

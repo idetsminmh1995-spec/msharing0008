@@ -2959,7 +2959,7 @@ measure ${measure ?? "?"}`);
     return out;
   }
 
-  // src/input/notation-engine/adapter.ts
+  // src/input/Engine/notation-engine/adapter.ts
   var STEP_SEMITONES2 = {
     C: 0,
     D: 2,
