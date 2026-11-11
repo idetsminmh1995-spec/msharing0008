@@ -3,6 +3,7 @@
 This folder owns Video Engine planning and technical documentation. It is separate from Main Plan and from the other engine plans.
 
 - [Video architecture and roadmap](ARCHITECTURE.md)
+- [Dedicated implementation plan](IMPLEMENTATION-PLAN.md)
 - [Video Engine contract](Documentation/VIDEO-ENGINE.md)
 - [Streaming muxer strategy](Documentation/VIDEO-ENGINE-STREAMING-MUXER.md)
 - [Canonical implementation](../../Engine/video-engine/)
