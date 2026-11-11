@@ -9,6 +9,7 @@ The `Plan/` folder is organized by responsibility. `Main Plan/` contains only pr
 | Video rendering and MP4 export | [Video Plan](Video%20Plan/) |
 | Piano keyboard and piano video | [Piano Plan](Piano%20Plan/) |
 | Piano hand motion and kinematics | [Piano Hand Plan](Piano%20Hand%20Plan/) |
+| Cross-instrument 3D scenes, models, and two-hand roadmap | [3D Model Plan](3D%20Model%20Plan/) |
 | Fingering and candidate scoring | [Finger Plan](Finger%20Plan/) |
 | Guitar and fretboard rendering | [Guitar Plan](Guitar%20Plan/) |
 | Tempo and metronome behavior | [Metronome Plan](Metronome%20Plan/) |
