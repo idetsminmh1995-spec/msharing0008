@@ -30,10 +30,10 @@ are not the same thing:
   perfectly usable; not covered by any stability promise, because they
   exist to serve the renderer and will follow it.
 
-## Not to be confused with `../Doc/`
+## Not to be confused with `../../../Plan/Notation Plan/Doc/`
 
-`docs/` is machine-generated reference. [`../Doc/`](../Doc/) is the
+`docs/` is machine-generated reference. [`../../../Plan/Notation Plan/Doc/`](../Doc/) is the
 hand-written build history: one record per phase, each saying what was
 built, what was deliberately *not* built, how it was verified, and how to
-revert it. Start at [`../Doc/STATUS.md`](../Doc/STATUS.md) for where the
-project stands, or [`../Doc/README.md`](../Doc/README.md) for the index.
+revert it. Start at [Notation status](../../../Plan/Notation%20Plan/Doc/STATUS.md) for where the
+project stands, or [Notation plan index](../../../Plan/Notation%20Plan/Doc/README.md) for the index.

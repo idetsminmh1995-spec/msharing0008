@@ -364,7 +364,7 @@ that is expected and already accounted for.
 ---
 ## H. Latest host-integration audit — 2026-11-10
 
-The previous §F entries are historical findings from the earlier web-app state. The current repository now has a separate host-side delivery record in [`../../Doc/CONSOLIDATED-PLAN-2026-11-10.md`](../../Doc/CONSOLIDATED-PLAN-2026-11-10.md). The following reconciliation is intentional:
+The previous §F entries are historical findings from the earlier web-app state. The current repository now has a separate host-side delivery record in [`../../../Doc/CONSOLIDATED-PLAN-2026-11-10.md`](../../../Doc/CONSOLIDATED-PLAN-2026-11-10.md). The following reconciliation is intentional:
 
 - **F4 browser coverage:** closed for the current five-page export scope. `tools/test-drum-rollout-browser.mjs` and `tools/test-cross-page-rollout-browser.mjs` run Chromium acceptance checks, and `.github/workflows/notation-and-video.yml` runs them in CI. This is host/browser verification rather than a new notation-core phase.
 - **F6 decorative notation/export wiring:** closed for Drum and the four migrated instrument pages in the current rollout. The host pages use the notation bundle, pinned export composition, asset gate, render report, and deterministic frame path. A true perceptual golden-image comparison against the user's final reference remains a separate future test, not silently marked complete.
