@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- §10.8 divergence: percussion parts that omit <display-step> (and
+     <display-octave>) entirely inside <unpitched>. Real drum exports
+     sometimes do this when the exporting program doesn't compute a
+     specific staff position for every percussion sound. -->
+<score-partwise version="3.1">
+  <part-list><score-part id="P1"><part-name>Drums</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>2</divisions>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>percussion</sign></clef>
+      </attributes>
+      <note>
+        <unpitched/>
+        <duration>8</duration><voice>1</voice><type>whole</type>
+      </note>
+    </measure>
+  </part>
+</score-partwise>

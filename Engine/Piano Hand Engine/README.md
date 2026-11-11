@@ -1,9 +1,8 @@
 # Piano Hand Engine
 
-Canonical source: [piano-hand-engine](../../piano-hand-engine/)
+This folder contains a complete source mirror of the Piano Hand Engine, including hand splitting, fingering, kinematics, performance planning, tests, and configuration.
 
-This engine handles piano hand splitting, fingering, kinematics, inverse-kinematics targets, timing, and performance plans.
-
-- [Engine README](../../piano-hand-engine/README.md)
-- [Implementation](../../piano-hand-engine/src/)
-- [Tests](../../piano-hand-engine/test/)
+- [Mirrored code and project files](source/)
+- [Canonical repository engine](../../piano-hand-engine/)
+- [Source](source/src/)
+- [Tests](source/test/)

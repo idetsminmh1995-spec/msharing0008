@@ -1,13 +1,10 @@
 # Drum Engine
 
-Canonical source trees:
+This folder contains complete mirrors of the Drum Engine code, including both sticking implementations, tests, configuration, and documentation.
 
-- [Drum documentation and integration](../../Drum/)
-- [TypeScript sticking engine](../../Drum/sticking-engine-ts/)
-- [Python sticking engine](../../Drum/sticking-engine/)
-
-This engine covers drum sticking rules, hand candidates, pattern analysis, and percussion-specific integration.
-
-- [Drum README](../../Drum/README.md)
-- [TypeScript implementation](../../Drum/sticking-engine-ts/src/)
-- [Python implementation](../../Drum/sticking-engine/sticking_engine/)
+- [Mirrored Drum code](source/)
+- [Canonical Drum integration](../../Drum/)
+- [TypeScript sticking source](source/sticking-engine-ts/src/)
+- [Python sticking source](source/sticking-engine/sticking_engine/)
+- [TypeScript tests](source/sticking-engine-ts/test/)
+- [Python tests](source/sticking-engine/test/)

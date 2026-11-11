@@ -1,9 +1,8 @@
 # Metronome Engine
 
-Canonical source: [metronome-engine](../../metronome-engine/)
+This folder contains a complete source mirror of the Metronome Engine, including tempo, beat, click, timing, rendering helpers, tests, and configuration.
 
-This engine provides tempo, beat, click, timing, and metronome rendering helpers.
-
-- [Engine README](../../metronome-engine/README.md)
-- [Implementation](../../metronome-engine/src/)
-- [Tests](../../metronome-engine/test/)
+- [Mirrored code and project files](source/)
+- [Canonical repository engine](../../metronome-engine/)
+- [Source](source/src/)
+- [Tests](source/test/)

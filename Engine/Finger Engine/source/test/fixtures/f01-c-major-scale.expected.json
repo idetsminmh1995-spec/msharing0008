@@ -1,0 +1,16 @@
+{
+  "fixture": "F-01",
+  "source": "docs/finger-engine/GUITAR_FINGER_ENGINE_PLAN.md, Part 08",
+  "note": "String numbers are THIS engine's [DM-01]: string 1 is the low E. finger null = open string.",
+  "sharedWith": ["F-09"],
+  "notes": [
+    { "pitch": 48, "name": "C3", "string": 2, "fret": 3, "finger": "3" },
+    { "pitch": 50, "name": "D3", "string": 3, "fret": 0, "finger": null },
+    { "pitch": 52, "name": "E3", "string": 3, "fret": 2, "finger": "2" },
+    { "pitch": 53, "name": "F3", "string": 3, "fret": 3, "finger": "3" },
+    { "pitch": 55, "name": "G3", "string": 4, "fret": 0, "finger": null },
+    { "pitch": 57, "name": "A3", "string": 4, "fret": 2, "finger": "2" },
+    { "pitch": 59, "name": "B3", "string": 5, "fret": 0, "finger": null },
+    { "pitch": 60, "name": "C4", "string": 5, "fret": 1, "finger": "1" }
+  ]
+}

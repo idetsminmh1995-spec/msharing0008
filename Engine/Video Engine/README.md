@@ -1,22 +1,13 @@
 # Video Engine
 
-This folder is the project entry point for the shared browser video-rendering engine.
+This folder contains a complete mirror of the Video Engine runtime source, tests, browser fixture, and technical documentation.
 
-The production source remains at `website/assets/video-engine.js` because all instrument video pages load that stable browser path directly. This folder groups the engine's ownership and navigation without duplicating or breaking the runtime asset.
+- [Mirrored code and project files](source/)
+- [Mirrored runtime source](source/website/assets/video-engine.js)
+- [Mirrored Node tests](source/tools/test-video-engine.mjs)
+- [Mirrored Chromium smoke test](source/tools/test-video-engine-browser.mjs)
+- [Mirrored browser fixture](source/tools/browser-video-engine-fixture.html)
+- [Canonical production source](../../website/assets/video-engine.js)
+- [Canonical documentation](../../docs/VIDEO-ENGINE.md)
 
-## Canonical implementation
-
-- [Video Engine source](../../website/assets/video-engine.js)
-- [Video Engine contract and architecture](../../docs/VIDEO-ENGINE.md)
-- [Streaming muxer strategy](../../docs/VIDEO-ENGINE-STREAMING-MUXER.md)
-
-## Verification
-
-- [Node regression suite](../../tools/test-video-engine.mjs)
-- [Chromium browser smoke-test runner](../../tools/test-video-engine-browser.mjs)
-- [Browser test fixture](../../tools/browser-video-engine-fixture.html)
-- [Website cleanup test](../../website/tests/video-engine-cleanup.test.mjs)
-
-## Runtime consumers
-
-The shared engine is loaded by the piano, guitar, bass-guitar, drum, metronome, and violin video-create pages. Keep `website/assets/video-engine.js` as the runtime source of truth and update this index when new engine surfaces are added.
+The canonical production source remains at `website/assets/video-engine.js` because the website loads that stable path directly. Keep the mirrored files synchronized with the canonical files when the engine changes.

@@ -1,9 +1,8 @@
 # Guitar Engine
 
-Canonical source: [guitar-engine](../../guitar-engine/)
+This folder contains a complete source mirror of the Guitar Engine, including geometry, fretboard mapping, fingering, tests, and configuration.
 
-This engine handles guitar geometry, fretboard mapping, fingering, hand position, and guitar-specific playback/rendering helpers.
-
-- [Engine README](../../guitar-engine/README.md)
-- [Implementation](../../guitar-engine/src/)
-- [Tests](../../guitar-engine/test/)
+- [Mirrored code and project files](source/)
+- [Canonical repository engine](../../guitar-engine/)
+- [Source](source/src/)
+- [Tests](source/test/)

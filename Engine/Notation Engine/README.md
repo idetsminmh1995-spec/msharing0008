@@ -1,9 +1,9 @@
 # Notation Engine
 
-Canonical source: [notation-engine](../../notation-engine/)
+This folder contains a complete source mirror of the Notation Engine, including TypeScript source, tests, fixtures, scripts, configuration, and documentation.
 
-This engine parses MusicXML and renders notation, articulations, beams, drum notation, piano grand staff, and related score layout.
-
-- [Engine README](../../notation-engine/README.md)
-- [Implementation](../../notation-engine/src/)
-- [Tests](../../notation-engine/test/)
+- [Mirrored code and project files](source/)
+- [Canonical repository engine](../../notation-engine/)
+- [Source](source/src/)
+- [Tests](source/test/)
+- [Scripts](source/scripts/)

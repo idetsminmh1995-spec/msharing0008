@@ -1,9 +1,8 @@
 # Piano Engine
 
-Canonical source: [piano-engine](../../piano-engine/)
+This folder contains a complete source mirror of the Piano Engine, including implementation, tests, configuration, and project documentation.
 
-This engine provides piano keyboard geometry, key rendering, colors, fingering display, and keyboard range helpers.
-
-- [Engine README](../../piano-engine/README.md)
-- [Implementation](../../piano-engine/src/)
-- [Tests](../../piano-engine/test/)
+- [Mirrored code and project files](source/)
+- [Canonical repository engine](../../piano-engine/)
+- [Source](source/src/)
+- [Tests](source/test/)

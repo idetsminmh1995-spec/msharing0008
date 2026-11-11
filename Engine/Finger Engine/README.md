@@ -1,9 +1,8 @@
 # Finger Engine
 
-Canonical source: [finger-engine](../../finger-engine/)
+This folder contains a complete source mirror of the Finger Engine, including fingering profiles, candidate generation, scoring, validation, tests, and configuration.
 
-This engine provides fingering profiles, candidate generation, scoring, validation, and instrument-specific finger planning.
-
-- [Engine README](../../finger-engine/README.md)
-- [Implementation](../../finger-engine/src/)
-- [Tests](../../finger-engine/test/)
+- [Mirrored code and project files](source/)
+- [Canonical repository engine](../../finger-engine/)
+- [Source](source/src/)
+- [Tests](source/test/)
