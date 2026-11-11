@@ -2,6 +2,8 @@
 
 This folder owns guitar geometry, fretboard mapping, string/fret rendering, guitar hand position, and guitar-video integration.
 
+- [Guitar architecture](ARCHITECTURE.md)
+- [Guitar documentation index](Documentation/README.md)
 - [Guitar Engine implementation](../../Engine/guitar-engine/)
 - [Finger Plan](../Finger%20Plan/)
 - [Guitar video page](../../website/video-create/guitar/)
