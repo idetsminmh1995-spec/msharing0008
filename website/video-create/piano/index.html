@@ -599,7 +599,7 @@
 }
 </script>
 <!-- The Hands design's production renderer: separate left/right rigged GLB hands + WebGL keys. -->
-<script type="module" src="../../assets/piano-hand-3d.js?v=18"></script>
+<script type="module" src="../../assets/piano-hand-3d.js?v=20"></script>
 </head>
 <body>
 
@@ -1829,6 +1829,34 @@
     new ResizeObserver(() => drawStage()).observe(pianoStage);
   }
   window.addEventListener('piano-hand-3d-ready', () => drawStage());
+  async function ensurePianoHandSceneReady() {
+    if (pianoDesign() !== 'hands') return true;
+    if (!window.PianoHand3D?.ready) {
+      await new Promise((resolve, reject) => {
+        let timer;
+        const cleanup = () => {
+          window.removeEventListener('piano-hand-3d-ready', onReady);
+          window.clearTimeout(timer);
+        };
+        const onReady = () => {
+          cleanup();
+          if (window.PianoHand3D?.ready) resolve();
+          else reject(new Error('The piano 3D renderer loaded without a readiness API.'));
+        };
+        timer = window.setTimeout(() => {
+          cleanup();
+          reject(new Error('Timed out waiting for the piano 3D renderer to load.'));
+        }, 15000);
+        window.addEventListener('piano-hand-3d-ready', onReady, { once: true });
+      });
+    }
+    const ready = await window.PianoHand3D.ready(pianoStage);
+    if (!ready) {
+      const detail = pianoStage.dataset.handErrorMessage || 'The hand rig or fingertip anchors did not pass validation.';
+      throw new Error(`The piano 3D hands are not ready; video export stopped instead of omitting them. ${detail}`);
+    }
+    return true;
+  }
   drawStage(0);
 
   document.getElementById('upload-musicxml').addEventListener('click', () => setActiveSlot('upload-musicxml'));
@@ -3529,6 +3557,10 @@
     };
 
     try {
+      if (pianoDesign() === 'hands') {
+        genLabel.textContent = 'Loading the 3D piano keyboard and hands…';
+        await ensurePianoHandSceneReady();
+      }
       genLabel.textContent = 'Fetching the Thank You clip…';
       const outro =
         typeof OutroVideo === 'undefined'
