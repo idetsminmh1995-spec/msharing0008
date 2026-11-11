@@ -2,9 +2,9 @@
 
 ## Purpose and ownership
 
-Piano Hand Engine converts timed piano notes into an inspectable, serialisable two-hand performance plan. It does not draw SVG or 3D pixels, does not own MusicXML engraving, and does not own video encoding. Its output is consumed by the Piano page and eventually by the 3D hand renderer.
+Piano Hand Engine converts timed piano notes into an inspectable, serialisable two-hand performance plan. It does not draw SVG or 3D pixels, does not own MusicXML engraving, and does not own video encoding. The engine remains available for future integration; the previous 3D hand renderer is disabled while replacement assets are built.
 
-The canonical implementation is under [`../../Engine/piano-hand-engine/`](../../Engine/piano-hand-engine/). The current package has phases 1–3 built and a bounded phase-4 IK solver for a synthetic hand rig. The engine's generic GLB calibration/integration, wrist trajectories, chord-shape motion, humanisation, full two-hand motion, and renderer completion remain incomplete. Separately, the production `hands_pair.glb` has a bounded five-sample single-finger visual-contact baseline; see the [cross-instrument 3D scene plan](../3D%20Model%20Plan/INSTRUMENT-3D-HANDS-PLAN.md) and the production [hand calibration manifest](../../website/assets/hand/hand-calibration.json).
+The canonical implementation is under [`../../Engine/piano-hand-engine/`](../../Engine/piano-hand-engine/). The current package has phases 1–3 built and a bounded phase-4 IK solver for a synthetic hand rig. The engine's generic GLB calibration/integration, wrist trajectories, chord-shape motion, humanisation, full two-hand motion, and renderer completion remain incomplete. The previous production hand models were removed from the current tree on 2026-11-12; the five-sample visual-contact baseline is historical evidence only and does not validate replacement assets. See the [cross-instrument 3D scene plan](../3D%20Model%20Plan/INSTRUMENT-3D-HANDS-PLAN.md).
 
 ## Coordinate and data architecture
 
@@ -67,15 +67,15 @@ The engine carries stable note IDs and source evidence through every stage. A re
 
 ### Kinematics and calibration
 
-`kinematics/handPose.ts` is the forward model: joint angles produce palm, wrist, and fingertip positions under joint limits. `kinematics/inverseKinematics.ts` provides bounded damped-least-squares finger IK with per-target residuals on the synthetic Engine rig. `calibration/glbCalibration.ts` validates the expected 21-joint skeleton and exposes engine↔GLB transforms; its generic engine calibration remains deliberately `calibrated: false`. Separately, `website/assets/hand/hand-calibration.json` records production `hands_pair.glb` contact evidence: five single-finger samples, 0.000 mm maximum residual against a 1 mm tolerance. `singleFingerContact.ts` defines the engine-level calibration/contact boundary for one finger and one key.
+`kinematics/handPose.ts` is the forward model: joint angles produce palm, wrist, and fingertip positions under joint limits. `kinematics/inverseKinematics.ts` provides bounded damped-least-squares finger IK with per-target residuals on the synthetic Engine rig. `calibration/glbCalibration.ts` validates the expected 21-joint skeleton and exposes engine↔GLB transforms; its generic engine calibration remains deliberately `calibrated: false`. The retained `website/assets/hand/hand-calibration.json` describes the removed `hands_pair.glb` only; it is historical evidence, not an active production calibration. `singleFingerContact.ts` defines the engine-level calibration/contact boundary for one finger and one key.
 
-A synthetic IK residual is not evidence of visual fingertip accuracy. The recorded production contact baseline applies only to its five sampled single-finger frames on `hands_pair.glb`; it does not establish chord contact, wrist trajectories, collision clearance, or complete 21-joint engine calibration.
+A synthetic IK residual is not evidence of visual fingertip accuracy. The archived contact baseline applies only to five sampled single-finger frames on the retired `hands_pair.glb`; it does not establish accuracy for any replacement model, chord contact, wrist trajectories, collision clearance, or complete 21-joint engine calibration.
 
 ## Renderer integration
 
-The Piano page adapter preserves MusicXML/MIDI time, stable IDs, staff, voice, track, stated fingering, and chord membership before calling the hand engine. The browser bundle exposes the engine through `website/assets/piano-hand-engine.js`; the 3D renderer consumes physical key and hand data while the Piano Engine continues to own the Falling Notes/SVG design. In Hands mode, `PianoHand3D.ready(container)` validates both wrist roots, all fingertip anchors, distal bones, and the production contact manifest; the page awaits that promise before export and stops with an explicit error if readiness fails.
+The Piano page adapter preserves MusicXML/MIDI time, stable IDs, staff, voice, track, stated fingering, and chord membership before calling the hand engine. The browser bundle exposes the engine through `website/assets/piano-hand-engine.js`; the active Piano page currently renders Falling Notes only. The previous `PianoHand3D` runtime and Hands-mode asset loader are disabled and no replacement hand GLB is loaded. Re-enable a 3D mode only after a new rig, measured model calibration, browser test, and export-readiness gate are in place.
 
-Preview and export must use the same absolute-time sampling API. Preview may interpolate presentation for responsiveness, but export must sample the exact requested timestamp. The readiness gate prevents a missing or unverified hand asset from being silently omitted; it does not yet prove full preview/export motion parity. Until that parity is tested, the hand renderer should expose a diagnostic mode that records the plan timestamp, sampled hand state, active contacts, and source note IDs.
+Preview and export must use the same absolute-time sampling API. Preview may interpolate presentation for responsiveness, but export must sample the exact requested timestamp. The former readiness gate applied to the retired asset; a new renderer must restore a fail-closed readiness gate and prove preview/export motion parity before Hands mode returns. It should expose diagnostics for plan timestamp, sampled hand state, active contacts, and source note IDs.
 
 ## Invariants
 
@@ -83,13 +83,13 @@ The engine follows six non-negotiable rules. Physical values remain in millimetr
 
 ## Current status
 
-Phases 1–3 are implemented: physical keyboard geometry, exact key positions, hand splitting, phrase-level fingering, stated-fingering precedence, confidence values, and serialisable performance plans. Phase 4 remains partial: synthetic-rig finger-target IK works with bounded residuals, and a separate production `hands_pair.glb` browser calibration passes five single-finger samples at 0.000 mm maximum residual against 1 mm tolerance. The latter is a bounded visual baseline, not a complete engine↔GLB solver or chord/motion validation. The Piano page now fails export readiness instead of silently omitting the hands when the rig or manifest is invalid. The current package verification covers typecheck, lint, formatting, build, unit tests, and browser bundle generation.
+Phases 1–3 are implemented: physical keyboard geometry, exact key positions, hand splitting, phrase-level fingering, stated-fingering precedence, confidence values, and serialisable performance plans. Phase 4 remains partial: synthetic-rig finger-target IK works with bounded residuals. The former `hands_pair.glb` five-sample browser baseline is historical; its model files are removed and the Piano Hands mode is disabled. The current Piano page uses Falling Notes. Package verification continues to cover typecheck, lint, formatting, build, unit tests, and browser bundle generation.
 
 ## Roadmap
 
 ### Phase 4 — calibrated contact
 
-Extend the current `hands_pair.glb` five-sample single-finger baseline to multi-finger chords, broader key coverage, wrist motion and collision clearance. Complete the generic engine↔GLB 21-bone mapping and transform calibration, verify left/right orientation, and keep the browser test checking scene-space contact. A calibration report must include residuals and tolerance, not only a boolean flag.
+Select or create a replacement two-hand model, then establish a new baseline from measured fingertip contact. Validate multi-finger chords, broader key coverage, wrist motion and collision clearance. Complete the generic engine↔GLB 21-bone mapping and transform calibration, verify left/right orientation, and keep the browser test checking scene-space contact. A calibration report must include residuals and tolerance, not only a boolean flag.
 
 ### Phase 5 — wrist trajectories
 

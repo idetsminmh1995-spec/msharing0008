@@ -1227,7 +1227,7 @@ var PianoHandEngine = (() => {
   };
   var DEFAULT_GLB_CALIBRATION = {
     version: 1,
-    model: "hand_model.glb",
+    model: "unassigned.glb",
     calibrated: false,
     skeleton: {
       jointCount: 21,

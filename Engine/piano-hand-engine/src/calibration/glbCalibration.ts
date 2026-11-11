@@ -39,10 +39,10 @@ export const EXPECTED_GLB_BONE_CHAINS: Readonly<Record<Finger, readonly string[]
   5: ['pinky_meta', 'pinky_prox', 'pinky_midd', 'pinky_dist'],
 };
 
-/** Metadata confirmed from website/assets/hand/hand_model.glb. */
+/** Uncalibrated skeleton template; no matching model asset is checked in. */
 export const DEFAULT_GLB_CALIBRATION: GlbCalibrationManifest = {
   version: 1,
-  model: 'hand_model.glb',
+  model: 'unassigned.glb',
   calibrated: false,
   skeleton: {
     jointCount: 21,

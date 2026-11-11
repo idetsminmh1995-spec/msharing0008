@@ -588,18 +588,8 @@
 <script src="../../assets/video-export-stability.js?v=1"></script>
 <script src="../../assets/video-engine.js?v=r2gate1"></script>
 <script src="../../assets/video-asset-gate.js?v=shared-gate-20261111"></script>
-<!-- Physical piano geometry, hand splitting and fingering for the Hands renderer. -->
+<!-- Piano performance analysis stays available while the 3D models are rebuilt. -->
 <script src="../../assets/piano-hand-engine.js?v=0.1.1"></script>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
-  }
-}
-</script>
-<!-- The Hands design's production renderer: separate left/right rigged GLB hands + WebGL keys. -->
-<script type="module" src="../../assets/piano-hand-3d.js?v=20"></script>
 </head>
 <body>
 
@@ -693,7 +683,7 @@
           <label for="pianoDesign">Design</label>
           <select id="pianoDesign" class="drum-input">
             <option value="falling-notes" selected>Falling Notes</option>
-            <option value="hands">Hands</option>
+            <option value="hands" disabled>Hands — being rebuilt</option>
           </select>
         </div>
         <div>
@@ -724,8 +714,8 @@
           <div class="tc-color-row"><input id="rightHandColor" type="color" value="#4FA3FF"></div>
         </div>
       </div>
-      <div class="field-hint">These colors highlight played notes and keys; both hands keep the same natural skin and nail textures.</div>
-      <div class="field-hint" id="keyboardHint">Two designs of the same video. <strong>Falling Notes</strong> is the stage with bars coming down onto the keys. <strong>Hands</strong> drops all of that and shows the keyboard alone, with two hands on it pressing the keys and the finger number on each key being played &mdash; so Fall time does not apply to it. Which hand plays a note comes from the score's own staves &mdash; the upper staff is the right hand, the lower the left. A note outside the keyboard you pick is not drawn, so a 61 shows less of a wide piece than an 88 does.</div>
+      <div class="field-hint">These colors highlight played notes and keys in the available video design.</div>
+      <div class="field-hint" id="keyboardHint"><strong>Hands mode is temporarily unavailable</strong> while its 3D models are rebuilt. Piano video export currently uses Falling Notes.</div>
     </div>
 
     <div class="card">
@@ -1407,9 +1397,8 @@
 
 
   // --- The piano stage (card 3) -------------------------------------
-  // Engine/piano-engine/ draws Falling Notes as SVG. Piano Hand Engine supplies
-  // physical key geometry, score-aware hand splits, fingering and strike
-  // points to the Hands design; the GLB/WebGL renderer consumes that data.
+  // The active Falling Notes design is rendered by Piano Engine as SVG.
+  // The previous GLB/WebGL hand renderer is disabled during the asset rebuild.
   const pianoStage = document.getElementById('pianoStage');
   const keyboardSizeSelect = document.getElementById('keyboardSize');
   const fallSecondsSelect = document.getElementById('fallSeconds');
@@ -1426,16 +1415,15 @@
    */
   const pianoDesignSelect = document.getElementById('pianoDesign');
 
+  // The previous 3D hand models are retired; keep any saved browser selection safe.
   function pianoDesign() {
-    return pianoDesignSelect?.value === 'hands' ? 'hands' : 'falling-notes';
+    return 'falling-notes';
   }
 
   function applyPianoDesign(atSeconds) {
     const hands = pianoDesign() === 'hands';
     videoFrame?.classList.toggle('design-hands', hands);
-    // Fall time is how long a note takes to come down. Nothing comes
-    // down in the Hands design, so the control is not disabled for
-    // tidiness -- it has nothing to mean.
+    // Falling Notes is the only enabled design while the 3D models are rebuilt.
     if (fallSecondsSelect) {
       fallSecondsSelect.disabled = hands;
       fallSecondsSelect.title = hands ? 'Only the Falling Notes design has falling notes.' : '';
@@ -1764,9 +1752,8 @@
       leadSeconds: fallSeconds(),
       colors: stageColors(),
       design: pianoDesign(),
-      // Legacy SVG fingering remains available to the Falling Notes
-      // renderer. The Hands design overrides its note/finger events
-      // below with Piano Hand Engine results; skin textures stay natural.
+      // Keep the existing SVG fingering data for the active Falling Notes
+      // renderer; the former 3D Hands mode is disabled during the reset.
       ...(pianoFingering
         ? {
             hands: {
@@ -1794,11 +1781,6 @@
     const height = Math.max(1, Math.round(box.height));
     if (!(width > 1) || !(height > 1)) return;
     const options = stageOptions(width, height, atSeconds);
-    if (pianoDesign() === 'hands' && window.PianoHand3D?.update) {
-      window.PianoHand3D.update({ ...options, container: pianoStage });
-      pianoStage.dataset.renderer = 'blender-3d';
-      return;
-    }
     pianoStage.dataset.renderer = 'svg';
     pianoStage.innerHTML = PianoEngine.renderPianoStage(options);
   }
@@ -1827,35 +1809,6 @@
    */
   if (typeof ResizeObserver !== 'undefined' && pianoStage) {
     new ResizeObserver(() => drawStage()).observe(pianoStage);
-  }
-  window.addEventListener('piano-hand-3d-ready', () => drawStage());
-  async function ensurePianoHandSceneReady() {
-    if (pianoDesign() !== 'hands') return true;
-    if (!window.PianoHand3D?.ready) {
-      await new Promise((resolve, reject) => {
-        let timer;
-        const cleanup = () => {
-          window.removeEventListener('piano-hand-3d-ready', onReady);
-          window.clearTimeout(timer);
-        };
-        const onReady = () => {
-          cleanup();
-          if (window.PianoHand3D?.ready) resolve();
-          else reject(new Error('The piano 3D renderer loaded without a readiness API.'));
-        };
-        timer = window.setTimeout(() => {
-          cleanup();
-          reject(new Error('Timed out waiting for the piano 3D renderer to load.'));
-        }, 15000);
-        window.addEventListener('piano-hand-3d-ready', onReady, { once: true });
-      });
-    }
-    const ready = await window.PianoHand3D.ready(pianoStage);
-    if (!ready) {
-      const detail = pianoStage.dataset.handErrorMessage || 'The hand rig or fingertip anchors did not pass validation.';
-      throw new Error(`The piano 3D hands are not ready; video export stopped instead of omitting them. ${detail}`);
-    }
-    return true;
   }
   drawStage(0);
 
@@ -3203,10 +3156,6 @@
     if (!pianoStage || typeof PianoEngine === 'undefined') return;
     if (!(box.w > 1) || !(box.h > 1) || !isVisible(pianoStage)) return;
     const options = stageOptions(box.w, box.h, atSeconds);
-    if (pianoDesign() === 'hands' && window.PianoHand3D?.renderToCanvas) {
-      window.PianoHand3D.renderToCanvas({ ...options, container: pianoStage }, ctx2d, box);
-      return;
-    }
     const shapes = PianoEngine.stageShapes(options);
     ctx2d.save();
     ctx2d.translate(box.x, box.y);
@@ -3557,10 +3506,6 @@
     };
 
     try {
-      if (pianoDesign() === 'hands') {
-        genLabel.textContent = 'Loading the 3D piano keyboard and hands…';
-        await ensurePianoHandSceneReady();
-      }
       genLabel.textContent = 'Fetching the Thank You clip…';
       const outro =
         typeof OutroVideo === 'undefined'
