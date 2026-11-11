@@ -1420,6 +1420,7 @@ function renderNoteMarks(
   bottomPosition: number,
   direction: StemDirection,
   ctx: RenderCtx,
+  abovePosition?: number,
 ): string {
   const articulations = source.articulations ?? [];
   const ornaments = source.ornaments ?? [];
@@ -1430,7 +1431,7 @@ function renderNoteMarks(
   const parts: string[] = [];
   const topLine = -(STAFF_LINES - 1);
   // Staff-position units: more negative is higher up the page.
-  let aboveStaff = Math.min(topPosition, topLine);
+  let aboveStaff = Math.min(topPosition, topLine, abovePosition ?? Number.POSITIVE_INFINITY);
   let aboveNote = topPosition;
   let belowNote = bottomPosition;
 
@@ -2147,6 +2148,7 @@ function renderBeamGroup(
   members.forEach((m, i) => {
     const markSource = m.source.kind === 'chord' ? m.source.notes[0] : m.source;
     if (markSource === undefined) return;
+    const stemX = stemXs[i] ?? m.x;
     const marks = renderNoteMarks(
       markSource,
       m.x,
@@ -2154,6 +2156,7 @@ function renderBeamGroup(
       Math.max(...m.positions),
       direction,
       ctx,
+      isDrumBeam ? beamYAtX(shape, stemX) : undefined,
     );
     if (marks !== '') memberParts[i]?.push(marks);
   });

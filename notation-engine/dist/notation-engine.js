@@ -77605,7 +77605,7 @@ ${xrefOffset}
       })
     ].join("\n");
   }
-  function renderNoteMarks(source, x2, topPosition, bottomPosition, direction, ctx) {
+  function renderNoteMarks(source, x2, topPosition, bottomPosition, direction, ctx, abovePosition) {
     const articulations = source.articulations ?? [];
     const ornaments = source.ornaments ?? [];
     const hasFermata = source.hasFermata === true;
@@ -77613,7 +77613,7 @@ ${xrefOffset}
     if (articulations.length === 0 && ornaments.length === 0 && !hasFermata) return "";
     const parts = [];
     const topLine = -(STAFF_LINES - 1);
-    let aboveStaff = Math.min(topPosition, topLine);
+    let aboveStaff = Math.min(topPosition, topLine, abovePosition ?? Number.POSITIVE_INFINITY);
     let aboveNote = topPosition;
     let belowNote = bottomPosition;
     if (isDrum && articulations.length > 0) {
@@ -78018,13 +78018,15 @@ ${xrefOffset}
     members.forEach((m, i2) => {
       const markSource = m.source.kind === "chord" ? m.source.notes[0] : m.source;
       if (markSource === void 0) return;
+      const stemX = stemXs[i2] ?? m.x;
       const marks = renderNoteMarks(
         markSource,
         m.x,
         Math.min(...m.positions),
         Math.max(...m.positions),
         direction,
-        ctx
+        ctx,
+        isDrumBeam ? beamYAtX(shape, stemX) : void 0
       );
       if (marks !== "") memberParts[i2]?.push(marks);
     });
