@@ -6,6 +6,14 @@ export interface ClefSpec {
   readonly line?: number;
 }
 
+/** MusicXML <transpose> metadata, persisted until the next <transpose>. */
+export interface TransposeSpec {
+  readonly diatonic?: number;
+  readonly chromatic: number;
+  readonly octaveChange?: number;
+  readonly semitones: number;
+}
+
 /**
  * The running per-part state an `<attributes>` element updates. `<attributes>`
  * can legally appear mid-measure (§10.8), not only at a measure's start, so
@@ -51,6 +59,7 @@ export interface AttributesUpdate {
    * is exactly what collapsed a piano's bass staff onto its treble staff.
    */
   readonly clefsByStaff?: Readonly<Record<number, ClefSpec>>;
+  readonly transpose?: TransposeSpec;
 }
 
 /** Parses one `<attributes>` element. Clefs are captured per staff (`clefsByStaff`); `clefSign`/`clefLine` remain as staff 1's own clef, the single-staff case every caller before Integration A assumed. */
@@ -67,7 +76,23 @@ export function parseAttributesElement(attributesEl: Element): AttributesUpdate 
     staves?: number;
     clefsByStaff?: Record<number, ClefSpec>;
     staffLinesByStaff?: Record<number, number>;
+    transpose?: TransposeSpec;
   } = {};
+
+  const transposeEl = firstChildNamed(attributesEl, 'transpose');
+  if (transposeEl !== undefined) {
+    const chromatic = intOf(firstChildNamed(transposeEl, 'chromatic'));
+    if (chromatic !== undefined) {
+      const diatonic = intOf(firstChildNamed(transposeEl, 'diatonic'));
+      const octaveChange = intOf(firstChildNamed(transposeEl, 'octave-change'));
+      result.transpose = {
+        ...(diatonic !== undefined ? { diatonic } : {}),
+        chromatic,
+        ...(octaveChange !== undefined ? { octaveChange } : {}),
+        semitones: chromatic + (octaveChange ?? 0) * 12,
+      };
+    }
+  }
 
   const divisionsEl = firstChildNamed(attributesEl, 'divisions');
   const divisions = intOf(divisionsEl);

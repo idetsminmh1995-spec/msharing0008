@@ -271,6 +271,10 @@ export function parseNotations(
       case 'non-arpeggiate':
         nonArpeggiate = true;
         break;
+      case 'slide':
+      case 'glissando':
+        // Owned by parseNoteElement so the source kind is preserved.
+        break;
       case 'tied':
       case 'technical':
         // Owned by parseNoteElement -- see this function's own doc comment.

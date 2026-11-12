@@ -163,7 +163,7 @@ signatures (including additive/irregular), barlines and repeats, noteheads
 tuplets, articulations, ornaments, dynamics, hairpins, tempo marks, multiple
 voices per staff, grand staff / multi-part scores, lyrics, chord symbols,
 grace notes, ledger lines, percussion/drum notation, measure numbering,
-and note-level MusicXML 4.0 named accidentals with fractional semitone
+slides and glissandi (straight guitar slides and distinct wavy glissandi, with endpoint diagnostics), and note-level MusicXML 4.0 named accidentals with fractional semitone
 alterations when the source or bundled SMuFL profile supplies a matching glyph.
 
 **Out of scope for now:** cross-staff beaming, pitch alterations without a
@@ -2795,6 +2795,43 @@ not renumbered**, so existing `Documentation/` records and commit history stay v
 | 52 | Export: SVG, PNG, PDF (§3, §16.2) | ✅ (built -- see Documentation/phase-52-export.md) |
 | 53 | Performance pass against §18.1's budgets | ✅ (built -- see Documentation/phase-53-performance.md) |
 | 54 | Public API surface + generated reference docs into `Documentation/` | ✅ (built -- see Documentation/phase-54-public-api.md) |
+
+### Remaining MusicXML note/direction completion notes (2026-11-12)
+
+#### Phase 57 — transpose and pedal `[BUILT]`
+
+`<transpose>` is now parsed as persistent positioned attribute metadata:
+`diatonic`, `chromatic`, `octaveChange`, and derived `semitones` survive into
+`MeasureAttributes` and `PositionedAttributeChange`. Written notation remains
+written; consumers that need sounding pitch use the public `soundingPitch`
+helper. `<direction-type><pedal>` now parses start/change/stop/continue,
+resolves below-staff spans, draws the Bravura pedal marks and continuation
+lines, reserves its below-staff band, and reports `UNSUPPORTED_PEDAL` or
+`UNMATCHED_PEDAL` instead of silently dropping malformed spans. See
+`Documentation/phase-57-transpose-pedal.md`.
+
+#### Phase 58 — cue notes and octave shifts `[BUILT]`
+
+`<cue/>` is preserved on individual notes and rendered with the file's
+`<note-size type="cue">` multiplier (75% fallback), including scaled notehead,
+stem, ledger, dot and flag content and attack-width spacing. MusicXML
+`<octave-shift type="up|down|stop" size="8|15" number="N">` is parsed and
+matched by staff/number, labelled and bracketed above the staff, included in
+above-staff reservation, and diagnosed for invalid attributes or unmatched
+endpoints. See `Documentation/phase-58-cue-octave-shift.md`.
+
+#### Phase 59 — slides and glissandi `[BUILT]`
+
+`<slide>` and `<glissando>` are preserved by source kind, paired across
+pitched notes/chords and tablature strings where anchors are available, and
+rendered through pure geometry/render modules: straight slides and distinct
+wavy glissandi. Unmatched, mismatched and cross-system endpoints report stable
+diagnostics rather than disappearing. See
+`Documentation/phase-59-slide-glissando.md`.
+
+### Slide and glissando completion note (2026-11-12)
+
+`<slide>` and `<glissando>` are now preserved by source kind, paired across notes/chords and tablature strings where anchors are available, rendered through pure geometry/render modules, and diagnosed when unmatched, mismatched, or crossing systems. This closes the slide/glissando rendering gap; remaining gaps below do not include it.
 
 ### Drum and chord completion ledger (updated 2026-11-08)
 

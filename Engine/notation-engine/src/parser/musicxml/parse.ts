@@ -11,7 +11,7 @@ import { measure as makeMeasure, type Measure } from '../../core/measure.js';
 import { part as makePart, type Part } from '../../core/part.js';
 import { score as makeScore, type Score } from '../../core/score.js';
 import { diagnostic, type Diagnostic, type DiagnosticLocation } from './diagnostic.js';
-import { parseAttributesElement, type ClefSpec } from './attributes.js';
+import { parseAttributesElement, type ClefSpec, type TransposeSpec } from './attributes.js';
 import { isKnownDurationType } from './note.js';
 import { parseNoteElement, type ParsedNoteEvent } from './note.js';
 import { attrOf, childrenNamed, firstChildNamed, intOf, textOf } from './dom-helpers.js';
@@ -33,6 +33,7 @@ import {
   parseSoundTempo,
   type ParsedDynamicLevel,
   type ParsedWedge,
+  type ParsedPedal,
 } from './direction.js';
 import { parseHarmonyElement, type ParsedHarmony } from './harmony.js';
 
@@ -68,6 +69,7 @@ export interface MeasureAttributes {
   readonly staves: number;
   /** Integration A: every staff's own clef, keyed by staff number -- what a grand staff needs so its bass staff isn't collapsed onto its treble staff. */
   readonly clefsByStaff: Readonly<Record<number, ClefSpec>>;
+  readonly transpose: TransposeSpec;
   /** Integration B: each staff's own line count (tab = 6, most = 5), keyed by staff number. Absent entries mean the ordinary 5. */
   readonly staffLinesByStaff: Readonly<Record<number, number>>;
   /** Raw MusicXML <bar-style> text (e.g. "light-heavy") for this measure's ending (right-edge) barline, if present -- from a <barline> with no `location`, or an explicit `location="right"`. Mapping this to Phase 13's BarlineType is a later integration step's job, not the parser's. */
@@ -125,6 +127,7 @@ export interface PositionedAttributeChange {
   readonly clefLine?: number;
   readonly staves: number;
   readonly clefsByStaff: Readonly<Record<number, ClefSpec>>;
+  readonly transpose: TransposeSpec;
   readonly staffLinesByStaff: Readonly<Record<number, number>>;
 }
 
@@ -164,6 +167,15 @@ export interface TempoMarkEvent {
  * `tempoMarks` is one -- a direction attaches to a POSITION, not to a
  * note, so Phase 3's core `Score` deliberately has nowhere to put it.
  */
+export interface OctaveShiftEvent {
+  readonly partId: string;
+  readonly measureNumber: number;
+  readonly tick: number;
+  readonly staff: number;
+  readonly type: 'up' | 'down' | 'stop';
+  readonly size: number;
+  readonly number: number;
+}
 export interface DirectionEvent {
   readonly partId: string;
   readonly measureNumber: number;
@@ -174,6 +186,7 @@ export interface DirectionEvent {
   readonly placement?: 'above' | 'below';
   readonly dynamics: readonly ParsedDynamicLevel[];
   readonly wedges: readonly ParsedWedge[];
+  readonly pedals: readonly ParsedPedal[];
   readonly words: readonly string[];
   readonly rehearsals: readonly string[];
 }
@@ -238,6 +251,7 @@ export interface ParseResult {
   readonly midiInstrumentsByPart: ReadonlyMap<string, ReadonlyMap<string, number>>;
   /** Phase 35 Tier 2/§10.4: every `<direction>` with recognized content, in document order. */
   readonly directions: readonly DirectionEvent[];
+  readonly octaveShifts: readonly OctaveShiftEvent[];
   /** Phase 35 Tier 2/§10.4: every `<harmony>`, in document order. */
   readonly harmonies: readonly HarmonyEvent[];
   /** Phase 35 Tier 2/§10.4: every `<print>` that asks for a system or page break, in document order. */
@@ -326,6 +340,9 @@ function buildSingle(ev: ParsedNoteEvent, startTick?: number): Note | Rest {
     ...(ev.fingering !== undefined ? { fingering: ev.fingering } : {}),
     ...(ev.slideStart ? { slideStart: true } : {}),
     ...(ev.slideStop ? { slideStop: true } : {}),
+    ...(ev.slideStartKind !== undefined ? { slideStartKind: ev.slideStartKind } : {}),
+    ...(ev.slideStopKind !== undefined ? { slideStopKind: ev.slideStopKind } : {}),
+    ...(ev.isCue ? { isCue: true } : {}),
     ...(ev.isGrace ? { isGrace: true, graceSlash: ev.graceSlash } : {}),
     ...(ev.explicitStemDirection !== undefined
       ? { explicitStemDirection: ev.explicitStemDirection }
@@ -483,6 +500,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
       tempoMarks: [],
       midiInstrumentsByPart: new Map(),
       directions: [],
+      octaveShifts: [],
       harmonies: [],
       prints: [],
       identity: { creators: {}, rights: [], software: [] },
@@ -512,6 +530,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
   const allAttributeChanges: PositionedAttributeChange[] = [];
   const tempoMarks: TempoMarkEvent[] = [];
   const directions: DirectionEvent[] = [];
+  const octaveShifts: OctaveShiftEvent[] = [];
   const harmonies: HarmonyEvent[] = [];
   const prints: PrintEvent[] = [];
 
@@ -531,6 +550,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
     let currentTimeNumeratorDisplay: string | undefined;
     let currentClefSign = DEFAULT_CLEF_SIGN;
     let currentClefLine: number | undefined = DEFAULT_CLEF_LINE;
+    let currentTranspose: TransposeSpec = { chromatic: 0, semitones: 0 };
     // Integration A: a part's staff count and its per-staff clefs. Merged
     // PER STAFF rather than replaced wholesale -- a mid-piece <clef
     // number="2"> change must not wipe staff 1's own clef, which a plain
@@ -573,6 +593,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
         staves: currentStaves,
         clefsByStaff: { ...currentClefsByStaff },
         staffLinesByStaff: { ...currentStaffLinesByStaff },
+        transpose: currentTranspose,
       });
       const measureAttributeChanges: PositionedAttributeChange[] = [snapshotAttributes(0)];
       // The ticks the most recently processed NON-chord note advanced the
@@ -618,6 +639,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           }
           if (update.clefSign !== undefined) currentClefSign = update.clefSign;
           if (update.clefLine !== undefined) currentClefLine = update.clefLine;
+          if (update.transpose !== undefined) currentTranspose = update.transpose;
           if (update.staves !== undefined) currentStaves = update.staves;
           if (update.clefsByStaff !== undefined) {
             currentClefsByStaff = { ...currentClefsByStaff, ...update.clefsByStaff };
@@ -744,6 +766,42 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           let recognizedSomething = false;
           let producedTempoMark = false;
           for (const directionTypeEl of childrenNamed(child, 'direction-type')) {
+            const octaveEl = firstChildNamed(directionTypeEl, 'octave-shift');
+            if (octaveEl !== undefined) {
+              const rawType = octaveEl.getAttribute('type');
+              const type =
+                rawType === 'up' || rawType === 'down' || rawType === 'stop' ? rawType : undefined;
+              const sizeRaw = octaveEl.getAttribute('size');
+              const size = sizeRaw === null ? 8 : Number.parseInt(sizeRaw, 10);
+              const numberRaw = octaveEl.getAttribute('number');
+              const number = numberRaw === null ? 1 : Number.parseInt(numberRaw, 10);
+              if (
+                type === undefined ||
+                ![8, 15].includes(size) ||
+                !Number.isInteger(number) ||
+                number < 1
+              ) {
+                diagnostics.push(
+                  diagnostic(
+                    'warning',
+                    'INVALID_OCTAVE_SHIFT',
+                    'Invalid <octave-shift>; expected type up/down/stop, size 8 or 15, and positive number.',
+                    location,
+                  ),
+                );
+              } else {
+                octaveShifts.push({
+                  partId,
+                  measureNumber,
+                  tick,
+                  staff: directionStaff(child),
+                  type,
+                  size,
+                  number,
+                });
+                recognizedSomething = true;
+              }
+            }
             const metronomeEl = firstChildNamed(directionTypeEl, 'metronome');
             if (metronomeEl === undefined) continue;
             const rawBeatUnit = textOf(firstChildNamed(metronomeEl, 'beat-unit'));
@@ -786,6 +844,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           if (
             content.dynamics.length > 0 ||
             content.wedges.length > 0 ||
+            content.pedals.length > 0 ||
             content.words.length > 0 ||
             content.rehearsals.length > 0
           ) {
@@ -797,6 +856,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
               ...(placement !== undefined ? { placement } : {}),
               dynamics: content.dynamics,
               wedges: content.wedges,
+              pedals: content.pedals,
               words: content.words,
               rehearsals: content.rehearsals,
             });
@@ -984,6 +1044,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
         staves: currentStaves,
         clefsByStaff: { ...currentClefsByStaff },
         staffLinesByStaff: { ...currentStaffLinesByStaff },
+        transpose: currentTranspose,
         ...(barlineStyle !== undefined ? { barlineStyle } : {}),
         ...(repeatDirection !== undefined ? { repeatDirection } : {}),
         ...(repeatTimes !== undefined ? { repeatTimes } : {}),
@@ -1030,6 +1091,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
     attributeChanges: allAttributeChanges,
     diagnostics,
     tempoMarks,
+    octaveShifts,
     midiInstrumentsByPart: midiInstrumentMaps,
     directions,
     harmonies,

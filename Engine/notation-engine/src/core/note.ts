@@ -45,6 +45,8 @@ export type TremoloType = 'single' | 'start' | 'stop';
  * is both MusicXML's own default and the overwhelming convention.
  */
 export type ArpeggioDirection = 'up' | 'down';
+/** MusicXML notation gesture kind, preserved so slide and glissando render distinctly. */
+export type SlideKind = 'slide' | 'glissando';
 
 /**
  * One `<beam number="N">` hint exactly as the file wrote it (§10.4).
@@ -140,6 +142,8 @@ export interface Note {
   readonly noteheadFilled?: boolean;
   /** MusicXML `<notehead parentheses="yes">`; rendered with SMuFL left/right wrappers. */
   readonly noteheadParentheses?: boolean;
+  /** MusicXML <cue/> note metadata; cue notes use the cue note-size multiplier. */
+  readonly isCue?: boolean;
   /** Phase 35/§10.4: true if this note is a <grace/> note. */
   readonly isGrace?: boolean;
   /** Phase 35/§10.4: the grace note's slash attribute -- true for an acciaccatura, false for an appoggiatura. Meaningless unless isGrace is true. */
@@ -164,6 +168,8 @@ export interface Note {
   readonly slideStart?: boolean;
   /** `<slide>`/`<glissando>` type="stop": this note is where a slide arrives. */
   readonly slideStop?: boolean;
+  readonly slideStartKind?: SlideKind;
+  readonly slideStopKind?: SlideKind;
   /** Phase 35 Tier 2/§10.4: `<notations><articulations>` -- §9.19's marks, in document order. Absent means none. */
   readonly articulations?: readonly ArticulationType[];
   /** Phase 35 Tier 2/§10.4: `<notations><ornaments>` -- §9.20's marks, in document order. Absent means none. */
@@ -220,6 +226,7 @@ export interface NoteInit {
   noteheadFilled?: boolean;
   noteheadParentheses?: boolean;
   instrumentId?: string;
+  isCue?: boolean;
   isGrace?: boolean;
   graceSlash?: boolean;
   explicitStemDirection?: 'up' | 'down';
@@ -232,6 +239,8 @@ export interface NoteInit {
   fingering?: number;
   slideStart?: boolean;
   slideStop?: boolean;
+  slideStartKind?: SlideKind;
+  slideStopKind?: SlideKind;
   articulations?: readonly ArticulationType[];
   ornaments?: readonly OrnamentType[];
   hasFermata?: boolean;

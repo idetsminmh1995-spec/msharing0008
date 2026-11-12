@@ -6,21 +6,21 @@ A+B+C corrective work** (making notes actually visible in the web app).
 Numbering is **`PLAN.md` §22's phase numbering** — deliberately not a second
 numbering system. Say a number from §B below and that's the phase to build.
 
-**Last audited:** against the code in `src/` and the **1,121-test** suite,
-after Phase 56's note marks (documented in
-[`phase-56`](./phase-56-note-marks.md)). Stages 0-10 are
-complete: every phase numbered 1-56 is built AND wired, including the
-full playback surface (§17.1's position API and event stream, §17.2's
-cursor and repeat unfolding) and host-selectable part-specific event streams.
-What remains is the named gaps in §C and
-§F, not roadmap work.
+**Last audited:** against the code in `src/` and the **1,129-test** suite,
+after Phases 57–59 closed the remaining MusicXML note/direction gaps
+(transpose, pedal, cue, octave-shift, slide and glissando). Stages 0–10 are
+complete: every phase numbered 1–59 is built AND wired, including the full
+playback surface (§17.1's position API and event stream, §17.2's cursor and
+repeat unfolding) and host-selectable part-specific event streams. What
+remains is the named engraving limitations in §C and §F, not unfinished
+MusicXML roadmap work.
 
 ---
 
-## A. DONE — Phases 1–56 ✅ (**every stage complete**) + Integration Passes A–Z
+## A. DONE — Phases 1–59 ✅ (**every stage complete**) + Integration Passes A–Z
 
 All of these are implemented, tested, and have a `Documentation/phase-NN-*.md` record.
-`npm run verify` passes **1,121/1,121** across them (verified 2026-11-12).
+`npm test` passes **1,129/1,129** across them (verified 2026-11-12).
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -110,16 +110,19 @@ All of these are implemented, tested, and have a `Documentation/phase-NN-*.md` r
 | 54 | Public API surface + generated reference docs (§22) | `docs/API.md` generated from the emitted .d.ts, with the ~30 supported entry points called out from the 479 exported symbols; `npm run docs:check` is in `verify`, so the reference cannot drift. Also closed §C1's tenor half (tenor-clef key signatures), §F4 (a browser-level visual test) and §F5 (dead `quick-demo/`) | [`phase-54`](./phase-54-public-api.md) |
 | 55 | Text layer: lyrics, chord symbols, rehearsal marks, `<words>` (§19.10) | Closes §19's limitation 10 -- one gap hit in four places. One small text layer (`render/text.ts`, `geometry/text-metrics.ts`) serves all four: lyric verses with hyphenation, elision and melisma extenders; chord symbols assembled from a root letter plus real `csym*` glyphs (slash bass, accidental, `<kind text>`); framed rehearsal marks; italic `<words>`. Layout reserves their room from the SAME functions the drawing pass uses, so nothing can be printed over the next system | [`phase-55`](./phase-55-text-layer.md) |
 | 56 | The marks that change what a note IS (§9.25–§9.27) | Tremolo (stroke count is the message; a count the font cannot draw is clamped AND reported), arpeggio/non-arpeggio (one path-based mark per chord, spacing reserved so it cannot land on the time signature or reach across a barline) and the guitar harmonic's diamond head. Found and fixed a stale plan entry: the fermata has been drawn since Integration H. See that phase's §5 for what is still not drawn (slides, cues, 8va brackets, pedals) | [`phase-56`](./phase-56-note-marks.md) |
+| 59 | Slides and glissandi | Source-kind preservation, straight `<slide>` and wavy `<glissando>` geometry/renderers, pitched/chord/tab endpoint pairing, string validation and unmatched/mismatched/cross-system diagnostics | [`phase-59`](./phase-59-slide-glissando.md) |
+| 58 | Cue notes and octave-shift | `<cue/>` metadata with file/default optical scale in note rendering and spacing; `<octave-shift>` up/down/stop 8/15 spans, matching, labels, brackets, above-staff reservation and invalid/unmatched diagnostics | [`phase-58`](./phase-58-cue-octave-shift.md) |
+| 57 | Transpose and pedal | Persistent `<transpose>` metadata (`diatonic`, `chromatic`, `octaveChange`, `semitones`) plus `soundingPitch`; `<pedal>` start/change/stop/continue parsing, below-staff glyphs, continuation lines and unmatched diagnostics | [`phase-57`](./phase-57-transpose-pedal.md) |
 
 **Public API today:** 305 runtime exports from `dist/notation-engine.js` (662 symbols including types). See [`../docs/API.md`](../docs/API.md) — generated, and checked by `npm run verify`.
 
 ---
 
-## B. NOT DONE — nothing
+## B. NOT DONE — nothing in the numbered MusicXML roadmap
 
-`PLAN.md` §22's roadmap is complete: Phases 1–54, Stages 0 through 10,
-plus Integration Passes A–Q. What remains is not roadmap work but the
-named, documented gaps in §C and §F below.
+`PLAN.md` §22's numbered roadmap is complete: Phases 1–59, Stages 0 through 10,
+plus Integration Passes A–Z. What remains is not unfinished parser/render
+roadmap work but the named, documented engraving limitations in §C and §F below.
 
 **Reviewed end to end** after Phase 54 — see
 [`final-review.md`](./final-review.md). It found four real bugs (a key

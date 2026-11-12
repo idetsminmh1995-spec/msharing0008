@@ -29,3 +29,5 @@ export * from './chord-symbol.js';
 export * from './expression-mark.js';
 export * from './tremolo.js';
 export * from './arpeggio.js';
+
+export * from './slide.js';

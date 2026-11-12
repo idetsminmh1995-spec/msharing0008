@@ -27,8 +27,6 @@ Parse a MusicXML document and render it, in one call -- the ordinary entry point
 export function renderParsedMusicXml(parsed: ParseResult, options?: RenderParsedMusicXmlOptions): RenderFromMusicXmlResult;
 ```
 
-Phase 53/§18.1: render a score that has ALREADY been parsed.
-
 *(`src/render-from-musicxml.ts`)*
 
 #### `parseMusicXml`
@@ -405,7 +403,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-682 exported symbols, by module.
+692 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -502,6 +500,7 @@ The diagnostics `level` lets through, in their original order.
 | type | `FermataShape` | MusicXML fermata shapes with an exact bundled Bravura glyph mapping. |
 | type | `TremoloType` | Phase 56/§9.24: `<tremolo type>`. |
 | type | `ArpeggioDirection` | Phase 56/§9.25: which way a rolled chord is rolled. |
+| type | `SlideKind` | MusicXML notation gesture kind, preserved so slide and glissando render distinctly. |
 | interface | `BeamHint` | One `<beam number="N">` hint exactly as the file wrote it (§10.4). |
 | interface | `LyricSyllable` | One `<lyric>` syllable attached to a note (§9.22/§10.4). |
 | interface | `Note` | A single sounding note -- pitched or unpitched, doesn't matter, both use this same type (see pitch.ts). |
@@ -527,6 +526,7 @@ The diagnostics `level` lets through, in their original order.
 | function | `isUnpitched` |  |
 | function | `pitchedPitch` |  |
 | function | `unpitchedPitch` |  |
+| function | `soundingPitch` | Applies MusicXML transposition to a pitched pitch; unpitched display positions are unchanged. |
 
 ### `src/core/rest.ts`
 
@@ -899,6 +899,13 @@ The diagnostics `level` lets through, in their original order.
 | function | `multiMeasureRestGlyphName` | The glyph for a multi-measure rest (a horizontal bar spanning several measures) -- separate from the per-duration glyphs above since it isn't tied to a DurationType at all. |
 | function | `defaultRestY` | §9.10's default/special-case vertical placement, before any per-voice offset: quarter-and-shorter center on the middle line; **whole and half are special-cased**, per real engraving convention (confirmed against Bravura's own glyph bounding boxes before writing this -- restWhole's shape sits almo... |
 | function | `restY` | The full rest Y position including an optional per-voice offset. |
+
+### `src/geometry/slide.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `SlideShape` |  |
+| function | `computeSlideShape` | Straight guitar slide or lightly wavy glissando; coordinates are SVG staff-space coordinates. |
 
 ### `src/geometry/slur.ts`
 
@@ -1287,6 +1294,7 @@ The diagnostics `level` lets through, in their original order.
 | | Name | Summary |
 |---|---|---|
 | interface | `ClefSpec` | One `<clef>`'s own sign/line, keyed by staff number in AttributesUpdate.clefsByStaff. |
+| interface | `TransposeSpec` | MusicXML <transpose> metadata, persisted until the next <transpose>. |
 | interface | `AttributesUpdate` | The running per-part state an `<attributes>` element updates. |
 | function | `parseAttributesElement` | Parses one `<attributes>` element. |
 
@@ -1323,6 +1331,8 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | type | `ParsedDynamicLevel` | Structurally identical to `geometry/dynamic.ts`'s `DynamicLevel` -- see this file's header. |
 | type | `ParsedWedgeType` | 'crescendo'/'decrescendo' are structurally identical to `geometry/hairpin.ts`'s `HairpinKind`; 'stop' is this parser's own marker for the wedge's closing element, which has no geometry of its own. |
+| type | `ParsedPedalType` |  |
+| interface | `ParsedPedal` |  |
 | interface | `ParsedWedge` |  |
 | interface | `ParsedDirectionContent` |  |
 | function | `parseSoundTempo` | `<sound tempo="...">` as a positive number, or undefined. |
@@ -1387,7 +1397,8 @@ The diagnostics `level` lets through, in their original order.
 | interface | `MeasureAttributes` | The per-(part, measure) clef/key/time/barline side-table §10 asks for -- separate from the core `Score`, which never knows about clefs or key/time signatures at all (those are notational, not musical, per Phase 3). |
 | interface | `PositionedAttributeChange` | The effective notational state immediately after an `<attributes>` element at its real measure-local cursor position. |
 | interface | `TempoMarkEvent` |  |
-| interface | `DirectionEvent` | Phase 35 Tier 2/§10.4: one `<direction>`'s recognized content at the measure-local tick it appeared at. |
+| interface | `OctaveShiftEvent` | Phase 35 Tier 2/§10.4: one `<direction>`'s recognized content at the measure-local tick it appeared at. |
+| interface | `DirectionEvent` |  |
 | interface | `HarmonyEvent` | Phase 35 Tier 2/§10.4: one `<harmony>` (chord symbol) at a measure-local tick. |
 | interface | `PrintEvent` | Phase 35 Tier 2/§10.4: one `<print>`'s system/page break request. |
 | interface | `PrintLayout` | The layout hints one `<print>` carries, in staff spaces. |
@@ -1470,7 +1481,7 @@ The diagnostics `level` lets through, in their original order.
 | interface | `RenderParsedMusicXmlOptions` | What `renderParsedMusicXml` takes: everything `renderFromMusicXml` does, minus the parser's own options (parsing already happened). |
 | interface | `RenderFromMusicXmlOptions` |  |
 | interface | `RenderFromMusicXmlResult` |  |
-| **API** | `renderParsedMusicXml` | Phase 53/§18.1: render a score that has ALREADY been parsed. |
+| **API** | `renderParsedMusicXml` |  |
 | **API** | `renderFromMusicXml` | Parse a MusicXML document and render it, in one call -- the ordinary entry point, and exactly `parseMusicXml` followed by `renderParsedMusicXml`. |
 
 ### `src/render/accidental.ts`
@@ -1621,6 +1632,13 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | interface | `RenderRestOptions` |  |
 | function | `renderRest` | Draws one rest glyph (from restGlyphName or multiMeasureRestGlyphName) at the given position. |
+
+### `src/render/slide.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `RenderSlideOptions` |  |
+| function | `renderSlide` | Draws a straight slash for <slide>; glissando is visibly distinct with a fine wave. |
 
 ### `src/render/slur.ts`
 

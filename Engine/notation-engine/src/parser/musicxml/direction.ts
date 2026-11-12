@@ -56,6 +56,12 @@ export type ParsedDynamicLevel =
 /** 'crescendo'/'decrescendo' are structurally identical to `geometry/hairpin.ts`'s `HairpinKind`; 'stop' is this parser's own marker for the wedge's closing element, which has no geometry of its own. */
 export type ParsedWedgeType = 'crescendo' | 'decrescendo' | 'stop';
 
+export type ParsedPedalType = 'start' | 'change' | 'stop' | 'continue';
+export interface ParsedPedal {
+  readonly type: ParsedPedalType;
+  readonly number: number;
+}
+
 export interface ParsedWedge {
   readonly type: ParsedWedgeType;
   /** From the element's `number` attribute, defaulting to 1 -- how two overlapping wedges stay distinguishable. */
@@ -65,6 +71,7 @@ export interface ParsedWedge {
 export interface ParsedDirectionContent {
   readonly dynamics: readonly ParsedDynamicLevel[];
   readonly wedges: readonly ParsedWedge[];
+  readonly pedals: readonly ParsedPedal[];
   /** `<words>` text, preserved though §9.21 cannot draw arbitrary text yet (no text-font system) -- §10.7's no-silent-loss rule. */
   readonly words: readonly string[];
   /** `<rehearsal>` text, preserved for the same reason as `words`. */
@@ -137,6 +144,7 @@ export function parseDirectionElement(
   const diagnostics: Diagnostic[] = [];
   const dynamics: ParsedDynamicLevel[] = [];
   const wedges: ParsedWedge[] = [];
+  const pedals: ParsedPedal[] = [];
   const words: string[] = [];
   const rehearsals: string[] = [];
 
@@ -160,6 +168,26 @@ export function parseDirectionElement(
             }
           }
           break;
+        case 'pedal': {
+          const rawType = attrOf(el, 'type');
+          if (
+            rawType === 'start' ||
+            rawType === 'change' ||
+            rawType === 'stop' ||
+            rawType === 'continue'
+          )
+            pedals.push({ type: rawType, number: numberAttr(el) });
+          else
+            diagnostics.push(
+              diagnostic(
+                'info',
+                'UNSUPPORTED_PEDAL',
+                `Ignored <pedal type="${rawType ?? ''}">.`,
+                location,
+              ),
+            );
+          break;
+        }
         case 'wedge': {
           const rawType = attrOf(el, 'type');
           const mapped = rawType !== undefined ? WEDGE_TYPES[rawType] : undefined;
@@ -213,6 +241,7 @@ export function parseDirectionElement(
     content: {
       dynamics,
       wedges,
+      pedals,
       words,
       rehearsals,
       ...(soundTempo !== undefined ? { soundTempo } : {}),

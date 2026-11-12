@@ -114,6 +114,7 @@ var NotationEngine = (() => {
     computeReferenceDuration: () => computeReferenceDuration,
     computeRehearsalMarkBox: () => computeRehearsalMarkBox,
     computeScrollLayout: () => computeScrollLayout,
+    computeSlideShape: () => computeSlideShape,
     computeSlurShape: () => computeSlurShape,
     computeStaffDistance: () => computeStaffDistance,
     computeStaffGeometry: () => computeStaffGeometry,
@@ -262,6 +263,7 @@ var NotationEngine = (() => {
     renderRepeatCount: () => renderRepeatCount,
     renderRest: () => renderRest,
     renderSkylineOverlay: () => renderSkylineOverlay,
+    renderSlide: () => renderSlide,
     renderSlur: () => renderSlur,
     renderStaff: () => renderStaff,
     renderStem: () => renderStem,
@@ -294,6 +296,7 @@ var NotationEngine = (() => {
     sharpsForCount: () => sharpsForCount,
     shouldShowBarNumber: () => shouldShowBarNumber,
     slurSide: () => slurSide,
+    soundingPitch: () => soundingPitch,
     spacingDiagnostic: () => spacingDiagnostic,
     staffPositionForPitch: () => staffPositionForPitch,
     stemGeometry: () => stemGeometry,
@@ -351,6 +354,34 @@ var NotationEngine = (() => {
   }
   function unpitchedPitch(displayStep, displayOctave) {
     return { kind: "unpitched", displayStep, displayOctave };
+  }
+  function soundingPitch(pitch, semitones) {
+    if (pitch.kind !== "pitched" || semitones === 0) return pitch;
+    const natural = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[pitch.step];
+    const midi = (pitch.octave + 1) * 12 + natural + pitch.alter + semitones;
+    const octave = Math.floor(midi / 12) - 1;
+    const pc = (midi % 12 + 12) % 12;
+    const steps = [
+      ["C", 0],
+      ["C", 1],
+      ["D", 2],
+      ["D", 3],
+      ["E", 4],
+      ["F", 5],
+      ["F", 6],
+      ["G", 7],
+      ["G", 8],
+      ["A", 9],
+      ["A", 10],
+      ["B", 11]
+    ];
+    const [step, base] = steps[pc] ?? ["C", 0];
+    return {
+      kind: "pitched",
+      step,
+      alter: base === 0 || [2, 4, 5, 7, 9, 11].includes(base) ? pc - { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[step] : 0,
+      octave
+    };
   }
 
   // src/core/duration.ts
@@ -70010,6 +70041,14 @@ var NotationEngine = (() => {
     return { x: x2, topY, bottomY, hookLength };
   }
 
+  // src/geometry/slide.ts
+  function computeSlideShape(startX, startY, endX, endY, kind) {
+    if (![startX, startY, endX, endY].every(Number.isFinite))
+      throw new Error("slide coordinates must be finite");
+    if (endX < startX) throw new Error("slide endpoint must not precede start");
+    return { startX, startY, endX, endY, kind };
+  }
+
   // src/render/svg-primitives.ts
   var SMUFL_STAFF_SPACES_PER_EM = 4;
   function escapeXmlText(text) {
@@ -70818,6 +70857,35 @@ ${denominator}`;
     ].join("\n");
   }
 
+  // src/render/slide.ts
+  function renderSlide(shape, options) {
+    const n = svgNumber;
+    if (shape.kind === "slide")
+      return svgPath(`M ${n(shape.startX)} ${n(shape.startY)} L ${n(shape.endX)} ${n(shape.endY)}`, {
+        fill: "none",
+        stroke: options.color,
+        "stroke-width": options.thickness,
+        "stroke-linecap": "round"
+      });
+    const dx = shape.endX - shape.startX, dy = shape.endY - shape.startY;
+    const steps = Math.max(4, Math.ceil(dx / 1.5));
+    const amp = Math.min(0.28, Math.max(0.12, dx / 24));
+    const pts = [`M ${n(shape.startX)} ${n(shape.startY)}`];
+    for (let i2 = 1; i2 <= steps; i2++) {
+      const t = i2 / steps;
+      const x2 = shape.startX + dx * t;
+      const y = shape.startY + dy * t + Math.sin(t * Math.PI * 2 * Math.max(1, dx / 4)) * amp;
+      pts.push(`L ${n(x2)} ${n(y)}`);
+    }
+    return svgPath(pts.join(" "), {
+      fill: "none",
+      stroke: options.color,
+      "stroke-width": options.thickness,
+      "stroke-linecap": "round",
+      "stroke-dasharray": "0.01 0"
+    });
+  }
+
   // src/config/config.ts
   var DEFAULT_CONFIG = {
     colors: {
@@ -71007,6 +71075,20 @@ ${denominator}`;
   // src/parser/musicxml/attributes.ts
   function parseAttributesElement(attributesEl) {
     const result = {};
+    const transposeEl = firstChildNamed(attributesEl, "transpose");
+    if (transposeEl !== void 0) {
+      const chromatic = intOf(firstChildNamed(transposeEl, "chromatic"));
+      if (chromatic !== void 0) {
+        const diatonic = intOf(firstChildNamed(transposeEl, "diatonic"));
+        const octaveChange = intOf(firstChildNamed(transposeEl, "octave-change"));
+        result.transpose = {
+          ...diatonic !== void 0 ? { diatonic } : {},
+          chromatic,
+          ...octaveChange !== void 0 ? { octaveChange } : {},
+          semitones: chromatic + (octaveChange ?? 0) * 12
+        };
+      }
+    }
     const divisionsEl = firstChildNamed(attributesEl, "divisions");
     const divisions = intOf(divisionsEl);
     if (divisions !== void 0) result.divisions = divisions;
@@ -71245,6 +71327,9 @@ ${denominator}`;
         case "non-arpeggiate":
           nonArpeggiate = true;
           break;
+        case "slide":
+        case "glissando":
+          break;
         case "tied":
         case "technical":
           break;
@@ -71350,6 +71435,7 @@ ${denominator}`;
     const voice2 = intOf(firstChildNamed(noteEl, "voice")) ?? 1;
     const staff = intOf(firstChildNamed(noteEl, "staff"));
     const isGrace = firstChildNamed(noteEl, "grace") !== void 0;
+    const isCue = firstChildNamed(noteEl, "cue") !== void 0;
     let safeDivisions = currentDivisions;
     if (safeDivisions <= 0) {
       diagnostics.push(
@@ -71406,8 +71492,12 @@ ${denominator}`;
     const fret = technicalEl !== void 0 ? intOf(firstChildNamed(technicalEl, "fret")) : void 0;
     const fingering = technicalEl !== void 0 ? intOf(firstChildNamed(technicalEl, "fingering")) : void 0;
     const slideEls = notationsEl !== void 0 ? [...childrenNamed(notationsEl, "slide"), ...childrenNamed(notationsEl, "glissando")] : [];
-    const slideStart = slideEls.some((el) => el.getAttribute("type") === "start");
-    const slideStop = slideEls.some((el) => el.getAttribute("type") === "stop");
+    const slideStartEl = slideEls.find((el) => el.getAttribute("type") === "start");
+    const slideStopEl = slideEls.find((el) => el.getAttribute("type") === "stop");
+    const slideStart = slideStartEl !== void 0;
+    const slideStop = slideStopEl !== void 0;
+    const slideStartKind = slideStartEl?.tagName === "glissando" ? "glissando" : slideStart ? "slide" : void 0;
+    const slideStopKind = slideStopEl?.tagName === "glissando" ? "glissando" : slideStop ? "slide" : void 0;
     const tieStart = tieEls.some((el) => el.getAttribute("type") === "start") || tiedEls.some((el) => el.getAttribute("type") === "start");
     const tieStop = tieEls.some((el) => el.getAttribute("type") === "stop") || tiedEls.some((el) => el.getAttribute("type") === "stop");
     const noteheadEl = firstChildNamed(noteEl, "notehead");
@@ -71675,6 +71765,7 @@ ${denominator}`;
       ...explicitNoteheadSmufl !== void 0 ? { explicitNoteheadSmufl } : {},
       ...noteheadFilled !== void 0 ? { noteheadFilled } : {},
       ...noteheadParentheses !== void 0 ? { noteheadParentheses } : {},
+      isCue,
       isGrace,
       graceSlash,
       ...tupletActualNotes !== void 0 ? { tupletActualNotes } : {},
@@ -71690,6 +71781,8 @@ ${denominator}`;
       ...fingering !== void 0 ? { fingering } : {},
       ...slideStart ? { slideStart: true } : {},
       ...slideStop ? { slideStop: true } : {},
+      ...slideStartKind !== void 0 ? { slideStartKind } : {},
+      ...slideStopKind !== void 0 ? { slideStopKind } : {},
       ...fret !== void 0 ? { fret } : {},
       notations,
       beams,
@@ -72012,6 +72105,7 @@ ${denominator}`;
     const diagnostics = [];
     const dynamics = [];
     const wedges = [];
+    const pedals = [];
     const words = [];
     const rehearsals = [];
     for (const directionTypeEl of childrenNamed(directionEl, "direction-type")) {
@@ -72034,6 +72128,21 @@ ${denominator}`;
               }
             }
             break;
+          case "pedal": {
+            const rawType = attrOf(el, "type");
+            if (rawType === "start" || rawType === "change" || rawType === "stop" || rawType === "continue")
+              pedals.push({ type: rawType, number: numberAttr2(el) });
+            else
+              diagnostics.push(
+                diagnostic(
+                  "info",
+                  "UNSUPPORTED_PEDAL",
+                  `Ignored <pedal type="${rawType ?? ""}">.`,
+                  location
+                )
+              );
+            break;
+          }
           case "wedge": {
             const rawType = attrOf(el, "type");
             const mapped = rawType !== void 0 ? WEDGE_TYPES[rawType] : void 0;
@@ -72081,6 +72190,7 @@ ${denominator}`;
       content: {
         dynamics,
         wedges,
+        pedals,
         words,
         rehearsals,
         ...soundTempo !== void 0 ? { soundTempo } : {}
@@ -72179,6 +72289,9 @@ ${denominator}`;
       ...ev.fingering !== void 0 ? { fingering: ev.fingering } : {},
       ...ev.slideStart ? { slideStart: true } : {},
       ...ev.slideStop ? { slideStop: true } : {},
+      ...ev.slideStartKind !== void 0 ? { slideStartKind: ev.slideStartKind } : {},
+      ...ev.slideStopKind !== void 0 ? { slideStopKind: ev.slideStopKind } : {},
+      ...ev.isCue ? { isCue: true } : {},
       ...ev.isGrace ? { isGrace: true, graceSlash: ev.graceSlash } : {},
       ...ev.explicitStemDirection !== void 0 ? { explicitStemDirection: ev.explicitStemDirection } : {},
       ...ev.hasExplicitAccidental ? { hasExplicitAccidental: true } : {},
@@ -72276,6 +72389,7 @@ ${denominator}`;
         tempoMarks: [],
         midiInstrumentsByPart: /* @__PURE__ */ new Map(),
         directions: [],
+        octaveShifts: [],
         harmonies: [],
         prints: [],
         identity: { creators: {}, rights: [], software: [] },
@@ -72303,6 +72417,7 @@ ${denominator}`;
     const allAttributeChanges = [];
     const tempoMarks = [];
     const directions = [];
+    const octaveShifts = [];
     const harmonies = [];
     const prints = [];
     for (const partEl of childrenNamed(root, "part")) {
@@ -72317,6 +72432,7 @@ ${denominator}`;
       let currentTimeNumeratorDisplay;
       let currentClefSign = DEFAULT_CLEF_SIGN;
       let currentClefLine = DEFAULT_CLEF_LINE;
+      let currentTranspose = { chromatic: 0, semitones: 0 };
       let currentStaves = 1;
       let currentStaffLinesByStaff = {};
       let currentClefsByStaff = {
@@ -72345,7 +72461,8 @@ ${denominator}`;
           ...currentClefLine !== void 0 ? { clefLine: currentClefLine } : {},
           staves: currentStaves,
           clefsByStaff: { ...currentClefsByStaff },
-          staffLinesByStaff: { ...currentStaffLinesByStaff }
+          staffLinesByStaff: { ...currentStaffLinesByStaff },
+          transpose: currentTranspose
         });
         const measureAttributeChanges = [snapshotAttributes(0)];
         let lastAdvance = 0;
@@ -72376,6 +72493,7 @@ ${denominator}`;
             }
             if (update.clefSign !== void 0) currentClefSign = update.clefSign;
             if (update.clefLine !== void 0) currentClefLine = update.clefLine;
+            if (update.transpose !== void 0) currentTranspose = update.transpose;
             if (update.staves !== void 0) currentStaves = update.staves;
             if (update.clefsByStaff !== void 0) {
               currentClefsByStaff = { ...currentClefsByStaff, ...update.clefsByStaff };
@@ -72476,6 +72594,36 @@ ${denominator}`;
             let recognizedSomething = false;
             let producedTempoMark = false;
             for (const directionTypeEl of childrenNamed(child, "direction-type")) {
+              const octaveEl = firstChildNamed(directionTypeEl, "octave-shift");
+              if (octaveEl !== void 0) {
+                const rawType = octaveEl.getAttribute("type");
+                const type = rawType === "up" || rawType === "down" || rawType === "stop" ? rawType : void 0;
+                const sizeRaw = octaveEl.getAttribute("size");
+                const size = sizeRaw === null ? 8 : Number.parseInt(sizeRaw, 10);
+                const numberRaw = octaveEl.getAttribute("number");
+                const number = numberRaw === null ? 1 : Number.parseInt(numberRaw, 10);
+                if (type === void 0 || ![8, 15].includes(size) || !Number.isInteger(number) || number < 1) {
+                  diagnostics.push(
+                    diagnostic(
+                      "warning",
+                      "INVALID_OCTAVE_SHIFT",
+                      "Invalid <octave-shift>; expected type up/down/stop, size 8 or 15, and positive number.",
+                      location
+                    )
+                  );
+                } else {
+                  octaveShifts.push({
+                    partId,
+                    measureNumber,
+                    tick,
+                    staff: directionStaff(child),
+                    type,
+                    size,
+                    number
+                  });
+                  recognizedSomething = true;
+                }
+              }
               const metronomeEl = firstChildNamed(directionTypeEl, "metronome");
               if (metronomeEl === void 0) continue;
               const rawBeatUnit = textOf(firstChildNamed(metronomeEl, "beat-unit"));
@@ -72508,7 +72656,7 @@ ${denominator}`;
             diagnostics.push(...directionDiags);
             if (directionDiags.length > 0) recognizedSomething = true;
             const placement = directionPlacement(child);
-            if (content.dynamics.length > 0 || content.wedges.length > 0 || content.words.length > 0 || content.rehearsals.length > 0) {
+            if (content.dynamics.length > 0 || content.wedges.length > 0 || content.pedals.length > 0 || content.words.length > 0 || content.rehearsals.length > 0) {
               directions.push({
                 partId,
                 measureNumber,
@@ -72517,6 +72665,7 @@ ${denominator}`;
                 ...placement !== void 0 ? { placement } : {},
                 dynamics: content.dynamics,
                 wedges: content.wedges,
+                pedals: content.pedals,
                 words: content.words,
                 rehearsals: content.rehearsals
               });
@@ -72654,6 +72803,7 @@ ${denominator}`;
           staves: currentStaves,
           clefsByStaff: { ...currentClefsByStaff },
           staffLinesByStaff: { ...currentStaffLinesByStaff },
+          transpose: currentTranspose,
           ...barlineStyle !== void 0 ? { barlineStyle } : {},
           ...repeatDirection !== void 0 ? { repeatDirection } : {},
           ...repeatTimes !== void 0 ? { repeatTimes } : {},
@@ -72692,6 +72842,7 @@ ${denominator}`;
       attributeChanges: allAttributeChanges,
       diagnostics,
       tempoMarks,
+      octaveShifts,
       midiInstrumentsByPart: midiInstrumentMaps,
       directions,
       harmonies,
@@ -77596,6 +77747,17 @@ ${xrefOffset}
   var ARPEGGIO_GAP = 0.6;
   var ARPEGGIO_MARGIN = 0.5;
   var ARPEGGIO_LEADING_WIDTH = 2.5;
+  var DEFAULT_CUE_NOTE_SCALE = 0.75;
+  function cueScaleForEvent(event, fileDefaults) {
+    const cue = event.kind === "note" ? event.isCue === true : event.kind === "chord" && event.notes.some((n) => n.isCue === true);
+    return cue ? Math.max(0.1, fileDefaults?.noteSizes.cue ?? DEFAULT_CUE_NOTE_SCALE) : 1;
+  }
+  function scaleCueSvg(svg, event, x2, baselineY, fileDefaults) {
+    const scale = cueScaleForEvent(event, fileDefaults);
+    return scale === 1 ? svg : svgGroup([svg], {
+      transform: `translate(${x2} ${baselineY}) scale(${scale}) translate(${-x2} ${-baselineY})`
+    });
+  }
   function carriesArpeggioMark(event) {
     if (event.kind === "note") {
       return event.arpeggiate !== void 0 || event.nonArpeggiate === true;
@@ -77691,7 +77853,7 @@ ${xrefOffset}
     }
     return drawn;
   }
-  function computeMeasureLayout(measure2, measureTicks, measureTempoMarks, headerWidth, spacingConfig, tempoFontSize, accidentals, attributeTransitions) {
+  function computeMeasureLayout(measure2, measureTicks, measureTempoMarks, headerWidth, spacingConfig, tempoFontSize, accidentals, attributeTransitions, fileDefaults) {
     const attacks = /* @__PURE__ */ new Set();
     const widthByTickAndStaff = /* @__PURE__ */ new Map();
     const eventByTick = /* @__PURE__ */ new Map();
@@ -77713,7 +77875,10 @@ ${xrefOffset}
           }
           perStaff.set(staff, Math.max(perStaff.get(staff) ?? 0, value));
         };
-        put(widthByTickAndStaff, attackWidth(event.duration.dots));
+        put(
+          widthByTickAndStaff,
+          attackWidth(event.duration.dots) * cueScaleForEvent(event, fileDefaults)
+        );
         put(
           leadingByTickAndStaff,
           attackLeading(accidentals.get(tick)) + (carriesArpeggioMark(event) ? ARPEGGIO_LEADING_WIDTH : 0)
@@ -77825,6 +77990,7 @@ ${xrefOffset}
   var LEDGER_THICKNESS_FALLBACK = 0.16;
   var STEM_THICKNESS_FALLBACK = 0.12;
   var TIE_MIDPOINT_THICKNESS_FALLBACK = 0.22;
+  var SLIDE_THICKNESS_FALLBACK = 0.13;
   var BEAM_THICKNESS_FALLBACK = 0.5;
   var BEAM_SPACING_FALLBACK = 0.25;
   var DEFAULT_UNBEAMED_STEM_LENGTH = 3.5;
@@ -77901,6 +78067,7 @@ ${xrefOffset}
       staves: state.staves,
       clefsByStaff: state.clefsByStaff,
       staffLinesByStaff: state.staffLinesByStaff,
+      transpose: state.transpose,
       ...summary.barlineStyle !== void 0 ? { barlineStyle: summary.barlineStyle } : {},
       ...summary.repeatDirection !== void 0 ? { repeatDirection: summary.repeatDirection } : {},
       ...summary.repeatTimes !== void 0 ? { repeatTimes: summary.repeatTimes } : {},
@@ -78203,6 +78370,12 @@ ${xrefOffset}
       }
     }
     return parts.join("\n");
+  }
+  function slideEndpointsMatch(a, note2, kind) {
+    if (a.kind !== kind) return false;
+    if (a.stringNumber !== void 0 || note2.stringNumber !== void 0)
+      return a.stringNumber === note2.stringNumber;
+    return true;
   }
   function resolveNoteRendering(note2, ctx) {
     const isUnpitched2 = note2.pitch.kind === "unpitched";
@@ -79129,6 +79302,21 @@ ${xrefOffset}
     if (!(band > 0)) return skyline;
     return addToSkyline(skyline, { xStart: 0, xEnd: 1, y: band });
   }
+  function octaveShiftSpans(events) {
+    const open = /* @__PURE__ */ new Map();
+    const spans = [];
+    for (const event of events) {
+      const key = `${event.staff}:${event.number}`;
+      if (event.type === "stop") {
+        const start = open.get(key);
+        if (start) {
+          spans.push({ start, stop: event });
+          open.delete(key);
+        }
+      } else if (event.type === "up" || event.type === "down") open.set(key, event);
+    }
+    return spans;
+  }
   function renderParsedMusicXml(parsed, options) {
     const {
       score: parsedScore,
@@ -79138,6 +79326,7 @@ ${xrefOffset}
       tempoMarks,
       midiInstrumentsByPart: midiInstrumentsByPartMap,
       directions,
+      octaveShifts,
       harmonies,
       prints,
       defaults: fileDefaults
@@ -79250,6 +79439,7 @@ ${xrefOffset}
       const part2 = score2.parts[partIndex];
       if (part2 === void 0) return 0;
       let band = 0;
+      if (octaveShifts.some((shift) => shift.partId === part2.id && shift.staff === 1)) band = 4.2;
       for (const measure2 of part2.measures) {
         band = Math.max(
           band,
@@ -79517,7 +79707,8 @@ ${xrefOffset}
           ...attrs.clefLine !== void 0 ? { clefLine: attrs.clefLine } : {},
           staves: attrs.staves,
           clefsByStaff: attrs.clefsByStaff,
-          staffLinesByStaff: attrs.staffLinesByStaff
+          staffLinesByStaff: attrs.staffLinesByStaff,
+          transpose: attrs.transpose
         };
         out.push({
           measure: m,
@@ -79560,7 +79751,8 @@ ${xrefOffset}
         config.spacing,
         config.fonts.sizes.tempo,
         drawnAccidentalTicks(accidentalParts(measureNumber)),
-        attributeTransitionsByMeasure.get(measureNumber) ?? []
+        attributeTransitionsByMeasure.get(measureNumber) ?? [],
+        fileDefaults
       );
       measureLayoutsByNumber.set(measureNumber, { ...layout, headerWidth });
       measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
@@ -79791,6 +79983,31 @@ ${xrefOffset}
         return noteAreaX + tick / (measureTicks || 1) * (placement.x + placement.width - noteAreaX);
       };
       const partDirections = directions.filter((d) => d.partId === part2.id);
+      const partOctaveShiftEvents = octaveShifts.filter((e) => e.partId === part2.id);
+      const partOctaveShifts = octaveShiftSpans(partOctaveShiftEvents);
+      {
+        const open = /* @__PURE__ */ new Map();
+        for (const event of partOctaveShiftEvents) {
+          const key = `${event.staff}:${event.number}`;
+          if (event.type === "stop") {
+            if (!open.has(key))
+              diagnostics.push({
+                severity: "info",
+                code: "UNMATCHED_OCTAVE_SHIFT",
+                message: `An <octave-shift type="stop" number="${event.number}"> has no matching start; the bracket was not drawn.`,
+                location: { partId: part2.id, measureNumber: event.measureNumber }
+              });
+            else open.delete(key);
+          } else open.set(key, event);
+        }
+        for (const event of open.values())
+          diagnostics.push({
+            severity: "info",
+            code: "UNMATCHED_OCTAVE_SHIFT",
+            message: `An <octave-shift type="${event.type}" number="${event.number}"> has no matching stop; the bracket was not drawn.`,
+            location: { partId: part2.id, measureNumber: event.measureNumber }
+          });
+      }
       const wedgeSpansByMeasure = /* @__PURE__ */ new Map();
       {
         const openWedges = /* @__PURE__ */ new Map();
@@ -79844,8 +80061,51 @@ ${xrefOffset}
           });
         }
       }
+      const pedalSpansByMeasure = /* @__PURE__ */ new Map();
+      {
+        const open = /* @__PURE__ */ new Map();
+        for (const d of partDirections) {
+          const x2 = directionXFor(d.measureNumber, d.tick);
+          if (x2 === void 0) continue;
+          for (const pedal of d.pedals) {
+            const key = `${d.staff}:${pedal.number}`;
+            if (pedal.type === "start" || pedal.type === "change") {
+              const prior = open.get(key);
+              if (prior !== void 0) {
+                const list = pedalSpansByMeasure.get(prior.measureNumber) ?? [];
+                list.push({ staff: prior.staff, startX: prior.x, endX: x2, startType: prior.type });
+                pedalSpansByMeasure.set(prior.measureNumber, list);
+              }
+              open.set(key, { measureNumber: d.measureNumber, staff: d.staff, x: x2, type: pedal.type });
+            } else if (pedal.type === "stop") {
+              const prior = open.get(key);
+              if (prior === void 0) {
+                diagnostics.push({
+                  severity: "info",
+                  code: "UNMATCHED_PEDAL",
+                  message: `A <pedal type="stop" number="${pedal.number}"> has no matching start.`,
+                  location: { partId: part2.id, measureNumber: d.measureNumber }
+                });
+              } else {
+                open.delete(key);
+                const list = pedalSpansByMeasure.get(prior.measureNumber) ?? [];
+                list.push({ staff: prior.staff, startX: prior.x, endX: x2, startType: prior.type });
+                pedalSpansByMeasure.set(prior.measureNumber, list);
+              }
+            }
+          }
+        }
+        for (const prior of open.values())
+          diagnostics.push({
+            severity: "info",
+            code: "UNMATCHED_PEDAL",
+            message: "A pedal start has no matching stop; the pedal was not drawn.",
+            location: { partId: part2.id, measureNumber: prior.measureNumber }
+          });
+      }
       const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part2.id);
       const pendingTiesByVoiceAndStaff = /* @__PURE__ */ new Map();
+      const pendingSlidesByVoiceAndStaff = /* @__PURE__ */ new Map();
       const tiePitchesMatch = (first, second) => {
         if (first.kind === "pitched" && second.kind === "pitched") {
           return first.step === second.step && first.alter === second.alter && first.octave === second.octave;
@@ -79876,7 +80136,8 @@ ${xrefOffset}
           ...attrs.clefLine !== void 0 ? { clefLine: attrs.clefLine } : {},
           staves: attrs.staves,
           clefsByStaff: attrs.clefsByStaff,
-          staffLinesByStaff: attrs.staffLinesByStaff
+          staffLinesByStaff: attrs.staffLinesByStaff,
+          transpose: attrs.transpose
         };
         const attributeTransitions = attributeTransitionsByPartAndMeasure.get(measureKey) ?? [];
         const systemY = layout.systemY;
@@ -80028,7 +80289,89 @@ ${xrefOffset}
             );
           }
         }
+        for (const span of partOctaveShifts.filter(
+          (candidate) => candidate.start.measureNumber === measure2.number
+        )) {
+          const startX = directionXFor(span.start.measureNumber, span.start.tick);
+          const endX = directionXFor(span.stop.measureNumber, span.stop.tick);
+          if (startX === void 0 || endX === void 0) continue;
+          const topStaffY = topStaff().topStaffY;
+          const y = topStaffY - 3.2;
+          const hook = span.start.type === "down" ? 0.7 : -0.7;
+          const label = span.start.size === 15 ? "15" : "8";
+          svgParts.push(
+            svgLine(startX, y, endX, y, { stroke: theme.colorOf("mark"), "stroke-width": 0.16 })
+          );
+          svgParts.push(
+            svgLine(startX, y, startX, y + 0.7, {
+              stroke: theme.colorOf("mark"),
+              "stroke-width": 0.16
+            })
+          );
+          svgParts.push(
+            svgLine(endX, y, endX, y + hook, { stroke: theme.colorOf("mark"), "stroke-width": 0.16 })
+          );
+          svgParts.push(
+            renderText(label, startX + 0.2, y - 0.15, {
+              fontFamily: theme.textFont,
+              fontSize: 1.2,
+              color: theme.colorOf("mark"),
+              bold: true
+            })
+          );
+        }
         staffNumbers.forEach((staffNumber, staffIndex) => {
+          const drawSlideFor = (note2, x2, y, kind, stringNumber) => {
+            const key = `${staffNumber}:${note2.voice}:${kind}`;
+            const pending = pendingSlidesByVoiceAndStaff.get(key);
+            if (note2.slideStop === true) {
+              if (pending === void 0) {
+                diagnostics.push({
+                  severity: "info",
+                  code: "UNMATCHED_SLIDE_STOP",
+                  message: `A <${kind}> stop has no matching start; no ${kind} was drawn.`,
+                  location: { partId: part2.id, measureNumber: measure2.number }
+                });
+              } else if (!slideEndpointsMatch(pending, note2, kind)) {
+                diagnostics.push({
+                  severity: "warning",
+                  code: "SLIDE_ENDPOINT_MISMATCH",
+                  message: `A <${kind}> stop does not match the preceding endpoint (pitch or string); no ${kind} was drawn.`,
+                  location: { partId: part2.id, measureNumber: measure2.number }
+                });
+              } else if (pending.systemIndex !== layout.systemIndex) {
+                diagnostics.push({
+                  severity: "info",
+                  code: "SLIDE_CROSSES_SYSTEM",
+                  message: `A <${kind}> crosses a system break; system-to-system continuation is not drawn.`,
+                  location: { partId: part2.id, measureNumber: pending.measureNumber }
+                });
+              } else {
+                svgParts.push(
+                  renderSlide(computeSlideShape(pending.x, pending.y, x2, y, kind), {
+                    color: theme.colorOf("slide"),
+                    thickness: lineWidth(
+                      theme,
+                      void 0,
+                      "slideThickness",
+                      SLIDE_THICKNESS_FALLBACK
+                    )
+                  })
+                );
+              }
+              pendingSlidesByVoiceAndStaff.delete(key);
+            }
+            if (note2.slideStart === true)
+              pendingSlidesByVoiceAndStaff.set(key, {
+                x: x2,
+                y,
+                kind,
+                pitch: note2.pitch,
+                ...stringNumber !== void 0 ? { stringNumber } : {},
+                measureNumber: measure2.number,
+                systemIndex: layout.systemIndex
+              });
+          };
           const startState = stateAtTick(0);
           const staffClef = clefSpecAt(startState, staffNumber);
           const { clefDef, keySigClefName } = mapClef(staffClef.sign, staffClef.line);
@@ -80051,6 +80394,35 @@ ${xrefOffset}
           {
             const topLineY = bottomY - staffGeometry.height;
             const markY = (placement) => placement === "above" ? topLineY - DYNAMIC_GAP : bottomY + DYNAMIC_GAP;
+            for (const pedal of partDirections.filter((d) => d.measureNumber === measure2.number && d.staff === staffNumber).flatMap(
+              (d) => d.pedals.map((p) => ({ p, x: directionXFor(d.measureNumber, d.tick) }))
+            )) {
+              if (pedal.x === void 0) continue;
+              const glyph = pedal.p.type === "stop" ? "keyboardPedalUp" : "keyboardPedalPed";
+              svgParts.push(
+                renderMark(glyph, {
+                  x: pedal.x,
+                  y: bottomY + DYNAMIC_GAP,
+                  color: theme.colorOf("text"),
+                  fontFamily: theme.musicFont
+                })
+              );
+            }
+            for (const span of pedalSpansByMeasure.get(measure2.number) ?? []) {
+              if (span.staff !== staffNumber) continue;
+              svgParts.push(
+                svgLine(
+                  span.startX + 1.2,
+                  bottomY + DYNAMIC_GAP - 0.35,
+                  span.endX,
+                  bottomY + DYNAMIC_GAP - 0.35,
+                  {
+                    stroke: theme.colorOf("text"),
+                    "stroke-width": lineWidth(theme, void 0, "pedalLineThickness", 0.16)
+                  }
+                )
+              );
+            }
             for (const d of partDirections) {
               if (d.measureNumber !== measure2.number || d.staff !== staffNumber) continue;
               if (d.dynamics.length === 0) continue;
@@ -80352,7 +80724,23 @@ ${xrefOffset}
                 );
                 const source = group.members.length === 1 ? group.members[0] : void 0;
                 svgParts.push(
-                  source !== void 0 ? withEventId(svg2, source.voiceId, source.index) : svg2
+                  source !== void 0 ? withEventId(
+                    scaleCueSvg(
+                      svg2,
+                      group.event,
+                      sharedXs[index] ?? 0,
+                      ctxAtTick(group.tick).measureBottomY,
+                      fileDefaults
+                    ),
+                    source.voiceId,
+                    source.index
+                  ) : scaleCueSvg(
+                    svg2,
+                    group.event,
+                    sharedXs[index] ?? 0,
+                    ctxAtTick(group.tick).measureBottomY,
+                    fileDefaults
+                  )
                 );
               });
             }
@@ -80461,8 +80849,25 @@ ${xrefOffset}
                     accidentalState,
                     forcedDirection
                   );
-                  if (anchor !== void 0) anchorByIndex.set(idx, anchor);
-                  svgParts.push(withEventId(svg2, voice2.id, idx));
+                  if (anchor !== void 0) {
+                    anchorByIndex.set(idx, anchor);
+                    const first = event.notes[0];
+                    if (first !== void 0 && (first.slideStart === true || first.slideStop === true))
+                      drawSlideFor(
+                        first,
+                        eventX,
+                        eventCtx.measureBottomY + anchor.topPosition,
+                        first.slideStartKind ?? first.slideStopKind ?? "slide",
+                        first.stringNumber
+                      );
+                  }
+                  svgParts.push(
+                    withEventId(
+                      scaleCueSvg(svg2, event, eventX, eventCtx.measureBottomY, fileDefaults),
+                      voice2.id,
+                      idx
+                    )
+                  );
                   accidentalState = newAccidentalState;
                 } else {
                   const { svg: svg2, newAccidentalState, tieAnchor } = renderNoteOrRest(
@@ -80473,6 +80878,15 @@ ${xrefOffset}
                     forcedDirection,
                     restOffset
                   );
+                  if (event.kind === "note" && (event.slideStart === true || event.slideStop === true) && tieAnchor !== void 0) {
+                    drawSlideFor(
+                      event,
+                      eventX,
+                      eventCtx.measureBottomY + tieAnchor.position,
+                      event.slideStartKind ?? event.slideStopKind ?? "slide",
+                      event.stringNumber
+                    );
+                  }
                   const pendingTie = pendingTiesByVoiceAndStaff.get(tieKey);
                   if (event.kind === "note" && event.tieStop && pendingTie !== void 0) {
                     if (!tiePitchesMatch(pendingTie.pitch, event.pitch)) {
@@ -80531,7 +80945,13 @@ ${xrefOffset}
                       noteheadGlyph: tieAnchor.noteheadGlyph
                     });
                   }
-                  svgParts.push(withEventId(svg2, voice2.id, idx));
+                  svgParts.push(
+                    withEventId(
+                      scaleCueSvg(svg2, event, eventX, eventCtx.measureBottomY, fileDefaults),
+                      voice2.id,
+                      idx
+                    )
+                  );
                   accidentalState = newAccidentalState;
                 }
               });
@@ -80593,6 +81013,15 @@ ${xrefOffset}
                     message: "Tab fret numbers cannot mask the string line behind them on a transparent background, so the line runs through them. Set colors.background to the colour this render will sit on.",
                     location: { partId: part2.id, measureNumber: measure2.number }
                   });
+                }
+                if (event.slideStart === true || event.slideStop === true) {
+                  drawSlideFor(
+                    event,
+                    eventX,
+                    bottomY + position,
+                    event.slideStartKind ?? event.slideStopKind ?? "slide",
+                    event.stringNumber
+                  );
                 }
                 svgParts.push(
                   renderTabNumber(fretDigitGlyphNames(event.fret), {
@@ -80751,6 +81180,13 @@ ${xrefOffset}
         }
         previousAttrs = attrs;
       });
+      for (const pending of pendingSlidesByVoiceAndStaff.values())
+        diagnostics.push({
+          severity: "info",
+          code: "UNMATCHED_SLIDE_START",
+          message: `A <${pending.kind}> start has no matching stop; no ${pending.kind} was drawn.`,
+          location: { partId: part2.id, measureNumber: pending.measureNumber }
+        });
       const partStaffCount = partStaffCounts[partIndex] ?? 1;
       if (needsBrace(partStaffCount)) {
         const firstOffset = staffOffsetFor(partIndex, 0);
@@ -81208,8 +81644,8 @@ ${xrefOffset}
   function stringIndexFromLowest(stringFromLowest, stringCount) {
     return stringCount - stringFromLowest;
   }
-  function writtenPitchFor(data, soundingPitch) {
-    return soundingPitch - data.transposeChromatic;
+  function writtenPitchFor(data, soundingPitch2) {
+    return soundingPitch2 - data.transposeChromatic;
   }
   function fretFor(data, writtenPitch, stringFromLowest) {
     const open = data.openStrings[stringFromLowest - 1];
