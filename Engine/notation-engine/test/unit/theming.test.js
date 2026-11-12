@@ -202,7 +202,7 @@ describe('Phase 50: the theming API is live (§8)', () => {
         layout: { pxPerStaffSpace: 40 },
       });
       const width = Number(/ width="([\d.]+)"/.exec(svg)[1]);
-      const viewBoxWidth = Number(/viewBox="0 0 ([\d.]+)/.exec(svg)[1]);
+      const viewBoxWidth = Number(/viewBox="[-\d.]+ 0 ([\d.]+)/.exec(svg)[1]);
       assert.equal(width, viewBoxWidth * 40);
     });
 
@@ -224,7 +224,9 @@ describe('Phase 50: the theming API is live (§8)', () => {
 
     test('an ordinary colour still paints the background rectangle', () => {
       assert.equal(
-        rectCount(render('simple-single-voice.musicxml', { colors: { background: '#202020' } }).svg),
+        rectCount(
+          render('simple-single-voice.musicxml', { colors: { background: '#202020' } }).svg,
+        ),
         1,
       );
     });
@@ -261,9 +263,7 @@ describe('Phase 50: the theming API is live (§8)', () => {
         fs.readFileSync(path.join(FIXTURES_DIR, 'guitar-tab-frets.musicxml'), 'utf8'),
         { domParser, config: { colors: { background: 'none' } } },
       );
-      const said = [...diagnostics].filter(
-        (d) => d.code === 'TAB_MASK_ON_TRANSPARENT_BACKGROUND',
-      );
+      const said = [...diagnostics].filter((d) => d.code === 'TAB_MASK_ON_TRANSPARENT_BACKGROUND');
       assert.equal(said.length, 1, 'reported exactly once for the whole render');
       assert.ok(!svg.includes('<rect'), 'and no mask was drawn');
     });
@@ -273,9 +273,7 @@ describe('Phase 50: the theming API is live (§8)', () => {
         fs.readFileSync(path.join(FIXTURES_DIR, 'guitar-tab-frets.musicxml'), 'utf8'),
         { domParser },
       );
-      assert.ok(
-        ![...diagnostics].some((d) => d.code === 'TAB_MASK_ON_TRANSPARENT_BACKGROUND'),
-      );
+      assert.ok(![...diagnostics].some((d) => d.code === 'TAB_MASK_ON_TRANSPARENT_BACKGROUND'));
     });
   });
 

@@ -2796,6 +2796,16 @@ not renumbered**, so existing `Documentation/` records and commit history stay v
 | 53 | Performance pass against §18.1's budgets | ✅ (built -- see Documentation/phase-53-performance.md) |
 | 54 | Public API surface + generated reference docs into `Documentation/` | ✅ (built -- see Documentation/phase-54-public-api.md) |
 
+### Phase 60 — visual engraving polish `[BUILT]`
+
+The visual audit retained the correct SMuFL/MuseScore proportions for noteheads,
+staff lines, stems, beams and ledger lines, and fixed the visible first-system
+edge defect instead of applying arbitrary global scaling. Scroll-mode SVGs now
+use a one-staff-space optical inset on both sides (`viewBoxMinX = -1`), so
+clefs, system-start bar numbers and header glyph overhangs are not clipped.
+The standalone SVG primitive and pure-scale resize path both support the
+negative viewBox origin. See `Documentation/phase-60-visual-polish.md`.
+
 ### Remaining MusicXML note/direction completion notes (2026-11-12)
 
 #### Phase 57 — transpose and pedal `[BUILT]`

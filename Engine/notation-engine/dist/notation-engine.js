@@ -70098,11 +70098,12 @@ ${children.join("\n")}
   }
   function createSvgDocument(options, children) {
     const { viewBoxWidth, viewBoxHeight, pxPerStaffSpace, backgroundColor } = options;
+    const minX = options.viewBoxMinX ?? 0;
     const minY = options.viewBoxMinY ?? 0;
     const pxWidth = viewBoxWidth * pxPerStaffSpace;
     const pxHeight = viewBoxHeight * pxPerStaffSpace;
-    const background = hasBackground(backgroundColor) ? svgRect(0, minY, viewBoxWidth, viewBoxHeight, { fill: backgroundColor }) : "";
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${pxWidth}" height="${pxHeight}" viewBox="0 ${svgNumber(minY)} ${viewBoxWidth} ${viewBoxHeight}">
+    const background = hasBackground(backgroundColor) ? svgRect(minX, minY, viewBoxWidth, viewBoxHeight, { fill: backgroundColor }) : "";
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${pxWidth}" height="${pxHeight}" viewBox="${svgNumber(minX)} ${svgNumber(minY)} ${viewBoxWidth} ${viewBoxHeight}">
 ` + (background !== "" ? background + "\n" : "") + children.join("\n") + `
 </svg>`;
   }
@@ -74494,7 +74495,7 @@ ${denominator}`;
 
   // src/layout/resize.ts
   function extractViewBox(svg) {
-    const match = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
+    const match = svg.match(/viewBox="[-\d.]+ [-\d.]+ ([\d.]+) ([\d.]+)"/);
     if (match === null) return void 0;
     const width = Number(match[1]);
     const height = Number(match[2]);
@@ -81320,7 +81321,13 @@ ${xrefOffset}
       {
         // §16.2: page mode's canvas is the PAGE, however much or little of
         // it the music fills; scroll mode's is as wide as the music itself.
-        viewBoxWidth: config.layout.mode === "page" ? config.page.pageWidth : totalWidth + 2,
+        // Scroll mode gets one staff-space of optical breathing room on both
+        // sides. Clefs and system-start bar numbers have real glyph ink that
+        // naturally overhangs their nominal x origin; starting the viewBox at
+        // zero clipped that ink in small web renders and made the score feel
+        // cramped against the edge.
+        viewBoxWidth: config.layout.mode === "page" ? config.page.pageWidth : totalWidth + 3,
+        ...config.layout.mode === "page" ? {} : { viewBoxMinX: -1 },
         // Integration A/B: the viewBox must fit EVERY staff of EVERY part,
         // or the lower ones are simply clipped out of the rendered image.
         // In page mode that means every page, stacked.

@@ -21,9 +21,11 @@ function renderGuitar() {
 
 /** The DISTINCT Y values of horizontal staff lines. Deduplicated because a staff line is drawn once per measure, so a 2-measure single staff yields 10 line elements at only 5 distinct heights. */
 function staffLineYs(svg) {
-  const ys = [...svg.matchAll(/<line x1="[\d.]+" y1="([\d.]+)" x2="[\d.]+" y2="\1" stroke="#000000" stroke-width="0\.13"/g)].map(
-    (m) => Number(m[1]),
-  );
+  const ys = [
+    ...svg.matchAll(
+      /<line x1="[\d.]+" y1="([\d.]+)" x2="[\d.]+" y2="\1" stroke="#000000" stroke-width="0\.13"/g,
+    ),
+  ].map((m) => Number(m[1]));
   return [...new Set(ys)].sort((a, b) => a - b);
 }
 
@@ -71,7 +73,7 @@ describe('multi-part rendering (Integration B)', () => {
 
   test('the viewBox grows tall enough to contain the second part', () => {
     const { svg } = renderGuitar();
-    const height = Number(svg.match(/viewBox="0 0 [\d.]+ ([\d.]+)"/)[1]);
+    const height = Number(svg.match(/viewBox="[-\d.]+ 0 [\d.]+ ([\d.]+)"/)[1]);
     const ys = staffLineYs(svg);
     assert.ok(height > Math.max(...ys), 'the lowest staff line must fit inside the viewBox');
   });

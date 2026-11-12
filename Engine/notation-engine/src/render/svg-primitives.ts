@@ -129,6 +129,12 @@ export interface SvgDocumentOptions {
   /** Height of the drawing, in staff-space units -- becomes the viewBox height. */
   readonly viewBoxHeight: number;
   /**
+   * Left edge of the drawing in notation coordinates. A small negative
+   * inset keeps first-system clefs and bar numbers from being clipped at
+   * x=0; their glyph ink naturally overhangs the measure origin.
+   */
+  readonly viewBoxMinX?: number;
+  /**
    * Where the top of the picture sits in the coordinates the music was
    * drawn in. Zero, except where `config.layout.fitSystemHeight` has
    * trimmed the empty air off a system: the trim moves the BOX, never
@@ -167,15 +173,16 @@ export function createSvgDocument(
   children: readonly string[],
 ): string {
   const { viewBoxWidth, viewBoxHeight, pxPerStaffSpace, backgroundColor } = options;
+  const minX = options.viewBoxMinX ?? 0;
   const minY = options.viewBoxMinY ?? 0;
   const pxWidth = viewBoxWidth * pxPerStaffSpace;
   const pxHeight = viewBoxHeight * pxPerStaffSpace;
   const background = hasBackground(backgroundColor)
-    ? svgRect(0, minY, viewBoxWidth, viewBoxHeight, { fill: backgroundColor })
+    ? svgRect(minX, minY, viewBoxWidth, viewBoxHeight, { fill: backgroundColor })
     : '';
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${pxWidth}" height="${pxHeight}" ` +
-    `viewBox="0 ${svgNumber(minY)} ${viewBoxWidth} ${viewBoxHeight}">\n` +
+    `viewBox="${svgNumber(minX)} ${svgNumber(minY)} ${viewBoxWidth} ${viewBoxHeight}">\n` +
     (background !== '' ? background + '\n' : '') +
     children.join('\n') +
     `\n</svg>`

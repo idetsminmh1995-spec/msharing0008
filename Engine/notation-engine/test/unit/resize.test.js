@@ -25,7 +25,7 @@ describe('extractViewBox (Phase 47, §16.3)', () => {
     // whenever spacing changes -- what this test is for is that
     // extractViewBox AGREES with the document, not what the document's
     // own width happens to be this week.
-    const declared = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(realSvg());
+    const declared = /viewBox="[-\d.]+ 0 ([\d.]+) ([\d.]+)"/.exec(realSvg());
     assert.equal(vb.width, Number(declared[1]));
     assert.equal(vb.height, Number(declared[2]));
     assert.ok(vb.width > 0 && vb.height > 0);
@@ -113,10 +113,12 @@ describe('resizePureScale (Phase 47, §16.3 O(1) fast path)', () => {
     assert.equal(result.pxPerStaffSpace, 0);
   });
 
-  test('PERFORMANCE: stays well under one animation frame (16ms) even for a large document -- §16.3\'s own explicit requirement', () => {
+  test("PERFORMANCE: stays well under one animation frame (16ms) even for a large document -- §16.3's own explicit requirement", () => {
     // Simulate a large, many-measure score by repeating real content many
     // times inside one big SVG string.
-    const chunk = realSvg().replace(/<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
+    const chunk = realSvg()
+      .replace(/<svg[^>]*>/, '')
+      .replace(/<\/svg>\s*$/, '');
     const bigInner = chunk.repeat(200);
     const bigSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="592" height="320" viewBox="0 0 29.6 16">\n${bigInner}\n</svg>`;
 

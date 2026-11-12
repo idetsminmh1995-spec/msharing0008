@@ -24,7 +24,7 @@ export interface ViewBox {
  * that gets `undefined` back has nothing sensible to resize).
  */
 export function extractViewBox(svg: string): ViewBox | undefined {
-  const match = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
+  const match = svg.match(/viewBox="[-\d.]+ [-\d.]+ ([\d.]+) ([\d.]+)"/);
   if (match === null) return undefined;
   const width = Number(match[1]);
   const height = Number(match[2]);
