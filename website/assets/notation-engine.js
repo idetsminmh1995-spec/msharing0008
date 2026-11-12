@@ -29,6 +29,7 @@ var NotationEngine = (() => {
     DEFAULT_CONFIG: () => DEFAULT_CONFIG,
     DEFAULT_CURSOR_FIXED_FRACTION: () => DEFAULT_CURSOR_FIXED_FRACTION,
     DEFAULT_DRUM_MAPPING_TABLE: () => DEFAULT_DRUM_MAPPING_TABLE,
+    DEFAULT_PART_GAP: () => DEFAULT_PART_GAP,
     DEFAULT_REPEAT_TIMES: () => DEFAULT_REPEAT_TIMES,
     DEFAULT_STEM_LENGTH: () => DEFAULT_STEM_LENGTH,
     DOT_DOT_DISTANCE: () => DOT_DOT_DISTANCE,
@@ -85,6 +86,7 @@ var NotationEngine = (() => {
     chordDotPlacements: () => chordDotPlacements,
     chordStemDirection: () => chordStemDirection,
     chordSymbolAccidentalGlyphName: () => chordSymbolAccidentalGlyphName,
+    chordSymbolLayout: () => chordSymbolLayout,
     chordSymbolQualityGlyphName: () => chordSymbolQualityGlyphName,
     chordSymbolSide: () => chordSymbolSide,
     chromaticNoteNumber: () => chromaticNoteNumber,
@@ -106,6 +108,7 @@ var NotationEngine = (() => {
     computeProportionalPositions: () => computeProportionalPositions,
     computePxPerStaffSpace: () => computePxPerStaffSpace,
     computeReferenceDuration: () => computeReferenceDuration,
+    computeRehearsalMarkBox: () => computeRehearsalMarkBox,
     computeScrollLayout: () => computeScrollLayout,
     computeSlurShape: () => computeSlurShape,
     computeStaffDistance: () => computeStaffDistance,
@@ -177,9 +180,11 @@ var NotationEngine = (() => {
     isUnpitched: () => isUnpitched,
     justifySystem: () => justifySystem,
     keySignatureAccidentals: () => keySignatureAccidentals,
+    layoutLyricRow: () => layoutLyricRow,
     lookupDrumMapEntry: () => lookupDrumMapEntry,
     lyricElisionGlyphName: () => lyricElisionGlyphName,
     lyricHyphenGlyphName: () => lyricHyphenGlyphName,
+    lyricRowBaselineY: () => lyricRowBaselineY,
     lyricSide: () => lyricSide,
     measure: () => measure,
     measureSvgBoxes: () => measureSvgBoxes,
@@ -232,6 +237,7 @@ var NotationEngine = (() => {
     renderBoundingBoxOverlay: () => renderBoundingBoxOverlay,
     renderBrace: () => renderBrace,
     renderCancellationNaturals: () => renderCancellationNaturals,
+    renderChordSymbol: () => renderChordSymbol,
     renderClef: () => renderClef,
     renderCursor: () => renderCursor,
     renderExtenderLine: () => renderExtenderLine,
@@ -240,10 +246,12 @@ var NotationEngine = (() => {
     renderHairpin: () => renderHairpin,
     renderKeySignature: () => renderKeySignature,
     renderLedgerLines: () => renderLedgerLines,
+    renderLyricRow: () => renderLyricRow,
     renderMark: () => renderMark,
     renderMetronomeMark: () => renderMetronomeMark,
     renderNotehead: () => renderNotehead,
     renderParsedMusicXml: () => renderParsedMusicXml,
+    renderRehearsalMark: () => renderRehearsalMark,
     renderRepeatCount: () => renderRepeatCount,
     renderRest: () => renderRest,
     renderSkylineOverlay: () => renderSkylineOverlay,
@@ -251,11 +259,14 @@ var NotationEngine = (() => {
     renderStaff: () => renderStaff,
     renderStem: () => renderStem,
     renderTabNumber: () => renderTabNumber,
+    renderText: () => renderText,
+    renderTextScaledGlyph: () => renderTextScaledGlyph,
     renderTie: () => renderTie,
     renderTimeSignature: () => renderTimeSignature,
     renderTupletBracket: () => renderTupletBracket,
     renderTupletNumber: () => renderTupletNumber,
     renderVolta: () => renderVolta,
+    renderWords: () => renderWords,
     repeatDiagnostic: () => repeatDiagnostic,
     resetMeasure: () => resetMeasure,
     resizePureScale: () => resizePureScale,
@@ -69474,12 +69485,55 @@ var NotationEngine = (() => {
     return { startX, endX, y, kind, spread: HAIRPIN_SPREAD };
   }
 
+  // src/geometry/text-metrics.ts
+  var ADVANCE_PER_EM = {
+    "0": 0.7,
+    "1": 0.7,
+    "2": 0.7,
+    "3": 0.7,
+    "4": 0.7,
+    "5": 0.7,
+    "6": 0.7,
+    "7": 0.7,
+    "8": 0.7,
+    "9": 0.7,
+    "=": 0.84,
+    " ": 0.38,
+    ".": 0.38,
+    ",": 0.38
+  };
+  var DEFAULT_ADVANCE_PER_EM = 0.7;
+  function estimateCharWidth(ch, fontSize) {
+    return (ADVANCE_PER_EM[ch] ?? DEFAULT_ADVANCE_PER_EM) * fontSize;
+  }
+  function estimateTextWidth(text, fontSize) {
+    let total = 0;
+    for (const ch of text) total += estimateCharWidth(ch, fontSize);
+    return total;
+  }
+  var TEXT_ASCENT_PER_EM = 0.78;
+  var TEXT_DESCENT_PER_EM = 0.22;
+
   // src/geometry/expression-mark.ts
   function tempoMarkSide() {
     return "above";
   }
   function rehearsalMarkSide() {
     return "above";
+  }
+  function computeRehearsalMarkBox(text, fontSize, padding = 0.45, thickness = 0.16) {
+    const textWidth2 = estimateTextWidth(text, fontSize);
+    const ascent = fontSize * TEXT_ASCENT_PER_EM;
+    const descent = fontSize * TEXT_DESCENT_PER_EM;
+    return {
+      textWidth: textWidth2,
+      width: textWidth2 + 2 * padding,
+      height: ascent + descent + 2 * padding,
+      padding,
+      thickness,
+      ascent,
+      descent
+    };
   }
 
   // src/geometry/lyric.ts
@@ -69497,6 +69551,59 @@ var NotationEngine = (() => {
   }
   function computeExtenderLine(startX, endX, y) {
     return { startX, endX, y };
+  }
+  function layoutLyricRow(boxes, options) {
+    const items = [];
+    const groups = [];
+    for (const box of boxes) {
+      const previous = groups[groups.length - 1];
+      if (previous !== void 0 && previous.boxes[0]?.x === box.x) {
+        groups[groups.length - 1] = {
+          boxes: [...previous.boxes, box],
+          left: previous.left,
+          right: previous.right
+        };
+        continue;
+      }
+      groups.push({ boxes: [box], left: box.x - box.width / 2, right: box.x + box.width / 2 });
+    }
+    const centered = [];
+    for (const group of groups) {
+      const first = group.boxes[0];
+      if (first === void 0) continue;
+      const total = group.boxes.reduce((sum, box) => sum + box.width, 0) + (group.boxes.length - 1) * options.elisionWidth;
+      let cursor = first.x - total / 2;
+      const left = cursor;
+      for (const [index, box] of group.boxes.entries()) {
+        items.push({ kind: "syllable", text: box.text, x: cursor + box.width / 2, width: box.width });
+        cursor += box.width;
+        if (group.boxes[index + 1] !== void 0) {
+          items.push({ kind: "elision", x: cursor + options.elisionWidth / 2 });
+          cursor += options.elisionWidth;
+        }
+      }
+      const last = group.boxes[group.boxes.length - 1];
+      if (last === void 0) continue;
+      centered.push({ left, right: cursor, last });
+    }
+    for (const [index, entry] of centered.entries()) {
+      const next = centered[index + 1];
+      if (next !== void 0 && (entry.last.syllabic === "begin" || entry.last.syllabic === "middle")) {
+        items.push({
+          kind: "hyphen",
+          x: computeHyphenX(entry.right + options.punctuationGap, next.left - options.punctuationGap)
+        });
+      }
+      if (entry.last.extend) {
+        const startX = entry.right + options.punctuationGap;
+        const endX = next !== void 0 ? next.left - options.punctuationGap : entry.last.melismaEndX;
+        if (endX > startX) items.push({ kind: "extender", startX, endX });
+      }
+    }
+    return items;
+  }
+  function lyricRowBaselineY(staffBottomY, rowIndex, gap, rowHeight) {
+    return staffBottomY + gap + rowIndex * rowHeight;
   }
 
   // src/geometry/chord-symbol.ts
@@ -69528,6 +69635,95 @@ var NotationEngine = (() => {
   };
   function chordSymbolQualityGlyphName(quality) {
     return QUALITY_GLYPHS[quality];
+  }
+  var KIND_SUFFIXES = {
+    major: [],
+    minor: [{ glyph: "csymMinor" }],
+    augmented: [{ glyph: "csymAugmented" }],
+    diminished: [{ glyph: "csymDiminished" }],
+    dominant: [{ text: "7" }],
+    "major-seventh": [{ glyph: "csymMajorSeventh" }],
+    "minor-seventh": [{ glyph: "csymMinor" }, { text: "7" }],
+    "diminished-seventh": [{ glyph: "csymDiminished" }, { text: "7" }],
+    "augmented-seventh": [{ glyph: "csymAugmented" }, { text: "7" }],
+    "half-diminished": [{ glyph: "csymHalfDiminished" }],
+    "major-minor": [{ glyph: "csymMinor" }, { text: "maj7" }],
+    "major-sixth": [{ text: "6" }],
+    "minor-sixth": [{ glyph: "csymMinor" }, { text: "6" }],
+    "dominant-seventh": [{ text: "7" }],
+    "dominant-ninth": [{ text: "9" }],
+    "major-ninth": [{ text: "9" }],
+    "minor-ninth": [{ glyph: "csymMinor" }, { text: "9" }],
+    "dominant-11th": [{ text: "11" }],
+    "major-11th": [{ text: "11" }],
+    "minor-11th": [{ glyph: "csymMinor" }, { text: "11" }],
+    "dominant-13th": [{ text: "13" }],
+    "major-13th": [{ text: "13" }],
+    "minor-13th": [{ glyph: "csymMinor" }, { text: "13" }],
+    "suspended-second": [{ text: "sus2" }],
+    "suspended-fourth": [{ text: "sus4" }],
+    power: [{ text: "5" }],
+    Neapolitan: [{ text: "N" }],
+    Italian: [{ text: "It" }],
+    French: [{ text: "Fr" }],
+    German: [{ text: "Ger" }],
+    pedal: [{ text: "ped" }],
+    Tristan: [{ text: "Tristan" }]
+  };
+  function glyphAdvance(glyphName, fontSize) {
+    const bbox = getGlyph(glyphName)?.bBox;
+    if (bbox === void 0) return 0;
+    return (bbox.bBoxNE[0] - bbox.bBoxSW[0]) * (fontSize / 4);
+  }
+  function chordSymbolLayout(source, fontSize) {
+    const parts = [];
+    const letter = (step, alter) => {
+      parts.push({
+        kind: "text",
+        text: step,
+        advance: estimateTextWidth(step, fontSize)
+      });
+      if (alter !== 0) {
+        const glyphName = chordSymbolAccidentalGlyphName(alter);
+        parts.push({ kind: "glyph", glyphName, advance: glyphAdvance(glyphName, fontSize) });
+      }
+    };
+    letter(source.rootStep, source.rootAlter);
+    const suffix = () => {
+      if (source.kindText !== void 0 && source.kindText.length > 0) {
+        return { specs: [{ text: source.kindText }] };
+      }
+      if (source.kind === void 0) return { specs: [] };
+      const specs = KIND_SUFFIXES[source.kind];
+      if (specs === void 0) return { unsupported: source.kind };
+      return { specs };
+    };
+    const resolved = suffix();
+    if ("unsupported" in resolved) {
+      return { parts: [], width: 0, unsupportedKind: resolved.unsupported };
+    }
+    for (const spec of resolved.specs) {
+      if (spec.glyph !== void 0) {
+        parts.push({
+          kind: "glyph",
+          glyphName: spec.glyph,
+          advance: glyphAdvance(spec.glyph, fontSize)
+        });
+      } else if (spec.text !== void 0) {
+        parts.push({
+          kind: "text",
+          text: spec.text,
+          advance: estimateTextWidth(spec.text, fontSize)
+        });
+      }
+    }
+    if (source.bassStep !== void 0) {
+      const slash = "csymAlteredBassSlash";
+      parts.push({ kind: "glyph", glyphName: slash, advance: glyphAdvance(slash, fontSize) });
+      letter(source.bassStep, source.bassAlter ?? 0);
+    }
+    const width = parts.reduce((total, part2) => total + part2.advance, 0);
+    return { parts, width };
   }
 
   // src/geometry/grace-note.ts
@@ -69717,35 +69913,6 @@ var NotationEngine = (() => {
     }
     return `= ${String(beatsPerMinute)}`;
   }
-
-  // src/geometry/text-metrics.ts
-  var ADVANCE_PER_EM = {
-    "0": 0.7,
-    "1": 0.7,
-    "2": 0.7,
-    "3": 0.7,
-    "4": 0.7,
-    "5": 0.7,
-    "6": 0.7,
-    "7": 0.7,
-    "8": 0.7,
-    "9": 0.7,
-    "=": 0.84,
-    " ": 0.38,
-    ".": 0.38,
-    ",": 0.38
-  };
-  var DEFAULT_ADVANCE_PER_EM = 0.7;
-  function estimateCharWidth(ch, fontSize) {
-    return (ADVANCE_PER_EM[ch] ?? DEFAULT_ADVANCE_PER_EM) * fontSize;
-  }
-  function estimateTextWidth(text, fontSize) {
-    let total = 0;
-    for (const ch of text) total += estimateCharWidth(ch, fontSize);
-    return total;
-  }
-  var TEXT_ASCENT_PER_EM = 0.78;
-  var TEXT_DESCENT_PER_EM = 0.22;
 
   // src/geometry/augmentation-dot.ts
   function augmentationDotGlyphName() {
@@ -70253,12 +70420,90 @@ ${denominator}`;
     ].join("\n");
   }
 
+  // src/render/text.ts
+  function renderText(text, x2, y, options) {
+    const attrs = {
+      "font-family": options.fontFamily,
+      "font-size": options.fontSize,
+      fill: options.color
+    };
+    if (options.anchor !== void 0 && options.anchor !== "start") {
+      attrs["text-anchor"] = options.anchor;
+    }
+    if (options.italic === true) attrs["font-style"] = "italic";
+    if (options.bold === true) attrs["font-weight"] = "bold";
+    return svgText(x2, y, text, attrs);
+  }
+  function renderTextScaledGlyph(char, x2, y, options) {
+    return svgText(x2, y, char, {
+      "font-family": options.fontFamily,
+      "font-size": options.fontSize,
+      fill: options.color
+    });
+  }
+
   // src/render/lyric.ts
   function renderExtenderLine(shape, options) {
     return svgLine(shape.startX, shape.y, shape.endX, shape.y, {
       stroke: options.color,
       "stroke-width": options.thickness
     });
+  }
+  var HYPHEN_RISE = 0.32;
+  function renderLyricRow(items, y, options) {
+    const hyphenChar = getGlyph(lyricHyphenGlyphName())?.char;
+    const elisionChar = getGlyph(lyricElisionGlyphName())?.char;
+    const children = [];
+    for (const item of items) {
+      switch (item.kind) {
+        case "syllable":
+          children.push(
+            renderText(item.text, item.x, y, {
+              fontFamily: options.fontFamily,
+              fontSize: options.fontSize,
+              color: options.color,
+              anchor: "middle"
+            })
+          );
+          break;
+        case "hyphen":
+          if (hyphenChar !== void 0) {
+            children.push(
+              renderTextScaledGlyph(
+                hyphenChar,
+                item.x - options.hyphenWidth / 2,
+                y - options.fontSize * HYPHEN_RISE,
+                {
+                  fontFamily: options.musicFont,
+                  fontSize: options.fontSize,
+                  color: options.color
+                }
+              )
+            );
+          }
+          break;
+        case "elision":
+          if (elisionChar !== void 0) {
+            children.push(
+              renderTextScaledGlyph(elisionChar, item.x - options.elisionWidth / 2, y, {
+                fontFamily: options.musicFont,
+                fontSize: options.fontSize,
+                color: options.color
+              })
+            );
+          }
+          break;
+        case "extender":
+          children.push(
+            renderExtenderLine(
+              { startX: item.startX, endX: item.endX, y: y + options.fontSize * 0.15 },
+              { thickness: options.lineThickness, color: options.color }
+            )
+          );
+          break;
+      }
+    }
+    return svgGroup(children, { "data-lyric-row": "true" });
   }
 
   // src/render/tab.ts
@@ -70431,6 +70676,62 @@ ${denominator}`;
     ).join("\n");
   }
 
+  // src/render/chord-symbol.ts
+  function renderChordSymbol(layout, x2, y, options) {
+    const children = [];
+    let cursor = x2;
+    for (const part2 of layout.parts) {
+      if (part2.kind === "text") {
+        children.push(
+          renderText(part2.text, cursor, y, {
+            fontFamily: options.textFont,
+            fontSize: options.fontSize,
+            color: options.color
+          })
+        );
+      } else {
+        const glyph = getGlyph(part2.glyphName);
+        if (glyph !== void 0) {
+          children.push(
+            renderTextScaledGlyph(glyph.char, cursor, y, {
+              fontFamily: options.musicFont,
+              fontSize: options.fontSize,
+              color: options.color
+            })
+          );
+        }
+      }
+      cursor += part2.advance;
+    }
+    return svgGroup(children, { "data-chord-symbol": "true" });
+  }
+
+  // src/render/expression-mark.ts
+  function renderRehearsalMark(text, x2, y, options) {
+    const { box } = options;
+    const frame = svgRect(x2 - box.width / 2, y - box.ascent - box.padding, box.width, box.height, {
+      fill: "none",
+      stroke: options.frameColor,
+      "stroke-width": box.thickness
+    });
+    const label = renderText(text, x2, y, {
+      fontFamily: options.fontFamily,
+      fontSize: options.fontSize,
+      color: options.color,
+      anchor: "middle"
+    });
+    return svgGroup([frame, label], { "data-rehearsal-mark": "true" });
+  }
+  function renderWords(text, x2, y, options) {
+    return renderText(text, x2, y, {
+      fontFamily: options.fontFamily,
+      fontSize: options.fontSize,
+      color: options.color,
+      ...options.anchor !== void 0 ? { anchor: options.anchor } : {},
+      ...options.italic !== void 0 ? { italic: options.italic } : {}
+    });
+  }
+
   // src/config/config.ts
   var DEFAULT_CONFIG = {
     colors: {
@@ -70519,6 +70820,21 @@ ${denominator}`;
       marginRight: 2.5
     },
     drums: {},
+    text: {
+      lyricsDisplay: "on",
+      // 2.2 staff spaces below the bottom line to the first verse's
+      // baseline. The staff's own descender room plus a lyric's ascender
+      // is what this clears; it is the same order as the 2.5 used for a
+      // dynamic, which sits in the same band under the staff.
+      lyricGap: 2.2,
+      // One lyric line of 1.8 plus a little air, so two verses do not
+      // touch. MuseScore's own lyric line spacing is ~1.4x the text size.
+      lyricRowHeight: 2.6,
+      chordSymbolsDisplay: "on",
+      chordSymbolGap: 1,
+      rehearsalMarksDisplay: "on",
+      wordsDisplay: "on"
+    },
     debug: {
       // 'info' keeps every diagnostic the engine produces, which is what
       // every caller got before this section existed -- a filter whose
@@ -70554,6 +70870,7 @@ ${denominator}`;
       staves: { ...DEFAULT_CONFIG.staves, ...overrides?.staves },
       page: { ...DEFAULT_CONFIG.page, ...overrides?.page },
       drums: { ...DEFAULT_CONFIG.drums, ...overrides?.drums },
+      text: { ...DEFAULT_CONFIG.text, ...overrides?.text },
       debug: { ...DEFAULT_CONFIG.debug, ...overrides?.debug }
     };
   }
@@ -73523,7 +73840,7 @@ ${denominator}`;
     });
     return { positions };
   }
-  function computeSystemLayoutVariableGaps(partStaffCounts, staffGapForPair, partGap = DEFAULT_PART_GAP) {
+  function computeSystemLayoutVariableGaps(partStaffCounts, staffGapForPair, partGap = DEFAULT_PART_GAP, partGapForPart) {
     const positions = [];
     let y = 0;
     partStaffCounts.forEach((staffCount, partIndex) => {
@@ -73533,7 +73850,7 @@ ${denominator}`;
           y += staffGapForPair(partIndex, staffIndexInPart);
         }
       }
-      y += partGap;
+      y += partGapForPart === void 0 ? partGap : partGapForPart(partIndex);
     });
     return { positions };
   }
@@ -77138,6 +77455,8 @@ ${xrefOffset}
   var TUPLET_BRACKET_THICKNESS_FALLBACK = 0.16;
   var DYNAMIC_GAP = 2.5;
   var HAIRPIN_THICKNESS_FALLBACK = 0.16;
+  var TEXT_MARK_GAP = 1.2;
+  var CHORD_SYMBOL_STACK_CLEARANCE = 0.4;
   function worstCaseStaffExtent(part2, staffNumber, allAttributes, side, theme, midiInstrumentsByPart, attributeTimelines) {
     const firstAttrs = allAttributes.find((a) => a.partId === part2.id);
     if (firstAttrs === void 0) return 0;
@@ -78553,6 +78872,59 @@ ${xrefOffset}
     }
     return parts.join("\n");
   }
+  function lyricVerseNumbers(part2, staffNumber) {
+    const verses = /* @__PURE__ */ new Set();
+    for (const measure2 of part2.measures) {
+      for (const voice2 of measure2.voices) {
+        for (const event of voice2.events) {
+          if ((event.staff ?? 1) !== staffNumber) continue;
+          const notes = event.kind === "note" ? [event] : event.kind === "chord" ? event.notes : [];
+          for (const note2 of notes) {
+            for (const syllable of note2.lyrics ?? []) verses.add(syllable.number);
+          }
+        }
+      }
+    }
+    return [...verses].sort((a, b) => a - b);
+  }
+  function lyricBandHeight(verseCount, gap, rowHeight, fontSize) {
+    if (verseCount <= 0) return 0;
+    return gap + (verseCount - 1) * rowHeight + fontSize * 0.35;
+  }
+  function northTextRows(needs, sizes, textConfig, rehearsalHeight, northExtent) {
+    if (!needs.chordSymbols && !needs.words && !needs.rehearsalMarks) {
+      return {
+        chordSymbolOffset: void 0,
+        wordsOffset: void 0,
+        rehearsalOffset: void 0,
+        band: 0,
+        shift: 0
+      };
+    }
+    let offset = 0;
+    let chordSymbolOffset;
+    let wordsOffset;
+    let rehearsalOffset;
+    if (needs.chordSymbols) {
+      chordSymbolOffset = textConfig.chordSymbolGap;
+      offset = chordSymbolOffset + sizes.chordSymbol * TEXT_ASCENT_PER_EM + CHORD_SYMBOL_STACK_CLEARANCE;
+    }
+    if (needs.words) {
+      wordsOffset = offset + TEXT_MARK_GAP;
+      offset = wordsOffset + sizes.tempo * TEXT_ASCENT_PER_EM;
+    }
+    if (needs.rehearsalMarks) {
+      rehearsalOffset = offset + TEXT_MARK_GAP;
+      offset = rehearsalOffset + rehearsalHeight;
+    }
+    const lowest = chordSymbolOffset ?? wordsOffset ?? rehearsalOffset ?? 0;
+    const shift = Math.max(0, northExtent + CHORD_SYMBOL_STACK_CLEARANCE - lowest);
+    return { chordSymbolOffset, wordsOffset, rehearsalOffset, band: offset + shift, shift };
+  }
+  function withTextBand(skyline, band) {
+    if (!(band > 0)) return skyline;
+    return addToSkyline(skyline, { xStart: 0, xEnd: 1, y: band });
+  }
   function renderParsedMusicXml(parsed, options) {
     const {
       score: parsedScore,
@@ -78562,6 +78934,7 @@ ${xrefOffset}
       tempoMarks,
       midiInstrumentsByPart: midiInstrumentsByPartMap,
       directions,
+      harmonies,
       prints,
       defaults: fileDefaults
     } = parsed;
@@ -78574,6 +78947,119 @@ ${xrefOffset}
     ) : parsedScore;
     const drawnTempoMarks = config.tempoMarks.display === "off" ? [] : tempoMarks;
     const theme = buildTheme(config, fileDefaults);
+    const measureTextKey = (partId, measureNumber) => `${partId}:${measureNumber}`;
+    const textNeedsByMeasure = /* @__PURE__ */ new Map();
+    {
+      const mark = (partId, measureNumber, update) => {
+        const key = measureTextKey(partId, measureNumber);
+        const existing = textNeedsByMeasure.get(key) ?? {
+          chordSymbols: false,
+          rehearsalMarks: false,
+          words: false
+        };
+        textNeedsByMeasure.set(key, { ...existing, ...update });
+      };
+      if (config.text.chordSymbolsDisplay === "on") {
+        for (const harmony of harmonies) {
+          mark(harmony.partId, harmony.measureNumber, { chordSymbols: true });
+        }
+      }
+      for (const direction of directions) {
+        if (direction.rehearsals.length > 0 && config.text.rehearsalMarksDisplay === "on") {
+          mark(direction.partId, direction.measureNumber, { rehearsalMarks: true });
+        }
+        if (direction.words.length > 0 && config.text.wordsDisplay === "on") {
+          mark(direction.partId, direction.measureNumber, { words: true });
+        }
+      }
+    }
+    const NO_TEXT_NEEDS = {
+      chordSymbols: false,
+      rehearsalMarks: false,
+      words: false
+    };
+    const textNeedsAt = (partId, measureNumber) => textNeedsByMeasure.get(measureTextKey(partId, measureNumber)) ?? NO_TEXT_NEEDS;
+    const lyricVersesByStaff = /* @__PURE__ */ new Map();
+    const lyricVersesFor = (partId, staffNumber) => {
+      if (config.text.lyricsDisplay === "off") return [];
+      const key = `${partId}:${staffNumber}`;
+      const cached = lyricVersesByStaff.get(key);
+      if (cached !== void 0) return cached;
+      const part2 = score2.parts.find((p) => p.id === partId);
+      const verses = part2 === void 0 ? [] : lyricVerseNumbers(part2, staffNumber);
+      lyricVersesByStaff.set(key, verses);
+      return verses;
+    };
+    const southTextBand = (partIndex, staffNumber) => {
+      const part2 = score2.parts[partIndex];
+      if (part2 === void 0) return 0;
+      return lyricBandHeight(
+        lyricVersesFor(part2.id, staffNumber).length,
+        config.text.lyricGap,
+        config.text.lyricRowHeight,
+        theme.sizes.lyric
+      );
+    };
+    const rehearsalHeightFor = (partId, measureNumber) => {
+      let height = 0;
+      for (const direction of directions) {
+        if (direction.partId !== partId || direction.measureNumber !== measureNumber) continue;
+        for (const text of direction.rehearsals) {
+          height = Math.max(height, computeRehearsalMarkBox(text, theme.sizes.tempo).height);
+        }
+      }
+      return height;
+    };
+    const partNorthExtentCache = /* @__PURE__ */ new Map();
+    const partNorthExtent = (partIndex) => {
+      const cached = partNorthExtentCache.get(partIndex);
+      if (cached !== void 0) return cached;
+      const part2 = score2.parts[partIndex];
+      if (part2 === void 0) return 0;
+      let extent = 0;
+      for (const measure2 of part2.measures) {
+        const attrsOfMeasure = attributesByPartAndMeasure.get(`${part2.id}:${measure2.number}`);
+        const timeline = attributeChangesByPartAndMeasure.get(`${part2.id}:${measure2.number}`) ?? [];
+        extent = Math.max(
+          extent,
+          measureNorthExtent(measure2, 1, (tick) => {
+            const state = attributeStateAt(timeline, tick);
+            const spec = state !== void 0 ? clefSpecAt(state, 1) : void 0;
+            const { clefDef } = mapClef(
+              spec?.sign ?? attrsOfMeasure?.clefSign ?? "G",
+              spec?.line ?? attrsOfMeasure?.clefLine
+            );
+            return {
+              clefDef,
+              measureBottomY: 0,
+              midiInstrumentsByPart: midiInstrumentsByPartMap.get(part2.id),
+              theme
+            };
+          })
+        );
+      }
+      partNorthExtentCache.set(partIndex, extent);
+      return extent;
+    };
+    const northTextBandFor = (partIndex, staffNumber) => {
+      if (staffNumber !== 1) return 0;
+      const part2 = score2.parts[partIndex];
+      if (part2 === void 0) return 0;
+      let band = 0;
+      for (const measure2 of part2.measures) {
+        band = Math.max(
+          band,
+          northTextRows(
+            textNeedsAt(part2.id, measure2.number),
+            theme.sizes,
+            config.text,
+            rehearsalHeightFor(part2.id, measure2.number),
+            partNorthExtent(partIndex)
+          ).band
+        );
+      }
+      return band;
+    };
     for (const part2 of score2.parts) {
       const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part2.id);
       for (const measure2 of part2.measures) {
@@ -78894,6 +79380,14 @@ ${xrefOffset}
           if (hasBarNumber) {
             needed = Math.max(needed, BAR_NUMBER_GAP + theme.sizes.barNumber);
           }
+          const textBand = partIndex === 0 ? northTextRows(
+            textNeedsAt(part2.id, m.number),
+            theme.sizes,
+            config.text,
+            rehearsalHeightFor(part2.id, m.number),
+            partNorthExtent(partIndex)
+          ).band : 0;
+          needed = Math.max(needed, textBand);
           if (!hasTempoMark) return;
           const a = attributesByPartAndMeasure.get(`${part2.id}:${m.number}`);
           const timeline = attributeChangesByPartAndMeasure.get(`${part2.id}:${m.number}`) ?? [];
@@ -78903,7 +79397,7 @@ ${xrefOffset}
             const { clefDef } = mapClef(spec?.sign ?? a?.clefSign ?? "G", spec?.line ?? a?.clefLine);
             return { clefDef, measureBottomY: 0, midiInstrumentsByPart: midi, theme };
           });
-          needed = Math.max(needed, extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
+          needed = Math.max(needed, textBand + extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
         });
       });
       const specsForHeadroom = repeatMeasureSpecs();
@@ -78962,8 +79456,20 @@ ${xrefOffset}
         return best === void 0 ? stated : Math.max(best, stated);
       }, void 0);
       return lowerStaffHeight + computeStaffDistance(
-        upperSouth,
-        lowerNorth,
+        // Phase 55: a lyric row under the upper staff of a grand staff is
+        // content the gap between the two staves has to clear, exactly
+        // like a low note is -- so it is added to that staff's own
+        // southward reach before the skyline compares them.
+        //
+        // Only when the band is non-zero: `addToSkyline` takes the more
+        // EXTREME of the two y values, and for a 'north' skyline that is
+        // the SMALLER one -- so adding a zero-height segment to a staff
+        // with a genuinely tall north extent would collapse that extent
+        // to zero and shrink the gap instead of growing it.
+        withTextBand(upperSouth, southTextBand(partIndex, upperStaffNumber)),
+        // And the same for text above the lower staff (a chord symbol on
+        // a single-staff part whose staff happens to be staff 1).
+        withTextBand(lowerNorth, northTextBandFor(partIndex, lowerStaffNumber)),
         Math.max(config.staves.minStaffDistance, statedDistance ?? 0)
       );
     };
@@ -78971,14 +79477,26 @@ ${xrefOffset}
       const a = firstAttributesByPart.get(p.id);
       return Math.max(1, a?.staves ?? 1);
     });
-    const scoreLayout = computeSystemLayoutVariableGaps(partStaffCounts, staffDistanceForPair);
+    const partGapForPart = (partIndex) => {
+      const lastStaff = partStaffCounts[partIndex] ?? 1;
+      return DEFAULT_PART_GAP + southTextBand(partIndex, lastStaff) + northTextBandFor(partIndex + 1, 1);
+    };
+    const scoreLayout = computeSystemLayoutVariableGaps(
+      partStaffCounts,
+      staffDistanceForPair,
+      void 0,
+      partGapForPart
+    );
     const staffOffsetFor = (partIndex, staffIndexInPart) => scoreLayout.positions.find(
       (pos) => pos.partIndex === partIndex && pos.staffIndexInPart === staffIndexInPart
     )?.y ?? 0;
     const placementByMeasureNumber = /* @__PURE__ */ new Map();
     const systemOrigins = [];
     const lowestStaffOffset = scoreLayout.positions[scoreLayout.positions.length - 1]?.y ?? 0;
-    const systemHeight = SYSTEM_HEIGHT + aboveStaffPadding + lowestStaffOffset - trimAbove - trimBelow;
+    const systemBottomRoom = SYSTEM_HEIGHT - STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
+    const lastPartIndex = Math.max(0, score2.parts.length - 1);
+    const lastStaffSouthBand = southTextBand(lastPartIndex, partStaffCounts[lastPartIndex] ?? 1);
+    const systemHeight = SYSTEM_HEIGHT + aboveStaffPadding + lowestStaffOffset + Math.max(0, lastStaffSouthBand - systemBottomRoom) - trimAbove - trimBelow;
     const widthOf = (measureNumber) => measureLayoutsByNumber.get(measureNumber)?.width ?? MEASURE_WIDTH;
     let pageCount = 1;
     if (config.layout.mode === "page") {
@@ -79191,23 +79709,112 @@ ${xrefOffset}
         const measureTempoMarks = drawnTempoMarks.filter(
           (m) => m.partId === part2.id && m.measureNumber === measure2.number
         );
-        if (measureTempoMarks.length > 0) {
+        const measureHarmonies = config.text.chordSymbolsDisplay === "off" ? [] : harmonies.filter((h) => h.partId === part2.id && h.measureNumber === measure2.number);
+        const measureDirectionText = config.text.wordsDisplay === "off" && config.text.rehearsalMarksDisplay === "off" ? [] : partDirections.filter((d) => d.measureNumber === measure2.number);
+        const measureRehearsals = config.text.rehearsalMarksDisplay === "off" ? [] : measureDirectionText.flatMap(
+          (d) => d.rehearsals.map((text) => ({ text, tick: d.tick }))
+        );
+        const measureWords = config.text.wordsDisplay === "off" ? [] : measureDirectionText.flatMap((d) => d.words.map((text) => ({ text, tick: d.tick })));
+        const measureTextNeeds = {
+          chordSymbols: measureHarmonies.length > 0,
+          rehearsalMarks: measureRehearsals.length > 0,
+          words: measureWords.length > 0
+        };
+        const hasAboveText = measureTextNeeds.chordSymbols || measureTextNeeds.rehearsalMarks || measureTextNeeds.words;
+        if (measureTempoMarks.length > 0 || hasAboveText) {
           const noteAreaX = noteAreaXOf(layout.x, measure2.number);
           const noteAreaWidth = layout.x + layout.width - noteAreaX;
           const measureTotalTicks = attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
           const { topStaffY } = topStaff();
           const northExtent = topStaffNorthExtent();
+          const rows = northTextRows(
+            measureTextNeeds,
+            theme.sizes,
+            config.text,
+            measureRehearsals.reduce(
+              (height, mark) => Math.max(height, computeRehearsalMarkBox(mark.text, theme.sizes.tempo).height),
+              0
+            ),
+            // The PART-wide extent, not this measure's: the rows hold one
+            // line across the whole part (see northTextRows), so a bar with
+            // a high melody note moves nothing and collides with nothing.
+            hasAboveText ? partNorthExtent(partIndex) : northExtent
+          );
+          const rowY = (offset) => offset === void 0 ? void 0 : topStaffY - offset - rows.shift;
+          const chordSymbolY = rowY(rows.chordSymbolOffset);
+          const wordsY = rowY(rows.wordsOffset);
+          const rehearsalY = rowY(rows.rehearsalOffset);
+          const textXFor = (tick) => noteAreaX + tick / (measureTotalTicks || 1) * noteAreaWidth;
+          if (chordSymbolY !== void 0) {
+            for (const harmony of measureHarmonies) {
+              if (harmony.rootStep === void 0) continue;
+              const layoutOfSymbol = chordSymbolLayout(
+                { ...harmony, rootStep: harmony.rootStep },
+                theme.sizes.chordSymbol
+              );
+              if (layoutOfSymbol.unsupportedKind !== void 0) {
+                diagnostics.push({
+                  severity: "info",
+                  code: "UNSUPPORTED_CHORD_KIND",
+                  message: `A <harmony> with <kind>${layoutOfSymbol.unsupportedKind}</kind> has no drawable spelling in this engine, so it was not drawn. MusicXML's <kind text="..."> attribute, or one of the named kinds, draws.`,
+                  location: { partId: part2.id, measureNumber: measure2.number }
+                });
+                continue;
+              }
+              if (layoutOfSymbol.parts.length === 0) continue;
+              const x2 = textXFor(harmony.tick);
+              svgParts.push(
+                renderChordSymbol(layoutOfSymbol, x2 - layoutOfSymbol.width / 2, chordSymbolY, {
+                  textFont: theme.textFont,
+                  musicFont: theme.musicFont,
+                  fontSize: theme.sizes.chordSymbol,
+                  color: theme.colorOf("chordSymbol")
+                })
+              );
+            }
+          }
+          if (wordsY !== void 0) {
+            for (const word of measureWords) {
+              svgParts.push(
+                renderWords(word.text, textXFor(word.tick), wordsY, {
+                  fontFamily: theme.textFont,
+                  fontSize: theme.sizes.tempo,
+                  color: theme.colorOf("text"),
+                  anchor: "middle",
+                  italic: true
+                })
+              );
+            }
+          }
+          if (rehearsalY !== void 0) {
+            for (const mark of measureRehearsals) {
+              svgParts.push(
+                renderRehearsalMark(mark.text, textXFor(mark.tick), rehearsalY, {
+                  box: computeRehearsalMarkBox(mark.text, theme.sizes.tempo),
+                  fontFamily: theme.textFont,
+                  fontSize: theme.sizes.tempo,
+                  color: theme.colorOf("rehearsalMark"),
+                  frameColor: theme.colorOf("rehearsalMark")
+                })
+              );
+            }
+          }
           for (const mark of measureTempoMarks) {
             const dotGlyph = mark.beatUnitDots > 0 ? metronomeDotGlyphName() : void 0;
-            const eventX = noteAreaX + mark.tick / (measureTotalTicks || 1) * noteAreaWidth;
+            const eventX = textXFor(mark.tick);
             svgParts.push(
               renderMetronomeMark(metronomeNoteGlyphName(mark.beatUnit), dotGlyph, mark.perMinute, {
                 x: eventX,
                 // tempoMarkSide() is always 'above'. The clearance is
                 // measured from whatever this measure's content actually
                 // reaches (stems and beams included), not from the staff
-                // line -- see the note where northExtent is computed.
-                y: topStaffY - northExtent - TEMPO_MARK_GAP,
+                // line -- see the note where northExtent is computed -- and
+                // then from the TOP of the text band, since the chord
+                // symbols now occupy the space immediately above the staff.
+                // With text above the staff, the tempo mark clears the whole
+                // text stack; with none, it keeps its own long-standing
+                // clearance from the measure's content extent.
+                y: topStaffY - (hasAboveText ? rows.band : northExtent) - TEMPO_MARK_GAP,
                 color: theme.colorOf("tempo"),
                 musicFont: theme.musicFont,
                 textFont: theme.textFont,
@@ -79801,6 +80408,75 @@ ${xrefOffset}
               message: `Clef "${attrs.clefSign}" does not position notes by pitch; skipping notes in this measure.`,
               location: { partId: part2.id, measureNumber: measure2.number }
             });
+          }
+          {
+            const verses = lyricVersesFor(part2.id, staffNumber);
+            if (verses.length > 0) {
+              const lyricNoteAreaX = Math.max(noteAreaXOf(layout.x, measure2.number), cursorX);
+              const lyricFallbackWidth = layout.x + layout.width - lyricNoteAreaX;
+              const measureTotalTicksForLyrics = measureTicksByNumber.get(measure2.number) ?? TICKS_PER_QUARTER * 4;
+              const hyphenWidth = glyphWidthOf(lyricHyphenGlyphName()) * (theme.sizes.lyric / 4);
+              const elisionWidth = glyphWidthOf(lyricElisionGlyphName()) * (theme.sizes.lyric / 4);
+              for (const [rowIndex, verse] of verses.entries()) {
+                const boxes = [];
+                const seenTicks = /* @__PURE__ */ new Set();
+                for (const voice2 of measure2.voices) {
+                  const starts = eventStartTicks(voice2.events);
+                  voice2.events.forEach((event, index) => {
+                    if ((event.staff ?? 1) !== staffNumber) return;
+                    const notes = event.kind === "note" ? [event] : event.kind === "chord" ? event.notes : [];
+                    const syllables = notes.flatMap((note2) => note2.lyrics ?? []).filter((candidate) => candidate.number === verse && candidate.text.length > 0);
+                    if (syllables.length === 0) return;
+                    const tick = starts[index] ?? 0;
+                    if (seenTicks.has(tick)) return;
+                    seenTicks.add(tick);
+                    const realX = measureLayoutsByNumber.get(measure2.number)?.positionsByTick.get(tick);
+                    const x2 = lyricNoteAreaX + (realX ?? tick / (measureTotalTicksForLyrics || 1) * lyricFallbackWidth);
+                    for (const syllable of syllables) {
+                      boxes.push({
+                        text: syllable.text,
+                        x: x2,
+                        width: estimateTextWidth(syllable.text, theme.sizes.lyric),
+                        ...syllable.syllabic !== void 0 ? { syllabic: syllable.syllabic } : {},
+                        extend: syllable.extend,
+                        // Where a melisma runs to when nothing follows it in
+                        // this row: the measure's own last ink, not its
+                        // barline -- a line that touches the barline reads as
+                        // a barline, not as a melisma.
+                        melismaEndX: layout.x + layout.width - MEASURE_TRAILING_MARGIN
+                      });
+                    }
+                  });
+                }
+                if (boxes.length === 0) continue;
+                boxes.sort((a, b) => a.x - b.x);
+                const items = layoutLyricRow(boxes, {
+                  hyphenWidth,
+                  elisionWidth,
+                  punctuationGap: 0.25
+                });
+                svgParts.push(
+                  renderLyricRow(
+                    items,
+                    lyricRowBaselineY(
+                      bottomY,
+                      rowIndex,
+                      config.text.lyricGap,
+                      config.text.lyricRowHeight
+                    ),
+                    {
+                      fontFamily: config.fonts.lyricFont,
+                      fontSize: theme.sizes.lyric,
+                      musicFont: theme.musicFont,
+                      color: theme.colorOf("lyric"),
+                      hyphenWidth,
+                      elisionWidth,
+                      lineThickness: lineWidth(theme, void 0, "lyricLineThickness", 0.16)
+                    }
+                  )
+                );
+              }
+            }
           }
         });
         const nextAttrs = attributesByPartAndMeasure.get(`${part2.id}:${measure2.number + 1}`);

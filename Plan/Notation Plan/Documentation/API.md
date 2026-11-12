@@ -405,7 +405,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-637 exported symbols, by module.
+662 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -433,6 +433,7 @@ The diagnostics `level` lets through, in their original order.
 | interface | `PageConfig` | §16.2's own requirement: "page geometry (size, margins) comes from `config.page`." Defaults match a standard A4 page in staff spaces at a typical engraving scale (roughly 7mm per staff space, the same scale most notation software defaults to) -- a reasonable starting point, fully overridable, the... |
 | interface | `DrumMapEntryOverride` | §13.3: every field of the default GM percussion table (`DEFAULT_DRUM_MAPPING_TABLE`, in `drums/drum-map.ts`) is overridable here, keyed by GM MIDI note number -- "the default table is a starting point, not a constraint: house styles differ on which line a tom sits on, and the user must be able to... |
 | interface | `DrumsConfig` |  |
+| interface | `TextConfig` | §19.10 named ONE gap hit in four places: lyrics, chord symbols, rehearsal marks and `<words>` directions were all parsed and preserved but never drawn, because none of them is a single SMuFL glyph. |
 | type | `LogLevel` | §18.3's own severity ladder. |
 | interface | `DebugConfig` |  |
 | interface | `EngineConfig` |  |
@@ -741,6 +742,10 @@ The diagnostics `level` lets through, in their original order.
 | function | `chordSymbolAccidentalGlyphName` | The chord-symbol-specific accidental glyph for a root note's alter -- a REAL, separate glyph set from §9.11's plain notehead accidentals (`csymAccidentalSharp` vs `accidentalSharp`), confirmed by checking `glyphnames.json` rather than assuming the two could be shared. |
 | type | `ChordSymbolQuality` |  |
 | function | `chordSymbolQualityGlyphName` | The real SMuFL glyph for one of the five chord qualities that have a dedicated symbol. |
+| type | `ChordSymbolPart` | One drawable piece of a chord symbol, in left-to-right order. |
+| interface | `ChordSymbolSource` | A `<harmony>`'s musical content, as the parser preserved it (§10.4). |
+| interface | `ChordSymbolLayout` |  |
+| function | `chordSymbolLayout` | Assembles a `<harmony>` into the ordered parts that draw it: root letter, root accidental, quality suffix, then `slash bass` if the file states one. |
 
 ### `src/geometry/clef.ts`
 
@@ -773,6 +778,8 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | function | `tempoMarkSide` | §9.21's placement rule -- confirmed directly (Finale's own tutorial: "common practice to place the tempo marking above only the top staff"). |
 | function | `rehearsalMarkSide` | §9.21's placement rule for rehearsal marks -- near-universal convention (boxed or circled letter/number, above the staff). |
+| interface | `RehearsalMarkBox` | The box around a rehearsal mark, in staff spaces. |
+| function | `computeRehearsalMarkBox` | Sizes the frame around `text`. |
 
 ### `src/geometry/fermata.ts`
 
@@ -835,6 +842,11 @@ The diagnostics `level` lets through, in their original order.
 | function | `computeHyphenX` | The centered X for a hyphen between two syllables -- simple midpoint, matching the real convention ("the hyphen will be centered between the syllables"). |
 | interface | `ExtenderLineShape` |  |
 | function | `computeExtenderLine` | A melisma extender line's endpoints -- genuinely drawn geometry (no SMuFL glyph represents an arbitrary-length line), using Bravura's real `lyricLineThickness` (0.16sp) for its stroke width at render time, the same reasoning already applied to hairpins (§9.21), ties (§9.15), and slurs (§9.16). |
+| interface | `LyricSyllableBox` | One syllable as it reaches the row layout: where its note is, how wide the syllable draws, and the two facts that decide the punctuation around it (`<syllabic>`, `<extend/>`). |
+| type | `LyricRenderItem` | One thing a lyric row draws, already positioned in staff spaces. |
+| interface | `LyricRowOptions` |  |
+| function | `layoutLyricRow` | Lays out one verse's syllables left to right, adding the punctuation §9.22 specifies: a hyphen between two syllables of the same word, an elision between two syllables sung on one note, and an extender line for a melisma. |
+| function | `lyricRowBaselineY` | The baseline y of lyric verse `rowIndex` (0-based) below a staff's bottom line. |
 
 ### `src/geometry/metronome.ts`
 
@@ -1083,6 +1095,7 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | interface | `PartStaffPosition` |  |
 | interface | `SystemLayout` |  |
+| const | `DEFAULT_PART_GAP` | The gap between two PARTS in the same system, exported because a caller that has to grow it for its own content (Phase 55's lyric rows below one part and chord symbols above the next) needs the floor it is growing FROM, not a second copy of the number. |
 | function | `computeSystemLayout` | §9.18's vertical stacking: every part's own staff (or staves, for a braced multi-staff part -- geometry's `needsBrace`) gets a distinct, non-overlapping Y, parts stacked top to bottom in score order. |
 | function | `computeSystemLayoutVariableGaps` | Phase 44 wiring: the same vertical stacking as `computeSystemLayout`, but the gap AFTER a given staff (before the next staff within the same part) is supplied per-pair by `staffGapForPair`, rather than one fixed value applied everywhere. |
 
@@ -1467,6 +1480,13 @@ The diagnostics `level` lets through, in their original order.
 | interface | `RenderBeamOptions` |  |
 | function | `renderBeam` | Draws every beam line a group gets. |
 
+### `src/render/chord-symbol.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `RenderChordSymbolOptions` |  |
+| function | `renderChordSymbol` | Draws one assembled chord symbol, left to right, starting at `x`. |
+
 ### `src/render/clef.ts`
 
 | | Name | Summary |
@@ -1492,6 +1512,15 @@ The diagnostics `level` lets through, in their original order.
 | interface | `OverlaySkyline` |  |
 | interface | `RenderSkylineOverlayOptions` |  |
 | **API** | `renderSkylineOverlay` | Both sides of every staff's skyline, in one `<g class="debug-skyline">`. |
+
+### `src/render/expression-mark.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `RenderRehearsalMarkOptions` |  |
+| function | `renderRehearsalMark` | One rehearsal mark: its letter or number, centred in a rectangle. |
+| interface | `RenderWordsOptions` |  |
+| function | `renderWords` | One `<words>` direction -- "Allegro", "dolce", "play twice" -- as text. |
 
 ### `src/render/flag.ts`
 
@@ -1529,6 +1558,8 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | interface | `RenderExtenderLineOptions` |  |
 | function | `renderExtenderLine` | Draws a melisma extender line as a plain horizontal segment. |
+| interface | `RenderLyricRowOptions` |  |
+| function | `renderLyricRow` | Draws one verse's row of lyric items at `y`, which is the row's text BASELINE: syllables, their hyphens and elisions, and any extender lines. |
 
 ### `src/render/mark.ts`
 
@@ -1612,6 +1643,15 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | interface | `RenderTabNumberOptions` |  |
 | function | `renderTabNumber` | Draws a fret number on its string's line: a background-coloured mask to interrupt the line, then the digit glyphs centred over it. |
+
+### `src/render/text.ts`
+
+| | Name | Summary |
+|---|---|---|
+| type | `TextAnchor` | §19.10's gap, closed: how an ARBITRARY run of ordinary text is drawn. |
+| interface | `RenderTextOptions` |  |
+| function | `renderText` | One text run, as a single `<text>` element. |
+| function | `renderTextScaledGlyph` | One SMuFL glyph drawn at TEXT scale rather than at the 4x convention. |
 
 ### `src/render/tie.ts`
 

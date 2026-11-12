@@ -9,7 +9,13 @@ export interface SystemLayout {
 }
 
 const DEFAULT_STAFF_GAP = 8;
-const DEFAULT_PART_GAP = 12;
+/**
+ * The gap between two PARTS in the same system, exported because a caller
+ * that has to grow it for its own content (Phase 55's lyric rows below
+ * one part and chord symbols above the next) needs the floor it is
+ * growing FROM, not a second copy of the number.
+ */
+export const DEFAULT_PART_GAP = 12;
 
 /**
  * §9.18's vertical stacking: every part's own staff (or staves, for a
@@ -51,6 +57,13 @@ export function computeSystemLayoutVariableGaps(
   partStaffCounts: readonly number[],
   staffGapForPair: (partIndex: number, staffIndexInPart: number) => number,
   partGap: number = DEFAULT_PART_GAP,
+  /**
+   * Phase 55: the gap AFTER each part, when it differs per part. A lyric
+   * row under part 1 and a chord symbol above part 2 both live in the
+   * same space, and one shared number cannot hold both. Omitted means
+   * `partGap` for every part, so every existing caller is unaffected.
+   */
+  partGapForPart?: (partIndex: number) => number,
 ): SystemLayout {
   const positions: PartStaffPosition[] = [];
   let y = 0;
@@ -61,7 +74,7 @@ export function computeSystemLayoutVariableGaps(
         y += staffGapForPair(partIndex, staffIndexInPart);
       }
     }
-    y += partGap;
+    y += partGapForPart === undefined ? partGap : partGapForPart(partIndex);
   });
   return { positions };
 }

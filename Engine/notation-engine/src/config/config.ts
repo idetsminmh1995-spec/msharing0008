@@ -385,6 +385,35 @@ export interface DrumsConfig {
   readonly closedHiHatPulse?: 'as-written' | 'quarter-to-eighths';
 }
 
+// ---- the text layer (Phase 55, §19.10) ----
+
+/**
+ * §19.10 named ONE gap hit in four places: lyrics, chord symbols,
+ * rehearsal marks and `<words>` directions were all parsed and preserved
+ * but never drawn, because none of them is a single SMuFL glyph. This
+ * section is the switchboard for the text layer that closed it.
+ *
+ * Flat rather than nested on purpose: `resolveConfig` merges each
+ * section with one spread, and a nested object would need a hand-written
+ * sub-merge (as `fonts.sizes` has) for no benefit -- these seven fields
+ * are independent.
+ *
+ * `gap` is measured from the staff line the text hangs off: below the
+ * bottom line for lyrics, above the top line for chord symbols, both in
+ * staff spaces and both to the text's BASELINE. `rowHeight` is the
+ * baseline-to-baseline step between two verses, so a score with two
+ * verses reserves exactly twice the room rather than overlapping them.
+ */
+export interface TextConfig {
+  readonly lyricsDisplay: 'on' | 'off';
+  readonly lyricGap: number;
+  readonly lyricRowHeight: number;
+  readonly chordSymbolsDisplay: 'on' | 'off';
+  readonly chordSymbolGap: number;
+  readonly rehearsalMarksDisplay: 'on' | 'off';
+  readonly wordsDisplay: 'on' | 'off';
+}
+
 // ---- debug (Phase 51, §18.3) ----
 
 /**
@@ -425,6 +454,7 @@ export interface EngineConfig {
   readonly staves: StavesConfig;
   readonly page: PageConfig;
   readonly drums: DrumsConfig;
+  readonly text: TextConfig;
   readonly debug: DebugConfig;
 }
 
@@ -445,6 +475,7 @@ export interface PartialEngineConfig {
   readonly staves?: Partial<StavesConfig>;
   readonly page?: Partial<PageConfig>;
   readonly drums?: Partial<DrumsConfig>;
+  readonly text?: Partial<TextConfig>;
   readonly debug?: Partial<DebugConfig>;
 }
 
@@ -542,6 +573,21 @@ export const DEFAULT_CONFIG: EngineConfig = {
     marginRight: 2.5,
   },
   drums: {},
+  text: {
+    lyricsDisplay: 'on',
+    // 2.2 staff spaces below the bottom line to the first verse's
+    // baseline. The staff's own descender room plus a lyric's ascender
+    // is what this clears; it is the same order as the 2.5 used for a
+    // dynamic, which sits in the same band under the staff.
+    lyricGap: 2.2,
+    // One lyric line of 1.8 plus a little air, so two verses do not
+    // touch. MuseScore's own lyric line spacing is ~1.4x the text size.
+    lyricRowHeight: 2.6,
+    chordSymbolsDisplay: 'on',
+    chordSymbolGap: 1.0,
+    rehearsalMarksDisplay: 'on',
+    wordsDisplay: 'on',
+  },
   debug: {
     // 'info' keeps every diagnostic the engine produces, which is what
     // every caller got before this section existed -- a filter whose
@@ -586,6 +632,7 @@ export function resolveConfig(overrides?: PartialEngineConfig): EngineConfig {
     staves: { ...DEFAULT_CONFIG.staves, ...overrides?.staves },
     page: { ...DEFAULT_CONFIG.page, ...overrides?.page },
     drums: { ...DEFAULT_CONFIG.drums, ...overrides?.drums },
+    text: { ...DEFAULT_CONFIG.text, ...overrides?.text },
     debug: { ...DEFAULT_CONFIG.debug, ...overrides?.debug },
   };
 }

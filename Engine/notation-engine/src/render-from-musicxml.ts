@@ -64,6 +64,15 @@ import {
   type AccidentalState,
   type BarlineType,
   type BeamStyle as BeamStyleOption,
+  chordSymbolLayout,
+  computeRehearsalMarkBox,
+  layoutLyricRow,
+  lyricRowBaselineY,
+  lyricHyphenGlyphName,
+  lyricElisionGlyphName,
+  estimateTextWidth,
+  TEXT_ASCENT_PER_EM,
+  type LyricSyllableBox,
 } from './geometry/index.js';
 import {
   expandClosedHiHatQuarterNotesToEighthPulse,
@@ -77,6 +86,8 @@ import {
   emptySkyline,
   addToSkyline,
   computeStaffDistance,
+  DEFAULT_PART_GAP,
+  type Skyline,
 } from './layout/index.js';
 import { fretDigitGlyphNames, tabStringPosition } from './geometry/index.js';
 import { metronomeNoteGlyphName, metronomeDotGlyphName } from './geometry/metronome.js';
@@ -117,6 +128,7 @@ import {
   type NoteheadMappingConfig,
   type PartialEngineConfig,
   type SpacingConfig,
+  type TextConfig,
 } from './config/index.js';
 import { computePageLayout, type PageMeasureInput } from './layout/index.js';
 import { measure as makeMeasure } from './core/index.js';
@@ -153,6 +165,10 @@ import {
   renderTupletNumber,
   renderTimeSignature,
   noteheadWidth,
+  renderChordSymbol,
+  renderLyricRow,
+  renderRehearsalMark,
+  renderWords,
 } from './render/index.js';
 
 const STAFF_LINES = 5;
@@ -211,7 +227,15 @@ export type ColorCategory =
   | 'tempo'
   | 'barNumber'
   | 'tabNumber'
-  | 'volta';
+  | 'volta'
+  // Phase 55/§19.10: the text layer. Each is its own category because
+  // they are drawn from two different fonts (a lyric's words and a
+  // chord symbol's root are ordinary text; the punctuation between them
+  // is SMuFL) and a host may well want them coloured differently.
+  | 'lyric'
+  | 'chordSymbol'
+  | 'rehearsalMark'
+  | 'text';
 
 /**
  * Phase 50/§8: the drawing values the renderer reads, resolved ONCE from
@@ -595,6 +619,22 @@ const TUPLET_BRACKET_THICKNESS_FALLBACK = 0.16;
  */
 const DYNAMIC_GAP = 2.5;
 const HAIRPIN_THICKNESS_FALLBACK = 0.16;
+
+/**
+ * Phase 55/§19.10: how far one above-staff TEXT item sits above whatever
+ * is already stacked at that x. The same kind of chosen constant as
+ * DYNAMIC_GAP above -- §9.21 specifies that these marks go above the
+ * staff, not the distance between them.
+ */
+const TEXT_MARK_GAP = 1.2;
+
+/**
+ * Phase 55: clear space between a chord symbol's own ascenders and the
+ * next thing stacked above it (a tempo mark or a `<words>` direction).
+ * Without it the chord symbol's `maj7` and the tempo mark's note-value
+ * glyph interleave.
+ */
+const CHORD_SYMBOL_STACK_CLEARANCE = 0.4;
 
 /**
  * Phase 44 wiring: the single most extreme staff-position value any note
@@ -3000,6 +3040,141 @@ function renderSpans(
  * collisions (K).
  */
 /**
+ * Phase 55/§19.10: the text a single measure carries ABOVE its staves.
+ *
+ * Three separate facts because they stack in a fixed order and each has
+ * its own size, so "there is text above this bar" is not enough to
+ * reserve room with.
+ */
+interface MeasureTextNeeds {
+  readonly chordSymbols: boolean;
+  readonly rehearsalMarks: boolean;
+  readonly words: boolean;
+}
+
+/**
+ * The verse numbers a part's staff actually uses, ascending -- which is
+ * also the row order a lyric block is drawn in (verse 1 nearest the
+ * staff, verse 2 below it, ...).
+ */
+function lyricVerseNumbers(
+  part: { readonly measures: readonly Measure[] },
+  staffNumber: number,
+): readonly number[] {
+  const verses = new Set<number>();
+  for (const measure of part.measures) {
+    for (const voice of measure.voices) {
+      for (const event of voice.events) {
+        if ((event.staff ?? 1) !== staffNumber) continue;
+        const notes = event.kind === 'note' ? [event] : event.kind === 'chord' ? event.notes : [];
+        for (const note of notes) {
+          for (const syllable of note.lyrics ?? []) verses.add(syllable.number);
+        }
+      }
+    }
+  }
+  return [...verses].sort((a, b) => a - b);
+}
+
+/**
+ * How far below a staff's bottom line its lyric block reaches, in staff
+ * spaces: the gap to verse 1's baseline, one row per further verse, and
+ * the descenders of the last row.
+ */
+function lyricBandHeight(
+  verseCount: number,
+  gap: number,
+  rowHeight: number,
+  fontSize: number,
+): number {
+  if (verseCount <= 0) return 0;
+  return gap + (verseCount - 1) * rowHeight + fontSize * 0.35;
+}
+
+/**
+ * Phase 55: where the above-staff text rows sit, as offsets ABOVE the
+ * staff's top line, plus how far the whole stack has to be pushed up to
+ * clear the measure's own content.
+ *
+ * One calculation, used twice: the drawing pass reads the offsets, and
+ * the layout pass reads `band` to reserve room for them. They cannot
+ * disagree because there is only one of them.
+ *
+ * The offsets are FIXED per part, not per measure. A chord symbol that
+ * jumped up and down with each bar's highest melody note would read as
+ * badly engraved -- chord symbols belong on a line, the way a lyric row
+ * does -- so the caller passes the part's own worst-case content extent
+ * (`partNorthExtent`), and the stack sits still across the whole part.
+ * The one thing that moves it is content that would otherwise collide.
+ */
+interface NorthTextRows {
+  /** Baseline offset above the top line, when this measure has chord symbols. */
+  readonly chordSymbolOffset: number | undefined;
+  readonly wordsOffset: number | undefined;
+  readonly rehearsalOffset: number | undefined;
+  /** Total band above the top line, shift included -- what layout reserves. */
+  readonly band: number;
+  /** How far the stack was pushed up to clear content. */
+  readonly shift: number;
+}
+
+function northTextRows(
+  needs: MeasureTextNeeds,
+  sizes: FontSizeConfig,
+  textConfig: TextConfig,
+  rehearsalHeight: number,
+  northExtent: number,
+): NorthTextRows {
+  // No text, no band and no shift -- the caller's own `northExtent` is
+  // not this function's business when there is nothing to place above it.
+  if (!needs.chordSymbols && !needs.words && !needs.rehearsalMarks) {
+    return {
+      chordSymbolOffset: undefined,
+      wordsOffset: undefined,
+      rehearsalOffset: undefined,
+      band: 0,
+      shift: 0,
+    };
+  }
+  let offset = 0;
+  let chordSymbolOffset: number | undefined;
+  let wordsOffset: number | undefined;
+  let rehearsalOffset: number | undefined;
+  if (needs.chordSymbols) {
+    chordSymbolOffset = textConfig.chordSymbolGap;
+    offset =
+      chordSymbolOffset + sizes.chordSymbol * TEXT_ASCENT_PER_EM + CHORD_SYMBOL_STACK_CLEARANCE;
+  }
+  if (needs.words) {
+    wordsOffset = offset + TEXT_MARK_GAP;
+    offset = wordsOffset + sizes.tempo * TEXT_ASCENT_PER_EM;
+  }
+  if (needs.rehearsalMarks) {
+    rehearsalOffset = offset + TEXT_MARK_GAP;
+    offset = rehearsalOffset + rehearsalHeight;
+  }
+  // The LOWEST row is the one that meets the music, so it is the one that
+  // decides how far the stack moves. Everything above moves with it, so
+  // the rows keep their own spacing.
+  const lowest = chordSymbolOffset ?? wordsOffset ?? rehearsalOffset ?? 0;
+  const shift = Math.max(0, northExtent + CHORD_SYMBOL_STACK_CLEARANCE - lowest);
+  return { chordSymbolOffset, wordsOffset, rehearsalOffset, band: offset + shift, shift };
+}
+
+/**
+ * Phase 55: a staff's own extent, plus whatever text band hangs off it.
+ *
+ * `addToSkyline` takes the MORE EXTREME of two y values, so adding a
+ * zero band is not a no-op on a north skyline (where "extreme" is the
+ * smaller number) -- it would collapse a genuinely tall extent to zero.
+ * Hence the guard: no band, no change.
+ */
+function withTextBand(skyline: Skyline, band: number): Skyline {
+  if (!(band > 0)) return skyline;
+  return addToSkyline(skyline, { xStart: 0, xEnd: 1, y: band });
+}
+
+/**
  * Phase 53/§18.1: render a score that has ALREADY been parsed.
  *
  * §18.1's own performance strategy says "the `Score` and layout result
@@ -3027,6 +3202,7 @@ export function renderParsedMusicXml(
     tempoMarks,
     midiInstrumentsByPart: midiInstrumentsByPartMap,
     directions,
+    harmonies,
     prints,
     defaults: fileDefaults,
   } = parsed;
@@ -3053,6 +3229,159 @@ export function renderParsedMusicXml(
   // Phase 50/§8: one resolution of every user-facing drawing value, passed
   // down on RenderCtx. Everything below reads `theme`, never a constant.
   const theme = buildTheme(config, fileDefaults);
+
+  // ---- Phase 55/§19.10: the text layer's own bookkeeping ---------------
+  //
+  // All of it is computed BEFORE layout, because layout's vertical
+  // reservations depend on it. A lyric row discovered only while drawing
+  // would already have been given no room and would print over the next
+  // system -- which is exactly why §9.22 refused to draw floating
+  // hyphens with no words: a half-drawn row is worse than none.
+  const measureTextKey = (partId: string, measureNumber: number): string =>
+    `${partId}:${measureNumber}`;
+  const textNeedsByMeasure = new Map<string, MeasureTextNeeds>();
+  {
+    const mark = (
+      partId: string,
+      measureNumber: number,
+      update: Partial<MeasureTextNeeds>,
+    ): void => {
+      const key = measureTextKey(partId, measureNumber);
+      const existing = textNeedsByMeasure.get(key) ?? {
+        chordSymbols: false,
+        rehearsalMarks: false,
+        words: false,
+      };
+      textNeedsByMeasure.set(key, { ...existing, ...update });
+    };
+    if (config.text.chordSymbolsDisplay === 'on') {
+      for (const harmony of harmonies) {
+        mark(harmony.partId, harmony.measureNumber, { chordSymbols: true });
+      }
+    }
+    for (const direction of directions) {
+      if (direction.rehearsals.length > 0 && config.text.rehearsalMarksDisplay === 'on') {
+        mark(direction.partId, direction.measureNumber, { rehearsalMarks: true });
+      }
+      if (direction.words.length > 0 && config.text.wordsDisplay === 'on') {
+        mark(direction.partId, direction.measureNumber, { words: true });
+      }
+    }
+  }
+  const NO_TEXT_NEEDS: MeasureTextNeeds = {
+    chordSymbols: false,
+    rehearsalMarks: false,
+    words: false,
+  };
+  const textNeedsAt = (partId: string, measureNumber: number): MeasureTextNeeds =>
+    textNeedsByMeasure.get(measureTextKey(partId, measureNumber)) ?? NO_TEXT_NEEDS;
+
+  /** The verse numbers each (part, staff) uses, cached: the same scan runs for layout and for drawing. */
+  const lyricVersesByStaff = new Map<string, readonly number[]>();
+  const lyricVersesFor = (partId: string, staffNumber: number): readonly number[] => {
+    if (config.text.lyricsDisplay === 'off') return [];
+    const key = `${partId}:${staffNumber}`;
+    const cached = lyricVersesByStaff.get(key);
+    if (cached !== undefined) return cached;
+    const part = score.parts.find((p) => p.id === partId);
+    const verses = part === undefined ? [] : lyricVerseNumbers(part, staffNumber);
+    lyricVersesByStaff.set(key, verses);
+    return verses;
+  };
+
+  /** How far below one staff its lyric block reaches. */
+  const southTextBand = (partIndex: number, staffNumber: number): number => {
+    const part = score.parts[partIndex];
+    if (part === undefined) return 0;
+    return lyricBandHeight(
+      lyricVersesFor(part.id, staffNumber).length,
+      config.text.lyricGap,
+      config.text.lyricRowHeight,
+      theme.sizes.lyric,
+    );
+  };
+
+  /** The tallest rehearsal-mark frame in one measure, which is what the stack has to clear. */
+  const rehearsalHeightFor = (partId: string, measureNumber: number): number => {
+    let height = 0;
+    for (const direction of directions) {
+      if (direction.partId !== partId || direction.measureNumber !== measureNumber) continue;
+      for (const text of direction.rehearsals) {
+        height = Math.max(height, computeRehearsalMarkBox(text, theme.sizes.tempo).height);
+      }
+    }
+    return height;
+  };
+
+  /**
+   * The part's own worst-case northward reach above staff 1, stems and
+   * beams included -- the SAME over-estimate `measureNorthExtent` already
+   * makes for tempo marks, but taken across the whole part so the text
+   * stack cannot move from bar to bar.
+   *
+   * Memoized, and only ever called for a part that actually carries text,
+   * so a score with no chord symbols or directions never pays for it.
+   */
+  const partNorthExtentCache = new Map<number, number>();
+  const partNorthExtent = (partIndex: number): number => {
+    const cached = partNorthExtentCache.get(partIndex);
+    if (cached !== undefined) return cached;
+    const part = score.parts[partIndex];
+    if (part === undefined) return 0;
+    let extent = 0;
+    for (const measure of part.measures) {
+      const attrsOfMeasure = attributesByPartAndMeasure.get(`${part.id}:${measure.number}`);
+      const timeline = attributeChangesByPartAndMeasure.get(`${part.id}:${measure.number}`) ?? [];
+      extent = Math.max(
+        extent,
+        measureNorthExtent(measure, 1, (tick) => {
+          const state = attributeStateAt(timeline, tick);
+          const spec = state !== undefined ? clefSpecAt(state, 1) : undefined;
+          const { clefDef } = mapClef(
+            spec?.sign ?? attrsOfMeasure?.clefSign ?? 'G',
+            spec?.line ?? attrsOfMeasure?.clefLine,
+          );
+          return {
+            clefDef,
+            measureBottomY: 0,
+            midiInstrumentsByPart: midiInstrumentsByPartMap.get(part.id),
+            theme,
+          };
+        }),
+      );
+    }
+    partNorthExtentCache.set(partIndex, extent);
+    return extent;
+  };
+
+  /**
+   * How far above one staff its chord symbols / `<words>` / rehearsal
+   * marks reach. Only staff 1 carries them: a `<harmony>` is parsed
+   * without a staff number (MusicXML's optional `staff` attribute on it
+   * is not read), and a `<words>` direction's own `staff` is honoured
+   * where it is drawn, but chord symbols and rehearsal marks belong
+   * above the top staff of the system in every score this engine has
+   * been tested on.
+   */
+  const northTextBandFor = (partIndex: number, staffNumber: number): number => {
+    if (staffNumber !== 1) return 0;
+    const part = score.parts[partIndex];
+    if (part === undefined) return 0;
+    let band = 0;
+    for (const measure of part.measures) {
+      band = Math.max(
+        band,
+        northTextRows(
+          textNeedsAt(part.id, measure.number),
+          theme.sizes,
+          config.text,
+          rehearsalHeightFor(part.id, measure.number),
+          partNorthExtent(partIndex),
+        ).band,
+      );
+    }
+    return band;
+  };
   // Collect lookup warnings once per score event instead of in the shared
   // resolver, which is called by layout and drawing. This also gives each
   // warning its source measure even when layout performs the first lookup.
@@ -3592,6 +3921,20 @@ export function renderParsedMusicXml(
           // over-estimate of how far above it they reach.
           needed = Math.max(needed, BAR_NUMBER_GAP + theme.sizes.barNumber);
         }
+        // Phase 55: only the TOP part's text layer sits against the top
+        // of the system; every other part's is absorbed by the gap above
+        // it (see `partGapForPart`).
+        const textBand =
+          partIndex === 0
+            ? northTextRows(
+                textNeedsAt(part.id, m.number),
+                theme.sizes,
+                config.text,
+                rehearsalHeightFor(part.id, m.number),
+                partNorthExtent(partIndex),
+              ).band
+            : 0;
+        needed = Math.max(needed, textBand);
         if (!hasTempoMark) return;
         const a = attributesByPartAndMeasure.get(`${part.id}:${m.number}`);
         const timeline = attributeChangesByPartAndMeasure.get(`${part.id}:${m.number}`) ?? [];
@@ -3601,7 +3944,9 @@ export function renderParsedMusicXml(
           const { clefDef } = mapClef(spec?.sign ?? a?.clefSign ?? 'G', spec?.line ?? a?.clefLine);
           return { clefDef, measureBottomY: 0, midiInstrumentsByPart: midi, theme };
         });
-        needed = Math.max(needed, extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
+        // A tempo mark sits ABOVE the chord symbols (see northTextStack),
+        // so its own clearance starts at the top of the text band.
+        needed = Math.max(needed, textBand + extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
       });
     });
     // A volta bracket (or a `×N`) is drawn above everything else that
@@ -3733,8 +4078,20 @@ export function renderParsedMusicXml(
     return (
       lowerStaffHeight +
       computeStaffDistance(
-        upperSouth,
-        lowerNorth,
+        // Phase 55: a lyric row under the upper staff of a grand staff is
+        // content the gap between the two staves has to clear, exactly
+        // like a low note is -- so it is added to that staff's own
+        // southward reach before the skyline compares them.
+        //
+        // Only when the band is non-zero: `addToSkyline` takes the more
+        // EXTREME of the two y values, and for a 'north' skyline that is
+        // the SMALLER one -- so adding a zero-height segment to a staff
+        // with a genuinely tall north extent would collapse that extent
+        // to zero and shrink the gap instead of growing it.
+        withTextBand(upperSouth, southTextBand(partIndex, upperStaffNumber)),
+        // And the same for text above the lower staff (a chord symbol on
+        // a single-staff part whose staff happens to be staff 1).
+        withTextBand(lowerNorth, northTextBandFor(partIndex, lowerStaffNumber)),
         Math.max(config.staves.minStaffDistance, statedDistance ?? 0),
       )
     );
@@ -3744,7 +4101,24 @@ export function renderParsedMusicXml(
     const a = firstAttributesByPart.get(p.id);
     return Math.max(1, a?.staves ?? 1);
   });
-  const scoreLayout = computeSystemLayoutVariableGaps(partStaffCounts, staffDistanceForPair);
+  /**
+   * Phase 55: the space between two parts holds TWO text layers when a
+   * score has both -- the lyrics under the part above and the chord
+   * symbols above the part below -- so the gap is per part rather than
+   * one number for all of them. The default (12) is kept as the floor.
+   */
+  const partGapForPart = (partIndex: number): number => {
+    const lastStaff = partStaffCounts[partIndex] ?? 1;
+    return (
+      DEFAULT_PART_GAP + southTextBand(partIndex, lastStaff) + northTextBandFor(partIndex + 1, 1)
+    );
+  };
+  const scoreLayout = computeSystemLayoutVariableGaps(
+    partStaffCounts,
+    staffDistanceForPair,
+    undefined,
+    partGapForPart,
+  );
   const staffOffsetFor = (partIndex: number, staffIndexInPart: number): number =>
     scoreLayout.positions.find(
       (pos) => pos.partIndex === partIndex && pos.staffIndexInPart === staffIndexInPart,
@@ -3768,8 +4142,24 @@ export function renderParsedMusicXml(
   // score (every part, every staff) plus the room STAFF_BOTTOM_Y already
   // reserves above the first staff.
   const lowestStaffOffset = scoreLayout.positions[scoreLayout.positions.length - 1]?.y ?? 0;
+  /**
+   * Phase 55: the last staff of the last part has no part below it to
+   * absorb its lyric rows, so the SYSTEM grows instead. The reserve it
+   * already has (SYSTEM_HEIGHT's own tail below the last staff) is
+   * subtracted first, which is what keeps a one-verse score byte-
+   * identical: its lyrics fit inside the room that was already there.
+   */
+  const systemBottomRoom =
+    SYSTEM_HEIGHT - STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
+  const lastPartIndex = Math.max(0, score.parts.length - 1);
+  const lastStaffSouthBand = southTextBand(lastPartIndex, partStaffCounts[lastPartIndex] ?? 1);
   const systemHeight =
-    SYSTEM_HEIGHT + aboveStaffPadding + lowestStaffOffset - trimAbove - trimBelow;
+    SYSTEM_HEIGHT +
+    aboveStaffPadding +
+    lowestStaffOffset +
+    Math.max(0, lastStaffSouthBand - systemBottomRoom) -
+    trimAbove -
+    trimBelow;
 
   const widthOf = (measureNumber: number): number =>
     measureLayoutsByNumber.get(measureNumber)?.width ?? MEASURE_WIDTH;
@@ -4149,7 +4539,36 @@ export function renderParsedMusicXml(
       const measureTempoMarks = drawnTempoMarks.filter(
         (m) => m.partId === part.id && m.measureNumber === measure.number,
       );
-      if (measureTempoMarks.length > 0) {
+      // Phase 55/§19.10: this measure's above-staff TEXT -- chord symbols,
+      // `<words>` directions and rehearsal marks -- gathered here so they
+      // and the tempo marks share ONE stack rather than each guessing its
+      // own height.
+      const measureHarmonies =
+        config.text.chordSymbolsDisplay === 'off'
+          ? []
+          : harmonies.filter((h) => h.partId === part.id && h.measureNumber === measure.number);
+      const measureDirectionText =
+        config.text.wordsDisplay === 'off' && config.text.rehearsalMarksDisplay === 'off'
+          ? []
+          : partDirections.filter((d) => d.measureNumber === measure.number);
+      const measureRehearsals =
+        config.text.rehearsalMarksDisplay === 'off'
+          ? []
+          : measureDirectionText.flatMap((d) =>
+              d.rehearsals.map((text) => ({ text, tick: d.tick })),
+            );
+      const measureWords =
+        config.text.wordsDisplay === 'off'
+          ? []
+          : measureDirectionText.flatMap((d) => d.words.map((text) => ({ text, tick: d.tick })));
+      const measureTextNeeds: MeasureTextNeeds = {
+        chordSymbols: measureHarmonies.length > 0,
+        rehearsalMarks: measureRehearsals.length > 0,
+        words: measureWords.length > 0,
+      };
+      const hasAboveText =
+        measureTextNeeds.chordSymbols || measureTextNeeds.rehearsalMarks || measureTextNeeds.words;
+      if (measureTempoMarks.length > 0 || hasAboveText) {
         // Use the EXACT same header allowance the note-rendering pass
         // below uses for noteAreaX -- a real, second bug: this used to
         // compute noteAreaX as a FRACTION of the measure's own width
@@ -4169,17 +4588,117 @@ export function renderParsedMusicXml(
           attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
         const { topStaffY } = topStaff();
         const northExtent = topStaffNorthExtent();
+        const rows = northTextRows(
+          measureTextNeeds,
+          theme.sizes,
+          config.text,
+          measureRehearsals.reduce(
+            (height, mark) =>
+              Math.max(height, computeRehearsalMarkBox(mark.text, theme.sizes.tempo).height),
+            0,
+          ),
+          // The PART-wide extent, not this measure's: the rows hold one
+          // line across the whole part (see northTextRows), so a bar with
+          // a high melody note moves nothing and collides with nothing.
+          hasAboveText ? partNorthExtent(partIndex) : northExtent,
+        );
+        /** The baseline of one row, as an absolute y. */
+        const rowY = (offset: number | undefined): number | undefined =>
+          offset === undefined ? undefined : topStaffY - offset - rows.shift;
+        const chordSymbolY = rowY(rows.chordSymbolOffset);
+        const wordsY = rowY(rows.wordsOffset);
+        const rehearsalY = rowY(rows.rehearsalOffset);
+        const textXFor = (tick: number): number =>
+          noteAreaX + (tick / (measureTotalTicks || 1)) * noteAreaWidth;
+
+        // §9.23: chord symbols, centred over the beat their <harmony>
+        // begins on, closest to the staff of everything above it.
+        if (chordSymbolY !== undefined) {
+          for (const harmony of measureHarmonies) {
+            // A `<harmony>` with no `<root>` is legal MusicXML (a
+            // continuation of the previous symbol) but has no letter to
+            // draw, so there is nothing to place.
+            if (harmony.rootStep === undefined) continue;
+            const layoutOfSymbol = chordSymbolLayout(
+              { ...harmony, rootStep: harmony.rootStep },
+              theme.sizes.chordSymbol,
+            );
+            if (layoutOfSymbol.unsupportedKind !== undefined) {
+              diagnostics.push({
+                severity: 'info',
+                code: 'UNSUPPORTED_CHORD_KIND',
+                message:
+                  `A <harmony> with <kind>${layoutOfSymbol.unsupportedKind}</kind> has no ` +
+                  "drawable spelling in this engine, so it was not drawn. MusicXML's " +
+                  '<kind text="..."> attribute, or one of the named kinds, draws.',
+                location: { partId: part.id, measureNumber: measure.number },
+              });
+              continue;
+            }
+            if (layoutOfSymbol.parts.length === 0) continue;
+            const x = textXFor(harmony.tick);
+            svgParts.push(
+              renderChordSymbol(layoutOfSymbol, x - layoutOfSymbol.width / 2, chordSymbolY, {
+                textFont: theme.textFont,
+                musicFont: theme.musicFont,
+                fontSize: theme.sizes.chordSymbol,
+                color: theme.colorOf('chordSymbol'),
+              }),
+            );
+          }
+        }
+
+        // §9.21: a `<words>` direction -- "Allegro", "dolce" -- as italic
+        // text above the chord symbols, the way an expression mark is
+        // printed. `<direction-type><words>` carries no font attributes
+        // this engine parses, so italic is the conventional default
+        // rather than a statement from the file.
+        if (wordsY !== undefined) {
+          for (const word of measureWords) {
+            svgParts.push(
+              renderWords(word.text, textXFor(word.tick), wordsY, {
+                fontFamily: theme.textFont,
+                fontSize: theme.sizes.tempo,
+                color: theme.colorOf('text'),
+                anchor: 'middle',
+                italic: true,
+              }),
+            );
+          }
+        }
+
+        // §9.21: rehearsal marks on top, in a frame, so they read as
+        // labels rather than as part of the music.
+        if (rehearsalY !== undefined) {
+          for (const mark of measureRehearsals) {
+            svgParts.push(
+              renderRehearsalMark(mark.text, textXFor(mark.tick), rehearsalY, {
+                box: computeRehearsalMarkBox(mark.text, theme.sizes.tempo),
+                fontFamily: theme.textFont,
+                fontSize: theme.sizes.tempo,
+                color: theme.colorOf('rehearsalMark'),
+                frameColor: theme.colorOf('rehearsalMark'),
+              }),
+            );
+          }
+        }
+
         for (const mark of measureTempoMarks) {
           const dotGlyph = mark.beatUnitDots > 0 ? metronomeDotGlyphName() : undefined;
-          const eventX = noteAreaX + (mark.tick / (measureTotalTicks || 1)) * noteAreaWidth;
+          const eventX = textXFor(mark.tick);
           svgParts.push(
             renderMetronomeMark(metronomeNoteGlyphName(mark.beatUnit), dotGlyph, mark.perMinute, {
               x: eventX,
               // tempoMarkSide() is always 'above'. The clearance is
               // measured from whatever this measure's content actually
               // reaches (stems and beams included), not from the staff
-              // line -- see the note where northExtent is computed.
-              y: topStaffY - northExtent - TEMPO_MARK_GAP,
+              // line -- see the note where northExtent is computed -- and
+              // then from the TOP of the text band, since the chord
+              // symbols now occupy the space immediately above the staff.
+              // With text above the staff, the tempo mark clears the whole
+              // text stack; with none, it keeps its own long-standing
+              // clearance from the measure's content extent.
+              y: topStaffY - (hasAboveText ? rows.band : northExtent) - TEMPO_MARK_GAP,
               color: theme.colorOf('tempo'),
               musicFont: theme.musicFont,
               textFont: theme.textFont,
@@ -5040,6 +5559,101 @@ export function renderParsedMusicXml(
             message: `Clef "${attrs.clefSign}" does not position notes by pitch; skipping notes in this measure.`,
             location: { partId: part.id, measureNumber: measure.number },
           });
+        }
+
+        // ---- Phase 55/§19.10: §9.22's lyrics -----------------------------
+        //
+        // The first ordinary PROSE this engine has ever drawn. One row per
+        // verse, below the staff, each syllable centred on the note it
+        // belongs to -- and every x computed the same way the noteheads
+        // were, from the measure's own positionsByTick, so a syllable
+        // cannot drift away from its note when a measure is widened.
+        //
+        // A file with no `<lyric>` pays nothing: `lyricVersesFor` returns
+        // an empty list and this whole block is one comparison.
+        {
+          const verses = lyricVersesFor(part.id, staffNumber);
+          if (verses.length > 0) {
+            const lyricNoteAreaX = Math.max(noteAreaXOf(layout.x, measure.number), cursorX);
+            const lyricFallbackWidth = layout.x + layout.width - lyricNoteAreaX;
+            const measureTotalTicksForLyrics =
+              measureTicksByNumber.get(measure.number) ?? TICKS_PER_QUARTER * 4;
+            const hyphenWidth = glyphWidthOf(lyricHyphenGlyphName()) * (theme.sizes.lyric / 4);
+            const elisionWidth = glyphWidthOf(lyricElisionGlyphName()) * (theme.sizes.lyric / 4);
+            for (const [rowIndex, verse] of verses.entries()) {
+              const boxes: LyricSyllableBox[] = [];
+              const seenTicks = new Set<number>();
+              for (const voice of measure.voices) {
+                const starts = eventStartTicks(voice.events);
+                voice.events.forEach((event, index) => {
+                  if ((event.staff ?? 1) !== staffNumber) return;
+                  const notes =
+                    event.kind === 'note' ? [event] : event.kind === 'chord' ? event.notes : [];
+                  // ALL of this note's syllables in this verse, not the
+                  // first: a file writes two `<lyric number="1">` on one
+                  // note to mean an elision ("A-men" on a single note), and
+                  // taking only the first would silently drop half the word.
+                  const syllables = notes
+                    .flatMap((note) => note.lyrics ?? [])
+                    .filter((candidate) => candidate.number === verse && candidate.text.length > 0);
+                  if (syllables.length === 0) return;
+                  const tick = starts[index] ?? 0;
+                  // Two voices carrying the SAME syllable at the same tick
+                  // (a drum chart's hi-hat and snare both marked up) are
+                  // one word, not an elision of two.
+                  if (seenTicks.has(tick)) return;
+                  seenTicks.add(tick);
+                  const realX = measureLayoutsByNumber
+                    .get(measure.number)
+                    ?.positionsByTick.get(tick);
+                  const x =
+                    lyricNoteAreaX +
+                    (realX ?? (tick / (measureTotalTicksForLyrics || 1)) * lyricFallbackWidth);
+                  for (const syllable of syllables) {
+                    boxes.push({
+                      text: syllable.text,
+                      x,
+                      width: estimateTextWidth(syllable.text, theme.sizes.lyric),
+                      ...(syllable.syllabic !== undefined ? { syllabic: syllable.syllabic } : {}),
+                      extend: syllable.extend,
+                      // Where a melisma runs to when nothing follows it in
+                      // this row: the measure's own last ink, not its
+                      // barline -- a line that touches the barline reads as
+                      // a barline, not as a melisma.
+                      melismaEndX: layout.x + layout.width - MEASURE_TRAILING_MARGIN,
+                    });
+                  }
+                });
+              }
+              if (boxes.length === 0) continue;
+              boxes.sort((a, b) => a.x - b.x);
+              const items = layoutLyricRow(boxes, {
+                hyphenWidth,
+                elisionWidth,
+                punctuationGap: 0.25,
+              });
+              svgParts.push(
+                renderLyricRow(
+                  items,
+                  lyricRowBaselineY(
+                    bottomY,
+                    rowIndex,
+                    config.text.lyricGap,
+                    config.text.lyricRowHeight,
+                  ),
+                  {
+                    fontFamily: config.fonts.lyricFont,
+                    fontSize: theme.sizes.lyric,
+                    musicFont: theme.musicFont,
+                    color: theme.colorOf('lyric'),
+                    hyphenWidth,
+                    elisionWidth,
+                    lineThickness: lineWidth(theme, undefined, 'lyricLineThickness', 0.16),
+                  },
+                ),
+              );
+            }
+          }
         }
       });
 

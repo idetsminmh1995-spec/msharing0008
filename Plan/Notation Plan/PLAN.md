@@ -1405,7 +1405,7 @@ similar compound ornaments.
 
 ---
 
-### 9.21 Dynamics, hairpins, tempo marks, rehearsal marks `[PARTIAL -- dynamics/hairpins BUILT and WIRED (Integration Pass J); tempo marks drawn since Integration Pass D and given real content-aware clearance by Integration Pass M; rehearsal marks remain placement-only (they need arbitrary text, which this engine still has no font for). See Documentation/integration-j-dynamics-hairpins.md]`
+### 9.21 Dynamics, hairpins, tempo marks, rehearsal marks `[BUILT -- dynamics/hairpins (Integration Pass J); tempo marks (Integration Pass D) with real content-aware clearance (Integration Pass M); rehearsal marks and <words> directions DRAWN since Phase 55, which gave the engine the text layer they were waiting for. See Documentation/integration-j-dynamics-hairpins.md and Documentation/phase-55-text-layer.md]`
 
 **Responsibility.** Four distinct expression-mark categories, bundled in
 one phase per the roadmap but researched and scoped separately, since
@@ -1473,7 +1473,7 @@ marks needed.
 
 ---
 
-### 9.22 Lyrics `[PARTIAL -- placement/hyphen/elision/extender-line built (Phase 32) and <lyric> now PARSED and preserved (Phase 35 Tier 2); syllable text still undrawn, because Bravura has no Latin alphabet and this engine has no text font. Nothing is wired into rendering: a row of floating hyphens with no words would be worse than the gap. See §19.10]`
+### 9.22 Lyrics `[BUILT -- placement/hyphen/elision/extender-line by Phase 32, <lyric> PARSED by Phase 35 Tier 2, and the words themselves DRAWN and wired into rendering by Phase 55, which closed §19.10. Multi-verse rows, hyphenation, elision and melisma extenders all render; see that phase's §4 for what is still not drawn (no cross-barline hyphen, estimated widths). See Documentation/phase-55-text-layer.md]`
 
 **Responsibility.** Syllables of sung text aligned under the notes they
 belong to, plus the punctuation that connects them (hyphens for a word
@@ -1532,7 +1532,7 @@ stack.
 
 ---
 
-### 9.23 Chord symbols `[PARTIAL -- placement/accidentals/qualities built (Phase 33) and <harmony> now PARSED and preserved verbatim, kind string included (Phase 35 Tier 2); nothing is drawn, per this section's own "meaningless to build before the root letter can be drawn". See §19.10]`
+### 9.23 Chord symbols `[BUILT -- placement/accidentals/qualities by Phase 33, <harmony> PARSED verbatim by Phase 35 Tier 2, and the symbols themselves ASSEMBLED and DRAWN by Phase 55 once the root letter could be drawn. An unknown <kind> draws nothing and reports UNSUPPORTED_CHORD_KIND rather than guessing a spelling. See Documentation/phase-55-text-layer.md]`
 
 **Responsibility.** Lead-sheet harmony markings ("Cmaj7", "Dm7♭5",
 "G7/B") above the melody. `<harmony>` is v2 parser scope (§10.4); this
@@ -2436,12 +2436,19 @@ API can be designed *then*, informed by what that extension actually needs.
 9. **Notation cannot be inferred from MIDI alone** — a MIDI-only input
    renders with default spelling, single voice, and inferred beaming, and
    this is documented behaviour, not a bug. Full notation requires MusicXML.
-10. **No arbitrary text is drawn anywhere** — lyric syllables (§9.22), chord
-    symbol root letters (§9.23), rehearsal marks and `<words>` directions
-    (§9.21) are all **parsed and preserved** but not rendered. Bravura is a
-    music-symbol font with no Latin alphabet at all, and this engine has no
-    text-font/character-metrics system. This is one gap, hit in four places,
-    not four separate gaps.
+10. ~~**No arbitrary text is drawn anywhere**~~ — **closed by Phase 55**:
+    lyric syllables (§9.22), chord-symbol root letters (§9.23), rehearsal
+    marks and `<words>` directions (§9.21) all draw now, from one small text
+    layer (`render/text.ts`, `geometry/text-metrics.ts`) shared by all four.
+    What remains open from that work is narrower and is listed here rather
+    than folded into the closure: text widths are **estimated**, not
+    measured (the engine has no canvas and the host owns the font), so
+    centred text is centred on the estimate; `<rehearsal enclosure>` is
+    ignored and always draws square; `<words>` is always italic at tempo
+    size because its font attributes are not parsed; no hyphen is drawn
+    across a barline; and `<words>`/rehearsal marks always sit above staff
+    1 whatever `staff` the direction names. See
+    Documentation/phase-55-text-layer.md §4.
 11. **A slur or tuplet crossing a barline is not drawn**, and a hairpin
     crossing a system break is not drawn — each reports a diagnostic rather
     than drawing something wrong. Same class of boundary as limitation 2.
