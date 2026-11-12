@@ -1643,6 +1643,33 @@ font, not swappable the way an ordinary note's is.
 
 ---
 
+### 9.25 Tremolo `[BUILT -- Phase 56]`
+A note played as a rapid repetition of itself. `<tremolo>`'s own text is the
+stroke count and the count is the whole message -- one stroke is eighth-note
+speed, two sixteenths, three thirty-seconds -- so a count the font cannot draw
+is clamped AND reported (`TREMOLO_STROKES_CLAMPED`), never silently rounded.
+Drawn centred on the stem (`stemGeometry` exists so the mark and the stem
+cannot disagree about where the stem is). Beamed notes are not given strokes:
+their rhythm is already in the beam, and the strokes would collide with it.
+See Documentation/phase-56-note-marks.md.
+
+### 9.26 Arpeggio / non-arpeggio `[BUILT -- Phase 56]`
+A rolled chord is drawn as a squiggle to the LEFT of the chord, as tall as the
+chord; `<non-arpeggiate>` draws the bracket that says the opposite. Drawn as a
+path rather than a scaled `arpeggiato` glyph, so the stroke weight does not
+change with the chord's height -- the same reason §9.18's brace is a path.
+ONE mark per chord, never one per member. The spacing pass reserves the mark's
+own width (`leadingByStaff`), including for a measure's FIRST attack, where the
+room has to come out of the header instead -- without that the mark lands on
+the time signature or reaches back across a barline.
+
+### 9.27 Harmonic `[BUILT -- Phase 56]`
+`<notations><harmonic>` -- the note sounds a harmonic and is drawn with a
+DIAMOND head, chosen by duration exactly as the oval set is. This is not
+decoration: the shape is the whole notation, since the pitch is unchanged and
+an oval tells a guitarist to stop the string where they must touch it. A file's
+own `<notehead>` outranks this default, because files commonly state both.
+
 ## 10. Module: `parser/musicxml/` — MusicXML Parser `[IN PROGRESS — v1 built (Phase 20); .mxl/score-timewise/v2 elements are Phase 35-36]`
 
 **Responsibility.** Turn any valid MusicXML document into a `Score` (§6),
@@ -2452,8 +2479,10 @@ API can be designed *then*, informed by what that extension actually needs.
 11. **A slur or tuplet crossing a barline is not drawn**, and a hairpin
     crossing a system break is not drawn — each reports a diagnostic rather
     than drawing something wrong. Same class of boundary as limitation 2.
-12. **Fermata is parsed but not drawn** — §9 has no fermata placement
-    section, and guessing one would not be implementing a spec.
+12. ~~**Fermata is parsed but not drawn**~~ — **stale, corrected here**: the
+    fermata has been parsed AND drawn since Integration H (`FERMATA_GAP`,
+    `fermataGlyphName`, drawn for notes and rests alike). This entry was left
+    behind when that landed; Phase 56's audit is what caught it.
 13. **Multi-voice collision is pairwise only** (§9.14) — a genuine 3-or-4
     voice pile-up needs column assignment, not pair resolution.
 14. **`rectangle` draws as a square notehead** (§9.7) — SMuFL has no

@@ -356,6 +356,15 @@ function buildSingle(ev: ParsedNoteEvent, startTick?: number): Note | Rest {
     ...(ev.notations.tupletStop ? { tupletStop: true } : {}),
     ...(ev.beams.length > 0 ? { beams: ev.beams } : {}),
     ...(ev.lyrics.length > 0 ? { lyrics: ev.lyrics } : {}),
+    // Phase 56/§9.24-§9.26: the marks that change what a note IS or how it
+    // is played, rather than merely decorating it.
+    ...(ev.notations.tremoloStrokes !== undefined
+      ? { tremoloStrokes: ev.notations.tremoloStrokes }
+      : {}),
+    ...(ev.notations.tremoloType !== undefined ? { tremoloType: ev.notations.tremoloType } : {}),
+    ...(ev.notations.isHarmonic ? { isHarmonic: true } : {}),
+    ...(ev.notations.arpeggiate !== undefined ? { arpeggiate: ev.notations.arpeggiate } : {}),
+    ...(ev.notations.nonArpeggiate ? { nonArpeggiate: true } : {}),
   });
 }
 

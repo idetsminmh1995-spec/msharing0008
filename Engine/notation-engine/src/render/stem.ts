@@ -22,7 +22,24 @@ export interface RenderStemOptions {
  * convention, the same sign flip already established when Phase 6/9 first
  * drew a stem from anchor data.
  */
-export function renderStem(options: RenderStemOptions): string {
+export interface StemGeometry {
+  /** The stem's own x -- where it meets the notehead's anchor. */
+  readonly x: number;
+  /** The end that touches the notehead. */
+  readonly attachY: number;
+  /** The free end. */
+  readonly endY: number;
+}
+
+/**
+ * Where a stem actually runs, without drawing it.
+ *
+ * Exported because a mark that sits ON the stem -- a tremolo, most of all
+ * -- has to agree with the stem about where that is. Recomputing the
+ * anchor arithmetic at the call site is exactly how a mark ends up a
+ * fraction of a space off the line it is meant to be centred on.
+ */
+export function stemGeometry(options: RenderStemOptions): StemGeometry {
   const glyph = getGlyph(options.noteheadGlyphName);
   if (glyph === undefined) {
     throw new Error(`No glyph found for notehead "${options.noteheadGlyphName}"`);
@@ -33,12 +50,16 @@ export function renderStem(options: RenderStemOptions): string {
     throw new Error(`Notehead "${options.noteheadGlyphName}" has no ${anchorName} anchor`);
   }
   const [anchorX, anchorY] = anchor;
-
-  const attachX = options.noteX + anchorX;
+  const x = options.noteX + anchorX;
   const attachY = options.noteY - anchorY;
   const endY = options.direction === 'up' ? attachY - options.length : attachY + options.length;
+  return { x, attachY, endY };
+}
 
-  return svgLine(attachX, attachY, attachX, endY, {
+/** Draws a stem attached at the notehead's REAL anchor point (`stemUpSE` for an up stem, `stemDownNW` for a down stem). */
+export function renderStem(options: RenderStemOptions): string {
+  const { x, attachY, endY } = stemGeometry(options);
+  return svgLine(x, attachY, x, endY, {
     stroke: options.color,
     'stroke-width': options.thickness,
   });

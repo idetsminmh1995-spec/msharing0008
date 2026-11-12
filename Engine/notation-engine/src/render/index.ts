@@ -27,3 +27,5 @@ export * from './augmentation-dot.js';
 export * from './text.js';
 export * from './chord-symbol.js';
 export * from './expression-mark.js';
+export * from './tremolo.js';
+export * from './arpeggio.js';

@@ -22,6 +22,7 @@ var NotationEngine = (() => {
   var index_exports = {};
   __export(index_exports, {
     ALTO_CLEF: () => ALTO_CLEF,
+    ARPEGGIO_AMPLITUDE: () => ARPEGGIO_AMPLITUDE,
     BASS_CLEF: () => BASS_CLEF,
     BEAM_HOOK_LENGTH: () => BEAM_HOOK_LENGTH,
     ByteReader: () => ByteReader,
@@ -54,6 +55,7 @@ var NotationEngine = (() => {
     TREBLE_8VA_CLEF: () => TREBLE_8VA_CLEF,
     TREBLE_8VB_CLEF: () => TREBLE_8VB_CLEF,
     TREBLE_CLEF: () => TREBLE_CLEF,
+    TREMOLO_STROKE_CHOICES: () => TREMOLO_STROKE_CHOICES,
     accidentalGlyphName: () => accidentalGlyphName,
     accidentalX: () => accidentalX,
     addToSkyline: () => addToSkyline,
@@ -91,6 +93,7 @@ var NotationEngine = (() => {
     chordSymbolSide: () => chordSymbolSide,
     chromaticNoteNumber: () => chromaticNoteNumber,
     codepointToChar: () => codepointToChar,
+    computeArpeggioShape: () => computeArpeggioShape,
     computeAttackSpace: () => computeAttackSpace,
     computeBarlineGeometry: () => computeBarlineGeometry,
     computeBeamSegments: () => computeBeamSegments,
@@ -103,6 +106,7 @@ var NotationEngine = (() => {
     computeHairpinShape: () => computeHairpinShape,
     computeHyphenX: () => computeHyphenX,
     computeLedgerLines: () => computeLedgerLines,
+    computeNonArpeggioShape: () => computeNonArpeggioShape,
     computePageLayout: () => computePageLayout,
     computePlaybackData: () => computePlaybackData,
     computeProportionalPositions: () => computeProportionalPositions,
@@ -171,6 +175,7 @@ var NotationEngine = (() => {
     graceNoteGlyphName: () => graceNoteGlyphName,
     groupBeams: () => groupBeams,
     groupBeamsFromHints: () => groupBeamsFromHints,
+    harmonicNoteheadGlyphName: () => harmonicNoteheadGlyphName,
     hasBackground: () => hasBackground,
     hasExplicitBeams: () => hasExplicitBeams,
     isKnownAccidentalGlyphName: () => isKnownAccidentalGlyphName,
@@ -230,6 +235,7 @@ var NotationEngine = (() => {
     readVariableLengthQuantity: () => readVariableLengthQuantity,
     rehearsalMarkSide: () => rehearsalMarkSide,
     renderAccidental: () => renderAccidental,
+    renderArpeggio: () => renderArpeggio,
     renderAugmentationDots: () => renderAugmentationDots,
     renderBarNumber: () => renderBarNumber,
     renderBarline: () => renderBarline,
@@ -249,6 +255,7 @@ var NotationEngine = (() => {
     renderLyricRow: () => renderLyricRow,
     renderMark: () => renderMark,
     renderMetronomeMark: () => renderMetronomeMark,
+    renderNonArpeggio: () => renderNonArpeggio,
     renderNotehead: () => renderNotehead,
     renderParsedMusicXml: () => renderParsedMusicXml,
     renderRehearsalMark: () => renderRehearsalMark,
@@ -263,6 +270,7 @@ var NotationEngine = (() => {
     renderTextScaledGlyph: () => renderTextScaledGlyph,
     renderTie: () => renderTie,
     renderTimeSignature: () => renderTimeSignature,
+    renderTremolo: () => renderTremolo,
     renderTupletBracket: () => renderTupletBracket,
     renderTupletNumber: () => renderTupletNumber,
     renderVolta: () => renderVolta,
@@ -288,6 +296,7 @@ var NotationEngine = (() => {
     slurSide: () => slurSide,
     spacingDiagnostic: () => spacingDiagnostic,
     staffPositionForPitch: () => staffPositionForPitch,
+    stemGeometry: () => stemGeometry,
     stringToUtf8: () => stringToUtf8,
     sumTicks: () => sumTicks,
     supportedMusicXmlNoteheads: () => supportedMusicXmlNoteheads,
@@ -312,6 +321,8 @@ var NotationEngine = (() => {
     tieSide: () => tieSide,
     timeSignature: () => timeSignature,
     timingDiagnostic: () => timingDiagnostic,
+    tremoloGlyphName: () => tremoloGlyphName,
+    tremoloPlacement: () => tremoloPlacement,
     tryAccidentalGlyphName: () => tryAccidentalGlyphName,
     tupletBracketNeeded: () => tupletBracketNeeded,
     tupletDigitGlyphName: () => tupletDigitGlyphName,
@@ -68691,6 +68702,10 @@ var NotationEngine = (() => {
     }
     return glyph;
   }
+  function harmonicNoteheadGlyphName(durationType, explicitlyFilled) {
+    if (durationType === "whole") return "noteheadDiamondWhole";
+    return fillForDuration(durationType, explicitlyFilled) === "black" ? "noteheadDiamondBlack" : "noteheadDiamondHalf";
+  }
   function supportedNoteheadShapes() {
     return Object.keys(SHAPE_GLYPHS);
   }
@@ -69963,6 +69978,38 @@ var NotationEngine = (() => {
     return GLYPHS[shape ?? "normal"][placement ?? "above"];
   }
 
+  // src/geometry/tremolo.ts
+  var TREMOLO_STROKE_CHOICES = [1, 2, 3];
+  function tremoloGlyphName(strokes) {
+    if (!Number.isInteger(strokes) || strokes < 1 || strokes > 3) return void 0;
+    return `tremolo${strokes}`;
+  }
+  function tremoloPlacement(stemX, attachY, endY) {
+    return { x: stemX, y: (attachY + endY) / 2 };
+  }
+
+  // src/geometry/arpeggio.ts
+  var ARPEGGIO_AMPLITUDE = 0.28;
+  var SPACES_PER_WAVE = 0.62;
+  var MIN_WAVES = 5;
+  function computeArpeggioShape(x2, topY, bottomY, direction = "up") {
+    const height = Math.max(bottomY - topY, 0);
+    const waves = Math.max(MIN_WAVES, Math.round(height / SPACES_PER_WAVE));
+    const points = [];
+    const lean = (direction === "up" ? 1 : -1) * ARPEGGIO_AMPLITUDE * 0.6;
+    for (let i2 = 0; i2 <= waves; i2++) {
+      const t = i2 / waves;
+      const y = topY + height * t;
+      const swing = i2 === 0 || i2 === waves ? 0 : i2 % 2 === 0 ? ARPEGGIO_AMPLITUDE : -ARPEGGIO_AMPLITUDE;
+      const xOffset = swing + lean * (1 - t * 2) * 0.5;
+      points.push([x2 + xOffset, y]);
+    }
+    return { x: x2, topY, bottomY, direction, points };
+  }
+  function computeNonArpeggioShape(x2, topY, bottomY, hookLength = 0.8) {
+    return { x: x2, topY, bottomY, hookLength };
+  }
+
   // src/render/svg-primitives.ts
   var SMUFL_STAFF_SPACES_PER_EM = 4;
   function escapeXmlText(text) {
@@ -70245,7 +70292,7 @@ ${denominator}`;
   }
 
   // src/render/stem.ts
-  function renderStem(options) {
+  function stemGeometry(options) {
     const glyph = getGlyph(options.noteheadGlyphName);
     if (glyph === void 0) {
       throw new Error(`No glyph found for notehead "${options.noteheadGlyphName}"`);
@@ -70256,10 +70303,14 @@ ${denominator}`;
       throw new Error(`Notehead "${options.noteheadGlyphName}" has no ${anchorName} anchor`);
     }
     const [anchorX, anchorY] = anchor;
-    const attachX = options.noteX + anchorX;
+    const x2 = options.noteX + anchorX;
     const attachY = options.noteY - anchorY;
     const endY = options.direction === "up" ? attachY - options.length : attachY + options.length;
-    return svgLine(attachX, attachY, attachX, endY, {
+    return { x: x2, attachY, endY };
+  }
+  function renderStem(options) {
+    const { x: x2, attachY, endY } = stemGeometry(options);
+    return svgLine(x2, attachY, x2, endY, {
       stroke: options.color,
       "stroke-width": options.thickness
     });
@@ -70732,6 +70783,41 @@ ${denominator}`;
     });
   }
 
+  // src/render/tremolo.ts
+  function renderTremolo(glyphName, placement, options) {
+    const glyph = getGlyph(glyphName);
+    if (glyph === void 0) return "";
+    return svgGlyphText(placement.x, placement.y, glyph.char, options.fontFamily, {
+      fill: options.color
+    });
+  }
+
+  // src/render/arpeggio.ts
+  function renderArpeggio(shape, options) {
+    if (shape.points.length < 2) return "";
+    const [first, ...rest2] = shape.points;
+    if (first === void 0) return "";
+    const d = [`M ${first[0]} ${first[1]}`, ...rest2.map((point) => `L ${point[0]} ${point[1]}`)].join(
+      " "
+    );
+    return svgPath(d, {
+      fill: "none",
+      stroke: options.color,
+      "stroke-width": options.thickness,
+      "stroke-linecap": "round",
+      "stroke-linejoin": "round"
+    });
+  }
+  function renderNonArpeggio(shape, options) {
+    const stroke = { stroke: options.color, "stroke-width": options.thickness };
+    const hookX = shape.x - shape.hookLength;
+    return [
+      svgLine(shape.x, shape.topY, shape.x, shape.bottomY, stroke),
+      svgLine(hookX, shape.topY, shape.x, shape.topY, stroke),
+      svgLine(hookX, shape.bottomY, shape.x, shape.bottomY, stroke)
+    ].join("\n");
+  }
+
   // src/config/config.ts
   var DEFAULT_CONFIG = {
     colors: {
@@ -71013,10 +71099,13 @@ ${denominator}`;
     "backward hook"
   ]);
   var SYLLABIC_VALUES = /* @__PURE__ */ new Set(["single", "begin", "middle", "end"]);
+  var MAX_TREMOLO_STROKES = 3;
   var EMPTY_NOTATIONS = {
     articulations: [],
     ornaments: [],
     hasFermata: false,
+    isHarmonic: false,
+    nonArpeggiate: false,
     slurStarts: [],
     slurStops: [],
     tupletStart: false,
@@ -71041,6 +71130,11 @@ ${denominator}`;
     let hasFermata = false;
     let fermataPlacement;
     let fermataShape;
+    let tremoloStrokes;
+    let tremoloType;
+    let isHarmonic = false;
+    let arpeggiate;
+    let nonArpeggiate = false;
     let tupletStart = false;
     let tupletStop = false;
     for (const el of childElements(notationsEl)) {
@@ -71121,6 +71215,36 @@ ${denominator}`;
             }
           }
           break;
+        case "tremolo": {
+          const raw = Number.parseInt(textOf(el)?.trim() ?? "", 10);
+          const requested = Number.isNaN(raw) ? MAX_TREMOLO_STROKES : raw;
+          const type = attrOf(el, "type");
+          tremoloType = type === "start" || type === "stop" ? type : type === "single" ? "single" : "single";
+          if (requested > MAX_TREMOLO_STROKES) {
+            diagnostics.push(
+              diagnostic(
+                "info",
+                "TREMOLO_STROKES_CLAMPED",
+                `A <tremolo> with ${requested} strokes is drawn with ${MAX_TREMOLO_STROKES}; the bundled font has no glyph above three.`,
+                location
+              )
+            );
+          }
+          const clamped = Math.min(Math.max(requested, 1), MAX_TREMOLO_STROKES);
+          if (requested > 0) tremoloStrokes = clamped;
+          break;
+        }
+        case "harmonic":
+          isHarmonic = true;
+          break;
+        case "arpeggiate": {
+          const direction = attrOf(el, "direction");
+          arpeggiate = direction === "down" ? "down" : "up";
+          break;
+        }
+        case "non-arpeggiate":
+          nonArpeggiate = true;
+          break;
         case "tied":
         case "technical":
           break;
@@ -71140,6 +71264,11 @@ ${denominator}`;
         articulations,
         ornaments,
         hasFermata,
+        ...tremoloStrokes !== void 0 ? { tremoloStrokes } : {},
+        ...tremoloType !== void 0 ? { tremoloType } : {},
+        isHarmonic,
+        ...arpeggiate !== void 0 ? { arpeggiate } : {},
+        nonArpeggiate,
         ...fermataPlacement !== void 0 ? { fermataPlacement } : {},
         ...fermataShape !== void 0 ? { fermataShape } : {},
         slurStarts,
@@ -72071,7 +72200,14 @@ ${denominator}`;
       ...ev.notations.tupletStart ? { tupletStart: true } : {},
       ...ev.notations.tupletStop ? { tupletStop: true } : {},
       ...ev.beams.length > 0 ? { beams: ev.beams } : {},
-      ...ev.lyrics.length > 0 ? { lyrics: ev.lyrics } : {}
+      ...ev.lyrics.length > 0 ? { lyrics: ev.lyrics } : {},
+      // Phase 56/§9.24-§9.26: the marks that change what a note IS or how it
+      // is played, rather than merely decorating it.
+      ...ev.notations.tremoloStrokes !== void 0 ? { tremoloStrokes: ev.notations.tremoloStrokes } : {},
+      ...ev.notations.tremoloType !== void 0 ? { tremoloType: ev.notations.tremoloType } : {},
+      ...ev.notations.isHarmonic ? { isHarmonic: true } : {},
+      ...ev.notations.arpeggiate !== void 0 ? { arpeggiate: ev.notations.arpeggiate } : {},
+      ...ev.notations.nonArpeggiate ? { nonArpeggiate: true } : {}
     });
   }
   function buildEvent(group, location, diagnostics, startTick) {
@@ -77457,6 +77593,18 @@ ${xrefOffset}
   var HAIRPIN_THICKNESS_FALLBACK = 0.16;
   var TEXT_MARK_GAP = 1.2;
   var CHORD_SYMBOL_STACK_CLEARANCE = 0.4;
+  var ARPEGGIO_GAP = 0.6;
+  var ARPEGGIO_MARGIN = 0.5;
+  var ARPEGGIO_LEADING_WIDTH = 2.5;
+  function carriesArpeggioMark(event) {
+    if (event.kind === "note") {
+      return event.arpeggiate !== void 0 || event.nonArpeggiate === true;
+    }
+    if (event.kind === "chord") {
+      return event.notes.length > 1 && event.notes.some((note2) => note2.arpeggiate !== void 0 || note2.nonArpeggiate === true);
+    }
+    return false;
+  }
   function worstCaseStaffExtent(part2, staffNumber, allAttributes, side, theme, midiInstrumentsByPart, attributeTimelines) {
     const firstAttrs = allAttributes.find((a) => a.partId === part2.id);
     if (firstAttrs === void 0) return 0;
@@ -77546,6 +77694,7 @@ ${xrefOffset}
   function computeMeasureLayout(measure2, measureTicks, measureTempoMarks, headerWidth, spacingConfig, tempoFontSize, accidentals, attributeTransitions) {
     const attacks = /* @__PURE__ */ new Set();
     const widthByTickAndStaff = /* @__PURE__ */ new Map();
+    const eventByTick = /* @__PURE__ */ new Map();
     const leadingByTickAndStaff = /* @__PURE__ */ new Map();
     const shortestStartingByTick = /* @__PURE__ */ new Map();
     for (const voice2 of measure2.voices) {
@@ -77555,6 +77704,7 @@ ${xrefOffset}
         const tick = starts[idx] ?? 0;
         attacks.add(tick);
         const staff = String(event.staff ?? 1);
+        if (!eventByTick.has(tick)) eventByTick.set(tick, event);
         const put = (into, value) => {
           let perStaff = into.get(tick);
           if (perStaff === void 0) {
@@ -77564,7 +77714,10 @@ ${xrefOffset}
           perStaff.set(staff, Math.max(perStaff.get(staff) ?? 0, value));
         };
         put(widthByTickAndStaff, attackWidth(event.duration.dots));
-        put(leadingByTickAndStaff, attackLeading(accidentals.get(tick)));
+        put(
+          leadingByTickAndStaff,
+          attackLeading(accidentals.get(tick)) + (carriesArpeggioMark(event) ? ARPEGGIO_LEADING_WIDTH : 0)
+        );
         const own = event.duration.ticks;
         const shortest = shortestStartingByTick.get(tick);
         if (own > 0 && (shortest === void 0 || own < shortest)) {
@@ -77644,11 +77797,15 @@ ${xrefOffset}
     };
     const proportional = computeProportionalPositions(spacingEvents, clock, spacing);
     const enforced = applyMinimumDistance(proportional, spacingEvents, spacing);
+    const firstTick = ticks[0];
+    const firstEvent = firstTick === void 0 ? void 0 : eventByTick.get(firstTick);
+    const firstAttackLeading = firstEvent !== void 0 && carriesArpeggioMark(firstEvent) ? ARPEGGIO_LEADING_WIDTH : 0;
+    const shifted = firstAttackLeading > 0 ? enforced.map((x2) => x2 + firstAttackLeading) : enforced;
     const positionsByTick = /* @__PURE__ */ new Map();
     ticks.forEach((tick, i2) => {
-      positionsByTick.set(tick, enforced[i2] ?? 0);
+      positionsByTick.set(tick, shifted[i2] ?? 0);
     });
-    const lastX = enforced[enforced.length - 1] ?? 0;
+    const lastX = shifted[shifted.length - 1] ?? 0;
     const lastEvent = spacingEvents[spacingEvents.length - 1];
     const lastWidth = lastEvent?.renderedWidth ?? 0;
     const finalSpace = lastEvent === void 0 ? 0 : Math.max(
@@ -78059,7 +78216,8 @@ ${xrefOffset}
     const drumGlyph = gmNote !== void 0 && drumEntry?.noteheadGlyph !== void 0 && !positionedByFile && note2.explicitNotehead === void 0 && note2.explicitNoteheadSmufl === void 0 ? drumEntry.noteheadGlyph : void 0;
     const configOverrides = ctx.theme.noteheadMapping.overridesByKey;
     const overridesByKey = drumOverride !== void 0 || configOverrides !== void 0 ? { ...drumOverride, ...configOverrides } : void 0;
-    const noteheadGlyph = selectNoteheadGlyphName({
+    const fileStatedHead = note2.explicitNotehead !== void 0 || note2.explicitNoteheadSmufl !== void 0;
+    const noteheadGlyph = note2.isHarmonic === true && !isUnpitched2 && !fileStatedHead ? harmonicNoteheadGlyphName(note2.duration.type, note2.noteheadFilled) : selectNoteheadGlyphName({
       pitch: note2.pitch,
       durationType: note2.duration.type,
       ...note2.noteheadFilled !== void 0 ? { filled: note2.noteheadFilled } : {},
@@ -78268,17 +78426,26 @@ ${xrefOffset}
     });
     if (ev.duration.type !== "whole") {
       const length = computeStemLength(head.position, middleLineY(STAFF_LINES), direction);
-      parts.push(
-        renderStem({
-          noteheadGlyphName: head.noteheadGlyph,
-          noteX: x2,
-          noteY: y,
-          direction,
-          length,
-          thickness: lineWidth(ctx.theme, "stem", "stemThickness", STEM_THICKNESS_FALLBACK),
-          color: ctx.theme.colorOf("stem")
-        })
-      );
+      const stemOptions = {
+        noteheadGlyphName: head.noteheadGlyph,
+        noteX: x2,
+        noteY: y,
+        direction,
+        length,
+        thickness: lineWidth(ctx.theme, "stem", "stemThickness", STEM_THICKNESS_FALLBACK),
+        color: ctx.theme.colorOf("stem")
+      };
+      parts.push(renderStem(stemOptions));
+      const tremoloGlyph = ev.tremoloStrokes !== void 0 ? tremoloGlyphName(ev.tremoloStrokes) : void 0;
+      if (tremoloGlyph !== void 0) {
+        const stem = stemGeometry(stemOptions);
+        parts.push(
+          renderTremolo(tremoloGlyph, tremoloPlacement(stem.x, stem.attachY, stem.endY), {
+            fontFamily: ctx.theme.musicFont,
+            color: ctx.theme.colorOf("mark")
+          })
+        );
+      }
       if (needsFlag(ev.duration.type, false)) {
         const anchorName = direction === "up" ? "stemUpSE" : "stemDownNW";
         const anchor = getGlyph(head.noteheadGlyph)?.anchors?.[anchorName];
@@ -78572,17 +78739,54 @@ ${xrefOffset}
         const outermostIndex = positions.findIndex((position) => position === outermost);
         const stemGlyph = heads.glyphs[outermostIndex] ?? heads.widestGlyph;
         const length = computeStemLength(outermost, middleLineY(STAFF_LINES), direction);
-        parts.push(
-          renderStem({
-            noteheadGlyphName: stemGlyph,
-            noteX: x2,
-            noteY: ctx.measureBottomY + outermost,
-            direction,
-            length,
-            thickness: lineWidth(ctx.theme, "stem", "stemThickness", STEM_THICKNESS_FALLBACK),
-            color: ctx.theme.colorOf("stem")
-          })
-        );
+        const stemOptions = {
+          noteheadGlyphName: stemGlyph,
+          noteX: x2,
+          noteY: ctx.measureBottomY + outermost,
+          direction,
+          length,
+          thickness: lineWidth(ctx.theme, "stem", "stemThickness", STEM_THICKNESS_FALLBACK),
+          color: ctx.theme.colorOf("stem")
+        };
+        parts.push(renderStem(stemOptions));
+        const chordTremolo = chord2.notes.find((note2) => note2.tremoloStrokes !== void 0);
+        const tremoloGlyph = chordTremolo?.tremoloStrokes !== void 0 ? tremoloGlyphName(chordTremolo.tremoloStrokes) : void 0;
+        if (tremoloGlyph !== void 0) {
+          const stem = stemGeometry(stemOptions);
+          parts.push(
+            renderTremolo(tremoloGlyph, tremoloPlacement(stem.x, stem.attachY, stem.endY), {
+              fontFamily: ctx.theme.musicFont,
+              color: ctx.theme.colorOf("mark")
+            })
+          );
+        }
+      }
+      const arpeggioDirection = chord2.notes.find((note2) => note2.arpeggiate !== void 0)?.arpeggiate;
+      const explicitlyNotRolled = chord2.notes.some((note2) => note2.nonArpeggiate === true);
+      if (positions.length > 1 && (arpeggioDirection !== void 0 || explicitlyNotRolled)) {
+        const topY = ctx.measureBottomY + Math.min(...positions) - ARPEGGIO_MARGIN;
+        const bottomY = ctx.measureBottomY + Math.max(...positions) + ARPEGGIO_MARGIN;
+        const markX = x2 - noteheadWidth(heads.widestGlyph) - ARPEGGIO_GAP;
+        const markOptions = {
+          color: ctx.theme.colorOf("mark"),
+          thickness: lineWidth(ctx.theme, "stem", "stemThickness", STEM_THICKNESS_FALLBACK)
+        };
+        if (explicitlyNotRolled) {
+          const offStaffLine = (y, direction2) => Math.abs(y - Math.round(y)) < 0.15 ? y + direction2 * 0.3 : y;
+          parts.push(
+            renderNonArpeggio(
+              computeNonArpeggioShape(markX, offStaffLine(topY, -1), offStaffLine(bottomY, 1)),
+              markOptions
+            )
+          );
+        } else if (arpeggioDirection !== void 0) {
+          parts.push(
+            renderArpeggio(
+              computeArpeggioShape(markX, topY, bottomY, arpeggioDirection),
+              markOptions
+            )
+          );
+        }
       }
       const firstNote = chord2.notes[0];
       if (firstNote !== void 0) {

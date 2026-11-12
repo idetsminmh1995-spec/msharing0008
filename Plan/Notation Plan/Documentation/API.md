@@ -405,7 +405,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-662 exported symbols, by module.
+682 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -500,6 +500,8 @@ The diagnostics `level` lets through, in their original order.
 | type | `OrnamentType` | §9.20's ornament types -- declared here for the same reason as ArticulationType above. |
 | type | `FermataPlacement` | Orientation of a fermata relative to its note or rest. |
 | type | `FermataShape` | MusicXML fermata shapes with an exact bundled Bravura glyph mapping. |
+| type | `TremoloType` | Phase 56/§9.24: `<tremolo type>`. |
+| type | `ArpeggioDirection` | Phase 56/§9.25: which way a rolled chord is rolled. |
 | interface | `BeamHint` | One `<beam number="N">` hint exactly as the file wrote it (§10.4). |
 | interface | `LyricSyllable` | One `<lyric>` syllable attached to a note (§9.22/§10.4). |
 | interface | `Note` | A single sounding note -- pitched or unpitched, doesn't matter, both use this same type (see pitch.ts). |
@@ -672,6 +674,16 @@ The diagnostics `level` lets through, in their original order.
 | function | `resetMeasure` | Clears in-measure overrides at a barline -- the key signature itself carries over unchanged. |
 | interface | `AccidentalDecision` |  |
 | function | `evaluateAccidental` | Decides whether THIS note needs a drawn accidental, and returns the state updated to reflect it (so the NEXT note at the same step+octave in this measure compares against the pitch that's now actually sounding, not the key signature again). |
+
+### `src/geometry/arpeggio.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `ARPEGGIO_AMPLITUDE` | How far the squiggle's own zigzag swings either side of its centre line. |
+| interface | `ArpeggioShape` |  |
+| function | `computeArpeggioShape` | The squiggle for a chord spanning `topY`..`bottomY` (y-down, so `topY` is the smaller number). |
+| interface | `NonArpeggioShape` |  |
+| function | `computeNonArpeggioShape` | The bracket for a chord the file explicitly says is NOT rolled. |
 
 ### `src/geometry/articulation.ts`
 
@@ -865,7 +877,8 @@ The diagnostics `level` lets through, in their original order.
 | function | `supportedMusicXmlNoteheads` | Every `<notehead>` value this engine understands, for a diagnostic's own message. |
 | function | `shapeGlyphNameOrUndefined` | The duration-appropriate glyph name for a shape family (e.g. 'x' + a quarter note -> 'noteheadXBlack'), or `undefined` for a family this engine has no glyphs for. |
 | function | `shapeGlyphName` | The same lookup, throwing on an unknown family. |
-| function | `supportedNoteheadShapes` | Every notehead shape family this engine can draw -- what a config error message lists. |
+| function | `harmonicNoteheadGlyphName` | Phase 56/§9.26: the diamond head a harmonic is drawn with. |
+| function | `supportedNoteheadShapes` |  |
 | function | `durationDefaultNotehead` | The plain duration-based default notehead glyph -- priority 3 (lowest) in §9.7's selection order. |
 | function | `musicXmlNoteheadToShape` | Maps a MusicXML `<notehead>` element's value to this engine's shape-family key, or `undefined` for "no override, use the ordinary duration-based head". |
 | function | `noteheadMappingKey` | The key used to look up a per-note notehead override in `config.noteheadMapping.overridesByKey` (§9.7, §8's NoteheadMappingConfig). |
@@ -965,6 +978,15 @@ The diagnostics `level` lets through, in their original order.
 | function | `glyphForTimeSigChar` | Looks up the glyph for one time-signature character, throwing if it isn't a real SMuFL glyph. |
 | function | `charAdvance` | Bravura advance width (staff-space units) of one time-signature character. |
 | function | `textWidth` | Total width (staff-space units) a display string (e.g. "12", "3+2+2") would take, using each character's real Bravura advance width. |
+
+### `src/geometry/tremolo.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `TREMOLO_STROKE_CHOICES` | The strokes a tremolo may be drawn with. |
+| function | `tremoloGlyphName` | The glyph for a stroke count, or `undefined` when there is no such glyph. |
+| interface | `TremoloPlacement` |  |
+| function | `tremoloPlacement` | Where a single tremolo goes: centred on the stem, between the notehead and the stem's tip. |
 
 ### `src/geometry/tuplet.ts`
 
@@ -1344,6 +1366,7 @@ The diagnostics `level` lets through, in their original order.
 
 | | Name | Summary |
 |---|---|---|
+| const | `MAX_TREMOLO_STROKES` | Phase 56/§9.24: the most strokes a tremolo can be drawn with. |
 | interface | `ParsedNotations` |  |
 | function | `parseNotations` | Parses one `<note>`'s `<notations>` child, if it has one. |
 | function | `parseBeamHints` | Parses a `<note>`'s own `<beam>` hints (§10.4/§10.8). |
@@ -1456,6 +1479,14 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | interface | `RenderAccidentalOptions` |  |
 | function | `renderAccidental` | Draws one accidental glyph (from geometry's accidentalGlyphName) at the given position. |
+
+### `src/render/arpeggio.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `RenderArpeggioOptions` |  |
+| function | `renderArpeggio` | Draws a rolled chord's squiggle as one open stroked path (§9.25). |
+| function | `renderNonArpeggio` | Draws the bracket that says a chord is explicitly NOT rolled (§9.25): a vertical line with a short hook at each end, hooks pointing away from the noteheads. |
 
 ### `src/render/augmentation-dot.ts`
 
@@ -1610,7 +1641,9 @@ The diagnostics `level` lets through, in their original order.
 | | Name | Summary |
 |---|---|---|
 | interface | `RenderStemOptions` |  |
-| function | `renderStem` | Draws a stem attached at the notehead's REAL anchor point (`stemUpSE` for an up stem, `stemDownNW` for a down stem -- Phase 5's Bravura data, not a bounding-box corner). |
+| interface | `StemGeometry` | Draws a stem attached at the notehead's REAL anchor point (`stemUpSE` for an up stem, `stemDownNW` for a down stem -- Phase 5's Bravura data, not a bounding-box corner). |
+| function | `stemGeometry` | Where a stem actually runs, without drawing it. |
+| function | `renderStem` | Draws a stem attached at the notehead's REAL anchor point (`stemUpSE` for an up stem, `stemDownNW` for a down stem). |
 
 ### `src/render/svg-primitives.ts`
 
@@ -1666,6 +1699,13 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | interface | `RenderTimeSignatureOptions` |  |
 | function | `renderTimeSignature` | Draws a time signature: for a plain numeric signature, the numerator centered on the upper half of the staff (y=-3, i.e. spanning the middle line to the top line) and the denominator centered on the lower half (y=-1, bottom line to middle line), with the narrower of the two strings horizontally c... |
+
+### `src/render/tremolo.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `RenderTremoloOptions` |  |
+| function | `renderTremolo` | Draws a tremolo's strokes centred on a stem (§9.24). |
 
 ### `src/render/tuplet.ts`
 

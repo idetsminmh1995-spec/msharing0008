@@ -270,6 +270,32 @@ export function shapeGlyphName(
 }
 
 /** Every notehead shape family this engine can draw -- what a config error message lists. */
+/**
+ * Phase 56/§9.26: the diamond head a harmonic is drawn with.
+ *
+ * Guitar notation writes a natural harmonic as a diamond rather than an
+ * oval, and that shape is the whole notation -- the pitch is unchanged,
+ * so without it the note says "stop this string here" when the player
+ * must touch it. Chosen by duration exactly as the oval set is: a whole
+ * note gets the wide open diamond, a half note the open one, everything
+ * else the filled one.
+ *
+ * Deliberately NOT routed through `SHAPE_GLYPHS.diamond`: that table's
+ * `diamond` entries are a MusicXML `<notehead>diamond</notehead>` value,
+ * which a file may legitimately ask for on a note that is not a harmonic.
+ * This is the harmonic's own default, applied only when the file has not
+ * stated a head of its own.
+ */
+export function harmonicNoteheadGlyphName(
+  durationType: DurationType,
+  explicitlyFilled?: boolean,
+): string {
+  if (durationType === 'whole') return 'noteheadDiamondWhole';
+  return fillForDuration(durationType, explicitlyFilled) === 'black'
+    ? 'noteheadDiamondBlack'
+    : 'noteheadDiamondHalf';
+}
+
 export function supportedNoteheadShapes(): readonly string[] {
   return Object.keys(SHAPE_GLYPHS);
 }

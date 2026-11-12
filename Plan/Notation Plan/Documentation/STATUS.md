@@ -6,10 +6,10 @@ A+B+C corrective work** (making notes actually visible in the web app).
 Numbering is **`PLAN.md` §22's phase numbering** — deliberately not a second
 numbering system. Say a number from §B below and that's the phase to build.
 
-**Last audited:** against the code in `src/` and the **1,102-test** suite,
-after Phase 55's text layer (documented in
-[`phase-55`](./phase-55-text-layer.md)). Stages 0-10 are
-complete: every phase numbered 1-55 is built AND wired, including the
+**Last audited:** against the code in `src/` and the **1,121-test** suite,
+after Phase 56's note marks (documented in
+[`phase-56`](./phase-56-note-marks.md)). Stages 0-10 are
+complete: every phase numbered 1-56 is built AND wired, including the
 full playback surface (§17.1's position API and event stream, §17.2's
 cursor and repeat unfolding) and host-selectable part-specific event streams.
 What remains is the named gaps in §C and
@@ -17,10 +17,10 @@ What remains is the named gaps in §C and
 
 ---
 
-## A. DONE — Phases 1–55 ✅ (**every stage complete**) + Integration Passes A–Z
+## A. DONE — Phases 1–56 ✅ (**every stage complete**) + Integration Passes A–Z
 
 All of these are implemented, tested, and have a `Documentation/phase-NN-*.md` record.
-`npm run verify` passes **1,102/1,102** across them (verified 2026-11-12).
+`npm run verify` passes **1,121/1,121** across them (verified 2026-11-12).
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -109,6 +109,7 @@ All of these are implemented, tested, and have a `Documentation/phase-NN-*.md` r
 | 53 | Performance pass (§18.1) | Every budget met with margin, measured in both Chromium and Node+jsdom; the budgets are now tests, with scaling checks that catch an accidental O(n²). Implemented the one §18.1 strategy that was written down but missing -- `renderParsedMusicXml`, so a resize/re-theme never re-parses (9x faster on that path) | [`phase-53`](./phase-53-performance.md) |
 | 54 | Public API surface + generated reference docs (§22) | `docs/API.md` generated from the emitted .d.ts, with the ~30 supported entry points called out from the 479 exported symbols; `npm run docs:check` is in `verify`, so the reference cannot drift. Also closed §C1's tenor half (tenor-clef key signatures), §F4 (a browser-level visual test) and §F5 (dead `quick-demo/`) | [`phase-54`](./phase-54-public-api.md) |
 | 55 | Text layer: lyrics, chord symbols, rehearsal marks, `<words>` (§19.10) | Closes §19's limitation 10 -- one gap hit in four places. One small text layer (`render/text.ts`, `geometry/text-metrics.ts`) serves all four: lyric verses with hyphenation, elision and melisma extenders; chord symbols assembled from a root letter plus real `csym*` glyphs (slash bass, accidental, `<kind text>`); framed rehearsal marks; italic `<words>`. Layout reserves their room from the SAME functions the drawing pass uses, so nothing can be printed over the next system | [`phase-55`](./phase-55-text-layer.md) |
+| 56 | The marks that change what a note IS (§9.25–§9.27) | Tremolo (stroke count is the message; a count the font cannot draw is clamped AND reported), arpeggio/non-arpeggio (one path-based mark per chord, spacing reserved so it cannot land on the time signature or reach across a barline) and the guitar harmonic's diamond head. Found and fixed a stale plan entry: the fermata has been drawn since Integration H. See that phase's §5 for what is still not drawn (slides, cues, 8va brackets, pedals) | [`phase-56`](./phase-56-note-marks.md) |
 
 **Public API today:** 305 runtime exports from `dist/notation-engine.js` (662 symbols including types). See [`../docs/API.md`](../docs/API.md) — generated, and checked by `npm run verify`.
 

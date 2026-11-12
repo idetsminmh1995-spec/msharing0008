@@ -65,6 +65,11 @@ import {
   type BarlineType,
   type BeamStyle as BeamStyleOption,
   chordSymbolLayout,
+  harmonicNoteheadGlyphName,
+  tremoloGlyphName,
+  tremoloPlacement,
+  computeArpeggioShape,
+  computeNonArpeggioShape,
   computeRehearsalMarkBox,
   layoutLyricRow,
   lyricRowBaselineY,
@@ -166,6 +171,10 @@ import {
   renderTimeSignature,
   noteheadWidth,
   renderChordSymbol,
+  renderTremolo,
+  renderArpeggio,
+  renderNonArpeggio,
+  stemGeometry,
   renderLyricRow,
   renderRehearsalMark,
   renderWords,
@@ -637,6 +646,39 @@ const TEXT_MARK_GAP = 1.2;
 const CHORD_SYMBOL_STACK_CLEARANCE = 0.4;
 
 /**
+ * Phase 56/§9.25: where an arpeggio mark sits relative to the chord it
+ * belongs to -- just left of the chord's own leftmost ink, and reaching a
+ * little past its outer heads at each end so it reads as a mark BESIDE
+ * the chord rather than as part of it.
+ */
+const ARPEGGIO_GAP = 0.6;
+const ARPEGGIO_MARGIN = 0.5;
+
+/**
+ * Phase 56/§9.25: the horizontal room an arpeggio mark needs to the LEFT
+ * of the chord it belongs to -- the widest notehead it can sit beside,
+ * plus its own gap, plus a non-arpeggio bracket's own hook (the widest of
+ * the two marks), so neither can reach back onto a barline or a time
+ * signature. Used by the spacing pass (`leadingByStaff`).
+ */
+const ARPEGGIO_LEADING_WIDTH = 2.5;
+
+/** Whether this event's chord carries an arpeggio or non-arpeggio mark, i.e. needs that leading room. */
+function carriesArpeggioMark(event: Note | Chord | Rest): boolean {
+  if (event.kind === 'note') {
+    return event.arpeggiate !== undefined || event.nonArpeggiate === true;
+  }
+  if (event.kind === 'chord') {
+    // A one-note "chord" is not rolled; the drawing pass ignores it too.
+    return (
+      event.notes.length > 1 &&
+      event.notes.some((note) => note.arpeggiate !== undefined || note.nonArpeggiate === true)
+    );
+  }
+  return false;
+}
+
+/**
  * Phase 44 wiring: the single most extreme staff-position value any note
  * on `staffNumber` reaches, expressed as a non-negative extent AWAY from
  * that staff's own near edge -- exactly the shape `Skyline`'s segments
@@ -857,6 +899,8 @@ function computeMeasureLayout(
    * `SpacingEvent.widthsByStaff`, which is what reads this.
    */
   const widthByTickAndStaff = new Map<number, Map<string, number>>();
+  /** §9.25: one event per tick, so the FIRST attack's own arpeggio mark can be found after the loop. */
+  const eventByTick = new Map<number, Note | Chord | Rest>();
   /** The same, for what reaches LEFT of each attack -- its accidental. */
   const leadingByTickAndStaff = new Map<number, Map<string, number>>();
   /** MuseScore's `shortestChordRest`, per attack -- see where it is filled. */
@@ -878,6 +922,7 @@ function computeMeasureLayout(
       const tick = starts[idx] ?? 0;
       attacks.add(tick);
       const staff = String(event.staff ?? 1);
+      if (!eventByTick.has(tick)) eventByTick.set(tick, event);
       const put = (into: Map<number, Map<string, number>>, value: number): void => {
         let perStaff = into.get(tick);
         if (perStaff === undefined) {
@@ -887,7 +932,16 @@ function computeMeasureLayout(
         perStaff.set(staff, Math.max(perStaff.get(staff) ?? 0, value));
       };
       put(widthByTickAndStaff, attackWidth(event.duration.dots));
-      put(leadingByTickAndStaff, attackLeading(accidentals.get(tick)));
+      // §9.25: an arpeggio mark is drawn to the LEFT of its chord, so the
+      // spacing pass must reserve that room before the attack -- without
+      // it the mark lands on the barline, or on the previous measure's
+      // last notehead. Added to (not maxed with) the accidental's own
+      // leading, since a chord can need both.
+      put(
+        leadingByTickAndStaff,
+        attackLeading(accidentals.get(tick)) +
+          (carriesArpeggioMark(event) ? ARPEGGIO_LEADING_WIDTH : 0),
+      );
       // MuseScore's `Segment::shortestChordRest`: the shortest thing
       // that BEGINS at this attack, across every voice. Not the gap to
       // the next attack -- the two are equal only while nothing longer
@@ -1006,12 +1060,28 @@ function computeMeasureLayout(
   const proportional = computeProportionalPositions(spacingEvents, clock, spacing);
   const enforced = applyMinimumDistance(proportional, spacingEvents, spacing);
 
+  /**
+   * §9.25: `applyMinimumDistance` only reserves LEADING space for attacks
+   * after the first -- the first one sits at the measure's own note-area
+   * origin, where the space to its left belongs to the header (clef, key,
+   * time signature). A rolled chord as the first thing in a bar therefore
+   * put its mark on top of the time signature. Shifting the whole measure's
+   * positions right by the mark's own width gives the header the room
+   * instead, and the measure's width grows by the same amount below, so
+   * nothing is taken from the notes.
+   */
+  const firstTick = ticks[0];
+  const firstEvent = firstTick === undefined ? undefined : eventByTick.get(firstTick);
+  const firstAttackLeading =
+    firstEvent !== undefined && carriesArpeggioMark(firstEvent) ? ARPEGGIO_LEADING_WIDTH : 0;
+  const shifted = firstAttackLeading > 0 ? enforced.map((x) => x + firstAttackLeading) : enforced;
+
   const positionsByTick = new Map<number, number>();
   ticks.forEach((tick, i) => {
-    positionsByTick.set(tick, enforced[i] ?? 0);
+    positionsByTick.set(tick, shifted[i] ?? 0);
   });
 
-  const lastX = enforced[enforced.length - 1] ?? 0;
+  const lastX = shifted[shifted.length - 1] ?? 0;
   const lastEvent = spacingEvents[spacingEvents.length - 1];
   const lastWidth = lastEvent?.renderedWidth ?? 0;
 
@@ -1767,20 +1837,30 @@ function resolveNoteRendering(
       ? { ...drumOverride, ...configOverrides }
       : undefined;
 
-  const noteheadGlyph = selectNoteheadGlyphName({
-    pitch: note.pitch,
-    durationType: note.duration.type,
-    ...(note.noteheadFilled !== undefined ? { filled: note.noteheadFilled } : {}),
-    defaultShape: ctx.theme.noteheadMapping.defaultShape,
-    ...(note.explicitNotehead !== undefined ? { explicitNotehead: note.explicitNotehead } : {}),
-    ...(note.explicitNoteheadSmufl !== undefined
-      ? { explicitNoteheadSmufl: note.explicitNoteheadSmufl }
-      : drumGlyph !== undefined
-        ? { explicitNoteheadSmufl: drumGlyph }
-        : {}),
-    ...(gmNote !== undefined ? { midiNote: gmNote } : {}),
-    ...(overridesByKey !== undefined ? { overridesByKey } : {}),
-  });
+  // §9.26: a harmonic's diamond head, unless the file stated a head of
+  // its own -- `<notehead>diamond</notehead>` and `<harmonic>` together
+  // are common, and the file's explicit statement outranks this default.
+  const fileStatedHead =
+    note.explicitNotehead !== undefined || note.explicitNoteheadSmufl !== undefined;
+  const noteheadGlyph =
+    note.isHarmonic === true && !isUnpitched && !fileStatedHead
+      ? harmonicNoteheadGlyphName(note.duration.type, note.noteheadFilled)
+      : selectNoteheadGlyphName({
+          pitch: note.pitch,
+          durationType: note.duration.type,
+          ...(note.noteheadFilled !== undefined ? { filled: note.noteheadFilled } : {}),
+          defaultShape: ctx.theme.noteheadMapping.defaultShape,
+          ...(note.explicitNotehead !== undefined
+            ? { explicitNotehead: note.explicitNotehead }
+            : {}),
+          ...(note.explicitNoteheadSmufl !== undefined
+            ? { explicitNoteheadSmufl: note.explicitNoteheadSmufl }
+            : drumGlyph !== undefined
+              ? { explicitNoteheadSmufl: drumGlyph }
+              : {}),
+          ...(gmNote !== undefined ? { midiNote: gmNote } : {}),
+          ...(overridesByKey !== undefined ? { overridesByKey } : {}),
+        });
 
   return {
     position,
@@ -2085,17 +2165,30 @@ function renderNoteOrRest(
 
   if (ev.duration.type !== 'whole') {
     const length = computeStemLength(head.position, middleLineY(STAFF_LINES), direction);
-    parts.push(
-      renderStem({
-        noteheadGlyphName: head.noteheadGlyph,
-        noteX: x,
-        noteY: y,
-        direction,
-        length,
-        thickness: lineWidth(ctx.theme, 'stem', 'stemThickness', STEM_THICKNESS_FALLBACK),
-        color: ctx.theme.colorOf('stem'),
-      }),
-    );
+    const stemOptions = {
+      noteheadGlyphName: head.noteheadGlyph,
+      noteX: x,
+      noteY: y,
+      direction,
+      length,
+      thickness: lineWidth(ctx.theme, 'stem', 'stemThickness', STEM_THICKNESS_FALLBACK),
+      color: ctx.theme.colorOf('stem'),
+    };
+    parts.push(renderStem(stemOptions));
+    // §9.24: a tremolo's strokes are drawn ON the stem, centred on it --
+    // which is why the stem's own geometry is asked for rather than
+    // recomputed here.
+    const tremoloGlyph =
+      ev.tremoloStrokes !== undefined ? tremoloGlyphName(ev.tremoloStrokes) : undefined;
+    if (tremoloGlyph !== undefined) {
+      const stem = stemGeometry(stemOptions);
+      parts.push(
+        renderTremolo(tremoloGlyph, tremoloPlacement(stem.x, stem.attachY, stem.endY), {
+          fontFamily: ctx.theme.musicFont,
+          color: ctx.theme.colorOf('mark'),
+        }),
+      );
+    }
     if (needsFlag(ev.duration.type, false)) {
       const anchorName = direction === 'up' ? 'stemUpSE' : 'stemDownNW';
       const anchor = getGlyph(head.noteheadGlyph)?.anchors?.[anchorName];
@@ -2564,17 +2657,70 @@ function renderChord(
       const outermostIndex = positions.findIndex((position) => position === outermost);
       const stemGlyph = heads.glyphs[outermostIndex] ?? heads.widestGlyph;
       const length = computeStemLength(outermost, middleLineY(STAFF_LINES), direction);
-      parts.push(
-        renderStem({
-          noteheadGlyphName: stemGlyph,
-          noteX: x,
-          noteY: ctx.measureBottomY + outermost,
-          direction,
-          length,
-          thickness: lineWidth(ctx.theme, 'stem', 'stemThickness', STEM_THICKNESS_FALLBACK),
-          color: ctx.theme.colorOf('stem'),
-        }),
-      );
+      const stemOptions = {
+        noteheadGlyphName: stemGlyph,
+        noteX: x,
+        noteY: ctx.measureBottomY + outermost,
+        direction,
+        length,
+        thickness: lineWidth(ctx.theme, 'stem', 'stemThickness', STEM_THICKNESS_FALLBACK),
+        color: ctx.theme.colorOf('stem'),
+      };
+      parts.push(renderStem(stemOptions));
+      // §9.24: MusicXML attaches a chord's notations to its FIRST note, so
+      // that is where a chord's tremolo is read from.
+      const chordTremolo = chord.notes.find((note) => note.tremoloStrokes !== undefined);
+      const tremoloGlyph =
+        chordTremolo?.tremoloStrokes !== undefined
+          ? tremoloGlyphName(chordTremolo.tremoloStrokes)
+          : undefined;
+      if (tremoloGlyph !== undefined) {
+        const stem = stemGeometry(stemOptions);
+        parts.push(
+          renderTremolo(tremoloGlyph, tremoloPlacement(stem.x, stem.attachY, stem.endY), {
+            fontFamily: ctx.theme.musicFont,
+            color: ctx.theme.colorOf('mark'),
+          }),
+        );
+      }
+    }
+
+    // §9.25: one arpeggio mark for the WHOLE chord, not one per member --
+    // a rolled chord is rolled once. Its height comes from the chord's own
+    // outer noteheads, so it cannot disagree with what it is marking.
+    const arpeggioDirection = chord.notes.find((note) => note.arpeggiate !== undefined)?.arpeggiate;
+    const explicitlyNotRolled = chord.notes.some((note) => note.nonArpeggiate === true);
+    if (positions.length > 1 && (arpeggioDirection !== undefined || explicitlyNotRolled)) {
+      // A small margin beyond the outer heads, so the mark reads as beside
+      // the chord rather than as touching it.
+      const topY = ctx.measureBottomY + Math.min(...positions) - ARPEGGIO_MARGIN;
+      const bottomY = ctx.measureBottomY + Math.max(...positions) + ARPEGGIO_MARGIN;
+      const markX = x - noteheadWidth(heads.widestGlyph) - ARPEGGIO_GAP;
+      const markOptions = {
+        color: ctx.theme.colorOf('mark'),
+        thickness: lineWidth(ctx.theme, 'stem', 'stemThickness', STEM_THICKNESS_FALLBACK),
+      };
+      if (explicitlyNotRolled) {
+        // A bracket's hooks are HORIZONTAL, so a hook that lands exactly on
+        // a staff line is invisible -- it merges with the line it sits on.
+        // The first render of this fixture had both hooks on lines and the
+        // bracket read as a bare vertical stroke. Nudged into the space.
+        const offStaffLine = (y: number, direction: -1 | 1): number =>
+          Math.abs(y - Math.round(y)) < 0.15 ? y + direction * 0.3 : y;
+        parts.push(
+          renderNonArpeggio(
+            computeNonArpeggioShape(markX, offStaffLine(topY, -1), offStaffLine(bottomY, 1)),
+            markOptions,
+          ),
+        );
+      } else if (arpeggioDirection !== undefined) {
+        parts.push(
+          renderArpeggio(
+            computeArpeggioShape(markX, topY, bottomY, arpeggioDirection),
+            markOptions,
+          ),
+        );
+      }
     }
     // Integration H: MusicXML attaches a chord's <notations> to its FIRST
     // <note> (the others carry only <chord/>), so that note's marks are

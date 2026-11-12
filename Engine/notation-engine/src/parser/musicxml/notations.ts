@@ -1,10 +1,12 @@
 import type {
+  ArpeggioDirection,
   ArticulationType,
   BeamHint,
   FermataPlacement,
   FermataShape,
   LyricSyllable,
   OrnamentType,
+  TremoloType,
 } from '../../core/note.js';
 import { diagnostic, type Diagnostic, type DiagnosticLocation } from './diagnostic.js';
 import { attrOf, childElements, childrenNamed, firstChildNamed, textOf } from './dom-helpers.js';
@@ -63,10 +65,30 @@ const BEAM_VALUES: ReadonlySet<string> = new Set([
 
 const SYLLABIC_VALUES: ReadonlySet<string> = new Set(['single', 'begin', 'middle', 'end']);
 
+/**
+ * Phase 56/§9.24: the most strokes a tremolo can be drawn with.
+ *
+ * MusicXML allows 0-8, and a file really does use 4 for a measured
+ * sixteenth roll. Bravura ships `tremolo1`-`tremolo3` and nothing above,
+ * so a 4-or-more stroke tremolo is drawn with 3 and says so, rather than
+ * silently drawing something a reader would count wrong.
+ */
+export const MAX_TREMOLO_STROKES = 3;
+
 export interface ParsedNotations {
   readonly articulations: readonly ArticulationType[];
   readonly ornaments: readonly OrnamentType[];
   readonly hasFermata: boolean;
+  /** Phase 56/§9.24: `<tremolo>` stroke count, 1-3, when the note has one. */
+  readonly tremoloStrokes?: number;
+  /** Phase 56/§9.24: `<tremolo type>`; omitted means `single`. */
+  readonly tremoloType?: TremoloType;
+  /** Phase 56/§9.26: `<harmonic>` present -- the note is drawn with a diamond head. */
+  readonly isHarmonic: boolean;
+  /** Phase 56/§9.25: `<arpeggiate direction>`, when the note's chord is rolled. */
+  readonly arpeggiate?: ArpeggioDirection;
+  /** Phase 56/§9.25: `<non-arpeggiate>` present -- the chord is bracketed as not rolled. */
+  readonly nonArpeggiate: boolean;
   readonly fermataPlacement?: FermataPlacement;
   readonly fermataShape?: FermataShape;
   /** `<slur type="start">` numbers beginning at this note. A slur with no `number` attribute is number 1, per MusicXML's own default. */
@@ -80,6 +102,8 @@ const EMPTY_NOTATIONS: ParsedNotations = {
   articulations: [],
   ornaments: [],
   hasFermata: false,
+  isHarmonic: false,
+  nonArpeggiate: false,
   slurStarts: [],
   slurStops: [],
   tupletStart: false,
@@ -118,6 +142,11 @@ export function parseNotations(
   let hasFermata = false;
   let fermataPlacement: FermataPlacement | undefined;
   let fermataShape: FermataShape | undefined;
+  let tremoloStrokes: number | undefined;
+  let tremoloType: TremoloType | undefined;
+  let isHarmonic = false;
+  let arpeggiate: ArpeggioDirection | undefined;
+  let nonArpeggiate = false;
   let tupletStart = false;
   let tupletStop = false;
 
@@ -203,6 +232,45 @@ export function parseNotations(
           }
         }
         break;
+      case 'tremolo': {
+        // §9.24: the ELEMENT's text is the stroke count, not its attribute.
+        // MusicXML's own default when the text is missing is 3.
+        const raw = Number.parseInt(textOf(el)?.trim() ?? '', 10);
+        const requested = Number.isNaN(raw) ? MAX_TREMOLO_STROKES : raw;
+        const type = attrOf(el, 'type');
+        tremoloType =
+          type === 'start' || type === 'stop' ? type : type === 'single' ? 'single' : 'single';
+        if (requested > MAX_TREMOLO_STROKES) {
+          diagnostics.push(
+            diagnostic(
+              'info',
+              'TREMOLO_STROKES_CLAMPED',
+              `A <tremolo> with ${requested} strokes is drawn with ${MAX_TREMOLO_STROKES}; ` +
+                'the bundled font has no glyph above three.',
+              location,
+            ),
+          );
+        }
+        // A zero-stroke tremolo is not a mark at all.
+        const clamped = Math.min(Math.max(requested, 1), MAX_TREMOLO_STROKES);
+        if (requested > 0) tremoloStrokes = clamped;
+        break;
+      }
+      case 'harmonic':
+        // §9.26: any of <natural>, <artificial> or <base-pitch> means the
+        // same thing to a reader -- a diamond head. The difference between
+        // them is how the note is PRODUCED, which a fretboard shows by the
+        // head alone.
+        isHarmonic = true;
+        break;
+      case 'arpeggiate': {
+        const direction = attrOf(el, 'direction');
+        arpeggiate = direction === 'down' ? 'down' : 'up';
+        break;
+      }
+      case 'non-arpeggiate':
+        nonArpeggiate = true;
+        break;
       case 'tied':
       case 'technical':
         // Owned by parseNoteElement -- see this function's own doc comment.
@@ -224,6 +292,11 @@ export function parseNotations(
       articulations,
       ornaments,
       hasFermata,
+      ...(tremoloStrokes !== undefined ? { tremoloStrokes } : {}),
+      ...(tremoloType !== undefined ? { tremoloType } : {}),
+      isHarmonic,
+      ...(arpeggiate !== undefined ? { arpeggiate } : {}),
+      nonArpeggiate,
       ...(fermataPlacement !== undefined ? { fermataPlacement } : {}),
       ...(fermataShape !== undefined ? { fermataShape } : {}),
       slurStarts,

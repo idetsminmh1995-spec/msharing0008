@@ -653,6 +653,14 @@ describe('visual regression (Phase 8)', () => {
     matchSnapshot('render-from-musicxml-text-layer', svg, SNAPSHOT_DIR);
   });
 
+  test('Phase 56: tremolo, harmonic and arpeggio marks render identically to the saved snapshot', () => {
+    const xml = fs.readFileSync(
+      path.join(__dirname, '..', 'fixtures', 'musicxml', 'note-marks.musicxml'),
+      'utf8',
+    );
+    const { svg } = NE.renderFromMusicXml(xml, { domParser: testDomParser() });
+    matchSnapshot('render-from-musicxml-note-marks', svg, SNAPSHOT_DIR);
+  });
   test('Phase 44 wiring: a real crossing-hands fixture (content-aware grand-staff distance, gap grown to 16) renders identically to the saved snapshot', () => {
     const xml = fs.readFileSync(
       path.join(__dirname, '..', 'fixtures', 'musicxml', 'piano-crossing-hands.musicxml'),
