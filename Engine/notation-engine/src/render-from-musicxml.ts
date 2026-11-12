@@ -4583,15 +4583,22 @@ export function renderParsedMusicXml(
             // single 5-note beam group (2 grace + 3 real), silently drawing
             // the grace notes as if they were ordinary noteheads and never
             // reaching the grace-note rendering branch below at all.
-            const beamableEvents = voice.events.map((event) => {
+            const beamableEvents = voice.events.map((event, eventIndex) => {
               // Integration M: a CHORD is beamable now. It used to be
               // lumped in with rests here, which broke every beam run a
               // chord sat in -- on a drum chart, where hi-hat + snare
               // struck together IS a chord, that was most of them.
               const beamSource =
                 event.kind === 'chord' ? event.notes[0] : event.kind === 'note' ? event : undefined;
+              // Cross-voice drum attacks are rendered once by the shared
+              // attack pass above. They must also break this voice-local
+              // beam run: otherwise a mixed group can start on a shared
+              // event, then its later voice-local chords are treated as
+              // non-first members of a group that was never drawn here.
               const isRest =
-                event.kind === 'rest' || (event.kind === 'note' && event.isGrace === true);
+                event.kind === 'rest' ||
+                (event.kind === 'note' && event.isGrace === true) ||
+                sharedDrumEventKeys.has(`${voice.id}:${eventIndex}`);
               // §10.4/§10.8: the file's own level-1 <beam>, when it wrote
               // one. A chord's <beam> lives on its first note, exactly
               // where MusicXML puts it.

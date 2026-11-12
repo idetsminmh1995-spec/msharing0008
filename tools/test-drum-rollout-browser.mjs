@@ -72,8 +72,8 @@ try {
   const pageState = await evaluate(cdp, `(() => ({
     title: document.title,
     hasGatePanel: Boolean(document.querySelector('#assetGatePanel')),
-    hasCopyReport: Boolean(document.querySelector('#copyAssetReport')),
-    hasDownloadReport: Boolean(document.querySelector('#downloadAssetReport')),
+    hasCopyReport: Boolean(document.querySelector('[data-video-gate-copy]')),
+    hasDownloadReport: Boolean(document.querySelector('[data-video-gate-download]')),
     hasRetryButton: Boolean(document.querySelector('#retryKitAssets')),
     hasAssetLoader: Boolean(window.AssetLoader),
     hasRenderReport: Boolean(window.RenderReport),
