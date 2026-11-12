@@ -6,9 +6,9 @@ A+B+C corrective work** (making notes actually visible in the web app).
 Numbering is **`PLAN.md` §22's phase numbering** — deliberately not a second
 numbering system. Say a number from §B below and that's the phase to build.
 
-**Last audited:** against the code in `src/` and the **1,054-test** suite,
-after the multi-track playback stream follow-up
-([`playback-track-streams.md`](./playback-track-streams.md)). Stages 0-10 are
+**Last audited:** against the code in `src/` and the **1,072-test** suite,
+after the 44130 mixed-voice drum beam-continuity follow-up
+(documented in [`../PLAN.md`](../PLAN.md)). Stages 0-10 are
 complete: every phase numbered 1-54 is built AND wired, including the
 full playback surface (§17.1's position API and event stream, §17.2's
 cursor and repeat unfolding) and host-selectable part-specific event streams.
@@ -17,10 +17,10 @@ What remains is the named gaps in §C and
 
 ---
 
-## A. DONE — Phases 1–54 ✅ (**every stage complete**) + Integration Passes A–Q
+## A. DONE — Phases 1–54 ✅ (**every stage complete**) + Integration Passes A–Z
 
 All of these are implemented, tested, and have a `Documentation/phase-NN-*.md` record.
-`npm run verify` passes **1,071/1,071** across them (verified 2026-11-12).
+`npm run verify` passes **1,072/1,072** across them (verified 2026-11-12).
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -178,6 +178,18 @@ chords render normally. A full-file regression confirms all 441 normal drum
 heads (including snare) and 353 hi-hat X heads render. The two final-measure
 overrun diagnostics remain visible rather than hiding source events. The plan
 records the root cause and closure in §19 and the drum audit log.
+
+**44130 beam-continuity follow-up (2026-11-12).** The first correction preserved
+all 794 heads but treated every shared cross-voice attack as a beam boundary.
+That split continuous quarter-note grooves: in measures 5–6, the shared attacks
+at ticks 0/960 were beamed separately while voice-local attacks at 480/1440
+were rendered alone. A narrow staff-wide attack pass now keeps all consecutive
+unpitched quarter notes in one run when there are no gaps, rests, grace notes,
+note spans, lyrics, local-only explicit down-stems or primary beam hints; other measures
+still use normal per-voice engraving. Regression coverage confirms **88 primary beam lines for 88
+measures** and all 794 noteheads remain. `npm run verify` passes **1,072 tests,
+0 failed**; the code, regression and plan record are under `Engine/notation-engine`
+and `Plan/Notation Plan` respectively.
 
 ---
 

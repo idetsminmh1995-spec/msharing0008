@@ -77533,7 +77533,7 @@ ${xrefOffset}
     }
     return starts;
   }
-  function collectSharedDrumEvents(measure2, staffNumber) {
+  function collectDrumAttackEvents(measure2, staffNumber) {
     const byTick = /* @__PURE__ */ new Map();
     for (const voice2 of measure2.voices) {
       const starts = eventStartTicks(voice2.events);
@@ -77548,10 +77548,8 @@ ${xrefOffset}
         byTick.set(tick, bucket);
       });
     }
-    const shared = [];
+    const attacks = [];
     for (const [tick, bucket] of byTick) {
-      const voiceIds = new Set(bucket.map((member) => member.voiceId));
-      if (voiceIds.size < 2) continue;
       const durationTicks = bucket[0]?.event.duration.ticks;
       if (durationTicks === void 0 || !bucket.every((member) => member.event.duration.ticks === durationTicks))
         continue;
@@ -77559,8 +77557,8 @@ ${xrefOffset}
         (member) => member.event.kind === "chord" ? [...member.event.notes] : [member.event]
       );
       const first = bucket[0]?.event;
-      if (first === void 0 || notes.length < 2) continue;
-      shared.push({
+      if (first === void 0 || notes.length === 0) continue;
+      attacks.push({
         tick,
         event: {
           kind: "chord",
@@ -77573,7 +77571,33 @@ ${xrefOffset}
         members: bucket.map(({ voiceId, index }) => ({ voiceId, index }))
       });
     }
-    return shared.sort((a, b) => a.tick - b.tick);
+    return attacks.sort((a, b) => a.tick - b.tick);
+  }
+  function shouldUnifyQuarterDrumBeams(measure2, staffNumber, attacks) {
+    if (attacks.length === 0) return false;
+    const sharedAttackTicks = new Set(
+      attacks.filter((attack) => new Set(attack.members.map((member) => member.voiceId)).size > 1).map((attack) => attack.tick)
+    );
+    if (sharedAttackTicks.size === 0) return false;
+    const staffEvents = measure2.voices.flatMap((voice2) => {
+      const starts = eventStartTicks(voice2.events);
+      return voice2.events.flatMap(
+        (event, index) => (event.staff ?? 1) === staffNumber ? [{ event, tick: starts[index] ?? 0 }] : []
+      );
+    });
+    if (staffEvents.length === 0 || !staffEvents.every(({ event, tick }) => {
+      if (event.duration.type !== "quarter") return false;
+      const notes = event.kind === "note" ? [event] : event.kind === "chord" ? event.notes : [];
+      return notes.length > 0 && notes.every(
+        (note2) => note2.pitch.kind === "unpitched" && note2.isGrace !== true && (note2.explicitStemDirection !== "down" || sharedAttackTicks.has(tick)) && !note2.tieStart && !note2.tieStop && !note2.slurStarts?.length && !note2.slurStops?.length && !note2.tupletStart && !note2.tupletStop && !note2.lyrics?.length && !(note2.beams ?? []).some((beam) => beam.number === 1)
+      );
+    }))
+      return false;
+    return attacks.every((attack, index) => {
+      if (index === 0) return true;
+      const previous = attacks[index - 1];
+      return previous !== void 0 && attack.tick === previous.tick + previous.event.duration.ticks;
+    });
   }
   function totalTicks(events) {
     const starts = eventStartTicks(events);
@@ -79430,7 +79454,18 @@ ${xrefOffset}
             const isMultiVoice = voicesOnThisStaff.size > 1;
             const collisionOffsets = computeVoiceCollisionOffsets(measure2, staffNumber, ctxAtTick);
             const restPushes = computeRestClearanceOffsets(measure2, staffNumber, ctxAtTick);
-            const sharedDrumEvents = collectSharedDrumEvents(measure2, staffNumber);
+            const withEventId = (svg2, voiceId, eventIndex) => svgGroup([svg2], {
+              "data-id": notationEventId(part2.id, measure2.number, voiceId, eventIndex)
+            });
+            const drumAttackEvents = collectDrumAttackEvents(measure2, staffNumber);
+            const unifyQuarterDrumBeams = shouldUnifyQuarterDrumBeams(
+              measure2,
+              staffNumber,
+              drumAttackEvents
+            );
+            const sharedDrumEvents = unifyQuarterDrumBeams ? drumAttackEvents : drumAttackEvents.filter(
+              (group) => new Set(group.members.map((member) => member.voiceId)).size > 1
+            );
             const sharedDrumEventKeys = new Set(
               sharedDrumEvents.flatMap(
                 (group) => group.members.map((member) => `${member.voiceId}:${member.index}`)
@@ -79483,7 +79518,14 @@ ${xrefOffset}
                     theme.beamStyle,
                     "up"
                   );
-                  memberSvgs.forEach((memberSvg) => svgParts.push(memberSvg));
+                  memberSvgs.forEach((memberSvg, memberIndex) => {
+                    const attackIndex = beamGroup.eventIndices[memberIndex];
+                    const attack = attackIndex !== void 0 ? sharedDrumEvents[attackIndex] : void 0;
+                    const source2 = attack?.members.length === 1 ? attack.members[0] : void 0;
+                    svgParts.push(
+                      source2 !== void 0 ? withEventId(memberSvg, source2.voiceId, source2.index) : memberSvg
+                    );
+                  });
                   svgParts.push(beamSvg);
                   return;
                 }
@@ -79495,7 +79537,10 @@ ${xrefOffset}
                   createAccidentalState(fifths),
                   "up"
                 );
-                svgParts.push(svg2);
+                const source = group.members.length === 1 ? group.members[0] : void 0;
+                svgParts.push(
+                  source !== void 0 ? withEventId(svg2, source.voiceId, source.index) : svg2
+                );
               });
             }
             for (const voice2 of measure2.voices) {
@@ -79536,9 +79581,6 @@ ${xrefOffset}
                 if (firstIndex !== void 0) groupByFirstIndex.set(firstIndex, group);
               }
               const anchorByIndex = /* @__PURE__ */ new Map();
-              const withEventId = (svg2, voiceId, eventIndex) => svgGroup([svg2], {
-                "data-id": notationEventId(part2.id, measure2.number, voiceId, eventIndex)
-              });
               voice2.events.forEach((event, idx) => {
                 const eventStaff = event.staff ?? 1;
                 if (eventStaff !== staffNumber) return;
