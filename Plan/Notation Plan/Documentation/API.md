@@ -27,8 +27,6 @@ Parse a MusicXML document and render it, in one call -- the ordinary entry point
 export function renderParsedMusicXml(parsed: ParseResult, options?: RenderParsedMusicXmlOptions): RenderFromMusicXmlResult;
 ```
 
-Phase 53/§18.1: render a score that has ALREADY been parsed.
-
 *(`src/render-from-musicxml.ts`)*
 
 #### `parseMusicXml`
@@ -405,7 +403,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-637 exported symbols, by module.
+692 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -433,6 +431,7 @@ The diagnostics `level` lets through, in their original order.
 | interface | `PageConfig` | §16.2's own requirement: "page geometry (size, margins) comes from `config.page`." Defaults match a standard A4 page in staff spaces at a typical engraving scale (roughly 7mm per staff space, the same scale most notation software defaults to) -- a reasonable starting point, fully overridable, the... |
 | interface | `DrumMapEntryOverride` | §13.3: every field of the default GM percussion table (`DEFAULT_DRUM_MAPPING_TABLE`, in `drums/drum-map.ts`) is overridable here, keyed by GM MIDI note number -- "the default table is a starting point, not a constraint: house styles differ on which line a tom sits on, and the user must be able to... |
 | interface | `DrumsConfig` |  |
+| interface | `TextConfig` | §19.10 named ONE gap hit in four places: lyrics, chord symbols, rehearsal marks and `<words>` directions were all parsed and preserved but never drawn, because none of them is a single SMuFL glyph. |
 | type | `LogLevel` | §18.3's own severity ladder. |
 | interface | `DebugConfig` |  |
 | interface | `EngineConfig` |  |
@@ -499,6 +498,9 @@ The diagnostics `level` lets through, in their original order.
 | type | `OrnamentType` | §9.20's ornament types -- declared here for the same reason as ArticulationType above. |
 | type | `FermataPlacement` | Orientation of a fermata relative to its note or rest. |
 | type | `FermataShape` | MusicXML fermata shapes with an exact bundled Bravura glyph mapping. |
+| type | `TremoloType` | Phase 56/§9.24: `<tremolo type>`. |
+| type | `ArpeggioDirection` | Phase 56/§9.25: which way a rolled chord is rolled. |
+| type | `SlideKind` | MusicXML notation gesture kind, preserved so slide and glissando render distinctly. |
 | interface | `BeamHint` | One `<beam number="N">` hint exactly as the file wrote it (§10.4). |
 | interface | `LyricSyllable` | One `<lyric>` syllable attached to a note (§9.22/§10.4). |
 | interface | `Note` | A single sounding note -- pitched or unpitched, doesn't matter, both use this same type (see pitch.ts). |
@@ -524,6 +526,7 @@ The diagnostics `level` lets through, in their original order.
 | function | `isUnpitched` |  |
 | function | `pitchedPitch` |  |
 | function | `unpitchedPitch` |  |
+| function | `soundingPitch` | Applies MusicXML transposition to a pitched pitch; unpitched display positions are unchanged. |
 
 ### `src/core/rest.ts`
 
@@ -672,6 +675,16 @@ The diagnostics `level` lets through, in their original order.
 | interface | `AccidentalDecision` |  |
 | function | `evaluateAccidental` | Decides whether THIS note needs a drawn accidental, and returns the state updated to reflect it (so the NEXT note at the same step+octave in this measure compares against the pitch that's now actually sounding, not the key signature again). |
 
+### `src/geometry/arpeggio.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `ARPEGGIO_AMPLITUDE` | How far the squiggle's own zigzag swings either side of its centre line. |
+| interface | `ArpeggioShape` |  |
+| function | `computeArpeggioShape` | The squiggle for a chord spanning `topY`..`bottomY` (y-down, so `topY` is the smaller number). |
+| interface | `NonArpeggioShape` |  |
+| function | `computeNonArpeggioShape` | The bracket for a chord the file explicitly says is NOT rolled. |
+
 ### `src/geometry/articulation.ts`
 
 | | Name | Summary |
@@ -741,6 +754,10 @@ The diagnostics `level` lets through, in their original order.
 | function | `chordSymbolAccidentalGlyphName` | The chord-symbol-specific accidental glyph for a root note's alter -- a REAL, separate glyph set from §9.11's plain notehead accidentals (`csymAccidentalSharp` vs `accidentalSharp`), confirmed by checking `glyphnames.json` rather than assuming the two could be shared. |
 | type | `ChordSymbolQuality` |  |
 | function | `chordSymbolQualityGlyphName` | The real SMuFL glyph for one of the five chord qualities that have a dedicated symbol. |
+| type | `ChordSymbolPart` | One drawable piece of a chord symbol, in left-to-right order. |
+| interface | `ChordSymbolSource` | A `<harmony>`'s musical content, as the parser preserved it (§10.4). |
+| interface | `ChordSymbolLayout` |  |
+| function | `chordSymbolLayout` | Assembles a `<harmony>` into the ordered parts that draw it: root letter, root accidental, quality suffix, then `slash bass` if the file states one. |
 
 ### `src/geometry/clef.ts`
 
@@ -773,6 +790,8 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | function | `tempoMarkSide` | §9.21's placement rule -- confirmed directly (Finale's own tutorial: "common practice to place the tempo marking above only the top staff"). |
 | function | `rehearsalMarkSide` | §9.21's placement rule for rehearsal marks -- near-universal convention (boxed or circled letter/number, above the staff). |
+| interface | `RehearsalMarkBox` | The box around a rehearsal mark, in staff spaces. |
+| function | `computeRehearsalMarkBox` | Sizes the frame around `text`. |
 
 ### `src/geometry/fermata.ts`
 
@@ -835,6 +854,11 @@ The diagnostics `level` lets through, in their original order.
 | function | `computeHyphenX` | The centered X for a hyphen between two syllables -- simple midpoint, matching the real convention ("the hyphen will be centered between the syllables"). |
 | interface | `ExtenderLineShape` |  |
 | function | `computeExtenderLine` | A melisma extender line's endpoints -- genuinely drawn geometry (no SMuFL glyph represents an arbitrary-length line), using Bravura's real `lyricLineThickness` (0.16sp) for its stroke width at render time, the same reasoning already applied to hairpins (§9.21), ties (§9.15), and slurs (§9.16). |
+| interface | `LyricSyllableBox` | One syllable as it reaches the row layout: where its note is, how wide the syllable draws, and the two facts that decide the punctuation around it (`<syllabic>`, `<extend/>`). |
+| type | `LyricRenderItem` | One thing a lyric row draws, already positioned in staff spaces. |
+| interface | `LyricRowOptions` |  |
+| function | `layoutLyricRow` | Lays out one verse's syllables left to right, adding the punctuation §9.22 specifies: a hyphen between two syllables of the same word, an elision between two syllables sung on one note, and an extender line for a melisma. |
+| function | `lyricRowBaselineY` | The baseline y of lyric verse `rowIndex` (0-based) below a staff's bottom line. |
 
 ### `src/geometry/metronome.ts`
 
@@ -853,7 +877,8 @@ The diagnostics `level` lets through, in their original order.
 | function | `supportedMusicXmlNoteheads` | Every `<notehead>` value this engine understands, for a diagnostic's own message. |
 | function | `shapeGlyphNameOrUndefined` | The duration-appropriate glyph name for a shape family (e.g. 'x' + a quarter note -> 'noteheadXBlack'), or `undefined` for a family this engine has no glyphs for. |
 | function | `shapeGlyphName` | The same lookup, throwing on an unknown family. |
-| function | `supportedNoteheadShapes` | Every notehead shape family this engine can draw -- what a config error message lists. |
+| function | `harmonicNoteheadGlyphName` | Phase 56/§9.26: the diamond head a harmonic is drawn with. |
+| function | `supportedNoteheadShapes` |  |
 | function | `durationDefaultNotehead` | The plain duration-based default notehead glyph -- priority 3 (lowest) in §9.7's selection order. |
 | function | `musicXmlNoteheadToShape` | Maps a MusicXML `<notehead>` element's value to this engine's shape-family key, or `undefined` for "no override, use the ordinary duration-based head". |
 | function | `noteheadMappingKey` | The key used to look up a per-note notehead override in `config.noteheadMapping.overridesByKey` (§9.7, §8's NoteheadMappingConfig). |
@@ -874,6 +899,13 @@ The diagnostics `level` lets through, in their original order.
 | function | `multiMeasureRestGlyphName` | The glyph for a multi-measure rest (a horizontal bar spanning several measures) -- separate from the per-duration glyphs above since it isn't tied to a DurationType at all. |
 | function | `defaultRestY` | §9.10's default/special-case vertical placement, before any per-voice offset: quarter-and-shorter center on the middle line; **whole and half are special-cased**, per real engraving convention (confirmed against Bravura's own glyph bounding boxes before writing this -- restWhole's shape sits almo... |
 | function | `restY` | The full rest Y position including an optional per-voice offset. |
+
+### `src/geometry/slide.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `SlideShape` |  |
+| function | `computeSlideShape` | Straight guitar slide or lightly wavy glissando; coordinates are SVG staff-space coordinates. |
 
 ### `src/geometry/slur.ts`
 
@@ -953,6 +985,15 @@ The diagnostics `level` lets through, in their original order.
 | function | `glyphForTimeSigChar` | Looks up the glyph for one time-signature character, throwing if it isn't a real SMuFL glyph. |
 | function | `charAdvance` | Bravura advance width (staff-space units) of one time-signature character. |
 | function | `textWidth` | Total width (staff-space units) a display string (e.g. "12", "3+2+2") would take, using each character's real Bravura advance width. |
+
+### `src/geometry/tremolo.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `TREMOLO_STROKE_CHOICES` | The strokes a tremolo may be drawn with. |
+| function | `tremoloGlyphName` | The glyph for a stroke count, or `undefined` when there is no such glyph. |
+| interface | `TremoloPlacement` |  |
+| function | `tremoloPlacement` | Where a single tremolo goes: centred on the stem, between the notehead and the stem's tip. |
 
 ### `src/geometry/tuplet.ts`
 
@@ -1083,6 +1124,7 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | interface | `PartStaffPosition` |  |
 | interface | `SystemLayout` |  |
+| const | `DEFAULT_PART_GAP` | The gap between two PARTS in the same system, exported because a caller that has to grow it for its own content (Phase 55's lyric rows below one part and chord symbols above the next) needs the floor it is growing FROM, not a second copy of the number. |
 | function | `computeSystemLayout` | §9.18's vertical stacking: every part's own staff (or staves, for a braced multi-staff part -- geometry's `needsBrace`) gets a distinct, non-overlapping Y, parts stacked top to bottom in score order. |
 | function | `computeSystemLayoutVariableGaps` | Phase 44 wiring: the same vertical stacking as `computeSystemLayout`, but the gap AFTER a given staff (before the next staff within the same part) is supplied per-pair by `staffGapForPair`, rather than one fixed value applied everywhere. |
 
@@ -1252,6 +1294,7 @@ The diagnostics `level` lets through, in their original order.
 | | Name | Summary |
 |---|---|---|
 | interface | `ClefSpec` | One `<clef>`'s own sign/line, keyed by staff number in AttributesUpdate.clefsByStaff. |
+| interface | `TransposeSpec` | MusicXML <transpose> metadata, persisted until the next <transpose>. |
 | interface | `AttributesUpdate` | The running per-part state an `<attributes>` element updates. |
 | function | `parseAttributesElement` | Parses one `<attributes>` element. |
 
@@ -1288,6 +1331,8 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | type | `ParsedDynamicLevel` | Structurally identical to `geometry/dynamic.ts`'s `DynamicLevel` -- see this file's header. |
 | type | `ParsedWedgeType` | 'crescendo'/'decrescendo' are structurally identical to `geometry/hairpin.ts`'s `HairpinKind`; 'stop' is this parser's own marker for the wedge's closing element, which has no geometry of its own. |
+| type | `ParsedPedalType` |  |
+| interface | `ParsedPedal` |  |
 | interface | `ParsedWedge` |  |
 | interface | `ParsedDirectionContent` |  |
 | function | `parseSoundTempo` | `<sound tempo="...">` as a positive number, or undefined. |
@@ -1331,6 +1376,7 @@ The diagnostics `level` lets through, in their original order.
 
 | | Name | Summary |
 |---|---|---|
+| const | `MAX_TREMOLO_STROKES` | Phase 56/§9.24: the most strokes a tremolo can be drawn with. |
 | interface | `ParsedNotations` |  |
 | function | `parseNotations` | Parses one `<note>`'s `<notations>` child, if it has one. |
 | function | `parseBeamHints` | Parses a `<note>`'s own `<beam>` hints (§10.4/§10.8). |
@@ -1351,7 +1397,8 @@ The diagnostics `level` lets through, in their original order.
 | interface | `MeasureAttributes` | The per-(part, measure) clef/key/time/barline side-table §10 asks for -- separate from the core `Score`, which never knows about clefs or key/time signatures at all (those are notational, not musical, per Phase 3). |
 | interface | `PositionedAttributeChange` | The effective notational state immediately after an `<attributes>` element at its real measure-local cursor position. |
 | interface | `TempoMarkEvent` |  |
-| interface | `DirectionEvent` | Phase 35 Tier 2/§10.4: one `<direction>`'s recognized content at the measure-local tick it appeared at. |
+| interface | `OctaveShiftEvent` | Phase 35 Tier 2/§10.4: one `<direction>`'s recognized content at the measure-local tick it appeared at. |
+| interface | `DirectionEvent` |  |
 | interface | `HarmonyEvent` | Phase 35 Tier 2/§10.4: one `<harmony>` (chord symbol) at a measure-local tick. |
 | interface | `PrintEvent` | Phase 35 Tier 2/§10.4: one `<print>`'s system/page break request. |
 | interface | `PrintLayout` | The layout hints one `<print>` carries, in staff spaces. |
@@ -1434,7 +1481,7 @@ The diagnostics `level` lets through, in their original order.
 | interface | `RenderParsedMusicXmlOptions` | What `renderParsedMusicXml` takes: everything `renderFromMusicXml` does, minus the parser's own options (parsing already happened). |
 | interface | `RenderFromMusicXmlOptions` |  |
 | interface | `RenderFromMusicXmlResult` |  |
-| **API** | `renderParsedMusicXml` | Phase 53/§18.1: render a score that has ALREADY been parsed. |
+| **API** | `renderParsedMusicXml` |  |
 | **API** | `renderFromMusicXml` | Parse a MusicXML document and render it, in one call -- the ordinary entry point, and exactly `parseMusicXml` followed by `renderParsedMusicXml`. |
 
 ### `src/render/accidental.ts`
@@ -1443,6 +1490,14 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | interface | `RenderAccidentalOptions` |  |
 | function | `renderAccidental` | Draws one accidental glyph (from geometry's accidentalGlyphName) at the given position. |
+
+### `src/render/arpeggio.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `RenderArpeggioOptions` |  |
+| function | `renderArpeggio` | Draws a rolled chord's squiggle as one open stroked path (§9.25). |
+| function | `renderNonArpeggio` | Draws the bracket that says a chord is explicitly NOT rolled (§9.25): a vertical line with a short hook at each end, hooks pointing away from the noteheads. |
 
 ### `src/render/augmentation-dot.ts`
 
@@ -1466,6 +1521,13 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | interface | `RenderBeamOptions` |  |
 | function | `renderBeam` | Draws every beam line a group gets. |
+
+### `src/render/chord-symbol.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `RenderChordSymbolOptions` |  |
+| function | `renderChordSymbol` | Draws one assembled chord symbol, left to right, starting at `x`. |
 
 ### `src/render/clef.ts`
 
@@ -1492,6 +1554,15 @@ The diagnostics `level` lets through, in their original order.
 | interface | `OverlaySkyline` |  |
 | interface | `RenderSkylineOverlayOptions` |  |
 | **API** | `renderSkylineOverlay` | Both sides of every staff's skyline, in one `<g class="debug-skyline">`. |
+
+### `src/render/expression-mark.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `RenderRehearsalMarkOptions` |  |
+| function | `renderRehearsalMark` | One rehearsal mark: its letter or number, centred in a rectangle. |
+| interface | `RenderWordsOptions` |  |
+| function | `renderWords` | One `<words>` direction -- "Allegro", "dolce", "play twice" -- as text. |
 
 ### `src/render/flag.ts`
 
@@ -1529,6 +1600,8 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | interface | `RenderExtenderLineOptions` |  |
 | function | `renderExtenderLine` | Draws a melisma extender line as a plain horizontal segment. |
+| interface | `RenderLyricRowOptions` |  |
+| function | `renderLyricRow` | Draws one verse's row of lyric items at `y`, which is the row's text BASELINE: syllables, their hyphens and elisions, and any extender lines. |
 
 ### `src/render/mark.ts`
 
@@ -1560,6 +1633,13 @@ The diagnostics `level` lets through, in their original order.
 | interface | `RenderRestOptions` |  |
 | function | `renderRest` | Draws one rest glyph (from restGlyphName or multiMeasureRestGlyphName) at the given position. |
 
+### `src/render/slide.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `RenderSlideOptions` |  |
+| function | `renderSlide` | Draws a straight slash for <slide>; glissando is visibly distinct with a fine wave. |
+
 ### `src/render/slur.ts`
 
 | | Name | Summary |
@@ -1579,7 +1659,9 @@ The diagnostics `level` lets through, in their original order.
 | | Name | Summary |
 |---|---|---|
 | interface | `RenderStemOptions` |  |
-| function | `renderStem` | Draws a stem attached at the notehead's REAL anchor point (`stemUpSE` for an up stem, `stemDownNW` for a down stem -- Phase 5's Bravura data, not a bounding-box corner). |
+| interface | `StemGeometry` | Draws a stem attached at the notehead's REAL anchor point (`stemUpSE` for an up stem, `stemDownNW` for a down stem -- Phase 5's Bravura data, not a bounding-box corner). |
+| function | `stemGeometry` | Where a stem actually runs, without drawing it. |
+| function | `renderStem` | Draws a stem attached at the notehead's REAL anchor point (`stemUpSE` for an up stem, `stemDownNW` for a down stem). |
 
 ### `src/render/svg-primitives.ts`
 
@@ -1613,6 +1695,15 @@ The diagnostics `level` lets through, in their original order.
 | interface | `RenderTabNumberOptions` |  |
 | function | `renderTabNumber` | Draws a fret number on its string's line: a background-coloured mask to interrupt the line, then the digit glyphs centred over it. |
 
+### `src/render/text.ts`
+
+| | Name | Summary |
+|---|---|---|
+| type | `TextAnchor` | §19.10's gap, closed: how an ARBITRARY run of ordinary text is drawn. |
+| interface | `RenderTextOptions` |  |
+| function | `renderText` | One text run, as a single `<text>` element. |
+| function | `renderTextScaledGlyph` | One SMuFL glyph drawn at TEXT scale rather than at the 4x convention. |
+
 ### `src/render/tie.ts`
 
 | | Name | Summary |
@@ -1626,6 +1717,13 @@ The diagnostics `level` lets through, in their original order.
 |---|---|---|
 | interface | `RenderTimeSignatureOptions` |  |
 | function | `renderTimeSignature` | Draws a time signature: for a plain numeric signature, the numerator centered on the upper half of the staff (y=-3, i.e. spanning the middle line to the top line) and the denominator centered on the lower half (y=-1, bottom line to middle line), with the narrower of the two strings horizontally c... |
+
+### `src/render/tremolo.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `RenderTremoloOptions` |  |
+| function | `renderTremolo` | Draws a tremolo's strokes centred on a stem (§9.24). |
 
 ### `src/render/tuplet.ts`
 

@@ -22,6 +22,7 @@ var NotationEngine = (() => {
   var index_exports = {};
   __export(index_exports, {
     ALTO_CLEF: () => ALTO_CLEF,
+    ARPEGGIO_AMPLITUDE: () => ARPEGGIO_AMPLITUDE,
     BASS_CLEF: () => BASS_CLEF,
     BEAM_HOOK_LENGTH: () => BEAM_HOOK_LENGTH,
     ByteReader: () => ByteReader,
@@ -29,6 +30,7 @@ var NotationEngine = (() => {
     DEFAULT_CONFIG: () => DEFAULT_CONFIG,
     DEFAULT_CURSOR_FIXED_FRACTION: () => DEFAULT_CURSOR_FIXED_FRACTION,
     DEFAULT_DRUM_MAPPING_TABLE: () => DEFAULT_DRUM_MAPPING_TABLE,
+    DEFAULT_PART_GAP: () => DEFAULT_PART_GAP,
     DEFAULT_REPEAT_TIMES: () => DEFAULT_REPEAT_TIMES,
     DEFAULT_STEM_LENGTH: () => DEFAULT_STEM_LENGTH,
     DOT_DOT_DISTANCE: () => DOT_DOT_DISTANCE,
@@ -53,6 +55,7 @@ var NotationEngine = (() => {
     TREBLE_8VA_CLEF: () => TREBLE_8VA_CLEF,
     TREBLE_8VB_CLEF: () => TREBLE_8VB_CLEF,
     TREBLE_CLEF: () => TREBLE_CLEF,
+    TREMOLO_STROKE_CHOICES: () => TREMOLO_STROKE_CHOICES,
     accidentalGlyphName: () => accidentalGlyphName,
     accidentalX: () => accidentalX,
     addToSkyline: () => addToSkyline,
@@ -85,10 +88,12 @@ var NotationEngine = (() => {
     chordDotPlacements: () => chordDotPlacements,
     chordStemDirection: () => chordStemDirection,
     chordSymbolAccidentalGlyphName: () => chordSymbolAccidentalGlyphName,
+    chordSymbolLayout: () => chordSymbolLayout,
     chordSymbolQualityGlyphName: () => chordSymbolQualityGlyphName,
     chordSymbolSide: () => chordSymbolSide,
     chromaticNoteNumber: () => chromaticNoteNumber,
     codepointToChar: () => codepointToChar,
+    computeArpeggioShape: () => computeArpeggioShape,
     computeAttackSpace: () => computeAttackSpace,
     computeBarlineGeometry: () => computeBarlineGeometry,
     computeBeamSegments: () => computeBeamSegments,
@@ -101,12 +106,15 @@ var NotationEngine = (() => {
     computeHairpinShape: () => computeHairpinShape,
     computeHyphenX: () => computeHyphenX,
     computeLedgerLines: () => computeLedgerLines,
+    computeNonArpeggioShape: () => computeNonArpeggioShape,
     computePageLayout: () => computePageLayout,
     computePlaybackData: () => computePlaybackData,
     computeProportionalPositions: () => computeProportionalPositions,
     computePxPerStaffSpace: () => computePxPerStaffSpace,
     computeReferenceDuration: () => computeReferenceDuration,
+    computeRehearsalMarkBox: () => computeRehearsalMarkBox,
     computeScrollLayout: () => computeScrollLayout,
+    computeSlideShape: () => computeSlideShape,
     computeSlurShape: () => computeSlurShape,
     computeStaffDistance: () => computeStaffDistance,
     computeStaffGeometry: () => computeStaffGeometry,
@@ -168,6 +176,7 @@ var NotationEngine = (() => {
     graceNoteGlyphName: () => graceNoteGlyphName,
     groupBeams: () => groupBeams,
     groupBeamsFromHints: () => groupBeamsFromHints,
+    harmonicNoteheadGlyphName: () => harmonicNoteheadGlyphName,
     hasBackground: () => hasBackground,
     hasExplicitBeams: () => hasExplicitBeams,
     isKnownAccidentalGlyphName: () => isKnownAccidentalGlyphName,
@@ -177,9 +186,11 @@ var NotationEngine = (() => {
     isUnpitched: () => isUnpitched,
     justifySystem: () => justifySystem,
     keySignatureAccidentals: () => keySignatureAccidentals,
+    layoutLyricRow: () => layoutLyricRow,
     lookupDrumMapEntry: () => lookupDrumMapEntry,
     lyricElisionGlyphName: () => lyricElisionGlyphName,
     lyricHyphenGlyphName: () => lyricHyphenGlyphName,
+    lyricRowBaselineY: () => lyricRowBaselineY,
     lyricSide: () => lyricSide,
     measure: () => measure,
     measureSvgBoxes: () => measureSvgBoxes,
@@ -225,6 +236,7 @@ var NotationEngine = (() => {
     readVariableLengthQuantity: () => readVariableLengthQuantity,
     rehearsalMarkSide: () => rehearsalMarkSide,
     renderAccidental: () => renderAccidental,
+    renderArpeggio: () => renderArpeggio,
     renderAugmentationDots: () => renderAugmentationDots,
     renderBarNumber: () => renderBarNumber,
     renderBarline: () => renderBarline,
@@ -232,6 +244,7 @@ var NotationEngine = (() => {
     renderBoundingBoxOverlay: () => renderBoundingBoxOverlay,
     renderBrace: () => renderBrace,
     renderCancellationNaturals: () => renderCancellationNaturals,
+    renderChordSymbol: () => renderChordSymbol,
     renderClef: () => renderClef,
     renderCursor: () => renderCursor,
     renderExtenderLine: () => renderExtenderLine,
@@ -240,22 +253,30 @@ var NotationEngine = (() => {
     renderHairpin: () => renderHairpin,
     renderKeySignature: () => renderKeySignature,
     renderLedgerLines: () => renderLedgerLines,
+    renderLyricRow: () => renderLyricRow,
     renderMark: () => renderMark,
     renderMetronomeMark: () => renderMetronomeMark,
+    renderNonArpeggio: () => renderNonArpeggio,
     renderNotehead: () => renderNotehead,
     renderParsedMusicXml: () => renderParsedMusicXml,
+    renderRehearsalMark: () => renderRehearsalMark,
     renderRepeatCount: () => renderRepeatCount,
     renderRest: () => renderRest,
     renderSkylineOverlay: () => renderSkylineOverlay,
+    renderSlide: () => renderSlide,
     renderSlur: () => renderSlur,
     renderStaff: () => renderStaff,
     renderStem: () => renderStem,
     renderTabNumber: () => renderTabNumber,
+    renderText: () => renderText,
+    renderTextScaledGlyph: () => renderTextScaledGlyph,
     renderTie: () => renderTie,
     renderTimeSignature: () => renderTimeSignature,
+    renderTremolo: () => renderTremolo,
     renderTupletBracket: () => renderTupletBracket,
     renderTupletNumber: () => renderTupletNumber,
     renderVolta: () => renderVolta,
+    renderWords: () => renderWords,
     repeatDiagnostic: () => repeatDiagnostic,
     resetMeasure: () => resetMeasure,
     resizePureScale: () => resizePureScale,
@@ -275,8 +296,10 @@ var NotationEngine = (() => {
     sharpsForCount: () => sharpsForCount,
     shouldShowBarNumber: () => shouldShowBarNumber,
     slurSide: () => slurSide,
+    soundingPitch: () => soundingPitch,
     spacingDiagnostic: () => spacingDiagnostic,
     staffPositionForPitch: () => staffPositionForPitch,
+    stemGeometry: () => stemGeometry,
     stringToUtf8: () => stringToUtf8,
     sumTicks: () => sumTicks,
     supportedMusicXmlNoteheads: () => supportedMusicXmlNoteheads,
@@ -301,6 +324,8 @@ var NotationEngine = (() => {
     tieSide: () => tieSide,
     timeSignature: () => timeSignature,
     timingDiagnostic: () => timingDiagnostic,
+    tremoloGlyphName: () => tremoloGlyphName,
+    tremoloPlacement: () => tremoloPlacement,
     tryAccidentalGlyphName: () => tryAccidentalGlyphName,
     tupletBracketNeeded: () => tupletBracketNeeded,
     tupletDigitGlyphName: () => tupletDigitGlyphName,
@@ -329,6 +354,34 @@ var NotationEngine = (() => {
   }
   function unpitchedPitch(displayStep, displayOctave) {
     return { kind: "unpitched", displayStep, displayOctave };
+  }
+  function soundingPitch(pitch, semitones) {
+    if (pitch.kind !== "pitched" || semitones === 0) return pitch;
+    const natural = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[pitch.step];
+    const midi = (pitch.octave + 1) * 12 + natural + pitch.alter + semitones;
+    const octave = Math.floor(midi / 12) - 1;
+    const pc = (midi % 12 + 12) % 12;
+    const steps = [
+      ["C", 0],
+      ["C", 1],
+      ["D", 2],
+      ["D", 3],
+      ["E", 4],
+      ["F", 5],
+      ["F", 6],
+      ["G", 7],
+      ["G", 8],
+      ["A", 9],
+      ["A", 10],
+      ["B", 11]
+    ];
+    const [step, base] = steps[pc] ?? ["C", 0];
+    return {
+      kind: "pitched",
+      step,
+      alter: base === 0 || [2, 4, 5, 7, 9, 11].includes(base) ? pc - { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[step] : 0,
+      octave
+    };
   }
 
   // src/core/duration.ts
@@ -68680,6 +68733,10 @@ var NotationEngine = (() => {
     }
     return glyph;
   }
+  function harmonicNoteheadGlyphName(durationType, explicitlyFilled) {
+    if (durationType === "whole") return "noteheadDiamondWhole";
+    return fillForDuration(durationType, explicitlyFilled) === "black" ? "noteheadDiamondBlack" : "noteheadDiamondHalf";
+  }
   function supportedNoteheadShapes() {
     return Object.keys(SHAPE_GLYPHS);
   }
@@ -69474,12 +69531,55 @@ var NotationEngine = (() => {
     return { startX, endX, y, kind, spread: HAIRPIN_SPREAD };
   }
 
+  // src/geometry/text-metrics.ts
+  var ADVANCE_PER_EM = {
+    "0": 0.7,
+    "1": 0.7,
+    "2": 0.7,
+    "3": 0.7,
+    "4": 0.7,
+    "5": 0.7,
+    "6": 0.7,
+    "7": 0.7,
+    "8": 0.7,
+    "9": 0.7,
+    "=": 0.84,
+    " ": 0.38,
+    ".": 0.38,
+    ",": 0.38
+  };
+  var DEFAULT_ADVANCE_PER_EM = 0.7;
+  function estimateCharWidth(ch, fontSize) {
+    return (ADVANCE_PER_EM[ch] ?? DEFAULT_ADVANCE_PER_EM) * fontSize;
+  }
+  function estimateTextWidth(text, fontSize) {
+    let total = 0;
+    for (const ch of text) total += estimateCharWidth(ch, fontSize);
+    return total;
+  }
+  var TEXT_ASCENT_PER_EM = 0.78;
+  var TEXT_DESCENT_PER_EM = 0.22;
+
   // src/geometry/expression-mark.ts
   function tempoMarkSide() {
     return "above";
   }
   function rehearsalMarkSide() {
     return "above";
+  }
+  function computeRehearsalMarkBox(text, fontSize, padding = 0.45, thickness = 0.16) {
+    const textWidth2 = estimateTextWidth(text, fontSize);
+    const ascent = fontSize * TEXT_ASCENT_PER_EM;
+    const descent = fontSize * TEXT_DESCENT_PER_EM;
+    return {
+      textWidth: textWidth2,
+      width: textWidth2 + 2 * padding,
+      height: ascent + descent + 2 * padding,
+      padding,
+      thickness,
+      ascent,
+      descent
+    };
   }
 
   // src/geometry/lyric.ts
@@ -69497,6 +69597,59 @@ var NotationEngine = (() => {
   }
   function computeExtenderLine(startX, endX, y) {
     return { startX, endX, y };
+  }
+  function layoutLyricRow(boxes, options) {
+    const items = [];
+    const groups = [];
+    for (const box of boxes) {
+      const previous = groups[groups.length - 1];
+      if (previous !== void 0 && previous.boxes[0]?.x === box.x) {
+        groups[groups.length - 1] = {
+          boxes: [...previous.boxes, box],
+          left: previous.left,
+          right: previous.right
+        };
+        continue;
+      }
+      groups.push({ boxes: [box], left: box.x - box.width / 2, right: box.x + box.width / 2 });
+    }
+    const centered = [];
+    for (const group of groups) {
+      const first = group.boxes[0];
+      if (first === void 0) continue;
+      const total = group.boxes.reduce((sum, box) => sum + box.width, 0) + (group.boxes.length - 1) * options.elisionWidth;
+      let cursor = first.x - total / 2;
+      const left = cursor;
+      for (const [index, box] of group.boxes.entries()) {
+        items.push({ kind: "syllable", text: box.text, x: cursor + box.width / 2, width: box.width });
+        cursor += box.width;
+        if (group.boxes[index + 1] !== void 0) {
+          items.push({ kind: "elision", x: cursor + options.elisionWidth / 2 });
+          cursor += options.elisionWidth;
+        }
+      }
+      const last = group.boxes[group.boxes.length - 1];
+      if (last === void 0) continue;
+      centered.push({ left, right: cursor, last });
+    }
+    for (const [index, entry] of centered.entries()) {
+      const next = centered[index + 1];
+      if (next !== void 0 && (entry.last.syllabic === "begin" || entry.last.syllabic === "middle")) {
+        items.push({
+          kind: "hyphen",
+          x: computeHyphenX(entry.right + options.punctuationGap, next.left - options.punctuationGap)
+        });
+      }
+      if (entry.last.extend) {
+        const startX = entry.right + options.punctuationGap;
+        const endX = next !== void 0 ? next.left - options.punctuationGap : entry.last.melismaEndX;
+        if (endX > startX) items.push({ kind: "extender", startX, endX });
+      }
+    }
+    return items;
+  }
+  function lyricRowBaselineY(staffBottomY, rowIndex, gap, rowHeight) {
+    return staffBottomY + gap + rowIndex * rowHeight;
   }
 
   // src/geometry/chord-symbol.ts
@@ -69528,6 +69681,95 @@ var NotationEngine = (() => {
   };
   function chordSymbolQualityGlyphName(quality) {
     return QUALITY_GLYPHS[quality];
+  }
+  var KIND_SUFFIXES = {
+    major: [],
+    minor: [{ glyph: "csymMinor" }],
+    augmented: [{ glyph: "csymAugmented" }],
+    diminished: [{ glyph: "csymDiminished" }],
+    dominant: [{ text: "7" }],
+    "major-seventh": [{ glyph: "csymMajorSeventh" }],
+    "minor-seventh": [{ glyph: "csymMinor" }, { text: "7" }],
+    "diminished-seventh": [{ glyph: "csymDiminished" }, { text: "7" }],
+    "augmented-seventh": [{ glyph: "csymAugmented" }, { text: "7" }],
+    "half-diminished": [{ glyph: "csymHalfDiminished" }],
+    "major-minor": [{ glyph: "csymMinor" }, { text: "maj7" }],
+    "major-sixth": [{ text: "6" }],
+    "minor-sixth": [{ glyph: "csymMinor" }, { text: "6" }],
+    "dominant-seventh": [{ text: "7" }],
+    "dominant-ninth": [{ text: "9" }],
+    "major-ninth": [{ text: "9" }],
+    "minor-ninth": [{ glyph: "csymMinor" }, { text: "9" }],
+    "dominant-11th": [{ text: "11" }],
+    "major-11th": [{ text: "11" }],
+    "minor-11th": [{ glyph: "csymMinor" }, { text: "11" }],
+    "dominant-13th": [{ text: "13" }],
+    "major-13th": [{ text: "13" }],
+    "minor-13th": [{ glyph: "csymMinor" }, { text: "13" }],
+    "suspended-second": [{ text: "sus2" }],
+    "suspended-fourth": [{ text: "sus4" }],
+    power: [{ text: "5" }],
+    Neapolitan: [{ text: "N" }],
+    Italian: [{ text: "It" }],
+    French: [{ text: "Fr" }],
+    German: [{ text: "Ger" }],
+    pedal: [{ text: "ped" }],
+    Tristan: [{ text: "Tristan" }]
+  };
+  function glyphAdvance(glyphName, fontSize) {
+    const bbox = getGlyph(glyphName)?.bBox;
+    if (bbox === void 0) return 0;
+    return (bbox.bBoxNE[0] - bbox.bBoxSW[0]) * (fontSize / 4);
+  }
+  function chordSymbolLayout(source, fontSize) {
+    const parts = [];
+    const letter = (step, alter) => {
+      parts.push({
+        kind: "text",
+        text: step,
+        advance: estimateTextWidth(step, fontSize)
+      });
+      if (alter !== 0) {
+        const glyphName = chordSymbolAccidentalGlyphName(alter);
+        parts.push({ kind: "glyph", glyphName, advance: glyphAdvance(glyphName, fontSize) });
+      }
+    };
+    letter(source.rootStep, source.rootAlter);
+    const suffix = () => {
+      if (source.kindText !== void 0 && source.kindText.length > 0) {
+        return { specs: [{ text: source.kindText }] };
+      }
+      if (source.kind === void 0) return { specs: [] };
+      const specs = KIND_SUFFIXES[source.kind];
+      if (specs === void 0) return { unsupported: source.kind };
+      return { specs };
+    };
+    const resolved = suffix();
+    if ("unsupported" in resolved) {
+      return { parts: [], width: 0, unsupportedKind: resolved.unsupported };
+    }
+    for (const spec of resolved.specs) {
+      if (spec.glyph !== void 0) {
+        parts.push({
+          kind: "glyph",
+          glyphName: spec.glyph,
+          advance: glyphAdvance(spec.glyph, fontSize)
+        });
+      } else if (spec.text !== void 0) {
+        parts.push({
+          kind: "text",
+          text: spec.text,
+          advance: estimateTextWidth(spec.text, fontSize)
+        });
+      }
+    }
+    if (source.bassStep !== void 0) {
+      const slash = "csymAlteredBassSlash";
+      parts.push({ kind: "glyph", glyphName: slash, advance: glyphAdvance(slash, fontSize) });
+      letter(source.bassStep, source.bassAlter ?? 0);
+    }
+    const width = parts.reduce((total, part2) => total + part2.advance, 0);
+    return { parts, width };
   }
 
   // src/geometry/grace-note.ts
@@ -69718,35 +69960,6 @@ var NotationEngine = (() => {
     return `= ${String(beatsPerMinute)}`;
   }
 
-  // src/geometry/text-metrics.ts
-  var ADVANCE_PER_EM = {
-    "0": 0.7,
-    "1": 0.7,
-    "2": 0.7,
-    "3": 0.7,
-    "4": 0.7,
-    "5": 0.7,
-    "6": 0.7,
-    "7": 0.7,
-    "8": 0.7,
-    "9": 0.7,
-    "=": 0.84,
-    " ": 0.38,
-    ".": 0.38,
-    ",": 0.38
-  };
-  var DEFAULT_ADVANCE_PER_EM = 0.7;
-  function estimateCharWidth(ch, fontSize) {
-    return (ADVANCE_PER_EM[ch] ?? DEFAULT_ADVANCE_PER_EM) * fontSize;
-  }
-  function estimateTextWidth(text, fontSize) {
-    let total = 0;
-    for (const ch of text) total += estimateCharWidth(ch, fontSize);
-    return total;
-  }
-  var TEXT_ASCENT_PER_EM = 0.78;
-  var TEXT_DESCENT_PER_EM = 0.22;
-
   // src/geometry/augmentation-dot.ts
   function augmentationDotGlyphName() {
     return "augmentationDot";
@@ -69794,6 +70007,46 @@ var NotationEngine = (() => {
   };
   function fermataGlyphName(shape, placement) {
     return GLYPHS[shape ?? "normal"][placement ?? "above"];
+  }
+
+  // src/geometry/tremolo.ts
+  var TREMOLO_STROKE_CHOICES = [1, 2, 3];
+  function tremoloGlyphName(strokes) {
+    if (!Number.isInteger(strokes) || strokes < 1 || strokes > 3) return void 0;
+    return `tremolo${strokes}`;
+  }
+  function tremoloPlacement(stemX, attachY, endY) {
+    return { x: stemX, y: (attachY + endY) / 2 };
+  }
+
+  // src/geometry/arpeggio.ts
+  var ARPEGGIO_AMPLITUDE = 0.28;
+  var SPACES_PER_WAVE = 0.62;
+  var MIN_WAVES = 5;
+  function computeArpeggioShape(x2, topY, bottomY, direction = "up") {
+    const height = Math.max(bottomY - topY, 0);
+    const waves = Math.max(MIN_WAVES, Math.round(height / SPACES_PER_WAVE));
+    const points = [];
+    const lean = (direction === "up" ? 1 : -1) * ARPEGGIO_AMPLITUDE * 0.6;
+    for (let i2 = 0; i2 <= waves; i2++) {
+      const t = i2 / waves;
+      const y = topY + height * t;
+      const swing = i2 === 0 || i2 === waves ? 0 : i2 % 2 === 0 ? ARPEGGIO_AMPLITUDE : -ARPEGGIO_AMPLITUDE;
+      const xOffset = swing + lean * (1 - t * 2) * 0.5;
+      points.push([x2 + xOffset, y]);
+    }
+    return { x: x2, topY, bottomY, direction, points };
+  }
+  function computeNonArpeggioShape(x2, topY, bottomY, hookLength = 0.8) {
+    return { x: x2, topY, bottomY, hookLength };
+  }
+
+  // src/geometry/slide.ts
+  function computeSlideShape(startX, startY, endX, endY, kind) {
+    if (![startX, startY, endX, endY].every(Number.isFinite))
+      throw new Error("slide coordinates must be finite");
+    if (endX < startX) throw new Error("slide endpoint must not precede start");
+    return { startX, startY, endX, endY, kind };
   }
 
   // src/render/svg-primitives.ts
@@ -69845,11 +70098,12 @@ ${children.join("\n")}
   }
   function createSvgDocument(options, children) {
     const { viewBoxWidth, viewBoxHeight, pxPerStaffSpace, backgroundColor } = options;
+    const minX = options.viewBoxMinX ?? 0;
     const minY = options.viewBoxMinY ?? 0;
     const pxWidth = viewBoxWidth * pxPerStaffSpace;
     const pxHeight = viewBoxHeight * pxPerStaffSpace;
-    const background = hasBackground(backgroundColor) ? svgRect(0, minY, viewBoxWidth, viewBoxHeight, { fill: backgroundColor }) : "";
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${pxWidth}" height="${pxHeight}" viewBox="0 ${svgNumber(minY)} ${viewBoxWidth} ${viewBoxHeight}">
+    const background = hasBackground(backgroundColor) ? svgRect(minX, minY, viewBoxWidth, viewBoxHeight, { fill: backgroundColor }) : "";
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${pxWidth}" height="${pxHeight}" viewBox="${svgNumber(minX)} ${svgNumber(minY)} ${viewBoxWidth} ${viewBoxHeight}">
 ` + (background !== "" ? background + "\n" : "") + children.join("\n") + `
 </svg>`;
   }
@@ -70078,7 +70332,7 @@ ${denominator}`;
   }
 
   // src/render/stem.ts
-  function renderStem(options) {
+  function stemGeometry(options) {
     const glyph = getGlyph(options.noteheadGlyphName);
     if (glyph === void 0) {
       throw new Error(`No glyph found for notehead "${options.noteheadGlyphName}"`);
@@ -70089,10 +70343,14 @@ ${denominator}`;
       throw new Error(`Notehead "${options.noteheadGlyphName}" has no ${anchorName} anchor`);
     }
     const [anchorX, anchorY] = anchor;
-    const attachX = options.noteX + anchorX;
+    const x2 = options.noteX + anchorX;
     const attachY = options.noteY - anchorY;
     const endY = options.direction === "up" ? attachY - options.length : attachY + options.length;
-    return svgLine(attachX, attachY, attachX, endY, {
+    return { x: x2, attachY, endY };
+  }
+  function renderStem(options) {
+    const { x: x2, attachY, endY } = stemGeometry(options);
+    return svgLine(x2, attachY, x2, endY, {
       stroke: options.color,
       "stroke-width": options.thickness
     });
@@ -70253,12 +70511,90 @@ ${denominator}`;
     ].join("\n");
   }
 
+  // src/render/text.ts
+  function renderText(text, x2, y, options) {
+    const attrs = {
+      "font-family": options.fontFamily,
+      "font-size": options.fontSize,
+      fill: options.color
+    };
+    if (options.anchor !== void 0 && options.anchor !== "start") {
+      attrs["text-anchor"] = options.anchor;
+    }
+    if (options.italic === true) attrs["font-style"] = "italic";
+    if (options.bold === true) attrs["font-weight"] = "bold";
+    return svgText(x2, y, text, attrs);
+  }
+  function renderTextScaledGlyph(char, x2, y, options) {
+    return svgText(x2, y, char, {
+      "font-family": options.fontFamily,
+      "font-size": options.fontSize,
+      fill: options.color
+    });
+  }
+
   // src/render/lyric.ts
   function renderExtenderLine(shape, options) {
     return svgLine(shape.startX, shape.y, shape.endX, shape.y, {
       stroke: options.color,
       "stroke-width": options.thickness
     });
+  }
+  var HYPHEN_RISE = 0.32;
+  function renderLyricRow(items, y, options) {
+    const hyphenChar = getGlyph(lyricHyphenGlyphName())?.char;
+    const elisionChar = getGlyph(lyricElisionGlyphName())?.char;
+    const children = [];
+    for (const item of items) {
+      switch (item.kind) {
+        case "syllable":
+          children.push(
+            renderText(item.text, item.x, y, {
+              fontFamily: options.fontFamily,
+              fontSize: options.fontSize,
+              color: options.color,
+              anchor: "middle"
+            })
+          );
+          break;
+        case "hyphen":
+          if (hyphenChar !== void 0) {
+            children.push(
+              renderTextScaledGlyph(
+                hyphenChar,
+                item.x - options.hyphenWidth / 2,
+                y - options.fontSize * HYPHEN_RISE,
+                {
+                  fontFamily: options.musicFont,
+                  fontSize: options.fontSize,
+                  color: options.color
+                }
+              )
+            );
+          }
+          break;
+        case "elision":
+          if (elisionChar !== void 0) {
+            children.push(
+              renderTextScaledGlyph(elisionChar, item.x - options.elisionWidth / 2, y, {
+                fontFamily: options.musicFont,
+                fontSize: options.fontSize,
+                color: options.color
+              })
+            );
+          }
+          break;
+        case "extender":
+          children.push(
+            renderExtenderLine(
+              { startX: item.startX, endX: item.endX, y: y + options.fontSize * 0.15 },
+              { thickness: options.lineThickness, color: options.color }
+            )
+          );
+          break;
+      }
+    }
+    return svgGroup(children, { "data-lyric-row": "true" });
   }
 
   // src/render/tab.ts
@@ -70431,6 +70767,126 @@ ${denominator}`;
     ).join("\n");
   }
 
+  // src/render/chord-symbol.ts
+  function renderChordSymbol(layout, x2, y, options) {
+    const children = [];
+    let cursor = x2;
+    for (const part2 of layout.parts) {
+      if (part2.kind === "text") {
+        children.push(
+          renderText(part2.text, cursor, y, {
+            fontFamily: options.textFont,
+            fontSize: options.fontSize,
+            color: options.color
+          })
+        );
+      } else {
+        const glyph = getGlyph(part2.glyphName);
+        if (glyph !== void 0) {
+          children.push(
+            renderTextScaledGlyph(glyph.char, cursor, y, {
+              fontFamily: options.musicFont,
+              fontSize: options.fontSize,
+              color: options.color
+            })
+          );
+        }
+      }
+      cursor += part2.advance;
+    }
+    return svgGroup(children, { "data-chord-symbol": "true" });
+  }
+
+  // src/render/expression-mark.ts
+  function renderRehearsalMark(text, x2, y, options) {
+    const { box } = options;
+    const frame = svgRect(x2 - box.width / 2, y - box.ascent - box.padding, box.width, box.height, {
+      fill: "none",
+      stroke: options.frameColor,
+      "stroke-width": box.thickness
+    });
+    const label = renderText(text, x2, y, {
+      fontFamily: options.fontFamily,
+      fontSize: options.fontSize,
+      color: options.color,
+      anchor: "middle"
+    });
+    return svgGroup([frame, label], { "data-rehearsal-mark": "true" });
+  }
+  function renderWords(text, x2, y, options) {
+    return renderText(text, x2, y, {
+      fontFamily: options.fontFamily,
+      fontSize: options.fontSize,
+      color: options.color,
+      ...options.anchor !== void 0 ? { anchor: options.anchor } : {},
+      ...options.italic !== void 0 ? { italic: options.italic } : {}
+    });
+  }
+
+  // src/render/tremolo.ts
+  function renderTremolo(glyphName, placement, options) {
+    const glyph = getGlyph(glyphName);
+    if (glyph === void 0) return "";
+    return svgGlyphText(placement.x, placement.y, glyph.char, options.fontFamily, {
+      fill: options.color
+    });
+  }
+
+  // src/render/arpeggio.ts
+  function renderArpeggio(shape, options) {
+    if (shape.points.length < 2) return "";
+    const [first, ...rest2] = shape.points;
+    if (first === void 0) return "";
+    const d = [`M ${first[0]} ${first[1]}`, ...rest2.map((point) => `L ${point[0]} ${point[1]}`)].join(
+      " "
+    );
+    return svgPath(d, {
+      fill: "none",
+      stroke: options.color,
+      "stroke-width": options.thickness,
+      "stroke-linecap": "round",
+      "stroke-linejoin": "round"
+    });
+  }
+  function renderNonArpeggio(shape, options) {
+    const stroke = { stroke: options.color, "stroke-width": options.thickness };
+    const hookX = shape.x - shape.hookLength;
+    return [
+      svgLine(shape.x, shape.topY, shape.x, shape.bottomY, stroke),
+      svgLine(hookX, shape.topY, shape.x, shape.topY, stroke),
+      svgLine(hookX, shape.bottomY, shape.x, shape.bottomY, stroke)
+    ].join("\n");
+  }
+
+  // src/render/slide.ts
+  function renderSlide(shape, options) {
+    const n = svgNumber;
+    if (shape.kind === "slide")
+      return svgPath(`M ${n(shape.startX)} ${n(shape.startY)} L ${n(shape.endX)} ${n(shape.endY)}`, {
+        fill: "none",
+        stroke: options.color,
+        "stroke-width": options.thickness,
+        "stroke-linecap": "round"
+      });
+    const dx = shape.endX - shape.startX, dy = shape.endY - shape.startY;
+    const steps = Math.max(4, Math.ceil(dx / 1.5));
+    const amp = Math.min(0.28, Math.max(0.12, dx / 24));
+    const pts = [`M ${n(shape.startX)} ${n(shape.startY)}`];
+    for (let i2 = 1; i2 <= steps; i2++) {
+      const t = i2 / steps;
+      const x2 = shape.startX + dx * t;
+      const y = shape.startY + dy * t + Math.sin(t * Math.PI * 2 * Math.max(1, dx / 4)) * amp;
+      pts.push(`L ${n(x2)} ${n(y)}`);
+    }
+    return svgPath(pts.join(" "), {
+      fill: "none",
+      stroke: options.color,
+      "stroke-width": options.thickness,
+      "stroke-linecap": "round",
+      "stroke-dasharray": "0.01 0"
+    });
+  }
+
   // src/config/config.ts
   var DEFAULT_CONFIG = {
     colors: {
@@ -70519,6 +70975,21 @@ ${denominator}`;
       marginRight: 2.5
     },
     drums: {},
+    text: {
+      lyricsDisplay: "on",
+      // 2.2 staff spaces below the bottom line to the first verse's
+      // baseline. The staff's own descender room plus a lyric's ascender
+      // is what this clears; it is the same order as the 2.5 used for a
+      // dynamic, which sits in the same band under the staff.
+      lyricGap: 2.2,
+      // One lyric line of 1.8 plus a little air, so two verses do not
+      // touch. MuseScore's own lyric line spacing is ~1.4x the text size.
+      lyricRowHeight: 2.6,
+      chordSymbolsDisplay: "on",
+      chordSymbolGap: 1,
+      rehearsalMarksDisplay: "on",
+      wordsDisplay: "on"
+    },
     debug: {
       // 'info' keeps every diagnostic the engine produces, which is what
       // every caller got before this section existed -- a filter whose
@@ -70554,6 +71025,7 @@ ${denominator}`;
       staves: { ...DEFAULT_CONFIG.staves, ...overrides?.staves },
       page: { ...DEFAULT_CONFIG.page, ...overrides?.page },
       drums: { ...DEFAULT_CONFIG.drums, ...overrides?.drums },
+      text: { ...DEFAULT_CONFIG.text, ...overrides?.text },
       debug: { ...DEFAULT_CONFIG.debug, ...overrides?.debug }
     };
   }
@@ -70604,6 +71076,20 @@ ${denominator}`;
   // src/parser/musicxml/attributes.ts
   function parseAttributesElement(attributesEl) {
     const result = {};
+    const transposeEl = firstChildNamed(attributesEl, "transpose");
+    if (transposeEl !== void 0) {
+      const chromatic = intOf(firstChildNamed(transposeEl, "chromatic"));
+      if (chromatic !== void 0) {
+        const diatonic = intOf(firstChildNamed(transposeEl, "diatonic"));
+        const octaveChange = intOf(firstChildNamed(transposeEl, "octave-change"));
+        result.transpose = {
+          ...diatonic !== void 0 ? { diatonic } : {},
+          chromatic,
+          ...octaveChange !== void 0 ? { octaveChange } : {},
+          semitones: chromatic + (octaveChange ?? 0) * 12
+        };
+      }
+    }
     const divisionsEl = firstChildNamed(attributesEl, "divisions");
     const divisions = intOf(divisionsEl);
     if (divisions !== void 0) result.divisions = divisions;
@@ -70696,10 +71182,13 @@ ${denominator}`;
     "backward hook"
   ]);
   var SYLLABIC_VALUES = /* @__PURE__ */ new Set(["single", "begin", "middle", "end"]);
+  var MAX_TREMOLO_STROKES = 3;
   var EMPTY_NOTATIONS = {
     articulations: [],
     ornaments: [],
     hasFermata: false,
+    isHarmonic: false,
+    nonArpeggiate: false,
     slurStarts: [],
     slurStops: [],
     tupletStart: false,
@@ -70724,6 +71213,11 @@ ${denominator}`;
     let hasFermata = false;
     let fermataPlacement;
     let fermataShape;
+    let tremoloStrokes;
+    let tremoloType;
+    let isHarmonic = false;
+    let arpeggiate;
+    let nonArpeggiate = false;
     let tupletStart = false;
     let tupletStop = false;
     for (const el of childElements(notationsEl)) {
@@ -70804,6 +71298,39 @@ ${denominator}`;
             }
           }
           break;
+        case "tremolo": {
+          const raw = Number.parseInt(textOf(el)?.trim() ?? "", 10);
+          const requested = Number.isNaN(raw) ? MAX_TREMOLO_STROKES : raw;
+          const type = attrOf(el, "type");
+          tremoloType = type === "start" || type === "stop" ? type : type === "single" ? "single" : "single";
+          if (requested > MAX_TREMOLO_STROKES) {
+            diagnostics.push(
+              diagnostic(
+                "info",
+                "TREMOLO_STROKES_CLAMPED",
+                `A <tremolo> with ${requested} strokes is drawn with ${MAX_TREMOLO_STROKES}; the bundled font has no glyph above three.`,
+                location
+              )
+            );
+          }
+          const clamped = Math.min(Math.max(requested, 1), MAX_TREMOLO_STROKES);
+          if (requested > 0) tremoloStrokes = clamped;
+          break;
+        }
+        case "harmonic":
+          isHarmonic = true;
+          break;
+        case "arpeggiate": {
+          const direction = attrOf(el, "direction");
+          arpeggiate = direction === "down" ? "down" : "up";
+          break;
+        }
+        case "non-arpeggiate":
+          nonArpeggiate = true;
+          break;
+        case "slide":
+        case "glissando":
+          break;
         case "tied":
         case "technical":
           break;
@@ -70823,6 +71350,11 @@ ${denominator}`;
         articulations,
         ornaments,
         hasFermata,
+        ...tremoloStrokes !== void 0 ? { tremoloStrokes } : {},
+        ...tremoloType !== void 0 ? { tremoloType } : {},
+        isHarmonic,
+        ...arpeggiate !== void 0 ? { arpeggiate } : {},
+        nonArpeggiate,
         ...fermataPlacement !== void 0 ? { fermataPlacement } : {},
         ...fermataShape !== void 0 ? { fermataShape } : {},
         slurStarts,
@@ -70904,6 +71436,7 @@ ${denominator}`;
     const voice2 = intOf(firstChildNamed(noteEl, "voice")) ?? 1;
     const staff = intOf(firstChildNamed(noteEl, "staff"));
     const isGrace = firstChildNamed(noteEl, "grace") !== void 0;
+    const isCue = firstChildNamed(noteEl, "cue") !== void 0;
     let safeDivisions = currentDivisions;
     if (safeDivisions <= 0) {
       diagnostics.push(
@@ -70960,8 +71493,12 @@ ${denominator}`;
     const fret = technicalEl !== void 0 ? intOf(firstChildNamed(technicalEl, "fret")) : void 0;
     const fingering = technicalEl !== void 0 ? intOf(firstChildNamed(technicalEl, "fingering")) : void 0;
     const slideEls = notationsEl !== void 0 ? [...childrenNamed(notationsEl, "slide"), ...childrenNamed(notationsEl, "glissando")] : [];
-    const slideStart = slideEls.some((el) => el.getAttribute("type") === "start");
-    const slideStop = slideEls.some((el) => el.getAttribute("type") === "stop");
+    const slideStartEl = slideEls.find((el) => el.getAttribute("type") === "start");
+    const slideStopEl = slideEls.find((el) => el.getAttribute("type") === "stop");
+    const slideStart = slideStartEl !== void 0;
+    const slideStop = slideStopEl !== void 0;
+    const slideStartKind = slideStartEl?.tagName === "glissando" ? "glissando" : slideStart ? "slide" : void 0;
+    const slideStopKind = slideStopEl?.tagName === "glissando" ? "glissando" : slideStop ? "slide" : void 0;
     const tieStart = tieEls.some((el) => el.getAttribute("type") === "start") || tiedEls.some((el) => el.getAttribute("type") === "start");
     const tieStop = tieEls.some((el) => el.getAttribute("type") === "stop") || tiedEls.some((el) => el.getAttribute("type") === "stop");
     const noteheadEl = firstChildNamed(noteEl, "notehead");
@@ -71229,6 +71766,7 @@ ${denominator}`;
       ...explicitNoteheadSmufl !== void 0 ? { explicitNoteheadSmufl } : {},
       ...noteheadFilled !== void 0 ? { noteheadFilled } : {},
       ...noteheadParentheses !== void 0 ? { noteheadParentheses } : {},
+      isCue,
       isGrace,
       graceSlash,
       ...tupletActualNotes !== void 0 ? { tupletActualNotes } : {},
@@ -71244,6 +71782,8 @@ ${denominator}`;
       ...fingering !== void 0 ? { fingering } : {},
       ...slideStart ? { slideStart: true } : {},
       ...slideStop ? { slideStop: true } : {},
+      ...slideStartKind !== void 0 ? { slideStartKind } : {},
+      ...slideStopKind !== void 0 ? { slideStopKind } : {},
       ...fret !== void 0 ? { fret } : {},
       notations,
       beams,
@@ -71566,6 +72106,7 @@ ${denominator}`;
     const diagnostics = [];
     const dynamics = [];
     const wedges = [];
+    const pedals = [];
     const words = [];
     const rehearsals = [];
     for (const directionTypeEl of childrenNamed(directionEl, "direction-type")) {
@@ -71588,6 +72129,21 @@ ${denominator}`;
               }
             }
             break;
+          case "pedal": {
+            const rawType = attrOf(el, "type");
+            if (rawType === "start" || rawType === "change" || rawType === "stop" || rawType === "continue")
+              pedals.push({ type: rawType, number: numberAttr2(el) });
+            else
+              diagnostics.push(
+                diagnostic(
+                  "info",
+                  "UNSUPPORTED_PEDAL",
+                  `Ignored <pedal type="${rawType ?? ""}">.`,
+                  location
+                )
+              );
+            break;
+          }
           case "wedge": {
             const rawType = attrOf(el, "type");
             const mapped = rawType !== void 0 ? WEDGE_TYPES[rawType] : void 0;
@@ -71635,6 +72191,7 @@ ${denominator}`;
       content: {
         dynamics,
         wedges,
+        pedals,
         words,
         rehearsals,
         ...soundTempo !== void 0 ? { soundTempo } : {}
@@ -71733,6 +72290,9 @@ ${denominator}`;
       ...ev.fingering !== void 0 ? { fingering: ev.fingering } : {},
       ...ev.slideStart ? { slideStart: true } : {},
       ...ev.slideStop ? { slideStop: true } : {},
+      ...ev.slideStartKind !== void 0 ? { slideStartKind: ev.slideStartKind } : {},
+      ...ev.slideStopKind !== void 0 ? { slideStopKind: ev.slideStopKind } : {},
+      ...ev.isCue ? { isCue: true } : {},
       ...ev.isGrace ? { isGrace: true, graceSlash: ev.graceSlash } : {},
       ...ev.explicitStemDirection !== void 0 ? { explicitStemDirection: ev.explicitStemDirection } : {},
       ...ev.hasExplicitAccidental ? { hasExplicitAccidental: true } : {},
@@ -71754,7 +72314,14 @@ ${denominator}`;
       ...ev.notations.tupletStart ? { tupletStart: true } : {},
       ...ev.notations.tupletStop ? { tupletStop: true } : {},
       ...ev.beams.length > 0 ? { beams: ev.beams } : {},
-      ...ev.lyrics.length > 0 ? { lyrics: ev.lyrics } : {}
+      ...ev.lyrics.length > 0 ? { lyrics: ev.lyrics } : {},
+      // Phase 56/§9.24-§9.26: the marks that change what a note IS or how it
+      // is played, rather than merely decorating it.
+      ...ev.notations.tremoloStrokes !== void 0 ? { tremoloStrokes: ev.notations.tremoloStrokes } : {},
+      ...ev.notations.tremoloType !== void 0 ? { tremoloType: ev.notations.tremoloType } : {},
+      ...ev.notations.isHarmonic ? { isHarmonic: true } : {},
+      ...ev.notations.arpeggiate !== void 0 ? { arpeggiate: ev.notations.arpeggiate } : {},
+      ...ev.notations.nonArpeggiate ? { nonArpeggiate: true } : {}
     });
   }
   function buildEvent(group, location, diagnostics, startTick) {
@@ -71823,6 +72390,7 @@ ${denominator}`;
         tempoMarks: [],
         midiInstrumentsByPart: /* @__PURE__ */ new Map(),
         directions: [],
+        octaveShifts: [],
         harmonies: [],
         prints: [],
         identity: { creators: {}, rights: [], software: [] },
@@ -71850,6 +72418,7 @@ ${denominator}`;
     const allAttributeChanges = [];
     const tempoMarks = [];
     const directions = [];
+    const octaveShifts = [];
     const harmonies = [];
     const prints = [];
     for (const partEl of childrenNamed(root, "part")) {
@@ -71864,6 +72433,7 @@ ${denominator}`;
       let currentTimeNumeratorDisplay;
       let currentClefSign = DEFAULT_CLEF_SIGN;
       let currentClefLine = DEFAULT_CLEF_LINE;
+      let currentTranspose = { chromatic: 0, semitones: 0 };
       let currentStaves = 1;
       let currentStaffLinesByStaff = {};
       let currentClefsByStaff = {
@@ -71892,7 +72462,8 @@ ${denominator}`;
           ...currentClefLine !== void 0 ? { clefLine: currentClefLine } : {},
           staves: currentStaves,
           clefsByStaff: { ...currentClefsByStaff },
-          staffLinesByStaff: { ...currentStaffLinesByStaff }
+          staffLinesByStaff: { ...currentStaffLinesByStaff },
+          transpose: currentTranspose
         });
         const measureAttributeChanges = [snapshotAttributes(0)];
         let lastAdvance = 0;
@@ -71923,6 +72494,7 @@ ${denominator}`;
             }
             if (update.clefSign !== void 0) currentClefSign = update.clefSign;
             if (update.clefLine !== void 0) currentClefLine = update.clefLine;
+            if (update.transpose !== void 0) currentTranspose = update.transpose;
             if (update.staves !== void 0) currentStaves = update.staves;
             if (update.clefsByStaff !== void 0) {
               currentClefsByStaff = { ...currentClefsByStaff, ...update.clefsByStaff };
@@ -72023,6 +72595,36 @@ ${denominator}`;
             let recognizedSomething = false;
             let producedTempoMark = false;
             for (const directionTypeEl of childrenNamed(child, "direction-type")) {
+              const octaveEl = firstChildNamed(directionTypeEl, "octave-shift");
+              if (octaveEl !== void 0) {
+                const rawType = octaveEl.getAttribute("type");
+                const type = rawType === "up" || rawType === "down" || rawType === "stop" ? rawType : void 0;
+                const sizeRaw = octaveEl.getAttribute("size");
+                const size = sizeRaw === null ? 8 : Number.parseInt(sizeRaw, 10);
+                const numberRaw = octaveEl.getAttribute("number");
+                const number = numberRaw === null ? 1 : Number.parseInt(numberRaw, 10);
+                if (type === void 0 || ![8, 15].includes(size) || !Number.isInteger(number) || number < 1) {
+                  diagnostics.push(
+                    diagnostic(
+                      "warning",
+                      "INVALID_OCTAVE_SHIFT",
+                      "Invalid <octave-shift>; expected type up/down/stop, size 8 or 15, and positive number.",
+                      location
+                    )
+                  );
+                } else {
+                  octaveShifts.push({
+                    partId,
+                    measureNumber,
+                    tick,
+                    staff: directionStaff(child),
+                    type,
+                    size,
+                    number
+                  });
+                  recognizedSomething = true;
+                }
+              }
               const metronomeEl = firstChildNamed(directionTypeEl, "metronome");
               if (metronomeEl === void 0) continue;
               const rawBeatUnit = textOf(firstChildNamed(metronomeEl, "beat-unit"));
@@ -72055,7 +72657,7 @@ ${denominator}`;
             diagnostics.push(...directionDiags);
             if (directionDiags.length > 0) recognizedSomething = true;
             const placement = directionPlacement(child);
-            if (content.dynamics.length > 0 || content.wedges.length > 0 || content.words.length > 0 || content.rehearsals.length > 0) {
+            if (content.dynamics.length > 0 || content.wedges.length > 0 || content.pedals.length > 0 || content.words.length > 0 || content.rehearsals.length > 0) {
               directions.push({
                 partId,
                 measureNumber,
@@ -72064,6 +72666,7 @@ ${denominator}`;
                 ...placement !== void 0 ? { placement } : {},
                 dynamics: content.dynamics,
                 wedges: content.wedges,
+                pedals: content.pedals,
                 words: content.words,
                 rehearsals: content.rehearsals
               });
@@ -72201,6 +72804,7 @@ ${denominator}`;
           staves: currentStaves,
           clefsByStaff: { ...currentClefsByStaff },
           staffLinesByStaff: { ...currentStaffLinesByStaff },
+          transpose: currentTranspose,
           ...barlineStyle !== void 0 ? { barlineStyle } : {},
           ...repeatDirection !== void 0 ? { repeatDirection } : {},
           ...repeatTimes !== void 0 ? { repeatTimes } : {},
@@ -72239,6 +72843,7 @@ ${denominator}`;
       attributeChanges: allAttributeChanges,
       diagnostics,
       tempoMarks,
+      octaveShifts,
       midiInstrumentsByPart: midiInstrumentMaps,
       directions,
       harmonies,
@@ -73523,7 +74128,7 @@ ${denominator}`;
     });
     return { positions };
   }
-  function computeSystemLayoutVariableGaps(partStaffCounts, staffGapForPair, partGap = DEFAULT_PART_GAP) {
+  function computeSystemLayoutVariableGaps(partStaffCounts, staffGapForPair, partGap = DEFAULT_PART_GAP, partGapForPart) {
     const positions = [];
     let y = 0;
     partStaffCounts.forEach((staffCount, partIndex) => {
@@ -73533,7 +74138,7 @@ ${denominator}`;
           y += staffGapForPair(partIndex, staffIndexInPart);
         }
       }
-      y += partGap;
+      y += partGapForPart === void 0 ? partGap : partGapForPart(partIndex);
     });
     return { positions };
   }
@@ -73890,7 +74495,7 @@ ${denominator}`;
 
   // src/layout/resize.ts
   function extractViewBox(svg) {
-    const match = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
+    const match = svg.match(/viewBox="[-\d.]+ [-\d.]+ ([\d.]+) ([\d.]+)"/);
     if (match === null) return void 0;
     const width = Number(match[1]);
     const height = Number(match[2]);
@@ -77138,6 +77743,31 @@ ${xrefOffset}
   var TUPLET_BRACKET_THICKNESS_FALLBACK = 0.16;
   var DYNAMIC_GAP = 2.5;
   var HAIRPIN_THICKNESS_FALLBACK = 0.16;
+  var TEXT_MARK_GAP = 1.2;
+  var CHORD_SYMBOL_STACK_CLEARANCE = 0.4;
+  var ARPEGGIO_GAP = 0.6;
+  var ARPEGGIO_MARGIN = 0.5;
+  var ARPEGGIO_LEADING_WIDTH = 2.5;
+  var DEFAULT_CUE_NOTE_SCALE = 0.75;
+  function cueScaleForEvent(event, fileDefaults) {
+    const cue = event.kind === "note" ? event.isCue === true : event.kind === "chord" && event.notes.some((n) => n.isCue === true);
+    return cue ? Math.max(0.1, fileDefaults?.noteSizes.cue ?? DEFAULT_CUE_NOTE_SCALE) : 1;
+  }
+  function scaleCueSvg(svg, event, x2, baselineY, fileDefaults) {
+    const scale = cueScaleForEvent(event, fileDefaults);
+    return scale === 1 ? svg : svgGroup([svg], {
+      transform: `translate(${x2} ${baselineY}) scale(${scale}) translate(${-x2} ${-baselineY})`
+    });
+  }
+  function carriesArpeggioMark(event) {
+    if (event.kind === "note") {
+      return event.arpeggiate !== void 0 || event.nonArpeggiate === true;
+    }
+    if (event.kind === "chord") {
+      return event.notes.length > 1 && event.notes.some((note2) => note2.arpeggiate !== void 0 || note2.nonArpeggiate === true);
+    }
+    return false;
+  }
   function worstCaseStaffExtent(part2, staffNumber, allAttributes, side, theme, midiInstrumentsByPart, attributeTimelines) {
     const firstAttrs = allAttributes.find((a) => a.partId === part2.id);
     if (firstAttrs === void 0) return 0;
@@ -77224,9 +77854,10 @@ ${xrefOffset}
     }
     return drawn;
   }
-  function computeMeasureLayout(measure2, measureTicks, measureTempoMarks, headerWidth, spacingConfig, tempoFontSize, accidentals, attributeTransitions) {
+  function computeMeasureLayout(measure2, measureTicks, measureTempoMarks, headerWidth, spacingConfig, tempoFontSize, accidentals, attributeTransitions, fileDefaults) {
     const attacks = /* @__PURE__ */ new Set();
     const widthByTickAndStaff = /* @__PURE__ */ new Map();
+    const eventByTick = /* @__PURE__ */ new Map();
     const leadingByTickAndStaff = /* @__PURE__ */ new Map();
     const shortestStartingByTick = /* @__PURE__ */ new Map();
     for (const voice2 of measure2.voices) {
@@ -77236,6 +77867,7 @@ ${xrefOffset}
         const tick = starts[idx] ?? 0;
         attacks.add(tick);
         const staff = String(event.staff ?? 1);
+        if (!eventByTick.has(tick)) eventByTick.set(tick, event);
         const put = (into, value) => {
           let perStaff = into.get(tick);
           if (perStaff === void 0) {
@@ -77244,8 +77876,14 @@ ${xrefOffset}
           }
           perStaff.set(staff, Math.max(perStaff.get(staff) ?? 0, value));
         };
-        put(widthByTickAndStaff, attackWidth(event.duration.dots));
-        put(leadingByTickAndStaff, attackLeading(accidentals.get(tick)));
+        put(
+          widthByTickAndStaff,
+          attackWidth(event.duration.dots) * cueScaleForEvent(event, fileDefaults)
+        );
+        put(
+          leadingByTickAndStaff,
+          attackLeading(accidentals.get(tick)) + (carriesArpeggioMark(event) ? ARPEGGIO_LEADING_WIDTH : 0)
+        );
         const own = event.duration.ticks;
         const shortest = shortestStartingByTick.get(tick);
         if (own > 0 && (shortest === void 0 || own < shortest)) {
@@ -77325,11 +77963,15 @@ ${xrefOffset}
     };
     const proportional = computeProportionalPositions(spacingEvents, clock, spacing);
     const enforced = applyMinimumDistance(proportional, spacingEvents, spacing);
+    const firstTick = ticks[0];
+    const firstEvent = firstTick === void 0 ? void 0 : eventByTick.get(firstTick);
+    const firstAttackLeading = firstEvent !== void 0 && carriesArpeggioMark(firstEvent) ? ARPEGGIO_LEADING_WIDTH : 0;
+    const shifted = firstAttackLeading > 0 ? enforced.map((x2) => x2 + firstAttackLeading) : enforced;
     const positionsByTick = /* @__PURE__ */ new Map();
     ticks.forEach((tick, i2) => {
-      positionsByTick.set(tick, enforced[i2] ?? 0);
+      positionsByTick.set(tick, shifted[i2] ?? 0);
     });
-    const lastX = enforced[enforced.length - 1] ?? 0;
+    const lastX = shifted[shifted.length - 1] ?? 0;
     const lastEvent = spacingEvents[spacingEvents.length - 1];
     const lastWidth = lastEvent?.renderedWidth ?? 0;
     const finalSpace = lastEvent === void 0 ? 0 : Math.max(
@@ -77349,6 +77991,7 @@ ${xrefOffset}
   var LEDGER_THICKNESS_FALLBACK = 0.16;
   var STEM_THICKNESS_FALLBACK = 0.12;
   var TIE_MIDPOINT_THICKNESS_FALLBACK = 0.22;
+  var SLIDE_THICKNESS_FALLBACK = 0.13;
   var BEAM_THICKNESS_FALLBACK = 0.5;
   var BEAM_SPACING_FALLBACK = 0.25;
   var DEFAULT_UNBEAMED_STEM_LENGTH = 3.5;
@@ -77425,6 +78068,7 @@ ${xrefOffset}
       staves: state.staves,
       clefsByStaff: state.clefsByStaff,
       staffLinesByStaff: state.staffLinesByStaff,
+      transpose: state.transpose,
       ...summary.barlineStyle !== void 0 ? { barlineStyle: summary.barlineStyle } : {},
       ...summary.repeatDirection !== void 0 ? { repeatDirection: summary.repeatDirection } : {},
       ...summary.repeatTimes !== void 0 ? { repeatTimes: summary.repeatTimes } : {},
@@ -77728,6 +78372,12 @@ ${xrefOffset}
     }
     return parts.join("\n");
   }
+  function slideEndpointsMatch(a, note2, kind) {
+    if (a.kind !== kind) return false;
+    if (a.stringNumber !== void 0 || note2.stringNumber !== void 0)
+      return a.stringNumber === note2.stringNumber;
+    return true;
+  }
   function resolveNoteRendering(note2, ctx) {
     const isUnpitched2 = note2.pitch.kind === "unpitched";
     const step = isUnpitched2 ? note2.pitch.displayStep : note2.pitch.step;
@@ -77740,7 +78390,8 @@ ${xrefOffset}
     const drumGlyph = gmNote !== void 0 && drumEntry?.noteheadGlyph !== void 0 && !positionedByFile && note2.explicitNotehead === void 0 && note2.explicitNoteheadSmufl === void 0 ? drumEntry.noteheadGlyph : void 0;
     const configOverrides = ctx.theme.noteheadMapping.overridesByKey;
     const overridesByKey = drumOverride !== void 0 || configOverrides !== void 0 ? { ...drumOverride, ...configOverrides } : void 0;
-    const noteheadGlyph = selectNoteheadGlyphName({
+    const fileStatedHead = note2.explicitNotehead !== void 0 || note2.explicitNoteheadSmufl !== void 0;
+    const noteheadGlyph = note2.isHarmonic === true && !isUnpitched2 && !fileStatedHead ? harmonicNoteheadGlyphName(note2.duration.type, note2.noteheadFilled) : selectNoteheadGlyphName({
       pitch: note2.pitch,
       durationType: note2.duration.type,
       ...note2.noteheadFilled !== void 0 ? { filled: note2.noteheadFilled } : {},
@@ -77949,17 +78600,26 @@ ${xrefOffset}
     });
     if (ev.duration.type !== "whole") {
       const length = computeStemLength(head.position, middleLineY(STAFF_LINES), direction);
-      parts.push(
-        renderStem({
-          noteheadGlyphName: head.noteheadGlyph,
-          noteX: x2,
-          noteY: y,
-          direction,
-          length,
-          thickness: lineWidth(ctx.theme, "stem", "stemThickness", STEM_THICKNESS_FALLBACK),
-          color: ctx.theme.colorOf("stem")
-        })
-      );
+      const stemOptions = {
+        noteheadGlyphName: head.noteheadGlyph,
+        noteX: x2,
+        noteY: y,
+        direction,
+        length,
+        thickness: lineWidth(ctx.theme, "stem", "stemThickness", STEM_THICKNESS_FALLBACK),
+        color: ctx.theme.colorOf("stem")
+      };
+      parts.push(renderStem(stemOptions));
+      const tremoloGlyph = ev.tremoloStrokes !== void 0 ? tremoloGlyphName(ev.tremoloStrokes) : void 0;
+      if (tremoloGlyph !== void 0) {
+        const stem = stemGeometry(stemOptions);
+        parts.push(
+          renderTremolo(tremoloGlyph, tremoloPlacement(stem.x, stem.attachY, stem.endY), {
+            fontFamily: ctx.theme.musicFont,
+            color: ctx.theme.colorOf("mark")
+          })
+        );
+      }
       if (needsFlag(ev.duration.type, false)) {
         const anchorName = direction === "up" ? "stemUpSE" : "stemDownNW";
         const anchor = getGlyph(head.noteheadGlyph)?.anchors?.[anchorName];
@@ -78253,17 +78913,54 @@ ${xrefOffset}
         const outermostIndex = positions.findIndex((position) => position === outermost);
         const stemGlyph = heads.glyphs[outermostIndex] ?? heads.widestGlyph;
         const length = computeStemLength(outermost, middleLineY(STAFF_LINES), direction);
-        parts.push(
-          renderStem({
-            noteheadGlyphName: stemGlyph,
-            noteX: x2,
-            noteY: ctx.measureBottomY + outermost,
-            direction,
-            length,
-            thickness: lineWidth(ctx.theme, "stem", "stemThickness", STEM_THICKNESS_FALLBACK),
-            color: ctx.theme.colorOf("stem")
-          })
-        );
+        const stemOptions = {
+          noteheadGlyphName: stemGlyph,
+          noteX: x2,
+          noteY: ctx.measureBottomY + outermost,
+          direction,
+          length,
+          thickness: lineWidth(ctx.theme, "stem", "stemThickness", STEM_THICKNESS_FALLBACK),
+          color: ctx.theme.colorOf("stem")
+        };
+        parts.push(renderStem(stemOptions));
+        const chordTremolo = chord2.notes.find((note2) => note2.tremoloStrokes !== void 0);
+        const tremoloGlyph = chordTremolo?.tremoloStrokes !== void 0 ? tremoloGlyphName(chordTremolo.tremoloStrokes) : void 0;
+        if (tremoloGlyph !== void 0) {
+          const stem = stemGeometry(stemOptions);
+          parts.push(
+            renderTremolo(tremoloGlyph, tremoloPlacement(stem.x, stem.attachY, stem.endY), {
+              fontFamily: ctx.theme.musicFont,
+              color: ctx.theme.colorOf("mark")
+            })
+          );
+        }
+      }
+      const arpeggioDirection = chord2.notes.find((note2) => note2.arpeggiate !== void 0)?.arpeggiate;
+      const explicitlyNotRolled = chord2.notes.some((note2) => note2.nonArpeggiate === true);
+      if (positions.length > 1 && (arpeggioDirection !== void 0 || explicitlyNotRolled)) {
+        const topY = ctx.measureBottomY + Math.min(...positions) - ARPEGGIO_MARGIN;
+        const bottomY = ctx.measureBottomY + Math.max(...positions) + ARPEGGIO_MARGIN;
+        const markX = x2 - noteheadWidth(heads.widestGlyph) - ARPEGGIO_GAP;
+        const markOptions = {
+          color: ctx.theme.colorOf("mark"),
+          thickness: lineWidth(ctx.theme, "stem", "stemThickness", STEM_THICKNESS_FALLBACK)
+        };
+        if (explicitlyNotRolled) {
+          const offStaffLine = (y, direction2) => Math.abs(y - Math.round(y)) < 0.15 ? y + direction2 * 0.3 : y;
+          parts.push(
+            renderNonArpeggio(
+              computeNonArpeggioShape(markX, offStaffLine(topY, -1), offStaffLine(bottomY, 1)),
+              markOptions
+            )
+          );
+        } else if (arpeggioDirection !== void 0) {
+          parts.push(
+            renderArpeggio(
+              computeArpeggioShape(markX, topY, bottomY, arpeggioDirection),
+              markOptions
+            )
+          );
+        }
       }
       const firstNote = chord2.notes[0];
       if (firstNote !== void 0) {
@@ -78553,6 +79250,74 @@ ${xrefOffset}
     }
     return parts.join("\n");
   }
+  function lyricVerseNumbers(part2, staffNumber) {
+    const verses = /* @__PURE__ */ new Set();
+    for (const measure2 of part2.measures) {
+      for (const voice2 of measure2.voices) {
+        for (const event of voice2.events) {
+          if ((event.staff ?? 1) !== staffNumber) continue;
+          const notes = event.kind === "note" ? [event] : event.kind === "chord" ? event.notes : [];
+          for (const note2 of notes) {
+            for (const syllable of note2.lyrics ?? []) verses.add(syllable.number);
+          }
+        }
+      }
+    }
+    return [...verses].sort((a, b) => a - b);
+  }
+  function lyricBandHeight(verseCount, gap, rowHeight, fontSize) {
+    if (verseCount <= 0) return 0;
+    return gap + (verseCount - 1) * rowHeight + fontSize * 0.35;
+  }
+  function northTextRows(needs, sizes, textConfig, rehearsalHeight, northExtent) {
+    if (!needs.chordSymbols && !needs.words && !needs.rehearsalMarks) {
+      return {
+        chordSymbolOffset: void 0,
+        wordsOffset: void 0,
+        rehearsalOffset: void 0,
+        band: 0,
+        shift: 0
+      };
+    }
+    let offset = 0;
+    let chordSymbolOffset;
+    let wordsOffset;
+    let rehearsalOffset;
+    if (needs.chordSymbols) {
+      chordSymbolOffset = textConfig.chordSymbolGap;
+      offset = chordSymbolOffset + sizes.chordSymbol * TEXT_ASCENT_PER_EM + CHORD_SYMBOL_STACK_CLEARANCE;
+    }
+    if (needs.words) {
+      wordsOffset = offset + TEXT_MARK_GAP;
+      offset = wordsOffset + sizes.tempo * TEXT_ASCENT_PER_EM;
+    }
+    if (needs.rehearsalMarks) {
+      rehearsalOffset = offset + TEXT_MARK_GAP;
+      offset = rehearsalOffset + rehearsalHeight;
+    }
+    const lowest = chordSymbolOffset ?? wordsOffset ?? rehearsalOffset ?? 0;
+    const shift = Math.max(0, northExtent + CHORD_SYMBOL_STACK_CLEARANCE - lowest);
+    return { chordSymbolOffset, wordsOffset, rehearsalOffset, band: offset + shift, shift };
+  }
+  function withTextBand(skyline, band) {
+    if (!(band > 0)) return skyline;
+    return addToSkyline(skyline, { xStart: 0, xEnd: 1, y: band });
+  }
+  function octaveShiftSpans(events) {
+    const open = /* @__PURE__ */ new Map();
+    const spans = [];
+    for (const event of events) {
+      const key = `${event.staff}:${event.number}`;
+      if (event.type === "stop") {
+        const start = open.get(key);
+        if (start) {
+          spans.push({ start, stop: event });
+          open.delete(key);
+        }
+      } else if (event.type === "up" || event.type === "down") open.set(key, event);
+    }
+    return spans;
+  }
   function renderParsedMusicXml(parsed, options) {
     const {
       score: parsedScore,
@@ -78562,6 +79327,8 @@ ${xrefOffset}
       tempoMarks,
       midiInstrumentsByPart: midiInstrumentsByPartMap,
       directions,
+      octaveShifts,
+      harmonies,
       prints,
       defaults: fileDefaults
     } = parsed;
@@ -78574,6 +79341,120 @@ ${xrefOffset}
     ) : parsedScore;
     const drawnTempoMarks = config.tempoMarks.display === "off" ? [] : tempoMarks;
     const theme = buildTheme(config, fileDefaults);
+    const measureTextKey = (partId, measureNumber) => `${partId}:${measureNumber}`;
+    const textNeedsByMeasure = /* @__PURE__ */ new Map();
+    {
+      const mark = (partId, measureNumber, update) => {
+        const key = measureTextKey(partId, measureNumber);
+        const existing = textNeedsByMeasure.get(key) ?? {
+          chordSymbols: false,
+          rehearsalMarks: false,
+          words: false
+        };
+        textNeedsByMeasure.set(key, { ...existing, ...update });
+      };
+      if (config.text.chordSymbolsDisplay === "on") {
+        for (const harmony of harmonies) {
+          mark(harmony.partId, harmony.measureNumber, { chordSymbols: true });
+        }
+      }
+      for (const direction of directions) {
+        if (direction.rehearsals.length > 0 && config.text.rehearsalMarksDisplay === "on") {
+          mark(direction.partId, direction.measureNumber, { rehearsalMarks: true });
+        }
+        if (direction.words.length > 0 && config.text.wordsDisplay === "on") {
+          mark(direction.partId, direction.measureNumber, { words: true });
+        }
+      }
+    }
+    const NO_TEXT_NEEDS = {
+      chordSymbols: false,
+      rehearsalMarks: false,
+      words: false
+    };
+    const textNeedsAt = (partId, measureNumber) => textNeedsByMeasure.get(measureTextKey(partId, measureNumber)) ?? NO_TEXT_NEEDS;
+    const lyricVersesByStaff = /* @__PURE__ */ new Map();
+    const lyricVersesFor = (partId, staffNumber) => {
+      if (config.text.lyricsDisplay === "off") return [];
+      const key = `${partId}:${staffNumber}`;
+      const cached = lyricVersesByStaff.get(key);
+      if (cached !== void 0) return cached;
+      const part2 = score2.parts.find((p) => p.id === partId);
+      const verses = part2 === void 0 ? [] : lyricVerseNumbers(part2, staffNumber);
+      lyricVersesByStaff.set(key, verses);
+      return verses;
+    };
+    const southTextBand = (partIndex, staffNumber) => {
+      const part2 = score2.parts[partIndex];
+      if (part2 === void 0) return 0;
+      return lyricBandHeight(
+        lyricVersesFor(part2.id, staffNumber).length,
+        config.text.lyricGap,
+        config.text.lyricRowHeight,
+        theme.sizes.lyric
+      );
+    };
+    const rehearsalHeightFor = (partId, measureNumber) => {
+      let height = 0;
+      for (const direction of directions) {
+        if (direction.partId !== partId || direction.measureNumber !== measureNumber) continue;
+        for (const text of direction.rehearsals) {
+          height = Math.max(height, computeRehearsalMarkBox(text, theme.sizes.tempo).height);
+        }
+      }
+      return height;
+    };
+    const partNorthExtentCache = /* @__PURE__ */ new Map();
+    const partNorthExtent = (partIndex) => {
+      const cached = partNorthExtentCache.get(partIndex);
+      if (cached !== void 0) return cached;
+      const part2 = score2.parts[partIndex];
+      if (part2 === void 0) return 0;
+      let extent = 0;
+      for (const measure2 of part2.measures) {
+        const attrsOfMeasure = attributesByPartAndMeasure.get(`${part2.id}:${measure2.number}`);
+        const timeline = attributeChangesByPartAndMeasure.get(`${part2.id}:${measure2.number}`) ?? [];
+        extent = Math.max(
+          extent,
+          measureNorthExtent(measure2, 1, (tick) => {
+            const state = attributeStateAt(timeline, tick);
+            const spec = state !== void 0 ? clefSpecAt(state, 1) : void 0;
+            const { clefDef } = mapClef(
+              spec?.sign ?? attrsOfMeasure?.clefSign ?? "G",
+              spec?.line ?? attrsOfMeasure?.clefLine
+            );
+            return {
+              clefDef,
+              measureBottomY: 0,
+              midiInstrumentsByPart: midiInstrumentsByPartMap.get(part2.id),
+              theme
+            };
+          })
+        );
+      }
+      partNorthExtentCache.set(partIndex, extent);
+      return extent;
+    };
+    const northTextBandFor = (partIndex, staffNumber) => {
+      if (staffNumber !== 1) return 0;
+      const part2 = score2.parts[partIndex];
+      if (part2 === void 0) return 0;
+      let band = 0;
+      if (octaveShifts.some((shift) => shift.partId === part2.id && shift.staff === 1)) band = 4.2;
+      for (const measure2 of part2.measures) {
+        band = Math.max(
+          band,
+          northTextRows(
+            textNeedsAt(part2.id, measure2.number),
+            theme.sizes,
+            config.text,
+            rehearsalHeightFor(part2.id, measure2.number),
+            partNorthExtent(partIndex)
+          ).band
+        );
+      }
+      return band;
+    };
     for (const part2 of score2.parts) {
       const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part2.id);
       for (const measure2 of part2.measures) {
@@ -78827,7 +79708,8 @@ ${xrefOffset}
           ...attrs.clefLine !== void 0 ? { clefLine: attrs.clefLine } : {},
           staves: attrs.staves,
           clefsByStaff: attrs.clefsByStaff,
-          staffLinesByStaff: attrs.staffLinesByStaff
+          staffLinesByStaff: attrs.staffLinesByStaff,
+          transpose: attrs.transpose
         };
         out.push({
           measure: m,
@@ -78870,7 +79752,8 @@ ${xrefOffset}
         config.spacing,
         config.fonts.sizes.tempo,
         drawnAccidentalTicks(accidentalParts(measureNumber)),
-        attributeTransitionsByMeasure.get(measureNumber) ?? []
+        attributeTransitionsByMeasure.get(measureNumber) ?? [],
+        fileDefaults
       );
       measureLayoutsByNumber.set(measureNumber, { ...layout, headerWidth });
       measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
@@ -78894,6 +79777,14 @@ ${xrefOffset}
           if (hasBarNumber) {
             needed = Math.max(needed, BAR_NUMBER_GAP + theme.sizes.barNumber);
           }
+          const textBand = partIndex === 0 ? northTextRows(
+            textNeedsAt(part2.id, m.number),
+            theme.sizes,
+            config.text,
+            rehearsalHeightFor(part2.id, m.number),
+            partNorthExtent(partIndex)
+          ).band : 0;
+          needed = Math.max(needed, textBand);
           if (!hasTempoMark) return;
           const a = attributesByPartAndMeasure.get(`${part2.id}:${m.number}`);
           const timeline = attributeChangesByPartAndMeasure.get(`${part2.id}:${m.number}`) ?? [];
@@ -78903,7 +79794,7 @@ ${xrefOffset}
             const { clefDef } = mapClef(spec?.sign ?? a?.clefSign ?? "G", spec?.line ?? a?.clefLine);
             return { clefDef, measureBottomY: 0, midiInstrumentsByPart: midi, theme };
           });
-          needed = Math.max(needed, extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
+          needed = Math.max(needed, textBand + extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
         });
       });
       const specsForHeadroom = repeatMeasureSpecs();
@@ -78962,8 +79853,20 @@ ${xrefOffset}
         return best === void 0 ? stated : Math.max(best, stated);
       }, void 0);
       return lowerStaffHeight + computeStaffDistance(
-        upperSouth,
-        lowerNorth,
+        // Phase 55: a lyric row under the upper staff of a grand staff is
+        // content the gap between the two staves has to clear, exactly
+        // like a low note is -- so it is added to that staff's own
+        // southward reach before the skyline compares them.
+        //
+        // Only when the band is non-zero: `addToSkyline` takes the more
+        // EXTREME of the two y values, and for a 'north' skyline that is
+        // the SMALLER one -- so adding a zero-height segment to a staff
+        // with a genuinely tall north extent would collapse that extent
+        // to zero and shrink the gap instead of growing it.
+        withTextBand(upperSouth, southTextBand(partIndex, upperStaffNumber)),
+        // And the same for text above the lower staff (a chord symbol on
+        // a single-staff part whose staff happens to be staff 1).
+        withTextBand(lowerNorth, northTextBandFor(partIndex, lowerStaffNumber)),
         Math.max(config.staves.minStaffDistance, statedDistance ?? 0)
       );
     };
@@ -78971,14 +79874,26 @@ ${xrefOffset}
       const a = firstAttributesByPart.get(p.id);
       return Math.max(1, a?.staves ?? 1);
     });
-    const scoreLayout = computeSystemLayoutVariableGaps(partStaffCounts, staffDistanceForPair);
+    const partGapForPart = (partIndex) => {
+      const lastStaff = partStaffCounts[partIndex] ?? 1;
+      return DEFAULT_PART_GAP + southTextBand(partIndex, lastStaff) + northTextBandFor(partIndex + 1, 1);
+    };
+    const scoreLayout = computeSystemLayoutVariableGaps(
+      partStaffCounts,
+      staffDistanceForPair,
+      void 0,
+      partGapForPart
+    );
     const staffOffsetFor = (partIndex, staffIndexInPart) => scoreLayout.positions.find(
       (pos) => pos.partIndex === partIndex && pos.staffIndexInPart === staffIndexInPart
     )?.y ?? 0;
     const placementByMeasureNumber = /* @__PURE__ */ new Map();
     const systemOrigins = [];
     const lowestStaffOffset = scoreLayout.positions[scoreLayout.positions.length - 1]?.y ?? 0;
-    const systemHeight = SYSTEM_HEIGHT + aboveStaffPadding + lowestStaffOffset - trimAbove - trimBelow;
+    const systemBottomRoom = SYSTEM_HEIGHT - STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
+    const lastPartIndex = Math.max(0, score2.parts.length - 1);
+    const lastStaffSouthBand = southTextBand(lastPartIndex, partStaffCounts[lastPartIndex] ?? 1);
+    const systemHeight = SYSTEM_HEIGHT + aboveStaffPadding + lowestStaffOffset + Math.max(0, lastStaffSouthBand - systemBottomRoom) - trimAbove - trimBelow;
     const widthOf = (measureNumber) => measureLayoutsByNumber.get(measureNumber)?.width ?? MEASURE_WIDTH;
     let pageCount = 1;
     if (config.layout.mode === "page") {
@@ -79069,6 +79984,31 @@ ${xrefOffset}
         return noteAreaX + tick / (measureTicks || 1) * (placement.x + placement.width - noteAreaX);
       };
       const partDirections = directions.filter((d) => d.partId === part2.id);
+      const partOctaveShiftEvents = octaveShifts.filter((e) => e.partId === part2.id);
+      const partOctaveShifts = octaveShiftSpans(partOctaveShiftEvents);
+      {
+        const open = /* @__PURE__ */ new Map();
+        for (const event of partOctaveShiftEvents) {
+          const key = `${event.staff}:${event.number}`;
+          if (event.type === "stop") {
+            if (!open.has(key))
+              diagnostics.push({
+                severity: "info",
+                code: "UNMATCHED_OCTAVE_SHIFT",
+                message: `An <octave-shift type="stop" number="${event.number}"> has no matching start; the bracket was not drawn.`,
+                location: { partId: part2.id, measureNumber: event.measureNumber }
+              });
+            else open.delete(key);
+          } else open.set(key, event);
+        }
+        for (const event of open.values())
+          diagnostics.push({
+            severity: "info",
+            code: "UNMATCHED_OCTAVE_SHIFT",
+            message: `An <octave-shift type="${event.type}" number="${event.number}"> has no matching stop; the bracket was not drawn.`,
+            location: { partId: part2.id, measureNumber: event.measureNumber }
+          });
+      }
       const wedgeSpansByMeasure = /* @__PURE__ */ new Map();
       {
         const openWedges = /* @__PURE__ */ new Map();
@@ -79122,8 +80062,51 @@ ${xrefOffset}
           });
         }
       }
+      const pedalSpansByMeasure = /* @__PURE__ */ new Map();
+      {
+        const open = /* @__PURE__ */ new Map();
+        for (const d of partDirections) {
+          const x2 = directionXFor(d.measureNumber, d.tick);
+          if (x2 === void 0) continue;
+          for (const pedal of d.pedals) {
+            const key = `${d.staff}:${pedal.number}`;
+            if (pedal.type === "start" || pedal.type === "change") {
+              const prior = open.get(key);
+              if (prior !== void 0) {
+                const list = pedalSpansByMeasure.get(prior.measureNumber) ?? [];
+                list.push({ staff: prior.staff, startX: prior.x, endX: x2, startType: prior.type });
+                pedalSpansByMeasure.set(prior.measureNumber, list);
+              }
+              open.set(key, { measureNumber: d.measureNumber, staff: d.staff, x: x2, type: pedal.type });
+            } else if (pedal.type === "stop") {
+              const prior = open.get(key);
+              if (prior === void 0) {
+                diagnostics.push({
+                  severity: "info",
+                  code: "UNMATCHED_PEDAL",
+                  message: `A <pedal type="stop" number="${pedal.number}"> has no matching start.`,
+                  location: { partId: part2.id, measureNumber: d.measureNumber }
+                });
+              } else {
+                open.delete(key);
+                const list = pedalSpansByMeasure.get(prior.measureNumber) ?? [];
+                list.push({ staff: prior.staff, startX: prior.x, endX: x2, startType: prior.type });
+                pedalSpansByMeasure.set(prior.measureNumber, list);
+              }
+            }
+          }
+        }
+        for (const prior of open.values())
+          diagnostics.push({
+            severity: "info",
+            code: "UNMATCHED_PEDAL",
+            message: "A pedal start has no matching stop; the pedal was not drawn.",
+            location: { partId: part2.id, measureNumber: prior.measureNumber }
+          });
+      }
       const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part2.id);
       const pendingTiesByVoiceAndStaff = /* @__PURE__ */ new Map();
+      const pendingSlidesByVoiceAndStaff = /* @__PURE__ */ new Map();
       const tiePitchesMatch = (first, second) => {
         if (first.kind === "pitched" && second.kind === "pitched") {
           return first.step === second.step && first.alter === second.alter && first.octave === second.octave;
@@ -79154,7 +80137,8 @@ ${xrefOffset}
           ...attrs.clefLine !== void 0 ? { clefLine: attrs.clefLine } : {},
           staves: attrs.staves,
           clefsByStaff: attrs.clefsByStaff,
-          staffLinesByStaff: attrs.staffLinesByStaff
+          staffLinesByStaff: attrs.staffLinesByStaff,
+          transpose: attrs.transpose
         };
         const attributeTransitions = attributeTransitionsByPartAndMeasure.get(measureKey) ?? [];
         const systemY = layout.systemY;
@@ -79191,23 +80175,112 @@ ${xrefOffset}
         const measureTempoMarks = drawnTempoMarks.filter(
           (m) => m.partId === part2.id && m.measureNumber === measure2.number
         );
-        if (measureTempoMarks.length > 0) {
+        const measureHarmonies = config.text.chordSymbolsDisplay === "off" ? [] : harmonies.filter((h) => h.partId === part2.id && h.measureNumber === measure2.number);
+        const measureDirectionText = config.text.wordsDisplay === "off" && config.text.rehearsalMarksDisplay === "off" ? [] : partDirections.filter((d) => d.measureNumber === measure2.number);
+        const measureRehearsals = config.text.rehearsalMarksDisplay === "off" ? [] : measureDirectionText.flatMap(
+          (d) => d.rehearsals.map((text) => ({ text, tick: d.tick }))
+        );
+        const measureWords = config.text.wordsDisplay === "off" ? [] : measureDirectionText.flatMap((d) => d.words.map((text) => ({ text, tick: d.tick })));
+        const measureTextNeeds = {
+          chordSymbols: measureHarmonies.length > 0,
+          rehearsalMarks: measureRehearsals.length > 0,
+          words: measureWords.length > 0
+        };
+        const hasAboveText = measureTextNeeds.chordSymbols || measureTextNeeds.rehearsalMarks || measureTextNeeds.words;
+        if (measureTempoMarks.length > 0 || hasAboveText) {
           const noteAreaX = noteAreaXOf(layout.x, measure2.number);
           const noteAreaWidth = layout.x + layout.width - noteAreaX;
           const measureTotalTicks = attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
           const { topStaffY } = topStaff();
           const northExtent = topStaffNorthExtent();
+          const rows = northTextRows(
+            measureTextNeeds,
+            theme.sizes,
+            config.text,
+            measureRehearsals.reduce(
+              (height, mark) => Math.max(height, computeRehearsalMarkBox(mark.text, theme.sizes.tempo).height),
+              0
+            ),
+            // The PART-wide extent, not this measure's: the rows hold one
+            // line across the whole part (see northTextRows), so a bar with
+            // a high melody note moves nothing and collides with nothing.
+            hasAboveText ? partNorthExtent(partIndex) : northExtent
+          );
+          const rowY = (offset) => offset === void 0 ? void 0 : topStaffY - offset - rows.shift;
+          const chordSymbolY = rowY(rows.chordSymbolOffset);
+          const wordsY = rowY(rows.wordsOffset);
+          const rehearsalY = rowY(rows.rehearsalOffset);
+          const textXFor = (tick) => noteAreaX + tick / (measureTotalTicks || 1) * noteAreaWidth;
+          if (chordSymbolY !== void 0) {
+            for (const harmony of measureHarmonies) {
+              if (harmony.rootStep === void 0) continue;
+              const layoutOfSymbol = chordSymbolLayout(
+                { ...harmony, rootStep: harmony.rootStep },
+                theme.sizes.chordSymbol
+              );
+              if (layoutOfSymbol.unsupportedKind !== void 0) {
+                diagnostics.push({
+                  severity: "info",
+                  code: "UNSUPPORTED_CHORD_KIND",
+                  message: `A <harmony> with <kind>${layoutOfSymbol.unsupportedKind}</kind> has no drawable spelling in this engine, so it was not drawn. MusicXML's <kind text="..."> attribute, or one of the named kinds, draws.`,
+                  location: { partId: part2.id, measureNumber: measure2.number }
+                });
+                continue;
+              }
+              if (layoutOfSymbol.parts.length === 0) continue;
+              const x2 = textXFor(harmony.tick);
+              svgParts.push(
+                renderChordSymbol(layoutOfSymbol, x2 - layoutOfSymbol.width / 2, chordSymbolY, {
+                  textFont: theme.textFont,
+                  musicFont: theme.musicFont,
+                  fontSize: theme.sizes.chordSymbol,
+                  color: theme.colorOf("chordSymbol")
+                })
+              );
+            }
+          }
+          if (wordsY !== void 0) {
+            for (const word of measureWords) {
+              svgParts.push(
+                renderWords(word.text, textXFor(word.tick), wordsY, {
+                  fontFamily: theme.textFont,
+                  fontSize: theme.sizes.tempo,
+                  color: theme.colorOf("text"),
+                  anchor: "middle",
+                  italic: true
+                })
+              );
+            }
+          }
+          if (rehearsalY !== void 0) {
+            for (const mark of measureRehearsals) {
+              svgParts.push(
+                renderRehearsalMark(mark.text, textXFor(mark.tick), rehearsalY, {
+                  box: computeRehearsalMarkBox(mark.text, theme.sizes.tempo),
+                  fontFamily: theme.textFont,
+                  fontSize: theme.sizes.tempo,
+                  color: theme.colorOf("rehearsalMark"),
+                  frameColor: theme.colorOf("rehearsalMark")
+                })
+              );
+            }
+          }
           for (const mark of measureTempoMarks) {
             const dotGlyph = mark.beatUnitDots > 0 ? metronomeDotGlyphName() : void 0;
-            const eventX = noteAreaX + mark.tick / (measureTotalTicks || 1) * noteAreaWidth;
+            const eventX = textXFor(mark.tick);
             svgParts.push(
               renderMetronomeMark(metronomeNoteGlyphName(mark.beatUnit), dotGlyph, mark.perMinute, {
                 x: eventX,
                 // tempoMarkSide() is always 'above'. The clearance is
                 // measured from whatever this measure's content actually
                 // reaches (stems and beams included), not from the staff
-                // line -- see the note where northExtent is computed.
-                y: topStaffY - northExtent - TEMPO_MARK_GAP,
+                // line -- see the note where northExtent is computed -- and
+                // then from the TOP of the text band, since the chord
+                // symbols now occupy the space immediately above the staff.
+                // With text above the staff, the tempo mark clears the whole
+                // text stack; with none, it keeps its own long-standing
+                // clearance from the measure's content extent.
+                y: topStaffY - (hasAboveText ? rows.band : northExtent) - TEMPO_MARK_GAP,
                 color: theme.colorOf("tempo"),
                 musicFont: theme.musicFont,
                 textFont: theme.textFont,
@@ -79217,7 +80290,89 @@ ${xrefOffset}
             );
           }
         }
+        for (const span of partOctaveShifts.filter(
+          (candidate) => candidate.start.measureNumber === measure2.number
+        )) {
+          const startX = directionXFor(span.start.measureNumber, span.start.tick);
+          const endX = directionXFor(span.stop.measureNumber, span.stop.tick);
+          if (startX === void 0 || endX === void 0) continue;
+          const topStaffY = topStaff().topStaffY;
+          const y = topStaffY - 3.2;
+          const hook = span.start.type === "down" ? 0.7 : -0.7;
+          const label = span.start.size === 15 ? "15" : "8";
+          svgParts.push(
+            svgLine(startX, y, endX, y, { stroke: theme.colorOf("mark"), "stroke-width": 0.16 })
+          );
+          svgParts.push(
+            svgLine(startX, y, startX, y + 0.7, {
+              stroke: theme.colorOf("mark"),
+              "stroke-width": 0.16
+            })
+          );
+          svgParts.push(
+            svgLine(endX, y, endX, y + hook, { stroke: theme.colorOf("mark"), "stroke-width": 0.16 })
+          );
+          svgParts.push(
+            renderText(label, startX + 0.2, y - 0.15, {
+              fontFamily: theme.textFont,
+              fontSize: 1.2,
+              color: theme.colorOf("mark"),
+              bold: true
+            })
+          );
+        }
         staffNumbers.forEach((staffNumber, staffIndex) => {
+          const drawSlideFor = (note2, x2, y, kind, stringNumber) => {
+            const key = `${staffNumber}:${note2.voice}:${kind}`;
+            const pending = pendingSlidesByVoiceAndStaff.get(key);
+            if (note2.slideStop === true) {
+              if (pending === void 0) {
+                diagnostics.push({
+                  severity: "info",
+                  code: "UNMATCHED_SLIDE_STOP",
+                  message: `A <${kind}> stop has no matching start; no ${kind} was drawn.`,
+                  location: { partId: part2.id, measureNumber: measure2.number }
+                });
+              } else if (!slideEndpointsMatch(pending, note2, kind)) {
+                diagnostics.push({
+                  severity: "warning",
+                  code: "SLIDE_ENDPOINT_MISMATCH",
+                  message: `A <${kind}> stop does not match the preceding endpoint (pitch or string); no ${kind} was drawn.`,
+                  location: { partId: part2.id, measureNumber: measure2.number }
+                });
+              } else if (pending.systemIndex !== layout.systemIndex) {
+                diagnostics.push({
+                  severity: "info",
+                  code: "SLIDE_CROSSES_SYSTEM",
+                  message: `A <${kind}> crosses a system break; system-to-system continuation is not drawn.`,
+                  location: { partId: part2.id, measureNumber: pending.measureNumber }
+                });
+              } else {
+                svgParts.push(
+                  renderSlide(computeSlideShape(pending.x, pending.y, x2, y, kind), {
+                    color: theme.colorOf("slide"),
+                    thickness: lineWidth(
+                      theme,
+                      void 0,
+                      "slideThickness",
+                      SLIDE_THICKNESS_FALLBACK
+                    )
+                  })
+                );
+              }
+              pendingSlidesByVoiceAndStaff.delete(key);
+            }
+            if (note2.slideStart === true)
+              pendingSlidesByVoiceAndStaff.set(key, {
+                x: x2,
+                y,
+                kind,
+                pitch: note2.pitch,
+                ...stringNumber !== void 0 ? { stringNumber } : {},
+                measureNumber: measure2.number,
+                systemIndex: layout.systemIndex
+              });
+          };
           const startState = stateAtTick(0);
           const staffClef = clefSpecAt(startState, staffNumber);
           const { clefDef, keySigClefName } = mapClef(staffClef.sign, staffClef.line);
@@ -79240,6 +80395,35 @@ ${xrefOffset}
           {
             const topLineY = bottomY - staffGeometry.height;
             const markY = (placement) => placement === "above" ? topLineY - DYNAMIC_GAP : bottomY + DYNAMIC_GAP;
+            for (const pedal of partDirections.filter((d) => d.measureNumber === measure2.number && d.staff === staffNumber).flatMap(
+              (d) => d.pedals.map((p) => ({ p, x: directionXFor(d.measureNumber, d.tick) }))
+            )) {
+              if (pedal.x === void 0) continue;
+              const glyph = pedal.p.type === "stop" ? "keyboardPedalUp" : "keyboardPedalPed";
+              svgParts.push(
+                renderMark(glyph, {
+                  x: pedal.x,
+                  y: bottomY + DYNAMIC_GAP,
+                  color: theme.colorOf("text"),
+                  fontFamily: theme.musicFont
+                })
+              );
+            }
+            for (const span of pedalSpansByMeasure.get(measure2.number) ?? []) {
+              if (span.staff !== staffNumber) continue;
+              svgParts.push(
+                svgLine(
+                  span.startX + 1.2,
+                  bottomY + DYNAMIC_GAP - 0.35,
+                  span.endX,
+                  bottomY + DYNAMIC_GAP - 0.35,
+                  {
+                    stroke: theme.colorOf("text"),
+                    "stroke-width": lineWidth(theme, void 0, "pedalLineThickness", 0.16)
+                  }
+                )
+              );
+            }
             for (const d of partDirections) {
               if (d.measureNumber !== measure2.number || d.staff !== staffNumber) continue;
               if (d.dynamics.length === 0) continue;
@@ -79541,7 +80725,23 @@ ${xrefOffset}
                 );
                 const source = group.members.length === 1 ? group.members[0] : void 0;
                 svgParts.push(
-                  source !== void 0 ? withEventId(svg2, source.voiceId, source.index) : svg2
+                  source !== void 0 ? withEventId(
+                    scaleCueSvg(
+                      svg2,
+                      group.event,
+                      sharedXs[index] ?? 0,
+                      ctxAtTick(group.tick).measureBottomY,
+                      fileDefaults
+                    ),
+                    source.voiceId,
+                    source.index
+                  ) : scaleCueSvg(
+                    svg2,
+                    group.event,
+                    sharedXs[index] ?? 0,
+                    ctxAtTick(group.tick).measureBottomY,
+                    fileDefaults
+                  )
                 );
               });
             }
@@ -79650,8 +80850,25 @@ ${xrefOffset}
                     accidentalState,
                     forcedDirection
                   );
-                  if (anchor !== void 0) anchorByIndex.set(idx, anchor);
-                  svgParts.push(withEventId(svg2, voice2.id, idx));
+                  if (anchor !== void 0) {
+                    anchorByIndex.set(idx, anchor);
+                    const first = event.notes[0];
+                    if (first !== void 0 && (first.slideStart === true || first.slideStop === true))
+                      drawSlideFor(
+                        first,
+                        eventX,
+                        eventCtx.measureBottomY + anchor.topPosition,
+                        first.slideStartKind ?? first.slideStopKind ?? "slide",
+                        first.stringNumber
+                      );
+                  }
+                  svgParts.push(
+                    withEventId(
+                      scaleCueSvg(svg2, event, eventX, eventCtx.measureBottomY, fileDefaults),
+                      voice2.id,
+                      idx
+                    )
+                  );
                   accidentalState = newAccidentalState;
                 } else {
                   const { svg: svg2, newAccidentalState, tieAnchor } = renderNoteOrRest(
@@ -79662,6 +80879,15 @@ ${xrefOffset}
                     forcedDirection,
                     restOffset
                   );
+                  if (event.kind === "note" && (event.slideStart === true || event.slideStop === true) && tieAnchor !== void 0) {
+                    drawSlideFor(
+                      event,
+                      eventX,
+                      eventCtx.measureBottomY + tieAnchor.position,
+                      event.slideStartKind ?? event.slideStopKind ?? "slide",
+                      event.stringNumber
+                    );
+                  }
                   const pendingTie = pendingTiesByVoiceAndStaff.get(tieKey);
                   if (event.kind === "note" && event.tieStop && pendingTie !== void 0) {
                     if (!tiePitchesMatch(pendingTie.pitch, event.pitch)) {
@@ -79720,7 +80946,13 @@ ${xrefOffset}
                       noteheadGlyph: tieAnchor.noteheadGlyph
                     });
                   }
-                  svgParts.push(withEventId(svg2, voice2.id, idx));
+                  svgParts.push(
+                    withEventId(
+                      scaleCueSvg(svg2, event, eventX, eventCtx.measureBottomY, fileDefaults),
+                      voice2.id,
+                      idx
+                    )
+                  );
                   accidentalState = newAccidentalState;
                 }
               });
@@ -79783,6 +81015,15 @@ ${xrefOffset}
                     location: { partId: part2.id, measureNumber: measure2.number }
                   });
                 }
+                if (event.slideStart === true || event.slideStop === true) {
+                  drawSlideFor(
+                    event,
+                    eventX,
+                    bottomY + position,
+                    event.slideStartKind ?? event.slideStopKind ?? "slide",
+                    event.stringNumber
+                  );
+                }
                 svgParts.push(
                   renderTabNumber(fretDigitGlyphNames(event.fret), {
                     x: eventX,
@@ -79801,6 +81042,75 @@ ${xrefOffset}
               message: `Clef "${attrs.clefSign}" does not position notes by pitch; skipping notes in this measure.`,
               location: { partId: part2.id, measureNumber: measure2.number }
             });
+          }
+          {
+            const verses = lyricVersesFor(part2.id, staffNumber);
+            if (verses.length > 0) {
+              const lyricNoteAreaX = Math.max(noteAreaXOf(layout.x, measure2.number), cursorX);
+              const lyricFallbackWidth = layout.x + layout.width - lyricNoteAreaX;
+              const measureTotalTicksForLyrics = measureTicksByNumber.get(measure2.number) ?? TICKS_PER_QUARTER * 4;
+              const hyphenWidth = glyphWidthOf(lyricHyphenGlyphName()) * (theme.sizes.lyric / 4);
+              const elisionWidth = glyphWidthOf(lyricElisionGlyphName()) * (theme.sizes.lyric / 4);
+              for (const [rowIndex, verse] of verses.entries()) {
+                const boxes = [];
+                const seenTicks = /* @__PURE__ */ new Set();
+                for (const voice2 of measure2.voices) {
+                  const starts = eventStartTicks(voice2.events);
+                  voice2.events.forEach((event, index) => {
+                    if ((event.staff ?? 1) !== staffNumber) return;
+                    const notes = event.kind === "note" ? [event] : event.kind === "chord" ? event.notes : [];
+                    const syllables = notes.flatMap((note2) => note2.lyrics ?? []).filter((candidate) => candidate.number === verse && candidate.text.length > 0);
+                    if (syllables.length === 0) return;
+                    const tick = starts[index] ?? 0;
+                    if (seenTicks.has(tick)) return;
+                    seenTicks.add(tick);
+                    const realX = measureLayoutsByNumber.get(measure2.number)?.positionsByTick.get(tick);
+                    const x2 = lyricNoteAreaX + (realX ?? tick / (measureTotalTicksForLyrics || 1) * lyricFallbackWidth);
+                    for (const syllable of syllables) {
+                      boxes.push({
+                        text: syllable.text,
+                        x: x2,
+                        width: estimateTextWidth(syllable.text, theme.sizes.lyric),
+                        ...syllable.syllabic !== void 0 ? { syllabic: syllable.syllabic } : {},
+                        extend: syllable.extend,
+                        // Where a melisma runs to when nothing follows it in
+                        // this row: the measure's own last ink, not its
+                        // barline -- a line that touches the barline reads as
+                        // a barline, not as a melisma.
+                        melismaEndX: layout.x + layout.width - MEASURE_TRAILING_MARGIN
+                      });
+                    }
+                  });
+                }
+                if (boxes.length === 0) continue;
+                boxes.sort((a, b) => a.x - b.x);
+                const items = layoutLyricRow(boxes, {
+                  hyphenWidth,
+                  elisionWidth,
+                  punctuationGap: 0.25
+                });
+                svgParts.push(
+                  renderLyricRow(
+                    items,
+                    lyricRowBaselineY(
+                      bottomY,
+                      rowIndex,
+                      config.text.lyricGap,
+                      config.text.lyricRowHeight
+                    ),
+                    {
+                      fontFamily: config.fonts.lyricFont,
+                      fontSize: theme.sizes.lyric,
+                      musicFont: theme.musicFont,
+                      color: theme.colorOf("lyric"),
+                      hyphenWidth,
+                      elisionWidth,
+                      lineThickness: lineWidth(theme, void 0, "lyricLineThickness", 0.16)
+                    }
+                  )
+                );
+              }
+            }
           }
         });
         const nextAttrs = attributesByPartAndMeasure.get(`${part2.id}:${measure2.number + 1}`);
@@ -79871,6 +81181,13 @@ ${xrefOffset}
         }
         previousAttrs = attrs;
       });
+      for (const pending of pendingSlidesByVoiceAndStaff.values())
+        diagnostics.push({
+          severity: "info",
+          code: "UNMATCHED_SLIDE_START",
+          message: `A <${pending.kind}> start has no matching stop; no ${pending.kind} was drawn.`,
+          location: { partId: part2.id, measureNumber: pending.measureNumber }
+        });
       const partStaffCount = partStaffCounts[partIndex] ?? 1;
       if (needsBrace(partStaffCount)) {
         const firstOffset = staffOffsetFor(partIndex, 0);
@@ -80004,7 +81321,13 @@ ${xrefOffset}
       {
         // §16.2: page mode's canvas is the PAGE, however much or little of
         // it the music fills; scroll mode's is as wide as the music itself.
-        viewBoxWidth: config.layout.mode === "page" ? config.page.pageWidth : totalWidth + 2,
+        // Scroll mode gets one staff-space of optical breathing room on both
+        // sides. Clefs and system-start bar numbers have real glyph ink that
+        // naturally overhangs their nominal x origin; starting the viewBox at
+        // zero clipped that ink in small web renders and made the score feel
+        // cramped against the edge.
+        viewBoxWidth: config.layout.mode === "page" ? config.page.pageWidth : totalWidth + 3,
+        ...config.layout.mode === "page" ? {} : { viewBoxMinX: -1 },
         // Integration A/B: the viewBox must fit EVERY staff of EVERY part,
         // or the lower ones are simply clipped out of the rendered image.
         // In page mode that means every page, stacked.
@@ -80328,8 +81651,8 @@ ${xrefOffset}
   function stringIndexFromLowest(stringFromLowest, stringCount) {
     return stringCount - stringFromLowest;
   }
-  function writtenPitchFor(data, soundingPitch) {
-    return soundingPitch - data.transposeChromatic;
+  function writtenPitchFor(data, soundingPitch2) {
+    return soundingPitch2 - data.transposeChromatic;
   }
   function fretFor(data, writtenPitch, stringFromLowest) {
     const open = data.openStrings[stringFromLowest - 1];

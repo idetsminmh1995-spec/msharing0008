@@ -1,4 +1,4 @@
-import type { Chord, Measure, MeasureEvent, Note, Rest } from './core/index.js';
+import type { Chord, Measure, MeasureEvent, Note, Rest, SlideKind } from './core/index.js';
 import type { DurationType } from './core/duration.js';
 import { getEngravingDefault, getGlyph } from './glyphs/index.js';
 import {
@@ -51,6 +51,7 @@ import {
   resolveStemDirection,
   computeTieShape,
   tieSide,
+  computeSlideShape,
   resolveNoteheadCollision,
   voiceForcedDirection,
   voiceRestOffset,
@@ -64,7 +65,22 @@ import {
   type AccidentalState,
   type BarlineType,
   type BeamStyle as BeamStyleOption,
+  chordSymbolLayout,
+  harmonicNoteheadGlyphName,
+  tremoloGlyphName,
+  tremoloPlacement,
+  computeArpeggioShape,
+  computeNonArpeggioShape,
+  computeRehearsalMarkBox,
+  layoutLyricRow,
+  lyricRowBaselineY,
+  lyricHyphenGlyphName,
+  lyricElisionGlyphName,
+  estimateTextWidth,
+  TEXT_ASCENT_PER_EM,
+  type LyricSyllableBox,
 } from './geometry/index.js';
+import { renderSlide } from './render/slide.js';
 import {
   expandClosedHiHatQuarterNotesToEighthPulse,
   lookupDrumMapEntry,
@@ -77,6 +93,8 @@ import {
   emptySkyline,
   addToSkyline,
   computeStaffDistance,
+  DEFAULT_PART_GAP,
+  type Skyline,
 } from './layout/index.js';
 import { fretDigitGlyphNames, tabStringPosition } from './geometry/index.js';
 import { metronomeNoteGlyphName, metronomeDotGlyphName } from './geometry/metronome.js';
@@ -107,7 +125,12 @@ import {
 } from './debug/index.js';
 import { computeBraceShape, needsBrace, needsContinuousBarline } from './geometry/index.js';
 import { renderBrace } from './render/index.js';
-import type { Diagnostic, MeasureAttributes, PositionedAttributeChange } from './parser/index.js';
+import type {
+  Diagnostic,
+  MeasureAttributes,
+  PositionedAttributeChange,
+  OctaveShiftEvent,
+} from './parser/index.js';
 import { parseMusicXml, type ParseMusicXmlOptions, type ParseResult } from './parser/index.js';
 import type { ScoreDefaults, ScoreLineWidths } from './parser/musicxml/defaults.js';
 import {
@@ -117,6 +140,7 @@ import {
   type NoteheadMappingConfig,
   type PartialEngineConfig,
   type SpacingConfig,
+  type TextConfig,
 } from './config/index.js';
 import { computePageLayout, type PageMeasureInput } from './layout/index.js';
 import { measure as makeMeasure } from './core/index.js';
@@ -153,6 +177,16 @@ import {
   renderTupletNumber,
   renderTimeSignature,
   noteheadWidth,
+  renderChordSymbol,
+  renderTremolo,
+  renderArpeggio,
+  renderNonArpeggio,
+  stemGeometry,
+  renderLyricRow,
+  renderRehearsalMark,
+  renderWords,
+  renderText,
+  svgLine,
 } from './render/index.js';
 
 const STAFF_LINES = 5;
@@ -203,6 +237,7 @@ export type ColorCategory =
   | 'keySignature'
   | 'timeSignature'
   | 'tie'
+  | 'slide'
   | 'slur'
   | 'tuplet'
   | 'mark'
@@ -211,7 +246,15 @@ export type ColorCategory =
   | 'tempo'
   | 'barNumber'
   | 'tabNumber'
-  | 'volta';
+  | 'volta'
+  // Phase 55/§19.10: the text layer. Each is its own category because
+  // they are drawn from two different fonts (a lyric's words and a
+  // chord symbol's root are ordinary text; the punctuation between them
+  // is SMuFL) and a host may well want them coloured differently.
+  | 'lyric'
+  | 'chordSymbol'
+  | 'rehearsalMark'
+  | 'text';
 
 /**
  * Phase 50/§8: the drawing values the renderer reads, resolved ONCE from
@@ -597,6 +640,81 @@ const DYNAMIC_GAP = 2.5;
 const HAIRPIN_THICKNESS_FALLBACK = 0.16;
 
 /**
+ * Phase 55/§19.10: how far one above-staff TEXT item sits above whatever
+ * is already stacked at that x. The same kind of chosen constant as
+ * DYNAMIC_GAP above -- §9.21 specifies that these marks go above the
+ * staff, not the distance between them.
+ */
+const TEXT_MARK_GAP = 1.2;
+
+/**
+ * Phase 55: clear space between a chord symbol's own ascenders and the
+ * next thing stacked above it (a tempo mark or a `<words>` direction).
+ * Without it the chord symbol's `maj7` and the tempo mark's note-value
+ * glyph interleave.
+ */
+const CHORD_SYMBOL_STACK_CLEARANCE = 0.4;
+
+/**
+ * Phase 56/§9.25: where an arpeggio mark sits relative to the chord it
+ * belongs to -- just left of the chord's own leftmost ink, and reaching a
+ * little past its outer heads at each end so it reads as a mark BESIDE
+ * the chord rather than as part of it.
+ */
+const ARPEGGIO_GAP = 0.6;
+const ARPEGGIO_MARGIN = 0.5;
+
+/**
+ * Phase 56/§9.25: the horizontal room an arpeggio mark needs to the LEFT
+ * of the chord it belongs to -- the widest notehead it can sit beside,
+ * plus its own gap, plus a non-arpeggio bracket's own hook (the widest of
+ * the two marks), so neither can reach back onto a barline or a time
+ * signature. Used by the spacing pass (`leadingByStaff`).
+ */
+const ARPEGGIO_LEADING_WIDTH = 2.5;
+
+/** Whether this event's chord carries an arpeggio or non-arpeggio mark, i.e. needs that leading room. */
+/** MusicXML cue-note optical scale. File appearance note-size='cue' overrides this. */
+const DEFAULT_CUE_NOTE_SCALE = 0.75;
+function cueScaleForEvent(
+  event: Note | Chord | Rest,
+  fileDefaults: ScoreDefaults | undefined,
+): number {
+  const cue =
+    event.kind === 'note'
+      ? event.isCue === true
+      : event.kind === 'chord' && event.notes.some((n) => n.isCue === true);
+  return cue ? Math.max(0.1, fileDefaults?.noteSizes.cue ?? DEFAULT_CUE_NOTE_SCALE) : 1;
+}
+function scaleCueSvg(
+  svg: string,
+  event: Note | Chord | Rest,
+  x: number,
+  baselineY: number,
+  fileDefaults: ScoreDefaults | undefined,
+): string {
+  const scale = cueScaleForEvent(event, fileDefaults);
+  return scale === 1
+    ? svg
+    : svgGroup([svg], {
+        transform: `translate(${x} ${baselineY}) scale(${scale}) translate(${-x} ${-baselineY})`,
+      });
+}
+function carriesArpeggioMark(event: Note | Chord | Rest): boolean {
+  if (event.kind === 'note') {
+    return event.arpeggiate !== undefined || event.nonArpeggiate === true;
+  }
+  if (event.kind === 'chord') {
+    // A one-note "chord" is not rolled; the drawing pass ignores it too.
+    return (
+      event.notes.length > 1 &&
+      event.notes.some((note) => note.arpeggiate !== undefined || note.nonArpeggiate === true)
+    );
+  }
+  return false;
+}
+
+/**
  * Phase 44 wiring: the single most extreme staff-position value any note
  * on `staffNumber` reaches, expressed as a non-negative extent AWAY from
  * that staff's own near edge -- exactly the shape `Skyline`'s segments
@@ -785,6 +903,7 @@ function computeMeasureLayout(
   accidentals: ReadonlyMap<number, number>,
   /** Mid-measure clef/key/time glyphs that must be reserved on this shared timeline. */
   attributeTransitions: readonly PositionedAttributeTransition[],
+  fileDefaults?: ScoreDefaults,
 ): {
   readonly width: number;
   readonly positionsByTick: ReadonlyMap<number, number>;
@@ -817,6 +936,8 @@ function computeMeasureLayout(
    * `SpacingEvent.widthsByStaff`, which is what reads this.
    */
   const widthByTickAndStaff = new Map<number, Map<string, number>>();
+  /** §9.25: one event per tick, so the FIRST attack's own arpeggio mark can be found after the loop. */
+  const eventByTick = new Map<number, Note | Chord | Rest>();
   /** The same, for what reaches LEFT of each attack -- its accidental. */
   const leadingByTickAndStaff = new Map<number, Map<string, number>>();
   /** MuseScore's `shortestChordRest`, per attack -- see where it is filled. */
@@ -838,6 +959,7 @@ function computeMeasureLayout(
       const tick = starts[idx] ?? 0;
       attacks.add(tick);
       const staff = String(event.staff ?? 1);
+      if (!eventByTick.has(tick)) eventByTick.set(tick, event);
       const put = (into: Map<number, Map<string, number>>, value: number): void => {
         let perStaff = into.get(tick);
         if (perStaff === undefined) {
@@ -846,8 +968,20 @@ function computeMeasureLayout(
         }
         perStaff.set(staff, Math.max(perStaff.get(staff) ?? 0, value));
       };
-      put(widthByTickAndStaff, attackWidth(event.duration.dots));
-      put(leadingByTickAndStaff, attackLeading(accidentals.get(tick)));
+      put(
+        widthByTickAndStaff,
+        attackWidth(event.duration.dots) * cueScaleForEvent(event, fileDefaults),
+      );
+      // §9.25: an arpeggio mark is drawn to the LEFT of its chord, so the
+      // spacing pass must reserve that room before the attack -- without
+      // it the mark lands on the barline, or on the previous measure's
+      // last notehead. Added to (not maxed with) the accidental's own
+      // leading, since a chord can need both.
+      put(
+        leadingByTickAndStaff,
+        attackLeading(accidentals.get(tick)) +
+          (carriesArpeggioMark(event) ? ARPEGGIO_LEADING_WIDTH : 0),
+      );
       // MuseScore's `Segment::shortestChordRest`: the shortest thing
       // that BEGINS at this attack, across every voice. Not the gap to
       // the next attack -- the two are equal only while nothing longer
@@ -966,12 +1100,28 @@ function computeMeasureLayout(
   const proportional = computeProportionalPositions(spacingEvents, clock, spacing);
   const enforced = applyMinimumDistance(proportional, spacingEvents, spacing);
 
+  /**
+   * §9.25: `applyMinimumDistance` only reserves LEADING space for attacks
+   * after the first -- the first one sits at the measure's own note-area
+   * origin, where the space to its left belongs to the header (clef, key,
+   * time signature). A rolled chord as the first thing in a bar therefore
+   * put its mark on top of the time signature. Shifting the whole measure's
+   * positions right by the mark's own width gives the header the room
+   * instead, and the measure's width grows by the same amount below, so
+   * nothing is taken from the notes.
+   */
+  const firstTick = ticks[0];
+  const firstEvent = firstTick === undefined ? undefined : eventByTick.get(firstTick);
+  const firstAttackLeading =
+    firstEvent !== undefined && carriesArpeggioMark(firstEvent) ? ARPEGGIO_LEADING_WIDTH : 0;
+  const shifted = firstAttackLeading > 0 ? enforced.map((x) => x + firstAttackLeading) : enforced;
+
   const positionsByTick = new Map<number, number>();
   ticks.forEach((tick, i) => {
-    positionsByTick.set(tick, enforced[i] ?? 0);
+    positionsByTick.set(tick, shifted[i] ?? 0);
   });
 
-  const lastX = enforced[enforced.length - 1] ?? 0;
+  const lastX = shifted[shifted.length - 1] ?? 0;
   const lastEvent = spacingEvents[spacingEvents.length - 1];
   const lastWidth = lastEvent?.renderedWidth ?? 0;
 
@@ -1012,6 +1162,7 @@ const LEDGER_EXTENSION_FALLBACK = 0.4;
 const LEDGER_THICKNESS_FALLBACK = 0.16;
 const STEM_THICKNESS_FALLBACK = 0.12;
 const TIE_MIDPOINT_THICKNESS_FALLBACK = 0.22;
+const SLIDE_THICKNESS_FALLBACK = 0.13;
 const BEAM_THICKNESS_FALLBACK = 0.5;
 const BEAM_SPACING_FALLBACK = 0.25;
 /** The natural (unbeamed) stem length a beam group's shape starts from, matching Phase 16's own default. */
@@ -1146,6 +1297,7 @@ function attributesAtMeasureStart(
     staves: state.staves,
     clefsByStaff: state.clefsByStaff,
     staffLinesByStaff: state.staffLinesByStaff,
+    transpose: state.transpose,
     ...(summary.barlineStyle !== undefined ? { barlineStyle: summary.barlineStyle } : {}),
     ...(summary.repeatDirection !== undefined ? { repeatDirection: summary.repeatDirection } : {}),
     ...(summary.repeatTimes !== undefined ? { repeatTimes: summary.repeatTimes } : {}),
@@ -1621,6 +1773,23 @@ function renderNoteMarks(
  * disagreeing way. `topPosition`/`bottomPosition` differ only for a
  * chord; for a single note they are the same value.
  */
+interface SlideEndpoint {
+  readonly x: number;
+  readonly y: number;
+  readonly kind: SlideKind;
+  readonly pitch: Note['pitch'];
+  readonly stringNumber?: number;
+  readonly measureNumber: number;
+  readonly systemIndex: number;
+}
+function slideEndpointsMatch(a: SlideEndpoint, note: Note, kind: SlideKind): boolean {
+  if (a.kind !== kind) return false;
+  // Tablature slides are string-bound; pitched glissandi intentionally change pitch.
+  if (a.stringNumber !== undefined || note.stringNumber !== undefined)
+    return a.stringNumber === note.stringNumber;
+  return true;
+}
+
 interface EventAnchor {
   readonly x: number;
   readonly topPosition: number;
@@ -1727,20 +1896,30 @@ function resolveNoteRendering(
       ? { ...drumOverride, ...configOverrides }
       : undefined;
 
-  const noteheadGlyph = selectNoteheadGlyphName({
-    pitch: note.pitch,
-    durationType: note.duration.type,
-    ...(note.noteheadFilled !== undefined ? { filled: note.noteheadFilled } : {}),
-    defaultShape: ctx.theme.noteheadMapping.defaultShape,
-    ...(note.explicitNotehead !== undefined ? { explicitNotehead: note.explicitNotehead } : {}),
-    ...(note.explicitNoteheadSmufl !== undefined
-      ? { explicitNoteheadSmufl: note.explicitNoteheadSmufl }
-      : drumGlyph !== undefined
-        ? { explicitNoteheadSmufl: drumGlyph }
-        : {}),
-    ...(gmNote !== undefined ? { midiNote: gmNote } : {}),
-    ...(overridesByKey !== undefined ? { overridesByKey } : {}),
-  });
+  // §9.26: a harmonic's diamond head, unless the file stated a head of
+  // its own -- `<notehead>diamond</notehead>` and `<harmonic>` together
+  // are common, and the file's explicit statement outranks this default.
+  const fileStatedHead =
+    note.explicitNotehead !== undefined || note.explicitNoteheadSmufl !== undefined;
+  const noteheadGlyph =
+    note.isHarmonic === true && !isUnpitched && !fileStatedHead
+      ? harmonicNoteheadGlyphName(note.duration.type, note.noteheadFilled)
+      : selectNoteheadGlyphName({
+          pitch: note.pitch,
+          durationType: note.duration.type,
+          ...(note.noteheadFilled !== undefined ? { filled: note.noteheadFilled } : {}),
+          defaultShape: ctx.theme.noteheadMapping.defaultShape,
+          ...(note.explicitNotehead !== undefined
+            ? { explicitNotehead: note.explicitNotehead }
+            : {}),
+          ...(note.explicitNoteheadSmufl !== undefined
+            ? { explicitNoteheadSmufl: note.explicitNoteheadSmufl }
+            : drumGlyph !== undefined
+              ? { explicitNoteheadSmufl: drumGlyph }
+              : {}),
+          ...(gmNote !== undefined ? { midiNote: gmNote } : {}),
+          ...(overridesByKey !== undefined ? { overridesByKey } : {}),
+        });
 
   return {
     position,
@@ -2045,17 +2224,30 @@ function renderNoteOrRest(
 
   if (ev.duration.type !== 'whole') {
     const length = computeStemLength(head.position, middleLineY(STAFF_LINES), direction);
-    parts.push(
-      renderStem({
-        noteheadGlyphName: head.noteheadGlyph,
-        noteX: x,
-        noteY: y,
-        direction,
-        length,
-        thickness: lineWidth(ctx.theme, 'stem', 'stemThickness', STEM_THICKNESS_FALLBACK),
-        color: ctx.theme.colorOf('stem'),
-      }),
-    );
+    const stemOptions = {
+      noteheadGlyphName: head.noteheadGlyph,
+      noteX: x,
+      noteY: y,
+      direction,
+      length,
+      thickness: lineWidth(ctx.theme, 'stem', 'stemThickness', STEM_THICKNESS_FALLBACK),
+      color: ctx.theme.colorOf('stem'),
+    };
+    parts.push(renderStem(stemOptions));
+    // §9.24: a tremolo's strokes are drawn ON the stem, centred on it --
+    // which is why the stem's own geometry is asked for rather than
+    // recomputed here.
+    const tremoloGlyph =
+      ev.tremoloStrokes !== undefined ? tremoloGlyphName(ev.tremoloStrokes) : undefined;
+    if (tremoloGlyph !== undefined) {
+      const stem = stemGeometry(stemOptions);
+      parts.push(
+        renderTremolo(tremoloGlyph, tremoloPlacement(stem.x, stem.attachY, stem.endY), {
+          fontFamily: ctx.theme.musicFont,
+          color: ctx.theme.colorOf('mark'),
+        }),
+      );
+    }
     if (needsFlag(ev.duration.type, false)) {
       const anchorName = direction === 'up' ? 'stemUpSE' : 'stemDownNW';
       const anchor = getGlyph(head.noteheadGlyph)?.anchors?.[anchorName];
@@ -2524,17 +2716,70 @@ function renderChord(
       const outermostIndex = positions.findIndex((position) => position === outermost);
       const stemGlyph = heads.glyphs[outermostIndex] ?? heads.widestGlyph;
       const length = computeStemLength(outermost, middleLineY(STAFF_LINES), direction);
-      parts.push(
-        renderStem({
-          noteheadGlyphName: stemGlyph,
-          noteX: x,
-          noteY: ctx.measureBottomY + outermost,
-          direction,
-          length,
-          thickness: lineWidth(ctx.theme, 'stem', 'stemThickness', STEM_THICKNESS_FALLBACK),
-          color: ctx.theme.colorOf('stem'),
-        }),
-      );
+      const stemOptions = {
+        noteheadGlyphName: stemGlyph,
+        noteX: x,
+        noteY: ctx.measureBottomY + outermost,
+        direction,
+        length,
+        thickness: lineWidth(ctx.theme, 'stem', 'stemThickness', STEM_THICKNESS_FALLBACK),
+        color: ctx.theme.colorOf('stem'),
+      };
+      parts.push(renderStem(stemOptions));
+      // §9.24: MusicXML attaches a chord's notations to its FIRST note, so
+      // that is where a chord's tremolo is read from.
+      const chordTremolo = chord.notes.find((note) => note.tremoloStrokes !== undefined);
+      const tremoloGlyph =
+        chordTremolo?.tremoloStrokes !== undefined
+          ? tremoloGlyphName(chordTremolo.tremoloStrokes)
+          : undefined;
+      if (tremoloGlyph !== undefined) {
+        const stem = stemGeometry(stemOptions);
+        parts.push(
+          renderTremolo(tremoloGlyph, tremoloPlacement(stem.x, stem.attachY, stem.endY), {
+            fontFamily: ctx.theme.musicFont,
+            color: ctx.theme.colorOf('mark'),
+          }),
+        );
+      }
+    }
+
+    // §9.25: one arpeggio mark for the WHOLE chord, not one per member --
+    // a rolled chord is rolled once. Its height comes from the chord's own
+    // outer noteheads, so it cannot disagree with what it is marking.
+    const arpeggioDirection = chord.notes.find((note) => note.arpeggiate !== undefined)?.arpeggiate;
+    const explicitlyNotRolled = chord.notes.some((note) => note.nonArpeggiate === true);
+    if (positions.length > 1 && (arpeggioDirection !== undefined || explicitlyNotRolled)) {
+      // A small margin beyond the outer heads, so the mark reads as beside
+      // the chord rather than as touching it.
+      const topY = ctx.measureBottomY + Math.min(...positions) - ARPEGGIO_MARGIN;
+      const bottomY = ctx.measureBottomY + Math.max(...positions) + ARPEGGIO_MARGIN;
+      const markX = x - noteheadWidth(heads.widestGlyph) - ARPEGGIO_GAP;
+      const markOptions = {
+        color: ctx.theme.colorOf('mark'),
+        thickness: lineWidth(ctx.theme, 'stem', 'stemThickness', STEM_THICKNESS_FALLBACK),
+      };
+      if (explicitlyNotRolled) {
+        // A bracket's hooks are HORIZONTAL, so a hook that lands exactly on
+        // a staff line is invisible -- it merges with the line it sits on.
+        // The first render of this fixture had both hooks on lines and the
+        // bracket read as a bare vertical stroke. Nudged into the space.
+        const offStaffLine = (y: number, direction: -1 | 1): number =>
+          Math.abs(y - Math.round(y)) < 0.15 ? y + direction * 0.3 : y;
+        parts.push(
+          renderNonArpeggio(
+            computeNonArpeggioShape(markX, offStaffLine(topY, -1), offStaffLine(bottomY, 1)),
+            markOptions,
+          ),
+        );
+      } else if (arpeggioDirection !== undefined) {
+        parts.push(
+          renderArpeggio(
+            computeArpeggioShape(markX, topY, bottomY, arpeggioDirection),
+            markOptions,
+          ),
+        );
+      }
     }
     // Integration H: MusicXML attaches a chord's <notations> to its FIRST
     // <note> (the others carry only <chord/>), so that note's marks are
@@ -3000,6 +3245,141 @@ function renderSpans(
  * collisions (K).
  */
 /**
+ * Phase 55/§19.10: the text a single measure carries ABOVE its staves.
+ *
+ * Three separate facts because they stack in a fixed order and each has
+ * its own size, so "there is text above this bar" is not enough to
+ * reserve room with.
+ */
+interface MeasureTextNeeds {
+  readonly chordSymbols: boolean;
+  readonly rehearsalMarks: boolean;
+  readonly words: boolean;
+}
+
+/**
+ * The verse numbers a part's staff actually uses, ascending -- which is
+ * also the row order a lyric block is drawn in (verse 1 nearest the
+ * staff, verse 2 below it, ...).
+ */
+function lyricVerseNumbers(
+  part: { readonly measures: readonly Measure[] },
+  staffNumber: number,
+): readonly number[] {
+  const verses = new Set<number>();
+  for (const measure of part.measures) {
+    for (const voice of measure.voices) {
+      for (const event of voice.events) {
+        if ((event.staff ?? 1) !== staffNumber) continue;
+        const notes = event.kind === 'note' ? [event] : event.kind === 'chord' ? event.notes : [];
+        for (const note of notes) {
+          for (const syllable of note.lyrics ?? []) verses.add(syllable.number);
+        }
+      }
+    }
+  }
+  return [...verses].sort((a, b) => a - b);
+}
+
+/**
+ * How far below a staff's bottom line its lyric block reaches, in staff
+ * spaces: the gap to verse 1's baseline, one row per further verse, and
+ * the descenders of the last row.
+ */
+function lyricBandHeight(
+  verseCount: number,
+  gap: number,
+  rowHeight: number,
+  fontSize: number,
+): number {
+  if (verseCount <= 0) return 0;
+  return gap + (verseCount - 1) * rowHeight + fontSize * 0.35;
+}
+
+/**
+ * Phase 55: where the above-staff text rows sit, as offsets ABOVE the
+ * staff's top line, plus how far the whole stack has to be pushed up to
+ * clear the measure's own content.
+ *
+ * One calculation, used twice: the drawing pass reads the offsets, and
+ * the layout pass reads `band` to reserve room for them. They cannot
+ * disagree because there is only one of them.
+ *
+ * The offsets are FIXED per part, not per measure. A chord symbol that
+ * jumped up and down with each bar's highest melody note would read as
+ * badly engraved -- chord symbols belong on a line, the way a lyric row
+ * does -- so the caller passes the part's own worst-case content extent
+ * (`partNorthExtent`), and the stack sits still across the whole part.
+ * The one thing that moves it is content that would otherwise collide.
+ */
+interface NorthTextRows {
+  /** Baseline offset above the top line, when this measure has chord symbols. */
+  readonly chordSymbolOffset: number | undefined;
+  readonly wordsOffset: number | undefined;
+  readonly rehearsalOffset: number | undefined;
+  /** Total band above the top line, shift included -- what layout reserves. */
+  readonly band: number;
+  /** How far the stack was pushed up to clear content. */
+  readonly shift: number;
+}
+
+function northTextRows(
+  needs: MeasureTextNeeds,
+  sizes: FontSizeConfig,
+  textConfig: TextConfig,
+  rehearsalHeight: number,
+  northExtent: number,
+): NorthTextRows {
+  // No text, no band and no shift -- the caller's own `northExtent` is
+  // not this function's business when there is nothing to place above it.
+  if (!needs.chordSymbols && !needs.words && !needs.rehearsalMarks) {
+    return {
+      chordSymbolOffset: undefined,
+      wordsOffset: undefined,
+      rehearsalOffset: undefined,
+      band: 0,
+      shift: 0,
+    };
+  }
+  let offset = 0;
+  let chordSymbolOffset: number | undefined;
+  let wordsOffset: number | undefined;
+  let rehearsalOffset: number | undefined;
+  if (needs.chordSymbols) {
+    chordSymbolOffset = textConfig.chordSymbolGap;
+    offset =
+      chordSymbolOffset + sizes.chordSymbol * TEXT_ASCENT_PER_EM + CHORD_SYMBOL_STACK_CLEARANCE;
+  }
+  if (needs.words) {
+    wordsOffset = offset + TEXT_MARK_GAP;
+    offset = wordsOffset + sizes.tempo * TEXT_ASCENT_PER_EM;
+  }
+  if (needs.rehearsalMarks) {
+    rehearsalOffset = offset + TEXT_MARK_GAP;
+    offset = rehearsalOffset + rehearsalHeight;
+  }
+  // The LOWEST row is the one that meets the music, so it is the one that
+  // decides how far the stack moves. Everything above moves with it, so
+  // the rows keep their own spacing.
+  const lowest = chordSymbolOffset ?? wordsOffset ?? rehearsalOffset ?? 0;
+  const shift = Math.max(0, northExtent + CHORD_SYMBOL_STACK_CLEARANCE - lowest);
+  return { chordSymbolOffset, wordsOffset, rehearsalOffset, band: offset + shift, shift };
+}
+
+/**
+ * Phase 55: a staff's own extent, plus whatever text band hangs off it.
+ *
+ * `addToSkyline` takes the MORE EXTREME of two y values, so adding a
+ * zero band is not a no-op on a north skyline (where "extreme" is the
+ * smaller number) -- it would collapse a genuinely tall extent to zero.
+ * Hence the guard: no band, no change.
+ */
+function withTextBand(skyline: Skyline, band: number): Skyline {
+  if (!(band > 0)) return skyline;
+  return addToSkyline(skyline, { xStart: 0, xEnd: 1, y: band });
+}
+
+/**
  * Phase 53/§18.1: render a score that has ALREADY been parsed.
  *
  * §18.1's own performance strategy says "the `Score` and layout result
@@ -3015,6 +3395,23 @@ function renderSpans(
  * `renderFromMusicXml` is exactly `parseMusicXml` + this, so nothing
  * about the one-shot path changes.
  */
+function octaveShiftSpans(
+  events: readonly OctaveShiftEvent[],
+): readonly { start: OctaveShiftEvent; stop: OctaveShiftEvent }[] {
+  const open = new Map<string, OctaveShiftEvent>();
+  const spans: { start: OctaveShiftEvent; stop: OctaveShiftEvent }[] = [];
+  for (const event of events) {
+    const key = `${event.staff}:${event.number}`;
+    if (event.type === 'stop') {
+      const start = open.get(key);
+      if (start) {
+        spans.push({ start, stop: event });
+        open.delete(key);
+      }
+    } else if (event.type === 'up' || event.type === 'down') open.set(key, event);
+  }
+  return spans;
+}
 export function renderParsedMusicXml(
   parsed: ParseResult,
   options?: RenderParsedMusicXmlOptions,
@@ -3027,6 +3424,8 @@ export function renderParsedMusicXml(
     tempoMarks,
     midiInstrumentsByPart: midiInstrumentsByPartMap,
     directions,
+    octaveShifts,
+    harmonies,
     prints,
     defaults: fileDefaults,
   } = parsed;
@@ -3053,6 +3452,160 @@ export function renderParsedMusicXml(
   // Phase 50/§8: one resolution of every user-facing drawing value, passed
   // down on RenderCtx. Everything below reads `theme`, never a constant.
   const theme = buildTheme(config, fileDefaults);
+
+  // ---- Phase 55/§19.10: the text layer's own bookkeeping ---------------
+  //
+  // All of it is computed BEFORE layout, because layout's vertical
+  // reservations depend on it. A lyric row discovered only while drawing
+  // would already have been given no room and would print over the next
+  // system -- which is exactly why §9.22 refused to draw floating
+  // hyphens with no words: a half-drawn row is worse than none.
+  const measureTextKey = (partId: string, measureNumber: number): string =>
+    `${partId}:${measureNumber}`;
+  const textNeedsByMeasure = new Map<string, MeasureTextNeeds>();
+  {
+    const mark = (
+      partId: string,
+      measureNumber: number,
+      update: Partial<MeasureTextNeeds>,
+    ): void => {
+      const key = measureTextKey(partId, measureNumber);
+      const existing = textNeedsByMeasure.get(key) ?? {
+        chordSymbols: false,
+        rehearsalMarks: false,
+        words: false,
+      };
+      textNeedsByMeasure.set(key, { ...existing, ...update });
+    };
+    if (config.text.chordSymbolsDisplay === 'on') {
+      for (const harmony of harmonies) {
+        mark(harmony.partId, harmony.measureNumber, { chordSymbols: true });
+      }
+    }
+    for (const direction of directions) {
+      if (direction.rehearsals.length > 0 && config.text.rehearsalMarksDisplay === 'on') {
+        mark(direction.partId, direction.measureNumber, { rehearsalMarks: true });
+      }
+      if (direction.words.length > 0 && config.text.wordsDisplay === 'on') {
+        mark(direction.partId, direction.measureNumber, { words: true });
+      }
+    }
+  }
+  const NO_TEXT_NEEDS: MeasureTextNeeds = {
+    chordSymbols: false,
+    rehearsalMarks: false,
+    words: false,
+  };
+  const textNeedsAt = (partId: string, measureNumber: number): MeasureTextNeeds =>
+    textNeedsByMeasure.get(measureTextKey(partId, measureNumber)) ?? NO_TEXT_NEEDS;
+
+  /** The verse numbers each (part, staff) uses, cached: the same scan runs for layout and for drawing. */
+  const lyricVersesByStaff = new Map<string, readonly number[]>();
+  const lyricVersesFor = (partId: string, staffNumber: number): readonly number[] => {
+    if (config.text.lyricsDisplay === 'off') return [];
+    const key = `${partId}:${staffNumber}`;
+    const cached = lyricVersesByStaff.get(key);
+    if (cached !== undefined) return cached;
+    const part = score.parts.find((p) => p.id === partId);
+    const verses = part === undefined ? [] : lyricVerseNumbers(part, staffNumber);
+    lyricVersesByStaff.set(key, verses);
+    return verses;
+  };
+
+  /** How far below one staff its lyric block reaches. */
+  const southTextBand = (partIndex: number, staffNumber: number): number => {
+    const part = score.parts[partIndex];
+    if (part === undefined) return 0;
+    return lyricBandHeight(
+      lyricVersesFor(part.id, staffNumber).length,
+      config.text.lyricGap,
+      config.text.lyricRowHeight,
+      theme.sizes.lyric,
+    );
+  };
+
+  /** The tallest rehearsal-mark frame in one measure, which is what the stack has to clear. */
+  const rehearsalHeightFor = (partId: string, measureNumber: number): number => {
+    let height = 0;
+    for (const direction of directions) {
+      if (direction.partId !== partId || direction.measureNumber !== measureNumber) continue;
+      for (const text of direction.rehearsals) {
+        height = Math.max(height, computeRehearsalMarkBox(text, theme.sizes.tempo).height);
+      }
+    }
+    return height;
+  };
+
+  /**
+   * The part's own worst-case northward reach above staff 1, stems and
+   * beams included -- the SAME over-estimate `measureNorthExtent` already
+   * makes for tempo marks, but taken across the whole part so the text
+   * stack cannot move from bar to bar.
+   *
+   * Memoized, and only ever called for a part that actually carries text,
+   * so a score with no chord symbols or directions never pays for it.
+   */
+  const partNorthExtentCache = new Map<number, number>();
+  const partNorthExtent = (partIndex: number): number => {
+    const cached = partNorthExtentCache.get(partIndex);
+    if (cached !== undefined) return cached;
+    const part = score.parts[partIndex];
+    if (part === undefined) return 0;
+    let extent = 0;
+    for (const measure of part.measures) {
+      const attrsOfMeasure = attributesByPartAndMeasure.get(`${part.id}:${measure.number}`);
+      const timeline = attributeChangesByPartAndMeasure.get(`${part.id}:${measure.number}`) ?? [];
+      extent = Math.max(
+        extent,
+        measureNorthExtent(measure, 1, (tick) => {
+          const state = attributeStateAt(timeline, tick);
+          const spec = state !== undefined ? clefSpecAt(state, 1) : undefined;
+          const { clefDef } = mapClef(
+            spec?.sign ?? attrsOfMeasure?.clefSign ?? 'G',
+            spec?.line ?? attrsOfMeasure?.clefLine,
+          );
+          return {
+            clefDef,
+            measureBottomY: 0,
+            midiInstrumentsByPart: midiInstrumentsByPartMap.get(part.id),
+            theme,
+          };
+        }),
+      );
+    }
+    partNorthExtentCache.set(partIndex, extent);
+    return extent;
+  };
+
+  /**
+   * How far above one staff its chord symbols / `<words>` / rehearsal
+   * marks reach. Only staff 1 carries them: a `<harmony>` is parsed
+   * without a staff number (MusicXML's optional `staff` attribute on it
+   * is not read), and a `<words>` direction's own `staff` is honoured
+   * where it is drawn, but chord symbols and rehearsal marks belong
+   * above the top staff of the system in every score this engine has
+   * been tested on.
+   */
+  const northTextBandFor = (partIndex: number, staffNumber: number): number => {
+    if (staffNumber !== 1) return 0;
+    const part = score.parts[partIndex];
+    if (part === undefined) return 0;
+    let band = 0;
+    if (octaveShifts.some((shift) => shift.partId === part.id && shift.staff === 1)) band = 4.2;
+    for (const measure of part.measures) {
+      band = Math.max(
+        band,
+        northTextRows(
+          textNeedsAt(part.id, measure.number),
+          theme.sizes,
+          config.text,
+          rehearsalHeightFor(part.id, measure.number),
+          partNorthExtent(partIndex),
+        ).band,
+      );
+    }
+    return band;
+  };
   // Collect lookup warnings once per score event instead of in the shared
   // resolver, which is called by layout and drawing. This also gives each
   // warning its source measure even when layout performs the first lookup.
@@ -3492,6 +4045,7 @@ export function renderParsedMusicXml(
           staves: attrs.staves,
           clefsByStaff: attrs.clefsByStaff,
           staffLinesByStaff: attrs.staffLinesByStaff,
+          transpose: attrs.transpose,
         };
       out.push({
         measure: m,
@@ -3538,6 +4092,7 @@ export function renderParsedMusicXml(
       config.fonts.sizes.tempo,
       drawnAccidentalTicks(accidentalParts(measureNumber)),
       attributeTransitionsByMeasure.get(measureNumber) ?? [],
+      fileDefaults,
     );
     measureLayoutsByNumber.set(measureNumber, { ...layout, headerWidth });
     measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
@@ -3592,6 +4147,20 @@ export function renderParsedMusicXml(
           // over-estimate of how far above it they reach.
           needed = Math.max(needed, BAR_NUMBER_GAP + theme.sizes.barNumber);
         }
+        // Phase 55: only the TOP part's text layer sits against the top
+        // of the system; every other part's is absorbed by the gap above
+        // it (see `partGapForPart`).
+        const textBand =
+          partIndex === 0
+            ? northTextRows(
+                textNeedsAt(part.id, m.number),
+                theme.sizes,
+                config.text,
+                rehearsalHeightFor(part.id, m.number),
+                partNorthExtent(partIndex),
+              ).band
+            : 0;
+        needed = Math.max(needed, textBand);
         if (!hasTempoMark) return;
         const a = attributesByPartAndMeasure.get(`${part.id}:${m.number}`);
         const timeline = attributeChangesByPartAndMeasure.get(`${part.id}:${m.number}`) ?? [];
@@ -3601,7 +4170,9 @@ export function renderParsedMusicXml(
           const { clefDef } = mapClef(spec?.sign ?? a?.clefSign ?? 'G', spec?.line ?? a?.clefLine);
           return { clefDef, measureBottomY: 0, midiInstrumentsByPart: midi, theme };
         });
-        needed = Math.max(needed, extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
+        // A tempo mark sits ABOVE the chord symbols (see northTextStack),
+        // so its own clearance starts at the top of the text band.
+        needed = Math.max(needed, textBand + extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
       });
     });
     // A volta bracket (or a `×N`) is drawn above everything else that
@@ -3733,8 +4304,20 @@ export function renderParsedMusicXml(
     return (
       lowerStaffHeight +
       computeStaffDistance(
-        upperSouth,
-        lowerNorth,
+        // Phase 55: a lyric row under the upper staff of a grand staff is
+        // content the gap between the two staves has to clear, exactly
+        // like a low note is -- so it is added to that staff's own
+        // southward reach before the skyline compares them.
+        //
+        // Only when the band is non-zero: `addToSkyline` takes the more
+        // EXTREME of the two y values, and for a 'north' skyline that is
+        // the SMALLER one -- so adding a zero-height segment to a staff
+        // with a genuinely tall north extent would collapse that extent
+        // to zero and shrink the gap instead of growing it.
+        withTextBand(upperSouth, southTextBand(partIndex, upperStaffNumber)),
+        // And the same for text above the lower staff (a chord symbol on
+        // a single-staff part whose staff happens to be staff 1).
+        withTextBand(lowerNorth, northTextBandFor(partIndex, lowerStaffNumber)),
         Math.max(config.staves.minStaffDistance, statedDistance ?? 0),
       )
     );
@@ -3744,7 +4327,24 @@ export function renderParsedMusicXml(
     const a = firstAttributesByPart.get(p.id);
     return Math.max(1, a?.staves ?? 1);
   });
-  const scoreLayout = computeSystemLayoutVariableGaps(partStaffCounts, staffDistanceForPair);
+  /**
+   * Phase 55: the space between two parts holds TWO text layers when a
+   * score has both -- the lyrics under the part above and the chord
+   * symbols above the part below -- so the gap is per part rather than
+   * one number for all of them. The default (12) is kept as the floor.
+   */
+  const partGapForPart = (partIndex: number): number => {
+    const lastStaff = partStaffCounts[partIndex] ?? 1;
+    return (
+      DEFAULT_PART_GAP + southTextBand(partIndex, lastStaff) + northTextBandFor(partIndex + 1, 1)
+    );
+  };
+  const scoreLayout = computeSystemLayoutVariableGaps(
+    partStaffCounts,
+    staffDistanceForPair,
+    undefined,
+    partGapForPart,
+  );
   const staffOffsetFor = (partIndex: number, staffIndexInPart: number): number =>
     scoreLayout.positions.find(
       (pos) => pos.partIndex === partIndex && pos.staffIndexInPart === staffIndexInPart,
@@ -3768,8 +4368,24 @@ export function renderParsedMusicXml(
   // score (every part, every staff) plus the room STAFF_BOTTOM_Y already
   // reserves above the first staff.
   const lowestStaffOffset = scoreLayout.positions[scoreLayout.positions.length - 1]?.y ?? 0;
+  /**
+   * Phase 55: the last staff of the last part has no part below it to
+   * absorb its lyric rows, so the SYSTEM grows instead. The reserve it
+   * already has (SYSTEM_HEIGHT's own tail below the last staff) is
+   * subtracted first, which is what keeps a one-verse score byte-
+   * identical: its lyrics fit inside the room that was already there.
+   */
+  const systemBottomRoom =
+    SYSTEM_HEIGHT - STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
+  const lastPartIndex = Math.max(0, score.parts.length - 1);
+  const lastStaffSouthBand = southTextBand(lastPartIndex, partStaffCounts[lastPartIndex] ?? 1);
   const systemHeight =
-    SYSTEM_HEIGHT + aboveStaffPadding + lowestStaffOffset - trimAbove - trimBelow;
+    SYSTEM_HEIGHT +
+    aboveStaffPadding +
+    lowestStaffOffset +
+    Math.max(0, lastStaffSouthBand - systemBottomRoom) -
+    trimAbove -
+    trimBelow;
 
   const widthOf = (measureNumber: number): number =>
     measureLayoutsByNumber.get(measureNumber)?.width ?? MEASURE_WIDTH;
@@ -3940,6 +4556,31 @@ export function renderParsedMusicXml(
     };
 
     const partDirections = directions.filter((d) => d.partId === part.id);
+    const partOctaveShiftEvents = octaveShifts.filter((e) => e.partId === part.id);
+    const partOctaveShifts = octaveShiftSpans(partOctaveShiftEvents);
+    {
+      const open = new Map<string, OctaveShiftEvent>();
+      for (const event of partOctaveShiftEvents) {
+        const key = `${event.staff}:${event.number}`;
+        if (event.type === 'stop') {
+          if (!open.has(key))
+            diagnostics.push({
+              severity: 'info',
+              code: 'UNMATCHED_OCTAVE_SHIFT',
+              message: `An <octave-shift type=\"stop\" number=\"${event.number}\"> has no matching start; the bracket was not drawn.`,
+              location: { partId: part.id, measureNumber: event.measureNumber },
+            });
+          else open.delete(key);
+        } else open.set(key, event);
+      }
+      for (const event of open.values())
+        diagnostics.push({
+          severity: 'info',
+          code: 'UNMATCHED_OCTAVE_SHIFT',
+          message: `An <octave-shift type=\"${event.type}\" number=\"${event.number}\"> has no matching stop; the bracket was not drawn.`,
+          location: { partId: part.id, measureNumber: event.measureNumber },
+        });
+    }
     /** Resolved crescendo/decrescendo spans, keyed by the measure they START in so each is drawn exactly once. */
     const wedgeSpansByMeasure = new Map<
       number,
@@ -4009,6 +4650,54 @@ export function renderParsedMusicXml(
         });
       }
     }
+    const pedalSpansByMeasure = new Map<
+      number,
+      { staff: number; startX: number; endX: number; startType: 'start' | 'change' }[]
+    >();
+    {
+      const open = new Map<
+        string,
+        { measureNumber: number; staff: number; x: number; type: 'start' | 'change' }
+      >();
+      for (const d of partDirections) {
+        const x = directionXFor(d.measureNumber, d.tick);
+        if (x === undefined) continue;
+        for (const pedal of d.pedals) {
+          const key = `${d.staff}:${pedal.number}`;
+          if (pedal.type === 'start' || pedal.type === 'change') {
+            const prior = open.get(key);
+            if (prior !== undefined) {
+              const list = pedalSpansByMeasure.get(prior.measureNumber) ?? [];
+              list.push({ staff: prior.staff, startX: prior.x, endX: x, startType: prior.type });
+              pedalSpansByMeasure.set(prior.measureNumber, list);
+            }
+            open.set(key, { measureNumber: d.measureNumber, staff: d.staff, x, type: pedal.type });
+          } else if (pedal.type === 'stop') {
+            const prior = open.get(key);
+            if (prior === undefined) {
+              diagnostics.push({
+                severity: 'info',
+                code: 'UNMATCHED_PEDAL',
+                message: `A <pedal type="stop" number="${pedal.number}"> has no matching start.`,
+                location: { partId: part.id, measureNumber: d.measureNumber },
+              });
+            } else {
+              open.delete(key);
+              const list = pedalSpansByMeasure.get(prior.measureNumber) ?? [];
+              list.push({ staff: prior.staff, startX: prior.x, endX: x, startType: prior.type });
+              pedalSpansByMeasure.set(prior.measureNumber, list);
+            }
+          }
+        }
+      }
+      for (const prior of open.values())
+        diagnostics.push({
+          severity: 'info',
+          code: 'UNMATCHED_PEDAL',
+          message: 'A pedal start has no matching stop; the pedal was not drawn.',
+          location: { partId: part.id, measureNumber: prior.measureNumber },
+        });
+    }
     // Phase 41: this part's own GM instrument map, if any -- used to look
     // up a real drum-table entry for an unpitched note whose <instrument
     // id> resolves to a known GM percussion note number.
@@ -4028,6 +4717,7 @@ export function renderParsedMusicXml(
         systemIndex: number;
       }
     >();
+    const pendingSlidesByVoiceAndStaff = new Map<string, SlideEndpoint>();
     const tiePitchesMatch = (first: Note['pitch'], second: Note['pitch']): boolean => {
       if (first.kind === 'pitched' && second.kind === 'pitched') {
         return (
@@ -4073,6 +4763,7 @@ export function renderParsedMusicXml(
           staves: attrs.staves,
           clefsByStaff: attrs.clefsByStaff,
           staffLinesByStaff: attrs.staffLinesByStaff,
+          transpose: attrs.transpose,
         };
       const attributeTransitions = attributeTransitionsByPartAndMeasure.get(measureKey) ?? [];
       // Integration L: in page mode a measure sits in one of several
@@ -4149,7 +4840,36 @@ export function renderParsedMusicXml(
       const measureTempoMarks = drawnTempoMarks.filter(
         (m) => m.partId === part.id && m.measureNumber === measure.number,
       );
-      if (measureTempoMarks.length > 0) {
+      // Phase 55/§19.10: this measure's above-staff TEXT -- chord symbols,
+      // `<words>` directions and rehearsal marks -- gathered here so they
+      // and the tempo marks share ONE stack rather than each guessing its
+      // own height.
+      const measureHarmonies =
+        config.text.chordSymbolsDisplay === 'off'
+          ? []
+          : harmonies.filter((h) => h.partId === part.id && h.measureNumber === measure.number);
+      const measureDirectionText =
+        config.text.wordsDisplay === 'off' && config.text.rehearsalMarksDisplay === 'off'
+          ? []
+          : partDirections.filter((d) => d.measureNumber === measure.number);
+      const measureRehearsals =
+        config.text.rehearsalMarksDisplay === 'off'
+          ? []
+          : measureDirectionText.flatMap((d) =>
+              d.rehearsals.map((text) => ({ text, tick: d.tick })),
+            );
+      const measureWords =
+        config.text.wordsDisplay === 'off'
+          ? []
+          : measureDirectionText.flatMap((d) => d.words.map((text) => ({ text, tick: d.tick })));
+      const measureTextNeeds: MeasureTextNeeds = {
+        chordSymbols: measureHarmonies.length > 0,
+        rehearsalMarks: measureRehearsals.length > 0,
+        words: measureWords.length > 0,
+      };
+      const hasAboveText =
+        measureTextNeeds.chordSymbols || measureTextNeeds.rehearsalMarks || measureTextNeeds.words;
+      if (measureTempoMarks.length > 0 || hasAboveText) {
         // Use the EXACT same header allowance the note-rendering pass
         // below uses for noteAreaX -- a real, second bug: this used to
         // compute noteAreaX as a FRACTION of the measure's own width
@@ -4169,17 +4889,117 @@ export function renderParsedMusicXml(
           attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
         const { topStaffY } = topStaff();
         const northExtent = topStaffNorthExtent();
+        const rows = northTextRows(
+          measureTextNeeds,
+          theme.sizes,
+          config.text,
+          measureRehearsals.reduce(
+            (height, mark) =>
+              Math.max(height, computeRehearsalMarkBox(mark.text, theme.sizes.tempo).height),
+            0,
+          ),
+          // The PART-wide extent, not this measure's: the rows hold one
+          // line across the whole part (see northTextRows), so a bar with
+          // a high melody note moves nothing and collides with nothing.
+          hasAboveText ? partNorthExtent(partIndex) : northExtent,
+        );
+        /** The baseline of one row, as an absolute y. */
+        const rowY = (offset: number | undefined): number | undefined =>
+          offset === undefined ? undefined : topStaffY - offset - rows.shift;
+        const chordSymbolY = rowY(rows.chordSymbolOffset);
+        const wordsY = rowY(rows.wordsOffset);
+        const rehearsalY = rowY(rows.rehearsalOffset);
+        const textXFor = (tick: number): number =>
+          noteAreaX + (tick / (measureTotalTicks || 1)) * noteAreaWidth;
+
+        // §9.23: chord symbols, centred over the beat their <harmony>
+        // begins on, closest to the staff of everything above it.
+        if (chordSymbolY !== undefined) {
+          for (const harmony of measureHarmonies) {
+            // A `<harmony>` with no `<root>` is legal MusicXML (a
+            // continuation of the previous symbol) but has no letter to
+            // draw, so there is nothing to place.
+            if (harmony.rootStep === undefined) continue;
+            const layoutOfSymbol = chordSymbolLayout(
+              { ...harmony, rootStep: harmony.rootStep },
+              theme.sizes.chordSymbol,
+            );
+            if (layoutOfSymbol.unsupportedKind !== undefined) {
+              diagnostics.push({
+                severity: 'info',
+                code: 'UNSUPPORTED_CHORD_KIND',
+                message:
+                  `A <harmony> with <kind>${layoutOfSymbol.unsupportedKind}</kind> has no ` +
+                  "drawable spelling in this engine, so it was not drawn. MusicXML's " +
+                  '<kind text="..."> attribute, or one of the named kinds, draws.',
+                location: { partId: part.id, measureNumber: measure.number },
+              });
+              continue;
+            }
+            if (layoutOfSymbol.parts.length === 0) continue;
+            const x = textXFor(harmony.tick);
+            svgParts.push(
+              renderChordSymbol(layoutOfSymbol, x - layoutOfSymbol.width / 2, chordSymbolY, {
+                textFont: theme.textFont,
+                musicFont: theme.musicFont,
+                fontSize: theme.sizes.chordSymbol,
+                color: theme.colorOf('chordSymbol'),
+              }),
+            );
+          }
+        }
+
+        // §9.21: a `<words>` direction -- "Allegro", "dolce" -- as italic
+        // text above the chord symbols, the way an expression mark is
+        // printed. `<direction-type><words>` carries no font attributes
+        // this engine parses, so italic is the conventional default
+        // rather than a statement from the file.
+        if (wordsY !== undefined) {
+          for (const word of measureWords) {
+            svgParts.push(
+              renderWords(word.text, textXFor(word.tick), wordsY, {
+                fontFamily: theme.textFont,
+                fontSize: theme.sizes.tempo,
+                color: theme.colorOf('text'),
+                anchor: 'middle',
+                italic: true,
+              }),
+            );
+          }
+        }
+
+        // §9.21: rehearsal marks on top, in a frame, so they read as
+        // labels rather than as part of the music.
+        if (rehearsalY !== undefined) {
+          for (const mark of measureRehearsals) {
+            svgParts.push(
+              renderRehearsalMark(mark.text, textXFor(mark.tick), rehearsalY, {
+                box: computeRehearsalMarkBox(mark.text, theme.sizes.tempo),
+                fontFamily: theme.textFont,
+                fontSize: theme.sizes.tempo,
+                color: theme.colorOf('rehearsalMark'),
+                frameColor: theme.colorOf('rehearsalMark'),
+              }),
+            );
+          }
+        }
+
         for (const mark of measureTempoMarks) {
           const dotGlyph = mark.beatUnitDots > 0 ? metronomeDotGlyphName() : undefined;
-          const eventX = noteAreaX + (mark.tick / (measureTotalTicks || 1)) * noteAreaWidth;
+          const eventX = textXFor(mark.tick);
           svgParts.push(
             renderMetronomeMark(metronomeNoteGlyphName(mark.beatUnit), dotGlyph, mark.perMinute, {
               x: eventX,
               // tempoMarkSide() is always 'above'. The clearance is
               // measured from whatever this measure's content actually
               // reaches (stems and beams included), not from the staff
-              // line -- see the note where northExtent is computed.
-              y: topStaffY - northExtent - TEMPO_MARK_GAP,
+              // line -- see the note where northExtent is computed -- and
+              // then from the TOP of the text band, since the chord
+              // symbols now occupy the space immediately above the staff.
+              // With text above the staff, the tempo mark clears the whole
+              // text stack; with none, it keeps its own long-standing
+              // clearance from the measure's content extent.
+              y: topStaffY - (hasAboveText ? rows.band : northExtent) - TEMPO_MARK_GAP,
               color: theme.colorOf('tempo'),
               musicFont: theme.musicFont,
               textFont: theme.textFont,
@@ -4190,7 +5010,97 @@ export function renderParsedMusicXml(
         }
       }
 
+      // MusicXML octave-shift spans are above-staff brackets. Draw only
+      // matched endpoints; malformed endpoints remain visible through diagnostics.
+      for (const span of partOctaveShifts.filter(
+        (candidate) => candidate.start.measureNumber === measure.number,
+      )) {
+        const startX = directionXFor(span.start.measureNumber, span.start.tick);
+        const endX = directionXFor(span.stop.measureNumber, span.stop.tick);
+        if (startX === undefined || endX === undefined) continue;
+        const topStaffY = topStaff().topStaffY;
+        const y = topStaffY - 3.2;
+        const hook = span.start.type === 'down' ? 0.7 : -0.7;
+        const label = span.start.size === 15 ? '15' : '8';
+        svgParts.push(
+          svgLine(startX, y, endX, y, { stroke: theme.colorOf('mark'), 'stroke-width': 0.16 }),
+        );
+        svgParts.push(
+          svgLine(startX, y, startX, y + 0.7, {
+            stroke: theme.colorOf('mark'),
+            'stroke-width': 0.16,
+          }),
+        );
+        svgParts.push(
+          svgLine(endX, y, endX, y + hook, { stroke: theme.colorOf('mark'), 'stroke-width': 0.16 }),
+        );
+        svgParts.push(
+          renderText(label, startX + 0.2, y - 0.15, {
+            fontFamily: theme.textFont,
+            fontSize: 1.2,
+            color: theme.colorOf('mark'),
+            bold: true,
+          }),
+        );
+      }
       staffNumbers.forEach((staffNumber, staffIndex) => {
+        const drawSlideFor = (
+          note: Note,
+          x: number,
+          y: number,
+          kind: SlideKind,
+          stringNumber?: number,
+        ): void => {
+          const key = `${staffNumber}:${note.voice}:${kind}`;
+          const pending = pendingSlidesByVoiceAndStaff.get(key);
+          if (note.slideStop === true) {
+            if (pending === undefined) {
+              diagnostics.push({
+                severity: 'info',
+                code: 'UNMATCHED_SLIDE_STOP',
+                message: `A <${kind}> stop has no matching start; no ${kind} was drawn.`,
+                location: { partId: part.id, measureNumber: measure.number },
+              });
+            } else if (!slideEndpointsMatch(pending, note, kind)) {
+              diagnostics.push({
+                severity: 'warning',
+                code: 'SLIDE_ENDPOINT_MISMATCH',
+                message: `A <${kind}> stop does not match the preceding endpoint (pitch or string); no ${kind} was drawn.`,
+                location: { partId: part.id, measureNumber: measure.number },
+              });
+            } else if (pending.systemIndex !== layout.systemIndex) {
+              diagnostics.push({
+                severity: 'info',
+                code: 'SLIDE_CROSSES_SYSTEM',
+                message: `A <${kind}> crosses a system break; system-to-system continuation is not drawn.`,
+                location: { partId: part.id, measureNumber: pending.measureNumber },
+              });
+            } else {
+              svgParts.push(
+                renderSlide(computeSlideShape(pending.x, pending.y, x, y, kind), {
+                  color: theme.colorOf('slide'),
+                  thickness: lineWidth(
+                    theme,
+                    undefined,
+                    'slideThickness',
+                    SLIDE_THICKNESS_FALLBACK,
+                  ),
+                }),
+              );
+            }
+            pendingSlidesByVoiceAndStaff.delete(key);
+          }
+          if (note.slideStart === true)
+            pendingSlidesByVoiceAndStaff.set(key, {
+              x,
+              y,
+              kind,
+              pitch: note.pitch,
+              ...(stringNumber !== undefined ? { stringNumber } : {}),
+              measureNumber: measure.number,
+              systemIndex: layout.systemIndex,
+            });
+        };
         // Integration A: THIS staff's own clef, not the part's first clef --
         // using attrs.clefSign for every staff is exactly what collapsed a
         // piano's bass staff onto its treble staff. Falls back to staff 1's
@@ -4233,6 +5143,38 @@ export function renderParsedMusicXml(
           const topLineY = bottomY - staffGeometry.height;
           const markY = (placement: 'above' | 'below'): number =>
             placement === 'above' ? topLineY - DYNAMIC_GAP : bottomY + DYNAMIC_GAP;
+
+          for (const pedal of partDirections
+            .filter((d) => d.measureNumber === measure.number && d.staff === staffNumber)
+            .flatMap((d) =>
+              d.pedals.map((p) => ({ p, x: directionXFor(d.measureNumber, d.tick) })),
+            )) {
+            if (pedal.x === undefined) continue;
+            const glyph = pedal.p.type === 'stop' ? 'keyboardPedalUp' : 'keyboardPedalPed';
+            svgParts.push(
+              renderMark(glyph, {
+                x: pedal.x,
+                y: bottomY + DYNAMIC_GAP,
+                color: theme.colorOf('text'),
+                fontFamily: theme.musicFont,
+              }),
+            );
+          }
+          for (const span of pedalSpansByMeasure.get(measure.number) ?? []) {
+            if (span.staff !== staffNumber) continue;
+            svgParts.push(
+              svgLine(
+                span.startX + 1.2,
+                bottomY + DYNAMIC_GAP - 0.35,
+                span.endX,
+                bottomY + DYNAMIC_GAP - 0.35,
+                {
+                  stroke: theme.colorOf('text'),
+                  'stroke-width': lineWidth(theme, undefined, 'pedalLineThickness', 0.16),
+                },
+              ),
+            );
+          }
 
           for (const d of partDirections) {
             if (d.measureNumber !== measure.number || d.staff !== staffNumber) continue;
@@ -4633,7 +5575,25 @@ export function renderParsedMusicXml(
               );
               const source = group.members.length === 1 ? group.members[0] : undefined;
               svgParts.push(
-                source !== undefined ? withEventId(svg, source.voiceId, source.index) : svg,
+                source !== undefined
+                  ? withEventId(
+                      scaleCueSvg(
+                        svg,
+                        group.event,
+                        sharedXs[index] ?? 0,
+                        ctxAtTick(group.tick).measureBottomY,
+                        fileDefaults,
+                      ),
+                      source.voiceId,
+                      source.index,
+                    )
+                  : scaleCueSvg(
+                      svg,
+                      group.event,
+                      sharedXs[index] ?? 0,
+                      ctxAtTick(group.tick).measureBottomY,
+                      fileDefaults,
+                    ),
               );
             });
           }
@@ -4840,8 +5800,28 @@ export function renderParsedMusicXml(
                   accidentalState,
                   forcedDirection,
                 );
-                if (anchor !== undefined) anchorByIndex.set(idx, anchor);
-                svgParts.push(withEventId(svg, voice.id, idx));
+                if (anchor !== undefined) {
+                  anchorByIndex.set(idx, anchor);
+                  const first = event.notes[0];
+                  if (
+                    first !== undefined &&
+                    (first.slideStart === true || first.slideStop === true)
+                  )
+                    drawSlideFor(
+                      first,
+                      eventX,
+                      eventCtx.measureBottomY + anchor.topPosition,
+                      first.slideStartKind ?? first.slideStopKind ?? 'slide',
+                      first.stringNumber,
+                    );
+                }
+                svgParts.push(
+                  withEventId(
+                    scaleCueSvg(svg, event, eventX, eventCtx.measureBottomY, fileDefaults),
+                    voice.id,
+                    idx,
+                  ),
+                );
                 accidentalState = newAccidentalState;
               } else {
                 const { svg, newAccidentalState, tieAnchor } = renderNoteOrRest(
@@ -4853,6 +5833,19 @@ export function renderParsedMusicXml(
                   restOffset,
                 );
 
+                if (
+                  event.kind === 'note' &&
+                  (event.slideStart === true || event.slideStop === true) &&
+                  tieAnchor !== undefined
+                ) {
+                  drawSlideFor(
+                    event,
+                    eventX,
+                    eventCtx.measureBottomY + tieAnchor.position,
+                    event.slideStartKind ?? event.slideStopKind ?? 'slide',
+                    event.stringNumber,
+                  );
+                }
                 const pendingTie = pendingTiesByVoiceAndStaff.get(tieKey);
                 if (event.kind === 'note' && event.tieStop && pendingTie !== undefined) {
                   if (!tiePitchesMatch(pendingTie.pitch, event.pitch)) {
@@ -4923,7 +5916,13 @@ export function renderParsedMusicXml(
                   });
                 }
 
-                svgParts.push(withEventId(svg, voice.id, idx));
+                svgParts.push(
+                  withEventId(
+                    scaleCueSvg(svg, event, eventX, eventCtx.measureBottomY, fileDefaults),
+                    voice.id,
+                    idx,
+                  ),
+                );
                 accidentalState = newAccidentalState;
               }
             });
@@ -5016,6 +6015,15 @@ export function renderParsedMusicXml(
                   location: { partId: part.id, measureNumber: measure.number },
                 });
               }
+              if (event.slideStart === true || event.slideStop === true) {
+                drawSlideFor(
+                  event,
+                  eventX,
+                  bottomY + position,
+                  event.slideStartKind ?? event.slideStopKind ?? 'slide',
+                  event.stringNumber,
+                );
+              }
               svgParts.push(
                 renderTabNumber(fretDigitGlyphNames(event.fret), {
                   x: eventX,
@@ -5040,6 +6048,101 @@ export function renderParsedMusicXml(
             message: `Clef "${attrs.clefSign}" does not position notes by pitch; skipping notes in this measure.`,
             location: { partId: part.id, measureNumber: measure.number },
           });
+        }
+
+        // ---- Phase 55/§19.10: §9.22's lyrics -----------------------------
+        //
+        // The first ordinary PROSE this engine has ever drawn. One row per
+        // verse, below the staff, each syllable centred on the note it
+        // belongs to -- and every x computed the same way the noteheads
+        // were, from the measure's own positionsByTick, so a syllable
+        // cannot drift away from its note when a measure is widened.
+        //
+        // A file with no `<lyric>` pays nothing: `lyricVersesFor` returns
+        // an empty list and this whole block is one comparison.
+        {
+          const verses = lyricVersesFor(part.id, staffNumber);
+          if (verses.length > 0) {
+            const lyricNoteAreaX = Math.max(noteAreaXOf(layout.x, measure.number), cursorX);
+            const lyricFallbackWidth = layout.x + layout.width - lyricNoteAreaX;
+            const measureTotalTicksForLyrics =
+              measureTicksByNumber.get(measure.number) ?? TICKS_PER_QUARTER * 4;
+            const hyphenWidth = glyphWidthOf(lyricHyphenGlyphName()) * (theme.sizes.lyric / 4);
+            const elisionWidth = glyphWidthOf(lyricElisionGlyphName()) * (theme.sizes.lyric / 4);
+            for (const [rowIndex, verse] of verses.entries()) {
+              const boxes: LyricSyllableBox[] = [];
+              const seenTicks = new Set<number>();
+              for (const voice of measure.voices) {
+                const starts = eventStartTicks(voice.events);
+                voice.events.forEach((event, index) => {
+                  if ((event.staff ?? 1) !== staffNumber) return;
+                  const notes =
+                    event.kind === 'note' ? [event] : event.kind === 'chord' ? event.notes : [];
+                  // ALL of this note's syllables in this verse, not the
+                  // first: a file writes two `<lyric number="1">` on one
+                  // note to mean an elision ("A-men" on a single note), and
+                  // taking only the first would silently drop half the word.
+                  const syllables = notes
+                    .flatMap((note) => note.lyrics ?? [])
+                    .filter((candidate) => candidate.number === verse && candidate.text.length > 0);
+                  if (syllables.length === 0) return;
+                  const tick = starts[index] ?? 0;
+                  // Two voices carrying the SAME syllable at the same tick
+                  // (a drum chart's hi-hat and snare both marked up) are
+                  // one word, not an elision of two.
+                  if (seenTicks.has(tick)) return;
+                  seenTicks.add(tick);
+                  const realX = measureLayoutsByNumber
+                    .get(measure.number)
+                    ?.positionsByTick.get(tick);
+                  const x =
+                    lyricNoteAreaX +
+                    (realX ?? (tick / (measureTotalTicksForLyrics || 1)) * lyricFallbackWidth);
+                  for (const syllable of syllables) {
+                    boxes.push({
+                      text: syllable.text,
+                      x,
+                      width: estimateTextWidth(syllable.text, theme.sizes.lyric),
+                      ...(syllable.syllabic !== undefined ? { syllabic: syllable.syllabic } : {}),
+                      extend: syllable.extend,
+                      // Where a melisma runs to when nothing follows it in
+                      // this row: the measure's own last ink, not its
+                      // barline -- a line that touches the barline reads as
+                      // a barline, not as a melisma.
+                      melismaEndX: layout.x + layout.width - MEASURE_TRAILING_MARGIN,
+                    });
+                  }
+                });
+              }
+              if (boxes.length === 0) continue;
+              boxes.sort((a, b) => a.x - b.x);
+              const items = layoutLyricRow(boxes, {
+                hyphenWidth,
+                elisionWidth,
+                punctuationGap: 0.25,
+              });
+              svgParts.push(
+                renderLyricRow(
+                  items,
+                  lyricRowBaselineY(
+                    bottomY,
+                    rowIndex,
+                    config.text.lyricGap,
+                    config.text.lyricRowHeight,
+                  ),
+                  {
+                    fontFamily: config.fonts.lyricFont,
+                    fontSize: theme.sizes.lyric,
+                    musicFont: theme.musicFont,
+                    color: theme.colorOf('lyric'),
+                    hyphenWidth,
+                    elisionWidth,
+                    lineThickness: lineWidth(theme, undefined, 'lyricLineThickness', 0.16),
+                  },
+                ),
+              );
+            }
+          }
         }
       });
 
@@ -5164,6 +6267,13 @@ export function renderParsedMusicXml(
       previousAttrs = attrs;
     });
 
+    for (const pending of pendingSlidesByVoiceAndStaff.values())
+      diagnostics.push({
+        severity: 'info',
+        code: 'UNMATCHED_SLIDE_START',
+        message: `A <${pending.kind}> start has no matching stop; no ${pending.kind} was drawn.`,
+        location: { partId: part.id, measureNumber: pending.measureNumber },
+      });
     // §9.18/Phase 29: a part with 2+ staves is ONE instrument, so its staves
     // are joined by a brace at each system's left edge -- drawn once per
     // SYSTEM (page mode has several), not once per measure.
@@ -5369,7 +6479,13 @@ export function renderParsedMusicXml(
     {
       // §16.2: page mode's canvas is the PAGE, however much or little of
       // it the music fills; scroll mode's is as wide as the music itself.
-      viewBoxWidth: config.layout.mode === 'page' ? config.page.pageWidth : totalWidth + 2,
+      // Scroll mode gets one staff-space of optical breathing room on both
+      // sides. Clefs and system-start bar numbers have real glyph ink that
+      // naturally overhangs their nominal x origin; starting the viewBox at
+      // zero clipped that ink in small web renders and made the score feel
+      // cramped against the edge.
+      viewBoxWidth: config.layout.mode === 'page' ? config.page.pageWidth : totalWidth + 3,
+      ...(config.layout.mode === 'page' ? {} : { viewBoxMinX: -1 }),
       // Integration A/B: the viewBox must fit EVERY staff of EVERY part,
       // or the lower ones are simply clipped out of the rendered image.
       // In page mode that means every page, stacked.

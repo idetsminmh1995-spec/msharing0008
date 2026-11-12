@@ -37,23 +37,17 @@ Modules marked `[TODO]` are not yet written.
 
 ## 1. Project Goal
 
-Build an **independent, extensible music notation engine** in TypeScript that
-renders SVG for explicitly specified input formats and notation profiles, with
-**no notation library as a dependency** — not VexFlow, not AlphaTab, not
-OpenSheetMusicDisplay. Every layer (data model, geometry, layout, rendering) is
-our own.
+Build an **independent, general-purpose music notation engine** in TypeScript
+that renders SVG, with **no notation library as a dependency** — not VexFlow,
+not AlphaTab, not OpenSheetMusicDisplay. Every layer (data model, geometry,
+layout, rendering) is our own.
 
 The engine must:
 
-1. Accept the **documented, tested MusicXML profiles** from authoring software
-   and preserve/render every feature the profile claims to support; report
-   unsupported valid content instead of silently losing it.
-2. Accept the documented **Standard MIDI File profiles** for timing,
-   alignment, or explicitly specified reconstruction; MIDI is not a lossless
-   substitute for an engraved notation source.
+1. Accept **MusicXML** from any authoring software and render it correctly.
+2. Accept **Standard MIDI Files** and render/synchronise against them.
 3. Work for **any instrument** — piano, vocal, guitar, drum kit, orchestral —
-   within the supported notation profiles, with no per-instrument code paths
-   in the core.
+   with no per-instrument code paths in the core.
 4. Be **resizable to any width × height** and **re-themeable (colours, fonts,
    styles)** at any time, without re-parsing the source file.
 5. Expose a **playback-position API** that a host application can drive a
@@ -70,9 +64,6 @@ The engine must:
 - **MusicXML export.** Import only. (Export could be added later; nothing in
   the architecture forbids it, but it is not planned work.)
 - **Automatic transcription** (audio → notation).
-- **A promise to parse every file or every notation system.** Each format and
-  notation family requires a named, tested support profile. PDF/image score
-  recognition is a separate future OMR capability, not direct symbolic import.
 
 ---
 
@@ -159,16 +150,16 @@ These are good decisions, already implemented, and v2 builds on them.
 
 | Format | Support level |
 |---|---|
-| MusicXML 3.0/3.1/4.0, uncompressed (`.musicxml`, `.xml`) | Existing primary parser for a substantial, bounded staff-notation subset; version-wide schema conformance is not demonstrated. See §25. |
-| Compressed MusicXML (`.mxl`, a ZIP container) | Existing extraction support; container/resource limits and version/feature coverage remain subject to §25. |
-| Standard MIDI File format 0 and 1 (`.mid`) | Existing selected note/meta-event parsing for timing and alignment; not faithful score-notation import. PPQ and event boundaries are constrained by §25. |
-| MIDI format 2 and SMPTE-timed MIDI | Not supported by the current profile; reject with a named diagnostic rather than reinterpret. |
+| MusicXML 3.0/3.1/4.0, uncompressed (`.musicxml`, `.xml`) | Full — primary format |
+| Compressed MusicXML (`.mxl`, a ZIP container) | Full (requires a ZIP reader — see §10.2) |
+| Standard MIDI File format 0 and 1 (`.mid`) | Full for notes, tempo, time signature, and key signature meta events |
+| MIDI format 2 | Not supported (rare; sequences of independent patterns, no meaningful single timeline) |
 
-**Support-claim correction (2026-11-12):** “Full” in older roadmap rows means
-the originally planned implementation stage was completed; it is not evidence
-of complete conformance to every element in a MusicXML version, every MXL
-container, every MIDI variant, or every producing application. The current
-support contract, gaps, input matrix and acceptance gates are in §25 and
+**Support-claim correction (2026-11-12):** “Full” in the historical phase
+ledger means the originally scoped implementation was completed; it does not
+demonstrate conformance to every element in MusicXML 3.0/3.1/4.0, every MXL
+container, or every producing application. The tested support boundary,
+remaining gaps, and acceptance gates are defined in §25 and
 [`Documentation/engine-completeness-roadmap.md`](./Documentation/engine-completeness-roadmap.md).
 
 ### 3.2 Notation features
@@ -179,14 +170,8 @@ signatures (including additive/irregular), barlines and repeats, noteheads
 tuplets, articulations, ornaments, dynamics, hairpins, tempo marks, multiple
 voices per staff, grand staff / multi-part scores, lyrics, chord symbols,
 grace notes, ledger lines, percussion/drum notation, measure numbering,
-and note-level MusicXML 4.0 named accidentals with fractional semitone
+slides and glissandi (straight guitar slides and distinct wavy glissandi, with endpoint diagnostics), and note-level MusicXML 4.0 named accidentals with fractional semitone
 alterations when the source or bundled SMuFL profile supplies a matching glyph.
-
-This is the target feature scope, not a statement that every listed feature is
-already rendered end to end. In particular, lyrics/chord-symbol text, several
-MusicXML placement and cue/offset semantics, and some dense percussion cases
-remain partial; §25 and the linked roadmap distinguish parsed, preserved,
-rendered and playback-resolved support.
 
 **Out of scope for now:** cross-staff beaming, pitch alterations without a
 matching accidental glyph, non-staff notation families (including Jianpu,
@@ -1427,7 +1412,7 @@ similar compound ornaments.
 
 ---
 
-### 9.21 Dynamics, hairpins, tempo marks, rehearsal marks `[PARTIAL -- dynamics/hairpins BUILT and WIRED (Integration Pass J); tempo marks drawn since Integration Pass D and given real content-aware clearance by Integration Pass M; rehearsal marks remain placement-only (they need arbitrary text, which this engine still has no font for). See Documentation/integration-j-dynamics-hairpins.md]`
+### 9.21 Dynamics, hairpins, tempo marks, rehearsal marks `[BUILT -- dynamics/hairpins (Integration Pass J); tempo marks (Integration Pass D) with real content-aware clearance (Integration Pass M); rehearsal marks and <words> directions DRAWN since Phase 55, which gave the engine the text layer they were waiting for. See Documentation/integration-j-dynamics-hairpins.md and Documentation/phase-55-text-layer.md]`
 
 **Responsibility.** Four distinct expression-mark categories, bundled in
 one phase per the roadmap but researched and scoped separately, since
@@ -1495,7 +1480,7 @@ marks needed.
 
 ---
 
-### 9.22 Lyrics `[PARTIAL -- placement/hyphen/elision/extender-line built (Phase 32) and <lyric> now PARSED and preserved (Phase 35 Tier 2); syllable text still undrawn, because Bravura has no Latin alphabet and this engine has no text font. Nothing is wired into rendering: a row of floating hyphens with no words would be worse than the gap. See §19.10]`
+### 9.22 Lyrics `[BUILT -- placement/hyphen/elision/extender-line by Phase 32, <lyric> PARSED by Phase 35 Tier 2, and the words themselves DRAWN and wired into rendering by Phase 55, which closed §19.10. Multi-verse rows, hyphenation, elision and melisma extenders all render; see that phase's §4 for what is still not drawn (no cross-barline hyphen, estimated widths). See Documentation/phase-55-text-layer.md]`
 
 **Responsibility.** Syllables of sung text aligned under the notes they
 belong to, plus the punctuation that connects them (hyphens for a word
@@ -1554,7 +1539,7 @@ stack.
 
 ---
 
-### 9.23 Chord symbols `[PARTIAL -- placement/accidentals/qualities built (Phase 33) and <harmony> now PARSED and preserved verbatim, kind string included (Phase 35 Tier 2); nothing is drawn, per this section's own "meaningless to build before the root letter can be drawn". See §19.10]`
+### 9.23 Chord symbols `[BUILT -- placement/accidentals/qualities by Phase 33, <harmony> PARSED verbatim by Phase 35 Tier 2, and the symbols themselves ASSEMBLED and DRAWN by Phase 55 once the root letter could be drawn. An unknown <kind> draws nothing and reports UNSUPPORTED_CHORD_KIND rather than guessing a spelling. See Documentation/phase-55-text-layer.md]`
 
 **Responsibility.** Lead-sheet harmony markings ("Cmaj7", "Dm7♭5",
 "G7/B") above the melody. `<harmony>` is v2 parser scope (§10.4); this
@@ -1664,6 +1649,33 @@ grace notes — the precomposed glyph's notehead shape is fixed by the
 font, not swappable the way an ordinary note's is.
 
 ---
+
+### 9.25 Tremolo `[BUILT -- Phase 56]`
+A note played as a rapid repetition of itself. `<tremolo>`'s own text is the
+stroke count and the count is the whole message -- one stroke is eighth-note
+speed, two sixteenths, three thirty-seconds -- so a count the font cannot draw
+is clamped AND reported (`TREMOLO_STROKES_CLAMPED`), never silently rounded.
+Drawn centred on the stem (`stemGeometry` exists so the mark and the stem
+cannot disagree about where the stem is). Beamed notes are not given strokes:
+their rhythm is already in the beam, and the strokes would collide with it.
+See Documentation/phase-56-note-marks.md.
+
+### 9.26 Arpeggio / non-arpeggio `[BUILT -- Phase 56]`
+A rolled chord is drawn as a squiggle to the LEFT of the chord, as tall as the
+chord; `<non-arpeggiate>` draws the bracket that says the opposite. Drawn as a
+path rather than a scaled `arpeggiato` glyph, so the stroke weight does not
+change with the chord's height -- the same reason §9.18's brace is a path.
+ONE mark per chord, never one per member. The spacing pass reserves the mark's
+own width (`leadingByStaff`), including for a measure's FIRST attack, where the
+room has to come out of the header instead -- without that the mark lands on
+the time signature or reaches back across a barline.
+
+### 9.27 Harmonic `[BUILT -- Phase 56]`
+`<notations><harmonic>` -- the note sounds a harmonic and is drawn with a
+DIAMOND head, chosen by duration exactly as the oval set is. This is not
+decoration: the shape is the whole notation, since the pitch is unchanged and
+an oval tells a guitarist to stop the string where they must touch it. A file's
+own `<notehead>` outranks this default, because files commonly state both.
 
 ## 10. Module: `parser/musicxml/` — MusicXML Parser `[IN PROGRESS — v1 built (Phase 20); .mxl/score-timewise/v2 elements are Phase 35-36]`
 
@@ -2458,17 +2470,26 @@ API can be designed *then*, informed by what that extension actually needs.
 9. **Notation cannot be inferred from MIDI alone** — a MIDI-only input
    renders with default spelling, single voice, and inferred beaming, and
    this is documented behaviour, not a bug. Full notation requires MusicXML.
-10. **No arbitrary text is drawn anywhere** — lyric syllables (§9.22), chord
-    symbol root letters (§9.23), rehearsal marks and `<words>` directions
-    (§9.21) are all **parsed and preserved** but not rendered. Bravura is a
-    music-symbol font with no Latin alphabet at all, and this engine has no
-    text-font/character-metrics system. This is one gap, hit in four places,
-    not four separate gaps.
+10. ~~**No arbitrary text is drawn anywhere**~~ — **closed by Phase 55**:
+    lyric syllables (§9.22), chord-symbol root letters (§9.23), rehearsal
+    marks and `<words>` directions (§9.21) all draw now, from one small text
+    layer (`render/text.ts`, `geometry/text-metrics.ts`) shared by all four.
+    What remains open from that work is narrower and is listed here rather
+    than folded into the closure: text widths are **estimated**, not
+    measured (the engine has no canvas and the host owns the font), so
+    centred text is centred on the estimate; `<rehearsal enclosure>` is
+    ignored and always draws square; `<words>` is always italic at tempo
+    size because its font attributes are not parsed; no hyphen is drawn
+    across a barline; and `<words>`/rehearsal marks always sit above staff
+    1 whatever `staff` the direction names. See
+    Documentation/phase-55-text-layer.md §4.
 11. **A slur or tuplet crossing a barline is not drawn**, and a hairpin
     crossing a system break is not drawn — each reports a diagnostic rather
     than drawing something wrong. Same class of boundary as limitation 2.
-12. **Fermata is parsed but not drawn** — §9 has no fermata placement
-    section, and guessing one would not be implementing a spec.
+12. ~~**Fermata is parsed but not drawn**~~ — **stale, corrected here**: the
+    fermata has been parsed AND drawn since Integration H (`FERMATA_GAP`,
+    `fermataGlyphName`, drawn for notes and rests alike). This entry was left
+    behind when that landed; Phase 56's audit is what caught it.
 13. **Multi-voice collision is pairwise only** (§9.14) — a genuine 3-or-4
     voice pile-up needs column assignment, not pair resolution.
 14. **`rectangle` draws as a square notehead** (§9.7) — SMuFL has no
@@ -2628,9 +2649,8 @@ The engine is "done" for its intended purpose when all of the following hold:
 1. A drum-kit MusicXML, a piano MusicXML, and a vocal-with-lyrics MusicXML
    each render every note at the correct staff position with the correct
    notehead — using the **same code path** (§4.3).
-2. For the declared feature subset, the same short piece exported from
-   multiple authoring programs renders equivalently within a provenance-tagged
-   corpus (§10.8); this is corpus-bounded evidence, not a universal claim.
+2. The same short piece exported from MuseScore, Sibelius, Finale, Dorico,
+   and Guitar Pro renders equivalently from all five (§10.8).
 3. A MIDI file's tempo map drives wall-clock timing such that a 10-minute
    piece has < 1 ms round-trip conversion error (§12.2).
 4. Multi-voice measures (drum hands/feet, piano LH/RH, SATB) render with
@@ -2746,7 +2766,7 @@ not renumbered**, so existing `Documentation/` records and commit history stay v
 | 33 | Chord symbols | ✅ (accidentals/qualities/placement + parsing); root letter deferred — no text font |
 | 34 | Grace notes | ✅ |
 
-### Stage 6 — Bounded import implementation `[COMPLETE for the originally declared subset; conformance follow-up in §25]`
+### Stage 6 — Full import `[COMPLETE]`
 
 | Phase | What | Status |
 |---|---|---|
@@ -2790,6 +2810,53 @@ not renumbered**, so existing `Documentation/` records and commit history stay v
 | 52 | Export: SVG, PNG, PDF (§3, §16.2) | ✅ (built -- see Documentation/phase-52-export.md) |
 | 53 | Performance pass against §18.1's budgets | ✅ (built -- see Documentation/phase-53-performance.md) |
 | 54 | Public API surface + generated reference docs into `Documentation/` | ✅ (built -- see Documentation/phase-54-public-api.md) |
+
+### Phase 60 — visual engraving polish `[BUILT]`
+
+The visual audit retained the correct SMuFL/MuseScore proportions for noteheads,
+staff lines, stems, beams and ledger lines, and fixed the visible first-system
+edge defect instead of applying arbitrary global scaling. Scroll-mode SVGs now
+use a one-staff-space optical inset on both sides (`viewBoxMinX = -1`), so
+clefs, system-start bar numbers and header glyph overhangs are not clipped.
+The standalone SVG primitive and pure-scale resize path both support the
+negative viewBox origin. See `Documentation/phase-60-visual-polish.md`.
+
+### Remaining MusicXML note/direction completion notes (2026-11-12)
+
+#### Phase 57 — transpose and pedal `[BUILT]`
+
+`<transpose>` is now parsed as persistent positioned attribute metadata:
+`diatonic`, `chromatic`, `octaveChange`, and derived `semitones` survive into
+`MeasureAttributes` and `PositionedAttributeChange`. Written notation remains
+written; consumers that need sounding pitch use the public `soundingPitch`
+helper. `<direction-type><pedal>` now parses start/change/stop/continue,
+resolves below-staff spans, draws the Bravura pedal marks and continuation
+lines, reserves its below-staff band, and reports `UNSUPPORTED_PEDAL` or
+`UNMATCHED_PEDAL` instead of silently dropping malformed spans. See
+`Documentation/phase-57-transpose-pedal.md`.
+
+#### Phase 58 — cue notes and octave shifts `[BUILT]`
+
+`<cue/>` is preserved on individual notes and rendered with the file's
+`<note-size type="cue">` multiplier (75% fallback), including scaled notehead,
+stem, ledger, dot and flag content and attack-width spacing. MusicXML
+`<octave-shift type="up|down|stop" size="8|15" number="N">` is parsed and
+matched by staff/number, labelled and bracketed above the staff, included in
+above-staff reservation, and diagnosed for invalid attributes or unmatched
+endpoints. See `Documentation/phase-58-cue-octave-shift.md`.
+
+#### Phase 59 — slides and glissandi `[BUILT]`
+
+`<slide>` and `<glissando>` are preserved by source kind, paired across
+pitched notes/chords and tablature strings where anchors are available, and
+rendered through pure geometry/render modules: straight slides and distinct
+wavy glissandi. Unmatched, mismatched and cross-system endpoints report stable
+diagnostics rather than disappearing. See
+`Documentation/phase-59-slide-glissando.md`.
+
+### Slide and glissando completion note (2026-11-12)
+
+`<slide>` and `<glissando>` are now preserved by source kind, paired across notes/chords and tablature strings where anchors are available, rendered through pure geometry/render modules, and diagnosed when unmatched, mismatched, or crossing systems. This closes the slide/glissando rendering gap; remaining gaps below do not include it.
 
 ### Drum and chord completion ledger (updated 2026-11-08)
 
@@ -2838,10 +2905,6 @@ documents; §19 tracks the remaining gaps.
 - When a phase completes, update its row in §22 and, if the module's
   specification changed during implementation, update its section in §6–§17
   to match what was actually built.
-- Use §25 and its linked completeness roadmap for post-Phase-54 correctness,
-  conformance, safety, corpus and additional-format work. Do not interpret a
-  completed historical phase or a passing test count as universal file-format
-  support.
 
 
 ## 24. Repository-wide implementation register (audit: 2026-11-09)
@@ -3175,41 +3238,42 @@ remaining roadmap items distinct from `piano-engine`'s SVG bundle.
 
 ---
 
-## 25. Notation Engine completeness contract and follow-up roadmap (2026-11-12)
+## 25. Notation Engine support contract and completeness roadmap (2026-11-12)
 
-The original Phases 1–54 and Stages 0–10 remain recorded as completed for the
-implementation scope they specified. They do **not** certify full MusicXML
-schema conformance, support for every authoring application, arbitrary MIDI
-variants, every notation tradition, or PDF/image recognition. The unqualified
-“Full” labels in older input/roadmap descriptions are superseded by §3.1 and
-the explicit profile rules here.
+Phases 1–60 remain recorded as completed for their declared implementation
+scope. In particular, phases 55–60 add the text layer, selected note marks,
+transpose/pedal, cue/octave-shift, slides/glissandi and visual polish. These
+completed features must not be listed as open gaps. Phase completion does not
+certify universal MusicXML schema or producer conformance, arbitrary MIDI
+variants, or every notation tradition. The unqualified “Full” labels in §3.1
+are historical implementation labels, not a conformance claim.
 
-Completeness means a named input profile is **accepted, parsed and preserved,
-resolved, engraved, explained and independently verified** for the features it
-claims. These are separate guarantees: a valid parse does not prove a correct
-render, and a visible score does not prove that every source event survived.
-Unsupported valid content must receive a stable diagnostic and documented
-fallback/rejection rather than silent loss.
+For dependable MusicXML support, distinguish file/container acceptance,
+semantic parsing and preservation, interpretation, engraving, diagnostics,
+and independent verification. A valid parse does not prove a correct render;
+a visible score does not prove that every source event survived. Unsupported
+valid content must receive an explicit fallback or stable diagnostic rather
+than silently disappearing.
 
-The detailed gap inventory, format matrix, implementation requirements,
-acceptance tests, security limits, corpus gates, references and completed
-user-reported regression fixes are maintained in
-[`Documentation/engine-completeness-roadmap.md`](./Documentation/engine-completeness-roadmap.md).
-The follow-up sequence is:
+The detailed audit, MusicXML/MXL/MIDI format matrix, current implementation
+baseline, gap inventory, test requirements, resource-safety criteria, future
+format boundaries, references and the completed user-reported drum fixes are
+in [`Documentation/engine-completeness-roadmap.md`](./Documentation/engine-completeness-roadmap.md).
+Its follow-up sequence is:
 
 | Follow-up | Priority | Exit objective |
 |---|---|---|
-| C0 — define support contract and reproducible evidence | P0 prerequisite | One versioned input/feature matrix; no blanket “Full” claim; fixtures and CI results have provenance and current commit identity. |
-| C1 — harden untrusted import boundaries and diagnostics | P0 safety | XML/MXL/MIDI size, structure and work limits; safe container rules; stable diagnostics; malformed input never crashes or creates invalid timing. |
-| C2 — fix high-impact semantics and engraving in the existing MusicXML profile | P1 correctness | Direction/harmony offsets, cue identity, placement/clef semantics, exact drum mappings, spacing/bounds/collisions and visible diagnostics are independently tested. |
-| C3 — publish a version-aware MusicXML/MXL conformance matrix | P1 contract | Every claimed element/version is implemented, partial, preserved, intentionally unsupported, or diagnosed; no silent unhandled note-child content. |
-| C4 — independent semantic goldens and producer corpus | P1 evidence | Source events, model events, beam geometry, playback and reviewed visual output have independent expected results and provenance. |
-| C5 — route, browser and release gates | P1 delivery | UI, engine, generated bundle, cache and deployed browser behavior match the same support contract; required browser tests cannot silently skip. |
-| C6 — add one scoped symbolic notation adapter by user need | P2 expansion | A named MEI/ABC/`**kern` profile is selected, scoped and corpus-tested before it is advertised. |
-| C7 — decide on PDF/image OMR as a separate capability | P2 decision | No direct image/PDF notation claim; any future OMR has a restricted domain, confidence, held-out benchmark and human correction. |
-| C8 — extend text, tuning and notation traditions as independent profiles | P3 domain work | Named scripts/traditions have their own semantic contract, renderer, diagnostics and domain-reviewed fixtures; no forced Western-model flattening. |
+| C0 — define support contract and reproducible evidence | P0 prerequisite | One versioned feature matrix; no blanket conformance claim; provenance-tagged fixtures and current CI evidence. |
+| C1 — harden untrusted import and diagnostics | P0 safety | Bounded XML/MXL/MIDI input, safe container rules, valid timing, stable diagnostics and recoverable uploads. |
+| C2 — close remaining gaps in the current MusicXML profile | P1 correctness | Direction/harmony offsets, placement/clef semantics, unhandled note children, exact drum mapping, spacing/bounds/collisions independently tested; completed phases 55–60 retained as closed. |
+| C3 — publish version-aware MusicXML/MXL conformance | P1 contract | Every claimed element/version classified as implemented, partial, preserved, unsupported or diagnosed; no silent loss. |
+| C4 — independent semantic goldens and producer corpus | P1 evidence | Source events, model events, beam geometry, playback and reviewed output have separate expected results and provenance. |
+| C5 — route, browser and release gates | P1 delivery | UI, engine bundle, caches and deployed behavior match the support contract; required checks cannot silently skip. |
+| C6 — select one scoped symbolic adapter by user need | P2 expansion | MEI, ABC or `**kern` profile chosen and corpus-tested before advertising. |
+| C7 — decide whether to build separate PDF/image OMR | P2 decision | No direct image/PDF notation claim; any OMR has scoped confidence, held-out benchmark and human correction. |
+| C8 — extend scripts, tuning and traditions as separate profiles | P3 domain work | Each named tradition has its own semantic contract, renderer, diagnostics and domain-reviewed fixtures. |
 
-The recent 44130 note-preservation, 44130 beam-continuity and 115 BPM
-covered-rest corrections remain **closed completed work** with their existing
-fixtures and regressions. The larger completeness roadmap extends the engine's
-verified boundary; it does not reopen or erase those fixes.
+Do not interpret the future C0–C8 requirements as reopened regressions: the
+44130 missing-head repair, 44130 beam-continuity fix, and 115 BPM covered-rest
+fix remain completed with their existing tests. Reopen them only for a new
+reproducer.

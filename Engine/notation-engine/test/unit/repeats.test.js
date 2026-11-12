@@ -19,7 +19,9 @@ function render(name, config) {
 
 /** "1 2 3 1(2) 2(2) ..." -- the played order, with each repeat pass marked. */
 function playedOrder(plan) {
-  return [...plan.entries].map((e) => (e.pass > 1 ? `${e.measureNumber}(${e.pass})` : `${e.measureNumber}`));
+  return [...plan.entries].map((e) =>
+    e.pass > 1 ? `${e.measureNumber}(${e.pass})` : `${e.measureNumber}`,
+  );
 }
 
 /** A one-part score whose measures are described by short specs, so a repeat structure can be written in one line. */
@@ -37,7 +39,8 @@ function repeatScore(measures) {
       if (m.endingStart) left.push(`<ending number="${m.endingStart}" type="start"/>`);
       const right = [];
       if (m.endingStop) right.push(`<ending number="${m.endingStop}" type="stop"/>`);
-      if (m.end) right.push(`<repeat direction="backward"${m.times ? ` times="${m.times}"` : ''}/>`);
+      if (m.end)
+        right.push(`<repeat direction="backward"${m.times ? ` times="${m.times}"` : ''}/>`);
       return (
         `<measure number="${i + 1}">${attributes}` +
         (left.length > 0 ? `<barline location="left">${left.join('')}</barline>` : '') +
@@ -79,7 +82,13 @@ describe('repeats: the score unfolded into the order it is played (§17.2)', () 
   });
 
   test('a plain repeat plays its section twice -- MusicXML s own default for a <repeat> with no times', () => {
-    assert.deepEqual(orderOf([{ start: true }, { end: true }, {}]), ['1', '2', '1(2)', '2(2)', '3']);
+    assert.deepEqual(orderOf([{ start: true }, { end: true }, {}]), [
+      '1',
+      '2',
+      '1(2)',
+      '2(2)',
+      '3',
+    ]);
   });
 
   test('times="4" plays it four times, not two', () => {
@@ -122,16 +131,29 @@ describe('repeats: the score unfolded into the order it is played (§17.2)', () 
   test('a repeat nested inside another plays fully on EVERY outer pass', () => {
     // Outer 1-4, inner 2-3. The classic bug is the inner repeat playing
     // only on the first outer pass, because its counter was never reset.
-    assert.deepEqual(
-      orderOf([{ start: true }, { start: true }, { end: true }, { end: true }]),
-      ['1', '2', '3', '2(2)', '3(2)', '4', '1(2)', '2(3)', '3(3)', '2(4)', '3(4)', '4(2)'],
-    );
+    assert.deepEqual(orderOf([{ start: true }, { start: true }, { end: true }, { end: true }]), [
+      '1',
+      '2',
+      '3',
+      '2(2)',
+      '3(2)',
+      '4',
+      '1(2)',
+      '2(3)',
+      '3(3)',
+      '2(4)',
+      '3(4)',
+      '4(2)',
+    ]);
   });
 
   test('a repeat structure that cannot terminate is reported, not hung on', () => {
     // Two backward repeats and no forward one: the second sends us to
     // the top, and the first sends us there again, forever.
-    const xml = repeatScore([{ end: true, times: 99 }, { end: true, times: 99 }]);
+    const xml = repeatScore([
+      { end: true, times: 99 },
+      { end: true, times: 99 },
+    ]);
     const { playback, diagnostics } = NE.renderFromMusicXml(xml, { domParser });
     assert.ok(
       [...playback.repeatDiagnostics].some((d) => d.code === 'REPEAT_RUNAWAY'),
@@ -141,7 +163,11 @@ describe('repeats: the score unfolded into the order it is played (§17.2)', () 
       [...diagnostics].some((d) => d.code === 'REPEAT_RUNAWAY'),
       'and the render surfaces it on its own one diagnostic channel',
     );
-    assert.deepEqual(playedOrder(playback.performance), ['1', '2'], 'falling back to straight through');
+    assert.deepEqual(
+      playedOrder(playback.performance),
+      ['1', '2'],
+      'falling back to straight through',
+    );
   });
 
   test('the performance is longer than the written score, in both ticks and seconds', () => {
@@ -175,7 +201,8 @@ describe('repeats: turning a moment of audio into a place on the page', () => {
     const xAt = (seconds) =>
       NE.playheadX(
         playback,
-        NE.performanceSecondsToWritten(playback.performance, playback.tempoMap, seconds).writtenTick,
+        NE.performanceSecondsToWritten(playback.performance, playback.tempoMap, seconds)
+          .writtenTick,
       ).x;
     assert.ok(xAt(3.9) > xAt(4.1), 'the marker jumped back to the repeat s start');
     assert.ok(
@@ -241,11 +268,7 @@ describe('repeats: what the reader sees (§9.18)', () => {
     // space where the sign should be.
     const { svg } = render('repeat-voltas.musicxml');
     const dot = NE.getGlyph('repeatDot').char;
-    assert.equal(
-      svg.split(dot).length - 1,
-      4,
-      'two dots opening the repeat, two closing it',
-    );
+    assert.equal(svg.split(dot).length - 1, 4, 'two dots opening the repeat, two closing it');
   });
 
   test('and the clef is drawn clear of it, not on top of its dots', () => {
@@ -270,7 +293,7 @@ describe('repeats: what the reader sees (§9.18)', () => {
 
   test('a score with no voltas is not pushed down to make room for one', () => {
     const plain = render('simple-single-voice.musicxml').svg;
-    const heightOf = (svg) => Number(/viewBox="0 0 [\d.]+ ([\d.]+)"/.exec(svg)[1]);
+    const heightOf = (svg) => Number(/viewBox="[-\d.]+ 0 [\d.]+ ([\d.]+)"/.exec(svg)[1]);
     const withVoltas = render('repeat-voltas.musicxml').svg;
     assert.ok(
       heightOf(withVoltas) > heightOf(plain),

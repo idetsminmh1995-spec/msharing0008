@@ -18,6 +18,7 @@
 
 ### 2.1 Graphic and SVG geometry
 
+- Slide and glissando notation is preserved and rendered end to end: straight guitar slides and distinct wavy glissandi pair across pitched notes, chords, and tablature strings where anchors are available, with unmatched/mismatch/system diagnostics.
 - Bravura/SMuFL font data and engraving metrics are used for noteheads, clefs, rests, stems, flags, beams, dynamics, articulations, ornaments, fermatas, and percussion shapes.
 - Chord stems are anchored to the actual outermost rendered notehead extents, not to the widest glyph box. This prevents stem detachment and incorrect chord stem placement.
 - Beam endpoints use each note's actual stem-attachment x-position, including notehead anchor offsets, so the final stem reaches the beam.

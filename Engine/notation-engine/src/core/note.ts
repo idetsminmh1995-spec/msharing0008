@@ -29,6 +29,26 @@ export type FermataPlacement = 'above' | 'below';
 export type FermataShape = 'normal';
 
 /**
+ * Phase 56/§9.24: `<tremolo type>`.
+ *
+ * `single` is one note whose stem carries the strokes -- a drum roll
+ * written on a half note, the ordinary case in a drum chart. `start` and
+ * `stop` are the two halves of a two-note tremolo, where the strokes
+ * belong between the two notes rather than on either one's stem.
+ */
+export type TremoloType = 'single' | 'start' | 'stop';
+
+/**
+ * Phase 56/§9.25: which way a rolled chord is rolled.
+ *
+ * MusicXML's `<arpeggiate direction="up|down">`; absent means up, which
+ * is both MusicXML's own default and the overwhelming convention.
+ */
+export type ArpeggioDirection = 'up' | 'down';
+/** MusicXML notation gesture kind, preserved so slide and glissando render distinctly. */
+export type SlideKind = 'slide' | 'glissando';
+
+/**
  * One `<beam number="N">` hint exactly as the file wrote it (§10.4).
  * §10.8 names "beams given explicitly via `<beam>` vs. left for the
  * renderer to infer" as a real cross-software divergence: a file that
@@ -122,6 +142,8 @@ export interface Note {
   readonly noteheadFilled?: boolean;
   /** MusicXML `<notehead parentheses="yes">`; rendered with SMuFL left/right wrappers. */
   readonly noteheadParentheses?: boolean;
+  /** MusicXML <cue/> note metadata; cue notes use the cue note-size multiplier. */
+  readonly isCue?: boolean;
   /** Phase 35/§10.4: true if this note is a <grace/> note. */
   readonly isGrace?: boolean;
   /** Phase 35/§10.4: the grace note's slash attribute -- true for an acciaccatura, false for an appoggiatura. Meaningless unless isGrace is true. */
@@ -146,6 +168,8 @@ export interface Note {
   readonly slideStart?: boolean;
   /** `<slide>`/`<glissando>` type="stop": this note is where a slide arrives. */
   readonly slideStop?: boolean;
+  readonly slideStartKind?: SlideKind;
+  readonly slideStopKind?: SlideKind;
   /** Phase 35 Tier 2/§10.4: `<notations><articulations>` -- §9.19's marks, in document order. Absent means none. */
   readonly articulations?: readonly ArticulationType[];
   /** Phase 35 Tier 2/§10.4: `<notations><ornaments>` -- §9.20's marks, in document order. Absent means none. */
@@ -168,6 +192,25 @@ export interface Note {
   readonly beams?: readonly BeamHint[];
   /** Phase 35 Tier 2/§10.4: `<lyric>` syllables attached to this note (§9.22). */
   readonly lyrics?: readonly LyricSyllable[];
+  /**
+   * Phase 56/§9.24: how many strokes `<tremolo>` asks for, clamped to
+   * what the font can draw (1-3). Present means "this note has a
+   * tremolo"; absent means it does not, so a note from a file with no
+   * tremolo produces exactly the object it produced before this phase.
+   */
+  readonly tremoloStrokes?: number;
+  /** Phase 56/§9.24: `<tremolo type>`; absent means `single`. */
+  readonly tremoloType?: TremoloType;
+  /**
+   * Phase 56/§9.26: `<notations><harmonic>` -- the note sounds a harmonic
+   * and is drawn with a diamond head: guitar notation's own way of saying
+   * "touch the string here, don't stop it".
+   */
+  readonly isHarmonic?: boolean;
+  /** Phase 56/§9.25: `<arpeggiate>` on this note's chord -- roll up or down. */
+  readonly arpeggiate?: ArpeggioDirection;
+  /** Phase 56/§9.25: `<non-arpeggiate>` -- the bracket that says "do NOT roll this chord". */
+  readonly nonArpeggiate?: boolean;
 }
 
 export interface NoteInit {
@@ -183,6 +226,7 @@ export interface NoteInit {
   noteheadFilled?: boolean;
   noteheadParentheses?: boolean;
   instrumentId?: string;
+  isCue?: boolean;
   isGrace?: boolean;
   graceSlash?: boolean;
   explicitStemDirection?: 'up' | 'down';
@@ -195,6 +239,8 @@ export interface NoteInit {
   fingering?: number;
   slideStart?: boolean;
   slideStop?: boolean;
+  slideStartKind?: SlideKind;
+  slideStopKind?: SlideKind;
   articulations?: readonly ArticulationType[];
   ornaments?: readonly OrnamentType[];
   hasFermata?: boolean;
@@ -206,6 +252,11 @@ export interface NoteInit {
   tupletStop?: boolean;
   beams?: readonly BeamHint[];
   lyrics?: readonly LyricSyllable[];
+  tremoloStrokes?: number;
+  tremoloType?: TremoloType;
+  isHarmonic?: boolean;
+  arpeggiate?: ArpeggioDirection;
+  nonArpeggiate?: boolean;
 }
 
 export function note(init: NoteInit): Note {

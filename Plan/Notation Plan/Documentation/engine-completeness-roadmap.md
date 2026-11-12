@@ -1,7 +1,7 @@
 # Notation Engine Completeness Roadmap
 
 **Audit date:** 2026-11-12
-**Audited baseline:** `origin/main` at `89bad1c63bf097616f8e3f58dff1f499d5a6bab9`
+**Audited baseline:** `origin/main` at `8906127` (includes Notation Engine phases 55–60)
 **State:** Requirements and audit findings; the phases below are not marked implemented.
 **Authority:** [`../PLAN.md`](../PLAN.md), §25. This document expands that master plan; it does not replace the existing phase history or close any implementation gap by itself.
 
@@ -27,7 +27,8 @@ The repository already contains substantial, useful functionality. This audit do
 ### 2.1 Implemented foundations to keep
 
 - A TypeScript score model, MusicXML/XML parser, score-timewise conversion, MXL wrapper, SVG engraving pipeline, layout modes, diagnostics, playback-position APIs, and MIDI event/timing tools.
-- Tested common staff-notation behavior: notes, rests, chords, voices/staves/parts, clefs, key/time signatures, beams, ties/slurs/tuplets, dynamics and many other marks, percussion, tablature, and layout.
+- Tested common staff-notation behavior: notes, rests, chords, voices/staves/parts, clefs, key/time signatures, beams, ties/slurs/tuplets, dynamics, text (lyrics/chord symbols/rehearsal marks/direction words), note marks (tremolo/arpeggio/harmonic), transpose/pedal, cue notes/octave shifts, slides/glissandi, percussion, tablature, and layout.
+- Phases 55–60 add the text layer, selected semantic note marks, transpose/pedal, cue/octave-shift and slide/glissando handling, plus visual proportion/edge polish. Keep their documented limits; these features are not open gaps merely because the earlier audit did not include them.
 - Regression coverage for real reported failures, including the 44130 notehead-loss and beam-continuity cases and the 115 BPM covered-rest case.
 - Bundle synchronization, website consumers, browser rollout tests, API documentation checks, and a large unit/fixture suite.
 
@@ -40,10 +41,9 @@ The following are audit findings against the source, tests and plan; they are wo
 | Area | Confirmed gap | Consequence / required direction |
 |---|---|---|
 | MusicXML direction timing | `src/parser/musicxml/direction.ts` does not read `<offset>`; direction and harmony events are recorded at the current cursor. | Valid tempo/dynamics/wedge/harmony positions can be wrong. Apply measure-local offsets without moving the note cursor; represent visual and playback positions separately where MusicXML semantics require it. Respect the sound-level offset override. |
-| Cue-note semantics | `src/parser/musicxml/note.ts` detects grace notes but not `<cue/>`; the core note model has no cue identity. | Cue notes can be confused with ordinary sounding notes or grace notes. Preserve cue identity, duration and cue-size data through the model and downstream APIs; consumers must be able to exclude cue notes from sounding events. |
-| MusicXML coverage claim | The plan calls MusicXML 3.0/3.1/4.0 “Full,” but the parser maps a selected set of elements and note-child coverage is not uniform. Some valid note content (for example `notehead-text`, `play`, or `listen`) has no corresponding semantic handler in the audited path. | “Full” overstates tested behavior. Publish an element/attribute matrix by version and profile; every in-scope field must be parsed/preserved/rendered or receive a stable, location-bearing unsupported-feature diagnostic. |
-| Placement and pitch context | The plan records incomplete handling for clef octave changes and note-level `default-x`/`default-y`; other valid source positioning and pitch semantics need explicit coverage. | Some scores can have incorrect written/display positions or lose source placement. Preserve written and sounding meaning distinctly; implement the declared subset and diagnose the rest. |
-| Drum engraving | The plan/status still name mapped chord/beam stem direction, exact mapped SMuFL glyph handling, mapped grace heads, glyph-aware spacing, dense-voice collision, and bounds/clipping as partial. | A correct source event may still look wrong even when it is present. Define precedence, use exact glyph APIs and real glyph/chord extents, and add geometry/render regressions. |
+| MusicXML coverage claim | Older plan rows describe MusicXML 3.0/3.1/4.0 as “Full,” but current tests do not establish version-wide schema conformance. The phase-55–60 additions close several earlier gaps; other note-child content (for example `notehead-text`, `play`, or `listen`) still needs explicit coverage or a diagnostic. | “Full” overstates tested behavior. Publish an element/attribute matrix by version and profile; every in-scope field must be parsed/preserved/rendered or receive a stable, location-bearing unsupported-feature diagnostic. |
+| Placement and pitch context | Phase 57 adds transpose metadata and sounding-pitch conversion; phase 58 adds octave-shift spans. Clef-octave changes and relevant note `default-x`/`default-y` behavior still need independent coverage against the MusicXML profile. | Some scores may have incorrect written/display positions or lose source placement. Preserve written and sounding meaning distinctly; implement the declared subset and diagnose the rest. |
+| Drum engraving | Phases 41 and later drum fixes cover GM note mapping, grace-note positions, missing heads, beam continuity, and covered-rest grouping. Remaining custom notehead/SMuFL mapping, mapped chord/beam stem precedence, glyph-aware spacing, dense-voice collision, and output-bound cases need verification against the current renderer and corpus. | A correct source event may still look wrong even when present. Define precedence, use exact-glyph APIs and complete ink extents, and add geometry/render regressions; do not reopen closed 44130/115 BPM fixes without a new reproducer. |
 | MXL resource safety | `src/parser/musicxml/mxl.ts` uses `unzipSync` on the complete archive before selecting `container.xml`/the rootfile; the audited upload path buffers a complete file. No explicit compressed/expanded byte, entry-count, or expansion-ratio ceilings were found. | A small hostile archive can cause excessive allocation or work. Define limits and reject over-limit files before expensive processing wherever the library allows. |
 | MIDI validation and parser parity | The engine parser accepts a zero PPQ division and its event reader is not constrained to the declared `MTrk` end; a browser preview also contains a separate MIDI parser. | Malformed timing can yield invalid normalized positions or consume bytes past a track boundary; browser and engine behavior can diverge. Validate header/division/chunk bounds and share one parser or test intentional differences. |
 | XML diagnostics and input boundaries | Parser-error detection, XML size/depth/time policy, DTD/external-resource policy, and user-visible structured diagnostics are not consistently specified across runtimes. | Malformed or adversarial input can be confusing or resource-intensive. Define safe limits, stable diagnostic codes/severity/location and predictable failed-upload recovery. This audit does not claim a reproduced XXE vulnerability. |
@@ -106,18 +106,16 @@ The order is intentional: establish what we claim, protect the parser boundary, 
 **Deliverables**
 
 1. **Offsets:** parse `<direction><offset>` and `<harmony><offset>` in divisions without advancing note cursor; honor `sound/@offset` precedence and `sound="no"` visual/playback semantics. If one tick field cannot express both, add separate visual and playback positions.
-2. **Cue notes:** preserve `<cue/>`, duration, cue size and cue identity independently of grace/ordinary notes. Keep them in notation and expose their silent/non-sounding state to playback consumers.
-3. **Placement and clefs:** implement or diagnose `clef-octave-change` and relevant note `default-x`/`default-y`; keep written pitch, sounding pitch and source engraving placement separate where they differ.
-4. **Note-child semantics:** cover or diagnose every in-scope MusicXML note child, including notehead text and playback/listening extensions. Unknown or unsupported legal content must not disappear silently.
-5. **Drum map semantics:** use exact mapped SMuFL glyph names through the exact-glyph path; define precedence among voice forcing, source `<stem>` and map direction for single notes, chords and beams; either render mapped grace heads or issue a named diagnostic.
-6. **Geometry:** use selected glyph and complete chord ink extents in spacing; derive output/viewBox bounds from emitted ink; test collisions for 2-, 3- and 4-voice scores or publish and enforce a supported voice ceiling. Fix the named high-beam clipping and multi-voice articulation/mark placement cases.
-7. **Text marks:** keep lyrics, chord symbols and rehearsal/direction words marked as parsed-but-not-fully-rendered until the text renderer exists. The later text system needs script shaping, fallback, directionality, combining-mark layout and measured extents; name the tested scripts rather than promising all Unicode.
+2. **Placement and clefs:** verify `clef-octave-change` and relevant note `default-x`/`default-y`; keep written pitch, sounding pitch and source engraving placement separate where they differ. Do not list cue notes or octave-shift spans as open: phase 58 implements them.
+3. **Note-child semantics:** cover or diagnose every in-scope MusicXML note child, including notehead text and playback/listening extensions. Unknown or unsupported legal content must not disappear silently.
+4. **Drum map semantics:** verify exact mapped SMuFL glyph names through the exact-glyph path and define precedence among voice forcing, source `<stem>` and map direction for single notes, chords and beams. Mapped grace positions are already fixed; any remaining grace-head work must identify a new unsupported case.
+5. **Geometry:** use selected glyph and complete chord ink extents in spacing; derive output/viewBox bounds from emitted ink; test collisions for 2-, 3- and 4-voice scores or publish and enforce a supported voice ceiling. Fix remaining clipping and multi-voice articulation/mark placement cases based on measured failures.
+6. **Text marks:** phases 55–56 provide text rendering and selected note marks. Verify script shaping, fallback, directionality, combining-mark layout and measured extents for the explicitly supported scripts; do not describe lyrics/chord symbols/rehearsal text as wholly undrawn.
 
 **Exit criteria**
 
 - Add table-driven tests for positive/negative offsets, divisions changes, measure boundaries and sound-offset override; exact ticks match independent expected data and the note cursor is unchanged.
-- Cue flags survive parser → model → render/playback adapters; tests prove cue events remain visible but are not treated as ordinary sounding notes.
-- Octave and placement fixtures conserve all source events and match independently parsed positions within 0.25 staff-space; no expected event ID is missing or clipped.
+- Existing phase-58 cue/octave-shift tests stay green; additional placement fixtures conserve source events and match independently parsed positions within 0.25 staff-space; no expected event ID is missing or clipped.
 - Exact-glyph, stem-precedence, grace-head, dense-spacing, output-bounds and collision tests pass; existing 44130 and 115 BPM regressions remain unchanged and pass.
 
 ### C3 — Publish a version-aware MusicXML/MXL conformance matrix (P1 contract)
@@ -218,7 +216,7 @@ The following work is already present on the audited merged `main` baseline. The
 - **44130 missing drum-note heads:** the mixed shared/local beam path skipped 176 chord heads. The renderer correction and full-score regression preserve all 794 parsed noteheads, including 441 normal drum heads and 353 hi-hat X heads.
 - **44130 beam continuity:** the initial note-loss correction split continuous mixed-voice quarter-note runs. The follow-up collects eligible staff-wide attacks and verifies 88 primary beam runs across 88 measures while retaining all 794 heads.
 - **115 BPM covered-rest grouping:** a secondary voice’s quarter rest at a tick occupied by another voice’s attack no longer breaks the beam. The small checked-in fixture reproduces the case; the exact user score renders 162/162 heads and each of its 27 active four-hit measures beams through beat 4.
-- **Merge and verification provenance:** the related fixes were delivered through merged PRs #6, #7 and #8. The audited baseline is main commit `89bad1c`. The audit itself was read-only and did not rerun the engine suite; current test totals must come from a fresh run/CI record.
+- **Merge and verification provenance:** the drum fixes were delivered through merged PRs #6, #7 and #8. The updated audited baseline is main commit `8906127`, which also contains phases 55–60. Those phases passed `npm run verify` at **1,129/1,129** on 2026-11-12; obtain a fresh result for any later code change rather than treating this historical count as current.
 
 These repairs prove that the reported failures were real and that targeted regression tests matter. They do not establish complete support for all MusicXML elements, all authoring software, arbitrary MIDI variants, image/PDF scores or every notation tradition.
 

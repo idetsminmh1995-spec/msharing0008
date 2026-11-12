@@ -31,3 +31,7 @@ export * from './metronome.js';
 export * from './text-metrics.js';
 export * from './augmentation-dot.js';
 export * from './fermata.js';
+export * from './tremolo.js';
+export * from './arpeggio.js';
+
+export * from './slide.js';

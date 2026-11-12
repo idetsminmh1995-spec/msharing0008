@@ -64,6 +64,8 @@ export interface ParsedNoteEvent {
   readonly explicitNoteheadSmufl?: string;
   readonly noteheadFilled?: boolean;
   readonly noteheadParentheses?: boolean;
+  /** MusicXML <cue/> presence; cue notes do not alter playback timing. */
+  readonly isCue: boolean;
   /** §10.4/Phase 35: <grace/> presence and its slash attribute -- true for an acciaccatura (slash="yes"), false for an appoggiatura. */
   readonly isGrace: boolean;
   readonly graceSlash: boolean;
@@ -105,6 +107,8 @@ export interface ParsedNoteEvent {
    */
   readonly slideStart?: boolean;
   readonly slideStop?: boolean;
+  readonly slideStartKind?: 'slide' | 'glissando';
+  readonly slideStopKind?: 'slide' | 'glissando';
   /** Phase 35 Tier 2/§10.4: this note's parsed <notations> -- articulations, ornaments, fermata, slur endpoints, tuplet endpoints. */
   readonly notations: ParsedNotations;
   /** Phase 35 Tier 2/§10.4/§10.8: the file's own <beam> hints for this note, empty when it gave none. */
@@ -148,6 +152,7 @@ export function parseNoteElement(
   // the grace note a full quarter note's worth of ticks, incorrectly
   // advancing the shared tick cursor as if it were a real rhythmic event.
   const isGrace = firstChildNamed(noteEl, 'grace') !== undefined;
+  const isCue = firstChildNamed(noteEl, 'cue') !== undefined;
 
   // §10.7/Phase 38: a non-positive <divisions> (0, or -- in principle,
   // though never legally negative per the spec -- a negative value from
@@ -234,8 +239,14 @@ export function parseNoteElement(
     notationsEl !== undefined
       ? [...childrenNamed(notationsEl, 'slide'), ...childrenNamed(notationsEl, 'glissando')]
       : [];
-  const slideStart = slideEls.some((el) => el.getAttribute('type') === 'start');
-  const slideStop = slideEls.some((el) => el.getAttribute('type') === 'stop');
+  const slideStartEl = slideEls.find((el) => el.getAttribute('type') === 'start');
+  const slideStopEl = slideEls.find((el) => el.getAttribute('type') === 'stop');
+  const slideStart = slideStartEl !== undefined;
+  const slideStop = slideStopEl !== undefined;
+  const slideStartKind =
+    slideStartEl?.tagName === 'glissando' ? 'glissando' : slideStart ? 'slide' : undefined;
+  const slideStopKind =
+    slideStopEl?.tagName === 'glissando' ? 'glissando' : slideStop ? 'slide' : undefined;
   const tieStart =
     tieEls.some((el) => el.getAttribute('type') === 'start') ||
     tiedEls.some((el) => el.getAttribute('type') === 'start');
@@ -570,6 +581,7 @@ export function parseNoteElement(
     ...(explicitNoteheadSmufl !== undefined ? { explicitNoteheadSmufl } : {}),
     ...(noteheadFilled !== undefined ? { noteheadFilled } : {}),
     ...(noteheadParentheses !== undefined ? { noteheadParentheses } : {}),
+    isCue,
     isGrace,
     graceSlash,
     ...(tupletActualNotes !== undefined ? { tupletActualNotes } : {}),
@@ -585,6 +597,8 @@ export function parseNoteElement(
     ...(fingering !== undefined ? { fingering } : {}),
     ...(slideStart ? { slideStart: true } : {}),
     ...(slideStop ? { slideStop: true } : {}),
+    ...(slideStartKind !== undefined ? { slideStartKind } : {}),
+    ...(slideStopKind !== undefined ? { slideStopKind } : {}),
     ...(fret !== undefined ? { fret } : {}),
     notations,
     beams,

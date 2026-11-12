@@ -57,3 +57,36 @@ export function pitchedPitch(step: PitchStep, alter: number, octave: number): Pi
 export function unpitchedPitch(displayStep: PitchStep, displayOctave: number): UnpitchedPitch {
   return { kind: 'unpitched', displayStep, displayOctave };
 }
+
+/** Applies MusicXML transposition to a pitched pitch; unpitched display positions are unchanged. */
+export function soundingPitch(pitch: Pitch, semitones: number): Pitch {
+  if (pitch.kind !== 'pitched' || semitones === 0) return pitch;
+  const natural = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[pitch.step];
+  const midi = (pitch.octave + 1) * 12 + natural + pitch.alter + semitones;
+  const octave = Math.floor(midi / 12) - 1;
+  const pc = ((midi % 12) + 12) % 12;
+  const steps = [
+    ['C', 0],
+    ['C', 1],
+    ['D', 2],
+    ['D', 3],
+    ['E', 4],
+    ['F', 5],
+    ['F', 6],
+    ['G', 7],
+    ['G', 8],
+    ['A', 9],
+    ['A', 10],
+    ['B', 11],
+  ] as const;
+  const [step, base] = steps[pc] ?? ['C', 0];
+  return {
+    kind: 'pitched',
+    step,
+    alter:
+      base === 0 || [2, 4, 5, 7, 9, 11].includes(base)
+        ? pc - { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[step]
+        : 0,
+    octave,
+  };
+}

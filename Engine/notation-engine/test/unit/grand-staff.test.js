@@ -80,7 +80,10 @@ describe('grand staff rendering (Integration A)', () => {
     // staff's bottom line and scaled up from there. Anchoring it at the
     // top -- which this engine did until Phase 52 read back an exported
     // PDF and saw it -- puts the whole brace above the music.
-    const m = /<g transform="translate\(([\d.]+) ([\d.]+)\) scale\(1 ([\d.]+)\)"><text[^>]*>\uE000</.exec(svg);
+    const m =
+      /<g transform="translate\(([\d.]+) ([\d.]+)\) scale\(1 ([\d.]+)\)"><text[^>]*>\uE000</.exec(
+        svg,
+      );
     assert.ok(m !== null, 'the brace is drawn with a scale transform');
     const originY = Number(m[2]);
     const scaleY = Number(m[3]);
@@ -112,7 +115,7 @@ describe('grand staff rendering (Integration A)', () => {
 
   test('the viewBox grows tall enough to contain the second staff', () => {
     const { svg } = renderPiano();
-    const m = svg.match(/viewBox="0 0 [\d.]+ ([\d.]+)"/);
+    const m = svg.match(/viewBox="[-\d.]+ 0 [\d.]+ ([\d.]+)"/);
     assert.ok(Number(m[1]) > 16, `expected a taller viewBox, got ${m?.[1]}`);
   });
 
@@ -124,7 +127,9 @@ describe('grand staff rendering (Integration A)', () => {
     // Ledger lines are HORIZONTAL (y1 === y2); a barline shares the same
     // 0.16 thickness but is vertical, so match on shape, not thickness.
     const horizontal016 = [
-      ...svg.matchAll(/<line x1="[\d.]+" y1="([\d.]+)" x2="[\d.]+" y2="([\d.]+)" stroke="#000000" stroke-width="0\.16"/g),
+      ...svg.matchAll(
+        /<line x1="[\d.]+" y1="([\d.]+)" x2="[\d.]+" y2="([\d.]+)" stroke="#000000" stroke-width="0\.16"/g,
+      ),
     ].filter((m) => m[1] === m[2]);
     assert.equal(horizontal016.length, 0);
   });
@@ -132,7 +137,9 @@ describe('grand staff rendering (Integration A)', () => {
   test('ONE continuous barline runs through both staves and the gap between them (§9.18)', () => {
     const { svg } = renderPiano();
     const verticals = [
-      ...svg.matchAll(/<line x1="([\d.]+)" y1="([\d.]+)" x2="\1" y2="([\d.]+)" stroke="#000000" stroke-width="0\.16"/g),
+      ...svg.matchAll(
+        /<line x1="([\d.]+)" y1="([\d.]+)" x2="\1" y2="([\d.]+)" stroke="#000000" stroke-width="0\.16"/g,
+      ),
     ];
     assert.equal(verticals.length, 1, 'expected exactly one barline, not one per staff');
     const [, , yA, yB] = verticals[0];

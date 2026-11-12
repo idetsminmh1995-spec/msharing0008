@@ -39,7 +39,7 @@ function codes(result) {
 }
 
 describe('MusicXML parser v2 Tier 2/3 -- <notations> (Phase 35, §10.4)', () => {
-  test('all five of §9.19\'s articulations parse, with strong-accent mapped to marcato', () => {
+  test("all five of §9.19's articulations parse, with strong-accent mapped to marcato", () => {
     const result = parse(
       score(
         `<note>${C4}<type>quarter</type><notations><articulations>` +
@@ -63,7 +63,7 @@ describe('MusicXML parser v2 Tier 2/3 -- <notations> (Phase 35, §10.4)', () => 
     assert.ok(codes(result).includes('UNSUPPORTED_ARTICULATION'));
   });
 
-  test('all four of §9.20\'s ornaments parse from their MusicXML element names', () => {
+  test("all four of §9.20's ornaments parse from their MusicXML element names", () => {
     const result = parse(
       score(
         `<note>${C4}<type>quarter</type><notations><ornaments>` +
@@ -71,10 +71,13 @@ describe('MusicXML parser v2 Tier 2/3 -- <notations> (Phase 35, §10.4)', () => 
           '</ornaments></notations></note>',
       ),
     );
-    assert.deepEqual([...firstEvent(result).ornaments], ['trill', 'mordent', 'turn', 'turnInverted']);
+    assert.deepEqual(
+      [...firstEvent(result).ornaments],
+      ['trill', 'mordent', 'turn', 'turnInverted'],
+    );
   });
 
-  test('<inverted-mordent> reports UNSUPPORTED_ORNAMENT rather than drawing the plain mordent glyph (§9.20\'s stated gap)', () => {
+  test("<inverted-mordent> reports UNSUPPORTED_ORNAMENT rather than drawing the plain mordent glyph (§9.20's stated gap)", () => {
     const result = parse(
       score(
         `<note>${C4}<type>quarter</type><notations><ornaments><inverted-mordent/></ornaments></notations></note>`,
@@ -123,14 +126,18 @@ describe('MusicXML parser v2 Tier 2/3 -- <notations> (Phase 35, §10.4)', () => 
     assert.equal(firstEvent(inverted).fermataShape, 'normal');
 
     const unsupported = parse(
-      score(`<note>${C4}<type>quarter</type><notations><fermata>angled</fermata></notations></note>`),
+      score(
+        `<note>${C4}<type>quarter</type><notations><fermata>angled</fermata></notations></note>`,
+      ),
     );
     assert.equal(firstEvent(unsupported).hasFermata, true);
     assert.equal(firstEvent(unsupported).fermataShape, undefined);
     assert.ok(codes(unsupported).includes('UNSUPPORTED_FERMATA_SHAPE'));
 
     const unknownType = parse(
-      score(`<note>${C4}<type>quarter</type><notations><fermata type="sideways"/></notations></note>`),
+      score(
+        `<note>${C4}<type>quarter</type><notations><fermata type="sideways"/></notations></note>`,
+      ),
     );
     assert.equal(firstEvent(unknownType).fermataPlacement, 'above');
     assert.ok(codes(unknownType).includes('UNSUPPORTED_FERMATA_TYPE'));
@@ -172,15 +179,16 @@ describe('MusicXML parser v2 Tier 2/3 -- <notations> (Phase 35, §10.4)', () => 
     assert.equal(events[1].tupletStop, true);
   });
 
-  test('a <notations> child the v2 parser does not handle is reported, not swallowed', () => {
+  test('glissando is parsed and preserved as a supported source kind', () => {
     const result = parse(
-      score(`<note>${C4}<type>quarter</type><notations><glissando type="start"/></notations></note>`),
-    );
-    assert.ok(
-      [...result.diagnostics].some(
-        (d) => d.code === 'UNKNOWN_ELEMENT' && d.message.includes('glissando'),
+      score(
+        `<note>${C4}<type>quarter</type><notations><glissando type="start"/></notations></note>`,
       ),
     );
+    const ev = firstEvent(result);
+    assert.equal(ev.slideStart, true);
+    assert.equal(ev.slideStartKind, 'glissando');
+    assert.ok(!codes(result).includes('UNKNOWN_ELEMENT'));
   });
 
   test('a note with no <notations> at all gains none of the Tier 2 keys (pre-Tier-2 objects stay identical)', () => {
@@ -216,7 +224,9 @@ describe('MusicXML parser v2 Tier 2/3 -- <beam> and <lyric> (Phase 35, §10.4/§
   });
 
   test('an unrecognized <beam> value is dropped WITH an UNSUPPORTED_BEAM_VALUE diagnostic, never guessed at', () => {
-    const result = parse(score(`<note>${C4}<type>eighth</type><beam number="1">sideways</beam></note>`));
+    const result = parse(
+      score(`<note>${C4}<type>eighth</type><beam number="1">sideways</beam></note>`),
+    );
     assert.equal(firstEvent(result).beams, undefined);
     assert.ok(codes(result).includes('UNSUPPORTED_BEAM_VALUE'));
   });
@@ -250,9 +260,31 @@ describe('MusicXML parser v2 Tier 2/3 -- <beam> and <lyric> (Phase 35, §10.4/§
 describe('MusicXML parser v2 Tier 2/3 -- <direction> content (Phase 35, §10.4)', () => {
   test('every exact-mapped MusicXML dynamic level parses', () => {
     const levels = [
-      'pppppp', 'ppppp', 'pppp', 'ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff',
-      'ffff', 'fffff', 'ffffff', 'sf', 'sfp', 'sfpp', 'fp', 'rf', 'sfz', 'sffz',
-      'fz', 'n', 'pf', 'sfzp',
+      'pppppp',
+      'ppppp',
+      'pppp',
+      'ppp',
+      'pp',
+      'p',
+      'mp',
+      'mf',
+      'f',
+      'ff',
+      'fff',
+      'ffff',
+      'fffff',
+      'ffffff',
+      'sf',
+      'sfp',
+      'sfpp',
+      'fp',
+      'rf',
+      'sfz',
+      'sffz',
+      'fz',
+      'n',
+      'pf',
+      'sfzp',
     ];
     const result = parse(
       score(
@@ -383,9 +415,7 @@ describe('MusicXML parser v2 Tier 2/3 -- <sound tempo>, <harmony>, <print> (Phas
   });
 
   test('<print> is recorded only when it actually asks for a system or page break', () => {
-    const asks = parse(
-      score(`<print new-system="yes"/><note>${C4}<type>quarter</type></note>`),
-    );
+    const asks = parse(score(`<print new-system="yes"/><note>${C4}<type>quarter</type></note>`));
     assert.deepEqual(plain(asks.prints), [
       { partId: 'P1', measureNumber: 1, newSystem: true, newPage: false },
     ]);
@@ -400,7 +430,10 @@ describe('MusicXML parser v2 Tier 2/3 -- <sound tempo>, <harmony>, <print> (Phas
 describe('MusicXML parser v2 Tier 2/3 -- additive time signatures (STATUS C3, §9.4)', () => {
   test('"3+2+2" over 8 parses as the numeric total 7 with "3+2+2" kept for display', () => {
     const result = parse(
-      score(`<note>${C4}<type>quarter</type></note>`, '<divisions>2</divisions><time><beats>3+2+2</beats><beat-type>8</beat-type></time>'),
+      score(
+        `<note>${C4}<type>quarter</type></note>`,
+        '<divisions>2</divisions><time><beats>3+2+2</beats><beat-type>8</beat-type></time>',
+      ),
     );
     const attrs = result.attributes[0];
     assert.equal(attrs.timeNumerator, 7);
@@ -421,7 +454,10 @@ describe('MusicXML parser v2 Tier 2/3 -- additive time signatures (STATUS C3, §
 
   test('an ordinary meter keeps timeNumeratorDisplay absent, so nothing about its rendering changes', () => {
     const result = parse(
-      score(`<note>${C4}<type>quarter</type></note>`, '<divisions>2</divisions><time><beats>4</beats><beat-type>4</beat-type></time>'),
+      score(
+        `<note>${C4}<type>quarter</type></note>`,
+        '<divisions>2</divisions><time><beats>4</beats><beat-type>4</beat-type></time>',
+      ),
     );
     assert.equal(result.attributes[0].timeNumerator, 4);
     assert.ok(!('timeNumeratorDisplay' in result.attributes[0]));
