@@ -6,14 +6,15 @@ A+B+C corrective work** (making notes actually visible in the web app).
 Numbering is **`PLAN.md` §22's phase numbering** — deliberately not a second
 numbering system. Say a number from §B below and that's the phase to build.
 
-**Last audited:** against the code in `src/` and the **1,129-test** suite,
-after Phases 57–59 closed the remaining MusicXML note/direction gaps
-(transpose, pedal, cue, octave-shift, slide and glissando). Stages 0–10 are
-complete: every phase numbered 1–60 is built AND wired, including the full
-playback surface (§17.1's position API and event stream, §17.2's cursor and
-repeat unfolding) and host-selectable part-specific event streams. What
-remains is the named engraving limitations in §C and §F, not unfinished
-MusicXML roadmap work.
+**Current plan update:** phases 1–60 are complete for their declared scope;
+the latest recorded full verification on main passed **1,129/1,129** after
+phases 55–60. That completion includes the text layer, selected note marks,
+transpose/pedal, cue/octave-shift, slides/glissandi, and visual polish. It does
+not establish version-wide MusicXML conformance or guarantee that every valid
+input is handled. The 2026-11-12 completeness roadmap was refreshed against
+main `8906127`; it records remaining gaps without reopening those completed
+features. Details are in §J and
+[`engine-completeness-roadmap.md`](./engine-completeness-roadmap.md).
 
 ---
 
@@ -109,7 +110,7 @@ All of these are implemented, tested, and have a `Documentation/phase-NN-*.md` r
 | 53 | Performance pass (§18.1) | Every budget met with margin, measured in both Chromium and Node+jsdom; the budgets are now tests, with scaling checks that catch an accidental O(n²). Implemented the one §18.1 strategy that was written down but missing -- `renderParsedMusicXml`, so a resize/re-theme never re-parses (9x faster on that path) | [`phase-53`](./phase-53-performance.md) |
 | 54 | Public API surface + generated reference docs (§22) | `docs/API.md` generated from the emitted .d.ts, with the ~30 supported entry points called out from the 479 exported symbols; `npm run docs:check` is in `verify`, so the reference cannot drift. Also closed §C1's tenor half (tenor-clef key signatures), §F4 (a browser-level visual test) and §F5 (dead `quick-demo/`) | [`phase-54`](./phase-54-public-api.md) |
 | 55 | Text layer: lyrics, chord symbols, rehearsal marks, `<words>` (§19.10) | Closes §19's limitation 10 -- one gap hit in four places. One small text layer (`render/text.ts`, `geometry/text-metrics.ts`) serves all four: lyric verses with hyphenation, elision and melisma extenders; chord symbols assembled from a root letter plus real `csym*` glyphs (slash bass, accidental, `<kind text>`); framed rehearsal marks; italic `<words>`. Layout reserves their room from the SAME functions the drawing pass uses, so nothing can be printed over the next system | [`phase-55`](./phase-55-text-layer.md) |
-| 56 | The marks that change what a note IS (§9.25–§9.27) | Tremolo (stroke count is the message; a count the font cannot draw is clamped AND reported), arpeggio/non-arpeggio (one path-based mark per chord, spacing reserved so it cannot land on the time signature or reach across a barline) and the guitar harmonic's diamond head. Found and fixed a stale plan entry: the fermata has been drawn since Integration H. See that phase's §5 for what is still not drawn (slides, cues, 8va brackets, pedals) | [`phase-56`](./phase-56-note-marks.md) |
+| 56 | The marks that change what a note IS (§9.25–§9.27) | Tremolo (stroke count is the message; a count the font cannot draw is clamped AND reported), arpeggio/non-arpeggio (one path-based mark per chord, spacing reserved so it cannot land on the time signature or reach across a barline) and the guitar harmonic's diamond head. Found and fixed a stale plan entry: the fermata has been drawn since Integration H. At the time, slides, cues, 8va brackets and pedals remained open; phases 57–59 subsequently closed those gaps. | [`phase-56`](./phase-56-note-marks.md) |
 | 60 | Visual engraving polish | SMuFL/MuseScore-proportioned note design retained; scroll SVGs gain a one-staff-space optical inset so first-system clefs, bar numbers and header glyphs are not clipped; negative viewBox origins are supported by resize | [`phase-60`](./phase-60-visual-polish.md) |
 | 59 | Slides and glissandi | Source-kind preservation, straight `<slide>` and wavy `<glissando>` geometry/renderers, pitched/chord/tab endpoint pairing, string validation and unmatched/mismatched/cross-system diagnostics | [`phase-59`](./phase-59-slide-glissando.md) |
 | 58 | Cue notes and octave-shift | `<cue/>` metadata with file/default optical scale in note rendering and spacing; `<octave-shift>` up/down/stop 8/15 spans, matching, labels, brackets, above-staff reservation and invalid/unmatched diagnostics | [`phase-58`](./phase-58-cue-octave-shift.md) |
@@ -433,3 +434,30 @@ cache keys are synchronized. `npm run verify --prefix Engine/notation-engine`
 passed **1,070 tests with 0 failures**, including four real-browser rendering
 checks. Mapped custom grace-notehead shapes and mapped stem direction for drum
 chords/beams remain open items in `Plan/Notation Plan/PLAN.md`.
+
+---
+
+## J. Notation Engine completeness follow-up — refreshed 2026-11-12
+
+This record is based on current main `8906127`, not the earlier `89bad1c`
+snapshot. Main has since completed phases 55–60: text rendering; tremolo,
+arpeggio and harmonic marks; transpose and pedal; cue notes and octave-shift
+spans; slides/glissandi; and score-proportion/edge polish. These are completed
+baseline capabilities and are not listed as pending work in the refreshed
+roadmap.
+
+The remaining purpose is practical correctness for declared MusicXML profiles,
+not a promise that one engine reads every possible score format. Current
+follow-up priorities include accurate direction/harmony offsets, explicitly
+verified clef/placement behavior and note-child coverage, MXL/XML/MIDI input
+limits and malformed-input diagnostics, selected drum glyph/stem/spacing and
+multi-voice bounds cases, plus independent event/geometry/browser corpora.
+The matrix and acceptance evidence are detailed in
+[`engine-completeness-roadmap.md`](./engine-completeness-roadmap.md) and
+[`../PLAN.md`](../PLAN.md) §25.
+
+The earlier 44130 missing-head repair, 44130 beam-continuity fix, and 115 BPM
+covered-rest fix remain completed with their merged regressions. Do not reopen
+them without a new reproducer. The **1,129/1,129** result is the recorded main
+verification for the phase-55–60 changes; the documentation merge itself does
+not modify engine source.

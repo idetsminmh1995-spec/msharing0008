@@ -155,6 +155,13 @@ These are good decisions, already implemented, and v2 builds on them.
 | Standard MIDI File format 0 and 1 (`.mid`) | Full for notes, tempo, time signature, and key signature meta events |
 | MIDI format 2 | Not supported (rare; sequences of independent patterns, no meaningful single timeline) |
 
+**Support-claim correction (2026-11-12):** “Full” in the historical phase
+ledger means the originally scoped implementation was completed; it does not
+demonstrate conformance to every element in MusicXML 3.0/3.1/4.0, every MXL
+container, or every producing application. The tested support boundary,
+remaining gaps, and acceptance gates are defined in §25 and
+[`Documentation/engine-completeness-roadmap.md`](./Documentation/engine-completeness-roadmap.md).
+
 ### 3.2 Notation features
 
 **In scope:** staves (1–6 lines), all standard clefs, key signatures, time
@@ -2664,6 +2671,14 @@ The engine is "done" for its intended purpose when all of the following hold:
 10. Rendering is deterministic — identical input yields byte-identical SVG.
 11. Every performance target in §18.1 is met on a 100-measure score.
 12. Every module in §6–§17 has the tests its section specifies.
+13. Every advertised file format/version/profile has a support matrix,
+    resource limits, route-level tests, named exclusions and stable diagnostics.
+14. No supported source event or semantic field is silently lost between
+    import, the normalized model, engraving and playback; each layer is tested
+    independently against reviewed expected data.
+15. Malformed and over-limit input is bounded and recoverable, and every
+    compatibility or visual-parity claim is backed by current CI evidence and
+    a documented corpus rather than a stale status count.
 
 ---
 
@@ -3220,3 +3235,45 @@ shared SVG shape-list renderer. The website adapter consumes the standalone
 Piano Hand Engine's Phase 1–3 APIs, but does not make that package a parser,
 continuous motion planner or IK engine. Keep both that boundary and the
 remaining roadmap items distinct from `piano-engine`'s SVG bundle.
+
+---
+
+## 25. Notation Engine support contract and completeness roadmap (2026-11-12)
+
+Phases 1–60 remain recorded as completed for their declared implementation
+scope. In particular, phases 55–60 add the text layer, selected note marks,
+transpose/pedal, cue/octave-shift, slides/glissandi and visual polish. These
+completed features must not be listed as open gaps. Phase completion does not
+certify universal MusicXML schema or producer conformance, arbitrary MIDI
+variants, or every notation tradition. The unqualified “Full” labels in §3.1
+are historical implementation labels, not a conformance claim.
+
+For dependable MusicXML support, distinguish file/container acceptance,
+semantic parsing and preservation, interpretation, engraving, diagnostics,
+and independent verification. A valid parse does not prove a correct render;
+a visible score does not prove that every source event survived. Unsupported
+valid content must receive an explicit fallback or stable diagnostic rather
+than silently disappearing.
+
+The detailed audit, MusicXML/MXL/MIDI format matrix, current implementation
+baseline, gap inventory, test requirements, resource-safety criteria, future
+format boundaries, references and the completed user-reported drum fixes are
+in [`Documentation/engine-completeness-roadmap.md`](./Documentation/engine-completeness-roadmap.md).
+Its follow-up sequence is:
+
+| Follow-up | Priority | Exit objective |
+|---|---|---|
+| C0 — define support contract and reproducible evidence | P0 prerequisite | One versioned feature matrix; no blanket conformance claim; provenance-tagged fixtures and current CI evidence. |
+| C1 — harden untrusted import and diagnostics | P0 safety | Bounded XML/MXL/MIDI input, safe container rules, valid timing, stable diagnostics and recoverable uploads. |
+| C2 — close remaining gaps in the current MusicXML profile | P1 correctness | Direction/harmony offsets, placement/clef semantics, unhandled note children, exact drum mapping, spacing/bounds/collisions independently tested; completed phases 55–60 retained as closed. |
+| C3 — publish version-aware MusicXML/MXL conformance | P1 contract | Every claimed element/version classified as implemented, partial, preserved, unsupported or diagnosed; no silent loss. |
+| C4 — independent semantic goldens and producer corpus | P1 evidence | Source events, model events, beam geometry, playback and reviewed output have separate expected results and provenance. |
+| C5 — route, browser and release gates | P1 delivery | UI, engine bundle, caches and deployed behavior match the support contract; required checks cannot silently skip. |
+| C6 — select one scoped symbolic adapter by user need | P2 expansion | MEI, ABC or `**kern` profile chosen and corpus-tested before advertising. |
+| C7 — decide whether to build separate PDF/image OMR | P2 decision | No direct image/PDF notation claim; any OMR has scoped confidence, held-out benchmark and human correction. |
+| C8 — extend scripts, tuning and traditions as separate profiles | P3 domain work | Each named tradition has its own semantic contract, renderer, diagnostics and domain-reviewed fixtures. |
+
+Do not interpret the future C0–C8 requirements as reopened regressions: the
+44130 missing-head repair, 44130 beam-continuity fix, and 115 BPM covered-rest
+fix remain completed with their existing tests. Reopen them only for a new
+reproducer.
