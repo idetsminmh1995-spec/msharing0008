@@ -510,3 +510,15 @@ the three layout viewBoxes and zoom, and downloaded an XML-parseable SVG.
 Implementation and engine fidelity changes are on the same unmerged feature
 branch and are not deployed or present on main until review/merge and site
 deployment.
+
+## M. CI browser provisioning follow-up — 2026-11-12
+
+Both hosted `notation-and-video/verify` runs failed before executing browser
+tests: Ubuntu's `chromium-browser` apt package invokes Snap, and the runners
+could not contact Snap Store. This was an environment setup failure, not a
+notation or browser-test assertion failure. The workflow now installs stable
+Chrome for Testing using `browser-actions/setup-chrome@v2`, aliases its binary
+to `chromium` for existing acceptance scripts, and installs `ffmpeg` for
+`ffprobe`. All three repository browser acceptance scripts pass locally with
+Chromium and `ffprobe`; hosted verification for the updated workflow is pending.
+Do not merge until the CI rerun is successful.

@@ -3314,4 +3314,8 @@ complete MusicXML conformance; MXL expanded-archive limits and the other C1/C2
 gaps remain open. Browser smoke checks loaded a known `.musicxml` fixture and a
 valid `.mxl` archive, confirmed all three SVG viewBoxes and zoom behavior, and
 downloaded an XML-parseable SVG. See `website/README.md` for the page inventory
-and operation.
+and operation. CI browser provisioning now avoids Ubuntu's Snap-based Chromium
+wrapper: the workflow installs stable Chrome for Testing, exposes it as the
+`chromium` executable expected by browser tests, and installs `ffmpeg` for
+`ffprobe`. The three existing browser acceptance scripts pass locally; the
+updated hosted verification is pending before merge.
