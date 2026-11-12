@@ -2501,6 +2501,7 @@ until those original files are available and rendered.
 | P2 | `drumMappingFromMuseScore` can place exact custom SMuFL glyph names in `noteheadShape`, although the config API separates shape families from `noteheadGlyph`. | Emit custom glyphs in the exact-glyph field and render GM 28, 52, 62 and 86 through merged config without throwing; retain family mapping behavior. |
 | CLOSED 2026-11-12 | Unpitched grace-note position bypassed GM drum-map fallback when display coordinates were absent. | The renderer now uses the shared note-position resolver, preserving a complete file-stated position and using configured GM mapping otherwise. Regression tests compare the grace position with an ordinary mapped hi-hat and confirm explicit-position precedence; unpitched grace stems follow the existing forced-up convention. |
 | CLOSED 2026-11-12 | In a mixed voice, the voice-local beam grouping included cross-voice drum attacks that had already been rendered by the shared-attack pass. Later local chord events were treated as non-first members of that separate group and silently skipped; the supplied 44130 score lost 176 of 794 noteheads. | Shared-attack events now break voice-local beam runs. Regression coverage renders the full 44130 fixture and asserts all 794 noteheads survive: 441 normal heads (including snares) and 353 explicit X heads (hi-hats). |
+| CLOSED 2026-11-12 | The note-loss correction split a continuous quarter-note drum run whenever a cross-voice attack was drawn separately; local attacks between shared ticks were left ungrouped (for example, measures 5–6 of 44130). | Consolidate the whole staff's time-ordered attacks into one beam stream only for gap-free, all-unpitched quarter-note measures containing shared attacks, no explicit primary beams, note spans, lyrics or local-only down-stems. The 44130 regression requires exactly one primary beam per measure (88 total) while retaining every notehead; other rhythms retain the normal voice-local path. |
 | P2 | Precomposed percussion grace glyphs cannot represent mapped/custom notehead shapes (for example, an X hi-hat head). | Decide whether to add a diagnostic or dedicated mapped grace glyphs; preserve the existing precomposed SMuFL articulation and add shape-specific rendering tests if support is implemented. |
 | P2 | The 44130 quarter-note hand-beaming exception classifies hands by odd voice-number parity. | Replace or configure semantic hand/foot classification; test equivalent odd/even hand voices and a foot voice without an explicit down stem. |
 | P2 | Horizontal attack spacing reserves `noteheadBlack` width even for wider mapped drum glyphs such as `noteheadHeavyXHat`. | Measure the selected glyph and chord-member extents; verify close-spaced SVG ink does not overlap. |
@@ -2552,6 +2553,26 @@ chords from being swallowed. Verification against the supplied score now finds
 794 rendered heads (441 normal and 353 X), while retaining the two
 `MEASURE_OVERRUN` warnings for the source's extra final-bar events. The
 regression is in `test/unit/drum-shared-beam-regression.test.js`.
+
+**44130 beam-continuity correction (2026-11-12).** The user then found that
+some hits which should share a beam were still isolated. In measures 5–6, the
+source has four consecutive quarter-note attacks at ticks 0, 480, 960 and 1440;
+the attacks at 0 and 960 are shared by voices 1 and 2, while the attacks at 480
+and 1440 are local to voice 1. Treating the two shared attacks as boundaries
+kept all noteheads but left the two local attacks outside any beam. The
+renderer now uses one staff-wide time-ordered attack stream for the narrow case
+of a gap-free staff made entirely of unpitched quarter notes, with at least one
+cross-voice attack and no explicit primary `<beam>` hints. Same-tick noteheads
+are still merged and source members are rendered once; measures with rests,
+gaps, grace notes, note ties/slurs/tuplets, lyrics, local-only explicit
+down-stems, other durations or explicit beaming retain the ordinary voice-local
+behavior. The 44130 score's 221 explicit down-stems are all on already-shared
+attacks, which already follow the consolidated pass's up-stem rule. The full
+source now renders **88 primary beam lines for
+88 measures** (the prior fragmented render produced 110) and still renders all
+794 heads, including 353 hi-hat X heads and 441 normal heads. The focused test
+is in `test/unit/drum-shared-beam-regression.test.js`; full verification passed
+**1,072/1,072 tests**.
 
 ---
 

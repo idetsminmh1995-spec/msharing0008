@@ -1293,22 +1293,22 @@ function eventStartTicks(events: readonly MeasureEvent[]): readonly number[] {
   return starts;
 }
 
-interface SharedDrumEvent {
+interface DrumAttackEvent {
   readonly tick: number;
   readonly event: Chord;
   readonly members: readonly { readonly voiceId: number; readonly index: number }[];
 }
 
 /**
- * MusicXML commonly writes a drum kit's hands and feet in separate voices.
- * At one tick that is still one engraved attack: every notehead shares one
- * stem/beam. Collect those cross-voice attacks before the normal voice pass;
- * same-voice `<chord/>` events already follow this rule in their own path.
+ * Collect all unpitched attacks on a staff into one time-ordered stream.
+ * Notes at the same tick share one engraved attack and stem, regardless of
+ * which MusicXML voice supplied them; `members` lets the voice pass avoid
+ * drawing those source events a second time.
  */
-function collectSharedDrumEvents(
+function collectDrumAttackEvents(
   measure: Measure,
   staffNumber: number,
-): readonly SharedDrumEvent[] {
+): readonly DrumAttackEvent[] {
   const byTick = new Map<number, { voiceId: number; index: number; event: Note | Chord }[]>();
   for (const voice of measure.voices) {
     const starts = eventStartTicks(voice.events);
@@ -1323,10 +1323,8 @@ function collectSharedDrumEvents(
       byTick.set(tick, bucket);
     });
   }
-  const shared: SharedDrumEvent[] = [];
+  const attacks: DrumAttackEvent[] = [];
   for (const [tick, bucket] of byTick) {
-    const voiceIds = new Set(bucket.map((member) => member.voiceId));
-    if (voiceIds.size < 2) continue;
     const durationTicks = bucket[0]?.event.duration.ticks;
     if (
       durationTicks === undefined ||
@@ -1337,8 +1335,8 @@ function collectSharedDrumEvents(
       member.event.kind === 'chord' ? [...member.event.notes] : [member.event],
     );
     const first = bucket[0]?.event;
-    if (first === undefined || notes.length < 2) continue;
-    shared.push({
+    if (first === undefined || notes.length === 0) continue;
+    attacks.push({
       tick,
       event: {
         kind: 'chord',
@@ -1351,7 +1349,68 @@ function collectSharedDrumEvents(
       members: bucket.map(({ voiceId, index }) => ({ voiceId, index })),
     });
   }
-  return shared.sort((a, b) => a.tick - b.tick);
+  return attacks.sort((a, b) => a.tick - b.tick);
+}
+
+/**
+ * A continuous all-quarter drum groove may use one house-style beam run for
+ * the whole staff, not separate runs that fracture wherever two voices hit
+ * together. Keep this deliberately narrow: rests, gaps, grace notes, spans,
+ * lyrics, down-stems on local-only attacks, other durations, or file-stated
+ * primary beams retain the ordinary voice path. Shared attacks already use
+ * the consolidated pass's up-stem rule, so their explicit down-stems do not
+ * change that existing behavior.
+ */
+function shouldUnifyQuarterDrumBeams(
+  measure: Measure,
+  staffNumber: number,
+  attacks: readonly DrumAttackEvent[],
+): boolean {
+  if (attacks.length === 0) return false;
+  const sharedAttackTicks = new Set(
+    attacks
+      .filter((attack) => new Set(attack.members.map((member) => member.voiceId)).size > 1)
+      .map((attack) => attack.tick),
+  );
+  if (sharedAttackTicks.size === 0) return false;
+
+  const staffEvents = measure.voices.flatMap((voice) => {
+    const starts = eventStartTicks(voice.events);
+    return voice.events.flatMap((event, index) =>
+      (event.staff ?? 1) === staffNumber ? [{ event, tick: starts[index] ?? 0 }] : [],
+    );
+  });
+  if (
+    staffEvents.length === 0 ||
+    !staffEvents.every(({ event, tick }) => {
+      if (event.duration.type !== 'quarter') return false;
+      const notes = event.kind === 'note' ? [event] : event.kind === 'chord' ? event.notes : [];
+      return (
+        notes.length > 0 &&
+        notes.every(
+          (note) =>
+            note.pitch.kind === 'unpitched' &&
+            note.isGrace !== true &&
+            (note.explicitStemDirection !== 'down' || sharedAttackTicks.has(tick)) &&
+            !note.tieStart &&
+            !note.tieStop &&
+            !note.slurStarts?.length &&
+            !note.slurStops?.length &&
+            !note.tupletStart &&
+            !note.tupletStop &&
+            !note.lyrics?.length &&
+            !(note.beams ?? []).some((beam) => beam.number === 1),
+        )
+      );
+    })
+  )
+    return false;
+
+  return attacks.every((attack, index) => {
+    if (index === 0) return true;
+    const previous = attacks[index - 1];
+    return previous !== undefined && attack.tick === previous.tick + previous.event.duration.ticks;
+  });
 }
 
 /** How far into the measure this voice's last event ENDS -- not the sum of its durations, which ignores any gap between them. */
@@ -4468,7 +4527,28 @@ export function renderParsedMusicXml(
           // Integration U: and the same for rests, which move out of the
           // other voice's way vertically rather than horizontally.
           const restPushes = computeRestClearanceOffsets(measure, staffNumber, ctxAtTick);
-          const sharedDrumEvents = collectSharedDrumEvents(measure, staffNumber);
+          // The id comes from notationEventId, the SAME function the playback
+          // event stream builds its noteIds from (§17.1). One helper is shared
+          // by consolidated drum attacks and ordinary per-voice rendering.
+          const withEventId = (svg: string, voiceId: number, eventIndex: number): string =>
+            svgGroup([svg], {
+              'data-id': notationEventId(part.id, measure.number, voiceId, eventIndex),
+            });
+          const drumAttackEvents = collectDrumAttackEvents(measure, staffNumber);
+          const unifyQuarterDrumBeams = shouldUnifyQuarterDrumBeams(
+            measure,
+            staffNumber,
+            drumAttackEvents,
+          );
+          // In mixed voices, a shared attack used to be drawn in its own beam
+          // group, splitting the continuous quarter-note hand run around it.
+          // For the narrowly-defined full-staff groove, send every attack
+          // through that shared renderer; otherwise preserve the old behavior.
+          const sharedDrumEvents = unifyQuarterDrumBeams
+            ? drumAttackEvents
+            : drumAttackEvents.filter(
+                (group) => new Set(group.members.map((member) => member.voiceId)).size > 1,
+              );
           const sharedDrumEventKeys = new Set(
             sharedDrumEvents.flatMap((group) =>
               group.members.map((member) => `${member.voiceId}:${member.index}`),
@@ -4526,7 +4606,17 @@ export function renderParsedMusicXml(
                   theme.beamStyle,
                   'up',
                 );
-                memberSvgs.forEach((memberSvg) => svgParts.push(memberSvg));
+                memberSvgs.forEach((memberSvg, memberIndex) => {
+                  const attackIndex = beamGroup.eventIndices[memberIndex];
+                  const attack =
+                    attackIndex !== undefined ? sharedDrumEvents[attackIndex] : undefined;
+                  const source = attack?.members.length === 1 ? attack.members[0] : undefined;
+                  svgParts.push(
+                    source !== undefined
+                      ? withEventId(memberSvg, source.voiceId, source.index)
+                      : memberSvg,
+                  );
+                });
                 svgParts.push(beamSvg);
                 return;
               }
@@ -4538,7 +4628,10 @@ export function renderParsedMusicXml(
                 createAccidentalState(fifths),
                 'up',
               );
-              svgParts.push(svg);
+              const source = group.members.length === 1 ? group.members[0] : undefined;
+              svgParts.push(
+                source !== undefined ? withEventId(svg, source.voiceId, source.index) : svg,
+              );
             });
           }
 
@@ -4590,11 +4683,8 @@ export function renderParsedMusicXml(
               // struck together IS a chord, that was most of them.
               const beamSource =
                 event.kind === 'chord' ? event.notes[0] : event.kind === 'note' ? event : undefined;
-              // Cross-voice drum attacks are rendered once by the shared
-              // attack pass above. They must also break this voice-local
-              // beam run: otherwise a mixed group can start on a shared
-              // event, then its later voice-local chords are treated as
-              // non-first members of a group that was never drawn here.
+              // Drum attacks consumed by the consolidated attack pass above
+              // must break this voice-local run so they are not drawn twice.
               const isRest =
                 event.kind === 'rest' ||
                 (event.kind === 'note' && event.isGrace === true) ||
@@ -4643,24 +4733,6 @@ export function renderParsedMusicXml(
             // Integration I: every drawn event's geometry, keyed by its
             // own index in this voice, for the span pass below.
             const anchorByIndex = new Map<number, EventAnchor>();
-
-            /**
-             * Phase 51/§18.3: "every rendered element carries a stable
-             * `data-id` attribute tracing back to its `Score` node".
-             *
-             * The id comes from `notationEventId`, the SAME function the
-             * playback event stream builds its `noteIds` from (§17.1) --
-             * so a host handed `{ tick, noteIds }` can find the exact
-             * `<g>` that sounds at that tick with a plain
-             * `querySelector`, with no second id scheme to keep in sync.
-             * A chord member's `#n<i>` suffix resolves to its chord's own
-             * group via `elementIdForNoteId`.
-             */
-            const withEventId = (svg: string, voiceId: number, eventIndex: number): string =>
-              svgGroup([svg], {
-                'data-id': notationEventId(part.id, measure.number, voiceId, eventIndex),
-              });
-
             voice.events.forEach((event, idx) => {
               // Integration A: a multi-staff part's voices carry events for
               // EVERY staff; this pass draws only the ones belonging to the

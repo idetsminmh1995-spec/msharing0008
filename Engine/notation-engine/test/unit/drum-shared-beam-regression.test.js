@@ -47,4 +47,24 @@ describe('44130 mixed shared/local drum beams preserve every notehead', () => {
       2,
     );
   });
+
+  test('keeps each continuous four-beat drum groove in one beam group per measure', () => {
+    const xml = fs.readFileSync(fixture, 'utf8');
+    const parsed = NE.parseMusicXml(xml, { domParser });
+    const result = NE.renderParsedMusicXml(parsed);
+    const primaryBeamLines = [
+      ...result.svg.matchAll(
+        /<line x1="[-\d.]+" y1="[-\d.]+" x2="[-\d.]+" y2="[-\d.]+" stroke="[^"]*" stroke-width="0\.5" \/>/g,
+      ),
+    ];
+
+    assert.equal(parsed.score.parts[0].measures.length, 88);
+    assert.equal(
+      primaryBeamLines.length,
+      parsed.score.parts[0].measures.length,
+      'shared and voice-local drum attacks must not split one continuous bar into partial beams',
+    );
+    assert.ok(result.svg.includes('data-id="P1#m5#v1#e1"'));
+    assert.ok(result.svg.includes('data-id="P1#m5#v1#e3"'));
+  });
 });
