@@ -14,7 +14,7 @@ import { diagnostic, type Diagnostic, type DiagnosticLocation } from './diagnost
 import { parseAttributesElement, type ClefSpec, type TransposeSpec } from './attributes.js';
 import { isKnownDurationType } from './note.js';
 import { parseNoteElement, type ParsedNoteEvent } from './note.js';
-import { attrOf, childrenNamed, firstChildNamed, intOf, textOf } from './dom-helpers.js';
+import { attrOf, childrenNamed, firstChildNamed, intOf, numberOf, textOf } from './dom-helpers.js';
 import { parseMidiInstrumentMap } from './instrument.js';
 import { convertTimewiseToPartwise } from './timewise.js';
 import {
@@ -151,11 +151,35 @@ function parseEndingType(raw: string | null): 'start' | 'stop' | 'discontinue' |
   return raw === 'start' || raw === 'stop' || raw === 'discontinue' ? raw : undefined;
 }
 
+/** MusicXML offsets shift a marking relative to the current measure cursor. */
+function offsetPositions(
+  element: Element,
+  cursorTick: number,
+  divisions: number,
+  diagnostics: Diagnostic[],
+  location: DiagnosticLocation,
+): { visualTick: number; playbackTick: number } {
+  const offsetEl = firstChildNamed(element, 'offset');
+  if (offsetEl === undefined) return { visualTick: cursorTick, playbackTick: cursorTick };
+  const rawOffset = numberOf(offsetEl);
+  if (rawOffset === undefined) {
+    diagnostics.push(
+      diagnostic('warning', 'INVALID_OFFSET', 'Ignored an invalid MusicXML <offset>.', location),
+    );
+    return { visualTick: cursorTick, playbackTick: cursorTick };
+  }
+  const visualTick = cursorTick + xmlDivisionsToTicks(rawOffset, divisions);
+  const playbackTick = attrOf(offsetEl, 'sound') === 'yes' ? visualTick : cursorTick;
+  return { visualTick, playbackTick };
+}
+
 export interface TempoMarkEvent {
   readonly partId: string;
   readonly measureNumber: number;
-  /** This measure-local tick, from the shared §10.1 cursor, at which the mark appears -- a <direction> is a marking, not a note/rest, and never advances that cursor. */
+  /** Playback tick. A direction offset affects this only when offset/@sound="yes". */
   readonly tick: number;
+  /** Visual tick when it differs from the playback tick because offset/@sound is absent or "no". */
+  readonly visualTick?: number;
   readonly beatUnit: DurationType;
   readonly beatUnitDots: number;
   readonly perMinute: number;
@@ -179,7 +203,7 @@ export interface OctaveShiftEvent {
 export interface DirectionEvent {
   readonly partId: string;
   readonly measureNumber: number;
-  /** Measure-local tick from §10.1's shared cursor. A `<direction>` is a marking and never advances it. */
+  /** Measure-local visual tick; the optional MusicXML `<offset>` never advances the shared note cursor. */
   readonly tick: number;
   /** `<direction staff="N">`, defaulting to 1 -- which staff of a grand staff this marking sits under. */
   readonly staff: number;
@@ -696,7 +720,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
             lastAdvance = event.ticks;
           }
         } else if (child.tagName === 'backup') {
-          const amount = intOf(firstChildNamed(child, 'duration')) ?? 0;
+          const amount = numberOf(firstChildNamed(child, 'duration')) ?? 0;
           const target = tick - xmlDivisionsToTicks(amount, currentDivisions ?? DEFAULT_DIVISIONS);
           // MusicXML's own rule: `<backup>` may not move before the start
           // of the measure. Real files break it -- writing the measure's
@@ -719,7 +743,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           tick = Math.max(0, target);
           lastAdvance = 0; // a chord can never span a backup/forward boundary
         } else if (child.tagName === 'forward') {
-          const amount = intOf(firstChildNamed(child, 'duration')) ?? 0;
+          const amount = numberOf(firstChildNamed(child, 'duration')) ?? 0;
           tick += xmlDivisionsToTicks(amount, currentDivisions ?? DEFAULT_DIVISIONS);
           lastAdvance = 0;
         } else if (child.tagName === 'barline') {
@@ -757,14 +781,21 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
         } else if (child.tagName === 'direction') {
           // Integration D: <direction><direction-type><metronome> is a
           // MARKING, not a note/rest -- it never advances the shared tick
-          // cursor. Recorded at the CURRENT (measure-local) tick, since
-          // §10.1's cursor is exactly where this direction was encountered
-          // in document order. A <direction> with no <metronome> (e.g.
+          // cursor. Its visual event uses the optional measure-local offset;
+          // tempo playback uses that offset only when offset/@sound="yes".
+          // A <direction> with no <metronome> (e.g.
           // <words> text, <dynamics>, <wedge>) is still v2/out-of-scope --
           // recorded the same UNKNOWN_ELEMENT way as before, rather than
           // silently swallowed now that <direction> itself has a branch.
           let recognizedSomething = false;
           let producedTempoMark = false;
+          const directionPosition = offsetPositions(
+            child,
+            tick,
+            currentDivisions ?? DEFAULT_DIVISIONS,
+            diagnostics,
+            location,
+          );
           for (const directionTypeEl of childrenNamed(child, 'direction-type')) {
             const octaveEl = firstChildNamed(directionTypeEl, 'octave-shift');
             if (octaveEl !== undefined) {
@@ -793,7 +824,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
                 octaveShifts.push({
                   partId,
                   measureNumber,
-                  tick,
+                  tick: directionPosition.visualTick,
                   staff: directionStaff(child),
                   type,
                   size,
@@ -826,7 +857,10 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
             tempoMarks.push({
               partId,
               measureNumber,
-              tick,
+              tick: directionPosition.playbackTick,
+              ...(directionPosition.visualTick !== directionPosition.playbackTick
+                ? { visualTick: directionPosition.visualTick }
+                : {}),
               beatUnit: rawBeatUnit,
               beatUnitDots,
               perMinute,
@@ -851,7 +885,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
             directions.push({
               partId,
               measureNumber,
-              tick,
+              tick: directionPosition.visualTick,
               staff: directionStaff(child),
               ...(placement !== undefined ? { placement } : {}),
               dynamics: content.dynamics,
@@ -872,7 +906,10 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
             tempoMarks.push({
               partId,
               measureNumber,
-              tick,
+              tick: directionPosition.playbackTick,
+              ...(directionPosition.visualTick !== directionPosition.playbackTick
+                ? { visualTick: directionPosition.visualTick }
+                : {}),
               beatUnit: 'quarter',
               beatUnitDots: 0,
               perMinute: content.soundTempo,
@@ -894,7 +931,52 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
           // Phase 35 Tier 2/§10.4: a chord symbol at the current cursor
           // position. Like <direction>, it is a marking and never advances
           // the tick cursor.
-          harmonies.push({ partId, measureNumber, tick, ...parseHarmonyElement(child) });
+          const harmonyPosition = offsetPositions(
+            child,
+            tick,
+            currentDivisions ?? DEFAULT_DIVISIONS,
+            diagnostics,
+            location,
+          );
+          const harmonyChildren = Array.from(child.children);
+          const chordForms = harmonyChildren.filter((item) =>
+            ['root', 'numeral', 'function'].includes(item.tagName),
+          );
+          const unsupportedHarmonyFeatures = new Set<string>();
+          if (chordForms.length > 1) unsupportedHarmonyFeatures.add('stacked harmony-chords');
+          if (chordForms.some((item) => item.tagName !== 'root')) {
+            unsupportedHarmonyFeatures.add('numeral/function chord roots');
+          }
+          for (const name of ['inversion', 'degree', 'frame', 'staff']) {
+            if (harmonyChildren.some((item) => item.tagName === name)) {
+              unsupportedHarmonyFeatures.add(`<${name}>`);
+            }
+          }
+          if (
+            child.hasAttribute('arrangement') ||
+            child.hasAttribute('type') ||
+            child.hasAttribute('default-x') ||
+            child.hasAttribute('default-y') ||
+            child.getAttribute('print-frame') === 'yes'
+          ) {
+            unsupportedHarmonyFeatures.add('harmony layout/arrangement metadata');
+          }
+          if (unsupportedHarmonyFeatures.size > 0) {
+            diagnostics.push(
+              diagnostic(
+                'warning',
+                'UNSUPPORTED_HARMONY_FEATURE',
+                `Preserved only the first simple root/kind/bass chord; unsupported harmony content: ${[...unsupportedHarmonyFeatures].join(', ')}.`,
+                location,
+              ),
+            );
+          }
+          harmonies.push({
+            partId,
+            measureNumber,
+            tick: harmonyPosition.visualTick,
+            ...parseHarmonyElement(child),
+          });
         } else if (child.tagName === 'print') {
           // Phase 35 Tier 2/§10.4 + §16.2: an explicit system/page break.
           // Recorded only when it actually asks for one -- a <print> that

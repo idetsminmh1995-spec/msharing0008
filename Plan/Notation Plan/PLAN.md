@@ -3259,13 +3259,16 @@ The detailed audit, MusicXML/MXL/MIDI format matrix, current implementation
 baseline, gap inventory, test requirements, resource-safety criteria, future
 format boundaries, references and the completed user-reported drum fixes are
 in [`Documentation/engine-completeness-roadmap.md`](./Documentation/engine-completeness-roadmap.md).
+The implementation-level MusicXML timing review and its authoritative source
+references are in
+[`Documentation/notation-correctness-audit-2026-11-12.md`](./Documentation/notation-correctness-audit-2026-11-12.md).
 Its follow-up sequence is:
 
 | Follow-up | Priority | Exit objective |
 |---|---|---|
 | C0 — define support contract and reproducible evidence | P0 prerequisite | One versioned feature matrix; no blanket conformance claim; provenance-tagged fixtures and current CI evidence. |
 | C1 — harden untrusted import and diagnostics | P0 safety | Bounded XML/MXL/MIDI input, safe container rules, valid timing, stable diagnostics and recoverable uploads. |
-| C2 — close remaining gaps in the current MusicXML profile | P1 correctness | Direction/harmony offsets, placement/clef semantics, unhandled note children, exact drum mapping, spacing/bounds/collisions independently tested; completed phases 55–60 retained as closed. |
+| C2 — close remaining gaps in the current MusicXML profile | P1 correctness | Fractional divisions/durations and direction/harmony offsets are now parsed with regression coverage; finish placement/clef semantics, unhandled note children, exact drum mapping, spacing/bounds/collisions; completed phases 55–60 retained as closed. |
 | C3 — publish version-aware MusicXML/MXL conformance | P1 contract | Every claimed element/version classified as implemented, partial, preserved, unsupported or diagnosed; no silent loss. |
 | C4 — independent semantic goldens and producer corpus | P1 evidence | Source events, model events, beam geometry, playback and reviewed output have separate expected results and provenance. |
 | C5 — route, browser and release gates | P1 delivery | UI, engine bundle, caches and deployed behavior match the support contract; required checks cannot silently skip. |
@@ -3277,3 +3280,42 @@ Do not interpret the future C0–C8 requirements as reopened regressions: the
 44130 missing-head repair, 44130 beam-continuity fix, and 115 BPM covered-rest
 fix remain completed with their existing tests. Reopen them only for a new
 reproducer.
+
+**C2 timing correction (2026-11-12).** The MusicXML parser now reads decimal
+`<divisions>`/`<duration>` values and preserves fractional `<backup>`/
+`<forward>` movement through the normalized JavaScript-number tick model.
+This model uses IEEE-754 floating point, not exact rational arithmetic;
+non-terminating tick ratios can therefore have tiny rounding error, and
+long-score cumulative precision remains a verification item. `<direction>`
+and `<harmony>` offsets move their visual event ticks without advancing the
+note cursor. For tempo events, `offset/@sound="yes"` moves both visual and
+playback ticks; absent/`no` `sound` keeps the original playback tick while
+applying the offset to the visual tick. Simple
+fractional chord alterations are retained, and currently unsupported legal
+harmony forms (including numeral/function roots, stacked harmony-chords,
+degrees, inversions and frames) now emit `UNSUPPORTED_HARMONY_FEATURE` rather
+than silently pretending to be fully parsed. Regression coverage is in
+`Engine/notation-engine/test/unit/musicxml-fractional-offsets.test.js`.
+The full package verification passed **1,136/1,136 tests** across 208 suites,
+with typecheck, lint, formatting and generated API-document checks passing.
+This does not complete C2: alternate harmony structures are diagnosed, not
+yet fully represented or rendered; MXL resource limits, remaining placement/
+clef behavior and the other listed geometry/corpus gaps remain open. The
+implementation is recorded on its feature branch until reviewed and merged.
+
+**Browser notation test workspace (2026-11-12).** The website's `/notation/`
+page loads `.musicxml`, `.xml`, and `.mxl` files in the browser and renders them
+with the bundled engine. It provides portrait-page, landscape-page, and
+continuous horizontal views, zoom, SVG download, and visible engine
+diagnostics. Changing views re-renders the parsed score without parsing the
+source again. File contents remain local to the browser; the page caps the
+selected file at 20 MiB. This is a practical visual repro tool, not evidence of
+complete MusicXML conformance; MXL expanded-archive limits and the other C1/C2
+gaps remain open. Browser smoke checks loaded a known `.musicxml` fixture and a
+valid `.mxl` archive, confirmed all three SVG viewBoxes and zoom behavior, and
+downloaded an XML-parseable SVG. See `website/README.md` for the page inventory
+and operation. CI browser provisioning now avoids Ubuntu's Snap-based Chromium
+wrapper: the workflow installs stable Chrome for Testing, exposes it as the
+`chromium` executable expected by browser tests, and installs `ffmpeg` for
+`ffprobe`. The three existing browser acceptance scripts pass locally; the
+updated hosted verification is pending before merge.

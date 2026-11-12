@@ -22,10 +22,18 @@ jobs:
         run: node tools/test-piano-musicxml-only.mjs
       - name: Verify notation engine
         run: npm run verify --prefix Engine/notation-engine
-      - name: Install Chromium and ffprobe
+      - uses: browser-actions/setup-chrome@v2
+        id: setup-chrome
+        with:
+          chrome-version: stable
+          install-dependencies: true
+      - name: Install ffprobe and expose Chrome as Chromium
         run: |
           sudo apt-get update
-          sudo apt-get install -y chromium-browser ffmpeg || sudo apt-get install -y chromium ffmpeg
+          sudo apt-get install -y ffmpeg
+          sudo ln -sf "${{ steps.setup-chrome.outputs.chrome-path }}" /usr/local/bin/chromium
+          echo "CHROMIUM_PATH=${{ steps.setup-chrome.outputs.chrome-path }}" >> "$GITHUB_ENV"
+          chromium --version
       - name: Browser video-engine smoke test
         run: node tools/test-video-engine-browser.mjs
       - name: Browser Drum rollout acceptance

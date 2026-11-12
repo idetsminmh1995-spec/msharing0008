@@ -71091,7 +71091,7 @@ ${denominator}`;
       }
     }
     const divisionsEl = firstChildNamed(attributesEl, "divisions");
-    const divisions = intOf(divisionsEl);
+    const divisions = numberOf(divisionsEl);
     if (divisions !== void 0) result.divisions = divisions;
     const staves = intOf(firstChildNamed(attributesEl, "staves"));
     if (staves !== void 0) result.staves = staves;
@@ -71449,7 +71449,7 @@ ${denominator}`;
       );
       safeDivisions = 1;
     }
-    const rawDuration = intOf(firstChildNamed(noteEl, "duration"));
+    const rawDuration = numberOf(firstChildNamed(noteEl, "duration"));
     let ticks;
     if (isGrace) {
       ticks = 0;
@@ -72216,7 +72216,7 @@ ${denominator}`;
   }
   function alterOf(parent, childName) {
     if (parent === void 0) return 0;
-    return intOf(firstChildNamed(parent, childName)) ?? 0;
+    return numberOf(firstChildNamed(parent, childName)) ?? 0;
   }
   function parseHarmonyElement(harmonyEl) {
     const rootEl = firstChildNamed(harmonyEl, "root");
@@ -72250,6 +72250,20 @@ ${denominator}`;
   }
   function parseEndingType(raw) {
     return raw === "start" || raw === "stop" || raw === "discontinue" ? raw : void 0;
+  }
+  function offsetPositions(element, cursorTick, divisions, diagnostics, location) {
+    const offsetEl = firstChildNamed(element, "offset");
+    if (offsetEl === void 0) return { visualTick: cursorTick, playbackTick: cursorTick };
+    const rawOffset = numberOf(offsetEl);
+    if (rawOffset === void 0) {
+      diagnostics.push(
+        diagnostic("warning", "INVALID_OFFSET", "Ignored an invalid MusicXML <offset>.", location)
+      );
+      return { visualTick: cursorTick, playbackTick: cursorTick };
+    }
+    const visualTick = cursorTick + xmlDivisionsToTicks(rawOffset, divisions);
+    const playbackTick = attrOf(offsetEl, "sound") === "yes" ? visualTick : cursorTick;
+    return { visualTick, playbackTick };
   }
   function buildDuration(ev) {
     const tuplet = ev.tupletActualNotes !== void 0 && ev.tupletNormalNotes !== void 0 ? { actualNotes: ev.tupletActualNotes, normalNotes: ev.tupletNormalNotes } : void 0;
@@ -72551,7 +72565,7 @@ ${denominator}`;
               lastAdvance = event.ticks;
             }
           } else if (child.tagName === "backup") {
-            const amount = intOf(firstChildNamed(child, "duration")) ?? 0;
+            const amount = numberOf(firstChildNamed(child, "duration")) ?? 0;
             const target = tick - xmlDivisionsToTicks(amount, currentDivisions ?? DEFAULT_DIVISIONS);
             if (target < 0) {
               diagnostics.push(
@@ -72566,7 +72580,7 @@ ${denominator}`;
             tick = Math.max(0, target);
             lastAdvance = 0;
           } else if (child.tagName === "forward") {
-            const amount = intOf(firstChildNamed(child, "duration")) ?? 0;
+            const amount = numberOf(firstChildNamed(child, "duration")) ?? 0;
             tick += xmlDivisionsToTicks(amount, currentDivisions ?? DEFAULT_DIVISIONS);
             lastAdvance = 0;
           } else if (child.tagName === "barline") {
@@ -72594,6 +72608,13 @@ ${denominator}`;
           } else if (child.tagName === "direction") {
             let recognizedSomething = false;
             let producedTempoMark = false;
+            const directionPosition = offsetPositions(
+              child,
+              tick,
+              currentDivisions ?? DEFAULT_DIVISIONS,
+              diagnostics,
+              location
+            );
             for (const directionTypeEl of childrenNamed(child, "direction-type")) {
               const octaveEl = firstChildNamed(directionTypeEl, "octave-shift");
               if (octaveEl !== void 0) {
@@ -72616,7 +72637,7 @@ ${denominator}`;
                   octaveShifts.push({
                     partId,
                     measureNumber,
-                    tick,
+                    tick: directionPosition.visualTick,
                     staff: directionStaff(child),
                     type,
                     size,
@@ -72645,7 +72666,8 @@ ${denominator}`;
               tempoMarks.push({
                 partId,
                 measureNumber,
-                tick,
+                tick: directionPosition.playbackTick,
+                ...directionPosition.visualTick !== directionPosition.playbackTick ? { visualTick: directionPosition.visualTick } : {},
                 beatUnit: rawBeatUnit,
                 beatUnitDots,
                 perMinute
@@ -72661,7 +72683,7 @@ ${denominator}`;
               directions.push({
                 partId,
                 measureNumber,
-                tick,
+                tick: directionPosition.visualTick,
                 staff: directionStaff(child),
                 ...placement !== void 0 ? { placement } : {},
                 dynamics: content.dynamics,
@@ -72676,7 +72698,8 @@ ${denominator}`;
               tempoMarks.push({
                 partId,
                 measureNumber,
-                tick,
+                tick: directionPosition.playbackTick,
+                ...directionPosition.visualTick !== directionPosition.playbackTick ? { visualTick: directionPosition.visualTick } : {},
                 beatUnit: "quarter",
                 beatUnitDots: 0,
                 perMinute: content.soundTempo
@@ -72694,7 +72717,46 @@ ${denominator}`;
               );
             }
           } else if (child.tagName === "harmony") {
-            harmonies.push({ partId, measureNumber, tick, ...parseHarmonyElement(child) });
+            const harmonyPosition = offsetPositions(
+              child,
+              tick,
+              currentDivisions ?? DEFAULT_DIVISIONS,
+              diagnostics,
+              location
+            );
+            const harmonyChildren = Array.from(child.children);
+            const chordForms = harmonyChildren.filter(
+              (item) => ["root", "numeral", "function"].includes(item.tagName)
+            );
+            const unsupportedHarmonyFeatures = /* @__PURE__ */ new Set();
+            if (chordForms.length > 1) unsupportedHarmonyFeatures.add("stacked harmony-chords");
+            if (chordForms.some((item) => item.tagName !== "root")) {
+              unsupportedHarmonyFeatures.add("numeral/function chord roots");
+            }
+            for (const name of ["inversion", "degree", "frame", "staff"]) {
+              if (harmonyChildren.some((item) => item.tagName === name)) {
+                unsupportedHarmonyFeatures.add(`<${name}>`);
+              }
+            }
+            if (child.hasAttribute("arrangement") || child.hasAttribute("type") || child.hasAttribute("default-x") || child.hasAttribute("default-y") || child.getAttribute("print-frame") === "yes") {
+              unsupportedHarmonyFeatures.add("harmony layout/arrangement metadata");
+            }
+            if (unsupportedHarmonyFeatures.size > 0) {
+              diagnostics.push(
+                diagnostic(
+                  "warning",
+                  "UNSUPPORTED_HARMONY_FEATURE",
+                  `Preserved only the first simple root/kind/bass chord; unsupported harmony content: ${[...unsupportedHarmonyFeatures].join(", ")}.`,
+                  location
+                )
+              );
+            }
+            harmonies.push({
+              partId,
+              measureNumber,
+              tick: harmonyPosition.visualTick,
+              ...parseHarmonyElement(child)
+            });
           } else if (child.tagName === "print") {
             const newSystem = child.getAttribute("new-system") === "yes";
             const newPage = child.getAttribute("new-page") === "yes";

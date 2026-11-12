@@ -447,11 +447,13 @@ baseline capabilities and are not listed as pending work in the refreshed
 roadmap.
 
 The remaining purpose is practical correctness for declared MusicXML profiles,
-not a promise that one engine reads every possible score format. Current
-follow-up priorities include accurate direction/harmony offsets, explicitly
-verified clef/placement behavior and note-child coverage, MXL/XML/MIDI input
-limits and malformed-input diagnostics, selected drum glyph/stem/spacing and
-multi-voice bounds cases, plus independent event/geometry/browser corpora.
+not a promise that one engine reads every possible score format. Direction/
+harmony offsets and fractional divisions/durations are implemented on the
+feature branch recorded in §K, pending review; they are not yet part of main.
+Current follow-up priorities include explicitly verified clef/placement
+behavior and note-child coverage, MXL/XML/MIDI input limits and malformed-input
+diagnostics, selected drum glyph/stem/spacing and multi-voice bounds cases,
+plus independent event/geometry/browser corpora.
 The matrix and acceptance evidence are detailed in
 [`engine-completeness-roadmap.md`](./engine-completeness-roadmap.md) and
 [`../PLAN.md`](../PLAN.md) §25.
@@ -461,3 +463,62 @@ covered-rest fix remain completed with their merged regressions. Do not reopen
 them without a new reproducer. The **1,129/1,129** result is the recorded main
 verification for the phase-55–60 changes; the documentation merge itself does
 not modify engine source.
+
+---
+
+## K. MusicXML timing and offset correctness — 2026-11-12 (review branch)
+
+The audit found integer parsing where MusicXML permits decimal `<divisions>`
+and `<duration>` values, including `<backup>`/`<forward>` durations. It also
+found ignored `<direction>` and `<harmony>` offsets. The parser now uses the
+existing finite-decimal helper through the normalized tick conversion. The
+model stores IEEE-754 numbers, not exact rational ticks; cumulative precision
+over long decimal-duration scores remains a verification item. It applies
+positive or negative offsets to visual direction/harmony positions without
+moving the note cursor; and separates a tempo event's visual tick from its
+playback tick unless `offset/@sound="yes"` requests both to move. Fractional
+root/bass alterations are retained. Numeral/function roots, stacked harmony,
+degrees, inversions, frames, and selected layout metadata emit
+`UNSUPPORTED_HARMONY_FEATURE` rather than silently looking fully parsed.
+
+Seven focused regressions cover fractional divisions and note durations,
+backup/forward movement, positive/negative direction/harmony offsets,
+visual-only versus playback tempo timing, fractional chord alterations,
+unsupported harmony diagnostics, and malformed offsets. The code and fixture
+are in `Engine/notation-engine/src/parser/musicxml/` and
+`Engine/notation-engine/test/unit/musicxml-fractional-offsets.test.js`; audit
+findings and source references are in
+[`notation-correctness-audit-2026-11-12.md`](./notation-correctness-audit-2026-11-12.md).
+Alternate harmony forms are warned about, not yet fully represented or
+rendered; MXL limits and the other C1/C2 gaps remain open. This is an unmerged
+feature branch and must not be reported as deployed or present on main. Full
+`npm run verify` passed **1,136/1,136 tests** (208 suites; 0 failed, 0 skipped),
+with typecheck, lint, format and API-document checks also passing.
+
+## L. Browser Notation Lab — 2026-11-12 (review branch)
+
+Added `website/notation/` as a working, browser-local MusicXML test page and
+linked it from the website home navigation. It accepts `.musicxml`, `.xml`, and
+`.mxl` files (20 MiB selected-file cap), renders with the bundled Notation
+Engine, and offers portrait page, landscape page, and continuous horizontal
+views, zoom, SVG download, and engine diagnostics. View changes re-render the
+already parsed score. The page does not upload the selected score. MXL
+expanded-size limits remain an open engine safety item; this page is a useful
+visual repro harness, not proof of complete MusicXML support. Browser smoke
+checks loaded a known `.musicxml` fixture and valid `.mxl` archive, confirmed
+the three layout viewBoxes and zoom, and downloaded an XML-parseable SVG.
+Implementation and engine fidelity changes are on the same unmerged feature
+branch and are not deployed or present on main until review/merge and site
+deployment.
+
+## M. CI browser provisioning follow-up — 2026-11-12
+
+Both hosted `notation-and-video/verify` runs failed before executing browser
+tests: Ubuntu's `chromium-browser` apt package invokes Snap, and the runners
+could not contact Snap Store. This was an environment setup failure, not a
+notation or browser-test assertion failure. The workflow now installs stable
+Chrome for Testing using `browser-actions/setup-chrome@v2`, aliases its binary
+to `chromium` for existing acceptance scripts, and installs `ffmpeg` for
+`ffprobe`. All three repository browser acceptance scripts pass locally with
+Chromium and `ffprobe`; hosted verification for the updated workflow is pending.
+Do not merge until the CI rerun is successful.

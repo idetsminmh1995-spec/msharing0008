@@ -8,6 +8,7 @@ deploy directly to Cloudflare Pages from this repo.
 | URL | File |
 |---|---|
 | `/` | `index.html` — home page (notes/courses storefront) |
+| `/notation/` | `notation/index.html` — local MusicXML/MXL notation-engine tester with page, landscape, and continuous views |
 | `/video-create/` | `video-create/index.html` — instrument-selection hub (9 boxes) |
 | `/video-create/drum/` | Drum upload &amp; create page |
 | `/video-create/piano/` | Piano upload &amp; create page |
@@ -24,6 +25,13 @@ Every instrument box on `/video-create/` now links to its own real
 page — each with an Upload File area (MusicXML / MIDI / Audio), so the
 full navigation flow (Home → Video Create → pick an instrument → reach
 the upload area) can be clicked through end to end once deployed.
+
+The `/notation/` page is a working browser tool, not a mockup: it reads
+MusicXML and MXL files locally, renders them with the bundled Notation
+Engine, exposes portrait-page, landscape-page, and continuous horizontal
+views, and shows engine diagnostics. The source file is not uploaded to a
+server. The page currently limits the selected file size to 20 MiB; MXL
+expanded-size ceilings remain an engine-level safety follow-up.
 
 The previous hand models and interactive `/hand-demo/` were retired as part
 of the 2026-11-12 3D model reset. The Piano page currently offers Falling
@@ -78,14 +86,9 @@ every sample table, every offset -- and compares it with what went in.
 
 ## Status
 
-This is a **visual mockup / static prototype**, converted from a design
-draft. Nothing here talks to Supabase, Cloudflare Workers, R2, or any
-of the actual engines yet — form fields and buttons don't submit
-anywhere, and every upload/preview panel is a static illustration of
-the intended UI, not the real, working `web-preview/canvas-preview.html`
-app (which is a separate, already-functional tool elsewhere in this
-repo). Drum's page carries a bit more illustrated detail (its own kit
-selector, a filled-in preview) since it was built first; the other 8
-instrument pages share one simpler template (upload area, titles, a
-generic preset dropdown, video style, an empty preview) with only the
-labels, icon, and engine name swapped per instrument.
+The home storefront remains a static visual prototype; it does not
+implement note-store checkout or account flows. The `/notation/` page is
+the browser-local notation test workspace described above. The separate
+instrument video-create pages and `/web-preview/canvas-preview.html` have
+their own functionality and should not be confused with the storefront
+mockup.
