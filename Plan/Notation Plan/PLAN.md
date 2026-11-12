@@ -2563,16 +2563,38 @@ kept all noteheads but left the two local attacks outside any beam. The
 renderer now uses one staff-wide time-ordered attack stream for the narrow case
 of a gap-free staff made entirely of unpitched quarter notes, with at least one
 cross-voice attack and no explicit primary `<beam>` hints. Same-tick noteheads
-are still merged and source members are rendered once; measures with rests,
-gaps, grace notes, note ties/slurs/tuplets, lyrics, local-only explicit
-down-stems, other durations or explicit beaming retain the ordinary voice-local
-behavior. The 44130 score's 221 explicit down-stems are all on already-shared
-attacks, which already follow the consolidated pass's up-stem rule. The full
-source now renders **88 primary beam lines for
-88 measures** (the prior fragmented render produced 110) and still renders all
-794 heads, including 353 hi-hat X heads and 441 normal heads. The focused test
-is in `test/unit/drum-shared-beam-regression.test.js`; full verification passed
-**1,072/1,072 tests**.
+are still merged and source members are rendered once. A quarter rest in one
+voice is allowed only when another drum attack occupies that exact staff tick;
+uncovered rests/gaps, grace notes, note ties/slurs/tuplets, lyrics, local-only
+explicit down-stems, other durations or explicit beaming retain the ordinary
+voice-local behavior. The 44130 score's 221 explicit down-stems are all on
+already-shared attacks, which already follow the consolidated pass's up-stem
+rule. The original 44130 full-score regression confirms 88 primary beam lines
+for 88 measures (the fragmented render had 110) and all 794 heads, including
+353 hi-hat X heads and 441 normal heads. The focused test is in
+`test/unit/drum-shared-beam-regression.test.js`.
+
+**115 BPM covered-rest correction (2026-11-12).** The user's separate 4/4,
+115 BPM MusicXML has 32 measures and 162 noteheads. In active bars such as
+measure 1, voice 1 attacks on all four quarter-note beats (ticks 0, 480, 960,
+1440); voice 2 shares the attacks at 0 and 960 but writes quarter rests at 480
+and 1440, where voice 1 is already attacking. The prior eligibility check
+rejected every staff rest, so the renderer fell back to separate shared/local
+beam runs and stopped the beam before beat 4. The screenshot's isolated note
+was therefore a real renderer defect, not a stale deployment. The former 44130
+test checked the number of beam strokes, not whether a beam reached its final
+attack, so it could pass without catching this pattern.
+
+The predicate now permits only rests covered by an attack at the same tick;
+the existing consecutive-attack check still rejects a real staff-wide gap.
+`test/fixtures/musicxml/drum-quarter-run-covered-by-other-voice.musicxml` is a
+minimal reproduction rather than a copy of the user's full score. Its regression
+proved the old beam ended at x=14.16 before beat 4 at x=16.5, then passed after
+the fix. The exact uploaded score was also rendered locally (not committed):
+all **162/162** heads appear (108 X and 54 normal), and each of its 27 active
+four-hit measures has a beam reaching beat 4. The actual drum-page upload path
+reports 4/4, 115 BPM, 32 measures and a first-beam endpoint x=17.66. Full
+`npm run verify` passed **1,073/1,073 tests**.
 
 ---
 
@@ -2754,6 +2776,7 @@ documents; §19 tracks the remaining gaps.
 | Drum mapping configuration overrides are consumed by the renderer | Phase 50; `Documentation/phase-50-theming-api.md` (supersedes the historical Phase 41 override limitation) |
 | Chord file-stated stem direction and glyph-anchor alignment, with voice forcing retained above file direction | Commit `e17647f`; `test/unit/chord-stem-direction.test.js` |
 | 44130-style continuous quarter-note hand-pattern beaming and subsequent restriction to hand voices | Commits `85dee0e`, `96113b8`; `website/assets/44130-drum-eighths.musicxml`; `test/unit/beam.test.js` |
+| 115 BPM mixed-voice quarter runs: a secondary-voice rest does not break the staff-wide beam when another voice attacks on that same tick | This follow-up; `test/fixtures/musicxml/drum-quarter-run-covered-by-other-voice.musicxml`; `test/unit/drum-shared-beam-regression.test.js` |
 | Beamed chords now use the first explicit `<stem>` on any chord member, matching unbeamed chord behavior; continuation-member regression checks rendered event geometry | This update; `src/render-from-musicxml.ts`, `test/unit/beam-chord-tempo-clearance.test.js` |
 
 ### Sequencing rules

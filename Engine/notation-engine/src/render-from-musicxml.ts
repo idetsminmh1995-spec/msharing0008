@@ -1355,7 +1355,8 @@ function collectDrumAttackEvents(
 /**
  * A continuous all-quarter drum groove may use one house-style beam run for
  * the whole staff, not separate runs that fracture wherever two voices hit
- * together. Keep this deliberately narrow: rests, gaps, grace notes, spans,
+ * together. A rest in one voice is harmless only when another voice has a
+ * drum attack at the same tick; uncovered rests/gaps, grace notes, spans,
  * lyrics, down-stems on local-only attacks, other durations, or file-stated
  * primary beams retain the ordinary voice path. Shared attacks already use
  * the consolidated pass's up-stem rule, so their explicit down-stems do not
@@ -1373,6 +1374,7 @@ function shouldUnifyQuarterDrumBeams(
       .map((attack) => attack.tick),
   );
   if (sharedAttackTicks.size === 0) return false;
+  const drumAttackTicks = new Set(attacks.map((attack) => attack.tick));
 
   const staffEvents = measure.voices.flatMap((voice) => {
     const starts = eventStartTicks(voice.events);
@@ -1384,6 +1386,7 @@ function shouldUnifyQuarterDrumBeams(
     staffEvents.length === 0 ||
     !staffEvents.every(({ event, tick }) => {
       if (event.duration.type !== 'quarter') return false;
+      if (event.kind === 'rest') return drumAttackTicks.has(tick);
       const notes = event.kind === 'note' ? [event] : event.kind === 'chord' ? event.notes : [];
       return (
         notes.length > 0 &&

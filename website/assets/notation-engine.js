@@ -77579,6 +77579,7 @@ ${xrefOffset}
       attacks.filter((attack) => new Set(attack.members.map((member) => member.voiceId)).size > 1).map((attack) => attack.tick)
     );
     if (sharedAttackTicks.size === 0) return false;
+    const drumAttackTicks = new Set(attacks.map((attack) => attack.tick));
     const staffEvents = measure2.voices.flatMap((voice2) => {
       const starts = eventStartTicks(voice2.events);
       return voice2.events.flatMap(
@@ -77587,6 +77588,7 @@ ${xrefOffset}
     });
     if (staffEvents.length === 0 || !staffEvents.every(({ event, tick }) => {
       if (event.duration.type !== "quarter") return false;
+      if (event.kind === "rest") return drumAttackTicks.has(tick);
       const notes = event.kind === "note" ? [event] : event.kind === "chord" ? event.notes : [];
       return notes.length > 0 && notes.every(
         (note2) => note2.pitch.kind === "unpitched" && note2.isGrace !== true && (note2.explicitStemDirection !== "down" || sharedAttackTicks.has(tick)) && !note2.tieStart && !note2.tieStop && !note2.slurStarts?.length && !note2.slurStops?.length && !note2.tupletStart && !note2.tupletStop && !note2.lyrics?.length && !(note2.beams ?? []).some((beam) => beam.number === 1)
