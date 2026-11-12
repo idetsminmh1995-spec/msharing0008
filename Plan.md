@@ -994,3 +994,30 @@ S1 ကို `website/assets/outro-video.js` တွင် shared loader တစ�
 S1 သည် loader ကိုသာ ခိုင်မာစေခြင်းဖြစ်ပြီး R2 မရသောအခါ built-in Thank You ending အလိုအလျောက် ထုတ်ပေးခြင်း မပါသေးပါ။ ထို့ကြောင့် လက်ရှိ pages များတွင် R2 failure သည် optional/no-outro path အဖြစ် ရှိနေဆဲဖြစ်သည်။ အဲဒီအပိုင်းသည် S2 built-in ending နှင့် S3 page policy တွင် ဆက်လုပ်ရမည်။
 
 S1 status: **complete**. Next planned step: **S2 — Built-in ending**.
+
+
+## 26. 2026-11-12 — Thank You outro S2/S3 acceptance update
+
+This current-state record supersedes the earlier notes that described S2 as not started. The built-in ending and six-page resolver wiring already exist in the repository; this branch closes the report and encoded-output verification gaps instead of rebuilding those parts.
+
+### Added in this branch
+
+- Render reports now include a structured `outro` object with `source`, `key`, `bytes`, `ms`, `attempts`, `reason`, `duration`, `state`, and `fallback` for Drum, Guitar, Bass Guitar, Piano, Violin, and Metronome.
+- A Chromium/WebCodecs smoke test encodes a one-second take followed by the three-second built-in ending, then checks the MP4 duration, frame count, and final-frame background pixel with ffmpeg/ffprobe.
+- Unit and policy tests cover the supported aspect/style combinations, all six page integrations, report serialization, and required-gate failure behavior. These checks are added to CI.
+- The generated asset-gate report buttons retain the DOM IDs used by the existing Drum browser acceptance test.
+
+### Verification on the feature branch
+
+- `node tools/test-outro-video.mjs` — passed.
+- `node tools/test-outro-report.mjs` — passed.
+- `node tools/test-outro-rollout-policy.mjs` — passed for six pages.
+- `node website/tests/video-asset-gate.test.mjs` — passed.
+- `node tools/test-video-engine-browser.mjs` — passed locally: H.264 MP4, 4.0 seconds, 120 frames; final-frame corner RGB `[250, 250, 246]` against the built-in ending background `[251, 250, 248]`.
+- GitHub Actions result is pending.
+
+### Still open
+
+- Golden-image pixel comparison against a user-approved visual reference.
+- Cross-browser and network-failure fallback matrix.
+- Worker Range/304 behavior and the complete R2 manifest; these remain separate S4/S5 work.

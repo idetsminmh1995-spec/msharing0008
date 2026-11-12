@@ -52,4 +52,22 @@ assert.throws(() => blocked.assertReady(), /Kit background: HTTP 404/);
 assert.equal(calls.some(([name, id]) => name === 'reject' && id === 'kit'), true);
 assert.equal(engineAssets.get('kit'), 'failed');
 
+engineAssets.clear();
+const outroGate = context.window.VideoAssetGate.create({
+  page: 'piano',
+  groups: [{ id: 'outro', label: 'Thank You ending', required: true }],
+});
+outroGate.start();
+const outroInput = { source: 'builtin', key: null, bytes: 0, ms: 12, attempts: 2, reason: 'not-found', seconds: 3, state: 'builtin-ready', fallback: true };
+const summary = context.window.VideoAssetGate.outroDetails(outroInput);
+assert.deepEqual(JSON.parse(JSON.stringify(summary)), { source: 'builtin', key: null, bytes: 0, ms: 12, attempts: 2, reason: 'not-found', duration: 3, state: 'builtin-ready', fallback: true });
+outroGate.setOutro(outroInput);
+assert.equal(outroGate.assertReady(), true);
+assert.deepEqual(JSON.parse(JSON.stringify(outroGate.snapshot().outro)), { source: 'builtin', key: null, bytes: 0, ms: 12, attempts: 2, reason: 'not-found', duration: 3, state: 'builtin-ready', fallback: true, status: 'ok', message: 'Built-in Thank You ending ready' });
+const failedOutroGate = context.window.VideoAssetGate.create({ page: 'drum', groups: [{ id: 'outro', label: 'Thank You ending', required: true }] });
+failedOutroGate.start();
+failedOutroGate.setOutro(null, { kind: 'not-found' });
+assert.throws(() => failedOutroGate.assertReady(), /Thank You ending unavailable: not-found/);
+assert.equal(failedOutroGate.snapshot().outro.source, 'unavailable');
+
 console.log('video-asset-gate tests passed');

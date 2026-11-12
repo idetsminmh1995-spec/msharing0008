@@ -10,9 +10,37 @@
     "fadeInSeconds": 0.4,
     "networkIndependent": true,
     "fallbackReasonPreserved": true,
-    "segmentAdapter": "OutroVideo.outroSegment handles source=builtin"
+    "segmentAdapter": "OutroVideo.outroSegment handles source=builtin",
+    "reportObject": {
+      "fields": [
+        "source",
+        "key",
+        "bytes",
+        "ms",
+        "attempts",
+        "reason",
+        "duration",
+        "state",
+        "fallback"
+      ],
+      "pages": [
+        "drum",
+        "guitar",
+        "bass-guitar",
+        "piano",
+        "violin",
+        "metronome"
+      ]
+    }
   },
-  "pages": ["drum", "guitar", "bass-guitar", "piano", "violin", "metronome"],
+  "pages": [
+    "drum",
+    "guitar",
+    "bass-guitar",
+    "piano",
+    "violin",
+    "metronome"
+  ],
   "policy": {
     "outroRequired": true,
     "resolverOnly": true,
@@ -21,21 +49,42 @@
     "builtinOnR2Failure": true
   },
   "verification": {
-    "command": "node tools/test-outro-video.mjs && node tools/test-outro-rollout-policy.mjs",
-    "result": "passed",
+    "command": "node tools/test-outro-video.mjs && node tools/test-outro-report.mjs && node tools/test-outro-rollout-policy.mjs && node website/tests/video-asset-gate.test.mjs && node tools/test-video-engine-browser.mjs",
+    "result": "passed locally; GitHub Actions pending",
     "coverage": [
       "built-in metadata and deterministic canvas draw",
       "three-second segment contract",
       "R2 failure resolves to builtin-ready",
       "all six active pages require Thank You ending",
       "all six active pages use OutroVideo.resolve",
-      "no active page uses loadOutro directly or advertises silent no-outro success"
-    ]
+      "no active page uses loadOutro directly or advertises silent no-outro success",
+      "normalized outro metadata survives render-report and asset-gate JSON serialization",
+      "all six page call sites include structured outro reporting",
+      "built-in ending renders across 3 aspect ratios × 2 styles",
+      "encoded MP4 final frame follows a one-second take with a three-second built-in ending"
+    ],
+    "encodedBrowser": {
+      "container": "mp4",
+      "path": "webcodecs",
+      "seconds": 4,
+      "frames": 120,
+      "codec": "h264",
+      "finalFrameCornerRgb": [
+        250,
+        250,
+        246
+      ],
+      "expectedBackgroundRgb": [
+        251,
+        250,
+        248
+      ],
+      "tolerance": 18
+    }
   },
   "remaining": [
-    "render-report nested outro object on every page",
-    "golden frame and encoded last-frame browser evidence",
+    "Golden-image pixel-diff against a user-approved reference",
     "Worker Range/304 and complete R2 manifest",
-    "cross-browser fallback matrix"
+    "Cross-browser fallback matrix"
   ]
 }

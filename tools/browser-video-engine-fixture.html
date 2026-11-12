@@ -1,6 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <script src="/website/assets/video-engine.js"></script>
+<script src="/website/assets/outro-video.js"></script>
 <script>
   window.runVideoEngineBrowserTest = async function () {
     if (!VideoEngine.isRenderable()) throw new Error('WebCodecs video APIs are unavailable');
@@ -20,6 +21,15 @@
       }],
     });
     if (result.container !== 'mp4') throw new Error(`expected MP4, got ${result.container}`);
+    const endCard = OutroVideo.createBuiltin({ aspect: '16x9', kind: 'drum', style: 'white' });
+    const outroResult = await VideoEngine.render({
+      width: 320, height: 180, fps: 30,
+      segments: [
+        { seconds: 1, draw(ctx) { ctx.fillStyle = '#d64545'; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); } },
+        OutroVideo.outroSegment(endCard, null, 30),
+      ],
+    });
+    if (outroResult.container !== 'mp4') throw new Error(`expected outro MP4, got ${outroResult.container}`);
     return {
       container: result.container,
       path: result.path,
@@ -33,6 +43,15 @@
         reader.readAsDataURL(result.blob);
       }),
       streamApiPresent: typeof VideoEngine.muxMp4ToStream === 'function',
+      outro: {
+        source: endCard.source, seconds: outroResult.seconds, frames: outroResult.frames, bytes: outroResult.blob.size,
+        base64: await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result).split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(outroResult.blob);
+        }),
+      },
     };
   };
 </script>

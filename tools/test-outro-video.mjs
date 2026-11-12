@@ -245,4 +245,20 @@ function loadApi(fetch, options) {
   assert.equal(api.outroSegment(result, null, 30).seconds, 3);
 }
 
+// The built-in card draws deterministically across all supported aspect/style combinations.
+{
+  const api = loadApi(async () => { throw new Error('canvas-only ending must not fetch'); }, { createVideo: false });
+  for (const aspect of ['16x9', '9x16', '1x1']) for (const style of ['black', 'white']) {
+    const ending = api.createBuiltin({ aspect, kind: 'piano', style, siteUrl: 'example.test' });
+    const dimensions = aspect === '16x9' ? [320, 180] : aspect === '9x16' ? [180, 320] : [240, 240];
+    let fillStyle = '';
+    const fills = [];
+    const texts = [];
+    const ctx = { save() {}, restore() {}, set fillStyle(value) { fillStyle = value; }, get fillStyle() { return fillStyle; }, fillRect() { fills.push(fillStyle); }, fillText(text) { texts.push(text); } };
+    assert.equal(ending.draw(ctx, { width: dimensions[0], height: dimensions[1] }, 2.9), true, aspect + '/' + style + ' should draw');
+    assert.ok(fills.includes(style === 'white' ? '#fbfaf8' : '#111318'));
+    assert.ok(texts.includes('Thank you for watching'));
+  }
+}
+
 console.log('outro-video S1-S3 tests passed');

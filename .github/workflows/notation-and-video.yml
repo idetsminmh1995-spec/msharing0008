@@ -18,6 +18,8 @@ jobs:
         run: node tools/test-asset-loader.mjs
       - name: Test outro failure cache
         run: node tools/test-outro-video.mjs
+      - name: Test outro reports and page policy
+        run: node tools/test-outro-report.mjs && node tools/test-outro-rollout-policy.mjs && node website/tests/video-asset-gate.test.mjs
       - name: Test Piano MusicXML-only flow
         run: node tools/test-piano-musicxml-only.mjs
       - name: Verify notation engine

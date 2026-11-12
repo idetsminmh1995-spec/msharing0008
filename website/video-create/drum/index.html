@@ -4064,6 +4064,7 @@
       exportWarnings.push(...assetReport.warnings);
       genLabel.textContent = 'Fetching the Thank You clip…';
       let outro = null;
+      let outroError = null;
       if (typeof OutroVideo !== 'undefined') {
         try {
           outro = await OutroVideo.resolve(API_BASE, {
@@ -4073,24 +4074,26 @@
           });
           if (!outro) {
             const failure = OutroVideo.lastFailure?.() || { kind: 'not-found' };
-            exportWarnings.push(
-              failure.kind === 'not-found'
-                ? 'Outro clip not found (404); video will render without the Thank You clip.'
-                : `Outro clip unavailable (${failure.status || 'timeout/5xx'}); video will render without the Thank You clip.`,
-            );
+            outroError = failure;
+            exportWarnings.push(`Thank You ending unavailable; export will be blocked (${failure.kind || failure.status || 'unknown reason'}).`);
           }
         } catch (err) {
-          exportWarnings.push(`Outro clip unavailable (timeout/5xx); video will render without the Thank You clip. ${err?.message ?? err}`);
+          outroError = err;
+          exportWarnings.push(`Thank You ending could not be prepared; export will be blocked. ${err?.message ?? err}`);
         }
       } else {
-        exportWarnings.push('Outro clip unavailable: OutroVideo loader is missing.');
+        outroError = { kind: 'resolver-unavailable' };
+        exportWarnings.push('Thank You ending resolver is missing; export will be blocked.');
       }
-      await askOptionalRender(exportWarnings);
+      const outroFailure = outroError || (typeof OutroVideo !== 'undefined' ? OutroVideo.lastFailure?.() : null);
+      const outroSummary = VideoAssetGate.outroDetails(outro, outroFailure);
+      RenderReport.setOutro(currentRenderReport, outroSummary);
+      await askOptionalRender(exportWarnings.filter((message) => !message.startsWith('Thank You ending')));
       assetReport.optional = [
         { id: 'count', status: exportWarnings.some((message) => message.includes('Count-')) ? 'failed' : 'ok', message: exportWarnings.find((message) => message.includes('Count-')) || 'optional count voice available or synth fallback ready' },
-        { id: 'outro', status: outro ? 'ok' : 'failed', message: outro?.source === 'builtin' ? 'built-in ending ready' : 'R2 ending ready' },
       ];
       showGateResult(assetReport);
+      lastAssetGateResult = videoAssetGate.setOutro(outro, outroFailure);
 
       genLabel.textContent = 'Preparing the notation…';
       await refreshNotationImage();

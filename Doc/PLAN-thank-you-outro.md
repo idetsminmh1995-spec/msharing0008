@@ -209,3 +209,24 @@
 | | | | |
 
 *Log ကို အဆင့်တစ်ခုပြီးတိုင်း ဖြည့်ပါ၊ ဆုံးဖြတ်ချက် D1–D6 ကိုလည်း ဒီမှာ မှတ်ပါ။*
+
+
+## 9. Implementation update — 2026-11-12
+
+The repository already contains the three-second, network-independent built-in ending, the R2-first resolver, and required-ending wiring for the six active pages. This branch completes the remaining S2/S3 reporting and encoded-output checks; it does not redo the existing fallback implementation.
+
+### Added in this branch
+
+- Each active page exposes a nested `outro` report with source, asset key, bytes, load time, attempts, fallback reason, duration, state, and fallback flag.
+- Tests cover the three supported aspect ratios and both styles, JSON report serialization, required asset-gate behavior, and all six page call sites.
+- The browser smoke test encodes a one-second take plus the built-in three-second ending and verifies the final MP4 frame uses the expected built-in background.
+- The asset-gate copy/download controls preserve the IDs expected by the Drum browser acceptance check.
+
+### Local verification
+
+The outro unit, report, six-page policy, and asset-gate tests passed. The Chromium/WebCodecs check passed with a four-second H.264 MP4 containing 120 frames; the final-frame corner measured RGB `[250, 250, 246]` versus expected `[251, 250, 248]`. GitHub Actions is still the final shared verification.
+
+### Remaining work outside this patch
+
+- Golden-image pixel-diff against an approved visual reference and the cross-browser fallback matrix.
+- Worker Range/304 behavior and complete R2 asset manifest (S4/S5).

@@ -3,6 +3,23 @@
   const STATUS = new Set(['idle', 'checking', 'retrying', 'ok', 'failed', 'warning', 'skipped']);
   const STYLE_ID = 'video-asset-gate-style';
 
+  function outroDetails(outro, failure = null) {
+    const source = outro?.source === 'r2' || outro?.source === 'builtin' ? outro.source : 'unavailable';
+    const number = (value) => { const parsed = Number(value); return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0; };
+    const failureReason = failure?.kind || (failure?.status ? 'http-' + String(failure.status) : null);
+    return {
+      source,
+      key: typeof outro?.key === 'string' ? outro.key : null,
+      bytes: number(outro?.bytes),
+      ms: number(outro?.ms),
+      attempts: number(outro?.attempts),
+      reason: typeof outro?.reason === 'string' ? outro.reason : (failureReason || (source === 'unavailable' ? 'resolver-unavailable' : null)),
+      duration: number(outro?.seconds),
+      state: typeof outro?.state === 'string' ? outro.state : (source === 'unavailable' ? 'unavailable' : source + '-ready'),
+      fallback: source === 'builtin' || Boolean(outro?.fallback),
+    };
+  }
+
   function ensureStyles() {
     if (typeof document === 'undefined' || document.getElementById(STYLE_ID)) return;
     const style = document.createElement('style');
@@ -54,7 +71,7 @@
     if (panel && typeof document !== 'undefined') {
       panel.classList.add('video-asset-gate');
       panel.setAttribute('aria-live', 'polite');
-      panel.innerHTML = '<div class="video-asset-gate__head"><span>Asset gate</span><span class="video-asset-gate__summary">Not checked</span></div><div class="video-asset-gate__rows"></div><div class="video-asset-gate__actions"><button type="button" data-video-gate-copy>Copy report</button><button type="button" data-video-gate-download>Download report</button></div>';
+      panel.innerHTML = '<div class="video-asset-gate__head"><span>Asset gate</span><span class="video-asset-gate__summary">Not checked</span></div><div class="video-asset-gate__rows"></div><div class="video-asset-gate__actions"><button id="copyAssetReport" type="button" data-video-gate-copy>Copy report</button><button id="downloadAssetReport" type="button" data-video-gate-download>Download report</button></div>';
       rows = panel.querySelector('.video-asset-gate__rows');
       summary = panel.querySelector('.video-asset-gate__summary');
       panel.querySelector('[data-video-gate-copy]')?.addEventListener('click', async (event) => {
@@ -133,6 +150,16 @@
       return item;
     }
 
+    function setOutro(outro, failure = null) {
+      const details = outroDetails(outro, failure);
+      const ready = details.source === 'r2' || details.source === 'builtin';
+      const message = ready
+        ? (details.source === 'builtin' ? 'Built-in Thank You ending ready' : 'R2 Thank You ending ready')
+        : 'Thank You ending unavailable: ' + details.reason;
+      set('outro', ready ? 'ok' : 'failed', message, details);
+      return snapshot();
+    }
+
     function start() {
       startedAt = performance.now();
       warnings = [];
@@ -203,6 +230,20 @@
     function snapshot(extra = {}) {
       const items = [...state.values()].map((item) => ({ ...item, details: { ...item.details } }));
       const status = overallStatus();
+      const outroItem = state.get('outro');
+      const outro = outroItem ? {
+        source: outroItem.details.source ?? null,
+        key: outroItem.details.key ?? null,
+        bytes: outroItem.details.bytes ?? 0,
+        ms: outroItem.details.ms ?? 0,
+        attempts: outroItem.details.attempts ?? 0,
+        reason: outroItem.details.reason ?? null,
+        duration: outroItem.details.duration ?? 0,
+        state: outroItem.details.state ?? outroItem.status,
+        fallback: outroItem.details.fallback ?? false,
+        status: outroItem.status,
+        message: outroItem.message,
+      } : null;
       return {
         schema: 'video-asset-gate', schemaVersion: 1, page,
         createdAt: new Date().toISOString(),
@@ -210,16 +251,17 @@
         ok: status === 'ready' || status === 'ready-warning',
         required: items.filter((item) => item.required),
         optional: items.filter((item) => !item.required),
+        outro,
         warnings: [...warnings],
         timings: { totalMs: startedAt === null ? 0 : Math.max(0, Math.round(performance.now() - startedAt)) },
         ...extra,
       };
     }
 
-    const api = { start, set, apply, check, assertReady, failPending, addWarning, snapshot, render };
+    const api = { start, set, setOutro, apply, check, assertReady, failPending, addWarning, snapshot, render };
     render();
     return api;
   }
 
-  window.VideoAssetGate = Object.freeze({ create, STATUS: Object.freeze([...STATUS]) });
+  window.VideoAssetGate = Object.freeze({ create, outroDetails, STATUS: Object.freeze([...STATUS]) });
 })();

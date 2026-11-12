@@ -3523,7 +3523,10 @@
               kind: 'paino',
               style: currentVideoStyle(),
             });
-      videoAssetGate.set('outro', outro ? 'ok' : 'failed', outro?.source === 'builtin' ? 'built-in ending ready' : 'R2 ending ready');
+      videoAssetGate.setOutro(
+        outro,
+        typeof OutroVideo === 'undefined' ? { kind: 'resolver-unavailable' } : OutroVideo.lastFailure?.(),
+      );
 
       genLabel.textContent = 'Preparing the notation…';
       await refreshNotationImage();

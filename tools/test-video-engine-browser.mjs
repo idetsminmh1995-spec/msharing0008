@@ -19,6 +19,8 @@ const ROOT = resolve(new URL('..', import.meta.url).pathname);
 const PORT = 9229;
 const profile = await mkdtemp(join(tmpdir(), 'video-engine-chromium-'));
 const output = join(profile, 'browser-output.mp4');
+const outroOutput = join(profile, 'browser-outro-output.mp4');
+const lastPixelOutput = join(profile, 'outro-last-frame.rgb');
 const server = spawn('python3', ['-m', 'http.server', '8765', '--bind', '127.0.0.1'], {
   cwd: ROOT,
   stdio: 'ignore',
@@ -92,7 +94,12 @@ try {
   assert.equal(result.frames, 30);
   assert.equal(result.streamApiPresent, true);
   assert.ok(result.bytes > 1000, 'browser output is unexpectedly small');
+  assert.equal(result.outro.source, 'builtin');
+  assert.equal(result.outro.frames, 120);
+  assert.ok(Math.abs(result.outro.seconds - 4) < 0.1, 'built-in ending should follow a one-second take for three seconds');
+  assert.ok(result.outro.bytes > 1000, 'encoded outro output is unexpectedly small');
   await writeFile(output, Buffer.from(result.base64, 'base64'));
+  await writeFile(outroOutput, Buffer.from(result.outro.base64, 'base64'));
   const { stdout } = await exec('ffprobe', [
     '-v', 'error', '-show_entries', 'format=format_name,duration',
     '-show_entries', 'stream=codec_name,width,height,nb_frames', '-of', 'json', output,
@@ -103,7 +110,25 @@ try {
   assert.equal(probe.streams[0].codec_name, 'h264');
   assert.equal(probe.streams[0].width, 320);
   assert.equal(probe.streams[0].height, 180);
-  console.log(JSON.stringify({ ...result, base64: undefined, ffprobe: probe }, null, 2));
+  const { stdout: outroProbeOutput } = await exec('ffprobe', [
+    '-v', 'error', '-show_entries', 'format=format_name,duration',
+    '-show_entries', 'stream=codec_name,width,height,nb_frames', '-of', 'json', outroOutput,
+  ]);
+  const outroProbe = JSON.parse(outroProbeOutput);
+  assert.ok(outroProbe.format.format_name.split(',').includes('mp4'));
+  assert.ok(Math.abs(Number(outroProbe.format.duration) - 4) < 0.1, 'outro export duration should include the full ending');
+  assert.equal(Number(outroProbe.streams[0].nb_frames), 120);
+  await exec('ffmpeg', [
+    '-v', 'error', '-i', outroOutput,
+    '-vf', 'select=eq(n\\,119),crop=2:2:0:0,format=rgb24',
+    '-fps_mode', 'passthrough', '-frames:v', '1', '-f', 'rawvideo', lastPixelOutput,
+  ]);
+  const lastPixel = [...await readFile(lastPixelOutput)];
+  assert.equal(lastPixel.length, 12, 'should extract the last encoded frame corner');
+  const expectedRgb = [251, 250, 248];
+  const cornerRgb = lastPixel.slice(0, 3);
+  assert.ok(cornerRgb.every((value, index) => Math.abs(value - expectedRgb[index]) <= 18), `last encoded frame corner ${cornerRgb} is not the white built-in ending`);
+  console.log(JSON.stringify({ ...result, base64: undefined, outro: { source: result.outro.source, seconds: result.outro.seconds, frames: result.outro.frames, bytes: result.outro.bytes, finalFrameCornerRgb: cornerRgb, expectedBackgroundRgb: expectedRgb }, ffprobe: probe, outroFfprobe: outroProbe }, null, 2));
 } finally {
   browser.kill('SIGTERM');
   server.kill('SIGTERM');

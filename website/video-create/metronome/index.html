@@ -1622,7 +1622,10 @@
     try {
       genLabel.textContent = 'Fetching the Thank You clip…';
       const outro = await loadOutroClip();
-      videoAssetGate.set('outro', outro ? 'ok' : 'failed', outro?.source === 'builtin' ? 'built-in ending ready' : 'R2 ending ready');
+      videoAssetGate.setOutro(
+        outro,
+        typeof OutroVideo === 'undefined' ? { kind: 'resolver-unavailable' } : OutroVideo.lastFailure?.(),
+      );
       genLabel.textContent = 'Mixing the count…';
       const countAudio = await renderCountAudio(total);
       if (!countAudio || !(countAudio.duration > 0)) throw new Error('The metronome audio could not be prepared.');
