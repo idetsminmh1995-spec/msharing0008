@@ -37,17 +37,23 @@ Modules marked `[TODO]` are not yet written.
 
 ## 1. Project Goal
 
-Build an **independent, general-purpose music notation engine** in TypeScript
-that renders SVG, with **no notation library as a dependency** — not VexFlow,
-not AlphaTab, not OpenSheetMusicDisplay. Every layer (data model, geometry,
-layout, rendering) is our own.
+Build an **independent, extensible music notation engine** in TypeScript that
+renders SVG for explicitly specified input formats and notation profiles, with
+**no notation library as a dependency** — not VexFlow, not AlphaTab, not
+OpenSheetMusicDisplay. Every layer (data model, geometry, layout, rendering) is
+our own.
 
 The engine must:
 
-1. Accept **MusicXML** from any authoring software and render it correctly.
-2. Accept **Standard MIDI Files** and render/synchronise against them.
+1. Accept the **documented, tested MusicXML profiles** from authoring software
+   and preserve/render every feature the profile claims to support; report
+   unsupported valid content instead of silently losing it.
+2. Accept the documented **Standard MIDI File profiles** for timing,
+   alignment, or explicitly specified reconstruction; MIDI is not a lossless
+   substitute for an engraved notation source.
 3. Work for **any instrument** — piano, vocal, guitar, drum kit, orchestral —
-   with no per-instrument code paths in the core.
+   within the supported notation profiles, with no per-instrument code paths
+   in the core.
 4. Be **resizable to any width × height** and **re-themeable (colours, fonts,
    styles)** at any time, without re-parsing the source file.
 5. Expose a **playback-position API** that a host application can drive a
@@ -64,6 +70,9 @@ The engine must:
 - **MusicXML export.** Import only. (Export could be added later; nothing in
   the architecture forbids it, but it is not planned work.)
 - **Automatic transcription** (audio → notation).
+- **A promise to parse every file or every notation system.** Each format and
+  notation family requires a named, tested support profile. PDF/image score
+  recognition is a separate future OMR capability, not direct symbolic import.
 
 ---
 
@@ -150,10 +159,17 @@ These are good decisions, already implemented, and v2 builds on them.
 
 | Format | Support level |
 |---|---|
-| MusicXML 3.0/3.1/4.0, uncompressed (`.musicxml`, `.xml`) | Full — primary format |
-| Compressed MusicXML (`.mxl`, a ZIP container) | Full (requires a ZIP reader — see §10.2) |
-| Standard MIDI File format 0 and 1 (`.mid`) | Full for notes, tempo, time signature, and key signature meta events |
-| MIDI format 2 | Not supported (rare; sequences of independent patterns, no meaningful single timeline) |
+| MusicXML 3.0/3.1/4.0, uncompressed (`.musicxml`, `.xml`) | Existing primary parser for a substantial, bounded staff-notation subset; version-wide schema conformance is not demonstrated. See §25. |
+| Compressed MusicXML (`.mxl`, a ZIP container) | Existing extraction support; container/resource limits and version/feature coverage remain subject to §25. |
+| Standard MIDI File format 0 and 1 (`.mid`) | Existing selected note/meta-event parsing for timing and alignment; not faithful score-notation import. PPQ and event boundaries are constrained by §25. |
+| MIDI format 2 and SMPTE-timed MIDI | Not supported by the current profile; reject with a named diagnostic rather than reinterpret. |
+
+**Support-claim correction (2026-11-12):** “Full” in older roadmap rows means
+the originally planned implementation stage was completed; it is not evidence
+of complete conformance to every element in a MusicXML version, every MXL
+container, every MIDI variant, or every producing application. The current
+support contract, gaps, input matrix and acceptance gates are in §25 and
+[`Documentation/engine-completeness-roadmap.md`](./Documentation/engine-completeness-roadmap.md).
 
 ### 3.2 Notation features
 
@@ -165,6 +181,12 @@ voices per staff, grand staff / multi-part scores, lyrics, chord symbols,
 grace notes, ledger lines, percussion/drum notation, measure numbering,
 and note-level MusicXML 4.0 named accidentals with fractional semitone
 alterations when the source or bundled SMuFL profile supplies a matching glyph.
+
+This is the target feature scope, not a statement that every listed feature is
+already rendered end to end. In particular, lyrics/chord-symbol text, several
+MusicXML placement and cue/offset semantics, and some dense percussion cases
+remain partial; §25 and the linked roadmap distinguish parsed, preserved,
+rendered and playback-resolved support.
 
 **Out of scope for now:** cross-staff beaming, pitch alterations without a
 matching accidental glyph, non-staff notation families (including Jianpu,
@@ -2606,8 +2628,9 @@ The engine is "done" for its intended purpose when all of the following hold:
 1. A drum-kit MusicXML, a piano MusicXML, and a vocal-with-lyrics MusicXML
    each render every note at the correct staff position with the correct
    notehead — using the **same code path** (§4.3).
-2. The same short piece exported from MuseScore, Sibelius, Finale, Dorico,
-   and Guitar Pro renders equivalently from all five (§10.8).
+2. For the declared feature subset, the same short piece exported from
+   multiple authoring programs renders equivalently within a provenance-tagged
+   corpus (§10.8); this is corpus-bounded evidence, not a universal claim.
 3. A MIDI file's tempo map drives wall-clock timing such that a 10-minute
    piece has < 1 ms round-trip conversion error (§12.2).
 4. Multi-voice measures (drum hands/feet, piano LH/RH, SATB) render with
@@ -2628,6 +2651,14 @@ The engine is "done" for its intended purpose when all of the following hold:
 10. Rendering is deterministic — identical input yields byte-identical SVG.
 11. Every performance target in §18.1 is met on a 100-measure score.
 12. Every module in §6–§17 has the tests its section specifies.
+13. Every advertised file format/version/profile has a support matrix,
+    resource limits, route-level tests, named exclusions and stable diagnostics.
+14. No supported source event or semantic field is silently lost between
+    import, the normalized model, engraving and playback; each layer is tested
+    independently against reviewed expected data.
+15. Malformed and over-limit input is bounded and recoverable, and every
+    compatibility or visual-parity claim is backed by current CI evidence and
+    a documented corpus rather than a stale status count.
 
 ---
 
@@ -2715,7 +2746,7 @@ not renumbered**, so existing `Documentation/` records and commit history stay v
 | 33 | Chord symbols | ✅ (accidentals/qualities/placement + parsing); root letter deferred — no text font |
 | 34 | Grace notes | ✅ |
 
-### Stage 6 — Full import `[COMPLETE]`
+### Stage 6 — Bounded import implementation `[COMPLETE for the originally declared subset; conformance follow-up in §25]`
 
 | Phase | What | Status |
 |---|---|---|
@@ -2807,6 +2838,10 @@ documents; §19 tracks the remaining gaps.
 - When a phase completes, update its row in §22 and, if the module's
   specification changed during implementation, update its section in §6–§17
   to match what was actually built.
+- Use §25 and its linked completeness roadmap for post-Phase-54 correctness,
+  conformance, safety, corpus and additional-format work. Do not interpret a
+  completed historical phase or a passing test count as universal file-format
+  support.
 
 
 ## 24. Repository-wide implementation register (audit: 2026-11-09)
@@ -3137,3 +3172,44 @@ shared SVG shape-list renderer. The website adapter consumes the standalone
 Piano Hand Engine's Phase 1–3 APIs, but does not make that package a parser,
 continuous motion planner or IK engine. Keep both that boundary and the
 remaining roadmap items distinct from `piano-engine`'s SVG bundle.
+
+---
+
+## 25. Notation Engine completeness contract and follow-up roadmap (2026-11-12)
+
+The original Phases 1–54 and Stages 0–10 remain recorded as completed for the
+implementation scope they specified. They do **not** certify full MusicXML
+schema conformance, support for every authoring application, arbitrary MIDI
+variants, every notation tradition, or PDF/image recognition. The unqualified
+“Full” labels in older input/roadmap descriptions are superseded by §3.1 and
+the explicit profile rules here.
+
+Completeness means a named input profile is **accepted, parsed and preserved,
+resolved, engraved, explained and independently verified** for the features it
+claims. These are separate guarantees: a valid parse does not prove a correct
+render, and a visible score does not prove that every source event survived.
+Unsupported valid content must receive a stable diagnostic and documented
+fallback/rejection rather than silent loss.
+
+The detailed gap inventory, format matrix, implementation requirements,
+acceptance tests, security limits, corpus gates, references and completed
+user-reported regression fixes are maintained in
+[`Documentation/engine-completeness-roadmap.md`](./Documentation/engine-completeness-roadmap.md).
+The follow-up sequence is:
+
+| Follow-up | Priority | Exit objective |
+|---|---|---|
+| C0 — define support contract and reproducible evidence | P0 prerequisite | One versioned input/feature matrix; no blanket “Full” claim; fixtures and CI results have provenance and current commit identity. |
+| C1 — harden untrusted import boundaries and diagnostics | P0 safety | XML/MXL/MIDI size, structure and work limits; safe container rules; stable diagnostics; malformed input never crashes or creates invalid timing. |
+| C2 — fix high-impact semantics and engraving in the existing MusicXML profile | P1 correctness | Direction/harmony offsets, cue identity, placement/clef semantics, exact drum mappings, spacing/bounds/collisions and visible diagnostics are independently tested. |
+| C3 — publish a version-aware MusicXML/MXL conformance matrix | P1 contract | Every claimed element/version is implemented, partial, preserved, intentionally unsupported, or diagnosed; no silent unhandled note-child content. |
+| C4 — independent semantic goldens and producer corpus | P1 evidence | Source events, model events, beam geometry, playback and reviewed visual output have independent expected results and provenance. |
+| C5 — route, browser and release gates | P1 delivery | UI, engine, generated bundle, cache and deployed browser behavior match the same support contract; required browser tests cannot silently skip. |
+| C6 — add one scoped symbolic notation adapter by user need | P2 expansion | A named MEI/ABC/`**kern` profile is selected, scoped and corpus-tested before it is advertised. |
+| C7 — decide on PDF/image OMR as a separate capability | P2 decision | No direct image/PDF notation claim; any future OMR has a restricted domain, confidence, held-out benchmark and human correction. |
+| C8 — extend text, tuning and notation traditions as independent profiles | P3 domain work | Named scripts/traditions have their own semantic contract, renderer, diagnostics and domain-reviewed fixtures; no forced Western-model flattening. |
+
+The recent 44130 note-preservation, 44130 beam-continuity and 115 BPM
+covered-rest corrections remain **closed completed work** with their existing
+fixtures and regressions. The larger completeness roadmap extends the engine's
+verified boundary; it does not reopen or erase those fixes.

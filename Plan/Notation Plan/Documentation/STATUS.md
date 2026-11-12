@@ -6,18 +6,21 @@ A+B+C corrective work** (making notes actually visible in the web app).
 Numbering is **`PLAN.md` §22's phase numbering** — deliberately not a second
 numbering system. Say a number from §B below and that's the phase to build.
 
-**Last audited:** against the code in `src/` and the **1,073-test** suite,
-after the exact 115 BPM covered-rest drum-beam follow-up
-(documented in [`../PLAN.md`](../PLAN.md)). Stages 0-10 are
-complete: every phase numbered 1-54 is built AND wired, including the
-full playback surface (§17.1's position API and event stream, §17.2's
-cursor and repeat unfolding) and host-selectable part-specific event streams.
-What remains is the named gaps in §C and
-§F, not roadmap work.
+**Latest full verification:** `npm run verify --prefix Engine/notation-engine`
+passed **1,073 tests, 0 failed, 0 skipped** on 2026-11-12 while this
+documentation-only branch used engine source identical to merged `main` at
+`89bad1c`. The run completed in 104.8 seconds after the roadmap body was
+written; later STATUS wording edits were documentation-only. No engine source
+was changed by this task. Stages 0-10 and phases 1-54 are
+complete for their originally declared implementation scope, including the
+playback surface and host-selectable part streams. That milestone does not
+mean every MusicXML element, file variant, authoring program or notation
+tradition is supported. New P0–P3 work is tracked in §J and the linked
+[`engine-completeness-roadmap.md`](./engine-completeness-roadmap.md).
 
 ---
 
-## A. DONE — Phases 1–54 ✅ (**every stage complete**) + Integration Passes A–Z
+## A. ORIGINAL ROADMAP COMPLETE — Phases 1–54 ✅ (within declared scope) + Integration Passes A–Z
 
 All of these are implemented, tested, and have a `Documentation/phase-NN-*.md` record.
 `npm run verify` passes **1,073/1,073** across them (verified 2026-11-12).
@@ -113,11 +116,13 @@ All of these are implemented, tested, and have a `Documentation/phase-NN-*.md` r
 
 ---
 
-## B. NOT DONE — nothing
+## B. ORIGINAL PHASE ROADMAP CLOSED; COMPLETENESS WORK REMAINS
 
-`PLAN.md` §22's roadmap is complete: Phases 1–54, Stages 0 through 10,
-plus Integration Passes A–Q. What remains is not roadmap work but the
-named, documented gaps in §C and §F below.
+`PLAN.md` §22's original roadmap is complete: Phases 1–54, Stages 0 through
+10, plus the recorded integration passes. This means the planned modules were
+implemented for their declared subset; it is not a conformance certificate for
+all of MusicXML, every input format, or every notation system. The new,
+sequenced follow-up is §J / [`engine-completeness-roadmap.md`](./engine-completeness-roadmap.md).
 
 **Reviewed end to end** after Phase 54 — see
 [`final-review.md`](./final-review.md). It found four real bugs (a key
@@ -354,28 +359,29 @@ new instrument branching or unordered-iteration-affecting-output crept in.
 
 ---
 
-## F. Raised by the A+B+C work — not yet done
+## F. Host-integration follow-ups raised by A+B+C (cumulative status)
 
 The A+B+C corrective work (see
 [`abc-make-notes-visible.md`](./abc-make-notes-visible.md)) made notes
 **appear** in the web app. It did not make everything about them
-**correct**. These are the specific follow-ups it raised, in the order
-they'd sensibly be tackled:
+**correct**. The rows below retain those findings as history and state which
+are closed for the current rollout scope; broader notation-core follow-up is
+now sequenced in §J.
 
 | # | Item | Why it matters | Belongs to |
 |---|---|---|---|
 | ~~**F1**~~ | ~~Drum notehead shapes are wrong~~ — **CLOSED by Phase 41.** A hi-hat/cymbal renders as a real ✕ (`noteheadXBlack`); verified on the project's own `Drum_Lesson_5.musicxml`, which draws 186 of them. | — | done |
 | ~~**F2**~~ | ~~No drum instrument → staff-position mapping~~ — **CLOSED by Phase 41.** `<midi-instrument>`/`<midi-unpitched>` resolves to a GM number, which drives position, notehead shape and stem direction from `DEFAULT_DRUM_MAPPING_TABLE`. | — | done |
 | ~~**F3**~~ | ~~`.mxl` still rejected~~ — **CLOSED by Phase 36**, and wired into the web app's upload path. | — | done |
-| **F4** | **No visual/browser-level test in the automated suite.** Integration M now drives a real headless Chromium by hand before calling a rendering change done — which is how §F7 and two placement bugs were finally caught — but that check is not yet part of `npm run verify`. | A markup-only suite structurally cannot catch "the glyphs are correct but nothing can draw them." The manual browser step closes the hole in practice; automating it closes it permanently. | Stage 10 (Phase 53) |
+| ~~**F4**~~ | ~~No visual/browser-level test in the automated suite.~~ **CLOSED for the current host rollout scope:** the Chromium rollout checks run in CI as recorded in §H. A notation-core perceptual golden corpus and geometry assertions remain follow-up work in §J/C4. | — | closed for current host scope; broader core evidence in §J |
 | ~~**F5**~~ | ~~`quick-demo/` is now dead code~~ — **CLOSED by Phase 54.** Deleted, along with its `eslint.config.js` ignore entry. | — | done |
-| **F6** | **The app's notation is still decorative.** It renders in the video preview panel, but it is not composited into exported frames and there is no cursor/playback sync. | This is what the drum-video project actually needs the engine *for*. Every engine-side piece it needs now exists — Phase 48's position API, Phase 49's cursor, Phase 52's PNG export — so what remains is **host-side wiring in `website/`**, not engine work. | The web app |
+| ~~**F6**~~ | ~~The app's notation is still decorative.~~ **CLOSED for Drum and the four migrated instrument-page export rollout** per §H. Future host pages or visual matching to the user's final reference remain separate work; this does not close the notation-core evidence gaps in §J. | — | current rollout closed; future host-specific work is separate |
 | ~~**F7**~~ | ~~The deployed website does not serve the Bravura font~~ — **CLOSED by Integration M**, after the user's own screenshot showed exactly the predicted result: every glyph an empty box. `website/assets/fonts/Bravura.woff2` is committed and the drum page declares `@font-face` + preload. | — | done |
 
-**None of these are regressions** — F1/F2/F3 are documented scope
-boundaries from Phases 20/35/36, F6 is simply later-stage work not yet
-reached. They're listed here so "what's left to make the app actually
-good?" has a written answer rather than living in memory.
+The F table is cumulative: closed rows remain as history, while remaining
+work must be read within the scope stated in each row and §H. Host rollout
+completion does not establish full parser conformance or visual parity; those
+separate engine-level requirements are tracked in §J.
 
 ---
 
@@ -389,12 +395,12 @@ built** — at that point, review everything end to end and rewrite/restyle
 as needed with the full picture in view, rather than repeatedly restyling
 piecemeal as each new phase changes what's possible.
 
-**Until that final pass:** keep building phases in order; keep noting any
-deferred/incomplete piece in this file (§F, and each phase's own
-`Documentation/phase-NN-*.md`) exactly as already practiced, so nothing gets
-forgotten by the time that final review happens. Do not treat "the drum
-notation doesn't look right yet" as a signal to stop and restyle now —
-that is expected and already accounted for.
+**Current interpretation:** Phases 1–54 are complete, so new engine work is
+sequenced by §J/C0–C8 rather than the original phase order. Keep broad style
+restyling distinct from correctness work: a missing, shifted, clipped, or
+misgrouped source note needs a reproducer and regression now, not a cosmetic
+label. Record any deferred stylistic decision for a deliberate final visual
+pass, and do not reopen a closed regression without new evidence.
 
 
 ---
@@ -427,3 +433,57 @@ cache keys are synchronized. `npm run verify --prefix Engine/notation-engine`
 passed **1,070 tests with 0 failures**, including four real-browser rendering
 checks. Mapped custom grace-notehead shapes and mapped stem direction for drum
 chords/beams remain open items in `Plan/Notation Plan/PLAN.md`.
+
+---
+
+## J. Notation Engine completeness audit — 2026-11-12
+
+The read-only audit of merged `main` (`89bad1c`) confirmed that the engine has
+substantial MusicXML/MXL parsing, engraving, MIDI timing/alignment and real
+regression coverage, but does **not** yet meet a testable “any notation file”
+claim. A blanket “Full” MusicXML label also exceeds the verified element and
+producer corpus. This is a scope correction and a forward plan, not a rollback
+of completed implementation work.
+
+**Confirmed follow-up areas:**
+
+1. **MusicXML fidelity:** parse direction/harmony offsets with sound/playback
+   precedence; preserve cue-note identity; handle or diagnose unimplemented valid
+   note children; close placement, clef-octave, selected key-signature and drum
+   map/glyph/spacing cases.
+2. **Input safety and diagnostics:** bound XML/MXL/MIDI bytes and processing;
+   validate MXL container/decompression limits; constrain MIDI events to track
+   boundaries and reject invalid PPQ; detect XML parser errors; surface stable,
+   location-bearing diagnostics and predictable upload recovery.
+3. **Independent correctness evidence:** keep semantic event inventories,
+   beam endpoints, playback events and reviewed visual references separate;
+   broaden authentic producer files, tag synthetic fixtures, and require browser
+   tests in CI rather than silently skipping them.
+4. **Honest input tiers:** MusicXML/MXL are bounded semantic notation profiles;
+   MIDI 0/1 is timing/performance input, not lossless score import; format 2 and
+   SMPTE timing remain unsupported unless deliberately added. MEI, ABC and
+   Humdrum `**kern` are future scoped adapters; native app formats are deferred;
+   PDF/images require separate OMR and human correction; non-Western systems need
+   profile-owned semantics and renderers.
+
+**Ordered work:** C0 define the support contract; C1 harden untrusted imports;
+C2 repair current-profile semantics/engraving; C3 publish versioned conformance
+matrices; C4 build independent semantic/visual corpora; C5 enforce route,
+browser and release gates; C6 select one additional symbolic adapter by user
+need; C7 decide on separate OMR; C8 develop named script/tuning/notation
+profiles. Detailed deliverables, code evidence, acceptance thresholds,
+references, format matrix and dependencies are in
+[`engine-completeness-roadmap.md`](./engine-completeness-roadmap.md) and
+[`../PLAN.md`](../PLAN.md) §25.
+
+**Completed work remains closed:** the 44130 missing-head repair, the 44130
+continuous-beam follow-up, and the 115 BPM covered-rest grouping fix remain
+merged with their regressions. The detailed roadmap records their existing
+evidence and explicitly distinguishes those repairs from universal format
+support. Do not reopen those fixes without a new reproducer.
+
+The six-area audit was read-only. The full verification recorded at the top of
+this file ran after the roadmap content was added; subsequent STATUS wording
+edits did not change engine code. The older **1,070-test** figure in §I and
+earlier phase totals are historical records from different snapshots. They
+remain as historical evidence, not as the current test total.
