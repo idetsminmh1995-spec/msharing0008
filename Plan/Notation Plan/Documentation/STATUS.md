@@ -447,11 +447,13 @@ baseline capabilities and are not listed as pending work in the refreshed
 roadmap.
 
 The remaining purpose is practical correctness for declared MusicXML profiles,
-not a promise that one engine reads every possible score format. Current
-follow-up priorities include accurate direction/harmony offsets, explicitly
-verified clef/placement behavior and note-child coverage, MXL/XML/MIDI input
-limits and malformed-input diagnostics, selected drum glyph/stem/spacing and
-multi-voice bounds cases, plus independent event/geometry/browser corpora.
+not a promise that one engine reads every possible score format. Direction/
+harmony offsets and fractional divisions/durations are implemented on the
+feature branch recorded in §K, pending review; they are not yet part of main.
+Current follow-up priorities include explicitly verified clef/placement
+behavior and note-child coverage, MXL/XML/MIDI input limits and malformed-input
+diagnostics, selected drum glyph/stem/spacing and multi-voice bounds cases,
+plus independent event/geometry/browser corpora.
 The matrix and acceptance evidence are detailed in
 [`engine-completeness-roadmap.md`](./engine-completeness-roadmap.md) and
 [`../PLAN.md`](../PLAN.md) §25.
@@ -461,3 +463,34 @@ covered-rest fix remain completed with their merged regressions. Do not reopen
 them without a new reproducer. The **1,129/1,129** result is the recorded main
 verification for the phase-55–60 changes; the documentation merge itself does
 not modify engine source.
+
+---
+
+## K. MusicXML timing and offset correctness — 2026-11-12 (review branch)
+
+The audit found integer parsing where MusicXML permits decimal `<divisions>`
+and `<duration>` values, including `<backup>`/`<forward>` durations. It also
+found ignored `<direction>` and `<harmony>` offsets. The parser now uses the
+existing finite-decimal helper through the normalized tick conversion. The
+model stores IEEE-754 numbers, not exact rational ticks; cumulative precision
+over long decimal-duration scores remains a verification item. It applies
+positive or negative offsets to visual direction/harmony positions without
+moving the note cursor; and separates a tempo event's visual tick from its
+playback tick unless `offset/@sound="yes"` requests both to move. Fractional
+root/bass alterations are retained. Numeral/function roots, stacked harmony,
+degrees, inversions, frames, and selected layout metadata emit
+`UNSUPPORTED_HARMONY_FEATURE` rather than silently looking fully parsed.
+
+Seven focused regressions cover fractional divisions and note durations,
+backup/forward movement, positive/negative direction/harmony offsets,
+visual-only versus playback tempo timing, fractional chord alterations,
+unsupported harmony diagnostics, and malformed offsets. The code and fixture
+are in `Engine/notation-engine/src/parser/musicxml/` and
+`Engine/notation-engine/test/unit/musicxml-fractional-offsets.test.js`; audit
+findings and source references are in
+[`notation-correctness-audit-2026-11-12.md`](./notation-correctness-audit-2026-11-12.md).
+Alternate harmony forms are warned about, not yet fully represented or
+rendered; MXL limits and the other C1/C2 gaps remain open. This is an unmerged
+feature branch and must not be reported as deployed or present on main. Full
+`npm run verify` passed **1,136/1,136 tests** (208 suites; 0 failed, 0 skipped),
+with typecheck, lint, format and API-document checks also passing.

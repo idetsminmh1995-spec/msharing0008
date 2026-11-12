@@ -1,5 +1,5 @@
 import type { PitchStep } from '../../core/pitch.js';
-import { attrOf, firstChildNamed, intOf, textOf } from './dom-helpers.js';
+import { attrOf, firstChildNamed, numberOf, textOf } from './dom-helpers.js';
 
 /**
  * Phase 35 Tier 2/§10.4 -- `<harmony>` (lead-sheet chord symbols).
@@ -40,7 +40,7 @@ function stepOf(parent: Element | undefined, childName: string): PitchStep | und
 
 function alterOf(parent: Element | undefined, childName: string): number {
   if (parent === undefined) return 0;
-  return intOf(firstChildNamed(parent, childName)) ?? 0;
+  return numberOf(firstChildNamed(parent, childName)) ?? 0;
 }
 
 /** Parses one `<harmony>` element. Never throws: every field is optional, and a `<harmony>` missing all of them simply yields an all-undefined record rather than a diagnostic storm. */

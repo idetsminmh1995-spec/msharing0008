@@ -1,4 +1,4 @@
-import { childrenNamed, firstChildNamed, intOf, textOf } from './dom-helpers.js';
+import { childrenNamed, firstChildNamed, intOf, numberOf, textOf } from './dom-helpers.js';
 
 /** One `<clef>`'s own sign/line, keyed by staff number in AttributesUpdate.clefsByStaff. */
 export interface ClefSpec {
@@ -95,7 +95,7 @@ export function parseAttributesElement(attributesEl: Element): AttributesUpdate 
   }
 
   const divisionsEl = firstChildNamed(attributesEl, 'divisions');
-  const divisions = intOf(divisionsEl);
+  const divisions = numberOf(divisionsEl);
   if (divisions !== undefined) result.divisions = divisions;
 
   const staves = intOf(firstChildNamed(attributesEl, 'staves'));

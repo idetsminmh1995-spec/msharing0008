@@ -175,7 +175,7 @@ export function parseNoteElement(
     safeDivisions = 1;
   }
 
-  const rawDuration = intOf(firstChildNamed(noteEl, 'duration'));
+  const rawDuration = numberOf(firstChildNamed(noteEl, 'duration'));
   let ticks: number;
   if (isGrace) {
     ticks = 0;
