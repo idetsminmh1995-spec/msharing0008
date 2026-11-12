@@ -3288,9 +3288,9 @@ This model uses IEEE-754 floating point, not exact rational arithmetic;
 non-terminating tick ratios can therefore have tiny rounding error, and
 long-score cumulative precision remains a verification item. `<direction>`
 and `<harmony>` offsets move their visual event ticks without advancing the
-note cursor. For tempo events, an absent/`no` `offset/@sound` retains the
-original playback tick while
-the distinct visual tick is preserved; `sound="yes"` moves both. Simple
+note cursor. For tempo events, `offset/@sound="yes"` moves both visual and
+playback ticks; absent/`no` `sound` keeps the original playback tick while
+applying the offset to the visual tick. Simple
 fractional chord alterations are retained, and currently unsupported legal
 harmony forms (including numeral/function roots, stacked harmony-chords,
 degrees, inversions and frames) now emit `UNSUPPORTED_HARMONY_FEATURE` rather
@@ -3302,3 +3302,16 @@ This does not complete C2: alternate harmony structures are diagnosed, not
 yet fully represented or rendered; MXL resource limits, remaining placement/
 clef behavior and the other listed geometry/corpus gaps remain open. The
 implementation is recorded on its feature branch until reviewed and merged.
+
+**Browser notation test workspace (2026-11-12).** The website's `/notation/`
+page loads `.musicxml`, `.xml`, and `.mxl` files in the browser and renders them
+with the bundled engine. It provides portrait-page, landscape-page, and
+continuous horizontal views, zoom, SVG download, and visible engine
+diagnostics. Changing views re-renders the parsed score without parsing the
+source again. File contents remain local to the browser; the page caps the
+selected file at 20 MiB. This is a practical visual repro tool, not evidence of
+complete MusicXML conformance; MXL expanded-archive limits and the other C1/C2
+gaps remain open. Browser smoke checks loaded a known `.musicxml` fixture and a
+valid `.mxl` archive, confirmed all three SVG viewBoxes and zoom behavior, and
+downloaded an XML-parseable SVG. See `website/README.md` for the page inventory
+and operation.

@@ -494,3 +494,19 @@ rendered; MXL limits and the other C1/C2 gaps remain open. This is an unmerged
 feature branch and must not be reported as deployed or present on main. Full
 `npm run verify` passed **1,136/1,136 tests** (208 suites; 0 failed, 0 skipped),
 with typecheck, lint, format and API-document checks also passing.
+
+## L. Browser Notation Lab — 2026-11-12 (review branch)
+
+Added `website/notation/` as a working, browser-local MusicXML test page and
+linked it from the website home navigation. It accepts `.musicxml`, `.xml`, and
+`.mxl` files (20 MiB selected-file cap), renders with the bundled Notation
+Engine, and offers portrait page, landscape page, and continuous horizontal
+views, zoom, SVG download, and engine diagnostics. View changes re-render the
+already parsed score. The page does not upload the selected score. MXL
+expanded-size limits remain an open engine safety item; this page is a useful
+visual repro harness, not proof of complete MusicXML support. Browser smoke
+checks loaded a known `.musicxml` fixture and valid `.mxl` archive, confirmed
+the three layout viewBoxes and zoom, and downloaded an XML-parseable SVG.
+Implementation and engine fidelity changes are on the same unmerged feature
+branch and are not deployed or present on main until review/merge and site
+deployment.
