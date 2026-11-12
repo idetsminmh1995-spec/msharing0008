@@ -8,6 +8,13 @@ import { testDomParser } from '../helpers/dom.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixture = path.join(__dirname, '..', 'fixtures', 'musicxml', '44130-drum-source.musicxml');
+const coveredRestFixture = path.join(
+  __dirname,
+  '..',
+  'fixtures',
+  'musicxml',
+  'drum-quarter-run-covered-by-other-voice.musicxml',
+);
 const NE = loadEngine();
 const domParser = testDomParser();
 
@@ -66,5 +73,26 @@ describe('44130 mixed shared/local drum beams preserve every notehead', () => {
     );
     assert.ok(result.svg.includes('data-id="P1#m5#v1#e1"'));
     assert.ok(result.svg.includes('data-id="P1#m5#v1#e3"'));
+  });
+
+  test('includes the fourth-beat attack when a secondary voice rests on that covered beat', () => {
+    const xml = fs.readFileSync(coveredRestFixture, 'utf8');
+    const parsed = NE.parseMusicXml(xml, { domParser });
+    const result = NE.renderParsedMusicXml(parsed);
+    const primaryBeamLines = [
+      ...result.svg.matchAll(
+        /<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)" stroke="[^"]*" stroke-width="0\.5" \/>/g,
+      ),
+    ];
+
+    assert.equal(notesIn(parsed.score).length, 7);
+    assert.equal(glyphCount(result.svg, 'noteheadXBlack'), 7);
+    assert.equal(primaryBeamLines.length, 1);
+    const fourthBeatX = NE.playheadX(result.playback, 3 * 480).x;
+    const beamEndX = Number(primaryBeamLines[0]?.[3]);
+    assert.ok(
+      beamEndX > fourthBeatX,
+      `the staff-wide beam must reach the fourth-beat attack at x=${fourthBeatX}, got ${beamEndX}`,
+    );
   });
 });

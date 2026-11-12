@@ -6,8 +6,8 @@ A+B+C corrective work** (making notes actually visible in the web app).
 Numbering is **`PLAN.md` §22's phase numbering** — deliberately not a second
 numbering system. Say a number from §B below and that's the phase to build.
 
-**Last audited:** against the code in `src/` and the **1,072-test** suite,
-after the 44130 mixed-voice drum beam-continuity follow-up
+**Last audited:** against the code in `src/` and the **1,073-test** suite,
+after the exact 115 BPM covered-rest drum-beam follow-up
 (documented in [`../PLAN.md`](../PLAN.md)). Stages 0-10 are
 complete: every phase numbered 1-54 is built AND wired, including the
 full playback surface (§17.1's position API and event stream, §17.2's
@@ -20,7 +20,7 @@ What remains is the named gaps in §C and
 ## A. DONE — Phases 1–54 ✅ (**every stage complete**) + Integration Passes A–Z
 
 All of these are implemented, tested, and have a `Documentation/phase-NN-*.md` record.
-`npm run verify` passes **1,072/1,072** across them (verified 2026-11-12).
+`npm run verify` passes **1,073/1,073** across them (verified 2026-11-12).
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -183,13 +183,28 @@ records the root cause and closure in §19 and the drum audit log.
 all 794 heads but treated every shared cross-voice attack as a beam boundary.
 That split continuous quarter-note grooves: in measures 5–6, the shared attacks
 at ticks 0/960 were beamed separately while voice-local attacks at 480/1440
-were rendered alone. A narrow staff-wide attack pass now keeps all consecutive
-unpitched quarter notes in one run when there are no gaps, rests, grace notes,
-note spans, lyrics, local-only explicit down-stems or primary beam hints; other measures
-still use normal per-voice engraving. Regression coverage confirms **88 primary beam lines for 88
-measures** and all 794 noteheads remain. `npm run verify` passes **1,072 tests,
-0 failed**; the code, regression and plan record are under `Engine/notation-engine`
-and `Plan/Notation Plan` respectively.
+were rendered alone. The first staff-wide pass kept consecutive unpitched
+quarter notes in one run but rejected any rest. Its 44130 regression confirms
+**88 primary beam lines for 88 measures** and all 794 noteheads; the then-current
+full suite passed **1,072 tests, 0 failed**. The exact 115 BPM score below
+revealed that the no-rest restriction was too broad.
+
+**115 BPM covered-rest correction (2026-11-12).** The user's separate 4/4,
+115 BPM score has 32 measures and 162 notes. In active measures such as measure
+1, voice 1 attacks on all four quarter beats (ticks 0, 480, 960 and 1440); voice
+2 shares attacks at 0/960 and writes quarter rests at 480/1440, where voice 1
+already attacks. The old predicate treated those covered rests as gaps, so the
+last local note was outside the beam (before-fix beam endpoint x=14.16; beat 4
+at x=16.5). It now allows a quarter rest only when another drum attack occupies
+the same staff tick; the continuous-tick check still blocks real gaps. The
+small fixture `Engine/notation-engine/test/fixtures/musicxml/drum-quarter-run-covered-by-other-voice.musicxml`
+reproduces the pattern without publishing the full user score. The regression
+checks the beam endpoint and all seven X noteheads. The exact upload renders
+**162/162** heads (108 X, 54 normal), and all 27 active four-hit measures beam
+through beat 4. The actual drum-page upload reports 4/4, 115 BPM and 32 measures;
+its first beam runs from x=7.18 to x=17.66, past beat 4 at x=16.5. Full
+`npm run verify` passes **1,073 tests, 0 failed**; source, regression and plan
+are under `Engine/notation-engine` and `Plan/Notation Plan`.
 
 ---
 
