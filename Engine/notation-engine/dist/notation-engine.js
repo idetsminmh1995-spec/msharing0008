@@ -79511,9 +79511,9 @@ ${xrefOffset}
                 const baseX = realX !== void 0 ? noteAreaX + realX : noteAreaX + startTick / total * fallbackNoteAreaWidth;
                 return baseX + (collisionOffsets.get(`${voice2.id}:${startTick}`) ?? 0);
               });
-              const beamableEvents = voice2.events.map((event) => {
+              const beamableEvents = voice2.events.map((event, eventIndex) => {
                 const beamSource = event.kind === "chord" ? event.notes[0] : event.kind === "note" ? event : void 0;
-                const isRest = event.kind === "rest" || event.kind === "note" && event.isGrace === true;
+                const isRest = event.kind === "rest" || event.kind === "note" && event.isGrace === true || sharedDrumEventKeys.has(`${voice2.id}:${eventIndex}`);
                 const level1 = isRest ? void 0 : beamSource?.beams?.find((b) => b.number === 1);
                 const isUnpitchedDrumEvent = event.duration.type === "quarter" && (event.kind === "note" ? event.pitch.kind === "unpitched" : event.kind === "chord" ? event.notes.length > 0 && event.notes.every((note2) => note2.pitch.kind === "unpitched") : false);
                 return {

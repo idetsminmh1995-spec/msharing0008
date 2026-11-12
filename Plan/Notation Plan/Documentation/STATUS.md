@@ -20,7 +20,7 @@ What remains is the named gaps in §C and
 ## A. DONE — Phases 1–54 ✅ (**every stage complete**) + Integration Passes A–Q
 
 All of these are implemented, tested, and have a `Documentation/phase-NN-*.md` record.
-`npm run verify` passes **1,070/1,070** across them (verified 2026-11-12).
+`npm run verify` passes **1,071/1,071** across them (verified 2026-11-12).
 
 | # | Phase | What exists | Record |
 |---|---|---|---|
@@ -169,6 +169,15 @@ which also covers the playback cursor now drawn on the drum page.
    all**: `colors.background: 'none'` omits the background rectangle
    entirely rather than painting a see-through one, so the video frame
    (or the drum-kit photo behind it) shows through.
+
+**44130 note-loss report (2026-11-12).** The attached MusicXML matched the
+existing 44130 fixture. Parsing retained 794 notes, but a mixed shared/local
+beam group caused 176 chord noteheads to be skipped during rendering. Shared
+cross-voice drum attacks now break voice-local beam runs, so subsequent local
+chords render normally. A full-file regression confirms all 441 normal drum
+heads (including snare) and 353 hi-hat X heads render. The two final-measure
+overrun diagnostics remain visible rather than hiding source events. The plan
+records the root cause and closure in §19 and the drum audit log.
 
 ---
 

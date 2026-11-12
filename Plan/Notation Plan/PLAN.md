@@ -2500,6 +2500,7 @@ until those original files are available and rendered.
 | P2 | Drum-map stem convention is used for single notes but dropped for chords and beam groups. | After voice forcing and file-stated `<stem>`, apply the mapped direction when group members agree; specify and test mixed-direction groups. |
 | P2 | `drumMappingFromMuseScore` can place exact custom SMuFL glyph names in `noteheadShape`, although the config API separates shape families from `noteheadGlyph`. | Emit custom glyphs in the exact-glyph field and render GM 28, 52, 62 and 86 through merged config without throwing; retain family mapping behavior. |
 | CLOSED 2026-11-12 | Unpitched grace-note position bypassed GM drum-map fallback when display coordinates were absent. | The renderer now uses the shared note-position resolver, preserving a complete file-stated position and using configured GM mapping otherwise. Regression tests compare the grace position with an ordinary mapped hi-hat and confirm explicit-position precedence; unpitched grace stems follow the existing forced-up convention. |
+| CLOSED 2026-11-12 | In a mixed voice, the voice-local beam grouping included cross-voice drum attacks that had already been rendered by the shared-attack pass. Later local chord events were treated as non-first members of that separate group and silently skipped; the supplied 44130 score lost 176 of 794 noteheads. | Shared-attack events now break voice-local beam runs. Regression coverage renders the full 44130 fixture and asserts all 794 noteheads survive: 441 normal heads (including snares) and 353 explicit X heads (hi-hats). |
 | P2 | Precomposed percussion grace glyphs cannot represent mapped/custom notehead shapes (for example, an X hi-hat head). | Decide whether to add a diagnostic or dedicated mapped grace glyphs; preserve the existing precomposed SMuFL articulation and add shape-specific rendering tests if support is implemented. |
 | P2 | The 44130 quarter-note hand-beaming exception classifies hands by odd voice-number parity. | Replace or configure semantic hand/foot classification; test equivalent odd/even hand voices and a foot voice without an explicit down stem. |
 | P2 | Horizontal attack spacing reserves `noteheadBlack` width even for wider mapped drum glyphs such as `noteheadHeavyXHat`. | Measure the selected glyph and chord-member extents; verify close-spaced SVG ink does not overlap. |
@@ -2536,6 +2537,21 @@ publishes the compiled engine, source map, and matching cache keys across the
 six active video-create pages and canvas preview. Mapped X/diamond grace heads
 and mapped stem-direction behavior for percussion chords/beams remain separate
 items in the table above.
+
+**44130 missing-note correction (2026-11-12).** The user's supplied
+`44130.musicxml` is byte-identical to the checked-in
+`test/fixtures/musicxml/44130-drum-source.musicxml`. Parsing retained all 794
+notes, including GM 38 acoustic-snare hits and GM 42 closed-hi-hat hits, but the
+render contained only 618 notehead glyphs. In measures with same-tick attacks
+from multiple voices, `collectSharedDrumEvents` rendered those attacks in its
+own beam pass; the ordinary per-voice beam grouping still included those
+already-consumed events. When such a group began with a shared event, subsequent
+voice-local chords were incorrectly treated as non-first group members and
+skipped. Marking the shared events as beam-run boundaries prevents those local
+chords from being swallowed. Verification against the supplied score now finds
+794 rendered heads (441 normal and 353 X), while retaining the two
+`MEASURE_OVERRUN` warnings for the source's extra final-bar events. The
+regression is in `test/unit/drum-shared-beam-regression.test.js`.
 
 ---
 
