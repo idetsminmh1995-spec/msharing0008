@@ -39,3 +39,7 @@ Create Video Page ကို web နှင့် phone view နှစ်မျိ
 ### နောက်တစ်ဆင့်
 
 လက်ရှိ card selection သည် UI prototype interaction ဖြစ်သည်။ နောက်ပိုင်းတွင် card တစ်ခုချင်းစီကို real recorder, instrument editor, tempo control နှင့် video timeline flow များနှင့် ချိတ်ဆက်ရမည်။
+
+## 2026-11-13 — Compact visual refinement
+
+Hero banner ၏ vertical space နှင့် heading scale ကို လျှော့ချပြီး tool cards များကိုလည်း ပိုသေးသော height, padding နှင့် gap ဖြင့် ပြန်ချိန်ညှိထားသည်။ Desktop တွင် page တစ်ခုတည်းအတွင်း tools များ ပိုမြင်ရပြီး phone view တွင် hero နှင့် two-column cards များ မျက်နှာပြင်ကို မလွှမ်းမိုးစေရန် compact breakpoints ထည့်ထားသည်။
