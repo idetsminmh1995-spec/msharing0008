@@ -55,3 +55,7 @@ Phone viewport ကို `390×844` ဖြင့် ပြန်လည်စစ�
 ## 2026-11-13 — Five-column web tool grid
 
 Web View တွင် tool cards များကို တစ်တန်းလျှင် ၅ ခုစီ ပေါ်စေရန် desktop grid ကို `repeat(5, 1fr)` သို့ ပြောင်းထားသည်။ Tablet breakpoint တွင် 3-column နှင့် phone breakpoint တွင် 2-column layout များကို မပြောင်းဘဲ ထိန်းထားသည်။ Desktop screenshot ဖြင့် five-column layout ကို verify လုပ်ထားသည်။
+
+## 2026-11-13 — Common studio split view with Drum first
+
+Tool box တစ်ခုခုကိုနှိပ်လျှင် instrument အားလုံးအတွက် တူညီသော `studio-workspace` view ကို ဖွင့်ရန် structure ထည့်ထားသည်။ Web View တွင် ဘယ်ဘက် panel သည် instrument controls ဖြစ်ပြီး ညာဘက် panel သည် Video preview ဖြစ်သည်။ Drum ကို ပထမဆုံးအဖြစ် အကောင်အထည်ဖော်ထားပြီး Kick, Snare, Hi-hat pads, Tempo နှင့် Start recording control များ ပါဝင်သည်။ Phone View တွင် အဆိုပါ panels နှစ်ခုကို အပေါ်အောက် stack ပြုလုပ်ထားသည်။ အခြား instrument များသည် ယခုအဆင့်တွင် တူညီသော workspace ကိုအသုံးပြု၍ သက်ဆိုင်ရာ controls များကို နောက်အဆင့်တွင် ဖြည့်မည်။
