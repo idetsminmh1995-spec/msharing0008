@@ -35,10 +35,15 @@
 - Notation Engine source မှ public renderer, `unzipMxl()`, `exportPdf()` နှင့် page/scroll configuration contract ကို စစ်ဆေးခဲ့သည်။
 - `notation.js` ကို `node --check` ဖြင့် syntax စစ်ဆေးခဲ့ပြီး pass ဖြစ်သည်။
 - Static HTML/CSS/JavaScript changes ဖြစ်ပြီး repository အတွက် active Webdev language-diagnostics project မရှိပါ။
-- Chromium ဖြင့် desktop `1440×900` နှင့် phone `375×812` viewport များတွင် compact `Choose file` ခလုတ်နှင့် fixed controls dock ကို စစ်ဆေးခဲ့သည်။ ခလုတ်များသည် viewport နှစ်ခုလုံးတွင် dock အတွင်းဝင်ဆံ့ပြီး phone တွင် mobile bottom navigation အပေါ်ဘက်၌ရှိသည်။ Controls မြင်ကွင်းကို temporary preview-only markup ဖြင့်စစ်ခဲ့ပြီး preview ဖိုင်ကို ဖယ်ရှားပြီးဖြစ်သည်။
+- Chromium ဖြင့် desktop `1440×900` နှင့် phone `375×812` viewport များတွင် compact `Choose file` ခလုတ်နှင့် fixed controls dock ကို စစ်ဆေးခဲ့သည်။ ခလုတ်များသည် viewport နှစ်ခုလုံးတွင် dock အတွင်းဝင်ဆံ့ပြီး phone တွင် mobile bottom navigation အပေါ်ဘက်၌ရှိသည်။ Loaded-state preview တွင် page title, `drum.musicxml` filename နှင့် `Notation loaded.` စာသားတို့က notation area မှ နေရာမယူတော့ကြောင်းလည်း စစ်ဆေးခဲ့သည်။ Preview-only markup ကို စမ်းသပ်ပြီးနောက် ဖယ်ရှားထားသည်။
 - `Sound Engine` implementation မရှိသေးသဖြင့် audio playback integration end-to-end မစစ်ဆေးနိုင်သေးပါ။
 
 ## ကျန်ရှိသောအလုပ်
 
 1. Sound Engine ရရှိသောအခါ `notationlab:*` event bridge ကို engine ၏ playback API နှင့် ချိတ်ဆက်ပါ။
 2. Browser တွင် MusicXML/MXL import, Page/Horizontal layout, PDF download နှင့် responsive display ကို end-to-end စစ်ဆေးပါ။
+
+
+## 2026-11-13 — Workspace space reduction
+
+Workspace အတွင်း နေရာမယူစေရန် `Notation Lab` H1, ရွေးထားသော MusicXML ဖိုင်အမည်နှင့် အောင်မြင်ကြောင်းပြသသည့် `Notation loaded.` status ကို မျက်မြင်မှ ဖယ်ထားသည်။ H1 နှင့် status live region ကို screen reader အတွက် ဆက်လက်ထားပြီး အမှား သို့မဟုတ် Engine မရရှိသည့်အခါမှသာ status ကို မြင်သာစေသည်။

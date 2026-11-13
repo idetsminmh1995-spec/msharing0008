@@ -24,8 +24,9 @@
   let soundReady = false;
   let isPlaying = false;
 
-  const announce = (message) => {
+  const announce = (message, visible = false) => {
     status.textContent = message;
+    status.classList.toggle('is-visible', visible);
   };
 
   const dispatchSoundEvent = (name, detail = {}) => {
@@ -76,14 +77,14 @@
         filename: fileName.textContent,
         volume: Number(volumeInput.value) / 100,
       });
-      announce(errors.length ? `Notation loaded with ${errors.length} issue${errors.length === 1 ? '' : 's'}.` : 'Notation loaded.');
+      announce(errors.length ? `Notation loaded with ${errors.length} issue${errors.length === 1 ? '' : 's'}.` : 'Notation loaded.', errors.length > 0);
     } catch (error) {
       renderResult = null;
       stage.hidden = true;
       controls.hidden = true;
       pdfButton.disabled = true;
       playButton.disabled = true;
-      announce(error instanceof Error ? error.message : 'Could not render this MusicXML file.');
+      announce(error instanceof Error ? error.message : 'Could not render this MusicXML file.', true);
     }
   };
 
@@ -91,11 +92,11 @@
     if (!file) return;
     const extension = file.name.split('.').pop()?.toLowerCase();
     if (!['musicxml', 'xml', 'mxl'].includes(extension)) {
-      announce('Choose a .musicxml, .xml, or .mxl file.');
+      announce('Choose a .musicxml, .xml, or .mxl file.', true);
       return;
     }
     if (!engine) {
-      announce('Notation Engine could not be loaded.');
+      announce('Notation Engine could not be loaded.', true);
       return;
     }
 
@@ -121,7 +122,7 @@
       stage.hidden = true;
       controls.hidden = true;
       pdfButton.disabled = true;
-      announce(error instanceof Error ? error.message : 'Could not open this file.');
+      announce(error instanceof Error ? error.message : 'Could not open this file.', true);
     }
   };
 
@@ -156,7 +157,7 @@
   playButton.addEventListener('click', () => {
     if (!renderResult) return;
     if (!soundReady) {
-      announce('Sound Engine is not connected.');
+      announce('Sound Engine is not connected.', true);
       dispatchSoundEvent('play-request', { playback: renderResult.playback, volume: Number(volumeInput.value) / 100 });
       return;
     }
@@ -188,7 +189,7 @@
       URL.revokeObjectURL(url);
       announce('PDF downloaded.');
     } catch (error) {
-      announce(error instanceof Error ? error.message : 'Could not export this score as PDF.');
+      announce(error instanceof Error ? error.message : 'Could not export this score as PDF.', true);
     } finally {
       pdfButton.disabled = false;
     }

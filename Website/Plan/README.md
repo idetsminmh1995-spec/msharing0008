@@ -165,3 +165,8 @@ Notation Lab ကို လက်ရှိ static-site architecture အတို�
 Playback/audio ကို Notation Engine ထဲတွင်မထည့်ဘဲ သီးခြား Sound Engine က တာဝန်ယူမည်။ Sound Engine source သည် လက်ရှိ repo ထဲတွင် မရှိသေးသောကြောင့် UI က `notationlab:*` browser event bridge မှတစ်ဆင့် playback data နှင့် volume ကိုပို့မည်။ Sound Engine မချိတ်ဆက်မချင်း အသံထွက်သည်ဟု မပြဘဲ connection status ကိုသာပြမည်။
 
 လက်ရှိအဆင့်တွင် import, notation render, view switch, PDF export UI နှင့် audio bridge အခြေခံကို ထည့်သွင်းထားသည်။ Sound Engine ၏ တကယ့် playback ချိတ်ဆက်မှုနှင့် browser end-to-end စစ်ဆေးမှုကို နောက်အဆင့်တွင် ပြုလုပ်မည်။ Implementation record: [Notation Lab Page](../Doc/Notation-Lab-Page.md).
+
+
+### Notation Lab: maximize score workspace
+
+Notation Lab-ийн score харах хэсэгт илүү зай гаргахын тулд үндсэн дэлгэц дээрх давхардсан `Notation Lab` гарчиг, файлын нэр болон амжилтын төлөвийн текстийг нууж, `h1` ба live status-ийг туслах технологид зориулан үлдээнэ. Алдаа, файл сонголт эсвэл Engine-ийн асуудал гарсан үед status-ийг л харагдуулж, хэрэгтэй мэдээллийг хадгалан дэлгэцийн зайг хэмнэнэ.
