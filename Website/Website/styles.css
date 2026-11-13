@@ -185,3 +185,27 @@
 @media (max-width:560px) {
   .notation-dock .notation-volume input { width:min(22vw,84px); }
 }
+
+
+/* Compact responsive utility controls: one layout picker and one PDF icon on phones. */
+.notation-layout-picker { display:inline-flex; min-width:0; }
+.notation-layout-select { min-width:104px; min-height:36px; padding:0 26px 0 11px; border:1px solid var(--border); border-radius:8px; color:var(--text); background:var(--surface); cursor:pointer; font:600 11px Inter,system-ui,sans-serif; }
+.notation-layout-select:focus-visible { outline:2px solid var(--accent-bright); outline-offset:2px; }
+.notation-button--pdf { gap:7px; }
+.notation-button--pdf svg { width:16px; height:16px; flex:0 0 auto; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.8; }
+@media (max-width:860px) {
+  .notation-dock-inner { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:7px; flex-direction:initial; }
+  .notation-dock .notation-import { grid-column:1; grid-row:1; justify-self:start; }
+  .notation-dock .notation-toolbar { display:contents; min-height:0; flex:none; margin:0; }
+  .notation-dock .notation-toolbar[hidden] { display:none; }
+  .notation-dock .notation-layout-picker { grid-column:2; grid-row:1; justify-self:stretch; }
+  .notation-dock .notation-playback-controls { grid-column:1 / -1; grid-row:2; justify-self:start; margin:0; }
+  .notation-dock .notation-button--pdf { grid-column:3; grid-row:1; justify-self:end; margin:0; }
+}
+@media (max-width:560px) {
+  .notation-dock .notation-file-button { min-height:32px; padding:0 10px; font-size:10px; }
+  .notation-dock .notation-layout-select { width:100%; min-width:0; min-height:32px; padding:0 20px 0 8px; font-size:10px; }
+  .notation-dock .notation-button--pdf { width:34px; min-height:32px; padding:0; }
+  .notation-dock .notation-button--pdf span { display:none; }
+  .notation-dock .notation-button--pdf svg { width:15px; height:15px; }
+}

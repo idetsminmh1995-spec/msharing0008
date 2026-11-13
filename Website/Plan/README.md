@@ -175,3 +175,8 @@ Notation Lab-ийн score харах хэсэгт илүү зай гаргахы
 ### Notation Lab: full-width canvas and zoom
 
 Notation ကို card ပုံစံဘောင်ထဲမထည့်ဘဲ website workspace အကျယ်အတိုင်း ပြသမည်။ အောက်ခြေ fixed toolbar ထဲတွင် Play ခလုတ်ဘေး၌ zoom အနီး/အဝေးခလုတ်များနှင့် လက်ရှိရာခိုင်နှုန်းကို ထည့်မည်။ ချဲ့နိုင်သည့်အကွာအဝေးကို 50%–200% သတ်မှတ်ပြီး Page/Horizontal view ပြောင်းရာတွင် လက်ရှိ zoom ကို ဆက်ထိန်းမည်။
+
+
+### Notation Lab: compact responsive toolbar
+
+Page နှင့် Horizontal ကို ခလုတ်နှစ်ခုအစား ရွေးချယ်စရာနှစ်ခုပါသော dropdown တစ်ခုအဖြစ်ထားမည်။ Phone တွင် `Choose file`, dropdown နှင့် PDF icon ကို အတန်းတစ်တန်း၊ Play/zoom/volume ကို နောက်တစ်တန်းတွင်ထား၍ fixed dock ၏ အမြင့်နှင့် control နေရာကို လျှော့မည်။ PDF icon သည် screen reader အတွက် `Download PDF` အမည်ကို ဆက်လက်ဖော်ပြမည်။ Desktop တွင် PDF စာသားကို ဆက်လက်ပြမည်။

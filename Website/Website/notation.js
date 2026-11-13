@@ -12,7 +12,7 @@
   const score = page.querySelector('[data-score]');
   const status = page.querySelector('[data-status]');
   const diagnostics = page.querySelector('[data-diagnostics]');
-  const layoutButtons = [...page.querySelectorAll('[data-layout]')];
+  const layoutSelect = page.querySelector('[data-layout-select]');
   const playButton = page.querySelector('[data-play]');
   const volumeInput = page.querySelector('[data-volume]');
   const volumeValue = page.querySelector('[data-volume-value]');
@@ -126,7 +126,7 @@
       } else {
         xmlText = await file.text();
       }
-      layoutMode = page.querySelector('[data-layout].is-selected')?.dataset.layout || 'page';
+      layoutMode = layoutSelect.value || 'page';
       renderScore();
     } catch (error) {
       xmlText = '';
@@ -154,16 +154,9 @@
     loadFile(event.dataTransfer?.files?.[0]);
   });
 
-  layoutButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      layoutButtons.forEach((item) => {
-        const selected = item === button;
-        item.classList.toggle('is-selected', selected);
-        item.setAttribute('aria-pressed', String(selected));
-      });
-      layoutMode = button.dataset.layout;
-      if (xmlText) renderScore();
-    });
+  layoutSelect.addEventListener('change', () => {
+    layoutMode = layoutSelect.value;
+    if (xmlText) renderScore();
   });
 
   zoomOutButton.addEventListener('click', () => {

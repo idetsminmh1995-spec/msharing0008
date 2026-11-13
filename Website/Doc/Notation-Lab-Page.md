@@ -35,7 +35,7 @@
 - Notation Engine source မှ public renderer, `unzipMxl()`, `exportPdf()` နှင့် page/scroll configuration contract ကို စစ်ဆေးခဲ့သည်။
 - `notation.js` ကို `node --check` ဖြင့် syntax စစ်ဆေးခဲ့ပြီး pass ဖြစ်သည်။
 - Static HTML/CSS/JavaScript changes ဖြစ်ပြီး repository အတွက် active Webdev language-diagnostics project မရှိပါ။
-- Chromium ဖြင့် desktop `1440×900`, phone `375×812` နှင့် ကျဉ်းသော phone `320×740` viewport များကို စစ်ဆေးခဲ့သည်။ Score area သည် card ဘောင်မရှိဘဲ အကျယ်ပြည့်ပေါ်ပြီး zoom ခလုတ်နှိပ်ရာတွင် `100%` မှ `110%` သို့ ပြောင်းသည်။ Zoom/Play/Volume ခလုတ်များသည် phone viewport များတွင် မျက်နှာပြင်မှ မလျှံဘဲ bottom navigation အပေါ်တွင် ရှိသည်။ Loaded-state စမ်းသပ်မှုတွင် ယာယီ NotationEngine stub သုံးပြီး title, filename နှင့် success status ကို မျက်မြင်မှ ဖယ်ထားကြောင်း စစ်ဆေးခဲ့သည်။ ယာယီ preview ဖိုင်ကို ဖယ်ရှားထားသည်။
+- Chromium ဖြင့် desktop `1440×900`, phone `403×639` နှင့် ကျဉ်းသော phone `320×740` viewport များကို စစ်ဆေးခဲ့သည်။ Phone တွင် `Choose file`, Page/Horizontal dropdown နှင့် PDF icon သည် ပထမအတန်း၊ Play/zoom/volume သည် ဒုတိယအတန်းတွင် နေရာကျဉ်းစွာ ဝင်ဆံ့သည်။ Desktop တွင် dropdown နှင့် `Download PDF` စာသားကို ပြသသည်။ ယာယီ NotationEngine stub ဖြင့် dropdown နှင့် zoom interaction ကိုစမ်းသပ်ခဲ့ပြီး preview ဖိုင်များကို ဖယ်ရှားထားသည်။
 - `Sound Engine` implementation မရှိသေးသဖြင့် audio playback integration end-to-end မစစ်ဆေးနိုင်သေးပါ။
 
 ## ကျန်ရှိသောအလုပ်
@@ -52,3 +52,8 @@ Workspace အတွင်း နေရာမယူစေရန် `Notation Lab`
 ## 2026-11-13 — Full-width notation canvas and zoom
 
 Notation canvas ကို card border နှင့် rounded frame မပါဘဲ workspace အကျယ်ပြည့် ပြင်ဆင်ထားပြီး lower fixed toolbar အတွင်း Play အနီး၌ zoom-out / zoom-in ခလုတ်နှင့် ရာခိုင်နှုန်းကို ထည့်ထားသည်။ Zoom သည် 50% မှ 200% အထိ 10% စီ ပြောင်းနိုင်ပြီး notation re-render လုပ်သည့်အခါ ရွေးထားသော အရွယ်အစားကို ထိန်းထားမည်။
+
+
+## 2026-11-13 — Compact responsive toolbar
+
+Page နှင့် Horizontal ရွေးချယ်မှုကို ခလုတ်နှစ်ခုအစား dropdown တစ်ခုအဖြစ်ပြောင်းထားသည်။ Phone တွင် `Choose file`, dropdown နှင့် PDF download icon ကို အတန်းတစ်တန်းတည်း၊ Play/zoom/volume ကို နောက်တစ်တန်းတည်း ပြသသည်။ PDF icon တွင် screen reader ဖတ်ရှုနိုင်သည့် `Download PDF` အမည်ကို ထည့်ထားသည်။

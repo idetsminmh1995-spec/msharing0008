@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="View and play MusicXML notation." />
     <title>Notation Lab — M Sharing</title>
-    <link rel="stylesheet" href="styles.css?v=notation-lab-clean-20261113" />
+    <link rel="stylesheet" href="styles.css?v=notation-toolbar-20261113" />
   </head>
   <body>
     <header class="site-header" data-header>
@@ -53,10 +53,13 @@
             <button class="notation-button notation-button--primary notation-file-button" type="button" data-choose-file aria-label="Choose MusicXML file">Choose file</button>
           </section>
           <section class="notation-toolbar" aria-label="Notation controls" data-controls hidden>
-            <div class="notation-toolbar-group notation-view-switch" role="group" aria-label="Notation layout">
-              <button type="button" class="notation-button is-selected" data-layout="page" aria-pressed="true">Page</button>
-              <button type="button" class="notation-button" data-layout="scroll" aria-pressed="false">Horizontal</button>
-            </div>
+            <label class="notation-layout-picker">
+              <span class="notation-sr-only">Notation layout</span>
+              <select class="notation-layout-select" data-layout-select aria-label="Notation layout">
+                <option value="page" selected>Page</option>
+                <option value="scroll">Horizontal</option>
+              </select>
+            </label>
             <div class="notation-toolbar-group notation-playback-controls" role="group" aria-label="Playback controls">
               <button class="notation-button notation-button--play" type="button" data-play aria-label="Play" disabled>▶</button>
               <div class="notation-zoom-controls" role="group" aria-label="Notation size">
@@ -66,7 +69,10 @@
               </div>
               <label class="notation-volume"><span>Volume</span><input type="range" min="0" max="100" value="75" data-volume aria-label="Volume" /><output data-volume-value>75%</output></label>
             </div>
-            <button class="notation-button notation-button--pdf" type="button" data-download-pdf disabled>Download PDF</button>
+            <button class="notation-button notation-button--pdf" type="button" data-download-pdf aria-label="Download PDF" title="Download PDF" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" /></svg>
+              <span>Download PDF</span>
+            </button>
           </section>
         </div>
       </aside>
@@ -74,6 +80,6 @@
 
     <script src="assets/notation-engine.js?v=engine-20261113"></script>
     <script src="script.js?v=notation-lab-20261113"></script>
-    <script src="notation.js?v=notation-lab-20261113"></script>
+    <script src="notation.js?v=notation-toolbar-20261113"></script>
   </body>
 </html>
