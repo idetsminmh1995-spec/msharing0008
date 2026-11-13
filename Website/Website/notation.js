@@ -52,11 +52,13 @@
     if (soundInitPromise) return soundInitPromise;
     const SoundFont = window.NotationSoundFont;
     if (!SoundFont?.R2SoundFontEngine) throw new Error('SoundFont engine bundle could not be loaded.');
+    const configuredSoundFont = window.MSHARING_SOUNDFONT_CONFIG || {};
     soundInitPromise = SoundFont.R2SoundFontEngine.create({
       manifestUrl: 'soundfonts/manifest.json',
       processorUrl: 'assets/spessasynth_processor.min.js',
       assetBaseUrl: 'soundfonts',
       assetId: 'musescore-general-sf3',
+      ...configuredSoundFont,
     }).then((engineInstance) => {
       soundEngine = engineInstance;
       soundReady = true;

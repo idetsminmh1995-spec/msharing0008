@@ -10,6 +10,8 @@
 
 `src/soundfont/browser.ts` ရှိ `R2SoundFontEngine` သည် R2 manifest/cache မှ MuseScore General SF3 ကို user ၏ Play gesture အချိန်တွင် load လုပ်ပြီး SpessaSynth AudioWorklet သို့ ချိတ်သည်။ Notation playback event stream ထဲရှိ pitched `midiNotes` နှင့် `durationTicks` ကို အသုံးပြုပြီး note-on/note-off scheduling လုပ်သည်။ Notation Lab သည် SoundFont loading/error state, play, pause နှင့် volume ကို ချိတ်ထားသည်။
 
+Default URL များသည် same-origin `soundfonts/manifest.json` နှင့် `soundfonts/` ဖြစ်သည်။ R2 custom domain သုံးမည်ဆိုပါက `window.MSHARING_SOUNDFONT_CONFIG = { manifestUrl: 'https://cdn.example.com/soundfonts/manifest.json', assetBaseUrl: 'https://cdn.example.com/soundfonts' }` ကို `notation.js` မတင်မီ သတ်မှတ်ပါ။
+
 - `notationlab:ready` — `{ apiVersion: 1 }`
 - `notationlab:score-loaded` — `{ playback, filename, volume }`
 - `notationlab:play-request` — legacy host hook; built-in R2 bridge သည် Play gesture မှာ တိုက်ရိုက် initialize လုပ်သည်
