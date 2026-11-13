@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="M Sharing — Learn, play and create music" />
-    <title>M Sharing — Learn · Play · Create</title>
+    <meta name="description" content="M Sharing fixed responsive header bar" />
+    <title>M Sharing — Header Preview</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -13,57 +13,55 @@
         <button class="icon-button menu-button" type="button" aria-label="Open menu" aria-expanded="false" data-menu-toggle>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
         </button>
+
         <a class="brand" href="#home" aria-label="M Sharing home page">
-          <span class="brand-mark" aria-hidden="true">M</span><span class="brand-name">Sharing</span>
+          <span class="brand-mark" aria-hidden="true">M</span>
+          <span class="brand-name">Sharing</span>
         </a>
+
         <nav class="desktop-nav" aria-label="Primary navigation">
-          <a class="nav-link is-active" href="#home">Home Page</a><a class="nav-link" href="#courses">Courses</a><a class="nav-link" href="#store">Store</a><a class="nav-link" href="#create-video">Create Video</a><a class="nav-link" href="#notation-lab">Notation Lab</a>
+          <a class="nav-link is-active" href="#home">Home Page</a>
+          <a class="nav-link" href="#courses">Courses</a>
+          <a class="nav-link" href="#store">Store</a>
+          <a class="nav-link" href="#create-video">Create Video</a>
+          <a class="nav-link" href="#notation-lab">Notation Lab</a>
         </nav>
+
         <div class="header-actions">
-          <button class="icon-button" type="button" aria-label="Search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.1-5.4a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" /></svg></button>
+          <button class="icon-button search-button" type="button" aria-label="Search" data-search-toggle>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.1-5.4a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" /></svg>
+          </button>
           <button class="text-button language-button" type="button" aria-label="Change language" data-language-toggle><span data-language>EN</span><span class="language-divider">/</span><span class="language-muted" data-language-alt>MM</span></button>
-          <button class="icon-button theme-button" type="button" aria-label="Switch to light mode" data-theme-toggle><svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" /><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></svg><svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.3A8.5 8.5 0 0 1 8.7 3.5 8.5 8.5 0 1 0 20.5 15.3Z" /></svg></button>
-          <button class="icon-button desktop-only" type="button" aria-label="Favorites"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 8.8c0 5.5-8.8 10.3-8.8 10.3S3.2 14.3 3.2 8.8A4.7 4.7 0 0 1 12 6.4a4.7 4.7 0 0 1 8.8 2.4Z" /></svg></button>
-          <button class="icon-button desktop-only" type="button" aria-label="Shopping cart"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 1.9-1.4L20 8H6M10 20a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm9 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" /></svg></button>
-          <button class="icon-button notification-button" type="button" aria-label="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Zm-8.5 12h5" /></svg><span class="notification-dot" aria-hidden="true"></span></button>
-          <button class="icon-button account-button desktop-only" type="button" aria-label="Account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg></button>
+          <button class="icon-button theme-button" type="button" aria-label="Switch to light mode" data-theme-toggle>
+            <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" /><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></svg>
+            <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.3A8.5 8.5 0 0 1 8.7 3.5 8.5 8.5 0 1 0 20.5 15.3Z" /></svg>
+          </button>
+          <button class="icon-button desktop-only" type="button" aria-label="Favorites">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 8.8c0 5.5-8.8 10.3-8.8 10.3S3.2 14.3 3.2 8.8A4.7 4.7 0 0 1 12 6.4a4.7 4.7 0 0 1 8.8 2.4Z" /></svg>
+          </button>
+          <button class="icon-button desktop-only" type="button" aria-label="Shopping cart">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 1.9-1.4L20 8H6M10 20a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm9 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" /></svg>
+          </button>
+          <button class="icon-button notification-button" type="button" aria-label="Notifications">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Zm-8.5 12h5" /></svg>
+            <span class="notification-dot" aria-hidden="true"></span>
+          </button>
+          <button class="icon-button account-button desktop-only" type="button" aria-label="Account">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg>
+          </button>
         </div>
       </div>
-      <nav class="mobile-nav" aria-label="Mobile navigation" data-mobile-nav><a class="nav-link is-active" href="#home">Home Page</a><a class="nav-link" href="#courses">Courses</a><a class="nav-link" href="#store">Store</a><a class="nav-link" href="#create-video">Create Video</a><a class="nav-link" href="#notation-lab">Notation Lab</a></nav>
+
+      <nav class="mobile-nav" aria-label="Mobile navigation" data-mobile-nav>
+        <a class="nav-link is-active" href="#home">Home Page</a>
+        <a class="nav-link" href="#courses">Courses</a>
+        <a class="nav-link" href="#store">Store</a>
+        <a class="nav-link" href="#create-video">Create Video</a>
+        <a class="nav-link" href="#notation-lab">Notation Lab</a>
+      </nav>
     </header>
 
-    <main id="home">
-      <section class="hero section-shell" aria-labelledby="hero-title">
-        <div class="hero-copy">
-          <p class="eyebrow"><span class="eyebrow-line"></span> LEARN · PLAY · CREATE</p>
-          <h1 id="hero-title">Your Complete<br /><span>Music Platform</span></h1>
-          <p class="hero-description">Learn music, build your skills, and turn every idea into something worth sharing.</p>
-          <div class="hero-actions"><a class="button button-primary" href="#courses">Get Started <span>→</span></a><a class="button button-ghost" href="#create-video"><span class="play-icon">▶</span> Watch Video</a></div>
-          <div class="hero-proof"><div class="proof-avatars"><span>AP</span><span>KL</span><span>MN</span></div><p><strong>12k+</strong> creators learning every day</p></div>
-        </div>
-        <div class="hero-art" aria-label="Abstract red music studio illustration" role="img"><div class="glow-orb orb-one"></div><div class="glow-orb orb-two"></div><div class="instrument instrument-piano"><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="instrument instrument-violin"><i></i><b></b></div><div class="art-note note-one">♪</div><div class="art-note note-two">♫</div><div class="art-caption"><span class="pulse-dot"></span> CREATE YOUR SOUND</div></div>
-      </section>
-
-      <section class="section-shell feature-section" aria-labelledby="feature-title">
-        <div class="section-heading"><div><p class="eyebrow">EXPLORE THE PLATFORM</p><h2 id="feature-title">Everything you need to make music.</h2></div><a class="see-all" href="#courses">View all <span>→</span></a></div>
-        <div class="feature-grid">
-          <a class="feature-card feature-red" href="#store"><span class="feature-icon">♫</span><span><strong>Music Notes Store</strong><small>Buy & download sheet music</small></span><span class="card-arrow">→</span></a>
-          <a class="feature-card" href="#create-video"><span class="feature-icon">▶</span><span><strong>Video Studio</strong><small>Create music videos in minutes</small></span><span class="card-arrow">→</span></a>
-          <a class="feature-card" href="#courses"><span class="feature-icon">▦</span><span><strong>Online Courses</strong><small>Learn from expert instructors</small></span><span class="card-arrow">→</span></a>
-          <a class="feature-card" href="#notation-lab"><span class="feature-icon">♬</span><span><strong>Notation Lab</strong><small>Open, edit and play notation</small></span><span class="card-arrow">→</span></a>
-        </div>
-      </section>
-
-      <section class="section-shell notes-section" id="store" aria-labelledby="notes-title">
-        <div class="section-heading"><div><p class="eyebrow">CURATED FOR YOU</p><h2 id="notes-title">Popular music notes</h2></div><a class="see-all" href="#store">See all <span>→</span></a></div>
-        <div class="notes-grid">
-          <a class="note-card" href="#store"><div class="sheet-preview sheet-red"><span class="clef">𝄞</span><i></i><i></i><i></i><i></i></div><div class="note-info"><strong>Canon in D</strong><small>J. Pachelbel</small><b>$2.99</b></div></a>
-          <a class="note-card" href="#store"><div class="sheet-preview sheet-blue"><span class="clef">𝄢</span><i></i><i></i><i></i><i></i></div><div class="note-info"><strong>Für Elise</strong><small>L. v. Beethoven</small><b>$2.99</b></div></a>
-          <a class="note-card" href="#store"><div class="sheet-preview sheet-purple"><span class="clef">𝄞</span><i></i><i></i><i></i><i></i></div><div class="note-info"><strong>Moonlight Sonata</strong><small>L. v. Beethoven</small><b>$1.99</b></div></a>
-          <a class="note-card" href="#store"><div class="sheet-preview sheet-gold"><span class="clef">𝄢</span><i></i><i></i><i></i><i></i></div><div class="note-info"><strong>Happy Birthday</strong><small>Traditional</small><b>$1.99</b></div></a>
-        </div>
-      </section>
-    </main>
+    <main class="preview-content" id="home"><p>Fixed Header Bar preview</p></main>
     <script src="script.js"></script>
   </body>
 </html>
