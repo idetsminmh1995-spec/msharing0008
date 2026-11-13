@@ -2,15 +2,15 @@
 
 ## အရေးကြီးသော error fix
 
-သင်ပေးထားသော deploy log အရ လက်ရှိ Cloudflare project သည် **Pages မဟုတ်ဘဲ Cloudflare Workers Static Assets** အဖြစ် deploy လုပ်နေသည်။ `npx wrangler deploy` က `Website/_redirects` ထဲက `/* /index.html 200` rule ကိုဖတ်ပြီး `Invalid _redirects configuration: Infinite loop detected` error ဖြစ်စေသည်။ ဤ project တွင် လက်ရှိ client-side route မရှိသေးသောကြောင့် `_redirects` ဖိုင်ကို ဖယ်ရှားထားသည်။
+သင်ပေးထားသော deploy log အရ လက်ရှိ Cloudflare project သည် **Pages မဟုတ်ဘဲ Cloudflare Workers Static Assets** အဖြစ် deploy လုပ်နေသည်။ ယခု error ၏ အကြောင်းရင်းမှာ Cloudflare က repository root မှ `npx wrangler deploy` ကို run သော်လည်း `wrangler.jsonc` သည် `Website/Website/` အတွင်းရှိနေခြင်းကြောင့် config မတွေ့ဘဲ static asset directory ကို မသိနိုင်ခြင်းဖြစ်သည်။ ယခင် `Website/_redirects` ၏ `/* /index.html 200` infinite loop ပြဿနာကိုလည်း ဖယ်ရှားပြီးဖြစ်သည်။
 
-`wrangler.jsonc` ကို repository root တွင် ထည့်ထားပြီး static asset directory ကို `./Website` ဟု တိတိကျကျ သတ်မှတ်ထားသည်။ ထို့ကြောင့် Wrangler prompt မေးခြင်းမရှိဘဲ deploy လုပ်နိုင်မည်။
+`wrangler.jsonc` သည် `Website/Website/` အတွင်းတွင်ရှိပြီး static asset directory ကို config file ၏ directory ကိုညွှန်းသည့် `.` ဟု သတ်မှတ်ထားသည်။ Repository root မှ deploy လုပ်ရာတွင် nested config ကို တိတိကျကျညွှန်ရန် `--config Website/Website/wrangler.jsonc` ထည့်ရမည်။
 
 ## GitHub repository
 
 - Repository: `idetsminmh1995-spec/msharing0008`
 - Production branch: `main`
-- Static asset directory: `Website`
+- Static asset directory: `Website/Website`
 - Worker name: `msharing0008`
 
 ## Cloudflare UI အသစ်တွင် ထည့်ရမည့် settings
@@ -22,23 +22,23 @@ Cloudflare Dashboard → **Workers & Pages** → သက်ဆိုင်ရာ 
 | Framework | `Static` |
 | Root directory | repository root (`/`) |
 | Build command | မဖြည့်ပါနှင့် |
-| Deploy command | `npx wrangler deploy` |
-| Output directory | `Website` |
+| Deploy command | `npx wrangler deploy --config Website/Website/wrangler.jsonc` |
+| Output directory | `Website/Website` |
 | Production branch | `main` |
 
-`wrangler.jsonc` ရှိနေသောကြောင့် Output Directory ကို UI က မေးပါက `Website` ထည့်နိုင်သည်။ အမှန်တကယ် deploy source ကို root `wrangler.jsonc` ၏ `assets.directory` က ထိန်းချုပ်မည်။
+`wrangler.jsonc` သည် nested path တွင်ရှိသောကြောင့် deploy command ထဲတွင် `--config Website/Website/wrangler.jsonc` မပါလျှင် Wrangler သည် repository root တွင် config မတွေ့ဘဲ default static directory ကိုရှာမည်။ အမှန်တကယ် deploy source ကို nested `wrangler.jsonc` ၏ `assets.directory: "."` က ထိန်းချုပ်မည်။
 
 ## ပြင်ဆင်ပြီးသားဖိုင်များ
 
-- `wrangler.jsonc` — Workers Static Assets deployment configuration
-- `Website/_headers` — security headers နှင့် cache policy
-- `Website/index.html` — Header Bar page
-- `Website/styles.css` — responsive fixed Header Bar styles
-- `Website/script.js` — menu, theme နှင့် language interactions
+- `Website/Website/wrangler.jsonc` — Workers Static Assets deployment configuration
+- `Website/Website/_headers` — security headers နှင့် cache policy
+- `Website/Website/index.html` — Create Video page
+- `Website/Website/styles.css` — responsive Create Video styles
+- `Website/Website/script.js` — menu, theme, language နှင့် tool selection interactions
 
 ## မထည့်ရတော့သောဖိုင်
 
-`Website/_redirects` ကို ဖယ်ရှားထားသည်။ `/* /index.html 200` သည် ဤ Wrangler Workers deployment တွင် index.html ကို သူ့ထံသူ redirect လုပ်သည့် infinite loop ဖြစ်စေသောကြောင့် ဖြစ်သည်။ အနာဂတ်တွင် client-side routes လိုလာပါက `_redirects` မသုံးဘဲ Wrangler assets configuration ၏ SPA not-found handling ကို သီးခြားစီ သတ်မှတ်မည်။
+`Website/Website/_redirects` ကို မသုံးပါ။ `/* /index.html 200` သည် ဤ Wrangler Workers deployment တွင် index.html ကို သူ့ထံသူ redirect လုပ်သည့် infinite loop ဖြစ်စေနိုင်သောကြောင့် ဖြစ်သည်။ အနာဂတ်တွင် client-side routes လိုလာပါက `_redirects` မသုံးဘဲ Wrangler assets configuration ၏ SPA not-found handling ကို သီးခြားစီ သတ်မှတ်မည်။
 
 ## Deploy ပြီးနောက် စစ်ရန်
 
@@ -56,7 +56,7 @@ Cloudflare Dashboard → **Workers & Pages** → သက်ဆိုင်ရာ 
 Cloudflare login ပြီးသား local terminal မှာ repository root ကနေ အောက်ပါ command ကို run နိုင်သည်။
 
 ```bash
-npx wrangler deploy
+npx wrangler deploy --config Website/Website/wrangler.jsonc
 ```
 
 Cloudflare login မလုပ်ရသေးပါက `npx wrangler login` ကို တစ်ကြိမ် run ပြီး browser မှာ authorize လုပ်ပါ။ GitHub ထဲသို့ token သို့မဟုတ် secret မတင်ရပါ။

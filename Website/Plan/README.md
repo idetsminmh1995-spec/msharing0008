@@ -92,6 +92,7 @@ Environment variables နှင့် secrets များကို local source
 ### Phase 4 — Cloudflare delivery
 
 - Cloudflare Pages/Workers deployment pipeline
+- လက်ရှိ nested static asset structure အတွက် repository root မှ `npx wrangler deploy --config Website/Website/wrangler.jsonc` ဖြင့် deploy လုပ်ခြင်း
 - Preview နှင့် production environments
 - R2 CDN/cache policy
 - Logging, error monitoring, backups နှင့် rollback procedure
