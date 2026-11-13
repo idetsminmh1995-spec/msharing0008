@@ -118,3 +118,14 @@ The settings are implemented in `Website/Website/studio.html`, styled responsive
 ### Remaining implementation boundaries
 
 The current VideoEngine integration remains visual-only. MusicXML is accepted and identified in the UI but is not parsed into drum events yet. Sound Model and Count Voice are stored/rendered as configuration metadata; they do not yet produce audio or synthesized counting. Instrument adapters for Guitar, Piano, Bass, Strings, and Voice remain disabled until their event source, deterministic renderer, asset readiness, and audio policy are implemented.
+
+
+## 8. Studio settings revision — current work
+
+The Studio settings panel was revised to remove the Kick, Snare, and Hi-hat pad boxes. MusicXML is now the primary optional event source; when no supported MusicXML event list is available, Generate Video uses a deterministic default drum pattern so the action remains usable.
+
+MusicXML and Logo inputs share one file row on desktop. If no custom logo is selected, the production asset `Website/Website/assets/logo/m-sharing-drum-logo.svg` is used. Title 1 and Title 2 now expose independent text color and font-size controls. Drum selection is split into a writable Brand field and a Model selector. Notation View now offers Page Landscape, Page Portrait, and Page Square.
+
+Sound Model now has model choices and a volume control. Count Voice has an Off/On control, two voice/count styles, and a separate volume control. Video Color is now a Black/White background choice; Video Ratio remains 16:9, 1:1, or 9:16.
+
+The current render remains silent/visual-only. Sound Model and Count Voice settings are rendered as metadata and retained for the future audio adapter; actual audio synthesis and spoken count generation remain pending.

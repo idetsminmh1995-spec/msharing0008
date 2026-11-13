@@ -3,10 +3,8 @@
   if (!studio) return;
 
   const engine = window.VideoEngine;
-  const recordButton = document.querySelector('[data-studio-record]');
   const generateButton = document.querySelector('[data-studio-generate]');
   const status = document.querySelector('[data-studio-status]');
-  const pads = [...document.querySelectorAll('[data-drum-pad]')];
   const video = document.querySelector('[data-video-output]');
   const placeholder = document.querySelector('[data-video-placeholder]');
   const download = document.querySelector('[data-video-download]');
@@ -21,17 +19,29 @@
   const musicXmlName = document.querySelector('[data-musicxml-name]');
   const logoInput = document.querySelector('[data-logo-input]');
   const logoName = document.querySelector('[data-logo-name]');
+  const logoPreview = document.querySelector('[data-logo-preview]');
   const titleOne = document.querySelector('[data-title-one]');
+  const titleOneColor = document.querySelector('[data-title-one-color]');
+  const titleOneSize = document.querySelector('[data-title-one-size]');
   const titleTwo = document.querySelector('[data-title-two]');
-  const drumSelection = document.querySelector('[data-drum-selection]');
+  const titleTwoColor = document.querySelector('[data-title-two-color]');
+  const titleTwoSize = document.querySelector('[data-title-two-size]');
+  const drumBrand = document.querySelector('[data-drum-brand]');
+  const drumModel = document.querySelector('[data-drum-model]');
   const notationView = document.querySelector('[data-notation-view]');
   const soundModel = document.querySelector('[data-sound-model]');
+  const soundVolume = document.querySelector('[data-sound-volume]');
+  const soundVolumeValue = document.querySelector('[data-sound-volume-value]');
+  const countVoiceEnabled = document.querySelector('[data-count-voice-enabled]');
   const countVoice = document.querySelector('[data-count-voice]');
+  const countVolume = document.querySelector('[data-count-volume]');
+  const countVolumeValue = document.querySelector('[data-count-volume-value]');
   const videoColor = document.querySelector('[data-video-color]');
-  const videoColorValue = document.querySelector('[data-video-color-value]');
   const videoRatio = document.querySelector('[data-video-ratio]');
-  const MAX_CAPTURE_SECONDS = 12;
+  const MAX_SECONDS = 12;
   const FPS = 30;
+  const QUARTER_SECONDS = 0.5;
+  const DEFAULT_LOGO = 'assets/logo/m-sharing-drum-logo.svg';
   const RATIO_SIZES = {
     '16:9': { width: 640, height: 360 },
     '1:1': { width: 512, height: 512 },
@@ -43,13 +53,8 @@
     { id: 'hihat', label: 'HI-HAT', y: 0.82, color: '#78a8ff' },
   ];
 
-  let isRecording = false;
   let isRendering = false;
   let cancelRequested = false;
-  let recordingStartedAt = 0;
-  let capturedDuration = 0;
-  let capturedHits = [];
-  let recordingTimer = 0;
   let objectUrl = null;
   let logoImage = null;
 
@@ -57,24 +62,28 @@
     if (status) status.textContent = message;
   };
 
-  const setButtonLabel = (label) => {
-    if (recordButton) recordButton.lastChild.textContent = ` ${label}`;
-  };
-
   const getSize = () => RATIO_SIZES[videoRatio?.value] || RATIO_SIZES['16:9'];
 
   const getSettings = () => ({
-    musicXmlName: musicXmlInput?.files?.[0]?.name || '',
-    logoImage,
     titleOne: titleOne?.value.trim() || 'DRUM PERFORMANCE',
-    titleTwo: titleTwo?.value.trim() || 'VISUAL PREVIEW · NO AUDIO',
-    drum: drumSelection?.value || 'full',
-    notation: notationView?.value || 'roll',
+    titleOneColor: titleOneColor?.value || '#f8fafc',
+    titleOneSize: Number(titleOneSize?.value) || 22,
+    titleTwo: titleTwo?.value.trim() || 'VISUAL PREVIEW',
+    titleTwoColor: titleTwoColor?.value || '#91a0b5',
+    titleTwoSize: Number(titleTwoSize?.value) || 11,
+    brand: drumBrand?.value.trim() || 'M Sharing',
+    model: drumModel?.value || 'custom',
+    notation: notationView?.value || 'landscape',
     soundModel: soundModel?.value || 'visual',
-    countVoice: countVoice?.value.trim() || '',
-    color: videoColor?.value || '#f20d3d',
+    soundVolume: Number(soundVolume?.value) || 0,
+    countEnabled: countVoiceEnabled?.value === 'on',
+    countVoice: countVoice?.value || 'one-two',
+    countVolume: Number(countVolume?.value) || 0,
+    color: videoColor?.value || 'black',
     ratio: videoRatio?.value || '16:9',
     size: getSize(),
+    logoImage,
+    musicXmlName: musicXmlInput?.files?.[0]?.name || '',
   });
 
   const hexToRgba = (hex, alpha) => {
@@ -86,24 +95,74 @@
     return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
   };
 
-  const syncPadAvailability = () => {
-    const selected = drumSelection?.value || 'full';
-    pads.forEach((pad) => {
-      pad.disabled = isRendering || (selected !== 'full' && selected !== pad.dataset.drumPad);
-      pad.classList.toggle('is-muted', selected !== 'full' && selected !== pad.dataset.drumPad);
-    });
-  };
+  const getPalette = (color) => color === 'white'
+    ? { background: '#f7f9fc', text: '#111827', muted: '#64748b', grid: 'rgba(15,23,42,.16)', line: 'rgba(15,23,42,.24)' }
+    : { background: '#080d16', text: '#f8fafc', muted: '#91a0b5', grid: 'rgba(148,163,184,.16)', line: 'rgba(148,163,184,.22)' };
 
-  const syncSettingsPreview = () => {
+  const syncControlState = () => {
     const settings = getSettings();
-    if (videoColorValue) videoColorValue.value = settings.color.toUpperCase();
     if (formatLabel) formatLabel.textContent = `${settings.ratio} · ${settings.size.width}×${settings.size.height}`;
-    syncPadAvailability();
+    if (soundVolumeValue) soundVolumeValue.value = `${settings.soundVolume}%`;
+    if (countVolumeValue) countVolumeValue.value = `${settings.countVolume}%`;
+    const countOn = settings.countEnabled;
+    if (countVoice) countVoice.disabled = !countOn;
+    if (countVolume) countVolume.disabled = !countOn;
+    if (logoPreview && !logoInput?.files?.[0]) logoPreview.src = DEFAULT_LOGO;
   };
 
-  if (!engine || !recordButton || !generateButton || !status || !stage || !video || !download) {
+  const defaultPattern = () => [
+    { type: 'kick', at: 0 }, { type: 'hihat', at: 0 },
+    { type: 'snare', at: 0.5 }, { type: 'hihat', at: 0.5 },
+    { type: 'kick', at: 1 }, { type: 'hihat', at: 1 },
+    { type: 'snare', at: 1.5 }, { type: 'hihat', at: 1.5 },
+    { type: 'kick', at: 2 }, { type: 'hihat', at: 2 },
+    { type: 'snare', at: 2.5 }, { type: 'hihat', at: 2.5 },
+    { type: 'kick', at: 3 }, { type: 'hihat', at: 3 },
+    { type: 'snare', at: 3.5 }, { type: 'hihat', at: 3.5 },
+  ];
+
+  const drumTypeFromNote = (note) => {
+    const step = note.querySelector('unpitched display-step')?.textContent?.trim().toUpperCase();
+    const octave = Number(note.querySelector('unpitched display-octave')?.textContent);
+    if (step === 'C' || (step === 'B' && octave <= 3)) return 'kick';
+    if (step === 'D' || step === 'E') return 'snare';
+    return 'hihat';
+  };
+
+  const parseMusicXml = async (file) => {
+    if (!file || file.name.toLowerCase().endsWith('.mxl')) return null;
+    const source = await file.text();
+    const document = new DOMParser().parseFromString(source, 'application/xml');
+    if (document.querySelector('parsererror')) throw new Error('MusicXML file could not be parsed.');
+    const measures = [...document.querySelectorAll('measure')];
+    if (!measures.length) throw new Error('MusicXML does not contain any measures.');
+    const hits = [];
+    let absoluteQuarter = 0;
+    let divisions = 1;
+    for (const measure of measures) {
+      const divisionNode = measure.querySelector('attributes divisions');
+      if (divisionNode) divisions = Math.max(1, Number(divisionNode.textContent) || 1);
+      let cursor = absoluteQuarter;
+      for (const note of [...measure.children].filter((child) => child.tagName.toLowerCase() === 'note')) {
+        const duration = Math.max(0, Number(note.querySelector(':scope > duration')?.textContent) || 0) / divisions;
+        const isChord = Boolean(note.querySelector(':scope > chord'));
+        if (!note.querySelector(':scope > rest')) hits.push({ type: drumTypeFromNote(note), at: cursor * QUARTER_SECONDS });
+        if (!isChord) cursor += duration;
+      }
+      absoluteQuarter = Math.max(absoluteQuarter, cursor);
+    }
+    return hits.length ? hits : null;
+  };
+
+  const getHits = async () => {
+    const file = musicXmlInput?.files?.[0];
+    if (!file) return { hits: defaultPattern(), source: 'default drum pattern' };
+    const parsed = await parseMusicXml(file);
+    return parsed ? { hits: parsed, source: file.name } : { hits: defaultPattern(), source: `${file.name} · default pattern fallback` };
+  };
+
+  if (!engine || !generateButton || !status || !stage || !video || !download) {
     setStatus('Video Engine or Studio controls are not available on this page.');
-    if (recordButton) recordButton.disabled = true;
     if (generateButton) generateButton.disabled = true;
     return;
   }
@@ -111,56 +170,41 @@
   const selectedTool = (new URLSearchParams(window.location.search).get('tool') || 'drums').toLowerCase();
   if (selectedTool !== 'drums') {
     setStatus('Visual video export is currently available only in Drum Studio. Other instrument adapters are not implemented yet.');
-    recordButton.disabled = true;
     generateButton.disabled = true;
-    pads.forEach((pad) => { pad.disabled = true; });
     settingsForm?.querySelectorAll('input,select').forEach((control) => { control.disabled = true; });
     return;
   }
 
-  function hit(pad) {
-    const type = pad.dataset.drumPad;
-    if (isRecording) {
-      const at = Math.min(MAX_CAPTURE_SECONDS, (performance.now() - recordingStartedAt) / 1000);
-      capturedHits.push({ type, at });
-      setStatus(`Recording visual performance · ${capturedHits.length} hit${capturedHits.length === 1 ? '' : 's'}`);
-    }
-    pad.classList.add('is-hit');
-    window.setTimeout(() => pad.classList.remove('is-hit'), 120);
-  }
-
-  pads.forEach((pad) => pad.addEventListener('click', () => hit(pad)));
-
   function drawPerformance(ctx, at, hits, duration, settings) {
     const { width, height } = settings.size;
+    const palette = getPalette(settings.color);
     const canvas = ctx.canvas;
     const scale = Math.max(0.72, Math.min(1.18, Math.min(width / 640, height / 360)));
     const left = Math.max(78, Math.round(width * 0.175));
     const right = width - Math.max(22, Math.round(width * 0.05));
     const trackWidth = Math.max(1, right - left);
     const lanePositions = LANES.map((lane) => ({ ...lane, y: Math.round(height * lane.y) }));
-    const titleSize = Math.round(22 * scale);
 
-    ctx.fillStyle = '#080d16';
+    ctx.fillStyle = palette.background;
     ctx.fillRect(0, 0, width, height);
     const glow = ctx.createRadialGradient(width * 0.72, height * 0.12, 4, width * 0.72, height * 0.12, Math.max(180, width * 0.4));
-    glow.addColorStop(0, hexToRgba(settings.color, 0.24));
-    glow.addColorStop(1, hexToRgba(settings.color, 0));
+    glow.addColorStop(0, hexToRgba('#f20d3d', settings.color === 'white' ? 0.1 : 0.24));
+    glow.addColorStop(1, hexToRgba('#f20d3d', 0));
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, width, height * 0.55);
 
-    ctx.fillStyle = '#f8fafc';
-    ctx.font = `700 ${titleSize}px Inter, system-ui, sans-serif`;
+    ctx.fillStyle = settings.titleOneColor;
+    ctx.font = `700 ${Math.round(settings.titleOneSize * scale)}px Inter, system-ui, sans-serif`;
     ctx.fillText(settings.titleOne, Math.round(32 * scale), Math.round(45 * scale));
-    ctx.fillStyle = '#91a0b5';
-    ctx.font = `${Math.round(11 * scale)}px Inter, system-ui, sans-serif`;
-    ctx.fillText(settings.titleTwo, Math.round(34 * scale), Math.round(67 * scale));
-    ctx.fillStyle = settings.color;
+    ctx.fillStyle = settings.titleTwoColor;
+    ctx.font = `${Math.round(settings.titleTwoSize * scale)}px Inter, system-ui, sans-serif`;
+    ctx.fillText(settings.titleTwo, Math.round(34 * scale), Math.round(70 * scale));
+    ctx.fillStyle = '#f20d3d';
     ctx.font = `600 ${Math.round(10 * scale)}px Inter, system-ui, sans-serif`;
-    ctx.fillText(`${settings.notation.toUpperCase()} · ${settings.ratio}`, Math.round(34 * scale), Math.round(87 * scale));
-    if (settings.countVoice) {
-      ctx.fillStyle = '#c5cedb';
-      ctx.fillText(`COUNT: ${settings.countVoice}`, Math.round(34 * scale), Math.round(104 * scale));
+    ctx.fillText(`${settings.brand} · ${settings.model.toUpperCase()} · ${settings.notation.toUpperCase()}`, Math.round(34 * scale), Math.round(90 * scale));
+    if (settings.countEnabled) {
+      ctx.fillStyle = palette.muted;
+      ctx.fillText(`COUNT ${settings.countVoice === 'numeric' ? '1 2 3 4' : 'ONE TWO THREE FOUR'} · ${settings.countVolume}%`, Math.round(34 * scale), Math.round(107 * scale));
     }
 
     if (settings.logoImage?.complete && settings.logoImage.naturalWidth > 0) {
@@ -171,131 +215,94 @@
 
     const gridStart = Math.round(height * 0.3);
     const gridEnd = Math.round(height * 0.86);
-    if (settings.notation !== 'minimal') {
-      const gridStep = Math.max(1, Math.ceil(duration / (settings.notation === 'standard' ? 4 : 8)));
-      ctx.font = `${Math.max(9, Math.round(10 * scale))}px monospace`;
-      for (let second = 0; second <= duration; second += gridStep) {
-        const x = left + (second / duration) * trackWidth;
-        ctx.strokeStyle = 'rgba(148, 163, 184, 0.16)';
-        ctx.beginPath();
-        ctx.moveTo(x, gridStart);
-        ctx.lineTo(x, gridEnd);
-        ctx.stroke();
-        ctx.fillStyle = '#91a0b5';
-        ctx.fillText(`${second}s`, x + 3, gridStart - 9);
-      }
+    const gridStep = Math.max(1, Math.ceil(duration / (settings.notation === 'square' ? 4 : 8)));
+    ctx.font = `${Math.max(9, Math.round(10 * scale))}px monospace`;
+    for (let second = 0; second <= duration; second += gridStep) {
+      const x = left + (second / duration) * trackWidth;
+      ctx.strokeStyle = palette.grid;
+      ctx.beginPath();
+      ctx.moveTo(x, gridStart);
+      ctx.lineTo(x, gridEnd);
+      ctx.stroke();
+      ctx.fillStyle = palette.muted;
+      ctx.fillText(`${second}s`, x + 3, gridStart - 9);
     }
-
     for (const lane of lanePositions) {
-      ctx.fillStyle = '#91a0b5';
+      ctx.fillStyle = palette.muted;
       ctx.font = `600 ${Math.max(9, Math.round(10 * scale))}px Inter, system-ui, sans-serif`;
       ctx.fillText(lane.label, Math.round(32 * scale), lane.y + Math.round(4 * scale));
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.22)';
+      ctx.strokeStyle = palette.line;
       ctx.beginPath();
       ctx.moveTo(left, lane.y);
       ctx.lineTo(right, lane.y);
       ctx.stroke();
     }
-
-    for (const hitEvent of hits) {
-      const lane = lanePositions.find((candidate) => candidate.id === hitEvent.type);
+    for (const hit of hits) {
+      const lane = lanePositions.find((candidate) => candidate.id === hit.type);
       if (!lane) continue;
-      const x = left + (Math.min(hitEvent.at, duration) / duration) * trackWidth;
-      const active = Math.abs(at - hitEvent.at) < 0.12;
+      const x = left + (Math.min(hit.at, duration) / duration) * trackWidth;
+      const active = Math.abs(at - hit.at) < 0.12;
       ctx.beginPath();
       ctx.fillStyle = lane.color;
       ctx.globalAlpha = active ? 1 : 0.78;
       ctx.arc(x, lane.y, active ? Math.round(8 * scale) : Math.round(5 * scale), 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
-      if (active) {
-        ctx.beginPath();
-        ctx.strokeStyle = lane.color;
-        ctx.globalAlpha = 0.4;
-        ctx.arc(x, lane.y, Math.round(15 * scale), 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
     }
-
     const playheadX = left + Math.min(1, at / duration) * trackWidth;
-    ctx.strokeStyle = settings.color;
+    ctx.strokeStyle = '#f20d3d';
     ctx.lineWidth = Math.max(1, Math.round(2 * scale));
     ctx.beginPath();
     ctx.moveTo(playheadX, gridStart);
     ctx.lineTo(playheadX, gridEnd);
     ctx.stroke();
-    ctx.fillStyle = '#91a0b5';
+    ctx.fillStyle = palette.muted;
     ctx.font = `${Math.max(10, Math.round(11 * scale))}px monospace`;
     ctx.fillText(`${at.toFixed(1)} / ${duration.toFixed(1)} sec`, Math.round(32 * scale), height - Math.round(20 * scale));
   }
 
   function updatePlaybackControls() {
-    if (!video || !timeline || !timeLabel) return;
     const duration = Number.isFinite(video.duration) ? video.duration : 0;
-    timeline.max = String(duration || 1);
-    timeline.value = String(Math.min(video.currentTime || 0, duration || 0));
-    timeLabel.textContent = formatStudioTime(video.currentTime || 0);
+    if (timeline) {
+      timeline.max = String(duration || 1);
+      timeline.value = String(Math.min(video.currentTime || 0, duration || 0));
+    }
+    if (timeLabel) timeLabel.textContent = formatTime(video.currentTime || 0);
   }
 
-  function formatStudioTime(value) {
+  function formatTime(value) {
     const seconds = Math.max(0, Math.floor(value));
     return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
   }
 
-  function startCapture() {
-    isRecording = true;
-    capturedHits = [];
-    capturedDuration = 0;
-    recordingStartedAt = performance.now();
-    syncPadAvailability();
-    setButtonLabel('Stop & render');
-    recordButton.setAttribute('aria-label', 'Stop recording and render video');
-    generateButton.disabled = true;
-    setStatus('Recording visual performance · tap the selected drum pads');
-    recordingTimer = window.setTimeout(stopCapture, MAX_CAPTURE_SECONDS * 1000);
-  }
-
-  async function renderCapturedVideo() {
-    if (isRecording || isRendering) return;
-    if (capturedHits.length === 0) {
-      setStatus('No drum hits were captured. Start recording and tap one or more pads first.');
+  async function generateVideo() {
+    if (isRendering) {
+      cancelRequested = true;
+      setStatus('Cancelling video render…');
       return;
     }
-
     const settings = getSettings();
-    const duration = Math.max(1, Math.min(MAX_CAPTURE_SECONDS, capturedDuration || 1));
-    const hits = capturedHits.map((item) => ({ ...item, at: Math.min(item.at, duration) }));
-    cancelRequested = false;
     isRendering = true;
-    recordButton.disabled = false;
+    cancelRequested = false;
     generateButton.disabled = true;
-    syncPadAvailability();
-    setButtonLabel('Cancel render');
-    recordButton.setAttribute('aria-label', 'Cancel video render');
+    generateButton.textContent = 'Generating…';
     if (placeholder) placeholder.hidden = true;
-    setStatus(`Rendering ${settings.ratio} visual preview · 0%`);
-
     try {
+      const { hits, source } = await getHits();
+      const duration = Math.max(1, Math.min(MAX_SECONDS, Math.max(...hits.map((hit) => hit.at), 3.5) + 0.5));
+      setStatus(`Preparing ${source} · ${settings.ratio} · 0%`);
       const result = await engine.render({
         width: settings.size.width,
         height: settings.size.height,
         fps: FPS,
-        segments: [{
-          seconds: duration,
-          draw: (ctx, at) => drawPerformance(ctx, at, hits, duration, settings),
-        }],
-        onProgress: (progress, phase) => {
-          if (!cancelRequested) setStatus(`${phase} · ${Math.round(progress * 100)}%`);
-        },
+        segments: [{ seconds: duration, draw: (ctx, at) => drawPerformance(ctx, at, hits, duration, settings) }],
+        onProgress: (progress, phase) => { if (!cancelRequested) setStatus(`${phase} · ${Math.round(progress * 100)}%`); },
         shouldStop: () => cancelRequested,
       });
-
       if (cancelRequested || result.cancelled) {
-        setStatus('Video render cancelled. Adjust the settings or generate again.');
+        setStatus('Video render cancelled. Adjust the settings and generate again.');
         return;
       }
-
       if (objectUrl) URL.revokeObjectURL(objectUrl);
       objectUrl = URL.createObjectURL(result.blob);
       video.src = objectUrl;
@@ -306,133 +313,72 @@
       download.hidden = false;
       if (playButton) playButton.disabled = false;
       if (timeline) timeline.disabled = false;
-      stage.classList.remove('is-playing');
       updatePlaybackControls();
-      const soundLabel = settings.soundModel === 'visual' ? 'silent visual preview' : `${settings.soundModel} selected · audio adapter pending`;
-      setStatus(`Rendered ${result.frames} frames · ${result.seconds.toFixed(1)} sec · ${result.container.toUpperCase()} · ${soundLabel}`);
+      const audioNote = settings.soundModel === 'visual' ? 'silent visual video' : `${settings.soundModel} selected · audio adapter pending`;
+      setStatus(`Rendered ${result.frames} frames · ${settings.ratio} · ${audioNote}`);
     } catch (error) {
       setStatus(`Video render failed: ${error.message || error}`);
     } finally {
       isRendering = false;
-      recordButton.disabled = false;
       generateButton.disabled = false;
-      setButtonLabel('Start recording');
-      recordButton.setAttribute('aria-label', 'Start recording');
-      syncPadAvailability();
+      generateButton.textContent = 'Generate Video';
       cancelRequested = false;
     }
   }
 
-  async function stopCapture() {
-    if (!isRecording || isRendering) return;
-    isRecording = false;
-    window.clearTimeout(recordingTimer);
-    capturedDuration = Math.max(1, Math.min(MAX_CAPTURE_SECONDS, (performance.now() - recordingStartedAt) / 1000));
-    syncPadAvailability();
-    if (capturedHits.length === 0) {
-      setButtonLabel('Start recording');
-      recordButton.setAttribute('aria-label', 'Start recording');
-      generateButton.disabled = false;
-      setStatus('No drum hits were captured. Start again and tap one or more pads.');
-      return;
-    }
-    await renderCapturedVideo();
-  }
-
-  recordButton.addEventListener('click', () => {
-    if (isRendering) {
-      cancelRequested = true;
-      recordButton.disabled = true;
-      setButtonLabel('Cancelling…');
-      setStatus('Cancelling video render…');
-      return;
-    }
-    if (isRecording) {
-      void stopCapture();
-      return;
-    }
-    startCapture();
-  });
-
-  generateButton.addEventListener('click', () => {
-    void renderCapturedVideo();
-  });
-
+  generateButton.addEventListener('click', () => { void generateVideo(); });
   playButton?.addEventListener('click', async () => {
     if (video.paused) {
       await video.play();
       playButton.textContent = '❚❚';
-      playButton.setAttribute('aria-label', 'Pause video');
       stage.classList.add('is-playing');
     } else {
       video.pause();
       playButton.textContent = '▶';
-      playButton.setAttribute('aria-label', 'Play video');
       stage.classList.remove('is-playing');
     }
   });
-
-  timeline?.addEventListener('input', () => {
-    video.currentTime = Number(timeline.value) || 0;
-    updatePlaybackControls();
-  });
-
+  timeline?.addEventListener('input', () => { video.currentTime = Number(timeline.value) || 0; updatePlaybackControls(); });
   fullscreenButton?.addEventListener('click', () => {
-    if (document.fullscreenElement) {
-      void document.exitFullscreen();
-    } else if (stage.requestFullscreen) {
-      void stage.requestFullscreen();
-    }
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else if (stage.requestFullscreen) void stage.requestFullscreen();
   });
-
   settingsForm?.addEventListener('submit', (event) => event.preventDefault());
-  [titleOne, titleTwo, countVoice, videoColor, videoRatio, drumSelection, notationView, soundModel].forEach((control) => {
-    control?.addEventListener('input', syncSettingsPreview);
-    control?.addEventListener('change', syncSettingsPreview);
+  [titleOne, titleOneColor, titleOneSize, titleTwo, titleTwoColor, titleTwoSize, drumBrand, drumModel, notationView, soundModel, soundVolume, countVoiceEnabled, countVoice, countVolume, videoColor, videoRatio].forEach((control) => {
+    control?.addEventListener('input', syncControlState);
+    control?.addEventListener('change', syncControlState);
   });
-
   musicXmlInput?.addEventListener('change', () => {
     const file = musicXmlInput.files?.[0];
     if (musicXmlName) musicXmlName.textContent = file ? file.name : 'No file selected';
-    if (file) setStatus(`MusicXML selected: ${file.name}. Record the drum performance to generate a preview.`);
+    setStatus(file ? `MusicXML selected: ${file.name}. Ready to generate.` : 'Choose a MusicXML file or use the default drum pattern.');
   });
-
   logoInput?.addEventListener('change', () => {
     const file = logoInput.files?.[0];
-    if (logoName) logoName.textContent = file ? file.name : 'No logo selected';
     if (!file) {
-      logoImage = null;
+      logoImage = new Image();
+      logoImage.src = DEFAULT_LOGO;
+      if (logoName) logoName.textContent = 'Default M Sharing Drum Logo';
+      if (logoPreview) logoPreview.src = DEFAULT_LOGO;
       return;
     }
     const object = URL.createObjectURL(file);
     const image = new Image();
     image.onload = () => {
       logoImage = image;
-      URL.revokeObjectURL(object);
-      setStatus(`Logo selected: ${file.name}. It will be included in the next generated video.`);
+      if (logoPreview) logoPreview.src = object;
+      if (logoName) logoName.textContent = file.name;
+      setStatus(`Logo selected: ${file.name}. Ready to generate.`);
     };
-    image.onerror = () => {
-      logoImage = null;
-      URL.revokeObjectURL(object);
-      setStatus('The selected logo could not be loaded. Please choose a PNG, JPG, WebP, or SVG image.');
-    };
+    image.onerror = () => { URL.revokeObjectURL(object); setStatus('The selected logo could not be loaded.'); };
     image.src = object;
   });
-
   video.addEventListener('loadedmetadata', updatePlaybackControls);
   video.addEventListener('timeupdate', updatePlaybackControls);
-  video.addEventListener('ended', () => {
-    if (playButton) {
-      playButton.textContent = '▶';
-      playButton.setAttribute('aria-label', 'Play video');
-    }
-    stage.classList.remove('is-playing');
-  });
+  video.addEventListener('ended', () => { if (playButton) playButton.textContent = '▶'; stage.classList.remove('is-playing'); });
+  window.addEventListener('pagehide', () => { if (objectUrl) URL.revokeObjectURL(objectUrl); }, { once: true });
 
-  window.addEventListener('pagehide', () => {
-    window.clearTimeout(recordingTimer);
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
-  }, { once: true });
-
-  syncSettingsPreview();
+  logoImage = new Image();
+  logoImage.src = DEFAULT_LOGO;
+  syncControlState();
 })();

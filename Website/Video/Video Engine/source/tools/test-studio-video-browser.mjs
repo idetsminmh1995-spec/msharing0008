@@ -123,7 +123,7 @@ try {
   const startedAt = Date.now();
   let ready = false;
   while (Date.now() - startedAt < 10000) {
-    ready = await evaluate("Boolean(window.VideoEngine && document.querySelector('[data-studio-record]') && document.querySelector('[data-drum-pad=kick]'))");
+    ready = await evaluate("Boolean(window.VideoEngine && document.querySelector('[data-studio-generate]') && document.querySelector('[data-musicxml-input]') && document.querySelector('[data-logo-preview]'))");
     if (ready) break;
     await sleep(100);
   }
@@ -144,7 +144,7 @@ try {
   assert.ok(desktop.scrollWidth <= desktop.width, `Studio overflows at desktop width: ${JSON.stringify(desktop)}`);
   assert.equal(desktop.columns.trim().split(/\s+/).length, 2, `Studio did not show two columns on desktop: ${JSON.stringify(desktop)}`);
 
-  await evaluate("document.querySelector('[data-studio-record]').click(); document.querySelector('[data-drum-pad=kick]').click(); setTimeout(() => document.querySelector('[data-studio-record]').click(), 350)");
+  await evaluate("document.querySelector('[data-studio-generate]').click()");
 
   const renderStarted = Date.now();
   let state;
@@ -170,9 +170,31 @@ try {
     '-show_entries', 'stream=codec_name,width,height', '-of', 'json', videoPath,
   ]);
   const probe = JSON.parse(stdout);
-  assert.ok(Math.abs(Number(probe.format.duration) - 1) < 0.2, 'Studio video duration is not approximately one second');
+  assert.ok(Math.abs(Number(probe.format.duration) - 4) < 0.3, 'Studio video duration is not approximately four seconds');
   assert.equal(probe.streams[0].width, 640);
   assert.equal(probe.streams[0].height, 360);
+
+  await evaluate("(() => { const ratio = document.querySelector('[data-video-ratio]'); const color = document.querySelector('[data-video-color]'); const count = document.querySelector('[data-count-voice-enabled]'); ratio.value = '9:16'; ratio.dispatchEvent(new Event('change', { bubbles: true })); color.value = 'white'; color.dispatchEvent(new Event('change', { bubbles: true })); count.value = 'on'; count.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[data-studio-generate]').click(); })()");
+  const portraitStartedAt = Date.now();
+  let portraitState;
+  while (Date.now() - portraitStartedAt < 60000) {
+    portraitState = await evaluate("JSON.stringify({status:document.querySelector('[data-studio-status]').textContent, videoReady:!document.querySelector('[data-video-output]').hidden && document.querySelector('[data-video-output]').readyState >= 1, href:document.querySelector('[data-video-download]').href})");
+    portraitState = JSON.parse(portraitState);
+    if (portraitState.status.startsWith('Rendered ') && portraitState.videoReady && portraitState.href !== state.href) break;
+    if (portraitState.status.startsWith('Video render failed:')) throw new Error(portraitState.status);
+    await sleep(150);
+  }
+  assert.ok(portraitState?.status.startsWith('Rendered '), `Portrait render did not complete: ${portraitState?.status}`);
+  const portraitResult = await evaluate(`(async () => { const response = await fetch(${JSON.stringify(portraitState.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return { base64: btoa(binary), bytes: bytes.length, status: document.querySelector('[data-studio-status]').textContent }; })()`);
+  const portraitBytes = Buffer.from(portraitResult.base64, 'base64');
+  const portraitPath = `${output}.portrait.mp4`;
+  await writeFile(portraitPath, portraitBytes);
+  const portraitProbeResult = await exec('ffprobe', [
+    '-v', 'error', '-show_entries', 'stream=codec_name,width,height', '-of', 'json', portraitPath,
+  ]);
+  const portraitProbe = JSON.parse(portraitProbeResult.stdout);
+  assert.equal(portraitProbe.streams[0].width, 360);
+  assert.equal(portraitProbe.streams[0].height, 640);
   console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe }, null, 2));
 } finally {
   cdp?.close();

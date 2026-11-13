@@ -58,3 +58,12 @@ Implemented behavior:
 Known limitations: MusicXML is currently accepted as a selected file but is not parsed into events; Sound Model options do not yet synthesize audio; Count Voice is currently a visual metadata label; and the current production adapter remains Drum-only and visual-only. These items stay pending under the shared adapter/audio phases in the Video Engine Plan.
 
 Verification for this update: Studio JavaScript syntax and control-marker checks passed; Video Engine source-to-production sync check passed; existing Video Engine automated tests passed (20/20); Wrangler nested deployment dry-run passed. The public Worker still serves the previous deployment until a commit is pushed and Cloudflare deploy is run.
+
+
+## Revised Studio control panel
+
+The Kick/Snare/Hi-hat capture boxes were removed from the left panel. The page now generates from an optional MusicXML source or a deterministic default drum pattern. MusicXML and Logo are presented in one desktop row. A custom logo replaces the default `Website/Website/assets/logo/m-sharing-drum-logo.svg`; without a custom file, the M Sharing Drum Logo remains selected automatically.
+
+Title 1 and Title 2 each have independent color and font-size controls. Drum settings are split into Brand text and Model selection. Notation View offers Page Landscape, Page Portrait, and Page Square. Sound Model offers multiple model choices plus volume. Count Voice has Off/On, two count styles, and volume. Video Color is restricted to Black or White, while Video Ratio remains 16:9, 1:1, and 9:16.
+
+The browser integration test was updated to click Generate Video without drum pads. MusicXML parsing currently covers plain XML/MusicXML drum notes; `.mxl` archives and actual sound/count audio remain pending. Existing VideoEngine output is still silent visual video.

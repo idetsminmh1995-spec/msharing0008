@@ -258,3 +258,31 @@
   .studio-field--file input[type='file'] { font-size:9px; }
   .studio-action-row { grid-template-columns:1fr; }
 }
+
+/* Studio settings revision: file row, title typography, brand/model and audio controls. */
+.studio-file-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+.studio-logo-preview { width:96px; height:28px; grid-column:1 / -1; grid-row:2; object-fit:contain; object-position:left center; border-radius:5px; background:#080d16; }
+.studio-field--file small { grid-row:3; }
+.studio-title-field { gap:6px; }
+.studio-inline-options { display:flex; align-items:center; justify-content:space-between; gap:7px; color:var(--muted); font-size:9px; font-weight:500; }
+.studio-inline-options label { display:flex; align-items:center; gap:4px; white-space:nowrap; }
+.studio-inline-options input[type='color'] { width:22px; height:22px; padding:0; border:1px solid var(--border); border-radius:5px; background:transparent; cursor:pointer; }
+.studio-inline-options input[type='number'] { width:46px; min-height:25px; padding:0 4px; border:1px solid var(--border); border-radius:6px; color:var(--text); background:rgba(255,255,255,.045); font-size:10px; }
+.studio-control-pair { display:grid; grid-template-columns:minmax(0,.65fr) minmax(0,1.35fr); gap:6px; }
+.range-control { display:flex; align-items:center; gap:8px; min-height:25px; }
+.range-control input[type='range'] { width:100%; accent-color:var(--accent); cursor:pointer; }
+.range-control output { min-width:30px; color:var(--text); font-family:'DM Mono',monospace; font-size:9px; text-align:right; }
+.studio-field select:disabled,.studio-field input:disabled { cursor:not-allowed; opacity:.5; }
+.studio-action-row { grid-template-columns:1fr; }
+@media (max-width:860px) {
+  .studio-file-row { gap:8px; }
+  .studio-logo-preview { width:76px; height:24px; }
+}
+@media (max-width:560px) {
+  .studio-file-row { grid-template-columns:1fr; }
+  .studio-file-row .studio-field--file { grid-template-columns:auto 1fr; }
+  .studio-file-row .studio-logo-preview { grid-column:1 / -1; grid-row:2; }
+  .studio-file-row .studio-field--file small { grid-row:3; }
+  .studio-inline-options { gap:4px; font-size:8px; }
+  .studio-inline-options input[type='number'] { width:42px; }
+}
