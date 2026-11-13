@@ -47,3 +47,7 @@ Hero banner ၏ vertical space နှင့် heading scale ကို လျှ
 ## 2026-11-13 — Further compact sizing and Home link
 
 User feedback အရ Hero နှင့် tool cards များကို ထပ်မံလျှော့ချထားသည်။ Desktop hero ကို 132px၊ desktop card ကို 100px ဝန်းကျင်၊ phone hero ကို 130px နှင့် phone card ကို 94px ဝန်းကျင်အဖြစ် ချိန်ညှိထားသည်။ Logo ၏ `#home` link သည် main page anchor သို့ရောက်ပြီး Create Video section ကို `#create-video` anchor အဖြစ် သီးခြားခွဲထားသည်။ ထို့ကြောင့် Logo ကိုနှိပ်လျှင် Home အပေါ်ဆုံးနေရာသို့ ပြန်ရောက်နိုင်သည်။
+
+## 2026-11-13 — Phone layout stability check
+
+Phone viewport ကို `390×844` ဖြင့် ပြန်လည်စစ်ဆေးပြီး fixed header, mobile menu နှင့် six-item bottom navigation များ၏ မူလ behavior ကို မပြောင်းဘဲ ထိန်းထားသည်။ Mobile content အောက်တွင် bottom navigation height အတွက် safe space ထည့်ထားပြီး နောက်ဆုံး tool row များ navigation အောက်တွင် မပျောက်စေရန် ပြင်ဆင်ထားသည်။ Phone breakpoint တွင် icon/text override များကို compact card sizing နှင့် ကိုက်ညီအောင် ပြန်ညှိထားသည်။ Headless Chromium screenshot ဖြင့် phone layout ကို verify လုပ်ထားသည်။

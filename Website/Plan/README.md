@@ -133,7 +133,7 @@ Backend API နှင့် integration များကို frontend feature d
 - Frontend framework final decision မချမှတ်ရသေးပါ။
 - Supabase schema, RLS, auth နှင့် backend API မစတင်ရသေးပါ။
 - Cloudflare R2 upload/download နှင့် media metadata integration မစတင်ရသေးပါ။
-- Hero, Dashboard, Courses, Store နှင့် Notation Lab page UI မစတင်ရသေးပါ။ Create Video အတွက် further compact responsive tool-selection page prototype ကို တည်ဆောက်ပြီး Piano, Drums, Guitar, Bass, Strings, Voice, Metronome နှင့် More tools cards ထည့်ထားသည်။ Hero နှင့် cards များကို web/phone view နှစ်မျိုးလုံးတွင် မျက်နှာပြင်မလွှမ်းမိုးစေရန် spacing နှင့် scale လျှော့ထားပြီး Logo ကို `#home` anchor သို့ ချိတ်ထားသည်။ နောက်တစ်ဆင့်တွင် card များကို recorder, instrument editor, tempo control နှင့် video timeline flow များနှင့် ချိတ်ဆက်မည်။
+- Hero, Dashboard, Courses, Store နှင့် Notation Lab page UI မစတင်ရသေးပါ။ Create Video အတွက် further compact responsive tool-selection page prototype ကို တည်ဆောက်ပြီး Piano, Drums, Guitar, Bass, Strings, Voice, Metronome နှင့် More tools cards ထည့်ထားသည်။ Hero နှင့် cards များကို web/phone view နှစ်မျိုးလုံးတွင် မျက်နှာပြင်မလွှမ်းမိုးစေရန် spacing နှင့် scale လျှော့ထားပြီး Logo ကို `#home` anchor သို့ ချိတ်ထားသည်။ Phone layout တွင် fixed navigation ကို မထိခိုက်စေရန် content safe space နှင့် compact breakpoint overrides များကို စစ်ဆေးပြီးပြီ။ နောက်တစ်ဆင့်တွင် card များကို recorder, instrument editor, tempo control နှင့် video timeline flow များနှင့် ချိတ်ဆက်မည်။
 - AWS migration implementation မစတင်ရသေးဘဲ နောက်ပိုင်း phase အဖြစ်သာ သတ်မှတ်ထားသည်။
 
 ## 10. လက်ရှိ Git/Cloudflare version
