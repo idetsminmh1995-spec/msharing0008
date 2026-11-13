@@ -2,7 +2,7 @@
 
 ## အကျဉ်းချုပ်
 
-Notation Engine Plan ကို အသုံးပြုသူ၏ လမ်းညွှန်ချက်အတိုင်း တိုးချဲ့ပြီး ပြီးစီးခဲ့သည့် Plan ပြင်ဆင်မှုများ၊ MuseScore source audit၊ license အခြေအနေနှင့် မပြီးသေးသည့်အလုပ်များကို ဤမှတ်တမ်းတွင် စုစည်းထားသည်။ ရည်မှန်းချက်မှာ လက်ရှိ TypeScript engine ထဲက အသုံးဝင်ပြီးသားအရာများကို ပြန်သုံးရန်၊ MuseScore ၏ notation behavior ကို reference အဖြစ်လေ့လာကာ project ၏ ကိုယ်ပိုင် style နှင့် instrument အလိုက် note mapping များကို တည်ဆောက်ရန်ဖြစ်သည်။ License မကိုက်ညီခြင်း သို့မဟုတ် မရှင်းလင်းခြင်းရှိသော code ကို တိုက်ရိုက်မကူးဘဲ လိုအပ်သည့် behavior ကို ကိုယ်ပိုင် TypeScript ဖြင့် ပြန်လည်တည်ဆောက်မည်။
+Notation Engine Plan ပြင်ဆင်မှု၊ MuseScore source audit၊ license အခြေအနေနှင့် မပြီးသေးသည့်အလုပ်များကို ဤမှတ်တမ်းတွင် စုစည်းထားသည်။ အသုံးပြုသူက 2026-11-14 တွင် Engine ကို Drum/Piano နှစ်မျိုးအတွက်သာ မဟုတ်ဘဲ တူရိယာအားလုံးနှင့် orchestra score များကိုပါ ပံ့ပိုးရမည်ဟု ထပ်မံရှင်းလင်းခဲ့သည်။ ထို့ကြောင့် လက်ရှိ TypeScript engine ကို ပြန်သုံးပြီး generic instrument-neutral rendering ကို အခြေခံကာ လိုအပ်သည့် instrument-specific profile များကိုသာ ထပ်ထည့်ရန် Plan ကို ချဲ့ထွင်ထားသည်။ MuseScore behavior ကို reference ယူသော်လည်း project ၏ style ကိုယ်ပိုင်ဖြစ်စေရမည်။ License မကိုက်ညီသော code ကို တိုက်ရိုက်မကူးဘဲ လိုအပ်သည့် behavior ကို independent TypeScript ဖြင့် ပြန်တည်ဆောက်မည်။
 
 ဤအလုပ်အတွင်း engine implementation code ကို မပြောင်းခဲ့ပါ။ MuseScore C++ source ကို repo ထဲသို့ download/copy မလုပ်ခဲ့ပါ။
 
@@ -17,19 +17,21 @@ Notation Engine Plan ကို အသုံးပြုသူ၏ လမ်းည
 
 ဆက်စပ် code: [core note model](../Notation/Notation%20Engine/src/core/note.ts), [pitch model](../Notation/Notation%20Engine/src/core/pitch.ts), [drum mapping](../Notation/Notation%20Engine/src/drums/drum-map.ts), [MuseScore drum reference data](../Notation/Notation%20Engine/src/musescore/drumset.ts), [notehead mapping](../Notation/Notation%20Engine/src/geometry/notehead.ts).
 
-### 2. P2B — Instrument အလိုက် note mapping Plan ထည့်သွင်းခြင်း
+### 2. P2B — တူရိယာအားလုံးနှင့် Orchestra/ensemble score များအတွက် Plan ထည့်သွင်းခြင်း
 
-[Notation Engine Plan](../Notation/Notation%20Plan/PLAN.md) ထဲတွင် `P2B — Note mapping ကို instrument အလိုက် ခွဲထုတ်ရန်` အပိုင်းအသစ် ထည့်သွင်းထားသည်။ အဓိက architecture မှာ အောက်ပါအတိုင်းဖြစ်သည်။
+[Notation Engine Plan](../Notation/Notation%20Plan/PLAN.md) ထဲတွင် Engine ကို Piano/Drum ဖြင့်သာ မကန့်သတ်ဘဲ generic pitched mapping နှင့် orchestra/ensemble full-score support ပါဝင်စေရန် P2B ကို ပြင်ဆင်ထားသည်။ Piano နှင့် Drum သည် specialized mapping ၏ ဥပမာများသာဖြစ်ပြီး တူရိယာတစ်ခုချင်းစီအတွက် သီးခြား map ရှိမှသာ support ဖြစ်မည်ဟု မသတ်မှတ်ရ။
 
 - `NoteMapping` သည် pitched/unpitched `Note` နှင့် part/staff/clef/instrument context ကို လက်ခံပြီး staff position, notehead, stem/voice preference စသည့် display-only result ကို ပြန်ပေးမည်။ Canonical pitch, duration, MIDI playback note နှင့် မူရင်း MusicXML metadata ကို မပြောင်းရ။
-- `MappingRegistry` သည် instrument/part identifier, mapping profile နှင့် အသုံးပြုသူ၏ override အပေါ်မူတည်၍ `PianoMapping`, `DrumMapping` သို့မဟုတ် custom mapping ကို ရွေးမည်။
-- `PianoMapping` သည် clef, note letter, accidental, octave နှင့် grand-staff policy ကို အသုံးပြုပြီး staff position ကို သတ်မှတ်မည်။ Written pitch နှင့် sounding pitch transposition ကို သီးခြားထားမည်။
+- `GenericPitchedMapping` ကို ပုံမှန် pitched instrument အားလုံးအတွက် default ထားပြီး `InstrumentProfile` ဖြင့် part/instrument identity, clef, staff အရေအတွက်, transposition, octave transposition နှင့် လိုအပ်သော engraving setting များကို ဖော်ပြမည်။
+- `MappingRegistry` သည် instrument/part identity နှင့် profile ကို အခြေခံ၍ generic mapping သို့မဟုတ် လိုအပ်သည့် specialized mapping ကို ရွေးမည်။ Profile မရှိသော instrument ၏ valid note များကိုလည်း generic mapping ဖြင့် render လုပ်ရမည်။
+- Piano, strings/tablature, transposing instruments, keyboard/organ, vocal parts နှင့် pitched/unpitched percussion အတွက် generic support လုံလောက်သည့်နေရာတွင် generic rule သုံးပြီး၊ အထူး notation လိုအပ်သည့်နေရာတွင်သာ သီးခြား profile/module ထည့်မည်။
 - `DrumMapping` သည် လက်ရှိ `DrumMappingTable` ကို adapter ဖြင့် shared contract ထဲသို့ ချိတ်မည်။ MIDI pitch သို့မဟုတ် `instrumentId` မှ drum identity, staff position, notehead, voice နှင့် articulation ကို သတ်မှတ်မည်။
+- Orchestra/ensemble support တွင် part များစွာ၊ part တစ်ခုအတွင်း staff/voice များစွာ၊ part အမည်/အစီအစဉ်၊ transposition နှင့် full-score system layout ကို ထိန်းသိမ်းပြီး render လုပ်ခြင်း ပါဝင်မည်။ Orchestra သည် instrument အမျိုးအစားတစ်ခုမဟုတ်ဘဲ ensemble ဖြစ်သည်။
 - `MappingProfile` သည် MuseScore ကိုးကားထားသော default နှင့် project ၏ ကိုယ်ပိုင် house style ကို ခွဲထားမည်။ Config မှ profile တစ်ခုချင်း override လုပ်နိုင်ရမည်။
 - Resolution precedence ကို tests ဖြင့် သတ်မှတ်မည် — MusicXML ၏ explicit display/notehead/stem metadata → user profile override → instrument mapping → documented fallback နှင့် diagnostic။ Mapping မတွေ့ခြင်းကြောင့် note ကို မဖယ်ရှားရ။
 - Mapping ပြောင်းလဲသော်လည်း sounding pitch နှင့် playback MIDI data မပြောင်းကြောင်း စစ်ဆေးမည့် regression tests ကို Plan ထဲတွင် ထည့်ထားသည်။
 
-ဤအရာများသည် Plan အဆင့်တွင်သာ ရှိသေးပြီး `NoteMapping`, `MappingRegistry` သို့မဟုတ် `PianoMapping` TypeScript module အသစ်များကို မရေးရသေးပါ။
+ဤအရာများသည် Plan အဆင့်တွင်သာ ရှိသေးပြီး `GenericPitchedMapping`, `InstrumentProfile`, `MappingRegistry`, orchestral full-score layout သို့မဟုတ် instrument-specific TypeScript module အသစ်များကို မရေးရသေးပါ။
 
 ### 3. MuseScore source audit နှင့် provenance မှတ်တမ်း
 
@@ -39,7 +41,7 @@ Official `musescore/MuseScore` repository ၏ `main` branch ကို commit `e3
 - **MusicXML note import:** `src/importexport/musicxml/internal/import/importmusicxmlnotepitch.cpp/.h`, `importmusicxmlnoteduration.cpp/.h`, `importmusicxmlpass2.cpp`, `musicxmlvoicedesc.cpp/.h`။ Pitch, divisions, voice/chord, instrument ID နှင့် unpitched note များ၏ behavior ကို လေ့လာရန်။
 - **Engraving:** `src/engraving/dom/note.cpp`, `stem.cpp`, `beam.cpp`, `accidental.cpp`, `ledgerline.cpp`, `notedot.cpp`, `tie.cpp`, `clef.cpp`, `src/engraving/rendering/score/horizontalspacing.cpp`။ MuseScore ၏ layout rules ကို reference လုပ်ပြီး TypeScript geometry ကို သီးခြားတည်ဆောက်ရန်။
 - **Note entry/editing:** `src/notation/inotationnoteinput.h`, `src/notation/internal/notationnoteinput.cpp`, `src/engraving/editing/noteinput.h`, `editnote.h`, `editduration.h`, `editchord.h`။ Desktop C++/Qt interaction code ဖြစ်သဖြင့် browser engine ထဲသို့ တိုက်ရိုက်ယူရန်မဟုတ်ဘဲ behavior ကို လေ့လာရန်။
-- **Instrument/Piano/Drum:** `share/instruments/instruments.xml`, `src/engraving/dom/instrument.h/.cpp`, `drumset.h/.cpp`, `staff.h/.cpp`။ Declarative data, engraving နှင့် playback dependency များကို သီးခြားစိစစ်ရန်။
+- **Instrument family/Piano/Drum:** `share/instruments/instruments.xml`, `src/engraving/dom/instrument.h/.cpp`, `drumset.h/.cpp`, `staff.h/.cpp`။ Instrument profile, transposition, staff နှင့် percussion data တို့ကို engraving/playback dependency များမှ ခွဲပြီး စိစစ်ရန်။
 - **Style/glyph:** `src/engraving/dom/engravingstyle.h/.cpp`, `symnames.cpp`, `fonts/bravura/Bravura.json`။ Code, glyph metadata/data နှင့် font binary တို့ကို license သီးခြားစီဖြင့် ကိုင်တွယ်ရန်။
 
 လက်ရှိ project ၏ `src/musescore/provenance.ts` သည် ယခင် commit `9140c5e4b7b5b48357b8d38dfebd0dd979653d21` ကို pin လုပ်ထားသည်။ Audit လုပ်ခဲ့သော commit က မတူသဖြင့် ရှိပြီးသား data/provenance ကို အလိုအလျောက် မပြောင်းရန် Plan တွင် သတိပြုချက် ထည့်ထားသည်။
@@ -50,22 +52,24 @@ Audit လုပ်ထားသော MuseScore note/model/import source မျ�
 
 အသုံးပြုသူ၏ 2026-11-14 လမ်းညွှန်ချက်ကိုလည်း Plan ထဲတွင် ထည့်သွင်းထားသည် — ရှိပြီးသား code နှင့် license ကိုက်ညီကြောင်း အတည်ပြုထားသည့် external code/assets များကို ပြန်သုံးရန်၊ notation ကို ကိုယ်ပိုင် style အတိုင်း ပြင်ဆင်ရန်၊ license မကိုက်ညီခြင်း သို့မဟုတ် မရှင်းလင်းခြင်းရှိပါက behavior ကို independent TypeScript ဖြင့် ပြန်ရေးရန်။
 
+အသုံးပြုသူက scope ကို ထပ်မံရှင်းလင်းရာတွင် တူရိယာအားလုံး၏ notation ကို ဖတ်/render လုပ်နိုင်ရမည်၊ orchestra/ensemble score များအတွက် part များစွာနှင့် staff များစွာပါဝင်သည့် full score ကိုလည်း ပံ့ပိုးရမည်ဟု ပြောထားသည်။ Piano နှင့် Drum ကိုသာ ဦးတည်သည့်ပုံစံမဖြစ်စေရန် P2B ကို generic instrument support နှင့် multi-part score support အဖြစ် ထပ်မံတိုးချဲ့ထားသည်။
+
 လက်ရှိအခြေအနေတွင် GPL MuseScore C++ source နှင့် Bravura font binary ကို repo ထဲသို့ မကူးထည့်ပါ။ License ကန့်သတ်ချက် မရှင်းသည့် code ကို pinned source link အဖြစ်သာ ထားမည်။ နောက်ပိုင်း project ၏ distribution/license မူဝါဒ GPL နှင့် ကိုက်ညီကြောင်း ဆုံးဖြတ်ပြီးမှသာ သီးခြား reference bundle ကို အပြည့်အစုံ license, per-file notice, source commit နှင့် manifest ပါအောင် ပြန်သုံးသပ်နိုင်သည်။ ဤမှတ်တမ်းသည် ဥပဒေအကြံပေးချက် မဟုတ်ပါ။
 
 ## ပြောင်းလဲခဲ့သည့်ဖိုင်များနှင့် Git မှတ်တမ်း
 
 - `Website/Notation/Notation Plan/PLAN.md` — P2B mapping roadmap, MuseScore source audit, provenance caution နှင့် license-aware reuse policy ကို ထည့်သွင်း/ပြင်ဆင်ခဲ့သည်။
 - `Website/Doc/Notation-Engine-Plan-Work-Log-2026-11-14.md` — ဤလုပ်ငန်းမှတ်တမ်း။
-- `Website/Doc/README.md` — ဤမှတ်တမ်းကို Documentation index တွင် ချိတ်ဆက်မည်။
+- `Website/Doc/README.md` — ဤမှတ်တမ်းကို Documentation index တွင် ချိတ်ဆက်ထားသည်။
 
-Plan ပြင်ဆင်မှုများ `main` branch သို့ push လုပ်ထားသော commit များ:
+မူလ mapping/license Plan ပြင်ဆင်မှုများ `main` branch သို့ push လုပ်ထားသော commit များ:
 
 - `b71e8395788230bb4777404d5d4d6135126a8150` — `docs: extend Notation Engine mapping plan`
 - `19523338079330ceb5ee8484da470eae42ebe4b7` — `docs: clarify MuseScore reuse and license policy`
 
 ## စစ်ဆေးမှုနှင့် မလုပ်ခဲ့သည့်အရာများ
 
-- Plan ပြင်ဆင်မှုများတွင် `git diff --check` ကို အသုံးပြုပြီး whitespace error မရှိကြောင်း စစ်ဆေးခဲ့သည်။ Push ပြီးနောက် `main` branch သည် `origin/main` နှင့် တစ်ပြိုင်တည်းဖြစ်ပြီး working tree သန့်ရှင်းကြောင်း စစ်ခဲ့သည်။
+- မူလ Plan ပြင်ဆင်မှုများတွင် `git diff --check` ဖြင့် whitespace စစ်ခဲ့ပြီး push ပြီးနောက် `main` နှင့် `origin/main` တစ်ပြိုင်တည်းဖြစ်ကြောင်း စစ်ခဲ့သည်။ ယခု all-instrument/orchestra scope ပြင်ဆင်မှုများတွင်လည်း `git diff --check`, Burmese text scan နှင့် local Markdown link စစ်ဆေးမှုတို့ကို အောင်မြင်စွာ ပြီးစီးခဲ့သည်။
 - ဤအလုပ်သည် documentation-only ဖြစ်သဖြင့် `npm test`, typecheck, lint, browser rendering သို့မဟုတ် E2E test များကို မလုပ်ခဲ့ပါ။ Plan ထဲရှိ test-file အရေအတွက်သည် ယခုအလုပ်တွင် test အားလုံး run/pass ဖြစ်သည်ဟု မဆိုလိုပါ။
 - MuseScore source file download/copy, C++ build/integration, `PianoMapping`, shared mapping interface နှင့် playback routing implementation မလုပ်ခဲ့ပါ။
 - Source/asset တစ်ခုချင်း၏ license အပြည့်အစုံကို inventory လုပ်ခြင်း သို့မဟုတ် ဥပဒေသုံးသပ်ချက် ပြုလုပ်ခြင်း မရှိသေးပါ။ Resource အသစ်သုံးမီ file တစ်ခုချင်း၏ license/header/notice နှင့် project distribution policy ကို စစ်ဆေးရန်လိုသည်။
@@ -94,15 +98,16 @@ Plan ပြင်ဆင်မှုများ `main` branch သို့ push 
 2. Instrument transposition, unusual notation, malformed note/chord နှင့် multiple-staff input များအတွက် diagnostic/recovery tests တိုးချဲ့ရန်။
 3. `parseMidiFile()` ကို event/meta parser အဖြစ်သာထားမည်လား၊ MIDI-to-Score API သီးခြားဖန်တီးမည်လား ဆုံးဖြတ်ရန်။ MIDI alignment လိုအပ်ပါက multi-part assignment, duplicate pitch/tick, unmatched note နှင့် stable event association ကို သတ်မှတ်ပြီး စမ်းသပ်ရန်။
 
-### P2B — Piano/Drum/custom mapping
+### P2B — တူရိယာအားလုံးနှင့် Orchestra/ensemble support
 
-1. Shared mapping input/context/result types, `MappingRegistry` နှင့် precedence contract ကို design/type-level tests ဖြင့် သတ်မှတ်ရန်။
-2. ရှိပြီးသား `DrumMappingTable` ကို adapter ဖြင့် contract ထဲသို့ ချိတ်ပြီး default, partial override, custom kit, unmapped-pitch diagnostic အတွက် regression tests ထည့်ရန်။
-3. `PianoMapping` ကို treble/bass clef, note letter/alteration/octave, grand-staff split/overlap, ledger line, written/sounding transposition နှင့် user remap တို့အတွက် implement လုပ်ရန်။
-4. `MappingProfile` customization/persistence နှင့် renderer bridge ကို တည်ဆောက်ရန်။ Explicit MusicXML metadata → user override → instrument mapping → fallback precedence ကို tests ဖြင့် အတည်ပြုရန်။
-5. Mapping override သည် playback/sounding MIDI pitch ကို မပြောင်းကြောင်း၊ unknown mapping က note ကို မပယ်ချဘဲ diagnostic ပြန်ပေးကြောင်း စမ်းသပ်ရန်။
-6. MuseScore reference behavior နှင့် fixture/snapshot comparison လုပ်ပြီး project style ၏ ရည်ရွယ်ထားသော ကွာခြားချက်များကို မှတ်တမ်းတင်ရန်။
-7. အသုံးပြုမည့် external code/asset တစ်ခုချင်း၏ license နှင့် attribution ကို စစ်ဆေးရန်။ Project license နှင့် မကိုက်ညီသည့် code ကို မကူးဘဲ independent TypeScript ဖြင့် ပြန်ရေးရန်။
+1. Generic pitched mapping, `InstrumentProfile`, shared mapping input/context/result types နှင့် `MappingRegistry` တို့၏ contract ကို သတ်မှတ်ပြီး contract/type-level tests ရေးရန်။
+2. Profile သတ်မှတ်မထားသော instrument အပါအဝင် ပုံမှန် pitched instrument အားလုံးကို generic rule ဖြင့် render လုပ်နိုင်ကြောင်း စမ်းသပ်ရန်။ မသိသော instrument identifier ကြောင့် note ကို မပယ်ချရ။
+3. Piano, strings/tablature, transposing/octave-transposing parts, keyboard/organ, vocal parts, pitched/unpitched percussion အတွက် generic support နှင့် special profile လိုအပ်ချက်ကို တစ်ခုချင်း စစ်ဆေးရန်။ ရှိပြီးသား Drum map ကို adapter ဖြင့် ပြန်သုံးရန်။
+4. Orchestra/ensemble fixtures ဖြင့် multi-part, multi-staff, multi-voice, transposing instruments, part name/order နှင့် full-score system spacing ကို စမ်းသပ်ရန်။ Group bracket/barline နှင့် automatic condensing ကို သီးခြားဆုံးဖြတ်ရန်။
+5. `MappingProfile` customization/persistence, renderer bridge နှင့် precedence ကို implement လုပ်ရန်။ User mapping ကြောင့် sounding pitch/playback data မပြောင်း၊ unknown mapping ကြောင့် note မပျောက်ဘဲ diagnostic ရှိကြောင်း စစ်ဆေးရန်။
+6. MuseScore reference behavior နှင့် pinned fixtures/snapshots ကို နှိုင်းယှဉ်ပြီး project ၏ ရည်ရွယ်ထားသော style ကွာခြားချက်များကို မှတ်တမ်းတင်ရန်။ Source/asset တစ်ခုချင်းစီ၏ license/attribution ကိုလည်း စစ်ဆေးရန်။
+
+**ပြီးစီးမှုစံ:** Profile မရှိသော instrument အပါအဝင် valid note များ မပျောက်ဘဲ render ဖြစ်ရမည်။ Instrument family များစွာနှင့် Orchestra/ensemble ၏ multi-part, multi-staff score များကို fixture/integration tests ဖြင့် အတည်ပြုရမည်။ Mapping သည် source MusicXML data, rhythm, sounding pitch သို့မဟုတ် playback ကို မပြောင်းရ။
 
 ### P3 — Rendering နှင့် layout
 

@@ -46,9 +46,9 @@ TypeScript ဖြင့်ရေးသားထားသော instrument-neutra
 
 **ပြီးစီးမှုစံ:** Parser/API တစ်ခုစီ၏ input/output boundary၊ မထောက်ပံ့သော MIDI formats နှင့် MusicXML recovery behavior ကို user-facing docs မှာရှင်းပြနိုင်ရမည်။
 
-### P2B — Note mapping ကို instrument အလိုက် ခွဲထုတ်ရန်
+### P2B — တူရိယာအားလုံးနှင့် Orchestra/ensemble score များကို ပံ့ပိုးရန်
 
-အသုံးပြုသူ၏ လမ်းညွှန်ချက်အရ MuseScore ၏ notation behavior ကို reference အဖြစ်လေ့လာပြီး project ၏ကိုယ်ပိုင် engraving style နှင့် note mapping များကို သီးခြားပြင်ဆင်နိုင်ရမည်။ Mapping ကို renderer ထဲတွင် hardcode မလုပ်ဘဲ Piano, Drum နှင့် နောက်ပိုင်း instrument mapping များကို profile/strategy အဖြစ် ခွဲထားပါ။ MusicXML က ပေးထားသော pitch, rhythm, voice, explicit display position နှင့် explicit notehead များကို mapping က အစားထိုးမဖျက်ရ။
+Notation Engine သည် instrument-neutral ဖြစ်ရမည်၊ Piano/Drum နှစ်မျိုးတည်းဖြင့် မကန့်သတ်ရ။ MusicXML တွင် note များပါဝင်သည့် မည်သည့် instrument part ကိုမဆို profile စာရင်းတွင် မပါခြင်းကြောင့် ပယ်မချဘဲ ဖတ်၍ render လုပ်နိုင်ရန် ရည်ရွယ်ရမည်။ ပုံမှန် pitched instrument များအတွက် generic mapping ကို default သုံးပြီး၊ သီးခြား notation rule လိုအပ်သည့်အခါမှသာ instrument/family-specific profile ထည့်ပါ။ Orchestra သည် instrument တစ်မျိုးမဟုတ်ဘဲ ensemble ဖြစ်သဖြင့် full score ထဲရှိ multi-part, multi-staff, multi-voice structure, instrument identity, transposition နှင့် system layout ကို ထိန်းသိမ်းပြီး render လုပ်ရမည်။
 
 လက်ရှိ code မှ ပြန်သုံးရန်:
 
@@ -59,19 +59,25 @@ TypeScript ဖြင့်ရေးသားထားသော instrument-neutra
 အကြံပြုထားသော architecture:
 
 - `NoteMapping` contract သည် pitched/unpitched `Note` နှင့် part/staff/clef/instrument context ကို လက်ခံပြီး display-only result ပြန်ပေးပါစေ။ Result တွင် staff index/position, notehead family/glyph, stem/voice preference နှင့် optional label ပါနိုင်သည်။ Pitch, duration, MIDI playback note နှင့် source MusicXML metadata ကို canonical model ထဲတွင် မပြောင်းပါနှင့်။
-- `MappingRegistry` သည် instrument/part identifier, mapping profile နှင့် user override ကို ကြည့်ပြီး `PianoMapping`, `DrumMapping` သို့မဟုတ် custom mapping ကို ရွေးပါစေ။ Engine core မှ mapping profile သို့ dependency တစ်ဖက်သတ်သာ ဖြစ်ရမည်။
+- `GenericPitchedMapping` သည် ordinary pitched notes အားလုံးအတွက် default ဖြစ်ရမည်။ `InstrumentProfile` သည် part/instrument identity, clef, staff count, written-to-sounding transposition, octave transposition နှင့် optional engraving settings ကို ဖော်ပြနိုင်ရမည်။
+- `MappingRegistry` သည် instrument/part identity, `InstrumentProfile` နှင့် user override ကို ကြည့်ပြီး generic mapping သို့မဟုတ် လိုအပ်သည့် specialized mapping ကို ရွေးပါစေ။ Registry တွင် mapping မရှိသော instrument ဖြစ်သော်လည်း valid note data ကို generic mapping ဖြင့် render လုပ်ရမည်။ Engine core မှ mapping profile သို့ dependency တစ်ဖက်သတ်သာ ဖြစ်ရမည်။
 - `PianoMapping` သည် note letter, accidental, octave, clef နှင့် grand-staff policy တို့မှ staff position ကိုတွက်ပါစေ။ Written pitch နှင့် sounding pitch transposition ကို သီးခြားထားပြီး treble/bass clef, ledger line, grand-staff split/overlap, user remap များအတွက် tests ထည့်ပါ။
 - `DrumMapping` သည် လက်ရှိ `DrumMappingTable` ကို shared interface မှတစ်ဆင့် သုံးပါစေ။ `instrumentId` သို့မဟုတ် MIDI pitch ကို အသုံးပြုပြီး drum identity, staff position, notehead, voice နှင့် articulation ကို သတ်မှတ်ပါ။ MusicXML တွင် explicit `<display-step>/<display-octave>` ပါလျှင် staff position ကို ထိုတန်ဖိုးမှယူပါ။ Explicit `<notehead>` သည် default/profile ထက် ဦးစားပေးရမည်။
+- Piano နှင့် Drum သည် specialized mapping ၏ ဥပမာများသာဖြစ်ပြီး engine ၏ အကျယ်အဝန်းကို မသတ်မှတ်ရ။ Strings, woodwinds, brass, keyboard/organ, vocal parts, octave-transposing instruments နှင့် pitched/unpitched percussion အပါအဝင် MusicXML မှတ်တမ်းတင်ထားသည့် အခြား instrument များကို generic support နှင့် လိုအပ်သည့် `InstrumentProfile` များဖြင့် ကိုင်တွယ်ပါ။ Instrument တစ်ခုချင်းစီအတွက် သီးခြား map မဖြစ်မနေ မလိုအပ်စေရ။
+- Orchestra/ensemble score များအတွက် instrument part များစွာ၊ part တစ်ခုအတွင်း staff/voice များစွာ၊ transposing part, part name/abbreviation, score order နှင့် system spacing ကို ထိန်းသိမ်း၍ render လုပ်နိုင်ကြောင်း fixture/tests ထည့်ပါ။ Group bracket/barline နှင့် automatic condensing ကို သီးခြား scope အဖြစ် ဆုံးဖြတ်ပြီး basic multi-part support ကို ထို feature များအပေါ် မမှီခိုစေရ။
 - `MappingProfile` သည် MuseScore မှ ကိုးကားထားသော default နှင့် project ၏ ကိုယ်ပိုင် house style ကို သီးခြားထားပါစေ။ MuseScore တန်ဖိုးများကို project default အဖြစ်သုံးမသုံးကို fixture comparison နှင့် အသုံးပြုသူဆုံးဖြတ်ချက်နောက်မှ ဆုံးဖြတ်ပါ။ Profile တစ်ခုချင်းကို config မှ override လုပ်နိုင်ရမည်။
 - Resolution precedence ကို tests များဖြင့် အတည်ပြုပါ: source MusicXML ၏ explicit display/notehead/stem metadata → user profile override → instrument mapping → documented fallback + diagnostic။ Fallback ကြောင့် note ကို မဖယ်ရှားဘဲ diagnostic ပေးရမည်။
 
 Implementation sequence:
 
-1. `[ ]` Shared mapping types/context/result, `MappingRegistry` болон precedence contract-ийг design document + type-level tests ဖြင့် သတ်မှတ်ပါ။
-2. `[ ]` Existing drum mapping ကို contract ထဲသို့ adapter ဖြင့်တင်ပြီး data/behavior မပြောင်းဘဲ regression tests ဖြင့် အတည်ပြုပါ။
-3. `[ ]` `PianoMapping` ကို implement လုပ်ပါ; clef/staff conversion, grand-staff split နှင့် user-defined remap cases များအတွက် fixture/snapshot tests ထည့်ပါ။
-4. `[ ]` `MappingProfile` customization/persistence, diagnostics နှင့် renderer bridge ကို integrate လုပ်ပါ။ Mapping profile ပြောင်းလဲသော်လည်း playback/sounding pitch မပြောင်းကြောင်း tests ထည့်ပါ။
-5. `[ ]` MuseScore ၏ pinned reference fixture များနှင့် နှိုင်းယှဉ်ပြီး ကိုယ်ပိုင် style ၏ ရည်ရွယ်ထားသော ကွာခြားချက်များကို documentation တွင် မှတ်တမ်းတင်ပါ။
+1. `[ ]` Generic pitched mapping, `InstrumentProfile`, shared input/context/result types, `MappingRegistry` နှင့် precedence ကို သတ်မှတ်ပြီး contract/type-level tests ရေးပါ။
+2. `[ ]` Instrument-specific map မရှိသော part များအပါအဝင် ပုံမှန် pitched instrument အားလုံးကို generic mapping ဖြင့် render လုပ်နိုင်ကြောင်း စစ်ဆေးပါ။ မသိသော instrument identifier တစ်ခုကြောင့် note ကို မပယ်ချရ။
+3. `[ ]` လိုအပ်သည့် special notation အတွက် profile/module များကို တိုးချဲ့ပါ။ ရှိပြီးသား Drum mapping ကို adapter ဖြင့်ဆက်သုံးပြီး Piano/grand staff, transposition/octave transposition, strings/tablature, pitched/unpitched percussion စသည့် case များကို သက်ဆိုင်ရာ tests ဖြင့် ဖြေရှင်းပါ။
+4. `[ ]` Orchestra/ensemble fixtures ဖြင့် multi-part, multi-staff, multi-voice, transposing instruments, part names/order နှင့် vertical/system layout ကို စမ်းသပ်ပါ။ Group brackets/barlines နှင့် automatic condensing ကို သီးခြားဆုံးဖြတ်ပါ။
+5. `[ ]` `MappingProfile` customization/persistence, diagnostics နှင့် renderer bridge ကို ချိတ်ဆက်ပါ။ MusicXML explicit data → user override → instrument profile → generic fallback precedence ကို စမ်းသပ်ပါ။ Mapping က sounding pitch/playback ကို မပြောင်းရ။
+6. `[ ]` MuseScore reference behavior နှင့် pinned fixture/snapshot comparison လုပ်ပြီး project style ၏ ရည်ရွယ်ထားသော ကွာခြားချက်များ၊ per-source license နှင့် attribution ကို မှတ်တမ်းတင်ပါ။
+
+**ပြီးစီးမှုစံ:** Profile စာရင်းထဲမပါသော instrument ပါအဝင် valid note များ မပျောက်ဘဲ render ဖြစ်ရမည်။ အမျိုးမျိုးသော instrument family များနှင့် orchestra/ensemble ၏ multi-part, multi-staff score များကို fixture/integration tests ဖြင့် အတည်ပြုရမည်။ Mapping သည် source MusicXML data, rhythm, sounding pitch သို့မဟုတ် playback ကို မပြောင်းရ။
 
 ### P3 — Rendering/layout လိုက်လျောညီထွေမှုကို တိုးတက်စေရန်
 
