@@ -58,4 +58,10 @@ Web View တွင် tool cards များကို တစ်တန်းလ�
 
 ## 2026-11-13 — Common studio split view with Drum first
 
-Tool box တစ်ခုခုကိုနှိပ်လျှင် instrument အားလုံးအတွက် တူညီသော `studio-workspace` view ကို ဖွင့်ရန် structure ထည့်ထားသည်။ Web View တွင် ဘယ်ဘက် panel သည် instrument controls ဖြစ်ပြီး ညာဘက် panel သည် Video preview ဖြစ်သည်။ Drum ကို ပထမဆုံးအဖြစ် အကောင်အထည်ဖော်ထားပြီး Kick, Snare, Hi-hat pads, Tempo နှင့် Start recording control များ ပါဝင်သည်။ Phone View တွင် အဆိုပါ panels နှစ်ခုကို အပေါ်အောက် stack ပြုလုပ်ထားသည်။ အခြား instrument များသည် ယခုအဆင့်တွင် တူညီသော workspace ကိုအသုံးပြု၍ သက်ဆိုင်ရာ controls များကို နောက်အဆင့်တွင် ဖြည့်မည်။
+Tool box တစ်ခုခုကိုနှိပ်လျှင် instrument အားလုံးအတွက် တူညီသော `studio.html?tool=...` Studio Page သို့ navigate လုပ်ရန် structure ထည့်ထားသည်။ Create Video Page သည် tool selection page အဖြစ် သီးခြားကျန်ပြီး Drum ကိုနှိပ်လျှင် `studio.html?tool=drums` သို့ ရောက်မည်။ Studio Page Web View တွင် ဘယ်ဘက် panel သည် instrument controls ဖြစ်ပြီး ညာဘက် panel သည် Video preview ဖြစ်သည်။ Drum ကို ပထမဆုံးအဖြစ် အကောင်အထည်ဖော်ထားပြီး Kick, Snare, Hi-hat pads, Tempo နှင့် Start recording control များ ပါဝင်သည်။ Phone View တွင် အဆိုပါ panels နှစ်ခုကို အပေါ်အောက် stack ပြုလုပ်ထားသည်။ အခြား instrument များသည် တူညီသော Studio Page layout ကို အသုံးပြု၍ သက်ဆိုင်ရာ controls များကို နောက်အဆင့်တွင် ဖြည့်မည်။
+
+### Page files
+
+- `Website/Website/index.html` — Create Video tool selection page
+- `Website/Website/studio.html` — shared instrument studio page
+- `Website/Website/script.js` — tool query parameter နှင့် page navigation logic

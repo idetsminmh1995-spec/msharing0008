@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="M Sharing instrument studio with controls and video preview." />
+    <title>Drum Studio — M Sharing</title>
+    <link rel="stylesheet" href="styles.css?v=studio-20261113" />
+  </head>
+  <body data-studio-page>
+    <header class="site-header" data-header>
+      <div class="header-shell">
+        <button class="icon-button menu-button" type="button" aria-label="Open menu" aria-expanded="false" data-menu-toggle><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg></button>
+        <a class="brand" href="index.html#home" aria-label="M Sharing home"><span class="brand-mark" aria-hidden="true">M</span><span class="brand-name">Sharing</span></a>
+        <nav class="desktop-nav" aria-label="Primary navigation">
+          <a class="nav-link" href="index.html#courses">Courses</a><a class="nav-link" href="index.html#store">Store</a><a class="nav-link is-active" href="index.html#create-video">Create Video</a><a class="nav-link" href="index.html#notation-lab">Notation Lab</a>
+        </nav>
+        <div class="header-actions">
+          <button class="icon-button search-button" type="button" aria-label="Search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.1-5.4a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" /></svg></button>
+          <button class="text-button language-button" type="button" aria-label="Change language" data-language-toggle><span data-language>EN</span><span class="language-divider">/</span><span class="language-muted" data-language-alt>MM</span></button>
+          <button class="icon-button theme-button" type="button" aria-label="Switch to light mode" data-theme-toggle><svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" /><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></svg><svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.3A8.5 8.5 0 0 1 8.7 3.5 8.5 8.5 0 1 0 20.5 15.3Z" /></svg></button>
+          <button class="icon-button desktop-only" type="button" aria-label="Favorites"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 8.8c0 5.5-8.8 10.3-8.8 10.3S3.2 14.3 3.2 8.8A4.7 4.7 0 0 1 12 6.4a4.7 4.7 0 0 1 8.8 2.4Z" /></svg></button>
+          <button class="icon-button desktop-only" type="button" aria-label="Shopping cart"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 1.9-1.4L20 8H6M10 20a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm9 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" /></svg></button>
+          <button class="icon-button notification-button" type="button" aria-label="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Zm-8.5 12h5" /></svg><span class="notification-dot" aria-hidden="true"></span></button>
+          <button class="icon-button account-button desktop-only" type="button" aria-label="Account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg></button>
+        </div>
+      </div>
+      <nav class="mobile-nav" aria-label="Mobile menu" data-mobile-nav><a class="nav-link" href="index.html#courses">Courses</a><a class="nav-link" href="index.html#store">Store</a><a class="nav-link is-active" href="index.html#create-video">Create Video</a><a class="nav-link" href="index.html#notation-lab">Notation Lab</a></nav>
+    </header>
+
+    <nav class="mobile-bottom-nav" aria-label="Mobile bottom navigation">
+      <a class="bottom-nav-item" href="index.html#home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z" /><path d="M9 21v-7h6v7" /></svg><span>Home</span></a>
+      <a class="bottom-nav-item" href="index.html#courses"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></svg><span>Courses</span></a>
+      <a class="bottom-nav-item" href="index.html#store"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-1 14H5L4 5Zm0 0-1-2M9 9a3 3 0 0 0 6 0" /></svg><span>Store</span></a>
+      <a class="bottom-nav-item is-active" href="index.html#create-video"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg><span>Create Video</span></a>
+      <a class="bottom-nav-item" href="index.html#notation-lab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v11.5M8 4l10-2v11.5M8 8l10-2" /><ellipse cx="5.5" cy="17" rx="3" ry="2.2" /><ellipse cx="15.5" cy="15" rx="3" ry="2.2" /></svg><span>Notation Lab</span></a>
+      <a class="bottom-nav-item" href="index.html#account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg><span>Account</span></a>
+    </nav>
+
+    <main class="create-page studio-page" id="studio">
+      <a class="studio-back-link" href="index.html#create-video">← Back to Create Video</a>
+      <section class="studio-workspace" data-studio-workspace aria-labelledby="studio-title">
+        <div class="studio-panel studio-panel--controls">
+          <div class="studio-panel-heading"><div><p class="eyebrow">INSTRUMENT SETUP</p><h1 id="studio-title" data-studio-title>Drum Studio</h1></div><span class="studio-live-dot">Ready</span></div>
+          <p class="studio-description" data-studio-description>Build a beat with your drum kit, then record it into the video preview.</p>
+          <div class="drum-pad-grid" aria-label="Drum pads">
+            <button type="button" class="drum-pad drum-pad--kick"><span>●</span><small>Kick</small></button>
+            <button type="button" class="drum-pad drum-pad--snare"><span>◉</span><small>Snare</small></button>
+            <button type="button" class="drum-pad drum-pad--hihat"><span>✦</span><small>Hi-hat</small></button>
+          </div>
+          <div class="tempo-row"><span>Tempo</span><strong>120 BPM</strong><button type="button" aria-label="Adjust tempo">↕</button></div>
+          <button type="button" class="record-button"><span class="record-dot"></span> Start recording</button>
+        </div>
+        <div class="studio-panel studio-panel--video">
+          <div class="video-panel-heading"><div><p class="eyebrow">VIDEO PREVIEW</p><h2>Performance canvas</h2></div><span class="video-format">16:9</span></div>
+          <div class="video-stage"><div class="video-play-mark">▶</div><p data-video-message>Your drum performance will appear here.</p><span class="video-stage-line"></span></div>
+          <div class="video-panel-footer"><span>Camera ready</span><span class="video-timer">00:00</span></div>
+        </div>
+      </section>
+    </main>
+    <script src="script.js?v=studio-20261113"></script>
+  </body>
+</html>
