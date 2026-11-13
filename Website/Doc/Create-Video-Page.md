@@ -51,3 +51,7 @@ User feedback အရ Hero နှင့် tool cards များကို ထ�
 ## 2026-11-13 — Phone layout stability check
 
 Phone viewport ကို `390×844` ဖြင့် ပြန်လည်စစ်ဆေးပြီး fixed header, mobile menu နှင့် six-item bottom navigation များ၏ မူလ behavior ကို မပြောင်းဘဲ ထိန်းထားသည်။ Mobile content အောက်တွင် bottom navigation height အတွက် safe space ထည့်ထားပြီး နောက်ဆုံး tool row များ navigation အောက်တွင် မပျောက်စေရန် ပြင်ဆင်ထားသည်။ Phone breakpoint တွင် icon/text override များကို compact card sizing နှင့် ကိုက်ညီအောင် ပြန်ညှိထားသည်။ Headless Chromium screenshot ဖြင့် phone layout ကို verify လုပ်ထားသည်။
+
+## 2026-11-13 — Five-column web tool grid
+
+Web View တွင် tool cards များကို တစ်တန်းလျှင် ၅ ခုစီ ပေါ်စေရန် desktop grid ကို `repeat(5, 1fr)` သို့ ပြောင်းထားသည်။ Tablet breakpoint တွင် 3-column နှင့် phone breakpoint တွင် 2-column layout များကို မပြောင်းဘဲ ထိန်းထားသည်။ Desktop screenshot ဖြင့် five-column layout ကို verify လုပ်ထားသည်။
