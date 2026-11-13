@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Final review: a measure whose HEADER is wider than the engine's own
+  MEASURE_HEADER_ALLOWANCE constant (6.0).
+
+  Clef (3) + four sharps (4 + 0.5) + time signature (2.5) + the leading
+  0.5 = 10.5 units of header, where the constant reserved 6.0. The note
+  pass always drew past the real header; the tempo mark, the direction
+  placement and positionToX all used the bare constant, so the playback
+  cursor sat 4.5 staff spaces to the left of the note it was pointing at,
+  and the tempo mark was drawn on top of the key signature.
+
+  Four sharps, 2/4, and a tempo mark, which is the exact combination that
+  makes all three visible at once. Every pitch here (E, B, A) is natural
+  in E major, so no note carries a cancelling accidental. This fixture is
+  about header width, and an accidental would put a second glyph in front
+  of a notehead for no reason.
+-->
+<score-partwise version="4.0">
+  <part-list>
+    <score-part id="P1">
+      <part-name>Piano</part-name>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>2</divisions>
+        <key><fifths>4</fifths></key>
+        <time><beats>2</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef>
+      </attributes>
+      <direction placement="above">
+        <direction-type>
+          <metronome>
+            <beat-unit>quarter</beat-unit>
+            <per-minute>180</per-minute>
+          </metronome>
+        </direction-type>
+        <sound tempo="180"/>
+      </direction>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>2</duration>
+        <type>quarter</type>
+      </note>
+      <note>
+        <pitch><step>B</step><octave>4</octave></pitch>
+        <duration>2</duration>
+        <type>quarter</type>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>A</step><octave>4</octave></pitch>
+        <duration>2</duration>
+        <type>quarter</type>
+      </note>
+      <note>
+        <pitch><step>E</step><octave>5</octave></pitch>
+        <duration>2</duration>
+        <type>quarter</type>
+      </note>
+    </measure>
+  </part>
+</score-partwise>

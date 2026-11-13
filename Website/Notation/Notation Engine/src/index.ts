@@ -1,0 +1,33 @@
+// Notation Engine -- entry point.
+//
+// Phase 2's toolchain smoke-test stub has grown into the real public API,
+// starting with Phase 3's core data model.
+
+/** Semantic version of the engine itself, bumped by hand for now. */
+export const ENGINE_VERSION = '0.0.0';
+
+export * from './core/index.js';
+export * from './glyphs/index.js';
+export * from './geometry/index.js';
+export * from './render/index.js';
+export * from './config/index.js';
+export * from './parser/index.js';
+export * from './layout/index.js';
+export * from './timing/index.js';
+export * from './drums/index.js';
+export * from './playback/index.js';
+export * from './debug/index.js';
+export * from './export/index.js';
+export * from './render-from-musicxml.js';
+
+/**
+ * MuseScore's own notation data, as a namespace rather than merged
+ * into the surface above.
+ *
+ * It is a separate layer on purpose -- a second, independently-sourced
+ * answer to questions the engine already answers its own way -- and a
+ * namespace keeps that visible at every call site:
+ * `MuseScore.MUSESCORE_DRUMSET` can never be mistaken for the engine's
+ * own `DEFAULT_DRUM_MAPPING_TABLE`. See `src/musescore/README.md`.
+ */
+export * as MuseScore from './musescore/index.js';

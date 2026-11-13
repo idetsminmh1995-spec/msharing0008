@@ -1,0 +1,72 @@
+# Notation Engine — Code Review နှင့် ပြီးစီးပြီးသားများ
+
+**သုံးသပ်ရက်စွဲ:** 2026-11-13
+
+**Source:** chat မှတင်ပေးထားသော `notation-engine.rar`
+**Repository လမ်းကြောင်း:** `Website/Notation/Notation Engine/`
+
+## ဤအလုပ်တွင် ပြီးစီးခဲ့သောအရာများ
+
+- [x] RAR archive ကို integrity-test လုပ်ခဲ့သည်။ `unrar t` ၏ရလဒ်မှာ `All OK` ဖြစ်သည်။ Archive စာရင်းတွင် entry 406 ခုရှိပြီး `notation-engine/` root တစ်ခုတည်းအောက်တွင်သာရှိကာ path traversal path မတွေ့ခဲ့ပါ။
+- [x] Archive ထဲမှ root contents ကို `Website/Notation/Notation Engine/` ထဲသို့ တစ်ဆင့်ပိုသော nested `notation-engine/` folder မဖန်တီးဘဲ ထည့်သွင်းခဲ့သည်။ ရရှိလာသော file 372 ခု၏စုစုပေါင်းအရွယ်အစားမှာ 7.4 MB ခန့်ဖြစ်သည်။ Source, tests, package manifests နှင့် bundled `dist/` တို့ပါဝင်သည်။
+- [x] Core/parser/render/layout/playback/export modules, public API entry points, test inventory, package/build scripts နှင့် module README များကို static code review လုပ်ခဲ့သည်။
+- [x] ဆက်လက်လုပ်ဆောင်ရန် roadmap ကို [`../Notation Plan/PLAN.md`](../Notation%20Plan/PLAN.md) တွင်ရေးသားခဲ့သည်။
+- [x] လက်ရှိ implementation နှင့် review ကန့်သတ်ချက်များကို ဤ Doc တွင် မှတ်တမ်းတင်ခဲ့သည်။
+
+## Engine ၏ လက်ရှိဖွဲ့စည်းပုံ
+
+`src/index.ts` သည် public barrel ဖြစ်သည်။ အဓိက flow မှာ `parseMusicXml(xmlText)` → `ParseResult` → `renderParsedMusicXml(parsed, { config })` ဖြစ်ပြီး shortcut `renderFromMusicXml(xmlText, options)` သည် parse/render ကို တစ်ခါတည်းလုပ်ကာ `{ svg, diagnostics, playback }` ပြန်ပေးသည်။ တူညီသော score ကို config ပြောင်းပြီး ပြန်ထုတ်လိုလျှင် parsed result ကို ပြန်အသုံးပြုနိုင်သည်။
+
+| Layer | လက်ရှိ code ၏တာဝန် |
+|---|---|
+| `src/core/` | Pitch, Duration, Note, Rest, Chord, Voice, Measure, Part, Score အပါအဝင် instrument-neutral score model နှင့် tick math |
+| `src/parser/musicxml/` | MusicXML parse, attributes/cursor, notes/voices/chords, directions, notations, metadata, diagnostics |
+| `src/parser/midi/` | MIDI byte stream မှ notes နှင့် tempo/time/key-signature meta events ကို parse လုပ်ခြင်း |
+| `src/glyphs/` | SMuFL glyph names နှင့် bundled Bravura metadata/metrics |
+| `src/geometry/`, `src/render/` | Staff-space geometry တွက်ချက်ခြင်းနှင့် SVG markup/DOM string တည်ဆောက်ခြင်း |
+| `src/layout/` | Spacing, skyline clearance, continuous scroll နှင့် page/system layout |
+| `src/timing/`, `src/playback/` | Tempo/tick conversions, event stream, position mapping, cursor/playhead နှင့် repeat unfolding |
+| `src/drums/`, `src/musescore/` | Drum mapping/overrides နှင့် MuseScore-derived notation defaults/provenance |
+| `src/export/`, `src/debug/` | SVG/PNG/PDF export helpers, diagnostic filtering နှင့် layout/debug overlays |
+| `src/config/` | `EngineConfig`, defaults နှင့် field-by-field `resolveConfig()` merge |
+
+## Code ထဲတွင် ရှိပြီးသား capabilities
+
+### Parsing နှင့် score data
+
+- MusicXML parser သည် partwise/timewise score အတွက် typed `Score` data ထုတ်ပေးပြီး voices, notes/rests/chords, multi-part/staff attributes, divisions/ticks, positioned attribute changes နှင့် diagnostics ကို ကိုင်တွယ်ထားသည်။
+- Side tables အနေဖြင့် tempo marks, dynamics/directions, octave shifts, harmony, print/layout breaks, instrument mapping, score defaults/identity/credits တို့ကို ထိန်းထားသည်။ Parsing result အားလုံးကို `Score` core type ထဲ ထည့်မထားခြင်းမှာ intentional design ဖြစ်သည်။
+- MXL (`.mxl`) အတွက် `unzipMxl(bytes, domParser)` ရှိသော်လည်း MXL bytes ကို `renderFromMusicXml()` ထဲ တိုက်ရိုက်ပေးသည့် API မဟုတ်ပါ; unzip ပြီး XML text ကို MusicXML API သို့ပေးရသည်။
+- MIDI `parseMidiFile(bytes)` သည် format 0/1 ကို parse လုပ်ပြီး file PPQ မှ internal 480 ticks-per-quarter သို့ normalize လုပ်သည်။ Format 2 နှင့် SMPTE timing ကို diagnostic ဖြင့် reject လုပ်သည်။ MIDI output သည် note/meta timeline သာဖြစ်ပြီး လက်ရှိ API တွင် MIDI→`Score` conversion သို့ MusicXML renderer နှင့်ပေါင်းထားသော high-level flow မရှိပါ။
+
+### Engraving, layout နှင့် playback
+
+- SMuFL glyph table နှင့် Bravura metadata ကို အသုံးပြုပြီး notes/rests, accidentals, clefs, key/time signatures, stems/flags/beams, ties/slurs/tuplets, dynamics/hairpins, lyrics, chord symbols, rehearsal marks, tablature စသည်များအတွက် geometry/render code ပါဝင်သည်။
+- `EngineConfig` မှ color/font/layout/cursor/notehead/beam/spacing/page/drum/text/debug options များကို override လုပ်နိုင်သည်။ Scroll နှင့် page mode, spacing laws, skyline staves clearance, explicit break hints တို့ကို layout layer က ကိုင်တွယ်သည်။
+- Playback layer သည် score/layout ပေါ်အခြေခံသော note event stream, event ID, written/performance repeat position mapping, cursor/playhead position helpers တို့ကိုပေးသည်။ **Audio playback/synthesis ကိုယ်တိုင်** မလုပ်ဘဲ host app က event stream ကို အသုံးပြုရသည်။
+- MuseScore-related mappings/defaults များကို `src/musescore/` ထဲတွင် provenance နှင့်အတူဖော်ပြထားပြီး drum table, spacing/style data နှင့် selected engraving conventions တွင် အသုံးပြုထားသည်။
+- Export layer တွင် SVG, PNG နှင့် PDF helpers ပါဝင်သည်။ PDF သည် vector PDF မဟုတ်ဘဲ raster image များဖြင့်ဖွဲ့ထားသည်။ Browser သို့မဟုတ် host-provided backend လိုအပ်နိုင်သည်။ `exportPng()` သည် raster slice တစ်ခုကိုသာ ပြန်ပေးသည်။
+
+## Test source ရှိမှုနှင့် မစမ်းသပ်ရသေးသောအချက်
+
+Repo ထဲတွင် unit test file 90 ခု၊ visual snapshot file 29 ခု၊ fixture file 56 ခုနှင့် performance test 1 ခုရှိသည်။ Tests သည် core, parsers, notation geometry, page/scroll layout, timing/alignment, playback/cursor/repeats, drums, config, exports နှင့် visual render cases များကို cover လုပ်ရန်ရေးသားထားသည်။
+
+**အရေးကြီး:** ဤ code review အတွင်း `npm ci`, `npm run build`, `npm test` သို့မဟုတ် `npm run verify` မလုပ်ခဲ့ပါ။ ထို့ကြောင့် စာရင်းပါ tests များသည် repo ထဲတွင်ရှိကြောင်းသာ အတည်ပြုထားပြီး pass ဖြစ်သည်ဟု မကြေညာပါ။ Engine directory ထဲ `node_modules/` မရှိခဲ့ပါ။
+
+## တွေ့ရှိထားသော follow-up gaps / risks
+
+1. **README drift:** `src/parser/README.md`, `src/layout/README.md`, `src/export/README.md` နှင့် `test/fixtures/README.md` အချို့တွင် “Nothing here yet / Phase 1” ဟုရေးထားသေးသော်လည်း အဆိုပါ code/tests များ ရှိပြီးသားဖြစ်သည်။ `theme/` သည် `EngineConfig` ဖြင့် superseded, `plugins/` သည် use case မရှိသေးသဖြင့် intentionally deferred ဖြစ်သည်။
+2. **MIDI boundary:** MIDI parsing နှင့် low-level MIDI alignment ရှိသော်လည်း parse → multi-part alignment → playback event association အထိ end-to-end API တစ်ခု မရှိသေးပါ။ Host integration လို/မလို ဆုံးဖြတ်ရမည်။
+3. **Staff-line/TAB integration:** `computeStaffGeometry()` သည် အမျိုးမျိုးသော line count ကိုတွက်နိုင်သော်လည်း `render-from-musicxml.ts` တွင် `STAFF_LINES = 5` နှင့်ဆိုင်သော assumptions များကျန်ရှိသည်။ TAB staff သည် end-to-end support ပြည့်စုံမပြည့်စုံ ထပ်မံစစ်ဆေးရန်လိုသည်။
+4. **Page reflow:** resize helpers ရှိသော်လည်း page dimension ပြောင်းသည့်အခါ repagination/reflow ကို unified public engine operation အဖြစ် အပြည့်အဝ wired လုပ်ထားခြင်းမရှိသေးပါ; page systems အတွက် fixed-height simplification ပါရှိသည်။
+5. **Runtime validation:** `resolveConfig()` သည် defaults merge လုပ်သော်လည်း JavaScript caller များမှလာသော value ranges/enums ကို runtime အဆင့်တွင် အပြည့်အဝ validate မလုပ်ပါ။ Timing-map input values အတွက်လည်း zero/negative/non-finite cases ကို harden လုပ်ရန် roadmap ထဲတွင် ထည့်ထားသည်။
+6. **Raster slicing:** `rasterizeSvg()` တွင် slice height rounding ကြောင့် အချို့ non-divisible dimension များတွင် pixel rows ပျောက်/ထပ်နိုင်သည့် risk ကို targeted test ဖြင့်စစ်ရန်လိုသည်။
+7. **Build path mismatch:** Engine build script သည် bundle ကို sibling `Website/website/assets` သို့ကူးပြီး `Website/website`၊ `Website/web-preview` တို့ကို scan လုပ်သည်။ လက်ရှိ repo checkout တွင် အဲဒီ lowercase directory-များ မတွေ့ရဘဲ `Website/index.html`, `script.js`, `styles.css` သာရှိသည်။ Build/verify မလုပ်မီ destination ကို reconcile လုပ်ရမည်။ API-doc generator သည် `Website/Plan/Notation Plan/Documentation/API.md` သို့ရေးရန်သတ်မှတ်ထားပြီး ယခုတောင်းထားသော `Website/Notation/Notation Plan/` နှင့်လမ်းကြောင်းမတူပါ။
+8. **Visual tests:** SVG snapshot များရှိသော်လည်း browser render check သည် Chromium/font မရှိလျှင် skip ဖြစ်နိုင်သည်။ CI မှာ prerequisites ကိုပြတ်သားစွာသတ်မှတ်ရန်လိုသည်။
+
+## ဒီ review မှာ မလုပ်ခဲ့သည့်အရာ
+
+- Engine implementation ကို ပြင်ဆင်/feature အသစ်ရေးသားခြင်း မလုပ်ခဲ့ပါ။
+- Project ၏ npm build/test scripts များကို မ run ခဲ့ပါ။
+- Test suite pass/fail ကို အတည်မပြုခဲ့ပါ။
+- Source comments ထဲတွင်ပါသည့် plan/phase ရည်ညွှန်းချက်များကို လက်ရှိ code behavior နှင့်မတူပါက အမှန်တရားအဖြစ် မယူဆခဲ့ပါ။

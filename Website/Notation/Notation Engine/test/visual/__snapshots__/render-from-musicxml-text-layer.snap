@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1175" height="584.12" viewBox="-1 0 58.75 29.206">
+<rect x="-1" y="0" width="58.75" height="29.206" fill="#ffffff" />
+<g data-chord-symbol="true">
+<text x="4.8678" y="9.376" font-family="Manrope, sans-serif" font-size="1.8" fill="#000000">C</text>
+<text x="6.1278" y="9.376" font-family="Bravura" font-size="1.8" fill="#000000"></text>
+</g>
+<text x="6" y="6.372" font-family="Manrope, sans-serif" font-size="2.4" fill="#000000" text-anchor="middle" font-style="italic">Allegro</text>
+<g data-rehearsal-mark="true">
+<rect x="4.71" y="0.978" width="2.58" height="3.3" fill="none" stroke="#000000" stroke-width="0.16" />
+<text x="6" y="3.3" font-family="Manrope, sans-serif" font-size="2.4" fill="#000000" text-anchor="middle">A</text>
+</g>
+<g>
+<line x1="0" y1="19.776" x2="20" y2="19.776" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="18.776" x2="20" y2="18.776" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="17.776" x2="20" y2="17.776" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="16.776" x2="20" y2="16.776" stroke="#000000" stroke-width="0.13" />
+<line x1="0" y1="15.776" x2="20" y2="15.776" stroke="#000000" stroke-width="0.13" />
+</g>
+<text x="0.5" y="18.776" font-family="Bravura" font-size="4" fill="#000000"></text>
+<text x="3.5" y="16.776" font-family="Bravura" font-size="4" fill="#000000"></text>
+<text x="3.5" y="18.776" font-family="Bravura" font-size="4" fill="#000000"></text>
+<g data-id="P1#m1#v1#e0">
+<text x="6" y="17.276" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="6" y1="17.444" x2="6" y2="20.944" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-id="P1#m1#v1#e1">
+<text x="9.5" y="16.276" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="9.5" y1="16.444" x2="9.5" y2="19.944" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-id="P1#m1#v1#e2">
+<text x="13" y="15.276" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="13" y1="15.444" x2="13" y2="18.944" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-id="P1#m1#v1#e3">
+<text x="16.5" y="13.776" font-family="Bravura" font-size="4" fill="#000000"></text>
+<g>
+<line x1="15.51" y1="14.776" x2="17.49" y2="14.776" stroke="#000000" stroke-width="0.16" />
+<line x1="15.51" y1="13.776" x2="17.49" y2="13.776" stroke="#000000" stroke-width="0.16" />
+</g>
+<line x1="16.5" y1="13.944" x2="16.5" y2="17.944" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-lyric-row="true">
+<text x="6" y="21.976" font-family="Manrope, sans-serif" font-size="1.8" fill="#000000" text-anchor="middle">Hal</text>
+<text x="9.5" y="21.976" font-family="Manrope, sans-serif" font-size="1.8" fill="#000000" text-anchor="middle">le</text>
+<text x="13" y="21.976" font-family="Manrope, sans-serif" font-size="1.8" fill="#000000" text-anchor="middle">lu</text>
+<text x="7.8382" y="21.4" font-family="Bravura" font-size="1.8" fill="#000000"></text>
+<text x="11.0232" y="21.4" font-family="Bravura" font-size="1.8" fill="#000000"></text>
+<line x1="14.51" y1="22.246" x2="18" y2="22.246" stroke="#000000" stroke-width="0.16" />
+</g>
+<g data-lyric-row="true">
+<text x="6" y="24.576" font-family="Manrope, sans-serif" font-size="1.8" fill="#000000" text-anchor="middle">Praise</text>
+</g>
+<g>
+<line x1="20" y1="19.776" x2="20" y2="15.776" stroke="#000000" stroke-width="0.16" />
+</g>
+<text x="0" y="14.776" fill="#000000" font-family="Manrope, sans-serif" font-size="1.6">1</text>
+<g data-chord-symbol="true">
+<text x="18.9475" y="9.376" font-family="Manrope, sans-serif" font-size="1.8" fill="#000000">D</text>
+<text x="20.2075" y="9.376" font-family="Bravura" font-size="1.8" fill="#000000"></text>
+<text x="20.7925" y="9.376" font-family="Manrope, sans-serif" font-size="1.8" fill="#000000">7</text>
+</g>
+<g data-chord-symbol="true">
+<text x="25.2887" y="9.376" font-family="Manrope, sans-serif" font-size="1.8" fill="#000000">G</text>
+<text x="26.5487" y="9.376" font-family="Manrope, sans-serif" font-size="1.8" fill="#000000">7</text>
+<text x="27.8087" y="9.376" font-family="Bravura" font-size="1.8" fill="#000000"></text>
+<text x="28.4513" y="9.376" font-family="Manrope, sans-serif" font-size="1.8" fill="#000000">B</text>
+</g>
+<g>
+<line x1="20" y1="19.776" x2="34.5" y2="19.776" stroke="#000000" stroke-width="0.13" />
+<line x1="20" y1="18.776" x2="34.5" y2="18.776" stroke="#000000" stroke-width="0.13" />
+<line x1="20" y1="17.776" x2="34.5" y2="17.776" stroke="#000000" stroke-width="0.13" />
+<line x1="20" y1="16.776" x2="34.5" y2="16.776" stroke="#000000" stroke-width="0.13" />
+<line x1="20" y1="15.776" x2="34.5" y2="15.776" stroke="#000000" stroke-width="0.13" />
+</g>
+<g data-id="P1#m2#v1#e0">
+<text x="20.5" y="16.776" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="20.5" y1="16.944" x2="20.5" y2="20.444" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-id="P1#m2#v1#e1">
+<text x="24" y="15.776" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="24" y1="15.944" x2="24" y2="19.444" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-id="P1#m2#v1#e2">
+<text x="27.5" y="14.776" font-family="Bravura" font-size="4" fill="#000000"></text>
+<g>
+<line x1="26.51" y1="14.776" x2="28.49" y2="14.776" stroke="#000000" stroke-width="0.16" />
+</g>
+<line x1="27.5" y1="14.944" x2="27.5" y2="18.444" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-id="P1#m2#v1#e3">
+<text x="31" y="13.776" font-family="Bravura" font-size="4" fill="#000000"></text>
+<g>
+<line x1="30.01" y1="14.776" x2="31.99" y2="14.776" stroke="#000000" stroke-width="0.16" />
+<line x1="30.01" y1="13.776" x2="31.99" y2="13.776" stroke="#000000" stroke-width="0.16" />
+</g>
+<line x1="31" y1="13.944" x2="31" y2="17.944" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-lyric-row="true">
+<text x="20.5" y="21.976" font-family="Manrope, sans-serif" font-size="1.8" fill="#000000" text-anchor="middle">jah</text>
+</g>
+<g>
+<line x1="34.5" y1="19.776" x2="34.5" y2="15.776" stroke="#000000" stroke-width="0.16" />
+</g>
+<g data-chord-symbol="true">
+<text x="33.6653" y="9.376" font-family="Manrope, sans-serif" font-size="1.8" fill="#000000">F</text>
+<text x="34.9253" y="9.376" font-family="Bravura" font-size="1.8" fill="#000000"></text>
+<text x="35.4833" y="9.376" font-family="Bravura" font-size="1.8" fill="#000000"></text>
+</g>
+<g>
+<line x1="34.5" y1="19.776" x2="47.25" y2="19.776" stroke="#000000" stroke-width="0.13" />
+<line x1="34.5" y1="18.776" x2="47.25" y2="18.776" stroke="#000000" stroke-width="0.13" />
+<line x1="34.5" y1="17.776" x2="47.25" y2="17.776" stroke="#000000" stroke-width="0.13" />
+<line x1="34.5" y1="16.776" x2="47.25" y2="16.776" stroke="#000000" stroke-width="0.13" />
+<line x1="34.5" y1="15.776" x2="47.25" y2="15.776" stroke="#000000" stroke-width="0.13" />
+</g>
+<g data-id="P1#m3#v1#e0">
+<text x="35" y="16.276" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="35" y1="16.444" x2="35" y2="19.944" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-id="P1#m3#v1#e1">
+<text x="38.5" y="16.776" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="38.5" y1="16.944" x2="38.5" y2="20.444" stroke="#000000" stroke-width="0.12" />
+</g>
+<g data-id="P1#m3#v1#e2">
+<text x="42" y="17.276" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="42" y1="17.444" x2="42" y2="20.944" stroke="#000000" stroke-width="0.12" />
+</g>
+<g>
+<line x1="47.25" y1="19.776" x2="47.25" y2="15.776" stroke="#000000" stroke-width="0.16" />
+</g>
+<g data-chord-symbol="true">
+<text x="47.12" y="9.376" font-family="Manrope, sans-serif" font-size="1.8" fill="#000000">C</text>
+</g>
+<g>
+<line x1="47.25" y1="19.776" x2="55.75" y2="19.776" stroke="#000000" stroke-width="0.13" />
+<line x1="47.25" y1="18.776" x2="55.75" y2="18.776" stroke="#000000" stroke-width="0.13" />
+<line x1="47.25" y1="17.776" x2="55.75" y2="17.776" stroke="#000000" stroke-width="0.13" />
+<line x1="47.25" y1="16.776" x2="55.75" y2="16.776" stroke="#000000" stroke-width="0.13" />
+<line x1="47.25" y1="15.776" x2="55.75" y2="15.776" stroke="#000000" stroke-width="0.13" />
+</g>
+<g data-id="P1#m4#v1#e0">
+<text x="47.75" y="17.276" font-family="Bravura" font-size="4" fill="#000000"></text>
+</g>
+<g data-lyric-row="true">
+<text x="45.2975" y="21.976" font-family="Manrope, sans-serif" font-size="1.8" fill="#000000" text-anchor="middle">A</text>
+<text x="45.9275" y="21.976" font-family="Bravura" font-size="1.8" fill="#000000"></text>
+<text x="48.9425" y="21.976" font-family="Manrope, sans-serif" font-size="1.8" fill="#000000" text-anchor="middle">men</text>
+</g>
+<g>
+<line x1="55.75" y1="19.776" x2="55.75" y2="15.776" stroke="#000000" stroke-width="0.16" />
+<line x1="56.31" y1="19.776" x2="56.31" y2="15.776" stroke="#000000" stroke-width="0.5" />
+</g>
+</svg>

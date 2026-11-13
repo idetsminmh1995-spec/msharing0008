@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Integration H: one measure exercising every placement rule §9.19 and
+     §9.20 state, chosen so each note proves a DIFFERENT branch:
+       1. C5  (above the middle line, so a DOWN stem) + accent
+              -> articAccentAbove, the notehead side.
+       2. E4  (below the middle line, so an UP stem) + accent
+              -> articAccentBelow, the opposite notehead side.
+       3. E4  (UP stem again) + strong-accent
+              -> articMarcatoAbove anyway: §9.19's one named exception,
+                 which only an up-stem note can demonstrate.
+       4. C5  + trill-mark + staccato
+              -> ornamentTrill above the staff (§9.20 is unconditional),
+                 articStaccatoAbove next to the notehead. -->
+<score-partwise version="3.1">
+  <part-list><score-part id="P1"><part-name>Flute</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>2</divisions>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef>
+      </attributes>
+      <note>
+        <pitch><step>C</step><octave>5</octave></pitch>
+        <duration>2</duration><voice>1</voice><type>quarter</type>
+        <notations><articulations><accent/></articulations></notations>
+      </note>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>2</duration><voice>1</voice><type>quarter</type>
+        <notations><articulations><accent/></articulations></notations>
+      </note>
+      <note>
+        <pitch><step>E</step><octave>4</octave></pitch>
+        <duration>2</duration><voice>1</voice><type>quarter</type>
+        <notations><articulations><strong-accent/></articulations></notations>
+      </note>
+      <note>
+        <pitch><step>C</step><octave>5</octave></pitch>
+        <duration>2</duration><voice>1</voice><type>quarter</type>
+        <notations>
+          <articulations><staccato/></articulations>
+          <ornaments><trill-mark/></ornaments>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>

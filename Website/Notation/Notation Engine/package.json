@@ -1,0 +1,34 @@
+{
+  "name": "notation-engine",
+  "version": "0.0.0",
+  "private": true,
+  "description": "General-purpose TypeScript + SVG music notation engine -- works for any instrument, any MusicXML source.",
+  "type": "module",
+  "main": "dist/notation-engine.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --outfile=dist/notation-engine.js --format=iife --global-name=NotationEngine --sourcemap && node scripts/sync-website-bundle.mjs",
+    "typecheck": "tsc --noEmit",
+    "declarations": "tsc --emitDeclarationOnly",
+    "lint": "eslint src",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "test": "npm run build && node --test --test-concurrency=1",
+    "test:update-snapshots": "npm run build && UPDATE_SNAPSHOTS=1 node --test --test-concurrency=1",
+    "verify": "npm run typecheck && npm run lint && npm run format:check && npm run docs:check && npm run test",
+    "docs": "npm run declarations && node scripts/generate-api-docs.mjs",
+    "docs:check": "npm run declarations && node scripts/generate-api-docs.mjs --check"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "8.70.0",
+    "@typescript-eslint/parser": "8.70.0",
+    "esbuild": "0.28.2",
+    "eslint": "10.10.0",
+    "jsdom": "^30.0.1",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3"
+  }
+}

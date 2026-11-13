@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- §10.8 divergence: explicit <beam> elements. Some programs write these
+     to record their own exact beaming decisions. Phase 35 Tier 2 now READS
+     them, and §10.8's own rule ("a file that states its beaming is the
+     authority on it") means they WIN over Phase 23's time-signature
+     inference.
+
+     This fixture is deliberately built so the two disagree: four eighth
+     notes in 4/4 written as ONE beam group across the half-bar. Phase 23's
+     inference would split them into two groups of two (one per quarter-note
+     beat), so a renderer that ignored these hints produces visibly
+     different output, which is exactly what the test asserts.
+     (No double-hyphen anywhere in this comment: XML forbids it inside a
+     comment, and an earlier draft of this very file hit that.) -->
+<score-partwise version="3.1">
+  <part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>2</divisions>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef>
+      </attributes>
+      <note>
+        <pitch><step>C</step><octave>5</octave></pitch>
+        <duration>1</duration><voice>1</voice><type>eighth</type>
+        <beam number="1">begin</beam>
+      </note>
+      <note>
+        <pitch><step>D</step><octave>5</octave></pitch>
+        <duration>1</duration><voice>1</voice><type>eighth</type>
+        <beam number="1">continue</beam>
+      </note>
+      <note>
+        <pitch><step>E</step><octave>5</octave></pitch>
+        <duration>1</duration><voice>1</voice><type>eighth</type>
+        <beam number="1">continue</beam>
+      </note>
+      <note>
+        <pitch><step>F</step><octave>5</octave></pitch>
+        <duration>1</duration><voice>1</voice><type>eighth</type>
+        <beam number="1">end</beam>
+      </note>
+      <note><rest/><duration>4</duration><voice>1</voice><type>half</type></note>
+    </measure>
+  </part>
+</score-partwise>

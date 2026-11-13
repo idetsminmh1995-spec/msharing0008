@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1">
+      <part-name>Drum Kit</part-name>
+      <midi-instrument id="P1-KICK"><midi-unpitched>37</midi-unpitched></midi-instrument>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>1</divisions>
+        <staves>2</staves>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef number="1"><sign>percussion</sign><line>2</line></clef>
+        <clef number="2"><sign>percussion</sign><line>2</line></clef>
+      </attributes>
+      <note>
+        <unpitched/>
+        <duration>4</duration><instrument id="P1-KICK"/><voice>1</voice><staff>1</staff><type>whole</type>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
