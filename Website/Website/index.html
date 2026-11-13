@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="M Sharing fixed responsive header bar" />
-    <title>M Sharing — Header Preview</title>
-    <link rel="stylesheet" href="styles.css?v=header-mobile-20261113" />
+    <meta name="description" content="Create music videos with instruments, voice and a metronome on M Sharing." />
+    <title>Create Video — M Sharing</title>
+    <link rel="stylesheet" href="styles.css?v=create-video-20261113" />
   </head>
   <body>
     <header class="site-header" data-header>
@@ -13,7 +13,7 @@
         <button class="icon-button menu-button" type="button" aria-label="Open menu" aria-expanded="false" data-menu-toggle><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg></button>
         <a class="brand" href="#home" aria-label="M Sharing home"><span class="brand-mark" aria-hidden="true">M</span><span class="brand-name">Sharing</span></a>
         <nav class="desktop-nav" aria-label="Primary navigation">
-          <a class="nav-link" href="#courses">Courses</a><a class="nav-link" href="#store">Store</a><a class="nav-link" href="#create-video">Create Video</a><a class="nav-link" href="#notation-lab">Notation Lab</a>
+          <a class="nav-link" href="#courses">Courses</a><a class="nav-link" href="#store">Store</a><a class="nav-link is-active" href="#create-video">Create Video</a><a class="nav-link" href="#notation-lab">Notation Lab</a>
         </nav>
         <div class="header-actions">
           <button class="icon-button search-button" type="button" aria-label="Search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.1-5.4a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" /></svg></button>
@@ -25,19 +25,42 @@
           <button class="icon-button account-button desktop-only" type="button" aria-label="Account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg></button>
         </div>
       </div>
-      <nav class="mobile-nav" aria-label="Mobile menu" data-mobile-nav><a class="nav-link" href="#courses">Courses</a><a class="nav-link" href="#store">Store</a><a class="nav-link" href="#create-video">Create Video</a><a class="nav-link" href="#notation-lab">Notation Lab</a></nav>
+      <nav class="mobile-nav" aria-label="Mobile menu" data-mobile-nav><a class="nav-link" href="#courses">Courses</a><a class="nav-link" href="#store">Store</a><a class="nav-link is-active" href="#create-video">Create Video</a><a class="nav-link" href="#notation-lab">Notation Lab</a></nav>
     </header>
 
     <nav class="mobile-bottom-nav" aria-label="Mobile bottom navigation">
-      <a class="bottom-nav-item is-active" href="#home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z" /><path d="M9 21v-7h6v7" /></svg><span>Home</span></a>
+      <a class="bottom-nav-item" href="#home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z" /><path d="M9 21v-7h6v7" /></svg><span>Home</span></a>
       <a class="bottom-nav-item" href="#courses"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></svg><span>Courses</span></a>
       <a class="bottom-nav-item" href="#store"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-1 14H5L4 5Zm0 0-1-2M9 9a3 3 0 0 0 6 0" /></svg><span>Store</span></a>
-      <a class="bottom-nav-item" href="#create-video"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg><span>Create Video</span></a>
+      <a class="bottom-nav-item is-active" href="#create-video"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg><span>Create Video</span></a>
       <a class="bottom-nav-item" href="#notation-lab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v11.5M8 4l10-2v11.5M8 8l10-2" /><ellipse cx="5.5" cy="17" rx="3" ry="2.2" /><ellipse cx="15.5" cy="15" rx="3" ry="2.2" /></svg><span>Notation Lab</span></a>
       <a class="bottom-nav-item" href="#account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg><span>Account</span></a>
     </nav>
 
-    <main class="preview-content" id="home"><p>Fixed Header Bar preview</p></main>
-    <script src="script.js?v=header-mobile-20261113"></script>
+    <main class="create-page" id="create-video">
+      <section class="create-hero" aria-labelledby="create-title">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line"></span> M SHARING STUDIO</p>
+          <h1 id="create-title">Create your next<br /><span>music video.</span></h1>
+          <p class="hero-copy">Choose an instrument or tool to start building a performance. Layer sounds, keep time and make it yours.</p>
+        </div>
+        <div class="hero-note" aria-hidden="true"><span>♪</span><span>♫</span><span>♩</span></div>
+      </section>
+
+      <section class="tool-section" aria-labelledby="tools-title">
+        <div class="section-heading"><div><p class="eyebrow">START CREATING</p><h2 id="tools-title">Choose a tool</h2></div><p class="selection-status" data-selection-status>Select a box to begin</p></div>
+        <div class="tool-grid">
+          <button class="tool-card tool-card--piano" type="button" data-tool="Piano" aria-pressed="false"><span class="tool-icon">▥</span><span class="tool-content"><strong>Piano</strong><small>Keys & melodies</small></span><span class="tool-arrow">↗</span></button>
+          <button class="tool-card tool-card--drums" type="button" data-tool="Drums" aria-pressed="false"><span class="tool-icon">◉</span><span class="tool-content"><strong>Drums</strong><small>Beats & rhythm</small></span><span class="tool-arrow">↗</span></button>
+          <button class="tool-card tool-card--guitar" type="button" data-tool="Guitar" aria-pressed="false"><span class="tool-icon">G</span><span class="tool-content"><strong>Guitar</strong><small>Chords & riffs</small></span><span class="tool-arrow">↗</span></button>
+          <button class="tool-card tool-card--bass" type="button" data-tool="Bass" aria-pressed="false"><span class="tool-icon">B</span><span class="tool-content"><strong>Bass</strong><small>Low-end groove</small></span><span class="tool-arrow">↗</span></button>
+          <button class="tool-card tool-card--strings" type="button" data-tool="Strings" aria-pressed="false"><span class="tool-icon">∿</span><span class="tool-content"><strong>Strings</strong><small>Bow & emotion</small></span><span class="tool-arrow">↗</span></button>
+          <button class="tool-card tool-card--voice" type="button" data-tool="Voice" aria-pressed="false"><span class="tool-icon">◌</span><span class="tool-content"><strong>Voice</strong><small>Record your sound</small></span><span class="tool-arrow">↗</span></button>
+          <button class="tool-card tool-card--metronome" type="button" data-tool="Metronome" aria-pressed="false"><span class="tool-icon metronome-icon">120</span><span class="tool-content"><strong>Metronome</strong><small>Stay in tempo</small></span><span class="tool-arrow">↗</span></button>
+          <button class="tool-card tool-card--more" type="button" data-tool="More tools" aria-pressed="false"><span class="tool-icon">＋</span><span class="tool-content"><strong>More tools</strong><small>Explore the studio</small></span><span class="tool-arrow">↗</span></button>
+        </div>
+      </section>
+    </main>
+    <script src="script.js?v=create-video-20261113"></script>
   </body>
 </html>
