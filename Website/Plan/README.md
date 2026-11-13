@@ -182,4 +182,16 @@ Notation ကို card ပုံစံဘောင်ထဲမထည့်ဘ�
 Page နှင့် Horizontal ကို ခလုတ်နှစ်ခုအစား ရွေးချယ်စရာနှစ်ခုပါသော dropdown တစ်ခုအဖြစ်ထားမည်။ Phone တွင် `Choose file`, dropdown နှင့် PDF icon ကို အတန်းတစ်တန်း၊ Play/zoom/volume ကို နောက်တစ်တန်းတွင်ထား၍ fixed dock ၏ အမြင့်နှင့် control နေရာကို လျှော့မည်။ PDF icon သည် screen reader အတွက် `Download PDF` အမည်ကို ဆက်လက်ဖော်ပြမည်။ Desktop တွင် PDF စာသားကို ဆက်လက်ပြမည်။
 
 ### Create Video — Engine workflow
-Create Video သည် video များဖန်တီးရန်အတွက် ဖြစ်သည်။ Drum ကိုရွေးပြီး Drum ထဲဝင်လျှင် Drum video ဖန်တီးမည်ဖြစ်ပြီး အောက်ပါ Engine များနှင့် အလုပ်လုပ်မည် — **Notation Engine, Sound Engine, Video Engine, Drum Stick Human Engine, Drum Animation Engine, Audio Engine**။ ဤအဆင့်တွင် Engine တစ်ခုချင်းစီ၏ တာဝန်နှင့် အလုပ်လုပ်ပုံအစီအစဉ်ကို မသတ်မှတ်ရသေးပါ။ Piano video ဖန်တီးရန် Piano ထဲသို့ ဝင်ရမည်ဖြစ်ပြီး ၎င်း၏ workflow သည် Drum နှင့် မတူပါ။ Piano workflow ၏ ကွာခြားချက်များကို နောက်တစ်ဆင့်တွင် အသုံးပြုသူ၏ လမ်းညွှန်ချက်အတိုင်း ထပ်မံသတ်မှတ်မည်။
+Create Video သည် video များဖန်တီးရန်အတွက် ဖြစ်သည်။ Drum ကိုရွေးပြီး Drum ထဲဝင်လျှင် Drum video ဖန်တီးမည်။ Piano video ဖန်တီးရန် Piano ထဲသို့ ဝင်ရမည်ဖြစ်ပြီး Piano workflow သည် Drum workflow နှင့် မတူပါ။ Engine တစ်ခုချင်းစီ၏ အကောင်အထည်ဖော်ပုံ၊ ချိတ်ဆက်ပုံအစီအစဉ်နှင့် မသတ်မှတ်ရသေးသော ကွာခြားချက်များကို အသုံးပြုသူ၏ နောက်ထပ်လမ်းညွှန်ချက်အတိုင်း ဆက်လက်သတ်မှတ်မည်။
+
+#### Drum video workflow
+- ပါဝင်မည့် Engine များ — **Notation Engine, Sound Engine, Video Engine, Drum Stick Human Engine, Drum Animation Engine, Audio Engine**။ Drum Stick Human Engine ၏ သီးခြားတာဝန်ကို ထပ်မံသတ်မှတ်ရန် ကျန်ရှိသည်။
+- **Notation Engine** က note များကို ပြသမည်။ **Sound Engine** က အဆိုပါ note များအတိုင်း အသံထုတ်ပေးမည်။
+- Drum video အတွက် လိုအပ်သော photo/data များကို Cloudflare R2 ထဲတွင် ထားမည်။ **Video Engine** က အရည်အသွေးကောင်းပြီး ချောမွေ့သော video file ထုတ်လုပ်ရာနှင့် R2 ထဲရှိ file များကို အသုံးပြုရာတွင် ကူညီမည်။
+- **Drum Animation Engine** က Drum video အတွင်း ဘယ်ပုံကို ဘယ်အချိန်တွင် highlight လုပ်ရမည်အပါအဝင် animation ဆိုင်ရာအလုပ်များကို ကိုင်တွယ်မည်။
+
+#### Piano video workflow
+- ပါဝင်မည့် Engine များ — **Notation Engine, Sound Engine, Video Engine, Piano Hand Human Engine, Drum Animation Engine, Audio Engine**။ Piano အတွက် 3D hand ကို လှုပ်ရှားစေမည့် သီးခြား **Piano 3D Hand Engine** ကိုလည်း တည်ဆောက်မည်။ Piano body ကိုလည်း 3D model အဖြစ် အသုံးပြုမည်။ Piano body နှင့် Drum workflow အကြား အသေးစိတ်ကွာခြားချက်များကို နောက်ထပ်ညွှန်ကြားချက်ရရှိပြီးမှ သတ်မှတ်မည်။
+- **Notation Engine** က note များကို ပြသပြီး **Sound Engine** က အဆိုပါ note များအတိုင်း အသံထုတ်ပေးမည်။ **Video Engine** က အရည်အသွေးကောင်းပြီး ချောမွေ့သော video file ထုတ်လုပ်ရာနှင့် လိုအပ်သော file များကို အသုံးပြုရာတွင် ကူညီမည်။
+- **Piano Hand Human Engine** က note တစ်လုံးချင်းအတွက် ဘယ်လက်/ညာလက်နှင့် ဘယ်လက်ချောင်းဖြင့် တီးရမည်ဆိုသော data ကို ပေးမည်။ **Piano 3D Hand Engine** က ထို data အတိုင်း 3D လက်လှုပ်ရှားမှုကို ပြမည်။
+- Animation Engine သည် Piano ခလုတ်များကို အရောင်ဖြင့် highlight လုပ်ခြင်းနှင့် အခြား animation ဆိုင်ရာအလုပ်များကို လုပ်မည်။ Drum Animation Engine ကို Piano workflow တွင် အသုံးပြုမည့်အမည်နှင့် ၎င်း၏ အကျုံးဝင်မှုကို ထပ်မံအတည်ပြုရန် ကျန်ရှိသည်။
