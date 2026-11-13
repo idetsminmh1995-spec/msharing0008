@@ -286,3 +286,13 @@
   .studio-inline-options { gap:4px; font-size:8px; }
   .studio-inline-options input[type='number'] { width:42px; }
 }
+
+/* Keep the preview frame stable regardless of the loaded video's intrinsic size. */
+.studio-panel--video .video-stage { width:100%; height:clamp(240px,26vw,460px); min-height:240px; flex:0 0 auto; aspect-ratio:16 / 9; }
+.studio-field--empty { min-height:1px; }
+@media (max-width:860px) {
+  .studio-panel--video .video-stage { height:auto; min-height:0; aspect-ratio:16 / 9; }
+}
+@media (max-width:560px) {
+  .studio-panel--video .video-stage { min-height:180px; }
+}

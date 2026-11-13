@@ -171,8 +171,8 @@ try {
   ]);
   const probe = JSON.parse(stdout);
   assert.ok(Math.abs(Number(probe.format.duration) - 4) < 0.3, 'Studio video duration is not approximately four seconds');
-  assert.equal(probe.streams[0].width, 640);
-  assert.equal(probe.streams[0].height, 360);
+  assert.equal(probe.streams[0].width, 1920);
+  assert.equal(probe.streams[0].height, 1080);
 
   await evaluate("(() => { const ratio = document.querySelector('[data-video-ratio]'); const color = document.querySelector('[data-video-color]'); const count = document.querySelector('[data-count-voice-enabled]'); ratio.value = '9:16'; ratio.dispatchEvent(new Event('change', { bubbles: true })); color.value = 'white'; color.dispatchEvent(new Event('change', { bubbles: true })); count.value = 'on'; count.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[data-studio-generate]').click(); })()");
   const portraitStartedAt = Date.now();
@@ -193,8 +193,8 @@ try {
     '-v', 'error', '-show_entries', 'stream=codec_name,width,height', '-of', 'json', portraitPath,
   ]);
   const portraitProbe = JSON.parse(portraitProbeResult.stdout);
-  assert.equal(portraitProbe.streams[0].width, 360);
-  assert.equal(portraitProbe.streams[0].height, 640);
+  assert.equal(portraitProbe.streams[0].width, 1080);
+  assert.equal(portraitProbe.streams[0].height, 1920);
   console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe }, null, 2));
 } finally {
   cdp?.close();

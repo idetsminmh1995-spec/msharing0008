@@ -43,9 +43,9 @@
   const QUARTER_SECONDS = 0.5;
   const DEFAULT_LOGO = 'assets/logo/m-sharing-drum-logo.svg';
   const RATIO_SIZES = {
-    '16:9': { width: 640, height: 360 },
-    '1:1': { width: 512, height: 512 },
-    '9:16': { width: 360, height: 640 },
+    '16:9': { width: 1920, height: 1080 },
+    '1:1': { width: 1080, height: 1080 },
+    '9:16': { width: 1080, height: 1920 },
   };
   const LANES = [
     { id: 'kick', label: 'KICK', y: 0.46, color: '#ff7b55' },

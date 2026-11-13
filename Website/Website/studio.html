@@ -45,23 +45,23 @@
           <form class="studio-settings" data-studio-settings>
             <div class="studio-file-row">
               <label class="studio-field studio-field--file"><span>MusicXML file</span><input type="file" accept=".musicxml,.xml,.mxl,application/xml,text/xml" data-musicxml-input /><small data-musicxml-name>No file selected</small></label>
-              <label class="studio-field studio-field--file"><span>Logo</span><input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" data-logo-input /><img class="studio-logo-preview" data-logo-preview src="assets/logo/m-sharing-drum-logo.svg" alt="Default M Sharing Drum Logo" /><small data-logo-name>Default M Sharing Drum Logo</small></label>
+              <label class="studio-field studio-field--file"><span>Logo</span><input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" data-logo-input /><img class="studio-logo-preview" data-logo-preview src="assets/logo/m-sharing-drum-logo.svg" alt="M Sharing Drum Logo" /></label>
             </div>
             <div class="studio-field-grid">
               <div class="studio-field studio-title-field"><span>Title 1</span><input type="text" maxlength="48" value="DRUM PERFORMANCE" placeholder="Main title" data-title-one /><div class="studio-inline-options"><label>Color <input type="color" value="#f8fafc" data-title-one-color /></label><label>Size <input type="number" min="12" max="72" value="22" data-title-one-size /> px</label></div></div>
               <div class="studio-field studio-title-field"><span>Title 2</span><input type="text" maxlength="64" value="VISUAL PREVIEW" placeholder="Subtitle" data-title-two /><div class="studio-inline-options"><label>Color <input type="color" value="#91a0b5" data-title-two-color /></label><label>Size <input type="number" min="8" max="48" value="11" data-title-two-size /> px</label></div></div>
             </div>
             <div class="studio-field-grid">
-              <label class="studio-field"><span>Drum Brand</span><input type="text" maxlength="32" value="M Sharing" placeholder="Brand name" data-drum-brand /></label>
-              <label class="studio-field"><span>Drum Model</span><select data-drum-model><option value="custom">Custom Drum Kit</option><option value="pearl">Pearl Export</option><option value="yamaha">Yamaha Stage Custom</option><option value="tama">Tama Imperialstar</option></select></label>
+              <label class="studio-field"><span>Drum Brand</span><select data-drum-brand><option value="m-sharing">M Sharing</option><option value="pearl">Pearl</option><option value="yamaha">Yamaha</option><option value="tama">Tama</option><option value="ludwig">Ludwig</option></select></label>
+              <label class="studio-field"><span>Drum Model</span><select data-drum-model><option value="custom">Custom Drum Kit</option><option value="export">Export Series</option><option value="stage">Stage Custom</option><option value="imperialstar">Imperialstar</option><option value="classic">Classic Kit</option></select></label>
             </div>
             <div class="studio-field-grid">
               <label class="studio-field"><span>Notation View</span><select data-notation-view><option value="landscape">Page — Landscape</option><option value="portrait">Page — Portrait</option><option value="square">Page — Square</option></select></label>
-              <label class="studio-field"><span>Sound Model</span><select data-sound-model><option value="visual">Visual Only</option><option value="natural">Natural Drum Model</option><option value="studio">Studio Drum Model</option><option value="room">Room Drum Model</option></select></label>
+              <div class="studio-field"><span>Sound Model</span><select data-sound-model><option value="visual">Visual Only</option><option value="natural">Natural Drum Model</option><option value="studio">Studio Drum Model</option><option value="room">Room Drum Model</option></select><label class="range-control"><input type="range" min="0" max="100" value="80" data-sound-volume /><output data-sound-volume-value>80%</output></label></div>
             </div>
             <div class="studio-field-grid">
-              <div class="studio-field"><span>Sound Volume</span><label class="range-control"><input type="range" min="0" max="100" value="80" data-sound-volume /><output data-sound-volume-value>80%</output></label></div>
               <div class="studio-field"><span>Count Voice</span><div class="studio-control-pair"><select data-count-voice-enabled aria-label="Count voice on or off"><option value="off">Off</option><option value="on">On</option></select><select data-count-voice disabled aria-label="Count voice type"><option value="one-two">One, Two, Three, Four</option><option value="numeric">1, 2, 3, 4</option></select></div><label class="range-control"><input type="range" min="0" max="100" value="75" data-count-volume disabled /><output data-count-volume-value>75%</output></label></div>
+              <div class="studio-field studio-field--empty" aria-hidden="true"></div>
             </div>
             <div class="studio-field-grid studio-field-grid--compact">
               <label class="studio-field"><span>Video Color</span><select data-video-color><option value="black">Black</option><option value="white">White</option></select></label>
@@ -72,7 +72,7 @@
           <p class="studio-status" data-studio-status role="status" aria-live="polite">Choose a MusicXML file or use the default drum pattern, then generate the video.</p>
         </div>
         <div class="studio-panel studio-panel--video">
-          <div class="video-panel-heading"><h2>Video</h2><span class="video-format" data-video-format>16:9 · 640×360</span></div>
+          <div class="video-panel-heading"><h2>Video</h2><span class="video-format" data-video-format>16:9 · 1920×1080</span></div>
           <div class="video-stage" data-video-stage>
             <video data-video-output playsinline preload="metadata" hidden aria-label="Rendered drum performance"></video>
             <p data-video-placeholder>No rendered performance yet.</p>

@@ -67,3 +67,10 @@ The Kick/Snare/Hi-hat capture boxes were removed from the left panel. The page n
 Title 1 and Title 2 each have independent color and font-size controls. Drum settings are split into Brand text and Model selection. Notation View offers Page Landscape, Page Portrait, and Page Square. Sound Model offers multiple model choices plus volume. Count Voice has Off/On, two count styles, and volume. Video Color is restricted to Black or White, while Video Ratio remains 16:9, 1:1, and 9:16.
 
 The browser integration test was updated to click Generate Video without drum pads. MusicXML parsing currently covers plain XML/MusicXML drum notes; `.mxl` archives and actual sound/count audio remain pending. Existing VideoEngine output is still silent visual video.
+
+
+## Latest control and preview clarification
+
+The redundant default-logo text label was removed. The default logo is now communicated by the visible logo preview only. Drum Brand is a select control. Sound Model and Sound Volume are stacked in the same field, and Count Voice controls retain their On/Off, type, and volume arrangement.
+
+The standard 16:9 export is now `1920×1080`; square and portrait exports are `1080×1080` and `1080×1920`. The video preview stage uses its own fixed 16:9 frame and does not resize based on the loaded video's intrinsic dimensions. Browser regression passed for the 1920×1080 landscape output and the portrait output.

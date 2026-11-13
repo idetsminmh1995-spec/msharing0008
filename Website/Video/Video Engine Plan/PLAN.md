@@ -129,3 +129,10 @@ MusicXML and Logo inputs share one file row on desktop. If no custom logo is sel
 Sound Model now has model choices and a volume control. Count Voice has an Off/On control, two voice/count styles, and a separate volume control. Video Color is now a Black/White background choice; Video Ratio remains 16:9, 1:1, or 9:16.
 
 The current render remains silent/visual-only. Sound Model and Count Voice settings are rendered as metadata and retained for the future audio adapter; actual audio synthesis and spoken count generation remain pending.
+
+
+## 9. Latest UI clarification — current work
+
+The logo field no longer displays a redundant default-logo text label. The logo preview itself remains available, and the built-in M Sharing Drum Logo is used whenever no custom logo file is selected. Drum Brand is now a selector rather than free text. Sound Model and Sound Volume are grouped vertically in one control block, matching the Count Voice and Count Volume arrangement.
+
+The standard video output is now `1920×1080` for the 16:9 option. Square and portrait options use `1080×1080` and `1080×1920`. The preview stage has an independent fixed 16:9 frame so its box remains stable when a video loads or when a portrait/square output is selected.
