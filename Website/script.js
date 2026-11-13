@@ -1,6 +1,7 @@
 const root = document.documentElement;
 const menuToggle = document.querySelector('[data-menu-toggle]');
 const mobileNav = document.querySelector('[data-mobile-nav]');
+const mobileBottomNav = document.querySelector('.mobile-bottom-nav');
 const themeToggle = document.querySelector('[data-theme-toggle]');
 const languageToggle = document.querySelector('[data-language-toggle]');
 const language = document.querySelector('[data-language]');
@@ -15,6 +16,13 @@ mobileNav?.querySelectorAll('a').forEach((link) => {
   link.addEventListener('click', () => {
     mobileNav.classList.remove('is-open');
     menuToggle?.setAttribute('aria-expanded', 'false');
+  });
+});
+
+mobileBottomNav?.querySelectorAll('.bottom-nav-item, .bottom-nav-create').forEach((item) => {
+  item.addEventListener('click', () => {
+    mobileBottomNav.querySelectorAll('.bottom-nav-item').forEach((navItem) => navItem.classList.remove('is-active'));
+    if (item.classList.contains('bottom-nav-item')) item.classList.add('is-active');
   });
 });
 
