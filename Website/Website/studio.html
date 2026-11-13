@@ -41,18 +41,38 @@
       <a class="studio-back-link" href="index.html#create-video">← Back to Create Video</a>
       <section class="studio-workspace" data-studio-workspace aria-labelledby="studio-title">
         <div class="studio-panel studio-panel--controls">
-          <div class="studio-panel-heading"><h1 id="studio-title" data-studio-title>Drum Studio</h1></div>
+          <div class="studio-panel-heading"><h1 id="studio-title" data-studio-title>Drum Studio</h1><span class="studio-live-dot">SETTINGS</span></div>
+          <form class="studio-settings" data-studio-settings>
+            <label class="studio-field studio-field--file"><span>MusicXML file</span><input type="file" accept=".musicxml,.xml,.mxl,application/xml,text/xml" data-musicxml-input /><small data-musicxml-name>No file selected</small></label>
+            <label class="studio-field studio-field--file"><span>Logo</span><input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" data-logo-input /><small data-logo-name>No logo selected</small></label>
+            <div class="studio-field-grid">
+              <label class="studio-field"><span>Title 1</span><input type="text" maxlength="48" placeholder="Main title" data-title-one /></label>
+              <label class="studio-field"><span>Title 2</span><input type="text" maxlength="64" placeholder="Subtitle" data-title-two /></label>
+            </div>
+            <div class="studio-field-grid">
+              <label class="studio-field"><span>Drum</span><select data-drum-selection><option value="full">Full Kit</option><option value="kick">Kick</option><option value="snare">Snare</option><option value="hihat">Hi-hat</option></select></label>
+              <label class="studio-field"><span>Notation View</span><select data-notation-view><option value="roll">Drum Roll</option><option value="standard">Standard</option><option value="minimal">Minimal</option></select></label>
+            </div>
+            <div class="studio-field-grid">
+              <label class="studio-field"><span>Sound Model</span><select data-sound-model><option value="visual">Visual Only</option><option value="studio-drums">Studio Drums</option><option value="r2-model">R2 Sound Model</option></select></label>
+              <label class="studio-field"><span>Count Voice</span><input type="text" maxlength="32" placeholder="e.g. One, two, three, four" data-count-voice /></label>
+            </div>
+            <div class="studio-field-grid studio-field-grid--compact">
+              <label class="studio-field"><span>Video Color</span><span class="color-input-wrap"><input type="color" value="#f20d3d" data-video-color /><output data-video-color-value>#F20D3D</output></span></label>
+              <label class="studio-field"><span>Video Ratio</span><select data-video-ratio><option value="16:9">16:9 Landscape</option><option value="1:1">1:1 Square</option><option value="9:16">9:16 Portrait</option></select></label>
+            </div>
+          </form>
           <div class="drum-pad-grid" aria-label="Drum pads">
             <button type="button" class="drum-pad drum-pad--kick" data-drum-pad="kick"><span>●</span><small>Kick</small></button>
             <button type="button" class="drum-pad drum-pad--snare" data-drum-pad="snare"><span>◉</span><small>Snare</small></button>
             <button type="button" class="drum-pad drum-pad--hihat" data-drum-pad="hihat"><span>✦</span><small>Hi-hat</small></button>
           </div>
           <div class="tempo-row"><span>Tempo</span><strong>120 BPM</strong><button type="button" aria-label="Adjust tempo">↕</button></div>
-          <button type="button" class="record-button" data-studio-record><span class="record-dot"></span> Start recording</button>
-          <p class="studio-status" data-studio-status role="status" aria-live="polite">Start recording, then tap the drum pads to capture a visual performance.</p>
+          <div class="studio-action-row"><button type="button" class="record-button" data-studio-record><span class="record-dot"></span> Start recording</button><button type="button" class="generate-button" data-studio-generate>Generate Video</button></div>
+          <p class="studio-status" data-studio-status role="status" aria-live="polite">Choose your settings, record the drum performance, then generate the video.</p>
         </div>
         <div class="studio-panel studio-panel--video">
-          <div class="video-panel-heading"><h2>Video</h2></div>
+          <div class="video-panel-heading"><h2>Video</h2><span class="video-format" data-video-format>16:9 · 640×360</span></div>
           <div class="video-stage" data-video-stage>
             <video data-video-output playsinline preload="metadata" hidden aria-label="Rendered drum performance"></video>
             <p data-video-placeholder>No rendered performance yet.</p>

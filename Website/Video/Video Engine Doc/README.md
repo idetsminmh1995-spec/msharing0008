@@ -41,3 +41,20 @@ Video Engine သည် canvas frame များကို WebCodecs ဖြင့
 - ယခင် code commit `d31337a` တွင် MP4 muxer tests 15 ခု၊ cleanup/safety tests 5 ခု၊ Chromium engine smoke test နှင့် Drum Studio browser integration/ffprobe test အောင်မြင်ထားသည်။ Production asset sync check နှင့် 375px/1280px viewport assertions လည်း pass ဖြစ်ထားသည်။
 - ဤ Plan/Doc ပြန်လည်ရေးဆွဲမှုတွင် instrument source code မပြင်ထားသဖြင့် code tests ကို ထပ်မ run ထားပါ။ Guitar/Piano/Bass/Strings/Voice ကို Video Engine ဖြင့် render လုပ်ပြီးကြောင်း မဆိုပါ။
 - နောက် code implementation တစ်ခုစီပြီးပါက သက်ဆိုင်ရာ engine tests, shared Drum regression, real browser export, silent/audio behavior နှင့် phone/web layout ကို ပြန်စစ်ပြီး Doc/Plan ကို update လုပ်ရမည်။
+
+
+## Current Studio settings UI update
+
+The shared left-side Studio control panel now supports MusicXML selection, logo selection, Title 1/Title 2, Drum selection, Notation View, Sound Model, Count Voice text, Video Color, Video Ratio, and Generate Video. The same markup and responsive CSS are intended to be reused by all instrument studio routes.
+
+Implemented behavior:
+
+- `16:9`, `1:1`, and `9:16` selections change the VideoEngine output dimensions.
+- Title fields, selected color, notation mode, count label, and an optional logo are drawn into generated frames.
+- Drum selection limits which capture pad is active.
+- Generate Video re-renders the captured drum event log using the current settings.
+- Phone layout collapses the settings fields into a single-column form while preserving the same controls.
+
+Known limitations: MusicXML is currently accepted as a selected file but is not parsed into events; Sound Model options do not yet synthesize audio; Count Voice is currently a visual metadata label; and the current production adapter remains Drum-only and visual-only. These items stay pending under the shared adapter/audio phases in the Video Engine Plan.
+
+Verification for this update: Studio JavaScript syntax and control-marker checks passed; Video Engine source-to-production sync check passed; existing Video Engine automated tests passed (20/20); Wrangler nested deployment dry-run passed. The public Worker still serves the previous deployment until a commit is pushed and Cloudflare deploy is run.

@@ -96,3 +96,25 @@ Instrument တစ်ခုချင်းစီသည် Video Engine encoder �
 ## 6. ပြီးစီးမှု သတ်မှတ်ချက်
 
 Instrument adapter တစ်ခုကိုပြီးစီးပြီဟု သတ်မှတ်ရန်: (1) instrument-specific input/event source ရှိရမည်; (2) renderer သည် arbitrary frame time များတွင် deterministic ဖြစ်ရမည်; (3) required bundles/assets readiness အတည်ပြုရမည်; (4) VideoEngine preview/export, progress/cancel/error/download lifecycle အလုပ်လုပ်ရမည်; (5) silent-vs-audio behavior ကိုမှန်ကန်စွာပြရမည်; (6) tests, phone/web layout review နှင့် shared Drum regression အောင်မြင်ရမည်; (7) သက်ဆိုင်ရာ Plan/Doc update လုပ်ပြီး အောင်မြင်သော commit ကို `main` သို့ push လုပ်ထားရမည်.
+
+
+## 7. Studio settings UI foundation — completed in current work
+
+The shared Studio left control panel now includes the first configuration surface for every instrument route:
+
+- MusicXML file selection (`.musicxml`, `.xml`, `.mxl`) with selected filename state
+- Logo image selection with preview-render asset loading
+- Title 1 and Title 2 text fields
+- Drum selection (`Full Kit`, `Kick`, `Snare`, `Hi-hat`) that limits active capture pads
+- Notation View selection (`Drum Roll`, `Standard`, `Minimal`)
+- Sound Model selection (`Visual Only`, `Studio Drums`, `R2 Sound Model`)
+- Count Voice text field
+- Video Color picker
+- Video Ratio selection (`16:9`, `1:1`, `9:16`)
+- Generate Video action using the captured event log and the shared VideoEngine lifecycle
+
+The settings are implemented in `Website/Website/studio.html`, styled responsively in `Website/Website/styles.css`, and connected in `Website/Website/studio-video.js`. Ratio changes affect the render dimensions; title, subtitle, logo, notation mode, count label, and accent color affect the generated visual frame.
+
+### Remaining implementation boundaries
+
+The current VideoEngine integration remains visual-only. MusicXML is accepted and identified in the UI but is not parsed into drum events yet. Sound Model and Count Voice are stored/rendered as configuration metadata; they do not yet produce audio or synthesized counting. Instrument adapters for Guitar, Piano, Bass, Strings, and Voice remain disabled until their event source, deterministic renderer, asset readiness, and audio policy are implemented.
