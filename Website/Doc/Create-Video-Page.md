@@ -69,3 +69,7 @@ Tool box တစ်ခုခုကိုနှိပ်လျှင် instrument
 ## 2026-11-13 — Dark/Light Mode coverage
 
 Dark/Light theme toggle ၏ သက်ရောက်မှုကို Create Video selection page နှင့် separate Studio Page နှစ်ခုလုံးတွင် တစ်ပြေးညီဖြစ်အောင် ပြင်ထားသည်။ Light Mode တွင် tool cards, Drum control panel, Video preview stage, pad buttons နှင့် mobile bottom navigation အတွက် light surfaces, borders နှင့် readable text contrast များ သီးခြားသတ်မှတ်ထားသည်။ Dark Mode ၏ မူလ dark surfaces နှင့် accent colors များကို မပြောင်းထားပါ။ Theme ရွေးချယ်မှုကို `localStorage` တွင် သိမ်းထားသောကြောင့် Create Video Page မှ Studio Page သို့ navigate လုပ်သည့်အခါ mode မပြောင်းတော့ပါ။ Light render screenshot နှင့် desktop/phone layout checks ဖြင့် စစ်ဆေးထားသည်။
+
+## 2026-11-13 — Minimal UI copy
+
+User feedback အရ မလိုအပ်သော explanatory copy များကို ဖယ်ရှားထားသည်။ Create Video Page တွင် page title နှင့် tool names များသာ အဓိကကျန်ပြီး card subtitle များကို ဖယ်ထားသည်။ Studio Page တွင် `Drum Studio`, `Video`, `Kick`, `Snare`, `Hi-hat`, `Tempo` နှင့် `Start recording` ကဲ့သို့ လုပ်ဆောင်ချက်အတွက် လိုအပ်သောစာသားများသာ ကျန်သည်။ `Performance canvas`, setup/preview eyebrow labels, explanatory descriptions, status နှင့် timer စာများကို မထည့်တော့ပါ။
