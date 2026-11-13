@@ -1,59 +1,67 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="M Sharing responsive header bar" />
+    <meta name="description" content="M Sharing fixed responsive header bar" />
     <title>M Sharing — Header Preview</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <header class="site-header" data-header>
       <div class="header-shell">
-        <a class="brand" href="#" aria-label="M Sharing home">
+        <button class="icon-button menu-button" type="button" aria-label="Open menu" aria-expanded="false" data-menu-toggle>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+
+        <a class="brand" href="#home" aria-label="M Sharing home page">
           <span class="brand-mark" aria-hidden="true">M</span>
           <span class="brand-name">Sharing</span>
         </a>
 
         <nav class="desktop-nav" aria-label="Primary navigation">
-          <a class="nav-link is-active" href="#">Home</a>
+          <a class="nav-link is-active" href="#home">Home Page</a>
           <a class="nav-link" href="#courses">Courses</a>
           <a class="nav-link" href="#store">Store</a>
-          <a class="nav-link" href="#create">Create</a>
-          <a class="nav-link" href="#library">Library</a>
+          <a class="nav-link" href="#create-video">Create Video</a>
+          <a class="nav-link" href="#notation-lab">Notation Lab</a>
         </nav>
 
         <div class="header-actions">
-          <label class="search-box" for="site-search">
+          <button class="icon-button search-button" type="button" aria-label="Search" data-search-toggle>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.1-5.4a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" /></svg>
-            <input id="site-search" type="search" placeholder="Search music, courses, notes..." />
-          </label>
+          </button>
+          <button class="text-button language-button" type="button" aria-label="Change language" data-language-toggle><span data-language>EN</span><span class="language-divider">/</span><span class="language-muted" data-language-alt>MM</span></button>
+          <button class="icon-button theme-button" type="button" aria-label="Switch to light mode" data-theme-toggle>
+            <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" /><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></svg>
+            <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.3A8.5 8.5 0 0 1 8.7 3.5 8.5 8.5 0 1 0 20.5 15.3Z" /></svg>
+          </button>
+          <button class="icon-button desktop-only" type="button" aria-label="Favorites">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 8.8c0 5.5-8.8 10.3-8.8 10.3S3.2 14.3 3.2 8.8A4.7 4.7 0 0 1 12 6.4a4.7 4.7 0 0 1 8.8 2.4Z" /></svg>
+          </button>
+          <button class="icon-button desktop-only" type="button" aria-label="Shopping cart">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 1.9-1.4L20 8H6M10 20a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm9 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" /></svg>
+          </button>
           <button class="icon-button notification-button" type="button" aria-label="Notifications">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Zm-8.5 12h5" /></svg>
             <span class="notification-dot" aria-hidden="true"></span>
           </button>
-          <button class="profile-button" type="button" aria-label="Open profile menu">
-            <span class="avatar">AP</span>
-            <svg class="profile-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
-          </button>
-          <button class="menu-button icon-button" type="button" aria-label="Open navigation menu" aria-expanded="false" data-menu-toggle>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+          <button class="icon-button account-button desktop-only" type="button" aria-label="Account">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg>
           </button>
         </div>
       </div>
 
       <nav class="mobile-nav" aria-label="Mobile navigation" data-mobile-nav>
-        <a class="nav-link is-active" href="#">Home</a>
+        <a class="nav-link is-active" href="#home">Home Page</a>
         <a class="nav-link" href="#courses">Courses</a>
         <a class="nav-link" href="#store">Store</a>
-        <a class="nav-link" href="#create">Create</a>
-        <a class="nav-link" href="#library">Library</a>
+        <a class="nav-link" href="#create-video">Create Video</a>
+        <a class="nav-link" href="#notation-lab">Notation Lab</a>
       </nav>
     </header>
 
-    <main class="preview-content">
-      <p>Header Bar preview</p>
-    </main>
+    <main class="preview-content" id="home"><p>Fixed Header Bar preview</p></main>
     <script src="script.js"></script>
   </body>
 </html>

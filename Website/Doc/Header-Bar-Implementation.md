@@ -1,34 +1,35 @@
 # Header Bar Implementation
 
-## အကျဉ်းချုပ်
+## လက်ရှိ scope
 
-M Sharing music-platform UI board ကို visual reference အဖြစ် အသုံးပြုပြီး Website ၏ Header Bar ပထမအဆင့်ကို တည်ဆောက်ထားသည်။ လက်ရှိအဆင့်တွင် Header Bar သာ ပါဝင်ပြီး dashboard, hero section နှင့် အခြားစာမျက်နှာ content များ မထည့်ရသေးပါ။
+M Sharing web app နှင့် နောက်ပိုင်း mobile app တို့သည် shared backend ကို အသုံးပြုမည်ဟု သတ်မှတ်ထားသည်။ ဤအဆင့်တွင် backend ချိတ်ဆက်မှုမလုပ်သေးဘဲ Web Header Bar UI နှင့် responsive behavior ကိုသာ တည်ဆောက်ထားသည်။
 
-## Web / Desktop view
+## Web view
 
-- Brand mark `M` နှင့် `Sharing` wordmark ကို ဘယ်ဘက်တွင် ထည့်ထားသည်။
-- Primary navigation အဖြစ် `Home`, `Courses`, `Store`, `Create`, `Library` ကို ထည့်ထားသည်။
-- လက်ရှိစာမျက်နှာကို အနီရောင် underline ဖြင့် active state ပြထားသည်။
-- Music/courses/notes ရှာဖွေရန် search box ထည့်ထားသည်။
-- Notification icon နှင့် unread notification dot ထည့်ထားသည်။
-- Profile avatar နှင့် profile menu indicator ထည့်ထားသည်။
+Desktop/web view တွင် ဘယ်ဘက်မှ logo နှင့် `Home Page`, `Courses`, `Store`, `Create Video`, `Notation Lab` navigation များ ပါဝင်သည်။ ညာဘက်တွင် Search icon, `EN/MM` language control, Dark/Light theme control, Favorite icon, Cart icon, Notification icon နှင့် Account icon များ ပါဝင်သည်။
 
-## Phone / Mobile view
+## Phone view
 
-- Desktop navigation ကို ဖျောက်ပြီး hamburger menu သို့ ပြောင်းထားသည်။
-- Mobile header တွင် menu button, brand, notification, profile ကို compact layout ဖြင့် ပြထားသည်။
-- Screen width 560px အောက်တွင် search box နှင့် profile chevron ကို ဖျောက်ထားပြီး touch target များကို မျက်နှာပြင်နှင့်ကိုက်ညီအောင် ထိန်းထားသည်။
-- Hamburger ကိုနှိပ်လျှင် mobile navigation menu ပွင့်/ပိတ်သည်။ Navigation item ကိုရွေးပြီးလျှင် menu ပြန်ပိတ်သည်။
+Phone view တွင် user သတ်မှတ်ထားသည့်အတိုင်း Menu icon, logo, Search icon နှင့် Notification icon ပဲ ပြထားသည်။ Menu icon ကိုနှိပ်လျှင် mobile navigation panel တွင် Home Page, Courses, Store, Create Video နှင့် Notation Lab များ ပေါ်လာသည်။
+
+## Fixed behavior
+
+Header ကို `position: fixed` နှင့် `top: 0` သတ်မှတ်ထားသောကြောင့် page scroll လုပ်သည့်အခါ Header Bar သည် အပေါ်တွင် အမြဲတည်နေပြီး မရွေ့ပါ။ Header အောက်က content မဖုံးစေရန် body တွင် header height နှင့်တူသော top padding ထည့်ထားသည်။ Anchor navigation သွားသည့်အခါ fixed header မဖုံးစေရန် `scroll-padding-top` ပါ ထည့်ထားသည်။
+
+## Interactions
+
+- Dark/Light icon ဖြင့် theme ပြောင်းနိုင်သည်။
+- `EN/MM` control ဖြင့် language indicator ပြောင်းနိုင်သည်။
+- Phone menu ကို ဖွင့်/ပိတ်နိုင်သည်။
+- Mobile navigation item ရွေးပြီးနောက် menu ပြန်ပိတ်သည်။
+- Icon နှင့် menu button များတွင် accessible `aria-label` နှင့် menu အတွက် `aria-expanded` ထည့်ထားသည်။
 
 ## ဖိုင်များ
 
-- `Website/index.html` — Header Bar markup နှင့် semantic navigation
-- `Website/styles.css` — dark theme, responsive breakpoints, spacing, colors, hover/focus states
-- `Website/script.js` — mobile menu toggle နှင့် accessible `aria-expanded` state
+- `Website/index.html` — responsive Header Bar markup
+- `Website/styles.css` — fixed positioning, web/mobile breakpoints နှင့် theme styles
+- `Website/script.js` — mobile menu, theme toggle နှင့် EN/MM toggle
 
-## Design decisions
+## နောက်ပိုင်း backend ချိတ်ဆက်မည့်အချက်
 
-- Reference ပုံ၏ black/navy background နှင့် red accent ကို အဓိက palette အဖြစ် အသုံးပြုထားသည်။
-- `Inter` font ကို UI text အတွက် အသုံးပြုထားသည်။ Google Fonts မရပါက system sans-serif fallback သုံးမည်။
-- CSS media queries သုံးပြီး desktop/tablet/mobile layout များကို dependency မလိုဘဲ responsive ပြုလုပ်ထားသည်။
-- Icon များကို inline SVG ဖြင့် ထည့်ထားသောကြောင့် icon library ထပ်မံ install လုပ်ရန် မလိုပါ။
+Account, Favorites, Cart, Notification နှင့် language preference state များကို နောက်ပိုင်းတွင် shared Supabase backend/API နှင့် ချိတ်ဆက်မည်။ UI ထဲတွင် လက်ရှိထည့်ထားသော interactions များသည် local preview behavior သာ ဖြစ်သည်။
