@@ -1,0 +1,222 @@
+# Guitar Engine
+
+The neck under the music on the Guitar video page: six strings, the
+frets, and a mark where the music is being played — one colour per
+finger, and a slide that travels rather than jumps.
+
+TypeScript in, SVG out. It knows nothing about scores, files or pages:
+notes arrive as a string, a fret and a finger, in seconds.
+
+```bash
+npm run build     # -> dist/guitar-engine.js  (global: GuitarEngine)
+npm run verify    # typecheck + lint + format + tests
+```
+
+The built bundle is copied to `website/assets/guitar-engine.js`, which
+is what the page loads — GitHub Pages has no build step, so the file
+has to be in the repo.
+
+## A note is a PLACE, not a pitch
+
+The same pitch is playable in five places on a guitar, and which one
+the player uses is the whole point of the picture. So a note here is a
+string and a fret:
+
+```js
+{ string: 3, fret: 5, startSeconds: 2, endSeconds: 2.5, finger: 1 }
+```
+
+Nothing is inferred from pitch. Where a score writes no tab position,
+this engine draws nothing rather than guessing a shape — an invented
+fingering shown confidently is worse than an empty neck.
+
+## The five digits, in colours that do not move
+
+`finger` is numbered as a score numbers them: **1 index, 2 middle,
+3 ring, 4 little**, **'T'** the thumb reaching over the top for a
+bass note, and **0 an open string** — played, but by no
+finger. An open string gets NO mark on the neck at all: nothing is
+stopping it, so there is nothing to point at, and the right hand
+plucking it is the whole of what happens.
+
+The colours are **fixed**, not pickable:
+
+```
+p thumb   #FFC93C amber
+1 index   #FF725F red     2 middle  #6EB2FF blue
+3 ring    #3FE489 green   4 little  #FF7DE4 pink
+```
+
+The thumb is there because the PICKING hand uses it, and both hands
+are drawn from the same five colours: a fretting finger's mark on the
+neck, and the right hand's mark on the string it plucks.
+
+Their whole job is to be learnt once. A viewer who has seen the hand
+knows what red means for the rest of the video, and for the next video
+too; five colours anyone can re-pick is five colours nobody can learn.
+
+They are read off the page's own drawing of the hand, to the hex: the
+legend is what teaches the code, so a mark a shade off the fingertip
+it is naming is a mark that has to be worked out rather than
+recognised.
+
+`undefined` is a fifth case and a real one: nobody has decided yet.
+It is drawn in `colors.unassigned`, never in a finger's colour, so a
+video never says "little finger" about a note no one has answered.
+
+Which finger plays which note is NOT decided here. A score that writes
+a fingering has already answered it; the rest is the Human Finger
+Engine's question, and this engine draws whatever it is told.
+
+`renderHand()` draws the little hand that says which colour is which:
+the fretting hand seen from the back, fingers up. A legend of four
+coloured squares is a legend of four coloured squares; a hand says it
+without words.
+
+It is rectangles, because rectangles are what both renderers can
+paint — so when the caller has a real drawing, `handImage` takes its
+place in the band above the neck:
+
+```js
+{ handLegend: true, handImage: handPicture('assets/guitar/hand-fingers.webp') }
+```
+
+The engine still decides where it goes and how big, because that is
+the part that has to agree with the neck beside it; the file keeps its
+own shape and is never allowed to grow across the frame. With no
+file, the rectangles are still there, so a lost asset costs the
+artwork rather than the legend.
+
+## Slides
+
+A slide is one finger travelling along a string while the note sounds,
+so the mark it draws is not at a fret but between two of them, moving:
+
+```js
+{ string: 2, fret: 5, slideToFret: 9, startSeconds: 0, endSeconds: 1 }
+```
+
+`positionsAt` reports a FRACTIONAL fret while it travels — half way
+through the note, half way along the neck — and `markShapes` draws the
+road behind it so the movement reads in a still frame as well as in
+motion. A slide to the fret it is already on is not a slide.
+
+## One description, two renderers
+
+`stageShapes(options)` returns the whole frame as rectangles and
+circles in paint order. `renderGuitarStage` writes them as SVG for the
+page; the video renderer paints the same list onto a canvas, because
+rasterising an SVG thirty times a second costs more than the rest of
+the frame together. Two hand-written drawings would drift, and the
+first anyone would know of it is a published video that does not match
+the preview.
+
+## A guitar, not a fretboard
+
+The picture reads as an instrument, because it IS one: a drawing of a
+real guitar, headstock and body and all, with everything about the
+playing laid over it. The engine used to build one out of shapes and
+gradients instead — wood, binding, tuners, a soundhole or a pair of
+humbuckers — and that is gone. A stage with no picture on it gets its
+background and nothing else.
+
+How many FRETS there are is not a setting either: it is whatever the
+picture shows. `firstFret`/`lastFret` are ignored when a picture is
+there, which it always is.
+
+## The right hand: a plectrum, or fingers
+
+`picking: 'pick' | 'fingers'` decides how a stroke is written, and
+they are two different notations because they are two different
+things to watch. A plectrum strikes the strings together, so it is
+ONE mark over all of them: the square bracket down, the V up, which
+every guitarist has read above a stave since they started.
+
+Fingers pluck the strings one at a time, so each plucked string gets
+a mark of its own, in the COLOUR of the digit that takes it — **a**
+on the first string, **m** on the second, **i** on the third and
+**p**, the thumb, on everything below. It used to be those letters on
+a dark plaque, which is how fingerstyle has always been written; but
+a video is not a page, and a viewer who has learnt the hand in the
+corner already knows amber for the thumb. Same legend for both hands,
+and nothing to read.
+
+The stroke's direction gets its own small arrow beside the marks,
+pointing the way the hand TRAVELS ACROSS THE PICTURE — which is the
+only thing a viewer can check against what they are looking at.
+String 1 is drawn at the top, as it is on a stave of tab, so a
+down-stroke climbs the picture and its arrow points up.
+
+The fret numbers are ruled under the board in a faint ink, there to be
+glanced at rather than read. When the neck is drawn too small to carry
+all of them, the ones a player actually looks for are kept — the
+inlaid frets and every third — rather than crushing twenty-two
+numbers into the space.
+
+## The guitar is a picture, measured
+
+Hand over a drawing of a real one:
+
+```js
+{ photo: guitarPhoto('assets/guitar/acoustic-drawn.svg') }
+```
+
+and that is the instrument. Everything about the PLAYING is drawn on
+top of it: the hand legend, the fret numbers, the marks and the
+picking strokes.
+
+A picture on its own would be useless here, because a mark has to land
+on the fifth fret of the second string and only the file knows where
+that is. So a picture arrives MEASURED (`photo.ts`): the x of every
+fret wire and the y of the outer strings at both ends of the board, in
+the file's own pixels. Scale and shift those with the picture and
+every mark lands where it belongs.
+
+The four the page draws — `ACOUSTIC_DRAWN`, `CLASSICAL_DRAWN`,
+`ELECTRIC_DRAWN`, `STRAT_DRAWN` — are the site owner's own SVGs.
+`website/assets/guitar/README.md` is the field guide to measuring
+another one, including the two mistakes that cost a round each.
+
+Two things follow from it being a photograph. The frets it shows are
+the frets there are, so `firstFret`/`lastFret` stop applying; and the
+spacing is the real one, so the numbers thin out where they crowd
+rather than printing over each other.
+
+The picture is scaled to the WIDTH of the frame and hung by its
+strings. It is bigger than the frame on purpose: a photographed guitar
+is framed by whoever took it, and cropping it to a box would throw
+that framing away, so the body runs off the top and the bottom the way
+the neck runs off the side. A canvas painting the shape list must cut
+it to the stage, as the SVG's viewBox does.
+
+That cut is a hard line straight across a guitar, so give the engine
+the colour behind the stage and it fades the picture into it instead:
+
+```js
+{ photo: guitarPhoto('assets/guitar/acoustic-drawn.svg'), fadeTo: '#17110E' }
+```
+
+`fit` says how a picture meets its box. `'whole'` -- what all four
+guitars use -- never lets the box cut it: `span: [left, right]`
+chooses the stretch of the file to show across (the nut on one edge,
+the bridge on the other), and down it hangs by its strings but is
+held inside the box, so it can move without losing an edge. `'frame'`
+is the other way, filling the box and letting the body run off the
+top and the bottom, with `drop` saying how far down to hang it. All
+of it lives with the measurements rather than with the caller,
+because how a picture wants to be framed is a fact about that
+picture.
+
+A band goes over each edge the picture is actually cut at — opaque
+there, gone before it reaches the board — and the hand, the marks and
+the fret numbers are drawn on top of it at full strength. An edge the
+picture ends at by itself gets nothing: a band over an outline is fog
+over the guitar, not a cut hidden. Without `fadeTo` nothing is faded,
+because a guessed colour would draw a band of the WRONG colour across
+the frame.
+
+## Tests
+
+`npm test` runs against the BUILT bundle in a bare sandbox — the same
+file the browser loads, so a test cannot pass against code the page
+will not run.
