@@ -55,4 +55,11 @@ License နှင့် sample attribution notices များကို bundle 
 - Official mirror မှ `.sf3` နှင့် attribution files download အောင်မြင်သည်။
 - SHA-256 checksum ကို bundle ထဲတွင် ထည့်ပြီး အတည်ပြုထားသည်။
 - Manifest တွင် General MIDI program 0–127 နှင့် percussion bank 128 ကို မှတ်တမ်းတင်ထားသည်။
-- Browser sampler integration, R2 upload execution နှင့် Notation Engine end-to-end playback ကို မစတင်ရသေးပါ။
+- R2 object upload ပြီးစီးပြီးဖြစ်သည်။ Browser sampler integration နှင့် Notation Engine end-to-end playback စမ်းသပ်မှုသာ ကျန်ရှိသည်။
+
+
+## R2 upload completion — 2026-11-13
+
+The collection upload has now placed `MuseScore_General.sf3` at `msharing0008/soundfonts/musescore-general/v0.2/MuseScore_General.sf3`, along with the matching MuseScore General SF2, license, and readme objects. R2 HEAD checks verified the expected byte sizes. The SF3 SHA-256 matches the value above. This updates the earlier status line: the asset upload is complete; browser sampler/end-to-end playback validation remains outstanding. No public bucket access or custom domain was enabled; the application still needs its approved public CDN URL or signed-URL configuration before browser fetches can work.
+
+The collection upload has now placed `MuseScore_General.sf3` at `msharing0008/soundfonts/musescore-general/v0.2/MuseScore_General.sf3`, along with the matching MuseScore General SF2, license, and readme objects. R2 HEAD checks verified the expected byte sizes. The SF3 SHA-256 matches the value above. This updates the earlier status line: the asset upload is complete; browser sampler/end-to-end playback validation remains outstanding. No public bucket access or custom domain was enabled; the application still needs its approved public CDN URL or signed-URL configuration before browser fetches can work.

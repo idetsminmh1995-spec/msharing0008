@@ -75,3 +75,13 @@ Notation Engine က normalized `noteOn`, `noteOff`, `programChange` နှင့
 - https://www.schristiancollins.com/generaluser
 - https://github.com/pianobooster/fluid-soundfont/releases/tag/v3.1
 - https://freepats.zenvoid.org/Piano/acoustic-grand-piano.html
+
+
+## R2 upload record — 2026-11-13
+
+- Uploaded the extracted collection as individual objects to bucket `msharing0008` under the `soundfonts/` prefix; the source ZIP itself was not uploaded.
+- All 19 objects in the layout above are present. R2 HEAD checks confirmed each object's stored size matches the corresponding extracted archive entry. SHA-256 values from `SHA256SUMS` were preserved as object metadata and match the verified local extraction; `soundfonts/manifest.json` is the application-compatible collection manifest with a `runtime.assetPaths` mapping.
+- The default Sound Engine asset is `soundfonts/musescore-general/v0.2/MuseScore_General.sf3` (`musescore-general-sf3`). Its SHA-256 matches the recorded official value `5b85b6c2c61d10b2b91cddd41efcce7b25cd31c8271d511c73afafbef20b6fa3`.
+- The optional Salamander Grand Piano SF2 (1,266,462,334 bytes) was also uploaded as an individual object. The collection's MS Basic license caveat above remains: obtain rights-holder clarification/legal review before public or commercial redistribution.
+- No public bucket access or custom domain was enabled as part of this upload. Configure the intended public CDN URL or signed-URL flow before browser clients attempt to fetch the manifest and binary.
+- All object-key/size checks passed. The temporary, prefix-restricted transfer Worker was deleted after upload verification.
