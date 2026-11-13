@@ -115,6 +115,14 @@ videoFullscreen?.addEventListener('click', async () => {
   }
 });
 
+document.addEventListener('fullscreenchange', () => {
+  const isFullscreen = document.fullscreenElement === videoStage;
+  if (videoFullscreen) {
+    videoFullscreen.textContent = isFullscreen ? '×' : '⛶';
+    videoFullscreen.setAttribute('aria-label', isFullscreen ? 'Exit full screen' : 'Full screen');
+  }
+});
+
 toolCards.forEach((card) => {
   card.addEventListener('click', () => {
     const toolSlug = card.dataset.tool.toLowerCase().replace(/\s+/g, '-');

@@ -77,3 +77,5 @@ User feedback အရ မလိုအပ်သော explanatory copy မျာ�
 ## 2026-11-13 — Video controls below preview
 
 Video preview အပေါ်တွင် control များကို overlay မလုပ်ဘဲ preview အောက်တွင် သီးခြား control bar ထည့်ထားသည်။ Play/Pause button, click/drag လုပ်နိုင်သော timeline seek bar နှင့် Full screen button ပါဝင်ပြီး timeline time ကို `00:00` ပုံစံဖြင့် ပြသသည်။ Full screen သည် video preview stage ကိုသာ အပြည့်မျက်နှာပြင်ဖြင့် ဖွင့်သည်။
+
+Full screen ဝင်သွားသောအခါ control bar ၏ Full screen button သည် `×` အဖြစ် ပြောင်းပြီး နှိပ်လျှင် Full screen မှ ပြန်ထွက်နိုင်သည်။ Browser `Esc` ဖြင့် ပြန်ထွက်သည့်အခါ button icon နှင့် label ကိုလည်း `fullscreenchange` event ဖြင့် အလိုအလျောက် ပြန်ညှိထားသည်။

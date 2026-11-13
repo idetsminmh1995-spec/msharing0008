@@ -153,3 +153,7 @@ Create Video နှင့် Studio Page များတွင် explanatory ma
 ### Video preview controls
 
 Studio Page ၏ Video preview controls များကို preview အပေါ်တွင် overlay မလုပ်ဘဲ အောက်တွင်ထားမည်။ Play/Pause, timeline seek နှင့် Full screen ကို အခြေခံ control များအဖြစ် ထည့်ထားပြီး နောက်ပိုင်းတွင် actual video source နှင့် timeline data model ချိတ်ဆက်မည်။
+
+### Fullscreen exit behavior
+
+Video preview fullscreen ဝင်ပြီးနောက် control bar ထဲတွင် Exit Full Screen button ကို ဆက်လက်မြင်ရမည်။ Button သည် `×` အဖြစ် ပြောင်းပြီး click သို့မဟုတ် browser `Esc` ဖြင့် fullscreen မှ ပြန်ထွက်နိုင်ရမည်။
