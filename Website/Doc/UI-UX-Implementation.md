@@ -6,7 +6,7 @@
 
 ## Web view
 
-Desktop/web view တွင် logo နှင့် `Home`, `Courses`, `Store`, `Create`, `Library` navigation များ ပါဝင်သည်။ `Home Page` ဆိုသောစာသားကို ဖယ်ရှားပြီး sample ပုံစံအတိုင်း `Home` ဟု တိုတောင်းထားသည်။ ညာဘက်တွင် Search icon, `EN/MM` language control, Dark/Light theme control, Favorite icon, Cart icon, Notification icon နှင့် Account icon များ ပါဝင်သည်။ Active navigation item ကို red underline ဖြင့် ပြထားသည်။
+Desktop/web view တွင် logo နှင့် `Courses`, `Store`, `Create Video`, `Notation Lab` navigation များ ပါဝင်သည်။ `Home Page` နှင့် မတောင်းထားသော `Library` menu နှစ်ခုလုံးကို မထည့်ထားပါ။ Logo ကို home သို့သွားရန် အသုံးပြုနိုင်သည်။ ညာဘက်တွင် Search icon, `EN/MM` language control, Dark/Light theme control, Favorite icon, Cart icon, Notification icon နှင့် Account icon များ ပါဝင်သည်။ Active navigation item ကို red underline ဖြင့် ပြထားသည်။
 
 ## Phone view
 
