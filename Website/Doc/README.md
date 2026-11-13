@@ -11,3 +11,4 @@ M Sharing Website ၏ လက်ရှိ implementation နှင့် မပ�
 - [Video Engine Implementation Status](../Video/Video%20Engine%20Doc/README.md) — Engine code inventory, test results, and remaining production integration work
 - [MuseScore General R2 Asset](../Notation/Sound%20Doc/MuseScore-General-R2-Asset.md) — MuseScore SoundFont bundle, license, checksum, R2 upload layout, and Sound Engine caching plan
 - [SoundFont Collection R2 Asset](../Notation/Sound%20Doc/SoundFont-Collection-R2.md) — MS Basic, MuseScore General, GeneralUser GS, FluidR3 GM, and Salamander asset sources and license notes
+- [SoundFont R2 Upload Work Log](SoundFont-R2-Upload-2026-11-13.md) — upload steps, R2 object verification, and remaining playback/license/access tasks.
