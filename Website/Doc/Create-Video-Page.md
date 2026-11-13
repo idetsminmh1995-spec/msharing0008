@@ -73,3 +73,7 @@ Dark/Light theme toggle ၏ သက်ရောက်မှုကို Create Vi
 ## 2026-11-13 — Minimal UI copy
 
 User feedback အရ မလိုအပ်သော explanatory copy များကို ဖယ်ရှားထားသည်။ Create Video Page တွင် page title နှင့် tool names များသာ အဓိကကျန်ပြီး card subtitle များကို ဖယ်ထားသည်။ Studio Page တွင် `Drum Studio`, `Video`, `Kick`, `Snare`, `Hi-hat`, `Tempo` နှင့် `Start recording` ကဲ့သို့ လုပ်ဆောင်ချက်အတွက် လိုအပ်သောစာသားများသာ ကျန်သည်။ `Performance canvas`, setup/preview eyebrow labels, explanatory descriptions, status နှင့် timer စာများကို မထည့်တော့ပါ။
+
+## 2026-11-13 — Video controls below preview
+
+Video preview အပေါ်တွင် control များကို overlay မလုပ်ဘဲ preview အောက်တွင် သီးခြား control bar ထည့်ထားသည်။ Play/Pause button, click/drag လုပ်နိုင်သော timeline seek bar နှင့် Full screen button ပါဝင်ပြီး timeline time ကို `00:00` ပုံစံဖြင့် ပြသသည်။ Full screen သည် video preview stage ကိုသာ အပြည့်မျက်နှာပြင်ဖြင့် ဖွင့်သည်။

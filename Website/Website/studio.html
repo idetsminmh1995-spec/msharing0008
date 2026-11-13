@@ -52,7 +52,13 @@
         </div>
         <div class="studio-panel studio-panel--video">
           <div class="video-panel-heading"><h2>Video</h2></div>
-          <div class="video-stage"><div class="video-play-mark">▶</div></div>
+          <div class="video-stage" data-video-stage></div>
+          <div class="video-controls" aria-label="Video controls">
+            <button class="video-play-button" type="button" data-video-play aria-label="Play video">▶</button>
+            <input class="video-timeline" type="range" min="0" max="60" value="0" step="1" data-video-timeline aria-label="Video timeline" />
+            <span class="video-time" data-video-time>00:00</span>
+            <button class="video-fullscreen-button" type="button" data-video-fullscreen aria-label="Full screen">⛶</button>
+          </div>
         </div>
       </section>
     </main>

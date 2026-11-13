@@ -13,6 +13,12 @@ const studioWorkspace = document.querySelector('[data-studio-workspace]');
 const studioTitle = document.querySelector('[data-studio-title]');
 const studioDescription = document.querySelector('[data-studio-description]');
 const videoMessage = document.querySelector('[data-video-message]');
+const videoStage = document.querySelector('[data-video-stage]');
+const videoPlay = document.querySelector('[data-video-play]');
+const videoTimeline = document.querySelector('[data-video-timeline]');
+const videoTime = document.querySelector('[data-video-time]');
+const videoFullscreen = document.querySelector('[data-video-fullscreen]');
+let videoTimer;
 const savedTheme = localStorage.getItem('msharing-theme');
 
 if (savedTheme === 'dark' || savedTheme === 'light') {
@@ -65,6 +71,49 @@ if (studioPage && studioWorkspace) {
     ? 'Your drum performance will appear here.'
     : `Your ${formattedName.toLowerCase()} performance will appear here.`;
 }
+
+const formatTime = (seconds) => {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+};
+const updateVideoTime = () => {
+  if (videoTime && videoTimeline) videoTime.textContent = formatTime(Number(videoTimeline.value));
+};
+
+videoTimeline?.addEventListener('input', updateVideoTime);
+
+videoPlay?.addEventListener('click', () => {
+  const isPlaying = videoPlay.dataset.playing === 'true';
+  videoPlay.dataset.playing = String(!isPlaying);
+  videoPlay.textContent = isPlaying ? '▶' : 'Ⅱ';
+  videoPlay.setAttribute('aria-label', isPlaying ? 'Play video' : 'Pause video');
+  videoStage?.classList.toggle('is-playing', !isPlaying);
+  window.clearInterval(videoTimer);
+  if (!isPlaying) {
+    videoTimer = window.setInterval(() => {
+      if (!videoTimeline) return;
+      const nextTime = Number(videoTimeline.value) + 1;
+      if (nextTime >= Number(videoTimeline.max)) {
+        videoTimeline.value = videoTimeline.max;
+        updateVideoTime();
+        videoPlay.click();
+        return;
+      }
+      videoTimeline.value = String(nextTime);
+      updateVideoTime();
+    }, 1000);
+  }
+});
+
+videoFullscreen?.addEventListener('click', async () => {
+  if (!videoStage) return;
+  if (document.fullscreenElement) {
+    await document.exitFullscreen();
+  } else if (videoStage.requestFullscreen) {
+    await videoStage.requestFullscreen();
+  }
+});
 
 toolCards.forEach((card) => {
   card.addEventListener('click', () => {
