@@ -30,6 +30,21 @@ Phone view ၏ အပေါ်ဘက် Header တွင် Menu icon, logo, Sea
 - `Website/styles.css` — fixed top header, fixed phone bottom bar, desktop/mobile breakpoints နှင့် sample-inspired colors
 - `Website/script.js` — mobile menu, theme toggle နှင့် EN/MM toggle
 
+## ပြီးစီးထားသောအလုပ်များ
+
+လက်ရှိ Header scope အတွင်း Web Header ကို fixed ပြုလုပ်ခြင်း၊ logo/home link ထည့်ခြင်း၊ Web Header အလယ်တွင် `Courses`, `Store`, `Create Video`, `Notation Lab` ထားခြင်း၊ ညာဘက်တွင် Search, EN/MM, Dark/Light, Favorite, Cart, Notification နှင့် Account controls ထည့်ခြင်းတို့ ပြီးစီးထားသည်။ `Home Page` နှင့် `Library` ကဲ့သို့ မတောင်းထားသော menu များကို ဖယ်ထားသည်။
+
+Phone အတွက် top Header တွင် Menu, Logo, Search, Notification ထားပြီး အောက် fixed bar တွင် `Home`, `Courses`, `Store`, `Create Video`, `Notation Lab`, `Account` tabs ခြောက်ခု ထည့်ပြီးဖြစ်သည်။ Mobile menu toggle, active tab, theme/language indicator, cache-busting asset links နှင့် Cloudflare Workers Static Assets configuration ကိုလည်း ပြင်ဆင်ပြီး Wrangler dry-run/static checks ဖြင့် စစ်ထားသည်။
+
+## မပြီးသေးသောအလုပ်များ
+
+- Navigation item များအတွက် တကယ့် route/page components မတည်ဆောက်ရသေးပါ။
+- Search, Favorite, Cart, Notification နှင့် Account controls သည် local UI state သာဖြစ်ပြီး Supabase shared backend မချိတ်ရသေးပါ။
+- EN/MM toggle သည် လက်ရှိ indicator ပြောင်းခြင်းသာဖြစ်ပြီး ဘာသာပြန် content မချိတ်ရသေးပါ။
+- Dark/Light toggle သည် လက်ရှိ local page theme သာဖြစ်ပြီး user preference ကို database တွင် မသိမ်းရသေးပါ။
+- Supabase Auth, database schema, RLS, Cloudflare R2 upload/download နှင့် media metadata မစတင်ရသေးပါ။
+- Dashboard, Courses, Store, Create Video နှင့် Notation Lab အတွင်းပိုင်း UI မစတင်ရသေးပါ။
+
 ## နောက်အဆင့်
 
 ဤ Header နှင့် mobile bottom navigation UI/UX ကို အတည်ပြုပြီးမှသာ အခြား page sections သို့မဟုတ် Supabase shared backend integration ကို သီးခြားအဆင့်အဖြစ် စတင်မည်။
