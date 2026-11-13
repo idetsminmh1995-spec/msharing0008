@@ -59,6 +59,11 @@
             </div>
             <div class="notation-toolbar-group notation-playback-controls" role="group" aria-label="Playback controls">
               <button class="notation-button notation-button--play" type="button" data-play aria-label="Play" disabled>▶</button>
+              <div class="notation-zoom-controls" role="group" aria-label="Notation size">
+                <button class="notation-button notation-zoom-button" type="button" data-zoom-out aria-label="Zoom out" disabled>−</button>
+                <output data-zoom-value aria-live="polite">100%</output>
+                <button class="notation-button notation-zoom-button" type="button" data-zoom-in aria-label="Zoom in" disabled>+</button>
+              </div>
               <label class="notation-volume"><span>Volume</span><input type="range" min="0" max="100" value="75" data-volume aria-label="Volume" /><output data-volume-value>75%</output></label>
             </div>
             <button class="notation-button notation-button--pdf" type="button" data-download-pdf disabled>Download PDF</button>

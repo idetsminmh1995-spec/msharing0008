@@ -162,3 +162,26 @@
 /* Keep workspace metadata available to assistive tech without taking score space. */
 .notation-sr-only { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
 .notation-status.is-visible { position:relative!important; width:auto!important; height:auto!important; min-height:0; margin:8px 0 10px; padding:8px 12px; overflow:visible!important; clip:auto!important; border:1px solid var(--border)!important; border-radius:8px; color:var(--muted); background:var(--surface); font-size:11px; white-space:normal!important; }
+
+
+/* Treat notation as the main web workspace, not a floating card. */
+.notation-page { display:flex; width:100%; height:calc(100dvh - var(--header-height)); min-height:0; flex-direction:column; margin:0; padding:12px 24px 105px; overflow:hidden; }
+.notation-page .notation-stage { min-height:0; flex:1; max-height:none; border:0; border-radius:0; background:#fff; }
+.notation-zoom-controls { display:inline-flex; align-items:center; gap:3px; padding:3px; border:1px solid var(--border); border-radius:9px; background:var(--surface); }
+.notation-zoom-button { width:28px; min-height:28px; padding:0; font-size:14px; line-height:1; }
+.notation-zoom-controls output { min-width:38px; color:var(--text); font-family:'DM Mono',monospace; font-size:10px; text-align:center; }
+@media (max-width:860px) {
+  .notation-page { padding:10px 14px calc(155px + var(--bottom-height)); }
+}
+@media (max-width:560px) {
+  .notation-page { padding:8px 12px calc(185px + var(--bottom-height)); }
+  .notation-playback-controls { gap:8px; }
+  .notation-zoom-controls { gap:2px; padding:2px; }
+  .notation-zoom-button { width:26px; min-height:26px; }
+  .notation-zoom-controls output { min-width:34px; }
+  .notation-volume input { width:min(25vw,90px); }
+}
+
+@media (max-width:560px) {
+  .notation-dock .notation-volume input { width:min(22vw,84px); }
+}

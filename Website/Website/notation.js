@@ -17,16 +17,27 @@
   const volumeInput = page.querySelector('[data-volume]');
   const volumeValue = page.querySelector('[data-volume-value]');
   const pdfButton = page.querySelector('[data-download-pdf]');
+  const zoomOutButton = page.querySelector('[data-zoom-out]');
+  const zoomInButton = page.querySelector('[data-zoom-in]');
+  const zoomValue = page.querySelector('[data-zoom-value]');
 
   let xmlText = '';
   let renderResult = null;
   let layoutMode = 'page';
   let soundReady = false;
   let isPlaying = false;
+  let zoomPercent = 100;
 
   const announce = (message, visible = false) => {
     status.textContent = message;
     status.classList.toggle('is-visible', visible);
+  };
+
+  const updateZoom = () => {
+    score.style.zoom = `${zoomPercent}%`;
+    zoomValue.textContent = `${zoomPercent}%`;
+    zoomOutButton.disabled = !renderResult || zoomPercent <= 50;
+    zoomInButton.disabled = !renderResult || zoomPercent >= 200;
   };
 
   const dispatchSoundEvent = (name, detail = {}) => {
@@ -55,6 +66,7 @@
       controls.hidden = false;
       pdfButton.disabled = false;
       playButton.disabled = false;
+      updateZoom();
       setPlaying(false);
 
       const errors = (renderResult.diagnostics || []).filter((item) => item.severity === 'error');
@@ -152,6 +164,15 @@
       layoutMode = button.dataset.layout;
       if (xmlText) renderScore();
     });
+  });
+
+  zoomOutButton.addEventListener('click', () => {
+    zoomPercent = Math.max(50, zoomPercent - 10);
+    updateZoom();
+  });
+  zoomInButton.addEventListener('click', () => {
+    zoomPercent = Math.min(200, zoomPercent + 10);
+    updateZoom();
   });
 
   playButton.addEventListener('click', () => {
