@@ -198,3 +198,9 @@ Notation Engine, Sound Engine နှင့် Video Engine တို့ကို
 - **Notation Engine** က note များကို ပြသပြီး **Sound Engine** က အဆိုပါ note များအတိုင်း အသံထုတ်ပေးမည်။ **Video Engine** က အရည်အသွေးကောင်းပြီး ချောမွေ့သော video file ထုတ်လုပ်ရာနှင့် လိုအပ်သော file များကို အသုံးပြုရာတွင် ကူညီမည်။
 - **Piano Hand Human Engine** က note တစ်လုံးချင်းအတွက် ဘယ်လက်/ညာလက်နှင့် ဘယ်လက်ချောင်းဖြင့် တီးရမည်ဆိုသော data ကို ပေးမည်။ **Piano 3D Hand Engine** က ထို data အတိုင်း 3D လက်လှုပ်ရှားမှုကို ပြမည်။
 - Animation Engine သည် Piano ခလုတ်များကို အရောင်ဖြင့် highlight လုပ်ခြင်းနှင့် အခြား animation ဆိုင်ရာအလုပ်များကို လုပ်မည်။ Drum Animation Engine ကို Piano workflow တွင် အသုံးပြုမည့်အမည်နှင့် ၎င်း၏ အကျုံးဝင်မှုကို ထပ်မံအတည်ပြုရန် ကျန်ရှိသည်။
+
+## Sound Engine နှင့် MuseScore SoundFont — 2026-11-13
+
+Notation Engine က score note များကို timing ပါသော `noteOn`, `noteOff`, `programChange` နှင့် `controlChange` events အဖြစ် ထုတ်ပေးပြီး Sound Engine က ထို events များကို အသံအဖြစ် render/playback လုပ်မည်။ ပထမဆုံး sound source အဖြစ် MuseScore 3 နှင့် MuseScore 2.2+ တွင် အသုံးပြုသော official `MuseScore_General.sf3` ကို သုံးမည်။ SoundFont၊ license၊ sample attribution နှင့် version metadata များကို Cloudflare R2 တွင် versioned prefix ဖြင့် သိမ်းမည်။ အသေးစိတ်သည် [Sound Engine Plan](../Notation/Sound%20Plan/README.md) နှင့် [MuseScore General R2 Asset Record](../Notation/Sound%20Doc/MuseScore-General-R2-Asset.md) တွင် ရှိသည်။
+
+R2 မှ ဖိုင်များကို note တစ်လုံးချင်း သို့မဟုတ် playback တစ်ကြိမ်ချင်း ထပ်ခါတလဲလဲ မခေါ်စေရန် `soundfont-manifest.json` ကို တစ်ကြိမ် fetch လုပ်ပြီး `.sf3` binary ကို browser Cache API သို့မဟုတ် IndexedDB တွင် cache-first ဖြင့် သိမ်းမည်။ JSON သည် audio binary မဟုတ်ဘဲ asset path, cache key, checksum, MIDI bank/program mapping နှင့် attribution references များပါသော manifest ဖြစ်မည်။ Browser-compatible SoundFont sampler/WASM adapter ကို နောက် implementation အဆင့်တွင် ရွေးချယ်ပြီး Notation Engine event clock နှင့် Sound Engine clock ကို sync လုပ်မည်။

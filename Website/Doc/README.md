@@ -9,3 +9,4 @@ M Sharing Website ၏ လက်ရှိ implementation နှင့် မပ�
 - [Create Video Page](Create-Video-Page.md) — Web/phone responsive instrument နှင့် Metronome tool selection page
 - [Notation Lab Page](Notation-Lab-Page.md) — MusicXML notation viewer, page/horizontal layouts, PDF export, and pending Sound Engine bridge
 - [Video Engine Implementation Status](../Video/Video%20Engine%20Doc/README.md) — Engine code inventory, test results, and remaining production integration work
+- [MuseScore General R2 Asset](../Notation/Sound%20Doc/MuseScore-General-R2-Asset.md) — MuseScore SoundFont bundle, license, checksum, R2 upload layout, and Sound Engine caching plan
