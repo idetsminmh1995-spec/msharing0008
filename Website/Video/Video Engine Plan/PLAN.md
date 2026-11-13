@@ -85,7 +85,7 @@ Instrument တစ်ခုချင်းစီသည် Video Engine encoder �
 
 ## 5. Cross-instrument စမ်းသပ်မှုအစီအစဉ်
 
-- **Dispatch regression:** drums သည် လက်ရှိအတိုင်းဆက်အလုပ်လုပ်ရမည်။ Piano/Guitar/Bass/Strings/Voice သည် ကိုယ့် adapter သာရွေးရမည်။ Unsupported route သည် drum controls သို့မဟုတ် false success မပြရ။
+- **Dispatch regression:** drums နှင့် metronome သည် ကိုယ့် adapter သာရွေးပြီး မှန်ကန်စွာအလုပ်လုပ်ရမည်။ Piano/Guitar/Bass/Strings/Voice ကို အကောင်အထည်ဖော်ပြီးမှ သက်ဆိုင်ရာ adapter သို့ route ချိတ်ရန်။ Unsupported route သည် drum controls သို့မဟုတ် false success မပြရ။
 - **Event contract:** stable IDs, time unit, ordering, start/end boundary, duration derivation, chords/simultaneous events, empty/invalid/out-of-range data ကို per instrument စမ်းပါ။
 - **Frame determinism:** event မတိုင်မီ၊ onset, attack, sustain, release, end, repeated timestamp, random/non-monotonic seek time တို့တွင် တူညီသော time အတွက် တူညီသော frame ရလဒ်ရရမည်။
 - **Render lifecycle:** dimensions/FPS/frame count/duration/container/extension, progress, cancel, cleanup, Blob URL revoke, preview/play/seek/download, retry/error ကို စစ်ပါ။
@@ -117,7 +117,7 @@ The settings are implemented in `Website/Website/studio.html`, styled responsive
 
 ### Remaining implementation boundaries
 
-The current VideoEngine integration remains visual-only. MusicXML is accepted and identified in the UI but is not parsed into drum events yet. Sound Model and Count Voice are stored/rendered as configuration metadata; they do not yet produce audio or synthesized counting. Instrument adapters for Guitar, Piano, Bass, Strings, and Voice remain disabled until their event source, deterministic renderer, asset readiness, and audio policy are implemented.
+Drum adapter သည် visual-only ဖြစ်သည်။ Metronome adapter ကို Studio route၊ SVG renderer နှင့် သီးခြား synthesized click-track `AudioBuffer` ဖြင့် ချိတ်ဆက်ပြီးဖြစ်သည်။ Drum MusicXML/audio/count limitations များကို Studio history အတိုင်း ဆက်လက်ဖြည့်ရန်ရှိသည်။ Guitar, Piano, Bass, Strings, Voice adapters များကို event source, deterministic renderer, asset readiness နှင့် audio policy သတ်မှတ်ပြီးမှ ချိတ်ဆက်ရန်။
 
 
 ## 8. Studio settings revision — current work
@@ -136,3 +136,16 @@ The current render remains silent/visual-only. Sound Model and Count Voice setti
 The logo field no longer displays a redundant default-logo text label. The logo preview itself remains available, and the built-in M Sharing Drum Logo is used whenever no custom logo file is selected. Drum Brand is now a selector rather than free text. Sound Model and Sound Volume are grouped vertically in one control block, matching the Count Voice and Count Volume arrangement.
 
 The standard video output is now `1920×1080` for the 16:9 option. Square and portrait options use `1080×1080` and `1080×1920`. The preview stage has an independent fixed 16:9 frame so its box remains stable when a video loads or when a portrait/square output is selected.
+
+
+## Metronome adapter — completed 2026-11-14
+
+Create Video ရှိ Metronome card ကို dedicated `studio-metronome.js` adapter နှင့် shared Video Engine သို့ ချိတ်ထားသည်။ `studio-video.js` သည် Metronome route တွင် Drum workflow ကို မစတင်စေပါ။ Metronome Engine IIFE bundle (`window.MetronomeDesigns`) ကို `Website/Website/assets/metronome-engine.js` တွင် serve လုပ်ပြီး `sync-metronome-engine.mjs` က `dist` source နှင့် sync ကိုစစ်သည်။
+
+Adapter သည် Engine design 11 မျိုး၊ 16:9/9:16/1:1, quarter-note BPM, meter နှင့် bars ကို အသုံးပြုသည်။ Frame time မှ beat/bar/phase ကို deterministic တွက်ပြီး SVG ကို Video Engine canvas သို့ဆွဲသည်။ 30 FPS output အရွယ်အစားများသည် 1280×720, 720×1280, 720×720 ဖြစ်သည်။ 12 sec ကျော်သော setting ကို ပိတ်ထားသည်။
+
+Audio သည် Engine shared sound capability မဟုတ်ပါ။ Adapter က `OfflineAudioContext` မှ downbeat accent ပါသော click track `AudioBuffer` ဖန်တီး၍ shared Video Engine render ထဲထည့်သည်။ Preview, progress/cancel, play/seek/download ပါဝင်သည်။
+
+**စမ်းသပ်မှု:** Engine 20/20, Video Engine muxer 15/15, cleanup/safety 5/5; Chromium Engine MP4 smoke, latest Drum Studio MP4 export/regression နှင့် Metronome homepage-card-to-export flow pass. Metronome output သည် 3/8, quarter-note 96 BPM, 1 bar တွင် 28 frames/0.933 sec, 720×1280 VP8 နှင့် 48 kHz mono Opus ဖြစ်ကြောင်း `ffprobe` ဖြင့်စစ်ထားသည်။ Phone 375×812, desktop 1280×900 layout တွင် overflow မရှိ။
+
+**လက်ကျန်:** ဖုန်းအစစ်/Safari/Firefox နှင့် MediaRecorder-only fallback; design 11 မျိုးအားလုံးအတွက် browser visual snapshots; logo asset policy; Engine source input/XML escaping edge cases. Guitar ကို နောက်ဦးစားပေးအဖြစ် ဆက်လုပ်ပြီး Piano, Bass, Strings, Voice ကို သီးခြား adapter ဖြင့်သာ ချိတ်ဆက်ရန်။

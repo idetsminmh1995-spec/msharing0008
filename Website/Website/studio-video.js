@@ -168,6 +168,7 @@
   }
 
   const selectedTool = (new URLSearchParams(window.location.search).get('tool') || 'drums').toLowerCase();
+  if (selectedTool === 'metronome') return;
   if (selectedTool !== 'drums') {
     setStatus('Visual video export is currently available only in Drum Studio. Other instrument adapters are not implemented yet.');
     generateButton.disabled = true;

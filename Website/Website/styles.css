@@ -296,3 +296,27 @@
 @media (max-width:560px) {
   .studio-panel--video .video-stage { min-height:180px; }
 }
+
+
+/* Metronome Studio adapter: preserve the shared settings stylesheet on other routes. */
+.studio-settings[hidden] { display:none; }
+.metronome-controls { display:grid; gap:10px; margin:16px 0 14px; }
+.metronome-controls[hidden] { display:none; }
+.metronome-help { margin:0; color:var(--muted); font-size:10px; line-height:1.5; }
+.metronome-field { display:flex; min-width:0; flex-direction:column; gap:6px; color:var(--muted); font-size:10px; font-weight:600; }
+.metronome-field input,.metronome-field select { width:100%; min-height:36px; padding:0 10px; border:1px solid var(--border); border-radius:8px; color:var(--text); background:var(--surface); font:inherit; }
+.metronome-field select { cursor:pointer; }
+.metronome-field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+.metronome-duration { min-height:1.4em; margin:0; color:var(--muted); font-size:10px; line-height:1.5; }
+.video-stage img[data-metronome-preview] { width:100%; height:100%; min-height:0; flex:1; object-fit:contain; border-radius:10px; }
+.video-stage img[data-metronome-preview][hidden] { display:none; }
+@media (max-width:860px) {
+  .metronome-controls { gap:8px; margin:13px 0 12px; }
+  .metronome-field-grid { gap:8px; }
+}
+@media (max-width:560px) {
+  .metronome-field { font-size:9px; }
+  .metronome-field input,.metronome-field select { min-height:34px; font-size:10px; }
+  .metronome-field-grid { grid-template-columns:1fr; }
+  .metronome-duration { font-size:9px; }
+}

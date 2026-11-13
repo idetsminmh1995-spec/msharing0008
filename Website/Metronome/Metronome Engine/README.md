@@ -4,8 +4,8 @@ Eleven metronome video designs, written in TypeScript and drawn as SVG.
 Each one lays itself out for **16:9, 9:16 and 1:1** — thirty-three
 layouts in all — and none of them is a scaled copy of another.
 
-```ts
-import { renderMetronomeFrame, listDesigns } from 'metronome-engine';
+```js
+const { renderMetronomeFrame, listDesigns } = window.MetronomeDesigns;
 
 const svg = renderMetronomeFrame({
   design: 'sweep-dial',
@@ -109,9 +109,13 @@ thing to keep in step.
 ## Build
 
 ```
-npm run verify    # typecheck, lint, format, tests
+npm run verify    # typecheck, lint, format, tests, website bundle sync check
 npm run build     # dist/metronome-engine.js -> window.MetronomeDesigns
+npm run sync:website # build and copy the browser bundle into Website/Website/assets
+npm run check:website # verify the served copy matches dist
 ```
 
-`website/assets/metronome-engine.js` is a copy of that bundle, which
-`website/video-create/metronome/` loads.
+`Website/Website/assets/metronome-engine.js` is the generated copy of that bundle. The
+Metronome mode in `Website/Website/studio.html` loads it before
+`Website/Website/studio-metronome.js`. Run `npm run sync:website` after changing the engine;
+`npm run verify` also checks that the served copy is current.

@@ -214,3 +214,10 @@ MS Basic ၏ upstream license file သည် MuseScore General filename/text အ
 ### Notation Engine ↔ SoundFont bridge — 2026-11-13
 
 Notation playback event stream တွင် pitched note များ၏ MIDI note number နှင့် duration ticks ကို ထည့်ပြီး `R2SoundFontEngine` က R2 manifest/cache မှ MuseScore General SF3 ကို တစ်ကြိမ် load လုပ်ကာ SpessaSynth AudioWorklet ဖြင့် WebAudio ထုတ်ပေးမည်။ Notation Lab ၏ play/pause/volume lifecycle သည် SoundFont engine နှင့် ချိတ်ပြီး phone/web viewport နှစ်မျိုးအတွက် UI control တစ်ခုတည်းကို သုံးမည်။ လက်ရှိအဆင့်တွင် unpitched drum mapping နှင့် MusicXML instrument program/bank routing သည် နောက်ထပ်အလုပ်ဖြစ်သည်။
+
+
+## Metronome Studio — 2026-11-14
+
+Create Video ရှိ Metronome card ကို `studio.html?tool=metronome` သို့ ချိတ်ပြီး Metronome Engine design 11 မျိုး၊ landscape/portrait/square output၊ quarter-note BPM၊ meter နှင့် bar controls ဖြင့် video ဖန်တီးနိုင်သည်။ Engine bundle ကို `Website/Website/assets/metronome-engine.js` သို့ reproducible sync/check လုပ်ပြီး `studio-metronome.js` က frame time မှ deterministic SVG state တွက်ကာ shared Video Engine ကို ပြန်သုံးသည်။ Metronome adapter သည် `OfflineAudioContext` ဖြင့် click-track `AudioBuffer` ကို ကိုယ်တိုင်ထုတ်ပေးသည်; ဤသည် Shared Sound Engine မဟုတ်ပါ။ Render အရှည်သည် 12 sec အထိဖြစ်သည်။
+
+Phone 375px နှင့် web/desktop 1280px viewport checks, Metronome portrait video/audio export နှင့် Drum regression တို့ Chromium တွင် pass ဖြစ်သည်။ အသေးစိတ် Plan: [Metronome Engine Plan](../Metronome/Metronome%20Engine%20Plan/PLAN.md); code/test inventory: [Metronome Engine Doc](../Metronome/Metronome%20Engine%20Doc/DOC.md). နောက်ဦးစားပေးမှာ Guitar၊ ထို့နောက် Piano, Bass, Strings နှင့် Voice ကို သီးခြား instrument adapter ဖြင့်ချိတ်ဆက်ခြင်းဖြစ်သည်။

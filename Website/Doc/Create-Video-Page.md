@@ -79,3 +79,11 @@ User feedback အရ မလိုအပ်သော explanatory copy မျာ�
 Video preview အပေါ်တွင် control များကို overlay မလုပ်ဘဲ preview အောက်တွင် သီးခြား control bar ထည့်ထားသည်။ Play/Pause button, click/drag လုပ်နိုင်သော timeline seek bar နှင့် Full screen button ပါဝင်ပြီး timeline time ကို `00:00` ပုံစံဖြင့် ပြသသည်။ Full screen သည် video preview stage ကိုသာ အပြည့်မျက်နှာပြင်ဖြင့် ဖွင့်သည်။
 
 Full screen ဝင်သွားသောအခါ control bar ၏ Full screen button သည် `×` အဖြစ် ပြောင်းပြီး နှိပ်လျှင် Full screen မှ ပြန်ထွက်နိုင်သည်။ Browser `Esc` ဖြင့် ပြန်ထွက်သည့်အခါ button icon နှင့် label ကိုလည်း `fullscreenchange` event ဖြင့် အလိုအလျောက် ပြန်ညှိထားသည်။
+
+## 2026-11-14 — Metronome Studio connected to Video Engine
+
+Metronome card သည် ယခု Studio mode သို့ ဝင်ပြီး Engine design 11 မျိုး၊ 16:9/9:16/1:1 orientation၊ BPM၊ time signature နှင့် bars ရွေးကာ animated video export လုပ်နိုင်သည်။ Adapter သည် preview, progress, cancel, playback/seek, download နှင့် synthesized click-track audio ကို ထည့်ထားသည်။ Drum mode သီးခြား branch အဖြစ် ဆက်ရှိပြီး Metronome page တွင် Drum pads မပြပါ။
+
+ပြောင်းလဲထားသော အဓိက paths: `Website/Website/studio.html`, `studio-metronome.js`, `studio-video.js`, `styles.css`, `assets/metronome-engine.js`, `Website/Metronome/Metronome Engine/tools/sync-metronome-engine.mjs`, `Website/Video/Video Engine/source/tools/test-metronome-studio-browser.mjs`. Video Engine ကိုပြန်မရေးဘဲ shared renderer ကို အသုံးပြုသည်။
+
+Chromium စမ်းသပ်မှုတွင် 375×812 phone နှင့် 1280×900 desktop တွင် overflow မရှိ၊ 3/8 at 96 quarter-note BPM portrait export တွင် 720×1280 VP8 + 48kHz mono Opus stream ရှိကြောင်း `ffprobe` ဖြင့် အတည်ပြုထားသည်။ Metronome Engine verify 20/20, Video Engine muxer 15/15, cleanup/safety 5/5, Engine smoke test နှင့် Drum regression အောင်မြင်သည်။ Device အစစ်/Safari/Firefox compatibility မစစ်ရသေးပါ။ နောက်တစ်ဆင့်အဖြစ် Guitar နှင့် ကျန် instrument များကို သီးခြား Plan အရ ဆက်လုပ်ရန်လိုသည်။ [Metronome Engine Doc](../Metronome/Metronome%20Engine%20Doc/DOC.md)

@@ -1,157 +1,121 @@
-# Metronome Engine — Code Review болон техникийн баримт
+# Metronome Engine — Code နှင့် ချိတ်ဆက်မှုမှတ်တမ်း
 
-**Шалгасан огноо:** 2026-11-13  
-**Source:** GitHub-д импортолсон `metronome-engine.zip` snapshot  
-**Engine зам:** `Website/Metronome/Metronome Engine/`  
-**Энэ баримтын зорилго:** Одоогийн кодын бодит үүрэг, public API, design-ууд, build/test болон илэрсэн хязгаарлалтыг тэмдэглэх. Энэ нь engine кодыг өөрчилсөн эсвэл website-д интеграц хийсэн гэсэн үг биш.
+**နောက်ဆုံးစစ်ဆေးသည့်နေ့:** 2026-11-14
+**Repository:** `idetsminmh1995-spec/msharing0008`
+**Plan:** [Metronome Engine Plan](../Metronome%20Engine%20Plan/PLAN.md)
+**ဆက်စပ်မှတ်တမ်း:** [Video Engine Doc](../../Video/Video%20Engine%20Doc/README.md)
 
-## Товч дүгнэлт
+## အကျဉ်းချုပ်
 
-Metronome Engine нь өгөгдсөн нэг beat-ийн төлөвийг SVG frame болгон дүрслэх TypeScript renderer юм. 11 төрлийн дүрслэлийн design, гурван aspect ratio (`16x9`, `9x16`, `1x1`), design тус бүрийн өнгөний palette, хэмнэл/measure readout болон optional logo URL-ийг нэг SVG output-д нэгтгэнэ.
+Metronome Engine သည် ပေးထားသော beat/frame state တစ်ခုမှ SVG frame တစ်ခုကို ထုတ်ပေးသည့် TypeScript renderer ဖြစ်သည်။ Design 11 မျိုးနှင့် Landscape `16x9`, Portrait `9x16`, Square `1x1` layout များ ပါဝင်သည်။ Engine ကို Create Video ရှိ Metronome card မှ Studio သို့ ချိတ်ဆက်ထားပြီး Studio adapter က SVG frame များကို Video Engine ဖြင့် video အဖြစ် render လုပ်သည်။ ထွက်လာသော video တွင် beat click audio ပါသည်။
 
-Энэ Engine өөрөө цаг хэмжигч, audio, metronome playback, DOM animation эсвэл эцсийн video encoder биш. Host application нь `beat`, `phase`, tempo болон meter-ийн төлөвийг өгч, үүссэн SVG-г preview эсвэл video pipeline-д ашиглах үүрэгтэй.
+ဤ integration သည် Drum workflow ကို ပြောင်းလဲခြင်းမဟုတ်ပါ။ Metronome သည် သီးခြား `studio-metronome.js` adapter ကို သုံးပြီး Studio ထဲတွင် Drum pads မပေါ်ပါ။ Guitar, Piano, Bass, Strings နှင့် Voice တို့ကို Metronome adapter သို့ ချိတ်ဆက်ထားခြင်း မရှိပါ။
 
-Орон нутгийн түр copy дээр `npm install --no-package-lock --no-audit --no-fund` болон `npm run verify` амжилттай ажилласан: typecheck, lint, format check болон **20 test бүгд pass** болсон. Энэ нь GitHub repo-д `node_modules` эсвэл build output нэмсэн гэсэн үг биш; шалгалтыг `/tmp` дахь temporary copy дээр хийсэн.
+## File တည်နေရာနှင့် အခြေအနေ
 
-## Бүтэц ба үүрэг
-
-| Зам | Үүрэг |
+| File/Folder | လုပ်ဆောင်ချက်နှင့် အခြေအနေ |
 |---|---|
-| `src/index.ts` | Public entry point; design сонгох, frame-ийг normalize хийх, SVG shell үүсгэх, `renderMetronomeFrame()` болон `listDesigns()` export хийх. |
-| `src/types.ts` | Aspect ratio, canvas, input frame, palette болон `Design`/`DesignContext` contracts. |
-| `src/designs/index.ts` | 11 design-ийг picker-ийн тогтсон дарааллаар бүртгэх; `designById()` болон `DEFAULT_DESIGN_ID`. |
-| `src/designs/01-*.ts`–`11-*.ts` | Тус бүрийн SVG body/layout болон beat/phase-д суурилсан дүрслэл. |
-| `src/layout.ts` | Canvas хэмжээ, gutter, header/stage band, logo box, title/subtitle болон нийтлэг BPM/meter readout. |
-| `src/theme.ts` | Design бүрийн өнгөний palette, light/dark ground болон readout өнгө. |
-| `src/logos.ts` | Design ID-гаас logo-ийн нэр сонгоно; файлын URL/path-ийг host application шийднэ. |
-| `src/svg.ts` | SVG element helpers, текст escaping, тоон хэмжээг форматлах, arc/polar/easing helpers. |
-| `test/designs.test.js` | Built IIFE bundle дээр ажиллах Node test suite. |
-| `dist/metronome-engine.js` | Build хийхэд гардаг browser IIFE bundle; global нэр нь `MetronomeDesigns`. |
+| `Website/Metronome/Metronome Engine/src/index.ts` | `renderMetronomeFrame()`, `listDesigns()` နှင့် public bundle exports. |
+| `Website/Metronome/Metronome Engine/src/layout.ts` | 11 design များအတွက် aspect/layout, header, logo box, BPM နှင့် meter readout. |
+| `Website/Metronome/Metronome Engine/src/theme.ts` | Design တစ်ခုချင်းစီ၏ palette. |
+| `Website/Metronome/Metronome Engine/src/logos.ts` | Design ID အလိုက် logo အမည် metadata; အမှန်တကယ် image URL ကို caller က ပေးရသည်။ |
+| `Website/Metronome/Metronome Engine/dist/metronome-engine.js` | `window.MetronomeDesigns` အဖြစ်သုံးသည့် generated IIFE. |
+| `Website/Metronome/Metronome Engine/tools/sync-metronome-engine.mjs` | `dist` bundle ကို static website asset သို့ ကူးခြင်းနှင့် `--check` ဖြင့် နှိုင်းယှဉ်ခြင်း. |
+| `Website/Website/assets/metronome-engine.js` | Production/static site မှ load လုပ်သည့် built copy; source bundle နှင့် တူညီသည်။ |
+| `Website/Website/studio.html` | Metronome settings form၊ preview element နှင့် engine scripts အစီအစဉ်. |
+| `Website/Website/studio-metronome.js` | Metronome controls, frame timing, click audio, Video Engine request, cancel/preview/download. |
+| `Website/Website/studio-video.js` | Drum adapter; Metronome query အတွက် အစောပိုင်း return လုပ်ပြီး Drum behavior ကို ထိန်းထားသည်။ |
+| `Website/Website/styles.css` | Metronome form နှင့် preview အတွက် responsive/dark-light styling. |
+| `Website/Video/Video Engine/source/tools/test-metronome-studio-browser.mjs` | Chromium end-to-end test: Studio route, UI, export, audio နှင့် ffprobe. |
 
-## Render pipeline
+## အသုံးပြုသူ flow နှင့် script အစီအစဉ်
 
-`renderMetronomeFrame(input)` дараах байдлаар ажиллана:
+1. `Website/Website/index.html` ထဲရှိ ရှိပြီးသား Metronome card ကိုနှိပ်ပါက `script.js` က `studio.html?tool=metronome` သို့ သွားသည်။
+2. Studio page က `assets/video-engine.js`, `assets/metronome-engine.js`, `script.js`, `studio-video.js`, `studio-metronome.js` ကို အစဉ်လိုက် load လုပ်သည်။ Engine bundle ၏ global သည် `window.MetronomeDesigns` ဖြစ်သည်။
+3. Metronome adapter သည် Metronome mode တစ်ခုတည်းတွင် စတင်ပြီး shared Drum settings form ကို ဖျောက်ကာ Metronome settings ကို ပြသည်။
+4. `listDesigns()` ဖြင့် design 11 မျိုးကို picker ထဲထည့်ပြီး ရွေးထားသော design/aspect အတွက် အဖွင့် beat SVG ကို preview ပြသည်။
+5. Render ကိုစတင်သည့်အခါ beat state ကို video time မှ တိုက်ရိုက်တွက်ပြီး frame တစ်ခုချင်းစီတွင် `renderMetronomeFrame()` ကိုခေါ်သည်။ Wall-clock time သို့မဟုတ် ယခင် frame state ကို မသုံးပါ။
+6. `VideoEngine.render()` က canvas frame များကို MP4/WebM အဖြစ် encode လုပ်သည်။ Browser/device က ပံ့ပိုးသည့် format သည် ကွာနိုင်သည်။ Export ပြီးလျှင် video preview, play/seek controls နှင့် download link ကို အသုံးပြုနိုင်သည်။
 
-1. `input.design`-ийг `designById()`-аар сонгоно. Танихгүй ID бол registry-ийн эхний design болох `pendulum` руу fallback хийнэ.
-2. `input.aspect`-ийг шалгана. Runtime дээр танихгүй aspect ирвэл `16x9` руу fallback хийнэ.
-3. Сонгосон aspect-д тохирох canvas болон design-ийн palette-г авна.
-4. `frame`-ийн утгуудыг normalize хийгээд `DesignContext` үүсгэнэ.
-5. Background rect, shared header (design нь `ownHeader` тохируулсан бол алгасна), design body, нийтлэг `tempoStats`-ийг дарааллаар SVG-д оруулна.
-6. `viewBox`, responsive `width/height`, `preserveAspectRatio="xMidYMid meet"`, `role="img"` болон beat-ийг илэрхийлсэн `aria-label`-тай бүрэн `<svg>` document string буцаана.
+## Tempo, meter နှင့် ကြာချိန်
 
-`renderMetronomeFrame()` нь нэг агшны SVG-г буцаадаг. Хөдөлгөөнийг video болгохын тулд caller нь хөгжмийн цагтай тааруулан `frame.phase` болон бусад frame values-ийг шинэчилж олон удаагийн render хийх ёстой.
+UI တွင် BPM ကို **quarter-note BPM** အဖြစ် သတ်မှတ်ထားသည်။ Beat unit ကို denominator `d` (2, 4, 8, 16) ဟုယူလျှင် beat တစ်ခုကြာချိန်မှာ:
 
-## Public API
+`beatSeconds = 60 × 4 ÷ (BPM × d)`
 
-| API | Тайлбар |
+စုစုပေါင်း beat အရေအတွက်မှာ `bars × beatsPerBar` ဖြစ်ပြီး စုစုပေါင်းအချိန်မှာ `beatSeconds × bars × beatsPerBar` ဖြစ်သည်။ Adapter သည် frame time မှ `beat`, `bar`, `phase` ကို တွက်၍ downbeat ကို bar တစ်ခုစီတွင် ပြန်စတင်သည်။ အရှည်ကို **12 sec အများဆုံး** သတ်မှတ်ထားပြီး ကျော်လွန်လျှင် render မလုပ်ဘဲ form status တွင် အကြောင်းပြသည်။
+
+Video canvas အရွယ်အစားများမှာ Landscape `1280×720`, Portrait `720×1280`, Square `720×720`; frame rate `30 FPS` ဖြစ်သည်။ SVG Engine သည် မိမိ၏ aspect-specific viewBox ကို ထိန်းထားပြီး Video Engine canvas ထဲသို့ အချိုးမှန်ဆွဲသည်။
+
+## Click audio
+
+Metronome Engine ကိုယ်တိုင် audio သို့မဟုတ် clock မထုတ်ပေးပါ။ Studio adapter သည် `OfflineAudioContext` ဖြင့် mono `AudioBuffer` ထုတ်လုပ်သည်။ Bar တစ်ခုစီ၏ ပထမ beat သည် accent frequency/level ပိုမြင့်ပြီး ကျန် beats များသည် ပုံမှန် tick ဖြစ်သည်။ `AudioBuffer` ကို video segment နှင့်အတူ Video Engine သို့ ပေးသည်။
+
+ဤသည် Metronome export အတွက်သာ local sine-tone click track ဖြစ်သည်။ `Website/Notation/Sound Egnine` folder ထဲတွင် Sound Engine source မရှိသေးသောကြောင့် ဤ code ကို shared Sound Engine သို့မဟုတ် တခြား instrument များ၏ audio provider ဟု မယူဆရ။ Browser တွင် `OfflineAudioContext` မရှိပါက adapter က error ပြပြီး silent video အောင်မြင်သကဲ့သို့ မပြပါ။
+
+## Build နှင့် asset synchronization
+
+Metronome Engine folder ထဲမှ:
+
+- `npm run sync:website` — bundle ကို build လုပ်ပြီး `Website/Website/assets/metronome-engine.js` သို့ copy လုပ်သည်။
+- `npm run check:website` — `dist` နှင့် website asset ကို အတိအကျနှိုင်းယှဉ်သည်။
+- `npm run verify` — typecheck, lint, format check, build, Node tests နှင့် website bundle sync check ကို လုပ်သည်။
+
+Package တွင် lockfile မရှိသေးသဖြင့် clean install အတွက် `npm ci` ကို အတည်မပြုရသေးပါ။ စမ်းသပ်ရာတွင် `npm install --no-package-lock --no-audit --no-fund` ကို အသုံးပြုသည်။
+
+## အတည်ပြုထားသော စမ်းသပ်မှုများ
+
+- Metronome Engine `npm run verify`: typecheck/lint/format/build အောင်မြင်; Node test **20/20 pass**; website bundle sync check pass.
+- Video Engine muxer Node tests **15/15 pass**.
+- Video Engine cleanup/safety Node tests **5/5 pass**.
+- Chromium Video Engine smoke test: `ffprobe` က MP4/H.264, 320×180, 30 frames, 1.0 sec ကို ဖတ်နိုင်သည်။
+- Drum Studio browser regression: default-pattern workflow က MP4/H.264 1920×1080 landscape export နှင့် 1080×1920 portrait export ထုတ်နိုင်ပြီး Drum export ၏ silent behavior မပြောင်းပါ။
+- Metronome Studio browser integration: Create Video ရှိ Metronome card ကိုနှိပ်ပြီး Studio route သို့ရောက်ကြောင်း စစ်သည်။ 12 စက္ကန့်ကျော်သော setting ကို export မစမီ ပိတ်ကြောင်းလည်း အတည်ပြုထားသည်။ `sweep-dial`, 9:16, quarter-note 96 BPM, 3/8, 1 bar ကို render လုပ်ပြီး **28 frames, 0.933 sec**, 720×1280 VP8 video နှင့် 48 kHz mono Opus audio ထွက်သည်။ `ffprobe` က video/audio stream နှစ်ခုလုံးကို ဖတ်နိုင်သည်။
+- Metronome controls နှင့် Studio layout: 375×812 phone viewport တွင် 1-column, 1280×900 desktop viewport တွင် 2-column ဖြစ်ပြီး horizontal overflow မရှိ။ Metronome route တွင် shared Drum settings form ကို ဖျောက်ထားကြောင်း စစ်ဆေးထားသည်။
+- Video Engine source/production sync နှင့် Metronome Engine source/production sync နှစ်ခုစလုံး pass.
+
+## လက်ကျန်ကန့်သတ်ချက်များ
+
+- Engine runtime frame input တွင် `NaN`/`Infinity` edge-case validation နှင့် SVG `logoUrl` attribute escaping ကို ပိုမိုစမ်းသပ်/ပြင်ဆင်ရန် ကျန်သည်။
+- Adapter သည် လက်ရှိ `logoUrl` မပေးသဖြင့် exported Metronome video တွင် brand/instrument logo မပါပါ။
+- Browser test သည် Chromium/headless environment ပေါ်တွင်သာ အတည်ပြုထားသည်။ Safari/Firefox နှင့် ဖုန်းအစစ် compatibility မစစ်ရသေးပါ။ 375px/1280px viewport test သည် actual device test မဟုတ်ပါ။
+- 11×3 design/aspect SVG outputs ကို engine unit tests ဖြင့်စစ်သော်လည်း browser visual snapshot/clipping test သည် design အားလုံးအတွက် မရှိသေးပါ။
+- Default click tone ကို user က ပြောင်းနိုင်ခြင်း၊ volume/accent options နှင့် အခြား instrument adapter များကို မထည့်ရသေးပါ။
+- Guitar, Piano, Bass, Strings, Voice တို့သည် Studio Video Engine နဲ့ မချိတ်ဆက်ရသေးပါ။ အသေးစိတ်ကို [Video Engine Doc](../../Video/Video%20Engine%20Doc/README.md) နှင့် [Plan](../../Video/Video%20Engine%20Plan/PLAN.md) တွင်ကြည့်ပါ။
+
+
+## Engine source behavior, API နှင့် design catalog
+
+`renderMetronomeFrame(input)` သည် **အချိန်တစ်ခဏအတွက် SVG string တစ်ခု** ကို ပြန်ပေးသည်။ Engine ကိုယ်တိုင် clock မစတင်၊ audio မထုတ်၊ DOM animation မလုပ်ပါ။ Video adapter က အချိန်တစ်ခုချင်းအတွက် `frame` state ကိုပေးပြီး Engine ကို ထပ်ခေါ်ရသည်။ Design တစ်ခုချင်းစီသည် `beat`/`phase` မှ frame geometry ကိုပြန်တွက်သဖြင့် prior frame များတွင် သိမ်းထားသည့် animation state ကို မလိုအပ်ပါ။
+
+| Browser API | လုပ်ဆောင်ချက် |
 |---|---|
-| `renderMetronomeFrame(input): string` | Нэг frame-ийн complete SVG string гаргана. |
-| `listDesigns(): readonly DesignSummary[]` | Picker-д зориулсан design ID, нэр, тайлбар, look, palette, `isLight`, logo-name metadata буцаана. |
-| `DESIGNS` | Picker-ийн тогтсон дараалалтай `Design[]`. Дарааллыг өөрчлөхөд хэрэглэгчийн хадгалсан/дугаарласан сонголт өөр утгатай болох эрсдэлтэй. |
-| `DEFAULT_DESIGN_ID` | Одоогийн default: `pendulum`. |
-| `designById(id)` | ID тохирсон `Design` эсвэл `undefined`. Энэ нь render fallback-тай андуурагдахгүй тусдаа lookup API. |
-| `ASPECT_RATIOS`, `canvasFor()`, `bands()`, `logoBox()` | Aspect/canvas болон layout-ийн helper-үүд. |
-| `tempoStats()`, `statRow()`, `statColumnWidth()`, `statRowHeight()`, `LOGO_FRACTION` | Shared readout/logo layout helper ба constant. |
-| `paletteForDesign()`, `isLightPalette()` | Theme helper-үүд. |
-| `metronomeLogoName()`, `DEFAULT_LOGO_NAME` | Design ID-д тохирох logo-ийн нэр; `DEFAULT_LOGO_NAME` нь `sharing`. |
-| `AspectRatio`, `Canvas`, `Design`, `DesignContext`, `MetronomeFrame`, `MetronomeRenderInput`, `Palette`, `DesignSummary` | TypeScript integration types. |
+| `window.MetronomeDesigns.renderMetronomeFrame(input)` | Background, optional title/header, design body နှင့် BPM/meter readout ပါသော complete SVG string တစ်ခု ထုတ်သည်။ |
+| `window.MetronomeDesigns.listDesigns()` | Picker အတွက် id/name/look/palette/light-mode/logo-name metadata ကို အစဉ်လိုက်ပြန်ပေးသည်။ |
+| `DESIGNS`, `DEFAULT_DESIGN_ID`, `designById()` | Registry အစီအစဉ်၊ `pendulum` default နှင့် design တစ်ခု lookup လုပ်ရန် helper များ။ |
+| `canvasFor()`, `bands()`, `logoBox()`, `tempoStats()` | Aspect/canvas, header-stage partition, logo box နှင့် shared tempo/meter layout helpers။ |
+| `AspectRatio`, `Canvas`, `Design`, `DesignContext`, `MetronomeFrame`, `MetronomeRenderInput` | Engine source ထဲရှိ TypeScript contracts။ Browser bundle သည် IIFE ဖြစ်ပြီး global name `MetronomeDesigns` ဖြစ်သည်။ |
 
-`DesignSummary.logo` нь `drum`, `piano`, `guitar`, `bass`, `violin`, `cello`, `vocal` эсвэл `sharing` зэрэг нэр байдаг. Engine нь эдгээрийг бодит image path болгон resolve хийхгүй; host нь өөрийн asset байршилд map хийх шаардлагатай. `logoUrl` өгөгдвөл SVG image-д ашиглах URL/data URI-г caller өгнө.
+Render input တွင် `design`, `aspect` (`16x9`, `9x16`, `1x1`), `frame.beat`, `frame.beatsPerBar`, `frame.phase`, `frame.bar`, `frame.bpm`, `frame.timeSignature` နှင့် optional `title`, `subtitle`, `logoUrl` ပါဝင်သည်။ `phase` သည် beat စသည့်အချိန်တွင် 0၊ နောက် beat မတိုင်မီ 1 ဖြစ်သည့် progress ဖြစ်သည်။ မသိသော design သည် ပထမ design `pendulum` သို့ fallback လုပ်ပြီး runtime တွင် မသိသော aspect သည် `16x9` သို့ fallback လုပ်သည်။ `phase` finite မဟုတ်ပါက 0 သို့ပြောင်းကာ၊ အခြားအချိန်တွင် 0–1 အတွင်းကန့်သတ်သည်။ အခြား numeric field များအတွက် `NaN`/`Infinity` validation မပြည့်စုံသေးကြောင်း Plan backlog တွင် မှတ်တမ်းတင်ထားသည်။
 
-## Input contract ба normalize хийх дүрэм
+SVG ၏ native design artboard အရွယ်အစားမှာ `16x9` = 1920×1080, `9x16` = 1080×1920, `1x1` = 1080×1080 ဖြစ်သည်။ Website video adapter က 30 FPS ဖြင့် သက်ဆိုင်ရာ 1280×720, 720×1280, 720×720 canvas ထဲသို့ aspect ratio မပျက်စေဘဲ ဆွဲသည်။ SVG shared layout သည် header, stage band, logo region နှင့် BPM/meter readout ကို ခွဲထားပြီး design-specific body ကို stage အတွင်းတွင် ထည့်သည်။
 
-`MetronomeRenderInput`:
+| ID | Design | Look | Frame အတွင်း အဓိကပုံဖော်ချက် |
+|---|---|---|---|
+| `pendulum` | Pendulum | Black / neon red | Metronome case, scale, pendulum နှင့် beat number; ကိုယ်ပိုင် header layout. |
+| `beat-dots` | Beat Dots | Black / red | Medallion count, beat တစ်ခုစီ၏ dot နှင့် beat ပြီးနောက် pulse ring. |
+| `pulse-ring` | Pulse Ring | Night blue | Beat တစ်ခုစီတွင် ကျယ်လာပြီး ပျောက်သွားသည့် ring များ၊ အလယ်တွင် count. |
+| `bar-meter` | Bar Meter | Paper / ink | Bar တစ်ခုအတွင်း past/current/future beat များကို block ဖြင့်ခွဲပြ; portrait တွင် အလျားလိုက်တန်း. |
+| `sweep-dial` | Sweep Dial | Charcoal / amber | Bar တစ်ခုလုံးအတွင်း လှည့်သွားသည့် hand/progress arc နှင့် beat tick များ. |
+| `big-number` | Big Number | White / red | လက်ရှိ beat ကို ကြီးမားသောနံပါတ်ဖြင့်ပြ; အခြား beat များကို rail ပေါ်ပြ. |
+| `segment-ring` | Segment Ring | Deep green | Bar ကို beat wedge များခွဲပြီး current/played/future အရောင်ကွဲစေသည်။ |
+| `travel-line` | Travel Line | Off-white / ink blue | Marker သည် beat များကြားရွေ့; aspect အလိုက် horizontal/vertical/rounded loop. |
+| `flash-frame` | Flash Frame | Black / hot red | Beat တစ်ချက်စီတွင် frame glow; downbeat တွင် ပိုပြင်းသော wash. |
+| `bounce-ball` | Bounce Ball | Cream / orange | Beat pad များကြားတွင် ball ကို ကွေးသည့်လမ်းကြောင်းဖြင့် ခုန်စေသည်။ |
+| `stack-blocks` | Stack Blocks | Slate / violet | Beat position ကို block ဖြင့်ပြပြီး နောက် beat များကို outline လုပ်သည်။ |
 
-| Field | Утга |
-|---|---|
-| `design` | Design registry-ийн string ID. |
-| `aspect` | `'16x9'`, `'9x16'` эсвэл `'1x1'`. |
-| `frame.beat` | Measure доторх 1-ээс эхэлсэн beat. |
-| `frame.beatsPerBar` | Measure дахь beat-ийн тоо. |
-| `frame.phase` | Одоогийн beat эхлэхэд `0`, дараагийн beat-ийн өмнө `1` болох progress. |
-| `frame.bar` | 1-ээс эхэлсэн bar number. |
-| `frame.bpm` | Tempo-ийн BPM утга. |
-| `frame.timeSignature` | `{ numerator, denominator }` хэлбэрийн meter. |
-| `title`, `subtitle` | Optional текст; орхисон эсвэл хоосон байвал текст нэмэхгүй. |
-| `logoUrl` | Optional image URL эсвэл data URI; орхисон/хоосон үед logo дүрслэхгүй. |
+`src/logos.ts` သည် design ID အလိုက် `drum`, `piano`, `guitar`, `bass`, `violin`, `cello`, `vocal` သို့မဟုတ် `sharing` ကဲ့သို့ logo-name metadata ပေးသည်; အမှန်တကယ် URL/path ကို host က map လုပ်ရသည်။ Adapter က လက်ရှိ `logoUrl` မပေးသဖြင့် Metronome export တွင် logo မပါ။ Engine text အတွက် `escapeText()` ရှိသော်လည်း SVG `logoUrl` attribute အတွက် escaping test မလုံလောက်သေးကြောင်း backlog တွင်ထားသည်။
 
-Одоогийн runtime normalization:
+## Package metadata နှင့် clean-install အခြေအနေ
 
-- `beatsPerBar`, `beat`, `bar`, `bpm`, time signature-ийн numerator/denominator-ийг бүхэл тоо руу тоймлож, доод утгыг `1` болгоно. `beat` нь `1..beatsPerBar` хооронд хязгаарлагдана.
-- `phase` нь finite биш бол `0`; бусад үед `0..1`-д clamp хийнэ.
-- Энэ normalization нь `NaN`/`Infinity`-г бүх numeric field дээр тусгайлан шалгадаггүй. Иймээс JavaScript caller нь дээрх утгуудыг finite, утгатайгаар өгөх ёстой; edge case-уудыг “хязгаарлалт ба хийх ажлууд” хэсэгт тэмдэглэв.
-- `src/svg.ts`-ийн `n()` helper SVG geometry-д очих finite биш тоог `0` болгодог ч энэ нь frame input-ийн бүрэн validation орлохгүй.
-- User text SVG text content-д гарахаас өмнө XML-escape хийгддэг. `logoUrl`-ийн attribute escaping нь тусдаа кодтой бөгөөд бүрэн escaping-ийн test одоогоор байхгүй.
-
-## Canvas, layout ба нийтлэг харагдах элемент
-
-| Aspect | Canvas | Layout-ийн онцлог |
-|---|---:|---|
-| `16x9` | `1920 × 1080` | Title зүүн дээд хэсэгт; BPM/meter readout нь stage-ийн хоёр талд column хэлбэртэй; үндсэн stage өргөн байрлана. |
-| `9x16` | `1080 × 1920` | Title/subtitle төвлөрнө; readout нь header-ийн доорх row; stage өндөр зай авна. |
-| `1x1` | `1080 × 1080` | Title төвлөрнө; readout нь header-ийн доорх row; design-ууд дугуй/loop зохиомжийг ашиглах боломжтой. |
-
-Layout-ийн нийтлэг баримт:
-
-- `gutter()` нь canvas-ийн богино талаас `7.5%`.
-- Canvas-ийн хэмжээс тогтмол; font, logo, stage хэмжээг богино талаас тооцно.
-- `bands()` нь header болон design stage-ийг тусгаарлаж, shared readout-ийн зайг stage-д давхар ашиглуулахгүй.
-- `tempoStats()` нь BPM тоо, `BPM` label болон time signature-г бүх design-д ижил байрлалын дүрмээр гаргана. Dark ground дээр шар/улаан өнгө; light ground дээр уншигдахаар гүн gold/улаан өнгө ашиглана.
-- `LOGO_FRACTION = 0.16`; logo box нь top-left corner-д байна. Design-ууд өөрсдийн logo name-ийг `metronomeLogoName()`-аар тайлбарлуулж, бодит URL-ийг host өгнө.
-- `pendulum` нь `ownHeader` ашиглан title/header зохиомжоо өөрөө тавьдаг; нийтлэг BPM/meter readout-ийг renderer мөн л нэмнэ.
-
-## 11 design-ийн каталог
-
-| № | ID | Нэр | Look | Үндсэн дүрслэл |
-|---:|---|---|---|---|
-| 1 | `pendulum` | Pendulum | Black & neon red | Дүүжинтэй metronome case, scale, beat number; өөрийн header layout-тай. |
-| 2 | `beat-dots` | Beat Dots | Black & red | Medallion доторх count, beat бүрийн dot, цохилтын дараах богино pulse ring. |
-| 3 | `pulse-ring` | Pulse Ring | Night blue | Beat бүрээр тэлж бүдгэрэх ring-үүд ба төвийн count. |
-| 4 | `bar-meter` | Bar Meter | Paper & ink | Measure-ийн beat бүрийг bar-аар харуулна; өнгөрсөн/current/future beat-ийн төлөв ялгаатай. Portrait-д bar-уудыг хэвтээ байрлалд шилжүүлнэ. |
-| 5 | `sweep-dial` | Sweep Dial | Charcoal & amber | Нэг бүтэн bar-ийн турш тойрох тасралтгүй hand/progress arc, beat бүрийн tick. |
-| 6 | `big-number` | Big Number | White & red | Current beat-ийг том тоогоор; бусад beat-ийг нимгэн rail дээр. Portrait-д rail босоо. |
-| 7 | `segment-ring` | Segment Ring | Deep green | Bar-ийг beat бүрийн wedge болгон хувааж, current/played/future хэсгийг ялгана. |
-| 8 | `travel-line` | Travel Line | Off-white & ink blue | Marker beat-үүдийн хооронд явна; landscape-д хэвтээ, portrait-д босоо, square-д rounded loop. |
-| 9 | `flash-frame` | Flash Frame | True black & hot red | Beat бүрээр canvas-ийн хүрээ цацарч, downbeat дээр илүү хүчтэй wash гаргана. |
-| 10 | `bounce-ball` | Bounce Ball | Cream & orange | Beat pad-уудын хооронд нумлан үсэрч, beat дээр бууна; гурван aspect-д үндсэндээ хэвтээ. |
-| 11 | `stack-blocks` | Stack Blocks | Slate & violet | Beat-ийн дугаарын байрлалуудыг block-оор дүрсэлж, ирэх beat-үүдийг outline хэлбэрээр үзүүлнэ; portrait/square-д босоо зохиомжтой. |
-
-**Beat-ийн animation state-ийг Engine үүсгэдэггүй.** Design-ууд өгөгдсөн `beat` болон `phase`-ээс frame-ийн геометрээ тооцно. Caller нь хөгжмийн цагтай тохирсон frame state нийлүүлэх ёстой. Жишээлбэл, `sweep-dial` bar-ийн бүх уртад тасралтгүй progress гаргадаг бол олон design current beat болон phase-ийн pulse/decay-г голчлон ашиглана.
-
-## Build ба verification
-
-`package.json`-д байгаа гол scripts:
-
-| Command | Одоогийн үүрэг |
-|---|---|
-| `npm run typecheck` | `tsc --noEmit`. |
-| `npm run lint` | `eslint src`. |
-| `npm run format:check` | TypeScript source-д Prettier check. |
-| `npm run test` / `npm test` | Bundle rebuild хийж, дараа нь Node `--test` ажиллуулна. |
-| `npm run verify` | Typecheck → lint → format check → test/build. |
-| `npm run build` | `src/index.ts`-ээс IIFE bundle `dist/metronome-engine.js` үүсгэнэ; global нэр `MetronomeDesigns`. |
-| `npm run declarations` | `tsc --emitDeclarationOnly`; `tsconfig.json`-ийн дагуу declaration output `dist/` руу гарна. `build` script энэ алхмыг өөрөө ажиллуулахгүй. |
-
-Орон нутгийн шалгалтын үр дүн:
-
-- Archive-д `package-lock.json` байгаагүй тул `npm ci` ажиллахгүй (`npm ci` нь lockfile шаардсан).
-- `npm install --no-package-lock --no-audit --no-fund`-ийн дараа `npm run verify` ажиллуулсан.
-- **Үр дүн:** typecheck pass, lint pass, Prettier check pass, build pass, test **20/20 pass**.
-- Энэ verification нь source/test code-ийн тухайн snapshot дээр хийгдсэн. Browser дээр харагдах байдлын review, website page integration, bundled file-ийн website-тэй sync-ийг энэ шалгалт нотлоогүй.
-
-## Одоогоор тодорхой бус эсвэл сайжруулах шаардлагатай зүйл
-
-1. **Frame-ийн runtime validation:** `phase`-ээс бусад numeric field-д `NaN`/`Infinity` ирэх нөхцөл тусгайлан хамгаалагдаагүй. Одоогийн invalid-input test нь zero, negative `bar`, болон `NaN phase`-ийг шалгадаг ч бусад field-ийн non-finite утгыг шалгахгүй.
-2. **Package artifact/metadata:** `package.json` `types: dist/index.d.ts` гэж заадаг; declaration үүсгэх тусдаа script байна. `build` болон `verify` нь declaration generation-ийг ажиллуулахгүй. `private: true` тул README-ийн package import жишээ болон бодит хэрэглээний хэлбэрийг тодорхой болгох хэрэгтэй.
-3. **Install reproducibility:** Archive-д lockfile байхгүй; цэвэр орчинд `npm ci` боломжгүй. `npm install` нь тухайн үед татагдсан dependency resolution-оос хамаарна.
-4. **Website integration:** README нь bundle-ийг `website/assets/metronome-engine.js` рүү хуулж `website/video-create/metronome/` ашиглана гэж бичсэн. Engine archive-д sync script байхгүй, харин GitHub дахь одоогийн байрлал нь `Website/Metronome/Metronome Engine/`; target path/case болон build-to-site холболтыг тусад нь баталгаажуулах шаардлагатай.
-5. **Visual test-ийн хамрах хүрээ:** 20 test нь SVG string, бүх design/aspect combination, сонгосон phase/beat болон layout contract-уудыг шалгадаг. Гэвч output-ийг browser эсвэл SVG parser-аар зураг болгон шалгахгүй; website дээр бодит asset ачаалж байгааг ч батлахгүй.
-6. **Logo URL escaping:** `logo()` helper нь double quote-ийг escape хийдэг боловч бусад XML attribute character-д зориулсан нийтлэг escaping helper-ийг ашигладаггүй. Test нь URL-д зөвхөн энгийн URL хэлбэрийг шалгадаг.
-7. **Design-ийн хязгаарын гэрээ:** Test нь `beatsPerBar`-ийн 1, 3, 5, 6, 7, 12 утгыг шалгадаг. Бүх design-д зориулсан дээд хязгаар эсвэл өндөр beat-count үед уншигдах байдлын universal guarantee кодод тодорхойлогдоогүй.
-
-## Энэ ажлын хүрээнд хийгдээгүй зүйл
-
-- Engine source code өөрчлөөгүй.
-- Website/video/audio application-д integration хийгээгүй.
-- Preview/video гаргаж харааны чанарыг баталгаажуулаагүй.
-- `npm ci` ажиллаагүй тул lockfile-тэй clean install-ийг баталгаажуулаагүй; `npm install`-оор verification хийсэн.
+`package.json` တွင် `private: true`, `main: dist/metronome-engine.js`, `types: dist/index.d.ts` ဖြစ်သည်။ Browser bundle သည် `npm run build` ဖြင့် IIFE ထုတ်လုပ်ပြီး `npm run declarations` သည် `.d.ts` ကို သီးခြားထုတ်သည်; `build`/`verify` သည် declaration step ကို အလိုအလျောက်မလုပ်ပါ။ Repo တွင် package lockfile မရှိသဖြင့် `npm ci` မစမ်းနိုင်ပါ။ ယခု verification ကို `npm install --no-package-lock --no-audit --no-fund` နောက်တွင် လုပ်ထားသည်။ Private browser bundle သာ ရည်ရွယ်ထားပါက `main`/`types` metadata နှင့် supported Node/npm version ကို နောက်ပိုင်း ဆုံးဖြတ်ရန်ရှိသည်။
