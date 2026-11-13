@@ -1,0 +1,16 @@
+{
+ "input": {
+  "genre": "generic",
+  "mode": "HIGH",
+  "notes": [],
+  "seed": 1
+ },
+ "output": {
+  "approved": true,
+  "duration_s": 0.0,
+  "engine_version": "1.0.0",
+  "events": [],
+  "issues": [],
+  "seed": 1
+ }
+}
