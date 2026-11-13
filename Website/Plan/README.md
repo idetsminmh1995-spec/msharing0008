@@ -180,3 +180,6 @@ Notation ကို card ပုံစံဘောင်ထဲမထည့်ဘ�
 ### Notation Lab: compact responsive toolbar
 
 Page နှင့် Horizontal ကို ခလုတ်နှစ်ခုအစား ရွေးချယ်စရာနှစ်ခုပါသော dropdown တစ်ခုအဖြစ်ထားမည်။ Phone တွင် `Choose file`, dropdown နှင့် PDF icon ကို အတန်းတစ်တန်း၊ Play/zoom/volume ကို နောက်တစ်တန်းတွင်ထား၍ fixed dock ၏ အမြင့်နှင့် control နေရာကို လျှော့မည်။ PDF icon သည် screen reader အတွက် `Download PDF` အမည်ကို ဆက်လက်ဖော်ပြမည်။ Desktop တွင် PDF စာသားကို ဆက်လက်ပြမည်။
+
+### Create Video — Engine workflow
+Create Video သည် video များဖန်တီးရန်အတွက် ဖြစ်သည်။ Drum ကိုရွေးပြီး Drum ထဲဝင်လျှင် Drum video ဖန်တီးမည်ဖြစ်ပြီး အောက်ပါ Engine များနှင့် အလုပ်လုပ်မည် — **Notation Engine, Sound Engine, Video Engine, Drum Stick Human Engine, Drum Animation Engine, Audio Engine**။ ဤအဆင့်တွင် Engine တစ်ခုချင်းစီ၏ တာဝန်နှင့် အလုပ်လုပ်ပုံအစီအစဉ်ကို မသတ်မှတ်ရသေးပါ။ Piano video ဖန်တီးရန် Piano ထဲသို့ ဝင်ရမည်ဖြစ်ပြီး ၎င်း၏ workflow သည် Drum နှင့် မတူပါ။ Piano workflow ၏ ကွာခြားချက်များကို နောက်တစ်ဆင့်တွင် အသုံးပြုသူ၏ လမ်းညွှန်ချက်အတိုင်း ထပ်မံသတ်မှတ်မည်။
