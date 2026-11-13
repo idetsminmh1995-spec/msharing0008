@@ -43,3 +43,7 @@ Create Video Page ကို web နှင့် phone view နှစ်မျိ
 ## 2026-11-13 — Compact visual refinement
 
 Hero banner ၏ vertical space နှင့် heading scale ကို လျှော့ချပြီး tool cards များကိုလည်း ပိုသေးသော height, padding နှင့် gap ဖြင့် ပြန်ချိန်ညှိထားသည်။ Desktop တွင် page တစ်ခုတည်းအတွင်း tools များ ပိုမြင်ရပြီး phone view တွင် hero နှင့် two-column cards များ မျက်နှာပြင်ကို မလွှမ်းမိုးစေရန် compact breakpoints ထည့်ထားသည်။
+
+## 2026-11-13 — Further compact sizing and Home link
+
+User feedback အရ Hero နှင့် tool cards များကို ထပ်မံလျှော့ချထားသည်။ Desktop hero ကို 132px၊ desktop card ကို 100px ဝန်းကျင်၊ phone hero ကို 130px နှင့် phone card ကို 94px ဝန်းကျင်အဖြစ် ချိန်ညှိထားသည်။ Logo ၏ `#home` link သည် main page anchor သို့ရောက်ပြီး Create Video section ကို `#create-video` anchor အဖြစ် သီးခြားခွဲထားသည်။ ထို့ကြောင့် Logo ကိုနှိပ်လျှင် Home အပေါ်ဆုံးနေရာသို့ ပြန်ရောက်နိုင်သည်။
