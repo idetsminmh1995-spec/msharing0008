@@ -1,50 +1,43 @@
-# Video Engine — Implementation Status
+# Video Engine — Implementation Status and Instrument Readiness
 
-စစ်ဆေးသည့် repo: `idetsminmh1995-spec/msharing0008`
-အလုပ်စတင်ချိန် branch/commit: `main` / `2a72310`
-Authoritative engine source: `Website/Video/Video Engine/source/website/assets/video-engine.js`
+Repo: `idetsminmh1995-spec/msharing0008`
+Plan review baseline: `main` / `0547011`
+Authoritative Video Engine source: `Website/Video/Video Engine/source/website/assets/video-engine.js`
 Production copy: `Website/Website/assets/video-engine.js`
 
-## အနှစ်ချုပ်
+## လက်ရှိ Video Engine အခြေအနေ
 
-Engine တွင် WebCodecs render, MP4/WebM muxing, MediaRecorder fallback code, audio support, memory budget, cancellation နှင့် resource cleanup ရှိသည်။ ယခု website asset ကို engine source မှ sync လုပ်ပြီး Drum Studio နှင့် ပထမဆုံး အမှန်တကယ် ချိတ်ဆက်ထားသည်။ User က recording ကိုစပြီး Drum pad များကိုနှိပ်ကာ visual event များဖမ်းယူနိုင်သည်။ ထို့နောက် VideoEngine ဖြင့် 640×360, 30 FPS, 12 sec အများဆုံး **silent visual preview** ကို render လုပ်၍ preview/play/seek/download လုပ်နိုင်သည်။ Audio, R2 workflow, သို့မဟုတ် အခြား instrument များ၏ video export ကို မပြီးသေးပါ။
+Video Engine သည် canvas frame များကို WebCodecs ဖြင့် MP4/WebM အဖြစ် render/mux လုပ်ခြင်း၊ MediaRecorder fallback, optional `AudioBuffer`, progress/cancel, memory guard နှင့် cleanup code များကို ပံ့ပိုးသည်။ Drum Studio နှင့် ပထမ integration သည် Kick/Snare/Hi-hat event များကို visual-only clip အဖြစ် render လုပ်ပြီး preview/play/seek/download လုပ်နိုင်သည်။ လက်ရှိ output တွင် အသံမပါပါ။ Studio client သည် `drums` သာ enable လုပ်ပြီး အခြား instrument များကို adapter မရှိသေးသည့်အတွက် ပိတ်ထားသည်။
 
-## ရေးပြီး အလုပ်လုပ်ကြောင်း စစ်ထားသော code
+## အခြား instrument များ၏ code readiness
 
-| Path | Status / coverage |
-|---|---|
-| `Website/Video/Video Engine/source/website/assets/video-engine.js` | Authoritative source: render orchestration, WebCodecs H.264/AAC MP4 နှင့် VP8/VP9+Opus WebM path, muxers, MediaRecorder fallback, memory guards, progress/cancel, required-asset gate, cleanup. |
-| `Website/Website/assets/video-engine.js` | Production website က load လုပ်သည့် copy. `sync-video-engine.mjs --check` ဖြင့် authoritative source နှင့် တူညီကြောင်း စစ်သည်။ |
-| `Website/Video/Video Engine/source/tools/sync-video-engine.mjs` | Source ကို production asset သို့ copy လုပ်ခြင်းနှင့် stale copy check. |
-| `Website/Website/studio.html` | Engine script, Drum pad data attributes, status, video preview/player controls, download link ကို ထည့်ထားသည်။ |
-| `Website/Website/studio-video.js` | Drum pad event capture; maximum 12 sec, 640×360, 30 FPS visual render; progress, cancel, no-hit/error, Blob preview/download, URL cleanup. **Export သည် အသံမပါပါ။** |
-| `Website/Website/script.js` | Custom play/pause, timeline seek, time display နှင့် fullscreen ကို generated video နှင့် ချိတ်ထားသည်။ |
-| `Website/Website/styles.css` | Status, hit feedback, preview/download styling နှင့် phone/web-responsive layout. Browser test က 375px နှင့် 1280px viewport တွင် overflow မရှိကြောင်း စစ်သည်။ |
-| `Website/Video/Video Engine/source/tools/test-video-engine-browser.mjs` | `fileURLToPath()` ဖြင့် space ပါသည့် repo path ကို decode လုပ်သည်။ Local server ready, free ports, fixture page/function readiness စောင့်ပြီး Chromium MP4 ကို ffprobe ဖြင့်စစ်သည်။ |
-| `Website/Video/Video Engine/source/tools/test-studio-video-browser.mjs` | Chromium ထဲတွင် Drum capture → render → Blob preview/download flow ကိုစမ်းပြီး ffprobe ဖြင့် output စစ်သည်။ Phone/desktop layout assertions ပါသည်။ |
-| `Website/Video/Video Engine/source/tools/test-video-engine.mjs` | MP4 boxes, timing, offsets, chunk grouping/interleaving, fractional FPS, silence, edit list နှင့် stream sink tests. |
-| `Website/Video/Video Engine/source/website/tests/video-engine-cleanup.test.mjs` | WebCodecs/MediaRecorder cleanup, memory-budget preflight နှင့် required-asset gate tests. |
+| Instrument | Repo ထဲတွင် တွေ့ရသော code | ချိတ်ဆက်ရန်အတွက် အဓိကလိုအပ်ချက် |
+|---|---|---|
+| **Guitar** | `Website/Guitar/Guitar Engine` တွင် TypeScript source, tests, built bundle, `positionsAt()`, `stageShapes()` နှင့် SVG renderer ရှိသည်။ Note data သည် string/fret/finger/time ကို သီးသန့်လိုအပ်သည်။ | Studio event producer မရှိ၊ built bundle ကို `Website/Website/assets` မှ load လုပ်ထားခြင်းမတွေ့၊ StageShape-to-Canvas painter နှင့် measured image asset preload/failure flow ကို ပြီးစီးစေရန်လိုသည်။ Guitar Engine သည် audio မထုတ်ပေးပါ။ |
+| **Piano** | `Piano Hand Human Engine` တွင် keyboard geometry, key press/contact curve, performance/finger planning နှင့် synthetic IK source/tests ရှိသည်။ | Piano note event input, renderer, Studio adapter, audio source မရှိသေး။ `Piano 3D Hand Engine` folder သည် `.gitkeep` သာရှိသည်။ Wrist-motion planning မပြီးသေး၊ IK ကို website GLB နှင့် calibrate မလုပ်ရသေး။ ပထမ key-only visual adapter ကိုရည်မှန်းရန်။ |
+| **Bass** | Landing page card နှင့် Notation Engine ထဲရှိ bass-clef/MIDI metadata ရှိသည်။ Guitar Engine ထဲတွင် Jazz Bass ပုံ configuration ရှိသည်။ | Bass-specific playable UI, event/audio producer သို့မဟုတ် Video adapter မတွေ့ရ။ Fretted Bass လား keyboard/synth Bass လား ဆုံးဖြတ်ပြီးမှ Guitar Engine ပြန်သုံးနိုင်မှု, input, renderer နှင့် audio policy ကို သတ်မှတ်ရန်။ |
+| **Strings** | Landing page card နှင့် Notation Engine ထဲရှိ strings tuning/fretted-instrument metadata ရှိသည်။ | Playable Strings engine/UI/event source/renderer/audio မတွေ့ရ။ Orchestral string family လား fretted-string instrument လား သတ်မှတ်ရန်။ Notation metadata ကို playable renderer ဟု မယူဆရ။ |
+| **Voice** | Landing page card နှင့် generic Studio route ရှိသည်။ | Voice-specific source/capture/import controls, renderer, audio decode workflow မတွေ့ရ။ Microphone/file input, permission/privacy/error handling, visual design နှင့် segment-aligned `AudioBuffer` ကို ဆုံးဖြတ်ရန်။ |
 
-## စမ်းသပ်မှုရလဒ်
+### Shared dependency မှတ်ချက်များ
 
-စမ်းသပ်မှုအားလုံးကို `Website/Video/Video Engine` folder ထဲမှ run လုပ်ထားသည်။
+- `Website/Notation/Sound Egnine` သည် `.gitkeep` သာရှိသည်။ Shared audio synthesis/provider ကို လက်ရှိ implementation အဖြစ် မယူဆရ။
+- Guitar/Piano package bundle output path များတွင် lowercase `website/assets` ကို အသုံးပြုထားသည့်နေရာရှိသည်။ Repo ၏ production directory သည် case-sensitive `Website/Website/assets` ဖြစ်သောကြောင့် copy/load/check path ကို အရင်ရှင်းလင်းရမည်။
+- `AudioBuffer` မပေးလျှင် VideoEngine က visual-only silent video ထုတ်နိုင်သည်။ အသံလိုအပ်သည့် instrument တစ်ခုချင်းစီသည် sound source နှင့် audio/video timing ကို သီးခြားပေးရမည်။
 
-- `node source/tools/test-video-engine.mjs` — **pass: 15, fail: 0**.
-- `node --test source/website/tests/video-engine-cleanup.test.mjs` — **pass: 5, fail: 0**.
-- `node source/tools/test-video-engine-browser.mjs` — **pass**. Chromium WebCodecs H.264 MP4, 320×180, 30 frames, 1.0 sec; ffprobe က MP4/H.264 အဖြစ်အတည်ပြုသည်။ ယခင် `%20`/fixture readiness failure မရှိတော့ပါ။
-- `node source/tools/test-studio-video-browser.mjs` — **pass**. Studio export က silent H.264 MP4, 640×360, 30 frames, 1.0 sec ထုတ်ပြီး ffprobe ဖြင့်အတည်ပြုသည်။ Chromium viewport စစ်ဆေးမှု: phone 375px မှ desktop 1280px အထိ layout မကျော်ထွက်ပါ။
-- `node --check` ဖြင့် `studio-video.js`, `script.js`, browser runner နှင့် sync tool syntax စစ်ဆေးမှု — **pass**.
-- `node source/tools/sync-video-engine.mjs --check` — **pass**, production copy သည် source နှင့်ကိုက်ညီသည်။
+## အကြံပြုထားသော အစီအစဉ်
 
-## မရေးရသေး / မအတည်ပြုရသေး
+အသေးစိတ် milestone, shared adapter contract, acceptance criteria နှင့် test sequence ကို [Video Engine Plan](../Video%20Engine%20Plan/PLAN.md) တွင် ထည့်ထားသည်။ အဓိကဦးစားပေးအစီအစဉ်မှာ:
 
-- Drum pad အသံ/sample, `AudioBuffer`, audio-video synchronization နှင့် audio ပါဝင်သော export.
-- Piano/Guitar/Bass/Strings/Voice အပါအဝင် အခြား instrument များအတွက် frame/timeline/audio adapters.
-- R2 signed URL, real asset fetch, upload/download, metadata, access-control နှင့် retry lifecycle. Engine asset gate သည် R2 client မဟုတ်ပါ။
-- MediaRecorder fallback ကို browser အမှန်တကယ်တွင် သီးခြားစမ်းသပ်ခြင်း; လက်ရှိ Chromium smoke သည် WebCodecs H.264 path ကိုစမ်းသည်။
-- Low-memory end-to-end incremental MP4 muxing. `muxMp4ToStream()` သည် လက်ရှိ Blob အပြည့်ကို အရင်တည်ဆောက်နေသည်။
-- Physical phone/browser/device matrix နှင့် product အတွက် resolution/duration/memory/retention requirements.
+1. Shared adapter dispatch/event-time contract သတ်မှတ်ပြီး unsupported tool များကို Drum branch သို့ fall-through မဖြစ်စေရန်။
+2. Guitar ကို ပထမချိတ်ဆက်ရန် — ရှိပြီးသား visual engine ကိုသုံးသော်လည်း Studio event source, bundle path, Canvas painter နှင့် photo assets ကို အရင်ဖြည့်ရန်။
+3. Piano ကို key-only silent visual adapter အဖြစ်စတင်ရန် — note source နှင့် bundle destination ကို အတည်ပြုပြီး human-hand animation ကို နောက်ပိုင်း သီးခြားလုပ်ရန်။
+4. Bass နှင့် Strings အတွက် playable code မရှိသေးသဖြင့် product/instrument definition နှင့် event model ကို အရင်တည်ဆောက်ရန်။
+5. Voice ကို source/capture/import နှင့် permission/privacy ဆုံးဖြတ်ချက်ပြီးမှ စတင်ရန်။
+6. Audible export ကို အရေးကြီးသည့် requirement အဖြစ် အတည်ပြုပြီးမှ Sound Engine/audio provider, `AudioBuffer`, timing နှင့် codec fallback ကို အကောင်အထည်ဖော်ရန်။
 
-## နောက်လုပ်ရန်
+## စမ်းသပ်မှုနှင့် အပြောင်းအလဲမှတ်တမ်း
 
-ဦးစားပေးအဆင့်များကို [Video Engine Plan](../Video%20Engine%20Plan/PLAN.md) တွင် update ထားသည်။ နောက်တစ်ဆင့်တွင် Drum Pad မှ real/synth audio data ထုတ်ပြီး segment audio အဖြစ် Engine သို့ပေးခြင်းနှင့် audio-video sync ကိုစစ်ဆေးရန်ဖြစ်သည်။ ထို့နောက် fallback, real R2 lifecycle လိုအပ်ချက်, အခြား instruments နှင့် low-memory muxing ကို သီးခြားပြီးစီးစေရမည်။
+- ယခင် code commit `d31337a` တွင် MP4 muxer tests 15 ခု၊ cleanup/safety tests 5 ခု၊ Chromium engine smoke test နှင့် Drum Studio browser integration/ffprobe test အောင်မြင်ထားသည်။ Production asset sync check နှင့် 375px/1280px viewport assertions လည်း pass ဖြစ်ထားသည်။
+- ဤ Plan/Doc ပြန်လည်ရေးဆွဲမှုတွင် instrument source code မပြင်ထားသဖြင့် code tests ကို ထပ်မ run ထားပါ။ Guitar/Piano/Bass/Strings/Voice ကို Video Engine ဖြင့် render လုပ်ပြီးကြောင်း မဆိုပါ။
+- နောက် code implementation တစ်ခုစီပြီးပါက သက်ဆိုင်ရာ engine tests, shared Drum regression, real browser export, silent/audio behavior နှင့် phone/web layout ကို ပြန်စစ်ပြီး Doc/Plan ကို update လုပ်ရမည်။
