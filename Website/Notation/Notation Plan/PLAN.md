@@ -46,6 +46,33 @@ TypeScript ဖြင့်ရေးသားထားသော instrument-neutra
 
 **ပြီးစီးမှုစံ:** Parser/API တစ်ခုစီ၏ input/output boundary၊ မထောက်ပံ့သော MIDI formats နှင့် MusicXML recovery behavior ကို user-facing docs မှာရှင်းပြနိုင်ရမည်။
 
+### P2B — Note mapping ကို instrument အလိုက် ခွဲထုတ်ရန်
+
+အသုံးပြုသူ၏ လမ်းညွှန်ချက်အရ MuseScore ၏ notation behavior ကို reference အဖြစ်လေ့လာပြီး project ၏ကိုယ်ပိုင် engraving style နှင့် note mapping များကို သီးခြားပြင်ဆင်နိုင်ရမည်။ Mapping ကို renderer ထဲတွင် hardcode မလုပ်ဘဲ Piano, Drum နှင့် နောက်ပိုင်း instrument mapping များကို profile/strategy အဖြစ် ခွဲထားပါ။ MusicXML က ပေးထားသော pitch, rhythm, voice, explicit display position နှင့် explicit notehead များကို mapping က အစားထိုးမဖျက်ရ။
+
+လက်ရှိ code မှ ပြန်သုံးရန်:
+
+- `src/core/pitch.ts`, `note.ts`, `chord.ts`, `duration.ts`, `part.ts`, `voice.ts` တို့သည် pitched/unpitched pitch, note metadata, chord/staff/voice/time ကို ထိန်းထားပြီးဖြစ်သည်။ Mapping အသစ်အတွက် ဒုတိယ score model မဖန်တီးပါနှင့်။
+- `src/drums/drum-map.ts` တွင် `DrumMapEntry`, `DrumMappingTable`, `lookupDrumMapEntry()` နှင့် `mergeDrumMappingTable()` ရှိပြီးသားဖြစ်သည်။ `src/musescore/drumset.ts`, `adapters.ts`, `staff-position.ts` တို့က provenance ပါသော MuseScore default data/conversion ကို ပေးထားသည်။ Drum mapping ကို ထပ်မံ duplicate မလုပ်ဘဲ shared contract အဖြစ် တိုးချဲ့ပါ။
+- `src/geometry/notehead.ts` တွင် MusicXML notehead, SMuFL glyph, configured override, duration default တို့ကို စဉ်လိုက်ရွေးသည့် logic ရှိသည်။ `src/geometry/clef.ts` နှင့် `src/geometry/staff.ts` ကို clef-aware position conversion အတွက် သုံးပါ။
+
+အကြံပြုထားသော architecture:
+
+- `NoteMapping` contract သည် pitched/unpitched `Note` နှင့် part/staff/clef/instrument context ကို လက်ခံပြီး display-only result ပြန်ပေးပါစေ။ Result တွင် staff index/position, notehead family/glyph, stem/voice preference နှင့် optional label ပါနိုင်သည်။ Pitch, duration, MIDI playback note နှင့် source MusicXML metadata ကို canonical model ထဲတွင် မပြောင်းပါနှင့်။
+- `MappingRegistry` သည် instrument/part identifier, mapping profile နှင့် user override ကို ကြည့်ပြီး `PianoMapping`, `DrumMapping` သို့မဟုတ် custom mapping ကို ရွေးပါစေ။ Engine core မှ mapping profile သို့ dependency တစ်ဖက်သတ်သာ ဖြစ်ရမည်။
+- `PianoMapping` သည် note letter, accidental, octave, clef နှင့် grand-staff policy တို့မှ staff position ကိုတွက်ပါစေ။ Written pitch နှင့် sounding pitch transposition ကို သီးခြားထားပြီး treble/bass clef, ledger line, grand-staff split/overlap, user remap များအတွက် tests ထည့်ပါ။
+- `DrumMapping` သည် လက်ရှိ `DrumMappingTable` ကို shared interface မှတစ်ဆင့် သုံးပါစေ။ `instrumentId` သို့မဟုတ် MIDI pitch ကို အသုံးပြုပြီး drum identity, staff position, notehead, voice နှင့် articulation ကို သတ်မှတ်ပါ။ MusicXML တွင် explicit `<display-step>/<display-octave>` ပါလျှင် staff position ကို ထိုတန်ဖိုးမှယူပါ။ Explicit `<notehead>` သည် default/profile ထက် ဦးစားပေးရမည်။
+- `MappingProfile` သည် MuseScore မှ ကိုးကားထားသော default နှင့် project ၏ ကိုယ်ပိုင် house style ကို သီးခြားထားပါစေ။ MuseScore တန်ဖိုးများကို project default အဖြစ်သုံးမသုံးကို fixture comparison နှင့် အသုံးပြုသူဆုံးဖြတ်ချက်နောက်မှ ဆုံးဖြတ်ပါ။ Profile တစ်ခုချင်းကို config မှ override လုပ်နိုင်ရမည်။
+- Resolution precedence ကို tests များဖြင့် အတည်ပြုပါ: source MusicXML ၏ explicit display/notehead/stem metadata → user profile override → instrument mapping → documented fallback + diagnostic။ Fallback ကြောင့် note ကို မဖယ်ရှားဘဲ diagnostic ပေးရမည်။
+
+Implementation sequence:
+
+1. `[ ]` Shared mapping types/context/result, `MappingRegistry` болон precedence contract-ийг design document + type-level tests ဖြင့် သတ်မှတ်ပါ။
+2. `[ ]` Existing drum mapping ကို contract ထဲသို့ adapter ဖြင့်တင်ပြီး data/behavior မပြောင်းဘဲ regression tests ဖြင့် အတည်ပြုပါ။
+3. `[ ]` `PianoMapping` ကို implement လုပ်ပါ; clef/staff conversion, grand-staff split နှင့် user-defined remap cases များအတွက် fixture/snapshot tests ထည့်ပါ။
+4. `[ ]` `MappingProfile` customization/persistence, diagnostics နှင့် renderer bridge ကို integrate လုပ်ပါ။ Mapping profile ပြောင်းလဲသော်လည်း playback/sounding pitch မပြောင်းကြောင်း tests ထည့်ပါ။
+5. `[ ]` MuseScore ၏ pinned reference fixture များနှင့် နှိုင်းယှဉ်ပြီး ကိုယ်ပိုင် style ၏ ရည်ရွယ်ထားသော ကွာခြားချက်များကို documentation တွင် မှတ်တမ်းတင်ပါ။
+
 ### P3 — Rendering/layout လိုက်လျောညီထွေမှုကို တိုးတက်စေရန်
 
 - [ ] `computeStaffGeometry()` က အမျိုးမျိုးသော line count ကိုတွက်နိုင်သော်လည်း `render-from-musicxml.ts` တွင် `STAFF_LINES = 5` assumptions များကျန်နေသည်။ Arbitrary staff-line count ကို import → geometry → note placement → SVG အဆုံးအထိ audit လုပ်ပြီး 1–6+ line fixtures ဖြင့် test လုပ်ပါ။
@@ -73,7 +100,7 @@ TypeScript ဖြင့်ရေးသားထားသော instrument-neutra
 
 ## လုပ်ဆောင်မှုအစဉ်
 
-အကြံပြုထားသောအစဉ်မှာ **P0 → P1 → P2 → P3 → P4 → P5** ဖြစ်သည်။ P0 ဖြေရှင်းပြီး clean baseline တစ်ခုမရမချင်း feature work မှရသော regression များကို ယုံကြည်စိတ်ချစွာ ခွဲခြားရန်ခက်နိုင်သည်။
+အကြံပြုထားသောအစဉ်မှာ **P0 → P1 → P2 → P2B → P3 → P4 → P5** ဖြစ်သည်။ P0 ဖြေရှင်းပြီး clean baseline တစ်ခုမရမချင်း feature work မှရသော regression များကို ယုံကြည်စိတ်ချစွာ ခွဲခြားရန်ခက်နိုင်သည်။
 
 ## R2 SoundFont integration milestone — 2026-11-13
 
@@ -81,3 +108,23 @@ TypeScript ဖြင့်ရေးသားထားသော instrument-neutra
 - [x] R2 `soundfonts/manifest.json` ကို fetch/cache လုပ်ပြီး versioned SoundFont object path မှ `.sf2/.sf3` တစ်ကြိမ် load လုပ်ရန်။
 - [x] SpessaSynth AudioWorklet ဖြင့် SoundFont ကို WebAudio output သို့ချိတ်ပြီး Notation Lab play/pause/volume lifecycle နှင့် ချိတ်ရန်။
 - [ ] Unpitched percussion mapping နှင့် MusicXML instrument program/bank routing ကို ထပ်တိုးရန်။
+
+
+## MuseScore note-source audit — 2026-11-13
+
+Official-source review inspected the MuseScore Studio repository at `main` commit `e32154cc04e12a05f52942cd9dc7b7e7f67685ce`. This is a moving-branch snapshot, not a release tag. The existing engine's `src/musescore/provenance.ts` remains pinned to the earlier `9140c5e4b7b5b48357b8d38dfebd0dd979653d21`; do not silently replace its provenance or tables with the newer snapshot. New reference comparisons must record their own pinned source revision.
+
+Relevant upstream areas identified for later reference-only review:
+
+- Score/note model: `src/engraving/dom/note.h/.cpp`, `pitchspelling.h`, `chord.h`, `chordrest.h`, `rest.h`, `tie.h`, `durationtype.h`, `staff.h`, and `segment.h`. These illustrate note pitch/spelling, duration, chord membership, ties, staff and voice/track semantics, but depend on MuseScore's broader C++ engraving model.
+- MusicXML note semantics: `src/importexport/musicxml/internal/import/importmusicxmlnotepitch.cpp/.h`, `importmusicxmlnoteduration.cpp/.h`, `importmusicxmlpass2.cpp`, and `musicxmlvoicedesc.cpp/.h`. Use these as behavior references for pitch, divisions, voices/chords, instrument IDs and unpitched notes; the import pipeline is coupled to MuseScore's score model.
+- Engraving: `src/engraving/dom/note.cpp`, `stem.cpp`, `beam.cpp`, `accidental.cpp`, `ledgerline.cpp`, `notedot.cpp`, `tie.cpp`, `clef.cpp`, and `src/engraving/rendering/score/horizontalspacing.cpp`. Derive independent tests and TypeScript geometry rules; do not port the native rendering subsystem as a unit.
+- Note entry/editing: `src/notation/inotationnoteinput.h`, `src/notation/internal/notationnoteinput.cpp`, and `src/engraving/editing/noteinput.h`, `editnote.h`, `editduration.h`, `editchord.h`. These are desktop C++/Qt interaction and undo code; treat them as behavior/API references, not browser-engine modules.
+- Instrument/Piano/Drum data and semantics: `share/instruments/instruments.xml`, `src/engraving/dom/instrument.h/.cpp`, `drumset.h/.cpp`, and `staff.h/.cpp`. Separate declarative instrument data from rendering and playback behavior; verify per-file notices before considering any data reuse.
+- Style/glyph sources: `src/engraving/dom/engravingstyle.h/.cpp`, `symnames.cpp`, and `fonts/bravura/Bravura.json`. Keep glyph metadata and font binaries separate from code; review each font's own license before redistributing it.
+
+The MuseScore repository identifies its program code as **GPL-3.0-only**. Representative note/model/import files carry GPL-3.0-only file headers. The top-level license's font exception is limited to the stated font/document conditions and is not a general permission to copy source code or redistribute webfont assets. This repository has no root license file and the Notation Engine package is currently private; whether GPL-covered implementation can be included in a distributed product is therefore unresolved. This is a compatibility risk, not legal advice.
+
+**Source intake status:** no MuseScore source snapshot has been copied into this repository yet. Before placing the curated paths above under a temporary reference-only folder, preserve the full upstream license, per-file copyright/SPDX headers, exact commit and a source manifest, and ensure the directory is excluded from builds. Because copying and later adapting GPL-3.0-only source can affect distribution/licensing obligations, wait for the owner to confirm that this source snapshot is acceptable; otherwise keep the pinned links and implement behavior independently in the existing TypeScript engine. Do not clone/import the entire MuseScore repository.
+
+Official references: [MuseScore repository at audited commit](https://github.com/musescore/MuseScore/tree/e32154cc04e12a05f52942cd9dc7b7e7f67685ce), [upstream license](https://github.com/musescore/MuseScore/blob/e32154cc04e12a05f52942cd9dc7b7e7f67685ce/LICENSE.txt), [note model](https://github.com/musescore/MuseScore/blob/e32154cc04e12a05f52942cd9dc7b7e7f67685ce/src/engraving/dom/note.h), [MusicXML note pitch import](https://github.com/musescore/MuseScore/blob/e32154cc04e12a05f52942cd9dc7b7e7f67685ce/src/importexport/musicxml/internal/import/importmusicxmlnotepitch.cpp), [note-input interface](https://github.com/musescore/MuseScore/blob/e32154cc04e12a05f52942cd9dc7b7e7f67685ce/src/notation/inotationnoteinput.h), [instrument catalogue](https://github.com/musescore/MuseScore/blob/e32154cc04e12a05f52942cd9dc7b7e7f67685ce/share/instruments/instruments.xml), and [Bravura font license](https://github.com/musescore/MuseScore/blob/e32154cc04e12a05f52942cd9dc7b7e7f67685ce/fonts/bravura/LICENSE.txt).
