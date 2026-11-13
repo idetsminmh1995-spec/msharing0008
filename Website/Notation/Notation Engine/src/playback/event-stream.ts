@@ -1,6 +1,18 @@
 import type { MeasureEvent, Score } from '../core/index.js';
+import { isPitched } from '../core/pitch.js';
 import { tickToSeconds } from '../timing/tick-seconds.js';
 import type { TempoMap } from '../timing/tempo-map.js';
+
+/** A pitch in the engine's scientific octave representation converted to a MIDI note number. */
+function midiNoteForEvent(event: MeasureEvent): readonly number[] {
+  const notes = event.kind === 'chord' ? event.notes : event.kind === 'note' ? [event] : [];
+  return notes.flatMap((note) => {
+    if (!isPitched(note.pitch)) return [];
+    const natural = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[note.pitch.step];
+    const midi = (note.pitch.octave + 1) * 12 + natural + note.pitch.alter;
+    return Number.isInteger(midi) && midi >= 0 && midi <= 127 ? [midi] : [];
+  });
+}
 
 /**
  * PLAN.md §17.1: one notated event -- a bare note, or a chord (whose
@@ -14,38 +26,19 @@ import type { TempoMap } from '../timing/tempo-map.js';
 export interface NotationEvent {
   readonly tick: number;
   readonly seconds: number;
+  /** Duration in ticks, for hosts that schedule a real audio note-off. */
+  readonly durationTicks: number;
   /** MusicXML part ID for selecting or routing this event as one playback track. */
   readonly partId: string;
-  /**
-   * One id per notehead sounding at this tick in this (part, voice) --
-   * length 1 for a bare note, one per member for a chord. Built as
-   * `${partId}#m${measureNumber}#v${voiceId}#e${eventIndexInVoice}`,
-   * with `#n${noteIndexInChord}` appended for a chord member. Stable and
-   * deterministic for identical input (§4.4) -- not a randomly generated
-   * id, so re-rendering the same file always produces the same ids, and
-   * a host can safely persist them (e.g. "the note the user clicked").
-   */
+  /** One id per notehead sounding at this tick in this (part, voice). */
   readonly noteIds: readonly string[];
-  /**
-   * Populated only once a host runs §13's MIDI<->MusicXML alignment
-   * (Phase 42) and threads its result back in. `renderFromMusicXml` has
-   * no MIDI file to align against, so its own event stream never sets
-   * this -- left as a documented gap rather than guessed at.
-   */
+  /** MIDI note numbers derived from pitched MusicXML notes; unpitched notes remain host-mapped. */
   readonly midiNotes?: readonly number[];
+  /** Populated only once a host runs MIDI↔MusicXML alignment. */
+  readonly midiNotesAligned?: readonly number[];
   readonly measureNumber: number;
 }
 
-/**
- * The id of ONE notated event -- the `data-id` its `<g>` carries in the
- * rendered SVG (Phase 51/§18.3) and the stem every `noteIds` entry below
- * is built from.
- *
- * Exported because two independent places need the exact same string: the
- * renderer, which stamps it on the group it draws, and the event stream,
- * which reports it to a host. A second implementation of this format is
- * precisely the bug that would make note-highlighting silently miss.
- */
 export function notationEventId(
   partId: string,
   measureNumber: number,
@@ -55,12 +48,6 @@ export function notationEventId(
   return `${partId}#m${measureNumber}#v${voiceId}#e${eventIndex}`;
 }
 
-/**
- * The rendered element a `noteId` belongs to: a chord member's
- * `...#e3#n1` lives inside the chord's own `...#e3` group, since a chord
- * is drawn as one element with several noteheads. A bare note's id is
- * already its element's.
- */
 export function elementIdForNoteId(noteId: string): string {
   const cut = noteId.lastIndexOf('#n');
   return cut === -1 ? noteId : noteId.slice(0, cut);
@@ -79,14 +66,6 @@ function noteIdsForEvent(
   return [];
 }
 
-/**
- * Builds the full, score-wide, tick-sorted event stream. `globalTickOffsetByMeasure`
- * must be the SAME measure -> tick-offset map `positionToX`/`xToPosition`
- * use (see `computePlaybackData`, which passes the one map to both) --
- * that is what keeps an event's own `tick` and the tick a cursor would
- * seek to reach it in exact agreement, never two independently-computed
- * numbers that could drift apart.
- */
 export function buildEventStream(
   score: Score,
   globalTickOffsetByMeasure: ReadonlyMap<number, number>,
@@ -99,20 +78,18 @@ export function buildEventStream(
       for (const voice of measure.voices) {
         let tickInMeasure = 0;
         voice.events.forEach((event, index) => {
-          // The event's OWN start tick where the parser recorded one --
-          // a voice with a `<forward>` gap does not start each event
-          // where the previous one ended, and playing it as though it
-          // did puts every note after the gap early. See `startTick` in
-          // core/note.ts.
           const startTick = event.startTick ?? tickInMeasure;
           const noteIds = noteIdsForEvent(part.id, measure.number, voice.id, index, event);
           if (noteIds.length > 0) {
             const tick = offset + startTick;
+            const midiNotes = midiNoteForEvent(event);
             events.push({
               tick,
               seconds: tickToSeconds(tempoMap, tick),
+              durationTicks: event.duration.ticks,
               partId: part.id,
               noteIds,
+              ...(midiNotes.length > 0 ? { midiNotes } : {}),
               measureNumber: measure.number,
             });
           }
@@ -125,14 +102,12 @@ export function buildEventStream(
   return events;
 }
 
-/** §17.1's own `getEventStream()` -- a plain accessor kept as an exported function (rather than reading `playback.events` directly) so the public shape matches the spec's own pseudocode exactly. */
 export function getEventStream(playback: {
   readonly events: readonly NotationEvent[];
 }): readonly NotationEvent[] {
   return playback.events;
 }
 
-/** Return the score-wide event stream for one MusicXML part/track, preserving the original tick order. */
 export function getTrackEventStream(
   playback: { readonly events: readonly NotationEvent[] },
   partId: string,

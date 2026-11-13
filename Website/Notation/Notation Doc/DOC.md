@@ -12,6 +12,7 @@
 - [x] Core/parser/render/layout/playback/export modules, public API entry points, test inventory, package/build scripts နှင့် module README များကို static code review လုပ်ခဲ့သည်။
 - [x] ဆက်လက်လုပ်ဆောင်ရန် roadmap ကို [`../Notation Plan/PLAN.md`](../Notation%20Plan/PLAN.md) တွင်ရေးသားခဲ့သည်။
 - [x] လက်ရှိ implementation နှင့် review ကန့်သတ်ချက်များကို ဤ Doc တွင် မှတ်တမ်းတင်ခဲ့သည်။
+- [x] R2 SoundFont integration ကို `src/soundfont/browser.ts` တွင် `R2SoundFontEngine` အဖြစ် ထည့်ပြီး manifest/cache/SF2-SF3 AudioWorklet playback ကို Website Notation Lab နှင့် ချိတ်ထားသည်။
 
 ## Engine ၏ လက်ရှိဖွဲ့စည်းပုံ
 
@@ -25,7 +26,8 @@
 | `src/glyphs/` | SMuFL glyph names နှင့် bundled Bravura metadata/metrics |
 | `src/geometry/`, `src/render/` | Staff-space geometry တွက်ချက်ခြင်းနှင့် SVG markup/DOM string တည်ဆောက်ခြင်း |
 | `src/layout/` | Spacing, skyline clearance, continuous scroll နှင့် page/system layout |
-| `src/timing/`, `src/playback/` | Tempo/tick conversions, event stream, position mapping, cursor/playhead နှင့် repeat unfolding |
+| `src/timing/`, `src/playback/` | Tempo/tick conversions, MIDI-ready event stream, position mapping, cursor/playhead နှင့် repeat unfolding |
+| `src/soundfont/` | R2 manifest/cache, SoundFont binary loading နှင့် SpessaSynth WebAudio adapter |
 | `src/drums/`, `src/musescore/` | Drum mapping/overrides နှင့် MuseScore-derived notation defaults/provenance |
 | `src/export/`, `src/debug/` | SVG/PNG/PDF export helpers, diagnostic filtering နှင့် layout/debug overlays |
 | `src/config/` | `EngineConfig`, defaults နှင့် field-by-field `resolveConfig()` merge |
@@ -43,7 +45,7 @@
 
 - SMuFL glyph table နှင့် Bravura metadata ကို အသုံးပြုပြီး notes/rests, accidentals, clefs, key/time signatures, stems/flags/beams, ties/slurs/tuplets, dynamics/hairpins, lyrics, chord symbols, rehearsal marks, tablature စသည်များအတွက် geometry/render code ပါဝင်သည်။
 - `EngineConfig` မှ color/font/layout/cursor/notehead/beam/spacing/page/drum/text/debug options များကို override လုပ်နိုင်သည်။ Scroll နှင့် page mode, spacing laws, skyline staves clearance, explicit break hints တို့ကို layout layer က ကိုင်တွယ်သည်။
-- Playback layer သည် score/layout ပေါ်အခြေခံသော note event stream, event ID, written/performance repeat position mapping, cursor/playhead position helpers တို့ကိုပေးသည်။ **Audio playback/synthesis ကိုယ်တိုင်** မလုပ်ဘဲ host app က event stream ကို အသုံးပြုရသည်။
+- Playback layer သည် score/layout ပေါ်အခြေခံသော note event stream, stable event ID, pitched MIDI note number/duration, written/performance repeat position mapping, cursor/playhead position helpers တို့ကိုပေးသည်။ Core engine သည် audio context ကို မဖွင့်ဘဲ သီးခြား `R2SoundFontEngine` host adapter က R2 နှင့် WebAudio playback ကို ကိုင်တွယ်သည်။
 - MuseScore-related mappings/defaults များကို `src/musescore/` ထဲတွင် provenance နှင့်အတူဖော်ပြထားပြီး drum table, spacing/style data နှင့် selected engraving conventions တွင် အသုံးပြုထားသည်။
 - Export layer တွင် SVG, PNG နှင့် PDF helpers ပါဝင်သည်။ PDF သည် vector PDF မဟုတ်ဘဲ raster image များဖြင့်ဖွဲ့ထားသည်။ Browser သို့မဟုတ် host-provided backend လိုအပ်နိုင်သည်။ `exportPng()` သည် raster slice တစ်ခုကိုသာ ပြန်ပေးသည်။
 
@@ -51,7 +53,7 @@
 
 Repo ထဲတွင် unit test file 90 ခု၊ visual snapshot file 29 ခု၊ fixture file 56 ခုနှင့် performance test 1 ခုရှိသည်။ Tests သည် core, parsers, notation geometry, page/scroll layout, timing/alignment, playback/cursor/repeats, drums, config, exports နှင့် visual render cases များကို cover လုပ်ရန်ရေးသားထားသည်။
 
-**အရေးကြီး:** ဤ code review အတွင်း `npm ci`, `npm run build`, `npm test` သို့မဟုတ် `npm run verify` မလုပ်ခဲ့ပါ။ ထို့ကြောင့် စာရင်းပါ tests များသည် repo ထဲတွင်ရှိကြောင်းသာ အတည်ပြုထားပြီး pass ဖြစ်သည်ဟု မကြေညာပါ။ Engine directory ထဲ `node_modules/` မရှိခဲ့ပါ။
+**လက်ရှိ integration verification:** `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run build` နှင့် core unit/visual tests အများစု run ပြီးပါပြီ။ Existing repository test assumptions ကြောင့် `Website/web-preview` directory နှင့် `website/assets/Drum_Lesson_5.musicxml` မရှိသည့် baseline failures ရှိနေပြီး performance budget test သည် sandbox runtime တွင် timing overrun ဖြစ်ခဲ့သည်။ SoundFont binary ကို R2 runtime asset အဖြစ်သာထားသောကြောင့် local test တွင် actual audio render မပါဝင်သေးပါ။
 
 ## တွေ့ရှိထားသော follow-up gaps / risks
 

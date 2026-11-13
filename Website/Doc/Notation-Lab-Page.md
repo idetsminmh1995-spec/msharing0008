@@ -8,11 +8,11 @@
 
 ## Playback နှင့် Sound Engine ချိတ်ဆက်မှု
 
-လက်ရှိ repository တွင် `Website/Notation/Sound Egnine/` သည် `.gitkeep` သာရှိပြီး sound playback implementation မရှိသေးပါ။ အသံထွက်နေသကဲ့သို့ မပြရန် Notation Lab သည် `notationlab:*` CustomEvent bridge ဖြင့် Sound Engine နှင့် ချိတ်ဆက်ရန် အခြေခံထားသည်။ `notationlab:sound-ready` ကို Sound Engine က dispatch လုပ်ပြီးနောက် Play ကိုဖွင့်နိုင်သည်။ Score load, play request, play, pause နှင့် volume ပြောင်းလဲမှုများကို event detail ထဲတွင် ပို့သည်။ Engine က playback-state နှင့် playback-ended event များကို ပြန်ပို့နိုင်သည်။
+`src/soundfont/browser.ts` ရှိ `R2SoundFontEngine` သည် R2 manifest/cache မှ MuseScore General SF3 ကို user ၏ Play gesture အချိန်တွင် load လုပ်ပြီး SpessaSynth AudioWorklet သို့ ချိတ်သည်။ Notation playback event stream ထဲရှိ pitched `midiNotes` နှင့် `durationTicks` ကို အသုံးပြုပြီး note-on/note-off scheduling လုပ်သည်။ Notation Lab သည် SoundFont loading/error state, play, pause နှင့် volume ကို ချိတ်ထားသည်။
 
 - `notationlab:ready` — `{ apiVersion: 1 }`
 - `notationlab:score-loaded` — `{ playback, filename, volume }`
-- `notationlab:play-request` — `{ playback, volume }` (Sound Engine မချိတ်ဆက်ရသေးလျှင်)
+- `notationlab:play-request` — legacy host hook; built-in R2 bridge သည် Play gesture မှာ တိုက်ရိုက် initialize လုပ်သည်
 - `notationlab:play` / `notationlab:pause` — `{ playback, volume }`
 - `notationlab:volume` — `{ volume }` (0–1)
 - `notationlab:sound-ready` — Sound Engine က `document` ပေါ် dispatch လုပ်ရန်
@@ -25,6 +25,8 @@
 - `Website/Website/notation.js` — MusicXML/MXL import, engine rendering, view switching, PDF download, playback event bridge.
 - `Website/Website/styles.css` — compact responsive workspace/control styling.
 - `Website/Website/assets/notation-engine.js` — website ကတင်သုံးနိုင်ရန် bundled engine copy.
+- `Website/Website/assets/sound-engine.js` — R2SoundFontEngine browser bundle.
+- `Website/Website/assets/spessasynth_processor.min.js` — SpessaSynth AudioWorklet processor.
 - `Website/Website/index.html` — Notation Lab navigation link ကို page အသစ်သို့ ချိတ်ဆက်ခြင်း။
 - `Website/Website/studio.html` — Studio မှ Notation Lab navigation ကို page အသစ်သို့ ချိတ်ဆက်ခြင်း။
 - `Website/Doc/README.md` — ဤ document link.
@@ -36,12 +38,13 @@
 - `notation.js` ကို `node --check` ဖြင့် syntax စစ်ဆေးခဲ့ပြီး pass ဖြစ်သည်။
 - Static HTML/CSS/JavaScript changes ဖြစ်ပြီး repository အတွက် active Webdev language-diagnostics project မရှိပါ။
 - Chromium ဖြင့် desktop `1440×900`, phone `403×639` နှင့် ကျဉ်းသော phone `320×740` viewport များကို စစ်ဆေးခဲ့သည်။ Phone တွင် `Choose file`, Page/Horizontal dropdown နှင့် PDF icon သည် ပထမအတန်း၊ Play/zoom/volume သည် ဒုတိယအတန်းတွင် နေရာကျဉ်းစွာ ဝင်ဆံ့သည်။ Desktop တွင် dropdown နှင့် `Download PDF` စာသားကို ပြသသည်။ ယာယီ NotationEngine stub ဖြင့် dropdown နှင့် zoom interaction ကိုစမ်းသပ်ခဲ့ပြီး preview ဖိုင်များကို ဖယ်ရှားထားသည်။
-- `Sound Engine` implementation မရှိသေးသဖြင့် audio playback integration end-to-end မစစ်ဆေးနိုင်သေးပါ။
+- `npm run build`, typecheck, lint နှင့် format စစ်ဆေးမှု pass ဖြစ်သည်။ Actual R2 audio playback သည် user bucket တွင် manifest/SF3 URL တင်ပြီး browser user gesture ဖြင့်သာ end-to-end စစ်ဆေးနိုင်မည်။
 
 ## ကျန်ရှိသောအလုပ်
 
-1. Sound Engine ရရှိသောအခါ `notationlab:*` event bridge ကို engine ၏ playback API နှင့် ချိတ်ဆက်ပါ။
-2. Browser တွင် MusicXML/MXL import, Page/Horizontal layout, PDF download နှင့် responsive display ကို end-to-end စစ်ဆေးပါ။
+1. User R2 bucket URL/manifest ကို production environment တွင် ထည့်ပြီး browser audio playback ကို end-to-end စစ်ဆေးပါ။
+2. Unpitched drum mapping နှင့် MusicXML instrument program/bank routing ထည့်ပါ။
+3. Browser တွင် MusicXML/MXL import, Page/Horizontal layout, PDF download နှင့် responsive display ကို end-to-end စစ်ဆေးပါ။
 
 
 ## 2026-11-13 — Workspace space reduction

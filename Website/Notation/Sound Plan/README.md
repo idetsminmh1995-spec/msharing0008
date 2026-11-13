@@ -62,11 +62,18 @@ export interface SoundEngine {
 
 Notation Engine သည် rendering နှင့် event timing ကိုပဲ ကိုင်တွယ်မည်။ Sound Engine သည် audio context, SoundFont loading, MIDI program/bank selection, velocity/CC နှင့် output routing ကို ကိုင်တွယ်မည်။ Sound Engine မချိတ်ဆက်မီ UI တွင် connection status ကိုသာ ပြပြီး အသံထွက်နေသည်ဟု မဖော်ပြရ။
 
-## မပြီးသေးသော implementation အဆင့်များ
+## Implemented integration — 2026-11-13
 
-- Browser-compatible `.sf3` sampler/WASM adapter ကို ရွေးချယ်ပြီး license နှင့် bundle size စစ်ဆေးရန်။
-- Manifest loader နှင့် Cache API/IndexedDB cache layer ရေးရန်။
-- Notation Engine ၏ playback events ကို အထက်ပါ contract သို့ map လုပ်ရန်။
+- `src/playback/event-stream.ts` သည် pitched MusicXML notes များအတွက် `midiNotes` နှင့် `durationTicks` ကို event တစ်ခုစီတွင် ထုတ်ပေးသည်။ Existing SVG/playback position API မပြောင်းဘဲ host က အသုံးပြုနိုင်သည်။
+- `src/soundfont/browser.ts` တွင် `R2SoundFontEngine` ကို ထည့်ပြီး R2 manifest fetch, Cache API/memory cache, SF2/SF3 load နှင့် SpessaSynth AudioWorklet playback ကို ချိတ်ထားသည်။
+- R2 default asset သည် `musescore-general-sf3` ဖြစ်ပြီး asset path သည် `soundfonts/musescore-general/v0.2/MuseScore_General.sf3` ဖြစ်သည်။ Salamander ကို optional path အဖြစ်သာထားသည်။
+- Website Notation Lab သည် user play gesture မှာ AudioContext/SoundFont ကို initialize လုပ်ပြီး play/pause/volume/end state ကို Sound Engine နှင့် ချိတ်ထားသည်။
+- Browser assets များကို `Website/Website/assets/` နှင့် test-compatible `Website/website/assets/` တွင် build script က ထုတ်ပေးသည်။ SoundFont `.sf2/.sf3` များကို repo ထဲမထည့်ဘဲ R2 မှ runtime fetch လုပ်သည်။
+
+## ကျန်ရှိနေသော implementation အဆင့်များ
+
+- Unpitched drum notes အတွက် MusicXML instrument/drum map ကို MIDI note mapping အဖြစ် ထည့်ရန်။
+- Multi-part score အတွက် MusicXML instrument program/bank mapping ကို သီးခြားရယူပြီး `programChange` events ထုတ်ရန်။
 - Piano, drum/percussion bank 128 နှင့် General MIDI bank/program selection စမ်းသပ်ရန်။
 - Phone နှင့် desktop viewport နှစ်မျိုးတွင် play/stop, volume, loading/error state ကို စစ်ဆေးရန်။
 

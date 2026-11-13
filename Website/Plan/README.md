@@ -210,3 +210,7 @@ R2 မှ ဖိုင်များကို note တစ်လုံးချ�
 Sound Engine အတွက် comparison/fallback source အဖြစ် `MS Basic.sf3`, `MuseScore_General.sf3`, `MuseScore_General.sf2`, `GeneralUser GS 1.472.sf2`, `FluidR3_GM.sf2` နှင့် `Salamander Grand Piano V3 SF2` တို့ကို စုစည်းထားမည်။ Asset တစ်ခုချင်းစီကို R2 versioned prefix သီးခြားဖြင့် ထားပြီး manifest JSON မှ asset ID, format, source, license file, bytes နှင့် checksum ကို ပြမည်။ Default/lightweight fallback ကို MuseScore General သို့မဟုတ် GeneralUser GS ထားပြီး 1.2 GB ခန့်ရှိသော Salamander SF2 ကို optional high-quality piano asset အဖြစ်သာ preload လုပ်မည်။
 
 MS Basic ၏ upstream license file သည် MuseScore General filename/text အဟောင်း reference ပါနေသဖြင့် public သို့မဟုတ် commercial redistribution မလုပ်မီ rights holder ထံမှ အတည်ပြုချက် သို့မဟုတ် legal review ရယူရမည်။ SoundFont source collection ၏ file list, R2 upload path, license notes နှင့် checksum record ကို [SoundFont Collection R2 Asset Record](../Notation/Sound%20Doc/SoundFont-Collection-R2.md) တွင် ထားမည်။
+
+### Notation Engine ↔ SoundFont bridge — 2026-11-13
+
+Notation playback event stream တွင် pitched note များ၏ MIDI note number နှင့် duration ticks ကို ထည့်ပြီး `R2SoundFontEngine` က R2 manifest/cache မှ MuseScore General SF3 ကို တစ်ကြိမ် load လုပ်ကာ SpessaSynth AudioWorklet ဖြင့် WebAudio ထုတ်ပေးမည်။ Notation Lab ၏ play/pause/volume lifecycle သည် SoundFont engine နှင့် ချိတ်ပြီး phone/web viewport နှစ်မျိုးအတွက် UI control တစ်ခုတည်းကို သုံးမည်။ လက်ရှိအဆင့်တွင် unpitched drum mapping နှင့် MusicXML instrument program/bank routing သည် နောက်ထပ်အလုပ်ဖြစ်သည်။

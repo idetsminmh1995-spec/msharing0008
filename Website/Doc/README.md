@@ -7,7 +7,7 @@ M Sharing Website ၏ လက်ရှိ implementation နှင့် မပ�
 - [Header Bar History](Header-Bar-Implementation.md) — ယခင် Header implementation မှတ်တမ်း
 - [Development Documentation Workflow](Development-Workflow.md) — Website အလုပ်များပြီးတိုင်း Doc နှင့် Plan update လုပ်ရမည့် စည်းမျဉ်း
 - [Create Video Page](Create-Video-Page.md) — Web/phone responsive instrument နှင့် Metronome tool selection page
-- [Notation Lab Page](Notation-Lab-Page.md) — MusicXML notation viewer, page/horizontal layouts, PDF export, and pending Sound Engine bridge
+- [Notation Lab Page](Notation-Lab-Page.md) — MusicXML notation viewer, page/horizontal layouts, PDF export, and R2 SoundFont playback bridge
 - [Video Engine Implementation Status](../Video/Video%20Engine%20Doc/README.md) — Engine code inventory, test results, and remaining production integration work
 - [MuseScore General R2 Asset](../Notation/Sound%20Doc/MuseScore-General-R2-Asset.md) — MuseScore SoundFont bundle, license, checksum, R2 upload layout, and Sound Engine caching plan
 - [SoundFont Collection R2 Asset](../Notation/Sound%20Doc/SoundFont-Collection-R2.md) — MS Basic, MuseScore General, GeneralUser GS, FluidR3 GM, and Salamander asset sources and license notes

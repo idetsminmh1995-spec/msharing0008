@@ -74,3 +74,10 @@ TypeScript ဖြင့်ရေးသားထားသော instrument-neutra
 ## လုပ်ဆောင်မှုအစဉ်
 
 အကြံပြုထားသောအစဉ်မှာ **P0 → P1 → P2 → P3 → P4 → P5** ဖြစ်သည်။ P0 ဖြေရှင်းပြီး clean baseline တစ်ခုမရမချင်း feature work မှရသော regression များကို ယုံကြည်စိတ်ချစွာ ခွဲခြားရန်ခက်နိုင်သည်။
+
+## R2 SoundFont integration milestone — 2026-11-13
+
+- [x] Notation playback event များတွင် `midiNotes` နှင့် `durationTicks` ထည့်ပြီး Sound Engine scheduling အတွက် typed data ပေးရန်။
+- [x] R2 `soundfonts/manifest.json` ကို fetch/cache လုပ်ပြီး versioned SoundFont object path မှ `.sf2/.sf3` တစ်ကြိမ် load လုပ်ရန်။
+- [x] SpessaSynth AudioWorklet ဖြင့် SoundFont ကို WebAudio output သို့ချိတ်ပြီး Notation Lab play/pause/volume lifecycle နှင့် ချိတ်ရန်။
+- [ ] Unpitched percussion mapping နှင့် MusicXML instrument program/bank routing ကို ထပ်တိုးရန်။

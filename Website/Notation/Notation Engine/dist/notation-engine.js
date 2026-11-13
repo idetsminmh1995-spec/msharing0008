@@ -76465,6 +76465,15 @@ ${denominator}`;
   }
 
   // src/playback/event-stream.ts
+  function midiNoteForEvent(event) {
+    const notes = event.kind === "chord" ? event.notes : event.kind === "note" ? [event] : [];
+    return notes.flatMap((note2) => {
+      if (!isPitched(note2.pitch)) return [];
+      const natural = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[note2.pitch.step];
+      const midi = (note2.pitch.octave + 1) * 12 + natural + note2.pitch.alter;
+      return Number.isInteger(midi) && midi >= 0 && midi <= 127 ? [midi] : [];
+    });
+  }
   function notationEventId(partId, measureNumber, voiceId, eventIndex) {
     return `${partId}#m${measureNumber}#v${voiceId}#e${eventIndex}`;
   }
@@ -76490,11 +76499,14 @@ ${denominator}`;
             const noteIds = noteIdsForEvent(part2.id, measure2.number, voice2.id, index, event);
             if (noteIds.length > 0) {
               const tick = offset + startTick;
+              const midiNotes = midiNoteForEvent(event);
               events.push({
                 tick,
                 seconds: tickToSeconds(tempoMap, tick),
+                durationTicks: event.duration.ticks,
                 partId: part2.id,
                 noteIds,
+                ...midiNotes.length > 0 ? { midiNotes } : {},
                 measureNumber: measure2.number
               });
             }
