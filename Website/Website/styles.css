@@ -144,3 +144,16 @@
   .notation-dock .notation-volume input { width:min(33vw,120px); }
   .notation-page .notation-stage { max-height:calc(100dvh - 390px); }
 }
+
+
+/* The import affordance stays compact: just the Choose file button. */
+.notation-dock .notation-import { width:max-content; min-height:0; flex:0 0 auto; align-self:center; padding:0; border:0; background:transparent; }
+.notation-dock .notation-import.is-dragging { border:0; background:transparent; }
+.notation-file-button { min-height:38px; padding:0 14px; white-space:nowrap; }
+.notation-dock .notation-import.is-dragging .notation-file-button { outline:2px solid var(--accent-bright); outline-offset:3px; }
+@media (max-width:860px) {
+  .notation-dock .notation-import { align-self:flex-start; min-height:0; padding:0; }
+}
+@media (max-width:560px) {
+  .notation-file-button { min-height:36px; padding:0 12px; }
+}

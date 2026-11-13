@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="View and play MusicXML notation." />
     <title>Notation Lab — M Sharing</title>
-    <link rel="stylesheet" href="styles.css?v=notation-lab-dock-20261113" />
+    <link rel="stylesheet" href="styles.css?v=notation-lab-compact-20261113" />
   </head>
   <body>
     <header class="site-header" data-header>
@@ -49,11 +49,7 @@
         <div class="notation-dock-inner">
           <section class="notation-import" data-drop-zone aria-label="Import MusicXML">
             <input class="notation-file-input" type="file" accept=".musicxml,.xml,.mxl,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml" data-file-input />
-            <div class="notation-import-content">
-              <span class="notation-upload-mark" aria-hidden="true">↑</span>
-              <div><strong>Choose MusicXML file</strong><span>.musicxml, .xml, .mxl</span></div>
-              <button class="notation-button notation-button--primary" type="button" data-choose-file>Choose file</button>
-            </div>
+            <button class="notation-button notation-button--primary notation-file-button" type="button" data-choose-file aria-label="Choose MusicXML file">Choose file</button>
           </section>
           <section class="notation-toolbar" aria-label="Notation controls" data-controls hidden>
             <div class="notation-toolbar-group notation-view-switch" role="group" aria-label="Notation layout">
