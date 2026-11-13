@@ -3,7 +3,7 @@
 <script src="/website/assets/video-engine.js"></script>
 <script>
   window.runVideoEngineBrowserTest = async function () {
-    if (!VideoEngine.isRenderable()) throw new Error('WebCodecs video APIs are unavailable');
+    if (!VideoEngine.isRenderable(false)) throw new Error('WebCodecs video APIs are unavailable');
     const result = await VideoEngine.render({
       width: 320,
       height: 180,

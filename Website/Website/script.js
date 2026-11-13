@@ -14,11 +14,11 @@ const studioTitle = document.querySelector('[data-studio-title]');
 const studioDescription = document.querySelector('[data-studio-description]');
 const videoMessage = document.querySelector('[data-video-message]');
 const videoStage = document.querySelector('[data-video-stage]');
+const videoOutput = document.querySelector('[data-video-output]');
 const videoPlay = document.querySelector('[data-video-play]');
 const videoTimeline = document.querySelector('[data-video-timeline]');
 const videoTime = document.querySelector('[data-video-time]');
 const videoFullscreen = document.querySelector('[data-video-fullscreen]');
-let videoTimer;
 const savedTheme = localStorage.getItem('msharing-theme');
 
 if (savedTheme === 'dark' || savedTheme === 'light') {
@@ -78,33 +78,51 @@ const formatTime = (seconds) => {
   return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
 };
 const updateVideoTime = () => {
-  if (videoTime && videoTimeline) videoTime.textContent = formatTime(Number(videoTimeline.value));
+  if (videoTime && videoTimeline) {
+    const seconds = videoOutput ? videoOutput.currentTime : Number(videoTimeline.value);
+    videoTime.textContent = formatTime(Math.floor(seconds));
+    if (videoTimeline && videoOutput && Number.isFinite(videoOutput.duration)) {
+      videoTimeline.value = String(videoOutput.currentTime);
+    }
+  }
 };
 
-videoTimeline?.addEventListener('input', updateVideoTime);
+videoTimeline?.addEventListener('input', () => {
+  if (videoOutput && Number.isFinite(videoOutput.duration)) {
+    videoOutput.currentTime = Number(videoTimeline.value);
+  }
+  updateVideoTime();
+});
 
 videoPlay?.addEventListener('click', () => {
-  const isPlaying = videoPlay.dataset.playing === 'true';
-  videoPlay.dataset.playing = String(!isPlaying);
-  videoPlay.textContent = isPlaying ? '▶' : 'Ⅱ';
-  videoPlay.setAttribute('aria-label', isPlaying ? 'Play video' : 'Pause video');
-  videoStage?.classList.toggle('is-playing', !isPlaying);
-  window.clearInterval(videoTimer);
-  if (!isPlaying) {
-    videoTimer = window.setInterval(() => {
-      if (!videoTimeline) return;
-      const nextTime = Number(videoTimeline.value) + 1;
-      if (nextTime >= Number(videoTimeline.max)) {
-        videoTimeline.value = videoTimeline.max;
-        updateVideoTime();
-        videoPlay.click();
-        return;
-      }
-      videoTimeline.value = String(nextTime);
-      updateVideoTime();
-    }, 1000);
+  if (!videoOutput || !videoOutput.src) return;
+  if (videoOutput.paused) {
+    videoOutput.play().catch((error) => {
+      const status = document.querySelector('[data-studio-status]');
+      if (status) status.textContent = `Video playback failed: ${error.message || error}`;
+    });
+  } else {
+    videoOutput.pause();
   }
 });
+
+videoOutput?.addEventListener('play', () => {
+  if (videoPlay) {
+    videoPlay.textContent = 'Ⅱ';
+    videoPlay.setAttribute('aria-label', 'Pause video');
+  }
+  videoStage?.classList.add('is-playing');
+});
+
+videoOutput?.addEventListener('pause', () => {
+  if (videoPlay) {
+    videoPlay.textContent = '▶';
+    videoPlay.setAttribute('aria-label', 'Play video');
+  }
+  videoStage?.classList.remove('is-playing');
+});
+
+videoOutput?.addEventListener('timeupdate', updateVideoTime);
 
 videoFullscreen?.addEventListener('click', async () => {
   if (!videoStage) return;

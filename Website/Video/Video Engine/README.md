@@ -1,13 +1,16 @@
 # Video Engine
 
-This folder contains a complete mirror of the Video Engine runtime source, tests, browser fixture, and technical documentation.
+This folder contains the authoritative Video Engine runtime source, tests, browser fixture, and tooling.
 
-- [Mirrored code and project files](source/)
-- [Mirrored runtime source](source/website/assets/video-engine.js)
-- [Mirrored Node tests](source/tools/test-video-engine.mjs)
-- [Mirrored Chromium smoke test](source/tools/test-video-engine-browser.mjs)
-- [Mirrored browser fixture](source/tools/browser-video-engine-fixture.html)
-- [Canonical production source](../../website/assets/video-engine.js)
-- [Canonical documentation](../../docs/VIDEO-ENGINE.md)
+- [Engine source and tooling](source/)
+- [Authoritative runtime source](source/website/assets/video-engine.js)
+- [Node muxer tests](source/tools/test-video-engine.mjs)
+- [Chromium engine smoke test](source/tools/test-video-engine-browser.mjs)
+- [Browser fixture](source/tools/browser-video-engine-fixture.html)
+- [Studio integration browser test](source/tools/test-studio-video-browser.mjs)
+- [Source-to-production sync tool](source/tools/sync-video-engine.mjs)
+- [Production website asset](../../Website/assets/video-engine.js)
+- [Implementation status](../Video%20Engine%20Doc/README.md)
+- [Video Engine Plan](../Video%20Engine%20Plan/PLAN.md)
 
-The canonical production source remains at `website/assets/video-engine.js` because the website loads that stable path directly. Keep the mirrored files synchronized with the canonical files when the engine changes.
+The authoritative source is `source/website/assets/video-engine.js`. The static website loads the generated copy at `Website/Website/assets/video-engine.js`. After changing the source, run `node source/tools/sync-video-engine.mjs`; CI/checks can use `node source/tools/sync-video-engine.mjs --check` to detect a stale production copy.

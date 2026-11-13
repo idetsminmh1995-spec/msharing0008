@@ -43,25 +43,32 @@
         <div class="studio-panel studio-panel--controls">
           <div class="studio-panel-heading"><h1 id="studio-title" data-studio-title>Drum Studio</h1></div>
           <div class="drum-pad-grid" aria-label="Drum pads">
-            <button type="button" class="drum-pad drum-pad--kick"><span>●</span><small>Kick</small></button>
-            <button type="button" class="drum-pad drum-pad--snare"><span>◉</span><small>Snare</small></button>
-            <button type="button" class="drum-pad drum-pad--hihat"><span>✦</span><small>Hi-hat</small></button>
+            <button type="button" class="drum-pad drum-pad--kick" data-drum-pad="kick"><span>●</span><small>Kick</small></button>
+            <button type="button" class="drum-pad drum-pad--snare" data-drum-pad="snare"><span>◉</span><small>Snare</small></button>
+            <button type="button" class="drum-pad drum-pad--hihat" data-drum-pad="hihat"><span>✦</span><small>Hi-hat</small></button>
           </div>
           <div class="tempo-row"><span>Tempo</span><strong>120 BPM</strong><button type="button" aria-label="Adjust tempo">↕</button></div>
-          <button type="button" class="record-button"><span class="record-dot"></span> Start recording</button>
+          <button type="button" class="record-button" data-studio-record><span class="record-dot"></span> Start recording</button>
+          <p class="studio-status" data-studio-status role="status" aria-live="polite">Start recording, then tap the drum pads to capture a visual performance.</p>
         </div>
         <div class="studio-panel studio-panel--video">
           <div class="video-panel-heading"><h2>Video</h2></div>
-          <div class="video-stage" data-video-stage></div>
+          <div class="video-stage" data-video-stage>
+            <video data-video-output playsinline preload="metadata" hidden aria-label="Rendered drum performance"></video>
+            <p data-video-placeholder>No rendered performance yet.</p>
+          </div>
           <div class="video-controls" aria-label="Video controls">
-            <button class="video-play-button" type="button" data-video-play aria-label="Play video">▶</button>
-            <input class="video-timeline" type="range" min="0" max="60" value="0" step="1" data-video-timeline aria-label="Video timeline" />
+            <button class="video-play-button" type="button" data-video-play aria-label="Play video" disabled>▶</button>
+            <input class="video-timeline" type="range" min="0" max="1" value="0" step="0.1" data-video-timeline aria-label="Video timeline" disabled />
             <span class="video-time" data-video-time>00:00</span>
             <button class="video-fullscreen-button" type="button" data-video-fullscreen aria-label="Full screen">⛶</button>
           </div>
+          <a class="video-download" data-video-download hidden>Download rendered video</a>
         </div>
       </section>
     </main>
+    <script src="assets/video-engine.js?v=video-engine-20261113"></script>
     <script src="script.js?v=studio-20261113"></script>
+    <script src="studio-video.js?v=studio-engine-20261113"></script>
   </body>
 </html>
