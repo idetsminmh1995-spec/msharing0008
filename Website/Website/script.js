@@ -13,6 +13,11 @@ const studioWorkspace = document.querySelector('[data-studio-workspace]');
 const studioTitle = document.querySelector('[data-studio-title]');
 const studioDescription = document.querySelector('[data-studio-description]');
 const videoMessage = document.querySelector('[data-video-message]');
+const savedTheme = localStorage.getItem('msharing-theme');
+
+if (savedTheme === 'dark' || savedTheme === 'light') {
+  root.dataset.theme = savedTheme;
+}
 
 menuToggle?.addEventListener('click', () => {
   const isOpen = mobileNav.classList.toggle('is-open');
@@ -38,6 +43,7 @@ mobileBottomNav?.querySelectorAll('.bottom-nav-item').forEach((item) => {
 themeToggle?.addEventListener('click', () => {
   const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
   root.dataset.theme = nextTheme;
+  localStorage.setItem('msharing-theme', nextTheme);
   themeToggle.setAttribute('aria-label', `Switch to ${nextTheme === 'dark' ? 'light' : 'dark'} mode`);
 });
 
