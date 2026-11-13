@@ -110,3 +110,37 @@
   .notation-volume input { width:min(33vw,120px); }
   .notation-stage { max-height:calc(100vh - 310px); }
 }
+
+
+/* Keep MusicXML import and notation controls anchored below the score workspace. */
+.notation-page { padding-bottom:180px; }
+.notation-dock { position:fixed; right:0; bottom:var(--bottom-height); left:0; z-index:95; padding:10px 0; border-top:1px solid var(--border); background:var(--header); box-shadow:0 -14px 34px rgba(0,0,0,.2); backdrop-filter:blur(18px); }
+.notation-dock-inner { display:flex; width:min(100% - 64px,1480px); align-items:center; gap:14px; margin:0 auto; }
+.notation-dock .notation-import { min-height:72px; flex:1; padding:8px 14px; }
+.notation-dock .notation-import-content { min-height:54px; }
+.notation-dock .notation-toolbar { min-width:0; flex:1; justify-content:space-between; margin:0; }
+.notation-dock .notation-toolbar[hidden] { display:none; }
+.notation-dock .notation-playback-controls { margin-left:0; }
+.notation-page .notation-stage { max-height:calc(100vh - 280px); }
+:root[data-theme='light'] .notation-dock { background:rgba(255,255,255,.96); box-shadow:0 -14px 34px rgba(15,23,42,.12); }
+@media (max-width:860px) {
+  .notation-page { padding-bottom:calc(250px + var(--bottom-height)); }
+  .notation-dock { padding:8px 0; }
+  .notation-dock-inner { width:min(100% - 28px,680px); align-items:stretch; flex-direction:column; gap:7px; }
+  .notation-dock .notation-import { min-height:62px; flex:none; padding:6px 10px; }
+  .notation-dock .notation-import-content { min-height:48px; }
+  .notation-dock .notation-toolbar { display:flex; min-height:42px; flex:none; flex-wrap:wrap; gap:7px; }
+  .notation-dock .notation-toolbar[hidden] { display:none; }
+  .notation-page .notation-stage { max-height:calc(100vh - 370px); }
+}
+@media (max-width:560px) {
+  .notation-page { padding-bottom:calc(252px + var(--bottom-height)); }
+  .notation-dock-inner { width:calc(100% - 20px); }
+  .notation-dock .notation-import { min-height:58px; padding:5px 8px; }
+  .notation-dock .notation-import-content { min-height:46px; gap:8px; }
+  .notation-dock .notation-toolbar { display:grid; grid-template-columns:1fr auto; row-gap:7px; }
+  .notation-dock .notation-playback-controls { grid-column:1 / -1; grid-row:2; justify-self:start; margin:0; }
+  .notation-dock .notation-button--pdf { grid-column:2; grid-row:1; justify-self:end; margin-left:0; }
+  .notation-dock .notation-volume input { width:min(33vw,120px); }
+  .notation-page .notation-stage { max-height:calc(100dvh - 390px); }
+}

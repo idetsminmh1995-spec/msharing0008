@@ -4,7 +4,7 @@
 
 ## အလုပ်အကျဉ်း
 
-`Website/Website/notation.html` တွင် hero banner နှင့် marketing copy မပါသော Notation Lab workspace ကို ထည့်သွင်းခဲ့သည်။ `.musicxml`, `.xml` နှင့် `.mxl` ဖိုင်များကို file picker သို့မဟုတ် drag-and-drop ဖြင့် ရွေးချယ်နိုင်ပြီး လက်ရှိ `NotationEngine` browser bundle ကို အသုံးပြုကာ notation ပြသသည်။ Page နှင့် Horizontal view ကို engine ၏ `layout.mode: 'page' | 'scroll'` ဖြင့်ပြောင်းနိုင်သည်။ `Download PDF` သည် engine ၏ `exportPdf()` ကိုခေါ်ပြီး ဖိုင်အမည်ကို input ဖိုင်အမည်မှ ရယူသည်။
+`Website/Website/notation.html` တွင် hero banner နှင့် marketing copy မပါသော Notation Lab workspace ကို ထည့်သွင်းခဲ့သည်။ `.musicxml`, `.xml` နှင့် `.mxl` ဖိုင်များကို file picker သို့မဟုတ် drag-and-drop ဖြင့် ရွေးချယ်နိုင်ပြီး လက်ရှိ `NotationEngine` browser bundle ကို အသုံးပြုကာ notation ပြသသည်။ Page နှင့် Horizontal view ကို engine ၏ `layout.mode: 'page' | 'scroll'` ဖြင့်ပြောင်းနိုင်သည်။ `Download PDF` သည် engine ၏ `exportPdf()` ကိုခေါ်ပြီး ဖိုင်အမည်ကို input ဖိုင်အမည်မှ ရယူသည်။ MusicXML ဖိုင်ထည့်သည့်နေရာနှင့် view/playback/volume/PDF ခလုတ်များကို စာမျက်နှာအောက်ခြေတွင် fixed dock အဖြစ်ထားပြီး ဖုန်းတွင် mobile bottom navigation အပေါ်ဘက်၌ ပြသသည်။
 
 ## Playback နှင့် Sound Engine ချိတ်ဆက်မှု
 
@@ -35,7 +35,7 @@
 - Notation Engine source မှ public renderer, `unzipMxl()`, `exportPdf()` နှင့် page/scroll configuration contract ကို စစ်ဆေးခဲ့သည်။
 - `notation.js` ကို `node --check` ဖြင့် syntax စစ်ဆေးခဲ့ပြီး pass ဖြစ်သည်။
 - Static HTML/CSS/JavaScript changes ဖြစ်ပြီး repository အတွက် active Webdev language-diagnostics project မရှိပါ။
-- Chromium ဖြင့် desktop `1440×900` နှင့် phone `375×812` viewport များတွင် page ကို render စစ်ဆေးခဲ့သည်။ Header/navigation, file import area နှင့် page spacing များသည် viewport နှစ်ခုလုံးတွင် မျက်နှာပြင်အတွင်းရှိသည်။
+- Chromium ဖြင့် desktop `1440×900` နှင့် phone `375×812` viewport များတွင် fixed dock နှင့် controls ကို စစ်ဆေးခဲ့သည်။ Phone တွင် dock သည် mobile bottom navigation အပေါ်ဘက်တွင်ရှိပြီး၊ desktop/phone နှစ်ခုလုံးတွင် dock သည် workspace ကို မဖုံးပါ။ Controls မြင်ကွင်းကို temporary preview-only markup ဖြင့်စစ်ခဲ့ပြီး အဲဒီဖိုင်ကိုဖယ်ရှားပြီးဖြစ်သည်။
 - `Sound Engine` implementation မရှိသေးသဖြင့် audio playback integration end-to-end မစစ်ဆေးနိုင်သေးပါ။
 
 ## ကျန်ရှိသောအလုပ်
