@@ -10,7 +10,7 @@ Desktop/web view တွင် logo နှင့် `Courses`, `Store`, `Create V
 
 ## Phone view
 
-Phone view ၏ အပေါ်ဘက် Header တွင် Menu icon, logo, Search icon နှင့် Notification icon ပဲ ပြထားသည်။ Sample ပုံထဲက phone navigation ပုံစံအတိုင်း အောက်ဘက်တွင် fixed bottom bar ထည့်ထားပြီး `Home`, `Courses`, အလယ်တွင် red `+` Create button, `Store` နှင့် `Profile` tabs ပါဝင်သည်။ Bottom bar သည် screen အောက်ခြေတွင် အမြဲတည်နေပြီး page content မဖုံးစေရန် body bottom padding ထည့်ထားသည်။
+Phone view ၏ အပေါ်ဘက် Header တွင် Menu icon, logo, Search icon နှင့် Notification icon ပဲ ပြထားသည်။ အောက်ဘက် fixed bottom bar တွင် `Home`, `Courses`, `Store`, `Create Video`, `Notation Lab` နှင့် `Account` tabs ခြောက်ခုသာ ပါဝင်သည်။ Bottom bar သည် screen အောက်ခြေတွင် အမြဲတည်နေပြီး page content မဖုံးစေရန် body bottom padding ထည့်ထားသည်။
 
 ## Fixed behavior
 

@@ -19,10 +19,10 @@ mobileNav?.querySelectorAll('a').forEach((link) => {
   });
 });
 
-mobileBottomNav?.querySelectorAll('.bottom-nav-item, .bottom-nav-create').forEach((item) => {
+mobileBottomNav?.querySelectorAll('.bottom-nav-item').forEach((item) => {
   item.addEventListener('click', () => {
     mobileBottomNav.querySelectorAll('.bottom-nav-item').forEach((navItem) => navItem.classList.remove('is-active'));
-    if (item.classList.contains('bottom-nav-item')) item.classList.add('is-active');
+    item.classList.add('is-active');
   });
 });
 
