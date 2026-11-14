@@ -10,7 +10,7 @@ Desktop/web view တွင် ဘယ်ဘက်မှ logo နှင့် `Hom
 
 ## Phone view
 
-Phone view တွင် user သတ်မှတ်ထားသည့်အတိုင်း Menu icon, logo, Search icon နှင့် Notification icon ပဲ ပြထားသည်။ Menu icon ကိုနှိပ်လျှင် mobile navigation panel တွင် Home Page, Courses, Store, Create Video နှင့် Notation Lab များ ပေါ်လာသည်။
+Phone view တွင် Menu icon, logo, Search icon နှင့် Notification icon ပဲ ပြထားသည်။ Menu icon ကိုနှိပ်လျှင် Courses, Store, Create Video နှင့် Notation Lab links များပါသော ဘယ်ဘက်ကနေ ထွက်လာသော drawer ပေါ်လာသည်။ Drawer ဖွင့်နေချိန် backdrop က နောက်ခံစာမျက်နှာကို မှိန်စေပြီး background scroll ကို ပိတ်ထားသည်။
 
 ## Fixed behavior
 
@@ -20,15 +20,16 @@ Header ကို `position: fixed` နှင့် `top: 0` သတ်မှတ�
 
 - Dark/Light icon ဖြင့် theme ပြောင်းနိုင်သည်။
 - `EN/MM` control ဖြင့် language indicator ပြောင်းနိုင်သည်။
-- Phone menu ကို ဖွင့်/ပိတ်နိုင်သည်။
+- Menu icon နှိပ်လျှင် drawer သည် ဘယ်ဘက်မှ slide-in ဖြစ်ပြီး close icon၊ backdrop၊ Escape key သို့မဟုတ် link ရွေးခြင်းဖြင့် ပိတ်နိုင်သည်။
+- Drawer ဖွင့်နေချိန် focus ကို menu အတွင်းထိန်းထားပြီး ပိတ်သောအခါ Menu icon သို့ ပြန်ထားသည်; background scroll ပိတ်ထားသည်။
 - Mobile navigation item ရွေးပြီးနောက် menu ပြန်ပိတ်သည်။
 - Icon နှင့် menu button များတွင် accessible `aria-label` နှင့် menu အတွက် `aria-expanded` ထည့်ထားသည်။
 
 ## ဖိုင်များ
 
-- `Website/index.html` — responsive Header Bar markup
-- `Website/styles.css` — fixed positioning, web/mobile breakpoints နှင့် theme styles
-- `Website/script.js` — mobile menu, theme toggle နှင့် EN/MM toggle
+- `Website/Website/index.html`, `Website/Website/notation.html`, `Website/Website/studio.html` — responsive Header Bar markup
+- `Website/Website/styles.css` — fixed positioning, web/mobile breakpoints နှင့် theme styles
+- `Website/Website/script.js` — mobile menu, theme toggle နှင့် EN/MM toggle
 
 ## နောက်ပိုင်း backend ချိတ်ဆက်မည့်အချက်
 

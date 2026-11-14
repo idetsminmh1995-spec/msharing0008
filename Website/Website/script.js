@@ -1,6 +1,8 @@
 const root = document.documentElement;
 const menuToggle = document.querySelector('[data-menu-toggle]');
 const mobileNav = document.querySelector('[data-mobile-nav]');
+const menuBackdrop = document.querySelector('[data-menu-backdrop]');
+const menuClose = document.querySelector('[data-menu-close]');
 const mobileBottomNav = document.querySelector('.mobile-bottom-nav');
 const themeToggle = document.querySelector('[data-theme-toggle]');
 const languageToggle = document.querySelector('[data-language-toggle]');
@@ -25,19 +27,66 @@ if (savedTheme === 'dark' || savedTheme === 'light') {
   root.dataset.theme = savedTheme;
 }
 
-menuToggle?.addEventListener('click', () => {
-  const isOpen = mobileNav.classList.toggle('is-open');
-  menuToggle.setAttribute('aria-expanded', String(isOpen));
-  menuToggle.setAttribute('aria-label', isOpen ? 'Close menu' : 'Open menu');
-});
+const menuIsOpen = () => Boolean(mobileNav?.classList.contains('is-open'));
+const menuFocusableItems = () => [...(mobileNav?.querySelectorAll('a[href], button:not([disabled])') || [])];
+const closeMobileMenu = (restoreFocus = true) => {
+  if (!mobileNav) return;
+  mobileNav.classList.remove('is-open');
+  mobileNav.setAttribute('aria-hidden', 'true');
+  mobileNav.inert = true;
+  menuBackdrop?.classList.remove('is-open');
+  menuBackdrop?.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('menu-open');
+  menuToggle?.setAttribute('aria-expanded', 'false');
+  menuToggle?.setAttribute('aria-label', 'Open menu');
+  if (restoreFocus) menuToggle?.focus();
+};
+const openMobileMenu = () => {
+  if (!mobileNav) return;
+  mobileNav.inert = false;
+  mobileNav.setAttribute('aria-hidden', 'false');
+  mobileNav.classList.add('is-open');
+  menuBackdrop?.setAttribute('aria-hidden', 'false');
+  menuBackdrop?.classList.add('is-open');
+  document.body.classList.add('menu-open');
+  menuToggle?.setAttribute('aria-expanded', 'true');
+  menuToggle?.setAttribute('aria-label', 'Close menu');
+  const focusTarget = menuClose || menuFocusableItems()[0];
+  if (focusTarget) window.requestAnimationFrame(() => { if (menuIsOpen()) focusTarget.focus(); });
+};
 
-mobileNav?.querySelectorAll('a').forEach((link) => {
-  link.addEventListener('click', () => {
-    mobileNav.classList.remove('is-open');
-    menuToggle?.setAttribute('aria-expanded', 'false');
-    menuToggle?.setAttribute('aria-label', 'Open menu');
+if (menuToggle && mobileNav) {
+  menuToggle.addEventListener('click', () => menuIsOpen() ? closeMobileMenu() : openMobileMenu());
+  menuClose?.addEventListener('click', () => closeMobileMenu());
+  menuBackdrop?.addEventListener('click', () => closeMobileMenu());
+  mobileNav.querySelectorAll('a').forEach((link) => {
+    link.addEventListener('click', () => closeMobileMenu(false));
   });
-});
+  document.addEventListener('keydown', (event) => {
+    if (!menuIsOpen()) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeMobileMenu();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = menuFocusableItems();
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!first || !last) return;
+    if (event.shiftKey && (document.activeElement === first || !mobileNav.contains(document.activeElement))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (document.activeElement === last || !mobileNav.contains(document.activeElement))) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+  const mobileMenuMedia = window.matchMedia?.('(max-width: 860px)');
+  const closeOnDesktop = (event) => { if (!event.matches && menuIsOpen()) closeMobileMenu(false); };
+  if (mobileMenuMedia?.addEventListener) mobileMenuMedia.addEventListener('change', closeOnDesktop);
+  else mobileMenuMedia?.addListener?.(closeOnDesktop);
+}
 
 mobileBottomNav?.querySelectorAll('.bottom-nav-item').forEach((item) => {
   item.addEventListener('click', () => {
