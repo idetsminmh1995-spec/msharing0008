@@ -15,6 +15,15 @@
   const numeratorInput = document.querySelector('[data-metronome-numerator]');
   const denominatorSelect = document.querySelector('[data-metronome-denominator]');
   const durationLabel = document.querySelector('[data-metronome-duration]');
+  const musicXmlInput = document.querySelector('[data-metronome-musicxml-input]');
+  const musicXmlName = document.querySelector('[data-metronome-musicxml-name]');
+  const countVoiceEnabled = document.querySelector('[data-metronome-count-voice-enabled]');
+  const countVoice = document.querySelector('[data-metronome-count-voice]');
+  const countVolume = document.querySelector('[data-metronome-count-volume]');
+  const countVolumeValue = document.querySelector('[data-metronome-count-volume-value]');
+  const soundModel = document.querySelector('[data-metronome-sound-model]');
+  const soundVolume = document.querySelector('[data-metronome-sound-volume]');
+  const soundVolumeValue = document.querySelector('[data-metronome-sound-volume-value]');
   const recordButton = document.querySelector('[data-studio-generate]') || document.querySelector('[data-studio-record]');
   const status = document.querySelector('[data-studio-status]');
   const video = document.querySelector('[data-video-output]');
@@ -43,6 +52,14 @@
 
   const setButtonLabel = (label) => {
     if (recordButton) recordButton.textContent = label;
+  };
+
+  const syncAudioControls = () => {
+    const countOn = countVoiceEnabled?.value === 'on';
+    if (countVoice) countVoice.disabled = !countOn;
+    if (countVolume) countVolume.disabled = !countOn;
+    if (countVolumeValue) countVolumeValue.value = `${countVolume?.value ?? 75}%`;
+    if (soundVolumeValue) soundVolumeValue.value = `${soundVolume?.value ?? 80}%`;
   };
 
   if (controls) controls.hidden = false;
@@ -198,6 +215,17 @@
     control.addEventListener('change', refreshPreview);
   }
 
+  for (const control of [countVoiceEnabled, countVoice, countVolume, soundModel, soundVolume]) {
+    control?.addEventListener('input', syncAudioControls);
+    control?.addEventListener('change', syncAudioControls);
+  }
+  musicXmlInput?.addEventListener('change', () => {
+    const file = musicXmlInput.files?.[0];
+    if (musicXmlName) musicXmlName.textContent = file ? file.name : 'No file selected';
+    if (file) setStatus(`MusicXML selected: ${file.name}.`);
+  });
+  syncAudioControls();
+
   async function renderMetronome() {
     if (isRendering) {
       cancelRequested = true;
@@ -273,7 +301,12 @@
       if (playButton) playButton.disabled = false;
       if (timeline) timeline.disabled = false;
       const audioLabel = result.audioCodec ? `${result.audioCodec} click track` : 'audio track';
-      setStatus(`Rendered ${result.frames} frames · ${result.seconds.toFixed(2)} sec · ${result.container.toUpperCase()} · ${audioLabel}`);
+      const pendingSettings = [];
+      if (musicXmlInput?.files?.[0]) pendingSettings.push('MusicXML selected but not yet used');
+      if (countVoiceEnabled?.value === 'on') pendingSettings.push('Count Voice not yet connected');
+      if (soundModel?.value && soundModel.value !== 'default') pendingSettings.push('selected Sound Model not yet applied');
+      const pendingNote = pendingSettings.length ? ` · ${pendingSettings.join(' · ')}` : '';
+      setStatus(`Rendered ${result.frames} frames · ${result.seconds.toFixed(2)} sec · ${result.container.toUpperCase()} · ${audioLabel}${pendingNote}`);
     } catch (error) {
       setStatus(`Metronome video render failed: ${error.message || error}`);
       imagePreview.hidden = false;
@@ -283,6 +316,7 @@
       setButtonLabel('Render metronome video');
       recordButton.setAttribute('aria-label', 'Render metronome video');
       controls.querySelectorAll('input, select').forEach((control) => { control.disabled = false; });
+      syncAudioControls();
       cancelRequested = false;
     }
   }

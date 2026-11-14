@@ -151,6 +151,22 @@ try {
   assert.ok(ready, 'Metronome bundle, VideoEngine, or Metronome controls did not load');
   assert.equal(await evaluate("document.querySelector('[data-studio-title]').textContent"), 'Metronome Studio');
   assert.equal(await evaluate("document.querySelector('[data-studio-settings]').hidden"), true, 'Metronome route exposed the shared Drum settings');
+  const inputControls = JSON.parse(await evaluate("JSON.stringify({musicXml:!!document.querySelector('[data-metronome-musicxml-input]'),name:document.querySelector('[data-metronome-musicxml-name]')?.textContent,countEnabled:document.querySelector('[data-metronome-count-voice-enabled]')?.value,countDisabled:document.querySelector('[data-metronome-count-voice]')?.disabled,soundModel:document.querySelector('[data-metronome-sound-model]')?.value,soundVolume:document.querySelector('[data-metronome-sound-volume-value]')?.value})"));
+  assert.ok(inputControls.musicXml, 'Metronome MusicXML picker is missing');
+  assert.equal(inputControls.name, 'No file selected');
+  assert.equal(inputControls.countEnabled, 'off');
+  assert.equal(inputControls.countDisabled, true, 'Count Voice type should be disabled while Count Voice is Off');
+  assert.equal(inputControls.soundModel, 'default');
+  assert.equal(inputControls.soundVolume, '80%');
+  const selectedFile = JSON.parse(await evaluate("(() => { const input = document.querySelector('[data-metronome-musicxml-input]'); const transfer = new DataTransfer(); transfer.items.add(new File(['<score-partwise/>'], 'studio-test.musicxml', {type:'application/xml'})); input.files = transfer.files; input.dispatchEvent(new Event('change', {bubbles:true})); return JSON.stringify({name:document.querySelector('[data-metronome-musicxml-name]').textContent,status:document.querySelector('[data-studio-status]').textContent}); })()"));
+  assert.equal(selectedFile.name, 'studio-test.musicxml', 'MusicXML selection name was not displayed');
+  assert.match(selectedFile.status, /MusicXML selected/);
+  const audioControls = JSON.parse(await evaluate("(() => { const set = (selector, value) => { const control = document.querySelector(selector); control.value = value; control.dispatchEvent(new Event('input', {bubbles:true})); control.dispatchEvent(new Event('change', {bubbles:true})); }; set('[data-metronome-count-voice-enabled]', 'on'); set('[data-metronome-count-voice]', 'numeric'); set('[data-metronome-count-volume]', '42'); set('[data-metronome-sound-model]', 'room'); set('[data-metronome-sound-volume]', '63'); return JSON.stringify({voiceDisabled:document.querySelector('[data-metronome-count-voice]').disabled,countDisabled:document.querySelector('[data-metronome-count-volume]').disabled,countVolume:document.querySelector('[data-metronome-count-volume-value]').value,soundVolume:document.querySelector('[data-metronome-sound-volume-value]').value,model:document.querySelector('[data-metronome-sound-model]').value}); })()"));
+  assert.equal(audioControls.voiceDisabled, false, 'Count Voice type did not enable when Count Voice was turned on');
+  assert.equal(audioControls.countDisabled, false, 'Count Voice volume did not enable when Count Voice was turned on');
+  assert.equal(audioControls.countVolume, '42%');
+  assert.equal(audioControls.soundVolume, '63%');
+  assert.equal(audioControls.model, 'room');
 
   await cdp.call('Emulation.setDeviceMetricsOverride', {
     width: 375, height: 812, deviceScaleFactor: 1, mobile: true,
@@ -199,6 +215,9 @@ try {
   assert.match(state.download, /^metronome-sweep-dial-9x16\.(mp4|webm)$/);
 
   const result = await evaluate(`(async () => { const response = await fetch(${JSON.stringify(state.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return { base64: btoa(binary), bytes: bytes.length, status: document.querySelector('[data-studio-status]').textContent }; })()`);
+  assert.match(result.status, /MusicXML selected but not yet used/);
+  assert.match(result.status, /Count Voice not yet connected/);
+  assert.match(result.status, /selected Sound Model not yet applied/);
   const videoBytes = Buffer.from(result.base64, 'base64');
   assert.ok(videoBytes.length > 1000, 'Metronome export is unexpectedly small');
   const extension = state.download.split('.').pop();

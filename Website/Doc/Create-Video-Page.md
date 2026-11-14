@@ -87,3 +87,13 @@ Metronome card သည် ယခု Studio mode သို့ ဝင်ပြီ�
 ပြောင်းလဲထားသော အဓိက paths: `Website/Website/studio.html`, `studio-metronome.js`, `studio-video.js`, `styles.css`, `assets/metronome-engine.js`, `Website/Metronome/Metronome Engine/tools/sync-metronome-engine.mjs`, `Website/Video/Video Engine/source/tools/test-metronome-studio-browser.mjs`. Video Engine ကိုပြန်မရေးဘဲ shared renderer ကို အသုံးပြုသည်။
 
 Chromium စမ်းသပ်မှုတွင် 375×812 phone နှင့် 1280×900 desktop တွင် overflow မရှိ၊ 3/8 at 96 quarter-note BPM portrait export တွင် 720×1280 VP8 + 48kHz mono Opus stream ရှိကြောင်း `ffprobe` ဖြင့် အတည်ပြုထားသည်။ Metronome Engine verify 20/20, Video Engine muxer 15/15, cleanup/safety 5/5, Engine smoke test နှင့် Drum regression အောင်မြင်သည်။ Device အစစ်/Safari/Firefox compatibility မစစ်ရသေးပါ။ နောက်တစ်ဆင့်အဖြစ် Guitar နှင့် ကျန် instrument များကို သီးခြား Plan အရ ဆက်လုပ်ရန်လိုသည်။ [Metronome Engine Doc](../Metronome/Metronome%20Engine%20Doc/DOC.md)
+
+## 2026-11-15 — Metronome Studio MusicXML နှင့် အသံဆိုင်ရာ control များ
+
+Metronome Studio control panel ၏ အပေါ်ဆုံးတွင် `.musicxml`, `.xml`, `.mxl` ဖိုင်ရွေးချယ်နိုင်ပြီး ရွေးထားသောဖိုင်အမည်ကို ပြသသည့် MusicXML picker ထည့်ထားသည်။ လက်ရှိ design, orientation, BPM, bars, meter နှင့် video preview/export အစီအစဉ်ကို မပြောင်းထားပါ။ ရှိပြီးသား controls များအောက်တွင် အခြား Studio settings များနှင့် တူညီသော ပုံစံဖြင့် `Count Voice` (Off/On, voice type, volume) နှင့် `Sound Model`/volume controls များကို ထည့်ထားသည်။ Count Voice ကို Off ထားပါက voice type နှင့် volume ကို အသုံးပြု၍မရပါ။
+
+ယခုအဆင့်တွင် MusicXML ဖိုင်ကို local file input ဖြင့်သာ ရွေးချယ်ပြီး အမည်ကို ပြသသည်။ ဖိုင်ကို Metronome Engine သို့ parse လုပ်၍ မပို့သေးပါ။ Count Voice audio နှင့် default မဟုတ်သော Sound Model ကိုလည်း video render နှင့် မချိတ်ဆက်ရသေးသဖြင့် render ပြီးနောက် status တွင် အသုံးမပြုသေးကြောင်း ဖော်ပြသည်။ ဤအရာများသည် နောက်ထပ် integration အဆင့်ဖြစ်ပြီး လက်ရှိ Metronome design renderer/export ကို မပြောင်းထားပါ။
+
+ပြောင်းလဲထားသော files: `Website/Website/studio.html`, `Website/Website/studio-metronome.js`, `Website/Video/Video Engine/source/tools/test-metronome-studio-browser.mjs`, `Website/Plan/README.md` နှင့် ဤ document.
+
+Chromium integration test တွင် MusicXML input ပေါ်လာခြင်း၊ ဖိုင်ရွေးပြီးနောက် အမည်နှင့် status ပြောင်းခြင်း၊ Count Voice On/Off အလိုက် သက်ဆိုင်ရာ controls ဖွင့်ပိတ်ခြင်း၊ volume output များ၊ Sound Model ရွေးချယ်မှု၊ 375px phone နှင့် 1280px desktop layout/overflow၊ ယခင် Metronome video export တို့ကို စစ်ဆေးပြီး အောင်မြင်သည်။ Export regression: 28 frames, 720×1280 VP8 + 48 kHz mono Opus. `node --check` နှင့် HTML parser/duplicate-ID checks အောင်မြင်သည်။

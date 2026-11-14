@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="M Sharing instrument studio with controls and video preview." />
     <title>Drum Studio — M Sharing</title>
-    <link rel="stylesheet" href="styles.css?v=mobile-sidebar-20261114" />
+    <link rel="stylesheet" href="styles.css?v=metronome-controls-20261115" />
   </head>
   <body data-studio-page>
     <header class="site-header" data-header>
@@ -49,10 +49,11 @@
     <main class="create-page studio-page" id="studio">
       <a class="studio-back-link" href="index.html#create-video">← Back to Create Video</a>
       <section class="studio-workspace" data-studio-workspace aria-labelledby="studio-title">
-        <div class="studio-panel studio-panel--controls">
-          <div class="studio-panel-heading"><h1 id="studio-title" data-studio-title>Drum Studio</h1><span class="studio-live-dot">SETTINGS</span></div>
-          <section class="metronome-controls" data-metronome-controls hidden aria-label="Metronome video settings">
-            <p class="metronome-help">Choose a visual design, tempo and meter. The rendered video includes a synthesized click track.</p>
+          <div class="studio-panel studio-panel--controls">
+            <div class="studio-panel-heading"><h1 id="studio-title" data-studio-title>Drum Studio</h1><span class="studio-live-dot">SETTINGS</span></div>
+            <section class="metronome-controls" data-metronome-controls hidden aria-label="Metronome video settings">
+              <label class="studio-field studio-field--file metronome-file-field"><span>MusicXML file</span><input type="file" accept=".musicxml,.xml,.mxl,application/xml,text/xml,application/vnd.recordare.musicxml+xml" data-metronome-musicxml-input aria-describedby="metronome-musicxml-name" /><small id="metronome-musicxml-name" data-metronome-musicxml-name>No file selected</small></label>
+              <p class="metronome-help">Choose a visual design, tempo and meter. The rendered video includes a synthesized click track.</p>
             <label class="metronome-field">Design
               <select data-metronome-design aria-label="Metronome visual design"></select>
             </label>
@@ -81,9 +82,13 @@
                   <option value="16">Sixteenth note · 16</option>
                 </select>
               </label>
-            </div>
-            <p class="metronome-duration" data-metronome-duration aria-live="polite"></p>
-          </section>
+              </div>
+              <p class="metronome-duration" data-metronome-duration aria-live="polite"></p>
+              <div class="metronome-field-grid metronome-audio-settings">
+                <div class="studio-field"><span>Count Voice</span><div class="studio-control-pair"><select data-metronome-count-voice-enabled aria-label="Count voice on or off"><option value="off">Off</option><option value="on">On</option></select><select data-metronome-count-voice aria-label="Count voice type" disabled><option value="one-two">One, Two, Three, Four</option><option value="numeric">1, 2, 3, 4</option></select></div><label class="range-control"><input type="range" min="0" max="100" value="75" data-metronome-count-volume disabled /><output data-metronome-count-volume-value>75%</output></label></div>
+                <div class="studio-field"><span>Sound Model</span><select data-metronome-sound-model><option value="default">Default Metronome Click</option><option value="natural">Natural Sound Model</option><option value="studio">Studio Sound Model</option><option value="room">Room Sound Model</option></select><label class="range-control"><input type="range" min="0" max="100" value="80" data-metronome-sound-volume /><output data-metronome-sound-volume-value>80%</output></label></div>
+              </div>
+            </section>
           <form class="studio-settings" data-studio-settings>
             <div class="studio-file-row">
               <label class="studio-field studio-field--file"><span>MusicXML file</span><input type="file" accept=".musicxml,.xml,.mxl,application/xml,text/xml" data-musicxml-input /><small data-musicxml-name>No file selected</small></label>
@@ -134,6 +139,6 @@
     <script src="assets/metronome-engine.js?v=metronome-engine-20261114"></script>
     <script src="script.js?v=mobile-sidebar-20261114"></script>
     <script src="studio-video.js?v=studio-engine-metronome-20261114"></script>
-    <script src="studio-metronome.js?v=metronome-studio-20261114"></script>
+    <script src="studio-metronome.js?v=metronome-controls-20261115"></script>
   </body>
 </html>
