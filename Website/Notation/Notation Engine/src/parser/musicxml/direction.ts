@@ -221,6 +221,10 @@ export function parseDirectionElement(
         case 'metronome':
           // Owned by Integration D's own branch in parse.ts.
           break;
+        case 'octave-shift':
+          // Parsed into the octaveShiftEvents side table by parse.ts.  Do not
+          // report it as unknown merely because it is owned by that layer.
+          break;
         default:
           diagnostics.push(
             diagnostic(
