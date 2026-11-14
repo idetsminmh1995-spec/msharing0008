@@ -9,6 +9,7 @@ M Sharing Website ၏ လက်ရှိ implementation နှင့် မပ�
 - [Create Video Page](Create-Video-Page.md) — Web/phone responsive instrument နှင့် Metronome tool selection page
 - [Notation Lab Page](Notation-Lab-Page.md) — Open File / Create / Scan entry page and Editor handoff
 - [Notation Lab UI/UX Plan](../Plan/Notation-Lab-UI-UX-Plan.md) — Active entry-screen and Editor handoff plan
+- [Notation Lab Editor Architecture](Notation-Lab-Editor-Architecture-2026-11-15.md) — Current code audit, original workspace design, feature matrix, and M1–M6 implementation roadmap
 - [Notation Lab Composer Work Log](Notation-Lab-Composer-Work-Log-2026-11-15.md) — Historical record; composer-first UI was retired
 - [Notation Engine Plan Update and MuseScore Review](Notation-Engine-Plan-Work-Log-2026-11-14.md) — Plan ပြောင်းလဲမှုများ၊ တူရိယာအားလုံးနှင့် Orchestra/ensemble score support၊ MuseScore source/license စိစစ်ချက်နှင့် ကျန်ရှိသော P0–P5 tasks
 - [Video Engine Implementation Status](../Video/Video%20Engine%20Doc/README.md) — Engine code inventory, test results, and remaining production integration work
