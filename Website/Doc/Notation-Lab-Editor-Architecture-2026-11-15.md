@@ -19,7 +19,7 @@ These capabilities should remain behind stable adapter boundaries:
 
 ### Replace, not extend
 
-`Website/Website/notation.js` is a viewer controller, not an editable-score controller. It has a single XML string as state; it reparses the entire document to render; it has no command model, selection, undo/redo, score editing API, or source-of-truth document layer. The current `notation-editor.html` therefore remains a temporary viewer route and must be replaced during the first editor milestone.
+The former `Website/Website/notation.js` viewer controller has been retired. It kept a single XML string as state and had no command model, selection, undo/redo, score editing API, or source-of-truth document layer. `notation-editor.html` is now the M1 score-first editor shell; its `notation-workspace.js` controller owns only open/render/zoom while ScoreDocument editing is implemented next.
 
 We will not mutate the rendered SVG as the source of truth. The new editor will edit a structured score document, derive MusicXML/export data, then ask the existing engine to render it.
 
@@ -121,7 +121,14 @@ renderer adapter ← layout/engine ← MusicXML, MIDI, audio, collaboration adap
 
 The next code milestone is M1. Before changing the editor route, define TypeScript types for ScoreDocument, selection, commands, history, and renderer adapter; write unit tests for command inversion and stable identifiers; then replace the temporary viewer UI with the score-first shell.
 
-## 8. Documentation rule
+## 8. M1 shell delivery — 2026-11-15
+
+- Removed the legacy viewer controller and its former viewer UI from the editor route.
+- Added the new score-first editor shell: project bar, compact mode rail, score canvas, contextual inspector, and transport/status strip.
+- Kept only working M1 actions visible: open a score and zoom. Save, note entry, and layout buttons are explicitly disabled rather than pretending to work.
+- Fixed the parser so `<direction-type><octave-shift>` is not incorrectly emitted as an unknown-element diagnostic after its dedicated parser has already handled it.
+
+## 9. Documentation rule
 
 After every milestone, update this document with:
 - delivered capabilities and their availability state;
