@@ -19,7 +19,7 @@ These capabilities should remain behind stable adapter boundaries:
 
 ### Replace, not extend
 
-The former `Website/Website/notation.js` viewer controller has been retired. It kept a single XML string as state and had no command model, selection, undo/redo, score editing API, or source-of-truth document layer. `notation-editor.html` is now the M1 score-first editor shell; its `notation-workspace.js` controller owns only open/render/zoom while ScoreDocument editing is implemented next.
+The former `Website/Website/notation.js` viewer controller has been retired. It kept a single XML string as state and had no command model, selection, undo/redo, score editing API, or source-of-truth document layer. `notation-editor.html` has been reset to the Web app header only. Editor workspace code will be added only after the new score-document design is explicitly accepted.
 
 We will not mutate the rendered SVG as the source of truth. The new editor will edit a structured score document, derive MusicXML/export data, then ask the existing engine to render it.
 
@@ -121,12 +121,11 @@ renderer adapter ← layout/engine ← MusicXML, MIDI, audio, collaboration adap
 
 The next code milestone is M1. Before changing the editor route, define TypeScript types for ScoreDocument, selection, commands, history, and renderer adapter; write unit tests for command inversion and stable identifiers; then replace the temporary viewer UI with the score-first shell.
 
-## 8. M1 shell delivery — 2026-11-15
+## 8. Editor-route reset — 2026-11-15
 
-- Removed the legacy viewer controller and its former viewer UI from the editor route.
-- Added the new score-first editor shell: project bar, compact mode rail, score canvas, contextual inspector, and transport/status strip.
-- Kept only working M1 actions visible: open a score and zoom. Save, note entry, and layout buttons are explicitly disabled rather than pretending to work.
-- Fixed the parser so `<direction-type><octave-shift>` is not incorrectly emitted as an unknown-element diagnostic after its dedicated parser has already handled it.
+- Removed the legacy viewer controller, the temporary score-first shell, its canvas, rail, inspector, transport controls, workspace controller, and related styling.
+- The Editor route now intentionally contains only the Web app header.
+- The octave-shift parser false diagnostic fix and its regression test remain independent engine work.
 
 ## 9. Documentation rule
 
