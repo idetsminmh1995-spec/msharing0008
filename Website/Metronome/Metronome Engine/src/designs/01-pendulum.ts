@@ -104,7 +104,7 @@ function fan(box: Case, progress: number, canvas: Canvas, palette: Palette): str
   for (let i = 0; i < TICKS; i++) {
     const turns = -FAN_SPAN + i * step;
     if (Math.abs(turns) < CAP_GAP) continue;
-    const isHead = Math.abs(turns - head) < step * 1.1;
+    const isHead = Math.abs(turns - head) < step * 0.82;
     const passed = turns < head;
     const atLimit = i < 2 || i >= TICKS - 2;
     const reach = isHead ? outer * 1.08 : outer;
@@ -113,8 +113,8 @@ function fan(box: Case, progress: number, canvas: Canvas, palette: Palette): str
     marks.push(
       line(x1, y1, x2, y2, {
         stroke: isHead || passed || atLimit ? palette.accent : palette.ink,
-        'stroke-width': canvas.short * (isHead ? 0.008 : 0.0045),
-        opacity: isHead ? 1 : atLimit ? 0.7 : passed ? 0.45 : 0.26,
+        'stroke-width': canvas.short * (isHead ? 0.01 : atLimit ? 0.0055 : 0.0038),
+        opacity: isHead ? 1 : atLimit ? 0.82 : passed ? 0.58 : 0.22,
       }),
     );
   }
@@ -283,6 +283,13 @@ export const pendulum: Design = {
       (halfWidthAt(box, beatDepth) * 1.6) / Math.max(1, String(frame.beat).length) / 0.62,
     );
     const [beatX, beatY] = pointAt(box, beatDepth);
+    const beatPlate = rect(
+      beatX - Math.min(halfWidthAt(box, beatDepth) * 0.68, beatSize * 0.72),
+      beatY - beatSize * 0.63,
+      Math.min(halfWidthAt(box, beatDepth) * 1.36, beatSize * 1.44),
+      beatSize * 0.9,
+      { fill: '#0C0A0B', opacity: 0.9, rx: beatSize * 0.14 },
+    );
     const beat = text(String(frame.beat), beatX, beatY + beatSize * 0.35, {
       fill: palette.ink,
       'font-family': FONT_DISPLAY,
@@ -326,6 +333,7 @@ export const pendulum: Design = {
       fan(box, barProgress, canvas, palette) +
       instrument(box, canvas, palette) +
       arm(box, swing, canvas, palette) +
+      beatPlate +
       beat +
       words +
       logo(context)

@@ -1,6 +1,6 @@
 # Metronome Engine — Code နှင့် ချိတ်ဆက်မှုမှတ်တမ်း
 
-**နောက်ဆုံးစစ်ဆေးသည့်နေ့:** 2026-11-14
+**နောက်ဆုံးစစ်ဆေးသည့်နေ့:** 2026-11-15
 **Repository:** `idetsminmh1995-spec/msharing0008`
 **Plan:** [Metronome Engine Plan](../Metronome%20Engine%20Plan/PLAN.md)
 **ဆက်စပ်မှတ်တမ်း:** [Video Engine Doc](../../Video/Video%20Engine%20Doc/README.md)
@@ -74,12 +74,30 @@ Package တွင် lockfile မရှိသေးသဖြင့် clean inst
 - Metronome controls နှင့် Studio layout: 375×812 phone viewport တွင် 1-column, 1280×900 desktop viewport တွင် 2-column ဖြစ်ပြီး horizontal overflow မရှိ။ Metronome route တွင် shared Drum settings form ကို ဖျောက်ထားကြောင်း စစ်ဆေးထားသည်။
 - Video Engine source/production sync နှင့် Metronome Engine source/production sync နှစ်ခုစလုံး pass.
 
+## 2026-11-15 — Design 11 မျိုး visual refresh
+
+Design တစ်ခုချင်း၏ မူလ visual identity နှင့် palette ကို ထိန်းထားပြီး beat/current-bar progress ကို ပိုသိသာစေရန် renderer 11 ခုလုံးကို ပြင်ဆင်ထားသည်။ Shared header၊ BPM/meter readout၊ Studio controls နှင့် audio/video export behavior ကို မပြောင်းထားပါ။
+
+- **Pendulum:** fan scale hierarchy, passed/head tick contrast နှင့် beat-number window.
+- **Beat Dots:** medallion hatching လျှော့ချခြင်း၊ played/current/future dot states, attack halo နှင့် narrow 12-beat spacing.
+- **Pulse Ring:** core contrast/keyline နှင့် beat-by-beat progress rail.
+- **Bar Meter:** beat တစ်ခုလုံးတစ်လျှောက် continuous fill နှင့် active fill cap.
+- **Sweep Dial:** dial track, current tick, phase marker နှင့် center number hub.
+- **Big Number:** multi-digit fit နှင့် current-beat phase ဖြည့်သည့် segmented rail.
+- **Segment Ring:** moving phase marker နှင့် contrast ပိုကောင်းသော center hub.
+- **Travel Line:** current/played/future waypoint states နှင့် outlined marker.
+- **Flash Frame:** border ကို shared stage safe area အတွင်းထား၊ full-canvas wash လျှော့ပြီး beat rail ထည့်သည်.
+- **Bounce Ball:** runway/pad hierarchy, adaptive labels နှင့် current/total beat readout.
+- **Stack Blocks:** motion ကို beat တစ်ခုလုံးအတွင်း ဆက်ပြပြီး active block highlight.
+
+11×3 = **33 SVG layout previews** ကို Chromium gallery ဖြင့် manual visual review လုပ်ထားသည်။ 12/8, beat 12/12, 240 BPM stress frame-ээр 2-digit number болон dense 12-beat arrangement ကိုလည်း ထပ်စစ်ထားသည်။ Metronome Engine `npm run verify` တွင် **20/20 tests** pass бөгөөд production/static website bundle sync ဖြစ်သည်။ Video Engine Chromium end-to-end test သည် `sweep-dial` portrait 3/8 example ကို **28 frames, 720×1280 VP8 video + 48 kHz mono Opus** အဖြစ် ထုတ်ပေးပြီး pass ဖြစ်သည်။ Automated pixel/snapshot visual regression ကို မထည့်ရသေးပါ။
+
 ## လက်ကျန်ကန့်သတ်ချက်များ
 
 - Engine runtime frame input တွင် `NaN`/`Infinity` edge-case validation နှင့် SVG `logoUrl` attribute escaping ကို ပိုမိုစမ်းသပ်/ပြင်ဆင်ရန် ကျန်သည်။
 - Adapter သည် လက်ရှိ `logoUrl` မပေးသဖြင့် exported Metronome video တွင် brand/instrument logo မပါပါ။
 - Browser test သည် Chromium/headless environment ပေါ်တွင်သာ အတည်ပြုထားသည်။ Safari/Firefox နှင့် ဖုန်းအစစ် compatibility မစစ်ရသေးပါ။ 375px/1280px viewport test သည် actual device test မဟုတ်ပါ။
-- 11×3 design/aspect SVG outputs ကို engine unit tests ဖြင့်စစ်သော်လည်း browser visual snapshot/clipping test သည် design အားလုံးအတွက် မရှိသေးပါ။
+- 11×3 design/aspect SVG outputs ကို engine unit tests ဖြင့်စစ်ပြီး Chromium gallery ဖြင့် manual visual review လုပ်ထားသည်။ Repeatable browser visual snapshot နှင့် automated clipping/overlap assertions မရှိသေးပါ။
 - Default click tone ကို user က ပြောင်းနိုင်ခြင်း၊ volume/accent options နှင့် အခြား instrument adapter များကို မထည့်ရသေးပါ။
 - Guitar, Piano, Bass, Strings, Voice တို့သည် Studio Video Engine နဲ့ မချိတ်ဆက်ရသေးပါ။ အသေးစိတ်ကို [Video Engine Doc](../../Video/Video%20Engine%20Doc/README.md) နှင့် [Plan](../../Video/Video%20Engine%20Plan/PLAN.md) တွင်ကြည့်ပါ။
 
@@ -102,17 +120,17 @@ SVG ၏ native design artboard အရွယ်အစားမှာ `16x9` = 192
 
 | ID | Design | Look | Frame အတွင်း အဓိကပုံဖော်ချက် |
 |---|---|---|---|
-| `pendulum` | Pendulum | Black / neon red | Metronome case, scale, pendulum နှင့် beat number; ကိုယ်ပိုင် header layout. |
-| `beat-dots` | Beat Dots | Black / red | Medallion count, beat တစ်ခုစီ၏ dot နှင့် beat ပြီးနောက် pulse ring. |
-| `pulse-ring` | Pulse Ring | Night blue | Beat တစ်ခုစီတွင် ကျယ်လာပြီး ပျောက်သွားသည့် ring များ၊ အလယ်တွင် count. |
-| `bar-meter` | Bar Meter | Paper / ink | Bar တစ်ခုအတွင်း past/current/future beat များကို block ဖြင့်ခွဲပြ; portrait တွင် အလျားလိုက်တန်း. |
-| `sweep-dial` | Sweep Dial | Charcoal / amber | Bar တစ်ခုလုံးအတွင်း လှည့်သွားသည့် hand/progress arc နှင့် beat tick များ. |
-| `big-number` | Big Number | White / red | လက်ရှိ beat ကို ကြီးမားသောနံပါတ်ဖြင့်ပြ; အခြား beat များကို rail ပေါ်ပြ. |
-| `segment-ring` | Segment Ring | Deep green | Bar ကို beat wedge များခွဲပြီး current/played/future အရောင်ကွဲစေသည်။ |
-| `travel-line` | Travel Line | Off-white / ink blue | Marker သည် beat များကြားရွေ့; aspect အလိုက် horizontal/vertical/rounded loop. |
-| `flash-frame` | Flash Frame | Black / hot red | Beat တစ်ချက်စီတွင် frame glow; downbeat တွင် ပိုပြင်းသော wash. |
-| `bounce-ball` | Bounce Ball | Cream / orange | Beat pad များကြားတွင် ball ကို ကွေးသည့်လမ်းကြောင်းဖြင့် ခုန်စေသည်။ |
-| `stack-blocks` | Stack Blocks | Slate / violet | Beat position ကို block ဖြင့်ပြပြီး နောက် beat များကို outline လုပ်သည်။ |
+| `pendulum` | Pendulum | Black / neon red | Metronome case, hierarchy ခွဲထားသော progress fan, pendulum နှင့် case-window beat number; ကိုယ်ပိုင် header layout. |
+| `beat-dots` | Beat Dots | Black / red | Medallion count, played/current/future beat dot များ၊ attack halo နှင့် pulse ring. |
+| `pulse-ring` | Pulse Ring | Night blue | Beat တစ်ခုစီတွင် ကျယ်လာပြီး ပျောက်သွားသည့် ring များ၊ count core နှင့် bar progress rail. |
+| `bar-meter` | Bar Meter | Paper / ink | Past/current/future beat blocks; current beat တစ်ခုလုံးအတွင်း ဖြည်းဖြည်းဖြည့်သည်။ |
+| `sweep-dial` | Sweep Dial | Charcoal / amber | Bar အတွင်းလှည့်သည့် hand/arc, active phase marker, current tick နှင့် center hub. |
+| `big-number` | Big Number | White / red | Multi-digit fit လုပ်ထားသည့် current beat နှင့် phase-filled beat rail. |
+| `segment-ring` | Segment Ring | Deep green | Current/played/future wedge များနှင့် active beat phase marker. |
+| `travel-line` | Travel Line | Off-white / ink blue | Aspect အလိုက် horizontal/vertical/rounded route ပေါ်တွင် state ခွဲထားသည့် marker ရွေ့သည်။ |
+| `flash-frame` | Flash Frame | Black / hot red | Stage-safe inset frame သည် beat တစ်ချက်စီတွင် glow; downbeat ပိုပြင်းပြီး beat rail ပါသည်။ |
+| `bounce-ball` | Bounce Ball | Cream / orange | Beat pad များကြား ball ခုန်သည်; current/total beat readout ပါသည်။ |
+| `stack-blocks` | Stack Blocks | Slate / violet | Beat အလိုက် block များတက်ပြီး future position များကို outline လုပ်သည်။ |
 
 `src/logos.ts` သည် design ID အလိုက် `drum`, `piano`, `guitar`, `bass`, `violin`, `cello`, `vocal` သို့မဟုတ် `sharing` ကဲ့သို့ logo-name metadata ပေးသည်; အမှန်တကယ် URL/path ကို host က map လုပ်ရသည်။ Adapter က လက်ရှိ `logoUrl` မပေးသဖြင့် Metronome export တွင် logo မပါ။ Engine text အတွက် `escapeText()` ရှိသော်လည်း SVG `logoUrl` attribute အတွက် escaping test မလုံလောက်သေးကြောင်း backlog တွင်ထားသည်။
 

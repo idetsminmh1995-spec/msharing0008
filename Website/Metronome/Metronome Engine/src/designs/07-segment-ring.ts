@@ -7,7 +7,7 @@
  */
 
 import { bands, centreOf, FONT_DISPLAY, logo, typeScale } from '../layout.js';
-import { easeOut, group, lerp, n, path, polar, text } from '../svg.js';
+import { circle, easeOut, group, lerp, n, path, polar, text } from '../svg.js';
 import type { Design, DesignContext } from '../types.js';
 
 /** A wedge of a donut: outer arc, in, inner arc back, out. */
@@ -74,6 +74,21 @@ export const segmentRing: Design = {
       'text-anchor': 'middle',
     });
 
-    return group({}, wedges) + number + of + logo(context);
+    const phaseTurns = (frame.beat - 1 + frame.phase) / count;
+    const [markerX, markerY] = polar(cx, cy, outer * 1.045, phaseTurns);
+    const phaseMarker =
+      circle(markerX, markerY, canvas.short * 0.022, {
+        fill: palette.background,
+        stroke: palette.accent,
+        'stroke-width': canvas.short * 0.006,
+      }) + circle(markerX, markerY, canvas.short * 0.009, { fill: palette.accent });
+    const hub = circle(cx, cy, inner * 0.78, {
+      fill: palette.background,
+      stroke: palette.inkSoft,
+      'stroke-width': canvas.short * 0.0025,
+      opacity: 0.94,
+    });
+
+    return group({}, wedges) + phaseMarker + hub + number + of + logo(context);
   },
 };

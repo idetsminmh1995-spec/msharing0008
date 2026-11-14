@@ -100,14 +100,14 @@ function medallion(
   return group(
     {},
     ring(RING.outer, hairline, 0.9) +
-      path(tickRing(cx, cy, radius, 84, RING.coarseTicksInner, RING.coarseTicksOuter), {
+      path(tickRing(cx, cy, radius, 48, RING.coarseTicksInner, RING.coarseTicksOuter), {
         stroke: palette.inkSoft,
         'stroke-width': hairline * 0.7,
         opacity: 0.75,
         fill: 'none',
       }) +
       ring(RING.middle, hairline * 0.8, 0.8) +
-      path(tickRing(cx, cy, radius, 120, RING.fineTicksInner, RING.fineTicksOuter), {
+      path(tickRing(cx, cy, radius, 72, RING.fineTicksInner, RING.fineTicksOuter), {
         stroke: palette.inkSoft,
         'stroke-width': hairline * 0.55,
         opacity: 0.55,
@@ -162,7 +162,10 @@ export const beatDots: Design = {
     // The row keeps to the stage even when the bar is long: the spacing
     // closes up before the dots themselves do, because dots that have
     // shrunk to specks stop reading as beats at all.
-    const dotRadius = radius * DOTS.radius;
+    const dotRadius = Math.min(
+      radius * DOTS.radius,
+      count > 1 ? ((stage.width * 0.92) / count) * 0.42 : radius * DOTS.radius,
+    );
     const spacing = Math.min(
       radius * DOTS.spacing,
       count > 1 ? (stage.width * 0.92 - dotRadius * 2) / (count - 1) : radius * DOTS.spacing,
@@ -174,11 +177,25 @@ export const beatDots: Design = {
     const swell = lerp(1.45, 1, easeOut(Math.min(1, frame.phase * 2.6)));
 
     const dots: string[] = [];
+    const halos: string[] = [];
     for (let i = 0; i < count; i++) {
       const isCurrent = i === frame.beat - 1;
+      const played = i < frame.beat - 1;
+      const x = cx + (i - (count - 1) / 2) * spacing;
+      if (isCurrent) {
+        halos.push(
+          circle(x, dotY, dotRadius * lerp(1.8, 1.35, easeOut(Math.min(1, frame.phase * 2))), {
+            fill: 'none',
+            stroke: palette.accent,
+            'stroke-width': Math.max(canvas.short * 0.002, radius * 0.016),
+            opacity: lerp(0.72, 0.22, easeOut(Math.min(1, frame.phase))),
+          }),
+        );
+      }
       dots.push(
-        circle(cx + (i - (count - 1) / 2) * spacing, dotY, dotRadius * (isCurrent ? swell : 1), {
-          fill: isCurrent ? palette.accent : palette.ink,
+        circle(x, dotY, dotRadius * (isCurrent ? swell : 1), {
+          fill: isCurrent ? palette.accent : played ? palette.accentSoft : palette.ink,
+          opacity: isCurrent ? 1 : played ? 0.92 : 0.58,
         }),
       );
     }
@@ -187,6 +204,7 @@ export const beatDots: Design = {
       medallion(cx, cy, radius, canvas, palette) +
       pulse +
       numeral +
+      group({}, halos.join('')) +
       group({}, dots.join('')) +
       logo(context)
     );

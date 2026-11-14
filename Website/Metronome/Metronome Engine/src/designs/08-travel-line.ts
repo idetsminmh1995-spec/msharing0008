@@ -40,8 +40,8 @@ export const travelLine: Design = {
     const size = typeScale(canvas);
     const count = Math.max(1, frame.beatsPerBar);
     const throughBar = (frame.beat - 1 + frame.phase) / count;
-    const stroke = canvas.short * 0.006;
-    const marker = canvas.short * 0.028;
+    const stroke = canvas.short * 0.008;
+    const marker = canvas.short * 0.032;
 
     if (canvas.isSquare) {
       // A square inside the stage, so the loop reads as one shape
@@ -62,13 +62,22 @@ export const travelLine: Design = {
       });
       const ticks = Array.from({ length: count }, (_, i) => {
         const [x, y] = aroundRect(loop, i / count);
-        return circle(x, y, marker * (i === 0 ? 0.55 : 0.4), {
-          fill: i <= frame.beat - 1 ? palette.accent : palette.inkSoft,
-          opacity: i <= frame.beat - 1 ? 1 : 0.4,
+        const current = i === frame.beat - 1;
+        const played = i < frame.beat - 1;
+        return circle(x, y, marker * (current ? 0.64 : i === 0 ? 0.55 : 0.4), {
+          fill: current ? palette.accent : played ? palette.accent : palette.background,
+          stroke: current || played ? palette.accent : palette.inkSoft,
+          'stroke-width': marker * 0.12,
+          opacity: current ? 1 : played ? 0.76 : 0.8,
         });
       }).join('');
       const [mx, my] = aroundRect(loop, throughBar);
-      const head = circle(mx, my, marker, { fill: palette.accent });
+      const head =
+        circle(mx, my, marker * 1.18, {
+          fill: palette.background,
+          stroke: palette.accent,
+          'stroke-width': marker * 0.18,
+        }) + circle(mx, my, marker * 0.72, { fill: palette.accent });
       const number = text(
         String(frame.beat),
         canvas.width / 2,
@@ -105,23 +114,33 @@ export const travelLine: Design = {
 
     const ticks = Array.from({ length: count + 1 }, (_, i) => {
       const at = along + (runway * i) / count;
-      const passed = i <= frame.beat - 1;
+      const passed = i < frame.beat - 1;
+      const current = i === frame.beat - 1;
       const size2 = marker * (i % count === 0 ? 0.6 : 0.42);
       return vertical
         ? circle(across, at, size2, {
-            fill: passed ? palette.accent : palette.inkSoft,
-            opacity: passed ? 1 : 0.4,
+            fill: current ? palette.background : passed ? palette.accent : palette.background,
+            stroke: current ? palette.accent : passed ? palette.accent : palette.inkSoft,
+            'stroke-width': marker * 0.12,
+            opacity: current || passed ? 1 : 0.78,
           })
         : circle(at, across, size2, {
-            fill: passed ? palette.accent : palette.inkSoft,
-            opacity: passed ? 1 : 0.4,
+            fill: current ? palette.background : passed ? palette.accent : palette.background,
+            stroke: current ? palette.accent : passed ? palette.accent : palette.inkSoft,
+            'stroke-width': marker * 0.12,
+            opacity: current || passed ? 1 : 0.78,
           });
     }).join('');
 
     const at = along + runway * throughBar;
-    const head = vertical
-      ? circle(across, at, marker, { fill: palette.accent })
-      : circle(at, across, marker, { fill: palette.accent });
+    const headX = vertical ? across : at;
+    const headY = vertical ? at : across;
+    const head =
+      circle(headX, headY, marker * 1.18, {
+        fill: palette.background,
+        stroke: palette.accent,
+        'stroke-width': marker * 0.18,
+      }) + circle(headX, headY, marker * 0.72, { fill: palette.accent });
     // A short trail behind the marker, so the direction of travel is
     // readable in a still frame.
     const tailFrom = along + runway * Math.max(0, throughBar - 0.08);

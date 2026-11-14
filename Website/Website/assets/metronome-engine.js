@@ -333,7 +333,7 @@ var MetronomeDesigns = (() => {
     for (let i = 0; i < TICKS; i++) {
       const turns = -FAN_SPAN + i * step;
       if (Math.abs(turns) < CAP_GAP) continue;
-      const isHead = Math.abs(turns - head) < step * 1.1;
+      const isHead = Math.abs(turns - head) < step * 0.82;
       const passed = turns < head;
       const atLimit = i < 2 || i >= TICKS - 2;
       const reach = isHead ? outer * 1.08 : outer;
@@ -342,8 +342,8 @@ var MetronomeDesigns = (() => {
       marks.push(
         line(x1, y1, x2, y2, {
           stroke: isHead || passed || atLimit ? palette.accent : palette.ink,
-          "stroke-width": canvas.short * (isHead ? 8e-3 : 45e-4),
-          opacity: isHead ? 1 : atLimit ? 0.7 : passed ? 0.45 : 0.26
+          "stroke-width": canvas.short * (isHead ? 0.01 : atLimit ? 55e-4 : 38e-4),
+          opacity: isHead ? 1 : atLimit ? 0.82 : passed ? 0.58 : 0.22
         })
       );
     }
@@ -457,6 +457,13 @@ var MetronomeDesigns = (() => {
         halfWidthAt(box, beatDepth) * 1.6 / Math.max(1, String(frame.beat).length) / 0.62
       );
       const [beatX, beatY] = pointAt(box, beatDepth);
+      const beatPlate = rect(
+        beatX - Math.min(halfWidthAt(box, beatDepth) * 0.68, beatSize * 0.72),
+        beatY - beatSize * 0.63,
+        Math.min(halfWidthAt(box, beatDepth) * 1.36, beatSize * 1.44),
+        beatSize * 0.9,
+        { fill: "#0C0A0B", opacity: 0.9, rx: beatSize * 0.14 }
+      );
       const beat = text(String(frame.beat), beatX, beatY + beatSize * 0.35, {
         fill: palette.ink,
         "font-family": FONT_DISPLAY,
@@ -485,7 +492,7 @@ var MetronomeDesigns = (() => {
         "text-anchor": titleAnchor
       });
       const [glowX, glowY] = pointAt(box, 0.45);
-      return bloom(glowX, glowY, caseHeight * 1.15, palette) + fan(box, barProgress, canvas, palette) + instrument(box, canvas, palette) + arm(box, swing, canvas, palette) + beat + words + logo(context);
+      return bloom(glowX, glowY, caseHeight * 1.15, palette) + fan(box, barProgress, canvas, palette) + instrument(box, canvas, palette) + arm(box, swing, canvas, palette) + beatPlate + beat + words + logo(context);
     }
   };
 
@@ -528,12 +535,12 @@ var MetronomeDesigns = (() => {
     });
     return group(
       {},
-      ring(RING.outer, hairline, 0.9) + path(tickRing(cx, cy, radius, 84, RING.coarseTicksInner, RING.coarseTicksOuter), {
+      ring(RING.outer, hairline, 0.9) + path(tickRing(cx, cy, radius, 48, RING.coarseTicksInner, RING.coarseTicksOuter), {
         stroke: palette.inkSoft,
         "stroke-width": hairline * 0.7,
         opacity: 0.75,
         fill: "none"
-      }) + ring(RING.middle, hairline * 0.8, 0.8) + path(tickRing(cx, cy, radius, 120, RING.fineTicksInner, RING.fineTicksOuter), {
+      }) + ring(RING.middle, hairline * 0.8, 0.8) + path(tickRing(cx, cy, radius, 72, RING.fineTicksInner, RING.fineTicksOuter), {
         stroke: palette.inkSoft,
         "stroke-width": hairline * 0.55,
         opacity: 0.55,
@@ -568,7 +575,10 @@ var MetronomeDesigns = (() => {
         "font-weight": 800,
         "text-anchor": "middle"
       });
-      const dotRadius = radius * DOTS.radius;
+      const dotRadius = Math.min(
+        radius * DOTS.radius,
+        count > 1 ? stage.width * 0.92 / count * 0.42 : radius * DOTS.radius
+      );
       const spacing = Math.min(
         radius * DOTS.spacing,
         count > 1 ? (stage.width * 0.92 - dotRadius * 2) / (count - 1) : radius * DOTS.spacing
@@ -576,15 +586,29 @@ var MetronomeDesigns = (() => {
       const dotY = cy + radius * DOTS.drop;
       const swell = lerp(1.45, 1, easeOut(Math.min(1, frame.phase * 2.6)));
       const dots = [];
+      const halos = [];
       for (let i = 0; i < count; i++) {
         const isCurrent = i === frame.beat - 1;
+        const played = i < frame.beat - 1;
+        const x = cx + (i - (count - 1) / 2) * spacing;
+        if (isCurrent) {
+          halos.push(
+            circle(x, dotY, dotRadius * lerp(1.8, 1.35, easeOut(Math.min(1, frame.phase * 2))), {
+              fill: "none",
+              stroke: palette.accent,
+              "stroke-width": Math.max(canvas.short * 2e-3, radius * 0.016),
+              opacity: lerp(0.72, 0.22, easeOut(Math.min(1, frame.phase)))
+            })
+          );
+        }
         dots.push(
-          circle(cx + (i - (count - 1) / 2) * spacing, dotY, dotRadius * (isCurrent ? swell : 1), {
-            fill: isCurrent ? palette.accent : palette.ink
+          circle(x, dotY, dotRadius * (isCurrent ? swell : 1), {
+            fill: isCurrent ? palette.accent : played ? palette.accentSoft : palette.ink,
+            opacity: isCurrent ? 1 : played ? 0.92 : 0.58
           })
         );
       }
-      return medallion(cx, cy, radius, canvas, palette) + pulse + numeral + group({}, dots.join("")) + logo(context);
+      return medallion(cx, cy, radius, canvas, palette) + pulse + numeral + group({}, halos.join("")) + group({}, dots.join("")) + logo(context);
     }
   };
 
@@ -616,17 +640,41 @@ var MetronomeDesigns = (() => {
           })
         );
       }
-      const core = circle(cx, cy, maxRadius * lerp(0.2, 0.14, easeOut(frame.phase)), {
+      const coreRadius = maxRadius * lerp(0.22, 0.17, easeOut(frame.phase));
+      const core = circle(cx, cy, coreRadius, {
         fill: frame.beat === 1 ? palette.accent : palette.ink
       });
-      const number = text(String(frame.beat), cx, cy + size.readout * 0.36, {
+      const coreKeyline = circle(cx, cy, coreRadius * 1.12, {
+        fill: "none",
+        stroke: frame.beat === 1 ? palette.onAccent : palette.accent,
+        "stroke-width": canvas.short * 3e-3,
+        opacity: 0.8
+      });
+      const numberSize = Math.min(
+        size.readout * 0.72,
+        coreRadius * 1.2 / Math.max(1, String(frame.beat).length) / 0.62
+      );
+      const number = text(String(frame.beat), cx, cy + numberSize * 0.34, {
         fill: frame.beat === 1 ? palette.onAccent : palette.background,
         "font-family": FONT_DISPLAY,
-        "font-size": size.readout,
+        "font-size": numberSize,
         "font-weight": 800,
         "text-anchor": "middle"
       });
-      return group({}, rings.join("")) + core + number + logo(context);
+      const count = Math.max(1, frame.beatsPerBar);
+      const railWidth = Math.min(stage.width * 0.76, canvas.short * 0.72);
+      const slot = railWidth / count;
+      const railY = stage.y + stage.height * 0.91;
+      const railHeight = canvas.short * 0.012;
+      const rail = Array.from({ length: count }, (_, i) => {
+        const x = cx - railWidth / 2 + i * slot;
+        const w = slot * 0.72;
+        const current = i === frame.beat - 1;
+        const played = i < frame.beat - 1;
+        const activeWidth = current ? w * lerp(0.18, 1, easeOut(frame.phase)) : played ? w : 0;
+        return `<rect x="${x}" y="${railY}" width="${w}" height="${railHeight}" rx="${railHeight / 2}" fill="${palette.inkSoft}" opacity="0.22"/>` + (activeWidth > 0 ? `<rect x="${x}" y="${railY}" width="${activeWidth}" height="${railHeight}" rx="${railHeight / 2}" fill="${current ? palette.accent : palette.ink}" opacity="${current ? 1 : 0.72}"/>` : "");
+      }).join("");
+      return group({}, rings.join("")) + coreKeyline + core + number + group({}, rail) + logo(context);
     }
   };
 
@@ -641,7 +689,7 @@ var MetronomeDesigns = (() => {
       const { stage } = bands(canvas);
       const size = typeScale(canvas);
       const count = Math.max(1, frame.beatsPerBar);
-      const grow = easeOut(Math.min(1, frame.phase * 2.5));
+      const grow = easeOut(frame.phase);
       const bars = [];
       const horizontal = canvas.isPortrait;
       const slot = (horizontal ? stage.height : stage.width) / count;
@@ -650,11 +698,12 @@ var MetronomeDesigns = (() => {
       for (let i = 0; i < count; i++) {
         const played = i < frame.beat - 1;
         const current = i === frame.beat - 1;
-        const fill = played ? 1 : current ? lerp(0.55, 1, grow) : 0.16;
+        const fill = played ? 1 : current ? lerp(0.12, 1, grow) : 0.12;
         const offset = (horizontal ? stage.y : stage.x) + slot * i + (slot - thickness) / 2;
         const length = runway * fill;
         const colour = current ? palette.accent : played ? palette.ink : palette.inkSoft;
-        const opacity = current ? 1 : played ? 0.7 : 0.25;
+        const opacity = current ? 1 : played ? 0.78 : 0.46;
+        const capLength = Math.max(thickness * 0.2, canvas.short * 4e-3);
         if (horizontal) {
           const x = stage.x + (stage.width - runway) / 2;
           bars.push(
@@ -662,7 +711,11 @@ var MetronomeDesigns = (() => {
               fill: palette.inkSoft,
               opacity: 0.12,
               rx: thickness * 0.3
-            }) + rect(x, offset, length, thickness, { fill: colour, opacity, rx: thickness * 0.3 })
+            }) + rect(x, offset, length, thickness, { fill: colour, opacity, rx: thickness * 0.3 }) + (current ? rect(x + Math.max(0, length - capLength), offset, capLength, thickness, {
+              fill: palette.onAccent,
+              opacity: 0.72,
+              rx: thickness * 0.3
+            }) : "")
           );
         } else {
           const bottom = stage.y + stage.height * 0.9;
@@ -675,7 +728,11 @@ var MetronomeDesigns = (() => {
               fill: colour,
               opacity,
               rx: thickness * 0.3
-            })
+            }) + (current ? rect(offset, bottom - length, thickness, capLength, {
+              fill: palette.onAccent,
+              opacity: 0.72,
+              rx: thickness * 0.3
+            }) : "")
           );
         }
       }
@@ -716,8 +773,13 @@ var MetronomeDesigns = (() => {
       const face = circle(cx, cy, radius, {
         fill: "none",
         stroke: palette.inkSoft,
-        "stroke-width": canvas.short * 4e-3,
-        opacity: 0.35
+        "stroke-width": canvas.short * 0.012,
+        opacity: 0.22
+      }) + circle(cx, cy, radius * 0.98, {
+        fill: "none",
+        stroke: palette.inkSoft,
+        "stroke-width": canvas.short * 25e-4,
+        opacity: 0.72
       }) + path(arcPath(cx, cy, radius, 0, throughBar), {
         fill: "none",
         stroke: palette.accent,
@@ -726,15 +788,16 @@ var MetronomeDesigns = (() => {
       });
       const ticks = Array.from({ length: count }, (_, i) => {
         const turns = i / count;
-        const passed = i <= frame.beat - 1;
+        const passed = i < frame.beat - 1;
+        const current = i === frame.beat - 1;
         const inner = radius * (i === 0 ? 0.82 : 0.88);
         const [x1, y1] = polar(cx, cy, inner, turns);
         const [x2, y2] = polar(cx, cy, radius * 1.06, turns);
         return line(x1, y1, x2, y2, {
-          stroke: passed ? palette.accent : palette.inkSoft,
-          "stroke-width": canvas.short * (i === 0 ? 8e-3 : 5e-3),
+          stroke: current ? palette.ink : passed ? palette.accent : palette.inkSoft,
+          "stroke-width": canvas.short * (current ? 0.011 : i === 0 ? 8e-3 : 5e-3),
           "stroke-linecap": "round",
-          opacity: passed ? 1 : 0.45
+          opacity: current || passed ? 1 : 0.62
         });
       }).join("");
       const [handX, handY] = polar(cx, cy, radius * 0.9, throughBar);
@@ -742,7 +805,21 @@ var MetronomeDesigns = (() => {
         stroke: palette.ink,
         "stroke-width": canvas.short * 7e-3,
         "stroke-linecap": "round"
-      }) + circle(handX, handY, canvas.short * 0.022, { fill: palette.accent }) + circle(cx, cy, canvas.short * 0.014, { fill: palette.ink });
+      }) + circle(handX, handY, canvas.short * 0.032, {
+        fill: palette.background,
+        stroke: palette.accent,
+        "stroke-width": canvas.short * 6e-3
+      }) + circle(handX, handY, canvas.short * 0.014, { fill: palette.accent }) + circle(cx, cy, canvas.short * 0.034, {
+        fill: palette.background,
+        stroke: palette.accent,
+        "stroke-width": canvas.short * 6e-3
+      }) + circle(cx, cy, canvas.short * 0.014, { fill: palette.accent });
+      const currentTurns = (frame.beat - 1 + frame.phase) / count;
+      const [progressX, progressY] = polar(cx, cy, radius * 1.075, currentTurns);
+      const progressHead = circle(progressX, progressY, canvas.short * 9e-3, {
+        fill: palette.onAccent,
+        opacity: 0.92
+      });
       const number = text(String(frame.beat), cx, cy + radius * 0.46, {
         fill: palette.ink,
         "font-family": FONT_DISPLAY,
@@ -758,7 +835,13 @@ var MetronomeDesigns = (() => {
         "letter-spacing": size.label * 0.14,
         "text-anchor": "middle"
       });
-      return group({}, face + ticks + hand) + barLabel + number + logo(context);
+      const numberPlate = circle(cx, cy + radius * 0.32, radius * 0.3, {
+        fill: palette.background,
+        stroke: palette.inkSoft,
+        "stroke-width": canvas.short * 25e-4,
+        opacity: 0.92
+      });
+      return group({}, face + ticks + hand) + numberPlate + progressHead + barLabel + number + logo(context);
     }
   };
 
@@ -776,7 +859,11 @@ var MetronomeDesigns = (() => {
       const count = Math.max(1, frame.beatsPerBar);
       const settle = easeOut(Math.min(1, frame.phase * 2.2));
       const scale = lerp(1.12, 1, settle);
-      const glyph = Math.min(size.huge, stage.height * 0.72) * scale;
+      const desiredGlyph = Math.min(size.huge, stage.height * 0.72) * scale;
+      const glyph = Math.min(
+        desiredGlyph,
+        stage.width * 0.72 / advanceWidth(String(frame.beat), 1)
+      );
       const isDownbeat = frame.beat === 1;
       const number = text(String(frame.beat), cx, cy + glyph * 0.35, {
         fill: isDownbeat ? palette.accent : palette.ink,
@@ -788,31 +875,51 @@ var MetronomeDesigns = (() => {
       const rail = [];
       const thickness = canvas.short * 0.014;
       for (let i = 0; i < count; i++) {
-        const on = i <= frame.beat - 1;
+        const played = i < frame.beat - 1;
+        const current = i === frame.beat - 1;
+        const progress = played ? 1 : current ? lerp(0.12, 1, easeOut(frame.phase)) : 0;
         if (canvas.isPortrait) {
           const runway = stage.height * 0.7;
           const slot = runway / count;
           const x = stage.x + stage.width - thickness * 2;
           const y = cy - runway / 2 + slot * i;
+          const segmentHeight = slot * 0.8;
           rail.push(
-            rect(x, y + slot * 0.1, thickness, slot * 0.8, {
-              fill: on ? palette.accent : palette.inkSoft,
-              opacity: on ? 1 : 0.3,
+            rect(x, y + slot * 0.1, thickness, segmentHeight, {
+              fill: palette.inkSoft,
+              opacity: 0.22,
               rx: thickness / 2
             })
           );
+          if (progress > 0)
+            rail.push(
+              rect(x, y + slot * 0.1, thickness, segmentHeight * progress, {
+                fill: current ? palette.accent : palette.ink,
+                opacity: current ? 1 : 0.78,
+                rx: thickness / 2
+              })
+            );
         } else {
           const runway = stage.width * 0.56;
           const slot = runway / count;
           const x = cx - runway / 2 + slot * i;
           const y = stage.y + stage.height * 0.9;
+          const segmentWidth = slot * 0.8;
           rail.push(
-            rect(x + slot * 0.1, y, slot * 0.8, thickness, {
-              fill: on ? palette.accent : palette.inkSoft,
-              opacity: on ? 1 : 0.3,
+            rect(x + slot * 0.1, y, segmentWidth, thickness, {
+              fill: palette.inkSoft,
+              opacity: 0.22,
               rx: thickness / 2
             })
           );
+          if (progress > 0)
+            rail.push(
+              rect(x + slot * 0.1, y, segmentWidth * progress, thickness, {
+                fill: current ? palette.accent : palette.ink,
+                opacity: current ? 1 : 0.78,
+                rx: thickness / 2
+              })
+            );
         }
       }
       const barLabel = text(`BAR ${frame.bar}`, cx, stage.y + size.label * 1.6, {
@@ -876,7 +983,20 @@ var MetronomeDesigns = (() => {
         "font-weight": 700,
         "text-anchor": "middle"
       });
-      return group({}, wedges) + number + of + logo(context);
+      const phaseTurns = (frame.beat - 1 + frame.phase) / count;
+      const [markerX, markerY] = polar(cx, cy, outer * 1.045, phaseTurns);
+      const phaseMarker = circle(markerX, markerY, canvas.short * 0.022, {
+        fill: palette.background,
+        stroke: palette.accent,
+        "stroke-width": canvas.short * 6e-3
+      }) + circle(markerX, markerY, canvas.short * 9e-3, { fill: palette.accent });
+      const hub = circle(cx, cy, inner * 0.78, {
+        fill: palette.background,
+        stroke: palette.inkSoft,
+        "stroke-width": canvas.short * 25e-4,
+        opacity: 0.94
+      });
+      return group({}, wedges) + phaseMarker + hub + number + of + logo(context);
     }
   };
 
@@ -906,8 +1026,8 @@ var MetronomeDesigns = (() => {
       const size = typeScale(canvas);
       const count = Math.max(1, frame.beatsPerBar);
       const throughBar = (frame.beat - 1 + frame.phase) / count;
-      const stroke = canvas.short * 6e-3;
-      const marker = canvas.short * 0.028;
+      const stroke = canvas.short * 8e-3;
+      const marker = canvas.short * 0.032;
       if (canvas.isSquare) {
         const side = Math.min(stage.width, stage.height) * 0.94;
         const loop = {
@@ -925,13 +1045,21 @@ var MetronomeDesigns = (() => {
         });
         const ticks2 = Array.from({ length: count }, (_, i) => {
           const [x, y] = aroundRect(loop, i / count);
-          return circle(x, y, marker * (i === 0 ? 0.55 : 0.4), {
-            fill: i <= frame.beat - 1 ? palette.accent : palette.inkSoft,
-            opacity: i <= frame.beat - 1 ? 1 : 0.4
+          const current = i === frame.beat - 1;
+          const played = i < frame.beat - 1;
+          return circle(x, y, marker * (current ? 0.64 : i === 0 ? 0.55 : 0.4), {
+            fill: current ? palette.accent : played ? palette.accent : palette.background,
+            stroke: current || played ? palette.accent : palette.inkSoft,
+            "stroke-width": marker * 0.12,
+            opacity: current ? 1 : played ? 0.76 : 0.8
           });
         }).join("");
         const [mx, my] = aroundRect(loop, throughBar);
-        const head2 = circle(mx, my, marker, { fill: palette.accent });
+        const head2 = circle(mx, my, marker * 1.18, {
+          fill: palette.background,
+          stroke: palette.accent,
+          "stroke-width": marker * 0.18
+        }) + circle(mx, my, marker * 0.72, { fill: palette.accent });
         const number2 = text(
           String(frame.beat),
           canvas.width / 2,
@@ -962,18 +1090,29 @@ var MetronomeDesigns = (() => {
       });
       const ticks = Array.from({ length: count + 1 }, (_, i) => {
         const at2 = along + runway * i / count;
-        const passed = i <= frame.beat - 1;
+        const passed = i < frame.beat - 1;
+        const current = i === frame.beat - 1;
         const size2 = marker * (i % count === 0 ? 0.6 : 0.42);
         return vertical ? circle(across, at2, size2, {
-          fill: passed ? palette.accent : palette.inkSoft,
-          opacity: passed ? 1 : 0.4
+          fill: current ? palette.background : passed ? palette.accent : palette.background,
+          stroke: current ? palette.accent : passed ? palette.accent : palette.inkSoft,
+          "stroke-width": marker * 0.12,
+          opacity: current || passed ? 1 : 0.78
         }) : circle(at2, across, size2, {
-          fill: passed ? palette.accent : palette.inkSoft,
-          opacity: passed ? 1 : 0.4
+          fill: current ? palette.background : passed ? palette.accent : palette.background,
+          stroke: current ? palette.accent : passed ? palette.accent : palette.inkSoft,
+          "stroke-width": marker * 0.12,
+          opacity: current || passed ? 1 : 0.78
         });
       }).join("");
       const at = along + runway * throughBar;
-      const head = vertical ? circle(across, at, marker, { fill: palette.accent }) : circle(at, across, marker, { fill: palette.accent });
+      const headX = vertical ? across : at;
+      const headY = vertical ? at : across;
+      const head = circle(headX, headY, marker * 1.18, {
+        fill: palette.background,
+        stroke: palette.accent,
+        "stroke-width": marker * 0.18
+      }) + circle(headX, headY, marker * 0.72, { fill: palette.accent });
       const tailFrom = along + runway * Math.max(0, throughBar - 0.08);
       const trail = path(
         vertical ? `M ${n(across)} ${n(tailFrom)} L ${n(across)} ${n(at)}` : `M ${n(tailFrom)} ${n(across)} L ${n(at)} ${n(across)}`,
@@ -1013,28 +1152,60 @@ var MetronomeDesigns = (() => {
       const size = typeScale(canvas);
       const isDownbeat = frame.beat === 1;
       const decay = 1 - easeOut(Math.min(1, frame.phase * 1.6));
-      const thickness = canvas.short * (isDownbeat ? 0.055 : 0.03) * lerp(0.35, 1, decay);
+      const thickness = canvas.short * (isDownbeat ? 0.04 : 0.024) * lerp(0.35, 1, decay);
+      const inset = canvas.short * 0.035;
       const border = rect(
-        thickness / 2,
-        thickness / 2,
-        canvas.width - thickness,
-        canvas.height - thickness,
+        stage.x + inset,
+        stage.y + inset,
+        stage.width - inset * 2,
+        stage.height - inset * 2,
         {
           fill: "none",
           stroke: palette.accent,
           "stroke-width": thickness,
-          opacity: lerp(0.15, 1, decay)
+          opacity: lerp(0.15, 1, decay),
+          rx: canvas.short * 0.035
         }
       );
-      const wash = isDownbeat ? rect(0, 0, canvas.width, canvas.height, { fill: palette.accent, opacity: 0.1 * decay }) : "";
-      const number = text(String(frame.beat), cx, cy + size.huge * 0.32, {
+      const wash = isDownbeat ? rect(stage.x + inset, stage.y + inset, stage.width - inset * 2, stage.height - inset * 2, {
+        fill: palette.accent,
+        opacity: 0.045 * decay,
+        rx: canvas.short * 0.035
+      }) : "";
+      const numberSize = Math.min(
+        size.huge * 0.82,
+        stage.height * 0.58,
+        stage.width * 0.72 / advanceWidth(String(frame.beat), 1)
+      );
+      const number = text(String(frame.beat), cx, cy + numberSize * 0.34, {
         fill: isDownbeat ? palette.accent : palette.ink,
         "font-family": FONT_DISPLAY,
-        "font-size": Math.min(size.huge * 0.9, stage.height * 0.66),
+        "font-size": numberSize,
         "font-weight": 800,
         "text-anchor": "middle"
       });
-      const of = text(`${frame.beat} / ${frame.beatsPerBar}`, cx, stage.y + stage.height * 0.96, {
+      const count = Math.max(1, frame.beatsPerBar);
+      const railWidth = stage.width * 0.54;
+      const railY = stage.y + stage.height * 0.9;
+      const slot = railWidth / count;
+      const progress = easeOut(frame.phase);
+      const rail = Array.from({ length: count }, (_, i) => {
+        const x = cx - railWidth / 2 + i * slot;
+        const w = slot * 0.76;
+        const current = i === frame.beat - 1;
+        const played = i < frame.beat - 1;
+        const fill = played ? 1 : current ? Math.max(0.14, progress) : 0;
+        return rect(x, railY, w, canvas.short * 0.014, {
+          fill: palette.inkSoft,
+          opacity: 0.2,
+          rx: canvas.short * 7e-3
+        }) + (fill > 0 ? rect(x, railY, w * fill, canvas.short * 0.014, {
+          fill: current ? palette.accent : palette.ink,
+          opacity: current ? 1 : 0.72,
+          rx: canvas.short * 7e-3
+        }) : "");
+      }).join("");
+      const of = text(`${frame.beat} / ${frame.beatsPerBar}`, cx, stage.y + stage.height * 0.97, {
         fill: palette.inkSoft,
         "font-family": FONT_TEXT,
         "font-size": size.label * 1.2,
@@ -1042,7 +1213,7 @@ var MetronomeDesigns = (() => {
         "letter-spacing": size.label * 0.12,
         "text-anchor": "middle"
       });
-      return group({}, wash + border) + number + of + logo(context);
+      return group({}, wash + border) + number + group({}, rail) + of + logo(context);
     }
   };
 
@@ -1067,13 +1238,32 @@ var MetronomeDesigns = (() => {
       const at = (i) => count === 1 ? start + runway / 2 : start + slot * i;
       const padThickness = canvas.short * 0.016;
       const padLength = Math.min(slot * 0.62, canvas.short * 0.17);
+      const runwayLine = line(
+        start,
+        baseline + padThickness * 0.5,
+        start + runway,
+        baseline + padThickness * 0.5,
+        {
+          stroke: palette.inkSoft,
+          "stroke-width": canvas.short * 3e-3,
+          opacity: 0.32,
+          "stroke-linecap": "round"
+        }
+      );
       const pads = Array.from({ length: count }, (_, i) => {
         const current = i === frame.beat - 1;
-        return rect(at(i) - padLength / 2, baseline, padLength, padThickness, {
-          fill: current ? palette.accent : palette.inkSoft,
-          opacity: current ? 1 : 0.35,
+        const played = i < frame.beat - 1;
+        const width = Math.max(canvas.short * 0.024, padLength);
+        return rect(at(i) - width / 2, baseline, width, padThickness, {
+          fill: current ? palette.accent : played ? palette.accentSoft : palette.inkSoft,
+          opacity: current ? 1 : played ? 0.9 : 0.52,
           rx: padThickness / 2
-        });
+        }) + (current ? circle(at(i), baseline + padThickness / 2, padThickness * 1.1, {
+          fill: "none",
+          stroke: palette.accent,
+          "stroke-width": canvas.short * 3e-3,
+          opacity: 0.58
+        }) : "");
       }).join("");
       const fromIndex = frame.beat - 1;
       const toIndex = frame.beat % count;
@@ -1085,17 +1275,33 @@ var MetronomeDesigns = (() => {
       const ball = `<ellipse cx="${n(along)}" cy="${n(ballY)}" rx="${n(radius * (2 - squash))}" ry="${n(radius * squash)}" fill="${palette.accent}"/>`;
       const shadowWidth = radius * lerp(1.5, 0.7, Math.sin(Math.PI * frame.phase));
       const shadow = `<ellipse cx="${n(along)}" cy="${n(baseline + padThickness * 1.6)}" rx="${n(shadowWidth)}" ry="${n(radius * 0.32)}" fill="${palette.ink}" opacity="0.16"/>`;
+      const labelSize = Math.min(
+        size.label * 1.5,
+        slot * 0.52 / Math.max(1, advanceWidth(String(count), 1))
+      );
+      const beatReadout = text(
+        `${frame.beat} / ${count}`,
+        stage.x + stage.width / 2,
+        stage.y + stage.height * 0.2,
+        {
+          fill: palette.ink,
+          "font-family": FONT_DISPLAY,
+          "font-size": size.readout * 0.62,
+          "font-weight": 800,
+          "text-anchor": "middle"
+        }
+      );
       const numbers = Array.from(
         { length: count },
         (_, i) => text(String(i + 1), at(i), baseline + canvas.short * 0.085, {
           fill: i === frame.beat - 1 ? palette.accent : palette.inkSoft,
           "font-family": FONT_DISPLAY,
-          "font-size": size.label * 1.5,
+          "font-size": labelSize,
           "font-weight": 800,
           "text-anchor": "middle"
         })
       ).join("");
-      return group({}, pads) + shadow + ball + numbers + logo(context);
+      return beatReadout + runwayLine + group({}, pads) + shadow + ball + numbers + logo(context);
     }
   };
 
@@ -1111,7 +1317,7 @@ var MetronomeDesigns = (() => {
       const [cx, cy] = centreOf(stage);
       const size = typeScale(canvas);
       const count = Math.max(1, frame.beatsPerBar);
-      const land = easeOut(Math.min(1, frame.phase * 3));
+      const land = easeOut(frame.phase);
       const upward = !canvas.isPortrait ? canvas.isSquare : true;
       const span = upward ? Math.min(stage.height * 0.8, canvas.short * 0.9) : stage.width * 0.8;
       const slot = span / count;
@@ -1123,7 +1329,7 @@ var MetronomeDesigns = (() => {
         const current = i === frame.beat - 1;
         if (!placed && !current) continue;
         const drop = current ? lerp(slot * 0.9, 0, land) : 0;
-        const fade = current ? lerp(0.4, 1, land) : 0.75;
+        const fade = current ? lerp(0.76, 1, land) : 0.84;
         if (upward) {
           const bottom = cy + span / 2;
           const y = bottom - slot * (i + 1) - drop;
@@ -1132,7 +1338,17 @@ var MetronomeDesigns = (() => {
               fill: current ? palette.accent : palette.ink,
               opacity: fade,
               rx: canvas.short * 0.012
-            })
+            }) + (current ? rect(
+              cx - blockShort * 0.36,
+              y + (slot - blockLong) / 2 + blockLong * 0.16,
+              blockShort * 0.72,
+              Math.max(canvas.short * 6e-3, blockLong * 0.045),
+              {
+                fill: palette.onAccent,
+                opacity: 0.88,
+                rx: canvas.short * 4e-3
+              }
+            ) : "")
           );
         } else {
           const left = cx - span / 2;
@@ -1142,7 +1358,17 @@ var MetronomeDesigns = (() => {
               fill: current ? palette.accent : palette.ink,
               opacity: fade,
               rx: canvas.short * 0.012
-            })
+            }) + (current ? rect(
+              x + (slot - blockLong) / 2 + blockLong * 0.12,
+              cy - blockShort * 0.34,
+              Math.max(canvas.short * 6e-3, blockLong * 0.045),
+              blockShort * 0.68,
+              {
+                fill: palette.onAccent,
+                opacity: 0.88,
+                rx: canvas.short * 4e-3
+              }
+            ) : "")
           );
         }
       }

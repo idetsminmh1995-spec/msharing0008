@@ -22,7 +22,7 @@ export const stackBlocks: Design = {
     const [cx, cy] = centreOf(stage);
     const size = typeScale(canvas);
     const count = Math.max(1, frame.beatsPerBar);
-    const land = easeOut(Math.min(1, frame.phase * 3));
+    const land = easeOut(frame.phase);
 
     // Landscape builds sideways (there is width to spare), portrait and
     // square build upwards, which is what "stack" means to the eye.
@@ -39,7 +39,7 @@ export const stackBlocks: Design = {
       if (!placed && !current) continue;
       // The newest block drops in rather than appearing.
       const drop = current ? lerp(slot * 0.9, 0, land) : 0;
-      const fade = current ? lerp(0.4, 1, land) : 0.75;
+      const fade = current ? lerp(0.76, 1, land) : 0.84;
       if (upward) {
         const bottom = cy + span / 2;
         const y = bottom - slot * (i + 1) - drop;
@@ -48,7 +48,20 @@ export const stackBlocks: Design = {
             fill: current ? palette.accent : palette.ink,
             opacity: fade,
             rx: canvas.short * 0.012,
-          }),
+          }) +
+            (current
+              ? rect(
+                  cx - blockShort * 0.36,
+                  y + (slot - blockLong) / 2 + blockLong * 0.16,
+                  blockShort * 0.72,
+                  Math.max(canvas.short * 0.006, blockLong * 0.045),
+                  {
+                    fill: palette.onAccent,
+                    opacity: 0.88,
+                    rx: canvas.short * 0.004,
+                  },
+                )
+              : ''),
         );
       } else {
         const left = cx - span / 2;
@@ -58,7 +71,20 @@ export const stackBlocks: Design = {
             fill: current ? palette.accent : palette.ink,
             opacity: fade,
             rx: canvas.short * 0.012,
-          }),
+          }) +
+            (current
+              ? rect(
+                  x + (slot - blockLong) / 2 + blockLong * 0.12,
+                  cy - blockShort * 0.34,
+                  Math.max(canvas.short * 0.006, blockLong * 0.045),
+                  blockShort * 0.68,
+                  {
+                    fill: palette.onAccent,
+                    opacity: 0.88,
+                    rx: canvas.short * 0.004,
+                  },
+                )
+              : ''),
         );
       }
     }

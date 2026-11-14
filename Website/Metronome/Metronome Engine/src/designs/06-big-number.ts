@@ -6,7 +6,15 @@
  * reads when everything else has become too small to see.
  */
 
-import { bands, centreOf, FONT_DISPLAY, FONT_TEXT, logo, typeScale } from '../layout.js';
+import {
+  advanceWidth,
+  bands,
+  centreOf,
+  FONT_DISPLAY,
+  FONT_TEXT,
+  logo,
+  typeScale,
+} from '../layout.js';
 import { easeOut, group, lerp, rect, text } from '../svg.js';
 import type { Design, DesignContext } from '../types.js';
 
@@ -26,7 +34,11 @@ export const bigNumber: Design = {
     // of the beat rather than just its value.
     const settle = easeOut(Math.min(1, frame.phase * 2.2));
     const scale = lerp(1.12, 1, settle);
-    const glyph = Math.min(size.huge, stage.height * 0.72) * scale;
+    const desiredGlyph = Math.min(size.huge, stage.height * 0.72) * scale;
+    const glyph = Math.min(
+      desiredGlyph,
+      (stage.width * 0.72) / advanceWidth(String(frame.beat), 1),
+    );
     const isDownbeat = frame.beat === 1;
 
     const number = text(String(frame.beat), cx, cy + glyph * 0.35, {
@@ -42,31 +54,51 @@ export const bigNumber: Design = {
     const rail: string[] = [];
     const thickness = canvas.short * 0.014;
     for (let i = 0; i < count; i++) {
-      const on = i <= frame.beat - 1;
+      const played = i < frame.beat - 1;
+      const current = i === frame.beat - 1;
+      const progress = played ? 1 : current ? lerp(0.12, 1, easeOut(frame.phase)) : 0;
       if (canvas.isPortrait) {
         const runway = stage.height * 0.7;
         const slot = runway / count;
         const x = stage.x + stage.width - thickness * 2;
         const y = cy - runway / 2 + slot * i;
+        const segmentHeight = slot * 0.8;
         rail.push(
-          rect(x, y + slot * 0.1, thickness, slot * 0.8, {
-            fill: on ? palette.accent : palette.inkSoft,
-            opacity: on ? 1 : 0.3,
+          rect(x, y + slot * 0.1, thickness, segmentHeight, {
+            fill: palette.inkSoft,
+            opacity: 0.22,
             rx: thickness / 2,
           }),
         );
+        if (progress > 0)
+          rail.push(
+            rect(x, y + slot * 0.1, thickness, segmentHeight * progress, {
+              fill: current ? palette.accent : palette.ink,
+              opacity: current ? 1 : 0.78,
+              rx: thickness / 2,
+            }),
+          );
       } else {
         const runway = stage.width * 0.56;
         const slot = runway / count;
         const x = cx - runway / 2 + slot * i;
         const y = stage.y + stage.height * 0.9;
+        const segmentWidth = slot * 0.8;
         rail.push(
-          rect(x + slot * 0.1, y, slot * 0.8, thickness, {
-            fill: on ? palette.accent : palette.inkSoft,
-            opacity: on ? 1 : 0.3,
+          rect(x + slot * 0.1, y, segmentWidth, thickness, {
+            fill: palette.inkSoft,
+            opacity: 0.22,
             rx: thickness / 2,
           }),
         );
+        if (progress > 0)
+          rail.push(
+            rect(x + slot * 0.1, y, segmentWidth * progress, thickness, {
+              fill: current ? palette.accent : palette.ink,
+              opacity: current ? 1 : 0.78,
+              rx: thickness / 2,
+            }),
+          );
       }
     }
 

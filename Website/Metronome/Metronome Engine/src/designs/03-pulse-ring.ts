@@ -46,18 +46,50 @@ export const pulseRing: Design = {
       );
     }
 
-    const core = circle(cx, cy, maxRadius * lerp(0.2, 0.14, easeOut(frame.phase)), {
+    const coreRadius = maxRadius * lerp(0.22, 0.17, easeOut(frame.phase));
+    const core = circle(cx, cy, coreRadius, {
       fill: frame.beat === 1 ? palette.accent : palette.ink,
     });
+    const coreKeyline = circle(cx, cy, coreRadius * 1.12, {
+      fill: 'none',
+      stroke: frame.beat === 1 ? palette.onAccent : palette.accent,
+      'stroke-width': canvas.short * 0.003,
+      opacity: 0.8,
+    });
 
-    const number = text(String(frame.beat), cx, cy + size.readout * 0.36, {
+    const numberSize = Math.min(
+      size.readout * 0.72,
+      (coreRadius * 1.2) / Math.max(1, String(frame.beat).length) / 0.62,
+    );
+    const number = text(String(frame.beat), cx, cy + numberSize * 0.34, {
       fill: frame.beat === 1 ? palette.onAccent : palette.background,
       'font-family': FONT_DISPLAY,
-      'font-size': size.readout,
+      'font-size': numberSize,
       'font-weight': 800,
       'text-anchor': 'middle',
     });
 
-    return group({}, rings.join('')) + core + number + logo(context);
+    const count = Math.max(1, frame.beatsPerBar);
+    const railWidth = Math.min(stage.width * 0.76, canvas.short * 0.72);
+    const slot = railWidth / count;
+    const railY = stage.y + stage.height * 0.91;
+    const railHeight = canvas.short * 0.012;
+    const rail = Array.from({ length: count }, (_, i) => {
+      const x = cx - railWidth / 2 + i * slot;
+      const w = slot * 0.72;
+      const current = i === frame.beat - 1;
+      const played = i < frame.beat - 1;
+      const activeWidth = current ? w * lerp(0.18, 1, easeOut(frame.phase)) : played ? w : 0;
+      return (
+        `<rect x="${x}" y="${railY}" width="${w}" height="${railHeight}" rx="${railHeight / 2}" fill="${palette.inkSoft}" opacity="0.22"/>` +
+        (activeWidth > 0
+          ? `<rect x="${x}" y="${railY}" width="${activeWidth}" height="${railHeight}" rx="${railHeight / 2}" fill="${current ? palette.accent : palette.ink}" opacity="${current ? 1 : 0.72}"/>`
+          : '')
+      );
+    }).join('');
+
+    return (
+      group({}, rings.join('')) + coreKeyline + core + number + group({}, rail) + logo(context)
+    );
   },
 };

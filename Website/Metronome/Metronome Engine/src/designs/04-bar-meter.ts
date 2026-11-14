@@ -21,7 +21,7 @@ export const barMeter: Design = {
     const { stage } = bands(canvas);
     const size = typeScale(canvas);
     const count = Math.max(1, frame.beatsPerBar);
-    const grow = easeOut(Math.min(1, frame.phase * 2.5));
+    const grow = easeOut(frame.phase);
 
     const bars: string[] = [];
     // Portrait lays the columns on their side and stacks them, because
@@ -34,11 +34,12 @@ export const barMeter: Design = {
     for (let i = 0; i < count; i++) {
       const played = i < frame.beat - 1;
       const current = i === frame.beat - 1;
-      const fill = played ? 1 : current ? lerp(0.55, 1, grow) : 0.16;
+      const fill = played ? 1 : current ? lerp(0.12, 1, grow) : 0.12;
       const offset = (horizontal ? stage.y : stage.x) + slot * i + (slot - thickness) / 2;
       const length = runway * fill;
       const colour = current ? palette.accent : played ? palette.ink : palette.inkSoft;
-      const opacity = current ? 1 : played ? 0.7 : 0.25;
+      const opacity = current ? 1 : played ? 0.78 : 0.46;
+      const capLength = Math.max(thickness * 0.2, canvas.short * 0.004);
       if (horizontal) {
         const x = stage.x + (stage.width - runway) / 2;
         bars.push(
@@ -46,7 +47,15 @@ export const barMeter: Design = {
             fill: palette.inkSoft,
             opacity: 0.12,
             rx: thickness * 0.3,
-          }) + rect(x, offset, length, thickness, { fill: colour, opacity, rx: thickness * 0.3 }),
+          }) +
+            rect(x, offset, length, thickness, { fill: colour, opacity, rx: thickness * 0.3 }) +
+            (current
+              ? rect(x + Math.max(0, length - capLength), offset, capLength, thickness, {
+                  fill: palette.onAccent,
+                  opacity: 0.72,
+                  rx: thickness * 0.3,
+                })
+              : ''),
         );
       } else {
         const bottom = stage.y + stage.height * 0.9;
@@ -60,7 +69,14 @@ export const barMeter: Design = {
               fill: colour,
               opacity,
               rx: thickness * 0.3,
-            }),
+            }) +
+            (current
+              ? rect(offset, bottom - length, thickness, capLength, {
+                  fill: palette.onAccent,
+                  opacity: 0.72,
+                  rx: thickness * 0.3,
+                })
+              : ''),
         );
       }
     }

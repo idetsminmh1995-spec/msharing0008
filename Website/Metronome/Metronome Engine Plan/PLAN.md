@@ -1,6 +1,6 @@
 # Metronome Engine — အကောင်အထည်ဖော်မှု Plan
 
-**နောက်ဆုံးစစ်ဆေး/ပြင်ဆင်သည့်နေ့:** 2026-11-14
+**နောက်ဆုံးစစ်ဆေး/ပြင်ဆင်သည့်နေ့:** 2026-11-15
 **Engine source:** `Website/Metronome/Metronome Engine/`
 **Studio adapter:** `Website/Website/studio-metronome.js`
 **ဆက်စပ်မှတ်တမ်း:** [Metronome Engine Doc](../Metronome%20Engine%20Doc/DOC.md)
@@ -50,6 +50,24 @@ Metronome Engine ၏ SVG design များကို Create Video မှ Studio
 ဤ milestone သည် Metronome video export ကို website ထဲတွင် တကယ်ချိတ်ဆက်ပြီး browser တွင်စမ်းသပ်ပြီးကြောင်း ဆိုလိုသည်။ အခြား instrument များ၊ R2 media assets၊ Shared Sound Engine၊ actual phone device compatibility နှင့် production deployment တို့ ပြီးစီးပြီဟု မဆိုလိုပါ။
 
 
+## 2026-11-15 — Design 11 မျိုးလုံး၏ visual refresh
+
+အသုံးပြုသူ၏ တောင်းဆိုချက်အရ Metronome design 11 မျိုးလုံးကို မူလ identity နှင့် အရောင် palette မပျောက်စေဘဲ frame တစ်ခုချင်းတွင် beat progression ကို ပိုရှင်းလင်းစေရန် ပြင်ဆင်ထားသည်။ Shared header, BPM/meter controls, UI control order, click audio, video workflow နှင့် export contract ကို မပြောင်းထားပါ။
+
+- **Pendulum:** scale tick hierarchy, bar-progress emphasis နှင့် case ထဲက beat-number window တိုးတက်စေသည်။
+- **Beat Dots:** medallion hatching ကို လျှော့ချ၊ played/current/future dot states ခွဲပြ၊ attack halo ထည့်ပြီး 12-beat narrow layout တွင် dot overlap မဖြစ်စေရန် sizing ပြင်သည်။
+- **Pulse Ring:** ring/core contrast နှင့် bar progress rail ထည့်သည်။
+- **Bar Meter:** current beat fill ကို beat တစ်ခုလုံးအတွင်း တဖြည်းဖြည်းတိုးစေပြီး track/active cap hierarchy မြှင့်သည်။
+- **Sweep Dial:** dial track, current tick, phase marker နှင့် center hub တိုးတက်စေသည်။
+- **Big Number:** multi-digit beat number-ийг stage width-д fit хийж rail дээр beat phase ကို харуулна။
+- **Segment Ring:** current beat-ийн phase marker болон center hub нэмнэ.
+- **Travel Line:** current/played/future waypoint ялгаа, tracked marker halo နှင့် contrast မြှင့်သည်။
+- **Flash Frame:** glow border ကို safe stage အတွင်းထား၊ canvas တစ်ခုလုံးအပေါ် wash လျှော့ပြီး segmented beat progress ထည့်သည်။
+- **Bounce Ball:** runway/pad hierarchy, adaptive beat labels နှင့် current/total beat readout တိုးတက်စေသည်။
+- **Stack Blocks:** block landing ကို beat တစ်ခုလုံးတစ်လျှောက် ဆက်လက်ပြပြီး active block highlight ထည့်သည်။
+
+**စစ်ဆေးမှု:** 11 design × 3 aspect ratio (33 SVG previews) ကို Chromium gallery ဖြင့် manual visual review လုပ်ထားပြီး၊ အထူးသဖြင့် 12/8, beat 12/12, 240 BPM stress frame တွင် dense/2-digit states များကို ထပ်စစ်ထားသည်။ Engine `npm run verify` သည် 20/20 Node tests နှင့် Website bundle sync ပါဝင်၍ pass ဖြစ်သည်။ Video Engine Chromium integration test သည် 28 frames, 720×1280 VP8 + 48 kHz mono Opus output ကို ထုတ်ပြီး pass ဖြစ်သည်။ Automated pixel/snapshot regression သည် နောက်ထပ်အလုပ်အဖြစ် ဆက်ကျန်သည်။
+
 ## Engine-level backlog carried forward from the 2026-11-13 review
 
 ဤလုပ်ငန်းများသည် Studio/Video Engine ချိတ်ဆက်ပြီးကြောင်းနှင့် သီးခြားဖြစ်သည်။ Integration ပြီးသွားခြင်းကြောင့် Engine source validation၊ package delivery နှင့် design visual test များ ပြီးစီးသွားသည်ဟု မယူဆရ။
@@ -87,7 +105,7 @@ Engine မှ `listDesigns()` ထဲတွင် `drum`, `piano`, `guitar`, `bas
 
 ### P2 — Browser visual regression
 
-Engine `npm run verify` သည် design 11 မျိုးနှင့် aspect 3 မျိုး (layout 33 မျိုး) ကို SVG output အဖြစ်စစ်သည်။ Chromium Studio test သည် `sweep-dial` portrait export ကို အတည်ပြုထားသော်လည်း design 11 မျိုးလုံး၏ browser raster output, text clipping, element overlap, font fallback နှင့် safe margin များကို အပြည့်အဝ မစစ်နိုင်သေးပါ။
+Engine `npm run verify` သည် design 11 မျိုးနှင့် aspect 3 မျိုး (layout 33 မျိုး) ကို SVG output အဖြစ်စစ်ပြီး 2026-11-15 တွင် layout 33 မျိုးကို manual Chromium visual review လုပ်ထားသည်။ သို့သော် repeatable browser pixel/snapshot test နှင့် automated clipping/overlap/safe-margin assertions မရှိသေးပါ။
 
 - Layout 33 မျိုးအတွက် browser render သို့မဟုတ် snapshot test ပြုလုပ်ပြီး header/readout/stage/logo boundaries, text clipping နှင့် font fallback ကို စစ်ရန်။
 - Beat transition, `phase=0`, အလယ်အဆင့် phase နှင့် `phase→1` boundary များတွင် design-specific regression ထည့်ရန်။

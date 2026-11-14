@@ -274,9 +274,9 @@ test('Beat Dots draws the medallion, the count inside it, and one dot per beat',
       // The count, in the medallion's own red.
       assert.match(svg, new RegExp(`fill="${palette.accent}"[^>]*>2<`), `${where}: no count`);
 
-      // One dot per beat: the one whose turn it is in the count's own
-      // red, the rest white.
-      const waiting = [...svg.matchAll(new RegExp(`<circle[^>]*fill="${palette.ink}"`, 'g'))];
+      // One dot per beat: current in red; played dots in soft red and
+      // upcoming dots in ink. Together, the non-current states are count - 1.
+      const waiting = [...svg.matchAll(new RegExp(`<circle[^>]*fill="(?:${palette.accentSoft}|${palette.ink})"`, 'g'))];
       const current = [...svg.matchAll(new RegExp(`<circle[^>]*fill="${palette.accent}"`, 'g'))];
       assert.equal(waiting.length, beatsPerBar - 1, `${where}: wrong number of waiting dots`);
       assert.equal(current.length, 1, `${where}: the beat's own dot is not lit`);
@@ -291,12 +291,9 @@ test('Beat Dots draws the medallion, the count inside it, and one dot per beat',
   }
 });
 
-test('Beat Dots settles to its drawn shape between beats', () => {
-  // The drawing it came from is a still: four equal dots and no ping.
-  // Right after a beat the current dot is swollen and a ring is on its
-  // way out; by the time the next beat is near, the frame is the still
-  // again. A design that never settled would never look like what was
-  // drawn.
+test('Beat Dots settles while retaining the played/current/future bar state', () => {
+  // The current dot swells and gets a fading halo on attack; late in the
+  // beat it settles to the shared dot size while the bar-state colors stay.
   const at = (phase) =>
     M.renderMetronomeFrame({
       design: 'beat-dots',
@@ -305,11 +302,13 @@ test('Beat Dots settles to its drawn shape between beats', () => {
     });
   const litRadius = (svg) =>
     Number(/<circle[^>]*r="([\d.]+)"[^>]*fill="#E90006"/.exec(svg)[1]);
+  const palette = M.listDesigns().find((d) => d.id === 'beat-dots').palette;
   const waitingRadii = (svg) =>
-    [...svg.matchAll(/<circle[^>]*r="([\d.]+)"[^>]*fill="#FFFFFF"/g)].map((m) => Number(m[1]));
+    [...svg.matchAll(new RegExp(`<circle[^>]*r="([\\d.]+)"[^>]*fill="(?:${palette.accentSoft}|${palette.ink})"`, 'g'))]
+      .map((m) => Number(m[1]));
 
   const resting = waitingRadii(at(0.9));
-  assert.equal(resting.length, 3, 'three dots are waiting their turn');
+  assert.equal(resting.length, 3, 'three non-current dots remain visible');
   assert.equal(new Set(resting.map((r) => r.toFixed(3))).size, 1, 'and are all one size');
   assert.ok(litRadius(at(0)) > litRadius(at(0.9)), 'the beat should swell its own dot');
   assert.ok(

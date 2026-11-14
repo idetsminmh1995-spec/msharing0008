@@ -15,8 +15,8 @@
  * changing everything around it is this one's.
  */
 
-import { bands, FONT_DISPLAY, logo, typeScale } from '../layout.js';
-import { easeOut, group, lerp, n, rect, text } from '../svg.js';
+import { advanceWidth, bands, FONT_DISPLAY, logo, typeScale } from '../layout.js';
+import { circle, easeOut, group, lerp, line, n, rect, text } from '../svg.js';
 import type { Design, DesignContext } from '../types.js';
 
 export const bounceBall: Design = {
@@ -46,13 +46,37 @@ export const bounceBall: Design = {
 
     const padThickness = canvas.short * 0.016;
     const padLength = Math.min(slot * 0.62, canvas.short * 0.17);
+    const runwayLine = line(
+      start,
+      baseline + padThickness * 0.5,
+      start + runway,
+      baseline + padThickness * 0.5,
+      {
+        stroke: palette.inkSoft,
+        'stroke-width': canvas.short * 0.003,
+        opacity: 0.32,
+        'stroke-linecap': 'round',
+      },
+    );
     const pads = Array.from({ length: count }, (_, i) => {
       const current = i === frame.beat - 1;
-      return rect(at(i) - padLength / 2, baseline, padLength, padThickness, {
-        fill: current ? palette.accent : palette.inkSoft,
-        opacity: current ? 1 : 0.35,
-        rx: padThickness / 2,
-      });
+      const played = i < frame.beat - 1;
+      const width = Math.max(canvas.short * 0.024, padLength);
+      return (
+        rect(at(i) - width / 2, baseline, width, padThickness, {
+          fill: current ? palette.accent : played ? palette.accentSoft : palette.inkSoft,
+          opacity: current ? 1 : played ? 0.9 : 0.52,
+          rx: padThickness / 2,
+        }) +
+        (current
+          ? circle(at(i), baseline + padThickness / 2, padThickness * 1.1, {
+              fill: 'none',
+              stroke: palette.accent,
+              'stroke-width': canvas.short * 0.003,
+              opacity: 0.58,
+            })
+          : '')
+      );
     }).join('');
 
     // From this beat's pad to the next, over an arc whose height is a
@@ -80,16 +104,32 @@ export const bounceBall: Design = {
     const shadowWidth = radius * lerp(1.5, 0.7, Math.sin(Math.PI * frame.phase));
     const shadow = `<ellipse cx="${n(along)}" cy="${n(baseline + padThickness * 1.6)}" rx="${n(shadowWidth)}" ry="${n(radius * 0.32)}" fill="${palette.ink}" opacity="0.16"/>`;
 
+    const labelSize = Math.min(
+      size.label * 1.5,
+      (slot * 0.52) / Math.max(1, advanceWidth(String(count), 1)),
+    );
+    const beatReadout = text(
+      `${frame.beat} / ${count}`,
+      stage.x + stage.width / 2,
+      stage.y + stage.height * 0.2,
+      {
+        fill: palette.ink,
+        'font-family': FONT_DISPLAY,
+        'font-size': size.readout * 0.62,
+        'font-weight': 800,
+        'text-anchor': 'middle',
+      },
+    );
     const numbers = Array.from({ length: count }, (_, i) =>
       text(String(i + 1), at(i), baseline + canvas.short * 0.085, {
         fill: i === frame.beat - 1 ? palette.accent : palette.inkSoft,
         'font-family': FONT_DISPLAY,
-        'font-size': size.label * 1.5,
+        'font-size': labelSize,
         'font-weight': 800,
         'text-anchor': 'middle',
       }),
     ).join('');
 
-    return group({}, pads) + shadow + ball + numbers + logo(context);
+    return beatReadout + runwayLine + group({}, pads) + shadow + ball + numbers + logo(context);
   },
 };

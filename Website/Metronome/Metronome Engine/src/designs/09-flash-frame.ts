@@ -7,7 +7,15 @@
  * still see the bar turn over.
  */
 
-import { bands, centreOf, FONT_DISPLAY, FONT_TEXT, logo, typeScale } from '../layout.js';
+import {
+  advanceWidth,
+  bands,
+  centreOf,
+  FONT_DISPLAY,
+  FONT_TEXT,
+  logo,
+  typeScale,
+} from '../layout.js';
 import { easeOut, group, lerp, rect, text } from '../svg.js';
 import type { Design, DesignContext } from '../types.js';
 
@@ -26,36 +34,74 @@ export const flashFrame: Design = {
     // Decays across the beat rather than staying lit: a border that is
     // always on says nothing at all.
     const decay = 1 - easeOut(Math.min(1, frame.phase * 1.6));
-    const thickness = canvas.short * (isDownbeat ? 0.055 : 0.03) * lerp(0.35, 1, decay);
+    const thickness = canvas.short * (isDownbeat ? 0.04 : 0.024) * lerp(0.35, 1, decay);
+    const inset = canvas.short * 0.035;
 
     const border = rect(
-      thickness / 2,
-      thickness / 2,
-      canvas.width - thickness,
-      canvas.height - thickness,
+      stage.x + inset,
+      stage.y + inset,
+      stage.width - inset * 2,
+      stage.height - inset * 2,
       {
         fill: 'none',
         stroke: palette.accent,
         'stroke-width': thickness,
         opacity: lerp(0.15, 1, decay),
+        rx: canvas.short * 0.035,
       },
     );
 
     // A wash over the whole frame on the downbeat only, so the bar line
     // is unmistakable without the other beats becoming noise.
     const wash = isDownbeat
-      ? rect(0, 0, canvas.width, canvas.height, { fill: palette.accent, opacity: 0.1 * decay })
+      ? rect(stage.x + inset, stage.y + inset, stage.width - inset * 2, stage.height - inset * 2, {
+          fill: palette.accent,
+          opacity: 0.045 * decay,
+          rx: canvas.short * 0.035,
+        })
       : '';
 
-    const number = text(String(frame.beat), cx, cy + size.huge * 0.32, {
+    const numberSize = Math.min(
+      size.huge * 0.82,
+      stage.height * 0.58,
+      (stage.width * 0.72) / advanceWidth(String(frame.beat), 1),
+    );
+    const number = text(String(frame.beat), cx, cy + numberSize * 0.34, {
       fill: isDownbeat ? palette.accent : palette.ink,
       'font-family': FONT_DISPLAY,
-      'font-size': Math.min(size.huge * 0.9, stage.height * 0.66),
+      'font-size': numberSize,
       'font-weight': 800,
       'text-anchor': 'middle',
     });
 
-    const of = text(`${frame.beat} / ${frame.beatsPerBar}`, cx, stage.y + stage.height * 0.96, {
+    const count = Math.max(1, frame.beatsPerBar);
+    const railWidth = stage.width * 0.54;
+    const railY = stage.y + stage.height * 0.9;
+    const slot = railWidth / count;
+    const progress = easeOut(frame.phase);
+    const rail = Array.from({ length: count }, (_, i) => {
+      const x = cx - railWidth / 2 + i * slot;
+      const w = slot * 0.76;
+      const current = i === frame.beat - 1;
+      const played = i < frame.beat - 1;
+      const fill = played ? 1 : current ? Math.max(0.14, progress) : 0;
+      return (
+        rect(x, railY, w, canvas.short * 0.014, {
+          fill: palette.inkSoft,
+          opacity: 0.2,
+          rx: canvas.short * 0.007,
+        }) +
+        (fill > 0
+          ? rect(x, railY, w * fill, canvas.short * 0.014, {
+              fill: current ? palette.accent : palette.ink,
+              opacity: current ? 1 : 0.72,
+              rx: canvas.short * 0.007,
+            })
+          : '')
+      );
+    }).join('');
+
+    const of = text(`${frame.beat} / ${frame.beatsPerBar}`, cx, stage.y + stage.height * 0.97, {
       fill: palette.inkSoft,
       'font-family': FONT_TEXT,
       'font-size': size.label * 1.2,
@@ -64,6 +110,6 @@ export const flashFrame: Design = {
       'text-anchor': 'middle',
     });
 
-    return group({}, wash + border) + number + of + logo(context);
+    return group({}, wash + border) + number + group({}, rail) + of + logo(context);
   },
 };

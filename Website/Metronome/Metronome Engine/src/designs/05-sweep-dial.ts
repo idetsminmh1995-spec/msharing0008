@@ -30,8 +30,14 @@ export const sweepDial: Design = {
       circle(cx, cy, radius, {
         fill: 'none',
         stroke: palette.inkSoft,
-        'stroke-width': canvas.short * 0.004,
-        opacity: 0.35,
+        'stroke-width': canvas.short * 0.012,
+        opacity: 0.22,
+      }) +
+      circle(cx, cy, radius * 0.98, {
+        fill: 'none',
+        stroke: palette.inkSoft,
+        'stroke-width': canvas.short * 0.0025,
+        opacity: 0.72,
       }) +
       path(arcPath(cx, cy, radius, 0, throughBar), {
         fill: 'none',
@@ -42,15 +48,16 @@ export const sweepDial: Design = {
 
     const ticks = Array.from({ length: count }, (_, i) => {
       const turns = i / count;
-      const passed = i <= frame.beat - 1;
+      const passed = i < frame.beat - 1;
+      const current = i === frame.beat - 1;
       const inner = radius * (i === 0 ? 0.82 : 0.88);
       const [x1, y1] = polar(cx, cy, inner, turns);
       const [x2, y2] = polar(cx, cy, radius * 1.06, turns);
       return line(x1, y1, x2, y2, {
-        stroke: passed ? palette.accent : palette.inkSoft,
-        'stroke-width': canvas.short * (i === 0 ? 0.008 : 0.005),
+        stroke: current ? palette.ink : passed ? palette.accent : palette.inkSoft,
+        'stroke-width': canvas.short * (current ? 0.011 : i === 0 ? 0.008 : 0.005),
         'stroke-linecap': 'round',
-        opacity: passed ? 1 : 0.45,
+        opacity: current || passed ? 1 : 0.62,
       });
     }).join('');
 
@@ -61,8 +68,25 @@ export const sweepDial: Design = {
         'stroke-width': canvas.short * 0.007,
         'stroke-linecap': 'round',
       }) +
-      circle(handX, handY, canvas.short * 0.022, { fill: palette.accent }) +
-      circle(cx, cy, canvas.short * 0.014, { fill: palette.ink });
+      circle(handX, handY, canvas.short * 0.032, {
+        fill: palette.background,
+        stroke: palette.accent,
+        'stroke-width': canvas.short * 0.006,
+      }) +
+      circle(handX, handY, canvas.short * 0.014, { fill: palette.accent }) +
+      circle(cx, cy, canvas.short * 0.034, {
+        fill: palette.background,
+        stroke: palette.accent,
+        'stroke-width': canvas.short * 0.006,
+      }) +
+      circle(cx, cy, canvas.short * 0.014, { fill: palette.accent });
+
+    const currentTurns = (frame.beat - 1 + frame.phase) / count;
+    const [progressX, progressY] = polar(cx, cy, radius * 1.075, currentTurns);
+    const progressHead = circle(progressX, progressY, canvas.short * 0.009, {
+      fill: palette.onAccent,
+      opacity: 0.92,
+    });
 
     const number = text(String(frame.beat), cx, cy + radius * 0.46, {
       fill: palette.ink,
@@ -80,6 +104,20 @@ export const sweepDial: Design = {
       'text-anchor': 'middle',
     });
 
-    return group({}, face + ticks + hand) + barLabel + number + logo(context);
+    const numberPlate = circle(cx, cy + radius * 0.32, radius * 0.3, {
+      fill: palette.background,
+      stroke: palette.inkSoft,
+      'stroke-width': canvas.short * 0.0025,
+      opacity: 0.92,
+    });
+
+    return (
+      group({}, face + ticks + hand) +
+      numberPlate +
+      progressHead +
+      barLabel +
+      number +
+      logo(context)
+    );
   },
 };
