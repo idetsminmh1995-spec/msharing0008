@@ -34,3 +34,10 @@ Notation Lab starts as a focused entry screen. It must not expose the previous v
 ## Current milestone
 
 Only steps 1–3 are in scope for this revision. Scan remains intentionally unavailable.
+
+
+## Editor program — added 2026-11-15
+
+The entry page is complete as the first UI milestone. The editor will now follow the score-first architecture and M1–M6 delivery sequence in [Notation Lab Editor — Audit, Product Design, and Capability Plan](../Doc/Notation-Lab-Editor-Architecture-2026-11-15.md).
+
+The current editor route is a temporary viewer, not the target editor. M1 must establish the canonical ScoreDocument, command/history system, selection model, and renderer adapter before adding visual editor controls.
