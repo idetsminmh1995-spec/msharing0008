@@ -28,6 +28,10 @@ describe('MusicXML cue notes and octave shifts', () => {
       result.diagnostics.some((d) => d.code === 'UNMATCHED_OCTAVE_SHIFT'),
       false,
     );
+    assert.equal(
+      result.diagnostics.some((d) => d.code === 'UNKNOWN_ELEMENT' && /octave-shift/.test(d.message)),
+      false,
+    );
   });
   test('reports unmatched octave-shift endpoints', () => {
     const result = NE.renderFromMusicXml(
