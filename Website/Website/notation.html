@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="View and play MusicXML notation." />
     <title>Notation Lab — M Sharing</title>
-    <link rel="stylesheet" href="styles.css?v=notation-toolbar-20261113" />
+    <link rel="stylesheet" href="styles.css?v=mobile-sidebar-20261114" />
   </head>
   <body>
     <header class="site-header" data-header>
       <div class="header-shell">
-        <button class="icon-button menu-button" type="button" aria-label="Open menu" aria-expanded="false" data-menu-toggle><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg></button>
+        <button class="icon-button menu-button" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-navigation" data-menu-toggle><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg></button>
         <a class="brand" href="index.html#home" aria-label="M Sharing home"><span class="brand-mark" aria-hidden="true">M</span><span class="brand-name">Sharing</span></a>
         <nav class="desktop-nav" aria-label="Primary navigation">
           <a class="nav-link" href="index.html#courses">Courses</a><a class="nav-link" href="index.html#store">Store</a><a class="nav-link" href="index.html#create-video">Create Video</a><a class="nav-link is-active" href="notation.html" aria-current="page">Notation Lab</a>
@@ -25,8 +25,17 @@
           <button class="icon-button account-button desktop-only" type="button" aria-label="Account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg></button>
         </div>
       </div>
-      <nav class="mobile-nav" aria-label="Mobile menu" data-mobile-nav><a class="nav-link" href="index.html#courses">Courses</a><a class="nav-link" href="index.html#store">Store</a><a class="nav-link" href="index.html#create-video">Create Video</a><a class="nav-link is-active" href="notation.html" aria-current="page">Notation Lab</a></nav>
-    </header>
+          </header>
+    <button class="mobile-nav-backdrop" type="button" data-menu-backdrop aria-label="Close menu" aria-hidden="true" tabindex="-1"></button>
+    <div class="mobile-nav" id="mobile-navigation" role="dialog" aria-modal="true" aria-label="Mobile navigation" data-mobile-nav aria-hidden="true" inert>
+      <div class="mobile-nav__head">
+        <a class="brand" href="index.html#home" aria-label="M Sharing home"><span class="brand-mark" aria-hidden="true">M</span><span class="brand-name">Sharing</span></a>
+        <button class="icon-button mobile-nav__close" type="button" data-menu-close aria-label="Close menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
+      </div>
+      <nav class="mobile-nav__links" aria-label="Mobile menu">
+        <a class="nav-link" href="index.html#courses">Courses</a><a class="nav-link" href="index.html#store">Store</a><a class="nav-link" href="index.html#create-video">Create Video</a><a class="nav-link is-active" href="notation.html" aria-current="page">Notation Lab</a>
+      </nav>
+    </div>
 
     <nav class="mobile-bottom-nav" aria-label="Mobile bottom navigation">
       <a class="bottom-nav-item" href="index.html#home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z" /><path d="M9 21v-7h6v7" /></svg><span>Home</span></a>
@@ -80,7 +89,7 @@
 
     <script src="assets/notation-engine.js?v=cdd3b038b040"></script>
     <script src="assets/sound-engine.js?v=c3869dbfa214"></script>
-    <script src="script.js?v=notation-lab-20261113"></script>
+    <script src="script.js?v=mobile-sidebar-20261114"></script>
     <script src="notation.js?v=notation-toolbar-20261113"></script>
   </body>
 </html>
