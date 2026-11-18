@@ -27,7 +27,7 @@ TypeScript ဖြင့်ရေးသားထားသော **instrument-neut
 - Layers: `config core debug drums export geometry glyphs layout notation-defaults parser playback plugins render soundfont theme timing` + `render-from-musicxml.ts`။
 - Data provenance: `src/notation-defaults/` ထဲက table တစ်ခုချင်းက `DefaultsSource` (`musicxml`, `smufl`, `gm1`, `drumNotation`, `houseStyle`) ဖြင့် ရင်းမြစ်ကို ဖော်ပြထားသည်။
 - Bundle: esbuild IIFE၊ global `NotationEngine` / `NotationSoundFont`။ `scripts/sync-website-bundle.mjs` က bundle ကို `Website/Website/assets/` သို့ကူးသည်။
-- Verify: `npm run verify` (typecheck + lint + format:check + build + API doc + tests) သည် **1280/1280 pass**။
+- Verify: `npm run verify` (typecheck + lint + format:check + build + API doc + fixture matrix + tests) သည် **1285/1285 pass**။
 
 ---
 
@@ -38,7 +38,7 @@ TypeScript ဖြင့်ရေးသားထားသော **instrument-neut
 - [x] `sync-website-bundle.mjs` ၏ destination ကို `Website/Website/assets/` အဖြစ် ပြင်ပြီးဖြစ်သည် (ယခင် plan ရဲ့ lowercase `Website/website` မှတ်ချက်သည် stale ဖြစ်သည်)။ `test/unit/website-bundle.test.js` က bundle hash နှင့် cache key ကို စစ်သည်။
 - [x] `generate-api-docs.mjs` ၏ output ကို `Notation/Notation Plan/Documentation/API.md` အဖြစ် ရောက်နေပြီ။ `npm run docs:check` က up-to-date ကို စစ်သည်။
 - [x] CI workflow `.github/workflows/notation-engine.yml` ထည့်ပြီးဖြစ်သည်: `npm ci` → Chromium install (visual check run ဖြစ်စေရန်) → `npm run verify`။ Browser test သည် Chromium မရှိလျှင် skip ဖြစ်ကြောင်း suite က ရှိပြီးသား (browser.test.js)။
-- [ ] Clean environment တွင် `npm ci` → `typecheck` → `lint` → `format:check` → `docs:check` → `test` ကို အစဉ်လိုက် run ပြီး failure တစ်ခုချင်းကို မှတ်တမ်းတင်ပါ (CI က ဤအလုပ်ကို အလိုအလျောက်လုပ်ပေးပြီး၊ ပထမ run ၏ ရလဒ်ကို စောင့်ကြည့်ရမည်)။
+- [x] Clean environment တွင် `npm ci` → `typecheck` → `lint` → `format:check` → `docs:check` → `test` ကို အစဉ်လိုက် run ပြီး failure တစ်ခုချင်းကို မှတ်တမ်းတင်ပါ။ 2026-11-18 တွင် `node_modules` ဖျက်၍ `npm ci` (140 packages, 39s) မှစပြီး အစဉ်လိုက် run သည်: `typecheck` ✓, `lint` ✓, `format:check` ✓ (`All matched files use Prettier code style`), `docs:check` ✓ (`API.md is up to date (775 symbols)`), `test` ✓ (**1284/1284 pass**; browser visual check သည် local Chromium ဖြင့် run ဖြစ်သည်)။ Run အပြီး `git status` သည် ပြောင်းလဲမှု မရှိ -- clean build သည် bundle ကို byte-identical ပြန်ထုတ်သည်။
 
 **ပြီးစီးမှုစံ:** Clean install မှ verify ရလဒ်ကို မှတ်တမ်းတင်ထားရမည်။ CI တွင် browser test skip/fail အကြောင်းရင်း မရှင်းလင်းဘဲ မကျန်ရ။
 
@@ -72,7 +72,7 @@ TypeScript ဖြင့်ရေးသားထားသော **instrument-neut
 
 - [x] Instrument transposition (`<transpose>`): parser က `TransposeSpec.semitones` (chromatic + octave-change × 12) ကို measure state တွင် သယ်ပြီး playback (`buildEventStream`) နှင့် MIDI alignment (`flattenPartNotes`) က sounding pitch ကို သုံးသည်။ ရေးထားသော notation (SVG) သည် written pitch အတိုင်း ဆဲလျက် ရှိသည် -- `<transpose>` ဖြုတ်လိုက်လျှင် SVG byte-identical ဖြစ်ကြောင်း `test/unit/transposition.test.js` က အတည်ပြုသည် (`transposing-bb-clarinet.musicxml` fixture)။
 
-- [ ] MusicXML partwise/timewise, MXL, changing attributes/divisions, voices/chords/rests, unpitched percussion, lyrics/directions/harmony စသည့် behavior များကို fixture matrix ဖြင့် ထိန်းပါ။ Exporter တစ်ခုချင်း၏ provenance ကို fixture တစ်ခုချင်း အတည်ပြုပါ။
+- [x] MusicXML partwise/timewise, MXL, changing attributes/divisions, voices/chords/rests, unpitched percussion, lyrics/directions/harmony behavior များကို fixture matrix ဖြင့် ထိန်းထားသည်။ `scripts/generate-fixture-matrix.mjs` က `test/fixtures/` မှ `Documentation/MusicXML-Fixture-Matrix.md` ကို **generate** လုပ်သည် (API.md နည်းတူ) -- behavior တစ်ခုချင်းကို XML မှ တိုက်ရိုက်ဖတ်သဖြင့် fixture တစ်ခုက မပါဝင်တဲ့ behavior ကို claim လုပ်လို့မရ၊ provenance ကို ဖိုင်၏ `<software>` မှ ဖတ်သည်။ `npm run fixtures:check` သည် `npm run verify` တွင် ပါပြီး matrix ကို corpus နှင့် drift မဖြစ်စေရ။ `test/unit/fixture-corpus.test.js` က test တစ်ခုမှ မဖတ်သော orphan fixture ကို fail စေသည်။ Matrix က တိုးလာလို့ တွေ့ရှိသည်မှာ -- ရှိပြီးသား 59 fixtures အားလုံးကို test တစ်ခုမှ ဖတ်သည်; တကယ့် third-party export သည် MuseScore တစ်ခုတည်း; `cross-software/` fixtures များသည် documented divergence များကို လက်ဖြင့် ပြန်ဖန်တီးထားသည် (မဟုတ်လျှင် အခြား program များမှ real export များ ထပ်ထည့်ရန် လိုသည်)။
 - [x] Harmony၊ unusual notation၊ instrument transposition၊ malformed note/chord နှင့် multiple-staff cases အတွက် diagnostic/recovery tests တိုးချဲ့ပါ။ `test/unit/parser-recovery.test.js` သည် case တစ်ခုချင်းကို တူညီသောစည်းဖြင့် စစ်သည် -- (1) throw မလုပ်ရ, (2) ကိုယ်ပိုင် stable code ထုတ်ရမည်, (3) ကောင်းသော note များ ကျန်ရမည် (မပျောက်ရ)။ Harmony (`UNSUPPORTED_HARMONY_FEATURE`), numeral/degree forms, malformed `<note>`/chord (`UNSUPPORTED_NOTE`, `INVALID_CHORD`), transposition + mid-score clef change, grand-staff/staff-out-of-range, unknown `<notehead>`, clamped `<tremolo>` အားလုံး ပါဝင်သည်။
 - [x] `parseMidiFile()` သည် MIDI event/meta reader အဖြစ်သာ ဆက်ရှိမည်ဟု ဆုံးဖြတ်ပြီးဖြစ်သည်; `MidiFile` (note list + tempo/time/key timeline) ပြန်သည်, `Score` မဟုတ်ပါ။ MIDI တွင် staff spelling/voice/beaming/clef data မပါသဖြင့် `midiFileToScore()`/`renderFromMidi()` ကို တမင်ဖန်တီးမထားပါ -- MIDI→notation policy သည် host ၏တာဝန်။ Format 0/1 ကိုသာ ပံ့ပိုးပြီး format 2/SMPTE ကို diagnostic ဖြင့် reject လုပ်သည်။ Boundary ကို root `README.md` ၏ "MIDI scope" အပိုင်းတွင် user-facing docs အဖြစ် ရေးပြီးဖြစ်သည်။
 
@@ -147,6 +147,14 @@ Implementation sequence:
 ---
 
 ## သမိုင်းမှတ်တမ်း (အကိုးအကား)
+
+### Clean-environment verify + generated fixture matrix (Parts A and D) — 2026-11-18
+
+Part A's last open item and Part D's fixture-matrix item, both closed.
+
+- [x] **Clean-environment verify (Part A).** `node_modules` ကို ဖျက်ပြီး `npm ci` (140 packages) မှစ၍ `typecheck` → `lint` → `format:check` → `docs:check` → `test` ကို အစဉ်လိုက် run သည် -- အားလုံး ✓, 1284/1284 pass, run အပြီး working tree မပြောင်း (clean build က bundle ကို byte-identical ပြန်ထုတ်)။
+- [x] **Fixture matrix (Part D).** `scripts/generate-fixture-matrix.mjs` က `test/fixtures/` မှ `Documentation/MusicXML-Fixture-Matrix.md` ကို generate လုပ်သည်; `npm run fixtures:check` သည် `npm run verify` တွင် ပါသည်။ Behavior တစ်ခုချင်းကို XML မှ ဖတ်သဖြင့် fixture တစ်ခုက မပါဝင်တဲ့ behavior ကို claim လုပ်လို့မရ; provenance ကို ဖိုင်၏ `<software>` မှ ဖတ်သည်။ `test/unit/fixture-corpus.test.js` က test တစ်ခုမှ မဖတ်သော fixture ကို fail စေသည်။
+- [x] **တွေ့ရှိချက်:** 59 fixtures အားလုံးကို test ဖတ်ပြီး; တကယ့် third-party export သည် MuseScore တစ်ခုတည်း။ `cross-software/` corpus သည် documented divergence များကို လက်ဖြင့် ပြန်ဖန်တီးထားခြင်း -- အခြား program များမှ real export ထပ်ထည့်လိုပါက matrix က အလိုအလျောက် update ဖြစ်သည်။
 
 ### Release / attribution decision (Part I) + Bravura OFL gap — 2026-11-18
 

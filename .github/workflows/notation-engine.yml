@@ -53,12 +53,14 @@ jobs:
           CHROMIUM_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
         run: npm run verify
 
-      # `npm run verify` runs `docs:check`, which regenerates the API
-      # reference and fails on a diff. This prints the drift when it does,
-      # so a failing run says what to re-run. The path is relative to the
-      # engine package (`defaults.run.working-directory`).
-      - name: Show API doc drift, if any
+      # `npm run verify` runs `docs:check` and `fixtures:check`, which
+      # regenerate the API reference and the fixture matrix and fail on a
+      # diff. This prints the drift when they do, so a failing run says
+      # what to re-run. The paths are relative to the engine package
+      # (`defaults.run.working-directory`).
+      - name: Show generated-doc drift, if any
         if: failure()
         run: |
           npm run docs
-          git --no-pager diff -- "../Notation Plan/Documentation/API.md" || true
+          npm run fixtures
+          git --no-pager diff -- "../Notation Plan/Documentation/API.md" "../Notation Plan/Documentation/MusicXML-Fixture-Matrix.md" || true
