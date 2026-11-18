@@ -8,6 +8,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "esbuild src/index.ts --bundle --outfile=dist/notation-engine.js --format=iife --global-name=NotationEngine --sourcemap && esbuild src/soundfont/browser.ts --bundle --outfile=dist/sound-engine.js --format=iife --global-name=NotationSoundFont --sourcemap && node scripts/sync-website-bundle.mjs",
+    "declarations": "tsc --emitDeclarationOnly",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "format": "prettier --write \"src/**/*.ts\"",

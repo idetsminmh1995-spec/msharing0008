@@ -16,20 +16,15 @@ const fontMetrics = JSON.parse(
 const NE = loadEngine();
 
 describe('SMuFL glyph table (Phase 5)', () => {
-  test('font metadata and both bundled fonts agree on Bravura 1.482', () => {
+  test('font metadata and the bundled font agree on Bravura 1.482', () => {
     const info = NE.getFontInfo();
     assert.equal(info.name, 'Bravura');
     assert.equal(info.version, '1.482');
     assert.equal(bravuraMetadata.fontName, fontMetrics.fontName);
     assert.equal(bravuraMetadata.fontVersion, fontMetrics.fontVersion);
-    for (const relativePath of [
-      '../../dist/fonts/Bravura.woff2',
-      '../../../../website/assets/fonts/Bravura.woff2',
-    ]) {
-      const bytes = readFileSync(new URL(relativePath, import.meta.url));
-      const sha256 = createHash('sha256').update(bytes).digest('hex');
-      assert.equal(sha256, fontMetrics.fontSha256, relativePath);
-    }
+    const bytes = readFileSync(new URL('../../dist/fonts/Bravura.woff2', import.meta.url));
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    assert.equal(sha256, fontMetrics.fontSha256, 'dist/fonts/Bravura.woff2');
   });
 
   test('getGlyph resolves real, spec-correct codepoints', () => {

@@ -1,0 +1,4 @@
+# Build-time sourcemaps synced next to the bundles by the Notation Engine's
+# scripts/sync-website-bundle.mjs. They are large and only useful for local
+# debugging, where the sync regenerates them anyway.
+*.js.map

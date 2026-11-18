@@ -45,7 +45,7 @@ const soundReferencePattern = /(sound-engine\.js\?v=)[^"'&\s]+/g;
 let updatedPages = 0;
 let updatedReferences = 0;
 let updatedSoundReferences = 0;
-for (const root of [...publicRoots, path.join(repoDir, 'web-preview')]) {
+for (const root of publicRoots) {
   for (const htmlPath of await htmlFilesUnder(root)) {
     const html = await readFile(htmlPath, 'utf8');
     const count = [...html.matchAll(referencePattern)].length;

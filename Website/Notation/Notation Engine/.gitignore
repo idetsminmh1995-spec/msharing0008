@@ -10,3 +10,9 @@ node_modules/
 # The sourcemap stays out -- it is 2x the bundle's own size and only helps
 # local debugging, where `npm run build` regenerates it anyway.
 dist/*.map
+
+# Emitted TypeScript declarations (npm run declarations) are generated from
+# src/ on demand by the `docs`/`docs:check` scripts; the package is private
+# and never published, so there is no consumer that needs them checked in.
+dist/**/*.d.ts
+dist/index.d.ts

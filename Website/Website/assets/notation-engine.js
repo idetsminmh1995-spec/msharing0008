@@ -72173,6 +72173,8 @@ ${denominator}`;
           }
           case "metronome":
             break;
+          case "octave-shift":
+            break;
           default:
             diagnostics.push(
               diagnostic(

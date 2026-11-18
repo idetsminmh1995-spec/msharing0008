@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Phase 54/§22: generates `Plan/Notation Plan/Documentation/API.md` from the engine's own emitted
+ * Phase 54/§22: generates `Notation/Notation Plan/Documentation/API.md` from the engine's own emitted
  * TypeScript declarations.
  *
  * Generated, not hand-written, for one reason: a hand-written API
@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, 'dist');
-const OUT = path.resolve(ROOT, '../../Plan/Notation Plan/Documentation/API.md');
+const OUT = path.resolve(ROOT, '../../Notation/Notation Plan/Documentation/API.md');
 
 /**
  * The supported entry points -- what a host app is meant to call, in the
@@ -230,17 +230,17 @@ function main() {
     const current = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8') : '';
     if (current !== generated) {
       console.error(
-        'Plan/Notation Plan/Documentation/API.md is out of date -- run `npm run docs` and commit the result.',
+        'Notation/Notation Plan/Documentation/API.md is out of date -- run `npm run docs` and commit the result.',
       );
       process.exit(1);
     }
-    console.log(`Plan/Notation Plan/Documentation/API.md is up to date (${byName.size} symbols).`);
+    console.log(`Notation/Notation Plan/Documentation/API.md is up to date (${byName.size} symbols).`);
     return;
   }
 
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, generated);
-  console.log(`Plan/Notation Plan/Documentation/API.md: ${byName.size} symbols across ${byModule.size} modules.`);
+  console.log(`Notation/Notation Plan/Documentation/API.md: ${byName.size} symbols across ${byModule.size} modules.`);
 }
 
 main();
