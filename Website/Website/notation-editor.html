@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="Write and edit a music score in the Notation Lab editor." />
     <title>Notation Lab Editor — M Sharing</title>
-    <link rel="stylesheet" href="styles.css?v=editor-boxes-20261118" />
+    <link rel="stylesheet" href="styles.css?v=editor-account2-20261118" />
   </head>
   <body class="editor-page">
 <header class="site-header" data-region="main-header" data-header aria-label="Main header">
@@ -35,10 +35,8 @@
 
     <nav class="mobile-bottom-nav" aria-label="Mobile bottom navigation"><a class="bottom-nav-item" href="index.html#home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z" /><path d="M9 21v-7h6v7" /></svg><span>Home</span></a><a class="bottom-nav-item" href="index.html#courses"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></svg><span>Courses</span></a><a class="bottom-nav-item" href="index.html#store"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-1 14H5L4 5Zm0 0-1-2M9 9a3 3 0 0 0 6 0" /></svg><span>Store</span></a><a class="bottom-nav-item" href="index.html#create-video"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg><span>Create Video</span></a><a class="bottom-nav-item is-active" href="notation.html" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v11.5M8 4l10-2v11.5M8 8l10-2" /><ellipse cx="5.5" cy="17" rx="3" ry="2.2" /><ellipse cx="15.5" cy="15" rx="3" ry="2.2" /></svg><span>Notation Lab</span></a><a class="bottom-nav-item" href="index.html#account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg><span>Account</span></a></nav>
     <div class="editor-toolbar" role="toolbar" aria-label="Editor header bar — score editing tools" data-editor-toolbar data-region="editor-header-bar">
-      <div class="editor-toolbar__group" role="group" aria-label="File">
-        <input class="notation-entry__file" type="file" accept=".musicxml,.xml,.mxl,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml" data-editor-file-input />
-        <button class="editor-tool" type="button" data-editor-open aria-label="Open score" title="Open score (Ctrl+O)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6Z" /></svg><span>Open</span></button>
-        <button class="editor-tool" type="button" data-editor-new aria-label="New score" title="New score"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg><span>New</span></button>
+      <div class="editor-toolbar__group" role="group" aria-label="Navigation">
+        <button class="editor-tool editor-tool--back" type="button" data-editor-back aria-label="Back to Notation Lab" title="Back to Notation Lab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg><span>Back</span></button>
       </div>
       <span class="editor-toolbar__divider" aria-hidden="true"></span>
       <div class="editor-toolbar__group" role="group" aria-label="History">
@@ -97,7 +95,6 @@
 
     <main class="editor-workspace" aria-label="Notation work" data-region="notation-work">
       <section class="editor-canvas" data-editor-canvas data-layout="page">
-        <div class="editor-empty" data-editor-empty aria-hidden="true"></div>
         <div class="editor-score" data-editor-score hidden></div>
       </section>
       <p class="editor-status" role="status" aria-live="polite">
@@ -118,26 +115,36 @@
       </div>
       <span class="editor-bottombar__divider" aria-hidden="true"></span>
       <div class="editor-bottombar__group" role="group" aria-label="Score view">
-        <div class="editor-segment" role="group" aria-label="Score view mode">
-          <button class="editor-segment__button" type="button" data-editor-view="page" aria-pressed="true" title="Page view">Page</button>
-          <button class="editor-segment__button" type="button" data-editor-view="scroll" aria-pressed="false" title="Horizontal view">H view</button>
+        <div class="editor-segment">
+          <div class="editor-export" data-editor-view-menu>
+            <button class="editor-segment__button" type="button" data-editor-view-toggle aria-label="Change score view" aria-expanded="false" aria-haspopup="true" title="Change score view">
+              <span data-editor-view-label>Page</span>
+              <svg class="editor-segment__caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+            </button>
+            <div class="editor-export__menu" role="menu" data-editor-view-list hidden>
+              <button class="editor-export__item" type="button" role="menuitemradio" data-editor-view="page" aria-checked="true">Page view</button>
+              <button class="editor-export__item" type="button" role="menuitemradio" data-editor-view="scroll" aria-checked="false">Horizontal view</button>
+            </div>
+          </div>
         </div>
       </div>
       <span class="editor-bottombar__divider" aria-hidden="true"></span>
       <div class="editor-bottombar__group editor-bottombar__group--end" role="group" aria-label="File">
-        <div class="editor-segment" role="group" aria-label="Save and export">
-          <button class="editor-segment__button" type="button" data-editor-save aria-label="Save score file" title="Save MusicXML (Ctrl+S)" disabled>
+        <div class="editor-segment">
+          <button class="editor-segment__button" type="button" data-editor-save aria-label="Save to my account" title="Save to my account (Ctrl+S)" disabled>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5z" /><path d="M8 4v5h7V4M8 20v-6h8v6" /></svg><span>Save</span>
           </button>
-          <button class="editor-segment__button" type="button" data-editor-export-toggle aria-label="Export" aria-expanded="false" aria-haspopup="true" title="Export" disabled>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4" /><path d="M5 19h14" /></svg><span>Export</span>
-          </button>
         </div>
-        <div class="editor-export" data-editor-export-menu>
-          <div class="editor-export__menu" role="menu" data-editor-export-list hidden>
-            <button class="editor-export__item" type="button" role="menuitem" data-editor-export-pdf disabled>PDF</button>
-            <button class="editor-export__item" type="button" role="menuitem" data-editor-export-svg disabled>SVG</button>
-            <button class="editor-export__item" type="button" role="menuitem" data-editor-export-png disabled>PNG</button>
+        <div class="editor-segment">
+          <div class="editor-export" data-editor-export-menu>
+            <button class="editor-segment__button" type="button" data-editor-export-toggle aria-label="Export" aria-expanded="false" aria-haspopup="true" title="Export" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4" /><path d="M5 19h14" /></svg><span>Export</span>
+            </button>
+            <div class="editor-export__menu" role="menu" data-editor-export-list hidden>
+              <button class="editor-export__item" type="button" role="menuitem" data-editor-export-pdf disabled>PDF</button>
+              <button class="editor-export__item" type="button" role="menuitem" data-editor-export-svg disabled>SVG</button>
+              <button class="editor-export__item" type="button" role="menuitem" data-editor-export-png disabled>PNG</button>
+            </div>
           </div>
         </div>
       </div>
@@ -146,6 +153,6 @@
     <script src="assets/sound-engine.js?v=sound-engine-20261118"></script>
     <script src="script.js?v=app-lock-20261118"></script>
     <script src="notation-doc.js?v=editor-musescore-20261118"></script>
-    <script src="notation-editor.js?v=editor-boxes-20261118"></script>
+    <script src="notation-editor.js?v=editor-account-20261118"></script>
   </body>
 </html>

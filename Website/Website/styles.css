@@ -449,9 +449,6 @@
   align-items:flex-start;
   justify-content:center;
   overflow:auto;
-  border:1px solid var(--border);
-  border-radius:14px;
-  background:var(--surface);
   overscroll-behavior:contain;
 }
 
@@ -478,7 +475,7 @@
   box-shadow:0 -12px 30px rgba(0,0,0,.24);
   backdrop-filter:blur(18px);
 }
-.editor-bottombar__group { display:flex; flex:0 0 auto; align-items:center; gap:5px; }
+.editor-bottombar__group { position:relative; display:flex; flex:0 0 auto; align-items:center; gap:5px; }
 .editor-bottombar__group--end { position:relative; margin-left:auto; }
 .editor-bottombar__divider { flex:0 0 auto; width:1px; height:24px; margin:0 4px; background:var(--border); }
 .editor-bottombar__readout { min-width:46px; color:var(--muted); font-family:'DM Mono',monospace; font-size:10px; text-align:center; }
@@ -538,6 +535,7 @@
   white-space:nowrap;
   transition:background .15s ease,color .15s ease,border-color .15s ease;
 }
+.editor-segment__caret { width:12px; height:12px; opacity:.75; }
 .editor-segment__button svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.7; }
 .editor-segment__button:hover:not(:disabled) { color:var(--text); }
 .editor-segment__button:focus-visible { outline:2px solid var(--accent-bright); outline-offset:2px; }
@@ -545,11 +543,11 @@
 .editor-segment__button[aria-pressed='true'],
 .editor-segment__button.is-active { border-color:var(--border); color:var(--text); background:var(--surface-hover); }
 
-.editor-export { position:absolute; right:0; bottom:100%; }
+.editor-export { position:relative; display:flex; align-items:center; }
 .editor-export__menu {
   position:absolute;
   right:0;
-  bottom:8px;
+  bottom:calc(100% + 8px);
   display:grid;
   min-width:120px;
   gap:2px;
@@ -593,13 +591,11 @@
 .editor-score { cursor:default; }
 .editor-toolbar[data-mode='input'] ~ .editor-workspace .editor-score { cursor:crosshair; }
 
-.editor-empty { flex:1; min-height:inherit; }
 
 .editor-status { display:flex; align-items:center; gap:10px; margin:10px 2px 0; color:var(--muted); font-size:11px; }
 .editor-status__message { min-height:16px; }
 .editor-status__file { margin-left:auto; overflow:hidden; max-width:40%; color:var(--muted); font-family:'DM Mono',monospace; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
 
-:root[data-theme='light'] .editor-canvas { background:#eef2f7; }
 :root[data-theme='light'] .editor-toolbar { background:rgba(255,255,255,.97); }
 
 @media (max-width:860px) {
@@ -616,8 +612,9 @@
 
 /* Compact laptop widths: icon-only keeps the single row short. */
 @media (max-width:1500px) {
-  .editor-tool > span:not(.editor-tool__glyph) { display:none; }
+  .editor-tool:not(.editor-tool--back) > span:not(.editor-tool__glyph) { display:none; }
   .editor-tool { min-width:32px; padding:0 6px; }
+  .editor-tool--back { min-width:auto; padding:0 12px; }
 }
 /* Narrow screens: the one row simply scrolls sideways, so the score keeps
    all the vertical space a wrapped second row would have taken. */
