@@ -136,3 +136,49 @@ The MuseScore repository identifies its program code as **GPL-3.0-only**. Repres
 **Source intake status:** no MuseScore source snapshot has been copied into this repository. GPL-3.0-only source is not automatically prohibited, but it is not considered compatible by default while the engine's release/license policy remains undecided. For now, keep the audited C++ source as pinned links/reference only; first inventory each proposed file and asset's own license. Reuse an external resource only when its terms and required attribution are recorded and compatible with the project. Do not copy Bravura font binaries or GPL C++ note/engraving/import files at this stage. Where source is not approved, derive behavior from public notation formats and test cases, then write independent TypeScript against the existing score model and mapping modules. If a GPL-compatible distribution decision is made later, revisit a clearly separated, non-build reference snapshot with the complete upstream license, per-file notices, exact commit and source manifest. Do not clone/import the entire MuseScore repository.
 
 Official references: [MuseScore repository at audited commit](https://github.com/musescore/MuseScore/tree/e32154cc04e12a05f52942cd9dc7b7e7f67685ce), [upstream license](https://github.com/musescore/MuseScore/blob/e32154cc04e12a05f52942cd9dc7b7e7f67685ce/LICENSE.txt), [note model](https://github.com/musescore/MuseScore/blob/e32154cc04e12a05f52942cd9dc7b7e7f67685ce/src/engraving/dom/note.h), [MusicXML note pitch import](https://github.com/musescore/MuseScore/blob/e32154cc04e12a05f52942cd9dc7b7e7f67685ce/src/importexport/musicxml/internal/import/importmusicxmlnotepitch.cpp), [note-input interface](https://github.com/musescore/MuseScore/blob/e32154cc04e12a05f52942cd9dc7b7e7f67685ce/src/notation/inotationnoteinput.h), [instrument catalogue](https://github.com/musescore/MuseScore/blob/e32154cc04e12a05f52942cd9dc7b7e7f67685ce/share/instruments/instruments.xml), and [Bravura font license](https://github.com/musescore/MuseScore/blob/e32154cc04e12a05f52942cd9dc7b7e7f67685ce/fonts/bravura/LICENSE.txt).
+
+## MuseScore provenance remediation — 2026-11-18
+
+The audit above left one concrete risk: the engine shipped `src/musescore/`, a
+copy of a GPL-3.0-only program's tables, and several engine defaults read from
+it. That folder is now deleted, and the engine answers from its own
+`src/notation-defaults/` data layer.
+
+- [x] Build `src/notation-defaults/` as the engine's own data layer: clefs,
+      staff positions, notehead groups, the General MIDI drum kit, string/tab
+      data, engraving style, the spacing law and the segment stretch. Each
+      table carries a `DefaultsSource` naming the public specification it comes
+      from (`musicxml`, `smufl`, `gm1`, `drumNotation`, or `houseStyle` for the
+      engine's own choices).
+- [x] Correct the engraving measurements to match the bundled Bravura font's
+      own `engravingDefaults`, so the numbers come from the font metadata the
+      engine already ships rather than from another program.
+- [x] Rewire the engine: `drums/drum-map.ts`, `layout/spacing.ts`,
+      `config/config.ts` and `index.ts` read `notation-defaults` instead of
+      `musescore`.
+- [x] Rename the shipped spacing law from `'musescore'` to `'power'`, because it
+      is now the engine's own default and is no longer named after another
+      program.
+- [x] Express the drum kit's heads in the engine's own shape-family vocabulary
+      (`x`, `circle-x`, `diamond`, ...), keeping an exact SMuFL glyph only where
+      no family describes the head.
+- [x] Delete `src/musescore/` and stop exporting the `MuseScore` namespace.
+- [x] Replace the two MuseScore-comparison test files with `notation-data.test.js`
+      and `engraving-parity.test.js`, which test this engine's own data against
+      the public specifications and against the bundled font, not against a
+      second copy of another program's tables.
+- [x] Add `test/unit/editor-integration.test.js`, which runs the Notation Lab
+      editor's own scripts against the built engine in a jsdom window and drives
+      the round trip the page drives (parse → edit → serialize → re-parse →
+      render), including a full `notation-editor.html` startup.
+
+**Completion criterion:** the engine must have no build-time dependency on
+GPL-3.0-only source or tables, and every remaining default must name the public
+specification it comes from. `npm run verify` must be green with the MuseScore
+folder gone. Both hold: 1163/1163 tests pass, and no engine module imports a
+MuseScore file.
+
+**What is deliberately kept:** the audited MuseScore repository remains a pinned
+reference *only* -- links and behaviour notes, no copied source. The audit's
+`9140c5e4...` provenance pin is no longer used by any shipped table, because the
+shipped tables are now the engine's own.
