@@ -353,6 +353,25 @@ describe('Phase 52: export (§3)', () => {
       );
     });
 
+    test('slicing covers every row when the height does not divide evenly', async () => {
+      // 40px over 3 slices: a single rounded slice height of 13 would put
+      // 39 rows on the pages and silently drop the last one.
+      const { backend, record } = stubBackend();
+      const images = await NE.rasterizeSvg(svg, { backend, scale: 1, slices: 3 });
+      const covered = record.reduce((sum, r) => sum + r.canvasHeight, 0);
+      assert.equal(covered, 40, 'the slices together cover the whole height');
+      assert.deepEqual(
+        record.map((r) => r.y),
+        [0, -13, -26],
+        'each slice starts where the previous one ended',
+      );
+      assert.deepEqual(
+        [...images].map((i) => i.height),
+        [13, 13, 14],
+        'the last slice takes the remainder',
+      );
+    });
+
     test('exportPng goes end to end through the stub backend', async () => {
       const { backend } = stubBackend();
       const bytes = await NE.exportPng(svg, { backend, scale: 1, dpi: 96 });

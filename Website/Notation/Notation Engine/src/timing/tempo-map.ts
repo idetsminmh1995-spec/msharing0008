@@ -38,11 +38,32 @@ export interface BuildTempoMapResult {
 export function buildTempoMap(rawEvents: readonly RawTempoEvent[]): BuildTempoMapResult {
   const diagnostics: TimingDiagnostic[] = [];
 
+  // A tempo of zero, negative, or not a number would divide the seconds
+  // computation by zero or run time backwards. MusicXML hands us whatever
+  // the file said, so guard here rather than let a bad file poison every
+  // later tickToSeconds call: drop the bad event and say so.
+  const events = rawEvents.filter((event) => {
+    const validTempo =
+      Number.isFinite(event.microsecondsPerQuarter) && event.microsecondsPerQuarter > 0;
+    const validTick = Number.isFinite(event.tick) && event.tick >= 0;
+    if (validTempo && validTick) return true;
+    diagnostics.push(
+      timingDiagnostic(
+        'warning',
+        'INVALID_TEMPO_EVENT',
+        `Dropped a tempo event with tick=${event.tick} and ` +
+          `microsecondsPerQuarter=${event.microsecondsPerQuarter}; ` +
+          'a tempo must be a positive, finite number of microseconds per quarter.',
+      ),
+    );
+    return false;
+  });
+
   // Sort by tick, and where two events share a tick, keep the LAST one
   // declared (matching the same "later wins" convention MusicXML's own
   // <attributes> merging already uses) -- a stable sort preserves
   // original relative order for same-tick events before this reduction.
-  const sorted = [...rawEvents].sort((a, b) => a.tick - b.tick);
+  const sorted = [...events].sort((a, b) => a.tick - b.tick);
   const byTick = new Map<number, number>();
   for (const e of sorted) byTick.set(e.tick, e.microsecondsPerQuarter);
   let dedupedTicks = [...byTick.keys()].sort((a, b) => a - b);

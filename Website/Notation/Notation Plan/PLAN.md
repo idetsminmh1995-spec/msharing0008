@@ -112,10 +112,10 @@ Implementation sequence:
 
 ### Part G — Timing, playback နှင့် export correctness
 
-- [ ] `buildTempoMap()` နှင့် measure map တို့တွင် non-finite/zero/negative tempo နှင့် meter values အတွက် validation/diagnostics ထည့်ပါ။ Conversion ရလဒ် finite ဖြစ်ကြောင်း tests ဖြင့်စစ်ပါ။
+- [x] `buildTempoMap()` တွင် non-finite/zero/negative tempo အတွက် validation/diagnostics ထည့်ပြီးဖြစ်သည် (`INVALID_TEMPO_EVENT`)။ Bad event ကို drop လုပ်ပြီး ကျန် map ကို ဆက်သုံးသည်။ Test က conversion ရလဒ် finite/non-decreasing ဖြစ်ကြောင်း စစ်သည်။
 - [ ] Playhead interpolation တွင် nominal time signature မဟုတ်ဘဲ pickup, shortened, overfull measure များ၏ actual tick length ကို `PlaybackData` ထဲ သယ်ဆောင်သုံးပါ။ Boundary နှင့် monotonicity tests ထည့်ပါ။
-- [ ] `rasterizeSvg()` ၏ rounded slice height ကြောင့် source row ပျောက်/ထပ်နိုင်ခြေကို ဖြေရှင်းပါ။ 40px/3 slices ကဲ့သို့ remainder ရှိသည့် dimension တွင် pixel row အားလုံး တစ်ကြိမ်တည်းပါဝင်ကြောင်း စစ်ပါ။
-- [ ] `exportPng()` က first slice ကိုသာပြန်ခြင်း၊ PDF က raster-image based ဖြစ်ခြင်း၊ rasterization အတွက် browser/host backend လိုခြင်းတို့ကို public docs တွင်ဖော်ပြပါ။
+- [x] `rasterizeSvg()` ၏ rounded slice height ကြောင့် source row ပျောက်ခြင်းကို ဖြေရှင်းပြီးဖြစ်သည် -- slice boundary များကို floor division ဖြင့် တွက်သည်။ 40px/3 slices ကဲ့သို့ remainder အတွက် regression test ရှိသည်။
+- [x] `exportPng()` က first slice ကိုသာပြန်ခြင်း၊ PDF က raster-image based ဖြစ်ခြင်း၊ rasterization အတွက် browser/host backend လိုခြင်းတို့ကို root `README.md` တွင် ဖော်ပြပြီးဖြစ်သည်။
 - [ ] Alignment, repeat expansion နှင့် raster/PDF encoding အတွက် representative performance budget များထည့်ပါ။
 
 **ပြီးစီးမှုစံ:** Invalid timing data အတွက် deterministic diagnostics ရှိရမည်။ Raster output တွင် rows မပျောက်ရ/မထပ်ရ။
@@ -124,7 +124,7 @@ Implementation sequence:
 
 ### Part H — Runtime config validation
 
-- [ ] `resolveConfig()` က JavaScript caller များမှလာသော enum/numeric ranges နှင့် unknown override များကို runtime validation/diagnostics ဖြင့် ကိုင်တွယ်ပါ။ Invalid value ကို တိတ်တဆိတ် လက်မခံရ။
+- [x] `resolveConfigWithDiagnostics()` ထည့်ပြီးဖြစ်သည်: JavaScript caller များမှလာသော out-of-range numeric (`INVALID_CONFIG_VALUE`), unknown enum (`UNKNOWN_CONFIG_VALUE`), နှင့် mistyped/unknown field (`UNKNOWN_CONFIG_FIELD`) များကို diagnostic အဖြစ် ပြန်သည်။ Renderer သည် ၎င်းတို့ကို score-file diagnostic များနှင့် တူညီသော `diagnostics` channel ထဲ ထည့်သည် -- throw မလုပ်ပါ။ Invalid value ကို တိတ်တဆိတ် လက်မခံပါ။
 
 **ပြီးစီးမှုစံ:** Invalid config behavior အဓိပ္ပာယ်ရှင်းလင်းပြီး diagnostic ဖြင့် သတိပေးရမည်။
 

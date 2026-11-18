@@ -630,3 +630,210 @@ export function resolveConfig(overrides?: PartialEngineConfig): EngineConfig {
     debug: { ...DEFAULT_CONFIG.debug, ...overrides?.debug },
   };
 }
+
+// ---- runtime validation (PLAN.md Part H) ----
+
+/**
+ * A problem found in a caller-supplied config.
+ *
+ * TypeScript catches these at compile time, but this engine's callers are
+ * not all TypeScript -- the bundle is a plain global a page drives from
+ * JavaScript, where `{ layout: { pxPerStaffSpace: 0 } }` or a mistyped
+ * enum compiles fine and then draws nothing. The rule is the same one the
+ * parsers follow: never silently accept input the engine cannot use.
+ */
+export interface ConfigDiagnostic {
+  readonly severity: 'warning';
+  readonly code: 'INVALID_CONFIG_VALUE' | 'UNKNOWN_CONFIG_VALUE' | 'UNKNOWN_CONFIG_FIELD';
+  /** Dotted path to the offending value, e.g. `layout.pxPerStaffSpace`. */
+  readonly path: string;
+  readonly message: string;
+}
+
+interface NumericRule {
+  readonly path: string;
+  /** Inclusive lower bound. */
+  readonly min?: number;
+  /** Inclusive upper bound. */
+  readonly max?: number;
+  /** When set, `min` is exclusive (the value must be strictly greater). */
+  readonly exclusiveMin?: boolean;
+}
+
+interface EnumRule {
+  readonly path: string;
+  readonly allowed: readonly string[];
+}
+
+const NUMERIC_RULES: readonly NumericRule[] = [
+  { path: 'layout.pxPerStaffSpace', min: 0, exclusiveMin: true },
+  { path: 'fonts.sizes.barNumber', min: 0, exclusiveMin: true },
+  { path: 'fonts.sizes.lyric', min: 0, exclusiveMin: true },
+  { path: 'fonts.sizes.dynamic', min: 0, exclusiveMin: true },
+  { path: 'fonts.sizes.tempo', min: 0, exclusiveMin: true },
+  { path: 'fonts.sizes.chordSymbol', min: 0, exclusiveMin: true },
+  { path: 'cursor.fixedFraction', min: 0, max: 1 },
+  { path: 'cursor.thickness', min: 0, exclusiveMin: true },
+  { path: 'cursor.opacity', min: 0, max: 1 },
+  { path: 'spacing.quarterNoteSpace', min: 0, exclusiveMin: true },
+  { path: 'spacing.durationSlope', min: 0, exclusiveMin: true },
+  { path: 'spacing.spacingDensity', min: 0, exclusiveMin: true },
+  { path: 'spacing.spacingIncrement', min: 0, exclusiveMin: true },
+  { path: 'spacing.shortestDurationSpace', min: 0, exclusiveMin: true },
+  { path: 'spacing.minNoteDistance', min: 0 },
+  { path: 'spacing.minMeasureWidth', min: 0, exclusiveMin: true },
+  { path: 'staves.minStaffDistance', min: 0, exclusiveMin: true },
+  { path: 'staves.minSystemDistance', min: 0, exclusiveMin: true },
+  { path: 'page.pageWidth', min: 0, exclusiveMin: true },
+  { path: 'page.pageHeight', min: 0, exclusiveMin: true },
+  { path: 'page.marginTop', min: 0 },
+  { path: 'page.marginBottom', min: 0 },
+  { path: 'page.marginLeft', min: 0 },
+  { path: 'page.marginRight', min: 0 },
+  { path: 'text.lyricGap', min: 0 },
+  { path: 'text.lyricRowHeight', min: 0, exclusiveMin: true },
+  { path: 'text.chordSymbolGap', min: 0 },
+  { path: 'barNumbers.everyNBars', min: 1, exclusiveMin: true },
+];
+
+const ENUM_RULES: readonly EnumRule[] = [
+  { path: 'layout.mode', allowed: ['scroll', 'page'] },
+  { path: 'cursor.mode', allowed: ['cursorMoves', 'notationMoves'] },
+  { path: 'beam.style', allowed: ['straight', 'flat', 'curved'] },
+  { path: 'barNumbers.display', allowed: ['off', 'everyBar', 'everyNBars', 'systemStart'] },
+  { path: 'tempoMarks.display', allowed: ['auto', 'off'] },
+  { path: 'keySignature.style', allowed: ['standard'] },
+  { path: 'spacing.law', allowed: ['power', 'increment'] },
+  { path: 'drums.closedHiHatPulse', allowed: ['as-written', 'quarter-to-eighths'] },
+  { path: 'text.lyricsDisplay', allowed: ['on', 'off'] },
+  { path: 'text.chordSymbolsDisplay', allowed: ['on', 'off'] },
+  { path: 'text.rehearsalMarksDisplay', allowed: ['on', 'off'] },
+  { path: 'text.wordsDisplay', allowed: ['on', 'off'] },
+  { path: 'debug.logLevel', allowed: ['silent', 'error', 'warn', 'info', 'debug'] },
+];
+
+function valueAtPath(root: unknown, path: string): unknown {
+  return path.split('.').reduce<unknown>((node, key) => {
+    if (node === null || typeof node !== 'object') return undefined;
+    return (node as Record<string, unknown>)[key];
+  }, root);
+}
+
+function describeBound(rule: NumericRule): string {
+  if (rule.min !== undefined && rule.max !== undefined)
+    return `between ${rule.min} and ${rule.max}`;
+  if (rule.min !== undefined)
+    return `${rule.exclusiveMin === true ? 'greater than' : 'at least'} ${rule.min}`;
+  if (rule.max !== undefined) return `at most ${rule.max}`;
+  return 'a number';
+}
+
+/**
+ * Every problem in a resolved config, as diagnostics rather than throws --
+ * a caller gets a usable score plus a list of what it should fix.
+ *
+ * Checks the config a caller would actually render with, so an override
+ * that TypeScript would have caught is still caught here.
+ */
+export function validateConfig(config: EngineConfig): readonly ConfigDiagnostic[] {
+  const out: ConfigDiagnostic[] = [];
+
+  for (const rule of NUMERIC_RULES) {
+    const value = valueAtPath(config, rule.path);
+    if (value === undefined) continue; // an unset optional (e.g. everyNBars) is fine
+    const ok =
+      typeof value === 'number' &&
+      Number.isFinite(value) &&
+      (rule.min === undefined ||
+        (rule.exclusiveMin === true ? value > rule.min : value >= rule.min)) &&
+      (rule.max === undefined || value <= rule.max);
+    if (!ok) {
+      out.push({
+        severity: 'warning',
+        code: 'INVALID_CONFIG_VALUE',
+        path: rule.path,
+        message: `${rule.path} must be ${describeBound(rule)}, but is ${JSON.stringify(value)}.`,
+      });
+    }
+  }
+
+  for (const rule of ENUM_RULES) {
+    const value = valueAtPath(config, rule.path);
+    if (value === undefined) continue;
+    if (typeof value !== 'string' || !rule.allowed.includes(value)) {
+      out.push({
+        severity: 'warning',
+        code: 'UNKNOWN_CONFIG_VALUE',
+        path: rule.path,
+        message: `${rule.path} must be one of ${rule.allowed.join(', ')}, but is ${JSON.stringify(value)}.`,
+      });
+    }
+  }
+
+  // `everyNBars` only means anything under `display: 'everyNBars'`.
+  if (config.barNumbers.display !== 'everyNBars' && config.barNumbers.everyNBars !== undefined) {
+    out.push({
+      severity: 'warning',
+      code: 'INVALID_CONFIG_VALUE',
+      path: 'barNumbers.everyNBars',
+      message:
+        'barNumbers.everyNBars is set but barNumbers.display is not "everyNBars", so it is ignored.',
+    });
+  }
+
+  return out;
+}
+
+/**
+ * Fields a section does not define. Derived from DEFAULT_CONFIG, so it
+ * stays correct as sections gain fields. A caller that passes a mistyped
+ * field name (`{ layout: { pxPerStaffspace: 30 } }`) otherwise gets the
+ * default silently, which looks like the override was ignored.
+ *
+ * A few fields are genuinely optional and so absent from DEFAULT_CONFIG
+ * (a map that starts empty, a switch that only means something under
+ * another value); they are listed here so they are not mistaken for
+ * typos.
+ */
+const OPTIONAL_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  colors: ['overrides'],
+  layout: ['fitSystemHeight', 'minStrokeWidth'],
+  noteheadMapping: ['overridesByKey'],
+  barNumbers: ['everyNBars'],
+  drums: ['mapping'],
+};
+
+function unknownFieldDiagnostics(overrides: PartialEngineConfig): ConfigDiagnostic[] {
+  const out: ConfigDiagnostic[] = [];
+  for (const [section, value] of Object.entries(overrides)) {
+    if (value === null || typeof value !== 'object') continue;
+    const known = [
+      ...Object.keys(DEFAULT_CONFIG[section as keyof EngineConfig]),
+      ...(OPTIONAL_FIELDS[section] ?? []),
+    ];
+    for (const field of Object.keys(value as Record<string, unknown>)) {
+      if (known.includes(field)) continue;
+      out.push({
+        severity: 'warning',
+        code: 'UNKNOWN_CONFIG_FIELD',
+        path: `${section}.${field}`,
+        message: `${section} has no field "${field}", so it was ignored.`,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * `resolveConfig`, plus the diagnostics for anything the caller got wrong.
+ * This is what the renderer calls, so a bad config surfaces through the
+ * same `diagnostics` channel as a bad score file.
+ */
+export function resolveConfigWithDiagnostics(overrides?: PartialEngineConfig): {
+  readonly config: EngineConfig;
+  readonly diagnostics: readonly ConfigDiagnostic[];
+} {
+  const config = resolveConfig(overrides);
+  const diagnostics = [...unknownFieldDiagnostics(overrides ?? {}), ...validateConfig(config)];
+  return { config, diagnostics };
+}

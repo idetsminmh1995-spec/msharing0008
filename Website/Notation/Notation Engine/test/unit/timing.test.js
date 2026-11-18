@@ -14,6 +14,33 @@ describe('TempoMap construction (Phase 40, §12.1/§12.2)', () => {
     assert.ok([...diagnostics].some((d) => d.code === 'EMPTY_TEMPO_MAP'));
   });
 
+  test('a zero, negative, or non-finite tempo is dropped with an INVALID_TEMPO_EVENT warning', () => {
+    const { tempoMap, diagnostics } = NE.buildTempoMap([
+      { tick: 0, microsecondsPerQuarter: 500000 },
+      { tick: 1920, microsecondsPerQuarter: 0 },
+      { tick: 3840, microsecondsPerQuarter: -100 },
+      { tick: 5760, microsecondsPerQuarter: Number.NaN },
+      { tick: Number.POSITIVE_INFINITY, microsecondsPerQuarter: 400000 },
+    ]);
+    assert.equal(
+      tempoMap.segments.length,
+      1,
+      'only the one valid tempo survives, so there is one segment',
+    );
+    assert.equal(tempoMap.segments[0].microsecondsPerQuarter, 500000);
+    assert.equal(
+      [...diagnostics].filter((d) => d.code === 'INVALID_TEMPO_EVENT').length,
+      4,
+      'each bad event is reported once',
+    );
+    // Every surviving segment must keep time finite and non-decreasing.
+    for (const segment of tempoMap.segments) {
+      assert.ok(Number.isFinite(segment.startSeconds));
+      assert.ok(segment.startSeconds >= 0);
+      assert.ok(segment.microsecondsPerQuarter > 0);
+    }
+  });
+
   test('a tempo map starting after tick 0 gets an implicit 120 BPM segment prepended, with no warning (this is normal, not malformed)', () => {
     const { tempoMap, diagnostics } = NE.buildTempoMap([{ tick: 1920, microsecondsPerQuarter: 400000 }]);
     assert.equal(tempoMap.segments.length, 2);

@@ -134,7 +134,7 @@ import type {
 import { parseMusicXml, type ParseMusicXmlOptions, type ParseResult } from './parser/index.js';
 import type { ScoreDefaults, ScoreLineWidths } from './parser/musicxml/defaults.js';
 import {
-  resolveConfig,
+  resolveConfigWithDiagnostics,
   type EngineConfig,
   type FontSizeConfig,
   type NoteheadMappingConfig,
@@ -3429,7 +3429,14 @@ export function renderParsedMusicXml(
     defaults: fileDefaults,
   } = parsed;
   const diagnostics: Diagnostic[] = [...parseDiagnostics];
-  const config = resolveConfig(options?.config);
+  const { config, diagnostics: configDiagnostics } = resolveConfigWithDiagnostics(options?.config);
+  for (const d of configDiagnostics) {
+    diagnostics.push({
+      severity: d.severity,
+      code: d.code,
+      message: `${d.message} (${d.path})`,
+    });
+  }
   const score =
     config.drums.closedHiHatPulse === 'quarter-to-eighths'
       ? expandClosedHiHatQuarterNotesToEighthPulse(

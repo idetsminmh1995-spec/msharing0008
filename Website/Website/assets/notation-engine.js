@@ -281,6 +281,7 @@ var NotationEngine = (() => {
     resetMeasure: () => resetMeasure,
     resizePureScale: () => resizePureScale,
     resolveConfig: () => resolveConfig,
+    resolveConfigWithDiagnostics: () => resolveConfigWithDiagnostics,
     resolveNoteheadCollision: () => resolveNoteheadCollision,
     resolvePosition: () => resolvePosition,
     resolveStemDirection: () => resolveStemDirection,
@@ -332,6 +333,7 @@ var NotationEngine = (() => {
     tupletSide: () => tupletSide,
     unpitchedPitch: () => unpitchedPitch,
     unzipMxl: () => unzipMxl,
+    validateConfig: () => validateConfig,
     verticalInkSpan: () => verticalInkSpan,
     voice: () => voice,
     voiceForcedDirection: () => voiceForcedDirection,
@@ -71026,6 +71028,134 @@ ${denominator}`;
       debug: { ...DEFAULT_CONFIG.debug, ...overrides?.debug }
     };
   }
+  var NUMERIC_RULES = [
+    { path: "layout.pxPerStaffSpace", min: 0, exclusiveMin: true },
+    { path: "fonts.sizes.barNumber", min: 0, exclusiveMin: true },
+    { path: "fonts.sizes.lyric", min: 0, exclusiveMin: true },
+    { path: "fonts.sizes.dynamic", min: 0, exclusiveMin: true },
+    { path: "fonts.sizes.tempo", min: 0, exclusiveMin: true },
+    { path: "fonts.sizes.chordSymbol", min: 0, exclusiveMin: true },
+    { path: "cursor.fixedFraction", min: 0, max: 1 },
+    { path: "cursor.thickness", min: 0, exclusiveMin: true },
+    { path: "cursor.opacity", min: 0, max: 1 },
+    { path: "spacing.quarterNoteSpace", min: 0, exclusiveMin: true },
+    { path: "spacing.durationSlope", min: 0, exclusiveMin: true },
+    { path: "spacing.spacingDensity", min: 0, exclusiveMin: true },
+    { path: "spacing.spacingIncrement", min: 0, exclusiveMin: true },
+    { path: "spacing.shortestDurationSpace", min: 0, exclusiveMin: true },
+    { path: "spacing.minNoteDistance", min: 0 },
+    { path: "spacing.minMeasureWidth", min: 0, exclusiveMin: true },
+    { path: "staves.minStaffDistance", min: 0, exclusiveMin: true },
+    { path: "staves.minSystemDistance", min: 0, exclusiveMin: true },
+    { path: "page.pageWidth", min: 0, exclusiveMin: true },
+    { path: "page.pageHeight", min: 0, exclusiveMin: true },
+    { path: "page.marginTop", min: 0 },
+    { path: "page.marginBottom", min: 0 },
+    { path: "page.marginLeft", min: 0 },
+    { path: "page.marginRight", min: 0 },
+    { path: "text.lyricGap", min: 0 },
+    { path: "text.lyricRowHeight", min: 0, exclusiveMin: true },
+    { path: "text.chordSymbolGap", min: 0 },
+    { path: "barNumbers.everyNBars", min: 1, exclusiveMin: true }
+  ];
+  var ENUM_RULES = [
+    { path: "layout.mode", allowed: ["scroll", "page"] },
+    { path: "cursor.mode", allowed: ["cursorMoves", "notationMoves"] },
+    { path: "beam.style", allowed: ["straight", "flat", "curved"] },
+    { path: "barNumbers.display", allowed: ["off", "everyBar", "everyNBars", "systemStart"] },
+    { path: "tempoMarks.display", allowed: ["auto", "off"] },
+    { path: "keySignature.style", allowed: ["standard"] },
+    { path: "spacing.law", allowed: ["power", "increment"] },
+    { path: "drums.closedHiHatPulse", allowed: ["as-written", "quarter-to-eighths"] },
+    { path: "text.lyricsDisplay", allowed: ["on", "off"] },
+    { path: "text.chordSymbolsDisplay", allowed: ["on", "off"] },
+    { path: "text.rehearsalMarksDisplay", allowed: ["on", "off"] },
+    { path: "text.wordsDisplay", allowed: ["on", "off"] },
+    { path: "debug.logLevel", allowed: ["silent", "error", "warn", "info", "debug"] }
+  ];
+  function valueAtPath(root, path) {
+    return path.split(".").reduce((node, key) => {
+      if (node === null || typeof node !== "object") return void 0;
+      return node[key];
+    }, root);
+  }
+  function describeBound(rule) {
+    if (rule.min !== void 0 && rule.max !== void 0)
+      return `between ${rule.min} and ${rule.max}`;
+    if (rule.min !== void 0)
+      return `${rule.exclusiveMin === true ? "greater than" : "at least"} ${rule.min}`;
+    if (rule.max !== void 0) return `at most ${rule.max}`;
+    return "a number";
+  }
+  function validateConfig(config) {
+    const out = [];
+    for (const rule of NUMERIC_RULES) {
+      const value = valueAtPath(config, rule.path);
+      if (value === void 0) continue;
+      const ok = typeof value === "number" && Number.isFinite(value) && (rule.min === void 0 || (rule.exclusiveMin === true ? value > rule.min : value >= rule.min)) && (rule.max === void 0 || value <= rule.max);
+      if (!ok) {
+        out.push({
+          severity: "warning",
+          code: "INVALID_CONFIG_VALUE",
+          path: rule.path,
+          message: `${rule.path} must be ${describeBound(rule)}, but is ${JSON.stringify(value)}.`
+        });
+      }
+    }
+    for (const rule of ENUM_RULES) {
+      const value = valueAtPath(config, rule.path);
+      if (value === void 0) continue;
+      if (typeof value !== "string" || !rule.allowed.includes(value)) {
+        out.push({
+          severity: "warning",
+          code: "UNKNOWN_CONFIG_VALUE",
+          path: rule.path,
+          message: `${rule.path} must be one of ${rule.allowed.join(", ")}, but is ${JSON.stringify(value)}.`
+        });
+      }
+    }
+    if (config.barNumbers.display !== "everyNBars" && config.barNumbers.everyNBars !== void 0) {
+      out.push({
+        severity: "warning",
+        code: "INVALID_CONFIG_VALUE",
+        path: "barNumbers.everyNBars",
+        message: 'barNumbers.everyNBars is set but barNumbers.display is not "everyNBars", so it is ignored.'
+      });
+    }
+    return out;
+  }
+  var OPTIONAL_FIELDS = {
+    colors: ["overrides"],
+    layout: ["fitSystemHeight", "minStrokeWidth"],
+    noteheadMapping: ["overridesByKey"],
+    barNumbers: ["everyNBars"],
+    drums: ["mapping"]
+  };
+  function unknownFieldDiagnostics(overrides) {
+    const out = [];
+    for (const [section, value] of Object.entries(overrides)) {
+      if (value === null || typeof value !== "object") continue;
+      const known = [
+        ...Object.keys(DEFAULT_CONFIG[section]),
+        ...OPTIONAL_FIELDS[section] ?? []
+      ];
+      for (const field of Object.keys(value)) {
+        if (known.includes(field)) continue;
+        out.push({
+          severity: "warning",
+          code: "UNKNOWN_CONFIG_FIELD",
+          path: `${section}.${field}`,
+          message: `${section} has no field "${field}", so it was ignored.`
+        });
+      }
+    }
+    return out;
+  }
+  function resolveConfigWithDiagnostics(overrides) {
+    const config = resolveConfig(overrides);
+    const diagnostics = [...unknownFieldDiagnostics(overrides ?? {}), ...validateConfig(config)];
+    return { config, diagnostics };
+  }
 
   // src/parser/musicxml/diagnostic.ts
   function diagnostic(severity, code, message, location) {
@@ -74598,7 +74728,20 @@ ${denominator}`;
   var DEFAULT_MICROSECONDS_PER_QUARTER = 5e5;
   function buildTempoMap(rawEvents) {
     const diagnostics = [];
-    const sorted = [...rawEvents].sort((a, b) => a.tick - b.tick);
+    const events = rawEvents.filter((event) => {
+      const validTempo = Number.isFinite(event.microsecondsPerQuarter) && event.microsecondsPerQuarter > 0;
+      const validTick = Number.isFinite(event.tick) && event.tick >= 0;
+      if (validTempo && validTick) return true;
+      diagnostics.push(
+        timingDiagnostic(
+          "warning",
+          "INVALID_TEMPO_EVENT",
+          `Dropped a tempo event with tick=${event.tick} and microsecondsPerQuarter=${event.microsecondsPerQuarter}; a tempo must be a positive, finite number of microseconds per quarter.`
+        )
+      );
+      return false;
+    });
+    const sorted = [...events].sort((a, b) => a.tick - b.tick);
     const byTick = /* @__PURE__ */ new Map();
     for (const e of sorted) byTick.set(e.tick, e.microsecondsPerQuarter);
     let dedupedTicks = [...byTick.keys()].sort((a, b) => a - b);
@@ -76903,11 +77046,13 @@ ${xrefOffset}
     const image = await backend.loadImage(svgToDataUri(svg));
     const fullWidth = Math.max(1, Math.round(width * scale));
     const fullHeight = Math.max(1, Math.round(height * scale));
-    const sliceHeight = Math.max(1, Math.round(fullHeight / slices));
     const out = [];
     for (let i2 = 0; i2 < slices; i2++) {
+      const start = Math.floor(i2 * fullHeight / slices);
+      const end = Math.floor((i2 + 1) * fullHeight / slices);
+      const sliceHeight = Math.max(1, end - start);
       const canvas = backend.createCanvas(fullWidth, sliceHeight);
-      const offsetY = i2 === 0 ? 0 : -(i2 * sliceHeight);
+      const offsetY = start === 0 ? 0 : -start;
       canvas.drawImage(image, 0, offsetY, fullWidth, fullHeight);
       out.push(canvas.getImageData());
     }
@@ -78654,7 +78799,14 @@ ${xrefOffset}
       defaults: fileDefaults
     } = parsed;
     const diagnostics = [...parseDiagnostics];
-    const config = resolveConfig(options?.config);
+    const { config, diagnostics: configDiagnostics } = resolveConfigWithDiagnostics(options?.config);
+    for (const d of configDiagnostics) {
+      diagnostics.push({
+        severity: d.severity,
+        code: d.code,
+        message: `${d.message} (${d.path})`
+      });
+    }
     const score2 = config.drums.closedHiHatPulse === "quarter-to-eighths" ? expandClosedHiHatQuarterNotesToEighthPulse(
       parsedScore,
       attributes,

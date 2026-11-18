@@ -116,10 +116,18 @@ function svgPixelSize(svg: string): { width: number; height: number } {
  * The SVG as one RGBA image per slice.
  *
  * Each slice is drawn by placing the WHOLE image at a negative y offset
- * on a canvas the height of one slice -- the browser clips it, which
+ * on a canvas the height of that slice -- the browser clips it, which
  * costs nothing and avoids re-serializing the SVG once per page with a
  * different viewBox (which would re-resolve and re-lay-out the fonts
  * every time).
+ *
+ * The slice boundaries are computed as even FLOOR divisions of the full
+ * height, not as `height / slices` rounded once and multiplied back. A
+ * single rounded slice height leaves the remainder rows uncovered: 40px
+ * over 3 slices rounds to 13, and 3 x 13 = 39, so the bottom row of the
+ * score is simply gone from every page. Floor boundaries always end the
+ * last slice at exactly `fullHeight`, so every row lands on exactly one
+ * page.
  */
 export async function rasterizeSvg(
   svg: string,
@@ -133,14 +141,16 @@ export async function rasterizeSvg(
   const image = await backend.loadImage(svgToDataUri(svg));
   const fullWidth = Math.max(1, Math.round(width * scale));
   const fullHeight = Math.max(1, Math.round(height * scale));
-  const sliceHeight = Math.max(1, Math.round(fullHeight / slices));
 
   const out: RgbaImage[] = [];
   for (let i = 0; i < slices; i++) {
+    const start = Math.floor((i * fullHeight) / slices);
+    const end = Math.floor(((i + 1) * fullHeight) / slices);
+    const sliceHeight = Math.max(1, end - start);
     const canvas = backend.createCanvas(fullWidth, sliceHeight);
     // `0` rather than `-0` for the first slice -- a host shouldn't be
     // handed a negative zero for "no offset".
-    const offsetY = i === 0 ? 0 : -(i * sliceHeight);
+    const offsetY = start === 0 ? 0 : -start;
     canvas.drawImage(image, 0, offsetY, fullWidth, fullHeight);
     out.push(canvas.getImageData());
   }

@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-740 exported symbols, by module.
+743 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -430,6 +430,9 @@ The diagnostics `level` lets through, in their original order.
 | interface | `PartialEngineConfig` | Same shape as EngineConfig, but every section and every field within it is optional -- what callers pass to resolveConfig(). |
 | **API** | `DEFAULT_CONFIG` | Reasonable defaults for every section -- black ink on white, scroll layout at a modest pixel scale, notation-moves cursor sync (matching the earlier drum-video project's panning behavior), plain noteheads, straight beams, bar numbers at each system start, standard key signatures. |
 | **API** | `resolveConfig` | Merges a partial config against DEFAULT_CONFIG, section by section -- every section not mentioned in `overrides` keeps its default wholesale, and every field not mentioned within a section that IS overridden keeps that section's default for just that field. |
+| interface | `ConfigDiagnostic` | A problem found in a caller-supplied config. |
+| function | `validateConfig` | Every problem in a resolved config, as diagnostics rather than throws -- a caller gets a usable score plus a list of what it should fix. |
+| function | `resolveConfigWithDiagnostics` | `resolveConfig`, plus the diagnostics for anything the caller got wrong. |
 
 ### `src/core/chord.ts`
 
