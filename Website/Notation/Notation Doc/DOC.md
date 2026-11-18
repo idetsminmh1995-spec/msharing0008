@@ -72,6 +72,7 @@ Repo ထဲတွင် unit test file 95 ခု၊ visual snapshot file 29 ခ�
 6. **Raster slicing:** `rasterizeSvg()` တွင် slice height rounding ကြောင့် အချို့ non-divisible dimension များတွင် pixel rows ပျောက်/ထပ်နိုင်သည့် risk ကို targeted test ဖြင့်စစ်ရန်လိုသည်။
 7. **Build path (resolved):** Engine build script သည် bundle ကို `Website/Website/assets/` သို့ကူးပြီး API doc ကို `Website/Notation/Notation Plan/Documentation/API.md` သို့ရေးသည်။ `website-bundle.test.js` က bundle hash နှင့် cache key တိုက်ဆိုင်မှုကို စစ်ဆေးသည်။
 8. **Visual tests:** SVG snapshot များရှိသော်လည်း browser render check သည် Chromium/font မရှိလျှင် skip ဖြစ်နိုင်သည်။ CI မှာ prerequisites ကိုပြတ်သားစွာသတ်မှတ်ရန်လိုသည်။
+9. **Release / attribution (resolved):** Engine ကို internal-only ဆက်ထားသည် (`package.json` `private`, `0.0.0`) ဖြစ်သဖြင့် outbound LICENSE မထုတ်။ Redistribute လုပ်သည့် third-party component များ (fflate MIT, spessasynth_lib Apache-2.0, Bravura OFL 1.1) ကို `Notation Engine/THIRD-PARTY-NOTICES.md` တွင် မှတ်တမ်းတင်ထားသည်။ Bravura OFL notice ကို font နှင့်အတူ `sync-website-bundle.mjs` က ကူးပေးပြီး `website-bundle.test.js` က guard လုပ်သည်။ SoundFont များသည် R2 host asset ဖြစ်သဖြင့် repo တွင် မပါဝင်ပါ။ (PLAN.md Part I)
 
 ## ဒီ review မှာ မလုပ်ခဲ့သည့်အရာ
 

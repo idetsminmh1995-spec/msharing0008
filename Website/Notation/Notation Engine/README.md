@@ -174,3 +174,11 @@ Each module has its own `README.md`. The plan for what is left is
 [`../Notation Plan/PLAN.md`](../Notation%20Plan/PLAN.md), and the code review
 and current capabilities are
 [`../Notation Doc/DOC.md`](../Notation%20Doc/DOC.md).
+
+## License and third-party notices
+
+The engine is internal to this project and is not published (`package.json`
+is `private`, version `0.0.0`), so there is no outbound license for it. It
+does redistribute third-party code and the Bravura font, so
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) records each component,
+its license and where it ends up.

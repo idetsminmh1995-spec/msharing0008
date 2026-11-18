@@ -11,6 +11,7 @@ const soundBundle = path.join(packageDir, 'dist', 'sound-engine.js');
 const soundMap = `${soundBundle}.map`;
 const processor = path.join(packageDir, 'node_modules', 'spessasynth_lib', 'dist', 'spessasynth_processor.min.js');
 const font = path.join(packageDir, 'dist', 'fonts', 'Bravura.woff2');
+const fontLicense = path.join(packageDir, 'dist', 'fonts', 'LICENSE.md');
 const publicRoots = [path.join(repoDir, 'Website')];
 const cacheVersion = createHash('sha256').update(await readFile(sourceBundle)).digest('hex').slice(0, 12);
 const soundCacheVersion = createHash('sha256').update(await readFile(soundBundle)).digest('hex').slice(0, 12);
@@ -24,6 +25,7 @@ for (const publicRoot of publicRoots) {
   await copyFile(soundMap, path.join(publicAssetsDir, 'sound-engine.js.map'));
   await copyFile(processor, path.join(publicAssetsDir, 'spessasynth_processor.min.js'));
   await copyFile(font, path.join(publicAssetsDir, 'fonts', 'Bravura.woff2'));
+  await copyFile(fontLicense, path.join(publicAssetsDir, 'fonts', 'LICENSE.md'));
 }
 
 async function htmlFilesUnder(directory) {

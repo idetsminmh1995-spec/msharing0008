@@ -48,7 +48,10 @@ test(
       }));
     });
 
-    assert.ok(versionedReferences.length > 0, 'at least one web app page must load the notation engine');
+    assert.ok(
+      versionedReferences.length > 0,
+      'at least one web app page must load the notation engine',
+    );
     for (const reference of versionedReferences) {
       assert.equal(
         reference.version,
@@ -56,5 +59,29 @@ test(
         `${reference.file} must use the current bundle hash to defeat stale browser caches`,
       );
     }
+  },
+);
+
+test(
+  'the served Bravura font ships with its OFL license next to it',
+  { skip: hasApp ? false : 'the Website app is not checked out next to the engine' },
+  () => {
+    const engineFontLicense = fs.readFileSync(path.join(packageDir, 'dist', 'fonts', 'LICENSE.md'));
+    const servedFontDir = path.join(APP_ROOT, 'assets', 'fonts');
+    const servedFontLicense = path.join(servedFontDir, 'LICENSE.md');
+
+    assert.ok(
+      fs.existsSync(path.join(servedFontDir, 'Bravura.woff2')),
+      'the served fonts directory must contain the Bravura font',
+    );
+    assert.ok(
+      fs.existsSync(servedFontLicense),
+      'the OFL requires the license be distributed with the font -- the served fonts directory must carry it too',
+    );
+    assert.deepEqual(
+      fs.readFileSync(servedFontLicense),
+      engineFontLicense,
+      'the served license must be the same file the engine ships, not a stale copy',
+    );
   },
 );

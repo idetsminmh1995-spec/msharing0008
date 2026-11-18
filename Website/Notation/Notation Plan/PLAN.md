@@ -134,8 +134,8 @@ Implementation sequence:
 
 ### Part I — Release / maintenance
 
-- [ ] Engine ကို internal-only ဆက်ထားမည်လား publishable package လုပ်မည်လား ဆုံးဖြတ်ပြီးမှ `version`, export contract, license/attribution, release checklist ကို တစ်ပြိုင်နက်တည်းပြင်ပါ။
-- [ ] Root license ဖိုင်နှင့် third-party asset (Bravura font, SoundFont) attribution ကို ရှင်းလင်းစွာ မှတ်တမ်းတင်ပါ။
+- [x] **Internal-only (decided).** The engine stays internal: `package.json` is `private`, version `0.0.0`, never published. So there is no outbound LICENSE file -- a license grants rights to someone receiving the work, and there is no such recipient. The extensibility contract stays what it is: typed `EngineConfig` plus exported functions. "Release" means rebuild the bundle and commit it (the static site has no build step), which the existing `npm run verify` + `sync-website-bundle.mjs` flow already covers.
+- [x] Root attribution: there is no root license to add, but the third-party components that ARE redistributed are recorded in `Website/Notation/Notation Engine/THIRD-PARTY-NOTICES.md` (fflate MIT, spessasynth_lib Apache-2.0, Bravura OFL 1.1). The Bravura OFL notice now travels with the font: `scripts/sync-website-bundle.mjs` copies `dist/fonts/LICENSE.md` next to the served font, and `test/unit/website-bundle.test.js` guards it. The SoundFonts are host assets in R2, not redistributed here, and are documented in `../Sound Plan/README.md` and `../Sound Doc/`.
 - [x] Plugin framework ကို concrete integration request မရှိမချင်း မတည်ဆောက်ရ။ လက်ရှိ extensibility သည် typed config နှင့် exported functions များမှတစ်ဆင့် ဖြစ်သည်။
 
 ---
@@ -147,6 +147,14 @@ Implementation sequence:
 ---
 
 ## သမိုင်းမှတ်တမ်း (အကိုးအကား)
+
+### Release / attribution decision (Part I) + Bravura OFL gap — 2026-11-18
+
+The engine stays internal-only, so there is no outbound license to write. What the review did surface was a real attribution gap and a missing record.
+
+- [x] **Bravura OFL gap (fixed).** The site served `assets/fonts/Bravura.woff2` with no license beside it, but the SIL OFL requires the license be distributed with the font. `dist/fonts/LICENSE.md` was only an attribution note, not the OFL text; it now carries the full copyright notice and license, and `scripts/sync-website-bundle.mjs` copies it next to the font on every build. `test/unit/website-bundle.test.js` fails if the served copy goes missing or drifts.
+- [x] **Third-party notices.** Added `Website/Notation/Notation Engine/THIRD-PARTY-NOTICES.md`: the bundled code (fflate MIT, spessasynth_lib Apache-2.0), the bundled font (Bravura OFL 1.1), and the R2-host SoundFonts (host assets, not redistributed here, cross-referenced to `Sound Plan/` and `Sound Doc/`).
+- [x] **No outbound license, no root license file.** `package.json` stays `private` at `0.0.0`; the export contract stays typed `EngineConfig` + exported functions. README now says so and points at the notices.
 
 ### Stale-comment and dead-reference sweep — 2026-11-18
 
