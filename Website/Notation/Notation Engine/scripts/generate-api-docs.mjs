@@ -148,6 +148,14 @@ function main() {
   const byName = new Map();
   for (const { file, module } of declarationFiles()) {
     if (module === 'index' || module.endsWith('/index')) continue; // pure re-exports
+    // `tsc --emitDeclarationOnly` never removes declarations for a source
+    // file that has since been deleted, and `dist/` is gitignored, so a
+    // long-lived checkout can accumulate `.d.ts` for modules that no longer
+    // exist under `src/`. Reading those would document a module the engine
+    // does not have. Only document a module that still has a source file.
+    if (!fs.existsSync(path.join(ROOT, 'src', `${module}.ts`)) && !fs.existsSync(path.join(ROOT, 'src', module))) {
+      continue;
+    }
     const items = parseDeclarations(fs.readFileSync(file, 'utf8'));
     if (items.length === 0) continue;
     byModule.set(module, items);

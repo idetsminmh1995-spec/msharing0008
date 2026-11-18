@@ -27,7 +27,7 @@ TypeScript ဖြင့်ရေးသားထားသော **instrument-neut
 - Layers: `config core debug drums export geometry glyphs layout notation-defaults parser playback plugins render soundfont theme timing` + `render-from-musicxml.ts`။
 - Data provenance: `src/notation-defaults/` ထဲက table တစ်ခုချင်းက `DefaultsSource` (`musicxml`, `smufl`, `gm1`, `drumNotation`, `houseStyle`) ဖြင့် ရင်းမြစ်ကို ဖော်ပြထားသည်။
 - Bundle: esbuild IIFE၊ global `NotationEngine` / `NotationSoundFont`။ `scripts/sync-website-bundle.mjs` က bundle ကို `Website/Website/assets/` သို့ကူးသည်။
-- Verify: `npm run verify` (typecheck + lint + format:check + build + API doc + fixture matrix + tests) သည် **1285/1285 pass**။
+- Verify: `npm run verify` (typecheck + lint + format:check + build + API doc + fixture matrix + tests) သည် **1286/1286 pass**။
 
 ---
 
@@ -63,6 +63,7 @@ TypeScript ဖြင့်ရေးသားထားသော **instrument-neut
 - [x] Engine `src/` ထဲမှ MuseScore-derived provenance comment အားလုံးကို house-style/public-spec အဖြစ် ပြန်ရေးပြီးဖြစ်သည် (value မပြောင်း)။
 - [x] **Host asset id:** `src/soundfont/browser.ts` ထဲက `musescore-general-*` သည် **host asset id** (R2 က serve လုပ်သော downloadable SoundFont) ဖြစ်သည်၊ engine data မဟုတ်။ `R2SoundFontEngine.create()` သည် ယခု hardcoded default asset id မထားတော့ဘဲ manifest က စာရင်းပြထားသော ပထမ asset ကို default အဖြစ်ယူသည်၊ manifest က asset တစ်ခုချင်းအတွက် `path` ပေးလျှင် ထိုတန်ဖိုးကို ဦးစားပေးသည်။ Table က manifest က path မပေးသည့်အခါအတွက် fallback သာဖြစ်သည်။
 - [x] Engine `src/` ထဲမှာ third-party notation program ၏ data/provenance ကျန်မကျန် အလိုအလျောက်စစ်တဲ့ `test/unit/own-provenance.test.js` guard ထည့်ပြီးဖြစ်သည် (host asset id ကိုသာ ခွင့်ပြုသည်၊ ကျန်အားလုံး ဖမ်းသည်)။
+- [x] **Generated doc မှ တကယ့် leak တစ်ခု ဖမ်းမိသည် (2026-11-18):** `src/musescore/` ကို ဖျက်ခဲ့သော်လည်း `tsc --emitDeclarationOnly` က ဖျက်လိုက်သော module ၏ `.d.ts` ကို `dist/` ထဲမှ မရှင်းလင်းသဖြင့် `dist/musescore/*.d.ts` (stale, gitignored) ကျန်ခဲ့သည်။ `scripts/generate-api-docs.mjs` က `dist/` တစ်ခုလုံးကို ဖတ်သဖြင့် `Documentation/API.md` ထဲသို့ MuseScore module ၁၁ ခု (52 ကြောင်း, "775 symbols") ဝင်သွားသည် -- Part C နှင့် တိုက်ရိုက်ဆန့်ကျင်သည်။ Fresh checkout (dist/ ရှင်းပြီး) တွင် `docs:check` က **fail** ဖြစ်သည် (committed API.md က polluted tree မှ generate ဖြစ်ခဲ့သည်)။ ပြင်ဆင်ပြီး: generator က `src/` ထဲ source မရှိတော့သော module ကို ချန်လှပ်သည်; stale `dist/musescore/` ကို ဖျက်သည်; API.md ကို ပြန်ထုတ်သည် (725 symbols, MuseScore ၀ ကြောင်း); `docs:check` ယခု green။
 
 **ပြီးစီးမှုစံ:** Engine `src/` ထဲတွင် third-party notation program ၏ data/provenance လုံးဝမရှိ။ ကျန်သော တစ်ခုတည်းသော ရည်ညွှန်းချက်က host asset id ဖြစ်ပြီး၊ ယင်းကို host manifest က ပိုင်ဆိုင်ကြောင်း ရှင်းလင်းထားရမည်။
 
