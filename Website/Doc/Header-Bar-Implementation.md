@@ -27,7 +27,7 @@ Header ကို `position: fixed` နှင့် `top: 0` သတ်မှတ�
 
 ## ဖိုင်များ
 
-- `Website/Website/index.html`, `Website/Website/notation.html`, `Website/Website/studio.html` — responsive Header Bar markup
+- `Website/Website/index.html`, `Website/Website/notation.html`, `Website/Website/notation-editor.html`, `Website/Website/studio.html` — responsive Header Bar markup (page လေးခုလုံး တူညီသည်)
 - `Website/Website/styles.css` — fixed positioning, web/mobile breakpoints နှင့် theme styles
 - `Website/Website/script.js` — mobile menu, theme toggle နှင့် EN/MM toggle
 

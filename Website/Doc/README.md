@@ -5,6 +5,7 @@ M Sharing Website ၏ လက်ရှိ implementation နှင့် မပ�
 - [Header UI/UX Implementation](UI-UX-Implementation.md) — Header နှင့် Phone bottom bar ၏ ပြီးစီး/မပြီးသေး status
 - [Cloudflare Workers Deployment](Cloudflare-Deployment.md) — Cloudflare deploy configuration နှင့် error fix
 - [Header Bar History](Header-Bar-Implementation.md) — ယခင် Header implementation မှတ်တမ်း
+- [Shared Header — Compact Sizing and Cross-Page Consistency](Shared-Header-2026-11-18.md) — Header သေးငယ်စေခြင်း၊ `styles.css` ကို local CSS ပြောင်းခြင်းနှင့် page တိုင်း Header တူညီစေခြင်း
 - [Development Documentation Workflow](Development-Workflow.md) — Website အလုပ်များပြီးတိုင်း Doc နှင့် Plan update လုပ်ရမည့် စည်းမျဉ်း
 - [Create Video Page](Create-Video-Page.md) — Web/phone responsive instrument နှင့် Metronome tool selection page
 - [Notation Lab Page](Notation-Lab-Page.md) — Open File / Create / Scan entry page and Editor handoff

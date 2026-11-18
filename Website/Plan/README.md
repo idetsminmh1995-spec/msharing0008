@@ -123,6 +123,8 @@ Backend API နှင့် integration များကို frontend feature d
 - Phone အောက် fixed bar တွင် `Home`, `Courses`, `Store`, `Create Video`, `Notation Lab`, `Account` tabs ခြောက်ခု ထည့်ထားသည်။
 - Mobile menu toggle, active tab state, theme toggle နှင့် EN/MM indicator toggle တို့ ထည့်ထားသည်။
 - Cloudflare Workers Static Assets အတွက် `wrangler.jsonc`, `_headers` နှင့် cache-busting asset versioning ထည့်ထားသည်။
+- Header ကို ပိုမိုသေးငယ်အောင် ပြုလုပ်ပြီး (web `60px`, phone `56px`) `styles.css` ကို remote `@import` မှ local CSS အစစ်သို့ ပြောင်းထားသည်။
+- Page လေးခုလုံး (`index.html`, `notation.html`, `notation-editor.html`, `studio.html`) တွင် Header markup, icon နှင့် stylesheet query တူညီအောင် ညှိထားသည်။ အသုံးမပြုသော `header-compact.css` ကို ဖယ်ရှားထားသည်။
 - GitHub `main` branch သို့ push လုပ်ပြီး Wrangler dry-run နှင့် static HTTP checks ပြုလုပ်ထားသည်။
 
 ### မပြီးသေးသည်

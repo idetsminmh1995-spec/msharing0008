@@ -26,9 +26,13 @@ Phone view ၏ အပေါ်ဘက် Header တွင် Menu icon, logo, Sea
 
 ## ဖိုင်များ
 
-- `Website/index.html` — Header Bar နှင့် mobile bottom navigation markup
-- `Website/styles.css` — fixed top header, fixed phone bottom bar, desktop/mobile breakpoints နှင့် sample-inspired colors
-- `Website/script.js` — mobile menu, theme toggle နှင့် EN/MM toggle
+- `Website/Website/index.html`, `Website/Website/notation.html`, `Website/Website/notation-editor.html`, `Website/Website/studio.html` — Header Bar နှင့် mobile bottom navigation markup (page လေးခုလုံး တူညီသည်)
+- `Website/Website/styles.css` — fixed top header, fixed phone bottom bar, desktop/mobile breakpoints နှင့် sample-inspired colors
+- `Website/Website/script.js` — mobile menu, theme toggle နှင့် EN/MM toggle
+
+## 2026-11-18 update
+
+Header ကို ပိုမိုသေးငယ်အောင် ပြုလုပ်ပြီး (web `60px`, phone `56px`) page လေးခုလုံးတွင် Header markup တူညီအောင် ညှိထားသည်။ အသေးစိတ်ကို [Shared Header — Compact Sizing and Cross-Page Consistency](Shared-Header-2026-11-18.md) တွင် ကြည့်ပါ။
 
 ## ပြီးစီးထားသောအလုပ်များ
 
