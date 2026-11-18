@@ -62,12 +62,13 @@ Three states:
 
 | Element | State | Notes |
 | --- | --- | --- |
-| `tied`, `tie`, `slur` | Implemented | Ties and slurs; `INVALID_OFFSET` for a bad number. |
+| `tied`, `tie`, `slur` | Implemented | Ties and slurs; `INVALID_OFFSET` for a bad number. A tie or slide that spans a system break is drawn as two halves, one on each system. |
 | `tuplet` | Implemented | Bracket/number display. |
 | `articulations` | Implemented | Known marks drawn; `UNSUPPORTED_ARTICULATION` otherwise. |
 | `ornaments` | Partly implemented | Trill etc. where known; `UNSUPPORTED_ORNAMENT` otherwise. |
 | `fermata` | Implemented | `UNSUPPORTED_FERMATA_TYPE`, `UNSUPPORTED_FERMATA_SHAPE`. |
 | `tremolo` | Implemented | `TREMOLO_STROKES_CLAMPED` when the count is out of range. |
+| `slide`, `glissando` | Implemented | Straight slide / wavy glissando; `UNMATCHED_SLIDE_STOP`, `SLIDE_ENDPOINT_MISMATCH`. Split across a system break. |
 
 ## Directions, harmony, lyrics
 
@@ -77,7 +78,7 @@ Three states:
 | `direction-type`/`words` | Implemented | Text directions. |
 | `metronome` | Implemented | Display form drawn; `<sound tempo>` in the same direction becomes a tempo event. `UNSUPPORTED_METRONOME` for a beat unit it cannot express. |
 | `dynamics` | Partly implemented | Known dynamics drawn; `UNSUPPORTED_DYNAMIC` otherwise. |
-| `wedge` | Partly implemented | Crescendo/diminuendo; `UNSUPPORTED_WEDGE` otherwise. |
+| `wedge` | Partly implemented | Crescendo/diminuendo; `UNSUPPORTED_WEDGE` otherwise. A hairpin that spans a system break is split at the break into an outgoing half and an incoming half. |
 | `pedal` | Partly implemented | `UNSUPPORTED_PEDAL` otherwise. |
 | `octave-shift` | Implemented | `INVALID_OCTAVE_SHIFT`. |
 | `harmony` | Partly implemented | Chord symbols; `UNSUPPORTED_HARMONY_FEATURE`. |

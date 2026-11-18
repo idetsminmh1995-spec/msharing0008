@@ -134,7 +134,7 @@ describe('page layout wiring (Integration L, §16.2)', () => {
     assert.ok(viewBox(broken.svg)[3] > viewBox(base.svg)[3]);
   });
 
-  test('a hairpin spanning a system break reports WEDGE_CROSSES_SYSTEM rather than drawing a diagonal', () => {
+  test('a hairpin spanning a system break is split at the break, not skipped', () => {
     const wedged =
       '<score-partwise><part-list><score-part id="P1"/></part-list><part id="P1">' +
       `<measure number="1">${ATTRS}` +
@@ -145,11 +145,32 @@ describe('page layout wiring (Integration L, §16.2)', () => {
       '<direction><direction-type><wedge type="stop"/></direction-type></direction>' +
       whole('D', 5) +
       '</measure></part></score-partwise>';
-    const { diagnostics } = render(wedged, { layout: { mode: 'page' }, page: { pageWidth: 120 } });
-    assert.ok([...diagnostics].some((d) => d.code === 'WEDGE_CROSSES_SYSTEM'));
+    const { svg, diagnostics } = render(wedged, {
+      layout: { mode: 'page' },
+      page: { pageWidth: 120 },
+    });
+    assert.ok(
+      ![...diagnostics].some((d) => d.code === 'WEDGE_CROSSES_SYSTEM'),
+      'the hairpin is now drawn, so the not-implemented diagnostic is gone',
+    );
+    // A crescendo opens (two lines meeting at a point on the left) on the
+    // start system and the incoming half closes toward its right edge on
+    // the stop system -- two systems, so two pairs of converging hairpin
+    // lines, one pair in each system's own vertical band.
+    const hairpinLines = [
+      ...svg.matchAll(/<line x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"[^/]*\/>/g),
+    ]
+      .map((m) => m.slice(1).map(Number))
+      .filter(([x1, y1, x2, y2]) => Math.abs(x2 - x1) > 3 && y1 !== y2);
+    assert.equal(hairpinLines.length, 4, 'two systems, each with a hairpin’s two converging lines');
+    const ys = hairpinLines.map(([, y]) => y);
+    assert.ok(
+      Math.max(...ys) - Math.min(...ys) > 10,
+      'the two halves sit on two different systems, not one',
+    );
   });
 
-  test('a tie spanning a system break reports TIE_CROSSES_SYSTEM rather than drawing a diagonal', () => {
+  test('a tie spanning a system break is split at the break, not skipped', () => {
     const tieNote = (type) =>
       '<note><pitch><step>C</step><octave>5</octave></pitch>' +
       '<duration>8</duration><voice>1</voice><type>whole</type>' +
@@ -163,12 +184,52 @@ describe('page layout wiring (Integration L, §16.2)', () => {
       layout: { mode: 'page' },
       page: { pageWidth: 120 },
     });
-    assert.ok([...diagnostics].some((d) => d.code === 'TIE_CROSSES_SYSTEM'));
-    assert.doesNotMatch(
-      svg,
-      /<path d="M [^"]* Q /,
-      'no tie path should run diagonally between systems',
+    assert.ok(
+      ![...diagnostics].some((d) => d.code === 'TIE_CROSSES_SYSTEM'),
+      'the tie is now drawn, so the not-implemented diagnostic is gone',
     );
+    // One filled tie path per system. Both of a half's endpoints sit at
+    // its own system's note height (only the curve's control points bulge
+    // away), and the two halves sit on different systems -- so no single
+    // diagonal runs between them.
+    const tiePaths = [...svg.matchAll(/<path d="(M [^"]* Q [^"]* Q [^"]* Z)"/g)].map((m) => m[1]);
+    assert.equal(tiePaths.length, 2, 'one tie half on each system');
+    const endYs = tiePaths.map((d) => {
+      const [, , y1, , y2] = d
+        .match(/M ([\d.-]+) ([\d.-]+) Q [\d.-]+ [\d.-]+ ([\d.-]+) ([\d.-]+)/)
+        .map(Number);
+      assert.equal(y1, y2, 'a tie half’s two endpoints share their system’s note height');
+      return y1;
+    });
+    assert.ok(
+      Math.abs(endYs[0] - endYs[1]) > 10,
+      'the two tie halves sit on two different systems',
+    );
+  });
+
+  test('a tie spanning TWO breaks gets a whole-system half on the middle system too', () => {
+    const tieNote = (types) =>
+      '<note><pitch><step>C</step><octave>5</octave></pitch>' +
+      '<duration>8</duration><voice>1</voice><type>whole</type>' +
+      types.map((t) => `<tie type="${t}"/>`).join('') +
+      '</note>';
+    const chained =
+      '<score-partwise><part-list><score-part id="P1"/></part-list><part id="P1">' +
+      `<measure number="1">${ATTRS}${tieNote(['start'])}</measure>` +
+      `<measure number="2"><print new-system="yes"/>${tieNote(['stop', 'start'])}</measure>` +
+      `<measure number="3"><print new-system="yes"/>${tieNote(['stop'])}</measure>` +
+      '</part></score-partwise>';
+    const { svg, diagnostics } = render(chained, {
+      layout: { mode: 'page' },
+      page: { pageWidth: 120 },
+    });
+    assert.ok(![...diagnostics].some((d) => d.code === 'TIE_CROSSES_SYSTEM'));
+    // Two ties, each split into halves: four filled paths, on three systems.
+    const tiePaths = [...svg.matchAll(/<path d="(M [^"]* Q [^"]* Q [^"]* Z)"/g)].map((m) => m[1]);
+    assert.equal(tiePaths.length, 4, 'two ties, each drawn as two halves');
+    const systemY = (d) => Number(/M [\d.-]+ ([\d.-]+)/.exec(d)[1]);
+    const bands = new Set(tiePaths.map(systemY));
+    assert.equal(bands.size, 3, 'the three halves land on three different systems');
   });
 
   test('the same hairpin in SCROLL mode draws normally -- there is only one system to cross', () => {

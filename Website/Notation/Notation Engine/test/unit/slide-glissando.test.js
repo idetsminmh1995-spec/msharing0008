@@ -30,4 +30,34 @@ describe('MusicXML slide/glissando', () => {
     );
     assert.ok([...out.diagnostics].some((d) => d.code === 'UNMATCHED_SLIDE_STOP'));
   });
+
+  test('a slide across a system break is split at the break, not skipped', () => {
+    const slideNote = (kind, step, octave, type) =>
+      `<note><pitch><step>${step}</step><octave>${octave}</octave></pitch>` +
+      '<duration>8</duration><voice>1</voice><type>whole</type>' +
+      `<notations><${kind} type="${type}"/></notations></note>`;
+    const crossing =
+      '<score-partwise><part-list><score-part id="P1"/></part-list><part id="P1">' +
+      '<measure number="1"><attributes><divisions>2</divisions>' +
+      '<time><beats>4</beats><beat-type>4</beat-type></time>' +
+      '<clef><sign>G</sign><line>2</line></clef></attributes>' +
+      slideNote('slide', 'C', 4, 'start') +
+      '</measure>' +
+      '<measure number="2"><print new-system="yes"/>' +
+      slideNote('slide', 'G', 4, 'stop') +
+      '</measure></part></score-partwise>';
+    const out = NE.renderFromMusicXml(crossing, {
+      domParser,
+      config: { layout: { mode: 'page' }, page: { pageWidth: 120 } },
+    });
+    assert.ok(
+      ![...out.diagnostics].some((d) => d.code === 'SLIDE_CROSSES_SYSTEM'),
+      'the slide is now drawn, so the not-implemented diagnostic is gone',
+    );
+    // Two straight slide segments (one per system), both L-shaped `M .. L ..`.
+    const slidePaths = [...out.svg.matchAll(/<path[^>]*d="(M [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+)"/g)].map(
+      (m) => m[1],
+    );
+    assert.equal(slidePaths.length, 2, 'one slide half on each system');
+  });
 });

@@ -27,7 +27,7 @@ TypeScript ဖြင့်ရေးသားထားသော **instrument-neut
 - Layers: `config core debug drums export geometry glyphs layout notation-defaults parser playback plugins render soundfont theme timing` + `render-from-musicxml.ts`။
 - Data provenance: `src/notation-defaults/` ထဲက table တစ်ခုချင်းက `DefaultsSource` (`musicxml`, `smufl`, `gm1`, `drumNotation`, `houseStyle`) ဖြင့် ရင်းမြစ်ကို ဖော်ပြထားသည်။
 - Bundle: esbuild IIFE၊ global `NotationEngine` / `NotationSoundFont`။ `scripts/sync-website-bundle.mjs` က bundle ကို `Website/Website/assets/` သို့ကူးသည်။
-- Verify: `npm run verify` (typecheck + lint + format:check + build + API doc + tests) သည် **1270/1270 pass**။
+- Verify: `npm run verify` (typecheck + lint + format:check + build + API doc + tests) သည် **1276/1276 pass**။
 
 ---
 
@@ -148,6 +148,14 @@ Implementation sequence:
 
 ## သမိုင်းမှတ်တမ်း (အကိုးအကား)
 
+### Cross-system tie / hairpin / slide continuation — 2026-11-18
+
+The renderer used to refuse three spans that ran off one system and back in on the next, each with a "not implemented" diagnostic: a tie (`TIE_CROSSES_SYSTEM`), a hairpin (`WEDGE_CROSSES_SYSTEM`), and a slide/glissando (`SLIDE_CROSSES_SYSTEM`). All three now split at the break the way an engraver does.
+
+- [x] `render-from-musicxml.ts` computes each system's own horizontal span and vertical origin (`systemBounds`) once, after placement, and a shared `crossSystemHalves` helper draws the outgoing half to the start system's right edge, the incoming half from the stop system's left edge, and a whole-system span on any system between.
+- [x] Ties, hairpins and slides each use that helper; a same-system span keeps drawing as one path, so existing output is byte-identical.
+- [x] Retired the three diagnostics. Tests updated to assert the split (one half per system, on each system's own vertical band) instead of the old diagnostic.
+
 ### MuseScore provenance remediation — 2026-11-18
 
 The audit left one concrete risk: the engine shipped `src/musescore/`, a copy of a GPL-3.0-only program's tables, and several engine defaults read from it. That folder is deleted, and the engine answers from its own `src/notation-defaults/` data layer.
@@ -171,4 +179,4 @@ The audit left one concrete risk: the engine shipped `src/musescore/`, a copy of
 - [x] SpessaSynth AudioWorklet ဖြင့် SoundFont ကို WebAudio output သို့ချိတ်ပြီး Notation Lab play/pause/volume lifecycle နှင့် ချိတ်ရန်။
 - [x] Unpitched percussion mapping နှင့် MusicXML instrument program/bank routing ကို ထပ်တိုးရန်။ `midi-unpitched` က GM key number ဖြစ်လာပြီး unpitched note များ တကယ်မြည်ကြသည် (`buildEventStream` က `midiNotes` ထုတ်သည်)။ `<midi-program>`/`<midi-bank>`/`<midi-channel>` ကို `PlaybackTrack` တွင် သယ်ဆောင်ပြီး `assignTrackRouting()` (pure) က channel ခွဲပေးသည် -- percussion သည် GM channel 10 (index 9) အမြဲရသည်။ `INVALID_MIDI_PROGRAM`/`INVALID_MIDI_BANK`/`INVALID_MIDI_CHANNEL` diagnostic များ ထည့်ပြီး; MusicXML 1-based → MIDI 0-based ကို W3C spec အတိုင်း လျှော့သည်။ `test/unit/instrument-routing.test.js` နှင့် `test/unit/soundfont-routing.test.js` က စစ်သည်။
 
-**Completion criterion (Part C):** the engine must have no build-time dependency on GPL-3.0-only source or tables, and every remaining default must name the public specification it comes from. `npm run verify` must be green. Both hold: 1270/1270 tests pass, and no engine module imports a MuseScore file.
+**Completion criterion (Part C):** the engine must have no build-time dependency on GPL-3.0-only source or tables, and every remaining default must name the public specification it comes from. `npm run verify` must be green. Both hold: 1276/1276 tests pass, and no engine module imports a MuseScore file.

@@ -4623,6 +4623,56 @@ export function renderParsedMusicXml(
     totalWidth = Math.max(totalWidth, placement.x + placement.width);
   }
 
+  /**
+   * Each system's own horizontal span and vertical origin, keyed by
+   * `systemIndex`. A tie, hairpin or slide that runs off the end of one
+   * system and back in on the next is drawn as two halves, so both halves
+   * need to know where that system's own edges are. The right edge is the
+   * widest measure placed on the system -- page mode justifies a system's
+   * last measure to the right margin, so the widest measure IS the margin.
+   */
+  const systemBounds = new Map<number, { left: number; right: number; y: number }>();
+  for (const origin of systemOrigins) {
+    systemBounds.set(origin.systemIndex, { left: origin.x, right: origin.x, y: origin.systemY });
+  }
+  for (const placement of placementByMeasureNumber.values()) {
+    const bounds = systemBounds.get(placement.systemIndex);
+    if (bounds === undefined) continue;
+    bounds.right = Math.max(bounds.right, placement.x + placement.width);
+  }
+
+  /**
+   * The two halves (plus any full-width middle) of a marking that runs off
+   * one system and continues on another. Systems share one staff layout,
+   * so the same pitch sits at the same relative height on every system;
+   * `yFor` gives each system's own absolute y. `draw` returns the markup
+   * for one segment and an empty string when the segment has no width.
+   */
+  const crossSystemHalves = (
+    startSystem: number,
+    stopSystem: number,
+    startX: number,
+    endX: number,
+    yFor: (systemIndex: number) => number,
+    draw: (fromX: number, toX: number, y: number) => string,
+  ): string => {
+    const start = systemBounds.get(startSystem);
+    const stop = systemBounds.get(stopSystem);
+    if (start === undefined || stop === undefined) return '';
+    const parts: string[] = [];
+    const outgoing = draw(startX, start.right, yFor(startSystem));
+    if (outgoing !== '') parts.push(outgoing);
+    for (let s = startSystem + 1; s < stopSystem; s += 1) {
+      const between = systemBounds.get(s);
+      if (between === undefined) continue;
+      const full = draw(between.left, between.right, yFor(s));
+      if (full !== '') parts.push(full);
+    }
+    const incoming = draw(stop.left, endX, yFor(stopSystem));
+    if (incoming !== '') parts.push(incoming);
+    return parts.join('\n');
+  };
+
   score.parts.forEach((part, partIndex) => {
     // Integration L: the measure x/width/system placement is SCORE-wide
     // now (see the block above), so a part only looks its own measures up
@@ -4671,18 +4721,32 @@ export function renderParsedMusicXml(
     /** Resolved crescendo/decrescendo spans, keyed by the measure they START in so each is drawn exactly once. */
     const wedgeSpansByMeasure = new Map<
       number,
-      { staff: number; startX: number; endX: number; kind: 'crescendo' | 'decrescendo' }[]
+      {
+        staff: number;
+        startX: number;
+        endX: number;
+        kind: 'crescendo' | 'decrescendo';
+        startSystem: number;
+        endSystem: number;
+      }[]
     >();
     {
       // A wedge's own `number` distinguishes overlapping wedges; its
       // staff keeps two staves' wedges from closing each other's spans.
       const openWedges = new Map<
         string,
-        { measureNumber: number; staff: number; x: number; kind: 'crescendo' | 'decrescendo' }
+        {
+          measureNumber: number;
+          staff: number;
+          x: number;
+          kind: 'crescendo' | 'decrescendo';
+          systemIndex: number;
+        }
       >();
       for (const d of partDirections) {
         const x = directionXFor(d.measureNumber, d.tick);
         if (x === undefined) continue;
+        const systemIndex = placementByMeasureNumber.get(d.measureNumber)?.systemIndex ?? 0;
         for (const wedge of d.wedges) {
           const key = `${d.staff}:${wedge.number}`;
           if (wedge.type === 'stop') {
@@ -4697,26 +4761,22 @@ export function renderParsedMusicXml(
               continue;
             }
             openWedges.delete(key);
-            // Integration L: in page mode the two ends can land in
-            // different SYSTEMS, where the x axis restarts and the y
-            // differs -- drawing one line between them would run
-            // diagonally across the page. Real engraving splits such a
-            // hairpin at the system break; that is not built, so this
-            // says so rather than drawing something wrong.
-            const startSystem = placementByMeasureNumber.get(open.measureNumber)?.systemIndex;
-            const endSystem = placementByMeasureNumber.get(d.measureNumber)?.systemIndex;
-            if (startSystem !== endSystem) {
-              diagnostics.push({
-                severity: 'info',
-                code: 'WEDGE_CROSSES_SYSTEM',
-                message:
-                  'A hairpin spans a system break; splitting one across systems is not implemented, so it was not drawn.',
-                location: { partId: part.id, measureNumber: open.measureNumber },
-              });
-              continue;
-            }
+            // Integration L: a hairpin whose ends land on different
+            // systems is split at the break the way an engraver does it --
+            // an outgoing half to the start system's right edge and an
+            // incoming half from the stop system's left edge (plus a whole
+            // -system hairpin on any system it fully spans). `startSystem`
+            // / `endSystem` let the draw site pick the split; a same-system
+            // hairpin keeps drawing as one span, byte-identically.
             const list = wedgeSpansByMeasure.get(open.measureNumber) ?? [];
-            list.push({ staff: open.staff, startX: open.x, endX: x, kind: open.kind });
+            list.push({
+              staff: open.staff,
+              startX: open.x,
+              endX: x,
+              kind: open.kind,
+              startSystem: open.systemIndex,
+              endSystem: systemIndex,
+            });
             wedgeSpansByMeasure.set(open.measureNumber, list);
           } else {
             openWedges.set(key, {
@@ -4724,6 +4784,7 @@ export function renderParsedMusicXml(
               staff: d.staff,
               x,
               kind: wedge.type,
+              systemIndex,
             });
           }
         }
@@ -5158,12 +5219,55 @@ export function renderParsedMusicXml(
                 location: { partId: part.id, measureNumber: measure.number },
               });
             } else if (pending.systemIndex !== layout.systemIndex) {
-              diagnostics.push({
-                severity: 'info',
-                code: 'SLIDE_CROSSES_SYSTEM',
-                message: `A <${kind}> crosses a system break; system-to-system continuation is not drawn.`,
-                location: { partId: part.id, measureNumber: pending.measureNumber },
-              });
+              // A slide that runs off one system and back in on the next is
+              // drawn as halves, exactly as a tie or hairpin is: the
+              // outgoing half leaves the start system's right edge and the
+              // incoming half arrives at the stop note from the stop
+              // system's left edge. Each half sits at its own system's
+              // vertical origin; the incoming half still lands on the stop
+              // note's own y, so a slide between two pitches stays a line
+              // between them.
+              const startSystemY = systemBounds.get(pending.systemIndex)?.y ?? 0;
+              const yFor = (s: number): number =>
+                pending.y + ((systemBounds.get(s)?.y ?? 0) - startSystemY);
+              const drawSlideSeg = (
+                fromX: number,
+                fromY: number,
+                toX: number,
+                toY: number,
+              ): string => {
+                if (!(toX > fromX)) return '';
+                return renderSlide(computeSlideShape(fromX, fromY, toX, toY, kind), {
+                  color: theme.colorOf('slide'),
+                  thickness: lineWidth(
+                    theme,
+                    undefined,
+                    'slideThickness',
+                    SLIDE_THICKNESS_FALLBACK,
+                  ),
+                });
+              };
+              const start = systemBounds.get(pending.systemIndex);
+              const stop = systemBounds.get(layout.systemIndex);
+              if (start !== undefined && stop !== undefined) {
+                const segments: string[] = [];
+                const outgoing = drawSlideSeg(
+                  pending.x,
+                  yFor(pending.systemIndex),
+                  start.right,
+                  yFor(pending.systemIndex),
+                );
+                if (outgoing !== '') segments.push(outgoing);
+                for (let s = pending.systemIndex + 1; s < layout.systemIndex; s += 1) {
+                  const between = systemBounds.get(s);
+                  if (between === undefined) continue;
+                  const full = drawSlideSeg(between.left, yFor(s), between.right, yFor(s));
+                  if (full !== '') segments.push(full);
+                }
+                const incoming = drawSlideSeg(stop.left, yFor(layout.systemIndex), x, y);
+                if (incoming !== '') segments.push(incoming);
+                if (segments.length > 0) svgParts.push(segments.join('\n'));
+              }
             } else {
               svgParts.push(
                 renderSlide(computeSlideShape(pending.x, pending.y, x, y, kind), {
@@ -5297,20 +5401,33 @@ export function renderParsedMusicXml(
 
           for (const span of wedgeSpansByMeasure.get(measure.number) ?? []) {
             if (span.staff !== staffNumber) continue;
-            svgParts.push(
-              renderHairpin(
-                computeHairpinShape(span.startX, span.endX, markY(dynamicSide()), span.kind),
-                {
-                  thickness: lineWidth(
-                    theme,
-                    'wedge',
-                    'hairpinThickness',
-                    HAIRPIN_THICKNESS_FALLBACK,
-                  ),
-                  color: theme.colorOf('hairpin'),
-                },
-              ),
-            );
+            const baseY = markY(dynamicSide());
+            const drawHairpin = (fromX: number, toX: number, y: number): string => {
+              if (!(toX > fromX)) return '';
+              return renderHairpin(computeHairpinShape(fromX, toX, y, span.kind), {
+                thickness: lineWidth(
+                  theme,
+                  'wedge',
+                  'hairpinThickness',
+                  HAIRPIN_THICKNESS_FALLBACK,
+                ),
+                color: theme.colorOf('hairpin'),
+              });
+            };
+            if (span.startSystem === span.endSystem) {
+              svgParts.push(drawHairpin(span.startX, span.endX, baseY));
+            } else {
+              const yFor = (s: number): number => baseY + ((systemBounds.get(s)?.y ?? 0) - systemY);
+              const split = crossSystemHalves(
+                span.startSystem,
+                span.endSystem,
+                span.startX,
+                span.endX,
+                yFor,
+                drawHairpin,
+              );
+              if (split !== '') svgParts.push(split);
+            }
           }
         }
 
@@ -5977,13 +6094,40 @@ export function renderParsedMusicXml(
                       }),
                     );
                   } else {
-                    diagnostics.push({
-                      severity: 'info',
-                      code: 'TIE_CROSSES_SYSTEM',
-                      message:
-                        'A tie spans a system break; system-to-system tie continuation is not implemented, so no diagonal tie was drawn.',
-                      location: { partId: part.id, measureNumber: pendingTie.measureNumber },
-                    });
+                    // §9.15: a tie that runs off one system and back in
+                    // on the next is engraved as two halves -- the start
+                    // note's half runs to its system's right edge, the
+                    // stop note's half comes in from its system's left
+                    // edge. Systems share one staff layout, so the note
+                    // sits at the same height within its staff on every
+                    // system; each half is shifted to its own system's
+                    // vertical origin. A tie spanning two or more full
+                    // systems also gets a whole-system tie on each system
+                    // between.
+                    const side = tieSide(pendingTie.direction);
+                    const startNoteheadWidth = noteheadWidth(pendingTie.noteheadGlyph);
+                    const stopSystemY = systemBounds.get(layout.systemIndex)?.y ?? 0;
+                    const tied = crossSystemHalves(
+                      pendingTie.systemIndex,
+                      layout.systemIndex,
+                      pendingTie.x + startNoteheadWidth,
+                      eventX,
+                      (s) =>
+                        eventCtx.measureBottomY + ((systemBounds.get(s)?.y ?? 0) - stopSystemY),
+                      (fromX, toX, y) => {
+                        if (!(toX > fromX)) return '';
+                        return renderTie(computeTieShape(fromX, toX, y, side), {
+                          color: theme.colorOf('tie'),
+                          midpointThickness: lineWidth(
+                            ctx.theme,
+                            'tieMiddle',
+                            'tieMidpointThickness',
+                            TIE_MIDPOINT_THICKNESS_FALLBACK,
+                          ),
+                        });
+                      },
+                    );
+                    if (tied !== '') svgParts.push(tied);
                   }
                   pendingTiesByVoiceAndStaff.delete(tieKey);
                 } else if (event.kind === 'rest') {

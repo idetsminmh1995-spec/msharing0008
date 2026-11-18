@@ -80050,6 +80050,32 @@ ${xrefOffset}
     for (const placement of placementByMeasureNumber.values()) {
       totalWidth = Math.max(totalWidth, placement.x + placement.width);
     }
+    const systemBounds = /* @__PURE__ */ new Map();
+    for (const origin of systemOrigins) {
+      systemBounds.set(origin.systemIndex, { left: origin.x, right: origin.x, y: origin.systemY });
+    }
+    for (const placement of placementByMeasureNumber.values()) {
+      const bounds = systemBounds.get(placement.systemIndex);
+      if (bounds === void 0) continue;
+      bounds.right = Math.max(bounds.right, placement.x + placement.width);
+    }
+    const crossSystemHalves = (startSystem, stopSystem, startX, endX, yFor, draw) => {
+      const start = systemBounds.get(startSystem);
+      const stop = systemBounds.get(stopSystem);
+      if (start === void 0 || stop === void 0) return "";
+      const parts = [];
+      const outgoing = draw(startX, start.right, yFor(startSystem));
+      if (outgoing !== "") parts.push(outgoing);
+      for (let s = startSystem + 1; s < stopSystem; s += 1) {
+        const between = systemBounds.get(s);
+        if (between === void 0) continue;
+        const full = draw(between.left, between.right, yFor(s));
+        if (full !== "") parts.push(full);
+      }
+      const incoming = draw(stop.left, endX, yFor(stopSystem));
+      if (incoming !== "") parts.push(incoming);
+      return parts.join("\n");
+    };
     score2.parts.forEach((part2, partIndex) => {
       const directionXFor = (measureNumber, tick) => {
         const placement = placementByMeasureNumber.get(measureNumber);
@@ -80092,6 +80118,7 @@ ${xrefOffset}
         for (const d of partDirections) {
           const x2 = directionXFor(d.measureNumber, d.tick);
           if (x2 === void 0) continue;
+          const systemIndex = placementByMeasureNumber.get(d.measureNumber)?.systemIndex ?? 0;
           for (const wedge of d.wedges) {
             const key = `${d.staff}:${wedge.number}`;
             if (wedge.type === "stop") {
@@ -80106,26 +80133,23 @@ ${xrefOffset}
                 continue;
               }
               openWedges.delete(key);
-              const startSystem = placementByMeasureNumber.get(open.measureNumber)?.systemIndex;
-              const endSystem = placementByMeasureNumber.get(d.measureNumber)?.systemIndex;
-              if (startSystem !== endSystem) {
-                diagnostics.push({
-                  severity: "info",
-                  code: "WEDGE_CROSSES_SYSTEM",
-                  message: "A hairpin spans a system break; splitting one across systems is not implemented, so it was not drawn.",
-                  location: { partId: part2.id, measureNumber: open.measureNumber }
-                });
-                continue;
-              }
               const list = wedgeSpansByMeasure.get(open.measureNumber) ?? [];
-              list.push({ staff: open.staff, startX: open.x, endX: x2, kind: open.kind });
+              list.push({
+                staff: open.staff,
+                startX: open.x,
+                endX: x2,
+                kind: open.kind,
+                startSystem: open.systemIndex,
+                endSystem: systemIndex
+              });
               wedgeSpansByMeasure.set(open.measureNumber, list);
             } else {
               openWedges.set(key, {
                 measureNumber: d.measureNumber,
                 staff: d.staff,
                 x: x2,
-                kind: wedge.type
+                kind: wedge.type,
+                systemIndex
               });
             }
           }
@@ -80420,12 +80444,41 @@ ${xrefOffset}
                   location: { partId: part2.id, measureNumber: measure2.number }
                 });
               } else if (pending.systemIndex !== layout.systemIndex) {
-                diagnostics.push({
-                  severity: "info",
-                  code: "SLIDE_CROSSES_SYSTEM",
-                  message: `A <${kind}> crosses a system break; system-to-system continuation is not drawn.`,
-                  location: { partId: part2.id, measureNumber: pending.measureNumber }
-                });
+                const startSystemY = systemBounds.get(pending.systemIndex)?.y ?? 0;
+                const yFor = (s) => pending.y + ((systemBounds.get(s)?.y ?? 0) - startSystemY);
+                const drawSlideSeg = (fromX, fromY, toX, toY) => {
+                  if (!(toX > fromX)) return "";
+                  return renderSlide(computeSlideShape(fromX, fromY, toX, toY, kind), {
+                    color: theme.colorOf("slide"),
+                    thickness: lineWidth(
+                      theme,
+                      void 0,
+                      "slideThickness",
+                      SLIDE_THICKNESS_FALLBACK
+                    )
+                  });
+                };
+                const start = systemBounds.get(pending.systemIndex);
+                const stop = systemBounds.get(layout.systemIndex);
+                if (start !== void 0 && stop !== void 0) {
+                  const segments = [];
+                  const outgoing = drawSlideSeg(
+                    pending.x,
+                    yFor(pending.systemIndex),
+                    start.right,
+                    yFor(pending.systemIndex)
+                  );
+                  if (outgoing !== "") segments.push(outgoing);
+                  for (let s = pending.systemIndex + 1; s < layout.systemIndex; s += 1) {
+                    const between = systemBounds.get(s);
+                    if (between === void 0) continue;
+                    const full = drawSlideSeg(between.left, yFor(s), between.right, yFor(s));
+                    if (full !== "") segments.push(full);
+                  }
+                  const incoming = drawSlideSeg(stop.left, yFor(layout.systemIndex), x2, y);
+                  if (incoming !== "") segments.push(incoming);
+                  if (segments.length > 0) svgParts.push(segments.join("\n"));
+                }
               } else {
                 svgParts.push(
                   renderSlide(computeSlideShape(pending.x, pending.y, x2, y, kind), {
@@ -80526,20 +80579,33 @@ ${xrefOffset}
             }
             for (const span of wedgeSpansByMeasure.get(measure2.number) ?? []) {
               if (span.staff !== staffNumber) continue;
-              svgParts.push(
-                renderHairpin(
-                  computeHairpinShape(span.startX, span.endX, markY(dynamicSide()), span.kind),
-                  {
-                    thickness: lineWidth(
-                      theme,
-                      "wedge",
-                      "hairpinThickness",
-                      HAIRPIN_THICKNESS_FALLBACK
-                    ),
-                    color: theme.colorOf("hairpin")
-                  }
-                )
-              );
+              const baseY = markY(dynamicSide());
+              const drawHairpin = (fromX, toX, y) => {
+                if (!(toX > fromX)) return "";
+                return renderHairpin(computeHairpinShape(fromX, toX, y, span.kind), {
+                  thickness: lineWidth(
+                    theme,
+                    "wedge",
+                    "hairpinThickness",
+                    HAIRPIN_THICKNESS_FALLBACK
+                  ),
+                  color: theme.colorOf("hairpin")
+                });
+              };
+              if (span.startSystem === span.endSystem) {
+                svgParts.push(drawHairpin(span.startX, span.endX, baseY));
+              } else {
+                const yFor = (s) => baseY + ((systemBounds.get(s)?.y ?? 0) - systemY);
+                const split = crossSystemHalves(
+                  span.startSystem,
+                  span.endSystem,
+                  span.startX,
+                  span.endX,
+                  yFor,
+                  drawHairpin
+                );
+                if (split !== "") svgParts.push(split);
+              }
             }
           }
           const isFirstMeasureOfPart = i2 === 0;
@@ -81007,12 +81073,29 @@ ${xrefOffset}
                         })
                       );
                     } else {
-                      diagnostics.push({
-                        severity: "info",
-                        code: "TIE_CROSSES_SYSTEM",
-                        message: "A tie spans a system break; system-to-system tie continuation is not implemented, so no diagonal tie was drawn.",
-                        location: { partId: part2.id, measureNumber: pendingTie.measureNumber }
-                      });
+                      const side = tieSide(pendingTie.direction);
+                      const startNoteheadWidth = noteheadWidth(pendingTie.noteheadGlyph);
+                      const stopSystemY = systemBounds.get(layout.systemIndex)?.y ?? 0;
+                      const tied = crossSystemHalves(
+                        pendingTie.systemIndex,
+                        layout.systemIndex,
+                        pendingTie.x + startNoteheadWidth,
+                        eventX,
+                        (s) => eventCtx.measureBottomY + ((systemBounds.get(s)?.y ?? 0) - stopSystemY),
+                        (fromX, toX, y) => {
+                          if (!(toX > fromX)) return "";
+                          return renderTie(computeTieShape(fromX, toX, y, side), {
+                            color: theme.colorOf("tie"),
+                            midpointThickness: lineWidth(
+                              ctx.theme,
+                              "tieMiddle",
+                              "tieMidpointThickness",
+                              TIE_MIDPOINT_THICKNESS_FALLBACK
+                            )
+                          });
+                        }
+                      );
+                      if (tied !== "") svgParts.push(tied);
                     }
                     pendingTiesByVoiceAndStaff.delete(tieKey);
                   } else if (event.kind === "rest") {
