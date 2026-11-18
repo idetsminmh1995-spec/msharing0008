@@ -1,8 +1,17 @@
+/**
+ * Notation Lab editor — MuseScore-style semantic editing.
+ *
+ * The SVG is only ever a picture of `state.doc`. Clicks map back to musical
+ * positions (measure/voice/event, or tick + staff position) through the
+ * engine's own playback geometry, edits rebuild `state.doc`, and the engine
+ * re-renders it. Nothing is edited by mutating the drawing.
+ */
 (() => {
   const root = document.querySelector('[data-editor-toolbar]');
   if (!root) return;
 
   const engine = window.NotationEngine;
+  const docTools = window.NotationDoc;
   const pick = (selector) => document.querySelector(selector);
 
   const fileInput = pick('[data-editor-file-input]');
@@ -12,6 +21,9 @@
   const undoButton = pick('[data-editor-undo]');
   const redoButton = pick('[data-editor-redo]');
   const playButton = pick('[data-editor-play]');
+  const noteInputButton = pick('[data-editor-note-input]');
+  const addMeasureButton = pick('[data-editor-add-measure]');
+  const removeMeasureButton = pick('[data-editor-remove-measure]');
   const canvas = pick('[data-editor-canvas]');
   const scoreHost = pick('[data-editor-score]');
   const emptyState = pick('[data-editor-empty]');
@@ -20,7 +32,6 @@
   const zoomOutput = pick('[data-editor-zoom]');
   const zoomIn = pick('[data-editor-zoom-in]');
   const zoomOut = pick('[data-editor-zoom-out]');
-  const layoutSelect = pick('[data-editor-layout]');
   const clefSelect = pick('[data-editor-clef]');
   const keySelect = pick('[data-editor-key]');
   const timeSelect = pick('[data-editor-time]');
@@ -28,43 +39,61 @@
   const exportPdf = pick('[data-editor-export-pdf]');
   const exportSvg = pick('[data-editor-export-svg]');
   const exportPng = pick('[data-editor-export-png]');
+  const exportToggle = pick('[data-editor-export-toggle]');
+  const exportList = pick('[data-editor-export-list]');
+  const metronomeButton = pick('[data-editor-metronome]');
+  const viewButtons = [...document.querySelectorAll('[data-editor-view]')];
   const durationButtons = [...document.querySelectorAll('[data-editor-duration]')];
   const accidentalButtons = [...document.querySelectorAll('[data-editor-accidental]')];
   const dotButton = pick('[data-editor-dot]');
   const restButton = pick('[data-editor-rest]');
 
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const ACCIDENTAL_ALTER = { sharp: 1, flat: -1, natural: 0 };
+  const SHORTCUT_DURATION = {
+    '1': 'whole', '2': 'half', '3': 'quarter', '4': 'eighth', '5': '16th', '6': '32nd',
+  };
+
   const state = {
-    xml: '',
-    filename: '',
+    doc: null,
     result: null,
+    filename: '',
     zoom: 100,
     layout: 'page',
+    tool: { duration: 'quarter', dots: 0, rest: false, accidental: null },
+    noteInput: false,
+    selection: null,
+    entry: null,
+    history: [],
+    future: [],
+    // playback
     playing: false,
     sound: null,
     soundTried: false,
-    endTimer: null,
-    tool: { duration: 'quarter', dot: false, rest: false, accidental: null },
-    history: [],
-    future: [],
+    playSeconds: 0,
+    playStartSeconds: 0,
+    playStartedAt: 0,
+    rafId: null,
+    soundingId: null,
+    // metronome
+    metronomeOn: false,
+    metronome: null,
+    metronomeTimers: [],
   };
 
   const announce = (message) => { statusMessage.textContent = message; };
   const setFile = (name) => { statusFile.textContent = name || ''; };
 
-  // ---- score templates --------------------------------------------------
+  // ---- starter score -----------------------------------------------------
 
-  const CLEF = {
-    treble: { sign: 'G', line: 2 },
-    bass: { sign: 'F', line: 4 },
-    alto: { sign: 'C', line: 3 },
-  };
-  const KEY = { C: 0, G: 1, D: 2, F: -1 };
-  const TIME = { '4/4': [4, 4], '3/4': [3, 4], '2/4': [2, 4], '6/8': [6, 8] };
+  const CLEF_SIGN = { treble: { sign: 'G', line: 2 }, bass: { sign: 'F', line: 4 }, alto: { sign: 'C', line: 3 } };
+  const KEY_FIFTHS = { C: 0, G: 1, D: 2, F: -1 };
+  const TIME_PAIR = { '4/4': [4, 4], '3/4': [3, 4], '2/4': [2, 4], '6/8': [6, 8] };
 
-  const starterScore = () => {
-    const clef = CLEF[clefSelect.value] || CLEF.treble;
-    const fifths = KEY[keySelect.value] ?? 0;
-    const [beats, beatType] = TIME[timeSelect.value] || TIME['4/4'];
+  function starterMusicXml() {
+    const clef = CLEF_SIGN[clefSelect.value] || CLEF_SIGN.treble;
+    const fifths = KEY_FIFTHS[keySelect.value] ?? 0;
+    const [beats, beatType] = TIME_PAIR[timeSelect.value] || TIME_PAIR['4/4'];
     const divisions = 4;
     const measures = [];
     for (let n = 1; n <= 4; n += 1) {
@@ -82,16 +111,201 @@
   <part-list><score-part id="P1"><part-name>Music</part-name></score-part></part-list>
   <part id="P1">${measures.join('')}</part>
 </score-partwise>`;
+  }
+
+  // ---- document history --------------------------------------------------
+
+  const canUndo = () => state.history.length > 0;
+  const canRedo = () => state.future.length > 0;
+
+  const syncHistory = () => {
+    undoButton.disabled = !canUndo();
+    redoButton.disabled = !canRedo();
   };
 
-  // ---- rendering --------------------------------------------------------
+  /** Snapshot the document, then apply a mutation to it. */
+  const commit = (mutate, message) => {
+    if (!state.doc) return;
+    const before = state.doc;
+    const after = mutate(before);
+    if (after === before) return;
+    state.history.push(before);
+    if (state.history.length > 100) state.history.shift();
+    state.future.length = 0;
+    state.doc = after;
+    syncHistory();
+    if (message) announce(message);
+    render();
+  };
+
+  const undo = () => {
+    if (!canUndo()) return;
+    state.future.push(state.doc);
+    state.doc = state.history.pop();
+    syncHistory();
+    clampPointers();
+    announce('Undo.');
+    render();
+  };
+
+  const redo = () => {
+    if (!canRedo()) return;
+    state.history.push(state.doc);
+    state.doc = state.future.pop();
+    syncHistory();
+    clampPointers();
+    announce('Redo.');
+    render();
+  };
+
+  // ---- musical helpers ---------------------------------------------------
+
+  const activePartId = () => state.doc?.score.parts[0]?.id ?? 'P1';
+
+  const attributeAt = (measureNumber) => docTools.attributeFor(state.doc, activePartId(), measureNumber);
+
+  const clefAt = (measureNumber) => {
+    const attribute = attributeAt(measureNumber);
+    const sign = attribute?.clefsByStaff?.[1]?.sign ?? attribute?.clefSign ?? 'G';
+    return docTools.clefDefinitionFor(sign);
+  };
+
+  const capacityOf = (measureNumber) => docTools.ticksPerMeasure(state.doc, activePartId(), measureNumber);
+
+  const durationForTool = () =>
+    engine.duration(
+      state.tool.duration,
+      state.tool.dots,
+      engine.ticksForDisplayedDuration({ type: state.tool.duration, dots: state.tool.dots }),
+    );
+
+  const accidentalAlter = () =>
+    state.tool.accidental === null ? null : ACCIDENTAL_ALTER[state.tool.accidental];
+
+  const eventsIn = (measureNumber, voiceId = 1) => {
+    const measure = state.doc?.score.parts[0]?.measures.find((m) => m.number === measureNumber);
+    return measure?.voices.find((voice) => voice.id === voiceId)?.events ?? [];
+  };
+
+  /** Resolves a tick that ran past the measure's end into the measure it belongs to, appending measures as needed. */
+  function locateTick(tick, measureNumber) {
+    let number = measureNumber;
+    let local = tick;
+    for (;;) {
+      const capacity = capacityOf(number);
+      if (local < capacity) return { measureNumber: number, tick: local };
+      const next = number + 1;
+      if (!state.doc.score.parts[0].measures.some((m) => m.number === next)) {
+        state.doc = docTools.appendMeasure(state.doc, activePartId());
+      }
+      local -= capacity;
+      number = next;
+    }
+  }
+
+  const globalTickOf = (measureNumber, tickInMeasure) =>
+    (state.result?.playback.globalTickOffsetByMeasure.get(measureNumber) ?? 0) + tickInMeasure;
+
+  // ---- geometry ----------------------------------------------------------
+
+  /** Staff line runs in the rendered SVG, top to bottom, as system bands. */
+  function detectStaves(svg) {
+    const lines = [...svg.querySelectorAll('line')]
+      .filter((line) => line.getAttribute('y1') === line.getAttribute('y2'))
+      .filter((line) => Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3)
+      .map((line) => Number(line.getAttribute('y1')));
+    const ys = [...new Set(lines)].sort((a, b) => a - b);
+    const staves = [];
+    let run = [];
+    for (const y of ys) {
+      const previous = run[run.length - 1];
+      if (previous === undefined || Math.abs(y - previous - 1) < 0.01) run.push(y);
+      else { if (run.length >= 5) staves.push(run); run = [y]; }
+    }
+    if (run.length >= 5) staves.push(run);
+    return staves.map((lines, index) => ({
+      systemIndex: index,
+      topY: lines[0],
+      bottomY: lines[lines.length - 1],
+    }));
+  }
+
+  /** Client point -> the SVG's own staff-space coordinates. */
+  function toSvgPoint(svg, clientX, clientY) {
+    const matrix = svg.getScreenCTM();
+    if (!matrix) return null;
+    const point = new DOMPoint(clientX, clientY).matrixTransform(matrix.inverse());
+    return { x: point.x, y: point.y };
+  }
+
+  /** The event whose drawn bounding box contains the point, smallest box first. */
+  function eventAt(svg, x, y) {
+    const groups = [...svg.querySelectorAll('[data-id]')];
+    let best = null;
+    for (const group of groups) {
+      let box;
+      try { box = group.getBBox(); } catch { continue; }
+      const pad = 0.6;
+      if (x < box.x - pad || x > box.x + box.width + pad) continue;
+      if (y < box.y - pad || y > box.y + box.height + pad) continue;
+      const area = Math.max(box.width, 0.5) * Math.max(box.height, 0.5);
+      if (!best || area < best.area) best = { group, area };
+    }
+    return best?.group ?? null;
+  }
+
+  /** The staff whose vertical band the point is in, or the nearest one. */
+  function staffAt(staves, y) {
+    if (staves.length === 0) return null;
+    const inside = staves.find((staff) => y >= staff.topY - 2 && y <= staff.bottomY + 2);
+    if (inside) return inside;
+    return staves.reduce((best, staff) => {
+      const center = (staff.topY + staff.bottomY) / 2;
+      const bestCenter = (best.topY + best.bottomY) / 2;
+      return Math.abs(y - center) < Math.abs(y - bestCenter) ? staff : best;
+    }, staves[0]);
+  }
+
+  /**
+   * A click's staff position, in half staff spaces. The engine's own
+   * convention: `staffPositionForPitch` returns 0 for the bottom line and
+   * grows downward, and the renderer draws a notehead's baseline at
+   * `bottomY + position`. Clicks far outside the staff are clamped to a
+   * sane ledger range rather than sent off the page.
+   */
+  function staffPositionFromPoint(staff, y) {
+    if (!staff) return 0;
+    const raw = y - staff.bottomY;
+    const top = staff.topY - staff.bottomY;
+    return Math.round(Math.min(top + 2, Math.max(-5, raw)) * 2) / 2;
+  }
+
+  // ---- rendering ---------------------------------------------------------
 
   const setControlsEnabled = (enabled) => {
     playButton.disabled = !enabled;
+    metronomeButton.disabled = !enabled;
     saveButton.disabled = !enabled;
+    exportToggle.disabled = !enabled;
     exportPdf.disabled = !enabled;
     exportSvg.disabled = !enabled;
     exportPng.disabled = !enabled;
+    addMeasureButton.disabled = !enabled;
+    removeMeasureButton.disabled = !enabled;
+    if (!enabled) setExportMenu(false);
+  };
+
+  const setExportMenu = (open) => {
+    exportList.hidden = !open;
+    exportToggle.setAttribute('aria-expanded', String(open));
+  };
+
+  const setView = (mode) => {
+    state.layout = mode;
+    viewButtons.forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.editorView === mode));
+    });
+    if (state.result) render();
   };
 
   const updateZoom = () => {
@@ -102,30 +316,89 @@
     zoomOut.disabled = !state.result || state.zoom <= 50;
   };
 
-  const render = () => {
-    if (!state.xml) return;
-    if (!engine?.renderFromMusicXml) {
+  function svgElement(name, attrs) {
+    const node = document.createElementNS(SVG_NS, name);
+    for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+    return node;
+  }
+
+  /** Draws the entry cursor, selection highlight and playback playhead over the score. */
+  function applyOverlays(svg, staves) {
+    svg.querySelectorAll('[data-editor-selected]').forEach((node) => node.removeAttribute('data-editor-selected'));
+    svg.querySelectorAll('.editor-overlay').forEach((node) => node.remove());
+
+    const overlay = svgElement('g', { class: 'editor-overlay' });
+    const staffFor = (systemIndex) => staves[systemIndex] ?? staves[0];
+    const bandTop = (staff) => (staff ? staff.topY - 4 : 0);
+    const bandHeight = (staff) => (staff ? staff.bottomY - staff.topY + 8 : 8);
+    const mark = (id) => {
+      const group = svg.querySelector(`[data-id="${id}"]`);
+      if (group) group.setAttribute('data-editor-selected', 'true');
+    };
+
+    if (state.selection) {
+      mark(engine.notationEventId(
+        state.selection.partId, state.selection.measureNumber, state.selection.voiceId, state.selection.eventIndex,
+      ));
+    }
+    if (state.soundingId) mark(state.soundingId);
+
+    if (state.entry && state.result) {
+      const staff = staffFor(state.entry.systemIndex);
+      const x = engine.positionToX(state.result.playback, globalTickOf(state.entry.measureNumber, state.entry.tick)).x;
+      overlay.appendChild(svgElement('rect', {
+        class: 'editor-cursor',
+        x: x - 0.08,
+        y: bandTop(staff),
+        width: 0.16,
+        height: bandHeight(staff),
+      }));
+    }
+
+    if (state.result && state.playing) {
+      const tick = engine.secondsToTick(state.result.playback.tempoMap, state.playSeconds);
+      const placement = engine.computeCursorPlacement(state.result.playback, tick, { mode: 'cursorMoves' });
+      const staff = staffFor(placement.systemIndex);
+      overlay.appendChild(svgElement('rect', {
+        class: 'editor-playhead',
+        x: placement.markerX - 0.06,
+        y: bandTop(staff),
+        width: 0.12,
+        height: bandHeight(staff),
+      }));
+    }
+
+    if (overlay.childElementCount > 0) svg.appendChild(overlay);
+  }
+
+  function render() {
+    if (!state.doc) return;
+    if (!engine?.renderParsedMusicXml) {
       announce('Notation Engine is unavailable.');
       return;
     }
     try {
-      const result = engine.renderFromMusicXml(state.xml, { config: { layout: { mode: state.layout } } });
+      const result = engine.renderParsedMusicXml(state.doc, { config: { layout: { mode: state.layout } } });
       const parsed = new DOMParser().parseFromString(result.svg, 'image/svg+xml');
       const svg = parsed.documentElement;
       if (parsed.querySelector('parsererror') || svg?.localName !== 'svg') {
         throw new Error('The score renderer returned invalid SVG.');
       }
-      scoreHost.replaceChildren(document.importNode(svg, true));
+      const imported = document.importNode(svg, true);
+      state.result = result;
+      scoreHost.replaceChildren(imported);
       scoreHost.hidden = false;
       emptyState.hidden = true;
       canvas.dataset.layout = state.layout;
-      state.result = result;
+      applyOverlays(imported, detectStaves(imported));
       setControlsEnabled(true);
+      syncHistory();
       updateZoom();
+      refreshTempo();
       const errors = (result.diagnostics || []).filter((item) => item.severity === 'error');
-      announce(errors.length
-        ? `Score loaded with ${errors.length} issue${errors.length === 1 ? '' : 's'}.`
-        : 'Score ready.');
+      if (errors.length) {
+        announce(`Score loaded with ${errors.length} issue${errors.length === 1 ? '' : 's'}.`);
+      }
     } catch (error) {
       state.result = null;
       scoreHost.hidden = true;
@@ -133,28 +406,43 @@
       setControlsEnabled(false);
       announce(error instanceof Error ? error.message : 'The score could not be rendered.');
     }
-  };
+  }
 
-  const showEmpty = (message) => {
-    state.xml = '';
+  function showEmpty(message) {
+    state.doc = null;
     state.result = null;
     state.filename = '';
+    state.selection = null;
+    state.entry = null;
+    state.history.length = 0;
+    state.future.length = 0;
     scoreHost.hidden = true;
     scoreHost.replaceChildren();
     emptyState.hidden = false;
     setControlsEnabled(false);
+    syncHistory();
     setFile('');
     if (message) announce(message);
-  };
+  }
 
-  const loadXml = (xml, name) => {
-    state.xml = xml;
+  function loadXml(xml, name) {
+    const parsed = engine.parseMusicXml(xml, window.DOMParser);
+    const errors = (parsed.diagnostics || []).filter((item) => item.severity === 'error');
+    if (errors.length && parsed.score.parts.every((part) => part.measures.length === 0)) {
+      throw new Error(errors[0]?.message || 'The score could not be read.');
+    }
+    state.doc = parsed;
     state.filename = name;
+    state.history.length = 0;
+    state.future.length = 0;
+    state.selection = null;
+    state.entry = { partId: activePartId(), measureNumber: 1, voiceId: 1, tick: 0, systemIndex: 0 };
     setFile(name);
     render();
-  };
+    announce('Score ready.');
+  }
 
-  const readFile = async (file) => {
+  async function readFile(file) {
     if (!file) return;
     const extension = file.name.split('.').pop()?.toLowerCase();
     if (!['musicxml', 'xml', 'mxl'].includes(extension || '')) {
@@ -179,9 +467,291 @@
     } catch (error) {
       showEmpty(error instanceof Error ? error.message : 'The score could not be opened.');
     }
+  }
+
+  // ---- selection, navigation, entry --------------------------------------
+
+  function clampPointers() {
+    if (!state.doc) return;
+    const measures = state.doc.score.parts[0]?.measures ?? [];
+    const last = measures[measures.length - 1]?.number ?? 1;
+    if (state.entry && !measures.some((m) => m.number === state.entry.measureNumber)) {
+      state.entry = { ...state.entry, measureNumber: last, tick: 0 };
+    }
+    if (state.selection && !measures.some((m) => m.number === state.selection.measureNumber)) {
+      state.selection = null;
+    }
+  }
+
+  function selectEvent(partId, measureNumber, voiceId, eventIndex) {
+    const events = eventsIn(measureNumber, voiceId);
+    state.selection = { partId, measureNumber, voiceId, eventIndex };
+    state.entry = {
+      partId,
+      measureNumber,
+      voiceId,
+      tick: events[eventIndex]?.startTick ?? 0,
+      systemIndex: state.entry?.systemIndex ?? 0,
+    };
+    render();
+  }
+
+  function moveSelection(direction) {
+    if (!state.selection) return;
+    const { measureNumber, voiceId, eventIndex } = state.selection;
+    const events = eventsIn(measureNumber, voiceId);
+    const nextIndex = eventIndex + direction;
+    if (nextIndex >= 0 && nextIndex < events.length) {
+      selectEvent(activePartId(), measureNumber, voiceId, nextIndex);
+      return;
+    }
+    if (direction > 0) {
+      const nextMeasure = measureNumber + 1;
+      if (!state.doc.score.parts[0].measures.some((m) => m.number === nextMeasure)) {
+        state.doc = docTools.appendMeasure(state.doc, activePartId());
+      }
+      if (eventsIn(nextMeasure, voiceId).length > 0) {
+        selectEvent(activePartId(), nextMeasure, voiceId, 0);
+        return;
+      }
+      state.entry = { partId: activePartId(), measureNumber: nextMeasure, voiceId, tick: 0, systemIndex: state.entry?.systemIndex ?? 0 };
+      state.selection = null;
+      announce(`Measure ${nextMeasure}.`);
+      render();
+      return;
+    }
+    if (measureNumber > 1) {
+      const previous = measureNumber - 1;
+      const previousEvents = eventsIn(previous, voiceId);
+      selectEvent(activePartId(), previous, voiceId, Math.max(0, previousEvents.length - 1));
+    }
+  }
+
+  const shiftPitch = (pitch, semitones) => engine.soundingPitch(pitch, semitones);
+
+  function transposeSelection(semitones) {
+    if (!state.selection) return;
+    const { partId, measureNumber, voiceId, eventIndex } = state.selection;
+    const event = eventsIn(measureNumber, voiceId)[eventIndex];
+    if (!event || event.kind === 'rest') return;
+    const moved = event.kind === 'chord'
+      ? { ...event, notes: event.notes.map((note) => ({ ...note, pitch: shiftPitch(note.pitch, semitones) })) }
+      : { ...event, pitch: shiftPitch(event.pitch, semitones) };
+    commit((doc) => docTools.replaceEvent(doc, { partId, measureNumber, voiceId, eventIndex, event: moved }),
+      `Moved ${semitones > 0 ? 'up' : 'down'}.`);
+  }
+
+  function deleteSelection() {
+    if (!state.selection) return;
+    const { partId, measureNumber, voiceId, eventIndex } = state.selection;
+    const remaining = eventsIn(measureNumber, voiceId).length - 1;
+    commit((doc) => docTools.deleteEvent(doc, { partId, measureNumber, voiceId, eventIndex }), 'Deleted.');
+    state.selection = remaining <= 0 ? null : { ...state.selection, eventIndex: Math.min(eventIndex, remaining - 1) };
+    render();
+  }
+
+  function advanceEntry(ticks, measureNumber, voiceId) {
+    const located = locateTick(state.entry.tick + ticks, measureNumber);
+    state.entry = { ...state.entry, measureNumber: located.measureNumber, tick: located.tick, voiceId };
+    state.selection = null;
+    render();
+  }
+
+  /** Writes a note, rest, or chord member at the entry cursor and rolls the cursor forward. */
+  function insertAtEntry({ step = null, octave = null, rest = false, addToChord = false }) {
+    if (!state.doc) return;
+    if (!state.entry) {
+      state.entry = { partId: activePartId(), measureNumber: 1, voiceId: 1, tick: 0, systemIndex: 0 };
+    }
+    const { measureNumber, voiceId } = state.entry;
+    const capacity = capacityOf(measureNumber);
+    const remaining = capacity - state.entry.tick;
+    if (remaining <= 0) {
+      const located = locateTick(state.entry.tick, measureNumber);
+      state.entry = { ...state.entry, ...located };
+      render();
+      return;
+    }
+    const duration = durationForTool();
+    const ticks = Math.min(duration.ticks, remaining);
+    const fitted = ticks === duration.ticks
+      ? duration
+      : engine.duration(engine.durationTypeAndDotsFromTicks(ticks).type, engine.durationTypeAndDotsFromTicks(ticks).dots, ticks);
+
+    if (rest) {
+      const event = engine.rest({ duration: fitted, voice: voiceId, staff: 1, startTick: state.entry.tick });
+      commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event }), 'Rest inserted.');
+      advanceEntry(ticks, measureNumber, voiceId);
+      return;
+    }
+
+    if (step === null) {
+      announce('Click a staff line or press a note letter first.');
+      return;
+    }
+    const alter = accidentalAlter();
+    const pitch = { kind: 'pitched', step, alter: alter ?? 0, octave };
+    const events = eventsIn(measureNumber, voiceId);
+    const existingIndex = events.findIndex((event) => (event.startTick ?? 0) === state.entry.tick);
+    const existing = existingIndex >= 0 ? events[existingIndex] : null;
+
+    if (existing && existing.kind !== 'rest') {
+      const note = engine.note({ pitch, duration: existing.duration, voice: voiceId, staff: 1 });
+      if (addToChord) {
+        const notes = existing.kind === 'chord' ? [...existing.notes, note] : [existing, note];
+        const chord = engine.chord(notes, { startTick: state.entry.tick });
+        commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: chord }), 'Note added to chord.');
+      } else {
+        // A plain letter or click on an occupied beat restates that beat's
+        // pitch, the way MuseScore replaces rather than stacking by default.
+        commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: note }), `Replaced with ${step}${octave}.`);
+      }
+      render();
+      return;
+    }
+
+    const event = engine.note({ pitch, duration: fitted, voice: voiceId, staff: 1, startTick: state.entry.tick });
+    commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event }), `Inserted ${step}${octave}.`);
+    advanceEntry(ticks, measureNumber, voiceId);
+  }
+
+  /** The octave whose notes sit nearest the middle of the current clef. */
+  function currentOctave() {
+    return docTools.pitchFromStaffPosition(clefAt(state.entry?.measureNumber ?? 1), 0).octave;
+  }
+
+  // ---- pointer interaction -----------------------------------------------
+
+  function onScorePointerDown(event) {
+    if (!state.result || !state.doc) return;
+    const svg = scoreHost.querySelector('svg');
+    if (!svg) return;
+    const point = toSvgPoint(svg, event.clientX, event.clientY);
+    if (!point) return;
+    const staves = detectStaves(svg);
+    const staff = staffAt(staves, point.y);
+    const systemIndex = staff?.systemIndex ?? 0;
+    const hit = eventAt(svg, point.x, point.y);
+
+    if (hit) {
+      const [partId, measureToken, voiceToken, eventToken] = hit.getAttribute('data-id').split('#');
+      const measureNumber = Number(measureToken.replace('m', ''));
+      const voiceId = Number(voiceToken.replace('v', ''));
+      const eventIndex = Number(eventToken.replace('e', ''));
+      const existing = eventsIn(measureNumber, voiceId)[eventIndex];
+      const staffPosition = staffPositionFromPoint(staff, point.y);
+      const { step, octave } = docTools.pitchFromStaffPosition(clefAt(measureNumber), staffPosition);
+      if (state.noteInput && event.shiftKey && existing && existing.kind !== 'rest') {
+        state.entry = { partId, measureNumber, voiceId, tick: existing.startTick ?? 0, systemIndex };
+        insertAtEntry({ step, octave, addToChord: true });
+        return;
+      }
+      state.selection = { partId, measureNumber, voiceId, eventIndex };
+      state.entry = { partId, measureNumber, voiceId, tick: existing?.startTick ?? 0, systemIndex };
+      announce(state.noteInput ? `Measure ${measureNumber}, beat ready.` : 'Note selected.');
+      render();
+      return;
+    }
+
+    const tick = engine.xToPosition(state.result.playback, point.x, systemIndex);
+    const position = engine.resolvePosition(state.result.playback, tick).position;
+    const staffPosition = staffPositionFromPoint(staff, point.y);
+    const { step, octave } = docTools.pitchFromStaffPosition(clefAt(position.measureNumber), staffPosition);
+    state.entry = {
+      partId: activePartId(),
+      measureNumber: position.measureNumber,
+      voiceId: 1,
+      tick: position.tickInMeasure,
+      systemIndex,
+    };
+    state.selection = null;
+    if (state.noteInput) {
+      if (state.tool.rest) insertAtEntry({ rest: true });
+      else insertAtEntry({ step, octave });
+      return;
+    }
+    announce(`Measure ${position.measureNumber}, ${step}${octave}.`);
+    render();
+  }
+
+  // ---- metronome ---------------------------------------------------------
+
+  /** Quarter-note BPM from the score's own tempo map (the engine's default is 120). */
+  const scoreBpm = () => {
+    const segment = state.result?.playback.tempoMap.segments?.[0];
+    if (!segment?.microsecondsPerQuarter) return 120;
+    return Math.round(60_000_000 / segment.microsecondsPerQuarter);
   };
 
-  // ---- playback ---------------------------------------------------------
+  const scoreTimeSignature = () => {
+    const measureNumber = state.entry?.measureNumber ?? 1;
+    const attribute = attributeAt(measureNumber);
+    const numerator = attribute?.timeNumerator ?? 4;
+    const denominator = attribute?.timeDenominator ?? 4;
+    return { numerator, denominator };
+  };
+
+  const refreshTempo = () => {
+    const { numerator, denominator } = scoreTimeSignature();
+    const unit = denominator === 4 ? '\u2669' : denominator === 8 ? '\u266A' : '\u2669';
+    tempoOutput.textContent = `${unit}=${scoreBpm()}`;
+    tempoOutput.title = `Tempo ${scoreBpm()} BPM · ${numerator}/${denominator}`;
+  };
+
+  const clearMetronomeTimers = () => {
+    for (const timer of state.metronomeTimers) window.clearTimeout(timer);
+    state.metronomeTimers.length = 0;
+  };
+
+  /** Schedules the metronome clicks from `fromSeconds` on, using the score's own tempo and metre. */
+  const scheduleMetronome = (fromSeconds = 0) => {
+    clearMetronomeTimers();
+    if (!state.metronomeOn || !state.result) return;
+    if (!state.metronome) {
+      state.metronome = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    const context = state.metronome;
+    void context.resume();
+    const bpm = scoreBpm();
+    const { numerator, denominator } = scoreTimeSignature();
+    const beatSeconds = (60 * 4) / (bpm * denominator);
+    const totalSeconds = Math.max(0, endSeconds() - fromSeconds);
+    const firstBeat = Math.ceil(fromSeconds / beatSeconds - 1e-6);
+    const beats = Math.ceil(totalSeconds / beatSeconds) + 1;
+    const origin = context.currentTime;
+    for (let index = 0; index < beats; index += 1) {
+      const beatIndex = firstBeat + index;
+      const at = origin + beatIndex * beatSeconds - fromSeconds;
+      if (at < origin) continue;
+      const accented = ((beatIndex % numerator) + numerator) % numerator === 0;
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = accented ? 1320 : 880;
+      gain.gain.setValueAtTime(0, at);
+      gain.gain.linearRampToValueAtTime(accented ? 0.34 : 0.2, at + 0.001);
+      gain.gain.exponentialRampToValueAtTime(0.001, at + 0.045);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(at);
+      oscillator.stop(at + 0.05);
+    }
+  };
+
+  const setMetronome = (on) => {
+    state.metronomeOn = on;
+    metronomeButton.setAttribute('aria-pressed', String(on));
+    metronomeButton.classList.toggle('is-active', on);
+    if (on) {
+      scheduleMetronome(state.playing ? state.playSeconds : 0);
+      announce('Metronome on.');
+    } else {
+      clearMetronomeTimers();
+      announce('Metronome off.');
+    }
+  };
+
+  // ---- playback ----------------------------------------------------------
 
   const setPlaying = (playing) => {
     state.playing = playing;
@@ -194,7 +764,7 @@
 
   const ensureSound = async () => {
     if (state.sound) return state.sound;
-    if (state.soundTried && !state.sound) throw new Error('Playback is unavailable in this preview.');
+    if (state.soundTried) throw new Error('Playback is unavailable in this preview.');
     state.soundTried = true;
     const SoundFont = window.NotationSoundFont;
     if (!SoundFont?.R2SoundFontEngine) throw new Error('The sound engine could not be loaded.');
@@ -209,37 +779,105 @@
     return state.sound;
   };
 
-  const scheduleEnd = (playback) => {
-    if (state.endTimer !== null) window.clearTimeout(state.endTimer);
-    const seconds = Math.max(0, ...playback.events.map((event) => engine.resolvePosition(playback, event.tick + event.durationTicks).seconds));
-    state.endTimer = window.setTimeout(() => setPlaying(false), Math.max(0, seconds * 1000 + 120));
+  /** Total ticks in the score — the whole timeline, rests included. */
+  const totalTicks = () => {
+    const measures = state.doc?.score.parts[0]?.measures ?? [];
+    return measures.reduce((sum, measure) => sum + capacityOf(measure.number), 0);
   };
 
-  const togglePlay = async () => {
+  const endTick = () => Math.max(totalTicks(), ...(state.result?.playback.events ?? []).map((event) => event.tick + event.durationTicks));
+
+  const endSeconds = () => {
+    if (!state.result) return 0;
+    return engine.resolvePosition(state.result.playback, endTick()).seconds;
+  };
+
+  /** The note id sounding at `tick`, so the cursor can highlight it. */
+  const soundingAt = (tick) => {
+    const events = state.result?.playback.events ?? [];
+    let best = null;
+    for (const event of events) {
+      if (tick >= event.tick && tick < event.tick + event.durationTicks && (!best || event.tick > best.tick)) {
+        best = event;
+      }
+    }
+    return best ? engine.elementIdForNoteId(best.noteIds[0]) : null;
+  };
+
+  function frame() {
+    if (!state.playing || !state.result) return;
+    state.playSeconds = state.playStartSeconds + (performance.now() - state.playStartedAt) / 1000;
+    const tick = engine.secondsToTick(state.result.playback.tempoMap, state.playSeconds);
+    if (tick >= endTick() || state.playSeconds >= endSeconds() + 0.15) {
+      stopPlayback();
+      return;
+    }
+    const id = soundingAt(tick);
+    if (id !== state.soundingId) {
+      state.soundingId = id;
+      render();
+    } else {
+      const line = scoreHost.querySelector('svg .editor-playhead');
+      if (line) {
+        line.setAttribute('x', String(engine.computeCursorPlacement(state.result.playback, tick, { mode: 'cursorMoves' }).markerX - 0.06));
+      } else {
+        render();
+      }
+    }
+    state.rafId = window.requestAnimationFrame(frame);
+  }
+
+  function stopPlayback() {
+    setPlaying(false);
+    if (state.rafId !== null) window.cancelAnimationFrame(state.rafId);
+    state.rafId = null;
+    state.soundingId = null;
+    state.playSeconds = 0;
+    clearMetronomeTimers();
+    state.sound?.pause?.();
+    announce('Stopped.');
+    render();
+  }
+
+  /** Where playback starts: the entry cursor if there is one, else the top. */
+  const startSeconds = () => {
+    if (!state.result || !state.entry) return 0;
+    const tick = globalTickOf(state.entry.measureNumber, state.entry.tick);
+    return Math.max(0, engine.resolvePosition(state.result.playback, tick).seconds);
+  };
+
+  async function togglePlay() {
     if (!state.result) return;
+    if (state.playing) {
+      state.sound?.pause?.();
+      clearMetronomeTimers();
+      setPlaying(false);
+      if (state.rafId !== null) window.cancelAnimationFrame(state.rafId);
+      state.rafId = null;
+      state.soundingId = null;
+      announce('Paused.');
+      render();
+      return;
+    }
     if (!state.sound) {
       announce('Loading playback…');
       try {
         await ensureSound();
       } catch (error) {
         announce(error instanceof Error ? error.message : 'Playback is unavailable.');
-        return;
       }
     }
-    const next = !state.playing;
-    setPlaying(next);
-    if (next) {
-      scheduleEnd(state.result.playback);
-      void state.sound.play(state.result.playback, 1);
-      announce('Playing.');
-    } else {
-      if (state.endTimer !== null) window.clearTimeout(state.endTimer);
-      state.sound.pause();
-      announce('Paused.');
-    }
-  };
+    if (state.playSeconds >= endSeconds()) state.playSeconds = startSeconds();
+    state.playStartSeconds = state.playSeconds;
+    state.playStartedAt = performance.now();
+    setPlaying(true);
+    state.sound?.play?.(state.result.playback, 1, state.playSeconds);
+    if (state.metronomeOn) scheduleMetronome(state.playSeconds);
+    state.rafId = window.requestAnimationFrame(frame);
+    announce('Playing.');
+  }
 
-  // ---- export -----------------------------------------------------------
+  // ---- export ------------------------------------------------------------
 
   const download = (blob, filename) => {
     const url = URL.createObjectURL(blob);
@@ -252,22 +890,18 @@
 
   const baseName = () => (state.filename || 'notation').replace(/\.[^.]+$/, '');
 
-  const runExport = async (button, kind) => {
+  async function runExport(button, kind) {
     if (!state.result?.svg) return;
     button.disabled = true;
     announce(`Preparing ${kind.toUpperCase()}…`);
     try {
       if (kind === 'svg') {
-        const svg = engine.exportSvg
-          ? engine.exportSvg(state.result.svg, { title: baseName() })
-          : state.result.svg;
+        const svg = engine.exportSvg ? engine.exportSvg(state.result.svg, { title: baseName() }) : state.result.svg;
         download(new Blob([svg], { type: 'image/svg+xml' }), `${baseName()}.svg`);
       } else if (kind === 'pdf') {
-        const bytes = await engine.exportPdf(state.result.svg, { scale: 2 });
-        download(new Blob([bytes], { type: 'application/pdf' }), `${baseName()}.pdf`);
+        download(new Blob([await engine.exportPdf(state.result.svg, { scale: 2 })], { type: 'application/pdf' }), `${baseName()}.pdf`);
       } else {
-        const bytes = await engine.exportPng(state.result.svg, { scale: 2 });
-        download(new Blob([bytes], { type: 'image/png' }), `${baseName()}.png`);
+        download(new Blob([await engine.exportPng(state.result.svg, { scale: 2 })], { type: 'image/png' }), `${baseName()}.png`);
       }
       announce(`${kind.toUpperCase()} downloaded.`);
     } catch (error) {
@@ -275,15 +909,18 @@
     } finally {
       button.disabled = !state.result;
     }
-  };
+  }
 
-  const saveScore = () => {
-    if (!state.xml) return;
-    download(new Blob([state.xml], { type: 'application/vnd.recordare.musicxml+xml' }), `${baseName()}.musicxml`);
+  function saveScore() {
+    if (!state.doc) return;
+    download(
+      new Blob([docTools.toMusicXml(state.doc)], { type: 'application/vnd.recordare.musicxml+xml' }),
+      `${baseName()}.musicxml`,
+    );
     announce('Score file downloaded.');
-  };
+  }
 
-  // ---- toolbar tools ----------------------------------------------------
+  // ---- toolbar state -----------------------------------------------------
 
   const syncTools = () => {
     durationButtons.forEach((button) => {
@@ -292,39 +929,63 @@
     accidentalButtons.forEach((button) => {
       button.setAttribute('aria-pressed', String(button.dataset.editorAccidental === state.tool.accidental));
     });
-    dotButton.setAttribute('aria-pressed', String(state.tool.dot));
+    dotButton.setAttribute('aria-pressed', String(state.tool.dots > 0));
     restButton.setAttribute('aria-pressed', String(state.tool.rest));
+    noteInputButton.setAttribute('aria-pressed', String(state.noteInput));
+    root.dataset.mode = state.noteInput ? 'input' : 'select';
   };
 
-  const applySetup = () => {
-    tempoOutput.textContent = '\u2669=120';
-    if (!state.xml) return;
-    loadXml(starterScore(), state.filename || 'Untitled score.musicxml');
-  };
+  function applySetup() {
+    const clef = CLEF_SIGN[clefSelect.value] || CLEF_SIGN.treble;
+    const fifths = KEY_FIFTHS[keySelect.value] ?? 0;
+    const [numerator, denominator] = TIME_PAIR[timeSelect.value] || TIME_PAIR['4/4'];
+    commit(
+      (doc) => docTools.setSetup(doc, { partId: activePartId(), clef, fifths, numerator, denominator }),
+      'Score setup applied.',
+    );
+  }
 
-  // ---- wiring -----------------------------------------------------------
+  // ---- wiring ------------------------------------------------------------
 
   openButtons.forEach((button) => button.addEventListener('click', () => fileInput.click()));
-  newButtons.forEach((button) => button.addEventListener('click', () => loadXml(starterScore(), 'Untitled score.musicxml')));
+  newButtons.forEach((button) => button.addEventListener('click', () => {
+    try { loadXml(starterMusicXml(), 'Untitled score.musicxml'); } catch (error) { showEmpty(error.message); }
+  }));
   fileInput.addEventListener('change', () => readFile(fileInput.files?.[0]));
   saveButton.addEventListener('click', saveScore);
-
-  undoButton.addEventListener('click', () => announce('Undo becomes available with note entry.'));
-  redoButton.addEventListener('click', () => announce('Redo becomes available with note entry.'));
-
+  undoButton.addEventListener('click', undo);
+  redoButton.addEventListener('click', redo);
   playButton.addEventListener('click', () => void togglePlay());
+
+  noteInputButton.addEventListener('click', () => {
+    state.noteInput = !state.noteInput;
+    syncTools();
+    announce(state.noteInput ? 'Note input on — click the staff to write.' : 'Note input off.');
+  });
+  addMeasureButton.addEventListener('click', () => commit((doc) => docTools.appendMeasure(doc, activePartId()), 'Measure added.'));
+  removeMeasureButton.addEventListener('click', () => commit((doc) => docTools.removeLastMeasure(doc, activePartId()), 'Measure removed.'));
+
+  scoreHost.addEventListener('pointerdown', onScorePointerDown);
 
   zoomIn.addEventListener('click', () => { state.zoom += 10; updateZoom(); });
   zoomOut.addEventListener('click', () => { state.zoom -= 10; updateZoom(); });
-  layoutSelect.addEventListener('change', () => { state.layout = layoutSelect.value; render(); });
+  viewButtons.forEach((button) => button.addEventListener('click', () => {
+    setView(button.dataset.editorView);
+    announce(button.dataset.editorView === 'page' ? 'Page view.' : 'Horizontal view.');
+  }));
 
-  exportPdf.addEventListener('click', () => void runExport(exportPdf, 'pdf'));
-  exportSvg.addEventListener('click', () => void runExport(exportSvg, 'svg'));
-  exportPng.addEventListener('click', () => void runExport(exportPng, 'png'));
+  metronomeButton.addEventListener('click', () => setMetronome(!state.metronomeOn));
+
+  exportToggle.addEventListener('click', () => setExportMenu(exportList.hidden));
+  exportPdf.addEventListener('click', () => { setExportMenu(false); void runExport(exportPdf, 'pdf'); });
+  exportSvg.addEventListener('click', () => { setExportMenu(false); void runExport(exportSvg, 'svg'); });
+  exportPng.addEventListener('click', () => { setExportMenu(false); void runExport(exportPng, 'png'); });
+  document.addEventListener('pointerdown', (event) => {
+    if (!exportList.hidden && !event.target.closest('[data-editor-export-menu]')) setExportMenu(false);
+  });
 
   durationButtons.forEach((button) => button.addEventListener('click', () => {
     state.tool.duration = button.dataset.editorDuration;
-    state.tool.rest = false;
     syncTools();
     announce(`Note value: ${button.getAttribute('aria-label')}.`);
   }));
@@ -334,33 +995,74 @@
     syncTools();
     announce(state.tool.accidental ? `${button.getAttribute('aria-label')} selected.` : 'Accidental cleared.');
   }));
-  dotButton.addEventListener('click', () => { state.tool.dot = !state.tool.dot; syncTools(); announce(state.tool.dot ? 'Dot on.' : 'Dot off.'); });
-  restButton.addEventListener('click', () => { state.tool.rest = !state.tool.rest; syncTools(); announce(state.tool.rest ? 'Rests on.' : 'Rests off.'); });
+  dotButton.addEventListener('click', () => {
+    state.tool.dots = state.tool.dots > 0 ? 0 : 1;
+    syncTools();
+    announce(state.tool.dots ? 'Dot on.' : 'Dot off.');
+  });
+  restButton.addEventListener('click', () => {
+    state.tool.rest = !state.tool.rest;
+    syncTools();
+    announce(state.tool.rest ? 'Rests on.' : 'Rests off.');
+  });
 
   [clefSelect, keySelect, timeSelect].forEach((select) => select.addEventListener('change', applySetup));
 
   document.addEventListener('keydown', (event) => {
     const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(event.target?.tagName || '');
     if (typing) return;
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'o') { event.preventDefault(); fileInput.click(); return; }
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); saveScore(); return; }
-    if ((event.ctrlKey || event.metaKey) && event.key === '=') { event.preventDefault(); state.zoom += 10; updateZoom(); return; }
-    if ((event.ctrlKey || event.metaKey) && event.key === '-') { event.preventDefault(); state.zoom -= 10; updateZoom(); return; }
+    const modifier = event.ctrlKey || event.metaKey;
+
+    if (modifier && event.key.toLowerCase() === 'o') { event.preventDefault(); fileInput.click(); return; }
+    if (modifier && event.key.toLowerCase() === 's') { event.preventDefault(); saveScore(); return; }
+    if (modifier && event.key.toLowerCase() === 'z' && !event.shiftKey) { event.preventDefault(); undo(); return; }
+    if (modifier && (event.key.toLowerCase() === 'y' || (event.shiftKey && event.key.toLowerCase() === 'z'))) { event.preventDefault(); redo(); return; }
+    if (modifier && event.key === '=') { event.preventDefault(); state.zoom += 10; updateZoom(); return; }
+    if (modifier && event.key === '-') { event.preventDefault(); state.zoom -= 10; updateZoom(); return; }
     if (event.code === 'Space') { event.preventDefault(); void togglePlay(); return; }
-    const shortcuts = { '1': 'whole', '2': 'half', '3': 'quarter', '4': 'eighth', '5': '16th' };
-    if (shortcuts[event.key]) {
-      state.tool.duration = shortcuts[event.key];
+
+    if (event.key === 'Escape') { state.selection = null; render(); return; }
+    if (event.key === 'ArrowRight') { event.preventDefault(); moveSelection(1); return; }
+    if (event.key === 'ArrowLeft') { event.preventDefault(); moveSelection(-1); return; }
+    if (event.key === 'ArrowUp') { event.preventDefault(); transposeSelection(event.shiftKey ? 12 : 1); return; }
+    if (event.key === 'ArrowDown') { event.preventDefault(); transposeSelection(event.shiftKey ? -12 : -1); return; }
+    if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); deleteSelection(); return; }
+
+    if (SHORTCUT_DURATION[event.key]) {
+      state.tool.duration = SHORTCUT_DURATION[event.key];
       syncTools();
-      announce(`Note value: ${shortcuts[event.key]}.`);
+      announce(`Note value: ${state.tool.duration}.`);
+      return;
+    }
+    if (event.key === '.') { state.tool.dots = state.tool.dots > 0 ? 0 : 1; syncTools(); return; }
+    if (event.key.toLowerCase() === 'n') {
+      state.noteInput = !state.noteInput;
+      syncTools();
+      announce(state.noteInput ? 'Note input on.' : 'Note input off.');
+      return;
+    }
+    if (event.key.toLowerCase() === 'm') { setMetronome(!state.metronomeOn); return; }
+    if (event.key === '0' || event.key.toLowerCase() === 'r') {
+      if (state.noteInput) insertAtEntry({ rest: true });
+      else { state.tool.rest = !state.tool.rest; syncTools(); }
+      return;
+    }
+
+    const letter = event.key.toUpperCase();
+    if (state.noteInput && docTools.STEPS.includes(letter)) {
+      event.preventDefault();
+      insertAtEntry({ step: letter, octave: currentOctave(), addToChord: event.shiftKey });
     }
   });
 
-  // ---- entry handoff ----------------------------------------------------
+  // ---- entry handoff -----------------------------------------------------
 
-  const restoreHandoff = () => {
+  function restoreHandoff() {
     const params = new URLSearchParams(window.location.search);
-    const intent = params.get('intent');
-    if (intent === 'create') { loadXml(starterScore(), 'Untitled score.musicxml'); return; }
+    if (params.get('intent') === 'create') {
+      try { loadXml(starterMusicXml(), 'Untitled score.musicxml'); } catch (error) { showEmpty(error.message); }
+      return;
+    }
     const pending = sessionStorage.getItem('notation-lab-pending-file');
     if (!pending) return;
     sessionStorage.removeItem('notation-lab-pending-file');
@@ -373,8 +1075,9 @@
     } catch {
       showEmpty('The selected file could not be reopened. Please choose it again.');
     }
-  };
+  }
 
+  tempoOutput.textContent = '\u2669=120';
   syncTools();
   setControlsEnabled(false);
   updateZoom();
