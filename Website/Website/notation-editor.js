@@ -14,10 +14,8 @@
   const docTools = window.NotationDoc;
   const pick = (selector) => document.querySelector(selector);
 
-  const fileInput = pick('[data-editor-file-input]');
-  const openButtons = [...document.querySelectorAll('[data-editor-open]')];
-  const newButtons = [...document.querySelectorAll('[data-editor-new]')];
   const saveButton = pick('[data-editor-save]');
+  const backButton = pick('[data-editor-back]');
   const undoButton = pick('[data-editor-undo]');
   const redoButton = pick('[data-editor-redo]');
   const playButton = pick('[data-editor-play]');
@@ -26,7 +24,6 @@
   const removeMeasureButton = pick('[data-editor-remove-measure]');
   const canvas = pick('[data-editor-canvas]');
   const scoreHost = pick('[data-editor-score]');
-  const emptyState = pick('[data-editor-empty]');
   const statusMessage = pick('[data-editor-status]');
   const statusFile = pick('[data-editor-file]');
   const zoomOutput = pick('[data-editor-zoom]');
@@ -42,7 +39,10 @@
   const exportToggle = pick('[data-editor-export-toggle]');
   const exportList = pick('[data-editor-export-list]');
   const metronomeButton = pick('[data-editor-metronome]');
-  const viewButtons = [...document.querySelectorAll('[data-editor-view]')];
+  const viewToggle = pick('[data-editor-view-toggle]');
+  const viewList = pick('[data-editor-view-list]');
+  const viewLabel = pick('[data-editor-view-label]');
+  const viewButtons = [...document.querySelectorAll('[data-editor-view-list] [data-editor-view]')];
   const durationButtons = [...document.querySelectorAll('[data-editor-duration]')];
   const accidentalButtons = [...document.querySelectorAll('[data-editor-accidental]')];
   const dotButton = pick('[data-editor-dot]');
@@ -300,10 +300,17 @@
     exportToggle.setAttribute('aria-expanded', String(open));
   };
 
+  const setViewMenu = (open) => {
+    viewList.hidden = !open;
+    viewToggle.setAttribute('aria-expanded', String(open));
+  };
+
   const setView = (mode) => {
     state.layout = mode;
+    const label = mode === 'scroll' ? 'Horizontal' : 'Page';
+    if (viewLabel) viewLabel.textContent = label;
     viewButtons.forEach((button) => {
-      button.setAttribute('aria-pressed', String(button.dataset.editorView === mode));
+      button.setAttribute('aria-checked', String(button.dataset.editorView === mode));
     });
     if (state.result) render();
   };
@@ -388,7 +395,6 @@
       state.result = result;
       scoreHost.replaceChildren(imported);
       scoreHost.hidden = false;
-      emptyState.hidden = true;
       canvas.dataset.layout = state.layout;
       applyOverlays(imported, detectStaves(imported));
       setControlsEnabled(true);
@@ -402,7 +408,6 @@
     } catch (error) {
       state.result = null;
       scoreHost.hidden = true;
-      emptyState.hidden = false;
       setControlsEnabled(false);
       announce(error instanceof Error ? error.message : 'The score could not be rendered.');
     }
@@ -418,7 +423,6 @@
     state.future.length = 0;
     scoreHost.hidden = true;
     scoreHost.replaceChildren();
-    emptyState.hidden = false;
     setControlsEnabled(false);
     syncHistory();
     setFile('');
@@ -911,13 +915,34 @@
     }
   }
 
+  // Save writes the score into the user's account library (kept in the
+  // browser); Export is the way a file leaves the app.
+  const SCORE_LIBRARY_KEY = 'msharing-notation-scores';
+
+  const readLibrary = () => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(SCORE_LIBRARY_KEY) || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
   function saveScore() {
     if (!state.doc) return;
-    download(
-      new Blob([docTools.toMusicXml(state.doc)], { type: 'application/vnd.recordare.musicxml+xml' }),
-      `${baseName()}.musicxml`,
-    );
-    announce('Score file downloaded.');
+    const name = baseName() || 'Untitled score';
+    const xml = docTools.toMusicXml(state.doc);
+    const scores = readLibrary();
+    const existing = scores.findIndex((score) => score.name === name);
+    const record = { name, xml, savedAt: new Date().toISOString() };
+    if (existing >= 0) scores[existing] = record;
+    else scores.unshift(record);
+    try {
+      localStorage.setItem(SCORE_LIBRARY_KEY, JSON.stringify(scores.slice(0, 100)));
+      announce(`Saved to your account — ${name}.`);
+    } catch {
+      announce('Could not save to your account — browser storage is full.');
+    }
   }
 
   // ---- toolbar state -----------------------------------------------------
@@ -947,11 +972,7 @@
 
   // ---- wiring ------------------------------------------------------------
 
-  openButtons.forEach((button) => button.addEventListener('click', () => fileInput.click()));
-  newButtons.forEach((button) => button.addEventListener('click', () => {
-    try { loadXml(starterMusicXml(), 'Untitled score.musicxml'); } catch (error) { showEmpty(error.message); }
-  }));
-  fileInput.addEventListener('change', () => readFile(fileInput.files?.[0]));
+  backButton.addEventListener('click', () => window.location.assign('notation.html'));
   saveButton.addEventListener('click', saveScore);
   undoButton.addEventListener('click', undo);
   redoButton.addEventListener('click', redo);
@@ -969,9 +990,11 @@
 
   zoomIn.addEventListener('click', () => { state.zoom += 10; updateZoom(); });
   zoomOut.addEventListener('click', () => { state.zoom -= 10; updateZoom(); });
+  viewToggle.addEventListener('click', () => setViewMenu(viewList.hidden));
   viewButtons.forEach((button) => button.addEventListener('click', () => {
     setView(button.dataset.editorView);
-    announce(button.dataset.editorView === 'page' ? 'Page view.' : 'Horizontal view.');
+    setViewMenu(false);
+    announce(button.dataset.editorView === 'scroll' ? 'Horizontal view.' : 'Page view.');
   }));
 
   metronomeButton.addEventListener('click', () => setMetronome(!state.metronomeOn));
@@ -982,6 +1005,7 @@
   exportPng.addEventListener('click', () => { setExportMenu(false); void runExport(exportPng, 'png'); });
   document.addEventListener('pointerdown', (event) => {
     if (!exportList.hidden && !event.target.closest('[data-editor-export-menu]')) setExportMenu(false);
+    if (!viewList.hidden && !event.target.closest('[data-editor-view-menu]')) setViewMenu(false);
   });
 
   durationButtons.forEach((button) => button.addEventListener('click', () => {
@@ -1013,7 +1037,6 @@
     if (typing) return;
     const modifier = event.ctrlKey || event.metaKey;
 
-    if (modifier && event.key.toLowerCase() === 'o') { event.preventDefault(); fileInput.click(); return; }
     if (modifier && event.key.toLowerCase() === 's') { event.preventDefault(); saveScore(); return; }
     if (modifier && event.key.toLowerCase() === 'z' && !event.shiftKey) { event.preventDefault(); undo(); return; }
     if (modifier && (event.key.toLowerCase() === 'y' || (event.shiftKey && event.key.toLowerCase() === 'z'))) { event.preventDefault(); redo(); return; }
