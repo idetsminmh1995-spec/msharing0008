@@ -243,6 +243,16 @@ Editor တွင် note ရေးခြင်း လုပ်ဆောင်ခ
 
 **ပြီးစီးမှုစံ:** page ဖွင့်ချင်း staff နှိပ်၍ note ရေးနိုင်; ရေးလိုက်တဲ့ note ကို ချက်ချင်း ကြား; "Hear" ခလုတ်ဖြင့် ပိတ်/ဖွင့် နိုင်။
 
+#### Part K ဆက်လက် — "note မရေးလို့ရဘူး" ဆိုသည့် အမှန်တကယ် အဆင့်နှစ်ခု (2026-11-18)
+
+အသုံးပြုသူက "ဘာ note မှ ရေးလို့မရသေး" ဟု ဆိုသဖြင့် browser တွင် ပြန်စမ်း၍ **နှစ်ချက်** တွေ့ရှိပြီး ဖြေရှင်းသည် —
+
+- [x] **Blank editor dead-end**: `notation-editor.html` ကို `?intent=create` မပါဘဲ (သို့) file handoff ပျောက်ဆုံးနေချိန် ဖွင့်လျှင် staff လုံးဝ မပေါ်၊ control အားလုံး disabled၊ status "Ready." — ရေးစရာ ဘာမှ မရှိ။ `restoreHandoff()` ကို ပြင်လိုက်သည်: pending file မရှိပါက (သို့) "create" intent ဖြစ်ပါက starter score ကို **အမြဲ** ဖွင့်ပေး; "open" intent ဖြစ်ပြီး file မပါလျှင် အကြောင်းပြချက် ပြ။ ✓
+- [x] **Note ပေါ်ကို click လုပ်လျှင် မရေးဘဲ select သာ ဖြစ်နေ**: note-input mode တွင် ရှိပြီးသား note တစ်ခုပေါ် click လုပ်လျှင် ယခင်က selection သို့ ကျပြီး "Measure N, beat ready." သာ ပြ — click လုပ်လိုက်ပေမဲ့ note အသစ် မပေါ်သဖြင့် "မရေးရ" လို့ ထင်ရသည်။ ယခု note-input mode တွင် staff click သည် **အမြဲ ရေးသည်** (ရှိပြီးသား note ကို replace; Shift နှိပ်လျှင် chord ထည့်)။ Note ကို select လုပ်၍ transpose လိုလျှင် note input ကို ပိတ်ရမည်။ ✓
+- [x] Test: `editor-integration.test.js` တွင် (က) bare visit → starter score ပေါ်, Play enabled, status "Score ready."; (ခ) note ပေါ် click → "Replaced" (note input on) / "Note selected." (note input off) ✓
+- [x] `npm run verify` = **1295/1295 pass** ✓
+- [x] Browser E2E (headless Chromium, local + deployed): bare load → staff ပေါ်; click ၂ ချက် → note ၂ ခု; ရှိပြီးသား note ပေါ် click → "Replaced with B4."; note input off → "Note selected." ✓
+
 ---
 
 ## လုပ်ဆောင်မှုအစဉ်
@@ -263,6 +273,10 @@ Editor တွင် note ရေးခြင်း လုပ်ဆောင်ခ
 ### Note entry + hear-while-writing (Part K) — 2026-11-18
 
 Editor တွင် note ရေးခြင်း ရှိပြီးသား ဖြစ်သည် (browser E2E ဖြင့် အတည်ပြု)။ လိုအပ်ချက် နှစ်ချက် ဖြည့်ပြီး — (၁) `noteInput` default on ပြောင်း၊ (၂) `midiNoteNumber()` (engine) + `preview()` (sound engine) + `previewPitch()` (editor) ဖြင့် ရေးစဉ် အသံကြားစေ။ `event-stream.ts` က `midiNoteNumber()` ကို ပြန်သုံးသဖြင့် preview နှင့် playback သည် MIDI number တူတူ ရ။ `npm run verify` = 1293/1293။
+
+### Part K follow-up — two real "cannot write a note" states — 2026-11-18
+
+အသုံးပြုသူ၏ "ဘာ note မှ ရေးလို့မရ" ဆိုသည့် တိုင်ကြားချက်ကို browser တွင် ပြန်စမ်း၍ အဆင့်နှစ်ခု တွေ့ရှိပြီး ဖြေရှင်းသည် — (၁) `?intent=` မပါဘဲ ဖွင့်လျှင် editor သည် staff မပေါ်ဘဲ control အားလုံး disabled ("Ready.") ဖြစ်နေ; `restoreHandoff()` ကို pending file/intent မရှိလျှင် starter score ကို အမြဲ ဖွင့်စေရန် ပြင်။ (၂) note-input mode တွင် ရှိပြီးသား note ပေါ် click လုပ်လျှင် မရေးဘဲ select သာ ဖြစ်နေ; ယခု click သည် အမြဲ ရေးသည် (replace; Shift → chord)။ Test ၂ ခု ထည့်; `npm run verify` = 1295/1295; local + deployed browser E2E အတည်ပြု။
 
 ### Clean-environment verify + generated fixture matrix (Parts A and D) — 2026-11-18
 

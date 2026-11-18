@@ -671,9 +671,16 @@
       // is the SPACE to write into, so fall through to the positional
       // placement below rather than trapping every click on beat 1.
       if (existing && existing.kind !== 'rest') {
-        if (state.noteInput && event.shiftKey) {
+        // In note input a staff click always writes. Clicking a note that
+        // is already there -- the commonest gesture when writing a melody,
+        // since notes sit where the pointer is -- must replace that note
+        // (or, with Shift, add to its chord). Dropping into selection here
+        // made the click look like it did nothing. Selecting a note in
+        // order to transpose it is what note input OFF is for.
+        if (state.noteInput && !state.tool.rest) {
           state.entry = { partId, measureNumber, voiceId, tick: existing.startTick ?? 0, systemIndex };
-          insertAtEntry({ step, octave, addToChord: true });
+          state.selection = null;
+          insertAtEntry({ step, octave, addToChord: event.shiftKey });
           return;
         }
         state.selection = { partId, measureNumber, voiceId, eventIndex };
@@ -1365,22 +1372,34 @@
   // ---- entry handoff -----------------------------------------------------
 
   function restoreHandoff() {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('intent') === 'create') {
-      try { loadXml(starterMusicXml(), 'Untitled score.musicxml'); } catch (error) { showEmpty(error.message); }
+    const intent = new URLSearchParams(window.location.search).get('intent');
+    const pending = sessionStorage.getItem('notation-lab-pending-file');
+    if (pending) {
+      sessionStorage.removeItem('notation-lab-pending-file');
+      try {
+        const payload = JSON.parse(pending);
+        const binary = atob(payload.data);
+        const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+        const file = new File([bytes], payload.name, { type: payload.type || 'application/octet-stream' });
+        void readFile(file);
+        return;
+      } catch {
+        showEmpty('The selected file could not be reopened. Please choose it again.');
+        return;
+      }
+    }
+    if (intent === 'open') {
+      showEmpty('No file was handed over. Please choose one from the Notation Lab.');
       return;
     }
-    const pending = sessionStorage.getItem('notation-lab-pending-file');
-    if (!pending) return;
-    sessionStorage.removeItem('notation-lab-pending-file');
+    // A bare visit, or "create": start a new score. An editor with no staff
+    // and every control disabled gives a writer nothing to click, which
+    // reads as "I cannot write a note here" -- the opposite of this page's
+    // purpose.
     try {
-      const payload = JSON.parse(pending);
-      const binary = atob(payload.data);
-      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-      const file = new File([bytes], payload.name, { type: payload.type || 'application/octet-stream' });
-      void readFile(file);
-    } catch {
-      showEmpty('The selected file could not be reopened. Please choose it again.');
+      loadXml(starterMusicXml(), 'Untitled score.musicxml');
+    } catch (error) {
+      showEmpty(error.message);
     }
   }
 

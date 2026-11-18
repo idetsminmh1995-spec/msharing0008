@@ -68,7 +68,7 @@ const STARTER_XML = `<?xml version="1.0" encoding="UTF-8"?>
  * `requestAnimationFrame` on its own, so the page is opened with the
  * `?intent=create` handoff, whose `loadXml` renders synchronously.
  */
-function loadEditorPage() {
+function loadEditorPage({ url = 'https://example.test/notation-editor.html?intent=create' } = {}) {
   const html = fs.readFileSync(path.join(appDir, 'notation-editor.html'), 'utf8');
   const virtualConsole = new VirtualConsole();
   const errors = [];
@@ -76,7 +76,7 @@ function loadEditorPage() {
   const dom = new JSDOM(html, {
     runScripts: 'outside-only',
     virtualConsole,
-    url: 'https://example.test/notation-editor.html?intent=create',
+    url,
   });
   const { window } = dom;
   const context = dom.getInternalVMContext();
@@ -386,5 +386,57 @@ describe('the editor and the engine agree, end to end', () => {
     const after = doc.querySelector('[data-editor-score] svg').querySelectorAll('[data-id]').length;
     assert.equal(after, before + 1, 'a staff click in note-input mode must add a note');
     assert.match(doc.querySelector('[data-editor-status]').textContent, /Inserted|Replaced/);
+  });
+
+  test('a bare visit to the editor starts a score instead of showing nothing', () => {
+    // No `?intent=` and no handed-over file: the page must still open a
+    // writable score. An empty canvas with every control disabled reads as
+    // "I cannot write a note here", which is the whole complaint.
+    const { window, errors } = loadEditorPage({ url: 'https://example.test/notation-editor.html' });
+    assert.deepEqual(errors, [], 'the page must start without a script error');
+    const scoreHost = window.document.querySelector('[data-editor-score]');
+    assert.equal(scoreHost.hidden, false, 'the score host must be visible');
+    assert.equal(scoreHost.querySelectorAll('svg').length, 1, 'a starter score must be drawn');
+    assert.equal(window.document.querySelector('[data-editor-play]').disabled, false, 'Play must be enabled');
+    assert.equal(
+      window.document.querySelector('[data-editor-status]').textContent,
+      'Score ready.',
+    );
+  });
+
+  test('clicking a note that is already there writes, and only selects with note input off', () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    // Identity transform and a generous hit box, so the click always lands
+    // on the first event in the measure -- the same thing a real click does
+    // when the pointer is over a note.
+    window.DOMPoint = class {
+      constructor(x = 0, y = 0) { this.x = x; this.y = y; }
+      matrixTransform() { return new window.DOMPoint(this.x, this.y); }
+    };
+    window.SVGElement.prototype.getScreenCTM = () => ({
+      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0, inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+    });
+    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 100, height: 100 });
+
+    const scoreHost = doc.querySelector('[data-editor-score]');
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const click = () => scoreHost.dispatchEvent(
+      new window.PointerEvent('pointerdown', { clientX: 5, clientY: 9, bubbles: true }),
+    );
+
+    // First click: the beat holds only the placeholder rest, so a note is written.
+    click();
+    assert.match(status(), /Inserted/, 'the first click must write a note');
+    // Second click: it now lands on that note. In note input that must
+    // write (replace) it, not merely select it -- otherwise a writer who
+    // clicks where the notes are sees the status change and no new note.
+    click();
+    assert.match(status(), /Replaced/, 'clicking an existing note must write, not just select');
+
+    // Turning note input off is how a writer selects a note to transpose it.
+    doc.querySelector('[data-editor-note-input]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    click();
+    assert.equal(status(), 'Note selected.');
   });
 });
