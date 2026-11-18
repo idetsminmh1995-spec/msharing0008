@@ -1,6 +1,8 @@
 import type { Score } from '../core/index.js';
+import { isPitched } from '../core/pitch.js';
 import { TICKS_PER_QUARTER, baseTicksForType, ticksWithDots } from '../core/duration-math.js';
 import type { TempoMarkEvent } from '../parser/musicxml/parse.js';
+import type { MidiInstrumentInfo } from '../parser/musicxml/instrument.js';
 import { buildTempoMap, type RawTempoEvent } from '../timing/tempo-map.js';
 import { buildEventStream } from './event-stream.js';
 import { buildRepeatPlan, type RepeatMeasureSpec } from './repeats.js';
@@ -49,12 +51,64 @@ export interface ComputePlaybackDataInput {
   readonly placementByMeasureNumber: ReadonlyMap<number, PlaybackMeasurePlacement>;
   readonly measureHeaderAllowance: number;
   /**
+   * MusicXML `<transpose>` semitones per `${partId}:${measureNumber}`,
+   * so `events[].midiNotes` sounds at concert pitch while the drawn
+   * notation stays at written pitch. Omitted means no part transposes.
+   */
+  readonly transposeSemitonesByPartAndMeasure?: ReadonlyMap<string, number>;
+  /**
+   * Each part's `<midi-instrument>` routing (`ParseResult.midiInstrumentInfoByPart`),
+   * so (a) an unpitched percussion note resolves to a GM key number and
+   * sounds, and (b) each `tracks[]` entry carries the program/bank/channel
+   * a host SoundFont engine should set. Omitted means no part carries
+   * routing, which is most hand-written MusicXML.
+   */
+  readonly midiInstrumentInfoByPart?: ReadonlyMap<string, ReadonlyMap<string, MidiInstrumentInfo>>;
+  /**
    * Each measure's repeat/volta marks, in written order, already
    * resolved from both sides of every shared barline. Omitted means
    * "this score has no repeats", which is what a hand-built `Score`
    * (no MusicXML barlines at all) is.
    */
   readonly repeatMeasures?: readonly RepeatMeasureSpec[];
+}
+
+/**
+ * The routing a track carries when a part has several `<midi-instrument>`
+ * entries (a drum kit names one per drum). The program/bank/channel are
+ * the part's own, not per-drum, so any entry that states them answers for
+ * the whole part; the first that does wins. A kit whose entries carry only
+ * `<midi-unpitched>` (the common case) contributes no program here and the
+ * host uses its own default patch, while the drum KEYS still resolve per
+ * note through the same map.
+ */
+function firstRoutingFor(
+  info: ReadonlyMap<string, MidiInstrumentInfo> | undefined,
+): Pick<MidiInstrumentInfo, 'program' | 'bank' | 'channel'> {
+  if (info === undefined) return {};
+  for (const record of info.values()) {
+    if (record.program !== undefined || record.bank !== undefined || record.channel !== undefined) {
+      return {
+        ...(record.program !== undefined ? { program: record.program } : {}),
+        ...(record.bank !== undefined ? { bank: record.bank } : {}),
+        ...(record.channel !== undefined ? { channel: record.channel } : {}),
+      };
+    }
+  }
+  return {};
+}
+
+/** True when any note in the part is unpitched -- what marks a track as percussion for a host. */
+function partHasUnpitchedNotes(part: Score['parts'][number]): boolean {
+  for (const measure of part.measures) {
+    for (const voice of measure.voices) {
+      for (const event of voice.events) {
+        const notes = event.kind === 'chord' ? event.notes : event.kind === 'note' ? [event] : [];
+        if (notes.some((note) => !isPitched(note.pitch))) return true;
+      }
+    }
+  }
+  return false;
 }
 
 /**
@@ -79,7 +133,13 @@ export function computePlaybackData(input: ComputePlaybackDataInput): PlaybackDa
   }));
   const { tempoMap } = buildTempoMap(rawTempoEvents);
 
-  const events = buildEventStream(input.score, globalTickOffsetByMeasure, tempoMap);
+  const events = buildEventStream(
+    input.score,
+    globalTickOffsetByMeasure,
+    tempoMap,
+    input.transposeSemitonesByPartAndMeasure,
+    input.midiInstrumentInfoByPart,
+  );
 
   const { plan, diagnostics: repeatDiagnostics } = buildRepeatPlan({
     measures:
@@ -97,15 +157,25 @@ export function computePlaybackData(input: ComputePlaybackDataInput): PlaybackDa
   return {
     measureNumbersInOrder: input.measureNumbersInOrder,
     globalTickOffsetByMeasure,
+    measureTicksByNumber: input.measureTicksByNumber,
     timeSignatureByMeasure: input.timeSignatureByMeasure,
     measureLayoutsByNumber: input.measureLayoutsByNumber,
     placementByMeasureNumber: input.placementByMeasureNumber,
     measureHeaderAllowance: input.measureHeaderAllowance,
     tempoMap,
     events,
-    tracks: input.score.parts.map((part): PlaybackTrack =>
-      part.name === undefined ? { id: part.id } : { id: part.id, name: part.name },
-    ),
+    tracks: input.score.parts.map((part): PlaybackTrack => {
+      const routing = firstRoutingFor(input.midiInstrumentInfoByPart?.get(part.id));
+      const percussion = partHasUnpitchedNotes(part);
+      return {
+        id: part.id,
+        ...(part.name !== undefined ? { name: part.name } : {}),
+        ...(routing.program !== undefined ? { program: routing.program } : {}),
+        ...(routing.bank !== undefined ? { bank: routing.bank } : {}),
+        ...(routing.channel !== undefined ? { channel: routing.channel } : {}),
+        ...(percussion ? { percussion: true } : {}),
+      };
+    }),
     performance: plan,
     repeatDiagnostics,
   };

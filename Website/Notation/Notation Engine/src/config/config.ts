@@ -114,7 +114,9 @@ export interface FontsConfig {
    * (`glyphs/data/bravura_metadata.json`), so substituting a
    * metric-incompatible font moves glyphs relative to their anchors --
    * a SMuFL-compliant alternative with Bravura-compatible metrics is
-   * the supported case, not any arbitrary font.
+   * the supported case, not any arbitrary font. Setting this to anything
+   * other than the bundled font's own name draws a `MUSIC_FONT_METRICS`
+   * diagnostic saying so.
    */
   readonly musicFont: string;
   /** The ordinary text font for bar numbers and other non-glyph text. */

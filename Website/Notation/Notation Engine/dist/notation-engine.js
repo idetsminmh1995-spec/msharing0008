@@ -30,7 +30,9 @@ var NotationEngine = (() => {
     DEFAULT_CONFIG: () => DEFAULT_CONFIG,
     DEFAULT_CURSOR_FIXED_FRACTION: () => DEFAULT_CURSOR_FIXED_FRACTION,
     DEFAULT_DRUM_MAPPING_TABLE: () => DEFAULT_DRUM_MAPPING_TABLE,
+    DEFAULT_MAPPING_REGISTRY: () => DEFAULT_MAPPING_REGISTRY,
     DEFAULT_PART_GAP: () => DEFAULT_PART_GAP,
+    DEFAULT_PROFILES: () => DEFAULT_PROFILES,
     DEFAULT_REPEAT_TIMES: () => DEFAULT_REPEAT_TIMES,
     DEFAULT_STEM_LENGTH: () => DEFAULT_STEM_LENGTH,
     DOT_DOT_DISTANCE: () => DOT_DOT_DISTANCE,
@@ -40,8 +42,11 @@ var NotationEngine = (() => {
     DRUM_FALLBACK_STAFF_POSITION: () => DRUM_FALLBACK_STAFF_POSITION,
     ENGINE_VERSION: () => ENGINE_VERSION,
     FLAT_ORDER: () => FLAT_ORDER,
+    GENERIC_PITCHED_PROFILE: () => GENERIC_PITCHED_PROFILE,
     MAX_BEAM_SLOPE: () => MAX_BEAM_SLOPE,
+    MappingRegistry: () => MappingRegistry,
     NotationDefaults: () => notation_defaults_exports,
+    PERCUSSION_CHANNEL: () => PERCUSSION_CHANNEL,
     PERCUSSION_CLEF: () => PERCUSSION_CLEF,
     SHARP_ORDER: () => SHARP_ORDER,
     SMUFL_STAFF_SPACES_PER_EM: () => SMUFL_STAFF_SPACES_PER_EM,
@@ -56,6 +61,7 @@ var NotationEngine = (() => {
     TREBLE_8VB_CLEF: () => TREBLE_8VB_CLEF,
     TREBLE_CLEF: () => TREBLE_CLEF,
     TREMOLO_STROKE_CHOICES: () => TREMOLO_STROKE_CHOICES,
+    UNPITCHED_PERCUSSION_PROFILE: () => UNPITCHED_PERCUSSION_PROFILE,
     accidentalGlyphName: () => accidentalGlyphName,
     accidentalX: () => accidentalX,
     addToSkyline: () => addToSkyline,
@@ -68,6 +74,7 @@ var NotationEngine = (() => {
     articulationGlyphName: () => articulationGlyphName,
     articulationSide: () => articulationSide,
     assignAccidentalColumns: () => assignAccidentalColumns,
+    assignTrackRouting: () => assignTrackRouting,
     augmentationDotGlyphName: () => augmentationDotGlyphName,
     automaticStemDirection: () => automaticStemDirection,
     baseTicksForType: () => baseTicksForType,
@@ -136,6 +143,7 @@ var NotationEngine = (() => {
     dotPosition: () => dotPosition,
     drumChoiceOrder: () => drumChoiceOrder,
     drumDiagnostic: () => drumDiagnostic,
+    drumLookupDiagnostics: () => drumLookupDiagnostics,
     drumStandIns: () => drumStandIns,
     drumToLight: () => drumToLight,
     duration: () => duration,
@@ -192,6 +200,8 @@ var NotationEngine = (() => {
     lyricHyphenGlyphName: () => lyricHyphenGlyphName,
     lyricRowBaselineY: () => lyricRowBaselineY,
     lyricSide: () => lyricSide,
+    mappingDiagnostic: () => mappingDiagnostic,
+    mappingProfileToInstrumentProfile: () => mappingProfileToInstrumentProfile,
     measure: () => measure,
     measureSvgBoxes: () => measureSvgBoxes,
     mergeDrumMappingTable: () => mergeDrumMappingTable,
@@ -217,18 +227,23 @@ var NotationEngine = (() => {
     numBeamLines: () => numBeamLines,
     numeratorText: () => numeratorText,
     ornamentGlyphName: () => ornamentGlyphName,
+    pageUsableHeight: () => pageUsableHeight,
+    pageUsableWidth: () => pageUsableWidth,
     parseCredits: () => parseCredits,
     parseDefaults: () => parseDefaults,
     parseIdentity: () => parseIdentity,
     parseMidiFile: () => parseMidiFile,
+    parseMidiInstrumentInfoMap: () => parseMidiInstrumentInfoMap,
     parseMidiInstrumentMap: () => parseMidiInstrumentMap,
     parseMusicXml: () => parseMusicXml,
     parsePrintLayout: () => parsePrintLayout,
     part: () => part,
+    percussionLookupDiagnostics: () => percussionLookupDiagnostics,
     performanceSecondsToWritten: () => performanceSecondsToWritten,
     performanceTickToWritten: () => performanceTickToWritten,
     pitchedPitch: () => pitchedPitch,
     placeElement: () => placeElement,
+    planResize: () => planResize,
     playheadX: () => playheadX,
     positionToTick: () => positionToTick,
     positionToX: () => positionToX,
@@ -282,9 +297,12 @@ var NotationEngine = (() => {
     resizePureScale: () => resizePureScale,
     resolveConfig: () => resolveConfig,
     resolveConfigWithDiagnostics: () => resolveConfigWithDiagnostics,
+    resolveGenericPitched: () => resolveGenericPitched,
     resolveNoteheadCollision: () => resolveNoteheadCollision,
+    resolvePercussion: () => resolvePercussion,
     resolvePosition: () => resolvePosition,
     resolveStemDirection: () => resolveStemDirection,
+    resolveWithProfiles: () => resolveWithProfiles,
     rest: () => rest,
     restGlyphName: () => restGlyphName,
     restY: () => restY,
@@ -334,6 +352,7 @@ var NotationEngine = (() => {
     unpitchedPitch: () => unpitchedPitch,
     unzipMxl: () => unzipMxl,
     validateConfig: () => validateConfig,
+    validateMappingProfile: () => validateMappingProfile,
     verticalInkSpan: () => verticalInkSpan,
     voice: () => voice,
     voiceForcedDirection: () => voiceForcedDirection,
@@ -68232,11 +68251,11 @@ var NotationEngine = (() => {
     takesKeySignature: false,
     octaveShift: 0,
     // SMuFL's 6stringTabClef bBox spans roughly -3..+3, i.e. its origin is
-    // its own centre, so it belongs on the centre line of a SIX-line tab
-    // staff: lines at 0..-5, centre -2.5. Note this assumes a real 6-line
-    // tab staff, which the renderer does not yet draw (it draws 5 lines for
-    // every clef) -- giving tab its own staff-line count is part of the
-    // separate guitar/tab work, not this pass.
+    // its own centre, so it belongs on the centre line of a six-line tab
+    // staff: lines at 0..-5, centre -2.5. This is a staff POSITION, and the
+    // renderer scales it by the staff's own line distance when drawing (tab
+    // spaces its lines 1.5 apart), so it lands on the centre line of a real
+    // tab staff whatever its declared <staff-lines>.
     glyphY: -2.5
   };
   function staffPositionForPitch(clefDef, step, octave) {
@@ -71920,28 +71939,99 @@ ${denominator}`;
   }
 
   // src/parser/musicxml/instrument.ts
-  function parseMidiInstrumentMap(scorePartEl, diagnostics, location) {
+  function readBoundedInt(parent, childName) {
+    const el = firstChildNamed(parent, childName);
+    if (el === void 0) return { present: false, raw: void 0, value: void 0 };
+    const raw = textOf(el);
+    const parsed = raw !== void 0 && /^\d+$/.test(raw) ? Number(raw) : void 0;
+    const value = parsed !== void 0 && Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : void 0;
+    return { present: true, raw, value };
+  }
+  function parseMidiInstrumentInfoMap(scorePartEl, diagnostics, location) {
     const map = /* @__PURE__ */ new Map();
     for (const midiInstrumentEl of childrenNamed(scorePartEl, "midi-instrument")) {
       const id = midiInstrumentEl.getAttribute("id");
-      const midiUnpitchedEl = firstChildNamed(midiInstrumentEl, "midi-unpitched");
-      if (midiUnpitchedEl === void 0) continue;
-      const rawUnpitched = textOf(midiUnpitchedEl);
-      const value = rawUnpitched !== void 0 && /^\d+$/.test(rawUnpitched) ? Number(rawUnpitched) : void 0;
-      if (value === void 0 || !Number.isSafeInteger(value) || value < 1 || value > 128) {
-        diagnostics?.push(
-          diagnostic(
-            "warning",
-            "INVALID_MIDI_UNPITCHED",
-            `Invalid <midi-unpitched> "${rawUnpitched ?? ""}"; expected an integer from 1 to 128, so this instrument has no GM mapping.`,
-            location
-          )
-        );
+      if (id === null) continue;
+      const unpitched = readBoundedInt(midiInstrumentEl, "midi-unpitched");
+      let gmNote;
+      if (unpitched.present) {
+        if (unpitched.value !== void 0 && unpitched.value <= 128) {
+          gmNote = unpitched.value - 1;
+        } else {
+          diagnostics?.push(
+            diagnostic(
+              "warning",
+              "INVALID_MIDI_UNPITCHED",
+              `Invalid <midi-unpitched> "${unpitched.raw ?? ""}"; expected an integer from 1 to 128, so this instrument has no GM mapping.`,
+              location
+            )
+          );
+        }
+      }
+      const program = readBoundedInt(midiInstrumentEl, "midi-program");
+      let programValue;
+      if (program.present) {
+        if (program.value !== void 0 && program.value <= 128) {
+          programValue = program.value - 1;
+        } else {
+          diagnostics?.push(
+            diagnostic(
+              "warning",
+              "INVALID_MIDI_PROGRAM",
+              `Invalid <midi-program> "${program.raw ?? ""}"; expected an integer from 1 to 128, so this instrument has no program.`,
+              location
+            )
+          );
+        }
+      }
+      const bank = readBoundedInt(midiInstrumentEl, "midi-bank");
+      let bankValue;
+      if (bank.present) {
+        if (bank.value !== void 0 && bank.value <= 16384) {
+          bankValue = bank.value - 1;
+        } else {
+          diagnostics?.push(
+            diagnostic(
+              "warning",
+              "INVALID_MIDI_BANK",
+              `Invalid <midi-bank> "${bank.raw ?? ""}"; expected an integer from 1 to 16384, so this instrument has no bank.`,
+              location
+            )
+          );
+        }
+      }
+      const channel = readBoundedInt(midiInstrumentEl, "midi-channel");
+      let channelValue;
+      if (channel.present) {
+        if (channel.value !== void 0 && channel.value <= 16) {
+          channelValue = channel.value - 1;
+        } else {
+          diagnostics?.push(
+            diagnostic(
+              "warning",
+              "INVALID_MIDI_CHANNEL",
+              `Invalid <midi-channel> "${channel.raw ?? ""}"; expected an integer from 1 to 16, so this instrument has no channel.`,
+              location
+            )
+          );
+        }
+      }
+      if (gmNote === void 0 && programValue === void 0 && bankValue === void 0 && channelValue === void 0) {
         continue;
       }
-      if (id !== null) {
-        map.set(id, value - 1);
-      }
+      map.set(id, {
+        ...gmNote !== void 0 ? { gmNote } : {},
+        ...programValue !== void 0 ? { program: programValue } : {},
+        ...bankValue !== void 0 ? { bank: bankValue } : {},
+        ...channelValue !== void 0 ? { channel: channelValue } : {}
+      });
+    }
+    return map;
+  }
+  function parseMidiInstrumentMap(scorePartEl, diagnostics, location) {
+    const map = /* @__PURE__ */ new Map();
+    for (const [id, info] of parseMidiInstrumentInfoMap(scorePartEl, diagnostics, location)) {
+      if (info.gmNote !== void 0) map.set(id, info.gmNote);
     }
     return map;
   }
@@ -72532,6 +72622,7 @@ ${denominator}`;
         diagnostics,
         tempoMarks: [],
         midiInstrumentsByPart: /* @__PURE__ */ new Map(),
+        midiInstrumentInfoByPart: /* @__PURE__ */ new Map(),
         directions: [],
         octaveShifts: [],
         harmonies: [],
@@ -72543,16 +72634,20 @@ ${denominator}`;
     const partListEl = firstChildNamed(root, "part-list");
     const partNames = /* @__PURE__ */ new Map();
     const midiInstrumentMaps = /* @__PURE__ */ new Map();
+    const midiInstrumentInfoMaps = /* @__PURE__ */ new Map();
     if (partListEl !== void 0) {
       for (const scorePartEl of childrenNamed(partListEl, "score-part")) {
         const id = attrOf(scorePartEl, "id");
         const name = textOf(firstChildNamed(scorePartEl, "part-name"));
         if (id !== void 0) {
           partNames.set(id, name ?? id);
-          midiInstrumentMaps.set(
-            id,
-            parseMidiInstrumentMap(scorePartEl, diagnostics, { partId: id })
-          );
+          const info = parseMidiInstrumentInfoMap(scorePartEl, diagnostics, { partId: id });
+          midiInstrumentInfoMaps.set(id, info);
+          const gmNotes = /* @__PURE__ */ new Map();
+          for (const [instrumentId, record] of info) {
+            if (record.gmNote !== void 0) gmNotes.set(instrumentId, record.gmNote);
+          }
+          midiInstrumentMaps.set(id, gmNotes);
         }
       }
     }
@@ -73036,6 +73131,7 @@ ${denominator}`;
       tempoMarks,
       octaveShifts,
       midiInstrumentsByPart: midiInstrumentMaps,
+      midiInstrumentInfoByPart: midiInstrumentInfoMaps,
       directions,
       harmonies,
       prints,
@@ -74644,6 +74740,10 @@ ${denominator}`;
     if (current.length > 0) pages.push(current);
     return pages;
   }
+  function pageHeightForSystems(systems, configuredPageHeight, marginTop, marginBottom) {
+    const contentHeight = systems.reduce((sum, s) => sum + s.height, 0);
+    return Math.max(configuredPageHeight, marginTop + contentHeight + marginBottom);
+  }
   function computePageLayout(measures, systemHeight, config, spacingConfig) {
     const usableWidth = config.pageWidth - config.marginLeft - config.marginRight;
     const usableHeight = config.pageHeight - config.marginTop - config.marginBottom;
@@ -74661,10 +74761,13 @@ ${denominator}`;
         const originalWidths = local.measures.map((m) => m.width);
         if (local.measures.length === 1) {
           const only = local.measures[0];
-          if (only === void 0) return { measures: [] };
+          if (only === void 0) return { measures: [], height: systemHeight };
           const shouldFillWidth = !isLastSystemOfPiece && only.width < usableWidth;
           const width = shouldFillWidth ? usableWidth : only.width;
-          return { measures: [{ measureNumber: only.measureNumber, x: 0, width }] };
+          return {
+            measures: [{ measureNumber: only.measureNumber, x: 0, width }],
+            height: systemHeight
+          };
         }
         const finalPositions = isLastSystemOfPiece ? positions2 : justifySystem(positions2, usableWidth, spacingConfig);
         const wasActuallyJustified = !isLastSystemOfPiece && finalPositions !== positions2;
@@ -74677,11 +74780,20 @@ ${denominator}`;
           const width = (nextX ?? usableWidth) - x2;
           return { measureNumber: m.measureNumber, x: x2, width };
         });
-        return { measures: systemMeasureLayouts };
+        return { measures: systemMeasureLayouts, height: systemHeight };
       });
-      return { systems };
+      return {
+        systems,
+        height: pageHeightForSystems(
+          systems,
+          config.pageHeight,
+          config.marginTop,
+          config.marginBottom
+        )
+      };
     });
-    return { pages, usableWidth, usableHeight };
+    const totalHeight = pages.reduce((sum, page) => sum + page.height, 0);
+    return { pages, usableWidth, usableHeight, totalHeight };
   }
 
   // src/layout/resize.ts
@@ -74717,6 +74829,27 @@ ${denominator}`;
   function needsReflow(layoutMode, oldUsableWidthSp, newUsableWidthSp) {
     if (layoutMode === "scroll") return false;
     return oldUsableWidthSp !== newUsableWidthSp;
+  }
+  function pageUsableWidth(page) {
+    return page.pageWidth - page.marginLeft - page.marginRight;
+  }
+  function pageUsableHeight(page) {
+    return page.pageHeight - page.marginTop - page.marginBottom;
+  }
+  function planResize(input) {
+    if (input.mode === "page" && input.currentPage !== void 0 && input.nextPage !== void 0) {
+      const widthChanged = pageUsableWidth(input.currentPage) !== pageUsableWidth(input.nextPage);
+      const heightChanged = pageUsableHeight(input.currentPage) !== pageUsableHeight(input.nextPage);
+      if (widthChanged || heightChanged) return { kind: "reflow" };
+    }
+    return {
+      kind: "pureScale",
+      pxPerStaffSpace: computePxPerStaffSpace(
+        input.viewBox,
+        input.targetWidthPx,
+        input.targetHeightPx
+      )
+    };
   }
 
   // src/timing/diagnostic.ts
@@ -74986,7 +75119,7 @@ ${denominator}`;
         v.events.forEach((event, eventIndex) => {
           const startTick = event.startTick ?? tickWithinVoice;
           if (event.kind === "note") {
-            const noteNumber = event.pitch.kind === "pitched" ? chromaticNoteNumber(event.pitch.step, event.pitch.alter, event.pitch.octave) : event.instrumentId !== void 0 ? gmByInstrumentId?.get(event.instrumentId) : void 0;
+            const noteNumber = event.pitch.kind === "pitched" ? chromaticNoteNumber(event.pitch.step, event.pitch.alter, event.pitch.octave) + (attrs?.transpose?.semitones ?? 0) : event.instrumentId !== void 0 ? gmByInstrumentId?.get(event.instrumentId) : void 0;
             flat.push({
               ref: { measureNumber: measure2.number, voiceId: v.id, eventIndex },
               tick: measureStartTick + startTick,
@@ -75006,11 +75139,31 @@ ${denominator}`;
   function alignNotes(coreNotes, midiNotes, toleranceTicks = DEFAULT_TOLERANCE_TICKS) {
     const alignment = /* @__PURE__ */ new Map();
     const claimedMidi = /* @__PURE__ */ new Set();
+    const exactBuckets = /* @__PURE__ */ new Map();
+    midiNotes.forEach((mn, i2) => {
+      const key = `${mn.tick}:${mn.noteNumber}`;
+      const bucket = exactBuckets.get(key);
+      if (bucket === void 0) exactBuckets.set(key, [i2]);
+      else bucket.push(i2);
+    });
+    const exactCursor = /* @__PURE__ */ new Map();
     const afterExact = [];
     for (const cn of coreNotes) {
-      const idx = cn.noteNumber !== void 0 ? midiNotes.findIndex(
-        (mn, i2) => !claimedMidi.has(i2) && mn.tick === cn.tick && mn.noteNumber === cn.noteNumber
-      ) : -1;
+      let idx = -1;
+      if (cn.noteNumber !== void 0) {
+        const key = `${cn.tick}:${cn.noteNumber}`;
+        const bucket = exactBuckets.get(key);
+        if (bucket !== void 0) {
+          let cursor = exactCursor.get(key) ?? 0;
+          while (cursor < bucket.length) {
+            const candidate = bucket[cursor];
+            if (candidate === void 0 || !claimedMidi.has(candidate)) break;
+            cursor++;
+          }
+          exactCursor.set(key, cursor);
+          if (cursor < bucket.length) idx = bucket[cursor] ?? -1;
+        }
+      }
       if (idx !== -1) {
         const midiNote = midiNotes[idx];
         if (midiNote !== void 0) {
@@ -75021,19 +75174,50 @@ ${denominator}`;
       }
       afterExact.push(cn);
     }
+    const byNoteNumber = /* @__PURE__ */ new Map();
+    midiNotes.forEach((mn, i2) => {
+      const bucket = byNoteNumber.get(mn.noteNumber);
+      if (bucket === void 0) byNoteNumber.set(mn.noteNumber, [{ index: i2, tick: mn.tick }]);
+      else bucket.push({ index: i2, tick: mn.tick });
+    });
+    for (const bucket of byNoteNumber.values()) bucket.sort((a, b) => a.tick - b.tick);
+    function toleranceRange(bucket, tick) {
+      let low = 0;
+      let high = bucket.length;
+      while (low < high) {
+        const mid = low + high >> 1;
+        const entry = bucket[mid];
+        if (entry !== void 0 && entry.tick < tick - toleranceTicks) low = mid + 1;
+        else high = mid;
+      }
+      const start = low;
+      high = bucket.length;
+      while (low < high) {
+        const mid = low + high >> 1;
+        const entry = bucket[mid];
+        if (entry !== void 0 && entry.tick <= tick + toleranceTicks) low = mid + 1;
+        else high = mid;
+      }
+      return [start, low];
+    }
     const afterTolerance = [];
     for (const cn of afterExact) {
       let bestIndex = -1;
       let bestDistance = Infinity;
       if (cn.noteNumber !== void 0) {
-        midiNotes.forEach((mn, i2) => {
-          if (claimedMidi.has(i2) || mn.noteNumber !== cn.noteNumber) return;
-          const distance = Math.abs(mn.tick - cn.tick);
-          if (distance <= toleranceTicks && distance < bestDistance) {
-            bestDistance = distance;
-            bestIndex = i2;
+        const bucket = byNoteNumber.get(cn.noteNumber);
+        if (bucket !== void 0) {
+          const [start, end] = toleranceRange(bucket, cn.tick);
+          for (let b = start; b < end; b++) {
+            const candidate = bucket[b];
+            if (candidate === void 0 || claimedMidi.has(candidate.index)) continue;
+            const distance = Math.abs(candidate.tick - cn.tick);
+            if (distance < bestDistance || distance === bestDistance && candidate.index < bestIndex) {
+              bestDistance = distance;
+              bestIndex = candidate.index;
+            }
           }
-        });
+        }
       }
       if (bestIndex !== -1) {
         const midiNote = midiNotes[bestIndex];
@@ -75854,14 +76038,261 @@ ${denominator}`;
     return scoreChanged ? { ...score2, parts } : score2;
   }
 
+  // src/mapping/diagnostic.ts
+  function mappingDiagnostic(severity, code, message) {
+    return { severity, code, message };
+  }
+
+  // src/mapping/generic.ts
+  function noteheadSource(ctx) {
+    const fileStatedHead = ctx.explicitNotehead !== void 0 || ctx.explicitNoteheadSmufl !== void 0;
+    if (fileStatedHead) return "explicit-file";
+    if (ctx.isHarmonic === true && ctx.pitch.kind === "pitched") return "fallback";
+    const key = ctx.pitch.kind === "pitched" ? `${ctx.pitch.step}${ctx.pitch.octave}` : ctx.gmNote !== void 0 ? String(ctx.gmNote) : `${ctx.pitch.displayStep}${ctx.pitch.displayOctave}`;
+    if (ctx.overridesByKey?.[key] !== void 0) return "user-override";
+    return "fallback";
+  }
+  function resolveGenericPitched(ctx) {
+    const { step, octave } = ctx.pitch.kind === "pitched" ? { step: ctx.pitch.step, octave: ctx.pitch.octave } : { step: ctx.pitch.displayStep, octave: ctx.pitch.displayOctave };
+    const fileStatedHead = ctx.explicitNotehead !== void 0 || ctx.explicitNoteheadSmufl !== void 0;
+    const glyph = ctx.isHarmonic === true && ctx.pitch.kind === "pitched" && !fileStatedHead ? harmonicNoteheadGlyphName(ctx.durationType, ctx.filled) : selectNoteheadGlyphName({
+      pitch: ctx.pitch,
+      durationType: ctx.durationType,
+      ...ctx.filled !== void 0 ? { filled: ctx.filled } : {},
+      ...ctx.explicitNotehead !== void 0 ? { explicitNotehead: ctx.explicitNotehead } : {},
+      ...ctx.explicitNoteheadSmufl !== void 0 ? { explicitNoteheadSmufl: ctx.explicitNoteheadSmufl } : {},
+      ...ctx.gmNote !== void 0 ? { midiNote: ctx.gmNote } : {},
+      ...ctx.overridesByKey !== void 0 ? { overridesByKey: ctx.overridesByKey } : {},
+      ...ctx.defaultShape !== void 0 ? { defaultShape: ctx.defaultShape } : {}
+    });
+    return {
+      // No `staffLines` argument: the renderer positions pitched notes with
+      // this function's own 5-line default and handles a shorter/taller staff
+      // through its ledger-line and stem rules instead. Passing the line count
+      // here would move notes the renderer does not move.
+      staffPosition: staffPositionForPitch(ctx.clef, step, octave),
+      staffPositionSource: ctx.pitch.kind === "unpitched" ? "explicit-file" : "fallback",
+      noteheadGlyph: glyph,
+      noteheadSource: noteheadSource(ctx)
+    };
+  }
+  var GENERIC_PITCHED_PROFILE = {
+    id: "generic-pitched",
+    description: "Any instrument with no specific profile: the clef (or display-step) decides the line, the \xA79.7 rule decides the head.",
+    matches: () => true,
+    resolve: resolveGenericPitched
+  };
+
+  // src/mapping/percussion.ts
+  function drumEntryFor(ctx) {
+    if (ctx.gmNote === void 0) return void 0;
+    return lookupDrumMapEntry(ctx.gmNote, ctx.drumMap).entry;
+  }
+  function percussionNotehead(ctx, drumEntry, positionedByFile) {
+    const drumOverride = ctx.gmNote !== void 0 && drumEntry !== void 0 && !positionedByFile ? { [String(ctx.gmNote)]: drumEntry.noteheadShape } : void 0;
+    const drumGlyph = ctx.gmNote !== void 0 && drumEntry?.noteheadGlyph !== void 0 && !positionedByFile && ctx.explicitNotehead === void 0 && ctx.explicitNoteheadSmufl === void 0 ? drumEntry.noteheadGlyph : void 0;
+    const configOverrides = ctx.overridesByKey;
+    const overridesByKey = drumOverride !== void 0 || configOverrides !== void 0 ? { ...drumOverride, ...configOverrides } : void 0;
+    const glyph = selectNoteheadGlyphName({
+      pitch: ctx.pitch,
+      durationType: ctx.durationType,
+      ...ctx.filled !== void 0 ? { filled: ctx.filled } : {},
+      ...ctx.explicitNotehead !== void 0 ? { explicitNotehead: ctx.explicitNotehead } : {},
+      ...ctx.explicitNoteheadSmufl !== void 0 ? { explicitNoteheadSmufl: ctx.explicitNoteheadSmufl } : drumGlyph !== void 0 ? { explicitNoteheadSmufl: drumGlyph } : {},
+      ...ctx.gmNote !== void 0 ? { midiNote: ctx.gmNote } : {},
+      ...overridesByKey !== void 0 ? { overridesByKey } : {},
+      ...ctx.defaultShape !== void 0 ? { defaultShape: ctx.defaultShape } : {}
+    });
+    const source = ctx.explicitNotehead !== void 0 || ctx.explicitNoteheadSmufl !== void 0 ? "explicit-file" : drumGlyph !== void 0 || drumOverride !== void 0 ? "instrument-profile" : configOverrides !== void 0 && overridesByKey !== void 0 ? "user-override" : "fallback";
+    return { glyph, source };
+  }
+  function resolvePercussion(ctx) {
+    const positionedByFile = ctx.hasExplicitDisplayPosition === true;
+    const drumEntry = drumEntryFor(ctx);
+    const position = drumEntry !== void 0 && !positionedByFile ? drumEntry.staffPosition : staffPositionForPitch(
+      ctx.clef,
+      ctx.pitch.kind === "unpitched" ? ctx.pitch.displayStep : "B",
+      ctx.pitch.kind === "unpitched" ? ctx.pitch.displayOctave : 4
+    );
+    const positionSource = drumEntry !== void 0 && !positionedByFile ? "instrument-profile" : positionedByFile ? "explicit-file" : "fallback";
+    const { glyph, source } = percussionNotehead(ctx, drumEntry, positionedByFile);
+    return {
+      staffPosition: position,
+      staffPositionSource: positionSource,
+      noteheadGlyph: glyph,
+      noteheadSource: source,
+      ...drumEntry?.stemDirection !== void 0 ? { stemDirection: drumEntry.stemDirection, stemSource: "instrument-profile" } : {}
+    };
+  }
+  var UNPITCHED_PERCUSSION_PROFILE = {
+    id: "unpitched-percussion",
+    description: "GM-mapped percussion: the drum table places the notehead, unless the file stated its own position.",
+    matches: (ctx) => isUnpitched(ctx.pitch) && ctx.gmNote !== void 0,
+    resolve: resolvePercussion
+  };
+  function drumLookupDiagnostics(gmNote, drumMap) {
+    return lookupDrumMapEntry(gmNote, drumMap).diagnostics.map(
+      (d) => mappingDiagnostic(d.severity, d.code, d.message)
+    );
+  }
+  function percussionLookupDiagnostics(ctx) {
+    if (ctx.gmNote === void 0) return [];
+    return drumLookupDiagnostics(ctx.gmNote, ctx.drumMap);
+  }
+
+  // src/mapping/registry.ts
+  var DEFAULT_PROFILES = [
+    UNPITCHED_PERCUSSION_PROFILE,
+    GENERIC_PITCHED_PROFILE
+  ];
+  var MappingRegistry = class {
+    constructor(profiles) {
+      const withoutGeneric = (profiles ?? []).filter((p) => p.id !== GENERIC_PITCHED_PROFILE.id);
+      this.profiles = [...withoutGeneric, ...DEFAULT_PROFILES];
+    }
+    /** The profiles this registry will try, in order -- for a test or a doc table. */
+    profileIds() {
+      return this.profiles.map((p) => p.id);
+    }
+    /**
+     * Resolve one note's notation. Never returns undefined: the generic
+     * fallback matches everything, so every note has an answer.
+     */
+    resolve(ctx) {
+      return resolveWithProfiles(this.profiles, ctx);
+    }
+  };
+  function resolveWithProfiles(profiles, ctx) {
+    const diagnostics = [];
+    for (const profile of profiles) {
+      if (!profile.matches(ctx)) continue;
+      const { note: note2, failure } = safeResolve(profile, ctx);
+      if (failure !== void 0) diagnostics.push(failure);
+      if (profile.id === UNPITCHED_PERCUSSION_PROFILE.id) {
+        diagnostics.push(...percussionLookupDiagnostics(ctx));
+      }
+      return { note: note2, profileId: profile.id, diagnostics };
+    }
+    return {
+      note: resolveGenericPitched(ctx),
+      profileId: GENERIC_PITCHED_PROFILE.id,
+      diagnostics: [
+        ...diagnostics,
+        mappingDiagnostic(
+          "warning",
+          "MAPPING_NO_PROFILE",
+          "No instrument profile matched this note; using the generic pitched mapping."
+        )
+      ]
+    };
+  }
+  function safeResolve(profile, ctx) {
+    try {
+      return { note: profile.resolve(ctx) };
+    } catch (e) {
+      return {
+        note: resolveGenericPitched(ctx),
+        failure: mappingDiagnostic(
+          "warning",
+          "MAPPING_PROFILE_FAILED",
+          `Mapping profile "${profile.id}" threw while resolving a note; using the generic pitched mapping. ${String(e)}`
+        )
+      };
+    }
+  }
+  var DEFAULT_MAPPING_REGISTRY = new MappingRegistry();
+
+  // src/mapping/profile.ts
+  function keyFor(ctx) {
+    if (isUnpitched(ctx.pitch)) {
+      return ctx.gmNote !== void 0 ? String(ctx.gmNote) : `${ctx.pitch.displayStep}${ctx.pitch.displayOctave}`;
+    }
+    return `${ctx.pitch.step}${ctx.pitch.octave}`;
+  }
+  function matchesProfile(profile, ctx) {
+    const m = profile.match;
+    if (m === void 0) return true;
+    if (m.instrumentName !== void 0 && m.instrumentName !== ctx.instrumentName) return false;
+    if (m.unpitched !== void 0 && m.unpitched !== isUnpitched(ctx.pitch)) return false;
+    if (m.gmNote !== void 0 && m.gmNote !== ctx.gmNote) return false;
+    return true;
+  }
+  function mappingProfileToInstrumentProfile(profile) {
+    return {
+      id: profile.id,
+      description: profile.description ?? `Custom mapping "${profile.id}".`,
+      matches: (ctx) => matchesProfile(profile, ctx),
+      resolve: (ctx) => {
+        const key = keyFor(ctx);
+        const shape = profile.noteheadByKey?.[key];
+        const explicitPosition = profile.staffPositionByKey?.[key];
+        const { step, octave } = isUnpitched(ctx.pitch) ? { step: ctx.pitch.displayStep, octave: ctx.pitch.displayOctave } : { step: ctx.pitch.step, octave: ctx.pitch.octave };
+        const staffPosition = explicitPosition !== void 0 ? explicitPosition : staffPositionForPitch(ctx.clef, step, octave);
+        const fileStatedHead = ctx.explicitNotehead !== void 0 || ctx.explicitNoteheadSmufl !== void 0;
+        const glyph = shape !== void 0 && !fileStatedHead ? selectNoteheadGlyphName({
+          pitch: ctx.pitch,
+          durationType: ctx.durationType,
+          defaultShape: shape,
+          ...ctx.filled !== void 0 ? { filled: ctx.filled } : {}
+        }) : selectNoteheadGlyphName({
+          pitch: ctx.pitch,
+          durationType: ctx.durationType,
+          ...ctx.filled !== void 0 ? { filled: ctx.filled } : {},
+          ...ctx.explicitNotehead !== void 0 ? { explicitNotehead: ctx.explicitNotehead } : {},
+          ...ctx.explicitNoteheadSmufl !== void 0 ? { explicitNoteheadSmufl: ctx.explicitNoteheadSmufl } : {},
+          ...ctx.overridesByKey !== void 0 ? { overridesByKey: ctx.overridesByKey } : {},
+          ...ctx.defaultShape !== void 0 ? { defaultShape: ctx.defaultShape } : {}
+        });
+        return {
+          staffPosition,
+          staffPositionSource: explicitPosition !== void 0 ? "instrument-profile" : "fallback",
+          noteheadGlyph: glyph,
+          noteheadSource: shape !== void 0 && !fileStatedHead ? "instrument-profile" : "fallback",
+          ...profile.stemDirection !== void 0 ? { stemDirection: profile.stemDirection, stemSource: "instrument-profile" } : {}
+        };
+      }
+    };
+  }
+  function validateMappingProfile(profile) {
+    const findings = [];
+    if (profile.id === "") {
+      findings.push(
+        mappingDiagnostic(
+          "error",
+          "MAPPING_PROFILE_NO_ID",
+          "A mapping profile must have a non-empty id."
+        )
+      );
+    }
+    if (profile.match?.instrumentName === void 0 && profile.match?.unpitched === void 0 && profile.match?.gmNote === void 0 && profile.match !== void 0) {
+      findings.push(
+        mappingDiagnostic(
+          "warning",
+          "MAPPING_PROFILE_EMPTY_MATCH",
+          `Mapping profile "${profile.id}" has an empty match object; it will apply to every note.`
+        )
+      );
+    }
+    return findings;
+  }
+
   // src/playback/event-stream.ts
-  function midiNoteForEvent(event) {
+  function midiNoteForEvent(event, transposeSemitones) {
     const notes = event.kind === "chord" ? event.notes : event.kind === "note" ? [event] : [];
     return notes.flatMap((note2) => {
       if (!isPitched(note2.pitch)) return [];
       const natural = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[note2.pitch.step];
-      const midi = (note2.pitch.octave + 1) * 12 + natural + note2.pitch.alter;
+      const midi = (note2.pitch.octave + 1) * 12 + natural + note2.pitch.alter + transposeSemitones;
       return Number.isInteger(midi) && midi >= 0 && midi <= 127 ? [midi] : [];
+    });
+  }
+  function percussionMidiNotesForEvent(event, instruments) {
+    if (instruments === void 0) return [];
+    const notes = event.kind === "chord" ? event.notes : event.kind === "note" ? [event] : [];
+    return notes.flatMap((note2) => {
+      if (isPitched(note2.pitch) || note2.instrumentId === void 0) return [];
+      const gmNote = instruments.get(note2.instrumentId)?.gmNote;
+      return gmNote !== void 0 ? [gmNote] : [];
     });
   }
   function notationEventId(partId, measureNumber, voiceId, eventIndex) {
@@ -75877,11 +76308,13 @@ ${denominator}`;
     if (event.kind === "chord") return event.notes.map((_, i2) => `${base}#n${i2}`);
     return [];
   }
-  function buildEventStream(score2, globalTickOffsetByMeasure, tempoMap) {
+  function buildEventStream(score2, globalTickOffsetByMeasure, tempoMap, transposeSemitonesByPartAndMeasure, midiInstrumentsByPart) {
     const events = [];
     for (const part2 of score2.parts) {
+      const instruments = midiInstrumentsByPart?.get(part2.id);
       for (const measure2 of part2.measures) {
         const offset = globalTickOffsetByMeasure.get(measure2.number) ?? 0;
+        const transposeSemitones = transposeSemitonesByPartAndMeasure?.get(`${part2.id}:${measure2.number}`) ?? 0;
         for (const voice2 of measure2.voices) {
           let tickInMeasure = 0;
           voice2.events.forEach((event, index) => {
@@ -75889,7 +76322,10 @@ ${denominator}`;
             const noteIds = noteIdsForEvent(part2.id, measure2.number, voice2.id, index, event);
             if (noteIds.length > 0) {
               const tick = offset + startTick;
-              const midiNotes = midiNoteForEvent(event);
+              const midiNotes = [
+                ...midiNoteForEvent(event, transposeSemitones),
+                ...percussionMidiNotesForEvent(event, instruments)
+              ];
               events.push({
                 tick,
                 seconds: tickToSeconds(tempoMap, tick),
@@ -75929,6 +76365,12 @@ ${denominator}`;
       else high = mid - 1;
     }
     return order[low];
+  }
+  function measureTicksFor(playback, measureNumber) {
+    const real = playback.measureTicksByNumber.get(measureNumber);
+    if (real !== void 0) return real;
+    const signature = playback.timeSignatureByMeasure.get(measureNumber);
+    return signature !== void 0 ? signature.numerator * (4 / signature.denominator) * TICKS_PER_QUARTER : void 0;
   }
   function floorEntry(positionsByTick, tickInMeasure) {
     let best;
@@ -75987,8 +76429,7 @@ ${denominator}`;
     const offset = playback.globalTickOffsetByMeasure.get(measureNumber) ?? 0;
     const tickInMeasure = Math.max(0, tick - offset);
     const noteAreaX = placement.x + layout.headerWidth;
-    const signature = playback.timeSignatureByMeasure.get(measureNumber);
-    const measureTicks = signature !== void 0 ? signature.numerator * (4 / signature.denominator) * TICKS_PER_QUARTER : void 0;
+    const measureTicks = measureTicksFor(playback, measureNumber);
     const entries = [...layout.positionsByTick.entries()].sort((a, b) => a[0] - b[0]);
     let fromTick = 0;
     let fromX = noteAreaX;
@@ -76231,6 +76672,30 @@ ${denominator}`;
     const quarterNotesPerMinute = mark.perMinute * (beatUnitTicks / TICKS_PER_QUARTER);
     return quarterNotesPerMinute > 0 ? 6e7 / quarterNotesPerMinute : DEFAULT_MICROSECONDS_PER_QUARTER2;
   }
+  function firstRoutingFor(info) {
+    if (info === void 0) return {};
+    for (const record of info.values()) {
+      if (record.program !== void 0 || record.bank !== void 0 || record.channel !== void 0) {
+        return {
+          ...record.program !== void 0 ? { program: record.program } : {},
+          ...record.bank !== void 0 ? { bank: record.bank } : {},
+          ...record.channel !== void 0 ? { channel: record.channel } : {}
+        };
+      }
+    }
+    return {};
+  }
+  function partHasUnpitchedNotes(part2) {
+    for (const measure2 of part2.measures) {
+      for (const voice2 of measure2.voices) {
+        for (const event of voice2.events) {
+          const notes = event.kind === "chord" ? event.notes : event.kind === "note" ? [event] : [];
+          if (notes.some((note2) => !isPitched(note2.pitch))) return true;
+        }
+      }
+    }
+    return false;
+  }
   function computePlaybackData(input) {
     const globalTickOffsetByMeasure = /* @__PURE__ */ new Map();
     let running = 0;
@@ -76243,7 +76708,13 @@ ${denominator}`;
       microsecondsPerQuarter: microsecondsPerQuarterFor(mark)
     }));
     const { tempoMap } = buildTempoMap(rawTempoEvents);
-    const events = buildEventStream(input.score, globalTickOffsetByMeasure, tempoMap);
+    const events = buildEventStream(
+      input.score,
+      globalTickOffsetByMeasure,
+      tempoMap,
+      input.transposeSemitonesByPartAndMeasure,
+      input.midiInstrumentInfoByPart
+    );
     const { plan, diagnostics: repeatDiagnostics } = buildRepeatPlan({
       measures: input.repeatMeasures ?? input.measureNumbersInOrder.map((measureNumber) => ({
         measureNumber,
@@ -76257,18 +76728,66 @@ ${denominator}`;
     return {
       measureNumbersInOrder: input.measureNumbersInOrder,
       globalTickOffsetByMeasure,
+      measureTicksByNumber: input.measureTicksByNumber,
       timeSignatureByMeasure: input.timeSignatureByMeasure,
       measureLayoutsByNumber: input.measureLayoutsByNumber,
       placementByMeasureNumber: input.placementByMeasureNumber,
       measureHeaderAllowance: input.measureHeaderAllowance,
       tempoMap,
       events,
-      tracks: input.score.parts.map(
-        (part2) => part2.name === void 0 ? { id: part2.id } : { id: part2.id, name: part2.name }
-      ),
+      tracks: input.score.parts.map((part2) => {
+        const routing = firstRoutingFor(input.midiInstrumentInfoByPart?.get(part2.id));
+        const percussion = partHasUnpitchedNotes(part2);
+        return {
+          id: part2.id,
+          ...part2.name !== void 0 ? { name: part2.name } : {},
+          ...routing.program !== void 0 ? { program: routing.program } : {},
+          ...routing.bank !== void 0 ? { bank: routing.bank } : {},
+          ...routing.channel !== void 0 ? { channel: routing.channel } : {},
+          ...percussion ? { percussion: true } : {}
+        };
+      }),
       performance: plan,
       repeatDiagnostics
     };
+  }
+
+  // src/playback/routing.ts
+  var PERCUSSION_CHANNEL = 9;
+  function assignTrackRouting(tracks) {
+    const result = /* @__PURE__ */ new Map();
+    const used = /* @__PURE__ */ new Set();
+    for (const track of tracks) {
+      if (track.percussion === true) {
+        used.add(PERCUSSION_CHANNEL);
+        result.set(track.id, {
+          channel: PERCUSSION_CHANNEL,
+          program: track.program ?? 0,
+          ...track.bank !== void 0 ? { bank: track.bank } : {}
+        });
+        continue;
+      }
+      const preferred = track.channel;
+      let channel;
+      if (preferred !== void 0 && preferred !== PERCUSSION_CHANNEL && !used.has(preferred)) {
+        channel = preferred;
+      } else {
+        for (let candidate = 0; candidate < 16; candidate++) {
+          if (candidate !== PERCUSSION_CHANNEL && !used.has(candidate)) {
+            channel = candidate;
+            break;
+          }
+        }
+      }
+      const resolved = channel ?? preferred ?? 0;
+      used.add(resolved);
+      result.set(track.id, {
+        channel: resolved,
+        program: track.program ?? 0,
+        ...track.bank !== void 0 ? { bank: track.bank } : {}
+      });
+    }
+    return result;
   }
 
   // src/playback/cursor.ts
@@ -77090,7 +77609,7 @@ ${xrefOffset}
     const width = stated ?? getEngravingDefault(smuflKey) ?? fallback;
     return Math.max(width, theme.minStrokeWidth);
   }
-  function buildTheme(config, fileDefaults) {
+  function buildTheme(config, fileDefaults, mappingRegistry) {
     const overrides = config.colors.overrides;
     return {
       ink: config.colors.ink,
@@ -77103,7 +77622,8 @@ ${xrefOffset}
       noteheadMapping: config.noteheadMapping,
       colorOf: (category) => overrides?.[category] ?? config.colors.ink,
       fileLineWidths: fileDefaults?.lineWidths ?? {},
-      minStrokeWidth: Math.max(0, config.layout.minStrokeWidth ?? 0)
+      minStrokeWidth: Math.max(0, config.layout.minStrokeWidth ?? 0),
+      mappingRegistry
     };
   }
   function withinMeasureSpacing(spacing) {
@@ -77256,7 +77776,14 @@ ${xrefOffset}
             clefSpec?.line ?? firstAttrs.clefLine
           );
           if (!clefDef.positionsByPitch) return;
-          const ctx = { clefDef, measureBottomY: 0, theme, midiInstrumentsByPart };
+          const ctx = {
+            clefDef,
+            measureBottomY: 0,
+            staffLines: state?.staffLinesByStaff[staffNumber] ?? staffLines,
+            theme,
+            midiInstrumentsByPart,
+            ...part2.name !== void 0 ? { instrumentName: part2.name } : {}
+          };
           if (event.kind === "note") {
             consider(resolveNoteRendering(event, ctx).position);
           } else if (event.kind === "chord") {
@@ -77790,7 +78317,7 @@ ${xrefOffset}
     const isDrum = source.pitch.kind === "unpitched";
     if (articulations.length === 0 && ornaments.length === 0 && !hasFermata) return "";
     const parts = [];
-    const topLine = -(STAFF_LINES - 1);
+    const topLine = -(ctx.staffLines - 1);
     let aboveStaff = Math.min(topPosition, topLine, abovePosition ?? Number.POSITIVE_INFINITY);
     let aboveNote = topPosition;
     let belowNote = bottomPosition;
@@ -77846,35 +78373,35 @@ ${xrefOffset}
   }
   function resolveNoteRendering(note2, ctx) {
     const isUnpitched2 = note2.pitch.kind === "unpitched";
-    const step = isUnpitched2 ? note2.pitch.displayStep : note2.pitch.step;
-    const octave = isUnpitched2 ? note2.pitch.displayOctave : note2.pitch.octave;
     const gmNote = isUnpitched2 && note2.instrumentId !== void 0 ? ctx.midiInstrumentsByPart?.get(note2.instrumentId) : void 0;
-    const drumEntry = gmNote !== void 0 ? lookupDrumMapEntry(gmNote, ctx.theme.drumMap).entry : void 0;
-    const positionedByFile = isUnpitched2 && note2.hasExplicitDisplayPosition === true;
-    const position = drumEntry !== void 0 && !positionedByFile ? drumEntry.staffPosition : staffPositionForPitch(ctx.clefDef, step, octave);
-    const drumOverride = gmNote !== void 0 && drumEntry !== void 0 && !positionedByFile ? { [String(gmNote)]: drumEntry.noteheadShape } : void 0;
-    const drumGlyph = gmNote !== void 0 && drumEntry?.noteheadGlyph !== void 0 && !positionedByFile && note2.explicitNotehead === void 0 && note2.explicitNoteheadSmufl === void 0 ? drumEntry.noteheadGlyph : void 0;
-    const configOverrides = ctx.theme.noteheadMapping.overridesByKey;
-    const overridesByKey = drumOverride !== void 0 || configOverrides !== void 0 ? { ...drumOverride, ...configOverrides } : void 0;
-    const fileStatedHead = note2.explicitNotehead !== void 0 || note2.explicitNoteheadSmufl !== void 0;
-    const noteheadGlyph2 = note2.isHarmonic === true && !isUnpitched2 && !fileStatedHead ? harmonicNoteheadGlyphName(note2.duration.type, note2.noteheadFilled) : selectNoteheadGlyphName({
+    const mappingContext = {
       pitch: note2.pitch,
       durationType: note2.duration.type,
+      staffLines: ctx.staffLines,
+      clef: ctx.clefDef,
+      drumMap: ctx.theme.drumMap,
       ...note2.noteheadFilled !== void 0 ? { filled: note2.noteheadFilled } : {},
-      defaultShape: ctx.theme.noteheadMapping.defaultShape,
+      ...ctx.instrumentName !== void 0 ? { instrumentName: ctx.instrumentName } : {},
+      ...note2.instrumentId !== void 0 ? { instrumentId: note2.instrumentId } : {},
+      ...gmNote !== void 0 ? { gmNote } : {},
+      ...note2.hasExplicitDisplayPosition !== void 0 ? { hasExplicitDisplayPosition: note2.hasExplicitDisplayPosition } : {},
       ...note2.explicitNotehead !== void 0 ? { explicitNotehead: note2.explicitNotehead } : {},
-      ...note2.explicitNoteheadSmufl !== void 0 ? { explicitNoteheadSmufl: note2.explicitNoteheadSmufl } : drumGlyph !== void 0 ? { explicitNoteheadSmufl: drumGlyph } : {},
-      ...gmNote !== void 0 ? { midiNote: gmNote } : {},
-      ...overridesByKey !== void 0 ? { overridesByKey } : {}
-    });
+      ...note2.explicitNoteheadSmufl !== void 0 ? { explicitNoteheadSmufl: note2.explicitNoteheadSmufl } : {},
+      ...note2.explicitStemDirection !== void 0 ? { explicitStemDirection: note2.explicitStemDirection } : {},
+      ...note2.isHarmonic !== void 0 ? { isHarmonic: note2.isHarmonic } : {},
+      defaultShape: ctx.theme.noteheadMapping.defaultShape,
+      ...ctx.theme.noteheadMapping.overridesByKey !== void 0 ? { overridesByKey: ctx.theme.noteheadMapping.overridesByKey } : {}
+    };
+    const resolution = ctx.theme.mappingRegistry.resolve(mappingContext);
+    const mapped = resolution.note;
     return {
-      position,
-      noteheadGlyph: noteheadGlyph2,
-      ...drumEntry?.stemDirection !== void 0 ? { drumStemDirection: drumEntry.stemDirection } : {}
+      position: mapped.staffPosition,
+      noteheadGlyph: mapped.noteheadGlyph,
+      ...mapped.stemDirection !== void 0 ? { drumStemDirection: mapped.stemDirection } : {}
     };
   }
   function measureNorthExtent(measure2, staffNumber, ctxAtTick) {
-    const topLineY = -(STAFF_LINES - 1);
+    let topLineY = -(STAFF_LINES - 1);
     let highest;
     const consider = (position) => {
       const reach = position - STEM_AND_BEAM_ALLOWANCE;
@@ -77885,6 +78412,7 @@ ${xrefOffset}
       voice2.events.forEach((event, index) => {
         if ((event.staff ?? 1) !== staffNumber) return;
         const ctx = ctxAtTick(starts[index] ?? 0);
+        topLineY = Math.min(topLineY, -(ctx.staffLines - 1));
         if (!ctx.clefDef.positionsByPitch) return;
         if (event.kind === "note") consider(resolveNoteRendering(event, ctx).position);
         else if (event.kind === "chord") {
@@ -77939,7 +78467,7 @@ ${xrefOffset}
         parentheses: note2.noteheadParentheses === true
       })
     );
-    const ledgerLines = computeLedgerLines(position, STAFF_LINES);
+    const ledgerLines = computeLedgerLines(position, ctx.staffLines);
     if (ledgerLines.length > 0) {
       parts.push(
         renderLedgerLines(ledgerLines, {
@@ -77972,7 +78500,7 @@ ${xrefOffset}
   }
   function renderNoteOrRest(ev, x2, ctx, accidentalState, forcedDirection, restOffset) {
     if (ev.kind === "rest") {
-      const restPosition = ev.displayStep !== void 0 && ev.displayOctave !== void 0 && ctx.clefDef.positionsByPitch ? staffPositionForPitch(ctx.clefDef, ev.displayStep, ev.displayOctave) + restOffset : restY(ev.duration.type, STAFF_LINES, restOffset);
+      const restPosition = ev.displayStep !== void 0 && ev.displayOctave !== void 0 && ctx.clefDef.positionsByPitch ? staffPositionForPitch(ctx.clefDef, ev.displayStep, ev.displayOctave) + restOffset : restY(ev.duration.type, ctx.staffLines, restOffset);
       const y2 = ctx.measureBottomY + restPosition;
       const restGlyph = restGlyphName(ev.duration.type);
       const svg = [
@@ -78037,7 +78565,7 @@ ${xrefOffset}
       }
       const graceDirection = resolveStemDirection({
         positions: [gracePosition],
-        numLines: STAFF_LINES,
+        numLines: ctx.staffLines,
         ...isUnpitchedGrace ? { forcedDirection: "up" } : forcedDirection !== void 0 ? { forcedDirection } : {},
         ...!isUnpitchedGrace && ev.explicitStemDirection !== void 0 ? { explicitDirection: ev.explicitStemDirection } : {}
       });
@@ -78060,12 +78588,12 @@ ${xrefOffset}
     const explicitDirection = isDrum ? void 0 : ev.explicitStemDirection ?? head.drumStemDirection;
     const direction = resolveStemDirection({
       positions: [head.position],
-      numLines: STAFF_LINES,
+      numLines: ctx.staffLines,
       ...isDrum ? { forcedDirection: "up" } : forcedDirection !== void 0 ? { forcedDirection } : {},
       ...explicitDirection !== void 0 ? { explicitDirection } : {}
     });
     if (ev.duration.type !== "whole") {
-      const length = computeStemLength(head.position, middleLineY(STAFF_LINES), direction);
+      const length = computeStemLength(head.position, middleLineY(ctx.staffLines), direction);
       const stemOptions = {
         noteheadGlyphName: head.noteheadGlyph,
         noteX: x2,
@@ -78154,7 +78682,7 @@ ${xrefOffset}
         });
       }
     });
-    const middle = middleLineY(STAFF_LINES);
+    const middle = middleLineY(ctx.staffLines);
     const allPositions = members.flatMap((m) => [...m.positions]);
     const statedDirections = new Set(
       events.map(explicitStemDirectionOf).filter((value) => value !== void 0)
@@ -78325,7 +78853,7 @@ ${xrefOffset}
           parentheses: note2?.noteheadParentheses === true
         })
       );
-      const ledgerLines = computeLedgerLines(position, STAFF_LINES);
+      const ledgerLines = computeLedgerLines(position, ctx.staffLines);
       if (ledgerLines.length > 0) {
         parts.push(
           renderLedgerLines(ledgerLines, {
@@ -78370,7 +78898,7 @@ ${xrefOffset}
       const explicitDirection = isDrumChord ? void 0 : explicitStemDirectionOf(chord2);
       const direction = resolveStemDirection({
         positions: positions2,
-        numLines: STAFF_LINES,
+        numLines: ctx.staffLines,
         ...isDrumChord ? { forcedDirection: "up" } : forcedDirection !== void 0 ? { forcedDirection } : {},
         ...explicitDirection !== void 0 ? { explicitDirection } : {}
       });
@@ -78378,7 +78906,7 @@ ${xrefOffset}
         const outermost = direction === "up" ? Math.max(...positions2) : Math.min(...positions2);
         const outermostIndex = positions2.findIndex((position) => position === outermost);
         const stemGlyph = heads.glyphs[outermostIndex] ?? heads.widestGlyph;
-        const length = computeStemLength(outermost, middleLineY(STAFF_LINES), direction);
+        const length = computeStemLength(outermost, middleLineY(ctx.staffLines), direction);
         const stemOptions = {
           noteheadGlyphName: stemGlyph,
           noteX: x2,
@@ -78472,7 +79000,7 @@ ${xrefOffset}
         const tick = starts[idx] ?? 0;
         const ctx = ctxAtTick(tick);
         if (event.kind === "rest") {
-          const y = event.displayStep !== void 0 && event.displayOctave !== void 0 && ctx.clefDef.positionsByPitch ? staffPositionForPitch(ctx.clefDef, event.displayStep, event.displayOctave) + base : restY(event.duration.type, STAFF_LINES, base);
+          const y = event.displayStep !== void 0 && event.displayOctave !== void 0 && ctx.clefDef.positionsByPitch ? staffPositionForPitch(ctx.clefDef, event.displayStep, event.displayOctave) + base : restY(event.duration.type, ctx.staffLines, base);
           const { top, bottom } = glyphExtent(restGlyphName(event.duration.type), y);
           extents.push({
             voiceId: voice2.id,
@@ -78792,6 +79320,7 @@ ${xrefOffset}
       diagnostics: parseDiagnostics,
       tempoMarks,
       midiInstrumentsByPart: midiInstrumentsByPartMap,
+      midiInstrumentInfoByPart: midiInstrumentInfoByPartMap,
       directions,
       octaveShifts,
       harmonies,
@@ -78807,13 +79336,25 @@ ${xrefOffset}
         message: `${d.message} (${d.path})`
       });
     }
+    const bundledFont = getFontInfo().name;
+    if (config.fonts.musicFont !== bundledFont) {
+      diagnostics.push({
+        severity: "warning",
+        code: "MUSIC_FONT_METRICS",
+        message: `fonts.musicFont is "${config.fonts.musicFont}", but glyph geometry is measured from the bundled ${bundledFont} metrics. Only a SMuFL font with Bravura-compatible metrics is supported; any other music font will draw its glyphs against the wrong anchors.`
+      });
+    }
     const score2 = config.drums.closedHiHatPulse === "quarter-to-eighths" ? expandClosedHiHatQuarterNotesToEighthPulse(
       parsedScore,
       attributes,
       midiInstrumentsByPartMap
     ) : parsedScore;
     const drawnTempoMarks = config.tempoMarks.display === "off" ? [] : tempoMarks;
-    const theme = buildTheme(config, fileDefaults);
+    const theme = buildTheme(
+      config,
+      fileDefaults,
+      options?.mappingRegistry ?? DEFAULT_MAPPING_REGISTRY
+    );
     const measureTextKey = (partId, measureNumber) => `${partId}:${measureNumber}`;
     const textNeedsByMeasure = /* @__PURE__ */ new Map();
     {
@@ -78899,8 +79440,10 @@ ${xrefOffset}
             return {
               clefDef,
               measureBottomY: 0,
+              staffLines: state?.staffLinesByStaff[1] ?? attrsOfMeasure?.staffLinesByStaff[1] ?? STAFF_LINES,
               midiInstrumentsByPart: midiInstrumentsByPartMap.get(part2.id),
-              theme
+              theme,
+              ...part2.name !== void 0 ? { instrumentName: part2.name } : {}
             };
           })
         );
@@ -78938,7 +79481,7 @@ ${xrefOffset}
               if (note2.pitch.kind !== "unpitched" || note2.instrumentId === void 0) continue;
               const gmNote = midiInstrumentsByPart?.get(note2.instrumentId);
               if (gmNote === void 0) continue;
-              for (const d of lookupDrumMapEntry(gmNote, theme.drumMap).diagnostics) {
+              for (const d of drumLookupDiagnostics(gmNote, theme.drumMap)) {
                 diagnostics.push({
                   severity: d.severity,
                   code: d.code,
@@ -78952,6 +79495,7 @@ ${xrefOffset}
       }
     }
     const staffBottomYs = /* @__PURE__ */ new Set();
+    const staffTopYs = /* @__PURE__ */ new Set();
     let reportedTransparentTabMask = false;
     const pageSpacingConfig = config.spacing;
     if (score2.parts.length === 0) {
@@ -79030,6 +79574,11 @@ ${xrefOffset}
         key,
         startState !== void 0 ? attributesAtMeasureStart(a, startState) : a
       );
+    }
+    const transposeSemitonesByPartAndMeasure = /* @__PURE__ */ new Map();
+    for (const [key, a] of attributesByPartAndMeasure) {
+      if (a.transpose.semitones !== 0)
+        transposeSemitonesByPartAndMeasure.set(key, a.transpose.semitones);
     }
     const firstAttributesByPart = /* @__PURE__ */ new Map();
     for (const a of attributesByPartAndMeasure.values()) {
@@ -79200,7 +79749,7 @@ ${xrefOffset}
     };
     for (const measureNumber of measureNumbersInOrder) {
       const combinedVoices = [];
-      let measureTicks;
+      let nominalTicks;
       for (const part2 of score2.parts) {
         const m = measureByPartAndNumber.get(`${part2.id}:${measureNumber}`);
         if (m === void 0) continue;
@@ -79208,18 +79757,23 @@ ${xrefOffset}
         const attrs = attributesByPartAndMeasure.get(`${part2.id}:${measureNumber}`);
         if (attrs === void 0) continue;
         const ticks = attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
-        if (measureTicks === void 0 || ticks > measureTicks) {
-          measureTicks = ticks;
+        if (nominalTicks === void 0 || ticks > nominalTicks) {
+          nominalTicks = ticks;
           timeSignatureByMeasure.set(measureNumber, {
             numerator: attrs.timeNumerator,
             denominator: attrs.timeDenominator
           });
         }
       }
+      const contentTicks = combinedVoices.reduce(
+        (max2, voice2) => Math.max(max2, totalTicks(voice2.events)),
+        0
+      );
+      const measureTicks = contentTicks > 0 ? contentTicks : nominalTicks ?? TICKS_PER_QUARTER * 4;
       const headerWidth = predictedHeaderWidths.get(measureNumber) ?? MEASURE_LEADING_PAD;
       const layout = computeMeasureLayout(
         measure(measureNumber, combinedVoices),
-        measureTicks ?? TICKS_PER_QUARTER * 4,
+        measureTicks,
         drawnTempoMarks.filter((tm) => tm.measureNumber === measureNumber),
         headerWidth,
         config.spacing,
@@ -79229,7 +79783,7 @@ ${xrefOffset}
         fileDefaults
       );
       measureLayoutsByNumber.set(measureNumber, { ...layout, headerWidth });
-      measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
+      measureTicksByNumber.set(measureNumber, measureTicks);
     }
     const couldCarryBarNumber = (measureNumber, isFirstOfScore) => {
       if (config.barNumbers.display === "systemStart") {
@@ -79238,7 +79792,9 @@ ${xrefOffset}
       return shouldShowBarNumber(measureNumber, config.barNumbers, false);
     };
     const aboveStaff = (() => {
-      const existingHeadroom = STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
+      const topPart = score2.parts[0];
+      const topStaffLines = (topPart !== void 0 ? firstAttributesByPart.get(topPart.id)?.staffLinesByStaff[1] : void 0) ?? STAFF_LINES;
+      const existingHeadroom = STAFF_BOTTOM_Y - computeStaffGeometry(topStaffLines).height;
       let needed = 0;
       score2.parts.forEach((part2, partIndex) => {
         const midi = midiInstrumentsByPartMap.get(part2.id);
@@ -79265,7 +79821,13 @@ ${xrefOffset}
             const state = attributeStateAt(timeline, tick);
             const spec = state !== void 0 ? clefSpecAt(state, 1) : void 0;
             const { clefDef } = mapClef(spec?.sign ?? a?.clefSign ?? "G", spec?.line ?? a?.clefLine);
-            return { clefDef, measureBottomY: 0, midiInstrumentsByPart: midi, theme };
+            return {
+              clefDef,
+              measureBottomY: 0,
+              staffLines: state?.staffLinesByStaff[1] ?? a?.staffLinesByStaff[1] ?? STAFF_LINES,
+              midiInstrumentsByPart: midi,
+              theme
+            };
           });
           needed = Math.max(needed, textBand + extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
         });
@@ -79363,12 +79925,15 @@ ${xrefOffset}
     const placementByMeasureNumber = /* @__PURE__ */ new Map();
     const systemOrigins = [];
     const lowestStaffOffset = scoreLayout.positions[scoreLayout.positions.length - 1]?.y ?? 0;
-    const systemBottomRoom = SYSTEM_HEIGHT - STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
+    const lastPart = score2.parts[score2.parts.length - 1];
+    const lastStaffNumber = lastPart !== void 0 ? partStaffCounts[score2.parts.length - 1] ?? 1 : 1;
+    const lastStaffLines = (lastPart !== void 0 ? firstAttributesByPart.get(lastPart.id)?.staffLinesByStaff[lastStaffNumber] : void 0) ?? STAFF_LINES;
+    const systemBottomRoom = SYSTEM_HEIGHT - STAFF_BOTTOM_Y - computeStaffGeometry(lastStaffLines).height;
     const lastPartIndex = Math.max(0, score2.parts.length - 1);
     const lastStaffSouthBand = southTextBand(lastPartIndex, partStaffCounts[lastPartIndex] ?? 1);
     const systemHeight = SYSTEM_HEIGHT + aboveStaffPadding + lowestStaffOffset + Math.max(0, lastStaffSouthBand - systemBottomRoom) - trimAbove - trimBelow;
     const widthOf = (measureNumber) => measureLayoutsByNumber.get(measureNumber)?.width ?? MEASURE_WIDTH;
-    let pageCount = 1;
+    let pageCanvasHeight = 0;
     if (config.layout.mode === "page") {
       const breaksByMeasure = /* @__PURE__ */ new Map();
       for (const pr of prints) {
@@ -79388,11 +79953,12 @@ ${xrefOffset}
         };
       });
       const pageLayout = computePageLayout(pageInputs, systemHeight, config.page, pageSpacingConfig);
-      pageCount = Math.max(1, pageLayout.pages.length);
+      pageCanvasHeight = pageLayout.pages.length > 0 ? pageLayout.totalHeight : config.page.pageHeight;
       let systemIndex = 0;
+      let pageTopY = 0;
       pageLayout.pages.forEach((page, pageIndex) => {
         page.systems.forEach((system, systemIndexOnPage) => {
-          const systemY = pageIndex * config.page.pageHeight + config.page.marginTop + systemIndexOnPage * systemHeight;
+          const systemY = pageTopY + config.page.marginTop + systemIndexOnPage * systemHeight;
           systemOrigins.push({ systemIndex, x: config.page.marginLeft, systemY });
           system.measures.forEach((m, i2) => {
             placementByMeasureNumber.set(m.measureNumber, {
@@ -79406,6 +79972,7 @@ ${xrefOffset}
           });
           systemIndex += 1;
         });
+        pageTopY += page.height;
       });
     } else {
       const scrollLayout = computeScrollLayout(
@@ -79638,8 +80205,10 @@ ${xrefOffset}
               return {
                 clefDef,
                 measureBottomY: 0,
+                staffLines: state.staffLinesByStaff[1] ?? attrs.staffLinesByStaff[1] ?? STAFF_LINES,
                 midiInstrumentsByPart: midiInstrumentsByPartMap.get(part2.id),
-                theme
+                theme,
+                ...part2.name !== void 0 ? { instrumentName: part2.name } : {}
               };
             });
           }
@@ -79856,6 +80425,7 @@ ${xrefOffset}
           );
           const bottomY = staffBottomY + systemY + staffOffsetFor(partIndex, staffIndex);
           staffBottomYs.add(bottomY);
+          staffTopYs.add(bottomY - staffGeometry.height);
           svgParts.push(
             renderStaff(staffGeometry, {
               x: layout.x,
@@ -79948,7 +80518,12 @@ ${xrefOffset}
                 // (gClef on G, fClef on F), not on the staff's bottom line.
                 // Passing bottomY alone drew every clef too low -- barely
                 // noticeable for treble (1 space) but glaring for bass (3).
-                y: bottomY + clefDef.glyphY,
+                //
+                // `glyphY` is a staff POSITION, so it is scaled by this
+                // staff's own line distance: identity for every unit-spacing
+                // staff, but a tab staff spaces its lines 1.5 apart, and its
+                // clef must sit at the centre of THAT staff.
+                y: bottomY + clefDef.glyphY * staffGeometry.lineDistance,
                 color: theme.colorOf("clef"),
                 fontFamily: theme.musicFont
               })
@@ -80003,7 +80578,14 @@ ${xrefOffset}
           let accidentalState = createAccidentalState(attrs.fifths);
           let activeFifths = attrs.fifths;
           if (clefDef.positionsByPitch) {
-            const ctx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart, theme };
+            const ctx = {
+              clefDef,
+              measureBottomY: bottomY,
+              staffLines,
+              midiInstrumentsByPart,
+              theme,
+              ...part2.name !== void 0 ? { instrumentName: part2.name } : {}
+            };
             const noteAreaX = Math.max(noteAreaXOf(layout.x, measure2.number), cursorX);
             const measureLayout = measureLayoutsByNumber.get(measure2.number);
             const ctxAtTick = (tick) => {
@@ -80012,8 +80594,10 @@ ${xrefOffset}
               return {
                 clefDef: mapClef(spec.sign, spec.line).clefDef,
                 measureBottomY: bottomY,
+                staffLines: state.staffLinesByStaff[staffNumber] ?? staffLines,
                 midiInstrumentsByPart,
-                theme
+                theme,
+                ...part2.name !== void 0 ? { instrumentName: part2.name } : {}
               };
             };
             for (const transition of attributeTransitions) {
@@ -80029,7 +80613,7 @@ ${xrefOffset}
                 svgParts.push(
                   renderClef(newClef.clefDef, {
                     x: changeX,
-                    y: bottomY + newClef.clefDef.glyphY,
+                    y: bottomY + newClef.clefDef.glyphY * staffGeometry.lineDistance,
                     color: theme.colorOf("clef"),
                     fontFamily: theme.musicFont
                   })
@@ -80783,7 +81367,7 @@ ${xrefOffset}
       const ink = verticalInkSpan(svgParts.join("\n"));
       if (ink === void 0) return void 0;
       const lines = [...staffBottomYs];
-      const staffTop = Math.min(...lines) - computeStaffGeometry(STAFF_LINES).height;
+      const staffTop = staffTopYs.size > 0 ? Math.min(...staffTopYs) : Math.min(...lines) - computeStaffGeometry(STAFF_LINES).height;
       const staffBottom = Math.max(...lines);
       const top = Math.min(ink.top, staffTop - PLAYHEAD_OVERHANG) - FIT_MARGIN;
       const bottom = Math.max(ink.bottom, staffBottom + PLAYHEAD_OVERHANG) + FIT_MARGIN;
@@ -80804,7 +81388,7 @@ ${xrefOffset}
         // Integration A/B: the viewBox must fit EVERY staff of EVERY part,
         // or the lower ones are simply clipped out of the rendered image.
         // In page mode that means every page, stacked.
-        viewBoxHeight: fitted?.height ?? (config.layout.mode === "page" ? pageCount * config.page.pageHeight : systemHeight),
+        viewBoxHeight: fitted?.height ?? (config.layout.mode === "page" ? pageCanvasHeight : systemHeight),
         ...fitted !== void 0 ? { viewBoxMinY: fitted.minY } : {},
         pxPerStaffSpace: config.layout.pxPerStaffSpace,
         backgroundColor: theme.background
@@ -80820,7 +81404,9 @@ ${xrefOffset}
       measureLayoutsByNumber,
       placementByMeasureNumber,
       measureHeaderAllowance: MEASURE_HEADER_ALLOWANCE,
-      repeatMeasures: repeatMeasureSpecs()
+      repeatMeasures: repeatMeasureSpecs(),
+      transposeSemitonesByPartAndMeasure,
+      midiInstrumentInfoByPart: midiInstrumentInfoByPartMap
     });
     for (const d of playback.repeatDiagnostics) {
       diagnostics.push({ severity: d.severity, code: d.code, message: d.message });

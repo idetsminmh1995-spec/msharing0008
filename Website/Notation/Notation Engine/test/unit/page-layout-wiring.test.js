@@ -1,10 +1,32 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadEngine } from '../helpers/load-engine.js';
 import { testDomParser } from '../helpers/dom.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NE = loadEngine();
 const domParser = testDomParser();
+
+const grandStaff = fs.readFileSync(
+  path.join(__dirname, '..', 'fixtures', 'musicxml', 'musescore-grand-staff.musicxml'),
+  'utf8',
+);
+
+/** The largest y any drawn primitive (text, line, path) reaches -- the ink's own bottom edge. */
+function maxInkY(svg) {
+  const ys = [];
+  for (const m of svg.matchAll(/<text x="[-\d.]+" y="(-?[\d.]+)"/g)) ys.push(Number(m[1]));
+  for (const m of svg.matchAll(/<line [^>]*y1="(-?[\d.]+)"[^>]*y2="(-?[\d.]+)"/g)) {
+    ys.push(Number(m[1]), Number(m[2]));
+  }
+  for (const m of svg.matchAll(/<path[^>]*d="[^"]*?"/g)) {
+    for (const c of m[0].matchAll(/-?[\d.]+[ ,](-?[\d.]+)/g)) ys.push(Number(c[1]));
+  }
+  return Math.max(...ys);
+}
 
 const glyphCount = (svg, glyphName) => svg.split(NE.getGlyph(glyphName).char).length - 1;
 const viewBox = (svg) => /viewBox="([^"]+)"/.exec(svg)[1].split(' ').map(Number);
@@ -46,7 +68,8 @@ function onePart(count, extraByMeasure = {}) {
   );
 }
 
-const render = (xml, config) => NE.renderFromMusicXml(xml, { domParser, ...(config ? { config } : {}) });
+const render = (xml, config) =>
+  NE.renderFromMusicXml(xml, { domParser, ...(config ? { config } : {}) });
 
 describe('page layout wiring (Integration L, §16.2)', () => {
   test('scroll mode is still the default and still produces ONE system', () => {
@@ -76,7 +99,11 @@ describe('page layout wiring (Integration L, §16.2)', () => {
     const { svg } = render(onePart(8), { layout: { mode: 'page' } });
     const [, , width, height] = viewBox(svg);
     assert.equal(width, 30); // DEFAULT_CONFIG.page.pageWidth
-    assert.equal(height % 42, 0, `page height should be a whole number of 42-unit pages, got ${height}`);
+    assert.equal(
+      height % 42,
+      0,
+      `page height should be a whole number of 42-unit pages, got ${height}`,
+    );
   });
 
   test('a narrower page fits fewer measures per system, so the score takes more systems', () => {
@@ -90,20 +117,20 @@ describe('page layout wiring (Integration L, §16.2)', () => {
 
   test('<print new-system="yes"> forces a break even where the music would have fitted', () => {
     const withoutBreak = render(onePart(2), { layout: { mode: 'page' }, page: { pageWidth: 120 } });
-    const withBreak = render(
-      onePart(2, { 2: '<print new-system="yes"/>' }),
-      { layout: { mode: 'page' }, page: { pageWidth: 120 } },
-    );
+    const withBreak = render(onePart(2, { 2: '<print new-system="yes"/>' }), {
+      layout: { mode: 'page' },
+      page: { pageWidth: 120 },
+    });
     assert.equal(glyphCount(withoutBreak.svg, 'gClef'), 1, 'both measures fit on one wide system');
     assert.equal(glyphCount(withBreak.svg, 'gClef'), 2, 'the explicit break must split them');
   });
 
   test('<print new-page="yes"> starts a new page, growing the canvas', () => {
     const base = render(onePart(2), { layout: { mode: 'page' }, page: { pageWidth: 120 } });
-    const broken = render(
-      onePart(2, { 2: '<print new-page="yes"/>' }),
-      { layout: { mode: 'page' }, page: { pageWidth: 120 } },
-    );
+    const broken = render(onePart(2, { 2: '<print new-page="yes"/>' }), {
+      layout: { mode: 'page' },
+      page: { pageWidth: 120 },
+    });
     assert.ok(viewBox(broken.svg)[3] > viewBox(base.svg)[3]);
   });
 
@@ -137,7 +164,11 @@ describe('page layout wiring (Integration L, §16.2)', () => {
       page: { pageWidth: 120 },
     });
     assert.ok([...diagnostics].some((d) => d.code === 'TIE_CROSSES_SYSTEM'));
-    assert.doesNotMatch(svg, /<path d="M [^"]* Q /, 'no tie path should run diagonally between systems');
+    assert.doesNotMatch(
+      svg,
+      /<path d="M [^"]* Q /,
+      'no tie path should run diagonally between systems',
+    );
   });
 
   test('the same hairpin in SCROLL mode draws normally -- there is only one system to cross', () => {
@@ -188,9 +219,77 @@ describe('score-wide horizontal alignment across parts (Integration L)', () => {
   });
 
   test('the same holds in page mode', () => {
-    const { svg } = render(twoUnevenParts(), { layout: { mode: 'page' }, page: { pageWidth: 120 } });
+    const { svg } = render(twoUnevenParts(), {
+      layout: { mode: 'page' },
+      page: { pageWidth: 120 },
+    });
     const xs = barlineXs(svg);
     assert.equal(xs.length, 4);
     assert.equal(new Set(xs).size, 2);
+  });
+});
+
+describe('page mode never clips or overlaps (Phase 47, §16.3 reflow)', () => {
+  test('a page fits the grand staff it holds -- no ink past the page’s bottom edge', () => {
+    // The grand staff's own system (28.8 staff spaces) is TALLER than the
+    // usable height of this short page (20 - 2 - 2 = 16), so before the
+    // height-aware fix the system spilled past the page and off the
+    // canvas. The page must now grow to hold it.
+    const page = {
+      pageWidth: 30,
+      pageHeight: 20,
+      marginTop: 2,
+      marginBottom: 2,
+      marginLeft: 2,
+      marginRight: 2,
+    };
+    const { svg } = render(grandStaff, { layout: { mode: 'page' }, page });
+    const [, , , canvasHeight] = viewBox(svg);
+    assert.ok(
+      maxInkY(svg) <= canvasHeight,
+      `ink at y=${maxInkY(svg)} runs past the ${canvasHeight}-unit canvas`,
+    );
+  });
+
+  test('systems on a short page are pitched by their REAL height, never overlapping', () => {
+    const page = {
+      pageWidth: 30,
+      pageHeight: 20,
+      marginTop: 2,
+      marginBottom: 2,
+      marginLeft: 2,
+      marginRight: 2,
+    };
+    // The grand staff's own system height (scroll mode draws exactly one).
+    const systemHeight = viewBox(render(grandStaff).svg)[3];
+    assert.ok(
+      systemHeight > page.pageHeight,
+      'the fixture must be taller than the page to be a real test',
+    );
+
+    const { svg } = render(grandStaff, { layout: { mode: 'page' }, page });
+    // Each system's treble clef, in reading order.
+    const clef = NE.getGlyph('gClef').char;
+    const clefYs = [
+      ...svg.matchAll(new RegExp(`<text x="[\\d.]+" y="(-?[\\d.]+)"[^>]*>${clef}</text>`, 'g')),
+    ].map((m) => Number(m[1]));
+    assert.ok(clefYs.length >= 2, 'expected more than one system');
+    const pitches = clefYs.slice(1).map((y, i) => y - clefYs[i]);
+    for (const pitch of pitches) {
+      assert.ok(
+        pitch >= systemHeight,
+        `systems overlap: pitch ${pitch} is less than the system height ${systemHeight}`,
+      );
+    }
+  });
+
+  test('a normal page’s output is unchanged by the height-aware page stacking', () => {
+    // pageHeight 42 comfortably fits the grand staff's 28.8-unit system,
+    // so every page is exactly 42 tall and the canvas is a whole number
+    // of pages -- the byte-for-byte case the fix must not disturb.
+    const { svg } = render(grandStaff, { layout: { mode: 'page' } });
+    const [, , width, height] = viewBox(svg);
+    assert.equal(width, 30);
+    assert.equal(height % 42, 0);
   });
 });

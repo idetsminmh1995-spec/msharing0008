@@ -69,6 +69,18 @@ describe('Phase 50: the theming API is live (§8)', () => {
       assert.ok(!svg.includes('Bravura'), 'no glyph is still pinned to Bravura');
     });
 
+    test('a non-Bravura music font reports MUSIC_FONT_METRICS -- glyph geometry still comes from the bundled metrics', () => {
+      const { diagnostics } = render('simple-single-voice.musicxml', {
+        fonts: { musicFont: 'Petaluma' },
+      });
+      assert.ok([...diagnostics].some((d) => d.code === 'MUSIC_FONT_METRICS'));
+    });
+
+    test('the default Bravura font reports NO MUSIC_FONT_METRICS diagnostic', () => {
+      const { diagnostics } = render('simple-single-voice.musicxml');
+      assert.ok(![...diagnostics].some((d) => d.code === 'MUSIC_FONT_METRICS'));
+    });
+
     test('config.fonts.textFont applies to the bar number, NOT to the glyphs', () => {
       const { svg } = render('simple-single-voice.musicxml', {
         fonts: { textFont: 'Georgia, serif' },

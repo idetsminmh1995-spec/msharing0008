@@ -37,8 +37,8 @@ Three states:
 | `clef` | Implemented | Sign/line/octave change; `INVALID_OCTAVE_SHIFT`. |
 | `staves` | Implemented | Multi-staff parts. |
 | `staff-details` | Implemented | Staff line count; `INVALID_BOOLEAN_ATTRIBUTE` on a bad flag. |
-| `transpose` | Parsed, not applied | Carried on the measure state, not yet applied to sounding pitch. |
-| `midi-instrument` | Parsed, not applied | Per-part instrument to GM percussion note; see PLAN.md Part E. |
+| `transpose` | Implemented | Carried on the measure state and applied to SOUNDING pitch for playback and MIDI alignment; the notation stays at written pitch. |
+| `midi-instrument` | Implemented | `midi-unpitched` → GM percussion key (unpitched notes now SOUND), plus `midi-program` / `midi-bank` / `midi-channel` routing on the playback track; `INVALID_MIDI_UNPITCHED` / `INVALID_MIDI_PROGRAM` / `INVALID_MIDI_BANK` / `INVALID_MIDI_CHANNEL`. See PLAN.md Part E and the SoundFont milestone. |
 
 ## Notes and rhythm
 

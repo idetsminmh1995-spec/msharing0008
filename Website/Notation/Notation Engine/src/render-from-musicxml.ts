@@ -1,6 +1,6 @@
 import type { Chord, Measure, MeasureEvent, Note, Rest, SlideKind } from './core/index.js';
 import type { DurationType } from './core/duration.js';
-import { getEngravingDefault, getGlyph } from './glyphs/index.js';
+import { getEngravingDefault, getFontInfo, getGlyph } from './glyphs/index.js';
 import {
   ALTO_CLEF,
   BASS_CLEF,
@@ -57,7 +57,6 @@ import {
   voiceRestOffset,
   restGlyphName,
   restY,
-  selectNoteheadGlyphName,
   shouldShowBarNumber,
   staffPositionForPitch,
   timeSignature,
@@ -66,7 +65,6 @@ import {
   type BarlineType,
   type BeamStyle as BeamStyleOption,
   chordSymbolLayout,
-  harmonicNoteheadGlyphName,
   tremoloGlyphName,
   tremoloPlacement,
   computeArpeggioShape,
@@ -83,10 +81,15 @@ import {
 import { renderSlide } from './render/slide.js';
 import {
   expandClosedHiHatQuarterNotesToEighthPulse,
-  lookupDrumMapEntry,
   mergeDrumMappingTable,
   type DrumMappingTable,
 } from './drums/index.js';
+import {
+  MappingRegistry,
+  DEFAULT_MAPPING_REGISTRY,
+  drumLookupDiagnostics,
+  type MappingContext,
+} from './mapping/index.js';
 import {
   computeSystemLayoutVariableGaps,
   computeScrollLayout,
@@ -294,6 +297,14 @@ interface RenderTheme {
   readonly fileLineWidths: ScoreLineWidths;
   /** `config.layout.minStrokeWidth`: the thinnest any line may be drawn, in staff spaces. */
   readonly minStrokeWidth: number;
+  /**
+   * Part E: the instrument-neutral mapping registry every note's staff
+   * position and notehead come from. Carried on the theme, which is
+   * resolved once per render and read by every drawing call, so the
+   * registry is reached without threading a second parameter through
+   * `RenderCtx`'s every construction site.
+   */
+  readonly mappingRegistry: MappingRegistry;
 }
 
 /**
@@ -326,7 +337,11 @@ function lineWidth(
   return Math.max(width, theme.minStrokeWidth);
 }
 
-function buildTheme(config: EngineConfig, fileDefaults: ScoreDefaults | undefined): RenderTheme {
+function buildTheme(
+  config: EngineConfig,
+  fileDefaults: ScoreDefaults | undefined,
+  mappingRegistry: MappingRegistry,
+): RenderTheme {
   const overrides = config.colors.overrides;
   return {
     ink: config.colors.ink,
@@ -340,6 +355,7 @@ function buildTheme(config: EngineConfig, fileDefaults: ScoreDefaults | undefine
     colorOf: (category) => overrides?.[category] ?? config.colors.ink,
     fileLineWidths: fileDefaults?.lineWidths ?? {},
     minStrokeWidth: Math.max(0, config.layout.minStrokeWidth ?? 0),
+    mappingRegistry,
   };
 }
 
@@ -725,7 +741,7 @@ function carriesArpeggioMark(event: Note | Chord | Rest): boolean {
  * the clef from that event's own positioned attribute state.
  */
 function worstCaseStaffExtent(
-  part: { readonly id: string; readonly measures: readonly Measure[] },
+  part: { readonly id: string; readonly measures: readonly Measure[]; readonly name?: string },
   staffNumber: number,
   allAttributes: readonly MeasureAttributes[],
   side: 'north' | 'south',
@@ -765,7 +781,14 @@ function worstCaseStaffExtent(
           clefSpec?.line ?? firstAttrs.clefLine,
         );
         if (!clefDef.positionsByPitch) return;
-        const ctx: RenderCtx = { clefDef, measureBottomY: 0, theme, midiInstrumentsByPart };
+        const ctx: RenderCtx = {
+          clefDef,
+          measureBottomY: 0,
+          staffLines: state?.staffLinesByStaff[staffNumber] ?? staffLines,
+          theme,
+          midiInstrumentsByPart,
+          ...(part.name !== undefined ? { instrumentName: part.name } : {}),
+        };
         if (event.kind === 'note') {
           consider(resolveNoteRendering(event, ctx).position);
         } else if (event.kind === 'chord') {
@@ -1175,6 +1198,15 @@ export interface RenderParsedMusicXmlOptions {
    * `Doc/phase-50-theming-api.md`.
    */
   readonly config?: PartialEngineConfig;
+  /**
+   * Part E: the instrument-neutral mapping registry. Left out, the engine
+   * uses `DEFAULT_MAPPING_REGISTRY` (the percussion profile and the
+   * generic pitched fallback). A host that has custom `MappingProfile`s
+   * builds one with `new MappingRegistry([mappingProfileToInstrumentProfile(p), ...])`
+   * and passes it here; the caller's profiles are tried before the
+   * built-ins.
+   */
+  readonly mappingRegistry?: MappingRegistry;
 }
 
 export interface RenderFromMusicXmlOptions
@@ -1704,7 +1736,7 @@ function renderNoteMarks(
   if (articulations.length === 0 && ornaments.length === 0 && !hasFermata) return '';
 
   const parts: string[] = [];
-  const topLine = -(STAFF_LINES - 1);
+  const topLine = -(ctx.staffLines - 1);
   // Staff-position units: more negative is higher up the page.
   let aboveStaff = Math.min(topPosition, topLine, abovePosition ?? Number.POSITIVE_INFINITY);
   let aboveNote = topPosition;
@@ -1801,10 +1833,20 @@ interface EventAnchor {
 interface RenderCtx {
   readonly clefDef: ClefDefinition;
   readonly measureBottomY: number;
+  /**
+   * This staff's own line count, from its `<staff-details><staff-lines>`.
+   * Everything that positions something against the staff -- ledger lines,
+   * stem length and direction, rest defaults, the top line an articulation
+   * clears -- reads it here instead of assuming 5, so a 1-, 3-, 4- or
+   * 6-line staff places its notes against its OWN lines.
+   */
+  readonly staffLines: number;
   /** Phase 50/§8: the resolved config values every drawing call below reads. */
   readonly theme: RenderTheme;
   /** Phase 41: this part's own <instrument id="..."> -> GM note number map (from Phase 35's parsed <midi-instrument> data), if any. Lets an unpitched note with a known GM number use the real drum mapping table instead of only its file-supplied display-step/octave. */
   readonly midiInstrumentsByPart: ReadonlyMap<string, number> | undefined;
+  /** Part E: this part's `<part-name>`, threaded so a `MappingProfile` can match on instrument name. */
+  readonly instrumentName?: string;
 }
 
 /**
@@ -1817,14 +1859,18 @@ interface RenderCtx {
  * case that makes this matter: re-deriving it from display-step/octave
  * would place the collision check on a different line than the notehead
  * actually lands on.
+ *
+ * Part E: the decision itself now lives in `mapping/` -- this function's
+ * job is to assemble a `MappingContext` from the note and its staff and
+ * hand it to the registry. The behavior is unchanged; the rule is simply
+ * stated once, in a layer that can be tested and extended without the
+ * renderer, which is what "instrument-neutral" means here.
  */
 function resolveNoteRendering(
   note: Note,
   ctx: RenderCtx,
 ): { position: number; noteheadGlyph: string; drumStemDirection?: StemDirection } {
   const isUnpitched = note.pitch.kind === 'unpitched';
-  const step = isUnpitched ? note.pitch.displayStep : note.pitch.step;
-  const octave = isUnpitched ? note.pitch.displayOctave : note.pitch.octave;
 
   // Phase 41/§13.3: an unpitched note whose <instrument id> resolves to a
   // known GM percussion note (via Phase 35's parsed <midi-instrument> map)
@@ -1833,99 +1879,40 @@ function resolveNoteRendering(
     isUnpitched && note.instrumentId !== undefined
       ? ctx.midiInstrumentsByPart?.get(note.instrumentId)
       : undefined;
-  const drumEntry =
-    gmNote !== undefined ? lookupDrumMapEntry(gmNote, ctx.theme.drumMap).entry : undefined;
 
-  /**
-   * Integration T: the FILE decides, where the file has said anything.
-   *
-   * `<display-step>`/`<display-octave>` are not a hint -- they are
-   * MusicXML's own way of saying which line a percussion note goes on,
-   * and this engine treats them as final: it computes the line from
-   * them and the clef, then looks for a drum in the drum table already
-   * on that line, and ADDS one when it finds none. The drum table
-   * adapts to the file; the file is never moved to suit the drum table.
-   *
-   * This engine used to do the opposite, and every unpitched note in a
-   * real export landed wherever this project's own GM table happened to
-   * put that drum -- the toms half a space out, the pedal
-   * hi-hat at the top of the staff instead of below it, the acoustic
-   * bass drum a line high. The table is still the answer for a file
-   * that states no position, which is the only case left for it.
-   */
-  const positionedByFile = isUnpitched && note.hasExplicitDisplayPosition === true;
-  const position =
-    drumEntry !== undefined && !positionedByFile
-      ? drumEntry.staffPosition
-      : staffPositionForPitch(ctx.clefDef, step, octave);
-
-  // §9.7's selection order, with the two override sources merged in
-  // precedence order: the drum table's own shape for this GM note is the
-  // engine's default opinion, and `config.noteheadMapping.overridesByKey`
-  // is the USER's -- so the user's entry for the same key wins. (A user
-  // who sets `{ "38": "diamond" }` means it for the snare whether or not
-  // the drum table already had an opinion about the snare.)
-  //
-  // The table's opinion is withheld for a note the FILE placed, for the
-  // same reason its position is: a file's own `<notehead>` is read and
-  // defaults to a plain one, so a file that
-  // wants an X on the hi-hat line says so, and one that says nothing
-  // means a plain oval. Substituting a shape there is this engine
-  // disagreeing with the file about its own notation.
-  const drumOverride =
-    gmNote !== undefined && drumEntry !== undefined && !positionedByFile
-      ? { [String(gmNote)]: drumEntry.noteheadShape }
-      : undefined;
-  // A drum the table names ONE glyph for -- the china cymbal, the slap
-  // -- cannot go through the shape-family override above, because no
-  // family contains that glyph. It travels the same road an explicit
-  // `<notehead smufl="...">` does, and loses to one: the file's own
-  // notation outranks the kit's.
-  const drumGlyph =
-    gmNote !== undefined &&
-    drumEntry?.noteheadGlyph !== undefined &&
-    !positionedByFile &&
-    note.explicitNotehead === undefined &&
-    note.explicitNoteheadSmufl === undefined
-      ? drumEntry.noteheadGlyph
-      : undefined;
-  const configOverrides = ctx.theme.noteheadMapping.overridesByKey;
-  const overridesByKey =
-    drumOverride !== undefined || configOverrides !== undefined
-      ? { ...drumOverride, ...configOverrides }
-      : undefined;
-
-  // §9.26: a harmonic's diamond head, unless the file stated a head of
-  // its own -- `<notehead>diamond</notehead>` and `<harmonic>` together
-  // are common, and the file's explicit statement outranks this default.
-  const fileStatedHead =
-    note.explicitNotehead !== undefined || note.explicitNoteheadSmufl !== undefined;
-  const noteheadGlyph =
-    note.isHarmonic === true && !isUnpitched && !fileStatedHead
-      ? harmonicNoteheadGlyphName(note.duration.type, note.noteheadFilled)
-      : selectNoteheadGlyphName({
-          pitch: note.pitch,
-          durationType: note.duration.type,
-          ...(note.noteheadFilled !== undefined ? { filled: note.noteheadFilled } : {}),
-          defaultShape: ctx.theme.noteheadMapping.defaultShape,
-          ...(note.explicitNotehead !== undefined
-            ? { explicitNotehead: note.explicitNotehead }
-            : {}),
-          ...(note.explicitNoteheadSmufl !== undefined
-            ? { explicitNoteheadSmufl: note.explicitNoteheadSmufl }
-            : drumGlyph !== undefined
-              ? { explicitNoteheadSmufl: drumGlyph }
-              : {}),
-          ...(gmNote !== undefined ? { midiNote: gmNote } : {}),
-          ...(overridesByKey !== undefined ? { overridesByKey } : {}),
-        });
-
-  return {
-    position,
-    noteheadGlyph,
-    ...(drumEntry?.stemDirection !== undefined
-      ? { drumStemDirection: drumEntry.stemDirection }
+  const mappingContext: MappingContext = {
+    pitch: note.pitch,
+    durationType: note.duration.type,
+    staffLines: ctx.staffLines,
+    clef: ctx.clefDef,
+    drumMap: ctx.theme.drumMap,
+    ...(note.noteheadFilled !== undefined ? { filled: note.noteheadFilled } : {}),
+    ...(ctx.instrumentName !== undefined ? { instrumentName: ctx.instrumentName } : {}),
+    ...(note.instrumentId !== undefined ? { instrumentId: note.instrumentId } : {}),
+    ...(gmNote !== undefined ? { gmNote } : {}),
+    ...(note.hasExplicitDisplayPosition !== undefined
+      ? { hasExplicitDisplayPosition: note.hasExplicitDisplayPosition }
       : {}),
+    ...(note.explicitNotehead !== undefined ? { explicitNotehead: note.explicitNotehead } : {}),
+    ...(note.explicitNoteheadSmufl !== undefined
+      ? { explicitNoteheadSmufl: note.explicitNoteheadSmufl }
+      : {}),
+    ...(note.explicitStemDirection !== undefined
+      ? { explicitStemDirection: note.explicitStemDirection }
+      : {}),
+    ...(note.isHarmonic !== undefined ? { isHarmonic: note.isHarmonic } : {}),
+    defaultShape: ctx.theme.noteheadMapping.defaultShape,
+    ...(ctx.theme.noteheadMapping.overridesByKey !== undefined
+      ? { overridesByKey: ctx.theme.noteheadMapping.overridesByKey }
+      : {}),
+  };
+
+  const resolution = ctx.theme.mappingRegistry.resolve(mappingContext);
+  const mapped = resolution.note;
+  return {
+    position: mapped.staffPosition,
+    noteheadGlyph: mapped.noteheadGlyph,
+    ...(mapped.stemDirection !== undefined ? { drumStemDirection: mapped.stemDirection } : {}),
   };
 }
 
@@ -1944,7 +1931,10 @@ function measureNorthExtent(
   staffNumber: number,
   ctxAtTick: (tick: number) => RenderCtx,
 ): number {
-  const topLineY = -(STAFF_LINES - 1);
+  // The staff's top line, taken from the tallest staff this measure uses
+  // (a mid-measure <staff-lines> change is rare, but the extent must clear
+  // the topmost staff line of whichever one is taller).
+  let topLineY = -(STAFF_LINES - 1);
   let highest: number | undefined;
   const consider = (position: number): void => {
     const reach = position - STEM_AND_BEAM_ALLOWANCE;
@@ -1955,6 +1945,7 @@ function measureNorthExtent(
     voice.events.forEach((event, index) => {
       if ((event.staff ?? 1) !== staffNumber) return;
       const ctx = ctxAtTick(starts[index] ?? 0);
+      topLineY = Math.min(topLineY, -(ctx.staffLines - 1));
       // A tab clef's events are fret numbers confined to its staff lines;
       // do not ask the pitch-positioning path to interpret them.
       if (!ctx.clefDef.positionsByPitch) return;
@@ -2034,7 +2025,7 @@ function renderNoteheadPart(
     }),
   );
 
-  const ledgerLines = computeLedgerLines(position, STAFF_LINES);
+  const ledgerLines = computeLedgerLines(position, ctx.staffLines);
   if (ledgerLines.length > 0) {
     parts.push(
       renderLedgerLines(ledgerLines, {
@@ -2088,7 +2079,7 @@ function renderNoteOrRest(
     const restPosition =
       ev.displayStep !== undefined && ev.displayOctave !== undefined && ctx.clefDef.positionsByPitch
         ? staffPositionForPitch(ctx.clefDef, ev.displayStep, ev.displayOctave) + restOffset
-        : restY(ev.duration.type, STAFF_LINES, restOffset);
+        : restY(ev.duration.type, ctx.staffLines, restOffset);
     const y = ctx.measureBottomY + restPosition;
     const restGlyph = restGlyphName(ev.duration.type);
     const svg = [
@@ -2169,7 +2160,7 @@ function renderNoteOrRest(
     }
     const graceDirection = resolveStemDirection({
       positions: [gracePosition],
-      numLines: STAFF_LINES,
+      numLines: ctx.staffLines,
       ...(isUnpitchedGrace
         ? { forcedDirection: 'up' as const }
         : forcedDirection !== undefined
@@ -2212,7 +2203,7 @@ function renderNoteOrRest(
 
   const direction = resolveStemDirection({
     positions: [head.position],
-    numLines: STAFF_LINES,
+    numLines: ctx.staffLines,
     ...(isDrum
       ? { forcedDirection: 'up' as const }
       : forcedDirection !== undefined
@@ -2222,7 +2213,7 @@ function renderNoteOrRest(
   });
 
   if (ev.duration.type !== 'whole') {
-    const length = computeStemLength(head.position, middleLineY(STAFF_LINES), direction);
+    const length = computeStemLength(head.position, middleLineY(ctx.staffLines), direction);
     const stemOptions = {
       noteheadGlyphName: head.noteheadGlyph,
       noteX: x,
@@ -2377,7 +2368,7 @@ function renderBeamGroup(
     }
   });
 
-  const middle = middleLineY(STAFF_LINES);
+  const middle = middleLineY(ctx.staffLines);
   // Every notehead in the group votes on the shared direction (§9.13),
   // not just one per event -- a chord's own spread is exactly the kind of
   // thing that decides which way a beam should go.
@@ -2639,7 +2630,7 @@ function renderChordHeadsPart(
         parentheses: note?.noteheadParentheses === true,
       }),
     );
-    const ledgerLines = computeLedgerLines(position, STAFF_LINES);
+    const ledgerLines = computeLedgerLines(position, ctx.staffLines);
     if (ledgerLines.length > 0) {
       parts.push(
         renderLedgerLines(ledgerLines, {
@@ -2702,7 +2693,7 @@ function renderChord(
     const explicitDirection = isDrumChord ? undefined : explicitStemDirectionOf(chord);
     const direction = resolveStemDirection({
       positions,
-      numLines: STAFF_LINES,
+      numLines: ctx.staffLines,
       ...(isDrumChord
         ? { forcedDirection: 'up' as const }
         : forcedDirection !== undefined
@@ -2714,7 +2705,7 @@ function renderChord(
       const outermost = direction === 'up' ? Math.max(...positions) : Math.min(...positions);
       const outermostIndex = positions.findIndex((position) => position === outermost);
       const stemGlyph = heads.glyphs[outermostIndex] ?? heads.widestGlyph;
-      const length = computeStemLength(outermost, middleLineY(STAFF_LINES), direction);
+      const length = computeStemLength(outermost, middleLineY(ctx.staffLines), direction);
       const stemOptions = {
         noteheadGlyphName: stemGlyph,
         noteX: x,
@@ -2894,7 +2885,7 @@ function computeRestClearanceOffsets(
           event.displayOctave !== undefined &&
           ctx.clefDef.positionsByPitch
             ? staffPositionForPitch(ctx.clefDef, event.displayStep, event.displayOctave) + base
-            : restY(event.duration.type, STAFF_LINES, base);
+            : restY(event.duration.type, ctx.staffLines, base);
         const { top, bottom } = glyphExtent(restGlyphName(event.duration.type), y);
         extents.push({
           voiceId: voice.id,
@@ -3422,6 +3413,7 @@ export function renderParsedMusicXml(
     diagnostics: parseDiagnostics,
     tempoMarks,
     midiInstrumentsByPart: midiInstrumentsByPartMap,
+    midiInstrumentInfoByPart: midiInstrumentInfoByPartMap,
     directions,
     octaveShifts,
     harmonies,
@@ -3435,6 +3427,24 @@ export function renderParsedMusicXml(
       severity: d.severity,
       code: d.code,
       message: `${d.message} (${d.path})`,
+    });
+  }
+  // §8/§16.3: every glyph's bBox, anchor and advance comes from the
+  // bundled Bravura metrics, not from the font the browser actually
+  // loads. A SMuFL font with Bravura-compatible metrics draws correctly;
+  // any other music font draws at the same codepoints but its glyphs sit
+  // wrong against those Bravura-derived anchors. There is no way to read
+  // a substituted font's own metrics at render time, so this states the
+  // limitation rather than silently misplacing ink.
+  const bundledFont = getFontInfo().name;
+  if (config.fonts.musicFont !== bundledFont) {
+    diagnostics.push({
+      severity: 'warning',
+      code: 'MUSIC_FONT_METRICS',
+      message:
+        `fonts.musicFont is "${config.fonts.musicFont}", but glyph geometry is measured from the bundled ` +
+        `${bundledFont} metrics. Only a SMuFL font with Bravura-compatible metrics is supported; ` +
+        `any other music font will draw its glyphs against the wrong anchors.`,
     });
   }
   const score =
@@ -3457,7 +3467,11 @@ export function renderParsedMusicXml(
   const drawnTempoMarks = config.tempoMarks.display === 'off' ? [] : tempoMarks;
   // Phase 50/§8: one resolution of every user-facing drawing value, passed
   // down on RenderCtx. Everything below reads `theme`, never a constant.
-  const theme = buildTheme(config, fileDefaults);
+  const theme = buildTheme(
+    config,
+    fileDefaults,
+    options?.mappingRegistry ?? DEFAULT_MAPPING_REGISTRY,
+  );
 
   // ---- Phase 55/§19.10: the text layer's own bookkeeping ---------------
   //
@@ -3573,8 +3587,11 @@ export function renderParsedMusicXml(
           return {
             clefDef,
             measureBottomY: 0,
+            staffLines:
+              state?.staffLinesByStaff[1] ?? attrsOfMeasure?.staffLinesByStaff[1] ?? STAFF_LINES,
             midiInstrumentsByPart: midiInstrumentsByPartMap.get(part.id),
             theme,
+            ...(part.name !== undefined ? { instrumentName: part.name } : {}),
           };
         }),
       );
@@ -3615,6 +3632,8 @@ export function renderParsedMusicXml(
   // Collect lookup warnings once per score event instead of in the shared
   // resolver, which is called by layout and drawing. This also gives each
   // warning its source measure even when layout performs the first lookup.
+  // Part E: the warning itself comes from the mapping layer, so the rule
+  // lives with the profile that applies it rather than being restated here.
   for (const part of score.parts) {
     const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part.id);
     for (const measure of part.measures) {
@@ -3625,7 +3644,7 @@ export function renderParsedMusicXml(
             if (note.pitch.kind !== 'unpitched' || note.instrumentId === undefined) continue;
             const gmNote = midiInstrumentsByPart?.get(note.instrumentId);
             if (gmNote === undefined) continue;
-            for (const d of lookupDrumMapEntry(gmNote, theme.drumMap).diagnostics) {
+            for (const d of drumLookupDiagnostics(gmNote, theme.drumMap)) {
               diagnostics.push({
                 severity: d.severity,
                 code: d.code,
@@ -3640,6 +3659,8 @@ export function renderParsedMusicXml(
   }
   /** Phase 51/§18.3: the absolute y of every staff bottom line drawn, for the skyline overlay. */
   const staffBottomYs = new Set<number>();
+  /** The absolute y of every staff's TOP line drawn, so `fitSystemHeight` can trim to the staff's real top whatever its line count. */
+  const staffTopYs = new Set<number>();
   /** Whether this render has already said that a tab mask cannot work on a transparent background. */
   let reportedTransparentTabMask = false;
   /**
@@ -3753,6 +3774,21 @@ export function renderParsedMusicXml(
       key,
       startState !== undefined ? attributesAtMeasureStart(a, startState) : a,
     );
+  }
+  /**
+   * MusicXML `<transpose>` semitones per measure, for playback only --
+   * §10.5's "what must be added to a written pitch to get a sounding
+   * pitch". The notation is DRAWN from the written pitch the file
+   * carries; only the MIDI numbers a host plays are moved, so a Bb
+   * clarinet part sounds a whole tone below what it reads. Sparse: a
+   * measure whose part does not transpose has no entry, so a score with
+   * no `<transpose>` at all produces an empty map and every downstream
+   * lookup falls back to 0.
+   */
+  const transposeSemitonesByPartAndMeasure = new Map<string, number>();
+  for (const [key, a] of attributesByPartAndMeasure) {
+    if (a.transpose.semitones !== 0)
+      transposeSemitonesByPartAndMeasure.set(key, a.transpose.semitones);
   }
   /** The first `<attributes>` of a part, for the score-wide passes that need a part's starting state. */
   const firstAttributesByPart = new Map<string, MeasureAttributes>();
@@ -4070,7 +4106,7 @@ export function renderParsedMusicXml(
 
   for (const measureNumber of measureNumbersInOrder) {
     const combinedVoices = [];
-    let measureTicks: number | undefined;
+    let nominalTicks: number | undefined;
     for (const part of score.parts) {
       const m = measureByPartAndNumber.get(`${part.id}:${measureNumber}`);
       if (m === undefined) continue;
@@ -4080,18 +4116,29 @@ export function renderParsedMusicXml(
       const ticks = attrs.timeNumerator * (4 / attrs.timeDenominator) * TICKS_PER_QUARTER;
       // Parts SHOULD agree on the meter; if a file disagrees, the longest
       // wins so no part's last note falls outside the measure.
-      if (measureTicks === undefined || ticks > measureTicks) {
-        measureTicks = ticks;
+      if (nominalTicks === undefined || ticks > nominalTicks) {
+        nominalTicks = ticks;
         timeSignatureByMeasure.set(measureNumber, {
           numerator: attrs.timeNumerator,
           denominator: attrs.timeDenominator,
         });
       }
     }
+    // A measure's REAL length, not the meter's: a pickup is shorter than
+    // its 4/4, a measure a file wrote one beat too long is longer. Taken
+    // from what was actually written (the furthest any voice reaches) so
+    // the playback timeline, the measure's own drawn width and the
+    // playhead's interpolation all agree with the notes on the page. An
+    // empty measure has no content to measure, so the meter stands.
+    const contentTicks = combinedVoices.reduce(
+      (max, voice) => Math.max(max, totalTicks(voice.events)),
+      0,
+    );
+    const measureTicks = contentTicks > 0 ? contentTicks : (nominalTicks ?? TICKS_PER_QUARTER * 4);
     const headerWidth = predictedHeaderWidths.get(measureNumber) ?? MEASURE_LEADING_PAD;
     const layout = computeMeasureLayout(
       makeMeasure(measureNumber, combinedVoices),
-      measureTicks ?? TICKS_PER_QUARTER * 4,
+      measureTicks,
       drawnTempoMarks.filter((tm) => tm.measureNumber === measureNumber),
       headerWidth,
       config.spacing,
@@ -4101,7 +4148,7 @@ export function renderParsedMusicXml(
       fileDefaults,
     );
     measureLayoutsByNumber.set(measureNumber, { ...layout, headerWidth });
-    measureTicksByNumber.set(measureNumber, measureTicks ?? TICKS_PER_QUARTER * 4);
+    measureTicksByNumber.set(measureNumber, measureTicks);
   }
 
   /**
@@ -4134,7 +4181,17 @@ export function renderParsedMusicXml(
    * keeps most fixtures byte-identical.
    */
   const aboveStaff = (() => {
-    const existingHeadroom = STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
+    // The headroom baseline is the FIRST staff's own height, so a score
+    // whose top staff is taller than five lines (a 6-line tab or a
+    // single-line percussion staff of unusual design) still reserves the
+    // right room. A plain 5-line score yields the same number as before,
+    // which is what keeps its output byte-identical.
+    const topPart = score.parts[0];
+    const topStaffLines =
+      (topPart !== undefined
+        ? firstAttributesByPart.get(topPart.id)?.staffLinesByStaff[1]
+        : undefined) ?? STAFF_LINES;
+    const existingHeadroom = STAFF_BOTTOM_Y - computeStaffGeometry(topStaffLines).height;
     let needed = 0;
     score.parts.forEach((part, partIndex) => {
       const midi = midiInstrumentsByPartMap.get(part.id);
@@ -4174,7 +4231,13 @@ export function renderParsedMusicXml(
           const state = attributeStateAt(timeline, tick);
           const spec = state !== undefined ? clefSpecAt(state, 1) : undefined;
           const { clefDef } = mapClef(spec?.sign ?? a?.clefSign ?? 'G', spec?.line ?? a?.clefLine);
-          return { clefDef, measureBottomY: 0, midiInstrumentsByPart: midi, theme };
+          return {
+            clefDef,
+            measureBottomY: 0,
+            staffLines: state?.staffLinesByStaff[1] ?? a?.staffLinesByStaff[1] ?? STAFF_LINES,
+            midiInstrumentsByPart: midi,
+            theme,
+          };
         });
         // A tempo mark sits ABOVE the chord symbols (see northTextStack),
         // so its own clearance starts at the top of the text band.
@@ -4380,9 +4443,20 @@ export function renderParsedMusicXml(
    * already has (SYSTEM_HEIGHT's own tail below the last staff) is
    * subtracted first, which is what keeps a one-verse score byte-
    * identical: its lyrics fit inside the room that was already there.
+   *
+   * Measured against THAT staff's own height -- a taller last staff
+   * (6-line tab) leaves less room, so the system grows by more. A 5-line
+   * last staff yields the same reserve as before.
    */
+  const lastPart = score.parts[score.parts.length - 1];
+  const lastStaffNumber =
+    lastPart !== undefined ? (partStaffCounts[score.parts.length - 1] ?? 1) : 1;
+  const lastStaffLines =
+    (lastPart !== undefined
+      ? firstAttributesByPart.get(lastPart.id)?.staffLinesByStaff[lastStaffNumber]
+      : undefined) ?? STAFF_LINES;
   const systemBottomRoom =
-    SYSTEM_HEIGHT - STAFF_BOTTOM_Y - computeStaffGeometry(STAFF_LINES).height;
+    SYSTEM_HEIGHT - STAFF_BOTTOM_Y - computeStaffGeometry(lastStaffLines).height;
   const lastPartIndex = Math.max(0, score.parts.length - 1);
   const lastStaffSouthBand = southTextBand(lastPartIndex, partStaffCounts[lastPartIndex] ?? 1);
   const systemHeight =
@@ -4396,7 +4470,8 @@ export function renderParsedMusicXml(
   const widthOf = (measureNumber: number): number =>
     measureLayoutsByNumber.get(measureNumber)?.width ?? MEASURE_WIDTH;
 
-  let pageCount = 1;
+  /** Page mode's canvas height: the sum of every page's own (possibly grown) height. Scroll mode never uses it. */
+  let pageCanvasHeight = 0;
   if (config.layout.mode === 'page') {
     // §16.2: "<print new-system/new-page> from MusicXML" is respected.
     // Any part asking for a break breaks the whole system -- a system is
@@ -4419,14 +4494,19 @@ export function renderParsedMusicXml(
       };
     });
     const pageLayout = computePageLayout(pageInputs, systemHeight, config.page, pageSpacingConfig);
-    pageCount = Math.max(1, pageLayout.pages.length);
+    // A score with no measures produces no pages at all; it still gets one
+    // blank page's worth of canvas, exactly as the fixed-pitch version did.
+    pageCanvasHeight =
+      pageLayout.pages.length > 0 ? pageLayout.totalHeight : config.page.pageHeight;
     let systemIndex = 0;
+    // Pages are stacked by their own REAL heights, not a fixed pitch. A
+    // page whose single system is taller than the configured page height
+    // grows to hold it (see `computePageLayout`), so the next page starts
+    // below the grown one rather than on top of its tail.
+    let pageTopY = 0;
     pageLayout.pages.forEach((page, pageIndex) => {
       page.systems.forEach((system, systemIndexOnPage) => {
-        const systemY =
-          pageIndex * config.page.pageHeight +
-          config.page.marginTop +
-          systemIndexOnPage * systemHeight;
+        const systemY = pageTopY + config.page.marginTop + systemIndexOnPage * systemHeight;
         systemOrigins.push({ systemIndex, x: config.page.marginLeft, systemY });
         system.measures.forEach((m, i) => {
           placementByMeasureNumber.set(m.measureNumber, {
@@ -4440,6 +4520,7 @@ export function renderParsedMusicXml(
         });
         systemIndex += 1;
       });
+      pageTopY += page.height;
     });
   } else {
     const scrollLayout = computeScrollLayout(
@@ -4832,8 +4913,10 @@ export function renderParsedMusicXml(
             return {
               clefDef,
               measureBottomY: 0,
+              staffLines: state.staffLinesByStaff[1] ?? attrs.staffLinesByStaff[1] ?? STAFF_LINES,
               midiInstrumentsByPart: midiInstrumentsByPartMap.get(part.id),
               theme,
+              ...(part.name !== undefined ? { instrumentName: part.name } : {}),
             };
           });
         }
@@ -5116,12 +5199,13 @@ export function renderParsedMusicXml(
         const staffClef = clefSpecAt(startState, staffNumber);
         const { clefDef, keySigClefName } = mapClef(staffClef.sign, staffClef.line);
         // Integration B: this staff's own line count, straight from the
-        // file's <staff-details><staff-lines> (tab = 6, most = 5). The
-        // note-drawing helpers below still assume STAFF_LINES, which is
-        // safe precisely because they only ever run for a pitch-positioning
-        // clef, and every such staff in practice has 5 lines -- a tab
-        // staff's notes are skipped entirely (see the UNSUPPORTED_CLEF
-        // diagnostic), so no note math depends on this being 6.
+        // file's <staff-details><staff-lines> (tab = 6, most = 5). Threaded
+        // onto every RenderCtx below so ledger lines, stems and rest
+        // defaults position against THIS staff's own lines rather than a
+        // hardcoded 5 -- a 1-, 3-, 4- or 6-line pitched staff now places
+        // its notes correctly. A tab staff's notes are skipped entirely
+        // (see the UNSUPPORTED_CLEF diagnostic), so its own line count only
+        // reaches the staff geometry and the tab note path.
         const staffLines = attrs.staffLinesByStaff[staffNumber] ?? STAFF_LINES;
         const staffGeometry = computeStaffGeometry(
           staffLines,
@@ -5131,6 +5215,7 @@ export function renderParsedMusicXml(
         // Phase 51/§18.3: every staff line this render actually drew, for
         // the skyline overlay to hang its per-staff envelopes on.
         staffBottomYs.add(bottomY);
+        staffTopYs.add(bottomY - staffGeometry.height);
 
         svgParts.push(
           renderStaff(staffGeometry, {
@@ -5256,7 +5341,12 @@ export function renderParsedMusicXml(
               // (gClef on G, fClef on F), not on the staff's bottom line.
               // Passing bottomY alone drew every clef too low -- barely
               // noticeable for treble (1 space) but glaring for bass (3).
-              y: bottomY + clefDef.glyphY,
+              //
+              // `glyphY` is a staff POSITION, so it is scaled by this
+              // staff's own line distance: identity for every unit-spacing
+              // staff, but a tab staff spaces its lines 1.5 apart, and its
+              // clef must sit at the centre of THAT staff.
+              y: bottomY + clefDef.glyphY * staffGeometry.lineDistance,
               color: theme.colorOf('clef'),
               fontFamily: theme.musicFont,
             }),
@@ -5334,7 +5424,14 @@ export function renderParsedMusicXml(
         let activeFifths = attrs.fifths;
 
         if (clefDef.positionsByPitch) {
-          const ctx: RenderCtx = { clefDef, measureBottomY: bottomY, midiInstrumentsByPart, theme };
+          const ctx: RenderCtx = {
+            clefDef,
+            measureBottomY: bottomY,
+            staffLines,
+            midiInstrumentsByPart,
+            theme,
+            ...(part.name !== undefined ? { instrumentName: part.name } : {}),
+          };
           // Phase 43/44 wiring: the header allowance every measure reserves
           // (see computeMeasureLayout), not a fraction of this measure's
           // own (now content-driven, no longer fixed) width.
@@ -5350,8 +5447,10 @@ export function renderParsedMusicXml(
             return {
               clefDef: mapClef(spec.sign, spec.line).clefDef,
               measureBottomY: bottomY,
+              staffLines: state.staffLinesByStaff[staffNumber] ?? staffLines,
               midiInstrumentsByPart,
               theme,
+              ...(part.name !== undefined ? { instrumentName: part.name } : {}),
             };
           };
           for (const transition of attributeTransitions) {
@@ -5368,7 +5467,7 @@ export function renderParsedMusicXml(
               svgParts.push(
                 renderClef(newClef.clefDef, {
                   x: changeX,
-                  y: bottomY + newClef.clefDef.glyphY,
+                  y: bottomY + newClef.clefDef.glyphY * staffGeometry.lineDistance,
                   color: theme.colorOf('clef'),
                   fontFamily: theme.musicFont,
                 }),
@@ -6473,7 +6572,13 @@ export function renderParsedMusicXml(
     const ink = verticalInkSpan(svgParts.join('\n'));
     if (ink === undefined) return undefined;
     const lines = [...staffBottomYs];
-    const staffTop = Math.min(...lines) - computeStaffGeometry(STAFF_LINES).height;
+    // The staff's real top line, from whichever staff reaches highest --
+    // a 6-line staff's top is two spaces above a 5-line one's, so a fixed
+    // 5-line height would trim into the staff's own lines.
+    const staffTop =
+      staffTopYs.size > 0
+        ? Math.min(...staffTopYs)
+        : Math.min(...lines) - computeStaffGeometry(STAFF_LINES).height;
     const staffBottom = Math.max(...lines);
     const top = Math.min(ink.top, staffTop - PLAYHEAD_OVERHANG) - FIT_MARGIN;
     const bottom = Math.max(ink.bottom, staffBottom + PLAYHEAD_OVERHANG) + FIT_MARGIN;
@@ -6496,8 +6601,7 @@ export function renderParsedMusicXml(
       // or the lower ones are simply clipped out of the rendered image.
       // In page mode that means every page, stacked.
       viewBoxHeight:
-        fitted?.height ??
-        (config.layout.mode === 'page' ? pageCount * config.page.pageHeight : systemHeight),
+        fitted?.height ?? (config.layout.mode === 'page' ? pageCanvasHeight : systemHeight),
       ...(fitted !== undefined ? { viewBoxMinY: fitted.minY } : {}),
       pxPerStaffSpace: config.layout.pxPerStaffSpace,
       backgroundColor: theme.background,
@@ -6515,6 +6619,8 @@ export function renderParsedMusicXml(
     placementByMeasureNumber,
     measureHeaderAllowance: MEASURE_HEADER_ALLOWANCE,
     repeatMeasures: repeatMeasureSpecs(),
+    transposeSemitonesByPartAndMeasure,
+    midiInstrumentInfoByPart: midiInstrumentInfoByPartMap,
   });
   // One diagnostic channel for the caller (§18.3), whichever module
   // produced the finding -- `playback/repeats.ts` keeps its own

@@ -177,11 +177,11 @@ export const TAB_CLEF: ClefDefinition = {
   takesKeySignature: false,
   octaveShift: 0,
   // SMuFL's 6stringTabClef bBox spans roughly -3..+3, i.e. its origin is
-  // its own centre, so it belongs on the centre line of a SIX-line tab
-  // staff: lines at 0..-5, centre -2.5. Note this assumes a real 6-line
-  // tab staff, which the renderer does not yet draw (it draws 5 lines for
-  // every clef) -- giving tab its own staff-line count is part of the
-  // separate guitar/tab work, not this pass.
+  // its own centre, so it belongs on the centre line of a six-line tab
+  // staff: lines at 0..-5, centre -2.5. This is a staff POSITION, and the
+  // renderer scales it by the staff's own line distance when drawing (tab
+  // spaces its lines 1.5 apart), so it lands on the centre line of a real
+  // tab staff whatever its declared <staff-lines>.
   glyphY: -2.5,
 };
 

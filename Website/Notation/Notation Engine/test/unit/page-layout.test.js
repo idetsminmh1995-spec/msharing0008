@@ -53,11 +53,16 @@ describe('system breaking (Phase 46, §16.2)', () => {
 });
 
 describe('justification of completed systems (Phase 46, §16.2 + §14.3)', () => {
-  test("a completed (non-final) system is stretched so its last measure reaches the right margin exactly", () => {
+  test('a completed (non-final) system is stretched so its last measure reaches the right margin exactly', () => {
     // Two systems' worth: system 1 (measures 1-2, forced to break by
     // measure 3 not fitting) must be justified to the FULL usableWidth,
     // even though its own natural width (10+10=20) is less than 25.
-    const layout = NE.computePageLayout([m(1, 10), m(2, 10), m(3, 20)], 10, PAGE_CONFIG, SPACING_CONFIG);
+    const layout = NE.computePageLayout(
+      [m(1, 10), m(2, 10), m(3, 20)],
+      10,
+      PAGE_CONFIG,
+      SPACING_CONFIG,
+    );
     const page = [...layout.pages][0];
     assert.equal(page.systems.length, 2);
     const system1 = page.systems[0];
@@ -66,7 +71,12 @@ describe('justification of completed systems (Phase 46, §16.2 + §14.3)', () =>
   });
 
   test('THE LAST SYSTEM OF THE WHOLE PIECE IS NOT JUSTIFIED (ragged-right, §14.3)', () => {
-    const layout = NE.computePageLayout([m(1, 10), m(2, 10), m(3, 20)], 10, PAGE_CONFIG, SPACING_CONFIG);
+    const layout = NE.computePageLayout(
+      [m(1, 10), m(2, 10), m(3, 20)],
+      10,
+      PAGE_CONFIG,
+      SPACING_CONFIG,
+    );
     const page = [...layout.pages][0];
     const lastSystem = page.systems[page.systems.length - 1];
     const lastMeasure = lastSystem.measures[lastSystem.measures.length - 1];
@@ -84,7 +94,8 @@ describe('justification of completed systems (Phase 46, §16.2 + §14.3)', () =>
     const layout = NE.computePageLayout(manyMeasures, 20, PAGE_CONFIG, SPACING_CONFIG);
     assert.ok(layout.pages.length > 1, 'expected the content to span multiple pages');
     const firstPageLastSystem = layout.pages[0].systems[layout.pages[0].systems.length - 1];
-    const lastMeasureOfPage1 = firstPageLastSystem.measures[firstPageLastSystem.measures.length - 1];
+    const lastMeasureOfPage1 =
+      firstPageLastSystem.measures[firstPageLastSystem.measures.length - 1];
     // Each measure here is alone in its own system (width 20 each,
     // usableWidth=25, so each fits alone but a second wouldn't); being
     // on page 1 (not the last page), it must be justified to fill the
@@ -95,7 +106,12 @@ describe('justification of completed systems (Phase 46, §16.2 + §14.3)', () =>
 
 describe('page breaking (Phase 46, §16.2)', () => {
   test('systems pack onto one page as long as the total height fits', () => {
-    const layout = NE.computePageLayout([m(1, 8), m(2, 8), m(3, 8)], 10, PAGE_CONFIG, SPACING_CONFIG);
+    const layout = NE.computePageLayout(
+      [m(1, 8), m(2, 8), m(3, 8)],
+      10,
+      PAGE_CONFIG,
+      SPACING_CONFIG,
+    );
     // All 3 fit into one system (8*3=24 < usableWidth 25), so this is
     // trivially one page with one system.
     assert.equal(layout.pages.length, 1);
@@ -118,9 +134,14 @@ describe('page breaking (Phase 46, §16.2)', () => {
     const measures = Array.from({ length: 12 }, (_, i) => m(i + 1, 20));
     const layout = NE.computePageLayout(measures, 15, PAGE_CONFIG, SPACING_CONFIG);
     const allMeasureNumbers = [
-      ...layout.pages.flatMap((p) => p.systems.flatMap((s) => s.measures.map((mm) => mm.measureNumber))),
+      ...layout.pages.flatMap((p) =>
+        p.systems.flatMap((s) => s.measures.map((mm) => mm.measureNumber)),
+      ),
     ];
-    assert.deepEqual(allMeasureNumbers, Array.from({ length: 12 }, (_, i) => i + 1));
+    assert.deepEqual(
+      allMeasureNumbers,
+      Array.from({ length: 12 }, (_, i) => i + 1),
+    );
   });
 });
 
@@ -160,5 +181,64 @@ describe('explicit <print> breaks (Phase 46, §16.2)', () => {
     const page = [...layout.pages][0];
     assert.equal(page.systems.length, 1);
     assert.equal(page.systems[0].measures.length, 2);
+  });
+});
+
+describe('page height accounting (Phase 47, §16.2)', () => {
+  test('a normal page is exactly the configured page height, and totalHeight is pages * pageHeight', () => {
+    const layout = NE.computePageLayout(
+      [m(1, 8), m(2, 8), m(3, 8)],
+      10,
+      PAGE_CONFIG,
+      SPACING_CONFIG,
+    );
+    assert.equal(layout.pages.length, 1);
+    assert.equal(layout.pages[0].height, PAGE_CONFIG.pageHeight);
+    assert.equal(layout.totalHeight, layout.pages.length * PAGE_CONFIG.pageHeight);
+  });
+
+  test('every system carries the system height it was laid out at', () => {
+    const layout = NE.computePageLayout(
+      [m(1, 8), m(2, 20), m(3, 8)],
+      10,
+      PAGE_CONFIG,
+      SPACING_CONFIG,
+    );
+    for (const page of layout.pages) {
+      for (const system of page.systems) {
+        assert.equal(system.height, 10);
+      }
+    }
+  });
+
+  test('a system TALLER than the usable page height grows its page instead of spilling past the margin', () => {
+    // usableHeight = 42 - 3 - 3 = 36. A system of 50 cannot fit inside it.
+    const layout = NE.computePageLayout([m(1, 8)], 50, PAGE_CONFIG, SPACING_CONFIG);
+    assert.equal(layout.pages.length, 1);
+    // The page grows to marginTop + systemHeight + marginBottom.
+    assert.equal(layout.pages[0].height, 3 + 50 + 3);
+    assert.ok(layout.pages[0].height > PAGE_CONFIG.pageHeight);
+  });
+
+  test('an over-tall system does not push the NEXT system onto the same page -- it still breaks the page', () => {
+    // Two 50-tall systems: neither fits in the 36 usable height, so each
+    // gets its own (grown) page rather than overlapping.
+    const layout = NE.computePageLayout([m(1, 20), m(2, 20)], 50, PAGE_CONFIG, SPACING_CONFIG);
+    assert.equal(layout.pages.length, 2);
+    assert.equal(layout.pages[0].systems.length, 1);
+    assert.equal(layout.pages[1].systems.length, 1);
+  });
+
+  test('totalHeight sums every page’s OWN (possibly grown) height, not pages * pageHeight', () => {
+    const layout = NE.computePageLayout([m(1, 20), m(2, 20)], 50, PAGE_CONFIG, SPACING_CONFIG);
+    const expected = layout.pages.reduce((sum, p) => sum + p.height, 0);
+    assert.equal(layout.totalHeight, expected);
+    assert.ok(layout.totalHeight > layout.pages.length * PAGE_CONFIG.pageHeight);
+  });
+
+  test('an empty measure list produces no pages and a zero total height', () => {
+    const layout = NE.computePageLayout([], 10, PAGE_CONFIG, SPACING_CONFIG);
+    assert.equal(layout.pages.length, 0);
+    assert.equal(layout.totalHeight, 0);
   });
 });

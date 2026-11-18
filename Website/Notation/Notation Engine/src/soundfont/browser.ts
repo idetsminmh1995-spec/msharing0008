@@ -1,6 +1,7 @@
 import { WorkletSynthesizer } from 'spessasynth_lib';
 import type { NotationEvent } from '../playback/event-stream.js';
 import { resolvePosition, type PlaybackData } from '../playback/position.js';
+import { assignTrackRouting, type TrackRouting } from '../playback/routing.js';
 
 export interface SoundFontAsset {
   readonly id: string;
@@ -104,6 +105,7 @@ export class R2SoundFontEngine implements NotationSoundEngine {
   private readonly context: AudioContext;
   private readonly synth: WorkletSynthesizer;
   private readonly partChannels = new Map<string, number>();
+  private routingByPart: ReadonlyMap<string, TrackRouting> = new Map();
   private timers = new Set<number>();
   private stopped = true;
   private volume = 0.75;
@@ -162,6 +164,7 @@ export class R2SoundFontEngine implements NotationSoundEngine {
     this.volume = Math.max(0, Math.min(1, volume));
     this.synth.setSystemParameter('gain', this.volume);
     this.stopped = false;
+    this.routingByPart = assignTrackRouting(playback.tracks);
     const origin = performance.now() / 1000;
     for (const event of playback.events) {
       const notes = midiNotesFor(event);
@@ -208,13 +211,23 @@ export class R2SoundFontEngine implements NotationSoundEngine {
     void this.context.close();
   }
 
+  /**
+   * The MIDI channel one part plays on, assigned once per playback by
+   * `assignTrackRouting` and then reused. The bank/program is set on the
+   * channel the first time the part sounds, so a part sounds as its own
+   * instrument rather than the default patch.
+   */
   private channelFor(partId: string): number {
     const existing = this.partChannels.get(partId);
     if (existing !== undefined) return existing;
-    const channel = this.partChannels.size % 16;
-    this.partChannels.set(partId, channel);
-    this.synth.programChange(channel, 0);
-    return channel;
+    const routing: TrackRouting = this.routingByPart.get(partId) ?? { channel: 0, program: 0 };
+    this.partChannels.set(partId, routing.channel);
+    if (routing.bank !== undefined) {
+      this.synth.controllerChange(routing.channel, 0, (routing.bank >> 7) & 0x7f);
+      this.synth.controllerChange(routing.channel, 32, routing.bank & 0x7f);
+    }
+    this.synth.programChange(routing.channel, routing.program);
+    return routing.channel;
   }
 }
 

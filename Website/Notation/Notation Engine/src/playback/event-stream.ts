@@ -1,16 +1,38 @@
-import type { MeasureEvent, Score } from '../core/index.js';
+import type { MeasureEvent, Note, Score } from '../core/index.js';
 import { isPitched } from '../core/pitch.js';
 import { tickToSeconds } from '../timing/tick-seconds.js';
 import type { TempoMap } from '../timing/tempo-map.js';
+import type { MidiInstrumentInfo } from '../parser/musicxml/instrument.js';
 
 /** A pitch in the engine's scientific octave representation converted to a MIDI note number. */
-function midiNoteForEvent(event: MeasureEvent): readonly number[] {
+function midiNoteForEvent(event: MeasureEvent, transposeSemitones: number): readonly number[] {
   const notes = event.kind === 'chord' ? event.notes : event.kind === 'note' ? [event] : [];
   return notes.flatMap((note) => {
     if (!isPitched(note.pitch)) return [];
     const natural = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[note.pitch.step];
-    const midi = (note.pitch.octave + 1) * 12 + natural + note.pitch.alter;
+    const midi = (note.pitch.octave + 1) * 12 + natural + note.pitch.alter + transposeSemitones;
     return Number.isInteger(midi) && midi >= 0 && midi <= 127 ? [midi] : [];
+  });
+}
+
+/**
+ * An unpitched percussion note's MIDI key number, from the part's
+ * `<midi-instrument>` map: a `<note><instrument id="...">` names which
+ * drum it is, and that id resolves to a GM percussion note. Without it
+ * there is no way to know WHICH drum a display position means -- the
+ * display position is layout, not identity -- so a note with no resolved
+ * GM number stays silent rather than guessing.
+ */
+function percussionMidiNotesForEvent(
+  event: MeasureEvent,
+  instruments: ReadonlyMap<string, MidiInstrumentInfo> | undefined,
+): readonly number[] {
+  if (instruments === undefined) return [];
+  const notes = event.kind === 'chord' ? event.notes : event.kind === 'note' ? [event] : [];
+  return notes.flatMap((note: Note) => {
+    if (isPitched(note.pitch) || note.instrumentId === undefined) return [];
+    const gmNote = instruments.get(note.instrumentId)?.gmNote;
+    return gmNote !== undefined ? [gmNote] : [];
   });
 }
 
@@ -70,11 +92,29 @@ export function buildEventStream(
   score: Score,
   globalTickOffsetByMeasure: ReadonlyMap<number, number>,
   tempoMap: TempoMap,
+  /**
+   * MusicXML `<transpose>` semitones per `${partId}:${measureNumber}`,
+   * applied to the MIDI numbers so playback sounds at concert pitch
+   * while the drawn notation stays at written pitch (see
+   * `core/pitch.ts`'s `soundingPitch()`). Omitted means no part
+   * transposes, which is every score that carries no `<transpose>`.
+   */
+  transposeSemitonesByPartAndMeasure?: ReadonlyMap<string, number>,
+  /**
+   * Each part's `<midi-instrument>` map, so an unpitched percussion note
+   * resolves to a real GM key number and actually sounds. Omitted means no
+   * part carries percussion routing, so unpitched notes stay silent (they
+   * have no other way to name their drum).
+   */
+  midiInstrumentsByPart?: ReadonlyMap<string, ReadonlyMap<string, MidiInstrumentInfo>>,
 ): readonly NotationEvent[] {
   const events: NotationEvent[] = [];
   for (const part of score.parts) {
+    const instruments = midiInstrumentsByPart?.get(part.id);
     for (const measure of part.measures) {
       const offset = globalTickOffsetByMeasure.get(measure.number) ?? 0;
+      const transposeSemitones =
+        transposeSemitonesByPartAndMeasure?.get(`${part.id}:${measure.number}`) ?? 0;
       for (const voice of measure.voices) {
         let tickInMeasure = 0;
         voice.events.forEach((event, index) => {
@@ -82,7 +122,10 @@ export function buildEventStream(
           const noteIds = noteIdsForEvent(part.id, measure.number, voice.id, index, event);
           if (noteIds.length > 0) {
             const tick = offset + startTick;
-            const midiNotes = midiNoteForEvent(event);
+            const midiNotes = [
+              ...midiNoteForEvent(event, transposeSemitones),
+              ...percussionMidiNotesForEvent(event, instruments),
+            ];
             events.push({
               tick,
               seconds: tickToSeconds(tempoMap, tick),

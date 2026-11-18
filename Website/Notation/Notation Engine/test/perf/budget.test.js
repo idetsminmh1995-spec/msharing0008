@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { loadEngine } from '../helpers/load-engine.js';
 import { testDomParser } from '../helpers/dom.js';
 import { generateScore } from '../helpers/generate-score.js';
+import { buildMidiFile, midiHelpers } from '../helpers/midi-builder.js';
 
 const NE = loadEngine();
 const domParser = testDomParser();
+const { noteEvent, endOfTrackMetaEvent } = midiHelpers;
 
 /**
  * Phase 53/§18.1: the performance budgets, as executable assertions.
@@ -76,7 +78,8 @@ describe('Phase 53: the §18.1 performance budgets', () => {
   test('a cursor position update stays under 1ms -- it runs every frame', () => {
     const { playback } = NE.renderFromMusicXml(xml50, { domParser });
     const ms = best(
-      () => NE.computeCursorPlacement(playback, 4096, { mode: 'notationMoves', viewportWidth: 800 }),
+      () =>
+        NE.computeCursorPlacement(playback, 4096, { mode: 'notationMoves', viewportWidth: 800 }),
       500,
     );
     assert.ok(ms < 1, `cursor update took ${ms.toFixed(3)}ms, budget 1ms`);
@@ -160,5 +163,125 @@ describe('Phase 53: renderParsedMusicXml is the cached path §18.1 asks for', ()
     const scrollAgain = NE.renderParsedMusicXml(parsed, { config: { layout: { mode: 'scroll' } } });
     assert.notEqual(page.svg, scroll.svg, 'the config really changed the output');
     assert.equal(scrollAgain.svg, scroll.svg, 'and rendering never mutated the cached parse');
+  });
+});
+
+/**
+ * Part G: the three remaining hot paths §18.1 names but the suite above
+ * did not yet time -- MIDI/MusicXML alignment, repeat expansion, and the
+ * raster/PDF encoders. Budgets are stated for the sizes a host actually
+ * throws at them: aligning a real part, unfolding a heavily repeated
+ * score, and encoding a page-sized image.
+ */
+describe('Part G: alignment, repeat expansion and export encoding budgets', () => {
+  /** A part with `measureCount` measures of eight eighth notes each, plus a matching MIDI track (one note event per note, exact ticks). */
+  function alignedPair(measureCount) {
+    const parsed = NE.parseMusicXml(generateScore(measureCount), { domParser });
+    const part = parsed.score.parts[0];
+    const flat = NE.flattenPartNotes(part, parsed.attributes, undefined);
+    const events = [];
+    for (const note of flat) {
+      events.push(noteEvent(0, 0x90, note.noteNumber ?? 60, 100));
+      events.push(noteEvent(240, 0x80, note.noteNumber ?? 60, 0));
+    }
+    events.push(endOfTrackMetaEvent());
+    const midiBytes = buildMidiFile({ format: 0, ppq: 480, tracks: [events] });
+    const midiNotes = NE.parseMidiFile(midiBytes).midiFile.tracks[0].notes;
+    return { flat, midiNotes };
+  }
+
+  test('aligning a 100-measure part (800 notes) stays under 50ms', () => {
+    const { flat, midiNotes } = alignedPair(100);
+    const ms = best(() => NE.alignNotes(flat, midiNotes));
+    assert.ok(ms < 50, `alignNotes took ${ms.toFixed(1)}ms, budget 50ms`);
+  });
+
+  test('alignment cost scales with note count, not its square -- exact AND tolerance paths', () => {
+    // Tier 1 (exact) and tier 2 (tolerance) are the two paths a real pair
+    // of files takes, and both were quadratic before Part G indexed them.
+    // A constant tick offset forces every note down the tolerance path,
+    // which is the case that most easily regresses.
+    const small = alignedPair(50);
+    const large = alignedPair(200);
+    const smallTol = alignedPair(50, 20);
+    const largeTol = alignedPair(200, 20);
+    const exactSmall = best(() => NE.alignNotes(small.flat, small.midiNotes), 5);
+    const exactLarge = best(() => NE.alignNotes(large.flat, large.midiNotes), 5);
+    const tolSmall = best(() => NE.alignNotes(smallTol.flat, smallTol.midiNotes), 5);
+    const tolLarge = best(() => NE.alignNotes(largeTol.flat, largeTol.midiNotes), 5);
+    // 4x the notes; linear is ~4x, quadratic ~16x. 8x catches the latter.
+    assert.ok(
+      exactLarge < exactSmall * 8 + 1,
+      `exact: 200 measures ${exactLarge.toFixed(1)}ms vs 50 measures ${exactSmall.toFixed(1)}ms`,
+    );
+    assert.ok(
+      tolLarge < tolSmall * 8 + 1,
+      `tolerance: 200 measures ${tolLarge.toFixed(1)}ms vs 50 measures ${tolSmall.toFixed(1)}ms`,
+    );
+  });
+
+  test('expanding a heavily repeated 200-measure score stays under 20ms', () => {
+    // Four passes over the whole score: the repeat resolver walks each
+    // measure once per pass, so this is the worst realistic case.
+    const measures = Array.from({ length: 200 }, (_, i) => ({
+      measureNumber: i + 1,
+      ticks: 1920,
+      repeatStart: i === 0,
+      ...(i === 199 ? { repeatEndTimes: 4 } : {}),
+      endingStop: false,
+    }));
+    const writtenTickByMeasure = new Map(measures.map((m, i) => [m.measureNumber, i * 1920]));
+    const { tempoMap } = NE.buildTempoMap([]);
+    const ms = best(() => NE.buildRepeatPlan({ measures, writtenTickByMeasure, tempoMap }));
+    assert.ok(ms < 20, `buildRepeatPlan took ${ms.toFixed(1)}ms, budget 20ms`);
+  });
+
+  test('expanding 400 measures costs less than 3x expanding 200', () => {
+    const make = (count) => {
+      const measures = Array.from({ length: count }, (_, i) => ({
+        measureNumber: i + 1,
+        ticks: 1920,
+        repeatStart: i === 0,
+        ...(i === count - 1 ? { repeatEndTimes: 4 } : {}),
+        endingStop: false,
+      }));
+      return {
+        measures,
+        writtenTickByMeasure: new Map(measures.map((m, i) => [m.measureNumber, i * 1920])),
+      };
+    };
+    const { tempoMap } = NE.buildTempoMap([]);
+    const a = make(200);
+    const b = make(400);
+    const ms200 = best(() => NE.buildRepeatPlan({ ...a, tempoMap }), 5);
+    const ms400 = best(() => NE.buildRepeatPlan({ ...b, tempoMap }), 5);
+    assert.ok(
+      ms400 < ms200 * 3 + 0.5,
+      `400 measures ${ms400.toFixed(1)}ms vs 200 measures ${ms200.toFixed(1)}ms`,
+    );
+  });
+
+  /** A page-sized RGBA image, opaque so the encoders take their real (non-trivial) path. */
+  function pageImage(width, height) {
+    const data = new Uint8Array(width * height * 4);
+    for (let p = 0; p < width * height; p++) data[p * 4 + 3] = 0xff;
+    return { width, height, data };
+  }
+
+  test('encoding an A4-at-150dpi PNG (1240x1754) stays under 400ms', () => {
+    const image = pageImage(1240, 1754);
+    const ms = best(() => NE.encodePng(image), 3);
+    assert.ok(ms < 400, `encodePng took ${ms.toFixed(1)}ms, budget 400ms`);
+  });
+
+  test('encoding a one-page A4-at-150dpi PDF stays under 2500ms', () => {
+    // PDF is the slow encoder by design: it flattens the image to RGB and
+    // deflates it at zlib level 6 for the smallest file, where PNG reuses
+    // the alpha-carrying rows as-is. The budget reflects that trade, not a
+    // target -- a host encoding a whole page per frame would be doing
+    // something the engine does not claim to support.
+    const image = pageImage(1240, 1754);
+    const ms = best(() => NE.encodePdf([{ image }], { creationDate: new Date(0) }), 3);
+    assert.ok(ms < 2500, `encodePdf took ${ms.toFixed(1)}ms, budget 2500ms`);
   });
 });

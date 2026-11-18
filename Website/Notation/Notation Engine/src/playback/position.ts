@@ -59,6 +59,23 @@ export interface EventPosition {
 export interface PlaybackTrack {
   readonly id: string;
   readonly name?: string;
+  /**
+   * §10.5's `<midi-instrument>` routing, resolved to the MIDI wire values
+   * (already decremented from MusicXML's 1-based numbering). A host
+   * SoundFont engine sets this program/bank on the track's channel so a
+   * piano part does not sound as the default patch. Omitted when the file
+   * states no routing, which is most hand-written MusicXML.
+   */
+  readonly program?: number;
+  readonly bank?: number;
+  /** The MIDI channel (0-15) the file asked for. A host that ignores it and assigns its own channels is still correct -- see `R2SoundFontEngine`. */
+  readonly channel?: number;
+  /**
+   * True when this part is unpitched percussion. A host sends its notes on
+   * the GM percussion channel (10, i.e. index 9) so a SoundFont plays a
+   * drum kit rather than a melodic patch.
+   */
+  readonly percussion?: boolean;
 }
 
 /**
@@ -74,6 +91,15 @@ export interface PlaybackTrack {
 export interface PlaybackData {
   readonly measureNumbersInOrder: readonly number[];
   readonly globalTickOffsetByMeasure: ReadonlyMap<number, number>;
+  /**
+   * Each measure's own REAL tick length -- a pickup measure is shorter
+   * than its meter says, an overfull one longer. `playheadX` interpolates
+   * the marker across a measure over this, not over the nominal
+   * `timeSignatureByMeasure` length, so a marker crosses a one-beat
+   * pickup in one beat rather than four. Same map the renderer laid the
+   * measures out from.
+   */
+  readonly measureTicksByNumber: ReadonlyMap<number, number>;
   readonly timeSignatureByMeasure: ReadonlyMap<
     number,
     { readonly numerator: number; readonly denominator: number }
@@ -119,6 +145,22 @@ function measureAtTick(playback: PlaybackData, tick: number): number | undefined
     else high = mid - 1;
   }
   return order[low];
+}
+
+/**
+ * A measure's real tick length: the one the renderer laid it out from,
+ * falling back to the nominal `numerator * 4/denominator * TICKS_PER_QUARTER`
+ * only for a `PlaybackData` built by hand with no length map. `undefined`
+ * means "neither is known", which `playheadX` reads as "use the measure's
+ * own last event instead".
+ */
+function measureTicksFor(playback: PlaybackData, measureNumber: number): number | undefined {
+  const real = playback.measureTicksByNumber.get(measureNumber);
+  if (real !== undefined) return real;
+  const signature = playback.timeSignatureByMeasure.get(measureNumber);
+  return signature !== undefined
+    ? signature.numerator * (4 / signature.denominator) * TICKS_PER_QUARTER
+    : undefined;
 }
 
 /** The largest recorded tick at or before `tickInMeasure` -- a rendered note's own x is exactly correct for every tick from its own onset up to (not including) the next one, so "the note currently sounding" is the floor, not the nearest. */
@@ -221,13 +263,12 @@ export function playheadX(playback: PlaybackData, tick: number): EventPosition {
   const tickInMeasure = Math.max(0, tick - offset);
   const noteAreaX = placement.x + layout.headerWidth;
 
-  // The measure's own tick length, so the last note can interpolate
-  // toward the barline over the RIGHT amount of time.
-  const signature = playback.timeSignatureByMeasure.get(measureNumber);
-  const measureTicks =
-    signature !== undefined
-      ? signature.numerator * (4 / signature.denominator) * TICKS_PER_QUARTER
-      : undefined;
+  // The measure's own REAL tick length, so the last note can
+  // interpolate toward the barline over the RIGHT amount of time --
+  // a pickup measure is shorter than its meter, an overfull one longer.
+  // The nominal `numerator * 4/denominator` figure is only the fallback
+  // for a `PlaybackData` built without a length for this measure.
+  const measureTicks = measureTicksFor(playback, measureNumber);
 
   const entries = [...layout.positionsByTick.entries()].sort((a, b) => a[0] - b[0]);
   // A measure with no events at all (an empty measure, or one whose

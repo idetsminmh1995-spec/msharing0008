@@ -27,7 +27,7 @@ TypeScript ဖြင့်ရေးသားထားသော **instrument-neut
 - Layers: `config core debug drums export geometry glyphs layout notation-defaults parser playback plugins render soundfont theme timing` + `render-from-musicxml.ts`။
 - Data provenance: `src/notation-defaults/` ထဲက table တစ်ခုချင်းက `DefaultsSource` (`musicxml`, `smufl`, `gm1`, `drumNotation`, `houseStyle`) ဖြင့် ရင်းမြစ်ကို ဖော်ပြထားသည်။
 - Bundle: esbuild IIFE၊ global `NotationEngine` / `NotationSoundFont`။ `scripts/sync-website-bundle.mjs` က bundle ကို `Website/Website/assets/` သို့ကူးသည်။
-- Verify: `npm run verify` (typecheck + lint + format:check + build + API doc + tests) သည် **1163/1163 pass**။
+- Verify: `npm run verify` (typecheck + lint + format:check + build + API doc + tests) သည် **1270/1270 pass**။
 
 ---
 
@@ -70,9 +70,11 @@ TypeScript ဖြင့်ရေးသားထားသော **instrument-neut
 
 ### Part D — Import compatibility နှင့် MIDI scope
 
+- [x] Instrument transposition (`<transpose>`): parser က `TransposeSpec.semitones` (chromatic + octave-change × 12) ကို measure state တွင် သယ်ပြီး playback (`buildEventStream`) နှင့် MIDI alignment (`flattenPartNotes`) က sounding pitch ကို သုံးသည်။ ရေးထားသော notation (SVG) သည် written pitch အတိုင်း ဆဲလျက် ရှိသည် -- `<transpose>` ဖြုတ်လိုက်လျှင် SVG byte-identical ဖြစ်ကြောင်း `test/unit/transposition.test.js` က အတည်ပြုသည် (`transposing-bb-clarinet.musicxml` fixture)။
+
 - [ ] MusicXML partwise/timewise, MXL, changing attributes/divisions, voices/chords/rests, unpitched percussion, lyrics/directions/harmony စသည့် behavior များကို fixture matrix ဖြင့် ထိန်းပါ။ Exporter တစ်ခုချင်း၏ provenance ကို fixture တစ်ခုချင်း အတည်ပြုပါ။
-- [ ] Harmony၊ unusual notation၊ instrument transposition၊ malformed note/chord နှင့် multiple-staff cases အတွက် diagnostic/recovery tests တိုးချဲ့ပါ။
-- [ ] `parseMidiFile()` ကို MIDI event/meta parser အဖြစ်သာ ဆက်ထားမည်လား၊ သီးခြား MIDI→`Score` conversion API ဖန်တီးမည်လား ဆုံးဖြတ်ပါ။ MIDI တွင် staff spelling/voice/beaming data မပါသဖြင့် မူဝါဒမရှိဘဲ MusicXML renderer သို့ တိုက်ရိုက်ပို့သည်ဟု မဆိုရ။
+- [x] Harmony၊ unusual notation၊ instrument transposition၊ malformed note/chord နှင့် multiple-staff cases အတွက် diagnostic/recovery tests တိုးချဲ့ပါ။ `test/unit/parser-recovery.test.js` သည် case တစ်ခုချင်းကို တူညီသောစည်းဖြင့် စစ်သည် -- (1) throw မလုပ်ရ, (2) ကိုယ်ပိုင် stable code ထုတ်ရမည်, (3) ကောင်းသော note များ ကျန်ရမည် (မပျောက်ရ)။ Harmony (`UNSUPPORTED_HARMONY_FEATURE`), numeral/degree forms, malformed `<note>`/chord (`UNSUPPORTED_NOTE`, `INVALID_CHORD`), transposition + mid-score clef change, grand-staff/staff-out-of-range, unknown `<notehead>`, clamped `<tremolo>` အားလုံး ပါဝင်သည်။
+- [x] `parseMidiFile()` သည် MIDI event/meta reader အဖြစ်သာ ဆက်ရှိမည်ဟု ဆုံးဖြတ်ပြီးဖြစ်သည်; `MidiFile` (note list + tempo/time/key timeline) ပြန်သည်, `Score` မဟုတ်ပါ။ MIDI တွင် staff spelling/voice/beaming/clef data မပါသဖြင့် `midiFileToScore()`/`renderFromMidi()` ကို တမင်ဖန်တီးမထားပါ -- MIDI→notation policy သည် host ၏တာဝန်။ Format 0/1 ကိုသာ ပံ့ပိုးပြီး format 2/SMPTE ကို diagnostic ဖြင့် reject လုပ်သည်။ Boundary ကို root `README.md` ၏ "MIDI scope" အပိုင်းတွင် user-facing docs အဖြစ် ရေးပြီးဖြစ်သည်။
 
 **ပြီးစီးမှုစံ:** Parser/API တစ်ခုစီ၏ input/output boundary၊ မထောက်ပံ့သော MIDI formats နှင့် MusicXML recovery behavior ကို user-facing docs မှာ ရှင်းပြနိုင်ရမည်။
 
@@ -89,11 +91,11 @@ Notation Engine သည် instrument-neutral ဖြစ်ရမည်။ MusicXM
 - `src/notation-defaults/` — clefs, staff positions, drum kit, strings/tab, engraving style, spacing law။
 
 Implementation sequence:
-1. `[ ]` `GenericPitchedMapping`, `InstrumentProfile`, shared input/context/result types, `MappingRegistry` နှင့် precedence ကို သတ်မှတ်ပြီး contract/type-level tests ရေးပါ။
-2. `[ ]` Instrument-specific map မရှိသော part များအပါအဝင် ပုံမှန် pitched instrument အားလုံးကို generic mapping ဖြင့် render လုပ်နိုင်ကြောင်း စစ်ပါ။
-3. `[ ]` Piano/grand staff, transposition/octave transposition, strings/tablature, pitched/unpitched percussion အတွက် profile/module တိုးချဲ့ပါ။
-4. `[ ]` Orchestra/ensemble fixtures ဖြင့် multi-part, multi-staff, multi-voice, transposing instruments, part names/order, vertical/system layout ကို စမ်းသပ်ပါ။ Group brackets/barlines နှင့် automatic condensing ကို သီးခြားဆုံးဖြတ်ပါ။
-5. `[ ]` `MappingProfile` customization/persistence, diagnostics နှင့် renderer bridge ကို ချိတ်ဆက်ပါ။ Precedence: explicit MusicXML display/notehead/stem → user override → instrument profile → documented fallback + diagnostic။ Mapping က sounding pitch/playback ကို မပြောင်းရ။
+1. `[x]` `GenericPitchedMapping`, `InstrumentProfile`, shared input/context/result types, `MappingRegistry` နှင့် precedence ကို `src/mapping/` (`types.ts`, `generic.ts`, `percussion.ts`, `registry.ts`, `index.ts`) တွင် သတ်မှတ်ပြီး contract/type-level tests ရေးပါ။ `MappingSource` သည် precedence tier တစ်ခုချင်းကို ဖော်ပြသည်: `explicit-file` → `user-override` → `instrument-profile` → `fallback`။
+2. `[x]` Instrument-specific map မရှိသော part များအပါအဝင် ပုံမှန် pitched instrument အားလုံးကို generic mapping ဖြင့် render လုပ်နိုင်ကြောင်း စစ်ပါ။ `GENERIC_PITCHED_PROFILE` သည် registry တွင် အမြဲနောက်ဆုံး tier ဖြစ်ပြီး note တစ်ခုကိုမျှ မပယ်ချပါ။
+3. `[x]` Piano/grand staff, transposition/octave transposition, strings/tablature, pitched/unpitched percussion အတွက် profile/module တိုးချဲ့ပါ။ Unpitched percussion ကို `percussion.ts` (`UNPITCHED_PERCUSSION_PROFILE`) အဖြစ် ခွဲထုတ်ပြီး; ကျန် instrument များ (clef-driven position) ကို generic profile က ကိုင်တွယ်သည်။
+4. `[x]` Orchestra/ensemble fixtures ဖြင့် multi-part, multi-staff, multi-voice, transposing instruments, part names/order, vertical/system layout ကို စမ်းသပ်ပါ။ ရှိပြီးသား `cross-software-corpus` နှင့် snapshot fixtures များ အားလုံး မပြောင်းဘဲ pass ဖြစ်သည်။ Group brackets/barlines နှင့် automatic condensing ကို Part E ၏ ပြင်ပ scope အဖြစ် ချန်ထားသည် (rendered output ကို မထိပါ)။
+5. `[x]` `MappingProfile` customization/persistence (`profile.ts`), diagnostics နှင့် renderer bridge (`resolveNoteRendering`, `render-from-musicxml.ts`) ကို ချိတ်ဆက်ပါ။ Precedence: explicit MusicXML display/notehead/stem → user override → instrument profile → documented fallback + diagnostic။ Mapping က sounding pitch/playback ကို မပြောင်းရ။ Renderer ၏ drum-lookup diagnostic pass သည် `drumLookupDiagnostics()` ကို ဖြတ်သုံးသဖြင့် rule သည် mapping layer ထဲတွင်တစ်ခုတည်းရှိသည်; profile တစ်ခု throw လျှင် `MAPPING_PROFILE_FAILED` diagnostic ဖြင့် generic answer သို့ ဆုတ်သည်။ Bridge သည် byte-identical output ထုတ်သည် -- ရှိပြီးသား visual-regression snapshots အားလုံး (1238 tests) မပြောင်းဘဲ pass ဖြစ်သည်။
 
 **ပြီးစီးမှုစံ:** Profile စာရင်းမပါသော instrument ပါဝင် valid note များ မပျောက်ဘဲ render ဖြစ်ရမည်။ Mapping သည် source MusicXML data, rhythm, sounding pitch, playback ကို မပြောင်းရ။
 
@@ -101,10 +103,10 @@ Implementation sequence:
 
 ### Part F — Staff/tablature layout လိုက်လျောညီထွေမှု
 
-- [ ] `computeStaffGeometry()` က line count အမျိုးမျိုးကို တွက်နိုင်သော်လည်း `render-from-musicxml.ts` တွင် `STAFF_LINES = 5` assumptions ကျန်နေသည်။ Arbitrary staff-line count ကို import → geometry → note placement → SVG အဆုံးအထိ audit လုပ်ပြီး 1–6+ line fixtures ဖြင့် test ပါ။
-- [ ] TAB clef/staff ကို end-to-end စစ်ပါ။ Code comments ထဲရှိ "tab staff not yet draw" သတိပေးချက်များနှင့် fixed-five-line assumptions ကို ဖြေရှင်းပါ။
-- [ ] Page-mode dimension change အတွက် resize/reflow ကို public flow အဖြစ် ဆုံးဖြတ်ပါ။ Pure scaling နှင့် page repagination ကို ခွဲဖော်ပြပြီး မတူညီသော system height ရှိ page တွင် clipping/overlap မဖြစ်စေရန် tests ထည့်ပါ။
-- [ ] Bravura metrics အခြေခံ custom music-font setting အတွက် compatible-font limitation ကို ဖော်ပြပါ၊ သို့မဟုတ် metrics provider ကို abstraction လုပ်ပါ။
+- [x] `computeStaffGeometry()` က line count အမျိုးမျိုးကို တွက်နိုင်သော်လည်း `render-from-musicxml.ts` တွင် `STAFF_LINES = 5` assumptions ကျန်နေသည်။ Arbitrary staff-line count ကို import → geometry → note placement → SVG အဆုံးအထိ audit လုပ်ပြီး 1–6+ line fixtures ဖြင့် test ပါ။ `RenderCtx` တွင် staff ၏ ကိုယ်ပိုင် line count ကို သယ်ဆောင်ပြီး renderer helper အားလုံး (notehead/ledger/stem/rest/bar-number) က ၎င်းကို ဖတ်သည်; system-level reserves (`aboveStaff` headroom, `systemBottomRoom`, `fitSystemHeight`) ကလည်း တကယ့် staff အမြင့်ကို သုံးသည်။ `test/unit/staff-line-count.test.js` က 1–6 line staves အတွက် lines/ledger/stem direction/rest/tab-cleft ကို စစ်ပြီး 5-line output မပြောင်းကြောင်း အတည်ပြုသည်။
+- [x] TAB clef/staff ကို end-to-end စစ်ပါ။ Code comments ထဲရှိ "tab staff not yet draw" သတိပေးချက်များနှင့် fixed-five-line assumptions ကို ဖြေရှင်းပါ။ Tab note placement သည် staff ၏ `<staff-lines>` ကို သုံးပြီးဖြစ်သည်; tab clef glyph `glyphY` ကို staff ၏ line distance (tab အတွက် 1.5) ဖြင့် scale လုပ်ပြီး staff centre ပေါ်တွင် တိကျစွာ ချထားသည် (ယခင် 1.25 units နိမ့်နေသည်)။ ခေတ်မမီတော့သော comment ကို ပြင်ဆင်ပြီး snapshot နှစ်ခုကို ရည်ရွယ်ချက်ရှိရှိ update လုပ်သည်။
+- [x] Page-mode dimension change အတွက် resize/reflow ကို public flow အဖြစ် ဆုံးဖြတ်ပါ။ Pure scaling နှင့် page repagination ကို ခွဲဖော်ပြပြီး မတူညီသော system height ရှိ page တွင် clipping/overlap မဖြစ်စေရန် tests ထည့်ပါ။ `resize.ts` တွင် `planResize()` (public re-flow decision) နှင့် `pageUsableWidth`/`pageUsableHeight` ထည့်ပြီး pure-scale (`resizePureScale`, O(1)) နှင့် re-flow (cached `Score` မှ ပြန်ဆွဲ) ကို ခွဲထားသည်။ `page.ts` သည် `PageSystem.height`/`Page.height`/`PageLayout.totalHeight` ကို သယ်ဆောင်ပြီး system တစ်ခုသည် usable height ထက် မြင့်လျှင် page ကို ချဲ့သည် (မဟုတ်လျှင် နောက် page ပေါ် ထပ်/ဖြတ်မည်)။ Renderer က page များကို တကယ့်အမြင့်ဖြင့် ဆင့်၍ viewBox ကို `totalHeight` ဖြင့် တွက်သည်။ `page-layout.test.js`/`page-layout-wiring.test.js` (clip/overlap end-to-end)/`resize.test.js` တွင် tests ထည့်ပြီး; ပုံမှန် page output မပြောင်း (snapshots)။
+- [x] Bravura metrics အခြေခံ custom music-font setting အတွက် compatible-font limitation ကို ဖော်ပြပါ၊ သို့မဟုတ် metrics provider ကို abstraction လုပ်ပါ။ `config.fonts.musicFont` ကို bundled `Bravura` မှ ကွဲပြားစွာ set လျှင် renderer က `MUSIC_FONT_METRICS` warning ထုတ်ပြီး glyph geometry သည် Bravura metrics မှ ဆဲလျက် ရှိကြောင်း ရှင်းလင်းစွာ ဖော်ပြသည် (metrics provider abstraction အစား limitation ကို diagnostic + doc ဖြင့် ဖော်ပြခြင်း)။
 
 **ပြီးစီးမှုစံ:** ကြေညာထားသော configuration အားလုံးအတွက် staff/tablature layout ကို snapshot + integration tests ဖြင့် အတည်ပြုထားရမည်။
 
@@ -113,10 +115,10 @@ Implementation sequence:
 ### Part G — Timing, playback နှင့် export correctness
 
 - [x] `buildTempoMap()` တွင် non-finite/zero/negative tempo အတွက် validation/diagnostics ထည့်ပြီးဖြစ်သည် (`INVALID_TEMPO_EVENT`)။ Bad event ကို drop လုပ်ပြီး ကျန် map ကို ဆက်သုံးသည်။ Test က conversion ရလဒ် finite/non-decreasing ဖြစ်ကြောင်း စစ်သည်။
-- [ ] Playhead interpolation တွင် nominal time signature မဟုတ်ဘဲ pickup, shortened, overfull measure များ၏ actual tick length ကို `PlaybackData` ထဲ သယ်ဆောင်သုံးပါ။ Boundary နှင့် monotonicity tests ထည့်ပါ။
+- [x] Playhead interpolation တွင် nominal time signature မဟုတ်ဘဲ pickup, shortened, overfull measure များ၏ actual tick length ကို `PlaybackData` ထဲ သယ်ဆောင်သုံးပါ။ Boundary နှင့် monotonicity tests ထည့်ပါ။ `PlaybackData.measureTicksByNumber` က measure တစ်ခုချင်း၏ တကယ့် content length ကို သယ်ဆောင်သည်; `playheadX` က ၎င်းအပေါ် interpolate လုပ်သည်။ `pickup-measure.musicxml` fixture နှင့် boundary/monotonicity tests ထည့်ပြီးဖြစ်သည်။
 - [x] `rasterizeSvg()` ၏ rounded slice height ကြောင့် source row ပျောက်ခြင်းကို ဖြေရှင်းပြီးဖြစ်သည် -- slice boundary များကို floor division ဖြင့် တွက်သည်။ 40px/3 slices ကဲ့သို့ remainder အတွက် regression test ရှိသည်။
 - [x] `exportPng()` က first slice ကိုသာပြန်ခြင်း၊ PDF က raster-image based ဖြစ်ခြင်း၊ rasterization အတွက် browser/host backend လိုခြင်းတို့ကို root `README.md` တွင် ဖော်ပြပြီးဖြစ်သည်။
-- [ ] Alignment, repeat expansion နှင့် raster/PDF encoding အတွက် representative performance budget များထည့်ပါ။
+- [x] Alignment, repeat expansion နှင့် raster/PDF encoding အတွက် representative performance budget များထည့်ပြီးဖြစ်သည် (`test/perf/budget.test.js`)။ `alignNotes()` ၏ tier 1/2 သည် ယခင် quadratic ဖြစ်ခဲ့သည် -- ယခု tick/pitch index ဖြင့် linear ဖြစ်သည် (random 4000 case ဖြင့် ရလဒ်တူကြောင်း အတည်ပြုပြီး)။
 
 **ပြီးစီးမှုစံ:** Invalid timing data အတွက် deterministic diagnostics ရှိရမည်။ Raster output တွင် rows မပျောက်ရ/မထပ်ရ။
 
@@ -167,6 +169,6 @@ The audit left one concrete risk: the engine shipped `src/musescore/`, a copy of
 - [x] Notation playback event များတွင် `midiNotes` နှင့် `durationTicks` ထည့်ပြီး Sound Engine scheduling အတွက် typed data ပေးရန်။
 - [x] R2 `soundfonts/manifest.json` ကို fetch/cache လုပ်ပြီး versioned SoundFont object path မှ `.sf2/.sf3` တစ်ကြိမ် load လုပ်ရန်။
 - [x] SpessaSynth AudioWorklet ဖြင့် SoundFont ကို WebAudio output သို့ချိတ်ပြီး Notation Lab play/pause/volume lifecycle နှင့် ချိတ်ရန်။
-- [ ] Unpitched percussion mapping နှင့် MusicXML instrument program/bank routing ကို ထပ်တိုးရန်။
+- [x] Unpitched percussion mapping နှင့် MusicXML instrument program/bank routing ကို ထပ်တိုးရန်။ `midi-unpitched` က GM key number ဖြစ်လာပြီး unpitched note များ တကယ်မြည်ကြသည် (`buildEventStream` က `midiNotes` ထုတ်သည်)။ `<midi-program>`/`<midi-bank>`/`<midi-channel>` ကို `PlaybackTrack` တွင် သယ်ဆောင်ပြီး `assignTrackRouting()` (pure) က channel ခွဲပေးသည် -- percussion သည် GM channel 10 (index 9) အမြဲရသည်။ `INVALID_MIDI_PROGRAM`/`INVALID_MIDI_BANK`/`INVALID_MIDI_CHANNEL` diagnostic များ ထည့်ပြီး; MusicXML 1-based → MIDI 0-based ကို W3C spec အတိုင်း လျှော့သည်။ `test/unit/instrument-routing.test.js` နှင့် `test/unit/soundfont-routing.test.js` က စစ်သည်။
 
-**Completion criterion (Part C):** the engine must have no build-time dependency on GPL-3.0-only source or tables, and every remaining default must name the public specification it comes from. `npm run verify` must be green. Both hold: 1163/1163 tests pass, and no engine module imports a MuseScore file.
+**Completion criterion (Part C):** the engine must have no build-time dependency on GPL-3.0-only source or tables, and every remaining default must name the public specification it comes from. `npm run verify` must be green. Both hold: 1270/1270 tests pass, and no engine module imports a MuseScore file.

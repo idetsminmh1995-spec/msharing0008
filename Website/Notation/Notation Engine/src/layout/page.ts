@@ -27,16 +27,39 @@ export interface PageSystemMeasureLayout {
 
 export interface PageSystem {
   readonly measures: readonly PageSystemMeasureLayout[];
+  /**
+   * This system's own vertical extent. Every system currently shares the
+   * score's single system height, but a page's height is the SUM of its
+   * systems' heights rather than a count times one value, so per-system
+   * heights (a grand staff on one system, a single staff on the next)
+   * can be introduced here without changing a page's own arithmetic.
+   */
+  readonly height: number;
 }
 
 export interface Page {
   readonly systems: readonly PageSystem[];
+  /**
+   * The page's own rendered height. Normally `config.pageHeight`, but a
+   * system TALLER than the page's usable height cannot be shrunk to fit
+   * it, so the page grows to hold it. Without this the system would spill
+   * past the page's bottom margin into the next page (overlap) or be cut
+   * off by the canvas. Never smaller than `pageHeight`.
+   */
+  readonly height: number;
 }
 
 export interface PageLayout {
   readonly pages: readonly Page[];
   readonly usableWidth: number;
   readonly usableHeight: number;
+  /**
+   * The sum of every page's own height -- the canvas height a page-mode
+   * render needs to show all pages without clipping. Equals
+   * `pages.length * pageHeight` whenever every page is a normal,
+   * non-grown page.
+   */
+  readonly totalHeight: number;
 }
 
 /** One system's own measures, before justification -- x-positions are LOCAL to this system (each one starts fresh at 0), unlike scroll mode's single continuous timeline. */
@@ -91,6 +114,25 @@ function groupIntoRawPages(
 }
 
 /**
+ * A page's own rendered height: the configured page height, unless a
+ * single system is taller than that page's usable height. A system
+ * cannot be shrunk to fit -- its height is the staff stack plus the room
+ * its own content needs -- so a page holding one grows to hold it rather
+ * than letting the system spill past the bottom margin. A normal page's
+ * systems already fit inside the usable height, so the result is then
+ * exactly the configured page height.
+ */
+function pageHeightForSystems(
+  systems: readonly PageSystem[],
+  configuredPageHeight: number,
+  marginTop: number,
+  marginBottom: number,
+): number {
+  const contentHeight = systems.reduce((sum, s) => sum + s.height, 0);
+  return Math.max(configuredPageHeight, marginTop + contentHeight + marginBottom);
+}
+
+/**
  * §16.2's full algorithm. `systemHeight` is a single fixed value applied
  * to every system -- a stated simplification; a real score with a grand
  * staff on some systems and a single staff on others would need a
@@ -137,10 +179,13 @@ export function computePageLayout(
       // even further).
       if (local.measures.length === 1) {
         const only = local.measures[0];
-        if (only === undefined) return { measures: [] };
+        if (only === undefined) return { measures: [], height: systemHeight };
         const shouldFillWidth = !isLastSystemOfPiece && only.width < usableWidth;
         const width = shouldFillWidth ? usableWidth : only.width;
-        return { measures: [{ measureNumber: only.measureNumber, x: 0, width }] };
+        return {
+          measures: [{ measureNumber: only.measureNumber, x: 0, width }],
+          height: systemHeight,
+        };
       }
 
       const finalPositions = isLastSystemOfPiece
@@ -168,10 +213,20 @@ export function computePageLayout(
         return { measureNumber: m.measureNumber, x, width };
       });
 
-      return { measures: systemMeasureLayouts };
+      return { measures: systemMeasureLayouts, height: systemHeight };
     });
-    return { systems };
+    return {
+      systems,
+      height: pageHeightForSystems(
+        systems,
+        config.pageHeight,
+        config.marginTop,
+        config.marginBottom,
+      ),
+    };
   });
 
-  return { pages, usableWidth, usableHeight };
+  const totalHeight = pages.reduce((sum, page) => sum + page.height, 0);
+
+  return { pages, usableWidth, usableHeight, totalHeight };
 }

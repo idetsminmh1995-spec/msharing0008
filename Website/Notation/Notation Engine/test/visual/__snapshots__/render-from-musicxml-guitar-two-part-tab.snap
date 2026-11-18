@@ -34,7 +34,7 @@
 <line x1="0" y1="14" x2="18.25" y2="14" stroke="#000000" stroke-width="0.13" />
 <line x1="0" y1="12.5" x2="18.25" y2="12.5" stroke="#000000" stroke-width="0.13" />
 </g>
-<text x="0.5" y="17.5" font-family="Bravura" font-size="4" fill="#000000"></text>
+<text x="0.5" y="16.25" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="17" font-family="Bravura" font-size="4" fill="#000000"></text>
 <text x="3.5" y="19" font-family="Bravura" font-size="4" fill="#000000"></text>
 <g>

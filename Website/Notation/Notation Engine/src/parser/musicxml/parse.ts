@@ -15,7 +15,7 @@ import { parseAttributesElement, type ClefSpec, type TransposeSpec } from './att
 import { isKnownDurationType } from './note.js';
 import { parseNoteElement, type ParsedNoteEvent } from './note.js';
 import { attrOf, childrenNamed, firstChildNamed, intOf, numberOf, textOf } from './dom-helpers.js';
-import { parseMidiInstrumentMap } from './instrument.js';
+import { parseMidiInstrumentInfoMap, type MidiInstrumentInfo } from './instrument.js';
 import { convertTimewiseToPartwise } from './timewise.js';
 import {
   parseCredits,
@@ -273,6 +273,15 @@ export interface ParseResult {
    * actually consumes this; this phase only makes the mapping available.
    */
   readonly midiInstrumentsByPart: ReadonlyMap<string, ReadonlyMap<string, number>>;
+  /**
+   * §10.5's full `<midi-instrument>` routing per part: a map from each
+   * `<instrument id="...">` to its GM note (percussion), program, bank and
+   * channel. `midiInstrumentsByPart` is the GM-note projection of this;
+   * this is the fuller record a playback host needs to route a part to the
+   * right SoundFont program. Kept as a side-table for the same reason
+   * `midiInstrumentsByPart` is.
+   */
+  readonly midiInstrumentInfoByPart: ReadonlyMap<string, ReadonlyMap<string, MidiInstrumentInfo>>;
   /** Phase 35 Tier 2/§10.4: every `<direction>` with recognized content, in document order. */
   readonly directions: readonly DirectionEvent[];
   readonly octaveShifts: readonly OctaveShiftEvent[];
@@ -523,6 +532,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
       diagnostics,
       tempoMarks: [],
       midiInstrumentsByPart: new Map(),
+      midiInstrumentInfoByPart: new Map(),
       directions: [],
       octaveShifts: [],
       harmonies: [],
@@ -535,16 +545,20 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
   const partListEl = firstChildNamed(root, 'part-list');
   const partNames = new Map<string, string>();
   const midiInstrumentMaps = new Map<string, ReadonlyMap<string, number>>();
+  const midiInstrumentInfoMaps = new Map<string, ReadonlyMap<string, MidiInstrumentInfo>>();
   if (partListEl !== undefined) {
     for (const scorePartEl of childrenNamed(partListEl, 'score-part')) {
       const id = attrOf(scorePartEl, 'id');
       const name = textOf(firstChildNamed(scorePartEl, 'part-name'));
       if (id !== undefined) {
         partNames.set(id, name ?? id);
-        midiInstrumentMaps.set(
-          id,
-          parseMidiInstrumentMap(scorePartEl, diagnostics, { partId: id }),
-        );
+        const info = parseMidiInstrumentInfoMap(scorePartEl, diagnostics, { partId: id });
+        midiInstrumentInfoMaps.set(id, info);
+        const gmNotes = new Map<string, number>();
+        for (const [instrumentId, record] of info) {
+          if (record.gmNote !== undefined) gmNotes.set(instrumentId, record.gmNote);
+        }
+        midiInstrumentMaps.set(id, gmNotes);
       }
     }
   }
@@ -1175,6 +1189,7 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
     tempoMarks,
     octaveShifts,
     midiInstrumentsByPart: midiInstrumentMaps,
+    midiInstrumentInfoByPart: midiInstrumentInfoMaps,
     directions,
     harmonies,
     prints,

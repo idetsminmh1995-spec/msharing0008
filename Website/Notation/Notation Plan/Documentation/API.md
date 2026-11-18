@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-743 exported symbols, by module.
+774 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -1061,6 +1061,11 @@ The diagnostics `level` lets through, in their original order.
 | interface | `ResizeResult` |  |
 | **API** | `resizePureScale` | §16.3's O(1) fast path. |
 | **API** | `needsReflow` | §16.3's re-flow decision: page mode's system breaking depends on the USABLE width available (§16.2's own `pageWidth - margins`), so a resize whose new width would place a different set of measures into each system needs the real layout algorithms re-run from the cached `Score`, not just a pixel-a... |
+| interface | `PageGeometry` | The page geometry page-mode pagination depends on -- the four margins plus the sheet size. |
+| function | `pageUsableWidth` | The usable width page-mode system breaking turns on (§16.2's own `pageWidth - margins`). |
+| function | `pageUsableHeight` | The usable height page-mode page breaking turns on. |
+| type | `ResizePlan` | §16.3's decision, in full: what a resize from one size (and, in page mode, one page geometry) to another actually requires. |
+| function | `planResize` | Decides whether a resize is the O(1) pure-scale case or needs a full re-flow, so a caller can pick `resizePureScale` or re-render from the cached `Score` without re-parsing. |
 
 ### `src/layout/scroll.ts`
 
@@ -1122,6 +1127,57 @@ The diagnostics `level` lets through, in their original order.
 | const | `DEFAULT_PART_GAP` | The gap between two PARTS in the same system, exported because a caller that has to grow it for its own content (Phase 55's lyric rows below one part and chord symbols above the next) needs the floor it is growing FROM, not a second copy of the number. |
 | function | `computeSystemLayout` | §9.18's vertical stacking: every part's own staff (or staves, for a braced multi-staff part -- geometry's `needsBrace`) gets a distinct, non-overlapping Y, parts stacked top to bottom in score order. |
 | function | `computeSystemLayoutVariableGaps` | Phase 44 wiring: the same vertical stacking as `computeSystemLayout`, but the gap AFTER a given staff (before the next staff within the same part) is supplied per-pair by `staffGapForPair`, rather than one fixed value applied everywhere. |
+
+### `src/mapping/diagnostic.ts`
+
+| | Name | Summary |
+|---|---|---|
+| type | `MappingDiagnosticSeverity` | The mapping layer's own diagnostic type. |
+| interface | `MappingDiagnostic` |  |
+| function | `mappingDiagnostic` |  |
+
+### `src/mapping/generic.ts`
+
+| | Name | Summary |
+|---|---|---|
+| function | `resolveGenericPitched` | Resolve a note with no instrument-specific profile: clef for the line, §9.7 for the head. |
+| const | `GENERIC_PITCHED_PROFILE` | The last-resort profile. |
+
+### `src/mapping/percussion.ts`
+
+| | Name | Summary |
+|---|---|---|
+| function | `resolvePercussion` |  |
+| const | `UNPITCHED_PERCUSSION_PROFILE` | The percussion profile. |
+| function | `drumLookupDiagnostics` | The drum-table lookup warning for one GM note, in the mapping layer's own diagnostic type. |
+| function | `percussionLookupDiagnostics` | The lookup warning for a GM note the drum table does not know, so the registry can surface it through its own diagnostic channel. |
+
+### `src/mapping/profile.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `MappingProfile` | One instrument's custom rendering, as data a host can store as JSON and load back. |
+| function | `mappingProfileToInstrumentProfile` | Turn a stored `MappingProfile` into a live profile a registry can hold. |
+| function | `validateMappingProfile` | A stored profile list, validated and turned into a registry the renderer can take. |
+
+### `src/mapping/registry.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `DEFAULT_PROFILES` | The profiles this engine ships, in precedence order. |
+| class | `MappingRegistry` | An ordered set of profiles. |
+| function | `resolveWithProfiles` | Resolve one note against an explicit profile list, first match wins. |
+| const | `DEFAULT_MAPPING_REGISTRY` | The registry `renderFromMusicXml` builds when the caller names none. |
+
+### `src/mapping/types.ts`
+
+| | Name | Summary |
+|---|---|---|
+| type | `MappingSource` | Which tier decided one rendering fact, so a caller (and a test) can see that the documented precedence actually held rather than inferring it from the output. |
+| interface | `MappingNoteResult` | The three facts a profile resolves for one note. |
+| interface | `MappingContext` | Everything a profile reads to resolve one note. |
+| interface | `InstrumentProfile` | One instrument family's way of resolving a note's notation. |
+| interface | `MappingResolution` | What `MappingRegistry.resolve` returns: the note's facts plus how they were reached. |
 
 ### `src/musescore/adapters.ts`
 
@@ -1472,7 +1528,9 @@ The diagnostics `level` lets through, in their original order.
 
 | | Name | Summary |
 |---|---|---|
-| function | `parseMidiInstrumentMap` | Parses one `<score-part>`'s `<midi-instrument>` children into a map from `<midi-instrument id="...">` (the same id a `<note><instrument id="...">` references) to its GM percussion note number. |
+| interface | `MidiInstrumentInfo` | One `<midi-instrument>`'s routing data, as the file states it. |
+| function | `parseMidiInstrumentInfoMap` | Parses one `<score-part>`'s `<midi-instrument>` children into a map from `<midi-instrument id="...">` (the same id a `<note><instrument id="...">` references) to its routing data. |
+| function | `parseMidiInstrumentMap` | The GM-note projection of `parseMidiInstrumentInfoMap`, kept as its own function because the drum-notehead and hi-hat layers only ever want the percussion note number. |
 
 ### `src/parser/musicxml/mxl.ts`
 
@@ -1581,6 +1639,14 @@ The diagnostics `level` lets through, in their original order.
 | **API** | `performanceTickToWritten` | Maps a tick in performance order onto the written tick it plays. |
 | **API** | `performanceSecondsToWritten` | Maps a moment of audio playback (seconds from the start of the performance) onto the written tick sounding then. |
 | **API** | `writtenTickToPerformanceTicks` | Every performance tick at which `writtenTick` is played -- the inverse of `performanceTickToWritten`, which is one-to-many exactly because a repeated bar is played more than once. |
+
+### `src/playback/routing.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `PERCUSSION_CHANNEL` | General MIDI reserves channel 10 (0-based index 9) for percussion; a SoundFont plays its drum kit only there. |
+| interface | `TrackRouting` | One track's resolved playback routing: the MIDI channel to send it on, plus the bank/program to set there. |
+| function | `assignTrackRouting` | Assigns each track a MIDI channel and its bank/program, as pure data. |
 
 ### `src/render-from-musicxml.ts`
 

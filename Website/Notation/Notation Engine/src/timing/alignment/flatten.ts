@@ -82,7 +82,8 @@ export function flattenPartNotes(
         if (event.kind === 'note') {
           const noteNumber =
             event.pitch.kind === 'pitched'
-              ? chromaticNoteNumber(event.pitch.step, event.pitch.alter, event.pitch.octave)
+              ? chromaticNoteNumber(event.pitch.step, event.pitch.alter, event.pitch.octave) +
+                (attrs?.transpose?.semitones ?? 0)
               : event.instrumentId !== undefined
                 ? gmByInstrumentId?.get(event.instrumentId)
                 : undefined;

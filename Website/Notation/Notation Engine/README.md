@@ -32,7 +32,7 @@ Node it is not, so a caller passes one in:
 import { JSDOM } from 'jsdom';
 import { renderFromMusicXml } from './dist/notation-engine.js';
 
-const domParser = new (new JSDOM().window.DOMParser)();
+const domParser = new new JSDOM().window.DOMParser();
 const { svg, diagnostics, playback } = renderFromMusicXml(xmlText, { domParser });
 ```
 
@@ -84,6 +84,37 @@ archive comes back with `xmlText` undefined and a diagnostic, like the rest of
 the engine's malformed-input handling.
 
 There is no `renderFromMusicXml(mxlBytes)` overload: unzip first, then parse.
+
+## MIDI scope
+
+`parseMidiFile(bytes)` is a MIDI event/meta reader, and that is all it is
+meant to be. It returns a note list plus a tempo/time/key timeline
+(`MidiFile`), never a `Score`:
+
+```js
+import { parseMidiFile } from './dist/notation-engine.js';
+
+const { midiFile, diagnostics } = parseMidiFile(midiBytes);
+if (midiFile === undefined) {
+  // bad magic, a truncated chunk, format 2 or SMPTE division; `diagnostics` says why
+}
+```
+
+MIDI carries no notation concepts -- no staff spelling, no voices, no
+beaming, no clef -- so a MIDI file cannot be handed to the MusicXML
+renderer without inventing a policy for each of those. This engine does
+not invent one: there is deliberately no `midiFileToScore()` and no
+`renderFromMidi()`.
+
+- Supported: format 0 and 1. Format 2 and SMPTE time division are
+  rejected with a diagnostic.
+- Every tick is normalised to the engine's own 480-per-quarter unit, so a
+  `MidiFile` and a MusicXML `Score` are directly comparable.
+- `MidiFile.endTicks` is the file's length (past the last note-off, or a
+  conductor track's own end); `tracks[].notes` answers a different
+  question. Anything asking "how long is this" should read `endTicks`.
+- A host that wants to render MIDI must supply its own MIDI-to-notation
+  policy first; that policy is the host's, not the engine's.
 
 ## Export
 

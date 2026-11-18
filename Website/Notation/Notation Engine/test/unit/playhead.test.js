@@ -68,7 +68,10 @@ describe('playheadX: a marker that keeps moving (§17.1)', () => {
     // And by the end of it, it has reached the next measure's own start.
     const m2 = playback.placementByMeasureNumber.get(2);
     assert.ok(
-      Math.abs(NE.playheadX(playback, measureTicks).x - (m2.x + playback.measureLayoutsByNumber.get(2).headerWidth)) < 1e-9,
+      Math.abs(
+        NE.playheadX(playback, measureTicks).x -
+          (m2.x + playback.measureLayoutsByNumber.get(2).headerWidth),
+      ) < 1e-9,
     );
   });
 
@@ -125,5 +128,76 @@ describe('playheadX: a marker that keeps moving (§17.1)', () => {
     const { playback } = render('simple-single-voice.musicxml');
     assert.ok(Number.isFinite(NE.playheadX(playback, -100).x));
     assert.ok(Number.isFinite(NE.playheadX(playback, 999999).x));
+  });
+});
+
+/**
+ * Part G: a measure's own tick length is what it actually contains, not
+ * what its time signature nominally implies. A one-beat pickup under a
+ * 4/4 signature spans 480 ticks, not 1920; a file that wrote one beat too
+ * many spans 2400. `PlaybackData.measureTicksByNumber` carries the real
+ * figure -- the same one the renderer drew the measure from -- and the
+ * playhead interpolates over it.
+ */
+describe('playheadX: a measure is as long as it actually is (Part G)', () => {
+  test('a pickup measure carries its own real tick length, not its meter', () => {
+    const { playback } = render('pickup-measure.musicxml');
+    assert.equal(playback.measureTicksByNumber.get(0), 480, 'one quarter, not a whole 4/4 bar');
+    assert.equal(playback.measureTicksByNumber.get(1), 1920, 'the full bar is still 4/4');
+    assert.equal(
+      playback.globalTickOffsetByMeasure.get(1),
+      480,
+      'measure 1 starts after the pickup, not after a phantom full bar',
+    );
+  });
+
+  test('the playhead crosses the pickup in its own 480 ticks', () => {
+    const { playback } = render('pickup-measure.musicxml');
+    const startOfMeasure1 = playback.placementByMeasureNumber.get(1).x;
+    const layout1 = playback.measureLayoutsByNumber.get(1);
+    // Halfway through the pickup is halfway to measure 1's note area,
+    // and by tick 480 the playhead has arrived there exactly.
+    const noteArea1 = startOfMeasure1 + layout1.headerWidth;
+    assert.ok(
+      Math.abs(NE.playheadX(playback, 480).x - noteArea1) < 1e-9,
+      'at the end of the pickup the playhead is at the next measure start',
+    );
+    const mid = NE.playheadX(playback, 240).x;
+    const start = NE.playheadX(playback, 0).x;
+    assert.ok(mid > start && mid < noteArea1, 'and halfway through it is halfway across');
+  });
+
+  test('an overfull measure is longer than its meter, so the playhead does not race ahead', () => {
+    // `measure-overrun.musicxml` writes five quarter notes under 4/4.
+    const { playback } = render('measure-overrun.musicxml');
+    assert.equal(playback.measureTicksByNumber.get(1), 2400, 'five quarters, not four');
+    const lastEvent = [...NE.getEventStream(playback)].at(-1);
+    assert.equal(lastEvent.tick, 1920, 'the fifth quarter starts on its own real tick');
+  });
+
+  test('the playhead never goes backwards across a pickup score', () => {
+    const { playback } = render('pickup-measure.musicxml');
+    let previous = -Infinity;
+    for (let tick = 0; tick <= 2400; tick += 20) {
+      const x = NE.playheadX(playback, tick).x;
+      assert.ok(x >= previous - 1e-9, `went backwards at tick ${tick}: ${x} < ${previous}`);
+      previous = x;
+    }
+  });
+
+  test('boundaries land exactly on the measure edges they claim', () => {
+    const { playback } = render('pickup-measure.musicxml');
+    const m0 = playback.placementByMeasureNumber.get(0);
+    const m1 = playback.placementByMeasureNumber.get(1);
+    // Tick 0 is measure 0's own note area.
+    assert.ok(
+      Math.abs(
+        NE.playheadX(playback, 0).x - (m0.x + playback.measureLayoutsByNumber.get(0).headerWidth),
+      ) < 1e-9,
+    );
+    // The first tick of measure 1 reports measure 1's system, not measure 0's.
+    const atBoundary = NE.playheadX(playback, 480);
+    assert.equal(atBoundary.systemIndex, m1.systemIndex);
+    assert.equal(atBoundary.x, m1.x + playback.measureLayoutsByNumber.get(1).headerWidth);
   });
 });

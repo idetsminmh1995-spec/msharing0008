@@ -20108,6 +20108,44 @@ Destination: ${this.destinationName}`;
     };
   }
 
+  // src/playback/routing.ts
+  var PERCUSSION_CHANNEL = 9;
+  function assignTrackRouting(tracks) {
+    const result = /* @__PURE__ */ new Map();
+    const used = /* @__PURE__ */ new Set();
+    for (const track of tracks) {
+      if (track.percussion === true) {
+        used.add(PERCUSSION_CHANNEL);
+        result.set(track.id, {
+          channel: PERCUSSION_CHANNEL,
+          program: track.program ?? 0,
+          ...track.bank !== void 0 ? { bank: track.bank } : {}
+        });
+        continue;
+      }
+      const preferred = track.channel;
+      let channel;
+      if (preferred !== void 0 && preferred !== PERCUSSION_CHANNEL && !used.has(preferred)) {
+        channel = preferred;
+      } else {
+        for (let candidate = 0; candidate < 16; candidate++) {
+          if (candidate !== PERCUSSION_CHANNEL && !used.has(candidate)) {
+            channel = candidate;
+            break;
+          }
+        }
+      }
+      const resolved = channel ?? preferred ?? 0;
+      used.add(resolved);
+      result.set(track.id, {
+        channel: resolved,
+        program: track.program ?? 0,
+        ...track.bank !== void 0 ? { bank: track.bank } : {}
+      });
+    }
+    return result;
+  }
+
   // src/soundfont/browser.ts
   var DEFAULT_ASSET_PATHS = {
     "ms-basic": "ms-basic/official-deprecated-master/MS Basic.sf3",
@@ -20151,6 +20189,7 @@ Destination: ${this.destinationName}`;
   var R2SoundFontEngine = class _R2SoundFontEngine {
     constructor(context, synth, asset, ready) {
       this.partChannels = /* @__PURE__ */ new Map();
+      this.routingByPart = /* @__PURE__ */ new Map();
       this.timers = /* @__PURE__ */ new Set();
       this.stopped = true;
       this.volume = 0.75;
@@ -20197,6 +20236,7 @@ Destination: ${this.destinationName}`;
       this.volume = Math.max(0, Math.min(1, volume));
       this.synth.setSystemParameter("gain", this.volume);
       this.stopped = false;
+      this.routingByPart = assignTrackRouting(playback.tracks);
       const origin = performance.now() / 1e3;
       for (const event of playback.events) {
         const notes = midiNotesFor(event);
@@ -20238,13 +20278,23 @@ Destination: ${this.destinationName}`;
       this.synth.destroy();
       void this.context.close();
     }
+    /**
+     * The MIDI channel one part plays on, assigned once per playback by
+     * `assignTrackRouting` and then reused. The bank/program is set on the
+     * channel the first time the part sounds, so a part sounds as its own
+     * instrument rather than the default patch.
+     */
     channelFor(partId) {
       const existing = this.partChannels.get(partId);
       if (existing !== void 0) return existing;
-      const channel = this.partChannels.size % 16;
-      this.partChannels.set(partId, channel);
-      this.synth.programChange(channel, 0);
-      return channel;
+      const routing = this.routingByPart.get(partId) ?? { channel: 0, program: 0 };
+      this.partChannels.set(partId, routing.channel);
+      if (routing.bank !== void 0) {
+        this.synth.controllerChange(routing.channel, 0, routing.bank >> 7 & 127);
+        this.synth.controllerChange(routing.channel, 32, routing.bank & 127);
+      }
+      this.synth.programChange(routing.channel, routing.program);
+      return routing.channel;
     }
   };
   function playbackEventDuration(playback, event) {

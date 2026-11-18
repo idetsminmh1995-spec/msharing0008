@@ -143,3 +143,92 @@ describe('needsReflow (Phase 47, §16.3 re-flow decision)', () => {
     assert.equal(NE.needsReflow('page', 25, 30), true);
   });
 });
+
+describe('pageUsableWidth / pageUsableHeight (Phase 47, §16.3)', () => {
+  const page = {
+    pageWidth: 30,
+    pageHeight: 42,
+    marginTop: 3,
+    marginBottom: 3,
+    marginLeft: 2.5,
+    marginRight: 2.5,
+  };
+
+  test('usable width is the sheet width minus the left and right margins', () => {
+    assert.equal(NE.pageUsableWidth(page), 25);
+  });
+
+  test('usable height is the sheet height minus the top and bottom margins', () => {
+    assert.equal(NE.pageUsableHeight(page), 36);
+  });
+});
+
+describe('planResize (Phase 47, §16.3 public re-flow decision)', () => {
+  const viewBox = { width: 30, height: 16 };
+  const basePage = {
+    pageWidth: 30,
+    pageHeight: 42,
+    marginTop: 3,
+    marginBottom: 3,
+    marginLeft: 2.5,
+    marginRight: 2.5,
+  };
+
+  test('scroll mode is always a pure scale, whatever the target size or geometry', () => {
+    const plan = NE.planResize({
+      mode: 'scroll',
+      viewBox,
+      targetWidthPx: 600,
+      targetHeightPx: 320,
+    });
+    assert.equal(plan.kind, 'pureScale');
+    assert.equal(plan.pxPerStaffSpace, NE.computePxPerStaffSpace(viewBox, 600, 320));
+  });
+
+  test('page mode with the SAME page geometry is a pure scale -- only the pixel box changed', () => {
+    const plan = NE.planResize({
+      mode: 'page',
+      viewBox,
+      targetWidthPx: 600,
+      targetHeightPx: 320,
+      currentPage: basePage,
+      nextPage: { ...basePage },
+    });
+    assert.equal(plan.kind, 'pureScale');
+  });
+
+  test('page mode re-flows when the usable WIDTH changes (a wider margin fits fewer measures per system)', () => {
+    const plan = NE.planResize({
+      mode: 'page',
+      viewBox,
+      targetWidthPx: 600,
+      targetHeightPx: 320,
+      currentPage: basePage,
+      nextPage: { ...basePage, marginLeft: 5, marginRight: 5 },
+    });
+    assert.equal(plan.kind, 'reflow');
+  });
+
+  test('page mode re-flows when the usable HEIGHT changes (a shorter sheet fits fewer systems per page)', () => {
+    const plan = NE.planResize({
+      mode: 'page',
+      viewBox,
+      targetWidthPx: 600,
+      targetHeightPx: 320,
+      currentPage: basePage,
+      nextPage: { ...basePage, marginTop: 10 },
+    });
+    assert.equal(plan.kind, 'reflow');
+  });
+
+  test('page mode without a next geometry is a pure scale (nothing says the sheet changed)', () => {
+    const plan = NE.planResize({
+      mode: 'page',
+      viewBox,
+      targetWidthPx: 600,
+      targetHeightPx: 320,
+      currentPage: basePage,
+    });
+    assert.equal(plan.kind, 'pureScale');
+  });
+});
