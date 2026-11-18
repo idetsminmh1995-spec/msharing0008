@@ -201,3 +201,62 @@ describe('playheadX: a measure is as long as it actually is (Part G)', () => {
     assert.equal(atBoundary.x, m1.x + playback.measureLayoutsByNumber.get(1).headerWidth);
   });
 });
+
+/**
+ * `xToTick` is the inverse of `playheadX`, added for click-to-enter in a
+ * host editor. `xToPosition` snaps to the nearest EXISTING note, which
+ * makes it useless for writing into an empty beat: in a measure whose
+ * only event sits on beat 1, every click returned beat 1, so a user
+ * could never click beat 3 of a blank measure. The user reported exactly
+ * that ("only one note written from four clicks").
+ */
+describe('xToTick: page -> time, the continuous inverse (§17.1)', () => {
+  test('it round-trips playheadX at every tick', () => {
+    const { playback } = render('simple-single-voice.musicxml');
+    for (const event of NE.getEventStream(playback)) {
+      const x = NE.playheadX(playback, event.tick).x;
+      const back = NE.xToTick(playback, x, NE.playheadX(playback, event.tick).systemIndex);
+      assert.ok(
+        Math.abs(back - event.tick) < 1e-6,
+        `tick ${event.tick} -> x ${x} -> tick ${back}`,
+      );
+    }
+  });
+
+  test('a click into an EMPTY measure lands on the beat under it, not beat 1', () => {
+    // A whole-rest measure has one position entry (tick 0); the continuous
+    // inverse must still spread the measure's own width across its meter.
+    const { playback } = render('simple-single-voice.musicxml');
+    const placement = playback.placementByMeasureNumber.get(1);
+    const header = playback.measureLayoutsByNumber.get(1).headerWidth;
+    const measureTicks = playback.measureTicksByNumber.get(1);
+    const left = placement.x + header;
+    const right = placement.x + placement.width;
+
+    const beat3x = left + (right - left) * 0.5;
+    const beat3 = NE.xToTick(playback, beat3x, placement.systemIndex);
+    assert.ok(
+      Math.abs(beat3 - measureTicks * 0.5) < measureTicks * 0.1,
+      `expected ~${measureTicks * 0.5}, got ${beat3}`,
+    );
+    assert.ok(beat3 > measureTicks * 0.25, 'and is not pinned to the measure start');
+
+    assert.equal(NE.xToTick(playback, left, placement.systemIndex), 0, 'the left edge is tick 0');
+    assert.equal(
+      NE.xToTick(playback, right, placement.systemIndex),
+      measureTicks,
+      'the right edge is the measure end',
+    );
+  });
+
+  test('it never decreases left to right', () => {
+    const { playback } = render('simple-single-voice.musicxml');
+    const placement = playback.placementByMeasureNumber.get(1);
+    let previous = -Infinity;
+    for (let x = placement.x; x <= placement.x + placement.width; x += 0.25) {
+      const tick = NE.xToTick(playback, x, placement.systemIndex);
+      assert.ok(tick >= previous - 1e-9, `went backwards at x ${x}: ${tick} < ${previous}`);
+      previous = tick;
+    }
+  });
+});

@@ -360,6 +360,7 @@ var NotationEngine = (() => {
     voltaLabel: () => voltaLabel,
     writtenTickToPerformanceTicks: () => writtenTickToPerformanceTicks,
     xToPosition: () => xToPosition,
+    xToTick: () => xToTick,
     xmlDivisionsToTicks: () => xmlDivisionsToTicks
   });
 
@@ -76453,6 +76454,42 @@ ${denominator}`;
     if (span <= 0) return { x: fromX, ...frame };
     const fraction = Math.min(1, Math.max(0, (tickInMeasure - fromTick) / span));
     return { x: fromX + (toX - fromX) * fraction, ...frame };
+  }
+  function xToTick(playback, x2, systemIndex) {
+    const candidates = [...playback.placementByMeasureNumber.entries()].filter(([, p]) => p.systemIndex === systemIndex).sort((a, b) => a[1].x - b[1].x);
+    if (candidates.length === 0) return 0;
+    let chosen = candidates[0];
+    for (const candidate of candidates) {
+      if (candidate[1].x <= x2) chosen = candidate;
+      else break;
+    }
+    const measureNumber = chosen?.[0];
+    const placement = chosen?.[1];
+    if (measureNumber === void 0 || placement === void 0) return 0;
+    const offset = playback.globalTickOffsetByMeasure.get(measureNumber) ?? 0;
+    const layout = playback.measureLayoutsByNumber.get(measureNumber);
+    const headerWidth = layout?.headerWidth ?? playback.measureHeaderAllowance;
+    const measureTicks = measureTicksFor(playback, measureNumber) ?? 0;
+    const localX = x2 - placement.x - headerWidth;
+    if (localX <= 0) return offset;
+    const points = [[0, 0]];
+    if (layout !== void 0) {
+      for (const [tick, tickX] of [...layout.positionsByTick.entries()].sort((a, b) => a[0] - b[0])) {
+        points.push([tick, tickX]);
+      }
+    }
+    points.push([measureTicks, placement.width - headerWidth]);
+    for (let i2 = 0; i2 < points.length - 1; i2 += 1) {
+      const from = points[i2];
+      const to = points[i2 + 1];
+      if (from === void 0 || to === void 0) continue;
+      if (localX <= to[1] || i2 === points.length - 2) {
+        const span = to[1] - from[1];
+        const fraction = span <= 0 ? 0 : Math.min(1, Math.max(0, (localX - from[1]) / span));
+        return offset + from[0] + (to[0] - from[0]) * fraction;
+      }
+    }
+    return offset + measureTicks;
   }
   var X_EPSILON = 1e-9;
   function xToPosition(playback, x2, systemIndex) {

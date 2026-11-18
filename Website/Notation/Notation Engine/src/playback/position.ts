@@ -301,6 +301,71 @@ export function playheadX(playback: PlaybackData, tick: number): EventPosition {
 }
 
 /**
+ * §17.1's inverse of `playheadX`, for a host that edits by clicking the
+ * staff: where on the page -> the tick under the pointer, as a REAL
+ * (fractional) tick a caller can snap to its own note-value grid.
+ *
+ * `xToPosition` deliberately snaps to the nearest EXISTING note -- it
+ * answers "which note did I click" -- which makes it useless for entry
+ * into an empty beat: every click in a measure whose only event sits on
+ * beat 1 returns beat 1, so a user can never click beat 3 of a blank
+ * measure. This inverts the same piecewise-linear interpolation
+ * `playheadX` draws with (note onsets, then the measure's own right
+ * edge), so clicking beat 3 of an empty 4/4 measure yields beat 3's
+ * tick rather than the measure's start.
+ *
+ * `systemIndex` narrows to one system, exactly as `xToPosition` does,
+ * since the same x recurs on every system/page.
+ */
+export function xToTick(playback: PlaybackData, x: number, systemIndex: number): number {
+  const candidates = [...playback.placementByMeasureNumber.entries()]
+    .filter(([, p]) => p.systemIndex === systemIndex)
+    .sort((a, b) => a[1].x - b[1].x);
+  if (candidates.length === 0) return 0;
+
+  let chosen = candidates[0];
+  for (const candidate of candidates) {
+    if (candidate[1].x <= x) chosen = candidate;
+    else break;
+  }
+  const measureNumber = chosen?.[0];
+  const placement = chosen?.[1];
+  if (measureNumber === undefined || placement === undefined) return 0;
+
+  const offset = playback.globalTickOffsetByMeasure.get(measureNumber) ?? 0;
+  const layout = playback.measureLayoutsByNumber.get(measureNumber);
+  const headerWidth = layout?.headerWidth ?? playback.measureHeaderAllowance;
+  const measureTicks = measureTicksFor(playback, measureNumber) ?? 0;
+
+  const localX = x - placement.x - headerWidth;
+  if (localX <= 0) return offset;
+  // The interpolation points, relative to the measure's own note area,
+  // in the same space `playheadX` builds: the note area's left edge,
+  // each note's onset, then the measure's right edge.
+  const points: Array<readonly [number, number]> = [[0, 0]];
+  if (layout !== undefined) {
+    for (const [tick, tickX] of [...layout.positionsByTick.entries()].sort((a, b) => a[0] - b[0])) {
+      points.push([tick, tickX]);
+    }
+  }
+  points.push([measureTicks, placement.width - headerWidth]);
+
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const from = points[i];
+    const to = points[i + 1];
+    if (from === undefined || to === undefined) continue;
+    // The final segment absorbs any x past the last note, so a click in
+    // the trailing space still maps onto the measure rather than past it.
+    if (localX <= to[1] || i === points.length - 2) {
+      const span = to[1] - from[1];
+      const fraction = span <= 0 ? 0 : Math.min(1, Math.max(0, (localX - from[1]) / span));
+      return offset + from[0] + (to[0] - from[0]) * fraction;
+    }
+  }
+  return offset + measureTicks;
+}
+
+/**
  * How close to a note's own x still counts as that note, absorbing the
  * floating-point error of `positionToX`'s own addition being undone.
  * 1e-9 staff spaces is a hundred-millionth of a notehead.

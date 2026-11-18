@@ -122,11 +122,133 @@
     return events;
   }
 
+  /**
+   * Splits a tick span into the fewest notatable rests, longest value
+   * first, so a note written into a later beat is preceded by real rests
+   * rather than a hole. The renderer lays a voice out left to right from
+   * its first event, so an event with nothing before it is drawn at the
+   * barline however late its own start tick is -- the rests are what keep
+   * the drawing honest.
+   */
+  function restsForSpan(ticks, voice, staff, baseTick) {
+    const rests = [];
+    let placed = 0;
+    while (placed < ticks) {
+      const remaining = ticks - placed;
+      const found = E.durationTypeAndDotsFromTicks(remaining, 3);
+      if (found) {
+        rests.push(
+          E.rest({
+            duration: E.duration(found.type, found.dots, remaining),
+            voice,
+            staff,
+            startTick: baseTick + placed,
+          }),
+        );
+        placed += remaining;
+        continue;
+      }
+      // Not a single notatable value: take the largest whole value below it
+      // and continue with the remainder.
+      let taken = 0;
+      for (const type of ['whole', 'half', 'quarter', 'eighth', '16th', '32nd']) {
+        const base = E.ticksForDisplayedDuration({ type, dots: 0 });
+        if (base <= remaining) {
+          rests.push(
+            E.rest({ duration: E.duration(type, 0, base), voice, staff, startTick: baseTick + placed }),
+          );
+          taken = base;
+          break;
+        }
+      }
+      if (taken === 0) break;
+      placed += taken;
+    }
+    return rests;
+  }
+
   function insertEvent(doc, { partId, measureNumber, voiceId = 1, event }) {
     const capacity = ticksPerMeasure(doc, partId, measureNumber);
-    return updateVoice(doc, partId, measureNumber, voiceId, (events) =>
-      sortEvents([...withoutPlaceholderRest(events, capacity), event]),
-    );
+    return updateVoice(doc, partId, measureNumber, voiceId, (events) => {
+      const base = withoutPlaceholderRest(events, capacity);
+      const start = event.startTick ?? 0;
+      const end = start + event.duration.ticks;
+      // Drop or trim any REST the new event overlaps. The padding rests
+      // above cover the whole bar, so writing into an empty beat lands
+      // inside one; without this the new note would stack on the rest and
+      // the measure would run past its own meter. Notes are left alone --
+      // only a deliberate click into the middle of a sounding note hits
+      // one, and shortening it silently would lose music.
+      const kept = [];
+      for (const current of base) {
+        const currentStart = current.startTick ?? 0;
+        const currentEnd = currentStart + current.duration.ticks;
+        if (current.kind !== 'rest' || currentEnd <= start || currentStart >= end) {
+          kept.push(current);
+          continue;
+        }
+        // Carve the new note out of the rest, keeping whatever head and
+        // tail remain as rests of their own (a span that is not one
+        // notatable value splits, so a hole in the middle of a whole rest
+        // still leaves legal note values on both sides).
+        if (currentStart < start) {
+          kept.push(...restsForSpan(start - currentStart, voiceId, current.staff ?? 1, currentStart));
+        }
+        if (currentEnd > end) {
+          kept.push(...restsForSpan(currentEnd - end, voiceId, current.staff ?? 1, end));
+        }
+      }
+      const sorted = sortEvents([...kept, event]);
+      const filled = [];
+      let cursor = 0;
+      for (const current of sorted) {
+        const currentStart = current.startTick ?? cursor;
+        if (currentStart > cursor) {
+          filled.push(...restsForSpan(currentStart - cursor, voiceId, current.staff ?? 1, cursor));
+        }
+        filled.push(current);
+        cursor = currentStart + current.duration.ticks;
+      }
+      return padVoiceToCapacity(filled, voiceId, capacity, 1);
+    });
+  }
+
+  /**
+   * Tops a voice up with a rest so its events span the whole measure.
+   *
+   * The renderer lays a voice out from its own first event to its own
+   * last, and takes the measure's drawn width from that span -- a bar
+   * holding a lone quarter note renders as a quarter-note-wide measure,
+   * so a click past it lands in the NEXT measure and the note the user
+   * then writes goes to the wrong bar. Keeping the tail (and, for a
+   * measure the placeholder rest already filled, the whole bar) covered
+   * by rests keeps every measure its full width and the click geometry
+   * stable.
+   */
+  function padVoiceToCapacity(events, voiceId, capacity, staff) {
+    const total = events.reduce((sum, event) => sum + event.duration.ticks, 0);
+    if (total >= capacity) return events;
+    return [
+      ...events,
+      ...restsForSpan(capacity - total, voiceId, staff, total),
+    ];
+  }
+
+  /** Applies `padVoiceToCapacity` to every voice of every measure, so a measure always spans its own meter. */
+  function padMeasure(doc, partId) {
+    return updatePart(doc, partId, (part) => ({
+      ...part,
+      measures: part.measures.map((measure) => {
+        const capacity = ticksPerMeasure(doc, partId, measure.number);
+        return {
+          ...measure,
+          voices: measure.voices.map((voice) => ({
+            ...voice,
+            events: padVoiceToCapacity(sortEvents(voice.events), voice.id, capacity, 1),
+          })),
+        };
+      }),
+    }));
   }
 
   function deleteEvent(doc, { partId, measureNumber, voiceId = 1, eventIndex }) {
@@ -382,6 +504,7 @@
     setSetup,
     appendMeasure,
     removeLastMeasure,
+    padMeasure,
     withoutPlaceholderRest,
     sortEvents,
     pitchFromStaffPosition,

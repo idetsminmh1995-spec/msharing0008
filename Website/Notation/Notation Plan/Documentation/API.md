@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-774 exported symbols, by module.
+775 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -1620,6 +1620,7 @@ The diagnostics `level` lets through, in their original order.
 | **API** | `resolvePosition` | §17.1's `PlaybackPosition` for an arbitrary tick -- tick, real seconds (§12's tempo map) and measure+beat, all three views of the same instant. |
 | **API** | `positionToX` | §17.1: time -> where on the page. |
 | **API** | `playheadX` | §17.1, for a MOVING playhead: where the music is at `tick`, as a continuous position rather than the last note's own x. |
+| function | `xToTick` | §17.1's inverse of `playheadX`, for a host that edits by clicking the staff: where on the page -> the tick under the pointer, as a REAL (fractional) tick a caller can snap to its own note-value grid. |
 | **API** | `xToPosition` | §17.1: where on the page -> time, for click-to-seek in a host app. |
 
 ### `src/playback/repeats.ts`

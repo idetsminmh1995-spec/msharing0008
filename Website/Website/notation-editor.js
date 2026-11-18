@@ -435,7 +435,15 @@
     if (errors.length && parsed.score.parts.every((part) => part.measures.length === 0)) {
       throw new Error(errors[0]?.message || 'The score could not be read.');
     }
-    state.doc = parsed;
+    // Pad every measure out to its own meter before editing. The renderer
+    // takes a measure's drawn width from the span its events cover, so a
+    // bar written as a lone quarter note would render a quarter wide and
+    // the next click would land in the following measure.
+    const padded = parsed.score.parts.reduce(
+      (doc, part) => docTools.padMeasure(doc, part.id),
+      parsed,
+    );
+    state.doc = padded;
     state.filename = name;
     state.history.length = 0;
     state.future.length = 0;
@@ -645,27 +653,44 @@
       const existing = eventsIn(measureNumber, voiceId)[eventIndex];
       const staffPosition = staffPositionFromPoint(staff, point.y);
       const { step, octave } = docTools.pitchFromStaffPosition(clefAt(measureNumber), staffPosition);
-      if (state.noteInput && event.shiftKey && existing && existing.kind !== 'rest') {
+      // A rest -- including the whole-measure placeholder MusicXML writes
+      // for an empty measure -- is not a note to select. In note input it
+      // is the SPACE to write into, so fall through to the positional
+      // placement below rather than trapping every click on beat 1.
+      if (existing && existing.kind !== 'rest') {
+        if (state.noteInput && event.shiftKey) {
+          state.entry = { partId, measureNumber, voiceId, tick: existing.startTick ?? 0, systemIndex };
+          insertAtEntry({ step, octave, addToChord: true });
+          return;
+        }
+        state.selection = { partId, measureNumber, voiceId, eventIndex };
         state.entry = { partId, measureNumber, voiceId, tick: existing.startTick ?? 0, systemIndex };
-        insertAtEntry({ step, octave, addToChord: true });
+        announce(state.noteInput ? `Measure ${measureNumber}, beat ready.` : 'Note selected.');
+        render();
         return;
       }
-      state.selection = { partId, measureNumber, voiceId, eventIndex };
-      state.entry = { partId, measureNumber, voiceId, tick: existing?.startTick ?? 0, systemIndex };
-      announce(state.noteInput ? `Measure ${measureNumber}, beat ready.` : 'Note selected.');
-      render();
-      return;
     }
 
-    const tick = engine.xToPosition(state.result.playback, point.x, systemIndex);
-    const position = engine.resolvePosition(state.result.playback, tick).position;
+    // `xToTick`, not `xToPosition`: the latter snaps to the nearest
+    // EXISTING note, so in a measure whose only event is on beat 1 every
+    // click would land on beat 1 and the user could never write beat 3.
+    // `xToTick` is the continuous inverse, and the result is snapped to
+    // the current note value's own grid, the way step entry does.
+    const rawTick = engine.xToTick(state.result.playback, point.x, systemIndex);
+    const position = engine.resolvePosition(state.result.playback, rawTick).position;
+    const grid = Math.max(1, durationForTool().ticks);
+    const capacity = capacityOf(position.measureNumber);
+    const snappedTick = Math.min(
+      Math.max(0, capacity - grid),
+      Math.round(position.tickInMeasure / grid) * grid,
+    );
     const staffPosition = staffPositionFromPoint(staff, point.y);
     const { step, octave } = docTools.pitchFromStaffPosition(clefAt(position.measureNumber), staffPosition);
     state.entry = {
       partId: activePartId(),
       measureNumber: position.measureNumber,
       voiceId: 1,
-      tick: position.tickInMeasure,
+      tick: snappedTick,
       systemIndex,
     };
     state.selection = null;

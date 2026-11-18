@@ -121,7 +121,17 @@ describe('the editor and the engine agree, end to end', () => {
         startTick: 0,
       }),
     });
-    assert.equal(inserted.score.parts[0].measures[0].voices[0].events.length, 1);
+    // The written note is there, and the measure is still exactly one bar
+    // long -- the rest of it is padded with rests so the renderer draws it
+    // full width rather than a quarter-note-wide stub.
+    const events = inserted.score.parts[0].measures[0].voices[0].events;
+    const note = events.find((event) => event.kind === 'note');
+    assert.equal(note.pitch.step, 'C');
+    assert.equal(note.startTick, 0);
+    assert.equal(
+      events.reduce((sum, event) => sum + event.duration.ticks, 0),
+      4 * quarter,
+    );
 
     const xml = doc.toMusicXml(inserted);
     assert.match(xml, /<step>C<\/step>/);
@@ -232,6 +242,69 @@ describe('the editor and the engine agree, end to end', () => {
       });
       assert.ok(svg.startsWith('<svg'));
       assert.ok(!svg.includes('NaN'));
+    }
+  });
+
+  test('a note written into a later beat is preceded by rests, and the measure stays a full bar', () => {
+    const { window, engine, doc } = loadEditor();
+    const parsed = doc.padMeasure(engine.parseMusicXml(STARTER_XML, window.DOMParser), 'P1');
+    const quarter = engine.TICKS_PER_QUARTER;
+
+    // Beat 3 of a 4/4 bar -- the case the user could not reach by clicking.
+    const edited = doc.insertEvent(parsed, {
+      partId: 'P1',
+      measureNumber: 1,
+      event: engine.note({
+        pitch: { kind: 'pitched', step: 'E', octave: 5, alter: 0 },
+        duration: engine.duration('quarter', 0, quarter),
+        voice: 1,
+        staff: 1,
+        startTick: 2 * quarter,
+      }),
+    });
+
+    const events = edited.score.parts[0].measures[0].voices[0].events;
+    const note = events.find((event) => event.kind === 'note');
+    assert.equal(note.startTick, 2 * quarter, 'the note keeps the beat it was written on');
+    // Everything before it is a real rest, not a hole the renderer would
+    // collapse to the barline.
+    const before = events.filter((event) => event.startTick < 2 * quarter);
+    assert.ok(before.length > 0, 'the gap before the note is filled with rests');
+    assert.ok(before.every((event) => event.kind === 'rest'));
+    assert.equal(
+      events.reduce((sum, event) => sum + event.duration.ticks, 0),
+      4 * quarter,
+      'the measure is still exactly one bar long',
+    );
+
+    // And it survives the export/reparse round trip the way a save does.
+    const back = engine.parseMusicXml(doc.toMusicXml(edited), window.DOMParser);
+    const backNote = back.score.parts[0].measures[0].voices[0].events.find(
+      (event) => event.kind === 'note',
+    );
+    assert.equal(backNote.startTick, 2 * quarter);
+  });
+
+  test('padding keeps every measure full width, so a click maps to the beat under it', () => {
+    const { window, engine, doc } = loadEditor();
+    const parsed = doc.padMeasure(engine.parseMusicXml(STARTER_XML, window.DOMParser), 'P1');
+    const { playback } = engine.renderParsedMusicXml(parsed, {
+      config: { layout: { mode: 'page' } },
+    });
+
+    const placement = playback.placementByMeasureNumber.get(1);
+    const header = playback.measureLayoutsByNumber.get(1).headerWidth;
+    const left = placement.x + header;
+    const right = placement.x + placement.width;
+
+    // Four clicks across the bar's note area must land on four different
+    // beats -- the bug was that all of them returned tick 0.
+    const ticks = [0.1, 0.35, 0.6, 0.85].map((f) =>
+      engine.xToTick(playback, left + (right - left) * f, placement.systemIndex),
+    );
+    assert.equal(new Set(ticks).size, 4, `clicks collapsed to ${JSON.stringify(ticks)}`);
+    for (let i = 1; i < ticks.length; i += 1) {
+      assert.ok(ticks[i] > ticks[i - 1], 'ticks increase across the measure');
     }
   });
 
