@@ -114,6 +114,18 @@
         <span class="editor-bottombar__readout" data-editor-tempo aria-label="Tempo" title="Tempo">&#9833;=120</span>
       </div>
       <span class="editor-bottombar__divider" aria-hidden="true"></span>
+      <div class="editor-bottombar__group" role="group" aria-label="SoundFont">
+        <select class="editor-bottombar__select" data-editor-soundfont aria-label="SoundFont" title="SoundFont used for playback" disabled>
+          <option value="">Loading SoundFonts…</option>
+        </select>
+        <button class="editor-bottombar__button" type="button" data-editor-test-note aria-label="Test a scale with the chosen SoundFont" title="Test scale (built)" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l10-2v13" /><circle cx="6.5" cy="18" r="2.5" /><circle cx="16.5" cy="16" r="2.5" /></svg><span>Test</span>
+        </button>
+        <button class="editor-bottombar__button" type="button" data-editor-test-score aria-label="Render a score and play it with the chosen SoundFont" title="Test scale (rendered score)" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></svg><span>Score</span>
+        </button>
+      </div>
+      <span class="editor-bottombar__divider" aria-hidden="true"></span>
       <div class="editor-bottombar__group" role="group" aria-label="Score view">
         <div class="editor-segment">
           <div class="editor-export" data-editor-view-menu>
@@ -152,6 +164,7 @@
     <script src="assets/notation-engine.js?v=bc18675adc40"></script>
     <script src="assets/sound-engine.js?v=e85b7f043658"></script>
     <script src="script.js?v=app-lock-20261118"></script>
+    <script src="soundfonts-config.js?v=soundfont-config-20261118"></script>
     <script src="notation-doc.js?v=editor-musescore-20261118"></script>
     <script src="notation-editor.js?v=editor-account-20261118"></script>
   </body>

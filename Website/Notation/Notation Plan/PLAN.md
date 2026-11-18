@@ -170,21 +170,23 @@ Implementation sequence:
 - [ ] Manifest fetch → asset download → SpessaSynth load → noteOn/noteOff အဆင့်ဆင့် အလုပ်လုပ် အတည်ပြု။
 - **မှတ်ချက်:** လက်ရှိ app တွင် SoundFont အသံစမ်းသည့် စာမျက်နှာ မရှိသေးပါ (`notation-editor.html` ရဲ့ Play button သာ ရှိသည်)။ စမ်းသပ်ရန် R2 public CDN URL သို့မဟုတ် signed-URL config လည်း မရှိသေးပါ (`Sound Doc/SoundFont-Collection-R2.md` အရ public access မဖွင့်ရသေး)။ ဆိုတော့ ဒီအဆင့်ကို မစမီ R2 URL config ကို အရင် ဖြေရှင်းရမည်။
 
-#### အသံစမ်းတဲ့ နေရာ — လမ်း ခ (editor ကို ချဲ့) — ဆုံးဖြတ်ပြီး
+#### အသံစမ်းတဲ့ နေရာ — လမ်း ခ (editor ကို ချဲ့) — ပြီးစီး ✓
 
 သီးသန့် audition စာမျက်နှာ မဆောက်ဘဲ ရှိပြီးသား `notation-editor.js` ထဲမှာပင် SoundFont စမ်းတဲ့ UI ထည့်မည်။
 
 **လုပ်ရမည့်အရာ:**
-- [ ] `notation-editor.html` ရဲ့ editor bottom bar (Play button အနီး) တွင် SoundFont ရွေးတဲ့ control ထည့်: `<select data-editor-soundfont>` (manifest ရဲ့ asset စာရင်းကို runtime တွင် ဖြည့်) + "Test note" ခလုတ် `<button data-editor-test-note>`။
+- [x] `notation-editor.html` ရဲ့ editor bottom bar (Play အနီး) တွင် SoundFont control ထည့်ပြီး ✓ — `<select data-editor-soundfont>` + `<button data-editor-test-note>` (built scale) + `<button data-editor-test-score>` (rendered score)။
 - [ ] `notation-editor.js` တွင်:
-  - Page load ချိန် `manifestUrl` မှ manifest ကို fetch လုပ်ပြီး asset စာရင်း (id/displayName) ကို select ထဲ ဖြည့် (`manifest.assets`); default ကို `manifest.runtime.defaultAssetId` (သို့) `MSHARING_SOUNDFONT_CONFIG.assetId` မှ ယူ။
-  - `ensureSound()` ကို လက်ရှိ hardcoded `assetId: 'musescore-general-sf3'` အစား **ရွေးထားတဲ့ asset id** ကို သုံးအောင် ပြင်; asset ပြောင်းရင် `state.sound.destroy()` → အသစ် `create()` → cache ရှင်းရန် `state.soundTried` reset။
-  - "Test note" ခလုတ်က score မလိုဘဲ note တစ်ခု (ဥပမာ C4 = MIDI 60) ကို ဖွင့်စေ — လက်ရှိ `sound.play(playback)` က `PlaybackData` လိုသဖြင့် ကိုယ်တိုင် တည်ဆောက်မည့် minimal `PlaybackData` (events ထဲ `midiNotes: [60]`, `durationTicks`, `seconds`, `tick`, `partId`) ကို pass မည်; သို့မဟုတ် `renderFromMusicXml` နဲ့ C major scale fixture တစ်ခု render လုပ်ပြီး `playback` ကို သုံး။
-  - Asset × စမ်းသည့်အသံ ရလဒ်ကို `data-editor-status` တွင် ပြ (pass/fail)၊ လိုအပ်ရင် `console`/status မှတ်တမ်း။
-- [ ] `MSHARING_SOUNDFONT_CONFIG` ကို R2 base URL ဖြင့် သတ်မှတ်ရန် နေရာ တစ်ခု ထည့် (inline config script သို့မဟုတ် `soundfonts-config.js`) — `manifestUrl: '<r2-base>/soundfonts/manifest.json'`, `assetBaseUrl: '<r2-base>/soundfonts'`။
-- [ ] `test/unit/editor-integration.test.js` ကို update — control အသစ် ၂ ခု ပါလာသဖြင့်; bundle rebuild + `npm run verify` green။
+  - [x] Page load ချိန် manifest fetch → asset စာရင်း select ထဲ ဖြည့်; default = `runtime.defaultAssetId`; fetch မရရင် control ကို disable လုပ်ပြီး status မှာ ပြ ✓
+  - [x] `ensureSound()` ကို ရွေးထားတဲ့ asset id သုံးအောင် ပြင်; ပြောင်းရင် `destroy()` → ပြန် `create()` → `soundTried` reset ✓
+  - [x] (က) "Test" ခလုတ် — C major scale ကို လက်ဖြင့် တည်ဆောက်တဲ့ `PlaybackData` (`engine.buildTempoMap` + `TICKS_PER_QUARTER`) ဖြင့် ဖွင့် ✓; (ခ) "Score" ခလုတ် — C major scale MusicXML ကို `engine.renderFromMusicXml(...).playback` ဖြင့် ဖွင့် ✓ (နှစ်မျိုးလုံး)
+  - [x] ရလဒ်ကို `data-editor-status` တွင် ပြ ✓
+- [x] `soundfonts-config.js` ဖိုင်အသစ်တွင် `window.MSHARING_SOUNDFONT_CONFIG` (R2 base URL) သတ်မှတ်; `notation-editor.html` တွင် ရည်ညွှန်း ✓
+- [x] `test/unit/editor-integration.test.js` update (picker + ခလုတ် ၂ ခု assert) ✓; `npm run verify` = **1287/1287 pass** ✓
 
 **သတိ:** Salamander SF2 (1.26 GB) ကို select ထဲ ထားသော်လည်း စမ်းရင် engine ၏ 512 MB decoded budget ကျော်နိုင် — UI တွင် optional/warn ပြ။
+
+**Browser စမ်းသပ်မှု (local, R2 မှ တကယ် load):** editor ကို `python3 -m http.server` ဖြင့် ဖွင့်၍ — picker တွင် assets ၆ ခု (MB ပါ) ပေါ်လာ ✓; MuseScore General ဖြင့် built + rendered နှစ်မျိုးလုံး play ✓; MS Basic သို့ ပြောင်း၍ ပြန် play ✓ (destroy/recreate အလုပ်လုပ်); Salamander ကို "— large" လို့ အမှတ်အသား ✓။
 
 #### အဆင့် ၁ — (ဂ) Asset id နှင့် R2 path ကို ကိုယ်ပိုင်အမည် ပြောင်းခြင်း
 

@@ -322,4 +322,22 @@ describe('the editor and the engine agree, end to end', () => {
     // The page announces readiness; anything else means a step failed.
     assert.equal(window.document.querySelector('[data-editor-status]').textContent, 'Score ready.');
   });
+
+  test('the editor exposes a SoundFont picker and two sound-test buttons', () => {
+    const { window } = loadEditorPage();
+    const select = window.document.querySelector('[data-editor-soundfont]');
+    const testBuilt = window.document.querySelector('[data-editor-test-note]');
+    const testRendered = window.document.querySelector('[data-editor-test-score]');
+    assert.ok(select, 'the editor has no SoundFont picker');
+    assert.ok(testBuilt, 'the editor has no built-scale test button');
+    assert.ok(testRendered, 'the editor has no rendered-score test button');
+
+    // jsdom implements no `fetch`, so the picker cannot list assets and
+    // must degrade to a disabled control rather than throw -- the same
+    // thing a browser does when the R2 manifest is unreachable.
+    assert.equal(select.disabled, true);
+    assert.equal(testBuilt.disabled, true);
+    assert.equal(testRendered.disabled, true);
+    assert.match(select.textContent, /unavailable/i);
+  });
 });

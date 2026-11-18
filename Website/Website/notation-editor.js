@@ -39,6 +39,9 @@
   const exportToggle = pick('[data-editor-export-toggle]');
   const exportList = pick('[data-editor-export-list]');
   const metronomeButton = pick('[data-editor-metronome]');
+  const soundFontSelect = pick('[data-editor-soundfont]');
+  const testNoteButton = pick('[data-editor-test-note]');
+  const testScoreButton = pick('[data-editor-test-score]');
   const viewToggle = pick('[data-editor-view-toggle]');
   const viewList = pick('[data-editor-view-list]');
   const viewLabel = pick('[data-editor-view-label]');
@@ -70,6 +73,9 @@
     playing: false,
     sound: null,
     soundTried: false,
+    // audition
+    soundFonts: [],
+    soundAssetId: null,
     playSeconds: 0,
     playStartSeconds: 0,
     playStartedAt: 0,
@@ -798,15 +804,211 @@
     const SoundFont = window.NotationSoundFont;
     if (!SoundFont?.R2SoundFontEngine) throw new Error('The sound engine could not be loaded.');
     const configured = window.MSHARING_SOUNDFONT_CONFIG || {};
+    const assetId = state.soundAssetId ?? configured.assetId;
     state.sound = await SoundFont.R2SoundFontEngine.create({
       manifestUrl: 'soundfonts/manifest.json',
       processorUrl: 'assets/spessasynth_processor.min.js',
       assetBaseUrl: 'soundfonts',
-      assetId: 'musescore-general-sf3',
       ...configured,
+      ...(assetId ? { assetId } : {}),
     });
     return state.sound;
   };
+
+  // ---- SoundFont audition ------------------------------------------------
+  //
+  // The Sound Engine fetches its SoundFonts from R2 at runtime, and the
+  // app has no other way to try one: the Play button needs a loaded
+  // score, and there is no page for picking a font. These controls fill
+  // that gap -- pick an asset from the manifest, then play a C major
+  // scale either as a hand-built event stream ("Test") or through a real
+  // render ("Score"), so a font that loads but does not sound is caught
+  // here rather than on the next score.
+
+  const C_MAJOR_SCALE = [60, 62, 64, 65, 67, 69, 71, 72];
+  /** A font that decodes past this is at risk of exhausting the browser. */
+  const LARGE_ASSET_BYTES = 512 * 1024 * 1024;
+
+  const selectedFont = () => state.soundFonts.find((font) => font.id === state.soundAssetId);
+
+  function assetBytes(manifest, assetPath) {
+    if (typeof assetPath !== 'string') return undefined;
+    const name = assetPath.split('/').pop();
+    const files = Array.isArray(manifest.files) ? manifest.files : [];
+    const match = files.find((file) => typeof file.path === 'string' && file.path.split('/').pop() === name);
+    return typeof match?.bytes === 'number' ? match.bytes : undefined;
+  }
+
+  function renderSoundFontOptions() {
+    if (!soundFontSelect) return;
+    soundFontSelect.replaceChildren(
+      ...state.soundFonts.map((font) => {
+        const option = document.createElement('option');
+        option.value = font.id;
+        option.textContent = font.label;
+        return option;
+      }),
+    );
+    if (state.soundAssetId) soundFontSelect.value = state.soundAssetId;
+    const hasFonts = state.soundFonts.length > 0;
+    soundFontSelect.disabled = !hasFonts;
+    testNoteButton.disabled = !hasFonts;
+    testScoreButton.disabled = !hasFonts;
+  }
+
+  /** Loads the R2 manifest and fills the picker. Never throws to the caller. */
+  async function loadSoundFonts() {
+    if (!soundFontSelect) return;
+    try {
+      if (typeof fetch !== 'function') throw new Error('fetch is unavailable');
+      const configured = window.MSHARING_SOUNDFONT_CONFIG || {};
+      const manifestUrl = configured.manifestUrl || 'soundfonts/manifest.json';
+      const response = await fetch(manifestUrl, { cache: 'no-cache' });
+      if (!response.ok) throw new Error(`SoundFont manifest request failed (${response.status}).`);
+      const manifest = await response.json();
+      const assets = Array.isArray(manifest.assets) ? manifest.assets : [];
+      const assetPaths = manifest.runtime?.assetPaths || {};
+      state.soundFonts = assets.map((asset) => {
+        const bytes = assetBytes(manifest, assetPaths[asset.id]);
+        const megabytes = bytes ? `, ${Math.round(bytes / (1024 * 1024))} MB` : '';
+        const oversized = bytes !== undefined && bytes > LARGE_ASSET_BYTES;
+        return {
+          id: asset.id,
+          displayName: asset.displayName || asset.id,
+          label: `${asset.displayName || asset.id} (${asset.format || 'sf2'}${megabytes})${oversized ? ' — large' : ''}`,
+          oversized,
+        };
+      });
+      const preferred = configured.assetId || manifest.runtime?.defaultAssetId;
+      const known = state.soundFonts.some((font) => font.id === preferred);
+      state.soundAssetId = known ? preferred : (state.soundFonts[0]?.id ?? null);
+      renderSoundFontOptions();
+    } catch (error) {
+      // Keep the page's own status line for the score; the picker says
+      // what went wrong on its own.
+      soundFontSelect.replaceChildren(new Option('SoundFonts unavailable', ''));
+      soundFontSelect.disabled = true;
+      soundFontSelect.title = error instanceof Error ? error.message : 'Could not load the SoundFont list.';
+    }
+  }
+
+  function disposeSound() {
+    if (!state.sound) return;
+    try {
+      state.sound.destroy?.();
+    } catch {
+      /* a failed teardown must not block picking another font */
+    }
+    state.sound = null;
+    state.soundTried = false;
+  }
+
+  function onSoundFontChange() {
+    const id = soundFontSelect?.value;
+    if (!id || id === state.soundAssetId) return;
+    state.soundAssetId = id;
+    disposeSound();
+    const font = selectedFont();
+    announce(
+      font?.oversized
+        ? `${font.displayName} is large — it may exhaust browser memory.`
+        : `SoundFont: ${font?.displayName ?? id}.`,
+    );
+  }
+
+  /** (က) A scale as a hand-built event stream — no score involved. */
+  function builtScalePlayback() {
+    const quarter = engine.TICKS_PER_QUARTER;
+    const { tempoMap } = engine.buildTempoMap([{ tick: 0, microsecondsPerQuarter: 500_000 }]);
+    const events = C_MAJOR_SCALE.map((midi, index) => {
+      const tick = index * quarter;
+      return {
+        tick,
+        seconds: engine.tickToSeconds(tempoMap, tick),
+        durationTicks: quarter,
+        partId: 'audition',
+        noteIds: [],
+        midiNotes: [midi],
+        measureNumber: 1,
+      };
+    });
+    const totalTicks = C_MAJOR_SCALE.length * quarter;
+    return {
+      measureNumbersInOrder: [1],
+      globalTickOffsetByMeasure: new Map([[1, 0]]),
+      measureTicksByNumber: new Map([[1, totalTicks]]),
+      timeSignatureByMeasure: new Map([[1, { numerator: 4, denominator: 4 }]]),
+      measureLayoutsByNumber: new Map([[1, { width: 0, positionsByTick: new Map(), headerWidth: 0 }]]),
+      placementByMeasureNumber: new Map([[1, { x: 0, width: 0, systemIndex: 0, pageIndex: 0, systemY: 0 }]]),
+      measureHeaderAllowance: 0,
+      tempoMap,
+      events,
+      tracks: [{ id: 'audition', name: 'Audition' }],
+      performance: {
+        entries: [],
+        totalTicks,
+        totalSeconds: engine.tickToSeconds(tempoMap, totalTicks),
+        hasRepeats: false,
+      },
+      repeatDiagnostics: [],
+    };
+  }
+
+  /** (ခ) The same scale written as MusicXML and put through a real render. */
+  function scaleMusicXml() {
+    const divisions = 4;
+    const eighth = divisions / 2;
+    const notes = [
+      ['C', 4],
+      ['D', 4],
+      ['E', 4],
+      ['F', 4],
+      ['G', 4],
+      ['A', 4],
+      ['B', 4],
+      ['C', 5],
+    ];
+    const body = notes
+      .map(
+        ([step, octave]) =>
+          `<note><pitch><step>${step}</step><octave>${octave}</octave></pitch><duration>${eighth}</duration><voice>1</voice></note>`,
+      )
+      .join('');
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Music</part-name></score-part></part-list>
+  <part id="P1"><measure number="1">
+    <attributes><divisions>${divisions}</divisions><key><fifths>0</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef></attributes>
+    ${body}
+  </measure></part>
+</score-partwise>`;
+  }
+
+  async function playAudition(playback, label) {
+    const font = selectedFont();
+    const name = font?.displayName ?? state.soundAssetId ?? 'SoundFont';
+    announce(`Testing ${name} — ${label}…`);
+    try {
+      const sound = await ensureSound();
+      await sound.play(playback, 1);
+      announce(`Test playing — ${name} (${label}).`);
+    } catch (error) {
+      announce(error instanceof Error ? error.message : 'The sound test failed.');
+    }
+  }
+
+  async function testBuiltScale() {
+    await playAudition(builtScalePlayback(), 'built');
+  }
+
+  async function testRenderedScale() {
+    try {
+      const rendered = engine.renderFromMusicXml(scaleMusicXml(), { domParser: window.DOMParser });
+      await playAudition(rendered.playback, 'rendered');
+    } catch (error) {
+      announce(error instanceof Error ? error.message : 'The test score could not be rendered.');
+    }
+  }
 
   /** Total ticks in the score — the whole timeline, rests included. */
   const totalTicks = () => {
@@ -1003,6 +1205,10 @@
   redoButton.addEventListener('click', redo);
   playButton.addEventListener('click', () => void togglePlay());
 
+  if (soundFontSelect) soundFontSelect.addEventListener('change', onSoundFontChange);
+  if (testNoteButton) testNoteButton.addEventListener('click', () => void testBuiltScale());
+  if (testScoreButton) testScoreButton.addEventListener('click', () => void testRenderedScale());
+
   noteInputButton.addEventListener('click', () => {
     state.noteInput = !state.noteInput;
     syncTools();
@@ -1130,4 +1336,5 @@
   setControlsEnabled(false);
   updateZoom();
   restoreHandoff();
+  void loadSoundFonts();
 })();
