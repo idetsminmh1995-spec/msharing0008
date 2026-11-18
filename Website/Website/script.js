@@ -1,3 +1,29 @@
+// App shell lock: the web app owns its viewport, so browser zoom and the
+// native context menu are off. The editor keeps its own in-app zoom
+// (Ctrl+= / Ctrl+-), which this only suppresses the browser default for.
+(() => {
+  document.addEventListener('contextmenu', (event) => event.preventDefault());
+
+  const ZOOM_KEYS = new Set(['+', '=', '-', '_', '0']);
+  const ZOOM_CODES = new Set(['Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract', 'Digit0', 'Numpad0']);
+  document.addEventListener('keydown', (event) => {
+    if (!(event.ctrlKey || event.metaKey)) return;
+    if (ZOOM_KEYS.has(event.key) || ZOOM_CODES.has(event.code)) event.preventDefault();
+  }, { capture: true });
+
+  document.addEventListener('wheel', (event) => {
+    if (event.ctrlKey || event.metaKey) event.preventDefault();
+  }, { passive: false });
+
+  // Touch/trackpad pinch, plus Safari's own gesture events.
+  document.addEventListener('touchmove', (event) => {
+    if (event.touches.length > 1) event.preventDefault();
+  }, { passive: false });
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach((type) => {
+    document.addEventListener(type, (event) => event.preventDefault());
+  });
+})();
+
 const root = document.documentElement;
 const menuToggle = document.querySelector('[data-menu-toggle]');
 const mobileNav = document.querySelector('[data-mobile-nav]');
