@@ -17,7 +17,7 @@ const FONT = path.join(ROOT, 'dist', 'fonts', 'Bravura.woff2');
 /**
  * Phase 54/§F4: the browser-level visual check, in the automated suite.
  *
- * `Doc/STATUS.md` §F4 named the hole this closes: *"A markup-only suite
+ * §F4 named the hole this closes: *"A markup-only suite
  * structurally cannot catch 'the glyphs are correct but nothing can draw
  * them.'"* That is not hypothetical here -- it is exactly what happened
  * in Integration M, when the deployed site served no Bravura and every

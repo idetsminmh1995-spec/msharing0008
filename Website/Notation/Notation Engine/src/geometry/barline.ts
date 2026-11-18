@@ -160,8 +160,8 @@ export interface BarNumberDecisionConfig {
 /**
  * Whether a bar number should be shown for this measure. `isSystemStart`
  * (whether this measure is the first on its line/system) is supplied by
- * the caller -- determining that is the layout engine's job (Phase 41/42,
- * not yet built), not this function's; this is purely the display-mode
+ * the caller -- determining that is the layout engine's job (Phase 41/42's
+ * `src/layout/page.ts`), not this function's; this is purely the display-mode
  * decision given that fact.
  */
 export function shouldShowBarNumber(

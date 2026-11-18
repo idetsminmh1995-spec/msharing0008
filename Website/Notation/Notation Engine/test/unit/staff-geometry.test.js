@@ -11,8 +11,8 @@ describe('staff geometry (Phase 9)', () => {
     assert.equal(g.height, 4);
     // Spread (executed in this file's own realm) rather than .slice()
     // (which would run on the sandboxed array's own Array.prototype) --
-    // see Doc/phase-08-testing-harness.md on why a sandboxed array/object
-    // compared via deepEqual against a same-file literal needs this.
+    // a sandboxed array/object compared via deepEqual against a same-file
+    // literal needs this.
     assert.deepEqual([...g.lineYPositions], [0, -1, -2, -3, -4]);
   });
 

@@ -123,8 +123,7 @@ function clef(
 
 // Reference points below were each hand-verified against the standard
 // mnemonics for that clef's staff (e.g. treble's lines E-G-B-D-F, bass's
-// G-B-D-F-A) before being committed -- see
-// Doc/phase-10-clef-engine.md Sec. 3 for the full derivation.
+// G-B-D-F-A) before being committed.
 
 /** G4 on the second line from the bottom (index 1, y=-1). */
 export const TREBLE_CLEF: ClefDefinition = clef('treble', 'gClef', 'G', 4, -1);
@@ -150,11 +149,11 @@ export const TREBLE_8VA_CLEF: ClefDefinition = clef('treble8va', 'gClef8va', 'G'
 /**
  * Percussion clef -- deliberately reuses treble's reference line/octave
  * shift. There is no single universal standard for which line an
- * unpitched instrument's displayStep/displayOctave should land on (see
- * Doc/phase-10-clef-engine.md for the research behind this); in practice,
- * MusicXML files calibrate their <unpitched> display-step/display-octave
- * values as if a treble-clef mapping applies, so matching that is what
- * makes real-world percussion files position correctly.
+ * unpitched instrument's displayStep/displayOctave should land on; in
+ * practice, MusicXML files calibrate their <unpitched>
+ * display-step/display-octave values as if a treble-clef mapping applies,
+ * so matching that is what makes real-world percussion files position
+ * correctly.
  */
 export const PERCUSSION_CLEF: ClefDefinition = clef(
   'percussion',

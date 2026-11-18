@@ -115,9 +115,7 @@ describe('cross-software compatibility corpus (Phase 37, §10.8)', () => {
 
   test('a percussion note with no <display-step>/<display-octave> recovers via the documented fallback, not silently wrong', () => {
     const result = parse('percussion-no-display-step.musicxml');
-    const reported = [...result.diagnostics].filter(
-      (d) => d.code === 'MISSING_DISPLAY_POSITION',
-    );
+    const reported = [...result.diagnostics].filter((d) => d.code === 'MISSING_DISPLAY_POSITION');
     // Reported, but as INFORMATION rather than as an error: MusicXML's
     // own DTD makes both elements optional inside <unpitched>, so a
     // file that leaves them out is not malformed -- it has simply left
@@ -139,7 +137,7 @@ describe('cross-software compatibility corpus (Phase 37, §10.8)', () => {
     );
   });
 
-  test('<print> break hints are ignored gracefully (info-level UNKNOWN_ELEMENT), never an error', () => {
+  test('<print> system/page break hints parse and render with no error diagnostics', () => {
     const result = render('print-breaks.musicxml');
     const notable = [...result.diagnostics].filter((d) => d.severity !== 'info');
     assert.deepEqual(notable, []);

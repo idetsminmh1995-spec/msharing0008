@@ -1194,8 +1194,7 @@ const DEFAULT_UNBEAMED_STEM_LENGTH = 3.5;
 export interface RenderParsedMusicXmlOptions {
   /**
    * Integration L/§16.2 + Phase 50/§8: the engine config. Every section
-   * the renderer can act on is live -- see `buildTheme` and
-   * `Doc/phase-50-theming-api.md`.
+   * the renderer can act on is live -- see `buildTheme`.
    */
   readonly config?: PartialEngineConfig;
   /**

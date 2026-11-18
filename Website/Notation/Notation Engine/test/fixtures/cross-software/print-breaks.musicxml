@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- §10.8 divergence: <print> usage for system/page breaks (also
-     <print-object> in real files). Layout hints — this engine's own
-     naive layout (Phase 21) doesn't consult them yet (Doc/phase-35's
-     Tier 2/3 list), but they must not break parsing. -->
+     <print-object> in real files). Layout hints — the engine's page mode
+     (§16.2, Phase 46) consults new-system/new-page to force breaks; the
+     point of this fixture is that they must also never break parsing. -->
 <score-partwise version="3.1">
   <part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
   <part id="P1">

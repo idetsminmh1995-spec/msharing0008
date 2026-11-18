@@ -68311,7 +68311,7 @@ var NotationEngine = (() => {
     const positions2 = CLEF_KEY_SIGNATURE_POSITIONS[clefName];
     if (positions2 === void 0) {
       throw new Error(
-        `No verified key-signature accidental positions for clef "${clefName}" (soprano clef is the one remaining gap -- see Doc/phase-11-key-signature-engine.md and Doc/phase-54-public-api.md). Supported clefs: ${Object.keys(CLEF_KEY_SIGNATURE_POSITIONS).join(", ")}.`
+        `No verified key-signature accidental positions for clef "${clefName}" (soprano clef is the one remaining gap). Supported clefs: ${Object.keys(CLEF_KEY_SIGNATURE_POSITIONS).join(", ")}.`
       );
     }
     return positions2;
@@ -68597,8 +68597,8 @@ var NotationEngine = (() => {
     },
     // SMuFL has no rectangle notehead; the square is its nearest real
     // shape, and drawing the wrong-but-adjacent glyph beats refusing the
-    // file. Recorded in Doc/ and in §19's known limitations rather than
-    // silently pretended to be exact.
+    // file. Recorded in §19's known limitations rather than silently
+    // pretended to be exact.
     rectangle: {
       whole: "noteheadSquareWhite",
       half: "noteheadSquareWhite",

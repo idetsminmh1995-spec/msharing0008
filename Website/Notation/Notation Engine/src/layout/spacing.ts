@@ -296,9 +296,9 @@ export function applyMinimumDistance(
  *
  * §14.3 also states the *policy* that the final system of a piece is
  * never stretched (ragged-right) -- that decision belongs to whichever
- * caller groups events into systems (§16, not yet built); this function
- * itself is a pure stretch-to-width operation with no opinion on when to
- * call it. `config.justify === false` disables stretching outright.
+ * caller groups events into systems (`src/layout/page.ts`, §16); this
+ * function itself is a pure stretch-to-width operation with no opinion on
+ * when to call it. `config.justify === false` disables stretching outright.
  */
 export function justifySystem(
   positions: readonly number[],
@@ -333,8 +333,8 @@ export function justifySystem(
  * available system width even after §14.2's minimum-distance pass.
  * Returns a warning rather than throwing or clamping -- the overflow is
  * ALLOWED to stand (this function never modifies `positions`), and §16
- * (system/page breaking, not yet built) is where a real fix -- breaking
- * the system earlier -- eventually belongs.
+ * (`src/layout/page.ts`) is where a real fix -- breaking the system
+ * earlier -- belongs.
  */
 export function checkMeasureOverflow(
   positions: readonly number[],

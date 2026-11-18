@@ -59,8 +59,8 @@ const SHAPE_GLYPHS: Readonly<Record<string, Readonly<Record<NoteheadFill, string
   },
   // SMuFL has no rectangle notehead; the square is its nearest real
   // shape, and drawing the wrong-but-adjacent glyph beats refusing the
-  // file. Recorded in Doc/ and in §19's known limitations rather than
-  // silently pretended to be exact.
+  // file. Recorded in §19's known limitations rather than silently
+  // pretended to be exact.
   rectangle: {
     whole: 'noteheadSquareWhite',
     half: 'noteheadSquareWhite',

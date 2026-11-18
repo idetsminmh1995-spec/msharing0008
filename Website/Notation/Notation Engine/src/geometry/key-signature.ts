@@ -39,8 +39,7 @@ export function flatsForCount(count: number): readonly PitchStep[] {
  * staff), which doesn't follow the clef's general pitch-position formula
  * in a way that could be computed generically. Each row below was
  * independently verified against the real notated pitch letter+octave
- * for every position -- see Doc/phase-11-key-signature-engine.md Sec. 3
- * for the full derivation and sourcing.
+ * for every position.
  */
 export interface ClefKeySignaturePositions {
   readonly sharpPositions: readonly number[];
@@ -78,7 +77,7 @@ const ALTO_POSITIONS: ClefKeySignaturePositions = {
 };
 
 /**
- * Tenor (Phase 54, closing `Doc/STATUS.md` §C1's tenor half).
+ * Tenor (Phase 54, closing §C1's tenor half).
  *
  * Tenor puts middle C on the FOURTH line, so its staff runs D3 (bottom
  * line, y=0) up to E4 (top line, y=-4). The highest F that fits on that
@@ -147,8 +146,7 @@ export function getKeySignaturePositions(clefName: string): ClefKeySignaturePosi
   if (positions === undefined) {
     throw new Error(
       `No verified key-signature accidental positions for clef "${clefName}" ` +
-        `(soprano clef is the one remaining gap -- see Doc/phase-11-key-signature-engine.md ` +
-        `and Doc/phase-54-public-api.md). ` +
+        `(soprano clef is the one remaining gap). ` +
         `Supported clefs: ${Object.keys(CLEF_KEY_SIGNATURE_POSITIONS).join(', ')}.`,
     );
   }

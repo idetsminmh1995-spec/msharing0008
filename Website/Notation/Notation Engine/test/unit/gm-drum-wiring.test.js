@@ -83,7 +83,7 @@ describe('GM drum mapping wired into rendering (Phase 41, §13.1/§13.3)', () =>
     // middle line), corrected from an earlier -1.5 after a real drum-lesson
     // MusicXML's own consistent encoding (62/62 snare notes at the same
     // display position) showed the table's default was a full staff-space
-    // too low. See Doc/integration-n-drum-position-corrections.md.
+    // too low.
     assert.match(svg, /x="6" y="5\.5"[^>]*>\uE0A4/);
   });
 
@@ -97,9 +97,11 @@ describe('GM drum mapping wired into rendering (Phase 41, §13.1/§13.3)', () =>
     const kick = svg.match(/x="([\d.]+)" y="7\.5"[^>]*>\uE0A4/);
     assert.ok(kick, "expected a plain oval notehead at the kick's own y=7.5");
     const x = kick[1];
-    const stems = [...svg.matchAll(/<line x1="([\d.]+)" y1="([\d.]+)" x2="[\d.]+" y2="([\d.]+)" stroke="#000000" stroke-width="0\.12"\s*\/>/g)].filter(
-      (match) => Math.abs(Number(match[1]) - Number(x)) < 2,
-    );
+    const stems = [
+      ...svg.matchAll(
+        /<line x1="([\d.]+)" y1="([\d.]+)" x2="[\d.]+" y2="([\d.]+)" stroke="#000000" stroke-width="0\.12"\s*\/>/g,
+      ),
+    ].filter((match) => Math.abs(Number(match[1]) - Number(x)) < 2);
     assert.equal(stems.length, 1);
     assert.ok(Number(stems[0][3]) < Number(stems[0][2]), 'expected an up stem for the kick');
   });
@@ -184,8 +186,20 @@ describe('GM drum mapping wired into rendering (Phase 41, §13.1/§13.3)', () =>
       'utf8',
     );
     const { svg } = NE.renderFromMusicXml(xml, { domParser });
-    const beams = [...svg.matchAll(/<line x1="[\d.]+" y1="[\d.]+" x2="[\d.]+" y2="[\d.]+" stroke="#000000" stroke-width="0\.5"\s*\/>/g)];
-    assert.equal(beams.length, 1, 'expected one shared beam for simultaneous hi-hat and kick attacks');
-    assert.equal((svg.match(/<path\b/g) || []).length, 0, 'the kick voice must not add slur or curve paths');
+    const beams = [
+      ...svg.matchAll(
+        /<line x1="[\d.]+" y1="[\d.]+" x2="[\d.]+" y2="[\d.]+" stroke="#000000" stroke-width="0\.5"\s*\/>/g,
+      ),
+    ];
+    assert.equal(
+      beams.length,
+      1,
+      'expected one shared beam for simultaneous hi-hat and kick attacks',
+    );
+    assert.equal(
+      (svg.match(/<path\b/g) || []).length,
+      0,
+      'the kick voice must not add slur or curve paths',
+    );
   });
 });

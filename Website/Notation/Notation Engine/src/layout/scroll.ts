@@ -9,7 +9,7 @@
  * width (Phase 43's `§14` algorithm, via `computeMeasureLayout`) is
  * placed at the running cumulative x, with no stretching and no limit
  * on how many measures or how wide the result gets -- unlike `§16.2`'s
- * page mode (Phase 46, not yet built), which packs measures into
+ * page mode (`src/layout/page.ts`, Phase 46), which packs measures into
  * systems and justifies each one once it's full.
  */
 export interface ScrollMeasureLayout {

@@ -133,9 +133,8 @@ describe('notehead selection (Phase 15)', () => {
   test('an unrecognized MusicXML notehead value falls back instead of throwing', () => {
     // This test used to assert the opposite. Throwing here took down the
     // WHOLE render of a real drum chart over one notehead
-    // MusicXML does define and this engine had not listed -- see
-    // Doc/any-drum-notation.md. A file is input; §10.7 says report and
-    // carry on.
+    // MusicXML does define and this engine had not listed. A file is
+    // input; §10.7 says report and carry on.
     assert.equal(NE.musicXmlNoteheadToShape('not-a-real-notehead'), undefined);
     assert.equal(NE.isKnownMusicXmlNotehead('not-a-real-notehead'), false);
     assert.equal(

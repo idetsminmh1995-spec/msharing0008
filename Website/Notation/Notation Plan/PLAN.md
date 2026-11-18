@@ -148,6 +148,15 @@ Implementation sequence:
 
 ## သမိုင်းမှတ်တမ်း (အကိုးအကား)
 
+### Stale-comment and dead-reference sweep — 2026-11-18
+
+Part B's completion criterion is that no README or source comment describes an existing feature as a placeholder. An audit found the sweep had been partial: several comments still called shipped features "not yet built", and a set of cross-references pointed at a `Doc/` tree that no longer exists anywhere in the repo.
+
+- [x] `src/layout/spacing.ts` (two comments), `src/layout/scroll.ts`, `src/geometry/barline.ts` and `src/layout/system.ts` no longer call system/page breaking, page mode or §15's skyline "not yet built"/`[TODO]`; they now name the module that carries each (`src/layout/page.ts`, `src/layout/system.ts`'s own skyline-aware variant).
+- [x] Removed the dead `Doc/` references (`Doc/phase-10-clef-engine.md`, `-11-`, `-50-`, `-54-`, `Doc/STATUS.md`, `Doc/integration-i-`, `-n-`, `-o-`, `Doc/any-drum-notation.md`, `Doc/phase-08-testing-harness.md`) from `src/geometry/clef.ts`, `stem.ts`, `key-signature.ts`, `notehead.ts`, `src/render-from-musicxml.ts`, and the affected tests/READMEs. The claims they supported were kept; only the pointer to a missing file was dropped.
+- [x] `test/fixtures/cross-software/print-breaks.musicxml` and its test said `<print>` breaks were ignored; page mode now forces breaks from them, so both now say so.
+- [x] 1283/1283 pass.
+
 ### Cross-barline / cross-system slur continuation — 2026-11-18
 
 The span pass resolved slurs only *within one measure*: a slur whose start and stop fell in different measures was left undrawn with an `UNMATCHED_SLUR` diagnostic, even though a slur crossing a barline is ordinary notation. Slurs now carry their start across measures the way ties already do.

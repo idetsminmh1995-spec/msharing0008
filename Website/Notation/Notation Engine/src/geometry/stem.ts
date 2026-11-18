@@ -88,7 +88,7 @@ const MIN_STEM_LENGTH = 2.5;
  * (the existing "reach the middle" branch) makes no sense when the
  * middle line is in the OPPOSITE direction from where the stem is
  * headed -- confirmed as a real, visible bug against a real drum
- * chart, see Doc/integration-o-stem-shortening.md.
+ * chart.
  *
  * `direction` decides which branch applies:
  * - **Heading toward the middle** (the ordinary case: automatic
