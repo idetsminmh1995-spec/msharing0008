@@ -148,6 +148,16 @@ Implementation sequence:
 
 ## သမိုင်းမှတ်တမ်း (အကိုးအကား)
 
+### Cross-barline / cross-system slur continuation — 2026-11-18
+
+The span pass resolved slurs only *within one measure*: a slur whose start and stop fell in different measures was left undrawn with an `UNMATCHED_SLUR` diagnostic, even though a slur crossing a barline is ordinary notation. Slurs now carry their start across measures the way ties already do.
+
+- [x] A slur start that has no stop in its own measure is carried (per staff and voice) into the next measure; when its stop is reached the curve is drawn from the start note to the stop note. A within-system span is one path; a span that also crosses a system break is split at the break with the same `crossSystemHalves` helper ties use, so it is never drawn backwards.
+- [x] Factored the slur-curve markup into `renderSlurCurve`, shared by the same-system and cross-system paths.
+- [x] A slur stop with no start anywhere in its part, and a start that never stops in its part, still report `UNMATCHED_SLUR` rather than throwing. A stop on a staff whose own pass does not draw it (a grand-staff part's other staff) is not misreported.
+- [x] Tuplets are still measure-local and still diagnose `UNMATCHED_TUPLET` across a barline; the scope difference is now stated in the pass's own doc comment.
+- [x] Tests added to `slur-tuplet-wiring.test.js`: a slur across a barline (one curve, starting on measure 1), a slur across a barline AND a system break (split into two halves on two systems), and a stop with no start anywhere.
+
 ### Cross-system pedal / octave-shift continuation — 2026-11-18
 
 The tie/hairpin/slide pass left two spans that crossed a system break *silently*: a sustain pedal span drew its whole line on the start system, running backwards off the system's left edge when the stop landed on the next system, and an octave-shift (8va/8vb) bracket vanished entirely when its start and stop landed on different systems. Neither emitted a diagnostic, so the mistake was invisible. Both now split at the break.

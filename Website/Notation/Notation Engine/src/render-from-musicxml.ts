@@ -3025,6 +3025,58 @@ function spanSourceNote(event: MeasureEvent): Note | undefined {
 }
 
 /**
+ * A slur whose start note was seen but whose stop note lies in a LATER
+ * measure. Both endpoints are drawn together, in the measure that holds
+ * the stop, because only then is the whole span's geometry known.
+ */
+interface SlurStart {
+  readonly systemIndex: number;
+  readonly measureNumber: number;
+  /** The start notehead's own anchor, from which the curve's near end is derived. */
+  readonly anchor: EventAnchor;
+  /** Where the curve begins: just past the start notehead. */
+  readonly x: number;
+}
+
+/** One slur curve between two x positions at one absolute y, its side and the notes it covers taken from `anchors`. */
+function renderSlurCurve(
+  anchors: readonly EventAnchor[],
+  startX: number,
+  endX: number,
+  y: number,
+  theme: RenderTheme,
+): string {
+  if (anchors.length < 2) return '';
+  const side = slurSide(anchors.map((a) => a.direction));
+  return renderSlur(computeSlurShape(startX, endX, y, side), {
+    color: theme.colorOf('slur'),
+    midpointThickness: lineWidth(
+      theme,
+      'slurMiddle',
+      'slurMidpointThickness',
+      SLUR_MIDPOINT_THICKNESS_FALLBACK,
+    ),
+  });
+}
+
+/** What a slur needs from the measure being rendered that `RenderCtx` does not carry. */
+interface SlurSpanContext {
+  readonly measureNumber: number;
+  readonly systemIndex: number;
+  /** A system's own origin y; a fixed offset on another system is adjusted by the difference. */
+  readonly systemYFor: (systemIndex: number) => number;
+  /** Splits a span at every system break between two systems, drawing each piece. */
+  readonly splitAcrossSystems: (
+    startSystem: number,
+    stopSystem: number,
+    startX: number,
+    endX: number,
+    yFor: (systemIndex: number) => number,
+    draw: (fromX: number, toX: number, y: number) => string,
+  ) => string;
+}
+
+/**
  * Integration I: draws one voice's SPANS -- §9.16 slurs and §9.17 tuplets
  * -- after every event in that voice has been drawn and has contributed
  * its `EventAnchor`.
@@ -3036,17 +3088,21 @@ function spanSourceNote(event: MeasureEvent): Note | undefined {
  * Collecting anchors once and resolving spans here is what lets all three
  * participate without each path knowing about spans at all.
  *
- * Scope, stated rather than implied: a span is resolved only WITHIN one
- * voice of one measure. A slur or tuplet that crosses a barline is left
- * undrawn with a diagnostic. Unlike simple-note ties, which carry their
- * anchors across measures within one system, this pass has no access to the
- * next measure's anchors or x positions.
+ * Scope, stated rather than implied: a TUPLET is still resolved only WITHIN
+ * one voice of one measure -- one that crosses a barline is left undrawn
+ * with a diagnostic. A SLUR, by contrast, may cross barlines: `pendingSlurs`
+ * holds a start whose stop lies in a later measure, and this pass adds to it
+ * as it sees starts and removes from it as it sees stops. A span that stays
+ * within one system is drawn whole; one that also crosses a system break is
+ * split at the break the way a tie is.
  */
 function renderSpans(
   events: readonly MeasureEvent[],
   anchorByIndex: ReadonlyMap<number, EventAnchor>,
   beamedIndices: ReadonlySet<number>,
+  pendingSlurs: Map<number, SlurStart>,
   ctx: RenderCtx,
+  slurCtx: SlurSpanContext,
   onDiagnostic: (code: string, message: string) => void,
 ): string {
   const parts: string[] = [];
@@ -3061,65 +3117,86 @@ function renderSpans(
   };
 
   // ---- §9.16 slurs ----------------------------------------------------
-  const openSlurs = new Map<number, number>();
+  // Starts seen in THIS measure, awaiting their stop, with the event index
+  // that began each so a within-measure span can collect the anchors
+  // BETWEEN its two endpoints. A start whose stop never comes here is
+  // carried into `pendingSlurs` for a later measure.
+  const openSlurs = new Map<number, { readonly idx: number; readonly start: SlurStart }>();
   events.forEach((event, idx) => {
     const note = spanSourceNote(event);
     if (note === undefined) return;
 
     for (const number of note.slurStops ?? []) {
-      const startIdx = openSlurs.get(number);
-      if (startIdx === undefined) {
+      const endAnchor = anchorByIndex.get(idx);
+      // The stop note is not drawn on THIS staff (a multi-staff part's
+      // voices carry events for every staff; the other staff's own pass
+      // handles its own). Nothing to diagnose here.
+      if (endAnchor === undefined) continue;
+      const local = openSlurs.get(number);
+      // A stop with no start in THIS measure may close a slur opened in an
+      // earlier measure.
+      const carried = local === undefined ? pendingSlurs.get(number) : undefined;
+      if (local === undefined && carried === undefined) {
         onDiagnostic(
           'UNMATCHED_SLUR',
           `A <slur type="stop" number="${number}"> has no matching start in this measure and voice; the slur was not drawn.`,
         );
         continue;
       }
-      openSlurs.delete(number);
-      const anchors = spanAnchors(startIdx, idx);
+      const start = local !== undefined ? local.start : (carried as SlurStart);
+      if (local !== undefined) openSlurs.delete(number);
+      else pendingSlurs.delete(number);
       // §9.16: "a single-note span is nonsensical for a slur (2+ notes
       // required) and should be rejected rather than silently drawing
-      // something."
+      // something." A within-measure span needs two notes; a carried span
+      // already has its start note, so its stop is the second.
+      const anchors = local !== undefined ? spanAnchors(local.idx, idx) : [start.anchor, endAnchor];
       if (anchors.length < 2) continue;
       const side = slurSide(anchors.map((a) => a.direction));
       const y =
         side === 'above'
           ? Math.min(...anchors.map((a) => a.topPosition)) - SLUR_GAP
           : Math.max(...anchors.map((a) => a.bottomPosition)) + SLUR_GAP;
-      const first = anchors[0];
-      const last = anchors[anchors.length - 1];
-      if (first === undefined || last === undefined) continue;
-      const shape = computeSlurShape(
-        // Start just past the first notehead and end at the last one's own
-        // x, the same convention Phase 26's ties already use.
-        first.x + noteheadWidth(first.noteheadGlyph),
-        last.x,
-        ctx.measureBottomY + y,
-        side,
-      );
-      parts.push(
-        renderSlur(shape, {
-          color: ctx.theme.colorOf('slur'),
-          midpointThickness: lineWidth(
-            ctx.theme,
-            'slurMiddle',
-            'slurMidpointThickness',
-            SLUR_MIDPOINT_THICKNESS_FALLBACK,
-          ),
-        }),
-      );
+      if (start.systemIndex === slurCtx.systemIndex) {
+        parts.push(
+          renderSlurCurve(anchors, start.x, endAnchor.x, ctx.measureBottomY + y, ctx.theme),
+        );
+      } else {
+        // The slur runs off one system and back in on the next: draw the
+        // outgoing piece to the start system's right edge, a whole-system
+        // piece on every system between, and the incoming piece from the
+        // stop system's left edge -- the same split a tie gets.
+        const split = slurCtx.splitAcrossSystems(
+          start.systemIndex,
+          slurCtx.systemIndex,
+          start.x,
+          endAnchor.x,
+          (s) =>
+            ctx.measureBottomY +
+            y +
+            (slurCtx.systemYFor(s) - slurCtx.systemYFor(slurCtx.systemIndex)),
+          (fromX, toX, segY) => renderSlurCurve(anchors, fromX, toX, segY, ctx.theme),
+        );
+        if (split !== '') parts.push(split);
+      }
     }
 
     for (const number of note.slurStarts ?? []) {
-      openSlurs.set(number, idx);
+      const startAnchor = anchorByIndex.get(idx);
+      if (startAnchor === undefined) continue;
+      openSlurs.set(number, {
+        idx,
+        start: {
+          systemIndex: slurCtx.systemIndex,
+          measureNumber: slurCtx.measureNumber,
+          anchor: startAnchor,
+          x: startAnchor.x + noteheadWidth(startAnchor.noteheadGlyph),
+        },
+      });
     }
   });
-  if (openSlurs.size > 0) {
-    onDiagnostic(
-      'UNMATCHED_SLUR',
-      `${openSlurs.size} slur(s) start in this measure and voice but never stop in it; a slur crossing a barline is not drawn (see Doc/integration-i-slur-tuplet-wiring.md).`,
-    );
-  }
+  // A start that never stopped in this measure continues in a later one.
+  for (const [number, open] of openSlurs) pendingSlurs.set(number, open.start);
 
   // ---- §9.17 tuplets --------------------------------------------------
   let openTuplet: number | undefined;
@@ -4947,6 +5024,11 @@ export function renderParsedMusicXml(
       }
     >();
     const pendingSlidesByVoiceAndStaff = new Map<string, SlideEndpoint>();
+    // §9.16: like ties, a slur's start anchor survives measure boundaries
+    // within a part, keyed by staff and voice. A start whose stop is in a
+    // later measure is drawn when the stop is reached -- whole if the two
+    // measures share one system, split at the break if they do not.
+    const pendingSlursByVoiceAndStaff = new Map<string, Map<number, SlurStart>>();
     const tiePitchesMatch = (first: Note['pitch'], second: Note['pitch']): boolean => {
       if (first.kind === 'pitched' && second.kind === 'pitched') {
         return (
@@ -5936,6 +6018,11 @@ export function renderParsedMusicXml(
           for (const voice of measure.voices) {
             const forcedDirection = isMultiVoice ? voiceForcedDirection(voice.id) : undefined;
             const tieKey = `${staffNumber}:${voice.id}`;
+            let pendingSlursForVoice = pendingSlursByVoiceAndStaff.get(tieKey);
+            if (pendingSlursForVoice === undefined) {
+              pendingSlursForVoice = new Map<number, SlurStart>();
+              pendingSlursByVoiceAndStaff.set(tieKey, pendingSlursForVoice);
+            }
             const restOffset = isMultiVoice
               ? voiceRestOffset(voice.id) + (restPushes.get(voice.id) ?? 0)
               : 0;
@@ -6296,7 +6383,14 @@ export function renderParsedMusicXml(
               voice.events,
               anchorByIndex,
               beamedIndices,
+              pendingSlursForVoice,
               ctx,
+              {
+                measureNumber: measure.number,
+                systemIndex: layout.systemIndex,
+                systemYFor: (s) => systemBounds.get(s)?.y ?? 0,
+                splitAcrossSystems: crossSystemHalves,
+              },
               (code, message) => {
                 diagnostics.push({
                   severity: 'info',
@@ -6636,6 +6730,16 @@ export function renderParsedMusicXml(
         message: `A <${pending.kind}> start has no matching stop; no ${pending.kind} was drawn.`,
         location: { partId: part.id, measureNumber: pending.measureNumber },
       });
+    // §9.16: a slur start that never reached a stop in the whole part.
+    for (const slurs of pendingSlursByVoiceAndStaff.values())
+      for (const pending of slurs.values())
+        diagnostics.push({
+          severity: 'info',
+          code: 'UNMATCHED_SLUR',
+          message:
+            'A <slur type="start"> has no matching stop in this part; the slur was not drawn.',
+          location: { partId: part.id, measureNumber: pending.measureNumber },
+        });
     // §9.18/Phase 29: a part with 2+ staves is ONE instrument, so its staves
     // are joined by a brace at each system's left edge -- drawn once per
     // SYSTEM (page mode has several), not once per measure.

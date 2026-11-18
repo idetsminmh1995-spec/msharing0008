@@ -62,7 +62,7 @@ Three states:
 
 | Element | State | Notes |
 | --- | --- | --- |
-| `tied`, `tie`, `slur` | Implemented | Ties and slurs; `INVALID_OFFSET` for a bad number. A tie or slide that spans a system break is drawn as two halves, one on each system. |
+| `tied`, `tie`, `slur` | Implemented | Ties and slurs; `INVALID_OFFSET` for a bad number. A tie, slur or slide that spans a system break is drawn as two halves, one on each system. A slur (like a tie) also continues across a barline within one system. |
 | `tuplet` | Implemented | Bracket/number display. |
 | `articulations` | Implemented | Known marks drawn; `UNSUPPORTED_ARTICULATION` otherwise. |
 | `ornaments` | Partly implemented | Trill etc. where known; `UNSUPPORTED_ORNAMENT` otherwise. |

@@ -79144,7 +79144,20 @@ ${xrefOffset}
     if (event.kind === "chord") return event.notes[0];
     return void 0;
   }
-  function renderSpans(events, anchorByIndex, beamedIndices, ctx, onDiagnostic) {
+  function renderSlurCurve(anchors, startX, endX, y, theme) {
+    if (anchors.length < 2) return "";
+    const side = slurSide(anchors.map((a) => a.direction));
+    return renderSlur(computeSlurShape(startX, endX, y, side), {
+      color: theme.colorOf("slur"),
+      midpointThickness: lineWidth(
+        theme,
+        "slurMiddle",
+        "slurMidpointThickness",
+        SLUR_MIDPOINT_THICKNESS_FALLBACK
+      )
+    });
+  }
+  function renderSpans(events, anchorByIndex, beamedIndices, pendingSlurs, ctx, slurCtx, onDiagnostic) {
     const parts = [];
     const spanAnchors = (startIdx, endIdx) => {
       const out = [];
@@ -79159,52 +79172,55 @@ ${xrefOffset}
       const note2 = spanSourceNote(event);
       if (note2 === void 0) return;
       for (const number of note2.slurStops ?? []) {
-        const startIdx = openSlurs.get(number);
-        if (startIdx === void 0) {
+        const endAnchor = anchorByIndex.get(idx);
+        if (endAnchor === void 0) continue;
+        const local = openSlurs.get(number);
+        const carried = local === void 0 ? pendingSlurs.get(number) : void 0;
+        if (local === void 0 && carried === void 0) {
           onDiagnostic(
             "UNMATCHED_SLUR",
             `A <slur type="stop" number="${number}"> has no matching start in this measure and voice; the slur was not drawn.`
           );
           continue;
         }
-        openSlurs.delete(number);
-        const anchors = spanAnchors(startIdx, idx);
+        const start = local !== void 0 ? local.start : carried;
+        if (local !== void 0) openSlurs.delete(number);
+        else pendingSlurs.delete(number);
+        const anchors = local !== void 0 ? spanAnchors(local.idx, idx) : [start.anchor, endAnchor];
         if (anchors.length < 2) continue;
         const side = slurSide(anchors.map((a) => a.direction));
         const y = side === "above" ? Math.min(...anchors.map((a) => a.topPosition)) - SLUR_GAP : Math.max(...anchors.map((a) => a.bottomPosition)) + SLUR_GAP;
-        const first = anchors[0];
-        const last = anchors[anchors.length - 1];
-        if (first === void 0 || last === void 0) continue;
-        const shape = computeSlurShape(
-          // Start just past the first notehead and end at the last one's own
-          // x, the same convention Phase 26's ties already use.
-          first.x + noteheadWidth(first.noteheadGlyph),
-          last.x,
-          ctx.measureBottomY + y,
-          side
-        );
-        parts.push(
-          renderSlur(shape, {
-            color: ctx.theme.colorOf("slur"),
-            midpointThickness: lineWidth(
-              ctx.theme,
-              "slurMiddle",
-              "slurMidpointThickness",
-              SLUR_MIDPOINT_THICKNESS_FALLBACK
-            )
-          })
-        );
+        if (start.systemIndex === slurCtx.systemIndex) {
+          parts.push(
+            renderSlurCurve(anchors, start.x, endAnchor.x, ctx.measureBottomY + y, ctx.theme)
+          );
+        } else {
+          const split = slurCtx.splitAcrossSystems(
+            start.systemIndex,
+            slurCtx.systemIndex,
+            start.x,
+            endAnchor.x,
+            (s) => ctx.measureBottomY + y + (slurCtx.systemYFor(s) - slurCtx.systemYFor(slurCtx.systemIndex)),
+            (fromX, toX, segY) => renderSlurCurve(anchors, fromX, toX, segY, ctx.theme)
+          );
+          if (split !== "") parts.push(split);
+        }
       }
       for (const number of note2.slurStarts ?? []) {
-        openSlurs.set(number, idx);
+        const startAnchor = anchorByIndex.get(idx);
+        if (startAnchor === void 0) continue;
+        openSlurs.set(number, {
+          idx,
+          start: {
+            systemIndex: slurCtx.systemIndex,
+            measureNumber: slurCtx.measureNumber,
+            anchor: startAnchor,
+            x: startAnchor.x + noteheadWidth(startAnchor.noteheadGlyph)
+          }
+        });
       }
     });
-    if (openSlurs.size > 0) {
-      onDiagnostic(
-        "UNMATCHED_SLUR",
-        `${openSlurs.size} slur(s) start in this measure and voice but never stop in it; a slur crossing a barline is not drawn (see Doc/integration-i-slur-tuplet-wiring.md).`
-      );
-    }
+    for (const [number, open] of openSlurs) pendingSlurs.set(number, open.start);
     let openTuplet;
     events.forEach((event, idx) => {
       const note2 = spanSourceNote(event);
@@ -80258,6 +80274,7 @@ ${xrefOffset}
       const midiInstrumentsByPart = midiInstrumentsByPartMap.get(part2.id);
       const pendingTiesByVoiceAndStaff = /* @__PURE__ */ new Map();
       const pendingSlidesByVoiceAndStaff = /* @__PURE__ */ new Map();
+      const pendingSlursByVoiceAndStaff = /* @__PURE__ */ new Map();
       const tiePitchesMatch = (first, second) => {
         if (first.kind === "pitched" && second.kind === "pitched") {
           return first.step === second.step && first.alter === second.alter && first.octave === second.octave;
@@ -80983,6 +81000,11 @@ ${xrefOffset}
             for (const voice2 of measure2.voices) {
               const forcedDirection = isMultiVoice ? voiceForcedDirection(voice2.id) : void 0;
               const tieKey = `${staffNumber}:${voice2.id}`;
+              let pendingSlursForVoice = pendingSlursByVoiceAndStaff.get(tieKey);
+              if (pendingSlursForVoice === void 0) {
+                pendingSlursForVoice = /* @__PURE__ */ new Map();
+                pendingSlursByVoiceAndStaff.set(tieKey, pendingSlursForVoice);
+              }
               const restOffset = isMultiVoice ? voiceRestOffset(voice2.id) + (restPushes.get(voice2.id) ?? 0) : 0;
               const starts = eventStartTicks(voice2.events);
               const total = totalTicks(voice2.events) || 1;
@@ -81212,7 +81234,14 @@ ${xrefOffset}
                 voice2.events,
                 anchorByIndex,
                 beamedIndices,
+                pendingSlursForVoice,
                 ctx,
+                {
+                  measureNumber: measure2.number,
+                  systemIndex: layout.systemIndex,
+                  systemYFor: (s) => systemBounds.get(s)?.y ?? 0,
+                  splitAcrossSystems: crossSystemHalves
+                },
                 (code, message) => {
                   diagnostics.push({
                     severity: "info",
@@ -81440,6 +81469,14 @@ ${xrefOffset}
           message: `A <${pending.kind}> start has no matching stop; no ${pending.kind} was drawn.`,
           location: { partId: part2.id, measureNumber: pending.measureNumber }
         });
+      for (const slurs of pendingSlursByVoiceAndStaff.values())
+        for (const pending of slurs.values())
+          diagnostics.push({
+            severity: "info",
+            code: "UNMATCHED_SLUR",
+            message: 'A <slur type="start"> has no matching stop in this part; the slur was not drawn.',
+            location: { partId: part2.id, measureNumber: pending.measureNumber }
+          });
       const partStaffCount = partStaffCounts[partIndex] ?? 1;
       if (needsBrace(partStaffCount)) {
         const firstOffset = staffOffsetFor(partIndex, 0);
