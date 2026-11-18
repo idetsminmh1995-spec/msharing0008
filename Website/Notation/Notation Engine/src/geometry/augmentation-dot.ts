@@ -12,13 +12,13 @@
  * half a space into the space above it, because a dot drawn on a line
  * cannot be seen. Further dots follow the first, evenly spaced.
  *
- * The distances are MuseScore's own (`musescore/style.ts`):
+ * The distances are the house style (`notation-defaults/engraving-style.ts`):
  * `dotNoteDistance` 0.5sp from the notehead, `dotDotDistance` 0.65sp
  * between dots, and `dotRestDistance` 0.25sp for a rest, which has no
  * notehead to clear.
  */
 
-import { MUSESCORE_STYLE } from '../musescore/style.js';
+import { ENGRAVING_STYLE } from '../notation-defaults/engraving-style.js';
 
 /** The SMuFL glyph for one augmentation dot. */
 export function augmentationDotGlyphName(): string {
@@ -26,11 +26,11 @@ export function augmentationDotGlyphName(): string {
 }
 
 /** From the notehead's right edge to the first dot. */
-export const DOT_NOTE_DISTANCE = MUSESCORE_STYLE.note.dotNoteDistance;
+export const DOT_NOTE_DISTANCE = ENGRAVING_STYLE.note.dotNoteDistance;
 /** Between one dot and the next. */
-export const DOT_DOT_DISTANCE = MUSESCORE_STYLE.note.dotDotDistance;
+export const DOT_DOT_DISTANCE = ENGRAVING_STYLE.note.dotDotDistance;
 /** From a REST's right edge to its first dot -- closer, since a rest has no notehead to clear. */
-export const DOT_REST_DISTANCE = MUSESCORE_STYLE.note.dotRestDistance;
+export const DOT_REST_DISTANCE = ENGRAVING_STYLE.note.dotRestDistance;
 
 export interface DotPlacement {
   readonly x: number;

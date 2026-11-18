@@ -1,4 +1,4 @@
-import { MUSESCORE_STYLE } from '../musescore/style.js';
+import { ENGRAVING_STYLE } from '../notation-defaults/engraving-style.js';
 import type { StemDirection } from './stem.js';
 import type { TieSide } from './tie.js';
 
@@ -29,7 +29,7 @@ export function slurSide(stemDirections: readonly StemDirection[]): SlurSide {
  * a smudge between two noteheads. Twice the midpoint thickness is the
  * point at which the shape is unmistakably an arc.
  */
-const MINIMUM_ARC_HEIGHT = MUSESCORE_STYLE.slur.midWidth * 2;
+const MINIMUM_ARC_HEIGHT = ENGRAVING_STYLE.slur.midWidth * 2;
 
 /**
  * How high a slur or tie arcs over its own span, in staff spaces.
@@ -40,7 +40,7 @@ const MINIMUM_ARC_HEIGHT = MUSESCORE_STYLE.slur.midWidth * 2;
  * slur over half a bar came out as flat as one over two notes, and a
  * two-note tie came out taller than its own length wanted.
  *
- * `MUSESCORE_STYLE.slur`'s three numbers give the SHOULDER height --
+ * `ENGRAVING_STYLE.slur`'s three numbers give the SHOULDER height --
  * where the curve's inner control points go. A curve does not reach its
  * control points: a cubic with both shoulders at the same height peaks
  * at three quarters of it (B(0.5) = (P0 + 3P1 + 3P2 + P3)/8, and with
@@ -51,7 +51,7 @@ const MINIMUM_ARC_HEIGHT = MUSESCORE_STYLE.slur.midWidth * 2;
  * do to hit it is their business.
  */
 export function arcHeightForSpan(span: number): number {
-  const { shoulderShortSlope, shoulderBase, shoulderLogCap } = MUSESCORE_STYLE.slur;
+  const { shoulderShortSlope, shoulderBase, shoulderLogCap } = ENGRAVING_STYLE.slur;
   const length = Math.abs(span);
   const shoulder =
     length <= 2

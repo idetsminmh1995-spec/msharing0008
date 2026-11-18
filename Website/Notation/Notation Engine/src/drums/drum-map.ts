@@ -1,12 +1,7 @@
 import { drumDiagnostic, type DrumDiagnostic } from './diagnostic.js';
 import type { DrumMapEntryOverride } from '../config/config.js';
-import {
-  NOTEHEAD_GROUP_TO_SHAPE,
-  noteheadForDrum,
-  stemDirectionForDrum,
-} from '../musescore/adapters.js';
-import { MUSESCORE_DRUMSET } from '../musescore/drumset.js';
-import { staffPositionFromLine } from '../musescore/staff-position.js';
+import { STANDARD_DRUM_KIT } from '../notation-defaults/drum-kit.js';
+import { staffPositionFromLine } from '../notation-defaults/staff-position.js';
 
 /**
  * §13.3's own specified shape. `staffPosition` uses the exact same
@@ -51,54 +46,38 @@ export const DRUM_FALLBACK_STAFF_POSITION = -2;
 export const DRUM_FALLBACK_NOTEHEAD_SHAPE = 'normal';
 
 /**
- * The kit, as MuseScore ships it.
+ * The kit, built from `notation-defaults/drum-kit.ts`.
  *
- * This WAS a hand-written table of 35 drums, positioned from several
- * drum-notation guides -- a defensible default, and §13.3 says so, but
- * a defensible default is not what a reader comparing this engine's
- * page with MuseScore's wants. Every score this engine is given was
- * written in MuseScore, MusicXML carries a drum note as a MIDI number
- * and nothing else, and so the two programs drew different charts from
- * the same file: toms half a space apart, the ride a half space low,
- * five instruments wearing a different head.
+ * Every score this engine is given was written in a program that stores a
+ * drum note as a General MIDI key number and nothing else, so the staff
+ * line and notehead have to come from the engine. The table they come
+ * from is the standard 61-key GM kit, stated once in
+ * `notation-defaults/drum-kit.ts` with its sources, and converted out of
+ * that file's top-down line numbers into this engine's bottom-up staff
+ * positions here.
  *
- * So it is MuseScore's own `Drumset::initDrumset()` now, read at the
- * pinned revision in `musescore/provenance.ts` and converted out of
- * MuseScore's top-down line numbers into this engine's bottom-up staff
- * positions. 61 drums rather than 35, and every one of them where
- * MuseScore puts it.
- *
- * It is still fully overridable, and that still matters: §13.3's point
- * -- that notators genuinely vary -- is true, and a kit of the owner's
- * own goes in `config.drums.mapping`, or through
- * `MuseScore.drumMappingFromMuseScore({ ... })` for a customised
- * MuseScore. What has changed is only which answer is given to someone
- * who says nothing.
+ * It is fully overridable, and that matters: §13.3's point -- that
+ * notators genuinely vary -- is true, and a kit of the owner's own goes in
+ * `config.drums.mapping`, or through
+ * `NotationDefaults.drumMapping({ overrides })`. What the default table
+ * gives is the answer to someone who says nothing.
  */
-function museScoreDrumTable(staffLines = 5): DrumMappingTable {
+function standardDrumTable(staffLines = 5): DrumMappingTable {
   const table: Record<number, DrumMapEntry> = {};
-  for (const drum of MUSESCORE_DRUMSET) {
-    // A drum whose head is one of MuseScore's named groups maps onto a
-    // shape family this engine draws in all four fills. A HEAD_CUSTOM
-    // drum -- the slap, the china cymbal, the muted conga and surdo --
-    // names one exact SMuFL glyph instead, and no family contains it,
-    // so it is carried as a glyph and the family falls back to a plain
-    // head for any caller reading only that.
-    const shape = NOTEHEAD_GROUP_TO_SHAPE[drum.notehead];
-    const glyph = shape === undefined ? noteheadForDrum(drum) : undefined;
+  for (const drum of STANDARD_DRUM_KIT) {
     table[drum.pitch] = {
       midiNote: drum.pitch,
       name: drum.name,
       staffPosition: staffPositionFromLine(drum.line, staffLines),
-      noteheadShape: shape ?? DRUM_FALLBACK_NOTEHEAD_SHAPE,
-      stemDirection: stemDirectionForDrum(drum),
-      ...(glyph !== undefined ? { noteheadGlyph: glyph } : {}),
+      noteheadShape: drum.notehead,
+      stemDirection: drum.stemDirection,
+      ...(drum.noteheadGlyph !== undefined ? { noteheadGlyph: drum.noteheadGlyph } : {}),
     };
   }
   return table;
 }
 
-export const DEFAULT_DRUM_MAPPING_TABLE: DrumMappingTable = museScoreDrumTable();
+export const DEFAULT_DRUM_MAPPING_TABLE: DrumMappingTable = standardDrumTable();
 
 export interface LookupDrumMapEntryResult {
   readonly entry: DrumMapEntry;

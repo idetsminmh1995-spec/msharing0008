@@ -104,7 +104,7 @@ import {
   DOT_NOTE_DISTANCE,
   DOT_DOT_DISTANCE,
 } from './geometry/augmentation-dot.js';
-import { MUSESCORE_STYLE } from './musescore/style.js';
+import { ENGRAVING_STYLE } from './notation-defaults/engraving-style.js';
 import { renderAugmentationDots } from './render/augmentation-dot.js';
 import { renderMetronomeMark, metronomeMarkWidth } from './render/metronome.js';
 import { TICKS_PER_QUARTER } from './core/duration-math.js';
@@ -384,7 +384,7 @@ function withinMeasureSpacing(spacing: SpacingConfig): SpacingConfig {
  */
 const NOTEHEAD_WIDTH_FALLBACK = 1.18;
 /** Between an accidental and the notehead it belongs to -- MuseScore's `accidentalNoteDistance`. */
-const ACCIDENTAL_NOTE_DISTANCE = MUSESCORE_STYLE.note.accidentalNoteDistance;
+const ACCIDENTAL_NOTE_DISTANCE = ENGRAVING_STYLE.note.accidentalNoteDistance;
 
 /** How far one attack's ink reaches RIGHT of its x: the notehead, and its augmentation dots. */
 function attackWidth(dots: number): number {
@@ -490,7 +490,7 @@ const REST_TO_CHORD_CLEARANCE = 0.35;
  * `TAB_4SIMPLE` to `TAB_6FULL` -- space their lines 1.5 apart rather
  * than 1, and the reason is structural: a fret number is written ON a
  * line, so the digits of two adjacent strings would touch at the
- * ordinary spacing. See `musescore/strings.ts`.
+ * ordinary spacing. See `notation-defaults/strings.ts`.
  */
 const TAB_LINE_DISTANCE = 1.5;
 /**

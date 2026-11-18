@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-739 exported symbols, by module.
+740 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -1268,6 +1268,7 @@ The diagnostics `level` lets through, in their original order.
 | const | `DRUM_KIT_SOURCE` |  |
 | const | `DRUM_NOTATION_SOURCE` |  |
 | type | `StemDirection` | Which way a drum stem points. |
+| const | `NOTEHEAD_SHAPES` | The notehead shape families this engine draws, matching the keys of `geometry/notehead.ts`'s `SHAPE_GLYPHS`. |
 | interface | `DrumKitEntry` |  |
 | const | `STANDARD_DRUM_KIT` | The standard 61-instrument General MIDI drum kit, by key number. |
 | function | `drumKitEntry` | One drum by MIDI key number, or undefined where the GM map defines none. |

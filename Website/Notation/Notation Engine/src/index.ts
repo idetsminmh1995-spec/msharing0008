@@ -21,18 +21,6 @@ export * from './export/index.js';
 export * from './render-from-musicxml.js';
 
 /**
- * MuseScore's own notation data, as a namespace rather than merged
- * into the surface above.
- *
- * It is a separate layer on purpose -- a second, independently-sourced
- * answer to questions the engine already answers its own way -- and a
- * namespace keeps that visible at every call site:
- * `MuseScore.MUSESCORE_DRUMSET` can never be mistaken for the engine's
- * own `DEFAULT_DRUM_MAPPING_TABLE`. See `src/musescore/README.md`.
- */
-export * as MuseScore from './musescore/index.js';
-
-/**
  * This engine's own notation data, as a namespace.
  *
  * Kept separate from the surface above so a call site reads as data:

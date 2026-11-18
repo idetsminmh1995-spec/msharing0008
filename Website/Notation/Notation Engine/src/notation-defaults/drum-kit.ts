@@ -49,17 +49,58 @@ export const DRUM_NOTATION_SOURCE: DefaultsSource = {
 /** Which way a drum stem points. */
 export type StemDirection = 'up' | 'down';
 
+/**
+ * The notehead shape families this engine draws, matching the keys of
+ * `geometry/notehead.ts`'s `SHAPE_GLYPHS`. A drum names one of these,
+ * or — where no family describes the head — an exact SMuFL glyph in
+ * `noteheadGlyph`. Kept as data here so this file stays free of an
+ * import back into the renderer; a test asserts the two lists agree.
+ */
+export const NOTEHEAD_SHAPES: readonly string[] = [
+  'normal',
+  'x',
+  'circle-x',
+  'diamond',
+  'triangle',
+  'inverted-triangle',
+  'left-triangle',
+  'square',
+  'rectangle',
+  'slash',
+  'slashed',
+  'back-slashed',
+  'plus',
+  'circled',
+  'circle-dot',
+  'arrow-up',
+  'arrow-down',
+  'cluster',
+  'none',
+  'do',
+  're',
+  'mi',
+  'fa',
+  'fa-up',
+  'so',
+  'la',
+  'ti',
+];
+
 export interface DrumKitEntry {
   /** General MIDI key number. */
   readonly pitch: number;
   /** The General MIDI name for the sound. */
   readonly name: string;
   /**
-   * A notehead shape family this engine draws (see `geometry/notehead.ts`
-   * `SHAPE_GLYPHS`: 'normal', 'x', 'diamond', 'triangle', 'slash', ...),
-   * OR one exact SMuFL glyph name where no family contains it.
+   * A notehead shape family this engine draws (see `NOTEHEAD_SHAPES`:
+   * 'normal', 'x', 'diamond', 'triangle', 'slash', ...).
    */
   readonly notehead: string;
+  /**
+   * One exact SMuFL glyph, for a drum no shape family contains. When set
+   * it wins over `notehead`.
+   */
+  readonly noteheadGlyph?: string;
   /** Staff line, our convention: 0 = top line, +1 = half a space down. */
   readonly line: number;
   readonly stemDirection: StemDirection;
@@ -74,47 +115,62 @@ export interface DrumKitEntry {
  */
 export const STANDARD_DRUM_KIT: readonly DrumKitEntry[] = [
   { pitch: 27, name: 'High Q', notehead: 'slash', line: 8, stemDirection: 'up' },
-  { pitch: 28, name: 'Slap', notehead: 'noteheadSlashX', line: 4, stemDirection: 'up' },
+  {
+    pitch: 28,
+    name: 'Slap',
+    notehead: 'slash',
+    noteheadGlyph: 'noteheadSlashX',
+    line: 4,
+    stemDirection: 'up',
+  },
   { pitch: 29, name: 'Scratch Push', notehead: 'slash', line: 6, stemDirection: 'up' },
   { pitch: 30, name: 'Scratch Pull', notehead: 'slash', line: 6, stemDirection: 'up' },
   { pitch: 31, name: 'Sticks', notehead: 'plus', line: -1, stemDirection: 'up' },
   { pitch: 32, name: 'Square Click', notehead: 'plus', line: 10, stemDirection: 'up' },
-  { pitch: 33, name: 'Metronome Click', notehead: 'cross', line: 10, stemDirection: 'up' },
+  { pitch: 33, name: 'Metronome Click', notehead: 'x', line: 10, stemDirection: 'up' },
   { pitch: 34, name: 'Metronome Bell', notehead: 'triangle', line: 10, stemDirection: 'up' },
   { pitch: 35, name: 'Acoustic Bass Drum', notehead: 'normal', line: 8, stemDirection: 'up' },
-  { pitch: 36, name: 'Bass Drum 1', notehead: 'normal', line: 7, stemDirection: 'down' },
+  { pitch: 36, name: 'Bass Drum 1', notehead: 'normal', line: 7, stemDirection: 'up' },
   { pitch: 37, name: 'Side Stick', notehead: 'slashed', line: 3, stemDirection: 'up' },
   { pitch: 38, name: 'Acoustic Snare', notehead: 'normal', line: 3, stemDirection: 'up' },
   { pitch: 39, name: 'Hand Clap', notehead: 'plus', line: -2, stemDirection: 'up' },
   { pitch: 40, name: 'Electric Snare', notehead: 'slash', line: 3, stemDirection: 'up' },
   { pitch: 41, name: 'Low Floor Tom', notehead: 'normal', line: 6, stemDirection: 'up' },
-  { pitch: 42, name: 'Closed Hi-Hat', notehead: 'cross', line: -1, stemDirection: 'up' },
+  { pitch: 42, name: 'Closed Hi-Hat', notehead: 'x', line: -1, stemDirection: 'up' },
   { pitch: 43, name: 'High Floor Tom', notehead: 'normal', line: 5, stemDirection: 'up' },
-  { pitch: 44, name: 'Pedal Hi-Hat', notehead: 'cross', line: 9, stemDirection: 'up' },
+  { pitch: 44, name: 'Pedal Hi-Hat', notehead: 'x', line: 9, stemDirection: 'up' },
   { pitch: 45, name: 'Low Tom', notehead: 'normal', line: 4, stemDirection: 'up' },
   { pitch: 46, name: 'Open Hi-Hat', notehead: 'circle-x', line: -1, stemDirection: 'up' },
   { pitch: 47, name: 'Low-Mid Tom', notehead: 'normal', line: 2, stemDirection: 'up' },
   { pitch: 48, name: 'Hi-Mid Tom', notehead: 'normal', line: 1, stemDirection: 'up' },
-  { pitch: 49, name: 'Crash Cymbal 1', notehead: 'cross', line: -2, stemDirection: 'up' },
+  { pitch: 49, name: 'Crash Cymbal 1', notehead: 'x', line: -2, stemDirection: 'up' },
   { pitch: 50, name: 'High Tom', notehead: 'normal', line: 0, stemDirection: 'up' },
-  { pitch: 51, name: 'Ride Cymbal 1', notehead: 'cross', line: 0, stemDirection: 'up' },
+  { pitch: 51, name: 'Ride Cymbal 1', notehead: 'x', line: 0, stemDirection: 'up' },
   {
     pitch: 52,
     name: 'Chinese Cymbal',
-    notehead: 'noteheadHeavyXHat',
+    notehead: 'x',
+    noteheadGlyph: 'noteheadHeavyXHat',
     line: -3,
     stemDirection: 'up',
   },
   { pitch: 53, name: 'Ride Bell', notehead: 'diamond', line: 0, stemDirection: 'up' },
   { pitch: 54, name: 'Tambourine', notehead: 'diamond', line: 6, stemDirection: 'up' },
-  { pitch: 55, name: 'Splash Cymbal', notehead: 'cross', line: -4, stemDirection: 'up' },
+  { pitch: 55, name: 'Splash Cymbal', notehead: 'x', line: -4, stemDirection: 'up' },
   { pitch: 56, name: 'Cowbell', notehead: 'inverted-triangle', line: 0, stemDirection: 'up' },
-  { pitch: 57, name: 'Crash Cymbal 2', notehead: 'cross', line: -3, stemDirection: 'up' },
+  { pitch: 57, name: 'Crash Cymbal 2', notehead: 'x', line: -3, stemDirection: 'up' },
   { pitch: 58, name: 'Vibraslap', notehead: 'ti', line: 0, stemDirection: 'up' },
-  { pitch: 59, name: 'Ride Cymbal 2', notehead: 'cross', line: 2, stemDirection: 'up' },
+  { pitch: 59, name: 'Ride Cymbal 2', notehead: 'x', line: 2, stemDirection: 'up' },
   { pitch: 60, name: 'Hi Bongo', notehead: 'normal', line: -1, stemDirection: 'up' },
   { pitch: 61, name: 'Low Bongo', notehead: 'normal', line: 0, stemDirection: 'up' },
-  { pitch: 62, name: 'Mute Hi Conga', notehead: 'noteheadXOrnate', line: 1, stemDirection: 'up' },
+  {
+    pitch: 62,
+    name: 'Mute Hi Conga',
+    notehead: 'x',
+    noteheadGlyph: 'noteheadXOrnate',
+    line: 1,
+    stemDirection: 'up',
+  },
   { pitch: 63, name: 'Open Hi Conga', notehead: 'normal', line: 1, stemDirection: 'up' },
   { pitch: 64, name: 'Low Conga', notehead: 'normal', line: 2, stemDirection: 'up' },
   { pitch: 65, name: 'High Timbale', notehead: 'normal', line: 5, stemDirection: 'up' },
@@ -123,22 +179,29 @@ export const STANDARD_DRUM_KIT: readonly DrumKitEntry[] = [
   { pitch: 68, name: 'Low Agogo', notehead: 'inverted-triangle', line: -1, stemDirection: 'up' },
   { pitch: 69, name: 'Cabasa', notehead: 'diamond', line: 2, stemDirection: 'up' },
   { pitch: 70, name: 'Maracas', notehead: 'diamond', line: 4, stemDirection: 'up' },
-  { pitch: 71, name: 'Short Whistle', notehead: 'cross', line: -3, stemDirection: 'up' },
+  { pitch: 71, name: 'Short Whistle', notehead: 'x', line: -3, stemDirection: 'up' },
   { pitch: 72, name: 'Long Whistle', notehead: 'ti', line: -3, stemDirection: 'up' },
-  { pitch: 73, name: 'Short Guiro', notehead: 'cross', line: -1, stemDirection: 'up' },
+  { pitch: 73, name: 'Short Guiro', notehead: 'x', line: -1, stemDirection: 'up' },
   { pitch: 74, name: 'Long Guiro', notehead: 'slashed', line: -1, stemDirection: 'up' },
   { pitch: 75, name: 'Claves', notehead: 'la', line: 0, stemDirection: 'up' },
   { pitch: 76, name: 'Hi Wood Block', notehead: 'la', line: 5, stemDirection: 'up' },
   { pitch: 77, name: 'Low Wood Block', notehead: 'la', line: 7, stemDirection: 'up' },
-  { pitch: 78, name: 'Mute Cuica', notehead: 'cross', line: 8, stemDirection: 'up' },
+  { pitch: 78, name: 'Mute Cuica', notehead: 'x', line: 8, stemDirection: 'up' },
   { pitch: 79, name: 'Open Cuica', notehead: 'back-slashed', line: 8, stemDirection: 'up' },
-  { pitch: 80, name: 'Mute Triangle', notehead: 'cross', line: 0, stemDirection: 'up' },
+  { pitch: 80, name: 'Mute Triangle', notehead: 'x', line: 0, stemDirection: 'up' },
   { pitch: 81, name: 'Open Triangle', notehead: 'triangle', line: 0, stemDirection: 'up' },
   { pitch: 82, name: 'Shaker', notehead: 'diamond', line: 5, stemDirection: 'up' },
   { pitch: 83, name: 'Sleigh Bell', notehead: 'inverted-triangle', line: 3, stemDirection: 'up' },
   { pitch: 84, name: 'Mark Tree', notehead: 'ti', line: 2, stemDirection: 'up' },
   { pitch: 85, name: 'Castanets', notehead: 'la', line: 2, stemDirection: 'up' },
-  { pitch: 86, name: 'Mute Surdo', notehead: 'noteheadSlashX', line: 4, stemDirection: 'up' },
+  {
+    pitch: 86,
+    name: 'Mute Surdo',
+    notehead: 'slash',
+    noteheadGlyph: 'noteheadSlashX',
+    line: 4,
+    stemDirection: 'up',
+  },
   { pitch: 87, name: 'Open Surdo', notehead: 'slash', line: 4, stemDirection: 'up' },
 ];
 
@@ -155,8 +218,10 @@ export interface DrumKitOverride {
   readonly name?: string;
   /** Our line convention: 0 = top line, +1 = half a space down. */
   readonly line?: number;
-  /** A shape family name, or one exact SMuFL glyph. */
+  /** A shape family name. */
   readonly notehead?: string;
+  /** One exact SMuFL glyph, which wins over `notehead`. */
+  readonly noteheadGlyph?: string;
   readonly stemDirection?: StemDirection;
   /**
    * Where this came from, in a few words -- "screenshot 2026-10-03, bar
@@ -198,6 +263,7 @@ export function applyDrumOverrides(
         pitch: over.pitch,
         name: over.name ?? `Drum ${over.pitch}`,
         notehead: over.notehead,
+        ...(over.noteheadGlyph === undefined ? {} : { noteheadGlyph: over.noteheadGlyph }),
         line: over.line,
         stemDirection: over.stemDirection ?? 'up',
       });
@@ -207,6 +273,7 @@ export function applyDrumOverrides(
       ...existing,
       ...(over.name === undefined ? {} : { name: over.name }),
       ...(over.notehead === undefined ? {} : { notehead: over.notehead }),
+      ...(over.noteheadGlyph === undefined ? {} : { noteheadGlyph: over.noteheadGlyph }),
       ...(over.line === undefined ? {} : { line: over.line }),
       ...(over.stemDirection === undefined ? {} : { stemDirection: over.stemDirection }),
     });

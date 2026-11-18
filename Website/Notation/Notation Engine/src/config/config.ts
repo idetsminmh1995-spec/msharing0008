@@ -231,34 +231,32 @@ export interface KeySignatureConfig {
 /**
  * Which law decides how much room a note's duration earns.
  *
- * `'musescore'` is MuseScore's: a quarter note gets `quarterNoteSpace`
- * and every doubling MULTIPLIES that by `durationSlope`. `'increment'`
- * is §14's own: every doubling ADDS `spacingIncrement`. They agree at
- * the reference duration and nowhere else, and the difference is
- * visible at a glance -- under §14 a whole note is 4.8 staff spaces,
- * under MuseScore's 7.9.
+ * `'power'` is the multiplicative law: a quarter note gets
+ * `quarterNoteSpace` and every doubling MULTIPLIES that by
+ * `durationSlope`. `'increment'` is §14's own: every doubling ADDS
+ * `spacingIncrement`. They agree at the reference duration and nowhere
+ * else, and the difference is visible at a glance -- a whole note is 7.9
+ * staff spaces under `'power'`, 4.8 under `'increment'`.
  *
- * The default is `'musescore'`, because every score this engine is
- * given was written in MuseScore and a reader comparing the two should
- * not have to wonder which one moved the notes.
+ * The default is `'power'`, the more common published convention.
  */
-export type SpacingLaw = 'musescore' | 'increment';
+export type SpacingLaw = 'power' | 'increment';
 
 export interface SpacingConfig {
   readonly law: SpacingLaw;
   /**
-   * `'musescore'` only: the staff spaces a quarter note is worth before
-   * any stretch. MuseScore's `DEFAULT_QUARTER_NOTE_SPACE`.
+   * `'power'` only: the staff spaces a quarter note is worth before any
+   * stretch.
    */
   readonly quarterNoteSpace: number;
   /**
-   * `'musescore'` only: the factor a note's space is multiplied by each
-   * time its duration doubles. MuseScore's `measureSpacing` style.
+   * `'power'` only: the factor a note's space is multiplied by each time
+   * its duration doubles.
    */
   readonly durationSlope: number;
   /**
-   * `'musescore'` only: MuseScore's `spacingDensity`, which DIVIDES.
-   * Above 1 the music is packed tighter, below 1 it is let out.
+   * `'power'` only: a divisor. Above 1 the music is packed tighter,
+   * below 1 it is let out.
    */
   readonly spacingDensity: number;
   /** `'increment'` only: the staff spaces one doubling of duration adds. */
@@ -539,13 +537,12 @@ export const DEFAULT_CONFIG: EngineConfig = {
     style: 'standard',
   },
   spacing: {
-    // MuseScore's horizontal law and its own numbers for it:
-    // DEFAULT_QUARTER_NOTE_SPACE 3.5, measureSpacing 1.5, spacingDensity
-    // 1.0, minNoteDistance 0.35, minMeasureWidth 8.0 -- see
-    // `musescore/style.ts` and `musescore/spacing.ts` for where each was
-    // read from. §14's own increment law is still here and still
-    // reachable by setting `law: 'increment'`.
-    law: 'musescore',
+    // The house horizontal law and its numbers: quarterNoteSpace 3.5,
+    // durationSlope 1.5, spacingDensity 1.0, minNoteDistance 0.35,
+    // minMeasureWidth 8.0 -- see `notation-defaults/spacing-law.ts` and
+    // `notation-defaults/engraving-style.ts`. §14's own increment law is
+    // still here and still reachable by setting `law: 'increment'`.
+    law: 'power',
     quarterNoteSpace: 3.5,
     durationSlope: 1.5,
     spacingDensity: 1.0,

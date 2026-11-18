@@ -20,7 +20,7 @@ const CONFIG = {
 };
 
 /** The shipped law, on MuseScore's own numbers. */
-const MUSESCORE_CONFIG = { ...CONFIG, law: 'musescore', minNoteDistance: 0.35 };
+const POWER_CONFIG = { ...CONFIG, law: 'power', minNoteDistance: 0.35 };
 
 /** `referenceTicks` is §14's; `ticksPerQuarter` is MuseScore's. */
 const clock = (referenceTicks) => ({ referenceTicks, ticksPerQuarter: TICKS_PER_QUARTER });
@@ -180,17 +180,17 @@ describe('checkMeasureOverflow (Phase 43, §14 error condition)', () => {
   });
 });
 
-describe("MuseScore's spacing law, which is the one the engine ships", () => {
+describe('the power law, which is the one the engine ships', () => {
   const QUARTER = TICKS_PER_QUARTER;
 
   test('a quarter note is worth exactly quarterNoteSpace', () => {
-    const space = NE.computeAttackSpace(ev(QUARTER), undefined, clock(QUARTER), MUSESCORE_CONFIG);
+    const space = NE.computeAttackSpace(ev(QUARTER), undefined, clock(QUARTER), POWER_CONFIG);
     assert.ok(Math.abs(space - 3.5) < 1e-9, `expected 3.5, got ${space}`);
   });
 
   test('each doubling MULTIPLIES by the slope -- it does not add', () => {
     const spaceOf = (ticks) =>
-      NE.computeAttackSpace(ev(ticks), undefined, clock(QUARTER), MUSESCORE_CONFIG);
+      NE.computeAttackSpace(ev(ticks), undefined, clock(QUARTER), POWER_CONFIG);
     const sixteenth = spaceOf(QUARTER / 4);
     const eighth = spaceOf(QUARTER / 2);
     const quarter = spaceOf(QUARTER);
@@ -204,7 +204,7 @@ describe("MuseScore's spacing law, which is the one the engine ships", () => {
     ]) {
       assert.ok(Math.abs(longer / shorter - 1.5) < 1e-9, `${longer} / ${shorter} should be 1.5`);
     }
-    // The numbers MuseScore itself lays out, to two decimals.
+    // The numbers the power law lays out, to two decimals.
     assert.ok(Math.abs(whole - 7.875) < 1e-9, `a whole note should be 7.875sp, got ${whole}`);
     assert.ok(Math.abs(sixteenth - 1.5555555555555556) < 1e-9);
   });
@@ -217,12 +217,12 @@ describe("MuseScore's spacing law, which is the one the engine ships", () => {
     const eighth = QUARTER / 2;
     const half = QUARTER * 2;
     const segment = ev(eighth, 0, half);
-    const space = NE.computeAttackSpace(segment, undefined, clock(QUARTER), MUSESCORE_CONFIG);
-    const halfSpace = NE.computeAttackSpace(ev(half), undefined, clock(QUARTER), MUSESCORE_CONFIG);
+    const space = NE.computeAttackSpace(segment, undefined, clock(QUARTER), POWER_CONFIG);
+    const halfSpace = NE.computeAttackSpace(ev(half), undefined, clock(QUARTER), POWER_CONFIG);
     assert.ok(Math.abs(space - halfSpace * (eighth / half)) < 1e-9);
     // And it is LESS than the eighth would have got on its own: the
     // segment is a fragment of a note already paid for.
-    const eighthSpace = NE.computeAttackSpace(ev(eighth), undefined, clock(QUARTER), MUSESCORE_CONFIG);
+    const eighthSpace = NE.computeAttackSpace(ev(eighth), undefined, clock(QUARTER), POWER_CONFIG);
     assert.ok(space < eighthSpace, `${space} should be under ${eighthSpace}`);
   });
 
@@ -230,14 +230,14 @@ describe("MuseScore's spacing law, which is the one the engine ships", () => {
     // Every attack's shortest-sounding equals its gap, so every segment
     // gets the plain power law and the positions are evenly spaced.
     const events = [ev(QUARTER), ev(QUARTER), ev(QUARTER), ev(QUARTER)];
-    const positions = [...NE.computeProportionalPositions(events, clock(QUARTER), MUSESCORE_CONFIG)];
+    const positions = [...NE.computeProportionalPositions(events, clock(QUARTER), POWER_CONFIG)];
     assert.deepEqual(positions, [0, 3.5, 7, 10.5]);
   });
 
   test('the two laws agree at a quarter note only by accident, and nowhere else', () => {
     const under = (config, ticks) =>
       NE.computeAttackSpace(ev(ticks), undefined, clock(QUARTER), config);
-    assert.ok(under(MUSESCORE_CONFIG, QUARTER * 4) > under(CONFIG, QUARTER * 4));
-    assert.ok(under(MUSESCORE_CONFIG, QUARTER / 4) > under(CONFIG, QUARTER / 4));
+    assert.ok(under(POWER_CONFIG, QUARTER * 4) > under(CONFIG, QUARTER * 4));
+    assert.ok(under(POWER_CONFIG, QUARTER / 4) > under(CONFIG, QUARTER / 4));
   });
 });

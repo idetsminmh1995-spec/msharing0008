@@ -164,7 +164,7 @@ test('drum kit: the standard kit covers the GM percussion key range', () => {
   // percussion staff (positions -0.5, -1.5, -2.5 from the bottom up).
   assert.equal(D.staffPositionFromLine(byPitch.get(38).line, 5), -2.5);
   // The closed hi-hat is an x.
-  assert.equal(byPitch.get(42).notehead, 'cross');
+  assert.equal(byPitch.get(42).notehead, 'x');
 });
 
 test('drum kit: overrides fold in without editing the standard table', () => {

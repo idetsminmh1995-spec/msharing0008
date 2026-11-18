@@ -22,7 +22,7 @@ type SpacingAlgorithmConfig = Pick<
   | 'minNoteDistance'
   | 'justify'
 >;
-import { museScoreSegmentSpace } from '../musescore/spacing.js';
+import { segmentSpace as notationSegmentSpace } from '../notation-defaults/spacing-law.js';
 import { spacingDiagnostic, type SpacingDiagnostic } from './spacing-diagnostic.js';
 
 /**
@@ -166,7 +166,7 @@ export function computeEventSpace(
 export interface SpacingClock {
   /** `'increment'` only: `computeReferenceDuration`'s answer for this measure. */
   readonly referenceTicks: number;
-  /** `'musescore'` only: one quarter note, in this score's ticks. */
+  /** `'power'` only: one quarter note, in this score's ticks. */
   readonly ticksPerQuarter: number;
 }
 
@@ -177,10 +177,10 @@ export interface SpacingClock {
  * `previous` is the attack before this one, which only MuseScore's law
  * reads, and only for the polyrhythm case its own source calls out.
  *
- * The MuseScore branch is `musescore/spacing.ts`'s own function rather
- * than a copy of its arithmetic. That folder is where the number is
- * checked against MuseScore; having the renderer compute it a second
- * way would mean two places to keep in step and one of them unchecked.
+ * The `'power'` branch is `notation-defaults/spacing-law.ts`'s own
+ * function rather than a copy of its arithmetic. That file is where the
+ * number is checked; having the renderer compute it a second way would
+ * mean two places to keep in step and one of them unchecked.
  */
 export function computeAttackSpace(
   event: SpacingEvent,
@@ -191,7 +191,7 @@ export function computeAttackSpace(
   if (config.law === 'increment') {
     return computeEventSpace(event.ticks, clock.referenceTicks, config);
   }
-  return museScoreSegmentSpace(
+  return notationSegmentSpace(
     { ticks: event.ticks, shortestSounding: event.shortestSounding ?? event.ticks },
     clock.ticksPerQuarter,
     {
