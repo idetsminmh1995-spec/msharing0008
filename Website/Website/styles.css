@@ -389,17 +389,20 @@
   top:var(--header-height);
   z-index:95;
   display:flex;
-  flex-wrap:wrap;
+  flex-wrap:nowrap;
   align-items:center;
   gap:5px;
-  padding:7px 14px;
+  padding:6px 12px;
+  overflow-x:auto;
+  overflow-y:hidden;
   border-bottom:1px solid var(--border);
   background:var(--header);
   box-shadow:0 8px 22px rgba(0,0,0,.16);
   backdrop-filter:blur(18px);
+  scrollbar-width:thin;
 }
-.editor-toolbar__group { display:flex; align-items:center; gap:3px; }
-.editor-toolbar__divider { width:1px; height:22px; margin:0 4px; background:var(--border); }
+.editor-toolbar__group { display:flex; flex:0 0 auto; align-items:center; gap:3px; }
+.editor-toolbar__divider { flex:0 0 auto; width:1px; height:22px; margin:0 3px; background:var(--border); }
 
 .editor-tool {
   display:inline-flex;
@@ -424,8 +427,6 @@
 .editor-tool:disabled { cursor:not-allowed; opacity:.4; }
 .editor-tool svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.7; }
 .editor-tool.is-active,.editor-tool[aria-pressed='true'] { border-color:var(--accent); color:var(--accent-bright); background:rgba(242,13,61,.12); }
-.editor-tool--play { border-radius:50%; color:#fff; background:var(--accent); }
-.editor-tool--play:hover:not(:disabled) { border-color:var(--accent-bright); background:var(--accent-bright); color:#fff; }
 .editor-tool__glyph { font-family:'Bravura','Inter',sans-serif; font-size:17px; font-weight:400; line-height:1; }
 
 .editor-toolbar__select {
@@ -453,16 +454,146 @@
   background:var(--surface);
   overscroll-behavior:contain;
 }
+
+/* ------------------------------------------------------------------ */
+/* Editor bottom bar — Play, metronome, view switch, Save, Export       */
+/* ------------------------------------------------------------------ */
+.editor-page { --editor-bottom-height:52px; padding-bottom:calc(var(--bottom-height) + var(--editor-bottom-height)); }
+.editor-canvas { min-height:calc(100vh - var(--header-height) - var(--editor-bottom-height) - 132px); }
+
+.editor-bottombar {
+  position:fixed;
+  right:0;
+  bottom:var(--bottom-height);
+  left:0;
+  z-index:96;
+  display:flex;
+  height:var(--editor-bottom-height);
+  align-items:center;
+  gap:6px;
+  padding:0 16px;
+  overflow:visible;
+  border-top:1px solid var(--border);
+  background:var(--header);
+  box-shadow:0 -12px 30px rgba(0,0,0,.24);
+  backdrop-filter:blur(18px);
+}
+.editor-bottombar__group { display:flex; flex:0 0 auto; align-items:center; gap:5px; }
+.editor-bottombar__group--end { position:relative; margin-left:auto; }
+.editor-bottombar__divider { flex:0 0 auto; width:1px; height:24px; margin:0 4px; background:var(--border); }
+.editor-bottombar__readout { min-width:46px; color:var(--muted); font-family:'DM Mono',monospace; font-size:10px; text-align:center; }
+
+.editor-bottombar__button {
+  display:inline-flex;
+  min-width:32px;
+  height:32px;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  padding:0 8px;
+  border:1px solid transparent;
+  border-radius:9px;
+  color:var(--muted);
+  background:transparent;
+  cursor:pointer;
+  font-size:11px;
+  font-weight:600;
+  white-space:nowrap;
+  transition:border-color .15s ease,background .15s ease,color .15s ease;
+}
+.editor-bottombar__button:hover:not(:disabled) { border-color:var(--border); background:var(--surface-hover); color:var(--text); }
+.editor-bottombar__button:focus-visible { outline:2px solid var(--accent-bright); outline-offset:2px; }
+.editor-bottombar__button:disabled { cursor:not-allowed; opacity:.4; }
+.editor-bottombar__button svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.7; }
+.editor-bottombar__button.is-active,
+.editor-bottombar__button[aria-pressed='true'] { border-color:var(--accent); color:var(--accent-bright); background:rgba(242,13,61,.12); }
+.editor-bottombar__button--play { border-radius:50%; color:#fff; background:var(--accent); }
+.editor-bottombar__button--play:hover:not(:disabled) { border-color:var(--accent-bright); background:var(--accent-bright); color:#fff; }
+.editor-bottombar__button--play[aria-pressed='true'] { border-color:var(--accent-bright); color:#fff; background:var(--accent-bright); }
+
+.editor-segment {
+  display:inline-flex;
+  align-items:center;
+  gap:2px;
+  padding:3px;
+  border:1px solid var(--border);
+  border-radius:11px;
+  background:var(--surface);
+}
+.editor-segment__button {
+  display:inline-flex;
+  min-width:46px;
+  height:26px;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  padding:0 10px;
+  border:1px solid transparent;
+  border-radius:8px;
+  color:var(--muted);
+  background:transparent;
+  cursor:pointer;
+  font-size:11px;
+  font-weight:600;
+  white-space:nowrap;
+  transition:background .15s ease,color .15s ease,border-color .15s ease;
+}
+.editor-segment__button svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.7; }
+.editor-segment__button:hover:not(:disabled) { color:var(--text); }
+.editor-segment__button:focus-visible { outline:2px solid var(--accent-bright); outline-offset:2px; }
+.editor-segment__button:disabled { cursor:not-allowed; opacity:.4; }
+.editor-segment__button[aria-pressed='true'],
+.editor-segment__button.is-active { border-color:var(--border); color:var(--text); background:var(--surface-hover); }
+
+.editor-export { position:absolute; right:0; bottom:100%; }
+.editor-export__menu {
+  position:absolute;
+  right:0;
+  bottom:8px;
+  display:grid;
+  min-width:120px;
+  gap:2px;
+  padding:6px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:var(--surface);
+  box-shadow:0 18px 40px rgba(0,0,0,.35);
+}
+.editor-export__menu[hidden] { display:none; }
+.editor-export__item {
+  padding:8px 10px;
+  border:0;
+  border-radius:8px;
+  color:var(--text);
+  background:transparent;
+  cursor:pointer;
+  font-size:12px;
+  font-weight:600;
+  text-align:left;
+}
+.editor-export__item:hover:not(:disabled) { background:var(--surface-hover); }
+.editor-export__item:disabled { cursor:not-allowed; opacity:.4; }
+
+:root[data-theme='light'] .editor-bottombar { background:rgba(255,255,255,.97); box-shadow:0 -10px 28px rgba(15,23,42,.1); }
+:root[data-theme='light'] .editor-export__menu { background:#fff; box-shadow:0 18px 40px rgba(15,23,42,.14); }
 .editor-score { width:100%; padding:22px; }
 .editor-score svg { display:block; width:100%; height:auto; margin:0 auto; }
 .editor-canvas[data-layout='scroll'] .editor-score { width:max-content; min-width:100%; }
 .editor-canvas[data-layout='scroll'] .editor-score svg { width:auto; max-width:none; }
 
-.editor-empty { display:flex; min-height:inherit; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:40px 20px; text-align:center; }
-.editor-empty__mark { color:var(--accent-bright); font-family:'Bravura','Inter',sans-serif; font-size:56px; line-height:1; }
-.editor-empty h1 { margin:0; font-size:22px; letter-spacing:-.04em; }
-.editor-empty p { max-width:360px; margin:0; color:var(--muted); font-size:12px; line-height:1.6; }
-.editor-empty__actions { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:6px; }
+/* Semantic-editing overlays drawn over the score: the entry cursor, the
+   playback playhead, and the highlight on the selected / sounding event. */
+.editor-score svg [data-editor-selected='true'] { fill:var(--accent-bright); }
+.editor-score svg [data-editor-selected='true'] text { fill:var(--accent-bright); }
+.editor-score svg [data-editor-selected='true'] line { stroke:var(--accent-bright); }
+.editor-score svg .editor-overlay { pointer-events:none; }
+.editor-score svg .editor-cursor { fill:var(--accent-bright); opacity:.85; }
+.editor-score svg .editor-playhead { fill:var(--accent); }
+.editor-toolbar[data-mode='input'] .editor-tool--input { border-color:var(--accent); color:var(--accent-bright); background:rgba(242,13,61,.12); }
+.editor-score { cursor:default; }
+.editor-toolbar[data-mode='input'] ~ .editor-workspace .editor-score { cursor:crosshair; }
+
+.editor-empty { flex:1; min-height:inherit; }
 
 .editor-status { display:flex; align-items:center; gap:10px; margin:10px 2px 0; color:var(--muted); font-size:11px; }
 .editor-status__message { min-height:16px; }
@@ -475,22 +606,22 @@
   .editor-toolbar { padding:6px 8px; gap:4px; }
   .editor-tool { height:32px; padding:0 8px; }
   .editor-toolbar__divider { display:none; }
-  .editor-workspace { padding:10px 8px 96px; }
-  .editor-canvas { min-height:calc(100vh - var(--header-height) - 160px); }
+  .editor-workspace { padding:10px 8px 20px; }
+  .editor-canvas { min-height:calc(100vh - var(--header-height) - var(--bottom-height) - var(--editor-bottom-height) - 120px); }
   .editor-score { padding:12px; }
+  .editor-bottombar { padding:0 10px; gap:4px; }
+  .editor-bottombar__divider { display:none; }
+  .editor-segment__button { min-width:40px; padding:0 8px; }
 }
 
-/* Compact laptop widths: icon-only keeps the bar on a single row. */
+/* Compact laptop widths: icon-only keeps the single row short. */
 @media (max-width:1500px) {
   .editor-tool > span:not(.editor-tool__glyph) { display:none; }
-  .editor-tool.editor-tool--labelled > span { display:inline; }
   .editor-tool { min-width:32px; padding:0 6px; }
 }
-/* Narrow screens: keep the bar one row high and scroll it sideways, so the
-   score keeps the vertical space the wrapped groups would have taken. */
+/* Narrow screens: the one row simply scrolls sideways, so the score keeps
+   all the vertical space a wrapped second row would have taken. */
 @media (max-width:1280px) {
-  .editor-toolbar { flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; padding:6px 10px; scrollbar-width:none; }
-  .editor-toolbar::-webkit-scrollbar { height:0; }
-  .editor-toolbar__group { flex:0 0 auto; }
+  .editor-toolbar { padding:6px 10px; }
   .editor-canvas { min-height:calc(100vh - var(--header-height) - 120px); }
 }
