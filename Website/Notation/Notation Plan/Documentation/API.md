@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-697 exported symbols, by module.
+739 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -1242,6 +1242,119 @@ The diagnostics `level` lets through, in their original order.
 | const | `STYLE_SOURCE` |  |
 | const | `BEAM_SPACING_SOURCE` |  |
 | const | `MUSESCORE_STYLE` | The defaults, grouped the way a renderer asks for them rather than the way MuseScore's own table is ordered. |
+
+### `src/notation-defaults/adapters.ts`
+
+| | Name | Summary |
+|---|---|---|
+| function | `drumMapping` | The standard drum kit, as `config.drums.mapping`. |
+
+### `src/notation-defaults/clefs.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `CLEF_TABLE_SOURCE` |  |
+| const | `CLEF_PITCH_SOURCE` |  |
+| type | `ClefStaffGroup` | Which family of staff a clef belongs on. |
+| interface | `ClefDefinition` |  |
+| const | `CLEF_TABLE` | Every clef this engine knows. |
+| function | `clefById` | One clef by its id, or undefined. |
+| function | `clefForMusicXml` | Which clef a MusicXML `<clef>` asks for. |
+
+### `src/notation-defaults/drum-kit.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `DRUM_KIT_SOURCE` |  |
+| const | `DRUM_NOTATION_SOURCE` |  |
+| type | `StemDirection` | Which way a drum stem points. |
+| interface | `DrumKitEntry` |  |
+| const | `STANDARD_DRUM_KIT` | The standard 61-instrument General MIDI drum kit, by key number. |
+| function | `drumKitEntry` | One drum by MIDI key number, or undefined where the GM map defines none. |
+| interface | `DrumKitOverride` | One drum's worth of difference from the standard kit. |
+| interface | `DrumKitOverrides` |  |
+| function | `applyDrumOverrides` | The standard kit with a set of overrides folded in. |
+
+### `src/notation-defaults/engraving-style.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `STYLE_SOURCE` |  |
+| const | `BEAM_SPACING_SOURCE` |  |
+| const | `SPATIUM_MM` | One staff space, in millimetres, at the default page scale. |
+| const | `ENGRAVING_STYLE` |  |
+
+### `src/notation-defaults/noteheads.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `NOTEHEAD_GROUP_SOURCE` |  |
+| const | `MUSICXML_NOTEHEAD_SOURCE` |  |
+| type | `NoteheadType` | Which of a group's four glyphs to take. |
+| interface | `NoteheadGroup` |  |
+| const | `NOTEHEAD_GROUPS` | Every notehead group a MusicXML file or a drum kit can reach. |
+| function | `noteheadGlyph` | The glyph for one group, head type and stem. |
+| const | `MUSICXML_NOTEHEAD_TO_GROUP` | MusicXML's `<notehead>` values, as this engine reads them. |
+| function | `groupForMusicXmlNotehead` | The group for a MusicXML `<notehead>` value, or undefined. |
+
+### `src/notation-defaults/sources.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `PublicSource` | A public specification, standard or authority a table is read from. |
+| const | `PUBLIC_SOURCES` | The public sources behind this folder. |
+| type | `PublicSourceId` | The id of one of `PUBLIC_SOURCES`. |
+| interface | `DefaultsSource` | Where one table (or one field of one) came from. |
+| type | `Confidence` | How confident this engine is in a value. |
+| function | `sourceUrl` | The URL for a source id, for a reviewer or a diagnostic. |
+
+### `src/notation-defaults/spacing-law.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `SPACING_SOURCE` |  |
+| const | `SEGMENT_STRETCH_SOURCE` |  |
+| const | `QUARTER_NOTE_SPACE` | What a quarter note is worth, in staff spaces, before any stretch. |
+| function | `durationStretch` | How much more (or less) room a note of `ticks` gets than a quarter note. |
+| function | `eventSpace` | The space, in staff spaces, a note of `ticks` is given before the minimum-distance pass and before the system is justified. |
+| interface | `SpacingSegment` | One attack, as this spacing law sees it. |
+| function | `segmentStretch` | The stretch for ONE segment, which is not always the power law. |
+| interface | `SegmentOptions` | The knobs this law exposes, each defaulting to the house value. |
+| function | `segmentSpace` | The space one segment is given, in staff spaces, before the minimum- distance pass and before the system is justified. |
+| function | `positions` | Running x positions for a measure's attacks. |
+
+### `src/notation-defaults/staff-position.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `ABS_STEP_SOURCE` |  |
+| const | `REL_STEP_SOURCE` |  |
+| const | `LEDGER_LINE_SOURCE` |  |
+| function | `absStep` | The absolute diatonic step of a written pitch: C-1 = 0, middle C = 35. |
+| function | `lineForPitch` | Which staff line a written pitch lands on under a clef, counted from the TOP line downward in half spaces (0 = top line, +1 = half a space down). |
+| function | `staffPositionFromLine` | A line counted from the top, in this engine's own y units. |
+| function | `lineFromStaffPosition` | The inverse, for reading this engine's own numbers back as lines. |
+| function | `staffPositionForPitch` | Where a written pitch sits in this engine's y units, under a clef. |
+| function | `needsLedgerLines` | Whether a note at `line` needs ledger lines on a staff of `staffLines`. |
+| function | `pitchedClefs` | Every clef in the table that positions notes by pitch (i.e. not TAB). |
+
+### `src/notation-defaults/strings.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `STRING_DATA_SOURCE` |  |
+| const | `FRET_SOURCE` |  |
+| interface | `StringData` |  |
+| const | `STRING_DATA` | The fretted instruments this engine plays: guitars, basses, ukuleles, mandolin and banjos, all in standard tuning. |
+| function | `stringData` | One instrument's string data by id. |
+| function | `stringIndexFromLowest` | The index of a string counted from the lowest (1-based) in a highest-first list — i.e. the position of that string in `openStrings`, which is lowest-first. |
+| function | `writtenPitchFor` | The WRITTEN pitch of a sounding pitch on this instrument. |
+| function | `fretFor` | The fret a WRITTEN pitch lands on, on one string (1 = lowest), or undefined where it does not reach. |
+| interface | `TuningPreset` |  |
+| const | `GUITAR_TUNINGS` | Named guitar tunings this engine offers: standard first in each string count, then the common alternates (drop tunings, open tunings, and the half/whole-step-down sets). |
+| function | `tuningsForStrings` | Every preset for a given string count. |
+| interface | `StaffTypePreset` |  |
+| const | `STAFF_TYPES` | The staff presets this engine draws for. |
 
 ### `src/parser/midi/byte-reader.ts`
 

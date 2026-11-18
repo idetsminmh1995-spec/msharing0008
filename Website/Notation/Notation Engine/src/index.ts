@@ -31,3 +31,12 @@ export * from './render-from-musicxml.js';
  * own `DEFAULT_DRUM_MAPPING_TABLE`. See `src/musescore/README.md`.
  */
 export * as MuseScore from './musescore/index.js';
+
+/**
+ * This engine's own notation data, as a namespace.
+ *
+ * Kept separate from the surface above so a call site reads as data:
+ * `NotationDefaults.CLEF_TABLE`, `NotationDefaults.STANDARD_DRUM_KIT`.
+ * See `src/notation-defaults/README.md`.
+ */
+export * as NotationDefaults from './notation-defaults/index.js';
