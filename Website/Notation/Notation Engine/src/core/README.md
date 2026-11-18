@@ -11,5 +11,6 @@ same typed factories. When omitted, timing consumers retain their sequential
 duration fallback for simple hand-built scores. Explicit positions must be
 finite and non-negative; fractional ticks are allowed for fine subdivisions.
 
-See PLAN.md §6 and §4.3 (the "any instrument, any line count" architectural
-requirement) and Phase 4 (duration/tick math).
+The model is instrument-neutral by design: any instrument, any staff
+line count. See `../Notation Plan/PLAN.md` Part E (instrument-neutral
+mapping), which is where that requirement is carried forward.

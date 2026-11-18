@@ -1,0 +1,64 @@
+name: notation-engine
+
+# The Notation Engine is a standalone TypeScript package under
+# `Website/Notation/Notation Engine`. It builds an esbuild bundle and runs
+# its own node:test suite, which loads that bundle. The suite must stay
+# runnable with nothing but `npm install`: the browser-level visual check
+# SKIPS (not fails) when no Chromium is present, so CI installs one to
+# actually exercise it rather than leave it silently skipped.
+#
+# The engine is the only buildable/verifiable piece in this repo -- the
+# website itself is static HTML/CSS/JS with no build step -- so this is
+# the whole CI.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+defaults:
+  run:
+    working-directory: Website/Notation/Notation Engine
+
+jobs:
+  verify:
+    name: verify (typecheck, lint, format, docs, tests)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: Website/Notation/Notation Engine/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # The visual check drives a real headless Chromium. Install it so the
+      # check RUNS in CI instead of skipping; the suite still skips cleanly
+      # on a machine without one.
+      - name: Install Chromium for the visual check
+        uses: browser-actions/setup-chrome@v1
+        id: setup-chrome
+        with:
+          chrome-version: stable
+
+      - name: Verify
+        env:
+          CHROMIUM_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+        run: npm run verify
+
+      # `npm run verify` runs `docs:check`, which regenerates the API
+      # reference and fails on a diff. This prints the drift when it does,
+      # so a failing run says what to re-run. The path is relative to the
+      # engine package (`defaults.run.working-directory`).
+      - name: Show API doc drift, if any
+        if: failure()
+        run: |
+          npm run docs
+          git --no-pager diff -- "../Notation Plan/Documentation/API.md" || true

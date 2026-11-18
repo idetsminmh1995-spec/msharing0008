@@ -37,8 +37,8 @@ TypeScript ဖြင့်ရေးသားထားသော **instrument-neut
 
 - [x] `sync-website-bundle.mjs` ၏ destination ကို `Website/Website/assets/` အဖြစ် ပြင်ပြီးဖြစ်သည် (ယခင် plan ရဲ့ lowercase `Website/website` မှတ်ချက်သည် stale ဖြစ်သည်)။ `test/unit/website-bundle.test.js` က bundle hash နှင့် cache key ကို စစ်သည်။
 - [x] `generate-api-docs.mjs` ၏ output ကို `Notation/Notation Plan/Documentation/API.md` အဖြစ် ရောက်နေပြီ။ `npm run docs:check` က up-to-date ကို စစ်သည်။
-- [ ] Clean environment တွင် `npm ci` → `typecheck` → `lint` → `format:check` → `docs:check` → `test` ကို အစဉ်လိုက် run ပြီး failure တစ်ခုချင်းကို မှတ်တမ်းတင်ပါ။
-- [ ] CI workflow တစ်ခုထည့်ပါ (`.github/workflows/`)။ browser/visual test အတွက် Chromium နှင့် Bravura font ရရှိမှုကို ပြတ်သားစွာ သတ်မှတ်ပါ၊ မရှိလျှင် skip အကြောင်းရင်းကို log ထုတ်ပါ။
+- [x] CI workflow `.github/workflows/notation-engine.yml` ထည့်ပြီးဖြစ်သည်: `npm ci` → Chromium install (visual check run ဖြစ်စေရန်) → `npm run verify`။ Browser test သည် Chromium မရှိလျှင် skip ဖြစ်ကြောင်း suite က ရှိပြီးသား (browser.test.js)။
+- [ ] Clean environment တွင် `npm ci` → `typecheck` → `lint` → `format:check` → `docs:check` → `test` ကို အစဉ်လိုက် run ပြီး failure တစ်ခုချင်းကို မှတ်တမ်းတင်ပါ (CI က ဤအလုပ်ကို အလိုအလျောက်လုပ်ပေးပြီး၊ ပထမ run ၏ ရလဒ်ကို စောင့်ကြည့်ရမည်)။
 
 **ပြီးစီးမှုစံ:** Clean install မှ verify ရလဒ်ကို မှတ်တမ်းတင်ထားရမည်။ CI တွင် browser test skip/fail အကြောင်းရင်း မရှင်းလင်းဘဲ မကျန်ရ။
 
@@ -46,9 +46,9 @@ TypeScript ဖြင့်ရေးသားထားသော **instrument-neut
 
 ### Part B — Documentation ကို code နှင့် ကိုက်ညီအောင်လုပ်ရန်
 
-- [ ] Root `README.md` တစ်ခုရေးပါ: install/build, DOMParser requirement, API example, MXL ကို သီးခြား unzip လုပ်ပုံ, export behavior, host-dependent features (SoundFont/raster)။
-- [ ] `src/parser/README.md`, `src/layout/README.md`, `src/export/README.md`, `test/fixtures/README.md` မှ ကျန်နေသော "Nothing here yet / Phase 1" စာသားများကို ဖြေရှင်းပါ (အဆိုပါ code/tests ရှိပြီးသား)။
-- [ ] MusicXML elements များအတွက် **implemented / partially supported / unsupported** support matrix တစ်ခုရေးပါ။ Unknown/malformed construct များကို drop/recover လုပ်ပုံနှင့် diagnostic code များကို contract အဖြစ် မှတ်တမ်းတင်ပါ။
+- [x] Root `README.md` ရေးပြီးဖြစ်သည်: install/build, DOMParser requirement, parse/render API example, MXL ကို သီးခြား unzip လုပ်ပုံ, export behavior (PNG = first slice, PDF = raster pages), host-dependent features (SoundFont/raster)။
+- [x] `src/*/README.md` နှင့် `test/fixtures/README.md` မှ ကျန်နေသော "Phase 1 / Phase N" စာသားများနှင့် ပျောက်နေသော `Doc/phase-*.md` cross-reference များကို ဖြေရှင်းပြီးဖြစ်သည်။ ယခု README များက `Notation Plan/PLAN.md` ၏ Part များကို ညွှန်သည်။
+- [x] MusicXML **support matrix** ကို `Notation Plan/Documentation/MusicXML-Support.md` အဖြစ် ရေးပြီးဖြစ်သည် (implemented / parsed-not-applied / recovered + stable diagnostic codes)။
 - [x] `src/theme/` ကို `EngineConfig` ဖြင့် supersede လုပ်ထားပြီး၊ `src/plugins/` ကို concrete use case မရှိသေးသဖြင့် defer ထားကြောင်း ရှင်းလင်းထားသည်။ Duplicate theme/plugin API မဖန်တီးရ။
 
 **ပြီးစီးမှုစံ:** README/source comments က ရှိပြီးသား feature ကို placeholder ဟု မဖော်ပြတော့ရ။

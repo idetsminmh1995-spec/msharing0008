@@ -6,5 +6,6 @@ paginated (`page.ts`) -- plus the formatter/spacing algorithm (`spacing.ts`,
 placement (`system.ts`, `skyline.ts`, `skyline-placement.ts`), and responsive
 W x H resize (`resize.ts`).
 
-See PLAN.md §14-§16, especially §16.3 (arbitrary
-width/height resize, a hard requirement).
+See `../Notation Plan/PLAN.md` Part F (staff/tablature layout), which
+covers arbitrary width/height resize and the page reflow that is still
+open.

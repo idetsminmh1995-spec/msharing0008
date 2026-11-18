@@ -2,8 +2,8 @@
 
 Sample MusicXML files used across the test suite -- piano, guitar, drum,
 orchestral, and vocal/lyrics scores, plus real exports from multiple
-authoring programs (MuseScore, Sibelius, Finale, Dorico, Guitar Pro) for the
-Phase 39b cross-software compatibility requirement.
+different authoring programs, which are the evidence for cross-software
+compatibility (see `../Notation Plan/PLAN.md` Part D).
 
 `musicxml/` holds the single-file fixtures, `mxl/` the compressed archives,
 and `cross-software/` the per-exporter provenance corpus.
