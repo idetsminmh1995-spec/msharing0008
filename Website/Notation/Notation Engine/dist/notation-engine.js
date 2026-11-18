@@ -80059,21 +80059,56 @@ ${xrefOffset}
       if (bounds === void 0) continue;
       bounds.right = Math.max(bounds.right, placement.x + placement.width);
     }
-    const crossSystemHalves = (startSystem, stopSystem, startX, endX, yFor, draw) => {
+    const crossSystemSegments = (startSystem, stopSystem, startX, endX, yFor) => {
       const start = systemBounds.get(startSystem);
       const stop = systemBounds.get(stopSystem);
-      if (start === void 0 || stop === void 0) return "";
-      const parts = [];
-      const outgoing = draw(startX, start.right, yFor(startSystem));
-      if (outgoing !== "") parts.push(outgoing);
+      if (start === void 0 || stop === void 0) return [];
+      if (startSystem === stopSystem) {
+        return [
+          {
+            fromX: startX,
+            fromY: yFor(startSystem),
+            toX: endX,
+            toY: yFor(startSystem),
+            systemIndex: startSystem
+          }
+        ];
+      }
+      const segments = [
+        {
+          fromX: startX,
+          fromY: yFor(startSystem),
+          toX: start.right,
+          toY: yFor(startSystem),
+          systemIndex: startSystem
+        }
+      ];
       for (let s = startSystem + 1; s < stopSystem; s += 1) {
         const between = systemBounds.get(s);
         if (between === void 0) continue;
-        const full = draw(between.left, between.right, yFor(s));
-        if (full !== "") parts.push(full);
+        segments.push({
+          fromX: between.left,
+          fromY: yFor(s),
+          toX: between.right,
+          toY: yFor(s),
+          systemIndex: s
+        });
       }
-      const incoming = draw(stop.left, endX, yFor(stopSystem));
-      if (incoming !== "") parts.push(incoming);
+      segments.push({
+        fromX: stop.left,
+        fromY: yFor(stopSystem),
+        toX: endX,
+        toY: yFor(stopSystem),
+        systemIndex: stopSystem
+      });
+      return segments;
+    };
+    const crossSystemHalves = (startSystem, stopSystem, startX, endX, yFor, draw) => {
+      const parts = [];
+      for (const segment of crossSystemSegments(startSystem, stopSystem, startX, endX, yFor)) {
+        const markup = draw(segment.fromX, segment.toX, segment.fromY);
+        if (markup !== "") parts.push(markup);
+      }
       return parts.join("\n");
     };
     score2.parts.forEach((part2, partIndex) => {
@@ -80165,6 +80200,7 @@ ${xrefOffset}
       }
       const pedalSpansByMeasure = /* @__PURE__ */ new Map();
       {
+        const systemOf = (measureNumber) => placementByMeasureNumber.get(measureNumber)?.systemIndex ?? 0;
         const open = /* @__PURE__ */ new Map();
         for (const d of partDirections) {
           const x2 = directionXFor(d.measureNumber, d.tick);
@@ -80175,7 +80211,14 @@ ${xrefOffset}
               const prior = open.get(key);
               if (prior !== void 0) {
                 const list = pedalSpansByMeasure.get(prior.measureNumber) ?? [];
-                list.push({ staff: prior.staff, startX: prior.x, endX: x2, startType: prior.type });
+                list.push({
+                  staff: prior.staff,
+                  startX: prior.x,
+                  endX: x2,
+                  startSystem: systemOf(prior.measureNumber),
+                  endSystem: systemOf(d.measureNumber),
+                  startType: prior.type
+                });
                 pedalSpansByMeasure.set(prior.measureNumber, list);
               }
               open.set(key, { measureNumber: d.measureNumber, staff: d.staff, x: x2, type: pedal.type });
@@ -80191,7 +80234,14 @@ ${xrefOffset}
               } else {
                 open.delete(key);
                 const list = pedalSpansByMeasure.get(prior.measureNumber) ?? [];
-                list.push({ staff: prior.staff, startX: prior.x, endX: x2, startType: prior.type });
+                list.push({
+                  staff: prior.staff,
+                  startX: prior.x,
+                  endX: x2,
+                  startSystem: systemOf(prior.measureNumber),
+                  endSystem: systemOf(d.measureNumber),
+                  startType: prior.type
+                });
                 pedalSpansByMeasure.set(prior.measureNumber, list);
               }
             }
@@ -80399,30 +80449,50 @@ ${xrefOffset}
           const startX = directionXFor(span.start.measureNumber, span.start.tick);
           const endX = directionXFor(span.stop.measureNumber, span.stop.tick);
           if (startX === void 0 || endX === void 0) continue;
-          const topStaffY = topStaff().topStaffY;
-          const y = topStaffY - 3.2;
+          const startSystem = placementByMeasureNumber.get(span.start.measureNumber)?.systemIndex ?? 0;
+          const endSystem = placementByMeasureNumber.get(span.stop.measureNumber)?.systemIndex ?? 0;
+          const topStaffHeight = computeStaffGeometry(
+            attrs.staffLinesByStaff[1] ?? STAFF_LINES
+          ).height;
+          const yForSystem = (systemIndex) => staffBottomY + (systemOrigins[systemIndex]?.systemY ?? 0) - topStaffHeight - 3.2;
           const hook = span.start.type === "down" ? 0.7 : -0.7;
           const label = span.start.size === 15 ? "15" : "8";
-          svgParts.push(
-            svgLine(startX, y, endX, y, { stroke: theme.colorOf("mark"), "stroke-width": 0.16 })
-          );
-          svgParts.push(
-            svgLine(startX, y, startX, y + 0.7, {
-              stroke: theme.colorOf("mark"),
-              "stroke-width": 0.16
-            })
-          );
-          svgParts.push(
-            svgLine(endX, y, endX, y + hook, { stroke: theme.colorOf("mark"), "stroke-width": 0.16 })
-          );
-          svgParts.push(
-            renderText(label, startX + 0.2, y - 0.15, {
-              fontFamily: theme.textFont,
-              fontSize: 1.2,
-              color: theme.colorOf("mark"),
-              bold: true
-            })
-          );
+          for (const segment of crossSystemSegments(
+            startSystem,
+            endSystem,
+            startX,
+            endX,
+            yForSystem
+          )) {
+            const { fromX, toX, fromY } = segment;
+            if (toX <= fromX) continue;
+            svgParts.push(
+              svgLine(fromX, fromY, toX, fromY, {
+                stroke: theme.colorOf("mark"),
+                "stroke-width": 0.16
+              })
+            );
+            svgParts.push(
+              svgLine(fromX, fromY, fromX, fromY + 0.7, {
+                stroke: theme.colorOf("mark"),
+                "stroke-width": 0.16
+              })
+            );
+            svgParts.push(
+              svgLine(toX, fromY, toX, fromY + hook, {
+                stroke: theme.colorOf("mark"),
+                "stroke-width": 0.16
+              })
+            );
+            svgParts.push(
+              renderText(label, fromX + 0.2, fromY - 0.15, {
+                fontFamily: theme.textFont,
+                fontSize: 1.2,
+                color: theme.colorOf("mark"),
+                bold: true
+              })
+            );
+          }
         }
         staffNumbers.forEach((staffNumber, staffIndex) => {
           const drawSlideFor = (note2, x2, y, kind, stringNumber) => {
@@ -80544,18 +80614,23 @@ ${xrefOffset}
             }
             for (const span of pedalSpansByMeasure.get(measure2.number) ?? []) {
               if (span.staff !== staffNumber) continue;
-              svgParts.push(
-                svgLine(
-                  span.startX + 1.2,
-                  bottomY + DYNAMIC_GAP - 0.35,
-                  span.endX,
-                  bottomY + DYNAMIC_GAP - 0.35,
-                  {
+              const pedalY = bottomY + DYNAMIC_GAP - 0.35;
+              const yForSystem = (systemIndex) => pedalY + ((systemOrigins[systemIndex]?.systemY ?? 0) - systemY);
+              for (const segment of crossSystemSegments(
+                span.startSystem,
+                span.endSystem,
+                span.startX + 1.2,
+                span.endX,
+                yForSystem
+              )) {
+                if (segment.toX <= segment.fromX) continue;
+                svgParts.push(
+                  svgLine(segment.fromX, segment.fromY, segment.toX, segment.toY, {
                     stroke: theme.colorOf("text"),
                     "stroke-width": lineWidth(theme, void 0, "pedalLineThickness", 0.16)
-                  }
-                )
-              );
+                  })
+                );
+              }
             }
             for (const d of partDirections) {
               if (d.measureNumber !== measure2.number || d.staff !== staffNumber) continue;

@@ -247,6 +247,96 @@ describe('page layout wiring (Integration L, §16.2)', () => {
     assert.ok(![...diagnostics].some((d) => d.code === 'WEDGE_CROSSES_SYSTEM'));
   });
 
+  /** Horizontal lines drawn at the pedal line's own thickness -- the sustain-span segments. */
+  function horizontalPedalLines(svg) {
+    return [...svg.matchAll(/<line x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"([^/]*)\/>/g)]
+      .filter((m) => m[5].includes('stroke-width="0.16"'))
+      .map((m) => m.slice(1, 5).map(Number))
+      .filter(([x1, y1, x2, y2]) => y1 === y2 && Math.abs(x2 - x1) > 2);
+  }
+
+  const pedalSpan = (count) => {
+    const start =
+      '<direction><direction-type><pedal type="start" number="1"/></direction-type></direction>';
+    const stop =
+      '<direction><direction-type><pedal type="stop" number="1"/></direction-type></direction>';
+    let measures = '';
+    for (let i = 1; i <= count; i++) {
+      const extra = i === 1 ? start : i === count ? stop : '';
+      const brk = i > 1 ? '<print new-system="yes"/>' : '';
+      measures += `<measure number="${i}">${brk}${extra}${i === 1 ? ATTRS : ''}${whole('C', 5)}</measure>`;
+    }
+    return (
+      '<score-partwise><part-list><score-part id="P1"/></part-list>' +
+      `<part id="P1">${measures}</part></score-partwise>`
+    );
+  };
+
+  test('a pedal span across a system break is split at the break, never drawn backwards', () => {
+    const { svg, diagnostics } = render(pedalSpan(2), {
+      layout: { mode: 'page' },
+      page: { pageWidth: 120 },
+    });
+    assert.ok(![...diagnostics].some((d) => d.code === 'UNMATCHED_PEDAL'));
+    const lines = horizontalPedalLines(svg);
+    assert.equal(lines.length, 2, 'one outgoing half on the start system, one incoming on the stop');
+    for (const [x1, , x2] of lines) {
+      assert.ok(x2 > x1, `a pedal half must run forward, got ${x1} -> ${x2}`);
+    }
+    const ys = lines.map(([, y]) => y);
+    assert.ok(Math.max(...ys) - Math.min(...ys) > 10, 'the two halves sit on two systems');
+  });
+
+  test('a pedal span across TWO breaks gets a whole-system segment on the middle system', () => {
+    const start =
+      '<direction><direction-type><pedal type="start" number="1"/></direction-type></direction>';
+    const stop =
+      '<direction><direction-type><pedal type="stop" number="1"/></direction-type></direction>';
+    const xml =
+      '<score-partwise><part-list><score-part id="P1"/></part-list><part id="P1">' +
+      `<measure number="1">${ATTRS}${start}${whole('C', 5)}</measure>` +
+      `<measure number="2"><print new-system="yes"/>${whole('C', 5)}</measure>` +
+      `<measure number="3"><print new-system="yes"/>${stop}${whole('C', 5)}</measure>` +
+      '</part></score-partwise>';
+    const { svg, diagnostics } = render(xml, {
+      layout: { mode: 'page' },
+      page: { pageWidth: 120 },
+    });
+    assert.ok(![...diagnostics].some((d) => d.code === 'UNMATCHED_PEDAL'));
+    const lines = horizontalPedalLines(svg);
+    assert.equal(lines.length, 3, 'outgoing, one whole-system middle, and incoming');
+    const bands = new Set(lines.map(([, y]) => y));
+    assert.equal(bands.size, 3, 'each segment sits on its own system');
+  });
+
+  test('an octave-shift bracket across a system break is drawn on BOTH systems, not dropped', () => {
+    const start =
+      '<direction><direction-type><octave-shift type="down" size="8" number="1"/></direction-type></direction>';
+    const stop =
+      '<direction><direction-type><octave-shift type="stop" size="8" number="1"/></direction-type></direction>';
+    const xml =
+      '<score-partwise><part-list><score-part id="P1"/></part-list><part id="P1">' +
+      `<measure number="1">${ATTRS}${start}${whole('C', 5)}</measure>` +
+      `<measure number="2"><print new-system="yes"/>${stop}${whole('C', 5)}</measure>` +
+      '</part></score-partwise>';
+    const { svg, diagnostics } = render(xml, {
+      layout: { mode: 'page' },
+      page: { pageWidth: 120 },
+    });
+    assert.ok(![...diagnostics].some((d) => d.code === 'UNMATCHED_OCTAVE_SHIFT'));
+    // The bracket is a horizontal line at the mark's thickness; two systems
+    // means two of them, in two different vertical bands.
+    const brackets = [
+      ...svg.matchAll(/<line x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"([^/]*)\/>/g),
+    ]
+      .filter((m) => m[5].includes('stroke-width="0.16"'))
+      .map((m) => m.slice(1, 5).map(Number))
+      .filter(([x1, y1, x2, y2]) => y1 === y2 && Math.abs(x2 - x1) > 2 && y1 < 24);
+    assert.equal(brackets.length, 2, 'one bracket on each system');
+    const ys = brackets.map(([, y]) => y);
+    assert.ok(Math.max(...ys) - Math.min(...ys) > 10, 'the two brackets sit on two systems');
+  });
+
   test('scroll mode ignores <print> breaks entirely -- it has only one system by definition', () => {
     const { svg } = render(onePart(2, { 2: '<print new-system="yes"/>' }));
     assert.equal(glyphCount(svg, 'gClef'), 1);

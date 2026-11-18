@@ -79,8 +79,8 @@ Three states:
 | `metronome` | Implemented | Display form drawn; `<sound tempo>` in the same direction becomes a tempo event. `UNSUPPORTED_METRONOME` for a beat unit it cannot express. |
 | `dynamics` | Partly implemented | Known dynamics drawn; `UNSUPPORTED_DYNAMIC` otherwise. |
 | `wedge` | Partly implemented | Crescendo/diminuendo; `UNSUPPORTED_WEDGE` otherwise. A hairpin that spans a system break is split at the break into an outgoing half and an incoming half. |
-| `pedal` | Partly implemented | `UNSUPPORTED_PEDAL` otherwise. |
-| `octave-shift` | Implemented | `INVALID_OCTAVE_SHIFT`. |
+| `pedal` | Partly implemented | `UNSUPPORTED_PEDAL` otherwise. A sustain span that crosses a system break is split at the break into an outgoing segment and an incoming one. |
+| `octave-shift` | Implemented | `INVALID_OCTAVE_SHIFT`. A bracket that crosses a system break is drawn on each system it covers. |
 | `harmony` | Partly implemented | Chord symbols; `UNSUPPORTED_HARMONY_FEATURE`. |
 | `lyric` | Implemented | Verse/chorus lines. |
 | `barline` | Implemented | Styles, repeats, endings. |
