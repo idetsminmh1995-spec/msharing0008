@@ -51,13 +51,17 @@
 
 ## Test source ရှိမှုနှင့် မစမ်းသပ်ရသေးသောအချက်
 
-Repo ထဲတွင် unit test file 90 ခု၊ visual snapshot file 29 ခု၊ fixture file 56 ခုနှင့် performance test 1 ခုရှိသည်။ Tests သည် core, parsers, notation geometry, page/scroll layout, timing/alignment, playback/cursor/repeats, drums, config, exports နှင့် visual render cases များကို cover လုပ်ရန်ရေးသားထားသည်။
+Repo ထဲတွင် unit test file 93 ခု၊ visual snapshot file 29 ခု၊ fixture file 56 ခုနှင့် performance test 1 ခုရှိသည်။ Tests သည် core, parsers, notation geometry, page/scroll layout, timing/alignment, playback/cursor/repeats, drums, config, exports နှင့် visual render cases များကို cover လုပ်ရန်ရေးသားထားသည်။
 
-**လက်ရှိ integration verification:** `npm run verify` (typecheck + lint + format:check + build + API doc + unit/visual tests) သည် **1163/1163 pass** ဖြစ်သည်။ Build/verify destination ကို `Website/Website/assets/` သို့ reconcile ပြီးဖြစ်ပြီး `test/unit/website-bundle.test.js` က app bundle နှင့် cache key ကို စစ်သည်။ Performance budget test သည် sandbox runtime တွင် timing overrun ဖြစ်နိုင်သေးသည်။ SoundFont binary ကို R2 runtime asset အဖြစ်သာထားသောကြောင့် local test တွင် actual audio render မပါဝင်သေးပါ။
+**လက်ရှိ integration verification:** `npm run verify` (typecheck + lint + format:check + build + API doc + unit/visual tests) သည် **1166/1166 pass** ဖြစ်သည်။ Build/verify destination ကို `Website/Website/assets/` သို့ reconcile ပြီးဖြစ်ပြီး `test/unit/website-bundle.test.js` က app bundle နှင့် cache key ကို စစ်သည်။ `test/unit/own-provenance.test.js` က engine `src/` ထဲတွင် third-party notation program ၏ provenance ပြန်မဝင်လာစေရန် guard လုပ်သည်။ Performance budget test သည် sandbox runtime တွင် timing overrun ဖြစ်နိုင်သေးသည်။ SoundFont binary ကို R2 runtime asset အဖြစ်သာထားသောကြောင့် local test တွင် actual audio render မပါဝင်သေးပါ။
+
+## နောက်ဆုံး engine plan
+
+"နောက်တစ်ဆင့် လုပ်ဆောင်ရန်" အစီအစဉ်ကို [`../Notation Plan/PLAN.md`](../Notation%20Plan/PLAN.md) တွင် **Part A–I** အဖြစ် ပြန်ရေးထားသည်။ Part C (MuseScore-derived အားလုံး ဖယ်ရှားခြင်း) ကို အရင်ပြီးအောင်လုပ်ပြီး clean provenance baseline ရမှ ကျန်အလုပ်များကို ဆက်လုပ်ရမည်။
 
 ## တွေ့ရှိထားသော follow-up gaps / risks
 
-1. **README drift:** `src/parser/README.md`, `src/layout/README.md`, `src/export/README.md` နှင့် `test/fixtures/README.md` အချို့တွင် “Nothing here yet / Phase 1” ဟုရေးထားသေးသော်လည်း အဆိုပါ code/tests များ ရှိပြီးသားဖြစ်သည်။ `theme/` သည် `EngineConfig` ဖြင့် superseded, `plugins/` သည် use case မရှိသေးသဖြင့် intentionally deferred ဖြစ်သည်။
+1. **README drift:** `src/parser/README.md`, `src/layout/README.md`, `src/export/README.md` နှင့် `test/fixtures/README.md` အချို့တွင် “Nothing here yet / Phase 1” ဟုရေးထားသေးသော်လည်း အဆိုပါ code/tests များ ရှိပြီးသားဖြစ်သည်။ `theme/` သည် `EngineConfig` ဖြင့် superseded, `plugins/` သည် use case မရှိသေးသဖြင့် intentionally deferred ဖြစ်သည်။ (PLAN.md Part B)
 2. **MIDI boundary:** MIDI parsing နှင့် low-level MIDI alignment ရှိသော်လည်း parse → multi-part alignment → playback event association အထိ end-to-end API တစ်ခု မရှိသေးပါ။ Host integration လို/မလို ဆုံးဖြတ်ရမည်။
 3. **Staff-line/TAB integration:** `computeStaffGeometry()` သည် အမျိုးမျိုးသော line count ကိုတွက်နိုင်သော်လည်း `render-from-musicxml.ts` တွင် `STAFF_LINES = 5` နှင့်ဆိုင်သော assumptions များကျန်ရှိသည်။ TAB staff သည် end-to-end support ပြည့်စုံမပြည့်စုံ ထပ်မံစစ်ဆေးရန်လိုသည်။
 4. **Page reflow:** resize helpers ရှိသော်လည်း page dimension ပြောင်းသည့်အခါ repagination/reflow ကို unified public engine operation အဖြစ် အပြည့်အဝ wired လုပ်ထားခြင်းမရှိသေးပါ; page systems အတွက် fixed-height simplification ပါရှိသည်။

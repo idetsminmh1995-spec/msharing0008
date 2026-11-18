@@ -20165,10 +20165,12 @@ Destination: ${this.destinationName}`;
       if (!manifestResponse.ok)
         throw new Error(`SoundFont manifest request failed (${manifestResponse.status}).`);
       const manifest = await manifestResponse.json();
-      const assetId = options.assetId ?? "musescore-general-sf3";
+      const firstAsset = manifest.assets[0];
+      if (firstAsset === void 0) throw new Error("The SoundFont manifest lists no assets.");
+      const assetId = options.assetId ?? firstAsset.id;
       const asset = assetFor(manifest, assetId);
       const assetBaseUrl = options.assetBaseUrl ?? new URL(".", manifestUrl).toString();
-      const assetPath = options.assetPaths?.[assetId] ?? DEFAULT_ASSET_PATHS[assetId];
+      const assetPath = options.assetPaths?.[assetId] ?? asset.path ?? DEFAULT_ASSET_PATHS[assetId];
       if (!assetPath) throw new Error(`No R2 path configured for SoundFont asset '${assetId}'.`);
       const context = new AudioContext();
       await context.audioWorklet.addModule(

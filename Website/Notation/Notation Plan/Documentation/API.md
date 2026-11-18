@@ -734,7 +734,7 @@ The diagnostics `level` lets through, in their original order.
 | function | `computeBeamShape` | Computes the beam's two endpoints for a group. |
 | function | `beamYAtX` | The beam's Y at any X along its span (linear interpolation) -- used to find where an individual note's stem should actually end once the beam's own slope is known. |
 | function | `numBeamLines` | How many parallel beam lines a duration needs -- the same count §9.9's flag glyphs already use (1 for eighth, up to 8 for 1024th), since a beam is visually just "the flags joined together." |
-| const | `BEAM_HOOK_LENGTH` | The shortest a beam line may be drawn -- MuseScore's own `Sid::beamMinLen`, and the length a HOOK is given, since a hook is exactly "a beam with nothing on its other end." |
+| const | `BEAM_HOOK_LENGTH` | The shortest a beam line may be drawn -- the house beam minimum, and the length a HOOK is given, since a hook is exactly "a beam with nothing on its other end." |
 | interface | `BeamSegment` | One drawn beam line: which level it is, and which notes of the group it runs between. |
 | function | `computeBeamSegments` | Which beam lines a group actually gets. |
 
@@ -991,7 +991,7 @@ The diagnostics `level` lets through, in their original order.
 
 | | Name | Summary |
 |---|---|---|
-| function | `tupletBracketNeeded` | §9.17's rule, confirmed against MuseScore's own documented "Automatic" bracket behavior: a bracket is redundant when the beam already shows the group's extent. |
+| function | `tupletBracketNeeded` | §9.17's rule, confirmed against published engraving practice's "Automatic" bracket behaviour: a bracket is redundant when the beam already shows the group's extent. |
 | function | `tupletSide` | §9.17's side rule, confirmed against Dorico's published conventions: the bracket/number sits on the SAME side as the stem direction -- notably the OPPOSITE relationship from a tie (§9.15) or slur (§9.16), which both sit opposite the stem. |
 | function | `tupletDigitGlyphName` | The real SMuFL digit glyph for a tuplet number -- confirmed to be a SEPARATE glyph set from time-signature digits (`tuplet0`..`tuplet9`, not `timeSig0`..`timeSig9`) before writing this, not assumed shared. |
 | interface | `TupletBracketShape` |  |
@@ -1001,7 +1001,7 @@ The diagnostics `level` lets through, in their original order.
 
 | | Name | Summary |
 |---|---|---|
-| function | `voiceForcedDirection` | §9.14's universal, non-negotiable rule -- confirmed independently across MuseScore's handbook, LilyPond's reference manual, and two general notation-pedagogy sources, all stating the identical rule with no disagreement: the odd-numbered voice(s) always get up stems, the even-numbered voice(s) alw... |
+| function | `voiceForcedDirection` | §9.14's universal, non-negotiable rule -- confirmed independently across several notation references and two general notation-pedagogy sources, all stating the identical rule with no disagreement: the odd-numbered voice(s) always get up stems, the even-numbered voice(s) always get down stems, "up... |
 | function | `voiceRestOffset` | §9.14's rest-separation offset (fed into Phase 18's existing `restY(..., voiceOffset)`): the odd (upper) voice's rests shift toward the top of the staff, the even (lower) voice's shift toward the bottom, so with both voices otherwise defaulting to the same shared middle line (Phase 18's own defau... |
 | interface | `NoteheadCollisionResolution` |  |
 | function | `resolveNoteheadCollision` | §9.14's horizontal-collision rule: at the same tick, if two different voices' notes sit within `NOTEHEAD_COLLISION_THRESHOLD` staff-spaces of each other (confirmed by an independent source -- Clairnote, citing LilyPond's own collision engine -- that the real threshold is notes one vertical staff ... |

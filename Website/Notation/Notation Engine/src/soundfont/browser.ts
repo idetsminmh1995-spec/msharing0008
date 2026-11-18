@@ -7,6 +7,8 @@ export interface SoundFontAsset {
   readonly displayName: string;
   readonly format: 'sf2' | 'sf3';
   readonly version: string;
+  /** Object path relative to `assetBaseUrl`, when the manifest states one. */
+  readonly path?: string;
 }
 
 export interface SoundFontManifest {
@@ -38,15 +40,16 @@ export interface NotationSoundEngine {
 }
 
 /**
- * Where each SoundFont asset lives on the R2 host, by the id the manifest
- * names it with.
+ * Where each SoundFont asset lives on the R2 host, keyed by the id the
+ * manifest names it with.
  *
  * These are HOST ASSETS, not engine data: a `.sf2`/`.sf3` file is a
  * downloadable instrument set the host chooses to serve, and the engine
- * only fetches whichever id the caller asks for. The keys here are the
- * manifest's own ids (a few of which name the upstream file they come
- * from), so an asset keeps the name the host published it under. Nothing
- * in the notation, layout, timing or export layers reads this table.
+ * only fetches whichever id the caller asks for. The keys below are a
+ * FALLBACK for a manifest that lists an asset id but states no `path` of
+ * its own; the manifest is authoritative, so a host that adds or renames
+ * an asset does not have to change this file. Nothing in the notation,
+ * layout, timing or export layers reads this table.
  */
 const DEFAULT_ASSET_PATHS: Readonly<Record<string, string>> = {
   'ms-basic': 'ms-basic/official-deprecated-master/MS Basic.sf3',
@@ -123,10 +126,14 @@ export class R2SoundFontEngine implements NotationSoundEngine {
     if (!manifestResponse.ok)
       throw new Error(`SoundFont manifest request failed (${manifestResponse.status}).`);
     const manifest = (await manifestResponse.json()) as SoundFontManifest;
-    const assetId = options.assetId ?? 'musescore-general-sf3';
+    // No hardcoded default asset id: the manifest is the host's to decide,
+    // and a caller that states none gets the first asset it lists.
+    const firstAsset = manifest.assets[0];
+    if (firstAsset === undefined) throw new Error('The SoundFont manifest lists no assets.');
+    const assetId = options.assetId ?? firstAsset.id;
     const asset = assetFor(manifest, assetId);
     const assetBaseUrl = options.assetBaseUrl ?? new URL('.', manifestUrl).toString();
-    const assetPath = options.assetPaths?.[assetId] ?? DEFAULT_ASSET_PATHS[assetId];
+    const assetPath = options.assetPaths?.[assetId] ?? asset.path ?? DEFAULT_ASSET_PATHS[assetId];
     if (!assetPath) throw new Error(`No R2 path configured for SoundFont asset '${assetId}'.`);
 
     const context = new AudioContext();
