@@ -156,7 +156,7 @@ Implementation sequence:
 - Assets ၆ ခုလုံး range request ဖြင့် စစ်ပြီး → 206 ✓ (`musescore-general-sf3/sf2`, `ms-basic`, `generaluser-gs`, `fluidr3-gm`, `salamander-grand-piano`)
 - Manifest ရဲ့ `runtime.defaultAssetId` မှာ `musescore-general-sf3` ဖြစ်သည် (Part J rename လုပ်ရမည့်အရာ)။
 
-**Blocker — CORS မရှိသေး:** `<base>/soundfonts/manifest.json` ကို `Origin` header ဖြင့် GET လုပ်ကြည့်ရာ `Access-Control-Allow-Origin` header **မပါ**၊ OPTIONS preflight က **403**။ ဆိုတော့ browser က အခြား origin မှ fetch လုပ်လျှင် response ကို block လုပ်မည် — engine ၏ `fetch()` က manifest ကို ဖတ်လို့ ရမည် မဟုတ်။ **R2 bucket ပေါ်တွင် CORS policy သတ်မှတ်ရမည်** (Cloudflare Dashboard → R2 → bucket → Settings → CORS Policy)။
+**CORS — ဖြေရှင်းပြီး ✓:** bucket ပေါ်တွင် CORS policy သတ်မှတ်ပြီးနောက် `<base>/soundfonts/manifest.json` ကို `Origin` header ဖြင့် GET လုပ်ရာ `Access-Control-Allow-Origin: *` ပြန်လာသည်; OPTIONS preflight က **204** ဖြစ်ပြီး `Access-Control-Allow-Methods: GET, HEAD`၊ `Access-Control-Max-Age: 3600` ပြန်သည်။ Assets ၆ ခုလုံးလည်း ACAO: * ပါသည်။ ဆိုတော့ browser မှ fetch/load လုပ်နိုင်ပြီ။ (လက်ရှိ policy က `AllowedOrigins: ["*"]` — စမ်းသပ်ရန် ကောင်း၊ production အတွက် တကယ့် site domain ဖြင့် ကျဉ်းမည်။)
 
 **အခြား မှတ်ချက်များ:**
 - `salamander-grand-piano` SF2 သည် **1.26 GB** ဖြစ်ပြီး engine ၏ `decodedSampleBudget` (512 MB) ကို ကျော်သည် — optional asset အဖြစ်သာ စမ်းရန်။
@@ -164,7 +164,7 @@ Implementation sequence:
 
 #### အသံစမ်းသပ်မှု (rename မလုပ်မီ လိုအပ်ချက်)
 
-- [ ] R2 bucket ပေါ်တွင် CORS policy သတ်မှတ် (မရှိရင် browser fetch မလုပ်နိုင်)။
+- [x] R2 bucket ပေါ်တွင် CORS policy သတ်မှတ် ✓ (`Access-Control-Allow-Origin: *`, preflight 204)။
 - [ ] Default asset (`ms-core-sf3` ဖြစ်လာမည့် MuseScore General SF3) ကို browser တွင် တကယ် play စမ်းပြီး အသံထွက် အတည်ပြု။
 - [ ] Fallback asset များ (`ms-basic`, `generaluser-gs`, `fluidr3-gm`, `salamander-grand-piano`) တစ်ခုချင်း load/play စမ်း။
 - [ ] Manifest fetch → asset download → SpessaSynth load → noteOn/noteOff အဆင့်ဆင့် အလုပ်လုပ် အတည်ပြု။
