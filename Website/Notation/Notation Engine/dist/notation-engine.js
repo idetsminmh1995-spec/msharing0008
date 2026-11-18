@@ -211,6 +211,7 @@ var NotationEngine = (() => {
     metronomeTempoText: () => metronomeTempoText,
     middleLineY: () => middleLineY,
     midiDiagnostic: () => midiDiagnostic,
+    midiNoteNumber: () => midiNoteNumber,
     minDistance: () => minDistance,
     multiMeasureRestGlyphName: () => multiMeasureRestGlyphName,
     musicXmlAccidentalGlyphName: () => musicXmlAccidentalGlyphName,
@@ -376,6 +377,12 @@ var NotationEngine = (() => {
   }
   function unpitchedPitch(displayStep, displayOctave) {
     return { kind: "unpitched", displayStep, displayOctave };
+  }
+  function midiNoteNumber(pitch, semitones = 0) {
+    if (pitch.kind !== "pitched") return void 0;
+    const natural = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[pitch.step];
+    const midi = (pitch.octave + 1) * 12 + natural + pitch.alter + semitones;
+    return Number.isInteger(midi) && midi >= 0 && midi <= 127 ? midi : void 0;
   }
   function soundingPitch(pitch, semitones) {
     if (pitch.kind !== "pitched" || semitones === 0) return pitch;
@@ -76281,10 +76288,8 @@ ${denominator}`;
   function midiNoteForEvent(event, transposeSemitones) {
     const notes = event.kind === "chord" ? event.notes : event.kind === "note" ? [event] : [];
     return notes.flatMap((note2) => {
-      if (!isPitched(note2.pitch)) return [];
-      const natural = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[note2.pitch.step];
-      const midi = (note2.pitch.octave + 1) * 12 + natural + note2.pitch.alter + transposeSemitones;
-      return Number.isInteger(midi) && midi >= 0 && midi <= 127 ? [midi] : [];
+      const midi = midiNoteNumber(note2.pitch, transposeSemitones);
+      return midi === void 0 ? [] : [midi];
     });
   }
   function percussionMidiNotesForEvent(event, instruments) {

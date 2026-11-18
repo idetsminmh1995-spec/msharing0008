@@ -1,5 +1,5 @@
 import type { MeasureEvent, Note, Score } from '../core/index.js';
-import { isPitched } from '../core/pitch.js';
+import { isPitched, midiNoteNumber } from '../core/pitch.js';
 import { tickToSeconds } from '../timing/tick-seconds.js';
 import type { TempoMap } from '../timing/tempo-map.js';
 import type { MidiInstrumentInfo } from '../parser/musicxml/instrument.js';
@@ -8,10 +8,8 @@ import type { MidiInstrumentInfo } from '../parser/musicxml/instrument.js';
 function midiNoteForEvent(event: MeasureEvent, transposeSemitones: number): readonly number[] {
   const notes = event.kind === 'chord' ? event.notes : event.kind === 'note' ? [event] : [];
   return notes.flatMap((note) => {
-    if (!isPitched(note.pitch)) return [];
-    const natural = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[note.pitch.step];
-    const midi = (note.pitch.octave + 1) * 12 + natural + note.pitch.alter + transposeSemitones;
-    return Number.isInteger(midi) && midi >= 0 && midi <= 127 ? [midi] : [];
+    const midi = midiNoteNumber(note.pitch, transposeSemitones);
+    return midi === undefined ? [] : [midi];
   });
 }
 

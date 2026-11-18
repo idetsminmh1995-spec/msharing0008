@@ -37,6 +37,13 @@ export interface NotationSoundEngine {
   pause(): void;
   stop(): void;
   setVolume(volume: number): void;
+  /**
+   * Sounds one or more MIDI notes briefly, without a `PlaybackData`. A
+   * host uses this to let a writer hear a note the moment it is written,
+   * rather than only on full playback. Silently does nothing while a full
+   * playback is running, so the two never overlap.
+   */
+  preview(midiNotes: readonly number[], seconds?: number): void;
   destroy(): void;
 }
 
@@ -194,6 +201,33 @@ export class R2SoundFontEngine implements NotationSoundEngine {
     for (const timer of this.timers) window.clearTimeout(timer);
     this.timers.clear();
     this.synth.stopAll();
+  }
+
+  /**
+   * Sounds the given MIDI notes once, on the first part's channel, for a
+   * short audition. Unlike `play`, this takes bare MIDI numbers rather
+   * than a `PlaybackData`, because a host writing a single note has no
+   * timeline to hand -- the note may not even be committed yet.
+   */
+  preview(midiNotes: readonly number[], seconds = 0.6): void {
+    if (this.stopped === false) return;
+    const notes = midiNotes.filter((note) => Number.isInteger(note) && note >= 0 && note <= 127);
+    if (notes.length === 0) return;
+    // Channel 0 is where the score's first part plays, so the preview uses
+    // the part's own program and sounds like the note being written. A
+    // preview never runs during playback (`stopped` guards it), so it can
+    // never collide with the scheduled notes.
+    const channel = this.partChannels.get('P1') ?? 0;
+    void this.context.resume();
+    for (const midiNote of notes) this.synth.noteOn(channel, midiNote, 100);
+    const offTimer = window.setTimeout(
+      () => {
+        for (const midiNote of notes) this.synth.noteOff(channel, midiNote);
+        this.timers.delete(offTimer);
+      },
+      Math.max(0.05, seconds) * 1000,
+    );
+    this.timers.add(offTimer);
   }
 
   stop(): void {

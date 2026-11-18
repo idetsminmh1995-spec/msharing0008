@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-725 exported symbols, by module.
+726 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -521,6 +521,7 @@ The diagnostics `level` lets through, in their original order.
 | function | `isUnpitched` |  |
 | function | `pitchedPitch` |  |
 | function | `unpitchedPitch` |  |
+| function | `midiNoteNumber` | The General MIDI note number a pitched pitch sounds, or `undefined` for an unpitched position (which names no audible pitch on its own). |
 | function | `soundingPitch` | Applies MusicXML transposition to a pitched pitch; unpitched display positions are unchanged. |
 
 ### `src/core/rest.ts`

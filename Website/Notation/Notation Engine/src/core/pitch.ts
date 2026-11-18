@@ -58,6 +58,22 @@ export function unpitchedPitch(displayStep: PitchStep, displayOctave: number): U
   return { kind: 'unpitched', displayStep, displayOctave };
 }
 
+/**
+ * The General MIDI note number a pitched pitch sounds, or `undefined` for
+ * an unpitched position (which names no audible pitch on its own). The
+ * result is the written pitch plus any transposition; a host that needs
+ * the sounding note passes the part's transposition in `semitones`.
+ *
+ * Out-of-range results (below 0 or above 127) return `undefined` rather
+ * than a number a synth would reject.
+ */
+export function midiNoteNumber(pitch: Pitch, semitones = 0): number | undefined {
+  if (pitch.kind !== 'pitched') return undefined;
+  const natural = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[pitch.step];
+  const midi = (pitch.octave + 1) * 12 + natural + pitch.alter + semitones;
+  return Number.isInteger(midi) && midi >= 0 && midi <= 127 ? midi : undefined;
+}
+
 /** Applies MusicXML transposition to a pitched pitch; unpitched display positions are unchanged. */
 export function soundingPitch(pitch: Pitch, semitones: number): Pitch {
   if (pitch.kind !== 'pitched' || semitones === 0) return pitch;

@@ -42,6 +42,7 @@
   const soundFontSelect = pick('[data-editor-soundfont]');
   const testNoteButton = pick('[data-editor-test-note]');
   const testScoreButton = pick('[data-editor-test-score]');
+  const previewButton = pick('[data-editor-preview]');
   const viewToggle = pick('[data-editor-view-toggle]');
   const viewList = pick('[data-editor-view-list]');
   const viewLabel = pick('[data-editor-view-label]');
@@ -64,7 +65,7 @@
     zoom: 100,
     layout: 'page',
     tool: { duration: 'quarter', dots: 0, rest: false, accidental: null },
-    noteInput: false,
+    noteInput: true,
     selection: null,
     entry: null,
     history: [],
@@ -72,8 +73,10 @@
     // playback
     playing: false,
     sound: null,
+    soundLoading: null,
     soundTried: false,
     // audition
+    previewOn: true,
     soundFonts: [],
     soundAssetId: null,
     soundAssetPaths: null,
@@ -558,6 +561,7 @@
       : { ...event, pitch: shiftPitch(event.pitch, semitones) };
     commit((doc) => docTools.replaceEvent(doc, { partId, measureNumber, voiceId, eventIndex, event: moved }),
       `Moved ${semitones > 0 ? 'up' : 'down'}.`);
+    previewPitch(moved.kind === 'chord' ? moved.notes[0].pitch : moved.pitch);
   }
 
   function deleteSelection() {
@@ -625,12 +629,14 @@
         // pitch, replacing rather than stacking by default.
         commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: note }), `Replaced with ${step}${octave}.`);
       }
+      previewPitch(pitch);
       render();
       return;
     }
 
     const event = engine.note({ pitch, duration: fitted, voice: voiceId, staff: 1, startTick: state.entry.tick });
     commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event }), `Inserted ${step}${octave}.`);
+    previewPitch(pitch);
     advanceEntry(ticks, measureNumber, voiceId);
   }
 
@@ -801,12 +807,16 @@
   const ensureSound = async () => {
     if (state.sound) return state.sound;
     if (state.soundTried) throw new Error('Playback is unavailable in this preview.');
+    if (state.soundLoading) return state.soundLoading;
     state.soundTried = true;
     const SoundFont = window.NotationSoundFont;
     if (!SoundFont?.R2SoundFontEngine) throw new Error('The sound engine could not be loaded.');
     const configured = window.MSHARING_SOUNDFONT_CONFIG || {};
     const assetId = state.soundAssetId ?? configured.assetId;
-    state.sound = await SoundFont.R2SoundFontEngine.create({
+    // One creation promise is shared by every caller (Play, the sound
+    // tests, and the note preview), so a fast writer never starts two
+    // loads of the same SoundFont.
+    state.soundLoading = SoundFont.R2SoundFontEngine.create({
       manifestUrl: 'soundfonts/manifest.json',
       processorUrl: 'assets/spessasynth_processor.min.js',
       assetBaseUrl: 'soundfonts',
@@ -815,9 +825,34 @@
       // a host that moves an asset only has to update the manifest.
       ...(state.soundAssetPaths ? { assetPaths: state.soundAssetPaths } : {}),
       ...(assetId ? { assetId } : {}),
+    }).then((engine) => {
+      state.sound = engine;
+      state.soundLoading = null;
+      return engine;
+    }).catch((error) => {
+      state.soundLoading = null;
+      state.soundTried = false;
+      throw error;
     });
-    return state.sound;
+    return state.soundLoading;
   };
+
+  /**
+   * Sounds a written pitch the moment it is placed, so the writer hears the
+   * note instead of pressing Play to check it. The SoundFont is fetched on
+   * the first preview and reused; a failed or slow load never blocks the
+   * edit -- the note is already committed by the time this runs.
+   */
+  function previewPitch(pitch) {
+    if (!state.previewOn || state.playing) return;
+    const midi = engine.midiNoteNumber?.(pitch);
+    if (midi === undefined) return;
+    void ensureSound()
+      .then((sound) => sound.preview?.([midi]))
+      .catch(() => {
+        /* no sound available; writing still works */
+      });
+  }
 
   // ---- SoundFont audition ------------------------------------------------
   //
@@ -905,6 +940,7 @@
       /* a failed teardown must not block picking another font */
     }
     state.sound = null;
+    state.soundLoading = null;
     state.soundTried = false;
   }
 
@@ -1189,6 +1225,7 @@
     dotButton.setAttribute('aria-pressed', String(state.tool.dots > 0));
     restButton.setAttribute('aria-pressed', String(state.tool.rest));
     noteInputButton.setAttribute('aria-pressed', String(state.noteInput));
+    if (previewButton) previewButton.setAttribute('aria-pressed', String(state.previewOn));
     root.dataset.mode = state.noteInput ? 'input' : 'select';
   };
 
@@ -1213,6 +1250,17 @@
   if (soundFontSelect) soundFontSelect.addEventListener('change', onSoundFontChange);
   if (testNoteButton) testNoteButton.addEventListener('click', () => void testBuiltScale());
   if (testScoreButton) testScoreButton.addEventListener('click', () => void testRenderedScale());
+  if (previewButton) previewButton.addEventListener('click', () => {
+    state.previewOn = !state.previewOn;
+    syncTools();
+    if (state.previewOn) {
+      announce('Note preview on — you will hear each note as you write.');
+      const octave = currentOctave();
+      previewPitch({ kind: 'pitched', step: 'C', alter: 0, octave });
+    } else {
+      announce('Note preview off.');
+    }
+  });
 
   noteInputButton.addEventListener('click', () => {
     state.noteInput = !state.noteInput;

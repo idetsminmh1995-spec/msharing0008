@@ -20266,6 +20266,28 @@ Destination: ${this.destinationName}`;
       this.timers.clear();
       this.synth.stopAll();
     }
+    /**
+     * Sounds the given MIDI notes once, on the first part's channel, for a
+     * short audition. Unlike `play`, this takes bare MIDI numbers rather
+     * than a `PlaybackData`, because a host writing a single note has no
+     * timeline to hand -- the note may not even be committed yet.
+     */
+    preview(midiNotes, seconds = 0.6) {
+      if (this.stopped === false) return;
+      const notes = midiNotes.filter((note) => Number.isInteger(note) && note >= 0 && note <= 127);
+      if (notes.length === 0) return;
+      const channel = this.partChannels.get("P1") ?? 0;
+      void this.context.resume();
+      for (const midiNote of notes) this.synth.noteOn(channel, midiNote, 100);
+      const offTimer = window.setTimeout(
+        () => {
+          for (const midiNote of notes) this.synth.noteOff(channel, midiNote);
+          this.timers.delete(offTimer);
+        },
+        Math.max(0.05, seconds) * 1e3
+      );
+      this.timers.add(offTimer);
+    }
     stop() {
       this.pause();
     }

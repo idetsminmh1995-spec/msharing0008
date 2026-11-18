@@ -226,6 +226,25 @@ Implementation sequence:
 
 ---
 
+### Part K — Note ရေးခြင်းနှင့် ရေးစဉ် အသံကြားခြင်း (note entry + hear-while-writing) — ပြီးစီး ✓
+
+Editor တွင် note ရေးခြင်း လုပ်ဆောင်ချက် ရှိပြီးသားဖြစ်သည် (staff click, letter key, duration/accidental/dot/rest, chord, arrow-key transpose, delete, add/remove measure)။ ဒါပေမယ့် နှစ်ချက် လိုနေသည် — (၁) `noteInput` က default **off** ဖြစ်သဖြင့် page ဖွင့်ဖွင့်ချင်း staff ကို နှိပ်ရင် note မရေးဘဲ "looks broken" ဖြစ်နေသည်၊ (၂) ရေးလိုက်တဲ့ note ကို **ချက်ချင်း မကြားရ**ဘဲ Play နှိပ်မှ ကြားရသည်။
+
+**လုပ်ရမည့်အရာ:**
+- [x] `notation-editor.js`: `state.noteInput = true` (default) — page ဖွင့်ချင်း staff ကို နှိပ်လျှင် note ရေးသည် ✓
+- [x] Engine: `core/pitch.ts` တွင် `midiNoteNumber(pitch, semitones?)` helper အသစ် ထုတ်; `playback/event-stream.ts` က ထို helper ကို ပြန်သုံး (event stream နှင့် preview သည် MIDI number တူတူ ရ) ✓
+- [x] Engine: `NotationSoundEngine` နှင့် `R2SoundFontEngine` တွင် `preview(midiNotes, seconds?)` ထည့် — `PlaybackData` မလိုဘဲ MIDI note များကို ခေတ္တ ဖွင့်ပေးသည်; playback လုပ်နေစဉ် ဘာမှ မလုပ် (ရောမနှောင်) ✓
+- [x] `notation-editor.js`: "Hear" toggle (`state.previewOn`, default on) — note insert / chord add / arrow transpose တွင် `previewPitch()` ခေါ်၍ ချက်ချင်း အသံကြား ✓
+- [x] `ensureSound()` ကို **idempotent** ဖြစ်စေ — `state.soundLoading` promise တစ်ခုတည်း မျှဝေ (Play, Test, preview အားလုံး) ✓
+- [x] `notation-editor.html`: bottom bar တွင် `<button data-editor-preview>` ထည့် ✓
+- [x] Test: `test/unit/midi-note-number.test.js` (helper 5 cases) + `editor-integration.test.js` (note-input/preview default, staff click → note တိုး) ✓
+- [x] `npm run verify` = **1293/1293 pass** ✓
+- [x] Browser E2E (headless Chromium): staff click ၂ ချက် → note ၂ ခု တိုး; `R2SoundFontEngine.prototype.preview` ကို ဖမ်း၍ MIDI `[71]`, `[72]` ခေါ်ကြောင်း အတည်ပြု ✓
+
+**ပြီးစီးမှုစံ:** page ဖွင့်ချင်း staff နှိပ်၍ note ရေးနိုင်; ရေးလိုက်တဲ့ note ကို ချက်ချင်း ကြား; "Hear" ခလုတ်ဖြင့် ပိတ်/ဖွင့် နိုင်။
+
+---
+
 ## လုပ်ဆောင်မှုအစဉ်
 
 အကြံပြုထားသောအစဉ်မှာ **C → A → B → D → F → G → H → E → I → J** ဖြစ်သည်။ Part C (MuseScore-derived အားလုံး ဖယ်ရှားခြင်း) ကို အရင်ပြီးအောင်လုပ်ပြီး clean provenance baseline တစ်ခုရမှ ကျန်အလုပ်များကို ယုံကြည်စိတ်ချစွာ ဆက်လုပ်နိုင်မည်။
@@ -240,6 +259,10 @@ Implementation sequence:
 - **အခု မပြောင်းသေး:** SoundFont အားလုံး browser playback တွင် အသံ တကယ်ထွက်ကြောင်း စမ်းပြီးမှ ပြောင်းမည်။
 - Rename လုပ်ရမည့်အရာ အားလုံးကို Part J တွင် repo-side (file:line အပါ) နှင့် R2-side ဟူ၍ မှတ်ထားသည်။
 - Blocker: လက်ရှိ app တွင် SoundFont အသံစမ်းစာမျက်နှာ မရှိ၊ R2 public CDN/signed URL config လည်း မရှိသေး — စမ်းသပ်မှုမစမီ ဒါကို ဖြေရှင်းရမည်။
+
+### Note entry + hear-while-writing (Part K) — 2026-11-18
+
+Editor တွင် note ရေးခြင်း ရှိပြီးသား ဖြစ်သည် (browser E2E ဖြင့် အတည်ပြု)။ လိုအပ်ချက် နှစ်ချက် ဖြည့်ပြီး — (၁) `noteInput` default on ပြောင်း၊ (၂) `midiNoteNumber()` (engine) + `preview()` (sound engine) + `previewPitch()` (editor) ဖြင့် ရေးစဉ် အသံကြားစေ။ `event-stream.ts` က `midiNoteNumber()` ကို ပြန်သုံးသဖြင့် preview နှင့် playback သည် MIDI number တူတူ ရ။ `npm run verify` = 1293/1293။
 
 ### Clean-environment verify + generated fixture matrix (Parts A and D) — 2026-11-18
 

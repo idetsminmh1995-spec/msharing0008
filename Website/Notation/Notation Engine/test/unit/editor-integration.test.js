@@ -340,4 +340,51 @@ describe('the editor and the engine agree, end to end', () => {
     assert.equal(testRendered.disabled, true);
     assert.match(select.textContent, /unavailable/i);
   });
+
+  test('the editor starts in note-input mode with note preview on', () => {
+    const { window } = loadEditorPage();
+    const noteInput = window.document.querySelector('[data-editor-note-input]');
+    const preview = window.document.querySelector('[data-editor-preview]');
+    assert.ok(preview, 'the editor has no note-preview toggle');
+    // A writer must be able to write a note the moment the page opens, and
+    // hear it -- the two things this editor is for.
+    assert.equal(noteInput.getAttribute('aria-pressed'), 'true');
+    assert.equal(preview.getAttribute('aria-pressed'), 'true');
+  });
+
+  test('writing a note in the editor changes the score it will play back', () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    const scoreHost = doc.querySelector('[data-editor-score]');
+    const svg = scoreHost.querySelector('svg');
+
+    // jsdom has no layout engine, so the click path's SVG coordinate
+    // helpers are stubbed to the identity transform -- the point then maps
+    // straight to the staff geometry the click code already reads.
+    window.DOMPoint = class {
+      constructor(x = 0, y = 0) {
+        this.x = x;
+        this.y = y;
+      }
+      matrixTransform() {
+        return new window.DOMPoint(this.x, this.y);
+      }
+    };
+    window.SVGElement.prototype.getScreenCTM = () => ({
+      a: 1,
+      b: 0,
+      c: 0,
+      d: 1,
+      e: 0,
+      f: 0,
+      inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+    });
+    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 1, height: 1 });
+
+    const before = svg.querySelectorAll('[data-id]').length;
+    scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', { clientX: 120, clientY: 9, bubbles: true }));
+    const after = doc.querySelector('[data-editor-score] svg').querySelectorAll('[data-id]').length;
+    assert.equal(after, before + 1, 'a staff click in note-input mode must add a note');
+    assert.match(doc.querySelector('[data-editor-status]').textContent, /Inserted|Replaced/);
+  });
 });
