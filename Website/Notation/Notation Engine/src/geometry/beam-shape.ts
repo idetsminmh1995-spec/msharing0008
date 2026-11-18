@@ -152,8 +152,8 @@ export function numBeamLines(durationType: DurationType): number {
 }
 
 /**
- * The shortest a beam line may be drawn -- MuseScore's own
- * `Sid::beamMinLen`, and the length a HOOK is given, since a hook is
+ * The shortest a beam line may be drawn -- the house beam minimum,
+ * and the length a HOOK is given, since a hook is
  * exactly "a beam with nothing on its other end."
  */
 export const BEAM_HOOK_LENGTH = 1.1;

@@ -37,6 +37,17 @@ export interface NotationSoundEngine {
   destroy(): void;
 }
 
+/**
+ * Where each SoundFont asset lives on the R2 host, by the id the manifest
+ * names it with.
+ *
+ * These are HOST ASSETS, not engine data: a `.sf2`/`.sf3` file is a
+ * downloadable instrument set the host chooses to serve, and the engine
+ * only fetches whichever id the caller asks for. The keys here are the
+ * manifest's own ids (a few of which name the upstream file they come
+ * from), so an asset keeps the name the host published it under. Nothing
+ * in the notation, layout, timing or export layers reads this table.
+ */
 const DEFAULT_ASSET_PATHS: Readonly<Record<string, string>> = {
   'ms-basic': 'ms-basic/official-deprecated-master/MS Basic.sf3',
   'musescore-general-sf3': 'musescore-general/v0.2/MuseScore_General.sf3',

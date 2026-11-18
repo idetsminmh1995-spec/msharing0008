@@ -20,9 +20,8 @@ export interface RenderBeamOptions {
    * spec this is "the distance between the inner edge of the primary and
    * outer edge of subsequent secondary beams", i.e. the GAP between two
    * beams, NOT their center-to-center distance. The center-to-center step
-   * is therefore `thickness + spacing` (0.5 + 0.25 = 0.75sp for Bravura) --
-   * a value MuseScore 4's own engraving notes independently confirm as the
-   * correct "regular" beam distance.
+   * is therefore `thickness + spacing` (0.5 + 0.25 = 0.75sp for Bravura),
+   * the house "regular" beam distance.
    */
   readonly spacing: number;
   readonly color: string;

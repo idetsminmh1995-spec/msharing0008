@@ -101,8 +101,8 @@ export interface Note {
    * constructing a score. The cursor honours `<backup>`
    * and `<forward>`. It is NOT redundant with summing the durations
    * before it: a voice can legitimately have GAPS (a `<forward>` skips
-   * time without writing a rest, which is how MuseScore writes a kick
-   * drum that plays on beats 1 and 3 and nothing in between) and can
+   * time without writing a rest, which is how a kick drum that plays on
+   * beats 1 and 3 and nothing in between is written) and can
    * legitimately start partway into the measure. Summing durations
    * silently pulls every event after a gap too early -- on this
    * project's own drum file that put the kick's beamed pair on beat 2
@@ -122,10 +122,9 @@ export interface Note {
    *
    * It decides which of two sources positions the note. A file that
    * says where a drum goes has already made the decision -- that is
-   * what the elements are for, and it is what MuseScore's own importer
-   * does with them -- so the drum table must not move it somewhere
-   * else. A file that says nothing leaves the drum table as the only
-   * answer there is.
+   * what the elements are for -- so the drum table must not move it
+   * somewhere else. A file that says nothing leaves the drum table as
+   * the only answer there is.
    *
    * Optional, and absent means "not stated": a hand-built `Score` and
    * a file that omits the elements are the same case, and both want

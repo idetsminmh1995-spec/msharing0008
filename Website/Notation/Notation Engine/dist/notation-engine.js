@@ -68582,12 +68582,12 @@ var NotationEngine = (() => {
       half: "noteheadSquareWhite",
       black: "noteheadSquareBlack"
     },
-    // MuseScore's HEAD_SLASH. The filled head is the one with HORIZONTAL
-    // ends -- a parallelogram leaning right, the shape a rhythm slash has
-    // in every chart written in MuseScore. This engine drew
-    // `noteheadSlashVerticalEnds`, which leans the same way but is cut
-    // square top and bottom, and against a MuseScore page it reads as a
-    // different symbol rather than a different weight of the same one.
+    // A slash head. The filled head is the one with HORIZONTAL ends -- a
+    // parallelogram leaning right, the shape a rhythm slash has in printed
+    // practice. This engine drew `noteheadSlashVerticalEnds`, which leans
+    // the same way but is cut square top and bottom, and against a printed
+    // page it reads as a different symbol rather than a different weight of
+    // the same one.
     slash: {
       whole: "noteheadSlashWhiteWhole",
       half: "noteheadSlashWhiteHalf",
@@ -68667,10 +68667,11 @@ var NotationEngine = (() => {
       half: "noteShapeSquareWhite",
       black: "noteShapeSquareBlack"
     },
-    // MuseScore's HEAD_TI. Aikin's ti is a rounded triangle; the keystone
-    // this engine drew belongs to the Funk shapes, which are a different
-    // seven-shape system. Both are real notations and SMuFL has glyphs
-    // for each -- this is the one a MuseScore file means.
+    // The ti (triangle) head. Aikin's ti is a rounded triangle; the
+    // keystone this engine drew belongs to the Funk shapes, which are a
+    // different seven-shape system. Both are real notations and SMuFL has
+    // glyphs for each -- the rounded triangle is the one a MusicXML file
+    // naming `ti` means.
     ti: {
       whole: "noteShapeTriangleRoundWhite",
       half: "noteShapeTriangleRoundWhite",
@@ -70681,7 +70682,7 @@ ${denominator}`;
         fill: options.color,
         "font-family": options.textFont,
         "font-size": options.fontSize,
-        // MuseScore's Tempo text style is bold, and a tempo mark reads as
+        // The house Tempo text style is bold, and a tempo mark reads as
         // an instruction to the player rather than as part of the music.
         "font-weight": "bold"
       })
@@ -70908,9 +70909,9 @@ ${denominator}`;
         barNumber: 1.6,
         lyric: 1.8,
         dynamic: 2.2,
-        // MuseScore's own Tempo text style is 12pt, and its default
-        // spatium is 1.75mm; 12pt is 4.2336mm, so one staff space is
-        // 2.42 of them. Rounded to 2.4.
+        // The house Tempo text style is 12pt, and the default spatium is
+        // 1.75mm; 12pt is 4.2336mm, so one staff space is 2.42 of them.
+        // Rounded to 2.4.
         tempo: 2.4,
         chordSymbol: 1.8
       }
@@ -70954,9 +70955,9 @@ ${denominator}`;
       minMeasureWidth: 8
     },
     staves: {
-      // MuseScore's `staffDistance` and `minSystemDistance`. Both are
+      // The house `staffDistance` and `minSystemDistance`. Both are
       // clearances -- empty space between two staves, not the distance
-      // between their lines -- which is how MuseScore states them too.
+      // between their lines.
       minStaffDistance: 6.5,
       minSystemDistance: 8.5
     },
@@ -70979,7 +70980,7 @@ ${denominator}`;
       // dynamic, which sits in the same band under the staff.
       lyricGap: 2.2,
       // One lyric line of 1.8 plus a little air, so two verses do not
-      // touch. MuseScore's own lyric line spacing is ~1.4x the text size.
+      // touch. The house lyric line spacing is ~1.4x the text size.
       lyricRowHeight: 2.6,
       chordSymbolsDisplay: "on",
       chordSymbolGap: 1,

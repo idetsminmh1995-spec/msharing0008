@@ -66,7 +66,7 @@ describe('a stand-in is always something a player could actually hit instead', (
     }
   });
 
-  test('every stand-in is a drum MuseScore itself defines', () => {
+  test('every stand-in is a drum the standard kit itself defines', () => {
     for (let note = 35; note <= 81; note++) {
       for (const standIn of NE.drumStandIns(note)) {
         assert.ok(

@@ -302,7 +302,7 @@ export function parseNoteElement(
   );
   if (explicitNotehead !== undefined && !isKnownMusicXmlNotehead(explicitNotehead)) {
     // §10.7: report, never refuse. This exact check is what a real
-    // MuseScore drum chart needed -- it writes `slashed` and
+    // drum chart needed -- it writes `slashed` and
     // `<notehead smufl="...">other</notehead>`, and the engine used to
     // THROW on any value outside a seven-item list, taking the whole
     // render down over one note's head.

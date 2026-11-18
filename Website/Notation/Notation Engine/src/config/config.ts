@@ -87,7 +87,7 @@ export interface LayoutConfig {
    * under it. A floor rather than a multiplier because it must do
    * NOTHING at a size that does not need it: at 1920 the natural 0.11
    * is already two pixels, the floor sits below it, and the engraving
-   * is MuseScore's untouched.
+   * is the house style untouched.
    *
    * Beams, barlines and ledger lines are thicker than the floor at any
    * realistic size, so in practice this moves the staff lines and the
@@ -279,17 +279,16 @@ export interface SpacingConfig {
    * when nothing is written in it. Engraving practice agrees; so does
    * every other notation program.
    *
-   * 8.0 is MuseScore's own `minMeasureWidth`, and it is the right floor
-   * for the spacing law that now sits above it: under MuseScore's law a
-   * plain 4/4 bar of four quarter notes is 14 staff spaces of note
-   * area, so 8 lifts the sparse bars without touching the ordinary
-   * ones. (Under §14's increment law the same bar was 10.2 and the
-   * floor had to be 12. The two numbers go together; moving one without
-   * the other makes every bar the same width.)
+   * 8.0 is the house `minMeasureWidth`, and it is the right floor for
+   * the spacing law that now sits above it: under that law a plain 4/4
+   * bar of four quarter notes is 14 staff spaces of note area, so 8
+   * lifts the sparse bars without touching the ordinary ones. (Under
+   * §14's increment law the same bar was 10.2 and the floor had to be
+   * 12. The two numbers go together; moving one without the other makes
+   * every bar the same width.)
    *
-   * This engine scales it by the measure's own notated length, which
-   * MuseScore does not: a 2/4 bar should not be as wide as a 4/4 one.
-   * That part is ours.
+   * This engine scales it by the measure's own notated length: a 2/4 bar
+   * should not be as wide as a 4/4 one. That part is ours.
    */
   readonly minMeasureWidth: number;
 }
@@ -302,13 +301,11 @@ export interface SpacingConfig {
  * their actual content; this is only what it may never go below.
  *
  * Both numbers are CLEARANCES -- the empty space between two staves, not
- * the distance between their lines -- which is how MuseScore states its
- * own, and the defaults are MuseScore's: `staffDistance` 6.5 and
- * `minSystemDistance` 8.5. They sit above §15.1's "around 3.5 staff
- * spaces at minimum; generous scores use more", which is where this
- * engine's own earlier 4.0 and 6.0 came from -- MuseScore is simply the
- * more generous of the two, and the scores being read were engraved to
- * it.
+ * the distance between their lines -- and they are the house numbers:
+ * 6.5 and 8.5. They sit above §15.1's "around 3.5 staff spaces at
+ * minimum; generous scores use more", which is where this engine's own
+ * earlier 4.0 and 6.0 came from -- the house style is simply the more
+ * generous of the two, and the scores being read were engraved to it.
  */
 export interface StavesConfig {
   readonly minStaffDistance: number;
@@ -507,9 +504,9 @@ export const DEFAULT_CONFIG: EngineConfig = {
       barNumber: 1.6,
       lyric: 1.8,
       dynamic: 2.2,
-      // MuseScore's own Tempo text style is 12pt, and its default
-      // spatium is 1.75mm; 12pt is 4.2336mm, so one staff space is
-      // 2.42 of them. Rounded to 2.4.
+      // The house Tempo text style is 12pt, and the default spatium is
+      // 1.75mm; 12pt is 4.2336mm, so one staff space is 2.42 of them.
+      // Rounded to 2.4.
       tempo: 2.4,
       chordSymbol: 1.8,
     },
@@ -553,9 +550,9 @@ export const DEFAULT_CONFIG: EngineConfig = {
     minMeasureWidth: 8.0,
   },
   staves: {
-    // MuseScore's `staffDistance` and `minSystemDistance`. Both are
+    // The house `staffDistance` and `minSystemDistance`. Both are
     // clearances -- empty space between two staves, not the distance
-    // between their lines -- which is how MuseScore states them too.
+    // between their lines.
     minStaffDistance: 6.5,
     minSystemDistance: 8.5,
   },
@@ -578,7 +575,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
     // dynamic, which sits in the same band under the staff.
     lyricGap: 2.2,
     // One lyric line of 1.8 plus a little air, so two verses do not
-    // touch. MuseScore's own lyric line spacing is ~1.4x the text size.
+    // touch. The house lyric line spacing is ~1.4x the text size.
     lyricRowHeight: 2.6,
     chordSymbolsDisplay: 'on',
     chordSymbolGap: 1.0,

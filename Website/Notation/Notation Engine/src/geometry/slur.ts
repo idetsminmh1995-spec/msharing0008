@@ -23,7 +23,7 @@ export function slurSide(stemDirections: readonly StemDirection[]): SlurSide {
 }
 
 /**
- * This engine's own floor, not MuseScore's: a curve shorter than about
+ * This engine's own floor: a curve shorter than about
  * one staff space would otherwise arc less than it is thick, and a lens
  * flatter than it is wide does not read as a curve at all -- it reads as
  * a smudge between two noteheads. Twice the midpoint thickness is the
@@ -34,7 +34,7 @@ const MINIMUM_ARC_HEIGHT = ENGRAVING_STYLE.slur.midWidth * 2;
 /**
  * How high a slur or tie arcs over its own span, in staff spaces.
  *
- * Shared by both because MuseScore shapes both from the same rule, and
+ * Shared by both because both are shaped from the same rule, and
  * because the alternative -- the flat 0.5 staff spaces this engine used
  * to give every curve regardless of length -- is wrong at both ends: a
  * slur over half a bar came out as flat as one over two notes, and a

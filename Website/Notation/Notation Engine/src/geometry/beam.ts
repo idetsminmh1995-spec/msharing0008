@@ -54,7 +54,7 @@ export interface BeamGroup {
  * This is the rule that separates a page of real music from a page of
  * correct-but-wrong music, and it is the one difference you see first:
  * eight eighth notes in 4/4 are engraved as two beams of four, not four
- * beams of two. Every published edition does it, and so does MuseScore.
+ * beams of two. Every published edition does it.
  *
  * It only applies where the beat is a QUARTER and the bar divides into
  * whole pairs of beats:

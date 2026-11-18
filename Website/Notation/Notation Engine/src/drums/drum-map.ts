@@ -19,8 +19,8 @@ export interface DrumMapEntry {
   /**
    * One exact SMuFL glyph, for a drum no shape family contains.
    *
-   * MuseScore's own distinction: most drums name a notehead GROUP,
-   * which has a head for every duration, but a few name a single glyph
+   * The distinction this engine draws: most drums name a notehead
+   * GROUP, which has a head for every duration, but a few name a single glyph
    * outright -- the china cymbal's `noteheadHeavyXHat`, the slap's
    * `noteheadSlashX`. When this is set it wins over `noteheadShape`,
    * and the note's own `<notehead>` still wins over both.

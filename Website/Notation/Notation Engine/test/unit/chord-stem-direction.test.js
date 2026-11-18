@@ -37,7 +37,7 @@ describe('a drum chord\'s drawn stem direction stays up for a unified percussion
     assert.equal((svg.match(/stroke-width="0\.5"/g) || []).length, 4);
   });
 
-  test('ONE voice, hi-hat+snare chords carrying <stem>up</stem> are drawn stem UP (MuseScore\'s own choice)', () => {
+  test('ONE voice, hi-hat+snare chords carrying <stem>up</stem> are drawn stem UP (the file\'s own choice)', () => {
     // The automatic rule alone would point these DOWN (the hi-hat above the
     // staff is the note furthest from the middle line) -- the bug this guards.
     assert.deepEqual(directions(1, 1), ['up', 'up', 'up', 'up']);

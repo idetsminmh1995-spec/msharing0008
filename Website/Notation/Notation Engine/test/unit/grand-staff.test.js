@@ -148,7 +148,7 @@ describe('grand staff rendering (Integration A)', () => {
     // Must reach from the top staff's top line (y=4) to the bottom
     // staff's bottom line -- i.e. through the gap, not stopping at the
     // first staff. The lower staff's bottom is the upper staff's bottom
-    // (8) plus MuseScore's own `staffDistance` clearance (6.5) plus the
+    // (8) plus the house `staffDistance` clearance (6.5) plus the
     // lower staff's own four spaces of height.
     assert.equal(top, 4);
     assert.equal(bottom, 8 + NE.DEFAULT_CONFIG.staves.minStaffDistance + 4);

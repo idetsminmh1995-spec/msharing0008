@@ -49,7 +49,7 @@ describe('config.layout.minStrokeWidth', () => {
 
   test('a floor under every natural width changes nothing at all', () => {
     // Which is what has to happen at a size that does not need it: at
-    // 1920 across, a staff line is already two pixels and MuseScore's
+    // 1920 across, a staff line is already two pixels and the house
     // engraving is left alone.
     const thinnest = Math.min(...strokes(render(FILE)));
     assert.equal(render(FILE), render(FILE, { layout: { minStrokeWidth: thinnest } }));

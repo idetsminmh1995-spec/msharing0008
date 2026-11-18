@@ -14,11 +14,12 @@ const FIXTURE = 'musescore-piano-defaults.musicxml';
 const xml = fs.readFileSync(path.join(FIXTURES, FIXTURE), 'utf8');
 
 /**
- * MuseScore writes `default-x` and `default-y` on every note and rest it
- * exports, and a `width` on every measure. That is not a hint: it is
- * MuseScore reporting the layout it actually produced, which makes this
- * file the strongest evidence available anywhere in this suite about
- * whether this engine draws what MuseScore draws.
+ * This fixture is a REAL export from another notation program, and it
+ * writes `default-x` and `default-y` on every note and rest, and a
+ * `width` on every measure. That is not a hint: it is that program
+ * reporting the layout it actually produced, which makes this file the
+ * strongest cross-software evidence in this suite about whether this
+ * engine draws a foreign file the way its own exporter drew it.
  *
  * `default-y` is in tenths, positive UP, and -- on a grand staff --
  * measured from the top line of the PART's first staff for both staves.
@@ -48,8 +49,8 @@ function noteBlocks() {
     }));
 }
 
-describe("MuseScore parity: the owner's own export, against what MuseScore says it drew", () => {
-  test('every notehead lands EXACTLY where MuseScore put it -- all 185 of them', () => {
+describe("cross-software parity: a foreign export, against what its own exporter says it drew", () => {
+  test('every notehead lands EXACTLY where the exporter put it -- all 185 of them', () => {
     const { svg } = render();
     const topLine = staffLines(svg)[0];
     const expected = noteBlocks()
@@ -67,7 +68,7 @@ describe("MuseScore parity: the owner's own export, against what MuseScore says 
     assert.deepEqual(drawn, expected);
   });
 
-  test('every rest sits where MuseScore put it -- on the middle line, not a space off it', () => {
+  test('every rest sits where the exporter put it -- on the middle line, not a space off it', () => {
     // This is what found the real bug: a grand staff is ONE measure with
     // two voices in it, the right hand's and the left hand's, and they
     // share no staff at all. Counting the measure's voices rather than
@@ -113,9 +114,10 @@ describe("MuseScore parity: the owner's own export, against what MuseScore says 
     );
   });
 
-  test('the SHAPE of every measure matches MuseScore to a thousandth of a staff space', () => {
-    // Not the absolute width: MuseScore justifies each system out to the
-    // page margin and this engine's scroll mode has no margin to reach.
+  test('the SHAPE of every measure matches the exporter to a thousandth of a staff space', () => {
+    // Not the absolute width: the exporter justifies each system out to
+    // the page margin and this engine's scroll mode has no margin to
+    // reach.
     // What has to match is the shape -- where each attack sits WITHIN
     // the measure, relative to the rest of them. That is the spacing
     // law, and it is what the eye reads.
@@ -145,7 +147,7 @@ describe("MuseScore parity: the owner's own export, against what MuseScore says 
     assert.equal(errors.length, 12);
     // Eleven of the twelve are exact. Measure 8 -- three cautionary
     // accidentals and two chords in one bar -- is 0.45sp out, because
-    // its minimum-distance floors bind and MuseScore evens the result
+    // its minimum-distance floors bind and the exporter evens the result
     // out again when it justifies the system. Scroll mode has no system
     // to justify, so that last bit of evening never happens here.
     const exact = errors.filter((e) => e.worst < 0.002);
@@ -153,8 +155,8 @@ describe("MuseScore parity: the owner's own export, against what MuseScore says 
     assert.ok(Math.max(...errors.map((e) => e.worst)) < 0.5);
   });
 
-  test('the two staves of the grand staff sit exactly MuseScore\'s own distance apart', () => {
-    // 6.5sp: MuseScore's `staffDistance`, and what this file's own
+  test('the two staves of the grand staff sit exactly the stated distance apart', () => {
+    // 6.5sp: the house `staffDistance`, and what this file's own
     // <staff-layout><staff-distance>65</staff-distance> states.
     const lines = staffLines(render().svg);
     assert.equal(lines.length, 10);

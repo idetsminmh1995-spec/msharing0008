@@ -29,8 +29,8 @@ export function renderExtenderLine(
  * box straddles the baseline (+0.14 to -0.136 staff spaces) -- drawn as-is
  * it reads as an underscore under the word rather than as the short dash
  * between two syllables that every songbook prints. Raising it to roughly
- * half the x-height puts it where a reader expects, which is what
- * MuseScore and Finale both do with the same glyph.
+ * half the x-height puts it where a reader expects, which is the
+ * conventional placement for the same glyph.
  */
 const HYPHEN_RISE = 0.32;
 

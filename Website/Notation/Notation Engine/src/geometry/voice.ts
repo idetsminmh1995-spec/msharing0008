@@ -1,9 +1,9 @@
 import type { StemDirection } from './stem.js';
 
 /**
- * §9.14's universal, non-negotiable rule -- confirmed independently across
- * MuseScore's handbook, LilyPond's reference manual, and two general
- * notation-pedagogy sources, all stating the identical rule with no
+ * §9.14's universal, non-negotiable rule -- confirmed independently
+ * across several notation references and two general notation-pedagogy
+ * sources, all stating the identical rule with no
  * disagreement: the odd-numbered voice(s) always get up stems, the
  * even-numbered voice(s) always get down stems, "upper up, lower down,
  * always" -- regardless of any individual note's own position relative to

@@ -897,8 +897,8 @@ export function parseMusicXml(xmlText: string, options?: ParseMusicXmlOptions): 
             recognizedSomething = true;
           }
           // A <sound tempo> alongside a <metronome> in the SAME <direction>
-          // is the same tempo stated twice (MuseScore and others routinely
-          // emit both) -- taking both would put two marks at one tick. The
+          // is the same tempo stated twice (exporters routinely emit
+          // both) -- taking both would put two marks at one tick. The
           // notated <metronome> wins, since it carries a real beat unit;
           // <sound tempo> is quarter-notes-per-minute by definition and is
           // only used when nothing notated said otherwise here.

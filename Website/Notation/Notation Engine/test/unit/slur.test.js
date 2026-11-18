@@ -66,7 +66,7 @@ describe('slurs (Phase 27)', () => {
     assert.equal(shape.endX - shape.startX, 100);
   });
   /**
-   * MuseScore shapes a slur from its LENGTH -- a short one's shoulder
+   * A slur is shaped from its LENGTH -- a short one's shoulder
    * rises straight with the span, a longer one's logarithmically, and
    * the rise is capped so a slur across a system is not a dome. The
    * engine used to give every slur the same half-space arc regardless.

@@ -36,11 +36,10 @@ import { spacingDiagnostic, type SpacingDiagnostic } from './spacing-diagnostic.
 export interface SpacingEvent {
   readonly ticks: number;
   /**
-   * The shortest note or rest STARTING at this attack, in any voice --
-   * MuseScore's `Segment::shortestChordRest`.
+   * The shortest note or rest STARTING at this attack, in any voice.
    *
    * It is NOT the same as `ticks`, and the difference is the whole of
-   * MuseScore's multi-voice spacing. `ticks` is the gap to the next
+   * multi-voice spacing. `ticks` is the gap to the next
    * attack; this is how long the shortest thing that begins here
    * actually lasts. They are equal whenever the gap is set by a note
    * that ends at the next attack, and they come apart the moment one
@@ -77,12 +76,12 @@ export interface SpacingEvent {
    * a staff (`"P1:1"`, say). Only the staves that actually draw
    * something at this attack appear.
    *
-   * This is what makes the minimum-distance pass behave like
-   * MuseScore's, and the difference is a cross-staff one. A dotted note
-   * low in the bass staff is wide, and the attack after it may be in
-   * the TREBLE staff, half a stave away -- nothing can collide, and
-   * MuseScore (which spaces by each element's real shape) lets them sit
-   * close. The old pass took one width per attack, the widest anywhere
+   * This is what makes the minimum-distance pass cross-staff aware, and
+   * the difference is a real one. A dotted note low in the bass staff is
+   * wide, and the attack after it may be in the TREBLE staff, half a
+   * stave away -- nothing can collide, and spacing by each element's own
+   * real shape lets them sit close. The old pass took one width per
+   * attack, the widest anywhere
    * on the system, and pushed the next attack clear of it whatever
    * staff that was: on a grand staff where the two hands alternate,
    * which is most piano music, that inflated the gap after every wide
@@ -158,9 +157,9 @@ export function computeEventSpace(
  *
  * §14's law is relative: it asks how this note compares with the
  * measure's own most common duration, so it needs `referenceTicks`.
- * MuseScore's is absolute: every duration is priced against a quarter
- * note, so it needs `ticksPerQuarter`. Both are carried because a
- * caller does not have to know which law is in force -- the config
+ * The `'power'` law is absolute: every duration is priced against a
+ * quarter note, so it needs `ticksPerQuarter`. Both are carried because
+ * a caller does not have to know which law is in force -- the config
  * does.
  */
 export interface SpacingClock {
@@ -174,8 +173,8 @@ export interface SpacingClock {
  * The room one attack is given before anything else moves it, in staff
  * spaces -- under whichever law `config.law` names.
  *
- * `previous` is the attack before this one, which only MuseScore's law
- * reads, and only for the polyrhythm case its own source calls out.
+ * `previous` is the attack before this one, which only the `'power'`
+ * law reads, and only for the polyrhythm case that law calls out.
  *
  * The `'power'` branch is `notation-defaults/spacing-law.ts`'s own
  * function rather than a copy of its arithmetic. That file is where the
@@ -215,8 +214,7 @@ export function computeAttackSpace(
  * starting at 0 -- each event's own position is the running sum of every
  * earlier event's `computeAttackSpace`. This is the FIRST pass alone;
  * the minimum-distance pass (`applyMinimumDistance`) and justification
- * (`justifySystem`) are deliberately separate functions run afterward,
- * which is how MuseScore stages it too.
+ * (`justifySystem`) are deliberately separate functions run afterward.
  */
 export function computeProportionalPositions(
   events: readonly SpacingEvent[],

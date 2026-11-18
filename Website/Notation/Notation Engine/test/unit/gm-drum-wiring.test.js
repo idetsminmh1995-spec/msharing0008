@@ -123,7 +123,7 @@ describe('GM drum mapping wired into rendering (Phase 41, §13.1/§13.3)', () =>
     assert.match(svg, /\uE0A9/); // noteheadXBlack, matching the file's own explicit override
   });
 
-  test('a two-voice MuseScore-style groove preserves GM IDs, written positions, stems and aligned beats', () => {
+  test('a two-voice groove preserves GM IDs, written positions, stems and aligned beats', () => {
     const xml = fs.readFileSync(
       path.join(FIXTURES_DIR, 'musescore-two-voice-drum-groove.musicxml'),
       'utf8',

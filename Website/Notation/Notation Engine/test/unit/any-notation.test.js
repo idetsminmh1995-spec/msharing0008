@@ -29,7 +29,7 @@ function noteheadScore(noteheadXml, type = 'quarter', duration = 1) {
  * "It must be able to read ANY drum notation."
  *
  * The engine used to THROW on any `<notehead>` value outside a
- * seven-item list. A real MuseScore drum chart writes `slashed` and
+ * seven-item list. A real drum chart writes `slashed` and
  * `<notehead smufl="noteheadHeavyXHat">other</notehead>`, so the whole
  * file came back as "Could not parse this file" -- over noteheads, on a
  * file whose notes, rhythms and barlines the engine read perfectly.
@@ -53,8 +53,8 @@ describe('every MusicXML notehead value, and none of them fatal (§9.7)', () => 
     // slashed and slash are DIFFERENT shapes, and getting them confused
     // is the easy mistake here.
     assert.equal(NE.selectNoteheadGlyphName({ pitch: NE.unpitchedPitch('F', 4), durationType: 'quarter', explicitNotehead: 'slashed' }), 'noteheadSlashedBlack1');
-    // MuseScore's own HEAD_SLASH: the filled rhythm slash is the one
-    // with horizontal ends, not the square-cut vertical-ended glyph.
+    // The filled rhythm slash is the one with horizontal ends, not the
+    // square-cut vertical-ended glyph.
     assert.equal(NE.selectNoteheadGlyphName({ pitch: NE.unpitchedPitch('F', 4), durationType: 'quarter', explicitNotehead: 'slash' }), 'noteheadSlashHorizontalEnds');
     assert.equal(NE.selectNoteheadGlyphName({ pitch: NE.unpitchedPitch('F', 4), durationType: 'quarter', explicitNotehead: 'back slashed' }), 'noteheadSlashedBlack2');
   });
@@ -125,8 +125,8 @@ describe('a measure has a standard minimum width (§14)', () => {
   });
 
   test('a sparse bar is not left barely wider than the rest inside it', () => {
-    // The owner's report, comparing this engine's drum output against
-    // MuseScore's: a bar of three quarter notes came out visibly
+    // The owner's report, comparing this engine's drum output against a
+    // published engraving: a bar of three quarter notes came out visibly
     // narrower than its neighbours of four, and a bar holding one whole
     // rest came out barely wider than the rest itself.
     //
@@ -134,11 +134,11 @@ describe('a measure has a standard minimum width (§14)', () => {
     // quarter rest is four attacks, exactly like four quarter notes, so
     // the two bars are identical. The second half is fixed by the
     // spacing law rather than by the floor: a whole rest's own segment
-    // is a whole note long, and under MuseScore's law that is worth
+    // is a whole note long, and under the 'power' law that is worth
     // 7.9 staff spaces rather than the 2.4 §14's law gave it.
     //
     // What is deliberately NOT asserted any more is that all three come
-    // out EQUAL. They do not in MuseScore either -- a bar's width
+    // out EQUAL. They do not in published engraving either -- a bar's width
     // follows what is written in it -- and the floor that used to force
     // equality here was this engine's own invention. A caller who wants
     // that look back has one number for it; the test below is it.

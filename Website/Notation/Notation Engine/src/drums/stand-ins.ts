@@ -40,9 +40,8 @@
  * than floor-tom parts.
  *
  * This table is this project's own, from how a kit is laid out and how
- * drum parts are written -- it is not MuseScore's, and it is not in
- * General MIDI, which says what a number SOUNDS like and nothing about
- * what stands in for it.
+ * drum parts are written -- it is not in General MIDI, which says what a
+ * number SOUNDS like and nothing about what stands in for it.
  */
 
 /**

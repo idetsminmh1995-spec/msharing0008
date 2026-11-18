@@ -98,7 +98,7 @@ describe('tab rendering end to end (Integration C)', () => {
 
   test('each fret number sits on ITS OWN string line', () => {
     const { svg } = render();
-    // A tab staff's lines are 1.5 staff spaces apart, not 1 -- MuseScore's
+    // A tab staff's lines are 1.5 staff spaces apart, not 1 -- the house
     // own TAB staff types, and the room a fret number needs. So a 6-line
     // staff with its bottom line at y=8 has lines at 8, 6.5, 5, 3.5, 2
     // and 0.5, and string 6 is the bottom one.

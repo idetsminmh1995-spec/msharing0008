@@ -66,12 +66,12 @@ const SHAPE_GLYPHS: Readonly<Record<string, Readonly<Record<NoteheadFill, string
     half: 'noteheadSquareWhite',
     black: 'noteheadSquareBlack',
   },
-  // MuseScore's HEAD_SLASH. The filled head is the one with HORIZONTAL
-  // ends -- a parallelogram leaning right, the shape a rhythm slash has
-  // in every chart written in MuseScore. This engine drew
-  // `noteheadSlashVerticalEnds`, which leans the same way but is cut
-  // square top and bottom, and against a MuseScore page it reads as a
-  // different symbol rather than a different weight of the same one.
+  // A slash head. The filled head is the one with HORIZONTAL ends -- a
+  // parallelogram leaning right, the shape a rhythm slash has in printed
+  // practice. This engine drew `noteheadSlashVerticalEnds`, which leans
+  // the same way but is cut square top and bottom, and against a printed
+  // page it reads as a different symbol rather than a different weight of
+  // the same one.
   slash: {
     whole: 'noteheadSlashWhiteWhole',
     half: 'noteheadSlashWhiteHalf',
@@ -152,10 +152,11 @@ const SHAPE_GLYPHS: Readonly<Record<string, Readonly<Record<NoteheadFill, string
     half: 'noteShapeSquareWhite',
     black: 'noteShapeSquareBlack',
   },
-  // MuseScore's HEAD_TI. Aikin's ti is a rounded triangle; the keystone
-  // this engine drew belongs to the Funk shapes, which are a different
-  // seven-shape system. Both are real notations and SMuFL has glyphs
-  // for each -- this is the one a MuseScore file means.
+  // The ti (triangle) head. Aikin's ti is a rounded triangle; the
+  // keystone this engine drew belongs to the Funk shapes, which are a
+  // different seven-shape system. Both are real notations and SMuFL has
+  // glyphs for each -- the rounded triangle is the one a MusicXML file
+  // naming `ti` means.
   ti: {
     whole: 'noteShapeTriangleRoundWhite',
     half: 'noteShapeTriangleRoundWhite',
@@ -317,7 +318,7 @@ export function durationDefaultNotehead(durationType: DurationType): string {
  * - anything unrecognized.
  *
  * **This used to throw on the third case**, and that is the whole reason
- * a real MuseScore drum chart (`<notehead>slashed</notehead>`, plus
+ * a real drum chart (`<notehead>slashed</notehead>`, plus
  * `<notehead smufl="noteheadHeavyXHat">other</notehead>`) rendered as
  * "Could not parse this file" instead of as music. A notation file is
  * INPUT. §10.7's rule for input the engine cannot honour is to say so in
@@ -354,8 +355,8 @@ export interface NoteheadSelectionInput {
   /**
    * The `smufl` attribute of that same `<notehead>` element. MusicXML's
    * `other` value means "the shape is not in my enumeration -- here is
-   * its SMuFL glyph name instead", which is how MuseScore writes a
-   * drum chart's hi-hat-with-hat head
+   * its SMuFL glyph name instead", which is how a drum chart's
+   * hi-hat-with-hat head is written
    * (`<notehead smufl="noteheadHeavyXHat">other</notehead>`).
    *
    * Used as a glyph name DIRECTLY, with no duration variant: the file

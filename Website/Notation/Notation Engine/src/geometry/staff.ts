@@ -26,8 +26,8 @@ export interface StaffGeometry {
  * from day one, not just the 5-line default).
  *
  * `lineDistance` is the gap between two adjacent lines, and it is not
- * always one staff space: MuseScore's own TAB staff types space their
- * lines 1.5 apart, because a fret number has to fit BETWEEN two lines
+ * always one staff space: the house TAB staff spaces its lines 1.5
+ * apart, because a fret number has to fit BETWEEN two lines
  * where a notehead sits across them. Five-line and percussion staves
  * are 1, which is why that is the default.
  */

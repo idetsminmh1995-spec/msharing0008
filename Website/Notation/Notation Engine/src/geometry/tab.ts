@@ -15,7 +15,7 @@
  * upward) of a given string on a tab staff of `numLines` lines.
  *
  * string 1 -> top line, string `numLines` -> bottom line. `lineDistance`
- * is how far apart the lines are, which on a MuseScore tab staff is 1.5
+ * is how far apart the lines are, which on the house tab staff is 1.5
  * rather than 1, so a standard 6-line guitar tab puts string 1 at -7.5
  * and string 6 at 0.
  */

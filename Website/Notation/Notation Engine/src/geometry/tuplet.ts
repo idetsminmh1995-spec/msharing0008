@@ -1,8 +1,8 @@
 import type { StemDirection } from './stem.js';
 
 /**
- * §9.17's rule, confirmed against MuseScore's own documented "Automatic"
- * bracket behavior: a bracket is redundant when the beam already shows
+ * §9.17's rule, confirmed against published engraving practice's
+ * "Automatic" bracket behaviour: a bracket is redundant when the beam already shows
  * the group's extent. Needed whenever the group contains any unbeamed
  * note or a rest (nothing there for a beam to visually join).
  */

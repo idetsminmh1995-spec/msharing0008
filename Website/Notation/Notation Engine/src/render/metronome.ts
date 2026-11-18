@@ -34,8 +34,8 @@ function glyphAdvanceWidth(glyphName: string): number {
 /**
  * Between the note glyph and its augmentation dot.
  *
- * MuseScore's own `dotNoteDistance` (0.5sp) is measured from a NOTEHEAD,
- * and a metNote glyph is wider than its notehead -- the stem is inside
+ * The house `dotNoteDistance` (0.5sp) is measured from a NOTEHEAD, and
+ * a metNote glyph is wider than its notehead -- the stem is inside
  * the same glyph, at its right-hand edge. So the dot is already past the
  * notehead by the time the glyph ends; this is just enough space to keep
  * it off the stem.
@@ -105,7 +105,7 @@ export function renderMetronomeMark(
       fill: options.color,
       'font-family': options.textFont,
       'font-size': options.fontSize,
-      // MuseScore's Tempo text style is bold, and a tempo mark reads as
+      // The house Tempo text style is bold, and a tempo mark reads as
       // an instruction to the player rather than as part of the music.
       'font-weight': 'bold',
     }),

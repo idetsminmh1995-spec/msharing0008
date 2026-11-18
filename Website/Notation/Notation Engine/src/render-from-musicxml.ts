@@ -349,9 +349,9 @@ function buildTheme(config: EngineConfig, fileDefaults: ScoreDefaults | undefine
  *
  * Taken from the resolved config rather than written out again here.
  * They WERE written out again here, and drifted: the copy still said
- * `minNoteDistance: 0.5` after the config had moved to MuseScore's
- * 0.35, so the measure the reader saw was spaced by a number nothing
- * else in the engine used.
+ * `minNoteDistance: 0.5` after the config had moved to the house 0.35,
+ * so the measure the reader saw was spaced by a number nothing else in
+ * the engine used.
  *
  * `justify: false` is not a drift but a decision -- see the note on
  * `pageSpacingConfig` in `renderFromMusicXml` for why a scroll system
@@ -376,14 +376,14 @@ function withinMeasureSpacing(spacing: SpacingConfig): SpacingConfig {
  * score, and since that allowance becomes the segment's own minimum
  * width, the floor then bound on nearly every segment and flattened
  * the spacing: on the owner's own file a sixteenth's segment came out
- * exactly as wide as an eighth's, where MuseScore makes it half.
+ * exactly as wide as an eighth's, where it should be half.
  *
  * So the measurement pass now runs the SAME accidental state machine
  * the renderer runs (`drawnAccidentalTicks`), and these are real glyph
  * widths rather than round numbers.
  */
 const NOTEHEAD_WIDTH_FALLBACK = 1.18;
-/** Between an accidental and the notehead it belongs to -- MuseScore's `accidentalNoteDistance`. */
+/** Between an accidental and the notehead it belongs to -- the house `accidentalNoteDistance`. */
 const ACCIDENTAL_NOTE_DISTANCE = ENGRAVING_STYLE.note.accidentalNoteDistance;
 
 /** How far one attack's ink reaches RIGHT of its x: the notehead, and its augmentation dots. */
@@ -479,18 +479,18 @@ function attackLeading(accidentalWidth: number | undefined): number {
 }
 /** Trailing room after a measure's last event, so it isn't flush against the barline. */
 const MEASURE_TRAILING_MARGIN = 2.0;
-/** MuseScore's `minRestToRestClearance`, also its floor for a whole or half rest against a chord. */
+/** The house `minRestToRestClearance`, also the floor for a whole or half rest against a chord. */
 const REST_TO_REST_CLEARANCE = 0.55;
-/** MuseScore's floor for any shorter rest against a chord. */
+/** The house floor for any shorter rest against a chord. */
 const REST_TO_CHORD_CLEARANCE = 0.35;
 /**
  * How far apart a tablature staff's lines sit, in staff spaces.
  *
- * MuseScore's own TAB staff types -- every one of them, from
- * `TAB_4SIMPLE` to `TAB_6FULL` -- space their lines 1.5 apart rather
- * than 1, and the reason is structural: a fret number is written ON a
- * line, so the digits of two adjacent strings would touch at the
- * ordinary spacing. See `notation-defaults/strings.ts`.
+ * The house TAB staff types -- every one of them, from four strings to
+ * six -- space their lines 1.5 apart rather than 1, and the reason is
+ * structural: a fret number is written ON a line, so the digits of two
+ * adjacent strings would touch at the ordinary spacing. See
+ * `notation-defaults/strings.ts`.
  */
 const TAB_LINE_DISTANCE = 1.5;
 /**
@@ -509,7 +509,7 @@ const TAB_LINE_DISTANCE = 1.5;
  * signature was restated (the tempo mark and the playback cursor landed
  * inside the header) and too WIDE everywhere else (five staff spaces of
  * empty air after every barline, which is what made this engine's drum
- * output look unlike MuseScore's).
+ * output look wrong).
  */
 const MEASURE_LEADING_PAD = 0.5;
 
@@ -940,7 +940,7 @@ function computeMeasureLayout(
   const eventByTick = new Map<number, Note | Chord | Rest>();
   /** The same, for what reaches LEFT of each attack -- its accidental. */
   const leadingByTickAndStaff = new Map<number, Map<string, number>>();
-  /** MuseScore's `shortestChordRest`, per attack -- see where it is filled. */
+  /** The shortest thing starting at each attack -- see where it is filled. */
   const shortestStartingByTick = new Map<number, number>();
   for (const voice of measure.voices) {
     const starts = eventStartTicks(voice.events);
@@ -982,8 +982,8 @@ function computeMeasureLayout(
         attackLeading(accidentals.get(tick)) +
           (carriesArpeggioMark(event) ? ARPEGGIO_LEADING_WIDTH : 0),
       );
-      // MuseScore's `Segment::shortestChordRest`: the shortest thing
-      // that BEGINS at this attack, across every voice. Not the gap to
+      // The shortest thing that BEGINS at this attack, across every
+      // voice. Not the gap to
       // the next attack -- the two are equal only while nothing longer
       // is being held through it, and the spacing law reads both.
       const own = event.duration.ticks;
@@ -1841,15 +1841,14 @@ function resolveNoteRendering(
    *
    * `<display-step>`/`<display-octave>` are not a hint -- they are
    * MusicXML's own way of saying which line a percussion note goes on,
-   * and MuseScore's importer treats them as final: it computes the
-   * line from them and the clef, then looks for a drum in its own
-   * drumset already on that line, and ADDS one when it finds none
-   * (`MusicXmlParserPass2::xmlSetDrumsetPitch`). The drumset adapts to
-   * the file; the file is never moved to suit the drumset.
+   * and this engine treats them as final: it computes the line from
+   * them and the clef, then looks for a drum in the drum table already
+   * on that line, and ADDS one when it finds none. The drum table
+   * adapts to the file; the file is never moved to suit the drum table.
    *
    * This engine used to do the opposite, and every unpitched note in a
-   * real MuseScore export landed wherever this project's own GM table
-   * happened to put that drum -- the toms half a space out, the pedal
+   * real export landed wherever this project's own GM table happened to
+   * put that drum -- the toms half a space out, the pedal
    * hi-hat at the top of the staff instead of below it, the acoustic
    * bass drum a line high. The table is still the answer for a file
    * that states no position, which is the only case left for it.
@@ -1868,8 +1867,8 @@ function resolveNoteRendering(
   // the drum table already had an opinion about the snare.)
   //
   // The table's opinion is withheld for a note the FILE placed, for the
-  // same reason its position is: MuseScore reads the head from the
-  // note's own `<notehead>` and defaults to a plain one, so a file that
+  // same reason its position is: a file's own `<notehead>` is read and
+  // defaults to a plain one, so a file that
   // wants an X on the hi-hat line says so, and one that says nothing
   // means a plain oval. Substituting a shape there is this engine
   // disagreeing with the file about its own notation.
@@ -2833,12 +2832,12 @@ function renderChord(
  * other voice's way, in whole staff spaces.
  *
  * §9.14 already pushes the upper voice's rests up a space and the
- * lower voice's down one, which is where MuseScore starts too. What it
+ * lower voice's down one, which is where the house style starts too. What it
  * does next, and this did not, is CHECK: a rest that still runs into
  * the other voice's notes -- or into the other voice's rest -- is moved
  * further, a whole space at a time, until it clears.
  *
- * MuseScore's own clearances, from `RestLayout`: 0.55sp between a rest
+ * The house clearances: 0.55sp between a rest
  * and another rest, 0.55sp between a whole or half rest and a chord,
  * 0.35sp for any other rest against a chord. Where two RESTS collide
  * the move is split between them -- the upper takes `floor(steps / 2)`
@@ -2847,7 +2846,7 @@ function renderChord(
  * music is and the rest is what has to get out of the way.
  *
  * One number per voice per measure, not per rest. That part is read off
- * MuseScore's OUTPUT rather than its source: on a real export, a bar
+ * a real export's output rather than derived: on such a file, a bar
  * whose quarter rest had to move put that bar's half rest at the same
  * new height, and rests of one voice wandering up and down within a bar
  * would look like a mistake anyway. Said plainly here because it is the
@@ -3911,7 +3910,7 @@ export function renderParsedMusicXml(
    * inside the header. A measure that restates NOTHING needs 0.5 and
    * also got 6.0, so every barline in the score was followed by five
    * staff spaces of empty air -- visible on this project's own drum
-   * file, and the thing that made it look unlike MuseScore's output.
+   * file, and the thing that made it look wrong.
    *
    * `isSystemStart` is a parameter rather than a lookup because it is
    * needed BOTH before layout (to give each measure a width that fits
@@ -5456,7 +5455,7 @@ export function renderParsedMusicXml(
           // measure's voices instead forced every treble stem up and
           // every bass stem down, overriding the <stem> the file itself
           // states for each note, and pushed every rest a staff space
-          // off the middle line, where MuseScore's own `default-y` says
+          // off the middle line, where the file's own `default-y` says
           // it belongs. Two voices on one staff still get the rule,
           // which is the case the rule is for.
           const voicesOnThisStaff = new Set(

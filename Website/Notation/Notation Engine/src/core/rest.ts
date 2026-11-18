@@ -20,8 +20,8 @@ export interface Rest {
    * constructing a score. The cursor honours `<backup>`
    * and `<forward>`. It is NOT redundant with summing the durations
    * before it: a voice can legitimately have GAPS (a `<forward>` skips
-   * time without writing a rest, which is how MuseScore writes a kick
-   * drum that plays on beats 1 and 3 and nothing in between) and can
+   * time without writing a rest, which is how a kick drum that plays on
+   * beats 1 and 3 and nothing in between is written) and can
    * legitimately start partway into the measure. Summing durations
    * silently pulls every event after a gap too early -- on this
    * project's own drum file that put the kick's beamed pair on beat 2

@@ -17,7 +17,7 @@ export interface RenderRehearsalMarkOptions {
  * A rectangle rather than a circle: MusicXML distinguishes `<rehearsal
  * enclosure="square|circle|none|...">`, and this engine does not parse
  * the enclosure attribute -- so it draws the default square, which is
- * what both MuseScore and Finale do when no enclosure is stated. A file
+ * the conventional default when no enclosure is stated. A file
  * asking for a circle therefore gets a square frame; that is a stated
  * limitation, not an accident (see the phase record).
  */

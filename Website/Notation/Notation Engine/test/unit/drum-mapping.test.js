@@ -24,7 +24,7 @@ describe('default GM drum mapping table (Phase 41, §13.3)', () => {
         () => NE.shapeGlyphName(entry.noteheadShape, 'quarter'),
         entry.noteheadShape,
       );
-      // A drum MuseScore names one glyph for (the china cymbal, 52)
+      // A drum this kit names one glyph for (the china cymbal, 52)
       // keeps a plain family for anyone reading only that, and the real
       // glyph beside it.
       if (entry.noteheadGlyph !== undefined) {
@@ -41,26 +41,27 @@ describe('default GM drum mapping table (Phase 41, §13.3)', () => {
     assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[49].stemDirection, 'up'); // Crash
   });
 
-  test('cymbals and hi-hat use the x head; drums use the plain oval -- MuseScore for every one', () => {
+  test('cymbals and hi-hat use the x head; drums use the plain oval', () => {
     const T = NE.DEFAULT_DRUM_MAPPING_TABLE;
     assert.equal(T[42].noteheadShape, 'x'); // Closed Hi-Hat
     assert.equal(T[49].noteheadShape, 'x'); // Crash
     assert.equal(T[38].noteheadShape, 'normal'); // Snare
     assert.equal(T[41].noteheadShape, 'normal'); // Low Floor Tom
     assert.equal(T[53].noteheadShape, 'diamond'); // Ride Bell
-    // Where MuseScore differs from the convention this engine used to
-    // follow, MuseScore wins -- these are the heads a MuseScore file
-    // actually draws, and a reader comparing the two pages sees them.
+    // Where the standard kit differs from the convention this engine
+    // used to follow, the standard kit wins -- these are the heads a
+    // real chart actually draws, and a reader comparing the two pages
+    // sees them.
     assert.equal(T[56].noteheadShape, 'inverted-triangle'); // Cowbell, not a diamond
     assert.equal(T[37].noteheadShape, 'slashed'); // Side Stick, not an x
     assert.equal(T[39].noteheadShape, 'plus'); // Hand Clap
     assert.equal(T[52].noteheadGlyph, 'noteheadHeavyXHat'); // Chinese Cymbal
   });
 
-  test('an open hi-hat is said by its head, the way MuseScore says it', () => {
-    // It used to be an x plus an `articulation: 'open'` marker. MuseScore
-    // draws a circled x and no marker, and drawing both would say it
-    // twice.
+  test('an open hi-hat is said by its head, not by a marker', () => {
+    // It used to be an x plus an `articulation: 'open'` marker. The
+    // standard kit draws a circled x and no marker, and drawing both
+    // would say it twice.
     assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[46].noteheadShape, 'circle-x');
     assert.equal(NE.DEFAULT_DRUM_MAPPING_TABLE[46].articulation, undefined);
   });
@@ -74,9 +75,9 @@ describe('lookupDrumMapEntry (Phase 41, §13.3)', () => {
   });
 
   test('an in-range but unmapped note falls back to the middle line with a warning, never dropped', () => {
-    // The DEFAULT table can no longer reach this branch: it is
-    // MuseScore's drumset now, and MuseScore defines every pitch from
-    // 35 to 81. A caller's own sparse table still can, which is what
+    // The DEFAULT table can no longer reach this branch: it is the
+    // standard kit now, and General MIDI defines every pitch from 35 to
+    // 81. A caller's own sparse table still can, which is what
     // this is really about -- `config.drums.mapping` is allowed to
     // describe a kit of four drums without every other pitch becoming
     // an error.
@@ -87,7 +88,7 @@ describe('lookupDrumMapEntry (Phase 41, §13.3)', () => {
     assert.ok([...diagnostics].some((d) => d.code === 'DRUM_NOTE_UNMAPPED'));
   });
 
-  test("MuseScore's drumset leaves no gap in the GM percussion range", () => {
+  test('the standard kit leaves no gap in the GM percussion range', () => {
     for (let note = 35; note <= 81; note++) {
       const { diagnostics } = NE.lookupDrumMapEntry(note, NE.DEFAULT_DRUM_MAPPING_TABLE);
       assert.deepEqual([...diagnostics], [], `GM note ${note} is unmapped`);

@@ -26,7 +26,7 @@ function staffBottomYs(svg) {
 }
 
 describe('Phase 44 wired into rendering: content-aware grand-staff distance', () => {
-  test("ordinary grand-staff content (nothing crossing toward the other staff) keeps the default staff gap -- MuseScore's 6.5 clearance below a 4-unit staff", () => {
+  test("ordinary grand-staff content (nothing crossing toward the other staff) keeps the default staff gap -- the house 6.5 clearance below a 4-unit staff", () => {
     const { svg } = NE.renderFromMusicXml(load('piano-grand-staff.musicxml'), { domParser });
     const { trebleBottom, bassBottom } = staffBottomYs(svg);
     assert.equal(bassBottom - trebleBottom, NE.DEFAULT_CONFIG.staves.minStaffDistance + 4);

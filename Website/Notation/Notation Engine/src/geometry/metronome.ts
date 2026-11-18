@@ -50,7 +50,7 @@ export function metronomeDotGlyphName(): string {
  *    and the "2" where the "1" is itself 0.468sp wide. The digits
  *    touched and overlapped.
  *
- * MuseScore sets this half as ordinary text (its Tempo style: Edwin
+ * The house sets this half as ordinary text (the Tempo style: Edwin
  * Bold, 12pt) with the note as an embedded music symbol, and that is
  * what this engine now does too. Spacing digits is then the font's job,
  * which is the only thing that can do it correctly.

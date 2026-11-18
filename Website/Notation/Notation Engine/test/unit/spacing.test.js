@@ -6,7 +6,7 @@ const NE = loadEngine();
 const TICKS_PER_QUARTER = 480;
 
 // §14's own increment law, which is no longer the default -- these
-// tests keep it honest, and the MuseScore suite below covers what the
+// tests keep it honest, and the 'power' suite below covers what the
 // engine actually ships with.
 const CONFIG = {
   law: 'increment',
@@ -19,10 +19,10 @@ const CONFIG = {
   justify: true,
 };
 
-/** The shipped law, on MuseScore's own numbers. */
+/** The shipped law, on the house numbers. */
 const POWER_CONFIG = { ...CONFIG, law: 'power', minNoteDistance: 0.35 };
 
-/** `referenceTicks` is §14's; `ticksPerQuarter` is MuseScore's. */
+/** `referenceTicks` is §14's; `ticksPerQuarter` is the 'power' law's. */
 const clock = (referenceTicks) => ({ referenceTicks, ticksPerQuarter: TICKS_PER_QUARTER });
 
 function ev(ticks, renderedWidth = 0, shortestSounding) {
@@ -212,7 +212,7 @@ describe('the power law, which is the one the engine ships', () => {
   test('a note that another voice runs underneath is priced off that shorter note, linearly', () => {
     // A half note in one voice while eighths move under it: the gap to
     // the next attack is an eighth, but the shortest thing STARTING
-    // here lasts a half. MuseScore prices it off the half and scales
+    // here lasts a half. The 'power' law prices it off the half and scales
     // down by the fraction of it this segment is worth.
     const eighth = QUARTER / 2;
     const half = QUARTER * 2;
