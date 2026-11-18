@@ -188,27 +188,28 @@ Implementation sequence:
 
 **Browser စမ်းသပ်မှု (local, R2 မှ တကယ် load):** editor ကို `python3 -m http.server` ဖြင့် ဖွင့်၍ — picker တွင် assets ၆ ခု (MB ပါ) ပေါ်လာ ✓; MuseScore General ဖြင့် built + rendered နှစ်မျိုးလုံး play ✓; MS Basic သို့ ပြောင်း၍ ပြန် play ✓ (destroy/recreate အလုပ်လုပ်); Salamander ကို "— large" လို့ အမှတ်အသား ✓။
 
-#### အဆင့် ၁ — (ဂ) Asset id နှင့် R2 path ကို ကိုယ်ပိုင်အမည် ပြောင်းခြင်း
+#### အဆင့် ၁ — (ဂ) Asset id နှင့် R2 path ကို ကိုယ်ပိုင်အမည် ပြောင်းခြင်း — repo-side ပြီးစီး ✓ / R2-side ကျန်
 
 လက်ရှိ sound source ဖြစ်သော MuseScore General သည် **MIT** ဖြစ်ပြီးသား (လိုင်စင် သန့်ရှင်း)။ ဒါကြောင့် ဖိုင်ကို မပြောင်းဘဲ **app-facing asset id နှင့် R2 object path ကိုသာ** ပရောဂျက်ကိုယ်ပိုင်အမည်သို့ ပြောင်းသည်။ (binary ဖိုင်အမည်များ ဖြစ်သည့် `MuseScore_General.sf3` ကို R2 object key ထဲ ဆက်ထားနိုင်သည်၊ သို့မဟုတ် `ms-core.sf3` သို့ပါ ပြောင်းနိုင်သည် — ရွေးချယ်ရန်။)
 
 **ပြောင်းရမည့်အရာ အားလုံး (repo-side):**
 
-- [ ] `Website/Notation/Notation Engine/src/soundfont/browser.ts` ရဲ့ `DEFAULT_ASSET_PATHS` (line 55–63):
-  - key `'musescore-general-sf3'` → `'ms-core-sf3'`; `'musescore-general-sf2'` → `'ms-core-sf2'`
-  - value (R2 path) → neutral prefix (`'musescore-general/v0.2/...'` → `'ms-core/v0.2/...'`)
-  - အခြား key များ (`ms-basic`, `generaluser-gs`, `fluidr3-gm`, `salamander-grand-piano`) ကို လိုအပ်သလို neutral လုပ်/ထား
-- [ ] `Website/Website/notation-editor.js` (line 805): `assetId: 'musescore-general-sf3'` → `'ms-core-sf3'`
-- [ ] `Website/Website/notation-editor.js` (line 2, line 618) နှင့် `Website/Website/notation-doc.js` (line 6): `MuseScore` ကို ရည်ညွှန်းသော comment များကို neutral စကားလုံး ("semantic score editing") သို့ ပြောင်း (branding သာ၊ လိုင်စင် မသက်ဆိုင်)
-- [ ] `Website/Notation/Notation Engine/test/unit/own-provenance.test.js`: `HOST_ASSET_FILE` exemption နှင့် `/['"][^'"]*musescore[^'"]*['"]/i` pattern ကို — rename ပြီးနောက် `src/` ထဲ MuseScore mention လုံးဝ မကျန်တော့သဖြင့် ဒီ exemption/pattern ကို **ဖျက်/ရှင်းနိုင်**သည် (သို့မဟုတ် `ms-core` အမည်အသစ်အတွက် ချိန်)
-- [ ] `npm run build` (bundle ကို `Website/Website/assets/` သို့ copy) ပြီး `npm run verify` green ဖြစ်စေ
+- [x] `Website/Notation/Notation Engine/src/soundfont/browser.ts` ရဲ့ `DEFAULT_ASSET_PATHS` (line 55–63):
+  - [x] key `'musescore-general-sf3'` → `'ms-core-sf3'`; `'musescore-general-sf2'` → `'ms-core-sf2'` ✓
+  - [x] value (R2 path) → neutral prefix (`'ms-core/v0.2/ms-core.sf3'` / `.sf2`) ✓
+  - [x] အခြား key များ (`ms-basic`, `generaluser-gs`, `fluidr3-gm`, `salamander-grand-piano`) သည် ကိုယ်ပိုင် id ဖြစ်ပြီးသား — မပြောင်း ✓
+- [x] `Website/Website/notation-editor.js`: hardcoded `assetId` မရှိတော့ — manifest ရဲ့ `runtime.defaultAssetId` (ယခု `ms-core-sf3`) ကို ယူသည် ✓
+- [x] `notation-editor.js` (line 2, chord comment) နှင့် `notation-doc.js` (line 6): comment များကို neutral ("semantic score editing") သို့ ပြောင်း ✓
+- [x] `test/unit/own-provenance.test.js`: `HOST_ASSET_FILE` exemption ကို ဖျက်ပြီး — ယခု `src/` ထဲ MuseScore mention လုံးဝ မရှိရ (test ၂ ခု: no-mention + asset-id) ✓
+- [x] `npm run build` + `npm run verify` = **1286/1286 pass** ✓; browser စမ်းသပ် (built/rendered) ✓
+- [x] **မဖြစ်မနေ လိုတဲ့ အလုပ်:** manifest ရဲ့ `runtime.assetPaths` ကို engine ဆီ pass လုပ်ပေးလိုက်သည် (`state.soundAssetPaths`) — ဒါမှ asset path ကို manifest ကသာ ဆုံးဖြတ်မည်၊ engine ရဲ့ `DEFAULT_ASSET_PATHS` က fallback သာ ဖြစ်မည် (R2 rename မလုပ်ရသေးချိန်တွင် live playback မကျိုးစေရန်)။
 
 **ပြောင်းရမည့်အရာ အားလုံး (R2-side — repo ပြင်ပ၊ လက်ဖြင့်):**
 
-- [ ] R2 object များကို neutral prefix အောက် ပြန် upload/rename (`soundfonts/ms-core/v0.2/...`)
-- [ ] `soundfonts/manifest.json` ထဲ asset `id` နှင့် `path` များ update (manifest သည် authoritative)။ **Backward-compat:** id အဟောင်းအတွက် alias entry ထားနိုင် (R2 object တူတူကို ညွှန်း၍)
-- [ ] `Sound Doc/SoundFont-Collection-R2.md` နှင့် `Sound Doc/MuseScore-General-R2-Asset.md` ရဲ့ R2 object layout/path မှတ်တမ်းများကို အသစ်နှင့် ကိုက်ညီအောင် update
-- [ ] Rename ပြီးနောက် browser playback ကို ထပ်မံ စမ်းသပ် (URL ပြောင်းသဖြင့် cache key လည်း ပြောင်း)
+- [ ] R2 object များကို neutral prefix အောက် ပြန် upload/rename (`soundfonts/ms-core/v0.2/...`) — **လမ်းညွှန်: `Sound Doc/PartJ-R2-Rename.md`** (ဒီ environment တွင် R2 credentials မရှိ၊ လက်ဖြင့် run ရမည်)
+- [x] manifest အသစ်ကို `Sound Doc/manifest.json` အဖြစ် ရေးပြီး (id/path အားလုံး neutral) — R2 သို့ upload ရန် အသင့် ✓ (upload ကို လက်ဖြင့်)
+- [x] `Sound Doc/SoundFont-Collection-R2.md`, `MuseScore-General-R2-Asset.md`, `Sound Plan/README.md` ရဲ့ layout/path များကို `ms-core` နှင့် ကိုက်ညီအောင် update ✓
+- [ ] R2 rename ပြီးနောက် browser playback ကို ထပ်မံ စမ်းသပ် (URL ပြောင်းသဖြင့် cache key လည်း ပြောင်း)
 
 #### အဆင့် ၂ — (ခ) ကိုယ်ပိုင်/CC0 sample မှ house SoundFont ဖန်တီးခြင်း
 
@@ -219,7 +220,7 @@ Implementation sequence:
 - [ ] Sample တစ်ခုချင်း၏ လိုင်စင်/မူလအရင်းအမြစ်/checksum ကို `Sound Doc/` တွင် မှတ်တမ်းတင်ရန်။
 - [ ] Browser end-to-end playback စမ်းသပ်။
 
-**MS Basic လိုင်စင် ပြဿနာ:** `MS Basic.sf3` ၏ upstream license file တွင် MuseScore General အမည်အဟောင်း ရှိနေသဖြင့် R2 public/commercial redistribution မလုပ်မီ rightsholder အတည်ပြုချက် ရယူရန် သို့မဟုတ် collection မှ ဖယ်ရန် လိုသည်။ အဆင့် ၁ နှင့် ၂ ပြီးပါက default asset မှာ ကိုယ်ပိုင်ဖြစ်သဖြင့် MS Basic သည် optional comparison asset သာဖြစ်လာမည်။
+**MS Basic လိုင်စင် ပြဿနာ — ဖြေရှင်းပြီး ✓:** `MS Basic.sf3` ၏ ကိုယ်ပိုင် `INFO` chunk က `MuseScore_General_HQ v0.2` ဖြစ်ပြီး `Released under the MIT license` လို့ ဖော်ပြသည် — ဆိုတော့ အဲဒါက naming အလွဲသာဖြစ်ပြီး license မဟုတ်; MuseScore_General ရဲ့ MIT notice ပါပြီးသား။ လိုအပ်ချက်မှာ MIT notice ဖိုင်များကို binary နှင့်အတူ ဆက်ထားရုံသာ (manifest ရဲ့ `licenseFile` က ညွှန်းပြီးသား)။ အသေးစိတ်: `Sound Doc/MS-Basic-License-Record.md`။ MS Basic သည် optional comparison asset အဖြစ်သာ ဆက်ရှိမည်။
 
 **ပြီးစီးမှုစံ:** engine/app ၏ ဖိုင်များတွင် third-party SoundFont အမည် မရှိတော့။ `npm run verify` green။ Default playback asset သည် ကိုယ်ပိုင် id ဖြင့် ချိတ်ဆက်ပြီး browser playback အလုပ်လုပ်။
 

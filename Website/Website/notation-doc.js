@@ -3,8 +3,8 @@
  *
  * The rendered SVG is never the source of truth. Every edit rebuilds this
  * structured document (the engine's own `ParseResult` shape) and the engine
- * re-renders from it, the same way MuseScore edits a semantic score rather
- * than the pixels it drew.
+ * re-renders from it, so edits act on a semantic score rather than on the
+ * pixels it drew.
  *
  * The engine has no MusicXML writer, so `toMusicXml` here is the only path
  * that turns an edited document back into a portable file.

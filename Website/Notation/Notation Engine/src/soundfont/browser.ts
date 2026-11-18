@@ -54,8 +54,8 @@ export interface NotationSoundEngine {
  */
 const DEFAULT_ASSET_PATHS: Readonly<Record<string, string>> = {
   'ms-basic': 'ms-basic/official-deprecated-master/MS Basic.sf3',
-  'musescore-general-sf3': 'musescore-general/v0.2/MuseScore_General.sf3',
-  'musescore-general-sf2': 'musescore-general/v0.2/MuseScore_General.sf2',
+  'ms-core-sf3': 'ms-core/v0.2/ms-core.sf3',
+  'ms-core-sf2': 'ms-core/v0.2/ms-core.sf2',
   'generaluser-gs': 'generaluser-gs/v1.472/GeneralUser GS v1.472.sf2',
   'fluidr3-gm': 'fluidr3-gm/v3.1/FluidR3_GM.sf2',
   'salamander-grand-piano':

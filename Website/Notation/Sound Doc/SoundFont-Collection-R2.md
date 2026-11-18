@@ -12,7 +12,7 @@ MuseScore General နှင့် FluidR3 သည် MIT notices ပါရှိ�
 
 ## R2 upload အကြံပြုချက်
 
-Asset တစ်ခုချင်းစီကို versioned prefix သီးခြားဖြင့် upload လုပ်ပါ။ ဥပမာ `soundfonts/musescore-general/v0.2/MuseScore_General.sf2` နှင့် `soundfonts/salamander-grand-piano/v3-20200602/SalamanderGrandPiano-V3+20200602.sf2` ဖြစ်သည်။ Original zip တစ်ခုထဲကို R2 တွင်ထားပြီး browser က unzip လုပ်မည့်ပုံစံ မသုံးရပါ။ Sound Engine သည် manifest JSON ကို တစ်ကြိမ် fetch လုပ်ပြီး လိုအပ်သည့် SoundFont binary ကို cache-first ဖြင့် download လုပ်ရမည်။
+Asset တစ်ခုချင်းစီကို versioned prefix သီးခြားဖြင့် upload လုပ်ပါ။ ဥပမာ `soundfonts/ms-core/v0.2/ms-core.sf2` နှင့် `soundfonts/salamander-grand-piano/v3-20200602/SalamanderGrandPiano-V3+20200602.sf2` ဖြစ်သည်။ Original zip တစ်ခုထဲကို R2 တွင်ထားပြီး browser က unzip လုပ်မည့်ပုံစံ မသုံးရပါ။ Sound Engine သည် manifest JSON ကို တစ်ကြိမ် fetch လုပ်ပြီး လိုအပ်သည့် SoundFont binary ကို cache-first ဖြင့် download လုပ်ရမည်။
 
 ## R2 folder တည်ဆောက်ပုံ
 
@@ -27,10 +27,10 @@ Zip ကို computer တွင် အရင် extract လုပ်ပြီ�
 │       ├── MS Basic_License.md
 │       ├── MS Basic_Readme.md
 │       └── MS_Basic_Changelog.md
-├── musescore-general/
+├── ms-core/
 │   └── v0.2/
-│       ├── MuseScore_General.sf2
-│       ├── MuseScore_General.sf3
+│       ├── ms-core.sf2
+│       ├── ms-core.sf3
 │       ├── MuseScore_General_License.md
 │       └── MuseScore_General_Readme.md
 ├── generaluser-gs/
@@ -53,7 +53,7 @@ Zip ကို computer တွင် အရင် extract လုပ်ပြီ�
 
 ## Dashboard ဖြင့် upload လုပ်နည်း
 
-Cloudflare Dashboard → **R2 Object Storage** → မိမိ bucket → **Upload** ကိုဝင်ပါ။ Zip ကို တိုက်ရိုက် upload မလုပ်ဘဲ extract လုပ်ထားသော `ms-basic`, `musescore-general`, `generaluser-gs`, `fluidr3-gm`, `salamander-grand-piano` folder များကို `soundfonts/` prefix အောက်သို့ upload လုပ်ပါ။ Upload ပြီးလျှင် object key တစ်ခုချင်းစီကို ဖွင့်၍ Content-Type ကို စစ်ပါ။ `.sf2` နှင့် `.sf3` အတွက် `audio/x-soundfont` မလက်ခံပါက `application/octet-stream` သုံးပါ။ JSON အတွက် `application/json`၊ Markdown/TXT/CSV အတွက် `text/plain; charset=utf-8` သုံးပါ။
+Cloudflare Dashboard → **R2 Object Storage** → မိမိ bucket → **Upload** ကိုဝင်ပါ။ Zip ကို တိုက်ရိုက် upload မလုပ်ဘဲ extract လုပ်ထားသော `ms-basic`, `ms-core`, `generaluser-gs`, `fluidr3-gm`, `salamander-grand-piano` folder များကို `soundfonts/` prefix အောက်သို့ upload လုပ်ပါ။ Upload ပြီးလျှင် object key တစ်ခုချင်းစီကို ဖွင့်၍ Content-Type ကို စစ်ပါ။ `.sf2` နှင့် `.sf3` အတွက် `audio/x-soundfont` မလက်ခံပါက `application/octet-stream` သုံးပါ။ JSON အတွက် `application/json`၊ Markdown/TXT/CSV အတွက် `text/plain; charset=utf-8` သုံးပါ။
 
 R2 bucket ကို public မဖွင့်ချင်ပါက application server/Worker က signed URL ထုတ်ပေးပါ။ Public CDN သုံးမည်ဆိုပါက custom domain တစ်ခုချိတ်ပြီး browser မှာ အသုံးပြုမည့် URL ကိုသာ ထုတ်ပေးပါ။ R2 access key နှင့် secret ကို frontend code၊ GitHub သို့မဟုတ် `.env` committed file ထဲ မထည့်ရပါ။
 
@@ -81,7 +81,7 @@ Notation Engine က normalized `noteOn`, `noteOff`, `programChange` နှင့
 
 - Uploaded the extracted collection as individual objects to bucket `msharing0008` under the `soundfonts/` prefix; the source ZIP itself was not uploaded.
 - All 19 objects in the layout above are present. R2 HEAD checks confirmed each object's stored size matches the corresponding extracted archive entry. SHA-256 values from `SHA256SUMS` were preserved as object metadata and match the verified local extraction; `soundfonts/manifest.json` is the application-compatible collection manifest with a `runtime.assetPaths` mapping.
-- The default Sound Engine asset is `soundfonts/musescore-general/v0.2/MuseScore_General.sf3` (`musescore-general-sf3`). Its SHA-256 matches the recorded official value `5b85b6c2c61d10b2b91cddd41efcce7b25cd31c8271d511c73afafbef20b6fa3`.
+- The default Sound Engine asset is `soundfonts/ms-core/v0.2/ms-core.sf3` (`ms-core-sf3`); it was renamed from the third-party prefix in Part J (see `PartJ-R2-Rename.md`). Its SHA-256 matches the recorded official value `5b85b6c2c61d10b2b91cddd41efcce7b25cd31c8271d511c73afafbef20b6fa3`.
 - The optional Salamander Grand Piano SF2 (1,266,462,334 bytes) was also uploaded as an individual object. The collection's MS Basic license caveat above remains: obtain rights-holder clarification/legal review before public or commercial redistribution.
 - No public bucket access or custom domain was enabled as part of this upload. Configure the intended public CDN URL or signed-URL flow before browser clients attempt to fetch the manifest and binary.
 - All object-key/size checks passed. The temporary, prefix-restricted transfer Worker was deleted after upload verification.

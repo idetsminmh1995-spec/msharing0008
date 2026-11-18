@@ -15,7 +15,7 @@ Notation Engine က score ထဲရှိ note events များကို ထ�
 
 ```text
 soundfonts/
-└── musescore-general/
+└── ms-core/
     └── v0.2/
         ├── MuseScore_General.sf3
         ├── soundfont-manifest.json
@@ -31,7 +31,7 @@ Version path သည် cache invalidation နှင့် rollback အတွက�
 
 ## JSON နှင့် fetch/cache design
 
-JSON ထဲသို့ audio bytes မထည့်ရ။ Manifest တစ်ခုကို တစ်ကြိမ် fetch လုပ်ပြီး Sound Engine က manifest ထဲရှိ `assetPath`, `cacheKey`, `sha256` နှင့် MIDI program mapping ကို အသုံးပြုမည်။ SoundFont binary ကို browser `Cache API` သို့မဟုတ် IndexedDB တွင် `soundfont:musescore-general:v0.2` key ဖြင့် သိမ်းပြီး နောက် playback များတွင် R2 ကို ထပ်ခေါ်မည်မဟုတ်ပါ။
+JSON ထဲသို့ audio bytes မထည့်ရ။ Manifest တစ်ခုကို တစ်ကြိမ် fetch လုပ်ပြီး Sound Engine က manifest ထဲရှိ `assetPath`, `cacheKey`, `sha256` နှင့် MIDI program mapping ကို အသုံးပြုမည်။ SoundFont binary ကို browser `Cache API` သို့မဟုတ် IndexedDB တွင် `soundfont:ms-core:v0.2` key ဖြင့် သိမ်းပြီး နောက် playback များတွင် R2 ကို ထပ်ခေါ်မည်မဟုတ်ပါ။
 
 Runtime flow သည် အောက်ပါအတိုင်း ဖြစ်မည်။
 
@@ -66,7 +66,7 @@ Notation Engine သည် rendering နှင့် event timing ကိုပဲ
 
 - `src/playback/event-stream.ts` သည် pitched MusicXML notes များအတွက် `midiNotes` နှင့် `durationTicks` ကို event တစ်ခုစီတွင် ထုတ်ပေးသည်။ Existing SVG/playback position API မပြောင်းဘဲ host က အသုံးပြုနိုင်သည်။
 - `src/soundfont/browser.ts` တွင် `R2SoundFontEngine` ကို ထည့်ပြီး R2 manifest fetch, Cache API/memory cache, SF2/SF3 load နှင့် SpessaSynth AudioWorklet playback ကို ချိတ်ထားသည်။
-- R2 default asset သည် `musescore-general-sf3` ဖြစ်ပြီး asset path သည် `soundfonts/musescore-general/v0.2/MuseScore_General.sf3` ဖြစ်သည်။ Salamander ကို optional path အဖြစ်သာထားသည်။
+- R2 default asset သည် `ms-core-sf3` ဖြစ်ပြီး asset path သည် `soundfonts/ms-core/v0.2/ms-core.sf3` ဖြစ်သည် (Part J rename)။ Salamander ကို optional path အဖြစ်သာထားသည်။
 - Website Notation Lab သည် user play gesture မှာ AudioContext/SoundFont ကို initialize လုပ်ပြီး play/pause/volume/end state ကို Sound Engine နှင့် ချိတ်ထားသည်။
 - Browser assets များကို `Website/Website/assets/` နှင့် test-compatible `Website/website/assets/` တွင် build script က ထုတ်ပေးသည်။ SoundFont `.sf2/.sf3` များကို repo ထဲမထည့်ဘဲ R2 မှ runtime fetch လုပ်သည်။
 

@@ -21,11 +21,11 @@ License နှင့် sample attribution notices များကို bundle 
 
 1. Zip ကို local computer တွင် extract လုပ်ပါ။ Extract ပြီးပါက folder တစ်ခုလုံးကို အောက်ပါ R2 prefix ထဲ upload လုပ်ပါ။
 
-   `soundfonts/musescore-general/v0.2/`
+   `soundfonts/ms-core/v0.2/`
 
 2. အနည်းဆုံး အောက်ပါဖိုင်များကို upload လုပ်ပါ။
 
-   - `MuseScore_General.sf3`
+   - `ms-core.sf3`
    - `soundfont-manifest.json`
    - `MuseScore_General_License.md`
    - `MuseScore_General_Readme.md`
@@ -34,7 +34,7 @@ License နှင့် sample attribution notices များကို bundle 
    - `VERSION`
    - `SHA256SUMS`
 
-3. `MuseScore_General.sf3` ကို binary object အဖြစ် `Content-Type: audio/x-soundfont` သို့မဟုတ် R2 dashboard တွင် လက်ခံသော `application/octet-stream` ဖြင့်ထားပါ။ `soundfont-manifest.json` ကို `application/json` သတ်မှတ်ပါ။ License/CSV/Markdown ကို `text/plain; charset=utf-8` သတ်မှတ်ပါ။
+3. `ms-core.sf3` ကို binary object အဖြစ် `Content-Type: audio/x-soundfont` သို့မဟုတ် R2 dashboard တွင် လက်ခံသော `application/octet-stream` ဖြင့်ထားပါ။ `soundfont-manifest.json` ကို `application/json` သတ်မှတ်ပါ။ License/CSV/Markdown ကို `text/plain; charset=utf-8` သတ်မှတ်ပါ။
 
 4. Public CDN URL သို့မဟုတ် signed URL တစ်ခုရပြီးနောက် manifest ထဲရှိ `runtime.assetPath` နှင့် application ၏ manifest URL ကို project configuration တွင် ထည့်ပါ။ Secret R2 credentials ကို browser code ထဲ မထည့်ရပါ။
 
@@ -60,6 +60,6 @@ License နှင့် sample attribution notices များကို bundle 
 
 ## R2 upload completion — 2026-11-13
 
-The collection upload has now placed `MuseScore_General.sf3` at `msharing0008/soundfonts/musescore-general/v0.2/MuseScore_General.sf3`, along with the matching MuseScore General SF2, license, and readme objects. R2 HEAD checks verified the expected byte sizes. The SF3 SHA-256 matches the value above. This updates the earlier status line: the asset upload is complete; browser sampler/end-to-end playback validation remains outstanding. No public bucket access or custom domain was enabled; the application still needs its approved public CDN URL or signed-URL configuration before browser fetches can work.
+Part J renames the R2 objects to the neutral `ms-core/v0.2/` prefix: the SF3 now lives at `msharing0008/soundfonts/ms-core/v0.2/ms-core.sf3` (was `msharing0008/soundfonts/musescore-general/v0.2/MuseScore_General.sf3`), along with the matching MuseScore General SF2, license, and readme objects. R2 HEAD checks verified the expected byte sizes. The SF3 SHA-256 matches the value above. This updates the earlier status line: the asset upload is complete; browser sampler/end-to-end playback validation remains outstanding. No public bucket access or custom domain was enabled; the application still needs its approved public CDN URL or signed-URL configuration before browser fetches can work.
 
-The collection upload has now placed `MuseScore_General.sf3` at `msharing0008/soundfonts/musescore-general/v0.2/MuseScore_General.sf3`, along with the matching MuseScore General SF2, license, and readme objects. R2 HEAD checks verified the expected byte sizes. The SF3 SHA-256 matches the value above. This updates the earlier status line: the asset upload is complete; browser sampler/end-to-end playback validation remains outstanding. No public bucket access or custom domain was enabled; the application still needs its approved public CDN URL or signed-URL configuration before browser fetches can work.
+Part J renames the R2 objects to the neutral `ms-core/v0.2/` prefix: the SF3 now lives at `msharing0008/soundfonts/ms-core/v0.2/ms-core.sf3` (was `msharing0008/soundfonts/musescore-general/v0.2/MuseScore_General.sf3`), along with the matching MuseScore General SF2, license, and readme objects. R2 HEAD checks verified the expected byte sizes. The SF3 SHA-256 matches the value above. This updates the earlier status line: the asset upload is complete; browser sampler/end-to-end playback validation remains outstanding. No public bucket access or custom domain was enabled; the application still needs its approved public CDN URL or signed-URL configuration before browser fetches can work.

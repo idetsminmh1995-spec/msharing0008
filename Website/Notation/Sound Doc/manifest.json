@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "purpose": "R2 SoundFont manifest consumed by Website/Notation/Notation Engine R2SoundFontEngine. Part J: assets use this project's own ids and a neutral R2 prefix.",
+  "warning": "MS Basic is a scaled-down MuseScore_General (v0.2) build and shares its MIT license. The retained license file carries the copyright and acknowledgement notices verbatim, as MIT requires; MS Basic.sf3 stays redistributable under MIT as long as those notices ship with it. No separate rights-holder action is needed beyond keeping the notices. Recorded for Part J task 3.",
+  "assets": [
+    {
+      "id": "ms-basic",
+      "displayName": "MS Basic",
+      "format": "sf3",
+      "version": "MuseScore official deprecated_master share/sound",
+      "licenseFile": "ms-basic/MS Basic_License.md",
+      "source": "https://github.com/musescore/MuseScore/tree/deprecated_master/share/sound"
+    },
+    {
+      "id": "ms-core-sf3",
+      "displayName": "MuseScore General",
+      "format": "sf3",
+      "version": "0.2",
+      "license": "MIT",
+      "licenseFile": "ms-core/v0.2/MuseScore_General_License.md",
+      "source": "https://ftp.osuosl.org/pub/musescore/soundfont/MuseScore_General/"
+    },
+    {
+      "id": "ms-core-sf2",
+      "displayName": "MuseScore General",
+      "format": "sf2",
+      "version": "0.2",
+      "license": "MIT",
+      "licenseFile": "ms-core/v0.2/MuseScore_General_License.md",
+      "source": "https://ftp.osuosl.org/pub/musescore/soundfont/MuseScore_General/"
+    },
+    {
+      "id": "generaluser-gs",
+      "displayName": "GeneralUser GS",
+      "format": "sf2",
+      "version": "1.472",
+      "licenseFile": "generaluser-gs/LICENSE.txt",
+      "source": "https://www.schristiancollins.com/generaluser"
+    },
+    {
+      "id": "fluidr3-gm",
+      "displayName": "FluidR3 GM",
+      "format": "sf2",
+      "version": "Piano Booster release v3.1",
+      "license": "MIT",
+      "licenseFile": "fluidr3-gm/COPYING",
+      "source": "https://github.com/pianobooster/fluid-soundfont/releases/tag/v3.1"
+    },
+    {
+      "id": "salamander-grand-piano",
+      "displayName": "Salamander Grand Piano",
+      "format": "sf2",
+      "version": "V3+2020-06-02",
+      "license": "CC BY 3.0",
+      "licenseFile": "salamander-grand-piano/readme.txt",
+      "source": "https://freepats.zenvoid.org/Piano/acoustic-grand-piano.html"
+    }
+  ],
+  "files": [
+    {
+      "path": "fluidr3-gm/COPYING",
+      "bytes": 1086,
+      "sha256": "8ef830b65c97a976b86e34bb5fde08d99dfb1db13c4149b5b20bc837ac6c4568"
+    },
+    {
+      "path": "fluidr3-gm/FluidR3_GM.sf2",
+      "bytes": 148398306,
+      "sha256": "74594e8f4250680adf590507a306655a299935343583256f3b722c48a1bc1cb0"
+    },
+    {
+      "path": "fluidr3-gm/README",
+      "bytes": 1042,
+      "sha256": "2f92d462684629f207e43815115b79d7f1ce130d30ca8792b7d82b398a8306f9"
+    },
+    {
+      "path": "generaluser-gs/GeneralUser GS v1.472.sf2",
+      "bytes": 31306002,
+      "sha256": "9f2b5ef1e059c5b1db57d0046ce8125ed91025818f591e96c65f728c53a045bb"
+    },
+    {
+      "path": "generaluser-gs/LICENSE.txt",
+      "bytes": 2291,
+      "sha256": "930d63748a842d3dc2b6278270e940b02df5b2a7b2a5be158324410997362265"
+    },
+    {
+      "path": "generaluser-gs/README.txt",
+      "bytes": 3361,
+      "sha256": "64d26b074ed5029d58d467b8c2373ba580b1077eb1e276dc338cffc01371cba3"
+    },
+    {
+      "path": "ms-basic/MS Basic.sf3",
+      "bytes": 51278610,
+      "sha256": "5ea2375e8bd7d8e71def1036978c1621e85b66934169b6a2744b27b9b3c2d99c"
+    },
+    {
+      "path": "ms-basic/MS Basic_License.md",
+      "bytes": 3327,
+      "sha256": "9486e6baeb3eb274cd3f0e131cf1bc50ac4b57f548791b1b6678def7988f19d4"
+    },
+    {
+      "path": "ms-basic/MS Basic_Readme.md",
+      "bytes": 5161,
+      "sha256": "e4ee85d097cda49a7926ea73e59ea8b7bb90d6ad715f82d20c6bfddf5dcfeb4c"
+    },
+    {
+      "path": "ms-basic/MS_Basic_Changelog.md",
+      "bytes": 15506,
+      "sha256": "63a911b91404bda6ce726b932e98a4c4943e14bcb1f1ffbdefa17419fc955720"
+    },
+    {
+      "path": "ms-core/v0.2/ms-core.sf2",
+      "bytes": 215614036,
+      "sha256": "ee51d2c4b1525e70f19a45909c4fd7a2e26d91d115fa89dbf5a6bc413d8b9bf3"
+    },
+    {
+      "path": "ms-core/v0.2/ms-core.sf3",
+      "bytes": 39900972,
+      "sha256": "5b85b6c2c61d10b2b91cddd41efcce7b25cd31c8271d511c73afafbef20b6fa3"
+    },
+    {
+      "path": "ms-core/v0.2/MuseScore_General_License.md",
+      "bytes": 3419,
+      "sha256": "5ad8d737e13c7f01f5b9674872a82a92b4ba253603e8ed14b9db12293550b4b9"
+    },
+    {
+      "path": "ms-core/v0.2/MuseScore_General_Readme.md",
+      "bytes": 5161,
+      "sha256": "e4ee85d097cda49a7926ea73e59ea8b7bb90d6ad715f82d20c6bfddf5dcfeb4c"
+    },
+    {
+      "path": "salamander-grand-piano/SalamanderGrandPiano-V3+20200602.sf2",
+      "bytes": 1266462334,
+      "sha256": "712d0e681efbe5203a8014e9b3e84168f1908c82f2f6fb13bd2c77d6d72c70b7"
+    },
+    {
+      "path": "salamander-grand-piano/readme.txt",
+      "bytes": 2802,
+      "sha256": "ed3a0ccd16573a8e72966bdfb14bf4b3e18fab94bb9e36da1aa6409522d359f8"
+    }
+  ],
+  "r2PrefixTemplate": "soundfonts/<asset-id>/<version>/",
+  "runtime": {
+    "defaultAssetId": "ms-core-sf3",
+    "manifestKey": "soundfonts/manifest.json",
+    "assetBaseKey": "soundfonts/",
+    "assetPaths": {
+      "ms-basic": "ms-basic/official-deprecated-master/MS Basic.sf3",
+      "ms-core-sf3": "ms-core/v0.2/ms-core.sf3",
+      "ms-core-sf2": "ms-core/v0.2/ms-core.sf2",
+      "generaluser-gs": "generaluser-gs/v1.472/GeneralUser GS v1.472.sf2",
+      "fluidr3-gm": "fluidr3-gm/v3.1/FluidR3_GM.sf2",
+      "salamander-grand-piano": "salamander-grand-piano/v3-20200602/SalamanderGrandPiano-V3+20200602.sf2"
+    }
+  }
+}

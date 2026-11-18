@@ -1,5 +1,5 @@
 /**
- * Notation Lab editor — MuseScore-style semantic editing.
+ * Notation Lab editor — semantic score editing.
  *
  * The SVG is only ever a picture of `state.doc`. Clicks map back to musical
  * positions (measure/voice/event, or tick + staff position) through the
@@ -76,6 +76,7 @@
     // audition
     soundFonts: [],
     soundAssetId: null,
+    soundAssetPaths: null,
     playSeconds: 0,
     playStartSeconds: 0,
     playStartedAt: 0,
@@ -621,7 +622,7 @@
         commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: chord }), 'Note added to chord.');
       } else {
         // A plain letter or click on an occupied beat restates that beat's
-        // pitch, the way MuseScore replaces rather than stacking by default.
+        // pitch, replacing rather than stacking by default.
         commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: note }), `Replaced with ${step}${octave}.`);
       }
       render();
@@ -810,6 +811,9 @@
       processorUrl: 'assets/spessasynth_processor.min.js',
       assetBaseUrl: 'soundfonts',
       ...configured,
+      // The manifest's own paths win over the engine's built-in table, so
+      // a host that moves an asset only has to update the manifest.
+      ...(state.soundAssetPaths ? { assetPaths: state.soundAssetPaths } : {}),
       ...(assetId ? { assetId } : {}),
     });
     return state.sound;
@@ -868,6 +872,7 @@
       const manifest = await response.json();
       const assets = Array.isArray(manifest.assets) ? manifest.assets : [];
       const assetPaths = manifest.runtime?.assetPaths || {};
+      state.soundAssetPaths = assetPaths;
       state.soundFonts = assets.map((asset) => {
         const bytes = assetBytes(manifest, assetPaths[asset.id]);
         const megabytes = bytes ? `, ${Math.round(bytes / (1024 * 1024))} MB` : '';
