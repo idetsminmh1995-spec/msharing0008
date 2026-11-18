@@ -32,7 +32,7 @@
 - Menu button, Brand, Desktop nav (Courses / Store / Create Video / Notation Lab), Search, EN/MM, Theme, Favorite, Cart, Notification, Account controls အားလုံး page တိုင်းတွင် တူညီသည်
 - Mobile drawer navigation နှင့် phone bottom navigation (tabs ၆ ခု) page တိုင်းတွင် တူညီသည်
 - Icon SVG path များ (Favorites, Cart, Notification dot အပါအဝင်) တူညီသည်
-- `styles.css` cache-busting query ကို `?v=shared-header-20261118` တစ်ခုတည်း အသုံးပြုသည်
+- `styles.css` cache-busting query ကို `?v=editor-toolbar-20261118` တစ်ခုတည်း အသုံးပြုသည်
 - Active navigation item သည် သက်ဆိုင်ရာ page အလိုက် `is-active` နှင့် `aria-current="page"` ရရှိသည်
 
 ## ဖိုင်များ

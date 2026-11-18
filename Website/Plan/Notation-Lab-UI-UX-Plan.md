@@ -40,4 +40,6 @@ Only steps 1–3 are in scope for this revision. Scan remains intentionally unav
 
 The entry page is complete as the first UI milestone. The editor will now follow the score-first architecture and M1–M6 delivery sequence in [Notation Lab Editor — Audit, Product Design, and Capability Plan](../Doc/Notation-Lab-Editor-Architecture-2026-11-15.md).
 
-The current editor route is a temporary viewer, not the target editor. M1 must establish the canonical ScoreDocument, command/history system, selection model, and renderer adapter before adding visual editor controls.
+The editor route now carries the shared site header plus a sticky secondary toolbar and a score workspace (see [Notation Lab Editor — Fixed Toolbar and Score Workspace](../Doc/Notation-Lab-Editor-Toolbar-2026-11-18.md)). Open, create, zoom, layout, playback, and export are live.
+
+The remaining editor work is note entry: the canonical ScoreDocument, the command/history system, the selection model, and the renderer adapter. The toolbar already reserves Undo/Redo and note-value controls for that milestone.
