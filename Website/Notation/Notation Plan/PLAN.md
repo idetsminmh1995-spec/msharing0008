@@ -149,8 +149,22 @@ Implementation sequence:
 
 **R2 path ဆုံးဖြတ်ချက် (ဆုံးဖြတ်ပြီး):** asset **id** သာမက R2 object **path/prefix** ကိုပါ neutral အမည်သို့ ပြောင်းမည် (`soundfonts/ms-core/v0.2/...`)။ သို့သော် **ချက်ချင်း မပြောင်းသေးပါ** — SoundFont အားလုံး (default + fallback များ) browser playback တွင် အသံ တကယ်ထွက်/မထွက် စမ်းသပ်အတည်ပြုပြီးမှ ပြောင်းမည်။ စမ်းသပ်မှု မပြီးခင် rename လုပ်လျှင် ဘယ် asset မှန်လဲ ဆိုတာ ခွဲခြားရ ခက်မည်။
 
+#### R2 public URL (ရပြီး)
+
+- Base URL: `https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev`
+- Manifest: `<base>/soundfonts/manifest.json` → **200 OK**, `application/json`, `Cache-Control: no-cache` ✓
+- Assets ၆ ခုလုံး range request ဖြင့် စစ်ပြီး → 206 ✓ (`musescore-general-sf3/sf2`, `ms-basic`, `generaluser-gs`, `fluidr3-gm`, `salamander-grand-piano`)
+- Manifest ရဲ့ `runtime.defaultAssetId` မှာ `musescore-general-sf3` ဖြစ်သည် (Part J rename လုပ်ရမည့်အရာ)။
+
+**Blocker — CORS မရှိသေး:** `<base>/soundfonts/manifest.json` ကို `Origin` header ဖြင့် GET လုပ်ကြည့်ရာ `Access-Control-Allow-Origin` header **မပါ**၊ OPTIONS preflight က **403**။ ဆိုတော့ browser က အခြား origin မှ fetch လုပ်လျှင် response ကို block လုပ်မည် — engine ၏ `fetch()` က manifest ကို ဖတ်လို့ ရမည် မဟုတ်။ **R2 bucket ပေါ်တွင် CORS policy သတ်မှတ်ရမည်** (Cloudflare Dashboard → R2 → bucket → Settings → CORS Policy)။
+
+**အခြား မှတ်ချက်များ:**
+- `salamander-grand-piano` SF2 သည် **1.26 GB** ဖြစ်ပြီး engine ၏ `decodedSampleBudget` (512 MB) ကို ကျော်သည် — optional asset အဖြစ်သာ စမ်းရန်။
+- `r2.dev` သည် Cloudflare ၏ development/testing အတွက်သာ (rate-limited) — production အတွက် custom domain ချိတ်ရန်။
+
 #### အသံစမ်းသပ်မှု (rename မလုပ်မီ လိုအပ်ချက်)
 
+- [ ] R2 bucket ပေါ်တွင် CORS policy သတ်မှတ် (မရှိရင် browser fetch မလုပ်နိုင်)။
 - [ ] Default asset (`ms-core-sf3` ဖြစ်လာမည့် MuseScore General SF3) ကို browser တွင် တကယ် play စမ်းပြီး အသံထွက် အတည်ပြု။
 - [ ] Fallback asset များ (`ms-basic`, `generaluser-gs`, `fluidr3-gm`, `salamander-grand-piano`) တစ်ခုချင်း load/play စမ်း။
 - [ ] Manifest fetch → asset download → SpessaSynth load → noteOn/noteOff အဆင့်ဆင့် အလုပ်လုပ် အတည်ပြု။
