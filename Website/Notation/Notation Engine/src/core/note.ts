@@ -17,7 +17,8 @@ export type VoiceId = number;
  * `DurationType`, which is why `export *` from both layers in `index.ts`
  * stays unambiguous: both names resolve to this single declaration.)
  */
-export type ArticulationType = 'accent' | 'staccato' | 'tenuto' | 'marcato' | 'staccatissimo';
+export type ArticulationType =
+  'accent' | 'staccato' | 'tenuto' | 'marcato' | 'staccatissimo' | 'sforzato';
 
 /** §9.20's ornament types -- declared here for the same reason as ArticulationType above. */
 export type OrnamentType = 'trill' | 'mordent' | 'turn' | 'turnInverted';

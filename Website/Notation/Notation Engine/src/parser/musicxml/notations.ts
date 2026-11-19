@@ -27,10 +27,12 @@ import { attrOf, childElements, childrenNamed, firstChildNamed, textOf } from '.
  */
 
 /**
- * MusicXML's own element names for §9.19's five articulations. Note
- * `strong-accent` -> `marcato`: those are the same mark under two names
- * (MusicXML calls the wedge "strong-accent", engraving convention calls
- * it "marcato"), which is exactly why this is a table and not a cast.
+ * MusicXML's own element names for §9.19's articulations. Note
+ * `strong-accent` -> `marcato` and `soft-accent` -> `sforzato`: those are
+ * the same marks under two names (MusicXML calls the wedge "strong-accent"
+ * and the soft wedge "soft-accent", engraving convention calls them
+ * "marcato" and "sforzato"), which is exactly why this is a table and not
+ * a cast.
  */
 const ARTICULATION_BY_ELEMENT: Readonly<Record<string, ArticulationType>> = {
   accent: 'accent',
@@ -38,6 +40,7 @@ const ARTICULATION_BY_ELEMENT: Readonly<Record<string, ArticulationType>> = {
   staccato: 'staccato',
   tenuto: 'tenuto',
   staccatissimo: 'staccatissimo',
+  'soft-accent': 'sforzato',
 };
 
 /**
@@ -206,7 +209,7 @@ export function parseNotations(
               diagnostic(
                 'info',
                 'UNSUPPORTED_ARTICULATION',
-                `Ignored <${child.tagName}>; §9.19 supports accent, staccato, tenuto, strong-accent (marcato) and staccatissimo.`,
+                `Ignored <${child.tagName}>; §9.19 supports accent, staccato, tenuto, strong-accent (marcato), soft-accent (sforzato) and staccatissimo.`,
                 location,
               ),
             );

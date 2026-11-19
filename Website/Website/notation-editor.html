@@ -34,7 +34,8 @@
     </div>
 
     <nav class="mobile-bottom-nav" aria-label="Mobile bottom navigation"><a class="bottom-nav-item" href="index.html#home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z" /><path d="M9 21v-7h6v7" /></svg><span>Home</span></a><a class="bottom-nav-item" href="index.html#courses"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></svg><span>Courses</span></a><a class="bottom-nav-item" href="index.html#store"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-1 14H5L4 5Zm0 0-1-2M9 9a3 3 0 0 0 6 0" /></svg><span>Store</span></a><a class="bottom-nav-item" href="index.html#create-video"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg><span>Create Video</span></a><a class="bottom-nav-item is-active" href="notation.html" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v11.5M8 4l10-2v11.5M8 8l10-2" /><ellipse cx="5.5" cy="17" rx="3" ry="2.2" /><ellipse cx="15.5" cy="15" rx="3" ry="2.2" /></svg><span>Notation Lab</span></a><a class="bottom-nav-item" href="index.html#account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg><span>Account</span></a></nav>
-    <div class="editor-toolbar" role="toolbar" aria-label="Editor toolbar" data-editor-toolbar data-region="editor-header-bar">
+    <div class="editor-toolbars" data-editor-toolbars data-region="editor-toolbars">
+    <div class="editor-toolbar" role="toolbar" aria-label="Editor toolbar" data-editor-toolbar>
       <div class="editor-toolbar__group" role="group" aria-label="Navigation">
         <button class="editor-tool editor-tool--back" type="button" data-editor-back aria-label="Back to Notation Lab" title="Back to Notation Lab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg><span>Back</span></button>
       </div>
@@ -44,13 +45,25 @@
         <button class="editor-tool" type="button" data-editor-redo aria-label="Redo" title="Redo (Ctrl+Y)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 7 5 5-5 5" /><path d="M20 12h-9a6 6 0 0 0 0 12h1" /></svg></button>
       </div>
       <span class="editor-toolbar__divider" aria-hidden="true"></span>
+      <div class="editor-toolbar__group" role="group" aria-label="Note input">
+        <button class="editor-tool" type="button" data-editor-note-input aria-label="Note input mode" title="Note input (N) — then click the staff" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11.5" /><ellipse cx="9" cy="17.5" rx="3" ry="2.2" /><path d="M12 4l6-1.6v11.1" /><ellipse cx="15" cy="15" rx="3" ry="2.2" /></svg><span>Input</span></button>
+      </div>
+      <span class="editor-toolbar__divider" aria-hidden="true"></span>
+      <div class="editor-toolbar__group" role="group" aria-label="Zoom">
+        <button class="editor-tool" type="button" data-editor-zoom-out aria-label="Zoom out" title="Zoom out (Ctrl+-)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21M7.5 10.5h6" /></svg></button>
+        <output class="editor-toolbar__output" data-editor-zoom aria-live="off" aria-label="Zoom level">100%</output>
+        <button class="editor-tool" type="button" data-editor-zoom-in aria-label="Zoom in" title="Zoom in (Ctrl+=)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21M7.5 10.5h6M10.5 7.5v6" /></svg></button>
+      </div>
+    </div>
+    <div class="editor-toolbar editor-toolbar--note-input" role="toolbar" aria-label="Note input toolbar" data-editor-note-toolbar>
       <div class="editor-toolbar__group" role="group" aria-label="Note value">
-        <button class="editor-tool" type="button" data-editor-duration="whole" aria-label="Whole note" title="Whole note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D15D;</span></button>
-        <button class="editor-tool" type="button" data-editor-duration="half" aria-label="Half note" title="Half note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D15E;</span></button>
-        <button class="editor-tool" type="button" data-editor-duration="quarter" aria-label="Quarter note" title="Quarter note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D15F;</span></button>
+        <button class="editor-tool" type="button" data-editor-duration="64th" aria-label="Sixty-fourth note" title="64th note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D163;</span></button>
+        <button class="editor-tool" type="button" data-editor-duration="32nd" aria-label="Thirty-second note" title="32nd note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D162;</span></button>
+        <button class="editor-tool" type="button" data-editor-duration="16th" aria-label="Sixteenth note" title="16th note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D161;</span></button>
         <button class="editor-tool" type="button" data-editor-duration="eighth" aria-label="Eighth note" title="Eighth note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D160;</span></button>
-        <button class="editor-tool" type="button" data-editor-duration="16th" aria-label="Sixteenth note" title="Sixteenth note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D161;</span></button>
-        <button class="editor-tool" type="button" data-editor-duration="32nd" aria-label="Thirty-second note" title="Thirty-second note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D162;</span></button>
+        <button class="editor-tool" type="button" data-editor-duration="quarter" aria-label="Quarter note" title="Quarter note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D15F;</span></button>
+        <button class="editor-tool" type="button" data-editor-duration="half" aria-label="Half note" title="Half note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D15E;</span></button>
+        <button class="editor-tool" type="button" data-editor-duration="whole" aria-label="Whole note" title="Whole note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D15D;</span></button>
       </div>
       <span class="editor-toolbar__divider" aria-hidden="true"></span>
       <div class="editor-toolbar__group" role="group" aria-label="Augmentation dots">
@@ -59,22 +72,35 @@
         <button class="editor-tool" type="button" data-editor-dots="3" aria-label="Triple dot" title="Triple dot" aria-pressed="false"><span class="editor-tool__glyph editor-tool__glyph--dots">&#x1D16D;&#x1D16D;&#x1D16D;</span></button>
       </div>
       <span class="editor-toolbar__divider" aria-hidden="true"></span>
-      <div class="editor-toolbar__group" role="group" aria-label="Tie">
-        <button class="editor-tool" type="button" data-editor-tie aria-label="Tie" title="Tie to the next note" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10c2.6 4.4 5.3 6.6 8 6.6S17.4 14.4 20 10" /></svg></button>
-      </div>
-      <span class="editor-toolbar__divider" aria-hidden="true"></span>
       <div class="editor-toolbar__group" role="group" aria-label="Rest">
         <button class="editor-tool" type="button" data-editor-rest aria-label="Insert rest" title="Rest (0)" aria-pressed="false"><span class="editor-tool__glyph">&#x1D13D;</span></button>
       </div>
       <span class="editor-toolbar__divider" aria-hidden="true"></span>
-      <div class="editor-toolbar__group" role="group" aria-label="Accidentals and stem">
-        <button class="editor-tool" type="button" data-editor-accidental="double-sharp" aria-label="Double sharp" title="Double sharp" aria-pressed="false"><span class="editor-tool__glyph">&#x1D12A;</span></button>
-        <button class="editor-tool" type="button" data-editor-accidental="sharp" aria-label="Sharp" title="Sharp" aria-pressed="false"><span class="editor-tool__glyph">&#x266F;</span></button>
-        <button class="editor-tool" type="button" data-editor-accidental="natural" aria-label="Natural" title="Natural" aria-pressed="false"><span class="editor-tool__glyph">&#x266E;</span></button>
-        <button class="editor-tool" type="button" data-editor-accidental="flat" aria-label="Flat" title="Flat" aria-pressed="false"><span class="editor-tool__glyph">&#x266D;</span></button>
+      <div class="editor-toolbar__group" role="group" aria-label="Accidentals">
         <button class="editor-tool" type="button" data-editor-accidental="double-flat" aria-label="Double flat" title="Double flat" aria-pressed="false"><span class="editor-tool__glyph">&#x1D12B;</span></button>
+        <button class="editor-tool" type="button" data-editor-accidental="flat" aria-label="Flat" title="Flat" aria-pressed="false"><span class="editor-tool__glyph">&#x266D;</span></button>
+        <button class="editor-tool" type="button" data-editor-accidental="natural" aria-label="Natural" title="Natural" aria-pressed="false"><span class="editor-tool__glyph">&#x266E;</span></button>
+        <button class="editor-tool" type="button" data-editor-accidental="sharp" aria-label="Sharp" title="Sharp" aria-pressed="false"><span class="editor-tool__glyph">&#x266F;</span></button>
+        <button class="editor-tool" type="button" data-editor-accidental="double-sharp" aria-label="Double sharp" title="Double sharp" aria-pressed="false"><span class="editor-tool__glyph">&#x1D12A;</span></button>
+      </div>
+      <span class="editor-toolbar__divider" aria-hidden="true"></span>
+      <div class="editor-toolbar__group" role="group" aria-label="Tie and slur">
+        <button class="editor-tool" type="button" data-editor-tie aria-label="Tie" title="Tie to the next note" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10c2.6 4.4 5.3 6.6 8 6.6S17.4 14.4 20 10" /></svg></button>
+        <button class="editor-tool" type="button" data-editor-slur aria-label="Slur" title="Slur to the next note" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9c1.4 6 5 9 8 9s6.6-3 8-9" /></svg></button>
+      </div>
+      <span class="editor-toolbar__divider" aria-hidden="true"></span>
+      <div class="editor-toolbar__group" role="group" aria-label="Articulations">
+        <button class="editor-tool" type="button" data-editor-articulation="marcato" aria-label="Marcato" title="Marcato" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="articMarcatoAbove"></span></button>
+        <button class="editor-tool" type="button" data-editor-articulation="sforzato" aria-label="Sforzato" title="Sforzato (soft accent)" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="articSoftAccentAbove"></span></button>
+        <button class="editor-tool" type="button" data-editor-articulation="tenuto" aria-label="Tenuto" title="Tenuto" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="articTenutoAbove"></span></button>
+        <button class="editor-tool" type="button" data-editor-articulation="staccato" aria-label="Staccato" title="Staccato" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="articStaccatoAbove"></span></button>
+        <button class="editor-tool" type="button" data-editor-articulation="accent" aria-label="Accent" title="Accent" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="articAccentAbove"></span></button>
+      </div>
+      <span class="editor-toolbar__divider" aria-hidden="true"></span>
+      <div class="editor-toolbar__group" role="group" aria-label="Stem">
         <button class="editor-tool" type="button" data-editor-flip aria-label="Flip stem" title="Flip stem direction"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v16M8 4l-3 3M8 4l3 3M16 20V4M16 20l-3-3M16 20l3-3" /></svg></button>
       </div>
+    </div>
     </div>
 
     <main class="editor-workspace" aria-label="Notation work" data-region="notation-work">
@@ -141,10 +167,7 @@
         </button>
       </div>
       <span class="editor-bottombar__divider" aria-hidden="true"></span>
-      <div class="editor-bottombar__group" role="group" aria-label="Note input">
-        <button class="editor-bottombar__button" type="button" data-editor-note-input aria-label="Note input mode" title="Note input (N) — then click the staff" aria-pressed="false">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11.5" /><ellipse cx="9" cy="17.5" rx="3" ry="2.2" /><path d="M12 4l6-1.6v11.1" /><ellipse cx="15" cy="15" rx="3" ry="2.2" /></svg><span>Input</span>
-        </button>
+      <div class="editor-bottombar__group" role="group" aria-label="Measures">
         <button class="editor-bottombar__button" type="button" data-editor-add-measure aria-label="Add measure" title="Add measure" disabled>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6v12M9 6v12M15 6v12M20 6v12" /></svg><span>+ Bar</span>
         </button>
@@ -204,7 +227,7 @@
         </div>
       </div>
     </div>
-    <script src="assets/notation-engine.js?v=b516d9642697"></script>
+    <script src="assets/notation-engine.js?v=2a9d8e05680d"></script>
     <script src="assets/sound-engine.js?v=dd4228c1a476"></script>
     <script src="script.js?v=app-lock-20261118"></script>
     <script src="soundfonts-config.js?v=soundfont-config-20261118"></script>

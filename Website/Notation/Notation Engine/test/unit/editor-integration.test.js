@@ -140,6 +140,55 @@ describe('the editor and the engine agree, end to end', () => {
     assert.match(xml, /<duration>4<\/duration>/);
   });
 
+  test('a slur and a sforzato survive the editor writing them back to MusicXML', () => {
+    const { window, engine, doc } = loadEditor();
+    const parsed = engine.parseMusicXml(STARTER_XML, window.DOMParser);
+    const quarter = engine.TICKS_PER_QUARTER;
+    let edited = parsed;
+    for (let index = 0; index < 3; index += 1) {
+      edited = doc.insertEvent(edited, {
+        partId: 'P1',
+        measureNumber: 1,
+        event: engine.note({
+          pitch: { kind: 'pitched', step: ['C', 'D', 'E'][index], octave: 5, alter: 0 },
+          duration: engine.duration('quarter', 0, quarter),
+          voice: 1,
+          staff: 1,
+          startTick: index * quarter,
+        }),
+      });
+    }
+    const patch = (eventIndex, values) => {
+      edited = doc.patchEvent(edited, {
+        partId: 'P1',
+        measureNumber: 1,
+        voiceId: 1,
+        eventIndex,
+        patch: values,
+      });
+    };
+    patch(0, { slurStarts: [1] });
+    patch(2, { slurStops: [1] });
+    patch(1, { articulations: ['sforzato'] });
+
+    const xml = doc.toMusicXml(edited);
+    // MusicXML's own names, so another program reads the same marks.
+    assert.match(xml, /<slur type="start" number="1"\/>/);
+    assert.match(xml, /<slur type="stop" number="1"\/>/);
+    assert.match(xml, /<soft-accent\/>/);
+
+    // And the engine reads its own writing back, with no diagnostics --
+    // without this a mark would draw once and vanish on reload.
+    const reread = engine.parseMusicXml(xml, window.DOMParser);
+    const events = reread.score.parts[0].measures[0].voices[0].events;
+    // Spread: the engine's arrays come from the page's realm, not this one.
+    assert.deepEqual([...events[0].slurStarts], [1]);
+    assert.deepEqual([...events[2].slurStops], [1]);
+    assert.deepEqual([...events[1].articulations], ['sforzato']);
+    const rendered = engine.renderParsedMusicXml(reread, { config: { layout: { mode: 'page' } } });
+    assert.equal((rendered.diagnostics ?? []).length, 0);
+  });
+
   test('what the editor writes, the engine reads back to the same note', () => {
     const { window, engine, doc } = loadEditor();
     const parsed = engine.parseMusicXml(STARTER_XML, window.DOMParser);
@@ -350,6 +399,77 @@ describe('the editor and the engine agree, end to end', () => {
     // hear it -- the two things this editor is for.
     assert.equal(noteInput.getAttribute('aria-pressed'), 'true');
     assert.equal(preview.getAttribute('aria-pressed'), 'true');
+  });
+
+  test('the note-input toolbar carries MuseScore\'s note values, marks and slurs', () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    const bar = doc.querySelector('[data-editor-note-toolbar]');
+    assert.ok(bar, 'the editor has no note-input toolbar');
+    assert.ok(doc.querySelector('[data-editor-toolbars]'), 'the two toolbars are not one sticky block');
+
+    const within = (selector) => [...bar.querySelectorAll(selector)];
+    // Every note value from a whole note down to a 64th, longest first --
+    // the engine can write all of them, so the bar must offer all of them.
+    assert.deepEqual(
+      within('[data-editor-duration]').map((button) => button.dataset.editorDuration),
+      ['64th', '32nd', '16th', 'eighth', 'quarter', 'half', 'whole'],
+    );
+    assert.deepEqual(within('[data-editor-dots]').map((b) => b.dataset.editorDots), ['1', '2', '3']);
+    assert.deepEqual(
+      within('[data-editor-accidental]').map((button) => button.dataset.editorAccidental),
+      ['double-flat', 'flat', 'natural', 'sharp', 'double-sharp'],
+    );
+    assert.deepEqual(
+      within('[data-editor-articulation]').map((button) => button.dataset.editorArticulation),
+      ['marcato', 'sforzato', 'tenuto', 'staccato', 'accent'],
+    );
+    for (const selector of ['[data-editor-tie]', '[data-editor-slur]', '[data-editor-rest]', '[data-editor-flip]']) {
+      assert.equal(within(selector).length, 1, `the note-input bar is missing ${selector}`);
+    }
+
+    // The articulation buttons are drawn with the engine's own font, not
+    // with a codepoint copied into the markup, so they match the score.
+    const sforzato = within('[data-editor-articulation="sforzato"] .editor-tool__glyph')[0];
+    assert.equal(sforzato.textContent, window.NotationEngine.getGlyph('articSoftAccentAbove').char);
+  });
+
+  test('the slur button slurs the selected note to the next one, and clears it again', () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    const scoreHost = doc.querySelector('[data-editor-score]');
+    window.SVGElement.prototype.getBoundingClientRect = () => ({
+      x: 0, y: 0, width: 400, height: 200, top: 0, left: 0, right: 400, bottom: 200,
+    });
+    window.SVGElement.prototype.getScreenCTM = () => ({
+      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0, inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+    });
+    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 100, height: 100 });
+    window.DOMPoint = class {
+      constructor(x = 0, y = 0) { this.x = x; this.y = y; }
+    };
+
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const click = (x) => scoreHost.dispatchEvent(
+      new window.PointerEvent('pointerdown', { clientX: x, clientY: 9, bubbles: true }),
+    );
+    const slur = doc.querySelector('[data-editor-slur]');
+
+    // Two clicks write two quarter notes on successive beats; the second is
+    // selected, so the slur button has a note to start from and a note to
+    // land on.
+    click(5);
+    click(120);
+    assert.match(status(), /Inserted/);
+    assert.equal(doc.querySelectorAll('[data-editor-score] svg').length, 1);
+
+    slur.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.match(status(), /Slur added/);
+    assert.equal(slur.getAttribute('aria-pressed'), 'true');
+
+    slur.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.match(status(), /Slur removed/);
+    assert.equal(slur.getAttribute('aria-pressed'), 'false');
   });
 
   test('writing a note in the editor changes the score it will play back', () => {

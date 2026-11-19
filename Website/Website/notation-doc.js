@@ -35,12 +35,14 @@
    * MusicXML elements that produce them. The engine's parser already
    * reads these, so writing the same elements is what makes a palette
    * edit survive a save -- without it the mark would draw once and then
-   * vanish on reload. `marcato` is MusicXML's `strong-accent`, and
-   * `turnInverted` is `inverted-turn`: same marks, different names.
+   * vanish on reload. `marcato` is MusicXML's `strong-accent`, `sforzato`
+   * is `soft-accent`, and `turnInverted` is `inverted-turn`: same marks,
+   * different names.
    */
   const ARTICULATION_ELEMENT = {
     accent: 'accent',
     marcato: 'strong-accent',
+    sforzato: 'soft-accent',
     staccato: 'staccato',
     tenuto: 'tenuto',
     staccatissimo: 'staccatissimo',
@@ -500,22 +502,31 @@
     note.explicitStemDirection ? `<stem>${note.explicitStemDirection}</stem>` : '';
 
   /**
-   * A note's `<notations>`: articulations and ornaments, in the order the
-   * palette applied them. Returns '' when the note carries none, so an
-   * ordinary note stays byte-identical to what the editor wrote before
-   * this existed.
+   * A note's `<notations>`: slurs, articulations and ornaments, in the
+   * order the palette applied them. Returns '' when the note carries none,
+   * so an ordinary note stays byte-identical to what the editor wrote
+   * before this existed.
+   *
+   * MusicXML's own element order puts `<slur>` after `<tied>` and before
+   * `<articulations>`; the renderer matches slurs by number, so the
+   * numbers are written back exactly as they were read.
    */
   function notationsXml(note) {
+    const slurs = [
+      ...(note.slurStarts ?? []).map((number) => `<slur type="start" number="${number}"/>`),
+      ...(note.slurStops ?? []).map((number) => `<slur type="stop" number="${number}"/>`),
+    ].join('');
     const articulations = (note.articulations ?? []).filter((mark) => ARTICULATION_ELEMENT[mark]);
     const ornaments = (note.ornaments ?? []).filter((mark) => ORNAMENT_ELEMENT[mark]);
     const tied =
       (note.tieStart ? '<tied type="start"/>' : '') + (note.tieStop ? '<tied type="stop"/>' : '');
-    if (articulations.length === 0 && ornaments.length === 0 && !note.hasFermata && !tied) {
+    if (articulations.length === 0 && ornaments.length === 0 && !note.hasFermata && !tied && !slurs) {
       return '';
     }
-    // MusicXML orders <tied> before <articulations> inside <notations>.
+    // MusicXML orders <tied> before <slur>, and both before <articulations>.
     const inner = [
       tied,
+      slurs,
       articulations.length
         ? `<articulations>${articulations.map((mark) => `<${ARTICULATION_ELEMENT[mark]}/>`).join('')}</articulations>`
         : '',

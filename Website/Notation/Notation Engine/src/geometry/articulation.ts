@@ -33,6 +33,7 @@ const GLYPH_NAMES: Readonly<Record<ArticulationType, Readonly<Record<Articulatio
     tenuto: { above: 'articTenutoAbove', below: 'articTenutoBelow' },
     marcato: { above: 'articMarcatoAbove', below: 'articMarcatoBelow' },
     staccatissimo: { above: 'articStaccatissimoAbove', below: 'articStaccatissimoBelow' },
+    sforzato: { above: 'articSoftAccentAbove', below: 'articSoftAccentBelow' },
   };
 
 /**

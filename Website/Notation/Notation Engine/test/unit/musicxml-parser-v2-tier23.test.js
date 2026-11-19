@@ -39,17 +39,17 @@ function codes(result) {
 }
 
 describe('MusicXML parser v2 Tier 2/3 -- <notations> (Phase 35, §10.4)', () => {
-  test("all five of §9.19's articulations parse, with strong-accent mapped to marcato", () => {
+  test("all six of §9.19's articulations parse, with strong-accent mapped to marcato and soft-accent to sforzato", () => {
     const result = parse(
       score(
         `<note>${C4}<type>quarter</type><notations><articulations>` +
-          '<accent/><staccato/><tenuto/><strong-accent/><staccatissimo/>' +
+          '<accent/><staccato/><tenuto/><strong-accent/><staccatissimo/><soft-accent/>' +
           '</articulations></notations></note>',
       ),
     );
     assert.deepEqual(
       [...firstEvent(result).articulations],
-      ['accent', 'staccato', 'tenuto', 'marcato', 'staccatissimo'],
+      ['accent', 'staccato', 'tenuto', 'marcato', 'staccatissimo', 'sforzato'],
     );
   });
 

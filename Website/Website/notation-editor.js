@@ -9,6 +9,7 @@
 (() => {
   const root = document.querySelector('[data-editor-toolbar]');
   if (!root) return;
+  const toolbarStack = document.querySelector('[data-editor-toolbars]');
 
   const engine = window.NotationEngine;
   const docTools = window.NotationDoc;
@@ -41,8 +42,13 @@
   const accidentalButtons = [...document.querySelectorAll('[data-editor-accidental]')];
   const dotButtons = [...document.querySelectorAll('[data-editor-dots]')];
   const tieButton = pick('[data-editor-tie]');
+  const slurButton = pick('[data-editor-slur]');
+  const articulationButtons = [...document.querySelectorAll('[data-editor-articulation]')];
   const flipButton = pick('[data-editor-flip]');
   const restButton = pick('[data-editor-rest]');
+  const zoomInButton = pick('[data-editor-zoom-in]');
+  const zoomOutButton = pick('[data-editor-zoom-out]');
+  const zoomOutput = pick('[data-editor-zoom]');
   const voiceSelect = pick('[data-editor-voice]');
   const palette = pick('[data-editor-palette]');
   const paletteToggle = pick('[data-editor-palette-toggle]');
@@ -51,7 +57,7 @@
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const ACCIDENTAL_ALTER = { 'double-sharp': 2, sharp: 1, natural: 0, flat: -1, 'double-flat': -2 };
   const SHORTCUT_DURATION = {
-    '1': 'whole', '2': 'half', '3': 'quarter', '4': 'eighth', '5': '16th', '6': '32nd',
+    '1': 'whole', '2': 'half', '3': 'quarter', '4': 'eighth', '5': '16th', '6': '32nd', '7': '64th',
   };
 
   const state = {
@@ -350,6 +356,7 @@
   const updateZoom = () => {
     state.zoom = Math.min(200, Math.max(50, state.zoom));
     scoreHost.style.zoom = `${state.zoom}%`;
+    if (zoomOutput) zoomOutput.textContent = `${state.zoom}%`;
   };
 
   function svgElement(name, attrs) {
@@ -725,6 +732,7 @@
       tenuto: 'articTenutoAbove',
       marcato: 'articMarcatoAbove',
       staccatissimo: 'articStaccatissimoAbove',
+      sforzato: 'articSoftAccentAbove',
     },
     ornament: {
       trill: 'ornamentTrill',
@@ -752,6 +760,13 @@
       const glyph = name ? engine.getGlyph?.(name) : null;
       const host = item.querySelector('.editor-palette__glyph');
       if (host && glyph?.char) host.textContent = glyph.char;
+    }
+    // The note-input toolbar shows the same marks, but as bare glyphs, so
+    // it asks the engine for each one by name rather than carrying a copy
+    // of the codepoint in the markup.
+    for (const host of document.querySelectorAll('[data-editor-glyph]')) {
+      const glyph = engine.getGlyph?.(host.dataset.editorGlyph);
+      if (glyph?.char) host.textContent = glyph.char;
     }
   }
 
@@ -855,6 +870,87 @@
       }
       return next;
     }, removing ? 'Tie removed.' : `Tie added${edits.length === 1 ? '' : ` (${edits.length})`}.`);
+  }
+
+  /** True when every selected note already starts a slur. */
+  const selectionSlurred = () =>
+    paletteTargets().length > 0 &&
+    paletteTargets().every((cell) =>
+      eventNotes(eventFor(cell)).every((note) => (note.slurStarts ?? []).length > 0),
+    );
+
+  /** The lowest slur number this note is not already using, so a second slur nests. */
+  function freeSlurNumber(note) {
+    const used = new Set([...(note?.slurStarts ?? []), ...(note?.slurStops ?? [])]);
+    for (let number = 1; number <= 8; number += 1) if (!used.has(number)) return number;
+    return 8;
+  }
+
+  /**
+   * Slur: joins each selected note to the next note in its own voice. Unlike
+   * a tie, a slur may join different pitches, so the only requirement is
+   * that a following note exists. Start and stop are one command, so undo
+   * takes the whole curve away.
+   */
+  function toggleSlur() {
+    const cells = paletteTargets();
+    if (cells.length === 0) {
+      announce('Select a note first.');
+      return;
+    }
+    const edits = [];
+    for (const cell of cells) {
+      const event = eventFor(cell);
+      if (!event) continue;
+      const notes = eventNotes(event);
+      const target = eventAfter(cell, event);
+      const startNumbers = notes.flatMap((note) => note.slurStarts ?? []);
+      if (startNumbers.length > 0) {
+        const stops = (target ? eventNotes(target) : []).flatMap((note) => note.slurStops ?? []);
+        const remaining = stops.filter((number) => !startNumbers.includes(number));
+        edits.push({
+          cell,
+          patch: { slurStarts: null },
+          ...(target
+            ? {
+                next: { ...cell, eventIndex: cell.eventIndex + 1 },
+                nextPatch: { slurStops: remaining.length > 0 ? remaining : null },
+              }
+            : {}),
+        });
+        continue;
+      }
+      if (!target || target.kind === 'rest') continue;
+      const number = freeSlurNumber(notes[0]);
+      edits.push({
+        cell,
+        patch: { slurStarts: [number] },
+        next: { ...cell, eventIndex: cell.eventIndex + 1 },
+        nextPatch: { slurStops: [number] },
+      });
+    }
+    if (edits.length === 0) {
+      announce('Nothing to slur to — a slur needs a following note in the same voice.');
+      return;
+    }
+    const removing = edits.every((edit) => edit.patch.slurStarts === null);
+    commit((doc) => {
+      let next = doc;
+      for (const edit of edits) {
+        const { partId, measureNumber, voiceId, eventIndex } = edit.cell;
+        next = docTools.patchEvent(next, { partId, measureNumber, voiceId, eventIndex, patch: edit.patch });
+        if (edit.next) {
+          next = docTools.patchEvent(next, {
+            partId: edit.next.partId,
+            measureNumber: edit.next.measureNumber,
+            voiceId: edit.next.voiceId,
+            eventIndex: edit.next.eventIndex,
+            patch: edit.nextPatch,
+          });
+        }
+      }
+      return next;
+    }, removing ? 'Slur removed.' : `Slur added${edits.length === 1 ? '' : ` (${edits.length})`}.`);
   }
 
   /**
@@ -2060,10 +2156,17 @@
       button.setAttribute('aria-pressed', String(Number(button.dataset.editorDots) === state.tool.dots));
     });
     tieButton.setAttribute('aria-pressed', String(selectionTied()));
+    if (slurButton) slurButton.setAttribute('aria-pressed', String(selectionSlurred()));
+    articulationButtons.forEach((button) => {
+      const value = button.dataset.editorArticulation;
+      button.setAttribute('aria-pressed', String(selectionCarries('articulation', value)));
+    });
     restButton.setAttribute('aria-pressed', String(state.tool.rest));
     noteInputButton.setAttribute('aria-pressed', String(state.noteInput));
     if (previewButton) previewButton.setAttribute('aria-pressed', String(state.previewOn));
+    if (zoomOutput) zoomOutput.textContent = `${state.zoom}%`;
     root.dataset.mode = state.noteInput ? 'input' : 'select';
+    if (toolbarStack) toolbarStack.dataset.mode = root.dataset.mode;
   };
 
   function applySetup() {
@@ -2211,6 +2314,12 @@
     announce(state.tool.dots ? `${state.tool.dots} dot${state.tool.dots === 1 ? '' : 's'} on.` : 'Dots off.');
   }));
   tieButton.addEventListener('click', toggleTie);
+  if (slurButton) slurButton.addEventListener('click', toggleSlur);
+  articulationButtons.forEach((button) => button.addEventListener('click', () => {
+    applyMark('articulation', button.dataset.editorArticulation);
+  }));
+  if (zoomInButton) zoomInButton.addEventListener('click', () => { state.zoom += 10; updateZoom(); });
+  if (zoomOutButton) zoomOutButton.addEventListener('click', () => { state.zoom -= 10; updateZoom(); });
   flipButton.addEventListener('click', flipStems);
   restButton.addEventListener('click', () => {
     state.tool.rest = !state.tool.rest;

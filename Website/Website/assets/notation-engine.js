@@ -69500,7 +69500,8 @@ var NotationEngine = (() => {
     staccato: { above: "articStaccatoAbove", below: "articStaccatoBelow" },
     tenuto: { above: "articTenutoAbove", below: "articTenutoBelow" },
     marcato: { above: "articMarcatoAbove", below: "articMarcatoBelow" },
-    staccatissimo: { above: "articStaccatissimoAbove", below: "articStaccatissimoBelow" }
+    staccatissimo: { above: "articStaccatissimoAbove", below: "articStaccatissimoBelow" },
+    sforzato: { above: "articSoftAccentAbove", below: "articSoftAccentBelow" }
   };
   function articulationGlyphName(type, side) {
     return GLYPH_NAMES[type][side];
@@ -71320,7 +71321,8 @@ ${denominator}`;
     "strong-accent": "marcato",
     staccato: "staccato",
     tenuto: "tenuto",
-    staccatissimo: "staccatissimo"
+    staccatissimo: "staccatissimo",
+    "soft-accent": "sforzato"
   };
   var ORNAMENT_BY_ELEMENT = {
     "trill-mark": "trill",
@@ -71428,7 +71430,7 @@ ${denominator}`;
                 diagnostic(
                   "info",
                   "UNSUPPORTED_ARTICULATION",
-                  `Ignored <${child.tagName}>; \xA79.19 supports accent, staccato, tenuto, strong-accent (marcato) and staccatissimo.`,
+                  `Ignored <${child.tagName}>; \xA79.19 supports accent, staccato, tenuto, strong-accent (marcato), soft-accent (sforzato) and staccatissimo.`,
                   location
                 )
               );
