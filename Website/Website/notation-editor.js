@@ -20,6 +20,11 @@
   const redoButton = pick('[data-editor-redo]');
   const playButton = pick('[data-editor-play]');
   const noteInputButton = pick('[data-editor-note-input]');
+  const newButton = pick('[data-editor-new]');
+  const openButton = pick('[data-editor-open]');
+  const openInput = pick('[data-editor-open-input]');
+  const printButton = pick('[data-editor-print]');
+  const rewindButton = pick('[data-editor-rewind]');
   const addMeasureButton = pick('[data-editor-add-measure]');
   const removeMeasureButton = pick('[data-editor-remove-measure]');
   const canvas = pick('[data-editor-canvas]');
@@ -351,6 +356,7 @@
     exportPng.disabled = !enabled;
     addMeasureButton.disabled = !enabled;
     removeMeasureButton.disabled = !enabled;
+    rewindButton.disabled = !enabled;
     if (!enabled) setExportMenu(false);
   };
 
@@ -1883,6 +1889,21 @@
     render();
   }
 
+  /** Rewind puts the playhead back at the top, stopping playback first. */
+  function rewind() {
+    if (state.playing) {
+      state.sound?.pause?.();
+      setPlaying(false);
+      if (state.rafId !== null) window.cancelAnimationFrame(state.rafId);
+      state.rafId = null;
+      state.soundingId = null;
+    }
+    state.playSeconds = 0;
+    clearMetronomeTimers();
+    announce('Rewound to start.');
+    render();
+  }
+
   /** Where playback starts: the entry cursor if there is one, else the top. */
   const startSeconds = () => {
     if (!state.result || !state.entry) return 0;
@@ -2064,12 +2085,12 @@
     partSelect.value = activePartId();
     // A single-part score has nothing to choose, so the whole group goes
     // away -- leaving its divider behind would show an empty separator.
-    const group = partSelect.closest('.editor-toolbar__group');
+    const group = partSelect.closest('.editor-bottombar__group');
     const divider = group?.previousElementSibling;
     const hide = options.length <= 1;
     partSelect.hidden = hide;
     if (group) group.hidden = hide;
-    if (divider?.classList.contains('editor-toolbar__divider')) divider.hidden = hide;
+    if (divider?.classList.contains('editor-bottombar__divider')) divider.hidden = hide;
   }
 
   /** Switching part is a change of target, not an edit: the clef and key
@@ -2089,6 +2110,17 @@
   // ---- wiring ------------------------------------------------------------
 
   backButton.addEventListener('click', () => window.location.assign('notation.html'));
+  // New hands off to the Notation Lab wizard, the same way the entry page's
+  // Create box does: instrument, key, time and bars are chosen there.
+  newButton.addEventListener('click', () => window.location.assign('notation.html?intent=create'));
+  openButton.addEventListener('click', () => openInput.click());
+  openInput.addEventListener('change', () => {
+    const file = openInput.files?.[0];
+    openInput.value = '';
+    void readFile(file);
+  });
+  printButton.addEventListener('click', () => window.print());
+  rewindButton.addEventListener('click', rewind);
   saveButton.addEventListener('click', saveScore);
   undoButton.addEventListener('click', undo);
   redoButton.addEventListener('click', redo);

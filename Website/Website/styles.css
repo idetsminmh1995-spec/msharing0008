@@ -709,7 +709,8 @@ body.is-newscore-open { overflow:hidden; }
   .editor-palette__glyph { font-size:17px; }
   .editor-canvas { min-height:calc(100vh - var(--header-height) - var(--bottom-height) - var(--editor-bottom-height) - 120px); }
   .editor-score { padding:12px; }
-  .editor-bottombar { padding:0 10px; gap:4px; }
+  .editor-page { --editor-bottom-height:96px; }
+  .editor-bottombar { height:auto; min-height:var(--editor-bottom-height); flex-wrap:wrap; padding:6px 10px; gap:4px; }
   .editor-bottombar__divider { display:none; }
   .editor-segment__button { min-width:40px; padding:0 8px; }
 }

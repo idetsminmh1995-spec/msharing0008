@@ -32,31 +32,37 @@ rather than in a status bar, so Play, metronome and the tempo readout live
 here too; the bottom bar keeps only the things that are about the file and the
 page (SoundFont, view, Save, Export).
 
+The header bar is MuseScore's **main toolbar**, in MuseScore's own order:
+file operations, then history, then zoom and view, then transport.
+
 | Group | Tools |
 |---|---|
 | Navigation | Back to Notation Lab |
 | History | Undo, Redo |
-| Note input | Note input (N), Add measure, Remove last measure |
-| Note duration | Whole, Half, Quarter, Eighth, Sixteenth, Thirty-second, Dot, Rest |
-| Accidentals | Sharp, Flat, Natural |
-| Part | Which instrument you are writing into (hidden for a single-part score) |
-| Score setup | Clef, Key signature, Time signature |
-| Playback | Play/Pause, Metronome, tempo readout |
-| View | Zoom −, zoom readout, Zoom + |
+| File | New, Open, Save, Print |
+| Zoom | Zoom −, zoom readout, Zoom + |
+| Score view | Page / Horizontal |
+| Playback | Rewind, Play/Pause, Metronome, tempo readout |
 
-Bottom bar: SoundFont picker, Hear, Test, Score, Page/Horizontal view, Save,
-Export (PDF/SVG/PNG).
+Bottom bar: note input (N), Add / Remove measure, note duration and dot and
+rest, accidentals, Part, Voice, score setup (Clef, Key, Time), Palette,
+SoundFont picker, Hear, Test, Score, Export (PDF/SVG/PNG). The editing tools
+that act on the note you are about to write live here, next to the SoundFont
+controls, so the header bar stays the short row of file and transport commands
+MuseScore shows.
 
 Keyboard shortcuts: `Ctrl+S` save, `Ctrl+Z`/`Ctrl+Y` undo/redo, `Ctrl+±` zoom,
 `Space` play/pause, `M` metronome, `N` note input, `.` dot, `0`/`R` rest,
-`1`–`6` note values.
+`1`–`6` note values. **New** hands off to the Notation Lab wizard
+(`notation.html?intent=create`), so a new score is set up there rather than in
+a toolbar dropdown; **Print** calls the browser's own print dialog.
 
 ## Behaviour
 
 - **Fixed toolbar.** `position:sticky; top:var(--header-height)` ဖြစ်သောကြောင့် scroll လုပ်လည်း Header Bar အောက်တွင် ဆက်ရှိသည်။
 - **Responsive wrapping.** Wide screens တွင် tool groups အားလုံး ပြသည်။ `≤1500px` တွင် ခလုတ် label များ ဖျောက်ပြီး icon-only ဖြစ်သည်။ `≤1280px` တွင် တစ်တန်းတည်း ထားပြီး ဘေးတိုက် scroll လုပ်နိုင်သည် (score အတွက် နေရာ မယူဘဲ)။
 - **Entry handoff.** `?intent=create` → empty starter score; `?intent=open` → Notation Lab entry box မှ sessionStorage ဖြင့် ပို့လာသော ဖိုင်ကို render လုပ်သည်။
-- **Starter score.** Create လုပ်သည့်အခါ treble clef, 4/4, 4 measures rest ပါသော MusicXML ကို ထုတ်ပြီး render လုပ်သည်။ Clef/Key/Time ပြောင်းလျှင် starter score ကို ပြန် render လုပ်သည်။
+- **Starter score.** Create လုပ်သည့်အခါ treble clef, 4/4, 4 measures rest ပါသော MusicXML ကို ထုတ်ပြီး render လုပ်သည်။ Clef/Key/Time ကို bottom bar မှ ပြောင်းလျှင် starter score ကို ပြန် render လုပ်သည်။
 - **Playback.** `soundfonts/manifest.json` သည် လက်ရှိ deploy တွင် မရှိသေးသောကြောင့် Play ကို နှိပ်လျှင် error message ဖြင့် ညင်သာစွာ ရပ်တန့်သည်။ R2 manifest ထည့်ပြီးပါက အလိုအလျောက် အလုပ်လုပ်မည်။
 - **Bravura font.** `styles.css` တွင် `@font-face` ပြန်ထည့်ထားသည် (`assets/fonts/Bravura.woff2`). Glyph များအားလုံး `<text font-family="Bravura">` ဖြင့် render ဖြစ်သည်။
 
