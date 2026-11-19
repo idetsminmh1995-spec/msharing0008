@@ -433,13 +433,59 @@ describe('the editor and the engine agree, end to end', () => {
     const sforzato = within('[data-editor-articulation="sforzato"] .editor-tool__glyph')[0];
     assert.equal(sforzato.textContent, window.NotationEngine.getGlyph('articSoftAccentAbove').char);
 
-    // The palette must offer every articulation the toolbar can set, or a
-    // writer browsing the list cannot find a mark the bar already shows.
-    const paletteValues = [...doc.querySelectorAll('[data-editor-palette-mark="articulation"]')]
-      .map((button) => button.dataset.editorPaletteValue);
-    for (const value of within('[data-editor-articulation]').map((b) => b.dataset.editorArticulation)) {
-      assert.ok(paletteValues.includes(value), `the palette is missing the ${value} articulation`);
+    // The palette must offer every mark the toolbar can set, or a writer
+    // browsing the list cannot find a mark the bar already shows. Order is
+    // each surface's own -- the bar groups marks by shape, the palette
+    // lists them in reading order -- so only membership is compared.
+    for (const kind of ['articulation', 'dynamic']) {
+      const field = `editor${kind[0].toUpperCase()}${kind.slice(1)}`;
+      const paletteValues = new Set(
+        [...doc.querySelectorAll(`[data-editor-palette-mark="${kind}"]`)].map((b) => b.dataset.editorPaletteValue),
+      );
+      for (const button of within(`[data-editor-${kind}]`)) {
+        assert.ok(paletteValues.has(button.dataset[field]), `the palette is missing the ${button.dataset[field]} ${kind}`);
+      }
     }
+  });
+
+  test('the dynamics buttons mark the selected note and light up with it', () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    const scoreHost = doc.querySelector('[data-editor-score]');
+    window.SVGElement.prototype.getBoundingClientRect = () => ({
+      x: 0, y: 0, width: 400, height: 200, top: 0, left: 0, right: 400, bottom: 200,
+    });
+    window.SVGElement.prototype.getScreenCTM = () => ({
+      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0, inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+    });
+    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 100, height: 100 });
+    window.DOMPoint = class {
+      constructor(x = 0, y = 0) { this.x = x; this.y = y; }
+      matrixTransform() { return new window.DOMPoint(this.x, this.y); }
+    };
+
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const button = (level) => doc.querySelector(`[data-editor-dynamic="${level}"]`);
+    assert.ok(button('ff'), 'the note-input bar has no dynamics buttons');
+
+    scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', { clientX: 5, clientY: 9, bubbles: true }));
+    doc.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'D', bubbles: true }));
+
+    // A dynamic belongs to a tick, so it needs a note selected to attach to.
+    doc.querySelector('[data-editor-note-input]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', { clientX: 5, clientY: 9, bubbles: true }));
+    assert.equal(status(), 'Note selected.');
+
+    button('ff').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.match(status(), /Added ff/);
+    assert.equal(button('ff').getAttribute('aria-pressed'), 'true');
+    // Only the level in force lights: the others must not claim the note.
+    assert.equal(button('p').getAttribute('aria-pressed'), 'false');
+
+    // A second click on the same level takes it away again.
+    button('ff').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.match(status(), /Removed ff/);
+    assert.equal(button('ff').getAttribute('aria-pressed'), 'false');
   });
 
   test('the slur button slurs the selected note to the next one, and clears it again', () => {

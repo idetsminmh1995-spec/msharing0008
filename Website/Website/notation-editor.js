@@ -44,6 +44,7 @@
   const tieButton = pick('[data-editor-tie]');
   const slurButton = pick('[data-editor-slur]');
   const articulationButtons = [...document.querySelectorAll('[data-editor-articulation]')];
+  const dynamicButtons = [...document.querySelectorAll('[data-editor-dynamic]')];
   const flipButton = pick('[data-editor-flip]');
   const restButton = pick('[data-editor-rest]');
   const zoomInButton = pick('[data-editor-zoom-in]');
@@ -1105,13 +1106,18 @@
     syncPalette();
   }
 
+  /** The dynamic level in force at the selection's own tick, if any. */
+  function selectionDynamic() {
+    const cell = paletteTargets()[0] ?? null;
+    if (!cell || !state.doc) return null;
+    const event = eventFor(cell);
+    return docTools.dynamicAt(state.doc, cell.partId, cell.measureNumber, event?.startTick ?? 0);
+  }
+
   /** Lights the palette buttons that the current selection already carries. */
   function syncPalette() {
     if (!palette) return;
-    const cell = paletteTargets()[0] ?? null;
-    const event = eventFor(cell);
-    const tick = event?.startTick ?? 0;
-    const dynamic = cell && state.doc ? docTools.dynamicAt(state.doc, cell.partId, cell.measureNumber, tick) : null;
+    const dynamic = selectionDynamic();
     for (const item of paletteItems) {
       const kind = item.dataset.editorPaletteMark;
       const value = item.dataset.editorPaletteValue;
@@ -2161,6 +2167,10 @@
       const value = button.dataset.editorArticulation;
       button.setAttribute('aria-pressed', String(selectionCarries('articulation', value)));
     });
+    const dynamic = selectionDynamic();
+    dynamicButtons.forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.editorDynamic === dynamic));
+    });
     restButton.setAttribute('aria-pressed', String(state.tool.rest));
     noteInputButton.setAttribute('aria-pressed', String(state.noteInput));
     if (previewButton) previewButton.setAttribute('aria-pressed', String(state.previewOn));
@@ -2317,6 +2327,9 @@
   if (slurButton) slurButton.addEventListener('click', toggleSlur);
   articulationButtons.forEach((button) => button.addEventListener('click', () => {
     applyMark('articulation', button.dataset.editorArticulation);
+  }));
+  dynamicButtons.forEach((button) => button.addEventListener('click', () => {
+    applyDynamic(button.dataset.editorDynamic);
   }));
   if (zoomInButton) zoomInButton.addEventListener('click', () => { state.zoom += 10; updateZoom(); });
   if (zoomOutButton) zoomOutButton.addEventListener('click', () => { state.zoom -= 10; updateZoom(); });
