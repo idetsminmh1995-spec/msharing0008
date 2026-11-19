@@ -432,6 +432,14 @@ describe('the editor and the engine agree, end to end', () => {
     // with a codepoint copied into the markup, so they match the score.
     const sforzato = within('[data-editor-articulation="sforzato"] .editor-tool__glyph')[0];
     assert.equal(sforzato.textContent, window.NotationEngine.getGlyph('articSoftAccentAbove').char);
+
+    // The palette must offer every articulation the toolbar can set, or a
+    // writer browsing the list cannot find a mark the bar already shows.
+    const paletteValues = [...doc.querySelectorAll('[data-editor-palette-mark="articulation"]')]
+      .map((button) => button.dataset.editorPaletteValue);
+    for (const value of within('[data-editor-articulation]').map((b) => b.dataset.editorArticulation)) {
+      assert.ok(paletteValues.includes(value), `the palette is missing the ${value} articulation`);
+    }
   });
 
   test('the slur button slurs the selected note to the next one, and clears it again', () => {
@@ -445,23 +453,35 @@ describe('the editor and the engine agree, end to end', () => {
       a: 1, b: 0, c: 0, d: 1, e: 0, f: 0, inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
     });
     window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 100, height: 100 });
+    // Identity transform, so a client point is already a staff point: the
+    // click lands on the beat the coordinate names.
     window.DOMPoint = class {
       constructor(x = 0, y = 0) { this.x = x; this.y = y; }
+      matrixTransform() { return new window.DOMPoint(this.x, this.y); }
     };
 
     const status = () => doc.querySelector('[data-editor-status]').textContent;
-    const click = (x) => scoreHost.dispatchEvent(
-      new window.PointerEvent('pointerdown', { clientX: x, clientY: 9, bubbles: true }),
+    const click = () => scoreHost.dispatchEvent(
+      new window.PointerEvent('pointerdown', { clientX: 5, clientY: 9, bubbles: true }),
     );
+    const press = (key) => doc.dispatchEvent(new window.KeyboardEvent('keydown', { key, bubbles: true }));
     const slur = doc.querySelector('[data-editor-slur]');
 
-    // Two clicks write two quarter notes on successive beats; the second is
-    // selected, so the slur button has a note to start from and a note to
-    // land on.
-    click(5);
-    click(120);
+    // A click puts the cursor on beat 1; two letter keys write a note each,
+    // the second on the beat after the first -- the ordinary way a melody
+    // gets entered, and the case the slur has something to join.
+    click();
+    press('D');
+    press('E');
     assert.match(status(), /Inserted/);
     assert.equal(doc.querySelectorAll('[data-editor-score] svg').length, 1);
+
+    // A staff click in note input WRITES, so selecting the note the slur
+    // starts from means leaving note input first -- the same two-step a
+    // writer takes in MuseScore.
+    doc.querySelector('[data-editor-note-input]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    click(5);
+    assert.equal(status(), 'Note selected.');
 
     slur.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     assert.match(status(), /Slur added/);
