@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="Write and edit a music score in the Notation Lab editor." />
     <title>Notation Lab Editor — M Sharing</title>
-    <link rel="stylesheet" href="styles.css?v=main-toolbar-20261118" />
+    <link rel="stylesheet" href="styles.css?v=sidebar-dock-20261118" />
   </head>
   <body class="editor-page">
 <header class="site-header" data-region="main-header" data-header aria-label="Main header">
@@ -113,43 +113,83 @@
     </div>
 
     <main class="editor-workspace" aria-label="Notation work" data-region="notation-work">
-      <aside class="editor-palette" data-editor-palette aria-label="Palette" hidden>
-        <div class="editor-palette__section">
-          <h2 class="editor-palette__heading">Articulations</h2>
-          <div class="editor-palette__grid" role="group" aria-label="Articulations">
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="articulation" data-editor-palette-value="accent" aria-pressed="false" title="Accent"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Accent</span></button>
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="articulation" data-editor-palette-value="staccato" aria-pressed="false" title="Staccato"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Staccato</span></button>
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="articulation" data-editor-palette-value="tenuto" aria-pressed="false" title="Tenuto"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Tenuto</span></button>
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="articulation" data-editor-palette-value="marcato" aria-pressed="false" title="Marcato"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Marcato</span></button>
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="articulation" data-editor-palette-value="sforzato" aria-pressed="false" title="Sforzato"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Sforzato</span></button>
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="articulation" data-editor-palette-value="staccatissimo" aria-pressed="false" title="Staccatissimo"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Staccatissimo</span></button>
-          </div>
+      <aside class="editor-sidebar" id="editor-sidebar" data-editor-sidebar aria-label="Sidebar">
+        <div class="editor-sidebar__rail" role="tablist" aria-label="Sidebar panels" aria-orientation="vertical">
+          <button class="editor-sidebar__tab" type="button" role="tab" data-editor-sidebar-tab="palettes" aria-selected="true" aria-controls="editor-sidebar-palettes" id="editor-sidebar-tab-palettes" title="Palettes">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h16" /><circle cx="8" cy="5" r="1.6" /><circle cx="16" cy="12" r="1.6" /><circle cx="10" cy="19" r="1.6" /></svg>
+            <span class="editor-sidebar__tab-label">Palettes</span>
+          </button>
+          <button class="editor-sidebar__tab" type="button" role="tab" data-editor-sidebar-tab="properties" aria-selected="false" aria-controls="editor-sidebar-properties" id="editor-sidebar-tab-properties" title="Properties">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10" /><circle cx="16" cy="17" r="2.2" /></svg>
+            <span class="editor-sidebar__tab-label">Properties</span>
+          </button>
+          <button class="editor-sidebar__tab" type="button" role="tab" data-editor-sidebar-tab="instruments" aria-selected="false" aria-controls="editor-sidebar-instruments" id="editor-sidebar-tab-instruments" title="Instruments">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l10-2v13" /><circle cx="6.5" cy="18" r="2.5" /><circle cx="16.5" cy="16" r="2.5" /></svg>
+            <span class="editor-sidebar__tab-label">Instruments</span>
+          </button>
         </div>
-        <div class="editor-palette__section">
-          <h2 class="editor-palette__heading">Ornaments</h2>
-          <div class="editor-palette__grid" role="group" aria-label="Ornaments">
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="ornament" data-editor-palette-value="trill" aria-pressed="false" title="Trill"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Trill</span></button>
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="ornament" data-editor-palette-value="mordent" aria-pressed="false" title="Mordent"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Mordent</span></button>
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="ornament" data-editor-palette-value="turn" aria-pressed="false" title="Turn"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Turn</span></button>
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="ornament" data-editor-palette-value="turnInverted" aria-pressed="false" title="Inverted turn"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Inverted turn</span></button>
-          </div>
-        </div>
-        <div class="editor-palette__section">
-          <h2 class="editor-palette__heading">Dynamics</h2>
-          <div class="editor-palette__grid editor-palette__grid--wide" role="group" aria-label="Dynamics">
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="dynamic" data-editor-palette-value="pp" aria-pressed="false" title="pianissimo"><span class="editor-palette__glyph"></span><span class="editor-palette__label">pp</span></button>
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="dynamic" data-editor-palette-value="p" aria-pressed="false" title="piano"><span class="editor-palette__glyph"></span><span class="editor-palette__label">p</span></button>
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="dynamic" data-editor-palette-value="mp" aria-pressed="false" title="mezzo-piano"><span class="editor-palette__glyph"></span><span class="editor-palette__label">mp</span></button>
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="dynamic" data-editor-palette-value="mf" aria-pressed="false" title="mezzo-forte"><span class="editor-palette__glyph"></span><span class="editor-palette__label">mf</span></button>
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="dynamic" data-editor-palette-value="f" aria-pressed="false" title="forte"><span class="editor-palette__glyph"></span><span class="editor-palette__label">f</span></button>
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="dynamic" data-editor-palette-value="ff" aria-pressed="false" title="fortissimo"><span class="editor-palette__glyph"></span><span class="editor-palette__label">ff</span></button>
-          </div>
-        </div>
-        <div class="editor-palette__section">
-          <h2 class="editor-palette__heading">Other</h2>
-          <div class="editor-palette__grid" role="group" aria-label="Other marks">
-            <button class="editor-palette__item" type="button" data-editor-palette-mark="fermata" data-editor-palette-value="fermata" aria-pressed="false" title="Fermata"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Fermata</span></button>
-          </div>
+
+        <div class="editor-sidebar__body">
+          <section class="editor-sidebar__panel" id="editor-sidebar-palettes" role="tabpanel" aria-labelledby="editor-sidebar-tab-palettes" data-editor-sidebar-panel="palettes" data-editor-palette>
+            <h2 class="editor-sidebar__title">Palettes</h2>
+            <div class="editor-palette__section">
+              <h3 class="editor-palette__heading">Articulations</h3>
+              <div class="editor-palette__grid" role="group" aria-label="Articulations">
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="articulation" data-editor-palette-value="accent" aria-pressed="false" title="Accent"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Accent</span></button>
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="articulation" data-editor-palette-value="staccato" aria-pressed="false" title="Staccato"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Staccato</span></button>
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="articulation" data-editor-palette-value="tenuto" aria-pressed="false" title="Tenuto"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Tenuto</span></button>
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="articulation" data-editor-palette-value="marcato" aria-pressed="false" title="Marcato"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Marcato</span></button>
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="articulation" data-editor-palette-value="sforzato" aria-pressed="false" title="Sforzato"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Sforzato</span></button>
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="articulation" data-editor-palette-value="staccatissimo" aria-pressed="false" title="Staccatissimo"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Staccatissimo</span></button>
+              </div>
+            </div>
+            <div class="editor-palette__section">
+              <h3 class="editor-palette__heading">Ornaments</h3>
+              <div class="editor-palette__grid" role="group" aria-label="Ornaments">
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="ornament" data-editor-palette-value="trill" aria-pressed="false" title="Trill"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Trill</span></button>
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="ornament" data-editor-palette-value="mordent" aria-pressed="false" title="Mordent"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Mordent</span></button>
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="ornament" data-editor-palette-value="turn" aria-pressed="false" title="Turn"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Turn</span></button>
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="ornament" data-editor-palette-value="turnInverted" aria-pressed="false" title="Inverted turn"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Inverted turn</span></button>
+              </div>
+            </div>
+            <div class="editor-palette__section">
+              <h3 class="editor-palette__heading">Dynamics</h3>
+              <div class="editor-palette__grid editor-palette__grid--wide" role="group" aria-label="Dynamics">
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="dynamic" data-editor-palette-value="pp" aria-pressed="false" title="pianissimo"><span class="editor-palette__glyph"></span><span class="editor-palette__label">pp</span></button>
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="dynamic" data-editor-palette-value="p" aria-pressed="false" title="piano"><span class="editor-palette__glyph"></span><span class="editor-palette__label">p</span></button>
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="dynamic" data-editor-palette-value="mp" aria-pressed="false" title="mezzo-piano"><span class="editor-palette__glyph"></span><span class="editor-palette__label">mp</span></button>
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="dynamic" data-editor-palette-value="mf" aria-pressed="false" title="mezzo-forte"><span class="editor-palette__glyph"></span><span class="editor-palette__label">mf</span></button>
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="dynamic" data-editor-palette-value="f" aria-pressed="false" title="forte"><span class="editor-palette__glyph"></span><span class="editor-palette__label">f</span></button>
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="dynamic" data-editor-palette-value="ff" aria-pressed="false" title="fortissimo"><span class="editor-palette__glyph"></span><span class="editor-palette__label">ff</span></button>
+              </div>
+            </div>
+            <div class="editor-palette__section">
+              <h3 class="editor-palette__heading">Other</h3>
+              <div class="editor-palette__grid" role="group" aria-label="Other marks">
+                <button class="editor-palette__item" type="button" data-editor-palette-mark="fermata" data-editor-palette-value="fermata" aria-pressed="false" title="Fermata"><span class="editor-palette__glyph"></span><span class="editor-palette__label">Fermata</span></button>
+              </div>
+            </div>
+          </section>
+
+          <section class="editor-sidebar__panel" id="editor-sidebar-properties" role="tabpanel" aria-labelledby="editor-sidebar-tab-properties" data-editor-sidebar-panel="properties" hidden>
+            <h2 class="editor-sidebar__title">Properties</h2>
+            <p class="editor-sidebar__empty" data-editor-properties-empty>Select a note to see its properties.</p>
+            <dl class="editor-properties" data-editor-properties hidden>
+              <div class="editor-properties__row"><dt>Pitch</dt><dd data-editor-property="pitch">—</dd></div>
+              <div class="editor-properties__row"><dt>Duration</dt><dd data-editor-property="duration">—</dd></div>
+              <div class="editor-properties__row"><dt>Voice</dt><dd data-editor-property="voice">—</dd></div>
+              <div class="editor-properties__row"><dt>Measure</dt><dd data-editor-property="measure">—</dd></div>
+              <div class="editor-properties__row"><dt>Marks</dt><dd data-editor-property="marks">—</dd></div>
+              <div class="editor-properties__row"><dt>Dynamic</dt><dd data-editor-property="dynamic">—</dd></div>
+            </dl>
+            <p class="editor-sidebar__hint" data-editor-properties-count hidden></p>
+          </section>
+
+          <section class="editor-sidebar__panel" id="editor-sidebar-instruments" role="tabpanel" aria-labelledby="editor-sidebar-tab-instruments" data-editor-sidebar-panel="instruments" hidden>
+            <h2 class="editor-sidebar__title">Instruments</h2>
+            <ul class="editor-instruments" data-editor-instruments role="list"></ul>
+            <p class="editor-sidebar__empty" data-editor-instruments-empty hidden>Open or create a score to see its instruments.</p>
+          </section>
         </div>
       </aside>
       <section class="editor-canvas" data-editor-canvas data-layout="page">
@@ -161,7 +201,7 @@
       </p>
     </main>
 
-    <div class="editor-bottombar" role="toolbar" aria-label="Editor bottom bar — SoundFont, note input, part, voice, score setup, palette and export" data-region="editor-bottom-bar" data-editor-bottom-bar>
+    <div class="editor-bottombar" role="toolbar" aria-label="Editor bottom bar — SoundFont, note input, part, voice, score setup, sidebar and export" data-region="editor-bottom-bar" data-editor-bottom-bar>
       <div class="editor-bottombar__group" role="group" aria-label="SoundFont">
         <select class="editor-bottombar__select" data-editor-soundfont aria-label="SoundFont" title="SoundFont used for playback" disabled>
           <option value="">Loading SoundFonts…</option>
@@ -216,9 +256,9 @@
         </select>
       </div>
       <span class="editor-bottombar__divider" aria-hidden="true"></span>
-      <div class="editor-bottombar__group" role="group" aria-label="Palette">
-        <button class="editor-bottombar__button" type="button" data-editor-palette-toggle aria-label="Palette" title="Palette — articulations, ornaments, dynamics" aria-expanded="false" aria-haspopup="true" aria-pressed="false">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h16" /><circle cx="8" cy="5" r="1.6" /><circle cx="16" cy="12" r="1.6" /><circle cx="10" cy="19" r="1.6" /></svg><span>Palette</span>
+      <div class="editor-bottombar__group" role="group" aria-label="Sidebar">
+        <button class="editor-bottombar__button" type="button" data-editor-sidebar-toggle aria-label="Sidebar" title="Sidebar — palettes, properties, instruments" aria-expanded="true" aria-controls="editor-sidebar" aria-pressed="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z" /><path d="M10 5v14" /></svg><span>Sidebar</span>
         </button>
       </div>
       <span class="editor-bottombar__divider" aria-hidden="true"></span>
@@ -237,12 +277,12 @@
         </div>
       </div>
     </div>
-    <script src="assets/notation-engine.js?v=2a9d8e05680d"></script>
+    <script src="assets/notation-engine.js?v=5f84aaaa1779"></script>
     <script src="assets/sound-engine.js?v=dd4228c1a476"></script>
     <script src="script.js?v=app-lock-20261118"></script>
     <script src="soundfonts-config.js?v=soundfont-config-20261118"></script>
     <script src="notation-doc.js?v=musescore-20261118"></script>
     <script src="notation-newscore.js?v=toolbar-20261124"></script>
-    <script src="notation-editor.js?v=main-toolbar-20261118"></script>
+    <script src="notation-editor.js?v=sidebar-dock-20261118"></script>
   </body>
 </html>

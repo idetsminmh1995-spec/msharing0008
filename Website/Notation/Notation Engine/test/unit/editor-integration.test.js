@@ -627,4 +627,126 @@ describe('the editor and the engine agree, end to end', () => {
     click();
     assert.equal(status(), 'Note selected.');
   });
+
+  describe('the sidebar dock', () => {
+    /** The editor page, with the click helpers the selection tests use. */
+    function openEditor() {
+      const { window, errors } = loadEditorPage();
+      window.DOMPoint = class {
+        constructor(x = 0, y = 0) { this.x = x; this.y = y; }
+        matrixTransform() { return new window.DOMPoint(this.x, this.y); }
+      };
+      window.SVGElement.prototype.getScreenCTM = () => ({
+        a: 1, b: 0, c: 0, d: 1, e: 0, f: 0, inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+      });
+      window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 100, height: 100 });
+      return { window, doc: window.document, errors };
+    }
+
+    const visible = (node) => Boolean(node) && !node.hidden;
+    const shownPanel = (doc) => [...doc.querySelectorAll('[data-editor-sidebar-panel]')]
+      .filter(visible)
+      .map((panel) => panel.dataset.editorSidebarPanel);
+
+    test('it opens on Palettes, beside the score', () => {
+      const { doc, errors } = openEditor();
+      assert.deepEqual(errors, [], 'the page must start without a script error');
+
+      const sidebar = doc.querySelector('[data-editor-sidebar]');
+      assert.ok(sidebar, 'the editor has no sidebar');
+      assert.equal(sidebar.hidden, false, 'the dock is the default and must start open');
+      assert.deepEqual(shownPanel(doc), ['palettes'], 'exactly one panel shows at a time');
+
+      const tabs = [...doc.querySelectorAll('[data-editor-sidebar-tab]')];
+      assert.deepEqual(
+        tabs.map((tab) => tab.dataset.editorSidebarTab),
+        ['palettes', 'properties', 'instruments'],
+      );
+      assert.equal(tabs[0].getAttribute('aria-selected'), 'true');
+      // A tab must name the panel it controls, or a screen reader announces
+      // a panel that is not the one on screen.
+      for (const tab of tabs) {
+        const panel = doc.querySelector(`[data-editor-sidebar-panel="${tab.dataset.editorSidebarTab}"]`);
+        assert.equal(tab.getAttribute('aria-controls'), panel.id);
+        assert.equal(panel.getAttribute('aria-labelledby'), tab.id);
+      }
+    });
+
+    test('a tab switches panels, and the toggle closes and reopens the dock', () => {
+      const { doc, window } = openEditor();
+      const click = (node) => node.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+
+      click(doc.querySelector('[data-editor-sidebar-tab="instruments"]'));
+      assert.deepEqual(shownPanel(doc), ['instruments']);
+      click(doc.querySelector('[data-editor-sidebar-tab="properties"]'));
+      assert.deepEqual(shownPanel(doc), ['properties']);
+
+      const toggle = doc.querySelector('[data-editor-sidebar-toggle]');
+      const sidebar = doc.querySelector('[data-editor-sidebar]');
+      click(toggle);
+      assert.equal(sidebar.hidden, true, 'the toggle closes the dock');
+      assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+      click(toggle);
+      assert.equal(sidebar.hidden, false, 'and opens it again');
+      assert.deepEqual(shownPanel(doc), ['properties'], 'the dock remembers its last panel');
+    });
+
+    test('the rail is keyboard-navigable with the arrow keys', () => {
+      const { doc, window } = openEditor();
+      const tabs = [...doc.querySelectorAll('[data-editor-sidebar-tab]')];
+      const press = (tab, key) => tab.dispatchEvent(new window.KeyboardEvent('keydown', { key, bubbles: true }));
+
+      // Roving tabindex: only the selected tab is a stop in the tab order.
+      assert.deepEqual(tabs.map((tab) => tab.tabIndex), [0, -1, -1]);
+      press(tabs[0], 'ArrowDown');
+      assert.deepEqual(shownPanel(doc), ['properties']);
+      assert.deepEqual(tabs.map((tab) => tab.tabIndex), [-1, 0, -1]);
+      press(tabs[1], 'ArrowDown');
+      assert.deepEqual(shownPanel(doc), ['instruments']);
+      // The last tab wraps back to the first, and up from there wraps again.
+      press(tabs[2], 'ArrowDown');
+      assert.deepEqual(shownPanel(doc), ['palettes']);
+      press(tabs[0], 'ArrowUp');
+      assert.deepEqual(shownPanel(doc), ['instruments']);
+    });
+
+    test('Properties reads the selected note, and says so when nothing is selected', () => {
+      const { doc, window } = openEditor();
+      const click = (node) => node.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      const staffClick = () => doc.querySelector('[data-editor-score]')
+        .dispatchEvent(new window.PointerEvent('pointerdown', { clientX: 5, clientY: 9, bubbles: true }));
+      const read = () => Object.fromEntries(
+        [...doc.querySelectorAll('[data-editor-property]')]
+          .map((node) => [node.dataset.editorProperty, node.textContent]),
+      );
+
+      click(doc.querySelector('[data-editor-sidebar-tab="properties"]'));
+      assert.equal(doc.querySelector('[data-editor-properties]').hidden, true, 'an empty selection hides the readout');
+      assert.equal(doc.querySelector('[data-editor-properties-empty]').hidden, false);
+
+      // A staff click in note input writes; selecting needs input off.
+      staffClick();
+      click(doc.querySelector('[data-editor-note-input]'));
+      staffClick();
+
+      assert.equal(doc.querySelector('[data-editor-properties]').hidden, false);
+      assert.equal(doc.querySelector('[data-editor-properties-empty]').hidden, true);
+      const values = read();
+      assert.equal(values.measure, '1');
+      assert.equal(values.duration, 'Quarter');
+      assert.equal(values.voice, '1');
+      assert.match(values.pitch, /^[A-G]/);
+    });
+
+    test('Instruments lists the score\'s parts and marks the one being written into', () => {
+      const { doc, window } = openEditor();
+      doc.querySelector('[data-editor-sidebar-tab="instruments"]')
+        .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+
+      const items = [...doc.querySelectorAll('[data-editor-instrument]')];
+      assert.deepEqual(items.map((item) => item.textContent.trim()), ['Music']);
+      assert.equal(items[0].getAttribute('aria-current'), 'true');
+      assert.equal(doc.querySelector('[data-editor-instruments-empty]').hidden, true);
+    });
+  });
 });
