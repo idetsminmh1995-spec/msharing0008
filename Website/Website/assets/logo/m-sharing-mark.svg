@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 120 120" role="img" aria-label="M Sharing">
+  <rect width="120" height="120" rx="24" fill="#080d16"/>
+  <g transform="translate(-3,0)">
+    <path d="M25 28h28l10 24 10-24h28v64H77V58L63 88 49 58v34H25z" fill="#f20d3d"/>
+  </g>
+</svg>

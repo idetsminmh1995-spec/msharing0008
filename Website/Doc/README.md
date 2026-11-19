@@ -10,6 +10,7 @@ M Sharing Website ၏ လက်ရှိ implementation နှင့် မပ�
 - [Create Video Page](Create-Video-Page.md) — Web/phone responsive instrument နှင့် Metronome tool selection page
 - [Notation Lab Page](Notation-Lab-Page.md) — Open File / Create / Scan entry page and Editor handoff
 - [Notation Lab Editor — Fixed Toolbar and Score Workspace](Notation-Lab-Editor-Toolbar-2026-11-18.md) — Editor ရဲ့ sticky secondary toolbar၊ tool groups၊ entry handoff နှင့် responsive behaviour
+- [Notation Lab Editor — Sidebar Dock, Properties and Instruments](Notation-Lab-Editor-Sidebar-Dock-2026-11-18.md) — Sidebar dock (panel ၃ ခု)၊ Properties readout၊ Instruments list နှင့် page-mode sheet layout
 - [Notation Lab UI/UX Plan](../Plan/Notation-Lab-UI-UX-Plan.md) — Active entry-screen and Editor handoff plan
 - [Notation Lab Editor Architecture](Notation-Lab-Editor-Architecture-2026-11-15.md) — Current code audit, original workspace design, feature matrix, and M1–M6 implementation roadmap
 - [Notation Lab Composer Work Log](Notation-Lab-Composer-Work-Log-2026-11-15.md) — Historical record; composer-first UI was retired

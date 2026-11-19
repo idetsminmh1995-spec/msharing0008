@@ -27,7 +27,7 @@ TypeScript ဖြင့်ရေးသားထားသော **instrument-neut
 - Layers: `config core debug drums export geometry glyphs layout notation-defaults parser playback plugins render soundfont theme timing` + `render-from-musicxml.ts`။
 - Data provenance: `src/notation-defaults/` ထဲက table တစ်ခုချင်းက `DefaultsSource` (`musicxml`, `smufl`, `gm1`, `drumNotation`, `houseStyle`) ဖြင့် ရင်းမြစ်ကို ဖော်ပြထားသည်။
 - Bundle: esbuild IIFE၊ global `NotationEngine` / `NotationSoundFont`။ `scripts/sync-website-bundle.mjs` က bundle ကို `Website/Website/assets/` သို့ကူးသည်။
-- Verify: `npm run verify` (typecheck + lint + format:check + build + API doc + fixture matrix + tests) သည် **1286/1286 pass**။
+- Verify: `npm run verify` (typecheck + lint + format:check + build + API doc + fixture matrix + tests) သည် **1341/1341 pass**။
 
 ---
 
@@ -262,6 +262,36 @@ Editor တွင် note ရေးခြင်း လုပ်ဆောင်ခ
 ---
 
 ## သမိုင်းမှတ်တမ်း (အကိုးအကား)
+
+### Page sheets and vertical justification (Part F) — 2026-11-18
+
+Page mode သည် စာမျက်နှာ တစ်ခုချင်းကို အစပ်လိုက် ဆွဲထားသဖြင့် စာမျက်နှာ
+များစွာပါ score က တစ်တန်းရှည်ကြီးလို ဖတ်ရပြီး၊ စာမျက်နှာတစ်ခုစီ၏
+system များက အပေါ်ဘက်တွင် စုပြီး အောက်တွင် လွတ်နေသည်။ Engine တွင်
+option နှစ်ခု ထည့်ပြီး editor ကို ချိတ်ထားသည်။
+
+- [x] `page.gapBetweenPages` — sheet နှစ်ခုကြား ကွက်လပ် (staff space ယူနစ်)။
+      သုည (default) ဆိုလျှင် ယခင် အတိုင်း ကပ်နေပြီး render က byte-identical။
+- [x] ကွက်လပ် ရှိလျှင် နောက်ခံကို sheet တစ်ခုချင်း `rect` ဖြင့် ဆွဲသည်
+      (`data-page` attribute ပါ)၊ canvas နောက်ခံကို `none` ထားသည်။
+      မဟုတ်လျှင် ကွက်လပ်က page အရောင်နှင့် ပြည့်သွားပြီး အက်ကွဲမှု
+      မမြင်ရ။
+- [x] `page.verticalJustify` — စာမျက်နှာတစ်ခု၏ ပိုလျှံ height ကို system
+      များကြား ခွဲပေးသဖြင့် နောက်ဆုံး system က အောက်ဘက် margin ပေါ်
+      ကျသည်။ System တစ်ခုတည်း ပါသော စာမျက်နှာကို မထိပါ။
+- [x] Layout က geometry ကို ပိုင်ဆိုင်သည်: `PageSystem.y` (စာမျက်နှာ၏
+      အပေါ်မှ တိုင်း) နှင့် `Page.top` (stack ထဲတွင် စာမျက်နှာ၏ အပေါ်)။
+      Renderer က ထို တန်ဖိုးများကို ဖတ်သဖြင့် ဆွဲထားသည့်နေရာနှင့်
+      placement API ကွဲလွဲနိုင်မည် မဟုတ်။
+- [x] `PageLayout.totalHeight` က ကွက်လပ်များ ပါသည် (နောက်ဆုံး ကွက်လပ်
+      မပါ)။
+- [x] Test: `page-layout.test.js` (spread, gap, totalHeight, single-system
+      no-op) နှင့် `page-layout-wiring.test.js` (SVG ထဲ `rect[data-page]`
+      နှင့် နောက်ခံ)။
+- [x] Editor က `gapBetweenPages: 3`, `verticalJustify: true` ဖြင့် ခေါ်သည်
+      (`notation-editor.js` `render()`)။
+- [x] `npm run verify` = **1341/1341 pass**; browser တွင် page mode ၏
+      viewBox `0 0 30 42` နှင့် `rect[data-page="0"]` အတည်ပြု။
 
 ### Part J decision — soundfont asset ownership, deferred behind a sound-check — 2026-11-18
 

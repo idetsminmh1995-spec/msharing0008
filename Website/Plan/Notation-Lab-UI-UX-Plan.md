@@ -42,4 +42,12 @@ The entry page is complete as the first UI milestone. The editor will now follow
 
 The editor route now carries the shared site header plus a sticky secondary toolbar and a score workspace (see [Notation Lab Editor — Fixed Toolbar and Score Workspace](../Doc/Notation-Lab-Editor-Toolbar-2026-11-18.md)). Open, create, zoom, layout, playback, and export are live.
 
-The remaining editor work is note entry: the canonical ScoreDocument, the command/history system, the selection model, and the renderer adapter. The toolbar already reserves Undo/Redo and note-value controls for that milestone.
+Note entry, the selection model and undo/redo history have since shipped (Part K in `Notation/Notation Plan/PLAN.md`), and the score workspace now has a three-panel sidebar dock — Palettes, Properties, Instruments — beside the score (see [Sidebar Dock, Properties and Instruments](../Doc/Notation-Lab-Editor-Sidebar-Dock-2026-11-18.md)).
+
+## Next editor milestone
+
+1. **Editable Properties.** The Properties panel reads the selected note today. Making its values write back (pitch, duration, voice) turns it into the inspector a notation program has, and reuses the existing `commit()` command path.
+2. **Page / Horizontal view switch.** `state.layout` exists and both modes render, but the toolbar carries no button for it yet.
+3. **Session persistence.** The dock's open/closed state and the last panel are not remembered across a reload; the score library already is (`localStorage`).
+
+Scan remains intentionally unavailable.

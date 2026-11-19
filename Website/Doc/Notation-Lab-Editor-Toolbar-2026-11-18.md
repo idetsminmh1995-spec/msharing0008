@@ -45,11 +45,14 @@ file operations, then history, then zoom and view, then transport.
 | Playback | Rewind, Play/Pause, Metronome, tempo readout |
 
 Bottom bar: note input (N), Add / Remove measure, note duration and dot and
-rest, accidentals, Part, Voice, score setup (Clef, Key, Time), Palette,
+rest, accidentals, Part, Voice, score setup (Clef, Key, Time), Sidebar,
 SoundFont picker, Hear, Test, Score, Export (PDF/SVG/PNG). The editing tools
 that act on the note you are about to write live here, next to the SoundFont
 controls, so the header bar stays the short row of file and transport commands
 MuseScore shows.
+
+The bottom bar's last panel button is the **Sidebar** toggle, which opens the
+dock described in [Sidebar Dock, Properties and Instruments](Notation-Lab-Editor-Sidebar-Dock-2026-11-18.md).
 
 Keyboard shortcuts: `Ctrl+S` save, `Ctrl+Z`/`Ctrl+Y` undo/redo, `Ctrl+±` zoom,
 `Space` play/pause, `M` metronome, `N` note input, `.` dot, `0`/`R` rest,
@@ -96,4 +99,9 @@ a toolbar dropdown; **Print** calls the browser's own print dialog.
 
 ## Not in this milestone
 
-Note entry (တကယ် note ရေးခြင်း/ရွှေ့ခြင်း), undo/redo history, selection model, playback cursor, နှင့် MXL save တို့သည် နောက်အဆင့်များ ဖြစ်သည်။ Toolbar ရှိ Undo/Redo ခလုတ်များသည် ထိုအဆင့် အတွက် နေရာ ချန်ထားသည်။
+This document records the toolbar milestone only. Note entry, the selection
+model, undo/redo history and the playback cursor shipped afterwards (see
+Part K in `Notation/Notation Plan/PLAN.md`), and the sidebar dock followed
+(see [Sidebar Dock, Properties and Instruments](Notation-Lab-Editor-Sidebar-Dock-2026-11-18.md)).
+Still open: MXL save, and the Page / Horizontal view switch this table lists
+but the toolbar does not carry yet.
