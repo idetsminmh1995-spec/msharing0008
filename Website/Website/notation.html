@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="Open, create, or scan a music score in Notation Lab." />
     <title>Notation Lab — M Sharing</title>
-    <link rel="stylesheet" href="styles.css?v=editor-toolbar-20261118" />
+    <link rel="stylesheet" href="styles.css?v=toolbar-20261124" />
   </head>
   <body>
     <header class="site-header" data-region="main-header" data-header aria-label="Main header">
@@ -54,7 +54,45 @@
       </section>
       <p class="notation-entry__feedback" data-notation-feedback role="status" aria-live="polite" hidden></p>
     </main>
+    <div class="newscore" data-newscore hidden>
+      <button class="newscore__backdrop" type="button" data-newscore-dismiss aria-label="Close new score setup"></button>
+      <div class="newscore__panel" role="dialog" aria-modal="true" aria-labelledby="newscore-title" data-newscore-panel>
+        <header class="newscore__head">
+          <p class="newscore__eyebrow">NEW SCORE</p>
+          <h2 id="newscore-title" data-newscore-heading>Choose instruments</h2>
+          <button class="icon-button newscore__close" type="button" data-newscore-dismiss aria-label="Close new score setup"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
+        </header>
+        <p class="newscore__status" data-newscore-status role="status" aria-live="polite" hidden></p>
+        <div class="newscore__step" data-newscore-step="instruments">
+          <p class="newscore__hint">Pick the instruments you want to write for. You can change everything later.</p>
+          <div class="newscore__groups" data-newscore-groups></div>
+        </div>
+        <div class="newscore__step" data-newscore-step="setup" hidden>
+          <p class="newscore__hint">Set the basics. These become the score's first measure.</p>
+          <div class="newscore__fields">
+            <label class="newscore__field"><span>Title</span><input type="text" maxlength="80" placeholder="Untitled score" data-newscore-title-input /></label>
+            <label class="newscore__field"><span>Composer</span><input type="text" maxlength="80" placeholder="Optional" data-newscore-composer-input /></label>
+            <label class="newscore__field"><span>Key</span><select data-newscore-key></select></label>
+            <label class="newscore__field"><span>Time signature</span><select data-newscore-time></select></label>
+            <label class="newscore__field"><span>Tempo (BPM)</span><input type="number" min="20" max="300" step="1" value="120" data-newscore-tempo /></label>
+            <label class="newscore__field"><span>Measures</span><input type="number" min="1" max="64" step="1" value="4" data-newscore-measures /></label>
+          </div>
+          <div class="newscore__preview" data-newscore-preview aria-live="polite"></div>
+        </div>
+        <div class="newscore__step" data-newscore-step="review" hidden>
+          <p class="newscore__hint">Ready. The editor opens with this score and note input already on.</p>
+          <dl class="newscore__summary" data-newscore-summary></dl>
+        </div>
+        <footer class="newscore__foot">
+          <button class="newscore__button newscore__button--ghost" type="button" data-newscore-back hidden>Back</button>
+          <span class="newscore__spacer"></span>
+          <button class="newscore__button newscore__button--ghost" type="button" data-newscore-dismiss>Cancel</button>
+          <button class="newscore__button" type="button" data-newscore-next>Continue</button>
+        </footer>
+      </div>
+    </div>
     <script src="script.js?v=app-lock-20261118"></script>
-    <script src="notation-entry.js?v=entry-flow-20261115"></script>
+    <script src="notation-newscore.js?v=toolbar-20261124"></script>
+    <script src="notation-entry.js?v=entry-flow-20261120"></script>
   </body>
 </html>

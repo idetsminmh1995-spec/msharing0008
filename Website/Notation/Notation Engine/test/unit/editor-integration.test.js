@@ -80,7 +80,7 @@ function loadEditorPage({ url = 'https://example.test/notation-editor.html?inten
   });
   const { window } = dom;
   const context = dom.getInternalVMContext();
-  for (const rel of ['assets/notation-engine.js', 'notation-doc.js', 'notation-editor.js']) {
+  for (const rel of ['assets/notation-engine.js', 'notation-doc.js', 'notation-newscore.js', 'notation-editor.js']) {
     vm.runInContext(fs.readFileSync(path.join(appDir, rel), 'utf8'), context, { filename: rel });
   }
   return { window, errors };

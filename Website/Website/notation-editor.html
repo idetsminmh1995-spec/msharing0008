@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="Write and edit a music score in the Notation Lab editor." />
     <title>Notation Lab Editor — M Sharing</title>
-    <link rel="stylesheet" href="styles.css?v=editor-account2-20261118" />
+    <link rel="stylesheet" href="styles.css?v=toolbar-20261124" />
   </head>
   <body class="editor-page">
 <header class="site-header" data-region="main-header" data-header aria-label="Main header">
@@ -56,6 +56,7 @@
         <button class="editor-tool" type="button" data-editor-duration="quarter" aria-label="Quarter note" title="Quarter note (3)" aria-pressed="true"><span class="editor-tool__glyph">&#x1D15F;</span></button>
         <button class="editor-tool" type="button" data-editor-duration="eighth" aria-label="Eighth note" title="Eighth note (4)" aria-pressed="false"><span class="editor-tool__glyph">&#x1D160;</span></button>
         <button class="editor-tool" type="button" data-editor-duration="16th" aria-label="Sixteenth note" title="Sixteenth note (5)" aria-pressed="false"><span class="editor-tool__glyph">&#x1D161;</span></button>
+        <button class="editor-tool" type="button" data-editor-duration="32nd" aria-label="Thirty-second note" title="Thirty-second note (6)" aria-pressed="false"><span class="editor-tool__glyph">&#x1D162;</span></button>
         <button class="editor-tool" type="button" data-editor-dot aria-label="Toggle dot" title="Augmentation dot (.)" aria-pressed="false"><span class="editor-tool__glyph">&#x1D16D;</span></button>
         <button class="editor-tool" type="button" data-editor-rest aria-label="Insert rest" title="Rest (0)" aria-pressed="false"><span class="editor-tool__glyph">&#x1D13D;</span></button>
       </div>
@@ -64,6 +65,10 @@
         <button class="editor-tool" type="button" data-editor-accidental="sharp" aria-label="Sharp" title="Sharp" aria-pressed="false"><span class="editor-tool__glyph">&#x266F;</span></button>
         <button class="editor-tool" type="button" data-editor-accidental="flat" aria-label="Flat" title="Flat" aria-pressed="false"><span class="editor-tool__glyph">&#x266D;</span></button>
         <button class="editor-tool" type="button" data-editor-accidental="natural" aria-label="Natural" title="Natural" aria-pressed="false"><span class="editor-tool__glyph">&#x266E;</span></button>
+      </div>
+      <span class="editor-toolbar__divider" aria-hidden="true"></span>
+      <div class="editor-toolbar__group" role="group" aria-label="Part">
+        <select class="editor-toolbar__select" data-editor-part aria-label="Part" title="Which instrument you are writing into"></select>
       </div>
       <span class="editor-toolbar__divider" aria-hidden="true"></span>
       <div class="editor-toolbar__group" role="group" aria-label="Score setup">
@@ -86,6 +91,12 @@
         </select>
       </div>
       <span class="editor-toolbar__divider" aria-hidden="true"></span>
+      <div class="editor-toolbar__group" role="group" aria-label="Playback">
+        <button class="editor-tool editor-tool--play" type="button" data-editor-play aria-label="Play" title="Play / Pause (Space)" aria-pressed="false" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14l12-7z" /></svg></button>
+        <button class="editor-tool" type="button" data-editor-metronome aria-label="Metronome" title="Metronome (M)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l3 18H6L9 3Z" /><path d="M12 19V8" /><path d="M12 8l4-3" /></svg></button>
+        <span class="editor-toolbar__output editor-toolbar__output--tempo" data-editor-tempo aria-label="Tempo" title="Tempo">&#9833;=120</span>
+      </div>
+      <span class="editor-toolbar__divider" aria-hidden="true"></span>
       <div class="editor-toolbar__group" role="group" aria-label="View">
         <button class="editor-tool" type="button" data-editor-zoom-out aria-label="Zoom out" title="Zoom out (Ctrl+-)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /></svg></button>
         <span class="editor-toolbar__output" data-editor-zoom>100%</span>
@@ -103,17 +114,7 @@
       </p>
     </main>
 
-    <div class="editor-bottombar" role="toolbar" aria-label="Editor bottom bar — playback, view, save and export" data-region="editor-bottom-bar" data-editor-bottom-bar>
-      <div class="editor-bottombar__group editor-bottombar__group--transport" role="group" aria-label="Playback">
-        <button class="editor-bottombar__button editor-bottombar__button--play" type="button" data-editor-play aria-label="Play" title="Play / Pause (Space)" aria-pressed="false" disabled>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14l12-7z" /></svg>
-        </button>
-        <button class="editor-bottombar__button" type="button" data-editor-metronome aria-label="Metronome" title="Metronome" aria-pressed="false">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l3 18H6L9 3Z" /><path d="M12 19V8" /><path d="M12 8l4-3" /></svg>
-        </button>
-        <span class="editor-bottombar__readout" data-editor-tempo aria-label="Tempo" title="Tempo">&#9833;=120</span>
-      </div>
-      <span class="editor-bottombar__divider" aria-hidden="true"></span>
+    <div class="editor-bottombar" role="toolbar" aria-label="Editor bottom bar — SoundFont, view, save and export" data-region="editor-bottom-bar" data-editor-bottom-bar>
       <div class="editor-bottombar__group" role="group" aria-label="SoundFont">
         <select class="editor-bottombar__select" data-editor-soundfont aria-label="SoundFont" title="SoundFont used for playback" disabled>
           <option value="">Loading SoundFonts…</option>
@@ -169,6 +170,7 @@
     <script src="script.js?v=app-lock-20261118"></script>
     <script src="soundfonts-config.js?v=soundfont-config-20261118"></script>
     <script src="notation-doc.js?v=editor-semantic-20261118"></script>
-    <script src="notation-editor.js?v=editor-write-20261118"></script>
+    <script src="notation-newscore.js?v=toolbar-20261124"></script>
+    <script src="notation-editor.js?v=toolbar-20261124"></script>
   </body>
 </html>

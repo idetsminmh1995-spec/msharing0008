@@ -25,18 +25,31 @@ Header Bar အောက်တွင် တိုက်ရိုက် ကပ်�
 
 ## Toolbar groups
 
+The main toolbar follows MuseScore's order and its visual language: one flat
+row of square icon buttons separated by hairlines, and a filled accent for the
+tools that are currently ON. MuseScore keeps transport in the main toolbar
+rather than in a status bar, so Play, metronome and the tempo readout live
+here too; the bottom bar keeps only the things that are about the file and the
+page (SoundFont, view, Save, Export).
+
 | Group | Tools |
 |---|---|
-| File | Open, New, Save (MusicXML) |
-| History | Undo, Redo (disabled until note entry lands) |
-| Note duration | Whole, Half, Quarter, Eighth, Sixteenth, Dot, Rest |
+| Navigation | Back to Notation Lab |
+| History | Undo, Redo |
+| Note input | Note input (N), Add measure, Remove last measure |
+| Note duration | Whole, Half, Quarter, Eighth, Sixteenth, Thirty-second, Dot, Rest |
 | Accidentals | Sharp, Flat, Natural |
+| Part | Which instrument you are writing into (hidden for a single-part score) |
 | Score setup | Clef, Key signature, Time signature |
-| Playback | Play/Pause, tempo display |
-| View | Page / Horizontal view, Zoom −, Zoom + |
-| Export | PDF, SVG, PNG |
+| Playback | Play/Pause, Metronome, tempo readout |
+| View | Zoom −, zoom readout, Zoom + |
 
-Keyboard shortcuts: `Ctrl+O` open, `Ctrl+S` save, `Ctrl+±` zoom, `Space` play/pause, `1`–`5` note values.
+Bottom bar: SoundFont picker, Hear, Test, Score, Page/Horizontal view, Save,
+Export (PDF/SVG/PNG).
+
+Keyboard shortcuts: `Ctrl+S` save, `Ctrl+Z`/`Ctrl+Y` undo/redo, `Ctrl+±` zoom,
+`Space` play/pause, `M` metronome, `N` note input, `.` dot, `0`/`R` rest,
+`1`–`6` note values.
 
 ## Behaviour
 
@@ -52,6 +65,18 @@ Keyboard shortcuts: `Ctrl+O` open, `Ctrl+S` save, `Ctrl+±` zoom, `Space` play/p
 - `Website/Website/notation-editor.html` — Header Bar + sticky toolbar + workspace (Header Bar သည် အခြား page များနှင့် တူညီသည်)
 - `Website/Website/notation-editor.js` — render, zoom, layout, playback, export, toolbar state, entry handoff
 - `Website/Website/styles.css` — `@font-face` နှင့် `.editor-*` styles
+
+## Verification (headless Chromium, 2026-11-24)
+
+- Toolbar is a single flat row; active tools (note value, accidental, dot,
+  rest, note input, metronome, Play) render with the filled accent.
+- Transport moved out of the bottom bar: `data-editor-play`,
+  `data-editor-metronome` and `data-editor-tempo` now resolve inside
+  `[data-editor-toolbar]`, and the bottom bar no longer duplicates them.
+- Thirty-second note (`6`) selects and announces; `M` toggles the metronome.
+- A one-instrument score hides the Part group and its divider; a two-part
+  score shows the selector listing both instruments.
+- `npm run verify` green: 1320 tests pass, lint and format clean.
 
 ## Verification (headless Chromium, 2026-11-18)
 

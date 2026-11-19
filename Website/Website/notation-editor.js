@@ -32,6 +32,7 @@
   const clefSelect = pick('[data-editor-clef]');
   const keySelect = pick('[data-editor-key]');
   const timeSelect = pick('[data-editor-time]');
+  const partSelect = pick('[data-editor-part]');
   const tempoOutput = pick('[data-editor-tempo]');
   const exportPdf = pick('[data-editor-export-pdf]');
   const exportSvg = pick('[data-editor-export-svg]');
@@ -66,6 +67,9 @@
     layout: 'page',
     tool: { duration: 'quarter', dots: 0, rest: false, accidental: null },
     noteInput: true,
+    activePartId: null,
+    drumInstruments: null,
+    tempoMarks: null,
     selection: null,
     entry: null,
     history: [],
@@ -170,7 +174,26 @@
 
   // ---- musical helpers ---------------------------------------------------
 
-  const activePartId = () => state.doc?.score.parts[0]?.id ?? 'P1';
+  /**
+   * The part being written into. A wizard score can hold several -- piano
+   * plus drums, say -- and every edit command takes a part id, so the
+   * editor writes into the one the user is looking at rather than always
+   * the first. Defaults to part 1, which is all a single-instrument score
+   * has.
+   */
+  const activePartId = () => state.activePartId ?? state.doc?.score.parts[0]?.id ?? 'P1';
+
+  const partById = (partId) => state.doc?.score.parts.find((part) => part.id === partId) ?? null;
+  const measureCountOf = (partId) => partById(partId)?.measures.length ?? 1;
+  const partNameOf = (partId) => partById(partId)?.name ?? 'this part';
+
+  /** True when the active part is a drum kit: its notes are unpitched and
+   *  each one names the drum it is played on. */
+  const activePartIsPercussion = () => {
+    const attribute = attributeAt(1);
+    const sign = attribute?.clefsByStaff?.[1]?.sign ?? attribute?.clefSign;
+    return sign === 'percussion';
+  };
 
   const attributeAt = (measureNumber) => docTools.attributeFor(state.doc, activePartId(), measureNumber);
 
@@ -193,7 +216,7 @@
     state.tool.accidental === null ? null : ACCIDENTAL_ALTER[state.tool.accidental];
 
   const eventsIn = (measureNumber, voiceId = 1) => {
-    const measure = state.doc?.score.parts[0]?.measures.find((m) => m.number === measureNumber);
+    const measure = partById(activePartId())?.measures.find((m) => m.number === measureNumber);
     return measure?.voices.find((voice) => voice.id === voiceId)?.events ?? [];
   };
 
@@ -409,6 +432,7 @@
       applyOverlays(imported, detectStaves(imported));
       setControlsEnabled(true);
       syncHistory();
+      syncPartSelect();
       updateZoom();
       refreshTempo();
       const errors = (result.diagnostics || []).filter((item) => item.severity === 'error');
@@ -427,6 +451,9 @@
     state.doc = null;
     state.result = null;
     state.filename = '';
+    state.activePartId = null;
+    state.drumInstruments = null;
+    state.tempoMarks = null;
     state.selection = null;
     state.entry = null;
     state.history.length = 0;
@@ -435,8 +462,44 @@
     scoreHost.replaceChildren();
     setControlsEnabled(false);
     syncHistory();
+    syncPartSelect();
     setFile('');
     if (message) announce(message);
+  }
+
+  /**
+   * The drum kits in this score, keyed by part, for writing into them.
+   *
+   * A kit part names its drums through `<midi-instrument><midi-unpitched>`,
+   * which the parser exposes as `midiInstrumentsByPart`. Each GM key then
+   * has a staff line and notehead in the engine's own kit table. Building
+   * the map here means the editor knows which line the user clicked
+   * without a second copy of the kit living in the website.
+   */
+  function collectDrumInstruments(parsed) {
+    const byPart = new Map();
+    const table = engine.DEFAULT_DRUM_MAPPING_TABLE;
+    if (!table) return byPart;
+    for (const part of parsed.score.parts) {
+      const gmNotes = parsed.midiInstrumentsByPart?.get(part.id);
+      if (!gmNotes || gmNotes.size === 0) continue;
+      const kit = new Map();
+      for (const [instrumentId, gmNote] of gmNotes) {
+        const entry = table[gmNote];
+        if (!entry) continue;
+        const { step, octave } = docTools.pitchFromStaffPosition(engine.PERCUSSION_CLEF, entry.staffPosition);
+        kit.set(`${step}${octave}`, {
+          instrumentId,
+          gmNote,
+          staffPosition: entry.staffPosition,
+          displayStep: step,
+          displayOctave: octave,
+          name: entry.name,
+        });
+      }
+      if (kit.size > 0) byPart.set(part.id, kit);
+    }
+    return byPart;
   }
 
   function loadXml(xml, name) {
@@ -445,6 +508,8 @@
     if (errors.length && parsed.score.parts.every((part) => part.measures.length === 0)) {
       throw new Error(errors[0]?.message || 'The score could not be read.');
     }
+    state.drumInstruments = collectDrumInstruments(parsed);
+    state.tempoMarks = parsed.tempoMarks ?? null;
     // Pad every measure out to its own meter before editing. The renderer
     // takes a measure's drawn width from the span its events cover, so a
     // bar written as a lone quarter note would render a quarter wide and
@@ -454,6 +519,7 @@
       parsed,
     );
     state.doc = padded;
+    state.activePartId = padded.score.parts[0]?.id ?? 'P1';
     state.filename = name;
     state.history.length = 0;
     state.future.length = 0;
@@ -580,8 +646,14 @@
     render();
   }
 
-  /** Writes a note, rest, or chord member at the entry cursor and rolls the cursor forward. */
-  function insertAtEntry({ step = null, octave = null, rest = false, addToChord = false }) {
+  /**
+   * Writes a note, rest, or chord member at the entry cursor and rolls the
+   * cursor forward.
+   *
+   * `staffPosition` is the clicked line, which a drum kit needs: its notes
+   * are unpitched, so the line the user clicked is what names the drum.
+   */
+  function insertAtEntry({ step = null, octave = null, rest = false, addToChord = false, staffPosition = null }) {
     if (!state.doc) return;
     if (!state.entry) {
       state.entry = { partId: activePartId(), measureNumber: 1, voiceId: 1, tick: 0, systemIndex: 0 };
@@ -604,6 +676,32 @@
     if (rest) {
       const event = engine.rest({ duration: fitted, voice: voiceId, staff: 1, startTick: state.entry.tick });
       commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event }), 'Rest inserted.');
+      advanceEntry(ticks, measureNumber, voiceId);
+      return;
+    }
+
+    // A kit part has no pitches: the clicked line names a drum instead.
+    const drumPitch = drumPitchFor(staffPosition);
+    if (drumPitch && !rest) {
+      const drum = drumFor(drumPitch);
+      const events = eventsIn(measureNumber, voiceId);
+      const existingIndex = events.findIndex((event) => (event.startTick ?? 0) === state.entry.tick);
+      const existing = existingIndex >= 0 ? events[existingIndex] : null;
+      const note = engine.note({
+        pitch: drumPitch,
+        duration: existing && existing.kind !== 'rest' ? existing.duration : fitted,
+        voice: voiceId,
+        staff: 1,
+        ...(drum ? { instrumentId: drum.instrumentId } : {}),
+      });
+      if (existing && existing.kind !== 'rest') {
+        commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: note }), `Replaced with ${drum?.name ?? 'drum'}.`);
+        previewPitch(drumPitch, drum);
+        render();
+        return;
+      }
+      commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event: note }), `Inserted ${drum?.name ?? 'drum'}.`);
+      previewPitch(drumPitch, drum);
       advanceEntry(ticks, measureNumber, voiceId);
       return;
     }
@@ -640,6 +738,33 @@
     advanceEntry(ticks, measureNumber, voiceId);
   }
 
+  /**
+   * The drum a staff position means, for a kit part.
+   *
+   * A kit's notes are `<unpitched>` and each one names the drum it is
+   * played on; a note with no instrument is silent. The drum map is what
+   * says which line is which drum, so the click's staff position is looked
+   * up there rather than converted to a pitch.
+   */
+  function drumFor(pitch) {
+    if (pitch.kind !== 'unpitched' || !activePartIsPercussion()) return null;
+    const partId = activePartId();
+    const key = `${pitch.displayStep}${pitch.displayOctave}`;
+    return state.drumInstruments?.get(partId)?.get(key) ?? null;
+  }
+
+  /** The unpitched pitch for the drum at a staff position, or null when
+   *  the part is not a kit (or nothing sits on that line). */
+  function drumPitchFor(staffPosition) {
+    if (!activePartIsPercussion() || staffPosition === undefined || staffPosition === null) return null;
+    const partId = activePartId();
+    const kit = state.drumInstruments?.get(partId);
+    if (!kit) return null;
+    const entry = [...kit.values()].find((drum) => drum.staffPosition === staffPosition);
+    if (!entry) return null;
+    return engine.unpitchedPitch(entry.displayStep, entry.displayOctave);
+  }
+
   /** The octave whose notes sit nearest the middle of the current clef. */
   function currentOctave() {
     return docTools.pitchFromStaffPosition(clefAt(state.entry?.measureNumber ?? 1), 0).octave;
@@ -660,6 +785,11 @@
 
     if (hit) {
       const [partId, measureToken, voiceToken, eventToken] = hit.getAttribute('data-id').split('#');
+      // Clicking a staff is how a multi-part score says which part you are
+      // writing into: every edit command takes a part id, and a drum part
+      // would otherwise be unreachable behind the first instrument.
+      state.activePartId = partId;
+      if (partSelect && !partSelect.hidden) partSelect.value = partId;
       const measureNumber = Number(measureToken.replace('m', ''));
       const voiceId = Number(voiceToken.replace('v', ''));
       const eventIndex = Number(eventToken.replace('e', ''));
@@ -680,7 +810,7 @@
         if (state.noteInput && !state.tool.rest) {
           state.entry = { partId, measureNumber, voiceId, tick: existing.startTick ?? 0, systemIndex };
           state.selection = null;
-          insertAtEntry({ step, octave, addToChord: event.shiftKey });
+          insertAtEntry({ step, octave, addToChord: event.shiftKey, staffPosition });
           return;
         }
         state.selection = { partId, measureNumber, voiceId, eventIndex };
@@ -716,7 +846,7 @@
     state.selection = null;
     if (state.noteInput) {
       if (state.tool.rest) insertAtEntry({ rest: true });
-      else insertAtEntry({ step, octave });
+      else insertAtEntry({ step, octave, staffPosition });
       return;
     }
     announce(`Measure ${position.measureNumber}, ${step}${octave}.`);
@@ -732,6 +862,23 @@
     return Math.round(60_000_000 / segment.microsecondsPerQuarter);
   };
 
+  /**
+   * The metronome mark the score itself carries, so the readout counts the
+   * same beat the printed mark does. 6/8 is counted in dotted quarters and
+   * 7/8 in eighths, so the unit cannot be guessed from the denominator
+   * alone.
+   */
+  const tempoMark = () => state.tempoMarks?.[0] ?? null;
+
+  const TEMPO_UNIT_GLYPH = {
+    whole: '\u{1D15D}',
+    half: '\u{1D15E}',
+    quarter: '\u2669',
+    eighth: '\u266A',
+    '16th': '\u{1D161}',
+    '32nd': '\u{1D162}',
+  };
+
   const scoreTimeSignature = () => {
     const measureNumber = state.entry?.measureNumber ?? 1;
     const attribute = attributeAt(measureNumber);
@@ -742,9 +889,16 @@
 
   const refreshTempo = () => {
     const { numerator, denominator } = scoreTimeSignature();
-    const unit = denominator === 4 ? '\u2669' : denominator === 8 ? '\u266A' : '\u2669';
-    tempoOutput.textContent = `${unit}=${scoreBpm()}`;
-    tempoOutput.title = `Tempo ${scoreBpm()} BPM · ${numerator}/${denominator}`;
+    const mark = tempoMark();
+    const fallbackUnit = denominator === 8 ? 'eighth' : denominator === 4 ? 'quarter' : 'quarter';
+    const unit = mark?.beatUnit ?? fallbackUnit;
+    const glyph = TEMPO_UNIT_GLYPH[unit] ?? '\u2669';
+    const dots = mark?.beatUnitDots ? '.'.repeat(mark.beatUnitDots) : '';
+    // The printed mark counts its own beat; the tempo map counts quarters,
+    // so the mark's own number wins whenever the score carries one.
+    const bpm = mark?.perMinute ?? scoreBpm();
+    tempoOutput.textContent = `${glyph}${dots}=${bpm}`;
+    tempoOutput.title = `Tempo ${bpm} BPM · ${numerator}/${denominator}`;
   };
 
   const clearMetronomeTimers = () => {
@@ -850,9 +1004,11 @@
    * the first preview and reused; a failed or slow load never blocks the
    * edit -- the note is already committed by the time this runs.
    */
-  function previewPitch(pitch) {
+  function previewPitch(pitch, drum = null) {
     if (!state.previewOn || state.playing) return;
-    const midi = engine.midiNoteNumber?.(pitch);
+    // An unpitched drum has no MIDI number of its own; its sound is the
+    // GM key the kit declared for it.
+    const midi = drum ? drum.gmNote : engine.midiNoteNumber?.(pitch);
     if (midi === undefined) return;
     void ensureSound()
       .then((sound) => sound.preview?.([midi]))
@@ -1246,6 +1402,81 @@
     );
   }
 
+  const keyForFifths = (fifths) => Object.keys(KEY_FIFTHS).find((key) => KEY_FIFTHS[key] === fifths) ?? 'C';
+  const timeForPair = (numerator, denominator) =>
+    Object.keys(TIME_PAIR).find((time) => TIME_PAIR[time][0] === numerator && TIME_PAIR[time][1] === denominator) ?? null;
+
+  /**
+   * Points the setup dropdowns at what the loaded score actually says.
+   *
+   * `applySetup` writes ALL THREE controls at once, so a dropdown left on
+   * its default while the score says something else would quietly reset
+   * the other two the first time it was touched: open a 3/4 score in G and
+   * change only the clef, and the meter would snap back to 4/4. A value the
+   * control has no option for is left alone rather than guessed at.
+   */
+  function syncSetupControls() {
+    syncPartSelect();
+    const attribute = attributeAt(1);
+    if (!attribute) return;
+    const clefName = docTools.clefNameFromSign(attribute.clefsByStaff?.[1]?.sign ?? attribute.clefSign ?? 'G');
+    if (CLEF_SIGN[clefName]) clefSelect.value = clefName;
+    const key = keyForFifths(attribute.fifths ?? 0);
+    if (KEY_FIFTHS[key] !== undefined) keySelect.value = key;
+    const time = timeForPair(attribute.timeNumerator, attribute.timeDenominator);
+    if (time) timeSelect.value = time;
+  }
+
+  /**
+   * The part list. A one-part score hides the control rather than showing
+   * a dropdown with a single choice, and a kit part is labelled as such so
+   * it is clear why clicking a line writes a drum and not a pitch.
+   */
+  function syncPartSelect() {
+    if (!partSelect) return;
+    const parts = state.doc?.score.parts ?? [];
+    const options = parts.map((part) => ({
+      value: part.id,
+      label: state.drumInstruments?.has(part.id) ? `${part.name} (percussion)` : part.name,
+    }));
+    // Rebuilding the options on every render would close an open menu, so
+    // only touch the DOM when the part list itself changed.
+    const signature = options.map((option) => `${option.value}:${option.label}`).join('|');
+    if (partSelect.dataset.signature !== signature) {
+      partSelect.textContent = '';
+      for (const option of options) {
+        const node = document.createElement('option');
+        node.value = option.value;
+        node.textContent = option.label;
+        partSelect.append(node);
+      }
+      partSelect.dataset.signature = signature;
+    }
+    partSelect.value = activePartId();
+    // A single-part score has nothing to choose, so the whole group goes
+    // away -- leaving its divider behind would show an empty separator.
+    const group = partSelect.closest('.editor-toolbar__group');
+    const divider = group?.previousElementSibling;
+    const hide = options.length <= 1;
+    partSelect.hidden = hide;
+    if (group) group.hidden = hide;
+    if (divider?.classList.contains('editor-toolbar__divider')) divider.hidden = hide;
+  }
+
+  /** Switching part is a change of target, not an edit: the clef and key
+   *  dropdowns follow, so the next note lands in the part on screen. */
+  function onPartChange() {
+    const partId = partSelect.value;
+    if (!state.doc?.score.parts.some((part) => part.id === partId)) return;
+    state.activePartId = partId;
+    const measureNumber = Math.min(state.entry?.measureNumber ?? 1, measureCountOf(partId));
+    state.entry = { partId, measureNumber, voiceId: state.entry?.voiceId ?? 1, tick: 0, systemIndex: state.entry?.systemIndex ?? 0 };
+    state.selection = null;
+    syncSetupControls();
+    render();
+    announce(`Writing into ${partNameOf(partId)}.`);
+  }
+
   // ---- wiring ------------------------------------------------------------
 
   backButton.addEventListener('click', () => window.location.assign('notation.html'));
@@ -1322,6 +1553,7 @@
   });
 
   [clefSelect, keySelect, timeSelect].forEach((select) => select.addEventListener('change', applySetup));
+  if (partSelect) partSelect.addEventListener('change', onPartChange);
 
   document.addEventListener('keydown', (event) => {
     const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(event.target?.tagName || '');
@@ -1391,6 +1623,21 @@
     if (intent === 'open') {
       showEmpty('No file was handed over. Please choose one from the Notation Lab.');
       return;
+    }
+    // "Create" asks for the instruments and the score's basics first; the
+    // wizard leaves that answer in sessionStorage for this page to build.
+    const newScore = sessionStorage.getItem('notation-lab-new-score');
+    if (newScore && window.NotationNewScore) {
+      sessionStorage.removeItem('notation-lab-new-score');
+      try {
+        const spec = window.NotationNewScore.normaliseSpec(JSON.parse(newScore));
+        loadXml(window.NotationNewScore.buildMusicXml(spec), `${spec.title}.musicxml`);
+        syncSetupControls();
+        return;
+      } catch {
+        // Fall through to the starter score: a broken handoff must still
+        // open something writable.
+      }
     }
     // A bare visit, or "create": start a new score. An editor with no staff
     // and every control disabled gives a writer nothing to click, which
