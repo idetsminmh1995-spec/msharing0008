@@ -337,6 +337,29 @@ export interface PageConfig {
   readonly marginBottom: number;
   readonly marginLeft: number;
   readonly marginRight: number;
+  /**
+   * The empty strip between two stacked pages, in staff spaces. Zero
+   * stacks pages edge to edge, which is what a single-sheet render
+   * wants; a host showing a scrollable score wants a visible break
+   * between sheets, the way a notation program does.
+   *
+   * A gap also switches the background from ONE rectangle behind the
+   * whole canvas to one rectangle per page -- otherwise the gap would
+   * be filled with the page colour and there would be nothing to see.
+   */
+  readonly gapBetweenPages?: number;
+  /**
+   * Spread each page's systems down its usable height, so the last
+   * system of a page sits on the bottom margin instead of leaving the
+   * leftover space under it. This is the "fill the page" behaviour of
+   * engraving programs; it only ever moves systems apart, never closer
+   * than `staves.minSystemDistance`.
+   *
+   * Off by default: it changes the vertical position of every system,
+   * so a host that positions its own overlays from the drawn staff
+   * lines should opt in deliberately.
+   */
+  readonly verticalJustify?: boolean;
 }
 
 // ---- drum mapping (Phase 41) ----
@@ -567,6 +590,10 @@ export const DEFAULT_CONFIG: EngineConfig = {
     marginBottom: 3,
     marginLeft: 2.5,
     marginRight: 2.5,
+    // Sheets touch by default, so an existing single-page render keeps
+    // its exact bytes and one background rectangle.
+    gapBetweenPages: 0,
+    verticalJustify: false,
   },
   drums: {},
   text: {
@@ -692,6 +719,7 @@ const NUMERIC_RULES: readonly NumericRule[] = [
   { path: 'page.marginBottom', min: 0 },
   { path: 'page.marginLeft', min: 0 },
   { path: 'page.marginRight', min: 0 },
+  { path: 'page.gapBetweenPages', min: 0 },
   { path: 'text.lyricGap', min: 0 },
   { path: 'text.lyricRowHeight', min: 0, exclusiveMin: true },
   { path: 'text.chordSymbolGap', min: 0 },

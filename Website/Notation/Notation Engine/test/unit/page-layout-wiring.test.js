@@ -444,3 +444,71 @@ describe('page mode never clips or overlaps (Phase 47, §16.3 reflow)', () => {
     assert.equal(height % 42, 0);
   });
 });
+
+describe('page sheets from the renderer (§16.2)', () => {
+  const rectsOf = (svg) =>
+    [...svg.matchAll(/<rect [^>]*data-page="(\d+)"[^>]*\/>/g)].map((m) => ({ page: Number(m[1]), tag: m[0] }));
+
+  test('with a gap, each page gets its own labelled background rectangle', () => {
+    const { svg } = render(onePart(8), { layout: { mode: 'page' }, page: { gapBetweenPages: 2 } });
+    const rects = rectsOf(svg);
+    assert.ok(rects.length > 1, `expected one rect per page, got ${rects.length}`);
+    assert.deepEqual(
+      rects.map((r) => r.page),
+      rects.map((_, i) => i),
+      'the sheets are numbered in reading order',
+    );
+  });
+
+  test('without a gap the background stays a single unlabelled rectangle', () => {
+    const { svg } = render(onePart(8), { layout: { mode: 'page' } });
+    assert.equal([...svg.matchAll(/<rect /g)].length, 1);
+    assert.ok(!svg.includes('data-page='));
+  });
+
+  test('sheets are page-height tall and separated by exactly the gap', () => {
+    const { svg } = render(onePart(8), { layout: { mode: 'page' }, page: { gapBetweenPages: 3 } });
+    const boxes = [...svg.matchAll(/<rect x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)"/g)].map(
+      (m) => ({ x: Number(m[1]), y: Number(m[2]), w: Number(m[3]), h: Number(m[4]) }),
+    );
+    assert.ok(boxes.length >= 2);
+    for (const box of boxes) {
+      assert.equal(box.x, 0);
+      assert.equal(box.w, 30);
+      assert.equal(box.h, 42);
+    }
+    for (const [index, box] of boxes.entries()) {
+      if (index === 0) continue;
+      assert.equal(box.y, boxes[index - 1].y + 42 + 3);
+    }
+  });
+
+  test('the canvas is every sheet plus the gaps between them, and nothing after the last', () => {
+    const { svg } = render(onePart(8), { layout: { mode: 'page' }, page: { gapBetweenPages: 4 } });
+    const boxes = [...svg.matchAll(/<rect x="0" y="([\d.-]+)" width="30" height="([\d.-]+)"/g)].map((m) => ({
+      y: Number(m[1]),
+      h: Number(m[2]),
+    }));
+    const last = boxes[boxes.length - 1];
+    assert.equal(viewBox(svg)[3], last.y + last.h);
+  });
+
+  test('verticalJustify keeps every system inside its own page', () => {
+    const { svg } = render(onePart(16), {
+      layout: { mode: 'page' },
+      page: { verticalJustify: true, gapBetweenPages: 2 },
+    });
+    const boxes = [...svg.matchAll(/<rect x="0" y="([\d.-]+)" width="30" height="([\d.-]+)"/g)].map((m) => ({
+      y: Number(m[1]),
+      h: Number(m[2]),
+    }));
+    const clefs = [...svg.matchAll(new RegExp(`<text x="[\\d.]+" y="(-?[\\d.]+)"[^>]*>${NE.getGlyph('gClef').char}</text>`, 'g'))].map(
+      (m) => Number(m[1]),
+    );
+    assert.ok(clefs.length > 1);
+    for (const clefY of clefs) {
+      const sheet = boxes.find((box) => clefY >= box.y && clefY <= box.y + box.h);
+      assert.ok(sheet, `the clef at y=${clefY} fell in the gap between sheets`);
+    }
+  });
+});

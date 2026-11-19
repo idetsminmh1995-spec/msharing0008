@@ -35,10 +35,25 @@ export interface PageSystem {
    * can be introduced here without changing a page's own arithmetic.
    */
   readonly height: number;
+  /**
+   * Where the system's own top sits, measured DOWN FROM THE PAGE'S TOP
+   * EDGE. Normally `marginTop + index * height`; with
+   * `config.page.verticalJustify` the leftover height of the page is
+   * shared out between the systems instead, so the last one lands on the
+   * bottom margin. A renderer must use this rather than recomputing the
+   * pitch, or the drawing and the placement API would disagree.
+   */
+  readonly y: number;
 }
 
 export interface Page {
   readonly systems: readonly PageSystem[];
+  /**
+   * Where this page's top edge sits in the stacked canvas. Pages are
+   * stacked by their real heights plus `config.page.gapBetweenPages`, so
+   * a grown page pushes the next one down rather than overlapping it.
+   */
+  readonly top: number;
   /**
    * The page's own rendered height. Normally `config.pageHeight`, but a
    * system TALLER than the page's usable height cannot be shrunk to fit
@@ -54,10 +69,10 @@ export interface PageLayout {
   readonly usableWidth: number;
   readonly usableHeight: number;
   /**
-   * The sum of every page's own height -- the canvas height a page-mode
-   * render needs to show all pages without clipping. Equals
-   * `pages.length * pageHeight` whenever every page is a normal,
-   * non-grown page.
+   * The sum of every page's own height, plus the gaps between them --
+   * the canvas height a page-mode render needs to show all pages without
+   * clipping. Equals `pages.length * pageHeight` whenever every page is a
+   * normal, non-grown page and `gapBetweenPages` is 0.
    */
   readonly totalHeight: number;
 }
@@ -156,7 +171,7 @@ export function computePageLayout(
   const rawSystems = groupIntoRawSystems(measures, usableWidth);
   const rawPages = groupIntoRawPages(rawSystems, systemHeight, usableHeight);
 
-  const pages: Page[] = rawPages.map((pageSystems, pageIndex) => {
+  const pages: Omit<Page, 'top'>[] = rawPages.map((pageSystems, pageIndex) => {
     const systems: PageSystem[] = pageSystems.map((systemMeasures, systemIndexOnPage) => {
       const isLastSystemOfPiece =
         pageIndex === rawPages.length - 1 && systemIndexOnPage === pageSystems.length - 1;
@@ -179,12 +194,13 @@ export function computePageLayout(
       // even further).
       if (local.measures.length === 1) {
         const only = local.measures[0];
-        if (only === undefined) return { measures: [], height: systemHeight };
+        if (only === undefined) return { measures: [], height: systemHeight, y: 0 };
         const shouldFillWidth = !isLastSystemOfPiece && only.width < usableWidth;
         const width = shouldFillWidth ? usableWidth : only.width;
         return {
           measures: [{ measureNumber: only.measureNumber, x: 0, width }],
           height: systemHeight,
+          y: 0,
         };
       }
 
@@ -213,20 +229,62 @@ export function computePageLayout(
         return { measureNumber: m.measureNumber, x, width };
       });
 
-      return { measures: systemMeasureLayouts, height: systemHeight };
+      return { measures: systemMeasureLayouts, height: systemHeight, y: 0 };
     });
-    return {
+    const pageHeight = pageHeightForSystems(
       systems,
-      height: pageHeightForSystems(
-        systems,
-        config.pageHeight,
-        config.marginTop,
-        config.marginBottom,
-      ),
-    };
+      config.pageHeight,
+      config.marginTop,
+      config.marginBottom,
+    );
+    return { systems: spreadSystems(systems, pageHeight, config), height: pageHeight };
   });
 
-  const totalHeight = pages.reduce((sum, page) => sum + page.height, 0);
+  // Pages are stacked by their real heights, with the configured gap
+  // between the sheets, so a grown page pushes the next one down.
+  const gap = config.gapBetweenPages ?? 0;
+  let pageTop = 0;
+  const stacked = pages.map((page) => {
+    const placed = { ...page, top: pageTop };
+    pageTop += page.height + gap;
+    return placed;
+  });
+  // The last gap is not part of the canvas: it is space under the last
+  // sheet, not between two sheets.
+  const totalHeight = Math.max(0, pageTop - (stacked.length > 0 ? gap : 0));
 
-  return { pages, usableWidth, usableHeight, totalHeight };
+  return { pages: stacked, usableWidth, usableHeight, totalHeight };
+}
+
+/**
+ * The vertical pitch of one page's systems.
+ *
+ * Without `verticalJustify` every system sits at `marginTop + i * height`,
+ * which leaves whatever height the page has left unused at the bottom.
+ * With it, that leftover is shared between the GAPS (so `n` systems have
+ * `n - 1` gaps): the last system then ends exactly on the bottom margin,
+ * which is what makes a page look full rather than half-empty. A page
+ * holding one system is left alone -- spreading one item across a page
+ * just moves it.
+ */
+function spreadSystems(
+  systems: readonly PageSystem[],
+  pageHeight: number,
+  config: PageConfig,
+): PageSystem[] {
+  const pitch = systems[0]?.height ?? 0;
+  const placed = systems.map((system, index) => ({
+    ...system,
+    y: config.marginTop + index * pitch,
+  }));
+  if (config.verticalJustify !== true || placed.length < 2) return placed;
+  const content = placed.length * pitch;
+  const usable = pageHeight - config.marginTop - config.marginBottom;
+  const slack = usable - content;
+  if (!Number.isFinite(slack) || slack <= 0) return placed;
+  const step = slack / (placed.length - 1);
+  return placed.map((system, index) => ({
+    ...system,
+    y: config.marginTop + index * (pitch + step),
+  }));
 }

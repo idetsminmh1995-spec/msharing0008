@@ -190,6 +190,7 @@ import {
   renderWords,
   renderText,
   svgLine,
+  svgRect,
 } from './render/index.js';
 
 const STAFF_LINES = 5;
@@ -4548,6 +4549,13 @@ export function renderParsedMusicXml(
 
   /** Page mode's canvas height: the sum of every page's own (possibly grown) height. Scroll mode never uses it. */
   let pageCanvasHeight = 0;
+  /**
+   * Where each sheet sits in the stacked canvas, in staff spaces. Empty in
+   * scroll mode, which has no sheets. The background is drawn per sheet
+   * from this rather than as one rectangle over the whole canvas, so a
+   * `gapBetweenPages` shows the host's own surface between the pages.
+   */
+  let pageSheetLayout: { top: number; height: number }[] = [];
   if (config.layout.mode === 'page') {
     // §16.2: "<print new-system/new-page> from MusicXML" is respected.
     // Any part asking for a break breaks the whole system -- a system is
@@ -4578,11 +4586,13 @@ export function renderParsedMusicXml(
     // Pages are stacked by their own REAL heights, not a fixed pitch. A
     // page whose single system is taller than the configured page height
     // grows to hold it (see `computePageLayout`), so the next page starts
-    // below the grown one rather than on top of its tail.
-    let pageTopY = 0;
+    // below the grown one rather than on top of its tail. `page.top` and
+    // `system.y` are the layout's own answer -- recomputing the pitch
+    // here would drift from it as soon as the page is vertically
+    // justified.
     pageLayout.pages.forEach((page, pageIndex) => {
-      page.systems.forEach((system, systemIndexOnPage) => {
-        const systemY = pageTopY + config.page.marginTop + systemIndexOnPage * systemHeight;
+      page.systems.forEach((system) => {
+        const systemY = page.top + system.y;
         systemOrigins.push({ systemIndex, x: config.page.marginLeft, systemY });
         system.measures.forEach((m, i) => {
           placementByMeasureNumber.set(m.measureNumber, {
@@ -4596,8 +4606,11 @@ export function renderParsedMusicXml(
         });
         systemIndex += 1;
       });
-      pageTopY += page.height;
     });
+    pageSheetLayout = pageLayout.pages.map((page) => ({
+      top: page.top,
+      height: page.height,
+    }));
   } else {
     const scrollLayout = computeScrollLayout(
       measureNumbersInOrder.map((measureNumber) => ({
@@ -6946,6 +6959,21 @@ export function renderParsedMusicXml(
     return { minY: top, height: bottom - top };
   })();
 
+  // A page-mode canvas is a stack of sheets. When the sheets are apart the
+  // background has to be drawn per sheet, or the gap would be filled with
+  // the page colour and the break would be invisible. Each sheet rect
+  // carries its index so a host can style the sheets themselves (a
+  // hairline edge, a shadow) without having to parse the drawing.
+  const sheetsApart = pageSheetLayout.length > 0 && (config.page.gapBetweenPages ?? 0) > 0;
+  const sheetRects = sheetsApart
+    ? pageSheetLayout.map((sheet, index) =>
+        svgRect(0, sheet.top, config.page.pageWidth, sheet.height, {
+          fill: theme.background,
+          'data-page': String(index),
+        }),
+      )
+    : [];
+
   const svg = createSvgDocument(
     {
       // §16.2: page mode's canvas is the PAGE, however much or little of
@@ -6964,9 +6992,9 @@ export function renderParsedMusicXml(
         fitted?.height ?? (config.layout.mode === 'page' ? pageCanvasHeight : systemHeight),
       ...(fitted !== undefined ? { viewBoxMinY: fitted.minY } : {}),
       pxPerStaffSpace: config.layout.pxPerStaffSpace,
-      backgroundColor: theme.background,
+      backgroundColor: sheetsApart ? 'none' : theme.background,
     },
-    svgParts,
+    sheetsApart ? [...sheetRects, ...svgParts] : svgParts,
   );
 
   const playback = computePlaybackData({

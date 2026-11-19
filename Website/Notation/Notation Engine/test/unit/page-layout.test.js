@@ -242,3 +242,84 @@ describe('page height accounting (Phase 47, §16.2)', () => {
     assert.equal(layout.totalHeight, 0);
   });
 });
+
+describe('page sheet stacking and vertical spread (§16.2 page geometry)', () => {
+  // usableWidth is 25, so a 30-wide measure always gets a system to
+  // itself: one measure per system, three systems per 36-usable page.
+  const oneMeasurePerSystem = (count) => Array.from({ length: count }, (_, i) => m(i + 1, 30));
+
+  test('a normal page starts at its own index times the page height, and its first system sits at marginTop', () => {
+    const layout = NE.computePageLayout(oneMeasurePerSystem(7), 10, PAGE_CONFIG, SPACING_CONFIG);
+    assert.equal(layout.pages.length, 3);
+    layout.pages.forEach((page, index) => {
+      assert.equal(page.top, index * PAGE_CONFIG.pageHeight);
+      assert.equal(page.systems[0].y, PAGE_CONFIG.marginTop);
+    });
+  });
+
+  test('systems are pitched by their own height down the page', () => {
+    const layout = NE.computePageLayout(oneMeasurePerSystem(3), 10, PAGE_CONFIG, SPACING_CONFIG);
+    const systems = layout.pages[0].systems;
+    assert.equal(systems.length, 3);
+    systems.forEach((system, index) => {
+      assert.equal(system.y, PAGE_CONFIG.marginTop + index * 10);
+    });
+  });
+
+  test('gapBetweenPages pushes each sheet down and widens the canvas by the gaps only', () => {
+    const withGap = NE.computePageLayout(
+      oneMeasurePerSystem(7),
+      10,
+      { ...PAGE_CONFIG, gapBetweenPages: 2 },
+      SPACING_CONFIG,
+    );
+    const without = NE.computePageLayout(oneMeasurePerSystem(7), 10, PAGE_CONFIG, SPACING_CONFIG);
+    assert.equal(withGap.pages[1].top, PAGE_CONFIG.pageHeight + 2);
+    assert.equal(withGap.pages[2].top, 2 * (PAGE_CONFIG.pageHeight + 2));
+    assert.equal(withGap.totalHeight, without.totalHeight + 2 * 2);
+  });
+
+  test('the gap under the LAST sheet is not part of the canvas', () => {
+    const layout = NE.computePageLayout(
+      oneMeasurePerSystem(4),
+      10,
+      { ...PAGE_CONFIG, gapBetweenPages: 5 },
+      SPACING_CONFIG,
+    );
+    const last = layout.pages[layout.pages.length - 1];
+    assert.equal(layout.totalHeight, last.top + last.height);
+  });
+
+  test('verticalJustify spreads a full page’s systems to the bottom margin', () => {
+    // Three 10-tall systems on a page with 6 units of slack: each of the
+    // two gaps grows by 3, and the last system ends on the bottom margin.
+    const page = { ...PAGE_CONFIG, pageHeight: 36 + 6, verticalJustify: true };
+    const layout = NE.computePageLayout(oneMeasurePerSystem(3), 10, page, SPACING_CONFIG);
+    const systems = layout.pages[0].systems;
+    assert.equal(systems.length, 3);
+    assert.equal(systems[0].y, page.marginTop);
+    const last = systems[systems.length - 1];
+    assert.equal(last.y + last.height, page.pageHeight - page.marginBottom);
+  });
+
+  test('verticalJustify leaves a single-system page exactly where it was', () => {
+    const plain = NE.computePageLayout([m(1, 30)], 10, PAGE_CONFIG, SPACING_CONFIG);
+    const spread = NE.computePageLayout(
+      [m(1, 30)],
+      10,
+      { ...PAGE_CONFIG, verticalJustify: true },
+      SPACING_CONFIG,
+    );
+    assert.equal(spread.pages[0].systems[0].y, plain.pages[0].systems[0].y);
+  });
+
+  test('verticalJustify never overlaps systems on a page with no slack at all', () => {
+    // usableHeight = 20 and two 10-tall systems: nothing to share out.
+    const page = { ...PAGE_CONFIG, pageHeight: 20 + 6, verticalJustify: true };
+    const layout = NE.computePageLayout(oneMeasurePerSystem(2), 10, page, SPACING_CONFIG);
+    const systems = layout.pages[0].systems;
+    assert.equal(systems.length, 2);
+    assert.equal(systems[0].y, page.marginTop);
+    assert.ok(systems[1].y >= systems[0].y + systems[0].height);
+  });
+});

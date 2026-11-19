@@ -70999,7 +70999,11 @@ ${denominator}`;
       marginTop: 3,
       marginBottom: 3,
       marginLeft: 2.5,
-      marginRight: 2.5
+      marginRight: 2.5,
+      // Sheets touch by default, so an existing single-page render keeps
+      // its exact bytes and one background rectangle.
+      gapBetweenPages: 0,
+      verticalJustify: false
     },
     drums: {},
     text: {
@@ -71081,6 +71085,7 @@ ${denominator}`;
     { path: "page.marginBottom", min: 0 },
     { path: "page.marginLeft", min: 0 },
     { path: "page.marginRight", min: 0 },
+    { path: "page.gapBetweenPages", min: 0 },
     { path: "text.lyricGap", min: 0 },
     { path: "text.lyricRowHeight", min: 0, exclusiveMin: true },
     { path: "text.chordSymbolGap", min: 0 },
@@ -74771,12 +74776,13 @@ ${denominator}`;
         const originalWidths = local.measures.map((m) => m.width);
         if (local.measures.length === 1) {
           const only = local.measures[0];
-          if (only === void 0) return { measures: [], height: systemHeight };
+          if (only === void 0) return { measures: [], height: systemHeight, y: 0 };
           const shouldFillWidth = !isLastSystemOfPiece && only.width < usableWidth;
           const width = shouldFillWidth ? usableWidth : only.width;
           return {
             measures: [{ measureNumber: only.measureNumber, x: 0, width }],
-            height: systemHeight
+            height: systemHeight,
+            y: 0
           };
         }
         const finalPositions = isLastSystemOfPiece ? positions2 : justifySystem(positions2, usableWidth, spacingConfig);
@@ -74790,20 +74796,42 @@ ${denominator}`;
           const width = (nextX ?? usableWidth) - x2;
           return { measureNumber: m.measureNumber, x: x2, width };
         });
-        return { measures: systemMeasureLayouts, height: systemHeight };
+        return { measures: systemMeasureLayouts, height: systemHeight, y: 0 };
       });
-      return {
+      const pageHeight = pageHeightForSystems(
         systems,
-        height: pageHeightForSystems(
-          systems,
-          config.pageHeight,
-          config.marginTop,
-          config.marginBottom
-        )
-      };
+        config.pageHeight,
+        config.marginTop,
+        config.marginBottom
+      );
+      return { systems: spreadSystems(systems, pageHeight, config), height: pageHeight };
     });
-    const totalHeight = pages.reduce((sum, page) => sum + page.height, 0);
-    return { pages, usableWidth, usableHeight, totalHeight };
+    const gap = config.gapBetweenPages ?? 0;
+    let pageTop = 0;
+    const stacked = pages.map((page) => {
+      const placed = { ...page, top: pageTop };
+      pageTop += page.height + gap;
+      return placed;
+    });
+    const totalHeight = Math.max(0, pageTop - (stacked.length > 0 ? gap : 0));
+    return { pages: stacked, usableWidth, usableHeight, totalHeight };
+  }
+  function spreadSystems(systems, pageHeight, config) {
+    const pitch = systems[0]?.height ?? 0;
+    const placed = systems.map((system, index) => ({
+      ...system,
+      y: config.marginTop + index * pitch
+    }));
+    if (config.verticalJustify !== true || placed.length < 2) return placed;
+    const content = placed.length * pitch;
+    const usable = pageHeight - config.marginTop - config.marginBottom;
+    const slack = usable - content;
+    if (!Number.isFinite(slack) || slack <= 0) return placed;
+    const step = slack / (placed.length - 1);
+    return placed.map((system, index) => ({
+      ...system,
+      y: config.marginTop + index * (pitch + step)
+    }));
   }
 
   // src/layout/resize.ts
@@ -79994,6 +80022,7 @@ ${xrefOffset}
     const systemHeight = SYSTEM_HEIGHT + aboveStaffPadding + lowestStaffOffset + Math.max(0, lastStaffSouthBand - systemBottomRoom) - trimAbove - trimBelow;
     const widthOf = (measureNumber) => measureLayoutsByNumber.get(measureNumber)?.width ?? MEASURE_WIDTH;
     let pageCanvasHeight = 0;
+    let pageSheetLayout = [];
     if (config.layout.mode === "page") {
       const breaksByMeasure = /* @__PURE__ */ new Map();
       for (const pr of prints) {
@@ -80015,10 +80044,9 @@ ${xrefOffset}
       const pageLayout = computePageLayout(pageInputs, systemHeight, config.page, pageSpacingConfig);
       pageCanvasHeight = pageLayout.pages.length > 0 ? pageLayout.totalHeight : config.page.pageHeight;
       let systemIndex = 0;
-      let pageTopY = 0;
       pageLayout.pages.forEach((page, pageIndex) => {
-        page.systems.forEach((system, systemIndexOnPage) => {
-          const systemY = pageTopY + config.page.marginTop + systemIndexOnPage * systemHeight;
+        page.systems.forEach((system) => {
+          const systemY = page.top + system.y;
           systemOrigins.push({ systemIndex, x: config.page.marginLeft, systemY });
           system.measures.forEach((m, i2) => {
             placementByMeasureNumber.set(m.measureNumber, {
@@ -80032,8 +80060,11 @@ ${xrefOffset}
           });
           systemIndex += 1;
         });
-        pageTopY += page.height;
       });
+      pageSheetLayout = pageLayout.pages.map((page) => ({
+        top: page.top,
+        height: page.height
+      }));
     } else {
       const scrollLayout = computeScrollLayout(
         measureNumbersInOrder.map((measureNumber) => ({
@@ -81613,6 +81644,13 @@ ${xrefOffset}
       if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom <= top) return void 0;
       return { minY: top, height: bottom - top };
     })();
+    const sheetsApart = pageSheetLayout.length > 0 && (config.page.gapBetweenPages ?? 0) > 0;
+    const sheetRects = sheetsApart ? pageSheetLayout.map(
+      (sheet, index) => svgRect(0, sheet.top, config.page.pageWidth, sheet.height, {
+        fill: theme.background,
+        "data-page": String(index)
+      })
+    ) : [];
     const svg = createSvgDocument(
       {
         // §16.2: page mode's canvas is the PAGE, however much or little of
@@ -81630,9 +81668,9 @@ ${xrefOffset}
         viewBoxHeight: fitted?.height ?? (config.layout.mode === "page" ? pageCanvasHeight : systemHeight),
         ...fitted !== void 0 ? { viewBoxMinY: fitted.minY } : {},
         pxPerStaffSpace: config.layout.pxPerStaffSpace,
-        backgroundColor: theme.background
+        backgroundColor: sheetsApart ? "none" : theme.background
       },
-      svgParts
+      sheetsApart ? [...sheetRects, ...svgParts] : svgParts
     );
     const playback = computePlaybackData({
       score: score2,
