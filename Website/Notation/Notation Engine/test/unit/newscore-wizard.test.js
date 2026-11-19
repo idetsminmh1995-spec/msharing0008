@@ -392,7 +392,7 @@ describe('the editor opens the score the wizard created', () => {
     const scoreHost = doc.querySelector('[data-editor-score]');
     assert.equal(scoreHost.hidden, false, 'the score must be drawn');
     assert.equal(scoreHost.querySelectorAll('svg').length, 1);
-    assert.equal(doc.querySelector('[data-editor-play]').disabled, false, 'Play must be enabled');
+    assert.equal(doc.querySelector('[data-editor-add-measure]').disabled, false, 'the score controls must be enabled');
     assert.equal(doc.querySelector('[data-editor-status]').textContent, 'Score ready.');
     assert.equal(doc.querySelector('[data-editor-file], [data-editor-filename]')?.textContent, 'My Song.musicxml');
     assert.equal(
@@ -444,7 +444,7 @@ describe('the editor opens the score the wizard created', () => {
     const window = loadEditorWithHandoff('{not json');
     const scoreHost = window.document.querySelector('[data-editor-score]');
     assert.equal(scoreHost.hidden, false, 'a corrupt handoff must still open a starter score');
-    assert.equal(window.document.querySelector('[data-editor-play]').disabled, false);
+    assert.equal(window.document.querySelector('[data-editor-add-measure]').disabled, false);
   });
 
   test('a multi-part score gets a part selector that hides for a single part', () => {

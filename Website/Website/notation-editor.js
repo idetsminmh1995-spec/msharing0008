@@ -14,48 +14,34 @@
   const docTools = window.NotationDoc;
   const pick = (selector) => document.querySelector(selector);
 
-  const saveButton = pick('[data-editor-save]');
   const backButton = pick('[data-editor-back]');
   const undoButton = pick('[data-editor-undo]');
   const redoButton = pick('[data-editor-redo]');
-  const playButton = pick('[data-editor-play]');
   const noteInputButton = pick('[data-editor-note-input]');
-  const newButton = pick('[data-editor-new]');
-  const openButton = pick('[data-editor-open]');
-  const openInput = pick('[data-editor-open-input]');
-  const printButton = pick('[data-editor-print]');
-  const rewindButton = pick('[data-editor-rewind]');
   const addMeasureButton = pick('[data-editor-add-measure]');
   const removeMeasureButton = pick('[data-editor-remove-measure]');
   const canvas = pick('[data-editor-canvas]');
   const scoreHost = pick('[data-editor-score]');
   const statusMessage = pick('[data-editor-status]');
   const statusFile = pick('[data-editor-file]');
-  const zoomOutput = pick('[data-editor-zoom]');
-  const zoomIn = pick('[data-editor-zoom-in]');
-  const zoomOut = pick('[data-editor-zoom-out]');
   const clefSelect = pick('[data-editor-clef]');
   const keySelect = pick('[data-editor-key]');
   const timeSelect = pick('[data-editor-time]');
   const partSelect = pick('[data-editor-part]');
-  const tempoOutput = pick('[data-editor-tempo]');
   const exportPdf = pick('[data-editor-export-pdf]');
   const exportSvg = pick('[data-editor-export-svg]');
   const exportPng = pick('[data-editor-export-png]');
   const exportToggle = pick('[data-editor-export-toggle]');
   const exportList = pick('[data-editor-export-list]');
-  const metronomeButton = pick('[data-editor-metronome]');
   const soundFontSelect = pick('[data-editor-soundfont]');
   const testNoteButton = pick('[data-editor-test-note]');
   const testScoreButton = pick('[data-editor-test-score]');
   const previewButton = pick('[data-editor-preview]');
-  const viewToggle = pick('[data-editor-view-toggle]');
-  const viewList = pick('[data-editor-view-list]');
-  const viewLabel = pick('[data-editor-view-label]');
-  const viewButtons = [...document.querySelectorAll('[data-editor-view-list] [data-editor-view]')];
   const durationButtons = [...document.querySelectorAll('[data-editor-duration]')];
   const accidentalButtons = [...document.querySelectorAll('[data-editor-accidental]')];
-  const dotButton = pick('[data-editor-dot]');
+  const dotButtons = [...document.querySelectorAll('[data-editor-dots]')];
+  const tieButton = pick('[data-editor-tie]');
+  const flipButton = pick('[data-editor-flip]');
   const restButton = pick('[data-editor-rest]');
   const voiceSelect = pick('[data-editor-voice]');
   const palette = pick('[data-editor-palette]');
@@ -63,7 +49,7 @@
   const paletteItems = [...document.querySelectorAll('[data-editor-palette-mark]')];
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const ACCIDENTAL_ALTER = { sharp: 1, flat: -1, natural: 0 };
+  const ACCIDENTAL_ALTER = { 'double-sharp': 2, sharp: 1, natural: 0, flat: -1, 'double-flat': -2 };
   const SHORTCUT_DURATION = {
     '1': 'whole', '2': 'half', '3': 'quarter', '4': 'eighth', '5': '16th', '6': '32nd',
   };
@@ -347,16 +333,12 @@
   // ---- rendering ---------------------------------------------------------
 
   const setControlsEnabled = (enabled) => {
-    playButton.disabled = !enabled;
-    metronomeButton.disabled = !enabled;
-    saveButton.disabled = !enabled;
     exportToggle.disabled = !enabled;
     exportPdf.disabled = !enabled;
     exportSvg.disabled = !enabled;
     exportPng.disabled = !enabled;
     addMeasureButton.disabled = !enabled;
     removeMeasureButton.disabled = !enabled;
-    rewindButton.disabled = !enabled;
     if (!enabled) setExportMenu(false);
   };
 
@@ -365,27 +347,9 @@
     exportToggle.setAttribute('aria-expanded', String(open));
   };
 
-  const setViewMenu = (open) => {
-    viewList.hidden = !open;
-    viewToggle.setAttribute('aria-expanded', String(open));
-  };
-
-  const setView = (mode) => {
-    state.layout = mode;
-    const label = mode === 'scroll' ? 'Horizontal' : 'Page';
-    if (viewLabel) viewLabel.textContent = label;
-    viewButtons.forEach((button) => {
-      button.setAttribute('aria-checked', String(button.dataset.editorView === mode));
-    });
-    if (state.result) render();
-  };
-
   const updateZoom = () => {
     state.zoom = Math.min(200, Math.max(50, state.zoom));
     scoreHost.style.zoom = `${state.zoom}%`;
-    zoomOutput.textContent = `${state.zoom}%`;
-    zoomIn.disabled = !state.result || state.zoom >= 200;
-    zoomOut.disabled = !state.result || state.zoom <= 50;
   };
 
   function svgElement(name, attrs) {
@@ -485,8 +449,10 @@
       syncHistory();
       syncPartSelect();
       syncPalette();
+      // The tie and flip buttons read the selection, so their pressed state
+      // has to follow every redraw, not only the tool clicks.
+      syncTools();
       updateZoom();
-      refreshTempo();
       const errors = (result.diagnostics || []).filter((item) => item.severity === 'error');
       if (errors.length) {
         announce(`Score loaded with ${errors.length} issue${errors.length === 1 ? '' : 's'}.`);
@@ -810,6 +776,133 @@
   };
 
   const eventNotes = (event) => (event.kind === 'chord' ? event.notes : [event]);
+
+  /**
+   * True when every selected note already starts a tie, so the button can
+   * show its pressed state and the click knows to remove instead of add.
+   */
+  const selectionTied = () =>
+    paletteTargets().length > 0 &&
+    paletteTargets().every((cell) => eventNotes(eventFor(cell)).every((note) => note.tieStart));
+
+  /** The event that begins exactly where `event` ends, in the same voice. */
+  function eventAfter(cell, event) {
+    const end = (event.startTick ?? 0) + event.duration.ticks;
+    const measure = partById(cell.partId)?.measures.find((m) => m.number === cell.measureNumber);
+    const events = measure?.voices.find((v) => v.id === cell.voiceId)?.events ?? [];
+    const next = events[events.indexOf(event) + 1];
+    return next && (next.startTick ?? 0) === end ? next : null;
+  }
+
+  const samePitchAs = (event, notes) => {
+    const others = eventNotes(event);
+    return notes.every((note) =>
+      others.some((other) => JSON.stringify(other.pitch) === JSON.stringify(note.pitch)),
+    );
+  };
+
+  /**
+   * Tie: joins each selected note to the next note of the same pitch in its
+   * own voice. Start and stop are written as one command, so undo takes the
+   * whole tie away instead of leaving half of it behind.
+   */
+  function toggleTie() {
+    const cells = paletteTargets();
+    if (cells.length === 0) {
+      announce('Select a note first.');
+      return;
+    }
+    const removing = selectionTied();
+    const edits = [];
+    for (const cell of cells) {
+      const event = eventFor(cell);
+      if (!event) continue;
+      if (removing) {
+        // Both halves come off together, or the next note keeps a stop tie
+        // that no longer has a start to meet.
+        const target = eventAfter(cell, event);
+        edits.push({
+          cell,
+          patch: { tieStart: null },
+          ...(target ? { next: { ...cell, eventIndex: cell.eventIndex + 1 }, nextPatch: { tieStop: null } } : {}),
+        });
+        continue;
+      }
+      const target = eventAfter(cell, event);
+      // A tie needs a following note of the same pitch to land on; anything
+      // else would draw into thin air and be dropped by the renderer.
+      if (!target || target.kind === 'rest' || !samePitchAs(target, eventNotes(event))) continue;
+      edits.push({ cell, patch: { tieStart: true }, next: { ...cell, eventIndex: cell.eventIndex + 1 }, nextPatch: { tieStop: true } });
+    }
+    if (edits.length === 0) {
+      announce(removing ? 'No tie to remove.' : 'Nothing to tie to — a tie needs the same pitch on the next beat.');
+      return;
+    }
+    commit((doc) => {
+      let next = doc;
+      for (const edit of edits) {
+        const { partId, measureNumber, voiceId, eventIndex } = edit.cell;
+        next = docTools.patchEvent(next, { partId, measureNumber, voiceId, eventIndex, patch: edit.patch });
+        if (edit.next) {
+          next = docTools.patchEvent(next, {
+            partId: edit.next.partId,
+            measureNumber: edit.next.measureNumber,
+            voiceId: edit.next.voiceId,
+            eventIndex: edit.next.eventIndex,
+            patch: edit.nextPatch,
+          });
+        }
+      }
+      return next;
+    }, removing ? 'Tie removed.' : `Tie added${edits.length === 1 ? '' : ` (${edits.length})`}.`);
+  }
+
+  /**
+   * Flip: turns the selected notes' stems over. A note with no explicit
+   * direction follows the staff's automatic rule, so the flip needs the
+   * direction it currently shows -- otherwise the first click would look
+   * like it did nothing.
+   */
+  function flipStems() {
+    const cells = paletteTargets();
+    if (cells.length === 0) {
+      announce('Select a note first.');
+      return;
+    }
+    commit((doc) => {
+      let next = doc;
+      for (const cell of cells) {
+        const event = eventFor(cell);
+        if (!event) continue;
+        const notes = eventNotes(event);
+        const current =
+          notes[0]?.explicitStemDirection ??
+          engine.chordStemDirection(
+            notes.map((note) => staffPositionOf(note.pitch, cell.measureNumber)),
+            engine.middleLineY(5),
+          );
+        next = docTools.patchEvent(next, {
+          partId: cell.partId,
+          measureNumber: cell.measureNumber,
+          voiceId: cell.voiceId,
+          eventIndex: cell.eventIndex,
+          patch: { explicitStemDirection: current === 'up' ? 'down' : 'up' },
+        });
+      }
+      return next;
+    }, 'Stem flipped.');
+  }
+
+  /** A note's staff position, so the stem rule can be asked what it would draw. */
+  function staffPositionOf(pitch, measureNumber) {
+    if (!pitch || pitch.kind !== 'pitched') return 0;
+    const clef = clefAt(measureNumber ?? state.entry?.measureNumber ?? 1);
+    try {
+      return engine.staffPositionForPitch(clef, pitch.step, pitch.octave);
+    } catch {
+      return 0;
+    }
+  }
 
   /** True when every selected note already has this mark. */
   function selectionCarries(kind, value) {
@@ -1477,43 +1570,12 @@
     return Math.round(60_000_000 / segment.microsecondsPerQuarter);
   };
 
-  /**
-   * The metronome mark the score itself carries, so the readout counts the
-   * same beat the printed mark does. 6/8 is counted in dotted quarters and
-   * 7/8 in eighths, so the unit cannot be guessed from the denominator
-   * alone.
-   */
-  const tempoMark = () => state.tempoMarks?.[0] ?? null;
-
-  const TEMPO_UNIT_GLYPH = {
-    whole: '\u{1D15D}',
-    half: '\u{1D15E}',
-    quarter: '\u2669',
-    eighth: '\u266A',
-    '16th': '\u{1D161}',
-    '32nd': '\u{1D162}',
-  };
-
   const scoreTimeSignature = () => {
     const measureNumber = state.entry?.measureNumber ?? 1;
     const attribute = attributeAt(measureNumber);
     const numerator = attribute?.timeNumerator ?? 4;
     const denominator = attribute?.timeDenominator ?? 4;
     return { numerator, denominator };
-  };
-
-  const refreshTempo = () => {
-    const { numerator, denominator } = scoreTimeSignature();
-    const mark = tempoMark();
-    const fallbackUnit = denominator === 8 ? 'eighth' : denominator === 4 ? 'quarter' : 'quarter';
-    const unit = mark?.beatUnit ?? fallbackUnit;
-    const glyph = TEMPO_UNIT_GLYPH[unit] ?? '\u2669';
-    const dots = mark?.beatUnitDots ? '.'.repeat(mark.beatUnitDots) : '';
-    // The printed mark counts its own beat; the tempo map counts quarters,
-    // so the mark's own number wins whenever the score carries one.
-    const bpm = mark?.perMinute ?? scoreBpm();
-    tempoOutput.textContent = `${glyph}${dots}=${bpm}`;
-    tempoOutput.title = `Tempo ${bpm} BPM · ${numerator}/${denominator}`;
   };
 
   const clearMetronomeTimers = () => {
@@ -1558,8 +1620,6 @@
 
   const setMetronome = (on) => {
     state.metronomeOn = on;
-    metronomeButton.setAttribute('aria-pressed', String(on));
-    metronomeButton.classList.toggle('is-active', on);
     if (on) {
       scheduleMetronome(state.playing ? state.playSeconds : 0);
       announce('Metronome on.');
@@ -1573,11 +1633,6 @@
 
   const setPlaying = (playing) => {
     state.playing = playing;
-    playButton.setAttribute('aria-pressed', String(playing));
-    playButton.setAttribute('aria-label', playing ? 'Pause' : 'Play');
-    playButton.innerHTML = playing
-      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14" /></svg>'
-      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14l12-7z" /></svg>';
   };
 
   const ensureSound = async () => {
@@ -1890,20 +1945,6 @@
   }
 
   /** Rewind puts the playhead back at the top, stopping playback first. */
-  function rewind() {
-    if (state.playing) {
-      state.sound?.pause?.();
-      setPlaying(false);
-      if (state.rafId !== null) window.cancelAnimationFrame(state.rafId);
-      state.rafId = null;
-      state.soundingId = null;
-    }
-    state.playSeconds = 0;
-    clearMetronomeTimers();
-    announce('Rewound to start.');
-    render();
-  }
-
   /** Where playback starts: the entry cursor if there is one, else the top. */
   const startSeconds = () => {
     if (!state.result || !state.entry) return 0;
@@ -2015,7 +2056,10 @@
     accidentalButtons.forEach((button) => {
       button.setAttribute('aria-pressed', String(button.dataset.editorAccidental === state.tool.accidental));
     });
-    dotButton.setAttribute('aria-pressed', String(state.tool.dots > 0));
+    dotButtons.forEach((button) => {
+      button.setAttribute('aria-pressed', String(Number(button.dataset.editorDots) === state.tool.dots));
+    });
+    tieButton.setAttribute('aria-pressed', String(selectionTied()));
     restButton.setAttribute('aria-pressed', String(state.tool.rest));
     noteInputButton.setAttribute('aria-pressed', String(state.noteInput));
     if (previewButton) previewButton.setAttribute('aria-pressed', String(state.previewOn));
@@ -2110,21 +2154,8 @@
   // ---- wiring ------------------------------------------------------------
 
   backButton.addEventListener('click', () => window.location.assign('notation.html'));
-  // New hands off to the Notation Lab wizard, the same way the entry page's
-  // Create box does: instrument, key, time and bars are chosen there.
-  newButton.addEventListener('click', () => window.location.assign('notation.html?intent=create'));
-  openButton.addEventListener('click', () => openInput.click());
-  openInput.addEventListener('change', () => {
-    const file = openInput.files?.[0];
-    openInput.value = '';
-    void readFile(file);
-  });
-  printButton.addEventListener('click', () => window.print());
-  rewindButton.addEventListener('click', rewind);
-  saveButton.addEventListener('click', saveScore);
   undoButton.addEventListener('click', undo);
   redoButton.addEventListener('click', redo);
-  playButton.addEventListener('click', () => void togglePlay());
 
   if (soundFontSelect) soundFontSelect.addEventListener('change', onSoundFontChange);
   if (testNoteButton) testNoteButton.addEventListener('click', () => void testBuiltScale());
@@ -2154,24 +2185,12 @@
   scoreHost.addEventListener('pointerup', onScorePointerUp);
   scoreHost.addEventListener('pointercancel', onScorePointerUp);
 
-  zoomIn.addEventListener('click', () => { state.zoom += 10; updateZoom(); });
-  zoomOut.addEventListener('click', () => { state.zoom -= 10; updateZoom(); });
-  viewToggle.addEventListener('click', () => setViewMenu(viewList.hidden));
-  viewButtons.forEach((button) => button.addEventListener('click', () => {
-    setView(button.dataset.editorView);
-    setViewMenu(false);
-    announce(button.dataset.editorView === 'scroll' ? 'Horizontal view.' : 'Page view.');
-  }));
-
-  metronomeButton.addEventListener('click', () => setMetronome(!state.metronomeOn));
-
   exportToggle.addEventListener('click', () => setExportMenu(exportList.hidden));
   exportPdf.addEventListener('click', () => { setExportMenu(false); void runExport(exportPdf, 'pdf'); });
   exportSvg.addEventListener('click', () => { setExportMenu(false); void runExport(exportSvg, 'svg'); });
   exportPng.addEventListener('click', () => { setExportMenu(false); void runExport(exportPng, 'png'); });
   document.addEventListener('pointerdown', (event) => {
     if (!exportList.hidden && !event.target.closest('[data-editor-export-menu]')) setExportMenu(false);
-    if (!viewList.hidden && !event.target.closest('[data-editor-view-menu]')) setViewMenu(false);
   });
 
   durationButtons.forEach((button) => button.addEventListener('click', () => {
@@ -2185,11 +2204,14 @@
     syncTools();
     announce(state.tool.accidental ? `${button.getAttribute('aria-label')} selected.` : 'Accidental cleared.');
   }));
-  dotButton.addEventListener('click', () => {
-    state.tool.dots = state.tool.dots > 0 ? 0 : 1;
+  dotButtons.forEach((button) => button.addEventListener('click', () => {
+    const dots = Number(button.dataset.editorDots);
+    state.tool.dots = state.tool.dots === dots ? 0 : dots;
     syncTools();
-    announce(state.tool.dots ? 'Dot on.' : 'Dot off.');
-  });
+    announce(state.tool.dots ? `${state.tool.dots} dot${state.tool.dots === 1 ? '' : 's'} on.` : 'Dots off.');
+  }));
+  tieButton.addEventListener('click', toggleTie);
+  flipButton.addEventListener('click', flipStems);
   restButton.addEventListener('click', () => {
     state.tool.rest = !state.tool.rest;
     syncTools();
@@ -2257,7 +2279,7 @@
       announce(`Note value: ${state.tool.duration}.`);
       return;
     }
-    if (event.key === '.') { state.tool.dots = state.tool.dots > 0 ? 0 : 1; syncTools(); return; }
+    if (event.key === '.') { state.tool.dots = (state.tool.dots + 1) % 4; syncTools(); return; }
     if (event.key.toLowerCase() === 'n') {
       state.noteInput = !state.noteInput;
       syncTools();
@@ -2327,7 +2349,6 @@
     }
   }
 
-  tempoOutput.textContent = '\u2669=120';
   syncTools();
   paintPaletteGlyphs();
   syncPalette();

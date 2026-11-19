@@ -397,7 +397,9 @@ describe('the editor and the engine agree, end to end', () => {
     const scoreHost = window.document.querySelector('[data-editor-score]');
     assert.equal(scoreHost.hidden, false, 'the score host must be visible');
     assert.equal(scoreHost.querySelectorAll('svg').length, 1, 'a starter score must be drawn');
-    assert.equal(window.document.querySelector('[data-editor-play]').disabled, false, 'Play must be enabled');
+    // The score controls are enabled once a score exists; Add measure is
+    // one of them, and unlike the transport it is always in the toolbar.
+    assert.equal(window.document.querySelector('[data-editor-add-measure]').disabled, false, 'the score controls must be enabled');
     assert.equal(
       window.document.querySelector('[data-editor-status]').textContent,
       'Score ready.',

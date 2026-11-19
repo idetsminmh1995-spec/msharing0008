@@ -486,10 +486,18 @@
     return name ? `<accidental>${name}</accidental>` : '';
   }
 
-  function noteCommon(event, divisions) {
+  function noteCommon(note, event, divisions) {
     const dots = '<dot/>'.repeat(event.duration.dots || 0);
-    return `<duration>${toDivisions(event.duration.ticks, divisions)}</duration><voice>${event.voice}</voice><type>${event.duration.type}</type>${dots}`;
+    // <tie> belongs directly after <duration> in MusicXML's own element
+    // order; without it a tie would draw once and vanish on reload.
+    const ties =
+      (note.tieStart ? '<tie type="start"/>' : '') + (note.tieStop ? '<tie type="stop"/>' : '');
+    return `<duration>${toDivisions(event.duration.ticks, divisions)}</duration>${ties}<voice>${event.voice}</voice><type>${event.duration.type}</type>${dots}`;
   }
+
+  /** `<stem>`, which MusicXML orders after `<accidental>` and before `<staff>`. */
+  const stemXml = (note) =>
+    note.explicitStemDirection ? `<stem>${note.explicitStemDirection}</stem>` : '';
 
   /**
    * A note's `<notations>`: articulations and ornaments, in the order the
@@ -500,8 +508,14 @@
   function notationsXml(note) {
     const articulations = (note.articulations ?? []).filter((mark) => ARTICULATION_ELEMENT[mark]);
     const ornaments = (note.ornaments ?? []).filter((mark) => ORNAMENT_ELEMENT[mark]);
-    if (articulations.length === 0 && ornaments.length === 0 && !note.hasFermata) return '';
+    const tied =
+      (note.tieStart ? '<tied type="start"/>' : '') + (note.tieStop ? '<tied type="stop"/>' : '');
+    if (articulations.length === 0 && ornaments.length === 0 && !note.hasFermata && !tied) {
+      return '';
+    }
+    // MusicXML orders <tied> before <articulations> inside <notations>.
     const inner = [
+      tied,
       articulations.length
         ? `<articulations>${articulations.map((mark) => `<${ARTICULATION_ELEMENT[mark]}/>`).join('')}</articulations>`
         : '',
@@ -515,19 +529,18 @@
 
   function eventXml(event, divisions) {
     const staff = event.staff ?? 1;
-    const common = noteCommon(event, divisions);
     if (event.kind === 'rest') {
-      return `<note><rest/>${common}<staff>${staff}</staff></note>`;
+      return `<note><rest/>${noteCommon(event, event, divisions)}<staff>${staff}</staff></note>`;
     }
     if (event.kind === 'chord') {
       return event.notes
         .map((note, index) => {
           const chordTag = index > 0 ? '<chord/>' : '';
-          return `<note>${chordTag}${pitchXml(note)}${common}${accidentalXml(note)}<staff>${staff}</staff>${notationsXml(note)}</note>`;
+          return `<note>${chordTag}${pitchXml(note)}${noteCommon(note, event, divisions)}${accidentalXml(note)}${stemXml(note)}<staff>${staff}</staff>${notationsXml(note)}</note>`;
         })
         .join('');
     }
-    return `<note>${pitchXml(event)}${common}${accidentalXml(event)}<staff>${staff}</staff>${notationsXml(event)}</note>`;
+    return `<note>${pitchXml(event)}${noteCommon(event, event, divisions)}${accidentalXml(event)}${stemXml(event)}<staff>${staff}</staff>${notationsXml(event)}</note>`;
   }
 
   function attributesXml(attribute, divisions, previous) {
