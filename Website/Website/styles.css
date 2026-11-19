@@ -646,16 +646,48 @@ body.is-newscore-open { overflow:hidden; }
 .editor-canvas[data-layout='scroll'] .editor-score svg { width:auto; max-width:none; }
 
 /* Semantic-editing overlays drawn over the score: the entry cursor, the
-   playback playhead, and the highlight on the selected / sounding event. */
+   playback playhead, and the highlight on the selected / sounding event.
+   The colour is the site's own accent, not MuseScore's blue -- the sizes
+   and shapes follow MuseScore, the palette follows this site. */
 .editor-score svg [data-editor-selected='true'] { fill:var(--accent-bright); }
 .editor-score svg [data-editor-selected='true'] text { fill:var(--accent-bright); }
 .editor-score svg [data-editor-selected='true'] line { stroke:var(--accent-bright); }
+.editor-score svg [data-editor-selected='true'] path { stroke:var(--accent-bright); }
+.editor-score svg [data-editor-selected='true'] rect { fill:var(--accent-bright); }
+/* The anchor of a multi-note selection reads a little stronger than the
+   rest of the band, so a long range still shows where the cursor sits. */
+.editor-score svg [data-editor-anchor='true'] { fill:var(--accent); }
+.editor-score svg [data-editor-anchor='true'] text { fill:var(--accent); }
 .editor-score svg .editor-overlay { pointer-events:none; }
 .editor-score svg .editor-cursor { fill:var(--accent-bright); opacity:.85; }
 .editor-score svg .editor-playhead { fill:var(--accent); }
+/* The rubber band: a thin accent outline over a faint wash, the same
+   shape MuseScore draws while a range is being dragged. */
+.editor-score svg .editor-marquee { fill:var(--accent); fill-opacity:.08; stroke:var(--accent-bright); stroke-width:.1; vector-effect:non-scaling-stroke; }
 .editor-toolbar[data-mode='input'] .editor-tool--input { border-color:var(--accent); color:var(--accent-bright); background:rgba(242,13,61,.12); }
 .editor-score { cursor:default; }
 .editor-toolbar[data-mode='input'] ~ .editor-workspace .editor-score { cursor:crosshair; }
+
+/* Palette: a left rail of marks applied to the selection. It sits inside
+   the workspace so the score keeps its full width when it is closed. */
+.editor-workspace { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+.editor-workspace > .editor-canvas { flex:1 1 auto; min-width:0; }
+.editor-workspace > .editor-status { flex:1 0 100%; }
+.editor-palette { flex:0 0 210px; display:flex; flex-direction:column; gap:14px; padding:12px; border:1px solid var(--border); border-radius:14px; background:linear-gradient(145deg,rgba(18,28,42,.96),rgba(10,16,26,.96)); }
+.editor-palette[hidden] { display:none; }
+.editor-palette__heading { margin:0 0 8px; color:var(--muted); font-family:'DM Mono',monospace; font-size:9px; font-weight:500; letter-spacing:.14em; text-transform:uppercase; }
+.editor-palette__grid { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
+.editor-palette__grid--wide { grid-template-columns:repeat(3,1fr); }
+.editor-palette__item { display:flex; min-height:52px; align-items:center; justify-content:center; flex-direction:column; gap:3px; padding:6px 4px; border:1px solid var(--border); border-radius:9px; color:var(--text); background:rgba(255,255,255,.04); cursor:pointer; }
+.editor-palette__item:hover { border-color:var(--accent); background:rgba(242,13,61,.1); }
+.editor-palette__item[aria-pressed='true'] { border-color:var(--accent); color:var(--accent-bright); background:rgba(242,13,61,.16); }
+.editor-palette__glyph { font-family:'Bravura',serif; font-size:19px; line-height:1; }
+.editor-palette__label { color:var(--muted); font-size:8.5px; letter-spacing:.01em; white-space:nowrap; }
+.editor-palette__item[aria-pressed='true'] .editor-palette__label { color:var(--accent-bright); }
+:root[data-theme='light'] .editor-palette { background:linear-gradient(145deg,#fff,#f6f8fb); }
+:root[data-theme='light'] .editor-palette__item { background:rgba(15,23,42,.03); }
+:root[data-theme='light'] .editor-palette__item:hover { background:rgba(242,13,61,.07); }
+:root[data-theme='light'] .editor-palette__item[aria-pressed='true'] { background:rgba(242,13,61,.11); }
 
 
 .editor-status { display:flex; align-items:center; gap:10px; margin:10px 2px 0; color:var(--muted); font-size:11px; }
@@ -669,6 +701,12 @@ body.is-newscore-open { overflow:hidden; }
   .editor-tool { height:32px; padding:0 8px; }
   .editor-toolbar__divider { display:none; }
   .editor-workspace { padding:10px 8px 20px; }
+  .editor-palette { flex:1 0 100%; order:-1; }
+  .editor-palette__grid { grid-template-columns:repeat(5,1fr); }
+  .editor-palette__grid--wide { grid-template-columns:repeat(6,1fr); }
+  .editor-palette__item { min-height:44px; }
+  .editor-palette__label { display:none; }
+  .editor-palette__glyph { font-size:17px; }
   .editor-canvas { min-height:calc(100vh - var(--header-height) - var(--bottom-height) - var(--editor-bottom-height) - 120px); }
   .editor-score { padding:12px; }
   .editor-bottombar { padding:0 10px; gap:4px; }

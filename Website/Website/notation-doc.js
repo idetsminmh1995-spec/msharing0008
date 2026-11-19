@@ -30,6 +30,29 @@
     2: 'double-sharp',
   };
 
+  /**
+   * The engine's `ArticulationType` / `OrnamentType` names back to the
+   * MusicXML elements that produce them. The engine's parser already
+   * reads these, so writing the same elements is what makes a palette
+   * edit survive a save -- without it the mark would draw once and then
+   * vanish on reload. `marcato` is MusicXML's `strong-accent`, and
+   * `turnInverted` is `inverted-turn`: same marks, different names.
+   */
+  const ARTICULATION_ELEMENT = {
+    accent: 'accent',
+    marcato: 'strong-accent',
+    staccato: 'staccato',
+    tenuto: 'tenuto',
+    staccatissimo: 'staccatissimo',
+  };
+
+  const ORNAMENT_ELEMENT = {
+    trill: 'trill-mark',
+    mordent: 'mordent',
+    turn: 'turn',
+    turnInverted: 'inverted-turn',
+  };
+
   const CLEF_BY_SIGN = {
     treble: { sign: 'G', line: 2 },
     bass: { sign: 'F', line: 4 },
@@ -251,6 +274,111 @@
     }));
   }
 
+  /**
+   * Deletes a set of events, leaving a rest of the same length in each
+   * one's place.
+   *
+   * This is MuseScore's Delete: the notes go, the rhythm stays. Simply
+   * removing the events would shrink the voice's drawn span and pull
+   * every later note leftwards, which is what makes a bar look like it
+   * lost a beat. Replacing each deleted note with a rest of its own
+   * duration keeps the bar full and every later note where the user last
+   * saw it.
+   *
+   * `cells` is a list of `{ partId, measureNumber, voiceId, eventIndex }`
+   * so a range can cross measures and staves. Cells are deleted from the
+   * highest index down, so earlier indices stay valid as the list shrinks.
+   */
+  function deleteEvents(doc, cells) {
+    const byVoice = new Map();
+    for (const cell of cells) {
+      const key = `${cell.partId}|${cell.measureNumber}|${cell.voiceId}`;
+      if (!byVoice.has(key)) byVoice.set(key, { ...cell, indices: [] });
+      byVoice.get(key).indices.push(cell.eventIndex);
+    }
+    let next = doc;
+    for (const group of byVoice.values()) {
+      const { partId, measureNumber, voiceId } = group;
+      const indices = [...new Set(group.indices)].sort((a, b) => b - a);
+      const capacity = ticksPerMeasure(next, partId, measureNumber);
+      next = updateVoice(next, partId, measureNumber, voiceId, (events) => {
+        const working = sortEvents(events);
+        for (const index of indices) {
+          const event = working[index];
+          if (!event) continue;
+          working[index] = E.rest({
+            duration: event.duration,
+            voice: event.voice,
+            staff: event.staff ?? 1,
+            startTick: event.startTick ?? 0,
+          });
+        }
+        return padVoiceToCapacity(sortEvents(working), voiceId, capacity, 1);
+      });
+    }
+    return next;
+  }
+
+  /**
+   * Applies a mark to one event. `patch` names the fields to merge, and
+   * a `null` value removes the field -- which is how the palette toggles
+   * a mark off without needing a second command per mark.
+   */
+  function patchEvent(doc, { partId, measureNumber, voiceId = 1, eventIndex, patch }) {
+    return updateVoice(doc, partId, measureNumber, voiceId, (events) => {
+      const sorted = sortEvents(events);
+      const current = sorted[eventIndex];
+      if (!current) return sorted;
+      const apply = (target) => {
+        const next = { ...target };
+        for (const [key, value] of Object.entries(patch)) {
+          if (value === null || value === undefined) delete next[key];
+          else next[key] = value;
+        }
+        return next;
+      };
+      // A chord's marks belong to each of its notes, so a palette action
+      // on a chord marks every note in it -- which is what MuseScore does.
+      sorted[eventIndex] = current.kind === 'chord'
+        ? { ...current, notes: current.notes.map(apply) }
+        : apply(current);
+      return sorted;
+    });
+  }
+
+  /** Replaces one dynamic at a tick, or inserts it, keeping directions sorted. */
+  function setDynamic(doc, { partId, measureNumber, tick, level, placement = 'below' }) {
+    const directions = doc.directions ?? [];
+    const index = directions.findIndex(
+      (direction) => direction.partId === partId && direction.measureNumber === measureNumber && direction.tick === tick,
+    );
+    if (level === null) {
+      if (index < 0) return doc;
+      return { ...doc, directions: directions.filter((_, i) => i !== index) };
+    }
+    const direction = {
+      partId,
+      measureNumber,
+      tick,
+      staff: 1,
+      placement,
+      dynamics: [level],
+      wedges: [],
+      pedals: [],
+      words: [],
+      rehearsals: [],
+    };
+    const next = index < 0
+      ? [...directions, direction]
+      : directions.map((current, i) => (i === index ? direction : current));
+    return { ...doc, directions: next.sort((a, b) => a.measureNumber - b.measureNumber || a.tick - b.tick) };
+  }
+
+  const dynamicAt = (doc, partId, measureNumber, tick) =>
+    (doc.directions ?? []).find(
+      (direction) => direction.partId === partId && direction.measureNumber === measureNumber && direction.tick === tick,
+    )?.dynamics?.[0] ?? null;
+
   function deleteEvent(doc, { partId, measureNumber, voiceId = 1, eventIndex }) {
     return updateVoice(doc, partId, measureNumber, voiceId, (events) =>
       sortEvents(events.filter((_, index) => index !== eventIndex)),
@@ -363,6 +491,28 @@
     return `<duration>${toDivisions(event.duration.ticks, divisions)}</duration><voice>${event.voice}</voice><type>${event.duration.type}</type>${dots}`;
   }
 
+  /**
+   * A note's `<notations>`: articulations and ornaments, in the order the
+   * palette applied them. Returns '' when the note carries none, so an
+   * ordinary note stays byte-identical to what the editor wrote before
+   * this existed.
+   */
+  function notationsXml(note) {
+    const articulations = (note.articulations ?? []).filter((mark) => ARTICULATION_ELEMENT[mark]);
+    const ornaments = (note.ornaments ?? []).filter((mark) => ORNAMENT_ELEMENT[mark]);
+    if (articulations.length === 0 && ornaments.length === 0 && !note.hasFermata) return '';
+    const inner = [
+      articulations.length
+        ? `<articulations>${articulations.map((mark) => `<${ARTICULATION_ELEMENT[mark]}/>`).join('')}</articulations>`
+        : '',
+      ornaments.length
+        ? `<ornaments>${ornaments.map((mark) => `<${ORNAMENT_ELEMENT[mark]}/>`).join('')}</ornaments>`
+        : '',
+      note.hasFermata ? '<fermata/>' : '',
+    ].join('');
+    return `<notations>${inner}</notations>`;
+  }
+
   function eventXml(event, divisions) {
     const staff = event.staff ?? 1;
     const common = noteCommon(event, divisions);
@@ -373,11 +523,11 @@
       return event.notes
         .map((note, index) => {
           const chordTag = index > 0 ? '<chord/>' : '';
-          return `<note>${chordTag}${pitchXml(note)}${common}${accidentalXml(note)}<staff>${staff}</staff></note>`;
+          return `<note>${chordTag}${pitchXml(note)}${common}${accidentalXml(note)}<staff>${staff}</staff>${notationsXml(note)}</note>`;
         })
         .join('');
     }
-    return `<note>${pitchXml(event)}${common}${accidentalXml(event)}<staff>${staff}</staff></note>`;
+    return `<note>${pitchXml(event)}${common}${accidentalXml(event)}<staff>${staff}</staff>${notationsXml(event)}</note>`;
   }
 
   function attributesXml(attribute, divisions, previous) {
@@ -407,10 +557,51 @@
     );
   }
 
+  /**
+   * One `<direction>` for a dynamic mark. The engine reads dynamics from
+   * `doc.directions`, so the writer has to emit them or a dynamic applied
+   * in the palette would draw once and disappear on the next load.
+   *
+   * `placement` is written only when the mark is above, matching the
+   * engine's own default (below) and keeping ordinary marks short.
+   */
+  function directionXml(direction) {
+    const children = (direction.dynamics ?? [])
+      .map((level) => `<${level}/>`)
+      .join('');
+    if (!children) return '';
+    const placement = direction.placement === 'above' ? ' placement="above"' : '';
+    return (
+      '<direction' +
+      placement +
+      '>' +
+      '<direction-type>' +
+      `<dynamics>${children}</dynamics>` +
+      '</direction-type>' +
+      `<staff>${direction.staff ?? 1}</staff>` +
+      '</direction>'
+    );
+  }
+
   function measureXml(doc, partId, measure, divisions, previousAttribute) {
     const attribute = attributeFor(doc, partId, measure.number);
     const head = attributesXml(attribute, divisions, previousAttribute);
     const body = [];
+    // Dynamics carry their own tick, and MusicXML wants them where they
+    // sound. Sorting them by tick and flushing each one just before the
+    // first note at or after that tick keeps the file readable and keeps
+    // the engine's own tick bookkeeping exact.
+    const directions = (doc.directions ?? [])
+      .filter((direction) => direction.partId === partId && direction.measureNumber === measure.number)
+      .sort((a, b) => (a.tick ?? 0) - (b.tick ?? 0));
+    let directionIndex = 0;
+    const flushDirections = (upToTick) => {
+      while (directionIndex < directions.length && (directions[directionIndex].tick ?? 0) <= upToTick) {
+        const xml = directionXml(directions[directionIndex]);
+        if (xml) body.push(xml);
+        directionIndex += 1;
+      }
+    };
     measure.voices.forEach((voice, voiceIndex) => {
       let cursor = 0;
       for (const event of sortEvents(voice.events)) {
@@ -420,6 +611,7 @@
         } else if (start < cursor) {
           body.push(`<backup><duration>${toDivisions(cursor - start, divisions)}</duration></backup>`);
         }
+        flushDirections(start);
         body.push(eventXml(event, divisions));
         cursor = start + event.duration.ticks;
       }
@@ -427,6 +619,7 @@
         body.push(`<backup><duration>${toDivisions(cursor, divisions)}</duration></backup>`);
       }
     });
+    flushDirections(Number.POSITIVE_INFINITY);
     return `<measure number="${measure.number}">${head}${body.join('')}</measure>`;
   }
 
@@ -499,6 +692,10 @@
     divisionsFor,
     insertEvent,
     deleteEvent,
+    deleteEvents,
+    patchEvent,
+    setDynamic,
+    dynamicAt,
     replaceEvent,
     setVoiceEvents,
     setSetup,

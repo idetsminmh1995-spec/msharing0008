@@ -52,6 +52,10 @@
   const accidentalButtons = [...document.querySelectorAll('[data-editor-accidental]')];
   const dotButton = pick('[data-editor-dot]');
   const restButton = pick('[data-editor-rest]');
+  const voiceSelect = pick('[data-editor-voice]');
+  const palette = pick('[data-editor-palette]');
+  const paletteToggle = pick('[data-editor-palette-toggle]');
+  const paletteItems = [...document.querySelectorAll('[data-editor-palette-mark]')];
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const ACCIDENTAL_ALTER = { sharp: 1, flat: -1, natural: 0 };
@@ -71,6 +75,17 @@
     drumInstruments: null,
     tempoMarks: null,
     selection: null,
+    // The full selection, as cells. A plain click leaves exactly one; a
+    // Shift-click or a rubber band leaves many. `selection` stays the
+    // anchor (where the cursor sits), `range` is what is painted and what
+    // commands act on -- MuseScore's own split between the anchor note and
+    // the blue band.
+    range: [],
+    drag: null,
+    marquee: null,
+    // The voice being written into. A measure can hold up to four, and a
+    // voice is the only way to write a second line on one staff.
+    voice: 1,
     entry: null,
     history: [],
     future: [],
@@ -217,6 +232,17 @@
 
   const eventsIn = (measureNumber, voiceId = 1) => {
     const measure = partById(activePartId())?.measures.find((m) => m.number === measureNumber);
+    return measure?.voices.find((voice) => voice.id === voiceId)?.events ?? [];
+  };
+
+  /**
+   * The same lookup against an arbitrary document. A drag reads its base
+   * document (the one from before the gesture) rather than the live one,
+   * so repeated pointer moves never compound on each other.
+   */
+  const eventsInFrom = (doc, measureNumber, voiceId, partId) => {
+    const measure = doc?.score.parts.find((part) => part.id === partId)
+      ?.measures.find((m) => m.number === measureNumber);
     return measure?.voices.find((voice) => voice.id === voiceId)?.events ?? [];
   };
 
@@ -376,10 +402,18 @@
       if (group) group.setAttribute('data-editor-selected', 'true');
     };
 
+    // The anchor gets the solid highlight; the rest of the range gets the
+    // lighter band, so a long selection still shows where the cursor is.
+    for (const cell of state.range) {
+      mark(engine.notationEventId(cell.partId, cell.measureNumber, cell.voiceId, cell.eventIndex));
+    }
     if (state.selection) {
-      mark(engine.notationEventId(
+      const id = engine.notationEventId(
         state.selection.partId, state.selection.measureNumber, state.selection.voiceId, state.selection.eventIndex,
-      ));
+      );
+      mark(id);
+      const anchor = svg.querySelector(`[data-id="${id}"]`);
+      if (anchor && state.range.length > 1) anchor.setAttribute('data-editor-anchor', 'true');
     }
     if (state.soundingId) mark(state.soundingId);
 
@@ -408,6 +442,17 @@
       }));
     }
 
+    if (state.marquee) {
+      const { x, y, width, height } = state.marquee;
+      overlay.appendChild(svgElement('rect', {
+        class: 'editor-marquee',
+        x,
+        y,
+        width,
+        height,
+      }));
+    }
+
     if (overlay.childElementCount > 0) svg.appendChild(overlay);
   }
 
@@ -433,6 +478,7 @@
       setControlsEnabled(true);
       syncHistory();
       syncPartSelect();
+      syncPalette();
       updateZoom();
       refreshTempo();
       const errors = (result.diagnostics || []).filter((item) => item.severity === 'error');
@@ -454,7 +500,7 @@
     state.activePartId = null;
     state.drumInstruments = null;
     state.tempoMarks = null;
-    state.selection = null;
+    clearSelection();
     state.entry = null;
     state.history.length = 0;
     state.future.length = 0;
@@ -523,8 +569,8 @@
     state.filename = name;
     state.history.length = 0;
     state.future.length = 0;
-    state.selection = null;
-    state.entry = { partId: activePartId(), measureNumber: 1, voiceId: 1, tick: 0, systemIndex: 0 };
+    clearSelection();
+    state.entry = { partId: activePartId(), measureNumber: 1, voiceId: state.voice, tick: 0, systemIndex: 0 };
     setFile(name);
     render();
     announce('Score ready.');
@@ -567,13 +613,51 @@
       state.entry = { ...state.entry, measureNumber: last, tick: 0 };
     }
     if (state.selection && !measures.some((m) => m.number === state.selection.measureNumber)) {
-      state.selection = null;
+      clearSelection();
     }
+    state.range = state.range.filter((cell) => eventsIn(cell.measureNumber, cell.voiceId)[cell.eventIndex]);
   }
 
-  function selectEvent(partId, measureNumber, voiceId, eventIndex) {
+  /** The selected cells, falling back to the anchor when no range is painted. */
+  const selectedCells = () =>
+    state.range.length > 0 ? state.range : state.selection ? [state.selection] : [];
+
+  /** The event behind a cell, or null when the cell has gone stale. */
+  const eventFor = (cell) =>
+    cell ? eventsIn(cell.measureNumber, cell.voiceId)[cell.eventIndex] ?? null : null;
+
+  function setSelection(cells, anchor = null) {
+    state.range = cells;
+    state.selection = anchor ?? cells[0] ?? null;
+  }
+
+  /**
+   * Selects one event. With `extend`, the range grows from the existing
+   * anchor to this event -- MuseScore's Shift-click. The span is taken in
+   * reading order (measure, then voice, then event index), so extending
+   * backwards works as well as forwards.
+   */
+  function selectEvent(partId, measureNumber, voiceId, eventIndex, { extend = false } = {}) {
     const events = eventsIn(measureNumber, voiceId);
-    state.selection = { partId, measureNumber, voiceId, eventIndex };
+    const anchor = state.selection;
+    const target = { partId, measureNumber, voiceId, eventIndex };
+    if (extend && anchor) {
+      const from = { ...anchor };
+      const cells = [];
+      const ordered = cellsBetween(from, target);
+      cells.push(...ordered);
+      setSelection(cells, anchor);
+      state.entry = {
+        partId: anchor.partId,
+        measureNumber: anchor.measureNumber,
+        voiceId: anchor.voiceId,
+        tick: eventFor(anchor)?.startTick ?? 0,
+        systemIndex: state.entry?.systemIndex ?? 0,
+      };
+      render();
+      return;
+    }
+    setSelection([target], target);
     state.entry = {
       partId,
       measureNumber,
@@ -584,12 +668,298 @@
     render();
   }
 
+  /**
+   * Every event from `from` to `to` in reading order, inclusive.
+   *
+   * A score reads measure by measure, and within a measure voice by
+   * voice. Both ends can sit anywhere, so the walk starts at whichever
+   * comes first and stops at whichever comes last -- which is what makes
+   * a Shift-click backwards behave the same as one forwards.
+   */
+  function cellsBetween(from, to) {
+    const key = (cell) => [cell.measureNumber, cell.voiceId, cell.eventIndex];
+    const compare = (a, b) => {
+      const [am, av, ae] = key(a);
+      const [bm, bv, be] = key(b);
+      return am - bm || av - bv || ae - be;
+    };
+    const [start, end] = compare(from, to) <= 0 ? [from, to] : [to, from];
+    const cells = [];
+    for (let measureNumber = start.measureNumber; measureNumber <= end.measureNumber; measureNumber += 1) {
+      const measure = partById(activePartId())?.measures.find((m) => m.number === measureNumber);
+      if (!measure) continue;
+      for (const voice of measure.voices) {
+        const count = voice.events.length;
+        for (let eventIndex = 0; eventIndex < count; eventIndex += 1) {
+          const cell = { partId: activePartId(), measureNumber, voiceId: voice.id, eventIndex };
+          if (compare(cell, start) < 0 || compare(cell, end) > 0) continue;
+          cells.push(cell);
+        }
+      }
+    }
+    return cells;
+  }
+
+  /** Ctrl+A: every note in the active part, as one range. */
+  function selectAll() {
+    if (!state.doc) return;
+    const partId = activePartId();
+    const measures = partById(partId)?.measures ?? [];
+    const cells = [];
+    for (const measure of measures) {
+      for (const voice of measure.voices) {
+        for (let eventIndex = 0; eventIndex < voice.events.length; eventIndex += 1) {
+          if (voice.events[eventIndex].kind === 'rest') continue;
+          cells.push({ partId, measureNumber: measure.number, voiceId: voice.id, eventIndex });
+        }
+      }
+    }
+    if (cells.length === 0) {
+      announce('Nothing to select.');
+      return;
+    }
+    setSelection(cells, cells[0]);
+    state.entry = {
+      partId,
+      measureNumber: cells[0].measureNumber,
+      voiceId: cells[0].voiceId,
+      tick: eventFor(cells[0])?.startTick ?? 0,
+      systemIndex: state.entry?.systemIndex ?? 0,
+    };
+    announce(`Selected ${cells.length} note${cells.length === 1 ? '' : 's'}.`);
+    render();
+  }
+
+  /** Clears the selection and any painted range. */
+  function clearSelection() {
+    state.range = [];
+    state.selection = null;
+  }
+
+  // ---- palette -----------------------------------------------------------
+  //
+  // A palette mark is a property of a note, not a mode: clicking "staccato"
+  // applies it to the selection and the button stays lit while every
+  // selected note already carries it. Clicking again removes it, which is
+  // how MuseScore's palette toggles work and saves a separate eraser.
+
+  // The glyph each palette button shows. Names are SMuFL's own, so the
+  // palette draws the exact mark the score will, and a font update can
+  // never leave the button showing a different symbol from the note.
+  const PALETTE_GLYPH = {
+    articulation: {
+      accent: 'articAccentAbove',
+      staccato: 'articStaccatoAbove',
+      tenuto: 'articTenutoAbove',
+      marcato: 'articMarcatoAbove',
+      staccatissimo: 'articStaccatissimoAbove',
+    },
+    ornament: {
+      trill: 'ornamentTrill',
+      mordent: 'ornamentMordent',
+      turn: 'ornamentTurn',
+      turnInverted: 'ornamentTurnInverted',
+    },
+    dynamic: {
+      pp: 'dynamicPP',
+      p: 'dynamicPiano',
+      mp: 'dynamicMP',
+      mf: 'dynamicMF',
+      f: 'dynamicForte',
+      ff: 'dynamicFF',
+    },
+    fermata: { fermata: 'fermataAbove' },
+  };
+
+  /** Fills each palette button with the glyph the engine's own font uses. */
+  function paintPaletteGlyphs() {
+    for (const item of paletteItems) {
+      const kind = item.dataset.editorPaletteMark;
+      const value = item.dataset.editorPaletteValue;
+      const name = PALETTE_GLYPH[kind]?.[value];
+      const glyph = name ? engine.getGlyph?.(name) : null;
+      const host = item.querySelector('.editor-palette__glyph');
+      if (host && glyph?.char) host.textContent = glyph.char;
+    }
+  }
+
+  // A fermata is a single flag on the note rather than a list, so it is
+  // patched through its own boolean field instead of an array.
+  const MARKS = {
+    articulation: { field: 'articulations' },
+    ornament: { field: 'ornaments' },
+    fermata: { field: 'hasFermata' },
+  };
+
+  /** The notes a palette action should touch: the selection, minus rests. */
+  const paletteTargets = () =>
+    selectedCells().filter((cell) => {
+      const event = eventFor(cell);
+      return event && event.kind !== 'rest';
+    });
+
+  const noteCarries = (note, kind, value) => {
+    if (kind === 'fermata') return Boolean(note.hasFermata);
+    return (note[MARKS[kind].field] ?? []).includes(value);
+  };
+
+  const eventNotes = (event) => (event.kind === 'chord' ? event.notes : [event]);
+
+  /** True when every selected note already has this mark. */
+  function selectionCarries(kind, value) {
+    const cells = paletteTargets();
+    if (cells.length === 0) return false;
+    return cells.every((cell) => eventNotes(eventFor(cell)).every((note) => noteCarries(note, kind, value)));
+  }
+
+  /**
+   * Applies or removes a mark on every selected note.
+   *
+   * The whole selection is one command, so undoing a palette click on a
+   * phrase restores the phrase rather than peeling it off one note at a
+   * time -- and the toggle is decided from the SELECTION's state, not from
+   * each note's, so a mixed selection becomes uniform instead of flipping
+   * half of it.
+   */
+  function applyMark(kind, value) {
+    const cells = paletteTargets();
+    if (cells.length === 0) {
+      announce('Select a note first.');
+      return;
+    }
+    const removing = selectionCarries(kind, value);
+    const definition = MARKS[kind];
+    commit((doc) => {
+      let next = doc;
+      for (const cell of cells) {
+        const event = eventFor(cell);
+        if (!event) continue;
+        const patch = {};
+        if (kind === 'fermata') {
+          patch.hasFermata = removing ? null : true;
+        } else {
+          const field = definition.field;
+          // Each note keeps its own list, so a chord's notes each get the
+          // mark and the patch is built from the note's own current state.
+          const apply = (note) => {
+            const current = note[field] ?? [];
+            return removing ? current.filter((mark) => mark !== value) : [...new Set([...current, value])];
+          };
+          if (event.kind === 'chord') {
+            patch.notes = event.notes.map((note) => {
+              const list = apply(note);
+              const copy = { ...note };
+              if (list.length === 0) delete copy[field];
+              else copy[field] = list;
+              return copy;
+            });
+          } else {
+            const list = apply(event);
+            patch[field] = list.length === 0 ? null : list;
+          }
+        }
+        next = docTools.patchEvent(next, {
+          partId: cell.partId,
+          measureNumber: cell.measureNumber,
+          voiceId: cell.voiceId,
+          eventIndex: cell.eventIndex,
+          patch,
+        });
+      }
+      return next;
+    }, `${removing ? 'Removed' : 'Added'} ${kind === 'fermata' ? 'fermata' : value}.`);
+    syncPalette();
+  }
+
+  /**
+   * Applies or removes a dynamic at the selection's own tick.
+   *
+   * A dynamic belongs to a tick, not a note, so a range applies it at each
+   * distinct tick it covers: selecting a phrase and pressing *ff* marks the
+   * start of each affected note. A range of tied or chorded notes that
+   * share one tick gets a single mark.
+   */
+  function applyDynamic(level) {
+    const cells = paletteTargets();
+    if (cells.length === 0) {
+      announce('Select a note first.');
+      return;
+    }
+    const targets = cells.map((cell) => ({ cell, event: eventFor(cell) })).filter((target) => target.event);
+    if (targets.length === 0) return;
+    const current = docTools.dynamicAt(state.doc, targets[0].cell.partId, targets[0].cell.measureNumber, targets[0].event.startTick ?? 0);
+    const removing = current === level;
+    commit((doc) => {
+      let next = doc;
+      const seen = new Set();
+      for (const { cell, event } of targets) {
+        const tick = event.startTick ?? 0;
+        const key = `${cell.partId}|${cell.measureNumber}|${tick}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        next = docTools.setDynamic(next, {
+          partId: cell.partId,
+          measureNumber: cell.measureNumber,
+          tick,
+          level: removing ? null : level,
+          placement: 'below',
+        });
+      }
+      return next;
+    }, removing ? `Removed ${level}.` : `Added ${level}.`);
+    syncPalette();
+  }
+
+  /** Lights the palette buttons that the current selection already carries. */
+  function syncPalette() {
+    if (!palette) return;
+    const cell = paletteTargets()[0] ?? null;
+    const event = eventFor(cell);
+    const tick = event?.startTick ?? 0;
+    const dynamic = cell && state.doc ? docTools.dynamicAt(state.doc, cell.partId, cell.measureNumber, tick) : null;
+    for (const item of paletteItems) {
+      const kind = item.dataset.editorPaletteMark;
+      const value = item.dataset.editorPaletteValue;
+      const active = kind === 'dynamic'
+        ? dynamic === value
+        : selectionCarries(kind, kind === 'fermata' ? true : value);
+      item.setAttribute('aria-pressed', String(Boolean(active)));
+    }
+    const voiceButton = document.querySelector(`[data-editor-voice]`);
+    if (voiceButton) voiceButton.value = String(state.voice);
+  }
+
+  function setPalette(open) {
+    if (!palette || !paletteToggle) return;
+    palette.hidden = !open;
+    paletteToggle.setAttribute('aria-expanded', String(open));
+    paletteToggle.setAttribute('aria-pressed', String(open));
+  }
+
+  /** Switches the voice that new notes are written into. */
+  function setVoice(voiceId) {
+    const id = Math.min(4, Math.max(1, Number(voiceId) || 1));
+    state.voice = id;
+    if (voiceSelect) voiceSelect.value = String(id);
+    if (state.entry) state.entry = { ...state.entry, voiceId: id };
+    announce(`Voice ${id}.`);
+    render();
+  }
+
   function moveSelection(direction) {
     if (!state.selection) return;
     const { measureNumber, voiceId, eventIndex } = state.selection;
     const events = eventsIn(measureNumber, voiceId);
-    const nextIndex = eventIndex + direction;
-    if (nextIndex >= 0 && nextIndex < events.length) {
+    // Arrow keys step note to note, the way MuseScore walks a phrase: a
+    // rest between two notes is skipped rather than becoming a stop.
+    const step = (from, delta) => {
+      for (let index = from + delta; index >= 0 && index < events.length; index += delta) {
+        if (events[index]?.kind !== 'rest') return index;
+      }
+      return -1;
+    };
+    const nextIndex = step(eventIndex, direction);
+    if (nextIndex >= 0) {
       selectEvent(activePartId(), measureNumber, voiceId, nextIndex);
       return;
     }
@@ -598,12 +968,14 @@
       if (!state.doc.score.parts[0].measures.some((m) => m.number === nextMeasure)) {
         state.doc = docTools.appendMeasure(state.doc, activePartId());
       }
-      if (eventsIn(nextMeasure, voiceId).length > 0) {
-        selectEvent(activePartId(), nextMeasure, voiceId, 0);
+      const nextEvents = eventsIn(nextMeasure, voiceId);
+      const firstNote = nextEvents.findIndex((event) => event.kind !== 'rest');
+      if (firstNote >= 0) {
+        selectEvent(activePartId(), nextMeasure, voiceId, firstNote);
         return;
       }
       state.entry = { partId: activePartId(), measureNumber: nextMeasure, voiceId, tick: 0, systemIndex: state.entry?.systemIndex ?? 0 };
-      state.selection = null;
+      clearSelection();
       announce(`Measure ${nextMeasure}.`);
       render();
       return;
@@ -611,38 +983,101 @@
     if (measureNumber > 1) {
       const previous = measureNumber - 1;
       const previousEvents = eventsIn(previous, voiceId);
-      selectEvent(activePartId(), previous, voiceId, Math.max(0, previousEvents.length - 1));
+      const lastNote = previousEvents.reduce((found, event, index) => (event.kind !== 'rest' ? index : found), -1);
+      if (lastNote >= 0) selectEvent(activePartId(), previous, voiceId, lastNote);
     }
   }
 
-  const shiftPitch = (pitch, semitones) => engine.soundingPitch(pitch, semitones);
-
-  function transposeSelection(semitones) {
-    if (!state.selection) return;
-    const { partId, measureNumber, voiceId, eventIndex } = state.selection;
-    const event = eventsIn(measureNumber, voiceId)[eventIndex];
-    if (!event || event.kind === 'rest') return;
-    const moved = event.kind === 'chord'
-      ? { ...event, notes: event.notes.map((note) => ({ ...note, pitch: shiftPitch(note.pitch, semitones) })) }
-      : { ...event, pitch: shiftPitch(event.pitch, semitones) };
-    commit((doc) => docTools.replaceEvent(doc, { partId, measureNumber, voiceId, eventIndex, event: moved }),
-      `Moved ${semitones > 0 ? 'up' : 'down'}.`);
-    previewPitch(moved.kind === 'chord' ? moved.notes[0].pitch : moved.pitch);
+  /**
+   * Moves one note by whole staff steps.
+   *
+   * MuseScore's Up/Down are diatonic: C becomes D, never C sharp, and the
+   * accidental that was written travels with the note. So this walks the
+   * staff's own diatonic ladder rather than adding semitones -- which is
+   * also what makes an octave exactly seven steps in both directions,
+   * whatever the key signature.
+   */
+  function transposeNote(pitch, steps, clef) {
+    if (!pitch || pitch.kind === 'unpitched') return pitch;
+    const position = engine.staffPositionForPitch(clef, pitch.step, pitch.octave);
+    const moved = docTools.pitchFromStaffPosition(clef, position - steps * 0.5);
+    return { ...pitch, step: moved.step, octave: moved.octave };
   }
 
+  /**
+   * Transposes every note in the selection. The whole range moves as one
+   * command, so a Shift-click selection and a single note behave the same
+   * and undo once.
+   */
+  function transposeSelection(steps) {
+    const cells = selectedCells();
+    if (cells.length === 0) return;
+    const movable = cells.filter((cell) => {
+      const event = eventFor(cell);
+      return event && event.kind !== 'rest';
+    });
+    if (movable.length === 0) return;
+    commit((doc) => {
+      let next = doc;
+      for (const cell of movable) {
+        const event = eventFor(cell);
+        const clef = clefAt(cell.measureNumber);
+        const patch = event.kind === 'chord'
+          ? { notes: event.notes.map((note) => ({ ...note, pitch: transposeNote(note.pitch, steps, clef) })) }
+          : { pitch: transposeNote(event.pitch, steps, clef) };
+        next = docTools.patchEvent(next, {
+          partId: cell.partId,
+          measureNumber: cell.measureNumber,
+          voiceId: cell.voiceId,
+          eventIndex: cell.eventIndex,
+          patch,
+        });
+      }
+      return next;
+    }, describeTranspose(steps, movable.length));
+    const first = eventFor(movable[0]);
+    if (first && first.kind !== 'chord') previewPitch(first.pitch);
+  }
+
+  /** The status line MuseScore would show: one note names the move, many count it. */
+  function describeTranspose(steps, count) {
+    const direction = steps > 0 ? 'up' : 'down';
+    const magnitude = Math.abs(steps);
+    if (count > 1) return `Moved ${count} notes ${direction} ${magnitude} step${magnitude === 1 ? '' : 's'}.`;
+    if (magnitude === 7) return `Moved ${direction} an octave.`;
+    return `Moved ${direction} ${magnitude} step${magnitude === 1 ? '' : 's'}.`;
+  }
+
+  /**
+   * Deletes the selection, leaving rests where the notes were.
+   *
+   * The anchor is kept so the cursor stays where the user was looking --
+   * MuseScore leaves the selection on the first rest of the cleared
+   * passage rather than dropping it.
+   */
   function deleteSelection() {
-    if (!state.selection) return;
-    const { partId, measureNumber, voiceId, eventIndex } = state.selection;
-    const remaining = eventsIn(measureNumber, voiceId).length - 1;
-    commit((doc) => docTools.deleteEvent(doc, { partId, measureNumber, voiceId, eventIndex }), 'Deleted.');
-    state.selection = remaining <= 0 ? null : { ...state.selection, eventIndex: Math.min(eventIndex, remaining - 1) };
+    const cells = selectedCells();
+    if (cells.length === 0) return;
+    const deletable = cells.filter((cell) => {
+      const event = eventFor(cell);
+      return event && event.kind !== 'rest';
+    });
+    if (deletable.length === 0) return;
+    const anchor = state.selection ? { ...state.selection } : { ...deletable[0] };
+    commit((doc) => docTools.deleteEvents(doc, deletable),
+      `Deleted ${deletable.length} note${deletable.length === 1 ? '' : 's'}.`);
+    // The event at the anchor's index is a rest now, so the anchor still
+    // points at the right place in the bar.
+    const anchorEvent = eventFor(anchor);
+    if (anchorEvent) setSelection([anchor], anchor);
+    else clearSelection();
     render();
   }
 
   function advanceEntry(ticks, measureNumber, voiceId) {
     const located = locateTick(state.entry.tick + ticks, measureNumber);
     state.entry = { ...state.entry, measureNumber: located.measureNumber, tick: located.tick, voiceId };
-    state.selection = null;
+    clearSelection();
     render();
   }
 
@@ -656,7 +1091,7 @@
   function insertAtEntry({ step = null, octave = null, rest = false, addToChord = false, staffPosition = null }) {
     if (!state.doc) return;
     if (!state.entry) {
-      state.entry = { partId: activePartId(), measureNumber: 1, voiceId: 1, tick: 0, systemIndex: 0 };
+      state.entry = { partId: activePartId(), measureNumber: 1, voiceId: state.voice, tick: 0, systemIndex: 0 };
     }
     const { measureNumber, voiceId } = state.entry;
     const capacity = capacityOf(measureNumber);
@@ -809,14 +1244,27 @@
         // order to transpose it is what note input OFF is for.
         if (state.noteInput && !state.tool.rest) {
           state.entry = { partId, measureNumber, voiceId, tick: existing.startTick ?? 0, systemIndex };
-          state.selection = null;
+          clearSelection();
           insertAtEntry({ step, octave, addToChord: event.shiftKey, staffPosition });
           return;
         }
-        state.selection = { partId, measureNumber, voiceId, eventIndex };
-        state.entry = { partId, measureNumber, voiceId, tick: existing.startTick ?? 0, systemIndex };
-        announce(state.noteInput ? `Measure ${measureNumber}, beat ready.` : 'Note selected.');
-        render();
+        // With note input off a click selects, Shift-click extends the
+        // range, and a drag moves the note to a new pitch -- MuseScore's
+        // three selection gestures.
+        selectEvent(partId, measureNumber, voiceId, eventIndex, { extend: event.shiftKey });
+        state.drag = {
+          kind: 'pitch',
+          pointerId: event.pointerId,
+          baseDoc: state.doc,
+          // Measured from where the POINTER went down, not from where the
+          // note is drawn: a note follows the pointer's own movement, so
+          // grabbing it off-centre never snaps it to the cursor.
+          startPosition: staffPosition,
+          anchor: { partId, measureNumber, voiceId, eventIndex },
+          steps: 0,
+        };
+        scoreHost.setPointerCapture?.(event.pointerId);
+        announce(event.shiftKey ? 'Range extended.' : 'Note selected.');
         return;
       }
     }
@@ -839,17 +1287,178 @@
     state.entry = {
       partId: activePartId(),
       measureNumber: position.measureNumber,
-      voiceId: 1,
+      voiceId: state.voice,
       tick: snappedTick,
       systemIndex,
     };
-    state.selection = null;
     if (state.noteInput) {
+      clearSelection();
       if (state.tool.rest) insertAtEntry({ rest: true });
       else insertAtEntry({ step, octave, staffPosition });
       return;
     }
+    // Note input off, empty staff: this is where a rubber band starts.
+    // MuseScore's band is the way to grab a phrase without clicking each
+    // note, so the gesture has to begin on empty space as well as on a
+    // note -- and it must not clear the selection until the band is
+    // actually dragged, or a plain click on empty staff would still be a
+    // selection gesture.
+    state.marquee = { originX: point.x, originY: point.y, x: point.x, y: point.y, width: 0, height: 0 };
+    state.drag = { kind: 'marquee', pointerId: event.pointerId };
+    scoreHost.setPointerCapture?.(event.pointerId);
     announce(`Measure ${position.measureNumber}, ${step}${octave}.`);
+    render();
+  }
+
+  /**
+   * A drag in flight.
+   *
+   * Two gestures share this handler because both start with a press on
+   * the score: moving a selected note's pitch, and dragging a rubber
+   * band. Which one is running is `state.drag.kind`.
+   */
+  function onScorePointerMove(event) {
+    const drag = state.drag;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const svg = scoreHost.querySelector('svg');
+    if (!svg) return;
+    const point = toSvgPoint(svg, event.clientX, event.clientY);
+    if (!point) return;
+
+    if (drag.kind === 'marquee') {
+      const { originX, originY } = state.marquee;
+      state.marquee = {
+        originX,
+        originY,
+        x: Math.min(originX, point.x),
+        y: Math.min(originY, point.y),
+        width: Math.abs(point.x - originX),
+        height: Math.abs(point.y - originY),
+      };
+      render();
+      return;
+    }
+
+    if (drag.kind !== 'pitch') return;
+    const steps = stepsFromPointer(drag, point);
+    if (steps === drag.steps) return;
+    drag.steps = steps;
+    applyDragTranspose(drag, steps);
+  }
+
+  /**
+   * Staff steps between the drag's start and the pointer.
+   *
+   * Staff positions are in half staff spaces -- one diatonic step is 0.5
+   * -- so the difference is doubled to count whole steps and rounded,
+   * because a pointer between two lines is nearer one of them.
+   */
+  function stepsFromPointer(drag, point) {
+    const svg = scoreHost.querySelector('svg');
+    if (!svg) return 0;
+    const staff = staffAt(detectStaves(svg), point.y);
+    if (!staff) return 0;
+    const position = staffPositionFromPoint(staff, point.y);
+    return Math.round((drag.startPosition - position) * 2);
+  }
+
+  /**
+   * Re-applies the drag's pitch from the document as it was when the drag
+   * began, so a long drag is one undo step rather than one per pointer
+   * move. The base document is re-read every time, which also means
+   * dragging back to the start leaves the note exactly as it was.
+   */
+  function applyDragTranspose(drag, steps) {
+    const { anchor } = drag;
+    const baseEvent = eventsInFrom(drag.baseDoc, anchor.measureNumber, anchor.voiceId, anchor.partId)[anchor.eventIndex];
+    if (!baseEvent || baseEvent.kind === 'rest') return;
+    if (steps === 0) {
+      state.doc = drag.baseDoc;
+      render();
+      return;
+    }
+    const clef = clefAt(anchor.measureNumber);
+    const patch = baseEvent.kind === 'chord'
+      ? { notes: baseEvent.notes.map((note) => ({ ...note, pitch: transposeNote(note.pitch, steps, clef) })) }
+      : { pitch: transposeNote(baseEvent.pitch, steps, clef) };
+    state.doc = docTools.patchEvent(drag.baseDoc, {
+      partId: anchor.partId,
+      measureNumber: anchor.measureNumber,
+      voiceId: anchor.voiceId,
+      eventIndex: anchor.eventIndex,
+      patch,
+    });
+    render();
+    announce(describeTranspose(steps, 1));
+  }
+
+  function onScorePointerUp(event) {
+    const drag = state.drag;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    scoreHost.releasePointerCapture?.(event.pointerId);
+    state.drag = null;
+
+    if (drag.kind === 'marquee') {
+      const band = state.marquee;
+      state.marquee = null;
+      if (band && (band.width > 0.3 || band.height > 0.3)) {
+        selectWithinBand(band);
+      } else {
+        // A press and release without movement is a plain click on empty
+        // staff: MuseScore clears the selection there.
+        clearSelection();
+        render();
+      }
+      return;
+    }
+
+    if (drag.kind === 'pitch' && drag.steps !== 0) {
+      // One history entry for the whole gesture: the document as it was
+      // before the drag, then the dragged one.
+      state.history.push(drag.baseDoc);
+      if (state.history.length > 100) state.history.shift();
+      state.future.length = 0;
+      syncHistory();
+    }
+    state.drag = null;
+  }
+
+  /** Everything whose drawn box the band covers, in reading order. */
+  function selectWithinBand(band) {
+    const svg = scoreHost.querySelector('svg');
+    if (!svg || !state.result) return;
+    const cells = [];
+    for (const group of svg.querySelectorAll('[data-id]')) {
+      let box;
+      try { box = group.getBBox(); } catch { continue; }
+      const overlaps =
+        box.x + box.width >= band.x &&
+        box.x <= band.x + band.width &&
+        box.y + box.height >= band.y &&
+        box.y <= band.y + band.height;
+      if (!overlaps) continue;
+      const [partId, measureToken, voiceToken, eventToken] = group.getAttribute('data-id').split('#');
+      const cell = {
+        partId,
+        measureNumber: Number(measureToken.replace('m', '')),
+        voiceId: Number(voiceToken.replace('v', '')),
+        eventIndex: Number(eventToken.replace('e', '')),
+      };
+      // Rests are not selectable, the same as a click on one.
+      if (eventFor(cell)?.kind === 'rest') continue;
+      cells.push(cell);
+    }
+    cells.sort((a, b) =>
+      a.measureNumber - b.measureNumber || a.voiceId - b.voiceId || a.eventIndex - b.eventIndex);
+    if (cells.length === 0) {
+      clearSelection();
+      announce('Nothing selected.');
+      render();
+      return;
+    }
+    setSelection(cells, cells[0]);
+    state.activePartId = cells[0].partId;
+    announce(`Selected ${cells.length} note${cells.length === 1 ? '' : 's'}.`);
     render();
   }
 
@@ -1470,8 +2079,8 @@
     if (!state.doc?.score.parts.some((part) => part.id === partId)) return;
     state.activePartId = partId;
     const measureNumber = Math.min(state.entry?.measureNumber ?? 1, measureCountOf(partId));
-    state.entry = { partId, measureNumber, voiceId: state.entry?.voiceId ?? 1, tick: 0, systemIndex: state.entry?.systemIndex ?? 0 };
-    state.selection = null;
+    state.entry = { partId, measureNumber, voiceId: state.entry?.voiceId ?? state.voice, tick: 0, systemIndex: state.entry?.systemIndex ?? 0 };
+    clearSelection();
     syncSetupControls();
     render();
     announce(`Writing into ${partNameOf(partId)}.`);
@@ -1509,6 +2118,9 @@
   removeMeasureButton.addEventListener('click', () => commit((doc) => docTools.removeLastMeasure(doc, activePartId()), 'Measure removed.'));
 
   scoreHost.addEventListener('pointerdown', onScorePointerDown);
+  scoreHost.addEventListener('pointermove', onScorePointerMove);
+  scoreHost.addEventListener('pointerup', onScorePointerUp);
+  scoreHost.addEventListener('pointercancel', onScorePointerUp);
 
   zoomIn.addEventListener('click', () => { state.zoom += 10; updateZoom(); });
   zoomOut.addEventListener('click', () => { state.zoom -= 10; updateZoom(); });
@@ -1552,6 +2164,21 @@
     announce(state.tool.rest ? 'Rests on.' : 'Rests off.');
   });
 
+  if (voiceSelect) voiceSelect.addEventListener('change', () => setVoice(voiceSelect.value));
+  if (paletteToggle) {
+    paletteToggle.addEventListener('click', () => {
+      const open = palette.hidden;
+      setPalette(open);
+      if (open) announce('Palette open.');
+    });
+  }
+  paletteItems.forEach((item) => item.addEventListener('click', () => {
+    const kind = item.dataset.editorPaletteMark;
+    const value = item.dataset.editorPaletteValue;
+    if (kind === 'dynamic') applyDynamic(value);
+    else applyMark(kind, kind === 'fermata' ? true : value);
+  }));
+
   [clefSelect, keySelect, timeSelect].forEach((select) => select.addEventListener('change', applySetup));
   if (partSelect) partSelect.addEventListener('change', onPartChange);
 
@@ -1565,13 +2192,31 @@
     if (modifier && (event.key.toLowerCase() === 'y' || (event.shiftKey && event.key.toLowerCase() === 'z'))) { event.preventDefault(); redo(); return; }
     if (modifier && event.key === '=') { event.preventDefault(); state.zoom += 10; updateZoom(); return; }
     if (modifier && event.key === '-') { event.preventDefault(); state.zoom -= 10; updateZoom(); return; }
+    // Ctrl+Alt+1-4 picks the voice, MuseScore's own shortcut. It is
+    // checked before the plain-digit note values below so the modifier
+    // wins over the note value those digits would otherwise set.
+    if (modifier && event.altKey && ['1', '2', '3', '4'].includes(event.key)) {
+      event.preventDefault();
+      setVoice(event.key);
+      return;
+    }
     if (event.code === 'Space') { event.preventDefault(); void togglePlay(); return; }
 
-    if (event.key === 'Escape') { state.selection = null; render(); return; }
+    if (event.key === 'Escape') { clearSelection(); render(); return; }
+    if (modifier && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAll(); return; }
     if (event.key === 'ArrowRight') { event.preventDefault(); moveSelection(1); return; }
     if (event.key === 'ArrowLeft') { event.preventDefault(); moveSelection(-1); return; }
-    if (event.key === 'ArrowUp') { event.preventDefault(); transposeSelection(event.shiftKey ? 12 : 1); return; }
-    if (event.key === 'ArrowDown') { event.preventDefault(); transposeSelection(event.shiftKey ? -12 : -1); return; }
+    // MuseScore's Up/Down move a staff step (diatonic); Ctrl is the octave.
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      transposeSelection(modifier ? 7 : 1);
+      return;
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      transposeSelection(modifier ? -7 : -1);
+      return;
+    }
     if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); deleteSelection(); return; }
 
     if (SHORTCUT_DURATION[event.key]) {
@@ -1652,6 +2297,8 @@
 
   tempoOutput.textContent = '\u2669=120';
   syncTools();
+  paintPaletteGlyphs();
+  syncPalette();
   setControlsEnabled(false);
   updateZoom();
   restoreHandoff();
