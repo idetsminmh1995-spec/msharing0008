@@ -49,6 +49,9 @@
   const zoomInButton = pick('[data-editor-zoom-in]');
   const zoomOutButton = pick('[data-editor-zoom-out]');
   const zoomOutput = pick('[data-editor-zoom]');
+  const popoverTriggers = [...document.querySelectorAll('[data-editor-popover]')];
+  const popoverPanels = [...document.querySelectorAll('[data-editor-popover-panel]')];
+  const valueGlyph = pick('[data-editor-value-glyph]');
   const voiceSelect = pick('[data-editor-voice]');
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -366,6 +369,56 @@
     scoreHost.style.setProperty('--editor-zoom', `${state.zoom}%`);
     scoreHost.style.setProperty('--editor-zoom-factor', String(state.zoom / 100));
     if (zoomOutput) zoomOutput.textContent = `${state.zoom}%`;
+  };
+
+  // ---- toolbar popovers --------------------------------------------------
+
+  /**
+   * Opens the panel under its trigger, clamped to the window.
+   *
+   * The row scrolls sideways on a narrow screen, so a panel left to CSS
+   * would be clipped by that scroll box. It is `position:fixed` and placed
+   * here from the trigger's own box: right-aligned to the trigger when
+   * there is room, shifted left when the panel would run off the right
+   * edge, and flipped above the trigger when it would run off the bottom.
+   * That is what keeps it inside the webview at any width.
+   */
+  const placePopover = (trigger, panel) => {
+    const anchor = trigger.getBoundingClientRect();
+    const margin = 8;
+    // Two passes: a panel that wraps to a second row grows taller than the
+    // box measured before it was laid out, so the first placement can still
+    // touch the edge. Re-measuring after the write settles it.
+    for (let pass = 0; pass < 2; pass += 1) {
+      const box = panel.getBoundingClientRect();
+      const maxLeft = window.innerWidth - box.width - margin;
+      const left = Math.max(margin, Math.min(anchor.left, maxLeft));
+      const below = anchor.bottom + 6;
+      const top = below + box.height <= window.innerHeight - margin
+        ? below
+        : Math.max(margin, anchor.top - box.height - 6);
+      panel.style.left = `${Math.round(left)}px`;
+      panel.style.top = `${Math.round(top)}px`;
+    }
+  };
+
+  const closePopovers = (except = null) => {
+    popoverTriggers.forEach((trigger) => {
+      if (trigger === except) return;
+      trigger.setAttribute('aria-expanded', 'false');
+      const panel = popoverPanels.find((node) => node.dataset.editorPopoverPanel === trigger.dataset.editorPopover);
+      if (panel) panel.hidden = true;
+    });
+  };
+
+  const togglePopover = (trigger) => {
+    const panel = popoverPanels.find((node) => node.dataset.editorPopoverPanel === trigger.dataset.editorPopover);
+    if (!panel) return;
+    const open = panel.hidden;
+    closePopovers(trigger);
+    panel.hidden = !open;
+    trigger.setAttribute('aria-expanded', String(open));
+    if (open) placePopover(trigger, panel);
   };
 
   function svgElement(name, attrs) {
@@ -2126,6 +2179,13 @@
     });
     restButton.setAttribute('aria-pressed', String(state.tool.rest));
     noteInputButton.setAttribute('aria-pressed', String(state.noteInput));
+    // The value trigger shows the note value in force, so the closed box
+    // still tells the writer what the next note will be.
+    const activeDuration = durationButtons.find((button) => button.dataset.editorDuration === state.tool.duration);
+    if (valueGlyph && activeDuration) {
+      const glyph = activeDuration.querySelector('.editor-tool__glyph');
+      if (glyph) valueGlyph.textContent = glyph.textContent;
+    }
     if (previewButton) previewButton.setAttribute('aria-pressed', String(state.previewOn));
     if (zoomOutput) zoomOutput.textContent = `${state.zoom}%`;
     root.dataset.mode = state.noteInput ? 'input' : 'select';
@@ -2275,6 +2335,26 @@
   if (exportPng) exportPng.addEventListener('click', () => { setExportMenu(false); void runExport(exportPng, 'png'); });
   document.addEventListener('pointerdown', (event) => {
     if (exportList && !exportList.hidden && !event.target.closest('[data-editor-export-menu]')) setExportMenu(false);
+    // A popover closes on any press outside its trigger and its panel, so
+    // the score stays reachable with one tap rather than two.
+    if (!event.target.closest('[data-editor-popover], [data-editor-popover-panel]')) closePopovers();
+  });
+
+  popoverTriggers.forEach((trigger) => {
+    trigger.addEventListener('click', () => togglePopover(trigger));
+  });
+  // A tool inside a panel picks its value and folds the box away again,
+  // which is what a palette button is for.
+  popoverPanels.forEach((panel) => {
+    panel.addEventListener('click', (event) => {
+      if (event.target.closest('.editor-tool')) closePopovers();
+    });
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closePopovers();
+  });
+  window.addEventListener('resize', () => {
+    closePopovers();
   });
 
   durationButtons.forEach((button) => button.addEventListener('click', () => {

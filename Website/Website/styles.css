@@ -429,14 +429,17 @@ body.is-newscore-open { overflow:hidden; }
 
 /* One MuseScore-style row holding navigation, history, note input and
    every note value, stuck under the header so it stays put while the
-   score scrolls. Zoom lives in the bottom bar. */
+   score scrolls. Zoom lives in the bottom bar.
+
+   No `backdrop-filter` here: it would make this box the containing block
+   for the popover panels, which are `position:fixed` so the row's own
+   clipping cannot cut them off. The background is near-opaque anyway. */
 .editor-toolbars {
   position:sticky;
   top:var(--header-height);
   z-index:95;
   background:var(--header);
   box-shadow:0 8px 22px rgba(0,0,0,.16);
-  backdrop-filter:blur(18px);
 }
 .editor-toolbar {
   position:relative;
@@ -454,6 +457,29 @@ body.is-newscore-open { overflow:hidden; }
 .editor-toolbar__group { display:flex; flex:0 0 auto; align-items:center; gap:1px; }
 .editor-toolbar__group[hidden] { display:none; }
 .editor-toolbar__divider { flex:0 0 auto; width:1px; height:20px; margin:0 5px; background:var(--border); opacity:.8; }
+
+/* A popover trigger is one icon on the row; its panel is the box that
+   opens under it. The panel is fixed and placed by script against the
+   toolbar, so it can never be clipped by the row's own scrolling and
+   never runs past the edge of the window. */
+.editor-toolbar__group--popover { position:relative; }
+.editor-popover {
+  position:fixed;
+  z-index:120;
+  display:flex;
+  flex-wrap:wrap;
+  gap:2px;
+  max-width:min(268px,calc(100vw - 16px));
+  padding:6px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:var(--surface);
+  box-shadow:0 18px 40px rgba(0,0,0,.42);
+}
+.editor-popover[hidden] { display:none; }
+.editor-popover--wide { max-width:min(320px,calc(100vw - 16px)); }
+.editor-popover .editor-tool { min-width:32px; height:32px; }
+.editor-tool--popover { position:relative; }
 
 /* MuseScore-style main toolbar: flat square icon buttons on one row,
    hairline separators, filled accent for tools that are ON. */
@@ -691,6 +717,8 @@ body.is-newscore-open { overflow:hidden; }
 @media (max-width:860px) {
   .editor-toolbar { padding:6px 8px; gap:4px; }
   .editor-tool { height:32px; padding:0 8px; }
+  .editor-tool--back { min-width:32px; padding:0 6px; }
+  .editor-tool--back > span { display:none; }
   .editor-toolbar__divider { display:none; }
   .editor-workspace { padding:10px 8px 20px; }
   .editor-page { --editor-bottom-height:56px; }

@@ -426,6 +426,70 @@ describe('the editor and the engine agree, end to end', () => {
     assert.equal(sforzato.textContent, window.NotationEngine.getGlyph('articSoftAccentAbove').char);
   });
 
+  test('undo and redo sit at the end of the row', () => {
+    const { window } = loadEditorPage();
+    const row = window.document.querySelector('[data-editor-toolbars] .editor-toolbar');
+    const controls = [...row.children].filter(
+      (node) => node.tagName === 'BUTTON' || node.classList.contains('editor-toolbar__group'),
+    );
+    const labels = controls.map(
+      (node) => node.getAttribute('aria-label') ?? node.querySelector('[aria-label]')?.getAttribute('aria-label'),
+    );
+    assert.deepEqual(labels.slice(-2), ['Undo', 'Redo'], 'undo and redo close the row');
+    assert.ok(labels.indexOf('Note input mode') < labels.indexOf('Undo'), 'history comes after the writing tools');
+  });
+
+  test('the crowded tools open from a box on the row instead of spreading out', () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+
+    // A trigger and its panel are a pair, so a panel with no trigger (or the
+    // reverse) would leave a box nothing can open.
+    const triggers = [...doc.querySelectorAll('[data-editor-popover]')];
+    const panels = [...doc.querySelectorAll('[data-editor-popover-panel]')];
+    assert.deepEqual(
+      triggers.map((node) => node.dataset.editorPopover).sort(),
+      panels.map((node) => node.dataset.editorPopoverPanel).sort(),
+    );
+    assert.deepEqual(
+      triggers.map((node) => node.dataset.editorPopover),
+      ['value', 'dots', 'accidentals', 'marks', 'dynamics', 'more'],
+    );
+    for (const panel of panels) {
+      assert.equal(panel.hidden, true, `${panel.dataset.editorPopoverPanel} starts closed`);
+      assert.ok(panel.querySelector('.editor-tool'), `${panel.dataset.editorPopoverPanel} holds no tools`);
+    }
+
+    // Every note value lives in a panel, so the closed row stays short
+    // enough not to scroll even on a phone.
+    const values = doc.querySelectorAll('[data-editor-popover-panel="value"] [data-editor-duration]');
+    assert.equal(values.length, 7);
+    for (const selector of ['[data-editor-tie]', '[data-editor-slur]', '[data-editor-rest]', '[data-editor-flip]']) {
+      assert.ok(doc.querySelector(`[data-editor-popover-panel="more"] ${selector}`), `${selector} is in the more box`);
+    }
+  });
+
+  test('a tool in a box closes it again, and the value trigger shows the value in force', () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    const trigger = doc.querySelector('[data-editor-popover="value"]');
+    const panel = doc.querySelector('[data-editor-popover-panel="value"]');
+
+    trigger.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(panel.hidden, false, 'the trigger opens its box');
+    assert.equal(trigger.getAttribute('aria-expanded'), 'true');
+
+    doc.querySelector('[data-editor-popover-panel="value"] [data-editor-duration="eighth"]')
+      .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(panel.hidden, true, 'picking a value folds the box away');
+    assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+    assert.equal(
+      doc.querySelector('[data-editor-value-glyph]').textContent,
+      doc.querySelector('[data-editor-popover-panel="value"] [data-editor-duration="eighth"] .editor-tool__glyph').textContent,
+      'the trigger shows the note value in force',
+    );
+  });
+
   test('the dynamics buttons mark the selected note and light up with it', () => {
     const { window } = loadEditorPage();
     const doc = window.document;
