@@ -426,6 +426,23 @@ describe('the editor and the engine agree, end to end', () => {
     assert.equal(sforzato.textContent, window.NotationEngine.getGlyph('articSoftAccentAbove').char);
   });
 
+  test('the note-input tool wears a pencil, and so does the pointer over the staff', () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    const button = doc.querySelector('[data-editor-note-input]');
+
+    // The toolbar icon and the pointer over the staff are the same pencil:
+    // one picture for "write here", whether it is the tool or the cursor.
+    assert.ok(button.querySelector('[data-editor-pencil]'), 'the note-input tool shows a pencil');
+    const style = doc.querySelector('link[rel="stylesheet"]').getAttribute('href');
+    assert.ok(style, 'the editor has no stylesheet');
+    const css = fs.readFileSync(path.join(appDir, style.split('?')[0]), 'utf8');
+    const inputCursor = css.match(/\.editor-toolbars\[data-mode='input'\][^{]*\.editor-score\s*\{[^}]*cursor:url\(([^)]*)\)/);
+    assert.ok(inputCursor, 'the staff has no pencil cursor in note-input mode');
+    assert.match(inputCursor[1], /svg/, 'the cursor is an SVG pencil');
+    assert.match(css, /cursor:default;/, 'the staff still falls back to the plain arrow');
+  });
+
   test('undo and redo sit at the end of the row', () => {
     const { window } = loadEditorPage();
     const row = window.document.querySelector('[data-editor-toolbars] .editor-toolbar');

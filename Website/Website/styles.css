@@ -696,7 +696,14 @@ body.is-newscore-open { overflow:hidden; }
 .editor-score svg .editor-marquee { fill:var(--accent); fill-opacity:.08; stroke:var(--accent-bright); stroke-width:.1; vector-effect:non-scaling-stroke; }
 .editor-toolbar[data-mode='input'] .editor-tool--input { border-color:var(--accent); color:var(--accent-bright); background:rgba(242,13,61,.12); }
 .editor-score { cursor:default; }
-.editor-toolbars[data-mode='input'] ~ .editor-workspace .editor-score { cursor:crosshair; }
+/* Writing into the score is done with a pencil, so the pointer over the
+   staff is the same pencil the toolbar shows. The hotspot is the lead tip
+   at the bottom-left of the 24x24 box, so the note lands where the tip
+   points rather than where the box starts. `crosshair` stays as the
+   fallback for a browser that will not load an SVG cursor. */
+.editor-toolbars[data-mode='input'] ~ .editor-workspace .editor-score {
+  cursor:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M2.6 21.4l1.7-5.5L15.9 4.3l3.8 3.8L8.1 19.7z' fill='%23f20d3d' stroke='%23ffffff' stroke-width='1.7' stroke-linejoin='round'/><path d='M2.6 21.4l1.7-5.5 3.8 3.8z' fill='%23090d14'/></svg>") 2 21, crosshair;
+}
 
 /* The status readout is a screen-reader live region only. The score is
    the whole workspace, so nothing is drawn under it. */
@@ -738,4 +745,13 @@ body.is-newscore-open { overflow:hidden; }
 /* Narrow screens: the one row simply scrolls sideways. */
 @media (max-width:1280px) {
   .editor-toolbar { padding:6px 10px; }
+}
+
+/* Very narrow phones: the same ten icons, packed tighter, so the row
+   still fits without scrolling. Declared after the 1280px padding rule
+   so it wins at phone widths. */
+@media (max-width:400px) {
+  .editor-toolbar { padding:6px 4px; gap:1px; }
+  .editor-tool { min-width:26px; padding:0 3px; }
+  .editor-tool--back { min-width:26px; padding:0 3px; }
 }
