@@ -541,7 +541,21 @@ describe('the editor and the engine agree, end to end', () => {
     window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 1, height: 1 });
 
     const before = svg.querySelectorAll('[data-id]').length;
-    scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', { clientX: 120, clientY: 9, bubbles: true }));
+    // Click where the page actually is, rather than at a fixed number of
+    // user units: the page geometry is configurable, and a coordinate that
+    // happens to sit inside it today would land on the margin tomorrow.
+    const [, , pageWidth] = svg.getAttribute('viewBox').split(/\s+/).map(Number);
+    const staffY = Number(
+      [...svg.querySelectorAll('line')]
+        .find((line) => line.getAttribute('y1') === line.getAttribute('y2')
+          && Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3)
+        .getAttribute('y1'),
+    );
+    scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', {
+      clientX: pageWidth * 0.1,
+      clientY: staffY,
+      bubbles: true,
+    }));
     const after = doc.querySelector('[data-editor-score] svg').querySelectorAll('[data-id]').length;
     assert.equal(after, before + 1, 'a staff click in note-input mode must add a note');
     assert.match(doc.querySelector('[data-editor-status]').textContent, /Inserted|Replaced/);

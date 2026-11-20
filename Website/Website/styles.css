@@ -648,6 +648,11 @@ body.is-newscore-open { overflow:hidden; }
 /* Zoom scales the sheet, not the scroll box: a percentage width on the
    host would be cancelled out by the container shrinking to match it. */
 .editor-score svg { display:block; width:var(--editor-zoom); height:auto; margin:0 auto; }
+/* A phone cannot fit a page at a readable size, so the sheet keeps a
+   paper-like width and the host scrolls sideways; zoom still applies. */
+@media (max-width:860px) {
+  .editor-score svg { width:calc(760px * var(--editor-zoom-factor, 1)); }
+}
 .editor-score[data-layout='scroll'] { width:max-content; min-width:100%; }
 .editor-score[data-layout='scroll'] svg { width:auto; max-width:none; }
 

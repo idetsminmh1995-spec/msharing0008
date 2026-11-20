@@ -52,6 +52,18 @@
   const voiceSelect = pick('[data-editor-voice]');
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
+  // A4 in staff spaces at the engine's own 1.75mm spatium -- the engraving
+  // scale MuseScore and other engravers default to, with 10mm margins.
+  // The engine's page default (30 x 42) is 7mm per staff space, four times
+  // larger, which drew every note four times too big for the sheet.
+  const PAGE_A4 = {
+    pageWidth: 120,
+    pageHeight: 169.7,
+    marginTop: 5.7,
+    marginBottom: 5.7,
+    marginLeft: 5.7,
+    marginRight: 5.7,
+  };
   const ACCIDENTAL_ALTER = { 'double-sharp': 2, sharp: 1, natural: 0, flat: -1, 'double-flat': -2 };
   const SHORTCUT_DURATION = {
     '1': 'whole', '2': 'half', '3': 'quarter', '4': 'eighth', '5': '16th', '6': '32nd', '7': '64th',
@@ -352,6 +364,7 @@
     // together, leaving the sheet the same size. Widening the sheet itself
     // is what actually makes the music bigger.
     scoreHost.style.setProperty('--editor-zoom', `${state.zoom}%`);
+    scoreHost.style.setProperty('--editor-zoom-factor', String(state.zoom / 100));
     if (zoomOutput) zoomOutput.textContent = `${state.zoom}%`;
   };
 
@@ -444,7 +457,7 @@
         config: {
           layout: { mode: state.layout },
           ...(state.layout === 'page'
-            ? { page: { gapBetweenPages: 3, verticalJustify: true } }
+            ? { page: { ...PAGE_A4, gapBetweenPages: 3, verticalJustify: true } }
             : {}),
         },
       });
