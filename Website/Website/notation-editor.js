@@ -127,6 +127,9 @@
     metronomeOn: false,
     metronome: null,
     metronomeTimers: [],
+    // Oscillators already scheduled on the audio clock. They keep sounding
+    // once scheduled, so stopping the metronome has to stop these too.
+    metronomeNodes: [],
   };
 
   const announce = (message) => { statusMessage.textContent = message; };
@@ -291,21 +294,32 @@
     const lines = [...svg.querySelectorAll('line')]
       .filter((line) => line.getAttribute('y1') === line.getAttribute('y2'))
       .filter((line) => Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3)
-      .map((line) => Number(line.getAttribute('y1')));
-    const ys = [...new Set(lines)].sort((a, b) => a - b);
+      .map((line) => ({
+        y: Number(line.getAttribute('y1')),
+        left: Math.min(Number(line.getAttribute('x1')), Number(line.getAttribute('x2'))),
+        right: Math.max(Number(line.getAttribute('x1')), Number(line.getAttribute('x2'))),
+      }));
+    const ys = [...new Set(lines.map((line) => line.y))].sort((a, b) => a - b);
     const staves = [];
     let run = [];
+    const closeRun = () => {
+      if (run.length < 5) return;
+      const band = run.map((y) => y.y);
+      staves.push({
+        systemIndex: staves.length,
+        topY: band[0],
+        bottomY: band[band.length - 1],
+        leftX: Math.min(...run.map((line) => line.left)),
+        rightX: Math.max(...run.map((line) => line.right)),
+      });
+    };
     for (const y of ys) {
-      const previous = run[run.length - 1];
-      if (previous === undefined || Math.abs(y - previous - 1) < 0.01) run.push(y);
-      else { if (run.length >= 5) staves.push(run); run = [y]; }
+      const previous = run[run.length - 1]?.y;
+      if (previous === undefined || Math.abs(y - previous - 1) < 0.01) run.push(...lines.filter((line) => line.y === y));
+      else { closeRun(); run = lines.filter((line) => line.y === y); }
     }
-    if (run.length >= 5) staves.push(run);
-    return staves.map((lines, index) => ({
-      systemIndex: index,
-      topY: lines[0],
-      bottomY: lines[lines.length - 1],
-    }));
+    closeRun();
+    return staves;
   }
 
   /** Client point -> the SVG's own staff-space coordinates. */
@@ -332,11 +346,21 @@
     return best?.group ?? null;
   }
 
-  /** The staff whose vertical band the point is in, or the nearest one. */
-  function staffAt(staves, y) {
+  /**
+   * The staff whose vertical band the point is in.
+   *
+   * The band is the five lines plus two spaces of ledger room above and
+   * below, which is where a note can be written. A point outside every band
+   * is not on any staff and returns null: a click in the margin, on the
+   * title, or between two systems must not drop a note into the score.
+   * Callers that only need a reference staff for measuring (a pitch drag)
+   * ask for `nearest`.
+   */
+  function staffAt(staves, y, { nearest = false } = {}) {
     if (staves.length === 0) return null;
     const inside = staves.find((staff) => y >= staff.topY - 2 && y <= staff.bottomY + 2);
     if (inside) return inside;
+    if (!nearest) return null;
     return staves.reduce((best, staff) => {
       const center = (staff.topY + staff.bottomY) / 2;
       const bestCenter = (best.topY + best.bottomY) / 2;
@@ -348,14 +372,34 @@
    * A click's staff position, in half staff spaces. The engine's own
    * convention: `staffPositionForPitch` returns 0 for the bottom line and
    * grows downward, and the renderer draws a notehead's baseline at
-   * `bottomY + position`. Clicks far outside the staff are clamped to a
-   * sane ledger range rather than sent off the page.
+   * `bottomY + position`. Clicks are clamped to two ledger lines either
+   * side of the staff rather than sent off the page.
    */
   function staffPositionFromPoint(staff, y) {
     if (!staff) return 0;
     const raw = y - staff.bottomY;
-    const top = staff.topY - staff.bottomY;
-    return Math.round(Math.min(top + 2, Math.max(-5, raw)) * 2) / 2;
+    // The staff is four spaces tall, so the top line sits at -4. A ledger
+    // line above or below is one more space, and two of them is as far as a
+    // click may reach; the band `staffAt` accepts is exactly this range.
+    const lowest = staff.topY - staff.bottomY - 2;
+    return Math.round(Math.min(2, Math.max(lowest, raw)) * 2) / 2;
+  }
+
+  /**
+   * Whether a point can be written on: inside a staff's five lines plus
+   * two ledger spaces, and within the horizontal run of the staff itself.
+   * Everything else on the page -- the margins, the title, the gap between
+   * two systems -- is not part of the score, so a click there writes
+   * nothing rather than dropping a note at a clamped position.
+   */
+  function pointOnStaff(staff, point) {
+    if (!staff) return false;
+    const bandTop = staff.topY - 2;
+    const bandBottom = staff.bottomY + 2;
+    if (point.y < bandTop || point.y > bandBottom) return false;
+    if (staff.leftX !== undefined && point.x < staff.leftX - 1) return false;
+    if (staff.rightX !== undefined && point.x > staff.rightX + 1) return false;
+    return true;
   }
 
   // ---- rendering ---------------------------------------------------------
@@ -1515,10 +1559,12 @@
     if (!point) return;
     const staves = detectStaves(svg);
     const staff = staffAt(staves, point.y);
-    const systemIndex = staff?.systemIndex ?? 0;
     const hit = eventAt(svg, point.x, point.y);
 
     if (hit) {
+      // A note is always grabbable, however many ledger lines it sits on:
+      // only a press on empty space has to be inside the staff band.
+      const hitStaff = staff ?? staffAt(staves, point.y, { nearest: true });
       const [partId, measureToken, voiceToken, eventToken] = hit.getAttribute('data-id').split('#');
       // Clicking a staff is how a multi-part score says which part you are
       // writing into: every edit command takes a part id, and a drum part
@@ -1529,7 +1575,7 @@
       const voiceId = Number(voiceToken.replace('v', ''));
       const eventIndex = Number(eventToken.replace('e', ''));
       const existing = eventsIn(measureNumber, voiceId)[eventIndex];
-      const staffPosition = staffPositionFromPoint(staff, point.y);
+      const staffPosition = staffPositionFromPoint(hitStaff, point.y);
       const { step, octave } = docTools.pitchFromStaffPosition(clefAt(measureNumber), staffPosition);
       // A rest -- including the whole-measure placeholder MusicXML writes
       // for an empty measure -- is not a note to select. In note input it
@@ -1543,7 +1589,7 @@
         // made the click look like it did nothing. Selecting a note in
         // order to transpose it is what note input OFF is for.
         if (state.noteInput && !state.tool.rest) {
-          state.entry = { partId, measureNumber, voiceId, tick: existing.startTick ?? 0, systemIndex };
+          state.entry = { partId, measureNumber, voiceId, tick: existing.startTick ?? 0, systemIndex: hitStaff.systemIndex };
           clearSelection();
           insertAtEntry({ step, octave, addToChord: event.shiftKey, staffPosition });
           return;
@@ -1568,6 +1614,12 @@
         return;
       }
     }
+
+    // Writing on empty space only happens on the staff itself. A press on
+    // the margin, the title or the gap between two systems is not part of
+    // the score, so it must not move the cursor or write a note there.
+    if (!pointOnStaff(staff, point)) return;
+    const systemIndex = staff.systemIndex;
 
     // `xToTick`, not `xToPosition`: the latter snaps to the nearest
     // EXISTING note, so in a measure whose only event is on beat 1 every
@@ -1656,7 +1708,7 @@
   function stepsFromPointer(drag, point) {
     const svg = scoreHost.querySelector('svg');
     if (!svg) return 0;
-    const staff = staffAt(detectStaves(svg), point.y);
+    const staff = staffAt(detectStaves(svg), point.y, { nearest: true });
     if (!staff) return 0;
     const position = staffPositionFromPoint(staff, point.y);
     return Math.round((drag.startPosition - position) * 2);
@@ -1782,20 +1834,37 @@
   const clearMetronomeTimers = () => {
     for (const timer of state.metronomeTimers) window.clearTimeout(timer);
     state.metronomeTimers.length = 0;
+    // Clicks are scheduled on the audio clock, so a timer cannot cancel
+    // them: each one has to be stopped by hand, or the metronome keeps
+    // ticking after the score has stopped.
+    for (const oscillator of state.metronomeNodes) {
+      try { oscillator.stop(); } catch { /* already stopped */ }
+      try { oscillator.disconnect(); } catch { /* already disconnected */ }
+    }
+    state.metronomeNodes.length = 0;
   };
 
   /**
-   * Schedules the metronome clicks from `fromSeconds` on, using the score's
-   * own tempo and metre.
+   * Clicks one bar at the score's own tempo and metre, then stops.
    *
-   * `leadIn` is how long the score waits before its first note. With the
-   * metronome on, that time is filled with one bar of clicks: the writer
-   * hears the count, then the notes come in on the beat. The clicks keep
-   * the same grid either way, so the count-in and the score never drift.
+   * The count-in is the metronome's whole job: it says "bar one is coming"
+   * and then gets out of the way. Clicking on into the score would put a
+   * stray click on the music's own downbeat -- the note and a click landing
+   * together -- so the last click is the bar's last beat and the music
+   * starts after it, in silence but on time.
+   *
+   * `onDone` runs when the bar is over, which is where the button goes off
+   * again.
    */
-  const scheduleMetronome = (fromSeconds = 0, leadIn = 0) => {
+  const scheduleMetronome = (barSeconds = countInSeconds(), onDone = null) => {
     clearMetronomeTimers();
     if (!state.metronomeOn || !state.result) return;
+    const { numerator, denominator } = scoreTimeSignature();
+    const beatSeconds = (60 * 4) / (scoreBpm() * denominator);
+    // The bar's length is the score's, not the audio host's: the switch has
+    // to go off on time even where nothing can be played.
+    if (onDone) state.metronomeTimers.push(window.setTimeout(onDone, barSeconds * 1000));
+
     // A host without Web Audio (an old browser, a preview) still has a
     // working metronome button; it just cannot make a sound there.
     if (!state.metronome) {
@@ -1805,12 +1874,6 @@
     }
     const context = state.metronome;
     void context.resume();
-    const bpm = scoreBpm();
-    const { numerator, denominator } = scoreTimeSignature();
-    const beatSeconds = (60 * 4) / (bpm * denominator);
-    const totalSeconds = Math.max(0, endSeconds() - fromSeconds);
-    const firstBeat = Math.ceil(fromSeconds / beatSeconds - 1e-6);
-    const beats = Math.ceil(totalSeconds / beatSeconds) + 1;
     const origin = context.currentTime;
 
     const click = (at, accented) => {
@@ -1826,15 +1889,15 @@
       gain.connect(context.destination);
       oscillator.start(at);
       oscillator.stop(at + 0.05);
+      state.metronomeNodes.push(oscillator);
     };
 
-    for (let index = 0; index < numerator && leadIn > 0; index += 1) {
-      click(origin + index * beatSeconds, index === 0);
-    }
-    for (let index = 0; index < beats; index += 1) {
-      const beatIndex = firstBeat + index;
-      const at = origin + leadIn + beatIndex * beatSeconds - fromSeconds;
-      click(at, ((beatIndex % numerator) + numerator) % numerator === 0);
+    for (let index = 0; index < numerator; index += 1) {
+      const at = index * beatSeconds;
+      // A bar cut short (a metre change mid-count) gets only the beats it
+      // actually has.
+      if (at >= barSeconds - 1e-9) break;
+      click(origin + at, index === 0);
     }
   };
 
@@ -1844,19 +1907,18 @@
     return numerator * ((60 * 4) / (scoreBpm() * denominator));
   };
 
-  const setMetronome = (on) => {
+  const setMetronome = (on, { quiet = false } = {}) => {
     state.metronomeOn = on;
     if (on) {
-      if (state.playing) {
-        // Turning the clicks on mid-play keeps them on the bar grid, and a
-        // count-in that is already running is left with the time it has.
-        const remaining = state.countInEndsAt ? Math.max(0, (state.countInEndsAt - performance.now()) / 1000) : 0;
-        scheduleMetronome(state.playSeconds, remaining);
+      if (state.playing && !state.countInEndsAt) {
+        // Switched on mid-play: count one bar from here and then go quiet
+        // again, so the clicks never run on under the music.
+        scheduleMetronome(countInSeconds(), () => setMetronome(false, { quiet: true }));
       }
       announce('Metronome on — one bar counts in before the notes.');
     } else {
       clearMetronomeTimers();
-      announce('Metronome off.');
+      if (!quiet) announce('Metronome off.');
     }
     syncPlayback();
   };
@@ -2233,7 +2295,8 @@
     if (state.playSeconds >= endSeconds()) state.playSeconds = startSeconds();
     // With the metronome on, one bar of clicks comes first and the score
     // waits for it, so the first note lands on a beat the writer has just
-    // heard rather than on a silent downbeat.
+    // heard rather than on a silent downbeat. The clicks stop with that
+    // bar: the metronome is the count, not a running pulse under the music.
     const leadIn = state.metronomeOn ? countInSeconds() : 0;
     const from = state.playSeconds;
     state.playStartSeconds = from;
@@ -2243,7 +2306,7 @@
     // Draw at once so the playhead appears and the entry cursor steps
     // aside on the same frame the sound starts.
     render();
-    if (state.metronomeOn) scheduleMetronome(from, leadIn);
+    if (leadIn > 0) scheduleMetronome(leadIn, () => setMetronome(false, { quiet: true }));
     state.rafId = requestFrame(frame);
     announce(leadIn > 0 ? 'Counting in…' : 'Playing.');
     syncPlayback();

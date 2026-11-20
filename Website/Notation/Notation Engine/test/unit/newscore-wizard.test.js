@@ -437,7 +437,19 @@ describe('the editor opens the score the wizard created', () => {
     window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 100, height: 100 });
 
     const scoreHost = doc.querySelector('[data-editor-score]');
-    scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', { clientX: 40, clientY: 9, bubbles: true }));
+    // A one-measure staff does not reach across the whole page, and a press
+    // past its last bar is not on the score, so the click has to land on the
+    // staff itself -- the same geometry the pointer code reads.
+    const svg = scoreHost.querySelector('svg');
+    const staffLines = [...svg.querySelectorAll('line')].filter((line) => line.getAttribute('y1') === line.getAttribute('y2')
+      && Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3);
+    const staffXs = staffLines.flatMap((line) => [Number(line.getAttribute('x1')), Number(line.getAttribute('x2'))]);
+    const staffYs = staffLines.map((line) => Number(line.getAttribute('y1')));
+    scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', {
+      clientX: (Math.min(...staffXs) + Math.max(...staffXs)) / 2,
+      clientY: Math.min(...staffYs),
+      bubbles: true,
+    }));
     // The status names the drum, which is the proof the click resolved to
     // a real kit instrument rather than to a pitch or to nothing.
     assert.match(doc.querySelector('[data-editor-status]').textContent, /Inserted .*(Snare|Hat|Tom|Cymbal|Drum)/);

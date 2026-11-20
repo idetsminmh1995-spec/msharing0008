@@ -402,6 +402,55 @@ describe('the editor and the engine agree, end to end', () => {
     );
   });
 
+  test('the count-in is exactly one bar of clicks and stops at the bar line', async () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    // Count the clicks the editor schedules, and when. A click is an
+    // oscillator with a start time, so a stand-in audio host records both.
+    const clicks = [];
+    class FakeParam {
+      setValueAtTime() {}
+      linearRampToValueAtTime() {}
+      exponentialRampToValueAtTime() {}
+    }
+    class FakeNode {
+      constructor() { this.gain = new FakeParam(); this.frequency = { value: 0 }; this.type = ''; }
+      connect() {}
+      disconnect() {}
+      start(at) { clicks.push({ at, freq: this.frequency.value }); }
+      stop() {}
+    }
+    window.AudioContext = class {
+      constructor() { this.destination = {}; this.currentTime = 0; }
+      resume() { return Promise.resolve(); }
+      createOscillator() { return new FakeNode(); }
+      createGain() { return new FakeNode(); }
+    };
+
+    window.requestAnimationFrame = (callback) => window.setTimeout(() => callback(window.performance.now()), 16);
+    window.cancelAnimationFrame = (id) => window.clearTimeout(id);
+    window.NotationSoundFont = {
+      R2SoundFontEngine: { create: async () => ({ play: () => {}, pause: () => {} }) },
+    };
+
+    const metronome = doc.querySelector('[data-editor-metronome]');
+    const play = doc.querySelector('[data-editor-play]');
+    metronome.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    play.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+
+    // A 4/4 bar at the default 120 is two seconds, one beat every 0.5s.
+    // Four clicks, at 0, 0.5, 1.0 and 1.5 -- and nothing at 2.0, where the
+    // music starts. That stray fifth click landing on the first note is
+    // exactly what the writer hears as "one more comes in".
+    assert.equal(clicks.length, 4, 'one bar of 4/4 is four clicks, not five');
+    assert.deepEqual(clicks.map((click) => click.at), [0, 0.5, 1, 1.5]);
+    // The first beat is accented, the rest are not, so the bar is countable.
+    assert.ok(clicks[0].freq > clicks[1].freq, 'the downbeat is the accented click');
+
+    await new Promise((resolve) => window.setTimeout(resolve, 2100));
+    assert.equal(clicks.length, 4, 'no click is scheduled once the bar is over');
+  });
+
   test('the metronome counts one bar in before the notes, and the score waits for it', async () => {
     const { window } = loadEditorPage();
     const doc = window.document;
@@ -449,6 +498,10 @@ describe('the editor and the engine agree, end to end', () => {
     assert.match(status(), /Playing/, 'after the bar, the score plays');
     assert.notEqual(playheadX(), held, 'the playhead moves once the count-in ends');
     assert.equal(played.length, 1, 'the notes start once, and only after the count-in');
+    // The count is over, so the switch goes off by itself: the metronome is
+    // the bar before the music, not a pulse running under it.
+    assert.equal(metronome.getAttribute('aria-pressed'), 'false', 'the metronome switches itself off after the bar');
+    assert.equal(metronome.dataset.metronome, undefined, 'no stray metronome flag is left on the button');
   });
 
   test('one cursor while the score plays: the playhead takes over from the entry cursor', () => {
@@ -810,6 +863,58 @@ describe('the editor and the engine agree, end to end', () => {
     doc.querySelector('[data-editor-note-input]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     click();
     assert.equal(status(), 'Note selected.');
+  });
+
+  test('a click on the staff writes a note at that line, and a click off it writes nothing', () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    const scoreHost = doc.querySelector('[data-editor-score]');
+    window.DOMPoint = class {
+      constructor(x = 0, y = 0) { this.x = x; this.y = y; }
+      matrixTransform() { return new window.DOMPoint(this.x, this.y); }
+    };
+    window.SVGElement.prototype.getScreenCTM = () => ({
+      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0, inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+    });
+    // A tight hit box, so a click only hits a note it is actually over: the
+    // note-at-a-line behaviour is the positional placement, not a selection.
+    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 0.0001, height: 0.0001 });
+
+    const svg = () => scoreHost.querySelector('svg');
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const press = (x, y) => scoreHost.dispatchEvent(
+      new window.PointerEvent('pointerdown', { clientX: x, clientY: y, bubbles: true }),
+    );
+    // The staff geometry comes from the score itself, not a guess.
+    const lines = [...svg().querySelectorAll('line')]
+      .filter((line) => line.getAttribute('y1') === line.getAttribute('y2')
+        && Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3);
+    const staffYs = [...new Set(lines.map((line) => Number(line.getAttribute('y1'))))].sort((a, b) => a - b);
+    const topY = staffYs[0];
+    const bottomY = staffYs[staffYs.length - 1];
+    const middleX = (Number(lines[0].getAttribute('x1')) + Number(lines[0].getAttribute('x2'))) / 2;
+
+    // The five lines and the ledger space above them are writable, and each
+    // one gives a different pitch: the line under the pointer is the pitch.
+    const pitches = [];
+    for (const y of [topY - 1, topY, (topY + bottomY) / 2, bottomY, bottomY + 1]) {
+      press(middleX, y);
+      pitches.push(status());
+      assert.match(status(), /Inserted|Replaced/, `a click on the staff at y=${y} must write a note`);
+    }
+    assert.equal(new Set(pitches).size, pitches.length, 'each line must give its own pitch');
+
+    // Away from the staff nothing is written and the cursor does not move.
+    const written = svg().querySelectorAll('[data-id]').length;
+    const before = status();
+    press(middleX, topY - 12);
+    assert.equal(svg().querySelectorAll('[data-id]').length, written, 'a click above the staff must not write');
+    assert.equal(status(), before, 'a click above the staff must not move the cursor');
+
+    press(1, (topY + bottomY) / 2);
+    assert.equal(svg().querySelectorAll('[data-id]').length, written, 'a click left of the staff must not write');
+    press(200, (topY + bottomY) / 2);
+    assert.equal(svg().querySelectorAll('[data-id]').length, written, 'a click right of the staff must not write');
   });
 
   describe('the workspace', () => {
