@@ -266,6 +266,14 @@ export function computePageLayout(
 }
 
 /**
+ * The "page fill threshold": the fraction of a page's usable height that
+ * must already be covered before its systems are spread to fill the
+ * rest. Below it a lightly-filled page keeps its natural pitch and the
+ * leftover stays at the bottom.
+ */
+const DEFAULT_FILL_THRESHOLD = 0.7;
+
+/**
  * The vertical pitch of one page's systems.
  *
  * Without `verticalJustify` every system sits at `marginTop + i * height`,
@@ -291,6 +299,12 @@ function spreadSystems(
   const usable = pageHeight - config.marginTop - config.marginBottom;
   const slack = usable - content;
   if (!Number.isFinite(slack) || slack <= 0) return placed;
+  // The "page fill threshold": a page that is only a third full is not
+  // stretched to fill, or three systems on an A4 sheet end up sixty
+  // staff spaces apart. Below the threshold the systems keep their
+  // natural pitch and the leftover stays at the bottom.
+  const threshold = config.fillThreshold ?? DEFAULT_FILL_THRESHOLD;
+  if (content < usable * threshold) return placed;
   const step = slack / (placed.length - 1);
   return placed.map((system, index) => ({
     ...system,

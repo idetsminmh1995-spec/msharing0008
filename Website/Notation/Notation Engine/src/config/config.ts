@@ -355,11 +355,26 @@ export interface PageConfig {
    * engraving programs; it only ever moves systems apart, never closer
    * than `staves.minSystemDistance`.
    *
+   * Only a page that is already reasonably full is spread -- see
+   * `fillThreshold`.
+   *
    * Off by default: it changes the vertical position of every system,
    * so a host that positions its own overlays from the drawn staff
    * lines should opt in deliberately.
    */
   readonly verticalJustify?: boolean;
+  /**
+   * How full a page must already be before `verticalJustify` spreads
+   * its systems, as a fraction of the usable height. The house value is
+   * 0.70: three systems on an A4 sheet fill about a third of it, and
+   * stretching those three down the whole sheet would leave gaps of
+   * sixty staff spaces between them. Below the threshold the systems
+   * keep their natural pitch and the leftover simply stays at the
+   * bottom, which is what a lightly-filled page should look like.
+   *
+   * Only consulted when `verticalJustify` is on.
+   */
+  readonly fillThreshold?: number;
 }
 
 // ---- drum mapping (Phase 41) ----
@@ -720,6 +735,7 @@ const NUMERIC_RULES: readonly NumericRule[] = [
   { path: 'page.marginLeft', min: 0 },
   { path: 'page.marginRight', min: 0 },
   { path: 'page.gapBetweenPages', min: 0 },
+  { path: 'page.fillThreshold', min: 0, max: 1 },
   { path: 'text.lyricGap', min: 0 },
   { path: 'text.lyricRowHeight', min: 0, exclusiveMin: true },
   { path: 'text.chordSymbolGap', min: 0 },

@@ -71086,6 +71086,7 @@ ${denominator}`;
     { path: "page.marginLeft", min: 0 },
     { path: "page.marginRight", min: 0 },
     { path: "page.gapBetweenPages", min: 0 },
+    { path: "page.fillThreshold", min: 0, max: 1 },
     { path: "text.lyricGap", min: 0 },
     { path: "text.lyricRowHeight", min: 0, exclusiveMin: true },
     { path: "text.chordSymbolGap", min: 0 },
@@ -74818,6 +74819,7 @@ ${denominator}`;
     const totalHeight = Math.max(0, pageTop - (stacked.length > 0 ? gap : 0));
     return { pages: stacked, usableWidth, usableHeight, totalHeight };
   }
+  var DEFAULT_FILL_THRESHOLD = 0.7;
   function spreadSystems(systems, pageHeight, config) {
     const pitch = systems[0]?.height ?? 0;
     const placed = systems.map((system, index) => ({
@@ -74829,6 +74831,8 @@ ${denominator}`;
     const usable = pageHeight - config.marginTop - config.marginBottom;
     const slack = usable - content;
     if (!Number.isFinite(slack) || slack <= 0) return placed;
+    const threshold = config.fillThreshold ?? DEFAULT_FILL_THRESHOLD;
+    if (content < usable * threshold) return placed;
     const step = slack / (placed.length - 1);
     return placed.map((system, index) => ({
       ...system,

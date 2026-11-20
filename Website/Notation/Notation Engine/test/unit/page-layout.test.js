@@ -324,6 +324,20 @@ describe('page sheet stacking and vertical spread (§16.2 page geometry)', () =>
     assert.equal(last.y + last.height, page.pageHeight - page.marginBottom);
   });
 
+  test('verticalJustify leaves a page under the fill threshold at its natural pitch', () => {
+    // The "page fill threshold" is 0.70: a page holding only half of its
+    // usable height keeps its systems at their natural pitch and leaves
+    // the leftover at the bottom, rather than pulling them far apart.
+    // Two 10-tall systems fill 20 of the 36 usable units.
+    const page = { ...PAGE_CONFIG, verticalJustify: true };
+    const layout = NE.computePageLayout(oneMeasurePerSystem(2), 10, page, SPACING_CONFIG);
+    const systems = layout.pages[0].systems;
+    assert.equal(systems.length, 2);
+    systems.forEach((system, index) => {
+      assert.equal(system.y, page.marginTop + index * 10);
+    });
+  });
+
   test('verticalJustify leaves a single-system page exactly where it was', () => {
     const plain = NE.computePageLayout([m(1, 30)], 10, PAGE_CONFIG, SPACING_CONFIG);
     const spread = NE.computePageLayout(
