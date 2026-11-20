@@ -507,23 +507,12 @@ body.is-newscore-open { overflow:hidden; }
 .editor-toolbar__output--tempo { min-width:52px; color:var(--text); font-size:11px; }
 
 .editor-workspace { width:100%; padding:14px 16px 24px; }
-.editor-score {
-  display:flex;
-  min-height:calc(100vh - var(--header-height) - 170px);
-  align-items:flex-start;
-  justify-content:center;
-  overflow:auto;
-  overscroll-behavior:contain;
-}
-/* `display:flex` would beat the UA's `[hidden]` rule, so the empty host
-   would keep the page tall before a score loads. */
-.editor-score[hidden] { display:none; }
+.editor-score { width:100%; overflow:auto; overscroll-behavior:contain; }
 
 /* ------------------------------------------------------------------ */
 /* Editor bottom bar — Play, metronome, view switch, Save, Export       */
 /* ------------------------------------------------------------------ */
 .editor-page { --editor-bottom-height:52px; padding-bottom:calc(var(--bottom-height) + var(--editor-bottom-height)); }
-.editor-score { min-height:calc(100vh - var(--header-height) - var(--editor-bottom-height) - 170px); }
 
 .editor-bottombar {
   position:fixed;
@@ -656,21 +645,7 @@ body.is-newscore-open { overflow:hidden; }
 
 :root[data-theme='light'] .editor-bottombar { background:rgba(255,255,255,.97); box-shadow:0 -10px 28px rgba(15,23,42,.1); }
 :root[data-theme='light'] .editor-export__menu { background:#fff; box-shadow:0 18px 40px rgba(15,23,42,.14); }
-.editor-score { width:100%; padding:22px; }
 .editor-score svg { display:block; width:100%; height:auto; margin:0 auto; }
-/* Page mode is a stack of sheets. The engine leaves the gap between
-   pages unpainted, so the score's own surface shows through it -- a
-   slightly darker desk under white paper is what makes the break read as
-   a page edge rather than a seam. The drop shadow is on the svg, not on
-   the score div, because a filter follows the PAINTED shapes: each sheet
-   gets its own shadow, and the gap stays clean. */
-.editor-score[data-layout='page'] { padding:18px; background:rgba(2,5,10,.45); }
-.editor-score[data-layout='page'] svg {
-  box-shadow:none;
-  filter:drop-shadow(0 1px 2px rgba(0,0,0,.4)) drop-shadow(0 14px 30px rgba(0,0,0,.3));
-}
-:root[data-theme='light'] .editor-score[data-layout='page'] { background:rgba(148,163,184,.22); }
-:root[data-theme='light'] .editor-score[data-layout='page'] svg { box-shadow:none; filter:drop-shadow(0 1px 2px rgba(15,23,42,.16)) drop-shadow(0 12px 26px rgba(15,23,42,.12)); }
 .editor-score[data-layout='scroll'] { width:max-content; min-width:100%; }
 .editor-score[data-layout='scroll'] svg { width:auto; max-width:none; }
 
@@ -708,7 +683,6 @@ body.is-newscore-open { overflow:hidden; }
   .editor-tool { height:32px; padding:0 8px; }
   .editor-toolbar__divider { display:none; }
   .editor-workspace { padding:10px 8px 20px; }
-  .editor-score { min-height:calc(100vh - var(--header-height) - var(--bottom-height) - var(--editor-bottom-height) - 158px); padding:12px; }
   .editor-page { --editor-bottom-height:96px; }
   .editor-bottombar { height:auto; min-height:var(--editor-bottom-height); flex-wrap:wrap; padding:6px 10px; gap:4px; }
   .editor-bottombar__divider { display:none; }
@@ -721,9 +695,7 @@ body.is-newscore-open { overflow:hidden; }
   .editor-tool { min-width:32px; padding:0 6px; }
   .editor-tool--back { min-width:auto; padding:0 12px; }
 }
-/* Narrow screens: the one row simply scrolls sideways, so the score keeps
-   all the vertical space a wrapped second row would have taken. */
+/* Narrow screens: the one row simply scrolls sideways. */
 @media (max-width:1280px) {
   .editor-toolbar { padding:6px 10px; }
-  .editor-score { min-height:calc(100vh - var(--header-height) - 158px); }
 }
