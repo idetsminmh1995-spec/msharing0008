@@ -372,13 +372,16 @@ describe('the editor and the engine agree, end to end', () => {
     assert.equal(window.document.querySelector('[data-editor-status]').textContent, 'Score ready.');
   });
 
-  test('the bottom bar is a single empty bar', () => {
+  test('the bottom bar holds the zoom controls and nothing else', () => {
     const { window } = loadEditorPage();
     const bars = window.document.querySelectorAll('[data-editor-bottom-bar]');
     assert.equal(bars.length, 1, 'the editor has exactly one bottom bar');
-    // The bar is kept as the layout anchor; every control that used to sit
-    // in it was removed, so it must render empty rather than half-filled.
-    assert.equal(bars[0].children.length, 0, 'the bottom bar must carry no controls');
+    const controls = bars[0].querySelectorAll('button, output, select, input');
+    assert.deepEqual(
+      [...controls].map((control) => control.getAttribute('aria-label')),
+      ['Zoom out', 'Zoom level', 'Zoom in'],
+      'the bottom bar carries the zoom controls',
+    );
   });
 
   test('the editor starts in note-input mode', () => {
@@ -388,12 +391,14 @@ describe('the editor and the engine agree, end to end', () => {
     assert.equal(noteInput.getAttribute('aria-pressed'), 'true');
   });
 
-  test('the note-input toolbar carries MuseScore\'s note values, marks and slurs', () => {
+  test('one toolbar row carries the note values, marks and slurs', () => {
     const { window } = loadEditorPage();
     const doc = window.document;
     const bar = doc.querySelector('[data-editor-note-toolbar]');
     assert.ok(bar, 'the editor has no note-input toolbar');
-    assert.ok(doc.querySelector('[data-editor-toolbars]'), 'the two toolbars are not one sticky block');
+    const rows = doc.querySelectorAll('[data-editor-toolbars] .editor-toolbar');
+    assert.equal(rows.length, 1, 'the editor draws one toolbar row, not two');
+    assert.equal(rows[0], bar, 'the note tools live on that one row');
 
     const within = (selector) => [...bar.querySelectorAll(selector)];
     // Every note value from a whole note down to a 64th, longest first --

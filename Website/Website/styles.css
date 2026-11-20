@@ -427,8 +427,9 @@ body.is-newscore-open { overflow:hidden; }
 /* ------------------------------------------------------------------ */
 .editor-page { padding-top:var(--header-height); }
 
-/* Two MuseScore-style rows -- the main toolbar and the note-input bar --
-   stuck together as one block, so both stay put while the score scrolls. */
+/* One MuseScore-style row holding navigation, history, note input and
+   every note value, stuck under the header so it stays put while the
+   score scrolls. Zoom lives in the bottom bar. */
 .editor-toolbars {
   position:sticky;
   top:var(--header-height);
@@ -446,15 +447,9 @@ body.is-newscore-open { overflow:hidden; }
   padding:6px 12px;
   overflow-x:auto;
   overflow-y:hidden;
+  border-bottom:1px solid var(--border);
   background:transparent;
   scrollbar-width:thin;
-}
-.editor-toolbar--note-input {
-  gap:4px;
-  padding-top:4px;
-  padding-bottom:5px;
-  border-top:1px solid rgba(148,163,184,.08);
-  border-bottom:1px solid var(--border);
 }
 .editor-toolbar__group { display:flex; flex:0 0 auto; align-items:center; gap:1px; }
 .editor-toolbar__group[hidden] { display:none; }
@@ -503,8 +498,6 @@ body.is-newscore-open { overflow:hidden; }
 }
 .editor-toolbar__select:hover { border-color:var(--border); }
 .editor-toolbar__select:focus-visible { border-color:var(--accent-bright); outline:0; }
-.editor-toolbar__output { min-width:38px; padding:0 4px; color:var(--muted); font-family:'DM Mono',monospace; font-size:10px; text-align:center; }
-.editor-toolbar__output--tempo { min-width:52px; color:var(--text); font-size:11px; }
 
 .editor-workspace { width:100%; padding:14px 16px 24px; }
 .editor-score { width:100%; overflow:auto; --editor-zoom:100%; }
@@ -700,9 +693,10 @@ body.is-newscore-open { overflow:hidden; }
   .editor-tool { height:32px; padding:0 8px; }
   .editor-toolbar__divider { display:none; }
   .editor-workspace { padding:10px 8px 20px; }
-  .editor-page { --editor-bottom-height:96px; }
+  .editor-page { --editor-bottom-height:56px; }
   .editor-bottombar { height:auto; min-height:var(--editor-bottom-height); flex-wrap:wrap; padding:6px 10px; gap:4px; }
   .editor-bottombar__divider { display:none; }
+  .editor-bottombar__group--end { margin-left:auto; }
   .editor-segment__button { min-width:40px; padding:0 8px; }
 }
 
@@ -711,6 +705,7 @@ body.is-newscore-open { overflow:hidden; }
   .editor-tool:not(.editor-tool--back) > span:not(.editor-tool__glyph) { display:none; }
   .editor-tool { min-width:32px; padding:0 6px; }
   .editor-tool--back { min-width:auto; padding:0 12px; }
+  .editor-toolbar__divider { margin:0 3px; }
 }
 /* Narrow screens: the one row simply scrolls sideways. */
 @media (max-width:1280px) {

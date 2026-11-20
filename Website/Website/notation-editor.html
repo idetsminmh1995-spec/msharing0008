@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="Write and edit a music score in the Notation Lab editor." />
     <title>Notation Lab Editor — M Sharing</title>
-    <link rel="stylesheet" href="styles.css?v=musescore-scale-20261118" />
+    <link rel="stylesheet" href="styles.css?v=single-toolbar-20261118" />
     <link rel="icon" type="image/svg+xml" href="assets/logo/m-sharing-mark.svg" />
   </head>
   <body class="editor-page">
@@ -36,7 +36,7 @@
 
     <nav class="mobile-bottom-nav" aria-label="Mobile bottom navigation"><a class="bottom-nav-item" href="index.html#home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z" /><path d="M9 21v-7h6v7" /></svg><span>Home</span></a><a class="bottom-nav-item" href="index.html#courses"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></svg><span>Courses</span></a><a class="bottom-nav-item" href="index.html#store"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-1 14H5L4 5Zm0 0-1-2M9 9a3 3 0 0 0 6 0" /></svg><span>Store</span></a><a class="bottom-nav-item" href="index.html#create-video"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg><span>Create Video</span></a><a class="bottom-nav-item is-active" href="notation.html" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v11.5M8 4l10-2v11.5M8 8l10-2" /><ellipse cx="5.5" cy="17" rx="3" ry="2.2" /><ellipse cx="15.5" cy="15" rx="3" ry="2.2" /></svg><span>Notation Lab</span></a><a class="bottom-nav-item" href="index.html#account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg><span>Account</span></a></nav>
     <div class="editor-toolbars" data-editor-toolbars data-region="editor-toolbars">
-    <div class="editor-toolbar" role="toolbar" aria-label="Editor toolbar" data-editor-toolbar>
+    <div class="editor-toolbar" role="toolbar" aria-label="Editor toolbar" data-editor-toolbar data-editor-note-toolbar>
       <div class="editor-toolbar__group" role="group" aria-label="Navigation">
         <button class="editor-tool editor-tool--back" type="button" data-editor-back aria-label="Back to Notation Lab" title="Back to Notation Lab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg><span>Back</span></button>
       </div>
@@ -50,13 +50,6 @@
         <button class="editor-tool" type="button" data-editor-note-input aria-label="Note input mode" title="Note input (N) — then click the staff" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11.5" /><ellipse cx="9" cy="17.5" rx="3" ry="2.2" /><path d="M12 4l6-1.6v11.1" /><ellipse cx="15" cy="15" rx="3" ry="2.2" /></svg><span>Input</span></button>
       </div>
       <span class="editor-toolbar__divider" aria-hidden="true"></span>
-      <div class="editor-toolbar__group" role="group" aria-label="Zoom">
-        <button class="editor-tool" type="button" data-editor-zoom-out aria-label="Zoom out" title="Zoom out (Ctrl+-)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21M7.5 10.5h6" /></svg></button>
-        <output class="editor-toolbar__output" data-editor-zoom aria-live="off" aria-label="Zoom level">100%</output>
-        <button class="editor-tool" type="button" data-editor-zoom-in aria-label="Zoom in" title="Zoom in (Ctrl+=)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21M7.5 10.5h6M10.5 7.5v6" /></svg></button>
-      </div>
-    </div>
-    <div class="editor-toolbar editor-toolbar--note-input" role="toolbar" aria-label="Note input toolbar" data-editor-note-toolbar>
       <div class="editor-toolbar__group" role="group" aria-label="Note value">
         <button class="editor-tool" type="button" data-editor-duration="64th" aria-label="Sixty-fourth note" title="64th note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D163;</span></button>
         <button class="editor-tool" type="button" data-editor-duration="32nd" aria-label="Thirty-second note" title="32nd note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D162;</span></button>
@@ -121,7 +114,13 @@
       </p>
     </main>
 
-    <div class="editor-bottombar" role="toolbar" aria-label="Editor bottom bar" data-region="editor-bottom-bar" data-editor-bottom-bar></div>
+    <div class="editor-bottombar" role="toolbar" aria-label="Editor bottom bar" data-region="editor-bottom-bar" data-editor-bottom-bar>
+      <div class="editor-bottombar__group editor-bottombar__group--end" role="group" aria-label="Zoom">
+        <button class="editor-bottombar__button" type="button" data-editor-zoom-out aria-label="Zoom out" title="Zoom out (Ctrl+-)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21M7.5 10.5h6" /></svg></button>
+        <output class="editor-bottombar__readout" data-editor-zoom aria-live="off" aria-label="Zoom level">100%</output>
+        <button class="editor-bottombar__button" type="button" data-editor-zoom-in aria-label="Zoom in" title="Zoom in (Ctrl+=)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21M7.5 10.5h6M10.5 7.5v6" /></svg></button>
+      </div>
+    </div>
     <script src="assets/notation-engine.js?v=da5bd332b7eb"></script>
     <script src="assets/sound-engine.js?v=dd4228c1a476"></script>
     <script src="script.js?v=app-lock-20261118"></script>
