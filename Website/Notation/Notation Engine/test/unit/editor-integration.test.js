@@ -372,33 +372,20 @@ describe('the editor and the engine agree, end to end', () => {
     assert.equal(window.document.querySelector('[data-editor-status]').textContent, 'Score ready.');
   });
 
-  test('the editor exposes a SoundFont picker and two sound-test buttons', () => {
+  test('the bottom bar is a single empty bar', () => {
     const { window } = loadEditorPage();
-    const select = window.document.querySelector('[data-editor-soundfont]');
-    const testBuilt = window.document.querySelector('[data-editor-test-note]');
-    const testRendered = window.document.querySelector('[data-editor-test-score]');
-    assert.ok(select, 'the editor has no SoundFont picker');
-    assert.ok(testBuilt, 'the editor has no built-scale test button');
-    assert.ok(testRendered, 'the editor has no rendered-score test button');
-
-    // jsdom implements no `fetch`, so the picker cannot list assets and
-    // must degrade to a disabled control rather than throw -- the same
-    // thing a browser does when the R2 manifest is unreachable.
-    assert.equal(select.disabled, true);
-    assert.equal(testBuilt.disabled, true);
-    assert.equal(testRendered.disabled, true);
-    assert.match(select.textContent, /unavailable/i);
+    const bars = window.document.querySelectorAll('[data-editor-bottom-bar]');
+    assert.equal(bars.length, 1, 'the editor has exactly one bottom bar');
+    // The bar is kept as the layout anchor; every control that used to sit
+    // in it was removed, so it must render empty rather than half-filled.
+    assert.equal(bars[0].children.length, 0, 'the bottom bar must carry no controls');
   });
 
-  test('the editor starts in note-input mode with note preview on', () => {
+  test('the editor starts in note-input mode', () => {
     const { window } = loadEditorPage();
     const noteInput = window.document.querySelector('[data-editor-note-input]');
-    const preview = window.document.querySelector('[data-editor-preview]');
-    assert.ok(preview, 'the editor has no note-preview toggle');
-    // A writer must be able to write a note the moment the page opens, and
-    // hear it -- the two things this editor is for.
+    // A writer must be able to write a note the moment the page opens.
     assert.equal(noteInput.getAttribute('aria-pressed'), 'true');
-    assert.equal(preview.getAttribute('aria-pressed'), 'true');
   });
 
   test('the note-input toolbar carries MuseScore\'s note values, marks and slurs', () => {
@@ -583,9 +570,6 @@ describe('the editor and the engine agree, end to end', () => {
     const scoreHost = window.document.querySelector('[data-editor-score]');
     assert.equal(scoreHost.hidden, false, 'the score host must be visible');
     assert.equal(scoreHost.querySelectorAll('svg').length, 1, 'a starter score must be drawn');
-    // The score controls are enabled once a score exists; Add measure is
-    // one of them, and unlike the transport it is always in the toolbar.
-    assert.equal(window.document.querySelector('[data-editor-add-measure]').disabled, false, 'the score controls must be enabled');
     assert.equal(
       window.document.querySelector('[data-editor-status]').textContent,
       'Score ready.',
@@ -672,7 +656,7 @@ describe('the editor and the engine agree, end to end', () => {
       }
     });
 
-    test('a tab switches panels, and the toggle closes and reopens the dock', () => {
+    test('a tab switches panels', () => {
       const { doc, window } = openEditor();
       const click = (node) => node.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 
@@ -680,15 +664,9 @@ describe('the editor and the engine agree, end to end', () => {
       assert.deepEqual(shownPanel(doc), ['instruments']);
       click(doc.querySelector('[data-editor-sidebar-tab="properties"]'));
       assert.deepEqual(shownPanel(doc), ['properties']);
-
-      const toggle = doc.querySelector('[data-editor-sidebar-toggle]');
-      const sidebar = doc.querySelector('[data-editor-sidebar]');
-      click(toggle);
-      assert.equal(sidebar.hidden, true, 'the toggle closes the dock');
-      assert.equal(toggle.getAttribute('aria-expanded'), 'false');
-      click(toggle);
-      assert.equal(sidebar.hidden, false, 'and opens it again');
-      assert.deepEqual(shownPanel(doc), ['properties'], 'the dock remembers its last panel');
+      // The dock has no toggle any more -- the bottom bar that carried it
+      // is empty -- so switching panels is the only dock control left.
+      assert.equal(doc.querySelector('[data-editor-sidebar-toggle]'), null, 'the dock toggle is gone');
     });
 
     test('the rail is keyboard-navigable with the arrow keys', () => {

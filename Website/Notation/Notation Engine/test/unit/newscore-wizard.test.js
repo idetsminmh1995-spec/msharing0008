@@ -392,7 +392,6 @@ describe('the editor opens the score the wizard created', () => {
     const scoreHost = doc.querySelector('[data-editor-score]');
     assert.equal(scoreHost.hidden, false, 'the score must be drawn');
     assert.equal(scoreHost.querySelectorAll('svg').length, 1);
-    assert.equal(doc.querySelector('[data-editor-add-measure]').disabled, false, 'the score controls must be enabled');
     assert.equal(doc.querySelector('[data-editor-status]').textContent, 'Score ready.');
     assert.equal(doc.querySelector('[data-editor-file], [data-editor-filename]')?.textContent, 'My Song.musicxml');
     assert.equal(
@@ -402,9 +401,9 @@ describe('the editor opens the score the wizard created', () => {
     );
   });
 
-  test('the setup dropdowns show the score the wizard built, not the defaults', () => {
-    // `applySetup` writes all three controls at once, so a dropdown left
-    // on its default would silently reset the others on first touch.
+  test('the wizard score reaches the editor even without the setup dropdowns', () => {
+    // The clef/key/time selects lived in the bottom bar and are gone, so
+    // the wizard's setup has to reach the drawn score on its own.
     const window = loadEditorWithHandoff({
       instrumentIds: ['piano'],
       key: 'G',
@@ -412,9 +411,15 @@ describe('the editor opens the score the wizard created', () => {
       measures: 1,
     });
     const doc = window.document;
-    assert.equal(doc.querySelector('[data-editor-key]').value, 'G');
-    assert.equal(doc.querySelector('[data-editor-time]').value, '3/4');
-    assert.equal(doc.querySelector('[data-editor-clef]').value, 'treble');
+    for (const selector of ['[data-editor-key]', '[data-editor-time]', '[data-editor-clef]']) {
+      assert.equal(doc.querySelector(selector), null, `${selector} must be gone from the bottom bar`);
+    }
+    const svg = doc.querySelector('[data-editor-score] svg');
+    assert.ok(svg, 'the wizard score must be drawn');
+    // The meter is drawn as SMuFL glyphs, so 3/4 shows up as timeSig3 +
+    // timeSig4 rather than as the text "3/4".
+    const drawn = [...svg.querySelectorAll('text')].map((node) => node.textContent).join('');
+    assert.ok(drawn.includes('\uE083\uE084'), 'the drawn score must carry the wizard 3/4 meter');
   });
 
   test('a drum score is writable: clicking a line writes a sounding drum', () => {
@@ -444,26 +449,25 @@ describe('the editor opens the score the wizard created', () => {
     const window = loadEditorWithHandoff('{not json');
     const scoreHost = window.document.querySelector('[data-editor-score]');
     assert.equal(scoreHost.hidden, false, 'a corrupt handoff must still open a starter score');
-    assert.equal(window.document.querySelector('[data-editor-add-measure]').disabled, false);
+    assert.equal(scoreHost.querySelectorAll('svg').length, 1, 'a starter score must be drawn');
   });
 
-  test('a multi-part score gets a part selector that hides for a single part', () => {
+  test('a multi-part score lists every part in the Instruments panel', () => {
     const one = loadEditorWithHandoff({ instrumentIds: ['piano'], measures: 1 });
-    assert.equal(one.document.querySelector('[data-editor-part]').hidden, true, 'one part needs no chooser');
+    assert.equal(one.document.querySelector('[data-editor-part]'), null, 'the part dropdown is gone');
 
     const many = loadEditorWithHandoff({ instrumentIds: ['piano', 'drum-kit'], measures: 1 });
-    const select = many.document.querySelector('[data-editor-part]');
-    assert.equal(select.hidden, false, 'two parts need a chooser');
-    assert.deepEqual([...select.options].map((option) => option.textContent), ['Piano', 'Drum Kit (percussion)']);
-    assert.equal(select.value, 'P1', 'the first part is active on open');
+    const items = [...many.document.querySelectorAll('[data-editor-instrument]')];
+    assert.deepEqual(items.map((item) => item.dataset.editorInstrument), ['P1', 'P2']);
+    assert.deepEqual(items.map((item) => item.textContent.trim()), ['Piano', 'Drum KitPercussion']);
+    assert.equal(items[0].getAttribute('aria-current'), 'true', 'the first part is active on open');
   });
 
-  test('switching part retargets the next note at that part', () => {
+  test('switching part from the Instruments panel retargets the next note at that part', () => {
     const window = loadEditorWithHandoff({ instrumentIds: ['piano', 'drum-kit'], measures: 1 });
     const doc = window.document;
-    const select = doc.querySelector('[data-editor-part]');
-    select.value = 'P2';
-    select.dispatchEvent(new window.Event('change', { bubbles: true }));
+    const drum = doc.querySelector('[data-editor-instrument="P2"]');
+    drum.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     assert.match(doc.querySelector('[data-editor-status]').textContent, /Writing into Drum Kit/);
 
     // A click now has to write into P2, and a kit line writes a drum --

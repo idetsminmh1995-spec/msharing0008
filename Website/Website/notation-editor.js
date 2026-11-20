@@ -126,9 +126,9 @@
   const TIME_PAIR = { '4/4': [4, 4], '3/4': [3, 4], '2/4': [2, 4], '6/8': [6, 8] };
 
   function starterMusicXml() {
-    const clef = CLEF_SIGN[clefSelect.value] || CLEF_SIGN.treble;
-    const fifths = KEY_FIFTHS[keySelect.value] ?? 0;
-    const [beats, beatType] = TIME_PAIR[timeSelect.value] || TIME_PAIR['4/4'];
+    const clef = CLEF_SIGN[clefSelect?.value] || CLEF_SIGN.treble;
+    const fifths = KEY_FIFTHS[keySelect?.value] ?? 0;
+    const [beats, beatType] = TIME_PAIR[timeSelect?.value] || TIME_PAIR['4/4'];
     const divisions = 4;
     const measures = [];
     for (let n = 1; n <= 4; n += 1) {
@@ -348,18 +348,14 @@
   // ---- rendering ---------------------------------------------------------
 
   const setControlsEnabled = (enabled) => {
-    exportToggle.disabled = !enabled;
-    exportPdf.disabled = !enabled;
-    exportSvg.disabled = !enabled;
-    exportPng.disabled = !enabled;
-    addMeasureButton.disabled = !enabled;
-    removeMeasureButton.disabled = !enabled;
+    [exportToggle, exportPdf, exportSvg, exportPng, addMeasureButton, removeMeasureButton]
+      .forEach((control) => { if (control) control.disabled = !enabled; });
     if (!enabled) setExportMenu(false);
   };
 
   const setExportMenu = (open) => {
-    exportList.hidden = !open;
-    exportToggle.setAttribute('aria-expanded', String(open));
+    if (exportList) exportList.hidden = !open;
+    if (exportToggle) exportToggle.setAttribute('aria-expanded', String(open));
   };
 
   const updateZoom = () => {
@@ -1188,10 +1184,12 @@
   }
 
   function setSidebar(open) {
-    if (!sidebar || !sidebarToggle) return;
+    if (!sidebar) return;
     sidebar.hidden = !open;
-    sidebarToggle.setAttribute('aria-expanded', String(open));
-    sidebarToggle.setAttribute('aria-pressed', String(open));
+    if (sidebarToggle) {
+      sidebarToggle.setAttribute('aria-expanded', String(open));
+      sidebarToggle.setAttribute('aria-pressed', String(open));
+    }
     if (open) showSidebarPanel(sidebarPanel);
   }
 
@@ -1979,8 +1977,8 @@
     if (state.soundAssetId) soundFontSelect.value = state.soundAssetId;
     const hasFonts = state.soundFonts.length > 0;
     soundFontSelect.disabled = !hasFonts;
-    testNoteButton.disabled = !hasFonts;
-    testScoreButton.disabled = !hasFonts;
+    if (testNoteButton) testNoteButton.disabled = !hasFonts;
+    if (testScoreButton) testScoreButton.disabled = !hasFonts;
   }
 
   /** Loads the R2 manifest and fills the picker. Never throws to the caller. */
@@ -2333,9 +2331,9 @@
   };
 
   function applySetup() {
-    const clef = CLEF_SIGN[clefSelect.value] || CLEF_SIGN.treble;
-    const fifths = KEY_FIFTHS[keySelect.value] ?? 0;
-    const [numerator, denominator] = TIME_PAIR[timeSelect.value] || TIME_PAIR['4/4'];
+    const clef = CLEF_SIGN[clefSelect?.value] || CLEF_SIGN.treble;
+    const fifths = KEY_FIFTHS[keySelect?.value] ?? 0;
+    const [numerator, denominator] = TIME_PAIR[timeSelect?.value] || TIME_PAIR['4/4'];
     commit(
       (doc) => docTools.setSetup(doc, { partId: activePartId(), clef, fifths, numerator, denominator }),
       'Score setup applied.',
@@ -2360,11 +2358,11 @@
     const attribute = attributeAt(1);
     if (!attribute) return;
     const clefName = docTools.clefNameFromSign(attribute.clefsByStaff?.[1]?.sign ?? attribute.clefSign ?? 'G');
-    if (CLEF_SIGN[clefName]) clefSelect.value = clefName;
+    if (clefSelect && CLEF_SIGN[clefName]) clefSelect.value = clefName;
     const key = keyForFifths(attribute.fifths ?? 0);
-    if (KEY_FIFTHS[key] !== undefined) keySelect.value = key;
+    if (keySelect && KEY_FIFTHS[key] !== undefined) keySelect.value = key;
     const time = timeForPair(attribute.timeNumerator, attribute.timeDenominator);
-    if (time) timeSelect.value = time;
+    if (timeSelect && time) timeSelect.value = time;
   }
 
   /**
@@ -2405,8 +2403,7 @@
 
   /** Switching part is a change of target, not an edit: the clef and key
    *  dropdowns follow, so the next note lands in the part on screen. */
-  function onPartChange() {
-    const partId = partSelect.value;
+  function selectPart(partId) {
     if (!state.doc?.score.parts.some((part) => part.id === partId)) return;
     state.activePartId = partId;
     const measureNumber = Math.min(state.entry?.measureNumber ?? 1, measureCountOf(partId));
@@ -2415,6 +2412,10 @@
     syncSetupControls();
     render();
     announce(`Writing into ${partNameOf(partId)}.`);
+  }
+
+  function onPartChange() {
+    if (partSelect) selectPart(partSelect.value);
   }
 
   // ---- wiring ------------------------------------------------------------
@@ -2443,20 +2444,20 @@
     syncTools();
     announce(state.noteInput ? 'Note input on — click the staff to write.' : 'Note input off.');
   });
-  addMeasureButton.addEventListener('click', () => commit((doc) => docTools.appendMeasure(doc, activePartId()), 'Measure added.'));
-  removeMeasureButton.addEventListener('click', () => commit((doc) => docTools.removeLastMeasure(doc, activePartId()), 'Measure removed.'));
+  if (addMeasureButton) addMeasureButton.addEventListener('click', () => commit((doc) => docTools.appendMeasure(doc, activePartId()), 'Measure added.'));
+  if (removeMeasureButton) removeMeasureButton.addEventListener('click', () => commit((doc) => docTools.removeLastMeasure(doc, activePartId()), 'Measure removed.'));
 
   scoreHost.addEventListener('pointerdown', onScorePointerDown);
   scoreHost.addEventListener('pointermove', onScorePointerMove);
   scoreHost.addEventListener('pointerup', onScorePointerUp);
   scoreHost.addEventListener('pointercancel', onScorePointerUp);
 
-  exportToggle.addEventListener('click', () => setExportMenu(exportList.hidden));
-  exportPdf.addEventListener('click', () => { setExportMenu(false); void runExport(exportPdf, 'pdf'); });
-  exportSvg.addEventListener('click', () => { setExportMenu(false); void runExport(exportSvg, 'svg'); });
-  exportPng.addEventListener('click', () => { setExportMenu(false); void runExport(exportPng, 'png'); });
+  if (exportToggle) exportToggle.addEventListener('click', () => setExportMenu(exportList.hidden));
+  if (exportPdf) exportPdf.addEventListener('click', () => { setExportMenu(false); void runExport(exportPdf, 'pdf'); });
+  if (exportSvg) exportSvg.addEventListener('click', () => { setExportMenu(false); void runExport(exportSvg, 'svg'); });
+  if (exportPng) exportPng.addEventListener('click', () => { setExportMenu(false); void runExport(exportPng, 'png'); });
   document.addEventListener('pointerdown', (event) => {
-    if (!exportList.hidden && !event.target.closest('[data-editor-export-menu]')) setExportMenu(false);
+    if (exportList && !exportList.hidden && !event.target.closest('[data-editor-export-menu]')) setExportMenu(false);
   });
 
   durationButtons.forEach((button) => button.addEventListener('click', () => {
@@ -2521,10 +2522,11 @@
   if (instrumentsList) {
     instrumentsList.addEventListener('click', (event) => {
       const button = event.target.closest('[data-editor-instrument]');
-      if (!button || !partSelect) return;
-      if (partSelect.value === button.dataset.editorInstrument) return;
-      partSelect.value = button.dataset.editorInstrument;
-      onPartChange();
+      if (!button) return;
+      const partId = button.dataset.editorInstrument;
+      if (partId === activePartId()) return;
+      if (partSelect) partSelect.value = partId;
+      selectPart(partId);
     });
   }
   paletteItems.forEach((item) => item.addEventListener('click', () => {
@@ -2534,7 +2536,7 @@
     else applyMark(kind, kind === 'fermata' ? true : value);
   }));
 
-  [clefSelect, keySelect, timeSelect].forEach((select) => select.addEventListener('change', applySetup));
+  [clefSelect, keySelect, timeSelect].forEach((select) => select?.addEventListener('change', applySetup));
   if (partSelect) partSelect.addEventListener('change', onPartChange);
 
   document.addEventListener('keydown', (event) => {
