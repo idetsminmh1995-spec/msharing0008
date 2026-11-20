@@ -431,9 +431,11 @@ body.is-newscore-open { overflow:hidden; }
    every note value, stuck under the header so it stays put while the
    score scrolls. Zoom lives in the bottom bar.
 
+   The row never scrolls: tools keep their written order, and whatever
+   would run past the window is moved into the "more" box by script.
    No `backdrop-filter` here: it would make this box the containing block
-   for the popover panels, which are `position:fixed` so the row's own
-   clipping cannot cut them off. The background is near-opaque anyway. */
+   for that box, which is `position:fixed` so the row's own clipping
+   cannot cut it off. The background is near-opaque anyway. */
 .editor-toolbars {
   position:sticky;
   top:var(--header-height);
@@ -448,21 +450,20 @@ body.is-newscore-open { overflow:hidden; }
   align-items:center;
   gap:5px;
   padding:6px 12px;
-  overflow-x:auto;
-  overflow-y:hidden;
+  /* Nothing may spill past the row: whatever would not fit is moved into
+     the "more" box by script, so there is no sideways scrolling to do. */
+  overflow:hidden;
   border-bottom:1px solid var(--border);
   background:transparent;
-  scrollbar-width:thin;
 }
 .editor-toolbar__group { display:flex; flex:0 0 auto; align-items:center; gap:1px; }
 .editor-toolbar__group[hidden] { display:none; }
 .editor-toolbar__divider { flex:0 0 auto; width:1px; height:20px; margin:0 5px; background:var(--border); opacity:.8; }
+.editor-toolbar__divider[hidden] { display:none; }
 
-/* A popover trigger is one icon on the row; its panel is the box that
-   opens under it. The panel is fixed and placed by script against the
-   toolbar, so it can never be clipped by the row's own scrolling and
+/* The box hangs under its icon. It is fixed and placed by script against
+   the trigger, so it can never be clipped by the row it came from and
    never runs past the edge of the window. */
-.editor-toolbar__group--popover { position:relative; }
 .editor-popover {
   position:fixed;
   z-index:120;
@@ -477,9 +478,10 @@ body.is-newscore-open { overflow:hidden; }
   box-shadow:0 18px 40px rgba(0,0,0,.42);
 }
 .editor-popover[hidden] { display:none; }
-.editor-popover--wide { max-width:min(320px,calc(100vw - 16px)); }
+/* The box behind the "more" icon holds whole tool groups, so it wraps
+   group by group instead of splitting a group across rows. */
+.editor-popover--overflow { max-width:min(360px,calc(100vw - 16px)); align-content:flex-start; }
 .editor-popover .editor-tool { min-width:32px; height:32px; }
-.editor-tool--popover { position:relative; }
 
 /* MuseScore-style main toolbar: flat square icon buttons on one row,
    hairline separators, filled accent for tools that are ON. */
@@ -510,6 +512,9 @@ body.is-newscore-open { overflow:hidden; }
 .editor-tool__glyph { font-family:'Bravura','Inter',sans-serif; font-size:18px; font-weight:400; line-height:1; }
 .editor-tool__glyph--dots { font-size:16px; letter-spacing:-1px; }
 .editor-tool--back { padding:0 8px 0 5px; }
+/* The fold sits at the end of the row and holds whole groups, so it is a
+   plain icon that happens to open a box. */
+.editor-tool--overflow[aria-expanded='true'] { color:#fff; background:var(--accent); }
 
 .editor-toolbar__select {
   height:28px;
@@ -745,13 +750,4 @@ body.is-newscore-open { overflow:hidden; }
 /* Narrow screens: the one row simply scrolls sideways. */
 @media (max-width:1280px) {
   .editor-toolbar { padding:6px 10px; }
-}
-
-/* Very narrow phones: the same ten icons, packed tighter, so the row
-   still fits without scrolling. Declared after the 1280px padding rule
-   so it wins at phone widths. */
-@media (max-width:400px) {
-  .editor-toolbar { padding:6px 4px; gap:1px; }
-  .editor-tool { min-width:26px; padding:0 3px; }
-  .editor-tool--back { min-width:26px; padding:0 3px; }
 }

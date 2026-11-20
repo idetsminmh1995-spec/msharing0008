@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="Write and edit a music score in the Notation Lab editor." />
     <title>Notation Lab Editor — M Sharing</title>
-    <link rel="stylesheet" href="styles.css?v=pencil-20261118b" />
+    <link rel="stylesheet" href="styles.css?v=overflow-box-20261118" />
     <link rel="icon" type="image/svg+xml" href="assets/logo/m-sharing-mark.svg" />
   </head>
   <body class="editor-page">
@@ -37,13 +37,15 @@
     <nav class="mobile-bottom-nav" aria-label="Mobile bottom navigation"><a class="bottom-nav-item" href="index.html#home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z" /><path d="M9 21v-7h6v7" /></svg><span>Home</span></a><a class="bottom-nav-item" href="index.html#courses"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></svg><span>Courses</span></a><a class="bottom-nav-item" href="index.html#store"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-1 14H5L4 5Zm0 0-1-2M9 9a3 3 0 0 0 6 0" /></svg><span>Store</span></a><a class="bottom-nav-item" href="index.html#create-video"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg><span>Create Video</span></a><a class="bottom-nav-item is-active" href="notation.html" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v11.5M8 4l10-2v11.5M8 8l10-2" /><ellipse cx="5.5" cy="17" rx="3" ry="2.2" /><ellipse cx="15.5" cy="15" rx="3" ry="2.2" /></svg><span>Notation Lab</span></a><a class="bottom-nav-item" href="index.html#account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg><span>Account</span></a></nav>
     <div class="editor-toolbars" data-editor-toolbars data-region="editor-toolbars">
     <div class="editor-toolbar" role="toolbar" aria-label="Editor toolbar" data-editor-toolbar data-editor-note-toolbar>
-  <button class="editor-tool editor-tool--back" type="button" data-editor-back aria-label="Back to Notation Lab" title="Back to Notation Lab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg><span>Back</span></button>
-      <span class="editor-toolbar__divider" aria-hidden="true"></span>
-  <button class="editor-tool" type="button" data-editor-note-input aria-label="Note input mode" title="Note input (N) — then click the staff" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" data-editor-pencil><path d="M4 20l1.4-4.2L15.8 5.4l2.8 2.8L8.2 18.6z" /><path d="M5.4 15.8 8.2 18.6" /><path d="M14.9 6.3 17.8 9.1" /></svg><span>Input</span></button>
-      <span class="editor-toolbar__divider" aria-hidden="true"></span>
-      <div class="editor-toolbar__group editor-toolbar__group--popover" role="group" aria-label="Note value">
-        <button class="editor-tool editor-tool--popover" type="button" data-editor-popover="value" aria-label="Note value" title="Note value" aria-haspopup="true" aria-expanded="false"><span class="editor-tool__glyph" data-editor-value-glyph>&#x1D15F;</span></button>
-      <div class="editor-popover editor-popover--wide" data-editor-popover-panel="value" role="group" aria-label="Note value" hidden>
+      <div class="editor-toolbar__group" data-editor-slot="navigation" role="group" aria-label="Navigation">
+        <button class="editor-tool editor-tool--back" type="button" data-editor-back aria-label="Back to Notation Lab" title="Back to Notation Lab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg><span>Back</span></button>
+      </div>
+      <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
+      <div class="editor-toolbar__group" data-editor-slot="note-input" role="group" aria-label="Note input">
+        <button class="editor-tool" type="button" data-editor-note-input aria-label="Note input mode" title="Note input (N) — then click the staff" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" data-editor-pencil><path d="M4 20l1.4-4.2L15.8 5.4l2.8 2.8L8.2 18.6z" /><path d="M5.4 15.8 8.2 18.6" /><path d="M14.9 6.3 17.8 9.1" /></svg><span>Input</span></button>
+      </div>
+      <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
+      <div class="editor-toolbar__group" data-editor-slot="note-value" role="group" aria-label="Note value">
         <button class="editor-tool" type="button" data-editor-duration="64th" aria-label="Sixty-fourth note" title="64th note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D163;</span></button>
         <button class="editor-tool" type="button" data-editor-duration="32nd" aria-label="Thirty-second note" title="32nd note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D162;</span></button>
         <button class="editor-tool" type="button" data-editor-duration="16th" aria-label="Sixteenth note" title="16th note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D161;</span></button>
@@ -52,39 +54,39 @@
         <button class="editor-tool" type="button" data-editor-duration="half" aria-label="Half note" title="Half note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D15E;</span></button>
         <button class="editor-tool" type="button" data-editor-duration="whole" aria-label="Whole note" title="Whole note" aria-pressed="false"><span class="editor-tool__glyph">&#x1D15D;</span></button>
       </div>
-      </div>
-      <span class="editor-toolbar__divider" aria-hidden="true"></span>
-      <div class="editor-toolbar__group editor-toolbar__group--popover" role="group" aria-label="Augmentation dots">
-        <button class="editor-tool editor-tool--popover" type="button" data-editor-popover="dots" aria-label="Augmentation dots" title="Augmentation dots" aria-haspopup="true" aria-expanded="false"><span class="editor-tool__glyph editor-tool__glyph--dots">&#x1D16D;</span></button>
-      <div class="editor-popover" data-editor-popover-panel="dots" role="group" aria-label="Augmentation dots" hidden>
+      <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
+      <div class="editor-toolbar__group" data-editor-slot="augmentation-dots" role="group" aria-label="Augmentation dots">
         <button class="editor-tool" type="button" data-editor-dots="1" aria-label="Dot" title="Dot" aria-pressed="false"><span class="editor-tool__glyph editor-tool__glyph--dots">&#x1D16D;</span></button>
         <button class="editor-tool" type="button" data-editor-dots="2" aria-label="Double dot" title="Double dot" aria-pressed="false"><span class="editor-tool__glyph editor-tool__glyph--dots">&#x1D16D;&#x1D16D;</span></button>
         <button class="editor-tool" type="button" data-editor-dots="3" aria-label="Triple dot" title="Triple dot" aria-pressed="false"><span class="editor-tool__glyph editor-tool__glyph--dots">&#x1D16D;&#x1D16D;&#x1D16D;</span></button>
       </div>
+      <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
+      <div class="editor-toolbar__group" data-editor-slot="rest" role="group" aria-label="Rest">
+        <button class="editor-tool" type="button" data-editor-rest aria-label="Insert rest" title="Rest (0)" aria-pressed="false"><span class="editor-tool__glyph">&#x1D13D;</span></button>
       </div>
-      <div class="editor-toolbar__group editor-toolbar__group--popover" role="group" aria-label="Accidentals">
-        <button class="editor-tool editor-tool--popover" type="button" data-editor-popover="accidentals" aria-label="Accidentals" title="Accidentals" aria-haspopup="true" aria-expanded="false"><span class="editor-tool__glyph">&#x266F;</span></button>
-      <div class="editor-popover" data-editor-popover-panel="accidentals" role="group" aria-label="Accidentals" hidden>
+      <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
+      <div class="editor-toolbar__group" data-editor-slot="accidentals" role="group" aria-label="Accidentals">
         <button class="editor-tool" type="button" data-editor-accidental="double-flat" aria-label="Double flat" title="Double flat" aria-pressed="false"><span class="editor-tool__glyph">&#x1D12B;</span></button>
         <button class="editor-tool" type="button" data-editor-accidental="flat" aria-label="Flat" title="Flat" aria-pressed="false"><span class="editor-tool__glyph">&#x266D;</span></button>
         <button class="editor-tool" type="button" data-editor-accidental="natural" aria-label="Natural" title="Natural" aria-pressed="false"><span class="editor-tool__glyph">&#x266E;</span></button>
         <button class="editor-tool" type="button" data-editor-accidental="sharp" aria-label="Sharp" title="Sharp" aria-pressed="false"><span class="editor-tool__glyph">&#x266F;</span></button>
         <button class="editor-tool" type="button" data-editor-accidental="double-sharp" aria-label="Double sharp" title="Double sharp" aria-pressed="false"><span class="editor-tool__glyph">&#x1D12A;</span></button>
       </div>
+      <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
+      <div class="editor-toolbar__group" data-editor-slot="tie-and-slur" role="group" aria-label="Tie and slur">
+        <button class="editor-tool" type="button" data-editor-tie aria-label="Tie" title="Tie to the next note" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10c2.6 4.4 5.3 6.6 8 6.6S17.4 14.4 20 10" /></svg></button>
+        <button class="editor-tool" type="button" data-editor-slur aria-label="Slur" title="Slur to the next note" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9c1.4 6 5 9 8 9s6.6-3 8-9" /></svg></button>
       </div>
-      <div class="editor-toolbar__group editor-toolbar__group--popover" role="group" aria-label="Articulations">
-        <button class="editor-tool editor-tool--popover" type="button" data-editor-popover="marks" aria-label="Articulations" title="Articulations" aria-haspopup="true" aria-expanded="false"><span class="editor-tool__glyph" data-editor-glyph="articAccentAbove"></span></button>
-      <div class="editor-popover" data-editor-popover-panel="marks" role="group" aria-label="Articulations" hidden>
+      <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
+      <div class="editor-toolbar__group" data-editor-slot="articulations" role="group" aria-label="Articulations">
         <button class="editor-tool" type="button" data-editor-articulation="marcato" aria-label="Marcato" title="Marcato" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="articMarcatoAbove"></span></button>
         <button class="editor-tool" type="button" data-editor-articulation="sforzato" aria-label="Sforzato" title="Sforzato (soft accent)" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="articSoftAccentAbove"></span></button>
         <button class="editor-tool" type="button" data-editor-articulation="tenuto" aria-label="Tenuto" title="Tenuto" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="articTenutoAbove"></span></button>
         <button class="editor-tool" type="button" data-editor-articulation="staccato" aria-label="Staccato" title="Staccato" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="articStaccatoAbove"></span></button>
         <button class="editor-tool" type="button" data-editor-articulation="accent" aria-label="Accent" title="Accent" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="articAccentAbove"></span></button>
       </div>
-      </div>
-      <div class="editor-toolbar__group editor-toolbar__group--popover" role="group" aria-label="Dynamics">
-        <button class="editor-tool editor-tool--popover" type="button" data-editor-popover="dynamics" aria-label="Dynamics" title="Dynamics" aria-haspopup="true" aria-expanded="false"><span class="editor-tool__glyph" data-editor-glyph="dynamicMF"></span></button>
-      <div class="editor-popover" data-editor-popover-panel="dynamics" role="group" aria-label="Dynamics" hidden>
+      <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
+      <div class="editor-toolbar__group" data-editor-slot="dynamics" role="group" aria-label="Dynamics">
         <button class="editor-tool" type="button" data-editor-dynamic="pp" aria-label="Pianissimo" title="Pianissimo" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="dynamicPP"></span></button>
         <button class="editor-tool" type="button" data-editor-dynamic="p" aria-label="Piano" title="Piano" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="dynamicPiano"></span></button>
         <button class="editor-tool" type="button" data-editor-dynamic="mp" aria-label="Mezzo-piano" title="Mezzo-piano" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="dynamicMP"></span></button>
@@ -92,19 +94,20 @@
         <button class="editor-tool" type="button" data-editor-dynamic="f" aria-label="Forte" title="Forte" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="dynamicForte"></span></button>
         <button class="editor-tool" type="button" data-editor-dynamic="ff" aria-label="Fortissimo" title="Fortissimo" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="dynamicFF"></span></button>
       </div>
-      </div>
-      <div class="editor-toolbar__group editor-toolbar__group--popover" role="group" aria-label="Ties, slurs, rests and stems">
-        <button class="editor-tool editor-tool--popover" type="button" data-editor-popover="more" aria-label="Ties, slurs, rests and stems" title="Tie, slur, rest and stem" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10c2.6 4.4 5.3 6.6 8 6.6S17.4 14.4 20 10" /><path d="M5 18h14" /></svg></button>
-      <div class="editor-popover" data-editor-popover-panel="more" role="group" aria-label="Ties, slurs, rests and stems" hidden>
-        <button class="editor-tool" type="button" data-editor-tie aria-label="Tie" title="Tie to the next note" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10c2.6 4.4 5.3 6.6 8 6.6S17.4 14.4 20 10" /></svg></button>
-        <button class="editor-tool" type="button" data-editor-slur aria-label="Slur" title="Slur to the next note" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9c1.4 6 5 9 8 9s6.6-3 8-9" /></svg></button>
-        <button class="editor-tool" type="button" data-editor-rest aria-label="Insert rest" title="Rest (0)" aria-pressed="false"><span class="editor-tool__glyph">&#x1D13D;</span></button>
+      <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
+      <div class="editor-toolbar__group" data-editor-slot="stem" role="group" aria-label="Stem">
         <button class="editor-tool" type="button" data-editor-flip aria-label="Flip stem" title="Flip stem direction"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v16M8 4l-3 3M8 4l3 3M16 20V4M16 20l-3-3M16 20l3-3" /></svg></button>
       </div>
+      <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
+      <div class="editor-toolbar__group editor-toolbar__group--overflow" role="group" aria-label="More tools" data-editor-overflow-group hidden>
+        <button class="editor-tool editor-tool--overflow" type="button" data-editor-popover="overflow" aria-label="More tools" title="More tools" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg></button>
+      <div class="editor-popover editor-popover--overflow" data-editor-popover-panel="overflow" role="group" aria-label="More tools" hidden></div>
       </div>
-      <span class="editor-toolbar__divider" aria-hidden="true"></span>
-  <button class="editor-tool" type="button" data-editor-undo aria-label="Undo" title="Undo (Ctrl+Z)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5" /><path d="M4 12h9a6 6 0 0 1 0 12h-1" /></svg></button>
-  <button class="editor-tool" type="button" data-editor-redo aria-label="Redo" title="Redo (Ctrl+Y)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 7 5 5-5 5" /><path d="M20 12h-9a6 6 0 0 0 0 12h1" /></svg></button>
+      <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
+      <div class="editor-toolbar__group" data-editor-slot="history" role="group" aria-label="History">
+        <button class="editor-tool" type="button" data-editor-undo aria-label="Undo" title="Undo (Ctrl+Z)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5" /><path d="M4 12h9a6 6 0 0 1 0 12h-1" /></svg></button>
+        <button class="editor-tool" type="button" data-editor-redo aria-label="Redo" title="Redo (Ctrl+Y)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 7 5 5-5 5" /><path d="M20 12h-9a6 6 0 0 0 0 12h1" /></svg></button>
+      </div>
     </div>
     </div>
 
@@ -129,6 +132,6 @@
     <script src="soundfonts-config.js?v=soundfont-config-20261118"></script>
     <script src="notation-doc.js?v=musescore-20261118"></script>
     <script src="notation-newscore.js?v=toolbar-20261124"></script>
-    <script src="notation-editor.js?v=tool-popover-20261118"></script>
+    <script src="notation-editor.js?v=overflow-box-20261118"></script>
   </body>
 </html>

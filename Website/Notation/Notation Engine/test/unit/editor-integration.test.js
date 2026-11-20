@@ -446,65 +446,98 @@ describe('the editor and the engine agree, end to end', () => {
   test('undo and redo sit at the end of the row', () => {
     const { window } = loadEditorPage();
     const row = window.document.querySelector('[data-editor-toolbars] .editor-toolbar');
-    const controls = [...row.children].filter(
-      (node) => node.tagName === 'BUTTON' || node.classList.contains('editor-toolbar__group'),
+    // History is the last group on the row, and the box sits before it, so
+    // neither the fold nor the tools it swallows can push history off the
+    // end where a writer looks for it after a change.
+    const groups = [...row.children].filter((node) => node.classList.contains('editor-toolbar__group'));
+    const last = groups.at(-1);
+    assert.equal(last.getAttribute('aria-label'), 'History', 'history closes the row');
+    assert.equal(groups.at(-2).getAttribute('aria-label'), 'More tools', 'the box sits just before history');
+    assert.deepEqual(
+      [...last.querySelectorAll('.editor-tool')].map((node) => node.getAttribute('aria-label')),
+      ['Undo', 'Redo'],
     );
-    const labels = controls.map(
-      (node) => node.getAttribute('aria-label') ?? node.querySelector('[aria-label]')?.getAttribute('aria-label'),
-    );
-    assert.deepEqual(labels.slice(-2), ['Undo', 'Redo'], 'undo and redo close the row');
+    const labels = [...row.querySelectorAll('.editor-tool')].map((node) => node.getAttribute('aria-label'));
     assert.ok(labels.indexOf('Note input mode') < labels.indexOf('Undo'), 'history comes after the writing tools');
   });
 
-  test('the crowded tools open from a box on the row instead of spreading out', () => {
+  test('every tool keeps its written place on the row', () => {
     const { window } = loadEditorPage();
     const doc = window.document;
-
-    // A trigger and its panel are a pair, so a panel with no trigger (or the
-    // reverse) would leave a box nothing can open.
-    const triggers = [...doc.querySelectorAll('[data-editor-popover]')];
-    const panels = [...doc.querySelectorAll('[data-editor-popover-panel]')];
-    assert.deepEqual(
-      triggers.map((node) => node.dataset.editorPopover).sort(),
-      panels.map((node) => node.dataset.editorPopoverPanel).sort(),
-    );
-    assert.deepEqual(
-      triggers.map((node) => node.dataset.editorPopover),
-      ['value', 'dots', 'accidentals', 'marks', 'dynamics', 'more'],
-    );
-    for (const panel of panels) {
-      assert.equal(panel.hidden, true, `${panel.dataset.editorPopoverPanel} starts closed`);
-      assert.ok(panel.querySelector('.editor-tool'), `${panel.dataset.editorPopoverPanel} holds no tools`);
-    }
-
-    // Every note value lives in a panel, so the closed row stays short
-    // enough not to scroll even on a phone.
-    const values = doc.querySelectorAll('[data-editor-popover-panel="value"] [data-editor-duration]');
-    assert.equal(values.length, 7);
-    for (const selector of ['[data-editor-tie]', '[data-editor-slur]', '[data-editor-rest]', '[data-editor-flip]']) {
-      assert.ok(doc.querySelector(`[data-editor-popover-panel="more"] ${selector}`), `${selector} is in the more box`);
-    }
+    const row = doc.querySelector('[data-editor-toolbar]');
+    const labels = [...row.children]
+      .filter((node) => node.classList.contains('editor-toolbar__group'))
+      .map((node) => node.getAttribute('aria-label'));
+    assert.deepEqual(labels, [
+      'Navigation',
+      'Note input',
+      'Note value',
+      'Augmentation dots',
+      'Rest',
+      'Accidentals',
+      'Tie and slur',
+      'Articulations',
+      'Dynamics',
+      'Stem',
+      'More tools',
+      'History',
+    ]);
+    // Nothing is folded away to begin with: the box starts empty and the
+    // row is measured before anything moves into it.
+    assert.equal(doc.querySelector('[data-editor-popover-panel="overflow"]').children.length, 0);
+    assert.equal(doc.querySelector('[data-editor-overflow-group]').hidden, true);
   });
 
-  test('a tool in a box closes it again, and the value trigger shows the value in force', () => {
+  test('the one box on the row holds whatever did not fit, in the same order', () => {
     const { window } = loadEditorPage();
     const doc = window.document;
-    const trigger = doc.querySelector('[data-editor-popover="value"]');
-    const panel = doc.querySelector('[data-editor-popover-panel="value"]');
+    const trigger = doc.querySelector('[data-editor-popover="overflow"]');
+    const panel = doc.querySelector('[data-editor-popover-panel="overflow"]');
+    assert.ok(trigger, 'the row has no box trigger');
+    assert.ok(panel, 'the row has no box');
+    assert.equal(panel.hidden, true, 'the box starts closed');
 
     trigger.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    assert.equal(panel.hidden, false, 'the trigger opens its box');
+    assert.equal(panel.hidden, false, 'the trigger opens the box');
     assert.equal(trigger.getAttribute('aria-expanded'), 'true');
+    trigger.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(panel.hidden, true, 'a second press closes it again');
+  });
 
-    doc.querySelector('[data-editor-popover-panel="value"] [data-editor-duration="eighth"]')
-      .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    assert.equal(panel.hidden, true, 'picking a value folds the box away');
-    assert.equal(trigger.getAttribute('aria-expanded'), 'false');
-    assert.equal(
-      doc.querySelector('[data-editor-value-glyph]').textContent,
-      doc.querySelector('[data-editor-popover-panel="value"] [data-editor-duration="eighth"] .editor-tool__glyph').textContent,
-      'the trigger shows the note value in force',
-    );
+  test('a tool taken from the box closes it and takes effect', () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    const panel = doc.querySelector('[data-editor-popover-panel="overflow"]');
+    // Stand in for the fold: the box is empty until the row runs out of
+    // room, so move a group in the way the script would.
+    const stemGroup = [...doc.querySelectorAll('.editor-toolbar__group')]
+      .find((node) => node.getAttribute('aria-label') === 'Stem');
+    panel.append(stemGroup);
+    doc.querySelector('[data-editor-popover="overflow"]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(panel.hidden, false);
+
+    const flip = doc.querySelector('[data-editor-flip]');
+    flip.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(panel.hidden, true, 'using a tool from the box folds it away');
+    assert.equal(doc.querySelector('[data-editor-popover="overflow"]').getAttribute('aria-expanded'), 'false');
+  });
+
+  test('the fold only happens when the row would run past the window', () => {
+    const { window } = loadEditorPage();
+    const row = window.document.querySelector('[data-editor-toolbar]');
+    const style = window.document.querySelector('link[rel="stylesheet"]').getAttribute('href');
+    const css = fs.readFileSync(path.join(appDir, style.split('?')[0]), 'utf8');
+
+    // The row must not scroll: a tool that is out of room moves into the
+    // box rather than off the edge, so there is nothing to scroll to.
+    const rule = css.match(/\.editor-toolbar\s*\{[^}]*\}/);
+    assert.ok(rule, 'the toolbar has no rule');
+    assert.match(rule[0], /overflow:hidden/, 'the row clips instead of scrolling');
+    assert.doesNotMatch(rule[0], /overflow-x:auto/, 'the row must not scroll sideways');
+    // The box itself is a fixed panel placed against the window, so it
+    // cannot be cut off by the row it hangs from.
+    assert.match(css, /\.editor-popover\s*\{[^}]*position:fixed/, 'the box is not fixed');
+    assert.equal(row.getAttribute('role'), 'toolbar');
   });
 
   test('the dynamics buttons mark the selected note and light up with it', () => {

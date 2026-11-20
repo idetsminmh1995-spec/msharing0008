@@ -51,7 +51,9 @@
   const zoomOutput = pick('[data-editor-zoom]');
   const popoverTriggers = [...document.querySelectorAll('[data-editor-popover]')];
   const popoverPanels = [...document.querySelectorAll('[data-editor-popover-panel]')];
-  const valueGlyph = pick('[data-editor-value-glyph]');
+  const overflowGroup = pick('[data-editor-overflow-group]');
+  const overflowPanel = pick('[data-editor-popover-panel="overflow"]');
+  const overflowTrigger = pick('[data-editor-popover="overflow"]');
   const voiceSelect = pick('[data-editor-voice]');
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -419,6 +421,86 @@
     panel.hidden = !open;
     trigger.setAttribute('aria-expanded', String(open));
     if (open) placePopover(trigger, panel);
+  };
+
+  // ---- toolbar overflow --------------------------------------------------
+
+  /**
+   * Keeps the tools in the order they were written, and folds only what
+   * would run past the window.
+   *
+   * The row is measured as it is: as long as it fits, every tool stays on
+   * it. When it would run past the edge, the groups at the end are moved
+   * -- unchanged, same order -- into the box behind the "more" icon, which
+   * takes their place on the row. Undo and Redo sit after that icon, so
+   * history is never behind a box.
+   */
+  const historyGroup = root.querySelector('.editor-toolbar__group[aria-label="History"]');
+  const toolbarUnits = [];
+  const overflowDivider = overflowGroup?.previousElementSibling?.hasAttribute('data-editor-divider')
+    ? overflowGroup.previousElementSibling
+    : null;
+  if (overflowGroup && historyGroup) {
+    let pendingDivider = null;
+    for (const node of [...root.children]) {
+      if (node === overflowGroup || node === historyGroup) break;
+      if (node.hasAttribute('data-editor-divider')) { pendingDivider = node; continue; }
+      if (node.classList.contains('editor-toolbar__group')) {
+        toolbarUnits.push({ group: node, divider: pendingDivider });
+        pendingDivider = null;
+      }
+    }
+  }
+
+  const layoutToolbar = () => {
+    if (!overflowGroup || !overflowPanel || !historyGroup) return;
+
+    // Put every unit back on the row in its written order first, so a
+    // wider window brings the tools back out of the box.
+    for (const { group, divider } of toolbarUnits) {
+      group.hidden = false;
+      if (divider) {
+        divider.hidden = false;
+        root.insertBefore(divider, overflowGroup);
+      }
+      root.insertBefore(group, overflowGroup);
+    }
+    overflowGroup.hidden = true;
+    if (overflowDivider) overflowDivider.hidden = true;
+    overflowPanel.replaceChildren();
+
+    // No layout to measure against (a hidden page, or a test runner): keep
+    // every tool on the row rather than folding the whole row away.
+    if (!(root.clientWidth > 0)) return;
+
+    const overflowing = () => root.scrollWidth > root.clientWidth + 1;
+    if (!overflowing()) return;
+
+    // The icon itself takes room, so show it before deciding how much is
+    // left; if the row fits again with it, nothing needs folding.
+    overflowGroup.hidden = false;
+    if (overflowDivider) overflowDivider.hidden = false;
+    if (!overflowing()) {
+      overflowGroup.hidden = true;
+      if (overflowDivider) overflowDivider.hidden = true;
+      return;
+    }
+
+    for (let index = toolbarUnits.length - 1; index >= 0 && overflowing(); index -= 1) {
+      const { group, divider } = toolbarUnits[index];
+      if (divider) divider.hidden = true;
+      // Prepending keeps the written order: the last unit moved is the
+      // first one in the box.
+      overflowPanel.prepend(group);
+    }
+  };
+
+  let toolbarWidth = -1;
+  const relayoutToolbar = () => {
+    const width = root.clientWidth;
+    if (width === toolbarWidth) return;
+    toolbarWidth = width;
+    layoutToolbar();
   };
 
   function svgElement(name, attrs) {
@@ -2179,13 +2261,6 @@
     });
     restButton.setAttribute('aria-pressed', String(state.tool.rest));
     noteInputButton.setAttribute('aria-pressed', String(state.noteInput));
-    // The value trigger shows the note value in force, so the closed box
-    // still tells the writer what the next note will be.
-    const activeDuration = durationButtons.find((button) => button.dataset.editorDuration === state.tool.duration);
-    if (valueGlyph && activeDuration) {
-      const glyph = activeDuration.querySelector('.editor-tool__glyph');
-      if (glyph) valueGlyph.textContent = glyph.textContent;
-    }
     if (previewButton) previewButton.setAttribute('aria-pressed', String(state.previewOn));
     if (zoomOutput) zoomOutput.textContent = `${state.zoom}%`;
     root.dataset.mode = state.noteInput ? 'input' : 'select';
@@ -2355,7 +2430,16 @@
   });
   window.addEventListener('resize', () => {
     closePopovers();
+    relayoutToolbar();
   });
+  // Fonts and the zoom readout settle after first paint, so measure once
+  // the row has its real width, and again whenever it changes size.
+  relayoutToolbar();
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(() => relayoutToolbar()).observe(root);
+  } else {
+    window.addEventListener('load', relayoutToolbar);
+  }
 
   durationButtons.forEach((button) => button.addEventListener('click', () => {
     state.tool.duration = button.dataset.editorDuration;
