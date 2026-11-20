@@ -348,7 +348,10 @@
 
   const updateZoom = () => {
     state.zoom = Math.min(200, Math.max(50, state.zoom));
-    scoreHost.style.zoom = `${state.zoom}%`;
+    // A CSS `zoom` on the host would scale the box and its 100%-wide child
+    // together, leaving the sheet the same size. Widening the sheet itself
+    // is what actually makes the music bigger.
+    scoreHost.style.setProperty('--editor-zoom', `${state.zoom}%`);
     if (zoomOutput) zoomOutput.textContent = `${state.zoom}%`;
   };
 
