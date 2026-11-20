@@ -1,5 +1,6 @@
 export * from './diagnostic.js';
 export * from './parse.js';
+export * from './write.js';
 export * from './instrument.js';
 export * from './timewise.js';
 export * from './mxl.js';

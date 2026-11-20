@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-726 exported symbols, by module.
+728 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -1457,6 +1457,13 @@ The diagnostics `level` lets through, in their original order.
 | | Name | Summary |
 |---|---|---|
 | function | `convertTimewiseToPartwise` | §10.6: `<score-timewise>` is the rarely-used alternative document order -- measures on the outside, parts nested inside each measure (the mirror image of `<score-partwise>`'s part-on-the-outside shape). |
+
+### `src/parser/musicxml/write.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `WriteMusicXmlOptions` | How `writeMusicXml` writes, for the rare caller that must pin `<divisions>`. |
+| function | `writeMusicXml` | A parsed, edited score as a portable MusicXML 4.0 partwise file. |
 
 ### `src/playback/compute.ts`
 

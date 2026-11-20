@@ -6,54 +6,12 @@
  * re-renders from it, so edits act on a semantic score rather than on the
  * pixels it drew.
  *
- * The engine has no MusicXML writer, so `toMusicXml` here is the only path
- * that turns an edited document back into a portable file.
+ * The MusicXML writer is the engine's own (`writeMusicXml`); this file owns
+ * only the edit commands that keep that document valid.
  */
 (() => {
   const E = window.NotationEngine;
   const STEPS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
-  const DIVISION_CANDIDATES = [4, 8, 16, 32, 64, 128, 256, 512];
-  const FALLBACK_DIVISIONS = 4;
-
-  const escapeXml = (value) =>
-    String(value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-
-  const ACCIDENTAL_NAME = {
-    '-2': 'flat-flat',
-    '-1': 'flat',
-    0: 'natural',
-    1: 'sharp',
-    2: 'double-sharp',
-  };
-
-  /**
-   * The engine's `ArticulationType` / `OrnamentType` names back to the
-   * MusicXML elements that produce them. The engine's parser already
-   * reads these, so writing the same elements is what makes a palette
-   * edit survive a save -- without it the mark would draw once and then
-   * vanish on reload. `marcato` is MusicXML's `strong-accent`, `sforzato`
-   * is `soft-accent`, and `turnInverted` is `inverted-turn`: same marks,
-   * different names.
-   */
-  const ARTICULATION_ELEMENT = {
-    accent: 'accent',
-    marcato: 'strong-accent',
-    sforzato: 'soft-accent',
-    staccato: 'staccato',
-    tenuto: 'tenuto',
-    staccatissimo: 'staccatissimo',
-  };
-
-  const ORNAMENT_ELEMENT = {
-    trill: 'trill-mark',
-    mordent: 'mordent',
-    turn: 'turn',
-    turnInverted: 'inverted-turn',
-  };
 
   const CLEF_BY_SIGN = {
     treble: { sign: 'G', line: 2 },
@@ -75,28 +33,6 @@
 
   const ticksPerMeasure = (doc, partId, measureNumber) =>
     measureTicks(attributeFor(doc, partId, measureNumber));
-
-  /** A `<divisions>` value that keeps every duration and measure length a whole number. */
-  function divisionsFor(doc) {
-    const values = [];
-    for (const part of doc.score.parts) {
-      for (const measure of part.measures) {
-        values.push(measureTicks(attributeFor(doc, part.id, measure.number)));
-        for (const voice of measure.voices) {
-          for (const event of voice.events) values.push(event.duration.ticks);
-        }
-      }
-    }
-    for (const divisions of DIVISION_CANDIDATES) {
-      if (values.every((ticks) => Number.isInteger((ticks * divisions) / E.TICKS_PER_QUARTER))) {
-        return divisions;
-      }
-    }
-    return FALLBACK_DIVISIONS;
-  }
-
-  const toDivisions = (ticks, divisions) =>
-    Math.round((ticks * divisions) / E.TICKS_PER_QUARTER);
 
   // ---- document edits (every one returns a new document) ------------------
 
@@ -469,217 +405,18 @@
 
   // ---- MusicXML serialization --------------------------------------------
 
-  function pitchXml(note) {
-    const pitch = note.pitch;
-    if (!pitch) return '';
-    if (pitch.kind === 'unpitched') {
-      return `<unpitched><display-step>${pitch.displayStep}</display-step><display-octave>${pitch.displayOctave}</display-octave></unpitched>`;
-    }
-    const alter = pitch.alter || 0;
-    return `<pitch><step>${pitch.step}</step>${alter ? `<alter>${alter}</alter>` : ''}<octave>${pitch.octave}</octave></pitch>`;
-  }
-
-  function accidentalXml(note) {
-    const pitch = note.pitch;
-    if (!pitch || pitch.kind !== 'pitched') return '';
-    const alter = pitch.alter || 0;
-    if (!alter) return '';
-    const name = ACCIDENTAL_NAME[alter];
-    return name ? `<accidental>${name}</accidental>` : '';
-  }
-
-  function noteCommon(note, event, divisions) {
-    const dots = '<dot/>'.repeat(event.duration.dots || 0);
-    // <tie> belongs directly after <duration> in MusicXML's own element
-    // order; without it a tie would draw once and vanish on reload.
-    const ties =
-      (note.tieStart ? '<tie type="start"/>' : '') + (note.tieStop ? '<tie type="stop"/>' : '');
-    return `<duration>${toDivisions(event.duration.ticks, divisions)}</duration>${ties}<voice>${event.voice}</voice><type>${event.duration.type}</type>${dots}`;
-  }
-
-  /** `<stem>`, which MusicXML orders after `<accidental>` and before `<staff>`. */
-  const stemXml = (note) =>
-    note.explicitStemDirection ? `<stem>${note.explicitStemDirection}</stem>` : '';
-
   /**
-   * A note's `<notations>`: slurs, articulations and ornaments, in the
-   * order the palette applied them. Returns '' when the note carries none,
-   * so an ordinary note stays byte-identical to what the editor wrote
-   * before this existed.
+   * The whole edited document as a portable MusicXML 4.0 file.
    *
-   * MusicXML's own element order puts `<slur>` after `<tied>` and before
-   * `<articulations>`; the renderer matches slurs by number, so the
-   * numbers are written back exactly as they were read.
+   * The writer is the engine's own (`writeMusicXml`), not a copy kept here.
+   * A drum note's identity is the `<instrument id>` it names, resolved
+   * through its part's `<midi-instrument>` table -- the same rule the reader
+   * and the renderer already follow. A host that restates that rule can get
+   * it wrong, and the version that did wrote neither element, so a saved
+   * drum score came back silent with every notehead on the middle line.
    */
-  function notationsXml(note) {
-    const slurs = [
-      ...(note.slurStarts ?? []).map((number) => `<slur type="start" number="${number}"/>`),
-      ...(note.slurStops ?? []).map((number) => `<slur type="stop" number="${number}"/>`),
-    ].join('');
-    const articulations = (note.articulations ?? []).filter((mark) => ARTICULATION_ELEMENT[mark]);
-    const ornaments = (note.ornaments ?? []).filter((mark) => ORNAMENT_ELEMENT[mark]);
-    const tied =
-      (note.tieStart ? '<tied type="start"/>' : '') + (note.tieStop ? '<tied type="stop"/>' : '');
-    if (articulations.length === 0 && ornaments.length === 0 && !note.hasFermata && !tied && !slurs) {
-      return '';
-    }
-    // MusicXML orders <tied> before <slur>, and both before <articulations>.
-    const inner = [
-      tied,
-      slurs,
-      articulations.length
-        ? `<articulations>${articulations.map((mark) => `<${ARTICULATION_ELEMENT[mark]}/>`).join('')}</articulations>`
-        : '',
-      ornaments.length
-        ? `<ornaments>${ornaments.map((mark) => `<${ORNAMENT_ELEMENT[mark]}/>`).join('')}</ornaments>`
-        : '',
-      note.hasFermata ? '<fermata/>' : '',
-    ].join('');
-    return `<notations>${inner}</notations>`;
-  }
-
-  function eventXml(event, divisions) {
-    const staff = event.staff ?? 1;
-    if (event.kind === 'rest') {
-      return `<note><rest/>${noteCommon(event, event, divisions)}<staff>${staff}</staff></note>`;
-    }
-    if (event.kind === 'chord') {
-      return event.notes
-        .map((note, index) => {
-          const chordTag = index > 0 ? '<chord/>' : '';
-          return `<note>${chordTag}${pitchXml(note)}${noteCommon(note, event, divisions)}${accidentalXml(note)}${stemXml(note)}<staff>${staff}</staff>${notationsXml(note)}</note>`;
-        })
-        .join('');
-    }
-    return `<note>${pitchXml(event)}${noteCommon(event, event, divisions)}${accidentalXml(event)}${stemXml(event)}<staff>${staff}</staff>${notationsXml(event)}</note>`;
-  }
-
-  function attributesXml(attribute, divisions, previous) {
-    if (!attribute) return '';
-    const same =
-      previous &&
-      previous.divisions === divisions &&
-      previous.fifths === attribute.fifths &&
-      previous.timeNumerator === attribute.timeNumerator &&
-      previous.timeDenominator === attribute.timeDenominator &&
-      previous.clefSign === attribute.clefSign &&
-      previous.clefLine === attribute.clefLine;
-    if (same) return '';
-    const clef = attribute.clefsByStaff?.[1] ?? {
-      sign: attribute.clefSign,
-      line: attribute.clefLine,
-    };
-    const staves = attribute.staves && attribute.staves > 1 ? `<staves>${attribute.staves}</staves>` : '';
-    return (
-      '<attributes>' +
-      `<divisions>${divisions}</divisions>` +
-      `<key><fifths>${attribute.fifths ?? 0}</fifths></key>` +
-      `<time><beats>${attribute.timeNumerator}</beats><beat-type>${attribute.timeDenominator}</beat-type></time>` +
-      `<clef><sign>${clef.sign}</sign>${clef.line !== undefined ? `<line>${clef.line}</line>` : ''}</clef>` +
-      staves +
-      '</attributes>'
-    );
-  }
-
-  /**
-   * One `<direction>` for a dynamic mark. The engine reads dynamics from
-   * `doc.directions`, so the writer has to emit them or a dynamic applied
-   * in the palette would draw once and disappear on the next load.
-   *
-   * `placement` is written only when the mark is above, matching the
-   * engine's own default (below) and keeping ordinary marks short.
-   */
-  function directionXml(direction) {
-    const children = (direction.dynamics ?? [])
-      .map((level) => `<${level}/>`)
-      .join('');
-    if (!children) return '';
-    const placement = direction.placement === 'above' ? ' placement="above"' : '';
-    return (
-      '<direction' +
-      placement +
-      '>' +
-      '<direction-type>' +
-      `<dynamics>${children}</dynamics>` +
-      '</direction-type>' +
-      `<staff>${direction.staff ?? 1}</staff>` +
-      '</direction>'
-    );
-  }
-
-  function measureXml(doc, partId, measure, divisions, previousAttribute) {
-    const attribute = attributeFor(doc, partId, measure.number);
-    const head = attributesXml(attribute, divisions, previousAttribute);
-    const body = [];
-    // Dynamics carry their own tick, and MusicXML wants them where they
-    // sound. Sorting them by tick and flushing each one just before the
-    // first note at or after that tick keeps the file readable and keeps
-    // the engine's own tick bookkeeping exact.
-    const directions = (doc.directions ?? [])
-      .filter((direction) => direction.partId === partId && direction.measureNumber === measure.number)
-      .sort((a, b) => (a.tick ?? 0) - (b.tick ?? 0));
-    let directionIndex = 0;
-    const flushDirections = (upToTick) => {
-      while (directionIndex < directions.length && (directions[directionIndex].tick ?? 0) <= upToTick) {
-        const xml = directionXml(directions[directionIndex]);
-        if (xml) body.push(xml);
-        directionIndex += 1;
-      }
-    };
-    measure.voices.forEach((voice, voiceIndex) => {
-      let cursor = 0;
-      for (const event of sortEvents(voice.events)) {
-        const start = event.startTick ?? cursor;
-        if (start > cursor) {
-          body.push(`<forward><duration>${toDivisions(start - cursor, divisions)}</duration></forward>`);
-        } else if (start < cursor) {
-          body.push(`<backup><duration>${toDivisions(cursor - start, divisions)}</duration></backup>`);
-        }
-        flushDirections(start);
-        body.push(eventXml(event, divisions));
-        cursor = start + event.duration.ticks;
-      }
-      if (voiceIndex < measure.voices.length - 1 && cursor > 0) {
-        body.push(`<backup><duration>${toDivisions(cursor, divisions)}</duration></backup>`);
-      }
-    });
-    flushDirections(Number.POSITIVE_INFINITY);
-    return `<measure number="${measure.number}">${head}${body.join('')}</measure>`;
-  }
-
-  /** The whole edited document as a portable MusicXML 4.0 file. */
   function toMusicXml(doc) {
-    const divisions = divisionsFor(doc);
-    const lines = [
-      '<?xml version="1.0" encoding="UTF-8"?>',
-      '<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">',
-      '<score-partwise version="4.0">',
-      `<work><work-title>${escapeXml(doc.score.title || 'Untitled score')}</work-title></work>`,
-    ];
-    const composer = doc.score.composer;
-    if (composer) {
-      lines.push(
-        `<identification><creator type="composer">${escapeXml(composer)}</creator></identification>`,
-      );
-    }
-    lines.push('<part-list>');
-    for (const part of doc.score.parts) {
-      lines.push(
-        `<score-part id="${escapeXml(part.id)}"><part-name>${escapeXml(part.name || 'Music')}</part-name></score-part>`,
-      );
-    }
-    lines.push('</part-list>');
-    for (const part of doc.score.parts) {
-      lines.push(`<part id="${escapeXml(part.id)}">`);
-      let previousAttribute;
-      for (const measure of part.measures) {
-        lines.push(measureXml(doc, part.id, measure, divisions, previousAttribute));
-        previousAttribute = { ...attributeFor(doc, part.id, measure.number), divisions };
-      }
-      lines.push('</part>');
-    }
-    lines.push('</score-partwise>');
-    return lines.join('\n');
+    return E.writeMusicXml(doc);
   }
 
   // ---- pitch <-> staff position ------------------------------------------
@@ -713,7 +450,6 @@
     attributeFor,
     measureTicks,
     ticksPerMeasure,
-    divisionsFor,
     insertEvent,
     deleteEvent,
     deleteEvents,

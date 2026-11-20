@@ -359,6 +359,7 @@ var NotationEngine = (() => {
     voiceForcedDirection: () => voiceForcedDirection,
     voiceRestOffset: () => voiceRestOffset,
     voltaLabel: () => voltaLabel,
+    writeMusicXml: () => writeMusicXml,
     writtenTickToPerformanceTicks: () => writtenTickToPerformanceTicks,
     xToPosition: () => xToPosition,
     xToTick: () => xToTick,
@@ -73157,6 +73158,364 @@ ${denominator}`;
     };
   }
 
+  // src/notation-defaults/drum-kit.ts
+  var DRUM_KIT_SOURCE = {
+    source: "gm1",
+    symbol: "Percussion Key Map",
+    what: "the MIDI key number and English name of each standard percussion sound"
+  };
+  var DRUM_NOTATION_SOURCE = {
+    source: "drumNotation",
+    symbol: "standard drum kit staff positions",
+    what: "which staff line and notehead each drum of a standard kit uses"
+  };
+  var STANDARD_DRUM_KIT = [
+    { pitch: 27, name: "High Q", notehead: "slash", line: 8, stemDirection: "up" },
+    {
+      pitch: 28,
+      name: "Slap",
+      notehead: "slash",
+      noteheadGlyph: "noteheadSlashX",
+      line: 4,
+      stemDirection: "up"
+    },
+    { pitch: 29, name: "Scratch Push", notehead: "slash", line: 6, stemDirection: "up" },
+    { pitch: 30, name: "Scratch Pull", notehead: "slash", line: 6, stemDirection: "up" },
+    { pitch: 31, name: "Sticks", notehead: "plus", line: -1, stemDirection: "up" },
+    { pitch: 32, name: "Square Click", notehead: "plus", line: 10, stemDirection: "up" },
+    { pitch: 33, name: "Metronome Click", notehead: "x", line: 10, stemDirection: "up" },
+    { pitch: 34, name: "Metronome Bell", notehead: "triangle", line: 10, stemDirection: "up" },
+    { pitch: 35, name: "Acoustic Bass Drum", notehead: "normal", line: 8, stemDirection: "up" },
+    { pitch: 36, name: "Bass Drum 1", notehead: "normal", line: 7, stemDirection: "up" },
+    { pitch: 37, name: "Side Stick", notehead: "slashed", line: 3, stemDirection: "up" },
+    { pitch: 38, name: "Acoustic Snare", notehead: "normal", line: 3, stemDirection: "up" },
+    { pitch: 39, name: "Hand Clap", notehead: "plus", line: -2, stemDirection: "up" },
+    { pitch: 40, name: "Electric Snare", notehead: "slash", line: 3, stemDirection: "up" },
+    { pitch: 41, name: "Low Floor Tom", notehead: "normal", line: 6, stemDirection: "up" },
+    { pitch: 42, name: "Closed Hi-Hat", notehead: "x", line: -1, stemDirection: "up" },
+    { pitch: 43, name: "High Floor Tom", notehead: "normal", line: 5, stemDirection: "up" },
+    { pitch: 44, name: "Pedal Hi-Hat", notehead: "x", line: 9, stemDirection: "up" },
+    { pitch: 45, name: "Low Tom", notehead: "normal", line: 4, stemDirection: "up" },
+    { pitch: 46, name: "Open Hi-Hat", notehead: "circle-x", line: -1, stemDirection: "up" },
+    { pitch: 47, name: "Low-Mid Tom", notehead: "normal", line: 2, stemDirection: "up" },
+    { pitch: 48, name: "Hi-Mid Tom", notehead: "normal", line: 1, stemDirection: "up" },
+    { pitch: 49, name: "Crash Cymbal 1", notehead: "x", line: -2, stemDirection: "up" },
+    { pitch: 50, name: "High Tom", notehead: "normal", line: 0, stemDirection: "up" },
+    { pitch: 51, name: "Ride Cymbal 1", notehead: "x", line: 0, stemDirection: "up" },
+    {
+      pitch: 52,
+      name: "Chinese Cymbal",
+      notehead: "x",
+      noteheadGlyph: "noteheadHeavyXHat",
+      line: -3,
+      stemDirection: "up"
+    },
+    { pitch: 53, name: "Ride Bell", notehead: "diamond", line: 0, stemDirection: "up" },
+    { pitch: 54, name: "Tambourine", notehead: "diamond", line: 6, stemDirection: "up" },
+    { pitch: 55, name: "Splash Cymbal", notehead: "x", line: -4, stemDirection: "up" },
+    { pitch: 56, name: "Cowbell", notehead: "inverted-triangle", line: 0, stemDirection: "up" },
+    { pitch: 57, name: "Crash Cymbal 2", notehead: "x", line: -3, stemDirection: "up" },
+    { pitch: 58, name: "Vibraslap", notehead: "ti", line: 0, stemDirection: "up" },
+    { pitch: 59, name: "Ride Cymbal 2", notehead: "x", line: 2, stemDirection: "up" },
+    { pitch: 60, name: "Hi Bongo", notehead: "normal", line: -1, stemDirection: "up" },
+    { pitch: 61, name: "Low Bongo", notehead: "normal", line: 0, stemDirection: "up" },
+    {
+      pitch: 62,
+      name: "Mute Hi Conga",
+      notehead: "x",
+      noteheadGlyph: "noteheadXOrnate",
+      line: 1,
+      stemDirection: "up"
+    },
+    { pitch: 63, name: "Open Hi Conga", notehead: "normal", line: 1, stemDirection: "up" },
+    { pitch: 64, name: "Low Conga", notehead: "normal", line: 2, stemDirection: "up" },
+    { pitch: 65, name: "High Timbale", notehead: "normal", line: 5, stemDirection: "up" },
+    { pitch: 66, name: "Low Timbale", notehead: "normal", line: 7, stemDirection: "up" },
+    { pitch: 67, name: "High Agogo", notehead: "inverted-triangle", line: -2, stemDirection: "up" },
+    { pitch: 68, name: "Low Agogo", notehead: "inverted-triangle", line: -1, stemDirection: "up" },
+    { pitch: 69, name: "Cabasa", notehead: "diamond", line: 2, stemDirection: "up" },
+    { pitch: 70, name: "Maracas", notehead: "diamond", line: 4, stemDirection: "up" },
+    { pitch: 71, name: "Short Whistle", notehead: "x", line: -3, stemDirection: "up" },
+    { pitch: 72, name: "Long Whistle", notehead: "ti", line: -3, stemDirection: "up" },
+    { pitch: 73, name: "Short Guiro", notehead: "x", line: -1, stemDirection: "up" },
+    { pitch: 74, name: "Long Guiro", notehead: "slashed", line: -1, stemDirection: "up" },
+    { pitch: 75, name: "Claves", notehead: "la", line: 0, stemDirection: "up" },
+    { pitch: 76, name: "Hi Wood Block", notehead: "la", line: 5, stemDirection: "up" },
+    { pitch: 77, name: "Low Wood Block", notehead: "la", line: 7, stemDirection: "up" },
+    { pitch: 78, name: "Mute Cuica", notehead: "x", line: 8, stemDirection: "up" },
+    { pitch: 79, name: "Open Cuica", notehead: "back-slashed", line: 8, stemDirection: "up" },
+    { pitch: 80, name: "Mute Triangle", notehead: "x", line: 0, stemDirection: "up" },
+    { pitch: 81, name: "Open Triangle", notehead: "triangle", line: 0, stemDirection: "up" },
+    { pitch: 82, name: "Shaker", notehead: "diamond", line: 5, stemDirection: "up" },
+    { pitch: 83, name: "Sleigh Bell", notehead: "inverted-triangle", line: 3, stemDirection: "up" },
+    { pitch: 84, name: "Mark Tree", notehead: "ti", line: 2, stemDirection: "up" },
+    { pitch: 85, name: "Castanets", notehead: "la", line: 2, stemDirection: "up" },
+    {
+      pitch: 86,
+      name: "Mute Surdo",
+      notehead: "slash",
+      noteheadGlyph: "noteheadSlashX",
+      line: 4,
+      stemDirection: "up"
+    },
+    { pitch: 87, name: "Open Surdo", notehead: "slash", line: 4, stemDirection: "up" }
+  ];
+  var BY_PITCH = new Map(STANDARD_DRUM_KIT.map((d) => [d.pitch, d]));
+  function drumKitEntry(pitch) {
+    return BY_PITCH.get(pitch);
+  }
+  function applyDrumOverrides(base, overrides) {
+    const list = overrides?.drums;
+    if (list === void 0 || list.length === 0) return base;
+    const byPitch = new Map(base.map((d) => [d.pitch, d]));
+    for (const over of list) {
+      const existing = byPitch.get(over.pitch);
+      if (existing === void 0) {
+        if (over.line === void 0 || over.notehead === void 0) continue;
+        byPitch.set(over.pitch, {
+          pitch: over.pitch,
+          name: over.name ?? `Drum ${over.pitch}`,
+          notehead: over.notehead,
+          ...over.noteheadGlyph === void 0 ? {} : { noteheadGlyph: over.noteheadGlyph },
+          line: over.line,
+          stemDirection: over.stemDirection ?? "up"
+        });
+        continue;
+      }
+      byPitch.set(over.pitch, {
+        ...existing,
+        ...over.name === void 0 ? {} : { name: over.name },
+        ...over.notehead === void 0 ? {} : { notehead: over.notehead },
+        ...over.noteheadGlyph === void 0 ? {} : { noteheadGlyph: over.noteheadGlyph },
+        ...over.line === void 0 ? {} : { line: over.line },
+        ...over.stemDirection === void 0 ? {} : { stemDirection: over.stemDirection }
+      });
+    }
+    return [...byPitch.values()].sort((a, b) => a.pitch - b.pitch);
+  }
+
+  // src/parser/musicxml/write.ts
+  var DIVISION_CANDIDATES = [4, 8, 16, 32, 64, 128, 256, 512];
+  var FALLBACK_DIVISIONS = 4;
+  var ACCIDENTAL_NAME = {
+    [-2]: "flat-flat",
+    [-1]: "flat",
+    0: "natural",
+    1: "sharp",
+    2: "double-sharp"
+  };
+  var ARTICULATION_ELEMENT = {
+    accent: "accent",
+    marcato: "strong-accent",
+    sforzato: "soft-accent",
+    staccato: "staccato",
+    tenuto: "tenuto",
+    staccatissimo: "staccatissimo"
+  };
+  var ORNAMENT_ELEMENT = {
+    trill: "trill-mark",
+    mordent: "mordent",
+    turn: "turn",
+    turnInverted: "inverted-turn"
+  };
+  function escapeXml(value) {
+    return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function attributeFor(parsed, partId, measureNumber) {
+    return parsed.attributes.find((a) => a.partId === partId && a.measureNumber === measureNumber);
+  }
+  function measureTicks(attribute) {
+    if (attribute === void 0) return TICKS_PER_QUARTER * 4;
+    return attribute.timeNumerator * (4 / attribute.timeDenominator) * TICKS_PER_QUARTER;
+  }
+  function divisionsFor(parsed) {
+    const values = [];
+    for (const part2 of parsed.score.parts) {
+      for (const measure2 of part2.measures) {
+        values.push(measureTicks(attributeFor(parsed, part2.id, measure2.number)));
+        for (const voice2 of measure2.voices) {
+          for (const event of voice2.events) values.push(event.duration.ticks);
+        }
+      }
+    }
+    for (const divisions of DIVISION_CANDIDATES) {
+      if (values.every((ticks) => Number.isInteger(ticks * divisions / TICKS_PER_QUARTER))) {
+        return divisions;
+      }
+    }
+    return FALLBACK_DIVISIONS;
+  }
+  var toDivisions = (ticks, divisions) => Math.round(ticksToXmlDivisions(ticks, divisions));
+  function pitchXml(pitch) {
+    if (pitch.kind === "unpitched") {
+      return `<unpitched><display-step>${pitch.displayStep}</display-step><display-octave>${pitch.displayOctave}</display-octave></unpitched>`;
+    }
+    const alter = pitch.alter || 0;
+    return `<pitch><step>${pitch.step}</step>` + (alter ? `<alter>${alter}</alter>` : "") + `<octave>${pitch.octave}</octave></pitch>`;
+  }
+  function accidentalXml(note2) {
+    const pitch = note2.pitch;
+    if (pitch.kind !== "pitched") return "";
+    const alter = pitch.alter || 0;
+    if (!alter) return "";
+    const name = ACCIDENTAL_NAME[alter];
+    return name === void 0 ? "" : `<accidental>${name}</accidental>`;
+  }
+  function durationXml(tieStart, tieStop, duration2, divisions) {
+    const ties = (tieStart ? '<tie type="start"/>' : "") + (tieStop ? '<tie type="stop"/>' : "");
+    return `<duration>${toDivisions(duration2.ticks, divisions)}</duration>${ties}`;
+  }
+  function instrumentXml(note2) {
+    return note2.instrumentId === void 0 ? "" : `<instrument id="${escapeXml(note2.instrumentId)}"/>`;
+  }
+  function voiceTypeXml(duration2, voice2) {
+    const dots = "<dot/>".repeat(duration2.dots || 0);
+    return `<voice>${voice2}</voice><type>${duration2.type}</type>${dots}`;
+  }
+  var stemXml = (note2) => note2.explicitStemDirection === void 0 ? "" : `<stem>${note2.explicitStemDirection}</stem>`;
+  function notationsXml(note2) {
+    const tied = (note2.tieStart ? '<tied type="start"/>' : "") + (note2.tieStop ? '<tied type="stop"/>' : "");
+    const slurs = [
+      ...(note2.slurStarts ?? []).map((number) => `<slur type="start" number="${number}"/>`),
+      ...(note2.slurStops ?? []).map((number) => `<slur type="stop" number="${number}"/>`)
+    ].join("");
+    const articulations = (note2.articulations ?? []).filter(
+      (mark) => ARTICULATION_ELEMENT[mark] !== void 0
+    );
+    const ornaments = (note2.ornaments ?? []).filter((mark) => ORNAMENT_ELEMENT[mark] !== void 0);
+    if (articulations.length === 0 && ornaments.length === 0 && !note2.hasFermata && !tied && !slurs) {
+      return "";
+    }
+    const inner = tied + slurs + (articulations.length ? `<articulations>${articulations.map((mark) => `<${ARTICULATION_ELEMENT[mark]}/>`).join("")}</articulations>` : "") + (ornaments.length ? `<ornaments>${ornaments.map((mark) => `<${ORNAMENT_ELEMENT[mark]}/>`).join("")}</ornaments>` : "") + (note2.hasFermata ? "<fermata/>" : "");
+    return `<notations>${inner}</notations>`;
+  }
+  function noteXml(note2, duration2, divisions, chordMember) {
+    return "<note>" + (chordMember ? "<chord/>" : "") + pitchXml(note2.pitch) + durationXml(note2.tieStart === true, note2.tieStop === true, duration2, divisions) + instrumentXml(note2) + voiceTypeXml(duration2, note2.voice) + accidentalXml(note2) + stemXml(note2) + `<staff>${note2.staff ?? 1}</staff>` + notationsXml(note2) + "</note>";
+  }
+  function restXml(rest2, divisions) {
+    const positioned = rest2.displayStep !== void 0 && rest2.displayOctave !== void 0 ? `<display-step>${rest2.displayStep}</display-step><display-octave>${rest2.displayOctave}</display-octave>` : "";
+    return `<note><rest>${positioned}</rest>` + durationXml(false, false, rest2.duration, divisions) + voiceTypeXml(rest2.duration, rest2.voice) + `<staff>${rest2.staff ?? 1}</staff></note>`;
+  }
+  function chordXml(chord2, divisions) {
+    return chord2.notes.map((note2, index) => noteXml(note2, chord2.duration, divisions, index > 0)).join("");
+  }
+  function eventXml(event, divisions) {
+    if (event.kind === "rest") return restXml(event, divisions);
+    if (event.kind === "chord") return chordXml(event, divisions);
+    return noteXml(event, event.duration, divisions, false);
+  }
+  function attributesXml(attribute, divisions, previous) {
+    if (attribute === void 0) return "";
+    const same = previous !== void 0 && previous.fifths === attribute.fifths && previous.mode === attribute.mode && previous.timeNumerator === attribute.timeNumerator && previous.timeDenominator === attribute.timeDenominator && previous.timeNumeratorDisplay === attribute.timeNumeratorDisplay && previous.clefSign === attribute.clefSign && previous.clefLine === attribute.clefLine;
+    if (same) return "";
+    const beats = attribute.timeNumeratorDisplay ?? String(attribute.timeNumerator);
+    const mode = attribute.mode === void 0 ? "" : `<mode>${attribute.mode}</mode>`;
+    const clef2 = `<clef><sign>${attribute.clefSign}</sign>` + (attribute.clefLine === void 0 ? "" : `<line>${attribute.clefLine}</line>`) + "</clef>";
+    const staves = attribute.staves !== void 0 && attribute.staves > 1 ? `<staves>${attribute.staves}</staves>` : "";
+    return `<attributes><divisions>${divisions}</divisions><key><fifths>${attribute.fifths}</fifths>${mode}</key><time><beats>${beats}</beats><beat-type>${attribute.timeDenominator}</beat-type></time>` + clef2 + staves + "</attributes>";
+  }
+  function directionXml(direction) {
+    if (direction.dynamics.length === 0) return "";
+    const placement = direction.placement === "above" ? ' placement="above"' : "";
+    return `<direction${placement}><direction-type><dynamics>${direction.dynamics.map((level) => `<${level}/>`).join("")}</dynamics></direction-type><staff>${direction.staff ?? 1}</staff></direction>`;
+  }
+  var sortEvents = (events) => [...events].sort((a, b) => (a.startTick ?? 0) - (b.startTick ?? 0));
+  function measureXml(parsed, partId, measure2, divisions, previous) {
+    const head = attributesXml(attributeFor(parsed, partId, measure2.number), divisions, previous);
+    const body = [];
+    const directions = parsed.directions.filter((d) => d.partId === partId && d.measureNumber === measure2.number).sort((a, b) => a.tick - b.tick);
+    let directionIndex = 0;
+    const flushDirections = (upToTick) => {
+      for (; ; ) {
+        const direction = directions[directionIndex];
+        if (direction === void 0 || direction.tick > upToTick) return;
+        const xml = directionXml(direction);
+        if (xml !== "") body.push(xml);
+        directionIndex += 1;
+      }
+    };
+    measure2.voices.forEach((voice2, voiceIndex) => {
+      let cursor = 0;
+      for (const event of sortEvents(voice2.events)) {
+        const start = event.startTick ?? cursor;
+        if (start > cursor) {
+          body.push(
+            `<forward><duration>${toDivisions(start - cursor, divisions)}</duration></forward>`
+          );
+        } else if (start < cursor) {
+          body.push(
+            `<backup><duration>${toDivisions(cursor - start, divisions)}</duration></backup>`
+          );
+        }
+        flushDirections(start);
+        body.push(eventXml(event, divisions));
+        cursor = start + event.duration.ticks;
+      }
+      if (voiceIndex < measure2.voices.length - 1 && cursor > 0) {
+        body.push(`<backup><duration>${toDivisions(cursor, divisions)}</duration></backup>`);
+      }
+    });
+    flushDirections(Number.POSITIVE_INFINITY);
+    return `<measure number="${measure2.number}">${head}${body.join("")}</measure>`;
+  }
+  function scorePartXml(part2, instruments) {
+    const partName = escapeXml(part2.name ?? "Music");
+    const entries = [...instruments ?? /* @__PURE__ */ new Map()];
+    if (entries.length === 0) {
+      return `<score-part id="${escapeXml(part2.id)}"><part-name>${partName}</part-name></score-part>`;
+    }
+    const children = entries.map(([instrumentId, info]) => {
+      const kitName = info.gmNote === void 0 ? void 0 : drumKitEntry(info.gmNote)?.name;
+      const name = escapeXml(kitName ?? part2.name ?? "Music");
+      const routing = [];
+      if (info.channel !== void 0) {
+        routing.push(`<midi-channel>${info.channel + 1}</midi-channel>`);
+      }
+      if (info.program !== void 0) {
+        routing.push(`<midi-program>${info.program + 1}</midi-program>`);
+      }
+      if (info.bank !== void 0) routing.push(`<midi-bank>${info.bank + 1}</midi-bank>`);
+      if (info.gmNote !== void 0) {
+        routing.push(`<midi-unpitched>${info.gmNote + 1}</midi-unpitched>`);
+      }
+      const midi = routing.length === 0 ? "" : `<midi-instrument id="${escapeXml(instrumentId)}">${routing.join("")}</midi-instrument>`;
+      return `<score-instrument id="${escapeXml(instrumentId)}"><instrument-name>${name}</instrument-name></score-instrument>` + midi;
+    }).join("");
+    return `<score-part id="${escapeXml(part2.id)}"><part-name>${partName}</part-name>${children}</score-part>`;
+  }
+  function writeMusicXml(parsed, options = {}) {
+    const divisions = options.divisions ?? divisionsFor(parsed);
+    const title = parsed.score.title ?? parsed.identity.workTitle ?? "Untitled score";
+    const composer = parsed.score.composer ?? parsed.identity.creators.composer;
+    const lines = [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">',
+      '<score-partwise version="4.0">',
+      `<work><work-title>${escapeXml(title)}</work-title></work>`
+    ];
+    if (composer !== void 0) {
+      lines.push(
+        `<identification><creator type="composer">${escapeXml(composer)}</creator></identification>`
+      );
+    }
+    lines.push("<part-list>");
+    for (const part2 of parsed.score.parts) {
+      lines.push(scorePartXml(part2, parsed.midiInstrumentInfoByPart.get(part2.id)));
+    }
+    lines.push("</part-list>");
+    for (const part2 of parsed.score.parts) {
+      lines.push(`<part id="${escapeXml(part2.id)}">`);
+      let previous;
+      for (const measure2 of part2.measures) {
+        lines.push(measureXml(parsed, part2.id, measure2, divisions, previous));
+        previous = attributeFor(parsed, part2.id, measure2.number);
+      }
+      lines.push("</part>");
+    }
+    lines.push("</score-partwise>");
+    return lines.join("\n");
+  }
+
   // node_modules/fflate/esm/browser.js
   var u8 = Uint8Array;
   var u16 = Uint16Array;
@@ -75314,142 +75673,6 @@ ${denominator}`;
     return { severity, code, message };
   }
 
-  // src/notation-defaults/drum-kit.ts
-  var DRUM_KIT_SOURCE = {
-    source: "gm1",
-    symbol: "Percussion Key Map",
-    what: "the MIDI key number and English name of each standard percussion sound"
-  };
-  var DRUM_NOTATION_SOURCE = {
-    source: "drumNotation",
-    symbol: "standard drum kit staff positions",
-    what: "which staff line and notehead each drum of a standard kit uses"
-  };
-  var STANDARD_DRUM_KIT = [
-    { pitch: 27, name: "High Q", notehead: "slash", line: 8, stemDirection: "up" },
-    {
-      pitch: 28,
-      name: "Slap",
-      notehead: "slash",
-      noteheadGlyph: "noteheadSlashX",
-      line: 4,
-      stemDirection: "up"
-    },
-    { pitch: 29, name: "Scratch Push", notehead: "slash", line: 6, stemDirection: "up" },
-    { pitch: 30, name: "Scratch Pull", notehead: "slash", line: 6, stemDirection: "up" },
-    { pitch: 31, name: "Sticks", notehead: "plus", line: -1, stemDirection: "up" },
-    { pitch: 32, name: "Square Click", notehead: "plus", line: 10, stemDirection: "up" },
-    { pitch: 33, name: "Metronome Click", notehead: "x", line: 10, stemDirection: "up" },
-    { pitch: 34, name: "Metronome Bell", notehead: "triangle", line: 10, stemDirection: "up" },
-    { pitch: 35, name: "Acoustic Bass Drum", notehead: "normal", line: 8, stemDirection: "up" },
-    { pitch: 36, name: "Bass Drum 1", notehead: "normal", line: 7, stemDirection: "up" },
-    { pitch: 37, name: "Side Stick", notehead: "slashed", line: 3, stemDirection: "up" },
-    { pitch: 38, name: "Acoustic Snare", notehead: "normal", line: 3, stemDirection: "up" },
-    { pitch: 39, name: "Hand Clap", notehead: "plus", line: -2, stemDirection: "up" },
-    { pitch: 40, name: "Electric Snare", notehead: "slash", line: 3, stemDirection: "up" },
-    { pitch: 41, name: "Low Floor Tom", notehead: "normal", line: 6, stemDirection: "up" },
-    { pitch: 42, name: "Closed Hi-Hat", notehead: "x", line: -1, stemDirection: "up" },
-    { pitch: 43, name: "High Floor Tom", notehead: "normal", line: 5, stemDirection: "up" },
-    { pitch: 44, name: "Pedal Hi-Hat", notehead: "x", line: 9, stemDirection: "up" },
-    { pitch: 45, name: "Low Tom", notehead: "normal", line: 4, stemDirection: "up" },
-    { pitch: 46, name: "Open Hi-Hat", notehead: "circle-x", line: -1, stemDirection: "up" },
-    { pitch: 47, name: "Low-Mid Tom", notehead: "normal", line: 2, stemDirection: "up" },
-    { pitch: 48, name: "Hi-Mid Tom", notehead: "normal", line: 1, stemDirection: "up" },
-    { pitch: 49, name: "Crash Cymbal 1", notehead: "x", line: -2, stemDirection: "up" },
-    { pitch: 50, name: "High Tom", notehead: "normal", line: 0, stemDirection: "up" },
-    { pitch: 51, name: "Ride Cymbal 1", notehead: "x", line: 0, stemDirection: "up" },
-    {
-      pitch: 52,
-      name: "Chinese Cymbal",
-      notehead: "x",
-      noteheadGlyph: "noteheadHeavyXHat",
-      line: -3,
-      stemDirection: "up"
-    },
-    { pitch: 53, name: "Ride Bell", notehead: "diamond", line: 0, stemDirection: "up" },
-    { pitch: 54, name: "Tambourine", notehead: "diamond", line: 6, stemDirection: "up" },
-    { pitch: 55, name: "Splash Cymbal", notehead: "x", line: -4, stemDirection: "up" },
-    { pitch: 56, name: "Cowbell", notehead: "inverted-triangle", line: 0, stemDirection: "up" },
-    { pitch: 57, name: "Crash Cymbal 2", notehead: "x", line: -3, stemDirection: "up" },
-    { pitch: 58, name: "Vibraslap", notehead: "ti", line: 0, stemDirection: "up" },
-    { pitch: 59, name: "Ride Cymbal 2", notehead: "x", line: 2, stemDirection: "up" },
-    { pitch: 60, name: "Hi Bongo", notehead: "normal", line: -1, stemDirection: "up" },
-    { pitch: 61, name: "Low Bongo", notehead: "normal", line: 0, stemDirection: "up" },
-    {
-      pitch: 62,
-      name: "Mute Hi Conga",
-      notehead: "x",
-      noteheadGlyph: "noteheadXOrnate",
-      line: 1,
-      stemDirection: "up"
-    },
-    { pitch: 63, name: "Open Hi Conga", notehead: "normal", line: 1, stemDirection: "up" },
-    { pitch: 64, name: "Low Conga", notehead: "normal", line: 2, stemDirection: "up" },
-    { pitch: 65, name: "High Timbale", notehead: "normal", line: 5, stemDirection: "up" },
-    { pitch: 66, name: "Low Timbale", notehead: "normal", line: 7, stemDirection: "up" },
-    { pitch: 67, name: "High Agogo", notehead: "inverted-triangle", line: -2, stemDirection: "up" },
-    { pitch: 68, name: "Low Agogo", notehead: "inverted-triangle", line: -1, stemDirection: "up" },
-    { pitch: 69, name: "Cabasa", notehead: "diamond", line: 2, stemDirection: "up" },
-    { pitch: 70, name: "Maracas", notehead: "diamond", line: 4, stemDirection: "up" },
-    { pitch: 71, name: "Short Whistle", notehead: "x", line: -3, stemDirection: "up" },
-    { pitch: 72, name: "Long Whistle", notehead: "ti", line: -3, stemDirection: "up" },
-    { pitch: 73, name: "Short Guiro", notehead: "x", line: -1, stemDirection: "up" },
-    { pitch: 74, name: "Long Guiro", notehead: "slashed", line: -1, stemDirection: "up" },
-    { pitch: 75, name: "Claves", notehead: "la", line: 0, stemDirection: "up" },
-    { pitch: 76, name: "Hi Wood Block", notehead: "la", line: 5, stemDirection: "up" },
-    { pitch: 77, name: "Low Wood Block", notehead: "la", line: 7, stemDirection: "up" },
-    { pitch: 78, name: "Mute Cuica", notehead: "x", line: 8, stemDirection: "up" },
-    { pitch: 79, name: "Open Cuica", notehead: "back-slashed", line: 8, stemDirection: "up" },
-    { pitch: 80, name: "Mute Triangle", notehead: "x", line: 0, stemDirection: "up" },
-    { pitch: 81, name: "Open Triangle", notehead: "triangle", line: 0, stemDirection: "up" },
-    { pitch: 82, name: "Shaker", notehead: "diamond", line: 5, stemDirection: "up" },
-    { pitch: 83, name: "Sleigh Bell", notehead: "inverted-triangle", line: 3, stemDirection: "up" },
-    { pitch: 84, name: "Mark Tree", notehead: "ti", line: 2, stemDirection: "up" },
-    { pitch: 85, name: "Castanets", notehead: "la", line: 2, stemDirection: "up" },
-    {
-      pitch: 86,
-      name: "Mute Surdo",
-      notehead: "slash",
-      noteheadGlyph: "noteheadSlashX",
-      line: 4,
-      stemDirection: "up"
-    },
-    { pitch: 87, name: "Open Surdo", notehead: "slash", line: 4, stemDirection: "up" }
-  ];
-  var BY_PITCH = new Map(STANDARD_DRUM_KIT.map((d) => [d.pitch, d]));
-  function drumKitEntry(pitch) {
-    return BY_PITCH.get(pitch);
-  }
-  function applyDrumOverrides(base, overrides) {
-    const list = overrides?.drums;
-    if (list === void 0 || list.length === 0) return base;
-    const byPitch = new Map(base.map((d) => [d.pitch, d]));
-    for (const over of list) {
-      const existing = byPitch.get(over.pitch);
-      if (existing === void 0) {
-        if (over.line === void 0 || over.notehead === void 0) continue;
-        byPitch.set(over.pitch, {
-          pitch: over.pitch,
-          name: over.name ?? `Drum ${over.pitch}`,
-          notehead: over.notehead,
-          ...over.noteheadGlyph === void 0 ? {} : { noteheadGlyph: over.noteheadGlyph },
-          line: over.line,
-          stemDirection: over.stemDirection ?? "up"
-        });
-        continue;
-      }
-      byPitch.set(over.pitch, {
-        ...existing,
-        ...over.name === void 0 ? {} : { name: over.name },
-        ...over.notehead === void 0 ? {} : { notehead: over.notehead },
-        ...over.noteheadGlyph === void 0 ? {} : { noteheadGlyph: over.noteheadGlyph },
-        ...over.line === void 0 ? {} : { line: over.line },
-        ...over.stemDirection === void 0 ? {} : { stemDirection: over.stemDirection }
-      });
-    }
-    return [...byPitch.values()].sort((a, b) => a.pitch - b.pitch);
-  }
-
   // src/notation-defaults/clefs.ts
   var CLEF_TABLE_SOURCE = {
     source: "smufl",
@@ -76471,11 +76694,11 @@ ${denominator}`;
     const offset = playback.globalTickOffsetByMeasure.get(measureNumber) ?? 0;
     const tickInMeasure = Math.max(0, tick - offset);
     const noteAreaX = placement.x + layout.headerWidth;
-    const measureTicks = measureTicksFor(playback, measureNumber);
+    const measureTicks2 = measureTicksFor(playback, measureNumber);
     const entries = [...layout.positionsByTick.entries()].sort((a, b) => a[0] - b[0]);
     let fromTick = 0;
     let fromX = noteAreaX;
-    let toTick = measureTicks ?? tickInMeasure;
+    let toTick = measureTicks2 ?? tickInMeasure;
     let toX = placement.x + placement.width;
     for (let i2 = 0; i2 < entries.length; i2++) {
       const entry = entries[i2];
@@ -76487,7 +76710,7 @@ ${denominator}`;
         toTick = next[0];
         toX = noteAreaX + next[1];
       } else {
-        toTick = measureTicks ?? fromTick;
+        toTick = measureTicks2 ?? fromTick;
         toX = placement.x + placement.width;
       }
     }
@@ -76510,7 +76733,7 @@ ${denominator}`;
     const offset = playback.globalTickOffsetByMeasure.get(measureNumber) ?? 0;
     const layout = playback.measureLayoutsByNumber.get(measureNumber);
     const headerWidth = layout?.headerWidth ?? playback.measureHeaderAllowance;
-    const measureTicks = measureTicksFor(playback, measureNumber) ?? 0;
+    const measureTicks2 = measureTicksFor(playback, measureNumber) ?? 0;
     const localX = x2 - placement.x - headerWidth;
     if (localX <= 0) return offset;
     const points = [[0, 0]];
@@ -76519,7 +76742,7 @@ ${denominator}`;
         points.push([tick, tickX]);
       }
     }
-    points.push([measureTicks, placement.width - headerWidth]);
+    points.push([measureTicks2, placement.width - headerWidth]);
     for (let i2 = 0; i2 < points.length - 1; i2 += 1) {
       const from = points[i2];
       const to = points[i2 + 1];
@@ -76530,7 +76753,7 @@ ${denominator}`;
         return offset + from[0] + (to[0] - from[0]) * fraction;
       }
     }
-    return offset + measureTicks;
+    return offset + measureTicks2;
   }
   var X_EPSILON = 1e-9;
   function xToPosition(playback, x2, systemIndex) {
@@ -77925,7 +78148,7 @@ ${xrefOffset}
     }
     return drawn;
   }
-  function computeMeasureLayout(measure2, measureTicks, measureTempoMarks, headerWidth, spacingConfig, tempoFontSize, accidentals, attributeTransitions, fileDefaults) {
+  function computeMeasureLayout(measure2, measureTicks2, measureTempoMarks, headerWidth, spacingConfig, tempoFontSize, accidentals, attributeTransitions, fileDefaults) {
     const attacks = /* @__PURE__ */ new Set();
     const widthByTickAndStaff = /* @__PURE__ */ new Map();
     const eventByTick = /* @__PURE__ */ new Map();
@@ -78004,7 +78227,7 @@ ${xrefOffset}
       );
       return Math.max(max2, headerWidth + markWidth + MEASURE_TRAILING_MARGIN);
     }, 0);
-    const durationScale = Math.min(2, Math.max(0.35, measureTicks / (TICKS_PER_QUARTER * 4)));
+    const durationScale = Math.min(2, Math.max(0.35, measureTicks2 / (TICKS_PER_QUARTER * 4)));
     const minWidth = headerWidth + spacingConfig.minMeasureWidth * durationScale;
     if (ticks.length === 0) {
       return {
@@ -78014,7 +78237,7 @@ ${xrefOffset}
       };
     }
     const spacingEvents = ticks.map((tick, i2) => {
-      const nextTick = i2 + 1 < ticks.length ? ticks[i2 + 1] ?? measureTicks : measureTicks;
+      const nextTick = i2 + 1 < ticks.length ? ticks[i2 + 1] ?? measureTicks2 : measureTicks2;
       const gapTicks = Math.max(1, nextTick - tick);
       const widthsByStaff = widthByTickAndStaff.get(tick) ?? /* @__PURE__ */ new Map();
       const leadingByStaff = leadingByTickAndStaff.get(tick) ?? /* @__PURE__ */ new Map();
@@ -79863,11 +80086,11 @@ ${xrefOffset}
         (max2, voice2) => Math.max(max2, totalTicks(voice2.events)),
         0
       );
-      const measureTicks = contentTicks > 0 ? contentTicks : nominalTicks ?? TICKS_PER_QUARTER * 4;
+      const measureTicks2 = contentTicks > 0 ? contentTicks : nominalTicks ?? TICKS_PER_QUARTER * 4;
       const headerWidth = predictedHeaderWidths.get(measureNumber) ?? MEASURE_LEADING_PAD;
       const layout = computeMeasureLayout(
         measure(measureNumber, combinedVoices),
-        measureTicks,
+        measureTicks2,
         drawnTempoMarks.filter((tm) => tm.measureNumber === measureNumber),
         headerWidth,
         config.spacing,
@@ -79877,7 +80100,7 @@ ${xrefOffset}
         fileDefaults
       );
       measureLayoutsByNumber.set(measureNumber, { ...layout, headerWidth });
-      measureTicksByNumber.set(measureNumber, measureTicks);
+      measureTicksByNumber.set(measureNumber, measureTicks2);
     }
     const couldCarryBarNumber = (measureNumber, isFirstOfScore) => {
       if (config.barNumbers.display === "systemStart") {
@@ -80178,8 +80401,8 @@ ${xrefOffset}
         const noteAreaX = noteAreaXOf(placement.x, measureNumber);
         const realX = measureLayoutsByNumber.get(measureNumber)?.positionsByTick.get(tick);
         if (realX !== void 0) return noteAreaX + realX;
-        const measureTicks = measureTicksByNumber.get(measureNumber) ?? TICKS_PER_QUARTER * 4;
-        return noteAreaX + tick / (measureTicks || 1) * (placement.x + placement.width - noteAreaX);
+        const measureTicks2 = measureTicksByNumber.get(measureNumber) ?? TICKS_PER_QUARTER * 4;
+        return noteAreaX + tick / (measureTicks2 || 1) * (placement.x + placement.width - noteAreaX);
       };
       const partDirections = directions.filter((d) => d.partId === part2.id);
       const partOctaveShiftEvents = octaveShifts.filter((e) => e.partId === part2.id);

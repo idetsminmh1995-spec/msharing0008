@@ -372,7 +372,7 @@ describe('the editor and the engine agree, end to end', () => {
     assert.equal(window.document.querySelector('[data-editor-status]').textContent, 'Score ready.');
   });
 
-  test('the bottom bar carries playback, zoom and the two file controls', () => {
+  test('the bottom bar carries playback, the score length, zoom and the two file controls', () => {
     const { window } = loadEditorPage();
     const bars = window.document.querySelectorAll('[data-editor-bottom-bar]');
     assert.equal(bars.length, 1, 'the editor has exactly one bottom bar');
@@ -382,7 +382,7 @@ describe('the editor and the engine agree, end to end', () => {
       .filter((control) => !control.closest('[data-editor-export-list]'));
     assert.deepEqual(
       controls.map((control) => control.getAttribute('aria-label')),
-      ['Play', 'Stop', 'Metronome', 'Zoom out', 'Zoom level', 'Zoom in', 'Save', 'Export'],
+      ['Play', 'Stop', 'Metronome', 'Score length', 'Zoom out', 'Zoom level', 'Zoom in', 'Save', 'Export'],
     );
 
     // Save and Export are different promises, not two names for one thing:
@@ -398,8 +398,13 @@ describe('the editor and the engine agree, end to end', () => {
     const groups = [...bars[0].children].filter((node) => node.classList.contains('editor-bottombar__group'));
     assert.deepEqual(
       groups.map((group) => group.getAttribute('aria-label')),
-      ['Playback', 'Zoom', 'File'],
+      ['Playback', 'Length', 'Zoom', 'File'],
     );
+
+    // The length readout is the timeline's own end in minutes:seconds, so a
+    // reader sees how long the score lasts next to the transport.
+    const length = bars[0].querySelector('[data-editor-length]');
+    assert.match(length.textContent, /^\d+:\d{2}$/);
   });
 
   test('the count-in is exactly one bar of clicks and stops at the bar line', async () => {

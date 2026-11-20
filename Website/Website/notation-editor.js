@@ -53,6 +53,7 @@
   const zoomInButton = pick('[data-editor-zoom-in]');
   const zoomOutButton = pick('[data-editor-zoom-out]');
   const zoomOutput = pick('[data-editor-zoom]');
+  const lengthOutput = pick('[data-editor-length]');
   const popoverTriggers = [...document.querySelectorAll('[data-editor-popover]')];
   const popoverPanels = [...document.querySelectorAll('[data-editor-popover-panel]')];
   const overflowGroup = pick('[data-editor-overflow-group]');
@@ -669,6 +670,7 @@
       // has to follow every redraw, not only the tool clicks.
       syncTools();
       updateZoom();
+      updateLength();
       const errors = (result.diagnostics || []).filter((item) => item.severity === 'error');
       if (errors.length) {
         announce(`Score loaded with ${errors.length} issue${errors.length === 1 ? '' : 's'}.`);
@@ -698,6 +700,7 @@
     syncHistory();
     syncPartSelect();
     setFile('');
+    updateLength();
     if (message) announce(message);
   }
 
@@ -2198,6 +2201,22 @@
     if (!state.result) return 0;
     return engine.resolvePosition(state.result.playback, endTick()).seconds;
   };
+
+  /**
+   * How long the score lasts, in the bottom bar.
+   *
+   * The length is the timeline's own end -- every measure's capacity,
+   * rests included -- resolved to seconds through the engine's tempo map,
+   * so a metronome mark in the file is reflected rather than a fixed
+   * tempo assumed. It follows every redraw, which is why render() calls it.
+   */
+  function updateLength() {
+    if (!lengthOutput) return;
+    const seconds = Math.round(endSeconds());
+    const minutes = Math.floor(seconds / 60);
+    const rest = seconds % 60;
+    lengthOutput.textContent = `${minutes}:${String(rest).padStart(2, '0')}`;
+  }
 
   /** The note id sounding at `tick`, so the cursor can highlight it. */
   const soundingAt = (tick) => {
