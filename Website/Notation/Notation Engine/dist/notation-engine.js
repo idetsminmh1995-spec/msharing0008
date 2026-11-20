@@ -74785,7 +74785,9 @@ ${denominator}`;
             y: 0
           };
         }
-        const finalPositions = isLastSystemOfPiece ? positions2 : justifySystem(positions2, usableWidth, spacingConfig);
+        const lastOwnWidth = originalWidths[originalWidths.length - 1] ?? 0;
+        const justifyTarget = Math.max(0, usableWidth - lastOwnWidth);
+        const finalPositions = isLastSystemOfPiece ? positions2 : justifySystem(positions2, justifyTarget, spacingConfig);
         const wasActuallyJustified = !isLastSystemOfPiece && finalPositions !== positions2;
         const systemMeasureLayouts = local.measures.map((m, i2) => {
           const x2 = finalPositions[i2] ?? m.x;

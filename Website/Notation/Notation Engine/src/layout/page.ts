@@ -204,9 +204,18 @@ export function computePageLayout(
         };
       }
 
+      // justifySystem stretches each measure's own START position, and
+      // its target is where the LAST start should land. Pointing that at
+      // `usableWidth` would put the last start on the right margin and
+      // leave the measure that starts there no width at all -- a zero-
+      // width final bar, its notes piled on the margin. The last measure
+      // keeps its own natural width instead, so the target is the margin
+      // minus that width.
+      const lastOwnWidth = originalWidths[originalWidths.length - 1] ?? 0;
+      const justifyTarget = Math.max(0, usableWidth - lastOwnWidth);
       const finalPositions = isLastSystemOfPiece
         ? positions
-        : justifySystem(positions, usableWidth, spacingConfig);
+        : justifySystem(positions, justifyTarget, spacingConfig);
       const wasActuallyJustified = !isLastSystemOfPiece && finalPositions !== positions;
 
       // justifySystem stretches each measure's own START position, not

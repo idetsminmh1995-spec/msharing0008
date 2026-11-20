@@ -53,6 +53,28 @@ describe('system breaking (Phase 46, §16.2)', () => {
 });
 
 describe('justification of completed systems (Phase 46, §16.2 + §14.3)', () => {
+  test('justification never collapses the last measure of a system to zero width', () => {
+    // Justifying the START positions to the usable width would put the
+    // last start exactly on the right margin, leaving the bar that
+    // begins there no room at all -- its notes drawn on the margin.
+    const layout = NE.computePageLayout(
+      [m(1, 10), m(2, 10), m(3, 20)],
+      10,
+      PAGE_CONFIG,
+      SPACING_CONFIG,
+    );
+    const system1 = [...layout.pages][0].systems[0];
+    for (const measure of system1.measures) {
+      assert.ok(measure.width > 0, `measure ${measure.measureNumber} must keep a positive width`);
+    }
+    const last = system1.measures[system1.measures.length - 1];
+    assert.ok(last !== undefined);
+    // The last bar keeps its own natural width, so the system still ends
+    // on the right margin without squashing it.
+    assert.equal(last.width, 10);
+    assert.ok(Math.abs(last.x + last.width - 25) < 1e-9);
+  });
+
   test('a completed (non-final) system is stretched so its last measure reaches the right margin exactly', () => {
     // Two systems' worth: system 1 (measures 1-2, forced to break by
     // measure 3 not fitting) must be justified to the FULL usableWidth,
