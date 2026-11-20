@@ -452,38 +452,16 @@ describe('the editor opens the score the wizard created', () => {
     assert.equal(scoreHost.querySelectorAll('svg').length, 1, 'a starter score must be drawn');
   });
 
-  test('a multi-part score lists every part in the Instruments panel', () => {
+  test('a multi-part score draws every part, and offers no part picker', () => {
     const one = loadEditorWithHandoff({ instrumentIds: ['piano'], measures: 1 });
     assert.equal(one.document.querySelector('[data-editor-part]'), null, 'the part dropdown is gone');
 
     const many = loadEditorWithHandoff({ instrumentIds: ['piano', 'drum-kit'], measures: 1 });
-    const items = [...many.document.querySelectorAll('[data-editor-instrument]')];
-    assert.deepEqual(items.map((item) => item.dataset.editorInstrument), ['P1', 'P2']);
-    assert.deepEqual(items.map((item) => item.textContent.trim()), ['Piano', 'Drum KitPercussion']);
-    assert.equal(items[0].getAttribute('aria-current'), 'true', 'the first part is active on open');
-  });
+    const doc = many.document;
+    assert.equal(doc.querySelector('[data-editor-instrument]'), null, 'the Instruments panel went with the sidebar');
 
-  test('switching part from the Instruments panel retargets the next note at that part', () => {
-    const window = loadEditorWithHandoff({ instrumentIds: ['piano', 'drum-kit'], measures: 1 });
-    const doc = window.document;
-    const drum = doc.querySelector('[data-editor-instrument="P2"]');
-    drum.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    assert.match(doc.querySelector('[data-editor-status]').textContent, /Writing into Drum Kit/);
-
-    // A click now has to write into P2, and a kit line writes a drum --
-    // proof the switch changed the edit target and not just a label.
-    window.DOMPoint = class {
-      constructor(x = 0, y = 0) { this.x = x; this.y = y; }
-      matrixTransform() { return new window.DOMPoint(this.x, this.y); }
-    };
-    window.SVGElement.prototype.getScreenCTM = () => ({
-      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0, inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
-    });
-    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 100, height: 100 });
-    doc.querySelector('[data-editor-score]').dispatchEvent(
-      new window.PointerEvent('pointerdown', { clientX: 40, clientY: 9, bubbles: true }),
-    );
-    const ids = [...doc.querySelectorAll('[data-editor-score] svg [data-id]')].map((node) => node.getAttribute('data-id'));
-    assert.ok(ids.some((id) => id.startsWith('P2#')), 'the note must land in the drum part');
+    const drawn = [...doc.querySelectorAll('[data-editor-score] svg [data-id]')]
+      .map((node) => node.getAttribute('data-id').split('#')[0]);
+    assert.deepEqual([...new Set(drawn)].sort(), ['P1', 'P2'], 'both parts must still be drawn');
   });
 });

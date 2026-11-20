@@ -21,7 +21,6 @@
   const noteInputButton = pick('[data-editor-note-input]');
   const addMeasureButton = pick('[data-editor-add-measure]');
   const removeMeasureButton = pick('[data-editor-remove-measure]');
-  const canvas = pick('[data-editor-canvas]');
   const scoreHost = pick('[data-editor-score]');
   const statusMessage = pick('[data-editor-status]');
   const statusFile = pick('[data-editor-file]');
@@ -51,17 +50,6 @@
   const zoomOutButton = pick('[data-editor-zoom-out]');
   const zoomOutput = pick('[data-editor-zoom]');
   const voiceSelect = pick('[data-editor-voice]');
-  const palette = pick('[data-editor-palette]');
-  const sidebarToggle = pick('[data-editor-sidebar-toggle]');
-  const paletteItems = [...document.querySelectorAll('[data-editor-palette-mark]')];
-  const sidebar = pick('[data-editor-sidebar]');
-  const sidebarTabs = [...document.querySelectorAll('[data-editor-sidebar-tab]')];
-  const sidebarPanels = [...document.querySelectorAll('[data-editor-sidebar-panel]')];
-  const propertiesList = pick('[data-editor-properties]');
-  const propertiesEmpty = pick('[data-editor-properties-empty]');
-  const propertiesCount = pick('[data-editor-properties-count]');
-  const instrumentsList = pick('[data-editor-instruments]');
-  const instrumentsEmpty = pick('[data-editor-instruments-empty]');
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const ACCIDENTAL_ALTER = { 'double-sharp': 2, sharp: 1, natural: 0, flat: -1, 'double-flat': -2 };
@@ -466,14 +454,11 @@
       state.result = result;
       scoreHost.replaceChildren(imported);
       scoreHost.hidden = false;
-      canvas.dataset.layout = state.layout;
+      scoreHost.dataset.layout = state.layout;
       applyOverlays(imported, detectStaves(imported));
       setControlsEnabled(true);
       syncHistory();
       syncPartSelect();
-      syncPalette();
-      syncProperties();
-      syncInstruments();
       // The tie and flip buttons read the selection, so their pressed state
       // has to follow every redraw, not only the tool clicks.
       syncTools();
@@ -731,7 +716,6 @@
   function clearSelection() {
     state.range = [];
     state.selection = null;
-    syncProperties();
   }
 
   // ---- palette -----------------------------------------------------------
@@ -741,48 +725,8 @@
   // selected note already carries it. Clicking again removes it, which is
   // how MuseScore's palette toggles work and saves a separate eraser.
 
-  // The glyph each palette button shows. Names are SMuFL's own, so the
-  // palette draws the exact mark the score will, and a font update can
-  // never leave the button showing a different symbol from the note.
-  const PALETTE_GLYPH = {
-    articulation: {
-      accent: 'articAccentAbove',
-      staccato: 'articStaccatoAbove',
-      tenuto: 'articTenutoAbove',
-      marcato: 'articMarcatoAbove',
-      staccatissimo: 'articStaccatissimoAbove',
-      sforzato: 'articSoftAccentAbove',
-    },
-    ornament: {
-      trill: 'ornamentTrill',
-      mordent: 'ornamentMordent',
-      turn: 'ornamentTurn',
-      turnInverted: 'ornamentTurnInverted',
-    },
-    dynamic: {
-      pp: 'dynamicPP',
-      p: 'dynamicPiano',
-      mp: 'dynamicMP',
-      mf: 'dynamicMF',
-      f: 'dynamicForte',
-      ff: 'dynamicFF',
-    },
-    fermata: { fermata: 'fermataAbove' },
-  };
-
-  /** Fills each palette button with the glyph the engine's own font uses. */
-  function paintPaletteGlyphs() {
-    for (const item of paletteItems) {
-      const kind = item.dataset.editorPaletteMark;
-      const value = item.dataset.editorPaletteValue;
-      const name = PALETTE_GLYPH[kind]?.[value];
-      const glyph = name ? engine.getGlyph?.(name) : null;
-      const host = item.querySelector('.editor-palette__glyph');
-      if (host && glyph?.char) host.textContent = glyph.char;
-    }
-    // The note-input toolbar shows the same marks, but as bare glyphs, so
-    // it asks the engine for each one by name rather than carrying a copy
-    // of the codepoint in the markup.
+  /** Fills the toolbar's bare glyph buttons from the engine's own font. */
+  function paintToolGlyphs() {
     for (const host of document.querySelectorAll('[data-editor-glyph]')) {
       const glyph = engine.getGlyph?.(host.dataset.editorGlyph);
       if (glyph?.char) host.textContent = glyph.char;
@@ -1082,7 +1026,6 @@
       }
       return next;
     }, `${removing ? 'Removed' : 'Added'} ${kind === 'fermata' ? 'fermata' : value}.`);
-    syncPalette();
   }
 
   /**
@@ -1121,7 +1064,6 @@
       }
       return next;
     }, removing ? `Removed ${level}.` : `Added ${level}.`);
-    syncPalette();
   }
 
   /** The dynamic level in force at the selection's own tick, if any. */
@@ -1130,162 +1072,6 @@
     if (!cell || !state.doc) return null;
     const event = eventFor(cell);
     return docTools.dynamicAt(state.doc, cell.partId, cell.measureNumber, event?.startTick ?? 0);
-  }
-
-  /** Lights the palette buttons that the current selection already carries. */
-  function syncPalette() {
-    if (!palette) return;
-    const dynamic = selectionDynamic();
-    for (const item of paletteItems) {
-      const kind = item.dataset.editorPaletteMark;
-      const value = item.dataset.editorPaletteValue;
-      const active = kind === 'dynamic'
-        ? dynamic === value
-        : selectionCarries(kind, kind === 'fermata' ? true : value);
-      item.setAttribute('aria-pressed', String(Boolean(active)));
-    }
-    const voiceButton = document.querySelector(`[data-editor-voice]`);
-    if (voiceButton) voiceButton.value = String(state.voice);
-  }
-
-  // ---- sidebar -----------------------------------------------------------
-  //
-  // MuseScore's dock, reduced to the three panels this editor can actually
-  // fill: the marks palette, the properties of the current selection, and
-  // the score's instruments. One shows at a time; the rail is the chrome.
-
-  const SIDEBAR_PANELS = ['palettes', 'properties', 'instruments'];
-  let sidebarPanel = 'palettes';
-
-  function showSidebarPanel(name) {
-    if (!SIDEBAR_PANELS.includes(name)) return;
-    sidebarPanel = name;
-    for (const tab of sidebarTabs) {
-      const current = tab.dataset.editorSidebarTab === name;
-      tab.setAttribute('aria-selected', String(current));
-      // Roving tabindex: the rail is one stop in the tab order, and the
-      // arrow keys move along it -- the pattern a tablist is expected to
-      // follow, so a keyboard user is not forced through all three tabs.
-      tab.tabIndex = current ? 0 : -1;
-    }
-    for (const panel of sidebarPanels) {
-      panel.hidden = panel.dataset.editorSidebarPanel !== name;
-    }
-    syncProperties();
-    syncInstruments();
-  }
-
-  /** Moves the selection along the rail, wrapping at both ends. */
-  function stepSidebarPanel(delta) {
-    const index = SIDEBAR_PANELS.indexOf(sidebarPanel);
-    const next = (index + delta + SIDEBAR_PANELS.length) % SIDEBAR_PANELS.length;
-    showSidebarPanel(SIDEBAR_PANELS[next]);
-    sidebarTabs.find((tab) => tab.dataset.editorSidebarTab === SIDEBAR_PANELS[next])?.focus();
-  }
-
-  function setSidebar(open) {
-    if (!sidebar) return;
-    sidebar.hidden = !open;
-    if (sidebarToggle) {
-      sidebarToggle.setAttribute('aria-expanded', String(open));
-      sidebarToggle.setAttribute('aria-pressed', String(open));
-    }
-    if (open) showSidebarPanel(sidebarPanel);
-  }
-
-  /** "C4", "F♯5", or a drum's display pitch -- the name a writer reads. */
-  function pitchLabel(pitch) {
-    if (!pitch) return '—';
-    if (pitch.kind === 'unpitched') return `${pitch.displayStep}${pitch.displayOctave}`;
-    const sign = pitch.alter === 1 ? '♯' : pitch.alter === -1 ? '♭' : pitch.alter === 2 ? '𝄪' : pitch.alter === -2 ? '𝄫' : '';
-    return `${pitch.step}${sign}${pitch.octave}`;
-  }
-
-  const DURATION_NAME = {
-    whole: 'Whole', half: 'Half', quarter: 'Quarter', eighth: 'Eighth',
-    '16th': '16th', '32nd': '32nd', '64th': '64th',
-  };
-
-  function durationLabel(duration) {
-    if (!duration) return '—';
-    const name = DURATION_NAME[duration.type] ?? duration.type;
-    return duration.dots ? `${name}, dotted` : name;
-  }
-
-  /** The anchor event's properties, one row each. */
-  function syncProperties() {
-    if (!propertiesList || !propertiesEmpty) return;
-    const cell = state.selection;
-    const event = eventFor(cell);
-    const cells = selectedCells();
-    const show = Boolean(cell && event);
-    propertiesList.hidden = !show;
-    propertiesEmpty.hidden = show;
-    if (propertiesCount) {
-      const extra = cells.length > 1 ? `${cells.length} events selected` : '';
-      propertiesCount.hidden = !extra;
-      propertiesCount.textContent = extra;
-    }
-    if (!show) return;
-
-    const notes = event.kind === 'chord' ? event.notes : [event];
-    const pitch = event.kind === 'rest'
-      ? 'Rest'
-      : notes.map((note) => pitchLabel(note.pitch)).join(' ');
-    const marks = [
-      ...(event.articulations ?? []),
-      ...(event.ornaments ?? []),
-      ...(event.hasFermata ? ['fermata'] : []),
-    ];
-    const values = {
-      pitch,
-      duration: durationLabel(event.duration),
-      voice: String(event.voice ?? cell.voiceId ?? 1),
-      measure: String(cell.measureNumber),
-      marks: marks.length ? marks.join(', ') : '—',
-      dynamic: selectionDynamic() ?? '—',
-    };
-    for (const node of propertiesList.querySelectorAll('[data-editor-property]')) {
-      node.textContent = values[node.dataset.editorProperty] ?? '—';
-    }
-  }
-
-  /** The score's instruments, with the one being written into marked. */
-  function syncInstruments() {
-    if (!instrumentsList || !instrumentsEmpty) return;
-    const parts = state.doc?.score.parts ?? [];
-    instrumentsEmpty.hidden = parts.length > 0;
-    instrumentsList.hidden = parts.length === 0;
-    const signature = parts
-      .map((part) => `${part.id}:${part.name}:${state.drumInstruments?.has(part.id) ? 'p' : ''}`)
-      .join('|');
-    if (instrumentsList.dataset.signature !== signature) {
-      instrumentsList.textContent = '';
-      for (const part of parts) {
-        const item = document.createElement('li');
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'editor-instruments__item';
-        button.dataset.editorInstrument = part.id;
-        const name = document.createElement('span');
-        name.className = 'editor-instruments__name';
-        name.textContent = part.name;
-        button.append(name);
-        if (state.drumInstruments?.has(part.id)) {
-          const badge = document.createElement('span');
-          badge.className = 'editor-instruments__badge';
-          badge.textContent = 'Percussion';
-          button.append(badge);
-        }
-        item.append(button);
-        instrumentsList.append(item);
-      }
-      instrumentsList.dataset.signature = signature;
-    }
-    const current = activePartId();
-    for (const button of instrumentsList.querySelectorAll('[data-editor-instrument]')) {
-      button.setAttribute('aria-current', String(button.dataset.editorInstrument === current));
-    }
   }
 
   /** Switches the voice that new notes are written into. */
@@ -2495,47 +2281,6 @@
   });
 
   if (voiceSelect) voiceSelect.addEventListener('change', () => setVoice(voiceSelect.value));
-  if (sidebarToggle) {
-    sidebarToggle.addEventListener('click', () => {
-      const open = sidebar?.hidden ?? false;
-      setSidebar(open);
-      announce(open ? 'Sidebar open.' : 'Sidebar closed.');
-    });
-  }
-  sidebarTabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      const name = tab.dataset.editorSidebarTab;
-      if (sidebar?.hidden) setSidebar(true);
-      showSidebarPanel(name);
-    });
-    tab.addEventListener('keydown', (event) => {
-      const delta = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
-      if (!delta) return;
-      // The score's own Up/Down transposes the selection, so the rail has
-      // to keep the key to itself or walking the rail would also move the
-      // note behind it.
-      event.preventDefault();
-      event.stopPropagation();
-      stepSidebarPanel(delta);
-    });
-  });
-  if (instrumentsList) {
-    instrumentsList.addEventListener('click', (event) => {
-      const button = event.target.closest('[data-editor-instrument]');
-      if (!button) return;
-      const partId = button.dataset.editorInstrument;
-      if (partId === activePartId()) return;
-      if (partSelect) partSelect.value = partId;
-      selectPart(partId);
-    });
-  }
-  paletteItems.forEach((item) => item.addEventListener('click', () => {
-    const kind = item.dataset.editorPaletteMark;
-    const value = item.dataset.editorPaletteValue;
-    if (kind === 'dynamic') applyDynamic(value);
-    else applyMark(kind, kind === 'fermata' ? true : value);
-  }));
-
   [clefSelect, keySelect, timeSelect].forEach((select) => select?.addEventListener('change', applySetup));
   if (partSelect) partSelect.addEventListener('change', onPartChange);
 
@@ -2653,10 +2398,7 @@
   }
 
   syncTools();
-  paintPaletteGlyphs();
-  syncPalette();
-  showSidebarPanel('palettes');
-  setSidebar(true);
+  paintToolGlyphs();
   setControlsEnabled(false);
   updateZoom();
   restoreHandoff();
