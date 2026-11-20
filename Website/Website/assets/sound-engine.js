@@ -20229,7 +20229,7 @@ Destination: ${this.destinationName}`;
       })();
       return new _R2SoundFontEngine(context, synth, asset, ready);
     }
-    async play(playback, volume = this.volume) {
+    async play(playback, volume = this.volume, fromSeconds = 0) {
       await this.ready;
       await this.context.resume();
       this.stop();
@@ -20238,12 +20238,16 @@ Destination: ${this.destinationName}`;
       this.stopped = false;
       this.routingByPart = assignTrackRouting(playback.tracks);
       const origin = performance.now() / 1e3;
+      const start = Math.max(0, fromSeconds);
       for (const event of playback.events) {
         const notes = midiNotesFor(event);
         if (notes.length === 0) continue;
-        const channel = this.channelFor(event.partId);
-        const startDelay = Math.max(0, event.seconds) * 1e3;
         const durationSeconds = Math.max(0.02, playbackEventDuration(playback, event));
+        const endSeconds = event.seconds + durationSeconds;
+        if (endSeconds <= start) continue;
+        const channel = this.channelFor(event.partId);
+        const startDelay = Math.max(0, event.seconds - start) * 1e3;
+        const remainingSeconds = Math.max(0.02, endSeconds - Math.max(event.seconds, start));
         const onTimer = window.setTimeout(
           () => {
             if (this.stopped) return;
@@ -20251,7 +20255,7 @@ Destination: ${this.destinationName}`;
             const offTimer = window.setTimeout(() => {
               for (const midiNote of notes) this.synth.noteOff(channel, midiNote);
               this.timers.delete(offTimer);
-            }, durationSeconds * 1e3);
+            }, remainingSeconds * 1e3);
             this.timers.add(offTimer);
             this.timers.delete(onTimer);
           },

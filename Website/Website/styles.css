@@ -602,6 +602,13 @@ body.is-newscore-open { overflow:hidden; }
 .editor-bottombar__button--play { border-radius:50%; color:#fff; background:var(--accent); }
 .editor-bottombar__button--play:hover:not(:disabled) { border-color:var(--accent-bright); background:var(--accent-bright); color:#fff; }
 .editor-bottombar__button--play[aria-pressed='true'] { border-color:var(--accent-bright); color:#fff; background:var(--accent-bright); }
+/* One button, two faces: it shows Pause while the score runs and Play when
+   it does not, so the control always says what pressing it will do. */
+.editor-bottombar__button--play svg,
+.editor-bottombar__button[data-editor-stop] svg { fill:currentColor; stroke:none; }
+.editor-bottombar__button--play .editor-pause-glyph { display:none; }
+.editor-bottombar__button--play[data-playing='true'] .editor-play-glyph { display:none; }
+.editor-bottombar__button--play[data-playing='true'] .editor-pause-glyph { display:block; }
 
 .editor-segment {
   display:inline-flex;
@@ -734,10 +741,16 @@ body.is-newscore-open { overflow:hidden; }
   .editor-toolbar__divider { display:none; }
   .editor-workspace { padding:10px 8px 20px; }
   .editor-page { --editor-bottom-height:56px; }
-  .editor-bottombar { height:auto; min-height:var(--editor-bottom-height); flex-wrap:wrap; padding:6px 10px; gap:4px; }
+  .editor-bottombar { height:auto; min-height:var(--editor-bottom-height); flex-wrap:wrap; padding:6px 8px; gap:4px; }
   .editor-bottombar__divider { display:none; }
   .editor-bottombar__group--end { margin-left:auto; }
-  .editor-segment__button { min-width:40px; padding:0 8px; }
+  /* Icon-only on a phone: the labels are what push the bar past the edge. */
+  .editor-segment__button { min-width:32px; padding:0 7px; }
+  .editor-segment__button > span { display:none; }
+  .editor-bottombar__readout { min-width:38px; }
+  .editor-bottombar__button { padding:0 6px; }
+  /* Save and Export keep the right-hand corner even when the bar wraps. */
+  .editor-bottombar__group[aria-label='File'] { margin-left:auto; }
 }
 
 /* Compact laptop widths: icon-only keeps the single row short. */

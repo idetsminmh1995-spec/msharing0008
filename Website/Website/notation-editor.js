@@ -33,6 +33,10 @@
   const exportPng = pick('[data-editor-export-png]');
   const exportToggle = pick('[data-editor-export-toggle]');
   const exportList = pick('[data-editor-export-list]');
+  const playButton = pick('[data-editor-play]');
+  const stopButton = pick('[data-editor-stop]');
+  const metronomeButton = pick('[data-editor-metronome]');
+  const saveButton = pick('[data-editor-save]');
   const soundFontSelect = pick('[data-editor-soundfont]');
   const testNoteButton = pick('[data-editor-test-note]');
   const testScoreButton = pick('[data-editor-test-score]');
@@ -115,6 +119,10 @@
     playStartedAt: 0,
     rafId: null,
     soundingId: null,
+    // The metronome's count-in: the score waits a bar before its first
+    // note, and the sound engine is started when that bar ends.
+    countInEndsAt: 0,
+    soundTimer: null,
     // metronome
     metronomeOn: false,
     metronome: null,
@@ -353,7 +361,7 @@
   // ---- rendering ---------------------------------------------------------
 
   const setControlsEnabled = (enabled) => {
-    [exportToggle, exportPdf, exportSvg, exportPng, addMeasureButton, removeMeasureButton]
+    [exportToggle, exportPdf, exportSvg, exportPng, addMeasureButton, removeMeasureButton, playButton, stopButton, metronomeButton, saveButton]
       .forEach((control) => { if (control) control.disabled = !enabled; });
     if (!enabled) setExportMenu(false);
   };
@@ -538,7 +546,10 @@
     }
     if (state.soundingId) mark(state.soundingId);
 
-    if (state.entry && state.result) {
+    // While the score plays, the playhead is the cursor. Drawing the entry
+    // cursor as well would put two vertical lines on the staff pointing at
+    // different beats, which reads as the editor losing its place.
+    if (state.entry && state.result && !state.playing) {
       const staff = staffFor(state.entry.systemIndex);
       const x = engine.positionToX(state.result.playback, globalTickOf(state.entry.measureNumber, state.entry.tick)).x;
       overlay.appendChild(svgElement('rect', {
@@ -1773,12 +1784,24 @@
     state.metronomeTimers.length = 0;
   };
 
-  /** Schedules the metronome clicks from `fromSeconds` on, using the score's own tempo and metre. */
-  const scheduleMetronome = (fromSeconds = 0) => {
+  /**
+   * Schedules the metronome clicks from `fromSeconds` on, using the score's
+   * own tempo and metre.
+   *
+   * `leadIn` is how long the score waits before its first note. With the
+   * metronome on, that time is filled with one bar of clicks: the writer
+   * hears the count, then the notes come in on the beat. The clicks keep
+   * the same grid either way, so the count-in and the score never drift.
+   */
+  const scheduleMetronome = (fromSeconds = 0, leadIn = 0) => {
     clearMetronomeTimers();
     if (!state.metronomeOn || !state.result) return;
+    // A host without Web Audio (an old browser, a preview) still has a
+    // working metronome button; it just cannot make a sound there.
     if (!state.metronome) {
-      state.metronome = new (window.AudioContext || window.webkitAudioContext)();
+      const Audio = window.AudioContext || window.webkitAudioContext;
+      if (!Audio) return;
+      state.metronome = new Audio();
     }
     const context = state.metronome;
     void context.resume();
@@ -1789,11 +1812,9 @@
     const firstBeat = Math.ceil(fromSeconds / beatSeconds - 1e-6);
     const beats = Math.ceil(totalSeconds / beatSeconds) + 1;
     const origin = context.currentTime;
-    for (let index = 0; index < beats; index += 1) {
-      const beatIndex = firstBeat + index;
-      const at = origin + beatIndex * beatSeconds - fromSeconds;
-      if (at < origin) continue;
-      const accented = ((beatIndex % numerator) + numerator) % numerator === 0;
+
+    const click = (at, accented) => {
+      if (at < origin) return;
       const oscillator = context.createOscillator();
       const gain = context.createGain();
       oscillator.type = 'sine';
@@ -1805,24 +1826,53 @@
       gain.connect(context.destination);
       oscillator.start(at);
       oscillator.stop(at + 0.05);
+    };
+
+    for (let index = 0; index < numerator && leadIn > 0; index += 1) {
+      click(origin + index * beatSeconds, index === 0);
     }
+    for (let index = 0; index < beats; index += 1) {
+      const beatIndex = firstBeat + index;
+      const at = origin + leadIn + beatIndex * beatSeconds - fromSeconds;
+      click(at, ((beatIndex % numerator) + numerator) % numerator === 0);
+    }
+  };
+
+  /** One bar at the score's own tempo — how long the count-in lasts. */
+  const countInSeconds = () => {
+    const { numerator, denominator } = scoreTimeSignature();
+    return numerator * ((60 * 4) / (scoreBpm() * denominator));
   };
 
   const setMetronome = (on) => {
     state.metronomeOn = on;
     if (on) {
-      scheduleMetronome(state.playing ? state.playSeconds : 0);
-      announce('Metronome on.');
+      if (state.playing) {
+        // Turning the clicks on mid-play keeps them on the bar grid, and a
+        // count-in that is already running is left with the time it has.
+        const remaining = state.countInEndsAt ? Math.max(0, (state.countInEndsAt - performance.now()) / 1000) : 0;
+        scheduleMetronome(state.playSeconds, remaining);
+      }
+      announce('Metronome on — one bar counts in before the notes.');
     } else {
       clearMetronomeTimers();
       announce('Metronome off.');
     }
+    syncPlayback();
   };
 
   // ---- playback ----------------------------------------------------------
 
   const setPlaying = (playing) => {
     state.playing = playing;
+  };
+
+  // Headless hosts have no animation-frame clock. Playback still runs
+  // there, it just cannot repaint, so the frame calls stay optional.
+  const requestFrame = (callback) =>
+    (typeof window.requestAnimationFrame === 'function' ? window.requestAnimationFrame(callback) : null);
+  const cancelFrame = (id) => {
+    if (id !== null && typeof window.cancelAnimationFrame === 'function') window.cancelAnimationFrame(id);
   };
 
   const ensureSound = async () => {
@@ -2101,7 +2151,19 @@
 
   function frame() {
     if (!state.playing || !state.result) return;
-    state.playSeconds = state.playStartSeconds + (performance.now() - state.playStartedAt) / 1000;
+    const now = performance.now();
+    // The count-in holds the playhead still on the first beat while the
+    // metronome clicks a bar, then the score starts on the click after it.
+    if (state.countInEndsAt) {
+      if (now < state.countInEndsAt) {
+        state.rafId = requestFrame(frame);
+        return;
+      }
+      state.countInEndsAt = 0;
+      state.playStartedAt = now;
+      announce('Playing.');
+    }
+    state.playSeconds = state.playStartSeconds + (now - state.playStartedAt) / 1000;
     const tick = engine.secondsToTick(state.result.playback.tempoMap, state.playSeconds);
     if (tick >= endTick() || state.playSeconds >= endSeconds() + 0.15) {
       stopPlayback();
@@ -2119,22 +2181,27 @@
         render();
       }
     }
-    state.rafId = window.requestAnimationFrame(frame);
+    state.rafId = requestFrame(frame);
   }
 
   function stopPlayback() {
     setPlaying(false);
-    if (state.rafId !== null) window.cancelAnimationFrame(state.rafId);
+    cancelFrame(state.rafId);
     state.rafId = null;
+    if (state.soundTimer) window.clearTimeout(state.soundTimer);
+    state.soundTimer = null;
+    state.countInEndsAt = 0;
     state.soundingId = null;
-    state.playSeconds = 0;
+    // Stop returns to where playback would begin, not to a silent top, so
+    // pressing Play again repeats from the entry cursor.
+    state.playSeconds = startSeconds();
     clearMetronomeTimers();
     state.sound?.pause?.();
     announce('Stopped.');
+    syncPlayback();
     render();
   }
 
-  /** Rewind puts the playhead back at the top, stopping playback first. */
   /** Where playback starts: the entry cursor if there is one, else the top. */
   const startSeconds = () => {
     if (!state.result || !state.entry) return 0;
@@ -2142,35 +2209,72 @@
     return Math.max(0, engine.resolvePosition(state.result.playback, tick).seconds);
   };
 
+  const pausePlayback = () => {
+    state.sound?.pause?.();
+    clearMetronomeTimers();
+    if (state.soundTimer) window.clearTimeout(state.soundTimer);
+    state.soundTimer = null;
+    state.countInEndsAt = 0;
+    setPlaying(false);
+    cancelFrame(state.rafId);
+    state.rafId = null;
+    state.soundingId = null;
+    announce('Paused.');
+    syncPlayback();
+    render();
+  };
+
   async function togglePlay() {
     if (!state.result) return;
     if (state.playing) {
-      state.sound?.pause?.();
-      clearMetronomeTimers();
-      setPlaying(false);
-      if (state.rafId !== null) window.cancelAnimationFrame(state.rafId);
-      state.rafId = null;
-      state.soundingId = null;
-      announce('Paused.');
-      render();
+      pausePlayback();
       return;
     }
+    if (state.playSeconds >= endSeconds()) state.playSeconds = startSeconds();
+    // With the metronome on, one bar of clicks comes first and the score
+    // waits for it, so the first note lands on a beat the writer has just
+    // heard rather than on a silent downbeat.
+    const leadIn = state.metronomeOn ? countInSeconds() : 0;
+    const from = state.playSeconds;
+    state.playStartSeconds = from;
+    state.playStartedAt = performance.now();
+    state.countInEndsAt = leadIn > 0 ? state.playStartedAt + leadIn * 1000 : 0;
+    setPlaying(true);
+    // Draw at once so the playhead appears and the entry cursor steps
+    // aside on the same frame the sound starts.
+    render();
+    if (state.metronomeOn) scheduleMetronome(from, leadIn);
+    state.rafId = requestFrame(frame);
+    announce(leadIn > 0 ? 'Counting in…' : 'Playing.');
+    syncPlayback();
+
+    // The SoundFont loads while the bar counts in, so the first note is not
+    // held up by a font that is still arriving.
     if (!state.sound) {
-      announce('Loading playback…');
+      if (leadIn === 0) announce('Loading playback…');
       try {
         await ensureSound();
       } catch (error) {
+        stopPlayback();
         announce(error instanceof Error ? error.message : 'Playback is unavailable.');
+        return;
       }
+      if (!state.playing) return;
     }
-    if (state.playSeconds >= endSeconds()) state.playSeconds = startSeconds();
-    state.playStartSeconds = state.playSeconds;
-    state.playStartedAt = performance.now();
-    setPlaying(true);
-    state.sound?.play?.(state.result.playback, 1, state.playSeconds);
-    if (state.metronomeOn) scheduleMetronome(state.playSeconds);
-    state.rafId = window.requestAnimationFrame(frame);
-    announce('Playing.');
+    const beginSound = () => {
+      state.soundTimer = null;
+      if (!state.playing) return;
+      state.sound?.play?.(state.result.playback, 1, from);
+    };
+    const wait = state.countInEndsAt ? Math.max(0, state.countInEndsAt - performance.now()) : 0;
+    if (wait > 0) {
+      state.soundTimer = window.setTimeout(beginSound, wait);
+    } else {
+      beginSound();
+      // The count-in announces its own end; without one the score is
+      // already running, so say so once the font is in.
+      announce('Playing.');
+    }
   }
 
   // ---- export ------------------------------------------------------------
@@ -2265,6 +2369,21 @@
     if (zoomOutput) zoomOutput.textContent = `${state.zoom}%`;
     root.dataset.mode = state.noteInput ? 'input' : 'select';
     if (toolbarStack) toolbarStack.dataset.mode = root.dataset.mode;
+  };
+
+  /**
+   * The playback controls follow the state they control: Play turns into
+   * Pause while the score runs, and the metronome shows whether it will
+   * count the next bar in.
+   */
+  const syncPlayback = () => {
+    if (playButton) {
+      playButton.setAttribute('aria-pressed', String(state.playing));
+      playButton.setAttribute('aria-label', state.playing ? 'Pause' : 'Play');
+      playButton.setAttribute('title', state.playing ? 'Pause (Space)' : 'Play (Space)');
+      playButton.dataset.playing = String(state.playing);
+    }
+    if (metronomeButton) metronomeButton.setAttribute('aria-pressed', String(state.metronomeOn));
   };
 
   function applySetup() {
@@ -2403,6 +2522,11 @@
     wheelTravel = 0;
     updateZoom();
   }, { passive: false });
+
+  if (playButton) playButton.addEventListener('click', () => void togglePlay());
+  if (stopButton) stopButton.addEventListener('click', stopPlayback);
+  if (metronomeButton) metronomeButton.addEventListener('click', () => setMetronome(!state.metronomeOn));
+  if (saveButton) saveButton.addEventListener('click', saveScore);
 
   if (exportToggle) exportToggle.addEventListener('click', () => setExportMenu(exportList.hidden));
   if (exportPdf) exportPdf.addEventListener('click', () => { setExportMenu(false); void runExport(exportPdf, 'pdf'); });
@@ -2593,6 +2717,7 @@
   }
 
   syncTools();
+  syncPlayback();
   paintToolGlyphs();
   setControlsEnabled(false);
   updateZoom();

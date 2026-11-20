@@ -164,7 +164,7 @@ export class R2SoundFontEngine implements NotationSoundEngine {
     return new R2SoundFontEngine(context, synth, asset, ready);
   }
 
-  async play(playback: PlaybackData, volume = this.volume): Promise<void> {
+  async play(playback: PlaybackData, volume = this.volume, fromSeconds = 0): Promise<void> {
     await this.ready;
     await this.context.resume();
     this.stop();
@@ -173,12 +173,19 @@ export class R2SoundFontEngine implements NotationSoundEngine {
     this.stopped = false;
     this.routingByPart = assignTrackRouting(playback.tracks);
     const origin = performance.now() / 1000;
+    const start = Math.max(0, fromSeconds);
     for (const event of playback.events) {
       const notes = midiNotesFor(event);
       if (notes.length === 0) continue;
-      const channel = this.channelFor(event.partId);
-      const startDelay = Math.max(0, event.seconds) * 1000;
       const durationSeconds = Math.max(0.02, playbackEventDuration(playback, event));
+      // A seek starts mid-timeline: notes that already ended are skipped,
+      // and one still sounding when the seek lands starts at once with only
+      // the part of it that is left.
+      const endSeconds = event.seconds + durationSeconds;
+      if (endSeconds <= start) continue;
+      const channel = this.channelFor(event.partId);
+      const startDelay = Math.max(0, event.seconds - start) * 1000;
+      const remainingSeconds = Math.max(0.02, endSeconds - Math.max(event.seconds, start));
       const onTimer = window.setTimeout(
         () => {
           if (this.stopped) return;
@@ -186,7 +193,7 @@ export class R2SoundFontEngine implements NotationSoundEngine {
           const offTimer = window.setTimeout(() => {
             for (const midiNote of notes) this.synth.noteOff(channel, midiNote);
             this.timers.delete(offTimer);
-          }, durationSeconds * 1000);
+          }, remainingSeconds * 1000);
           this.timers.add(offTimer);
           this.timers.delete(onTimer);
         },

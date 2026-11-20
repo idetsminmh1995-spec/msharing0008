@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="Write and edit a music score in the Notation Lab editor." />
     <title>Notation Lab Editor — M Sharing</title>
-    <link rel="stylesheet" href="styles.css?v=overflow-box-20261118" />
+    <link rel="stylesheet" href="styles.css?v=playbar-20261118" />
     <link rel="icon" type="image/svg+xml" href="assets/logo/m-sharing-mark.svg" />
   </head>
   <body class="editor-page">
@@ -120,18 +120,49 @@
     </main>
 
     <div class="editor-bottombar" role="toolbar" aria-label="Editor bottom bar" data-region="editor-bottom-bar" data-editor-bottom-bar>
+      <div class="editor-bottombar__group" role="group" aria-label="Playback">
+        <button class="editor-bottombar__button editor-bottombar__button--play" type="button" data-editor-play aria-label="Play" title="Play (Space)" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path class="editor-play-glyph" d="M8 4.6 19 12 8 19.4Z" /><g class="editor-pause-glyph"><rect x="7.5" y="5" width="3.6" height="14" rx="1" /><rect x="12.9" y="5" width="3.6" height="14" rx="1" /></g></svg>
+        </button>
+        <button class="editor-bottombar__button" type="button" data-editor-stop aria-label="Stop" title="Stop and go back to the start">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.6" /></svg>
+        </button>
+        <button class="editor-bottombar__button" type="button" data-editor-metronome aria-label="Metronome" title="Metronome (M) — one bar counts in before the notes" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3h4l4 18H6Z" /><path d="M16.6 5.4 10.4 15.6" /><circle cx="16.9" cy="4.8" r="1.5" /></svg>
+        </button>
+      </div>
       <div class="editor-bottombar__group editor-bottombar__group--end" role="group" aria-label="Zoom">
         <button class="editor-bottombar__button" type="button" data-editor-zoom-out aria-label="Zoom out" title="Zoom out (Ctrl+-)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21M7.5 10.5h6" /></svg></button>
         <output class="editor-bottombar__readout" data-editor-zoom aria-live="off" aria-label="Zoom level">100%</output>
         <button class="editor-bottombar__button" type="button" data-editor-zoom-in aria-label="Zoom in" title="Zoom in (Ctrl+=)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21M7.5 10.5h6M10.5 7.5v6" /></svg></button>
       </div>
+      <span class="editor-bottombar__divider" aria-hidden="true"></span>
+      <div class="editor-bottombar__group" role="group" aria-label="File">
+        <div class="editor-segment">
+          <button class="editor-segment__button" type="button" data-editor-save aria-label="Save" title="Save to your account (Ctrl+S)" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5Z" /><path d="M9 4v5h6V4" /><path d="M8.5 14h7" /></svg><span>Save</span>
+          </button>
+        </div>
+        <div class="editor-segment">
+          <div class="editor-export" data-editor-export-menu>
+            <button class="editor-segment__button" type="button" data-editor-export-toggle aria-label="Export" aria-expanded="false" aria-haspopup="true" title="Export a file you keep" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0 4 4m-4-4-4 4" /><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" /></svg><span>Export</span>
+            </button>
+            <div class="editor-export__menu" role="menu" data-editor-export-list hidden>
+              <button class="editor-export__item" type="button" role="menuitem" data-editor-export-pdf disabled>PDF</button>
+              <button class="editor-export__item" type="button" role="menuitem" data-editor-export-svg disabled>SVG</button>
+              <button class="editor-export__item" type="button" role="menuitem" data-editor-export-png disabled>PNG</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
     <script src="assets/notation-engine.js?v=da5bd332b7eb"></script>
-    <script src="assets/sound-engine.js?v=dd4228c1a476"></script>
+    <script src="assets/sound-engine.js?v=ff94e9014682"></script>
     <script src="script.js?v=app-lock-20261118"></script>
     <script src="soundfonts-config.js?v=soundfont-config-20261118"></script>
     <script src="notation-doc.js?v=musescore-20261118"></script>
     <script src="notation-newscore.js?v=toolbar-20261124"></script>
-    <script src="notation-editor.js?v=overflow-box-20261118"></script>
+    <script src="notation-editor.js?v=playbar-20261118"></script>
   </body>
 </html>

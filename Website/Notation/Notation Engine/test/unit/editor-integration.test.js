@@ -372,16 +372,97 @@ describe('the editor and the engine agree, end to end', () => {
     assert.equal(window.document.querySelector('[data-editor-status]').textContent, 'Score ready.');
   });
 
-  test('the bottom bar holds the zoom controls and nothing else', () => {
+  test('the bottom bar carries playback, zoom and the two file controls', () => {
     const { window } = loadEditorPage();
     const bars = window.document.querySelectorAll('[data-editor-bottom-bar]');
     assert.equal(bars.length, 1, 'the editor has exactly one bottom bar');
-    const controls = bars[0].querySelectorAll('button, output, select, input');
+    // The export menu's own items live in the bar's markup but only appear
+    // once Export is pressed, so they are not counted as bar controls.
+    const controls = [...bars[0].querySelectorAll('button, output, select, input')]
+      .filter((control) => !control.closest('[data-editor-export-list]'));
     assert.deepEqual(
-      [...controls].map((control) => control.getAttribute('aria-label')),
-      ['Zoom out', 'Zoom level', 'Zoom in'],
-      'the bottom bar carries the zoom controls',
+      controls.map((control) => control.getAttribute('aria-label')),
+      ['Play', 'Stop', 'Metronome', 'Zoom out', 'Zoom level', 'Zoom in', 'Save', 'Export'],
     );
+
+    // Save and Export are different promises, not two names for one thing:
+    // Save keeps the score in the writer's own account, Export hands them a
+    // file they keep.
+    const save = bars[0].querySelector('[data-editor-save]');
+    const exportToggle = bars[0].querySelector('[data-editor-export-toggle]');
+    assert.match(save.getAttribute('title'), /account/, 'Save says where the score goes');
+    assert.match(exportToggle.getAttribute('title'), /file/, 'Export says it makes a file');
+    assert.equal(bars[0].querySelector('[data-editor-export-list]').hidden, true);
+
+    // They sit at the right-hand end, after zoom.
+    const groups = [...bars[0].children].filter((node) => node.classList.contains('editor-bottombar__group'));
+    assert.deepEqual(
+      groups.map((group) => group.getAttribute('aria-label')),
+      ['Playback', 'Zoom', 'File'],
+    );
+  });
+
+  test('the metronome counts one bar in before the notes, and the score waits for it', async () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    // jsdom has no animation clock; the editor asks for one on every frame,
+    // so a timer-backed stand-in is enough to watch the count-in run.
+    window.requestAnimationFrame = (callback) => window.setTimeout(() => callback(window.performance.now()), 16);
+    window.cancelAnimationFrame = (id) => window.clearTimeout(id);
+    // The SoundFont bundle is not part of this test. The editor's contract
+    // with it is `create`, `play` and `pause`, so a stand-in that honours
+    // that contract lets the count-in be timed without a real font.
+    const played = [];
+    window.NotationSoundFont = {
+      R2SoundFontEngine: {
+        create: async () => ({ play: (...args) => played.push(args), pause: () => {} }),
+      },
+    };
+
+    const metronome = doc.querySelector('[data-editor-metronome]');
+    const play = doc.querySelector('[data-editor-play]');
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const playheadX = () => doc.querySelector('.editor-playhead')?.getAttribute('x') ?? null;
+    assert.equal(metronome.getAttribute('aria-pressed'), 'false', 'the metronome starts off');
+
+    // The metronome is a switch, not a transport: it says the next Play will
+    // count in, and only Play starts anything.
+    metronome.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(metronome.getAttribute('aria-pressed'), 'true', 'the button shows the metronome is on');
+    assert.equal(play.dataset.playing, 'false', 'switching the metronome on does not start the score');
+
+    play.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(play.dataset.playing, 'true', 'Play starts the count-in');
+    assert.match(status(), /Counting in/, 'the writer is told the bar is counting');
+    assert.equal(doc.querySelectorAll('.editor-cursor').length, 0, 'the entry cursor gives way to the playhead');
+    assert.equal(doc.querySelectorAll('.editor-playhead').length, 1, 'the playhead holds the first beat through the count');
+
+    // A 4/4 bar at the default 120 lasts two seconds. Half a second in, the
+    // playhead must still be on the first beat: the notes have not started.
+    const held = playheadX();
+    await new Promise((resolve) => window.setTimeout(resolve, 500));
+    assert.match(status(), /Counting in/, 'half a second in, the bar is still counting');
+    assert.equal(playheadX(), held, 'the playhead holds the first beat while the metronome counts');
+
+    // Once the bar is over the notes start and the playhead moves.
+    await new Promise((resolve) => window.setTimeout(resolve, 1900));
+    assert.match(status(), /Playing/, 'after the bar, the score plays');
+    assert.notEqual(playheadX(), held, 'the playhead moves once the count-in ends');
+    assert.equal(played.length, 1, 'the notes start once, and only after the count-in');
+  });
+
+  test('one cursor while the score plays: the playhead takes over from the entry cursor', () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    // Idle: the entry cursor is where the next note goes.
+    assert.equal(doc.querySelectorAll('.editor-cursor').length, 1);
+    assert.equal(doc.querySelectorAll('.editor-playhead').length, 0);
+
+    doc.querySelector('[data-editor-play]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    // Two vertical lines on the staff, pointing at different beats, read as
+    // the editor losing its place, so only the playhead is drawn.
+    assert.equal(doc.querySelectorAll('.editor-cursor').length, 0, 'the entry cursor steps aside');
+    assert.equal(doc.querySelectorAll('.editor-playhead').length, 1, 'the playhead is the one cursor');
   });
 
   test('the editor starts in note-input mode', () => {
