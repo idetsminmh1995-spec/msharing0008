@@ -2238,6 +2238,21 @@
   scoreHost.addEventListener('pointerup', onScorePointerUp);
   scoreHost.addEventListener('pointercancel', onScorePointerUp);
 
+  // Ctrl+wheel zooms the score; a plain wheel is left alone so it scrolls
+  // the page. `passive:false` is required or the browser zooms the whole
+  // page instead. Trackpads and pinch gestures emit many small deltas, so
+  // the wheel travel is accumulated and one step is taken per notch.
+  let wheelTravel = 0;
+  scoreHost.addEventListener('wheel', (event) => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    wheelTravel += event.deltaY;
+    if (Math.abs(wheelTravel) < 40) return;
+    state.zoom += wheelTravel < 0 ? 10 : -10;
+    wheelTravel = 0;
+    updateZoom();
+  }, { passive: false });
+
   if (exportToggle) exportToggle.addEventListener('click', () => setExportMenu(exportList.hidden));
   if (exportPdf) exportPdf.addEventListener('click', () => { setExportMenu(false); void runExport(exportPdf, 'pdf'); });
   if (exportSvg) exportSvg.addEventListener('click', () => { setExportMenu(false); void runExport(exportSvg, 'svg'); });
