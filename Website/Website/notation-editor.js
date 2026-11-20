@@ -49,6 +49,9 @@
   const articulationButtons = [...document.querySelectorAll('[data-editor-articulation]')];
   const dynamicButtons = [...document.querySelectorAll('[data-editor-dynamic]')];
   const flipButton = pick('[data-editor-flip]');
+  const copyButton = pick('[data-editor-copy]');
+  const cutButton = pick('[data-editor-cut]');
+  const deleteButton = pick('[data-editor-delete]');
   const restButton = pick('[data-editor-rest]');
   const zoomInButton = pick('[data-editor-zoom-in]');
   const zoomOutButton = pick('[data-editor-zoom-out]');
@@ -1404,12 +1407,18 @@
    */
   function deleteSelection() {
     const cells = selectedCells();
-    if (cells.length === 0) return;
+    if (cells.length === 0) {
+      announce('Select a note first.');
+      return;
+    }
     const deletable = cells.filter((cell) => {
       const event = eventFor(cell);
       return event && event.kind !== 'rest';
     });
-    if (deletable.length === 0) return;
+    if (deletable.length === 0) {
+      announce('There is nothing to delete there.');
+      return;
+    }
     const anchor = state.selection ? { ...state.selection } : { ...deletable[0] };
     commit((doc) => docTools.deleteEvents(doc, deletable),
       `Deleted ${deletable.length} note${deletable.length === 1 ? '' : 's'}.`);
@@ -1419,6 +1428,40 @@
     if (anchorEvent) setSelection([anchor], anchor);
     else clearSelection();
     render();
+  }
+
+  /**
+   * The selection as MusicXML on the clipboard, so a copy can be pasted
+   * into another notation program rather than only within this page.
+   *
+   * The excerpt is a whole document (see `docTools.excerpt`), which is what
+   * makes it portable: it carries its own attributes and bar lines.
+   */
+  async function copySelection() {
+    const cells = selectedCells();
+    if (cells.length === 0) {
+      announce('Select a note first.');
+      return false;
+    }
+    const excerpt = docTools.excerpt(state.doc, cells);
+    if (!excerpt) {
+      announce('Nothing to copy.');
+      return false;
+    }
+    const counted = `${cells.length} note${cells.length === 1 ? '' : 's'}`;
+    try {
+      await navigator.clipboard.writeText(docTools.toMusicXml(excerpt));
+    } catch {
+      announce('The browser would not give this page the clipboard.');
+      return false;
+    }
+    announce(`Copied ${counted}.`);
+    return true;
+  }
+
+  /** Copies the selection, then clears the notes it copied. */
+  async function cutSelection() {
+    if (await copySelection()) deleteSelection();
   }
 
   function advanceEntry(ticks, measureNumber, voiceId) {
@@ -2582,8 +2625,39 @@
     syncTools();
     announce(state.noteInput ? 'Note input on — click the staff to write.' : 'Note input off.');
   });
-  if (addMeasureButton) addMeasureButton.addEventListener('click', () => commit((doc) => docTools.appendMeasure(doc, activePartId()), 'Measure added.'));
-  if (removeMeasureButton) removeMeasureButton.addEventListener('click', () => commit((doc) => docTools.removeLastMeasure(doc, activePartId()), 'Measure removed.'));
+  // The new bar goes where the writer is looking -- after the bar the
+  // cursor sits in -- and the eraser takes that same bar away, so the two
+  // buttons act on one place rather than one acting at the end of the piece
+  // and the other wherever the pointer happens to be.
+  const currentMeasureNumber = () =>
+    state.selection?.measureNumber ?? state.entry?.measureNumber ?? 1;
+
+  if (addMeasureButton) {
+    addMeasureButton.addEventListener('click', () => {
+      const at = currentMeasureNumber();
+      commit((doc) => docTools.insertMeasureAfter(doc, activePartId(), at), `Measure added after bar ${at}.`);
+      clearSelection();
+      state.entry = { ...(state.entry ?? {}), partId: activePartId(), measureNumber: at + 1, voiceId: state.voice, tick: 0 };
+      render();
+    });
+  }
+  if (removeMeasureButton) {
+    removeMeasureButton.addEventListener('click', () => {
+      const at = currentMeasureNumber();
+      const count = partById(activePartId())?.measures.length ?? 0;
+      if (count <= 1) {
+        announce('A score keeps at least one bar.');
+        return;
+      }
+      commit((doc) => docTools.removeMeasure(doc, activePartId(), at), `Bar ${at} removed.`);
+      clearSelection();
+      state.entry = { ...(state.entry ?? {}), partId: activePartId(), measureNumber: Math.max(1, Math.min(at, count - 1)), voiceId: state.voice, tick: 0 };
+      render();
+    });
+  }
+  if (copyButton) copyButton.addEventListener('click', () => void copySelection());
+  if (cutButton) cutButton.addEventListener('click', () => void cutSelection());
+  if (deleteButton) deleteButton.addEventListener('click', () => deleteSelection());
 
   scoreHost.addEventListener('pointerdown', onScorePointerDown);
   scoreHost.addEventListener('pointermove', onScorePointerMove);
@@ -2691,6 +2765,8 @@
     const modifier = event.ctrlKey || event.metaKey;
 
     if (modifier && event.key.toLowerCase() === 's') { event.preventDefault(); saveScore(); return; }
+    if (modifier && event.key.toLowerCase() === 'c') { event.preventDefault(); void copySelection(); return; }
+    if (modifier && event.key.toLowerCase() === 'x') { event.preventDefault(); void cutSelection(); return; }
     if (modifier && event.key.toLowerCase() === 'z' && !event.shiftKey) { event.preventDefault(); undo(); return; }
     if (modifier && (event.key.toLowerCase() === 'y' || (event.shiftKey && event.key.toLowerCase() === 'z'))) { event.preventDefault(); redo(); return; }
     if (modifier && event.key === '=') { event.preventDefault(); state.zoom += 10; updateZoom(); return; }

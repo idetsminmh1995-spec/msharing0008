@@ -609,6 +609,7 @@ describe('the editor and the engine agree, end to end', () => {
       .map((node) => node.getAttribute('aria-label'));
     assert.deepEqual(labels, [
       'Navigation',
+      'Measure',
       'Note input',
       'Note value',
       'Augmentation dots',
@@ -618,6 +619,7 @@ describe('the editor and the engine agree, end to end', () => {
       'Articulations',
       'Dynamics',
       'Stem',
+      'Copy and delete',
       'More tools',
       'History',
     ]);
@@ -659,6 +661,197 @@ describe('the editor and the engine agree, end to end', () => {
     flip.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     assert.equal(panel.hidden, true, 'using a tool from the box folds it away');
     assert.equal(doc.querySelector('[data-editor-popover="overflow"]').getAttribute('aria-expanded'), 'false');
+  });
+
+  test('the row carries the bar controls, the clipboard and the eraser', () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    const measure = doc.querySelector('.editor-toolbar__group[aria-label="Measure"]');
+    const clipboard = doc.querySelector('.editor-toolbar__group[aria-label="Copy and delete"]');
+    assert.ok(measure, 'the row has no bar controls');
+    assert.ok(clipboard, 'the row has no copy, cut and delete');
+    assert.deepEqual(
+      [...measure.querySelectorAll('.editor-tool')].map((node) => node.getAttribute('aria-label')),
+      ['Add measure', 'Remove measure'],
+    );
+    assert.deepEqual(
+      [...clipboard.querySelectorAll('.editor-tool')].map((node) => node.getAttribute('aria-label')),
+      ['Copy', 'Cut', 'Delete'],
+    );
+    // Every one of them is usable as soon as a score is on screen -- a
+    // control that does nothing until something else happens is a dead
+    // button, and the bar has no room for one.
+    for (const label of ['Add measure', 'Remove measure', 'Copy', 'Cut', 'Delete']) {
+      const button = [...doc.querySelectorAll('.editor-tool')]
+        .find((node) => node.getAttribute('aria-label') === label);
+      assert.equal(button.disabled, false, `${label} is disabled with a score loaded`);
+      assert.match(button.getAttribute('title'), /\(|measure|bar|selection/, `${label} has no title`);
+    }
+  });
+
+  test('the bar buttons add and remove a bar, and the length readout follows', () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const length = () => doc.querySelector('[data-editor-length]').textContent;
+    const click = (label) => [...doc.querySelectorAll('.editor-tool')]
+      .find((node) => node.getAttribute('aria-label') === label)
+      .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+
+    // The starter score is four bars of 4/4, which is eight seconds at the
+    // tempo the file itself carries.
+    assert.equal(length(), '0:08');
+
+    click('Add measure');
+    assert.equal(status(), 'Measure added after bar 1.');
+    assert.equal(length(), '0:10', 'the fifth bar did not lengthen the score');
+
+    // The cursor moved into the new bar, so the eraser takes that one away
+    // again -- the two buttons act on the bar the writer is looking at.
+    click('Remove measure');
+    assert.equal(status(), 'Bar 2 removed.');
+    assert.equal(length(), '0:08');
+  });
+
+  test('a bar inserted in the middle keeps the music after it in its own bar', () => {
+    const { window, engine, doc } = loadEditor();
+    const parsed = engine.parseMusicXml(STARTER_XML, window.DOMParser);
+    const quarter = engine.TICKS_PER_QUARTER;
+
+    // Bar 1 gets a note, bar 2 keeps its rest. Inserting after bar 1 must
+    // push bar 2 down to 3 and leave both bars' music where it was -- a
+    // measure number is a position, so every table keyed on one has to move
+    // with the bars or a mark ends up over the wrong bar.
+    const withNote = doc.insertEvent(parsed, {
+      partId: 'P1',
+      measureNumber: 1,
+      event: engine.note({
+        pitch: { kind: 'pitched', step: 'C', octave: 5, alter: 0 },
+        duration: engine.duration('quarter', 0, quarter),
+        voice: 1,
+        staff: 1,
+        startTick: 0,
+      }),
+    });
+    const grown = doc.insertMeasureAfter(withNote, 'P1', 1);
+
+    const measures = grown.score.parts[0].measures;
+    assert.deepEqual(JSON.parse(JSON.stringify(measures.map((m) => m.number))), [1, 2, 3]);
+    const barOne = measures[0].voices[0].events;
+    assert.equal(barOne.find((event) => event.kind === 'note').pitch.step, 'C');
+    assert.equal(
+      measures[1].voices[0].events.filter((event) => event.kind !== 'rest').length,
+      0,
+      'the new bar is not empty',
+    );
+    // The attributes followed the bars, so the new bar still knows its meter
+    // and the bar that moved still has its own.
+    assert.equal(doc.attributeFor(grown, 'P1', 1).timeNumerator, 4);
+    assert.equal(doc.attributeFor(grown, 'P1', 2).timeNumerator, 4);
+    assert.equal(doc.attributeFor(grown, 'P1', 3).timeNumerator, 4);
+
+    // Removing bar 2 pulls bar 3 back down to 2, with its music intact.
+    const shrunk = doc.removeMeasure(grown, 'P1', 2);
+    assert.deepEqual(JSON.parse(JSON.stringify(shrunk.score.parts[0].measures.map((m) => m.number))), [1, 2]);
+    assert.equal(
+      doc.attributeFor(shrunk, 'P1', 2).timeNumerator,
+      4,
+      'the attributes did not come back with the bar',
+    );
+
+    // And the result still writes and renders: the round trip a save takes.
+    for (const candidate of [grown, shrunk]) {
+      const xml = doc.toMusicXml(candidate);
+      const reread = engine.parseMusicXml(xml, window.DOMParser);
+      assert.deepEqual(
+        JSON.parse(JSON.stringify(reread.score.parts[0].measures.map((m) => m.number))),
+        JSON.parse(JSON.stringify(candidate.score.parts[0].measures.map((m) => m.number))),
+      );
+      const { svg } = engine.renderParsedMusicXml(reread, { config: { layout: { mode: 'page' } } });
+      assert.ok(svg.startsWith('<svg'));
+      assert.ok(!svg.includes('NaN'));
+    }
+  });
+
+  test('copy puts the selection on the clipboard as a file another program can read', async () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    let written = null;
+    Object.defineProperty(window.navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async (text) => { written = text; } },
+    });
+
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const press = (key, init = {}) => doc.dispatchEvent(
+      new window.KeyboardEvent('keydown', { key, bubbles: true, ...init }),
+    );
+
+    press('D');
+    assert.match(status(), /Inserted D/);
+    press('a', { ctrlKey: true });
+    assert.equal(status(), 'Selected 1 note.');
+
+    press('c', { ctrlKey: true });
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    assert.equal(status(), 'Copied 1 note.');
+    assert.ok(written, 'nothing reached the clipboard');
+    // A copy that only the editor can read is half a copy: what lands on
+    // the clipboard is a whole MusicXML document, so it can be pasted into
+    // another notation program.
+    const parsed = window.NotationEngine.parseMusicXml(written, { domParser: window.DOMParser });
+    assert.equal(parsed.score.parts.length, 1);
+    assert.equal(parsed.score.parts[0].measures.length, 1, 'the excerpt lost its bar');
+    const notes = parsed.score.parts[0].measures[0].voices[0].events
+      .filter((event) => event.kind !== 'rest');
+    assert.equal(notes.length, 1);
+    assert.equal(notes[0].pitch.step, 'D');
+    // The bar still adds up, so the excerpt opens as a legal measure rather
+    // than a stub the receiving program has to repair.
+    const total = parsed.score.parts[0].measures[0].voices[0].events
+      .reduce((sum, event) => sum + event.duration.ticks, 0);
+    assert.equal(total, 4 * window.NotationEngine.TICKS_PER_QUARTER);
+  });
+
+  test('cut copies the selection and then clears it, and delete clears it alone', async () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    let written = null;
+    Object.defineProperty(window.navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async (text) => { written = text; } },
+    });
+
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const press = (key, init = {}) => doc.dispatchEvent(
+      new window.KeyboardEvent('keydown', { key, bubbles: true, ...init }),
+    );
+    const tool = (label) => [...doc.querySelectorAll('.editor-tool')]
+      .find((node) => node.getAttribute('aria-label') === label);
+
+    // Cut keeps the note on the clipboard and leaves a rest behind: with
+    // nothing sounding left, "select all" has nothing to select.
+    press('E');
+    press('a', { ctrlKey: true });
+    assert.equal(status(), 'Selected 1 note.');
+    press('x', { ctrlKey: true });
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    assert.equal(status(), 'Deleted 1 note.');
+    assert.match(written, /<step>E<\/step>/);
+    press('a', { ctrlKey: true });
+    assert.equal(status(), 'Nothing to select.');
+
+    // Delete does the same clearing without touching the clipboard.
+    written = null;
+    press('E');
+    press('a', { ctrlKey: true });
+    assert.equal(status(), 'Selected 1 note.');
+    tool('Delete').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(status(), 'Deleted 1 note.');
+    assert.equal(written, null, 'delete must not write to the clipboard');
+    press('a', { ctrlKey: true });
+    assert.equal(status(), 'Nothing to select.');
   });
 
   test('the fold only happens when the row would run past the window', () => {

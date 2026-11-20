@@ -34,6 +34,13 @@
   const ticksPerMeasure = (doc, partId, measureNumber) =>
     measureTicks(attributeFor(doc, partId, measureNumber));
 
+  /** The event a `{ measureNumber, voiceId, eventIndex }` cell points at. */
+  function eventAt(doc, cell) {
+    const measure = partOf(doc, cell.partId).measures.find((m) => m.number === cell.measureNumber);
+    const voice = measure?.voices.find((v) => v.id === cell.voiceId);
+    return voice ? voice.events[cell.eventIndex] : undefined;
+  }
+
   // ---- document edits (every one returns a new document) ------------------
 
   function updatePart(doc, partId, updater) {
@@ -355,51 +362,179 @@
     };
   }
 
+  /**
+   * The side-tables keyed by measure number, each entry shifted so it keeps
+   * pointing at the same music after a bar is inserted or removed.
+   *
+   * A measure number is a position, not an identity: every table that keys
+   * on one -- attributes, tempo marks, dynamics, octave shifts, harmonies,
+   * prints -- has to move with the bars, or a mark ends up over the wrong
+   * bar the first time a bar is inserted before it.
+   */
+  const MEASURE_KEYED_TABLES = [
+    'attributes',
+    'attributeChanges',
+    'tempoMarks',
+    'directions',
+    'octaveShifts',
+    'harmonies',
+    'prints',
+  ];
+
+  function shiftMeasureTables(doc, partId, fromMeasure, delta) {
+    const shifted = { ...doc };
+    for (const table of MEASURE_KEYED_TABLES) {
+      const entries = doc[table];
+      if (!Array.isArray(entries)) continue;
+      shifted[table] = entries.map((entry) =>
+        entry.partId === partId && entry.measureNumber >= fromMeasure
+          ? { ...entry, measureNumber: entry.measureNumber + delta }
+          : entry,
+      );
+    }
+    return shifted;
+  }
+
+  /** An empty measure of the same meter as the one it is copied from. */
+  function emptyMeasure(doc, partId, number, like) {
+    const template = attributeFor(doc, partId, like) ?? doc.attributes[0];
+    const filler = E.rest({
+      duration: E.duration('whole', 0, measureTicks(template)),
+      voice: 1,
+      staff: 1,
+      startTick: 0,
+    });
+    return E.measure(number, [E.voice(1, [filler])]);
+  }
+
+  /**
+   * Inserts an empty measure after `measureNumber`, renumbering the bars
+   * that follow it.
+   *
+   * Inserting in the middle is what a writer actually asks for -- the new
+   * bar belongs where the cursor is, not at the end of the piece -- so the
+   * bars after it move down one and keep their own music.
+   */
+  function insertMeasureAfter(doc, partId, measureNumber) {
+    const part = partOf(doc, partId);
+    if (part.measures.length === 0) return doc;
+    const number = measureNumber + 1;
+    const moved = shiftMeasureTables(doc, partId, number, 1);
+    const withMeasure = updatePart(moved, partId, (current) => ({
+      ...current,
+      measures: [
+        ...current.measures.map((measure) =>
+          measure.number >= number ? { ...measure, number: measure.number + 1 } : measure,
+        ),
+        emptyMeasure(doc, partId, number, measureNumber),
+      ].sort((a, b) => a.number - b.number),
+    }));
+    const template = attributeFor(doc, partId, measureNumber) ?? doc.attributes[0];
+    const change = doc.attributeChanges.find(
+      (a) => a.partId === partId && a.measureNumber === measureNumber,
+    );
+    return {
+      ...withMeasure,
+      attributes: [...withMeasure.attributes, { ...template, measureNumber: number }],
+      // Only a bar that really carries a mid-bar change hands one on; a
+      // clef change four bars earlier is not the new bar's business.
+      attributeChanges:
+        change === undefined
+          ? withMeasure.attributeChanges
+          : [...withMeasure.attributeChanges, { ...change, measureNumber: number }],
+    };
+  }
+
   /** Appends an empty measure to a part, carrying the current attributes forward. */
   function appendMeasure(doc, partId) {
     const part = partOf(doc, partId);
     const last = part.measures[part.measures.length - 1];
     if (!last) return doc;
-    const number = last.number + 1;
-    const template = attributeFor(doc, partId, last.number) ?? doc.attributes[0];
-    const capacity = measureTicks(template);
-    const filler = E.rest({
-      duration: E.duration('whole', 0, capacity),
-      voice: 1,
-      staff: 1,
-      startTick: 0,
-    });
-    const withMeasure = updatePart(doc, partId, (current) => ({
-      ...current,
-      measures: [...current.measures, E.measure(number, [E.voice(1, [filler])])],
-    }));
-    return {
-      ...withMeasure,
-      attributes: [...withMeasure.attributes, { ...template, measureNumber: number }],
-      attributeChanges: [
-        ...withMeasure.attributeChanges,
-        { ...(doc.attributeChanges.find((a) => a.partId === partId) ?? template), measureNumber: number },
-      ],
-    };
+    return insertMeasureAfter(doc, partId, last.number);
   }
 
   /** Removes the last measure of a part, keeping at least one. */
   function removeLastMeasure(doc, partId) {
     const part = partOf(doc, partId);
     if (part.measures.length <= 1) return doc;
-    const number = part.measures[part.measures.length - 1].number;
-    const trimmed = updatePart(doc, partId, (current) => ({
+    return removeMeasure(doc, partId, part.measures[part.measures.length - 1].number);
+  }
+
+  /**
+   * Removes one measure, renumbering the bars after it. The last bar of a
+   * part is never removed, so a score cannot be emptied out from under the
+   * renderer.
+   */
+  function removeMeasure(doc, partId, measureNumber) {
+    const part = partOf(doc, partId);
+    if (part.measures.length <= 1) return doc;
+    if (!part.measures.some((measure) => measure.number === measureNumber)) return doc;
+    const dropped = MEASURE_KEYED_TABLES.reduce((next, table) => {
+      const entries = next[table];
+      if (!Array.isArray(entries)) return next;
+      return {
+        ...next,
+        [table]: entries.filter(
+          (entry) => !(entry.partId === partId && entry.measureNumber === measureNumber),
+        ),
+      };
+    }, { ...doc });
+    const moved = shiftMeasureTables(dropped, partId, measureNumber + 1, -1);
+    return updatePart(moved, partId, (current) => ({
       ...current,
-      measures: current.measures.slice(0, -1),
+      measures: current.measures
+        .filter((measure) => measure.number !== measureNumber)
+        .map((measure) =>
+          measure.number > measureNumber ? { ...measure, number: measure.number - 1 } : measure,
+        ),
     }));
+  }
+
+  /**
+   * The selection as a document of its own -- what a copy hands to another
+   * program.
+   *
+   * The measures the selection touches are kept whole, with every event it
+   * does not cover turned into a rest, so the excerpt keeps its rhythm and
+   * its bar lines. `null` means nothing sounding was selected.
+   */
+  function excerpt(doc, cells) {
+    const sounding = cells.filter((cell) => {
+      const event = eventAt(doc, cell);
+      return event !== undefined && event.kind !== 'rest';
+    });
+    if (sounding.length === 0) return null;
+    const partId = sounding[0].partId;
+    const numbers = [...new Set(sounding.map((cell) => cell.measureNumber))].sort((a, b) => a - b);
+    const keep = new Set(
+      sounding.map((cell) => `${cell.measureNumber}|${cell.voiceId}|${cell.eventIndex}`),
+    );
+    const part = partOf(doc, partId);
+    const measures = part.measures
+      .filter((measure) => numbers.includes(measure.number))
+      .map((measure) => ({
+        ...measure,
+        voices: measure.voices.map((voice) => ({
+          ...voice,
+          events: voice.events.map((event, eventIndex) =>
+            event.kind === 'rest' || keep.has(`${measure.number}|${voice.id}|${eventIndex}`)
+              ? event
+              : E.rest({
+                  duration: event.duration,
+                  voice: event.voice,
+                  staff: event.staff ?? 1,
+                  startTick: event.startTick ?? 0,
+                }),
+          ),
+        })),
+      }));
+    const inRange = (entry) => entry.partId === partId && numbers.includes(entry.measureNumber);
     return {
-      ...trimmed,
-      attributes: trimmed.attributes.filter(
-        (a) => !(a.partId === partId && a.measureNumber === number),
-      ),
-      attributeChanges: trimmed.attributeChanges.filter(
-        (a) => !(a.partId === partId && a.measureNumber === number),
-      ),
+      ...doc,
+      score: { ...doc.score, parts: [{ ...part, measures }] },
+      attributes: doc.attributes.filter(inRange),
+      attributeChanges: doc.attributeChanges.filter(inRange),
+      directions: doc.directions.filter(inRange),
     };
   }
 
@@ -460,13 +595,17 @@
     setVoiceEvents,
     setSetup,
     appendMeasure,
+    insertMeasureAfter,
     removeLastMeasure,
+    removeMeasure,
     padMeasure,
     withoutPlaceholderRest,
     sortEvents,
     pitchFromStaffPosition,
     clefDefinitionFor,
     clefNameFromSign,
+    eventAt,
+    excerpt,
     toMusicXml,
   };
 })();

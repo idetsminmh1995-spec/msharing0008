@@ -41,6 +41,11 @@
         <button class="editor-tool editor-tool--back" type="button" data-editor-back aria-label="Back to Notation Lab" title="Back to Notation Lab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg><span>Back</span></button>
       </div>
       <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
+      <div class="editor-toolbar__group" data-editor-slot="measure" role="group" aria-label="Measure">
+        <button class="editor-tool" type="button" data-editor-add-measure aria-label="Add measure" title="Add a measure after this bar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14M19 5v14" /><path d="M9 12h6M12 9v6" /></svg></button>
+        <button class="editor-tool" type="button" data-editor-remove-measure aria-label="Remove measure" title="Remove this bar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14M19 5v14" /><path d="M9 12h6" /></svg></button>
+      </div>
+      <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
       <div class="editor-toolbar__group" data-editor-slot="note-input" role="group" aria-label="Note input">
         <button class="editor-tool" type="button" data-editor-note-input aria-label="Note input mode" title="Note input (N) — then click the staff" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" data-editor-pencil><path d="M4 20l1.4-4.2L15.8 5.4l2.8 2.8L8.2 18.6z" /><path d="M5.4 15.8 8.2 18.6" /><path d="M14.9 6.3 17.8 9.1" /></svg><span>Input</span></button>
       </div>
@@ -97,6 +102,12 @@
       <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
       <div class="editor-toolbar__group" data-editor-slot="stem" role="group" aria-label="Stem">
         <button class="editor-tool" type="button" data-editor-flip aria-label="Flip stem" title="Flip stem direction"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v16M8 4l-3 3M8 4l3 3M16 20V4M16 20l-3-3M16 20l3-3" /></svg></button>
+      </div>
+      <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
+      <div class="editor-toolbar__group" data-editor-slot="clipboard" role="group" aria-label="Copy and delete">
+        <button class="editor-tool" type="button" data-editor-copy aria-label="Copy" title="Copy the selection (Ctrl+C)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.6" /><path d="M15 9V5.6A1.6 1.6 0 0 0 13.4 4H5.6A1.6 1.6 0 0 0 4 5.6v7.8A1.6 1.6 0 0 0 5.6 15H9" /></svg></button>
+        <button class="editor-tool" type="button" data-editor-cut aria-label="Cut" title="Cut the selection (Ctrl+X)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6.5" cy="17.5" r="2.8" /><circle cx="17.5" cy="17.5" r="2.8" /><path d="M8.4 15.4 18 4M15.6 15.4 6 4" /></svg></button>
+        <button class="editor-tool" type="button" data-editor-delete aria-label="Delete" title="Delete the selection, leaving rests (Delete)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14" /><path d="M9.5 7V4.8h5V7" /><path d="M6.8 7l.9 12.2h8.6L17.2 7" /><path d="M10.5 10.5v5.5M13.5 10.5v5.5" /></svg></button>
       </div>
       <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
       <div class="editor-toolbar__group editor-toolbar__group--overflow" role="group" aria-label="More tools" data-editor-overflow-group hidden>
