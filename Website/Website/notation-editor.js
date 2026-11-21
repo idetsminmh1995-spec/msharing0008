@@ -37,9 +37,6 @@
   const stopButton = pick('[data-editor-stop]');
   const metronomeButton = pick('[data-editor-metronome]');
   const saveButton = pick('[data-editor-save]');
-  const soundFontSelect = pick('[data-editor-soundfont]');
-  const testNoteButton = pick('[data-editor-test-note]');
-  const testScoreButton = pick('[data-editor-test-score]');
   const previewButton = pick('[data-editor-preview]');
   const durationButtons = [...document.querySelectorAll('[data-editor-duration]')];
   const accidentalButtons = [...document.querySelectorAll('[data-editor-accidental]')];
@@ -114,9 +111,8 @@
     sound: null,
     soundLoading: null,
     soundTried: false,
-    // audition
+    // preview
     previewOn: true,
-    soundFonts: [],
     soundAssetId: null,
     soundAssetPaths: null,
     playSeconds: 0,
@@ -2208,25 +2204,19 @@
   };
 
   /**
-   * Clicks one bar at the score's own tempo and metre, then stops.
+   * Clicks a bar at the score's own tempo and metre, then queues the next
+   * one, so the pulse runs on for as long as the switch is on.
    *
-   * The count-in is the metronome's whole job: it says "bar one is coming"
-   * and then gets out of the way. Clicking on into the score would put a
-   * stray click on the music's own downbeat -- the note and a click landing
-   * together -- so the last click is the bar's last beat and the music
-   * starts after it, in silence but on time.
-   *
-   * `onDone` runs when the bar is over, which is where the button goes off
-   * again.
+   * `startAt` is the audio clock's own time for the bar: a pulse that runs
+   * on stays on its grid instead of drifting with each timer.
    */
-  const scheduleMetronome = (barSeconds = countInSeconds(), onDone = null) => {
+  const scheduleMetronome = (barSeconds = countInSeconds(), startAt = null) => {
     clearMetronomeTimers();
-    if (!state.metronomeOn || !state.result) return;
+    // The metre and tempo come from the score, so there is nothing to click
+    // against until one is open.
+    if (!state.metronomeOn || !state.doc) return;
     const { numerator, denominator } = scoreTimeSignature();
     const beatSeconds = (60 * 4) / (scoreBpm() * denominator);
-    // The bar's length is the score's, not the audio host's: the switch has
-    // to go off on time even where nothing can be played.
-    if (onDone) state.metronomeTimers.push(window.setTimeout(onDone, barSeconds * 1000));
 
     // A host without Web Audio (an old browser, a preview) still has a
     // working metronome button; it just cannot make a sound there.
@@ -2237,10 +2227,10 @@
     }
     const context = state.metronome;
     void context.resume();
-    const origin = context.currentTime;
+    const origin = startAt ?? context.currentTime;
 
     const click = (at, accented) => {
-      if (at < origin) return;
+      if (at < context.currentTime) return;
       const oscillator = context.createOscillator();
       const gain = context.createGain();
       oscillator.type = 'sine';
@@ -2262,6 +2252,12 @@
       if (at >= barSeconds - 1e-9) break;
       click(origin + at, index === 0);
     }
+
+    // Queue the next bar a little early, on the same grid, so the pulse
+    // never gaps between one bar and the next.
+    const next = origin + barSeconds;
+    const delay = Math.max(0, (next - context.currentTime) * 1000 - 120);
+    state.metronomeTimers.push(window.setTimeout(() => scheduleMetronome(barSeconds, next), delay));
   };
 
   /** One bar at the score's own tempo — how long the count-in lasts. */
@@ -2270,18 +2266,16 @@
     return numerator * ((60 * 4) / (scoreBpm() * denominator));
   };
 
-  const setMetronome = (on, { quiet = false } = {}) => {
+  const setMetronome = (on) => {
     state.metronomeOn = on;
     if (on) {
-      if (state.playing && !state.countInEndsAt) {
-        // Switched on mid-play: count one bar from here and then go quiet
-        // again, so the clicks never run on under the music.
-        scheduleMetronome(countInSeconds(), () => setMetronome(false, { quiet: true }));
-      }
-      announce('Metronome on — one bar counts in before the notes.');
+      // The switch is audible on its own: it starts the pulse straight
+      // away, whether or not the score is playing.
+      scheduleMetronome();
+      announce('Metronome on.');
     } else {
       clearMetronomeTimers();
-      if (!quiet) announce('Metronome off.');
+      announce('Metronome off.');
     }
     syncPlayback();
   };
@@ -2382,46 +2376,12 @@
       });
   }
 
-  // ---- SoundFont audition ------------------------------------------------
+  // ---- SoundFont manifest ------------------------------------------------
   //
   // The Sound Engine fetches its SoundFonts from R2 at runtime, and the
-  // app has no other way to try one: the Play button needs a loaded
-  // score, and there is no page for picking a font. These controls fill
-  // that gap -- pick an asset from the manifest, then play a C major
-  // scale either as a hand-built event stream ("Test") or through a real
-  // render ("Score"), so a font that loads but does not sound is caught
-  // here rather than on the next score.
-
-  const C_MAJOR_SCALE = [60, 62, 64, 65, 67, 69, 71, 72];
-  /** A font that decodes past this is at risk of exhausting the browser. */
-  const LARGE_ASSET_BYTES = 512 * 1024 * 1024;
-
-  const selectedFont = () => state.soundFonts.find((font) => font.id === state.soundAssetId);
-
-  function assetBytes(manifest, assetPath) {
-    if (typeof assetPath !== 'string') return undefined;
-    const name = assetPath.split('/').pop();
-    const files = Array.isArray(manifest.files) ? manifest.files : [];
-    const match = files.find((file) => typeof file.path === 'string' && file.path.split('/').pop() === name);
-    return typeof match?.bytes === 'number' ? match.bytes : undefined;
-  }
-
-  function renderSoundFontOptions() {
-    if (!soundFontSelect) return;
-    soundFontSelect.replaceChildren(
-      ...state.soundFonts.map((font) => {
-        const option = document.createElement('option');
-        option.value = font.id;
-        option.textContent = font.label;
-        return option;
-      }),
-    );
-    if (state.soundAssetId) soundFontSelect.value = state.soundAssetId;
-    const hasFonts = state.soundFonts.length > 0;
-    soundFontSelect.disabled = !hasFonts;
-    if (testNoteButton) testNoteButton.disabled = !hasFonts;
-    if (testScoreButton) testScoreButton.disabled = !hasFonts;
-  }
+  // host's manifest is the only list of them: it names the assets, their
+  // paths and which one to load by default. Reading it is what lets the
+  // engine use the project's own fonts instead of its built-in table.
 
   /** Loads the R2 manifest so playback uses the host's own asset list. Never throws to the caller. */
   async function loadSoundFonts() {
@@ -2432,152 +2392,15 @@
       const response = await fetch(manifestUrl, { cache: 'no-cache' });
       if (!response.ok) throw new Error(`SoundFont manifest request failed (${response.status}).`);
       const manifest = await response.json();
-      const assets = Array.isArray(manifest.assets) ? manifest.assets : [];
       const assetPaths = manifest.runtime?.assetPaths || {};
+      const assets = Array.isArray(manifest.assets) ? manifest.assets : [];
       state.soundAssetPaths = assetPaths;
-      state.soundFonts = assets.map((asset) => {
-        const bytes = assetBytes(manifest, assetPaths[asset.id]);
-        const megabytes = bytes ? `, ${Math.round(bytes / (1024 * 1024))} MB` : '';
-        const oversized = bytes !== undefined && bytes > LARGE_ASSET_BYTES;
-        return {
-          id: asset.id,
-          displayName: asset.displayName || asset.id,
-          label: `${asset.displayName || asset.id} (${asset.format || 'sf2'}${megabytes})${oversized ? ' — large' : ''}`,
-          oversized,
-        };
-      });
       const preferred = configured.assetId || manifest.runtime?.defaultAssetId;
-      const known = state.soundFonts.some((font) => font.id === preferred);
-      state.soundAssetId = known ? preferred : (state.soundFonts[0]?.id ?? null);
-      renderSoundFontOptions();
-    } catch (error) {
-      // The picker is optional now, so a missing one must not cost the
-      // page its status line; only a picker that is present says why the
-      // list did not arrive.
-      if (soundFontSelect) {
-        soundFontSelect.replaceChildren(new Option('SoundFonts unavailable', ''));
-        soundFontSelect.disabled = true;
-        soundFontSelect.title = error instanceof Error ? error.message : 'Could not load the SoundFont list.';
-      }
-    }
-  }
-
-  function disposeSound() {
-    if (!state.sound) return;
-    try {
-      state.sound.destroy?.();
+      const known = assets.some((asset) => asset.id === preferred);
+      state.soundAssetId = known ? preferred : (assets[0]?.id ?? null);
     } catch {
-      /* a failed teardown must not block picking another font */
-    }
-    state.sound = null;
-    state.soundLoading = null;
-    state.soundTried = false;
-  }
-
-  function onSoundFontChange() {
-    const id = soundFontSelect?.value;
-    if (!id || id === state.soundAssetId) return;
-    state.soundAssetId = id;
-    disposeSound();
-    const font = selectedFont();
-    announce(
-      font?.oversized
-        ? `${font.displayName} is large — it may exhaust browser memory.`
-        : `SoundFont: ${font?.displayName ?? id}.`,
-    );
-  }
-
-  /** (က) A scale as a hand-built event stream — no score involved. */
-  function builtScalePlayback() {
-    const quarter = engine.TICKS_PER_QUARTER;
-    const { tempoMap } = engine.buildTempoMap([{ tick: 0, microsecondsPerQuarter: 500_000 }]);
-    const events = C_MAJOR_SCALE.map((midi, index) => {
-      const tick = index * quarter;
-      return {
-        tick,
-        seconds: engine.tickToSeconds(tempoMap, tick),
-        durationTicks: quarter,
-        partId: 'audition',
-        noteIds: [],
-        midiNotes: [midi],
-        measureNumber: 1,
-      };
-    });
-    const totalTicks = C_MAJOR_SCALE.length * quarter;
-    return {
-      measureNumbersInOrder: [1],
-      globalTickOffsetByMeasure: new Map([[1, 0]]),
-      measureTicksByNumber: new Map([[1, totalTicks]]),
-      timeSignatureByMeasure: new Map([[1, { numerator: 4, denominator: 4 }]]),
-      measureLayoutsByNumber: new Map([[1, { width: 0, positionsByTick: new Map(), headerWidth: 0 }]]),
-      placementByMeasureNumber: new Map([[1, { x: 0, width: 0, systemIndex: 0, pageIndex: 0, systemY: 0 }]]),
-      measureHeaderAllowance: 0,
-      tempoMap,
-      events,
-      tracks: [{ id: 'audition', name: 'Audition' }],
-      performance: {
-        entries: [],
-        totalTicks,
-        totalSeconds: engine.tickToSeconds(tempoMap, totalTicks),
-        hasRepeats: false,
-      },
-      repeatDiagnostics: [],
-    };
-  }
-
-  /** (ခ) The same scale written as MusicXML and put through a real render. */
-  function scaleMusicXml() {
-    const divisions = 4;
-    const eighth = divisions / 2;
-    const notes = [
-      ['C', 4],
-      ['D', 4],
-      ['E', 4],
-      ['F', 4],
-      ['G', 4],
-      ['A', 4],
-      ['B', 4],
-      ['C', 5],
-    ];
-    const body = notes
-      .map(
-        ([step, octave]) =>
-          `<note><pitch><step>${step}</step><octave>${octave}</octave></pitch><duration>${eighth}</duration><voice>1</voice></note>`,
-      )
-      .join('');
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<score-partwise version="4.0">
-  <part-list><score-part id="P1"><part-name>Music</part-name></score-part></part-list>
-  <part id="P1"><measure number="1">
-    <attributes><divisions>${divisions}</divisions><key><fifths>0</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef></attributes>
-    ${body}
-  </measure></part>
-</score-partwise>`;
-  }
-
-  async function playAudition(playback, label) {
-    const font = selectedFont();
-    const name = font?.displayName ?? state.soundAssetId ?? 'SoundFont';
-    announce(`Testing ${name} — ${label}…`);
-    try {
-      const sound = await ensureSound();
-      await sound.play(playback, 1);
-      announce(`Test playing — ${name} (${label}).`);
-    } catch (error) {
-      announce(error instanceof Error ? error.message : 'The sound test failed.');
-    }
-  }
-
-  async function testBuiltScale() {
-    await playAudition(builtScalePlayback(), 'built');
-  }
-
-  async function testRenderedScale() {
-    try {
-      const rendered = engine.renderFromMusicXml(scaleMusicXml(), { domParser: window.DOMParser });
-      await playAudition(rendered.playback, 'rendered');
-    } catch (error) {
-      announce(error instanceof Error ? error.message : 'The test score could not be rendered.');
+      // The engine keeps its own table when the manifest cannot be read,
+      // so a failed fetch costs the host's fonts, not playback.
     }
   }
 
@@ -2694,6 +2517,9 @@
     // pressing Play again repeats from the entry cursor.
     state.playSeconds = startSeconds();
     clearMetronomeTimers();
+    // Stopping the score does not switch the metronome off; the switch is
+    // still on, so its pulse picks up again.
+    if (state.metronomeOn) scheduleMetronome();
     state.sound?.pause?.();
     announce('Stopped.');
     syncPlayback();
@@ -2714,6 +2540,7 @@
   const pausePlayback = () => {
     state.sound?.pause?.();
     clearMetronomeTimers();
+    if (state.metronomeOn) scheduleMetronome();
     if (state.soundTimer) window.clearTimeout(state.soundTimer);
     state.soundTimer = null;
     state.countInEndsAt = 0;
@@ -2736,8 +2563,8 @@
     if (state.playSeconds >= endSeconds()) state.playSeconds = startSeconds();
     // With the metronome on, one bar of clicks comes first and the score
     // waits for it, so the first note lands on a beat the writer has just
-    // heard rather than on a silent downbeat. The clicks stop with that
-    // bar: the metronome is the count, not a running pulse under the music.
+    // heard. The pulse runs on under the music: the switch is a metronome,
+    // and it keeps time for as long as it is on.
     const leadIn = state.metronomeOn ? countInSeconds() : 0;
     const from = state.playSeconds;
     state.playStartSeconds = from;
@@ -2747,7 +2574,7 @@
     // Draw at once so the playhead appears and the entry cursor steps
     // aside on the same frame the sound starts.
     render();
-    if (leadIn > 0) scheduleMetronome(leadIn, () => setMetronome(false, { quiet: true }));
+    if (leadIn > 0) scheduleMetronome(leadIn);
     state.rafId = requestFrame(frame);
     announce(leadIn > 0 ? 'Counting in…' : 'Playing.');
     syncPlayback();
@@ -2985,9 +2812,6 @@
   undoButton.addEventListener('click', undo);
   redoButton.addEventListener('click', redo);
 
-  if (soundFontSelect) soundFontSelect.addEventListener('change', onSoundFontChange);
-  if (testNoteButton) testNoteButton.addEventListener('click', () => void testBuiltScale());
-  if (testScoreButton) testScoreButton.addEventListener('click', () => void testRenderedScale());
   if (previewButton) previewButton.addEventListener('click', () => {
     state.previewOn = !state.previewOn;
     syncTools();

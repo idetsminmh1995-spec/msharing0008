@@ -466,7 +466,7 @@ describe('the editor and the engine agree, end to end', () => {
     assert.match(length.textContent, /^\d+:\d{2}$/);
   });
 
-  test('the count-in is exactly one bar of clicks and stops at the bar line', async () => {
+  test('the count-in bar is four clicks at the score\'s own tempo, and the music starts after it', async () => {
     const { window } = loadEditorPage();
     const doc = window.document;
     // Count the clicks the editor schedules, and when. A click is an
@@ -500,6 +500,9 @@ describe('the editor and the engine agree, end to end', () => {
     const metronome = doc.querySelector('[data-editor-metronome]');
     const play = doc.querySelector('[data-editor-play]');
     metronome.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    // The switch has already clicked a bar; Play restarts the count from
+    // beat one, so count only what Play itself schedules.
+    clicks.length = 0;
     play.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 
     // A 4/4 bar at the default 120 is two seconds, one beat every 0.5s.
@@ -511,8 +514,64 @@ describe('the editor and the engine agree, end to end', () => {
     // The first beat is accented, the rest are not, so the bar is countable.
     assert.ok(clicks[0].freq > clicks[1].freq, 'the downbeat is the accented click');
 
+    // The switch stays on, so the pulse carries on under the music.
     await new Promise((resolve) => window.setTimeout(resolve, 2100));
-    assert.equal(clicks.length, 4, 'no click is scheduled once the bar is over');
+    assert.ok(clicks.length > 4, 'the pulse continues past the count-in bar');
+    metronome.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  });
+
+  test('the metronome clicks as soon as it is switched on, with no Play behind it', async () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    // A click is an oscillator with a start time; a stand-in audio host
+    // records every one, so "the switch makes a sound" is countable.
+    const clicks = [];
+    class FakeParam {
+      setValueAtTime() {}
+      linearRampToValueAtTime() {}
+      exponentialRampToValueAtTime() {}
+    }
+    class FakeNode {
+      constructor() { this.gain = new FakeParam(); this.frequency = { value: 0 }; this.type = ''; }
+      connect() {}
+      disconnect() {}
+      start(at) { clicks.push({ at, freq: this.frequency.value }); }
+      stop() {}
+    }
+    window.AudioContext = class {
+      constructor() { this.destination = {}; this.currentTime = 0; }
+      resume() { return Promise.resolve(); }
+      createOscillator() { return new FakeNode(); }
+      createGain() { return new FakeNode(); }
+    };
+    window.requestAnimationFrame = (callback) => window.setTimeout(() => callback(window.performance.now()), 16);
+    window.cancelAnimationFrame = (id) => window.clearTimeout(id);
+
+    const metronome = doc.querySelector('[data-editor-metronome]');
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const toggle = () => metronome.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+
+    // The switch alone has to be audible: a writer who taps it wants to
+    // hear the tempo, not to be told a count-in will happen later.
+    toggle();
+    assert.equal(metronome.getAttribute('aria-pressed'), 'true', 'the switch shows it is on');
+    assert.ok(clicks.length >= 4, 'a 4/4 bar is heard at once, with no Play');
+    assert.deepEqual(clicks.slice(0, 4).map((click) => click.at), [0, 0.5, 1, 1.5]);
+    assert.ok(clicks[0].freq > clicks[1].freq, 'the downbeat is the accented click');
+
+    // It is a metronome, not a one-bar flourish: the pulse keeps going
+    // while the switch stays on.
+    await new Promise((resolve) => window.setTimeout(resolve, 2200));
+    assert.ok(clicks.length > 4, 'the pulse continues past the first bar');
+    assert.equal(metronome.getAttribute('aria-pressed'), 'true', 'the switch stays on by itself');
+
+    // And switching it off stops the sound.
+    toggle();
+    assert.equal(metronome.getAttribute('aria-pressed'), 'false', 'the switch shows it is off');
+    const afterOff = clicks.length;
+    await new Promise((resolve) => window.setTimeout(resolve, 2200));
+    assert.equal(clicks.length, afterOff, 'no click is scheduled once it is switched off');
+    assert.match(status(), /Metronome off/, 'the writer is told it went quiet');
   });
 
   test('the metronome counts one bar in before the notes, and the score waits for it', async () => {
@@ -562,10 +621,11 @@ describe('the editor and the engine agree, end to end', () => {
     assert.match(status(), /Playing/, 'after the bar, the score plays');
     assert.notEqual(playheadX(), held, 'the playhead moves once the count-in ends');
     assert.equal(played.length, 1, 'the notes start once, and only after the count-in');
-    // The count is over, so the switch goes off by itself: the metronome is
-    // the bar before the music, not a pulse running under it.
-    assert.equal(metronome.getAttribute('aria-pressed'), 'false', 'the metronome switches itself off after the bar');
+    // The switch stays on through the music: the metronome is the pulse the
+    // writer asked for, not a bar of clicks that hands over and quits.
+    assert.equal(metronome.getAttribute('aria-pressed'), 'true', 'the metronome stays on while the score plays');
     assert.equal(metronome.dataset.metronome, undefined, 'no stray metronome flag is left on the button');
+    metronome.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
   });
 
   test('one cursor while the score plays: the playhead takes over from the entry cursor', () => {
