@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-733 exported symbols, by module.
+734 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -1494,6 +1494,7 @@ The diagnostics `level` lets through, in their original order.
 | | Name | Summary |
 |---|---|---|
 | interface | `NotationEvent` | PLAN.md §17.1: one notated event -- a bare note, or a chord (whose several `noteIds` sound together) -- at the GLOBAL tick it starts on, resolved to real seconds via §12's tempo map. |
+| interface | `SoundingNote` | One notehead this event sounds, and how. |
 | **API** | `notationEventId` |  |
 | **API** | `elementIdForNoteId` |  |
 | function | `buildEventStream` |  |

@@ -124,6 +124,8 @@
     playStartedAt: 0,
     rafId: null,
     soundingId: null,
+    /** Which system the playhead was last drawn on, so a frame that crosses into another one redraws. */
+    playheadSystem: null,
     // The metronome's count-in: the score waits a bar before its first
     // note, and the sound engine is started when that bar ends.
     countInEndsAt: 0,
@@ -237,11 +239,20 @@
     return sign === 'percussion';
   };
 
-  const attributeAt = (measureNumber) => docTools.attributeFor(state.doc, activePartId(), measureNumber);
+  const attributeAt = (measureNumber, partId = activePartId()) =>
+    docTools.attributeFor(state.doc, partId, measureNumber);
 
-  const clefAt = (measureNumber) => {
-    const attribute = attributeAt(measureNumber);
-    const sign = attribute?.clefsByStaff?.[1]?.sign ?? attribute?.clefSign ?? 'G';
+  /**
+   * The clef a staff is written in.
+   *
+   * A grand staff's two staves have their own clefs, so the staff the user
+   * is writing on decides the pitch of the line they clicked: without the
+   * number, a click on the bass staff would be read in the treble clef and
+   * write a note two octaves from where it was drawn.
+   */
+  const clefAt = (measureNumber, staffNumber = 1, partId = activePartId()) => {
+    const attribute = attributeAt(measureNumber, partId);
+    const sign = attribute?.clefsByStaff?.[staffNumber]?.sign ?? attribute?.clefSign ?? 'G';
     return docTools.clefDefinitionFor(sign);
   };
 
@@ -294,7 +305,18 @@
 
   // ---- geometry ----------------------------------------------------------
 
-  /** Staff line runs in the rendered SVG, top to bottom, as system bands. */
+  /**
+   * Staff line runs in the rendered SVG, top to bottom.
+   *
+   * A run of five lines is a STAFF. The engine, however, addresses a
+   * SYSTEM -- the row of staves played together, one staff per part. Those
+   * two numbers only agree in a one-part score: with two parts every system
+   * holds two staves, so the second staff is band 1 but still system 0.
+   * Each band therefore carries the system it belongs to, taken from the
+   * engine's own system origins rather than from its position in this list.
+   * Without that, clicking the lower staff asked the engine about a system
+   * that does not exist and the note landed at the start of the score.
+   */
   function detectStaves(svg) {
     const lines = [...svg.querySelectorAll('line')]
       .filter((line) => line.getAttribute('y1') === line.getAttribute('y2'))
@@ -311,7 +333,7 @@
       if (run.length < 5) return;
       const band = run.map((y) => y.y);
       staves.push({
-        systemIndex: staves.length,
+        systemIndex: 0,
         topY: band[0],
         bottomY: band[band.length - 1],
         leftX: Math.min(...run.map((line) => line.left)),
@@ -324,7 +346,56 @@
       else { closeRun(); run = lines.filter((line) => line.y === y); }
     }
     closeRun();
+
+    // A system's origin sits above its top staff, so a band belongs to the
+    // last origin that does not start below it.
+    const origins = systemOrigins();
+    for (const staff of staves) {
+      const owner = origins.filter((origin) => origin.y <= staff.topY + 0.01).pop();
+      staff.systemIndex = owner?.systemIndex ?? origins[0]?.systemIndex ?? 0;
+    }
+
+    // Every system draws the same staves in the same order -- part by part,
+    // staff by staff -- so a band's place within its system names which
+    // part and which of that part's staves it is.
+    const slots = staffSlots();
+    const bySystem = new Map();
+    for (const staff of staves) {
+      if (!bySystem.has(staff.systemIndex)) bySystem.set(staff.systemIndex, []);
+      bySystem.get(staff.systemIndex).push(staff);
+    }
+    for (const group of bySystem.values()) {
+      group.forEach((staff, index) => {
+        staff.partId = slots[index]?.partId;
+        staff.staffNumber = slots[index]?.staffNumber ?? 1;
+      });
+    }
     return staves;
+  }
+
+  /** Every staff the score draws, in drawing order: one entry per staff of each part. */
+  function staffSlots() {
+    const slots = [];
+    for (const part of state.doc?.score.parts ?? []) {
+      const count = Math.max(1, attributeAt(1, part.id)?.staves ?? 1);
+      for (let staffNumber = 1; staffNumber <= count; staffNumber += 1) {
+        slots.push({ partId: part.id, staffNumber });
+      }
+    }
+    return slots;
+  }
+
+  /** Each system's vertical origin, top to bottom, from the engine's placements. */
+  function systemOrigins() {
+    const placements = state.result?.playback.placementByMeasureNumber;
+    if (!placements) return [];
+    const seen = new Map();
+    for (const placement of placements.values()) {
+      if (!seen.has(placement.systemIndex)) seen.set(placement.systemIndex, placement.systemY);
+    }
+    return [...seen]
+      .map(([systemIndex, y]) => ({ systemIndex, y }))
+      .sort((a, b) => a.y - b.y);
   }
 
   /** Client point -> the SVG's own staff-space coordinates. */
@@ -572,9 +643,29 @@
     svg.querySelectorAll('.editor-overlay').forEach((node) => node.remove());
 
     const overlay = svgElement('g', { class: 'editor-overlay' });
-    const staffFor = (systemIndex) => staves[systemIndex] ?? staves[0];
+    /** Every staff of one system, top to bottom -- one per part, then per staff of that part. */
+    const stavesOf = (systemIndex) => staves.filter((staff) => staff.systemIndex === systemIndex);
     const bandTop = (staff) => (staff ? staff.topY - 4 : 0);
     const bandHeight = (staff) => (staff ? staff.bottomY - staff.topY + 8 : 8);
+    /**
+     * The band one staff of one part covers. A marker for a particular
+     * note belongs on that note's own staff -- a grand staff draws two, and
+     * a beat written into the bass staff must not be marked on the treble.
+     */
+    const staffBand = (partId, staffNumber) => {
+      const staff =
+        staves.find((candidate) => candidate.partId === partId && candidate.staffNumber === staffNumber) ?? staves[0];
+      return { top: bandTop(staff), height: bandHeight(staff) };
+    };
+    /** A marker for a whole system covers every staff on it: the beat belongs to all the parts. */
+    const systemBand = (systemIndex) => {
+      const own = stavesOf(systemIndex);
+      if (own.length === 0) return { top: 0, height: 8 };
+      return {
+        top: own[0].topY - 4,
+        height: own[own.length - 1].bottomY - own[0].topY + 8,
+      };
+    };
     const mark = (id) => {
       const group = svg.querySelector(`[data-id="${id}"]`);
       if (group) group.setAttribute('data-editor-selected', 'true');
@@ -599,14 +690,18 @@
     // cursor as well would put two vertical lines on the staff pointing at
     // different beats, which reads as the editor losing its place.
     if (state.entry && state.result && !state.playing) {
-      const staff = staffFor(state.entry.systemIndex);
+      // The cursor marks the staff the next note goes on, so it is drawn on
+      // that staff and not on the whole system: a grand staff would
+      // otherwise show one line spanning both, which says nothing about
+      // where the note will land.
+      const band = staffBand(state.entry.partId ?? activePartId(), state.entry.staffNumber ?? 1);
       const x = engine.positionToX(state.result.playback, globalTickOf(state.entry.measureNumber, state.entry.tick)).x;
       overlay.appendChild(svgElement('rect', {
         class: 'editor-cursor',
         x: x - 0.08,
-        y: bandTop(staff),
+        y: band.top,
         width: 0.16,
-        height: bandHeight(staff),
+        height: band.height,
       }));
     }
 
@@ -615,13 +710,13 @@
       // must jump back with the music instead of running off the end.
       const tick = writtenTickAt(state.playSeconds);
       const placement = engine.computeCursorPlacement(state.result.playback, tick, { mode: 'cursorMoves' });
-      const staff = staffFor(placement.systemIndex);
+      const band = systemBand(placement.systemIndex);
       overlay.appendChild(svgElement('rect', {
         class: 'editor-playhead',
         x: placement.markerX - 0.06,
-        y: bandTop(staff),
+        y: band.top,
         width: 0.12,
-        height: bandHeight(staff),
+        height: band.height,
       }));
     }
 
@@ -767,7 +862,7 @@
     state.history.length = 0;
     state.future.length = 0;
     clearSelection();
-    state.entry = { partId: activePartId(), measureNumber: 1, voiceId: state.voice, tick: 0, systemIndex: 0 };
+    state.entry = { partId: activePartId(), measureNumber: 1, voiceId: state.voice, tick: 0 };
     setFile(name);
     render();
     announce('Score ready.');
@@ -849,7 +944,7 @@
         measureNumber: anchor.measureNumber,
         voiceId: anchor.voiceId,
         tick: eventFor(anchor)?.startTick ?? 0,
-        systemIndex: state.entry?.systemIndex ?? 0,
+        staffNumber: eventFor(anchor)?.staff ?? state.entry?.staffNumber ?? 1,
       };
       render();
       return;
@@ -860,7 +955,7 @@
       measureNumber,
       voiceId,
       tick: events[eventIndex]?.startTick ?? 0,
-      systemIndex: state.entry?.systemIndex ?? 0,
+      staffNumber: events[eventIndex]?.staff ?? state.entry?.staffNumber ?? 1,
     };
     render();
   }
@@ -916,13 +1011,9 @@
       return;
     }
     setSelection(cells, cells[0]);
-    state.entry = {
-      partId,
-      measureNumber: cells[0].measureNumber,
-      voiceId: cells[0].voiceId,
-      tick: eventFor(cells[0])?.startTick ?? 0,
-      systemIndex: state.entry?.systemIndex ?? 0,
-    };
+    // Selecting is not moving the insertion point: the entry cursor stays
+    // where the user left it, so a copy-then-paste lands on the next beat
+    // rather than on top of the note it just copied.
     announce(`Selected ${cells.length} note${cells.length === 1 ? '' : 's'}.`);
     render();
   }
@@ -1327,7 +1418,7 @@
         selectEvent(activePartId(), nextMeasure, voiceId, firstNote);
         return;
       }
-      state.entry = { partId: activePartId(), measureNumber: nextMeasure, voiceId, tick: 0, systemIndex: state.entry?.systemIndex ?? 0 };
+      state.entry = { partId: activePartId(), measureNumber: nextMeasure, voiceId, tick: 0 };
       clearSelection();
       announce(`Measure ${nextMeasure}.`);
       render();
@@ -1547,9 +1638,10 @@
   function insertAtEntry({ step = null, octave = null, rest = false, addToChord = false, staffPosition = null }) {
     if (!state.doc) return;
     if (!state.entry) {
-      state.entry = { partId: activePartId(), measureNumber: 1, voiceId: state.voice, tick: 0, systemIndex: 0 };
+      state.entry = { partId: activePartId(), measureNumber: 1, voiceId: state.voice, tick: 0 };
     }
     const { measureNumber, voiceId } = state.entry;
+    const staff = state.entry.staffNumber ?? 1;
     const capacity = capacityOf(measureNumber);
     const remaining = capacity - state.entry.tick;
     if (remaining <= 0) {
@@ -1565,7 +1657,7 @@
       : engine.duration(engine.durationTypeAndDotsFromTicks(ticks).type, engine.durationTypeAndDotsFromTicks(ticks).dots, ticks);
 
     if (rest) {
-      const event = engine.rest({ duration: fitted, voice: voiceId, staff: 1, startTick: state.entry.tick });
+      const event = engine.rest({ duration: fitted, voice: voiceId, staff, startTick: state.entry.tick });
       commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event }), 'Rest inserted.');
       advanceEntry(ticks, measureNumber, voiceId);
       return;
@@ -1582,7 +1674,7 @@
         pitch: drumPitch,
         duration: existing && existing.kind !== 'rest' ? existing.duration : fitted,
         voice: voiceId,
-        staff: 1,
+        staff,
         ...(drum ? { instrumentId: drum.instrumentId } : {}),
       });
       if (existing && existing.kind !== 'rest') {
@@ -1608,7 +1700,7 @@
     const existing = existingIndex >= 0 ? events[existingIndex] : null;
 
     if (existing && existing.kind !== 'rest') {
-      const note = engine.note({ pitch, duration: existing.duration, voice: voiceId, staff: 1 });
+      const note = engine.note({ pitch, duration: existing.duration, voice: voiceId, staff });
       if (addToChord) {
         const notes = existing.kind === 'chord' ? [...existing.notes, note] : [existing, note];
         const chord = engine.chord(notes, { startTick: state.entry.tick });
@@ -1623,7 +1715,7 @@
       return;
     }
 
-    const event = engine.note({ pitch, duration: fitted, voice: voiceId, staff: 1, startTick: state.entry.tick });
+    const event = engine.note({ pitch, duration: fitted, voice: voiceId, staff, startTick: state.entry.tick });
     commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event }), `Inserted ${step}${octave}.`);
     previewPitch(pitch);
     advanceEntry(ticks, measureNumber, voiceId);
@@ -1688,7 +1780,11 @@
       const eventIndex = Number(eventToken.replace('e', ''));
       const existing = eventsIn(measureNumber, voiceId)[eventIndex];
       const staffPosition = staffPositionFromPoint(hitStaff, point.y);
-      const { step, octave } = docTools.pitchFromStaffPosition(clefAt(measureNumber), staffPosition);
+      const staffNumber = hitStaff?.staffNumber ?? 1;
+      const { step, octave } = docTools.pitchFromStaffPosition(
+        clefAt(measureNumber, staffNumber, partId),
+        staffPosition,
+      );
       // A rest -- including the whole-measure placeholder MusicXML writes
       // for an empty measure -- is not a note to select. In note input it
       // is the SPACE to write into, so fall through to the positional
@@ -1701,7 +1797,7 @@
         // made the click look like it did nothing. Selecting a note in
         // order to transpose it is what note input OFF is for.
         if (state.noteInput && !state.tool.rest) {
-          state.entry = { partId, measureNumber, voiceId, tick: existing.startTick ?? 0, systemIndex: hitStaff.systemIndex };
+          state.entry = { partId, measureNumber, voiceId, tick: existing.startTick ?? 0, staffNumber };
           clearSelection();
           insertAtEntry({ step, octave, addToChord: event.shiftKey, staffPosition });
           return;
@@ -1732,6 +1828,14 @@
     // the score, so it must not move the cursor or write a note there.
     if (!pointOnStaff(staff, point)) return;
     const systemIndex = staff.systemIndex;
+    // A staff click names the part as well as the beat: a grand staff's
+    // lower staff belongs to the same part, a second part's staff to its
+    // own, and the note has to be written into the one that was clicked.
+    if (staff.partId) {
+      state.activePartId = staff.partId;
+      if (partSelect && !partSelect.hidden) partSelect.value = staff.partId;
+    }
+    const staffNumber = staff.staffNumber ?? 1;
 
     // `xToTick`, not `xToPosition`: the latter snaps to the nearest
     // EXISTING note, so in a measure whose only event is on beat 1 every
@@ -1747,13 +1851,16 @@
       Math.round(position.tickInMeasure / grid) * grid,
     );
     const staffPosition = staffPositionFromPoint(staff, point.y);
-    const { step, octave } = docTools.pitchFromStaffPosition(clefAt(position.measureNumber), staffPosition);
+    const { step, octave } = docTools.pitchFromStaffPosition(
+      clefAt(position.measureNumber, staffNumber),
+      staffPosition,
+    );
     state.entry = {
       partId: activePartId(),
       measureNumber: position.measureNumber,
       voiceId: state.voice,
       tick: snappedTick,
-      systemIndex,
+      staffNumber,
     };
     if (state.noteInput) {
       clearSelection();
@@ -2378,13 +2485,19 @@
       return;
     }
     const id = soundingAt(tick);
-    if (id !== state.soundingId) {
+    // Crossing into another system moves the marker DOWN as well as along,
+    // so a frame that only re-sets `x` would leave the playhead on the row
+    // it started on -- on a paged score that is a different line of music
+    // entirely. A system change is a redraw, exactly like a new note.
+    const placement = engine.computeCursorPlacement(state.result.playback, tick, { mode: 'cursorMoves' });
+    if (id !== state.soundingId || placement.systemIndex !== state.playheadSystem) {
       state.soundingId = id;
+      state.playheadSystem = placement.systemIndex;
       render();
     } else {
       const line = scoreHost.querySelector('svg .editor-playhead');
       if (line) {
-        line.setAttribute('x', String(engine.computeCursorPlacement(state.result.playback, tick, { mode: 'cursorMoves' }).markerX - 0.06));
+        line.setAttribute('x', String(placement.markerX - 0.06));
       } else {
         render();
       }
@@ -2400,6 +2513,7 @@
     state.soundTimer = null;
     state.countInEndsAt = 0;
     state.soundingId = null;
+    state.playheadSystem = null;
     // Stop returns to where playback would begin, not to a silent top, so
     // pressing Play again repeats from the entry cursor.
     state.playSeconds = startSeconds();
@@ -2431,6 +2545,7 @@
     cancelFrame(state.rafId);
     state.rafId = null;
     state.soundingId = null;
+    state.playheadSystem = null;
     announce('Paused.');
     syncPlayback();
     render();
@@ -2676,7 +2791,8 @@
     if (!state.doc?.score.parts.some((part) => part.id === partId)) return;
     state.activePartId = partId;
     const measureNumber = Math.min(state.entry?.measureNumber ?? 1, measureCountOf(partId));
-    state.entry = { partId, measureNumber, voiceId: state.entry?.voiceId ?? state.voice, tick: 0, systemIndex: state.entry?.systemIndex ?? 0 };
+    // A different part has its own staves, so the entry starts on its first.
+    state.entry = { partId, measureNumber, voiceId: state.entry?.voiceId ?? state.voice, tick: 0, staffNumber: 1 };
     clearSelection();
     syncSetupControls();
     render();

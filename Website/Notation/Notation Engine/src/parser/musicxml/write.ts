@@ -13,18 +13,28 @@
  *
  * ## What is written back
  *
- * Everything the reader turns into a `ParseResult` and the renderer draws:
- * part names and their MIDI routing, per-measure attributes, notes, rests,
- * chords, ties, accidentals, stems, notations, dynamics and unpitched
- * percussion. Elements the parser keeps only as prose the renderer cannot
- * draw (words, rehearsal marks, harmonies) are not re-emitted; losing them
- * on an edit is a known limit, stated here rather than left to be
- * discovered.
+ * Everything the reader turns into a `ParseResult` and the renderer draws,
+ * including the side-tables that attach to a measure POSITION rather than to
+ * a note: `<barline>` (bar style, repeats, endings, on either edge),
+ * `<direction>` (dynamics, wedges, pedals, words, rehearsal marks),
+ * `<metronome>`/`<sound tempo>` tempo marks, `<harmony>` chord symbols,
+ * `<octave-shift>`, and `<print>`'s system/page breaks and layout hints.
+ *
+ * They are written because they are all load-bearing on a re-read: a score
+ * saved and reopened without its repeats plays straight through, one without
+ * its tempo marks plays at the wrong speed, and one without its chord symbols
+ * loses the lead sheet. The reader already keeps them, so dropping them on
+ * the way out was a data loss with nothing to recommend it.
+ *
+ * The one thing not preserved exactly: a tempo mark whose visual position
+ * differs from its playback position (a source `offset` without
+ * `sound="yes"`). It is written at its playback tick, because that is the
+ * position a synthesiser must obey; the drawn position then follows it.
  */
 
 import { TICKS_PER_QUARTER, ticksToXmlDivisions } from '../../core/duration-math.js';
 import type { Chord } from '../../core/chord.js';
-import type { Duration } from '../../core/duration.js';
+import type { Duration, DurationType } from '../../core/duration.js';
 import type { Measure } from '../../core/measure.js';
 import type { MeasureEvent } from '../../core/measure-event.js';
 import type { Note } from '../../core/note.js';
@@ -33,8 +43,19 @@ import type { Pitch } from '../../core/pitch.js';
 import type { Rest } from '../../core/rest.js';
 import type { Voice } from '../../core/voice.js';
 import { drumKitEntry } from '../../notation-defaults/drum-kit.js';
+import { TENTHS_PER_STAFF_SPACE } from './defaults.js';
 import type { MidiInstrumentInfo } from './instrument.js';
-import type { MeasureAttributes, ParseResult } from './parse.js';
+import type { ClefSpec, TransposeSpec } from './attributes.js';
+import type { PrintLayout } from './parse.js';
+import type {
+  DirectionEvent,
+  HarmonyEvent,
+  MeasureAttributes,
+  OctaveShiftEvent,
+  ParseResult,
+  PrintEvent,
+  TempoMarkEvent,
+} from './parse.js';
 
 /** `<divisions>` values tried in order, the same list the editor used before this module existed. */
 const DIVISION_CANDIDATES = [4, 8, 16, 32, 64, 128, 256, 512] as const;
@@ -276,15 +297,21 @@ function attributesXml(
     previous.timeDenominator === attribute.timeDenominator &&
     previous.timeNumeratorDisplay === attribute.timeNumeratorDisplay &&
     previous.clefSign === attribute.clefSign &&
-    previous.clefLine === attribute.clefLine;
+    previous.clefLine === attribute.clefLine &&
+    previous.staves === attribute.staves &&
+    sameStaffDetail(previous, attribute);
   if (same) return '';
 
   const beats = attribute.timeNumeratorDisplay ?? String(attribute.timeNumerator);
   const mode = attribute.mode === undefined ? '' : `<mode>${attribute.mode}</mode>`;
+  // A multi-staff part states its clefs per staff; a single-staff one keeps
+  // the plain unnumbered `<clef>` every other reader expects.
   const clef =
-    `<clef><sign>${attribute.clefSign}</sign>` +
-    (attribute.clefLine === undefined ? '' : `<line>${attribute.clefLine}</line>`) +
-    '</clef>';
+    attribute.staves > 1
+      ? ''
+      : `<clef><sign>${attribute.clefSign}</sign>` +
+        (attribute.clefLine === undefined ? '' : `<line>${attribute.clefLine}</line>`) +
+        '</clef>';
   const staves =
     attribute.staves !== undefined && attribute.staves > 1
       ? `<staves>${attribute.staves}</staves>`
@@ -296,26 +323,271 @@ function attributesXml(
     `<time><beats>${beats}</beats><beat-type>${attribute.timeDenominator}</beat-type></time>` +
     clef +
     staves +
+    staffDetailXml(attribute) +
     '</attributes>'
   );
 }
 
-/** One `<direction>` for a dynamic mark, at the tick the caller flushes it on. */
-function directionXml(direction: {
-  readonly dynamics: readonly string[];
-  readonly placement?: 'above' | 'below';
-  readonly staff?: number;
-}): string {
-  if (direction.dynamics.length === 0) return '';
-  const placement = direction.placement === 'above' ? ' placement="above"' : '';
+/** True when two bars state the same per-staff clefs, line counts and transpose. */
+function sameStaffDetail(a: MeasureAttributes, b: MeasureAttributes): boolean {
   return (
-    `<direction${placement}>` +
-    '<direction-type>' +
-    `<dynamics>${direction.dynamics.map((level) => `<${level}/>`).join('')}</dynamics>` +
-    '</direction-type>' +
-    `<staff>${direction.staff ?? 1}</staff>` +
+    JSON.stringify(a.clefsByStaff) === JSON.stringify(b.clefsByStaff) &&
+    JSON.stringify(a.staffLinesByStaff) === JSON.stringify(b.staffLinesByStaff) &&
+    a.transpose.chromatic === b.transpose.chromatic &&
+    a.transpose.diatonic === b.transpose.diatonic &&
+    a.transpose.octaveChange === b.transpose.octaveChange
+  );
+}
+
+/**
+ * One `<direction>` holding everything a `DirectionEvent` carries.
+ *
+ * MusicXML allows several `<direction-type>` children in one `<direction>`,
+ * but each of these draws in a different place on the page (a dynamic under
+ * the staff, a wedge spanning the passage, a rehearsal mark above it), so
+ * they are written as one `<direction>` each: a reader that only understands
+ * one of them then still keeps the others.
+ */
+function fullDirectionXml(event: DirectionEvent): string {
+  const placement = event.placement === undefined ? '' : ` placement="${event.placement}"`;
+  const wrap = (inner: string): string =>
+    `<direction${placement}>` + inner + `<staff>${event.staff}</staff></direction>`;
+  const parts: string[] = [];
+  if (event.dynamics.length > 0) {
+    parts.push(
+      wrap(
+        '<direction-type>' +
+          `<dynamics>${event.dynamics.map((level) => `<${level}/>`).join('')}</dynamics>` +
+          '</direction-type>',
+      ),
+    );
+  }
+  for (const wedge of event.wedges) {
+    parts.push(
+      wrap(
+        '<direction-type>' +
+          `<wedge type="${wedge.type}" number="${wedge.number}"/>` +
+          '</direction-type>',
+      ),
+    );
+  }
+  for (const pedal of event.pedals) {
+    parts.push(
+      wrap(
+        '<direction-type>' +
+          `<pedal type="${pedal.type}" number="${pedal.number}"/>` +
+          '</direction-type>',
+      ),
+    );
+  }
+  for (const text of event.rehearsals) {
+    parts.push(wrap(`<direction-type><rehearsal>${escapeXml(text)}</rehearsal></direction-type>`));
+  }
+  for (const text of event.words) {
+    parts.push(wrap(`<direction-type><words>${escapeXml(text)}</words></direction-type>`));
+  }
+  return parts.join('');
+}
+
+/**
+ * One `<direction>` holding a metronome mark, with a `<sound tempo>` beside
+ * it.
+ *
+ * Both are written because exporters read different ones: notation software
+ * draws the metronome, playback software reads `<sound tempo>`. The `sound`
+ * attribute is the quarter-notes-per-minute equivalent, which is what a
+ * reader that ignores `<beat-unit>` falls back to.
+ */
+function tempoXml(event: TempoMarkEvent): string {
+  const dots = '<beat-unit-dot/>'.repeat(event.beatUnitDots);
+  const perQuarter =
+    event.perMinute * (quarterNotesPerBeat(event.beatUnit) * dottedFactor(event.beatUnitDots));
+  return (
+    '<direction placement="above"><direction-type><metronome>' +
+    `<beat-unit>${event.beatUnit}</beat-unit>${dots}<per-minute>${event.perMinute}</per-minute>` +
+    '</metronome></direction-type>' +
+    `<sound tempo="${Number(perQuarter.toFixed(4))}"/>` +
     '</direction>'
   );
+}
+
+/** How many quarter notes one of this note value is worth. */
+function quarterNotesPerBeat(type: DurationType): number {
+  const beats: Readonly<Record<string, number>> = {
+    whole: 4,
+    half: 2,
+    quarter: 1,
+    eighth: 0.5,
+    '16th': 0.25,
+    '32nd': 0.125,
+    '64th': 0.0625,
+    '128th': 0.03125,
+    '256th': 0.015625,
+    '512th': 0.0078125,
+  };
+  return beats[type] ?? 1;
+}
+
+/** A dotted note's multiplier: one dot adds half, two add three quarters, and so on. */
+function dottedFactor(dots: number): number {
+  return 2 - 1 / 2 ** dots;
+}
+
+/** One `<harmony>` (chord symbol). */
+function harmonyXml(event: HarmonyEvent): string {
+  const root =
+    event.rootStep === undefined
+      ? ''
+      : '<root>' +
+        `<root-step>${event.rootStep}</root-step>` +
+        (event.rootAlter ? `<root-alter>${event.rootAlter}</root-alter>` : '') +
+        '</root>';
+  const kind =
+    event.kind === undefined
+      ? ''
+      : `<kind${event.kindText === undefined ? '' : ` text="${escapeXml(event.kindText)}"`}>` +
+        `${escapeXml(event.kind)}</kind>`;
+  const bass =
+    event.bassStep === undefined
+      ? ''
+      : '<bass>' +
+        `<bass-step>${event.bassStep}</bass-step>` +
+        (event.bassAlter ? `<bass-alter>${event.bassAlter}</bass-alter>` : '') +
+        '</bass>';
+  if (root === '' && kind === '') return '';
+  return `<harmony>${root}${kind}${bass}</harmony>`;
+}
+
+/** One `<direction>` holding an octave shift, or the `stop` that closes it. */
+function octaveShiftXml(event: OctaveShiftEvent): string {
+  return (
+    '<direction placement="above"><direction-type>' +
+    `<octave-shift type="${event.type}" size="${event.size}" number="${event.number}"/>` +
+    '</direction-type>' +
+    `<staff>${event.staff}</staff>` +
+    '</direction>'
+  );
+}
+
+/** Staff spaces back to the tenths MusicXML writes. */
+const toTenths = (staffSpaces: number): number =>
+  Number((staffSpaces * TENTHS_PER_STAFF_SPACE).toFixed(4));
+
+/** One `<print>`: its system/page break and any layout hints it carries. */
+function printXml(event: PrintEvent): string {
+  const attributes =
+    (event.newSystem ? ' new-system="yes"' : '') + (event.newPage ? ' new-page="yes"' : '');
+  const layout = event.layout === undefined ? '' : printLayoutXml(event.layout);
+  if (attributes === '' && layout === '') return '';
+  return `<print${attributes}>${layout}</print>`;
+}
+
+function printLayoutXml(layout: PrintLayout): string {
+  const staves = Object.entries(layout.staffDistances ?? {})
+    .map(
+      ([number, distance]) =>
+        `<staff-layout number="${number}"><staff-distance>${toTenths(distance)}</staff-distance></staff-layout>`,
+    )
+    .join('');
+  const system = [
+    layout.systemDistance === undefined
+      ? ''
+      : `<system-distance>${toTenths(layout.systemDistance)}</system-distance>`,
+    layout.topSystemDistance === undefined
+      ? ''
+      : `<top-system-distance>${toTenths(layout.topSystemDistance)}</top-system-distance>`,
+    layout.systemLeftMargin === undefined || layout.systemRightMargin === undefined
+      ? ''
+      : '<system-margins>' +
+        `<left-margin>${toTenths(layout.systemLeftMargin)}</left-margin>` +
+        `<right-margin>${toTenths(layout.systemRightMargin)}</right-margin>` +
+        '</system-margins>',
+  ].join('');
+  return staves + (system === '' ? '' : `<system-layout>${system}</system-layout>`);
+}
+
+/**
+ * One edge's `<barline>`: its bar style, a repeat, and any ending it closes.
+ *
+ * `side` is the `location` attribute MusicXML wants, or `undefined` for the
+ * default right-hand barline -- writing `location="right"` there would be
+ * legal but noisy, and the reader treats the two identically.
+ */
+function barlineXml(
+  side: 'left' | 'right',
+  style: string | undefined,
+  repeatDirection: 'forward' | 'backward' | undefined,
+  repeatTimes: number | undefined,
+  endingNumbers: readonly number[] | undefined,
+  endingType: 'start' | 'stop' | 'discontinue' | undefined,
+): string {
+  const children: string[] = [];
+  if (style !== undefined) children.push(`<bar-style>${escapeXml(style)}</bar-style>`);
+  if (endingNumbers !== undefined && endingNumbers.length > 0) {
+    children.push(`<ending number="${endingNumbers.join(',')}" type="${endingType ?? 'start'}"/>`);
+  }
+  if (repeatDirection !== undefined) {
+    // MusicXML's default is 2, so a plain repeat writes nothing there.
+    const times = repeatTimes === undefined || repeatTimes === 2 ? '' : ` times="${repeatTimes}"`;
+    children.push(`<repeat direction="${repeatDirection}"${times}/>`);
+  }
+  if (children.length === 0) return '';
+  const location = side === 'left' ? ' location="left"' : '';
+  return `<barline${location}>${children.join('')}</barline>`;
+}
+
+/**
+ * `<attributes>`'s per-staff detail: each staff's clef, its line count and
+ * the part's transpose.
+ *
+ * A grand staff needs this: writing one clef for the whole part collapses a
+ * piano's bass staff onto its treble staff, which is what a saved and
+ * reopened piano score used to look like.
+ */
+function staffDetailXml(attribute: MeasureAttributes): string {
+  const staves = attribute.staves > 1 ? attribute.staves : 1;
+  const clefs: string[] = [];
+  // A single-staff part already wrote its one `<clef>` unnumbered above;
+  // repeating it as `<clef number="1">` would state the same clef twice.
+  if (staves > 1) {
+    for (let staff = 1; staff <= staves; staff += 1) {
+      const clef: ClefSpec | undefined = attribute.clefsByStaff[staff];
+      if (clef === undefined) continue;
+      clefs.push(
+        `<clef number="${staff}">` +
+          `<sign>${clef.sign}</sign>` +
+          (clef.line === undefined ? '' : `<line>${clef.line}</line>`) +
+          '</clef>',
+      );
+    }
+  }
+  const details = Object.entries(attribute.staffLinesByStaff)
+    .filter(([staff, lines]) => lines !== 5 && Number(staff) <= staves)
+    .map(
+      ([staff, lines]) =>
+        `<staff-details number="${staff}"><staff-lines>${lines}</staff-lines></staff-details>`,
+    );
+  return clefs.join('') + details.join('') + transposeXml(attribute.transpose);
+}
+
+/**
+ * `<transpose>`: what to add to a written pitch to get a sounding one.
+ *
+ * The parser derives `semitones` from `chromatic` and `octave-change`, so
+ * only those two are written back.
+ */
+function transposeXml(transpose: TransposeSpec): string {
+  const octave =
+    transpose.octaveChange === undefined
+      ? ''
+      : `<octave-change>${transpose.octaveChange}</octave-change>`;
+  const diatonic =
+    transpose.diatonic === undefined ? '' : `<diatonic>${transpose.diatonic}</diatonic>`;
+  // A zero chromatic with no octave change is the parser's default for "no
+  // <transpose>", not something the file stated: writing it back would add
+  // the element to every part of every score.
+  if (transpose.chromatic === 0 && octave === '') return '';
+  return `<transpose>${diatonic}<chromatic>${transpose.chromatic}</chromatic>${octave}</transpose>`;
 }
 
 const sortEvents = (events: readonly MeasureEvent[]): readonly MeasureEvent[] =>
@@ -328,22 +600,59 @@ function measureXml(
   divisions: number,
   previous: MeasureAttributes | undefined,
 ): string {
-  const head = attributesXml(attributeFor(parsed, partId, measure.number), divisions, previous);
+  const attribute = attributeFor(parsed, partId, measure.number);
+  const head = attributesXml(attribute, divisions, previous);
   const body: string[] = [];
 
-  // Dynamics carry their own tick; flushing each just before the first
-  // event at or after it puts the mark where it sounds.
-  const directions = parsed.directions
-    .filter((d) => d.partId === partId && d.measureNumber === measure.number)
-    .sort((a, b) => a.tick - b.tick);
-  let directionIndex = 0;
-  const flushDirections = (upToTick: number): void => {
+  // A <print> and a left-edge barline both come before the bar's music.
+  for (const print of parsed.prints) {
+    if (print.partId !== partId || print.measureNumber !== measure.number) continue;
+    const xml = printXml(print);
+    if (xml !== '') body.push(xml);
+  }
+  if (attribute !== undefined) {
+    const left = barlineXml(
+      'left',
+      attribute.leftBarlineStyle,
+      attribute.leftRepeatDirection,
+      attribute.leftRepeatTimes,
+      attribute.leftEndingNumbers,
+      attribute.leftEndingType,
+    );
+    if (left !== '') body.push(left);
+  }
+
+  // Every marking that attaches to a POSITION in this bar, keyed by that
+  // tick, so one flush writes them all in the order the bar reaches them.
+  // Dynamics, wedges, pedals, words, rehearsal marks, tempo marks, chord
+  // symbols and octave shifts all belong here: they are drawn at a tick,
+  // not owned by a note, and losing them on save was the whole data loss.
+  type Mark = { readonly tick: number; readonly xml: string };
+  const marks: Mark[] = [];
+  const inMeasure = (event: { partId: string; measureNumber: number }): boolean =>
+    event.partId === partId && event.measureNumber === measure.number;
+  for (const direction of parsed.directions.filter(inMeasure)) {
+    const xml = fullDirectionXml(direction);
+    if (xml !== '') marks.push({ tick: direction.tick, xml });
+  }
+  for (const tempo of parsed.tempoMarks.filter(inMeasure)) {
+    marks.push({ tick: tempo.visualTick ?? tempo.tick, xml: tempoXml(tempo) });
+  }
+  for (const harmony of parsed.harmonies.filter(inMeasure)) {
+    const xml = harmonyXml(harmony);
+    if (xml !== '') marks.push({ tick: harmony.tick, xml });
+  }
+  for (const shift of parsed.octaveShifts.filter(inMeasure)) {
+    marks.push({ tick: shift.tick, xml: octaveShiftXml(shift) });
+  }
+  marks.sort((a, b) => a.tick - b.tick);
+  let markIndex = 0;
+  const flushMarks = (upToTick: number): void => {
     for (;;) {
-      const direction = directions[directionIndex];
-      if (direction === undefined || direction.tick > upToTick) return;
-      const xml = directionXml(direction);
-      if (xml !== '') body.push(xml);
-      directionIndex += 1;
+      const mark = marks[markIndex];
+      if (mark === undefined || mark.tick > upToTick) return;
+      body.push(mark.xml);
+      markIndex += 1;
     }
   };
 
@@ -360,7 +669,7 @@ function measureXml(
           `<backup><duration>${toDivisions(cursor - start, divisions)}</duration></backup>`,
         );
       }
-      flushDirections(start);
+      flushMarks(start);
       body.push(eventXml(event, divisions));
       cursor = start + event.duration.ticks;
     }
@@ -368,7 +677,19 @@ function measureXml(
       body.push(`<backup><duration>${toDivisions(cursor, divisions)}</duration></backup>`);
     }
   });
-  flushDirections(Number.POSITIVE_INFINITY);
+  flushMarks(Number.POSITIVE_INFINITY);
+
+  if (attribute !== undefined) {
+    const right = barlineXml(
+      'right',
+      attribute.barlineStyle,
+      attribute.repeatDirection,
+      attribute.repeatTimes,
+      attribute.endingNumbers,
+      attribute.endingType,
+    );
+    if (right !== '') body.push(right);
+  }
 
   return `<measure number="${measure.number}">${head}${body.join('')}</measure>`;
 }

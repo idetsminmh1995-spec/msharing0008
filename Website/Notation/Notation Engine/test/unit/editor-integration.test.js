@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { test, describe } from 'node:test';
 import vm from 'node:vm';
 import { JSDOM, VirtualConsole } from 'jsdom';
+import { testDomParser } from '../helpers/dom.js';
 
 const packageDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const repoDir = path.resolve(packageDir, '..', '..');
@@ -68,7 +69,7 @@ const STARTER_XML = `<?xml version="1.0" encoding="UTF-8"?>
  * `requestAnimationFrame` on its own, so the page is opened with the
  * `?intent=create` handoff, whose `loadXml` renders synchronously.
  */
-function loadEditorPage({ url = 'https://example.test/notation-editor.html?intent=create' } = {}) {
+function loadEditorPage({ url = 'https://example.test/notation-editor.html?intent=create', pendingXml } = {}) {
   const html = fs.readFileSync(path.join(appDir, 'notation-editor.html'), 'utf8');
   const virtualConsole = new VirtualConsole();
   const errors = [];
@@ -79,6 +80,19 @@ function loadEditorPage({ url = 'https://example.test/notation-editor.html?inten
     url,
   });
   const { window } = dom;
+  if (pendingXml !== undefined) {
+    // The Lab hands a score over through sessionStorage and the page's boot
+    // reads it before anything else, so seeding it is how a test opens a
+    // specific score instead of the starter one.
+    window.sessionStorage.setItem(
+      'notation-lab-pending-file',
+      JSON.stringify({
+        name: 'score.musicxml',
+        type: 'application/xml',
+        data: Buffer.from(pendingXml, 'utf8').toString('base64'),
+      }),
+    );
+  }
   const context = dom.getInternalVMContext();
   for (const rel of ['assets/notation-engine.js', 'notation-doc.js', 'notation-newscore.js', 'notation-editor.js']) {
     vm.runInContext(fs.readFileSync(path.join(appDir, rel), 'utf8'), context, { filename: rel });
@@ -944,6 +958,108 @@ describe('the editor and the engine agree, end to end', () => {
     assert.equal(status(), 'The clipboard does not hold MusicXML.');
   });
 
+  test('paste over a sounding note replaces it instead of stacking on it', () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    const E = window.NotationEngine;
+    const D = window.NotationDoc;
+    const domParser = testDomParser();
+
+    const score = (body) =>
+      '<?xml version="1.0"?><score-partwise version="4.0"><part-list>' +
+      '<score-part id="P1"><part-name>M</part-name></score-part></part-list>' +
+      '<part id="P1"><measure number="1"><attributes><divisions>4</divisions>' +
+      '<time><beats>4</beats><beat-type>4</beat-type></time>' +
+      '<clef><sign>G</sign><line>2</line></clef></attributes>' +
+      body +
+      '</measure></part></score-partwise>';
+    const whole = (step) =>
+      `<note><pitch><step>${step}</step><octave>4</octave></pitch>` +
+      '<duration>16</duration><voice>1</voice><type>whole</type></note>';
+    const quarter = (step) =>
+      `<note><pitch><step>${step}</step><octave>4</octave></pitch>` +
+      '<duration>4</duration><voice>1</voice><type>quarter</type></note>';
+
+    const capacity = (document) => D.ticksPerMeasure(document, 'P1', 1);
+    const total = (document) =>
+      document.score.parts[0].measures[0].voices[0].events.reduce(
+        (sum, event) => sum + event.duration.ticks,
+        0,
+      );
+    // The document comes from the page's own realm, so its arrays carry
+    // that realm's Array.prototype and `deepEqual` would compare prototypes
+    // rather than contents. Copying into this realm is what makes the
+    // comparison about the pitches.
+    const pitches = (document) =>
+      JSON.parse(JSON.stringify(
+        document.score.parts[0].measures[0].voices[0].events
+          .filter((event) => event.kind !== 'rest')
+          .map((event) => event.pitch.step),
+      ));
+
+    const target = E.parseMusicXml(score(whole('C')), { domParser });
+    const clip = E.parseMusicXml(score(whole('D')), { domParser });
+
+    // A whole note pasted onto a whole note: the pasted one replaces it, so
+    // the bar is still exactly one bar long and sounds one note, not two.
+    const overWhole = D.paste(target, clip, { partId: 'P1', measureNumber: 1, voiceId: 1, tick: 0 });
+    assert.deepEqual(pitches(overWhole), ['D']);
+    assert.equal(total(overWhole), capacity(overWhole));
+
+    // A quarter pasted onto a whole: the whole goes, the quarter lands, and
+    // the rest of the bar becomes rests -- not the old note plus a new one.
+    const quarterClip = E.parseMusicXml(score(quarter('E')), { domParser });
+    const overQuarter = D.paste(target, quarterClip, {
+      partId: 'P1', measureNumber: 1, voiceId: 1, tick: 0,
+    });
+    assert.deepEqual(pitches(overQuarter), ['E']);
+    assert.equal(total(overQuarter), capacity(overQuarter));
+    assert.equal(overQuarter.score.parts[0].measures[0].voices[0].events.length, 2, 'a quarter and one rest');
+  });
+
+  test('paste next to the barline drops the note rather than throwing', () => {
+    const { window } = loadEditorPage();
+    const E = window.NotationEngine;
+    const D = window.NotationDoc;
+    const domParser = testDomParser();
+
+    const score = (body) =>
+      '<?xml version="1.0"?><score-partwise version="4.0"><part-list>' +
+      '<score-part id="P1"><part-name>M</part-name></score-part></part-list>' +
+      '<part id="P1"><measure number="1"><attributes><divisions>4</divisions>' +
+      '<time><beats>4</beats><beat-type>4</beat-type></time>' +
+      '<clef><sign>G</sign><line>2</line></clef></attributes>' +
+      body +
+      '</measure></part></score-partwise>';
+    const target = E.parseMusicXml(
+      score(
+        '<note><pitch><step>C</step><octave>4</octave></pitch>' +
+          '<duration>16</duration><voice>1</voice><type>whole</type></note>',
+      ),
+      { domParser },
+    );
+    const clip = E.parseMusicXml(
+      score(
+        '<note><pitch><step>E</step><octave>4</octave></pitch>' +
+          '<duration>4</duration><voice>1</voice><type>quarter</type></note>',
+      ),
+      { domParser },
+    );
+
+    // 100 ticks of room is less than a 32nd note, so there is no value to
+    // shorten the pasted quarter TO. The old code asked the engine for one,
+    // got null, and threw a TypeError reading `.type` off it.
+    const pasted = D.paste(target, clip, {
+      partId: 'P1', measureNumber: 1, voiceId: 1, tick: D.ticksPerMeasure(target, 'P1', 1) - 100,
+    });
+    const events = pasted.score.parts[0].measures[0].voices[0].events;
+    assert.equal(
+      events.reduce((sum, event) => sum + event.duration.ticks, 0),
+      D.ticksPerMeasure(pasted, 'P1', 1),
+      'the bar is still exactly one bar long',
+    );
+  });
+
   test('the fold only happens when the row would run past the window', () => {
     const { window } = loadEditorPage();
     const row = window.document.querySelector('[data-editor-toolbar]');
@@ -1203,6 +1319,199 @@ describe('the editor and the engine agree, end to end', () => {
     assert.equal(svg().querySelectorAll('[data-id]').length, written, 'a click left of the staff must not write');
     press(200, (topY + bottomY) / 2);
     assert.equal(svg().querySelectorAll('[data-id]').length, written, 'a click right of the staff must not write');
+  });
+
+  test('a click writes into the part and staff whose lines it landed on', async () => {
+    // A piano's two staves plus a flute's one: three staff bands in a single
+    // system, so the band a click lands in is not the same number as the
+    // system the engine addresses.
+    const twoStaves =
+      '<attributes><divisions>4</divisions><key><fifths>0</fifths></key>' +
+      '<time><beats>4</beats><beat-type>4</beat-type></time><staves>2</staves>' +
+      '<clef number="1"><sign>G</sign><line>2</line></clef>' +
+      '<clef number="2"><sign>F</sign><line>4</line></clef></attributes>';
+    const oneStaff =
+      '<attributes><divisions>4</divisions><key><fifths>0</fifths></key>' +
+      '<time><beats>4</beats><beat-type>4</beat-type></time>' +
+      '<clef><sign>G</sign><line>2</line></clef></attributes>';
+    const whole = (step, octave, staff) =>
+      `<note><pitch><step>${step}</step><octave>${octave}</octave></pitch>` +
+      `<duration>16</duration><voice>1</voice><type>whole</type>` +
+      (staff > 1 ? `<staff>${staff}</staff>` : '') + '</note>';
+    const emptyMeasure = '<note><rest measure="yes"/><duration>16</duration><voice>1</voice></note>';
+    const xml =
+      '<?xml version="1.0"?><score-partwise version="4.0"><part-list>' +
+      '<score-part id="P1"><part-name>Piano</part-name></score-part>' +
+      '<score-part id="P2"><part-name>Flute</part-name></score-part></part-list>' +
+      `<part id="P1"><measure number="1">${twoStaves}${whole('C', 5, 1)}${whole('C', 3, 2)}</measure>` +
+      `<measure number="2">${emptyMeasure}</measure></part>` +
+      `<part id="P2"><measure number="1">${oneStaff}${whole('E', 5, 1)}</measure>` +
+      `<measure number="2">${emptyMeasure}</measure></part></score-partwise>`;
+
+    const { window, errors } = loadEditorPage({ pendingXml: xml });
+    // The handoff is read through `File.text()`, which resolves off the
+    // boot's own stack, so the first render lands a tick later.
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+    assert.deepEqual(errors, [], 'the page must start without a script error');
+    const doc = window.document;
+    const scoreHost = doc.querySelector('[data-editor-score]');
+    window.DOMPoint = class {
+      constructor(x = 0, y = 0) { this.x = x; this.y = y; }
+      matrixTransform() { return new window.DOMPoint(this.x, this.y); }
+    };
+    window.SVGElement.prototype.getScreenCTM = () => ({
+      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0, inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+    });
+    // A tight hit box, so the click is the positional placement and not a
+    // selection of the note the placeholder rest draws.
+    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 0.0001, height: 0.0001 });
+
+    const svg = () => scoreHost.querySelector('svg');
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const bands = () => {
+      const lines = [...svg().querySelectorAll('line')].filter(
+        (line) =>
+          line.getAttribute('y1') === line.getAttribute('y2') &&
+          Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3,
+      );
+      const ys = [...new Set(lines.map((line) => Number(line.getAttribute('y1'))))].sort((a, b) => a - b);
+      const found = [];
+      let run = [];
+      const close = () => {
+        if (run.length >= 5) found.push({ top: run[0], bottom: run[run.length - 1] });
+        run = [];
+      };
+      for (const y of ys) {
+        if (run.length === 0 || Math.abs(y - run[run.length - 1] - 1) < 0.01) run.push(y);
+        else { close(); run = [y]; }
+      }
+      close();
+      return found;
+    };
+
+    const staffBands = bands();
+    assert.equal(staffBands.length, 3, 'a piano and a flute draw three staves');
+    // Measure 2 is the empty bar, and it is where every click below lands.
+    const press = (band, fraction) => {
+      const lines = [...svg().querySelectorAll('line')].filter(
+        (line) => line.getAttribute('y1') === line.getAttribute('y2'),
+      );
+      const right = Math.max(...lines.map((line) => Number(line.getAttribute('x2'))));
+      scoreHost.dispatchEvent(
+        new window.PointerEvent('pointerdown', {
+          clientX: right * fraction,
+          clientY: band.bottom,
+          bubbles: true,
+        }),
+      );
+    };
+
+    // The bottom line of the piano's BASS staff is a low pitch in the bass
+    // clef, and the entry cursor must sit on that staff and not the top one.
+    press(staffBands[1], 0.55);
+    assert.match(status(), /Inserted G2/, 'the bass staff bottom line is G2');
+    let cursor = doc.querySelector('.editor-cursor');
+    assert.ok(cursor, 'the entry cursor is drawn');
+    assert.ok(
+      Math.abs(Number(cursor.getAttribute('y')) - (staffBands[1].top - 4)) < 0.5,
+      'the cursor sits on the bass staff, not the treble one',
+    );
+
+    // The flute's staff is a treble staff: the same line is a different
+    // pitch, and the note belongs to the flute, not the piano.
+    press(staffBands[2], 0.75);
+    assert.match(status(), /Inserted E4/, 'the flute staff bottom line is E4');
+    cursor = doc.querySelector('.editor-cursor');
+    assert.ok(
+      Math.abs(Number(cursor.getAttribute('y')) - (staffBands[2].top - 4)) < 0.5,
+      'the cursor follows the flute staff',
+    );
+    // The note belongs to the FLUTE, which is the second part: a click on
+    // its staff must not write into the piano instead.
+    const ids = [...svg().querySelectorAll('[data-id]')].map((group) => group.getAttribute('data-id'));
+    assert.ok(
+      ids.some((id) => id.startsWith('P2#m2#')),
+      'the note written on the flute staff belongs to the flute part',
+    );
+  });
+
+  test('the playhead crosses into the next system instead of staying on the first', async () => {
+    // Twenty-four bars in page mode spill over two systems, so playing
+    // through the score has to move the marker down the page -- a frame
+    // that only re-sets `x` leaves it on the row it started on.
+    const attributes =
+      '<attributes><divisions>4</divisions><key><fifths>0</fifths></key>' +
+      '<time><beats>4</beats><beat-type>4</beat-type></time>' +
+      '<clef><sign>G</sign><line>2</line></clef></attributes>';
+    // Every bar is a rest: the marker then moves with no note to highlight,
+    // which is the frame path that used to re-set only `x` and so left the
+    // playhead on the system it started on.
+    const measures = Array.from({ length: 24 }, (_, index) =>
+      `<measure number="${index + 1}">${index === 0 ? attributes : ''}` +
+      '<note><rest measure="yes"/><duration>16</duration><voice>1</voice></note></measure>',
+    ).join('');
+    const xml =
+      '<?xml version="1.0"?><score-partwise version="4.0"><part-list>' +
+      '<score-part id="P1"><part-name>M</part-name></score-part></part-list>' +
+      `<part id="P1">${measures}</part></score-partwise>`;
+
+    const { window } = loadEditorPage({ pendingXml: xml });
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+    const doc = window.document;
+    const scoreHost = doc.querySelector('[data-editor-score]');
+
+    const staffTops = () => {
+      const lines = [...scoreHost.querySelectorAll('svg line')].filter(
+        (line) =>
+          line.getAttribute('y1') === line.getAttribute('y2') &&
+          Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3,
+      );
+      const ys = [...new Set(lines.map((line) => Number(line.getAttribute('y1'))))].sort((a, b) => a - b);
+      const found = [];
+      let run = [];
+      const close = () => {
+        if (run.length >= 5) found.push(run[0]);
+        run = [];
+      };
+      for (const y of ys) {
+        if (run.length === 0 || Math.abs(y - run[run.length - 1] - 1) < 0.01) run.push(y);
+        else { close(); run = [y]; }
+      }
+      close();
+      return found;
+    };
+    assert.equal(staffTops().length, 2, 'twenty-four bars span two systems');
+
+    // A clock the test owns, so the playhead can be moved to the second
+    // system without waiting out the music in real time.
+    let clock = 0;
+    window.performance.now = () => clock;
+    let pending = [];
+    window.requestAnimationFrame = (callback) => { pending.push(callback); return pending.length; };
+    window.cancelAnimationFrame = () => { pending = []; };
+    const runFrame = () => {
+      const due = pending;
+      pending = [];
+      for (const callback of due) callback(clock);
+    };
+
+    doc.querySelector('[data-editor-play]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    runFrame();
+    const first = doc.querySelector('.editor-playhead');
+    assert.ok(first, 'the playhead is drawn while the score plays');
+    const firstY = Number(first.getAttribute('y'));
+
+    // The second system starts halfway through: jump the clock there, then
+    // let one more frame draw.
+    clock += 30000;
+    runFrame();
+    const later = doc.querySelector('.editor-playhead');
+    assert.ok(later, 'the playhead is still drawn');
+    assert.ok(
+      Number(later.getAttribute('y')) > firstY,
+      'the playhead moved down to the system the music reached',
+    );
+    doc.querySelector('[data-editor-stop]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
   });
 
   describe('the workspace', () => {

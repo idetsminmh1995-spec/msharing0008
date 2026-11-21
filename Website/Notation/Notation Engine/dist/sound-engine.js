@@ -20186,22 +20186,27 @@ Destination: ${this.destinationName}`;
     if (!plan.hasRepeats || plan.entries.length === 0) return events;
     const sorted = [...events].sort((a2, b) => a2.tick - b.tick);
     const out = [];
+    const secondsFor = (tick, ticks) => tempoMap !== void 0 && ticks !== void 0 ? Math.max(0.02, tickToSeconds(tempoMap, tick + ticks) - tickToSeconds(tempoMap, tick)) : void 0;
     for (const entry of plan.entries) {
       const from = entry.writtenTick;
       const to = entry.writtenTick + entry.ticks;
       for (const event of sorted) {
         if (event.tick < from) continue;
         if (event.tick >= to) break;
-        const lengthTicks = event.tieChainDurationTicks ?? event.durationTicks;
-        const durationSeconds = tempoMap !== void 0 && lengthTicks !== void 0 ? Math.max(
-          0.02,
-          tickToSeconds(tempoMap, event.tick + lengthTicks) - tickToSeconds(tempoMap, event.tick)
-        ) : void 0;
+        const durationSeconds = secondsFor(
+          event.tick,
+          event.tieChainDurationTicks ?? event.durationTicks
+        );
+        const sounding = event.sounding?.map((note) => {
+          const seconds = secondsFor(event.tick, note.ticks);
+          return seconds === void 0 ? note : { ...note, seconds };
+        });
         out.push({
           ...event,
           tick: entry.performanceTick + (event.tick - from),
           seconds: entry.startSeconds + (event.seconds - entry.writtenStartSeconds),
-          ...durationSeconds !== void 0 ? { durationSeconds } : {}
+          ...durationSeconds !== void 0 ? { durationSeconds } : {},
+          ...sounding !== void 0 ? { sounding } : {}
         });
       }
     }
@@ -20247,6 +20252,25 @@ Destination: ${this.destinationName}`;
   }
   function midiNotesFor(event) {
     return event.midiNotesAligned ?? event.midiNotes ?? [];
+  }
+  function soundingFor(event, playback) {
+    const aligned = midiNotesFor(event);
+    const perNotehead = event.sounding;
+    if (perNotehead !== void 0 && perNotehead.length > 0) {
+      return perNotehead.map((note, position) => ({
+        // An alignment that renamed the MIDI numbers wins, the same way it
+        // does for `midiNotes` above.
+        midi: aligned[position] ?? note.midi,
+        strike: note.strike,
+        seconds: Math.max(0.02, note.seconds ?? playbackEventDuration(playback, event, note.ticks))
+      }));
+    }
+    if (event.tiedFromPrevious === true) return [];
+    const seconds = Math.max(
+      0.02,
+      event.durationSeconds ?? playbackEventDuration(playback, event, event.tieChainDurationTicks)
+    );
+    return aligned.map((midi) => ({ midi, strike: true, seconds }));
   }
   var R2SoundFontEngine = class _R2SoundFontEngine {
     constructor(context, synth, asset, ready) {
@@ -20304,33 +20328,31 @@ Destination: ${this.destinationName}`;
       const start = Math.max(0, fromSeconds);
       const scheduled = unfoldEvents(playback.performance, playback.events, playback.tempoMap);
       for (const event of scheduled) {
-        const notes = midiNotesFor(event);
-        if (notes.length === 0) continue;
-        if (event.tiedFromPrevious === true) continue;
-        const durationSeconds = Math.max(
-          0.02,
-          event.durationSeconds ?? playbackEventDuration(playback, event, event.tieChainDurationTicks)
-        );
-        const endSeconds = event.seconds + durationSeconds;
-        if (endSeconds <= start) continue;
+        const notes = soundingFor(event, playback);
+        const struck = notes.filter((note) => note.strike);
+        if (struck.length === 0) continue;
         const channel = this.channelFor(event.partId);
-        const startDelay = Math.max(0, event.seconds - start) * 1e3;
-        const remainingSeconds = Math.max(0.02, endSeconds - Math.max(event.seconds, start));
         const velocity = event.velocity ?? DEFAULT_VELOCITY;
-        const onTimer = window.setTimeout(
-          () => {
-            if (this.stopped) return;
-            for (const midiNote of notes) this.synth.noteOn(channel, midiNote, velocity);
-            const offTimer = window.setTimeout(() => {
-              for (const midiNote of notes) this.synth.noteOff(channel, midiNote);
-              this.timers.delete(offTimer);
-            }, remainingSeconds * 1e3);
-            this.timers.add(offTimer);
-            this.timers.delete(onTimer);
-          },
-          Math.max(0, startDelay - (performance.now() / 1e3 - origin) * 1e3)
-        );
-        this.timers.add(onTimer);
+        for (const note of struck) {
+          const endSeconds = event.seconds + note.seconds;
+          if (endSeconds <= start) continue;
+          const startDelay = Math.max(0, event.seconds - start) * 1e3;
+          const remainingSeconds = Math.max(0.02, endSeconds - Math.max(event.seconds, start));
+          const onTimer = window.setTimeout(
+            () => {
+              if (this.stopped) return;
+              this.synth.noteOn(channel, note.midi, velocity);
+              const offTimer = window.setTimeout(() => {
+                this.synth.noteOff(channel, note.midi);
+                this.timers.delete(offTimer);
+              }, remainingSeconds * 1e3);
+              this.timers.add(offTimer);
+              this.timers.delete(onTimer);
+            },
+            Math.max(0, startDelay - (performance.now() / 1e3 - origin) * 1e3)
+          );
+          this.timers.add(onTimer);
+        }
       }
     }
     pause() {

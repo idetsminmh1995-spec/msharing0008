@@ -73411,32 +73411,183 @@ ${denominator}`;
   }
   function attributesXml(attribute, divisions, previous) {
     if (attribute === void 0) return "";
-    const same = previous !== void 0 && previous.fifths === attribute.fifths && previous.mode === attribute.mode && previous.timeNumerator === attribute.timeNumerator && previous.timeDenominator === attribute.timeDenominator && previous.timeNumeratorDisplay === attribute.timeNumeratorDisplay && previous.clefSign === attribute.clefSign && previous.clefLine === attribute.clefLine;
+    const same = previous !== void 0 && previous.fifths === attribute.fifths && previous.mode === attribute.mode && previous.timeNumerator === attribute.timeNumerator && previous.timeDenominator === attribute.timeDenominator && previous.timeNumeratorDisplay === attribute.timeNumeratorDisplay && previous.clefSign === attribute.clefSign && previous.clefLine === attribute.clefLine && previous.staves === attribute.staves && sameStaffDetail(previous, attribute);
     if (same) return "";
     const beats = attribute.timeNumeratorDisplay ?? String(attribute.timeNumerator);
     const mode = attribute.mode === void 0 ? "" : `<mode>${attribute.mode}</mode>`;
-    const clef2 = `<clef><sign>${attribute.clefSign}</sign>` + (attribute.clefLine === void 0 ? "" : `<line>${attribute.clefLine}</line>`) + "</clef>";
+    const clef2 = attribute.staves > 1 ? "" : `<clef><sign>${attribute.clefSign}</sign>` + (attribute.clefLine === void 0 ? "" : `<line>${attribute.clefLine}</line>`) + "</clef>";
     const staves = attribute.staves !== void 0 && attribute.staves > 1 ? `<staves>${attribute.staves}</staves>` : "";
-    return `<attributes><divisions>${divisions}</divisions><key><fifths>${attribute.fifths}</fifths>${mode}</key><time><beats>${beats}</beats><beat-type>${attribute.timeDenominator}</beat-type></time>` + clef2 + staves + "</attributes>";
+    return `<attributes><divisions>${divisions}</divisions><key><fifths>${attribute.fifths}</fifths>${mode}</key><time><beats>${beats}</beats><beat-type>${attribute.timeDenominator}</beat-type></time>` + clef2 + staves + staffDetailXml(attribute) + "</attributes>";
   }
-  function directionXml(direction) {
-    if (direction.dynamics.length === 0) return "";
-    const placement = direction.placement === "above" ? ' placement="above"' : "";
-    return `<direction${placement}><direction-type><dynamics>${direction.dynamics.map((level) => `<${level}/>`).join("")}</dynamics></direction-type><staff>${direction.staff ?? 1}</staff></direction>`;
+  function sameStaffDetail(a, b) {
+    return JSON.stringify(a.clefsByStaff) === JSON.stringify(b.clefsByStaff) && JSON.stringify(a.staffLinesByStaff) === JSON.stringify(b.staffLinesByStaff) && a.transpose.chromatic === b.transpose.chromatic && a.transpose.diatonic === b.transpose.diatonic && a.transpose.octaveChange === b.transpose.octaveChange;
+  }
+  function fullDirectionXml(event) {
+    const placement = event.placement === void 0 ? "" : ` placement="${event.placement}"`;
+    const wrap = (inner) => `<direction${placement}>` + inner + `<staff>${event.staff}</staff></direction>`;
+    const parts = [];
+    if (event.dynamics.length > 0) {
+      parts.push(
+        wrap(
+          `<direction-type><dynamics>${event.dynamics.map((level) => `<${level}/>`).join("")}</dynamics></direction-type>`
+        )
+      );
+    }
+    for (const wedge of event.wedges) {
+      parts.push(
+        wrap(
+          `<direction-type><wedge type="${wedge.type}" number="${wedge.number}"/></direction-type>`
+        )
+      );
+    }
+    for (const pedal of event.pedals) {
+      parts.push(
+        wrap(
+          `<direction-type><pedal type="${pedal.type}" number="${pedal.number}"/></direction-type>`
+        )
+      );
+    }
+    for (const text of event.rehearsals) {
+      parts.push(wrap(`<direction-type><rehearsal>${escapeXml(text)}</rehearsal></direction-type>`));
+    }
+    for (const text of event.words) {
+      parts.push(wrap(`<direction-type><words>${escapeXml(text)}</words></direction-type>`));
+    }
+    return parts.join("");
+  }
+  function tempoXml(event) {
+    const dots = "<beat-unit-dot/>".repeat(event.beatUnitDots);
+    const perQuarter = event.perMinute * (quarterNotesPerBeat(event.beatUnit) * dottedFactor(event.beatUnitDots));
+    return `<direction placement="above"><direction-type><metronome><beat-unit>${event.beatUnit}</beat-unit>${dots}<per-minute>${event.perMinute}</per-minute></metronome></direction-type><sound tempo="${Number(perQuarter.toFixed(4))}"/></direction>`;
+  }
+  function quarterNotesPerBeat(type) {
+    const beats = {
+      whole: 4,
+      half: 2,
+      quarter: 1,
+      eighth: 0.5,
+      "16th": 0.25,
+      "32nd": 0.125,
+      "64th": 0.0625,
+      "128th": 0.03125,
+      "256th": 0.015625,
+      "512th": 78125e-7
+    };
+    return beats[type] ?? 1;
+  }
+  function dottedFactor(dots) {
+    return 2 - 1 / 2 ** dots;
+  }
+  function harmonyXml(event) {
+    const root = event.rootStep === void 0 ? "" : `<root><root-step>${event.rootStep}</root-step>` + (event.rootAlter ? `<root-alter>${event.rootAlter}</root-alter>` : "") + "</root>";
+    const kind = event.kind === void 0 ? "" : `<kind${event.kindText === void 0 ? "" : ` text="${escapeXml(event.kindText)}"`}>${escapeXml(event.kind)}</kind>`;
+    const bass = event.bassStep === void 0 ? "" : `<bass><bass-step>${event.bassStep}</bass-step>` + (event.bassAlter ? `<bass-alter>${event.bassAlter}</bass-alter>` : "") + "</bass>";
+    if (root === "" && kind === "") return "";
+    return `<harmony>${root}${kind}${bass}</harmony>`;
+  }
+  function octaveShiftXml(event) {
+    return `<direction placement="above"><direction-type><octave-shift type="${event.type}" size="${event.size}" number="${event.number}"/></direction-type><staff>${event.staff}</staff></direction>`;
+  }
+  var toTenths = (staffSpaces) => Number((staffSpaces * TENTHS_PER_STAFF_SPACE).toFixed(4));
+  function printXml(event) {
+    const attributes = (event.newSystem ? ' new-system="yes"' : "") + (event.newPage ? ' new-page="yes"' : "");
+    const layout = event.layout === void 0 ? "" : printLayoutXml(event.layout);
+    if (attributes === "" && layout === "") return "";
+    return `<print${attributes}>${layout}</print>`;
+  }
+  function printLayoutXml(layout) {
+    const staves = Object.entries(layout.staffDistances ?? {}).map(
+      ([number, distance]) => `<staff-layout number="${number}"><staff-distance>${toTenths(distance)}</staff-distance></staff-layout>`
+    ).join("");
+    const system = [
+      layout.systemDistance === void 0 ? "" : `<system-distance>${toTenths(layout.systemDistance)}</system-distance>`,
+      layout.topSystemDistance === void 0 ? "" : `<top-system-distance>${toTenths(layout.topSystemDistance)}</top-system-distance>`,
+      layout.systemLeftMargin === void 0 || layout.systemRightMargin === void 0 ? "" : `<system-margins><left-margin>${toTenths(layout.systemLeftMargin)}</left-margin><right-margin>${toTenths(layout.systemRightMargin)}</right-margin></system-margins>`
+    ].join("");
+    return staves + (system === "" ? "" : `<system-layout>${system}</system-layout>`);
+  }
+  function barlineXml(side, style, repeatDirection, repeatTimes, endingNumbers, endingType) {
+    const children = [];
+    if (style !== void 0) children.push(`<bar-style>${escapeXml(style)}</bar-style>`);
+    if (endingNumbers !== void 0 && endingNumbers.length > 0) {
+      children.push(`<ending number="${endingNumbers.join(",")}" type="${endingType ?? "start"}"/>`);
+    }
+    if (repeatDirection !== void 0) {
+      const times = repeatTimes === void 0 || repeatTimes === 2 ? "" : ` times="${repeatTimes}"`;
+      children.push(`<repeat direction="${repeatDirection}"${times}/>`);
+    }
+    if (children.length === 0) return "";
+    const location = side === "left" ? ' location="left"' : "";
+    return `<barline${location}>${children.join("")}</barline>`;
+  }
+  function staffDetailXml(attribute) {
+    const staves = attribute.staves > 1 ? attribute.staves : 1;
+    const clefs = [];
+    if (staves > 1) {
+      for (let staff = 1; staff <= staves; staff += 1) {
+        const clef2 = attribute.clefsByStaff[staff];
+        if (clef2 === void 0) continue;
+        clefs.push(
+          `<clef number="${staff}"><sign>${clef2.sign}</sign>` + (clef2.line === void 0 ? "" : `<line>${clef2.line}</line>`) + "</clef>"
+        );
+      }
+    }
+    const details = Object.entries(attribute.staffLinesByStaff).filter(([staff, lines]) => lines !== 5 && Number(staff) <= staves).map(
+      ([staff, lines]) => `<staff-details number="${staff}"><staff-lines>${lines}</staff-lines></staff-details>`
+    );
+    return clefs.join("") + details.join("") + transposeXml(attribute.transpose);
+  }
+  function transposeXml(transpose) {
+    const octave = transpose.octaveChange === void 0 ? "" : `<octave-change>${transpose.octaveChange}</octave-change>`;
+    const diatonic = transpose.diatonic === void 0 ? "" : `<diatonic>${transpose.diatonic}</diatonic>`;
+    if (transpose.chromatic === 0 && octave === "") return "";
+    return `<transpose>${diatonic}<chromatic>${transpose.chromatic}</chromatic>${octave}</transpose>`;
   }
   var sortEvents = (events) => [...events].sort((a, b) => (a.startTick ?? 0) - (b.startTick ?? 0));
   function measureXml(parsed, partId, measure2, divisions, previous) {
-    const head = attributesXml(attributeFor(parsed, partId, measure2.number), divisions, previous);
+    const attribute = attributeFor(parsed, partId, measure2.number);
+    const head = attributesXml(attribute, divisions, previous);
     const body = [];
-    const directions = parsed.directions.filter((d) => d.partId === partId && d.measureNumber === measure2.number).sort((a, b) => a.tick - b.tick);
-    let directionIndex = 0;
-    const flushDirections = (upToTick) => {
+    for (const print of parsed.prints) {
+      if (print.partId !== partId || print.measureNumber !== measure2.number) continue;
+      const xml = printXml(print);
+      if (xml !== "") body.push(xml);
+    }
+    if (attribute !== void 0) {
+      const left = barlineXml(
+        "left",
+        attribute.leftBarlineStyle,
+        attribute.leftRepeatDirection,
+        attribute.leftRepeatTimes,
+        attribute.leftEndingNumbers,
+        attribute.leftEndingType
+      );
+      if (left !== "") body.push(left);
+    }
+    const marks = [];
+    const inMeasure = (event) => event.partId === partId && event.measureNumber === measure2.number;
+    for (const direction of parsed.directions.filter(inMeasure)) {
+      const xml = fullDirectionXml(direction);
+      if (xml !== "") marks.push({ tick: direction.tick, xml });
+    }
+    for (const tempo of parsed.tempoMarks.filter(inMeasure)) {
+      marks.push({ tick: tempo.visualTick ?? tempo.tick, xml: tempoXml(tempo) });
+    }
+    for (const harmony of parsed.harmonies.filter(inMeasure)) {
+      const xml = harmonyXml(harmony);
+      if (xml !== "") marks.push({ tick: harmony.tick, xml });
+    }
+    for (const shift of parsed.octaveShifts.filter(inMeasure)) {
+      marks.push({ tick: shift.tick, xml: octaveShiftXml(shift) });
+    }
+    marks.sort((a, b) => a.tick - b.tick);
+    let markIndex = 0;
+    const flushMarks = (upToTick) => {
       for (; ; ) {
-        const direction = directions[directionIndex];
-        if (direction === void 0 || direction.tick > upToTick) return;
-        const xml = directionXml(direction);
-        if (xml !== "") body.push(xml);
-        directionIndex += 1;
+        const mark = marks[markIndex];
+        if (mark === void 0 || mark.tick > upToTick) return;
+        body.push(mark.xml);
+        markIndex += 1;
       }
     };
     measure2.voices.forEach((voice2, voiceIndex) => {
@@ -73452,7 +73603,7 @@ ${denominator}`;
             `<backup><duration>${toDivisions(cursor - start, divisions)}</duration></backup>`
           );
         }
-        flushDirections(start);
+        flushMarks(start);
         body.push(eventXml(event, divisions));
         cursor = start + event.duration.ticks;
       }
@@ -73460,7 +73611,18 @@ ${denominator}`;
         body.push(`<backup><duration>${toDivisions(cursor, divisions)}</duration></backup>`);
       }
     });
-    flushDirections(Number.POSITIVE_INFINITY);
+    flushMarks(Number.POSITIVE_INFINITY);
+    if (attribute !== void 0) {
+      const right = barlineXml(
+        "right",
+        attribute.barlineStyle,
+        attribute.repeatDirection,
+        attribute.repeatTimes,
+        attribute.endingNumbers,
+        attribute.endingType
+      );
+      if (right !== "") body.push(right);
+    }
     return `<measure number="${measure2.number}">${head}${body.join("")}</measure>`;
   }
   function scorePartXml(part2, instruments) {
@@ -76591,20 +76753,16 @@ ${denominator}`;
   }
 
   // src/playback/event-stream.ts
-  function midiNoteForEvent(event, transposeSemitones) {
+  function noteheadsFor(event, transposeSemitones, instruments) {
     const notes = event.kind === "chord" ? event.notes : event.kind === "note" ? [event] : [];
     return notes.flatMap((note2) => {
-      const midi = midiNoteNumber(note2.pitch, transposeSemitones);
-      return midi === void 0 ? [] : [midi];
-    });
-  }
-  function percussionMidiNotesForEvent(event, instruments) {
-    if (instruments === void 0) return [];
-    const notes = event.kind === "chord" ? event.notes : event.kind === "note" ? [event] : [];
-    return notes.flatMap((note2) => {
-      if (isPitched(note2.pitch) || note2.instrumentId === void 0) return [];
-      const gmNote = instruments.get(note2.instrumentId)?.gmNote;
-      return gmNote !== void 0 ? [gmNote] : [];
+      if (isPitched(note2.pitch)) {
+        const midi = midiNoteNumber(note2.pitch, transposeSemitones);
+        return midi === void 0 ? [] : [{ midi, tieStart: note2.tieStart === true, tieStop: note2.tieStop === true }];
+      }
+      const instrumentId = note2.instrumentId;
+      const gmNote = instrumentId === void 0 ? void 0 : instruments?.get(instrumentId)?.gmNote;
+      return gmNote === void 0 ? [] : [{ midi: gmNote, tieStart: note2.tieStart === true, tieStop: note2.tieStop === true }];
     });
   }
   function notationEventId(partId, measureNumber, voiceId, eventIndex) {
@@ -76633,23 +76791,20 @@ ${denominator}`;
           voice2.events.forEach((event, index) => {
             const startTick = event.startTick ?? tickInMeasure;
             const noteIds = noteIdsForEvent(part2.id, measure2.number, voice2.id, index, event);
+            const noteheads = noteheadsFor(event, transposeSemitones, instruments);
             if (noteIds.length > 0) {
               const tick = offset + startTick;
-              const midiNotes = [
-                ...midiNoteForEvent(event, transposeSemitones),
-                ...percussionMidiNotesForEvent(event, instruments)
-              ];
               events.push({
                 tick,
                 seconds: tickToSeconds(tempoMap, tick),
                 durationTicks: event.duration.ticks,
                 partId: part2.id,
                 noteIds,
-                ...midiNotes.length > 0 ? { midiNotes } : {},
+                ...noteheads.length > 0 ? { midiNotes: noteheads.map((note2) => note2.midi) } : {},
                 measureNumber: measure2.number,
                 velocity: DEFAULT_VELOCITY
               });
-              written.push(event);
+              written.push(noteheads);
             }
             tickInMeasure = startTick + event.duration.ticks;
           });
@@ -76680,41 +76835,54 @@ ${denominator}`;
   }
   function voiceKeyOf(event) {
     const id = event.noteIds[0] ?? "";
-    const match = /^(.*)#m\d+#v(\d+)#e\d+$/.exec(id);
+    const match = /^(.*)#m\d+#v(\d+)#e\d+(?:#n\d+)?$/.exec(id);
     return match ? `${match[1]}#v${match[2]}` : id;
   }
   function resolveTiesInVoice(voiceEvents, written, indices) {
     const open = /* @__PURE__ */ new Map();
-    const keyOf = (event) => event.midiNotes === void 0 ? void 0 : event.midiNotes.join(",");
     for (const index of indices) {
       const event = voiceEvents[index];
-      const source = written[index];
-      if (event === void 0 || source === void 0) continue;
-      const key = keyOf(event);
-      if (key === void 0) continue;
-      const head = open.get(key);
-      const headEvent = head === void 0 ? void 0 : voiceEvents[head];
-      if (hasTieStop(source) && headEvent !== void 0) {
-        event.tiedFromPrevious = true;
-        const chain = headEvent;
-        chain.tieChainDurationTicks = (chain.tieChainDurationTicks ?? headEvent.durationTicks) + event.durationTicks;
-        if (!hasTieStart(source)) open.delete(key);
-        continue;
+      const noteheads = written[index];
+      if (event === void 0 || noteheads === void 0 || noteheads.length === 0) continue;
+      const sounding = [];
+      for (let position = 0; position < noteheads.length; position += 1) {
+        const notehead = noteheads[position];
+        if (notehead === void 0) continue;
+        const head = open.get(notehead.midi);
+        const headEvent = head === void 0 ? void 0 : voiceEvents[head.event];
+        const headSounding = headEvent === void 0 ? void 0 : mutableSounding(headEvent);
+        if (notehead.tieStop && head !== void 0 && headEvent !== void 0) {
+          const carried = headSounding?.[head.notehead];
+          const held = (carried?.ticks ?? headEvent.durationTicks) + event.durationTicks;
+          if (headSounding !== void 0 && carried !== void 0) {
+            headSounding[head.notehead] = { ...carried, ticks: held };
+          }
+          sounding.push({ midi: notehead.midi, strike: false, ticks: held });
+          if (!notehead.tieStart) open.delete(notehead.midi);
+          continue;
+        }
+        if (notehead.tieStart) open.set(notehead.midi, { event: index, notehead: position });
+        else open.delete(notehead.midi);
+        sounding.push({ midi: notehead.midi, strike: true, ticks: event.durationTicks });
       }
-      if (hasTieStart(source)) open.set(key, index);
-      else open.delete(key);
+      event.sounding = sounding;
+    }
+    for (const index of indices) {
+      const event = voiceEvents[index];
+      const notes = event === void 0 ? void 0 : event.sounding;
+      if (event === void 0 || notes === void 0 || notes.length === 0) continue;
+      if (notes.every((note2) => !note2.strike)) {
+        event.tiedFromPrevious = true;
+      }
+      const lengths = new Set(notes.filter((note2) => note2.strike).map((note2) => note2.ticks));
+      const [only] = [...lengths];
+      if (lengths.size === 1 && only !== void 0 && only !== event.durationTicks) {
+        event.tieChainDurationTicks = only;
+      }
     }
   }
-  function hasTieStart(event) {
-    return notesOf(event).some((note2) => note2.tieStart === true);
-  }
-  function hasTieStop(event) {
-    return notesOf(event).some((note2) => note2.tieStop === true);
-  }
-  function notesOf(event) {
-    if (event.kind === "note") return [event];
-    if (event.kind === "chord") return event.notes;
-    return [];
+  function mutableSounding(event) {
+    return event.sounding === void 0 ? void 0 : event.sounding;
   }
   function applyDynamics(events, written, directions, globalTickOffsetByMeasure) {
     resolveTies(events, written);
@@ -77118,22 +77286,27 @@ ${denominator}`;
     if (!plan.hasRepeats || plan.entries.length === 0) return events;
     const sorted = [...events].sort((a, b) => a.tick - b.tick);
     const out = [];
+    const secondsFor = (tick, ticks) => tempoMap !== void 0 && ticks !== void 0 ? Math.max(0.02, tickToSeconds(tempoMap, tick + ticks) - tickToSeconds(tempoMap, tick)) : void 0;
     for (const entry of plan.entries) {
       const from = entry.writtenTick;
       const to = entry.writtenTick + entry.ticks;
       for (const event of sorted) {
         if (event.tick < from) continue;
         if (event.tick >= to) break;
-        const lengthTicks = event.tieChainDurationTicks ?? event.durationTicks;
-        const durationSeconds = tempoMap !== void 0 && lengthTicks !== void 0 ? Math.max(
-          0.02,
-          tickToSeconds(tempoMap, event.tick + lengthTicks) - tickToSeconds(tempoMap, event.tick)
-        ) : void 0;
+        const durationSeconds = secondsFor(
+          event.tick,
+          event.tieChainDurationTicks ?? event.durationTicks
+        );
+        const sounding = event.sounding?.map((note2) => {
+          const seconds = secondsFor(event.tick, note2.ticks);
+          return seconds === void 0 ? note2 : { ...note2, seconds };
+        });
         out.push({
           ...event,
           tick: entry.performanceTick + (event.tick - from),
           seconds: entry.startSeconds + (event.seconds - entry.writtenStartSeconds),
-          ...durationSeconds !== void 0 ? { durationSeconds } : {}
+          ...durationSeconds !== void 0 ? { durationSeconds } : {},
+          ...sounding !== void 0 ? { sounding } : {}
         });
       }
     }

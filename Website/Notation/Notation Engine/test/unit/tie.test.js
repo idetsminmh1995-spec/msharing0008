@@ -157,3 +157,116 @@ describe('ties in the event stream (§17.1)', () => {
     assert.equal(second.tieChainDurationTicks, undefined, 'only the head of the chain carries it');
   });
 });
+
+/**
+ * A chord ties its noteheads one at a time. A single flag on the event
+ * cannot say that, and the first version of this code could not say it at
+ * all: it keyed the open chain on the whole event's MIDI set, and the chord
+ * suffix `#n0` on a note id also broke the voice grouping, so a chord tie
+ * resolved to nothing and the second bar struck the note again.
+ */
+describe('ties inside a chord (§17.1)', () => {
+  const note = (step, octave, tie, chordMember) =>
+    `<note>${chordMember ? '<chord/>' : ''}` +
+    `<pitch><step>${step}</step><octave>${octave}</octave></pitch>` +
+    '<duration>16</duration><voice>1</voice><type>whole</type>' +
+    (tie === undefined ? '' : `<tie type="${tie}"/><notations><tied type="${tie}"/></notations>`) +
+    '</note>';
+  const score = (first, second) =>
+    '<?xml version="1.0"?><score-partwise version="4.0"><part-list>' +
+    '<score-part id="P1"><part-name>M</part-name></score-part></part-list>' +
+    '<part id="P1">' +
+    '<measure number="1"><attributes><divisions>4</divisions>' +
+    '<time><beats>4</beats><beat-type>4</beat-type></time>' +
+    '<clef><sign>G</sign><line>2</line></clef></attributes>' +
+    first +
+    '</measure>' +
+    `<measure number="2">${second}</measure>` +
+    '</part></score-partwise>';
+  const streamOf = (xml) => NE.getEventStream(NE.renderFromMusicXml(xml, { domParser }).playback);
+
+  test('a fully tied chord is one held chord, not a chord struck twice', () => {
+    const [first, second] = streamOf(
+      score(
+        note('C', 4, 'start', false) + note('E', 4, 'start', true),
+        note('C', 4, 'stop', false) + note('E', 4, 'stop', true),
+      ),
+    );
+    assert.deepEqual(JSON.parse(JSON.stringify(first.sounding)), [
+      { midi: 60, strike: true, ticks: 3840 },
+      { midi: 64, strike: true, ticks: 3840 },
+    ]);
+    assert.deepEqual(JSON.parse(JSON.stringify(second.sounding)), [
+      { midi: 60, strike: false, ticks: 3840 },
+      { midi: 64, strike: false, ticks: 3840 },
+    ]);
+    assert.equal(second.tiedFromPrevious, true, 'every notehead is held over');
+    assert.equal(first.tieChainDurationTicks, 3840);
+  });
+
+  test('a partially tied chord holds one notehead and restrikes the other', () => {
+    const [first, second] = streamOf(
+      score(
+        note('C', 4, undefined, false) + note('E', 4, 'start', true),
+        note('C', 4, undefined, false) + note('E', 4, 'stop', true),
+      ),
+    );
+    assert.deepEqual(JSON.parse(JSON.stringify(first.sounding)), [
+      { midi: 60, strike: true, ticks: 1920 },
+      { midi: 64, strike: true, ticks: 3840 },
+    ]);
+    assert.deepEqual(JSON.parse(JSON.stringify(second.sounding)), [
+      { midi: 60, strike: true, ticks: 1920 },
+      { midi: 64, strike: false, ticks: 3840 },
+    ]);
+    assert.notEqual(second.tiedFromPrevious, true, 'one notehead is struck again, so the event is not wholly held');
+    assert.equal(first.tieChainDurationTicks, undefined, 'the two noteheads have different lengths');
+  });
+
+  test('a chord with no ties is struck whole, twice', () => {
+    const [first, second] = streamOf(
+      score(
+        note('C', 4, undefined, false) + note('E', 4, undefined, true),
+        note('C', 4, undefined, false) + note('E', 4, undefined, true),
+      ),
+    );
+    for (const event of [first, second]) {
+      assert.deepEqual(JSON.parse(JSON.stringify(event.sounding)), [
+        { midi: 60, strike: true, ticks: 1920 },
+        { midi: 64, strike: true, ticks: 1920 },
+      ]);
+      assert.notEqual(event.tiedFromPrevious, true);
+    }
+  });
+
+  test('a tie does not cross between two voices sounding the same chord', () => {
+    const xml =
+      '<?xml version="1.0"?><score-partwise version="4.0"><part-list>' +
+      '<score-part id="P1"><part-name>M</part-name></score-part></part-list>' +
+      '<part id="P1"><measure number="1"><attributes><divisions>4</divisions>' +
+      '<time><beats>4</beats><beat-type>4</beat-type></time>' +
+      '<clef><sign>G</sign><line>2</line></clef></attributes>' +
+      '<note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration>' +
+      '<tie type="start"/><voice>1</voice><type>whole</type>' +
+      '<notations><tied type="start"/></notations></note>' +
+      '<backup><duration>16</duration></backup>' +
+      '<note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration>' +
+      '<voice>2</voice><type>whole</type></note>' +
+      '</measure><measure number="2">' +
+      '<note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration>' +
+      '<tie type="stop"/><voice>1</voice><type>whole</type>' +
+      '<notations><tied type="stop"/></notations></note>' +
+      '<backup><duration>16</duration></backup>' +
+      '<note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration>' +
+      '<voice>2</voice><type>whole</type></note>' +
+      '</measure></part></score-partwise>';
+    const events = NE.getEventStream(NE.renderFromMusicXml(xml, { domParser }).playback);
+    // Voice 1's tie continues into voice 1's second bar; voice 2 is a
+    // separate note and is struck both times.
+    const voice2 = events.filter((e) => e.noteIds[0].includes('#v2#'));
+    assert.deepEqual(JSON.parse(JSON.stringify(voice2.map((e) => e.sounding))), [
+      [{ midi: 60, strike: true, ticks: 1920 }],
+      [{ midi: 60, strike: true, ticks: 1920 }],
+    ]);
+  });
+});

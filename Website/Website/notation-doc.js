@@ -135,7 +135,7 @@
     return rests;
   }
 
-  function insertEvent(doc, { partId, measureNumber, voiceId = 1, event }) {
+  function insertEvent(doc, { partId, measureNumber, voiceId = 1, event, overwrite = false }) {
     const capacity = ticksPerMeasure(doc, partId, measureNumber);
     return updateVoice(doc, partId, measureNumber, voiceId, (events) => {
       const base = withoutPlaceholderRest(events, capacity);
@@ -147,12 +147,22 @@
       // the measure would run past its own meter. Notes are left alone --
       // only a deliberate click into the middle of a sounding note hits
       // one, and shortening it silently would lose music.
+      //
+      // `overwrite` is the exception, and it is what paste means: the
+      // clipboard replaces whatever it lands on. A sounding note cannot be
+      // carved like a rest (there is no such thing as the tail of a
+      // notehead), so it is dropped whole and the gap becomes rests below.
       const kept = [];
       for (const current of base) {
         const currentStart = current.startTick ?? 0;
         const currentEnd = currentStart + current.duration.ticks;
-        if (current.kind !== 'rest' || currentEnd <= start || currentStart >= end) {
+        const overlaps = currentEnd > start && currentStart < end;
+        if (!overlaps) {
           kept.push(current);
+          continue;
+        }
+        if (current.kind !== 'rest') {
+          if (!overwrite) kept.push(current);
           continue;
         }
         // Carve the new note out of the rest, keeping whatever head and
@@ -593,11 +603,20 @@
         number += 1;
         next = ensureMeasure(next, cell.partId, number);
       }
+      const fitted = fitToBar(event, tick, ticksPerMeasure(next, cell.partId, number));
+      // Nothing fits in what is left of the bar -- the paste point sits
+      // closer to the barline than the shortest note can express. Skipping
+      // one note beats writing a duration the engine cannot name.
+      if (fitted === null) continue;
+      // Paste REPLACES what it lands on: without `overwrite` the pasted
+      // note stacks on the one already sounding there and the bar runs
+      // past its own meter.
       next = insertEvent(next, {
         partId: cell.partId,
         measureNumber: number,
         voiceId,
-        event: { ...fitToBar(event, tick, ticksPerMeasure(next, cell.partId, number)), voice: voiceId, startTick: tick },
+        event: { ...fitted, voice: voiceId, startTick: tick },
+        overwrite: true,
       });
     }
     return next;
@@ -610,15 +629,41 @@
    * the last beat has to become a quarter. Letting it run over makes the
    * bar longer than its own time signature, which every later measure's
    * position is measured from.
+   *
+   * `null` means the room left is smaller than the shortest note the
+   * engine can write -- there is nothing to shorten the note TO, so the
+   * caller drops it rather than inventing a duration.
    */
   function fitToBar(event, startTick, capacity) {
-    const room = Math.max(1, capacity - startTick);
+    const room = capacity - startTick;
+    if (room <= 0) return null;
     if (event.duration.ticks <= room) return event;
-    const fitted = E.durationTypeAndDotsFromTicks(room, 3);
+    const fitted = largestNotatableAtMost(room);
+    if (fitted === null) return null;
     return {
       ...event,
-      duration: E.duration(fitted.type, fitted.dots, room),
+      duration: E.duration(fitted.type, fitted.dots, fitted.ticks),
     };
+  }
+
+  /**
+   * The longest written value that fits in `ticks`, or `null` when even a
+   * 32nd is too long.
+   *
+   * `durationTypeAndDotsFromTicks` only answers for an exact match, and the
+   * room left before a barline is whatever the meter leaves -- 100 ticks,
+   * or 1820 -- so an exact-match-only lookup finds nothing and a paste
+   * near the end of a bar has no legal note to fall back on.
+   */
+  function largestNotatableAtMost(ticks) {
+    let best = null;
+    for (const type of ['whole', 'half', 'quarter', 'eighth', '16th', '32nd']) {
+      for (let dots = 0; dots <= 3; dots += 1) {
+        const span = E.ticksForDisplayedDuration({ type, dots });
+        if (span <= ticks && (best === null || span > best.ticks)) best = { type, dots, ticks: span };
+      }
+    }
+    return best;
   }
 
   /** Appends bars until `measureNumber` exists in this part. */

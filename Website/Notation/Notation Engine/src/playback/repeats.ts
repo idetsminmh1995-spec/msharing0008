@@ -439,6 +439,12 @@ export function unfoldEvents<
     readonly seconds: number;
     readonly durationTicks?: number;
     readonly tieChainDurationTicks?: number;
+    readonly sounding?: readonly {
+      readonly midi: number;
+      readonly strike: boolean;
+      readonly ticks: number;
+      readonly seconds?: number;
+    }[];
   },
 >(
   plan: RepeatPlan,
@@ -448,6 +454,11 @@ export function unfoldEvents<
   if (!plan.hasRepeats || plan.entries.length === 0) return events;
   const sorted = [...events].sort((a, b) => a.tick - b.tick);
   const out: (T & { readonly durationSeconds?: number })[] = [];
+  /** A written tick span as seconds, measured on the written timeline before any repeat moves it. */
+  const secondsFor = (tick: number, ticks: number | undefined): number | undefined =>
+    tempoMap !== undefined && ticks !== undefined
+      ? Math.max(0.02, tickToSeconds(tempoMap, tick + ticks) - tickToSeconds(tempoMap, tick))
+      : undefined;
   for (const entry of plan.entries) {
     const from = entry.writtenTick;
     const to = entry.writtenTick + entry.ticks;
@@ -458,20 +469,23 @@ export function unfoldEvents<
       // is moved: a second pass sits past the end of the score in
       // performance time, so reading the tempo map there would measure
       // the wrong span whenever the file changes tempo.
-      const lengthTicks = event.tieChainDurationTicks ?? event.durationTicks;
-      const durationSeconds =
-        tempoMap !== undefined && lengthTicks !== undefined
-          ? Math.max(
-              0.02,
-              tickToSeconds(tempoMap, event.tick + lengthTicks) -
-                tickToSeconds(tempoMap, event.tick),
-            )
-          : undefined;
+      const durationSeconds = secondsFor(
+        event.tick,
+        event.tieChainDurationTicks ?? event.durationTicks,
+      );
+      // Each notehead keeps its own length, so a chord that ties only one
+      // of its notes holds that one for the chain and the rest for their
+      // own written value.
+      const sounding = event.sounding?.map((note) => {
+        const seconds = secondsFor(event.tick, note.ticks);
+        return seconds === undefined ? note : { ...note, seconds };
+      });
       out.push({
         ...event,
         tick: entry.performanceTick + (event.tick - from),
         seconds: entry.startSeconds + (event.seconds - entry.writtenStartSeconds),
         ...(durationSeconds !== undefined ? { durationSeconds } : {}),
+        ...(sounding !== undefined ? { sounding } : {}),
       });
     }
   }

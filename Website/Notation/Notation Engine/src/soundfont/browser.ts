@@ -107,6 +107,41 @@ function midiNotesFor(event: NotationEvent): readonly number[] {
   return event.midiNotesAligned ?? event.midiNotes ?? [];
 }
 
+/**
+ * What this event sounds, one entry per notehead, with a real duration in
+ * seconds for each.
+ *
+ * An event built by `buildEventStream` carries `sounding`, where a chord's
+ * noteheads tie independently. An event from somewhere else may only have
+ * the whole-event fields, so they are the fallback -- and either way each
+ * entry gets a duration, because a host schedules one note-off per
+ * notehead rather than one per event.
+ */
+function soundingFor(
+  event: NotationEvent & { readonly durationSeconds?: number },
+  playback: PlaybackData,
+): readonly { midi: number; strike: boolean; seconds: number }[] {
+  const aligned = midiNotesFor(event);
+  const perNotehead = event.sounding;
+  if (perNotehead !== undefined && perNotehead.length > 0) {
+    return perNotehead.map((note, position) => ({
+      // An alignment that renamed the MIDI numbers wins, the same way it
+      // does for `midiNotes` above.
+      midi: aligned[position] ?? note.midi,
+      strike: note.strike,
+      seconds: Math.max(0.02, note.seconds ?? playbackEventDuration(playback, event, note.ticks)),
+    }));
+  }
+  // A tied continuation is the same note still held: striking it again is
+  // exactly the wrong thing, so it gets no note-on of its own.
+  if (event.tiedFromPrevious === true) return [];
+  const seconds = Math.max(
+    0.02,
+    event.durationSeconds ?? playbackEventDuration(playback, event, event.tieChainDurationTicks),
+  );
+  return aligned.map((midi) => ({ midi, strike: true, seconds }));
+}
+
 /** Browser SoundFont adapter used by the Notation Lab host. */
 export class R2SoundFontEngine implements NotationSoundEngine {
   readonly asset: SoundFontAsset;
@@ -185,39 +220,38 @@ export class R2SoundFontEngine implements NotationSoundEngine {
     // score with a repeat barline simply stops at it.
     const scheduled = unfoldEvents(playback.performance, playback.events, playback.tempoMap);
     for (const event of scheduled) {
-      const notes = midiNotesFor(event);
-      if (notes.length === 0) continue;
-      // A tied continuation is the same note still held: striking it again
-      // is exactly the wrong thing, so it never gets a note-on of its own.
-      if (event.tiedFromPrevious === true) continue;
-      const durationSeconds = Math.max(
-        0.02,
-        event.durationSeconds ??
-          playbackEventDuration(playback, event, event.tieChainDurationTicks),
-      );
-      // A seek starts mid-timeline: notes that already ended are skipped,
-      // and one still sounding when the seek lands starts at once with only
-      // the part of it that is left.
-      const endSeconds = event.seconds + durationSeconds;
-      if (endSeconds <= start) continue;
+      // Each notehead carries its own verdict: a chord can hold one note
+      // across the barline while striking the rest again, which a single
+      // per-event flag cannot say. `sounding` is that per-notehead truth;
+      // the whole-event fields are the fallback for an event that has none.
+      const notes = soundingFor(event, playback);
+      const struck = notes.filter((note) => note.strike);
+      if (struck.length === 0) continue;
       const channel = this.channelFor(event.partId);
-      const startDelay = Math.max(0, event.seconds - start) * 1000;
-      const remainingSeconds = Math.max(0.02, endSeconds - Math.max(event.seconds, start));
       const velocity = event.velocity ?? DEFAULT_VELOCITY;
-      const onTimer = window.setTimeout(
-        () => {
-          if (this.stopped) return;
-          for (const midiNote of notes) this.synth.noteOn(channel, midiNote, velocity);
-          const offTimer = window.setTimeout(() => {
-            for (const midiNote of notes) this.synth.noteOff(channel, midiNote);
-            this.timers.delete(offTimer);
-          }, remainingSeconds * 1000);
-          this.timers.add(offTimer);
-          this.timers.delete(onTimer);
-        },
-        Math.max(0, startDelay - (performance.now() / 1000 - origin) * 1000),
-      );
-      this.timers.add(onTimer);
+      for (const note of struck) {
+        // A seek starts mid-timeline: notes that already ended are skipped,
+        // and one still sounding when the seek lands starts at once with
+        // only the part of it that is left.
+        const endSeconds = event.seconds + note.seconds;
+        if (endSeconds <= start) continue;
+        const startDelay = Math.max(0, event.seconds - start) * 1000;
+        const remainingSeconds = Math.max(0.02, endSeconds - Math.max(event.seconds, start));
+        const onTimer = window.setTimeout(
+          () => {
+            if (this.stopped) return;
+            this.synth.noteOn(channel, note.midi, velocity);
+            const offTimer = window.setTimeout(() => {
+              this.synth.noteOff(channel, note.midi);
+              this.timers.delete(offTimer);
+            }, remainingSeconds * 1000);
+            this.timers.add(offTimer);
+            this.timers.delete(onTimer);
+          },
+          Math.max(0, startDelay - (performance.now() / 1000 - origin) * 1000),
+        );
+        this.timers.add(onTimer);
+      }
     }
   }
 

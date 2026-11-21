@@ -7,33 +7,45 @@ import type { DirectionEvent } from '../parser/musicxml/parse.js';
 import type { ParsedDynamicLevel } from '../parser/musicxml/direction.js';
 import { DEFAULT_VELOCITY, velocityForDynamic } from './dynamics.js';
 
-/** A pitch in the engine's scientific octave representation converted to a MIDI note number. */
-function midiNoteForEvent(event: MeasureEvent, transposeSemitones: number): readonly number[] {
-  const notes = event.kind === 'chord' ? event.notes : event.kind === 'note' ? [event] : [];
-  return notes.flatMap((note) => {
-    const midi = midiNoteNumber(note.pitch, transposeSemitones);
-    return midi === undefined ? [] : [midi];
-  });
+/** One sounding notehead of an event, before ties are resolved. */
+interface Notehead {
+  readonly midi: number;
+  readonly tieStart: boolean;
+  readonly tieStop: boolean;
 }
 
 /**
- * An unpitched percussion note's MIDI key number, from the part's
- * `<midi-instrument>` map: a `<note><instrument id="...">` names which
- * drum it is, and that id resolves to a GM percussion note. Without it
- * there is no way to know WHICH drum a display position means -- the
- * display position is layout, not identity -- so a note with no resolved
- * GM number stays silent rather than guessing.
+ * The noteheads an event sounds, in written order, with their own tie
+ * flags -- one entry per pitched note, plus every unpitched note whose
+ * `<instrument>` resolves to a GM key number.
+ *
+ * Kept per notehead rather than per event because a chord ties its
+ * noteheads independently: `C` can be held across a barline while `E` in
+ * the same chord is struck again. A single flag on the event cannot say
+ * that, so tie resolution works from this.
+ *
+ * An unpitched note with no resolved GM number is left out entirely: its
+ * display position is layout, not identity, so it has no pitch to tie to
+ * and nothing to sound.
  */
-function percussionMidiNotesForEvent(
+function noteheadsFor(
   event: MeasureEvent,
+  transposeSemitones: number,
   instruments: ReadonlyMap<string, MidiInstrumentInfo> | undefined,
-): readonly number[] {
-  if (instruments === undefined) return [];
+): readonly Notehead[] {
   const notes = event.kind === 'chord' ? event.notes : event.kind === 'note' ? [event] : [];
-  return notes.flatMap((note: Note) => {
-    if (isPitched(note.pitch) || note.instrumentId === undefined) return [];
-    const gmNote = instruments.get(note.instrumentId)?.gmNote;
-    return gmNote !== undefined ? [gmNote] : [];
+  return notes.flatMap((note: Note): readonly Notehead[] => {
+    if (isPitched(note.pitch)) {
+      const midi = midiNoteNumber(note.pitch, transposeSemitones);
+      return midi === undefined
+        ? []
+        : [{ midi, tieStart: note.tieStart === true, tieStop: note.tieStop === true }];
+    }
+    const instrumentId = note.instrumentId;
+    const gmNote = instrumentId === undefined ? undefined : instruments?.get(instrumentId)?.gmNote;
+    return gmNote === undefined
+      ? []
+      : [{ midi: gmNote, tieStart: note.tieStart === true, tieStop: note.tieStop === true }];
   });
 }
 
@@ -70,6 +82,10 @@ export interface NotationEvent {
    * True when a tie from the previous event continues into this one.
    * The note is the same note still held, so a host must NOT strike it
    * again -- sounding it twice is the audible symptom of ignoring this.
+   *
+   * Only set when EVERY notehead of the event is held over. A chord can
+   * tie some of its notes and restrike the rest, which this one flag
+   * cannot express; `sounding` is the per-notehead truth.
    */
   readonly tiedFromPrevious?: boolean;
   /**
@@ -77,8 +93,40 @@ export interface NotationEvent {
    * that STARTS the chain. A note tied across a barline is one note as
    * far as the ear is concerned, so a host schedules one note-off at the
    * end of this, not at `durationTicks`.
+   *
+   * Only set when every struck notehead of the event shares one chain
+   * length; `sounding` is the per-notehead truth.
    */
   readonly tieChainDurationTicks?: number;
+  /**
+   * What this event actually sounds, one entry per notehead, in the order
+   * `midiNotes` lists them.
+   *
+   * A chord ties its noteheads independently -- `C` held across the
+   * barline while `E` is struck again -- which the two flags above cannot
+   * say. A host that schedules audio reads this; one that only highlights
+   * the page can keep using `tiedFromPrevious`.
+   */
+  readonly sounding?: readonly SoundingNote[];
+}
+
+/** One notehead this event sounds, and how. */
+export interface SoundingNote {
+  readonly midi: number;
+  /** False when the notehead continues a tie: it is the same note still held. */
+  readonly strike: boolean;
+  /**
+   * How long to hold it, in ticks, measured from this event's start. The
+   * head of a tie chain carries the whole chain, so a host schedules one
+   * note-off there rather than one per notehead.
+   */
+  readonly ticks: number;
+  /**
+   * `ticks` as seconds, filled in by `unfoldEvents` for a host that
+   * schedules audio. Absent on the `PlaybackData.events` the renderer
+   * works from.
+   */
+  readonly seconds?: number;
 }
 
 export function notationEventId(
@@ -135,8 +183,8 @@ export function buildEventStream(
   directions?: readonly DirectionEvent[],
 ): readonly NotationEvent[] {
   const events: NotationEvent[] = [];
-  /** The measure event each entry of `events` came from, so ties can be read off the notation. */
-  const written: MeasureEvent[] = [];
+  /** The noteheads each entry of `events` sounds, so ties resolve per notehead. */
+  const written: (readonly Notehead[])[] = [];
   for (const part of score.parts) {
     const instruments = midiInstrumentsByPart?.get(part.id);
     for (const measure of part.measures) {
@@ -148,23 +196,20 @@ export function buildEventStream(
         voice.events.forEach((event, index) => {
           const startTick = event.startTick ?? tickInMeasure;
           const noteIds = noteIdsForEvent(part.id, measure.number, voice.id, index, event);
+          const noteheads = noteheadsFor(event, transposeSemitones, instruments);
           if (noteIds.length > 0) {
             const tick = offset + startTick;
-            const midiNotes = [
-              ...midiNoteForEvent(event, transposeSemitones),
-              ...percussionMidiNotesForEvent(event, instruments),
-            ];
             events.push({
               tick,
               seconds: tickToSeconds(tempoMap, tick),
               durationTicks: event.duration.ticks,
               partId: part.id,
               noteIds,
-              ...(midiNotes.length > 0 ? { midiNotes } : {}),
+              ...(noteheads.length > 0 ? { midiNotes: noteheads.map((note) => note.midi) } : {}),
               measureNumber: measure.number,
               velocity: DEFAULT_VELOCITY,
             });
-            written.push(event);
+            written.push(noteheads);
           }
           tickInMeasure = startTick + event.duration.ticks;
         });
@@ -190,21 +235,19 @@ export function buildEventStream(
 }
 
 /**
- * Marks the events that a tie holds over, and gives the first event of
- * each chain the chain's whole sounding length.
+ * Marks the noteheads a tie holds over, and gives the head of each chain
+ * the chain's whole sounding length.
  *
- * `voiceEvents` is one voice's events in tick order; the result replaces
- * them in place.
+ * A tie joins one PITCH within one voice: the same pitch in another voice
+ * at the same time is a different note, and pairing the two would hold one
+ * of them over forever. The voice is recoverable from the event id
+ * (`part#m1#v1#e0`, or `part#m1#v1#e0#n0` for a chord's noteheads), which
+ * is why this groups rather than walking the whole stream.
  */
 function resolveTies(
   voiceEvents: readonly NotationEvent[],
-  written: readonly MeasureEvent[],
+  written: readonly (readonly Notehead[])[],
 ): void {
-  // A tie holds a pitch WITHIN one voice: the same pitch in another voice
-  // at the same time is a different note, and pairing the two would hold
-  // one of them over forever. The voice is recoverable from the event id
-  // (`part#m1#v1#e0`), which is why this groups rather than walking the
-  // whole stream.
   const groups = new Map<string, number[]>();
   voiceEvents.forEach((event, index) => {
     const key = voiceKeyOf(event);
@@ -215,60 +258,79 @@ function resolveTies(
   for (const indices of groups.values()) resolveTiesInVoice(voiceEvents, written, indices);
 }
 
-/** `${partId}#v${voiceId}` from an event id, so a chain never crosses a voice. */
+/**
+ * `${partId}#v${voiceId}` from an event id, so a chain never crosses a voice.
+ *
+ * The chord suffix matters: a chord's note ids carry `#n0`, `#n1`, ...,
+ * and an id pattern that stopped at `#e0` would treat every chord note as
+ * its own voice. That is what used to make a chord tie resolve to nothing
+ * at all -- the first bar's note and the second bar's note landed in
+ * different groups, so no chain was ever opened.
+ */
 function voiceKeyOf(event: NotationEvent): string {
   const id = event.noteIds[0] ?? '';
-  const match = /^(.*)#m\d+#v(\d+)#e\d+$/.exec(id);
+  const match = /^(.*)#m\d+#v(\d+)#e\d+(?:#n\d+)?$/.exec(id);
   return match ? `${match[1]}#v${match[2]}` : id;
 }
 
 function resolveTiesInVoice(
   voiceEvents: readonly NotationEvent[],
-  written: readonly MeasureEvent[],
+  written: readonly (readonly Notehead[])[],
   indices: readonly number[],
 ): void {
-  /** Open chains, keyed by the exact MIDI note set they sound -- a tie holds a pitch, so only an identical set continues it. */
-  const open = new Map<string, number>();
-  // An event with no MIDI notes has no pitch to hold, so it can neither
-  // open nor continue a chain -- giving it a key would tie it to every
-  // other pitchless event in the voice.
-  const keyOf = (event: NotationEvent) =>
-    event.midiNotes === undefined ? undefined : event.midiNotes.join(',');
+  /** Open chains, keyed by MIDI number: a tie holds one pitch, so only that same pitch continues it. */
+  const open = new Map<number, { event: number; notehead: number }>();
   for (const index of indices) {
     const event = voiceEvents[index];
-    const source = written[index];
-    if (event === undefined || source === undefined) continue;
-    const key = keyOf(event);
-    if (key === undefined) continue;
-    const head = open.get(key);
-    const headEvent = head === undefined ? undefined : voiceEvents[head];
-    if (hasTieStop(source) && headEvent !== undefined) {
-      (event as { tiedFromPrevious?: boolean }).tiedFromPrevious = true;
-      const chain = headEvent as { tieChainDurationTicks?: number };
-      chain.tieChainDurationTicks =
-        (chain.tieChainDurationTicks ?? headEvent.durationTicks) + event.durationTicks;
-      if (!hasTieStart(source)) open.delete(key);
-      continue;
+    const noteheads = written[index];
+    if (event === undefined || noteheads === undefined || noteheads.length === 0) continue;
+    const sounding: SoundingNote[] = [];
+    for (let position = 0; position < noteheads.length; position += 1) {
+      const notehead = noteheads[position];
+      if (notehead === undefined) continue;
+      const head = open.get(notehead.midi);
+      const headEvent = head === undefined ? undefined : voiceEvents[head.event];
+      const headSounding = headEvent === undefined ? undefined : mutableSounding(headEvent);
+      if (notehead.tieStop && head !== undefined && headEvent !== undefined) {
+        // The chain is the head's own length plus every notehead it has
+        // grown through, and the note already sounding is not struck again.
+        const carried = headSounding?.[head.notehead];
+        const held = (carried?.ticks ?? headEvent.durationTicks) + event.durationTicks;
+        if (headSounding !== undefined && carried !== undefined) {
+          headSounding[head.notehead] = { ...carried, ticks: held };
+        }
+        sounding.push({ midi: notehead.midi, strike: false, ticks: held });
+        if (!notehead.tieStart) open.delete(notehead.midi);
+        continue;
+      }
+      if (notehead.tieStart) open.set(notehead.midi, { event: index, notehead: position });
+      else open.delete(notehead.midi);
+      sounding.push({ midi: notehead.midi, strike: true, ticks: event.durationTicks });
     }
-    if (hasTieStart(source)) open.set(key, index);
-    else open.delete(key);
+    (event as { sounding?: readonly SoundingNote[] }).sounding = sounding;
+  }
+  for (const index of indices) {
+    const event = voiceEvents[index];
+    const notes = event === undefined ? undefined : event.sounding;
+    if (event === undefined || notes === undefined || notes.length === 0) continue;
+    // The whole-event flags stay for the hosts that already read them: set
+    // only when EVERY notehead agrees, so a partially tied chord never
+    // claims to be held whole and a mixed-length chord never claims one
+    // chain length.
+    if (notes.every((note) => !note.strike)) {
+      (event as { tiedFromPrevious?: boolean }).tiedFromPrevious = true;
+    }
+    const lengths = new Set(notes.filter((note) => note.strike).map((note) => note.ticks));
+    const [only] = [...lengths];
+    if (lengths.size === 1 && only !== undefined && only !== event.durationTicks) {
+      (event as { tieChainDurationTicks?: number }).tieChainDurationTicks = only;
+    }
   }
 }
 
-/** True when any notehead of this event starts a tie. */
-function hasTieStart(event: MeasureEvent): boolean {
-  return notesOf(event).some((note) => note.tieStart === true);
-}
-
-/** True when any notehead of this event ends a tie. */
-function hasTieStop(event: MeasureEvent): boolean {
-  return notesOf(event).some((note) => note.tieStop === true);
-}
-
-function notesOf(event: MeasureEvent): readonly Note[] {
-  if (event.kind === 'note') return [event];
-  if (event.kind === 'chord') return event.notes;
-  return [];
+/** An event's sounding list as a mutable array, for a chain to grow in place. */
+function mutableSounding(event: NotationEvent): SoundingNote[] | undefined {
+  return event.sounding === undefined ? undefined : (event.sounding as SoundingNote[]);
 }
 
 /**
@@ -282,7 +344,7 @@ function notesOf(event: MeasureEvent): readonly Note[] {
  */
 function applyDynamics(
   events: readonly NotationEvent[],
-  written: readonly MeasureEvent[],
+  written: readonly (readonly Notehead[])[],
   directions: readonly DirectionEvent[] | undefined,
   globalTickOffsetByMeasure: ReadonlyMap<number, number>,
 ): void {
