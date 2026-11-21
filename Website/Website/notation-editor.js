@@ -51,6 +51,7 @@
   const deleteButton = pick('[data-editor-delete]');
   const pasteButton = pick('[data-editor-paste]');
   const restButton = pick('[data-editor-rest]');
+  const chordButton = pick('[data-editor-chord]');
   const zoomInButton = pick('[data-editor-zoom-in]');
   const zoomOutButton = pick('[data-editor-zoom-out]');
   const zoomOutput = pick('[data-editor-zoom]');
@@ -86,7 +87,7 @@
     filename: '',
     zoom: 100,
     layout: 'page',
-    tool: { duration: 'quarter', dots: 0, rest: false, accidental: null },
+    tool: { duration: 'quarter', dots: 0, rest: false, accidental: null, chord: false },
     noteInput: true,
     activePartId: null,
     drumInstruments: null,
@@ -1670,6 +1671,10 @@
     if (!state.entry) {
       state.entry = { partId: activePartId(), measureNumber: 1, voiceId: state.voice, tick: 0 };
     }
+    // Chord mode keeps every note on the beat the last one was written on,
+    // so the mode and Shift are the same gesture: one is a latch, the other
+    // is held. A rest is a beat of its own and never joins a chord.
+    const stacking = !rest && (addToChord || state.tool.chord);
     const { measureNumber, voiceId } = state.entry;
     const staff = state.entry.staffNumber ?? 1;
     // A chord member belongs on the beat the last note was written on, not
@@ -1677,7 +1682,7 @@
     // a letter after a note writes a NEW note on the next beat, which is the
     // opposite of what stacking means. `written` is only ever set by
     // `advanceEntry`, so a fresh click never inherits it.
-    if (addToChord && state.entry.written !== undefined) {
+    if (stacking && state.entry.written !== undefined) {
       state.entry = { ...state.entry, ...state.entry.written };
     }
     const capacity = capacityOf(measureNumber);
@@ -1747,7 +1752,7 @@
         // A drum chord is written the same way a pitched one is: kick and
         // hi-hat land on the same beat, so a Shift-click on the second
         // line stacks it instead of replacing the first.
-        if (addToChord) {
+        if (stacking) {
           const stacked = stackedWith(existing, note, state.entry.tick);
           if (stacked === null) {
             announce(`${drum.name} is already in the chord.`);
@@ -1779,7 +1784,7 @@
 
     if (existing && existing.kind !== 'rest') {
       const note = engine.note({ pitch, duration: existing.duration, voice: voiceId, staff });
-      if (addToChord) {
+      if (stacking) {
         const stacked = stackedWith(existing, note, state.entry.tick);
         if (stacked === null) {
           announce(`${step}${octave} is already in the chord.`);
@@ -2695,6 +2700,7 @@
       button.setAttribute('aria-pressed', String(button.dataset.editorDynamic === dynamic));
     });
     restButton.setAttribute('aria-pressed', String(state.tool.rest));
+    if (chordButton) chordButton.setAttribute('aria-pressed', String(state.tool.chord));
     noteInputButton.setAttribute('aria-pressed', String(state.noteInput));
     if (previewButton) previewButton.setAttribute('aria-pressed', String(state.previewOn));
     if (zoomOutput) zoomOutput.textContent = `${state.zoom}%`;
@@ -2958,6 +2964,13 @@
     state.tool.rest = !state.tool.rest;
     syncTools();
     announce(state.tool.rest ? 'Rests on.' : 'Rests off.');
+  });
+  if (chordButton) chordButton.addEventListener('click', () => {
+    state.tool.chord = !state.tool.chord;
+    syncTools();
+    announce(state.tool.chord
+      ? 'Chord mode on — each note you write stacks on the same beat.'
+      : 'Chord mode off.');
   });
 
   if (voiceSelect) voiceSelect.addEventListener('change', () => setVoice(voiceSelect.value));

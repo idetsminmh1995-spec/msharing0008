@@ -1965,6 +1965,33 @@ describe('the editor and the engine agree, end to end', () => {
         });
     };
 
+    test('Chord mode stacks plain clicks, so a triad needs no Shift', () => {
+      const page = openForClicking();
+      // Three lines, three plain clicks: a writer who turns the mode on has
+      // said "these belong together", so the second and third must stack
+      // rather than replace. Shift still works and means the same thing.
+      const chordButton = page.doc.querySelector('[data-editor-chord]');
+      assert.ok(chordButton, 'the row has no chord control');
+      chordButton.dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      assert.equal(chordButton.getAttribute('aria-pressed'), 'true', 'the control shows chord mode is on');
+
+      page.press(9, 11.7);
+      assert.equal(page.status(), 'Inserted B4.');
+      page.press(9, 10.7);
+      assert.equal(page.status(), 'Note added to chord.');
+      page.press(9, 12.7);
+      assert.equal(page.status(), 'Note added to chord.');
+      assert.deepEqual(barOneNotes(page.saved()), ['B4', '+D5', '+G4']);
+
+      // Turning it off gives the beat back to replacement: the chord is
+      // replaced by the one note written on it.
+      chordButton.dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      assert.equal(chordButton.getAttribute('aria-pressed'), 'false');
+      page.press(9, 12.7);
+      assert.match(page.status(), /^Replaced with /);
+      assert.deepEqual(barOneNotes(page.saved()), ['G4']);
+    });
+
     test('Shift-clicking a second line stacks it on the first instead of replacing it', () => {
       const page = openForClicking();
       // The starter staff's middle line, then one line above and one below.
