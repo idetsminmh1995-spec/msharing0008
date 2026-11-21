@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="Write and edit a music score in the Notation Lab editor." />
     <title>Notation Lab Editor — M Sharing</title>
-    <link rel="stylesheet" href="styles.css?v=013b23b319b4" />
+    <link rel="stylesheet" href="styles.css?v=c55c26409294" />
     <link rel="icon" type="image/svg+xml" href="assets/logo/m-sharing-mark.svg" />
   </head>
   <body class="editor-page">
@@ -151,6 +151,12 @@
         <div class="editor-popover editor-popover--inst" data-editor-popover-panel="inst" role="group" aria-label="Instruments" hidden></div>
         <div class="editor-popover editor-popover--mixer" data-editor-popover-panel="mixer" role="group" aria-label="Mixer" hidden></div>
       </div>
+      <div class="editor-bottombar__group" role="group" aria-label="View">
+        <div class="editor-segment" role="group" aria-label="Page layout">
+          <button class="editor-segment__button" type="button" data-editor-layout="page" aria-label="Page view" title="Page view — sheets with margins" aria-pressed="true"><span>Page</span></button>
+          <button class="editor-segment__button" type="button" data-editor-layout="scroll" aria-label="Horizontal view" title="Horizontal view — one continuous row of systems" aria-pressed="false"><span>Horizontal</span></button>
+        </div>
+      </div>
       <div class="editor-bottombar__group" role="group" aria-label="Length">
         <output class="editor-bottombar__readout editor-bottombar__readout--length" data-editor-length aria-live="off" aria-label="Score length" title="How long the score lasts">0:00</output>
       </div>
@@ -180,12 +186,12 @@
         </div>
       </div>
     </div>
-    <script src="assets/notation-engine.js?v=d9353d8e989e"></script>
+    <script src="assets/notation-engine.js?v=7eeeec70f32b"></script>
     <script src="assets/sound-engine.js?v=bf60ebeed9a3"></script>
     <script src="script.js?v=cb8dc501cd10"></script>
     <script src="soundfonts-config.js?v=11199e76d024"></script>
     <script src="notation-doc.js?v=3298488721aa"></script>
     <script src="notation-newscore.js?v=99c9bb4cc6d4"></script>
-    <script src="notation-editor.js?v=4cb261cbd55d"></script>
+    <script src="notation-editor.js?v=638f03e8520f"></script>
   </body>
 </html>

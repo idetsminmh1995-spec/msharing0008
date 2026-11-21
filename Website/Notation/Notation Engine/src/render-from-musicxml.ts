@@ -4793,6 +4793,43 @@ export function renderParsedMusicXml(
   }
 
   const svgParts: string[] = [];
+  // The title block: MusicXML carries a work title and a composer, and a
+  // printed score shows them above the first system. They go in the page's
+  // own top margin, which the layout already reserves, so no system moves:
+  // every y below is the one the layout handed out.
+  const firstSheet = pageSheetLayout[0];
+  if (config.layout.mode === 'page' && firstSheet !== undefined) {
+    const top = firstSheet.top;
+    const title = score.title?.trim() ?? '';
+    const composer = score.composer?.trim() ?? '';
+    if (title !== '') {
+      svgParts.push(
+        renderText(title, config.page.pageWidth / 2, top + config.page.marginTop - 2.5, {
+          fontFamily: theme.textFont,
+          fontSize: 2.6,
+          color: theme.ink,
+          anchor: 'middle',
+          bold: true,
+        }),
+      );
+    }
+    if (composer !== '') {
+      svgParts.push(
+        renderText(
+          composer,
+          config.page.pageWidth - config.page.marginRight,
+          top + config.page.marginTop - 0.5,
+          {
+            fontFamily: theme.textFont,
+            fontSize: 1.5,
+            color: theme.ink,
+            anchor: 'end',
+            italic: true,
+          },
+        ),
+      );
+    }
+  }
   let totalWidth = MEASURE_WIDTH;
   for (const placement of placementByMeasureNumber.values()) {
     totalWidth = Math.max(totalWidth, placement.x + placement.width);

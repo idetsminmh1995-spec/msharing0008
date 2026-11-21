@@ -625,8 +625,20 @@ body.is-newscore-open { overflow:hidden; }
   padding:0 16px;
   overflow:visible;
   border-top:1px solid var(--border);
-  background:var(--header);
   box-shadow:0 -12px 30px rgba(0,0,0,.24);
+}
+/* The fill and its blur live on a pseudo-element, not on the bar itself.
+   A `backdrop-filter` on the bar makes it the containing block for every
+   `position:fixed` descendant, so the instrument and mixer panels were
+   placed against the bar's own box and opened a full screen below the
+   window instead of above it. Painting the same fill from a child keeps
+   the look and leaves the panels anchored to the viewport. */
+.editor-bottombar::before {
+  content:'';
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  background:var(--header);
   backdrop-filter:blur(18px);
 }
 .editor-bottombar__group { position:relative; display:flex; flex:0 0 auto; align-items:center; gap:5px; }

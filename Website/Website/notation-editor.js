@@ -54,6 +54,7 @@
   const chordButton = pick('[data-editor-chord]');
   const zoomInButton = pick('[data-editor-zoom-in]');
   const zoomOutButton = pick('[data-editor-zoom-out]');
+  const layoutButtons = [...document.querySelectorAll('[data-editor-layout]')];
   const zoomOutput = pick('[data-editor-zoom]');
   const lengthOutput = pick('[data-editor-length]');
   const popoverTriggers = [...document.querySelectorAll('[data-editor-popover]')];
@@ -2083,12 +2084,20 @@
           clefAt(position.measureNumber, staffNumber),
           staffPosition,
         );
+    // Chord mode is a latch on the BEAT, not on the pitch: the next note
+    // joins the beat the last one was written on, wherever it was clicked.
+    // Rebuilding `entry` from the click's own x would move the beat, so
+    // every chord click landed on the next slot and no chord could ever
+    // grow past one notehead. `written` is what `advanceEntry` recorded;
+    // keeping it here is what makes the second and third click stack.
+    const stackingClick = state.tool.chord && state.entry?.written !== undefined;
     state.entry = {
       partId: activePartId(),
-      measureNumber: position.measureNumber,
+      measureNumber: stackingClick ? state.entry.written.measureNumber : position.measureNumber,
       voiceId: state.voice,
-      tick: snappedTick,
+      tick: stackingClick ? state.entry.written.tick : snappedTick,
       staffNumber,
+      ...(stackingClick ? { written: state.entry.written } : {}),
     };
     if (state.noteInput) {
       clearSelection();
@@ -2770,6 +2779,12 @@
 
   // ---- toolbar state -----------------------------------------------------
 
+  const syncLayout = () => {
+    layoutButtons.forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.editorLayout === state.layout));
+    });
+  };
+
   const syncTools = () => {
     durationButtons.forEach((button) => {
       button.setAttribute('aria-pressed', String(button.dataset.editorDuration === state.tool.duration));
@@ -2797,6 +2812,7 @@
     if (zoomOutput) zoomOutput.textContent = `${state.zoom}%`;
     root.dataset.mode = state.noteInput ? 'input' : 'select';
     if (toolbarStack) toolbarStack.dataset.mode = root.dataset.mode;
+    syncLayout();
   };
 
   /**
@@ -3289,6 +3305,17 @@
   }));
   if (zoomInButton) zoomInButton.addEventListener('click', () => { state.zoom += 10; updateZoom(); });
   if (zoomOutButton) zoomOutButton.addEventListener('click', () => { state.zoom -= 10; updateZoom(); });
+  // Page and Horizontal are the same score drawn two ways: sheets with
+  // margins, or one continuous row of systems. Switching re-renders from
+  // the same document, so nothing is lost and the cursor stays put.
+  layoutButtons.forEach((button) => button.addEventListener('click', () => {
+    const mode = button.dataset.editorLayout;
+    if (state.layout === mode) return;
+    state.layout = mode;
+    syncLayout();
+    render();
+    announce(mode === 'page' ? 'Page view.' : 'Horizontal view.');
+  }));
   flipButton.addEventListener('click', flipStems);
   restButton.addEventListener('click', () => {
     state.tool.rest = !state.tool.rest;

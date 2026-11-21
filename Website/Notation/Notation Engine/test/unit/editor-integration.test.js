@@ -443,7 +443,7 @@ describe('the editor and the engine agree, end to end', () => {
       .filter((control) => !control.closest('[data-editor-popover-panel]'));
     assert.deepEqual(
       controls.map((control) => control.getAttribute('aria-label')),
-      ['Play', 'Stop', 'Metronome', 'Inst.', 'Mixer', 'Score length', 'Zoom out', 'Zoom level', 'Zoom in', 'Save', 'Export'],
+      ['Play', 'Stop', 'Metronome', 'Inst.', 'Mixer', 'Page view', 'Horizontal view', 'Score length', 'Zoom out', 'Zoom level', 'Zoom in', 'Save', 'Export'],
     );
 
     // Save and Export are different promises, not two names for one thing:
@@ -459,7 +459,7 @@ describe('the editor and the engine agree, end to end', () => {
     const groups = [...bars[0].children].filter((node) => node.classList.contains('editor-bottombar__group'));
     assert.deepEqual(
       groups.map((group) => group.getAttribute('aria-label')),
-      ['Playback', 'Instrument', 'Length', 'Zoom', 'File'],
+      ['Playback', 'Instrument', 'View', 'Length', 'Zoom', 'File'],
     );
 
     // The length readout is the timeline's own end in minutes:seconds, so a
