@@ -85,24 +85,50 @@ function appAssetPattern(relative) {
 const referencePattern = /(notation-engine\.js\?v=)[^"'&\s]+/g;
 const soundReferencePattern = /(sound-engine\.js\?v=)[^"'&\s]+/g;
 let updatedPages = 0;
+let foundReferences = 0;
 let updatedReferences = 0;
 let updatedSoundReferences = 0;
 let updatedAppReferences = 0;
+
+// Rewrite every key to the current one, counting only the references whose key
+// value actually changed, so the build log reports what a build moved rather
+// than what it merely touched.
+function rekey(html, pattern, render) {
+  let updated = 0;
+  let found = 0;
+  const next = html.replace(pattern, (match, ...groups) => {
+    found += 1;
+    const replacement = render(...groups);
+    if (match !== replacement) updated += 1;
+    return replacement;
+  });
+  return { next, updated, found };
+}
+
 for (const root of publicRoots) {
   for (const htmlPath of await htmlFilesUnder(root)) {
     const html = await readFile(htmlPath, 'utf8');
-    const count = [...html.matchAll(referencePattern)].length;
-    const soundCount = [...html.matchAll(soundReferencePattern)].length;
-    let nextHtml = html
-      .replace(referencePattern, `$1${cacheVersion}`)
-      .replace(soundReferencePattern, `$1${soundCacheVersion}`);
+    let nextHtml = html;
+
+    const notation = rekey(nextHtml, referencePattern, (prefix) => `${prefix}${cacheVersion}`);
+    nextHtml = notation.next;
+    foundReferences += notation.found;
+    updatedReferences += notation.updated;
+
+    const sound = rekey(nextHtml, soundReferencePattern, (prefix) => `${prefix}${soundCacheVersion}`);
+    nextHtml = sound.next;
+    updatedSoundReferences += sound.updated;
+
     for (const [relative, version] of appAssetVersions) {
-      const pattern = appAssetPattern(relative);
-      updatedAppReferences += [...nextHtml.matchAll(pattern)].length;
-      nextHtml = nextHtml.replace(pattern, `$1${relative}$2${version}$3`);
+      const app = rekey(
+        nextHtml,
+        appAssetPattern(relative),
+        (prefix, separator, quote) => `${prefix}${relative}${separator}${version}${quote}`,
+      );
+      nextHtml = app.next;
+      updatedAppReferences += app.updated;
     }
-    updatedReferences += count;
-    updatedSoundReferences += soundCount;
+
     if (nextHtml !== html) {
       await writeFile(htmlPath, nextHtml);
       updatedPages += 1;
@@ -110,12 +136,13 @@ for (const root of publicRoots) {
   }
 }
 
-if (updatedReferences === 0) {
+if (foundReferences === 0) {
   throw new Error('No versioned notation-engine.js HTML references were found to synchronize.');
 }
 
 console.log(
   `Published notation engine ${cacheVersion}: website bundles + maps; ` +
     `published sound engine ${soundCacheVersion}, worklet and Bravura font; ` +
-    `updated ${updatedReferences} notation and ${updatedSoundReferences} sound cache key(s) across ${updatedPages} HTML page(s).`,
+    `updated ${updatedReferences} notation, ${updatedSoundReferences} sound and ` +
+    `${updatedAppReferences} app cache key(s) across ${updatedPages} HTML page(s).`,
 );
