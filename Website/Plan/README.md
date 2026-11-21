@@ -162,6 +162,8 @@ Video preview fullscreen ဝင်ပြီးနောက် control bar ထဲ
 
 ## Notation Lab Page — 2026-11-13
 
+> **2026-11-15 မှတ်ချက်:** ဤ section ထဲက viewer UI (အောက်ခြေ fixed dock, `Choose file` ခလုတ်၊ viewer controls) နှင့် အောက်က sub-section သုံးခုသည် အစောပိုင်း baseline ဖြစ်သည်။ Notation Lab ၏ လက်ရှိ UI/UX flow ကို [Notation Lab UI/UX Plan](#notation-lab-uiux-plan--revised-2026-11-15) section တွင် ကြည့်ပါ။ Engine, Sound Engine bridge နှင့် PDF export ဆိုင်ရာ အချက်များ မပြောင်းပါ။
+
 Notation Lab ကို လက်ရှိ static-site architecture အတိုင်း `Website/Website/notation.html` route အဖြစ် ဆက်လက်တည်ဆောက်မည်။ Page တွင် hero/banner နှင့် မလိုအပ်သော explanatory copy မပါစေရ။ `.musicxml`, `.xml`, `.mxl` ကို Notation Engine browser bundle (`NotationEngine.renderFromMusicXml`, `unzipMxl`) ဖြင့် notation ပြသမည်။ `layout.mode` ကို `page` နှင့် `scroll` အကြား ပြောင်းနိုင်ပြီး ထွက်လာသော SVG ကို Engine ၏ `exportPdf()` ဖြင့် PDF ထုတ်မည်။ MusicXML ဖိုင်ရွေးရန် ကြီးမားသော box မထားဘဲ `Choose file` ခလုတ်ငယ်တစ်ခုသာထားမည်။ အဆိုပါခလုတ်နှင့် view/playback/volume/PDF controls ကို viewport အောက်ခြေရှိ fixed dock တွင်ထားပြီး ဖုန်းတွင် mobile bottom navigation အပေါ်ဘက်၌ ပြသမည်။
 
 Playback/audio ကို Notation Engine ထဲတွင်မထည့်ဘဲ သီးခြား Sound Engine က တာဝန်ယူမည်။ Sound Engine source သည် လက်ရှိ repo ထဲတွင် မရှိသေးသောကြောင့် UI က `notationlab:*` browser event bridge မှတစ်ဆင့် playback data နှင့် volume ကိုပို့မည်။ Sound Engine မချိတ်ဆက်မချင်း အသံထွက်သည်ဟု မပြဘဲ connection status ကိုသာပြမည်။
@@ -200,6 +202,62 @@ Notation Engine, Sound Engine နှင့် Video Engine တို့ကို
 - **Notation Engine** က note များကို ပြသပြီး **Sound Engine** က အဆိုပါ note များအတိုင်း အသံထုတ်ပေးမည်။ **Video Engine** က အရည်အသွေးကောင်းပြီး ချောမွေ့သော video file ထုတ်လုပ်ရာနှင့် လိုအပ်သော file များကို အသုံးပြုရာတွင် ကူညီမည်။
 - **Piano Hand Human Engine** က note တစ်လုံးချင်းအတွက် ဘယ်လက်/ညာလက်နှင့် ဘယ်လက်ချောင်းဖြင့် တီးရမည်ဆိုသော data ကို ပေးမည်။ **Piano 3D Hand Engine** က ထို data အတိုင်း 3D လက်လှုပ်ရှားမှုကို ပြမည်။
 - Animation Engine သည် Piano ခလုတ်များကို အရောင်ဖြင့် highlight လုပ်ခြင်းနှင့် အခြား animation ဆိုင်ရာအလုပ်များကို လုပ်မည်။ Drum Animation Engine ကို Piano workflow တွင် အသုံးပြုမည့်အမည်နှင့် ၎င်း၏ အကျုံးဝင်မှုကို ထပ်မံအတည်ပြုရန် ကျန်ရှိသည်။
+
+## Notation Lab UI/UX Plan — revised 2026-11-15
+
+အရင်းအမြစ်: `Website/Plan/Notation-Lab-UI-UX-Plan.md` (ထိုဖိုင်ကို မဖျက်ဘဲ ထိန်းထားသည်။ ဤ section သည် ၎င်း၏ အကြောင်းအရာကို Main Plan ထဲသို့ ပေါင်းထည့်ထားခြင်းဖြစ်သည်။)
+
+**Status:** Active — revised 2026-11-15
+
+### Product flow
+
+Notation Lab starts as a focused entry screen. It must not expose the previous viewer or composer controls before a user chooses an intent.
+
+1. **Open File** opens a file picker for supported score files. After a valid selection, the user is sent to the Editor with that file.
+2. **Create** sends the user directly to the Editor to start a new score.
+3. **Scan** is visually present but disabled and labelled **Coming soon**. No scan/upload workflow is implied or implemented.
+
+### Entry-screen requirements
+
+- Use three equally clear action boxes: Open File, Create, and Scan.
+- Keep the page lightweight, responsive, keyboard-accessible, and free of the old notation canvas, bottom dock, playback, composer, diagnostics, and marketing-style workspace UI.
+- Give each action a concise explanation and a clear disabled state for Scan.
+- Preserve the existing site header and mobile navigation for brand consistency.
+
+### Editor handoff
+
+- The Editor is a dedicated route. It receives either a create intent or a selected local file.
+- File transfer and editor implementation details will be expanded only after the entry screen is accepted.
+- The current score composer implementation is removed; it is not the baseline for the new editor.
+
+### Delivery sequence
+
+1. Remove the composer enhancement and the old Notation Lab landing-workspace UI.
+2. Implement the three-action entry page.
+3. Add the editor route and create/open handoff contract.
+4. Update this plan and work log after each accepted editor milestone.
+5. Verify keyboard navigation, responsive layout, and file-type validation before publishing.
+
+### Current milestone
+
+Only steps 1–3 are in scope for this revision. Scan remains intentionally unavailable.
+
+
+### Editor program — added 2026-11-15
+
+The entry page is complete as the first UI milestone. The editor will now follow the score-first architecture and M1–M6 delivery sequence in [Notation Lab Editor — Audit, Product Design, and Capability Plan](../Doc/Notation-Lab-Editor-Architecture-2026-11-15.md).
+
+The editor route now carries the shared site header plus a sticky secondary toolbar and a score workspace (see [Notation Lab Editor — Fixed Toolbar and Score Workspace](../Doc/Notation-Lab-Editor-Toolbar-2026-11-18.md)). Open, create, zoom, layout, playback, and export are live.
+
+Note entry, the selection model and undo/redo history have since shipped (Part K in `Notation/Notation Plan/PLAN.md`), and the score workspace now has a three-panel sidebar dock — Palettes, Properties, Instruments — beside the score (see [Sidebar Dock, Properties and Instruments](../Doc/Notation-Lab-Editor-Sidebar-Dock-2026-11-18.md)).
+
+### Next editor milestone
+
+1. **Editable Properties.** The Properties panel reads the selected note today. Making its values write back (pitch, duration, voice) turns it into the inspector a notation program has, and reuses the existing `commit()` command path.
+2. **Page / Horizontal view switch.** `state.layout` exists and both modes render, but the toolbar carries no button for it yet.
+3. **Session persistence.** The dock's open/closed state and the last panel are not remembered across a reload; the score library already is (`localStorage`).
+
+Scan remains intentionally unavailable.
 
 ## Sound Engine နှင့် MuseScore SoundFont — 2026-11-13
 
