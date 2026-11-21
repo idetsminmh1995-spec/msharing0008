@@ -256,6 +256,17 @@
     return docTools.clefDefinitionFor(sign);
   };
 
+  /**
+   * How far a written pitch on this part must move to sound.
+   *
+   * MusicXML's `<transpose>` states what is added to a written pitch to get
+   * a sounding one, so a guitar written at E4 sounds at E3. Playback reads
+   * it from the same attribute (`transpose.semitones`); a preview that
+   * skipped it would audition a different note from the one Play produces.
+   */
+  const transposeSemitonesAt = (measureNumber, partId = activePartId()) =>
+    attributeAt(measureNumber, partId)?.transpose?.semitones ?? 0;
+
   const capacityOf = (measureNumber) => docTools.ticksPerMeasure(state.doc, activePartId(), measureNumber);
 
   const durationForTool = () =>
@@ -816,6 +827,14 @@
    * has a staff line and notehead in the engine's own kit table. Building
    * the map here means the editor knows which line the user clicked
    * without a second copy of the kit living in the website.
+   *
+   * A line can carry more than one drum: closed and open hi-hat share the
+   * top space and differ only by notehead, and so do the high tom and the
+   * ride. Keying the kit by line alone kept only the last of each pair, so
+   * one of the two could never be written -- and which one survived
+   * depended on the order the file happened to declare them. Every drum is
+   * kept here instead, in the part's own declaration order, and the writer
+   * chooses among them (see `insertAtEntry`).
    */
   function collectDrumInstruments(parsed) {
     const byPart = new Map();
@@ -824,21 +843,24 @@
     for (const part of parsed.score.parts) {
       const gmNotes = parsed.midiInstrumentsByPart?.get(part.id);
       if (!gmNotes || gmNotes.size === 0) continue;
-      const kit = new Map();
+      const byPosition = new Map();
       for (const [instrumentId, gmNote] of gmNotes) {
         const entry = table[gmNote];
         if (!entry) continue;
         const { step, octave } = docTools.pitchFromStaffPosition(engine.PERCUSSION_CLEF, entry.staffPosition);
-        kit.set(`${step}${octave}`, {
+        const drum = {
           instrumentId,
           gmNote,
           staffPosition: entry.staffPosition,
           displayStep: step,
           displayOctave: octave,
           name: entry.name,
-        });
+        };
+        const onThisLine = byPosition.get(entry.staffPosition);
+        if (onThisLine === undefined) byPosition.set(entry.staffPosition, [drum]);
+        else onThisLine.push(drum);
       }
-      if (kit.size > 0) byPart.set(part.id, kit);
+      if (byPosition.size > 0) byPart.set(part.id, byPosition);
     }
     return byPart;
   }
@@ -1483,7 +1505,7 @@
       return next;
     }, describeTranspose(steps, movable.length));
     const first = eventFor(movable[0]);
-    if (first && first.kind !== 'chord') previewPitch(first.pitch);
+    if (first && first.kind !== 'chord') previewPitch(first.pitch, null, movable[0].measureNumber);
   }
 
   /** The status line MuseScore would show: one note names the move, many count it. */
@@ -1684,18 +1706,46 @@
     }
 
     // A kit part has no pitches: the clicked line names a drum instead.
-    const drumPitch = drumPitchFor(staffPosition);
-    if (drumPitch && !rest) {
-      const drum = drumFor(drumPitch);
+    // A letter key names the same line a click there would, so both
+    // gestures reach the kit -- and neither may fall through to the
+    // pitched branch below, which would write a note a drum part cannot
+    // sound.
+    //
+    // Gated on a kit actually being declared, not on the clef: a
+    // percussion-clef staff that names no GM drums has no drums to write,
+    // and keeps writing pitches exactly as it always did.
+    //
+    // A line can name two drums, so the choice is made against what is
+    // already on the beat: a plain click writes the first, a chord click
+    // the first that is not in the chord yet.
+    const kit = state.drumInstruments?.get(activePartId()) ?? null;
+    const line = staffPosition ?? drumLineForLetter(step);
+    const drums = drumsOnLine(line);
+    if (kit !== null && !rest) {
+      if (drums.length === 0) {
+        announce(
+          step === null
+            ? 'Click a staff line to write a drum.'
+            : `No drum is mapped to ${step}; click the line you want.`,
+        );
+        return;
+      }
       const events = eventsIn(measureNumber, voiceId);
       const existingIndex = events.findIndex((event) => (event.startTick ?? 0) === state.entry.tick);
       const existing = existingIndex >= 0 ? events[existingIndex] : null;
+      const drum = pickDrumForLine(line, existing);
+      if (drum === null) {
+        const names = drums.map((entry) => entry.name).join(' and ');
+        announce(`${names} are already in the chord.`);
+        return;
+      }
+      const drumPitch = engine.unpitchedPitch(drum.displayStep, drum.displayOctave);
       const note = engine.note({
         pitch: drumPitch,
         duration: existing && existing.kind !== 'rest' ? existing.duration : fitted,
         voice: voiceId,
         staff,
-        ...(drum ? { instrumentId: drum.instrumentId } : {}),
+        instrumentId: drum.instrumentId,
       });
       if (existing && existing.kind !== 'rest') {
         // A drum chord is written the same way a pitched one is: kick and
@@ -1704,18 +1754,18 @@
         if (addToChord) {
           const stacked = stackedWith(existing, note, state.entry.tick);
           if (stacked === null) {
-            announce(`${drum?.name ?? 'That drum'} is already in the chord.`);
+            announce(`${drum.name} is already in the chord.`);
             return;
           }
-          commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: stacked }), `Added ${drum?.name ?? 'drum'} to the chord.`);
+          commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: stacked }), `Added ${drum.name} to the chord.`);
         } else {
-          commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: note }), `Replaced with ${drum?.name ?? 'drum'}.`);
+          commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: note }), `Replaced with ${drum.name}.`);
         }
         previewPitch(drumPitch, drum);
         render();
         return;
       }
-      commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event: note }), `Inserted ${drum?.name ?? 'drum'}.`);
+      commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event: note }), `Inserted ${drum.name}.`);
       previewPitch(drumPitch, drum);
       advanceEntry(ticks, measureNumber, voiceId);
       return;
@@ -1745,14 +1795,14 @@
         // pitch, replacing rather than stacking by default.
         commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: note }), `Replaced with ${step}${octave}.`);
       }
-      previewPitch(pitch);
+      previewPitch(pitch, null, measureNumber);
       render();
       return;
     }
 
     const event = engine.note({ pitch, duration: fitted, voice: voiceId, staff, startTick: state.entry.tick });
     commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event }), `Inserted ${step}${octave}.`);
-    previewPitch(pitch);
+    previewPitch(pitch, null, measureNumber);
     advanceEntry(ticks, measureNumber, voiceId);
   }
 
@@ -1780,30 +1830,66 @@
   }
 
   /**
-   * The drum a staff position means, for a kit part.
+   * The staff line a note letter names on a kit staff.
    *
-   * A kit's notes are `<unpitched>` and each one names the drum it is
-   * played on; a note with no instrument is silent. The drum map is what
-   * says which line is which drum, so the click's staff position is looked
-   * up there rather than converted to a pitch.
+   * A kit's drums are not all in one octave -- a snare sits above the
+   * middle line and a bass drum below it -- so a letter has to mean "the
+   * line this letter names" on whichever octave actually carries a drum.
+   * The kit's own lines decide: a letter resolves to the first line,
+   * starting from the one nearest the middle of the staff and moving
+   * outward, that the part has a drum on. That keeps every drum the kit
+   * declares reachable from the keyboard, which is the point of step
+   * entry.
    */
-  function drumFor(pitch) {
-    if (pitch.kind !== 'unpitched' || !activePartIsPercussion()) return null;
-    const partId = activePartId();
-    const key = `${pitch.displayStep}${pitch.displayOctave}`;
-    return state.drumInstruments?.get(partId)?.get(key) ?? null;
+  function drumLineForLetter(step) {
+    if (step === null) return null;
+    const kit = state.drumInstruments?.get(activePartId());
+    if (kit === undefined) return null;
+    const centre = docTools.pitchFromStaffPosition(
+      clefAt(state.entry?.measureNumber ?? 1, state.entry?.staffNumber ?? 1),
+      0,
+    ).octave;
+    // Two octaves either way covers every line a five-line staff and its
+    // ledger lines reach; nearest-first means F is the bass drum before
+    // it is a tom two octaves up.
+    for (const octave of [centre, centre + 1, centre - 1, centre + 2, centre - 2]) {
+      const position = engine.staffPositionForPitch(engine.PERCUSSION_CLEF, step, octave);
+      if (kit.has(position)) return position;
+    }
+    return null;
   }
 
-  /** The unpitched pitch for the drum at a staff position, or null when
-   *  the part is not a kit (or nothing sits on that line). */
-  function drumPitchFor(staffPosition) {
-    if (!activePartIsPercussion() || staffPosition === undefined || staffPosition === null) return null;
-    const partId = activePartId();
-    const kit = state.drumInstruments?.get(partId);
-    if (!kit) return null;
-    const entry = [...kit.values()].find((drum) => drum.staffPosition === staffPosition);
-    if (!entry) return null;
-    return engine.unpitchedPitch(entry.displayStep, entry.displayOctave);
+  /**
+   * Every drum the kit puts on one staff line, in the part's declaration
+   * order -- or an empty list when the part is not a kit, or nothing sits
+   * on that line.
+   *
+   * A line can carry more than one drum (closed and open hi-hat; high tom
+   * and ride), so a click on it is a choice, not a single answer. Which
+   * one gets written is `pickDrumForLine`'s call.
+   */
+  function drumsOnLine(staffPosition) {
+    if (!activePartIsPercussion() || staffPosition === undefined || staffPosition === null) return [];
+    return state.drumInstruments?.get(activePartId())?.get(staffPosition) ?? [];
+  }
+
+  /**
+   * Which drum a click on `staffPosition` writes.
+   *
+   * One line can carry two drums -- closed and open hi-hat, high tom and
+   * ride -- so a plain click writes the first the part declared, and a
+   * chord click writes the first that is not already in the chord. That
+   * makes the second drum on a line reachable at all, which keying the
+   * kit by line alone made impossible. `null` means every drum on the
+   * line is already in the chord.
+   */
+  function pickDrumForLine(staffPosition, existing) {
+    const drums = drumsOnLine(staffPosition);
+    if (drums.length === 0) return null;
+    if (existing === null || existing.kind === 'rest') return drums[0];
+    const members = existing.kind === 'chord' ? existing.notes : [existing];
+    const inChord = new Set(members.map((member) => member.instrumentId));
+    return drums.find((drum) => !inChord.has(drum.instrumentId)) ?? null;
   }
 
   /** The octave whose notes sit nearest the middle of the current clef. */
@@ -2265,12 +2351,18 @@
    * note instead of pressing Play to check it. The SoundFont is fetched on
    * the first preview and reused; a failed or slow load never blocks the
    * edit -- the note is already committed by the time this runs.
+   *
+   * The audition has to be the note Play would produce, so a transposing
+   * part is moved by its `<transpose>` here too. The measure decides the
+   * amount, because a part can change transposition mid-score.
    */
-  function previewPitch(pitch, drum = null) {
+  function previewPitch(pitch, drum = null, measureNumber = state.entry?.measureNumber ?? 1) {
     if (!state.previewOn || state.playing) return;
     // An unpitched drum has no MIDI number of its own; its sound is the
-    // GM key the kit declared for it.
-    const midi = drum ? drum.gmNote : engine.midiNoteNumber?.(pitch);
+    // GM key the kit declared for it, and a kit never transposes.
+    const midi = drum
+      ? drum.gmNote
+      : engine.midiNoteNumber?.(pitch, transposeSemitonesAt(measureNumber));
     if (midi === undefined) return;
     // The part decides the channel, and so the instrument and whether the
     // note is percussion: a note written on the violin part must not be

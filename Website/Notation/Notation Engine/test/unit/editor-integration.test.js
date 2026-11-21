@@ -1290,6 +1290,254 @@ describe('the editor and the engine agree, end to end', () => {
     );
   });
 
+  test('a note auditioned on a transposing part sounds at the pitch Play produces', async () => {
+    // A guitar part is written an octave above where it sounds. The
+    // audition must apply the part's `<transpose>` the way playback does,
+    // or the writer hears a note an octave away from the one Play gives.
+    const { window } = loadEditorPage({
+      newScore: {
+        title: 'Guitar',
+        instrumentIds: ['acoustic-guitar'],
+        key: 'C',
+        time: '4/4',
+        tempo: 120,
+        measures: 1,
+      },
+    });
+    const doc = window.document;
+    const scoreHost = doc.querySelector('[data-editor-score]');
+
+    const previews = [];
+    window.NotationSoundFont = {
+      R2SoundFontEngine: {
+        create: async () => ({
+          play: () => {},
+          pause: () => {},
+          setTracks: () => {},
+          preview: (...args) => previews.push(args),
+        }),
+      },
+    };
+    window.DOMPoint = class {
+      constructor(x = 0, y = 0) {
+        this.x = x;
+        this.y = y;
+      }
+      matrixTransform() {
+        return new window.DOMPoint(this.x, this.y);
+      }
+    };
+    window.SVGElement.prototype.getScreenCTM = () => ({
+      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0,
+      inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+    });
+    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 1, height: 1 });
+
+    const svg = scoreHost.querySelector('svg');
+    const [, , pageWidth] = svg.getAttribute('viewBox').split(/\s+/).map(Number);
+    const staffYs = [...svg.querySelectorAll('line')]
+      .filter((line) => line.getAttribute('y1') === line.getAttribute('y2')
+        && Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3)
+      .map((line) => Number(line.getAttribute('y1')))
+      .sort((a, b) => a - b);
+    scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', {
+      clientX: pageWidth * 0.1,
+      clientY: staffYs[Math.floor(staffYs.length / 2)],
+      bubbles: true,
+    }));
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+    assert.equal(previews.length, 1, 'writing a note auditions it once');
+    const auditioned = previews[0][0][0];
+
+    // The score as the editor saved it, which is what Play reads.
+    doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    const saved = JSON.parse(window.localStorage.getItem('msharing-notation-scores') ?? '[]');
+    const xml = saved[0]?.xml ?? '';
+    assert.match(xml, /<transpose>/, 'the guitar part must carry its octave transposition');
+
+    const engine = window.NotationEngine;
+    const parsed = engine.parseMusicXml(xml, { domParser: window.DOMParser });
+    const written = parsed.score.parts[0].measures[0].voices[0].events.find((event) => event.kind === 'note');
+    const asWritten = engine.midiNoteNumber(written.pitch);
+    const played = engine.renderFromMusicXml(xml, { domParser: window.DOMParser })
+      .playback.events[0].midiNotes[0];
+
+    assert.notEqual(auditioned, asWritten, 'the audition must not be the written pitch');
+    assert.equal(auditioned, played, 'the audition must be the pitch Play produces');
+  });
+
+  test('a fresh drum kit previews on the percussion channel before any drum is written', async () => {
+    // A kit opens as rests, so nothing in the score is unpitched yet. The
+    // routing has to come from the kit's declared GM keys, or the first
+    // drum a writer places is auditioned as a piano.
+    const { window } = loadEditorPage({
+      newScore: {
+        title: 'Kit',
+        instrumentIds: ['drum-kit'],
+        key: 'C',
+        time: '4/4',
+        tempo: 120,
+        measures: 1,
+      },
+    });
+    const doc = window.document;
+    const scoreHost = doc.querySelector('[data-editor-score]');
+
+    const previews = [];
+    const trackSets = [];
+    window.NotationSoundFont = {
+      R2SoundFontEngine: {
+        create: async () => ({
+          play: () => {},
+          pause: () => {},
+          setTracks: (tracks) => trackSets.push(tracks),
+          preview: (...args) => previews.push(args),
+        }),
+      },
+    };
+    window.DOMPoint = class {
+      constructor(x = 0, y = 0) {
+        this.x = x;
+        this.y = y;
+      }
+      matrixTransform() {
+        return new window.DOMPoint(this.x, this.y);
+      }
+    };
+    window.SVGElement.prototype.getScreenCTM = () => ({
+      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0,
+      inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+    });
+    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 1, height: 1 });
+
+    const svg = scoreHost.querySelector('svg');
+    const [, , pageWidth] = svg.getAttribute('viewBox').split(/\s+/).map(Number);
+    const staffYs = [...svg.querySelectorAll('line')]
+      .filter((line) => line.getAttribute('y1') === line.getAttribute('y2')
+        && Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3)
+      .map((line) => Number(line.getAttribute('y1')))
+      .sort((a, b) => a - b);
+    scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', {
+      clientX: pageWidth * 0.1,
+      clientY: staffYs[Math.floor(staffYs.length / 2)],
+      bubbles: true,
+    }));
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+    assert.ok(trackSets.length > 0, 'the score tracks reach the sound engine');
+    const tracks = trackSets[trackSets.length - 1];
+    assert.equal(tracks[0].percussion, true, 'a declared kit is a percussion track before its first note');
+    assert.equal(
+      window.NotationEngine.assignTrackRouting(tracks).get('P1').channel,
+      9,
+      'the kit must be routed to the GM percussion channel',
+    );
+    assert.equal(previews.length, 1, 'writing a drum auditions it once');
+    assert.equal(previews[0][2], 'P1', 'the audition is attributed to the kit');
+  });
+
+  test('letter keys write drums on a kit part instead of pitches it cannot sound', async () => {
+    // Step entry is how a writer types a part: the letters have to reach
+    // the kit. Falling through to the pitched branch wrote a note with no
+    // drum to sound it, so the part played silence and the score stopped
+    // being a drum part at all.
+    const { window } = loadEditorPage({
+      newScore: {
+        title: 'Kit',
+        instrumentIds: ['drum-kit'],
+        key: 'C',
+        time: '4/4',
+        tempo: 120,
+        measures: 4,
+      },
+    });
+    const doc = window.document;
+    const scoreHost = doc.querySelector('[data-editor-score]');
+    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 1, height: 1 });
+    window.SVGElement.prototype.getScreenCTM = () => ({
+      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0,
+      inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+    });
+    window.DOMPoint = class {
+      constructor(x = 0, y = 0) {
+        this.x = x;
+        this.y = y;
+      }
+      matrixTransform() {
+        return new window.DOMPoint(this.x, this.y);
+      }
+    };
+
+    const svg = scoreHost.querySelector('svg');
+    const [, , pageWidth] = svg.getAttribute('viewBox').split(/\s+/).map(Number);
+    const staffYs = [...svg.querySelectorAll('line')]
+      .filter((line) => line.getAttribute('y1') === line.getAttribute('y2')
+        && Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3)
+      .map((line) => Number(line.getAttribute('y1')))
+      .sort((a, b) => a - b);
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const press = (key) => doc.dispatchEvent(new window.KeyboardEvent('keydown', { key, bubbles: true }));
+
+    // Place the entry cursor in the kit, then type the kit's own lines.
+    scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', {
+      clientX: pageWidth * 0.1,
+      clientY: staffYs[Math.floor(staffYs.length / 2)],
+      bubbles: true,
+    }));
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+    const written = [];
+    for (const letter of ['F', 'C', 'G', 'B', 'D', 'A']) {
+      press(letter);
+      written.push(status());
+    }
+
+    for (const message of written) {
+      assert.match(message, /Inserted /, `a kit letter must write a drum, got "${message}"`);
+      assert.doesNotMatch(message, /Inserted [A-G]\d/, 'a kit letter must never write a pitched note');
+    }
+
+    doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    const xml = JSON.parse(window.localStorage.getItem('msharing-notation-scores') ?? '[]')[0]?.xml ?? '';
+    assert.equal((xml.match(/<pitch>/g) ?? []).length, 0, 'a drum part carries no pitched notes');
+
+    const engine = window.NotationEngine;
+    const { playback } = engine.renderFromMusicXml(xml, { domParser: window.DOMParser });
+    // The click that placed the cursor wrote a drum of its own, so the
+    // letters are the events after it.
+    assert.deepEqual(
+      JSON.parse(JSON.stringify(
+        playback.events.map((event) => (event.midiNotes ? [...event.midiNotes] : [])).slice(-6),
+      )),
+      [[36], [38], [42], [45], [47], [49]],
+      'each letter sounds its own drum',
+    );
+  });
+
+  test('letter keys still write pitches on a pitched part', async () => {
+    const { window } = loadEditorPage({
+      newScore: {
+        title: 'Piano',
+        instrumentIds: ['piano'],
+        key: 'C',
+        time: '4/4',
+        tempo: 120,
+        measures: 2,
+      },
+    });
+    const doc = window.document;
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    doc.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'C', bubbles: true }));
+    doc.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'D', bubbles: true }));
+    assert.match(status(), /Inserted D\d/);
+
+    doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    const xml = JSON.parse(window.localStorage.getItem('msharing-notation-scores') ?? '[]')[0]?.xml ?? '';
+    assert.equal((xml.match(/<unpitched/g) ?? []).length, 0, 'a pitched part carries no unpitched notes');
+    assert.equal((xml.match(/<pitch>/g) ?? []).length, 2, 'the two notes typed, and no drum beside them');
+  });
+
   test('a bare visit to the editor starts a score instead of showing nothing', () => {
     // No `?intent=` and no handed-over file: the page must still open a
     // writable score. An empty canvas with every control disabled reads as
@@ -1698,6 +1946,58 @@ describe('the editor and the engine agree, end to end', () => {
         .matchAll(/<instrument id="([^"]+)"\/>/g)].map((match) => match[1]);
       assert.equal(instruments.length, 2, 'both drums are written on the one beat');
       assert.notEqual(instruments[0], instruments[1], 'and they are different drums');
+    });
+
+    test('the staff does not move while a drum groove is written', () => {
+      // The staff is what the writer clicks. Every drum written above the
+      // old one used to push the whole staff down, so the next click
+      // landed on a line that was no longer where it had been aimed --
+      // which is what made kick + hi-hat chords impossible.
+      const page = openForClicking({
+        newScore: { title: 'kit', instrumentIds: ['drum-kit'], key: 'C', time: '4/4', tempo: 120, measures: 4 },
+      });
+      const staffLines = () => {
+        const lines = [...page.doc.querySelectorAll('[data-editor-score] svg line')]
+          .map((line) => ({
+            y: Number(line.getAttribute('y1')),
+            end: Number(line.getAttribute('y2')),
+            x1: Number(line.getAttribute('x1')),
+            x2: Number(line.getAttribute('x2')),
+          }))
+          .filter((line) => line.y === line.end);
+        const widest = Math.max(...lines.map((line) => Math.abs(line.x2 - line.x1)));
+        return [...new Set(lines.filter((l) => Math.abs(l.x2 - l.x1) > widest * 0.8).map((l) => l.y))]
+          .sort((a, b) => a - b);
+      };
+      const before = staffLines();
+      assert.equal(before.length, 5);
+      const bottom = before[before.length - 1];
+      // From the crash down to the kick, each drum on its own beat.
+      for (const position of [-5, -4.5, -4, -3, -2.5, -2, -0.5]) {
+        page.press(9, bottom + position);
+      }
+      assert.deepEqual(staffLines(), before, 'the staff must stay on the same lines');
+    });
+
+    test('both drums sharing a staff line can be written', () => {
+      // Closed and open hi-hat share one line, and so do the high tom and
+      // the ride. Keying the kit by line alone kept only the last drum of
+      // each pair, so the other could never be reached at all.
+      const page = openForClicking({
+        newScore: { title: 'kit', instrumentIds: ['drum-kit'], key: 'C', time: '4/4', tempo: 120, measures: 1 },
+      });
+      page.press(9, 14 - 4.5);
+      assert.equal(page.status(), 'Inserted Closed Hi-Hat.');
+      page.press(9, 14 - 4.5, true);
+      assert.equal(page.status(), 'Added Open Hi-Hat to the chord.');
+      page.press(9, 14 - 4, true);
+      assert.equal(page.status(), 'Added High Tom to the chord.');
+      page.press(9, 14 - 4, true);
+      assert.equal(page.status(), 'Added Ride Cymbal 1 to the chord.');
+      const instruments = [...(page.saved().match(/<measure number="1">[\s\S]*?<\/measure>/) || [''])[0]
+        .matchAll(/<instrument id="([^"]+)"\/>/g)].map((match) => match[1]);
+      assert.equal(instruments.length, 4, 'all four drums are on the one beat');
+      assert.equal(new Set(instruments).size, 4, 'and they are four different drums');
     });
   });
 

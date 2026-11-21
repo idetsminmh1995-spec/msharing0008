@@ -77446,6 +77446,13 @@ ${denominator}`;
     }
     return false;
   }
+  function partDeclaresPercussionKeys(info) {
+    if (info === void 0 || info.size === 0) return false;
+    for (const record of info.values()) {
+      if (record.gmNote === void 0) return false;
+    }
+    return true;
+  }
   function computePlaybackData(input) {
     const globalTickOffsetByMeasure = /* @__PURE__ */ new Map();
     let running = 0;
@@ -77487,8 +77494,9 @@ ${denominator}`;
       tempoMap,
       events,
       tracks: input.score.parts.map((part2) => {
-        const routing = firstRoutingFor(input.midiInstrumentInfoByPart?.get(part2.id));
-        const percussion = partHasUnpitchedNotes(part2);
+        const info = input.midiInstrumentInfoByPart?.get(part2.id);
+        const routing = firstRoutingFor(info);
+        const percussion = partHasUnpitchedNotes(part2) || partDeclaresPercussionKeys(info);
         return {
           id: part2.id,
           ...part2.name !== void 0 ? { name: part2.name } : {},
@@ -79174,9 +79182,12 @@ ${xrefOffset}
     if (highest === void 0) return 0;
     return Math.max(0, topLineY - highest);
   }
+  function drumStemDirection(stated, fromTable) {
+    return stated ?? fromTable ?? "up";
+  }
   function renderNoteheadPart(note2, x2, ctx, accidentalState) {
     const parts = [];
-    const { position, noteheadGlyph: noteheadGlyph2, drumStemDirection } = resolveNoteRendering(note2, ctx);
+    const { position, noteheadGlyph: noteheadGlyph2, drumStemDirection: drumStemDirection2 } = resolveNoteRendering(note2, ctx);
     const y = ctx.measureBottomY + position;
     let state = accidentalState;
     if (note2.pitch.kind === "pitched") {
@@ -79246,7 +79257,7 @@ ${xrefOffset}
       position,
       noteheadGlyph: noteheadGlyph2,
       newAccidentalState: state,
-      ...drumStemDirection !== void 0 ? { drumStemDirection } : {}
+      ...drumStemDirection2 !== void 0 ? { drumStemDirection: drumStemDirection2 } : {}
     };
   }
   function renderNoteOrRest(ev, x2, ctx, accidentalState, forcedDirection, restOffset) {
@@ -79336,11 +79347,11 @@ ${xrefOffset}
     parts.push(head.svg);
     const y = ctx.measureBottomY + head.position;
     const isDrum = ev.pitch.kind === "unpitched";
-    const explicitDirection = isDrum ? void 0 : ev.explicitStemDirection ?? head.drumStemDirection;
+    const explicitDirection = isDrum ? drumStemDirection(ev.explicitStemDirection, head.drumStemDirection) : ev.explicitStemDirection ?? head.drumStemDirection;
     const direction = resolveStemDirection({
       positions: [head.position],
       numLines: ctx.staffLines,
-      ...isDrum ? { forcedDirection: "up" } : forcedDirection !== void 0 ? { forcedDirection } : {},
+      ...isDrum ? {} : forcedDirection !== void 0 ? { forcedDirection } : {},
       ...explicitDirection !== void 0 ? { explicitDirection } : {}
     });
     if (ev.duration.type !== "whole") {
@@ -79418,6 +79429,7 @@ ${xrefOffset}
           positions: heads.positions,
           glyphs: heads.glyphs,
           widestGlyph: heads.widestGlyph,
+          drumStemDirections: heads.drumStemDirections,
           source: event
         });
       } else {
@@ -79429,6 +79441,7 @@ ${xrefOffset}
           positions: [head.position],
           glyphs: [head.noteheadGlyph],
           widestGlyph: head.noteheadGlyph,
+          drumStemDirections: [head.drumStemDirection],
           source: event
         });
       }
@@ -79442,7 +79455,8 @@ ${xrefOffset}
     const isDrumBeam = events.some(
       (event) => event.kind === "chord" ? event.notes.some((note2) => note2.pitch.kind === "unpitched") : event.pitch.kind === "unpitched"
     );
-    const direction = isDrumBeam ? "up" : forcedDirection ?? stated ?? beamDirection(allPositions, middle);
+    const tableDirection = members.flatMap((member) => member.drumStemDirections ?? []).find((direction2) => direction2 !== void 0);
+    const direction = isDrumBeam ? drumStemDirection(stated, tableDirection) : forcedDirection ?? stated ?? beamDirection(allPositions, middle);
     const beamPositionOf = (m) => direction === "up" ? Math.min(...m.positions) : Math.max(...m.positions);
     const attachPositionOf = (m) => direction === "up" ? Math.max(...m.positions) : Math.min(...m.positions);
     const attachGlyphOf = (m) => {
@@ -79604,20 +79618,29 @@ ${xrefOffset}
           parentheses: note2?.noteheadParentheses === true
         })
       );
-      const ledgerLines = computeLedgerLines(position, ctx.staffLines);
-      if (ledgerLines.length > 0) {
-        parts.push(
-          renderLedgerLines(ledgerLines, {
+    });
+    const ledgerYs = [
+      ...new Set(
+        positions2.flatMap(
+          (position) => computeLedgerLines(position, ctx.staffLines).map((line) => line.y)
+        )
+      )
+    ];
+    if (ledgerYs.length > 0) {
+      parts.push(
+        renderLedgerLines(
+          ledgerYs.map((y) => ({ y })),
+          {
             x: x2,
-            noteheadWidth: noteheadWidth(glyphName),
+            noteheadWidth: noteheadWidth(widestGlyph ?? "noteheadBlack"),
             staffBottomY: ctx.measureBottomY,
             extension: getEngravingDefault("legerLineExtension") ?? LEDGER_EXTENSION_FALLBACK,
             thickness: lineWidth(ctx.theme, "leger", "legerLineThickness", LEDGER_THICKNESS_FALLBACK),
             color: ctx.theme.colorOf("ledger")
-          })
-        );
-      }
-    });
+          }
+        )
+      );
+    }
     parts.push(
       renderAugmentationDots(
         chordDotPlacements(
@@ -79637,7 +79660,8 @@ ${xrefOffset}
       positions: positions2,
       glyphs,
       widestGlyph: widestGlyph ?? "noteheadBlack",
-      newAccidentalState: state
+      newAccidentalState: state,
+      drumStemDirections: resolved.map((r) => r.drumStemDirection)
     };
   }
   function renderChord(chord2, x2, ctx, accidentalState, forcedDirection) {
@@ -79646,11 +79670,14 @@ ${xrefOffset}
     const positions2 = heads.positions;
     if (positions2.length > 0) {
       const isDrumChord = chord2.notes.some((note2) => note2.pitch.kind === "unpitched");
-      const explicitDirection = isDrumChord ? void 0 : explicitStemDirectionOf(chord2);
+      const tableDirection = heads.drumStemDirections.find(
+        (direction2) => direction2 !== void 0
+      );
+      const explicitDirection = isDrumChord ? drumStemDirection(explicitStemDirectionOf(chord2), tableDirection) : explicitStemDirectionOf(chord2);
       const direction = resolveStemDirection({
         positions: positions2,
         numLines: ctx.staffLines,
-        ...isDrumChord ? { forcedDirection: "up" } : forcedDirection !== void 0 ? { forcedDirection } : {},
+        ...isDrumChord ? {} : forcedDirection !== void 0 ? { forcedDirection } : {},
         ...explicitDirection !== void 0 ? { explicitDirection } : {}
       });
       if (chord2.duration.type !== "whole") {
@@ -80558,6 +80585,7 @@ ${xrefOffset}
       }
       return shouldShowBarNumber(measureNumber, config.barNumbers, false);
     };
+    const northExtentForHeadroom = (partIndex) => config.layout.mode === "page" ? 0 : partNorthExtent(partIndex);
     const aboveStaff = (() => {
       const topPart = score2.parts[0];
       const topStaffLines = (topPart !== void 0 ? firstAttributesByPart.get(topPart.id)?.staffLinesByStaff[1] : void 0) ?? STAFF_LINES;
@@ -80578,10 +80606,15 @@ ${xrefOffset}
             theme.sizes,
             config.text,
             rehearsalHeightFor(part2.id, m.number),
-            partNorthExtent(partIndex)
+            northExtentForHeadroom(partIndex)
           ).band : 0;
           needed = Math.max(needed, textBand);
           if (!hasTempoMark) return;
+          const tempoHeadroom = TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT;
+          if (config.layout.mode === "page") {
+            needed = Math.max(needed, textBand + tempoHeadroom);
+            return;
+          }
           const a = attributesByPartAndMeasure.get(`${part2.id}:${m.number}`);
           const timeline = attributeChangesByPartAndMeasure.get(`${part2.id}:${m.number}`) ?? [];
           const extent = measureNorthExtent(m, 1, (tick) => {
@@ -80596,7 +80629,7 @@ ${xrefOffset}
               theme
             };
           });
-          needed = Math.max(needed, textBand + extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
+          needed = Math.max(needed, textBand + extent + tempoHeadroom);
         });
       });
       const specsForHeadroom = repeatMeasureSpecs();
@@ -81167,7 +81200,14 @@ ${xrefOffset}
                 // With text above the staff, the tempo mark clears the whole
                 // text stack; with none, it keeps its own long-standing
                 // clearance from the measure's content extent.
-                y: topStaffY - (hasAboveText ? rows.band : northExtent) - TEMPO_MARK_GAP,
+                //
+                // PAGE mode drops the content-extent term: a mark that
+                // moves up with each new high note moves the staff down
+                // with it (the reserve above is what places the staff), so
+                // the line the user clicks is not the line they aimed at.
+                // The page's top margin holds the mark instead, and it sits
+                // at a fixed height above the staff for the whole session.
+                y: topStaffY - (hasAboveText ? rows.band : northExtentForHeadroom(partIndex)) - TEMPO_MARK_GAP,
                 color: theme.colorOf("tempo"),
                 musicFont: theme.musicFont,
                 textFont: theme.textFont,
