@@ -760,6 +760,9 @@
       }
       const imported = document.importNode(svg, true);
       state.result = result;
+      // A part added, renamed or re-instrumented changes the routing, so
+      // the sound engine has to hear about it before the next note.
+      syncSoundTracks();
       scoreHost.replaceChildren(imported);
       scoreHost.hidden = false;
       scoreHost.dataset.layout = state.layout;
@@ -2180,6 +2183,9 @@
     }).then((engine) => {
       state.sound = engine;
       state.soundLoading = null;
+      // A note auditioned before Play needs the score's own routing, or
+      // the first note a writer places sounds as the default piano.
+      syncSoundTracks();
       return engine;
     }).catch((error) => {
       state.soundLoading = null;
@@ -2188,6 +2194,16 @@
     });
     return state.soundLoading;
   };
+
+  /** Hands the score's current tracks to the sound engine, if it is loaded. */
+  function syncSoundTracks() {
+    // Re-routing mid-playback would re-send program changes under the notes
+    // already sounding; `play` sets the routing itself when it starts.
+    if (state.playing) return;
+    const tracks = state.result?.playback?.tracks;
+    if (!tracks || !state.sound?.setTracks) return;
+    state.sound.setTracks(tracks);
+  }
 
   /**
    * Sounds a written pitch the moment it is placed, so the writer hears the
@@ -2201,8 +2217,12 @@
     // GM key the kit declared for it.
     const midi = drum ? drum.gmNote : engine.midiNoteNumber?.(pitch);
     if (midi === undefined) return;
+    // The part decides the channel, and so the instrument and whether the
+    // note is percussion: a note written on the violin part must not be
+    // auditioned as a piano.
+    const partId = activePartId();
     void ensureSound()
-      .then((sound) => sound.preview?.([midi]))
+      .then((sound) => sound.preview?.([midi], undefined, partId))
       .catch(() => {
         /* no sound available; writing still works */
       });

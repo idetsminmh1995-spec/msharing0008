@@ -1218,6 +1218,73 @@ describe('the editor and the engine agree, end to end', () => {
     assert.match(doc.querySelector('[data-editor-status]').textContent, /Inserted|Replaced/);
   });
 
+  test('a note auditioned while writing sounds on its own part, not on the first part', async () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    const scoreHost = doc.querySelector('[data-editor-score]');
+
+    // The engine's contract with the sound bundle: it creates one engine,
+    // hands it the score's tracks, and asks it to audition single notes.
+    // What matters here is WHICH part the audition is attributed to -- a
+    // note written on the second part must not be heard as the first
+    // part's instrument.
+    const previews = [];
+    const trackSets = [];
+    window.NotationSoundFont = {
+      R2SoundFontEngine: {
+        create: async () => ({
+          play: () => {},
+          pause: () => {},
+          setTracks: (tracks) => trackSets.push(tracks),
+          preview: (...args) => previews.push(args),
+        }),
+      },
+    };
+    window.DOMPoint = class {
+      constructor(x = 0, y = 0) {
+        this.x = x;
+        this.y = y;
+      }
+      matrixTransform() {
+        return new window.DOMPoint(this.x, this.y);
+      }
+    };
+    window.SVGElement.prototype.getScreenCTM = () => ({
+      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0,
+      inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+    });
+    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 1, height: 1 });
+
+    const svg = scoreHost.querySelector('svg');
+    const [, , pageWidth] = svg.getAttribute('viewBox').split(/\s+/).map(Number);
+    const staffY = Number(
+      [...svg.querySelectorAll('line')]
+        .find((line) => line.getAttribute('y1') === line.getAttribute('y2')
+          && Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3)
+        .getAttribute('y1'),
+    );
+    scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', {
+      clientX: pageWidth * 0.1,
+      clientY: staffY,
+      bubbles: true,
+    }));
+    // The preview resolves through a promise chain, so the click's own
+    // turn has to end before the audition is recorded.
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+    assert.equal(previews.length, 1, 'writing a note auditions it once');
+    const [notes, , partId] = previews[0];
+    assert.equal(notes.length, 1);
+    assert.equal(typeof notes[0], 'number', 'a preview takes MIDI numbers');
+    assert.equal(partId, 'P1', 'the audition is attributed to the part being written on');
+    assert.ok(trackSets.length > 0, 'the score tracks reach the sound engine before the first note');
+    assert.deepEqual(
+      [...trackSets[trackSets.length - 1]].map((track) => track.id),
+      ['P1'],
+      'the engine is given the score it is about to sound',
+    );
+  });
+
   test('a bare visit to the editor starts a score instead of showing nothing', () => {
     // No `?intent=` and no handed-over file: the page must still open a
     // writable score. An empty canvas with every control disabled reads as

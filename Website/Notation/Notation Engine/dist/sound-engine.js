@@ -20322,8 +20322,7 @@ Destination: ${this.destinationName}`;
       this.volume = Math.max(0, Math.min(1, volume));
       this.synth.setSystemParameter("gain", this.volume);
       this.stopped = false;
-      this.partChannels.clear();
-      this.routingByPart = assignTrackRouting(playback.tracks);
+      this.setTracks(playback.tracks);
       const origin = performance.now() / 1e3;
       const start = Math.max(0, fromSeconds);
       const scheduled = unfoldEvents(playback.performance, playback.events, playback.tempoMap);
@@ -20362,16 +20361,22 @@ Destination: ${this.destinationName}`;
       this.synth.stopAll();
     }
     /**
-     * Sounds the given MIDI notes once, on the first part's channel, for a
-     * short audition. Unlike `play`, this takes bare MIDI numbers rather
-     * than a `PlaybackData`, because a host writing a single note has no
-     * timeline to hand -- the note may not even be committed yet.
+     * Sounds the given MIDI notes once for a short audition. Unlike `play`,
+     * this takes bare MIDI numbers rather than a `PlaybackData`, because a
+     * host writing a single note has no timeline to hand -- the note may not
+     * even be committed yet.
+     *
+     * `partId` decides the channel, and with it the instrument: a note
+     * written on the violin part must not come back as a piano, and a drum
+     * must land on the percussion channel or it sounds as a pitched note.
+     * Without a part the first part's routing is used, which is what a host
+     * with a single-part score wants.
      */
-    preview(midiNotes, seconds = 0.6) {
+    preview(midiNotes, seconds = 0.6, partId) {
       if (this.stopped === false) return;
       const notes = midiNotes.filter((note) => Number.isInteger(note) && note >= 0 && note <= 127);
       if (notes.length === 0) return;
-      const channel = this.partChannels.get("P1") ?? 0;
+      const channel = this.channelFor(partId ?? this.firstPartId ?? "P1");
       void this.context.resume();
       for (const midiNote of notes) this.synth.noteOn(channel, midiNote, 100);
       const offTimer = window.setTimeout(
@@ -20382,6 +20387,19 @@ Destination: ${this.destinationName}`;
         Math.max(0.05, seconds) * 1e3
       );
       this.timers.add(offTimer);
+    }
+    /**
+     * The score's tracks, which decide each part's channel and instrument.
+     *
+     * `play` calls this itself from the playback it is handed. A host that
+     * auditions a note before ever pressing Play calls it once when the
+     * score loads, so the first note a writer places already sounds on its
+     * own part's instrument instead of the default piano.
+     */
+    setTracks(tracks) {
+      this.routingByPart = assignTrackRouting(tracks);
+      this.firstPartId = tracks[0]?.id;
+      this.partChannels.clear();
     }
     stop() {
       this.pause();

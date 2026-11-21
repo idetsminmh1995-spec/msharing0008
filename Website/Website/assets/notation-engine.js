@@ -216,6 +216,7 @@ var NotationEngine = (() => {
     minDistance: () => minDistance,
     multiMeasureRestGlyphName: () => multiMeasureRestGlyphName,
     musicXmlAccidentalGlyphName: () => musicXmlAccidentalGlyphName,
+    musicXmlAccidentalValueForGlyphName: () => musicXmlAccidentalValueForGlyphName,
     musicXmlNoteheadToShape: () => musicXmlNoteheadToShape,
     naiveMeasureLayout: () => naiveMeasureLayout,
     needsBrace: () => needsBrace,
@@ -68995,6 +68996,12 @@ var NotationEngine = (() => {
   function musicXmlAccidentalGlyphName(value) {
     return Object.prototype.hasOwnProperty.call(MUSICXML_ACCIDENTAL_GLYPHS, value) ? MUSICXML_ACCIDENTAL_GLYPHS[value] : void 0;
   }
+  var ACCIDENTAL_VALUE_BY_GLYPH = new Map(
+    Object.entries(MUSICXML_ACCIDENTAL_GLYPHS).map(([value, glyph]) => [glyph, value])
+  );
+  function musicXmlAccidentalValueForGlyphName(glyphName) {
+    return ACCIDENTAL_VALUE_BY_GLYPH.get(glyphName);
+  }
   function isKnownAccidentalGlyphName(name) {
     return /^(?:acc|medRenFla|medRenNatura|medRenShar|kievanAccidental)/.test(name) && getGlyph(name) !== void 0;
   }
@@ -73351,8 +73358,9 @@ ${denominator}`;
     return FALLBACK_DIVISIONS;
   }
   var toDivisions = (ticks, divisions) => Math.round(ticksToXmlDivisions(ticks, divisions));
-  function pitchXml(pitch) {
+  function pitchXml(pitch, hasExplicitDisplayPosition) {
     if (pitch.kind === "unpitched") {
+      if (hasExplicitDisplayPosition !== true) return "<unpitched/>";
       return `<unpitched><display-step>${pitch.displayStep}</display-step><display-octave>${pitch.displayOctave}</display-octave></unpitched>`;
     }
     const alter = pitch.alter || 0;
@@ -73362,9 +73370,13 @@ ${denominator}`;
     const pitch = note2.pitch;
     if (pitch.kind !== "pitched") return "";
     const alter = pitch.alter || 0;
-    if (!alter) return "";
-    const name = ACCIDENTAL_NAME[alter];
-    return name === void 0 ? "" : `<accidental>${name}</accidental>`;
+    const glyph = note2.accidentalGlyphName;
+    const value = glyph === void 0 ? alter === 0 ? note2.hasExplicitAccidental === true ? "natural" : void 0 : ACCIDENTAL_NAME[alter] : musicXmlAccidentalValueForGlyphName(glyph) ?? "other";
+    if (value === void 0) return "";
+    const smufl = glyph === void 0 || musicXmlAccidentalGlyphName(value) === glyph ? "" : ` smufl="${escapeXml(glyph)}"`;
+    const parentheses = note2.accidentalParentheses === void 0 ? "" : ` parentheses="${note2.accidentalParentheses ? "yes" : "no"}"`;
+    const bracket = note2.accidentalBracket === void 0 ? "" : ` bracket="${note2.accidentalBracket ? "yes" : "no"}"`;
+    return `<accidental${smufl}${parentheses}${bracket}>${escapeXml(value)}</accidental>`;
   }
   function durationXml(tieStart, tieStop, duration2, divisions) {
     const ties = (tieStart ? '<tie type="start"/>' : "") + (tieStop ? '<tie type="stop"/>' : "");
@@ -73378,28 +73390,58 @@ ${denominator}`;
     return `<voice>${voice2}</voice><type>${duration2.type}</type>${dots}`;
   }
   var stemXml = (note2) => note2.explicitStemDirection === void 0 ? "" : `<stem>${note2.explicitStemDirection}</stem>`;
+  function fermataXml(placement, shape) {
+    const type = placement === "below" ? ' type="inverted"' : "";
+    return `<fermata${type}>${shape ?? ""}</fermata>`;
+  }
+  function slideXml(type, kind) {
+    const element = kind === "glissando" ? "glissando" : "slide";
+    return `<${element} type="${type}"/>`;
+  }
   function notationsXml(note2) {
     const tied = (note2.tieStart ? '<tied type="start"/>' : "") + (note2.tieStop ? '<tied type="stop"/>' : "");
     const slurs = [
       ...(note2.slurStarts ?? []).map((number) => `<slur type="start" number="${number}"/>`),
       ...(note2.slurStops ?? []).map((number) => `<slur type="stop" number="${number}"/>`)
     ].join("");
+    const tuplets = (note2.tupletStart ? '<tuplet type="start"/>' : "") + (note2.tupletStop ? '<tuplet type="stop"/>' : "");
+    const tremolo = note2.tremoloStrokes === void 0 ? "" : `<tremolo${note2.tremoloType === void 0 ? "" : ` type="${note2.tremoloType}"`}>${note2.tremoloStrokes}</tremolo>`;
     const articulations = (note2.articulations ?? []).filter(
       (mark) => ARTICULATION_ELEMENT[mark] !== void 0
     );
     const ornaments = (note2.ornaments ?? []).filter((mark) => ORNAMENT_ELEMENT[mark] !== void 0);
-    if (articulations.length === 0 && ornaments.length === 0 && !note2.hasFermata && !tied && !slurs) {
-      return "";
-    }
-    const inner = tied + slurs + (articulations.length ? `<articulations>${articulations.map((mark) => `<${ARTICULATION_ELEMENT[mark]}/>`).join("")}</articulations>` : "") + (ornaments.length ? `<ornaments>${ornaments.map((mark) => `<${ORNAMENT_ELEMENT[mark]}/>`).join("")}</ornaments>` : "") + (note2.hasFermata ? "<fermata/>" : "");
-    return `<notations>${inner}</notations>`;
+    const technical = note2.stringNumber === void 0 && note2.fret === void 0 && note2.fingering === void 0 ? "" : "<technical>" + (note2.stringNumber === void 0 ? "" : `<string>${note2.stringNumber}</string>`) + (note2.fret === void 0 ? "" : `<fret>${note2.fret}</fret>`) + (note2.fingering === void 0 ? "" : `<fingering>${note2.fingering}</fingering>`) + "</technical>";
+    const slides = (note2.slideStart ? slideXml("start", note2.slideStartKind) : "") + (note2.slideStop ? slideXml("stop", note2.slideStopKind) : "");
+    const arpeggiate = note2.nonArpeggiate === true ? "<non-arpeggiate/>" : note2.arpeggiate === void 0 ? "" : `<arpeggiate direction="${note2.arpeggiate}"/>`;
+    const inner = tied + slurs + tuplets + tremolo + (articulations.length ? `<articulations>${articulations.map((mark) => `<${ARTICULATION_ELEMENT[mark]}/>`).join("")}</articulations>` : "") + (ornaments.length ? `<ornaments>${ornaments.map((mark) => `<${ORNAMENT_ELEMENT[mark]}/>`).join("")}</ornaments>` : "") + technical + slides + arpeggiate + (note2.isHarmonic === true ? "<harmonic/>" : "") + (note2.hasFermata ? fermataXml(note2.fermataPlacement, note2.fermataShape) : "");
+    return inner === "" ? "" : `<notations>${inner}</notations>`;
+  }
+  function timeModificationXml(duration2) {
+    const tuplet = duration2.tuplet;
+    if (tuplet === void 0) return "";
+    return `<time-modification><actual-notes>${tuplet.actualNotes}</actual-notes><normal-notes>${tuplet.normalNotes}</normal-notes></time-modification>`;
+  }
+  function noteheadXml(note2) {
+    const value = note2.explicitNotehead;
+    if (value === void 0) return "";
+    const attributes = (note2.explicitNoteheadSmufl === void 0 ? "" : ` smufl="${escapeXml(note2.explicitNoteheadSmufl)}"`) + (note2.noteheadFilled === void 0 ? "" : ` filled="${note2.noteheadFilled ? "yes" : "no"}"`) + (note2.noteheadParentheses === void 0 ? "" : ` parentheses="${note2.noteheadParentheses ? "yes" : "no"}"`);
+    return `<notehead${attributes}>${escapeXml(value)}</notehead>`;
+  }
+  function beamsXml(note2) {
+    return (note2.beams ?? []).map((beam) => `<beam number="${beam.number}">${beam.value}</beam>`).join("");
+  }
+  function lyricsXml(note2) {
+    return (note2.lyrics ?? []).map(
+      (lyric) => `<lyric number="${lyric.number}">` + (lyric.syllabic === void 0 ? "" : `<syllabic>${lyric.syllabic}</syllabic>`) + `<text>${escapeXml(lyric.text)}</text>` + (lyric.extend ? "<extend/>" : "") + "</lyric>"
+    ).join("");
   }
   function noteXml(note2, duration2, divisions, chordMember) {
-    return "<note>" + (chordMember ? "<chord/>" : "") + pitchXml(note2.pitch) + durationXml(note2.tieStart === true, note2.tieStop === true, duration2, divisions) + instrumentXml(note2) + voiceTypeXml(duration2, note2.voice) + accidentalXml(note2) + stemXml(note2) + `<staff>${note2.staff ?? 1}</staff>` + notationsXml(note2) + "</note>";
+    return "<note>" + (note2.isGrace === true ? `<grace${note2.graceSlash === true ? ' slash="yes"' : ""}/>` : "") + (note2.isCue === true ? "<cue/>" : "") + (chordMember ? "<chord/>" : "") + pitchXml(note2.pitch, note2.hasExplicitDisplayPosition) + durationXml(note2.tieStart === true, note2.tieStop === true, duration2, divisions) + instrumentXml(note2) + voiceTypeXml(duration2, note2.voice) + accidentalXml(note2) + timeModificationXml(duration2) + stemXml(note2) + noteheadXml(note2) + `<staff>${note2.staff ?? 1}</staff>` + beamsXml(note2) + notationsXml(note2) + lyricsXml(note2) + "</note>";
   }
   function restXml(rest2, divisions) {
     const positioned = rest2.displayStep !== void 0 && rest2.displayOctave !== void 0 ? `<display-step>${rest2.displayStep}</display-step><display-octave>${rest2.displayOctave}</display-octave>` : "";
-    return `<note><rest>${positioned}</rest>` + durationXml(false, false, rest2.duration, divisions) + voiceTypeXml(rest2.duration, rest2.voice) + `<staff>${rest2.staff ?? 1}</staff></note>`;
+    const notations = rest2.hasFermata === true ? `<notations>${fermataXml(rest2.fermataPlacement, rest2.fermataShape)}</notations>` : "";
+    return `<note><rest>${positioned}</rest>` + durationXml(false, false, rest2.duration, divisions) + voiceTypeXml(rest2.duration, rest2.voice) + timeModificationXml(rest2.duration) + `<staff>${rest2.staff ?? 1}</staff>` + notations + "</note>";
   }
   function chordXml(chord2, divisions) {
     return chord2.notes.map((note2, index) => noteXml(note2, chord2.duration, divisions, index > 0)).join("");
@@ -76884,35 +76926,94 @@ ${denominator}`;
   function mutableSounding(event) {
     return event.sounding === void 0 ? void 0 : event.sounding;
   }
+  function wedgeSpans(marks) {
+    const open = /* @__PURE__ */ new Map();
+    const spans = [];
+    for (const mark of marks) {
+      if (mark.type === "stop") {
+        const startTick = open.get(mark.number);
+        if (startTick === void 0) continue;
+        open.delete(mark.number);
+        if (mark.tick > startTick) spans.push({ startTick, endTick: mark.tick });
+        continue;
+      }
+      open.set(mark.number, mark.tick);
+    }
+    return spans;
+  }
+  function levelAt(marks, tick) {
+    let low = 0;
+    let high = marks.length - 1;
+    let found;
+    while (low <= high) {
+      const middle = low + high >> 1;
+      const mark = marks[middle];
+      if (mark === void 0) break;
+      if (mark.tick <= tick) {
+        found = mark.level;
+        low = middle + 1;
+      } else {
+        high = middle - 1;
+      }
+    }
+    return found;
+  }
   function applyDynamics(events, written, directions, globalTickOffsetByMeasure) {
     resolveTies(events, written);
     if (directions === void 0 || directions.length === 0) return;
     const byPart = /* @__PURE__ */ new Map();
+    const wedgesByPart = /* @__PURE__ */ new Map();
     for (const direction of directions) {
-      const level = direction.dynamics[0];
-      if (level === void 0) continue;
       const tick = (globalTickOffsetByMeasure.get(direction.measureNumber) ?? 0) + direction.tick;
-      const list = byPart.get(direction.partId) ?? [];
-      list.push({ tick, level });
-      byPart.set(direction.partId, list);
+      const level = direction.dynamics[0];
+      if (level !== void 0) {
+        const list = byPart.get(direction.partId) ?? [];
+        list.push({ tick, level });
+        byPart.set(direction.partId, list);
+      }
+      for (const wedge of direction.wedges) {
+        const list = wedgesByPart.get(direction.partId) ?? [];
+        list.push({ tick, type: wedge.type, number: wedge.number });
+        wedgesByPart.set(direction.partId, list);
+      }
     }
     for (const list of byPart.values()) list.sort((a, b) => a.tick - b.tick);
+    for (const list of wedgesByPart.values()) list.sort((a, b) => a.tick - b.tick);
+    const spansByPart = /* @__PURE__ */ new Map();
+    for (const [partId, marks] of wedgesByPart) spansByPart.set(partId, wedgeSpans(marks));
     const cursorByPart = /* @__PURE__ */ new Map();
     const levelByPart = /* @__PURE__ */ new Map();
     for (const event of events) {
       const marks = byPart.get(event.partId);
-      if (marks === void 0) continue;
       let cursor = cursorByPart.get(event.partId) ?? 0;
       let level = levelByPart.get(event.partId);
       for (; ; ) {
-        const mark = marks[cursor];
+        const mark = marks?.[cursor];
         if (mark === void 0 || mark.tick > event.tick) break;
         level = mark.level;
         cursor += 1;
       }
       cursorByPart.set(event.partId, cursor);
+      if (level !== void 0) levelByPart.set(event.partId, level);
+      const spans = spansByPart.get(event.partId);
+      const span = spans?.find(
+        (candidate) => event.tick >= candidate.startTick && event.tick < candidate.endTick
+      );
+      if (span !== void 0) {
+        const own = byPart.get(event.partId) ?? [];
+        const from = levelAt(own, span.startTick);
+        const to = levelAt(own, span.endTick);
+        if (from !== void 0 && to !== void 0) {
+          const progress = (event.tick - span.startTick) / (span.endTick - span.startTick);
+          event.velocity = velocityWithinWedge(
+            velocityForDynamic(from),
+            velocityForDynamic(to),
+            progress
+          );
+          continue;
+        }
+      }
       if (level !== void 0) {
-        levelByPart.set(event.partId, level);
         event.velocity = velocityForDynamic(level);
       }
     }
