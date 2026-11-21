@@ -1,6 +1,6 @@
 import { WorkletSynthesizer } from 'spessasynth_lib';
 import type { NotationEvent } from '../playback/event-stream.js';
-import { resolvePosition, type PlaybackData, type PlaybackTrack } from '../playback/position.js';
+import { resolvePosition, type PlaybackData } from '../playback/position.js';
 import { assignTrackRouting, type TrackRouting } from '../playback/routing.js';
 import { DEFAULT_VELOCITY } from '../playback/dynamics.js';
 import { unfoldEvents } from '../playback/repeats.js';
@@ -40,22 +40,12 @@ export interface NotationSoundEngine {
   stop(): void;
   setVolume(volume: number): void;
   /**
-   * The score's own tracks, so a note auditioned before Play still sounds
-   * as its own instrument. `play` rebuilds this from the playback it is
-   * given; calling this only matters for a host that previews a note
-   * without having played yet.
-   */
-  setTracks(tracks: readonly PlaybackTrack[]): void;
-  /**
    * Sounds one or more MIDI notes briefly, without a `PlaybackData`. A
    * host uses this to let a writer hear a note the moment it is written,
    * rather than only on full playback. Silently does nothing while a full
    * playback is running, so the two never overlap.
-   *
-   * `partId` picks the channel, and with it the instrument and whether the
-   * note is percussion. Omitting it auditions on the first part.
    */
-  preview(midiNotes: readonly number[], seconds?: number, partId?: string): void;
+  preview(midiNotes: readonly number[], seconds?: number): void;
   destroy(): void;
 }
 
@@ -160,8 +150,6 @@ export class R2SoundFontEngine implements NotationSoundEngine {
   private readonly synth: WorkletSynthesizer;
   private readonly partChannels = new Map<string, number>();
   private routingByPart: ReadonlyMap<string, TrackRouting> = new Map();
-  /** The first track's id, so a preview with no part named still sounds on the score's own instrument. */
-  private firstPartId: string | undefined;
   private timers = new Set<number>();
   private stopped = true;
   private volume = 0.75;
@@ -223,7 +211,8 @@ export class R2SoundFontEngine implements NotationSoundEngine {
     // A part's channel is decided by the score being played now, so the
     // map is rebuilt here rather than kept across playbacks: the second
     // score a writer opened used to inherit the first one's routing.
-    this.setTracks(playback.tracks);
+    this.partChannels.clear();
+    this.routingByPart = assignTrackRouting(playback.tracks);
     const origin = performance.now() / 1000;
     const start = Math.max(0, fromSeconds);
     // A repeated section is played more than once, so the score's written
@@ -274,22 +263,20 @@ export class R2SoundFontEngine implements NotationSoundEngine {
   }
 
   /**
-   * Sounds the given MIDI notes once for a short audition. Unlike `play`,
-   * this takes bare MIDI numbers rather than a `PlaybackData`, because a
-   * host writing a single note has no timeline to hand -- the note may not
-   * even be committed yet.
-   *
-   * `partId` decides the channel, and with it the instrument: a note
-   * written on the violin part must not come back as a piano, and a drum
-   * must land on the percussion channel or it sounds as a pitched note.
-   * Without a part the first part's routing is used, which is what a host
-   * with a single-part score wants.
+   * Sounds the given MIDI notes once, on the first part's channel, for a
+   * short audition. Unlike `play`, this takes bare MIDI numbers rather
+   * than a `PlaybackData`, because a host writing a single note has no
+   * timeline to hand -- the note may not even be committed yet.
    */
-  preview(midiNotes: readonly number[], seconds = 0.6, partId?: string): void {
+  preview(midiNotes: readonly number[], seconds = 0.6): void {
     if (this.stopped === false) return;
     const notes = midiNotes.filter((note) => Number.isInteger(note) && note >= 0 && note <= 127);
     if (notes.length === 0) return;
-    const channel = this.channelFor(partId ?? this.firstPartId ?? 'P1');
+    // Channel 0 is where the score's first part plays, so the preview uses
+    // the part's own program and sounds like the note being written. A
+    // preview never runs during playback (`stopped` guards it), so it can
+    // never collide with the scheduled notes.
+    const channel = this.partChannels.get('P1') ?? 0;
     void this.context.resume();
     for (const midiNote of notes) this.synth.noteOn(channel, midiNote, 100);
     const offTimer = window.setTimeout(
@@ -300,23 +287,6 @@ export class R2SoundFontEngine implements NotationSoundEngine {
       Math.max(0.05, seconds) * 1000,
     );
     this.timers.add(offTimer);
-  }
-
-  /**
-   * The score's tracks, which decide each part's channel and instrument.
-   *
-   * `play` calls this itself from the playback it is handed. A host that
-   * auditions a note before ever pressing Play calls it once when the
-   * score loads, so the first note a writer places already sounds on its
-   * own part's instrument instead of the default piano.
-   */
-  setTracks(tracks: readonly PlaybackTrack[]): void {
-    this.routingByPart = assignTrackRouting(tracks);
-    this.firstPartId = tracks[0]?.id;
-    // A channel's program is set the first time the part sounds, and the
-    // map caches that decision. Dropping it here makes the next note pick
-    // up the routing just given rather than the previous score's.
-    this.partChannels.clear();
   }
 
   stop(): void {

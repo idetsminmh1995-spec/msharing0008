@@ -396,10 +396,6 @@
 .newscore__step[hidden] { display:none; }
 .newscore__hint { margin:0; color:var(--muted); font-size:13px; line-height:1.55; }
 .newscore__groups { display:grid; gap:16px; }
-.newscore__pick { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,220px); gap:18px; align-items:start; }
-.newscore__pick-side { display:grid; gap:10px; min-width:0; }
-.newscore__pick-side[hidden] { display:none; }
-.newscore__field[hidden] { display:none; }
 .newscore__group-label { margin:0 0 7px; color:var(--muted); font-family:'DM Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; }
 .newscore__chips { display:flex; flex-wrap:wrap; gap:7px; }
 .newscore__chip { padding:8px 13px; border:1px solid var(--border); border-radius:999px; color:var(--text); background:transparent; font-size:12.5px; font-weight:600; cursor:pointer; transition:border-color .15s ease,background .15s ease,color .15s ease; }
@@ -424,7 +420,7 @@
 .newscore__button[hidden] { display:none; }
 .newscore__button:focus-visible { outline:2px solid var(--accent-bright); outline-offset:2px; }
 body.is-newscore-open { overflow:hidden; }
-@media (max-width:640px) { .newscore { padding:12px; align-items:end; }.newscore__panel { max-height:92vh; border-radius:18px 18px 12px 12px; }.newscore__head { padding:18px 18px 8px; }.newscore__status { margin:0 18px; }.newscore__step { padding:6px 18px 4px; }.newscore__pick { grid-template-columns:1fr; }.newscore__fields { grid-template-columns:1fr; }.newscore__foot { padding:12px 18px 16px; } }
+@media (max-width:640px) { .newscore { padding:12px; align-items:end; }.newscore__panel { max-height:92vh; border-radius:18px 18px 12px 12px; }.newscore__head { padding:18px 18px 8px; }.newscore__status { margin:0 18px; }.newscore__step { padding:6px 18px 4px; }.newscore__fields { grid-template-columns:1fr; }.newscore__foot { padding:12px 18px 16px; } }
 
 /* ------------------------------------------------------------------ */
 /* Notation Lab Editor — sticky secondary toolbar + score workspace    */
@@ -486,76 +482,6 @@ body.is-newscore-open { overflow:hidden; }
    group by group instead of splitting a group across rows. */
 .editor-popover--overflow { max-width:min(360px,calc(100vw - 16px)); align-content:flex-start; }
 .editor-popover .editor-tool { min-width:32px; height:32px; }
-/* The instrument and mixer boxes hang off the bottom bar, so they are
-   wider than a tool palette and scroll their own body when the window is
-   short. */
-.editor-popover--inst { max-width:min(620px,calc(100vw - 16px)); }
-.editor-popover--mixer { max-width:min(420px,calc(100vw - 16px)); }
-.editor-inst { display:flex; flex-direction:column; gap:8px; padding:2px; }
-.editor-inst__title { color:var(--muted); font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
-.editor-inst__keys { display:flex; gap:2px; }
-.editor-inst__octave { position:relative; display:flex; gap:2px; }
-.editor-inst__white {
-  display:inline-flex;
-  width:26px;
-  height:76px;
-  align-items:flex-end;
-  justify-content:center;
-  padding-bottom:4px;
-  border:1px solid var(--border);
-  border-radius:0 0 4px 4px;
-  color:var(--muted);
-  background:var(--surface);
-  cursor:pointer;
-  font-size:9px;
-  font-weight:600;
-}
-.editor-inst__white:hover { border-color:var(--accent); color:var(--accent-bright); }
-.editor-inst__black {
-  position:absolute;
-  top:0;
-  z-index:2;
-  width:16px;
-  height:46px;
-  padding:0;
-  border:1px solid #000;
-  border-radius:0 0 3px 3px;
-  background:#1b1b1f;
-  cursor:pointer;
-}
-.editor-inst__black:hover { background:var(--accent); }
-.editor-inst__string { display:flex; align-items:center; gap:3px; }
-.editor-inst__string-label { width:38px; color:var(--muted); font-size:9px; font-weight:600; }
-.editor-inst__fret {
-  width:28px;
-  height:24px;
-  border:1px solid var(--border);
-  border-radius:4px;
-  color:var(--muted);
-  background:var(--surface);
-  cursor:pointer;
-  font-size:10px;
-  font-weight:600;
-}
-.editor-inst__fret:hover { border-color:var(--accent); color:var(--accent-bright); }
-.editor-inst__fret--open { border-style:dashed; }
-.editor-inst__drums { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
-.editor-inst__drum {
-  padding:6px 8px;
-  border:1px solid var(--border);
-  border-radius:6px;
-  color:var(--text);
-  background:var(--surface);
-  cursor:pointer;
-  font-size:11px;
-  font-weight:600;
-  text-align:left;
-}
-.editor-inst__drum:hover { border-color:var(--accent); color:var(--accent-bright); }
-.editor-inst__row { display:flex; align-items:center; gap:8px; }
-.editor-inst__row-name { flex:1 1 auto; min-width:0; overflow:hidden; color:var(--text); font-size:11px; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
-.editor-inst__slider { flex:0 0 120px; accent-color:var(--accent); }
-.editor-inst__note { color:var(--muted); font-size:10px; }
 
 /* MuseScore-style main toolbar: flat square icon buttons on one row,
    hairline separators, filled accent for tools that are ON. */

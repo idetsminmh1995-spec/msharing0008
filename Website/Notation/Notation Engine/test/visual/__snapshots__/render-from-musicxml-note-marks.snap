@@ -12,11 +12,11 @@
 <text x="3.5" y="7" font-family="Bravura" font-size="4" fill="#000000"></text>
 <g data-id="P1#m1#v1#e0">
 <text x="8.5" y="9" font-family="Bravura" font-size="4" fill="#000000"></text>
-<text x="8.5" y="8" font-family="Bravura" font-size="4" fill="#000000"></text>
-<text x="8.5" y="7" font-family="Bravura" font-size="4" fill="#000000"></text>
 <g>
 <line x1="7.51" y1="9" x2="9.49" y2="9" stroke="#000000" stroke-width="0.16" />
 </g>
+<text x="8.5" y="8" font-family="Bravura" font-size="4" fill="#000000"></text>
+<text x="8.5" y="7" font-family="Bravura" font-size="4" fill="#000000"></text>
 <line x1="9.68" y1="8.832" x2="9.68" y2="5.332" stroke="#000000" stroke-width="0.12" />
 <path d="M 6.804 6.5 L 6.490400000000001 7.1 L 7.016800000000001 7.7 L 6.4232000000000005 8.3 L 6.9496 8.9 L 6.636000000000001 9.5" fill="none" stroke="#000000" stroke-width="0.12" stroke-linecap="round" stroke-linejoin="round" />
 </g>

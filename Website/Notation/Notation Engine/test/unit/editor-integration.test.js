@@ -69,7 +69,7 @@ const STARTER_XML = `<?xml version="1.0" encoding="UTF-8"?>
  * `requestAnimationFrame` on its own, so the page is opened with the
  * `?intent=create` handoff, whose `loadXml` renders synchronously.
  */
-function loadEditorPage({ url = 'https://example.test/notation-editor.html?intent=create', pendingXml, newScore, globals } = {}) {
+function loadEditorPage({ url = 'https://example.test/notation-editor.html?intent=create', pendingXml } = {}) {
   const html = fs.readFileSync(path.join(appDir, 'notation-editor.html'), 'utf8');
   const virtualConsole = new VirtualConsole();
   const errors = [];
@@ -80,10 +80,6 @@ function loadEditorPage({ url = 'https://example.test/notation-editor.html?inten
     url,
   });
   const { window } = dom;
-  // Page globals the boot reads -- the SoundFont host config, a stubbed
-  // `fetch`, a stand-in engine -- have to be in place BEFORE the scripts
-  // run, because the boot fetches the manifest on its first tick.
-  for (const [key, value] of Object.entries(globals ?? {})) window[key] = value;
   if (pendingXml !== undefined) {
     // The Lab hands a score over through sessionStorage and the page's boot
     // reads it before anything else, so seeding it is how a test opens a
@@ -96,11 +92,6 @@ function loadEditorPage({ url = 'https://example.test/notation-editor.html?inten
         data: Buffer.from(pendingXml, 'utf8').toString('base64'),
       }),
     );
-  }
-  if (newScore !== undefined) {
-    // The new-score wizard leaves its answer here and the page builds the
-    // score from it, so seeding this is how a test opens a chosen line-up.
-    window.sessionStorage.setItem('notation-lab-new-score', JSON.stringify(newScore));
   }
   const context = dom.getInternalVMContext();
   for (const rel of ['assets/notation-engine.js', 'notation-doc.js', 'notation-newscore.js', 'notation-editor.js']) {
@@ -436,14 +427,12 @@ describe('the editor and the engine agree, end to end', () => {
     const bars = window.document.querySelectorAll('[data-editor-bottom-bar]');
     assert.equal(bars.length, 1, 'the editor has exactly one bottom bar');
     // The export menu's own items live in the bar's markup but only appear
-    // once Export is pressed, so they are not counted as bar controls. The
-    // instrument and mixer boxes hang off the bar the same way.
+    // once Export is pressed, so they are not counted as bar controls.
     const controls = [...bars[0].querySelectorAll('button, output, select, input')]
-      .filter((control) => !control.closest('[data-editor-export-list]'))
-      .filter((control) => !control.closest('[data-editor-popover-panel]'));
+      .filter((control) => !control.closest('[data-editor-export-list]'));
     assert.deepEqual(
       controls.map((control) => control.getAttribute('aria-label')),
-      ['Play', 'Stop', 'Metronome', 'Inst.', 'Mixer', 'Score length', 'Zoom out', 'Zoom level', 'Zoom in', 'Save', 'Export'],
+      ['Play', 'Stop', 'Metronome', 'Score length', 'Zoom out', 'Zoom level', 'Zoom in', 'Save', 'Export'],
     );
 
     // Save and Export are different promises, not two names for one thing:
@@ -459,7 +448,7 @@ describe('the editor and the engine agree, end to end', () => {
     const groups = [...bars[0].children].filter((node) => node.classList.contains('editor-bottombar__group'));
     assert.deepEqual(
       groups.map((group) => group.getAttribute('aria-label')),
-      ['Playback', 'Instrument', 'Length', 'Zoom', 'File'],
+      ['Playback', 'Length', 'Zoom', 'File'],
     );
 
     // The length readout is the timeline's own end in minutes:seconds, so a
@@ -468,7 +457,7 @@ describe('the editor and the engine agree, end to end', () => {
     assert.match(length.textContent, /^\d+:\d{2}$/);
   });
 
-  test('the count-in bar is four clicks at the score\'s own tempo, and the music starts after it', async () => {
+  test('the count-in is exactly one bar of clicks and stops at the bar line', async () => {
     const { window } = loadEditorPage();
     const doc = window.document;
     // Count the clicks the editor schedules, and when. A click is an
@@ -502,9 +491,6 @@ describe('the editor and the engine agree, end to end', () => {
     const metronome = doc.querySelector('[data-editor-metronome]');
     const play = doc.querySelector('[data-editor-play]');
     metronome.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    // The switch has already clicked a bar; Play restarts the count from
-    // beat one, so count only what Play itself schedules.
-    clicks.length = 0;
     play.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 
     // A 4/4 bar at the default 120 is two seconds, one beat every 0.5s.
@@ -516,64 +502,8 @@ describe('the editor and the engine agree, end to end', () => {
     // The first beat is accented, the rest are not, so the bar is countable.
     assert.ok(clicks[0].freq > clicks[1].freq, 'the downbeat is the accented click');
 
-    // The switch stays on, so the pulse carries on under the music.
     await new Promise((resolve) => window.setTimeout(resolve, 2100));
-    assert.ok(clicks.length > 4, 'the pulse continues past the count-in bar');
-    metronome.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-  });
-
-  test('the metronome clicks as soon as it is switched on, with no Play behind it', async () => {
-    const { window } = loadEditorPage();
-    const doc = window.document;
-    // A click is an oscillator with a start time; a stand-in audio host
-    // records every one, so "the switch makes a sound" is countable.
-    const clicks = [];
-    class FakeParam {
-      setValueAtTime() {}
-      linearRampToValueAtTime() {}
-      exponentialRampToValueAtTime() {}
-    }
-    class FakeNode {
-      constructor() { this.gain = new FakeParam(); this.frequency = { value: 0 }; this.type = ''; }
-      connect() {}
-      disconnect() {}
-      start(at) { clicks.push({ at, freq: this.frequency.value }); }
-      stop() {}
-    }
-    window.AudioContext = class {
-      constructor() { this.destination = {}; this.currentTime = 0; }
-      resume() { return Promise.resolve(); }
-      createOscillator() { return new FakeNode(); }
-      createGain() { return new FakeNode(); }
-    };
-    window.requestAnimationFrame = (callback) => window.setTimeout(() => callback(window.performance.now()), 16);
-    window.cancelAnimationFrame = (id) => window.clearTimeout(id);
-
-    const metronome = doc.querySelector('[data-editor-metronome]');
-    const status = () => doc.querySelector('[data-editor-status]').textContent;
-    const toggle = () => metronome.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-
-    // The switch alone has to be audible: a writer who taps it wants to
-    // hear the tempo, not to be told a count-in will happen later.
-    toggle();
-    assert.equal(metronome.getAttribute('aria-pressed'), 'true', 'the switch shows it is on');
-    assert.ok(clicks.length >= 4, 'a 4/4 bar is heard at once, with no Play');
-    assert.deepEqual(clicks.slice(0, 4).map((click) => click.at), [0, 0.5, 1, 1.5]);
-    assert.ok(clicks[0].freq > clicks[1].freq, 'the downbeat is the accented click');
-
-    // It is a metronome, not a one-bar flourish: the pulse keeps going
-    // while the switch stays on.
-    await new Promise((resolve) => window.setTimeout(resolve, 2200));
-    assert.ok(clicks.length > 4, 'the pulse continues past the first bar');
-    assert.equal(metronome.getAttribute('aria-pressed'), 'true', 'the switch stays on by itself');
-
-    // And switching it off stops the sound.
-    toggle();
-    assert.equal(metronome.getAttribute('aria-pressed'), 'false', 'the switch shows it is off');
-    const afterOff = clicks.length;
-    await new Promise((resolve) => window.setTimeout(resolve, 2200));
-    assert.equal(clicks.length, afterOff, 'no click is scheduled once it is switched off');
-    assert.match(status(), /Metronome off/, 'the writer is told it went quiet');
+    assert.equal(clicks.length, 4, 'no click is scheduled once the bar is over');
   });
 
   test('the metronome counts one bar in before the notes, and the score waits for it', async () => {
@@ -623,11 +553,10 @@ describe('the editor and the engine agree, end to end', () => {
     assert.match(status(), /Playing/, 'after the bar, the score plays');
     assert.notEqual(playheadX(), held, 'the playhead moves once the count-in ends');
     assert.equal(played.length, 1, 'the notes start once, and only after the count-in');
-    // The switch stays on through the music: the metronome is the pulse the
-    // writer asked for, not a bar of clicks that hands over and quits.
-    assert.equal(metronome.getAttribute('aria-pressed'), 'true', 'the metronome stays on while the score plays');
+    // The count is over, so the switch goes off by itself: the metronome is
+    // the bar before the music, not a pulse running under it.
+    assert.equal(metronome.getAttribute('aria-pressed'), 'false', 'the metronome switches itself off after the bar');
     assert.equal(metronome.dataset.metronome, undefined, 'no stray metronome flag is left on the button');
-    metronome.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
   });
 
   test('one cursor while the score plays: the playhead takes over from the entry cursor', () => {
@@ -1289,429 +1218,6 @@ describe('the editor and the engine agree, end to end', () => {
     assert.match(doc.querySelector('[data-editor-status]').textContent, /Inserted|Replaced/);
   });
 
-  test('a note auditioned while writing sounds on its own part, not on the first part', async () => {
-    const { window } = loadEditorPage();
-    const doc = window.document;
-    const scoreHost = doc.querySelector('[data-editor-score]');
-
-    // The engine's contract with the sound bundle: it creates one engine,
-    // hands it the score's tracks, and asks it to audition single notes.
-    // What matters here is WHICH part the audition is attributed to -- a
-    // note written on the second part must not be heard as the first
-    // part's instrument.
-    const previews = [];
-    const trackSets = [];
-    window.NotationSoundFont = {
-      R2SoundFontEngine: {
-        create: async () => ({
-          play: () => {},
-          pause: () => {},
-          setTracks: (tracks) => trackSets.push(tracks),
-          preview: (...args) => previews.push(args),
-        }),
-      },
-    };
-    window.DOMPoint = class {
-      constructor(x = 0, y = 0) {
-        this.x = x;
-        this.y = y;
-      }
-      matrixTransform() {
-        return new window.DOMPoint(this.x, this.y);
-      }
-    };
-    window.SVGElement.prototype.getScreenCTM = () => ({
-      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0,
-      inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
-    });
-    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 1, height: 1 });
-
-    const svg = scoreHost.querySelector('svg');
-    const [, , pageWidth] = svg.getAttribute('viewBox').split(/\s+/).map(Number);
-    const staffY = Number(
-      [...svg.querySelectorAll('line')]
-        .find((line) => line.getAttribute('y1') === line.getAttribute('y2')
-          && Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3)
-        .getAttribute('y1'),
-    );
-    scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', {
-      clientX: pageWidth * 0.1,
-      clientY: staffY,
-      bubbles: true,
-    }));
-    // The preview resolves through a promise chain, so the click's own
-    // turn has to end before the audition is recorded.
-    await new Promise((resolve) => window.setTimeout(resolve, 0));
-
-    assert.equal(previews.length, 1, 'writing a note auditions it once');
-    const [notes, , partId] = previews[0];
-    assert.equal(notes.length, 1);
-    assert.equal(typeof notes[0], 'number', 'a preview takes MIDI numbers');
-    assert.equal(partId, 'P1', 'the audition is attributed to the part being written on');
-    assert.ok(trackSets.length > 0, 'the score tracks reach the sound engine before the first note');
-    assert.deepEqual(
-      [...trackSets[trackSets.length - 1]].map((track) => track.id),
-      ['P1'],
-      'the engine is given the score it is about to sound',
-    );
-  });
-
-  test('a note auditioned on a transposing part sounds at the pitch Play produces', async () => {
-    // A guitar part is written an octave above where it sounds. The
-    // audition must apply the part's `<transpose>` the way playback does,
-    // or the writer hears a note an octave away from the one Play gives.
-    const { window } = loadEditorPage({
-      newScore: {
-        title: 'Guitar',
-        instrumentIds: ['acoustic-guitar'],
-        key: 'C',
-        time: '4/4',
-        tempo: 120,
-        measures: 1,
-      },
-    });
-    const doc = window.document;
-    const scoreHost = doc.querySelector('[data-editor-score]');
-
-    const previews = [];
-    window.NotationSoundFont = {
-      R2SoundFontEngine: {
-        create: async () => ({
-          play: () => {},
-          pause: () => {},
-          setTracks: () => {},
-          preview: (...args) => previews.push(args),
-        }),
-      },
-    };
-    window.DOMPoint = class {
-      constructor(x = 0, y = 0) {
-        this.x = x;
-        this.y = y;
-      }
-      matrixTransform() {
-        return new window.DOMPoint(this.x, this.y);
-      }
-    };
-    window.SVGElement.prototype.getScreenCTM = () => ({
-      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0,
-      inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
-    });
-    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 1, height: 1 });
-
-    const svg = scoreHost.querySelector('svg');
-    const [, , pageWidth] = svg.getAttribute('viewBox').split(/\s+/).map(Number);
-    const staffYs = [...svg.querySelectorAll('line')]
-      .filter((line) => line.getAttribute('y1') === line.getAttribute('y2')
-        && Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3)
-      .map((line) => Number(line.getAttribute('y1')))
-      .sort((a, b) => a - b);
-    scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', {
-      clientX: pageWidth * 0.1,
-      clientY: staffYs[Math.floor(staffYs.length / 2)],
-      bubbles: true,
-    }));
-    await new Promise((resolve) => window.setTimeout(resolve, 0));
-
-    assert.equal(previews.length, 1, 'writing a note auditions it once');
-    const auditioned = previews[0][0][0];
-
-    // The score as the editor saved it, which is what Play reads.
-    doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    const saved = JSON.parse(window.localStorage.getItem('msharing-notation-scores') ?? '[]');
-    const xml = saved[0]?.xml ?? '';
-    assert.match(xml, /<transpose>/, 'the guitar part must carry its octave transposition');
-
-    const engine = window.NotationEngine;
-    const parsed = engine.parseMusicXml(xml, { domParser: window.DOMParser });
-    const written = parsed.score.parts[0].measures[0].voices[0].events.find((event) => event.kind === 'note');
-    const asWritten = engine.midiNoteNumber(written.pitch);
-    const played = engine.renderFromMusicXml(xml, { domParser: window.DOMParser })
-      .playback.events[0].midiNotes[0];
-
-    assert.notEqual(auditioned, asWritten, 'the audition must not be the written pitch');
-    assert.equal(auditioned, played, 'the audition must be the pitch Play produces');
-  });
-
-  test('a fresh drum kit previews on the percussion channel before any drum is written', async () => {
-    // A kit opens as rests, so nothing in the score is unpitched yet. The
-    // routing has to come from the kit's declared GM keys, or the first
-    // drum a writer places is auditioned as a piano.
-    const { window } = loadEditorPage({
-      newScore: {
-        title: 'Kit',
-        instrumentIds: ['drum-kit'],
-        key: 'C',
-        time: '4/4',
-        tempo: 120,
-        measures: 1,
-      },
-    });
-    const doc = window.document;
-    const scoreHost = doc.querySelector('[data-editor-score]');
-
-    const previews = [];
-    const trackSets = [];
-    window.NotationSoundFont = {
-      R2SoundFontEngine: {
-        create: async () => ({
-          play: () => {},
-          pause: () => {},
-          setTracks: (tracks) => trackSets.push(tracks),
-          preview: (...args) => previews.push(args),
-        }),
-      },
-    };
-    window.DOMPoint = class {
-      constructor(x = 0, y = 0) {
-        this.x = x;
-        this.y = y;
-      }
-      matrixTransform() {
-        return new window.DOMPoint(this.x, this.y);
-      }
-    };
-    window.SVGElement.prototype.getScreenCTM = () => ({
-      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0,
-      inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
-    });
-    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 1, height: 1 });
-
-    const svg = scoreHost.querySelector('svg');
-    const [, , pageWidth] = svg.getAttribute('viewBox').split(/\s+/).map(Number);
-    const staffYs = [...svg.querySelectorAll('line')]
-      .filter((line) => line.getAttribute('y1') === line.getAttribute('y2')
-        && Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3)
-      .map((line) => Number(line.getAttribute('y1')))
-      .sort((a, b) => a - b);
-    scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', {
-      clientX: pageWidth * 0.1,
-      clientY: staffYs[Math.floor(staffYs.length / 2)],
-      bubbles: true,
-    }));
-    await new Promise((resolve) => window.setTimeout(resolve, 0));
-
-    assert.ok(trackSets.length > 0, 'the score tracks reach the sound engine');
-    const tracks = trackSets[trackSets.length - 1];
-    assert.equal(tracks[0].percussion, true, 'a declared kit is a percussion track before its first note');
-    assert.equal(
-      window.NotationEngine.assignTrackRouting(tracks).get('P1').channel,
-      9,
-      'the kit must be routed to the GM percussion channel',
-    );
-    assert.equal(previews.length, 1, 'writing a drum auditions it once');
-    assert.equal(previews[0][2], 'P1', 'the audition is attributed to the kit');
-  });
-
-  test('letter keys write drums on a kit part instead of pitches it cannot sound', async () => {
-    // Step entry is how a writer types a part: the letters have to reach
-    // the kit. Falling through to the pitched branch wrote a note with no
-    // drum to sound it, so the part played silence and the score stopped
-    // being a drum part at all.
-    const { window } = loadEditorPage({
-      newScore: {
-        title: 'Kit',
-        instrumentIds: ['drum-kit'],
-        key: 'C',
-        time: '4/4',
-        tempo: 120,
-        measures: 4,
-      },
-    });
-    const doc = window.document;
-    const scoreHost = doc.querySelector('[data-editor-score]');
-    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 1, height: 1 });
-    window.SVGElement.prototype.getScreenCTM = () => ({
-      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0,
-      inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
-    });
-    window.DOMPoint = class {
-      constructor(x = 0, y = 0) {
-        this.x = x;
-        this.y = y;
-      }
-      matrixTransform() {
-        return new window.DOMPoint(this.x, this.y);
-      }
-    };
-
-    const svg = scoreHost.querySelector('svg');
-    const [, , pageWidth] = svg.getAttribute('viewBox').split(/\s+/).map(Number);
-    const staffYs = [...svg.querySelectorAll('line')]
-      .filter((line) => line.getAttribute('y1') === line.getAttribute('y2')
-        && Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3)
-      .map((line) => Number(line.getAttribute('y1')))
-      .sort((a, b) => a - b);
-    const status = () => doc.querySelector('[data-editor-status]').textContent;
-    const press = (key) => doc.dispatchEvent(new window.KeyboardEvent('keydown', { key, bubbles: true }));
-
-    // Place the entry cursor in the kit, then type the kit's own lines.
-    scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', {
-      clientX: pageWidth * 0.1,
-      clientY: staffYs[Math.floor(staffYs.length / 2)],
-      bubbles: true,
-    }));
-    await new Promise((resolve) => window.setTimeout(resolve, 0));
-
-    const written = [];
-    for (const letter of ['F', 'C', 'G', 'B', 'D', 'A']) {
-      press(letter);
-      written.push(status());
-    }
-
-    for (const message of written) {
-      assert.match(message, /Inserted /, `a kit letter must write a drum, got "${message}"`);
-      assert.doesNotMatch(message, /Inserted [A-G]\d/, 'a kit letter must never write a pitched note');
-    }
-
-    doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    const xml = JSON.parse(window.localStorage.getItem('msharing-notation-scores') ?? '[]')[0]?.xml ?? '';
-    assert.equal((xml.match(/<pitch>/g) ?? []).length, 0, 'a drum part carries no pitched notes');
-
-    const engine = window.NotationEngine;
-    const { playback } = engine.renderFromMusicXml(xml, { domParser: window.DOMParser });
-    // The click that placed the cursor wrote a drum of its own, so the
-    // letters are the events after it.
-    assert.deepEqual(
-      JSON.parse(JSON.stringify(
-        playback.events.map((event) => (event.midiNotes ? [...event.midiNotes] : [])).slice(-6),
-      )),
-      [[36], [38], [42], [45], [47], [49]],
-      'each letter sounds its own drum',
-    );
-  });
-
-  test('letter keys still write pitches on a pitched part', async () => {
-    const { window } = loadEditorPage({
-      newScore: {
-        title: 'Piano',
-        instrumentIds: ['piano'],
-        key: 'C',
-        time: '4/4',
-        tempo: 120,
-        measures: 2,
-      },
-    });
-    const doc = window.document;
-    const status = () => doc.querySelector('[data-editor-status]').textContent;
-    doc.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'C', bubbles: true }));
-    doc.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'D', bubbles: true }));
-    assert.match(status(), /Inserted D\d/);
-
-    doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    const xml = JSON.parse(window.localStorage.getItem('msharing-notation-scores') ?? '[]')[0]?.xml ?? '';
-    assert.equal((xml.match(/<unpitched/g) ?? []).length, 0, 'a pitched part carries no unpitched notes');
-    assert.equal((xml.match(/<pitch>/g) ?? []).length, 2, 'the two notes typed, and no drum beside them');
-  });
-
-  test('the Inst. box shows a keyboard for a pitched part and writes the key that was pressed', () => {
-    const { window } = loadEditorPage({
-      newScore: { title: 'Piano', instrumentIds: ['piano'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
-    });
-    const doc = window.document;
-    const status = () => doc.querySelector('[data-editor-status]').textContent;
-    const inst = doc.querySelector('[data-editor-popover="inst"]');
-    const panel = doc.querySelector('[data-editor-popover-panel="inst"]');
-    assert.equal(inst.disabled, false, 'a loaded score can open the instrument box');
-
-    inst.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    assert.equal(panel.hidden, false, 'the box opens under its button');
-
-    const whites = panel.querySelectorAll('.editor-inst__white');
-    assert.equal(whites.length, 14, 'two octaves of white keys');
-    assert.equal(panel.querySelectorAll('.editor-inst__black').length, 10, 'and their black keys');
-    assert.equal(panel.querySelector('.editor-inst__title').textContent, 'Keyboard');
-
-    // A key press writes the note it names, at the cursor.
-    const key = [...whites].find((node) => node.dataset.editorInstKey === 'G4');
-    key.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    assert.match(status(), /Inserted G4/);
-
-    // A black key writes its accidental.
-    const sharp = [...panel.querySelectorAll('.editor-inst__black')]
-      .find((node) => node.dataset.editorInstKey === 'C#4');
-    sharp.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    assert.match(status(), /Inserted C#4/);
-  });
-
-  test('the Inst. box shows the guitar\'s own strings and frets, and a fret writes that pitch', () => {
-    const { window } = loadEditorPage({
-      newScore: { title: 'Guitar', instrumentIds: ['acoustic-guitar'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
-    });
-    const doc = window.document;
-    const status = () => doc.querySelector('[data-editor-status]').textContent;
-    const panel = doc.querySelector('[data-editor-popover-panel="inst"]');
-
-    // Six strings, each with an open string and twelve frets, and the top
-    // line is string 1 -- the highest string, as a player counts them.
-    const strings = panel.querySelectorAll('.editor-inst__string');
-    assert.equal(strings.length, 6);
-    assert.equal(strings[0].querySelectorAll('.editor-inst__fret').length, 13);
-    assert.match(strings[0].querySelector('.editor-inst__string-label').textContent, /S1 E4/);
-    assert.match(strings[5].querySelector('.editor-inst__string-label').textContent, /S6 E2/);
-
-    // A fret states the string and the fret, so the note lands where a tab
-    // staff would draw it, and the pitch is the open string plus the fret.
-    const fifthFret = panel.querySelector('[data-editor-inst-fret="1:5"]');
-    assert.equal(fifthFret.title, 'A4');
-    fifthFret.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    assert.match(status(), /Inserted A4/);
-
-    doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    const xml = JSON.parse(window.localStorage.getItem('msharing-notation-scores') ?? '[]')[0]?.xml ?? '';
-    assert.match(xml, /<string>1<\/string>/, 'the string is written into the file');
-    assert.match(xml, /<fret>5<\/fret>/, 'and so is the fret');
-  });
-
-  test('the Inst. box shows drum pads for a kit part, and a pad writes that drum', () => {
-    const { window } = loadEditorPage({
-      newScore: { title: 'kit', instrumentIds: ['drum-kit'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
-    });
-    const doc = window.document;
-    const status = () => doc.querySelector('[data-editor-status]').textContent;
-    const panel = doc.querySelector('[data-editor-popover-panel="inst"]');
-
-    assert.equal(panel.querySelector('.editor-inst__title').textContent, 'Percussion');
-    const pads = [...panel.querySelectorAll('.editor-inst__drum')];
-    assert.equal(pads.length, 9, 'the nine drums a new kit declares');
-    const names = pads.map((pad) => pad.textContent);
-    assert.ok(names.includes('Bass Drum 1') && names.includes('Acoustic Snare'), `unexpected pads: ${names}`);
-
-    // The pad writes its own drum, not whichever drum happens to share the
-    // line: Open Hi-Hat and Closed Hi-Hat sit on one line.
-    const open = pads.find((pad) => pad.textContent === 'Open Hi-Hat');
-    open.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    assert.match(status(), /Inserted Open Hi-Hat/);
-
-    doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    const xml = JSON.parse(window.localStorage.getItem('msharing-notation-scores') ?? '[]')[0]?.xml ?? '';
-    // GM key 46 is Open Hi-Hat, stated 1-based as 47.
-    assert.match(xml, /<midi-unpitched>47<\/midi-unpitched>|Open Hi-Hat/);
-  });
-
-  test('the Mixer box lists the score\'s parts and says its levels are not wired yet', () => {
-    const { window } = loadEditorPage();
-    const doc = window.document;
-    const mixer = doc.querySelector('[data-editor-popover="mixer"]');
-    const panel = doc.querySelector('[data-editor-popover-panel="mixer"]');
-    assert.equal(mixer.disabled, false);
-
-    mixer.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    assert.equal(panel.hidden, false, 'the box opens under its button');
-    assert.equal(panel.querySelector('.editor-inst__title').textContent, 'Mixer');
-    assert.match(panel.textContent, /not wired up yet/);
-
-    // One row per part, and its level control is inert until the mixer is
-    // real -- a slider that moves but changes nothing would be a lie.
-    const rows = panel.querySelectorAll('.editor-inst__row');
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].querySelector('.editor-inst__slider').disabled, true);
-
-    // Pressing the button again folds it away.
-    mixer.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    assert.equal(panel.hidden, true);
-  });
-
   test('a bare visit to the editor starts a score instead of showing nothing', () => {
     // No `?intent=` and no handed-over file: the page must still open a
     // writable score. An empty canvas with every control disabled reads as
@@ -2006,302 +1512,6 @@ describe('the editor and the engine agree, end to end', () => {
       'the playhead moved down to the system the music reached',
     );
     doc.querySelector('[data-editor-stop]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-  });
-
-  describe('writing more than one note on a beat', () => {
-    /**
-     * jsdom has no layout, so the pointer is given a 20x scale from SVG
-     * units to client pixels and each note's box comes from the glyphs it
-     * actually drew -- which is exactly what the editor's hit test reads.
-     */
-    const SCALE = 20;
-
-    function installPointer(window) {
-      window.SVGElement.prototype.getScreenCTM = () => ({
-        a: SCALE, b: 0, c: 0, d: SCALE, e: 0, f: 0,
-        inverse: () => ({ a: 1 / SCALE, b: 0, c: 0, d: 1 / SCALE, e: 0, f: 0 }),
-      });
-      window.DOMPoint = class {
-        constructor(x = 0, y = 0) { this.x = x; this.y = y; }
-        matrixTransform(m) { return new window.DOMPoint(this.x * m.a + m.e, this.y * m.d + m.f); }
-      };
-      window.SVGElement.prototype.getBBox = function () {
-        const points = [...this.querySelectorAll('text')].map((text) => ({
-          x: Number(text.getAttribute('x')),
-          y: Number(text.getAttribute('y')),
-        }));
-        if (points.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
-        const xs = points.map((point) => point.x);
-        const ys = points.map((point) => point.y);
-        const x = Math.min(...xs);
-        const y = Math.min(...ys);
-        return { x: x - 0.3, y: y - 0.3, width: Math.max(...xs) - x + 0.6, height: Math.max(...ys) - y + 0.6 };
-      };
-    }
-
-    /** The page, plus the three gestures a test needs: press, read, save. */
-    function openForClicking(options = {}) {
-      const { window } = loadEditorPage(options);
-      installPointer(window);
-      const doc = window.document;
-      const host = doc.querySelector('[data-editor-score]');
-      return {
-        window,
-        doc,
-        status: () => doc.querySelector('[data-editor-status]').textContent,
-        press: (x, y, shiftKey = false) => host.dispatchEvent(
-          new window.PointerEvent('pointerdown', {
-            clientX: x * SCALE, clientY: y * SCALE, shiftKey, bubbles: true,
-          }),
-        ),
-        /** Saves through the page's own Save button and returns the XML. */
-        saved: () => {
-          doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-          return JSON.parse(window.localStorage.getItem('msharing-notation-scores') || '[]')[0]?.xml ?? '';
-        },
-      };
-    }
-
-    /** Measure 1's noteheads, top to bottom, with a `+` on the chord members. */
-    const barOneNotes = (xml) => {
-      const measure = (xml.match(/<measure number="1">[\s\S]*?<\/measure>/) || [''])[0];
-      return [...measure.matchAll(/<note>[\s\S]*?<\/note>/g)]
-        .map((match) => match[0].replace(/\s+/g, ''))
-        .filter((note) => !note.includes('<rest'))
-        .map((note) => {
-          const pitch = note.match(/<step>(\w)<\/step>(?:<alter>(-?\d+)<\/alter>)?<octave>(\d)/);
-          const name = pitch === null ? '?' : `${pitch[1]}${pitch[2] ?? ''}${pitch[3]}`;
-          return note.includes('<chord/>') ? `+${name}` : name;
-        });
-    };
-
-    test('Chord mode stacks plain clicks, so a triad needs no Shift', () => {
-      const page = openForClicking();
-      // Three lines, three plain clicks: a writer who turns the mode on has
-      // said "these belong together", so the second and third must stack
-      // rather than replace. Shift still works and means the same thing.
-      const chordButton = page.doc.querySelector('[data-editor-chord]');
-      assert.ok(chordButton, 'the row has no chord control');
-      chordButton.dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
-      assert.equal(chordButton.getAttribute('aria-pressed'), 'true', 'the control shows chord mode is on');
-
-      page.press(9, 11.7);
-      assert.equal(page.status(), 'Inserted B4.');
-      page.press(9, 10.7);
-      assert.equal(page.status(), 'Note added to chord.');
-      page.press(9, 12.7);
-      assert.equal(page.status(), 'Note added to chord.');
-      assert.deepEqual(barOneNotes(page.saved()), ['B4', '+D5', '+G4']);
-
-      // Turning it off gives the beat back to replacement: the chord is
-      // replaced by the one note written on it.
-      chordButton.dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
-      assert.equal(chordButton.getAttribute('aria-pressed'), 'false');
-      page.press(9, 12.7);
-      assert.match(page.status(), /^Replaced with /);
-      assert.deepEqual(barOneNotes(page.saved()), ['G4']);
-    });
-
-    test('Shift-clicking a second line stacks it on the first instead of replacing it', () => {
-      const page = openForClicking();
-      // The starter staff's middle line, then one line above and one below.
-      page.press(9, 11.7);
-      assert.equal(page.status(), 'Inserted B4.');
-      page.press(9, 10.7, true);
-      assert.equal(page.status(), 'Note added to chord.');
-      page.press(9, 12.7, true);
-      assert.equal(page.status(), 'Note added to chord.');
-      assert.deepEqual(barOneNotes(page.saved()), ['B4', '+D5', '+G4']);
-    });
-
-    test('Shift-clicking a line already in the chord leaves the chord alone', () => {
-      const page = openForClicking();
-      page.press(9, 11.7);
-      page.press(9, 10.7, true);
-      page.press(9, 10.7, true);
-      assert.equal(page.status(), 'D5 is already in the chord.');
-      assert.deepEqual(barOneNotes(page.saved()), ['B4', '+D5']);
-    });
-
-    test('Shift and a note letter stacks a note on the beat the cursor is on', () => {
-      const page = openForClicking();
-      page.press(9, 11.7);
-      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', {
-        key: 'E', shiftKey: true, bubbles: true,
-      }));
-      assert.equal(page.status(), 'Note added to chord.');
-      assert.deepEqual(barOneNotes(page.saved()), ['B4', '+E4']);
-    });
-
-    test('a drum kit stacks two drums on one beat', () => {
-      const page = openForClicking({
-        newScore: { title: 'kit', instrumentIds: ['drum-kit'], key: 'C', time: '4/4', tempo: 120, measures: 1 },
-      });
-      // The kit's staff has its bottom line at y 14, so a drum's staff
-      // position p is drawn at y = 14 + p: bass drum -0.5, snare -2.5.
-      page.press(9, 14 - 0.5);
-      assert.equal(page.status(), 'Inserted Bass Drum 1.');
-      page.press(9, 14 - 2.5, true);
-      assert.match(page.status(), /^Added .+ to the chord\.$/);
-      const instruments = [...(page.saved().match(/<measure number="1">[\s\S]*?<\/measure>/) || [''])[0]
-        .matchAll(/<instrument id="([^"]+)"\/>/g)].map((match) => match[1]);
-      assert.equal(instruments.length, 2, 'both drums are written on the one beat');
-      assert.notEqual(instruments[0], instruments[1], 'and they are different drums');
-    });
-
-    test('the staff does not move while a drum groove is written', () => {
-      // The staff is what the writer clicks. Every drum written above the
-      // old one used to push the whole staff down, so the next click
-      // landed on a line that was no longer where it had been aimed --
-      // which is what made kick + hi-hat chords impossible.
-      const page = openForClicking({
-        newScore: { title: 'kit', instrumentIds: ['drum-kit'], key: 'C', time: '4/4', tempo: 120, measures: 4 },
-      });
-      const staffLines = () => {
-        const lines = [...page.doc.querySelectorAll('[data-editor-score] svg line')]
-          .map((line) => ({
-            y: Number(line.getAttribute('y1')),
-            end: Number(line.getAttribute('y2')),
-            x1: Number(line.getAttribute('x1')),
-            x2: Number(line.getAttribute('x2')),
-          }))
-          .filter((line) => line.y === line.end);
-        const widest = Math.max(...lines.map((line) => Math.abs(line.x2 - line.x1)));
-        return [...new Set(lines.filter((l) => Math.abs(l.x2 - l.x1) > widest * 0.8).map((l) => l.y))]
-          .sort((a, b) => a - b);
-      };
-      const before = staffLines();
-      assert.equal(before.length, 5);
-      const bottom = before[before.length - 1];
-      // From the crash down to the kick, each drum on its own beat.
-      for (const position of [-5, -4.5, -4, -3, -2.5, -2, -0.5]) {
-        page.press(9, bottom + position);
-      }
-      assert.deepEqual(staffLines(), before, 'the staff must stay on the same lines');
-    });
-
-    test('both drums sharing a staff line can be written', () => {
-      // Closed and open hi-hat share one line, and so do the high tom and
-      // the ride. Keying the kit by line alone kept only the last drum of
-      // each pair, so the other could never be reached at all.
-      const page = openForClicking({
-        newScore: { title: 'kit', instrumentIds: ['drum-kit'], key: 'C', time: '4/4', tempo: 120, measures: 1 },
-      });
-      page.press(9, 14 - 4.5);
-      assert.equal(page.status(), 'Inserted Closed Hi-Hat.');
-      page.press(9, 14 - 4.5, true);
-      assert.equal(page.status(), 'Added Open Hi-Hat to the chord.');
-      page.press(9, 14 - 4, true);
-      assert.equal(page.status(), 'Added High Tom to the chord.');
-      page.press(9, 14 - 4, true);
-      assert.equal(page.status(), 'Added Ride Cymbal 1 to the chord.');
-      const instruments = [...(page.saved().match(/<measure number="1">[\s\S]*?<\/measure>/) || [''])[0]
-        .matchAll(/<instrument id="([^"]+)"\/>/g)].map((match) => match[1]);
-      assert.equal(instruments.length, 4, 'all four drums are on the one beat');
-      assert.equal(new Set(instruments).size, 4, 'and they are four different drums');
-    });
-  });
-
-  describe('the SoundFont the host asks for', () => {
-    /** A manifest shaped like the one on R2: the paths live under `runtime`, not on each asset. */
-    const MANIFEST = {
-      schemaVersion: 1,
-      assets: [
-        { id: 'ms-basic', displayName: 'MS Basic', format: 'sf3', version: 'deprecated' },
-        { id: 'musescore-general-sf3', displayName: 'MuseScore General', format: 'sf3', version: '0.2' },
-        { id: 'generaluser-gs', displayName: 'GeneralUser GS', format: 'sf2', version: '1.472' },
-      ],
-      runtime: {
-        defaultAssetId: 'musescore-general-sf3',
-        assetPaths: {
-          'ms-basic': 'ms-basic/official-deprecated-master/MS Basic.sf3',
-          'musescore-general-sf3': 'musescore-general/v0.2/MuseScore_General.sf3',
-          'generaluser-gs': 'generaluser-gs/v1.472/GeneralUser GS v1.472.sf2',
-        },
-      },
-    };
-
-    /** Opens the page with a stubbed manifest and captures what `create()` was handed. */
-    function openWithManifest({ manifest = MANIFEST, configure = {}, fetchOk = true } = {}) {
-      const created = [];
-      const page = loadEditorPage({
-        globals: {
-          MSHARING_SOUNDFONT_CONFIG: {
-            manifestUrl: 'https://fonts.test/soundfonts/manifest.json',
-            assetBaseUrl: 'https://fonts.test/soundfonts',
-            ...configure,
-          },
-          fetch: async () => (fetchOk
-            ? { ok: true, status: 200, json: async () => manifest }
-            : { ok: false, status: 503, json: async () => ({}) }),
-          NotationSoundFont: {
-            R2SoundFontEngine: {
-              create: async (options) => {
-                created.push(options);
-                return { play: () => {}, pause: () => {}, setTracks: () => {}, preview: () => {} };
-              },
-            },
-          },
-        },
-      });
-      return { ...page, created };
-    }
-
-    /** Presses Play and lets the manifest fetch and the engine creation settle. */
-    async function playAndSettle(window) {
-      window.document
-        .querySelector('[data-editor-play]')
-        .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-      for (let i = 0; i < 40; i += 1) await new Promise((resolve) => window.setTimeout(resolve, 5));
-    }
-
-    test("the manifest's own default asset is the one created, not the first asset it lists", async () => {
-      const { window, created } = openWithManifest();
-      await playAndSettle(window);
-
-      assert.equal(created.length, 1, 'one engine is created for the first playback');
-      assert.equal(
-        created[0].assetId,
-        'musescore-general-sf3',
-        "the manifest's defaultAssetId wins over the first listed asset",
-      );
-    });
-
-    test("the manifest's asset paths reach the engine, so its own table stays a fallback", async () => {
-      const { window, created } = openWithManifest();
-      await playAndSettle(window);
-
-      assert.equal(created.length, 1);
-      assert.deepEqual(
-        created[0].assetPaths,
-        MANIFEST.runtime.assetPaths,
-        'the host passes runtime.assetPaths through untouched',
-      );
-    });
-
-    test('a configured asset id wins over the manifest default', async () => {
-      const { window, created } = openWithManifest({ configure: { assetId: 'generaluser-gs' } });
-      await playAndSettle(window);
-
-      assert.equal(created[0].assetId, 'generaluser-gs', 'an explicit host choice is honoured');
-    });
-
-    test('a manifest that names no default falls back to its first asset', async () => {
-      const manifest = { ...MANIFEST, runtime: { assetPaths: MANIFEST.runtime.assetPaths } };
-      const { window, created } = openWithManifest({ manifest });
-      await playAndSettle(window);
-
-      assert.equal(created[0].assetId, 'ms-basic', 'with no default stated, the first listed asset is used');
-    });
-
-    test('an unreachable manifest still lets the score play', async () => {
-      const { window, created } = openWithManifest({ fetchOk: false });
-      await playAndSettle(window);
-
-      assert.equal(created.length, 1, 'a failed manifest must not stop playback');
-      assert.equal(created[0].assetPaths, undefined, 'and it must not invent paths');
-      assert.equal(created[0].assetId, undefined, 'nor an asset id it never learned');
-    });
   });
 
   describe('the workspace', () => {

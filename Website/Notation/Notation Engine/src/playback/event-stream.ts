@@ -4,8 +4,8 @@ import { tickToSeconds } from '../timing/tick-seconds.js';
 import type { TempoMap } from '../timing/tempo-map.js';
 import type { MidiInstrumentInfo } from '../parser/musicxml/instrument.js';
 import type { DirectionEvent } from '../parser/musicxml/parse.js';
-import type { ParsedDynamicLevel, ParsedWedgeType } from '../parser/musicxml/direction.js';
-import { DEFAULT_VELOCITY, velocityForDynamic, velocityWithinWedge } from './dynamics.js';
+import type { ParsedDynamicLevel } from '../parser/musicxml/direction.js';
+import { DEFAULT_VELOCITY, velocityForDynamic } from './dynamics.js';
 
 /** One sounding notehead of an event, before ties are resolved. */
 interface Notehead {
@@ -334,72 +334,13 @@ function mutableSounding(event: NotationEvent): SoundingNote[] | undefined {
 }
 
 /**
- * A crescendo or decrescendo's tick span, already matched start-to-stop.
- */
-interface WedgeSpan {
-  readonly startTick: number;
-  readonly endTick: number;
-}
-
-/**
- * The tick spans where a hairpin is sounding, from the part's `<wedge>`
- * marks.
+ * Applies every dynamic marking to the notes after it.
  *
- * A wedge is two directions in the file -- an opening one and a stop --
- * and only the pair says where the ramp runs. An opening with no stop is
- * drawn as nothing (`UNMATCHED_WEDGE` is the renderer's diagnostic), so
- * it must not ramp either: the writer never said where it ends.
- */
-function wedgeSpans(
-  marks: readonly { tick: number; type: ParsedWedgeType; number: number }[],
-): WedgeSpan[] {
-  const open = new Map<number, number>();
-  const spans: WedgeSpan[] = [];
-  for (const mark of marks) {
-    if (mark.type === 'stop') {
-      const startTick = open.get(mark.number);
-      if (startTick === undefined) continue;
-      open.delete(mark.number);
-      if (mark.tick > startTick) spans.push({ startTick, endTick: mark.tick });
-      continue;
-    }
-    // Two openings with one number never nest in MusicXML, so the later
-    // one is the wedge that is really sounding.
-    open.set(mark.number, mark.tick);
-  }
-  return spans;
-}
-
-/** The last marking at or before `tick`, or undefined when the score states none yet. */
-function levelAt(
-  marks: readonly { tick: number; level: ParsedDynamicLevel }[],
-  tick: number,
-): ParsedDynamicLevel | undefined {
-  let low = 0;
-  let high = marks.length - 1;
-  let found: ParsedDynamicLevel | undefined;
-  while (low <= high) {
-    const middle = (low + high) >> 1;
-    const mark = marks[middle];
-    if (mark === undefined) break;
-    if (mark.tick <= tick) {
-      found = mark.level;
-      low = middle + 1;
-    } else {
-      high = middle - 1;
-    }
-  }
-  return found;
-}
-
-/**
- * Turns each part's dynamics and hairpins into the velocity its notes
- * sound at.
- *
- * A `p` under a bar is a letter on the page until a velocity carries it to
- * the sound engine, and a crescendo is only a drawn shape until the notes
- * beneath it actually get louder -- MIDI has no "gradually get louder"
- * message, so the ramp is sampled per note.
+ * A dynamic is a direction, not a note property: `<dynamics><p/></dynamics>`
+ * says "from here on, play softly" and stays in force until the next one.
+ * This walks each part's events in tick order alongside that part's
+ * directions, so a note written before any marking keeps the default and
+ * one written after `pp` sounds at `pp` -- which is what the page shows.
  */
 function applyDynamics(
   events: readonly NotationEvent[],
@@ -410,27 +351,17 @@ function applyDynamics(
   resolveTies(events, written);
   if (directions === undefined || directions.length === 0) return;
   const byPart = new Map<string, { tick: number; level: ParsedDynamicLevel }[]>();
-  const wedgesByPart = new Map<string, { tick: number; type: ParsedWedgeType; number: number }[]>();
   for (const direction of directions) {
+    const level = direction.dynamics[0];
+    if (level === undefined) continue;
     // A direction's `tick` is measure-local; a note's is global. Converting
     // here is what keeps the comparison honest across a bar line.
     const tick = (globalTickOffsetByMeasure.get(direction.measureNumber) ?? 0) + direction.tick;
-    const level = direction.dynamics[0];
-    if (level !== undefined) {
-      const list = byPart.get(direction.partId) ?? [];
-      list.push({ tick, level });
-      byPart.set(direction.partId, list);
-    }
-    for (const wedge of direction.wedges) {
-      const list = wedgesByPart.get(direction.partId) ?? [];
-      list.push({ tick, type: wedge.type, number: wedge.number });
-      wedgesByPart.set(direction.partId, list);
-    }
+    const list = byPart.get(direction.partId) ?? [];
+    list.push({ tick, level });
+    byPart.set(direction.partId, list);
   }
   for (const list of byPart.values()) list.sort((a, b) => a.tick - b.tick);
-  for (const list of wedgesByPart.values()) list.sort((a, b) => a.tick - b.tick);
-  const spansByPart = new Map<string, readonly WedgeSpan[]>();
-  for (const [partId, marks] of wedgesByPart) spansByPart.set(partId, wedgeSpans(marks));
 
   // One cursor per part: each part's own markings apply to its own notes,
   // so a single shared cursor would let one part consume another's.
@@ -438,38 +369,18 @@ function applyDynamics(
   const levelByPart = new Map<string, ParsedDynamicLevel>();
   for (const event of events) {
     const marks = byPart.get(event.partId);
+    if (marks === undefined) continue;
     let cursor = cursorByPart.get(event.partId) ?? 0;
     let level = levelByPart.get(event.partId);
     for (;;) {
-      const mark = marks?.[cursor];
+      const mark = marks[cursor];
       if (mark === undefined || mark.tick > event.tick) break;
       level = mark.level;
       cursor += 1;
     }
     cursorByPart.set(event.partId, cursor);
-    if (level !== undefined) levelByPart.set(event.partId, level);
-
-    const spans = spansByPart.get(event.partId);
-    const span = spans?.find(
-      (candidate) => event.tick >= candidate.startTick && event.tick < candidate.endTick,
-    );
-    if (span !== undefined) {
-      // Both ends of the ramp read the same marking list the notes do, so
-      // a `<f>` written at the stop is what the crescendo grows into.
-      const own = byPart.get(event.partId) ?? [];
-      const from = levelAt(own, span.startTick);
-      const to = levelAt(own, span.endTick);
-      if (from !== undefined && to !== undefined) {
-        const progress = (event.tick - span.startTick) / (span.endTick - span.startTick);
-        (event as { velocity?: number }).velocity = velocityWithinWedge(
-          velocityForDynamic(from),
-          velocityForDynamic(to),
-          progress,
-        );
-        continue;
-      }
-    }
     if (level !== undefined) {
+      levelByPart.set(event.partId, level);
       (event as { velocity?: number }).velocity = velocityForDynamic(level);
     }
   }

@@ -55,10 +55,9 @@ const eighth = (step, octave, beam, chord = '', stem = '') =>
   (beam ? `<beam number="1">${beam}</beam>` : '') +
   '</note>';
 
-const drumEighth = (displayStep, displayOctave, beam, chord = '', stem = '') =>
+const drumEighth = (displayStep, displayOctave, beam, chord = '') =>
   `<note>${chord}<unpitched><display-step>${displayStep}</display-step>` +
   `<display-octave>${displayOctave}</display-octave></unpitched>` +
-  (stem ? `<stem>${stem}</stem>` : '') +
   '<duration>1</duration><voice>1</voice><type>eighth</type>' +
   (beam ? `<beam number="1">${beam}</beam>` : '') +
   '</note>';
@@ -96,10 +95,7 @@ describe('a chord inside a beam group (Integration M, §9.13)', () => {
 
     const stems = lines(svg).filter((line) => line.w === '0.12');
     assert.equal(stems.length, 3, 'each beamed event must draw one shared-direction stem');
-    assert.ok(
-      stems.every((stem) => stem.y2 < stem.y1),
-      'all drum stems must point upward',
-    );
+    assert.ok(stems.every((stem) => stem.y2 < stem.y1), 'all drum stems must point upward');
     const beam = lines(svg).find((line) => line.w === '0.5');
     assert.ok(beam !== undefined);
     for (const stem of stems) {
@@ -256,11 +252,7 @@ describe('tempo mark clearance (Integration M, §9.21)', () => {
     );
     const markY = glyphPlacements(svg, 'metNoteQuarterUp')[0]?.y;
     assert.ok(markY !== undefined, 'the tempo mark must be drawn');
-    const beamY = Math.min(
-      ...lines(svg)
-        .filter((l) => l.w === '0.5')
-        .map((l) => Math.min(l.y1, l.y2)),
-    );
+    const beamY = Math.min(...lines(svg).filter((l) => l.w === '0.5').map((l) => Math.min(l.y1, l.y2)));
     // Smaller y is higher up the page.
     assert.ok(markY < beamY, `tempo mark (y=${markY}) must sit ABOVE the beam (y=${beamY})`);
   });
@@ -281,155 +273,12 @@ describe('tempo mark clearance (Integration M, §9.21)', () => {
 
   test('a score with NO tempo mark gains no extra headroom at all', () => {
     const { svg } = render(
-      measure(
-        eighth('F', 5, 'begin') +
-          eighth('F', 5, 'end') +
-          '<note><rest/><duration>6</duration><voice>1</voice><type>half</type></note>',
-      ),
+      measure(eighth('F', 5, 'begin') + eighth('F', 5, 'end') +
+        '<note><rest/><duration>6</duration><voice>1</voice><type>half</type></note>'),
     );
     const height = Number(/viewBox="[^"]*?([\d.]+)"/.exec(svg)[1]);
     // The engine's own single-staff system height, unchanged -- which is
     // what keeps every non-tempo fixture byte-identical.
     assert.equal(height, 16);
-  });
-});
-
-describe('a PAGE-mode staff holds still while notes are written (editor typing)', () => {
-  const pageConfig = {
-    layout: { mode: 'page' },
-    page: {
-      pageWidth: 120,
-      pageHeight: 169.7,
-      marginTop: 5.7,
-      marginBottom: 5.7,
-      marginLeft: 5.7,
-      marginRight: 5.7,
-      gapBetweenPages: 3,
-      verticalJustify: true,
-    },
-  };
-  /** The five staff lines a page-mode render drew, top first. */
-  const staffLines = (svg) => {
-    const drawn = lines(svg).filter((line) => line.y1 === line.y2);
-    const widest = Math.max(...drawn.map((line) => Math.abs(line.x2 - line.x1)));
-    return [...new Set(drawn.filter((l) => Math.abs(l.x2 - l.x1) > widest * 0.8).map((l) => l.y1))]
-      .sort((a, b) => a - b)
-      .slice(0, 5);
-  };
-  const renderPage = (body) =>
-    NE.renderFromMusicXml(
-      measure(
-        '<direction><direction-type><metronome><beat-unit>quarter</beat-unit>' +
-          '<per-minute>120</per-minute></metronome></direction-type></direction>' +
-          body,
-      ),
-      { domParser, config: pageConfig },
-    ).svg;
-
-  test('a tempo mark and a note written higher and higher leave the staff on the same lines', () => {
-    // The staff is where the writer clicks. If the reserve above it grows
-    // with the highest note, each note written pushes the staff down and
-    // the next click lands on a different line than the one aimed at --
-    // which is exactly what made drum chords impossible to stack.
-    const empty = staffLines(
-      renderPage('<note><rest measure="yes"/><duration>8</duration><voice>1</voice></note>'),
-    );
-    assert.equal(empty.length, 5);
-    for (const [step, octave] of [
-      ['G', 4],
-      ['C', 5],
-      ['G', 5],
-      ['C', 6],
-      ['A', 6],
-    ]) {
-      const svg = renderPage(
-        `<note><pitch><step>${step}</step><octave>${octave}</octave></pitch>` +
-          '<duration>2</duration><voice>1</voice><type>quarter</type></note>' +
-          '<note><rest/><duration>6</duration><voice>1</voice><type>half</type><dot/></note>',
-      );
-      assert.deepEqual(
-        staffLines(svg),
-        empty,
-        `the staff must not move for a ${step}${octave} note`,
-      );
-    }
-  });
-
-  test("a drum stem follows the file's own <stem> instead of being forced up", () => {
-    // The drum convention is "stems up", and the renderer used to hard-code
-    // it -- so a chart that states <stem>down</stem> (a hi-hat pedal line, a
-    // chart written by someone with their own house style) came out up, and
-    // the file's own notation was silently overridden.
-    const renderDrumStem = (stem) =>
-      lines(
-        render(
-          measure(
-            drumEighth('C', 5, null, '', stem) +
-              '<note><rest/><duration>6</duration><voice>1</voice><type>half</type><dot/></note>',
-          ),
-        ).svg,
-      ).filter((line) => line.w === '0.12');
-
-    const stated = renderDrumStem('down');
-    assert.equal(stated.length, 1, 'the drum must draw one stem');
-    assert.ok(stated[0].y2 > stated[0].y1, 'a stated down stem must point down');
-
-    const up = renderDrumStem('up');
-    assert.ok(up[0].y2 < up[0].y1, 'a stated up stem must point up');
-
-    const unstated = renderDrumStem('');
-    assert.ok(
-      unstated[0].y2 < unstated[0].y1,
-      'with no <stem>, the drum convention still points up',
-    );
-  });
-
-  test('a stated drum stem carries the whole beamed group, not just its first note', () => {
-    // A beam has one direction, so the group cannot mix. The file's own
-    // direction has to reach every stem under the beam.
-    const stems = lines(
-      render(
-        measure(
-          drumEighth('G', 5, 'begin', '', 'down') +
-            drumEighth('C', 5, 'end', '', 'down') +
-            '<note><rest/><duration>6</duration><voice>1</voice><type>half</type><dot/></note>',
-        ),
-      ).svg,
-    ).filter((line) => line.w === '0.12');
-    assert.equal(stems.length, 2, 'each beamed event draws one stem');
-    assert.ok(
-      stems.every((stem) => stem.y2 > stem.y1),
-      'both beamed stems must follow the stated direction',
-    );
-  });
-
-  test('a stated drum stem on a chord points the whole chord one way', () => {
-    const stems = lines(
-      render(
-        measure(
-          drumEighth('C', 5, null, '', 'down') +
-            drumEighth('F', 4, null, '<chord/>') +
-            '<note><rest/><duration>6</duration><voice>1</voice><type>half</type><dot/></note>',
-        ),
-      ).svg,
-    ).filter((line) => line.w === '0.12');
-    assert.equal(stems.length, 1, 'a chord draws one shared stem');
-    assert.ok(stems[0].y2 > stems[0].y1, 'the chord stem must follow the stated direction');
-  });
-
-  test('the tempo mark still sits above the staff it belongs to', () => {
-    const svg = renderPage(
-      '<note><pitch><step>G</step><octave>5</octave></pitch>' +
-        '<duration>2</duration><voice>1</voice><type>quarter</type></note>' +
-        '<note><rest/><duration>6</duration><voice>1</voice><type>half</type><dot/></note>',
-    );
-    const markY = glyphPlacements(svg, 'metNoteQuarterUp')[0]?.y;
-    const staffTop = staffLines(svg)[0];
-    assert.ok(markY !== undefined, 'the tempo mark must be drawn');
-    assert.ok(
-      markY < staffTop,
-      `tempo mark (y=${markY}) must sit above the staff (top=${staffTop})`,
-    );
-    assert.ok(markY > 0, `the mark must be inside the page, got y=${markY}`);
   });
 });

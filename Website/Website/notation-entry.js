@@ -25,9 +25,6 @@
   const heading = document.querySelector('[data-newscore-heading]');
   const statusLine = document.querySelector('[data-newscore-status]');
   const groupsHost = document.querySelector('[data-newscore-groups]');
-  const staffSide = document.querySelector('[data-newscore-staff-side]');
-  const staffHost = document.querySelector('[data-newscore-staff-kinds]');
-  const keyField = document.querySelector('[data-newscore-key-field]');
   const previewHost = document.querySelector('[data-newscore-preview]');
   const summaryHost = document.querySelector('[data-newscore-summary]');
   const titleInput = document.querySelector('[data-newscore-title-input]');
@@ -47,10 +44,7 @@
     review: 'Review',
   };
   const NEXT_LABELS = { instruments: 'Continue', setup: 'Continue', review: 'Create score' };
-  // One instrument, one note-line layout: the score is built for a single
-  // player, so both choices are single-select.
-  let selectedId = NewScore ? NewScore.DEFAULT_SPEC.instrumentIds[0] : 'piano';
-  let staffKind = NewScore ? NewScore.DEFAULT_SPEC.staffKind : 'grand';
+  const selected = new Set(NewScore ? NewScore.DEFAULT_SPEC.instrumentIds : ['piano']);
   let step = 0;
   let lastFocused = null;
 
@@ -76,9 +70,9 @@
         chip.type = 'button';
         chip.className = 'newscore__chip';
         chip.dataset.instrumentId = instrument.id;
-        chip.setAttribute('aria-pressed', String(selectedId === instrument.id));
+        chip.setAttribute('aria-pressed', String(selected.has(instrument.id)));
         chip.textContent = instrument.name;
-        chip.addEventListener('click', () => chooseInstrument(instrument));
+        chip.addEventListener('click', () => toggleInstrument(instrument));
         list.append(chip);
       }
       section.append(label, list);
@@ -86,62 +80,34 @@
     }
   }
 
-  /**
-   * Choosing an instrument replaces the previous one and re-offers the
-   * note lines that instrument can be written on. A kit has exactly one
-   * layout, so the note-line side hides itself rather than offering a
-   * choice with a single option.
-   */
-  function chooseInstrument(instrument) {
-    selectedId = instrument.id;
-    const offered = NewScore.staffKindsFor(instrument.id);
-    if (!offered.includes(staffKind)) staffKind = offered[0];
+  function toggleInstrument(instrument) {
+    if (selected.has(instrument.id)) {
+      // One instrument must remain: a score with no part has nothing to
+      // write into, so the last chip cannot be switched off.
+      if (selected.size === 1) {
+        setStatus('Keep at least one instrument.');
+        return;
+      }
+      selected.delete(instrument.id);
+    } else {
+      selected.add(instrument.id);
+    }
     setStatus('');
     syncInstrumentChips();
-    syncStaffKinds();
-    syncKeyField();
     syncPreview();
   }
 
   function syncInstrumentChips() {
     for (const chip of groupsHost.querySelectorAll('[data-instrument-id]')) {
-      chip.setAttribute('aria-pressed', String(chip.dataset.instrumentId === selectedId));
+      chip.setAttribute('aria-pressed', String(selected.has(chip.dataset.instrumentId)));
     }
-  }
-
-  function syncStaffKinds() {
-    const offered = NewScore.staffKindsFor(selectedId);
-    if (staffSide) staffSide.hidden = offered.length < 2;
-    if (!staffHost) return;
-    staffHost.textContent = '';
-    for (const id of offered) {
-      const kind = NewScore.STAFF_KINDS[id];
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'newscore__chip';
-      chip.dataset.staffKind = id;
-      chip.setAttribute('aria-pressed', String(id === staffKind));
-      chip.textContent = kind.label;
-      chip.addEventListener('click', () => {
-        staffKind = id;
-        syncStaffKinds();
-        syncPreview();
-      });
-      staffHost.append(chip);
-    }
-  }
-
-  /** A drum part carries no key signature, so the field is not asked for. */
-  function syncKeyField() {
-    if (keyField) keyField.hidden = NewScore.instrumentFor(selectedId).percussion === true;
   }
 
   function currentSpec() {
     return NewScore.normaliseSpec({
       title: titleInput.value,
       composer: composerInput.value,
-      instrumentIds: [selectedId],
-      staffKind,
+      instrumentIds: [...selected],
       key: keySelect.value,
       time: timeSelect.value,
       tempo: tempoInput.value,
@@ -154,15 +120,10 @@
   function syncPreview() {
     if (!previewHost) return;
     const summary = NewScore.summarise(currentSpec());
-    const parts = [
-      summary.instrumentNames[0],
-      summary.staffKindLabel,
-      summary.time,
-      `${summary.tempo} BPM`,
-      `${summary.measures} bars`,
-    ];
-    if (!NewScore.instrumentFor(summary.instrumentIds[0]).percussion) parts.splice(2, 0, summary.keyLabel);
-    previewHost.textContent = parts.join(' · ');
+    const count = summary.instrumentNames.length;
+    previewHost.textContent =
+      `${count} ${count === 1 ? 'instrument' : 'instruments'} · ` +
+      `${summary.keyLabel} · ${summary.time} · ${summary.tempo} BPM · ${summary.measures} bars`;
   }
 
   function fillChoices() {
@@ -192,7 +153,6 @@
     nextButton.textContent = NEXT_LABELS[name];
     setStatus('');
     if (name === 'setup') {
-      syncKeyField();
       syncPreview();
       titleInput.focus();
     } else if (name === 'review') {
@@ -206,19 +166,15 @@
 
   function renderSummary() {
     const summary = NewScore.summarise(currentSpec());
-    const percussion = NewScore.instrumentFor(summary.instrumentIds[0]).percussion === true;
     const rows = [
-      ['Instrument', summary.instrumentNames[0]],
-      ['Note lines', summary.staffKindLabel],
+      ['Instruments', summary.instrumentNames.join(', ')],
       ['Title', summary.title],
-    ];
-    if (!percussion) rows.push(['Key', summary.keyLabel]);
-    rows.push(
+      ['Key', summary.keyLabel],
       ['Time signature', summary.time],
       ['Tempo', `${summary.tempo} BPM`],
       ['Measures', String(summary.measures)],
-    );
-    if (summary.composer) rows.splice(3, 0, ['Composer', summary.composer]);
+    ];
+    if (summary.composer) rows.splice(2, 0, ['Composer', summary.composer]);
     summaryHost.textContent = '';
     for (const [term, value] of rows) {
       const dt = document.createElement('dt');
@@ -233,14 +189,6 @@
     if (!NewScore) return;
     lastFocused = document.activeElement;
     step = 0;
-    // Every open starts from the default instrument and its first layout,
-    // so a cancelled wizard does not carry a half-made choice into the
-    // next one.
-    selectedId = NewScore.DEFAULT_SPEC.instrumentIds[0];
-    staffKind = NewScore.DEFAULT_SPEC.staffKind;
-    syncInstrumentChips();
-    syncStaffKinds();
-    syncKeyField();
     wizard.hidden = false;
     document.body.classList.add('is-newscore-open');
     syncStep();
@@ -266,8 +214,8 @@
   }
 
   function advance() {
-    if (STEPS[step] === 'instruments' && !selectedId) {
-      setStatus('Choose an instrument.');
+    if (STEPS[step] === 'instruments' && selected.size === 0) {
+      setStatus('Choose at least one instrument.');
       return;
     }
     if (step === STEPS.length - 1) {
@@ -287,8 +235,6 @@
   if (NewScore && wizard) {
     buildInstrumentGroups();
     fillChoices();
-    syncStaffKinds();
-    syncKeyField();
     nextButton.addEventListener('click', advance);
     backButton.addEventListener('click', retreat);
     for (const dismisser of dismissers) dismisser.addEventListener('click', closeWizard);

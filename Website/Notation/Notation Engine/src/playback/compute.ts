@@ -119,27 +119,6 @@ function partHasUnpitchedNotes(part: Score['parts'][number]): boolean {
 }
 
 /**
- * True when the part's `<midi-instrument>` entries ALL declare a
- * `<midi-unpitched>` key, which MusicXML defines as unpitched percussion
- * only -- so a kit that has been declared but not yet written into is
- * still known to be a kit.
- *
- * Without this, a drum part's percussion flag depended on a written note:
- * a fresh kit is all rests, `partHasUnpitchedNotes` said no, and the host
- * routed the part to a melodic channel, so the first drum a writer placed
- * auditioned as a piano.
- */
-function partDeclaresPercussionKeys(
-  info: ReadonlyMap<string, MidiInstrumentInfo> | undefined,
-): boolean {
-  if (info === undefined || info.size === 0) return false;
-  for (const record of info.values()) {
-    if (record.gmNote === undefined) return false;
-  }
-  return true;
-}
-
-/**
  * PLAN.md §17.1, Phase 48: assembles the full `PlaybackData` a rendered
  * score's `positionToX`/`xToPosition`/`getEventStream`/`resolvePosition`
  * all read. Called once, at the end of `renderFromMusicXml`, from the
@@ -194,11 +173,8 @@ export function computePlaybackData(input: ComputePlaybackDataInput): PlaybackDa
     tempoMap,
     events,
     tracks: input.score.parts.map((part): PlaybackTrack => {
-      const info = input.midiInstrumentInfoByPart?.get(part.id);
-      const routing = firstRoutingFor(info);
-      // A written unpitched note and a declared GM percussion key are both
-      // proof of a kit; the second is what makes an empty kit one.
-      const percussion = partHasUnpitchedNotes(part) || partDeclaresPercussionKeys(info);
+      const routing = firstRoutingFor(input.midiInstrumentInfoByPart?.get(part.id));
+      const percussion = partHasUnpitchedNotes(part);
       return {
         id: part.id,
         ...(part.name !== undefined ? { name: part.name } : {}),
