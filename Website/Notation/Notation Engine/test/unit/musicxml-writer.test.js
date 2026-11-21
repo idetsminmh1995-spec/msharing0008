@@ -802,3 +802,65 @@ describe('an unpitched note keeps only the position the file stated', () => {
     assert.deepEqual(JSON.parse(JSON.stringify(after)), JSON.parse(JSON.stringify(before)));
   });
 });
+
+/**
+ * `<divisions>` is the unit every `<duration>` in the file is counted in, so
+ * a save that picks a value the score's own note lengths do not divide by
+ * silently rewrites the music: a triplet eighth of 160 ticks becomes 120,
+ * the bar comes up short, and the next open shows a bar that no longer adds
+ * up to its meter.
+ */
+describe('<divisions> keeps every duration whole', () => {
+  const triplets =
+    '<?xml version="1.0"?><score-partwise version="4.0"><part-list>' +
+    '<score-part id="P1"><part-name>Flute</part-name></score-part></part-list>' +
+    '<part id="P1"><measure number="1">' +
+    '<attributes><divisions>6</divisions><time><beats>4</beats><beat-type>4</beat-type></time>' +
+    '<clef><sign>G</sign><line>2</line></clef></attributes>' +
+    '<note><pitch><step>C</step><octave>5</octave></pitch><duration>6</duration><voice>1</voice>' +
+    '<type>quarter</type></note>' +
+    '<note><pitch><step>C</step><octave>5</octave></pitch><duration>2</duration><voice>1</voice>' +
+    '<type>eighth</type><time-modification><actual-notes>3</actual-notes>' +
+    '<normal-notes>2</normal-notes></time-modification></note>' +
+    '<note><pitch><step>D</step><octave>5</octave></pitch><duration>2</duration><voice>1</voice>' +
+    '<type>eighth</type><time-modification><actual-notes>3</actual-notes>' +
+    '<normal-notes>2</normal-notes></time-modification></note>' +
+    '<note><pitch><step>E</step><octave>5</octave></pitch><duration>2</duration><voice>1</voice>' +
+    '<type>eighth</type><time-modification><actual-notes>3</actual-notes>' +
+    '<normal-notes>2</normal-notes></time-modification></note>' +
+    '</measure></part></score-partwise>';
+
+  const ticksOf = (result) =>
+    result.score.parts[0].measures[0].voices[0].events.map((event) => event.duration.ticks);
+
+  test('a triplet score keeps its note lengths through a save', () => {
+    const first = NE.parseMusicXml(triplets, { domParser: DOMParser });
+    const written = NE.writeMusicXml(first);
+    const second = NE.parseMusicXml(written, { domParser: DOMParser });
+    assert.deepEqual(ticksOf(second), ticksOf(first));
+  });
+
+  test('the written file holds a whole number of divisions for each note', () => {
+    const written = NE.writeMusicXml(NE.parseMusicXml(triplets, { domParser: DOMParser }));
+    const divisions = Number(/<divisions>(\d+)<\/divisions>/.exec(written)[1]);
+    for (const duration of [...written.matchAll(/<duration>(\d+)<\/duration>/g)]) {
+      assert.ok(Number.isInteger(Number(duration[1])), `${duration[1]} divisions is not whole`);
+    }
+    // 160 ticks is a third of a quarter, so the file's unit has to divide 480
+    // by 3 -- a power of two cannot.
+    assert.equal((160 * divisions) % 480, 0);
+  });
+
+  test('a score with no tuplets still writes the plain unit', () => {
+    const plain =
+      '<?xml version="1.0"?><score-partwise version="4.0"><part-list>' +
+      '<score-part id="P1"><part-name>M</part-name></score-part></part-list>' +
+      '<part id="P1"><measure number="1">' +
+      '<attributes><divisions>2</divisions><time><beats>4</beats><beat-type>4</beat-type></time>' +
+      '<clef><sign>G</sign><line>2</line></clef></attributes>' +
+      '<note><pitch><step>C</step><octave>4</octave></pitch><duration>8</duration><voice>1</voice>' +
+      '<type>whole</type></note></measure></part></score-partwise>';
+    const written = NE.writeMusicXml(NE.parseMusicXml(plain, { domParser: DOMParser }));
+    assert.match(written, /<divisions>4<\/divisions>/);
+  });
+});

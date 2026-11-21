@@ -73307,8 +73307,8 @@ ${denominator}`;
   }
 
   // src/parser/musicxml/write.ts
-  var DIVISION_CANDIDATES = [4, 8, 16, 32, 64, 128, 256, 512];
-  var FALLBACK_DIVISIONS = 4;
+  var DIVISION_FLOOR = 4;
+  var MAX_DIVISIONS = 4096;
   var ACCIDENTAL_NAME = {
     [-2]: "flat-flat",
     [-1]: "flat",
@@ -73340,6 +73340,8 @@ ${denominator}`;
     if (attribute === void 0) return TICKS_PER_QUARTER * 4;
     return attribute.timeNumerator * (4 / attribute.timeDenominator) * TICKS_PER_QUARTER;
   }
+  var gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+  var lcm = (a, b) => a / gcd(a, b) * b;
   function divisionsFor(parsed) {
     const values = [];
     for (const part2 of parsed.score.parts) {
@@ -73350,12 +73352,18 @@ ${denominator}`;
         }
       }
     }
-    for (const divisions of DIVISION_CANDIDATES) {
+    let required = 1;
+    for (const ticks of values) {
+      if (ticks === 0 || !Number.isInteger(ticks)) continue;
+      required = lcm(required, TICKS_PER_QUARTER / gcd(ticks, TICKS_PER_QUARTER));
+    }
+    const first = Math.ceil(DIVISION_FLOOR / required) * required;
+    for (let divisions = first; divisions <= MAX_DIVISIONS; divisions += required) {
       if (values.every((ticks) => Number.isInteger(ticks * divisions / TICKS_PER_QUARTER))) {
         return divisions;
       }
     }
-    return FALLBACK_DIVISIONS;
+    return DIVISION_FLOOR;
   }
   var toDivisions = (ticks, divisions) => Math.round(ticksToXmlDivisions(ticks, divisions));
   function pitchXml(pitch, hasExplicitDisplayPosition) {

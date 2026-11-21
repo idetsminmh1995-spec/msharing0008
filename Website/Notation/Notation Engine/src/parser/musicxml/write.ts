@@ -62,9 +62,10 @@ import type {
   TempoMarkEvent,
 } from './parse.js';
 
-/** `<divisions>` values tried in order, the same list the editor used before this module existed. */
-const DIVISION_CANDIDATES = [4, 8, 16, 32, 64, 128, 256, 512] as const;
-const FALLBACK_DIVISIONS = 4;
+/** The `<divisions>` a score with no tuplets keeps writing, so its file stays as it was. */
+const DIVISION_FLOOR = 4;
+/** Upper bound for the search when a duration is not a whole number of ticks at all. */
+const MAX_DIVISIONS = 4096;
 
 /** MusicXML's own names for the accidentals an `<alter>` can produce. */
 const ACCIDENTAL_NAME: Readonly<Record<number, string>> = {
@@ -124,7 +125,19 @@ function measureTicks(attribute: MeasureAttributes | undefined): number {
   return attribute.timeNumerator * (4 / attribute.timeDenominator) * TICKS_PER_QUARTER;
 }
 
-/** A `<divisions>` that keeps every duration and measure length a whole number. */
+const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+const lcm = (a: number, b: number): number => (a / gcd(a, b)) * b;
+
+/**
+ * A `<divisions>` that keeps every duration and measure length a whole
+ * number.
+ *
+ * The answer is the smallest multiple of the value the score's own tick
+ * lengths demand. A triplet eighth is 160 ticks, which is exact only at
+ * multiples of 3 -- so a score with a tuplet cannot use the power of two a
+ * plain score uses, and rounding its 160 to 120 shortens every triplet and
+ * leaves the bar a beat's worth of ticks short on the next open.
+ */
 function divisionsFor(parsed: ParseResult): number {
   const values: number[] = [];
   for (const part of parsed.score.parts) {
@@ -135,12 +148,20 @@ function divisionsFor(parsed: ParseResult): number {
       }
     }
   }
-  for (const divisions of DIVISION_CANDIDATES) {
+  let required = 1;
+  for (const ticks of values) {
+    if (ticks === 0 || !Number.isInteger(ticks)) continue;
+    required = lcm(required, TICKS_PER_QUARTER / gcd(ticks, TICKS_PER_QUARTER));
+  }
+  // Multiples of `required` at or above the floor: a third becomes 6, which
+  // is the smallest unit a triplet score can be written in.
+  const first = Math.ceil(DIVISION_FLOOR / required) * required;
+  for (let divisions = first; divisions <= MAX_DIVISIONS; divisions += required) {
     if (values.every((ticks) => Number.isInteger((ticks * divisions) / TICKS_PER_QUARTER))) {
       return divisions;
     }
   }
-  return FALLBACK_DIVISIONS;
+  return DIVISION_FLOOR;
 }
 
 const toDivisions = (ticks: number, divisions: number): number =>
