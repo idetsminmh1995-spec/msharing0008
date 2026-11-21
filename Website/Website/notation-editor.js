@@ -1624,9 +1624,18 @@
     render();
   }
 
+  /**
+   * Rolls the entry cursor past a written note.
+   *
+   * `written` remembers where the note went so that Shift and a letter can
+   * stack on it rather than on the beat the cursor has moved to. A new click
+   * replaces the whole entry object, so the memory never outlives the
+   * gesture that set it.
+   */
   function advanceEntry(ticks, measureNumber, voiceId) {
+    const written = { measureNumber, tick: state.entry.tick };
     const located = locateTick(state.entry.tick + ticks, measureNumber);
-    state.entry = { ...state.entry, measureNumber: located.measureNumber, tick: located.tick, voiceId };
+    state.entry = { ...state.entry, measureNumber: located.measureNumber, tick: located.tick, voiceId, written };
     clearSelection();
     render();
   }
@@ -1645,6 +1654,14 @@
     }
     const { measureNumber, voiceId } = state.entry;
     const staff = state.entry.staffNumber ?? 1;
+    // A chord member belongs on the beat the last note was written on, not
+    // on the beat the cursor has rolled forward to. Without this, Shift and
+    // a letter after a note writes a NEW note on the next beat, which is the
+    // opposite of what stacking means. `written` is only ever set by
+    // `advanceEntry`, so a fresh click never inherits it.
+    if (addToChord && state.entry.written !== undefined) {
+      state.entry = { ...state.entry, ...state.entry.written };
+    }
     const capacity = capacityOf(measureNumber);
     const remaining = capacity - state.entry.tick;
     if (remaining <= 0) {
@@ -1681,7 +1698,19 @@
         ...(drum ? { instrumentId: drum.instrumentId } : {}),
       });
       if (existing && existing.kind !== 'rest') {
-        commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: note }), `Replaced with ${drum?.name ?? 'drum'}.`);
+        // A drum chord is written the same way a pitched one is: kick and
+        // hi-hat land on the same beat, so a Shift-click on the second
+        // line stacks it instead of replacing the first.
+        if (addToChord) {
+          const stacked = stackedWith(existing, note, state.entry.tick);
+          if (stacked === null) {
+            announce(`${drum?.name ?? 'That drum'} is already in the chord.`);
+            return;
+          }
+          commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: stacked }), `Added ${drum?.name ?? 'drum'} to the chord.`);
+        } else {
+          commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: note }), `Replaced with ${drum?.name ?? 'drum'}.`);
+        }
         previewPitch(drumPitch, drum);
         render();
         return;
@@ -1705,9 +1734,12 @@
     if (existing && existing.kind !== 'rest') {
       const note = engine.note({ pitch, duration: existing.duration, voice: voiceId, staff });
       if (addToChord) {
-        const notes = existing.kind === 'chord' ? [...existing.notes, note] : [existing, note];
-        const chord = engine.chord(notes, { startTick: state.entry.tick });
-        commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: chord }), 'Note added to chord.');
+        const stacked = stackedWith(existing, note, state.entry.tick);
+        if (stacked === null) {
+          announce(`${step}${octave} is already in the chord.`);
+          return;
+        }
+        commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: stacked }), 'Note added to chord.');
       } else {
         // A plain letter or click on an occupied beat restates that beat's
         // pitch, replacing rather than stacking by default.
@@ -1722,6 +1754,29 @@
     commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event }), `Inserted ${step}${octave}.`);
     previewPitch(pitch);
     advanceEntry(ticks, measureNumber, voiceId);
+  }
+
+  /**
+   * `existing` plus `note` as one chord at `tick`, or `null` when `note` is
+   * already a notehead of that chord.
+   *
+   * Writing a chord is a repeated gesture -- click the beat, Shift-click
+   * each further line -- so the same line clicked twice has to be a no-op.
+   * The engine's `chord()` would happily accept two identical noteheads,
+   * which draws a doubled head and plays the note twice as loud.
+   */
+  function stackedWith(existing, note, tick) {
+    const members = existing.kind === 'chord' ? existing.notes : [existing];
+    const samePitch = (a, b) =>
+      a.pitch.kind === 'unpitched' || b.pitch.kind === 'unpitched'
+        ? a.instrumentId === b.instrumentId &&
+          a.pitch.displayStep === b.pitch.displayStep &&
+          a.pitch.displayOctave === b.pitch.displayOctave
+        : a.pitch.step === b.pitch.step &&
+          a.pitch.alter === b.pitch.alter &&
+          a.pitch.octave === b.pitch.octave;
+    if (members.some((member) => samePitch(member, note))) return null;
+    return engine.chord([...members, note], { startTick: tick });
   }
 
   /**
@@ -1868,7 +1923,7 @@
     if (state.noteInput) {
       clearSelection();
       if (state.tool.rest) insertAtEntry({ rest: true });
-      else insertAtEntry({ step, octave, staffPosition });
+      else insertAtEntry({ step, octave, staffPosition, addToChord: event.shiftKey });
       return;
     }
     // Note input off, empty staff: this is where a rubber band starts.

@@ -69,7 +69,7 @@ const STARTER_XML = `<?xml version="1.0" encoding="UTF-8"?>
  * `requestAnimationFrame` on its own, so the page is opened with the
  * `?intent=create` handoff, whose `loadXml` renders synchronously.
  */
-function loadEditorPage({ url = 'https://example.test/notation-editor.html?intent=create', pendingXml } = {}) {
+function loadEditorPage({ url = 'https://example.test/notation-editor.html?intent=create', pendingXml, newScore } = {}) {
   const html = fs.readFileSync(path.join(appDir, 'notation-editor.html'), 'utf8');
   const virtualConsole = new VirtualConsole();
   const errors = [];
@@ -92,6 +92,11 @@ function loadEditorPage({ url = 'https://example.test/notation-editor.html?inten
         data: Buffer.from(pendingXml, 'utf8').toString('base64'),
       }),
     );
+  }
+  if (newScore !== undefined) {
+    // The new-score wizard leaves its answer here and the page builds the
+    // score from it, so seeding this is how a test opens a chosen line-up.
+    window.sessionStorage.setItem('notation-lab-new-score', JSON.stringify(newScore));
   }
   const context = dom.getInternalVMContext();
   for (const rel of ['assets/notation-engine.js', 'notation-doc.js', 'notation-newscore.js', 'notation-editor.js']) {
@@ -1579,6 +1584,121 @@ describe('the editor and the engine agree, end to end', () => {
       'the playhead moved down to the system the music reached',
     );
     doc.querySelector('[data-editor-stop]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  });
+
+  describe('writing more than one note on a beat', () => {
+    /**
+     * jsdom has no layout, so the pointer is given a 20x scale from SVG
+     * units to client pixels and each note's box comes from the glyphs it
+     * actually drew -- which is exactly what the editor's hit test reads.
+     */
+    const SCALE = 20;
+
+    function installPointer(window) {
+      window.SVGElement.prototype.getScreenCTM = () => ({
+        a: SCALE, b: 0, c: 0, d: SCALE, e: 0, f: 0,
+        inverse: () => ({ a: 1 / SCALE, b: 0, c: 0, d: 1 / SCALE, e: 0, f: 0 }),
+      });
+      window.DOMPoint = class {
+        constructor(x = 0, y = 0) { this.x = x; this.y = y; }
+        matrixTransform(m) { return new window.DOMPoint(this.x * m.a + m.e, this.y * m.d + m.f); }
+      };
+      window.SVGElement.prototype.getBBox = function () {
+        const points = [...this.querySelectorAll('text')].map((text) => ({
+          x: Number(text.getAttribute('x')),
+          y: Number(text.getAttribute('y')),
+        }));
+        if (points.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+        const xs = points.map((point) => point.x);
+        const ys = points.map((point) => point.y);
+        const x = Math.min(...xs);
+        const y = Math.min(...ys);
+        return { x: x - 0.3, y: y - 0.3, width: Math.max(...xs) - x + 0.6, height: Math.max(...ys) - y + 0.6 };
+      };
+    }
+
+    /** The page, plus the three gestures a test needs: press, read, save. */
+    function openForClicking(options = {}) {
+      const { window } = loadEditorPage(options);
+      installPointer(window);
+      const doc = window.document;
+      const host = doc.querySelector('[data-editor-score]');
+      return {
+        window,
+        doc,
+        status: () => doc.querySelector('[data-editor-status]').textContent,
+        press: (x, y, shiftKey = false) => host.dispatchEvent(
+          new window.PointerEvent('pointerdown', {
+            clientX: x * SCALE, clientY: y * SCALE, shiftKey, bubbles: true,
+          }),
+        ),
+        /** Saves through the page's own Save button and returns the XML. */
+        saved: () => {
+          doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+          return JSON.parse(window.localStorage.getItem('msharing-notation-scores') || '[]')[0]?.xml ?? '';
+        },
+      };
+    }
+
+    /** Measure 1's noteheads, top to bottom, with a `+` on the chord members. */
+    const barOneNotes = (xml) => {
+      const measure = (xml.match(/<measure number="1">[\s\S]*?<\/measure>/) || [''])[0];
+      return [...measure.matchAll(/<note>[\s\S]*?<\/note>/g)]
+        .map((match) => match[0].replace(/\s+/g, ''))
+        .filter((note) => !note.includes('<rest'))
+        .map((note) => {
+          const pitch = note.match(/<step>(\w)<\/step>(?:<alter>(-?\d+)<\/alter>)?<octave>(\d)/);
+          const name = pitch === null ? '?' : `${pitch[1]}${pitch[2] ?? ''}${pitch[3]}`;
+          return note.includes('<chord/>') ? `+${name}` : name;
+        });
+    };
+
+    test('Shift-clicking a second line stacks it on the first instead of replacing it', () => {
+      const page = openForClicking();
+      // The starter staff's middle line, then one line above and one below.
+      page.press(9, 11.7);
+      assert.equal(page.status(), 'Inserted B4.');
+      page.press(9, 10.7, true);
+      assert.equal(page.status(), 'Note added to chord.');
+      page.press(9, 12.7, true);
+      assert.equal(page.status(), 'Note added to chord.');
+      assert.deepEqual(barOneNotes(page.saved()), ['B4', '+D5', '+G4']);
+    });
+
+    test('Shift-clicking a line already in the chord leaves the chord alone', () => {
+      const page = openForClicking();
+      page.press(9, 11.7);
+      page.press(9, 10.7, true);
+      page.press(9, 10.7, true);
+      assert.equal(page.status(), 'D5 is already in the chord.');
+      assert.deepEqual(barOneNotes(page.saved()), ['B4', '+D5']);
+    });
+
+    test('Shift and a note letter stacks a note on the beat the cursor is on', () => {
+      const page = openForClicking();
+      page.press(9, 11.7);
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', {
+        key: 'E', shiftKey: true, bubbles: true,
+      }));
+      assert.equal(page.status(), 'Note added to chord.');
+      assert.deepEqual(barOneNotes(page.saved()), ['B4', '+E4']);
+    });
+
+    test('a drum kit stacks two drums on one beat', () => {
+      const page = openForClicking({
+        newScore: { title: 'kit', instrumentIds: ['drum-kit'], key: 'C', time: '4/4', tempo: 120, measures: 1 },
+      });
+      // The kit's staff has its bottom line at y 14, so a drum's staff
+      // position p is drawn at y = 14 + p: bass drum -0.5, snare -2.5.
+      page.press(9, 14 - 0.5);
+      assert.equal(page.status(), 'Inserted Bass Drum 1.');
+      page.press(9, 14 - 2.5, true);
+      assert.match(page.status(), /^Added .+ to the chord\.$/);
+      const instruments = [...(page.saved().match(/<measure number="1">[\s\S]*?<\/measure>/) || [''])[0]
+        .matchAll(/<instrument id="([^"]+)"\/>/g)].map((match) => match[1]);
+      assert.equal(instruments.length, 2, 'both drums are written on the one beat');
+      assert.notEqual(instruments[0], instruments[1], 'and they are different drums');
+    });
   });
 
   describe('the workspace', () => {
