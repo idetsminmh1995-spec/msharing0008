@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-734 exported symbols, by module.
+735 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -654,6 +654,7 @@ The diagnostics `level` lets through, in their original order.
 | | Name | Summary |
 |---|---|---|
 | function | `musicXmlAccidentalGlyphName` | Resolve a MusicXML accidental value to the exact SMuFL glyph used by MusicXML 4.0. |
+| function | `musicXmlAccidentalValueForGlyphName` | The MusicXML accidental value that draws `glyphName`, or undefined when no value in the table produces it -- a glyph that only exists because a file named it through `<accidental smufl="...">`. |
 | function | `isKnownAccidentalGlyphName` | True when the SMuFL canonical glyph name is present in the bundled glyph table. |
 | function | `tryAccidentalGlyphName` | Return a drawable glyph for an alteration, preferring a source-preserved MusicXML/SMuFL glyph. |
 | function | `accidentalGlyphName` | Strict public lookup retained for callers that require a drawable glyph. |

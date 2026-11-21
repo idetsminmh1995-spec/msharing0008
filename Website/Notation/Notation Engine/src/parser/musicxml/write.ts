@@ -38,11 +38,16 @@ import type { Duration, DurationType } from '../../core/duration.js';
 import type { Measure } from '../../core/measure.js';
 import type { MeasureEvent } from '../../core/measure-event.js';
 import type { Note } from '../../core/note.js';
+import type { FermataPlacement, FermataShape, SlideKind } from '../../core/note.js';
 import type { Part } from '../../core/part.js';
 import type { Pitch } from '../../core/pitch.js';
 import type { Rest } from '../../core/rest.js';
 import type { Voice } from '../../core/voice.js';
 import { drumKitEntry } from '../../notation-defaults/drum-kit.js';
+import {
+  musicXmlAccidentalGlyphName,
+  musicXmlAccidentalValueForGlyphName,
+} from '../../geometry/accidental.js';
 import { TENTHS_PER_STAFF_SPACE } from './defaults.js';
 import type { MidiInstrumentInfo } from './instrument.js';
 import type { ClefSpec, TransposeSpec } from './attributes.js';
@@ -57,18 +62,10 @@ import type {
   TempoMarkEvent,
 } from './parse.js';
 
-/** `<divisions>` values tried in order, the same list the editor used before this module existed. */
-const DIVISION_CANDIDATES = [4, 8, 16, 32, 64, 128, 256, 512] as const;
-const FALLBACK_DIVISIONS = 4;
-
-/** MusicXML's own names for the accidentals an `<alter>` can produce. */
-const ACCIDENTAL_NAME: Readonly<Record<number, string>> = {
-  [-2]: 'flat-flat',
-  [-1]: 'flat',
-  0: 'natural',
-  1: 'sharp',
-  2: 'double-sharp',
-};
+/** The `<divisions>` a score with no tuplets keeps writing, so its file stays as it was. */
+const DIVISION_FLOOR = 4;
+/** Upper bound for the search when a duration is not a whole number of ticks at all. */
+const MAX_DIVISIONS = 4096;
 
 /** The engine's articulation names back to the MusicXML elements that produce them. */
 const ARTICULATION_ELEMENT: Readonly<Record<string, string>> = {
@@ -119,7 +116,19 @@ function measureTicks(attribute: MeasureAttributes | undefined): number {
   return attribute.timeNumerator * (4 / attribute.timeDenominator) * TICKS_PER_QUARTER;
 }
 
-/** A `<divisions>` that keeps every duration and measure length a whole number. */
+const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+const lcm = (a: number, b: number): number => (a / gcd(a, b)) * b;
+
+/**
+ * A `<divisions>` that keeps every duration and measure length a whole
+ * number.
+ *
+ * The answer is the smallest multiple of the value the score's own tick
+ * lengths demand. A triplet eighth is 160 ticks, which is exact only at
+ * multiples of 3 -- so a score with a tuplet cannot use the power of two a
+ * plain score uses, and rounding its 160 to 120 shortens every triplet and
+ * leaves the bar a beat's worth of ticks short on the next open.
+ */
 function divisionsFor(parsed: ParseResult): number {
   const values: number[] = [];
   for (const part of parsed.score.parts) {
@@ -130,12 +139,20 @@ function divisionsFor(parsed: ParseResult): number {
       }
     }
   }
-  for (const divisions of DIVISION_CANDIDATES) {
+  let required = 1;
+  for (const ticks of values) {
+    if (ticks === 0 || !Number.isInteger(ticks)) continue;
+    required = lcm(required, TICKS_PER_QUARTER / gcd(ticks, TICKS_PER_QUARTER));
+  }
+  // Multiples of `required` at or above the floor: a third becomes 6, which
+  // is the smallest unit a triplet score can be written in.
+  const first = Math.ceil(DIVISION_FLOOR / required) * required;
+  for (let divisions = first; divisions <= MAX_DIVISIONS; divisions += required) {
     if (values.every((ticks) => Number.isInteger((ticks * divisions) / TICKS_PER_QUARTER))) {
       return divisions;
     }
   }
-  return FALLBACK_DIVISIONS;
+  return DIVISION_FLOOR;
 }
 
 const toDivisions = (ticks: number, divisions: number): number =>
@@ -143,8 +160,19 @@ const toDivisions = (ticks: number, divisions: number): number =>
 
 // ---- note elements ------------------------------------------------------
 
-function pitchXml(pitch: Pitch): string {
+/**
+ * `<pitch>` or `<unpitched>`, in MusicXML's own shape.
+ *
+ * A drum note's display position is written only when the file stated one.
+ * The reader fills in a neutral B4 when `<unpitched>` names no position,
+ * and that placeholder exists only so the note has somewhere to sit while
+ * the drum table decides. Writing it back would turn the placeholder into
+ * a real instruction, and the note would move to the middle line the next
+ * time the file was opened.
+ */
+function pitchXml(pitch: Pitch, hasExplicitDisplayPosition: boolean | undefined): string {
   if (pitch.kind === 'unpitched') {
+    if (hasExplicitDisplayPosition !== true) return '<unpitched/>';
     return (
       '<unpitched>' +
       `<display-step>${pitch.displayStep}</display-step>` +
@@ -162,13 +190,42 @@ function pitchXml(pitch: Pitch): string {
   );
 }
 
+/**
+ * `<accidental>`, with the glyph the file asked for and the wrappers that
+ * say how to draw it.
+ *
+ * Only a note the file actually marked gets an element. A sharpened pitch
+ * in E major already says so in `<alter>`, and the reader works out from
+ * the key signature whether to draw the sign; writing `<accidental>` for
+ * every altered note would turn each one into an explicit mark, and the
+ * score would come back covered in sharps nobody wrote.
+ *
+ * A `<natural>` on an unaltered pitch is a real mark -- it cancels a key
+ * signature -- so it survives through `hasExplicitAccidental` even though
+ * the pitch agrees with it.
+ */
 function accidentalXml(note: Note): string {
   const pitch = note.pitch;
   if (pitch.kind !== 'pitched') return '';
-  const alter = pitch.alter || 0;
-  if (!alter) return '';
-  const name = ACCIDENTAL_NAME[alter];
-  return name === undefined ? '' : `<accidental>${name}</accidental>`;
+  const glyph = note.accidentalGlyphName;
+  if (glyph === undefined && note.hasExplicitAccidental !== true) return '';
+  const value =
+    glyph === undefined ? 'natural' : (musicXmlAccidentalValueForGlyphName(glyph) ?? 'other');
+  // A value that already draws this glyph needs no `smufl` hint; one that
+  // does not (`other`) has to carry the glyph it really meant.
+  const smufl =
+    glyph === undefined || musicXmlAccidentalGlyphName(value) === glyph
+      ? ''
+      : ` smufl="${escapeXml(glyph)}"`;
+  const parentheses =
+    note.accidentalParentheses === undefined
+      ? ''
+      : ` parentheses="${note.accidentalParentheses ? 'yes' : 'no'}"`;
+  const bracket =
+    note.accidentalBracket === undefined
+      ? ''
+      : ` bracket="${note.accidentalBracket ? 'yes' : 'no'}"`;
+  return `<accidental${smufl}${parentheses}${bracket}>${escapeXml(value)}</accidental>`;
 }
 
 /** `<duration>` and `<tie>`, in MusicXML's order: duration first, then tie. */
@@ -205,7 +262,26 @@ const stemXml = (note: Note): string =>
   note.explicitStemDirection === undefined ? '' : `<stem>${note.explicitStemDirection}</stem>`;
 
 /**
- * A note's `<notations>`: ties, slurs, articulations, ornaments and fermata,
+ * `<fermata type="...">shape</fermata>`: the orientation lives in `type`
+ * and the shape in the element's text, so the two are written together.
+ */
+function fermataXml(
+  placement: FermataPlacement | undefined,
+  shape: FermataShape | undefined,
+): string {
+  const type = placement === 'below' ? ' type="inverted"' : '';
+  return `<fermata${type}>${shape ?? ''}</fermata>`;
+}
+
+/** `<slide>` or `<glissando>`, whichever kind this endpoint was read as. */
+function slideXml(type: 'start' | 'stop', kind: SlideKind | undefined): string {
+  const element = kind === 'glissando' ? 'glissando' : 'slide';
+  return `<${element} type="${type}"/>`;
+}
+
+/**
+ * A note's `<notations>`: ties, slurs, tuplets, tremolo, articulations,
+ * ornaments, tablature marks, slides, arpeggiation, harmonic and fermata,
  * in MusicXML's own order. Returns '' for an ordinary note so its output
  * stays byte-identical to what the engine wrote before notations existed.
  */
@@ -216,16 +292,42 @@ function notationsXml(note: Note): string {
     ...(note.slurStarts ?? []).map((number) => `<slur type="start" number="${number}"/>`),
     ...(note.slurStops ?? []).map((number) => `<slur type="stop" number="${number}"/>`),
   ].join('');
+  const tuplets =
+    (note.tupletStart ? '<tuplet type="start"/>' : '') +
+    (note.tupletStop ? '<tuplet type="stop"/>' : '');
+  const tremolo =
+    note.tremoloStrokes === undefined
+      ? ''
+      : `<tremolo${note.tremoloType === undefined ? '' : ` type="${note.tremoloType}"`}>` +
+        `${note.tremoloStrokes}</tremolo>`;
   const articulations = (note.articulations ?? []).filter(
     (mark) => ARTICULATION_ELEMENT[mark] !== undefined,
   );
   const ornaments = (note.ornaments ?? []).filter((mark) => ORNAMENT_ELEMENT[mark] !== undefined);
-  if (articulations.length === 0 && ornaments.length === 0 && !note.hasFermata && !tied && !slurs) {
-    return '';
-  }
+  const technical =
+    note.stringNumber === undefined && note.fret === undefined && note.fingering === undefined
+      ? ''
+      : '<technical>' +
+        (note.stringNumber === undefined ? '' : `<string>${note.stringNumber}</string>`) +
+        (note.fret === undefined ? '' : `<fret>${note.fret}</fret>`) +
+        (note.fingering === undefined ? '' : `<fingering>${note.fingering}</fingering>`) +
+        '</technical>';
+  // A slide and a glissando are one gesture to a fretboard but two elements
+  // in the file, so each endpoint is written back as the kind it was read as.
+  const slides =
+    (note.slideStart ? slideXml('start', note.slideStartKind) : '') +
+    (note.slideStop ? slideXml('stop', note.slideStopKind) : '');
+  const arpeggiate =
+    note.nonArpeggiate === true
+      ? '<non-arpeggiate/>'
+      : note.arpeggiate === undefined
+        ? ''
+        : `<arpeggiate direction="${note.arpeggiate}"/>`;
   const inner =
     tied +
     slurs +
+    tuplets +
+    tremolo +
     (articulations.length
       ? `<articulations>${articulations
           .map((mark) => `<${ARTICULATION_ELEMENT[mark]}/>`)
@@ -234,22 +336,84 @@ function notationsXml(note: Note): string {
     (ornaments.length
       ? `<ornaments>${ornaments.map((mark) => `<${ORNAMENT_ELEMENT[mark]}/>`).join('')}</ornaments>`
       : '') +
-    (note.hasFermata ? '<fermata/>' : '');
-  return `<notations>${inner}</notations>`;
+    technical +
+    slides +
+    arpeggiate +
+    (note.isHarmonic === true ? '<harmonic/>' : '') +
+    (note.hasFermata ? fermataXml(note.fermataPlacement, note.fermataShape) : '');
+  return inner === '' ? '' : `<notations>${inner}</notations>`;
+}
+
+/**
+ * `<time-modification>`, which is what makes a note's written value differ
+ * from its sounding length. Without it a triplet reads back as three plain
+ * eighths and the bar no longer adds up.
+ */
+function timeModificationXml(duration: Duration): string {
+  const tuplet = duration.tuplet;
+  if (tuplet === undefined) return '';
+  return (
+    '<time-modification>' +
+    `<actual-notes>${tuplet.actualNotes}</actual-notes>` +
+    `<normal-notes>${tuplet.normalNotes}</normal-notes>` +
+    '</time-modification>'
+  );
+}
+
+/** `<notehead>`, with the attributes that say how to draw it. */
+function noteheadXml(note: Note): string {
+  const value = note.explicitNotehead;
+  if (value === undefined) return '';
+  const attributes =
+    (note.explicitNoteheadSmufl === undefined
+      ? ''
+      : ` smufl="${escapeXml(note.explicitNoteheadSmufl)}"`) +
+    (note.noteheadFilled === undefined ? '' : ` filled="${note.noteheadFilled ? 'yes' : 'no'}"`) +
+    (note.noteheadParentheses === undefined
+      ? ''
+      : ` parentheses="${note.noteheadParentheses ? 'yes' : 'no'}"`);
+  return `<notehead${attributes}>${escapeXml(value)}</notehead>`;
+}
+
+/** `<beam>` hints, in the order the file gave them. */
+function beamsXml(note: Note): string {
+  return (note.beams ?? [])
+    .map((beam) => `<beam number="${beam.number}">${beam.value}</beam>`)
+    .join('');
+}
+
+/** `<lyric>` syllables, one element per verse. */
+function lyricsXml(note: Note): string {
+  return (note.lyrics ?? [])
+    .map(
+      (lyric) =>
+        `<lyric number="${lyric.number}">` +
+        (lyric.syllabic === undefined ? '' : `<syllabic>${lyric.syllabic}</syllabic>`) +
+        `<text>${escapeXml(lyric.text)}</text>` +
+        (lyric.extend ? '<extend/>' : '') +
+        '</lyric>',
+    )
+    .join('');
 }
 
 function noteXml(note: Note, duration: Duration, divisions: number, chordMember: boolean): string {
   return (
     '<note>' +
+    (note.isGrace === true ? `<grace${note.graceSlash === true ? ' slash="yes"' : ''}/>` : '') +
+    (note.isCue === true ? '<cue/>' : '') +
     (chordMember ? '<chord/>' : '') +
-    pitchXml(note.pitch) +
+    pitchXml(note.pitch, note.hasExplicitDisplayPosition) +
     durationXml(note.tieStart === true, note.tieStop === true, duration, divisions) +
     instrumentXml(note) +
     voiceTypeXml(duration, note.voice) +
     accidentalXml(note) +
+    timeModificationXml(duration) +
     stemXml(note) +
+    noteheadXml(note) +
     `<staff>${note.staff ?? 1}</staff>` +
+    beamsXml(note) +
     notationsXml(note) +
+    lyricsXml(note) +
     '</note>'
   );
 }
@@ -259,12 +423,20 @@ function restXml(rest: Rest, divisions: number): string {
     rest.displayStep !== undefined && rest.displayOctave !== undefined
       ? `<display-step>${rest.displayStep}</display-step><display-octave>${rest.displayOctave}</display-octave>`
       : '';
+  // A rest carries a fermata as readily as a note does -- it is what holds
+  // a whole bar while the conductor waits.
+  const notations =
+    rest.hasFermata === true
+      ? `<notations>${fermataXml(rest.fermataPlacement, rest.fermataShape)}</notations>`
+      : '';
   return (
     '<note>' +
     `<rest>${positioned}</rest>` +
     durationXml(false, false, rest.duration, divisions) +
     voiceTypeXml(rest.duration, rest.voice) +
+    timeModificationXml(rest.duration) +
     `<staff>${rest.staff ?? 1}</staff>` +
+    notations +
     '</note>'
   );
 }

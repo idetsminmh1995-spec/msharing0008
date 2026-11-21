@@ -496,3 +496,422 @@ describe('the writer keeps a grand staff grand', () => {
     assert.match(written, /<staff-details number="1"><staff-lines>6<\/staff-lines><\/staff-details>/);
   });
 });
+
+/**
+ * A note is more than its pitch and duration. Everything a writer drew --
+ * a grace note, a triplet's ratio, a lyric, a fingering, a tremolo -- lives
+ * only in the file, so a save that drops it destroys work the page still
+ * shows. Each case below is one such mark: write it, read it back, and
+ * require the note to come out the same.
+ */
+describe('note-level marks survive a write/read round trip', () => {
+  const ATTRIBUTES =
+    '<attributes><divisions>4</divisions><key><fifths>0</fifths></key>' +
+    '<time><beats>4</beats><beat-type>4</beat-type></time>' +
+    '<clef><sign>G</sign><line>2</line></clef></attributes>';
+
+  /** Parse a one-note score, write it back, parse that, and return both notes. */
+  function roundTrip(noteXml) {
+    const source =
+      '<?xml version="1.0"?><score-partwise version="4.0"><part-list>' +
+      '<score-part id="P1"><part-name>M</part-name></score-part></part-list>' +
+      `<part id="P1"><measure number="1">${ATTRIBUTES}${noteXml}</measure></part></score-partwise>`;
+    const first = NE.parseMusicXml(source, { domParser: DOMParser });
+    const written = NE.writeMusicXml(first);
+    const second = NE.parseMusicXml(written, { domParser: DOMParser });
+    return {
+      before: first.score.parts[0].measures[0].voices[0].events[0],
+      after: second.score.parts[0].measures[0].voices[0].events[0],
+      written,
+      diagnostics: second.diagnostics,
+    };
+  }
+
+  const pitch = (step, octave, alter) =>
+    `<pitch><step>${step}</step>${alter === undefined ? '' : `<alter>${alter}</alter>`}` +
+    `<octave>${octave}</octave></pitch>`;
+
+  const whole = (inner, extra = '') =>
+    `<note>${inner}<duration>16</duration><voice>1</voice><type>whole</type>${extra}</note>`;
+
+  test('a grace note keeps both its grace-ness and its slash', () => {
+    const { before, after, written } = roundTrip(
+      `<note><grace slash="yes"/><pitch><step>C</step><octave>5</octave></pitch>` +
+        '<voice>1</voice><type>eighth</type></note>',
+    );
+    assert.equal(before.isGrace, true);
+    assert.equal(after.isGrace, true, 'a grace note must not come back as an ordinary note');
+    assert.equal(after.graceSlash, true);
+    assert.match(written, /<grace slash="yes"\/>/);
+  });
+
+  test('a cue note stays a cue note', () => {
+    const { after, written } = roundTrip(whole(pitch('C', 5), '') .replace('<note>', '<note><cue/>'));
+    assert.equal(after.isCue, true);
+    assert.match(written, /<cue\/>/);
+  });
+
+  test('a triplet keeps its ratio, so the bar still adds up', () => {
+    const { before, after, written } = roundTrip(
+      '<note>' +
+        pitch('C', 5) +
+        '<duration>2</duration><voice>1</voice><type>eighth</type>' +
+        '<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>' +
+        '<notations><tuplet type="start"/></notations></note>',
+    );
+    assert.deepEqual({ ...before.duration.tuplet }, { actualNotes: 3, normalNotes: 2 });
+    assert.deepEqual(
+      { ...after.duration.tuplet },
+      { actualNotes: 3, normalNotes: 2 },
+      'without the ratio the triplet reads back as three plain eighths',
+    );
+    assert.equal(after.tupletStart, true);
+    assert.match(written, /<time-modification><actual-notes>3<\/actual-notes><normal-notes>2<\/normal-notes><\/time-modification>/);
+  });
+
+  test('a lyric keeps its syllable, its text and its extender', () => {
+    const { after, written } = roundTrip(
+      whole(
+        pitch('C', 5),
+        '<lyric number="1"><syllabic>begin</syllabic><text>la</text><extend/></lyric>',
+      ),
+    );
+    assert.deepEqual(JSON.parse(JSON.stringify(after.lyrics)), [
+      { number: 1, text: 'la', syllabic: 'begin', extend: true },
+    ]);
+    assert.match(written, /<lyric number="1"><syllabic>begin<\/syllabic><text>la<\/text><extend\/><\/lyric>/);
+  });
+
+  test('a lyric with XML-significant characters stays readable', () => {
+    const { after } = roundTrip(
+      whole(pitch('C', 5), '<lyric number="1"><text>a &amp; b &lt;c&gt;</text></lyric>'),
+    );
+    assert.equal(after.lyrics?.[0]?.text, 'a & b <c>');
+  });
+
+  test('an explicit notehead keeps its shape, fill and parentheses', () => {
+    const { after, written } = roundTrip(
+      whole(pitch('C', 5), '<notehead filled="no" parentheses="yes">diamond</notehead>'),
+    );
+    assert.equal(after.explicitNotehead, 'diamond');
+    assert.equal(after.noteheadFilled, false);
+    assert.equal(after.noteheadParentheses, true);
+    assert.match(written, /<notehead filled="no" parentheses="yes">diamond<\/notehead>/);
+  });
+
+  test('beam hints keep their order and their numbers', () => {
+    const { after, written } = roundTrip(
+      '<note>' +
+        pitch('C', 5) +
+        '<duration>2</duration><voice>1</voice><type>eighth</type>' +
+        '<beam number="1">begin</beam><beam number="2">forward hook</beam></note>',
+    );
+    assert.deepEqual(JSON.parse(JSON.stringify(after.beams)), [
+      { number: 1, value: 'begin' },
+      { number: 2, value: 'forward hook' },
+    ]);
+    assert.match(written, /<beam number="1">begin<\/beam><beam number="2">forward hook<\/beam>/);
+  });
+
+  test('a tremolo keeps its stroke count and type', () => {
+    const { after, written } = roundTrip(
+      whole(pitch('C', 5), '<notations><tremolo type="start">2</tremolo></notations>'),
+    );
+    assert.equal(after.tremoloStrokes, 2);
+    assert.equal(after.tremoloType, 'start');
+    assert.match(written, /<tremolo type="start">2<\/tremolo>/);
+  });
+
+  test('a harmonic stays a harmonic', () => {
+    const { after, written } = roundTrip(whole(pitch('C', 5), '<notations><harmonic/></notations>'));
+    assert.equal(after.isHarmonic, true);
+    assert.match(written, /<harmonic\/>/);
+  });
+
+  test('an arpeggio keeps its direction', () => {
+    const { after, written } = roundTrip(
+      whole(pitch('C', 5), '<notations><arpeggiate direction="down"/></notations>'),
+    );
+    assert.equal(after.arpeggiate, 'down');
+    assert.match(written, /<arpeggiate direction="down"\/>/);
+  });
+
+  test('a non-arpeggiate bracket stays a bracket', () => {
+    const { after, written } = roundTrip(
+      whole(pitch('C', 5), '<notations><non-arpeggiate/></notations>'),
+    );
+    assert.equal(after.nonArpeggiate, true);
+    assert.match(written, /<non-arpeggiate\/>/);
+  });
+
+  test('tablature marks keep string, fret and fingering', () => {
+    const { after, written } = roundTrip(
+      whole(
+        pitch('C', 5),
+        '<notations><technical><string>2</string><fret>3</fret><fingering>1</fingering></technical></notations>',
+      ),
+    );
+    assert.equal(after.stringNumber, 2);
+    assert.equal(after.fret, 3);
+    assert.equal(after.fingering, 1);
+    assert.match(
+      written,
+      /<technical><string>2<\/string><fret>3<\/fret><fingering>1<\/fingering><\/technical>/,
+    );
+  });
+
+  test('a slide and a glissando each come back as the element they were read from', () => {
+    const { after, written } = roundTrip(
+      whole(pitch('C', 5), '<notations><slide type="start"/><glissando type="stop"/></notations>'),
+    );
+    assert.equal(after.slideStart, true);
+    assert.equal(after.slideStartKind, 'slide');
+    assert.equal(after.slideStop, true);
+    assert.equal(after.slideStopKind, 'glissando');
+    assert.match(written, /<slide type="start"\/><glissando type="stop"\/>/);
+  });
+
+  test('an inverted fermata keeps its orientation', () => {
+    const { after, written } = roundTrip(
+      whole(pitch('C', 5), '<notations><fermata type="inverted"/></notations>'),
+    );
+    assert.equal(after.hasFermata, true);
+    assert.equal(after.fermataPlacement, 'below');
+    assert.match(written, /<fermata type="inverted">/);
+  });
+
+  test('a natural that cancels a key signature is written even though the pitch has no alter', () => {
+    const { before, after, written } = roundTrip(
+      whole(pitch('B', 4), '<accidental>natural</accidental>'),
+    );
+    assert.equal(before.hasExplicitAccidental, true);
+    assert.equal(after.hasExplicitAccidental, true, 'the cancellation is the point of the mark');
+    assert.match(written, /<accidental>natural<\/accidental>/);
+  });
+
+  test('an accidental keeps its parentheses', () => {
+    const { after, written } = roundTrip(
+      whole(pitch('F', 5, 1), '<accidental parentheses="yes">sharp</accidental>'),
+    );
+    assert.equal(after.accidentalParentheses, true);
+    assert.match(written, /<accidental parentheses="yes">sharp<\/accidental>/);
+  });
+
+  test('an editorial accidental keeps its bracket', () => {
+    const { after, written } = roundTrip(
+      whole(pitch('F', 5, 1), '<accidental bracket="yes">sharp</accidental>'),
+    );
+    assert.equal(after.accidentalBracket, true);
+    assert.match(written, /<accidental bracket="yes">sharp<\/accidental>/);
+  });
+
+  test('a note with no marks writes none of them, so an ordinary note stays ordinary', () => {
+    const { written } = roundTrip(whole(pitch('C', 5)));
+    for (const element of [
+      '<grace',
+      '<cue/>',
+      '<time-modification>',
+      '<lyric',
+      '<notehead',
+      '<beam',
+      '<tremolo',
+      '<harmonic/>',
+      '<arpeggiate',
+      '<technical>',
+      '<slide',
+      '<fermata',
+      '<accidental',
+    ]) {
+      assert.equal(written.includes(element), false, `an unmarked note must not gain ${element}`);
+    }
+  });
+
+  test('a rest keeps its fermata', () => {
+    const { after, written } = roundTrip(
+      '<note><rest/><duration>16</duration><voice>1</voice><type>whole</type>' +
+        '<notations><fermata/></notations></note>',
+    );
+    assert.equal(after.hasFermata, true, 'a fermata over a rest holds the bar');
+    assert.match(written, /<notations><fermata>/);
+  });
+});
+
+/**
+ * A drum note's staff position comes from the kit table unless the file
+ * places it. The reader invents a neutral B4 when `<unpitched>` says
+ * nothing, so a writer that echoes that placeholder back would pin every
+ * such note to the middle line -- the note visibly moves the first time
+ * the saved file is opened again.
+ */
+describe('an unpitched note keeps only the position the file stated', () => {
+  const kit = (note) =>
+    '<?xml version="1.0"?><score-partwise version="4.0"><part-list>' +
+    '<score-part id="P1"><part-name>Drums</part-name>' +
+    '<score-instrument id="I36"><instrument-name>Bass Drum</instrument-name></score-instrument>' +
+    '<midi-instrument id="I36"><midi-channel>10</midi-channel><midi-program>1</midi-program>' +
+    '<midi-unpitched>37</midi-unpitched></midi-instrument>' +
+    '</score-part></part-list><part id="P1"><measure number="1">' +
+    '<attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time>' +
+    '<clef><sign>percussion</sign><line>2</line></clef></attributes>' +
+    note +
+    '</measure></part></score-partwise>';
+
+  const roundTrip = (xml) => {
+    const written = NE.writeMusicXml(NE.parseMusicXml(xml, { domParser: DOMParser }));
+    const event = NE.parseMusicXml(written, { domParser: DOMParser }).score.parts[0].measures[0].voices[0]
+      .events[0];
+    return { written, event };
+  };
+
+  test('a note with no stated position is written without one', () => {
+    const { written, event } = roundTrip(
+      kit('<note><unpitched/><duration>16</duration><voice>1</voice><type>whole</type>' +
+        '<instrument id="I36"/></note>'),
+    );
+    assert.match(written, /<unpitched\/>/);
+    assert.equal(
+      event.hasExplicitDisplayPosition,
+      undefined,
+      'the invented B4 must not come back as a real position, or the drum table stops placing the note',
+    );
+  });
+
+  test('a stated position is written back exactly', () => {
+    const { written, event } = roundTrip(
+      kit('<note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched>' +
+        '<duration>16</duration><voice>1</voice><type>whole</type><instrument id="I36"/></note>'),
+    );
+    assert.match(written, /<unpitched><display-step>F<\/display-step><display-octave>4<\/display-octave><\/unpitched>/);
+    assert.equal(event.hasExplicitDisplayPosition, true);
+  });
+
+  test('a drum note does not move when the file is saved and reopened', () => {
+    const source = kit(
+      '<note><unpitched/><duration>16</duration><voice>1</voice><type>whole</type>' +
+        '<instrument id="I36"/></note>',
+    );
+    const { written } = roundTrip(source);
+    // The position the kit table puts the bass drum on, before and after.
+    const positionOf = (xml) => {
+      const event = NE.parseMusicXml(xml, { domParser: DOMParser }).score.parts[0].measures[0].voices[0]
+        .events[0];
+      return { explicit: event.hasExplicitDisplayPosition, pitch: event.pitch };
+    };
+    const before = positionOf(source);
+    const after = positionOf(written);
+    assert.deepEqual(JSON.parse(JSON.stringify(after)), JSON.parse(JSON.stringify(before)));
+  });
+});
+
+/**
+ * `<divisions>` is the unit every `<duration>` in the file is counted in, so
+ * a save that picks a value the score's own note lengths do not divide by
+ * silently rewrites the music: a triplet eighth of 160 ticks becomes 120,
+ * the bar comes up short, and the next open shows a bar that no longer adds
+ * up to its meter.
+ */
+describe('<divisions> keeps every duration whole', () => {
+  const triplets =
+    '<?xml version="1.0"?><score-partwise version="4.0"><part-list>' +
+    '<score-part id="P1"><part-name>Flute</part-name></score-part></part-list>' +
+    '<part id="P1"><measure number="1">' +
+    '<attributes><divisions>6</divisions><time><beats>4</beats><beat-type>4</beat-type></time>' +
+    '<clef><sign>G</sign><line>2</line></clef></attributes>' +
+    '<note><pitch><step>C</step><octave>5</octave></pitch><duration>6</duration><voice>1</voice>' +
+    '<type>quarter</type></note>' +
+    '<note><pitch><step>C</step><octave>5</octave></pitch><duration>2</duration><voice>1</voice>' +
+    '<type>eighth</type><time-modification><actual-notes>3</actual-notes>' +
+    '<normal-notes>2</normal-notes></time-modification></note>' +
+    '<note><pitch><step>D</step><octave>5</octave></pitch><duration>2</duration><voice>1</voice>' +
+    '<type>eighth</type><time-modification><actual-notes>3</actual-notes>' +
+    '<normal-notes>2</normal-notes></time-modification></note>' +
+    '<note><pitch><step>E</step><octave>5</octave></pitch><duration>2</duration><voice>1</voice>' +
+    '<type>eighth</type><time-modification><actual-notes>3</actual-notes>' +
+    '<normal-notes>2</normal-notes></time-modification></note>' +
+    '</measure></part></score-partwise>';
+
+  const ticksOf = (result) =>
+    result.score.parts[0].measures[0].voices[0].events.map((event) => event.duration.ticks);
+
+  test('a triplet score keeps its note lengths through a save', () => {
+    const first = NE.parseMusicXml(triplets, { domParser: DOMParser });
+    const written = NE.writeMusicXml(first);
+    const second = NE.parseMusicXml(written, { domParser: DOMParser });
+    assert.deepEqual(ticksOf(second), ticksOf(first));
+  });
+
+  test('the written file holds a whole number of divisions for each note', () => {
+    const written = NE.writeMusicXml(NE.parseMusicXml(triplets, { domParser: DOMParser }));
+    const divisions = Number(/<divisions>(\d+)<\/divisions>/.exec(written)[1]);
+    for (const duration of [...written.matchAll(/<duration>(\d+)<\/duration>/g)]) {
+      assert.ok(Number.isInteger(Number(duration[1])), `${duration[1]} divisions is not whole`);
+    }
+    // 160 ticks is a third of a quarter, so the file's unit has to divide 480
+    // by 3 -- a power of two cannot.
+    assert.equal((160 * divisions) % 480, 0);
+  });
+
+  test('a score with no tuplets still writes the plain unit', () => {
+    const plain =
+      '<?xml version="1.0"?><score-partwise version="4.0"><part-list>' +
+      '<score-part id="P1"><part-name>M</part-name></score-part></part-list>' +
+      '<part id="P1"><measure number="1">' +
+      '<attributes><divisions>2</divisions><time><beats>4</beats><beat-type>4</beat-type></time>' +
+      '<clef><sign>G</sign><line>2</line></clef></attributes>' +
+      '<note><pitch><step>C</step><octave>4</octave></pitch><duration>8</duration><voice>1</voice>' +
+      '<type>whole</type></note></measure></part></score-partwise>';
+    const written = NE.writeMusicXml(NE.parseMusicXml(plain, { domParser: DOMParser }));
+    assert.match(written, /<divisions>4<\/divisions>/);
+  });
+});
+
+/**
+ * A sharp in the key signature is already spelled by `<alter>`; the reader
+ * works out from the key whether a sign has to be drawn. Writing an
+ * `<accidental>` for every altered pitch would turn each one into an
+ * explicit mark, and a score saved once would come back with a sharp on
+ * every note that the key signature already covers.
+ */
+describe('an accidental is written only where the file marked one', () => {
+  const score = (fifths, ...notes) =>
+    '<?xml version="1.0"?><score-partwise version="4.0"><part-list>' +
+    '<score-part id="P1"><part-name>Piano</part-name></score-part></part-list>' +
+    '<part id="P1"><measure number="1">' +
+    `<attributes><divisions>4</divisions><key><fifths>${fifths}</fifths></key>` +
+    '<time><beats>4</beats><beat-type>4</beat-type></time>' +
+    '<clef><sign>G</sign><line>2</line></clef></attributes>' +
+    notes.join('') +
+    '</measure></part></score-partwise>';
+
+  const pitched = (step, alter, mark = '') =>
+    `<note><pitch><step>${step}</step>${alter ? `<alter>${alter}</alter>` : ''}<octave>4</octave></pitch>` +
+    `<duration>16</duration><voice>1</voice><type>whole</type>${mark}</note>`;
+
+  test('a note the key signature already sharpens gets no accidental', () => {
+    // E major has F#, C#, G#, D#: every one of these is in the key.
+    const written = NE.writeMusicXml(
+      NE.parseMusicXml(score(4, pitched('F', 1), pitched('C', 1), pitched('G', 1), pitched('D', 1)), {
+        domParser: DOMParser,
+      }),
+    );
+    assert.equal(written.includes('<accidental'), false);
+  });
+
+  test('a mark the file did write survives, including a canceling natural', () => {
+    const written = NE.writeMusicXml(
+      NE.parseMusicXml(
+        score(4, pitched('F', 1, '<accidental>sharp</accidental>'), pitched('B', 0, '<accidental>natural</accidental>')),
+        { domParser: DOMParser },
+      ),
+    );
+    assert.match(written, /<accidental>sharp<\/accidental>/);
+    assert.match(written, /<accidental>natural<\/accidental>/);
+  });
+
+  test('saving a key-signature score twice changes nothing', () => {
+    const first = NE.parseMusicXml(score(4, pitched('F', 1), pitched('C', 1)), { domParser: DOMParser });
+    const once = NE.writeMusicXml(first);
+    const twice = NE.writeMusicXml(NE.parseMusicXml(once, { domParser: DOMParser }));
+    assert.equal(twice, once);
+  });
+});
