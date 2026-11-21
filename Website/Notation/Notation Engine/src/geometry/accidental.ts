@@ -56,6 +56,24 @@ export function musicXmlAccidentalGlyphName(value: string): string | undefined {
     : undefined;
 }
 
+/**
+ * The same table read backwards, so a writer holding only the glyph a file
+ * asked for can name the MusicXML value that draws it. Every value in the
+ * table has its own glyph, so the reverse direction is unambiguous.
+ */
+const ACCIDENTAL_VALUE_BY_GLYPH: ReadonlyMap<string, string> = new Map(
+  Object.entries(MUSICXML_ACCIDENTAL_GLYPHS).map(([value, glyph]) => [glyph, value]),
+);
+
+/**
+ * The MusicXML accidental value that draws `glyphName`, or undefined when
+ * no value in the table produces it -- a glyph that only exists because a
+ * file named it through `<accidental smufl="...">`.
+ */
+export function musicXmlAccidentalValueForGlyphName(glyphName: string): string | undefined {
+  return ACCIDENTAL_VALUE_BY_GLYPH.get(glyphName);
+}
+
 /** True when the SMuFL canonical glyph name is present in the bundled glyph table. */
 export function isKnownAccidentalGlyphName(name: string): boolean {
   return (

@@ -22,12 +22,12 @@
    * its notes as `<unpitched>` rather than `<pitch>`.
    */
   const INSTRUMENTS = [
-    { id: 'piano', name: 'Piano', group: 'Keyboards', program: 1, clef: { sign: 'G', line: 2 }, midiChannel: 1 },
-    { id: 'electric-piano', name: 'Electric Piano', group: 'Keyboards', program: 5, clef: { sign: 'G', line: 2 }, midiChannel: 1 },
-    { id: 'organ', name: 'Organ', group: 'Keyboards', program: 20, clef: { sign: 'G', line: 2 }, midiChannel: 1 },
-    { id: 'acoustic-guitar', name: 'Acoustic Guitar', group: 'Guitars', program: 25, clef: { sign: 'G', line: 2 }, midiChannel: 1, transposeChromatic: -12 },
-    { id: 'electric-guitar', name: 'Electric Guitar', group: 'Guitars', program: 28, clef: { sign: 'G', line: 2 }, midiChannel: 1, transposeChromatic: -12 },
-    { id: 'bass-guitar', name: 'Bass Guitar', group: 'Guitars', program: 34, clef: { sign: 'F', line: 4 }, midiChannel: 1, transposeChromatic: -12 },
+    { id: 'piano', name: 'Piano', group: 'Keyboards', program: 1, clef: { sign: 'G', line: 2 }, midiChannel: 1, staffKinds: ['grand', 'single'] },
+    { id: 'electric-piano', name: 'Electric Piano', group: 'Keyboards', program: 5, clef: { sign: 'G', line: 2 }, midiChannel: 1, staffKinds: ['grand', 'single'] },
+    { id: 'organ', name: 'Organ', group: 'Keyboards', program: 20, clef: { sign: 'G', line: 2 }, midiChannel: 1, staffKinds: ['grand', 'single'] },
+    { id: 'acoustic-guitar', name: 'Acoustic Guitar', group: 'Guitars', program: 25, clef: { sign: 'G', line: 2 }, midiChannel: 1, transposeChromatic: -12, staffKinds: ['single', 'tab', 'grand-tab'] },
+    { id: 'electric-guitar', name: 'Electric Guitar', group: 'Guitars', program: 28, clef: { sign: 'G', line: 2 }, midiChannel: 1, transposeChromatic: -12, staffKinds: ['single', 'tab', 'grand-tab'] },
+    { id: 'bass-guitar', name: 'Bass Guitar', group: 'Guitars', program: 34, clef: { sign: 'F', line: 4 }, midiChannel: 1, transposeChromatic: -12, staffKinds: ['single', 'tab'] },
     { id: 'violin', name: 'Violin', group: 'Strings', program: 41, clef: { sign: 'G', line: 2 }, midiChannel: 1 },
     { id: 'viola', name: 'Viola', group: 'Strings', program: 42, clef: { sign: 'C', line: 3 }, midiChannel: 1 },
     { id: 'cello', name: 'Cello', group: 'Strings', program: 43, clef: { sign: 'F', line: 4 }, midiChannel: 1 },
@@ -46,8 +46,23 @@
       clef: { sign: 'percussion', line: 2 },
       midiChannel: 10,
       percussion: true,
+      staffKinds: ['percussion'],
     },
   ];
+
+  /**
+   * How a part is laid out on the page -- the second question the wizard
+   * asks, beside the instrument. A piano writes on a grand staff or a
+   * single one; a guitar in notation, in tab, or in both at once; a kit
+   * has only its percussion staff, so it is not offered a choice at all.
+   */
+  const STAFF_KINDS = {
+    grand: { id: 'grand', label: 'Grand staff', staves: 2 },
+    single: { id: 'single', label: 'Single staff', staves: 1 },
+    tab: { id: 'tab', label: 'Tab', staves: 1, tab: true },
+    'grand-tab': { id: 'grand-tab', label: 'Grand staff + Tab', staves: 2, tab: true },
+    percussion: { id: 'percussion', label: 'Percussion staff', staves: 1 },
+  };
 
   const BY_ID = new Map(INSTRUMENTS.map((instrument) => [instrument.id, instrument]));
 
@@ -67,11 +82,15 @@
     title: 'Untitled score',
     composer: '',
     instrumentIds: ['piano'],
+    staffKind: 'grand',
     key: 'C',
     time: '4/4',
     tempo: 120,
     measures: 4,
   };
+
+  /** The staff kinds an instrument can be written on; a kit has no choice. */
+  const staffKindsFor = (id) => instrumentFor(id).staffKinds ?? ['single'];
 
   const escapeXml = (value) =>
     String(value)
@@ -93,12 +112,18 @@
     const ids = Array.isArray(input.instrumentIds) ? input.instrumentIds : [];
     const known = ids.filter((id) => BY_ID.has(id));
     const unique = [...new Set(known)];
+    const instrumentIds = unique.length > 0 ? unique : [...DEFAULT_SPEC.instrumentIds];
+    // The note-line choice belongs to the FIRST instrument: it is asked
+    // beside that instrument, and one part cannot be laid out two ways.
+    const offered = staffKindsFor(instrumentIds[0]);
+    const staffKind = offered.includes(input.staffKind) ? input.staffKind : offered[0];
     const measures = Number(input.measures);
     const tempo = Number(input.tempo);
     return {
       title: String(input.title ?? '').trim() || DEFAULT_SPEC.title,
       composer: String(input.composer ?? '').trim(),
-      instrumentIds: unique.length > 0 ? unique : [...DEFAULT_SPEC.instrumentIds],
+      instrumentIds,
+      staffKind,
       key: input.key in KEY_FIFTHS ? input.key : DEFAULT_SPEC.key,
       time: TIME_SIGNATURES.includes(input.time) ? input.time : DEFAULT_SPEC.time,
       tempo: Number.isFinite(tempo) ? Math.min(300, Math.max(20, Math.round(tempo))) : DEFAULT_SPEC.tempo,
@@ -117,11 +142,49 @@
     return beatType >= 8 ? 8 : 4;
   };
 
+  /**
+   * The note lines a part is drawn on: `<staves>`, the per-staff clefs and
+   * the tab line count.
+   *
+   * The wizard's note-line choice is what decides this. A grand staff is
+   * two staves with a treble clef above and a bass below; a tab is one
+   * six-line staff with a TAB clef; a grand staff plus tab is both at once,
+   * which is how guitar music is usually printed. Every clef has to be
+   * numbered when there is more than one staff, or the second one is drawn
+   * on top of the first.
+   */
+  function staffLayoutXml(instrument, spec) {
+    const kind = STAFF_KINDS[spec.staffKind] ?? STAFF_KINDS.single;
+    const tabLines = 6;
+    const clef = (number, sign, line) =>
+      `<clef${number === undefined ? '' : ` number="${number}"`}><sign>${sign}</sign><line>${line}</line></clef>`;
+    const details = (number) =>
+      `<staff-details${number === undefined ? '' : ` number="${number}"`}><staff-lines>${tabLines}</staff-lines></staff-details>`;
+    if (kind.staves === 1) {
+      return kind.tab
+        ? { staves: '', clefs: clef(undefined, 'TAB', 5), details: details(undefined) }
+        : { staves: '', clefs: '', details: '' };
+    }
+    if (kind.tab) {
+      return {
+        staves: '<staves>2</staves>',
+        clefs: clef(1, instrument.clef.sign, instrument.clef.line) + clef(2, 'TAB', 5),
+        details: details(2),
+      };
+    }
+    // Grand staff: treble over bass, the pairing every piano part uses.
+    return { staves: '<staves>2</staves>', clefs: clef(1, 'G', 2) + clef(2, 'F', 4), details: '' };
+  }
+
   function attributesXml(instrument, spec, divisions) {
     const { beats, beatType } = beatsOf(spec.time);
     const fifths = KEY_FIFTHS[spec.key] ?? 0;
-    const clef =
-      instrument.clef.sign === 'percussion'
+    const layout = staffLayoutXml(instrument, spec);
+    // The layout names its own clefs whenever it lays the part out; only a
+    // plain single staff needs the instrument's clef stated here.
+    const clef = layout.clefs !== ''
+      ? ''
+      : instrument.clef.sign === 'percussion'
         ? '<clef><sign>percussion</sign><line>2</line></clef>'
         : `<clef><sign>${instrument.clef.sign}</sign><line>${instrument.clef.line}</line></clef>`;
     // A transposing instrument states its sounding-vs-written interval so
@@ -139,11 +202,17 @@
     const staffDetails = instrument.percussion
       ? '<staff-details><staff-lines>5</staff-lines></staff-details>'
       : '';
+    // MusicXML's own element order: divisions, key, time, staves, clef,
+    // staff-details, transpose. A reader that walks the elements in this
+    // order is entitled to stop at the first one it does not expect.
     return (
       `<attributes><divisions>${divisions}</divisions>` +
       `<key><fifths>${fifths}</fifths></key>` +
       `<time><beats>${beats}</beats><beat-type>${beatType}</beat-type></time>` +
+      layout.staves +
       clef +
+      layout.clefs +
+      layout.details +
       staffDetails +
       transpose +
       `</attributes>`
@@ -200,11 +269,25 @@
    * QUARTER note, so an eighth-note beat is half a division, not one. A
    * 6/8 bar is 3 quarters long, not 6 -- getting this wrong makes every
    * x/8 bar twice too wide and the click grid lands half a bar off.
+   *
+   * A two-staff part gets one rest PER staff, each on its own voice, with
+   * a `<backup>` between them. A grand staff whose lower staff carries no
+   * voice at all is drawn empty and every click there lands on nothing, so
+   * the placeholder has to cover both lines from the first bar.
    */
-  function measureXml(number, divisions, beats, beatType, head = '') {
+  function measureXml(number, divisions, beats, beatType, head = '', staves = 1) {
     const barDivisions = (divisions * beats * 4) / beatType;
-    const rest = `<note><rest measure="yes"/><duration>${barDivisions}</duration><voice>1</voice></note>`;
-    return `<measure number="${number}">${head}${rest}</measure>`;
+    const rest = (staff) =>
+      `<note><rest measure="yes"/><duration>${barDivisions}</duration><voice>${staff}</voice>` +
+      (staves > 1 ? `<staff>${staff}</staff>` : '') +
+      `</note>`;
+    if (staves <= 1) return `<measure number="${number}">${head}${rest(1)}</measure>`;
+    const body = [];
+    for (let staff = 1; staff <= staves; staff += 1) {
+      if (staff > 1) body.push(`<backup><duration>${barDivisions}</duration></backup>`);
+      body.push(rest(staff));
+    }
+    return `<measure number="${number}">${head}${body.join('')}</measure>`;
   }
 
   /**
@@ -288,6 +371,10 @@
     const instruments = spec.instrumentIds.map(instrumentFor);
     const divisions = divisionsFor(spec.time);
     const { beats, beatType } = beatsOf(spec.time);
+    // Only the first instrument carries the note-line choice, so only its
+    // part is laid out on more than one staff.
+    const stavesOf = (index) =>
+      index === 0 ? (STAFF_KINDS[spec.staffKind] ?? STAFF_KINDS.single).staves : 1;
     const parts = instruments
       .map((instrument, index) => {
         const measures = [];
@@ -296,7 +383,7 @@
             number === 1
               ? attributesXml(instrument, spec, divisions) + tempoXml(spec.tempo, spec.time)
               : '';
-          measures.push(measureXml(number, divisions, beats, beatType, head));
+          measures.push(measureXml(number, divisions, beats, beatType, head, stavesOf(index)));
         }
         return `<part id="P${index + 1}">${measures.join('')}</part>`;
       })
@@ -319,17 +406,20 @@
     return {
       ...spec,
       instrumentNames: names,
+      staffKindLabel: (STAFF_KINDS[spec.staffKind] ?? STAFF_KINDS.single).label,
       keyLabel: KEY_LABELS[spec.key] ?? spec.key,
     };
   }
 
   window.NotationNewScore = {
     INSTRUMENTS,
+    STAFF_KINDS,
     KEY_FIFTHS,
     KEY_LABELS,
     TIME_SIGNATURES,
     DEFAULT_SPEC,
     instrumentFor,
+    staffKindsFor,
     normaliseSpec,
     buildMusicXml,
     summarise,

@@ -44,6 +44,10 @@ function loadEntryPage() {
 const measureTicks = (measure) =>
   measure.voices.flatMap((voice) => voice.events).reduce((sum, event) => sum + event.duration.ticks, 0);
 
+/** Ticks each voice of a measure holds, one entry per voice. */
+const voiceTicks = (measure) =>
+  measure.voices.map((voice) => voice.events.reduce((sum, event) => sum + event.duration.ticks, 0));
+
 const barTicks = (engine, time) => {
   const [beats, beatType] = time.split('/').map(Number);
   return (engine.TICKS_PER_QUARTER * 4 * beats) / beatType;
@@ -69,7 +73,11 @@ describe('the new-score builder writes MusicXML the engine accepts', () => {
       const parsed = engine.parseMusicXml(xml, window.DOMParser);
       const expected = barTicks(engine, time);
       for (const measure of parsed.score.parts[0].measures) {
-        assert.equal(measureTicks(measure), expected, `${time} bar ${measure.number} must be one bar long`);
+        // A grand staff holds one voice per staff, each a bar long; the
+        // two staves are parallel, not summed.
+        for (const ticks of voiceTicks(measure)) {
+          assert.equal(ticks, expected, `${time} bar ${measure.number} must be one bar long`);
+        }
       }
     }
   });
@@ -258,7 +266,7 @@ describe('the Create wizard asks for a score before the editor opens', () => {
     assert.ok(groups.includes('Keyboards'), 'keyboards must be its own group');
   });
 
-  test('a chip toggles, and the last instrument cannot be removed', () => {
+  test('one instrument at a time: a chip replaces the previous choice', () => {
     const window = loadEntryPage();
     window.document.querySelector('[data-notation-create]').click();
     const piano = chipFor(window, 'piano');
@@ -266,18 +274,69 @@ describe('the Create wizard asks for a score before the editor opens', () => {
     assert.equal(piano.getAttribute('aria-pressed'), 'true', 'piano is on by default');
 
     drums.click();
-    assert.equal(drums.getAttribute('aria-pressed'), 'true', 'clicking adds the kit');
+    assert.equal(drums.getAttribute('aria-pressed'), 'true', 'clicking picks the kit');
+    assert.equal(piano.getAttribute('aria-pressed'), 'false', 'the previous choice is released');
 
-    drums.click();
-    assert.equal(drums.getAttribute('aria-pressed'), 'false', 'clicking again removes it');
-
-    // One instrument must remain: a score with no part has nothing to
-    // write into, so the last chip stays on and says why.
     piano.click();
     assert.equal(piano.getAttribute('aria-pressed'), 'true');
-    const status = window.document.querySelector('[data-newscore-status]');
-    assert.equal(status.hidden, false);
-    assert.match(status.textContent, /at least one instrument/i);
+    assert.equal(drums.getAttribute('aria-pressed'), 'false');
+    // A single-select never leaves the score with no part, so there is no
+    // "keep at least one" complaint to make.
+    assert.equal(window.document.querySelector('[data-newscore-status]').hidden, true);
+  });
+
+  test('the note lines a chip offers sit beside it, and drums are offered none', () => {
+    const window = loadEntryPage();
+    window.document.querySelector('[data-notation-create]').click();
+    const staffKinds = () =>
+      [...window.document.querySelectorAll('[data-newscore-staff-kinds] [data-staff-kind]')]
+        .map((chip) => chip.dataset.staffKind);
+    const staffSide = window.document.querySelector('[data-newscore-staff-side]');
+
+    assert.deepEqual(staffKinds(), ['grand', 'single'], 'a piano writes on a grand or a single staff');
+    assert.equal(staffSide.hidden, false);
+    assert.equal(
+      window.document.querySelector('[data-newscore-staff-kinds] [aria-pressed="true"]').dataset.staffKind,
+      'grand',
+      'a piano starts on a grand staff',
+    );
+
+    chipFor(window, 'acoustic-guitar').click();
+    assert.deepEqual(staffKinds(), ['single', 'tab', 'grand-tab'], 'a guitar is offered tab as well');
+
+    chipFor(window, 'drum-kit').click();
+    assert.equal(staffSide.hidden, true, 'a kit has one staff, so there is nothing to choose');
+  });
+
+  test('the chosen note lines are the ones the score is built on', () => {
+    const window = loadEntryPage();
+    window.document.querySelector('[data-notation-create]').click();
+    chipFor(window, 'acoustic-guitar').click();
+    window.document.querySelector('[data-newscore-staff-kinds] [data-staff-kind="tab"]').click();
+    window.document.querySelector('[data-newscore-next]').click();
+    window.document.querySelector('[data-newscore-next]').click();
+    window.document.querySelector('[data-newscore-next]').click();
+    const stored = JSON.parse(window.sessionStorage.getItem('notation-lab-new-score'));
+    assert.equal(stored.staffKind, 'tab');
+    assert.deepEqual(stored.instrumentIds, ['acoustic-guitar']);
+  });
+
+  test('a drum score is not asked for a key', () => {
+    const window = loadEntryPage();
+    window.document.querySelector('[data-notation-create]').click();
+    const keyField = window.document.querySelector('[data-newscore-key-field]');
+    window.document.querySelector('[data-newscore-next]').click();
+    assert.equal(keyField.hidden, false, 'a pitched instrument asks for its key');
+
+    window.document.querySelector('[data-newscore-back]').click();
+    chipFor(window, 'drum-kit').click();
+    window.document.querySelector('[data-newscore-next]').click();
+    assert.equal(keyField.hidden, true, 'a kit carries no key signature');
+    assert.doesNotMatch(
+      window.document.querySelector('[data-newscore-summary]').textContent,
+      /Key/,
+      'the review must not claim a key the kit does not have',
+    );
   });
 
   test('the setup step offers the key, meter, tempo and bar count', () => {
@@ -300,7 +359,6 @@ describe('the Create wizard asks for a score before the editor opens', () => {
     window.document.querySelector('[data-notation-create]').click();
     chipFor(window, 'drum-kit').click();
     window.document.querySelector('[data-newscore-next]').click();
-    window.document.querySelector('[data-newscore-key]').value = 'D';
     window.document.querySelector('[data-newscore-time]').value = '3/4';
     window.document.querySelector('[data-newscore-tempo]').value = '90';
     window.document.querySelector('[data-newscore-title-input]').value = 'My Song';
@@ -308,9 +366,9 @@ describe('the Create wizard asks for a score before the editor opens', () => {
 
     assert.equal(stepOf(window, 'review').hidden, false);
     const summary = window.document.querySelector('[data-newscore-summary]').textContent;
-    assert.match(summary, /Piano, Drum Kit/);
+    assert.match(summary, /Drum Kit/);
+    assert.match(summary, /Percussion staff/);
     assert.match(summary, /My Song/);
-    assert.match(summary, /D major/);
     assert.match(summary, /3\/4/);
     assert.match(summary, /90 BPM/);
     assert.match(window.document.querySelector('[data-newscore-next]').textContent, /Create score/);
@@ -345,7 +403,8 @@ describe('the Create wizard asks for a score before the editor opens', () => {
   test('Create score hands the spec to the editor', () => {
     const window = loadEntryPage();
     window.document.querySelector('[data-notation-create]').click();
-    chipFor(window, 'drum-kit').click();
+    chipFor(window, 'acoustic-guitar').click();
+    window.document.querySelector('[data-newscore-staff-kinds] [data-staff-kind="grand-tab"]').click();
     window.document.querySelector('[data-newscore-next]').click();
     window.document.querySelector('[data-newscore-time]').value = '6/8';
     window.document.querySelector('[data-newscore-next]').click();
@@ -354,7 +413,8 @@ describe('the Create wizard asks for a score before the editor opens', () => {
     // jsdom cannot navigate, so the handoff itself is what is asserted
     // here; the editor tests below open the editor and consume it.
     const stored = JSON.parse(window.sessionStorage.getItem('notation-lab-new-score'));
-    assert.deepEqual(stored.instrumentIds, ['piano', 'drum-kit']);
+    assert.deepEqual(stored.instrumentIds, ['acoustic-guitar']);
+    assert.equal(stored.staffKind, 'grand-tab');
     assert.equal(stored.time, '6/8');
     assert.equal(stored.title, 'Untitled score');
   });

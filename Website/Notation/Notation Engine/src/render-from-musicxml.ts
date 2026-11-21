@@ -1959,6 +1959,25 @@ function measureNorthExtent(
   return Math.max(0, topLineY - highest);
 }
 
+/**
+ * A drum's stem direction: the file's own `<stem>` first, then the drum
+ * table's own opinion, and only then the drum convention of "up".
+ *
+ * Drums are written with every stem up regardless of where the note sits
+ * on the staff, which is why an unpitched note does not go through the
+ * position-based rule a pitched one does. That convention is the DEFAULT,
+ * not a law: §10.8 puts the file's own statement above any profile, so a
+ * chart that states `<stem>down</stem>` gets a down stem -- and the kit's
+ * table can pin a direction per drum (a hi-hat pedal is often written
+ * down) without the renderer overriding it.
+ */
+function drumStemDirection(
+  stated: StemDirection | undefined,
+  fromTable: StemDirection | undefined,
+): StemDirection {
+  return stated ?? fromTable ?? 'up';
+}
+
 /** Draws a note's accidental (if needed)/notehead/ledger-lines only -- no stem, no flag. Shared by both the plain (unbeamed) path and the beam-group path, which differ only in how the stem/flag (or beam) gets drawn afterward. */
 function renderNoteheadPart(
   note: Note,
@@ -2194,21 +2213,22 @@ function renderNoteOrRest(
   // stem) because §9.15's tie side needs SOME resolved direction even
   // then -- "imagine where the stem would go if there was one."
   // Drum notation is the exception to the general voice rule: when kick,
-  // hi-hat and other percussion notes share a beat, keep every unpitched
-  // drum stem up for one consistent visual direction.
+  // hi-hat and other percussion notes share a beat, every unpitched drum
+  // stem points up, so the kit reads as one shape rather than a zigzag.
+  // That is the fallback, not a lock -- a stated `<stem>` or the drum
+  // table's own direction still wins (see `drumStemDirection`).
   const isDrum = ev.pitch.kind === 'unpitched';
+  // Always defined for a drum, so it outranks the per-voice forced
+  // direction above -- the kit keeps one visual direction even in two
+  // voices, which is what the drum convention is for.
   const explicitDirection = isDrum
-    ? undefined
+    ? drumStemDirection(ev.explicitStemDirection, head.drumStemDirection)
     : (ev.explicitStemDirection ?? head.drumStemDirection);
 
   const direction = resolveStemDirection({
     positions: [head.position],
     numLines: ctx.staffLines,
-    ...(isDrum
-      ? { forcedDirection: 'up' as const }
-      : forcedDirection !== undefined
-        ? { forcedDirection }
-        : {}),
+    ...(isDrum ? {} : forcedDirection !== undefined ? { forcedDirection } : {}),
     ...(explicitDirection !== undefined ? { explicitDirection } : {}),
   });
 
@@ -2327,6 +2347,8 @@ function renderBeamGroup(
     readonly glyphs: readonly string[];
     /** The widest notehead, used for the shared dot column. */
     readonly widestGlyph: string;
+    /** The drum table's own direction for each head, when a drum pins one. */
+    readonly drumStemDirections?: readonly (StemDirection | undefined)[];
     readonly source: Note | Chord;
   }
 
@@ -2352,6 +2374,7 @@ function renderBeamGroup(
         positions: heads.positions,
         glyphs: heads.glyphs,
         widestGlyph: heads.widestGlyph,
+        drumStemDirections: heads.drumStemDirections,
         source: event,
       });
     } else {
@@ -2363,6 +2386,7 @@ function renderBeamGroup(
         positions: [head.position],
         glyphs: [head.noteheadGlyph],
         widestGlyph: head.noteheadGlyph,
+        drumStemDirections: [head.drumStemDirection],
         source: event,
       });
     }
@@ -2388,8 +2412,14 @@ function renderBeamGroup(
       ? event.notes.some((note) => note.pitch.kind === 'unpitched')
       : event.pitch.kind === 'unpitched',
   );
+  // A beamed drum group is one shape: the drum convention keeps every stem
+  // up unless the file or the drum table states a direction, in which case
+  // that direction carries the whole group -- a beam cannot mix the two.
+  const tableDirection = members
+    .flatMap((member) => member.drumStemDirections ?? [])
+    .find((direction): direction is StemDirection => direction !== undefined);
   const direction = isDrumBeam
-    ? 'up'
+    ? drumStemDirection(stated, tableDirection)
     : (forcedDirection ?? stated ?? beamDirection(allPositions, middle));
 
   /** The notehead nearest the beam: the beam must clear it. */
@@ -2547,6 +2577,7 @@ function renderChordHeadsPart(
   glyphs: readonly string[];
   widestGlyph: string;
   newAccidentalState: AccidentalState;
+  drumStemDirections: readonly (StemDirection | undefined)[];
 } {
   const parts: string[] = [];
   // Chord members may be pitched OR unpitched (a drum chart legitimately
@@ -2630,20 +2661,40 @@ function renderChordHeadsPart(
         parentheses: note?.noteheadParentheses === true,
       }),
     );
-    const ledgerLines = computeLedgerLines(position, ctx.staffLines);
-    if (ledgerLines.length > 0) {
-      parts.push(
-        renderLedgerLines(ledgerLines, {
+  });
+
+  // A chord sits in one column, so its ledger lines belong to the CHORD,
+  // not to each member: a line two members both need is drawn once. Drawn
+  // per member, crash+splash above the staff (both needing the -5 line)
+  // stacked two identical <line> elements on the same y, and A5+C6 stacked
+  // three lines where the chord needs two. The run spans the chord's
+  // widest notehead, so it reaches past every head it serves.
+  //
+  // Order is computeLedgerLines' own -- nearest to the staff first, per
+  // side -- kept by de-duplicating in place rather than sorting, so a chord
+  // draws its lines in the same order a single note at either end would.
+  const ledgerYs = [
+    ...new Set(
+      positions.flatMap((position) =>
+        computeLedgerLines(position, ctx.staffLines).map((line) => line.y),
+      ),
+    ),
+  ];
+  if (ledgerYs.length > 0) {
+    parts.push(
+      renderLedgerLines(
+        ledgerYs.map((y) => ({ y })),
+        {
           x,
-          noteheadWidth: noteheadWidth(glyphName),
+          noteheadWidth: noteheadWidth(widestGlyph ?? 'noteheadBlack'),
           staffBottomY: ctx.measureBottomY,
           extension: getEngravingDefault('legerLineExtension') ?? LEDGER_EXTENSION_FALLBACK,
           thickness: lineWidth(ctx.theme, 'leger', 'legerLineThickness', LEDGER_THICKNESS_FALLBACK),
           color: ctx.theme.colorOf('ledger'),
-        }),
-      );
-    }
-  });
+        },
+      ),
+    );
+  }
 
   // Integration W: every member's dots, in one shared column measured
   // from the chord's widest notehead -- a chord's dots line up, and two
@@ -2670,6 +2721,7 @@ function renderChordHeadsPart(
     glyphs,
     widestGlyph: widestGlyph ?? 'noteheadBlack',
     newAccidentalState: state,
+    drumStemDirections: resolved.map((r) => r.drumStemDirection),
   };
 }
 
@@ -2689,16 +2741,19 @@ function renderChord(
     // direction wins, then the file's own <stem>, then automatic direction.
     // MusicXML attaches <stem> to chord members; use the first member that
     // states one, consistently with the shared beam-group direction rule.
+    // A drum chord follows the drum convention instead -- one direction for
+    // the whole chord -- unless the file or the drum table states one.
     const isDrumChord = chord.notes.some((note) => note.pitch.kind === 'unpitched');
-    const explicitDirection = isDrumChord ? undefined : explicitStemDirectionOf(chord);
+    const tableDirection = heads.drumStemDirections.find(
+      (direction): direction is StemDirection => direction !== undefined,
+    );
+    const explicitDirection = isDrumChord
+      ? drumStemDirection(explicitStemDirectionOf(chord), tableDirection)
+      : explicitStemDirectionOf(chord);
     const direction = resolveStemDirection({
       positions,
       numLines: ctx.staffLines,
-      ...(isDrumChord
-        ? { forcedDirection: 'up' as const }
-        : forcedDirection !== undefined
-          ? { forcedDirection }
-          : {}),
+      ...(isDrumChord ? {} : forcedDirection !== undefined ? { forcedDirection } : {}),
       ...(explicitDirection !== undefined ? { explicitDirection } : {}),
     });
     if (chord.duration.type !== 'whole') {
@@ -4249,6 +4304,23 @@ export function renderParsedMusicXml(
   };
 
   /**
+   * How far above-staff content reaches, as far as the STAFF's own
+   * placement is concerned.
+   *
+   * In PAGE mode the sheet's own top margin is the room above the staff,
+   * so nothing hanging above the staff may decide how far down the staff
+   * sits: a reserve that grows with the highest note moves the staff
+   * every time a note is written, and the next click lands on a
+   * different line than the one aimed at. Above-staff content is placed
+   * at a fixed offset instead, and the staff stays put for the whole
+   * editing session. Scroll mode has no margin to fall back on -- its
+   * box is drawn around the ink -- so there the content's real reach is
+   * still reserved.
+   */
+  const northExtentForHeadroom = (partIndex: number): number =>
+    config.layout.mode === 'page' ? 0 : partNorthExtent(partIndex);
+
+  /**
    * Integration M (extended by Phase 50): how much extra room above the
    * staff the things drawn ABOVE it need -- tempo marks, and now bar
    * numbers -- beyond what STAFF_BOTTOM_Y already leaves. Computed
@@ -4297,11 +4369,25 @@ export function renderParsedMusicXml(
                 theme.sizes,
                 config.text,
                 rehearsalHeightFor(part.id, m.number),
-                partNorthExtent(partIndex),
+                northExtentForHeadroom(partIndex),
               ).band
             : 0;
         needed = Math.max(needed, textBand);
         if (!hasTempoMark) return;
+        // The mark's own room is the gap plus its height. Asking for the
+        // measure's content extent on top of that -- as this did -- made
+        // the reserve depend on the notes, so every note written moved
+        // the staff down and the next click landed on a different line.
+        // In PAGE mode the page's top margin is already there to hold
+        // the mark, so the reserve stays fixed and the staff stays put
+        // while the writer types. Scroll mode draws its box around the
+        // ink with no margin to fall back on, so there the extent is
+        // still reserved -- and only there is it worth measuring.
+        const tempoHeadroom = TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT;
+        if (config.layout.mode === 'page') {
+          needed = Math.max(needed, textBand + tempoHeadroom);
+          return;
+        }
         const a = attributesByPartAndMeasure.get(`${part.id}:${m.number}`);
         const timeline = attributeChangesByPartAndMeasure.get(`${part.id}:${m.number}`) ?? [];
         const extent = measureNorthExtent(m, 1, (tick) => {
@@ -4318,7 +4404,7 @@ export function renderParsedMusicXml(
         });
         // A tempo mark sits ABOVE the chord symbols (see northTextStack),
         // so its own clearance starts at the top of the text band.
-        needed = Math.max(needed, textBand + extent + TEMPO_MARK_GAP + TEMPO_MARK_HEIGHT);
+        needed = Math.max(needed, textBand + extent + tempoHeadroom);
       });
     });
     // A volta bracket (or a `×N`) is drawn above everything else that
@@ -5324,7 +5410,17 @@ export function renderParsedMusicXml(
               // With text above the staff, the tempo mark clears the whole
               // text stack; with none, it keeps its own long-standing
               // clearance from the measure's content extent.
-              y: topStaffY - (hasAboveText ? rows.band : northExtent) - TEMPO_MARK_GAP,
+              //
+              // PAGE mode drops the content-extent term: a mark that
+              // moves up with each new high note moves the staff down
+              // with it (the reserve above is what places the staff), so
+              // the line the user clicks is not the line they aimed at.
+              // The page's top margin holds the mark instead, and it sits
+              // at a fixed height above the staff for the whole session.
+              y:
+                topStaffY -
+                (hasAboveText ? rows.band : northExtentForHeadroom(partIndex)) -
+                TEMPO_MARK_GAP,
               color: theme.colorOf('tempo'),
               musicFont: theme.musicFont,
               textFont: theme.textFont,

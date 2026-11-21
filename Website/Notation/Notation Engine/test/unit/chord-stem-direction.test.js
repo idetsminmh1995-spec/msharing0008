@@ -8,7 +8,13 @@ import { testDomParser } from '../helpers/dom.js';
 import { eventGeometry } from '../helpers/svg-geometry.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const FIXTURE = path.join(__dirname, '..', 'fixtures', 'musicxml', 'single-voice-drum-chords.musicxml');
+const FIXTURE = path.join(
+  __dirname,
+  '..',
+  'fixtures',
+  'musicxml',
+  'single-voice-drum-chords.musicxml',
+);
 
 const NE = loadEngine();
 const domParser = testDomParser();
@@ -26,7 +32,7 @@ function directions(measure, voice) {
   return out;
 }
 
-describe('a drum chord\'s drawn stem direction stays up for a unified percussion pattern', () => {
+describe("a drum chord's drawn stem direction stays up for a unified percussion pattern", () => {
   test('the fixture renders without diagnostics and every event is drawn', () => {
     assert.deepEqual([...diagnostics], []);
     assert.equal(directions(1, 1).length, 4);
@@ -37,14 +43,18 @@ describe('a drum chord\'s drawn stem direction stays up for a unified percussion
     assert.equal((svg.match(/stroke-width="0\.5"/g) || []).length, 4);
   });
 
-  test('ONE voice, hi-hat+snare chords carrying <stem>up</stem> are drawn stem UP (the file\'s own choice)', () => {
+  test("ONE voice, hi-hat+snare chords carrying <stem>up</stem> are drawn stem UP (the file's own choice)", () => {
     // The automatic rule alone would point these DOWN (the hi-hat above the
     // staff is the note furthest from the middle line) -- the bug this guards.
     assert.deepEqual(directions(1, 1), ['up', 'up', 'up', 'up']);
   });
 
-  test('ONE voice, kick+snare chords carrying <stem>down</stem> are normalized to stem UP', () => {
-    assert.deepEqual(directions(2, 1), ['up', 'up', 'up', 'up']);
+  test("ONE voice, kick+snare chords carrying <stem>down</stem> are drawn stem DOWN (the file's own choice)", () => {
+    // §10.8 puts the file above the drum convention: "the automatic direction
+    // for these would be up, so the file must win" (the fixture's own words).
+    // The renderer used to force every drum stem up, which silently overrode
+    // this measure.
+    assert.deepEqual(directions(2, 1), ['down', 'down', 'down', 'down']);
   });
 
   test('a drum chord with NO <stem> element still uses the all-up drum direction', () => {
