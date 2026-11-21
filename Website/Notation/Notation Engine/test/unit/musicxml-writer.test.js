@@ -864,3 +864,54 @@ describe('<divisions> keeps every duration whole', () => {
     assert.match(written, /<divisions>4<\/divisions>/);
   });
 });
+
+/**
+ * A sharp in the key signature is already spelled by `<alter>`; the reader
+ * works out from the key whether a sign has to be drawn. Writing an
+ * `<accidental>` for every altered pitch would turn each one into an
+ * explicit mark, and a score saved once would come back with a sharp on
+ * every note that the key signature already covers.
+ */
+describe('an accidental is written only where the file marked one', () => {
+  const score = (fifths, ...notes) =>
+    '<?xml version="1.0"?><score-partwise version="4.0"><part-list>' +
+    '<score-part id="P1"><part-name>Piano</part-name></score-part></part-list>' +
+    '<part id="P1"><measure number="1">' +
+    `<attributes><divisions>4</divisions><key><fifths>${fifths}</fifths></key>` +
+    '<time><beats>4</beats><beat-type>4</beat-type></time>' +
+    '<clef><sign>G</sign><line>2</line></clef></attributes>' +
+    notes.join('') +
+    '</measure></part></score-partwise>';
+
+  const pitched = (step, alter, mark = '') =>
+    `<note><pitch><step>${step}</step>${alter ? `<alter>${alter}</alter>` : ''}<octave>4</octave></pitch>` +
+    `<duration>16</duration><voice>1</voice><type>whole</type>${mark}</note>`;
+
+  test('a note the key signature already sharpens gets no accidental', () => {
+    // E major has F#, C#, G#, D#: every one of these is in the key.
+    const written = NE.writeMusicXml(
+      NE.parseMusicXml(score(4, pitched('F', 1), pitched('C', 1), pitched('G', 1), pitched('D', 1)), {
+        domParser: DOMParser,
+      }),
+    );
+    assert.equal(written.includes('<accidental'), false);
+  });
+
+  test('a mark the file did write survives, including a canceling natural', () => {
+    const written = NE.writeMusicXml(
+      NE.parseMusicXml(
+        score(4, pitched('F', 1, '<accidental>sharp</accidental>'), pitched('B', 0, '<accidental>natural</accidental>')),
+        { domParser: DOMParser },
+      ),
+    );
+    assert.match(written, /<accidental>sharp<\/accidental>/);
+    assert.match(written, /<accidental>natural<\/accidental>/);
+  });
+
+  test('saving a key-signature score twice changes nothing', () => {
+    const first = NE.parseMusicXml(score(4, pitched('F', 1), pitched('C', 1)), { domParser: DOMParser });
+    const once = NE.writeMusicXml(first);
+    const twice = NE.writeMusicXml(NE.parseMusicXml(once, { domParser: DOMParser }));
+    assert.equal(twice, once);
+  });
+});

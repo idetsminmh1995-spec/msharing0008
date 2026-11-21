@@ -67,15 +67,6 @@ const DIVISION_FLOOR = 4;
 /** Upper bound for the search when a duration is not a whole number of ticks at all. */
 const MAX_DIVISIONS = 4096;
 
-/** MusicXML's own names for the accidentals an `<alter>` can produce. */
-const ACCIDENTAL_NAME: Readonly<Record<number, string>> = {
-  [-2]: 'flat-flat',
-  [-1]: 'flat',
-  0: 'natural',
-  1: 'sharp',
-  2: 'double-sharp',
-};
-
 /** The engine's articulation names back to the MusicXML elements that produce them. */
 const ARTICULATION_ELEMENT: Readonly<Record<string, string>> = {
   accent: 'accent',
@@ -203,25 +194,23 @@ function pitchXml(pitch: Pitch, hasExplicitDisplayPosition: boolean | undefined)
  * `<accidental>`, with the glyph the file asked for and the wrappers that
  * say how to draw it.
  *
+ * Only a note the file actually marked gets an element. A sharpened pitch
+ * in E major already says so in `<alter>`, and the reader works out from
+ * the key signature whether to draw the sign; writing `<accidental>` for
+ * every altered note would turn each one into an explicit mark, and the
+ * score would come back covered in sharps nobody wrote.
+ *
  * A `<natural>` on an unaltered pitch is a real mark -- it cancels a key
- * signature -- so an explicit accidental survives even when it agrees with
- * the pitch. A note the file did not mark gets no element at all, or every
- * saved score would come back peppered with naturals nobody asked for.
+ * signature -- so it survives through `hasExplicitAccidental` even though
+ * the pitch agrees with it.
  */
 function accidentalXml(note: Note): string {
   const pitch = note.pitch;
   if (pitch.kind !== 'pitched') return '';
-  const alter = pitch.alter || 0;
   const glyph = note.accidentalGlyphName;
+  if (glyph === undefined && note.hasExplicitAccidental !== true) return '';
   const value =
-    glyph === undefined
-      ? alter === 0
-        ? note.hasExplicitAccidental === true
-          ? 'natural'
-          : undefined
-        : ACCIDENTAL_NAME[alter]
-      : (musicXmlAccidentalValueForGlyphName(glyph) ?? 'other');
-  if (value === undefined) return '';
+    glyph === undefined ? 'natural' : (musicXmlAccidentalValueForGlyphName(glyph) ?? 'other');
   // A value that already draws this glyph needs no `smufl` hint; one that
   // does not (`other`) has to carry the glyph it really meant.
   const smufl =

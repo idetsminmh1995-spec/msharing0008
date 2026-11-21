@@ -73309,13 +73309,6 @@ ${denominator}`;
   // src/parser/musicxml/write.ts
   var DIVISION_FLOOR = 4;
   var MAX_DIVISIONS = 4096;
-  var ACCIDENTAL_NAME = {
-    [-2]: "flat-flat",
-    [-1]: "flat",
-    0: "natural",
-    1: "sharp",
-    2: "double-sharp"
-  };
   var ARTICULATION_ELEMENT = {
     accent: "accent",
     marcato: "strong-accent",
@@ -73377,10 +73370,9 @@ ${denominator}`;
   function accidentalXml(note2) {
     const pitch = note2.pitch;
     if (pitch.kind !== "pitched") return "";
-    const alter = pitch.alter || 0;
     const glyph = note2.accidentalGlyphName;
-    const value = glyph === void 0 ? alter === 0 ? note2.hasExplicitAccidental === true ? "natural" : void 0 : ACCIDENTAL_NAME[alter] : musicXmlAccidentalValueForGlyphName(glyph) ?? "other";
-    if (value === void 0) return "";
+    if (glyph === void 0 && note2.hasExplicitAccidental !== true) return "";
+    const value = glyph === void 0 ? "natural" : musicXmlAccidentalValueForGlyphName(glyph) ?? "other";
     const smufl = glyph === void 0 || musicXmlAccidentalGlyphName(value) === glyph ? "" : ` smufl="${escapeXml(glyph)}"`;
     const parentheses = note2.accidentalParentheses === void 0 ? "" : ` parentheses="${note2.accidentalParentheses ? "yes" : "no"}"`;
     const bracket = note2.accidentalBracket === void 0 ? "" : ` bracket="${note2.accidentalBracket ? "yes" : "no"}"`;
