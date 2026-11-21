@@ -2300,6 +2300,9 @@
     if (id !== null && typeof window.cancelAnimationFrame === 'function') window.cancelAnimationFrame(id);
   };
 
+  /** The in-flight manifest read, so playback can wait for the host's asset list. */
+  let soundFontsLoading = null;
+
   const ensureSound = async () => {
     if (state.sound) return state.sound;
     if (state.soundTried) throw new Error('Playback is unavailable in this preview.');
@@ -2307,6 +2310,10 @@
     state.soundTried = true;
     const SoundFont = window.NotationSoundFont;
     if (!SoundFont?.R2SoundFontEngine) throw new Error('The sound engine could not be loaded.');
+    // Play must not race the manifest: a writer can press Play before the
+    // asset list has arrived, and the id it carries decides which font
+    // loads. Waiting here costs nothing when the read already finished.
+    if (soundFontsLoading) await soundFontsLoading;
     const configured = window.MSHARING_SOUNDFONT_CONFIG || {};
     const assetId = state.soundAssetId ?? configured.assetId;
     // One creation promise is shared by every caller (Play, the sound
@@ -2416,9 +2423,8 @@
     if (testScoreButton) testScoreButton.disabled = !hasFonts;
   }
 
-  /** Loads the R2 manifest and fills the picker. Never throws to the caller. */
+  /** Loads the R2 manifest so playback uses the host's own asset list. Never throws to the caller. */
   async function loadSoundFonts() {
-    if (!soundFontSelect) return;
     try {
       if (typeof fetch !== 'function') throw new Error('fetch is unavailable');
       const configured = window.MSHARING_SOUNDFONT_CONFIG || {};
@@ -2445,11 +2451,14 @@
       state.soundAssetId = known ? preferred : (state.soundFonts[0]?.id ?? null);
       renderSoundFontOptions();
     } catch (error) {
-      // Keep the page's own status line for the score; the picker says
-      // what went wrong on its own.
-      soundFontSelect.replaceChildren(new Option('SoundFonts unavailable', ''));
-      soundFontSelect.disabled = true;
-      soundFontSelect.title = error instanceof Error ? error.message : 'Could not load the SoundFont list.';
+      // The picker is optional now, so a missing one must not cost the
+      // page its status line; only a picker that is present says why the
+      // list did not arrive.
+      if (soundFontSelect) {
+        soundFontSelect.replaceChildren(new Option('SoundFonts unavailable', ''));
+        soundFontSelect.disabled = true;
+        soundFontSelect.title = error instanceof Error ? error.message : 'Could not load the SoundFont list.';
+      }
     }
   }
 
@@ -3253,5 +3262,5 @@
   setControlsEnabled(false);
   updateZoom();
   restoreHandoff();
-  void loadSoundFonts();
+  void (soundFontsLoading = loadSoundFonts());
 })();

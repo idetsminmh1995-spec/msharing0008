@@ -69,7 +69,7 @@ const STARTER_XML = `<?xml version="1.0" encoding="UTF-8"?>
  * `requestAnimationFrame` on its own, so the page is opened with the
  * `?intent=create` handoff, whose `loadXml` renders synchronously.
  */
-function loadEditorPage({ url = 'https://example.test/notation-editor.html?intent=create', pendingXml, newScore } = {}) {
+function loadEditorPage({ url = 'https://example.test/notation-editor.html?intent=create', pendingXml, newScore, globals } = {}) {
   const html = fs.readFileSync(path.join(appDir, 'notation-editor.html'), 'utf8');
   const virtualConsole = new VirtualConsole();
   const errors = [];
@@ -80,6 +80,10 @@ function loadEditorPage({ url = 'https://example.test/notation-editor.html?inten
     url,
   });
   const { window } = dom;
+  // Page globals the boot reads -- the SoundFont host config, a stubbed
+  // `fetch`, a stand-in engine -- have to be in place BEFORE the scripts
+  // run, because the boot fetches the manifest on its first tick.
+  for (const [key, value] of Object.entries(globals ?? {})) window[key] = value;
   if (pendingXml !== undefined) {
     // The Lab hands a score over through sessionStorage and the page's boot
     // reads it before anything else, so seeding it is how a test opens a
@@ -1998,6 +2002,108 @@ describe('the editor and the engine agree, end to end', () => {
         .matchAll(/<instrument id="([^"]+)"\/>/g)].map((match) => match[1]);
       assert.equal(instruments.length, 4, 'all four drums are on the one beat');
       assert.equal(new Set(instruments).size, 4, 'and they are four different drums');
+    });
+  });
+
+  describe('the SoundFont the host asks for', () => {
+    /** A manifest shaped like the one on R2: the paths live under `runtime`, not on each asset. */
+    const MANIFEST = {
+      schemaVersion: 1,
+      assets: [
+        { id: 'ms-basic', displayName: 'MS Basic', format: 'sf3', version: 'deprecated' },
+        { id: 'musescore-general-sf3', displayName: 'MuseScore General', format: 'sf3', version: '0.2' },
+        { id: 'generaluser-gs', displayName: 'GeneralUser GS', format: 'sf2', version: '1.472' },
+      ],
+      runtime: {
+        defaultAssetId: 'musescore-general-sf3',
+        assetPaths: {
+          'ms-basic': 'ms-basic/official-deprecated-master/MS Basic.sf3',
+          'musescore-general-sf3': 'musescore-general/v0.2/MuseScore_General.sf3',
+          'generaluser-gs': 'generaluser-gs/v1.472/GeneralUser GS v1.472.sf2',
+        },
+      },
+    };
+
+    /** Opens the page with a stubbed manifest and captures what `create()` was handed. */
+    function openWithManifest({ manifest = MANIFEST, configure = {}, fetchOk = true } = {}) {
+      const created = [];
+      const page = loadEditorPage({
+        globals: {
+          MSHARING_SOUNDFONT_CONFIG: {
+            manifestUrl: 'https://fonts.test/soundfonts/manifest.json',
+            assetBaseUrl: 'https://fonts.test/soundfonts',
+            ...configure,
+          },
+          fetch: async () => (fetchOk
+            ? { ok: true, status: 200, json: async () => manifest }
+            : { ok: false, status: 503, json: async () => ({}) }),
+          NotationSoundFont: {
+            R2SoundFontEngine: {
+              create: async (options) => {
+                created.push(options);
+                return { play: () => {}, pause: () => {}, setTracks: () => {}, preview: () => {} };
+              },
+            },
+          },
+        },
+      });
+      return { ...page, created };
+    }
+
+    /** Presses Play and lets the manifest fetch and the engine creation settle. */
+    async function playAndSettle(window) {
+      window.document
+        .querySelector('[data-editor-play]')
+        .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      for (let i = 0; i < 40; i += 1) await new Promise((resolve) => window.setTimeout(resolve, 5));
+    }
+
+    test("the manifest's own default asset is the one created, not the first asset it lists", async () => {
+      const { window, created } = openWithManifest();
+      await playAndSettle(window);
+
+      assert.equal(created.length, 1, 'one engine is created for the first playback');
+      assert.equal(
+        created[0].assetId,
+        'musescore-general-sf3',
+        "the manifest's defaultAssetId wins over the first listed asset",
+      );
+    });
+
+    test("the manifest's asset paths reach the engine, so its own table stays a fallback", async () => {
+      const { window, created } = openWithManifest();
+      await playAndSettle(window);
+
+      assert.equal(created.length, 1);
+      assert.deepEqual(
+        created[0].assetPaths,
+        MANIFEST.runtime.assetPaths,
+        'the host passes runtime.assetPaths through untouched',
+      );
+    });
+
+    test('a configured asset id wins over the manifest default', async () => {
+      const { window, created } = openWithManifest({ configure: { assetId: 'generaluser-gs' } });
+      await playAndSettle(window);
+
+      assert.equal(created[0].assetId, 'generaluser-gs', 'an explicit host choice is honoured');
+    });
+
+    test('a manifest that names no default falls back to its first asset', async () => {
+      const manifest = { ...MANIFEST, runtime: { assetPaths: MANIFEST.runtime.assetPaths } };
+      const { window, created } = openWithManifest({ manifest });
+      await playAndSettle(window);
+
+      assert.equal(created[0].assetId, 'ms-basic', 'with no default stated, the first listed asset is used');
+    });
+
+    test('an unreachable manifest still lets the score play', async () => {
+      const { window, created } = openWithManifest({ fetchOk: false });
+      await playAndSettle(window);
+
+      assert.equal(created.length, 1, 'a failed manifest must not stop playback');
+      assert.equal(created[0].assetPaths, undefined, 'and it must not invent paths');
+      assert.equal(created[0].assetId, undefined, 'nor an asset id it never learned');
     });
   });
 
