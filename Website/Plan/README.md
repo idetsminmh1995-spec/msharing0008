@@ -1,8 +1,34 @@
 # M Sharing Website — Development Plan
 
+> ## ⚠ အရေးအကြီးဆုံး သတိပေးချက် — Video Engine နှင့် shared code
+>
+> **Video Engine** သည် instrument အားလုံး (Drum, Piano, Guitar နှင့် နောက်ထပ်ထည့်မည့်ဟာများ) အတွက် တူညီသော common အလုပ်ကို လုပ်ပေးရမည်။ Page တစ်ခုချင်းစီ (`studio.html`, `studio-*.js` စသည်) ထဲတွင် ပြန့်ကျဲနေသော shared code များကို သက်ဆိုင်ရာ Engine ထဲသို့ ရွှေ့ရမည်။ ရွှေ့ပြီးနောက် code ကို ဂရုတစိုက် ပြန်လည်စစ်ဆေးရမည်။ Instrument တစ်ခုချင်းစီအတွက် common အလုပ်ကို feature folder ထဲတွင် ထပ်ရေးခြင်း/ကူးခြင်း မပြုရ။ (အသေးစိတ် placement rule — "Shared engine placement and reuse" ကို ကြည့်ပါ။)
+
 ## 1. ရည်ရွယ်ချက်
 
 M Sharing သည် music learning, music notes, online courses, video studio, library နှင့် user profile/dashboard များ ပါဝင်မည့် responsive web application ဖြစ်မည်။ လက်ရှိ repository ထဲတွင် Header Bar prototype ကိုသာ တည်ဆောက်ထားပြီး ဤ Plan သည် နောက်ပိုင်း frontend၊ backend၊ storage နှင့် deployment အဆင့်များအတွက် အခြေခံ architecture ဖြစ်သည်။
+
+### 1.1 Feature ၄ ခု နှင့် revenue share
+
+Web app တွင် အဓိက feature ၄ ခု ရှိသည် — **Notes ရောင်းခြင်း၊ Lessons တက်ခြင်း၊ Create Video နှင့် Music Notes ရေးခြင်း (Notation Lab/Editor)**။ Create Video နှင့် Notation Lab ကို အရင်ဆွေးနွေး/တည်ဆောက်ပြီး Notes Store နှင့် Lessons ကို နောက်မှ လုပ်မည်။
+
+- **Notation Lab/Editor:** MuseScore ကဲ့သို့ notation ရေးနိုင်ရမည်။ Creator များသည် ရေးထားသောအရာကို web app ထဲတွင် ရောင်းချရန် list လုပ်နိုင်မည်။
+- **Revenue share:** ရောင်းရသည့် sale တစ်ခုချင်းစီ၏ **၄၅%** ကို platform က ယူမည်။ ၎င်း ၄၅% ကို payment fee များ မနှုတ်မီ ရောင်းဈေးမှ တိုက်ရိုက်ယူမည်။
+- **Create Video:** အသုံးပြုသူက MusicXML ဖိုင်ပေးပြီး Engine များကို အသုံးပြု၍ video ဖိုင်ထုတ်ပေးမည်။
+
+### 1.2 Engine architecture
+
+| Feature | အသုံးပြုမည့် Engine များ |
+|---|---|
+| Notation Editor | Notation Engine + Sound Engine + **Writer Engine** |
+| Create Video | Notation Engine + Sound Engine + Video Engine + သက်ဆိုင်ရာ အခြား Engine များ (ဥပမာ instrument-specific engines) |
+
+- **Notation Engine** — notation ကို ပြသသည်။ သီးခြား၊ မပြောင်းလဲဘဲ ရပ်တည်သည်။ Notation Editor နှင့် Create Video နှစ်ခုစလုံးက ၎င်းကို **ကိုယ်ပိုင်ဖြင့် တိုက်ရိုက်ခေါ်သုံးသည်**။
+- **Sound Engine** — notation အတွက် audio (အသံ) ကို ထုတ်ပေးသည်။
+- **Writer Engine** — Notation Editor ထဲတွင် လုပ်ဆောင်သမျှ — notation ကို ရေးပုံရေးနည်းနှင့် editor operation အားလုံးကို ပိုင်ဆိုင်သည်။
+- **Video Engine** — video ထုတ်လုပ်ခြင်း (Create Video)။ Instrument အားလုံးအတွက် common အလုပ်ကို လုပ်သည် (အပေါ်ဆုံး သတိပေးချက်ကို ကြည့်ပါ)။
+
+**ဆုံးဖြတ်ချက်:** Notation Editor သည် score ကို Create Video သို့ **တိုက်ရိုက် မပို့ပါ**။ ၎င်းတို့ နှစ်ခုကြား ချိတ်ဆက်မှုကို Notation Engine မှတစ်ဆင့်သာ သီးခြားစီ လုပ်ဆောင်သည်။ Writer Engine ၏ အသေးစိတ် (တည်နေရာ၊ API) ကို နောက်ထပ်ဆွေးနွေးပြီးမှ သတ်မှတ်မည်။
 
 ## 2. Frontend technology options
 
