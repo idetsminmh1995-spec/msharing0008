@@ -144,6 +144,13 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3h4l4 18H6Z" /><path d="M16.6 5.4 10.4 15.6" /><circle cx="16.9" cy="4.8" r="1.5" /></svg>
         </button>
       </div>
+      <span class="editor-bottombar__divider" aria-hidden="true"></span>
+      <div class="editor-bottombar__group" role="group" aria-label="Instrument">
+        <button class="editor-bottombar__button" type="button" data-editor-popover="inst" aria-label="Inst." title="Instruments — keys, fretboard or drum pads for the part you are writing" aria-haspopup="true" aria-expanded="false"><span>Inst.</span></button>
+        <button class="editor-bottombar__button" type="button" data-editor-popover="mixer" aria-label="Mixer" title="Mixer" aria-haspopup="true" aria-expanded="false"><span>Mixer</span></button>
+        <div class="editor-popover editor-popover--inst" data-editor-popover-panel="inst" role="group" aria-label="Instruments" hidden></div>
+        <div class="editor-popover editor-popover--mixer" data-editor-popover-panel="mixer" role="group" aria-label="Mixer" hidden></div>
+      </div>
       <div class="editor-bottombar__group" role="group" aria-label="Length">
         <output class="editor-bottombar__readout editor-bottombar__readout--length" data-editor-length aria-live="off" aria-label="Score length" title="How long the score lasts">0:00</output>
       </div>

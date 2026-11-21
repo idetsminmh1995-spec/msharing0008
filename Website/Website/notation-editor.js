@@ -61,6 +61,10 @@
   const overflowGroup = pick('[data-editor-overflow-group]');
   const overflowPanel = pick('[data-editor-popover-panel="overflow"]');
   const overflowTrigger = pick('[data-editor-popover="overflow"]');
+  const instPanel = pick('[data-editor-popover-panel="inst"]');
+  const mixerPanel = pick('[data-editor-popover-panel="mixer"]');
+  const instButton = pick('[data-editor-popover="inst"]');
+  const mixerButton = pick('[data-editor-popover="mixer"]');
   const voiceSelect = pick('[data-editor-voice]');
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -253,6 +257,45 @@
     return docTools.clefDefinitionFor(sign);
   };
 
+  /** Whether a staff is a tab staff, so a click there names a string, not a pitch. */
+  const isTabStaff = (measureNumber, staffNumber = 1, partId = activePartId()) => {
+    const attribute = attributeAt(measureNumber, partId);
+    const sign = attribute?.clefsByStaff?.[staffNumber]?.sign ?? attribute?.clefSign;
+    return sign === 'TAB';
+  };
+
+  /**
+   * What a click on a tab line means: a string, its fret, and the pitch
+   * that pair sounds.
+   *
+   * A tab staff's lines ARE its strings, highest string on the top line,
+   * and `staffPositionFromPoint` already measures in the staff's own
+   * spaces, so one line is one unit and the bottom line (position 0) is
+   * the lowest string. A click writes an open string: the writer picks the
+   * fret from the Inst. panel, where each string shows its frets.
+   */
+  const tabClickFor = (staffNumber, staffPosition) => {
+    const lines = attributeAt(state.entry?.measureNumber ?? 1)?.staffLinesByStaff?.[staffNumber] ?? 6;
+    // Position 0 is the bottom line and each line above it is one more,
+    // so the top line reads as string 1 and the bottom as the last one.
+    const stringNumber = Math.min(lines, Math.max(1, Math.round(lines + staffPosition)));
+    const pitch = tabPitch(stringNumber, 0);
+    return pitch ? { ...pitch, stringNumber, fret: 0 } : null;
+  };
+
+  /**
+   * The pitch a string sounds at a fret.
+   *
+   * A tab line names a string, not a pitch, so the open string's tuning is
+   * what turns the click into a note. `openStrings` runs lowest first, so
+   * string 1 (the highest) is its last entry.
+   */
+  const tabPitch = (stringNumber, fret) => {
+    const open = activeInstrument().data?.openStrings ?? [];
+    const openMidi = open[open.length - stringNumber];
+    return openMidi === undefined ? null : pitchFromMidi(openMidi + fret);
+  };
+
   /**
    * How far a written pitch on this part must move to sound.
    *
@@ -275,6 +318,10 @@
 
   const accidentalAlter = () =>
     state.tool.accidental === null ? null : ACCIDENTAL_ALTER[state.tool.accidental];
+
+  /** A pitch as a writer reads it, so the status line names the note it wrote. */
+  const pitchLabel = (step, alter, octave) =>
+    `${step}${alter === 1 ? '#' : alter === -1 ? 'b' : alter === 2 ? '##' : alter === -2 ? 'bb' : ''}${octave}`;
 
   const eventsIn = (measureNumber, voiceId = 1) => {
     const measure = partById(activePartId())?.measures.find((m) => m.number === measureNumber);
@@ -337,21 +384,40 @@
     const ys = [...new Set(lines.map((line) => line.y))].sort((a, b) => a - b);
     const staves = [];
     let run = [];
+    let runSpacing = null;
     const closeRun = () => {
-      if (run.length < 5) return;
-      const band = run.map((y) => y.y);
-      staves.push({
-        systemIndex: 0,
-        topY: band[0],
-        bottomY: band[band.length - 1],
-        leftX: Math.min(...run.map((line) => line.left)),
-        rightX: Math.max(...run.map((line) => line.right)),
-      });
+      if (run.length >= 5) {
+        const band = run.map((line) => line.y);
+        staves.push({
+          systemIndex: 0,
+          topY: band[0],
+          bottomY: band[band.length - 1],
+          // One space of THIS staff, in SVG units: a five-line staff is 1,
+          // a six-line tab staff is 1.5. Pitch and hit-test maths both need
+          // it, and assuming 1 draws a tab note in the wrong place.
+          space: runSpacing ?? 1,
+          leftX: Math.min(...run.map((line) => line.left)),
+          rightX: Math.max(...run.map((line) => line.right)),
+        });
+      }
+      run = [];
+      runSpacing = null;
     };
     for (const y of ys) {
+      // A run continues while the gap matches the spacing the run itself
+      // established. A grand staff's two staves are 6.5 apart while a tab
+      // staff spaces its six lines 1.5 apart, so a fixed gap of 1 finds
+      // neither: the first gap of a run is what defines that staff.
       const previous = run[run.length - 1]?.y;
-      if (previous === undefined || Math.abs(y - previous - 1) < 0.01) run.push(...lines.filter((line) => line.y === y));
-      else { closeRun(); run = lines.filter((line) => line.y === y); }
+      const gap = previous === undefined ? null : y - previous;
+      const continues = gap !== null && (runSpacing === null ? gap > 0 : Math.abs(gap - runSpacing) < 0.01);
+      if (continues) {
+        if (runSpacing === null) runSpacing = gap;
+        run.push(...lines.filter((line) => line.y === y));
+      } else {
+        closeRun();
+        run = lines.filter((line) => line.y === y);
+      }
     }
     closeRun();
 
@@ -442,7 +508,9 @@
    */
   function staffAt(staves, y, { nearest = false } = {}) {
     if (staves.length === 0) return null;
-    const inside = staves.find((staff) => y >= staff.topY - 2 && y <= staff.bottomY + 2);
+    const inside = staves.find(
+      (staff) => y >= staff.topY - 2 * (staff.space ?? 1) && y <= staff.bottomY + 2 * (staff.space ?? 1),
+    );
     if (inside) return inside;
     if (!nearest) return null;
     return staves.reduce((best, staff) => {
@@ -461,11 +529,14 @@
    */
   function staffPositionFromPoint(staff, y) {
     if (!staff) return 0;
-    const raw = y - staff.bottomY;
+    // Measured in this staff's own spaces, so a tab staff's 1.5 spacing is
+    // read as the six lines it is rather than as a five-line staff's 1.
+    const space = staff.space ?? 1;
+    const raw = (y - staff.bottomY) / space;
     // The staff is four spaces tall, so the top line sits at -4. A ledger
     // line above or below is one more space, and two of them is as far as a
     // click may reach; the band `staffAt` accepts is exactly this range.
-    const lowest = staff.topY - staff.bottomY - 2;
+    const lowest = (staff.topY - staff.bottomY) / space - 2;
     return Math.round(Math.min(2, Math.max(lowest, raw)) * 2) / 2;
   }
 
@@ -478,8 +549,9 @@
    */
   function pointOnStaff(staff, point) {
     if (!staff) return false;
-    const bandTop = staff.topY - 2;
-    const bandBottom = staff.bottomY + 2;
+    const space = staff.space ?? 1;
+    const bandTop = staff.topY - 2 * space;
+    const bandBottom = staff.bottomY + 2 * space;
     if (point.y < bandTop || point.y > bandBottom) return false;
     if (staff.leftX !== undefined && point.x < staff.leftX - 1) return false;
     if (staff.rightX !== undefined && point.x > staff.rightX + 1) return false;
@@ -778,6 +850,7 @@
       setControlsEnabled(true);
       syncHistory();
       syncPartSelect();
+      syncInstrumentPanel();
       // The tie and flip buttons read the selection, so their pressed state
       // has to follow every redraw, not only the tool clicks.
       syncTools();
@@ -811,6 +884,7 @@
     setControlsEnabled(false);
     syncHistory();
     syncPartSelect();
+    syncInstrumentPanel();
     setFile('');
     updateLength();
     if (message) announce(message);
@@ -1666,7 +1740,7 @@
    * `staffPosition` is the clicked line, which a drum kit needs: its notes
    * are unpitched, so the line the user clicked is what names the drum.
    */
-  function insertAtEntry({ step = null, octave = null, rest = false, addToChord = false, staffPosition = null }) {
+  function insertAtEntry({ step = null, octave = null, rest = false, addToChord = false, staffPosition = null, alter = null, drum = null, stringNumber = null, fret = null }) {
     if (!state.doc) return;
     if (!state.entry) {
       state.entry = { partId: activePartId(), measureNumber: 1, voiceId: state.voice, tick: 0 };
@@ -1720,8 +1794,8 @@
     // already on the beat: a plain click writes the first, a chord click
     // the first that is not in the chord yet.
     const kit = state.drumInstruments?.get(activePartId()) ?? null;
-    const line = staffPosition ?? drumLineForLetter(step);
-    const drums = drumsOnLine(line);
+    const line = drum !== null ? drum.staffPosition : staffPosition ?? drumLineForLetter(step);
+    const drums = drum !== null ? [drum] : drumsOnLine(line);
     if (kit !== null && !rest) {
       if (drums.length === 0) {
         announce(
@@ -1734,19 +1808,19 @@
       const events = eventsIn(measureNumber, voiceId);
       const existingIndex = events.findIndex((event) => (event.startTick ?? 0) === state.entry.tick);
       const existing = existingIndex >= 0 ? events[existingIndex] : null;
-      const drum = pickDrumForLine(line, existing);
-      if (drum === null) {
+      const chosen = drum ?? pickDrumForLine(line, existing);
+      if (chosen === null) {
         const names = drums.map((entry) => entry.name).join(' and ');
         announce(`${names} are already in the chord.`);
         return;
       }
-      const drumPitch = engine.unpitchedPitch(drum.displayStep, drum.displayOctave);
+      const drumPitch = engine.unpitchedPitch(chosen.displayStep, chosen.displayOctave);
       const note = engine.note({
         pitch: drumPitch,
         duration: existing && existing.kind !== 'rest' ? existing.duration : fitted,
         voice: voiceId,
         staff,
-        instrumentId: drum.instrumentId,
+        instrumentId: chosen.instrumentId,
       });
       if (existing && existing.kind !== 'rest') {
         // A drum chord is written the same way a pitched one is: kick and
@@ -1755,19 +1829,19 @@
         if (stacking) {
           const stacked = stackedWith(existing, note, state.entry.tick);
           if (stacked === null) {
-            announce(`${drum.name} is already in the chord.`);
+            announce(`${chosen.name} is already in the chord.`);
             return;
           }
-          commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: stacked }), `Added ${drum.name} to the chord.`);
+          commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: stacked }), `Added ${chosen.name} to the chord.`);
         } else {
-          commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: note }), `Replaced with ${drum.name}.`);
+          commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: note }), `Replaced with ${chosen.name}.`);
         }
-        previewPitch(drumPitch, drum);
+        previewPitch(drumPitch, chosen);
         render();
         return;
       }
-      commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event: note }), `Inserted ${drum.name}.`);
-      previewPitch(drumPitch, drum);
+      commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event: note }), `Inserted ${chosen.name}.`);
+      previewPitch(drumPitch, chosen);
       advanceEntry(ticks, measureNumber, voiceId);
       return;
     }
@@ -1776,33 +1850,34 @@
       announce('Click a staff line or press a note letter first.');
       return;
     }
-    const alter = accidentalAlter();
-    const pitch = { kind: 'pitched', step, alter: alter ?? 0, octave };
+    const alterValue = alter ?? accidentalAlter();
+    const pitch = { kind: 'pitched', step, alter: alterValue ?? 0, octave };
+    const tab = stringNumber === null ? {} : { stringNumber, ...(fret === null ? {} : { fret }) };
     const events = eventsIn(measureNumber, voiceId);
     const existingIndex = events.findIndex((event) => (event.startTick ?? 0) === state.entry.tick);
     const existing = existingIndex >= 0 ? events[existingIndex] : null;
 
     if (existing && existing.kind !== 'rest') {
-      const note = engine.note({ pitch, duration: existing.duration, voice: voiceId, staff });
+      const note = engine.note({ pitch, duration: existing.duration, voice: voiceId, staff, ...tab });
       if (stacking) {
         const stacked = stackedWith(existing, note, state.entry.tick);
         if (stacked === null) {
-          announce(`${step}${octave} is already in the chord.`);
+          announce(`${pitchLabel(step, pitch.alter, octave)} is already in the chord.`);
           return;
         }
         commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: stacked }), 'Note added to chord.');
       } else {
         // A plain letter or click on an occupied beat restates that beat's
         // pitch, replacing rather than stacking by default.
-        commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: note }), `Replaced with ${step}${octave}.`);
+        commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: note }), `Replaced with ${pitchLabel(step, pitch.alter, octave)}.`);
       }
       previewPitch(pitch, null, measureNumber);
       render();
       return;
     }
 
-    const event = engine.note({ pitch, duration: fitted, voice: voiceId, staff, startTick: state.entry.tick });
-    commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event }), `Inserted ${step}${octave}.`);
+    const event = engine.note({ pitch, duration: fitted, voice: voiceId, staff, startTick: state.entry.tick, ...tab });
+    commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event }), `Inserted ${pitchLabel(step, pitch.alter, octave)}.`);
     previewPitch(pitch, null, measureNumber);
     advanceEntry(ticks, measureNumber, voiceId);
   }
@@ -1996,10 +2071,18 @@
       Math.round(position.tickInMeasure / grid) * grid,
     );
     const staffPosition = staffPositionFromPoint(staff, point.y);
-    const { step, octave } = docTools.pitchFromStaffPosition(
-      clefAt(position.measureNumber, staffNumber),
-      staffPosition,
-    );
+    // A tab line names a string, not a pitch: the click has to become a
+    // string/fret pair or the note is written to a staff position the tab
+    // cannot draw, and the engine then drops it as a missing fret.
+    const tab = isTabStaff(position.measureNumber, staffNumber)
+      ? tabClickFor(staffNumber, staffPosition)
+      : null;
+    const { step, octave } = tab
+      ? tab
+      : docTools.pitchFromStaffPosition(
+          clefAt(position.measureNumber, staffNumber),
+          staffPosition,
+        );
     state.entry = {
       partId: activePartId(),
       measureNumber: position.measureNumber,
@@ -2010,7 +2093,15 @@
     if (state.noteInput) {
       clearSelection();
       if (state.tool.rest) insertAtEntry({ rest: true });
-      else insertAtEntry({ step, octave, staffPosition, addToChord: event.shiftKey });
+      else if (tab) {
+        insertAtEntry({
+          ...tab,
+          step,
+          octave,
+          staffPosition,
+          addToChord: event.shiftKey,
+        });
+      } else insertAtEntry({ step, octave, staffPosition, addToChord: event.shiftKey });
       return;
     }
     // Note input off, empty staff: this is where a rubber band starts.
@@ -2810,6 +2901,245 @@
 
   function onPartChange() {
     if (partSelect) selectPart(partSelect.value);
+  }
+
+  // ---- instrument and mixer boxes -----------------------------------------
+
+  const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const NOTE_ALTER = { 'C#': 1, 'D#': 1, 'F#': 1, 'G#': 1, 'A#': 1 };
+  const BLACK_AFTER = new Set([0, 1, 3, 4, 5]);
+
+  /** Splits a MIDI number into the step, accidental and octave it is written with. */
+  function pitchFromMidi(midi) {
+    const name = NOTE_NAMES[((midi % 12) + 12) % 12];
+    return { step: name[0], alter: NOTE_ALTER[name] ?? 0, octave: Math.floor(midi / 12) - 1 };
+  }
+
+  const stringData = () => engine.NotationDefaults?.STRING_DATA ?? [];
+
+  /**
+   * What the Inst. box offers for the part being written.
+   *
+   * The part itself decides, not the writer: a kit gets drum pads, a
+   * fretted instrument gets its own strings and frets, and everything else
+   * gets a keyboard. A fretted part is recognised by the name the score
+   * gives it, falling back to its GM program so a part named by another
+   * program still gets a fretboard.
+   */
+  function activeInstrument() {
+    if (!state.doc) return { kind: 'none' };
+    const partId = activePartId();
+    if (state.drumInstruments?.has(partId) || activePartIsPercussion()) return { kind: 'drums' };
+    const name = partById(partId)?.name ?? '';
+    const byName = stringData().find((entry) => entry.name === name);
+    if (byName) return { kind: 'fretted', data: byName };
+    const program = state.result?.playback?.tracks?.find((track) => track.id === partId)?.program;
+    if (program !== undefined && program >= 24 && program <= 39) {
+      const family = program <= 31 ? /guitar/i : /bass/i;
+      const byProgram = stringData().find((entry) => family.test(entry.id));
+      if (byProgram) return { kind: 'fretted', data: byProgram };
+    }
+    return { kind: 'keys' };
+  }
+
+  const panelTitle = (text) => {
+    const title = document.createElement('span');
+    title.className = 'editor-inst__title';
+    title.textContent = text;
+    return title;
+  };
+
+  const panelNote = (text) => {
+    const note = document.createElement('span');
+    note.className = 'editor-inst__note';
+    note.textContent = text;
+    return note;
+  };
+
+  /**
+   * Two octaves of keys from middle C, the range a writer reaches for
+   * first. A black key sits on the seam between the whites either side of
+   * it, which is what makes the row read as a keyboard rather than as
+   * twelve evenly spaced buttons.
+   */
+  function buildKeyboard() {
+    const body = document.createElement('div');
+    body.className = 'editor-inst';
+    body.append(panelTitle('Keyboard'));
+    const row = document.createElement('div');
+    row.className = 'editor-inst__keys';
+    const WHITE = 26;
+    const GAP = 2;
+    const START = 60;
+    for (let octaveIndex = 0; octaveIndex < 2; octaveIndex += 1) {
+      const octave = document.createElement('div');
+      octave.className = 'editor-inst__octave';
+      for (let whiteIndex = 0; whiteIndex < 7; whiteIndex += 1) {
+        const semitone = [0, 2, 4, 5, 7, 9, 11][whiteIndex];
+        const pitch = pitchFromMidi(START + octaveIndex * 12 + semitone);
+        const key = document.createElement('button');
+        key.type = 'button';
+        key.className = 'editor-inst__white';
+        key.dataset.editorInstKey = `${pitch.step}${pitch.octave}`;
+        key.setAttribute('aria-label', `${pitch.step}${pitch.octave}`);
+        key.textContent = `${pitch.step}${pitch.octave}`;
+        key.addEventListener('click', () => insertAtEntry({ ...pitch }));
+        octave.append(key);
+        if (!BLACK_AFTER.has(whiteIndex)) continue;
+        const blackPitch = pitchFromMidi(START + octaveIndex * 12 + semitone + 1);
+        const black = document.createElement('button');
+        black.type = 'button';
+        black.className = 'editor-inst__black';
+        black.dataset.editorInstKey = `${blackPitch.step}#${blackPitch.octave}`;
+        black.setAttribute('aria-label', `${blackPitch.step}#${blackPitch.octave}`);
+        black.style.left = `${whiteIndex * (WHITE + GAP) + WHITE + GAP / 2 - 8}px`;
+        black.addEventListener('click', () => insertAtEntry({ ...blackPitch }));
+        octave.append(black);
+      }
+      row.append(octave);
+    }
+    body.append(row);
+    return body;
+  }
+
+  /**
+   * The instrument's own strings, highest first, with a fret button per
+   * position. A click states the string and fret as well as the pitch, so
+   * the note lands where a tab staff would draw it.
+   */
+  function buildFretboard(data) {
+    const body = document.createElement('div');
+    body.className = 'editor-inst';
+    body.append(panelTitle(`${data.name} — ${data.openStrings.length} strings`));
+    const shownFrets = Math.min(12, data.frets);
+    const highest = data.openStrings.length;
+    for (let stringNumber = 1; stringNumber <= highest; stringNumber += 1) {
+      const openMidi = data.openStrings[highest - stringNumber];
+      const line = document.createElement('div');
+      line.className = 'editor-inst__string';
+      const label = document.createElement('span');
+      label.className = 'editor-inst__string-label';
+      const openPitch = pitchFromMidi(openMidi);
+      label.textContent = `S${stringNumber} ${openPitch.step}${openPitch.octave}`;
+      line.append(label);
+      for (let fret = 0; fret <= shownFrets; fret += 1) {
+        const pitch = pitchFromMidi(openMidi + fret);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `editor-inst__fret${fret === 0 ? ' editor-inst__fret--open' : ''}`;
+        button.dataset.editorInstFret = `${stringNumber}:${fret}`;
+        button.setAttribute('aria-label', `String ${stringNumber}, fret ${fret}`);
+        button.title = `${pitch.step}${pitch.octave}`;
+        button.textContent = fret === 0 ? '0' : String(fret);
+        button.addEventListener('click', () =>
+          insertAtEntry({ ...pitch, stringNumber, fret }),
+        );
+        line.append(button);
+      }
+      body.append(line);
+    }
+    body.append(panelNote(`Frets 0–${shownFrets} of ${data.frets}.`));
+    return body;
+  }
+
+  /** The kit's drums as pads, highest line first, the order a percussion palette uses. */
+  function buildDrumPads() {
+    const body = document.createElement('div');
+    body.className = 'editor-inst';
+    const kit = state.drumInstruments?.get(activePartId());
+    const drums = [...(kit?.values() ?? [])].flat();
+    body.append(panelTitle('Percussion'));
+    if (drums.length === 0) {
+      body.append(panelNote('This part names no drums to write.'));
+      return body;
+    }
+    const grid = document.createElement('div');
+    grid.className = 'editor-inst__drums';
+    [...drums]
+      .sort((a, b) => b.staffPosition - a.staffPosition)
+      .forEach((drum) => {
+        const pad = document.createElement('button');
+        pad.type = 'button';
+        pad.className = 'editor-inst__drum';
+        pad.dataset.editorInstDrum = String(drum.gmNote);
+        pad.setAttribute('aria-label', drum.name);
+        pad.textContent = drum.name;
+        pad.addEventListener('click', () => insertAtEntry({ drum }));
+        grid.append(pad);
+      });
+    body.append(grid);
+    return body;
+  }
+
+  /**
+   * The mixer lists the score's parts. It is a placeholder: the sliders
+   * are drawn but carry no level yet, so the box says so rather than
+   * pretending to mix.
+   */
+  function buildMixer() {
+    const body = document.createElement('div');
+    body.className = 'editor-inst';
+    body.append(panelTitle('Mixer'));
+    const tracks = state.result?.playback?.tracks ?? [];
+    if (tracks.length === 0) {
+      body.append(panelNote('Open a score to see its parts.'));
+      return body;
+    }
+    for (const track of tracks) {
+      const row = document.createElement('div');
+      row.className = 'editor-inst__row';
+      const name = document.createElement('span');
+      name.className = 'editor-inst__row-name';
+      name.textContent = track.name ?? track.id;
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.className = 'editor-inst__slider';
+      slider.min = '0';
+      slider.max = '127';
+      slider.value = '100';
+      slider.disabled = true;
+      slider.setAttribute('aria-label', `${track.name ?? track.id} level`);
+      row.append(name, slider);
+      body.append(row);
+    }
+    body.append(panelNote('Levels are not wired up yet.'));
+    return body;
+  }
+
+  /**
+   * Rebuilds both boxes for the part now being written.
+   *
+   * Only when what they show has changed: a redraw follows every written
+   * note, and replacing the panel's buttons on each one would throw away
+   * the focus a keyboard user is standing on.
+   */
+  function syncInstrumentPanel() {
+    const instrument = activeInstrument();
+    const signature = [
+      instrument.kind,
+      instrument.data?.id ?? '',
+      activePartId() ?? '',
+      state.drumInstruments?.get(activePartId())?.size ?? 0,
+      (state.result?.playback?.tracks ?? []).map((track) => `${track.id}:${track.name}`).join('|'),
+    ].join('/');
+    if (instPanel && instPanel.dataset.signature !== signature) {
+      instPanel.dataset.signature = signature;
+      instPanel.replaceChildren(
+        instrument.kind === 'drums'
+          ? buildDrumPads()
+          : instrument.kind === 'fretted'
+            ? buildFretboard(instrument.data)
+            : instrument.kind === 'keys'
+              ? buildKeyboard()
+              : panelNote('Open a score to write notes.'),
+      );
+    }
+    if (mixerPanel && mixerPanel.dataset.signature !== signature) {
+      mixerPanel.dataset.signature = signature;
+      mixerPanel.replaceChildren(buildMixer());
+    }
+    if (instButton) instButton.disabled = !state.doc;
+    if (mixerButton) mixerButton.disabled = !state.doc;
   }
 
   // ---- wiring ------------------------------------------------------------

@@ -222,11 +222,23 @@
           ...measure,
           voices: measure.voices.map((voice) => ({
             ...voice,
-            events: padVoiceToCapacity(sortEvents(voice.events), voice.id, capacity, 1),
+            events: padVoiceToCapacity(sortEvents(voice.events), voice.id, capacity, staffOfVoice(voice)),
           })),
         };
       }),
     }));
+  }
+
+  /**
+   * The staff a voice is drawn on, taken from its own events.
+   *
+   * A grand staff holds one voice per staff, so padding every voice with
+   * rests on staff 1 would drop the lower staff's rests onto the upper one
+   * and leave the bass staff short of its meter.
+   */
+  function staffOfVoice(voice) {
+    const staff = voice.events.find((event) => event.staff !== undefined)?.staff;
+    return staff ?? 1;
   }
 
   /**
@@ -284,19 +296,28 @@
       const sorted = sortEvents(events);
       const current = sorted[eventIndex];
       if (!current) return sorted;
-      const apply = (target) => {
+      const merge = (target, fields) => {
         const next = { ...target };
-        for (const [key, value] of Object.entries(patch)) {
+        for (const [key, value] of Object.entries(fields)) {
           if (value === null || value === undefined) delete next[key];
           else next[key] = value;
         }
         return next;
       };
+      const apply = (target) => merge(target, patch);
       // A chord's marks belong to each of its notes, so a palette action
       // on a chord marks every note in it -- which is what MuseScore does.
-      sorted[eventIndex] = current.kind === 'chord'
-        ? { ...current, notes: current.notes.map(apply) }
-        : apply(current);
+      // `notes` is the one field that replaces the chord's members instead
+      // of being merged into each of them: a caller that has already built
+      // the new member list must not have it nested inside every note.
+      if (current.kind !== 'chord') {
+        sorted[eventIndex] = apply(current);
+        return sorted;
+      }
+      const { notes, ...fields } = patch;
+      sorted[eventIndex] = notes === undefined || notes === null
+        ? { ...current, notes: current.notes.map((note) => merge(note, fields)) }
+        : { ...merge(current, fields), notes };
       return sorted;
     });
   }

@@ -65,15 +65,23 @@
         </header>
         <p class="newscore__status" data-newscore-status role="status" aria-live="polite" hidden></p>
         <div class="newscore__step" data-newscore-step="instruments">
-          <p class="newscore__hint">Pick the instruments you want to write for. You can change everything later.</p>
-          <div class="newscore__groups" data-newscore-groups></div>
+          <p class="newscore__hint">Pick one instrument, then the note lines you want to write on.</p>
+          <div class="newscore__pick">
+            <div class="newscore__pick-side">
+              <div class="newscore__groups" data-newscore-groups></div>
+            </div>
+            <div class="newscore__pick-side" data-newscore-staff-side hidden>
+              <h3 class="newscore__group-label">Note lines</h3>
+              <div class="newscore__chips" data-newscore-staff-kinds></div>
+            </div>
+          </div>
         </div>
         <div class="newscore__step" data-newscore-step="setup" hidden>
           <p class="newscore__hint">Set the basics. These become the score's first measure.</p>
           <div class="newscore__fields">
             <label class="newscore__field"><span>Title</span><input type="text" maxlength="80" placeholder="Untitled score" data-newscore-title-input /></label>
             <label class="newscore__field"><span>Composer</span><input type="text" maxlength="80" placeholder="Optional" data-newscore-composer-input /></label>
-            <label class="newscore__field"><span>Key</span><select data-newscore-key></select></label>
+            <label class="newscore__field" data-newscore-key-field><span>Key</span><select data-newscore-key></select></label>
             <label class="newscore__field"><span>Time signature</span><select data-newscore-time></select></label>
             <label class="newscore__field"><span>Tempo (BPM)</span><input type="number" min="20" max="300" step="1" value="120" data-newscore-tempo /></label>
             <label class="newscore__field"><span>Measures</span><input type="number" min="1" max="64" step="1" value="4" data-newscore-measures /></label>

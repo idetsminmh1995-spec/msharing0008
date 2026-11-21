@@ -436,12 +436,14 @@ describe('the editor and the engine agree, end to end', () => {
     const bars = window.document.querySelectorAll('[data-editor-bottom-bar]');
     assert.equal(bars.length, 1, 'the editor has exactly one bottom bar');
     // The export menu's own items live in the bar's markup but only appear
-    // once Export is pressed, so they are not counted as bar controls.
+    // once Export is pressed, so they are not counted as bar controls. The
+    // instrument and mixer boxes hang off the bar the same way.
     const controls = [...bars[0].querySelectorAll('button, output, select, input')]
-      .filter((control) => !control.closest('[data-editor-export-list]'));
+      .filter((control) => !control.closest('[data-editor-export-list]'))
+      .filter((control) => !control.closest('[data-editor-popover-panel]'));
     assert.deepEqual(
       controls.map((control) => control.getAttribute('aria-label')),
-      ['Play', 'Stop', 'Metronome', 'Score length', 'Zoom out', 'Zoom level', 'Zoom in', 'Save', 'Export'],
+      ['Play', 'Stop', 'Metronome', 'Inst.', 'Mixer', 'Score length', 'Zoom out', 'Zoom level', 'Zoom in', 'Save', 'Export'],
     );
 
     // Save and Export are different promises, not two names for one thing:
@@ -457,7 +459,7 @@ describe('the editor and the engine agree, end to end', () => {
     const groups = [...bars[0].children].filter((node) => node.classList.contains('editor-bottombar__group'));
     assert.deepEqual(
       groups.map((group) => group.getAttribute('aria-label')),
-      ['Playback', 'Length', 'Zoom', 'File'],
+      ['Playback', 'Instrument', 'Length', 'Zoom', 'File'],
     );
 
     // The length readout is the timeline's own end in minutes:seconds, so a
@@ -1600,6 +1602,114 @@ describe('the editor and the engine agree, end to end', () => {
     const xml = JSON.parse(window.localStorage.getItem('msharing-notation-scores') ?? '[]')[0]?.xml ?? '';
     assert.equal((xml.match(/<unpitched/g) ?? []).length, 0, 'a pitched part carries no unpitched notes');
     assert.equal((xml.match(/<pitch>/g) ?? []).length, 2, 'the two notes typed, and no drum beside them');
+  });
+
+  test('the Inst. box shows a keyboard for a pitched part and writes the key that was pressed', () => {
+    const { window } = loadEditorPage({
+      newScore: { title: 'Piano', instrumentIds: ['piano'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
+    });
+    const doc = window.document;
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const inst = doc.querySelector('[data-editor-popover="inst"]');
+    const panel = doc.querySelector('[data-editor-popover-panel="inst"]');
+    assert.equal(inst.disabled, false, 'a loaded score can open the instrument box');
+
+    inst.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(panel.hidden, false, 'the box opens under its button');
+
+    const whites = panel.querySelectorAll('.editor-inst__white');
+    assert.equal(whites.length, 14, 'two octaves of white keys');
+    assert.equal(panel.querySelectorAll('.editor-inst__black').length, 10, 'and their black keys');
+    assert.equal(panel.querySelector('.editor-inst__title').textContent, 'Keyboard');
+
+    // A key press writes the note it names, at the cursor.
+    const key = [...whites].find((node) => node.dataset.editorInstKey === 'G4');
+    key.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.match(status(), /Inserted G4/);
+
+    // A black key writes its accidental.
+    const sharp = [...panel.querySelectorAll('.editor-inst__black')]
+      .find((node) => node.dataset.editorInstKey === 'C#4');
+    sharp.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.match(status(), /Inserted C#4/);
+  });
+
+  test('the Inst. box shows the guitar\'s own strings and frets, and a fret writes that pitch', () => {
+    const { window } = loadEditorPage({
+      newScore: { title: 'Guitar', instrumentIds: ['acoustic-guitar'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
+    });
+    const doc = window.document;
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const panel = doc.querySelector('[data-editor-popover-panel="inst"]');
+
+    // Six strings, each with an open string and twelve frets, and the top
+    // line is string 1 -- the highest string, as a player counts them.
+    const strings = panel.querySelectorAll('.editor-inst__string');
+    assert.equal(strings.length, 6);
+    assert.equal(strings[0].querySelectorAll('.editor-inst__fret').length, 13);
+    assert.match(strings[0].querySelector('.editor-inst__string-label').textContent, /S1 E4/);
+    assert.match(strings[5].querySelector('.editor-inst__string-label').textContent, /S6 E2/);
+
+    // A fret states the string and the fret, so the note lands where a tab
+    // staff would draw it, and the pitch is the open string plus the fret.
+    const fifthFret = panel.querySelector('[data-editor-inst-fret="1:5"]');
+    assert.equal(fifthFret.title, 'A4');
+    fifthFret.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.match(status(), /Inserted A4/);
+
+    doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    const xml = JSON.parse(window.localStorage.getItem('msharing-notation-scores') ?? '[]')[0]?.xml ?? '';
+    assert.match(xml, /<string>1<\/string>/, 'the string is written into the file');
+    assert.match(xml, /<fret>5<\/fret>/, 'and so is the fret');
+  });
+
+  test('the Inst. box shows drum pads for a kit part, and a pad writes that drum', () => {
+    const { window } = loadEditorPage({
+      newScore: { title: 'kit', instrumentIds: ['drum-kit'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
+    });
+    const doc = window.document;
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const panel = doc.querySelector('[data-editor-popover-panel="inst"]');
+
+    assert.equal(panel.querySelector('.editor-inst__title').textContent, 'Percussion');
+    const pads = [...panel.querySelectorAll('.editor-inst__drum')];
+    assert.equal(pads.length, 9, 'the nine drums a new kit declares');
+    const names = pads.map((pad) => pad.textContent);
+    assert.ok(names.includes('Bass Drum 1') && names.includes('Acoustic Snare'), `unexpected pads: ${names}`);
+
+    // The pad writes its own drum, not whichever drum happens to share the
+    // line: Open Hi-Hat and Closed Hi-Hat sit on one line.
+    const open = pads.find((pad) => pad.textContent === 'Open Hi-Hat');
+    open.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.match(status(), /Inserted Open Hi-Hat/);
+
+    doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    const xml = JSON.parse(window.localStorage.getItem('msharing-notation-scores') ?? '[]')[0]?.xml ?? '';
+    // GM key 46 is Open Hi-Hat, stated 1-based as 47.
+    assert.match(xml, /<midi-unpitched>47<\/midi-unpitched>|Open Hi-Hat/);
+  });
+
+  test('the Mixer box lists the score\'s parts and says its levels are not wired yet', () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    const mixer = doc.querySelector('[data-editor-popover="mixer"]');
+    const panel = doc.querySelector('[data-editor-popover-panel="mixer"]');
+    assert.equal(mixer.disabled, false);
+
+    mixer.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(panel.hidden, false, 'the box opens under its button');
+    assert.equal(panel.querySelector('.editor-inst__title').textContent, 'Mixer');
+    assert.match(panel.textContent, /not wired up yet/);
+
+    // One row per part, and its level control is inert until the mixer is
+    // real -- a slider that moves but changes nothing would be a lie.
+    const rows = panel.querySelectorAll('.editor-inst__row');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].querySelector('.editor-inst__slider').disabled, true);
+
+    // Pressing the button again folds it away.
+    mixer.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(panel.hidden, true);
   });
 
   test('a bare visit to the editor starts a score instead of showing nothing', () => {
