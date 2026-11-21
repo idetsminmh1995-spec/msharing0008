@@ -42,20 +42,65 @@ async function htmlFilesUnder(directory) {
   return result;
 }
 
+// The hand-written app assets carry their own `?v=` key. Nothing regenerated
+// it, so an edited file kept a key from whenever it was last typed by hand and
+// a returning browser served its cached copy -- the page ran old code against a
+// new bundle. Derive each key from the file's own bytes here, so a build always
+// re-keys whatever changed.
+// `repoDir` is the top-level `Website/` deploy dir; the served pages and the
+// hand-written app assets live one level down in `Website/Website/`.
+const appAssetsDir = path.join(repoDir, 'Website');
+const appAssets = [
+  'script.js',
+  'soundfonts-config.js',
+  'notation-doc.js',
+  'notation-entry.js',
+  'notation-editor.js',
+  'notation-newscore.js',
+  'studio-video.js',
+  'studio-metronome.js',
+  'styles.css',
+  'assets/video-engine.js',
+  'assets/metronome-engine.js',
+];
+
+const appAssetVersions = new Map();
+for (const relative of appAssets) {
+  try {
+    const bytes = await readFile(path.join(appAssetsDir, relative));
+    appAssetVersions.set(relative, createHash('sha256').update(bytes).digest('hex').slice(0, 12));
+  } catch (error) {
+    // A standalone engine checkout has no host app next to it; nothing to key.
+    if (error?.code !== 'ENOENT') throw error;
+  }
+}
+
+function appAssetPattern(relative) {
+  return new RegExp(
+    `((?:src|href)=")${relative.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\?v=)[^"]*(")`,
+    'g',
+  );
+}
+
 const referencePattern = /(notation-engine\.js\?v=)[^"'&\s]+/g;
 const soundReferencePattern = /(sound-engine\.js\?v=)[^"'&\s]+/g;
 let updatedPages = 0;
 let updatedReferences = 0;
 let updatedSoundReferences = 0;
+let updatedAppReferences = 0;
 for (const root of publicRoots) {
   for (const htmlPath of await htmlFilesUnder(root)) {
     const html = await readFile(htmlPath, 'utf8');
     const count = [...html.matchAll(referencePattern)].length;
     const soundCount = [...html.matchAll(soundReferencePattern)].length;
-    if (count === 0 && soundCount === 0) continue;
-    const nextHtml = html
+    let nextHtml = html
       .replace(referencePattern, `$1${cacheVersion}`)
       .replace(soundReferencePattern, `$1${soundCacheVersion}`);
+    for (const [relative, version] of appAssetVersions) {
+      const pattern = appAssetPattern(relative);
+      updatedAppReferences += [...nextHtml.matchAll(pattern)].length;
+      nextHtml = nextHtml.replace(pattern, `$1${relative}$2${version}$3`);
+    }
     updatedReferences += count;
     updatedSoundReferences += soundCount;
     if (nextHtml !== html) {

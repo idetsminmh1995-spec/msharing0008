@@ -62,6 +62,64 @@ test(
   },
 );
 
+/**
+ * The hand-written app assets are served with a `?v=` key that a browser uses
+ * to decide whether its cached copy is still good. A key that does not match
+ * the file's bytes pins returning visitors to whatever version was current
+ * when the key was last typed, so they run stale JavaScript against the new
+ * engine bundle. `scripts/sync-website-bundle.mjs` re-derives the keys on every
+ * build; this test fails if a page was left holding a key the bytes do not
+ * match, which is what a hand-edited page or a skipped build looks like.
+ */
+test(
+  'every hand-written app asset is referenced by a key derived from its own bytes',
+  { skip: hasApp ? false : 'the Website app is not checked out next to the engine' },
+  () => {
+    const appAssets = [
+      'script.js',
+      'soundfonts-config.js',
+      'notation-doc.js',
+      'notation-entry.js',
+      'notation-editor.js',
+      'notation-newscore.js',
+      'studio-video.js',
+      'studio-metronome.js',
+      'styles.css',
+      'assets/video-engine.js',
+      'assets/metronome-engine.js',
+    ];
+
+    const expectedVersions = new Map(
+      appAssets.map((relative) => [
+        relative,
+        createHash('sha256')
+          .update(fs.readFileSync(path.join(APP_ROOT, relative)))
+          .digest('hex')
+          .slice(0, 12),
+      ]),
+    );
+
+    const pages = htmlFilesUnder(APP_ROOT).map((htmlPath) => ({
+      name: path.relative(repoDir, htmlPath),
+      html: fs.readFileSync(htmlPath, 'utf8'),
+    }));
+
+    for (const [relative, expected] of expectedVersions) {
+      const escaped = relative.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = new RegExp(`(?:src|href)="${escaped}\\?v=([^"]+)"`, 'g');
+      for (const page of pages) {
+        for (const match of page.html.matchAll(pattern)) {
+          assert.equal(
+            match[1],
+            expected,
+            `${page.name} pins ${relative} to ${match[1]}, but the file's own bytes hash to ${expected} -- run the build so the cache key follows the file`,
+          );
+        }
+      }
+    }
+  },
+);
+
 test(
   'the served Bravura font ships with its OFL license next to it',
   { skip: hasApp ? false : 'the Website app is not checked out next to the engine' },
