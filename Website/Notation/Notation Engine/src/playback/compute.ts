@@ -1,7 +1,7 @@
 import type { Score } from '../core/index.js';
 import { isPitched } from '../core/pitch.js';
 import { TICKS_PER_QUARTER, baseTicksForType, ticksWithDots } from '../core/duration-math.js';
-import type { TempoMarkEvent } from '../parser/musicxml/parse.js';
+import type { DirectionEvent, TempoMarkEvent } from '../parser/musicxml/parse.js';
 import type { MidiInstrumentInfo } from '../parser/musicxml/instrument.js';
 import { buildTempoMap, type RawTempoEvent } from '../timing/tempo-map.js';
 import { buildEventStream } from './event-stream.js';
@@ -71,6 +71,13 @@ export interface ComputePlaybackDataInput {
    * (no MusicXML barlines at all) is.
    */
   readonly repeatMeasures?: readonly RepeatMeasureSpec[];
+  /**
+   * Every `<direction>` the score carries (`ParseResult.directions`), so a
+   * dynamic marking becomes the velocity of the notes after it. Omitted
+   * means the score states no dynamics and every note sounds at the
+   * default velocity.
+   */
+  readonly directions?: readonly DirectionEvent[];
 }
 
 /**
@@ -139,6 +146,7 @@ export function computePlaybackData(input: ComputePlaybackDataInput): PlaybackDa
     tempoMap,
     input.transposeSemitonesByPartAndMeasure,
     input.midiInstrumentInfoByPart,
+    input.directions,
   );
 
   const { plan, diagnostics: repeatDiagnostics } = buildRepeatPlan({

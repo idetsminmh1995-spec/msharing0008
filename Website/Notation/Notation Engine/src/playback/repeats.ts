@@ -398,3 +398,82 @@ export function writtenTickToPerformanceTicks(
   }
   return out;
 }
+
+/**
+ * Where a written tick is heard, in seconds from the start of the
+ * performance -- its FIRST pass, which is what "play from here" means.
+ *
+ * A written tick is heard once per pass, so this is deliberately
+ * many-to-one: seeking to bar 3 plays bar 3 the first time it comes
+ * round, not the second.
+ */
+export function writtenTickToPerformanceSeconds(
+  plan: RepeatPlan,
+  tempoMap: TempoMap,
+  writtenTick: number,
+): number {
+  if (!plan.hasRepeats) return tickToSeconds(tempoMap, writtenTick);
+  for (const entry of plan.entries) {
+    if (writtenTick >= entry.writtenTick && writtenTick < entry.writtenTick + entry.ticks) {
+      const intoMeasure = tickToSeconds(tempoMap, writtenTick) - entry.writtenStartSeconds;
+      return Math.max(0, entry.startSeconds + intoMeasure);
+    }
+  }
+  return tickToSeconds(tempoMap, writtenTick);
+}
+
+/**
+ * A score's events in PERFORMANCE order, with a repeated section's notes
+ * written out once per pass.
+ *
+ * `PlaybackData.events` is in WRITTEN time, which is what the page needs:
+ * a notehead sits at one x however many times it is played. A synthesiser
+ * needs the opposite -- one note-on per playing -- so a score with repeats
+ * handed to it un-unfolded simply stops at the repeat barline, which is
+ * the one thing a repeat is for. This is that conversion, and it returns
+ * the input untouched when the score has no repeats.
+ */
+export function unfoldEvents<
+  T extends {
+    readonly tick: number;
+    readonly seconds: number;
+    readonly durationTicks?: number;
+    readonly tieChainDurationTicks?: number;
+  },
+>(
+  plan: RepeatPlan,
+  events: readonly T[],
+  tempoMap?: TempoMap,
+): readonly (T & { readonly durationSeconds?: number })[] {
+  if (!plan.hasRepeats || plan.entries.length === 0) return events;
+  const sorted = [...events].sort((a, b) => a.tick - b.tick);
+  const out: (T & { readonly durationSeconds?: number })[] = [];
+  for (const entry of plan.entries) {
+    const from = entry.writtenTick;
+    const to = entry.writtenTick + entry.ticks;
+    for (const event of sorted) {
+      if (event.tick < from) continue;
+      if (event.tick >= to) break;
+      // The duration is measured on the WRITTEN timeline before the tick
+      // is moved: a second pass sits past the end of the score in
+      // performance time, so reading the tempo map there would measure
+      // the wrong span whenever the file changes tempo.
+      const lengthTicks = event.tieChainDurationTicks ?? event.durationTicks;
+      const durationSeconds =
+        tempoMap !== undefined && lengthTicks !== undefined
+          ? Math.max(
+              0.02,
+              tickToSeconds(tempoMap, event.tick + lengthTicks) -
+                tickToSeconds(tempoMap, event.tick),
+            )
+          : undefined;
+      out.push({
+        ...event,
+        tick: entry.performanceTick + (event.tick - from),
+        seconds: entry.startSeconds + (event.seconds - entry.writtenStartSeconds),
+        ...(durationSeconds !== undefined ? { durationSeconds } : {}),
+      });
+    }
+  }
+  return out;
+}

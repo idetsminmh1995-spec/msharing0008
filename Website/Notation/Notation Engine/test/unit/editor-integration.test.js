@@ -140,6 +140,42 @@ describe('the editor and the engine agree, end to end', () => {
     assert.match(xml, /<duration>4<\/duration>/);
   });
 
+  test('a pasted note is fitted to the barline instead of running past the meter', () => {
+    const { window, engine, doc } = loadEditor();
+    const quarter = engine.TICKS_PER_QUARTER;
+    const parsed = engine.parseMusicXml(STARTER_XML, window.DOMParser);
+    const written = doc.insertEvent(parsed, {
+      partId: 'P1',
+      measureNumber: 1,
+      event: engine.note({
+        pitch: { kind: 'pitched', step: 'C', octave: 5, alter: 0 },
+        duration: engine.duration('whole', 0, 4 * quarter),
+        voice: 1,
+        staff: 1,
+        startTick: 0,
+      }),
+    });
+    const excerpt = doc.excerpt(written, [
+      { partId: 'P1', measureNumber: 1, voiceId: 1, eventIndex: 0 },
+    ]);
+    // Last beat of bar 2: a whole note has one beat of room, not four.
+    const pasted = doc.paste(written, excerpt, {
+      partId: 'P1',
+      measureNumber: 2,
+      voiceId: 1,
+      tick: 3 * quarter,
+    });
+    const events = pasted.score.parts[0].measures[1].voices[0].events;
+    assert.equal(
+      events.reduce((sum, event) => sum + event.duration.ticks, 0),
+      4 * quarter,
+      'the bar is still one bar long',
+    );
+    const note = events.find((event) => event.kind !== 'rest');
+    assert.equal(note.startTick, 3 * quarter);
+    assert.equal(note.duration.ticks, quarter, 'the note stops at the barline');
+  });
+
   test('a slur and a sforzato survive the editor writing them back to MusicXML', () => {
     const { window, engine, doc } = loadEditor();
     const parsed = engine.parseMusicXml(STARTER_XML, window.DOMParser);
@@ -676,12 +712,12 @@ describe('the editor and the engine agree, end to end', () => {
     );
     assert.deepEqual(
       [...clipboard.querySelectorAll('.editor-tool')].map((node) => node.getAttribute('aria-label')),
-      ['Copy', 'Cut', 'Delete'],
+      ['Copy', 'Cut', 'Paste', 'Delete'],
     );
     // Every one of them is usable as soon as a score is on screen -- a
     // control that does nothing until something else happens is a dead
     // button, and the bar has no room for one.
-    for (const label of ['Add measure', 'Remove measure', 'Copy', 'Cut', 'Delete']) {
+    for (const label of ['Add measure', 'Remove measure', 'Copy', 'Cut', 'Paste', 'Delete']) {
       const button = [...doc.querySelectorAll('.editor-tool')]
         .find((node) => node.getAttribute('aria-label') === label);
       assert.equal(button.disabled, false, `${label} is disabled with a score loaded`);
@@ -852,6 +888,60 @@ describe('the editor and the engine agree, end to end', () => {
     assert.equal(written, null, 'delete must not write to the clipboard');
     press('a', { ctrlKey: true });
     assert.equal(status(), 'Nothing to select.');
+  });
+
+  test('paste writes the clipboard back in at the cursor, so a copy round-trips', async () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    let written = null;
+    Object.defineProperty(window.navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text) => { written = text; },
+        readText: async () => written,
+      },
+    });
+
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const press = (key, init = {}) => doc.dispatchEvent(
+      new window.KeyboardEvent('keydown', { key, bubbles: true, ...init }),
+    );
+    const tool = (label) => [...doc.querySelectorAll('.editor-tool')]
+      .find((node) => node.getAttribute('aria-label') === label);
+
+    press('D');
+    press('a', { ctrlKey: true });
+    assert.equal(status(), 'Selected 1 note.');
+    press('c', { ctrlKey: true });
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    assert.equal(status(), 'Copied 1 note.');
+
+    // Paste lands the copied note at the entry cursor, which has rolled on
+    // to the beat after the note that was just written.
+    tool('Paste').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    assert.equal(status(), 'Pasted 1 note.');
+
+    // The note is really in the score, not just announced: select-all now
+    // counts two of them, and the page has drawn the second.
+    press('a', { ctrlKey: true });
+    assert.equal(status(), 'Selected 2 notes.');
+  });
+
+  test('paste refuses a clipboard that does not hold MusicXML', async () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    Object.defineProperty(window.navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async () => {}, readText: async () => 'not music at all' },
+    });
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const press = (key, init = {}) => doc.dispatchEvent(
+      new window.KeyboardEvent('keydown', { key, bubbles: true, ...init }),
+    );
+    press('v', { ctrlKey: true });
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    assert.equal(status(), 'The clipboard does not hold MusicXML.');
   });
 
   test('the fold only happens when the row would run past the window', () => {

@@ -2,6 +2,8 @@ import { WorkletSynthesizer } from 'spessasynth_lib';
 import type { NotationEvent } from '../playback/event-stream.js';
 import { resolvePosition, type PlaybackData } from '../playback/position.js';
 import { assignTrackRouting, type TrackRouting } from '../playback/routing.js';
+import { DEFAULT_VELOCITY } from '../playback/dynamics.js';
+import { unfoldEvents } from '../playback/repeats.js';
 
 export interface SoundFontAsset {
   readonly id: string;
@@ -171,13 +173,28 @@ export class R2SoundFontEngine implements NotationSoundEngine {
     this.volume = Math.max(0, Math.min(1, volume));
     this.synth.setSystemParameter('gain', this.volume);
     this.stopped = false;
+    // A part's channel is decided by the score being played now, so the
+    // map is rebuilt here rather than kept across playbacks: the second
+    // score a writer opened used to inherit the first one's routing.
+    this.partChannels.clear();
     this.routingByPart = assignTrackRouting(playback.tracks);
     const origin = performance.now() / 1000;
     const start = Math.max(0, fromSeconds);
-    for (const event of playback.events) {
+    // A repeated section is played more than once, so the score's written
+    // events are unfolded into performance order first. Without this a
+    // score with a repeat barline simply stops at it.
+    const scheduled = unfoldEvents(playback.performance, playback.events, playback.tempoMap);
+    for (const event of scheduled) {
       const notes = midiNotesFor(event);
       if (notes.length === 0) continue;
-      const durationSeconds = Math.max(0.02, playbackEventDuration(playback, event));
+      // A tied continuation is the same note still held: striking it again
+      // is exactly the wrong thing, so it never gets a note-on of its own.
+      if (event.tiedFromPrevious === true) continue;
+      const durationSeconds = Math.max(
+        0.02,
+        event.durationSeconds ??
+          playbackEventDuration(playback, event, event.tieChainDurationTicks),
+      );
       // A seek starts mid-timeline: notes that already ended are skipped,
       // and one still sounding when the seek lands starts at once with only
       // the part of it that is left.
@@ -186,10 +203,11 @@ export class R2SoundFontEngine implements NotationSoundEngine {
       const channel = this.channelFor(event.partId);
       const startDelay = Math.max(0, event.seconds - start) * 1000;
       const remainingSeconds = Math.max(0.02, endSeconds - Math.max(event.seconds, start));
+      const velocity = event.velocity ?? DEFAULT_VELOCITY;
       const onTimer = window.setTimeout(
         () => {
           if (this.stopped) return;
-          for (const midiNote of notes) this.synth.noteOn(channel, midiNote, 100);
+          for (const midiNote of notes) this.synth.noteOn(channel, midiNote, velocity);
           const offTimer = window.setTimeout(() => {
             for (const midiNote of notes) this.synth.noteOff(channel, midiNote);
             this.timers.delete(offTimer);
@@ -272,7 +290,19 @@ export class R2SoundFontEngine implements NotationSoundEngine {
   }
 }
 
-function playbackEventDuration(playback: PlaybackData, event: NotationEvent): number {
-  const endTick = event.tick + event.durationTicks;
+/**
+ * How long one event sounds, in seconds.
+ *
+ * `durationTicks` is the note as WRITTEN; a tie makes it sound longer than
+ * that, so the caller passes the chain's own length when there is one.
+ * Reading the written value instead cuts every tied note short at its own
+ * barline -- the note stops while the score is still holding it.
+ */
+function playbackEventDuration(
+  playback: PlaybackData,
+  event: NotationEvent,
+  durationTicks = event.durationTicks,
+): number {
+  const endTick = event.tick + durationTicks;
   return Math.max(0.02, resolvePosition(playback, endTick).seconds - event.seconds);
 }

@@ -35,6 +35,7 @@ var NotationEngine = (() => {
     DEFAULT_PROFILES: () => DEFAULT_PROFILES,
     DEFAULT_REPEAT_TIMES: () => DEFAULT_REPEAT_TIMES,
     DEFAULT_STEM_LENGTH: () => DEFAULT_STEM_LENGTH,
+    DEFAULT_VELOCITY: () => DEFAULT_VELOCITY,
     DOT_DOT_DISTANCE: () => DOT_DOT_DISTANCE,
     DOT_NOTE_DISTANCE: () => DOT_NOTE_DISTANCE,
     DOT_REST_DISTANCE: () => DOT_REST_DISTANCE,
@@ -350,16 +351,20 @@ var NotationEngine = (() => {
     tupletBracketNeeded: () => tupletBracketNeeded,
     tupletDigitGlyphName: () => tupletDigitGlyphName,
     tupletSide: () => tupletSide,
+    unfoldEvents: () => unfoldEvents,
     unpitchedPitch: () => unpitchedPitch,
     unzipMxl: () => unzipMxl,
     validateConfig: () => validateConfig,
     validateMappingProfile: () => validateMappingProfile,
+    velocityForDynamic: () => velocityForDynamic,
+    velocityWithinWedge: () => velocityWithinWedge,
     verticalInkSpan: () => verticalInkSpan,
     voice: () => voice,
     voiceForcedDirection: () => voiceForcedDirection,
     voiceRestOffset: () => voiceRestOffset,
     voltaLabel: () => voltaLabel,
     writeMusicXml: () => writeMusicXml,
+    writtenTickToPerformanceSeconds: () => writtenTickToPerformanceSeconds,
     writtenTickToPerformanceTicks: () => writtenTickToPerformanceTicks,
     xToPosition: () => xToPosition,
     xToTick: () => xToTick,
@@ -76543,6 +76548,48 @@ ${denominator}`;
     return findings;
   }
 
+  // src/playback/dynamics.ts
+  var VELOCITY_BY_LEVEL = {
+    pppppp: 8,
+    ppppp: 12,
+    pppp: 20,
+    ppp: 30,
+    pp: 40,
+    p: 52,
+    mp: 64,
+    mf: 80,
+    f: 96,
+    ff: 112,
+    fff: 120,
+    ffff: 126,
+    fffff: 127,
+    ffffff: 127,
+    // The accented markings: the note they sit on is struck hard, and the
+    // ones after it fall back to the level the marking implies. `sf`-family
+    // accents carry no level of their own, so they take the forte attack.
+    sf: 112,
+    sfz: 112,
+    sffz: 120,
+    fz: 112,
+    rf: 112,
+    sfzp: 112,
+    // "loud, then immediately soft" -- the attack is what a single note's
+    // velocity can express, so that is what it gets.
+    sfp: 112,
+    sfpp: 112,
+    fp: 96,
+    pf: 88,
+    n: 8
+  };
+  var DEFAULT_VELOCITY = VELOCITY_BY_LEVEL.mf;
+  function velocityForDynamic(level) {
+    return VELOCITY_BY_LEVEL[level] ?? DEFAULT_VELOCITY;
+  }
+  function velocityWithinWedge(from, to, progress) {
+    const t = Math.max(0, Math.min(1, progress));
+    return Math.round(from + (to - from) * t);
+  }
+
   // src/playback/event-stream.ts
   function midiNoteForEvent(event, transposeSemitones) {
     const notes = event.kind === "chord" ? event.notes : event.kind === "note" ? [event] : [];
@@ -76573,8 +76620,9 @@ ${denominator}`;
     if (event.kind === "chord") return event.notes.map((_, i2) => `${base}#n${i2}`);
     return [];
   }
-  function buildEventStream(score2, globalTickOffsetByMeasure, tempoMap, transposeSemitonesByPartAndMeasure, midiInstrumentsByPart) {
+  function buildEventStream(score2, globalTickOffsetByMeasure, tempoMap, transposeSemitonesByPartAndMeasure, midiInstrumentsByPart, directions) {
     const events = [];
+    const written = [];
     for (const part2 of score2.parts) {
       const instruments = midiInstrumentsByPart?.get(part2.id);
       for (const measure2 of part2.measures) {
@@ -76598,16 +76646,108 @@ ${denominator}`;
                 partId: part2.id,
                 noteIds,
                 ...midiNotes.length > 0 ? { midiNotes } : {},
-                measureNumber: measure2.number
+                measureNumber: measure2.number,
+                velocity: DEFAULT_VELOCITY
               });
+              written.push(event);
             }
             tickInMeasure = startTick + event.duration.ticks;
           });
         }
       }
     }
-    events.sort((a, b) => a.tick - b.tick);
-    return events;
+    const order = events.map((_, index) => index).sort((a, b) => (events[a]?.tick ?? 0) - (events[b]?.tick ?? 0));
+    const sortedEvents = order.flatMap((index) => {
+      const event = events[index];
+      return event === void 0 ? [] : [event];
+    });
+    const sortedWritten = order.flatMap((index) => {
+      const event = written[index];
+      return event === void 0 ? [] : [event];
+    });
+    applyDynamics(sortedEvents, sortedWritten, directions, globalTickOffsetByMeasure);
+    return sortedEvents;
+  }
+  function resolveTies(voiceEvents, written) {
+    const groups = /* @__PURE__ */ new Map();
+    voiceEvents.forEach((event, index) => {
+      const key = voiceKeyOf(event);
+      const list = groups.get(key) ?? [];
+      list.push(index);
+      groups.set(key, list);
+    });
+    for (const indices of groups.values()) resolveTiesInVoice(voiceEvents, written, indices);
+  }
+  function voiceKeyOf(event) {
+    const id = event.noteIds[0] ?? "";
+    const match = /^(.*)#m\d+#v(\d+)#e\d+$/.exec(id);
+    return match ? `${match[1]}#v${match[2]}` : id;
+  }
+  function resolveTiesInVoice(voiceEvents, written, indices) {
+    const open = /* @__PURE__ */ new Map();
+    const keyOf = (event) => event.midiNotes === void 0 ? void 0 : event.midiNotes.join(",");
+    for (const index of indices) {
+      const event = voiceEvents[index];
+      const source = written[index];
+      if (event === void 0 || source === void 0) continue;
+      const key = keyOf(event);
+      if (key === void 0) continue;
+      const head = open.get(key);
+      const headEvent = head === void 0 ? void 0 : voiceEvents[head];
+      if (hasTieStop(source) && headEvent !== void 0) {
+        event.tiedFromPrevious = true;
+        const chain = headEvent;
+        chain.tieChainDurationTicks = (chain.tieChainDurationTicks ?? headEvent.durationTicks) + event.durationTicks;
+        if (!hasTieStart(source)) open.delete(key);
+        continue;
+      }
+      if (hasTieStart(source)) open.set(key, index);
+      else open.delete(key);
+    }
+  }
+  function hasTieStart(event) {
+    return notesOf(event).some((note2) => note2.tieStart === true);
+  }
+  function hasTieStop(event) {
+    return notesOf(event).some((note2) => note2.tieStop === true);
+  }
+  function notesOf(event) {
+    if (event.kind === "note") return [event];
+    if (event.kind === "chord") return event.notes;
+    return [];
+  }
+  function applyDynamics(events, written, directions, globalTickOffsetByMeasure) {
+    resolveTies(events, written);
+    if (directions === void 0 || directions.length === 0) return;
+    const byPart = /* @__PURE__ */ new Map();
+    for (const direction of directions) {
+      const level = direction.dynamics[0];
+      if (level === void 0) continue;
+      const tick = (globalTickOffsetByMeasure.get(direction.measureNumber) ?? 0) + direction.tick;
+      const list = byPart.get(direction.partId) ?? [];
+      list.push({ tick, level });
+      byPart.set(direction.partId, list);
+    }
+    for (const list of byPart.values()) list.sort((a, b) => a.tick - b.tick);
+    const cursorByPart = /* @__PURE__ */ new Map();
+    const levelByPart = /* @__PURE__ */ new Map();
+    for (const event of events) {
+      const marks = byPart.get(event.partId);
+      if (marks === void 0) continue;
+      let cursor = cursorByPart.get(event.partId) ?? 0;
+      let level = levelByPart.get(event.partId);
+      for (; ; ) {
+        const mark = marks[cursor];
+        if (mark === void 0 || mark.tick > event.tick) break;
+        level = mark.level;
+        cursor += 1;
+      }
+      cursorByPart.set(event.partId, cursor);
+      if (level !== void 0) {
+        levelByPart.set(event.partId, level);
+        event.velocity = velocityForDynamic(level);
+      }
+    }
   }
   function getEventStream(playback) {
     return playback.events;
@@ -76964,6 +77104,41 @@ ${denominator}`;
     }
     return out;
   }
+  function writtenTickToPerformanceSeconds(plan, tempoMap, writtenTick) {
+    if (!plan.hasRepeats) return tickToSeconds(tempoMap, writtenTick);
+    for (const entry of plan.entries) {
+      if (writtenTick >= entry.writtenTick && writtenTick < entry.writtenTick + entry.ticks) {
+        const intoMeasure = tickToSeconds(tempoMap, writtenTick) - entry.writtenStartSeconds;
+        return Math.max(0, entry.startSeconds + intoMeasure);
+      }
+    }
+    return tickToSeconds(tempoMap, writtenTick);
+  }
+  function unfoldEvents(plan, events, tempoMap) {
+    if (!plan.hasRepeats || plan.entries.length === 0) return events;
+    const sorted = [...events].sort((a, b) => a.tick - b.tick);
+    const out = [];
+    for (const entry of plan.entries) {
+      const from = entry.writtenTick;
+      const to = entry.writtenTick + entry.ticks;
+      for (const event of sorted) {
+        if (event.tick < from) continue;
+        if (event.tick >= to) break;
+        const lengthTicks = event.tieChainDurationTicks ?? event.durationTicks;
+        const durationSeconds = tempoMap !== void 0 && lengthTicks !== void 0 ? Math.max(
+          0.02,
+          tickToSeconds(tempoMap, event.tick + lengthTicks) - tickToSeconds(tempoMap, event.tick)
+        ) : void 0;
+        out.push({
+          ...event,
+          tick: entry.performanceTick + (event.tick - from),
+          seconds: entry.startSeconds + (event.seconds - entry.writtenStartSeconds),
+          ...durationSeconds !== void 0 ? { durationSeconds } : {}
+        });
+      }
+    }
+    return out;
+  }
 
   // src/playback/compute.ts
   var DEFAULT_MEASURE_TICKS = TICKS_PER_QUARTER * 4;
@@ -77014,7 +77189,8 @@ ${denominator}`;
       globalTickOffsetByMeasure,
       tempoMap,
       input.transposeSemitonesByPartAndMeasure,
-      input.midiInstrumentInfoByPart
+      input.midiInstrumentInfoByPart,
+      input.directions
     );
     const { plan, diagnostics: repeatDiagnostics } = buildRepeatPlan({
       measures: input.repeatMeasures ?? input.measureNumbersInOrder.map((measureNumber) => ({
@@ -81912,7 +82088,8 @@ ${xrefOffset}
       measureHeaderAllowance: MEASURE_HEADER_ALLOWANCE,
       repeatMeasures: repeatMeasureSpecs(),
       transposeSemitonesByPartAndMeasure,
-      midiInstrumentInfoByPart: midiInstrumentInfoByPartMap
+      midiInstrumentInfoByPart: midiInstrumentInfoByPartMap,
+      directions
     });
     for (const d of playback.repeatDiagnostics) {
       diagnostics.push({ severity: d.severity, code: d.code, message: d.message });

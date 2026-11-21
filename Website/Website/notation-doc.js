@@ -529,17 +529,110 @@
         })),
       }));
     const inRange = (entry) => entry.partId === partId && numbers.includes(entry.measureNumber);
+    // Every measure-keyed side table is cut down the same way, not just
+    // the three that happen to matter today: an excerpt carrying a tempo
+    // mark or a dynamic from a bar it does not include would paste that
+    // marking somewhere it was never written.
+    const trimmed = { ...doc };
+    for (const table of MEASURE_KEYED_TABLES) {
+      const entries = doc[table];
+      if (Array.isArray(entries)) trimmed[table] = entries.filter(inRange);
+    }
     return {
-      ...doc,
+      ...trimmed,
       score: { ...doc.score, parts: [{ ...part, measures }] },
-      attributes: doc.attributes.filter(inRange),
-      attributeChanges: doc.attributeChanges.filter(inRange),
-      directions: doc.directions.filter(inRange),
     };
   }
 
-  // ---- MusicXML serialization --------------------------------------------
+  // ---- pasting -----------------------------------------------------------
 
+  /**
+   * Writes a parsed excerpt into this document at `cell`, keeping its
+   * rhythm and its bar structure.
+   *
+   * A copy is a whole little document (see `excerpt`), so pasting is a
+   * parse plus a walk: every part's notes are re-inserted at the target
+   * beat, and a selection that runs past the end of its first bar carries
+   * on into the bars after it. Bars that do not exist yet are appended,
+   * because a paste of a whole phrase into a one-bar score has nowhere
+   * else to go.
+   *
+   * `cell` is the entry cursor: `{ partId, measureNumber, voiceId, tick }`.
+   */
+  function paste(doc, parsed, cell) {
+    const source = parsed.score.parts[0];
+    if (!source) return doc;
+    const voiceId = cell.voiceId ?? 1;
+    // The excerpt's own timeline, in its own ticks: each note's distance
+    // from the excerpt's first bar. Reading it flat is what lets a phrase
+    // cross a barline -- the source's bar structure is not the target's.
+    const placed = [];
+    let excerptOffset = 0;
+    for (const measure of source.measures) {
+      for (const voice of measure.voices) {
+        for (const event of sortEvents(voice.events)) {
+          if (event.kind === 'rest') continue;
+          placed.push({ at: excerptOffset + (event.startTick ?? 0), event });
+        }
+      }
+      excerptOffset += measureTicks(attributeFor(parsed, source.id, measure.number));
+    }
+    placed.sort((a, b) => a.at - b.at);
+
+    let next = doc;
+    for (const { at, event } of placed) {
+      // `at` is measured from the paste point, so every note is placed
+      // independently -- one note crossing a barline must not shift the
+      // ones after it.
+      let number = cell.measureNumber;
+      let tick = (cell.tick ?? 0) + at;
+      for (;;) {
+        const capacity = ticksPerMeasure(next, cell.partId, number);
+        if (tick < capacity) break;
+        tick -= capacity;
+        number += 1;
+        next = ensureMeasure(next, cell.partId, number);
+      }
+      next = insertEvent(next, {
+        partId: cell.partId,
+        measureNumber: number,
+        voiceId,
+        event: { ...fitToBar(event, tick, ticksPerMeasure(next, cell.partId, number)), voice: voiceId, startTick: tick },
+      });
+    }
+    return next;
+  }
+
+  /**
+   * Shortens a pasted note so it ends at the barline.
+   *
+   * A bar holds its meter and nothing more, so a whole note dropped on
+   * the last beat has to become a quarter. Letting it run over makes the
+   * bar longer than its own time signature, which every later measure's
+   * position is measured from.
+   */
+  function fitToBar(event, startTick, capacity) {
+    const room = Math.max(1, capacity - startTick);
+    if (event.duration.ticks <= room) return event;
+    const fitted = E.durationTypeAndDotsFromTicks(room, 3);
+    return {
+      ...event,
+      duration: E.duration(fitted.type, fitted.dots, room),
+    };
+  }
+
+  /** Appends bars until `measureNumber` exists in this part. */
+  function ensureMeasure(doc, partId, measureNumber) {
+    let next = doc;
+    while (!partOf(next, partId).measures.some((measure) => measure.number === measureNumber)) {
+      const grown = appendMeasure(next, partId);
+      if (grown === next) break;
+      next = grown;
+    }
+    return next;
+  }
+
+  // ---- MusicXML serialization --------------------------------------------
   /**
    * The whole edited document as a portable MusicXML 4.0 file.
    *
@@ -606,6 +699,7 @@
     clefNameFromSign,
     eventAt,
     excerpt,
+    paste,
     toMusicXml,
   };
 })();

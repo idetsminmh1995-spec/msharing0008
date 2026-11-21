@@ -1,8 +1,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadEngine } from '../helpers/load-engine.js';
+import { testDomParser } from '../helpers/dom.js';
 
 const NE = loadEngine();
+const domParser = testDomParser();
 
 describe('ties (Phase 26)', () => {
   test('a down-stem note gets its tie above (opposite the stem)', () => {
@@ -102,5 +104,56 @@ describe('ties (Phase 26)', () => {
     assert.ok(long > short, `${String(long)} should exceed ${String(short)}`);
     // Flatter than it is thick reads as a smudge, not a curve.
     assert.ok(short >= 0.21 * 2);
+  });
+});
+
+/**
+ * A tie is drawn as a curve but HEARD as one longer note.
+ *
+ * The renderer draws two noteheads and a curve; a synthesiser has to be
+ * told the opposite -- that the second notehead is the same note still
+ * sounding. Without that the second note is struck again on the barline,
+ * which is the one thing a tie exists to prevent.
+ */
+describe('ties in the event stream (§17.1)', () => {
+  const XML = `<?xml version="1.0"?><score-partwise version="4.0">
+    <part-list><score-part id="P1"><part-name>M</part-name></score-part></part-list>
+    <part id="P1">
+      <measure number="1">
+        <attributes><divisions>4</divisions><key><fifths>0</fifths></key>
+          <time><beats>4</beats><beat-type>4</beat-type></time>
+          <clef><sign>G</sign><line>2</line></clef></attributes>
+        <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration>
+          <tie type="start"/><voice>1</voice><type>whole</type>
+          <notations><tied type="start"/></notations></note>
+      </measure>
+      <measure number="2">
+        <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration>
+          <tie type="stop"/><voice>1</voice><type>whole</type>
+          <notations><tied type="stop"/></notations></note>
+      </measure>
+    </part></score-partwise>`;
+
+  const stream = () => {
+    const { playback } = NE.renderFromMusicXml(XML, { domParser });
+    return NE.getEventStream(playback);
+  };
+
+  test('the second notehead is marked as a continuation, not a new note', () => {
+    const events = stream();
+    assert.equal(events.length, 2);
+    assert.notEqual(events[0].tiedFromPrevious, true, 'the first note starts the chain');
+    assert.equal(events[1].tiedFromPrevious, true, 'the second note continues it');
+  });
+
+  test('the chain carries its whole sounding length, so it is not cut at the barline', () => {
+    const [first, second] = stream();
+    assert.equal(first.durationTicks, 1920, 'the first notehead is one bar as written');
+    assert.equal(
+      first.tieChainDurationTicks,
+      first.durationTicks + second.durationTicks,
+      'the chain lasts as long as both noteheads together',
+    );
+    assert.equal(second.tieChainDurationTicks, undefined, 'only the head of the chain carries it');
   });
 });

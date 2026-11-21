@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-728 exported symbols, by module.
+733 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -1481,6 +1481,14 @@ The diagnostics `level` lets through, in their original order.
 | interface | `CursorPlacement` | §17.2: where the marker goes, and how far the notation must move for it to line up. |
 | **API** | `computeCursorPlacement` | PLAN.md §17.2, Phase 49. |
 
+### `src/playback/dynamics.ts`
+
+| | Name | Summary |
+|---|---|---|
+| const | `DEFAULT_VELOCITY` | What a note sounds at when the score states no dynamic at all. |
+| function | `velocityForDynamic` | The MIDI velocity for one dynamic level. |
+| function | `velocityWithinWedge` | A `<wedge>` (crescendo/diminuendo) as a straight ramp between two velocities, sampled per note. |
+
 ### `src/playback/event-stream.ts`
 
 | | Name | Summary |
@@ -1525,6 +1533,8 @@ The diagnostics `level` lets through, in their original order.
 | **API** | `performanceTickToWritten` | Maps a tick in performance order onto the written tick it plays. |
 | **API** | `performanceSecondsToWritten` | Maps a moment of audio playback (seconds from the start of the performance) onto the written tick sounding then. |
 | **API** | `writtenTickToPerformanceTicks` | Every performance tick at which `writtenTick` is played -- the inverse of `performanceTickToWritten`, which is one-to-many exactly because a repeated bar is played more than once. |
+| function | `writtenTickToPerformanceSeconds` | Where a written tick is heard, in seconds from the start of the performance -- its FIRST pass, which is what "play from here" means. |
+| function | `unfoldEvents` | A score's events in PERFORMANCE order, with a repeated section's notes written out once per pass. |
 
 ### `src/playback/routing.ts`
 

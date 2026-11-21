@@ -300,4 +300,83 @@ describe('repeats: what the reader sees (§9.18)', () => {
       'the volta score reserves the extra headroom its brackets need',
     );
   });
+
+  test('the sound engine is handed the repeated notes once per pass', () => {
+    const { playback } = NE.renderFromMusicXml(
+      repeatScore([{ start: true }, {}, { end: true }, {}]),
+      { domParser },
+    );
+    assert.equal(playback.performance.hasRepeats, true);
+    const written = playback.events.length;
+    const scheduled = NE.unfoldEvents(playback.performance, playback.events);
+    // Three bars repeated, then the fourth: one extra pass over the first
+    // three, so the unfolded stream is longer than the written one.
+    assert.ok(
+      scheduled.length > written,
+      `a repeat must sound its notes twice (${scheduled.length} vs ${written})`,
+    );
+    const ticks = scheduled.map((event) => event.tick);
+    // Compared as text: the stream comes out of the engine's own realm, so
+    // a deep-equal against an array built here fails on the prototype even
+    // when every number matches.
+    assert.equal(
+      [...ticks].sort((a, b) => a - b).join(','),
+      ticks.join(','),
+      'the unfolded stream is in time order',
+    );
+    assert.equal(new Set(ticks).size, ticks.length, 'no two passes land on the same tick');
+  });
+
+  test('a score with no repeats is unfolded to itself', () => {
+    const { playback } = render('simple-single-voice.musicxml');
+    assert.equal(
+      NE.unfoldEvents(playback.performance, playback.events),
+      playback.events,
+      'the untouched stream is returned as-is, not copied',
+    );
+  });
+
+  test('a second pass keeps its own length even when the tempo changes later', () => {
+    // 120 then 60: a whole bar is 2s at the first tempo and 4s at the
+    // second. The repeat's second pass sits past the tempo change in
+    // PERFORMANCE time, so a length read from there would stretch it.
+    const XML = `<?xml version="1.0"?><score-partwise version="4.0">
+      <part-list><score-part id="P1"/></part-list><part id="P1">
+      <measure number="1"><attributes><divisions>4</divisions>
+        <key><fifths>0</fifths></key>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef></attributes>
+      <direction><direction-type><metronome><beat-unit>quarter</beat-unit>
+        <per-minute>120</per-minute></metronome></direction-type><sound tempo="120"/></direction>
+      <barline location="left"><repeat direction="forward"/></barline>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration>
+        <voice>1</voice><type>whole</type></note>
+      <barline location="right"><repeat direction="backward"/></barline></measure>
+      <measure number="2">
+      <direction><direction-type><metronome><beat-unit>quarter</beat-unit>
+        <per-minute>60</per-minute></metronome></direction-type><sound tempo="60"/></direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>16</duration>
+        <voice>1</voice><type>whole</type></note></measure>
+      </part></score-partwise>`;
+    const { playback } = NE.renderFromMusicXml(XML, { domParser });
+    const scheduled = NE.unfoldEvents(playback.performance, playback.events, playback.tempoMap);
+    const secondPass = scheduled.find((event) => event.tick === 1920);
+    assert.ok(secondPass, 'the repeated bar is scheduled twice');
+    assert.equal(secondPass.durationSeconds, 2, 'the repeat is not stretched by the later tempo');
+  });
+
+  test('a written tick maps back to where it is first heard', () => {
+    const { playback } = NE.renderFromMusicXml(
+      repeatScore([{ start: true }, {}, { end: true }, {}]),
+      { domParser },
+    );
+    const { performance: plan, tempoMap } = playback;
+    // Bar 2 is heard twice; "play from here" means the first time.
+    const first = plan.entries.find((entry) => entry.measureNumber === 2);
+    assert.ok(first);
+    assert.equal(
+      NE.writtenTickToPerformanceSeconds(plan, tempoMap, first.writtenTick),
+      first.startSeconds,
+    );
+  });
 });

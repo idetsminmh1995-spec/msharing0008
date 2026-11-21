@@ -7009,6 +7009,7 @@ export function renderParsedMusicXml(
     repeatMeasures: repeatMeasureSpecs(),
     transposeSemitonesByPartAndMeasure,
     midiInstrumentInfoByPart: midiInstrumentInfoByPartMap,
+    directions,
   });
   // One diagnostic channel for the caller (§18.3), whichever module
   // produced the finding -- `playback/repeats.ts` keeps its own

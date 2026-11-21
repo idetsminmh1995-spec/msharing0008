@@ -20146,6 +20146,68 @@ Destination: ${this.destinationName}`;
     return result;
   }
 
+  // src/playback/dynamics.ts
+  var VELOCITY_BY_LEVEL = {
+    pppppp: 8,
+    ppppp: 12,
+    pppp: 20,
+    ppp: 30,
+    pp: 40,
+    p: 52,
+    mp: 64,
+    mf: 80,
+    f: 96,
+    ff: 112,
+    fff: 120,
+    ffff: 126,
+    fffff: 127,
+    ffffff: 127,
+    // The accented markings: the note they sit on is struck hard, and the
+    // ones after it fall back to the level the marking implies. `sf`-family
+    // accents carry no level of their own, so they take the forte attack.
+    sf: 112,
+    sfz: 112,
+    sffz: 120,
+    fz: 112,
+    rf: 112,
+    sfzp: 112,
+    // "loud, then immediately soft" -- the attack is what a single note's
+    // velocity can express, so that is what it gets.
+    sfp: 112,
+    sfpp: 112,
+    fp: 96,
+    pf: 88,
+    n: 8
+  };
+  var DEFAULT_VELOCITY = VELOCITY_BY_LEVEL.mf;
+
+  // src/playback/repeats.ts
+  function unfoldEvents(plan, events, tempoMap) {
+    if (!plan.hasRepeats || plan.entries.length === 0) return events;
+    const sorted = [...events].sort((a2, b) => a2.tick - b.tick);
+    const out = [];
+    for (const entry of plan.entries) {
+      const from = entry.writtenTick;
+      const to = entry.writtenTick + entry.ticks;
+      for (const event of sorted) {
+        if (event.tick < from) continue;
+        if (event.tick >= to) break;
+        const lengthTicks = event.tieChainDurationTicks ?? event.durationTicks;
+        const durationSeconds = tempoMap !== void 0 && lengthTicks !== void 0 ? Math.max(
+          0.02,
+          tickToSeconds(tempoMap, event.tick + lengthTicks) - tickToSeconds(tempoMap, event.tick)
+        ) : void 0;
+        out.push({
+          ...event,
+          tick: entry.performanceTick + (event.tick - from),
+          seconds: entry.startSeconds + (event.seconds - entry.writtenStartSeconds),
+          ...durationSeconds !== void 0 ? { durationSeconds } : {}
+        });
+      }
+    }
+    return out;
+  }
+
   // src/soundfont/browser.ts
   var DEFAULT_ASSET_PATHS = {
     "ms-basic": "ms-basic/official-deprecated-master/MS Basic.sf3",
@@ -20236,22 +20298,29 @@ Destination: ${this.destinationName}`;
       this.volume = Math.max(0, Math.min(1, volume));
       this.synth.setSystemParameter("gain", this.volume);
       this.stopped = false;
+      this.partChannels.clear();
       this.routingByPart = assignTrackRouting(playback.tracks);
       const origin = performance.now() / 1e3;
       const start = Math.max(0, fromSeconds);
-      for (const event of playback.events) {
+      const scheduled = unfoldEvents(playback.performance, playback.events, playback.tempoMap);
+      for (const event of scheduled) {
         const notes = midiNotesFor(event);
         if (notes.length === 0) continue;
-        const durationSeconds = Math.max(0.02, playbackEventDuration(playback, event));
+        if (event.tiedFromPrevious === true) continue;
+        const durationSeconds = Math.max(
+          0.02,
+          event.durationSeconds ?? playbackEventDuration(playback, event, event.tieChainDurationTicks)
+        );
         const endSeconds = event.seconds + durationSeconds;
         if (endSeconds <= start) continue;
         const channel = this.channelFor(event.partId);
         const startDelay = Math.max(0, event.seconds - start) * 1e3;
         const remainingSeconds = Math.max(0.02, endSeconds - Math.max(event.seconds, start));
+        const velocity = event.velocity ?? DEFAULT_VELOCITY;
         const onTimer = window.setTimeout(
           () => {
             if (this.stopped) return;
-            for (const midiNote of notes) this.synth.noteOn(channel, midiNote, 100);
+            for (const midiNote of notes) this.synth.noteOn(channel, midiNote, velocity);
             const offTimer = window.setTimeout(() => {
               for (const midiNote of notes) this.synth.noteOff(channel, midiNote);
               this.timers.delete(offTimer);
@@ -20323,8 +20392,8 @@ Destination: ${this.destinationName}`;
       return routing.channel;
     }
   };
-  function playbackEventDuration(playback, event) {
-    const endTick = event.tick + event.durationTicks;
+  function playbackEventDuration(playback, event, durationTicks = event.durationTicks) {
+    const endTick = event.tick + durationTicks;
     return Math.max(0.02, resolvePosition(playback, endTick).seconds - event.seconds);
   }
   return __toCommonJS(browser_exports);

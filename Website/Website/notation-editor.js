@@ -52,6 +52,7 @@
   const copyButton = pick('[data-editor-copy]');
   const cutButton = pick('[data-editor-cut]');
   const deleteButton = pick('[data-editor-delete]');
+  const pasteButton = pick('[data-editor-paste]');
   const restButton = pick('[data-editor-rest]');
   const zoomInButton = pick('[data-editor-zoom-in]');
   const zoomOutButton = pick('[data-editor-zoom-out]');
@@ -610,7 +611,9 @@
     }
 
     if (state.result && state.playing) {
-      const tick = engine.secondsToTick(state.result.playback.tempoMap, state.playSeconds);
+      // Same mapping the play loop uses: on a repeated score the marker
+      // must jump back with the music instead of running off the end.
+      const tick = writtenTickAt(state.playSeconds);
       const placement = engine.computeCursorPlacement(state.result.playback, tick, { mode: 'cursorMoves' });
       const staff = staffFor(placement.systemIndex);
       overlay.appendChild(svgElement('rect', {
@@ -1464,6 +1467,69 @@
     if (await copySelection()) deleteSelection();
   }
 
+  /**
+   * Writes the clipboard's MusicXML into the score at the entry cursor.
+   *
+   * The clipboard is read as text and parsed with the engine's own reader,
+   * so a copy pasted from another program lands with its rhythm intact --
+   * and a copy taken here round-trips, because `copySelection` writes the
+   * same MusicXML this reads back.
+   */
+  async function pasteSelection() {
+    let text = '';
+    try {
+      text = await navigator.clipboard.readText();
+    } catch {
+      announce('The browser would not give this page the clipboard.');
+      return;
+    }
+    if (!text.trim()) {
+      announce('The clipboard is empty.');
+      return;
+    }
+    let parsed;
+    try {
+      parsed = engine.parseMusicXml(text, window.DOMParser);
+    } catch {
+      announce('The clipboard does not hold MusicXML.');
+      return;
+    }
+    if (!parsed?.score?.parts?.length) {
+      announce('The clipboard does not hold MusicXML.');
+      return;
+    }
+    const entry = state.entry ?? {
+      partId: activePartId(),
+      measureNumber: 1,
+      voiceId: state.voice,
+      tick: 0,
+    };
+    const cell = {
+      partId: activePartId(),
+      measureNumber: entry.measureNumber,
+      voiceId: entry.voiceId ?? state.voice,
+      tick: entry.tick,
+    };
+    const notes = parsed.score.parts[0].measures.reduce(
+      (sum, measure) =>
+        sum +
+        measure.voices.reduce(
+          (inner, voice) => inner + voice.events.filter((event) => event.kind !== 'rest').length,
+          0,
+        ),
+      0,
+    );
+    if (notes === 0) {
+      announce('Nothing to paste.');
+      return;
+    }
+    commit(
+      (doc) => docTools.paste(doc, parsed, cell),
+      `Pasted ${notes} note${notes === 1 ? '' : 's'}.`,
+    );
+    render();
+  }
+
   function advanceEntry(ticks, measureNumber, voiceId) {
     const located = locateTick(state.entry.tick + ticks, measureNumber);
     state.entry = { ...state.entry, measureNumber: located.measureNumber, tick: located.tick, voiceId };
@@ -2242,6 +2308,11 @@
 
   const endSeconds = () => {
     if (!state.result) return 0;
+    // A repeated score lasts as long as its PERFORMANCE, not as long as
+    // its written bars: stopping at the written end would cut the second
+    // pass off mid-phrase.
+    const performance = state.result.playback.performance;
+    if (performance?.hasRepeats) return performance.totalSeconds;
     return engine.resolvePosition(state.result.playback, endTick()).seconds;
   };
 
@@ -2251,7 +2322,9 @@
    * The length is the timeline's own end -- every measure's capacity,
    * rests included -- resolved to seconds through the engine's tempo map,
    * so a metronome mark in the file is reflected rather than a fixed
-   * tempo assumed. It follows every redraw, which is why render() calls it.
+   * tempo assumed. A repeated score lasts as long as it SOUNDS, so the
+   * second pass is counted. It follows every redraw, which is why
+   * render() calls it.
    */
   function updateLength() {
     if (!lengthOutput) return;
@@ -2273,6 +2346,15 @@
     return best ? engine.elementIdForNoteId(best.noteIds[0]) : null;
   };
 
+  /** The written tick sounding at `seconds` of the performance. */
+  const writtenTickAt = (seconds) => {
+    const performance = state.result?.playback.performance;
+    if (performance?.hasRepeats) {
+      return engine.performanceSecondsToWritten(performance, state.result.playback.tempoMap, seconds).writtenTick;
+    }
+    return engine.secondsToTick(state.result.playback.tempoMap, seconds);
+  };
+
   function frame() {
     if (!state.playing || !state.result) return;
     const now = performance.now();
@@ -2288,8 +2370,10 @@
       announce('Playing.');
     }
     state.playSeconds = state.playStartSeconds + (now - state.playStartedAt) / 1000;
-    const tick = engine.secondsToTick(state.result.playback.tempoMap, state.playSeconds);
-    if (tick >= endTick() || state.playSeconds >= endSeconds() + 0.15) {
+    // The cursor follows the score's WRITTEN timeline, so a repeat sends
+    // it back to the bar it jumps to rather than running off the end.
+    const tick = writtenTickAt(state.playSeconds);
+    if (state.playSeconds >= endSeconds() + 0.15) {
       stopPlayback();
       return;
     }
@@ -2330,6 +2414,10 @@
   const startSeconds = () => {
     if (!state.result || !state.entry) return 0;
     const tick = globalTickOf(state.entry.measureNumber, state.entry.tick);
+    const performance = state.result.playback.performance;
+    if (performance?.hasRepeats) {
+      return engine.writtenTickToPerformanceSeconds(performance, state.result.playback.tempoMap, tick);
+    }
     return Math.max(0, engine.resolvePosition(state.result.playback, tick).seconds);
   };
 
@@ -2658,6 +2746,7 @@
   if (copyButton) copyButton.addEventListener('click', () => void copySelection());
   if (cutButton) cutButton.addEventListener('click', () => void cutSelection());
   if (deleteButton) deleteButton.addEventListener('click', () => deleteSelection());
+  if (pasteButton) pasteButton.addEventListener('click', () => void pasteSelection());
 
   scoreHost.addEventListener('pointerdown', onScorePointerDown);
   scoreHost.addEventListener('pointermove', onScorePointerMove);
@@ -2767,6 +2856,7 @@
     if (modifier && event.key.toLowerCase() === 's') { event.preventDefault(); saveScore(); return; }
     if (modifier && event.key.toLowerCase() === 'c') { event.preventDefault(); void copySelection(); return; }
     if (modifier && event.key.toLowerCase() === 'x') { event.preventDefault(); void cutSelection(); return; }
+    if (modifier && event.key.toLowerCase() === 'v') { event.preventDefault(); void pasteSelection(); return; }
     if (modifier && event.key.toLowerCase() === 'z' && !event.shiftKey) { event.preventDefault(); undo(); return; }
     if (modifier && (event.key.toLowerCase() === 'y' || (event.shiftKey && event.key.toLowerCase() === 'z'))) { event.preventDefault(); redo(); return; }
     if (modifier && event.key === '=') { event.preventDefault(); state.zoom += 10; updateZoom(); return; }

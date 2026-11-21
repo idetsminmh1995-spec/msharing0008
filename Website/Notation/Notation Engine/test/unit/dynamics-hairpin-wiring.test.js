@@ -184,3 +184,46 @@ describe('dynamics + hairpin wiring (Integration J, §9.21)', () => {
     assert.ok([...result.diagnostics].some((d) => d.code === 'UNMATCHED_WEDGE'));
   });
 });
+
+/**
+ * A dynamic marking is drawn as a letter but heard as a velocity.
+ *
+ * Without this the page shows `pp` under a bar and every note still
+ * sounds at one fixed loudness -- the mark would be decoration.
+ */
+describe('dynamics reach the sound engine as velocity (§17.1)', () => {
+  const XML = `<?xml version="1.0"?><score-partwise version="4.0">
+    <part-list><score-part id="P1"><part-name>M</part-name></score-part></part-list>
+    <part id="P1">
+      <measure number="1">
+        <attributes><divisions>4</divisions><key><fifths>0</fifths></key>
+          <time><beats>4</beats><beat-type>4</beat-type></time>
+          <clef><sign>G</sign><line>2</line></clef></attributes>
+        <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration>
+          <voice>1</voice><type>whole</type></note>
+      </measure>
+      <measure number="2">
+        <direction placement="below"><direction-type><dynamics><p/></dynamics></direction-type></direction>
+        <note><pitch><step>D</step><octave>4</octave></pitch><duration>16</duration>
+          <voice>1</voice><type>whole</type></note>
+      </measure>
+    </part></score-partwise>`;
+
+  test('a note before any marking keeps the default, one after it takes the level', () => {
+    const { playback } = NE.renderFromMusicXml(XML, { domParser });
+    const [before, after] = NE.getEventStream(playback);
+    assert.equal(before.velocity, NE.DEFAULT_VELOCITY, 'no marking yet means the default');
+    assert.equal(after.velocity, NE.velocityForDynamic('p'));
+    assert.ok(after.velocity < before.velocity, 'p must sound softer than the default');
+  });
+
+  test('the velocity table rises with the marking', () => {
+    const order = ['ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff'];
+    const velocities = order.map((level) => NE.velocityForDynamic(level));
+    assert.equal(
+      velocities.join(','),
+      [...velocities].sort((a, b) => a - b).join(','),
+      'louder markings must map to higher velocities',
+    );
+  });
+});
