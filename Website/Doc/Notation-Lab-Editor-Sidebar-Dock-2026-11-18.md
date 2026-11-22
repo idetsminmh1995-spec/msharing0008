@@ -15,7 +15,7 @@ Sidebar ကို **dock** အဖြစ် ပြောင်းပြီး pan
 | Panel | ပြသည့်အရာ |
 |---|---|
 | Palettes | ယခင် marks palette အတိုင်း (articulations, ornaments, dynamics, fermata) |
-| Properties | ရွေးထားသည့် event ၏ pitch, duration, voice, measure, marks, dynamic |
+| Properties | ရွေးထားသည့် event ၏ pitch, duration, voice, measure, marks, dynamic, lyrics |
 | Instruments | score ၏ part များ၊ ရေးနေသည့် part ကို `aria-current` ဖြင့် မှတ်၊ row ကို နှိပ်လျှင် part ပြောင်း |
 
 ## Implementation detail
@@ -94,3 +94,26 @@ justification" မှတ်တမ်းတွင် ကြည့်ပါ။
 - Sidebar ၏ ဖွင့်/ပိတ် အခြေအနေနှင့် နောက်ဆုံး panel ကို
   `notation-lab-sidebar` key ဖြင့် မှတ်ထားသည်၊ page ပြန်ဖွင့်လျှင်
   ထိုအတိုင်း ပြန်လာသည်။
+
+## Lyrics — ထပ်တိုး 2026-11-18
+
+Properties တွင် **lyrics** ရေးနိုင်ပြီ။ Engine သည် `<lyric>` ကို parse,
+render, write လုပ်နိုင်ပြီးသား ဖြစ်ခဲ့သည် (Phase 55)၊ Editor ဘက်တွင်
+ချိတ်ရုံသာ ကျန်ခဲ့သည်။
+
+- `notation-doc.js` — `setLyric(doc, cell, { verse, text })`။ Syllable သည်
+  **note** ပေါ်တွင် ရှိသည်၊ event ပေါ်တွင် မဟုတ်၊ ထို့ကြောင့် chord တစ်ခုတွင်
+  member အားလုံးက syllable တူတူ ရသည် (renderer က tick တူသော member များကို
+  syllable တစ်ခုအဖြစ် ပေါင်းပြီးသား)။ Text ဗလာဖြစ်လျှင် verse ကို ဖျက်သည်
+  — `<text></text>` သည် syllable မဟုတ်၊ row တစ်ခု မလိုအပ်ဘဲ ယူထားမည့်
+  ကွက်လပ်သာ ဖြစ်သည်။
+- Hyphen ကို `<syllabic>` အဖြစ် အလိုအလျောက် ပြောင်းသည် — အဆုံးတွင် `-`
+  ဆိုလျှင် `begin`၊ အစတွင် `-` ဆိုလျှင် `end`၊ နှစ်ဖက်လုံးဆိုလျှင် `middle`။
+  ထို့ကြောင့် စာရိုက်သူသည် element ကို မသိဘဲ မှန်ကန်စွာ ရေးနိုင်သည်။
+- `notation-editor.js` — Properties တွင် verse တစ်ခုလျှင် row တစ်ခု၊
+  နောက်ဆုံး row သည် အမြဲ ဗလာ (verse အသစ်အတွက်)။ Enter နှိပ်လျှင်
+  commit လုပ်ပြီး focus ကို score သို့ ပြန်ပို့သည်။
+- Test: `editor-integration.test.js` — syllable → `<lyric>` + undo၊ verse
+  နှစ်ခု၊ ဗလာပြန်လုပ်လျှင် verse ပျောက်။ `npm run verify` = **1512/1512**။
+- Browser E2E: staff click → note၊ Properties → `Twin-` ရိုက် → SVG တွင်
+  `Twin` ပေါ်လာ၊ page error မရှိ။

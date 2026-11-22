@@ -4504,6 +4504,58 @@
     return box;
   }
 
+  /**
+   * The lyric verses under this note, one text field each.
+   *
+   * A note's syllables are the note's own, so the panel reads them from the
+   * first member of a chord -- which is the note the renderer centres the
+   * word on. Existing verses are listed in order; the last row is always an
+   * empty field for the next verse, so a second verse needs no "add"
+   * button. Typing `-` at either end of a syllable is how a writer says the
+   * word continues, and `setLyric` turns that into `<syllabic>`.
+   */
+  function propertyLyrics(target) {
+    const box = document.createElement('div');
+    box.className = 'editor-props__lyrics';
+    const member = eventNotes(target.event)[0];
+    const existing = [...(member?.lyrics ?? [])].sort((a, b) => a.number - b.number);
+    const nextVerse = existing.reduce((highest, lyric) => Math.max(highest, lyric.number), 0) + 1;
+    const rows = [...existing.map((lyric) => ({ verse: lyric.number, text: lyric.text })), { verse: nextVerse, text: '' }];
+    for (const row of rows) {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'editor-props__text';
+      input.value = row.text;
+      input.placeholder = row.text === '' && row.verse === 1 ? 'Add lyrics' : `Verse ${row.verse}`;
+      input.setAttribute('aria-label', `Lyrics verse ${row.verse}`);
+      input.dataset.propsField = `lyric-${row.verse}`;
+      // The panel is only rebuilt when its signature changes, so this field
+      // outlives one commit. Compare against the last value this field wrote,
+      // not the value it was built with, or a second edit looks like a no-op.
+      let committed = row.text;
+      const write = () => {
+        const text = input.value;
+        if (text === committed) return;
+        committed = text;
+        commit(
+          (doc) => docTools.setLyric(doc, target.cell, { verse: row.verse, text }),
+          text.trim() === '' ? 'Lyric removed.' : `Wrote "${text.trim()}".`,
+        );
+      };
+      input.addEventListener('change', write);
+      // Enter commits and returns focus to the score so typing a line of
+      // syllables never needs the mouse.
+      input.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        write();
+        scoreHost.focus();
+      });
+      box.append(propertyRow(row.verse === 1 && row.text === '' ? 'Lyrics' : `Verse ${row.verse}`, input));
+    }
+    return box;
+  }
+
   /** The Properties tab: what the selection is and the fields it can change. */
   function buildPropertiesPanel() {
     const panel = document.createElement('div');
@@ -4525,7 +4577,7 @@
     readout.append(readoutLabel, readoutValue);
     panel.append(panelTitle('Properties'), readout);
 
-    panel.append(propertyPitches(target));
+    panel.append(propertyPitches(target), propertyLyrics(target));
 
     const duration = event.duration;
     panel.append(

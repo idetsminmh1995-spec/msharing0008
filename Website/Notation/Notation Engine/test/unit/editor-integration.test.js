@@ -3237,6 +3237,59 @@ describe('the editor and the engine agree, end to end', () => {
       assert.match(measure, /<rest(\s*\/)?>/, 'the gap became a rest');
       assert.equal((measure.match(/<type>half<\/type>/g) ?? []).length, 2, 'two halves fill the bar');
     });
+
+    test('a syllable typed into the panel becomes a lyric in the file', async () => {
+      const page = await openProperties();
+      const lyrics = page.field('lyric-1');
+      assert.ok(lyrics, 'a note with no lyrics still offers the field');
+      assert.equal(lyrics.value, '');
+
+      lyrics.value = 'Twin-';
+      lyrics.dispatchEvent(new page.window.Event('change', { bubbles: true }));
+      assert.match(page.doc.querySelector('[data-editor-status]').textContent, /Wrote "Twin-"/);
+      const measure = page.saved().match(/<measure number="1">([\s\S]*?)<\/measure>/)?.[1] ?? '';
+      assert.match(measure, /<lyric number="1">/, 'the syllable is written as a lyric');
+      assert.match(measure, /<text>Twin<\/text>/, 'the continuation hyphen is not part of the word');
+      // A trailing hyphen is the writer's way of saying "this word carries
+      // on", which is exactly what <syllabic>begin</syllabic> means.
+      assert.match(measure, /<syllabic>begin<\/syllabic>/, 'the hyphen became the syllabic value');
+
+      // The edit is a command like any other, so one undo takes it away.
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }));
+      assert.doesNotMatch(page.saved(), /<lyric/, 'undo removes the syllable');
+    });
+
+    test('a second verse gets its own row, and an empty field removes a verse', async () => {
+      const page = await openProperties();
+      const first = page.field('lyric-1');
+      first.value = 'Twin';
+      first.dispatchEvent(new page.window.Event('change', { bubbles: true }));
+
+      // Re-opening the panel lists the verse that exists and offers the next.
+      page.doc.querySelector('[data-sidebar-tab="instruments"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      page.doc.querySelector('[data-sidebar-tab="properties"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      const panel = page.doc.querySelector('.editor-sidebar__panel');
+      const verse2 = panel.querySelector('[data-props-field="lyric-2"]');
+      assert.ok(verse2, 'the next verse is offered without an Add button');
+      assert.equal(panel.querySelector('[data-props-field="lyric-1"]').value, 'Twin');
+
+      verse2.value = 'kle';
+      verse2.dispatchEvent(new page.window.Event('change', { bubbles: true }));
+      const both = page.saved();
+      assert.match(both, /<lyric number="2">/, 'the second verse is written');
+      assert.match(both, /<text>kle<\/text>/);
+
+      // Clearing a verse removes it rather than writing an empty <text>,
+      // which would still reserve a lyric row under the staff.
+      const clear = page.doc.querySelector('[data-props-field="lyric-2"]');
+      clear.value = '';
+      clear.dispatchEvent(new page.window.Event('change', { bubbles: true }));
+      const after = page.saved();
+      assert.doesNotMatch(after, /<lyric number="2">/, 'the cleared verse is gone');
+      assert.match(after, /<text>Twin<\/text>/, 'the other verse is untouched');
+    });
   });
 
   describe('a guitar part that prints notation and tab', () => {

@@ -817,6 +817,55 @@
     });
   }
 
+  /**
+   * Writes one verse's syllable onto the selected event.
+   *
+   * Lyrics live on a NOTE, not on the event, and a chord has several. Every
+   * member of the chord gets the same syllable, which is what a songbook
+   * means: the word under a chord is one word, and the renderer already
+   * collapses members that share a tick into a single syllable. An empty
+   * text removes the verse instead of writing an empty `<lyric>`, because
+   * `<text></text>` is not a syllable -- it is a blank the renderer would
+   * still reserve a row for.
+   *
+   * `syllabic` is derived from the text the way the file format expects:
+   * a trailing hyphen means this syllable continues (`begin`), a leading
+   * one means it finishes the previous word (`end`), both mean `middle`.
+   * A writer typing plain words therefore gets correct hyphenation without
+   * having to know the element exists.
+   */
+  function setLyric(doc, cell, { verse = 1, text = '', extend = false }) {
+    return updateVoice(doc, cell.partId, cell.measureNumber, cell.voiceId, (events) => {
+      const sorted = sortEvents(events);
+      const current = sorted[cell.eventIndex];
+      if (!current || current.kind === 'rest') return sorted;
+      const raw = String(text);
+      const leading = raw.startsWith('-');
+      const trailing = raw.endsWith('-');
+      const body = raw.replace(/^-/, '').replace(/-$/, '').trim();
+      const syllabic = leading && trailing ? 'middle' : trailing ? 'begin' : leading ? 'end' : 'single';
+      const rewrite = (note) => {
+        const others = (note.lyrics ?? []).filter((lyric) => lyric.number !== verse);
+        if (body.length === 0) {
+          const { lyrics, ...rest } = note;
+          return others.length > 0 ? { ...rest, lyrics: others } : rest;
+        }
+        const syllable = {
+          number: verse,
+          text: body,
+          syllabic,
+          extend: extend === true,
+        };
+        return { ...note, lyrics: [...others, syllable].sort((a, b) => a.number - b.number) };
+      };
+      sorted[cell.eventIndex] =
+        current.kind === 'chord'
+          ? { ...current, notes: current.notes.map(rewrite) }
+          : rewrite(current);
+      return sorted;
+    });
+  }
+
   // ---- parts -------------------------------------------------------------
 
   /** Renames a part; the part list and the mixer both read this. */
@@ -1185,6 +1234,7 @@
     setEventVoice,
     moveEvent,
     setNotesPitch,
+    setLyric,
     renamePart,
     addPart,
     removePart,

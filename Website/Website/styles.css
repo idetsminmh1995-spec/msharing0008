@@ -701,7 +701,8 @@ body.is-newscore-open { overflow:hidden; }
 .editor-props__label { flex:0 0 62px; color:var(--muted); font-size:10.5px; }
 .editor-props__readout { flex:1 1 auto; min-width:0; overflow:hidden; color:var(--text); font-size:10.5px; text-overflow:ellipsis; white-space:nowrap; }
 .editor-props__select,
-.editor-props__number {
+.editor-props__number,
+.editor-props__text {
   flex:1 1 auto;
   min-width:0;
   padding:4px 6px;
@@ -714,7 +715,8 @@ body.is-newscore-open { overflow:hidden; }
 }
 .editor-props__number { flex:0 0 54px; }
 .editor-props__select:focus,
-.editor-props__number:focus { border-color:var(--accent); outline:none; }
+.editor-props__number:focus,
+.editor-props__text:focus { border-color:var(--accent); outline:none; }
 
 /* Instruments: the score's part list, one row per part. */
 .editor-instruments__list { display:flex; flex-direction:column; gap:5px; margin-bottom:10px; }
