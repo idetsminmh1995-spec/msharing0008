@@ -275,15 +275,103 @@ The entry page is complete as the first UI milestone. The editor will now follow
 
 The editor route now carries the shared site header plus a sticky secondary toolbar and a score workspace (see [Notation Lab Editor — Fixed Toolbar and Score Workspace](../Doc/Notation-Lab-Editor-Toolbar-2026-11-18.md)). Open, create, zoom, layout, playback, and export are live.
 
+> **2026-11-22 မှတ်ချက်:** ဤနေရာတွင် ဖော်ပြထားသော sidebar dock ကို လက်ရှိ code တွင် မတွေ့ပါ။ လက်ရှိ အခြေအနေနှင့် ဘယ်ဘက် sidebar အသစ်၏ လိုအပ်ချက်ကို [Writer Engine — Notation Editor](#writer-engine--notation-editor--2026-11-22) တွင် ကြည့်ပါ။
+
 Note entry, the selection model and undo/redo history have since shipped (Part K in `Notation/Notation Plan/PLAN.md`), and the score workspace now has a three-panel sidebar dock — Palettes, Properties, Instruments — beside the score (see [Sidebar Dock, Properties and Instruments](../Doc/Notation-Lab-Editor-Sidebar-Dock-2026-11-18.md)).
 
 ### Next editor milestone
 
 1. **Editable Properties.** The Properties panel reads the selected note today. Making its values write back (pitch, duration, voice) turns it into the inspector a notation program has, and reuses the existing `commit()` command path.
 2. **Page / Horizontal view switch.** `state.layout` exists and both modes render, but the toolbar carries no button for it yet.
+   *2026-11-22: ပြီးပြီ — bottom bar တွင် Page / Horizontal segmented control ထည့်ထားသည် (commit `2518fbe`)။*
 3. **Session persistence.** The dock's open/closed state and the last panel are not remembered across a reload; the score library already is (`localStorage`).
 
 Scan remains intentionally unavailable.
+
+## Writer Engine — Notation Editor — 2026-11-22
+
+Writer Engine သည် Notation Editor ထဲတွင် လုပ်ဆောင်သမျှကို ပိုင်ဆိုင်သည် — notation ကို ရေးပုံရေးနည်းနှင့် editor operation အားလုံး (note ထည့်/ဖျက်/ရွှေ့၊ marks နှင့် dynamics၊ clef/key/time သတ်မှတ်ခြင်း၊ measure ထည့်/ဖယ်၊ copy/paste၊ selection၊ undo/redo၊ MusicXML သိမ်းခြင်း)။ [Engine architecture](#12-engine-architecture) ကို ကြည့်ပါ။
+
+**ဆုံးဖြတ်ချက်:** Writer Engine ကို `Website` အတွင်း **သီးခြား folder တစ်ခုဖြင့်** သီးခြား module အဖြစ် ခွဲထုတ်တည်ဆောက်မည် (Notation / Video / Guitar Engine များကဲ့သို့)။ Folder အမည်အတိအကျ (အဆိုပြု — `Website/Writer/Writer Engine`) ကို အတည်ပြုရန် ကျန်သည်။
+
+### လက်ရှိအခြေအနေ (main branch, 2026-11-22 စစ်ဆေးချက်)
+
+**Writer Engine ဟူသော သီးခြား module မရှိသေးပါ။** ၎င်း၏ လုပ်ဆောင်ချက်များသည် `Website/Website/` အတွင်း ဖိုင်နှစ်ခုတွင် ကွဲနေသည်။
+
+| ဖိုင် | လက်ရှိ တာဝန် |
+|---|---|
+| `notation-doc.js` | Score document ပေါ်ရှိ edit command များ။ `insertEvent`, `deleteEvents` (ဖျက်လျှင် အလားတူ rest ထားခဲ့သည် — MuseScore ၏ Delete ကဲ့သို့)၊ `patchEvent` (marks)၊ `setDynamic`၊ `setSetup` (clef/key/time)၊ `insertMeasureAfter`/`removeMeasure` (measure နံပါတ်ပြောင်းလျှင် ဆက်စပ် table များပါ ရွှေ့သည်)၊ `excerpt` (copy) နှင့် `paste`၊ `toMusicXml` (Notation Engine ၏ `writeMusicXml` ကို ခေါ်သည်)။ |
+| `notation-editor.js` (၃,၆၀၀ ကြောင်းခန့်) | UI state၊ selection၊ entry cursor၊ undo/redo history (နောက်ဆုံး ၁၀၀ ဆင့်၊ drag တစ်ခုလုံး ၁ ဆင့်)၊ palette marks၊ toolbar နှင့် popover များ၊ Inst. box၊ Mixer (placeholder)၊ keyboard shortcut များ။ |
+
+**အခြေခံစည်းမျဉ်း:** Render လုပ်ထားသော SVG သည် source of truth မဟုတ်ပါ။ Edit တိုင်းသည် structured score document အသစ်တစ်ခု ဖန်တီးပြီး Notation Engine က ပြန် render လုပ်သည်။
+
+**မကြာသေးမီ ပြောင်းလဲမှုများ (commits `2518fbe`, `bdf5896`, `56f757c`):**
+- Inst. box တွင် piano ၈၈ ခလုတ် (A0–C8) အကုန်ပြပြီး Shift ဖြင့် chord ရေးနိုင်သည်။ Part အမျိုးအစားအလိုက် drum pads (kit)၊ fretted တူရိယာ၏ string/fret၊ ကျန်တာအတွက် keyboard ပြသည်။
+- Grand staff တွင် staff တစ်ခုစီက voice ကိုယ်ပိုင်ဖြင့် ရေးသည် (treble = voice 1၊ bass = voice 2)။
+- Chord mode တွင် beat ကို latch လုပ်ထားသည်။
+- Bottom bar တွင် Page / Horizontal segmented control ပါပြီ (`state.layout` နှင့် sync)။
+- Inst. နှင့် Mixer panel များ မျက်နှာပြင်ပြင်ပ မထွက်စေရန် `backdrop-filter` ပြဿနာ ပြင်ပြီ။
+
+**Docs နှင့် code မကိုက်သည့်အချက်:** `Doc/Notation-Lab-Editor-Sidebar-Dock-2026-11-18.md` နှင့် အထက်ပါ UI/UX section တို့သည် Palettes / Properties / Instruments sidebar dock ရှိသည်ဟု ဖော်ပြထားသည်။ သို့သော် လက်ရှိ `notation-editor.js` ထဲတွင် sidebar နှင့်ပတ်သက်သော code လုံးဝ မတွေ့ပါ (Docs နှင့် test ဖိုင်တွင်သာ ကျန်သည်)။ Dock ကို ဖယ်ရှားခဲ့ခြင်းလား၊ မပေါင်းစည်းရသေးခြင်းလားဆိုသည်ကို git history ဖြင့် အတည်ပြုရန် ကျန်ရှိသည်။ အောက်ပါ sidebar လိုအပ်ချက်သည် ၎င်းကို အစားထိုးသည်။
+
+### အမည်ပေးခြင်း
+
+- **Inst.** — အသုံးပြုသူ ကိုယ်တိုင်ပေးထားသော အမည်။ Toolbar ပေါ်ရှိ ကိုယ်ပိုင် instrument-entry box (Piano / Percussion / Guitar)။
+- **Instruments tab** — Sidebar ထဲရှိ MuseScore ၏ Instruments panel ကဲ့သို့ ပုံမှန် part စာရင်း panel။ ၎င်းနှစ်ခုသည် မတူသောအရာများဖြစ်ပြီး အမည်ခွဲထားမည်။
+
+### လိုအပ်ချက် ၁ — Inst. box (တူရိယာအလိုက်၊ အလျားလိုက် အပြည့်)
+
+- Toolbar ၏ **Inst.** ကိုနှိပ်လျှင် box တစ်ခု တက်လာရမည်။ ထို box သည် editor window ၏ **အလျားလိုက် အကျယ်အပြည့်** ကို ယူရမည် (MuseScore ပုံစံ)။ လက်ရှိတွင် ၎င်းသည် Inst. ခလုတ်အောက်တွင် အကြောင်းအရာရှိသလောက်သာ အကျယ်ရှိသော floating popover ဖြစ်သည် (`placePopover`)။
+- ရေးနေသော part အလိုက် box အကြောင်းအရာ ပြောင်းရမည် —
+
+| Part | Box |
+|---|---|
+| Piano စသော keyboard တူရိယာ | Keyboard (၈၈ ခလုတ်၊ A0–C8) |
+| **Drum** | **Percussion** — drum pads၊ MuseScore ကဲ့သို့ အလျားလိုက် အပြည့် |
+| **Guitar** | ကြိုးများနှင့် fret များ မြင်ရသော guitar fretboard (flat) — အလျားလိုက် အပြည့် |
+
+- Box ထဲရှိ key / pad / fret ကို နှိပ်လျှင် **အပေါ်ရှိ staff ပေါ်တွင် note ရေးသွားရမည်**။
+- **Guitar:** Staff ပေါ်တွင် note ရေးသည်နှင့် **အောက်ရှိ Tab note ပါ အလုပ်လုပ်ရမည်** (staff နှင့် Tab တစ်ပြိုင်တည်း)။ Notation Engine တွင် Tab ဆွဲသော geometry (`geometry/tab.ts`) နှင့် note တစ်လုံးချင်းတွင် string/fret ပါနိုင်သော data ရှိပြီး MusicXML writer တွင်လည်း ပါသည်။ သို့သော် Editor က staff note နှင့် Tab note ကို တစ်ပြိုင်တည်း ရေးပေးခြင်း ရှိမရှိ **စစ်ဆေးရန် ကျန်သည်**။
+- ပြင်ပကို နှိပ်လျှင် ပိတ်ခြင်း၊ Box ထဲ toolbar tool နှိပ်လျှင် ဆက်ဖွင့်ထားခြင်း (`56f757c` ၏ အပြုအမူ) ကို ထိန်းမည်။
+
+### လိုအပ်ချက် ၂ — ဘယ်ဘက် sidebar (MuseScore ပုံစံ)
+
+**အပြုအမူ**
+1. Sidebar သည် ပုံမှန်အားဖြင့် **ဘေးဘက်တွင် ပျောက်နေ**ပြီး မျှားလေး (arrow handle) တစ်ခုသာ မြင်ရမည်။
+2. မျှားလေးကိုနှိပ်လျှင် sidebar ပေါ်လာမည်။
+3. မျှားလေးကို ထပ်နှိပ်ခြင်း၊ သို့မဟုတ် sidebar box မဟုတ်သော **အခြားနေရာ တစ်ခုခုကို နှိပ်ခြင်း** ဖြင့် sidebar ပြန်ဝင်သွားမည်။
+4. **Inst. box နှင့် sidebar တစ်ပြိုင်တည်း မပွင့်ရ** — တစ်ခု ပွင့်လာလျှင် ကျန်တစ်ခု auto ပိတ်ရမည်။
+5. **ဖုန်းတွင်လည်း** ကွန်ပျူတာနှင့် တူညီစွာ (မျှားလေးဖြင့် ဖျောက်ထား၊ နှိပ်လျှင်ပေါ်) အလုပ်လုပ်မည်။
+
+**အကြောင်းအရာ:** MuseScore နှင့် **တစ်ပုံစံတည်း** ဖြစ်ရမည် (အသုံးပြုသူပေးသော MuseScore screenshot အရ)။
+
+- **Tab များ:** `Palettes`၊ `⋯` (အခြား panel များ)၊ `Properties`၊ `Instruments`
+- **Palettes tab:** အပေါ်ဆုံးတွင် `Add Palettes` ခလုတ်နှင့် search (ဘီလူး) icon။ အောက်တွင် ဖွင့်/ပိတ်ရသော (မျှားလေးပါသော) palette အုပ်စုများ။ Screenshot ပါ အုပ်စု ၁၃ ခု —
+  Clefs · Key signatures · Time signatures · Tempo · Pitch · Accidentals · Dynamics · Articulations · Text · Keyboard · Repeats & jumps · Barlines · Layout
+- **အုပ်စုအားလုံး ပေါ်ရမည်:** အထက်ပါ ၁၃ ခုသာမက MuseScore ၏ palette အုပ်စု **အားလုံး** ပါဝင်စေမည်။ အရင်းအမြစ်များတွင် ဖော်ပြထားသော ထပ်ဆောင်းအုပ်စုများ (MuseScore 3 Advanced workspace နှင့် handbook အရ) — Grace notes · Lines · Arpeggios & glissandi · Breaths & pauses · Brackets · Ornaments · Fingering · Noteheads · Tremolos · Breaks & spacers · Beam properties · Bagpipe embellishments · Fretboard diagrams · Frames & measures၊ ထို့အပြင် `Master palette`။ **MuseScore 4 ၏ `Add Palettes` စာရင်းအတိအကျနှင့် နှိုင်းယှဉ်ပြီး အတည်ပြုရန် ကျန်သည်။**
+- **Properties tab:** ရွေးထားသော note ၏ တန်ဖိုးများကို ဖတ်ရုံသာမက **ပြင်လို့ရရမည်** (pitch, duration, voice စသည်)။ ပြင်ဆင်မှုများသည် ရှိပြီးသား `commit()` command path နှင့် undo/redo ကို ပြန်သုံးမည်။
+- **Instruments tab:** MuseScore ၏ Instruments panel ကဲ့သို့ ပုံမှန်အလုပ်လုပ်ရမည် (score ၏ part စာရင်း၊ part ပြောင်း/ထည့်/ဖယ်)။ Inst. box နှင့် မတူပါ။
+
+**လက်ရှိနှင့် ကွာခြားချက်:** ယခု editor ရှိ marks palette တွင် articulations, ornaments, dynamics, fermata သာရှိသည်။ အုပ်စုအားလုံးကို ဖြည့်ရန် palette အကြောင်းအရာများ ထပ်သတ်မှတ်ရမည်။
+
+### မဖြေရှင်းရသေးသော အချက်များ
+
+1. Writer Engine folder အမည်အတိအကျ (အဆိုပြု `Website/Writer/Writer Engine`)။
+2. MuseScore 4 `Add Palettes` စာရင်းအတိအကျ။
+3. Editable Properties တွင် ပထမအဆင့်၌ ပြင်လို့ရမည့် field များ (pitch / duration / voice ...)။
+4. Guitar staff note ↔ Tab note တစ်ပြိုင်တည်း ရေးခြင်း ယခု အလုပ်လုပ်/မလုပ် စစ်ဆေးခြင်း။
+5. Sidebar dock ကို ဖယ်ရှားခဲ့ခြင်းလား မပေါင်းရသေးခြင်းလား (git history)။
+
+### အကောင်အထည်ဖော်မည့် အဆင့်များ (အဆိုပြုချက် — အတည်ပြုရန်)
+
+1. Inst. box ကို တူရိယာအလိုက် (Piano / Percussion / Guitar) အလျားလိုက် အပြည့်ယူစေခြင်း။
+2. Sidebar shell — ဘယ်ဘက်၊ ပျောက်နေ၊ မျှားလေး၊ ပြင်ပနှိပ်လျှင် ပိတ်ခြင်း၊ Inst. box နှင့် တစ်ခုပွင့်လျှင် ကျန်တစ်ခုပိတ်ခြင်း။
+3. Palettes tab — MuseScore palette အုပ်စု အားလုံး၊ `Add Palettes`၊ search။
+4. Properties (ပြင်လို့ရ) နှင့် Instruments tab။
+5. Guitar staff ↔ Tab တစ်ပြိုင်တည်း။
+6. Writer Engine ကို သီးခြား folder/module အဖြစ် ခွဲထုတ်ခြင်း။
+
+အဆင့်တစ်ခုချင်းစီကို သင် "ready" ဟု ပြောမှသာ စတင်မည်။
 
 ## Sound Engine နှင့် MuseScore SoundFont — 2026-11-13
 
@@ -296,6 +384,22 @@ R2 မှ ဖိုင်များကို note တစ်လုံးချ�
 Sound Engine အတွက် comparison/fallback source အဖြစ် `MS Basic.sf3`, `MuseScore_General.sf3`, `MuseScore_General.sf2`, `GeneralUser GS 1.472.sf2`, `FluidR3_GM.sf2` နှင့် `Salamander Grand Piano V3 SF2` တို့ကို စုစည်းထားမည်။ Asset တစ်ခုချင်းစီကို R2 versioned prefix သီးခြားဖြင့် ထားပြီး manifest JSON မှ asset ID, format, source, license file, bytes နှင့် checksum ကို ပြမည်။ Default/lightweight fallback ကို MuseScore General သို့မဟုတ် GeneralUser GS ထားပြီး 1.2 GB ခန့်ရှိသော Salamander SF2 ကို optional high-quality piano asset အဖြစ်သာ preload လုပ်မည်။
 
 MS Basic ၏ upstream license file သည် MuseScore General filename/text အဟောင်း reference ပါနေသဖြင့် public သို့မဟုတ် commercial redistribution မလုပ်မီ rights holder ထံမှ အတည်ပြုချက် သို့မဟုတ် legal review ရယူရမည်။ SoundFont source collection ၏ file list, R2 upload path, license notes နှင့် checksum record ကို [SoundFont Collection R2 Asset Record](../Notation/Sound%20Doc/SoundFont-Collection-R2.md) တွင် ထားမည်။
+
+### SoundFont ရွေးချယ်ချက် — 2026-11-22
+
+**ရွေးချယ်မှု စံနှုန်း:** (၁) Commercial အသုံးပြုခွင့်ရှိသော license၊ (၂) တူရိယာသံ အစုံအလင် (General MIDI program အားလုံးကို ဖုံးနိုင်ခြင်း)။ License လုံးဝမပါသော ဖိုင်သည် ပိုင်ရှင်က ခွင့်မပြုထားသောဖိုင် (all rights reserved) ဖြစ်သဖြင့် မသုံးရ။ M Sharing သည် ရောင်းချမှု (platform share ၄၅%) ပါဝင်သော commercial platform ဖြစ်သောကြောင့် commercial ခွင့်ပြုချက်ကို အရေးကြီးဆုံးအဖြစ် သတ်မှတ်သည်။
+
+| SoundFont | License | ဆုံးဖြတ်ချက် |
+|---|---|---|
+| **MuseScore General** (`ms-core`, v0.2) | MIT | **အဓိက အသံ။** Commercial သုံးခွင့်ရှိပြီး General MIDI တူရိယာအစုံပါသည်။ |
+| Salamander Grand Piano V3 | CC BY 3.0 | Optional။ Piano အရည်အသွေး ပိုလိုလျှင် နောက်မှထည့်မည် (attribution လိုသည်၊ 1.27 GB ကြီးသည်)။ |
+| GeneralUser GS 1.472 | ဖိုင်ပါ `LICENSE.txt` အတိုင်း | Fallback သို့မဟုတ် ဖယ်ထားမည်။ |
+| FluidR3 GM | MIT | မလိုတော့ — MuseScore General သည် ၎င်းကို ပြင်ဆင်ထားသော ဗားရှင်းဖြစ်သည်။ |
+| MS Basic | မရှင်းလင်းသေး | ဖယ်ထားမည်။ Rights holder ထံမှ အတည်ပြုချက်ရမှ ပြန်စဉ်းစားမည်။ |
+
+**MIT နှင့် လိုက်နာရမည့်အချက်:** မူပိုင်ခွင့်ကြေညာချက်နှင့် MIT ခွင့်ပြုချက်စာသားကို SoundFont ကူးထားသည့် ဖိုင်တိုင်းနှင့်အတူ ထားရမည်။ ထို့ကြောင့် `MuseScore_General_License.md` ကို asset နှင့်အတူ R2 ထဲတွင် ဆက်ထားပြီး website ၏ credits အပိုင်းတွင် ဖော်ပြမည်။
+
+**အရည်အသွေးအပေါ် ရိုးသားချက်:** MuseScore General v0.2 သည် work-in-progress ဖြစ်ပြီး FluidR3 အခြေပြု ပြင်ဆင်ထားခြင်းဖြစ်သည်။ အစုံအလင်ဆုံးနှင့် license အလုံခြုံဆုံး ဖြစ်သော်လည်း တူရိယာတစ်ခုချင်းစီတိုင်းတွင် အကောင်းဆုံးအသံ မဟုတ်နိုင်ပါ။ R2 ထဲရှိ ဖိုင်များကို ဤဆုံးဖြတ်ချက်ကြောင့် မဖျက်ပါ — Plan ကိုသာ ပြောင်းလဲထားသည်။
 
 ### Notation Engine ↔ SoundFont bridge — 2026-11-13
 
