@@ -370,8 +370,8 @@ Writer Engine သည် Notation Editor ထဲတွင် လုပ်ဆော
 
 1. ✅ ပြီးပြီ (`9afa500`) — Inst. box ကို တူရိယာအလိုက် (Piano / Percussion / Guitar) အလျားလိုက် အပြည့်ယူစေခြင်း။
 2. ✅ ပြီးပြီ (`51eec10`) — Sidebar shell — ဘယ်ဘက်၊ ပျောက်နေ၊ မျှားလေး၊ ပြင်ပနှိပ်လျှင် ပိတ်ခြင်း၊ Inst. box နှင့် တစ်ခုပွင့်လျှင် ကျန်တစ်ခုပိတ်ခြင်း။ (အထဲ ဗလာ)
-3. Palettes tab — MuseScore palette အုပ်စု အားလုံး၊ `Add Palettes`၊ search။
-4. Properties (ပြင်လို့ရ) နှင့် Instruments tab။
+3. ✅ အစိတ်အပိုင်း ပြီးပြီ (`879da48`) — Palettes tab တွင် default အုပ်စု ၁၃ ခု (clefs, keys, times, tempo, accidentals, dynamics, articulations, ornaments, text, repeats, barlines, lines, breaks)၊ `Add Palettes` ဖြင့် ထပ်ထည့်နိုင်သော အုပ်စု ၆ ခု (fermata, pedal, grace notes, tremolos, arpeggios, noteheads)၊ အုပ်စုတစ်ခုချင်း ခေါက်/ဖြန့်၊ search၊ item နှိပ်လျှင် toggle လုပ်ပြီး score ပေါ် ရေးသည်။ **ကျန်ရှိသည်:** အသုံးပြုသူ screenshot ပါ default ၁၃ ခုတွင် ပါသော `Pitch`၊ `Keyboard`၊ `Layout` အုပ်စုများ မပါသေးပါ (ယခု default တွင် ornaments, lines, breaks ပါနေသည်)။ ထို့အပြင် Breaths & pauses၊ Brackets၊ Fingering၊ Beam properties၊ Fretboard diagrams၊ Frames & measures စသည့် MuseScore အုပ်စုများ commit မှတ်တမ်းတွင် မပါပါ။ ဘယ် default ၁၃ ခုကို သုံးမည်ကို အတည်ပြုရန်။
+4. ✅ ပြီးပြီ (`863b4c7`, `ece0125`) — Properties tab (ပြင်လို့ရ၊ lyrics ပါ) နှင့် Instruments tab။ `⋯` (more panels) tab သည် မပြီးသေးပါ။
 5. Guitar staff ↔ Tab တစ်ပြိုင်တည်း။
 6. Writer Engine ကို သီးခြား folder/module အဖြစ် ခွဲထုတ်ခြင်း။
 
