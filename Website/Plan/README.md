@@ -456,13 +456,13 @@ Video ထဲတွင် ထည့်ရန် ရွေးချယ်ခွင
 - **ရေတွက်ပုံ ရွေးချယ်မှု** သည် Video ပေါ်ရှိ စာသားကိုသာ ပြောင်းသည်။ `Count Voice` အသံသည် သီးခြား။
 - **Notation ပေါ်ရှိ တီးနေသော note** ကို Notation Engine ၏ ကိုယ်ပိုင် cursor ဖြင့် ပြမည်။
 - **Thank You ဖိုင်အမည်၊ R2 path၊ ဖိုင်မရလျှင် လုပ်ပုံ** — Video Engine ၏ တာဝန်၊ Engine ထဲတွင်သာ ထားမည်။
-- **Logo** — R2 ထဲတွင် အမြဲတမ်း ဖိုင်ရှိပြီး (default) အသုံးပြုသူကလည်း ကိုယ်ပိုင်ဖိုင် ထည့်နိုင်သည်။ **Title 1 / Title 2** ၏ data ကို ယခု ခဏ ထားခဲ့သည်။
+- **Logo** — R2 ထဲတွင် အမြဲတမ်း ဖိုင်ရှိပြီး (default) အသုံးပြုသူကလည်း ကိုယ်ပိုင်ဖိုင် ထည့်နိုင်သည်။ **Title 1 / Title 2** သည် အသုံးပြုသူ ရိုက်ထည့်သည့်အတိုင်း ပြမည်။ **Video အရှည်** = Count Voice + MusicXML အရှည် + Thank You video။
 
 ### မဖြေရှင်းရသေးသော အချက်များ
 
 1. Violin ကို ဘယ်ဘက်/ညာဘက် ထားမည်ကို အတည်ပြုရန်။
 2. Bass၊ Strings၊ Voice စသည့် အခြားတူရိယာများ၏ layout နေရာ။
-3. `Title 1`၊ `Title 2` ၏ data ဘယ်ကလာသည် (ခဏထားခဲ့သည်၊ နောက်မှ ပြန်ဆွေးနွေးမည်)။
+3. (ဖြေပြီး) `Title 1`၊ `Title 2` သည် အသုံးပြုသူ ရိုက်ထည့်သည့်အတိုင်း။
 
 ## Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ် — 2026-11-22
 
@@ -504,7 +504,7 @@ Studio ၏ options box ──► MusicXML ဖိုင် + settings
 | ရွေးချယ်စရာ | လက်ရှိ code | မှတ်ချက် |
 |---|---|---|
 | MusicXML ဖိုင် | Metronome Studio တွင် ရှိ၊ Drum Studio သည် MusicXML ကို ကိုယ်တိုင် parse လုပ်၍ drum hit များထုတ်သည် | |
-| Title 1 / Title 2 (စာသား၊ အရောင်၊ အရွယ်) | ရှိပြီး (Drum Studio) | Data ဘယ်ကလာသည်ကို နောက်မှ ပြန်ဆွေးနွေးမည် |
+| Title 1 / Title 2 (စာသား၊ အရောင်၊ အရွယ်) | ရှိပြီး (Drum Studio) | **အသုံးပြုသူ ရိုက်ထည့်သည့်အတိုင်း ပြမည်** (ဆုံးဖြတ်ပြီး) |
 | Logo | ရှိပြီး — default `assets/logo/m-sharing-drum-logo.svg` + user ကိုယ်ပိုင်ဖိုင်တင်နိုင် | Plan ၏ ဆုံးဖြတ်ချက်မှာ default ကို **R2** ထဲတွင် ထားမည်၊ လက်ရှိတွင် repo ထဲ asset ဖိုင်ဖြစ်သည် |
 | Video Ratio | ရှိပြီး (16:9 / 1:1 / 9:16) | |
 | Notation View | ရှိပြီး (`Page — Landscape` ပါ) | Plan ၏ **Page / Horizontal** နှင့် ကိုက်အောင် ညှိရန် |
@@ -562,7 +562,8 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 
 ### ၇။ ကန့်သတ်ချက်များ (လက်ရှိ)
 
-- Video အရှည် **အများဆုံး ၁၂ စက္ကန့်** (`MAX_SECONDS = 12`)။ သီချင်းအပြည့် ထုတ်ရန် ဤကန့်သတ်ချက်ကို ပြန်စဉ်းစားရမည် (အောက်ပါ မေးခွန်းတွင်)။
+- လက်ရှိ code တွင် Drum Studio ၏ video အရှည်ကို အများဆုံး ၁၂ စက္ကန့် (`MAX_SECONDS = 12`) ဟု ကန့်သတ်ထားသည်။
+- **ဆုံးဖြတ်ချက်:** Video အရှည် = **Count Voice + MusicXML ဖိုင်၏ အရှည် + Thank You video** ၃ ခု၏ ပေါင်းလဒ်။ ကိုယ်ပိုင် အရှည်ကန့်သတ်ချက် မထားဘဲ ထိုပေါင်းလဒ်အတိုင်း ဖြစ်ရမည်။ ထို့ကြောင့် `MAX_SECONDS` ကို ဖယ်ရှားပြီး Video Engine ၏ memory guard ကိုသာ safety အဖြစ် ထားမည်။
 - Video Engine တွင် memory budget နှင့် H.264 level စစ်ဆေးချက် ပါပြီးသား (picture size နှင့် fps အလိုက်)။ Video ကို ရှည်လျှင်/ကြီးလျှင် ပိုမိုလိုအပ်မည်။
 
 ### ၈။ အကောင်အထည်ဖော်ရန် အစီအစဉ် (အဆိုပြုချက် — အတည်ပြုရန်)
@@ -577,14 +578,44 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 
 အဆင့်တစ်ခုချင်းစီကို သင် "ready" ဟု ပြောမှသာ စတင်မည်။
 
+### ၉။ ပြီးစီးမှု အခြေအနေ (Doc စစ်ဆေးချက် — 2026-11-22)
+
+`Website/Video/Video Engine Doc/README.md`၊ `Metronome Engine Doc/DOC.md`၊ `Website/Doc/Create-Video-Page.md` နှင့် code ကို ဖတ်၍ ပြုစုထားသည်။
+
+**ပြီးပြီ**
+
+| အပိုင်း | အခြေအနေ |
+|---|---|
+| Video Engine core | Canvas frame များကို WebCodecs ဖြင့် MP4/WebM အဖြစ် render/mux၊ MediaRecorder fallback၊ optional `AudioBuffer`၊ progress/cancel၊ memory guard၊ cleanup။ Tests — MP4 muxer ၁၅၊ cleanup/safety ၅ (စုစုပေါင်း ၂၀/၂၀ အောင်)၊ Chromium smoke၊ Drum browser integration နှင့် ffprobe စစ်ဆေးချက်။ |
+| Create Video selection page | Tool card များ (Piano, Drums, Guitar, Bass, Strings, Voice, Metronome, More) နှင့် shared `studio.html?tool=...` routing။ |
+| Studio ၏ shared control panel | MusicXML ရွေးခြင်း၊ Logo၊ Title 1 / Title 2 (စာသား/အရောင်/အရွယ်)၊ Drum Brand/Model၊ Notation View (Page Landscape / Portrait / Square)၊ Sound Model + volume၊ Count Voice (Off/On၊ ပုံစံ ၂ မျိုး၊ volume)၊ Video Color (Black/White)၊ Video Ratio (16:9 / 1:1 / 9:16)၊ Generate Video။ Ratio ပြောင်းလျှင် output အရွယ်ပြောင်းသည်။ |
+| Drum adapter | Video ထုတ်နိုင်သည် — **visual-only (အသံမပါ)**။ MusicXML plain XML ကို parse လုပ်သည်။ |
+| Metronome adapter | Design ၁၁ မျိုး၊ landscape/portrait/square၊ BPM/meter/bars၊ `OfflineAudioContext` ဖြင့် click-track အသံပါ ထုတ်နိုင်သည်။ Chromium စစ်ဆေးချက် pass။ |
+
+**မပြီးသေး / မရှိသေး**
+
+| အပိုင်း | အခြေအနေ |
+|---|---|
+| Drum အသံ | Drum sound နှင့် Count Voice အသံ မချိတ်ရသေး။ `.mxl` ဖိုင် parse မလုပ်ရသေး။ |
+| Guitar adapter | Guitar Engine (TypeScript၊ tests၊ bundle၊ `positionsAt()`၊ `stageShapes()`၊ SVG renderer) ရှိသော်လည်း Studio event producer၊ Canvas painter၊ photo asset preload မရှိ။ Bundle path တွင် `website/assets` (အသေး) နှင့် `Website/Website/assets` ကွဲနေ၍ ရှင်းရမည်။ Guitar Engine သည် အသံမထုတ်ပါ။ |
+| Piano adapter | Piano Hand Human Engine (keyboard geometry၊ key press curve၊ fingering၊ IK) ရှိ။ Note event input၊ renderer၊ Studio adapter၊ အသံ မရှိ။ `Piano 3D Hand Engine` folder သည် `.gitkeep` သာ။ Wrist motion မပြီး၊ IK ကို website GLB နှင့် calibrate မလုပ်ရသေး။ ပထမ key-only visual adapter ကို ရည်မှန်း။ |
+| Violin | Engine folder မရှိ။ |
+| Bass / Strings | Playable code မရှိ။ Fretted လား keyboard/synth/orchestral လား instrument အဓိပ္ပာယ် သတ်မှတ်ရန်။ |
+| Voice | Source/capture/import၊ permission/privacy ဆုံးဖြတ်ချက် မရှိသေး။ |
+| အသံပါသော export | `AudioBuffer` မပေးလျှင် silent video ထုတ်သည်။ Sound Engine သည် Video ထဲသို့ မချိတ်ရသေး။ Notation ၏ အသံပါ ထုတ်ရန် Plan ၏ လိုအပ်ချက်ဖြစ်၍ **audible export ကို requirement အဖြစ် အတည်ပြုရန်**။ |
+| ၃ ပိုင်း layout | မရှိသေး — အထက်ပါ ပေါင်းစပ်ဆွဲခြင်း၊ Title/Info၊ layout template၊ Notation Engine ချိတ်ခြင်း၊ ရေတွက်ပုံ ရွေးချယ်မှု၊ Thank You segment။ |
+| Doc များ | `Drum Human Stick Engine Doc`၊ `Guitar Engine Doc`၊ `Piano Hand Human Engine Doc` folder များ `.gitkeep` သာရှိ — Doc မရေးရသေး။ |
+
+**သတိ:** GitHub သို့ push လုပ်ခြင်းသည် Cloudflare site ကို အလိုအလျောက် deploy မလုပ်ပါ (Video Engine Doc: public Worker သည် push နှင့် deploy မလုပ်မချင်း ယခင် version ကို ဆက်ပေးသည်)။
+
 ### မဖြေရှင်းရသေးသော အချက်များ (Video ထုတ်လုပ်ပုံ)
 
-1. Video အရှည်ကန့်သတ်ချက် (၁၂ စက္ကန့်) ကို ဘယ်လောက်အထိ တိုးမလဲ။
+1. (ဖြေပြီး) Video အရှည် = Count Voice + MusicXML + Thank You။ Count Voice ကို Video အစ (count-in) တွင် ထားသည်ဟု ယူဆထားသည် — အတည်ပြုရန်။
 2. Ratio သုံးမျိုးအလိုက် (အထူးသဖြင့် 9:16 Portrait တွင် Violin ဘေးတစ်ဖက် layout) အပိုင်းအချိုးကို ဘယ်လိုထားမလဲ။
 3. Drum ပုံများ၏ ဖိုင်စာရင်း၊ အမည်၊ R2 path။
 4. Drum Animation Engine ၏ တာဝန် (ဘယ်ပုံ ဘယ်အချိန် highlight)။
 5. Metronome အပိုင်း (Title / Info ထဲ) ကို ဘယ်လိုပုံစံပြမလဲ (Metronome design ၁၁ မျိုးထဲက ရွေးလို့ရမလား၊ icon တစ်ခုတည်းလား)။
-6. `BPM` / `Key` ကို MusicXML မပါလျှင် ဘယ်ကယူမလဲ (Studio ၏ input အသစ်လား)။
+6. `Title 1` / `Title 2` — (ဖြေပြီး) အသုံးပြုသူ ရိုက်ထည့်သည့်အတိုင်း။ `4/4` / `BPM` / `Key` ကိုလည်း အသုံးပြုသူ ရိုက်ထည့်ခွင့်ပေးမလား၊ MusicXML မှ ယူမလား — အတည်ပြုရန်။
 
 ## Sound Engine နှင့် MuseScore SoundFont — 2026-11-13
 
