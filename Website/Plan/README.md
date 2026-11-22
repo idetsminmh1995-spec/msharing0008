@@ -518,7 +518,7 @@ Studio ၏ options box ──► MusicXML ဖိုင် + settings
 
 **Title / Info**
 - ဘယ်ဘက်တွင် Logo၊ ဘေးတွင် Title 1၊ Title 1 အောက်တွင် Title 2။ ထိုတန်းထဲတွင် `4/4`၊ `BPM`၊ `Key`၊ `Metronome`။
-- `4/4` နှင့် `BPM` ကို MusicXML ထဲမှ (မပါလျှင် Studio ၏ setting မှ)၊ `Key` ကို MusicXML မှ ယူမည်။ `Metronome` သည် beat တိုင်း ကိုယ်ပိုင်ရှိပြီးသား Metronome design များကို ပြန်သုံး၍ပြမည်။
+- `4/4`၊ `BPM`၊ `Key` ကို **MusicXML မှ ယူမည်** (အတည်ပြုပြီး)။ `Title 1` / `Title 2` ကိုသာ အသုံးပြုသူ ရိုက်ထည့်သည့်အတိုင်း ပြမည်။ `Metronome` သည် beat တိုင်း ကိုယ်ပိုင်ရှိပြီးသား Metronome design များကို ပြန်သုံး၍ပြမည်။
 - ဆွဲသူ — Video Engine။ လက်ရှိ Drum video တွင် Logo သည် ညာဘက်ထိပ်တွင်ရှိပြီး (Plan: ဘယ်ဘက်)၊ 4/4 / BPM / Key / Metronome မပါသေး။
 
 **Notation**
@@ -610,12 +610,12 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 
 ### မဖြေရှင်းရသေးသော အချက်များ (Video ထုတ်လုပ်ပုံ)
 
-1. (ဖြေပြီး) Video အရှည် = Count Voice + MusicXML + Thank You။ Count Voice ကို Video အစ (count-in) တွင် ထားသည်ဟု ယူဆထားသည် — အတည်ပြုရန်။
+1. (ဖြေပြီး) Video အရှည် = Count Voice + MusicXML + Thank You။ Count Voice ကို Video အစ (count-in) တွင် ထားမည် (အတည်ပြုပြီး)။
 2. Ratio သုံးမျိုးအလိုက် (အထူးသဖြင့် 9:16 Portrait တွင် Violin ဘေးတစ်ဖက် layout) အပိုင်းအချိုးကို ဘယ်လိုထားမလဲ။
 3. Drum ပုံများ၏ ဖိုင်စာရင်း၊ အမည်၊ R2 path။
 4. Drum Animation Engine ၏ တာဝန် (ဘယ်ပုံ ဘယ်အချိန် highlight)။
 5. Metronome အပိုင်း (Title / Info ထဲ) ကို ဘယ်လိုပုံစံပြမလဲ (Metronome design ၁၁ မျိုးထဲက ရွေးလို့ရမလား၊ icon တစ်ခုတည်းလား)။
-6. `Title 1` / `Title 2` — (ဖြေပြီး) အသုံးပြုသူ ရိုက်ထည့်သည့်အတိုင်း။ `4/4` / `BPM` / `Key` ကိုလည်း အသုံးပြုသူ ရိုက်ထည့်ခွင့်ပေးမလား၊ MusicXML မှ ယူမလား — အတည်ပြုရန်။
+6. (ဖြေပြီး) `Title 1` / `Title 2` သည် အသုံးပြုသူ ရိုက်ထည့်သည့်အတိုင်း၊ `4/4` / `BPM` / `Key` သည် MusicXML မှ ယူမည်။
 
 ## Sound Engine နှင့် MuseScore SoundFont — 2026-11-13
 
