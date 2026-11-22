@@ -581,6 +581,82 @@
   }
 
   /**
+   * Sets or clears one ottava bracket, written as the start/stop pair
+   * MusicXML wants.
+   *
+   * The pair is keyed on staff and `number`, and a bracket already starting
+   * at this beat is removed first, so a palette item behaves as a toggle.
+   * The stop goes at `stopTick` of `stopMeasureNumber` -- the caller gives
+   * the end of the bar, because an ottava that ran past it would be a
+   * bracket the writer never drew.
+   */
+  function setOctaveShift(
+    doc,
+    {
+      partId,
+      measureNumber,
+      tick = 0,
+      staff = 1,
+      number = 1,
+      shift = null,
+      stopMeasureNumber = measureNumber,
+      stopTick = 0,
+    },
+  ) {
+    const shifts = doc.octaveShifts ?? [];
+    const isStart = (event) => event.type !== 'stop';
+    const startIndex = shifts.findIndex(
+      (event) =>
+        event.partId === partId &&
+        event.staff === staff &&
+        event.number === number &&
+        isStart(event) &&
+        event.measureNumber === measureNumber &&
+        event.tick === tick,
+    );
+    const removed = new Set();
+    if (startIndex >= 0) {
+      removed.add(startIndex);
+      // Its stop is the first stop for this staff and number after it.
+      const stopIndex = shifts.findIndex(
+        (event, index) =>
+          index > startIndex &&
+          event.partId === partId &&
+          event.staff === staff &&
+          event.number === number &&
+          event.type === 'stop',
+      );
+      if (stopIndex >= 0) removed.add(stopIndex);
+    }
+    const kept = shifts.filter((_, index) => !removed.has(index));
+    if (shift === null) return { ...doc, octaveShifts: kept };
+    const start = {
+      partId,
+      measureNumber,
+      tick,
+      staff,
+      type: shift.type,
+      size: shift.size,
+      number,
+    };
+    const stop = {
+      partId,
+      measureNumber: stopMeasureNumber,
+      tick: stopTick,
+      staff,
+      type: 'stop',
+      size: shift.size,
+      number,
+    };
+    return {
+      ...doc,
+      octaveShifts: [...kept, start, stop].sort(
+        (a, b) => a.measureNumber - b.measureNumber || a.tick - b.tick,
+      ),
+    };
+  }
+
+  /**
    * The side-tables keyed by measure number, each entry shifted so it keeps
    * pointing at the same music after a bar is inserted or removed.
    *
@@ -1246,6 +1322,7 @@
     setTempo,
     setDirection,
     setPrint,
+    setOctaveShift,
     appendMeasure,
     insertMeasureAfter,
     removeLastMeasure,

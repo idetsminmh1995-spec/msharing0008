@@ -3068,11 +3068,11 @@ describe('the editor and the engine agree, end to end', () => {
       assert.ok(doc.querySelector('[data-palette-search]'), 'the search field is there');
       assert.ok(doc.querySelector('[data-palette-add]'), 'and the Add Palettes button');
 
-      // MuseScore's own thirteen groups, and every one of them folds.
+      // MuseScore's own thirteen groups in its own order, and every one folds.
       const groups = [...doc.querySelectorAll('[data-palette-group]')].map((group) => group.dataset.paletteGroup);
       assert.deepEqual(groups, [
-        'clefs', 'keys', 'times', 'tempo', 'accidentals', 'dynamics',
-        'articulations', 'ornaments', 'text', 'repeats', 'barlines', 'lines', 'breaks',
+        'clefs', 'keys', 'times', 'tempo', 'pitch', 'accidentals', 'dynamics',
+        'articulations', 'text', 'pedal', 'repeats', 'barlines', 'breaks',
       ]);
       for (const header of doc.querySelectorAll('[data-palette-toggle]')) {
         assert.equal(header.getAttribute('aria-expanded'), 'true');
@@ -3137,6 +3137,30 @@ describe('the editor and the engine agree, end to end', () => {
         ['clefs', 'noteheads'],
         'and the choice survives the next visit',
       );
+    });
+
+    test('an ottava is written as a start/stop pair and toggles away', async () => {
+      const { window, doc } = openPalettesWithNotes();
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+      doc.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }));
+
+      const button = clickItem(window, doc, 'ottava-8va');
+      assert.match(doc.querySelector('[data-editor-status]').textContent, /8va added\./);
+      assert.equal(button.getAttribute('aria-pressed'), 'true');
+
+      // The bracket only draws when the stop exists too, so the saved score
+      // has to hold both halves of the pair.
+      doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      const saved = JSON.parse(window.localStorage.getItem('msharing-notation-scores') || '[]')[0]?.xml ?? '';
+      assert.match(saved, /<octave-shift type="down" size="8" number="1"\/>/, 'the start is written');
+      assert.match(saved, /<octave-shift type="stop" size="8" number="1"\/>/, 'and its stop');
+
+      // Clicking the same item takes the whole bracket away again.
+      button.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      assert.match(doc.querySelector('[data-editor-status]').textContent, /8va removed\./);
+      doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      const cleared = JSON.parse(window.localStorage.getItem('msharing-notation-scores') || '[]')[0]?.xml ?? '';
+      assert.doesNotMatch(cleared, /<octave-shift/, 'both halves are gone');
     });
 
     test('the search narrows the dock to the marks it names', () => {

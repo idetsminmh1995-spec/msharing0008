@@ -184,3 +184,41 @@ note နှစ်ခု ဖြစ်သွားသည်။
 - Browser E2E (real Chromium): fretboard → E4၊ Properties → G4၊ duration →
   half၊ palette → G#4၊ ArrowUp → A#4 — အဆင့်တိုင်း staff နှစ်ခုလုံး
   ကိုက်ညီ၊ page error မရှိ။
+
+## Palette စာရင်း MuseScore 4 နှင့် ကိုက်ညီအောင် ပြင်ခြင်း — 2026-11-18
+
+Plan ၏ အဆင့် ၃ တွင် ကျန်ရှိသည့် palette အလုပ်ကို လုပ်ပြီးပါပြီ။
+
+**ပြောင်းခဲ့သည်များ**
+
+- **Pitch** အုပ်စု အသစ် — 8va၊ 8vb၊ 15ma၊ 15mb။ MusicXML တွင်
+  `type` သည် notation ရွေ့ရာဘက်ကို ဆိုလိုသဖြင့် 8va = `down` (size 8)၊
+  8vb = `up` (8)၊ 15ma = `down` (15)၊ 15mb = `up` (15)။
+- **Pedal → Keyboard** အမည်ပြောင်း (MuseScore ၏ အုပ်စုအမည်အတိုင်း)။
+- **Breaks & spacers → Layout** အမည်ပြောင်း။
+- **Default ၁၃ ခု** ကို MuseScore အစီအစဉ်အတိုင်း ပြန်စီသည် —
+  Clefs၊ Key signatures၊ Time signatures၊ Tempo၊ **Pitch**၊ Accidentals၊
+  Dynamics၊ Articulations၊ Text၊ **Keyboard**၊ Repeats & jumps၊ Barlines၊
+  **Layout**။ `Ornaments` နှင့် `Lines` သည် catalogue ထဲ ရှိနေဆဲ၊
+  Add Palettes ဖြင့် ပြန်ထည့်နိုင်သည်။
+
+**ကုဒ်**
+
+- `notation-doc.js` — `setOctaveShift()` အသစ်။ Start/stop အတွဲကို
+  တစ်ခါတည်း ရေးသည်၊ `staff`+`number` ဖြင့် ချိတ်သည်။ ထို beat တွင်
+  bracket တစ်ခု ရှိပြီးသားဖြစ်လျှင် ၎င်း၏ stop ပါ ဖျက်ပြီး
+  toggle အဖြစ် ပြုမူသည်။ Stop ကို bar ၏ အဆုံးတွင် ထားသည်။
+- `notation-editor.js` — `applyOttava()` နှင့် `pitch` palette အုပ်စု။
+  `pedal` အုပ်စုကို `text` နောက်သို့ ရွှေ့သည် (catalogue အစီအစဉ်သည်
+  ပြသသည့် အစီအစဉ်ဖြစ်သည်)။
+
+**စမ်းသပ်စစ်ဆေးမှု**
+
+- Test အသစ်: 8va နှိပ်လျှင် `<octave-shift type="down" size="8" number="1"/>`
+  နှင့် ၎င်း၏ `stop` နှစ်ခုလုံး ရေးသည်၊ ပြန်နှိပ်လျှင် နှစ်ခုလုံး ပျောက်သည်။
+- Group-order test ကို အစီအစဉ်အသစ်အတိုင်း ပြင်သည်။
+- Full suite **1525/1525**၊ typecheck 0၊ lint 0။
+- Real Chromium E2E: dock သည် အုပ်စု ၁၃ ခုကို အစီအစဉ်မှန်စွာ ပြ၊
+  အမည်များ မှန် (Pitch၊ Keyboard၊ Layout)၊ 8va နှိပ်လျှင် staff ပေါ်တွင်
+  bracket ဆွဲသည် (SVG text "8" ပေါ်လာ၊ line ၃ ခု တိုး)၊ ပြန်နှိပ်လျှင်
+  ပျောက်၊ page error မရှိ။

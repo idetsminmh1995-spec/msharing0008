@@ -3829,6 +3829,44 @@
     );
   }
 
+  /**
+   * Sets or clears one ottava bracket on the selected bar.
+   *
+   * A bracket spans the rest of the bar from the chosen beat, so the stop is
+   * written at the bar's end -- the pair has to exist together, or the engine
+   * draws nothing and says the shift has no stop.
+   */
+  function applyOttava(shift, label) {
+    const partId = activePartId();
+    const measureNumber = paletteMeasure();
+    const tick = paletteTick();
+    const on = (state.doc?.octaveShifts ?? []).some(
+      (event) =>
+        event.partId === partId &&
+        event.staff === 1 &&
+        event.number === 1 &&
+        event.type !== 'stop' &&
+        event.type === shift.type &&
+        event.size === shift.size &&
+        event.measureNumber === measureNumber &&
+        event.tick === tick,
+    );
+    const end = Math.max(tick + 1, Math.round(docTools.ticksPerMeasure(state.doc, partId, measureNumber)));
+    commit(
+      (doc) => docTools.setOctaveShift(doc, {
+        partId,
+        measureNumber,
+        tick,
+        staff: 1,
+        number: 1,
+        shift: on ? null : shift,
+        stopMeasureNumber: measureNumber,
+        stopTick: end,
+      }),
+      on ? `${label} removed.` : `${label} added.`,
+    );
+  }
+
   /** Sets or clears one bar's ending barline. */
   function applyBarline(patch, message) {
     commit(
@@ -3958,6 +3996,29 @@
       ),
     },
     {
+      id: 'pitch',
+      label: 'Pitch',
+      open: true,
+      items: [
+        { id: 'ottava-8va', label: '8va', text: '8va', value: { type: 'down', size: 8 } },
+        { id: 'ottava-8vb', label: '8vb', text: '8vb', value: { type: 'up', size: 8 } },
+        { id: 'ottava-15ma', label: '15ma', text: '15ma', value: { type: 'down', size: 15 } },
+        { id: 'ottava-15mb', label: '15mb', text: '15mb', value: { type: 'up', size: 15 } },
+      ],
+      apply: (shift, item) => applyOttava(shift, item.label),
+      pressed: (shift) => (state.doc?.octaveShifts ?? []).some(
+        (event) =>
+          event.partId === activePartId() &&
+          event.staff === 1 &&
+          event.number === 1 &&
+          event.type !== 'stop' &&
+          event.type === shift.type &&
+          event.size === shift.size &&
+          event.measureNumber === paletteMeasure() &&
+          event.tick === paletteTick(),
+      ),
+    },
+    {
       id: 'accidentals',
       label: 'Accidentals',
       open: true,
@@ -4055,6 +4116,20 @@
       pressed: () => false,
     },
     {
+      id: 'pedal',
+      label: 'Keyboard',
+      open: true,
+      items: [
+        { id: 'pedal-start', label: 'Pedal start', glyph: 'keyboardPedalPed', value: 'start' },
+        { id: 'pedal-stop', label: 'Pedal stop', glyph: 'keyboardPedalUp', value: 'stop' },
+      ],
+      apply: (type) => applyDirectionMark(
+        (direction) => ({ ...direction, pedals: [{ type, number: 1 }] }),
+        type === 'start' ? 'Pedal start added.' : 'Pedal stop added.',
+      ),
+      pressed: () => false,
+    },
+    {
       id: 'repeats',
       label: 'Repeats & jumps',
       open: true,
@@ -4092,20 +4167,6 @@
         { id: 'decrescendo', label: 'Decrescendo', text: '>', value: ['decrescendo', 'Decrescendo'] },
       ],
       apply: ([type, label]) => applyHairpin(type, label),
-      pressed: () => false,
-    },
-    {
-      id: 'pedal',
-      label: 'Pedal',
-      open: true,
-      items: [
-        { id: 'pedal-start', label: 'Pedal start', glyph: 'keyboardPedalPed', value: 'start' },
-        { id: 'pedal-stop', label: 'Pedal stop', glyph: 'keyboardPedalUp', value: 'stop' },
-      ],
-      apply: (type) => applyDirectionMark(
-        (direction) => ({ ...direction, pedals: [{ type, number: 1 }] }),
-        type === 'start' ? 'Pedal start added.' : 'Pedal stop added.',
-      ),
       pressed: () => false,
     },
     {
@@ -4184,7 +4245,7 @@
     },
     {
       id: 'breaks',
-      label: 'Breaks & spacers',
+      label: 'Layout',
       open: true,
       items: [
         { id: 'system-break', label: 'System break', text: '\u21B5', value: 'newSystem' },
@@ -4206,8 +4267,8 @@
    * what keeps the dock from opening as a wall of headers.
    */
   const DEFAULT_PALETTE_GROUPS = [
-    'clefs', 'keys', 'times', 'tempo', 'accidentals', 'dynamics',
-    'articulations', 'ornaments', 'text', 'repeats', 'barlines', 'lines', 'breaks',
+    'clefs', 'keys', 'times', 'tempo', 'pitch', 'accidentals', 'dynamics',
+    'articulations', 'text', 'pedal', 'repeats', 'barlines', 'breaks',
   ];
 
   const PALETTE_STORE_KEY = 'notation-lab-palette-groups';
