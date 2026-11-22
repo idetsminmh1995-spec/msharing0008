@@ -275,7 +275,7 @@ The entry page is complete as the first UI milestone. The editor will now follow
 
 The editor route now carries the shared site header plus a sticky secondary toolbar and a score workspace (see [Notation Lab Editor — Fixed Toolbar and Score Workspace](../Doc/Notation-Lab-Editor-Toolbar-2026-11-18.md)). Open, create, zoom, layout, playback, and export are live.
 
-> **2026-11-22 မှတ်ချက်:** ဤနေရာတွင် ဖော်ပြထားသော sidebar dock ကို လက်ရှိ code တွင် မတွေ့ပါ။ လက်ရှိ အခြေအနေနှင့် ဘယ်ဘက် sidebar အသစ်၏ လိုအပ်ချက်ကို [Writer Engine — Notation Editor](#writer-engine--notation-editor--2026-11-22) တွင် ကြည့်ပါ။
+> **2026-11-22 မှတ်ချက်:** ဤနေရာတွင် ဖော်ပြထားသော အဟောင်း dock ကို 2026-11-20 တွင် ဖယ်ရှားခဲ့ပြီး 2026-11-22 တွင် shell အသစ် (ဘယ်ဘက်၊ မျှားလေး handle၊ အထဲဗလာ) ပြန်ထည့်ထားသည်။ အသေးစိတ်ကို [Writer Engine — Notation Editor](#writer-engine--notation-editor--2026-11-22) တွင် ကြည့်ပါ။
 
 Note entry, the selection model and undo/redo history have since shipped (Part K in `Notation/Notation Plan/PLAN.md`), and the score workspace now has a three-panel sidebar dock — Palettes, Properties, Instruments — beside the score (see [Sidebar Dock, Properties and Instruments](../Doc/Notation-Lab-Editor-Sidebar-Dock-2026-11-18.md)).
 
@@ -312,7 +312,11 @@ Writer Engine သည် Notation Editor ထဲတွင် လုပ်ဆော
 - Bottom bar တွင် Page / Horizontal segmented control ပါပြီ (`state.layout` နှင့် sync)။
 - Inst. နှင့် Mixer panel များ မျက်နှာပြင်ပြင်ပ မထွက်စေရန် `backdrop-filter` ပြဿနာ ပြင်ပြီ။
 
-**Docs နှင့် code မကိုက်သည့်အချက်:** `Doc/Notation-Lab-Editor-Sidebar-Dock-2026-11-18.md` နှင့် အထက်ပါ UI/UX section တို့သည် Palettes / Properties / Instruments sidebar dock ရှိသည်ဟု ဖော်ပြထားသည်။ သို့သော် လက်ရှိ `notation-editor.js` ထဲတွင် sidebar နှင့်ပတ်သက်သော code လုံးဝ မတွေ့ပါ (Docs နှင့် test ဖိုင်တွင်သာ ကျန်သည်)။ Dock ကို ဖယ်ရှားခဲ့ခြင်းလား၊ မပေါင်းစည်းရသေးခြင်းလားဆိုသည်ကို git history ဖြင့် အတည်ပြုရန် ကျန်ရှိသည်။ အောက်ပါ sidebar လိုအပ်ချက်သည် ၎င်းကို အစားထိုးသည်။
+**Sidebar နှင့် Inst. box — လက်ရှိအခြေအနေ (git history စစ်ဆေးချက်):**
+- **Inst. box အလျားလိုက်အပြည့်** — commit `9afa500` (2026-11-22) ဖြင့် ပြီးပြီ။ `placeWidePopover` က score workspace ၏ အကျယ်အတိုင်း box ကို ချပြီး တူရိယာအလိုက် keys / pads / fretboard ပြသည်။
+- **Sidebar shell** — ဘယ်ဘက်၊ မျှားလေး handle ဖြင့် ဖျောက်ထား၊ handle ကို ထပ်နှိပ် သို့မဟုတ် အခြားနေရာနှိပ်လျှင် ပိတ်၊ Inst. box နှင့် တစ်ခုပွင့်လျှင် ကျန်တစ်ခု auto ပိတ် — commit `51eec10` (2026-11-22) ဖြင့် ပြီးပြီ။ **အထဲ (tabs, palettes) မရှိသေးဘဲ ဗလာဖြစ်သည်။** Palettes tab ကို score နှင့် ချိတ်သော commit `7e9ddb8` ကို `45e871e` ဖြင့် revert လုပ်ထားသည်။
+- Dock သမိုင်း: 2026-11-19 ထည့် (`18f6ac9`) → 2026-11-20 ဖယ်ရှား (`ca30ceb`) → 2026-11-22 shell အသစ်အဖြစ် ပြန်ထည့် (`51eec10`)။ `Doc/Notation-Lab-Editor-Sidebar-Dock-2026-11-18.md` သည် အဟောင်း dock ကို ဖော်ပြထားသဖြင့် ခေတ်နောက်ကျနေသည်။
+- Guitar: wizard သည် note lines ကို notation / tab / နှစ်ခုလုံး ရွေးခိုင်းပြီး tab staff ပေါ်တွင် ရေးနိုင်အောင် ပြုလုပ်ထားသည် (`a86116a`, 2026-11-21)။ Staff ပေါ်ရေးလျှင် Tab ပါ တစ်ပြိုင်တည်း ပေါ်ခြင်း ရှိမရှိ စစ်ဆေးရန် ကျန်သည်။
 
 ### အမည်ပေးခြင်း
 
@@ -321,7 +325,7 @@ Writer Engine သည် Notation Editor ထဲတွင် လုပ်ဆော
 
 ### လိုအပ်ချက် ၁ — Inst. box (တူရိယာအလိုက်၊ အလျားလိုက် အပြည့်)
 
-- Toolbar ၏ **Inst.** ကိုနှိပ်လျှင် box တစ်ခု တက်လာရမည်။ ထို box သည် editor window ၏ **အလျားလိုက် အကျယ်အပြည့်** ကို ယူရမည် (MuseScore ပုံစံ)။ လက်ရှိတွင် ၎င်းသည် Inst. ခလုတ်အောက်တွင် အကြောင်းအရာရှိသလောက်သာ အကျယ်ရှိသော floating popover ဖြစ်သည် (`placePopover`)။
+- Toolbar ၏ **Inst.** ကိုနှိပ်လျှင် box တစ်ခု တက်လာရမည်။ ထို box သည် editor window ၏ **အလျားလိုက် အကျယ်အပြည့်** ကို ယူရမည် (MuseScore ပုံစံ)။ **အခြေအနေ: ပြီးပြီ** (`9afa500`) — `placeWidePopover` ဖြင့် score workspace ၏ အကျယ်အတိုင်း ချထားသည်။
 - ရေးနေသော part အလိုက် box အကြောင်းအရာ ပြောင်းရမည် —
 
 | Part | Box |
@@ -360,12 +364,12 @@ Writer Engine သည် Notation Editor ထဲတွင် လုပ်ဆော
 2. MuseScore 4 `Add Palettes` စာရင်းအတိအကျ။
 3. Editable Properties တွင် ပထမအဆင့်၌ ပြင်လို့ရမည့် field များ (pitch / duration / voice ...)။
 4. Guitar staff note ↔ Tab note တစ်ပြိုင်တည်း ရေးခြင်း ယခု အလုပ်လုပ်/မလုပ် စစ်ဆေးခြင်း။
-5. Sidebar dock ကို ဖယ်ရှားခဲ့ခြင်းလား မပေါင်းရသေးခြင်းလား (git history)။
+5. (ဖြေပြီး) Sidebar dock ကို 11-20 တွင် ဖယ်ရှားပြီး 11-22 တွင် shell အဖြစ် ပြန်ထည့်ထားသည် (`51eec10`)။
 
 ### အကောင်အထည်ဖော်မည့် အဆင့်များ (အဆိုပြုချက် — အတည်ပြုရန်)
 
-1. Inst. box ကို တူရိယာအလိုက် (Piano / Percussion / Guitar) အလျားလိုက် အပြည့်ယူစေခြင်း။
-2. Sidebar shell — ဘယ်ဘက်၊ ပျောက်နေ၊ မျှားလေး၊ ပြင်ပနှိပ်လျှင် ပိတ်ခြင်း၊ Inst. box နှင့် တစ်ခုပွင့်လျှင် ကျန်တစ်ခုပိတ်ခြင်း။
+1. ✅ ပြီးပြီ (`9afa500`) — Inst. box ကို တူရိယာအလိုက် (Piano / Percussion / Guitar) အလျားလိုက် အပြည့်ယူစေခြင်း။
+2. ✅ ပြီးပြီ (`51eec10`) — Sidebar shell — ဘယ်ဘက်၊ ပျောက်နေ၊ မျှားလေး၊ ပြင်ပနှိပ်လျှင် ပိတ်ခြင်း၊ Inst. box နှင့် တစ်ခုပွင့်လျှင် ကျန်တစ်ခုပိတ်ခြင်း။ (အထဲ ဗလာ)
 3. Palettes tab — MuseScore palette အုပ်စု အားလုံး၊ `Add Palettes`၊ search။
 4. Properties (ပြင်လို့ရ) နှင့် Instruments tab။
 5. Guitar staff ↔ Tab တစ်ပြိုင်တည်း။
