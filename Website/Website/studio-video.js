@@ -36,12 +36,18 @@
   const countVoice = document.querySelector('[data-count-voice]');
   const countVolume = document.querySelector('[data-count-volume]');
   const countVolumeValue = document.querySelector('[data-count-volume-value]');
+  const countDisplay = document.querySelector('[data-count-display]');
   const videoColor = document.querySelector('[data-video-color]');
   const videoRatio = document.querySelector('[data-video-ratio]');
   const MAX_SECONDS = 12;
   const FPS = 30;
   const QUARTER_SECONDS = 0.5;
   const DEFAULT_LOGO = 'assets/logo/m-sharing-drum-logo.svg';
+  const DEFAULT_META = { beats: 4, beatType: 4, bpm: 120, key: '' };
+  // The circle of fifths, written out: a key is what its `<fifths>` says it is,
+  // and there is no formula here that beats a table somebody can read.
+  const MAJOR_KEYS = ['Cb', 'Gb', 'Db', 'Ab', 'Eb', 'Bb', 'F', 'C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#'];
+  const MINOR_KEYS = ['Ab', 'Eb', 'Bb', 'F', 'C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'G#', 'D#', 'A#'];
   const RATIO_SIZES = {
     '16:9': { width: 1920, height: 1080 },
     '1:1': { width: 1080, height: 1080 },
@@ -79,6 +85,7 @@
     countEnabled: countVoiceEnabled?.value === 'on',
     countVoice: countVoice?.value || 'one-two',
     countVolume: Number(countVolume?.value) || 0,
+    countDisplay: countDisplay?.value || 'beats',
     color: videoColor?.value || 'black',
     ratio: videoRatio?.value || '16:9',
     size: getSize(),
@@ -129,6 +136,31 @@
     return 'hihat';
   };
 
+  const keyName = (fifths, mode) => {
+    const table = String(mode).toLowerCase() === 'minor' ? MINOR_KEYS : MAJOR_KEYS;
+    const index = Number(fifths) + 7;
+    return table[index] ?? '';
+  };
+
+  /** Metre, tempo and key as the file states them; the first value wins. */
+  const readMeta = (document) => {
+    const meta = { ...DEFAULT_META };
+    const attributes = document.querySelector('attributes');
+    const beats = Number(attributes?.querySelector('time beats')?.textContent);
+    const beatType = Number(attributes?.querySelector('time beat-type')?.textContent);
+    if (Number.isFinite(beats) && beats > 0) meta.beats = beats;
+    if (Number.isFinite(beatType) && beatType > 0) meta.beatType = beatType;
+    const fifths = attributes?.querySelector('key fifths')?.textContent;
+    if (fifths !== undefined && fifths !== null && fifths.trim() !== '') {
+      meta.key = keyName(Number(fifths), attributes.querySelector('key mode')?.textContent);
+    }
+    const perMinute = Number(document.querySelector('sound[tempo]')?.getAttribute('tempo'));
+    const metronome = Number(document.querySelector('metronome per-minute')?.textContent);
+    const bpm = Number.isFinite(perMinute) && perMinute > 0 ? perMinute : metronome;
+    if (Number.isFinite(bpm) && bpm > 0) meta.bpm = Math.round(bpm);
+    return meta;
+  };
+
   const parseMusicXml = async (file) => {
     if (!file || file.name.toLowerCase().endsWith('.mxl')) return null;
     const source = await file.text();
@@ -136,6 +168,7 @@
     if (document.querySelector('parsererror')) throw new Error('MusicXML file could not be parsed.');
     const measures = [...document.querySelectorAll('measure')];
     if (!measures.length) throw new Error('MusicXML does not contain any measures.');
+    const meta = readMeta(document);
     const hits = [];
     let absoluteQuarter = 0;
     let divisions = 1;
@@ -151,14 +184,16 @@
       }
       absoluteQuarter = Math.max(absoluteQuarter, cursor);
     }
-    return hits.length ? hits : null;
+    return hits.length ? { hits, meta } : null;
   };
 
   const getHits = async () => {
     const file = musicXmlInput?.files?.[0];
-    if (!file) return { hits: defaultPattern(), source: 'default drum pattern' };
+    if (!file) return { hits: defaultPattern(), meta: DEFAULT_META, source: 'default drum pattern' };
     const parsed = await parseMusicXml(file);
-    return parsed ? { hits: parsed, source: file.name } : { hits: defaultPattern(), source: `${file.name} · default pattern fallback` };
+    return parsed
+      ? { ...parsed, source: file.name }
+      : { hits: defaultPattern(), meta: DEFAULT_META, source: `${file.name} · default pattern fallback` };
   };
 
   if (!engine || !generateButton || !status || !stage || !video || !download) {
@@ -176,10 +211,138 @@
     return;
   }
 
-  function drawPerformance(ctx, at, hits, duration, settings) {
+  /**
+   * A small metronome whose arm swings with the beat.
+   *
+   * The Plan asks for the beat to be visible in the Title / Info band
+   * without adding a click: the arm is drawn from `at` and the tempo, so
+   * the same second of the video always shows the same frame.
+   */
+  function drawMetronomeIcon(ctx, x, y, size, at, bpm, color) {
+    const beatSeconds = 60 / Math.max(1, bpm);
+    const position = at / beatSeconds;
+    const phase = position - Math.floor(position);
+    const swing = Math.sin(phase * Math.PI) * 0.5;
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1, size * 0.07);
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.34, size * 0.5);
+    ctx.lineTo(-size * 0.18, -size * 0.5);
+    ctx.lineTo(size * 0.18, -size * 0.5);
+    ctx.lineTo(size * 0.34, size * 0.5);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, size * 0.12);
+    ctx.lineTo(swing * size * 0.5, -size * 0.62);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(swing * size * 0.5, -size * 0.62, Math.max(1, size * 0.08), 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /**
+   * Title / Info: logo on the left, Title 1 beside it, Title 2 under it,
+   * and the metre, tempo, key and beat on the same row.
+   */
+  function drawInfoBand(ctx, { at, meta, settings, palette, scale }) {
+    const pad = Math.round(32 * scale);
+    const top = Math.round(14 * scale);
+    const leftEdge = pad;
+    const logoSize = Math.round(56 * scale);
+    let textX = leftEdge;
+
+    if (settings.logoImage?.complete && settings.logoImage.naturalWidth > 0) {
+      const ratio = settings.logoImage.naturalWidth / settings.logoImage.naturalHeight;
+      const logoWidth = Math.min(Math.round(logoSize * 1.9), Math.round(logoSize * ratio));
+      ctx.drawImage(settings.logoImage, leftEdge, top + Math.round(4 * scale), logoWidth, logoSize);
+      textX = leftEdge + logoWidth + Math.round(18 * scale);
+    }
+
+    ctx.fillStyle = settings.titleOneColor;
+    ctx.font = `700 ${Math.round(settings.titleOneSize * scale)}px Inter, system-ui, sans-serif`;
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(settings.titleOne, textX, top + Math.round(28 * scale));
+    ctx.fillStyle = settings.titleTwoColor;
+    ctx.font = `${Math.round(settings.titleTwoSize * scale)}px Inter, system-ui, sans-serif`;
+    ctx.fillText(settings.titleTwo, textX + Math.round(2 * scale), top + Math.round(52 * scale));
+
+    const statsY = top + Math.round(78 * scale);
+    const statSize = Math.max(10, Math.round(13 * scale));
+    const gap = Math.round(26 * scale);
+    const metronome = `${meta.beats}/${meta.beatType}`;
+    const items = [metronome, `${meta.bpm} BPM`];
+    if (meta.key) items.push(`Key ${meta.key}`);
+
+    ctx.font = `600 ${statSize}px Inter, system-ui, sans-serif`;
+    ctx.fillStyle = '#f20d3d';
+    let cursorX = leftEdge;
+    for (const item of items) {
+      ctx.fillText(item, cursorX, statsY);
+      cursorX += ctx.measureText(item).width + gap;
+    }
+
+    drawMetronomeIcon(ctx, cursorX + Math.round(6 * scale), statsY - Math.round(statSize * 0.35), Math.round(statSize * 1.15), at, meta.bpm, palette.muted);
+
+    const secondary = [`${settings.brand} · ${settings.model.toUpperCase()} · ${settings.notation.toUpperCase()}`];
+    ctx.fillStyle = palette.muted;
+    ctx.font = `600 ${Math.max(9, Math.round(10 * scale))}px Inter, system-ui, sans-serif`;
+    ctx.fillText(secondary.join(' · '), leftEdge, statsY + Math.round(20 * scale));
+
+    if (settings.countEnabled) {
+      drawCountRow(ctx, { at, meta, settings, palette, scale, pad: leftEdge, y: statsY + Math.round(40 * scale) });
+    }
+  }
+
+  /**
+   * The count as the video prints it: `1, 2, 3, 4` or its eighth/sixteenth
+   * subdivision. The Plan keeps this display separate from the Count Voice
+   * SOUND, so this only ever changes what is written on the frame.
+   */
+  const countTokens = (display, beats) => {
+    const subdivisions = display === 'sixteenths' ? ['e', '&', 'a'] : display === 'eighths' ? ['&'] : [];
+    const tokens = [];
+    for (let beat = 1; beat <= beats; beat += 1) {
+      tokens.push(String(beat));
+      for (const subdivision of subdivisions) tokens.push(subdivision);
+    }
+    return tokens;
+  };
+
+  /** The token the frame is currently sitting on, or -1 when counting is off. */
+  const currentCountToken = (tokens, display, meta, at) => {
+    const perBeat = display === 'sixteenths' ? 4 : display === 'eighths' ? 2 : 1;
+    const beatSeconds = (60 / Math.max(1, meta.bpm)) * (4 / Math.max(1, meta.beatType));
+    const position = at / beatSeconds;
+    const beatIndex = Math.floor(position) % Math.max(1, meta.beats);
+    const within = position - Math.floor(position);
+    return beatIndex * perBeat + Math.min(perBeat - 1, Math.floor(within * perBeat));
+  };
+
+  function drawCountRow(ctx, { at, meta, settings, palette, scale, pad, y }) {
+    const tokens = countTokens(settings.countDisplay, meta.beats);
+    const active = currentCountToken(tokens, settings.countDisplay, meta, at);
+    const size = Math.max(9, Math.round(10 * scale));
+    ctx.font = `600 ${size}px Inter, system-ui, sans-serif`;
+    ctx.textBaseline = 'alphabetic';
+    let x = pad;
+    const gap = Math.round(5 * scale);
+    for (let index = 0; index < tokens.length; index += 1) {
+      const token = tokens[index];
+      ctx.fillStyle = index === active ? '#f20d3d' : palette.muted;
+      ctx.fillText(token, x, y);
+      x += ctx.measureText(token).width + gap;
+    }
+  }
+
+  function drawPerformance(ctx, at, hits, duration, settings, meta) {
     const { width, height } = settings.size;
     const palette = getPalette(settings.color);
-    const canvas = ctx.canvas;
     const scale = Math.max(0.72, Math.min(1.18, Math.min(width / 640, height / 360)));
     const left = Math.max(78, Math.round(width * 0.175));
     const right = width - Math.max(22, Math.round(width * 0.05));
@@ -194,25 +357,7 @@
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, width, height * 0.55);
 
-    ctx.fillStyle = settings.titleOneColor;
-    ctx.font = `700 ${Math.round(settings.titleOneSize * scale)}px Inter, system-ui, sans-serif`;
-    ctx.fillText(settings.titleOne, Math.round(32 * scale), Math.round(45 * scale));
-    ctx.fillStyle = settings.titleTwoColor;
-    ctx.font = `${Math.round(settings.titleTwoSize * scale)}px Inter, system-ui, sans-serif`;
-    ctx.fillText(settings.titleTwo, Math.round(34 * scale), Math.round(70 * scale));
-    ctx.fillStyle = '#f20d3d';
-    ctx.font = `600 ${Math.round(10 * scale)}px Inter, system-ui, sans-serif`;
-    ctx.fillText(`${settings.brand} · ${settings.model.toUpperCase()} · ${settings.notation.toUpperCase()}`, Math.round(34 * scale), Math.round(90 * scale));
-    if (settings.countEnabled) {
-      ctx.fillStyle = palette.muted;
-      ctx.fillText(`COUNT ${settings.countVoice === 'numeric' ? '1 2 3 4' : 'ONE TWO THREE FOUR'} · ${settings.countVolume}%`, Math.round(34 * scale), Math.round(107 * scale));
-    }
-
-    if (settings.logoImage?.complete && settings.logoImage.naturalWidth > 0) {
-      const logoHeight = Math.round(42 * scale);
-      const logoWidth = Math.min(Math.round(100 * scale), Math.round(logoHeight * (settings.logoImage.naturalWidth / settings.logoImage.naturalHeight)));
-      ctx.drawImage(settings.logoImage, width - logoWidth - Math.round(26 * scale), Math.round(24 * scale), logoWidth, logoHeight);
-    }
+    drawInfoBand(ctx, { at, meta, settings, palette, scale });
 
     const gridStart = Math.round(height * 0.3);
     const gridEnd = Math.round(height * 0.86);
@@ -289,14 +434,14 @@
     generateButton.textContent = 'Generating…';
     if (placeholder) placeholder.hidden = true;
     try {
-      const { hits, source } = await getHits();
+      const { hits, meta, source } = await getHits();
       const duration = Math.max(1, Math.min(MAX_SECONDS, Math.max(...hits.map((hit) => hit.at), 3.5) + 0.5));
       setStatus(`Preparing ${source} · ${settings.ratio} · 0%`);
       const result = await engine.render({
         width: settings.size.width,
         height: settings.size.height,
         fps: FPS,
-        segments: [{ seconds: duration, draw: (ctx, at) => drawPerformance(ctx, at, hits, duration, settings) }],
+        segments: [{ seconds: duration, draw: (ctx, at) => drawPerformance(ctx, at, hits, duration, settings, meta) }],
         onProgress: (progress, phase) => { if (!cancelRequested) setStatus(`${phase} · ${Math.round(progress * 100)}%`); },
         shouldStop: () => cancelRequested,
       });
@@ -345,7 +490,7 @@
     else if (stage.requestFullscreen) void stage.requestFullscreen();
   });
   settingsForm?.addEventListener('submit', (event) => event.preventDefault());
-  [titleOne, titleOneColor, titleOneSize, titleTwo, titleTwoColor, titleTwoSize, drumBrand, drumModel, notationView, soundModel, soundVolume, countVoiceEnabled, countVoice, countVolume, videoColor, videoRatio].forEach((control) => {
+  [titleOne, titleOneColor, titleOneSize, titleTwo, titleTwoColor, titleTwoSize, drumBrand, drumModel, notationView, soundModel, soundVolume, countVoiceEnabled, countVoice, countVolume, countDisplay, videoColor, videoRatio].forEach((control) => {
     control?.addEventListener('input', syncControlState);
     control?.addEventListener('change', syncControlState);
   });
