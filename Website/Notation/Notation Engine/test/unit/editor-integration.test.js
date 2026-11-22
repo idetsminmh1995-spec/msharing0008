@@ -3177,6 +3177,52 @@ describe('the editor and the engine agree, end to end', () => {
     });
   });
 
+  describe('the `⋯` tab', () => {
+    const SCORE = {
+      title: 'More',
+      instrumentIds: ['piano'],
+      key: 'C',
+      time: '4/4',
+      tempo: 120,
+      measures: 2,
+    };
+
+    const openMore = () => {
+      const opened = loadEditorPage({ newScore: SCORE });
+      const doc = opened.window.document;
+      doc.querySelector('[data-editor-sidebar-handle]')
+        .dispatchEvent(new opened.window.MouseEvent('click', { bubbles: true }));
+      doc.querySelector('[data-sidebar-tab="more"]')
+        .dispatchEvent(new opened.window.MouseEvent('click', { bubbles: true }));
+      return { ...opened, doc, panel: doc.querySelector('.editor-sidebar__panel') };
+    };
+
+    test('it is a tab of its own, not a placeholder', () => {
+      const { doc, panel } = openMore();
+      const tab = doc.querySelector('[data-sidebar-tab="more"]');
+      assert.equal(tab.getAttribute('aria-selected'), 'true');
+      assert.equal(tab.dataset.pending, undefined, 'the tab no longer says it is unwired');
+      assert.doesNotMatch(doc.querySelector('[data-editor-status]').textContent, /not wired up/);
+      assert.ok(panel.querySelector('.editor-more'), 'and it draws a panel rather than folding away');
+    });
+
+    test('it holds the instrument surface and the mixer', () => {
+      const { doc, panel } = openMore();
+      assert.ok(panel.querySelector('[data-more-panel="instrument"]'), 'the instrument surface is there');
+      assert.ok(panel.querySelector('[data-more-panel="instrument"] [data-editor-piano]'),
+        'a piano part gets the 88-key strip');
+      assert.ok(panel.querySelector('[data-more-panel="mixer"]'), 'and the mixer');
+      assert.equal(panel.querySelectorAll('[data-more-panel="mixer"] .editor-inst__row').length, 1,
+        'one row per part');
+    });
+
+    test('it is remembered across a reload, like the other tabs', () => {
+      const { window, doc } = openMore();
+      assert.match(window.localStorage.getItem('notation-lab-sidebar') ?? '', /"tab":"more"/);
+      assert.equal(doc.querySelector('[data-sidebar-tab="palettes"]').getAttribute('aria-selected'), 'false');
+    });
+  });
+
   describe('the Properties tab', () => {
     const NOTED_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="4.0">

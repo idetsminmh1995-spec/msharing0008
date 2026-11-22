@@ -3629,7 +3629,7 @@
    * working dock for the visit.
    */
   const SIDEBAR_STORE_KEY = 'notation-lab-sidebar';
-  const SIDEBAR_TABS = ['palettes', 'properties', 'instruments'];
+  const SIDEBAR_TABS = ['palettes', 'more', 'properties', 'instruments'];
 
   function readSidebarState() {
     try {
@@ -4708,6 +4708,40 @@
     return box;
   }
 
+  /**
+   * The `⋯` tab: the panels that are not tabs of their own.
+   *
+   * MuseScore keeps its dock panels side by side rather than inventing a
+   * second surface for each one, so this shows the instrument the writer is
+   * on and the mixer -- the two panels the editor already has -- in the dock
+   * instead of only in the bottom bar's boxes.
+   */
+  function buildMorePanel() {
+    const panel = document.createElement('div');
+    panel.className = 'editor-more';
+    if (!state.doc) {
+      panel.append(panelNote('Open a score to see its panels.'));
+      return panel;
+    }
+    const instrument = activeInstrument();
+    const surface = document.createElement('section');
+    surface.className = 'editor-more__panel';
+    surface.dataset.morePanel = 'instrument';
+    surface.append(
+      instrument.kind === 'drums'
+        ? buildDrumPads()
+        : instrument.kind === 'fretted'
+          ? buildFretboard(instrument.data)
+          : buildKeyboard(),
+    );
+    const mixer = document.createElement('section');
+    mixer.className = 'editor-more__panel';
+    mixer.dataset.morePanel = 'mixer';
+    mixer.append(buildMixer());
+    panel.append(surface, mixer);
+    return panel;
+  }
+
   /** The Properties tab: what the selection is and the fields it can change. */
   function buildPropertiesPanel() {
     const panel = document.createElement('div');
@@ -5031,7 +5065,7 @@
     tabs.setAttribute('role', 'tablist');
     const panels = [
       { id: 'palettes', label: 'Palettes', ready: true },
-      { id: 'more', label: '\u22EF', ready: false, title: 'More panels' },
+      { id: 'more', label: '\u22EF', ready: true, title: 'More panels' },
       { id: 'properties', label: 'Properties', ready: true },
       { id: 'instruments', label: 'Instruments', ready: true },
     ];
@@ -5069,6 +5103,8 @@
         panel.append(empty);
       }
       for (const group of groups) panel.append(paletteSection(group));
+    } else if (state.sidebarTab === 'more') {
+      panel.append(buildMorePanel());
     } else if (state.sidebarTab === 'properties') {
       panel.append(buildPropertiesPanel());
     } else if (state.sidebarTab === 'instruments') {
@@ -5086,6 +5122,17 @@
    * test for "would rebuilding change anything".
    */
   function sidebarPanelSignature() {
+    if (state.sidebarTab === 'more') {
+      const instrument = activeInstrument();
+      return [
+        'more',
+        instrument.kind,
+        instrument.data?.id ?? '',
+        activePartId() ?? '',
+        state.drumInstruments?.get(activePartId())?.size ?? 0,
+        (state.result?.playback?.tracks ?? []).map((track) => `${track.id}:${track.name}`).join('|'),
+      ].join('/');
+    }
     if (state.sidebarTab === 'properties') {
       return [
         'properties',
@@ -5120,7 +5167,11 @@
     if (panel.dataset.signature === signature) return;
     panel.dataset.signature = signature;
     panel.replaceChildren(
-      state.sidebarTab === 'properties' ? buildPropertiesPanel() : buildInstrumentsPanel(),
+      state.sidebarTab === 'properties'
+        ? buildPropertiesPanel()
+        : state.sidebarTab === 'more'
+          ? buildMorePanel()
+          : buildInstrumentsPanel(),
     );
   }
 
