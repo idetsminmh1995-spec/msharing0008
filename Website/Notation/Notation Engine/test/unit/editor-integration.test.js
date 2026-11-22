@@ -3434,6 +3434,96 @@ describe('the editor and the engine agree, end to end', () => {
       assert.deepEqual(sounding.map((note) => note.staff), ['2'], 'the note sits on the tab staff');
       assert.equal(sounding[0].fret, '5', 'and still names its fret');
     });
+
+    /**
+     * The notes of bar 1 as a writer reads them, one entry per staff.
+     *
+     * `alter` is kept because a pitch edit has to reach BOTH staves -- a
+     * note written by the fretboard and then re-pitched in Properties used
+     * to leave the tab drawing the old pitch, which is two different notes
+     * on one beat.
+     */
+    function pitches(xml) {
+      const measure = xml.match(/<measure number="1">([\s\S]*?)<\/measure>/)?.[1] ?? '';
+      return [...measure.matchAll(/<note>([\s\S]*?)<\/note>/g)]
+        .map((match) => match[1].replace(/\s+/g, ''))
+        .filter((note) => !note.startsWith('<rest'))
+        .map((note) => ({
+          staff: note.match(/<staff>(\d+)<\/staff>/)?.[1] ?? '1',
+          name: `${note.match(/<step>(\w)<\/step>/)?.[1] ?? '?'}`
+            + `${note.match(/<alter>(-?\d+)<\/alter>/)?.[1] ?? ''}`
+            + `${note.match(/<octave>(\d)<\/octave>/)?.[1] ?? ''}`,
+          type: note.match(/<type>(\w+)<\/type>/)?.[1] ?? null,
+          fret: note.match(/<fret>(\d+)<\/fret>/)?.[1] ?? null,
+        }));
+    }
+
+    /** Selects every note, then opens the Properties tab on the selection. */
+    function openProperties(page) {
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }));
+      page.doc.querySelector('[data-editor-sidebar-handle]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      page.doc.querySelector('[data-sidebar-tab="properties"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+    }
+
+    test('a pitch typed into Properties reaches the tab staff', async () => {
+      const page = await openGuitar();
+      page.panel.querySelector('[data-editor-inst-fret="1:0"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      openProperties(page);
+
+      // E4 open first string becomes G4: the tab has to move with it, and
+      // its fret has to be worked out again (G4 sits at fret 3 there).
+      const step = page.doc.querySelector('[data-props-field="step-0"]');
+      step.value = 'G';
+      step.dispatchEvent(new page.window.Event('change', { bubbles: true }));
+
+      const written = pitches(page.saved());
+      assert.deepEqual(written.map((note) => note.name), ['G4', 'G4'], 'both staves say G4');
+      assert.deepEqual(written.map((note) => note.fret), [null, '3'], 'and the tab names the new fret');
+    });
+
+    test('a duration chosen in Properties reaches the tab staff', async () => {
+      const page = await openGuitar();
+      page.panel.querySelector('[data-editor-inst-fret="1:0"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      openProperties(page);
+
+      const duration = page.doc.querySelector('[data-props-field="duration"]');
+      duration.value = 'half:0';
+      duration.dispatchEvent(new page.window.Event('change', { bubbles: true }));
+
+      const written = pitches(page.saved());
+      assert.deepEqual(written.map((note) => note.type), ['half', 'half'], 'both staves hold a half note');
+    });
+
+    test('an accidental applied to the selection reaches the tab staff', async () => {
+      const page = await openGuitar();
+      page.panel.querySelector('[data-editor-inst-fret="3:0"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }));
+      page.doc.querySelector('[data-palette-item="sharp"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+
+      // Open G3 becomes G sharp 3, which is fret 1 on the same string.
+      const written = pitches(page.saved());
+      assert.deepEqual(written.map((note) => note.name), ['G13', 'G13'], 'both staves carry the sharp');
+      assert.deepEqual(written.map((note) => note.fret), [null, '1'], 'and the tab names the new fret');
+    });
+
+    test('transposing the selection moves the tab with it', async () => {
+      const page = await openGuitar();
+      page.panel.querySelector('[data-editor-inst-fret="3:0"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }));
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+
+      // Open G3 up one step is A3, fret 2 on the same string.
+      const written = pitches(page.saved());
+      assert.deepEqual(written.map((note) => note.name), ['A3', 'A3'], 'both staves move up');
+      assert.deepEqual(written.map((note) => note.fret), [null, '2'], 'and the tab follows the new pitch');
+    });
   });
 
   describe('the Instruments tab', () => {

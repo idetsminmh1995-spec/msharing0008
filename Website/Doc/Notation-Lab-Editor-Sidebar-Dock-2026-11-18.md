@@ -144,3 +144,45 @@ note-on တစ်ခု လာတိုင်း `insertAtEntry()` ဖြင့�
 - Test: `editor-integration.test.js` — access on/off၊ key → note၊
   ထပ်နေသော key → chord၊ key signature spelling၊ drum kit၊
   note-input guard၊ Web MIDI မရှိခြင်း၊ ငြင်းခံရခြင်း။
+
+## Guitar staff ↔ Tab တစ်ပြိုင်တည်း — 2026-11-18
+
+Guitar part တစ်ခုကို notation staff (staff 1) နှင့် tab staff (staff 2)
+နှစ်ခုအဖြစ် ပုံနှိပ်သောအခါ တစ်ခုတည်းသော တူရိယာ၏ တစ်ခုတည်းသော ဂီတကို
+staff နှစ်ခုတွင် ရေးထားသည်။ ထို့ကြောင့် တစ်ခုတွင် ရေးသည်များ ကျန်တစ်ခုတွင်
+ပါ ပေါ်ရမည်။
+
+**စစ်ဆေးပြီး ရလဒ် (၂၀၂၆-၁၁-၁၈):**
+
+- ✅ **ရေးခြင်း** — fretboard မှ ရေးလျှင်၊ staff ကို နှိပ်၍ ရေးလျှင်၊
+  letter key နှိပ်၍ ရေးလျှင် staff နှစ်ခုလုံး ရသည်။ Fretboard မှ
+  ရေးသော note သည် string/fret ကို ထိန်းထားသည်။
+- ✅ **ရှေ့သို့ ရွေ့ခြင်း** — arrow key / drag ဖြင့် pitch ကို ရွှေ့လျှင် tab
+  ပါ လိုက်သည်။
+- ✅ **ဖျက်ခြင်း** — Delete လုပ်လျှင် staff နှစ်ခုလုံး ရှင်းသည်။
+- ✅ **Staff ရွှေ့ခြင်း** — Properties ၏ Staff field ဖြင့် ရွှေ့နိုင်သည်။
+
+**တွေ့ရှိပြီး ဖြည့်ခဲ့သော ကွက်လပ် (ယခု ပြင်ပြီး):** ရေးခြင်းသာ
+တွဲထားခဲ့သည်။ **ပြင်ဆင်ခြင်း** မတွဲပါ — Properties တွင် pitch သို့မဟုတ်
+duration ပြောင်းလျှင်၊ palette မှ accidental တင်လျှင်၊ arrow/drag ဖြင့်
+transpose လုပ်လျှင် ရေးထားသည့် staff တစ်ခုတည်းသာ ပြောင်းပြီး tab သည်
+အဟောင်းကို ဆက်ပြသည်။ ထို beat သည် staff နှစ်ခုတွင် မတူညီသော note
+နှစ်ခု ဖြစ်သွားသည်။
+
+- `notation-editor.js` — `mirrorCounterpart()` အသစ်။ တစ်ခုတည်းသော event ကို
+  `pairedStaffFor()` က ပြသည့် ကျန်တစ်ခုသို့ ကူးသည်။ Event ကို
+  tick+staff ဖြင့် ရှာသည် (index မဟုတ်) — duration ပြောင်းလျှင် voice ကို
+  ပြန်ဖြည့်သဖြင့် index ရွေ့သွားနိုင်သည်။
+- `counterpartEvent()` တွင် `rederiveTab` option။ ရေးခြင်းတွင် ရေးသူ
+  ရွေးထားသော string/fret ကို လေးစားသည်။ သို့သော် **pitch ပြင်လျှင်**
+  ထို string/fret သည် pitch အဟောင်းကို ဖော်ပြသည်၊ ထို့ကြောင့်
+  `tabPositionFor()` ဖြင့် pitch အသစ်မှ ပြန်တွက်သည်။
+- ချိတ်ထားသော path များ: Properties pitch (`setNotesPitch`)， Properties
+  duration (`setEventDuration`)， palette accidental၊ arrow-key transpose，
+  drag transpose။
+- Test: `editor-integration.test.js` — လေးခု အသစ် (pitch, duration,
+  accidental, transpose)၊ တစ်ခုစီသည် staff နှစ်ခုလုံး ကိုက်ညီမှုနှင့် tab ၏
+  fret အသစ်ကို စစ်သည်။ Full suite **1524/1524**။
+- Browser E2E (real Chromium): fretboard → E4၊ Properties → G4၊ duration →
+  half၊ palette → G#4၊ ArrowUp → A#4 — အဆင့်တိုင်း staff နှစ်ခုလုံး
+  ကိုက်ညီ၊ page error မရှိ။

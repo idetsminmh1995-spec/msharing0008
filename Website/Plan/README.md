@@ -363,7 +363,7 @@ Writer Engine သည် Notation Editor ထဲတွင် လုပ်ဆော
 1. Writer Engine folder အမည်အတိအကျ (အဆိုပြု `Website/Writer/Writer Engine`)။
 2. MuseScore 4 `Add Palettes` စာရင်းအတိအကျ။
 3. Editable Properties တွင် ပထမအဆင့်၌ ပြင်လို့ရမည့် field များ (pitch / duration / voice ...)။
-4. Guitar staff note ↔ Tab note တစ်ပြိုင်တည်း ရေးခြင်း ယခု အလုပ်လုပ်/မလုပ် စစ်ဆေးခြင်း။
+4. (ဖြေပြီး 2026-11-18) Guitar staff note ↔ Tab note တစ်ပြိုင်တည်း — ရေးခြင်း၊ ဖျက်ခြင်း၊ Staff ရွှေ့ခြင်းအပြင် **ပြင်ဆင်ခြင်း** (Properties pitch/duration၊ palette accidental၊ arrow/drag transpose) ပါ staff နှစ်ခုလုံး ကိုက်ညီသည်။ ရေးခြင်းတွင် သာ တွဲထားခဲ့သဖြင့် ပြင်ဆင်မှုများ ကွဲနေခဲ့သည် — `mirrorCounterpart()` ဖြင့် ဖြည့်ပြီး။ အသေးစိတ် [Sidebar Dock doc](../Doc/Notation-Lab-Editor-Sidebar-Dock-2026-11-18.md) တွင်။
 5. (ဖြေပြီး) Sidebar dock ကို 11-20 တွင် ဖယ်ရှားပြီး 11-22 တွင် shell အဖြစ် ပြန်ထည့်ထားသည် (`51eec10`)။
 
 ### အကောင်အထည်ဖော်မည့် အဆင့်များ (အဆိုပြုချက် — အတည်ပြုရန်)
@@ -376,7 +376,7 @@ Writer Engine သည် Notation Editor ထဲတွင် လုပ်ဆော
    - **Pitch** = ottava (8va, 8vb, 15ma, 15mb)။ Notation Engine သည် octave-shift ကို parse လုပ်ခြင်း၊ ဆွဲခြင်း (bracket)၊ MusicXML ထဲ ပြန်ရေးခြင်း လုပ်နိုင်ပြီး document ထဲတွင် `octaveShifts` table လည်း ရှိသည်။ သို့သော် Editor ဘက်တွင် ottava ထည့်/ဖယ်ပေးသော command မရှိသေးသဖြင့် **ထိုအပိုင်း အသစ်လိုသည်**။ မှတ်ချက် — MusicXML တွင် `type` သည် notation ရွေ့ရာဘက်ကို ဆိုလိုသဖြင့် 8va = `down` (size 8)၊ 8vb = `up` (size 8)၊ 15ma = `down` (15)၊ 15mb = `up` (15)။
    - Breaths & pauses၊ Brackets၊ Fingering၊ Beam properties၊ Fretboard diagrams၊ Frames & measures စသည့် ကျန်အုပ်စုများ — MuseScore 4 ၏ `Add Palettes` စာရင်းအတိအကျနှင့် နှိုင်းယှဉ်ပြီး အတည်ပြုရန်။
 4. ✅ ပြီးပြီ (`863b4c7`, `ece0125`) — Properties tab (ပြင်လို့ရ၊ lyrics ပါ) နှင့် Instruments tab။ `⋯` (more panels) tab သည် မပြီးသေးပါ။
-5. Guitar staff ↔ Tab တစ်ပြိုင်တည်း။
+5. ✅ ပြီးပြီ (2026-11-18) — Guitar staff ↔ Tab တစ်ပြိုင်တည်း။ ရေးခြင်း/ဖျက်ခြင်း/ရွှေ့ခြင်းအပြင် ပြင်ဆင်မှု လမ်းကြောင်းအားလုံး (Properties pitch & duration၊ palette accidental၊ arrow/drag transpose) တွဲပြီး။ `mirrorCounterpart()` + `counterpartEvent({ rederiveTab })`။ Test ၄ ခု အသစ်၊ full suite 1524/1524၊ real Chromium E2E။
 6. Writer Engine ကို သီးခြား folder/module အဖြစ် ခွဲထုတ်ခြင်း။
 
 အဆင့်တစ်ခုချင်းစီကို သင် "ready" ဟု ပြောမှသာ စတင်မည်။

@@ -370,7 +370,7 @@
    * string can reach makes the whole counterpart impossible -- half a chord
    * on the tab staff would be a different chord from the one written.
    */
-  function counterpartEvent(event, toStaff, measureNumber) {
+  function counterpartEvent(event, toStaff, measureNumber, { rederiveTab = false } = {}) {
     const tab = isTabStaff(measureNumber, toStaff);
     const voiceId = voiceForStaff(toStaff);
     const startTick = event.startTick ?? 0;
@@ -386,11 +386,14 @@
         continue;
       }
       // A note written from the fretboard already states its string; honour
-      // that choice instead of re-deriving a different one.
-      const position =
-        note.stringNumber !== undefined && note.fret !== undefined
+      // that choice instead of re-deriving a different one. An EDIT of the
+      // pitch is the exception: the string and fret then describe the old
+      // pitch, so they have to be worked out again from the new one.
+      const stated =
+        !rederiveTab && note.stringNumber !== undefined && note.fret !== undefined
           ? { stringNumber: note.stringNumber, fret: note.fret }
-          : tabPositionFor(note.pitch, taken);
+          : null;
+      const position = stated ?? tabPositionFor(note.pitch, taken);
       if (position === null) return null;
       taken.add(position.stringNumber);
       members.push(engine.note({ ...init, pitch: note.pitch, ...position }));
@@ -426,6 +429,50 @@
           event: counterpart,
         })
       : docTools.insertEvent(written, {
+          partId,
+          measureNumber,
+          voiceId: pairVoice,
+          event: counterpart,
+        });
+  }
+
+  /**
+   * Copies one event onto the part's other staff.
+   *
+   * Writing a note already pairs the two staves, but an EDIT -- a new
+   * pitch, a new duration -- changed only the staff the writer was on, so
+   * the tab kept drawing the old music. The counterpart is derived from
+   * the event as it now reads, which is what re-derives a tab note's
+   * string and fret from the instrument's tuning instead of leaving the
+   * ones that described the old pitch.
+   *
+   * The event is found by tick and staff rather than by index: a duration
+   * change refills the voice, so the index the edit started from may no
+   * longer be the index the event sits at.
+   */
+  function mirrorCounterpart(doc, { partId, measureNumber, voiceId, staffNumber, tick, rederiveTab = false }) {
+    const to = pairedStaffFor(staffNumber, measureNumber);
+    if (to === null) return doc;
+    const source = eventsInFrom(doc, measureNumber, voiceId, partId)
+      .find((event) => (event.startTick ?? 0) === tick && (event.staff ?? 1) === staffNumber);
+    if (!source) return doc;
+    const counterpart = counterpartEvent(source, to, measureNumber, { rederiveTab });
+    if (counterpart === null) return doc;
+    const pairVoice = voiceForStaff(to, partId);
+    const index = indexAtTickOnStaff(
+      eventsInFrom(doc, measureNumber, pairVoice, partId),
+      tick,
+      to,
+    );
+    return index >= 0
+      ? docTools.replaceEvent(doc, {
+          partId,
+          measureNumber,
+          voiceId: pairVoice,
+          eventIndex: index,
+          event: counterpart,
+        })
+      : docTools.insertEvent(doc, {
           partId,
           measureNumber,
           voiceId: pairVoice,
@@ -1800,13 +1847,23 @@
         const patch = event.kind === 'chord'
           ? { notes: event.notes.map((note) => ({ ...note, pitch: transposeNote(note.pitch, steps, clef) })) }
           : { pitch: transposeNote(event.pitch, steps, clef) };
-        next = docTools.patchEvent(next, {
-          partId: cell.partId,
-          measureNumber: cell.measureNumber,
-          voiceId: cell.voiceId,
-          eventIndex: cell.eventIndex,
-          patch,
-        });
+        next = mirrorCounterpart(
+          docTools.patchEvent(next, {
+            partId: cell.partId,
+            measureNumber: cell.measureNumber,
+            voiceId: cell.voiceId,
+            eventIndex: cell.eventIndex,
+            patch,
+          }),
+          {
+            partId: cell.partId,
+            measureNumber: cell.measureNumber,
+            voiceId: cell.voiceId,
+            staffNumber: event.staff ?? 1,
+            tick: event.startTick ?? 0,
+            rederiveTab: true,
+          },
+        );
       }
       return next;
     }, describeTranspose(steps, movable.length));
@@ -2562,13 +2619,23 @@
     const patch = baseEvent.kind === 'chord'
       ? { notes: baseEvent.notes.map((note) => ({ ...note, pitch: transposeNote(note.pitch, steps, clef) })) }
       : { pitch: transposeNote(baseEvent.pitch, steps, clef) };
-    state.doc = docTools.patchEvent(drag.baseDoc, {
-      partId: anchor.partId,
-      measureNumber: anchor.measureNumber,
-      voiceId: anchor.voiceId,
-      eventIndex: anchor.eventIndex,
-      patch,
-    });
+    state.doc = mirrorCounterpart(
+      docTools.patchEvent(drag.baseDoc, {
+        partId: anchor.partId,
+        measureNumber: anchor.measureNumber,
+        voiceId: anchor.voiceId,
+        eventIndex: anchor.eventIndex,
+        patch,
+      }),
+      {
+        partId: anchor.partId,
+        measureNumber: anchor.measureNumber,
+        voiceId: anchor.voiceId,
+        staffNumber: baseEvent.staff ?? 1,
+        tick: baseEvent.startTick ?? 0,
+        rederiveTab: true,
+      },
+    );
     render();
     announce(describeTranspose(steps, 1));
   }
@@ -3696,13 +3763,23 @@
         const patch = event.kind === 'chord'
           ? { notes: event.notes.map(repitch) }
           : { pitch: repitch(event).pitch };
-        next = docTools.patchEvent(next, {
-          partId: cell.partId,
-          measureNumber: cell.measureNumber,
-          voiceId: cell.voiceId,
-          eventIndex: cell.eventIndex,
-          patch,
-        });
+        next = mirrorCounterpart(
+          docTools.patchEvent(next, {
+            partId: cell.partId,
+            measureNumber: cell.measureNumber,
+            voiceId: cell.voiceId,
+            eventIndex: cell.eventIndex,
+            patch,
+          }),
+          {
+            partId: cell.partId,
+            measureNumber: cell.measureNumber,
+            voiceId: cell.voiceId,
+            staffNumber: event.staff ?? 1,
+            tick: event.startTick ?? 0,
+            rederiveTab: true,
+          },
+        );
       }
       return next;
     }, removing ? 'Accidental removed.' : `${label} applied.`);
@@ -4457,7 +4534,15 @@
         : { step: note.pitch.step, octave: note.pitch.octave, alter: note.pitch.alter ?? 0 },
     );
     commit(
-      (doc) => docTools.setNotesPitch(doc, cell, pitches),
+      (doc) =>
+        mirrorCounterpart(docTools.setNotesPitch(doc, cell, pitches), {
+          partId: cell.partId,
+          measureNumber: cell.measureNumber,
+          voiceId: cell.voiceId,
+          staffNumber: event.staff ?? 1,
+          tick: event.startTick ?? 0,
+          rederiveTab: true,
+        }),
       `Wrote ${pitchLabel(step, alter, octave)}.`,
     );
     const updated = eventFor(cell);
@@ -4597,7 +4682,16 @@
             const ticks = engine.ticksForDisplayedDuration({ type, dots: Number(dots) });
             commit(
               (doc) =>
-                docTools.setEventDuration(doc, cell, engine.duration(type, Number(dots), ticks)),
+                mirrorCounterpart(
+                  docTools.setEventDuration(doc, cell, engine.duration(type, Number(dots), ticks)),
+                  {
+                    partId: cell.partId,
+                    measureNumber: cell.measureNumber,
+                    voiceId: cell.voiceId,
+                    staffNumber: event.staff ?? 1,
+                    tick: event.startTick ?? 0,
+                  },
+                ),
               'Duration changed.',
             );
           },
