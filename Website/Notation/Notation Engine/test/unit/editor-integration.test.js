@@ -1995,6 +1995,66 @@ describe('the editor and the engine agree, end to end', () => {
     assert.equal(guitarPanel.querySelectorAll('.editor-inst__piano').length, 0, 'a guitar is not given a keyboard');
   });
 
+  test('the sidebar opens from its handle and closes on a press anywhere else', () => {
+    const { window } = loadEditorPage({
+      newScore: { title: 'Piano', instrumentIds: ['piano'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
+    });
+    const doc = window.document;
+    const sidebar = doc.querySelector('[data-editor-sidebar]');
+    const handle = doc.querySelector('[data-editor-sidebar-handle]');
+    const click = (node) => node.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+
+    // Hidden by default: the score owns the window, and only an arrow is
+    // left on the edge, which is how MuseScore's dock behaves.
+    assert.equal(sidebar.hidden, true);
+    click(handle);
+    assert.equal(sidebar.hidden, false, 'the handle opens the dock');
+    assert.equal(handle.getAttribute('aria-expanded'), 'true');
+    assert.equal(handle.getAttribute('aria-label'), 'Close sidebar');
+
+    // The handle is a toggle, so the same control puts it away again.
+    click(handle);
+    assert.equal(sidebar.hidden, true);
+    assert.equal(handle.getAttribute('aria-expanded'), 'false');
+
+    // A press on the score is what closes it, so writing is never behind
+    // a panel the writer has to find a button for.
+    click(handle);
+    assert.equal(sidebar.hidden, false);
+    doc.body.dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true }));
+    assert.equal(sidebar.hidden, true, 'a press outside the dock folds it away');
+
+    // A press INSIDE the dock leaves it open -- that is where the panels
+    // are used from.
+    click(handle);
+    sidebar.dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true }));
+    assert.equal(sidebar.hidden, false, 'using the dock keeps it open');
+  });
+
+  test('the Inst. box and the sidebar are never open together', () => {
+    const { window } = loadEditorPage({
+      newScore: { title: 'Piano', instrumentIds: ['piano'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
+    });
+    const doc = window.document;
+    const sidebar = doc.querySelector('[data-editor-sidebar]');
+    const handle = doc.querySelector('[data-editor-sidebar-handle]');
+    const instButton = doc.querySelector('[data-editor-popover="inst"]');
+    const instPanel = doc.querySelector('[data-editor-popover-panel="inst"]');
+    const click = (node) => node.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+
+    // Two panels over one score: the second one opened is the one that
+    // stays, so the writer is never looking past a panel to find another.
+    click(instButton);
+    assert.equal(instPanel.hidden, false);
+    click(handle);
+    assert.equal(sidebar.hidden, false, 'the dock opens');
+    assert.equal(instPanel.hidden, true, 'and the Inst. box folds away behind it');
+
+    click(instButton);
+    assert.equal(instPanel.hidden, false, 'the Inst. box opens');
+    assert.equal(sidebar.hidden, true, 'and the dock folds away behind it');
+  });
+
   test('the Mixer box lists the score\'s parts and says its levels are not wired yet', () => {
     const { window } = loadEditorPage();
     const doc = window.document;
@@ -2679,19 +2739,27 @@ describe('the editor and the engine agree, end to end', () => {
   });
 
   describe('the workspace', () => {
-    test('the score is the only thing beside the status line', () => {
+    test('the workspace holds the score, the status line and a dock that stays out of the way', () => {
       const { window, errors } = loadEditorPage();
       const doc = window.document;
       assert.deepEqual(errors, [], 'the page must start without a script error');
 
-      assert.equal(doc.querySelector('[data-editor-sidebar]'), null, 'the sidebar must be gone');
-      assert.equal(doc.querySelector('[data-editor-palette]'), null, 'the palette went with the sidebar');
+      // The dock is part of the editor again, but it does not take a column
+      // of the score to be there: it starts hidden behind an arrow handle on
+      // the left edge, which is the only control that opens it.
+      const sidebar = doc.querySelector('[data-editor-sidebar]');
+      const handle = doc.querySelector('[data-editor-sidebar-handle]');
+      assert.ok(sidebar, 'the dock is in the page');
+      assert.equal(sidebar.hidden, true, 'and it starts out of the way');
+      assert.ok(handle, 'the handle is what opens it');
+      assert.equal(handle.getAttribute('aria-expanded'), 'false');
+      assert.equal(handle.getAttribute('aria-controls'), sidebar.id, 'the handle names the dock it opens');
       assert.equal(doc.querySelector('[data-editor-canvas]'), null, 'the canvas is folded into the score host');
 
       const workspace = doc.querySelector('main.editor-workspace');
       assert.deepEqual(
         [...workspace.children].map((node) => node.className),
-        ['editor-score', 'editor-status'],
+        ['editor-sidebar__handle', 'editor-sidebar', 'editor-score', 'editor-status'],
       );
       assert.equal(doc.querySelector('[data-editor-score]').dataset.layout, 'page', 'the score host carries the layout');
     });

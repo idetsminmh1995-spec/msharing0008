@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="Write and edit a music score in the Notation Lab editor." />
     <title>Notation Lab Editor — M Sharing</title>
-    <link rel="stylesheet" href="styles.css?v=d783eb696f90" />
+    <link rel="stylesheet" href="styles.css?v=7ca12d6576e0" />
     <link rel="icon" type="image/svg+xml" href="assets/logo/m-sharing-mark.svg" />
   </head>
   <body class="editor-page">
@@ -125,6 +125,12 @@
     </div>
 
     <main class="editor-workspace" aria-label="Notation work" data-region="notation-work">
+      <button class="editor-sidebar__handle" type="button" data-editor-sidebar-handle aria-label="Open sidebar" title="Sidebar — palettes, properties, instruments" aria-expanded="false" aria-controls="editor-sidebar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+      </button>
+      <aside class="editor-sidebar" id="editor-sidebar" data-editor-sidebar aria-label="Sidebar" hidden>
+        <div class="editor-sidebar__body" data-editor-sidebar-body></div>
+      </aside>
       <div class="editor-score" data-editor-score data-layout="page" hidden></div>
       <p class="editor-status" role="status" aria-live="polite">
         <span class="editor-status__message" data-editor-status>Ready.</span>
@@ -192,6 +198,6 @@
     <script src="soundfonts-config.js?v=11199e76d024"></script>
     <script src="notation-doc.js?v=3298488721aa"></script>
     <script src="notation-newscore.js?v=99c9bb4cc6d4"></script>
-    <script src="notation-editor.js?v=f6923aa8bad9"></script>
+    <script src="notation-editor.js?v=7e4cb347c74e"></script>
   </body>
 </html>

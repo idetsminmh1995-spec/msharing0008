@@ -66,6 +66,8 @@
   const mixerPanel = pick('[data-editor-popover-panel="mixer"]');
   const instButton = pick('[data-editor-popover="inst"]');
   const mixerButton = pick('[data-editor-popover="mixer"]');
+  const sidebar = pick('[data-editor-sidebar]');
+  const sidebarHandle = pick('[data-editor-sidebar-handle]');
   const voiceSelect = pick('[data-editor-voice]');
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -3331,6 +3333,26 @@
     if (mixerButton) mixerButton.disabled = !state.doc;
   }
 
+  // ---- sidebar -----------------------------------------------------------
+
+  /**
+   * The dock opens from one arrow handle and closes on anything else.
+   *
+   * A notation window belongs to the score, so the dock cannot be a
+   * column that is always there: it slides in over the page, and the
+   * first press that is not on it -- or the handle again -- puts it back.
+   * It and the Inst. box are two panels over the same score, so opening
+   * one closes the other rather than stacking them.
+   */
+  const setSidebar = (open) => {
+    if (!sidebar || !sidebarHandle) return;
+    sidebar.hidden = !open;
+    sidebarHandle.setAttribute('aria-expanded', String(open));
+    sidebarHandle.setAttribute('aria-label', open ? 'Close sidebar' : 'Open sidebar');
+    if (open) closePopovers();
+  };
+  const isSidebarOpen = () => Boolean(sidebar) && !sidebar.hidden;
+
   // ---- wiring ------------------------------------------------------------
 
   backButton.addEventListener('click', () => window.location.assign('notation.html'));
@@ -3448,10 +3470,21 @@
     ) {
       closePopovers();
     }
+    if (!event.target.closest('[data-editor-sidebar], [data-editor-sidebar-handle]')) {
+      setSidebar(false);
+    }
   });
 
+  if (sidebarHandle) {
+    sidebarHandle.addEventListener('click', () => setSidebar(!isSidebarOpen()));
+  }
+
   popoverTriggers.forEach((trigger) => {
-    trigger.addEventListener('click', () => togglePopover(trigger));
+    trigger.addEventListener('click', () => {
+      // The Inst. box and the dock both cover the score, so one at a time.
+      if (trigger !== sidebarHandle) setSidebar(false);
+      togglePopover(trigger);
+    });
   });
   // A tool inside a panel picks its value and folds the box away again,
   // which is what a palette button is for.
@@ -3465,7 +3498,9 @@
     });
   });
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closePopovers();
+    if (event.key !== 'Escape') return;
+    closePopovers();
+    setSidebar(false);
   });
   window.addEventListener('resize', () => {
     closePopovers();
