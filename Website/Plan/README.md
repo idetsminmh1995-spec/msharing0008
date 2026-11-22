@@ -373,6 +373,80 @@ Writer Engine သည် Notation Editor ထဲတွင် လုပ်ဆော
 
 အဆင့်တစ်ခုချင်းစီကို သင် "ready" ဟု ပြောမှသာ စတင်မည်။
 
+## Create Video — Final video layout — 2026-11-22
+
+Create Video မှ ထွက်လာသော final video ကို **အပိုင်း ၃ ပိုင်း** ခွဲပြမည်။ အပိုင်း ၃ ပိုင်းသည် အမြဲတူသော်လည်း တူရိယာတစ်ခုနှင့်တစ်ခု အပိုင်းများ၏ **နေရာ** မတူပါ။ ထို့ကြောင့် Video Engine ၏ layout ကို တူရိယာအလိုက် ပြောင်းလို့ရသော **template** အဖြစ် တည်ဆောက်ရမည် (တူရိယာအသစ်ထည့်တိုင်း Engine ကို ပြန်မရေးဘဲ layout တစ်ခု ထပ်ကြေညာရုံဖြင့် ရစေရန်)။ ၎င်းသည် အပေါ်ဆုံး သတိပေးချက် (instrument အားလုံးအတွက် common အလုပ်ကို Video Engine က လုပ်ရမည်) နှင့် ကိုက်ညီသည်။
+
+### အပိုင်း ၃ ပိုင်း
+
+| အပိုင်း | အကြောင်းအရာ | ဆွဲပေးမည့် Engine |
+|---|---|---|
+| **Title / Info** | ဘယ်ဘက်တွင် Logo၊ ၎င်းဘေးတွင် Title 1၊ Title 1 အောက်တွင် Title 2။ ထိုတန်းထဲတွင်ပင် `4/4`၊ `BPM`၊ `Key`၊ `Metronome` | Video Engine (Metronome/BPM data၊ Key ကို MusicXML မှ) |
+| **Notation** | Notation | Notation Engine |
+| **တူရိယာ** | ထုတ်နေသော တူရိယာ (Drum / Piano / Guitar / Violin ...) | Drum Animation Engine၊ Piano Hand Engine စသည့် တူရိယာအလိုက် Engine |
+
+Video Engine သည် ဤအပိုင်း ၃ ခုကို frame တစ်ခုထဲတွင် ပေါင်းဆွဲပေးရမည်။
+
+### တူရိယာအလိုက် နေရာချထားပုံ
+
+| တူရိယာ | Title / Info | Notation | တူရိယာ |
+|---|---|---|---|
+| **Drum**၊ **Piano** | အပေါ်ဆုံး | အလယ် | **အောက်** |
+| **Guitar** | **အောက်ဆုံး** | အလယ် | **အပေါ်** |
+| **Violin** | **အောက်ဆုံး** | ဘေးတစ်ဖက် | **ဘေးတစ်ဖက်** (ဘယ်/ညာ မသတ်မှတ်ရသေး) |
+
+```
+Drum / Piano            Guitar                 Violin
+┌───────────────┐    ┌───────────────┐    ┌──────────┬────────┐
+│ Title / Info  │    │ Guitar        │    │ Notation │ Violin │
+├───────────────┤    ├───────────────┤    │          │        │
+│ Notation      │    │ Notation      │    ├──────────┴────────┤
+├───────────────┤    ├───────────────┤    │ Title / Info      │
+│ Drum / Piano  │    │ Title / Info  │    └───────────────────┘
+└───────────────┘    └───────────────┘
+```
+
+(Violin ပုံတွင် Violin ကို ညာဘက်တွင် ဥပမာထားထားသည်။ Bass၊ Strings၊ Voice စသည့် အခြားတူရိယာများ၏ နေရာကို နောက်မှ သတ်မှတ်မည်။)
+
+### Notation အပိုင်း
+
+Notation ကို **Page** သို့မဟုတ် **Horizontal (အလျားလိုက်)** ရွေးနိုင်သည်။ ၎င်းတို့သည် Notation Engine ၏ `page` နှင့် `scroll` layout နှစ်မျိုးနှင့် ကိုက်ညီသည်။
+
+| ရွေးချယ်မှု | Notation ရွေ့ပုံ |
+|---|---|
+| **Horizontal** | ညာဘက်မှ ဘယ်ဘက်သို့ |
+| **Page** | အောက်မှ အပေါ်သို့ |
+
+### Metronome — ရေတွက်ပုံ ရွေးချယ်မှု (Studio option box အသစ်)
+
+Video ထဲတွင် ထည့်ရန် ရွေးချယ်ခွင့်ပေးသော box များထဲတွင် Metronome အတွက် **ရေတွက်ပုံ ရွေးသော box** မပါသေးပါ။ ထပ်ထည့်ရမည်။
+
+| ရွေးချယ်မှု | ပြပုံ | ခွဲပုံ |
+|---|---|---|
+| ၁ | `1, 2, 3, 4` | quarter note |
+| ၂ | `1&, 2&, 3&, 4&` | eighth note |
+| ၃ | `1e&a, 2e&a, 3e&a, 4e&a` | sixteenth note |
+
+ရှိပြီးသား Metronome Studio ၏ `Count Voice` (အသံဖြင့်ရေတွက်ခြင်း) toggle/type/volume သည် UI သာရှိပြီး render နှင့် မချိတ်ရသေးပါ (Doc: Metronome Studio input controls)။
+
+### Thank You video (Video အဆုံး)
+
+- Video တိုင်း၏ **အဆုံးတွင်** R2 ထဲရှိ **Thank You video** ဖိုင်ကို ဆက်ပေါင်းထည့်ရမည်။ ၎င်းကို **Video Engine** က လုပ်ပေးရမည်။
+- Thank You video ဖိုင်များသည် R2 ထဲတွင် ရှိပြီးသား ဖြစ်ပြီး **Landscape / Portrait / Square အလိုက် သီးခြားဖိုင်များ** ခွဲထားသည်။ Video ၏ output ပုံစံနှင့် ကိုက်ညီသောဖိုင်ကို ရွေးသုံးရမည်။ ဖိုင်အမည်နှင့် R2 path များကို နောက်မှ သတ်မှတ်ပေးမည်။
+- **Engine ၏ လက်ရှိအခြေအနေ (2026-11-22 စစ်ဆေးချက်):** Video Engine (`assets/video-engine.js`) သည် `segments` ကို အစဉ်လိုက်ဆက်ပြီး MP4 တစ်ဖိုင်တည်း ထုတ်ပေးနိုင်သည်။ Code ၏ မှတ်ချက်တွင် Video အဓိကနှင့် အဆုံးရှိ Thank You clip ကို ဖိုင်တစ်ခုတည်းဖြစ်စေရန် ရည်ရွယ်ကြောင်း ဖော်ပြထားသည်။ `<video>` ကဲ့သို့ ကိုယ်ပိုင်အမြန်နှုန်းရှိသော source ကို frame တစ်ခုချင်း တောင်းဆိုပြီး စောင့်နိုင်သည်။ သို့သော် Studio page များဘက်တွင် R2 မှ Thank You clip ကို ခေါ်ပြီး အဆုံး segment အဖြစ် ထည့်သော code ကို ရှာမတွေ့ပါ ("thank"/"outro"/"ending" ဖြင့် ရှာဖွေစစ်ဆေးချက်)။ ထို့ကြောင့် Engine ဘက် အခြေခံရှိသော်လည်း page ဘက် ချိတ်ဆက်မှု မရှိသေးဟု ယူဆရသည်။
+- Engine ၏ code မှတ်ချက်အရ Thank You clip သည် **optional** (မရလျှင် export ကို မတားပါ)။ အသုံးပြုသူ၏ လိုအပ်ချက်မှာ Video တိုင်းတွင် ထည့်ရမည် ဖြစ်သည်။ မရလျှင် ဘာလုပ်မည်ကို အောက်တွင် မေးခွန်းအဖြစ် ဖွင့်ထားသည်။
+- အသံသည် segment အားလုံး၏ အသံကို ပေါင်းပြီး တစ်ပုံတည်း encode လုပ်သဖြင့် Thank You clip ၏ အသံပါ အဆုံးတွင် ချောမွေ့စွာ ဆက်ပေါင်းနိုင်ရမည်။
+
+### မဖြေရှင်းရသေးသော အချက်များ
+
+1. Violin ကို ဘယ်ဘက်/ညာဘက် ထားမည်ကို အတည်ပြုရန်။
+2. ရေတွက်ပုံ ရွေးချယ်မှုသည် Video ပေါ်ရှိ စာသားကိုသာ ပြောင်းမလား၊ `Count Voice` ၏ အသံကိုပါ တူညီအောင် ပြောင်းမလား။
+3. ရွေ့နေသော Notation ပေါ်တွင် အခု တီးနေသော note ကို ဘယ်လိုပြမည် (ပုံသေ playhead မျဉ်း၊ note ကို အရောင်ပြောင်း highlight၊ သို့မဟုတ် နှစ်ခုလုံး)။
+4. Thank You ဖိုင် မရလျှင် Video ထုတ်ခြင်းကို ရပ်မလား၊ မပါဘဲ ဆက်ထုတ်မလား။
+5. Thank You ဖိုင်အမည်နှင့် R2 path (Landscape / Portrait / Square)။
+6. Bass၊ Strings၊ Voice စသည့် အခြားတူရိယာများ၏ layout နေရာ။
+7. `Title 1`၊ `Title 2` နှင့် Logo ၏ data ဘယ်ကလာသည် (အသုံးပြုသူ ရိုက်ထည့်ခြင်း / profile / project)။
+
 ## Sound Engine နှင့် MuseScore SoundFont — 2026-11-13
 
 Notation Engine က score note များကို timing ပါသော `noteOn`, `noteOff`, `programChange` နှင့် `controlChange` events အဖြစ် ထုတ်ပေးပြီး Sound Engine က ထို events များကို အသံအဖြစ် render/playback လုပ်မည်။ ပထမဆုံး sound source အဖြစ် MuseScore 3 နှင့် MuseScore 2.2+ တွင် အသုံးပြုသော official `MuseScore_General.sf3` ကို သုံးမည်။ SoundFont၊ license၊ sample attribution နှင့် version metadata များကို Cloudflare R2 တွင် versioned prefix ဖြင့် သိမ်းမည်။ အသေးစိတ်သည် [Sound Engine Plan](../Notation/Sound%20Plan/README.md) နှင့် [MuseScore General R2 Asset Record](../Notation/Sound%20Doc/MuseScore-General-R2-Asset.md) တွင် ရှိသည်။
