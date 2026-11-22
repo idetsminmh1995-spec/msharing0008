@@ -2060,6 +2060,43 @@ describe('the editor and the engine agree, end to end', () => {
     assert.equal(sidebar.hidden, true, 'and the dock folds away behind it');
   });
 
+  test('the dock comes back open on the tab it was left on', () => {
+    const { window } = loadEditorPage({
+      newScore: { title: 'Piano', instrumentIds: ['piano'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
+    });
+    const doc = window.document;
+    const click = (node) => node.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    click(doc.querySelector('[data-editor-sidebar-handle]'));
+    click(doc.querySelector('[data-sidebar-tab="instruments"]'));
+
+    // A reload is a fresh page reading the same storage, so the dock is
+    // asked to come back where the writer left it.
+    const reopened = loadEditorPage({
+      newScore: { title: 'Piano', instrumentIds: ['piano'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
+      localStorage: { 'notation-lab-sidebar': window.localStorage.getItem('notation-lab-sidebar') },
+    });
+    const again = reopened.window.document;
+    assert.equal(again.querySelector('[data-editor-sidebar]').hidden, false, 'the dock is still open');
+    assert.equal(
+      again.querySelector('[data-sidebar-tab="instruments"]').getAttribute('aria-selected'),
+      'true',
+      'and still on the tab it was left on',
+    );
+    assert.equal(
+      again.querySelector('[data-editor-sidebar-handle]').getAttribute('aria-expanded'),
+      'true',
+      'the handle agrees with it',
+    );
+  });
+
+  test('a first visit still starts with the dock put away', () => {
+    const { window } = loadEditorPage();
+    const doc = window.document;
+    assert.equal(doc.querySelector('[data-editor-sidebar]').hidden, true, 'nothing is open over the score');
+    assert.equal(doc.querySelector('[data-sidebar-tab="palettes"]').getAttribute('aria-selected'), 'true');
+    assert.equal(window.localStorage.getItem('notation-lab-sidebar'), null, 'and no state is invented');
+  });
+
   test('the Mixer box lists the score\'s parts and says its levels are not wired yet', () => {
     const { window } = loadEditorPage();
     const doc = window.document;
@@ -2744,6 +2781,33 @@ describe('the editor and the engine agree, end to end', () => {
   });
 
   describe('the workspace', () => {
+    test('the view switch draws the same score as pages or one row', () => {
+      const { window } = loadEditorPage();
+      const doc = window.document;
+      const score = doc.querySelector('[data-editor-score]');
+      const page = doc.querySelector('[data-editor-layout="page"]');
+      const scroll = doc.querySelector('[data-editor-layout="scroll"]');
+      const click = (node) => node.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+
+      assert.equal(score.dataset.layout, 'page', 'the editor opens on pages');
+      assert.equal(page.getAttribute('aria-pressed'), 'true');
+      assert.equal(scroll.getAttribute('aria-pressed'), 'false');
+      assert.ok(score.querySelector('svg'), 'and a score is drawn');
+
+      click(scroll);
+      assert.equal(score.dataset.layout, 'scroll', 'Horizontal redraws the score as one row');
+      assert.equal(scroll.getAttribute('aria-pressed'), 'true');
+      assert.equal(page.getAttribute('aria-pressed'), 'false');
+      assert.ok(score.querySelector('svg'), 'the score is still there');
+      assert.match(doc.querySelector('[data-editor-status]').textContent, /Horizontal view/);
+
+      // The two modes are one document drawn two ways, so going back does
+      // not lose the score.
+      click(page);
+      assert.equal(score.dataset.layout, 'page');
+      assert.ok(score.querySelector('svg'), 'and Page view draws it again');
+    });
+
     test('the workspace holds the score, the status line and a dock that stays out of the way', () => {
       const { window, errors } = loadEditorPage();
       const doc = window.document;
@@ -3053,6 +3117,337 @@ describe('the editor and the engine agree, end to end', () => {
       assert.equal(visible('accent'), false, 'an unmatched mark is hidden');
       assert.equal(doc.querySelector('[data-palette-group="clefs"]').hidden, true,
         'a group with nothing left is hidden too');
+    });
+  });
+
+  describe('the Properties tab', () => {
+    const NOTED_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+  <part id="P1">
+    ${[1, 2].map((number) => `<measure number="${number}">
+      ${number === 1 ? `<attributes><divisions>4</divisions><key><fifths>0</fifths></key>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef></attributes>` : ''}
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><type>whole</type></note>
+    </measure>`).join('')}
+  </part>
+</score-partwise>`;
+
+    /** Opens the dock on a noted score, selects everything, shows Properties. */
+    async function openProperties() {
+      const opened = loadEditorPage({ pendingXml: NOTED_XML });
+      const { window } = opened;
+      const doc = window.document;
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+      doc.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }));
+      doc.querySelector('[data-editor-sidebar-handle]')
+        .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      doc.querySelector('[data-sidebar-tab="properties"]')
+        .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      const panel = doc.querySelector('.editor-sidebar__panel');
+      return {
+        window,
+        doc,
+        panel,
+        field: (name) => panel.querySelector(`[data-props-field="${name}"]`),
+        saved: () => {
+          doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+          return JSON.parse(window.localStorage.getItem('msharing-notation-scores') || '[]')[0]?.xml ?? '';
+        },
+      };
+    }
+
+    test('it reads the selected note and offers the fields that can change', async () => {
+      const page = await openProperties();
+      assert.ok(page.panel.querySelector('.editor-props'), 'the Properties panel is drawn');
+      assert.match(page.panel.textContent, /Bar 1/, 'it names where the selection sits');
+      assert.equal(page.field('step-0').value, 'C');
+      assert.equal(page.field('octave-0').value, '4');
+      assert.equal(page.field('duration').value, 'whole:0');
+      assert.equal(page.field('voice').value, '1');
+
+      // A score with nothing selected says so rather than showing blank
+      // fields that would write nowhere.
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      page.doc.querySelector('[data-sidebar-tab="instruments"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      page.doc.querySelector('[data-sidebar-tab="properties"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      const empty = page.doc.querySelector('.editor-sidebar__panel');
+      assert.match(empty.textContent, /Select a note/, 'an empty selection is stated plainly');
+    });
+
+    test('a pitch change is written into the score and undoes once', async () => {
+      const page = await openProperties();
+      const step = page.field('step-0');
+      step.value = 'E';
+      step.dispatchEvent(new page.window.Event('change', { bubbles: true }));
+      assert.match(page.doc.querySelector('[data-editor-status]').textContent, /Wrote E4/);
+      assert.match(page.saved(), /<step>E<\/step>/, 'the note is re-pitched in the file');
+
+      // The edit went through the same command path as every other one, so
+      // one undo puts the note back.
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }));
+      assert.match(page.saved(), /<step>C<\/step>/, 'undo restores the old pitch');
+    });
+
+    test('a duration change refills the bar to its own meter', async () => {
+      const page = await openProperties();
+      const duration = page.field('duration');
+      duration.value = 'half:0';
+      duration.dispatchEvent(new page.window.Event('change', { bubbles: true }));
+      const measure = page.saved().match(/<measure number="1">([\s\S]*?)<\/measure>/)?.[1] ?? '';
+      assert.match(measure, /<type>half<\/type>/, 'the note is now a half note');
+      // A shorter note leaves the rest of the bar as rests, so the bar still
+      // holds exactly four beats.
+      assert.match(measure, /<rest(\s*\/)?>/, 'the gap became a rest');
+      assert.equal((measure.match(/<type>half<\/type>/g) ?? []).length, 2, 'two halves fill the bar');
+    });
+  });
+
+  describe('a guitar part that prints notation and tab', () => {
+    /** A guitar written as notation over tab: one part, two staves. */
+    const GUITAR_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list>
+    <score-part id="P1">
+      <part-name>Acoustic Guitar</part-name>
+      <score-instrument id="P1-I1"><instrument-name>Acoustic Guitar</instrument-name></score-instrument>
+      <midi-instrument id="P1-I1">
+        <midi-channel>1</midi-channel><midi-program>26</midi-program>
+      </midi-instrument>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <key><fifths>0</fifths></key>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <staves>2</staves>
+        <clef number="1"><sign>G</sign><line>2</line></clef>
+        <clef number="2"><sign>TAB</sign><line>5</line></clef>
+        <staff-details number="2"><staff-lines>6</staff-lines></staff-details>
+        <transpose><chromatic>0</chromatic><octave-change>-1</octave-change></transpose>
+      </attributes>
+      <note><rest measure="yes"/><duration>16</duration><voice>1</voice><staff>1</staff></note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+    /** Measure 1's sounding notes, with the staff, string and fret each names. */
+    function soundingNotes(xml) {
+      const measure = xml.match(/<measure number="1">([\s\S]*?)<\/measure>/)?.[1] ?? '';
+      return [...measure.matchAll(/<note>([\s\S]*?)<\/note>/g)]
+        .map((match) => match[1].replace(/\s+/g, ''))
+        .filter((note) => !note.startsWith('<rest'))
+        .map((note) => ({
+          staff: note.match(/<staff>(\d+)<\/staff>/)?.[1] ?? '1',
+          string: note.match(/<string>(\d+)<\/string>/)?.[1] ?? null,
+          fret: note.match(/<fret>(\d+)<\/fret>/)?.[1] ?? null,
+        }));
+    }
+
+    /** Opens the guitar score, the Inst. box, and gives the pointer a 20x scale. */
+    async function openGuitar() {
+      const { window } = loadEditorPage({ pendingXml: GUITAR_XML });
+      const doc = window.document;
+      // The handoff is read through `File.text()`, so the score lands a tick
+      // after the boot's own stack returns.
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+      window.DOMPoint = class {
+        constructor(x = 0, y = 0) { this.x = x; this.y = y; }
+        matrixTransform() { return new window.DOMPoint(this.x, this.y); }
+      };
+      window.SVGElement.prototype.getScreenCTM = () => ({
+        a: 20, b: 0, c: 0, d: 20, e: 0, f: 0,
+        inverse: () => ({ a: 1 / 20, b: 0, c: 0, d: 1 / 20, e: 0, f: 0 }),
+      });
+      window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 1, height: 1 });
+      doc.querySelector('[data-editor-popover="inst"]')
+        .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      return {
+        window,
+        doc,
+        panel: doc.querySelector('[data-editor-popover-panel="inst"]'),
+        status: () => doc.querySelector('[data-editor-status]').textContent,
+        saved: () => {
+          doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+          return JSON.parse(window.localStorage.getItem('msharing-notation-scores') || '[]')[0]?.xml ?? '';
+        },
+      };
+    }
+
+    test('a note written from the fretboard lands on both staves', async () => {
+      const page = await openGuitar();
+      // The fretboard writes a string and a fret; the notation staff above
+      // it has to carry the same note, or the two staves disagree.
+      page.panel.querySelector('[data-editor-inst-fret="1:5"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      assert.match(page.status(), /Inserted A4/);
+
+      // One sounding note on each staff, and both name the same string and
+      // fret: the notation staff and the tab staff say the same thing.
+      const sounding = soundingNotes(page.saved());
+      assert.deepEqual(sounding.map((note) => note.staff), ['1', '2'], 'one note on each staff');
+      assert.deepEqual(sounding.map((note) => note.fret), ['5', '5'], 'both name the fret');
+      assert.deepEqual(sounding.map((note) => note.string), ['1', '1'], 'and the string');
+    });
+
+    test('a note written from the notation staff reaches the tab staff', async () => {
+      const page = await openGuitar();
+      page.panel.querySelector('[data-editor-inst-fret="1:0"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      // The cursor moved on to the next beat; write a second note there.
+      page.panel.querySelector('[data-editor-inst-fret="2:3"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      assert.match(page.status(), /Inserted /);
+
+      // Both beats are written twice: once per staff.
+      const sounding = soundingNotes(page.saved());
+      assert.equal(sounding.filter((note) => note.staff === '1').length, 2, 'two notes on the notation staff');
+      assert.equal(sounding.filter((note) => note.staff === '2').length, 2, 'and two on the tab staff');
+    });
+
+    test('a rest clears both staves', async () => {
+      const page = await openGuitar();
+      page.panel.querySelector('[data-editor-inst-fret="1:5"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      // Deleting the beat has to clear the tab note too, or the tab staff
+      // would keep sounding a note the notation staff no longer holds.
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }));
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+
+      const measure = page.saved().match(/<measure number="1">([\s\S]*?)<\/measure>/)?.[1] ?? '';
+      assert.equal((measure.match(/<fret>5<\/fret>/g) ?? []).length, 0, 'the note is gone from both staves');
+      assert.match(measure, /<rest/, 'and the beat is a rest');
+    });
+
+    test('the Staff field moves a note between the two staves', async () => {
+      const page = await openGuitar();
+      page.panel.querySelector('[data-editor-inst-fret="1:5"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      // The fretboard leaves the cursor on the next beat, so select the
+      // note that was just written before asking Properties about it.
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }));
+      page.doc.querySelector('[data-editor-sidebar-handle]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      page.doc.querySelector('[data-sidebar-tab="properties"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      const staff = page.doc.querySelector('[data-props-field="staff"]');
+      assert.ok(staff, 'a two-staff part offers the Staff field');
+
+      // Move the notation note down to the tab staff: the beat is one note
+      // on the tab staff, and the notation staff keeps a rest.
+      staff.value = '2';
+      staff.dispatchEvent(new page.window.Event('change', { bubbles: true }));
+      assert.match(page.status(), /Moved to staff 2/);
+
+      const sounding = soundingNotes(page.saved());
+      assert.deepEqual(sounding.map((note) => note.staff), ['2'], 'the note sits on the tab staff');
+      assert.equal(sounding[0].fret, '5', 'and still names its fret');
+    });
+  });
+
+  describe('the Instruments tab', () => {
+    const TWO_PART_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list>
+    <score-part id="P1"><part-name>Piano</part-name></score-part>
+    <score-part id="P2"><part-name>Flute</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions><key><fifths>0</fifths></key>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef></attributes>
+      <note><rest measure="yes"/><duration>16</duration></note>
+    </measure>
+  </part>
+  <part id="P2">
+    <measure number="1">
+      <attributes><divisions>4</divisions><key><fifths>0</fifths></key>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef></attributes>
+      <note><rest measure="yes"/><duration>16</duration></note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+    /** Opens the dock on its Instruments tab. */
+    async function openInstruments(xml = TWO_PART_XML) {
+      const opened = loadEditorPage({ pendingXml: xml });
+      const { window } = opened;
+      const doc = window.document;
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+      doc.querySelector('[data-editor-sidebar-handle]')
+        .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      doc.querySelector('[data-sidebar-tab="instruments"]')
+        .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      return {
+        window,
+        doc,
+        panel: () => doc.querySelector('.editor-sidebar__panel'),
+        saved: () => {
+          doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+          return JSON.parse(window.localStorage.getItem('msharing-notation-scores') || '[]')[0]?.xml ?? '';
+        },
+      };
+    }
+
+    test('it lists the score\u2019s parts and switches which one is written into', async () => {
+      const page = await openInstruments();
+      const rows = [...page.panel().querySelectorAll('[data-part-row]')].map((row) => row.dataset.partRow);
+      assert.deepEqual(rows, ['P1', 'P2'], 'one row per part, in score order');
+      assert.equal(page.panel().querySelector('[data-part-name="P1"]').value, 'Piano');
+      assert.equal(page.panel().querySelector('[data-part-name="P2"]').value, 'Flute');
+      assert.equal(page.panel().querySelector('[data-part-row="P1"]').dataset.active, 'true');
+
+      page.panel().querySelector('[data-part-select="P2"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      assert.equal(
+        page.doc.querySelector('[data-editor-part]')?.value ?? 'P2',
+        'P2',
+        'the part selector follows the switch',
+      );
+      assert.equal(page.panel().querySelector('[data-part-row="P2"]').dataset.active, 'true');
+    });
+
+    test('renaming a part reaches the saved file', async () => {
+      const page = await openInstruments();
+      const name = page.panel().querySelector('[data-part-name="P2"]');
+      name.value = 'Oboe';
+      name.dispatchEvent(new page.window.Event('change', { bubbles: true }));
+      assert.match(page.doc.querySelector('[data-editor-status]').textContent, /Renamed to Oboe/);
+      assert.match(page.saved(), /<part-name>Oboe<\/part-name>/, 'the file carries the new name');
+    });
+
+    test('a part can be added and removed, and the last one is kept', async () => {
+      const page = await openInstruments();
+      const select = page.panel().querySelector('[data-instrument-add-select]');
+      select.value = 'violin';
+      page.panel().querySelector('[data-instrument-add]')
+        .dispatchEvent(new page.window.Event('submit', { bubbles: true, cancelable: true }));
+
+      let rows = [...page.panel().querySelectorAll('[data-part-row]')].map((row) => row.dataset.partRow);
+      assert.deepEqual(rows, ['P1', 'P2', 'P3'], 'the new part is appended');
+      assert.match(page.saved(), /<part-name>Violin<\/part-name>/, 'and it is in the file');
+
+      page.panel().querySelector('[data-part-remove="P3"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      rows = [...page.panel().querySelectorAll('[data-part-row]')].map((row) => row.dataset.partRow);
+      assert.deepEqual(rows, ['P1', 'P2'], 'the part is taken away again');
+
+      // Two more removals leave the score with its first part and a disabled
+      // button: a score with no parts has nothing to draw.
+      for (const id of ['P2', 'P1']) {
+        page.panel().querySelector(`[data-part-remove="${id}"]`)
+          ?.dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      }
+      rows = [...page.panel().querySelectorAll('[data-part-row]')].map((row) => row.dataset.partRow);
+      assert.deepEqual(rows, ['P1'], 'the last part stays');
+      assert.equal(page.panel().querySelector('[data-part-remove="P1"]').disabled, true);
     });
   });
 });

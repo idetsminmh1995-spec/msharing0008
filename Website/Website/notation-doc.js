@@ -176,19 +176,32 @@
           kept.push(...restsForSpan(currentEnd - end, voiceId, current.staff ?? 1, end));
         }
       }
-      const sorted = sortEvents([...kept, event]);
-      const filled = [];
-      let cursor = 0;
-      for (const current of sorted) {
-        const currentStart = current.startTick ?? cursor;
-        if (currentStart > cursor) {
-          filled.push(...restsForSpan(currentStart - cursor, voiceId, current.staff ?? 1, cursor));
-        }
-        filled.push(current);
-        cursor = currentStart + current.duration.ticks;
-      }
-      return padVoiceToCapacity(filled, voiceId, capacity, 1);
+      return fillVoice([...kept, event], voiceId, capacity, event.staff ?? 1);
     });
+  }
+
+  /**
+   * Fills the gaps between events with rests and tops the bar up to its
+   * meter, so a voice always spans its whole measure.
+   *
+   * Every command that changes the shape of a voice -- writing a note,
+   * changing a duration, moving a note to another voice -- has to leave
+   * the voice covering its bar, or the renderer draws a short measure and
+   * the next click lands in the wrong bar.
+   */
+  function fillVoice(events, voiceId, capacity, staff) {
+    const sorted = sortEvents(events);
+    const filled = [];
+    let cursor = 0;
+    for (const current of sorted) {
+      const currentStart = current.startTick ?? cursor;
+      if (currentStart > cursor) {
+        filled.push(...restsForSpan(currentStart - cursor, voiceId, current.staff ?? staff, cursor));
+      }
+      filled.push(current);
+      cursor = currentStart + current.duration.ticks;
+    }
+    return padVoiceToCapacity(filled, voiceId, capacity, staff);
   }
 
   /**
@@ -280,7 +293,7 @@
             startTick: event.startTick ?? 0,
           });
         }
-        return padVoiceToCapacity(sortEvents(working), voiceId, capacity, 1);
+        return padVoiceToCapacity(sortEvents(working), voiceId, capacity, staffOfVoice({ events: working }));
       });
     }
     return next;
@@ -695,6 +708,248 @@
     }));
   }
 
+  // ---- properties and instrument edits -----------------------------------
+
+  /**
+   * Replaces one event's duration, keeping the bar full.
+   *
+   * A duration change moves every note after it, so the voice is refilled
+   * rather than patched: the new length may leave a hole where the old
+   * one ended, and only `fillVoice` turns that hole into legal rests. An
+   * event that would now run past its own barline is clamped to what the
+   * bar has left, which is what MuseScore does instead of spilling into
+   * the next bar.
+   */
+  function setEventDuration(doc, cell, duration) {
+    const capacity = ticksPerMeasure(doc, cell.partId, cell.measureNumber);
+    return updateVoice(doc, cell.partId, cell.measureNumber, cell.voiceId, (events) => {
+      const sorted = sortEvents(events);
+      const current = sorted[cell.eventIndex];
+      if (!current) return sorted;
+      const start = current.startTick ?? 0;
+      const room = capacity - start;
+      const ticks = Math.min(duration.ticks, room);
+      const fitted =
+        ticks === duration.ticks
+          ? duration
+          : E.duration(
+              E.durationTypeAndDotsFromTicks(ticks, 3)?.type ?? duration.type,
+              E.durationTypeAndDotsFromTicks(ticks, 3)?.dots ?? 0,
+              ticks,
+            );
+      // Everything the old event covered is cleared, so a longer value eats
+      // the rests after it and a shorter one leaves rests behind.
+      const kept = sorted.filter((_, index) => index !== cell.eventIndex);
+      const next = [...kept, { ...current, duration: fitted }];
+      return fillVoice(next, cell.voiceId, capacity, current.staff ?? 1);
+    });
+  }
+
+  /**
+   * Moves one event into another voice as `event`.
+   *
+   * The same beat, written differently: another voice, or the part's other
+   * staff (which needs the note re-spelled -- a tab note carries a string
+   * and a fret, a notation note carries only its pitch). The beat it
+   * leaves becomes a rest, so the bar keeps its meter.
+   */
+  function moveEvent(doc, cell, { voiceId, event }) {
+    const source = eventAt(doc, cell);
+    if (source === undefined) return doc;
+    const capacity = ticksPerMeasure(doc, cell.partId, cell.measureNumber);
+    const without = updateVoice(doc, cell.partId, cell.measureNumber, cell.voiceId, (events) =>
+      fillVoice(
+        sortEvents(events).filter((_, index) => index !== cell.eventIndex),
+        cell.voiceId,
+        capacity,
+        source.staff ?? 1,
+      ),
+    );
+    return updateVoice(without, cell.partId, cell.measureNumber, voiceId, (events) => {
+      const kept = events.filter(
+        (current) =>
+          (current.startTick ?? 0) !== (event.startTick ?? 0) || current.kind === 'rest',
+      );
+      return fillVoice([...kept, event], voiceId, capacity, event.staff ?? 1);
+    });
+  }
+
+  /**
+   * Moves one event into another voice of the same bar.
+   *
+   * Voices are drawn on their own stems, so this is how a writer splits a
+   * chord into two parts. The event keeps its tick, staff and pitches; the
+   * source voice is refilled with rests where it used to be.
+   */
+  function setEventVoice(doc, cell, voiceId) {
+    if (voiceId === cell.voiceId) return doc;
+    const event = eventAt(doc, cell);
+    if (event === undefined) return doc;
+    return moveEvent(doc, cell, { voiceId, event: { ...event, voice: voiceId } });
+  }
+
+  /**
+   * Writes new pitches onto the selected event's notes.
+   *
+   * `pitches` runs parallel to the event's own note list, so a chord is
+   * re-pitched member by member and a single note is the one-element case.
+   * A tab note also carries the string and fret it was written on, and
+   * those describe the OLD pitch -- leaving them behind would draw the new
+   * pitch on the old string. They are dropped here and re-derived by the
+   * caller, which is the only place that knows the instrument's tuning.
+   */
+  function setNotesPitch(doc, cell, pitches) {
+    return updateVoice(doc, cell.partId, cell.measureNumber, cell.voiceId, (events) => {
+      const sorted = sortEvents(events);
+      const current = sorted[cell.eventIndex];
+      if (!current || current.kind === 'rest') return sorted;
+      const repitch = (note, index) => {
+        const pitch = pitches[index];
+        if (pitch === undefined) return note;
+        const { stringNumber, fret, ...rest } = note;
+        return { ...rest, pitch: { ...note.pitch, ...pitch } };
+      };
+      sorted[cell.eventIndex] =
+        current.kind === 'chord'
+          ? { ...current, notes: current.notes.map(repitch) }
+          : repitch(current, 0);
+      return sorted;
+    });
+  }
+
+  // ---- parts -------------------------------------------------------------
+
+  /** Renames a part; the part list and the mixer both read this. */
+  function renamePart(doc, partId, name) {
+    return updatePart(doc, partId, (part) => ({ ...part, name }));
+  }
+
+  /**
+   * Adds a part after the existing ones.
+   *
+   * A new part needs everything the parser would have produced for it: a
+   * measure list, one attributes row per bar, the same rows in the change
+   * timeline the renderer draws clefs from, and its `<midi-instrument>`
+   * routing so playback can reach it. The caller states the part's own
+   * layout (staves, clefs, tab lines, transpose) because that belongs to
+   * the instrument, while key and meter are the score's and are copied
+   * from bar 1.
+   */
+  function addPart(doc, { partId, name, layout = {}, routing = new Map() }) {
+    if (doc.score.parts.some((part) => part.id === partId)) return doc;
+    const template = doc.attributes.find((attribute) => attribute.measureNumber === 1);
+    if (template === undefined) return doc;
+    const count = Math.max(...doc.score.parts.map((part) => part.measures.length), 1);
+    const attributes = [];
+    const measures = [];
+    for (let number = 1; number <= count; number += 1) {
+      const existing = doc.attributes.find(
+        (attribute) => attribute.partId === template.partId && attribute.measureNumber === number,
+      );
+      const attribute = {
+        ...(existing ?? template),
+        ...layout,
+        partId,
+        measureNumber: number,
+      };
+      attributes.push(attribute);
+      const staves = Math.max(1, attribute.staves ?? 1);
+      const voices = [];
+      for (let staff = 1; staff <= staves; staff += 1) {
+        voices.push(
+          E.voice(staff, [
+            E.rest({
+              duration: E.duration('whole', 0, measureTicks(attribute)),
+              voice: staff,
+              staff,
+              startTick: 0,
+            }),
+          ]),
+        );
+      }
+      measures.push(E.measure(number, voices));
+    }
+    const gmNotes = new Map();
+    for (const [instrumentId, info] of routing) {
+      if (info.gmNote !== undefined) gmNotes.set(instrumentId, info.gmNote);
+    }
+    return {
+      ...doc,
+      score: {
+        ...doc.score,
+        parts: [...doc.score.parts, E.part(partId, measures, name)],
+      },
+      attributes: [...doc.attributes, ...attributes],
+      attributeChanges: [...(doc.attributeChanges ?? []), ...attributes.map(attributeChangeFor)],
+      midiInstrumentInfoByPart: new Map([
+        ...(doc.midiInstrumentInfoByPart ?? new Map()),
+        [partId, routing],
+      ]),
+      midiInstrumentsByPart: new Map([
+        ...(doc.midiInstrumentsByPart ?? new Map()),
+        [partId, gmNotes],
+      ]),
+    };
+  }
+
+  /**
+   * Removes a part and everything keyed to it.
+   *
+   * The last part is never removed: a score with no parts has nothing for
+   * the renderer to draw and nothing for the editor to write into. Every
+   * side table keyed by part id goes with it, or a later part that happens
+   * to reuse the id would inherit the old one's clefs and routing.
+   */
+  function removePart(doc, partId) {
+    if (doc.score.parts.length <= 1) return doc;
+    if (!doc.score.parts.some((part) => part.id === partId)) return doc;
+    const withoutPart = (entries) =>
+      Array.isArray(entries) ? entries.filter((entry) => entry.partId !== partId) : entries;
+    const drop = (map) => {
+      if (!(map instanceof Map) || !map.has(partId)) return map;
+      const next = new Map(map);
+      next.delete(partId);
+      return next;
+    };
+    return {
+      ...doc,
+      score: {
+        ...doc.score,
+        parts: doc.score.parts.filter((part) => part.id !== partId),
+      },
+      attributes: withoutPart(doc.attributes),
+      attributeChanges: withoutPart(doc.attributeChanges ?? []),
+      tempoMarks: withoutPart(doc.tempoMarks ?? []),
+      directions: withoutPart(doc.directions ?? []),
+      octaveShifts: withoutPart(doc.octaveShifts ?? []),
+      harmonies: withoutPart(doc.harmonies ?? []),
+      prints: withoutPart(doc.prints ?? []),
+      midiInstrumentInfoByPart: drop(doc.midiInstrumentInfoByPart),
+      midiInstrumentsByPart: drop(doc.midiInstrumentsByPart),
+    };
+  }
+
+  /** Points a part at another GM program, keeping its `<midi-instrument>` id. */
+  function setPartProgram(doc, partId, program) {
+    const routing = doc.midiInstrumentInfoByPart?.get(partId);
+    if (!routing || routing.size === 0) return doc;
+    const next = new Map();
+    for (const [instrumentId, info] of routing) {
+      next.set(instrumentId, { ...info, program });
+    }
+    return {
+      ...doc,
+      midiInstrumentInfoByPart: new Map([
+        ...(doc.midiInstrumentInfoByPart ?? new Map()),
+        [partId, next],
+      ]),
+    };
+  }
+
+  /** The `<instrument id>` a part's routing names first, or undefined. */
+  const instrumentIdOf = (doc, partId) =>
+    [...(doc.midiInstrumentInfoByPart?.get(partId)?.keys() ?? [])][0];
+
   /**
    * The selection as a document of its own -- what a copy hands to another
    * program.
@@ -926,6 +1181,15 @@
     dynamicAt,
     replaceEvent,
     setVoiceEvents,
+    setEventDuration,
+    setEventVoice,
+    moveEvent,
+    setNotesPitch,
+    renamePart,
+    addPart,
+    removePart,
+    setPartProgram,
+    instrumentIdOf,
     setSetup,
     setAttributesFrom,
     setBarline,

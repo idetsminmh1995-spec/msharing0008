@@ -295,6 +295,146 @@
   };
 
   /**
+   * The staff a part draws its tablature on, or null when it has none.
+   *
+   * A guitar part printed as "grand staff + tab" is ONE part on two
+   * staves: staff 1 carries the notation and staff 2 the fret numbers. The
+   * two are the same music, so whatever is written on one has to appear on
+   * the other -- see `writePaired`.
+   */
+  function tabStaffOf(measureNumber, partId = activePartId()) {
+    const staves = Math.max(1, attributeAt(measureNumber, partId)?.staves ?? 1);
+    for (let staff = 1; staff <= staves; staff += 1) {
+      if (isTabStaff(measureNumber, staff, partId)) return staff;
+    }
+    return null;
+  }
+
+  /** The part's first staff that is not a tab staff, or null when every staff is one. */
+  function notationStaffOf(measureNumber, partId = activePartId()) {
+    const staves = Math.max(1, attributeAt(measureNumber, partId)?.staves ?? 1);
+    for (let staff = 1; staff <= staves; staff += 1) {
+      if (!isTabStaff(measureNumber, staff, partId)) return staff;
+    }
+    return null;
+  }
+
+  /**
+   * Where a written pitch sits on the instrument's fretboard.
+   *
+   * The written pitch is compared with the open strings directly: the
+   * engine's `STRING_DATA` lists a fretted instrument's strings at the
+   * pitches they are WRITTEN with, so the octave a guitar or a bass sounds
+   * below its notation is already carried by the clef. The lowest fret
+   * wins -- that is how a player reads a single note -- and a tie goes to
+   * the thinner string, which keeps the note off the low strings when it
+   * fits higher up.
+   *
+   * `taken` holds the strings already spoken for by an earlier note of the
+   * same chord, so two notes never land on one string.
+   */
+  function tabPositionFor(pitch, taken = new Set()) {
+    const data = activeInstrument().data;
+    const midi = pitch?.kind === 'pitched' ? engine.midiNoteNumber?.(pitch) : undefined;
+    if (!data || midi === undefined) return null;
+    const count = data.openStrings.length;
+    let best = null;
+    for (let index = 0; index < count; index += 1) {
+      const fret = midi - data.openStrings[index];
+      if (fret < 0 || fret > data.frets) continue;
+      const stringNumber = count - index;
+      if (taken.has(stringNumber)) continue;
+      if (
+        best === null ||
+        fret < best.fret ||
+        (fret === best.fret && stringNumber < best.stringNumber)
+      ) {
+        best = { stringNumber, fret };
+      }
+    }
+    return best;
+  }
+
+  /**
+   * The same music as `event`, drawn on `toStaff`.
+   *
+   * A tab staff needs the string and fret as well as the pitch, and only
+   * the instrument's tuning can turn one into the other, so a note that no
+   * string can reach makes the whole counterpart impossible -- half a chord
+   * on the tab staff would be a different chord from the one written.
+   */
+  function counterpartEvent(event, toStaff, measureNumber) {
+    const tab = isTabStaff(measureNumber, toStaff);
+    const voiceId = voiceForStaff(toStaff);
+    const startTick = event.startTick ?? 0;
+    const init = { duration: event.duration, voice: voiceId, staff: toStaff, startTick };
+    // A rest carries no pitch, so it needs no string: it is the same rest on
+    // either staff, and a beat the writer cleared has to clear both.
+    if (event.kind === 'rest') return engine.rest(init);
+    const taken = new Set();
+    const members = [];
+    for (const note of eventNotes(event)) {
+      if (!tab) {
+        members.push(engine.note({ ...init, pitch: note.pitch }));
+        continue;
+      }
+      // A note written from the fretboard already states its string; honour
+      // that choice instead of re-deriving a different one.
+      const position =
+        note.stringNumber !== undefined && note.fret !== undefined
+          ? { stringNumber: note.stringNumber, fret: note.fret }
+          : tabPositionFor(note.pitch, taken);
+      if (position === null) return null;
+      taken.add(position.stringNumber);
+      members.push(engine.note({ ...init, pitch: note.pitch, ...position }));
+    }
+    if (members.length === 0) return null;
+    return members.length === 1 ? members[0] : engine.chord(members, { startTick });
+  }
+
+  /**
+   * Writes one event, and the same music on the part's other staff.
+   *
+   * Both writes go into ONE document, so the pair undoes as a single
+   * command and the score is never drawn with a notation note and a tab
+   * rest on the same beat. `to` is null on a part that prints one staff.
+   */
+  function writePaired(doc, { partId, measureNumber, voiceId, event, replaceIndex = -1, to = null }) {
+    const written =
+      replaceIndex >= 0
+        ? docTools.replaceEvent(doc, { partId, measureNumber, voiceId, eventIndex: replaceIndex, event })
+        : docTools.insertEvent(doc, { partId, measureNumber, voiceId, event });
+    if (to === null) return written;
+    const counterpart = counterpartEvent(event, to, measureNumber);
+    if (counterpart === null) return written;
+    const pairVoice = voiceForStaff(to, partId);
+    const events = eventsInFrom(written, measureNumber, pairVoice, partId);
+    const index = indexAtTickOnStaff(events, event.startTick ?? 0, to);
+    return index >= 0
+      ? docTools.replaceEvent(written, {
+          partId,
+          measureNumber,
+          voiceId: pairVoice,
+          eventIndex: index,
+          event: counterpart,
+        })
+      : docTools.insertEvent(written, {
+          partId,
+          measureNumber,
+          voiceId: pairVoice,
+          event: counterpart,
+        });
+  }
+
+  /** The part's other staff when it prints notation and tab together, else null. */
+  function pairedStaffFor(staffNumber, measureNumber = state.entry?.measureNumber ?? 1) {
+    const tabStaff = tabStaffOf(measureNumber);
+    if (tabStaff === null) return null;
+    if (staffNumber === tabStaff) return notationStaffOf(measureNumber);
+    return tabStaff;
+  }
+
+  /**
    * The pitch a string sounds at a fret.
    *
    * A tab line names a string, not a pitch, so the open string's tuning is
@@ -926,6 +1066,7 @@
       // has to follow every redraw, not only the tool clicks.
       syncTools();
       syncPalette();
+      syncSidebarPanel();
       updateZoom();
       updateLength();
       const errors = (result.diagnostics || []).filter((item) => item.severity === 'error');
@@ -1676,6 +1817,36 @@
   }
 
   /**
+   * The cells the selection implies, with their notation/tab counterparts.
+   *
+   * On a guitar part that prints both, one beat is one note written twice,
+   * so clearing the notation note has to clear the tab one as well or the
+   * two staves disagree about the bar.
+   */
+  function withCounterparts(cells) {
+    const all = new Map(cells.map((cell) => [`${cell.measureNumber}:${cell.voiceId}:${cell.eventIndex}`, cell]));
+    for (const cell of cells) {
+      const event = eventFor(cell);
+      if (!event || event.kind === 'rest') continue;
+      const to = pairedStaffFor(event.staff ?? 1, cell.measureNumber);
+      if (to === null) continue;
+      const voiceId = voiceForStaff(to);
+      const events = eventsIn(cell.measureNumber, voiceId);
+      const index = indexAtTickOnStaff(events, event.startTick ?? 0, to);
+      if (index < 0) continue;
+      const pairEvent = events[index];
+      if (!pairEvent || pairEvent.kind === 'rest') continue;
+      all.set(`${cell.measureNumber}:${voiceId}:${index}`, {
+        partId: cell.partId,
+        measureNumber: cell.measureNumber,
+        voiceId,
+        eventIndex: index,
+      });
+    }
+    return [...all.values()];
+  }
+
+  /**
    * Deletes the selection, leaving rests where the notes were.
    *
    * The anchor is kept so the cursor stays where the user was looking --
@@ -1688,7 +1859,7 @@
       announce('Select a note first.');
       return;
     }
-    const deletable = cells.filter((cell) => {
+    const deletable = withCounterparts(cells).filter((cell) => {
       const event = eventFor(cell);
       return event && event.kind !== 'rest';
     });
@@ -1696,9 +1867,16 @@
       announce('There is nothing to delete there.');
       return;
     }
+    // The count is what the writer selected, not what was written: on a
+    // paired part the tab note goes with the notation one, and saying
+    // "2 notes" for one click would be wrong.
+    const count = cells.filter((cell) => {
+      const event = eventFor(cell);
+      return event && event.kind !== 'rest';
+    }).length;
     const anchor = state.selection ? { ...state.selection } : { ...deletable[0] };
     commit((doc) => docTools.deleteEvents(doc, deletable),
-      `Deleted ${deletable.length} note${deletable.length === 1 ? '' : 's'}.`);
+      `Deleted ${count} note${count === 1 ? '' : 's'}.`);
     // The event at the anchor's index is a rest now, so the anchor still
     // points at the right place in the bar.
     const anchorEvent = eventFor(anchor);
@@ -1908,7 +2086,20 @@
 
     if (rest) {
       const event = engine.rest({ duration: fitted, voice: voiceId, staff, startTick: state.entry.tick });
-      commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event }), 'Rest inserted.');
+      // A guitar part that prints notation and tab is one part on two
+      // staves, so a rest clears both -- otherwise the tab staff keeps
+      // sounding a note the notation staff has just been cleared of.
+      commit(
+        (doc) =>
+          writePaired(doc, {
+            partId: activePartId(),
+            measureNumber,
+            voiceId,
+            event,
+            to: pairedStaffFor(staff, measureNumber),
+          }),
+        'Rest inserted.',
+      );
       advanceEntry(ticks, measureNumber, voiceId);
       return;
     }
@@ -1992,17 +2183,21 @@
 
     if (existing && existing.kind !== 'rest') {
       const note = engine.note({ pitch, duration: existing.duration, voice: voiceId, staff, ...tab });
+      // The tab staff is the same music as the notation staff above it, so
+      // a note written on either has to appear on both -- a guitarist reads
+      // one and plays from the other.
+      const to = pairedStaffFor(staff, measureNumber);
       if (stacking) {
         const stacked = stackedWith(existing, note, state.entry.tick);
         if (stacked === null) {
           announce(`${pitchLabel(step, pitch.alter, octave)} is already in the chord.`);
           return;
         }
-        commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: stacked }), 'Note added to chord.');
+        commit((doc) => writePaired(doc, { partId: activePartId(), measureNumber, voiceId, event: stacked, replaceIndex: existingIndex, to }), 'Note added to chord.');
       } else {
         // A plain letter or click on an occupied beat restates that beat's
         // pitch, replacing rather than stacking by default.
-        commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: note }), `Replaced with ${pitchLabel(step, pitch.alter, octave)}.`);
+        commit((doc) => writePaired(doc, { partId: activePartId(), measureNumber, voiceId, event: note, replaceIndex: existingIndex, to }), `Replaced with ${pitchLabel(step, pitch.alter, octave)}.`);
       }
       previewPitch(pitch, null, measureNumber);
       render();
@@ -2010,7 +2205,7 @@
     }
 
     const event = engine.note({ pitch, duration: fitted, voice: voiceId, staff, startTick: state.entry.tick, ...tab });
-    commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event }), `Inserted ${pitchLabel(step, pitch.alter, octave)}.`);
+    commit((doc) => writePaired(doc, { partId: activePartId(), measureNumber, voiceId, event, to: pairedStaffFor(staff, measureNumber) }), `Inserted ${pitchLabel(step, pitch.alter, octave)}.`);
     previewPitch(pitch, null, measureNumber);
     advanceEntry(ticks, measureNumber, voiceId);
   }
@@ -3341,6 +3536,41 @@
   // ---- sidebar -----------------------------------------------------------
 
   /**
+   * The dock remembers where the writer left it: open or closed, and on
+   * which tab.
+   *
+   * The score library already survives a reload, so a dock that snapped
+   * shut on every visit would make the writer reopen the same panel each
+   * time. Storage is optional -- a browser that refuses it still gets a
+   * working dock for the visit.
+   */
+  const SIDEBAR_STORE_KEY = 'notation-lab-sidebar';
+  const SIDEBAR_TABS = ['palettes', 'properties', 'instruments'];
+
+  function readSidebarState() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(SIDEBAR_STORE_KEY) || '{}');
+      return {
+        open: parsed?.open === true,
+        tab: SIDEBAR_TABS.includes(parsed?.tab) ? parsed.tab : 'palettes',
+      };
+    } catch {
+      return { open: false, tab: 'palettes' };
+    }
+  }
+
+  function writeSidebarState() {
+    try {
+      localStorage.setItem(
+        SIDEBAR_STORE_KEY,
+        JSON.stringify({ open: isSidebarOpen(), tab: state.sidebarTab }),
+      );
+    } catch {
+      // Storage is optional: the dock still works for this visit.
+    }
+  }
+
+  /**
    * The dock opens from one arrow handle and closes on anything else.
    *
    * A notation window belongs to the score, so the dock cannot be a
@@ -3351,10 +3581,15 @@
    */
   const setSidebar = (open) => {
     if (!sidebar || !sidebarHandle) return;
+    // A press on the score closes the dock on every click, so a state that
+    // is already the wanted one has to cost nothing -- not a repaint and
+    // not a storage write.
+    if (isSidebarOpen() === open) return;
     sidebar.hidden = !open;
     sidebarHandle.setAttribute('aria-expanded', String(open));
     sidebarHandle.setAttribute('aria-label', open ? 'Close sidebar' : 'Open sidebar');
     if (open) closePopovers();
+    writeSidebarState();
   };
   const isSidebarOpen = () => Boolean(sidebar) && !sidebar.hidden;
 
@@ -4091,6 +4326,472 @@
     }
   }
 
+  // ---- properties panel --------------------------------------------------
+  //
+  // MuseScore's Properties dock: the selected note's own values, editable
+  // in place. Every control writes through the same `commit()` path the
+  // toolbar and the palette use, so a property edit undoes like any other
+  // command and the renderer is never edited directly.
+
+  /** The one event the panel edits: the selection's anchor, when it is a note. */
+  function propertyTarget() {
+    const cells = paletteTargets();
+    if (cells.length === 0) return null;
+    const cell = state.selection ?? cells[0];
+    const event = eventFor(cell);
+    return event && event.kind !== 'rest' ? { cell, event } : null;
+  }
+
+  const propertyRow = (label, control, field = null) => {
+    const row = document.createElement('label');
+    row.className = 'editor-props__row';
+    const name = document.createElement('span');
+    name.className = 'editor-props__label';
+    name.textContent = label;
+    if (field) control.dataset.propsField = field;
+    row.append(name, control);
+    return row;
+  };
+
+  const propertySelect = (options, value, onChange, ariaLabel) => {
+    const select = document.createElement('select');
+    select.className = 'editor-props__select';
+    select.setAttribute('aria-label', ariaLabel);
+    for (const option of options) {
+      const node = document.createElement('option');
+      node.value = option.value;
+      node.textContent = option.label;
+      select.append(node);
+    }
+    select.value = value;
+    select.addEventListener('change', () => onChange(select.value));
+    return select;
+  };
+
+  const propertyNumber = (value, { min, max, onChange, ariaLabel }) => {
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'editor-props__number';
+    input.min = String(min);
+    input.max = String(max);
+    input.value = String(value);
+    input.setAttribute('aria-label', ariaLabel);
+    input.addEventListener('change', () => onChange(Number(input.value)));
+    return input;
+  };
+
+  /** Every note value the toolbar can write, as a duration picker. */
+  const DURATION_OPTIONS = [
+    { value: 'whole:0', label: 'Whole' },
+    { value: 'half:0', label: 'Half' },
+    { value: 'half:1', label: 'Dotted half' },
+    { value: 'quarter:0', label: 'Quarter' },
+    { value: 'quarter:1', label: 'Dotted quarter' },
+    { value: 'eighth:0', label: 'Eighth' },
+    { value: 'eighth:1', label: 'Dotted eighth' },
+    { value: '16th:0', label: '16th' },
+    { value: '32nd:0', label: '32nd' },
+  ];
+
+  /**
+   * Moves the selected note onto another staff of its own part.
+   *
+   * A grand staff or a notation-plus-tab part is one part on two staves, so
+   * this is how a writer moves a line between them. The note is re-spelled
+   * for its destination -- a tab staff wants a string and a fret, a
+   * notation staff wants only the pitch -- and the beat it leaves becomes a
+   * rest, so neither staff loses its meter.
+   */
+  function moveNoteToStaff(cell, staffNumber) {
+    const event = eventFor(cell);
+    if (!event || event.kind === 'rest') return;
+    if ((event.staff ?? 1) === staffNumber) return;
+    const moved = counterpartEvent(event, staffNumber, cell.measureNumber);
+    if (moved === null) {
+      announce('That note cannot be played on the other staff.');
+      return;
+    }
+    const voiceId = voiceForStaff(staffNumber);
+    commit(
+      (doc) => docTools.moveEvent(doc, cell, { voiceId, event: moved }),
+      `Moved to staff ${staffNumber}.`,
+    );
+    setSelection([{ ...cell, voiceId }], { ...cell, voiceId });
+    render();
+  }
+
+  /**
+   * Re-pitches one note of the selection, keeping its string and fret
+   * honest.
+   *
+   * A tab note's `<string>`/`<fret>` describe its OLD pitch, so writing a
+   * new one has to re-derive them from the instrument's tuning or the tab
+   * staff would draw the new pitch on the old string. `fretFor` is the
+   * engine's own arithmetic; a pitch no string can reach is written as a
+   * plain pitched note, which is what MuseScore does rather than guessing.
+   */
+  function pitchNoteAt(cell, noteIndex, step, octave, alter = 0) {
+    const event = eventFor(cell);
+    if (!event || event.kind === 'rest') return;
+    const notes = eventNotes(event);
+    const pitches = notes.map((note, index) =>
+      index === noteIndex
+        ? { step, octave, alter, kind: note.pitch.kind === 'unpitched' ? 'unpitched' : 'pitched' }
+        : { step: note.pitch.step, octave: note.pitch.octave, alter: note.pitch.alter ?? 0 },
+    );
+    commit(
+      (doc) => docTools.setNotesPitch(doc, cell, pitches),
+      `Wrote ${pitchLabel(step, alter, octave)}.`,
+    );
+    const updated = eventFor(cell);
+    const written = updated ? eventNotes(updated)[noteIndex] : null;
+    if (written) previewPitch(written.pitch, null, cell.measureNumber);
+  }
+
+  /** One editable row per notehead, so a chord's members are edited one by one. */
+  function propertyPitches(target) {
+    const box = document.createElement('div');
+    box.className = 'editor-props__pitches';
+    const notes = eventNotes(target.event);
+    notes.forEach((note, index) => {
+      if (note.pitch.kind === 'unpitched') {
+        const row = document.createElement('div');
+        row.className = 'editor-props__row';
+        const label = document.createElement('span');
+        label.className = 'editor-props__label';
+        label.textContent = `Note ${index + 1}`;
+        const value = document.createElement('span');
+        value.className = 'editor-props__readout';
+        value.textContent = `${note.pitch.displayStep}${note.pitch.displayOctave}`;
+        row.append(label, value);
+        box.append(row);
+        return;
+      }
+      const stepSelect = propertySelect(
+        docTools.STEPS.map((step) => ({ value: step, label: step })),
+        note.pitch.step,
+        (value) => pitchNoteAt(target.cell, index, value, note.pitch.octave, note.pitch.alter ?? 0),
+        `Note ${index + 1} step`,
+      );
+      stepSelect.dataset.propsField = `step-${index}`;
+      const octaveInput = propertyNumber(note.pitch.octave, {
+        min: -1,
+        max: 9,
+        ariaLabel: `Note ${index + 1} octave`,
+        onChange: (value) =>
+          pitchNoteAt(target.cell, index, note.pitch.step, value, note.pitch.alter ?? 0),
+      });
+      octaveInput.dataset.propsField = `octave-${index}`;
+      const row = document.createElement('div');
+      row.className = 'editor-props__row';
+      const label = document.createElement('span');
+      label.className = 'editor-props__label';
+      label.textContent = notes.length > 1 ? `Note ${index + 1}` : 'Pitch';
+      row.append(label, stepSelect, octaveInput);
+      box.append(row);
+    });
+    return box;
+  }
+
+  /** The Properties tab: what the selection is and the fields it can change. */
+  function buildPropertiesPanel() {
+    const panel = document.createElement('div');
+    panel.className = 'editor-props';
+    const target = propertyTarget();
+    if (!target) {
+      panel.append(panelNote('Select a note to see its properties.'));
+      return panel;
+    }
+    const { cell, event } = target;
+    const readout = document.createElement('div');
+    readout.className = 'editor-props__row';
+    const readoutLabel = document.createElement('span');
+    readoutLabel.className = 'editor-props__label';
+    readoutLabel.textContent = 'Position';
+    const readoutValue = document.createElement('span');
+    readoutValue.className = 'editor-props__readout';
+    readoutValue.textContent = `Bar ${cell.measureNumber}, voice ${cell.voiceId}, tick ${event.startTick ?? 0}`;
+    readout.append(readoutLabel, readoutValue);
+    panel.append(panelTitle('Properties'), readout);
+
+    panel.append(propertyPitches(target));
+
+    const duration = event.duration;
+    panel.append(
+      propertyRow(
+        'Duration',
+        propertySelect(
+          DURATION_OPTIONS,
+          `${duration.type}:${duration.dots}`,
+          (value) => {
+            const [type, dots] = value.split(':');
+            const ticks = engine.ticksForDisplayedDuration({ type, dots: Number(dots) });
+            commit(
+              (doc) =>
+                docTools.setEventDuration(doc, cell, engine.duration(type, Number(dots), ticks)),
+              'Duration changed.',
+            );
+          },
+          'Duration',
+        ),
+        'duration',
+      ),
+    );
+
+    const staves = Math.max(1, attributeAt(cell.measureNumber)?.staves ?? 1);
+    panel.append(
+      propertyRow(
+        'Voice',
+        propertySelect(
+          [1, 2, 3, 4].map((voiceId) => ({ value: String(voiceId), label: `Voice ${voiceId}` })),
+          String(event.voice ?? cell.voiceId),
+          (value) => {
+            commit(
+              (doc) => docTools.setEventVoice(doc, cell, Number(value)),
+              `Moved to voice ${value}.`,
+            );
+            setSelection([{ ...cell, voiceId: Number(value) }], {
+              ...cell,
+              voiceId: Number(value),
+            });
+            render();
+          },
+          'Voice',
+        ),
+        'voice',
+      ),
+    );
+
+    if (staves > 1) {
+      panel.append(
+        propertyRow(
+          'Staff',
+          propertySelect(
+            Array.from({ length: staves }, (_, index) => ({
+              value: String(index + 1),
+              label: `Staff ${index + 1}`,
+            })),
+            String(event.staff ?? 1),
+            (value) => moveNoteToStaff(cell, Number(value)),
+            'Staff',
+          ),
+          'staff',
+        ),
+      );
+    }
+
+    const member = eventNotes(event)[0];
+    if (member?.stringNumber !== undefined) {
+      panel.append(
+        propertyRow(
+          'Tab',
+          Object.assign(document.createElement('span'), {
+            className: 'editor-props__readout',
+            textContent: `String ${member.stringNumber}, fret ${member.fret ?? 0}`,
+          }),
+          'tab',
+        ),
+      );
+    }
+    return panel;
+  }
+
+  // ---- instruments panel -------------------------------------------------
+  //
+  // MuseScore's Instruments dock: the score's own part list, not the Inst.
+  // box. The box is a writing surface for the part you are on; this panel
+  // is the score's staff setup -- rename a part, switch to it, add one,
+  // take one away.
+
+  /** A fresh part id that no part in the document already uses. */
+  function nextPartId() {
+    const used = new Set((state.doc?.score.parts ?? []).map((part) => part.id));
+    for (let index = 1; ; index += 1) {
+      const id = `P${index}`;
+      if (!used.has(id)) return id;
+    }
+  }
+
+  /**
+   * The layout a catalog instrument is written in.
+   *
+   * Key and meter belong to the score and are copied by `addPart`; what
+   * belongs to the instrument is its staves, clefs, tab lines and
+   * transposition, and those are the fields the renderer reads to draw it.
+   */
+  function layoutForInstrument(instrument) {
+    const percussion = Boolean(instrument.percussion);
+    const transposing =
+      instrument.transposeChromatic === undefined
+        ? {}
+        : {
+            transpose: {
+              chromatic: instrument.transposeChromatic % 12,
+              octaveChange: Math.trunc(instrument.transposeChromatic / 12),
+              semitones: instrument.transposeChromatic,
+            },
+          };
+    const clef = { sign: instrument.clef.sign, line: instrument.clef.line };
+    const single = { staves: 1, clefSign: clef.sign, clefLine: clef.line, clefsByStaff: { 1: clef } };
+    if (instrument.id === 'piano' || instrument.id === 'electric-piano' || instrument.id === 'organ') {
+      return {
+        ...single,
+        staves: 2,
+        clefsByStaff: { 1: { sign: 'G', line: 2 }, 2: { sign: 'F', line: 4 } },
+        clefSign: 'G',
+        clefLine: 2,
+        ...transposing,
+      };
+    }
+    if (percussion) {
+      return {
+        ...single,
+        clefsByStaff: { 1: clef },
+        staffLinesByStaff: { 1: 5 },
+        ...transposing,
+      };
+    }
+    return { ...single, ...transposing };
+  }
+
+  /** The GM routing a new part's `<midi-instrument>` needs. */
+  function routingForInstrument(instrument, partId) {
+    const instrumentId = `${partId}-I1`;
+    const info = {
+      program: instrument.program,
+      channel: instrument.midiChannel ?? 1,
+      name: instrument.name,
+    };
+    return new Map([[instrumentId, info]]);
+  }
+
+  /** One part's row: its name, a switch-to button, and a remove button. */
+  function instrumentRow(part) {
+    const row = document.createElement('div');
+    row.className = 'editor-instruments__row';
+    row.dataset.partRow = part.id;
+    const active = part.id === activePartId();
+    if (active) row.dataset.active = 'true';
+
+    const name = document.createElement('input');
+    name.type = 'text';
+    name.className = 'editor-instruments__name';
+    name.value = part.name ?? part.id;
+    name.setAttribute('aria-label', `Name of ${part.name ?? part.id}`);
+    name.dataset.partName = part.id;
+    name.addEventListener('change', () => {
+      const value = name.value.trim();
+      if (value === '' || value === part.name) {
+        name.value = part.name ?? part.id;
+        return;
+      }
+      commit((doc) => docTools.renamePart(doc, part.id, value), `Renamed to ${value}.`);
+    });
+
+    const select = document.createElement('button');
+    select.type = 'button';
+    select.className = 'editor-instruments__select';
+    select.dataset.partSelect = part.id;
+    select.textContent = active ? 'Writing' : 'Write';
+    select.setAttribute('aria-pressed', String(active));
+    select.addEventListener('click', () => {
+      state.activePartId = part.id;
+      clearSelection();
+      state.entry = null;
+      syncPartSelect();
+      buildSidebar();
+      render();
+      announce(`Writing into ${part.name ?? part.id}.`);
+    });
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'editor-instruments__remove';
+    remove.dataset.partRemove = part.id;
+    remove.textContent = '\u00D7';
+    remove.title = `Remove ${part.name ?? part.id}`;
+    remove.setAttribute('aria-label', `Remove ${part.name ?? part.id}`);
+    remove.disabled = (state.doc?.score.parts.length ?? 0) <= 1;
+    remove.addEventListener('click', () => {
+      const remaining = (state.doc?.score.parts ?? []).filter((entry) => entry.id !== part.id);
+      if (remaining.length === 0) {
+        announce('A score needs at least one part.');
+        return;
+      }
+      commit((doc) => docTools.removePart(doc, part.id), `Removed ${part.name ?? part.id}.`);
+      if (activePartId() === part.id) {
+        state.activePartId = remaining[0].id;
+        state.entry = null;
+        clearSelection();
+      }
+      buildSidebar();
+      render();
+    });
+
+    row.append(name, select, remove);
+    return row;
+  }
+
+  /** The Instruments tab: the score's part list, and the catalog to add from. */
+  function buildInstrumentsPanel() {
+    const panel = document.createElement('div');
+    panel.className = 'editor-instruments';
+    panel.append(panelTitle('Instruments'));
+    const parts = state.doc?.score.parts ?? [];
+    if (parts.length === 0) {
+      panel.append(panelNote('Open a score to see its parts.'));
+      return panel;
+    }
+    const list = document.createElement('div');
+    list.className = 'editor-instruments__list';
+    for (const part of parts) list.append(instrumentRow(part));
+    panel.append(list);
+
+    const catalog = window.NotationNewScore?.INSTRUMENTS ?? [];
+    const form = document.createElement('form');
+    form.className = 'editor-instruments__add';
+    form.dataset.instrumentAdd = '';
+    const select = document.createElement('select');
+    select.className = 'editor-props__select';
+    select.setAttribute('aria-label', 'Instrument to add');
+    select.dataset.instrumentAddSelect = '';
+    for (const instrument of catalog) {
+      const option = document.createElement('option');
+      option.value = instrument.id;
+      option.textContent = instrument.name;
+      select.append(option);
+    }
+    const add = document.createElement('button');
+    add.type = 'submit';
+    add.className = 'editor-instruments__add-button';
+    add.textContent = 'Add';
+    form.append(select, add);
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const instrument = catalog.find((entry) => entry.id === select.value);
+      if (!instrument) return;
+      const partId = nextPartId();
+      commit(
+        (doc) =>
+          docTools.addPart(doc, {
+            partId,
+            name: instrument.name,
+            layout: layoutForInstrument(instrument),
+            routing: routingForInstrument(instrument, partId),
+          }),
+        `Added ${instrument.name}.`,
+      );
+      state.activePartId = partId;
+      state.entry = null;
+      clearSelection();
+      buildSidebar();
+      render();
+    });
+    panel.append(form);
+    panel.append(panelNote('Adding a part copies the score\u2019s key and meter.'));
+    return panel;
+  }
+
   /**
    * The dock itself: its tab bar and the Palettes panel.
    *
@@ -4107,8 +4808,8 @@
     const panels = [
       { id: 'palettes', label: 'Palettes', ready: true },
       { id: 'more', label: '\u22EF', ready: false, title: 'More panels' },
-      { id: 'properties', label: 'Properties', ready: false },
-      { id: 'instruments', label: 'Instruments', ready: false },
+      { id: 'properties', label: 'Properties', ready: true },
+      { id: 'instruments', label: 'Instruments', ready: true },
     ];
     for (const panel of panels) {
       const tab = document.createElement('button');
@@ -4126,6 +4827,7 @@
           return;
         }
         state.sidebarTab = panel.id;
+        writeSidebarState();
         buildSidebar();
       });
       tabs.append(tab);
@@ -4143,9 +4845,59 @@
         panel.append(empty);
       }
       for (const group of groups) panel.append(paletteSection(group));
+    } else if (state.sidebarTab === 'properties') {
+      panel.append(buildPropertiesPanel());
+    } else if (state.sidebarTab === 'instruments') {
+      panel.append(buildInstrumentsPanel());
     }
     sidebarBody.replaceChildren(tabs, panel);
+    if (state.sidebarTab !== 'palettes') panel.dataset.signature = sidebarPanelSignature();
     syncPalette();
+  }
+
+  /**
+   * What the open dock panel is showing, as one comparable string.
+   *
+   * Both builders read the score and the selection, so this is the cheap
+   * test for "would rebuilding change anything".
+   */
+  function sidebarPanelSignature() {
+    if (state.sidebarTab === 'properties') {
+      return [
+        'properties',
+        state.selection
+          ? `${state.selection.measureNumber}:${state.selection.voiceId}:${state.selection.eventIndex}`
+          : '',
+        state.range.length,
+        (state.doc?.score.parts ?? []).map((part) => part.id).join('|'),
+      ].join('/');
+    }
+    return [
+      'instruments',
+      (state.doc?.score.parts ?? []).map((part) => `${part.id}:${part.name}`).join('|'),
+      activePartId() ?? '',
+    ].join('/');
+  }
+
+  /**
+   * Keeps the open dock panel in step with the selection.
+   *
+   * The panel is rebuilt rather than patched because every field in it
+   * reads the selection, but only when what it would show has actually
+   * changed -- a redraw follows every written note, and replacing the
+   * controls on each one would throw away the focus a keyboard user is
+   * standing on.
+   */
+  function syncSidebarPanel() {
+    if (!sidebarBody || state.sidebarTab === 'palettes') return;
+    const panel = sidebarBody.querySelector('.editor-sidebar__panel');
+    if (!panel) return;
+    const signature = sidebarPanelSignature();
+    if (panel.dataset.signature === signature) return;
+    panel.dataset.signature = signature;
+    panel.replaceChildren(
+      state.sidebarTab === 'properties' ? buildPropertiesPanel() : buildInstrumentsPanel(),
+    );
   }
 
   // ---- wiring ------------------------------------------------------------
@@ -4483,10 +5235,15 @@
   }
 
   state.paletteGroups = readPaletteGroups();
+  const savedDock = readSidebarState();
+  state.sidebarTab = savedDock.tab;
   syncTools();
   syncPlayback();
   paintToolGlyphs();
   buildSidebar();
+  // The dock comes back where it was left; `setSidebar` is what puts the
+  // handle's own labels in step with it.
+  setSidebar(savedDock.open);
   setControlsEnabled(false);
   updateZoom();
   restoreHandoff();

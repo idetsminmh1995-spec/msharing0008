@@ -46,8 +46,8 @@ Note entry, the selection model and undo/redo history have since shipped (Part K
 
 ## Next editor milestone
 
-1. **Editable Properties.** The Properties panel reads the selected note today. Making its values write back (pitch, duration, voice) turns it into the inspector a notation program has, and reuses the existing `commit()` command path.
-2. **Page / Horizontal view switch.** `state.layout` exists and both modes render, but the toolbar carries no button for it yet.
-3. **Session persistence.** The dock's open/closed state and the last panel are not remembered across a reload; the score library already is (`localStorage`).
+1. ~~**Editable Properties.**~~ Shipped: pitch, duration, voice and staff write back through `commit()`.
+2. ~~**Page / Horizontal view switch.**~~ Shipped: the View segment redraws the same document as sheets or one row.
+3. ~~**Session persistence.**~~ Shipped: `notation-lab-sidebar` remembers whether the dock was open and which panel it was on.
 
 Scan remains intentionally unavailable.
