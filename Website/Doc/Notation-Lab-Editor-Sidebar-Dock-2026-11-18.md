@@ -117,3 +117,30 @@ render, write လုပ်နိုင်ပြီးသား ဖြစ်ခ�
   နှစ်ခု၊ ဗလာပြန်လုပ်လျှင် verse ပျောက်။ `npm run verify` = **1512/1512**။
 - Browser E2E: staff click → note၊ Properties → `Twin-` ရိုက် → SVG တွင်
   `Twin` ပေါ်လာ၊ page error မရှိ။
+
+## MIDI input — ထပ်တိုး 2026-11-18
+
+အောက်ခြေ bar တွင် **MIDI** ခလုတ် တစ်ခု ထပ်ထည့်ထားသည်။ နှိပ်လျှင်
+`navigator.requestMIDIAccess()` ကို ခေါ်ပြီး၊ ချိတ်ထားသည့် keyboard မှ
+note-on တစ်ခု လာတိုင်း `insertAtEntry()` ဖြင့် ရေးသည် — staff click
+နှင့် လက်ကွက် letter နှိပ်ခြင်း သုံးမျိုးလုံး တူညီသော command တစ်ခုကို
+ဖြတ်သွားသည်။
+
+- **Chord ကို အလိုအလျောက် သိသည်။** Key နှစ်ခု တစ်ပြိုင်နက် ဖိ (note-off
+  မရောက်သေး) လျှင် ဒုတိယ key သည် ထို beat ပေါ်တွင် stack လုပ်သည်။
+  Key အားလုံး လွှတ်လိုက်လျှင် cursor သည် နောက် beat သို့ ရွေ့သည်။
+  ထို့ကြောင့် C-E-G ကို တစ်ချက်တည်း ဖိ၍ triad တစ်ခု ရသည်၊ mode ကို
+  ကြိုတင် ရွေးထားရန် မလိုပါ။
+- **Key signature က spelling ကို ဆုံးဖြတ်သည်။** MIDI သည် နံပါတ်သာ
+  ပို့သည်၊ letter မပါ။ ထို့ကြောင့် 61 သည် D major တွင် C#၊ E-flat တွင်
+  Db ဖြစ်သည် — လက်ရှိ key ၏ alter ကို ဖတ်ပြီး ဆုံးဖြတ်သည်။
+  ရလဒ်အနေဖြင့် မလိုအပ်သော accidental များ မပေါ်ပါ။
+- **Drum kit ကို လိုက်နာသည်။** Kit part တွင် key ၏ GM note နှင့် ကိုက်ညီသော
+  drum ကို ရေးသည် (36 = Bass Drum 1၊ 38 = Acoustic Snare)။
+- **Note input ပိတ်ထားလျှင် မရေးပါ။** ပထမ key တစ်ချက်တွင် "Turn note
+  input on (N)" ဟု တစ်ခါသာ အသိပေးသည်။
+- **Browser မပံ့ပိုးလျှင် / ငြင်းလျှင်** status line တွင် ပြောပြီး ခလုတ်ကို
+  ပိတ်ထားသည်၊ editor ကို လက်ဖြင့် ဆက်ရေးနိုင်သည်။
+- Test: `editor-integration.test.js` — access on/off၊ key → note၊
+  ထပ်နေသော key → chord၊ key signature spelling၊ drum kit၊
+  note-input guard၊ Web MIDI မရှိခြင်း၊ ငြင်းခံရခြင်း။

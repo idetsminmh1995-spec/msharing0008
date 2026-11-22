@@ -51,5 +51,6 @@ Note entry, the selection model and undo/redo history have since shipped (Part K
 2. ~~**Page / Horizontal view switch.**~~ Shipped: the View segment redraws the same document as sheets or one row.
 3. ~~**Session persistence.**~~ Shipped: `notation-lab-sidebar` remembers whether the dock was open and which panel it was on.
 4. ~~**Lyrics.**~~ Shipped 2026-11-18: the Properties tab writes syllables onto the selected note, one row per verse, through the same `commit()` path as every other property. A trailing or leading hyphen becomes `<syllabic>` and an emptied field removes the verse.
+5. ~~**MIDI input.**~~ Shipped 2026-11-18: the bottom bar's MIDI button asks the browser for Web MIDI, and each key-down writes at the entry cursor through `insertAtEntry()`. Keys that overlap in time become one chord, a kit part writes the drum the key names, and the key signature decides whether a black key is spelled sharp or flat. A browser without Web MIDI, or one that refuses, says so in the status line and leaves the editor writable by hand.
 
 Scan remains intentionally unavailable.

@@ -38,6 +38,7 @@
   const playButton = pick('[data-editor-play]');
   const stopButton = pick('[data-editor-stop]');
   const metronomeButton = pick('[data-editor-metronome]');
+  const midiButton = pick('[data-editor-midi]');
   const saveButton = pick('[data-editor-save]');
   const previewButton = pick('[data-editor-preview]');
   const durationButtons = [...document.querySelectorAll('[data-editor-duration]')];
@@ -151,6 +152,10 @@
     // Oscillators already scheduled on the audio clock. They keep sounding
     // once scheduled, so stopping the metronome has to stop these too.
     metronomeNodes: [],
+    // A MIDI keyboard, once the writer has switched it on. Held keys are
+    // what turn a chord into a chord rather than three separate beats.
+    midiAccess: null,
+    midiHinted: false,
   };
 
   const announce = (message) => { statusMessage.textContent = message; };
@@ -734,7 +739,7 @@
   // ---- rendering ---------------------------------------------------------
 
   const setControlsEnabled = (enabled) => {
-    [exportToggle, exportPdf, exportSvg, exportPng, exportXml, exportMxl, addMeasureButton, removeMeasureButton, playButton, stopButton, metronomeButton, saveButton]
+    [exportToggle, exportPdf, exportSvg, exportPng, exportXml, exportMxl, addMeasureButton, removeMeasureButton, playButton, stopButton, metronomeButton, midiButton, saveButton]
       .forEach((control) => { if (control) control.disabled = !enabled; });
     if (!enabled) setExportMenu(false);
   };
@@ -3178,6 +3183,7 @@
     if (chordButton) chordButton.setAttribute('aria-pressed', String(state.tool.chord));
     noteInputButton.setAttribute('aria-pressed', String(state.noteInput));
     if (previewButton) previewButton.setAttribute('aria-pressed', String(state.previewOn));
+    syncMidi();
     if (zoomOutput) zoomOutput.textContent = `${state.zoom}%`;
     root.dataset.mode = state.noteInput ? 'input' : 'select';
     if (toolbarStack) toolbarStack.dataset.mode = root.dataset.mode;
@@ -5060,6 +5066,12 @@
   if (playButton) playButton.addEventListener('click', () => void togglePlay());
   if (stopButton) stopButton.addEventListener('click', stopPlayback);
   if (metronomeButton) metronomeButton.addEventListener('click', () => setMetronome(!state.metronomeOn));
+  if (midiButton) {
+    midiButton.addEventListener('click', () => {
+      if (state.midiAccess) disarmMidi();
+      else void armMidi();
+    });
+  }
   if (saveButton) saveButton.addEventListener('click', saveScore);
 
   if (exportToggle) exportToggle.addEventListener('click', () => setExportMenu(exportList.hidden));
@@ -5249,6 +5261,149 @@
       insertAtEntry({ step: letter, octave: currentOctave(), addToChord: event.shiftKey });
     }
   });
+
+  // ---- MIDI input ---------------------------------------------------------
+  //
+  // A connected keyboard is a second way to press a note letter: a key-down
+  // writes at the entry cursor and rolls it forward, and a key that arrives
+  // while an earlier one is still held stacks on the same beat. That is how
+  // a player actually plays a chord -- the notes overlap in time -- so the
+  // held set is what decides chord versus new beat, not a mode the writer
+  // has to remember to set.
+
+  const heldMidiKeys = new Set();
+  /** Where the cursor goes when the held chord is released: the beat after it. */
+  let midiNextBeat = null;
+
+  /**
+   * A MIDI number spelled the way the current key signature writes it.
+   *
+   * A keyboard sends a number, not a letter, so the engine cannot know
+   * whether 61 is C# or Db. The key signature decides: in D major the
+   * black key above C is C#, in E-flat it is Db. Reading the signature
+   * also means the note needs no drawn accidental, which is what a
+   * player reading the score expects to see.
+   */
+  function spellMidi(midi, fifths) {
+    const alterForStep = engine.createAccidentalState?.(fifths)?.keySignatureAlterForStep;
+    if (alterForStep) {
+      const natural = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+      for (const step of Object.keys(natural)) {
+        const alter = alterForStep[step] ?? 0;
+        if (((natural[step] + alter) % 12 + 12) % 12 !== ((midi % 12) + 12) % 12) continue;
+        const octave = Math.floor((midi - natural[step] - alter) / 12) - 1;
+        if (octave < 0 || octave > 9) continue;
+        return { step, alter, octave };
+      }
+    }
+    return pitchFromMidi(midi);
+  }
+
+  /** The drum a kit part puts on this MIDI key, or null. */
+  function drumForMidi(midi) {
+    const kit = state.drumInstruments?.get(activePartId());
+    if (!kit) return null;
+    for (const drums of kit.values()) {
+      const found = drums.find((drum) => drum.gmNote === midi);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function midiNoteOn(midi) {
+    if (!state.noteInput) {
+      if (!state.midiHinted) {
+        state.midiHinted = true;
+        announce('MIDI is connected. Turn note input on (N) to write from the keyboard.');
+      }
+      return;
+    }
+    const addToChord = heldMidiKeys.size > 0;
+    heldMidiKeys.add(midi);
+
+    const drum = drumForMidi(midi);
+    if (drum) {
+      insertAtEntry({ drum, addToChord });
+    } else {
+      const measureNumber = state.entry?.measureNumber ?? 1;
+      const fifths = attributeAt(measureNumber)?.fifths ?? 0;
+      insertAtEntry({ ...spellMidi(midi, fifths), addToChord });
+    }
+    // The first key of a chord is the one that rolls the cursor on; the
+    // keys stacked after it are pulled back onto the same beat. Holding
+    // the cursor there until the chord is released is what makes the
+    // next press a new beat instead of another member of the same one.
+    if (!addToChord) midiNextBeat = { ...state.entry };
+  }
+
+  const midiMessage = (event) => {
+    const [statusByte = 0, data1 = 0, data2 = 0] = event.data ?? [];
+    const command = statusByte & 0xf0;
+    // A note-on with velocity 0 is a note-off; some keyboards only send that.
+    if (command === 0x90 && data2 > 0) { midiNoteOn(data1); return; }
+    if (command !== 0x80 && !(command === 0x90 && data2 === 0)) return;
+    heldMidiKeys.delete(data1);
+    if (heldMidiKeys.size > 0 || midiNextBeat === null) return;
+    // Every key is up, so the chord is finished. Stacking pulls the cursor
+    // back onto the beat it joined, so it is put back where the first key
+    // of the chord left it -- one beat on, ready for the next chord.
+    state.entry = midiNextBeat;
+    midiNextBeat = null;
+    clearSelection();
+    render();
+  };
+
+  const syncMidi = () => {
+    if (midiButton) midiButton.setAttribute('aria-pressed', String(state.midiAccess !== null));
+  };
+
+  /** Listens to every input the browser currently reports, including ones plugged in later. */
+  function listenToMidiInputs() {
+    const access = state.midiAccess;
+    if (!access) return;
+    for (const input of access.inputs.values()) input.onmidimessage = midiMessage;
+  }
+
+  function disarmMidi() {
+    const access = state.midiAccess;
+    if (access) {
+      for (const input of access.inputs.values()) input.onmidimessage = null;
+      access.removeEventListener?.('statechange', listenToMidiInputs);
+    }
+    state.midiAccess = null;
+    state.midiHinted = false;
+    heldMidiKeys.clear();
+    midiNextBeat = null;
+    syncMidi();
+    announce('MIDI keyboard off.');
+  }
+
+  async function armMidi() {
+    const request = navigator.requestMIDIAccess?.bind(navigator);
+    if (typeof request !== 'function') {
+      announce('This browser cannot reach a MIDI keyboard. Chrome and Edge can.');
+      return;
+    }
+    try {
+      const access = await request();
+      state.midiAccess = access;
+      state.midiHinted = false;
+      listenToMidiInputs();
+      access.addEventListener?.('statechange', listenToMidiInputs);
+      syncMidi();
+      const count = access.inputs.size;
+      announce(
+        count === 0
+          ? 'MIDI on — connect a keyboard and its notes will be written here.'
+          : `MIDI on — ${count} keyboard${count === 1 ? '' : 's'} connected.`,
+      );
+    } catch {
+      // The browser refuses for its own reasons: no permission, or an
+      // insecure page. Either way the writer needs to know it was the
+      // browser and not a broken editor.
+      announce('MIDI access was refused. Allow it in the browser to play notes in.');
+    }
+  }
 
   // ---- entry handoff -----------------------------------------------------
 

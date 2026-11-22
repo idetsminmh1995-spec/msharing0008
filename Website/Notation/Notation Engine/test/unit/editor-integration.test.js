@@ -448,7 +448,7 @@ describe('the editor and the engine agree, end to end', () => {
       .filter((control) => !control.closest('[data-editor-popover-panel]'));
     assert.deepEqual(
       controls.map((control) => control.getAttribute('aria-label')),
-      ['Play', 'Stop', 'Metronome', 'Inst.', 'Mixer', 'Page view', 'Horizontal view', 'Score length', 'Zoom out', 'Zoom level', 'Zoom in', 'Save', 'Export'],
+      ['Play', 'Stop', 'Metronome', 'MIDI keyboard', 'Inst.', 'Mixer', 'Page view', 'Horizontal view', 'Score length', 'Zoom out', 'Zoom level', 'Zoom in', 'Save', 'Export'],
     );
 
     // Save and Export are different promises, not two names for one thing:
@@ -3534,6 +3534,202 @@ describe('the editor and the engine agree, end to end', () => {
       rows = [...page.panel().querySelectorAll('[data-part-row]')].map((row) => row.dataset.partRow);
       assert.deepEqual(rows, ['P1'], 'the last part stays');
       assert.equal(page.panel().querySelector('[data-part-remove="P1"]').disabled, true);
+    });
+  });
+
+  describe('a MIDI keyboard', () => {
+    /**
+     * A stand-in for Web MIDI.
+     *
+     * The real API hands back an `inputs` map of ports whose
+     * `onmidimessage` the page assigns. Nothing about that is testable
+     * without a browser and a keyboard, so the fake keeps the same shape
+     * -- a Map of ports plus a `send` the test drives -- and the page is
+     * exercised exactly as it would be with hardware attached.
+     */
+    function fakeMidiAccess() {
+      const port = { id: 'kbd', name: 'Test keyboard', onmidimessage: null };
+      const access = {
+        inputs: new Map([[port.id, port]]),
+        listeners: [],
+        addEventListener(type, listener) { if (type === 'statechange') this.listeners.push(listener); },
+        removeEventListener(type, listener) {
+          if (type !== 'statechange') return;
+          this.listeners = this.listeners.filter((entry) => entry !== listener);
+        },
+      };
+      return { access, port };
+    }
+
+    /** Opens the editor with Web MIDI present, and switches the keyboard on. */
+    async function openWithMidi({ xml, request } = {}) {
+      const fake = fakeMidiAccess();
+      const opened = loadEditorPage(xml !== undefined ? { pendingXml: xml } : {});
+      const { window } = opened;
+      // jsdom's window has no Web MIDI at all, so the request function is
+      // what stands in for a browser that has one. It is installed before
+      // the button is pressed, which is the only time the page reads it.
+      Object.defineProperty(window.navigator, 'requestMIDIAccess', {
+        configurable: true,
+        value: request ?? (async () => fake.access),
+      });
+      const doc = window.document;
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+      const button = doc.querySelector('[data-editor-midi]');
+      button.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await new Promise((resolve) => window.setTimeout(resolve, 10));
+      return {
+        window,
+        doc,
+        port: fake.port,
+        button,
+        status: () => doc.querySelector('[data-editor-status]').textContent,
+        on: (midi, velocity = 90) => fake.port.onmidimessage?.({ data: [0x90, midi, velocity] }),
+        off: (midi) => fake.port.onmidimessage?.({ data: [0x80, midi, 0] }),
+        saved: () => {
+          doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+          return JSON.parse(window.localStorage.getItem('msharing-notation-scores') || '[]')[0]?.xml ?? '';
+        },
+      };
+    }
+
+    /** Measure 1's noteheads, top to bottom, with a `+` on the chord members. */
+    const notesOfBarOne = (xml) => {
+      const measure = (xml.match(/<measure number="1">[\s\S]*?<\/measure>/) || [''])[0];
+      return [...measure.matchAll(/<note>[\s\S]*?<\/note>/g)]
+        .map((match) => match[0].replace(/\s+/g, ''))
+        .filter((note) => !note.includes('<rest'))
+        .map((note) => {
+          const pitch = note.match(/<step>(\w)<\/step>(?:<alter>(-?\d+)<\/alter>)?<octave>(\d)/);
+          const alter = { 1: '#', 2: '##', '-1': 'b', '-2': 'bb' }[pitch?.[2]] ?? '';
+          const name = pitch === null ? '?' : `${pitch[1]}${alter}${pitch[3]}`;
+          return note.includes('<chord/>') ? `+${name}` : name;
+        });
+    };
+
+    test('the button asks the browser for access and shows it is on', async () => {
+      const page = await openWithMidi();
+      assert.equal(page.button.getAttribute('aria-pressed'), 'true', 'the control shows the keyboard is on');
+      assert.match(page.status(), /MIDI on/);
+
+      // Pressing it again hands the ports back rather than leaving a
+      // listener attached to a keyboard the writer has finished with.
+      page.button.dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      assert.equal(page.button.getAttribute('aria-pressed'), 'false');
+      assert.equal(page.port.onmidimessage, null, 'the port is no longer listened to');
+      assert.match(page.status(), /MIDI keyboard off/);
+    });
+
+    test('a key press writes the note it names and rolls the cursor on', async () => {
+      const page = await openWithMidi();
+      // 60 is middle C, which the treble staff writes as C4.
+      page.on(60);
+      assert.equal(page.status(), 'Inserted C4.');
+      // A key is only held while it is down: lifting it before the next
+      // press is what makes the next press a new beat.
+      page.off(60);
+      page.on(62);
+      assert.equal(page.status(), 'Inserted D4.');
+      assert.deepEqual(notesOfBarOne(page.saved()), ['C4', 'D4']);
+    });
+
+    test('keys that overlap in time become one chord, not three beats', async () => {
+      const page = await openWithMidi();
+      // A player holding C-E-G sends three note-ons before any note-off.
+      page.on(60);
+      page.on(64);
+      page.on(67);
+      assert.equal(page.status(), 'Note added to chord.');
+      assert.deepEqual(notesOfBarOne(page.saved()), ['C4', '+E4', '+G4']);
+
+      // Lifting them all and pressing again is a new beat, not more chord.
+      page.off(60); page.off(64); page.off(67);
+      page.on(65);
+      assert.equal(page.status(), 'Inserted F4.');
+      assert.deepEqual(notesOfBarOne(page.saved()), ['C4', '+E4', '+G4', 'F4']);
+    });
+
+    test('the key signature decides how a black key is spelled', async () => {
+      // D major writes F# and C#, so 66 is F# rather than Gb, and 61 is C#.
+      const xml = STARTER_XML.replace('<fifths>0</fifths>', '<fifths>2</fifths>');
+      const page = await openWithMidi({ xml });
+      page.on(66);
+      assert.equal(page.status(), 'Inserted F#4.');
+      page.off(66);
+      page.on(61);
+      assert.equal(page.status(), 'Inserted C#4.');
+      assert.deepEqual(notesOfBarOne(page.saved()), ['F#4', 'C#4']);
+    });
+
+    test('a drum kit writes the drum the key names', async () => {
+      const fake = fakeMidiAccess();
+      const opened = loadEditorPage({
+        newScore: { title: 'kit', instrumentIds: ['drum-kit'], key: 'C', time: '4/4', tempo: 120, measures: 1 },
+      });
+      const { window } = opened;
+      Object.defineProperty(window.navigator, 'requestMIDIAccess', {
+        configurable: true,
+        value: async () => fake.access,
+      });
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+      window.document.querySelector('[data-editor-midi]')
+        .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await new Promise((resolve) => window.setTimeout(resolve, 10));
+
+      // 36 is GM's bass drum, 38 the snare -- the two a kit is built around.
+      fake.port.onmidimessage({ data: [0x90, 36, 90] });
+      assert.equal(window.document.querySelector('[data-editor-status]').textContent, 'Inserted Bass Drum 1.');
+      fake.port.onmidimessage({ data: [0x90, 38, 90] });
+      assert.match(
+        window.document.querySelector('[data-editor-status]').textContent,
+        /^Added .+ to the chord\.$/,
+        'the snare joins the bass drum on the same beat',
+      );
+
+      window.document.querySelector('[data-editor-save]')
+        .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      const saved = JSON.parse(window.localStorage.getItem('msharing-notation-scores') || '[]')[0]?.xml ?? '';
+      const measure = (saved.match(/<measure number="1">[\s\S]*?<\/measure>/) || [''])[0];
+      const instruments = [...measure.matchAll(/<instrument id="([^"]+)"\/>/g)].map((match) => match[1]);
+      assert.equal(instruments.length, 2, 'both drums reached the file');
+      assert.notEqual(instruments[0], instruments[1], 'and they are different drums');
+    });
+
+    test('notes are only written while note input is on', async () => {
+      const page = await openWithMidi();
+      page.doc.querySelector('[data-editor-note-input]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      page.on(60);
+      assert.match(page.status(), /Turn note input on/);
+      page.off(60);
+      assert.deepEqual(notesOfBarOne(page.saved()), [], 'nothing was written');
+
+      page.doc.querySelector('[data-editor-note-input]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      page.on(60);
+      assert.equal(page.status(), 'Inserted C4.');
+    });
+
+    test('a browser with no Web MIDI says so instead of doing nothing', async () => {
+      const { window } = loadEditorPage();
+      const doc = window.document;
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+      doc.querySelector('[data-editor-midi]')
+        .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await new Promise((resolve) => window.setTimeout(resolve, 10));
+      assert.match(doc.querySelector('[data-editor-status]').textContent, /cannot reach a MIDI keyboard/);
+      assert.equal(doc.querySelector('[data-editor-midi]').getAttribute('aria-pressed'), 'false');
+    });
+
+    test('a refused request leaves the editor writable by hand', async () => {
+      const page = await openWithMidi({
+        request: async () => { throw new Error('NotAllowedError'); },
+      });
+      assert.match(page.status(), /MIDI access was refused/);
+      assert.equal(page.button.getAttribute('aria-pressed'), 'false');
+      // The keyboard is off, but the page still works: a letter key writes.
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'C', bubbles: true }));
+      assert.equal(page.status(), 'Inserted C4.');
     });
   });
 });
