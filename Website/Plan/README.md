@@ -395,6 +395,8 @@ Create Video မှ ထွက်လာသော final video ကို **အပ�
 
 Video Engine သည် ဤအပိုင်း ၃ ခုကို frame တစ်ခုထဲတွင် ပေါင်းဆွဲပေးရမည်။
 
+**မှတ်ချက်:** Metronome tool ၏ video တွင် Title / Info အပိုင်း မပါပါ။
+
 ### တူရိယာအလိုက် နေရာချထားပုံ
 
 | တူရိယာ | Title / Info | Notation | တူရိယာ |
@@ -530,7 +532,7 @@ Studio ၏ options box ──► MusicXML ဖိုင် + settings
 
 | တူရိယာ | Engine | လက်ရှိအခြေအနေ |
 |---|---|---|
-| Drum | Drum Human Stick Engine (ရှိ)၊ Drum Animation Engine (Plan တွင်သာ၊ code မရှိ) | **တစ်ခုတည်း အလုပ်လုပ်သော instrument။** Drum ပုံများကို R2 မှ ယူသုံးရမည် (ဘယ်ပုံ၊ ဘယ်အမည် မသတ်မှတ်ရသေး) |
+| Drum | Drum Human Stick Engine (ရှိ)၊ Drum Animation Engine (Plan တွင်သာ၊ code မရှိ) | **တစ်ခုတည်း အလုပ်လုပ်သော instrument။** Drum Animation Engine ၏ တာဝန်မှာ **R2 ထဲရှိ Drum data/ပုံများကို မကျန်အောင် ပြသပေးခြင်း** (လိုအပ်မှသာ ထပ်ထည့်) |
 | Piano | Piano Hand Human Engine (ရှိ)၊ Piano 3D Hand Engine (folder ဗလာ) | Video Engine Plan Phase 2 |
 | Guitar | Guitar Engine (ရှိ) | Video Engine Plan Phase 1 (ပထမဦးစားပေး) |
 | Violin | Engine folder မရှိသေး | မစတင်ရသေး |
@@ -608,14 +610,47 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 
 **သတိ:** GitHub သို့ push လုပ်ခြင်းသည် Cloudflare site ကို အလိုအလျောက် deploy မလုပ်ပါ (Video Engine Doc: public Worker သည် push နှင့် deploy မလုပ်မချင်း ယခင် version ကို ဆက်ပေးသည်)။
 
+### ၁၀။ Engine တာဝန်ခွဲခြားမှု (ဆုံးဖြတ်ချက်)
+
+**မူ:** Engine တစ်ခုသည် အလုပ်တစ်မျိုးသာ လုပ်သည်။ Engine တစ်ခုတည်းက အလုပ်အားလုံးကို မလုပ်စေရ။ Engine တစ်ခုက အခြား Engine ၏ အလုပ်ကို လိုက်မလုပ်ရ၊ လိုအပ်လျှင် ထို Engine ကို ခေါ်သုံးရမည်။
+
+| Engine | တာဝန် (တစ်ခုတည်း) | မလုပ်ရသည့်အရာ |
+|---|---|---|
+| Notation Engine | MusicXML မှ notation ကို ဆွဲခြင်း၊ cursor | အသံ၊ video encode၊ editor operation |
+| Sound Engine | Notation အတွက် အသံထုတ်ခြင်း | notation ဆွဲခြင်း၊ video |
+| Writer Engine | Notation Editor ထဲ ရေးခြင်းနှင့် editor operation အားလုံး | video၊ အသံ |
+| Video Engine | Segment/frame များ ပေါင်းဆွဲ၊ AudioBuffer ပေါင်း၊ MP4 encode၊ Thank You ဆက်ခြင်း | တူရိယာ animation၊ notation ဆွဲခြင်း |
+| Drum Animation Engine | **R2 ထဲရှိ Drum data/ပုံများကို မကျန်အောင် ပြသပေးခြင်း** (ဘယ်ပုံကို ဘယ်အချိန် highlight)၊ လိုအပ်မှ ထပ်ထည့် | notation၊ အသံ၊ encode |
+| Drum Human Stick Engine | Drum တီးသူ (stick) ၏ လှုပ်ရှားမှု | R2 ပုံများ ပြခြင်း |
+| Guitar Engine / Piano Hand Human Engine | သက်ဆိုင်ရာ တူရိယာ၏ position / finger / hand data | video encode |
+| Metronome Engine | Metronome design နှင့် click-track | notation၊ Title / Info |
+
+**Drum Animation Engine ၏ စည်းကမ်း:** R2 ထဲ ရှိသမျှ Drum data ကို manifest (စာရင်း) မှ ဖတ်၍ **မကျန်အောင်** ပြရမည်။ ဖိုင်အမည်ကို code ထဲ hard-code မလုပ်ရ။ ရှိရမည့်ဖိုင် မတွေ့လျှင် တိတ်တိတ် ကျော်မသွားဘဲ diagnostic ဖြင့် ပြရမည်။
+
+### ၁၁။ ဆုံးဖြတ်ပြီးသော အချက်များ (နောက်ဆုံး)
+
+အသုံးပြုသူ၏ ညွှန်ကြားချက် — "ကျန်တာ မစဉ်းစားဘဲ လုပ်ပါ" ကြောင့် အောက်ပါအချက်များကို ကျွန်တော် သတ်မှတ်ထားသော **ပုံမှန် (default) တန်ဖိုးများ** အဖြစ် ရေးထားသည်။ ပြင်လိုလျှင် ပြင်လို့ရသည်။
+
+1. **Video အရှည်** = Count Voice (အစ၊ count-in) + MusicXML အရှည် + Thank You video။
+2. **Title 1 / Title 2** = အသုံးပြုသူ ရိုက်ထည့်သည့်အတိုင်း။ **4/4၊ BPM၊ Key** = MusicXML မှ။
+3. **Metronome tool ၏ video** တွင် Title / Info အပိုင်း မပါ။
+4. **Title / Info ထဲရှိ `Metronome`** (အခြားတူရိယာ video များတွင်) = beat တိုင်းတွင် တုန်ခါသော metronome icon ငယ် (အသံမပါ)။ ရှိပြီးသား Metronome design ကို ပြန်သုံးမည်။
+5. **အသံပါသော Video** = requirement။ Count Voice (အစ) နှင့် Notation ၏ အသံ (Sound Engine) ပါရမည်။ Audible export ကို Plan ၏ လိုအပ်ချက်အဖြစ် သတ်မှတ်သည်။
+6. **Ratio အလိုက် အပိုင်းအချိုး** (အစပျိုး default၊ ချိန်ညှိနိုင်):
+
+| Ratio | Title / Info | Notation | တူရိယာ |
+|---|---|---|---|
+| 16:9 | အမြင့် ~၁၂% | ~၄၈% | ~၄၀% |
+| 1:1 | ~၁၂% | ~၄၄% | ~၄၄% |
+| 9:16 | ~၈% | ~၄၂% | ~၅၀% |
+
+   **Violin (ဘေးတစ်ဖက်):** 16:9 နှင့် 1:1 တွင် Notation ကို ဘယ်ဘက် ~၆၀%၊ Violin ကို ညာဘက် ~၄၀% ထားပြီး အောက်ဆုံးတွင် Title / Info အကျယ်အပြည့်။ 9:16 (Portrait) တွင် ဘေးချင်းယှဉ်လျှင် ကျဉ်းလွန်းသဖြင့် Notation အပေါ်၊ Violin အောက် ထပ်၍ အောက်ဆုံးတွင် Title / Info။
+7. **Drum ပုံများ** — ဖိုင်စာရင်း/အမည်/path ကို Plan ထဲ မသတ်မှတ်၊ R2 ထဲက manifest မှ Drum Animation Engine က ဖတ်မည်။ **Thank You ဖိုင်အမည်/path** သည် Video Engine ထဲတွင်သာ။
+
 ### မဖြေရှင်းရသေးသော အချက်များ (Video ထုတ်လုပ်ပုံ)
 
-1. (ဖြေပြီး) Video အရှည် = Count Voice + MusicXML + Thank You။ Count Voice ကို Video အစ (count-in) တွင် ထားမည် (အတည်ပြုပြီး)။
-2. Ratio သုံးမျိုးအလိုက် (အထူးသဖြင့် 9:16 Portrait တွင် Violin ဘေးတစ်ဖက် layout) အပိုင်းအချိုးကို ဘယ်လိုထားမလဲ။
-3. Drum ပုံများ၏ ဖိုင်စာရင်း၊ အမည်၊ R2 path။
-4. Drum Animation Engine ၏ တာဝန် (ဘယ်ပုံ ဘယ်အချိန် highlight)။
-5. Metronome အပိုင်း (Title / Info ထဲ) ကို ဘယ်လိုပုံစံပြမလဲ (Metronome design ၁၁ မျိုးထဲက ရွေးလို့ရမလား၊ icon တစ်ခုတည်းလား)။
-6. (ဖြေပြီး) `Title 1` / `Title 2` သည် အသုံးပြုသူ ရိုက်ထည့်သည့်အတိုင်း၊ `4/4` / `BPM` / `Key` သည် MusicXML မှ ယူမည်။
+1. R2 ထဲတွင် Drum manifest (ပုံစာရင်း) ကို ဘယ်လိုပုံစံနှင့် ထားမည် — Drum Animation Engine ကို စတင်သည့်အချိန်တွင် ဆုံးဖြတ်မည်။
+2. အပေါ်ပါ ၁၁။ (4) (Metronome icon) နှင့် (6) (အချိုးများ) ကို အသုံးပြုသူ ပြန်ကြည့်အတည်ပြုရန်။
 
 ## Sound Engine နှင့် MuseScore SoundFont — 2026-11-13
 
