@@ -395,7 +395,7 @@ The diagnostics `level` lets through, in their original order.
 
 ## Full index
 
-735 exported symbols, by module.
+737 exported symbols, by module.
 
 ### `src/config/config.ts`
 
@@ -606,6 +606,13 @@ The diagnostics `level` lets through, in their original order.
 | function | `drumStandIns` | The drums that may stand in for `midiNote`, nearest first. |
 | function | `drumChoiceOrder` | The written drum, then every stand-in: the whole order to try. |
 | function | `drumToLight` | The drum from `available` that should be lit for a written `midiNote`, or undefined when the kit has nothing near enough. |
+
+### `src/export/mxl.ts`
+
+| | Name | Summary |
+|---|---|---|
+| interface | `ExportMxlOptions` | §10.2: a `.mxl` file is a ZIP archive whose `META-INF/container.xml` names the real score file inside it. |
+| function | `exportMxl` | A compressed MusicXML (`.mxl`) archive from a MusicXML document. |
 
 ### `src/export/pdf.ts`
 

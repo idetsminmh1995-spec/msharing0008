@@ -31,6 +31,8 @@
   const exportPdf = pick('[data-editor-export-pdf]');
   const exportSvg = pick('[data-editor-export-svg]');
   const exportPng = pick('[data-editor-export-png]');
+  const exportXml = pick('[data-editor-export-xml]');
+  const exportMxl = pick('[data-editor-export-mxl]');
   const exportToggle = pick('[data-editor-export-toggle]');
   const exportList = pick('[data-editor-export-list]');
   const playButton = pick('[data-editor-play]');
@@ -732,7 +734,7 @@
   // ---- rendering ---------------------------------------------------------
 
   const setControlsEnabled = (enabled) => {
-    [exportToggle, exportPdf, exportSvg, exportPng, addMeasureButton, removeMeasureButton, playButton, stopButton, metronomeButton, saveButton]
+    [exportToggle, exportPdf, exportSvg, exportPng, exportXml, exportMxl, addMeasureButton, removeMeasureButton, playButton, stopButton, metronomeButton, saveButton]
       .forEach((control) => { if (control) control.disabled = !enabled; });
     if (!enabled) setExportMenu(false);
   };
@@ -3094,8 +3096,17 @@
         download(new Blob([svg], { type: 'image/svg+xml' }), `${baseName()}.svg`);
       } else if (kind === 'pdf') {
         download(new Blob([await engine.exportPdf(state.result.svg, { scale: 2 })], { type: 'application/pdf' }), `${baseName()}.pdf`);
-      } else {
+      } else if (kind === 'png') {
         download(new Blob([await engine.exportPng(state.result.svg, { scale: 2 })], { type: 'image/png' }), `${baseName()}.png`);
+      } else {
+        // MusicXML and MXL carry the score itself, not a picture of it, so
+        // another program can open it and keep editing.
+        const xml = docTools.toMusicXml(state.doc);
+        if (kind === 'mxl') {
+          download(new Blob([engine.exportMxl(xml)], { type: 'application/vnd.recordare.musicxml' }), `${baseName()}.mxl`);
+        } else {
+          download(new Blob([xml], { type: 'application/vnd.recordare.musicxml+xml' }), `${baseName()}.musicxml`);
+        }
       }
       announce(`${kind.toUpperCase()} downloaded.`);
     } catch (error) {
@@ -5003,6 +5014,8 @@
   if (exportPdf) exportPdf.addEventListener('click', () => { setExportMenu(false); void runExport(exportPdf, 'pdf'); });
   if (exportSvg) exportSvg.addEventListener('click', () => { setExportMenu(false); void runExport(exportSvg, 'svg'); });
   if (exportPng) exportPng.addEventListener('click', () => { setExportMenu(false); void runExport(exportPng, 'png'); });
+  if (exportXml) exportXml.addEventListener('click', () => { setExportMenu(false); void runExport(exportXml, 'musicxml'); });
+  if (exportMxl) exportMxl.addEventListener('click', () => { setExportMenu(false); void runExport(exportMxl, 'mxl'); });
   document.addEventListener('pointerdown', (event) => {
     if (exportList && !exportList.hidden && !event.target.closest('[data-editor-export-menu]')) setExportMenu(false);
     // A popover closes on any press outside its trigger and its panel, so

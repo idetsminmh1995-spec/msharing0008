@@ -4,6 +4,7 @@ import zlib from 'node:zlib';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { unzipSync, strFromU8 } from 'fflate';
 import { loadEngine } from '../helpers/load-engine.js';
 import { testDomParser } from '../helpers/dom.js';
 
@@ -421,6 +422,43 @@ describe('Phase 52: export (§3)', () => {
       const file = NE.exportSvg(svg, { title: 'Groove' });
       const glyphs = (s) => (s.match(/<text /g) ?? []).length;
       assert.equal(glyphs(file), glyphs(svg));
+    });
+  });
+
+  describe('MXL export', () => {
+    test('a written archive unzips back to the same score', () => {
+      const xml = fs.readFileSync(path.join(FIXTURES_DIR, 'simple-single-voice.musicxml'), 'utf8');
+      const archive = NE.exportMxl(xml);
+      const { xmlText, diagnostics } = NE.unzipMxl(archive, domParser);
+      assert.deepEqual([...diagnostics], []);
+      assert.equal(xmlText, xml);
+    });
+
+    test('the same score serializes to the same bytes twice', () => {
+      const xml = fs.readFileSync(path.join(FIXTURES_DIR, 'simple-single-voice.musicxml'), 'utf8');
+      assert.deepEqual(NE.exportMxl(xml), NE.exportMxl(xml));
+    });
+
+    test('the archive declares itself as compressed MusicXML', () => {
+      const archive = NE.exportMxl('<score-partwise version="4.0"><part-list/></score-partwise>');
+      const files = unzipSync(archive);
+      assert.equal(strFromU8(files.mimetype), 'application/vnd.recordare.musicxml');
+      assert.ok(files['META-INF/container.xml'], 'a reader looks for the pointer here');
+      // Stored, not deflated: the media type is readable in the raw bytes,
+      // which is what lets a reader identify the archive without inflating.
+      assert.ok(
+        Buffer.from(archive).toString('latin1').includes('application/vnd.recordare.musicxml'),
+        'the mimetype entry is stored uncompressed',
+      );
+    });
+
+    test('a chosen score file name is the one container.xml points at', () => {
+      const archive = NE.exportMxl('<score-partwise version="4.0"><part-list/></score-partwise>', {
+        scoreFileName: 'My Score.xml',
+      });
+      const files = unzipSync(archive);
+      assert.ok(files['My Score.xml']);
+      assert.match(strFromU8(files['META-INF/container.xml']), /full-path="My Score\.xml"/);
     });
   });
 });

@@ -2780,6 +2780,39 @@ describe('the editor and the engine agree, end to end', () => {
     });
   });
 
+  describe('the export menu', () => {
+    test('Export offers the score file as well as pictures of it', () => {
+      const { window } = loadEditorPage();
+      const doc = window.document;
+      const items = [...doc.querySelectorAll('[data-editor-export-list] [role="menuitem"]')];
+      assert.deepEqual(
+        items.map((item) => item.textContent),
+        ['PDF', 'SVG', 'PNG', 'MusicXML', 'MXL'],
+      );
+    });
+
+    test('MXL downloads an archive another program can open', async () => {
+      const { window } = loadEditorPage();
+      const doc = window.document;
+      const saved = [];
+      window.URL.createObjectURL = (blob) => { saved.push(blob); return 'blob:test'; };
+      window.URL.revokeObjectURL = () => {};
+      window.HTMLAnchorElement.prototype.click = function click() { saved.filename = this.download; };
+
+      doc.querySelector('[data-editor-export-toggle]')
+        .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      doc.querySelector('[data-editor-export-mxl]')
+        .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+      assert.match(saved.filename, /^Untitled score\.mxl$/, 'the file is named after the score');
+      const bytes = new Uint8Array(await saved[0].arrayBuffer());
+      const { xmlText, diagnostics } = window.NotationEngine.unzipMxl(bytes, window.DOMParser);
+      assert.deepEqual([...diagnostics], []);
+      assert.match(xmlText, /<score-partwise/, 'the archive holds the score itself, not a picture');
+    });
+  });
+
   describe('the workspace', () => {
     test('the view switch draws the same score as pages or one row', () => {
       const { window } = loadEditorPage();

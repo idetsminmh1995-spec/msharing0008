@@ -161,6 +161,7 @@ var NotationEngine = (() => {
     estimateTextWidth: () => estimateTextWidth,
     evaluateAccidental: () => evaluateAccidental,
     expandClosedHiHatQuarterNotesToEighthPulse: () => expandClosedHiHatQuarterNotesToEighthPulse,
+    exportMxl: () => exportMxl,
     exportPdf: () => exportPdf,
     exportPng: () => exportPng,
     exportSvg: () => exportSvg,
@@ -74382,6 +74383,30 @@ ${denominator}`;
     }
     return slc(o, 0, pre + shft(pos) + post);
   };
+  var crct = /* @__PURE__ */ (function() {
+    var t = new Int32Array(256);
+    for (var i2 = 0; i2 < 256; ++i2) {
+      var c = i2, k = 9;
+      while (--k)
+        c = (c & 1 && -306674912) ^ c >>> 1;
+      t[i2] = c;
+    }
+    return t;
+  })();
+  var crc = function() {
+    var c = -1;
+    return {
+      p: function(d) {
+        var cr = c;
+        for (var i2 = 0; i2 < d.length; ++i2)
+          cr = crct[cr & 255 ^ d[i2]] ^ cr >>> 8;
+        c = cr;
+      },
+      d: function() {
+        return ~c;
+      }
+    };
+  };
   var adler = function() {
     var a = 1, b = 0;
     return {
@@ -74416,6 +74441,14 @@ ${denominator}`;
     }
     return dflt(dat, opt.level == null ? 6 : opt.level, opt.mem == null ? st.l ? Math.ceil(Math.max(8, Math.min(13, Math.log(dat.length))) * 1.5) : 20 : 12 + opt.mem, pre, post, st);
   };
+  var mrg = function(a, b) {
+    var o = {};
+    for (var k in a)
+      o[k] = a[k];
+    for (var k in b)
+      o[k] = b[k];
+    return o;
+  };
   var b2 = function(d, b) {
     return d[b] | d[b + 1] << 8;
   };
@@ -74439,6 +74472,9 @@ ${denominator}`;
       wbytes(c, 2, h.d());
     }
   };
+  function deflateSync(data, opts) {
+    return dopt(data, opts || {}, 0, 0);
+  }
   function inflateSync(data, opts) {
     return inflt(data, { i: 2 }, opts && opts.out, opts && opts.dictionary);
   }
@@ -74450,6 +74486,20 @@ ${denominator}`;
     var d = dopt(data, opts, opts.dictionary ? 6 : 2, 4);
     return zlh(d, opts), wbytes(d, d.length - 4, a.d()), d;
   }
+  var fltn = function(d, p, t, o) {
+    for (var k in d) {
+      var val = d[k], n = p + k, op = o;
+      if (Array.isArray(val))
+        op = mrg(o, val[1]), val = val[0];
+      if (ArrayBuffer.isView(val))
+        t[n] = [val, op];
+      else {
+        t[n += "/"] = [new u8(0), op];
+        fltn(val, n, t, o);
+      }
+    }
+  };
+  var te = typeof TextEncoder != "undefined" && /* @__PURE__ */ new TextEncoder();
   var td = typeof TextDecoder != "undefined" && /* @__PURE__ */ new TextDecoder();
   var tds = 0;
   try {
@@ -74473,6 +74523,39 @@ ${denominator}`;
         r += String.fromCharCode((c & 15) << 12 | (d[i2++] & 63) << 6 | d[i2++] & 63);
     }
   };
+  function strToU8(str, latin1) {
+    if (latin1) {
+      var ar_1 = new u8(str.length);
+      for (var i2 = 0; i2 < str.length; ++i2)
+        ar_1[i2] = str.charCodeAt(i2);
+      return ar_1;
+    }
+    if (te)
+      return te.encode(str);
+    var l = str.length;
+    var ar = new u8(str.length + (str.length >> 1));
+    var ai = 0;
+    var w = function(v) {
+      ar[ai++] = v;
+    };
+    for (var i2 = 0; i2 < l; ++i2) {
+      if (ai + 5 > ar.length) {
+        var n = new u8(ai + 8 + (l - i2 << 1));
+        n.set(ar);
+        ar = n;
+      }
+      var c = str.charCodeAt(i2);
+      if (c < 128 || latin1)
+        w(c);
+      else if (c < 2048)
+        w(192 | c >> 6), w(128 | c & 63);
+      else if (c > 55295 && c < 57344)
+        c = 65536 + (c & 1023 << 10) | str.charCodeAt(++i2) & 1023, w(240 | c >> 18), w(128 | c >> 12 & 63), w(128 | c >> 6 & 63), w(128 | c & 63);
+      else
+        w(224 | c >> 12), w(128 | c >> 6 & 63), w(128 | c & 63);
+    }
+    return slc(ar, 0, ai);
+  }
   function strFromU8(dat, latin1) {
     if (latin1) {
       var r = "";
@@ -74515,6 +74598,107 @@ ${denominator}`;
     }
     return [sc, su, off, 0];
   };
+  var exfl = function(ex) {
+    var le = 0;
+    if (ex) {
+      for (var k in ex) {
+        var l = ex[k].length;
+        if (l > 65535)
+          err(9);
+        le += l + 4;
+      }
+    }
+    return le;
+  };
+  var wzh = function(d, b, f, fn, u, c, ce, co) {
+    var fl2 = fn.length, ex = f.extra, col = co && co.length;
+    var exl = exfl(ex);
+    wbytes(d, b, ce != null ? 33639248 : 67324752), b += 4;
+    if (ce != null)
+      d[b++] = 20, d[b++] = f.os;
+    d[b] = 20, b += 2;
+    d[b++] = f.flag << 1 | (c < 0 && 8), d[b++] = u && 8;
+    d[b++] = f.compression & 255, d[b++] = f.compression >> 8;
+    var dt = new Date(f.mtime == null ? Date.now() : f.mtime), y = dt.getFullYear() - 1980;
+    if (y < 0 || y > 119)
+      err(10);
+    wbytes(d, b, y << 25 | dt.getMonth() + 1 << 21 | dt.getDate() << 16 | dt.getHours() << 11 | dt.getMinutes() << 5 | dt.getSeconds() >> 1), b += 4;
+    if (c != -1) {
+      wbytes(d, b, f.crc);
+      wbytes(d, b + 4, c < 0 ? -c - 2 : c);
+      wbytes(d, b + 8, f.size);
+    }
+    wbytes(d, b + 12, fl2);
+    wbytes(d, b + 14, exl), b += 16;
+    if (ce != null) {
+      wbytes(d, b, col);
+      wbytes(d, b + 6, f.attrs);
+      wbytes(d, b + 10, ce), b += 14;
+    }
+    d.set(fn, b);
+    b += fl2;
+    if (exl) {
+      for (var k in ex) {
+        var exf = ex[k], l = exf.length;
+        wbytes(d, b, +k);
+        wbytes(d, b + 2, l);
+        d.set(exf, b + 4), b += 4 + l;
+      }
+    }
+    if (col)
+      d.set(co, b), b += col;
+    return b;
+  };
+  var wzf = function(o, b, c, d, e) {
+    wbytes(o, b, 101010256);
+    wbytes(o, b + 8, c);
+    wbytes(o, b + 10, c);
+    wbytes(o, b + 12, d);
+    wbytes(o, b + 16, e);
+  };
+  function zipSync(data, opts) {
+    if (!opts)
+      opts = {};
+    var r = {};
+    var files = [];
+    fltn(data, "", r, opts);
+    var o = 0;
+    var tot = 0;
+    for (var fn in r) {
+      var _a2 = r[fn], file = _a2[0], p = _a2[1];
+      var compression = p.level == 0 ? 0 : 8;
+      var f = strToU8(fn), s = f.length;
+      var com = p.comment, m = com && strToU8(com), ms = m && m.length;
+      var exl = exfl(p.extra);
+      if (s > 65535)
+        err(11);
+      var d = compression ? deflateSync(file, p) : file, l = d.length;
+      var c = crc();
+      c.p(file);
+      files.push(mrg(p, {
+        size: file.length,
+        crc: c.d(),
+        c: d,
+        f,
+        m,
+        u: s != fn.length || m && com.length != ms,
+        o,
+        compression
+      }));
+      o += 30 + s + exl + l;
+      tot += 76 + 2 * (s + exl) + (ms || 0) + l;
+    }
+    var out = new u8(tot + 22), oe = o, cdl = tot - o;
+    for (var i2 = 0; i2 < files.length; ++i2) {
+      var f = files[i2];
+      wzh(out, f.o, f, f.f, f.u, f.c.length);
+      var badd = 30 + f.f.length + exfl(f.extra);
+      out.set(f.c, f.o + badd);
+      wzh(out, o, f, f.f, f.u, f.c.length, f.o, f.m), o += 16 + badd + (f.m ? f.m.length : 0);
+    }
+    wzf(out, o, files.length, cdl, oe);
+    return out;
+  }
   function unzipSync(data, opts) {
     var files = {};
     var e = data.length - 22;
@@ -78062,11 +78246,11 @@ ${body}`;
         crcTable[n] = c >>> 0;
       }
     }
-    let crc = 4294967295;
+    let crc2 = 4294967295;
     for (const byte of bytes) {
-      crc = (crcTable[(crc ^ byte) & 255] ?? 0) ^ crc >>> 8;
+      crc2 = (crcTable[(crc2 ^ byte) & 255] ?? 0) ^ crc2 >>> 8;
     }
-    return (crc ^ 4294967295) >>> 0;
+    return (crc2 ^ 4294967295) >>> 0;
   }
   function u32(value) {
     return Uint8Array.from([
@@ -78353,6 +78537,31 @@ ${xrefOffset}
         ...options.pageHeightPt !== void 0 ? { heightPt: options.pageHeightPt } : {}
       })),
       options
+    );
+  }
+
+  // src/export/mxl.ts
+  var CONTAINER_XML = (fullPath) => `<?xml version="1.0" encoding="UTF-8"?>
+<container>
+  <rootfiles>
+    <rootfile full-path="${fullPath}" media-type="application/vnd.recordare.musicxml+xml"/>
+  </rootfiles>
+</container>
+`;
+  var MXL_MEDIA_TYPE = "application/vnd.recordare.musicxml";
+  var ZIP_EPOCH = new Date(Date.UTC(1980, 0, 1));
+  function exportMxl(xmlText, options = {}) {
+    const scoreFileName = options.scoreFileName ?? "score.xml";
+    const mtime = options.creationDate ?? ZIP_EPOCH;
+    return zipSync(
+      {
+        // The spec wants `mimetype` first and stored uncompressed, so a
+        // reader can identify the archive without inflating anything.
+        mimetype: [strToU8(MXL_MEDIA_TYPE), { level: 0 }],
+        "META-INF/container.xml": stringToUtf8(CONTAINER_XML(scoreFileName)),
+        [scoreFileName]: stringToUtf8(xmlText)
+      },
+      { mtime }
     );
   }
 
