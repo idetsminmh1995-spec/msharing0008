@@ -165,10 +165,10 @@ Implementation sequence:
 #### အသံစမ်းသပ်မှု (rename မလုပ်မီ လိုအပ်ချက်)
 
 - [x] R2 bucket ပေါ်တွင် CORS policy သတ်မှတ် ✓ (`Access-Control-Allow-Origin: *`, preflight 204)။
-- [ ] Default asset (`ms-core-sf3` ဖြစ်လာမည့် MuseScore General SF3) ကို browser တွင် တကယ် play စမ်းပြီး အသံထွက် အတည်ပြု။
-- [ ] Fallback asset များ (`ms-basic`, `generaluser-gs`, `fluidr3-gm`, `salamander-grand-piano`) တစ်ခုချင်း load/play စမ်း။
-- [ ] Manifest fetch → asset download → SpessaSynth load → noteOn/noteOff အဆင့်ဆင့် အလုပ်လုပ် အတည်ပြု။
-- **မှတ်ချက်:** လက်ရှိ app တွင် SoundFont အသံစမ်းသည့် စာမျက်နှာ မရှိသေးပါ (`notation-editor.html` ရဲ့ Play button သာ ရှိသည်)။ စမ်းသပ်ရန် R2 public CDN URL သို့မဟုတ် signed-URL config လည်း မရှိသေးပါ (`Sound Doc/SoundFont-Collection-R2.md` အရ public access မဖွင့်ရသေး)။ ဆိုတော့ ဒီအဆင့်ကို မစမီ R2 URL config ကို အရင် ဖြေရှင်းရမည်။
+- [x] Default asset (`ms-core-sf3` ဖြစ်လာမည့် MuseScore General SF3) ကို browser တွင် တကယ် play စမ်းပြီး အသံထွက် အတည်ပြု ✓ — headless Chromium တွင် load 1.9s၊ `144 60/64/67 100` noteOn ၃ ခု နှင့် noteOff ၃ ခု ထွက်၊ analyser peak `0.10` (တိတ်ဆိတ်မဟုတ်)။
+- [x] Fallback asset များ (`ms-basic`, `generaluser-gs`, `fluidr3-gm`, `salamander-grand-piano`) တစ်ခုချင်း load/play စမ်း ✓ — အားလုံး noteOn/noteOff ၃ ခုစီ ထွက်၊ peak `0.09 / 0.29 / 0.11 / 0.14`။ Salamander က 39s ကြာ (ဖိုင် 1.26 GB)၊ သို့သော် 512 MB budget အတွင်း load ဖြစ်ပြီး အသံထွက်သည်။
+- [x] Manifest fetch → asset download → SpessaSynth load → noteOn/noteOff အဆင့်ဆင့် အလုပ်လုပ် အတည်ပြု ✓ — editor ၏ Play ကို နှိပ်၍ beamed-eighths fixture ကို ဖွင့်စမ်းရာ manifest → `MuseScore_General.sf3` download → note ၈ ခု noteOn/noteOff (status `Playing.` → `Stopped.`, error မရှိ)။
+- **မှတ်ချက် (ခေတ်ကုန်):** ဤစာပိုဒ်ရေးစဉ်က app တွင် SoundFont audition UI မရှိသေးပါ။ ယခု editor သည် manifest ကို page load တွင် ဖတ်ပြီး Play/note preview နှစ်ခုလုံးအတွက် အသုံးပြုသည်; သီးသန့် picker ကို နောက်ပိုင်း ဖယ်ရှားခဲ့သည်။
 
 #### အသံစမ်းတဲ့ နေရာ — လမ်း ခ (editor ကို ချဲ့) — ပြီးစီး ✓
 
@@ -176,7 +176,7 @@ Implementation sequence:
 
 **လုပ်ရမည့်အရာ:**
 - [x] `notation-editor.html` ရဲ့ editor bottom bar (Play အနီး) တွင် SoundFont control ထည့်ပြီး ✓ — `<select data-editor-soundfont>` + `<button data-editor-test-note>` (built scale) + `<button data-editor-test-score>` (rendered score)။
-- [ ] `notation-editor.js` တွင်:
+- [x] `notation-editor.js` တွင်:
   - [x] Page load ချိန် manifest fetch → asset စာရင်း select ထဲ ဖြည့်; default = `runtime.defaultAssetId`; fetch မရရင် control ကို disable လုပ်ပြီး status မှာ ပြ ✓
   - [x] `ensureSound()` ကို ရွေးထားတဲ့ asset id သုံးအောင် ပြင်; ပြောင်းရင် `destroy()` → ပြန် `create()` → `soundTried` reset ✓
   - [x] (က) "Test" ခလုတ် — C major scale ကို လက်ဖြင့် တည်ဆောက်တဲ့ `PlaybackData` (`engine.buildTempoMap` + `TICKS_PER_QUARTER`) ဖြင့် ဖွင့် ✓; (ခ) "Score" ခလုတ် — C major scale MusicXML ကို `engine.renderFromMusicXml(...).playback` ဖြင့် ဖွင့် ✓ (နှစ်မျိုးလုံး)
@@ -292,6 +292,20 @@ option နှစ်ခု ထည့်ပြီး editor ကို ချိတ
       (`notation-editor.js` `render()`)။
 - [x] `npm run verify` = **1341/1341 pass**; browser တွင် page mode ၏
       viewBox `0 0 30 42` နှင့် `rect[data-page="0"]` အတည်ပြု။
+
+### SoundFont sound check in a real browser (Part J) — 2026-11-18
+
+Part J ၏ "rename မလုပ်မီ" လိုအပ်ချက် သုံးခုကို headless Chromium (puppeteer-core +
+`/usr/bin/chromium`) ဖြင့် စမ်းပြီး ပိတ်သည်။ စမ်းသပ်မှုသည် page ရဲ့
+`MessagePort.postMessage` ကို tap လုပ်၍ worklet ဆီ ရောက်သော MIDI bytes ကို
+ဖတ်ပြီး၊ `AudioContext.destination` ကို analyser တစ်ခု ဖြင့် ချိတ်သဖြင့်
+အသံတကယ်ထွက်/မထွက် (sample peak) ကို တိုင်းသည် — schedule လုပ်တာနှင့်
+အသံထွက်တာ ကွဲပြားနိုင်သဖြင့် နှစ်ခုလုံး လိုသည်။
+
+- [x] Default asset `musescore-general-sf3` — 1.9s load, noteOn ၃ / noteOff ၃, peak 0.10။
+- [x] `ms-basic` 2.2s / peak 0.09; `generaluser-gs` 2.0s / 0.29; `fluidr3-gm` 4.9s / 0.11; `salamander-grand-piano` 39s / 0.14 (ဖိုင် 1.26 GB ဖြစ်လည်း 512 MB budget အတွင်း load ဖြစ်သည်)။
+- [x] အဆင့်ဆင့် လမ်းကြောင်း — editor ရဲ့ Play ကို နှိပ်ပြီး `beamed-eighths` fixture ကို ဖွင့်စမ်း: manifest fetch → `.sf3` download → note ၈ ခု noteOn/noteOff၊ status `Playing.` → `Stopped.`၊ page error မရှိ။
+- [x] R2-side rename (`soundfonts/ms-core/v0.2/...`) ကို မလုပ်ရသေးပါ — ဤ environment တွင် R2 credentials မရှိ။ Repo-side က ပြီးပြီး manifest ရဲ့ `runtime.assetPaths` ကို ဖတ်သဖြင့် rename လုပ်ပြီးပါက manifest တစ်ခုတည်း ပြင်ရမည်။
 
 ### Part J decision — soundfont asset ownership, deferred behind a sound-check — 2026-11-18
 

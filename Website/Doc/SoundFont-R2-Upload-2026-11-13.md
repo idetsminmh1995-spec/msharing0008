@@ -50,7 +50,7 @@ msharing0008/soundfonts/
 
 **Амжилттай:** ZIP integrity, бүх asset-ийн local SHA-256 тулгалт, R2-д 19 object байгаа эсэх болон object тус бүрийн byte size. MuseScore General SF3 нь repo-д тэмдэглэсэн official checksum-тэй таарсан. Түр Worker устсан, temporary upload ажиллагаа дууссан.
 
-**Хийгдээгүй:** Browser-оос R2 manifest/audio-г татах бодит playback/E2E туршилт хийгдээгүй. Bucket private хэвээр тул production browser fetch энэ upload-оор дангаараа ажиллахгүй.
+**Хийгдээгүй:** Browser-оос R2 manifest/audio-г татах бодит playback/E2E туршилт хийгдээгүй. Bucket private хэвээр тул production browser fetch энэ upload-оор дангаараа ажиллахгүй. *(2026-11-18: доорх Update-г үзнэ үү — энэ хоёр зүйл шийдэгдсэн.)*
 
 ## Үлдсэн ажил
 
@@ -60,6 +60,22 @@ msharing0008/soundfonts/
 4. MusicXML unpitched drum mapping, instrument program/bank routing, percussion bank 128 болон multi-part score-ийн mapping/tests — Sound Engine Plan-д үлдсэн implementation work.
 5. Collection record-д тэмдэглэсэн MS Basic upstream license caveat-ийг public эсвэл commercial redistribution-ээс өмнө эрх эзэмшигчээр баталгаажуулах/эрх зүйн review авах.
 6. Salamander SF2 нь ойролцоогоор 1.27 GB тул optional asset хэвээр; default preload-д оруулахгүй, хэрэглэгч сонгосон үед л татах стратегийг E2E/performance туршилтаар баталгаажуулах.
+
+## Update — 2026-11-18
+
+Items 1–3 above are closed. The bucket now serves the manifest and every asset
+over its public `r2.dev` subdomain with `Access-Control-Allow-Origin: *`, and
+`Website/Website/soundfonts-config.js` is the one place that states the host
+URL, so no R2 credential ever reaches browser code. Playback was verified in
+headless Chromium against the real R2 objects: all five fonts load, every one
+produces `noteOn`/`noteOff` and audible output, and the editor's own Play
+button drives manifest fetch → `.sf3` download → note scheduling end to end.
+Measurements and the test method are recorded in
+[Part J of the Notation Engine Plan](../Notation/Notation%20Plan/PLAN.md).
+
+Item 6 stands: Salamander loads and sounds, but it takes ~39 s, so it stays an
+optional asset rather than a preloaded default. Item 5 (the MS Basic licence
+caveat) is still open.
 
 ## Холбоотой баримтууд
 

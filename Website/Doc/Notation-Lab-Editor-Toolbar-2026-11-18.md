@@ -103,5 +103,7 @@ This document records the toolbar milestone only. Note entry, the selection
 model, undo/redo history and the playback cursor shipped afterwards (see
 Part K in `Notation/Notation Plan/PLAN.md`), and the sidebar dock followed
 (see [Sidebar Dock, Properties and Instruments](Notation-Lab-Editor-Sidebar-Dock-2026-11-18.md)).
-Still open: MXL save, and the Page / Horizontal view switch this table lists
-but the toolbar does not carry yet.
+The two items this section used to leave open have both shipped: the View
+segment draws the score as pages or as one row, and Export now writes the
+score itself as MusicXML or as a compressed `.mxl` archive beside the
+PDF, SVG and PNG pictures.
