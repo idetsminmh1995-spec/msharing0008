@@ -1753,9 +1753,18 @@ describe('the editor and the engine agree, end to end', () => {
     assert.equal(panel.hidden, false, 'the box opens under its button');
 
     const whites = panel.querySelectorAll('.editor-inst__white');
-    assert.equal(whites.length, 14, 'two octaves of white keys');
-    assert.equal(panel.querySelectorAll('.editor-inst__black').length, 10, 'and their black keys');
-    assert.equal(panel.querySelector('.editor-inst__title').textContent, 'Keyboard');
+    assert.equal(whites.length, 52, 'a piano has 52 white keys');
+    assert.equal(panel.querySelectorAll('.editor-inst__black').length, 36, 'and 36 black ones');
+    assert.match(panel.querySelector('.editor-inst__title').textContent, /88 keys/);
+
+    // The whole instrument, not a window onto it: A0 is the lowest key and
+    // C8 the highest, which is what makes a bass line and a high melody
+    // both reachable from the panel.
+    const keys = [...panel.querySelectorAll('[data-editor-inst-key]')].map(
+      (node) => node.dataset.editorInstKey,
+    );
+    assert.equal(keys[0], 'A0');
+    assert.equal(keys[keys.length - 1], 'C8');
 
     // A key press writes the note it names, at the cursor.
     const key = [...whites].find((node) => node.dataset.editorInstKey === 'G4');
@@ -1767,6 +1776,87 @@ describe('the editor and the engine agree, end to end', () => {
       .find((node) => node.dataset.editorInstKey === 'C#4');
     sharp.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     assert.match(status(), /Inserted C#4/);
+  });
+
+  test('Shift-clicking the Inst. keys stacks a chord instead of replacing the beat', () => {
+    const { window } = loadEditorPage({
+      newScore: { title: 'Piano', instrumentIds: ['piano'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
+    });
+    const doc = window.document;
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const panel = doc.querySelector('[data-editor-popover-panel="inst"]');
+    const key = (name) => panel.querySelector(`[data-editor-inst-key="${name}"]`);
+    const click = (node, init = {}) =>
+      node.dispatchEvent(new window.MouseEvent('click', { bubbles: true, ...init }));
+
+    // A C major triad is three presses on the panel, the same Shift
+    // gesture the staff uses. Without it each press landed on the beat and
+    // replaced the note before, so a chord could never be written here.
+    click(key('C4'));
+    assert.match(status(), /Inserted C4/);
+    click(key('E4'), { shiftKey: true });
+    assert.match(status(), /chord/i);
+    click(key('G4'), { shiftKey: true });
+    assert.match(status(), /chord/i);
+
+    doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    const xml = JSON.parse(window.localStorage.getItem('msharing-notation-scores') ?? '[]')[0]?.xml ?? '';
+    const measure = xml.match(/<measure number="1">([\s\S]*?)<\/measure>/)?.[1] ?? '';
+    assert.equal((measure.match(/<chord\/>/g) ?? []).length, 2, 'E and G join the beat C started');
+    const steps = [...measure.matchAll(/<step>([A-G])<\/step>/g)].map((match) => match[1]);
+    assert.deepEqual(steps, ['C', 'E', 'G'], `the triad is written, got ${steps}`);
+  });
+
+  test('Shift-clicking a drum pad stacks Kick and Hi-Hat on one beat', () => {
+    const { window } = loadEditorPage({
+      newScore: { title: 'kit', instrumentIds: ['drum-kit'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
+    });
+    const doc = window.document;
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const panel = doc.querySelector('[data-editor-popover-panel="inst"]');
+    const pad = (name) => [...panel.querySelectorAll('.editor-inst__drum')].find((node) => node.textContent === name);
+    const click = (node, init = {}) =>
+      node.dispatchEvent(new window.MouseEvent('click', { bubbles: true, ...init }));
+
+    click(pad('Bass Drum 1'));
+    assert.match(status(), /Inserted Bass Drum 1/);
+    click(pad('Closed Hi-Hat'), { shiftKey: true });
+    assert.match(status(), /chord/i);
+
+    doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    const xml = JSON.parse(window.localStorage.getItem('msharing-notation-scores') ?? '[]')[0]?.xml ?? '';
+    const measure = xml.match(/<measure number="1">([\s\S]*?)<\/measure>/)?.[1] ?? '';
+    assert.equal((measure.match(/<chord\/>/g) ?? []).length, 1, 'the hi-hat joins the kick');
+    // The kit states each drum as its instrument id: GM 36 is Bass Drum 1
+    // and GM 42 is Closed Hi-Hat, both written 1-based.
+    assert.match(measure, /<instrument id="P1-I36"\/>/);
+    assert.match(measure, /<instrument id="P1-I42"\/>/);
+  });
+
+  test('a toolbar tool leaves the Inst. box open, so a chord can be built from it', () => {
+    const { window } = loadEditorPage({
+      newScore: { title: 'Piano', instrumentIds: ['piano'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
+    });
+    const doc = window.document;
+    const panel = doc.querySelector('[data-editor-popover-panel="inst"]');
+    const chord = doc.querySelector('[data-editor-chord]');
+    const press = (node) => node.dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true }));
+
+    doc.querySelector('[data-editor-popover="inst"]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(panel.hidden, false);
+
+    // Chord mode and the note values are settings you change while writing
+    // on the keys. Folding the panel on the press made the two gestures
+    // unusable together: reaching for chord mode closed the keyboard.
+    press(chord);
+    chord.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(panel.hidden, false, 'pressing chord mode keeps the keyboard open');
+    assert.equal(chord.getAttribute('aria-pressed'), 'true');
+
+    // A press on the score still folds it away, so the staff stays one tap
+    // away.
+    doc.body.dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true }));
+    assert.equal(panel.hidden, true);
   });
 
   test('the Inst. box shows the guitar\'s own strings and frets, and a fret writes that pitch', () => {
@@ -1796,6 +1886,32 @@ describe('the editor and the engine agree, end to end', () => {
     const xml = JSON.parse(window.localStorage.getItem('msharing-notation-scores') ?? '[]')[0]?.xml ?? '';
     assert.match(xml, /<string>1<\/string>/, 'the string is written into the file');
     assert.match(xml, /<fret>5<\/fret>/, 'and so is the fret');
+  });
+
+  test('Shift-clicking a fret stacks a chord on a fretted part', () => {
+    const { window } = loadEditorPage({
+      newScore: { title: 'Guitar', instrumentIds: ['acoustic-guitar'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
+    });
+    const doc = window.document;
+    const status = () => doc.querySelector('[data-editor-status]').textContent;
+    const panel = doc.querySelector('[data-editor-popover-panel="inst"]');
+    const click = (node, init = {}) =>
+      node.dispatchEvent(new window.MouseEvent('click', { bubbles: true, ...init }));
+
+    // Three strings stopped at the same fret are a chord, and the fretboard
+    // is where a guitarist shapes one -- so it needs the same Shift gesture
+    // the keys and the staff already honour.
+    click(panel.querySelector('[data-editor-inst-fret="6:3"]'));
+    assert.match(status(), /Inserted/);
+    click(panel.querySelector('[data-editor-inst-fret="5:2"]'), { shiftKey: true });
+    assert.match(status(), /chord/i);
+
+    doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    const xml = JSON.parse(window.localStorage.getItem('msharing-notation-scores') ?? '[]')[0]?.xml ?? '';
+    const measure = xml.match(/<measure number="1">([\s\S]*?)<\/measure>/)?.[1] ?? '';
+    assert.equal((measure.match(/<chord\/>/g) ?? []).length, 1, 'the second string joins the beat');
+    assert.match(measure, /<string>6<\/string>/);
+    assert.match(measure, /<string>5<\/string>/);
   });
 
   test('the Inst. box shows drum pads for a kit part, and a pad writes that drum', () => {

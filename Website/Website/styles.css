@@ -493,12 +493,22 @@ body.is-newscore-open { overflow:hidden; }
 .editor-popover--mixer { max-width:min(420px,calc(100vw - 16px)); }
 .editor-inst { display:flex; flex-direction:column; gap:8px; padding:2px; }
 .editor-inst__title { color:var(--muted); font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
-.editor-inst__keys { display:flex; gap:2px; }
-.editor-inst__octave { position:relative; display:flex; gap:2px; }
+/* A piano's full 88 keys do not fit a popover, so the strip scrolls
+   sideways instead of shrinking the keys past the point a pointer can
+   hit one. It opens on middle C. */
+.editor-inst__piano {
+  max-width:min(560px,calc(100vw - 40px));
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding-bottom:4px;
+  scrollbar-width:thin;
+}
+.editor-inst__piano-row { position:relative; display:flex; gap:1px; width:max-content; }
 .editor-inst__white {
   display:inline-flex;
-  width:26px;
+  width:22px;
   height:76px;
+  flex:0 0 auto;
   align-items:flex-end;
   justify-content:center;
   padding-bottom:4px;
@@ -515,7 +525,7 @@ body.is-newscore-open { overflow:hidden; }
   position:absolute;
   top:0;
   z-index:2;
-  width:16px;
+  width:14px;
   height:46px;
   padding:0;
   border:1px solid #000;

@@ -633,7 +633,17 @@
     closePopovers(trigger);
     panel.hidden = !open;
     trigger.setAttribute('aria-expanded', String(open));
-    if (open) placePopover(trigger, panel);
+    if (open) {
+      placePopover(trigger, panel);
+      // The strip is as wide as a real piano, so it opens on middle C
+      // rather than on A0. Measured after the box is laid out, or the
+      // scroll width is still zero.
+      const strip = panel.querySelector('[data-editor-piano]');
+      const middleC = strip?.querySelector('[data-editor-inst-key="C4"]');
+      if (strip && middleC) {
+        strip.scrollLeft = Math.max(0, middleC.offsetLeft - strip.clientWidth / 2 + middleC.offsetWidth / 2);
+      }
+    }
   };
 
   // ---- toolbar overflow --------------------------------------------------
@@ -3014,7 +3024,10 @@
 
   const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const NOTE_ALTER = { 'C#': 1, 'D#': 1, 'F#': 1, 'G#': 1, 'A#': 1 };
-  const BLACK_AFTER = new Set([0, 1, 3, 4, 5]);
+  // A piano's own range: A0 (MIDI 21) to C8 (MIDI 108), the 88 keys a
+  // player expects when the panel says "piano".
+  const PIANO_LOW_MIDI = 21;
+  const PIANO_HIGH_MIDI = 108;
 
   /** Splits a MIDI number into the step, accidental and octave it is written with. */
   function pitchFromMidi(midi) {
@@ -3064,48 +3077,55 @@
   };
 
   /**
-   * Two octaves of keys from middle C, the range a writer reaches for
-   * first. A black key sits on the seam between the whites either side of
-   * it, which is what makes the row read as a keyboard rather than as
-   * twelve evenly spaced buttons.
+   * The whole piano, A0 to C8.
+   *
+   * A writer picks the instrument's real range, not a window onto it: a
+   * bass line needs A0 and a melody can reach C8, and a panel that stopped
+   * at two octaves could write neither. The strip scrolls sideways and
+   * opens on middle C, where most writing starts.
+   *
+   * Shift-click stacks, the same gesture the staff uses for a chord, so
+   * C-E-G is three presses without leaving the panel.
    */
   function buildKeyboard() {
     const body = document.createElement('div');
     body.className = 'editor-inst';
-    body.append(panelTitle('Keyboard'));
+    body.append(panelTitle('Keyboard — 88 keys'));
+    const strip = document.createElement('div');
+    strip.className = 'editor-inst__piano';
+    strip.dataset.editorPiano = '';
     const row = document.createElement('div');
-    row.className = 'editor-inst__keys';
-    const WHITE = 26;
-    const GAP = 2;
-    const START = 60;
-    for (let octaveIndex = 0; octaveIndex < 2; octaveIndex += 1) {
-      const octave = document.createElement('div');
-      octave.className = 'editor-inst__octave';
-      for (let whiteIndex = 0; whiteIndex < 7; whiteIndex += 1) {
-        const semitone = [0, 2, 4, 5, 7, 9, 11][whiteIndex];
-        const pitch = pitchFromMidi(START + octaveIndex * 12 + semitone);
-        const key = document.createElement('button');
-        key.type = 'button';
+    row.className = 'editor-inst__piano-row';
+    const WHITE = 22;
+    const GAP = 1;
+    const BLACK = 14;
+    let whiteCount = 0;
+    for (let midi = PIANO_LOW_MIDI; midi <= PIANO_HIGH_MIDI; midi += 1) {
+      const pitch = pitchFromMidi(midi);
+      const black = pitch.alter !== 0;
+      const key = document.createElement('button');
+      key.type = 'button';
+      key.dataset.editorInstKey = `${pitch.step}${black ? '#' : ''}${pitch.octave}`;
+      key.setAttribute('aria-label', `${pitch.step}${black ? '#' : ''}${pitch.octave}`);
+      key.title = key.dataset.editorInstKey;
+      key.addEventListener('click', (event) =>
+        insertAtEntry({ ...pitch, addToChord: event.shiftKey }),
+      );
+      if (black) {
+        key.className = 'editor-inst__black';
+        key.style.left = `${(whiteCount - 1) * (WHITE + GAP) + WHITE + GAP / 2 - BLACK / 2}px`;
+      } else {
         key.className = 'editor-inst__white';
-        key.dataset.editorInstKey = `${pitch.step}${pitch.octave}`;
-        key.setAttribute('aria-label', `${pitch.step}${pitch.octave}`);
-        key.textContent = `${pitch.step}${pitch.octave}`;
-        key.addEventListener('click', () => insertAtEntry({ ...pitch }));
-        octave.append(key);
-        if (!BLACK_AFTER.has(whiteIndex)) continue;
-        const blackPitch = pitchFromMidi(START + octaveIndex * 12 + semitone + 1);
-        const black = document.createElement('button');
-        black.type = 'button';
-        black.className = 'editor-inst__black';
-        black.dataset.editorInstKey = `${blackPitch.step}#${blackPitch.octave}`;
-        black.setAttribute('aria-label', `${blackPitch.step}#${blackPitch.octave}`);
-        black.style.left = `${whiteIndex * (WHITE + GAP) + WHITE + GAP / 2 - 8}px`;
-        black.addEventListener('click', () => insertAtEntry({ ...blackPitch }));
-        octave.append(black);
+        // Only the C keys are labelled: 52 names in a strip this narrow
+        // would read as noise, and C is how a player finds their place.
+        if (pitch.step === 'C') key.textContent = `C${pitch.octave}`;
+        whiteCount += 1;
       }
-      row.append(octave);
+      row.append(key);
     }
-    body.append(row);
+    strip.append(row);
+    body.append(strip);
+    body.append(panelNote('88 keys, A0–C8. Shift-click stacks a chord.'));
     return body;
   }
 
@@ -3138,8 +3158,8 @@
         button.setAttribute('aria-label', `String ${stringNumber}, fret ${fret}`);
         button.title = `${pitch.step}${pitch.octave}`;
         button.textContent = fret === 0 ? '0' : String(fret);
-        button.addEventListener('click', () =>
-          insertAtEntry({ ...pitch, stringNumber, fret }),
+        button.addEventListener('click', (event) =>
+          insertAtEntry({ ...pitch, stringNumber, fret, addToChord: event.shiftKey }),
         );
         line.append(button);
       }
@@ -3171,7 +3191,9 @@
         pad.dataset.editorInstDrum = String(drum.gmNote);
         pad.setAttribute('aria-label', drum.name);
         pad.textContent = drum.name;
-        pad.addEventListener('click', () => insertAtEntry({ drum }));
+        pad.addEventListener('click', (event) =>
+          insertAtEntry({ drum, addToChord: event.shiftKey }),
+        );
         grid.append(pad);
       });
     body.append(grid);
@@ -3355,8 +3377,17 @@
   document.addEventListener('pointerdown', (event) => {
     if (exportList && !exportList.hidden && !event.target.closest('[data-editor-export-menu]')) setExportMenu(false);
     // A popover closes on any press outside its trigger and its panel, so
-    // the score stays reachable with one tap rather than two.
-    if (!event.target.closest('[data-editor-popover], [data-editor-popover-panel]')) closePopovers();
+    // the score stays reachable with one tap rather than two. A toolbar
+    // tool is the exception: chord mode and the note values are settings
+    // you change WHILE writing on the instrument's keys, so pressing one
+    // must leave the instrument box open behind it.
+    const onToolbarTool = event.target.closest('.editor-toolbar .editor-tool');
+    if (
+      !onToolbarTool &&
+      !event.target.closest('[data-editor-popover], [data-editor-popover-panel]')
+    ) {
+      closePopovers();
+    }
   });
 
   popoverTriggers.forEach((trigger) => {
@@ -3366,7 +3397,11 @@
   // which is what a palette button is for.
   popoverPanels.forEach((panel) => {
     panel.addEventListener('click', (event) => {
-      if (event.target.closest('.editor-tool')) closePopovers();
+      // Only a tool INSIDE the box folds it away (that is a palette pick).
+      // Chord mode and the note values live in the toolbar, and they are
+      // settings you change while writing on the instrument's keys -- so
+      // pressing one must leave the instrument box open.
+      if (event.target.closest('[data-editor-popover-panel] .editor-tool')) closePopovers();
     });
   });
   document.addEventListener('keydown', (event) => {
