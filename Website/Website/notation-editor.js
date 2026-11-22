@@ -321,6 +321,26 @@
       engine.ticksForDisplayedDuration({ type: state.tool.duration, dots: state.tool.dots }),
     );
 
+  /**
+   * The beat a point on a staff falls on, snapped to the current note
+   * value's grid.
+   *
+   * The click handler and the hit test both need it: the hit test uses it
+   * to tell a press on a note from a press on the beat beside it, which
+   * differ by only a notehead's width in a dense bar.
+   */
+  function snappedTickAt(x, systemIndex, staffNumber) {
+    const rawTick = engine.xToTick(state.result.playback, x, systemIndex);
+    const position = engine.resolvePosition(state.result.playback, rawTick).position;
+    const grid = Math.max(1, durationForTool().ticks);
+    const capacity = capacityOf(position.measureNumber);
+    return {
+      measureNumber: position.measureNumber,
+      tick: Math.min(Math.max(0, capacity - grid), Math.round(position.tickInMeasure / grid) * grid),
+      staffNumber,
+    };
+  }
+
   const accidentalAlter = () =>
     state.tool.accidental === null ? null : ACCIDENTAL_ALTER[state.tool.accidental];
 
@@ -599,6 +619,13 @@
    * That is what keeps it inside the webview at any width.
    */
   const placePopover = (trigger, panel) => {
+    // The instrument box is a strip -- a keyboard, a fretboard, a row of
+    // pads -- so it takes the editor's own width rather than the width of
+    // its contents under the button, which is how MuseScore's panel reads.
+    if (panel.classList.contains('editor-popover--inst')) {
+      placeWidePopover(trigger, panel);
+      return;
+    }
     const anchor = trigger.getBoundingClientRect();
     const margin = 8;
     // Two passes: a panel that wraps to a second row grows taller than the
@@ -612,6 +639,29 @@
       const top = below + box.height <= window.innerHeight - margin
         ? below
         : Math.max(margin, anchor.top - box.height - 6);
+      panel.style.left = `${Math.round(left)}px`;
+      panel.style.top = `${Math.round(top)}px`;
+    }
+  };
+
+  /**
+   * Places a box that spans the editor, aligned with the score workspace.
+   *
+   * It is clamped to the window, so a narrow screen still gets a box that
+   * fills it edge to edge instead of one that overflows; and it sits above
+   * the bottom bar, which is where its trigger lives.
+   */
+  const placeWidePopover = (trigger, panel) => {
+    const margin = 8;
+    const anchor = trigger.getBoundingClientRect();
+    const workspace = scoreHost.getBoundingClientRect();
+    const width = Math.max(240, Math.min(workspace.width, window.innerWidth - margin * 2));
+    const left = Math.max(margin, Math.min(workspace.left, window.innerWidth - width - margin));
+    for (let pass = 0; pass < 2; pass += 1) {
+      const height = panel.getBoundingClientRect().height;
+      const above = anchor.top - height - 8;
+      const top = above >= margin ? above : Math.max(margin, anchor.bottom + 8);
+      panel.style.width = `${Math.round(width)}px`;
       panel.style.left = `${Math.round(left)}px`;
       panel.style.top = `${Math.round(top)}px`;
     }
@@ -2084,11 +2134,24 @@
         clefAt(measureNumber, staffNumber, partId),
         staffPosition,
       );
+      // A note's hit box is a notehead wide plus padding, which in a dense
+      // bar overlaps the beat beside it. Taking every hit as "you clicked
+      // this note" meant a click on the '&' replaced the note on the beat,
+      // so an eighth-note groove could never be written. The beat the
+      // POINTER is over decides instead: only a press on the note's own
+      // beat is a press on the note, and anything else falls through to
+      // the positional placement below.
+      const clickedTick = hitStaff === null
+        ? null
+        : snappedTickAt(point.x, hitStaff.systemIndex, hitStaff.staffNumber ?? 1);
+      const onThisNote = clickedTick === null
+        || clickedTick.measureNumber !== measureNumber
+        || clickedTick.tick === (existing?.startTick ?? 0);
       // A rest -- including the whole-measure placeholder MusicXML writes
       // for an empty measure -- is not a note to select. In note input it
       // is the SPACE to write into, so fall through to the positional
       // placement below rather than trapping every click on beat 1.
-      if (existing && existing.kind !== 'rest') {
+      if (existing && existing.kind !== 'rest' && onThisNote) {
         // In note input a staff click always writes. Clicking a note that
         // is already there -- the commonest gesture when writing a melody,
         // since notes sit where the pointer is -- must replace that note
@@ -2145,16 +2208,10 @@
     // `xToTick`, not `xToPosition`: the latter snaps to the nearest
     // EXISTING note, so in a measure whose only event is on beat 1 every
     // click would land on beat 1 and the user could never write beat 3.
-    // `xToTick` is the continuous inverse, and the result is snapped to
-    // the current note value's own grid, the way step entry does.
-    const rawTick = engine.xToTick(state.result.playback, point.x, systemIndex);
-    const position = engine.resolvePosition(state.result.playback, rawTick).position;
-    const grid = Math.max(1, durationForTool().ticks);
-    const capacity = capacityOf(position.measureNumber);
-    const snappedTick = Math.min(
-      Math.max(0, capacity - grid),
-      Math.round(position.tickInMeasure / grid) * grid,
-    );
+    // `xToTick` is the continuous inverse, and `snappedTickAt` snaps the
+    // result to the current note value's own grid, the way step entry does.
+    const position = snappedTickAt(point.x, systemIndex, staffNumber);
+    const snappedTick = position.tick;
     const staffPosition = staffPositionFromPoint(staff, point.y);
     // A tab line names a string, not a pitch: the click has to become a
     // string/fret pair or the note is written to a staff position the tab
@@ -2168,19 +2225,22 @@
           clefAt(position.measureNumber, staffNumber),
           staffPosition,
         );
-    // Chord mode is a latch on the BEAT, not on the pitch: the next note
-    // joins the beat the last one was written on, wherever it was clicked.
-    // Rebuilding `entry` from the click's own x would move the beat, so
-    // every chord click landed on the next slot and no chord could ever
-    // grow past one notehead. `written` is what `advanceEntry` recorded;
-    // keeping it here is what makes the second and third click stack.
+    // Chord mode is a latch on the BEAT you are working on, not a trap: a
+    // click that lands on a different beat moves there and starts a new
+    // chord. Pinning every click to the last written beat made a groove
+    // impossible -- the kick and hi-hat stacked on 1, and the hi-hat
+    // written on the '&' stacked on 1 as well, because its own x was
+    // ignored. `written` is what `advanceEntry` recorded, so a click on the
+    // same beat (or near enough to snap to it) still stacks.
     // A chord stacks only on its own staff: joining a treble chord from the
     // bass staff would put two staves' notes in one chord, which the engine
     // rejects outright (and used to leave the click doing nothing at all).
     const stackingClick =
       state.tool.chord &&
       state.entry?.written !== undefined &&
-      (state.entry.written.staffNumber ?? 1) === staffNumber;
+      (state.entry.written.staffNumber ?? 1) === staffNumber &&
+      state.entry.written.measureNumber === position.measureNumber &&
+      state.entry.written.tick === snappedTick;
     // A grand staff's two staves are separate lines, so each writes into its
     // own voice. Without this both landed in voice 1, and because the beat
     // lookup used to ignore the staff, the second note replaced the first.

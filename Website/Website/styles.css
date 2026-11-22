@@ -486,10 +486,18 @@ body.is-newscore-open { overflow:hidden; }
    group by group instead of splitting a group across rows. */
 .editor-popover--overflow { max-width:min(360px,calc(100vw - 16px)); align-content:flex-start; }
 .editor-popover .editor-tool { min-width:32px; height:32px; }
-/* The instrument and mixer boxes hang off the bottom bar, so they are
-   wider than a tool palette and scroll their own body when the window is
-   short. */
-.editor-popover--inst { max-width:min(620px,calc(100vw - 16px)); }
+/* The instrument box spans the editor's width, the way MuseScore's
+   instrument panel does: a keyboard, a fretboard or a row of pads is a
+   strip, and a narrow box under the button would force it to wrap. The
+   script sets its width; this is only the ceiling and the scroll for a
+   short window. */
+.editor-popover--inst {
+  max-width:none;
+  max-height:calc(100vh - 140px);
+  overflow:auto;
+  flex-direction:column;
+  flex-wrap:nowrap;
+}
 .editor-popover--mixer { max-width:min(420px,calc(100vw - 16px)); }
 .editor-inst { display:flex; flex-direction:column; gap:8px; padding:2px; }
 .editor-inst__title { color:var(--muted); font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
@@ -497,7 +505,7 @@ body.is-newscore-open { overflow:hidden; }
    sideways instead of shrinking the keys past the point a pointer can
    hit one. It opens on middle C. */
 .editor-inst__piano {
-  max-width:min(560px,calc(100vw - 40px));
+  width:100%;
   overflow-x:auto;
   overflow-y:hidden;
   padding-bottom:4px;
@@ -537,7 +545,9 @@ body.is-newscore-open { overflow:hidden; }
 .editor-inst__string { display:flex; align-items:center; gap:3px; }
 .editor-inst__string-label { width:38px; color:var(--muted); font-size:9px; font-weight:600; }
 .editor-inst__fret {
-  width:28px;
+  flex:1 1 28px;
+  min-width:26px;
+  max-width:56px;
   height:24px;
   border:1px solid var(--border);
   border-radius:4px;
@@ -549,7 +559,7 @@ body.is-newscore-open { overflow:hidden; }
 }
 .editor-inst__fret:hover { border-color:var(--accent); color:var(--accent-bright); }
 .editor-inst__fret--open { border-style:dashed; }
-.editor-inst__drums { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
+.editor-inst__drums { display:grid; grid-template-columns:repeat(auto-fill,minmax(132px,1fr)); gap:4px; }
 .editor-inst__drum {
   padding:6px 8px;
   border:1px solid var(--border);

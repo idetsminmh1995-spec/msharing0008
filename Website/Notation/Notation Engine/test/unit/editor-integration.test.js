@@ -1940,6 +1940,61 @@ describe('the editor and the engine agree, end to end', () => {
     assert.match(xml, /<midi-unpitched>47<\/midi-unpitched>|Open Hi-Hat/);
   });
 
+  test('the Inst. box takes the editor\'s width instead of a box under its button', () => {
+    // MuseScore's instrument panel is a strip across the window: a keyboard,
+    // a fretboard or a row of pads does not fit a narrow popover, and a box
+    // sized to its contents would force every one of them to wrap. The panel
+    // is placed from the score workspace's own width instead.
+    const { window } = loadEditorPage({
+      newScore: { title: 'Piano', instrumentIds: ['piano'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
+    });
+    const doc = window.document;
+    const panel = doc.querySelector('[data-editor-popover-panel="inst"]');
+    const workspace = doc.querySelector('[data-editor-score]');
+    const style = doc.querySelector('link[rel="stylesheet"]').getAttribute('href');
+    const css = fs.readFileSync(path.join(appDir, style.split('?')[0]), 'utf8');
+
+    // jsdom has no layout, so the widths are stated: the workspace is 900
+    // wide and starts at x=20, and the box is opened against it.
+    workspace.getBoundingClientRect = () => ({
+      x: 20, y: 0, width: 900, height: 400, top: 0, left: 20, right: 920, bottom: 400,
+    });
+    doc.querySelector('[data-editor-popover="inst"]').dispatchEvent(
+      new window.MouseEvent('click', { bubbles: true }),
+    );
+    assert.equal(panel.hidden, false);
+    assert.equal(panel.style.width, '900px', 'the box spans the score workspace, not its contents');
+    assert.equal(panel.style.left, '20px', 'and it lines up with the workspace');
+
+    // The rule that lets it grow past a popover's ceiling, and the strip
+    // that fills it, both have to be in the stylesheet -- a fixed max-width
+    // is what kept the box small before.
+    const rule = css.match(/\.editor-popover--inst\s*\{[^}]*\}/);
+    assert.ok(rule, 'the instrument box has no rule of its own');
+    assert.match(rule[0], /max-width:none/, 'the instrument box is not capped to a popover width');
+    assert.match(css, /\.editor-inst__piano\s*\{[^}]*width:100%/, 'the keyboard fills the box');
+  });
+
+  test('the Inst. box shows a percussion strip for a kit and a fretboard for a guitar', () => {
+    // The box follows the part being written, which is what makes one
+    // panel serve every instrument: a kit gets pads, a guitar gets its own
+    // strings and frets, and the pitch instruments get the keyboard.
+    const kit = loadEditorPage({
+      newScore: { title: 'kit', instrumentIds: ['drum-kit'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
+    });
+    const kitPanel = kit.window.document.querySelector('[data-editor-popover-panel="inst"]');
+    assert.equal(kitPanel.querySelector('.editor-inst__title').textContent, 'Percussion');
+    assert.equal(kitPanel.querySelectorAll('.editor-inst__drum').length, 9);
+
+    const guitar = loadEditorPage({
+      newScore: { title: 'Guitar', instrumentIds: ['acoustic-guitar'], key: 'C', time: '4/4', tempo: 120, measures: 2 },
+    });
+    const guitarPanel = guitar.window.document.querySelector('[data-editor-popover-panel="inst"]');
+    assert.match(guitarPanel.querySelector('.editor-inst__title').textContent, /Acoustic Guitar/);
+    assert.equal(guitarPanel.querySelectorAll('.editor-inst__string').length, 6);
+    assert.equal(guitarPanel.querySelectorAll('.editor-inst__piano').length, 0, 'a guitar is not given a keyboard');
+  });
+
   test('the Mixer box lists the score\'s parts and says its levels are not wired yet', () => {
     const { window } = loadEditorPage();
     const doc = window.document;
@@ -2450,6 +2505,74 @@ describe('the editor and the engine agree, end to end', () => {
         .matchAll(/<instrument id="([^"]+)"\/>/g)].map((match) => match[1]);
       assert.equal(instruments.length, 4, 'all four drums are on the one beat');
       assert.equal(new Set(instruments).size, 4, 'and they are four different drums');
+    });
+
+    test('chord mode leaves the beat it is not on alone, so a chord can move on', () => {
+      // Chord mode used to pin every click to the beat the last note was
+      // written on, wherever the pointer went. A triad could be built, but
+      // the next chord landed on the same beat -- the mode had no way out
+      // of the beat it was on.
+      const page = openForClicking();
+      const chordButton = page.doc.querySelector('[data-editor-chord]');
+      chordButton.dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+
+      page.press(9, 11.7);
+      assert.equal(page.status(), 'Inserted B4.');
+      page.press(9, 10.7);
+      assert.equal(page.status(), 'Note added to chord.');
+      // A different beat: the cursor moves there and starts a new chord.
+      page.press(15, 11.7);
+      assert.equal(page.status(), 'Inserted B4.');
+      const notes = barOneNotes(page.saved());
+      assert.deepEqual(notes.slice(0, 3), ['B4', '+D5', 'B4'], 'a second chord opens on the next beat');
+    });
+
+    test('the beat under the pointer decides, so an eighth-note offbeat is reachable', () => {
+      // A note's hit box is a notehead wide plus padding, which in a dense
+      // bar overlaps the beat beside it. Every hit used to count as "you
+      // clicked this note", so the press aimed at the '&' replaced the
+      // note on the beat and an eighth-note groove could never be written.
+      const page = openForClicking();
+      page.doc.querySelector('[data-editor-duration="eighth"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+
+      page.press(9, 11.7);
+      assert.equal(page.status(), 'Inserted B4.');
+      // 13.5 is inside the first note's hit box but a whole eighth to its
+      // right: the beat under the pointer is the '&', so this writes a new
+      // note rather than replacing the one on beat 1.
+      page.press(13.5, 11.7);
+      assert.equal(page.status(), 'Inserted B4.');
+      const notes = barOneNotes(page.saved());
+      assert.equal(notes.length, 2, 'two eighth notes, not one replaced note');
+      assert.ok(!notes[1].startsWith('+'), 'the second note is not a chord member');
+    });
+
+    test('a drum groove writes kick and hi-hat on 1 and the hi-hat on the &', () => {
+      const page = openForClicking({
+        newScore: { title: 'kit', instrumentIds: ['drum-kit'], key: 'C', time: '4/4', tempo: 120, measures: 1 },
+      });
+      page.doc.querySelector('[data-editor-duration="eighth"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      const chordButton = page.doc.querySelector('[data-editor-chord]');
+      chordButton.dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+
+      // The kit's staff has its bottom line at y 14: the kick sits half a
+      // space below it, the closed hi-hat four and a half spaces above.
+      page.press(9, 14 - 0.5);
+      assert.equal(page.status(), 'Inserted Bass Drum 1.');
+      page.press(9, 14 - 4.5);
+      assert.equal(page.status(), 'Added Closed Hi-Hat to the chord.');
+      // The '&' of beat 1 is one eighth to the right.
+      page.press(13.5, 14 - 4.5);
+      assert.equal(page.status(), 'Inserted Closed Hi-Hat.');
+
+      const measure = (page.saved().match(/<measure number="1">[\s\S]*?<\/measure>/) || [''])[0];
+      const events = [...measure.matchAll(/<note>[\s\S]*?<\/note>/g)].map((match) => match[0].replace(/\s+/g, ''));
+      const onBeatOne = events.filter((note) => !note.includes('<rest'));
+      assert.equal(onBeatOne.length, 3, 'kick, hi-hat and the offbeat hi-hat are three notes');
+      assert.equal(onBeatOne.filter((note) => note.includes('<chord/>')).length, 1,
+        'the kick and the hi-hat share beat 1, and the offbeat stands alone');
     });
   });
 
