@@ -51,7 +51,7 @@ Sidebar ကို **dock** အဖြစ် ပြောင်းပြီး pan
 ## ပူးတွဲ ပြောင်းလဲမှု — page mode ကို sheet များအဖြစ် ပြခြင်း
 
 Editor က engine ကို `page.gapBetweenPages: 3`, `page.verticalJustify: true`
-ဖြင့် ခေါ်သည်။ ရလဒ်အနေဖြင့် စာမျက်နှာများ အကြား ကွက်လပ် ပေါ်လာပြီး
+ဖြင့် ခေါ်သည်။ ရလဒ်အနေဖြင့် စာမျက်နှာများ အကြား ကွက်လွတ် ပေါ်လာပြီး
 စာမျက်နှာတစ်ခုစီ၏ system များက အောက်ဘက် margin အထိ ဖြန့်ကျက်သည်။
 Engine ဘက်တွင် `Page.top` နှင့် `PageSystem.y` က တည်နေရာကို
 ပိုင်ဆိုင်သဖြင့် renderer က ပြန်တွက်စရာ မလိုတော့ပါ။ အသေးစိတ်ကို
@@ -106,7 +106,7 @@ render, write လုပ်နိုင်ပြီးသား ဖြစ်ခ�
   member အားလုံးက syllable တူတူ ရသည် (renderer က tick တူသော member များကို
   syllable တစ်ခုအဖြစ် ပေါင်းပြီးသား)။ Text ဗလာဖြစ်လျှင် verse ကို ဖျက်သည်
   — `<text></text>` သည် syllable မဟုတ်၊ row တစ်ခု မလိုအပ်ဘဲ ယူထားမည့်
-  ကွက်လပ်သာ ဖြစ်သည်။
+  ကွက်လွတ်သာ ဖြစ်သည်။
 - Hyphen ကို `<syllabic>` အဖြစ် အလိုအလျောက် ပြောင်းသည် — အဆုံးတွင် `-`
   ဆိုလျှင် `begin`၊ အစတွင် `-` ဆိုလျှင် `end`၊ နှစ်ဖက်လုံးဆိုလျှင် `middle`။
   ထို့ကြောင့် စာရိုက်သူသည် element ကို မသိဘဲ မှန်ကန်စွာ ရေးနိုင်သည်။
@@ -152,22 +152,20 @@ Guitar part တစ်ခုကို notation staff (staff 1) နှင့် ta
 staff နှစ်ခုတွင် ရေးထားသည်။ ထို့ကြောင့် တစ်ခုတွင် ရေးသည်များ ကျန်တစ်ခုတွင်
 ပါ ပေါ်ရမည်။
 
-**စစ်ဆေးပြီး ရလဒ် (၂၀၂၆-၁၁-၁၈):**
+**စစ်ဆေးပြီး ရလဒ် (2026-11-18):**
 
 - ✅ **ရေးခြင်း** — fretboard မှ ရေးလျှင်၊ staff ကို နှိပ်၍ ရေးလျှင်၊
   letter key နှိပ်၍ ရေးလျှင် staff နှစ်ခုလုံး ရသည်။ Fretboard မှ
   ရေးသော note သည် string/fret ကို ထိန်းထားသည်။
-- ✅ **ရှေ့သို့ ရွေ့ခြင်း** — arrow key / drag ဖြင့် pitch ကို ရွှေ့လျှင် tab
-  ပါ လိုက်သည်။
 - ✅ **ဖျက်ခြင်း** — Delete လုပ်လျှင် staff နှစ်ခုလုံး ရှင်းသည်။
 - ✅ **Staff ရွှေ့ခြင်း** — Properties ၏ Staff field ဖြင့် ရွှေ့နိုင်သည်။
 
-**တွေ့ရှိပြီး ဖြည့်ခဲ့သော ကွက်လပ် (ယခု ပြင်ပြီး):** ရေးခြင်းသာ
+**တွေ့ရှိပြီး ဖြည့်ခဲ့သော ကွက်လွတ် (ယခု ပြင်ပြီး):** ရေးခြင်းသာ
 တွဲထားခဲ့သည်။ **ပြင်ဆင်ခြင်း** မတွဲပါ — Properties တွင် pitch သို့မဟုတ်
-duration ပြောင်းလျှင်၊ palette မှ accidental တင်လျှင်၊ arrow/drag ဖြင့်
-transpose လုပ်လျှင် ရေးထားသည့် staff တစ်ခုတည်းသာ ပြောင်းပြီး tab သည်
-အဟောင်းကို ဆက်ပြသည်။ ထို beat သည် staff နှစ်ခုတွင် မတူညီသော note
-နှစ်ခု ဖြစ်သွားသည်။
+duration ပြောင်းလျှင်၊ palette မှ accidental တင်လျှင်၊ arrow key သို့မဟုတ်
+drag ဖြင့် transpose လုပ်လျှင် ရေးထားသည့် staff တစ်ခုတည်းသာ ပြောင်းပြီး
+tab သည် အဟောင်းကို ဆက်ပြသည်။ ထို beat သည် staff နှစ်ခုတွင် မတူညီသော
+note နှစ်ခု ဖြစ်သွားသည်။
 
 - `notation-editor.js` — `mirrorCounterpart()` အသစ်။ တစ်ခုတည်းသော event ကို
   `pairedStaffFor()` က ပြသည့် ကျန်တစ်ခုသို့ ကူးသည်။ Event ကို
@@ -177,8 +175,8 @@ transpose လုပ်လျှင် ရေးထားသည့် staff တ�
   ရွေးထားသော string/fret ကို လေးစားသည်။ သို့သော် **pitch ပြင်လျှင်**
   ထို string/fret သည် pitch အဟောင်းကို ဖော်ပြသည်၊ ထို့ကြောင့်
   `tabPositionFor()` ဖြင့် pitch အသစ်မှ ပြန်တွက်သည်။
-- ချိတ်ထားသော path များ: Properties pitch (`setNotesPitch`)， Properties
-  duration (`setEventDuration`)， palette accidental၊ arrow-key transpose，
+- ချိတ်ထားသော path များ: Properties pitch (`setNotesPitch`), Properties
+  duration (`setEventDuration`), palette accidental, arrow-key transpose,
   drag transpose။
 - Test: `editor-integration.test.js` — လေးခု အသစ် (pitch, duration,
   accidental, transpose)၊ တစ်ခုစီသည် staff နှစ်ခုလုံး ကိုက်ညီမှုနှင့် tab ၏
