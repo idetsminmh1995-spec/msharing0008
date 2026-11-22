@@ -29,12 +29,13 @@ Notation Lab starts as a focused entry screen. It must not expose the previous v
 2. Implement the three-action entry page.
 3. Add the editor route and create/open handoff contract.
 4. Update this plan and work log after each accepted editor milestone.
-5. Verify keyboard navigation, responsive layout, and file-type validation before publishing.
+5. ~~Verify keyboard navigation, responsive layout, and file-type validation before publishing.~~ Done 2026-11-18: a real Chromium tab walk reaches the header, then Open File, then Create, and wraps; the off-screen file picker is no longer an invisible tab stop; the layout holds at 375 px with no horizontal overflow; and a rejected file (wrong extension or over the 3 MB handoff cap) clears the picker so the next choice still fires. Covered by `test/unit/newscore-wizard.test.js`.
 
 ## Current milestone
 
 Only steps 1–3 are in scope for this revision. Scan remains intentionally unavailable.
 
+Step 5 was closed on 2026-11-18 with the entry-page keyboard and file-validation checks above.
 
 ## Editor program — added 2026-11-15
 

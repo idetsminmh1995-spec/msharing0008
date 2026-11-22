@@ -537,3 +537,57 @@ describe('the editor opens the score the wizard created', () => {
     assert.deepEqual([...new Set(drawn)].sort(), ['P1', 'P2'], 'both parts must still be drawn');
   });
 });
+
+/**
+ * The Open File half of the entry page. The three action cards are buttons,
+ * so the only control that could be missed from a keyboard is the file
+ * picker itself -- it is drawn off-screen, and a hidden control that still
+ * takes focus is a tab stop nobody can see. The validation below is the
+ * other half of the same promise: a rejected file must leave the page able
+ * to accept the next one.
+ */
+describe('the entry page opens a file from the keyboard', () => {
+  const pick = async (window, file) => {
+    const input = window.document.querySelector('[data-notation-open-input]');
+    Object.defineProperty(input, 'files', { value: [file], configurable: true, writable: true });
+    input.dispatchEvent(new window.Event('change', { bubbles: true }));
+    // The handler reads the bytes before handing over, so let it settle.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return input;
+  };
+  const feedbackOf = (window) => window.document.querySelector('[data-notation-feedback]');
+
+  test('the off-screen file picker is not a tab stop, and Open File still reaches it', () => {
+    const window = loadEntryPage();
+    const input = window.document.querySelector('[data-notation-open-input]');
+    assert.equal(input.getAttribute('tabindex'), '-1', 'a control nobody can see must not take focus');
+    assert.match(input.getAttribute('aria-label') ?? '', /score/i, 'a file input needs a name of its own');
+    assert.equal(input.getAttribute('aria-hidden'), null, 'hiding it from assistive tech would hide the picker too');
+  });
+
+  test('a supported file is handed to the editor as bytes', async () => {
+    const window = loadEntryPage();
+    await pick(window, new window.File(['<score-partwise/>'], 'song.MusicXML', { type: 'application/xml' }));
+    const stored = JSON.parse(window.sessionStorage.getItem('notation-lab-pending-file'));
+    assert.equal(stored.name, 'song.MusicXML', 'the editor shows the name the user chose');
+    assert.equal(window.atob(stored.data), '<score-partwise/>', 'the bytes must survive the handoff');
+    assert.equal(feedbackOf(window).hidden, true, 'a good file says nothing');
+  });
+
+  test('a wrong extension is refused and cleared, so the same file can be chosen again', async () => {
+    const window = loadEntryPage();
+    const input = await pick(window, new window.File(['x'], 'song.pdf'));
+    assert.match(feedbackOf(window).textContent, /\.musicxml, \.xml, or \.mxl/);
+    assert.equal(input.value, '', 'a kept selection would swallow the next change event');
+    assert.equal(window.sessionStorage.getItem('notation-lab-pending-file'), null);
+  });
+
+  test('an oversized file is refused and cleared too', async () => {
+    const window = loadEntryPage();
+    const input = await pick(window, new window.File([new Uint8Array(3 * 1024 * 1024 + 1)], 'huge.musicxml'));
+    assert.match(feedbackOf(window).textContent, /too large/);
+    assert.equal(input.value, '', 'a kept selection would swallow the next change event');
+    assert.equal(window.sessionStorage.getItem('notation-lab-pending-file'), null);
+  });
+});
+

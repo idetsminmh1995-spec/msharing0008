@@ -334,7 +334,10 @@
       return;
     }
     if (file.size > 3 * 1024 * 1024) {
+      // Clear the input as well, or the same oversized file is still
+      // selected and choosing it again fires no `change` event.
       setFeedback('This file is too large for the browser handoff. Please open it from the Editor.');
+      input.value = '';
       return;
     }
     try {
