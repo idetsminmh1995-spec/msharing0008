@@ -109,6 +109,10 @@
     // The voice being written into. A measure can hold up to four, and a
     // voice is the only way to write a second line on one staff.
     voice: 1,
+    // Voice overrides keyed `partId:staffNumber`, set by the voice picker or
+    // Ctrl+Alt+1-4. Absent means "the staff's own default", which is voice 1
+    // on a single staff and the staff's own number on a grand staff.
+    voicesByStaff: {},
     entry: null,
     history: [],
     future: [],
@@ -959,7 +963,13 @@
     state.history.length = 0;
     state.future.length = 0;
     clearSelection();
-    state.entry = { partId: activePartId(), measureNumber: 1, voiceId: state.voice, tick: 0 };
+    state.entry = {
+      partId: activePartId(),
+      measureNumber: 1,
+      voiceId: voiceForStaff(1),
+      tick: 0,
+      staffNumber: 1,
+    };
     setFile(name);
     render();
     announce('Score ready.');
@@ -1477,12 +1487,21 @@
     return docTools.dynamicAt(state.doc, cell.partId, cell.measureNumber, event?.startTick ?? 0);
   }
 
-  /** Switches the voice that new notes are written into. */
+  /** Switches the voice that new notes are written into, for the current staff. */
   function setVoice(voiceId) {
     const id = Math.min(4, Math.max(1, Number(voiceId) || 1));
     state.voice = id;
     if (voiceSelect) voiceSelect.value = String(id);
-    if (state.entry) state.entry = { ...state.entry, voiceId: id };
+    // The picker applies to the staff the cursor is on, so the other staff
+    // keeps its own default instead of being dragged along.
+    const staffNumber = state.entry?.staffNumber ?? 1;
+    if (state.entry) {
+      state.voicesByStaff = {
+        ...state.voicesByStaff,
+        [`${activePartId()}:${staffNumber}`]: id,
+      };
+      state.entry = { ...state.entry, voiceId: id };
+    }
     announce(`Voice ${id}.`);
     render();
   }
@@ -1719,6 +1738,44 @@
   }
 
   /**
+   * The voice a staff writes into.
+   *
+   * A part's staves are separate lines of music and need separate voices.
+   * Writing both into voice 1 put a treble note and a bass note on one
+   * timeline, where the second read as "this beat is taken" and replaced
+   * the first -- the bug that made only one note per column writable. A new
+   * grand staff already ships placeholder rests this way (voice 1 on staff
+   * 1, voice 2 on staff 2), so the default matches what is on screen.
+   */
+  function voiceForStaff(staffNumber, partId = activePartId()) {
+    const staves = Math.max(1, attributeAt(1, partId)?.staves ?? 1);
+    const fallback = staves <= 1 ? 1 : Math.min(4, Math.max(1, staffNumber));
+    return state.voicesByStaff?.[`${partId}:${staffNumber}`] ?? fallback;
+  }
+
+  /** The voice the cursor will write into. */
+  function entryVoiceId() {
+    if (!state.entry) return state.voice;
+    return state.entry.voiceId ?? voiceForStaff(state.entry.staffNumber ?? 1);
+  }
+
+  /**
+   * The index of the event already sitting on `tick` on `staffNumber`.
+   *
+   * A voice is not one per part: a grand staff's two staves hold their own
+   * voices, but a file may still carry one voice across both (the parser
+   * keeps whatever the file said). Matching on the tick alone then finds the
+   * OTHER staff's note and overwrites it, which is what made a bass note
+   * delete the treble note above it. The staff is part of what "this beat is
+   * taken" means.
+   */
+  function indexAtTickOnStaff(events, tick, staffNumber) {
+    return events.findIndex(
+      (event) => (event.startTick ?? 0) === tick && (event.staff ?? 1) === staffNumber,
+    );
+  }
+
+  /**
    * Rolls the entry cursor past a written note.
    *
    * `written` remembers where the note went so that Shift and a letter can
@@ -1727,7 +1784,12 @@
    * gesture that set it.
    */
   function advanceEntry(ticks, measureNumber, voiceId) {
-    const written = { measureNumber, tick: state.entry.tick };
+    const written = {
+      measureNumber,
+      tick: state.entry.tick,
+      staffNumber: state.entry.staffNumber ?? 1,
+      voiceId,
+    };
     const located = locateTick(state.entry.tick + ticks, measureNumber);
     state.entry = { ...state.entry, measureNumber: located.measureNumber, tick: located.tick, voiceId, written };
     clearSelection();
@@ -1744,22 +1806,25 @@
   function insertAtEntry({ step = null, octave = null, rest = false, addToChord = false, staffPosition = null, alter = null, drum = null, stringNumber = null, fret = null }) {
     if (!state.doc) return;
     if (!state.entry) {
-      state.entry = { partId: activePartId(), measureNumber: 1, voiceId: state.voice, tick: 0 };
+      state.entry = {
+        partId: activePartId(),
+        measureNumber: 1,
+        voiceId: voiceForStaff(1),
+        tick: 0,
+        staffNumber: 1,
+      };
     }
     // Chord mode keeps every note on the beat the last one was written on,
     // so the mode and Shift are the same gesture: one is a latch, the other
     // is held. A rest is a beat of its own and never joins a chord.
     const stacking = !rest && (addToChord || state.tool.chord);
-    const { measureNumber, voiceId } = state.entry;
-    const staff = state.entry.staffNumber ?? 1;
-    // A chord member belongs on the beat the last note was written on, not
-    // on the beat the cursor has rolled forward to. Without this, Shift and
-    // a letter after a note writes a NEW note on the next beat, which is the
-    // opposite of what stacking means. `written` is only ever set by
-    // `advanceEntry`, so a fresh click never inherits it.
+    // A chord stacks on the beat AND the staff it was written on: a click on
+    // the bass staff must not join the chord the treble staff holds.
     if (stacking && state.entry.written !== undefined) {
       state.entry = { ...state.entry, ...state.entry.written };
     }
+    const { measureNumber, voiceId } = state.entry;
+    const staff = state.entry.staffNumber ?? 1;
     const capacity = capacityOf(measureNumber);
     const remaining = capacity - state.entry.tick;
     if (remaining <= 0) {
@@ -1807,7 +1872,7 @@
         return;
       }
       const events = eventsIn(measureNumber, voiceId);
-      const existingIndex = events.findIndex((event) => (event.startTick ?? 0) === state.entry.tick);
+      const existingIndex = indexAtTickOnStaff(events, state.entry.tick, staff);
       const existing = existingIndex >= 0 ? events[existingIndex] : null;
       const chosen = drum ?? pickDrumForLine(line, existing);
       if (chosen === null) {
@@ -1855,7 +1920,7 @@
     const pitch = { kind: 'pitched', step, alter: alterValue ?? 0, octave };
     const tab = stringNumber === null ? {} : { stringNumber, ...(fret === null ? {} : { fret }) };
     const events = eventsIn(measureNumber, voiceId);
-    const existingIndex = events.findIndex((event) => (event.startTick ?? 0) === state.entry.tick);
+    const existingIndex = indexAtTickOnStaff(events, state.entry.tick, staff);
     const existing = existingIndex >= 0 ? events[existingIndex] : null;
 
     if (existing && existing.kind !== 'rest') {
@@ -1971,7 +2036,10 @@
 
   /** The octave whose notes sit nearest the middle of the current clef. */
   function currentOctave() {
-    return docTools.pitchFromStaffPosition(clefAt(state.entry?.measureNumber ?? 1), 0).octave;
+    return docTools.pitchFromStaffPosition(
+      clefAt(state.entry?.measureNumber ?? 1, state.entry?.staffNumber ?? 1),
+      0,
+    ).octave;
   }
 
   // ---- pointer interaction -----------------------------------------------
@@ -2018,7 +2086,13 @@
         // made the click look like it did nothing. Selecting a note in
         // order to transpose it is what note input OFF is for.
         if (state.noteInput && !state.tool.rest) {
-          state.entry = { partId, measureNumber, voiceId, tick: existing.startTick ?? 0, staffNumber };
+          state.entry = {
+            partId,
+            measureNumber,
+            voiceId,
+            tick: existing.startTick ?? 0,
+            staffNumber,
+          };
           clearSelection();
           insertAtEntry({ step, octave, addToChord: event.shiftKey, staffPosition });
           return;
@@ -2090,11 +2164,23 @@
     // every chord click landed on the next slot and no chord could ever
     // grow past one notehead. `written` is what `advanceEntry` recorded;
     // keeping it here is what makes the second and third click stack.
-    const stackingClick = state.tool.chord && state.entry?.written !== undefined;
+    // A chord stacks only on its own staff: joining a treble chord from the
+    // bass staff would put two staves' notes in one chord, which the engine
+    // rejects outright (and used to leave the click doing nothing at all).
+    const stackingClick =
+      state.tool.chord &&
+      state.entry?.written !== undefined &&
+      (state.entry.written.staffNumber ?? 1) === staffNumber;
+    // A grand staff's two staves are separate lines, so each writes into its
+    // own voice. Without this both landed in voice 1, and because the beat
+    // lookup used to ignore the staff, the second note replaced the first.
+    const clickedVoiceId = stackingClick
+      ? state.entry.written.voiceId ?? voiceForStaff(staffNumber)
+      : voiceForStaff(staffNumber);
     state.entry = {
       partId: activePartId(),
       measureNumber: stackingClick ? state.entry.written.measureNumber : position.measureNumber,
-      voiceId: state.voice,
+      voiceId: clickedVoiceId,
       tick: stackingClick ? state.entry.written.tick : snappedTick,
       staffNumber,
       ...(stackingClick ? { written: state.entry.written } : {}),
@@ -2812,6 +2898,11 @@
     if (zoomOutput) zoomOutput.textContent = `${state.zoom}%`;
     root.dataset.mode = state.noteInput ? 'input' : 'select';
     if (toolbarStack) toolbarStack.dataset.mode = root.dataset.mode;
+    // The voice picker shows the voice of the staff the cursor is on, so it
+    // has to follow the cursor: clicking the bass staff must show voice 2.
+    if (voiceSelect) {
+      voiceSelect.value = String(entryVoiceId());
+    }
     syncLayout();
   };
 
@@ -2908,7 +2999,7 @@
     state.activePartId = partId;
     const measureNumber = Math.min(state.entry?.measureNumber ?? 1, measureCountOf(partId));
     // A different part has its own staves, so the entry starts on its first.
-    state.entry = { partId, measureNumber, voiceId: state.entry?.voiceId ?? state.voice, tick: 0, staffNumber: 1 };
+    state.entry = { partId, measureNumber, voiceId: voiceForStaff(1, partId), tick: 0, staffNumber: 1 };
     clearSelection();
     syncSetupControls();
     render();
@@ -3193,7 +3284,15 @@
       const at = currentMeasureNumber();
       commit((doc) => docTools.insertMeasureAfter(doc, activePartId(), at), `Measure added after bar ${at}.`);
       clearSelection();
-      state.entry = { ...(state.entry ?? {}), partId: activePartId(), measureNumber: at + 1, voiceId: state.voice, tick: 0 };
+      const staffNumber = state.entry?.staffNumber ?? 1;
+      state.entry = {
+        ...(state.entry ?? {}),
+        partId: activePartId(),
+        measureNumber: at + 1,
+        voiceId: voiceForStaff(staffNumber),
+        tick: 0,
+        staffNumber,
+      };
       render();
     });
   }
@@ -3207,7 +3306,15 @@
       }
       commit((doc) => docTools.removeMeasure(doc, activePartId(), at), `Bar ${at} removed.`);
       clearSelection();
-      state.entry = { ...(state.entry ?? {}), partId: activePartId(), measureNumber: Math.max(1, Math.min(at, count - 1)), voiceId: state.voice, tick: 0 };
+      const staffNumber = state.entry?.staffNumber ?? 1;
+      state.entry = {
+        ...(state.entry ?? {}),
+        partId: activePartId(),
+        measureNumber: Math.max(1, Math.min(at, count - 1)),
+        voiceId: voiceForStaff(staffNumber),
+        tick: 0,
+        staffNumber,
+      };
       render();
     });
   }

@@ -1356,6 +1356,141 @@ describe('the editor and the engine agree, end to end', () => {
     );
   });
 
+  test('a grand staff keeps a treble note and a bass note on the same beat', () => {
+    const { window } = loadEditorPage({
+      newScore: {
+        title: 'Piano',
+        instrumentIds: ['piano'],
+        staffKind: 'grand',
+        key: 'C',
+        time: '4/4',
+        tempo: 120,
+        measures: 1,
+      },
+    });
+    const doc = window.document;
+    const scoreHost = doc.querySelector('[data-editor-score]');
+    window.DOMPoint = class {
+      constructor(x = 0, y = 0) { this.x = x; this.y = y; }
+      matrixTransform() { return new window.DOMPoint(this.x, this.y); }
+    };
+    window.SVGElement.prototype.getScreenCTM = () => ({
+      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0,
+      inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+    });
+    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 1, height: 1 });
+
+    const staffYs = () => {
+      const svg = doc.querySelector('[data-editor-score] svg');
+      const ys = [...svg.querySelectorAll('line')]
+        .filter((line) => line.getAttribute('y1') === line.getAttribute('y2')
+          && Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3)
+        .map((line) => Number(line.getAttribute('y1')));
+      return [...new Set(ys)].sort((a, b) => a - b);
+    };
+    const click = (clientY) => {
+      const svg = doc.querySelector('[data-editor-score] svg');
+      const [, , pageWidth] = svg.getAttribute('viewBox').split(/\s+/).map(Number);
+      scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', {
+        clientX: pageWidth * 0.1,
+        clientY,
+        bubbles: true,
+      }));
+    };
+    const groups = () => {
+      const svg = doc.querySelector('[data-editor-score] svg');
+      return [...svg.querySelectorAll('[data-id]')]
+        .filter((group) => /m1#/.test(group.getAttribute('data-id')));
+    };
+
+    const ys = staffYs();
+    assert.ok(ys.length >= 10, `a grand staff draws two five-line staves, got ${ys.length} lines`);
+
+    click(ys[1]);
+    const afterTreble = groups().length;
+    assert.match(doc.querySelector('[data-editor-status]').textContent, /Inserted/);
+
+    click(ys[ys.length - 2]);
+    assert.equal(
+      groups().length,
+      afterTreble + 1,
+      'the bass note must be added, not replace the treble note',
+    );
+  });
+
+  test('chord mode on a grand staff never joins notes from two staves', () => {
+    const { window } = loadEditorPage({
+      newScore: {
+        title: 'Piano',
+        instrumentIds: ['piano'],
+        staffKind: 'grand',
+        key: 'C',
+        time: '4/4',
+        tempo: 120,
+        measures: 1,
+      },
+    });
+    const doc = window.document;
+    const scoreHost = doc.querySelector('[data-editor-score]');
+    window.DOMPoint = class {
+      constructor(x = 0, y = 0) { this.x = x; this.y = y; }
+      matrixTransform() { return new window.DOMPoint(this.x, this.y); }
+    };
+    window.SVGElement.prototype.getScreenCTM = () => ({
+      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0,
+      inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+    });
+    window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 1, height: 1 });
+
+    const staffYs = () => {
+      const svg = doc.querySelector('[data-editor-score] svg');
+      const ys = [...svg.querySelectorAll('line')]
+        .filter((line) => line.getAttribute('y1') === line.getAttribute('y2')
+          && Math.abs(Number(line.getAttribute('x2')) - Number(line.getAttribute('x1'))) > 3)
+        .map((line) => Number(line.getAttribute('y1')));
+      return [...new Set(ys)].sort((a, b) => a - b);
+    };
+    const click = (clientY) => {
+      const svg = doc.querySelector('[data-editor-score] svg');
+      const [, , pageWidth] = svg.getAttribute('viewBox').split(/\s+/).map(Number);
+      scoreHost.dispatchEvent(new window.PointerEvent('pointerdown', {
+        clientX: pageWidth * 0.1,
+        clientY,
+        bubbles: true,
+      }));
+    };
+
+    doc.querySelector('[data-editor-chord]').dispatchEvent(
+      new window.MouseEvent('click', { bubbles: true }),
+    );
+
+    const ys = staffYs();
+    click(ys[1]);
+    click(ys[ys.length - 2]);
+
+    // Read the score itself, not the SVG: an empty grand staff already
+    // draws a placeholder rest on each staff, so counting groups would pass
+    // whether or not a note was written. Save writes the score as MusicXML,
+    // which names each note's staff.
+    doc.querySelector('[data-editor-save]').dispatchEvent(
+      new window.MouseEvent('click', { bubbles: true }),
+    );
+    const saved = JSON.parse(window.localStorage.getItem('msharing-notation-scores') || '[]');
+    const xml = saved[0]?.xml ?? '';
+    const measure = xml.match(/<measure number="1">([\s\S]*?)<\/measure>/)?.[1] ?? '';
+    const pitched = [...measure.matchAll(/<note>([\s\S]*?)<\/note>/g)]
+      .map((match) => match[1])
+      .filter((note) => /<pitch>/.test(note));
+    const staves = [...new Set(
+      pitched.map((note) => note.match(/<staff>(\d+)<\/staff>/)?.[1] ?? '1'),
+    )].sort();
+    assert.deepEqual(
+      staves,
+      ['1', '2'],
+      'a chord click on each staff must leave a note on that staff',
+    );
+  });
+
   test('a note auditioned on a transposing part sounds at the pitch Play produces', async () => {
     // A guitar part is written an octave above where it sounds. The
     // audition must apply the part's `<transpose>` the way playback does,
