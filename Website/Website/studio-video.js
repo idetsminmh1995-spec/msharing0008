@@ -246,13 +246,258 @@
     ctx.restore();
   }
 
+  // The notation engine is a 2 MB bundle that only a score needs, so it is
+  // fetched when a MusicXML file is first rendered rather than on every
+  // Studio visit. The version key must track notation-editor.html's own.
+  const NOTATION_ENGINE_SRC = 'assets/notation-engine.js?v=de5f363a73f7';
+  const BRAVURA_SRC = 'assets/fonts/Bravura.woff2?v=1.482';
+  const NOTATION_PX_PER_SPACE = 20;
+  // A cursor one staff tall plus its ledger room -- the engine's own
+  // cursor is a glyph of about this size.
+  const CURSOR_SPACES = 4.5;
+  // Page shapes the Notation View control offers, in staff spaces (A4 is
+  // 30 x 42, which is the engine's own default sheet).
+  const PAGE_SHAPES = {
+    landscape: [42, 30],
+    portrait: [30, 42],
+    square: [30, 30],
+  };
+
+  let notationEnginePromise = null;
+  let bravuraBase64 = null;
+  let notation = null;
+
+  const loadNotationEngine = () => {
+    if (window.NotationEngine) return Promise.resolve(window.NotationEngine);
+    if (notationEnginePromise) return notationEnginePromise;
+    notationEnginePromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = NOTATION_ENGINE_SRC;
+      script.onload = () => (window.NotationEngine
+        ? resolve(window.NotationEngine)
+        : reject(new Error('The notation engine loaded without its API.')));
+      script.onerror = () => reject(new Error('The notation engine could not be loaded.'));
+      document.head.appendChild(script);
+    });
+    return notationEnginePromise;
+  };
+
+  /** Bravura travels inside the SVG: an <img> has no access to page fonts. */
+  const loadBravura = async () => {
+    if (bravuraBase64) return bravuraBase64;
+    const response = await fetch(BRAVURA_SRC);
+    if (!response.ok) throw new Error('The Bravura music font could not be loaded.');
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    let binary = '';
+    for (let index = 0; index < bytes.length; index += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+    }
+    bravuraBase64 = btoa(binary);
+    return bravuraBase64;
+  };
+
+  const decodeSvg = (markup) => new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(new Blob([markup], { type: 'image/svg+xml;charset=utf-8' }));
+    const image = new Image();
+    image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('The notation SVG could not be decoded.')); };
+    image.src = url;
+  });
+
+  /**
+   * The Notation part: one engine render per video, decoded once, then
+   * drawn per frame. `page` lays the score on a sheet whose shape follows
+   * the part's own rectangle; `scroll` (Horizontal) is one long system.
+   */
+  const prepareNotation = async (file, settings, rect) => {
+    if (!file || file.name.toLowerCase().endsWith('.mxl')) return null;
+    const api = await loadNotationEngine();
+    const mode = settings.notation === 'horizontal' ? 'scroll' : 'page';
+    const config = {
+      layout: { mode, pxPerStaffSpace: NOTATION_PX_PER_SPACE },
+      colors: { ink: '#101828', background: '#ffffff' },
+    };
+    if (mode === 'page') {
+      // The chosen page shape, in staff spaces -- the same A4 proportions
+      // the engine defaults to, turned or squared as the user asked.
+      const [pageWidth, pageHeight] = PAGE_SHAPES[settings.notation] || PAGE_SHAPES.landscape;
+      config.page = {
+        pageWidth,
+        pageHeight,
+        marginTop: 1.6,
+        marginBottom: 1.6,
+        marginLeft: 1.4,
+        marginRight: 1.4,
+      };
+    }
+    const parsed = api.parseMusicXml(await file.text());
+    const rendered = api.renderParsedMusicXml(parsed, { config });
+    const document = api.exportSvg(rendered.svg, {
+      title: settings.titleOne,
+      fonts: [{ family: 'Bravura', base64: await loadBravura(), format: 'woff2' }],
+    });
+    const image = await decodeSvg(document);
+    const [, , viewBoxWidth, viewBoxHeight] = (rendered.svg.match(/viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"/) || [])
+      .slice(1).map(Number);
+    const viewBox = { width: viewBoxWidth, height: viewBoxHeight };
+    const ink = measureInk(image);
+    const systemYs = [...new Set(rendered.playback.measureNumbersInOrder
+      .map((number) => rendered.playback.placementByMeasureNumber.get(number).systemY))]
+      .sort((left, right) => left - right);
+    return {
+      api,
+      mode,
+      playback: rendered.playback,
+      image,
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+      systemYs,
+      viewBox,
+      ink,
+      cursor: api.resolveConfig().cursor,
+      seconds: rendered.playback.performance?.totalSeconds ?? 0,
+    };
+  };
+
+  /**
+   * The drawn extent of a rendered score, in image pixels. A page carries
+   * margins and a scroll system carries room for lyrics, so fitting the
+   * raw image would leave the staff a fraction of the part.
+   */
+  const measureInk = (image) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(image, 0, 0);
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let left = canvas.width;
+    let top = canvas.height;
+    let right = -1;
+    let bottom = -1;
+    for (let y = 0; y < canvas.height; y += 1) {
+      for (let x = 0; x < canvas.width; x += 1) {
+        const offset = (y * canvas.width + x) * 4;
+        const dark = data[offset] < 160 && data[offset + 1] < 160 && data[offset + 2] < 160;
+        if (!dark || data[offset + 3] < 32) continue;
+        if (x < left) left = x;
+        if (x > right) right = x;
+        if (y < top) top = y;
+        if (y > bottom) bottom = y;
+      }
+    }
+    canvas.width = 0;
+    canvas.height = 0;
+    if (right < 0) return { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight };
+    return { x: left, y: top, width: right - left + 1, height: bottom - top + 1 };
+  };
+
+  /**
+   * The Notation part's rectangle for this frame, taken from the same
+   * layout the engine will draw with -- so the sheet is prepared at the
+   * shape it is actually shown in, without the page duplicating the shares.
+   */
+  const prepareNotationFor = async (file, settings) => {
+    // The same three parts drawPerformance composes, so the sheet is
+    // prepared at the shape it is actually shown in.
+    const layout = engine.layoutFor(selectedTool, {
+      width: settings.size.width,
+      height: settings.size.height,
+      parts: ['title', 'notation', 'instrument'],
+    });
+    const rect = layout.rects.notation;
+    if (!rect) return null;
+    try {
+      return await prepareNotation(file, settings, rect);
+    } catch (error) {
+      setStatus(`Notation could not be prepared: ${error.message || error}`);
+      return null;
+    }
+  };
+
+  function drawNotationPart(ctx, rect, at, state) {
+    ctx.save();
+    ctx.translate(rect.x, rect.y);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, rect.width, rect.height);
+    if (!state) {
+      ctx.fillStyle = '#8b95a7';
+      ctx.font = `600 ${Math.max(10, Math.round(rect.height * 0.07))}px Inter, system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Notation needs a MusicXML score', rect.width / 2, rect.height / 2);
+      ctx.restore();
+      return;
+    }
+
+    const { api, ink, viewBox } = state;
+    const tick = api.secondsToTick(state.playback.tempoMap, at);
+    // The SVG is one staff space per viewBox unit; the image is that times
+    // its own scale, so both the ink box and the cursor can be placed in
+    // the units the engine measured them in.
+    const imageSpace = state.image.naturalWidth / viewBox.width;
+    const inkHeight = ink.height / imageSpace;
+
+    if (state.mode === 'scroll') {
+      // Horizontal: the system slides left under a marker that stays put.
+      const pxPerSpace = (rect.height * 0.9) / inkHeight;
+      const placement = api.computeCursorPlacement(state.playback, tick, {
+        mode: 'notationMoves',
+        viewportWidth: rect.width / pxPerSpace,
+      });
+      const originX = placement.notationTranslateX * pxPerSpace;
+      const originY = (rect.height - inkHeight * pxPerSpace) / 2 - (ink.y / imageSpace) * pxPerSpace;
+      ctx.drawImage(state.image, originX, originY,
+        state.image.naturalWidth * (pxPerSpace / imageSpace),
+        state.image.naturalHeight * (pxPerSpace / imageSpace));
+      drawCursor(ctx, state, placement.markerX * pxPerSpace,
+        originY + placement.systemY * pxPerSpace, CURSOR_SPACES * pxPerSpace, pxPerSpace);
+      ctx.restore();
+      return;
+    }
+
+    // Page: the sheet is as wide as the part and slides bottom to top, one
+    // system at a time -- the Plan's own wording for this view.
+    const pxPerSpace = (rect.width * 0.98) / viewBox.width;
+    const placement = api.computeCursorPlacement(state.playback, tick, { mode: 'cursorMoves' });
+    const sheetHeight = state.image.naturalHeight * (pxPerSpace / imageSpace);
+    const originX = (rect.width - viewBox.width * pxPerSpace) / 2;
+    const systemTop = placement.systemY * pxPerSpace;
+    const originY = sheetHeight <= rect.height
+      ? (rect.height - sheetHeight) / 2
+      : Math.min(0, Math.max(rect.height - sheetHeight, rect.height * 0.4 - systemTop));
+    ctx.drawImage(state.image, originX, originY,
+      state.image.naturalWidth * (pxPerSpace / imageSpace), sheetHeight);
+    drawCursor(ctx, state, originX + placement.markerX * pxPerSpace,
+      originY + systemTop, CURSOR_SPACES * pxPerSpace, pxPerSpace);
+    ctx.restore();
+  }
+
+  /** The engine's cursor config, drawn as a bar rather than a re-decoded glyph. */
+  const drawCursor = (ctx, state, x, top, height, pxPerSpace) => {
+    ctx.save();
+    ctx.globalAlpha = state.cursor.opacity ?? 0.85;
+    ctx.fillStyle = state.cursor.color;
+    ctx.fillRect(x - (state.cursor.thickness * pxPerSpace) / 2, top,
+      Math.max(1.5, state.cursor.thickness * pxPerSpace), height);
+    ctx.restore();
+  };
+
   /**
    * Title / Info: logo on the left, Title 1 beside it, Title 2 under it,
    * and the metre, tempo, key and beat on the same row.
    */
+  function drawTitlePart(ctx, rect, at, meta, settings, palette) {
+    const scale = Math.max(0.5, Math.min(1.15, rect.height / 150));
+    ctx.save();
+    ctx.translate(rect.x, rect.y);
+    drawInfoBand(ctx, { at, meta, settings, palette, scale });
+    ctx.restore();
+  }
+
   function drawInfoBand(ctx, { at, meta, settings, palette, scale }) {
-    const pad = Math.round(32 * scale);
-    const top = Math.round(14 * scale);
+    const pad = Math.round(24 * scale);
+    const top = Math.round(10 * scale);
     const leftEdge = pad;
     const logoSize = Math.round(56 * scale);
     let textX = leftEdge;
@@ -289,10 +534,9 @@
 
     drawMetronomeIcon(ctx, cursorX + Math.round(6 * scale), statsY - Math.round(statSize * 0.35), Math.round(statSize * 1.15), at, meta.bpm, palette.muted);
 
-    const secondary = [`${settings.brand} · ${settings.model.toUpperCase()} · ${settings.notation.toUpperCase()}`];
     ctx.fillStyle = palette.muted;
     ctx.font = `600 ${Math.max(9, Math.round(10 * scale))}px Inter, system-ui, sans-serif`;
-    ctx.fillText(secondary.join(' · '), leftEdge, statsY + Math.round(20 * scale));
+    ctx.fillText(`${settings.brand} · ${settings.model.toUpperCase()} · ${settings.notation.toUpperCase()}`, leftEdge, statsY + Math.round(20 * scale));
 
     if (settings.countEnabled) {
       drawCountRow(ctx, { at, meta, settings, palette, scale, pad: leftEdge, y: statsY + Math.round(40 * scale) });
@@ -340,43 +584,34 @@
     }
   }
 
-  function drawPerformance(ctx, at, hits, duration, settings, meta) {
-    const { width, height } = settings.size;
-    const palette = getPalette(settings.color);
-    const scale = Math.max(0.72, Math.min(1.18, Math.min(width / 640, height / 360)));
-    const left = Math.max(78, Math.round(width * 0.175));
-    const right = width - Math.max(22, Math.round(width * 0.05));
+  /** The instrument part: the drum lanes the performance is read from. */
+  function drawInstrumentPart(ctx, rect, at, hits, duration, settings, palette) {
+    const scale = Math.max(0.6, Math.min(1.2, Math.min(rect.width / 640, rect.height / 360)));
+    const labelWidth = Math.round(78 * scale);
+    const left = rect.x + labelWidth;
+    const right = rect.x + rect.width - Math.round(16 * scale);
     const trackWidth = Math.max(1, right - left);
-    const lanePositions = LANES.map((lane) => ({ ...lane, y: Math.round(height * lane.y) }));
+    const lanePositions = LANES.map((lane, index) => ({
+      ...lane,
+      y: Math.round(rect.y + rect.height * (0.2 + index * 0.3)),
+    }));
 
-    ctx.fillStyle = palette.background;
-    ctx.fillRect(0, 0, width, height);
-    const glow = ctx.createRadialGradient(width * 0.72, height * 0.12, 4, width * 0.72, height * 0.12, Math.max(180, width * 0.4));
-    glow.addColorStop(0, hexToRgba('#f20d3d', settings.color === 'white' ? 0.1 : 0.24));
-    glow.addColorStop(1, hexToRgba('#f20d3d', 0));
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, width, height * 0.55);
-
-    drawInfoBand(ctx, { at, meta, settings, palette, scale });
-
-    const gridStart = Math.round(height * 0.3);
-    const gridEnd = Math.round(height * 0.86);
-    const gridStep = Math.max(1, Math.ceil(duration / (settings.notation === 'square' ? 4 : 8)));
+    const gridStep = Math.max(1, Math.ceil(duration / 8));
     ctx.font = `${Math.max(9, Math.round(10 * scale))}px monospace`;
     for (let second = 0; second <= duration; second += gridStep) {
       const x = left + (second / duration) * trackWidth;
       ctx.strokeStyle = palette.grid;
       ctx.beginPath();
-      ctx.moveTo(x, gridStart);
-      ctx.lineTo(x, gridEnd);
+      ctx.moveTo(x, rect.y + Math.round(6 * scale));
+      ctx.lineTo(x, rect.y + rect.height - Math.round(6 * scale));
       ctx.stroke();
       ctx.fillStyle = palette.muted;
-      ctx.fillText(`${second}s`, x + 3, gridStart - 9);
+      ctx.fillText(`${second}s`, x + 3, rect.y + Math.round(18 * scale));
     }
     for (const lane of lanePositions) {
       ctx.fillStyle = palette.muted;
       ctx.font = `600 ${Math.max(9, Math.round(10 * scale))}px Inter, system-ui, sans-serif`;
-      ctx.fillText(lane.label, Math.round(32 * scale), lane.y + Math.round(4 * scale));
+      ctx.fillText(lane.label, rect.x + Math.round(10 * scale), lane.y + Math.round(4 * scale));
       ctx.strokeStyle = palette.line;
       ctx.beginPath();
       ctx.moveTo(left, lane.y);
@@ -399,12 +634,37 @@
     ctx.strokeStyle = '#f20d3d';
     ctx.lineWidth = Math.max(1, Math.round(2 * scale));
     ctx.beginPath();
-    ctx.moveTo(playheadX, gridStart);
-    ctx.lineTo(playheadX, gridEnd);
+    ctx.moveTo(playheadX, rect.y + Math.round(6 * scale));
+    ctx.lineTo(playheadX, rect.y + rect.height - Math.round(6 * scale));
     ctx.stroke();
+    ctx.lineWidth = 1;
     ctx.fillStyle = palette.muted;
     ctx.font = `${Math.max(10, Math.round(11 * scale))}px monospace`;
-    ctx.fillText(`${at.toFixed(1)} / ${duration.toFixed(1)} sec`, Math.round(32 * scale), height - Math.round(20 * scale));
+    ctx.fillText(`${at.toFixed(1)} / ${duration.toFixed(1)} sec`, rect.x + Math.round(10 * scale), rect.y + rect.height - Math.round(10 * scale));
+  }
+
+  async function drawPerformance(ctx, at, hits, duration, settings, meta) {
+    const { width, height } = settings.size;
+    const palette = getPalette(settings.color);
+
+    ctx.fillStyle = palette.background;
+    ctx.fillRect(0, 0, width, height);
+    const glow = ctx.createRadialGradient(width * 0.72, height * 0.12, 4, width * 0.72, height * 0.12, Math.max(180, width * 0.4));
+    glow.addColorStop(0, hexToRgba('#f20d3d', settings.color === 'white' ? 0.1 : 0.24));
+    glow.addColorStop(1, hexToRgba('#f20d3d', 0));
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, width, height * 0.55);
+
+    await engine.composeFrame(ctx, {
+      instrument: selectedTool,
+      width,
+      height,
+      parts: {
+        title: (target, rect) => drawTitlePart(target, rect, at, meta, settings, palette),
+        notation: (target, rect) => drawNotationPart(target, rect, at, notation),
+        instrument: (target, rect) => drawInstrumentPart(target, rect, at, hits, duration, settings, palette),
+      },
+    });
   }
 
   function updatePlaybackControls() {
@@ -437,6 +697,7 @@
       const { hits, meta, source } = await getHits();
       const duration = Math.max(1, Math.min(MAX_SECONDS, Math.max(...hits.map((hit) => hit.at), 3.5) + 0.5));
       setStatus(`Preparing ${source} · ${settings.ratio} · 0%`);
+      notation = await prepareNotationFor(musicXmlInput?.files?.[0], settings);
       const result = await engine.render({
         width: settings.size.width,
         height: settings.size.height,

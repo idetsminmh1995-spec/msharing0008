@@ -1454,6 +1454,134 @@
     }
   }
 
+  // ---------------------------------------------------------------------
+  // The three-part layout, as data.
+  //
+  // Every video is Title / Info, Notation and the instrument, but the
+  // three do not sit in the same order for every instrument: a drum or a
+  // piano is watched with the hands at the bottom, a guitar with the neck
+  // at the top. So each instrument declares an ORDER and nothing else --
+  // there is no `if (instrument === ...)` anywhere below, and adding an
+  // instrument is one more entry in this table.
+  //
+  // A template may list a part the page does not draw yet; `parts` narrows
+  // the layout to what the caller actually has, and the shares renormalise
+  // over those, so a half-built page still gets a sane frame.
+  // ---------------------------------------------------------------------
+  const LAYOUT_TEMPLATES = {
+    drums: { shape: 'rows', order: ['title', 'notation', 'instrument'] },
+    piano: { shape: 'rows', order: ['title', 'notation', 'instrument'] },
+    guitar: { shape: 'rows', order: ['instrument', 'notation', 'title'] },
+    // Notation beside the instrument, with the Title / Info band across
+    // the foot of the frame. Portrait stacks instead of splitting: two
+    // columns there would leave neither part any width.
+    violin: { shape: 'split', order: ['notation', 'instrument', 'title'], columns: [0.6, 0.4] },
+  };
+
+  const LAYOUT_SHARES = {
+    rows: {
+      '16:9': { title: 0.12, notation: 0.46, instrument: 0.42 },
+      '1:1': { title: 0.12, notation: 0.44, instrument: 0.44 },
+      '9:16': { title: 0.08, notation: 0.42, instrument: 0.5 },
+    },
+    split: {
+      '16:9': { title: 0.12, notation: 0.55, instrument: 0.33 },
+      '1:1': { title: 0.12, notation: 0.52, instrument: 0.36 },
+      '9:16': { title: 0.08, notation: 0.42, instrument: 0.5 },
+    },
+  };
+
+  const LAYOUT_GUTTER = 0.02;
+
+  /** The ratio name a frame's own dimensions are closest to. */
+  function ratioOf(width, height) {
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      throw new TypeError('Layout width and height must be positive numbers');
+    }
+    const ratio = width / height;
+    const candidates = [
+      ['16:9', 16 / 9],
+      ['1:1', 1],
+      ['9:16', 9 / 16],
+    ];
+    let best = candidates[0];
+    for (const candidate of candidates) {
+      if (Math.abs(candidate[1] - ratio) < Math.abs(best[1] - ratio)) best = candidate;
+    }
+    return best[0];
+  }
+
+  /**
+   * Rectangles for one instrument's frame. `options.parts` narrows the
+   * layout to the parts a caller can actually draw; the rest renormalise.
+   */
+  function layoutFor(instrument, options = {}) {
+    const { width, height } = options;
+    const template = LAYOUT_TEMPLATES[instrument];
+    if (!template) throw new RangeError(`No video layout is declared for "${instrument}"`);
+    const ratio = ratioOf(width, height);
+    const shares = LAYOUT_SHARES[template.shape][ratio];
+    const requested = Array.isArray(options.parts) && options.parts.length > 0 ? options.parts : template.order;
+    const parts = template.order.filter((part) => requested.includes(part));
+    if (parts.length === 0) throw new RangeError('A layout needs at least one part to place');
+    const pad = Math.round(Math.min(width, height) * LAYOUT_GUTTER);
+
+    if (template.shape === 'split' && ratio !== '9:16') {
+      const [leftShare, rightShare] = template.columns;
+      const bandHeight = Math.round(height * shares.title);
+      const bodyBottom = height - bandHeight - pad * 2;
+      const columnWidth = Math.round((width - pad * 3) * (leftShare / (leftShare + rightShare)));
+      const rightWidth = width - pad * 3 - columnWidth;
+      const rects = {};
+      if (parts.includes('notation')) rects.notation = { x: pad, y: pad, width: columnWidth, height: bodyBottom };
+      if (parts.includes('instrument')) {
+        rects.instrument = { x: pad * 2 + columnWidth, y: pad, width: rightWidth, height: bodyBottom };
+      }
+      if (parts.includes('title')) {
+        rects.title = { x: pad, y: height - bandHeight - pad, width: width - pad * 2, height: bandHeight };
+      }
+      return { ratio, shape: template.shape, parts, pad, rects };
+    }
+
+    const total = parts.reduce((sum, part) => sum + shares[part], 0) || 1;
+    const rects = {};
+    let y = pad;
+    for (const part of parts) {
+      const partHeight = Math.round((height - pad * 2) * (shares[part] / total));
+      rects[part] = { x: pad, y, width: width - pad * 2, height: partHeight };
+      y += partHeight;
+    }
+    return { ratio, shape: template.shape, parts, pad, rects };
+  }
+
+  /**
+   * Draws one frame's three parts. The engine owns WHERE each part goes;
+   * each part owns HOW it draws, and receives its own rectangle. A part
+   * the caller does not pass is simply not drawn, so a page can ship one
+   * part at a time without the engine knowing which instrument it is.
+   */
+  async function composeFrame(ctx, options) {
+    const { instrument, width, height, parts } = options;
+    if (!parts || typeof parts !== 'object') throw new TypeError('composeFrame needs a parts map');
+    const layout = layoutFor(instrument, {
+      width,
+      height,
+      parts: Object.keys(parts).filter((name) => typeof parts[name] === 'function'),
+    });
+    for (const name of layout.parts) {
+      const rect = layout.rects[name];
+      const draw = parts[name];
+      if (!rect || typeof draw !== 'function') continue;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(rect.x, rect.y, rect.width, rect.height);
+      ctx.clip();
+      await draw(ctx, rect, layout);
+      ctx.restore();
+    }
+    return layout;
+  }
+
   // The encoder owns the final asset contract. Pages may fetch photos or the
   // R2 Thank You clip through helper modules, but only this engine decides
   // whether an export is allowed to start.
@@ -1529,6 +1657,9 @@
     muxMp4,
     muxMp4ToStream,
     muxWebM,
+    layoutFor,
+    ratioOf,
+    composeFrame,
     requireAsset,
     resolveRequired,
     rejectRequired,

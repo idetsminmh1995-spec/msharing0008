@@ -7,7 +7,7 @@
  */
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -195,7 +195,73 @@ try {
   const portraitProbe = JSON.parse(portraitProbeResult.stdout);
   assert.equal(portraitProbe.streams[0].width, 1080);
   assert.equal(portraitProbe.streams[0].height, 1920);
-  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe }, null, 2));
+
+  // A real score must reach the Notation part, and its own cursor must be
+  // drawn: the Plan puts both inside the frame the Video Engine composes.
+  const score = await readFile(new URL(
+    '../../../../Notation/Notation Engine/test/fixtures/musicxml/two-voice-drum-groove.musicxml',
+    import.meta.url,
+  ), 'utf8');
+  const scoreName = await evaluate(`(() => {
+    const input = document.querySelector('[data-musicxml-input]');
+    const file = new File([${JSON.stringify(score)}], 'two-voice-drum-groove.musicxml', { type: 'application/xml' });
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    input.files = transfer.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    const view = document.querySelector('[data-notation-view]');
+    view.value = 'landscape';
+    view.dispatchEvent(new Event('change', { bubbles: true }));
+    const ratio = document.querySelector('[data-video-ratio]');
+    ratio.value = '16:9';
+    ratio.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector('[data-studio-generate]').click();
+    return input.files[0].name;
+  })()`);
+  assert.equal(scoreName, 'two-voice-drum-groove.musicxml');
+
+  const notationStartedAt = Date.now();
+  let notationState;
+  while (Date.now() - notationStartedAt < 60000) {
+    notationState = JSON.parse(await evaluate("JSON.stringify({status:document.querySelector('[data-studio-status]').textContent, ready:!document.querySelector('[data-video-output]').hidden && document.querySelector('[data-video-output]').readyState>=1, href:document.querySelector('[data-video-download]').href})"));
+    if (notationState.status.startsWith('Rendered ') && notationState.ready && notationState.href !== portraitState.href) break;
+    if (notationState.status.startsWith('Video render failed:')) throw new Error(notationState.status);
+    await sleep(150);
+  }
+  assert.ok(notationState?.status.startsWith('Rendered '), `Notation render did not complete: ${notationState?.status}`);
+
+  const notationBytes = Buffer.from(await evaluate(`(async () => { const response = await fetch(${JSON.stringify(notationState.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); })()`), 'base64');
+  const notationPath = `${output}.notation.mp4`;
+  await writeFile(notationPath, notationBytes);
+  const frames = [];
+  for (const second of ['0.2', '1.5']) {
+    const framePath = `${output}.notation-${second}.png`;
+    await exec('ffmpeg', ['-v', 'error', '-y', '-ss', second, '-i', notationPath, '-frames:v', '1', framePath]);
+    frames.push(framePath);
+  }
+  // The notation band is the middle third of a drum frame; the engine's
+  // cursor is red there, and the notes are dark ink on a white sheet.
+  const inkAndCursor = await Promise.all(frames.map((framePath) => exec('python3', ['-c', `
+from PIL import Image
+image = Image.open(${JSON.stringify(framePath)}).convert('RGB')
+width, height = image.size
+pixels = image.load()
+dark = red = white = 0
+for y in range(int(height * 0.15), int(height * 0.55)):
+    for x in range(0, width, 2):
+        r, g, b = pixels[x, y]
+        if r < 130 and g < 130 and b < 130: dark += 1
+        elif r > 140 and g < 90 and b < 90: red += 1
+        elif r > 240 and g > 240 and b > 240: white += 1
+print(dark, red, white)
+`])));
+  const [firstInk, secondInk] = inkAndCursor.map(({ stdout }) => stdout.trim().split(/\s+/).map(Number));
+  assert.ok(firstInk[0] > 3000, `Notation notes are missing from the frame: ${firstInk}`);
+  assert.ok(firstInk[2] > 50000, `Notation sheet is not drawn: ${firstInk}`);
+  assert.ok(firstInk[1] > 0 && secondInk[1] > 0, `Notation cursor is not drawn: ${firstInk} / ${secondInk}`);
+  assert.notEqual(firstInk[1], secondInk[1], 'The notation cursor did not move with playback');
+
+  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk }, null, 2));
 } finally {
   cdp?.close();
   for (const child of [browser, server]) {
