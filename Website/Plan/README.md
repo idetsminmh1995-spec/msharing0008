@@ -464,6 +464,128 @@ Video ထဲတွင် ထည့်ရန် ရွေးချယ်ခွင
 2. Bass၊ Strings၊ Voice စသည့် အခြားတူရိယာများ၏ layout နေရာ။
 3. `Title 1`၊ `Title 2` ၏ data ဘယ်ကလာသည် (ခဏထားခဲ့သည်၊ နောက်မှ ပြန်ဆွေးနွေးမည်)။
 
+## Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ် — 2026-11-22
+
+ဤ section သည် Create Video ၏ video ထုတ်လုပ်သည့် အပိုင်းအားလုံးကို စုစည်းဖော်ပြသည်။ အပိုင်း ၃ ပိုင်း ပြင်အဆင်၏ အကျဉ်းကို အထက်ပါ [Create Video — Final video layout](#create-video--final-video-layout--2026-11-22) တွင်ကြည့်ပါ။ လက်ရှိ code အခြေအနေကို 2026-11-22 တွင် `main` branch မှ ဖတ်စစ်ထားသည်။
+
+### ၁။ ထုတ်လုပ်မှု လမ်းကြောင်း
+
+```
+Studio ၏ options box ──► MusicXML ဖိုင် + settings
+                              │
+        ┌─────────────────────┼──────────────────────┐
+        ▼                     ▼                      ▼
+ Title / Info            Notation Engine        တူရိယာ Engine
+ (Logo, Title 1/2,       (Page / Horizontal,    (Drum / Piano / Guitar /
+  4/4, BPM, Key,          cursor)                Violin ...)
+  Metronome)                  │                      │
+        └─────────────────────┼──────────────────────┘
+                              ▼
+        Video Engine — frame တစ်ခုချင်း ၃ ပိုင်းကို ပေါင်းဆွဲ
+                              │   + အသံ (Sound Engine, Metronome, Count Voice) ကို AAC တစ်ပုံတည်းပေါင်း
+                              ▼
+                 Segment: Video အဓိက  ──►  Segment: Thank You (R2)
+                              ▼
+                       MP4 တစ်ဖိုင်တည်း
+```
+
+**Output:** Video Engine သည် H.264 video နှင့် AAC-LC အသံ (48 kHz) ပါသော MP4 တစ်ဖိုင်တည်း ထုတ်ပေးသည်။ လက်ရှိ 30 FPS။ Browser က H.264/AAC ကို encode မလုပ်နိုင်လျှင် ရှင်းရှင်းလင်းလင်း ငြင်းပယ်သည်။ Segment များ (`segments`) ကို အစဉ်လိုက်ဆက်ပြီး အသံကို segment အားလုံးမှ ပေါင်းကာ encode လုပ်သည်။
+
+**အရွယ်အစား (ratio):**
+
+| Ratio | Pixel |
+|---|---|
+| 16:9 Landscape | 1920 × 1080 |
+| 1:1 Square | 1080 × 1080 |
+| 9:16 Portrait | 1080 × 1920 |
+
+### ၂။ Studio ၏ options box (Video ထဲထည့်ရန် ရွေးချယ်စရာများ)
+
+| ရွေးချယ်စရာ | လက်ရှိ code | မှတ်ချက် |
+|---|---|---|
+| MusicXML ဖိုင် | Metronome Studio တွင် ရှိ၊ Drum Studio သည် MusicXML ကို ကိုယ်တိုင် parse လုပ်၍ drum hit များထုတ်သည် | |
+| Title 1 / Title 2 (စာသား၊ အရောင်၊ အရွယ်) | ရှိပြီး (Drum Studio) | Data ဘယ်ကလာသည်ကို နောက်မှ ပြန်ဆွေးနွေးမည် |
+| Logo | ရှိပြီး — default `assets/logo/m-sharing-drum-logo.svg` + user ကိုယ်ပိုင်ဖိုင်တင်နိုင် | Plan ၏ ဆုံးဖြတ်ချက်မှာ default ကို **R2** ထဲတွင် ထားမည်၊ လက်ရှိတွင် repo ထဲ asset ဖိုင်ဖြစ်သည် |
+| Video Ratio | ရှိပြီး (16:9 / 1:1 / 9:16) | |
+| Notation View | ရှိပြီး (`Page — Landscape` ပါ) | Plan ၏ **Page / Horizontal** နှင့် ကိုက်အောင် ညှိရန် |
+| Video Color | ရှိပြီး | |
+| Sound Model + volume | ရှိပြီး (Metronome Studio တွင် UI သာ) | Render နှင့် ချိတ်ရန် ကျန်သည် |
+| Count Voice (on/off၊ type၊ volume) | ရှိပြီး | အသံအမျိုးအစားသာ — "1 2 3 4" သို့ "ONE TWO THREE FOUR" |
+| **ရေတွက်ပုံ ရွေးချယ်မှု** (`1,2,3,4` / `1&,…` / `1e&a,…`) | **မရှိသေး — အသစ်** | Video ပေါ်ရှိ စာသားကိုသာ ပြောင်း၊ Count Voice အသံနှင့် မဆက်စပ် |
+| 4/4 (meter)၊ BPM၊ Key | Metronome Studio တွင် BPM / bars / beats per bar / beat unit ရှိ၊ Drum Studio တွင် မရှိ၊ Key မရှိ | Title / Info အပိုင်းတွင် ပြရမည် |
+
+### ၃။ အပိုင်းတစ်ခုချင်းစီ၏ တာဝန်
+
+**Title / Info**
+- ဘယ်ဘက်တွင် Logo၊ ဘေးတွင် Title 1၊ Title 1 အောက်တွင် Title 2။ ထိုတန်းထဲတွင် `4/4`၊ `BPM`၊ `Key`၊ `Metronome`။
+- `4/4` နှင့် `BPM` ကို MusicXML ထဲမှ (မပါလျှင် Studio ၏ setting မှ)၊ `Key` ကို MusicXML မှ ယူမည်။ `Metronome` သည် beat တိုင်း ကိုယ်ပိုင်ရှိပြီးသား Metronome design များကို ပြန်သုံး၍ပြမည်။
+- ဆွဲသူ — Video Engine။ လက်ရှိ Drum video တွင် Logo သည် ညာဘက်ထိပ်တွင်ရှိပြီး (Plan: ဘယ်ဘက်)၊ 4/4 / BPM / Key / Metronome မပါသေး။
+
+**Notation**
+- ဆွဲသူ — Notation Engine (`renderFromMusicXml`)။ **Page** (အောက်မှ အပေါ်သို့ရွေ့) နှင့် **Horizontal** (ညာမှ ဘယ်သို့ရွေ့) ရွေးနိုင်မည်။
+- တီးနေသော note ကို Notation Engine ၏ ကိုယ်ပိုင် cursor ဖြင့် ပြမည်။
+- **လက်ရှိ:** Studio (`studio-video.js`, `studio-metronome.js`) သည် Notation Engine ကို မသုံးသေးပါ။ Drum video သည် ကိုယ်ပိုင် canvas ပေါ်တွင် drum lane (KICK / SNARE / HI-HAT) နှင့် playhead ကိုဆွဲထားသည်။
+
+**တူရိယာအပိုင်း**
+
+| တူရိယာ | Engine | လက်ရှိအခြေအနေ |
+|---|---|---|
+| Drum | Drum Human Stick Engine (ရှိ)၊ Drum Animation Engine (Plan တွင်သာ၊ code မရှိ) | **တစ်ခုတည်း အလုပ်လုပ်သော instrument။** Drum ပုံများကို R2 မှ ယူသုံးရမည် (ဘယ်ပုံ၊ ဘယ်အမည် မသတ်မှတ်ရသေး) |
+| Piano | Piano Hand Human Engine (ရှိ)၊ Piano 3D Hand Engine (folder ဗလာ) | Video Engine Plan Phase 2 |
+| Guitar | Guitar Engine (ရှိ) | Video Engine Plan Phase 1 (ပထမဦးစားပေး) |
+| Violin | Engine folder မရှိသေး | မစတင်ရသေး |
+| Bass / Strings / Voice | — | Video Engine Plan Phase 3 / 4 / 5 |
+
+Drum မဟုတ်သော instrument များအတွက် Studio သည် "visual video export is only available in Drum Studio" ဟု ပြပြီး ပိတ်ထားသည်။
+
+### ၄။ Layout template (Video Engine)
+
+- အပိုင်း ၃ ခု၏ နေရာအစီအစဉ်ကို **data ဖြင့်ကြေညာ**ရမည် (တူရိယာတစ်ခုချင်းအတွက် layout တစ်ခု)၊ Engine code ထဲ တူရိယာအလိုက် `if` မရေးရ။ တူရိယာအသစ်ထည့်လျှင် layout တစ်ခု ထပ်ကြေညာရုံဖြင့် ရရမည်။
+- တူရိယာအလိုက် နေရာချထားပုံကို [အထက်ပါ ဇယား](#တူရိယာအလိုက်-နေရာချထားပုံ) တွင် ကြည့်ပါ (Drum/Piano — Title အပေါ်၊ တူရိယာအောက် / Guitar — တူရိယာအပေါ်၊ Title အောက် / Violin — ဘေး၊ Title အောက်)။
+- Ratio သုံးမျိုး (16:9, 1:1, 9:16) စီအတွက် အပိုင်းတစ်ခုချင်း၏ အချိုး ကွဲမည်ဖြစ်သည်။ အသေးစိတ်ကို မဖြေရှင်းရသေးသော အချက်များတွင် ဖွင့်ထားသည်။
+
+### ၅။ အသံ
+
+- အသံအားလုံးကို Video Engine က segment အားလုံးမှ စုပေါင်း၍ AAC တစ်ပုံတည်း encode လုပ်သည်။
+- ရင်းမြစ် — Sound Engine (Notation ၏ အသံ)၊ Metronome click၊ Count Voice။ Metronome adapter သည် ယခု `OfflineAudioContext` ဖြင့် click-track ကို ကိုယ်တိုင်ထုတ်သည် (Shared Sound Engine မဟုတ်)။
+
+### ၆။ R2 ကို အသုံးပြုပုံ
+
+| အရာ | အခြေအနေ |
+|---|---|
+| Drum ပုံများ | R2 မှ ယူသုံးရမည် (ဖိုင်စာရင်း မသတ်မှတ်ရသေး) |
+| Logo default | R2 ထဲတွင် အမြဲရှိ၊ user ကလည်း ကိုယ်ပိုင်တင်နိုင် |
+| Thank You video | R2 ထဲ ရှိပြီးသား၊ Landscape / Portrait / Square သီးခြားဖိုင်၊ Video Engine ၏ တာဝန် |
+| SoundFont | R2 versioned prefix (အထက်ပါ Sound Engine section) |
+
+R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပြီး cache လုပ်ရမည်၊ frame တိုင်း/ပြန်ပြန် မခေါ်ရ။ ဖိုင်အမည်၊ path၊ မရလျှင် လုပ်ပုံတို့ကို Video Engine ထဲတွင်သာ ထားမည်။
+
+### ၇။ ကန့်သတ်ချက်များ (လက်ရှိ)
+
+- Video အရှည် **အများဆုံး ၁၂ စက္ကန့်** (`MAX_SECONDS = 12`)။ သီချင်းအပြည့် ထုတ်ရန် ဤကန့်သတ်ချက်ကို ပြန်စဉ်းစားရမည် (အောက်ပါ မေးခွန်းတွင်)။
+- Video Engine တွင် memory budget နှင့် H.264 level စစ်ဆေးချက် ပါပြီးသား (picture size နှင့် fps အလိုက်)။ Video ကို ရှည်လျှင်/ကြီးလျှင် ပိုမိုလိုအပ်မည်။
+
+### ၈။ အကောင်အထည်ဖော်ရန် အစီအစဉ် (အဆိုပြုချက် — အတည်ပြုရန်)
+
+1. **Drum Studio — Title / Info အပိုင်း:** Logo ဘယ်ဘက်ပြောင်း၊ `4/4`၊ `BPM`၊ `Key`၊ `Metronome` ထည့်။
+2. **Layout template ခွဲထုတ်ခြင်း:** အပိုင်း ၃ ခုကို data ဖြင့်ကြေညာနိုင်အောင် Video Engine ကို ပြင်။
+3. **Notation Engine ချိတ်ခြင်း:** အလယ်အပိုင်း (Page / Horizontal၊ cursor)။
+4. **Drum အပိုင်း:** R2 မှ Drum ပုံများသုံး၍ ဆွဲ။
+5. **ရေတွက်ပုံ ရွေးချယ်မှု** (Studio option) ထည့်။
+6. **Thank You segment** ကို Video Engine ထဲ ချိတ်။
+7. **Guitar** (Phase 1)၊ ထို့နောက် **Piano** (Phase 2)၊ **Violin**။
+
+အဆင့်တစ်ခုချင်းစီကို သင် "ready" ဟု ပြောမှသာ စတင်မည်။
+
+### မဖြေရှင်းရသေးသော အချက်များ (Video ထုတ်လုပ်ပုံ)
+
+1. Video အရှည်ကန့်သတ်ချက် (၁၂ စက္ကန့်) ကို ဘယ်လောက်အထိ တိုးမလဲ။
+2. Ratio သုံးမျိုးအလိုက် (အထူးသဖြင့် 9:16 Portrait တွင် Violin ဘေးတစ်ဖက် layout) အပိုင်းအချိုးကို ဘယ်လိုထားမလဲ။
+3. Drum ပုံများ၏ ဖိုင်စာရင်း၊ အမည်၊ R2 path။
+4. Drum Animation Engine ၏ တာဝန် (ဘယ်ပုံ ဘယ်အချိန် highlight)။
+5. Metronome အပိုင်း (Title / Info ထဲ) ကို ဘယ်လိုပုံစံပြမလဲ (Metronome design ၁၁ မျိုးထဲက ရွေးလို့ရမလား၊ icon တစ်ခုတည်းလား)။
+6. `BPM` / `Key` ကို MusicXML မပါလျှင် ဘယ်ကယူမလဲ (Studio ၏ input အသစ်လား)။
+
 ## Sound Engine နှင့် MuseScore SoundFont — 2026-11-13
 
 Notation Engine က score note များကို timing ပါသော `noteOn`, `noteOff`, `programChange` နှင့် `controlChange` events အဖြစ် ထုတ်ပေးပြီး Sound Engine က ထို events များကို အသံအဖြစ် render/playback လုပ်မည်။ ပထမဆုံး sound source အဖြစ် MuseScore 3 နှင့် MuseScore 2.2+ တွင် အသုံးပြုသော official `MuseScore_General.sf3` ကို သုံးမည်။ SoundFont၊ license၊ sample attribution နှင့် version metadata များကို Cloudflare R2 တွင် versioned prefix ဖြင့် သိမ်းမည်။ အသေးစိတ်သည် [Sound Engine Plan](../Notation/Sound%20Plan/README.md) နှင့် [MuseScore General R2 Asset Record](../Notation/Sound%20Doc/MuseScore-General-R2-Asset.md) တွင် ရှိသည်။
