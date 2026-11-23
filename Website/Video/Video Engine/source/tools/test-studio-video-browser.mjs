@@ -310,6 +310,143 @@ print(dark, red, white)
   assert.ok(firstInk[1] > 0 && secondInk[1] > 0, `Notation cursor is not drawn: ${firstInk} / ${secondInk}`);
   assert.notEqual(firstInk[1], secondInk[1], 'The notation cursor did not move with playback');
 
+  // The instrument band carries the R2 kit photo, not the lane chart. A
+  // photograph has hundreds of distinct colours in a band; three lanes on
+  // one background have a handful, so the count tells the two apart.
+  const bandColours = await Promise.all(frames.map((framePath) => exec('python3', ['-c', `
+from PIL import Image
+image = Image.open(${JSON.stringify(framePath)}).convert('RGB')
+width, height = image.size
+pixels = image.load()
+colours = set()
+for y in range(int(height * 0.62), height, 3):
+    for x in range(0, width, 3):
+        colours.add(pixels[x, y])
+print(len(colours))
+`])));
+  for (const { stdout } of bandColours) {
+    const count = Number(stdout.trim());
+    assert.ok(count > 400, `The drum kit photo is not drawn in the instrument band (${count} colours)`);
+  }
+
+  // A stroke lights the picture the sticking engine's own limb points at:
+  // the module is asked directly, so the answer is checked rather than
+  // inferred from pixels.
+  const kitProbe = JSON.parse(await evaluate(`(async () => {
+    const art = await window.DrumKit.loadArt('RolandDrums/VAD716', '16:9');
+    const strokes = [{ note: 38, at: 0.5 }, { note: 42, at: 1 }, { note: 36, at: 1.5 }];
+    const limbs = window.DrumKit.solveLimbs(strokes.map((s) => ({ time: s.at, note: s.note })));
+    strokes.forEach((s, i) => { s.limb = limbs[i]; });
+    const resolved = await window.DrumKit.loadHitImages(art, strokes);
+    return JSON.stringify({
+      ratioPath: art.ratioPath,
+      inkWidth: Math.round(art.ink.width),
+      inkHeight: Math.round(art.ink.height),
+      limbs,
+      files: [...resolved.values()].map((hit) => hit.name),
+      count: resolved.size,
+    });
+  })()`));
+  assert.equal(kitProbe.ratioPath, '16x9');
+  assert.ok(kitProbe.inkWidth > 0 && kitProbe.inkHeight > 0, `The kit photo has no measurable ink: ${JSON.stringify(kitProbe)}`);
+  assert.equal(kitProbe.count, 3, `Not every stroke found a picture: ${JSON.stringify(kitProbe)}`);
+  assert.ok(kitProbe.limbs.every((limb) => typeof limb === 'string'), `No limb was solved: ${JSON.stringify(kitProbe)}`);
+  // A foot takes the bare number (one pedal picture serves either foot); a
+  // hand takes the side its limb names.
+  const expectedFiles = kitProbe.limbs.map((limb, index) => {
+    if (limb === 'RF' || limb === 'LF') return `${[38, 42, 36][index]}.png`;
+    return `${limb === 'RH' ? 'R' : 'L'}${[38, 42, 36][index]}.png`;
+  });
+  assert.deepEqual(kitProbe.files.slice().sort(), expectedFiles.sort());
+
+  // A score that names its drums with <midi-unpitched> must light the kit,
+  // and the stroke must change the instrument band: the background alone
+  // is the same picture on every frame.
+  const gapScore = await readFile(new URL(
+    '../../../../Notation/Notation Engine/test/fixtures/musicxml/drum-forward-gap.musicxml',
+    import.meta.url,
+  ), 'utf8');
+  await evaluate(`(() => {
+    window.__kitCalls = [];
+    const original = window.DrumKit.draw;
+    window.DrumKit.draw = function (...args) {
+      if (window.__kitCalls.length < 200) window.__kitCalls.push({ at: args[3], notes: args[4].map((s) => s.note), resolved: args[5].size });
+      return original.apply(this, args);
+    };
+    const input = document.querySelector('[data-musicxml-input]');
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([${JSON.stringify(gapScore)}], 'drum-forward-gap.musicxml', { type: 'application/xml' }));
+    input.files = transfer.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector('[data-studio-generate]').click();
+  })()`);
+  const gapStartedAt = Date.now();
+  let gapState;
+  while (Date.now() - gapStartedAt < 60000) {
+    gapState = JSON.parse(await evaluate("JSON.stringify({status:document.querySelector('[data-studio-status]').textContent, ready:!document.querySelector('[data-video-output]').hidden && document.querySelector('[data-video-output]').readyState>=1, href:document.querySelector('[data-video-download]').href})"));
+    if (gapState.status.startsWith('Rendered ') && gapState.ready && gapState.href !== notationState.href) break;
+    if (gapState.status.startsWith('Video render failed:')) throw new Error(gapState.status);
+    await sleep(150);
+  }
+  assert.ok(gapState?.status.startsWith('Rendered '), `Kit-stroke render did not complete: ${gapState?.status}`);
+  // The render itself is asked, not a re-run of the module: every frame
+  // must reach the kit, with a GM note on each stroke and a picture for it.
+  const kitCalls = JSON.parse(await evaluate("JSON.stringify({ calls: window.__kitCalls.length, first: window.__kitCalls[0] })"));
+  assert.equal(kitCalls.calls, 120, `The kit was not drawn for every frame: ${kitCalls.calls}`);
+  assert.ok(kitCalls.first.notes.every((note) => Number.isFinite(note)), `The strokes carry no GM note: ${JSON.stringify(kitCalls.first.notes)}`);
+  assert.equal(kitCalls.first.resolved, kitCalls.first.notes.length, `Not every stroke found a picture: ${JSON.stringify(kitCalls.first)}`);
+  const gapBytes = Buffer.from(await evaluate(`(async () => { const response = await fetch(${JSON.stringify(gapState.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); })()`), 'base64');
+  const gapPath = `${output}.kit-stroke.mp4`;
+  await writeFile(gapPath, gapBytes);
+  // The score's first bar is a whole rest, so 1.5 s is a frame with nothing
+  // landing; 2.02 s is the first beat of the second bar, where the kick and
+  // the hi-hat both strike. If the overlays are drawn, the bands differ.
+  const drawProbe = JSON.parse(await evaluate(`(async () => {
+    const art = await window.DrumKit.loadArt('RolandDrums/VAD716', '16:9');
+    const strokes = [{ note: 36, at: 2.0 }, { note: 42, at: 2.0 }];
+    const limbs = window.DrumKit.solveLimbs(strokes.map((s) => ({ time: s.at, note: s.note })));
+    strokes.forEach((s, i) => { s.limb = limbs[i]; });
+    const resolved = await window.DrumKit.loadHitImages(art, strokes);
+    const rect = { x: 0, y: 0, width: 1843, height: 453 };
+    const shoot = (at) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = rect.width; canvas.height = rect.height;
+      const ctx = canvas.getContext('2d');
+      window.DrumKit.draw(ctx, rect, art, at, strokes, resolved);
+      return ctx.getImageData(0, 0, rect.width, rect.height).data;
+    };
+    const lit = shoot(2.02);
+    const dark = shoot(2.9);
+    let changed = 0, delta = 0;
+    for (let i = 0; i < lit.length; i += 4) {
+      const d = Math.abs(lit[i] - dark[i]) + Math.abs(lit[i+1] - dark[i+1]) + Math.abs(lit[i+2] - dark[i+2]);
+      if (d > 8) { changed += 1; delta += d; }
+    }
+    return JSON.stringify({ changed, delta, total: lit.length / 4, files: [...resolved.values()].map(h => h.name) });
+  })()`));
+  assert.ok(drawProbe.changed > 2000, `The hit overlay is not drawn on the canvas: ${JSON.stringify(drawProbe)}`);
+  const gapBands = await Promise.all(['1.5', '2.02'].map(async (second) => {
+    const framePath = `${output}.kit-${second}.png`;
+    await exec('ffmpeg', ['-v', 'error', '-y', '-ss', second, '-i', gapPath, '-frames:v', '1', framePath]);
+    const { stdout } = await exec('python3', ['-c', `
+from PIL import Image
+image = Image.open(${JSON.stringify(framePath)}).convert('RGB')
+width, height = image.size
+image.crop((0, int(height * 0.60), width, height)).save(${JSON.stringify(framePath)} + '.band.png')
+`]);
+    return `${framePath}.band.png`;
+  }));
+  const { stdout: diffStdout } = await exec('python3', ['-c', `
+from PIL import Image, ImageChops
+left = Image.open(${JSON.stringify(gapBands[0])}).convert('RGB')
+right = Image.open(${JSON.stringify(gapBands[1])}).convert('RGB')
+diff = ImageChops.difference(left, right).convert('L')
+pixels = list(diff.getdata())
+print(sum(1 for value in pixels if value > 10), max(pixels))
+`]);
+  const [changedPixels, peakDelta] = diffStdout.trim().split(/\s+/).map(Number);
+  assert.ok(changedPixels > 500, `The hit overlay never changed the instrument band (${changedPixels} px, peak ${peakDelta})`);
+
   // The Plan's length rule: the video is the score's own length, on the
   // score's own tempo, with no cap of the Studio's. Each case builds a
   // score, renders it, and measures the file that came out.
@@ -490,7 +627,7 @@ print(json.dumps({'peak': max(peaks) if peaks else 0, 'at': peaks}))
   assert.ok(onBeat > offBeat * 2,
     `The drums do not land on the beat: ${onBeat} on the beat against ${offBeat} between beats`);
 
-  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slow.seconds, twoVoiceSeconds: twoVoice.seconds, repeatSeconds: repeated.seconds, twoPartSeconds: twoPart.seconds, countInSeconds: counted.seconds, thankYouSeconds: thanked.seconds, visualOnlyStatus: visualOnly.status, audibleStatus: audible.status, drumPeak: loudness.peak }, null, 2));
+  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slow.seconds, twoVoiceSeconds: twoVoice.seconds, repeatSeconds: repeated.seconds, twoPartSeconds: twoPart.seconds, countInSeconds: counted.seconds, thankYouSeconds: thanked.seconds, visualOnlyStatus: visualOnly.status, audibleStatus: audible.status, drumPeak: loudness.peak, kitBandColours: bandColours.map(({ stdout }) => Number(stdout.trim())), kitProbe, kitStrokeChangedPixels: changedPixels, kitStrokePeakDelta: peakDelta, kitOverlayProbe: drawProbe }, null, 2));
 } finally {
   cdp?.close();
   for (const child of [browser, server]) {

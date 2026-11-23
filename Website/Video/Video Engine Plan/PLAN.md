@@ -164,3 +164,15 @@ Phase 2 ၏ ပန်းတိုင်ဖြစ်သော key-only visual ada
 **Bundle:** `Website/Piano/Piano Hand Human Engine/tools/sync-piano-engine.mjs` က `dist/piano-hand-engine.js` ကို `Website/Website/assets/piano-hand-engine.js` သို့ copy လုပ်ပြီး `--check` ဖြင့် stale copy ကို ဖမ်းသည်။ Guitar Engine ၏ ပုံစံအတိုင်း ဖြစ်သည်။
 
 **ကျန်ရှိ:** Sound Engine သို့မဟုတ် uploaded audio ကို Piano အသံအဖြစ် အစားထိုးချိတ်ခြင်း နှင့် hand/wrist animation သည် သီးခြား project အဖြစ် ကျန်သည်။ ဖုန်းအစစ်၊ Safari/Firefox နှင့် MediaRecorder-only fallback ကို မစစ်ရသေးပါ။ Bass ကို နောက်ဦးစားပေးအဖြစ် ဆက်လုပ်ရန်။
+
+## Drum kit visual (R2 hotlink) — 2026-11-18
+
+Drum adapter ၏ instrument band သည် ယခု R2 ရှိ kit ဓာတ်ပုံများကို တိုက်ရိုက် hotlink လုပ်ပြီး ဆွဲသည်။ Lane chart ကို မဖျက်ပါ — kit မရလျှင် သို့မဟုတ် `DrumKit` module မတင်လျှင် ထို chart သို့ ပြန်ကျသည်။
+
+1. **ပုံရင်းမြစ်** — `https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev/drums/{Brand}/{Model}/{ratio}/`။ Bucket က `Access-Control-Allow-Origin: *` ပြန်ပေးသဖြင့် PNG များကို canvas ထဲ ဆွဲပြီး encode လုပ်နိုင်သည်။ Download မလုပ်ပါ၊ cache လုပ်သည်။
+2. **ဖိုင် အမည်စည်းမျဉ်း** — `Drum Bg.png` သည် kit ကိုယ်ထည်; hit ပုံများသည် GM note ဖြစ်သည်။ လက်က `R38.png`/`L38.png` (sticking engine က ဘယ်/ညာ ဆုံးဖြတ်သည်); ခြေက `36.png` ကဲ့သို့ ဘေး မပါသော အမည်။ တူညီသော drum ကို ပြသည့် GM note များ (35/36 ကဲ့သို့) ကို engine ၏ GM map မှ ဖတ်၍ အရန် အမည်အဖြစ် သုံးသည်။
+3. **Note ဖတ်ခြင်း** — `midi-unpitched` ကို တစ်ကြိမ် ဖတ်ပြီး 1-based မှ 0-based သို့ ချိန်သည် (Notation Engine နှင့် တူညီအောင်)။ GM note မပါသော score တွင် hit ပုံ မပေါ်နိုင်သဖြင့် kit ဓာတ်ပုံကို သာ ဆွဲသည်။
+4. **အချိန် တူညီမှု** — Hit များသည် Notation Engine ၏ tempo map နှင့် repeat ဖြေရှင်းချက်ကို သုံးသည်။ `at` သည် segment အတွင်း စက္ကန့်ဖြစ်သဖြင့် မည်သည့် frame ကို ပြန်ခေါ်လျှင်လည်း ပုံတူသည်။ Hit ပုံသည် 0.11 sec သာ လင်းသည်။
+5. **မအောင်မြင်လျှင်** — R2 မရခြင်း၊ ပုံ မရှိခြင်း၊ module မတင်ခြင်း အားလုံးတွင် export ကို မရပ်ပါ; lane chart သို့ ပြန်ကျပြီး status တွင် အကြောင်း ပြသည်။
+6. **Brand/Model** — Select နှစ်ခုသည် bucket ၏ folder အမည်နှင့် ကိုက်ညီသည်။ Brand ပြောင်းလျှင် Model list ကို ထို brand ၏ kit များဖြင့် ပြန်ဖြည့်သည်။
+7. **စမ်းသပ်မှု** — `test-studio-video-browser.mjs` တွင် kit ဓာတ်ပုံ ပေါ်ခြင်း (band colour count), limb → ဖိုင် အမည် တိုက်ဆိုင်ခြင်း, နှင့် `midi-unpitched` ပါသော score ဖြင့် hit overlay က band ကို ပြောင်းခြင်းတို့ကို စစ်သည်။ Drum Studio export regression အားလုံး ဆက်လက် အောင်မြင်သည်။

@@ -149,7 +149,9 @@ Run every command from `Website/Notation/Notation Engine/`.
   implementation, a test, or a fix on the grounds of "no code please".
   The owner reaffirmed this on 2026-11-23 and asked for it to be recorded:
   write the whole implementation, including tests and docs, without asking
-  for per-file permission first.
+  for per-file permission first. The owner reaffirmed it once more on
+  2026-11-18 and asked for the permission itself to be written down here,
+  so a later session does not have to rediscover it.
 - The Plan under `Website/Video/Video Engine Plan/PLAN.md` is reviewed and
   updated roughly every five hours. Work is landed in small pushes: push
   whatever is written first, then continue from the Plan, then push again.

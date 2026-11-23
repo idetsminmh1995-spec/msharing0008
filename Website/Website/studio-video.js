@@ -175,12 +175,33 @@
     return meta;
   };
 
+  /**
+   * The GM percussion number each `<instrument id>` stands for. Read once
+   * per file from the part list: a note's own `<instrument>` is a reference,
+   * and the number lives beside it in `<midi-instrument>`.
+   *
+   * MusicXML writes `midi-unpitched` as 1-128 while the General MIDI
+   * percussion map -- and every kit folder in R2 -- is numbered from 0, so
+   * the value is shifted down to match the notation engine, which makes the
+   * same adjustment for the same reason.
+   */
+  const readMidiInstruments = (document) => {
+    const byId = new Map();
+    for (const node of document.querySelectorAll('midi-instrument')) {
+      const id = node.getAttribute('id');
+      const raw = Number(node.querySelector('midi-unpitched')?.textContent);
+      if (id && Number.isFinite(raw)) byId.set(id, raw - 1);
+    }
+    return byId;
+  };
+
   const parseMusicXml = async (file) => {
     if (!file || file.name.toLowerCase().endsWith('.mxl')) return null;
     const source = await file.text();
     const document = new DOMParser().parseFromString(source, 'application/xml');
     if (document.querySelector('parsererror')) throw new Error('MusicXML file could not be parsed.');
     const meta = readMeta(document);
+    const midiInstruments = readMidiInstruments(document);
     // A score may carry other parts beside the drums (a bass, a backing
     // line). Only one part is the drum performance; reading every part
     // would make the video as long as the whole score is stacked up.
@@ -211,7 +232,13 @@
         if (tag !== 'note') continue;
         const duration = Math.max(0, Number(child.querySelector(':scope > duration')?.textContent) || 0) / divisions;
         const isChord = Boolean(child.querySelector(':scope > chord'));
-        if (!child.querySelector(':scope > rest')) hits.push({ type: drumTypeFromNote(child), quarter: cursor });
+        if (!child.querySelector(':scope > rest')) {
+          hits.push({
+            type: drumTypeFromNote(child),
+            quarter: cursor,
+            midi: midiInstruments.get(child.querySelector(':scope > instrument')?.getAttribute('id')),
+          });
+        }
         if (!isChord) cursor += duration;
       }
       absoluteQuarter = Math.max(absoluteQuarter, cursor);
@@ -237,9 +264,13 @@
   const timeHits = (hits, endQuarter, notationState) => {
     const api = notationState?.api;
     const tempoMap = notationState?.playback?.tempoMap;
+    // Everything the hit already knew rides along: the lane it belongs to
+    // is not the only thing a renderer needs, and the GM number is what
+    // picks the kit picture.
+    const keep = (hit) => ({ type: hit.type, midi: hit.midi, quarter: hit.quarter });
     if (!api || !tempoMap) {
       return {
-        hits: hits.map((hit) => ({ type: hit.type, at: hit.quarter * QUARTER_SECONDS })),
+        hits: hits.map((hit) => ({ ...keep(hit), at: hit.quarter * QUARTER_SECONDS })),
         seconds: endQuarter * QUARTER_SECONDS,
       };
     }
@@ -255,7 +286,7 @@
         const writtenSeconds = toSeconds(hit.quarter);
         for (const entry of performance.entries) {
           if (tick >= entry.writtenTick && tick < entry.writtenTick + entry.ticks) {
-            at.push({ type: hit.type, at: entry.startSeconds + (writtenSeconds - entry.writtenStartSeconds) });
+            at.push({ ...keep(hit), at: entry.startSeconds + (writtenSeconds - entry.writtenStartSeconds) });
           }
         }
       }
@@ -263,7 +294,7 @@
       return { hits: at, seconds: performance.totalSeconds };
     }
     return {
-      hits: hits.map((hit) => ({ type: hit.type, at: toSeconds(hit.quarter) })),
+      hits: hits.map((hit) => ({ ...keep(hit), at: toSeconds(hit.quarter) })),
       seconds: toSeconds(endQuarter),
     };
   };
@@ -345,7 +376,40 @@
     ctx.fillText(`${at.toFixed(1)} / ${duration.toFixed(1)} sec`, rect.x + Math.round(10 * scale), rect.y + rect.height - Math.round(10 * scale));
   }
 
-  async function drawPerformance(ctx, at, hits, duration, settings, meta) {
+  /**
+   * The kit pictures this render will draw, or `null` when the bucket
+   * cannot be reached.
+   *
+   * A kit is decoration, not evidence: if R2 is down the video still
+   * renders, with the lane chart it drew before. What must NOT happen is a
+   * half-loaded kit -- a background with no sticks on it looks like a kit
+   * nobody played -- so a failed load falls back whole.
+   */
+  async function loadKit(settings, hits) {
+    const drumKit = window.DrumKit;
+    if (!drumKit) return null;
+    const name = `${settings.brand}/${settings.model}`;
+    if (!drumKit.KITS[name]) return null;
+    try {
+      setStatus('Loading the drum kit from R2…');
+      const art = await drumKit.loadArt(name, settings.ratio);
+      const strokes = hits
+        .filter((hit) => Number.isFinite(hit.midi))
+        .map((hit) => ({ note: hit.midi, at: hit.at }));
+      const limbs = drumKit.solveLimbs(strokes.map((stroke) => ({ time: stroke.at, note: stroke.note })));
+      strokes.forEach((stroke, index) => { stroke.limb = limbs[index]; });
+      const resolved = await drumKit.loadHitImages(art, strokes);
+      return {
+        draw: (ctx, rect, at) => drumKit.draw(ctx, rect, art, at, strokes, resolved),
+      };
+    } catch (error) {
+      console.warn('Drum kit pictures unavailable; drawing the lane chart instead.', error);
+      setStatus(`Drum kit unavailable (${error.message || error}). Drawing the lane chart instead.`);
+      return null;
+    }
+  }
+
+  async function drawPerformance(ctx, at, hits, duration, settings, meta, kit) {
     const { width, height } = settings.size;
     const palette = getPalette(settings.color);
 
@@ -364,7 +428,9 @@
       parts: {
         title: (target, rect) => engine.drawTitlePart(target, rect, at, meta, palette, settings),
         notation: (target, rect) => engine.drawNotationPart(target, rect, at, notation),
-        instrument: (target, rect) => drawInstrumentPart(target, rect, at, hits, duration, settings, palette),
+        instrument: (target, rect) => (kit
+          ? kit.draw(ctx, rect, at)
+          : drawInstrumentPart(target, rect, at, hits, duration, settings, palette)),
       },
     });
   }
@@ -523,6 +589,7 @@
       }
       const timed = timeHits(written, endQuarter, notation);
       const hits = timed.hits;
+      const kit = await loadKit(settings, hits);
       // The Plan's length: the count-in the score is played in, then the
       // score's own length, with no cap of the Studio's.
       const countIn = countInSeconds(settings, meta);
@@ -531,7 +598,7 @@
       if (countIn > 0) {
         segments.push({ seconds: countIn, draw: (ctx, at) => drawCountIn(ctx, at, settings, meta) });
       }
-      segments.push({ seconds: duration, draw: (ctx, at) => drawPerformance(ctx, at, hits, duration, settings, meta) });
+      segments.push({ seconds: duration, draw: (ctx, at) => drawPerformance(ctx, at, hits, duration, settings, meta, kit) });
 
       // The sound spans the count-in and the performance together, so it
       // rides on the first of those two segments and starts at zero.
@@ -600,6 +667,26 @@
     else if (stage.requestFullscreen) void stage.requestFullscreen();
   });
   settingsForm?.addEventListener('submit', (event) => event.preventDefault());
+  // The bucket names a kit by brand AND model, so the model list is the
+  // brand's own: a model left over from another brand would name a folder
+  // that does not exist and the render would quietly lose its kit.
+  const syncModelOptions = () => {
+    const kits = window.DrumKit?.KITS;
+    if (!drumModel || !kits) return;
+    const brand = drumBrand?.value;
+    const models = Object.values(kits).filter((kit) => kit.brand === brand);
+    if (!models.length) return;
+    const previous = drumModel.value;
+    drumModel.replaceChildren(...models.map((kit) => {
+      const option = document.createElement('option');
+      option.value = kit.model;
+      option.textContent = kit.label;
+      return option;
+    }));
+    drumModel.value = models.some((kit) => kit.model === previous) ? previous : models[0].model;
+  };
+  syncModelOptions();
+  drumBrand?.addEventListener('change', syncModelOptions);
   [titleOne, titleOneColor, titleOneSize, titleTwo, titleTwoColor, titleTwoSize, drumBrand, drumModel, notationView, soundModel, soundVolume, countVoiceEnabled, countVoice, countVolume, countDisplay, videoColor, videoRatio].forEach((control) => {
     control?.addEventListener('input', syncControlState);
     control?.addEventListener('change', syncControlState);
