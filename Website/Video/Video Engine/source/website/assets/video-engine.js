@@ -1996,6 +1996,9 @@
     // the foot of the frame. Portrait stacks instead of splitting: two
     // columns there would leave neither part any width.
     violin: { shape: 'split', order: ['notation', 'instrument', 'title'], columns: [0.6, 0.4] },
+    // A voice has no notation and no instrument to mark: the recording's own
+    // waveform is the whole body of the frame, under the Title / Info band.
+    voice: { shape: 'rows', order: ['title', 'instrument'] },
   };
 
   const LAYOUT_SHARES = {

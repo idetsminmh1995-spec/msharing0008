@@ -73,6 +73,24 @@ test('each instrument gets all three parts, inside the frame and apart', () => {
   }
 });
 
+test('a voice frame is the Title band over the waveform, with no notation part', () => {
+  const { layoutFor } = loadEngine();
+  for (const [ratio, { width, height }] of Object.entries(SIZES)) {
+    const layout = layoutFor('voice', { width, height });
+    assert.equal(layout.ratio, ratio);
+    // A voice has nothing to notate and nothing to mark: the recording's
+    // waveform is the body of the frame.
+    assert.deepEqual([...layout.parts], ['title', 'instrument']);
+    assert.equal(layout.rects.notation, undefined);
+    assert.ok(layout.rects.title.y < layout.rects.instrument.y);
+    for (const [name, rect] of Object.entries(layout.rects)) {
+      assert.ok(rect.width > 0 && rect.height > 0, `voice/${ratio}/${name} has no area`);
+      assert.ok(rect.x + rect.width <= width, `voice/${ratio}/${name} runs off the right`);
+      assert.ok(rect.y + rect.height <= height, `voice/${ratio}/${name} runs off the bottom`);
+    }
+  }
+});
+
 test('the declared order is the drawn order, per the Plan', () => {
   const { layoutFor } = loadEngine();
   const topOf = (rect) => rect.y;

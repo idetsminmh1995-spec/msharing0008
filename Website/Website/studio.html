@@ -152,6 +152,23 @@
               </div>
               <p class="metronome-duration" data-violin-summary aria-live="polite"></p>
             </section>
+            <section class="metronome-controls" data-voice-controls hidden aria-label="Voice video settings">
+              <label class="studio-field studio-field--file metronome-file-field"><span>Voice recording</span><input type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.flac" data-voice-audio-input aria-describedby="voice-audio-name" /><small id="voice-audio-name" data-voice-audio-name>No file selected</small></label>
+              <p class="metronome-help">Choose a recording, or record one here. The sound is decoded in this browser and nothing is uploaded. The waveform is drawn from that sound, so the video is audible.</p>
+              <div class="metronome-field-grid">
+                <div class="metronome-field"><span>Microphone</span>
+                  <button type="button" class="generate-button" data-voice-record aria-label="Record from the microphone">Record from microphone</button>
+                </div>
+                <label class="metronome-field">Video orientation
+                  <select data-voice-aspect aria-label="Voice video orientation">
+                    <option value="16x9">Landscape · 16:9</option>
+                    <option value="9x16">Portrait · 9:16</option>
+                    <option value="1x1">Square · 1:1</option>
+                  </select>
+                </label>
+              </div>
+              <p class="metronome-duration" data-voice-summary aria-live="polite"></p>
+            </section>
           <form class="studio-settings" data-studio-settings>
             <div class="studio-file-row">
               <label class="studio-field studio-field--file"><span>MusicXML file</span><input type="file" accept=".musicxml,.xml,.mxl,application/xml,text/xml" data-musicxml-input /><small data-musicxml-name>No file selected</small></label>
@@ -198,16 +215,17 @@
         </div>
       </section>
     </main>
-    <script src="assets/video-engine.js?v=d3fc10d77083"></script>
+    <script src="assets/video-engine.js?v=7233869aa49c"></script>
     <script src="assets/metronome-engine.js?v=7d4f30b60e08"></script>
     <script src="assets/guitar-engine.js"></script>
     <script src="assets/piano-hand-engine.js"></script>
     <script src="script.js?v=cb8dc501cd10"></script>
-    <script src="studio-video.js?v=7024cdb468c3"></script>
+    <script src="studio-video.js?v=bc7ee4995194"></script>
     <script src="studio-metronome.js?v=2ac6aea8ca8e"></script>
     <script src="studio-guitar.js?v=aae883620e66"></script>
     <script src="studio-piano.js?v=9e2aab9d66ac"></script>
     <script src="studio-bass.js?v=b73d2244b8ec"></script>
     <script src="studio-violin.js?v=963744a52dde"></script>
+    <script src="studio-voice.js?v=41638d4da1db"></script>
   </body>
 </html>
