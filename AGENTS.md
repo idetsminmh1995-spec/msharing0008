@@ -206,3 +206,17 @@ permission is read-only. Pushing needs a token with Contents: write on
 `idetsminmh1995-spec/msharing0008`; until one is supplied, commits stay
 local and must be reported as unpushed rather than described as landed.
 
+
+**2026-11-18 — the supplied fine-grained PAT is read-only.** The
+`github_pat_…` handed over for this push authenticates as `mhfashion`
+(`GET /user`). The repo API reports `{"admin": false, "maintain": false,
+"push": false, "triage": false, "pull": true}`, `POST /git/refs` with a
+real SHA answers `403 Resource not accessible by personal access token`,
+and `git-receive-pack` answers `403 ... Permission to
+idetsminmh1995-spec/msharing0008.git denied to mhfashion`. A `422` from
+`POST /git/refs` only means the made-up SHA was refused, not that the
+token can write — use a real SHA before believing it. All three tokens
+fail the same way: `$GITHUB_TOKEN` -> `403`, the new `github_pat_…` ->
+`403`, `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` -> `401`. Pushing needs a
+token with **Contents: write** on this repository; until one is supplied,
+commits stay local and must be reported as unpushed.
