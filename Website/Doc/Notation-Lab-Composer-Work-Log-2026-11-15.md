@@ -9,4 +9,4 @@ Notation Lab now starts with an **Open File / Create / Scan** entry page and han
 See:
 
 - [Current Notation Lab Page](Notation-Lab-Page.md)
-- [Notation Lab UI/UX Plan](../Plan/Notation-Lab-UI-UX-Plan.md)
+- [Notation Lab UI/UX Plan](../Plan/README.md#notation-lab-uiux-plan--revised-2026-11-15)

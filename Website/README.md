@@ -10,6 +10,13 @@ M Sharing music platform ၏ responsive web interface ဖြစ်သည်။ �
 
 ## Project folders
 
-- `Plan/` — frontend, shared backend, storage နှင့် AWS migration architecture plan
-- `Doc/` — implementation နှင့် deployment documentation
-- `Website/` — deployable static assets, Wrangler config နှင့် website source
+| Folder | ထဲတွင် ရှိရမည့်အရာ |
+|---|---|
+| `Plan/` | **Plan ဖိုင် တစ်ခုတည်း** (`README.md` = Main Plan) |
+| `Doc/` | လုပ်ပြီးသော အလုပ်မှတ်တမ်း Doc များ (`README.md` = index)၊ `Doc/Archive/` = အသုံးမဝင်တော့သော ဖိုင်အဟောင်းများ |
+| `SQL/` | **SQL ဖိုင်များသာ** (Supabase migrations) |
+| `Worker/` | **Worker ဖိုင် တစ်ခုတည်း** (Cloudflare Worker) |
+| `Website/` | Deploy လုပ်ရသော static site၊ Wrangler config |
+| `Notation/`, `Video/`, `Drum/`, `Guitar/`, `Piano/`, `Metronome/` | Engine code နှင့် ၎င်းတို့၏ Engine Plan / Doc folder |
+
+အသေးစိတ်စည်းမျဉ်းကို Main Plan ၏ `Repository structure — folder rules` section တွင် ကြည့်ပါ။

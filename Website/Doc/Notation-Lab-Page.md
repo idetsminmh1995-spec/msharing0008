@@ -27,4 +27,4 @@ The off-screen file picker is `tabindex="-1"` with its own `aria-label`: the thr
 
 The Editor now carries the shared site header plus a sticky secondary toolbar (file, history, note value, accidentals, score setup, playback, view, export). See [Notation Lab Editor — Fixed Toolbar](Notation-Lab-Editor-Toolbar-2026-11-18.md).
 
-The active source of truth for future changes is [Notation Lab UI/UX Plan](../Plan/Notation-Lab-UI-UX-Plan.md).
+The active source of truth for future changes is [Notation Lab UI/UX Plan](../Plan/README.md#notation-lab-uiux-plan--revised-2026-11-15).

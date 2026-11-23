@@ -4,6 +4,23 @@
 >
 > **Video Engine** သည် instrument အားလုံး (Drum, Piano, Guitar နှင့် နောက်ထပ်ထည့်မည့်ဟာများ) အတွက် တူညီသော common အလုပ်ကို လုပ်ပေးရမည်။ Page တစ်ခုချင်းစီ (`studio.html`, `studio-*.js` စသည်) ထဲတွင် ပြန့်ကျဲနေသော shared code များကို သက်ဆိုင်ရာ Engine ထဲသို့ ရွှေ့ရမည်။ ရွှေ့ပြီးနောက် code ကို ဂရုတစိုက် ပြန်လည်စစ်ဆေးရမည်။ Instrument တစ်ခုချင်းစီအတွက် common အလုပ်ကို feature folder ထဲတွင် ထပ်ရေးခြင်း/ကူးခြင်း မပြုရ။ (အသေးစိတ် placement rule — "Shared engine placement and reuse" ကို ကြည့်ပါ။)
 
+## အကြောင်းအရာစာရင်း
+
+- **အခြေခံ Plan:** ၁ ရည်ရွယ်ချက် / feature / engine architecture · ၂ Frontend · ၃ Backend · ၄ Storage · ၅ Deployment · ၆ AWS portability · ၇ အဆင့်များ · ၈ Testing · ၉ လက်ရှိအခြေအနေ (Header) · ၁၀ Git/Cloudflare · ၁၁ Doc workflow
+- [Notation Lab Page — 2026-11-13](#notation-lab-page--2026-11-13) (အစောပိုင်း baseline)
+- [Create Video — Engine workflow](#create-video--engine-workflow--2026-11-13) (Drum / Piano workflow)
+- [Notation Lab UI/UX Plan](#notation-lab-uiux-plan--revised-2026-11-15)
+- [Writer Engine — Notation Editor](#writer-engine--notation-editor--2026-11-22) (Inst. box၊ sidebar၊ palettes)
+- [Create Video — Final video layout](#create-video--final-video-layout--2026-11-22) (၃ ပိုင်း layout)
+- Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ် (pipeline၊ Studio options၊ engine တာဝန်ခွဲခြားမှု၊ ဆုံးဖြတ်ချက်များ၊ ပြီးစီးမှုအခြေအနေ)
+- Sound Engine နှင့် MuseScore SoundFont (SoundFont ရွေးချယ်ချက် ပါ)
+- Metronome Studio
+- [Repository structure — folder rules](#repository-structure--folder-rules--2026-11-23) (Plan/Doc/SQL/Worker folder စည်းမျဉ်း)
+- [Search — အလုပ်လုပ်ပုံ](#search--အလုပ်လုပ်ပုံ--2026-11-23) (Header search၊ Notes filter၊ Postgres full-text/trigram)
+- [Handoff — Manus AI](#handoff--manus-ai-supabase-နှင့်-cloudflare-r2--2026-11-23) (Supabase data model၊ R2 layout၊ အလုပ်အစီအစဉ်)
+- [Work packages — OpenHands](#work-packages--openhands-အတွက်-အစီအစဉ်အတိုင်း--2026-11-23) (Editor နှင့် Create Video အစဉ်လိုက် အလုပ်များ)
+- **အခြား Plan များ:** [Video Engine Plan](../Video/Video%20Engine%20Plan/PLAN.md) · [Notation Plan](../Notation/Notation%20Plan/PLAN.md) · [Metronome Engine Plan](../Metronome/Metronome%20Engine%20Plan/PLAN.md) · [Sound Plan](../Notation/Sound%20Plan/README.md)
+
 ## 1. ရည်ရွယ်ချက်
 
 M Sharing သည် music learning, music notes, online courses, video studio, library နှင့် user profile/dashboard များ ပါဝင်မည့် responsive web application ဖြစ်မည်။ လက်ရှိ repository ထဲတွင် Header Bar prototype ကိုသာ တည်ဆောက်ထားပြီး ဤ Plan သည် နောက်ပိုင်း frontend၊ backend၊ storage နှင့် deployment အဆင့်များအတွက် အခြေခံ architecture ဖြစ်သည်။
@@ -50,6 +67,8 @@ Web app တွင် အဓိက feature ၄ ခု ရှိသည် — **No
 
 SEO-heavy public landing pages, server rendering သို့မဟုတ် route-level server features လိုအပ်လာပါက **Next.js** ကို ပြောင်းရွေးနိုင်သည်။ SvelteKit, Nuxt, Angular နှင့် React Native Web တို့ကို product scope ပြောင်းလဲလာချိန်တွင် architecture review ပြုလုပ်ပြီးမှ ရွေးချယ်မည်။
 
+> **2026-11-23 ဆုံးဖြတ်ချက်:** လက်ရှိ site သည် static HTML/JS + Cloudflare Workers Static Assets (`Website/Website/`) ဖြစ်ပြီး Notation Lab၊ Create Video၊ Studio များကို ဤ stack ဖြင့် တည်ဆောက်ပြီးဖြစ်သည်။ ထို့ကြောင့် **ဤ stack ဖြင့် ဆက်သွားမည်**။ React + Vite သည် Dashboard၊ Store၊ Lessons ကဲ့သို့ state များသော page များ စတင်သည့်အခါမှ ပြန်စဉ်းစားမည့် candidate အဖြစ်သာ ထားသည်။
+
 ## 3. Backend architecture
 
 Backend အတွက် **Supabase** ကို အဓိကအသုံးပြုမည်။ Frontend မှ Supabase ကို တိုက်ရိုက်သုံးနိုင်သည့်အရာများနှင့် server-side logic လိုအပ်သည့်အရာများကို ခွဲထားမည်။
@@ -91,6 +110,8 @@ Environment variables နှင့် secrets များကို local source
 - Infrastructure ကို နောက်ပိုင်း Terraform/OpenTofu ဖြင့် Cloudflare နှင့် AWS resources နှစ်မျိုးစလုံးအတွက် ပြန်ဖော်ပြနိုင်အောင် naming, secrets နှင့် resource ownership ကို စနစ်တကျ ထားမည်။
 
 ## 7. အကောင်အထည်ဖော်မည့်အဆင့်များ
+
+> **လက်ရှိ ဦးစားပေး (2026-11-23):** Create Video နှင့် Notation Lab ကို အရင်ဆောက်နေပြီး Notes Store၊ Lessons နှင့် Backend (Supabase) ကို နောက်မှ လုပ်မည်။ ထို့ကြောင့် အောက်ပါ Phase 1 (backend first) သည် မူလအစီအစဉ်ဖြစ်ပြီး လက်ရှိ အလုပ်လုပ်နေသော အစဉ်အတိုင်း မဟုတ်ပါ။ Backend ကို ရောင်းချမှု/account လိုအပ်လာသည့်အချိန်တွင် စမည်။
 
 ### Phase 1 — Foundation and backend first
 
@@ -137,7 +158,7 @@ Backend API နှင့် integration များကို frontend feature d
 
 ## 9. လက်ရှိအခြေအနေ နှင့် Header UI/UX scope
 
-လက်ရှိ implementation အဆင့်တွင် Header Bar နှင့် phone bottom navigation ကိုသာ တည်ဆောက်ထားသည်။ Sample music-platform UI board ကို visual reference အဖြစ် အသုံးပြုထားသော်လည်း Hero, dashboard, course cards, music-note cards နှင့် အခြား page content များကို မစတင်ရသေးပါ။
+(2026-11-23 မှတ်ချက် — ဤ section သည် Header အပိုင်းကိုသာ ဖော်ပြသည်။ Notation Lab၊ Create Video၊ Studio တို့၏ လက်ရှိအခြေအနေကို အောက်ပါ သက်ဆိုင်ရာ section များတွင် ကြည့်ပါ။) Header အပိုင်းတွင် Header Bar နှင့် phone bottom navigation ကို တည်ဆောက်ပြီးဖြစ်သည်။ Sample music-platform UI board ကို visual reference အဖြစ် အသုံးပြုထားသော်လည်း Hero, dashboard, course cards, music-note cards နှင့် အခြား page content များကို မစတင်ရသေးပါ။
 
 ### ပြီးစီးထားသည်
 
@@ -158,10 +179,10 @@ Backend API နှင့် integration များကို frontend feature d
 - Header controls များကို Supabase shared backend နှင့် မချိတ်ရသေးပါ။
 - Account authentication, Favorites, Cart နှင့် Notifications data flow မစတင်ရသေးပါ။
 - Phone bottom tabs နှင့် Web navigation အတွက် real routes/page components မတည်ဆောက်ရသေးပါ။
-- Frontend framework final decision မချမှတ်ရသေးပါ။
+- Frontend framework — **ဆုံးဖြတ်ပြီး**: လက်ရှိ static HTML/JS + Cloudflare Workers Static Assets ဖြင့် ဆက်သွားမည် (§2)။
 - Supabase schema, RLS, auth နှင့် backend API မစတင်ရသေးပါ။
 - Cloudflare R2 upload/download နှင့် media metadata integration မစတင်ရသေးပါ။
-- Hero, Dashboard, Courses နှင့် Store page UI မစတင်ရသေးပါ။ Notation Lab ကို သီးခြား route အဖြစ် ဖန်တီးပြီး MusicXML render, Page/Horizontal view, PDF export နှင့် Sound Engine event bridge အခြေခံကို ထည့်သွင်းထားသည်။ Create Video အတွက် further compact responsive tool-selection page prototype ကို တည်ဆောက်ပြီး Piano, Drums, Guitar, Bass, Strings, Voice, Metronome နှင့် More tools cards ထည့်ထားသည်။ Web View တွင် tool cards ၅ ခုစီ တစ်တန်းပေါ်ပြီး tablet တွင် ၃ ခု၊ phone တွင် ၂ ခု ပေါ်ရန် grid plan သတ်မှတ်ထားသည်။ Tool box တစ်ခုခုကိုနှိပ်လျှင် Create Video Page အောက်တွင်မဟုတ်ဘဲ shared `studio.html?tool=...` Studio Page သို့ navigate လုပ်မည်။ ထို Studio Page တွင် ဘယ်ဘက် instrument control panel နှင့် ညာဘက် Video preview panel ပါမည်။ Drum ကို ပထမဆုံးအဖြစ် Kick, Snare, Hi-hat, Tempo နှင့် recording controls ဖြင့် စတင်အကောင်အထည်ဖော်ထားသည်။ Dark/Light Mode သည် selection page နှင့် Studio Page နှစ်ခုလုံးရှိ surfaces, text contrast, cards, controls, preview နှင့် mobile navigation များအပေါ် သက်ရောက်ရမည်။ Hero နှင့် cards များကို web/phone view နှစ်မျိုးလုံးတွင် မျက်နှာပြင်မလွှမ်းမိုးစေရန် spacing နှင့် scale လျှော့ထားပြီး Logo ကို `#home` anchor သို့ ချိတ်ထားသည်။ Phone layout တွင် fixed navigation ကို မထိခိုက်စေရန် content safe space နှင့် compact breakpoint overrides များကို စစ်ဆေးပြီးပြီ။ နောက်တစ်ဆင့်တွင် card များနှင့် Studio Page controls များကို recorder, instrument editor, tempo control နှင့် video timeline flow များနှင့် အပြည့်အဝ ချိတ်ဆက်မည်။
+- Hero, Dashboard, Courses နှင့် Store page UI မစတင်ရသေးပါ။ (ဆက်လာသော အချက်များသည် 2026-11-13 အခြေအနေ မှတ်တမ်းဖြစ်ပြီး အများစု ပြီးစီးပြီ — လက်ရှိအခြေအနေကို နောက်ပိုင်း section များတွင် ကြည့်ပါ။) Notation Lab ကို သီးခြား route အဖြစ် ဖန်တီးပြီး MusicXML render, Page/Horizontal view, PDF export နှင့် Sound Engine event bridge အခြေခံကို ထည့်သွင်းထားသည်။ Create Video အတွက် further compact responsive tool-selection page prototype ကို တည်ဆောက်ပြီး Piano, Drums, Guitar, Bass, Strings, Voice, Metronome နှင့် More tools cards ထည့်ထားသည်။ Web View တွင် tool cards ၅ ခုစီ တစ်တန်းပေါ်ပြီး tablet တွင် ၃ ခု၊ phone တွင် ၂ ခု ပေါ်ရန် grid plan သတ်မှတ်ထားသည်။ Tool box တစ်ခုခုကိုနှိပ်လျှင် Create Video Page အောက်တွင်မဟုတ်ဘဲ shared `studio.html?tool=...` Studio Page သို့ navigate လုပ်မည်။ ထို Studio Page တွင် ဘယ်ဘက် instrument control panel နှင့် ညာဘက် Video preview panel ပါမည်။ Drum ကို ပထမဆုံးအဖြစ် Kick, Snare, Hi-hat, Tempo နှင့် recording controls ဖြင့် စတင်အကောင်အထည်ဖော်ထားသည်။ Dark/Light Mode သည် selection page နှင့် Studio Page နှစ်ခုလုံးရှိ surfaces, text contrast, cards, controls, preview နှင့် mobile navigation များအပေါ် သက်ရောက်ရမည်။ Hero နှင့် cards များကို web/phone view နှစ်မျိုးလုံးတွင် မျက်နှာပြင်မလွှမ်းမိုးစေရန် spacing နှင့် scale လျှော့ထားပြီး Logo ကို `#home` anchor သို့ ချိတ်ထားသည်။ Phone layout တွင် fixed navigation ကို မထိခိုက်စေရန် content safe space နှင့် compact breakpoint overrides များကို စစ်ဆေးပြီးပြီ။ နောက်တစ်ဆင့်တွင် card များနှင့် Studio Page controls များကို recorder, instrument editor, tempo control နှင့် video timeline flow များနှင့် အပြည့်အဝ ချိတ်ဆက်မည်။
 - AWS migration implementation မစတင်ရသေးဘဲ နောက်ပိုင်း phase အဖြစ်သာ သတ်မှတ်ထားသည်။
 
 ## 10. လက်ရှိ Git/Cloudflare version
@@ -173,6 +194,16 @@ Header နှင့် mobile bottom navigation source များကို Git
 Website နှင့်ပတ်သက်သည့် implementation, UI/UX, deployment, configuration, bug fix သို့မဟုတ် refactor အလုပ်တစ်ခု ပြီးတိုင်း `Website/Doc/` အတွင်းတွင် အလုပ်မှတ်တမ်း၊ ပြောင်းလဲခဲ့သည့် paths၊ စမ်းသပ်မှုရလဒ်နှင့် မပြီးသေးသည့်အချက်များကို update လုပ်ရမည်။ Document အသစ်ဖန်တီးပါက `Website/Doc/README.md` တွင် link ထည့်ရမည်။
 
 Plan, architecture decision, implementation sequence သို့မဟုတ် အလုပ်လုပ်သည့်ပုံစံကို ပြောဆို/ပြောင်းလဲသည့်အခါ `Website/Plan/README.md` သို့မဟုတ် သက်ဆိုင်ရာ `Website/Plan/` document ကို တစ်ပြိုင်နက် update လုပ်ရမည်။ UI/UX ကို ဖုန်းနှင့် web app/desktop နှစ်မျိုးလုံးအတွက် အစကတည်းက responsive ရေးပြီး အနည်းဆုံး viewport တစ်မျိုးစီတွင် စစ်ဆေးရမည်။ Code နှင့် သက်ဆိုင်ရာ Doc/Plan update များကို အတူတကွ commit လုပ်ပြီး စစ်ဆေးမှုအောင်မြင်လျှင် ချိတ်ဆက်ထားသော GitHub repository/branch သို့ push လုပ်ရမည်။ Push မတိုင်မီ remote ကို fetch လုပ်၊ remote changes ရှိလျှင် ပေါင်းစည်းပြီး၊ push ပြီး commit SHA ကို အတည်ပြုရမည်။ GitHub push သည် deployment ကို အလိုအလျောက်ခွင့်ပြုခြင်းမဟုတ်ပါ။ အသေးစိတ်စည်းမျဉ်းကို [Website Development Documentation Workflow](../Doc/Development-Workflow.md) တွင် ထားရှိသည်။
+
+### အလုပ်ခွဲဝေမှု (Roles)
+
+| ဘယ်သူ | တာဝန် |
+|---|---|
+| **Claude** | **Plan ကို တောက်လျှောက်ရေးထားပေးခြင်း** — ဆုံးဖြတ်ချက်များ၊ လိုအပ်ချက်များ၊ လက်ရှိအခြေအနေ (Doc/code စစ်ဆေးချက်) ကို Plan ထဲ မှတ်သားထိန်းသိမ်းသည်။ Code မရေးပါ။ |
+| **OpenHands** | လက်ရှိ **Code ရေးသူ** (`Website/Website/` နှင့် Engine များ)။ |
+| **Manus AI** | နောက်ရက်များတွင် Code ရေးခြင်း၊ **Supabase ချိတ်ဆက်ခြင်း**၊ **Cloudflare R2** ဆိုင်ရာအလုပ်များ အားလုံးကို ကိုယ်တိုင် ဝင်လုပ်မည်။ |
+
+Code ရေးသူများသည် ဤ Plan နှင့် သက်ဆိုင်ရာ Engine Plan များ (အကြောင်းအရာစာရင်းကို ကြည့်ပါ) ကို အရင်ဖတ်ပြီးမှ အလုပ်စရန်။ Plan နှင့် code မကိုက်သည်ကို တွေ့လျှင် Plan ထဲတွင် မှတ်ရန် (Claude က Plan ကို ညှိပေးမည်)။
 
 ### Create Video UI copy rule
 
@@ -199,7 +230,7 @@ Playback/audio ကို Notation Engine ထဲတွင်မထည့်ဘဲ
 
 ### Notation Lab: maximize score workspace
 
-Notation Lab-ийн score харах хэсэгт илүү зай гаргахын тулд үндсэн дэлгэц дээрх давхардсан `Notation Lab` гарчиг, файлын нэр болон амжилтын төлөвийн текстийг нууж, `h1` ба live status-ийг туслах технологид зориулан үлдээнэ. Алдаа, файл сонголт эсвэл Engine-ийн асуудал гарсан үед status-ийг л харагдуулж, хэрэгтэй мэдээллийг хадгалан дэлгэцийн зайг хэмнэнэ.
+Score ကြည့်ရှုသည့်နေရာတွင် ပိုမိုနေရာရစေရန် အဓိကမျက်နှာပြင်ပေါ်ရှိ ထပ်နေသော `Notation Lab` ခေါင်းစဉ်၊ ဖိုင်အမည်နှင့် အောင်မြင်မှုအခြေအနေ စာသားကို ဖျောက်ပြီး `h1` နှင့် live status ကို assistive technology အတွက် ထားမည်။ အမှား၊ ဖိုင်ရွေးခြင်း သို့မဟုတ် Engine ပြဿနာ ဖြစ်သည့်အခါသာ status ကို မြင်ရအောင်ပြပြီး လိုအပ်သော အချက်အလက်ကို ထိန်းကာ screen နေရာကို သက်သာစေမည်။
 
 
 ### Notation Lab: full-width canvas and zoom
@@ -211,27 +242,27 @@ Notation ကို card ပုံစံဘောင်ထဲမထည့်ဘ�
 
 Page နှင့် Horizontal ကို ခလုတ်နှစ်ခုအစား ရွေးချယ်စရာနှစ်ခုပါသော dropdown တစ်ခုအဖြစ်ထားမည်။ Phone တွင် `Choose file`, dropdown နှင့် PDF icon ကို အတန်းတစ်တန်း၊ Play/zoom/volume ကို နောက်တစ်တန်းတွင်ထား၍ fixed dock ၏ အမြင့်နှင့် control နေရာကို လျှော့မည်။ PDF icon သည် screen reader အတွက် `Download PDF` အမည်ကို ဆက်လက်ဖော်ပြမည်။ Desktop တွင် PDF စာသားကို ဆက်လက်ပြမည်။
 
-### Create Video — Engine workflow
+## Create Video — Engine workflow — 2026-11-13
 Create Video သည် video များဖန်တီးရန်အတွက် ဖြစ်သည်။ Drum ကိုရွေးပြီး Drum ထဲဝင်လျှင် Drum video ဖန်တီးမည်။ Piano video ဖန်တီးရန် Piano ထဲသို့ ဝင်ရမည်ဖြစ်ပြီး Piano workflow သည် Drum workflow နှင့် မတူပါ။ Engine တစ်ခုချင်းစီ၏ အကောင်အထည်ဖော်ပုံ၊ ချိတ်ဆက်ပုံအစီအစဉ်နှင့် မသတ်မှတ်ရသေးသော ကွာခြားချက်များကို အသုံးပြုသူ၏ နောက်ထပ်လမ်းညွှန်ချက်အတိုင်း ဆက်လက်သတ်မှတ်မည်။
 
-#### Shared engine placement and reuse
+### Shared engine placement and reuse
 Notation Engine, Sound Engine နှင့် Video Engine တို့ကို သီးခြားတည်နေရာတစ်ခုစီတွင် တစ်ခုတည်းထားပြီး လိုအပ်သော video workflow များက ချိတ်ဆက်အသုံးပြုမည်။ **Video Engine** သည် Drum အတွက်သာမဟုတ်ဘဲ Piano နှင့် နောင်ထပ်ထည့်မည့် video ဖန်တီးမှုများတွင်လည်း အသုံးပြုမည့် shared Engine ဖြစ်သောကြောင့် `Website/Drum/` အတွင်း မထားရ။ Engine ကို feature folder တစ်ခုစီတွင် ထပ်မံကူးယူ/တည်ဆောက်မည့်အစား ၎င်း၏ သီးခြားတည်နေရာမှ ပြန်လည်အသုံးပြုမည်။
 
-#### Drum video workflow
-- ပါဝင်မည့် Engine များ — **Notation Engine, Sound Engine, Video Engine, Drum Human Stick Engine, Drum Animation Engine, Audio Engine**။ Drum Human Stick Engine ၏ သီးခြားတာဝန်ကို ထပ်မံသတ်မှတ်ရန် ကျန်ရှိသည်။
+### Drum video workflow
+- ပါဝင်မည့် Engine များ — **Notation Engine, Sound Engine, Video Engine, Drum Human Stick Engine, Drum Animation Engine, Audio Engine**။ Drum Human Stick Engine ၏ တာဝန် (Drum တီးသူ stick ၏ လှုပ်ရှားမှု) ကို [Engine တာဝန်ခွဲခြားမှု](#၁၀။-engine-တာဝန်ခွဲခြားမှု-ဆုံးဖြတ်ချက်) ဇယားတွင် သတ်မှတ်ပြီး။
 - **Notation Engine** က note များကို ပြသမည်။ **Sound Engine** က အဆိုပါ note များအတိုင်း အသံထုတ်ပေးမည်။
 - Drum video အတွက် လိုအပ်သော photo/data များကို Cloudflare R2 ထဲတွင် ထားမည်။ **Video Engine** က အရည်အသွေးကောင်းပြီး ချောမွေ့သော video file ထုတ်လုပ်ရာနှင့် R2 ထဲရှိ file များကို အသုံးပြုရာတွင် ကူညီမည်။
 - **Drum Animation Engine** က Drum video အတွင်း ဘယ်ပုံကို ဘယ်အချိန်တွင် highlight လုပ်ရမည်အပါအဝင် animation ဆိုင်ရာအလုပ်များကို ကိုင်တွယ်မည်။
 
-#### Piano video workflow
-- ပါဝင်မည့် Engine များ — **Notation Engine, Sound Engine, Video Engine, Piano Hand Human Engine, Drum Animation Engine, Audio Engine**။ Piano အတွက် 3D hand ကို လှုပ်ရှားစေမည့် သီးခြား **Piano 3D Hand Engine** ကိုလည်း တည်ဆောက်မည်။ Piano body ကိုလည်း 3D model အဖြစ် အသုံးပြုမည်။ Piano body နှင့် Drum workflow အကြား အသေးစိတ်ကွာခြားချက်များကို နောက်ထပ်ညွှန်ကြားချက်ရရှိပြီးမှ သတ်မှတ်မည်။
+### Piano video workflow
+- ပါဝင်မည့် Engine များ — **Notation Engine, Sound Engine, Video Engine, Piano Hand Human Engine, Piano Animation Engine, Audio Engine**။ Piano အတွက် 3D hand ကို လှုပ်ရှားစေမည့် သီးခြား **Piano 3D Hand Engine** ကိုလည်း တည်ဆောက်မည်။ Piano body ကိုလည်း 3D model အဖြစ် အသုံးပြုမည်။ Piano body နှင့် Drum workflow အကြား အသေးစိတ်ကွာခြားချက်များကို နောက်ထပ်ညွှန်ကြားချက်ရရှိပြီးမှ သတ်မှတ်မည်။
 - **Notation Engine** က note များကို ပြသပြီး **Sound Engine** က အဆိုပါ note များအတိုင်း အသံထုတ်ပေးမည်။ **Video Engine** က အရည်အသွေးကောင်းပြီး ချောမွေ့သော video file ထုတ်လုပ်ရာနှင့် လိုအပ်သော file များကို အသုံးပြုရာတွင် ကူညီမည်။
 - **Piano Hand Human Engine** က note တစ်လုံးချင်းအတွက် ဘယ်လက်/ညာလက်နှင့် ဘယ်လက်ချောင်းဖြင့် တီးရမည်ဆိုသော data ကို ပေးမည်။ **Piano 3D Hand Engine** က ထို data အတိုင်း 3D လက်လှုပ်ရှားမှုကို ပြမည်။
-- Animation Engine သည် Piano ခလုတ်များကို အရောင်ဖြင့် highlight လုပ်ခြင်းနှင့် အခြား animation ဆိုင်ရာအလုပ်များကို လုပ်မည်။ Drum Animation Engine ကို Piano workflow တွင် အသုံးပြုမည့်အမည်နှင့် ၎င်း၏ အကျုံးဝင်မှုကို ထပ်မံအတည်ပြုရန် ကျန်ရှိသည်။
+- **Piano Animation Engine** (သီးခြား) က Piano ခလုတ်များကို အရောင်ဖြင့် highlight လုပ်ခြင်းနှင့် အခြား animation ဆိုင်ရာအလုပ်များကို လုပ်မည်။ Engine တစ်ခုက အလုပ်တစ်မျိုးသာ လုပ်သည်ဟူသော မူအရ Drum Animation Engine ကို Piano တွင် မသုံးပါ။
 
 ## Notation Lab UI/UX Plan — revised 2026-11-15
 
-အရင်းအမြစ်: `Website/Plan/Notation-Lab-UI-UX-Plan.md` (ထိုဖိုင်ကို မဖျက်ဘဲ ထိန်းထားသည်။ ဤ section သည် ၎င်း၏ အကြောင်းအရာကို Main Plan ထဲသို့ ပေါင်းထည့်ထားခြင်းဖြစ်သည်။)
+အရင်းအမြစ်: `Website/Doc/Archive/Notation-Lab-UI-UX-Plan-2026-11-15.md` (မဖျက်ဘဲ Archive တွင် သိမ်းထားသည်။ ဤ section သည် ၎င်း၏ အကြောင်းအရာကို Main Plan ထဲသို့ ပေါင်းထည့်ထားခြင်းဖြစ်သည်။)
 
 **Status:** Active — revised 2026-11-15
 
@@ -277,11 +308,11 @@ The editor route now carries the shared site header plus a sticky secondary tool
 
 > **2026-11-22 မှတ်ချက်:** ဤနေရာတွင် ဖော်ပြထားသော အဟောင်း dock ကို 2026-11-20 တွင် ဖယ်ရှားခဲ့ပြီး 2026-11-22 တွင် shell အသစ် (ဘယ်ဘက်၊ မျှားလေး handle၊ အထဲဗလာ) ပြန်ထည့်ထားသည်။ အသေးစိတ်ကို [Writer Engine — Notation Editor](#writer-engine--notation-editor--2026-11-22) တွင် ကြည့်ပါ။
 
-Note entry, the selection model and undo/redo history have since shipped (Part K in `Notation/Notation Plan/PLAN.md`), and the score workspace now has a three-panel sidebar dock — Palettes, Properties, Instruments — beside the score (see [Sidebar Dock, Properties and Instruments](../Doc/Notation-Lab-Editor-Sidebar-Dock-2026-11-18.md)).
+Note entry, selection model နှင့် undo/redo history သည် ပြီးပြီ (`Notation/Notation Plan/PLAN.md` Part K)။ Sidebar ၏ လက်ရှိအခြေအနေကို [Writer Engine — Notation Editor](#writer-engine--notation-editor--2026-11-22) တွင် ကြည့်ပါ။
 
 ### Next editor milestone
 
-1. **Editable Properties.** The Properties panel reads the selected note today. Making its values write back (pitch, duration, voice) turns it into the inspector a notation program has, and reuses the existing `commit()` command path.
+1. ✅ **Editable Properties** — ပြီးပြီ (`863b4c7`, `ece0125`)။ Properties panel မှ တန်ဖိုးများကို ပြင်လို့ရပြီး ရှိပြီးသား `commit()` command path ကို ပြန်သုံးသည်။
 2. **Page / Horizontal view switch.** `state.layout` exists and both modes render, but the toolbar carries no button for it yet.
    *2026-11-22: ပြီးပြီ — bottom bar တွင် Page / Horizontal segmented control ထည့်ထားသည် (commit `2518fbe`)။*
 3. **Session persistence.** The dock's open/closed state and the last panel are not remembered across a reload; the score library already is (`localStorage`).
@@ -451,8 +482,6 @@ Video ထဲတွင် ထည့်ရန် ရွေးချယ်ခွင
 - Engine ၏ code မှတ်ချက်အရ Thank You clip သည် **optional** (မရလျှင် export ကို မတားပါ)။ အသုံးပြုသူ၏ လိုအပ်ချက်မှာ Video တိုင်းတွင် ထည့်ရမည် ဖြစ်သည်။ မရလျှင် ဘာလုပ်မည်ကို အောက်တွင် မေးခွန်းအဖြစ် ဖွင့်ထားသည်။
 - အသံသည် segment အားလုံး၏ အသံကို ပေါင်းပြီး တစ်ပုံတည်း encode လုပ်သဖြင့် Thank You clip ၏ အသံပါ အဆုံးတွင် ချောမွေ့စွာ ဆက်ပေါင်းနိုင်ရမည်။
 
-### မဖြေရှင်းရသေးသော အချက်များ
-
 ### ဆုံးဖြတ်ပြီးသော အချက်များ (2026-11-22 နောက်ဆုံး)
 
 - **ရေတွက်ပုံ ရွေးချယ်မှု** သည် Video ပေါ်ရှိ စာသားကိုသာ ပြောင်းသည်။ `Count Voice` အသံသည် သီးခြား။
@@ -460,15 +489,19 @@ Video ထဲတွင် ထည့်ရန် ရွေးချယ်ခွင
 - **Thank You ဖိုင်အမည်၊ R2 path၊ ဖိုင်မရလျှင် လုပ်ပုံ** — Video Engine ၏ တာဝန်၊ Engine ထဲတွင်သာ ထားမည်။
 - **Logo** — R2 ထဲတွင် အမြဲတမ်း ဖိုင်ရှိပြီး (default) အသုံးပြုသူကလည်း ကိုယ်ပိုင်ဖိုင် ထည့်နိုင်သည်။ **Title 1 / Title 2** သည် အသုံးပြုသူ ရိုက်ထည့်သည့်အတိုင်း ပြမည်။ **Video အရှည်** = Count Voice + MusicXML အရှည် + Thank You video။
 
-### မဖြေရှင်းရသေးသော အချက်များ
+### Violin နှင့် အခြားတူရိယာ layout (default သတ်မှတ်ချက်)
 
-1. Violin ကို ဘယ်ဘက်/ညာဘက် ထားမည်ကို အတည်ပြုရန်။
-2. Bass၊ Strings၊ Voice စသည့် အခြားတူရိယာများ၏ layout နေရာ။
-3. (ဖြေပြီး) `Title 1`၊ `Title 2` သည် အသုံးပြုသူ ရိုက်ထည့်သည့်အတိုင်း။
+အသုံးပြုသူ၏ ညွှန်ကြားချက်အရ ကျွန်တော်ဆုံးဖြတ်ထားသော default များ ဖြစ်သည်။ ထုတ်လုပ်ပြီးသော video အစစ်ကို စမ်းကြည့်ပြီးမှ ပြင်ဆင်မည်။
+
+1. **Violin** — Notation ဘယ်ဘက်၊ Violin ညာဘက် (၆၀/၄၀)၊ Title / Info အောက်ဆုံး။
+2. **Bass** — Guitar layout ကို ပြန်သုံး (တူရိယာအပေါ်၊ Title / Info အောက်ဆုံး)။ Fretted bass ဖြစ်မှ Guitar Engine ကို ပြန်သုံးနိုင်ကြောင်း အတည်ပြုရန် (Video Engine Plan Phase 3)။
+3. **Strings** — Violin layout ကို ပြန်သုံး (ဘေးတစ်ဖက်)။
+4. **Voice** — Drum / Piano layout ကို သုံး (waveform/visual ကို အောက်၊ Title / Info အပေါ်)။
+5. `Title 1`၊ `Title 2` သည် အသုံးပြုသူ ရိုက်ထည့်သည့်အတိုင်း (ဆုံးဖြတ်ပြီး)။
 
 ## Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ် — 2026-11-22
 
-ဤ section သည် Create Video ၏ video ထုတ်လုပ်သည့် အပိုင်းအားလုံးကို စုစည်းဖော်ပြသည်။ အပိုင်း ၃ ပိုင်း ပြင်အဆင်၏ အကျဉ်းကို အထက်ပါ [Create Video — Final video layout](#create-video--final-video-layout--2026-11-22) တွင်ကြည့်ပါ။ လက်ရှိ code အခြေအနေကို 2026-11-22 တွင် `main` branch မှ ဖတ်စစ်ထားသည်။
+ဤ section သည် Create Video ၏ video ထုတ်လုပ်သည့် အပိုင်းအားလုံးကို စုစည်းဖော်ပြသည်။ အပိုင်း ၃ ပိုင်း ပြင်အဆင်၏ အကျဉ်းကို အထက်ပါ [Create Video — Final video layout](#create-video--final-video-layout--2026-11-22) တွင်ကြည့်ပါ။ လက်ရှိ code အခြေအနေကို 2026-11-22 တွင် `main` branch မှ ဖတ်စစ်ထားသည်။ တူရိယာတစ်ခုချင်းစီကို Video Engine နှင့် ချိတ်ဆက်ရန် **Adapter Contract (၆ ချက်)** နှင့် **Phase 0–6** အစီအစဉ်ကို [`Website/Video/Video Engine Plan/PLAN.md`](../Video/Video%20Engine%20Plan/PLAN.md) တွင် အသေးစိတ်သတ်မှတ်ပြီးဖြစ်သည်။ ဤ section သည် ထိုအစီအစဉ်နှင့် ကိုက်ညီရမည် (အထူးသဖြင့် — adapter သည် `draw(ctx, atSeconds, frameIndex)` ကို deterministic ဖြစ်စေရမည်၊ လိုအပ်သော asset မရလျှင် export ကို မစတင်ရ၊ adapter သည် encoder/muxer ကို မပိုင်ရ)။
 
 ### ၁။ ထုတ်လုပ်မှု လမ်းကြောင်း
 
@@ -493,13 +526,15 @@ Studio ၏ options box ──► MusicXML ဖိုင် + settings
 
 **Output:** Video Engine သည် H.264 video နှင့် AAC-LC အသံ (48 kHz) ပါသော MP4 တစ်ဖိုင်တည်း ထုတ်ပေးသည်။ လက်ရှိ 30 FPS။ Browser က H.264/AAC ကို encode မလုပ်နိုင်လျှင် ရှင်းရှင်းလင်းလင်း ငြင်းပယ်သည်။ Segment များ (`segments`) ကို အစဉ်လိုက်ဆက်ပြီး အသံကို segment အားလုံးမှ ပေါင်းကာ encode လုပ်သည်။
 
-**အရွယ်အစား (ratio):**
+**အရွယ်အစား (ratio) — Video အားလုံးအတွက် စံတူ (ဆုံးဖြတ်ချက်):** Metronome အပါအဝင် video အားလုံး (တူရိယာအားလုံး) သည် အောက်ပါ အရွယ်သုံးမျိုးသာ ထွက်ရမည်။
 
 | Ratio | Pixel |
 |---|---|
 | 16:9 Landscape | 1920 × 1080 |
 | 1:1 Square | 1080 × 1080 |
 | 9:16 Portrait | 1080 × 1920 |
+
+**လက်ရှိ:** Drum Studio သည် ဤအရွယ်များကို သုံးပြီးဖြစ်သည်။ Metronome Studio သည် 1280×720 / 720×720 / 720×1280 ဖြစ်နေသဖြင့် **ပြောင်းရမည်**။ အရွယ်ကို Video Engine ၏ shared setting တစ်ခုတည်းမှ သတ်မှတ်ရမည် (Studio တစ်ခုချင်းစီက ကိုယ်ပိုင်မသတ်ရ)။ 1080p အတွက် memory budget ကို စစ်ရမည်။
 
 ### ၂။ Studio ၏ options box (Video ထဲထည့်ရန် ရွေးချယ်စရာများ)
 
@@ -532,7 +567,7 @@ Studio ၏ options box ──► MusicXML ဖိုင် + settings
 
 | တူရိယာ | Engine | လက်ရှိအခြေအနေ |
 |---|---|---|
-| Drum | Drum Human Stick Engine (ရှိ)၊ Drum Animation Engine (Plan တွင်သာ၊ code မရှိ) | **တစ်ခုတည်း အလုပ်လုပ်သော instrument။** Drum Animation Engine ၏ တာဝန်မှာ **R2 ထဲရှိ Drum data/ပုံများကို မကျန်အောင် ပြသပေးခြင်း** (လိုအပ်မှသာ ထပ်ထည့်) |
+| Drum | Drum Human Stick Engine (ရှိ)၊ Drum Animation Engine (Plan တွင်သာ၊ code မရှိ) | **တစ်ခုတည်း အလုပ်လုပ်သော instrument။** Drum Animation Engine ၏ တာဝန်မှာ **R2 ထဲရှိ Drum data/ပုံများကို မကျန်အောင် ပြသပေးခြင်း** (လိုအပ်မှသာ ထပ်ထည့်)။ ယခုလက်ရှိ MusicXML event မရှိလျှင် deterministic default drum pattern ဖြင့် ထုတ်သည် |
 | Piano | Piano Hand Human Engine (ရှိ)၊ Piano 3D Hand Engine (folder ဗလာ) | Video Engine Plan Phase 2 |
 | Guitar | Guitar Engine (ရှိ) | Video Engine Plan Phase 1 (ပထမဦးစားပေး) |
 | Violin | Engine folder မရှိသေး | မစတင်ရသေး |
@@ -550,6 +585,7 @@ Drum မဟုတ်သော instrument များအတွက် Studio သ�
 
 - အသံအားလုံးကို Video Engine က segment အားလုံးမှ စုပေါင်း၍ AAC တစ်ပုံတည်း encode လုပ်သည်။
 - ရင်းမြစ် — Sound Engine (Notation ၏ အသံ)၊ Metronome click၊ Count Voice။ Metronome adapter သည် ယခု `OfflineAudioContext` ဖြင့် click-track ကို ကိုယ်တိုင်ထုတ်သည် (Shared Sound Engine မဟုတ်)။
+- **လက်ရှိ:** `Website/Notation/Sound Egnine` folder သည် `.gitkeep` သာရှိပြီး Video အတွက် Sound Engine မရှိသေးပါ။ Drum video သည် အသံမပါ (silent)၊ Sound Model နှင့် Count Voice settings သည် metadata အဖြစ်သာ သိမ်းထားသည်။ ထို့ကြောင့် အသံပါ Video (အထက်ပါ requirement) သည် Video Engine Plan ၏ **Phase 6** (shared audio) အပေါ် မူတည်သည် — Sound Engine သည် Video အတွက် finite `AudioBuffer` ကို offline ထုတ်ပေးနိုင်ရမည်။
 
 ### ၆။ R2 ကို အသုံးပြုပုံ
 
@@ -564,7 +600,7 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 
 ### ၇။ ကန့်သတ်ချက်များ (လက်ရှိ)
 
-- လက်ရှိ code တွင် Drum Studio ၏ video အရှည်ကို အများဆုံး ၁၂ စက္ကန့် (`MAX_SECONDS = 12`) ဟု ကန့်သတ်ထားသည်။
+- လက်ရှိ code တွင် Drum Studio နှင့် Metronome Studio နှစ်ခုလုံး၏ video အရှည်ကို အများဆုံး ၁၂ စက္ကန့်ဟု ကန့်သတ်ထားသည် (Drum: `MAX_SECONDS = 12`၊ Metronome: 12 စက္ကန့်ကျော်သော setting ကို ပိတ်ထားသည်)။
 - **ဆုံးဖြတ်ချက်:** Video အရှည် = **Count Voice + MusicXML ဖိုင်၏ အရှည် + Thank You video** ၃ ခု၏ ပေါင်းလဒ်။ ကိုယ်ပိုင် အရှည်ကန့်သတ်ချက် မထားဘဲ ထိုပေါင်းလဒ်အတိုင်း ဖြစ်ရမည်။ ထို့ကြောင့် `MAX_SECONDS` ကို ဖယ်ရှားပြီး Video Engine ၏ memory guard ကိုသာ safety အဖြစ် ထားမည်။
 - Video Engine တွင် memory budget နှင့် H.264 level စစ်ဆေးချက် ပါပြီးသား (picture size နှင့် fps အလိုက်)။ Video ကို ရှည်လျှင်/ကြီးလျှင် ပိုမိုလိုအပ်မည်။
 
@@ -650,7 +686,7 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 ### မဖြေရှင်းရသေးသော အချက်များ (Video ထုတ်လုပ်ပုံ)
 
 1. R2 ထဲတွင် Drum manifest (ပုံစာရင်း) ကို ဘယ်လိုပုံစံနှင့် ထားမည် — Drum Animation Engine ကို စတင်သည့်အချိန်တွင် ဆုံးဖြတ်မည်။
-2. အပေါ်ပါ ၁၁။ (4) (Metronome icon) နှင့် (6) (အချိုးများ) ကို အသုံးပြုသူ ပြန်ကြည့်အတည်ပြုရန်။
+2. အပေါ်ပါ ၁၁။ (4) (Metronome icon) နှင့် (6) (အချိုးများ) ကို အသုံးပြုသူသည် **ထုတ်လုပ်ပြီးသော video အစစ်ကို စမ်းကြည့်ပြီးမှ** ပြင်ဆင်မည်။ ယခုတန်ဖိုးများကို default အဖြစ်သာ သုံးသည်။
 
 ## Sound Engine နှင့် MuseScore SoundFont — 2026-11-13
 
@@ -694,3 +730,203 @@ Phone 375px နှင့် web/desktop 1280px viewport checks, Metronome portra
 ### Metronome Studio input controls — 2026-11-15
 
 Metronome Studio control panel ၏ အပေါ်တွင် `.musicxml`, `.xml`, `.mxl` ရွေးချယ်နိုင်သော MusicXML file field ကို ထည့်မည်။ ရှိပြီးသား design, orientation, BPM, bars နှင့် meter controls များ၏ ပုံစံ/အစီအစဉ်ကို ထိန်းထားပြီး၊ ၎င်းတို့အောက်တွင် အခြား instrument studio များနှင့်တူသော `Count Voice` toggle/type/volume နှင့် `Sound Model`/volume controls ကို ပြမည်။ File selection သည် browser ပေါ်တွင် filename ပြသသည့် local input ဖြစ်သည်; MusicXML ကို video timing သို့ parse ချိတ်ဆက်ခြင်း၊ Count Voice အသံထုတ်ခြင်း၊ Sound Model အသံနှင့် volume ကို render ထဲသုံးခြင်းသည် သီးခြားနောက်အဆင့်ဖြစ်ပြီး ဤ UI pass ထဲတွင် မပါဝင်ပါ။
+
+## Repository structure — folder rules — 2026-11-23
+
+ရည်ရွယ်ချက်: ဖိုင်များ ပြန့်ကျဲမနေဘဲ folder တစ်ခုချင်းစီတွင် ထည့်ရမည့်အရာကို တစ်မျိုးတည်း ထားရန်။ အသုံးပြုသူ၏ ညွှန်ကြားချက်အရ Claude က ဆုံးဖြတ်ပြီး ကျင့်သုံးသည်။
+
+| Folder | ထဲတွင် ရှိရမည့်အရာ | မရှိရသည့်အရာ |
+|---|---|---|
+| `Website/Plan/` | **Plan ဖိုင် တစ်ခုတည်း** — `README.md` (Main Plan) | အခြားဖိုင်အားလုံး |
+| `Website/Doc/` | လုပ်ပြီးသော အလုပ်မှတ်တမ်း Doc များ၊ index `README.md` | Plan ဖိုင်၊ code |
+| `Website/Doc/Archive/` | ပေါင်းစည်းပြီး/အသုံးမဝင်တော့သော ဖိုင်အဟောင်းများ (မဖျက်၊ သမိုင်းအတွက်သိမ်း၊ မပြင်ရ) | |
+| `Website/SQL/` | **SQL ဖိုင်များသာ** — Supabase migrations | `.md`၊ `.js` စသည် |
+| `Website/Worker/` | **Worker ဖိုင် တစ်ခုတည်း** (Cloudflare Worker) | အခြားဖိုင် |
+| `Website/Website/` | Deploy လုပ်ရသော static site၊ `wrangler.jsonc` | Plan / Doc |
+| `Website/Notation/`, `Video/`, `Drum/`, `Guitar/`, `Piano/`, `Metronome/` | Engine code နှင့် ၎င်း၏ `… Plan` / `… Doc` folder | — |
+
+**SQL စည်းမျဉ်း:** ဖိုင်အမည် `NNNN_short-name.sql` (အစဉ်နံပါတ်ဖြင့် အစဉ်လိုက် run)။ Apply လုပ်ပြီးသော migration ကို မပြင်ရ — ပြောင်းလိုလျှင် migration အသစ်ထည့်။ Schema ကို [Handoff — Manus AI](#handoff--manus-ai-supabase-နှင့်-cloudflare-r2--2026-11-23) ၏ data model အတိုင်း Manus AI က ရေးမည်။
+
+**Worker စည်းမျဉ်း:** Worker code အားလုံးကို ဖိုင်တစ်ခုတည်း (အဆိုပြုအမည် `worker.js`) တွင် ထားမည်။ အရွယ်ကြီးလာလျှင် ခွဲမည့်အစား ဤစည်းမျဉ်းကို Plan ထဲတွင် ပြန်ဆွေးနွေးရမည်။ ယခု static site ၏ `wrangler.jsonc` သည် `Website/Website/` ထဲတွင်ဆက်ရှိသည်။ Worker ရှိလာသောအခါ deploy config ကို Manus AI က ညှိမည်။
+
+**Engine Plan / Doc folder များအကြောင်း (ဆုံးဖြတ်ချက်):** Engine တစ်ခုချင်းစီ၏ Plan/Doc (`Notation Plan`, `Video Engine Plan`, `Metronome Engine Plan`, `Sound Plan` စသည်) ကို Engine နှင့်အတူ နေရာမရွှေ့ဘဲ ထားမည်။ အကြောင်းမှာ CI က Notation Engine ၏ `Notation Plan/Documentation/API.md` ကို စစ်ဆေးနေပြီး code/test များက ထိုလမ်းကြောင်းများကို ရည်ညွှန်းထားသောကြောင့် ရွှေ့လျှင် CI ပျက်နိုင်သည်။ ပြန့်ကျဲမှုကို လျှော့ရန် Main Plan ၏ အကြောင်းအရာစာရင်းမှ ထိုဖိုင်အားလုံးကို link ချိတ်ထားသည်။ Plan အသစ်ကို ဤ folder များ၏ အပြင်တွင် မဖန်တီးရ။
+
+**လုပ်ဆောင်ပြီး (2026-11-23):**
+- `Website/Plan/` ကို ဖိုင်တစ်ခုတည်း (`README.md`) ဖြစ်စေရန် `Notation-Lab-UI-UX-Plan.md` ကို `Website/Doc/Archive/` သို့ ရွှေ့ (မဖျက်)၊ ဆက်စပ် link ၃ ခု ပြင်။
+- `Website/SQL/` နှင့် `Website/Worker/` folder ဖန်တီး (အလွတ်၊ `.gitkeep` သာ — Manus AI က ဖိုင်ထည့်မည်)။
+- `Website/README.md` ၏ folder စာရင်းနှင့် `AGENTS.md` တွင် ဤစည်းမျဉ်း ထည့်။
+
+**အတည်ပြုရန်:** Notation Engine ၏ source အတွက် `AGENTS.md` တွင် "GPL ဖြစ်သော MuseScore source/table ကို ပြန်မထည့်ရ၊ MuseScore ကို pinned reference အဖြစ်သာ သုံးရ" ဟု စည်းမျဉ်းရှိသည်။ အသုံးပြုသူ အစောပိုင်းပြောခဲ့သော "MuseScore code ကို ထည့်သုံးပြီး ပြင်သုံး" နှင့် ကွာသဖြင့် **ဘယ်စည်းမျဉ်းကို လိုက်မလဲ အသုံးပြုသူ ပြန်ဆုံးဖြတ်ရန်**။ (GPL code ကို ထည့်သုံးလျှင် ရောင်းချသော platform အတွက် license တာဝန်များ ပါလာနိုင်သဖြင့် legal review လိုနိုင်သည်။)
+
+## Search — အလုပ်လုပ်ပုံ — 2026-11-23
+
+ဤ section သည် site ပေါ်ရှိ search များ ဘယ်လိုအလုပ်လုပ်မည်ကို Manus AI / OpenHands အတွက် ဖော်ပြသည်။ **အကုန်လုံးကို Claude က ဆုံးဖြတ်ထားခြင်း (အဆိုပြု)** ဖြစ်သည်။
+
+### Search နေရာ ၃ ခု
+
+| Search | ရှာမည့်အရာ | လုပ်ဆောင်ပုံ |
+|---|---|---|
+| **Header Search** (site တစ်ခုလုံး) | ရောင်းရန် list လုပ်ထားသော Notes (`published`)၊ Creators၊ (နောက်မှ) Courses | Search icon နှိပ်လျှင် search box ပွင့်၊ ရိုက်လျှင် ရလဒ်ကို အုပ်စုလိုက်ပြ၊ Enter ဖြင့် ရလဒ် page (`?q=…`) |
+| **Notes Store filter** | Notes စာရင်း | ရှာစာသားနှင့်အတူ filter — တူရိယာ၊ ဈေးနှုန်းအပိုင်း၊ creator၊ အစဉ် (အသစ်/ဈေး/လူကြိုက်များ) |
+| **Editor palette search** (Notation Lab) | Sidebar ၏ palette အုပ်စု/item များ | ယခု ရှိပြီး — client-side သာ၊ ရိုက်လျှင် အုပ်စုနှင့် item နာမည်ကို စစ်ထုတ် (server မလို) |
+
+ထို့အပြင် အသုံးပြုသူ၏ ကိုယ်ပိုင် score library (`scores`) ကို Notation Lab ၏ Open File စာရင်းတွင် title ဖြင့် client-side စစ်ထုတ်မည် (ကိုယ့်ဒေတာ၊ ကိုယ်သာမြင်)။
+
+### Backend — Postgres (Supabase) ဖြင့် စတင်
+
+နောက်ထပ် search service (Meilisearch/Typesense စသည်) မထည့်ဘဲ Supabase Postgres ၏ ကိုယ်ပိုင် စွမ်းရည်ဖြင့် စမည်။ မလုံလောက်သည့်အခါမှ ပြောင်းစဉ်းစားမည်။
+
+- **Latin (English) စာသား:** Full-text search — `tsvector` (`simple` config၊ stemming မသုံး — title ကို မြန်မာ/English ရောရေးတတ်သောကြောင့်) + GIN index။
+- **မြန်မာစာ:** မြန်မာစာတွင် စကားလုံးကြား space မရှိသဖြင့် full-text tokenization အလုပ်မလုပ်ပါ။ ထို့ကြောင့် **`pg_trgm` (trigram) GIN index** ဖြင့် substring/ဆင်တူ ပေါင်းရှာမည် (`ILIKE`/`similarity`)။
+- **Ranking:** title အတိအကျတူ > title အစပိုင်းတူ > full-text ရလဒ် > trigram ဆင်တူမှု၊ တူလျှင် အသစ်ကို ကြိုတင်။
+- **Typo ခံနိုင်ရည်:** trigram similarity threshold (အစပိုင်း ၀.၃)။
+- **Autocomplete:** ရိုက်နေစဉ် title အစပိုင်းတူသော ၅ ခုအထိ အကြံပြု (debounce ~၂၅၀ ms၊ အနည်းဆုံး Latin ၂ လုံး / မြန်မာ ၁ လုံး)။
+- **Pagination:** တစ်ခါလျှင် ၂၀ ခု၊ offset သို့မဟုတ် cursor။
+
+### ဖွင့်ပေးမည့် ပုံစံ (RPC function)
+
+Browser က table ကို တိုက်ရိုက်မရှာဘဲ Postgres function (`search_notes(q, filters, limit, offset)`) ကို ခေါ်မည် (`security invoker` — RLS အတိုင်း အလုပ်လုပ်)။ ပြန်ပေးသော field များ — `id`, `title`, creator နာမည်, ဈေးနှုန်း, cover URL သာ (private field မပါ)။
+
+### လုံခြုံရေး၊ စနစ်
+
+- **`status = 'published'` သာ** ရှာတွေ့ရမည်။ `draft`/`unlisted`/`removed` ကို မည်သူ့ကိုမှ မပြရ (RLS နှင့် function နှစ်ခုလုံးတွင် စစ်)။
+- Search စာသားကို SQL ထဲ တိုက်ရိုက်မစပ်ရ (parameterized)။
+- မြန်မာစာကို **Unicode (NFC)** အဖြစ် normalize လုပ်ပြီးမှ index/ရှာမည်။ **Zawgyi** (အဟောင်းသုံး encoding) ဖြင့် ရိုက်ထားသော စာသားကို ဘယ်လိုကိုင်မလဲ — အောက်ပါ မေးခွန်းတွင် ဖွင့်ထားသည်။
+- ပျော်ပျော်ရှာနေသော query များကို Worker တွင် အချိန်တိုတို (~၆၀ စက္ကန့်) cache လုပ်နိုင် (optional)။
+- Search စာသားကို မူလအားဖြင့် မသိမ်း (privacy)။ Analytics လိုမှ ထပ်ဆုံးဖြတ်။
+
+### ပြီးစီးမှု စံနှုန်း (test)
+
+1. မြန်မာစာ၏ အစိတ်အပိုင်း (ဥပမာ စကားလုံးအလယ်) ဖြင့်ရှာ၍ တွေ့ရမည်။
+2. `draft`/`removed` note ကို search ရလဒ်တွင် **မည်သူမှ** မတွေ့ရ။
+3. Index များ (`GIN`) ရှိကြောင်း migration test။
+4. Notes ၁၀,၀၀၀ ခု ဖြင့် ပျမ်းမျှ ~၂၀၀ ms အောက် (ရည်မှန်း)။
+5. Header search box ကို keyboard ဖြင့်သုံးနိုင်ခြင်း၊ phone တွင်လည်း ပြောင်းလဲမှုမရှိ အလုပ်လုပ်ခြင်း။
+
+### မဖြေရှင်းရသေးသော အချက်များ (Search)
+
+1. **Zawgyi** ကို detect လုပ်ပြောင်းမလား၊ Unicode သာ လက်ခံမလား။
+2. "လူကြိုက်များ" အစဉ်၏ တိုင်းတာမှု (ဝယ်သူအရေအတွက်၊ favorite၊ ကြည့်ရှုမှု)။
+3. Postgres search မလုံလောက်လာလျှင် ပြောင်းမည့် search service ရွေးချယ်ခြင်း။
+
+## Handoff — Manus AI (Supabase နှင့် Cloudflare R2) — 2026-11-23
+
+ဤ section သည် နောက်ရက်များတွင် Manus AI က Code၊ Supabase ချိတ်ဆက်ခြင်းနှင့် Cloudflare R2 အလုပ်များကို ကိုယ်တိုင်လုပ်ရန် Claude က ကြိုရေးထားသော Plan ဖြစ်သည်။ **အောက်ပါ table/bucket/key အမည်များသည် အဆိုပြုချက်များ** ဖြစ်ပြီး Manus AI က လက်တွေ့အခြေအနေအရ ညှိနိုင်သည်။ ညှိလျှင် ဤ Plan ထဲ ပြန်မှတ်ရန်။ အသုံးပြုသူ (user) ကိုယ်တိုင် ပြောထားသော ဆုံးဖြတ်ချက်များကို "ဆုံးဖြတ်ပြီး" ဟု ခွဲဖော်ပြထားသည်။
+
+### ဆုံးဖြတ်ပြီးသော အချက်များ (user ပြောထားသည်)
+
+- Backend = **Supabase** (Postgres + Auth + Edge Functions/RLS)။ Storage = **Cloudflare R2**။ Deployment = Cloudflare။ နောက်ပိုင်း AWS သို့ ပြောင်းနိုင်ရန် portability rules (§6) ကို လိုက်နာရမည်။
+- Platform သည် ရောင်းရသော sale တစ်ခုချင်းစီ၏ **၄၅%** ကို ယူသည်။ ၎င်းကို **payment fee မနှုတ်မီ ရောင်းဈေးမှ တိုက်ရိုက်** တွက်သည်။
+- Notation Lab မှ ရေးထားသော notes များကို creator များက ရောင်းချရန် list လုပ်နိုင်သည်။ Notes Store နှင့် Lessons ကို Create Video / Notation Lab ပြီးမှ လုပ်မည်။
+- Create Video အတွက် Logo default သည် R2 ထဲတွင် ရှိပြီး အသုံးပြုသူက ကိုယ်ပိုင်ဖိုင်လည်း တင်နိုင်သည်။ Thank You video ဖိုင်များ (Landscape / Portrait / Square) သည် R2 ထဲတွင် ရှိပြီး။ Drum ပုံများကို R2 မှ ယူသုံးမည်။
+- Service-role key ကို browser code ထဲ မထည့်ရ (§3)။ R2 credential ကို browser မမြင်ရ (§4)။
+
+### Supabase data model (အဆိုပြုချက်)
+
+| Table | အဓိက field များ | မှတ်ချက် |
+|---|---|---|
+| `profiles` | `id` (= auth user id), `display_name`, `avatar_asset_id`, `is_creator`, `language` (`en`/`my`), `theme`, `created_at` | Header ၏ EN/MM နှင့် Dark/Light ကို သိမ်းရန် |
+| `assets` | `id`, `owner_id`, `bucket` (`public`/`private`), `object_key`, `mime_type`, `size_bytes`, `sha256`, `status` (`pending`/`ready`/`failed`), `created_at` | R2 ၏ metadata registry (§4)။ Binary မသိမ်းပါ |
+| `scores` | `id`, `owner_id`, `title`, `musicxml_asset_id`, `updated_at` | Notation Lab ၏ score library (ယခု browser `localStorage` တွင်ရှိ) ကို အစားထိုးရန် |
+| `notes` | `id`, `creator_id`, `title`, `description`, `instrument`, `price_amount`, `currency`, `status` (`draft`/`published`/`unlisted`/`removed`), `score_asset_id`, `preview_asset_id`, `cover_asset_id`, `published_at` | ရောင်းရန် list လုပ်ထားသော notes |
+| `orders` | `id`, `buyer_id`, `status` (`pending`/`paid`/`refunded`/`failed`), `currency`, `total_amount`, `payment_provider`, `provider_ref`, `created_at`, `paid_at` | |
+| `order_items` | `id`, `order_id`, `note_id`, `creator_id`, `unit_price`, `platform_share_bps` (= 4500), `platform_amount`, `creator_amount` | အောက်ပါ "ငွေစာရင်း စည်းမျဉ်း" |
+| `entitlements` | `user_id`, `note_id`, `order_item_id`, `granted_at`, `revoked_at` | ဝယ်ပြီးသော content ကို ဖတ်/ဒေါင်းခွင့် |
+| `favorites` | `user_id`, `target_type`, `target_id`, `created_at` | Header ၏ Favorite |
+| `cart_items` | `user_id`, `note_id`, `added_at` | Header ၏ Cart |
+| `notifications` | `id`, `user_id`, `type`, `payload` (jsonb), `read_at`, `created_at` | Header ၏ Notification |
+| `video_jobs` | `id`, `owner_id`, `tool` (`drum`/`piano`/`guitar`/`violin`/`metronome` ...), `ratio`, `status`, `score_id`, `output_asset_id`, `duration_seconds`, `created_at` | Create Video ၏ ထွက်ကုန်များ |
+| `courses`, `lessons`, `enrollments` | (နောက်မှ) | Lessons ကို Create Video / Notation Lab ပြီးမှ ဆုံးဖြတ်ရန် |
+
+**ငွေစာရင်း စည်းမျဉ်း:** ငွေပမာဏကို အနည်းဆုံးယူနစ် (integer minor units) ဖြင့်သိမ်းပါ (decimal/float မသုံးရ)။ Platform ၏ ၄၅% ကို `platform_share_bps = 4500` အဖြစ် **order item တစ်ခုချင်းစီတွင် ဝယ်သည့်အချိန်က snapshot လုပ်** သိမ်းရမည် (နောက်ပိုင်း ရာခိုင်နှုန်းပြောင်းလျှင် အရင်စာရင်းမပြောင်းစေရန်)။ `platform_amount` ကို ရောင်းဈေး (`unit_price`) မှ တိုက်ရိုက်တွက်ပြီး `creator_amount = unit_price − platform_amount`။ Rounding စည်းမျဉ်းကို သတ်မှတ်ပြီး test ရေးရမည် (ဥပမာ `unit_price` မ၀ ဖြစ်သည့်အခါ ပေါင်းလဒ် အမြဲ `unit_price` နှင့် ညီရမည်)။
+
+**RLS (Row Level Security) အခြေခံမူ:** `profiles`, `scores`, `cart_items`, `favorites`, `notifications`, `video_jobs` — ပိုင်ရှင်ကိုယ်တိုင်သာ ဖတ်/ရေး။ `notes` — `published` ကို လူတိုင်းဖတ်နိုင်၊ ရေး/ပြင်ခြင်းကို creator သာ။ `orders`, `order_items`, `entitlements` — ဝယ်သူနှင့် (order item ၏) creator သာ ဖတ်နိုင်၊ ရေးခြင်းကို server-side (Edge Function) သာ။ `assets` — ပုံမှန်အားဖြင့် private။ **Service-role key ကို server-side တွင်သာ သုံးရမည်။**
+
+### Cloudflare R2 layout (အဆိုပြုချက်)
+
+**လက်ရှိ:** bucket `msharing0008` ထဲတွင် `soundfonts/` prefix အောက် SoundFont ၁၉ object (versioned key၊ `manifest.json` ကို no-cache) ရှိပြီး `r2.dev` public subdomain နှင့် `Access-Control-Allow-Origin: *` ဖြင့် browser က တိုက်ရိုက်ဖတ်နေသည် (Doc: SoundFont R2 Upload — 2026-11-18 မှတ်ချက်)။
+
+**အဆိုပြုချက်:** Bucket နှစ်ခု ခွဲပါ။
+
+| Bucket | အကြောင်းအရာ | ဝင်ရောက်ပုံ |
+|---|---|---|
+| `msharing0008` (ရှိပြီး — **public**) | `soundfonts/…` (ရှိပြီး)၊ Logo default၊ Thank You video များ၊ Drum ပုံများ/manifest — **လူတိုင်းမြင်ရမည့် static asset များသာ** | Public URL |
+| private bucket အသစ် (အမည် Manus AI ရွေး) | ရောင်းမည့် notes (`notes/{note_id}/…`)၊ အသုံးပြုသူ upload များ (`users/{user_id}/…` — MusicXML၊ logo)၊ ထုတ်ထားသော video များ (`users/{user_id}/videos/…`) | Worker က entitlement/ပိုင်ရှင် စစ်ပြီး **signed URL** ထုတ်ပေးမှ |
+
+**အရေးကြီး:** ရောင်းမည့် (ငွေပေးမှ ရမည့်) content ကို public bucket ထဲ **မထားရ**။ Public bucket ၏ URL ကို သိသူတိုင်း ဒေါင်းလို့ရသည်။
+
+- `r2.dev` URL သည် Cloudflare က production မဟုတ်သော အသုံးပြုမှုအတွက် ရည်ရွယ်ထားသည်ဟု သိရ၍ (Manus AI က Cloudflare docs ဖြင့် အတည်ပြုရန်) production တွင် **custom domain** ကို public bucket ပေါ်ချိတ်ပြီး ပြောင်းသုံးရန်။
+- Object key ကို business meaning မပါသော stable ID ဖြင့်ပေးပါ (§4)။ မပြောင်းရသော asset များကို versioned prefix (`…/v0.2/…`) ဖြင့်ထားပြီး immutable cache၊ ပြောင်းနိုင်သော manifest ကို `no-cache`။
+- **Upload flow:** client က Worker ထံ upload ခွင့်တောင်း → Worker က size/type စစ်ပြီး signed upload URL ပေး → `assets` row (`pending`) ဖန်တီး → upload ပြီးလျှင် checksum စစ်ပြီး `ready`။ R2 credential ကို browser မမြင်ရ။
+- **Create Video ၏ R2 အသုံးပြုမှု:** Thank You၊ Drum ပုံ/manifest၊ Logo default တို့၏ **ဖိုင်အမည်/path ကို Plan ထဲ မသတ်မှတ်ပါ** — ၎င်းတို့သည် သက်ဆိုင်ရာ Engine (Video Engine၊ Drum Animation Engine) ၏ တာဝန်ဖြစ်သည်။ Manus AI သည် bucket/prefix နှင့် access ကိုသာ ပြင်ဆင်ပေးမည်။
+
+### Config အမည်များ (အဆိုပြုချက်)
+
+| အမည် | အမျိုးအစား | နေရာ |
+|---|---|---|
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | public | Browser/Worker config |
+| `SUPABASE_SERVICE_ROLE_KEY` | **secret** | Cloudflare secrets (server-side သာ) |
+| `PUBLIC_ASSETS_BASE_URL` | public | Public bucket ၏ custom domain URL |
+| R2 bindings (ဥပမာ `PRIVATE_BUCKET`) | binding | Worker config (`wrangler`) |
+
+`.env` ကို git ထဲ commit မလုပ်ရ။ Production / preview / development ကို ခွဲထားရမည် (§5)။
+
+### Manus AI အလုပ်အစီအစဉ် (အဆိုပြု၊ တစ်ဆင့်ချင်း)
+
+| # | အလုပ် | ပြီးစီးမှု စံနှုန်း |
+|---|---|---|
+| 1 | Supabase project၊ migrations (`profiles`, `assets`)၊ RLS | User A သည် User B ၏ row ကို ဖတ်/ရေးမရကြောင်း test၊ migration ကို အစမှ ပြန်ပြေးနိုင် |
+| 2 | Auth (sign up / sign in) နှင့် Header ၏ Account control၊ EN/MM နှင့် Dark/Light ကို `profiles` တွင်သိမ်း | Reload/device ပြောင်းလည်း setting မပျောက် |
+| 3 | R2 Worker — signed upload/download နှင့် `assets` registry၊ private bucket | Link သက်တမ်းကုန်လျှင် မရ၊ အခြားသူ၏ ဖိုင်မရ |
+| 4 | Notation Lab score library ကို `scores` + R2 သို့ ရွှေ့ (OpenHands နှင့် ညှိ) | localStorage မလိုဘဲ score ပြန်ဖွင့်နိုင်၊ အခြား device တွင်လည်းရ |
+| 5 | Favorites / Cart / Notifications (Header controls) | ပိုင်ရှင်ကိုယ်တိုင်သာ မြင်၊ test pass |
+| 6 | Notes Store — list၊ ဝယ်ခြင်း၊ `entitlements`၊ ၄၅% ငွေစာရင်း | ဝယ်မှသာ content ဖတ်/ဒေါင်းရ၊ `platform_amount + creator_amount = unit_price` test pass |
+| 7 | Create Video — `video_jobs`၊ user logo upload၊ ထုတ်ထားသော video ကို private bucket တွင်သိမ်း | Job အခြေအနေ ပြန်ကြည့်နိုင် |
+| 8 | Courses / Lessons (နောက်ဆုံး) | — |
+
+ပြီးသည့် အဆင့်တိုင်းတွင် `Website/Doc/` ကို update လုပ်ရမည် (§11)။
+
+### မဖြေရှင်းရသေးသော အချက်များ (user ဆုံးဖြတ်ရန်)
+
+1. **ငွေပေးချေမှု provider** (ဘာကို သုံးမလဲ)။
+2. **Payment fee ကို ဘယ်သူ ထမ်းမလဲ** — ၄၅% ကို fee မနှုတ်မီ တွက်ထားသောကြောင့် provider fee ကို platform ၏ ၄၅% ထဲမှ ထုတ်မလား၊ creator ၏ ၅၅% မှ နှုတ်မလား။
+3. **Creator ငွေထုတ်ခြင်း (payout)** — နည်းလမ်း၊ အချိန်ဇယား၊ အနည်းဆုံးပမာဏ။
+4. Refund မူဝါဒ၊ ရောင်းချမှုဆိုင်ရာ အခွန် (tax/VAT)။
+5. အသုံးပြုမည့် ငွေကြေးအမျိုးအစား (currency)။
+6. Auth provider များ (email တစ်မျိုးတည်းလား၊ Google စသည်ထပ်လား)။
+7. Creator များ တင်သော content ကို စစ်ဆေး (moderation) ခြင်း။
+8. ဝယ်ပြီးသော note ကို ဘယ်လိုပေးမလဲ (MusicXML ဒေါင်းခွင့်လား၊ Notation Lab ထဲ ဖွင့်ကြည့်ခွင့်သာလား၊ PDF လား)။
+
+
+## Work packages — OpenHands အတွက် (အစီအစဉ်အတိုင်း) — 2026-11-23
+
+OpenHands က Code ရေးသူဖြစ်သည်။ အောက်ပါ work package (WP) များသည် ဤ Plan ၏ ဆုံးဖြတ်ချက်များမှ ထုတ်ယူထားသော အစီအစဉ်ဖြစ်ပြီး **အစဉ်အတိုင်း တစ်ခုချင်း** လုပ်ရန်အဆိုပြုသည်။ **အလုပ်စမည့် WP ကို user က "ready" ဟုပြောမှ စ**ရမည်။ WP တစ်ခုပြီးတိုင်း သက်ဆိုင်ရာ Doc ကို update လုပ်ပြီး test ပြေးရမည် (§11)။
+
+### A — Notation Lab Editor
+
+| WP | အလုပ် | ပြီးစီးမှု စံနှုန်း |
+|---|---|---|
+| A1 | Palette default ၁၃ ခုကို MuseScore အစီအစဉ် (Clefs · Key signatures · Time signatures · Tempo · **Pitch** · Accidentals · Dynamics · Articulations · Text · **Keyboard** · Repeats & jumps · Barlines · **Layout**) အတိုင်း ပြောင်း။ ရှိပြီးသား `Pedal` ကို `Keyboard`၊ `Breaks & spacers` ကို `Layout` အဖြစ် အမည်ပြောင်း၊ Ornaments နှင့် Lines ကို `Add Palettes` ထဲဆက်ထား | Default ၁၃ ခု၏ စာရင်း/အစဉ် မှန်၊ ရှိပြီးသား test ကို update ပြီး pass |
+| A2 | **Pitch** (ottava: 8va, 8vb, 15ma, 15mb) — doc ထဲ octave-shift ထည့်/ဖယ်သော command အသစ်။ MusicXML တွင် 8va = `down` size 8၊ 8vb = `up` 8၊ 15ma = `down` 15၊ 15mb = `up` 15 | Bracket ပေါ်ခြင်း၊ MusicXML ပြန်ရေး/ပြန်ဖတ်ခြင်း မှန်၊ undo/redo အလုပ်လုပ်ခြင်း၊ palette ခလုတ် pressed အခြေအနေ မှန် |
+| A3 | ကျန် MuseScore palette အုပ်စုများ (MuseScore 4 ၏ `Add Palettes` စာရင်းနှင့် နှိုင်းယှဉ်ပြီး အတည်ပြုပြီးမှ) | အုပ်စုများ ပေါ်ပြီး item များ score ပေါ် ရေးနိုင်ခြင်း |
+| A4 | Guitar — staff ပေါ် note ရေးလျှင် Tab note ပါ တစ်ပြိုင်တည်းပေါ်/အလုပ်လုပ်ခြင်းကို စစ်ပြီး မလုပ်ပါက ပြင် | Staff နှင့် Tab နှစ်ခုလုံးတွင် note တူညီစွာပေါ်၊ undo/redo နှင့် ကိုက် |
+| A5 | Sidebar ၏ `Instruments` tab ကို MuseScore ၏ Instruments panel ကဲ့သို့ ပုံမှန်အလုပ်လုပ်စေ (part စာရင်း၊ ထည့်/ဖယ်/ပြောင်း)၊ `⋯` tab | Part များ ထည့်/ဖယ်နိုင်၊ score နှင့်ကိုက် |
+| A6 | **Writer Engine** ကို `Website` အတွင်း သီးခြား folder/module အဖြစ် ခွဲထုတ် (အဆိုပြုအမည် `Website/Writer/Writer Engine`)၊ ယခု `notation-doc.js` နှင့် `notation-editor.js` ထဲရှိ edit logic ကို ရွှေ့ | အပြုအမူ မပြောင်း (အရင် test အားလုံး pass)၊ Editor က Engine ကို import သုံး |
+
+### B — Create Video
+
+| WP | အလုပ် | ပြီးစီးမှု စံနှုန်း |
+|---|---|---|
+| B1 | Metronome Studio ၏ output ကို 1920×1080 / 1080×1080 / 1080×1920 သို့ ပြောင်း၊ အရွယ်ကို Video Engine ၏ shared setting တစ်ခုမှ သတ်မှတ် | Video အားလုံး အရွယ်တူ၊ 1080p memory/encode အောင်၊ Metronome test pass |
+| B2 | Video Engine တွင် ၃ ပိုင်း layout template (data ဖြင့်ကြေညာ၊ တူရိယာအလိုက်နေရာ) | `atSeconds` တူလျှင် frame တူ၊ ratio ၃ မျိုးလုံးတွင် layout မှန် |
+| B3 | Drum Studio — **Title / Info အပိုင်း** (Logo ဘယ်ဘက်၊ Title 1 / Title 2 (user ရိုက်)၊ `4/4` / `BPM` / `Key` (MusicXML မှ)၊ Metronome icon) | Video ပေါ်တွင် မှန်ကန်စွာပြ၊ MusicXML မပါလျှင် ရှင်းရှင်းလင်းလင်း ပြ |
+| B4 | **Video အရှည်** = Count Voice (အစ) + MusicXML + Thank You၊ `MAX_SECONDS = 12` ကို ဖယ် (memory guard သာ) | ရှည်သော MusicXML ဖြင့် ထုတ်နိုင်၊ အရှည်ပေါင်းလဒ် မှန် |
+| B5 | Notation Engine ကို Video အလယ်အပိုင်းတွင် ချိတ် (Page: အောက်မှအပေါ်၊ Horizontal: ညာမှဘယ်၊ Notation Engine ၏ cursor) | Cursor က တီးနေသော note နှင့် တိုက်ဆိုင်၊ ရွေ့ပုံ မှန် |
+| B6 | ရေတွက်ပုံ ရွေးချယ်မှု option (`1,2,3,4` / `1&,…` / `1e&a,…`) — စာသားသာပြောင်း | Video ပေါ်စာသားပြောင်း၊ Count Voice အသံ မပြောင်း |
+| B7 | **Thank You segment** ကို Video Engine ထဲ ချိတ် (output ratio အလိုက်ဖိုင်ကို R2 မှ၊ အဆုံးတွင်ဆက်) | အဆုံးတွင်ပေါ်၊ ratio မှန်၊ ဖိုင်မရလျှင် Adapter Contract အတိုင်း |
+| B8 | **Drum Animation Engine** (R2 ထဲက Drum data/ပုံများကို manifest မှဖတ်၍ မကျန်အောင်ပြ) | Manifest ထဲရှိ အားလုံးပြ၊ မရှိရင် diagnostic ပြ (တိတ်တိတ်မကျော်) |
+| B9 | **အသံပါ Video** — Sound Engine ကို Video အတွက် offline `AudioBuffer` ထုတ်ပေးနိုင်အောင်၊ Count Voice အသံ၊ Drum အသံ | Video တွင် အသံပါ (ffprobe နှင့် စစ်)၊ audio/video sync |
+| B10 | Guitar adapter (Video Engine Plan Phase 1) | Phase 1 ၏ စံနှုန်းများ |
+| B11 | Piano key-only adapter (Phase 2)၊ ထို့နောက် Violin၊ Bass၊ Strings၊ Voice | သက်ဆိုင်ရာ Phase စံနှုန်းများ |
+
+**မှတ်ချက်:** B2 → B3 → B4 အစဉ်ကို ပထမဆုံးလုပ်ရန် အကြံပြုသည် (user က ထုတ်လုပ်ပြီးသော video အစစ်ကို စမ်းကြည့်နိုင်ရန်)။ Video အပိုင်း အချိုးများ၊ Metronome icon တို့သည် default ဖြစ်ပြီး user က video အစစ်ကိုကြည့်ပြီးမှ ညှိမည်။
