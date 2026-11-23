@@ -164,6 +164,26 @@ Implementation Plan/Doc: [Metronome Engine Plan](../../Metronome/Metronome%20Eng
 
 **လက်ကျန်:** ဖုန်းအစစ်၊ Safari/Firefox နှင့် MediaRecorder-only fallback ကို မစစ်ရသေးပါ။ Voice အတွက် notation/event model မရှိပါ — ဤ adapter သည် အသံကို တိုက်ရိုက် decode လုပ်သည့် နည်းလမ်းဖြစ်သည်။ အသံဖိုင် ဖြတ်တောက်ခြင်း (trim) နှင့် အသံအမြန်နှုန်း ပြောင်းခြင်း မပါသေးပါ။
 
+## Studio dispatch — §5 regression (2026-11-24)
+
+Plan §5 ၏ ပထမဆုံး စစ်ချက်ဖြစ်သော **dispatch regression** ကို စစ်ထားသည်။ `studio-video.js` သည် Drum adapter ကိုယ်တိုင် ဖြစ်နေသဖြင့် `tool` တန်ဖိုးတစ်ခုကို အပေါ်ပိုင်းတွင် မခွဲထုတ်ပါက အခြား instrument တစ်ခုကို တောင်းဆိုလျှင်ပင် Drum ဗီဒီယို ထွက်လာမည်။ ထို အမှားသည် တိတ်ဆိတ်စွာ ဖြစ်ပျက်သဖြင့် "အလုပ်လုပ်/မလုပ်" မဟုတ်ဘဲ "ငြင်းဆို/မငြင်းဆို" ကို စစ်ရသည်။
+
+`tools/test-studio-dispatch-browser.mjs` (အသစ်) ၏ ရလဒ်များ —
+
+| စစ်ချက် | ရလဒ် |
+|---|---|
+| `theremin` (adapter မရှိ) | status တွင် `not implemented yet` ပါသည်၊ Generate Video disabled၊ download မရှိ၊ settings control ၁၉/၁၉ disabled |
+| ထို route တွင် Generate နှိပ်ခြင်း | download နှင့် output မထွက်ပါ |
+| `drums` | Drum ၏ ကိုယ်ပိုင် prompt (မှန်ကန်သည်) |
+| `metronome` | Metronome ၏ ကိုယ်ပိုင် status |
+| `guitar`, `piano`, `bass`, `strings`, `voice` | ကိုယ်ပိုင် prompt ဖြစ်ပြီး Drum prompt မဟုတ်ပါ |
+
+နောက်ဆုံး စစ်ချက်က အရေးကြီးသည်။ route တစ်ခုစီသည် ကိုယ်ပိုင် status ကို ပြသဖြင့် fall-through ဖြစ်ခဲ့လျှင် Drum ၏ `default drum pattern` စာသား ပေါ်လာမည်။ ထို စာသားကို စစ်ခြင်းဖြင့် route ခုနစ်ခုလုံး ကိုယ်ပိုင် adapter ရှိကြောင်း သက်သေဖြစ်သည်။
+
+**မှတ်ချက်:** ငြင်းဆိုသော route တွင် `settingsForm` အတွင်းရှိ `input,select` များကိုသာ disable လုပ်သည်။ ထို form ပြင်ပ ခလုတ်များ (ဥပမာ instrument selector) ကို မထိပါ — အသုံးပြုသူသည် အခြား instrument သို့ ပြောင်းနိုင်ရန် လိုအပ်သဖြင့် ဖြစ်သည်။
+
+**လက်ကျန်:** §5 ၏ အခြား စစ်ချက်များ (event contract, frame determinism, assets, audio policy, renderer/fallback) ကို instrument တစ်ခုချင်းစီ၏ စမ်းသပ်မှုများတွင် ဖုံးလွှမ်းထားပြီး ဖြစ်သည်။
+
 ## Shared audio contract — Phase 6.1 (2026-11-24)
 
 Plan §6.1 သည် segment တစ်ခုချင်း၏ `AudioBuffer` ကို ဗီဒီယိုတစ်ခုတည်း၏ အသံအဖြစ် ပေါင်းသည့် စည်းမျဉ်းများကို သတ်မှတ်ရန် ဖြစ်သည်။ Instrument adapter တိုင်း (Metronome, Voice, နောင် Piano) သည် ထို စည်းမျဉ်းများကို အတူတူ အမွေခံသဖြင့် ဤနေရာတွင် တစ်ခါတည်း စစ်ထားသည်။
