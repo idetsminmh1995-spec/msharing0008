@@ -182,7 +182,18 @@ Plan §5 ၏ ပထမဆုံး စစ်ချက်ဖြစ်သော **
 
 **မှတ်ချက်:** ငြင်းဆိုသော route တွင် `settingsForm` အတွင်းရှိ `input,select` များကိုသာ disable လုပ်သည်။ ထို form ပြင်ပ ခလုတ်များ (ဥပမာ instrument selector) ကို မထိပါ — အသုံးပြုသူသည် အခြား instrument သို့ ပြောင်းနိုင်ရန် လိုအပ်သဖြင့် ဖြစ်သည်။
 
-**လက်ကျန်:** §5 ၏ အခြား စစ်ချက်များ (event contract, frame determinism, assets, audio policy, renderer/fallback) ကို instrument တစ်ခုချင်းစီ၏ စမ်းသပ်မှုများတွင် ဖုံးလွှမ်းထားပြီး ဖြစ်သည်။
+**§5 ၏ ကျန် စစ်ချက်များ — အခြေအနေ အတိအကျ**
+
+| စစ်ချက် | Piano | Guitar | Bass | Strings | Voice | Metronome |
+|---|---|---|---|---|---|---|
+| Frame determinism (same time → same frame) | ရှိ | ရှိ | ရှိ | ရှိ | ရှိ | ရှိ |
+| Audio policy (silent vs audible) | မသက်ဆိုင် (silent) | မသက်ဆိုင် | မသက်ဆိုင် | မသက်ဆိုင် | ရှိ | ရှိ |
+| Asset readiness | ရှိ | ရှိ | ရှိ | ရှိ | ရှိ | ရှိ |
+| Render lifecycle | ရှိ | ရှိ | ရှိ | ရှိ | ရှိ | ရှိ |
+
+**ဖြည့်ခဲ့သော gap — Metronome determinism။** စစ်ကြည့်သောအခါ `test-metronome-studio-browser.mjs` တွင် `assert` ၄၀ ကျော် ပါသော်လည်း frame determinism စစ်ချက် လုံးဝ မပါကြောင်း တွေ့ရသည်။ Piano နှင့် Voice တွင် ထို စစ်ချက် ရှိပြီးသားဖြစ်သဖြင့် Metronome တစ်ခုတည်း လွတ်နေသည်။ ယခု ထည့်ပြီးဖြစ်သည် — တူညီသော setting ဖြင့် နှစ်ကြိမ် render လုပ်ပြီး 0.4 sec (swing အလယ်) မှ frame ကို နှိုင်းယှဉ်သည်။ ရလဒ် — **ရွေ့သော pixel 0 / 921,600, delta 0**။ ဤအချက်က `frameAt()` သည် wall clock မဖတ်၊ frame အကြား state မထားကြောင်း သက်သေဖြစ်သည်။
+
+**မှတ်ချက် — စမ်းသပ်မှု ပတ်ဝန်းကျင်။** ဤ session တွင် `ffmpeg`/`ffprobe` သည် system `PATH` မှ ပျောက်နေသဖြင့် browser test များ run ရန် `PATH="/workspace/tools/node_modules/@ffprobe-installer/linux-x64:/workspace/tools/node_modules/@ffmpeg-installer/linux-x64:$PATH"` ကို ရှေ့ဆက် ထည့်ရသည်။ `Pillow` ကိုလည်း `pip install pillow` ဖြင့် ထည့်ခဲ့သည် (frame နှိုင်းယှဉ်မှုအတွက်)။
 
 ## Shared audio contract — Phase 6.1 (2026-11-24)
 

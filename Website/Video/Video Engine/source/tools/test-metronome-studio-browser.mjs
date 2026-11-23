@@ -235,7 +235,58 @@ try {
   assert.equal(videoStream.width, 720, 'Portrait video width is wrong');
   assert.equal(videoStream.height, 1280, 'Portrait video height is wrong');
   assert.ok(Math.abs(Number(probe.format.duration) - 0.9375) < 0.2, 'Video duration does not match 3/8 at quarter-note 96 BPM');
-  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, download: state.download, ffprobe: probe }, null, 2));
+
+  // Frame determinism (Plan §5). The same settings rendered twice have to
+  // draw the same frames: a renderer that read the wall clock, or carried
+  // state from one frame to the next, would drift here even though both
+  // files have the right length and the right codecs.
+  //
+  // The frame is taken mid-swing, where a drifting clock shows up. An MP4
+  // is lossy, so two encodings of the same picture differ by a few units at
+  // hard edges; that is allowed. A moved hand is thousands of pixels, far
+  // apart in colour, and is not.
+  const firstFrame = `${output}-first-frame.png`;
+  await exec('ffmpeg', ['-v', 'error', '-y', '-ss', '0.4', '-i', videoPath, '-frames:v', '1', firstFrame]);
+
+  await evaluate("document.querySelector('[data-studio-generate]').click()");
+  const againStarted = Date.now();
+  let again;
+  while (Date.now() - againStarted < 90000) {
+    again = JSON.parse(await evaluate("JSON.stringify({status:document.querySelector('[data-studio-status]').textContent,videoReady:!document.querySelector('[data-video-output]').hidden && document.querySelector('[data-video-output]').readyState >= 1,href:document.querySelector('[data-video-download]').href})"));
+    if (again.status.startsWith('Rendered ') && again.videoReady && again.href !== state.href) break;
+    if (again.status.startsWith('Metronome video render failed:')) throw new Error(again.status);
+    await sleep(150);
+  }
+  assert.ok(again?.status.startsWith('Rendered '), `The second Metronome render did not complete: ${again?.status}`);
+  const againResult = await evaluate(`(async () => { const response = await fetch(${JSON.stringify(again.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); })()`);
+  const againPath = `${output}-again.${extension}`;
+  await writeFile(againPath, Buffer.from(againResult, 'base64'));
+  const againFrame = `${output}-again-frame.png`;
+  await exec('ffmpeg', ['-v', 'error', '-y', '-ss', '0.4', '-i', againPath, '-frames:v', '1', againFrame]);
+  const { stdout: drift } = await exec('python3', ['-c', `
+from PIL import Image
+first = Image.open(${JSON.stringify(firstFrame)}).convert('RGB')
+second = Image.open(${JSON.stringify(againFrame)}).convert('RGB')
+one, two = first.load(), second.load()
+width, height = first.size
+moved = worst = 0
+for y in range(height):
+    for x in range(width):
+        delta = sum(abs(one[x, y][channel] - two[x, y][channel]) for channel in range(3))
+        if delta > 12:
+            moved += 1
+            worst = max(worst, delta)
+print(moved, worst, width * height)
+`]);
+  const [movedPixels, worstDelta, totalPixels] = drift.trim().split(/\s+/).map(Number);
+  assert.ok(movedPixels / totalPixels < 0.0005,
+    `The same metronome settings drew a different frame the second time: ${movedPixels} of ${totalPixels} pixels moved`);
+  assert.ok(worstDelta <= 48, `The second render changed a colour rather than rounding one: delta ${worstDelta}`);
+
+  console.log(JSON.stringify({
+    status: result.status, bytes: result.bytes, download: state.download, ffprobe: probe,
+    determinism: { movedPixels, totalPixels, worstDelta },
+  }, null, 2));
 } finally {
   cdp?.close();
   for (const child of [browser, server]) {
