@@ -142,3 +142,16 @@ Run every command from `Website/Notation/Notation Engine/`.
   when free, and otherwise takes the next free melodic channel. The browser
   engine only turns the result into `programChange`/`controllerChange` calls.
 
+
+## Working agreement
+
+- Code may be written in full for this repository. Do not hold back an
+  implementation, a test, or a fix on the grounds of "no code please".
+- The Plan under `Website/Video/Video Engine Plan/PLAN.md` is reviewed and
+  updated roughly every five hours. Work is landed in small pushes: push
+  whatever is written first, then continue from the Plan, then push again.
+  Unfinished Plan items are filled in later; a push is not a claim of
+  completeness.
+- `Website/Plan/README.md` is not to be edited.
+- Docs (`.../Doc/`, `.../Plan/`) are updated only after the work they
+  describe actually exists and has been verified.
