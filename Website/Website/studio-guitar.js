@@ -37,12 +37,12 @@
     'electric-drawn': 'assets/guitar/electric-drawn.svg',
     'strat-drawn': 'assets/guitar/strat-drawn.svg',
   };
-  const NOTATION_ENGINE_SRC = 'assets/notation-engine.js?v=de5f363a73f7';
+  // The parts this page draws, in the order the Guitar layout stacks them.
+  const PARTS = ['instrument', 'notation', 'title'];
 
   let isRendering = false;
   let cancelRequested = false;
   let videoUrl = null;
-  let notationEnginePromise = null;
   const imageCache = new Map();
 
   const setStatus = (message) => {
@@ -76,20 +76,7 @@
     photoSelect.append(option);
   }
 
-  const loadNotationEngine = () => {
-    if (window.NotationEngine) return Promise.resolve(window.NotationEngine);
-    if (notationEnginePromise) return notationEnginePromise;
-    notationEnginePromise = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = NOTATION_ENGINE_SRC;
-      script.onload = () => (window.NotationEngine
-        ? resolve(window.NotationEngine)
-        : reject(new Error('The notation engine loaded without its API.')));
-      script.onerror = () => reject(new Error('The notation engine could not be loaded.'));
-      document.head.appendChild(script);
-    });
-    return notationEnginePromise;
-  };
+  const loadNotationEngine = () => engine.loadNotationEngine();
 
   /** A picture, decoded once. A shape pointing at a file that will not load draws nothing. */
   const loadImage = (href) => {
@@ -111,7 +98,20 @@
     const handLegend = handLegendInput?.checked === true;
     if (!PHOTO_FILES[photo]) throw new RangeError('Choose a guitar picture.');
     if (!DIMENSIONS[aspect]) throw new RangeError('Choose a supported video orientation.');
-    return { photo, aspect, picking, handLegend, ...DIMENSIONS[aspect] };
+    const size = DIMENSIONS[aspect];
+    return {
+      photo,
+      aspect,
+      picking,
+      handLegend,
+      ...size,
+      instrument: 'guitar',
+      size,
+      // The page has no Notation View control, so the sheet is the
+      // landscape page the other video pages default to.
+      notation: 'landscape',
+      color: 'black',
+    };
   }
 
   /**
@@ -327,6 +327,37 @@
       if (!picture) throw new Error(`The guitar picture could not be loaded: ${photo.href}`);
       images.set(photo.href, picture);
 
+      /**
+       * The Instrument part: the neck the notes are played on. The
+       * stage is asked for the box the Video Engine laid out, so the
+       * picture is drawn at the size it is actually shown at.
+       */
+      const drawNeck = (ctx, rect, at) => {
+        ctx.fillStyle = palette.background;
+        ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+        ctx.save();
+        ctx.translate(rect.x, rect.y);
+        ctx.beginPath();
+        ctx.rect(0, 0, rect.width, rect.height);
+        ctx.clip();
+        // Centred in the band, and never lifted above it.
+        ctx.translate(0, Math.max(0, Math.round((rect.height - stageHeight) / 2)));
+        const active = picks.find((pick) => Math.abs(pick.startSeconds - at) < 0.08);
+        const shapes = guitar.stageShapes({
+          width: stageWidth,
+          height: stageHeight,
+          seconds: at,
+          notes,
+          photo,
+          picking: settings.picking,
+          handLegend: settings.handLegend,
+          fadeTo: palette.background,
+          ...(active ? { pick: { ...active, age: Math.min(1, Math.abs(at - active.startSeconds) / 0.16) } } : {}),
+        });
+        paintShapes(ctx, shapes, images);
+        ctx.restore();
+      };
+
       const lastEnd = Math.max(...notes.map((note) => note.endSeconds));
       const seconds = Math.min(MAX_EXPORT_SECONDS, Math.max(1, lastEnd + 0.5));
       const picks = readPicks(notes);
@@ -335,6 +366,29 @@
         summaryLabel.textContent = `${notes.length} notes · ${bars} bar${bars === 1 ? '' : 's'} · ${seconds.toFixed(2)} sec`;
       }
 
+      const palette = engine.paletteFor(settings.color);
+      const meta = engine.scoreMeta(parsed);
+
+      // The instrument band is pinned to the picture's own height, so the
+      // photograph is never floating in a box it does not fill. The
+      // notation and title bands divide what is left in the shares the
+      // layout declares.
+      const probe = engine.layoutFor('guitar', {
+        width: settings.width,
+        height: settings.height,
+        parts: PARTS,
+      });
+      const stageWidth = Math.max(1, Math.round(settings.width - probe.pad * 2));
+      const stageHeight = Math.max(1, Math.round(guitar.stageHeightFor(stageWidth, photo, {
+        handLegend: settings.handLegend,
+      })));
+      const free = settings.height - probe.pad * 2;
+      settings.shares = { instrument: Math.min(1, stageHeight / Math.max(1, free)) };
+
+      setStatus('Laying out the notation…');
+      const notation = await engine.prepareNotationFor(file, settings, PARTS);
+      if (notation?.error) throw new Error(`The notation could not be prepared: ${notation.error}`);
+
       const result = await engine.render({
         width: settings.width,
         height: settings.height,
@@ -342,33 +396,26 @@
         segments: [{
           seconds,
           draw: (ctx, at) => {
-            const layout = engine.layoutFor('guitar', {
+            // The parts paint their own boxes; the gaps between them and
+            // the frame's own edge belong to the page.
+            ctx.fillStyle = palette.background;
+            ctx.fillRect(0, 0, settings.width, settings.height);
+            return engine.composeFrame(ctx, {
+              instrument: 'guitar',
               width: settings.width,
               height: settings.height,
-              parts: ['instrument'],
+              shares: settings.shares,
+              parts: {
+                title: (target, rect) => engine.drawTitlePart(target, rect, at, meta, palette, {
+                  brand: 'M Sharing',
+                  model: 'guitar',
+                  titleOne: parsed.score?.title || file.name,
+                  titleTwo: `${notes.length} notes · ${settings.aspect} · silent`,
+                }),
+                notation: (target, rect) => engine.drawNotationPart(target, rect, at, notation),
+                instrument: (target, rect) => drawNeck(target, rect, at),
+              },
             });
-            const rect = layout.rects.instrument;
-            ctx.save();
-            ctx.fillStyle = '#0b1018';
-            ctx.fillRect(0, 0, settings.width, settings.height);
-            ctx.translate(rect.x, rect.y);
-            ctx.beginPath();
-            ctx.rect(0, 0, rect.width, rect.height);
-            ctx.clip();
-            const active = picks.find((pick) => Math.abs(pick.startSeconds - at) < 0.08);
-            const shapes = guitar.stageShapes({
-              width: rect.width,
-              height: rect.height,
-              seconds: at,
-              notes,
-              photo,
-              picking: settings.picking,
-              handLegend: settings.handLegend,
-              fadeTo: '#0b1018',
-              ...(active ? { pick: { ...active, age: Math.min(1, Math.abs(at - active.startSeconds) / 0.16) } } : {}),
-            });
-            paintShapes(ctx, shapes, images);
-            ctx.restore();
           },
         }],
         onProgress: (progress, phase) => {
