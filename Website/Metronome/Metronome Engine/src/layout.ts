@@ -8,7 +8,7 @@
  * in their IDEA rather than in where they put the BPM.
  */
 
-import { group, n, text } from './svg.js';
+import { escapeText, group, n, text } from './svg.js';
 import type { AspectRatio, Canvas, DesignContext } from './types.js';
 
 /**
@@ -358,5 +358,8 @@ export function logo(context: DesignContext): string {
   const { canvas, logoUrl } = context;
   if (logoUrl === undefined || logoUrl === '') return '';
   const box = logoBox(canvas);
-  return `<image href="${logoUrl.replace(/"/g, '&quot;')}" x="${n(box.x)}" y="${n(box.y)}" width="${n(box.width)}" height="${n(box.height)}" preserveAspectRatio="xMidYMid meet"/>`;
+  // `&` has to be escaped along with the quote: a signed object URL carries
+  // `?a=1&b=2`, and one raw `&` is not well-formed XML -- the browser then
+  // refuses the WHOLE document, so the frame is blank rather than logo-less.
+  return `<image href="${escapeText(logoUrl)}" x="${n(box.x)}" y="${n(box.y)}" width="${n(box.width)}" height="${n(box.height)}" preserveAspectRatio="xMidYMid meet"/>`;
 }

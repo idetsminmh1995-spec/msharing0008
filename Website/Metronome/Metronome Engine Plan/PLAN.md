@@ -40,7 +40,7 @@ Metronome Engine ၏ SVG design များကို Create Video မှ Studio
 ## နောက်ထပ်လုပ်ရန်
 
 1. **Input/edge-case test:** Chromium test သည် Create Video card က Metronome Studio သို့သွားခြင်းနှင့် 12 စက္ကန့်ကျော် setting ကို ပိတ်ခြင်းကို စစ်ထားသည်။ လက်ကျန်အနေဖြင့် cancel behavior, `OfflineAudioContext` မရသည့် error state နှင့် runtime input တွင် `NaN`/`Infinity` သို့မဟုတ် phase/design မမှန်သည့်အခါကို ထပ်စစ်ပြီး လိုအပ်သော data မပြည့်လျှင် render မစကြောင်း အတည်ပြုရန်။
-2. **Logo policy:** လက်ရှိ adapter သည် `logoUrl` မပေးသဖြင့် logo မပါသော output ထုတ်သည်။ တကယ့် brand/instrument logo ကို ထည့်လိုပါက production asset path, preload, failure fallback နှင့် design 11 ခုလုံး၏ safe area ကို သီးခြားသတ်မှတ်ရန်။
+2. **Logo policy — ပြီးစီး (2026-11-18):** Adapter က engine ရဲ့ logo အမည်ကို `assets/logo/m-sharing-mark.svg` သို့ map လုပ်ပြီး **data URI အဖြစ် inline** လုပ်ကာ `logoUrl` ပေးသည်။ Blob SVG သည် relative/absolute file path ကို မဖွင့်နိုင်ပါ (Chromium တွင် dark pixel 0)၊ data URI ကသာ ဆွဲသည်။ Fetch fail ဖြစ်လျှင် logo မပါဘဲ render ဆက်လုပ်သည်။ Instrument တစ်ခုချင်းအတွက် square mark asset မရှိသေးသဖြင့် design 11 ခုလုံးတွင် house mark ကို သုံးထားသည် (drum logo သည် 420×120 wordmark ဖြစ်ပြီး square corner box ထဲ ဖိနှိပ်လျှင် မဖတ်နိုင်ပါ)။
 3. **Browser/device coverage:** Chromium တွင် export ကို စမ်းထားသည်။ Safari/Firefox နှင့် ဖုန်းအစစ်များတွင် WebCodecs/MediaRecorder codec fallback၊ audio output နှင့် performance ကို စစ်ဆေးရန်။ 375px/1280px viewport check သည် ဖုန်းအစစ် compatibility ကို အတည်မပြုပါ။
 4. **Visual regression:** Engine tests က 11×3 design/aspect combinations ကို SVG အဖြစ်စစ်သည်။ သို့သော် browser ပေါ်က visual snapshot/clipping၊ font fallback နှင့် preview/export frame တူညီမှုကို ထပ်မံစစ်ရန်။
 5. **အခြား instrument များ:** Guitar ကို နောက်ဦးစားပေးအဖြစ်ထားပြီး Studio event source နှင့် renderer ကို သီးခြားအကောင်အထည်ဖော်ရန်; Piano, Bass, Strings နှင့် Voice တို့သည် Metronome adapter နှင့် မချိတ်ဆက်ရသေးပါ။ အလုပ်အစီအစဉ်ကို [Video Engine Plan](../../Video/Video%20Engine%20Plan/PLAN.md) တွင် ဆက်လက်လိုက်နာပါ။
@@ -100,8 +100,9 @@ Engine မှ `listDesigns()` ထဲတွင် `drum`, `piano`, `guitar`, `bas
 
 `src/svg.ts` သည် text content ကို XML escape လုပ်သည်။ သို့သော် logo URL ကို SVG attribute ထဲသို့ ထည့်သည့် helper သည် quote escaping အပြည့်အဝ မလုပ်ကြောင်း ယခင် code review တွင် တွေ့ထားသည်။
 
-- `logoUrl` အပါအဝင် attribute string အားလုံးကို သီးခြား safe escaping helper သို့မဟုတ် serializer ဖြင့် ထုတ်ရန်။
-- `&`, `<`, `>`, single/double quote ပါသော title, subtitle, URL များအတွက် regression test ထည့်ပြီး SVG parser သို့မဟုတ် browser က valid အဖြစ်ဖတ်ကြောင်း အတည်ပြုရန်။
+- **ပြီးစီး (2026-11-18):** `layout.ts` ရဲ့ `logo()` က href ကို `escapeText()` ဖြင့် escape လုပ်သည်။ `&` မပါဘဲ ထည့်လျှင် SVG document တစ်ခုလုံးကို Chromium က `EncodingError` ဖြင့် ငြင်းပယ်ပြီး frame တစ်ခုလုံး ဗလာထွက်သည် — logo မပါတာမဟုတ်ပါ။
+- **ပြီးစီး (2026-11-18):** `renderMetronomeFrame()` က `title`, `subtitle`, `logoUrl` တွင် string မဟုတ်သည့် တန်ဖိုး (`123`, `null`, `undefined`) ကို ဖယ်ရှားသည်; ယခင် ကုဒ်က `TypeError` throw လုပ်သည်။
+- Regression tests (`test/designs.test.js`): `&`/`<`/quote escaping, logo URL escaping, non-string field drop။
 
 ### P2 — Browser visual regression
 
@@ -123,5 +124,5 @@ Studio UI သည် BPM 30–240, bars 1–16, numerator 1–12, denominator 2/4
 
 1. P0 frame validation contract ကို သတ်မှတ်ပြီး tests ဖြည့်ရန်။
 2. P1 package output/install behavior နှင့် optional logo policy ကို ဆုံးဖြတ်ရန်; Website bundle sync နှင့် Studio route smoke test ကို ပြီးစီးထားသည်။
-3. P2 XML escaping, browser visual regression, design boundary နှင့် Engine numeric range များကို အဆင့်လိုက်ဖြည့်ရန်။
+3. P2 browser visual regression, design boundary နှင့် Engine numeric range များကို အဆင့်လိုက်ဖြည့်ရန် (XML escaping ပြီးစီး)။
 4. Source သို့မဟုတ် adapter ပြင်ဆင်ပြီးတိုင်း Metronome `npm run verify`, Video Engine regression, bundle sync နှင့် browser smoke test များကို ပြန်လည်လုပ်ဆောင်ပြီး ဤ Plan/Doc တွင် ရလဒ်တင်ရန်။

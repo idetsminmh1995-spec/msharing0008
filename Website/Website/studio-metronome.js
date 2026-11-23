@@ -35,6 +35,18 @@
   const stage = document.querySelector('[data-video-stage]');
   const MAX_EXPORT_SECONDS = 12;
   const FPS = 30;
+  // The files a design's mark name resolves to. A blob SVG cannot load a
+  // file path -- the browser treats the blob as its own base and refuses
+  // every href inside it -- so the mark has to travel IN the document,
+  // inlined as a data URI.
+  //
+  // Only the house mark is here. The instrument marks the engine names
+  // (drum, piano, guitar, ...) have no square asset yet: the drum logo is a
+  // 420x120 wordmark, and `preserveAspectRatio` would fit it into the square
+  // corner box at a third of its height -- too small to read. Until square
+  // marks exist, every design carries the house mark.
+  const LOGO_ASSETS = { sharing: 'assets/logo/m-sharing-mark.svg' };
+  const HOUSE_LOGO = 'sharing';
   const DIMENSIONS = {
     '16x9': { width: 1280, height: 720 },
     '9x16': { width: 720, height: 1280 },
@@ -45,6 +57,8 @@
   let cancelRequested = false;
   let videoUrl = null;
   let previewUrl = null;
+  let previewToken = 0;
+  const logoDataUris = new Map();
 
   const setStatus = (message) => {
     if (status) status.textContent = message;
@@ -125,13 +139,39 @@
     };
   }
 
-  function settingsAsSvg(settings) {
+  /**
+   * The mark a design carries, inlined so a blob SVG can draw it.
+   *
+   * `listDesigns()` names a mark; this page decides which file that is.
+   * Names with no square asset of their own fall back to the house mark
+   * rather than to a stretched wordmark. A failed fetch is remembered as
+   * null so a broken asset costs one request, not one per frame.
+   */
+  async function logoFor(designId) {
+    const name = metronome.metronomeLogoName(designId);
+    const resolved = LOGO_ASSETS[name] ? name : HOUSE_LOGO;
+    if (logoDataUris.has(resolved)) return logoDataUris.get(resolved);
+    let dataUri = null;
+    try {
+      const response = await fetch(LOGO_ASSETS[resolved]);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const source = await response.text();
+      dataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`;
+    } catch (error) {
+      setStatus(`The ${resolved} logo could not be loaded (${error.message || error}); rendering without it.`);
+    }
+    logoDataUris.set(resolved, dataUri);
+    return dataUri;
+  }
+
+  function settingsAsSvg(settings, logoUrl) {
     return metronome.renderMetronomeFrame({
       design: settings.design,
       aspect: settings.aspect,
       frame: frameAt(settings, 0),
       title: '',
       subtitle: '',
+      ...(logoUrl ? { logoUrl } : {}),
     });
   }
 
@@ -186,22 +226,48 @@
     videoUrl = null;
   }
 
-  function refreshPreview() {
+  async function refreshPreview() {
     if (isRendering) return;
+    // Preview refreshes overlap: a fast slider drag starts a second one
+    // before the first has fetched its logo. Only the newest may paint.
+    const token = ++previewToken;
     resetVideo();
     try {
       const settings = readSettings();
-      const svg = settingsAsSvg(settings);
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      previewUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
-      imagePreview.src = previewUrl;
+      const logoUrl = await logoFor(settings.design);
+      if (token !== previewToken) return;
+      const svg = settingsAsSvg(settings, logoUrl);
+      const nextUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+      // Decode on a detached image, not on the visible one: a refresh that
+      // loses the race must not leave the <img> pointing at a URL it then
+      // revokes, which paints a blank frame instead of the previous design.
+      try {
+        const probe = new Image();
+        probe.src = nextUrl;
+        await probe.decode();
+      } catch (error) {
+        URL.revokeObjectURL(nextUrl);
+        throw error;
+      }
+      if (token !== previewToken) {
+        URL.revokeObjectURL(nextUrl);
+        return;
+      }
+      // Swap first, revoke second: the <img> must not lose the URL it is
+      // showing while the replacement is still arriving.
+      const previousUrl = previewUrl;
+      previewUrl = nextUrl;
+      imagePreview.src = nextUrl;
+      imagePreview.dataset.design = settings.design;
       imagePreview.hidden = false;
+      if (previousUrl) URL.revokeObjectURL(previousUrl);
       if (placeholder) placeholder.hidden = true;
       const bars = settings.bars === 1 ? 'bar' : 'bars';
       durationLabel.textContent = `${settings.bars} ${bars} · ${settings.seconds.toFixed(2)} sec · ${settings.aspect}`;
       recordButton.disabled = false;
       setStatus('Ready. Preview shows the opening beat; export includes the full animated count and synthesized click track.');
     } catch (error) {
+      if (token !== previewToken) return;
       imagePreview.hidden = true;
       if (placeholder) placeholder.hidden = false;
       durationLabel.textContent = error.message;
@@ -211,8 +277,8 @@
   }
 
   for (const control of [designSelect, aspectSelect, bpmInput, barsInput, numeratorInput, denominatorSelect]) {
-    control.addEventListener('input', refreshPreview);
-    control.addEventListener('change', refreshPreview);
+    control.addEventListener('input', () => { void refreshPreview(); });
+    control.addEventListener('change', () => { void refreshPreview(); });
   }
 
   for (const control of [countVoiceEnabled, countVoice, countVolume, soundModel, soundVolume]) {
@@ -260,6 +326,9 @@
         setStatus('Metronome render cancelled.');
         return;
       }
+      // Resolved once, before the first frame: a fetch per frame would put
+      // a network round trip behind every one of them.
+      const logoUrl = await logoFor(settings.design);
       const result = await engine.render({
         width: settings.width,
         height: settings.height,
@@ -274,6 +343,7 @@
               frame: frameAt(settings, at),
               title: '',
               subtitle: '',
+              ...(logoUrl ? { logoUrl } : {}),
             });
             await drawSvgFrame(ctx, svg);
           },
@@ -322,7 +392,7 @@
   }
 
   recordButton.addEventListener('click', () => { void renderMetronome(); });
-  refreshPreview();
+  void refreshPreview();
   window.addEventListener('pagehide', () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     if (videoUrl) URL.revokeObjectURL(videoUrl);

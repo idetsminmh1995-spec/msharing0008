@@ -294,7 +294,7 @@ var MetronomeDesigns = (() => {
     const { canvas, logoUrl } = context;
     if (logoUrl === void 0 || logoUrl === "") return "";
     const box = logoBox(canvas);
-    return `<image href="${logoUrl.replace(/"/g, "&quot;")}" x="${n(box.x)}" y="${n(box.y)}" width="${n(box.width)}" height="${n(box.height)}" preserveAspectRatio="xMidYMid meet"/>`;
+    return `<image href="${escapeText(logoUrl)}" x="${n(box.x)}" y="${n(box.y)}" width="${n(box.width)}" height="${n(box.height)}" preserveAspectRatio="xMidYMid meet"/>`;
   }
 
   // src/designs/01-pendulum.ts
@@ -1561,19 +1561,23 @@ var MetronomeDesigns = (() => {
       }
     };
   }
+  function asText(value) {
+    return typeof value === "string" ? value : "";
+  }
   function renderMetronomeFrame(input) {
     const design = designById(input.design) ?? DESIGNS[0];
     const aspect = ASPECT_RATIOS.includes(input.aspect) ? input.aspect : "16x9";
     const canvas = canvasFor(aspect);
     const palette = paletteForDesign(design.id);
     const frame = normalizeFrame(input.frame);
+    const logoUrl = asText(input.logoUrl);
     const context = {
       canvas,
       palette,
       frame,
-      title: input.title ?? "",
-      subtitle: input.subtitle ?? "",
-      logoUrl: input.logoUrl === "" ? void 0 : input.logoUrl
+      title: asText(input.title),
+      subtitle: asText(input.subtitle),
+      logoUrl: logoUrl === "" ? void 0 : logoUrl
     };
     const background = rect(0, 0, canvas.width, canvas.height, { fill: palette.background });
     const body = design.draw(context);

@@ -200,6 +200,16 @@ try {
   assert.match(preview.estimate, /0\.94 sec/, `Unexpected meter duration calculation: ${preview.estimate}`);
   assert.match(preview.status, /synthesized click track/i, 'Preview state does not explain the click track');
 
+  // The mark has to be IN the document, not a path: a blob SVG cannot
+  // resolve an href to a file, so a path would silently draw nothing.
+  const logo = JSON.parse(await evaluate("(async () => { const img = document.querySelector('[data-metronome-preview]'); const text = await (await fetch(img.src)).text(); const tag = (text.match(/<image[^>]*>/) || [''])[0]; return JSON.stringify({present: tag.length > 0, inlined: /href=\"data:image\\/svg\\+xml/.test(tag), href: tag.slice(0, 60)}); })()"));
+  assert.ok(logo.present, 'Metronome preview frame has no logo image at all');
+  assert.ok(logo.inlined, `Metronome logo is not inlined as a data URI: ${logo.href}`);
+
+  // A decoded <image> is not proof the pixels landed. Read the corner.
+  const logoPixels = await evaluate("(async () => { const img = document.querySelector('[data-metronome-preview]'); const canvas = document.createElement('canvas'); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); const short = Math.min(canvas.width, canvas.height); const size = Math.round(short * 0.16); const pad = Math.round(short * 0.055); const data = ctx.getImageData(pad, pad, size, size).data; let painted = 0; for (let i = 0; i < data.length; i += 4) { if (data[i + 3] > 10 && (data[i] > 60 || data[i + 1] > 60 || data[i + 2] > 60)) painted += 1; } return painted; })()");
+  assert.ok(logoPixels > 50, `Metronome logo did not paint in the corner (${logoPixels} non-background pixels)`);
+
   await evaluate("document.querySelector('[data-studio-generate]').click()");
   const renderStarted = Date.now();
   let state;
@@ -298,8 +308,13 @@ print(moved, worst, width * height)
     let shot = null;
     while (Date.now() - designReadyAt < 10000) {
       shot = JSON.parse(await evaluate(`(async () => {
+        const DESIGN = ${JSON.stringify(design)};
         const image = document.querySelector('[data-metronome-preview]');
         if (image.hidden || !image.src || !image.naturalWidth) return JSON.stringify({ ready: false });
+        // A refresh for the previous design can still be in flight. Its
+        // frame is a real frame, so only the one the panel says it is
+        // showing counts -- otherwise two designs compare as identical.
+        if (image.dataset.design !== DESIGN) return JSON.stringify({ ready: false });
         const canvas = document.createElement('canvas');
         canvas.width = 240; canvas.height = 240;
         const ctx = canvas.getContext('2d');

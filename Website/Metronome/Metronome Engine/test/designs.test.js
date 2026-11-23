@@ -175,6 +175,41 @@ test('text is escaped, so a title cannot break the frame', () => {
   assert.ok(svg.includes('&amp;'));
 });
 
+test('a logo URL is escaped too, because one raw & blanks the frame', () => {
+  // A signed object URL carries `?a=1&b=2`. An unescaped `&` is not
+  // well-formed XML, and the browser does not draw a frame without its
+  // logo -- it refuses the document, so the export comes out empty.
+  const svg = M.renderMetronomeFrame({
+    design: 'pendulum',
+    aspect: '16x9',
+    frame: frame(),
+    logoUrl: 'https://example.test/mark.svg?a=1&b=2',
+  });
+  const image = svg.match(/<image[^>]*>/)?.[0] ?? '';
+  assert.ok(image.length > 0, 'the logo was not drawn at all');
+  assert.ok(image.includes('a=1&amp;b=2'), `the URL was not escaped: ${image}`);
+});
+
+test('a field that is not a string is dropped, not thrown on', () => {
+  // A host that builds the input itself can pass a number, or leave the
+  // field out. `123` is not a title, and `undefined` must not reach the
+  // escape step, which would throw and fail the whole render.
+  for (const patch of [{ title: 123 }, { subtitle: null }, { logoUrl: 42 }, { title: undefined }]) {
+    const svg = M.renderMetronomeFrame({
+      design: 'pendulum',
+      aspect: '16x9',
+      frame: frame(),
+      ...patch,
+    });
+    assert.ok(svg.startsWith('<svg'), `${JSON.stringify(patch)} did not render a frame`);
+    // Read the text nodes, so a coordinate that happens to be 123 is not
+    // mistaken for a title the render printed.
+    const printed = [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((match) => match[1]);
+    assert.ok(!printed.includes('123'), `${JSON.stringify(patch)} printed a number as a title`);
+    assert.ok(!printed.includes('null') && !printed.includes('undefined'), `${JSON.stringify(patch)} printed the value itself`);
+  }
+});
+
 test('every design carries the same BPM and metre readout, in the same two colours', () => {
   // The owner asked for ONE readout treatment across all eleven -- the
   // tempo in yellow with BPM under it in red, and the metre's figures

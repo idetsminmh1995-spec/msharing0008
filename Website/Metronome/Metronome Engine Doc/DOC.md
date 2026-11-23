@@ -90,12 +90,12 @@ Design တစ်ခုချင်း၏ မူလ visual identity နှင့�
 - **Bounce Ball:** runway/pad hierarchy, adaptive labels နှင့် current/total beat readout.
 - **Stack Blocks:** motion ကို beat တစ်ခုလုံးအတွင်း ဆက်ပြပြီး active block highlight.
 
-11×3 = **33 SVG layout previews** ကို Chromium gallery ဖြင့် manual visual review လုပ်ထားသည်။ 12/8, beat 12/12, 240 BPM stress frame-ээр 2-digit number болон dense 12-beat arrangement ကိုလည်း ထပ်စစ်ထားသည်။ Metronome Engine `npm run verify` တွင် **20/20 tests** pass бөгөөд production/static website bundle sync ဖြစ်သည်။ Video Engine Chromium end-to-end test သည် `sweep-dial` portrait 3/8 example ကို **28 frames, 720×1280 VP8 video + 48 kHz mono Opus** အဖြစ် ထုတ်ပေးပြီး pass ဖြစ်သည်။ Automated pixel/snapshot visual regression ကို မထည့်ရသေးပါ။
+11×3 = **33 SVG layout previews** ကို Chromium gallery ဖြင့် manual visual review လုပ်ထားသည်။ 12/8, beat 12/12, 240 BPM stress frame-ээр 2-digit number болон dense 12-beat arrangement ကိုလည်း ထပ်စစ်ထားသည်။ Metronome Engine `npm run verify` တွင် **22/22 tests** pass бөгөөд production/static website bundle sync ဖြစ်သည်။ Video Engine Chromium end-to-end test သည် `sweep-dial` portrait 3/8 example ကို **28 frames, 720×1280 VP8 video + 48 kHz mono Opus** အဖြစ် ထုတ်ပေးပြီး pass ဖြစ်သည်။ Automated pixel/snapshot visual regression ကို မထည့်ရသေးပါ။
 
 ## လက်ကျန်ကန့်သတ်ချက်များ
 
-- Engine runtime frame input တွင် `NaN`/`Infinity` edge-case validation နှင့် SVG `logoUrl` attribute escaping ကို ပိုမိုစမ်းသပ်/ပြင်ဆင်ရန် ကျန်သည်။
-- Adapter သည် လက်ရှိ `logoUrl` မပေးသဖြင့် exported Metronome video တွင် brand/instrument logo မပါပါ။
+- Engine runtime frame input တွင် `NaN`/`Infinity` edge-case validation ကို ပိုမိုစမ်းသပ်/ပြင်ဆင်ရန် ကျန်သည်။ SVG `logoUrl` attribute escaping ကို `escapeText()` ဖြင့် ပြင်ပြီးဖြစ်သည်။
+- Adapter က `logoUrl` ကို data URI အဖြစ် ပေးပို့ပြီး house mark (`m-sharing-mark.svg`) ပါဝင်လာသည်။ Instrument တစ်ခုချင်းအတွက် square mark asset မရှိသေးသဖြင့် design 11 ခုလုံးတွင် house mark ကို သုံးထားသည်။
 - Browser test သည် Chromium/headless environment ပေါ်တွင်သာ အတည်ပြုထားသည်။ Safari/Firefox နှင့် ဖုန်းအစစ် compatibility မစစ်ရသေးပါ။ 375px/1280px viewport test သည် actual device test မဟုတ်ပါ။
 - 11×3 design/aspect SVG outputs ကို engine unit tests ဖြင့်စစ်ပြီး Chromium gallery ဖြင့် manual visual review လုပ်ထားသည်။ Repeatable browser visual snapshot နှင့် automated clipping/overlap assertions မရှိသေးပါ။
 - Default click tone ကို user က ပြောင်းနိုင်ခြင်း၊ volume/accent options နှင့် အခြား instrument adapter များကို မထည့်ရသေးပါ။
@@ -132,7 +132,7 @@ SVG ၏ native design artboard အရွယ်အစားမှာ `16x9` = 192
 | `bounce-ball` | Bounce Ball | Cream / orange | Beat pad များကြား ball ခုန်သည်; current/total beat readout ပါသည်။ |
 | `stack-blocks` | Stack Blocks | Slate / violet | Beat အလိုက် block များတက်ပြီး future position များကို outline လုပ်သည်။ |
 
-`src/logos.ts` သည် design ID အလိုက် `drum`, `piano`, `guitar`, `bass`, `violin`, `cello`, `vocal` သို့မဟုတ် `sharing` ကဲ့သို့ logo-name metadata ပေးသည်; အမှန်တကယ် URL/path ကို host က map လုပ်ရသည်။ Adapter က လက်ရှိ `logoUrl` မပေးသဖြင့် Metronome export တွင် logo မပါ။ Engine text အတွက် `escapeText()` ရှိသော်လည်း SVG `logoUrl` attribute အတွက် escaping test မလုံလောက်သေးကြောင်း backlog တွင်ထားသည်။
+`src/logos.ts` သည် design ID အလိုက် `drum`, `piano`, `guitar`, `bass`, `violin`, `cello`, `vocal` သို့မဟုတ် `sharing` ကဲ့သို့ logo-name metadata ပေးသည်; အမှန်တကယ် URL/path ကို host က map လုပ်ရသည်။ `layout.ts` ရဲ့ `logo()` က href ကို `escapeText()` ဖြင့် escape လုပ်သည် — `&` မပါဘဲ ထည့်လျှင် SVG document တစ်ခုလုံးကို browser က ငြင်းပယ်ပြီး frame ဗလာထွက်သည်။ `renderMetronomeFrame()` က `title`, `subtitle`, `logoUrl` တွင် string မဟုတ်သည့် တန်ဖိုးကို ဖယ်ရှားသည် (throw မလုပ်ပါ)။ Adapter က logo ကို data URI အဖြစ် inline လုပ်ပေးသဖြင့် Metronome export တွင် house mark ပါဝင်သည်; blob SVG သည် file path ကို မဖွင့်နိုင်ပါ။
 
 ## Package metadata နှင့် clean-install အခြေအနေ
 
