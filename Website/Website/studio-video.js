@@ -57,6 +57,28 @@
 
   const selectedTool = (new URLSearchParams(window.location.search).get('tool') || 'drums').toLowerCase();
 
+  /**
+   * The drum voices. Each is a short synthesized stroke, because the Plan
+   * does not let an adapter assume the Sound Engine exists. `decay` is how
+   * long the stroke rings; `tone` is where its body sits.
+   */
+  const DRUM_VOICES = {
+    kick: { tone: 52, sweepTo: 42, decay: 0.16, gain: 0.85, noise: 0.02 },
+    snare: { tone: 190, sweepTo: 165, decay: 0.13, gain: 0.5, noise: 0.55 },
+    hihat: { tone: 7600, sweepTo: 6100, decay: 0.05, gain: 0.22, noise: 0.85 },
+  };
+  /**
+   * How the four Sound Model choices differ. `ring` stretches every stroke,
+   * which is what separates a dry Studio take from a long Room one;
+   * `bright` moves the body up or down.
+   */
+  const SOUND_MODELS = {
+    visual: { level: 0, ring: 1, bright: 1 },
+    natural: { level: 1, ring: 1, bright: 1 },
+    studio: { level: 1, ring: 0.8, bright: 1.15 },
+    room: { level: 1, ring: 1.9, bright: 0.9 },
+  };
+
   let isRendering = false;
   let cancelRequested = false;
   let objectUrl = null;
@@ -383,6 +405,88 @@
     ctx.restore();
   }
 
+  /**
+   * One stroke of a drum, at `at` seconds, on a context that is rendering
+   * offline. A stroke is a pitched body that falls away plus a burst of
+   * noise for the stick; a kick has almost no noise, a hi-hat almost
+   * nothing else.
+   */
+  const addStroke = (context, voice, at, gainScale, model) => {
+    const body = DRUM_VOICES[voice] || DRUM_VOICES.snare;
+    const level = body.gain * gainScale;
+    if (level <= 0) return;
+    const decay = body.decay * model.ring;
+
+    const tone = context.createOscillator();
+    const toneGain = context.createGain();
+    tone.type = 'sine';
+    tone.frequency.setValueAtTime(body.tone * model.bright, at);
+    tone.frequency.exponentialRampToValueAtTime(Math.max(20, body.sweepTo * model.bright), at + decay);
+    toneGain.gain.setValueAtTime(0, at);
+    toneGain.gain.linearRampToValueAtTime(level, at + 0.002);
+    toneGain.gain.exponentialRampToValueAtTime(0.0008, at + decay);
+    tone.connect(toneGain);
+    toneGain.connect(context.destination);
+    tone.start(at);
+    tone.stop(at + decay + 0.02);
+
+    if (body.noise > 0) {
+      const frames = Math.max(1, Math.ceil(decay * context.sampleRate));
+      const noise = context.createBuffer(1, frames, context.sampleRate);
+      const channel = noise.getChannelData(0);
+      // A fixed seed keeps one render byte-identical to the next, which is
+      // what makes the export testable.
+      let seed = 12345;
+      for (let index = 0; index < frames; index += 1) {
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+        channel[index] = (seed / 0x3fffffff - 1) * (1 - index / frames);
+      }
+      const source = context.createBufferSource();
+      const noiseGain = context.createGain();
+      source.buffer = noise;
+      noiseGain.gain.value = level * body.noise;
+      source.connect(noiseGain);
+      noiseGain.connect(context.destination);
+      source.start(at);
+    }
+  };
+
+  /**
+   * The drum performance as one AudioBuffer covering the whole video,
+   * count-in included: the count is spoken over a click, so a silent
+   * count-in would leave the first bar out of time with the picture.
+   */
+  async function createDrumAudio({ settings, hits, countIn, duration, meta }) {
+    const model = SOUND_MODELS[settings.soundModel] || SOUND_MODELS.visual;
+    if (model.level === 0) return null;
+    const OfflineContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!OfflineContext) throw new Error('This browser cannot synthesize the drum sound. Try a current version of Chrome, Edge, Safari, or Firefox.');
+
+    const sampleRate = 48000;
+    const total = countIn + duration;
+    const context = new OfflineContext(2, Math.max(1, Math.ceil(total * sampleRate)), sampleRate);
+
+    const soundGain = settings.soundVolume / 100;
+    for (const hit of hits) {
+      addStroke(context, hit.type, countIn + hit.at, soundGain, model);
+    }
+
+    if (settings.countEnabled) {
+      const beatSeconds = (60 / Math.max(1, meta.bpm)) * (4 / Math.max(1, meta.beatType));
+      const countGain = settings.countVolume / 100;
+      for (let beat = 0; beat < meta.beats; beat += 1) {
+        const at = beat * beatSeconds;
+        if (at >= countIn) break;
+        // The count is a woodblock: a bright click on every beat, the
+        // downbeat higher, so the player hears where the bar starts.
+        addStroke(context, 'hihat', at, countGain * 0.8, model);
+        if (beat === 0) addStroke(context, 'snare', at, countGain * 0.35, model);
+      }
+    }
+
+    return await context.startRendering();
+  }
+
   function updatePlaybackControls() {
     const duration = Number.isFinite(video.duration) ? video.duration : 0;
     if (timeline) {
@@ -428,6 +532,11 @@
         segments.push({ seconds: countIn, draw: (ctx, at) => drawCountIn(ctx, at, settings, meta) });
       }
       segments.push({ seconds: duration, draw: (ctx, at) => drawPerformance(ctx, at, hits, duration, settings, meta) });
+
+      // The sound spans the count-in and the performance together, so it
+      // rides on the first of those two segments and starts at zero.
+      const audio = await createDrumAudio({ settings, hits, countIn, duration, meta });
+      if (audio) segments[0].audio = audio;
       // The Plan's last part of the length: the Thank You clip. The engine
       // owns its address and shape, so the page only asks for it.
       const ending = await engine.thankYouSegment(settings.size.width, settings.size.height);
@@ -455,7 +564,13 @@
       if (playButton) playButton.disabled = false;
       if (timeline) timeline.disabled = false;
       updatePlaybackControls();
-      const audioNote = settings.soundModel === 'visual' ? 'silent visual video' : `${settings.soundModel} selected · audio adapter pending`;
+      // The status names the drum sound, because that is the part the
+      // Sound Model controls. The Thank You clip carries its own sound
+      // whether or not the drums do, so claiming the whole file is silent
+      // would be a lie once the ending is attached.
+      const audioNote = audio
+        ? `${settings.soundModel} drum sound`
+        : 'visual only · no drum sound';
       setStatus(`Rendered ${result.frames} frames · ${settings.ratio} · ${audioNote}`);
     } catch (error) {
       setStatus(`Video render failed: ${error.message || error}`);

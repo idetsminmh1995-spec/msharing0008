@@ -7,7 +7,7 @@ Production copy: `Website/Website/assets/video-engine.js`
 
 ## လက်ရှိ Video Engine အခြေအနေ
 
-Video Engine သည် canvas frame များကို WebCodecs ဖြင့် MP4/WebM အဖြစ် render/mux လုပ်ခြင်း၊ MediaRecorder fallback, optional `AudioBuffer`, progress/cancel, memory guard နှင့် cleanup code များကို ပံ့ပိုးသည်။ လက်ရှိ Studio တွင် Drum, Metronome, Guitar, Piano, Bass, Strings (violin) နှင့် Voice adapter ခုနစ်ခုရှိသည်။ Drum export သည် visual-only ဖြစ်ပြီး၊ Metronome adapter က `OfflineAudioContext` ဖြင့် သီးခြားဖန်တီးသော click-track `AudioBuffer` ကို ပေးနိုင်သည်။ Guitar adapter သည် tablature မှ တီးခတ်ပုံကို ဆွဲပြီး အသံမထုတ်ပါ။ Piano နှင့် Bass adapter များလည်း visual-only ဖြစ်သည်။ Strings card သည် လက်ရှိတွင် violin ပုံကို ဆွဲပေးသည် — တီးခတ်ပုံ (fingering) မပါပါ။ Voice adapter သည် အသံဖိုင် import သို့မဟုတ် microphone အသံဖမ်းမှုကို decode လုပ်ပြီး ထို အသံပါသော ဗီဒီယို (audible) ကို ထုတ်ပေးသည်။
+Video Engine သည် canvas frame များကို WebCodecs ဖြင့် MP4/WebM အဖြစ် render/mux လုပ်ခြင်း၊ MediaRecorder fallback, optional `AudioBuffer`, progress/cancel, memory guard နှင့် cleanup code များကို ပံ့ပိုးသည်။ လက်ရှိ Studio တွင် Drum, Metronome, Guitar, Piano, Bass, Strings (violin) နှင့် Voice adapter ခုနစ်ခုရှိသည်။ Drum export သည် Sound Model ရွေးထားလျှင် `OfflineAudioContext` ဖြင့် တိုက်ရိုက်ဖန်တီးသော ဒရမ်အသံကို ပါဝင်သည် (Visual Only ရွေးလျှင် အသံမပါ)၊ Metronome adapter က သီးခြားဖန်တီးသော click-track `AudioBuffer` ကို ပေးသည်။ Guitar adapter သည် tablature မှ တီးခတ်ပုံကို ဆွဲပြီး အသံမထုတ်ပါ။ Piano နှင့် Bass adapter များလည်း visual-only ဖြစ်သည်။ Strings card သည် လက်ရှိတွင် violin ပုံကို ဆွဲပေးသည် — တီးခတ်ပုံ (fingering) မပါပါ။ Voice adapter သည် အသံဖိုင် import သို့မဟုတ် microphone အသံဖမ်းမှုကို decode လုပ်ပြီး ထို အသံပါသော ဗီဒီယို (audible) ကို ထုတ်ပေးသည်။
 
 ## အခြား instrument များ၏ code readiness
 
@@ -84,6 +84,16 @@ The standard 16:9 export is now `1920×1080`; square and portrait exports are `1
 - Adapter တွင် design, orientation (16:9/9:16/1:1), quarter-note BPM, time signature နှင့် bars ရွေးနိုင်ပြီး 12 sec အထိ deterministic animated video ထုတ်သည်။ Browser-size canvas သည် 1280×720, 720×1280 သို့မဟုတ် 720×720, 30 FPS ဖြစ်သည်။
 - `OfflineAudioContext` မှ bar downbeat accent ပါသော mono click-track `AudioBuffer` ကို adapter ကဖန်တီးပြီး shared Video Engine သို့ပေးသည်။ ဤ click track သည် Sound Engine မဟုတ်ပါ။ WebCodecs/MediaRecorder support အလိုက် MP4 သို့မဟုတ် WebM ထွက်နိုင်သည်။ စမ်းသပ်ထားသော Chromium run တွင် VP8 video နှင့် 48 kHz mono Opus audio ထွက်ခဲ့သည်။
 - UI တွင် opening-frame preview, duration-limit validation, progress/cancel, output preview, play/seek/download ပါဝင်သည်။ Metronome card click navigation နှင့် 12-sec limit ကို Chromium integration test ဖြင့်စစ်ထားသည်။
+
+## Drum Studio — ဗီဒီယိုထဲတွင် ဒရမ်အသံ (2026-11-24)
+
+- **အသံ ချိတ်ပြီးပါပြီ။** ယခင် Drum export သည် အသံမပါသော ဗီဒီယိုသာ ဖြစ်ပြီး Sound Model ရွေးလျှင် status တွင် "audio adapter pending" ဟု ပြခဲ့သည်။ ယခု `studio-video.js` က `OfflineAudioContext` ဖြင့် ဒရမ်အသံကို တိုက်ရိုက် ဖန်တီးပြီး segment ၏ `audio` အဖြစ် Video Engine သို့ ပေးသည်။ Metronome adapter ၏ နည်းလမ်းအတိုင်း ဖြစ်သည် — Plan က `Sound Engine` folder ကို implementation ရှိသကဲ့သို့ မယူဆရန် ဆိုထားသဖြင့် adapter ကိုယ်တိုင် synthesize လုပ်သည်။
+- **အသံ ၃ မျိုး** — kick (နိမ့်သော tone ကျဆင်းမှု၊ noise နည်း)၊ snare (အလယ် tone + noise များ)၊ hi-hat (မြင့်သော tone + noise များ)။ noise ကို ပုံသေ seed ဖြင့် ဖန်တီးသဖြင့် render တစ်ချီနှင့်တစ်ချီ ထပ်တူဖြစ်သည်။
+- **Sound Model ၄ မျိုး** — Visual Only (အသံ လုံးဝမထုတ်)၊ Natural၊ Studio၊ Room။ တစ်ခုစီသည် room length နှင့် brightness ဖြင့် ကွဲပြားသည်။ ရွေးထားသော model ကို status တွင် ပြသည်။
+- **Count Voice အသံ** — Count Voice On ဖြစ်လျှင် count-in ကို ကြိမ်သံဖြင့် တီးသည် (downbeat တွင် ပိုမြင့်သည်)။ count-in သည် အသံပါသော segment ဖြစ်သဖြင့် ပထမ bar သည် ရုပ်နှင့် အသံ ကိုက်ညီသည်။
+- **Status မှန်ကန်မှု** — ယခင် "silent visual video" ဟု အမြဲပြခဲ့သည်။ ယခု ဒရမ်အသံ မပါလျှင် "visual only · no drum sound"၊ ပါလျှင် "<model> drum sound" ဟု ပြသည်။ Thank You clip တွင် ကိုယ်ပိုင်အသံ ပါသဖြင့် ဖိုင်တစ်ခုလုံးကို "silent" ဟု မခေါ်တော့ပါ။
+- **စမ်းသပ်မှု** — `tools/test-studio-video-browser.mjs` တွင် case ၂ ခု ထည့်သည်: (၁) Visual Only သည် audio stream မထုတ်ကြောင်း၊ status က ဒရမ်အသံမရှိကြောင်း ပြောကြောင်း; (၂) Natural သည် audio stream ထုတ်ကြောင်း၊ peak > 3000 ရှိကြောင်း၊ beat ပေါ်တွင် ကျကြောင်း (beat ပေါ် peak သည် beat ကြားထက် ၂ ဆ ကျော်)။ နှစ်ခုလုံးအတွက် Thank You clip ကို ဖယ်ထားသည် — clip ၏ ကိုယ်ပိုင်အသံက ဒရမ်အသံကို ဖုံးလွှမ်းမည် ဖြစ်သောကြောင့်။
+- **ကျန်ရှိ** — count ကို စကားဖြင့် (spoken "one, two, three, four") မခေါ်သေးဘဲ ကြိမ်သံဖြင့်သာ တီးသည်။ Count Voice အသံဖိုင် (သို့) speech synthesis ကို နောက်ပိုင်း ချိတ်ရန် ကျန်သည်။
 
 **အတည်ပြုထားသော စမ်းသပ်မှုများ:** Metronome Engine verify 20/20; Video Engine muxer 15/15; cleanup/safety 5/5; Video Engine MP4 smoke, updated Drum settings/export regression နှင့် Metronome card-to-export browser integration pass. Metronome test output: 3/8, quarter-note 96 BPM, 1 bar, 28 frames/0.933 sec, 720×1280 VP8 + 48kHz mono Opus; `ffprobe` က stream နှစ်ခုလုံးကိုဖတ်နိုင်သည်။ 375×812 phone နှင့် 1280×900 desktop viewport တွင် horizontal overflow မရှိ။ ဖုန်းအစစ်၊ Safari/Firefox နှင့် MediaRecorder-only fallback ကို မစစ်ရသေးပါ။
 

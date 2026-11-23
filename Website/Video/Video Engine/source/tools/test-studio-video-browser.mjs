@@ -366,8 +366,15 @@ print(dark, red, white)
     const bytes = Buffer.from(await evaluate(`(async () => { const response = await fetch(${JSON.stringify(state.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); })()`), 'base64');
     const path = `${output}.${name.replace(/\.musicxml$/, '')}.mp4`;
     await writeFile(path, bytes);
-    const { stdout } = await exec('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'json', path]);
-    return { seconds: Number(JSON.parse(stdout).format.duration), href: state.href, path };
+    const { stdout } = await exec('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-show_entries', 'stream=codec_type', '-of', 'json', path]);
+    const probed = JSON.parse(stdout);
+    return {
+      seconds: Number(probed.format.duration),
+      streams: probed.streams,
+      status: state.status,
+      href: state.href,
+      path,
+    };
   };
 
   // Four 4/4 bars at 60 BPM: sixteen seconds, past the old twelve-second cap
@@ -436,7 +443,54 @@ print(*image.load()[image.size[0] // 2, image.size[1] // 2])
   assert.ok(thankedStreams.some((stream) => stream.codec_type === 'audio'),
     `The Thank You clip's sound is missing: ${JSON.stringify(thankedStreams)}`);
 
-  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slow.seconds, twoVoiceSeconds: twoVoice.seconds, repeatSeconds: repeated.seconds, twoPartSeconds: twoPart.seconds, countInSeconds: counted.seconds, thankYouSeconds: thanked.seconds }, null, 2));
+  // The drum sound. A Sound Model other than Visual Only means the file
+  // carries the drums the picture shows, and Visual Only means it does not:
+  // the status and the streams must agree, because a silent file described
+  // as audible is worse than no sound at all.
+  //
+  // The Thank You clip is taken away for these two renders. It carries its
+  // own sound, so leaving it in would give every export an audio track and
+  // say nothing about whether the drums themselves are heard.
+  thankYouClip = null;
+  const visualOnly = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'visual-only.musicxml', thanked.href);
+  assert.match(visualOnly.status, /visual only · no drum sound/,
+    `Visual Only did not say the drums are absent: ${visualOnly.status}`);
+  assert.equal(visualOnly.streams.some((stream) => stream.codec_type === 'audio'), false,
+    `Visual Only still carries a sound track: ${JSON.stringify(visualOnly.streams)}`);
+
+  await evaluate("(() => { const model = document.querySelector('[data-sound-model]'); model.value = 'natural'; model.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  const audible = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'audible.musicxml', visualOnly.href);
+  const audibleStream = audible.streams.find((stream) => stream.codec_type === 'audio');
+  assert.ok(audibleStream, `A drum Sound Model produced no sound: ${JSON.stringify(audible.streams)}`);
+  assert.match(audible.status, /natural drum sound/,
+    `An audible export does not say which sound it carries: ${audible.status}`);
+
+  // The hits have to be heard where the picture shows them: a kick and a
+  // snare alternate on the quarters of a 120 BPM bar, so the sound is loud
+  // at 0.5 s steps and quiet between them.
+  const wavPath = `${output}.audible.wav`;
+  await exec('ffmpeg', ['-v', 'error', '-y', '-i', audible.path, '-ac', '1', '-ar', '48000', '-c:a', 'pcm_s16le', wavPath]);
+  const loudness = JSON.parse((await exec('python3', ['-c', `
+import json, struct, wave
+handle = wave.open(${JSON.stringify(wavPath)})
+frames = handle.getnframes()
+rate = handle.getframerate()
+samples = struct.unpack('<%dh' % frames, handle.readframes(frames))
+window = rate // 100
+peaks = []
+for index in range(0, frames // window):
+    piece = samples[index * window:(index + 1) * window]
+    peaks.append(max(abs(value) for value in piece))
+print(json.dumps({'peak': max(peaks) if peaks else 0, 'at': peaks}))
+`])).stdout);
+  assert.ok(loudness.peak > 3000, `The drum sound is too quiet to hear: peak ${loudness.peak}`);
+  const peakAt = (seconds) => loudness.at[Math.round(seconds * 100)] ?? 0;
+  const onBeat = Math.max(peakAt(0.02), peakAt(0.52), peakAt(1.02));
+  const offBeat = Math.max(peakAt(0.26), peakAt(0.76), peakAt(1.26));
+  assert.ok(onBeat > offBeat * 2,
+    `The drums do not land on the beat: ${onBeat} on the beat against ${offBeat} between beats`);
+
+  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slow.seconds, twoVoiceSeconds: twoVoice.seconds, repeatSeconds: repeated.seconds, twoPartSeconds: twoPart.seconds, countInSeconds: counted.seconds, thankYouSeconds: thanked.seconds, visualOnlyStatus: visualOnly.status, audibleStatus: audible.status, drumPeak: loudness.peak }, null, 2));
 } finally {
   cdp?.close();
   for (const child of [browser, server]) {
