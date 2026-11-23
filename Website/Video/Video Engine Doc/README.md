@@ -187,4 +187,6 @@ Plan §6.1 သည် segment တစ်ခုချင်း၏ `AudioBuffer` က
 
 Video Engine muxer 15/15, layout 8/8, cleanup 5/5, Voice နှင့် Drum browser regression နှစ်ခုလုံး ဆက်လက်အောင်မြင်သည်။
 
-**လက်ကျန် (§6.2, §6.3):** Piano hand/wrist animation သည် သီးခြား project အဖြစ် ကျန်သည်။ MediaRecorder-only fallback နှင့် `muxMp4ToStream()` ၏ incremental muxing ကို real browser/device တွင် မစစ်ရသေးပါ။
+**MediaRecorder fallback (§6.3):** WebCodecs မရှိသော browser အတွက် real-time path ကို သီးခြား စစ်ထားသည် — fixture က `VideoEncoder`/`VideoFrame` ကို ဖျက်လိုက်သဖြင့် `render()` သည် `path: 'mediarecorder'` သို့ ဆင်းသည်။ ထို path မှ ထွက်လာသော ဖိုင်တွင်လည်း အသံ ပါကြောင်း (440 Hz တိုင်းတာ) စစ်ထားသည်။ Headless Chromium တွင် `--autoplay-policy=no-user-gesture-required` မပါလျှင် `AudioContext` က suspended ဖြစ်နေသဖြင့် အသံ track လုံးဝ မထွက်ပါ — ဤအချက်သည် test environment ၏ ကန့်သတ်ချက်ဖြစ်ပြီး အတည့်အစစ် browser တွင် အသုံးပြုသူ၏ click က context ကို နှိုးပေးမည်ဖြစ်သည်။ `muxMp4ToStream()` ၏ incremental muxing ကို real device တွင် မစစ်ရသေးပါ။
+
+**လက်ကျန် (§6.2):** Piano hand/wrist animation (wrist trajectory planner, site GLB calibration) သည် သီးခြား project အဖြစ် ကျန်သည်။

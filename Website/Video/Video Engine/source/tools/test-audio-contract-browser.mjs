@@ -129,13 +129,15 @@ async function waitForFixture(timeoutMs = 15000) {
 const probe = async (path) => {
   const { stdout } = await exec('ffprobe', [
     '-v', 'error', '-show_entries', 'format=duration',
-    '-show_entries', 'stream=codec_name,channels,sample_rate', '-of', 'json', path,
+    '-show_entries', 'stream=codec_type,codec_name,channels,sample_rate', '-of', 'json', path,
   ]);
   const info = JSON.parse(stdout);
+  const VIDEO_CODECS = new Set(['vp8', 'vp9', 'h264', 'av1']);
   return {
     seconds: Number(info.format.duration),
-    video: info.streams.find((stream) => stream.codec_name === 'vp8'),
-    audio: info.streams.find((stream) => stream.codec_name === 'opus'),
+    streams: info.streams,
+    video: info.streams.find((stream) => VIDEO_CODECS.has(stream.codec_name)),
+    audio: info.streams.find((stream) => stream.codec_type === 'audio'),
   };
 };
 
@@ -174,6 +176,7 @@ try {
 
   browser = spawn(CHROMIUM, [
     '--headless=new', '--no-sandbox', '--disable-gpu', '--mute-audio',
+    '--autoplay-policy=no-user-gesture-required',
     `--remote-debugging-port=${debugPort}`, `--user-data-dir=${join(profile, 'profile')}`,
     `http://127.0.0.1:${httpPort}${FIXTURE_PATH}`,
   ], { stdio: 'ignore' });
@@ -188,9 +191,9 @@ try {
 
   const render = async (name) => {
     const result = await evaluate(`runAudioContractTest(${JSON.stringify(name)})`);
-    const path = join(profile, `${name}.${result.container === 'mp4' ? 'mp4' : 'webm'}`);
-    await writeFile(path, Buffer.from(result.base64, 'base64'));
-    return { ...result, path, probe: await probe(path) };
+    const file = join(profile, `${name}.${result.container === 'mp4' ? 'mp4' : 'webm'}`);
+    await writeFile(file, Buffer.from(result.base64, 'base64'));
+    return { ...result, file, probe: await probe(file) };
   };
 
   // 1. Timeline. Two one-second tones; the second starts at 1s.
@@ -201,8 +204,8 @@ try {
   assert.ok(Math.abs(offset.probe.seconds - 2) < 0.3,
     `two one-second segments did not make a two-second file: ${offset.probe.seconds}s`);
   // Inside each second, away from the join and the codec padding.
-  const first = await pitchBetween(offset.path, 0.2, 0.8);
-  const second = await pitchBetween(offset.path, 1.2, 1.8);
+  const first = await pitchBetween(offset.file, 0.2, 0.8);
+  const second = await pitchBetween(offset.file, 1.2, 1.8);
   assert.ok(Math.abs(first - 440) < 25, `segment one is not its 440Hz tone: ${first.toFixed(1)}Hz`);
   assert.ok(Math.abs(second - 880) < 30, `segment two is not its 880Hz tone: ${second.toFixed(1)}Hz`);
   // The point of the check: segment two is not also at 440Hz, which is what
@@ -213,7 +216,7 @@ try {
   // 2. Sample rate. A 44.1kHz buffer keeps its pitch through the 48kHz master.
   const resample = await render('resample');
   assert.equal(resample.probe.audio.sample_rate, '48000', 'the resampled sound is not at 48kHz');
-  const resampled = await pitchBetween(resample.path, 0.2, 0.8);
+  const resampled = await pitchBetween(resample.file, 0.2, 0.8);
   assert.ok(Math.abs(resampled - 660) < 25,
     `a 44.1kHz 660Hz tone came out at ${resampled.toFixed(1)}Hz, so it was not resampled correctly`);
 
@@ -222,10 +225,22 @@ try {
   assert.equal(Number(channels.probe.audio.channels), 2,
     'a stereo segment followed by a mono one was folded down to mono; the widest segment has to decide');
 
+  // 4. Fallback. A browser without WebCodecs records in real time instead;
+  // the Plan asks for that path to be exercised separately, and the sound
+  // still has to come through it.
+  const fallback = await render('fallback');
+  assert.equal(fallback.path, 'mediarecorder',
+    `removing WebCodecs did not reach the MediaRecorder path (got ${fallback.path})`);
+  assert.ok(fallback.probe.audio, `the real-time capture has no sound: ${JSON.stringify(fallback.probe.streams)}`);
+  const captured = await pitchBetween(fallback.file, 0.2, 0.8);
+  assert.ok(Math.abs(captured - 440) < 25,
+    `the real-time capture is not the 440Hz tone that went in: ${captured.toFixed(1)}Hz`);
+
   console.log(JSON.stringify({
     offset: { seconds: offset.probe.seconds, first: Number(first.toFixed(1)), second: Number(second.toFixed(1)) },
     resample: { hz: Number(resampled.toFixed(1)), sampleRate: resample.probe.audio.sample_rate },
     channels: Number(channels.probe.audio.channels),
+    fallback: { path: fallback.path, hz: Number(captured.toFixed(1)) },
   }, null, 2));
 } finally {
   cdp?.close();

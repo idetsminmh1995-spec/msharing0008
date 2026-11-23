@@ -38,6 +38,7 @@
       container: result.container,
       path: result.path,
       seconds: result.seconds,
+      frames: result.frames,
       base64: await encode(result),
     };
   }
@@ -65,6 +66,22 @@
         { seconds: 1, audio: await toneBuffer(1, 440, 48000, 2), draw: flat('#102a43') },
         { seconds: 1, audio: await toneBuffer(1, 440, 48000, 1), draw: flat('#d64545') },
       ]);
+    }
+    if (name === 'fallback') {
+      // Browsers without WebCodecs get the real-time MediaRecorder path.
+      // Removing the constructors is how this browser becomes one, and the
+      // sound still has to survive it.
+      const saved = { VideoEncoder: window.VideoEncoder, VideoFrame: window.VideoFrame };
+      delete window.VideoEncoder;
+      delete window.VideoFrame;
+      try {
+        return await render([
+          { seconds: 1, audio: await toneBuffer(1, 440, 48000, 2), draw: flat('#102a43') },
+        ]);
+      } finally {
+        window.VideoEncoder = saved.VideoEncoder;
+        window.VideoFrame = saved.VideoFrame;
+      }
     }
     throw new Error(`unknown case: ${name}`);
   };
