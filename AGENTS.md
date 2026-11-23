@@ -188,3 +188,16 @@ is rejected outright (`Bad credentials`). Confirm with
   https://api.github.com/repos/<owner>/<repo>/git/refs -d '{"ref":"refs/heads/probe","sha":"<short-sha>"}'`:
 `422` means the token was accepted and only the made-up SHA was refused, while
 `403` means it cannot write.
+
+**2026-11-23 13:2x — both tokens are read-only.** A push that had worked at
+12:14 UTC was refused at 13:21 UTC with the same `403 ... denied`. Checked
+with the recipe above and with the tokens pasted directly into the URL: every
+attempt is refused. `$GITHUB_TOKEN` still reads the repo and reports
+`push: true`, but `POST /git/refs` and `PUT /contents/...` both answer
+`403 Resource not accessible by integration`. The `github_pat_…` the user
+supplied authenticates as `mhdeliverymm`, and the repo API reports
+`pull: true` with `push: false` — a fine-grained token whose Contents
+permission is read-only. Pushing needs a token with Contents: write on
+`idetsminmh1995-spec/msharing0008`; until one is supplied, commits stay
+local and must be reported as unpushed rather than described as landed.
+
