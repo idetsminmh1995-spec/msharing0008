@@ -283,9 +283,53 @@ print(moved, worst, width * height)
     `The same metronome settings drew a different frame the second time: ${movedPixels} of ${totalPixels} pixels moved`);
   assert.ok(worstDelta <= 48, `The second render changed a colour rather than rounding one: delta ${worstDelta}`);
 
+  // Every design gets a picture (Plan §5, metronome "remaining" list). A
+  // design that throws, or that draws nothing, would still pass the export
+  // test above because that one only exercises `sweep-dial`. Each design is
+  // rendered through the page's own preview path, so this covers the code
+  // the user actually sees, and the eleven pictures are compared with each
+  // other: two designs that draw the same frame mean one of them is dead.
+  const designs = JSON.parse(await evaluate("JSON.stringify(window.MetronomeDesigns.listDesigns().map((design) => design.id))"));
+  assert.equal(designs.length, 11, `Expected 11 metronome designs, found ${designs.length}`);
+  const snapshots = {};
+  for (const design of designs) {
+    await evaluate(`(() => { const select = document.querySelector('[data-metronome-design]'); select.value = ${JSON.stringify(design)}; select.dispatchEvent(new Event('change', {bubbles:true})); })()`);
+    const designReadyAt = Date.now();
+    let shot = null;
+    while (Date.now() - designReadyAt < 10000) {
+      shot = JSON.parse(await evaluate(`(async () => {
+        const image = document.querySelector('[data-metronome-preview]');
+        if (image.hidden || !image.src || !image.naturalWidth) return JSON.stringify({ ready: false });
+        const canvas = document.createElement('canvas');
+        canvas.width = 240; canvas.height = 240;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 240, 240);
+        ctx.drawImage(image, 0, 0, 240, 240);
+        const data = ctx.getImageData(0, 0, 240, 240).data;
+        let ink = 0, hash = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const value = data[i] + data[i + 1] * 3 + data[i + 2] * 7;
+          if (value > 24) ink += 1;
+          hash = (hash * 31 + value) % 2147483647;
+        }
+        return JSON.stringify({ ready: true, ink, hash, status: document.querySelector('[data-studio-status]').textContent });
+      })()`));
+      if (shot.ready) break;
+      await sleep(100);
+    }
+    assert.ok(shot?.ready, `Design "${design}" did not produce a decodable preview`);
+    assert.ok(shot.ink > 400, `Design "${design}" drew an almost empty frame (${shot.ink} lit samples)`);
+    assert.doesNotMatch(shot.status, /failed|error/i, `Design "${design}" reported a failure: ${shot.status}`);
+    snapshots[design] = shot.hash;
+  }
+  const duplicateDesigns = Object.entries(snapshots)
+    .filter(([design, hash]) => Object.entries(snapshots).some(([other, value]) => other !== design && value === hash));
+  assert.deepEqual(duplicateDesigns, [], `These designs drew an identical frame: ${duplicateDesigns.map(([design]) => design).join(', ')}`);
+
   console.log(JSON.stringify({
     status: result.status, bytes: result.bytes, download: state.download, ffprobe: probe,
     determinism: { movedPixels, totalPixels, worstDelta },
+    designs: { count: designs.length, ids: designs },
   }, null, 2));
 } finally {
   cdp?.close();

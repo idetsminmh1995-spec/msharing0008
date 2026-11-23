@@ -148,7 +148,7 @@ Audio သည် Engine shared sound capability မဟုတ်ပါ။ Adapter 
 
 **စမ်းသပ်မှု:** Engine 20/20, Video Engine muxer 15/15, cleanup/safety 5/5; Chromium Engine MP4 smoke, latest Drum Studio MP4 export/regression နှင့် Metronome homepage-card-to-export flow pass. Metronome output သည် 3/8, quarter-note 96 BPM, 1 bar တွင် 28 frames/0.933 sec, 720×1280 VP8 နှင့် 48 kHz mono Opus ဖြစ်ကြောင်း `ffprobe` ဖြင့်စစ်ထားသည်။ Phone 375×812, desktop 1280×900 layout တွင် overflow မရှိ။
 
-**လက်ကျန်:** ဖုန်းအစစ်/Safari/Firefox နှင့် MediaRecorder-only fallback; design 11 မျိုးအားလုံးအတွက် browser visual snapshots; logo asset policy; Engine source input/XML escaping edge cases. Guitar ကို နောက်ဦးစားပေးအဖြစ် ဆက်လုပ်ပြီး Piano, Bass, Strings, Voice ကို သီးခြား adapter ဖြင့်သာ ချိတ်ဆက်ရန်။
+**လက်ကျန်:** ဖုန်းအစစ်/Safari/Firefox နှင့် MediaRecorder-only fallback; logo asset policy; Engine source input/XML escaping edge cases. **design 11 မျိုး browser visual snapshots — ပြီးပါပြီ (2026-11-18):** `test-metronome-studio-browser.mjs` က design တစ်ခုချင်းစီကို page ၏ preview လမ်းကြောင်းဖြင့် ဆွဲပြီး 240×240 canvas သို့ ချကာ လင်းနေသော sample အရေအတွက် (အလွတ် မဖြစ်ရ) နှင့် hash ကို စစ်သည်။ design နှစ်ခု တူညီသော frame ဆွဲလျှင် ကျရှုံးသည် — တစ်ခု အလုပ်မလုပ်နေခြင်းကို ဖမ်းရန်။ Guitar ကို နောက်ဦးစားပေးအဖြစ် ဆက်လုပ်ပြီး Piano, Bass, Strings, Voice ကို သီးခြား adapter ဖြင့်သာ ချိတ်ဆက်ရန်။
 
 ## Piano adapter — Phase 2 ပြီးစီး (2026-11-23)
 

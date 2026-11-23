@@ -184,6 +184,14 @@ git -c credential.https://github.com.username=<account> \
 Nothing is written to disk that way. Check the result with
 `git ls-remote origin refs/heads/<branch>` against `git rev-parse HEAD`.
 
+**2026-11-18 — a working token was supplied.** The current
+`github_pat_…` authenticates as `idetsminmh1995-spec`, the repo owner, and
+the repo API reports `admin/push: true`. A real push landed
+(`d757fae..1c5a718` on `feat/guitar-video-adapter`). It goes in the
+helper above as `password=$NEW_PAT`; the username must be
+`idetsminmh1995-spec`, not `x-access-token` or `mhfashion`. Earlier
+tokens in this file were read-only and their notes stay as history.
+
 Which token works: `$GH_PAT` is the one that can write to this repo.
 `$GITHUB_TOKEN` authenticates as the right account and the API reports
 `push: true`, yet the git endpoint still refuses it — its REST writes return
