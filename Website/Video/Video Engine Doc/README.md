@@ -17,7 +17,7 @@ Video Engine သည် canvas frame များကို WebCodecs ဖြင့
 | **Piano** | `Piano Hand Human Engine` တွင် keyboard geometry, key press/contact curve, performance/finger planning နှင့် synthetic IK source/tests ရှိသည်။ | **ချိတ်ပြီး (key-only)** — `studio-piano.js` သည် MusicXML မှ key press များကို ဖတ်၍ Engine ၏ keyboard geometry ဖြင့် ဆွဲသည်။ Hand/wrist animation မပါသေးပါ။ `Piano 3D Hand Engine` folder သည် `.gitkeep` သာရှိသည်။ |
 | **Bass** | `Guitar Engine` တွင် Jazz Bass နှင့် Precision Bass ပုံများကို တိုင်းထားပြီး (`JAZZ_BASS_DRAWN`, `PRECISION_BASS_DRAWN`)၊ ပုံဖိုင်များသည် `Website/Website/assets/bass/` တွင် ရှိသည်။ | **ချိတ်ပြီး (visual-only)** — `studio-bass.js` သည် fretted bass အဖြစ် Guitar Engine ကို ပြန်သုံးသည်။ Tablature ရှိလျှင် ၎င်းကို သုံး၍ မရှိလျှင် pitch မှ အနိမ့်ဆုံး fret အဖြစ် တွက်သည်။ အသံ မထုတ်ပါ။ |
 | **Strings** | `Website/Website/assets/violin/violin.svg` တွင် တူရိယာပုံ တစ်ပုံရှိသည် (violin နှင့် bow၊ vector)။ `Layout` တွင် `violin` template ရှိပြီး 16:9/1:1 တွင် notation ဘယ်၊ violin ညာ၊ 9:16 တွင် အပေါ်အောက် ထပ်၍ အောက်ဆုံးတွင် Title/Info ဖြစ်သည်။ | **ချိတ်ပြီး (drawing-only)** — `studio-violin.js` သည် Strings route တွင် ပုံကို ဆွဲသည်။ Violin fingering/bowing engine မရှိသေးသဖြင့် ကြိုးပေါ်တွင် အမှတ်အသား မထားပါ။ Viola/cello တို့အတွက် ပုံနှင့် တိုင်းတာချက် သီးခြားလိုအပ်သည်။ |
-| **Voice** | Landing page card နှင့် generic Studio route ရှိသည်။ | Voice-specific source/capture/import controls, renderer, audio decode workflow မတွေ့ရ။ Microphone/file input, permission/privacy/error handling, visual design နှင့် segment-aligned `AudioBuffer` ကို ဆုံးဖြတ်ရန်။ |
+| **Voice** | `Website/Website/studio-voice.js` တွင် file import နှင့် `MediaRecorder` capture ရှိသည်။ `Layout` တွင် `voice` template ရှိပြီး Title band အောက်တွင် waveform ကို ဆွဲသည်။ | **ချိတ်ပြီး (audible)** — decode လုပ်ထားသော `AudioBuffer` ကို segment ၏ audio အဖြစ် ပေးသဖြင့် export သည် အသံပါသည်။ Waveform ကို ထို buffer မှ ဆွဲသည်။ Permission ငြင်းခြင်း၊ decode မရခြင်း၊ 300 s/64 MB ကန့်သတ်ချက်များကို render မစမီ ပြသည်။ |
 
 ### Shared dependency မှတ်ချက်များ
 
@@ -33,13 +33,13 @@ Video Engine သည် canvas frame များကို WebCodecs ဖြင့
 2. Guitar ကို ပထမချိတ်ဆက်ရန် — ရှိပြီးသား visual engine ကိုသုံးသော်လည်း Studio event source, bundle path, Canvas painter နှင့် photo assets ကို အရင်ဖြည့်ရန်။
 3. Piano ကို key-only silent visual adapter အဖြစ်စတင်ရန် — note source နှင့် bundle destination ကို အတည်ပြုပြီး human-hand animation ကို နောက်ပိုင်း သီးခြားလုပ်ရန်။
 4. Voice တွင် notation/instrument event model မရှိပါ — အသံကို တိုက်ရိုက် decode လုပ်သည့် adapter ဖြစ်သည်။ Violin တွင် ပုံသာ ရှိပြီး fingering/bowing engine မရှိသေးပါ။
-5. Voice ကို source/capture/import နှင့် permission/privacy ဆုံးဖြတ်ချက်ပြီးမှ စတင်ရန်။
+5. Voice ကို source/capture/import နှင့် permission/privacy ဆုံးဖြတ်ချက်ပြီးမှ စတင်ရန် — ဆုံးဖြတ်ပြီး၊ `studio-voice.js` တွင် ချိတ်ပြီးဖြစ်သည်။
 6. Audible export ကို အရေးကြီးသည့် requirement အဖြစ် အတည်ပြုပြီးမှ Sound Engine/audio provider, `AudioBuffer`, timing နှင့် codec fallback ကို အကောင်အထည်ဖော်ရန်။
 
 ## စမ်းသပ်မှုနှင့် အပြောင်းအလဲမှတ်တမ်း
 
 - ယခင် code commit `d31337a` တွင် MP4 muxer tests 15 ခု၊ cleanup/safety tests 5 ခု၊ Chromium engine smoke test နှင့် Drum Studio browser integration/ffprobe test အောင်မြင်ထားသည်။ Production asset sync check နှင့် 375px/1280px viewport assertions လည်း pass ဖြစ်ထားသည်။
-- Metronome implementation သည် Video Engine core ကိုပြင်ခြင်းမဟုတ်ဘဲ Studio အတွက် သီးခြား consumer adapter နှင့် bundle sync ကို ထည့်ထားသည်။ Guitar/Piano/Bass/Strings(violin)/Voice ကို Video Engine ဖြင့် render လုပ်ပြီးကြောင်း မဆိုပါ။
+- Metronome implementation သည် Video Engine core ကိုပြင်ခြင်းမဟုတ်ဘဲ Studio အတွက် သီးခြား consumer adapter နှင့် bundle sync ကို ထည့်ထားသည်။ Guitar/Piano/Bass/Strings(violin)/Voice အားလုံးကို Video Engine ဖြင့် render လုပ်ပြီးဖြစ်သည်။
 - နောက် code implementation တစ်ခုစီပြီးပါက သက်ဆိုင်ရာ engine tests, shared Drum regression, real browser export, silent/audio behavior နှင့် phone/web layout ကို ပြန်စစ်ပြီး Doc/Plan ကို update လုပ်ရမည်။
 - **Guitar adapter ချိတ်ပြီး** — `tools/test-guitar-studio-browser.mjs` တွင် tablature ဖတ်ခြင်း၊ ပုံတိုင်း၏ အတိုင်းအတာ၊ Canvas ပေါ်တွင် neck ရှိကြောင်း၊ 375px/1280px layout နှင့် Plan §7 အရှည်စည်းမျဉ်း (score ၂ bar = ၄ စက္ကန့်၊ Thank You clip ၂ စက္ကန့် ဖြင့် ၆ စက္ကန့်) ကို စစ်သည်။ Guitar စာမျက်နှာတွင်လည်း ကိုယ်ပိုင် ၁၂ စက္ကန့် ကန့်သတ်ချက် မရှိတော့ပါ။
 

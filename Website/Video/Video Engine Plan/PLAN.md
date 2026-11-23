@@ -176,3 +176,35 @@ Drum adapter ၏ instrument band သည် ယခု R2 ရှိ kit ဓာတ�
 5. **မအောင်မြင်လျှင်** — R2 မရခြင်း၊ ပုံ မရှိခြင်း၊ module မတင်ခြင်း အားလုံးတွင် export ကို မရပ်ပါ; lane chart သို့ ပြန်ကျပြီး status တွင် အကြောင်း ပြသည်။
 6. **Brand/Model** — Select နှစ်ခုသည် bucket ၏ folder အမည်နှင့် ကိုက်ညီသည်။ Brand ပြောင်းလျှင် Model list ကို ထို brand ၏ kit များဖြင့် ပြန်ဖြည့်သည်။
 7. **စမ်းသပ်မှု** — `test-studio-video-browser.mjs` တွင် kit ဓာတ်ပုံ ပေါ်ခြင်း (band colour count), limb → ဖိုင် အမည် တိုက်ဆိုင်ခြင်း, နှင့် `midi-unpitched` ပါသော score ဖြင့် hit overlay က band ကို ပြောင်းခြင်းတို့ကို စစ်သည်။ Drum Studio export regression အားလုံး ဆက်လက် အောင်မြင်သည်။
+
+## Bass, Strings နှင့် Voice adapters — ပြီးစီး (2026-11-18)
+
+Plan ၏ Phase 3, 4, 5 ကို adapter သုံးခုဖြင့် ချိတ်ပြီးဖြစ်သည်။ ဤအပိုင်းသည် အပေါ်ရှိ Phase စာသားများကို အစားထိုးခြင်းမဟုတ် — ဘာပြီးသွားပြီး ဘာကျန်သည်ကို မှတ်တမ်းတင်ခြင်းသာ ဖြစ်သည်။
+
+### Bass — `studio-bass.js` (visual-only)
+
+1. **Fretted bass အဖြစ် ဆုံးဖြတ်ပြီး** Guitar Engine ကို ပြန်သုံးသည်။ `JAZZ_BASS_DRAWN` နှင့် `PRECISION_BASS_DRAWN` တို့၏ measured ကို အသုံးပြုပြီး ကြိုး ၄ ကြိုး/ဖရက် ၂၀ ကို ဆွဲသည်။ ကြိုးလိုင်းများကို ပုံ၏ ကိုယ်ပိုင် တိုင်းထားချက်မှ ဖြန့်သဖြင့် နှစ်ခု မထပ်ပါ၊ ပုံ၏ လည်ပင်းအပြင် မရောက်ပါ။
+2. **Note အရင်းအမြစ်** — `<string>`/`<fret>` အတွဲကို ရေးထားသည့်အတိုင်း သုံးသည်။ Tablature မပါသော note ကို pitch မှ အနိမ့်ဆုံး fret အဖြစ် တွက်သည် (Bass Engine တွင် `analyzeBass` မရှိသေးသဖြင့် ထို စည်းမျဉ်းသည် adapter ထဲတွင် ရှိသည်)။ E1 အောက် မရောက်သော score ကို ငြင်းသည် — လည်ပင်း အလွတ် မဆွဲပါ။
+3. **အသံ မထုတ်ပါ** (silent)။
+4. **စမ်းသပ်မှု** — `tools/test-bass-studio-browser.mjs` က Chromium တွင် တကယ့် page ကို မောင်းပြီး ffprobe ဖြင့် တိုင်းသည်: 720×1280 portrait၊ score ၏ 4.00 s၊ audio stream မပါ၊ Thank You clip ၏ အရှည်နှင့် အသံ ပါ၊ ကြိုး ၄ ကြိုး/ဖရက် ၂၀၊ shape determinism၊ cancel လုပ်လျှင် ဖိုင် မကျန်၊ ဖုန်း/desktop တွင် overflow မရှိ။ **PASS**။
+
+### Strings — `studio-violin.js` (drawing-only)
+
+1. **Violin ပုံ တစ်ပုံသာ** ရှိသည် (`assets/violin/violin.svg`)။ ထို ပုံကို ဆွဲသည်။
+2. **ဘာမှ အမှတ်အသား မထားပါ** — violin တွင် ဖရက် မရှိ၊ fingering engine မရှိသဖြင့် နေရာ ခန့်မှန်း မထည့်ပါ။ Summary တွင် ထို အချက်ကို ပြသည်။
+3. **Layout** — `violin` template၊ 16:9/1:1 တွင် notation ဘယ်/violin ညာ၊ 9:16 တွင် အပေါ်အောက် ထပ်၍ အောက်ဆုံးတွင် Title/Info။
+4. **စမ်းသပ်မှု** — `tools/test-violin-studio-browser.mjs`။ 9:16 က 720×1280/4.00 s၊ 16:9 က 1280×720၊ 2 s Thank You clip ဖြင့် 6.00 s နှင့် clip အသံ ပါ။ Violin ၏ band/column ကို pixel ဖြင့် ရေတွက်သဖြင့် အလွတ် မဖြတ်နိုင်ပါ။ **PASS**။
+
+### Voice — `studio-voice.js` (audible)
+
+1. **အသံ ပါရမည့် တစ်ခုတည်းသော export။** ဖိုင် import သို့မဟုတ် microphone recording ကို `AudioBuffer` အဖြစ် decode ပြီး segment ၏ `audio` အဖြစ် ပေးသည်။ Waveform ကို ထို buffer မှ ဆွဲသဖြင့် မြင်ရသည်နှင့် ကြားရသည် တစ်ခုတည်း။
+2. **Layout** — `voice` template: Title band အောက် waveform။ Voice တွင် notation/instrument event မရှိပါ။
+3. **ကန့်သတ်ချက်** — permission ငြင်းခြင်း၊ decode မရခြင်း၊ အလွတ် recording၊ 300 s နှင့် 64 MB ကန့်သတ်ချက်များကို render မစမီ ပြသည်။
+4. **စမ်းသပ်မှု** — `tools/test-voice-studio-browser.mjs`။ တိတ်ဆိတ်ခြင်း → A440 WAV ထည့်ပြီး အသံ level၊ pitch (439.4 Hz)၊ mono 48 kHz၊ ကျယ်သော/တိတ်သော အပိုင်း waveform အထူ၊ microphone လမ်းကြောင်း၊ permission ငြင်းခြင်း၊ decode မရခြင်း၊ cancel တို့ကို တိုင်းသည်။ **PASS**။
+
+### ကျန်ရှိ (ဤသုံးခုအတွက်)
+
+- ဖုန်းအစစ်၊ Safari/Firefox၊ MediaRecorder-only fallback — မစစ်ရသေးပါ။
+- Bass: ကြိုး ၅ ကြိုး model၊ နှင့် `analyzeBass` ကို Bass Engine ထဲ ရွှေ့ခြင်း။
+- Strings: viola/cello ပုံနှင့် တိုင်းတာချက် သီးခြား လိုအပ်သည်; bowing/fingering engine မရှိသေးပါ။
+- Voice: Sound Engine နှင့် ချိတ်ဆက်ခြင်း (လက်ရှိတွင် အသံကို decode လုပ်သည့် လမ်းကြောင်းသာ ရှိသည်)။
