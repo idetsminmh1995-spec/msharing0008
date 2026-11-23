@@ -427,6 +427,10 @@
         segments.push({ seconds: countIn, draw: (ctx, at) => drawCountIn(ctx, at, settings, meta) });
       }
       segments.push({ seconds: duration, draw: (ctx, at) => drawPerformance(ctx, at, hits, duration, settings, meta) });
+      // The Plan's last part of the length: the Thank You clip. The engine
+      // owns its address and shape, so the page only asks for it.
+      const ending = await engine.thankYouSegment(settings.size.width, settings.size.height);
+      if (ending) segments.push(ending);
       const result = await engine.render({
         width: settings.size.width,
         height: settings.size.height,

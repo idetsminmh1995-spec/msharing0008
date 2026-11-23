@@ -64,14 +64,24 @@ class Cdp {
       this.ws.onopen = resolve;
       this.ws.onerror = reject;
     });
+    this.listeners = new Map();
     this.ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
+      if (message.method) {
+        for (const listener of this.listeners.get(message.method) ?? []) listener(message.params);
+        return;
+      }
       const pending = this.pending.get(message.id);
       if (!pending) return;
       this.pending.delete(message.id);
       if (message.error) pending.reject(new Error(message.error.message));
       else pending.resolve(message.result);
     };
+  }
+
+  on(method, listener) {
+    if (!this.listeners.has(method)) this.listeners.set(method, []);
+    this.listeners.get(method).push(listener);
   }
 
   async call(method, params = {}) {
@@ -99,6 +109,40 @@ async function evaluate(expression, options = {}) {
   return response.result.value;
 }
 
+/**
+ * The Thank You clip is the engine's own R2 asset, so the test stands in
+ * for R2: every request to it is answered here. `clip` is the clip's
+ * bytes, or null for a 404 -- the two states the Plan cares about.
+ */
+let thankYouClip = null;
+async function serveThankYou() {
+  cdp.on('Fetch.requestPaused', async (event) => {
+    if (!event.request.url.includes('/thank-you/')) {
+      await cdp.call('Fetch.continueRequest', { requestId: event.requestId });
+      return;
+    }
+    if (!thankYouClip) {
+      await cdp.call('Fetch.fulfillRequest', {
+        requestId: event.requestId,
+        responseCode: 404,
+        responseHeaders: [{ name: 'Access-Control-Allow-Origin', value: '*' }],
+        body: Buffer.from('not found').toString('base64'),
+      });
+      return;
+    }
+    await cdp.call('Fetch.fulfillRequest', {
+      requestId: event.requestId,
+      responseCode: 200,
+      responseHeaders: [
+        { name: 'Content-Type', value: 'video/mp4' },
+        { name: 'Access-Control-Allow-Origin', value: '*' },
+      ],
+      body: thankYouClip.toString('base64'),
+    });
+  });
+  await cdp.call('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
+}
+
 try {
   const httpPort = await findFreePort();
   const debugPort = await findFreePort();
@@ -119,6 +163,7 @@ try {
   cdp = new Cdp(page.webSocketDebuggerUrl);
   await cdp.call('Page.enable');
   await cdp.call('Runtime.enable');
+  await serveThankYou();
 
   const startedAt = Date.now();
   let ready = false;
@@ -322,7 +367,7 @@ print(dark, red, white)
     const path = `${output}.${name.replace(/\.musicxml$/, '')}.mp4`;
     await writeFile(path, bytes);
     const { stdout } = await exec('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'json', path]);
-    return { seconds: Number(JSON.parse(stdout).format.duration), href: state.href };
+    return { seconds: Number(JSON.parse(stdout).format.duration), href: state.href, path };
   };
 
   // Four 4/4 bars at 60 BPM: sixteen seconds, past the old twelve-second cap
@@ -349,7 +394,49 @@ print(dark, red, white)
   const counted = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'count-in.musicxml', twoPart.href);
   assert.ok(Math.abs(counted.seconds - 6) < 0.4, `The count-in was not added to the length: ${counted.seconds}s instead of 6s`);
 
-  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slow.seconds, twoVoiceSeconds: twoVoice.seconds, repeatSeconds: repeated.seconds, twoPartSeconds: twoPart.seconds, countInSeconds: counted.seconds }, null, 2));
+  // The Plan's last part: the Thank You clip closes the video and is
+  // counted in its length. The clip is two seconds of a known colour, so
+  // both the length and the picture can be checked.
+  const clipPath = join(profile, 'thank-you.mp4');
+  await exec('ffmpeg', ['-v', 'error', '-y',
+    '-f', 'lavfi', '-i', 'color=c=#0b1220:s=1920x1080:d=2:r=30',
+    '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2',
+    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', clipPath]);
+  thankYouClip = await readFile(clipPath);
+  await evaluate("(() => { const count = document.querySelector('[data-count-voice-enabled]'); count.value = 'off'; count.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  const thanked = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'thank-you-score.musicxml', counted.href);
+  assert.ok(Math.abs(thanked.seconds - 6) < 0.5, `The Thank You clip was not counted in the length: ${thanked.seconds}s instead of 6s`);
+  const clipFrames = [];
+  for (const second of ['3.5', '5.0']) {
+    const framePath = `${output}.thank-${second}.png`;
+    await exec('ffmpeg', ['-v', 'error', '-y', '-ss', second, '-i', thanked.path, '-frames:v', '1', framePath]);
+    clipFrames.push(framePath);
+  }
+  // The clip's own first frame is the reference: comparing against it
+  // rather than a written-down colour keeps the check honest through the
+  // encoder's colour conversion.
+  const referencePath = `${output}.thank-reference.png`;
+  await exec('ffmpeg', ['-v', 'error', '-y', '-ss', '0', '-i', clipPath, '-frames:v', '1', referencePath]);
+  const centreColour = (framePath) => exec('python3', ['-c', `
+from PIL import Image
+image = Image.open(${JSON.stringify(framePath)}).convert('RGB')
+print(*image.load()[image.size[0] // 2, image.size[1] // 2])
+`]).then(({ stdout }) => stdout.trim().split(/\s+/).map(Number));
+  const referenceColour = await centreColour(referencePath);
+  const [scoreColour, endingColour] = await Promise.all(clipFrames.map(centreColour));
+  const near = (a, b) => a.every((value, index) => Math.abs(value - b[index]) < 20);
+  assert.ok(!near(scoreColour, referenceColour),
+    `The score frame already looks like the clip: ${scoreColour} vs ${referenceColour}`);
+  assert.ok(near(endingColour, referenceColour),
+    `The Thank You clip is not at the end of the video: ${endingColour} vs ${referenceColour}`);
+  // The clip's sound is part of the video too, so the export is no longer
+  // a picture-only file.
+  const thankedStreams = JSON.parse((await exec('ffprobe', ['-v', 'error',
+    '-show_entries', 'stream=codec_type', '-of', 'json', thanked.path])).stdout).streams;
+  assert.ok(thankedStreams.some((stream) => stream.codec_type === 'audio'),
+    `The Thank You clip's sound is missing: ${JSON.stringify(thankedStreams)}`);
+
+  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slow.seconds, twoVoiceSeconds: twoVoice.seconds, repeatSeconds: repeated.seconds, twoPartSeconds: twoPart.seconds, countInSeconds: counted.seconds, thankYouSeconds: thanked.seconds }, null, 2));
 } finally {
   cdp?.close();
   for (const child of [browser, server]) {

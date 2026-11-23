@@ -2098,6 +2098,121 @@
     throw new Error(`Video export blocked by required assets — ${reason}`);
   }
 
+  // ---------------------------------------------------------------
+  // The Thank You clip that closes every video.
+  //
+  // The Plan gives this whole matter to the engine: the file names, the
+  // R2 path and what happens when a clip is missing are decided here and
+  // nowhere else. One clip per frame shape, named by the shape's own
+  // ratio. A missing clip leaves the video without an ending rather than
+  // failing the export.
+  // ---------------------------------------------------------------
+  const THANK_YOU_BASE = 'https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev/thank-you';
+  const THANK_YOU_RATIOS = { '16:9': 'landscape', '1:1': 'square', '9:16': 'portrait' };
+
+  const thankYouCache = new Map();
+
+  /** The R2 address of the clip for a frame this shape, or null. */
+  function thankYouUrl(width, height) {
+    const shape = THANK_YOU_RATIOS[ratioOf(width, height)];
+    return shape ? `${THANK_YOU_BASE}/${shape}.mp4` : null;
+  }
+
+  /**
+   * The clip as a playable source plus its sound. Fetched once per shape
+   * and kept: a clip is read for every frame of its segment, and asking
+   * R2 each time would put a download behind every frame.
+   */
+  async function loadThankYou(width, height) {
+    const url = thankYouUrl(width, height);
+    if (!url) return null;
+    if (thankYouCache.has(url)) return thankYouCache.get(url);
+    const pending = (async () => {
+      try {
+        const response = await fetch(url, { mode: 'cors' });
+        if (!response.ok) return null;
+        const blob = await response.blob();
+        // A blob URL is what makes seeking honest: an element reading
+        // from a plain URL reports a zero-length seekable range and stays
+        // on its first frame however far it is asked to go.
+        const objectUrl = URL.createObjectURL(blob);
+        const video = document.createElement('video');
+        video.crossOrigin = 'anonymous';
+        video.preload = 'auto';
+        video.playsInline = true;
+        video.muted = true;
+        video.src = objectUrl;
+        await new Promise((resolve, reject) => {
+          video.onloadeddata = resolve;
+          video.onerror = () => reject(new Error(`Thank You clip could not be played: ${video.error?.code ?? 'unknown'}`));
+          video.load();
+        });
+        let audio = null;
+        try {
+          const context = new OfflineAudioContext(1, 1, AUDIO_SAMPLE_RATE);
+          audio = await context.decodeAudioData(await blob.arrayBuffer());
+        } catch (error) {
+          audio = null;
+        }
+        return { video, audio, objectUrl, seconds: video.duration, url };
+      } catch (error) {
+        return null;
+      }
+    })();
+    thankYouCache.set(url, pending);
+    const clip = await pending;
+    // A missing clip must not be remembered: the next export may find it
+    // uploaded, and a cached "no" would end every video after that one
+    // short.
+    if (!clip) thankYouCache.delete(url);
+    return clip;
+  }
+
+  /** Seeks a clip to `at` and resolves once that frame is the one on show. */
+  const seekThankYou = (video, at) => new Promise((resolve, reject) => {
+    if (Math.abs(video.currentTime - at) < 1e-3 && video.readyState >= 2) {
+      resolve();
+      return;
+    }
+    const done = () => {
+      video.removeEventListener('seeked', done);
+      resolve();
+    };
+    video.addEventListener('seeked', done);
+    video.currentTime = at;
+    setTimeout(() => {
+      video.removeEventListener('seeked', done);
+      reject(new Error('Thank You clip did not reach the requested frame'));
+    }, 8000);
+  });
+
+  /**
+   * The segment a page appends after its own: the clip fitted to the
+   * frame, letterboxed rather than cropped so nothing of it is lost.
+   * `null` when the clip is unavailable, so a page can skip it.
+   */
+  async function thankYouSegment(width, height) {
+    const clip = await loadThankYou(width, height);
+    if (!clip || !Number.isFinite(clip.seconds) || clip.seconds <= 0) return null;
+    return {
+      seconds: clip.seconds,
+      audio: clip.audio,
+      draw: async (ctx, at) => {
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, width, height);
+        await seekThankYou(clip.video, Math.min(at, Math.max(0, clip.seconds - 0.05)));
+        const scale = Math.min(width / clip.video.videoWidth, height / clip.video.videoHeight);
+        const drawWidth = clip.video.videoWidth * scale;
+        const drawHeight = clip.video.videoHeight * scale;
+        ctx.drawImage(clip.video, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
+      },
+      onEnd: () => {
+        URL.revokeObjectURL(clip.objectUrl);
+        thankYouCache.delete(clip.url);
+      },
+    };
+  }
+
   function validateRenderOptions(options) {
     if (!options || !Number.isFinite(options.width) || options.width <= 0 ||
         !Number.isFinite(options.height) || options.height <= 0) {
@@ -2155,6 +2270,10 @@
     // the score prints the same count the Title band does.
     countTokens,
     currentCountToken,
+    // The Plan gives the Thank You clip to this engine: a page asks for a
+    // segment and appends it, and never learns the clip's address.
+    thankYouUrl,
+    thankYouSegment,
     muxMp4,
     muxMp4ToStream,
     muxWebM,
