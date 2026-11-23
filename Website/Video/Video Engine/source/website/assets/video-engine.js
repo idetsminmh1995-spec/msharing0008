@@ -996,12 +996,27 @@
   /** 48kHz: what an MP4 is mastered at, and what every encoder here takes. */
   const AUDIO_SAMPLE_RATE = 48000;
 
+  /**
+   * The channel count the whole video is mastered at: stereo if any segment
+   * carries stereo, mono otherwise.
+   *
+   * The widest segment decides, not the narrowest. A mono clip appended
+   * after a stereo recording -- the Thank You clip is mono -- would
+   * otherwise fold the recording down to mono, and the viewer would lose a
+   * channel they supplied. OfflineAudioContext widens a mono source to
+   * stereo on its own, so mixing up costs nothing.
+   */
+  function audioChannelsFor(segments) {
+    const counts = segments.filter((segment) => segment.audio).map((segment) => segment.audio.numberOfChannels);
+    if (counts.length === 0) return 0;
+    return Math.min(2, Math.max(1, ...counts));
+  }
+
   /** Joins the segments' audio into one buffer covering the whole video. */
   async function joinAudio(segments, totalSeconds) {
-    const withAudio = segments.filter((s) => s.audio);
-    if (withAudio.length === 0) return null;
     const sampleRate = AUDIO_SAMPLE_RATE;
-    const channels = Math.max(1, Math.min(2, ...withAudio.map((s) => s.audio.numberOfChannels)));
+    const channels = audioChannelsFor(segments);
+    if (channels === 0) return null;
     const length = Math.max(1, Math.ceil(totalSeconds * sampleRate));
     const offline = new OfflineAudioContext(channels, length, sampleRate);
     let at = 0;
@@ -1024,9 +1039,7 @@
   async function renderWithWebCodecs(options) {
     const { width, height, fps, segments, onProgress, shouldStop } = options;
     const bitrate = options.bitrate ?? defaultBitrate(width, height, fps);
-    const audioChannels = segments.some((s) => s.audio)
-      ? Math.max(1, Math.min(2, ...segments.filter((s) => s.audio).map((s) => s.audio.numberOfChannels)))
-      : 0;
+    const audioChannels = audioChannelsFor(segments);
     const format = await pickFormat(width, height, fps, bitrate, audioChannels);
     if (!format) return null;
     const codec = format.video;
@@ -1280,9 +1293,7 @@
     const mimeType = pickRecorderMime();
     if (mimeType === '' || !window.AudioContext) return null;
     const totalSeconds = segments.reduce((sum, segment) => sum + segment.seconds, 0);
-    const audioChannels = segments.some((segment) => segment.audio)
-      ? Math.max(1, Math.min(2, ...segments.filter((segment) => segment.audio).map((segment) => segment.audio.numberOfChannels)))
-      : 0;
+    const audioChannels = audioChannelsFor(segments);
     const bitrate = options.bitrate ?? defaultBitrate(width, height, fps);
     const budgetBytes = renderMemoryPolicy().budgetBytes;
     const estimatedBytes = Math.ceil(

@@ -163,3 +163,28 @@ Implementation Plan/Doc: [Metronome Engine Plan](../../Metronome/Metronome%20Eng
 **အတည်ပြုထားသော စမ်းသပ်မှုများ:** Notation Engine 1528/1528, Guitar Engine 37/37, Piano Hand Human Engine 86/86, Video Engine muxer 15/15 နှင့် layout 8/8. `tools/test-voice-studio-browser.mjs` သည် Chromium တွင် တကယ့် page ကို နှိပ်ပြီး ထွက်လာသော ဖိုင်ကို `ffprobe` နှင့် `ffmpeg volumedetect` ဖြင့် တိုင်းသည် — ဝင်သွားသော အသံမှာ ၁.၅ စက္ကန့် တိတ်ဆိတ်ပြီး ၁.၅ စက္ကန့် A440 ဖြစ်သည်။ ထွက်လာသော ဖိုင် 9:16 = 720×1280, 3.00 sec, Opus mono 48 kHz, mean volume −24 dB (တိတ်ဆိတ်မဟုတ်)၊ ပြန်ဖြည်ပြီး တိုင်းသော pitch မှာ 439.4 Hz ဖြစ်သည် — ဝင်သွားသော 440 Hz နှင့် ကိုက်သည်။ Waveform သည် အသံကို လိုက်ကြောင်း တိတ်ဆိတ်သော အပိုင်းတွင် ၂.၉ px အထူ၊ ကျယ်သော အပိုင်းတွင် ၁၀၈.၆ px အထူ ဖြစ်ကြောင်း pixel ဖြင့် စစ်သည်။ Microphone ငြင်းပယ်မှု၊ decode မရသော ဖိုင်၊ cancel လုပ်လျှင် ဖိုင်မထွက်၊ ခလုတ်ပြန်ရကြောင်း စစ်ထားသည်။ Thank You clip ၂ စက္ကန့် ပေးလျှင် 5.00 sec ဖြစ်ပြီး clip ၏ အသံပါ ပါလာသည်။ 375×812 phone နှင့် 1280×900 desktop viewport တွင် horizontal overflow မရှိ။ Drum နှင့် Violin browser regression နှစ်ခုလုံး ဆက်လက်အောင်မြင်သည်။
 
 **လက်ကျန်:** ဖုန်းအစစ်၊ Safari/Firefox နှင့် MediaRecorder-only fallback ကို မစစ်ရသေးပါ။ Voice အတွက် notation/event model မရှိပါ — ဤ adapter သည် အသံကို တိုက်ရိုက် decode လုပ်သည့် နည်းလမ်းဖြစ်သည်။ အသံဖိုင် ဖြတ်တောက်ခြင်း (trim) နှင့် အသံအမြန်နှုန်း ပြောင်းခြင်း မပါသေးပါ။
+
+## Shared audio contract — Phase 6.1 (2026-11-24)
+
+Plan §6.1 သည် segment တစ်ခုချင်း၏ `AudioBuffer` ကို ဗီဒီယိုတစ်ခုတည်း၏ အသံအဖြစ် ပေါင်းသည့် စည်းမျဉ်းများကို သတ်မှတ်ရန် ဖြစ်သည်။ Instrument adapter တိုင်း (Metronome, Voice, နောင် Piano) သည် ထို စည်းမျဉ်းများကို အတူတူ အမွေခံသဖြင့် ဤနေရာတွင် တစ်ခါတည်း စစ်ထားသည်။
+
+**စည်းမျဉ်းများ**
+
+1. **Timeline** — segment တစ်ခုချင်းစီ၏ အသံသည် ယခင်က segment များ၏ အရှည်ပေါ်တွင် ဆက်တိုက် စတင်သည်။ `joinAudio()` က `segment.seconds` ကို ပေါင်း၍ `at` ကို တိုးသည်။ Segment အားလုံးကို zero မှာ ထပ် မထားပါ။
+2. **Sample rate** — master သည် **48 kHz** တစ်မျိုးတည်း (`AUDIO_SAMPLE_RATE`)။ Adapter က 44.1 kHz ဖြင့် ပေးလာလျှင် `OfflineAudioContext` က resample လုပ်သည်။ Adapter ကိုယ်တိုင် resample မလုပ်ရ။
+3. **Channels** — ဗီဒီယိုတစ်ခုလုံး၏ channel count ကို **အကျယ်ဆုံး** segment က ဆုံးဖြတ်သည် (အကျဉ်းဆုံး မဟုတ်)။ `audioChannelsFor()` က `Math.min(2, Math.max(1, ...counts))` ဖြင့် တွက်သည်။ Mono source ကို stereo master ထဲ ထည့်လျှင် `OfflineAudioContext` က အလိုအလျောက် နှစ်ဖက်သို့ ဖြန့်ပေးသဖြင့် ဆုံးရှုံးမှု မရှိပါ။
+4. **Codec fallback** — `pickFormat()` သည် AAC (MP4) ကို အရင်စစ်ပြီး မရလျှင် Opus (WebM) သို့ ဆင်းသည်။ `AudioEncoder.isConfigSupported` ကို အသံ channel count နှင့်အတူ စစ်သဖြင့် stereo မရသော encoder ကို ရွေးမထားပါ။
+
+**တွေ့ရှိပြီး ပြင်ခဲ့သော အမှား — stereo ပျောက်ခြင်း**
+
+အရင် `joinAudio()` နှင့် `recordInRealTime()` နှစ်ခုလုံးတွင် channel count ကို **အကျဉ်းဆုံး** segment မှ ယူခဲ့သည် (`Math.min(2, ...counts)` ကို `Math.max(1, ...)` ဖြင့် ပတ်ထားသည်)။ အကျိုးဆက်မှာ — Voice တွင် stereo recording ကို ဖမ်းပြီး mono ဖြစ်သော Thank You clip ကို ဆက်ထည့်လျှင် ဗီဒီယိုတစ်ခုလုံး **mono** ဖြစ်သွားပြီး အသုံးပြုသူ ပေးခဲ့သော channel တစ်ခု ဆုံးရှုံးသည်။ ဤအမှားကို စမ်းသပ်မှုဖြင့် ဦးစွာ သက်သေပြပြီး (stereo + mono → 1 channel) ပြီးမှ ပြင်ခဲ့သည်။ ယခု ထို case သည် 2 channel ထွက်သည်။
+
+**အတည်ပြုထားသော စမ်းသပ်မှုများ:** `tools/test-audio-contract-browser.mjs` (အသစ်) သည် Chromium တွင် တကယ် render လုပ်ပြီး ထွက်လာသော ဖိုင်ကို `ffprobe` နှင့် zero-crossing ဖြင့် တိုင်းသည် —
+
+- **timeline** — တစ်စက္ကန့် 440 Hz + တစ်စက္ကန့် 880 Hz နှစ်ခု → 2.00 sec, ပထမပိုင်း 439.2 Hz, ဒုတိယပိုင်း 879.2 Hz။ တူညီသော tone မဟုတ်ကြောင်း တိတိကျကျ စစ်သဖြင့် segment နှစ်ခု zero မှာ ထပ်မနေကြောင်း သက်သေဖြစ်သည်။
+- **resample** — 44.1 kHz ဖြင့် ပေးသော 660 Hz → 48 kHz master တွင် 659.2 Hz။
+- **channels** — stereo + mono → **2 channel** (ပြင်ပြီးနောက်)။
+
+Video Engine muxer 15/15, layout 8/8, cleanup 5/5, Voice နှင့် Drum browser regression နှစ်ခုလုံး ဆက်လက်အောင်မြင်သည်။
+
+**လက်ကျန် (§6.2, §6.3):** Piano hand/wrist animation သည် သီးခြား project အဖြစ် ကျန်သည်။ MediaRecorder-only fallback နှင့် `muxMp4ToStream()` ၏ incremental muxing ကို real browser/device တွင် မစစ်ရသေးပါ။
