@@ -158,16 +158,33 @@ Run every command from `Website/Notation/Notation Engine/`.
 
 ### Pushing
 
-`~/.gitconfig` pins `credential.https://github.com.username=x-access-token`
-and the OpenHands credential helper. Those answer for the wrong account and
-the push fails with `403 ... denied`. Clear the inherited helper for the one
-command, then supply the account's own token:
+`~/.gitconfig` pins two `https://github.com`-scoped keys:
+
+```
+credential.https://github.com.username = x-access-token
+credential.https://github.com.helper   = !"<openhands>/git-credential-helper" github
+```
+
+Both are URL-scoped, so a plain `-c credential.helper=` does NOT clear them —
+git still finds the scoped helper, answers as `x-access-token`, and the push
+fails with `403 ... denied`. The override has to be on the same scoped key:
 
 ```
 git -c credential.https://github.com.username=<account> \
-    -c credential.helper= -c credential.helper='!f() { echo "username=<account>"; echo "password=<pat>"; }; f' \
+    -c credential.https://github.com.helper= \
+    -c credential.https://github.com.helper='!f() { echo "username=<account>"; echo "password=$GH_PAT"; }; f' \
     push origin <branch>
 ```
 
 Nothing is written to disk that way. Check the result with
 `git ls-remote origin refs/heads/<branch>` against `git rev-parse HEAD`.
+
+Which token works: `$GH_PAT` is the one that can write to this repo.
+`$GITHUB_TOKEN` authenticates as the right account and the API reports
+`push: true`, yet the git endpoint still refuses it — its REST writes return
+`403`, so it is read-only in practice. `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB`
+is rejected outright (`Bad credentials`). Confirm with
+`curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $GH_PAT" \
+  https://api.github.com/repos/<owner>/<repo>/git/refs -d '{"ref":"refs/heads/probe","sha":"<short-sha>"}'`:
+`422` means the token was accepted and only the made-up SHA was refused, while
+`403` means it cannot write.
