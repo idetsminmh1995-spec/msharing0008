@@ -264,7 +264,7 @@ print(dark, red, white)
   // The Plan's length rule: the video is the score's own length, on the
   // score's own tempo, with no cap of the Studio's. Each case builds a
   // score, renders it, and measures the file that came out.
-  const drumScore = ({ tempo, bars, voices = 1, repeat = false }) => {
+  const drumScore = ({ tempo, bars, voices = 1, repeat = false, extraParts = 0 }) => {
     const head = '      <attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>percussion</sign></clef></attributes>\n'
       + `      <direction><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${tempo}</per-minute></metronome></direction-type><sound tempo="${tempo}"/></direction>\n`;
     const note = (step, voice) => `      <note><unpitched><display-step>${step}</display-step><display-octave>4</display-octave></unpitched><duration>1</duration><voice>${voice}</voice><type>quarter</type></note>\n`;
@@ -283,7 +283,16 @@ print(dark, red, white)
         : '';
       measures.push(`    <measure number="${number}">\n${number === 1 ? head : ''}${body}${marks}    </measure>`);
     }
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<score-partwise version="3.1">\n  <part-list><score-part id="P1"><part-name>Drums</part-name></score-part></part-list>\n  <part id="P1">\n${measures.join('\n')}\n  </part>\n</score-partwise>\n`;
+    // A backing part beside the drums: the drum video is the drum part's
+    // length, not the whole score's.
+    const backing = [];
+    for (let index = 0; index < extraParts; index += 1) {
+      const id = `P${index + 2}`;
+      const notes = Array.from({ length: bars }, () => `    <measure number="1">\n${['E', 'E', 'E', 'E'].map((step) => `      <note><pitch><step>${step}</step><octave>3</octave></pitch><duration>1</duration><voice>1</voice><type>quarter</type></note>\n`).join('')}    </measure>\n`).join('');
+      backing.push(`  <part id="${id}">\n${notes}  </part>\n`);
+    }
+    const list = `<score-part id="P1"><part-name>Drums</part-name></score-part>${Array.from({ length: extraParts }, (_, index) => `<score-part id="P${index + 2}"><part-name>Bass</part-name></score-part>`).join('')}`;
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<score-partwise version="3.1">\n  <part-list>${list}</part-list>\n  <part id="P1">\n${measures.join('\n')}\n  </part>\n${backing.join('')}</score-partwise>\n`;
   };
 
   const renderScore = async (xml, name, previousHref) => {
@@ -326,7 +335,11 @@ print(dark, red, white)
   const repeated = await renderScore(drumScore({ tempo: 120, bars: 2, repeat: true }), 'repeat.musicxml', twoVoice.href);
   assert.ok(Math.abs(repeated.seconds - 8) < 0.4, `A repeat was not played twice: ${repeated.seconds}s instead of 8s`);
 
-  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slow.seconds, twoVoiceSeconds: twoVoice.seconds, repeatSeconds: repeated.seconds }, null, 2));
+  // A bass part beside the drums is not more drum video.
+  const twoPart = await renderScore(drumScore({ tempo: 120, bars: 2, extraParts: 1 }), 'two-part.musicxml', repeated.href);
+  assert.ok(Math.abs(twoPart.seconds - 4) < 0.4, `Another part was counted as drum music: ${twoPart.seconds}s instead of 4s`);
+
+  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slow.seconds, twoVoiceSeconds: twoVoice.seconds, repeatSeconds: repeated.seconds, twoPartSeconds: twoPart.seconds }, null, 2));
 } finally {
   cdp?.close();
   for (const child of [browser, server]) {

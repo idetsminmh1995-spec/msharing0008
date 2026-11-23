@@ -158,9 +158,17 @@
     const source = await file.text();
     const document = new DOMParser().parseFromString(source, 'application/xml');
     if (document.querySelector('parsererror')) throw new Error('MusicXML file could not be parsed.');
-    const measures = [...document.querySelectorAll('measure')];
-    if (!measures.length) throw new Error('MusicXML does not contain any measures.');
     const meta = readMeta(document);
+    // A score may carry other parts beside the drums (a bass, a backing
+    // line). Only one part is the drum performance; reading every part
+    // would make the video as long as the whole score is stacked up.
+    const parts = [...document.querySelectorAll('part')];
+    const part = parts.find((candidate) => candidate.querySelector('clef sign')?.textContent?.trim().toLowerCase() === 'percussion')
+      || parts.find((candidate) => candidate.querySelector('note unpitched'))
+      || parts[0]
+      || document;
+    const measures = [...part.querySelectorAll('measure')];
+    if (!measures.length) throw new Error('MusicXML does not contain any measures.');
     const hits = [];
     let absoluteQuarter = 0;
     let divisions = 1;
