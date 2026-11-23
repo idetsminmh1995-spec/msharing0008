@@ -1473,9 +1473,11 @@
    * against one of these rather than each page inventing its own ink.
    */
   function paletteFor(color) {
+    // `accent` is the one colour an instrument part may use to say "this
+    // is being played", so every instrument's marks read the same.
     return color === 'white'
-      ? { background: '#f7f9fc', text: '#111827', muted: '#64748b', grid: 'rgba(15,23,42,.16)', line: 'rgba(15,23,42,.24)' }
-      : { background: '#080d16', text: '#f8fafc', muted: '#91a0b5', grid: 'rgba(148,163,184,.16)', line: 'rgba(148,163,184,.22)' };
+      ? { background: '#f7f9fc', text: '#111827', muted: '#64748b', accent: '#2f6feb', grid: 'rgba(15,23,42,.16)', line: 'rgba(15,23,42,.24)' }
+      : { background: '#080d16', text: '#f8fafc', muted: '#91a0b5', accent: '#5b9cff', grid: 'rgba(148,163,184,.16)', line: 'rgba(148,163,184,.22)' };
   }
 
   /**
@@ -1489,6 +1491,62 @@
     const table = String(mode).toLowerCase() === 'minor' ? MINOR_KEYS : MAJOR_KEYS;
     const index = Number(fifths) + 7;
     return table[index] ?? '';
+  }
+
+  /**
+   * A score's own clock: where each measure starts, the tempo map its marks
+   * make, and how long the file runs.
+   *
+   * The parser hands back measures and tempo marks but no timeline, so this
+   * is assembled once here rather than in each instrument's page -- two
+   * pages measuring the same file differently is how one video ends before
+   * its music does.
+   */
+  function longestMeasureTicks(parsed, number) {
+    let longest = 0;
+    for (const part of parsed.score.parts) {
+      const measure = part.measures.find((entry) => entry.number === number);
+      if (!measure) continue;
+      for (const voice of measure.voices) {
+        let end = 0;
+        let cursor = 0;
+        for (const event of voice.events) {
+          const startTick = event.startTick ?? cursor;
+          cursor = startTick + event.duration.ticks;
+          end = Math.max(end, cursor);
+        }
+        longest = Math.max(longest, end);
+      }
+    }
+    return longest;
+  }
+
+  function scoreTimeline(parsed, api) {
+    const offsets = new Map();
+    const numbers = [];
+    for (const part of parsed.score.parts) {
+      for (const measure of part.measures) {
+        if (!numbers.includes(measure.number)) numbers.push(measure.number);
+      }
+    }
+    let running = 0;
+    for (const number of numbers) {
+      offsets.set(number, running);
+      running += longestMeasureTicks(parsed, number);
+    }
+    const raw = (parsed.tempoMarks ?? []).map((mark) => ({
+      tick: (offsets.get(mark.measureNumber) ?? 0) + mark.tick,
+      microsecondsPerQuarter: 60_000_000 /
+        (mark.perMinute * (api.ticksWithDots(api.baseTicksForType(mark.beatUnit), mark.beatUnitDots) / api.TICKS_PER_QUARTER)),
+    })).filter((event) => Number.isFinite(event.microsecondsPerQuarter) && event.microsecondsPerQuarter > 0);
+    const tempoMap = api.buildTempoMap(raw).tempoMap;
+    // The file's length comes from its measures, not its last note: a bar
+    // that ends in a rest is still part of what the writer wrote.
+    const last = numbers[numbers.length - 1];
+    const endSeconds = last === undefined
+      ? 0
+      : api.tickToSeconds(tempoMap, (offsets.get(last) ?? 0) + longestMeasureTicks(parsed, last));
+    return { offsets, numbers, tempoMap, endSeconds };
   }
 
   /**
@@ -2261,6 +2319,7 @@
     titleSettings,
     keyName,
     scoreMeta,
+    scoreTimeline,
     drawTitlePart,
     loadNotationEngine,
     prepareNotation,

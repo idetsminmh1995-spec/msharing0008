@@ -254,9 +254,9 @@
 
   // Metronome and Guitar have adapters of their own; a tool with no adapter
   // must never fall through to the drum branch and render a drum video.
-  if (selectedTool === 'metronome' || selectedTool === 'guitar') return;
+  if (selectedTool === 'metronome' || selectedTool === 'guitar' || selectedTool === 'piano') return;
   if (selectedTool !== 'drums') {
-    setStatus('Visual video export is currently available in Drum, Metronome and Guitar Studio. Other instrument adapters are not implemented yet.');
+    setStatus('Visual video export is currently available in Drum, Metronome, Guitar and Piano Studio. Other instrument adapters are not implemented yet.');
     generateButton.disabled = true;
     settingsForm?.querySelectorAll('input,select').forEach((control) => { control.disabled = true; });
     return;

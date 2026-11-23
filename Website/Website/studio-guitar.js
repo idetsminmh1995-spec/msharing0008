@@ -120,18 +120,12 @@
    * the picture -- so a note without one is dropped rather than given a
    * guessed position from its pitch. An invented fingering shown
    * confidently is worse than a neck with one fewer mark on it.
-   *
-   * `parseMusicXml` hands back the score and its tempo marks but not a
-   * timeline, so the measure offsets and the tempo map are assembled here
-   * from what the parser did give: each measure's own longest voice.
    */
-  function readTabNotes(parsed, api) {
+  function readTabNotes(parsed, api, timeline) {
     const notes = [];
-    const tempoMap = buildTempoMap(parsed, api);
-    const tickOffset = measureTickOffsets(parsed);
     for (const part of parsed.score.parts) {
       for (const measure of part.measures) {
-        const offset = tickOffset.get(measure.number) ?? 0;
+        const offset = timeline.offsets.get(measure.number) ?? 0;
         for (const voice of measure.voices) {
           let cursor = 0;
           for (const event of voice.events) {
@@ -140,13 +134,11 @@
             const written = event.kind === 'chord' ? event.notes : event.kind === 'note' ? [event] : [];
             for (const note of written) {
               if (!Number.isFinite(note.stringNumber) || !Number.isFinite(note.fret)) continue;
-              const startSeconds = api.tickToSeconds(tempoMap, offset + startTick);
-              const endSeconds = api.tickToSeconds(tempoMap, offset + startTick + event.duration.ticks);
               notes.push({
                 string: note.stringNumber,
                 fret: note.fret,
-                startSeconds,
-                endSeconds,
+                startSeconds: api.tickToSeconds(timeline.tempoMap, offset + startTick),
+                endSeconds: api.tickToSeconds(timeline.tempoMap, offset + startTick + event.duration.ticks),
                 ...(note.fingering !== undefined ? { finger: note.fingering } : {}),
               });
             }
@@ -155,62 +147,7 @@
       }
     }
     notes.sort((left, right) => left.startSeconds - right.startSeconds || left.string - right.string);
-    // The score's own length, from its measures rather than its last note:
-    // a bar that ends in a rest is still part of the file the writer made.
-    const numbers = [...tickOffset.keys()];
-    const last = numbers[numbers.length - 1];
-    const endSeconds = last === undefined
-      ? 0
-      : api.tickToSeconds(tempoMap, (tickOffset.get(last) ?? 0) + longestMeasureTicks(parsed, last));
-    return { notes, endSeconds };
-  }
-
-  /** Each measure's start tick: the running total of the measure before it. */
-  function measureTickOffsets(parsed) {
-    const offsets = new Map();
-    const numbers = [];
-    for (const part of parsed.score.parts) {
-      for (const measure of part.measures) {
-        if (!numbers.includes(measure.number)) numbers.push(measure.number);
-      }
-    }
-    let running = 0;
-    for (const number of numbers) {
-      offsets.set(number, running);
-      running += longestMeasureTicks(parsed, number);
-    }
-    return offsets;
-  }
-
-  /** A measure is as long as its longest voice -- the same rule the notation renderer uses. */
-  function longestMeasureTicks(parsed, number) {
-    let longest = 0;
-    for (const part of parsed.score.parts) {
-      const measure = part.measures.find((entry) => entry.number === number);
-      if (!measure) continue;
-      for (const voice of measure.voices) {
-        let end = 0;
-        let cursor = 0;
-        for (const event of voice.events) {
-          const startTick = event.startTick ?? cursor;
-          cursor = startTick + event.duration.ticks;
-          end = Math.max(end, cursor);
-        }
-        longest = Math.max(longest, end);
-      }
-    }
-    return longest;
-  }
-
-  /** The file's own tempo marks, or the MIDI default when it states none. */
-  function buildTempoMap(parsed, api) {
-    const offsets = measureTickOffsets(parsed);
-    const raw = (parsed.tempoMarks ?? []).map((mark) => ({
-      tick: (offsets.get(mark.measureNumber) ?? 0) + mark.tick,
-      microsecondsPerQuarter: 60_000_000 /
-        (mark.perMinute * (api.ticksWithDots(api.baseTicksForType(mark.beatUnit), mark.beatUnitDots) / api.TICKS_PER_QUARTER)),
-    })).filter((event) => Number.isFinite(event.microsecondsPerQuarter) && event.microsecondsPerQuarter > 0);
-    return api.buildTempoMap(raw).tempoMap;
+    return { notes, endSeconds: timeline.endSeconds };
   }
 
   /** The two hands' marks, from the notes the score gave a stroke for. */
@@ -321,7 +258,8 @@
       setStatus('Reading the tablature…');
       const api = await loadNotationEngine();
       const parsed = api.parseMusicXml(await file.text());
-      const { notes, endSeconds } = readTabNotes(parsed, api);
+      const timeline = engine.scoreTimeline(parsed, api);
+      const { notes, endSeconds } = readTabNotes(parsed, api, timeline);
       if (notes.length === 0) {
         throw new Error('This score carries no tablature positions, so there is nothing to draw on the neck.');
       }
