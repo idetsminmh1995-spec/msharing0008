@@ -173,8 +173,23 @@ async function waitForRender(label, timeoutMs = 120000, previousHref = null) {
  * for it: `clip` is its bytes, or null for the 404 the Plan allows.
  */
 let thankYouClip = null;
+/**
+ * A picture the page is told not to find. Plan §5 says a required asset that
+ * will not load stops the export; a neck drawn without its strings would be
+ * a wrong video, not a missing one.
+ */
+let missingPicture = null;
 async function serveThankYou() {
   cdp.on('Fetch.requestPaused', async (event) => {
+    if (missingPicture && event.request.url.includes(missingPicture)) {
+      await cdp.call('Fetch.fulfillRequest', {
+        requestId: event.requestId,
+        responseCode: 404,
+        responseHeaders: [{ name: 'Access-Control-Allow-Origin', value: '*' }],
+        body: Buffer.from('not found').toString('base64'),
+      });
+      return;
+    }
     if (!event.request.url.includes('/thank-you/')) {
       await cdp.call('Fetch.continueRequest', { requestId: event.requestId });
       return;
@@ -393,7 +408,24 @@ print(background, other)
   assert.ok(thankedProbe.streams.some((stream) => stream.codec_type === 'audio'),
     `The Thank You clip's sound is missing: ${JSON.stringify(thankedProbe.streams)}`);
 
-  console.log(JSON.stringify({ status: result.status, summary: result.summary, bytes: result.bytes, download: state.name, ffprobe: probe, scoreSeconds, thankYouSeconds: thankedSeconds, ink: { backgroundPixels, otherPixels } }, null, 2));
+  // Plan §5: a required picture that will not load stops the export rather
+  // than producing a neck with no strings on it.
+  //
+  // This runs last, and on a picture no earlier render has drawn, because
+  // `imageCache` keeps what it fetched: a picture that loaded once is drawn
+  // from memory, and one that failed once stays failed for the life of the
+  // page. Blocking a picture that is already cached would prove nothing.
+  missingPicture = 'electric-drawn.svg';
+  await evaluate("(() => { const el = document.querySelector('[data-guitar-photo]'); el.value = 'electric-drawn'; el.dispatchEvent(new Event('change', {bubbles:true})); })()");
+  await evaluate("document.querySelector('[data-studio-generate]').click()");
+  const noPicture = await waitForRender('A render whose guitar picture is missing', 30000, thanked.href);
+  assert.match(noPicture.status, /could not be loaded/i,
+    `A missing guitar picture did not stop the export: ${noPicture.status}`);
+  assert.equal(noPicture.href, thanked.href,
+    'A missing guitar picture replaced the previous video with a broken one');
+  missingPicture = null;
+
+  console.log(JSON.stringify({ status: result.status, summary: result.summary, bytes: result.bytes, download: state.name, ffprobe: probe, scoreSeconds, thankYouSeconds: thankedSeconds, missingPicture: noPicture.status, ink: { backgroundPixels, otherPixels } }, null, 2));
 } finally {
   cdp?.close();
   for (const child of [browser, server]) {

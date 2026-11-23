@@ -188,10 +188,14 @@ Plan §5 ၏ ပထမဆုံး စစ်ချက်ဖြစ်သော **
 |---|---|---|---|---|---|---|
 | Frame determinism (same time → same frame) | ရှိ | ရှိ | ရှိ | ရှိ | ရှိ | ရှိ |
 | Audio policy (silent vs audible) | မသက်ဆိုင် (silent) | မသက်ဆိုင် | မသက်ဆိုင် | မသက်ဆိုင် | ရှိ | ရှိ |
-| Asset readiness | ရှိ | ရှိ | ရှိ | ရှိ | ရှိ | ရှိ |
+| Asset readiness | ရှိ | **အသစ်** | ရှိ | ရှိ | ရှိ | ရှိ |
 | Render lifecycle | ရှိ | ရှိ | ရှိ | ရှိ | ရှိ | ရှိ |
 
 **ဖြည့်ခဲ့သော gap — Metronome determinism။** စစ်ကြည့်သောအခါ `test-metronome-studio-browser.mjs` တွင် `assert` ၄၀ ကျော် ပါသော်လည်း frame determinism စစ်ချက် လုံးဝ မပါကြောင်း တွေ့ရသည်။ Piano နှင့် Voice တွင် ထို စစ်ချက် ရှိပြီးသားဖြစ်သဖြင့် Metronome တစ်ခုတည်း လွတ်နေသည်။ ယခု ထည့်ပြီးဖြစ်သည် — တူညီသော setting ဖြင့် နှစ်ကြိမ် render လုပ်ပြီး 0.4 sec (swing အလယ်) မှ frame ကို နှိုင်းယှဉ်သည်။ ရလဒ် — **ရွေ့သော pixel 0 / 921,600, delta 0**။ ဤအချက်က `frameAt()` သည် wall clock မဖတ်၊ frame အကြား state မထားကြောင်း သက်သေဖြစ်သည်။
+
+**ဖြည့်ခဲ့သော gap — Guitar asset failure။** §5 ၏ "Assets" စစ်ချက် (လိုအပ်သော asset မရလျှင် export ကို မစရ) ကို Guitar တွင် တကယ် မစစ်ရသေးပါ။ ကုဒ်တွင် guard ရှိပြီးသားဖြစ်သည် (`if (!picture) throw new Error(...)`)၊ သို့သော် စမ်းသပ်မှု မရှိလျှင် ထို guard ကို နောက်တစ်ခါ ဖျက်မိလျှင် မည်သူမျှ မသိပါ။ ယခု `electric-drawn.svg` ကို 404 ဖြစ်စေပြီး စစ်သည် — status က `could not be loaded` ဖြင့် ရပ်ပြီး download မထွက်ပါ။ ယခင် ဗီဒီယို (Thank You ပါသော) ကိုလည်း မဖျက်ပါ။
+
+**တွေ့ရှိချက် — မအောင်မြင်သော ပုံကို cache လုပ်ထားသည်။** `imageCache` က မအောင်မြင်သော promise ကို လည်း သိမ်းထားသဖြင့် ထို ပုံကို တစ်ခါ မရပြီးနောက် page တစ်ခုလုံးအတွက် ထပ်မကြိုးစားတော့ပါ။ 404 အတွက် မှန်ကန်သည် (ဖိုင် မရှိ)၊ သို့သော် ကွန်ရက် glitch တစ်ခုဖြစ်လျှင် အသုံးပြုသူသည် page ကို ပြန် reload လုပ်ရမည်။ ဤအချက်ကို doc တွင် မှတ်ထားသည်၊ ကုဒ် မပြောင်းပါ။
 
 **မှတ်ချက် — စမ်းသပ်မှု ပတ်ဝန်းကျင်။** ဤ session တွင် `ffmpeg`/`ffprobe` သည် system `PATH` မှ ပျောက်နေသဖြင့် browser test များ run ရန် `PATH="/workspace/tools/node_modules/@ffprobe-installer/linux-x64:/workspace/tools/node_modules/@ffmpeg-installer/linux-x64:$PATH"` ကို ရှေ့ဆက် ထည့်ရသည်။ `Pillow` ကိုလည်း `pip install pillow` ဖြင့် ထည့်ခဲ့သည် (frame နှိုင်းယှဉ်မှုအတွက်)။
 
