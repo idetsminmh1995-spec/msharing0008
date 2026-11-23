@@ -79,6 +79,34 @@
                 <div class="studio-field"><span>Sound Model</span><select data-metronome-sound-model><option value="default">Default Metronome Click</option><option value="natural">Natural Sound Model</option><option value="studio">Studio Sound Model</option><option value="room">Room Sound Model</option></select><label class="range-control"><input type="range" min="0" max="100" value="80" data-metronome-sound-volume /><output data-metronome-sound-volume-value>80%</output></label></div>
               </div>
             </section>
+            <section class="metronome-controls" data-guitar-controls hidden aria-label="Guitar video settings">
+              <label class="studio-field studio-field--file metronome-file-field"><span>MusicXML file (with tablature)</span><input type="file" accept=".musicxml,.xml,application/xml,text/xml,application/vnd.recordare.musicxml+xml" data-guitar-musicxml-input aria-describedby="guitar-musicxml-name" /><small id="guitar-musicxml-name" data-guitar-musicxml-name>No file selected</small></label>
+              <p class="metronome-help">The neck is drawn from the file's own string and fret numbers. A score with no tablature has no positions to draw, so it is refused rather than guessed.</p>
+              <div class="metronome-field-grid">
+                <label class="metronome-field">Guitar picture
+                  <select data-guitar-photo aria-label="Guitar picture"></select>
+                </label>
+                <label class="metronome-field">Video orientation
+                  <select data-guitar-aspect aria-label="Guitar video orientation">
+                    <option value="16x9">Landscape · 16:9</option>
+                    <option value="9x16">Portrait · 9:16</option>
+                    <option value="1x1">Square · 1:1</option>
+                  </select>
+                </label>
+              </div>
+              <div class="metronome-field-grid">
+                <label class="metronome-field">Right hand
+                  <select data-guitar-picking aria-label="Right hand notation">
+                    <option value="pick">Plectrum</option>
+                    <option value="fingers">Fingers</option>
+                  </select>
+                </label>
+                <label class="metronome-field">Finger colour legend
+                  <input type="checkbox" data-guitar-hand-legend checked aria-label="Draw the finger colour legend" />
+                </label>
+              </div>
+              <p class="metronome-duration" data-guitar-summary aria-live="polite"></p>
+            </section>
           <form class="studio-settings" data-studio-settings>
             <div class="studio-file-row">
               <label class="studio-field studio-field--file"><span>MusicXML file</span><input type="file" accept=".musicxml,.xml,.mxl,application/xml,text/xml" data-musicxml-input /><small data-musicxml-name>No file selected</small></label>
@@ -127,8 +155,10 @@
     </main>
     <script src="assets/video-engine.js?v=5520d16b88c1"></script>
     <script src="assets/metronome-engine.js?v=7d4f30b60e08"></script>
+    <script src="assets/guitar-engine.js"></script>
     <script src="script.js?v=cb8dc501cd10"></script>
     <script src="studio-video.js?v=0890cb19dd8b"></script>
     <script src="studio-metronome.js?v=2ac6aea8ca8e"></script>
+    <script src="studio-guitar.js"></script>
   </body>
 </html>
