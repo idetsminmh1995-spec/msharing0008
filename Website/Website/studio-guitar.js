@@ -340,8 +340,11 @@
         ctx.beginPath();
         ctx.rect(0, 0, rect.width, rect.height);
         ctx.clip();
-        // Centred in the band, and never lifted above it.
-        ctx.translate(0, Math.max(0, Math.round((rect.height - stageHeight) / 2)));
+        // The band is the box of what is DRAWN, so the stage's first drawn
+        // pixel is lifted to the band's top edge instead of being centred.
+        const fit = Math.min(1, rect.height / contentHeight);
+        ctx.translate((rect.width - stageWidth * fit) / 2, -inkTop * fit);
+        if (fit < 1) ctx.scale(fit, fit);
         const active = picks.find((pick) => Math.abs(pick.startSeconds - at) < 0.08);
         const shapes = guitar.stageShapes({
           width: stageWidth,
@@ -382,8 +385,24 @@
       const stageHeight = Math.max(1, Math.round(guitar.stageHeightFor(stageWidth, photo, {
         handLegend: settings.handLegend,
       })));
+      // The stage hangs the picture by its strings, so the guitar reaches
+      // past the stage's own box. The band holds what is DRAWN, or the
+      // body is cut by the band it was given.
+      const probeShapes = guitar.stageShapes({
+        width: stageWidth,
+        height: stageHeight,
+        seconds: 0,
+        notes,
+        photo,
+        picking: settings.picking,
+        handLegend: settings.handLegend,
+        fadeTo: palette.background,
+      });
+      const inkTop = Math.min(...probeShapes.map((shape) => shape.y ?? 0));
+      const inkBottom = Math.max(...probeShapes.map((shape) => (shape.y ?? 0) + (shape.height ?? 0)));
+      const contentHeight = Math.max(1, inkBottom - inkTop);
       const free = settings.height - probe.pad * 2;
-      settings.shares = { instrument: Math.min(1, stageHeight / Math.max(1, free)) };
+      settings.shares = { instrument: Math.min(1, contentHeight / Math.max(1, free)) };
 
       setStatus('Laying out the notation…');
       const notation = await engine.prepareNotationFor(file, settings, PARTS);
