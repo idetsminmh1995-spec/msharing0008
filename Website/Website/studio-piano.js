@@ -202,6 +202,74 @@
     return `rgb(${blend(r1, r2)}, ${blend(g1, g2)}, ${blend(b1, b2)})`;
   }
 
+  /** The frequency of a MIDI note, in the tuning the notation assumes. */
+  const midiToHz = (midi) => 440 * (2 ** ((midi - 69) / 12));
+
+  /**
+   * One piano note, at `at` seconds, on a context that renders offline.
+   *
+   * A struck string is not a sine: the hammer excites a stack of partials
+   * that fade at different rates, the upper ones first. Summing the first
+   * six partials with their own decays is what makes the result read as a
+   * piano rather than a beep, and it needs no sample library.
+   */
+  const addNote = (context, midi, at, seconds, gain) => {
+    if (gain <= 0 || seconds <= 0) return;
+    const hz = midiToHz(midi);
+    // Low notes ring for seconds, high ones for a fraction of that.
+    const ring = Math.max(0.18, Math.min(2.6, 5.5 - midi / 22));
+    const length = Math.min(ring, Math.max(0.12, seconds + ring * 0.5));
+    const partials = [1, 2, 3, 4, 5, 6];
+    const weights = [1, 0.5, 0.28, 0.16, 0.09, 0.05];
+
+    partials.forEach((partial, index) => {
+      const osc = context.createOscillator();
+      const envelope = context.createGain();
+      osc.type = 'sine';
+      // A string is slightly sharp on its upper partials; without this the
+      // chord sounds like an organ.
+      osc.frequency.setValueAtTime(hz * partial * (1 + 0.0004 * partial * partial), at);
+      const decay = length / (1 + index * 0.45);
+      envelope.gain.setValueAtTime(0, at);
+      envelope.gain.linearRampToValueAtTime(gain * weights[index], at + 0.004);
+      envelope.gain.exponentialRampToValueAtTime(0.0006, at + decay);
+      osc.connect(envelope);
+      envelope.connect(context.destination);
+      osc.start(at);
+      osc.stop(at + decay + 0.02);
+    });
+  };
+
+  /**
+   * The whole performance as one AudioBuffer, so the picture and the sound
+   * share one timeline and a seek lands on the same note in both.
+   *
+   * The page has no Sound Model control, so the tone is fixed: the notes
+   * the score presses, and nothing else. Silence would be a bug here, not a
+   * choice the user made.
+   */
+  async function createPianoAudio({ keys, seconds }) {
+    const OfflineContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!OfflineContext) throw new Error('This browser cannot synthesize the piano sound. Try a current version of Chrome, Edge, Safari, or Firefox.');
+
+    const sampleRate = 48000;
+    const context = new OfflineContext(2, Math.max(1, Math.ceil(Math.max(1, seconds) * sampleRate)), sampleRate);
+    // A dense chord would clip if every note played at full level, so the
+    // gain per note falls as more notes sound together. The partials sum to
+    // about 2.1, so a note's own peak is a little over twice its gain: 0.11
+    // leaves a chord of three notes under full scale instead of squared off.
+    const gain = Math.min(0.11, 0.5 / Math.max(1, Math.sqrt(keys.length)));
+
+    for (const key of keys) {
+      const at = Math.max(0, key.startMs / 1000);
+      if (at >= seconds) continue;
+      const held = Math.max(0.05, (key.endMs - key.startMs) / 1000);
+      addNote(context, key.midi, at, held, gain);
+    }
+
+    return await context.startRendering();
+  }
+
   async function renderPiano() {
     if (isRendering) {
       cancelRequested = true;
@@ -334,6 +402,10 @@
           });
         },
       }];
+      // The keys and the notes are one timeline, so the sound rides on the
+      // performance segment and starts with it.
+      setStatus('Synthesizing the piano sound…');
+      segments[0].audio = await createPianoAudio({ keys, seconds });
       const ending = await engine.thankYouSegment(settings.width, settings.height);
       if (ending) segments.push(ending);
 
@@ -364,7 +436,7 @@
       if (playButton) playButton.disabled = false;
       if (timeline) timeline.disabled = false;
       const sound = ending ? 'Thank You ending' : 'no Thank You clip';
-      setStatus(`Rendered ${result.frames} frames · ${seconds.toFixed(2)} sec · ${result.container.toUpperCase()} · ${sound}`);
+      setStatus(`Rendered ${result.frames} frames · ${seconds.toFixed(2)} sec · ${result.container.toUpperCase()} · piano sound · ${sound}`);
     } catch (error) {
       setStatus(`Piano video render failed: ${error.message || error}`);
       if (placeholder) placeholder.hidden = false;

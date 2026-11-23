@@ -147,6 +147,9 @@ Run every command from `Website/Notation/Notation Engine/`.
 
 - Code may be written in full for this repository. Do not hold back an
   implementation, a test, or a fix on the grounds of "no code please".
+  The owner reaffirmed this on 2026-11-23 and asked for it to be recorded:
+  write the whole implementation, including tests and docs, without asking
+  for per-file permission first.
 - The Plan under `Website/Video/Video Engine Plan/PLAN.md` is reviewed and
   updated roughly every five hours. Work is landed in small pushes: push
   whatever is written first, then continue from the Plan, then push again.

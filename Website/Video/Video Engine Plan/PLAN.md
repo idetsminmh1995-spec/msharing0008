@@ -156,11 +156,11 @@ Phase 2 ၏ ပန်းတိုင်ဖြစ်သော key-only visual ada
 
 1. **Event source (§2.1)** — MusicXML ကို ရွေးထားသည်။ Adapter သည် pitched note တစ်ခုချင်းစီကို MIDI pitch, onset, duration အဖြစ် ဖတ်ပြီး tie ၏ အပိုင်းနှစ်ခုကို အသံတစ်ခုတည်းအဖြစ် ပေါင်းသည်။ Chord တစ်ခုကို key များအဖြစ် တစ်ပြိုင်နက် ဖိနေသည့်အတိုင်း ဆွဲသည်။ Pitch မရှိသော note ကို ခန့်မှန်း မထည့်ပါ။
 2. **Renderer (§2.2)** — `buildKeyboard()` ၏ geometry နှင့် `keyPressDepthMm()` ကို `atSeconds` မှ တွက်၍ ဆွဲသည်။ Wall-clock time နှင့် live DOM state ကို မဖတ်သဖြင့် မည်သည့် time ကို ပြန်ခေါ်လျှင်လည်း frame တူသည်။
-3. **Key-only, silent (§2.3)** — `Piano 3D Hand Engine` သည် empty ဖြစ်သဖြင့် dependency အဖြစ် မသုံးပါ။ Synthetic IK ကို လူ့လက်ဟု မဖော်ပြပါ။ Audio မပါသော export ဖြစ်ကြောင်း status တွင် ဖော်ပြသည်။
+3. **Key-only, audible (§2.3)** — `Piano 3D Hand Engine` သည် empty ဖြစ်သဖြင့် dependency အဖြစ် မသုံးပါ။ Synthetic IK ကို လူ့လက်ဟု မဖော်ပြပါ။ Score ၏ pitched note တစ်ခုချင်းစီကို `OfflineAudioContext` ဖြင့် partial ခြောက်ခုဖြင့် synthesize လုပ်သဖြင့် export တွင် အသံ ပါသည်။
 4. **စံနှုန်း (§2.4)** — note mapping, range/out-of-range, chord, attack/hold/release, seek/repeated frame, no-note/cancel/error, render metadata/playback/download နှင့် Drum/Guitar/Metronome regression အားလုံး စစ်ပြီးဖြစ်သည်။
 
 **အရှည် (§7 စည်းမျဉ်း):** Count Voice + MusicXML အရှည် + Thank You clip။ Adapter တွင် ကိုယ်ပိုင် `MAX_SECONDS` မထားပါ; Video Engine ၏ memory guard သာ safety ဖြစ်သည်။
 
 **Bundle:** `Website/Piano/Piano Hand Human Engine/tools/sync-piano-engine.mjs` က `dist/piano-hand-engine.js` ကို `Website/Website/assets/piano-hand-engine.js` သို့ copy လုပ်ပြီး `--check` ဖြင့် stale copy ကို ဖမ်းသည်။ Guitar Engine ၏ ပုံစံအတိုင်း ဖြစ်သည်။
 
-**ကျန်ရှိ:** Piano အသံ (Sound Engine သို့မဟုတ် uploaded audio) နှင့် hand/wrist animation သည် သီးခြား project အဖြစ် ကျန်သည်။ ဖုန်းအစစ်၊ Safari/Firefox နှင့် MediaRecorder-only fallback ကို မစစ်ရသေးပါ။ Bass ကို နောက်ဦးစားပေးအဖြစ် ဆက်လုပ်ရန်။
+**ကျန်ရှိ:** Sound Engine သို့မဟုတ် uploaded audio ကို Piano အသံအဖြစ် အစားထိုးချိတ်ခြင်း နှင့် hand/wrist animation သည် သီးခြား project အဖြစ် ကျန်သည်။ ဖုန်းအစစ်၊ Safari/Firefox နှင့် MediaRecorder-only fallback ကို မစစ်ရသေးပါ။ Bass ကို နောက်ဦးစားပေးအဖြစ် ဆက်လုပ်ရန်။

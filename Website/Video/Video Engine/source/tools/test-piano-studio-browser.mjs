@@ -384,13 +384,35 @@ try {
   const videoStream = probe.streams.find((stream) => stream.codec_type === 'video');
   const audioStream = probe.streams.find((stream) => stream.codec_type === 'audio');
   assert.ok(videoStream, 'Piano output has no video stream');
-  assert.equal(audioStream, undefined, 'Piano output claims an audio track the engine cannot make');
+  // The Plan's piano adapter is silent no longer: the score's own notes are
+  // synthesized, so the export must carry an audio track.
+  assert.ok(audioStream, 'Piano output has no audio track, so the score is not heard');
   assert.equal(videoStream.width, 720, 'Portrait piano video width is wrong');
   assert.equal(videoStream.height, 1280, 'Portrait piano video height is wrong');
   // The Plan's length rule, with no cap of the page's own: two 4/4 bars at
   // the default 120 BPM are four seconds, and no 12-second cap applies.
   const scoreSeconds = Number(probe.format.duration);
   assert.ok(Math.abs(scoreSeconds - 4) < 0.4, `Piano video is not the score's length: ${scoreSeconds}s instead of 4s`);
+
+  // A track that exists but is silent would pass the stream check, so the
+  // samples are read: the score's notes have to be loud, and they have to
+  // land where the keys go down.
+  const pianoWav = `${output}.piano.wav`;
+  await exec('ffmpeg', ['-v', 'error', '-y', '-i', videoPath, '-ac', '1', '-ar', '48000', '-c:a', 'pcm_s16le', pianoWav]);
+  const pianoLoudness = JSON.parse((await exec('python3', ['-c', `
+import json, struct, wave
+with wave.open(${JSON.stringify(pianoWav)}, 'rb') as handle:
+    rate = handle.getframerate()
+    frames = handle.getnframes()
+    samples = struct.unpack('<%dh' % frames, handle.readframes(frames))
+window = rate // 100
+peaks = []
+for index in range(0, frames // window):
+    piece = samples[index * window:(index + 1) * window]
+    peaks.append(max(abs(value) for value in piece))
+print(json.dumps({'peak': max(peaks) if peaks else 0, 'at': peaks}))
+`])).stdout);
+  assert.ok(pianoLoudness.peak > 3000, `The piano sound is too quiet to hear: peak ${pianoLoudness.peak}`);
 
   // The keyboard must actually be in the pixels, not just in the shape list.
   const framePath = `${output}-frame.png`;
@@ -542,7 +564,7 @@ print(len(blacks), len(whites), (sum(blacks) / len(blacks)) if blacks else 0, (s
   assert.ok(thankedProbe.streams.some((stream) => stream.codec_type === 'audio'),
     `The Thank You clip's sound is missing: ${JSON.stringify(thankedProbe.streams)}`);
 
-  console.log(JSON.stringify({ status: result.status, summary: result.summary, bytes: result.bytes, download: state.name, ffprobe: probe, scoreSeconds, thankYouSeconds: thankedSeconds, ink: { backgroundPixels, otherPixels } }, null, 2));
+  console.log(JSON.stringify({ status: result.status, summary: result.summary, bytes: result.bytes, download: state.name, ffprobe: probe, scoreSeconds, thankYouSeconds: thankedSeconds, ink: { backgroundPixels, otherPixels }, pianoPeak: pianoLoudness.peak }, null, 2));
 } finally {
   cdp?.close();
   for (const child of [browser, server]) {
