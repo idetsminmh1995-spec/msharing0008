@@ -157,6 +157,14 @@ Run every command from `Website/Notation/Notation Engine/`.
   it. The owner reaffirmed it again on 2026-11-18 and asked for it to be
   recorded at the start of the session: full permission, write the whole
   implementation, and push what is written before continuing.
+- **Permission is standing — reaffirmed again at the start of the
+  2026-11-18 02:05 session.** The owner said, in the same message that
+  asked for a read-only pass over the repository, that the code permission
+  is full and asked for it to be written down first. Treat full
+  code-writing permission as the default state of every session: no
+  per-file ask, no "should I write this" pause. A message that opens with
+  "do not write code" describes that one pass only; the next instruction
+  that asks for work is enough to resume writing.
 - The Plan under `Website/Video/Video Engine Plan/PLAN.md` is reviewed and
   updated roughly every five hours. Work is landed in small pushes: push
   whatever is written first, then continue from the Plan, then push again.
