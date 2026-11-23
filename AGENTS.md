@@ -155,3 +155,19 @@ Run every command from `Website/Notation/Notation Engine/`.
 - `Website/Plan/README.md` is not to be edited.
 - Docs (`.../Doc/`, `.../Plan/`) are updated only after the work they
   describe actually exists and has been verified.
+
+### Pushing
+
+`~/.gitconfig` pins `credential.https://github.com.username=x-access-token`
+and the OpenHands credential helper. Those answer for the wrong account and
+the push fails with `403 ... denied`. Clear the inherited helper for the one
+command, then supply the account's own token:
+
+```
+git -c credential.https://github.com.username=<account> \
+    -c credential.helper= -c credential.helper='!f() { echo "username=<account>"; echo "password=<pat>"; }; f' \
+    push origin <branch>
+```
+
+Nothing is written to disk that way. Check the result with
+`git ls-remote origin refs/heads/<branch>` against `git rev-parse HEAD`.
