@@ -42,6 +42,18 @@ Instrument တစ်ခုချင်းစီသည် Video Engine encoder �
 3. Guitar/Piano bundle output path, script load order နှင့် case-sensitive website assets destination ကို အတည်ပြုပါ။ Bundle copy/check command ရှိပါက အသုံးပြုပြီး freshness test ထည့်ပါ။
 4. Shared event time convention, output dimensions/FPS ceiling, maximum duration/memory budget, silent-vs-audio UX နှင့် common error messages ကို သတ်မှတ်ပါ။
 
+### Phase 0.5 — Final video layout နှင့် စံ output (2026-11-22 ထပ်ထည့်)
+
+အသေးစိတ်ကို Main Plan ၏ `Create Video — Final video layout` နှင့် `Video ထုတ်လုပ်ပုံ အသေးစိတ်` section များတွင် ကြည့်ပါ။ ဤ phase သည် instrument adapter များ (Phase 1–5) မတိုင်မီ Video Engine ဘက်မှ လိုအပ်သော shared အလုပ်များ ဖြစ်သည်။
+
+1. **စံ output အရွယ်:** Video အားလုံး (Metronome အပါအဝင်) သည် **1920×1080 (16:9) / 1080×1080 (1:1) / 1080×1920 (9:16)** ဖြစ်ရမည်။ အရွယ်ကို Video Engine ၏ shared setting တစ်ခုတည်းမှ သတ်မှတ်ရမည်။ လက်ရှိ Metronome adapter သည် 1280×720 / 720×720 / 720×1280 ဖြစ်သဖြင့် ပြောင်းရမည်၊ Metronome frame renderer သည် အရွယ်ကို parameter အဖြစ် လက်ခံရမည်။ 1080p အတွက် memory budget နှင့် H.264 level ကို ပြန်စစ်ရမည်။
+2. **၃ ပိုင်း layout template:** Title / Info၊ Notation၊ တူရိယာ အပိုင်း ၃ ခုကို data ဖြင့်ကြေညာ၍ တူရိယာအလိုက် နေရာပြောင်းနိုင်ရမည် (Drum/Piano — Title အပေါ်၊ တူရိယာအောက်။ Guitar — တူရိယာအပေါ်၊ Title အောက်။ Violin — ဘေးတစ်ဖက်၊ Title အောက်)။ Ratio ၃ မျိုးအလိုက် အချိုးကို Main Plan ၏ ဇယားအတိုင်း (default)။ Metronome tool ၏ video တွင် Title / Info အပိုင်း မပါ။
+3. **Video အရှည်** = Count Voice (အစ၊ count-in) + MusicXML အရှည် + Thank You video။ `MAX_SECONDS = 12` (Drum) နှင့် Metronome ၏ ၁၂ စက္ကန့် ကန့်သတ်ချက်ကို ဖယ်ပြီး memory guard ကိုသာ safety အဖြစ်ထားရမည်။
+4. **Thank You segment:** R2 ထဲရှိ Landscape / Portrait / Square သီးခြားဖိုင်ကို output ratio အလိုက်ရွေး၍ Video အဆုံးတွင် ဆက်ရမည်။ ဖိုင်အမည်၊ path နှင့် ဖိုင်မရလျှင် လုပ်ပုံသည် Video Engine ၏ တာဝန်ဖြစ်ပြီး §3 Adapter Contract (လိုအပ်သော asset မရလျှင် export မစရ) ကို လိုက်နာရမည်။
+5. **Title / Info:** Logo (R2 default + အသုံးပြုသူ upload)၊ Title 1 / Title 2 (အသုံးပြုသူ ရိုက်ထည့်သည့်အတိုင်း)၊ `4/4` / `BPM` / `Key` (MusicXML မှ)၊ Metronome icon (beat တိုင်း တုန်ခါ၊ အသံမပါ)။
+6. **ရေတွက်ပုံ ရွေးချယ်မှု** (`1,2,3,4` / `1&,…` / `1e&a,…`) သည် Video ပေါ်ရှိ စာသားကိုသာ ပြောင်းသည်။ Count Voice အသံနှင့် မဆက်စပ်။
+7. **စစ်ဆေးရမည့် စံနှုန်း:** ratio ၃ မျိုး × တူရိယာအလိုက် layout တွင် `atSeconds` တူလျှင် frame တူခြင်း၊ စုစုပေါင်းအရှည် = Count Voice + MusicXML + Thank You ဖြစ်ခြင်း၊ 1080p memory/encode အောင်မြင်ခြင်း၊ Thank You ကို ratio မှန်ကန်စွာ ဆက်ခြင်း၊ Drum နှင့် Metronome regression အောင်မြင်ခြင်း။
+
 ### Phase 1 — Guitar visual adapter (ပထမဦးစားပေး)
 
 **အကြောင်းရင်း:** Guitar Engine တွင် reusable source, tests, built bundle နှင့် SVG stage API ရှိသော်လည်း Studio event source နှင့် Canvas painter မချိတ်ရသေးပါ။ လက်ရှိအထောက်အထားအရ စတင်ရန်အဆင်သင့်ဆုံးဖြစ်သော်လည်း integration ပြီးစီးပြီဟု မယူဆရ။
