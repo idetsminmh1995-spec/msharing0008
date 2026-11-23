@@ -468,7 +468,7 @@ Video ထဲတွင် ထည့်ရန် ရွေးချယ်ခွင
 
 ## Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ် — 2026-11-22
 
-ဤ section သည် Create Video ၏ video ထုတ်လုပ်သည့် အပိုင်းအားလုံးကို စုစည်းဖော်ပြသည်။ အပိုင်း ၃ ပိုင်း ပြင်အဆင်၏ အကျဉ်းကို အထက်ပါ [Create Video — Final video layout](#create-video--final-video-layout--2026-11-22) တွင်ကြည့်ပါ။ လက်ရှိ code အခြေအနေကို 2026-11-22 တွင် `main` branch မှ ဖတ်စစ်ထားသည်။
+ဤ section သည် Create Video ၏ video ထုတ်လုပ်သည့် အပိုင်းအားလုံးကို စုစည်းဖော်ပြသည်။ အပိုင်း ၃ ပိုင်း ပြင်အဆင်၏ အကျဉ်းကို အထက်ပါ [Create Video — Final video layout](#create-video--final-video-layout--2026-11-22) တွင်ကြည့်ပါ။ လက်ရှိ code အခြေအနေကို 2026-11-22 တွင် `main` branch မှ ဖတ်စစ်ထားသည်။ တူရိယာတစ်ခုချင်းစီကို Video Engine နှင့် ချိတ်ဆက်ရန် **Adapter Contract (၆ ချက်)** နှင့် **Phase 0–6** အစီအစဉ်ကို [`Website/Video/Video Engine Plan/PLAN.md`](../Video/Video%20Engine%20Plan/PLAN.md) တွင် အသေးစိတ်သတ်မှတ်ပြီးဖြစ်သည်။ ဤ section သည် ထိုအစီအစဉ်နှင့် ကိုက်ညီရမည် (အထူးသဖြင့် — adapter သည် `draw(ctx, atSeconds, frameIndex)` ကို deterministic ဖြစ်စေရမည်၊ လိုအပ်သော asset မရလျှင် export ကို မစတင်ရ၊ adapter သည် encoder/muxer ကို မပိုင်ရ)။
 
 ### ၁။ ထုတ်လုပ်မှု လမ်းကြောင်း
 
@@ -493,13 +493,15 @@ Studio ၏ options box ──► MusicXML ဖိုင် + settings
 
 **Output:** Video Engine သည် H.264 video နှင့် AAC-LC အသံ (48 kHz) ပါသော MP4 တစ်ဖိုင်တည်း ထုတ်ပေးသည်။ လက်ရှိ 30 FPS။ Browser က H.264/AAC ကို encode မလုပ်နိုင်လျှင် ရှင်းရှင်းလင်းလင်း ငြင်းပယ်သည်။ Segment များ (`segments`) ကို အစဉ်လိုက်ဆက်ပြီး အသံကို segment အားလုံးမှ ပေါင်းကာ encode လုပ်သည်။
 
-**အရွယ်အစား (ratio):**
+**အရွယ်အစား (ratio):** Studio တစ်ခုချင်းစီ၏ လက်ရှိ output အရွယ်သည် မတူပါ။
 
-| Ratio | Pixel |
-|---|---|
-| 16:9 Landscape | 1920 × 1080 |
-| 1:1 Square | 1080 × 1080 |
-| 9:16 Portrait | 1080 × 1920 |
+| Ratio | Drum Studio | Metronome Studio |
+|---|---|---|
+| 16:9 Landscape | 1920 × 1080 | 1280 × 720 |
+| 1:1 Square | 1080 × 1080 | 720 × 720 |
+| 9:16 Portrait | 1080 × 1920 | 720 × 1280 |
+
+Final video (၃ ပိုင်း layout) အတွက် ဤအရွယ်များကို တစ်ခုတည်း တူညီအောင် သတ်မှတ်ရန် ကျန်သည်။
 
 ### ၂။ Studio ၏ options box (Video ထဲထည့်ရန် ရွေးချယ်စရာများ)
 
@@ -532,7 +534,7 @@ Studio ၏ options box ──► MusicXML ဖိုင် + settings
 
 | တူရိယာ | Engine | လက်ရှိအခြေအနေ |
 |---|---|---|
-| Drum | Drum Human Stick Engine (ရှိ)၊ Drum Animation Engine (Plan တွင်သာ၊ code မရှိ) | **တစ်ခုတည်း အလုပ်လုပ်သော instrument။** Drum Animation Engine ၏ တာဝန်မှာ **R2 ထဲရှိ Drum data/ပုံများကို မကျန်အောင် ပြသပေးခြင်း** (လိုအပ်မှသာ ထပ်ထည့်) |
+| Drum | Drum Human Stick Engine (ရှိ)၊ Drum Animation Engine (Plan တွင်သာ၊ code မရှိ) | **တစ်ခုတည်း အလုပ်လုပ်သော instrument။** Drum Animation Engine ၏ တာဝန်မှာ **R2 ထဲရှိ Drum data/ပုံများကို မကျန်အောင် ပြသပေးခြင်း** (လိုအပ်မှသာ ထပ်ထည့်)။ ယခုလက်ရှိ MusicXML event မရှိလျှင် deterministic default drum pattern ဖြင့် ထုတ်သည် |
 | Piano | Piano Hand Human Engine (ရှိ)၊ Piano 3D Hand Engine (folder ဗလာ) | Video Engine Plan Phase 2 |
 | Guitar | Guitar Engine (ရှိ) | Video Engine Plan Phase 1 (ပထမဦးစားပေး) |
 | Violin | Engine folder မရှိသေး | မစတင်ရသေး |
@@ -550,6 +552,7 @@ Drum မဟုတ်သော instrument များအတွက် Studio သ�
 
 - အသံအားလုံးကို Video Engine က segment အားလုံးမှ စုပေါင်း၍ AAC တစ်ပုံတည်း encode လုပ်သည်။
 - ရင်းမြစ် — Sound Engine (Notation ၏ အသံ)၊ Metronome click၊ Count Voice။ Metronome adapter သည် ယခု `OfflineAudioContext` ဖြင့် click-track ကို ကိုယ်တိုင်ထုတ်သည် (Shared Sound Engine မဟုတ်)။
+- **လက်ရှိ:** `Website/Notation/Sound Egnine` folder သည် `.gitkeep` သာရှိပြီး Video အတွက် Sound Engine မရှိသေးပါ။ Drum video သည် အသံမပါ (silent)၊ Sound Model နှင့် Count Voice settings သည် metadata အဖြစ်သာ သိမ်းထားသည်။ ထို့ကြောင့် အသံပါ Video (အထက်ပါ requirement) သည် Video Engine Plan ၏ **Phase 6** (shared audio) အပေါ် မူတည်သည် — Sound Engine သည် Video အတွက် finite `AudioBuffer` ကို offline ထုတ်ပေးနိုင်ရမည်။
 
 ### ၆။ R2 ကို အသုံးပြုပုံ
 
@@ -564,7 +567,7 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 
 ### ၇။ ကန့်သတ်ချက်များ (လက်ရှိ)
 
-- လက်ရှိ code တွင် Drum Studio ၏ video အရှည်ကို အများဆုံး ၁၂ စက္ကန့် (`MAX_SECONDS = 12`) ဟု ကန့်သတ်ထားသည်။
+- လက်ရှိ code တွင် Drum Studio နှင့် Metronome Studio နှစ်ခုလုံး၏ video အရှည်ကို အများဆုံး ၁၂ စက္ကန့်ဟု ကန့်သတ်ထားသည် (Drum: `MAX_SECONDS = 12`၊ Metronome: 12 စက္ကန့်ကျော်သော setting ကို ပိတ်ထားသည်)။
 - **ဆုံးဖြတ်ချက်:** Video အရှည် = **Count Voice + MusicXML ဖိုင်၏ အရှည် + Thank You video** ၃ ခု၏ ပေါင်းလဒ်။ ကိုယ်ပိုင် အရှည်ကန့်သတ်ချက် မထားဘဲ ထိုပေါင်းလဒ်အတိုင်း ဖြစ်ရမည်။ ထို့ကြောင့် `MAX_SECONDS` ကို ဖယ်ရှားပြီး Video Engine ၏ memory guard ကိုသာ safety အဖြစ် ထားမည်။
 - Video Engine တွင် memory budget နှင့် H.264 level စစ်ဆေးချက် ပါပြီးသား (picture size နှင့် fps အလိုက်)။ Video ကို ရှည်လျှင်/ကြီးလျှင် ပိုမိုလိုအပ်မည်။
 
