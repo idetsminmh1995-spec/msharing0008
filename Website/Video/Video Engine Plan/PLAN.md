@@ -149,3 +149,18 @@ Audio သည် Engine shared sound capability မဟုတ်ပါ။ Adapter 
 **စမ်းသပ်မှု:** Engine 20/20, Video Engine muxer 15/15, cleanup/safety 5/5; Chromium Engine MP4 smoke, latest Drum Studio MP4 export/regression နှင့် Metronome homepage-card-to-export flow pass. Metronome output သည် 3/8, quarter-note 96 BPM, 1 bar တွင် 28 frames/0.933 sec, 720×1280 VP8 နှင့် 48 kHz mono Opus ဖြစ်ကြောင်း `ffprobe` ဖြင့်စစ်ထားသည်။ Phone 375×812, desktop 1280×900 layout တွင် overflow မရှိ။
 
 **လက်ကျန်:** ဖုန်းအစစ်/Safari/Firefox နှင့် MediaRecorder-only fallback; design 11 မျိုးအားလုံးအတွက် browser visual snapshots; logo asset policy; Engine source input/XML escaping edge cases. Guitar ကို နောက်ဦးစားပေးအဖြစ် ဆက်လုပ်ပြီး Piano, Bass, Strings, Voice ကို သီးခြား adapter ဖြင့်သာ ချိတ်ဆက်ရန်။
+
+## Piano adapter — Phase 2 ပြီးစီး (2026-11-23)
+
+Phase 2 ၏ ပန်းတိုင်ဖြစ်သော key-only visual adapter ကို ချိတ်ဆက်ပြီးပါပြီ။
+
+1. **Event source (§2.1)** — MusicXML ကို ရွေးထားသည်။ Adapter သည် pitched note တစ်ခုချင်းစီကို MIDI pitch, onset, duration အဖြစ် ဖတ်ပြီး tie ၏ အပိုင်းနှစ်ခုကို အသံတစ်ခုတည်းအဖြစ် ပေါင်းသည်။ Chord တစ်ခုကို key များအဖြစ် တစ်ပြိုင်နက် ဖိနေသည့်အတိုင်း ဆွဲသည်။ Pitch မရှိသော note ကို ခန့်မှန်း မထည့်ပါ။
+2. **Renderer (§2.2)** — `buildKeyboard()` ၏ geometry နှင့် `keyPressDepthMm()` ကို `atSeconds` မှ တွက်၍ ဆွဲသည်။ Wall-clock time နှင့် live DOM state ကို မဖတ်သဖြင့် မည်သည့် time ကို ပြန်ခေါ်လျှင်လည်း frame တူသည်။
+3. **Key-only, silent (§2.3)** — `Piano 3D Hand Engine` သည် empty ဖြစ်သဖြင့် dependency အဖြစ် မသုံးပါ။ Synthetic IK ကို လူ့လက်ဟု မဖော်ပြပါ။ Audio မပါသော export ဖြစ်ကြောင်း status တွင် ဖော်ပြသည်။
+4. **စံနှုန်း (§2.4)** — note mapping, range/out-of-range, chord, attack/hold/release, seek/repeated frame, no-note/cancel/error, render metadata/playback/download နှင့် Drum/Guitar/Metronome regression အားလုံး စစ်ပြီးဖြစ်သည်။
+
+**အရှည် (§7 စည်းမျဉ်း):** Count Voice + MusicXML အရှည် + Thank You clip။ Adapter တွင် ကိုယ်ပိုင် `MAX_SECONDS` မထားပါ; Video Engine ၏ memory guard သာ safety ဖြစ်သည်။
+
+**Bundle:** `Website/Piano/Piano Hand Human Engine/tools/sync-piano-engine.mjs` က `dist/piano-hand-engine.js` ကို `Website/Website/assets/piano-hand-engine.js` သို့ copy လုပ်ပြီး `--check` ဖြင့် stale copy ကို ဖမ်းသည်။ Guitar Engine ၏ ပုံစံအတိုင်း ဖြစ်သည်။
+
+**ကျန်ရှိ:** Piano အသံ (Sound Engine သို့မဟုတ် uploaded audio) နှင့် hand/wrist animation သည် သီးခြား project အဖြစ် ကျန်သည်။ ဖုန်းအစစ်၊ Safari/Firefox နှင့် MediaRecorder-only fallback ကို မစစ်ရသေးပါ။ Bass ကို နောက်ဦးစားပေးအဖြစ် ဆက်လုပ်ရန်။

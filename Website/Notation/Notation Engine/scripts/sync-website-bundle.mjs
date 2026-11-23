@@ -59,6 +59,8 @@ const appAssets = [
   'notation-newscore.js',
   'studio-video.js',
   'studio-metronome.js',
+  'studio-guitar.js',
+  'studio-piano.js',
   'styles.css',
   'assets/video-engine.js',
   'assets/metronome-engine.js',

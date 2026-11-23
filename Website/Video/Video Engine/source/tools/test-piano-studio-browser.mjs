@@ -65,6 +65,31 @@ const NO_PITCH_SCORE = `<?xml version="1.0" encoding="UTF-8"?>
   </measure></part>
 </score-partwise>`;
 
+/** Every note is below the 88-key piano's lowest key (A0), so nothing can be pressed. */
+const OUT_OF_RANGE_SCORE = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+  <part id="P1"><measure number="1">
+    <attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time>
+      <clef><sign>G</sign><line>2</line></clef></attributes>
+    <note><pitch><step>C</step><octave>0</octave></pitch><duration>4</duration><type>whole</type></note>
+  </measure></part>
+</score-partwise>`;
+
+/** One unplayable note below A0 among notes the piano can play. */
+const MIXED_RANGE_SCORE = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+  <part id="P1"><measure number="1">
+    <attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time>
+      <clef><sign>G</sign><line>2</line></clef></attributes>
+    <note><pitch><step>C</step><octave>0</octave></pitch><duration>1</duration><type>quarter</type></note>
+    <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+    <note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+    <note><pitch><step>G</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+  </measure></part>
+</score-partwise>`;
+
 async function findFreePort() {
   const listener = net.createServer();
   await new Promise((resolve, reject) => {
@@ -156,13 +181,20 @@ const selectScore = (xml, name) => evaluate(`(() => {
   return true;
 })()`);
 
+// A page that refuses a score says why and stops; there is no file to wait for.
+const REFUSAL = /no pitched notes|outside an 88-key piano|Choose a MusicXML file/;
+
 async function waitForRender(label, timeoutMs = 120000, previousHref = null) {
   const startedAt = Date.now();
   let state;
   while (Date.now() - startedAt < timeoutMs) {
     state = JSON.parse(await evaluate("JSON.stringify({status:document.querySelector('[data-studio-status]').textContent,download:!document.querySelector('[data-video-download]').hidden,href:document.querySelector('[data-video-download]').href,name:document.querySelector('[data-video-download]').download,ready:document.querySelector('[data-video-output]').readyState})"));
-    if (state.download && state.ready >= 1 && state.href !== previousHref) return state;
+    // A previous render leaves its own download in place, so a finished
+    // render is one whose status says so and whose file is new.
+    if (state.status.startsWith('Rendered ') && state.download && state.ready >= 1 &&
+        state.href !== previousHref) return state;
     if (state.status.startsWith('Piano video render failed:')) return state;
+    if (!state.download && REFUSAL.test(state.status)) return state;
     await sleep(150);
   }
   throw new Error(`${label} did not finish: ${state?.status}`);
@@ -308,6 +340,21 @@ try {
   assert.match(refused.status, /no pitched notes/, `A score with no pitched notes was not refused: ${refused.status}`);
   assert.equal(refused.download, false, 'A score with no pitched notes still produced a download');
 
+  // A score the instrument cannot reach is refused too: an empty keyboard
+  // with a few notes crammed under it would be a picture of nothing.
+  await selectScore(OUT_OF_RANGE_SCORE, 'below-the-keyboard.musicxml');
+  await evaluate("document.querySelector('[data-studio-generate]').click()");
+  const unreachable = await waitForRender('A score below the keyboard');
+  assert.match(unreachable.status, /outside an 88-key piano/, `A score below A0 was not refused: ${unreachable.status}`);
+  assert.equal(unreachable.download, false, 'A score below A0 still produced a download');
+
+  // One unplayable note among playable ones does not cost the whole video:
+  // the keys it can reach are drawn and the rest of the file is ignored.
+  await selectScore(MIXED_RANGE_SCORE, 'one-note-below-the-keyboard.musicxml');
+  await evaluate("document.querySelector('[data-studio-generate]').click()");
+  const mixed = await waitForRender('A score with one unplayable note');
+  assert.ok(mixed.status.startsWith('Rendered '), `One unplayable note stopped the render: ${mixed.status}`);
+
   await selectScore(PIANO_SCORE, 'piano-studio-test.musicxml');
   const selected = JSON.parse(await evaluate("JSON.stringify({name:document.querySelector('[data-piano-musicxml-name]').textContent,status:document.querySelector('[data-studio-status]').textContent})"));
   assert.equal(selected.name, 'piano-studio-test.musicxml', 'MusicXML selection name was not displayed');
@@ -315,7 +362,7 @@ try {
 
   await evaluate("(() => { const set = (selector, value) => { const el = document.querySelector(selector); el.value = value; el.dispatchEvent(new Event('change', {bubbles:true})); }; set('[data-piano-aspect]', '9x16'); })()");
   await evaluate("document.querySelector('[data-studio-generate]').click()");
-  const state = await waitForRender('Piano render');
+  const state = await waitForRender('Piano render', 120000, mixed.href);
   assert.ok(state.status.startsWith('Rendered '), `Piano render did not complete: ${state.status}`);
   assert.match(state.status, /no Thank You clip/, 'Piano export does not say its ending is missing');
   assert.ok(state.href.startsWith('blob:'), 'Piano export is not backed by a Blob URL');
@@ -365,6 +412,113 @@ print(background, other)
   const [backgroundPixels, otherPixels] = ink.trim().split(/\s+/).map(Number);
   assert.ok(otherPixels > backgroundPixels, `The piano frame is mostly empty: ${otherPixels} painted of ${backgroundPixels + otherPixels}`);
 
+  // The keyboard is the last band of a portrait frame, so it must reach the
+  // bottom gutter. A keyboard floating above an empty strip would mean the
+  // page reserved a band taller than the keys and left the rest as nothing.
+  const { stdout: bottom } = await exec('python3', ['-c', `
+from PIL import Image
+image = Image.open(${JSON.stringify(framePath)}).convert('RGB')
+width, height = image.size
+pixels = image.load()
+last = 0
+for y in range(height):
+    for x in range(0, width, 2):
+        r, g, b = pixels[x, y]
+        if abs(r - 11) + abs(g - 16) + abs(b - 24) > 24:
+            last = y
+            break
+print(last, height)
+`]);
+  const [lastPaintedRow, frameHeight] = bottom.trim().split(/\s+/).map(Number);
+  assert.ok(frameHeight - lastPaintedRow <= 40,
+    `The keyboard leaves an empty band under it: last painted row ${lastPaintedRow} of ${frameHeight}`);
+
+  // Frame determinism: the same score drawn twice is the same pixels. A
+  // renderer that read the wall clock, or kept state between frames, would
+  // drift here even though both files are the right length.
+  await evaluate("document.querySelector('[data-studio-generate]').click()");
+  const again = await waitForRender('Piano render again', 120000, state.href);
+  assert.ok(again.status.startsWith('Rendered '), `The second Piano render did not complete: ${again.status}`);
+  const againBytes = Buffer.from(await evaluate(`(async () => { const response = await fetch(${JSON.stringify(again.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); })()`), 'base64');
+  const againPath = `${output}-again.mp4`;
+  await writeFile(againPath, againBytes);
+  const againFrame = `${output}-again-frame.png`;
+  await exec('ffmpeg', ['-v', 'error', '-y', '-ss', '1.0', '-i', againPath, '-frames:v', '1', againFrame]);
+  // An MP4 is lossy, so two encodings of the same frame differ by a few
+  // units at hard edges. A moved cursor or a drifting clock is a different
+  // animal: thousands of pixels, far apart in colour. So the test allows
+  // the encoder's rounding and nothing more.
+  const { stdout: drift } = await exec('python3', ['-c', `
+from PIL import Image
+first = Image.open(${JSON.stringify(framePath)}).convert('RGB')
+second = Image.open(${JSON.stringify(againFrame)}).convert('RGB')
+one, two = first.load(), second.load()
+width, height = first.size
+moved = worst = 0
+for y in range(height):
+    for x in range(width):
+        delta = sum(abs(one[x, y][channel] - two[x, y][channel]) for channel in range(3))
+        if delta > 12:
+            moved += 1
+            worst = max(worst, delta)
+print(moved, worst, width * height)
+`]);
+  const [movedPixels, worstDelta, totalPixels] = drift.trim().split(/\s+/).map(Number);
+  assert.ok(movedPixels / totalPixels < 0.0005,
+    `The same score drew a different frame the second time: ${movedPixels} of ${totalPixels} pixels moved`);
+  assert.ok(worstDelta <= 48, `The second render changed a colour rather than rounding one: delta ${worstDelta}`);
+
+  // A render the user stops leaves no file behind and says so, rather than
+  // finishing in the background and swapping a video in under them.
+  await evaluate("document.querySelector('[data-studio-generate]').click()");
+  await sleep(120);
+  await evaluate("document.querySelector('[data-studio-generate]').click()");
+  const cancelledAt = Date.now();
+  let cancelledState;
+  while (Date.now() - cancelledAt < 30000) {
+    cancelledState = JSON.parse(await evaluate("JSON.stringify({status:document.querySelector('[data-studio-status]').textContent,download:!document.querySelector('[data-video-download]').hidden,href:document.querySelector('[data-video-download]').href})"));
+    if (/cancelled/i.test(cancelledState.status)) break;
+    await sleep(100);
+  }
+  assert.match(cancelledState?.status ?? '', /cancelled/i, `Cancelling a Piano render did not report a cancellation: ${cancelledState?.status}`);
+  assert.equal(cancelledState.href, again.href, 'A cancelled render replaced the previous video');
+  assert.equal(await evaluate("document.querySelector('[data-studio-generate]').textContent"), 'Generate Piano Video',
+    'The generate button did not come back after a cancellation');
+
+  // The keys must be the instrument's own shape, not equal-width stripes:
+  // a black key is 11mm on a 23.5mm white, so it is a little under half as
+  // wide on screen. Equal widths would mean the geometry never reached the
+  // canvas, and a keyboard of even stripes does not read as a piano.
+  const { stdout: keyWidths } = await exec('python3', ['-c', `
+from PIL import Image
+image = Image.open(${JSON.stringify(framePath)}).convert('RGB')
+width, height = image.size
+pixels = image.load()
+def runs(y, test):
+    out, current, count = [], None, 0
+    for x in range(width):
+        value = test(pixels[x, y])
+        if current is None or value == current:
+            count += 1
+            current = value
+        else:
+            out.append((current, count))
+            current, count = value, 1
+    out.append((current, count))
+    return out
+black = lambda pixel: sum(pixel) < 160
+white = lambda pixel: pixel[0] > 200
+blacks = [count for dark, count in runs(int(height * 0.86), black) if dark and count > 4]
+whites = [count for lit, count in runs(height - 20, white) if lit and count > 4]
+print(len(blacks), len(whites), (sum(blacks) / len(blacks)) if blacks else 0, (sum(whites) / len(whites)) if whites else 0)
+`]);
+  const [blackCount, whiteCount, blackWidth, whiteWidth] = keyWidths.trim().split(/\s+/).map(Number);
+  assert.ok(whiteCount >= 15, `The frame shows only ${whiteCount} white keys`);
+  assert.ok(blackCount >= 12, `The frame shows only ${blackCount} black keys`);
+  const keyRatio = blackWidth / whiteWidth;
+  assert.ok(Math.abs(keyRatio - 11 / (165 / 7)) < 0.06,
+    `Black keys are not the instrument's width: ratio ${keyRatio.toFixed(3)} instead of ${(11 / (165 / 7)).toFixed(3)}`);
+
   // The Plan's last part of the length: the Thank You clip closes the video
   // and is counted in it. The clip is two seconds, so four becomes six.
   const clipPath = join(profile, 'thank-you.mp4');
@@ -374,7 +528,7 @@ print(background, other)
     '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', clipPath]);
   thankYouClip = await readFile(clipPath);
   await evaluate("document.querySelector('[data-studio-generate]').click()");
-  const thanked = await waitForRender('Piano render with a Thank You clip', 120000, state.href);
+  const thanked = await waitForRender('Piano render with a Thank You clip', 120000, again.href);
   assert.ok(thanked.status.startsWith('Rendered '), `Piano render did not complete: ${thanked.status}`);
   assert.match(thanked.status, /Thank You ending/, 'Piano export does not report its Thank You ending');
   const thankedBytes = Buffer.from(await evaluate(`(async () => { const response = await fetch(${JSON.stringify(thanked.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); })()`), 'base64');
