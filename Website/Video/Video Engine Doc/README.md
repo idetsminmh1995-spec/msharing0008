@@ -87,3 +87,11 @@ The standard 16:9 export is now `1920×1080`; square and portrait exports are `1
 **အတည်ပြုထားသော စမ်းသပ်မှုများ:** Metronome Engine verify 20/20; Video Engine muxer 15/15; cleanup/safety 5/5; Video Engine MP4 smoke, updated Drum settings/export regression နှင့် Metronome card-to-export browser integration pass. Metronome test output: 3/8, quarter-note 96 BPM, 1 bar, 28 frames/0.933 sec, 720×1280 VP8 + 48kHz mono Opus; `ffprobe` က stream နှစ်ခုလုံးကိုဖတ်နိုင်သည်။ 375×812 phone နှင့် 1280×900 desktop viewport တွင် horizontal overflow မရှိ။ ဖုန်းအစစ်၊ Safari/Firefox နှင့် MediaRecorder-only fallback ကို မစစ်ရသေးပါ။
 
 Implementation Plan/Doc: [Metronome Engine Plan](../../Metronome/Metronome%20Engine%20Plan/PLAN.md), [Metronome Engine Doc](../../Metronome/Metronome%20Engine%20Doc/DOC.md). Guitar နှင့် အခြား instrument များသည် ဆက်လက်မချိတ်ဆက်ရသေးပါ။
+
+## Drum Studio — အရှည်ကို score အတိုင်း ထုတ်ခြင်း (2026-11-23)
+
+- Drum Studio က video အရှည်ကို ကိုယ်ပိုင် ကန့်သတ်ချက်ဖြင့် မဖြတ်တောက်တော့ပါ။ ယခင် `MAX_SECONDS = 12` ကို ဖယ်ရှားပြီး MusicXML ဖိုင်၏ အရှည်အတိုင်း ထုတ်သည်။
+- Hit အချိန်များကို ဖိုင်၏ tempo map အတိုင်း (`api.tickToSeconds`) တွက်သည်။ ယခင် ပုံသေ `QUARTER_SECONDS = 0.5` (120 BPM) ကြောင့် tempo ကွာသော score တွင် lane marker နှင့် notation cursor မကိုက်ညီဖြစ်ခဲ့သည်။ ဖိုင်တွင် tempo မပါမှသာ 120 BPM ကို သုံးသည်။
+- Default drum pattern ကို quarter ၈ ခု (၂ bar) အနေဖြင့် ပြင်ရေးပြီး score နှင့် တူညီသော tempo map ဖြင့် အချိန်ချိန်သည်။
+- Chromium စမ်းသပ်မှုတွင် ၄/၄ bar ၄ ခု၊ 60 BPM (စက္ကန့် ၁၆) score ကို `ffprobe` ဖြင့် တိုင်းပြီး အရှည်မှန်ကန်ကြောင်း အတည်ပြုထားသည်။ ဖုန်း/desktop layout၊ 16:9 နှင့် 9:16 output၊ notation band နှင့် cursor စစ်ဆေးချက်များ ဆက်လက် အောင်မြင်သည်။
+- ကျန် ကန့်သတ်ချက် — Video Engine ၏ memory guard သာ safety အဖြစ် ကျန်သည်။ Drum အသံ နှင့် Count Voice အသံ မချိတ်ရသေးပါ။

@@ -261,7 +261,49 @@ print(dark, red, white)
   assert.ok(firstInk[1] > 0 && secondInk[1] > 0, `Notation cursor is not drawn: ${firstInk} / ${secondInk}`);
   assert.notEqual(firstInk[1], secondInk[1], 'The notation cursor did not move with playback');
 
-  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk }, null, 2));
+  // The Plan's length rule: the video is the score's own length, on the
+  // score's own tempo, with no cap of the Studio's. Four 4/4 measures at
+  // 60 BPM are sixteen seconds -- twice the twelve-second cap that used to
+  // cut the score short, and twice what 120 BPM would have produced.
+  const slowScore = (() => {
+    const notes = ['C', 'D', 'C', 'D'].map((step) => `      <note><unpitched><display-step>${step}</display-step><display-octave>4</display-octave></unpitched><duration>2</duration><voice>1</voice><type>quarter</type></note>`).join('\n');
+    const measures = [];
+    for (let number = 1; number <= 4; number += 1) {
+      const attributes = number === 1
+        ? '      <attributes><divisions>2</divisions><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>percussion</sign></clef></attributes>\n      <direction><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>60</per-minute></metronome></direction-type><sound tempo="60"/></direction>\n'
+        : '';
+      measures.push(`    <measure number="${number}">\n${attributes}${notes}\n    </measure>`);
+    }
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<score-partwise version="3.1">\n  <part-list><score-part id="P1"><part-name>Drums</part-name></score-part></part-list>\n  <part id="P1">\n${measures.join('\n')}\n  </part>\n</score-partwise>\n`;
+  })();
+  await evaluate(`(() => {
+    const input = document.querySelector('[data-musicxml-input]');
+    const file = new File([${JSON.stringify(slowScore)}], 'slow-four-bars.musicxml', { type: 'application/xml' });
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    input.files = transfer.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector('[data-studio-generate]').click();
+  })()`);
+  const slowStartedAt = Date.now();
+  let slowState;
+  while (Date.now() - slowStartedAt < 90000) {
+    slowState = JSON.parse(await evaluate("JSON.stringify({status:document.querySelector('[data-studio-status]').textContent, ready:!document.querySelector('[data-video-output]').hidden && document.querySelector('[data-video-output]').readyState>=1, href:document.querySelector('[data-video-download]').href})"));
+    if (slowState.status.startsWith('Rendered ') && slowState.ready && slowState.href !== notationState.href) break;
+    if (slowState.status.startsWith('Video render failed:')) throw new Error(slowState.status);
+    await sleep(150);
+  }
+  assert.ok(slowState?.status.startsWith('Rendered '), `Slow score render did not complete: ${slowState?.status}`);
+  const slowBytes = Buffer.from(await evaluate(`(async () => { const response = await fetch(${JSON.stringify(slowState.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); })()`), 'base64');
+  const slowPath = `${output}.slow.mp4`;
+  await writeFile(slowPath, slowBytes);
+  const slowProbe = JSON.parse((await exec('ffprobe', [
+    '-v', 'error', '-show_entries', 'format=duration', '-of', 'json', slowPath,
+  ])).stdout);
+  const slowSeconds = Number(slowProbe.format.duration);
+  assert.ok(Math.abs(slowSeconds - 16) < 0.4, `Score length was not kept: ${slowSeconds}s instead of 16s`);
+
+  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slowSeconds }, null, 2));
 } finally {
   cdp?.close();
   for (const child of [browser, server]) {

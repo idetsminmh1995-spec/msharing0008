@@ -39,8 +39,8 @@
   const countDisplay = document.querySelector('[data-count-display]');
   const videoColor = document.querySelector('[data-video-color]');
   const videoRatio = document.querySelector('[data-video-ratio]');
-  const MAX_SECONDS = 12;
   const FPS = 30;
+  // Only for a score that states no tempo: 120 BPM is the MusicXML default.
   const QUARTER_SECONDS = 0.5;
   const DEFAULT_LOGO = 'assets/logo/m-sharing-drum-logo.svg';
   const DEFAULT_META = { beats: 4, beatType: 4, bpm: 120, key: '' };
@@ -115,16 +115,15 @@
     if (logoPreview && !logoInput?.files?.[0]) logoPreview.src = DEFAULT_LOGO;
   };
 
-  const defaultPattern = () => [
-    { type: 'kick', at: 0 }, { type: 'hihat', at: 0 },
-    { type: 'snare', at: 0.5 }, { type: 'hihat', at: 0.5 },
-    { type: 'kick', at: 1 }, { type: 'hihat', at: 1 },
-    { type: 'snare', at: 1.5 }, { type: 'hihat', at: 1.5 },
-    { type: 'kick', at: 2 }, { type: 'hihat', at: 2 },
-    { type: 'snare', at: 2.5 }, { type: 'hihat', at: 2.5 },
-    { type: 'kick', at: 3 }, { type: 'hihat', at: 3 },
-    { type: 'snare', at: 3.5 }, { type: 'hihat', at: 3.5 },
-  ];
+  // Two bars of quarters, so the pattern is timed by the same tempo map as a score.
+  const defaultPattern = () => {
+    const hits = [];
+    for (let quarter = 0; quarter < 8; quarter += 1) {
+      hits.push({ type: quarter % 2 === 0 ? 'kick' : 'snare', quarter });
+      hits.push({ type: 'hihat', quarter });
+    }
+    return hits;
+  };
 
   const drumTypeFromNote = (note) => {
     const step = note.querySelector('unpitched display-step')?.textContent?.trim().toUpperCase();
@@ -172,21 +171,43 @@
       for (const note of [...measure.children].filter((child) => child.tagName.toLowerCase() === 'note')) {
         const duration = Math.max(0, Number(note.querySelector(':scope > duration')?.textContent) || 0) / divisions;
         const isChord = Boolean(note.querySelector(':scope > chord'));
-        if (!note.querySelector(':scope > rest')) hits.push({ type: drumTypeFromNote(note), at: cursor * QUARTER_SECONDS });
+        if (!note.querySelector(':scope > rest')) hits.push({ type: drumTypeFromNote(note), quarter: cursor });
         if (!isChord) cursor += duration;
       }
       absoluteQuarter = Math.max(absoluteQuarter, cursor);
     }
-    return hits.length ? { hits, meta } : null;
+    return hits.length ? { hits, meta, endQuarter: absoluteQuarter } : null;
   };
 
   const getHits = async () => {
+    const fallback = { hits: defaultPattern(), endQuarter: 8, meta: DEFAULT_META };
     const file = musicXmlInput?.files?.[0];
-    if (!file) return { hits: defaultPattern(), meta: DEFAULT_META, source: 'default drum pattern' };
+    if (!file) return { ...fallback, source: 'default drum pattern' };
     const parsed = await parseMusicXml(file);
     return parsed
       ? { ...parsed, source: file.name }
-      : { hits: defaultPattern(), meta: DEFAULT_META, source: `${file.name} · default pattern fallback` };
+      : { ...fallback, source: `${file.name} · default pattern fallback` };
+  };
+
+  /**
+   * Hits in seconds on the score's own tempo map: the notation cursor and the
+   * lane markers must agree about when a note is played, and the tempo marks
+   * are what say so. 120 BPM applies only when the file states no tempo.
+   */
+  const timeHits = (hits, endQuarter, notationState) => {
+    const api = notationState?.api;
+    const tempoMap = notationState?.playback?.tempoMap;
+    if (!api || !tempoMap) {
+      return {
+        hits: hits.map((hit) => ({ type: hit.type, at: hit.quarter * QUARTER_SECONDS })),
+        seconds: endQuarter * QUARTER_SECONDS,
+      };
+    }
+    const toSeconds = (quarter) => api.tickToSeconds(tempoMap, quarter * api.TICKS_PER_QUARTER);
+    return {
+      hits: hits.map((hit) => ({ type: hit.type, at: toSeconds(hit.quarter) })),
+      seconds: toSeconds(endQuarter),
+    };
   };
 
   if (!engine || !generateButton || !status || !stage || !video || !download) {
@@ -316,14 +337,17 @@
     generateButton.textContent = 'Generating…';
     if (placeholder) placeholder.hidden = true;
     try {
-      const { hits, meta, source } = await getHits();
-      const duration = Math.max(1, Math.min(MAX_SECONDS, Math.max(...hits.map((hit) => hit.at), 3.5) + 0.5));
+      const { hits: written, endQuarter, meta, source } = await getHits();
       setStatus(`Preparing ${source} · ${settings.ratio} · 0%`);
       notation = await engine.prepareNotationFor(musicXmlInput?.files?.[0], settings, ['title', 'notation', 'instrument']);
       if (notation?.error) {
         setStatus(`Notation could not be prepared: ${notation.error}`);
         notation = null;
       }
+      const timed = timeHits(written, endQuarter, notation);
+      const hits = timed.hits;
+      // The Plan's length: the score's own, with no cap of its own.
+      const duration = Math.max(1, timed.seconds);
       const result = await engine.render({
         width: settings.size.width,
         height: settings.size.height,
