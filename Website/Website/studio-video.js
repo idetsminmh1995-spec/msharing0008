@@ -346,6 +346,42 @@
     });
   }
 
+  /**
+   * The Plan's length rule counts the count-in as part of the video: one
+   * bar of the score's own metre, before the score itself starts.
+   */
+  const countInSeconds = (settings, meta) => {
+    if (!settings.countEnabled) return 0;
+    const beatSeconds = (60 / Math.max(1, meta.bpm)) * (4 / Math.max(1, meta.beatType));
+    return meta.beats * beatSeconds;
+  };
+
+  /** The count-in frame: the Title band, and the count called out large. */
+  async function drawCountIn(ctx, at, settings, meta) {
+    const { width, height } = settings.size;
+    const palette = getPalette(settings.color);
+    ctx.fillStyle = palette.background;
+    ctx.fillRect(0, 0, width, height);
+    await engine.composeFrame(ctx, {
+      instrument: selectedTool,
+      width,
+      height,
+      parts: {
+        title: (target, rect) => engine.drawTitlePart(target, rect, at, meta, palette, settings),
+      },
+    });
+    const tokens = engine.countTokens(settings.countDisplay, meta.beats);
+    const active = engine.currentCountToken(tokens, settings.countDisplay, meta, at);
+    if (active < 0 || active >= tokens.length) return;
+    ctx.save();
+    ctx.fillStyle = '#f20d3d';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `700 ${Math.round(Math.min(width, height) * 0.22)}px Inter, system-ui, sans-serif`;
+    ctx.fillText(tokens[active], width / 2, height / 2);
+    ctx.restore();
+  }
+
   function updatePlaybackControls() {
     const duration = Number.isFinite(video.duration) ? video.duration : 0;
     if (timeline) {
@@ -382,13 +418,20 @@
       }
       const timed = timeHits(written, endQuarter, notation);
       const hits = timed.hits;
-      // The Plan's length: the score's own, with no cap of its own.
+      // The Plan's length: the count-in the score is played in, then the
+      // score's own length, with no cap of the Studio's.
+      const countIn = countInSeconds(settings, meta);
       const duration = Math.max(1, timed.seconds);
+      const segments = [];
+      if (countIn > 0) {
+        segments.push({ seconds: countIn, draw: (ctx, at) => drawCountIn(ctx, at, settings, meta) });
+      }
+      segments.push({ seconds: duration, draw: (ctx, at) => drawPerformance(ctx, at, hits, duration, settings, meta) });
       const result = await engine.render({
         width: settings.size.width,
         height: settings.size.height,
         fps: FPS,
-        segments: [{ seconds: duration, draw: (ctx, at) => drawPerformance(ctx, at, hits, duration, settings, meta) }],
+        segments,
         onProgress: (progress, phase) => { if (!cancelRequested) setStatus(`${phase} · ${Math.round(progress * 100)}%`); },
         shouldStop: () => cancelRequested,
       });

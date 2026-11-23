@@ -2151,6 +2151,10 @@
     prepareNotation,
     prepareNotationFor,
     drawNotationPart,
+    // The count's own token rules, so a page that draws the count-in before
+    // the score prints the same count the Title band does.
+    countTokens,
+    currentCountToken,
     muxMp4,
     muxMp4ToStream,
     muxWebM,

@@ -215,6 +215,10 @@ try {
     const ratio = document.querySelector('[data-video-ratio]');
     ratio.value = '16:9';
     ratio.dispatchEvent(new Event('change', { bubbles: true }));
+    // The notation frames below are the score's own, not a count-in.
+    const count = document.querySelector('[data-count-voice-enabled]');
+    count.value = 'off';
+    count.dispatchEvent(new Event('change', { bubbles: true }));
     document.querySelector('[data-studio-generate]').click();
     return input.files[0].name;
   })()`);
@@ -339,7 +343,13 @@ print(dark, red, white)
   const twoPart = await renderScore(drumScore({ tempo: 120, bars: 2, extraParts: 1 }), 'two-part.musicxml', repeated.href);
   assert.ok(Math.abs(twoPart.seconds - 4) < 0.4, `Another part was counted as drum music: ${twoPart.seconds}s instead of 4s`);
 
-  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slow.seconds, twoVoiceSeconds: twoVoice.seconds, repeatSeconds: repeated.seconds, twoPartSeconds: twoPart.seconds }, null, 2));
+  // The count-in is part of the length: one bar of the score's metre before
+  // the music starts, so a 4/4 bar at 120 BPM adds two seconds.
+  await evaluate("(() => { const count = document.querySelector('[data-count-voice-enabled]'); count.value = 'on'; count.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  const counted = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'count-in.musicxml', twoPart.href);
+  assert.ok(Math.abs(counted.seconds - 6) < 0.4, `The count-in was not added to the length: ${counted.seconds}s instead of 6s`);
+
+  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slow.seconds, twoVoiceSeconds: twoVoice.seconds, repeatSeconds: repeated.seconds, twoPartSeconds: twoPart.seconds, countInSeconds: counted.seconds }, null, 2));
 } finally {
   cdp?.close();
   for (const child of [browser, server]) {
