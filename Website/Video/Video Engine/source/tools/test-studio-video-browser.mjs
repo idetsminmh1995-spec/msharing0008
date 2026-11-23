@@ -262,48 +262,71 @@ print(dark, red, white)
   assert.notEqual(firstInk[1], secondInk[1], 'The notation cursor did not move with playback');
 
   // The Plan's length rule: the video is the score's own length, on the
-  // score's own tempo, with no cap of the Studio's. Four 4/4 measures at
-  // 60 BPM are sixteen seconds -- twice the twelve-second cap that used to
-  // cut the score short, and twice what 120 BPM would have produced.
-  const slowScore = (() => {
-    const notes = ['C', 'D', 'C', 'D'].map((step) => `      <note><unpitched><display-step>${step}</display-step><display-octave>4</display-octave></unpitched><duration>2</duration><voice>1</voice><type>quarter</type></note>`).join('\n');
+  // score's own tempo, with no cap of the Studio's. Each case builds a
+  // score, renders it, and measures the file that came out.
+  const drumScore = ({ tempo, bars, voices = 1, repeat = false }) => {
+    const head = '      <attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>percussion</sign></clef></attributes>\n'
+      + `      <direction><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${tempo}</per-minute></metronome></direction-type><sound tempo="${tempo}"/></direction>\n`;
+    const note = (step, voice) => `      <note><unpitched><display-step>${step}</display-step><display-octave>4</display-octave></unpitched><duration>1</duration><voice>${voice}</voice><type>quarter</type></note>\n`;
     const measures = [];
-    for (let number = 1; number <= 4; number += 1) {
-      const attributes = number === 1
-        ? '      <attributes><divisions>2</divisions><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>percussion</sign></clef></attributes>\n      <direction><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>60</per-minute></metronome></direction-type><sound tempo="60"/></direction>\n'
+    for (let number = 1; number <= bars; number += 1) {
+      // A second voice shares the bar by rewinding with <backup>; that rewind
+      // is not more music.
+      const body = voices === 1
+        ? ['C', 'D', 'C', 'D'].map((step) => note(step, 1)).join('')
+        : ['G', 'G', 'G', 'G'].map((step) => note(step, 1)).join('')
+          + '      <backup><duration>4</duration></backup>\n'
+          + ['C', 'C', 'D', 'C'].map((step) => note(step, 2)).join('');
+      const marks = repeat
+        ? (number === 1 ? '      <barline location="left"><repeat direction="forward"/></barline>\n' : '')
+          + (number === bars ? '      <barline location="right"><repeat direction="backward"/></barline>\n' : '')
         : '';
-      measures.push(`    <measure number="${number}">\n${attributes}${notes}\n    </measure>`);
+      measures.push(`    <measure number="${number}">\n${number === 1 ? head : ''}${body}${marks}    </measure>`);
     }
     return `<?xml version="1.0" encoding="UTF-8"?>\n<score-partwise version="3.1">\n  <part-list><score-part id="P1"><part-name>Drums</part-name></score-part></part-list>\n  <part id="P1">\n${measures.join('\n')}\n  </part>\n</score-partwise>\n`;
-  })();
-  await evaluate(`(() => {
-    const input = document.querySelector('[data-musicxml-input]');
-    const file = new File([${JSON.stringify(slowScore)}], 'slow-four-bars.musicxml', { type: 'application/xml' });
-    const transfer = new DataTransfer();
-    transfer.items.add(file);
-    input.files = transfer.files;
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-    document.querySelector('[data-studio-generate]').click();
-  })()`);
-  const slowStartedAt = Date.now();
-  let slowState;
-  while (Date.now() - slowStartedAt < 90000) {
-    slowState = JSON.parse(await evaluate("JSON.stringify({status:document.querySelector('[data-studio-status]').textContent, ready:!document.querySelector('[data-video-output]').hidden && document.querySelector('[data-video-output]').readyState>=1, href:document.querySelector('[data-video-download]').href})"));
-    if (slowState.status.startsWith('Rendered ') && slowState.ready && slowState.href !== notationState.href) break;
-    if (slowState.status.startsWith('Video render failed:')) throw new Error(slowState.status);
-    await sleep(150);
-  }
-  assert.ok(slowState?.status.startsWith('Rendered '), `Slow score render did not complete: ${slowState?.status}`);
-  const slowBytes = Buffer.from(await evaluate(`(async () => { const response = await fetch(${JSON.stringify(slowState.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); })()`), 'base64');
-  const slowPath = `${output}.slow.mp4`;
-  await writeFile(slowPath, slowBytes);
-  const slowProbe = JSON.parse((await exec('ffprobe', [
-    '-v', 'error', '-show_entries', 'format=duration', '-of', 'json', slowPath,
-  ])).stdout);
-  const slowSeconds = Number(slowProbe.format.duration);
-  assert.ok(Math.abs(slowSeconds - 16) < 0.4, `Score length was not kept: ${slowSeconds}s instead of 16s`);
+  };
 
-  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slowSeconds }, null, 2));
+  const renderScore = async (xml, name, previousHref) => {
+    await evaluate(`(() => {
+      const input = document.querySelector('[data-musicxml-input]');
+      const file = new File([${JSON.stringify(xml)}], ${JSON.stringify(name)}, { type: 'application/xml' });
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      input.files = transfer.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      document.querySelector('[data-studio-generate]').click();
+    })()`);
+    const startedAt = Date.now();
+    let state;
+    while (Date.now() - startedAt < 90000) {
+      state = JSON.parse(await evaluate("JSON.stringify({status:document.querySelector('[data-studio-status]').textContent, ready:!document.querySelector('[data-video-output]').hidden && document.querySelector('[data-video-output]').readyState>=1, href:document.querySelector('[data-video-download]').href})"));
+      if (state.status.startsWith('Rendered ') && state.ready && state.href !== previousHref) break;
+      if (state.status.startsWith('Video render failed:')) throw new Error(`${name}: ${state.status}`);
+      await sleep(150);
+    }
+    assert.ok(state?.status.startsWith('Rendered '), `${name} render did not complete: ${state?.status}`);
+    const bytes = Buffer.from(await evaluate(`(async () => { const response = await fetch(${JSON.stringify(state.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); })()`), 'base64');
+    const path = `${output}.${name.replace(/\.musicxml$/, '')}.mp4`;
+    await writeFile(path, bytes);
+    const { stdout } = await exec('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'json', path]);
+    return { seconds: Number(JSON.parse(stdout).format.duration), href: state.href };
+  };
+
+  // Four 4/4 bars at 60 BPM: sixteen seconds, past the old twelve-second cap
+  // and twice what a fixed 120 BPM would have produced.
+  const slow = await renderScore(drumScore({ tempo: 60, bars: 4 }), 'slow-four-bars.musicxml', notationState.href);
+  assert.ok(Math.abs(slow.seconds - 16) < 0.4, `Score length was not kept: ${slow.seconds}s instead of 16s`);
+
+  // Two voices in one bar are eight quarters of music, not sixteen.
+  const twoVoice = await renderScore(drumScore({ tempo: 120, bars: 2, voices: 2 }), 'two-voice.musicxml', slow.href);
+  assert.ok(Math.abs(twoVoice.seconds - 4) < 0.4, `A <backup> was counted as music: ${twoVoice.seconds}s instead of 4s`);
+
+  // A repeat makes the score longer than it is written: two 4/4 bars at
+  // 120 BPM are four seconds written and eight seconds played.
+  const repeated = await renderScore(drumScore({ tempo: 120, bars: 2, repeat: true }), 'repeat.musicxml', twoVoice.href);
+  assert.ok(Math.abs(repeated.seconds - 8) < 0.4, `A repeat was not played twice: ${repeated.seconds}s instead of 8s`);
+
+  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slow.seconds, twoVoiceSeconds: twoVoice.seconds, repeatSeconds: repeated.seconds }, null, 2));
 } finally {
   cdp?.close();
   for (const child of [browser, server]) {

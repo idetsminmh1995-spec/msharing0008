@@ -95,3 +95,11 @@ Implementation Plan/Doc: [Metronome Engine Plan](../../Metronome/Metronome%20Eng
 - Default drum pattern ကို quarter ၈ ခု (၂ bar) အနေဖြင့် ပြင်ရေးပြီး score နှင့် တူညီသော tempo map ဖြင့် အချိန်ချိန်သည်။
 - Chromium စမ်းသပ်မှုတွင် ၄/၄ bar ၄ ခု၊ 60 BPM (စက္ကန့် ၁၆) score ကို `ffprobe` ဖြင့် တိုင်းပြီး အရှည်မှန်ကန်ကြောင်း အတည်ပြုထားသည်။ ဖုန်း/desktop layout၊ 16:9 နှင့် 9:16 output၊ notation band နှင့် cursor စစ်ဆေးချက်များ ဆက်လက် အောင်မြင်သည်။
 - ကျန် ကန့်သတ်ချက် — Video Engine ၏ memory guard သာ safety အဖြစ် ကျန်သည်။ Drum အသံ နှင့် Count Voice အသံ မချိတ်ရသေးပါ။
+
+## Drum Studio — voice နှစ်ခုနှင့် repeat ပါသော score (2026-11-23)
+
+- **`<backup>` / `<forward>`** — Drum score များသည် voice ၂ ခုကို တစ်ခုတည်းသော bar ထဲတွင် `<backup>` ဖြင့် ပြန်စ၍ ရေးလေ့ရှိသည်။ `studio-video.js` ၏ parser သည် ယခင် `<note>` child များကိုသာ ဖတ်သဖြင့် voice ၂ ခုကို အစဉ်လိုက် ဆက်တွဲကာ score အရှည်ကို ၂ ဆ ဖြစ်စေခဲ့သည် (၂ bar / ၄ စက္ကန့် score → ၈ စက္ကန့်)။ ယခု measure ၏ child များကို အစဉ်လိုက် ဖတ်ပြီး `<backup>` ကို နောက်ပြန်၊ `<forward>` ကို အရှေ့သို့ cursor ရွှေ့သည်။
+- **Repeat sign** — `<repeat direction="forward|backward">` ပါသော score ကို ယခင် တစ်ချီသာ ကွက်ခဲ့သည်။ ယခု hit များကို Notation Engine ၏ `playback.performance` (repeat plan) အတိုင်း pass တစ်ခုစီအတွက် ထပ်ထုတ်ပြီး video အရှည်ကို `performance.totalSeconds` ဖြင့် သတ်မှတ်သည်။
+- **Notation cursor** — `video-engine.js` သည် ယခင် `secondsToTick` ဖြင့်သာ တွက်သဖြင့် repeat ဒုတိယချီတွင် cursor က ရှေ့ဆက် ရွေ့နေခဲ့သည်။ ယခု repeat ရှိလျှင် `api.performanceSecondsToWritten` ဖြင့် ဖတ်သဖြင့် pass အသစ်စတိုင်း cursor က repeat အစသို့ ပြန်ခုန်သည်။ repeat မရှိလျှင် ယခင် လမ်းကြောင်းအတိုင်း ဖြစ်သည်။
+- **စမ်းသပ်မှု** — `tools/test-studio-video-browser.mjs` တွင် case ၃ ခု ထည့်ထားသည်: 60 BPM ၄ bar (၁၆ စက္ကန့်)၊ voice ၂ ခု ၂ bar (၄ စက္ကန့်)၊ repeat ၂ bar (written ၄ → played ၈ စက္ကန့်)။ သုံးခုလုံးကို Chromium မှ render ပြီး `ffprobe` ဖြင့် အရှည်တိုင်းသည်။
+- **ကျန်ရှိ** — `MAX_SECONDS` ကဲ့သို့ ကိုယ်ပိုင် ကန့်သတ်ချက် မရှိတော့ပါ; Video Engine ၏ memory guard သာ safety အဖြစ် ကျန်သည်။ Drum အသံ၊ Count Voice နှင့် Thank You segment ကို မချိတ်ရသေးပါ။

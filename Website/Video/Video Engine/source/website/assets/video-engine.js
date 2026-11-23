@@ -1741,7 +1741,14 @@
     }
 
     const { api, ink, viewBox } = state;
-    const tick = api.secondsToTick(state.playback.tempoMap, at);
+    // A repeated score is heard more often than it is written, so the cursor
+    // has to jump back at each repeat. Reading the time through the
+    // performance plan is what says where; without repeats it returns the
+    // same written tick `secondsToTick` does.
+    const performance = state.playback.performance;
+    const tick = performance?.hasRepeats
+      ? api.performanceSecondsToWritten(performance, state.playback.tempoMap, at).writtenTick
+      : api.secondsToTick(state.playback.tempoMap, at);
     // The SVG is one staff space per viewBox unit; the image is that times
     // its own scale, so both the ink box and the cursor can be placed in
     // the units the engine measured them in.

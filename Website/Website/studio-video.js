@@ -168,10 +168,20 @@
       const divisionNode = measure.querySelector('attributes divisions');
       if (divisionNode) divisions = Math.max(1, Number(divisionNode.textContent) || 1);
       let cursor = absoluteQuarter;
-      for (const note of [...measure.children].filter((child) => child.tagName.toLowerCase() === 'note')) {
-        const duration = Math.max(0, Number(note.querySelector(':scope > duration')?.textContent) || 0) / divisions;
-        const isChord = Boolean(note.querySelector(':scope > chord'));
-        if (!note.querySelector(':scope > rest')) hits.push({ type: drumTypeFromNote(note), quarter: cursor });
+      // A drum score writes its second voice after a <backup> that rewinds to
+      // the top of the bar. Reading only <note> would lay the voices end to
+      // end and make the video twice as long as the score.
+      for (const child of [...measure.children]) {
+        const tag = child.tagName.toLowerCase();
+        if (tag === 'backup' || tag === 'forward') {
+          const shift = Math.max(0, Number(child.querySelector(':scope > duration')?.textContent) || 0) / divisions;
+          cursor += tag === 'backup' ? -shift : shift;
+          continue;
+        }
+        if (tag !== 'note') continue;
+        const duration = Math.max(0, Number(child.querySelector(':scope > duration')?.textContent) || 0) / divisions;
+        const isChord = Boolean(child.querySelector(':scope > chord'));
+        if (!child.querySelector(':scope > rest')) hits.push({ type: drumTypeFromNote(child), quarter: cursor });
         if (!isChord) cursor += duration;
       }
       absoluteQuarter = Math.max(absoluteQuarter, cursor);
@@ -204,6 +214,24 @@
       };
     }
     const toSeconds = (quarter) => api.tickToSeconds(tempoMap, quarter * api.TICKS_PER_QUARTER);
+    // A repeated score is heard more often than it is written, so a hit lands
+    // once per pass: each pass restarts its own measure clock at
+    // `startSeconds`, which is what keeps the lanes on the notation cursor.
+    const performance = notationState?.playback?.performance;
+    if (performance?.hasRepeats) {
+      const at = [];
+      for (const hit of hits) {
+        const tick = hit.quarter * api.TICKS_PER_QUARTER;
+        const writtenSeconds = toSeconds(hit.quarter);
+        for (const entry of performance.entries) {
+          if (tick >= entry.writtenTick && tick < entry.writtenTick + entry.ticks) {
+            at.push({ type: hit.type, at: entry.startSeconds + (writtenSeconds - entry.writtenStartSeconds) });
+          }
+        }
+      }
+      at.sort((left, right) => left.at - right.at);
+      return { hits: at, seconds: performance.totalSeconds };
+    }
     return {
       hits: hits.map((hit) => ({ type: hit.type, at: toSeconds(hit.quarter) })),
       seconds: toSeconds(endQuarter),
