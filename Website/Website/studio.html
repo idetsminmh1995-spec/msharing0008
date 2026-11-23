@@ -138,6 +138,20 @@
               </div>
               <p class="metronome-duration" data-bass-summary aria-live="polite"></p>
             </section>
+            <section class="metronome-controls" data-violin-controls hidden aria-label="Violin video settings">
+              <label class="studio-field studio-field--file metronome-file-field"><span>MusicXML file</span><input type="file" accept=".musicxml,.xml,application/xml,text/xml,application/vnd.recordare.musicxml+xml" data-violin-musicxml-input aria-describedby="violin-musicxml-name" /><small id="violin-musicxml-name" data-violin-musicxml-name>No file selected</small></label>
+              <p class="metronome-help">The violin stands beside the notation. Nothing is marked on it: there is no violin fingering engine, and a violin has no frets for a mark to land on.</p>
+              <div class="metronome-field-grid">
+                <label class="metronome-field">Video orientation
+                  <select data-violin-aspect aria-label="Violin video orientation">
+                    <option value="16x9">Landscape · 16:9</option>
+                    <option value="9x16">Portrait · 9:16</option>
+                    <option value="1x1">Square · 1:1</option>
+                  </select>
+                </label>
+              </div>
+              <p class="metronome-duration" data-violin-summary aria-live="polite"></p>
+            </section>
           <form class="studio-settings" data-studio-settings>
             <div class="studio-file-row">
               <label class="studio-field studio-field--file"><span>MusicXML file</span><input type="file" accept=".musicxml,.xml,.mxl,application/xml,text/xml" data-musicxml-input /><small data-musicxml-name>No file selected</small></label>
@@ -189,10 +203,11 @@
     <script src="assets/guitar-engine.js"></script>
     <script src="assets/piano-hand-engine.js"></script>
     <script src="script.js?v=cb8dc501cd10"></script>
-    <script src="studio-video.js?v=366ebf73bdb2"></script>
+    <script src="studio-video.js?v=7024cdb468c3"></script>
     <script src="studio-metronome.js?v=2ac6aea8ca8e"></script>
     <script src="studio-guitar.js?v=aae883620e66"></script>
     <script src="studio-piano.js?v=9e2aab9d66ac"></script>
     <script src="studio-bass.js?v=b73d2244b8ec"></script>
+    <script src="studio-violin.js?v=963744a52dde"></script>
   </body>
 </html>

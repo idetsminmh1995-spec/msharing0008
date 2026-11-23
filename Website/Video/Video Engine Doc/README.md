@@ -7,7 +7,7 @@ Production copy: `Website/Website/assets/video-engine.js`
 
 ## လက်ရှိ Video Engine အခြေအနေ
 
-Video Engine သည် canvas frame များကို WebCodecs ဖြင့် MP4/WebM အဖြစ် render/mux လုပ်ခြင်း၊ MediaRecorder fallback, optional `AudioBuffer`, progress/cancel, memory guard နှင့် cleanup code များကို ပံ့ပိုးသည်။ လက်ရှိ Studio တွင် Drum, Metronome, Guitar, Piano နှင့် Bass adapter ငါးခုရှိသည်။ Drum export သည် visual-only ဖြစ်ပြီး၊ Metronome adapter က `OfflineAudioContext` ဖြင့် သီးခြားဖန်တီးသော click-track `AudioBuffer` ကို ပေးနိုင်သည်။ Guitar adapter သည် tablature မှ တီးခတ်ပုံကို ဆွဲပြီး အသံမထုတ်ပါ။ Piano နှင့် Bass adapter များလည်း visual-only ဖြစ်သည်။ Strings နှင့် Voice adapter များ မရှိသေးပါ။
+Video Engine သည် canvas frame များကို WebCodecs ဖြင့် MP4/WebM အဖြစ် render/mux လုပ်ခြင်း၊ MediaRecorder fallback, optional `AudioBuffer`, progress/cancel, memory guard နှင့် cleanup code များကို ပံ့ပိုးသည်။ လက်ရှိ Studio တွင် Drum, Metronome, Guitar, Piano, Bass နှင့် Strings (violin) adapter ခြောက်ခုရှိသည်။ Drum export သည် visual-only ဖြစ်ပြီး၊ Metronome adapter က `OfflineAudioContext` ဖြင့် သီးခြားဖန်တီးသော click-track `AudioBuffer` ကို ပေးနိုင်သည်။ Guitar adapter သည် tablature မှ တီးခတ်ပုံကို ဆွဲပြီး အသံမထုတ်ပါ။ Piano နှင့် Bass adapter များလည်း visual-only ဖြစ်သည်။ Strings card သည် လက်ရှိတွင် violin ပုံကို ဆွဲပေးသည် — တီးခတ်ပုံ (fingering) မပါပါ။ Voice adapter မရှိသေးပါ။
 
 ## အခြား instrument များ၏ code readiness
 
@@ -16,7 +16,7 @@ Video Engine သည် canvas frame များကို WebCodecs ဖြင့
 | **Guitar** | `Website/Guitar/Guitar Engine` တွင် TypeScript source, tests, built bundle, `positionsAt()`, `stageShapes()` နှင့် SVG renderer ရှိသည်။ Note data သည် string/fret/finger/time ကို သီးသန့်လိုအပ်သည်။ | **ချိတ်ပြီး** — `studio-guitar.js` သည် tablature ကို `parseMusicXml` မှ ဖတ်၍ Canvas painter ဖြင့် ဆွဲသည်၊ bundle ကို `Website/Website/assets/guitar-engine.js` မှ load သည်။ Guitar Engine သည် audio မထုတ်ပေးပါ။ |
 | **Piano** | `Piano Hand Human Engine` တွင် keyboard geometry, key press/contact curve, performance/finger planning နှင့် synthetic IK source/tests ရှိသည်။ | **ချိတ်ပြီး (key-only)** — `studio-piano.js` သည် MusicXML မှ key press များကို ဖတ်၍ Engine ၏ keyboard geometry ဖြင့် ဆွဲသည်။ Hand/wrist animation မပါသေးပါ။ `Piano 3D Hand Engine` folder သည် `.gitkeep` သာရှိသည်။ |
 | **Bass** | `Guitar Engine` တွင် Jazz Bass နှင့် Precision Bass ပုံများကို တိုင်းထားပြီး (`JAZZ_BASS_DRAWN`, `PRECISION_BASS_DRAWN`)၊ ပုံဖိုင်များသည် `Website/Website/assets/bass/` တွင် ရှိသည်။ | **ချိတ်ပြီး (visual-only)** — `studio-bass.js` သည် fretted bass အဖြစ် Guitar Engine ကို ပြန်သုံးသည်။ Tablature ရှိလျှင် ၎င်းကို သုံး၍ မရှိလျှင် pitch မှ အနိမ့်ဆုံး fret အဖြစ် တွက်သည်။ အသံ မထုတ်ပါ။ |
-| **Strings** | Landing page card နှင့် Notation Engine ထဲရှိ strings tuning/fretted-instrument metadata ရှိသည်။ | Playable Strings engine/UI/event source/renderer/audio မတွေ့ရ။ Orchestral string family လား fretted-string instrument လား သတ်မှတ်ရန်။ Notation metadata ကို playable renderer ဟု မယူဆရ။ |
+| **Strings** | `Website/Website/assets/violin/violin.svg` တွင် တူရိယာပုံ တစ်ပုံရှိသည် (violin နှင့် bow၊ vector)။ `Layout` တွင် `violin` template ရှိပြီး 16:9/1:1 တွင် notation ဘယ်၊ violin ညာ၊ 9:16 တွင် အပေါ်အောက် ထပ်၍ အောက်ဆုံးတွင် Title/Info ဖြစ်သည်။ | **ချိတ်ပြီး (drawing-only)** — `studio-violin.js` သည် Strings route တွင် ပုံကို ဆွဲသည်။ Violin fingering/bowing engine မရှိသေးသဖြင့် ကြိုးပေါ်တွင် အမှတ်အသား မထားပါ။ Viola/cello တို့အတွက် ပုံနှင့် တိုင်းတာချက် သီးခြားလိုအပ်သည်။ |
 | **Voice** | Landing page card နှင့် generic Studio route ရှိသည်။ | Voice-specific source/capture/import controls, renderer, audio decode workflow မတွေ့ရ။ Microphone/file input, permission/privacy/error handling, visual design နှင့် segment-aligned `AudioBuffer` ကို ဆုံးဖြတ်ရန်။ |
 
 ### Shared dependency မှတ်ချက်များ
@@ -32,14 +32,14 @@ Video Engine သည် canvas frame များကို WebCodecs ဖြင့
 1. နောက်ထပ် instrument များအတွက် shared adapter dispatch/event-time contract သတ်မှတ်ပြီး unsupported tool များကို Drum branch သို့ fall-through မဖြစ်စေရန်။
 2. Guitar ကို ပထမချိတ်ဆက်ရန် — ရှိပြီးသား visual engine ကိုသုံးသော်လည်း Studio event source, bundle path, Canvas painter နှင့် photo assets ကို အရင်ဖြည့်ရန်။
 3. Piano ကို key-only silent visual adapter အဖြစ်စတင်ရန် — note source နှင့် bundle destination ကို အတည်ပြုပြီး human-hand animation ကို နောက်ပိုင်း သီးခြားလုပ်ရန်။
-4. Bass နှင့် Strings အတွက် playable code မရှိသေးသဖြင့် product/instrument definition နှင့် event model ကို အရင်တည်ဆောက်ရန်။
+4. Voice အတွက် playable code မရှိသေးသဖြင့် product/instrument definition နှင့် event model ကို အရင်တည်ဆောက်ရန်။ Violin တွင် ပုံသာ ရှိပြီး fingering/bowing engine မရှိသေးပါ။
 5. Voice ကို source/capture/import နှင့် permission/privacy ဆုံးဖြတ်ချက်ပြီးမှ စတင်ရန်။
 6. Audible export ကို အရေးကြီးသည့် requirement အဖြစ် အတည်ပြုပြီးမှ Sound Engine/audio provider, `AudioBuffer`, timing နှင့် codec fallback ကို အကောင်အထည်ဖော်ရန်။
 
 ## စမ်းသပ်မှုနှင့် အပြောင်းအလဲမှတ်တမ်း
 
 - ယခင် code commit `d31337a` တွင် MP4 muxer tests 15 ခု၊ cleanup/safety tests 5 ခု၊ Chromium engine smoke test နှင့် Drum Studio browser integration/ffprobe test အောင်မြင်ထားသည်။ Production asset sync check နှင့် 375px/1280px viewport assertions လည်း pass ဖြစ်ထားသည်။
-- Metronome implementation သည် Video Engine core ကိုပြင်ခြင်းမဟုတ်ဘဲ Studio အတွက် သီးခြား consumer adapter နှင့် bundle sync ကို ထည့်ထားသည်။ Guitar/Piano/Bass/Strings/Voice ကို Video Engine ဖြင့် render လုပ်ပြီးကြောင်း မဆိုပါ။
+- Metronome implementation သည် Video Engine core ကိုပြင်ခြင်းမဟုတ်ဘဲ Studio အတွက် သီးခြား consumer adapter နှင့် bundle sync ကို ထည့်ထားသည်။ Guitar/Piano/Bass/Strings(violin)/Voice ကို Video Engine ဖြင့် render လုပ်ပြီးကြောင်း မဆိုပါ။
 - နောက် code implementation တစ်ခုစီပြီးပါက သက်ဆိုင်ရာ engine tests, shared Drum regression, real browser export, silent/audio behavior နှင့် phone/web layout ကို ပြန်စစ်ပြီး Doc/Plan ကို update လုပ်ရမည်။
 - **Guitar adapter ချိတ်ပြီး** — `tools/test-guitar-studio-browser.mjs` တွင် tablature ဖတ်ခြင်း၊ ပုံတိုင်း၏ အတိုင်းအတာ၊ Canvas ပေါ်တွင် neck ရှိကြောင်း၊ 375px/1280px layout နှင့် Plan §7 အရှည်စည်းမျဉ်း (score ၂ bar = ၄ စက္ကန့်၊ Thank You clip ၂ စက္ကန့် ဖြင့် ၆ စက္ကန့်) ကို စစ်သည်။ Guitar စာမျက်နှာတွင်လည်း ကိုယ်ပိုင် ၁၂ စက္ကန့် ကန့်သတ်ချက် မရှိတော့ပါ။
 
@@ -56,7 +56,7 @@ Implemented behavior:
 - Generate Video re-renders the captured drum event log using the current settings.
 - Phone layout collapses the settings fields into a single-column form while preserving the same controls.
 
-Drum-specific limitations: MusicXML and Sound Model/Count Voice behavior follow the status recorded in the Studio history below; Drum export remains visual-only. Metronome has its separate synthesized click-track adapter. Guitar is connected through `studio-guitar.js` with its own tablature reader and Canvas painter; Piano and Bass are connected the same way through `studio-piano.js` and `studio-bass.js`. Strings and Voice remain unconnected and require their own event/render adapters.
+Drum-specific limitations: MusicXML and Sound Model/Count Voice behavior follow the status recorded in the Studio history below; Drum export remains visual-only. Metronome has its separate synthesized click-track adapter. Guitar is connected through `studio-guitar.js` with its own tablature reader and Canvas painter; Piano and Bass are connected the same way through `studio-piano.js` and `studio-bass.js`, and Strings draws the violin through `studio-violin.js`. Nothing marks the violin: it has no frets and no fingering engine, so only the drawing is placed in the frame. Voice remains unconnected and requires its own event/render adapter.
 
 Verification for this update: Studio JavaScript syntax and control-marker checks passed; Video Engine source-to-production sync check passed; existing Video Engine automated tests passed (20/20); Wrangler nested deployment dry-run passed. The public Worker still serves the previous deployment until a commit is pushed and Cloudflare deploy is run.
 
@@ -136,3 +136,16 @@ Implementation Plan/Doc: [Metronome Engine Plan](../../Metronome/Metronome%20Eng
 **အတည်ပြုထားသော စမ်းသပ်မှုများ:** Notation Engine 1528/1528, Guitar Engine 37/37, Piano Hand Human Engine 86/86, Video Engine muxer 15/15. `tools/test-bass-studio-browser.mjs` သည် Chromium တွင် တကယ့် page ကို နှိပ်ပြီး ထွက်လာသော ဖိုင်ကို `ffprobe` ဖြင့် တိုင်းသည် — 9:16 output 720×1280, 4/4 bar နှစ်ခု 120 BPM = 4.00 sec, MP4, အသံ stream မပါ။ Thank You clip ၂ စက္ကန့် ပေးလျှင် 6.00 sec ဖြစ်ပြီး clip ၏ အသံပါ ပါလာသည်။ ကြိုး ၄ ကြိုး E1–G3, 20 fret, ကြိုးလိုင်းများ အညီအမျှ ဖြစ်ကြောင်း စစ်ထားသည်။ ကိုယ်ပိုင် ဆွဲသည့် shape များ တူညီသော အခိုက်အတန့်တွင် အတိအကျ တူကြောင်း၊ ထွက်လာသော frame သည် codec rounding အတွင်း မပြောင်းကြောင်း၊ cancel လုပ်လျှင် ဖိုင်မထွက်၊ ခလုတ်ပြန်ရကြောင်း စစ်ထားသည်။ 375×812 phone နှင့် 1280×900 desktop viewport တွင် horizontal overflow မရှိ။ Drum, Guitar, Piano browser regression သုံးခုလုံး ဆက်လက်အောင်မြင်သည်။
 
 **လက်ကျန်:** Bass အသံ မချိတ်ရသေးပါ။ ပုံနှစ်ပုံသာ ရှိသေးသည်။ ဖုန်းအစစ်၊ Safari/Firefox နှင့် MediaRecorder-only fallback ကို မစစ်ရသေးပါ။
+
+## Violin Studio — drawing-only adapter (2026-11-23)
+
+- Strings card သည် `studio.html?tool=strings` သို့သွားပြီး `studio-violin.js` က ကိုင်တွယ်သည်။ Drum settings, Guitar, Piano နှင့် Bass controls များကို Strings route တွင် မပြပါ။ `studio-video.js` သည်လည်း Strings route တွင် Drum renderer မစတင်စေရန် return လုပ်သည်။
+- ပုံတစ်ပုံသာ ရှိသည် — `Website/Website/assets/violin/violin.svg`။ Violin နှင့် bow ကို vector အဖြစ် ဆွဲထားပြီး 16:9၊ 1:1၊ 9:16 သုံးမျိုးလုံးတွင် ထိုပုံတစ်ပုံတည်းကို သုံးသည်။ Drum ကဲ့သို့ အပိုင်းအလိုက် ဖိုင်ခွဲ မလိုပါ — vector ပုံတစ်ပုံကို အရွယ်ပြောင်း ဆွဲနိုင်သည်။
+- **အမှတ်အသား မထားပါ။** Violin တွင် fret မရှိသဖြင့် Guitar/Bass ကဲ့သို့ ကြိုးပေါ် နေရာချ၍ မရပါ။ Violin fingering/bowing engine လည်း မရှိသေးပါ။ ထို့ကြောင့် adapter သည် တူရိယာပုံကို နေရာချရုံသာ လုပ်သည်။ Summary တွင် "violin drawn, not fingered" ဟု တိုက်ရိုက် ရေးပြသည်။
+- Layout သည် `LAYOUT_TEMPLATES.violin` ကို သုံးသည် — 16:9 နှင့် 1:1 တွင် notation ဘယ်ဘက်၊ violin ညာဘက်၊ အောက်ဆုံးတွင် Title/Info အကျယ်အပြည့်။ 9:16 တွင် ဘေးချင်းယှဉ်လျှင် ကျဉ်းလွန်းသဖြင့် notation အပေါ်၊ violin အောက် ထပ်၍ Title/Info အောက်ဆုံးတွင်။
+- ပုံကို အမြင့်ဖြင့် fit လုပ်ပြီး အချိုးမပျက် ထားသည်။ Frame ကျဉ်းလျှင် violin ငယ်သွားမည်၊ ဘယ်တော့မှ ဆန့်ထုတ် မခံရပါ။
+- Output သည် visual-only, အသံမပါသော export ဖြစ်သည်။ Video အရှည်သည် Plan §7 အတိုင်း MusicXML အရှည် + Thank You clip ဖြစ်ပြီး adapter ကိုယ်ပိုင် `MAX_SECONDS` ကန့်သတ်ချက် မထားပါ။
+
+**အတည်ပြုထားသော စမ်းသပ်မှုများ:** Notation Engine 1528/1528, Guitar Engine 37/37, Piano Hand Human Engine 86/86, Video Engine muxer 15/15 နှင့် layout 7/7. `tools/test-violin-studio-browser.mjs` သည် Chromium တွင် တကယ့် page ကို နှိပ်ပြီး ထွက်လာသော ဖိုင်ကို `ffprobe` ဖြင့် တိုင်းသည် — 9:16 output 720×1280, 4/4 bar နှစ်ခု 120 BPM = 4.00 sec, MP4, အသံ stream မပါ။ 16:9 output 1280×720။ Thank You clip ၂ စက္ကန့် ပေးလျှင် 6.00 sec ဖြစ်ပြီး clip ၏ အသံပါ ပါလာသည်။ Layout ကို တိုက်ရိုက် စစ်သည် — 16:9 တွင် ဘေးချင်းယှဉ်၊ band အောက်ဆုံး၊ 9:16 တွင် ထပ်၍ အကျယ်အပြည့်။ ပုံသည် frame ထဲ တကယ်ရောက်ကြောင်း violin band နှင့် ညာဘက် column တို့တွင် pixel ရေတွက်၍ စစ်သည်။ ထွက်လာသော frame သည် codec rounding အတွင်း မပြောင်းကြောင်၊ cancel လုပ်လျှင် ဖိုင်မထွက်၊ ခလုတ်ပြန်ရကြောင်း စစ်ထားသည်။ 375×812 phone နှင့် 1280×900 desktop viewport တွင် horizontal overflow မရှိ။ Drum, Guitar, Piano နှင့် Bass browser regression အားလုံး ဆက်လက်အောင်မြင်သည်။
+
+**လက်ကျန်:** Violin အသံ မချိတ်ရသေးပါ။ Fingering/bowing engine မရှိသေးသဖြင့် ကြိုး/finger အမှတ်အသား မထားပါ။ Viola/cello တို့အတွက် ပုံနှင့် တိုင်းတာချက် သီးခြားလိုအပ်သည်။ ဖုန်းအစစ်၊ Safari/Firefox နှင့် MediaRecorder-only fallback ကို မစစ်ရသေးပါ။

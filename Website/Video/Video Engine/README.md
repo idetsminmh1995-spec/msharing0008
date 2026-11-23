@@ -11,6 +11,7 @@ This folder contains the authoritative Video Engine runtime source, tests, brows
 - [Guitar Studio browser test](source/tools/test-guitar-studio-browser.mjs)
 - [Piano Studio browser test](source/tools/test-piano-studio-browser.mjs)
 - [Bass Studio browser test](source/tools/test-bass-studio-browser.mjs)
+- [Violin Studio browser test](source/tools/test-violin-studio-browser.mjs)
 - [Source-to-production sync tool](source/tools/sync-video-engine.mjs)
 - [Production website asset](../../Website/assets/video-engine.js)
 - [Implementation status](../Video%20Engine%20Doc/README.md)

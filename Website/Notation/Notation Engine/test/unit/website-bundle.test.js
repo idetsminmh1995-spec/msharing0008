@@ -86,6 +86,8 @@ test(
       'studio-metronome.js',
       'studio-guitar.js',
       'studio-piano.js',
+      'studio-bass.js',
+      'studio-violin.js',
       'styles.css',
       'assets/video-engine.js',
       'assets/metronome-engine.js',
