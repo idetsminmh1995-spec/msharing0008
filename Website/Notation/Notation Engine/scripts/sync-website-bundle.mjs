@@ -61,6 +61,7 @@ const appAssets = [
   'studio-metronome.js',
   'studio-guitar.js',
   'studio-piano.js',
+  'studio-bass.js',
   'styles.css',
   'assets/video-engine.js',
   'assets/metronome-engine.js',

@@ -1989,6 +1989,9 @@
     drums: { shape: 'rows', order: ['title', 'notation', 'instrument'] },
     piano: { shape: 'rows', order: ['title', 'notation', 'instrument'] },
     guitar: { shape: 'rows', order: ['instrument', 'notation', 'title'] },
+    // A bass is a fretted neck, so it stacks the way the guitar does:
+    // the neck the notes are played on, then the sheet, then the title.
+    bass: { shape: 'rows', order: ['instrument', 'notation', 'title'] },
     // Notation beside the instrument, with the Title / Info band across
     // the foot of the frame. Portrait stacks instead of splitting: two
     // columns there would leave neither part any width.

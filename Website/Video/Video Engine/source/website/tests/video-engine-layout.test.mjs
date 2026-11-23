@@ -46,7 +46,7 @@ const SIZES = {
 
 test('each instrument gets all three parts, inside the frame and apart', () => {
   const { layoutFor } = loadEngine();
-  for (const instrument of ['drums', 'piano', 'guitar', 'violin']) {
+  for (const instrument of ['drums', 'piano', 'guitar', 'bass', 'violin']) {
     for (const [ratio, { width, height }] of Object.entries(SIZES)) {
       const layout = layoutFor(instrument, { width, height });
       assert.deepEqual([...layout.parts].sort(), ['instrument', 'notation', 'title']);
@@ -86,6 +86,10 @@ test('the declared order is the drawn order, per the Plan', () => {
   const guitar = layoutFor('guitar', SIZES['16:9']);
   assert.ok(topOf(guitar.rects.instrument) < topOf(guitar.rects.notation));
   assert.ok(topOf(guitar.rects.notation) < topOf(guitar.rects.title));
+
+  const bass = layoutFor('bass', SIZES['16:9']);
+  assert.ok(topOf(bass.rects.instrument) < topOf(bass.rects.notation));
+  assert.ok(topOf(bass.rects.notation) < topOf(bass.rects.title));
 
   const violin = layoutFor('violin', SIZES['16:9']);
   assert.equal(violin.shape, 'split');
