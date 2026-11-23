@@ -7,7 +7,7 @@
  */
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -104,14 +104,24 @@ class Cdp {
       this.ws.onopen = resolve;
       this.ws.onerror = reject;
     });
+    this.listeners = new Map();
     this.ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
+      if (message.method) {
+        for (const listener of this.listeners.get(message.method) ?? []) listener(message.params);
+        return;
+      }
       const pending = this.pending.get(message.id);
       if (!pending) return;
       this.pending.delete(message.id);
       if (message.error) pending.reject(new Error(message.error.message));
       else pending.resolve(message.result);
     };
+  }
+
+  on(method, listener) {
+    if (!this.listeners.has(method)) this.listeners.set(method, []);
+    this.listeners.get(method).push(listener);
   }
 
   async call(method, params = {}) {
@@ -146,16 +156,49 @@ const selectScore = (xml, name) => evaluate(`(() => {
   return true;
 })()`);
 
-async function waitForRender(label, timeoutMs = 120000) {
+async function waitForRender(label, timeoutMs = 120000, previousHref = null) {
   const startedAt = Date.now();
   let state;
   while (Date.now() - startedAt < timeoutMs) {
     state = JSON.parse(await evaluate("JSON.stringify({status:document.querySelector('[data-studio-status]').textContent,download:!document.querySelector('[data-video-download]').hidden,href:document.querySelector('[data-video-download]').href,name:document.querySelector('[data-video-download]').download,ready:document.querySelector('[data-video-output]').readyState})"));
-    if (state.download && state.ready >= 1) return state;
+    if (state.download && state.ready >= 1 && state.href !== previousHref) return state;
     if (state.status.startsWith('Guitar video render failed:')) return state;
     await sleep(150);
   }
   throw new Error(`${label} did not finish: ${state?.status}`);
+}
+
+/**
+ * The Thank You clip lives on the engine's R2 bucket, so the test answers
+ * for it: `clip` is its bytes, or null for the 404 the Plan allows.
+ */
+let thankYouClip = null;
+async function serveThankYou() {
+  cdp.on('Fetch.requestPaused', async (event) => {
+    if (!event.request.url.includes('/thank-you/')) {
+      await cdp.call('Fetch.continueRequest', { requestId: event.requestId });
+      return;
+    }
+    if (!thankYouClip) {
+      await cdp.call('Fetch.fulfillRequest', {
+        requestId: event.requestId,
+        responseCode: 404,
+        responseHeaders: [{ name: 'Access-Control-Allow-Origin', value: '*' }],
+        body: Buffer.from('not found').toString('base64'),
+      });
+      return;
+    }
+    await cdp.call('Fetch.fulfillRequest', {
+      requestId: event.requestId,
+      responseCode: 200,
+      responseHeaders: [
+        { name: 'Content-Type', value: 'video/mp4' },
+        { name: 'Access-Control-Allow-Origin', value: '*' },
+      ],
+      body: thankYouClip.toString('base64'),
+    });
+  });
+  await cdp.call('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
 }
 
 try {
@@ -178,6 +221,7 @@ try {
   cdp = new Cdp(page.webSocketDebuggerUrl);
   await cdp.call('Page.enable');
   await cdp.call('Runtime.enable');
+  await serveThankYou();
 
   const homeStartedAt = Date.now();
   let homeReady = false;
@@ -279,7 +323,7 @@ try {
   await evaluate("document.querySelector('[data-studio-generate]').click()");
   const state = await waitForRender('Guitar render');
   assert.ok(state.status.startsWith('Rendered '), `Guitar render did not complete: ${state.status}`);
-  assert.match(state.status, /silent visual video/, 'Guitar export does not say it is silent');
+  assert.match(state.status, /no Thank You clip/, 'Guitar export does not say its ending is missing');
   assert.ok(state.href.startsWith('blob:'), 'Guitar export is not backed by a Blob URL');
   assert.match(state.name, /^guitar-strat-drawn-9x16\.(mp4|webm)$/);
 
@@ -301,7 +345,10 @@ try {
   assert.equal(audioStream, undefined, 'Guitar output claims an audio track the engine cannot make');
   assert.equal(videoStream.width, 720, 'Portrait guitar video width is wrong');
   assert.equal(videoStream.height, 1280, 'Portrait guitar video height is wrong');
-  assert.ok(Number(probe.format.duration) > 1, 'Guitar video is shorter than one second');
+  // The Plan's length rule, with no cap of the page's own: two 4/4 bars at
+  // the default 120 BPM are four seconds, and no 12-second cap applies.
+  const scoreSeconds = Number(probe.format.duration);
+  assert.ok(Math.abs(scoreSeconds - 4) < 0.4, `Guitar video is not the score's length: ${scoreSeconds}s instead of 4s`);
 
   // The neck must actually be in the pixels, not just in the shape list.
   const framePath = `${output}-frame.png`;
@@ -323,7 +370,30 @@ print(background, other)
   const [backgroundPixels, otherPixels] = ink.trim().split(/\s+/).map(Number);
   assert.ok(otherPixels > backgroundPixels, `The guitar frame is mostly empty: ${otherPixels} painted of ${backgroundPixels + otherPixels}`);
 
-  console.log(JSON.stringify({ status: result.status, summary: result.summary, bytes: result.bytes, download: state.name, ffprobe: probe, ink: { backgroundPixels, otherPixels } }, null, 2));
+  // The Plan's last part of the length: the Thank You clip closes the video
+  // and is counted in it. The clip is two seconds, so four becomes six.
+  const clipPath = join(profile, 'thank-you.mp4');
+  await exec('ffmpeg', ['-v', 'error', '-y',
+    '-f', 'lavfi', '-i', 'color=c=#0b1220:s=720x1280:d=2:r=30',
+    '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2',
+    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', clipPath]);
+  thankYouClip = await readFile(clipPath);
+  await evaluate("document.querySelector('[data-studio-generate]').click()");
+  const thanked = await waitForRender('Guitar render with a Thank You clip', 120000, state.href);
+  assert.ok(thanked.status.startsWith('Rendered '), `Guitar render did not complete: ${thanked.status}`);
+  assert.match(thanked.status, /Thank You ending/, 'Guitar export does not report its Thank You ending');
+  const thankedBytes = Buffer.from(await evaluate(`(async () => { const response = await fetch(${JSON.stringify(thanked.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); })()`), 'base64');
+  const thankedPath = `${output}-thanked.mp4`;
+  await writeFile(thankedPath, thankedBytes);
+  const thankedProbe = JSON.parse((await exec('ffprobe', ['-v', 'error',
+    '-show_entries', 'format=duration', '-show_entries', 'stream=codec_type',
+    '-of', 'json', thankedPath])).stdout);
+  const thankedSeconds = Number(thankedProbe.format.duration);
+  assert.ok(Math.abs(thankedSeconds - 6) < 0.5, `The Thank You clip was not counted in the length: ${thankedSeconds}s instead of 6s`);
+  assert.ok(thankedProbe.streams.some((stream) => stream.codec_type === 'audio'),
+    `The Thank You clip's sound is missing: ${JSON.stringify(thankedProbe.streams)}`);
+
+  console.log(JSON.stringify({ status: result.status, summary: result.summary, bytes: result.bytes, download: state.name, ffprobe: probe, scoreSeconds, thankYouSeconds: thankedSeconds, ink: { backgroundPixels, otherPixels } }, null, 2));
 } finally {
   cdp?.close();
   for (const child of [browser, server]) {

@@ -23,7 +23,6 @@
   const timeline = document.querySelector('[data-video-timeline]');
   const playButton = document.querySelector('[data-video-play]');
   const stage = document.querySelector('[data-video-stage]');
-  const MAX_EXPORT_SECONDS = 12;
   const FPS = 30;
   const DIMENSIONS = {
     '16x9': { width: 1280, height: 720 },
@@ -156,7 +155,14 @@
       }
     }
     notes.sort((left, right) => left.startSeconds - right.startSeconds || left.string - right.string);
-    return notes;
+    // The score's own length, from its measures rather than its last note:
+    // a bar that ends in a rest is still part of the file the writer made.
+    const numbers = [...tickOffset.keys()];
+    const last = numbers[numbers.length - 1];
+    const endSeconds = last === undefined
+      ? 0
+      : api.tickToSeconds(tempoMap, (tickOffset.get(last) ?? 0) + longestMeasureTicks(parsed, last));
+    return { notes, endSeconds };
   }
 
   /** Each measure's start tick: the running total of the measure before it. */
@@ -315,7 +321,7 @@
       setStatus('Reading the tablature…');
       const api = await loadNotationEngine();
       const parsed = api.parseMusicXml(await file.text());
-      const notes = readTabNotes(parsed, api);
+      const { notes, endSeconds } = readTabNotes(parsed, api);
       if (notes.length === 0) {
         throw new Error('This score carries no tablature positions, so there is nothing to draw on the neck.');
       }
@@ -361,8 +367,10 @@
         ctx.restore();
       };
 
+      // The Plan's length rule, with no cap of the page's own: the score's
+      // own length, then the Thank You clip the engine owns.
       const lastEnd = Math.max(...notes.map((note) => note.endSeconds));
-      const seconds = Math.min(MAX_EXPORT_SECONDS, Math.max(1, lastEnd + 0.5));
+      const seconds = Math.max(1, endSeconds, lastEnd);
       const picks = readPicks(notes);
       if (summaryLabel) {
         const bars = Math.max(1, Math.round(seconds / 2));
@@ -408,11 +416,7 @@
       const notation = await engine.prepareNotationFor(file, settings, PARTS);
       if (notation?.error) throw new Error(`The notation could not be prepared: ${notation.error}`);
 
-      const result = await engine.render({
-        width: settings.width,
-        height: settings.height,
-        fps: FPS,
-        segments: [{
+      const segments = [{
           seconds,
           draw: (ctx, at) => {
             // The parts paint their own boxes; the gaps between them and
@@ -429,14 +433,22 @@
                   brand: 'M Sharing',
                   model: 'guitar',
                   titleOne: parsed.score?.title || file.name,
-                  titleTwo: `${notes.length} notes · ${settings.aspect} · silent`,
+                  titleTwo: `${notes.length} notes · ${settings.aspect}`,
                 }),
                 notation: (target, rect) => engine.drawNotationPart(target, rect, at, notation),
                 instrument: (target, rect) => drawNeck(target, rect, at),
               },
             });
           },
-        }],
+        }];
+      const ending = await engine.thankYouSegment(settings.width, settings.height);
+      if (ending) segments.push(ending);
+
+      const result = await engine.render({
+        width: settings.width,
+        height: settings.height,
+        fps: FPS,
+        segments,
         onProgress: (progress, phase) => {
           if (!cancelRequested) setStatus(`${phase} · ${Math.round(progress * 100)}%`);
         },
@@ -458,7 +470,10 @@
       if (placeholder) placeholder.hidden = true;
       if (playButton) playButton.disabled = false;
       if (timeline) timeline.disabled = false;
-      setStatus(`Rendered ${result.frames} frames · ${seconds.toFixed(2)} sec · ${result.container.toUpperCase()} · silent visual video`);
+      // The Guitar Engine makes no sound of its own, so the file is silent
+      // unless the Thank You clip brought its own.
+      const sound = ending ? 'Thank You ending' : 'no Thank You clip';
+      setStatus(`Rendered ${result.frames} frames · ${seconds.toFixed(2)} sec · ${result.container.toUpperCase()} · ${sound}`);
     } catch (error) {
       setStatus(`Guitar video render failed: ${error.message || error}`);
       if (placeholder) placeholder.hidden = false;
