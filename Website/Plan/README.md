@@ -15,6 +15,8 @@
 - Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ် (pipeline၊ Studio options၊ engine တာဝန်ခွဲခြားမှု၊ ဆုံးဖြတ်ချက်များ၊ ပြီးစီးမှုအခြေအနေ)
 - Sound Engine နှင့် MuseScore SoundFont (SoundFont ရွေးချယ်ချက် ပါ)
 - Metronome Studio
+- [Handoff — Manus AI](#handoff--manus-ai-supabase-နှင့်-cloudflare-r2--2026-11-23) (Supabase data model၊ R2 layout၊ အလုပ်အစီအစဉ်)
+- [Work packages — OpenHands](#work-packages--openhands-အတွက်-အစီအစဉ်အတိုင်း--2026-11-23) (Editor နှင့် Create Video အစဉ်လိုက် အလုပ်များ)
 - **အခြား Plan များ:** [Video Engine Plan](../Video/Video%20Engine%20Plan/PLAN.md) · [Notation Plan](../Notation/Notation%20Plan/PLAN.md) · [Metronome Engine Plan](../Metronome/Metronome%20Engine%20Plan/PLAN.md) · [Sound Plan](../Notation/Sound%20Plan/README.md)
 
 ## 1. ရည်ရွယ်ချက်
@@ -726,3 +728,125 @@ Phone 375px နှင့် web/desktop 1280px viewport checks, Metronome portra
 ### Metronome Studio input controls — 2026-11-15
 
 Metronome Studio control panel ၏ အပေါ်တွင် `.musicxml`, `.xml`, `.mxl` ရွေးချယ်နိုင်သော MusicXML file field ကို ထည့်မည်။ ရှိပြီးသား design, orientation, BPM, bars နှင့် meter controls များ၏ ပုံစံ/အစီအစဉ်ကို ထိန်းထားပြီး၊ ၎င်းတို့အောက်တွင် အခြား instrument studio များနှင့်တူသော `Count Voice` toggle/type/volume နှင့် `Sound Model`/volume controls ကို ပြမည်။ File selection သည် browser ပေါ်တွင် filename ပြသသည့် local input ဖြစ်သည်; MusicXML ကို video timing သို့ parse ချိတ်ဆက်ခြင်း၊ Count Voice အသံထုတ်ခြင်း၊ Sound Model အသံနှင့် volume ကို render ထဲသုံးခြင်းသည် သီးခြားနောက်အဆင့်ဖြစ်ပြီး ဤ UI pass ထဲတွင် မပါဝင်ပါ။
+
+## Handoff — Manus AI (Supabase နှင့် Cloudflare R2) — 2026-11-23
+
+ဤ section သည် နောက်ရက်များတွင် Manus AI က Code၊ Supabase ချိတ်ဆက်ခြင်းနှင့် Cloudflare R2 အလုပ်များကို ကိုယ်တိုင်လုပ်ရန် Claude က ကြိုရေးထားသော Plan ဖြစ်သည်။ **အောက်ပါ table/bucket/key အမည်များသည် အဆိုပြုချက်များ** ဖြစ်ပြီး Manus AI က လက်တွေ့အခြေအနေအရ ညှိနိုင်သည်။ ညှိလျှင် ဤ Plan ထဲ ပြန်မှတ်ရန်။ အသုံးပြုသူ (user) ကိုယ်တိုင် ပြောထားသော ဆုံးဖြတ်ချက်များကို "ဆုံးဖြတ်ပြီး" ဟု ခွဲဖော်ပြထားသည်။
+
+### ဆုံးဖြတ်ပြီးသော အချက်များ (user ပြောထားသည်)
+
+- Backend = **Supabase** (Postgres + Auth + Edge Functions/RLS)။ Storage = **Cloudflare R2**။ Deployment = Cloudflare။ နောက်ပိုင်း AWS သို့ ပြောင်းနိုင်ရန် portability rules (§6) ကို လိုက်နာရမည်။
+- Platform သည် ရောင်းရသော sale တစ်ခုချင်းစီ၏ **၄၅%** ကို ယူသည်။ ၎င်းကို **payment fee မနှုတ်မီ ရောင်းဈေးမှ တိုက်ရိုက်** တွက်သည်။
+- Notation Lab မှ ရေးထားသော notes များကို creator များက ရောင်းချရန် list လုပ်နိုင်သည်။ Notes Store နှင့် Lessons ကို Create Video / Notation Lab ပြီးမှ လုပ်မည်။
+- Create Video အတွက် Logo default သည် R2 ထဲတွင် ရှိပြီး အသုံးပြုသူက ကိုယ်ပိုင်ဖိုင်လည်း တင်နိုင်သည်။ Thank You video ဖိုင်များ (Landscape / Portrait / Square) သည် R2 ထဲတွင် ရှိပြီး။ Drum ပုံများကို R2 မှ ယူသုံးမည်။
+- Service-role key ကို browser code ထဲ မထည့်ရ (§3)။ R2 credential ကို browser မမြင်ရ (§4)။
+
+### Supabase data model (အဆိုပြုချက်)
+
+| Table | အဓိက field များ | မှတ်ချက် |
+|---|---|---|
+| `profiles` | `id` (= auth user id), `display_name`, `avatar_asset_id`, `is_creator`, `language` (`en`/`my`), `theme`, `created_at` | Header ၏ EN/MM နှင့် Dark/Light ကို သိမ်းရန် |
+| `assets` | `id`, `owner_id`, `bucket` (`public`/`private`), `object_key`, `mime_type`, `size_bytes`, `sha256`, `status` (`pending`/`ready`/`failed`), `created_at` | R2 ၏ metadata registry (§4)။ Binary မသိမ်းပါ |
+| `scores` | `id`, `owner_id`, `title`, `musicxml_asset_id`, `updated_at` | Notation Lab ၏ score library (ယခု browser `localStorage` တွင်ရှိ) ကို အစားထိုးရန် |
+| `notes` | `id`, `creator_id`, `title`, `description`, `instrument`, `price_amount`, `currency`, `status` (`draft`/`published`/`unlisted`/`removed`), `score_asset_id`, `preview_asset_id`, `cover_asset_id`, `published_at` | ရောင်းရန် list လုပ်ထားသော notes |
+| `orders` | `id`, `buyer_id`, `status` (`pending`/`paid`/`refunded`/`failed`), `currency`, `total_amount`, `payment_provider`, `provider_ref`, `created_at`, `paid_at` | |
+| `order_items` | `id`, `order_id`, `note_id`, `creator_id`, `unit_price`, `platform_share_bps` (= 4500), `platform_amount`, `creator_amount` | အောက်ပါ "ငွေစာရင်း စည်းမျဉ်း" |
+| `entitlements` | `user_id`, `note_id`, `order_item_id`, `granted_at`, `revoked_at` | ဝယ်ပြီးသော content ကို ဖတ်/ဒေါင်းခွင့် |
+| `favorites` | `user_id`, `target_type`, `target_id`, `created_at` | Header ၏ Favorite |
+| `cart_items` | `user_id`, `note_id`, `added_at` | Header ၏ Cart |
+| `notifications` | `id`, `user_id`, `type`, `payload` (jsonb), `read_at`, `created_at` | Header ၏ Notification |
+| `video_jobs` | `id`, `owner_id`, `tool` (`drum`/`piano`/`guitar`/`violin`/`metronome` ...), `ratio`, `status`, `score_id`, `output_asset_id`, `duration_seconds`, `created_at` | Create Video ၏ ထွက်ကုန်များ |
+| `courses`, `lessons`, `enrollments` | (နောက်မှ) | Lessons ကို Create Video / Notation Lab ပြီးမှ ဆုံးဖြတ်ရန် |
+
+**ငွေစာရင်း စည်းမျဉ်း:** ငွေပမာဏကို အနည်းဆုံးယူနစ် (integer minor units) ဖြင့်သိမ်းပါ (decimal/float မသုံးရ)။ Platform ၏ ၄၅% ကို `platform_share_bps = 4500` အဖြစ် **order item တစ်ခုချင်းစီတွင် ဝယ်သည့်အချိန်က snapshot လုပ်** သိမ်းရမည် (နောက်ပိုင်း ရာခိုင်နှုန်းပြောင်းလျှင် အရင်စာရင်းမပြောင်းစေရန်)။ `platform_amount` ကို ရောင်းဈေး (`unit_price`) မှ တိုက်ရိုက်တွက်ပြီး `creator_amount = unit_price − platform_amount`။ Rounding စည်းမျဉ်းကို သတ်မှတ်ပြီး test ရေးရမည် (ဥပမာ `unit_price` မ၀ ဖြစ်သည့်အခါ ပေါင်းလဒ် အမြဲ `unit_price` နှင့် ညီရမည်)။
+
+**RLS (Row Level Security) အခြေခံမူ:** `profiles`, `scores`, `cart_items`, `favorites`, `notifications`, `video_jobs` — ပိုင်ရှင်ကိုယ်တိုင်သာ ဖတ်/ရေး။ `notes` — `published` ကို လူတိုင်းဖတ်နိုင်၊ ရေး/ပြင်ခြင်းကို creator သာ။ `orders`, `order_items`, `entitlements` — ဝယ်သူနှင့် (order item ၏) creator သာ ဖတ်နိုင်၊ ရေးခြင်းကို server-side (Edge Function) သာ။ `assets` — ပုံမှန်အားဖြင့် private။ **Service-role key ကို server-side တွင်သာ သုံးရမည်။**
+
+### Cloudflare R2 layout (အဆိုပြုချက်)
+
+**လက်ရှိ:** bucket `msharing0008` ထဲတွင် `soundfonts/` prefix အောက် SoundFont ၁၉ object (versioned key၊ `manifest.json` ကို no-cache) ရှိပြီး `r2.dev` public subdomain နှင့် `Access-Control-Allow-Origin: *` ဖြင့် browser က တိုက်ရိုက်ဖတ်နေသည် (Doc: SoundFont R2 Upload — 2026-11-18 မှတ်ချက်)။
+
+**အဆိုပြုချက်:** Bucket နှစ်ခု ခွဲပါ။
+
+| Bucket | အကြောင်းအရာ | ဝင်ရောက်ပုံ |
+|---|---|---|
+| `msharing0008` (ရှိပြီး — **public**) | `soundfonts/…` (ရှိပြီး)၊ Logo default၊ Thank You video များ၊ Drum ပုံများ/manifest — **လူတိုင်းမြင်ရမည့် static asset များသာ** | Public URL |
+| private bucket အသစ် (အမည် Manus AI ရွေး) | ရောင်းမည့် notes (`notes/{note_id}/…`)၊ အသုံးပြုသူ upload များ (`users/{user_id}/…` — MusicXML၊ logo)၊ ထုတ်ထားသော video များ (`users/{user_id}/videos/…`) | Worker က entitlement/ပိုင်ရှင် စစ်ပြီး **signed URL** ထုတ်ပေးမှ |
+
+**အရေးကြီး:** ရောင်းမည့် (ငွေပေးမှ ရမည့်) content ကို public bucket ထဲ **မထားရ**။ Public bucket ၏ URL ကို သိသူတိုင်း ဒေါင်းလို့ရသည်။
+
+- `r2.dev` URL သည် Cloudflare က production မဟုတ်သော အသုံးပြုမှုအတွက် ရည်ရွယ်ထားသည်ဟု သိရ၍ (Manus AI က Cloudflare docs ဖြင့် အတည်ပြုရန်) production တွင် **custom domain** ကို public bucket ပေါ်ချိတ်ပြီး ပြောင်းသုံးရန်။
+- Object key ကို business meaning မပါသော stable ID ဖြင့်ပေးပါ (§4)။ မပြောင်းရသော asset များကို versioned prefix (`…/v0.2/…`) ဖြင့်ထားပြီး immutable cache၊ ပြောင်းနိုင်သော manifest ကို `no-cache`။
+- **Upload flow:** client က Worker ထံ upload ခွင့်တောင်း → Worker က size/type စစ်ပြီး signed upload URL ပေး → `assets` row (`pending`) ဖန်တီး → upload ပြီးလျှင် checksum စစ်ပြီး `ready`။ R2 credential ကို browser မမြင်ရ။
+- **Create Video ၏ R2 အသုံးပြုမှု:** Thank You၊ Drum ပုံ/manifest၊ Logo default တို့၏ **ဖိုင်အမည်/path ကို Plan ထဲ မသတ်မှတ်ပါ** — ၎င်းတို့သည် သက်ဆိုင်ရာ Engine (Video Engine၊ Drum Animation Engine) ၏ တာဝန်ဖြစ်သည်။ Manus AI သည် bucket/prefix နှင့် access ကိုသာ ပြင်ဆင်ပေးမည်။
+
+### Config အမည်များ (အဆိုပြုချက်)
+
+| အမည် | အမျိုးအစား | နေရာ |
+|---|---|---|
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | public | Browser/Worker config |
+| `SUPABASE_SERVICE_ROLE_KEY` | **secret** | Cloudflare secrets (server-side သာ) |
+| `PUBLIC_ASSETS_BASE_URL` | public | Public bucket ၏ custom domain URL |
+| R2 bindings (ဥပမာ `PRIVATE_BUCKET`) | binding | Worker config (`wrangler`) |
+
+`.env` ကို git ထဲ commit မလုပ်ရ။ Production / preview / development ကို ခွဲထားရမည် (§5)။
+
+### Manus AI အလုပ်အစီအစဉ် (အဆိုပြု၊ တစ်ဆင့်ချင်း)
+
+| # | အလုပ် | ပြီးစီးမှု စံနှုန်း |
+|---|---|---|
+| 1 | Supabase project၊ migrations (`profiles`, `assets`)၊ RLS | User A သည် User B ၏ row ကို ဖတ်/ရေးမရကြောင်း test၊ migration ကို အစမှ ပြန်ပြေးနိုင် |
+| 2 | Auth (sign up / sign in) နှင့် Header ၏ Account control၊ EN/MM နှင့် Dark/Light ကို `profiles` တွင်သိမ်း | Reload/device ပြောင်းလည်း setting မပျောက် |
+| 3 | R2 Worker — signed upload/download နှင့် `assets` registry၊ private bucket | Link သက်တမ်းကုန်လျှင် မရ၊ အခြားသူ၏ ဖိုင်မရ |
+| 4 | Notation Lab score library ကို `scores` + R2 သို့ ရွှေ့ (OpenHands နှင့် ညှိ) | localStorage မလိုဘဲ score ပြန်ဖွင့်နိုင်၊ အခြား device တွင်လည်းရ |
+| 5 | Favorites / Cart / Notifications (Header controls) | ပိုင်ရှင်ကိုယ်တိုင်သာ မြင်၊ test pass |
+| 6 | Notes Store — list၊ ဝယ်ခြင်း၊ `entitlements`၊ ၄၅% ငွေစာရင်း | ဝယ်မှသာ content ဖတ်/ဒေါင်းရ၊ `platform_amount + creator_amount = unit_price` test pass |
+| 7 | Create Video — `video_jobs`၊ user logo upload၊ ထုတ်ထားသော video ကို private bucket တွင်သိမ်း | Job အခြေအနေ ပြန်ကြည့်နိုင် |
+| 8 | Courses / Lessons (နောက်ဆုံး) | — |
+
+ပြီးသည့် အဆင့်တိုင်းတွင် `Website/Doc/` ကို update လုပ်ရမည် (§11)။
+
+### မဖြေရှင်းရသေးသော အချက်များ (user ဆုံးဖြတ်ရန်)
+
+1. **ငွေပေးချေမှု provider** (ဘာကို သုံးမလဲ)။
+2. **Payment fee ကို ဘယ်သူ ထမ်းမလဲ** — ၄၅% ကို fee မနှုတ်မီ တွက်ထားသောကြောင့် provider fee ကို platform ၏ ၄၅% ထဲမှ ထုတ်မလား၊ creator ၏ ၅၅% မှ နှုတ်မလား။
+3. **Creator ငွေထုတ်ခြင်း (payout)** — နည်းလမ်း၊ အချိန်ဇယား၊ အနည်းဆုံးပမာဏ။
+4. Refund မူဝါဒ၊ ရောင်းချမှုဆိုင်ရာ အခွန် (tax/VAT)။
+5. အသုံးပြုမည့် ငွေကြေးအမျိုးအစား (currency)။
+6. Auth provider များ (email တစ်မျိုးတည်းလား၊ Google စသည်ထပ်လား)။
+7. Creator များ တင်သော content ကို စစ်ဆေး (moderation) ခြင်း။
+8. ဝယ်ပြီးသော note ကို ဘယ်လိုပေးမလဲ (MusicXML ဒေါင်းခွင့်လား၊ Notation Lab ထဲ ဖွင့်ကြည့်ခွင့်သာလား၊ PDF လား)။
+
+
+## Work packages — OpenHands အတွက် (အစီအစဉ်အတိုင်း) — 2026-11-23
+
+OpenHands က Code ရေးသူဖြစ်သည်။ အောက်ပါ work package (WP) များသည် ဤ Plan ၏ ဆုံးဖြတ်ချက်များမှ ထုတ်ယူထားသော အစီအစဉ်ဖြစ်ပြီး **အစဉ်အတိုင်း တစ်ခုချင်း** လုပ်ရန်အဆိုပြုသည်။ **အလုပ်စမည့် WP ကို user က "ready" ဟုပြောမှ စ**ရမည်။ WP တစ်ခုပြီးတိုင်း သက်ဆိုင်ရာ Doc ကို update လုပ်ပြီး test ပြေးရမည် (§11)။
+
+### A — Notation Lab Editor
+
+| WP | အလုပ် | ပြီးစီးမှု စံနှုန်း |
+|---|---|---|
+| A1 | Palette default ၁၃ ခုကို MuseScore အစီအစဉ် (Clefs · Key signatures · Time signatures · Tempo · **Pitch** · Accidentals · Dynamics · Articulations · Text · **Keyboard** · Repeats & jumps · Barlines · **Layout**) အတိုင်း ပြောင်း။ ရှိပြီးသား `Pedal` ကို `Keyboard`၊ `Breaks & spacers` ကို `Layout` အဖြစ် အမည်ပြောင်း၊ Ornaments နှင့် Lines ကို `Add Palettes` ထဲဆက်ထား | Default ၁၃ ခု၏ စာရင်း/အစဉ် မှန်၊ ရှိပြီးသား test ကို update ပြီး pass |
+| A2 | **Pitch** (ottava: 8va, 8vb, 15ma, 15mb) — doc ထဲ octave-shift ထည့်/ဖယ်သော command အသစ်။ MusicXML တွင် 8va = `down` size 8၊ 8vb = `up` 8၊ 15ma = `down` 15၊ 15mb = `up` 15 | Bracket ပေါ်ခြင်း၊ MusicXML ပြန်ရေး/ပြန်ဖတ်ခြင်း မှန်၊ undo/redo အလုပ်လုပ်ခြင်း၊ palette ခလုတ် pressed အခြေအနေ မှန် |
+| A3 | ကျန် MuseScore palette အုပ်စုများ (MuseScore 4 ၏ `Add Palettes` စာရင်းနှင့် နှိုင်းယှဉ်ပြီး အတည်ပြုပြီးမှ) | အုပ်စုများ ပေါ်ပြီး item များ score ပေါ် ရေးနိုင်ခြင်း |
+| A4 | Guitar — staff ပေါ် note ရေးလျှင် Tab note ပါ တစ်ပြိုင်တည်းပေါ်/အလုပ်လုပ်ခြင်းကို စစ်ပြီး မလုပ်ပါက ပြင် | Staff နှင့် Tab နှစ်ခုလုံးတွင် note တူညီစွာပေါ်၊ undo/redo နှင့် ကိုက် |
+| A5 | Sidebar ၏ `Instruments` tab ကို MuseScore ၏ Instruments panel ကဲ့သို့ ပုံမှန်အလုပ်လုပ်စေ (part စာရင်း၊ ထည့်/ဖယ်/ပြောင်း)၊ `⋯` tab | Part များ ထည့်/ဖယ်နိုင်၊ score နှင့်ကိုက် |
+| A6 | **Writer Engine** ကို `Website` အတွင်း သီးခြား folder/module အဖြစ် ခွဲထုတ် (အဆိုပြုအမည် `Website/Writer/Writer Engine`)၊ ယခု `notation-doc.js` နှင့် `notation-editor.js` ထဲရှိ edit logic ကို ရွှေ့ | အပြုအမူ မပြောင်း (အရင် test အားလုံး pass)၊ Editor က Engine ကို import သုံး |
+
+### B — Create Video
+
+| WP | အလုပ် | ပြီးစီးမှု စံနှုန်း |
+|---|---|---|
+| B1 | Metronome Studio ၏ output ကို 1920×1080 / 1080×1080 / 1080×1920 သို့ ပြောင်း၊ အရွယ်ကို Video Engine ၏ shared setting တစ်ခုမှ သတ်မှတ် | Video အားလုံး အရွယ်တူ၊ 1080p memory/encode အောင်၊ Metronome test pass |
+| B2 | Video Engine တွင် ၃ ပိုင်း layout template (data ဖြင့်ကြေညာ၊ တူရိယာအလိုက်နေရာ) | `atSeconds` တူလျှင် frame တူ၊ ratio ၃ မျိုးလုံးတွင် layout မှန် |
+| B3 | Drum Studio — **Title / Info အပိုင်း** (Logo ဘယ်ဘက်၊ Title 1 / Title 2 (user ရိုက်)၊ `4/4` / `BPM` / `Key` (MusicXML မှ)၊ Metronome icon) | Video ပေါ်တွင် မှန်ကန်စွာပြ၊ MusicXML မပါလျှင် ရှင်းရှင်းလင်းလင်း ပြ |
+| B4 | **Video အရှည်** = Count Voice (အစ) + MusicXML + Thank You၊ `MAX_SECONDS = 12` ကို ဖယ် (memory guard သာ) | ရှည်သော MusicXML ဖြင့် ထုတ်နိုင်၊ အရှည်ပေါင်းလဒ် မှန် |
+| B5 | Notation Engine ကို Video အလယ်အပိုင်းတွင် ချိတ် (Page: အောက်မှအပေါ်၊ Horizontal: ညာမှဘယ်၊ Notation Engine ၏ cursor) | Cursor က တီးနေသော note နှင့် တိုက်ဆိုင်၊ ရွေ့ပုံ မှန် |
+| B6 | ရေတွက်ပုံ ရွေးချယ်မှု option (`1,2,3,4` / `1&,…` / `1e&a,…`) — စာသားသာပြောင်း | Video ပေါ်စာသားပြောင်း၊ Count Voice အသံ မပြောင်း |
+| B7 | **Thank You segment** ကို Video Engine ထဲ ချိတ် (output ratio အလိုက်ဖိုင်ကို R2 မှ၊ အဆုံးတွင်ဆက်) | အဆုံးတွင်ပေါ်၊ ratio မှန်၊ ဖိုင်မရလျှင် Adapter Contract အတိုင်း |
+| B8 | **Drum Animation Engine** (R2 ထဲက Drum data/ပုံများကို manifest မှဖတ်၍ မကျန်အောင်ပြ) | Manifest ထဲရှိ အားလုံးပြ၊ မရှိရင် diagnostic ပြ (တိတ်တိတ်မကျော်) |
+| B9 | **အသံပါ Video** — Sound Engine ကို Video အတွက် offline `AudioBuffer` ထုတ်ပေးနိုင်အောင်၊ Count Voice အသံ၊ Drum အသံ | Video တွင် အသံပါ (ffprobe နှင့် စစ်)၊ audio/video sync |
+| B10 | Guitar adapter (Video Engine Plan Phase 1) | Phase 1 ၏ စံနှုန်းများ |
+| B11 | Piano key-only adapter (Phase 2)၊ ထို့နောက် Violin၊ Bass၊ Strings၊ Voice | သက်ဆိုင်ရာ Phase စံနှုန်းများ |
+
+**မှတ်ချက်:** B2 → B3 → B4 အစဉ်ကို ပထမဆုံးလုပ်ရန် အကြံပြုသည် (user က ထုတ်လုပ်ပြီးသော video အစစ်ကို စမ်းကြည့်နိုင်ရန်)။ Video အပိုင်း အချိုးများ၊ Metronome icon တို့သည် default ဖြစ်ပြီး user က video အစစ်ကိုကြည့်ပြီးမှ ညှိမည်။
