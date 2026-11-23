@@ -191,6 +191,16 @@ Website နှင့်ပတ်သက်သည့် implementation, UI/UX, dep
 
 Plan, architecture decision, implementation sequence သို့မဟုတ် အလုပ်လုပ်သည့်ပုံစံကို ပြောဆို/ပြောင်းလဲသည့်အခါ `Website/Plan/README.md` သို့မဟုတ် သက်ဆိုင်ရာ `Website/Plan/` document ကို တစ်ပြိုင်နက် update လုပ်ရမည်။ UI/UX ကို ဖုန်းနှင့် web app/desktop နှစ်မျိုးလုံးအတွက် အစကတည်းက responsive ရေးပြီး အနည်းဆုံး viewport တစ်မျိုးစီတွင် စစ်ဆေးရမည်။ Code နှင့် သက်ဆိုင်ရာ Doc/Plan update များကို အတူတကွ commit လုပ်ပြီး စစ်ဆေးမှုအောင်မြင်လျှင် ချိတ်ဆက်ထားသော GitHub repository/branch သို့ push လုပ်ရမည်။ Push မတိုင်မီ remote ကို fetch လုပ်၊ remote changes ရှိလျှင် ပေါင်းစည်းပြီး၊ push ပြီး commit SHA ကို အတည်ပြုရမည်။ GitHub push သည် deployment ကို အလိုအလျောက်ခွင့်ပြုခြင်းမဟုတ်ပါ။ အသေးစိတ်စည်းမျဉ်းကို [Website Development Documentation Workflow](../Doc/Development-Workflow.md) တွင် ထားရှိသည်။
 
+### အလုပ်ခွဲဝေမှု (Roles)
+
+| ဘယ်သူ | တာဝန် |
+|---|---|
+| **Claude** | **Plan ကို တောက်လျှောက်ရေးထားပေးခြင်း** — ဆုံးဖြတ်ချက်များ၊ လိုအပ်ချက်များ၊ လက်ရှိအခြေအနေ (Doc/code စစ်ဆေးချက်) ကို Plan ထဲ မှတ်သားထိန်းသိမ်းသည်။ Code မရေးပါ။ |
+| **OpenHands** | လက်ရှိ **Code ရေးသူ** (`Website/Website/` နှင့် Engine များ)။ |
+| **Manus AI** | နောက်ရက်များတွင် Code ရေးခြင်း၊ **Supabase ချိတ်ဆက်ခြင်း**၊ **Cloudflare R2** ဆိုင်ရာအလုပ်များ အားလုံးကို ကိုယ်တိုင် ဝင်လုပ်မည်။ |
+
+Code ရေးသူများသည် ဤ Plan နှင့် သက်ဆိုင်ရာ Engine Plan များ (အကြောင်းအရာစာရင်းကို ကြည့်ပါ) ကို အရင်ဖတ်ပြီးမှ အလုပ်စရန်။ Plan နှင့် code မကိုက်သည်ကို တွေ့လျှင် Plan ထဲတွင် မှတ်ရန် (Claude က Plan ကို ညှိပေးမည်)။
+
 ### Create Video UI copy rule
 
 Create Video နှင့် Studio Page များတွင် explanatory marketing copy မထည့်ဘဲ page title, tool name နှင့် လုပ်ဆောင်ချက်အတွက် လိုအပ်သော control label များကိုသာ ထားမည်။ `Performance canvas` ကဲ့သို့ မလိုအပ်သော presentation label များကို မသုံးရ။
