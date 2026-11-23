@@ -2,6 +2,17 @@
 
 Repository-specific knowledge for the M Sharing music platform.
 
+## Repository structure (folder rules)
+
+- Read `Website/Plan/README.md` (the Main Plan) before starting work. The Plan
+  is written and maintained by Claude; follow its decisions, and note any
+  mismatch between Plan and code in your report.
+- `Website/Plan/` holds exactly ONE file (`README.md`). `Website/Doc/` holds
+  work records (index: `Website/Doc/README.md`; retired files go to
+  `Website/Doc/Archive/`). `Website/SQL/` holds SQL files only.
+  `Website/Worker/` holds a single Worker file. Engine plans/docs stay beside
+  their engine. Do not scatter plan or doc files anywhere else.
+
 ## Layout
 
 - Top-level deploy directory: `Website/`. The actual static site lives in

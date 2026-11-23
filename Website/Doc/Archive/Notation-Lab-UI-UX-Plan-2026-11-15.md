@@ -1,3 +1,5 @@
+> **Archived 2026-11-23.** ဤဖိုင်၏ အကြောင်းအရာကို Main Plan (`Website/Plan/README.md`) ၏ [Notation Lab UI/UX Plan](../../Plan/README.md#notation-lab-uiux-plan--revised-2026-11-15) section ထဲသို့ ပေါင်းထည့်ပြီးဖြစ်သည်။ သမိုင်းအတွက် မပြောင်းဘဲ သိမ်းထားသည် — ပြင်လိုလျှင် Main Plan ကို ပြင်ပါ။
+
 # Notation Lab UI/UX Plan
 
 **Status:** Active — revised 2026-11-15

@@ -15,6 +15,8 @@
 - Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ် (pipeline၊ Studio options၊ engine တာဝန်ခွဲခြားမှု၊ ဆုံးဖြတ်ချက်များ၊ ပြီးစီးမှုအခြေအနေ)
 - Sound Engine နှင့် MuseScore SoundFont (SoundFont ရွေးချယ်ချက် ပါ)
 - Metronome Studio
+- [Repository structure — folder rules](#repository-structure--folder-rules--2026-11-23) (Plan/Doc/SQL/Worker folder စည်းမျဉ်း)
+- [Search — အလုပ်လုပ်ပုံ](#search--အလုပ်လုပ်ပုံ--2026-11-23) (Header search၊ Notes filter၊ Postgres full-text/trigram)
 - [Handoff — Manus AI](#handoff--manus-ai-supabase-နှင့်-cloudflare-r2--2026-11-23) (Supabase data model၊ R2 layout၊ အလုပ်အစီအစဉ်)
 - [Work packages — OpenHands](#work-packages--openhands-အတွက်-အစီအစဉ်အတိုင်း--2026-11-23) (Editor နှင့် Create Video အစဉ်လိုက် အလုပ်များ)
 - **အခြား Plan များ:** [Video Engine Plan](../Video/Video%20Engine%20Plan/PLAN.md) · [Notation Plan](../Notation/Notation%20Plan/PLAN.md) · [Metronome Engine Plan](../Metronome/Metronome%20Engine%20Plan/PLAN.md) · [Sound Plan](../Notation/Sound%20Plan/README.md)
@@ -260,7 +262,7 @@ Notation Engine, Sound Engine နှင့် Video Engine တို့ကို
 
 ## Notation Lab UI/UX Plan — revised 2026-11-15
 
-အရင်းအမြစ်: `Website/Plan/Notation-Lab-UI-UX-Plan.md` (ထိုဖိုင်ကို မဖျက်ဘဲ ထိန်းထားသည်။ ဤ section သည် ၎င်း၏ အကြောင်းအရာကို Main Plan ထဲသို့ ပေါင်းထည့်ထားခြင်းဖြစ်သည်။)
+အရင်းအမြစ်: `Website/Doc/Archive/Notation-Lab-UI-UX-Plan-2026-11-15.md` (မဖျက်ဘဲ Archive တွင် သိမ်းထားသည်။ ဤ section သည် ၎င်း၏ အကြောင်းအရာကို Main Plan ထဲသို့ ပေါင်းထည့်ထားခြင်းဖြစ်သည်။)
 
 **Status:** Active — revised 2026-11-15
 
@@ -728,6 +730,84 @@ Phone 375px နှင့် web/desktop 1280px viewport checks, Metronome portra
 ### Metronome Studio input controls — 2026-11-15
 
 Metronome Studio control panel ၏ အပေါ်တွင် `.musicxml`, `.xml`, `.mxl` ရွေးချယ်နိုင်သော MusicXML file field ကို ထည့်မည်။ ရှိပြီးသား design, orientation, BPM, bars နှင့် meter controls များ၏ ပုံစံ/အစီအစဉ်ကို ထိန်းထားပြီး၊ ၎င်းတို့အောက်တွင် အခြား instrument studio များနှင့်တူသော `Count Voice` toggle/type/volume နှင့် `Sound Model`/volume controls ကို ပြမည်။ File selection သည် browser ပေါ်တွင် filename ပြသသည့် local input ဖြစ်သည်; MusicXML ကို video timing သို့ parse ချိတ်ဆက်ခြင်း၊ Count Voice အသံထုတ်ခြင်း၊ Sound Model အသံနှင့် volume ကို render ထဲသုံးခြင်းသည် သီးခြားနောက်အဆင့်ဖြစ်ပြီး ဤ UI pass ထဲတွင် မပါဝင်ပါ။
+
+## Repository structure — folder rules — 2026-11-23
+
+ရည်ရွယ်ချက်: ဖိုင်များ ပြန့်ကျဲမနေဘဲ folder တစ်ခုချင်းစီတွင် ထည့်ရမည့်အရာကို တစ်မျိုးတည်း ထားရန်။ အသုံးပြုသူ၏ ညွှန်ကြားချက်အရ Claude က ဆုံးဖြတ်ပြီး ကျင့်သုံးသည်။
+
+| Folder | ထဲတွင် ရှိရမည့်အရာ | မရှိရသည့်အရာ |
+|---|---|---|
+| `Website/Plan/` | **Plan ဖိုင် တစ်ခုတည်း** — `README.md` (Main Plan) | အခြားဖိုင်အားလုံး |
+| `Website/Doc/` | လုပ်ပြီးသော အလုပ်မှတ်တမ်း Doc များ၊ index `README.md` | Plan ဖိုင်၊ code |
+| `Website/Doc/Archive/` | ပေါင်းစည်းပြီး/အသုံးမဝင်တော့သော ဖိုင်အဟောင်းများ (မဖျက်၊ သမိုင်းအတွက်သိမ်း၊ မပြင်ရ) | |
+| `Website/SQL/` | **SQL ဖိုင်များသာ** — Supabase migrations | `.md`၊ `.js` စသည် |
+| `Website/Worker/` | **Worker ဖိုင် တစ်ခုတည်း** (Cloudflare Worker) | အခြားဖိုင် |
+| `Website/Website/` | Deploy လုပ်ရသော static site၊ `wrangler.jsonc` | Plan / Doc |
+| `Website/Notation/`, `Video/`, `Drum/`, `Guitar/`, `Piano/`, `Metronome/` | Engine code နှင့် ၎င်း၏ `… Plan` / `… Doc` folder | — |
+
+**SQL စည်းမျဉ်း:** ဖိုင်အမည် `NNNN_short-name.sql` (အစဉ်နံပါတ်ဖြင့် အစဉ်လိုက် run)။ Apply လုပ်ပြီးသော migration ကို မပြင်ရ — ပြောင်းလိုလျှင် migration အသစ်ထည့်။ Schema ကို [Handoff — Manus AI](#handoff--manus-ai-supabase-နှင့်-cloudflare-r2--2026-11-23) ၏ data model အတိုင်း Manus AI က ရေးမည်။
+
+**Worker စည်းမျဉ်း:** Worker code အားလုံးကို ဖိုင်တစ်ခုတည်း (အဆိုပြုအမည် `worker.js`) တွင် ထားမည်။ အရွယ်ကြီးလာလျှင် ခွဲမည့်အစား ဤစည်းမျဉ်းကို Plan ထဲတွင် ပြန်ဆွေးနွေးရမည်။ ယခု static site ၏ `wrangler.jsonc` သည် `Website/Website/` ထဲတွင်ဆက်ရှိသည်။ Worker ရှိလာသောအခါ deploy config ကို Manus AI က ညှိမည်။
+
+**Engine Plan / Doc folder များအကြောင်း (ဆုံးဖြတ်ချက်):** Engine တစ်ခုချင်းစီ၏ Plan/Doc (`Notation Plan`, `Video Engine Plan`, `Metronome Engine Plan`, `Sound Plan` စသည်) ကို Engine နှင့်အတူ နေရာမရွှေ့ဘဲ ထားမည်။ အကြောင်းမှာ CI က Notation Engine ၏ `Notation Plan/Documentation/API.md` ကို စစ်ဆေးနေပြီး code/test များက ထိုလမ်းကြောင်းများကို ရည်ညွှန်းထားသောကြောင့် ရွှေ့လျှင် CI ပျက်နိုင်သည်။ ပြန့်ကျဲမှုကို လျှော့ရန် Main Plan ၏ အကြောင်းအရာစာရင်းမှ ထိုဖိုင်အားလုံးကို link ချိတ်ထားသည်။ Plan အသစ်ကို ဤ folder များ၏ အပြင်တွင် မဖန်တီးရ။
+
+**လုပ်ဆောင်ပြီး (2026-11-23):**
+- `Website/Plan/` ကို ဖိုင်တစ်ခုတည်း (`README.md`) ဖြစ်စေရန် `Notation-Lab-UI-UX-Plan.md` ကို `Website/Doc/Archive/` သို့ ရွှေ့ (မဖျက်)၊ ဆက်စပ် link ၃ ခု ပြင်။
+- `Website/SQL/` နှင့် `Website/Worker/` folder ဖန်တီး (အလွတ်၊ `.gitkeep` သာ — Manus AI က ဖိုင်ထည့်မည်)။
+- `Website/README.md` ၏ folder စာရင်းနှင့် `AGENTS.md` တွင် ဤစည်းမျဉ်း ထည့်။
+
+**အတည်ပြုရန်:** Notation Engine ၏ source အတွက် `AGENTS.md` တွင် "GPL ဖြစ်သော MuseScore source/table ကို ပြန်မထည့်ရ၊ MuseScore ကို pinned reference အဖြစ်သာ သုံးရ" ဟု စည်းမျဉ်းရှိသည်။ အသုံးပြုသူ အစောပိုင်းပြောခဲ့သော "MuseScore code ကို ထည့်သုံးပြီး ပြင်သုံး" နှင့် ကွာသဖြင့် **ဘယ်စည်းမျဉ်းကို လိုက်မလဲ အသုံးပြုသူ ပြန်ဆုံးဖြတ်ရန်**။ (GPL code ကို ထည့်သုံးလျှင် ရောင်းချသော platform အတွက် license တာဝန်များ ပါလာနိုင်သဖြင့် legal review လိုနိုင်သည်။)
+
+## Search — အလုပ်လုပ်ပုံ — 2026-11-23
+
+ဤ section သည် site ပေါ်ရှိ search များ ဘယ်လိုအလုပ်လုပ်မည်ကို Manus AI / OpenHands အတွက် ဖော်ပြသည်။ **အကုန်လုံးကို Claude က ဆုံးဖြတ်ထားခြင်း (အဆိုပြု)** ဖြစ်သည်။
+
+### Search နေရာ ၃ ခု
+
+| Search | ရှာမည့်အရာ | လုပ်ဆောင်ပုံ |
+|---|---|---|
+| **Header Search** (site တစ်ခုလုံး) | ရောင်းရန် list လုပ်ထားသော Notes (`published`)၊ Creators၊ (နောက်မှ) Courses | Search icon နှိပ်လျှင် search box ပွင့်၊ ရိုက်လျှင် ရလဒ်ကို အုပ်စုလိုက်ပြ၊ Enter ဖြင့် ရလဒ် page (`?q=…`) |
+| **Notes Store filter** | Notes စာရင်း | ရှာစာသားနှင့်အတူ filter — တူရိယာ၊ ဈေးနှုန်းအပိုင်း၊ creator၊ အစဉ် (အသစ်/ဈေး/လူကြိုက်များ) |
+| **Editor palette search** (Notation Lab) | Sidebar ၏ palette အုပ်စု/item များ | ယခု ရှိပြီး — client-side သာ၊ ရိုက်လျှင် အုပ်စုနှင့် item နာမည်ကို စစ်ထုတ် (server မလို) |
+
+ထို့အပြင် အသုံးပြုသူ၏ ကိုယ်ပိုင် score library (`scores`) ကို Notation Lab ၏ Open File စာရင်းတွင် title ဖြင့် client-side စစ်ထုတ်မည် (ကိုယ့်ဒေတာ၊ ကိုယ်သာမြင်)။
+
+### Backend — Postgres (Supabase) ဖြင့် စတင်
+
+နောက်ထပ် search service (Meilisearch/Typesense စသည်) မထည့်ဘဲ Supabase Postgres ၏ ကိုယ်ပိုင် စွမ်းရည်ဖြင့် စမည်။ မလုံလောက်သည့်အခါမှ ပြောင်းစဉ်းစားမည်။
+
+- **Latin (English) စာသား:** Full-text search — `tsvector` (`simple` config၊ stemming မသုံး — title ကို မြန်မာ/English ရောရေးတတ်သောကြောင့်) + GIN index။
+- **မြန်မာစာ:** မြန်မာစာတွင် စကားလုံးကြား space မရှိသဖြင့် full-text tokenization အလုပ်မလုပ်ပါ။ ထို့ကြောင့် **`pg_trgm` (trigram) GIN index** ဖြင့် substring/ဆင်တူ ပေါင်းရှာမည် (`ILIKE`/`similarity`)။
+- **Ranking:** title အတိအကျတူ > title အစပိုင်းတူ > full-text ရလဒ် > trigram ဆင်တူမှု၊ တူလျှင် အသစ်ကို ကြိုတင်။
+- **Typo ခံနိုင်ရည်:** trigram similarity threshold (အစပိုင်း ၀.၃)။
+- **Autocomplete:** ရိုက်နေစဉ် title အစပိုင်းတူသော ၅ ခုအထိ အကြံပြု (debounce ~၂၅၀ ms၊ အနည်းဆုံး Latin ၂ လုံး / မြန်မာ ၁ လုံး)။
+- **Pagination:** တစ်ခါလျှင် ၂၀ ခု၊ offset သို့မဟုတ် cursor။
+
+### ဖွင့်ပေးမည့် ပုံစံ (RPC function)
+
+Browser က table ကို တိုက်ရိုက်မရှာဘဲ Postgres function (`search_notes(q, filters, limit, offset)`) ကို ခေါ်မည် (`security invoker` — RLS အတိုင်း အလုပ်လုပ်)။ ပြန်ပေးသော field များ — `id`, `title`, creator နာမည်, ဈေးနှုန်း, cover URL သာ (private field မပါ)။
+
+### လုံခြုံရေး၊ စနစ်
+
+- **`status = 'published'` သာ** ရှာတွေ့ရမည်။ `draft`/`unlisted`/`removed` ကို မည်သူ့ကိုမှ မပြရ (RLS နှင့် function နှစ်ခုလုံးတွင် စစ်)။
+- Search စာသားကို SQL ထဲ တိုက်ရိုက်မစပ်ရ (parameterized)။
+- မြန်မာစာကို **Unicode (NFC)** အဖြစ် normalize လုပ်ပြီးမှ index/ရှာမည်။ **Zawgyi** (အဟောင်းသုံး encoding) ဖြင့် ရိုက်ထားသော စာသားကို ဘယ်လိုကိုင်မလဲ — အောက်ပါ မေးခွန်းတွင် ဖွင့်ထားသည်။
+- ပျော်ပျော်ရှာနေသော query များကို Worker တွင် အချိန်တိုတို (~၆၀ စက္ကန့်) cache လုပ်နိုင် (optional)။
+- Search စာသားကို မူလအားဖြင့် မသိမ်း (privacy)။ Analytics လိုမှ ထပ်ဆုံးဖြတ်။
+
+### ပြီးစီးမှု စံနှုန်း (test)
+
+1. မြန်မာစာ၏ အစိတ်အပိုင်း (ဥပမာ စကားလုံးအလယ်) ဖြင့်ရှာ၍ တွေ့ရမည်။
+2. `draft`/`removed` note ကို search ရလဒ်တွင် **မည်သူမှ** မတွေ့ရ။
+3. Index များ (`GIN`) ရှိကြောင်း migration test။
+4. Notes ၁၀,၀၀၀ ခု ဖြင့် ပျမ်းမျှ ~၂၀၀ ms အောက် (ရည်မှန်း)။
+5. Header search box ကို keyboard ဖြင့်သုံးနိုင်ခြင်း၊ phone တွင်လည်း ပြောင်းလဲမှုမရှိ အလုပ်လုပ်ခြင်း။
+
+### မဖြေရှင်းရသေးသော အချက်များ (Search)
+
+1. **Zawgyi** ကို detect လုပ်ပြောင်းမလား၊ Unicode သာ လက်ခံမလား။
+2. "လူကြိုက်များ" အစဉ်၏ တိုင်းတာမှု (ဝယ်သူအရေအတွက်၊ favorite၊ ကြည့်ရှုမှု)။
+3. Postgres search မလုံလောက်လာလျှင် ပြောင်းမည့် search service ရွေးချယ်ခြင်း။
 
 ## Handoff — Manus AI (Supabase နှင့် Cloudflare R2) — 2026-11-23
 

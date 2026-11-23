@@ -11,7 +11,8 @@ M Sharing Website ၏ လက်ရှိ implementation နှင့် မပ�
 - [Notation Lab Page](Notation-Lab-Page.md) — Open File / Create / Scan entry page and Editor handoff
 - [Notation Lab Editor — Fixed Toolbar and Score Workspace](Notation-Lab-Editor-Toolbar-2026-11-18.md) — Editor ရဲ့ sticky secondary toolbar၊ tool groups၊ entry handoff နှင့် responsive behaviour
 - [Notation Lab Editor — Sidebar Dock, Properties and Instruments](Notation-Lab-Editor-Sidebar-Dock-2026-11-18.md) — Sidebar dock (panel ၃ ခု)၊ Properties readout၊ Instruments list နှင့် page-mode sheet layout
-- [Notation Lab UI/UX Plan](../Plan/Notation-Lab-UI-UX-Plan.md) — Active entry-screen and Editor handoff plan
+- [Notation Lab UI/UX Plan](../Plan/README.md#notation-lab-uiux-plan--revised-2026-11-15) — Active entry-screen and Editor handoff plan (Main Plan ထဲတွင်ရှိ)
+- [Archive/Notation-Lab-UI-UX-Plan-2026-11-15.md](Archive/Notation-Lab-UI-UX-Plan-2026-11-15.md) — မူလ UI/UX Plan ဖိုင် (Archive၊ မပြင်ရ)
 - [Notation Lab Editor Architecture](Notation-Lab-Editor-Architecture-2026-11-15.md) — Current code audit, original workspace design, feature matrix, and M1–M6 implementation roadmap
 - [Notation Lab Composer Work Log](Notation-Lab-Composer-Work-Log-2026-11-15.md) — Historical record; composer-first UI was retired
 - [Notation Engine Plan Update and MuseScore Review](Notation-Engine-Plan-Work-Log-2026-11-14.md) — Plan ပြောင်းလဲမှုများ၊ တူရိယာအားလုံးနှင့် Orchestra/ensemble score support၊ MuseScore source/license စိစစ်ချက်နှင့် ကျန်ရှိသော P0–P5 tasks
