@@ -493,15 +493,15 @@ Studio ၏ options box ──► MusicXML ဖိုင် + settings
 
 **Output:** Video Engine သည် H.264 video နှင့် AAC-LC အသံ (48 kHz) ပါသော MP4 တစ်ဖိုင်တည်း ထုတ်ပေးသည်။ လက်ရှိ 30 FPS။ Browser က H.264/AAC ကို encode မလုပ်နိုင်လျှင် ရှင်းရှင်းလင်းလင်း ငြင်းပယ်သည်။ Segment များ (`segments`) ကို အစဉ်လိုက်ဆက်ပြီး အသံကို segment အားလုံးမှ ပေါင်းကာ encode လုပ်သည်။
 
-**အရွယ်အစား (ratio):** Studio တစ်ခုချင်းစီ၏ လက်ရှိ output အရွယ်သည် မတူပါ။
+**အရွယ်အစား (ratio) — Video အားလုံးအတွက် စံတူ (ဆုံးဖြတ်ချက်):** Metronome အပါအဝင် video အားလုံး (တူရိယာအားလုံး) သည် အောက်ပါ အရွယ်သုံးမျိုးသာ ထွက်ရမည်။
 
-| Ratio | Drum Studio | Metronome Studio |
-|---|---|---|
-| 16:9 Landscape | 1920 × 1080 | 1280 × 720 |
-| 1:1 Square | 1080 × 1080 | 720 × 720 |
-| 9:16 Portrait | 1080 × 1920 | 720 × 1280 |
+| Ratio | Pixel |
+|---|---|
+| 16:9 Landscape | 1920 × 1080 |
+| 1:1 Square | 1080 × 1080 |
+| 9:16 Portrait | 1080 × 1920 |
 
-Final video (၃ ပိုင်း layout) အတွက် ဤအရွယ်များကို တစ်ခုတည်း တူညီအောင် သတ်မှတ်ရန် ကျန်သည်။
+**လက်ရှိ:** Drum Studio သည် ဤအရွယ်များကို သုံးပြီးဖြစ်သည်။ Metronome Studio သည် 1280×720 / 720×720 / 720×1280 ဖြစ်နေသဖြင့် **ပြောင်းရမည်**။ အရွယ်ကို Video Engine ၏ shared setting တစ်ခုတည်းမှ သတ်မှတ်ရမည် (Studio တစ်ခုချင်းစီက ကိုယ်ပိုင်မသတ်ရ)။ 1080p အတွက် memory budget ကို စစ်ရမည်။
 
 ### ၂။ Studio ၏ options box (Video ထဲထည့်ရန် ရွေးချယ်စရာများ)
 
