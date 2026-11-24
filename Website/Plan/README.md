@@ -615,11 +615,21 @@ Drum မဟုတ်သော instrument များအတွက် Studio သ�
 
 R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပြီး cache လုပ်ရမည်၊ frame တိုင်း/ပြန်ပြန် မခေါ်ရ။ ဖိုင်အမည်၊ path၊ မရလျှင် လုပ်ပုံတို့ကို Video Engine ထဲတွင်သာ ထားမည်။
 
-### ၇။ ကန့်သတ်ချက်များ (လက်ရှိ)
+### ၇။ Video အရှည်နှင့် ကန့်သတ်ချက်များ
 
-- လက်ရှိ code တွင် Drum Studio နှင့် Metronome Studio နှစ်ခုလုံး၏ video အရှည်ကို အများဆုံး ၁၂ စက္ကန့်ဟု ကန့်သတ်ထားသည် (Drum: `MAX_SECONDS = 12`၊ Metronome: 12 စက္ကန့်ကျော်သော setting ကို ပိတ်ထားသည်)။
-- **ဆုံးဖြတ်ချက်:** Video အရှည် = **Count Voice + MusicXML ဖိုင်၏ အရှည် + Thank You video** ၃ ခု၏ ပေါင်းလဒ်။ ကိုယ်ပိုင် အရှည်ကန့်သတ်ချက် မထားဘဲ ထိုပေါင်းလဒ်အတိုင်း ဖြစ်ရမည်။ ထို့ကြောင့် `MAX_SECONDS` ကို ဖယ်ရှားပြီး Video Engine ၏ memory guard ကိုသာ safety အဖြစ် ထားမည်။
-- Video Engine တွင် memory budget နှင့် H.264 level စစ်ဆေးချက် ပါပြီးသား (picture size နှင့် fps အလိုက်)။ Video ကို ရှည်လျှင်/ကြီးလျှင် ပိုမိုလိုအပ်မည်။
+**လက်ရှိ code (Drum Studio):** `duration = max(1, min(MAX_SECONDS, max(drum hit အချိန်, 3.5) + 0.5))` — ဆိုလိုသည်မှာ (၁) **drum hit များ၏ အချိန်**ကိုသာ အခြေခံ၍ Notation ၏ အရှည် (`notation.seconds`) ကို မသုံးပါ၊ (၂) **အများဆုံး ၁၂ စက္ကန့်** (`MAX_SECONDS = 12`) ဖြင့် ဖြတ်သည်၊ (၃) Count-in မပါ၊ (၄) Thank You မပါ။ Metronome Studio တွင်လည်း ၁၂ စက္ကန့်ကျော် setting ကို ပိတ်ထားသည်။
+
+**ဆုံးဖြတ်ချက် (လိုအပ်ချက်):** Video အရှည် = **Count Voice (count-in) + MusicXML ဖိုင်၏ အရှည် + Thank You video**။
+
+| ပါဝင်မှု | အရှည် ဘယ်ကယူမလဲ |
+|---|---|
+| Count-in | အစ bar တစ်ခု (`beats per bar` × beat အရှည်၊ MusicXML ၏ tempo/meter မှ) — default၊ ချိန်ညှိနိုင် |
+| MusicXML | Notation Engine ၏ `playback.performance.totalSeconds` (ရှိပြီး — `notation.seconds`) |
+| Thank You | R2 ဖိုင်၏ အရှည် (Video Engine က ဖတ်) |
+
+- MusicXML မပါလျှင် (default drum pattern) ယခုအတိုင်း အနည်းဆုံး ၃.၅ စက္ကန့် စသည့် ရိုးရိုးစည်းမျဉ်းဖြင့်ဆက်သည်။
+- `MAX_SECONDS = 12` ကို ဖယ်ရမည်။ Safety အတွက် Video Engine ၏ memory guard ကိုသာ ထားမည် (ရှည်လွန်း/ကြီးလွန်းလျှင် ရှင်းရှင်းလင်းလင်း ငြင်းပယ်)။
+- Notation ကို Duration တွက်ပြီးမှ ပြင်ဆင်နေသော လက်ရှိ အစဉ် (duration → `prepareNotationFor`) ကို ပြောင်းရမည် — Notation အရင် ပြင်ပြီး `notation.seconds` ကို သိမှ duration တွက်ရမည်။
 
 ### ၈။ အကောင်အထည်ဖော်ရန် အစီအစဉ် (အဆိုပြုချက် — အတည်ပြုရန်)
 
@@ -699,6 +709,30 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 
    **Violin (ဘေးတစ်ဖက်):** 16:9 နှင့် 1:1 တွင် Notation ကို ဘယ်ဘက် ~၆၀%၊ Violin ကို ညာဘက် ~၄၀% ထားပြီး အောက်ဆုံးတွင် Title / Info အကျယ်အပြည့်။ 9:16 (Portrait) တွင် ဘေးချင်းယှဉ်လျှင် ကျဉ်းလွန်းသဖြင့် Notation အပေါ်၊ Violin အောက် ထပ်၍ အောက်ဆုံးတွင် Title / Info။
 7. **Drum ပုံများ** — ဖိုင်စာရင်း/အမည်/path ကို Plan ထဲ မသတ်မှတ်၊ R2 ထဲက manifest မှ Drum Animation Engine က ဖတ်မည်။ **Thank You ဖိုင်အမည်/path** သည် Video Engine ထဲတွင်သာ။
+
+### ၁၂။ Preview Play (video ကို play ကြည့်နိုင်ရန်)
+
+အသုံးပြုသူ လိုအပ်ချက် — **Video ကို Preview Play လို့ရရမည်**။ ပုံစံ နှစ်မျိုး။
+
+**(A) Live Preview** — Export မလုပ်ခင်/မလုပ်ဘဲ Studio ၏ preview panel ထဲတွင် video ကို real time ဖြင့် ကြည့်နိုင်ရမည်။
+- **တစ်ခုတည်းသော ဆွဲနည်း:** Preview သည် Export နှင့် **တူညီသော frame ဆွဲလုပ်ငန်း** (`drawPerformance(ctx, atSeconds)` / `composeFrame`) ကိုသာ သုံးရမည်။ ထို့ကြောင့် "မြင်ရသည်က Export ထွက်လာမည့်အတိုင်း" (WYSIWYG) ဖြစ်ရမည်။ Preview အတွက် ဆွဲနည်း ထပ်မရေးရ။
+- နာရီ (`requestAnimationFrame` + `performance.now`) ဖြင့် `atSeconds` ကို မောင်းပြီး canvas ပေါ်ဆွဲမည်။ Encoder/muxer ကို မဖန်တီးရ။
+- **Control:** Play / Pause၊ timeline seek၊ အချိန်ပြ `mm:ss / mm:ss`၊ Full screen — ရှိပြီးသား button/timeline (`data-video-play`, timeline, `data-video-fullscreen`) ကို ပြန်သုံး။ ယခုတွင် ၎င်းတို့သည် **Export ပြီးမှသာ** ပွင့်သည် (ပိတ်ထားသည်) — Live Preview အတွက် MusicXML/settings မှန်သည်နှင့် ပွင့်ရမည်။
+- **အလျင်အမြန်:** Preview ကို အရွယ်ချုံ့၍ (ဥပမာ အရှည်ဘက် ≤ ၉၆၀ px) ဆွဲနိုင်သည် — layout အချိုးမပြောင်းရ။ Frame rate မလုံလောက်လျှင် (phone စသည်) အလိုအလျောက် ပိုချုံ့။
+- Notation SVG ကို တစ်ကြိမ်သာ decode ပြီး cache လုပ်ပြီး ပြန်သုံး (frame တိုင်း မ decode ရ)။
+- Settings (Title၊ Ratio၊ Notation View၊ Count display စသည်) ပြောင်းလျှင် Preview ကို အလိုအလျောက် ပြန်ဆွဲ (debounce ~၃၀၀ ms)။ Export စလျှင် Live Preview ကို ရပ်၍ resource လွှတ်။
+- **အသံ:** Sound Engine အသံ ပြီးသည့်အခါ Preview သည် အသံကို **တူညီသော နာရီ**ဖြင့်ပါ ဖွင့်ရမည်။ မပြီးမချင်း "Visual only" ဟု ပြ။
+- **အရှည်:** Count-in + MusicXML + Thank You အားလုံးပါသော စုစုပေါင်းကို ပြ (Thank You ကိုလည်း Preview ထဲ ပါထည့် — ဆုံးဖြတ်ချက်)။
+
+**(B) Rendered playback** — Export ပြီးသော MP4 ကို Studio ထဲ `<video>` (`data-video-output`) ဖြင့် ပြန်ဖွင့်ကြည့်ခြင်း။ ရှိပြီးသား — Export ပြီးလျှင် Play / Pause / seek / time label / Full screen အလုပ်လုပ်ပြီး Download လင့်ခ်ပေါ်သည်။ Export ပြီးလျှင် control များကို **ထုတ်ထားသောဖိုင်** သို့ ပြောင်းပေးရမည်၊ ဘယ်အရာ ဖွင့်နေသလဲ ရှင်းလင်းစွာ ပြရမည် (`Preview (live)` / `Rendered file`)။
+
+**ပြီးစီးမှု စံနှုန်း (test):**
+1. Live Preview ကို ၁၀ စက္ကန့် ဖွင့်၍ desktop Chromium တွင် ပျမ်းမျှ ≥ ၂၄ fps (preview အရွယ်)။
+2. Seek ဖြင့် အချိန် `t` သို့ သွားလျှင် ပေါ်သော frame သည် Export ၏ `t` frame နှင့် တူရမည် (pixel နှိုင်းယှဉ်၊ သဘောတူ ခြားနားမှု ကန့်သတ်)။
+3. Title စာသား ပြောင်းလျှင် ၃၀၀ ms အတွင်း Preview ပြောင်း။
+4. Play/Pause ကို keyboard ဖြင့်သုံးနိုင်၊ Full screen အလုပ်လုပ်။
+5. ၅ ကြိမ် play ပြီးနောက် memory မတိုး။
+6. Preview ကြောင့် Export မပျက်။
 
 ### မဖြေရှင်းရသေးသော အချက်များ (Video ထုတ်လုပ်ပုံ)
 
