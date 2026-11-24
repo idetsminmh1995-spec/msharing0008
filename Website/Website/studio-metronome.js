@@ -113,6 +113,10 @@
     if (!Number.isInteger(bars) || bars < 1 || bars > 16) throw new RangeError('Bars must be an integer from 1 to 16.');
     if (!Number.isInteger(numerator) || numerator < 1 || numerator > 12) throw new RangeError('Beats per bar must be an integer from 1 to 12.');
     if (![2, 4, 8, 16].includes(denominator)) throw new RangeError('Choose a supported beat unit.');
+    // The engine falls back to its first design for an unknown id, which
+    // would render a video the panel never offered. A design the list does
+    // not hold is refused here instead.
+    if (!metronome.listDesigns().some((entry) => entry.id === design)) throw new RangeError('Choose one of the metronome designs.');
     const size = sizeFor(aspect);
     const beatSeconds = (60 * 4) / (bpm * denominator);
     const totalBeats = bars * numerator;

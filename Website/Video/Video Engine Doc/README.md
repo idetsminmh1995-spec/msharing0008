@@ -390,3 +390,20 @@ level, so the check steps aside for it rather than reading ffprobe's `-99`.
 
 Still open: a 1080p encode has not been tried on a real phone (the memory
 guard is exercised in desktop Chromium only).
+
+## Metronome Studio — input, cancel and offline-audio paths (2026-11-18)
+
+The Metronome Engine Plan's first remaining item was the set of paths where
+a page can be wrong without any picture looking wrong. `test-metronome-studio-browser.mjs`
+now checks three of them:
+
+| Path | What the page must do | What the test reads |
+|---|---|---|
+| Empty tempo, 99 bars, unknown design | Refuse, and leave Render closed | Status names the reason; the button stays disabled |
+| Cancel mid-render (384 sec setting) | Report a cancel, unlock, keep no file | Status says cancelled, button returns to its render label, no download, no `<video>` |
+| No `OfflineAudioContext` | Refuse with the reason, export nothing | Status says the click track cannot be made; no video; preview works again afterwards |
+
+One code change came out of this: `studio-metronome.js`'s `readSettings()`
+now rejects a design id the list does not hold. The engine falls back to its
+first design for an unknown id, so before this the page could quietly export
+a video for a design the panel never offered.

@@ -264,6 +264,18 @@ Main Plan B1 က Metronome Studio အပါအဝင် video အားလုံ
 
 **ကျန်ရှိ:** 1080p encode ကို ဖုန်းအစစ်တွင် မစမ်းရသေးပါ — memory guard ကို Chromium desktop တွင်သာ စမ်းထားသည်။
 
+## Metronome Studio ၏ input/edge-case စမ်းသပ်မှု (2026-11-18)
+
+Metronome Engine Plan ၏ "နောက်ထပ်လုပ်ရန်" ပထမအချက်မှာ cancel၊ `OfflineAudioContext` မရခြင်း နှင့် မမှန်သော input တို့ကို စစ်ရန် ကျန်ခဲ့သည်။ ယခု `tools/test-metronome-studio-browser.mjs` တွင် ထည့်ပြီး:
+
+1. **မမှန်သော input** — အလွတ် tempo၊ bars 99၊ နှင့် မသိသော design သုံးမျိုးလုံးတွင် render ခလုတ်ကို ပိတ်ထားပြီး status တွင် အကြောင်းပြချက် ပြသည်။
+2. **Cancel** — 384 sec setting ကို render စပြီး အလယ်တွင် cancel လုပ်လျှင် "cancelled" ဟု ပြ၊ ခလုတ်သည် `Render metronome video` သို့ ပြန်၊ control များ ပြန်ပွင့်၊ download link နှင့် `<video>` မကျန်။
+3. **`OfflineAudioContext` မရှိခြင်း** — constructor ကို ဖျောက်ထားလျှင် "cannot create the metronome click track" ဟု အကြောင်းပြချက်ဖြင့် ငြင်းပြီး ဗီဒီယို မထုတ်။ ပြန်ထည့်ပြီးနောက် preview နှင့် render ခလုတ် ပြန်အလုပ်လုပ်သည်။
+
+**Code ပြောင်းလဲမှု တစ်ခုသာ:** `studio-metronome.js` ၏ `readSettings()` သည် မသိသော design ကို ယခု ငြင်းသည်။ Engine က မသိသော design ကို ပထမ design (`pendulum`) သို့ fallback လုပ်သဖြင့် ယခင် page သည် panel က မကမ်းလှမ်းခဲ့သော ဗီဒီယိုကို တိတ်တဆိတ် ထုတ်နိုင်ခဲ့သည်။
+
+**ကျန်ရှိ:** 1080p encode ကို ဖုန်းအစစ်တွင် မစမ်းရသေးပါ — memory guard ကို Chromium desktop တွင်သာ စမ်းထားသည်။
+
 ## Drum kit ပုံမရှိသော note ကို အမည်ဖြင့် ပြခြင်း (2026-11-18)
 
 §3 Adapter Contract ၏ "လိုအပ်သော asset မရလျှင် မည်သည့်အရာ လျော့နည်းသွားသည်ကို ဖော်ပြရမည်" စည်းမျဉ်းအတွက် Drum kit တွင် ကွာဟမှု တစ်ခု ရှိခဲ့သည်။ `DrumKit.loadHitImages()` သည် ပုံမရှိသော stroke ကို ချန်ထားခဲ့သည် (မှန်သည့် ဆုံးဖြတ်ချက် — မှားသော drum ကို ဆွဲခြင်းထက် မဆွဲခြင်းက ကောင်းသည်)၊ သို့သော် **တိတ်တဆိတ်** ချန်ထားသဖြင့် video ထဲတွင် အပေါက် ကျန်နေသည်ကို မည်သူမှ မသိရပါ။

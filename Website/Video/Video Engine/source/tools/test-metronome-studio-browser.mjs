@@ -421,10 +421,98 @@ print(moved, worst, width * height)
     .filter(([design, hash]) => Object.entries(snapshots).some(([other, value]) => other !== design && value === hash));
   assert.deepEqual(duplicateDesigns, [], `These designs drew an identical frame: ${duplicateDesigns.map(([design]) => design).join(', ')}`);
 
+  // The Metronome Engine Plan's remaining item: the input and failure paths.
+  // Three ways a page can be wrong without any picture looking wrong -- it
+  // renders from settings it never validated, it keeps a file after the user
+  // cancelled, or it reports success when the browser has no offline audio.
+  await evaluate("(() => { const set = (selector, value) => { const el = document.querySelector(selector); el.value = value; el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); }; set('[data-metronome-bpm]','120'); set('[data-metronome-bars]','4'); set('[data-metronome-numerator]','4'); set('[data-metronome-denominator]','4'); set('[data-metronome-aspect]','9x16'); })()");
+  await sleep(400);
+  const invalidInput = JSON.parse(await evaluate(`(() => {
+    const set = (selector, value) => { const el = document.querySelector(selector); el.value = value; el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); };
+    const read = () => ({ disabled: document.querySelector('[data-studio-generate]').disabled, status: document.querySelector('[data-studio-status]').textContent });
+    set('[data-metronome-bpm]', '');
+    const emptyTempo = read();
+    set('[data-metronome-bpm]', '120');
+    set('[data-metronome-bars]', '99');
+    const tooManyBars = read();
+    set('[data-metronome-bars]', '4');
+    set('[data-metronome-design]', 'no-such-design');
+    const unknownDesign = read();
+    set('[data-metronome-design]', 'sweep-dial');
+    return JSON.stringify({ emptyTempo, tooManyBars, unknownDesign });
+  })()`));
+  assert.equal(invalidInput.emptyTempo.disabled, true, `An empty tempo still offered a render: ${invalidInput.emptyTempo.status}`);
+  assert.match(invalidInput.emptyTempo.status, /Tempo must be an integer/);
+  assert.equal(invalidInput.tooManyBars.disabled, true, `99 bars still offered a render: ${invalidInput.tooManyBars.status}`);
+  assert.match(invalidInput.tooManyBars.status, /Bars must be an integer from 1 to 16/);
+  assert.equal(invalidInput.unknownDesign.disabled, true, `An unknown design still offered a render: ${invalidInput.unknownDesign.status}`);
+  assert.match(invalidInput.unknownDesign.status, /Choose one of the metronome designs/);
+
+  // A long setting, so the cancel lands mid-render rather than after it.
+  await evaluate("(() => { const set = (selector, value) => { const el = document.querySelector(selector); el.value = value; el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); }; set('[data-metronome-bpm]','30'); set('[data-metronome-bars]','16'); })()");
+  await sleep(400);
+  await evaluate("document.querySelector('[data-studio-generate]').click()");
+  await sleep(600);
+  const midRender = JSON.parse(await evaluate("JSON.stringify({label:document.querySelector('[data-studio-generate]').textContent,status:document.querySelector('[data-studio-status]').textContent})"));
+  assert.match(midRender.label, /Cancel render/, `The render button did not turn into a cancel: ${JSON.stringify(midRender)}`);
+  await evaluate("document.querySelector('[data-studio-generate]').click()");
+  const cancelStartedAt = Date.now();
+  let cancelled = null;
+  while (Date.now() - cancelStartedAt < 20000) {
+    cancelled = JSON.parse(await evaluate("JSON.stringify({status:document.querySelector('[data-studio-status]').textContent,label:document.querySelector('[data-studio-generate]').textContent,downloadHidden:document.querySelector('[data-video-download]').hidden,videoHidden:document.querySelector('[data-video-output]').hidden,disabled:document.querySelector('[data-studio-generate]').disabled})"));
+    if (/cancelled/i.test(cancelled.status) && cancelled.label === 'Render metronome video') break;
+    await sleep(150);
+  }
+  assert.match(cancelled?.status ?? '', /cancelled/i, `Cancelling did not report a cancelled render: ${cancelled?.status}`);
+  assert.equal(cancelled.label, 'Render metronome video', 'The button did not return to its render label after a cancel');
+  assert.equal(cancelled.disabled, false, 'The page stayed locked after a cancel');
+  assert.equal(cancelled.downloadHidden, true, 'A cancelled render left a download link behind');
+  assert.equal(cancelled.videoHidden, true, 'A cancelled render left a video on the page');
+
+  // A browser with no OfflineAudioContext must say so, not export a silent
+  // video or claim the click track was made.
+  const noOfflineAudio = JSON.parse(await evaluate(`(async () => {
+    const saved = [window.OfflineAudioContext, window.webkitOfflineAudioContext];
+    window.OfflineAudioContext = undefined;
+    window.webkitOfflineAudioContext = undefined;
+    const set = (selector, value) => { const el = document.querySelector(selector); el.value = value; el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); };
+    set('[data-metronome-bpm]', '120');
+    set('[data-metronome-bars]', '2');
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    document.querySelector('[data-studio-generate]').click();
+    const startedAt = Date.now();
+    let state = { status: '', disabled: true };
+    while (Date.now() - startedAt < 10000) {
+      state = { status: document.querySelector('[data-studio-status]').textContent, disabled: document.querySelector('[data-studio-generate]').disabled, videoHidden: document.querySelector('[data-video-output]').hidden };
+      if (/failed/i.test(state.status)) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    [window.OfflineAudioContext, window.webkitOfflineAudioContext] = saved;
+    return JSON.stringify(state);
+  })()`));
+  assert.match(noOfflineAudio.status, /cannot create the metronome click track/,
+    `A browser without OfflineAudioContext did not report the reason: ${noOfflineAudio.status}`);
+  assert.equal(noOfflineAudio.disabled, false, 'The page stayed locked after the offline-audio failure');
+  assert.equal(noOfflineAudio.videoHidden, true, 'A failed render left a video on the page');
+
+  // Restoring the constructor has to leave the page working, not merely
+  // unblocked: the next settings change must paint a preview again.
+  await evaluate("(() => { const set = (selector, value) => { const el = document.querySelector(selector); el.value = value; el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); }; set('[data-metronome-bars]','4'); })()");
+  const recoveredAt = Date.now();
+  let recovered = null;
+  while (Date.now() - recoveredAt < 10000) {
+    recovered = JSON.parse(await evaluate("JSON.stringify({visible:!document.querySelector('[data-metronome-preview]').hidden,naturalWidth:document.querySelector('[data-metronome-preview]').naturalWidth,disabled:document.querySelector('[data-studio-generate]').disabled})"));
+    if (recovered.visible && recovered.naturalWidth > 0) break;
+    await sleep(100);
+  }
+  assert.ok(recovered?.visible && recovered.naturalWidth > 0, 'The preview did not recover after the offline-audio failure');
+  assert.equal(recovered.disabled, false, 'The render button did not recover after the offline-audio failure');
+
   console.log(JSON.stringify({
     status: result.status, bytes: result.bytes, download: state.download, ffprobe: probe,
     determinism: { movedPixels, totalPixels, worstDelta },
     designs: { count: designs.length, ids: designs },
+    invalidInput, cancel: cancelled.status, noOfflineAudio: noOfflineAudio.status,
   }, null, 2));
 } finally {
   cdp?.close();
