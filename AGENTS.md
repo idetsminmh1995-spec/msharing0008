@@ -220,6 +220,18 @@ Run every command from `Website/Notation/Notation Engine/`.
   five-hour refresh had still not produced a new Plan revision (main Plan
   mtime unchanged, no diff against `origin/main`). Everything written is
   already on the remote (`6f79022`), so this pass starts from a clean tree.
+- **Plan refresh cadence and what "open" means.** The Main Plan and the
+  Video Engine Plan are revised about every five hours by Claude. A pass
+  that finds no diff against `origin/main` is normal, not a failure; the
+  open items are then the ones the Plan's own tables list. Check mtime and
+  `git diff origin/main -- Website/Plan/README.md` before claiming a new
+  revision arrived.
+- **A test that measures one ratio proves one ratio.** The Metronome suite
+  probed portrait only while the Plan asked every video to be 1080p; the
+  page would have passed even if it exported 720p in landscape. When the
+  Plan states a rule over ratios, sizes or parts, the test has to cover
+  each case, and the Doc's numbers must be read off the assertions rather
+  than copied forward.
 - **Permission is standing — reaffirmed 2026-11-18, sixth time this
   session.** The owner asked again for the same shape: check what the Plan
   leaves open, write the full code-writing permission down first, push what
