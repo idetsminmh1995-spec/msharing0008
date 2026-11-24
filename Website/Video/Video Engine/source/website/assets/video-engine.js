@@ -2156,13 +2156,9 @@
     ctx.fillText(fitText(ctx, settings.titleTwo, room), textX + Math.round(2 * scale), top + Math.round(52 * scale));
 
     if (settings.infoBoxes) {
+      // The COUNT box is the count display. A row underneath it would
+      // print the same count a second time, which is what the owner saw.
       drawInfoBoxes(ctx, { at, meta, settings, palette, scale, width, top: top + Math.round(6 * scale) });
-      if (settings.countEnabled) {
-        drawCountRow(ctx, {
-          at, meta, settings, palette, scale, pad: leftEdge,
-          y: top + Math.round(100 * scale), rightEdge,
-        });
-      }
       return;
     }
 
@@ -2465,6 +2461,56 @@
   }
 
   // ---------------------------------------------------------------
+  // The spoken count that counts the score in.
+  //
+  // The Plan hands the file names and the R2 path to the engine, the same
+  // way it hands over the Thank You clip: a page asks for the recordings
+  // it needs and never learns their address. R2 holds one recording per
+  // beat number, `Voices/{n}.wav`; a beat with no recording leaves the
+  // click alone rather than failing the export.
+  // ---------------------------------------------------------------
+  const COUNT_VOICE_BASE = 'https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev/Voices';
+  const countVoiceCache = new Map();
+
+  /** The R2 address of the recording for a beat number, or null. */
+  function countVoiceUrl(beat) {
+    const number = Math.round(beat);
+    return number >= 1 ? `${COUNT_VOICE_BASE}/${number}.wav` : null;
+  }
+
+  /** One beat's recording, decoded once. A missing one resolves to null. */
+  async function loadCountVoice(beat) {
+    const url = countVoiceUrl(beat);
+    if (!url) return null;
+    if (countVoiceCache.has(url)) return countVoiceCache.get(url);
+    const pending = (async () => {
+      try {
+        const response = await fetch(url, { mode: 'cors' });
+        if (!response.ok) return null;
+        const bytes = await response.arrayBuffer();
+        const context = new OfflineAudioContext(1, 1, AUDIO_SAMPLE_RATE);
+        return await context.decodeAudioData(bytes);
+      } catch (error) {
+        return null;
+      }
+    })();
+    countVoiceCache.set(url, pending);
+    const sample = await pending;
+    // A miss is not remembered: the next export may find the file uploaded.
+    if (!sample) countVoiceCache.delete(url);
+    return sample;
+  }
+
+  /** One recording per beat, in beat order; a beat with none is null. */
+  async function countVoiceSamples(beats) {
+    const wanted = [];
+    for (let beat = 1; beat <= Math.max(0, Math.round(beats)); beat += 1) {
+      wanted.push(loadCountVoice(beat));
+    }
+    return await Promise.all(wanted);
+  }
+
+  // ---------------------------------------------------------------
   // The Thank You clip that closes every video.
   //
   // The Plan gives this whole matter to the engine: the file names, the
@@ -2705,6 +2751,10 @@
     // segment and appends it, and never learns the clip's address.
     thankYouUrl,
     thankYouSegment,
+    // The spoken count, for the same reason: the recordings' address and
+    // names stay in here, and a page asks for the beats it is counting in.
+    countVoiceUrl,
+    countVoiceSamples,
     // One clock for the encoder and the preview: the plan says where each
     // segment starts in frames, so a preview cannot drift from the file.
     timelinePlan,

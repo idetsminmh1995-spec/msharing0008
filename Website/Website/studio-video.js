@@ -539,32 +539,56 @@
    * The drum performance as one AudioBuffer covering the whole video,
    * count-in included: the count is spoken over a click, so a silent
    * count-in would leave the first bar out of time with the picture.
+   *
+   * The spoken count is its own sound, not a property of the drum model,
+   * so it is heard even when the drum model is Visual Only.
    */
   async function createDrumAudio({ settings, hits, countIn, duration, meta }) {
     const model = SOUND_MODELS[settings.soundModel] || SOUND_MODELS.visual;
-    if (model.level === 0) return null;
+    const wantsDrums = model.level > 0;
+    // A count-in of zero seconds has nothing to count, so asking for the
+    // recordings there would be a download with no sound behind it.
+    const wantsCount = settings.countEnabled && countIn > 0;
+    if (!wantsDrums && !wantsCount) return null;
     const OfflineContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     if (!OfflineContext) throw new Error('This browser cannot synthesize the drum sound. Try a current version of Chrome, Edge, Safari, or Firefox.');
+
+    // The recordings are fetched before the context is built: an offline
+    // render cannot wait for a network read once it has started.
+    const voices = wantsCount ? await engine.countVoiceSamples(meta.beats) : [];
 
     const sampleRate = 48000;
     const total = countIn + duration;
     const context = new OfflineContext(2, Math.max(1, Math.ceil(total * sampleRate)), sampleRate);
 
     const soundGain = settings.soundVolume / 100;
-    for (const hit of hits) {
-      addStroke(context, hit.type, countIn + hit.at, soundGain, model);
+    if (wantsDrums) {
+      for (const hit of hits) {
+        addStroke(context, hit.type, countIn + hit.at, soundGain, model);
+      }
     }
 
-    if (settings.countEnabled) {
+    if (wantsCount) {
       const beatSeconds = (60 / Math.max(1, meta.bpm)) * (4 / Math.max(1, meta.beatType));
       const countGain = settings.countVolume / 100;
       for (let beat = 0; beat < meta.beats; beat += 1) {
         const at = beat * beatSeconds;
         if (at >= countIn) break;
-        // The count is a woodblock: a bright click on every beat, the
-        // downbeat higher, so the player hears where the bar starts.
+        // The count is a woodblock under the voice: a bright click on every
+        // beat, the downbeat higher, so the player hears where the bar
+        // starts even if a recording is missing.
         addStroke(context, 'hihat', at, countGain * 0.8, model);
         if (beat === 0) addStroke(context, 'snare', at, countGain * 0.35, model);
+        const voice = voices[beat];
+        if (voice) {
+          const source = context.createBufferSource();
+          const gain = context.createGain();
+          source.buffer = voice;
+          gain.gain.value = countGain;
+          source.connect(gain);
+          gain.connect(context.destination);
+          source.start(at);
+        }
       }
     }
 
@@ -957,9 +981,12 @@
       // The status names the drum sound, because that is the part the
       // Sound Model controls. The Thank You clip carries its own sound
       // whether or not the drums do, so claiming the whole file is silent
-      // would be a lie once the ending is attached.
+      // would be a lie once the ending is attached. The spoken count is a
+      // sound of its own too, so Visual Only with a count-in is not silent.
       const audioNote = audio
-        ? `${settings.soundModel} drum sound`
+        ? (SOUND_MODELS[settings.soundModel]?.level > 0
+          ? `${settings.soundModel} drum sound`
+          : 'count voice only')
         : 'visual only · no drum sound';
       // A kit that had no picture for a note leaves that stroke unlit. Say
       // so, rather than shipping a video with a silent hole in it.

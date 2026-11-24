@@ -215,6 +215,18 @@ try {
   assert.ok(countAt(boxes.eighths).includes('&'),
     `The eighth-note count did not print an "&" token: ${JSON.stringify(countAt(boxes.eighths))}`);
 
+  // The count is drawn once, inside the COUNT box. A second row under the
+  // boxes would put a count token on a line of its own, which is what the
+  // owner saw and asked to have removed. The BPM box's own number is the
+  // only other digit on the band, so it is discounted by name.
+  const countTokensDrawn = boxes.beats.texts.filter((entry) => /^\d+$|^&$|^e$|^a$/.test(entry.text)
+    && entry.text !== '120');
+  assert.equal(countTokensDrawn.length, 1,
+    `The count is drawn ${countTokensDrawn.length} times, not once: ${JSON.stringify(countTokensDrawn)}`);
+  const bpm = labelOf(boxes.beats, '120');
+  assert.equal(Math.round(countTokensDrawn[0].y), Math.round(bpm.y),
+    `The count is not on the boxes' value line: ${countTokensDrawn[0].y} vs ${bpm.y}`);
+
   // The three boxes sit on the right of the band, in order, and none of
   // them runs past the frame.
   const boxesRight = ['TIME', 'BPM', 'COUNT'].map((label) => labelOf(boxes.beats, label));

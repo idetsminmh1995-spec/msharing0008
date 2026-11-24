@@ -110,18 +110,24 @@ async function evaluate(expression, options = {}) {
 }
 
 /**
- * The Thank You clip is the engine's own R2 asset, so the test stands in
- * for R2: every request to it is answered here. `clip` is the clip's
- * bytes, or null for a 404 -- the two states the Plan cares about.
+ * The Thank You clip and the spoken count are the engine's own R2 assets,
+ * so the test stands in for R2: every request to either is answered here.
+ * `thankYouClip` is the clip's bytes, or null for a 404 -- the two states
+ * the Plan cares about. `countVoice` is the WAV handed back for every
+ * `Voices/{n}.wav`, or null for a 404.
  */
 let thankYouClip = null;
+let countVoice = null;
 async function serveThankYou() {
   cdp.on('Fetch.requestPaused', async (event) => {
-    if (!event.request.url.includes('/thank-you/')) {
+    const { url } = event.request;
+    const isCountVoice = url.includes('/Voices/');
+    if (!url.includes('/thank-you/') && !isCountVoice) {
       await cdp.call('Fetch.continueRequest', { requestId: event.requestId });
       return;
     }
-    if (!thankYouClip) {
+    const body = isCountVoice ? countVoice : thankYouClip;
+    if (!body) {
       await cdp.call('Fetch.fulfillRequest', {
         requestId: event.requestId,
         responseCode: 404,
@@ -134,10 +140,10 @@ async function serveThankYou() {
       requestId: event.requestId,
       responseCode: 200,
       responseHeaders: [
-        { name: 'Content-Type', value: 'video/mp4' },
+        { name: 'Content-Type', value: isCountVoice ? 'audio/wav' : 'video/mp4' },
         { name: 'Access-Control-Allow-Origin', value: '*' },
       ],
-      body: thankYouClip.toString('base64'),
+      body: body.toString('base64'),
     });
   });
   await cdp.call('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
@@ -829,6 +835,45 @@ print(sum(1 for value in pixels if value > 10), max(pixels))
   await evaluate("(() => { const count = document.querySelector('[data-count-voice-enabled]'); count.value = 'on'; count.dispatchEvent(new Event('change', { bubbles: true })); })()");
   const counted = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'count-in.musicxml', twoPart.href);
   assert.ok(Math.abs(counted.seconds - 6) < 0.4, `The count-in was not added to the length: ${counted.seconds}s instead of 6s`);
+
+  // The spoken count is its own sound: R2's `Voices/{n}.wav` is played over
+  // the click, and it is heard even when the drum model is Visual Only.
+  // The two renders below differ in nothing but whether the recordings
+  // answer, so the extra loudness can only be the voice.
+  const voicePath = join(profile, 'count-voice.wav');
+  await exec('ffmpeg', ['-v', 'error', '-y',
+    '-f', 'lavfi', '-i', 'sine=frequency=880:duration=0.3',
+    '-af', 'volume=8', '-ac', '2', '-ar', '44100', '-c:a', 'pcm_s16le', voicePath]);
+  countVoice = await readFile(voicePath);
+  const spoken = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'count-voice.musicxml', counted.href);
+  // The click is over within 50 ms of the beat, so the second half of each
+  // beat is the window where only the spoken count can be heard.
+  const loudnessOf = async (path, from, to) => {
+    const wav = `${path}.count-in.wav`;
+    await exec('ffmpeg', ['-v', 'error', '-y', '-i', path, '-ac', '1', '-ar', '48000', '-c:a', 'pcm_s16le', wav]);
+    const { stdout } = await exec('python3', ['-c', `
+import json, math, struct, wave
+handle = wave.open(${JSON.stringify(wav)})
+frames = handle.getnframes()
+rate = handle.getframerate()
+samples = struct.unpack('<%dh' % frames, handle.readframes(frames))
+start, end = int(${from} * rate), int(${to} * rate)
+window = samples[start:end]
+print(json.dumps(math.sqrt(sum(v * v for v in window) / max(1, len(window)))))
+`]);
+    return JSON.parse(stdout);
+  };
+  // Between the beats: the click has decayed, the recording is still on.
+  const clickOnly = await loudnessOf(counted.path, 0.15, 0.4);
+  const withVoice = await loudnessOf(spoken.path, 0.15, 0.4);
+  assert.ok(withVoice > Math.max(clickOnly * 4, 300),
+    `The spoken count was not played over the click: ${withVoice} against ${clickOnly}`);
+  // The count is over before the score starts, so the voice does not leak
+  // into the music.
+  const afterCount = await loudnessOf(spoken.path, 2.5, 3.5);
+  assert.ok(afterCount < withVoice * 0.5,
+    `The spoken count runs into the score: ${afterCount} against ${withVoice}`);
+  countVoice = null;
 
   // The Plan's last part: the Thank You clip closes the video and is
   // counted in its length. The clip is two seconds of a known colour, so
