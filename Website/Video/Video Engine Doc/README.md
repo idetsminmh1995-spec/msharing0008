@@ -304,6 +304,7 @@ Frame တစ်ခုကို အပိုင်း ၃ ခုအဖြစ် �
 
 - `ratioOf(width, height)` က `16:9` / `1:1` / `9:16` ကို ဆုံးဖြတ်ပြီး `LAYOUT_SHARES` မှ အချိုးကို ယူသည်။ `rows` 16:9 တွင် `title 0.12 / notation 0.46 / instrument 0.42`။
 - `LAYOUT_GUTTER = 0.02` — frame ၏ အတိုဆုံးအနံဘက်မှ ၂% ကို ဘောင် အဖြစ် ထားသည်။
+- `drums` သည် template ထဲတွင် ကိုယ်ပိုင် `shares` ကို ကြေညာသည် — ရည်ညွှန်းပုံ (§၁၃) အတိုင်း 16:9 တွင် title 0.20 / notation 0.33 / instrument 0.47၊ 1:1 တွင် 0.18 / 0.36 / 0.46၊ 9:16 တွင် 0.14 / 0.38 / 0.48။ `layoutFor()` က `template.shares?.[ratio]` ကို အရင်ယူပြီး မရှိမှ `LAYOUT_SHARES` သို့ ကျသည်။
 - `parts` ပေးလျှင် ထို အပိုင်းများသာ နေရာချသည်။ `shares` ပေးလျှင် ပင်ထားသော အပိုင်း၏ အချိုးကို လိုက်နာပြီး ကျန်အပိုင်းများကို `resolveShares()` က ကျန်နေသော နေရာအပေါ် အချိုးကျ ပြန်ဝေသည်။
 - မသိသော instrument အတွက် `RangeError` ပစ်သည်။ Drum branch သို့ fall-through မရှိပါ။
 
@@ -321,7 +322,20 @@ Adapter က export မစမီ လိုအပ်သော asset ကို က�
 - `thankYouSegment()` က clip ကို `requireAsset('thank-you')` ဖြင့် ကြေညာပြီး ရလျှင် `resolveRequired()` ကို ခေါ်သည်။ 404 ဖြစ်လျှင် `null` ပြန်ပြီး `buildTimeline()` က ထို segment ကို ချန်သည်။
 - Metronome က `layoutFor()` ကို မသုံးပါ — ၎င်း၏ video တွင် Title/Info band မပါသဖြင့် ကိုယ်ပိုင် design renderer ရှိသည်။
 
-**စမ်းသပ်မှု** — `website/tests/video-engine-layout.test.mjs` က ratio ၃ မျိုးတွင် အပိုင်းများ ထပ်/ကျော်မှု မရှိကြောင်း၊ `shares` override အလုပ်လုပ်ကြောင်း၊ မသိသော instrument က ပစ်ကြောင်း စစ်သည်။
+**စမ်းသပ်မှု** — `website/tests/video-engine-layout.test.mjs` က ratio ၃ မျိုးတွင် အပိုင်းများ ထပ်/ကျော်မှု မရှိကြောင်း၊ `shares` override အလုပ်လုပ်ကြောင်း၊ မသိသော instrument က ပစ်ကြောင်း စစ်သည်။ Drum ၏ ရည်ညွှန်းအချိုးကို `tools/test-drum-reference-browser.mjs` က တိုင်းသည်။
+
+## Drum ရည်ညွှန်းဒီဇိုင်း — Info ကွက်နှင့် Video Color (V12၊ V13)
+
+`drawTitlePart()` က `infoBoxes: true` ရလျှင် stats row အစား ရည်ညွှန်းပုံ (§၁၃) ၏ ထောင့်ဝိုင်းကွက် ၃ ခုကို ဆွဲသည် — **TIME** (`4/4`၊ MusicXML မှ)၊ **BPM** (MusicXML မှ) နှင့် **COUNT**။ Label က စာလုံးသေး အပေါ်၊ တန်ဖိုးက စာလုံးကြီး အောက်။ COUNT ကွက်သာ အရောင်ရင့် highlight ဖြစ်ပြီး beat တိုင်း ပြောင်းသည် — `countTokens()`/`currentCountToken()` ကို ပြန်သုံးသဖြင့် `1` / `1&` / `1e&a` ရွေးချယ်မှုအတိုင်း ဖြစ်သည်။ Key ကို Drum တွင် မပြပါ။ Title 1/2 သည် ကွက်များ၏ ဘယ်ဘက်တွင် ရပ်သည်။
+
+**Video Color (§၁၄)** — အရောင်အားလုံးကို `paletteFor(color)` တစ်ခုတည်းမှ ယူသည်။ Table တွင် `background`၊ `surface`၊ `text`၊ `muted`၊ `accent`၊ `grid`၊ `line`၊ `highlight`၊ `highlightText`၊ `notationInk`၊ `notationBackground`၊ `logoVariant` နှင့် `titleOne`/`titleTwo` ပါသည်။
+
+- Notation စာရွက်သည် `notationInk`/`notationBackground` ကို သုံးသည် — Black frame တွင် အဖြူစာသား/အမည်းစာရွက် ဖြစ်သည်။ `prepareNotation()` ကို palette ပေးသဖြင့် sheet ကို ပြန်မဆွဲရ။
+- `measureInk(image, { darkInk })` က ink ကို luminance ဖြင့် တိုင်းသည်၊ ထို့ကြောင့် Black theme ၏ အဖြူ ink ကိုလည်း မှန်ကန်စွာ တိုင်းနိုင်သည်။
+- `titleSettings(options, palette)` က Title အရောင် မပေးလျှင် theme ၏ `titleOne`/`titleTwo` ကို ယူသည်၊ ထို့ကြောင့် White frame တွင် အဖြူစာလုံး မကျန်ပါ။
+- Page ဘက်တွင် `videoColor` ပြောင်းလျှင် အသုံးပြုသူ မပြင်ရသေးသော Title အရောင်များ နောက်လိုက်သည် (ကိုယ်တိုင်ရွေးထားသော အရောင်ကို မဖျက်ပါ)။ Notation cache key တွင် `color` ပါသဖြင့် အရောင်ပြောင်းလျှင် စာရွက် အသစ် ဆွဲသည်။
+
+**စမ်းသပ်မှု** — `tools/test-drum-reference-browser.mjs` က (၁) ratio တစ်ခုချင်းစီ၏ band အချိုး၊ (၂) TIME/BPM/COUNT ကွက်၏ နေရာနှင့် COUNT ၏ beat တိုင်းပြောင်းမှု၊ (၃) theme နှစ်ခုလုံးတွင် ink က နောက်ခံနှင့် ကွဲပြားမှု၊ (၄) live preview က Video Color ကို လိုက်မှု — အားလုံးကို တိုင်းသည်။
 
 ## `.mxl` score support (2026-11-18)
 

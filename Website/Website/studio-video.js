@@ -95,10 +95,10 @@
   const getSettings = () => ({
     instrument: selectedTool,
     titleOne: titleOne?.value.trim() || 'DRUM PERFORMANCE',
-    titleOneColor: titleOneColor?.value || '#f8fafc',
+    titleOneColor: titleOneColor?.value || getPalette(videoColor?.value || 'black').titleOne,
     titleOneSize: Number(titleOneSize?.value) || 22,
     titleTwo: titleTwo?.value.trim() || 'VISUAL PREVIEW',
-    titleTwoColor: titleTwoColor?.value || '#91a0b5',
+    titleTwoColor: titleTwoColor?.value || getPalette(videoColor?.value || 'black').titleTwo,
     titleTwoSize: Number(titleTwoSize?.value) || 11,
     brand: drumBrand?.value.trim() || 'M Sharing',
     model: drumModel?.value || 'custom',
@@ -109,6 +109,10 @@
     countVoice: countVoice?.value || 'one-two',
     countVolume: Number(countVolume?.value) || 0,
     countDisplay: countDisplay?.value || 'beats',
+    // The Drum reference picture puts TIME / BPM / COUNT boxes in the Title
+    // band; the other pages keep the plain stats row until their own
+    // reference exists.
+    infoBoxes: true,
     color: videoColor?.value || 'black',
     ratio: videoRatio?.value || '16:9',
     size: getSize(),
@@ -429,7 +433,7 @@
       height,
       parts: {
         title: (target, rect) => engine.drawTitlePart(target, rect, at, meta, palette, settings),
-        notation: (target, rect) => engine.drawNotationPart(target, rect, at, notationState),
+        notation: (target, rect) => engine.drawNotationPart(target, rect, at, notationState, palette),
         instrument: (target, rect) => (kit
           ? kit.draw(target, rect, at)
           : drawInstrumentPart(target, rect, at, hits, duration, settings, palette)),
@@ -465,7 +469,7 @@
     const active = engine.currentCountToken(tokens, settings.countDisplay, meta, at);
     if (active < 0 || active >= tokens.length) return;
     ctx.save();
-    ctx.fillStyle = '#f20d3d';
+    ctx.fillStyle = palette.accent;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = `700 ${Math.round(Math.min(width, height) * 0.22)}px Inter, system-ui, sans-serif`;
@@ -565,9 +569,12 @@
   async function notationFor(settings) {
     const file = musicXmlInput?.files?.[0] || null;
     const key = [file ? `${file.name}:${file.size}:${file.lastModified}` : 'none',
-      settings.notation, settings.size.width, settings.size.height, settings.titleOne].join('|');
+      settings.notation, settings.size.width, settings.size.height, settings.titleOne,
+      settings.color].join('|');
     if (notationCache.has(key)) return notationCache.get(key);
-    const state = await engine.prepareNotationFor(file, settings, ['title', 'notation', 'instrument']);
+    const state = await engine.prepareNotationFor(
+      file, { ...settings, palette: getPalette(settings.color) }, ['title', 'notation', 'instrument'],
+    );
     if (state?.error) {
       setStatus(`Notation could not be prepared: ${state.error}`);
       return state;
@@ -1042,6 +1049,22 @@
   [titleOne, titleOneColor, titleOneSize, titleTwo, titleTwoColor, titleTwoSize, drumBrand, drumModel, notationView, soundModel, soundVolume, countVoiceEnabled, countVoice, countVolume, countDisplay, videoColor, videoRatio].forEach((control) => {
     control?.addEventListener('input', () => { syncControlState(); schedulePreview(); });
     control?.addEventListener('change', () => { syncControlState(); schedulePreview(); });
+  });
+  // §၁၄: switching Video Color repaints everything. A Title picker the user
+  // has not touched still holds the previous theme's default, so it follows
+  // the theme; a colour the user chose is theirs and is kept.
+  let lastThemeTitles = getPalette(videoColor?.value || 'black');
+  videoColor?.addEventListener('change', () => {
+    const next = getPalette(videoColor.value);
+    for (const [input, key] of [[titleOneColor, 'titleOne'], [titleTwoColor, 'titleTwo']]) {
+      if (!input) continue;
+      if (input.value.toLowerCase() === lastThemeTitles[key].toLowerCase()) input.value = next[key];
+    }
+    lastThemeTitles = next;
+    // This listener runs after the shared control loop, so the preview it
+    // scheduled still holds the old Title colours; ask for one more frame.
+    syncControlState();
+    schedulePreview();
   });
   musicXmlInput?.addEventListener('change', () => {
     const file = musicXmlInput.files?.[0];

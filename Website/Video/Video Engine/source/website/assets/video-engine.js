@@ -1477,15 +1477,52 @@
   // over those, so a half-built page still gets a sane frame.
   // ---------------------------------------------------------------------
   /**
-   * The two colour schemes every video page offers. The parts draw
-   * against one of these rather than each page inventing its own ink.
+   * The one table of colours a frame is drawn from.
+   *
+   * The Plan's Video Color rule is that switching Black/White changes
+   * everything at once, so every part reads its colours here rather than
+   * carrying its own. A part that hard-codes a colour would survive the
+   * switch and leave white text on a white frame, which is exactly the
+   * failure §၁၄ names.
+   *
+   * `accent` is the one colour an instrument part may use to say "this is
+   * being played", so every instrument's marks read the same. `highlight`
+   * is the darker fill the COUNT box takes in the Drum layout.
    */
   function paletteFor(color) {
-    // `accent` is the one colour an instrument part may use to say "this
-    // is being played", so every instrument's marks read the same.
     return color === 'white'
-      ? { background: '#f7f9fc', text: '#111827', muted: '#64748b', accent: '#2f6feb', grid: 'rgba(15,23,42,.16)', line: 'rgba(15,23,42,.24)' }
-      : { background: '#080d16', text: '#f8fafc', muted: '#91a0b5', accent: '#5b9cff', grid: 'rgba(148,163,184,.16)', line: 'rgba(148,163,184,.22)' };
+      ? {
+        background: '#f7f9fc',
+        surface: '#ffffff',
+        text: '#111827',
+        muted: '#64748b',
+        accent: '#2f6feb',
+        grid: 'rgba(15,23,42,.16)',
+        line: 'rgba(15,23,42,.24)',
+        highlight: '#f8c9c9',
+        highlightText: '#7f1220',
+        notationInk: '#101828',
+        notationBackground: '#ffffff',
+        logoVariant: 'light',
+        titleOne: '#ffaa00',
+        titleTwo: '#111827',
+      }
+      : {
+        background: '#080d16',
+        surface: '#111a29',
+        text: '#f8fafc',
+        muted: '#91a0b5',
+        accent: '#5b9cff',
+        grid: 'rgba(148,163,184,.16)',
+        line: 'rgba(148,163,184,.22)',
+        highlight: '#7f1220',
+        highlightText: '#ffd9dd',
+        notationInk: '#f8fafc',
+        notationBackground: '#0b1220',
+        logoVariant: 'dark',
+        titleOne: '#ffaa00',
+        titleTwo: '#e2e8f0',
+      };
   }
 
   /**
@@ -1709,9 +1746,14 @@
     if (!file) return null;
     const api = await loadNotationEngine();
     const mode = settings.notation === 'horizontal' ? 'scroll' : 'page';
+    // Only a page that offers Video Color passes a palette; the rest keep
+    // the paper-and-ink sheet they have always had.
+    const palette = settings.palette ?? null;
     const config = {
       layout: { mode, pxPerStaffSpace: NOTATION_PX_PER_SPACE },
-      colors: { ink: '#101828', background: '#ffffff' },
+      colors: palette
+        ? { ink: palette.notationInk, background: palette.notationBackground }
+        : { ink: '#101828', background: '#ffffff' },
     };
     if (mode === 'page') {
       // The chosen page shape, in staff spaces -- the same A4 proportions
@@ -1736,7 +1778,7 @@
     const [, , viewBoxWidth, viewBoxHeight] = (rendered.svg.match(/viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"/) || [])
       .slice(1).map(Number);
     const viewBox = { width: viewBoxWidth, height: viewBoxHeight };
-    const ink = measureInk(image);
+    const ink = measureInk(image, { darkInk: palette ? palette.logoVariant === 'light' : true });
     const systemYs = [...new Set(rendered.playback.measureNumbersInOrder
       .map((number) => rendered.playback.placementByMeasureNumber.get(number).systemY))]
       .sort((left, right) => left - right);
@@ -1759,8 +1801,12 @@
    * The drawn extent of a rendered score, in image pixels. A page carries
    * margins and a scroll system carries room for lyrics, so fitting the
    * raw image would leave the staff a fraction of the part.
+   *
+   * The ink is whatever stands out from the sheet, not simply "dark": on a
+   * Black frame the score is white on a dark sheet, and a fixed threshold
+   * would measure the whole page as one ink box.
    */
-  const measureInk = (image) => {
+  const measureInk = (image, { darkInk = true } = {}) => {
     const canvas = document.createElement('canvas');
     canvas.width = image.naturalWidth;
     canvas.height = image.naturalHeight;
@@ -1774,8 +1820,9 @@
     for (let y = 0; y < canvas.height; y += 1) {
       for (let x = 0; x < canvas.width; x += 1) {
         const offset = (y * canvas.width + x) * 4;
-        const dark = data[offset] < 160 && data[offset + 1] < 160 && data[offset + 2] < 160;
-        if (!dark || data[offset + 3] < 32) continue;
+        const luminance = 0.299 * data[offset] + 0.587 * data[offset + 1] + 0.114 * data[offset + 2];
+        const ink = darkInk ? luminance < 160 : luminance > 96;
+        if (!ink || data[offset + 3] < 32) continue;
         if (x < left) left = x;
         if (x > right) right = x;
         if (y < top) top = y;
@@ -1809,13 +1856,13 @@
     }
   };
 
-  function drawNotationPart(ctx, rect, at, state) {
+  function drawNotationPart(ctx, rect, at, state, palette = null) {
     ctx.save();
     ctx.translate(rect.x, rect.y);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = palette ? palette.notationBackground : '#ffffff';
     ctx.fillRect(0, 0, rect.width, rect.height);
     if (!state) {
-      ctx.fillStyle = '#8b95a7';
+      ctx.fillStyle = palette ? palette.muted : '#8b95a7';
       ctx.font = `600 ${Math.max(10, Math.round(rect.height * 0.07))}px Inter, system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -1892,7 +1939,7 @@
     const scale = Math.max(0.5, Math.min(1.15, rect.height / 150));
     ctx.save();
     ctx.translate(rect.x, rect.y);
-    drawInfoBand(ctx, { at, meta, settings: titleSettings(options), palette, scale, width: rect.width });
+    drawInfoBand(ctx, { at, meta, settings: titleSettings(options, palette), palette, scale, width: rect.width });
     ctx.restore();
   }
 
@@ -1920,22 +1967,97 @@
    * left at the house default. A page that has no Title controls (the
    * Guitar page) still gets a complete band rather than "undefined".
    */
-  function titleSettings(options = {}) {
+  function titleSettings(options = {}, palette = null) {
     return {
       titleOne: '',
-      titleOneColor: '#f8fafc',
+      // A page that names no colour takes the frame's own, so a White frame
+      // never gets the dark theme's near-white title by default -- the
+      // failure §၁၄ calls out by name.
+      titleOneColor: palette?.titleOne ?? '#f8fafc',
       titleOneSize: 22,
       titleTwo: '',
-      titleTwoColor: '#91a0b5',
+      titleTwoColor: palette?.titleTwo ?? '#91a0b5',
       titleTwoSize: 11,
       brand: 'M Sharing',
       model: '',
       notation: '',
       countEnabled: false,
       countDisplay: 'beats',
+      infoBoxes: false,
       logoImage: null,
       ...options,
     };
+  }
+
+  /**
+   * A rounded rectangle path. `ctx.roundRect` is not in every browser this
+   * page has to run in, so the corners are drawn by hand.
+   */
+  function roundedRectPath(ctx, x, y, width, height, radius) {
+    const r = Math.max(0, Math.min(radius, Math.min(width, height) / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.arcTo(x + width, y, x + width, y + r, r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.arcTo(x + width, y + height, x + width - r, y + height, r);
+    ctx.lineTo(x + r, y + height);
+    ctx.arcTo(x, y + height, x, y + height - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+
+  /**
+   * The three rounded boxes the Drum reference picture puts on the right of
+   * the Title band: TIME, BPM and COUNT, label above value.
+   *
+   * COUNT is the one box that changes during the video -- it carries the
+   * token the frame is sitting on, in the same `1` / `1&` / `1e&a` spelling
+   * the count row uses. The Plan keeps that separate from the Count Voice
+   * sound, so only the printed value is read here.
+   */
+  function drawInfoBoxes(ctx, { at, meta, settings, palette, scale, width, top }) {
+    const tokens = countTokens(settings.countDisplay, meta.beats);
+    const active = currentCountToken(tokens, settings.countDisplay, meta, at);
+    const count = active >= 0 && active < tokens.length ? tokens[active] : '';
+    const boxes = [
+      { label: 'TIME', value: `${meta.beats}/${meta.beatType}`, highlight: false },
+      { label: 'BPM', value: String(meta.bpm), highlight: false },
+      { label: 'COUNT', value: count, highlight: true },
+    ];
+
+    const pad = Math.round(24 * scale);
+    const boxWidth = Math.max(44, Math.min(Math.round(width * 0.085), Math.round(132 * scale)));
+    const boxHeight = Math.max(30, Math.round(66 * scale));
+    const gap = Math.max(6, Math.round(12 * scale));
+    const radius = Math.round(Math.min(boxWidth, boxHeight) * 0.22);
+    let x = width - pad - boxWidth * boxes.length - gap * (boxes.length - 1);
+
+    for (const box of boxes) {
+      ctx.save();
+      roundedRectPath(ctx, x, top, boxWidth, boxHeight, radius);
+      if (box.highlight) {
+        ctx.fillStyle = palette.highlight;
+        ctx.fill();
+      }
+      ctx.strokeStyle = box.highlight ? palette.highlight : palette.line;
+      ctx.lineWidth = Math.max(1, Math.round(1.6 * scale));
+      ctx.stroke();
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = box.highlight ? palette.highlightText : palette.muted;
+      ctx.font = `600 ${Math.max(7, Math.round(9 * scale))}px Inter, system-ui, sans-serif`;
+      ctx.fillText(fitText(ctx, box.label, boxWidth - Math.round(8 * scale)),
+        x + boxWidth / 2, top + Math.round(boxHeight * 0.36));
+      ctx.fillStyle = box.highlight ? palette.highlightText : palette.text;
+      ctx.font = `800 ${Math.max(11, Math.round(20 * scale))}px Inter, system-ui, sans-serif`;
+      ctx.fillText(fitText(ctx, box.value, boxWidth - Math.round(8 * scale)),
+        x + boxWidth / 2, top + Math.round(boxHeight * 0.78));
+      ctx.restore();
+      x += boxWidth + gap;
+    }
   }
 
   function drawInfoBand(ctx, { at, meta, settings, palette, scale, width }) {
@@ -1956,7 +2078,16 @@
     // does not say how wide it is leaves the band unconstrained, which is
     // what the tests that predate this did.
     const rightEdge = Number.isFinite(width) ? width - pad : Infinity;
-    const room = rightEdge - textX;
+
+    // The reference picture puts the three rounded boxes where the stats row
+    // used to be, so the Title lines have to stop before them rather than
+    // run underneath. The boxes are measured the same way here and in the
+    // draw call, from the band's own width and scale.
+    const boxesWidth = settings.infoBoxes
+      ? Math.max(44, Math.min(Math.round(width * 0.085), Math.round(132 * scale))) * 3
+        + Math.max(6, Math.round(12 * scale)) * 2 + pad
+      : 0;
+    const room = rightEdge - textX - boxesWidth;
 
     ctx.fillStyle = settings.titleOneColor;
     ctx.font = `700 ${Math.round(settings.titleOneSize * scale)}px Inter, system-ui, sans-serif`;
@@ -1966,6 +2097,17 @@
     ctx.font = `${Math.round(settings.titleTwoSize * scale)}px Inter, system-ui, sans-serif`;
     ctx.fillText(fitText(ctx, settings.titleTwo, room), textX + Math.round(2 * scale), top + Math.round(52 * scale));
 
+    if (settings.infoBoxes) {
+      drawInfoBoxes(ctx, { at, meta, settings, palette, scale, width, top: top + Math.round(6 * scale) });
+      if (settings.countEnabled) {
+        drawCountRow(ctx, {
+          at, meta, settings, palette, scale, pad: leftEdge,
+          y: top + Math.round(100 * scale), rightEdge,
+        });
+      }
+      return;
+    }
+
     const statsY = top + Math.round(78 * scale);
     const statSize = Math.max(10, Math.round(13 * scale));
     const gap = Math.round(26 * scale);
@@ -1974,7 +2116,7 @@
     if (meta.key) items.push(`Key ${meta.key}`);
 
     ctx.font = `600 ${statSize}px Inter, system-ui, sans-serif`;
-    ctx.fillStyle = '#f20d3d';
+    ctx.fillStyle = palette.accent;
     let cursorX = leftEdge;
     for (const item of items) {
       const fitted = fitText(ctx, item, rightEdge - cursorX);
@@ -2038,14 +2180,27 @@
       // A count that would run off the frame stops at the last token that
       // fits rather than drawing a partial row past the edge.
       if (x + width > rightEdge) break;
-      ctx.fillStyle = index === active ? '#f20d3d' : palette.muted;
+      ctx.fillStyle = index === active ? palette.accent : palette.muted;
       ctx.fillText(token, x, y);
       x += width + gap;
     }
   }
 
   const LAYOUT_TEMPLATES = {
-    drums: { shape: 'rows', order: ['title', 'notation', 'instrument'] },
+    // The Drum reference picture (Main Plan §၁၃) measures the three bands at
+    // about 20 / 33 / 47 per cent, so a drum frame declares its own shares
+    // rather than taking the row default. The kit is the subject of the
+    // video and gets the largest band; the title band has to hold the logo,
+    // two title lines and the three info boxes.
+    drums: {
+      shape: 'rows',
+      order: ['title', 'notation', 'instrument'],
+      shares: {
+        '16:9': { title: 0.2, notation: 0.33, instrument: 0.47 },
+        '1:1': { title: 0.18, notation: 0.36, instrument: 0.46 },
+        '9:16': { title: 0.14, notation: 0.38, instrument: 0.48 },
+      },
+    },
     piano: { shape: 'rows', order: ['title', 'notation', 'instrument'] },
     guitar: { shape: 'rows', order: ['instrument', 'notation', 'title'] },
     // A bass is a fretted neck, so it stacks the way the guitar does:
@@ -2157,7 +2312,7 @@
     const template = LAYOUT_TEMPLATES[instrument];
     if (!template) throw new RangeError(`No video layout is declared for "${instrument}"`);
     const ratio = ratioOf(width, height);
-    const declared = LAYOUT_SHARES[template.shape][ratio];
+    const declared = template.shares?.[ratio] ?? LAYOUT_SHARES[template.shape][ratio];
     const shares = options.shares ? resolveShares(declared, options.shares) : declared;
     const requested = Array.isArray(options.parts) && options.parts.length > 0 ? options.parts : template.order;
     const parts = template.order.filter((part) => requested.includes(part));
