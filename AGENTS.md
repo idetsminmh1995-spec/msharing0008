@@ -240,6 +240,16 @@ Run every command from `Website/Notation/Notation Engine/`.
   still 2026-11-24 04:46, no diff against `origin/main`), so the open items
   are the ones the Plan's own tables list. Everything previously written was
   already on the remote (`f7dc17c`), so this pass starts from a clean tree.
+- **Permission is standing — reaffirmed 2026-11-18, seventh time this
+  session.** Same shape again: check what the Plan leaves open, write the
+  full code-writing permission down first, push what is written, continue
+  from the Plan, push once at the end, and leave any Plan item still open
+  for a later pass. The five-hour refresh had still produced no new Plan
+  revision: `Website/Plan/README.md` mtime is 2026-11-24 04:46, it has no
+  diff against `origin/main` (`a92d393`), and a fresh fetch of every remote
+  branch shows `a92d393` as the newest commit touching that file. The tree
+  is clean and everything written is already on the remote (`28d994b`), so
+  nothing needed pushing before starting.
 - The Plan under `Website/Video/Video Engine Plan/PLAN.md` is reviewed and
   updated roughly every five hours. Work is landed in small pushes: push
   whatever is written first, then continue from the Plan, then push again.
