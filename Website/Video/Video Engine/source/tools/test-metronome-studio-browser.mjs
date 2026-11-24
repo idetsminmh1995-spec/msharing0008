@@ -246,7 +246,7 @@ try {
   await writeFile(videoPath, videoBytes);
   const { stdout } = await exec('ffprobe', [
     '-v', 'error', '-show_entries', 'format=format_name,duration',
-    '-show_entries', 'stream=codec_type,codec_name,width,height,sample_rate,channels', '-of', 'json', videoPath,
+    '-show_entries', 'stream=codec_type,codec_name,width,height,profile,level,sample_rate,channels', '-of', 'json', videoPath,
   ]);
   const probe = JSON.parse(stdout);
   const videoStream = probe.streams.find((stream) => stream.codec_type === 'video');
@@ -279,7 +279,7 @@ try {
     const path = `${output}-${aspect}.${rendered.download.split('.').pop()}`;
     await writeFile(path, bytes);
     const streams = JSON.parse((await exec('ffprobe', ['-v', 'error',
-      '-show_entries', 'stream=codec_type,width,height', '-of', 'json', path])).stdout).streams;
+      '-show_entries', 'stream=codec_type,codec_name,width,height,profile,level', '-of', 'json', path])).stdout).streams;
     return { ...rendered, path, stream: streams.find((stream) => stream.codec_type === 'video') };
   };
 
@@ -292,6 +292,33 @@ try {
   const square = await renderAspect('1x1', landscape.href);
   assert.equal(square.stream?.width, 1080, `Square width is not the engine's delivery size: ${square.stream?.width}`);
   assert.equal(square.stream?.height, 1080, `Square height is not the engine's delivery size: ${square.stream?.height}`);
+  // The Plan's remaining check: a delivery size must fit the H.264 level the
+  // file declares, or a strict decoder may refuse it. 1080x1080@30 is 4624
+  // macroblocks and 138,720 a second, which level 3.2 already allows, so
+  // the assertion is the level's own table rather than a fixed number.
+  const AVC_LIMITS = {
+    30: { frame: 1620, rate: 40500 },
+    31: { frame: 3600, rate: 108000 },
+    32: { frame: 5120, rate: 216000 },
+    40: { frame: 8192, rate: 245760 },
+    42: { frame: 8704, rate: 522240 },
+    50: { frame: 22080, rate: 589824 },
+    51: { frame: 36864, rate: 983040 },
+    52: { frame: 36864, rate: 2073600 },
+  };
+  const assertAvcLevel = (stream, label) => {
+    // A WebM fallback is VP8/VP9 and has no H.264 level; ffprobe reports
+    // -99 for "not applicable", so the codec decides, not the number.
+    if (!stream || stream.codec_name !== 'h264') return;
+    const level = Number(stream.level);
+    assert.ok(AVC_LIMITS[level], `${label} declares an H.264 level this test does not know: ${stream.level}`);
+    const macroblocks = Math.ceil(stream.width / 16) * Math.ceil(stream.height / 16);
+    assert.ok(macroblocks <= AVC_LIMITS[level].frame && macroblocks * 30 <= AVC_LIMITS[level].rate,
+      `${label} does not fit the level it declares (level ${level}, ${macroblocks} macroblocks)`);
+  };
+  assertAvcLevel(videoStream, 'Portrait');
+  assertAvcLevel(landscape.stream, 'Landscape');
+  assertAvcLevel(square.stream, 'Square');
   assert.match(square.download, /^metronome-sweep-dial-1x1\.(mp4|webm)$/,
     `The square export is not named for its ratio: ${square.download}`);
 

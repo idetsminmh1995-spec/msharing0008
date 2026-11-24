@@ -189,6 +189,31 @@ try {
   assert.ok(desktop.scrollWidth <= desktop.width, `Studio overflows at desktop width: ${JSON.stringify(desktop)}`);
   assert.equal(desktop.columns.trim().split(/\s+/).length, 2, `Studio did not show two columns on desktop: ${JSON.stringify(desktop)}`);
 
+  // The Plan asks that a delivery size fit the H.264 level a decoder will
+  // accept. 1920x1080@30 is 8160 macroblocks and 244,800 a second, which
+  // only level 4.0 or higher allows; a file declaring a lower level is one a
+  // strict decoder may refuse. ffprobe reports the level the encoder wrote,
+  // so this reads the stream rather than trusting the engine's table.
+  const AVC_LIMITS = {
+    30: { frame: 1620, rate: 40500 },
+    31: { frame: 3600, rate: 108000 },
+    32: { frame: 5120, rate: 216000 },
+    40: { frame: 8192, rate: 245760 },
+    42: { frame: 8704, rate: 522240 },
+    50: { frame: 22080, rate: 589824 },
+    51: { frame: 36864, rate: 983040 },
+    52: { frame: 36864, rate: 2073600 },
+  };
+  const assertAvcLevel = (stream) => {
+    // A WebM fallback is VP8/VP9 and has no H.264 level to fit.
+    if (stream.codec_name !== 'h264') return;
+    const level = Number(stream.level);
+    assert.ok(AVC_LIMITS[level], `The export declares an H.264 level this test does not know: ${stream.level}`);
+    const macroblocks = Math.ceil(stream.width / 16) * Math.ceil(stream.height / 16);
+    assert.ok(macroblocks <= AVC_LIMITS[level].frame && macroblocks * 30 <= AVC_LIMITS[level].rate,
+      `The ${stream.width}x${stream.height} picture does not fit the level it declares (level ${level}, ${macroblocks} macroblocks)`);
+  };
+
   await evaluate("document.querySelector('[data-studio-generate]').click()");
 
   const renderStarted = Date.now();
@@ -212,12 +237,14 @@ try {
   await writeFile(videoPath, videoBytes);
   const { stdout } = await exec('ffprobe', [
     '-v', 'error', '-show_entries', 'format=format_name,duration',
-    '-show_entries', 'stream=codec_name,width,height', '-of', 'json', videoPath,
+    '-show_entries', 'stream=codec_name,width,height,profile,level', '-of', 'json', videoPath,
   ]);
   const probe = JSON.parse(stdout);
   assert.ok(Math.abs(Number(probe.format.duration) - 4) < 0.3, 'Studio video duration is not approximately four seconds');
   assert.equal(probe.streams[0].width, 1920);
   assert.equal(probe.streams[0].height, 1080);
+
+  assertAvcLevel(probe.streams[0]);
 
   // ---------------------------------------------------------------
   // Live Preview (§၁၂). The page opens it from the same settings the file
@@ -431,11 +458,12 @@ print(total / max(1, count))
   const portraitPath = `${output}.portrait.mp4`;
   await writeFile(portraitPath, portraitBytes);
   const portraitProbeResult = await exec('ffprobe', [
-    '-v', 'error', '-show_entries', 'stream=codec_name,width,height', '-of', 'json', portraitPath,
+    '-v', 'error', '-show_entries', 'stream=codec_name,width,height,profile,level', '-of', 'json', portraitPath,
   ]);
   const portraitProbe = JSON.parse(portraitProbeResult.stdout);
   assert.equal(portraitProbe.streams[0].width, 1080);
   assert.equal(portraitProbe.streams[0].height, 1920);
+  assertAvcLevel(portraitProbe.streams[0]);
 
   // The Plan's B0 asks for an export in each of the three ratios, not just
   // the one the page happens to open with. 16:9 is measured at the top of
@@ -455,10 +483,11 @@ print(total / max(1, count))
   const squarePath = `${output}.square.mp4`;
   await writeFile(squarePath, squareBytes);
   const squareProbe = JSON.parse((await exec('ffprobe', [
-    '-v', 'error', '-show_entries', 'stream=codec_name,width,height', '-of', 'json', squarePath,
+    '-v', 'error', '-show_entries', 'stream=codec_name,width,height,profile,level', '-of', 'json', squarePath,
   ])).stdout);
   assert.equal(squareProbe.streams[0].width, 1080, `Square video width is wrong: ${JSON.stringify(squareProbe)}`);
   assert.equal(squareProbe.streams[0].height, 1080, `Square video height is wrong: ${JSON.stringify(squareProbe)}`);
+  assertAvcLevel(squareProbe.streams[0]);
   assert.match(squareState.download, /1x1/, `The square export is not named for its ratio: ${squareState.download}`);
 
   // A real score must reach the Notation part, and its own cursor must be

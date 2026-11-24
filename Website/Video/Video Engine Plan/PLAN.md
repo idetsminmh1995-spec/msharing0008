@@ -46,7 +46,7 @@ Instrument တစ်ခုချင်းစီသည် Video Engine encoder �
 
 အသေးစိတ်ကို Main Plan ၏ `Create Video — Final video layout` နှင့် `Video ထုတ်လုပ်ပုံ အသေးစိတ်` section များတွင် ကြည့်ပါ။ ဤ phase သည် instrument adapter များ (Phase 1–5) မတိုင်မီ Video Engine ဘက်မှ လိုအပ်သော shared အလုပ်များ ဖြစ်သည်။
 
-1. **စံ output အရွယ်:** Video အားလုံး (Metronome အပါအဝင်) သည် **1920×1080 (16:9) / 1080×1080 (1:1) / 1080×1920 (9:16)** ဖြစ်ရမည်။ အရွယ်ကို Video Engine ၏ shared setting တစ်ခုတည်းမှ သတ်မှတ်ရမည်။ **ပြီးစီး (2026-11-18):** adapter ခုနစ်ခုလုံးသည် ဤဇယားကို ကိုယ်ပိုင် မထားတော့ဘဲ `engine.sizeFor(ratio)` ကို ခေါ်သည် (engine တွင် `DELIVERY_SIZES` + `ratioNames()`); Metronome ၏ ကိုယ်ပိုင် `DIMENSIONS` ကို ဖျက်ထားသည်။ 1080p memory budget နှင့် H.264 level ကို ဆက်လက်စစ်ရန် ကျန်သည်။
+1. **စံ output အရွယ်:** Video အားလုံး (Metronome အပါအဝင်) သည် **1920×1080 (16:9) / 1080×1080 (1:1) / 1080×1920 (9:16)** ဖြစ်ရမည်။ အရွယ်ကို Video Engine ၏ shared setting တစ်ခုတည်းမှ သတ်မှတ်ရမည်။ **ပြီးစီး (2026-11-18):** adapter ခုနစ်ခုလုံးသည် ဤဇယားကို ကိုယ်ပိုင် မထားတော့ဘဲ `engine.sizeFor(ratio)` ကို ခေါ်သည် (engine တွင် `DELIVERY_SIZES` + `ratioNames()`); Metronome ၏ ကိုယ်ပိုင် `DIMENSIONS` ကို ဖျက်ထားသည်။ **H.264 level ကို စစ်ပြီး (2026-11-18):** Drum နှင့် Metronome suite နှစ်ခုလုံးသည် output တစ်ခုချင်းစီ၏ `ffprobe` level ကို H.264 Table A-1 နှင့် တိုက်သည် (1920×1080@30 → 8160 MB / 244,800 MB/s၊ level 4.0 လိုသည်; 1080×1080 → 4624 / 138,720၊ level 3.2 လုံလောက်သည်)။ Chromium ၏ encoder က level 4.0၊ High profile ဖြင့် ရေးသည်ကို တိုင်းထားသည်။ **ကျန်ရှိ:** memory budget ကို ဖုန်းအစစ်တွင် မစမ်းရသေးပါ။
 2. **၃ ပိုင်း layout template:** Title / Info၊ Notation၊ တူရိယာ အပိုင်း ၃ ခုကို data ဖြင့်ကြေညာ၍ တူရိယာအလိုက် နေရာပြောင်းနိုင်ရမည် (Drum/Piano — Title အပေါ်၊ တူရိယာအောက်။ Guitar — တူရိယာအပေါ်၊ Title အောက်။ Violin — ဘေးတစ်ဖက်၊ Title အောက်)။ Ratio ၃ မျိုးအလိုက် အချိုးကို Main Plan ၏ ဇယားအတိုင်း (default)။ Metronome tool ၏ video တွင် Title / Info အပိုင်း မပါ။
 3. **Video အရှည်** = Count Voice (အစ၊ count-in) + MusicXML အရှည် + Thank You video။ `MAX_SECONDS = 12` (Drum) နှင့် Metronome ၏ ၁၂ စက္ကန့် ကန့်သတ်ချက်ကို ဖယ်ပြီး memory guard ကိုသာ safety အဖြစ်ထားရမည်။
 4. **Thank You segment:** R2 ထဲရှိ Landscape / Portrait / Square သီးခြားဖိုင်ကို output ratio အလိုက်ရွေး၍ Video အဆုံးတွင် ဆက်ရမည်။ ဖိုင်အမည်၊ path နှင့် ဖိုင်မရလျှင် လုပ်ပုံသည် Video Engine ၏ တာဝန်ဖြစ်ပြီး §3 Adapter Contract (လိုအပ်သော asset မရလျှင် export မစရ) ကို လိုက်နာရမည်။
@@ -58,7 +58,7 @@ Instrument တစ်ခုချင်းစီသည် Video Engine encoder �
 
 | # | အချက် | အခြေအနေ |
 |---|---|---|
-| 1 | စံ output အရွယ် | ✅ Drum, Metronome အပါအဝင် adapter ခုနစ်ခုလုံး `engine.sizeFor()` ကို သုံးသည် — Metronome portrait test တွင် 1080×1920 တိုင်းထားသည်။ 1080p memory budget နှင့် H.264 level ကို ဆက်စစ်ရန် ကျန်သည် |
+| 1 | စံ output အရွယ် | ✅ Drum, Metronome အပါအဝင် adapter ခုနစ်ခုလုံး `engine.sizeFor()` ကို သုံးသည် — Metronome portrait test တွင် 1080×1920 တိုင်းထားသည်။ H.264 level ကို ratio တစ်ခုချင်းစီတွင် ffprobe ဖြင့် စစ်ပြီး (2026-11-18)။ memory budget ကို ဖုန်းအစစ်တွင် မစမ်းရသေးပါ |
 | 2 | ၃ ပိုင်း layout template | ✅ `layoutFor` / `composeFrame` / `requireAsset` + test၊ Doc ရေးပြီး |
 | 3 | Video အရှည် = Count Voice + MusicXML + Thank You | ✅ Drum တွင် `MAX_SECONDS` မရှိတော့ — `countIn + notation seconds + Thank You`။ Browser test တွင် 16 s score၊ 6 s count-in ပါ video၊ 6 s Thank You ပါ video ကို တိုင်းထားသည် |
 | 4 | Thank You segment | ✅ `engine.thankYouSegment()` ကို `buildTimeline()` က ခေါ်သည်။ `requireAsset` စာချုပ်အတိုင်း clip မရလျှင် (404) ထို segment ကို ချန်ပြီး export ဆက်သည် — test တွင် case နှစ်ခုလုံး စစ်ထားသည် |

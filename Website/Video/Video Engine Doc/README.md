@@ -371,5 +371,22 @@ for feet) and no file for 81, so the test uses 81 as the missing case: the
 stroke with a picture still resolves, the one without comes back marked, and
 the summary names the note. `test-studio-video-browser.mjs` checks all three.
 
+## The 1080p picture fits its H.264 level (2026-11-18)
+
+The Plan asked that a delivery size fit the H.264 level the file declares,
+because a decoder is entitled to refuse a stream whose macroblock rate is
+over the level it names. Both suites now read the level the encoder wrote
+(`ffprobe -show_entries stream=profile,level`) and compare it with Table A-1:
+
+| Picture | Macroblocks | Macroblocks/s at 30 fps | Lowest level that allows it |
+|---|---|---|---|
+| 1920×1080 | 8160 | 244,800 | 4.0 |
+| 1080×1080 | 4624 | 138,720 | 3.2 |
+| 1080×1920 | 8160 | 244,800 | 4.0 |
+
+Chromium's encoder writes level 4.0 / High profile for 1920×1080, which is
+what the table requires. A WebM fallback is VP8 or VP9 and carries no H.264
+level, so the check steps aside for it rather than reading ffprobe's `-99`.
+
 Still open: a 1080p encode has not been tried on a real phone (the memory
 guard is exercised in desktop Chromium only).
