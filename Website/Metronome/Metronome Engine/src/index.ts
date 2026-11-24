@@ -105,6 +105,18 @@ function normalizeFrame(frame: MetronomeFrame): MetronomeFrame {
   };
 }
 
+/**
+ * A string field as text, whatever the host handed over.
+ *
+ * The page reads these from inputs, so they arrive as strings -- but a host
+ * that builds the input object itself can pass a number or leave the field
+ * out. `''` for anything else keeps the escape step from throwing and keeps
+ * a `123` from becoming a title.
+ */
+function asText(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
 /** One frame of one design, as a complete standalone `<svg>` document. */
 export function renderMetronomeFrame(input: MetronomeRenderInput): string {
   const design: Design = designById(input.design) ?? DESIGNS[0]!;
@@ -115,13 +127,14 @@ export function renderMetronomeFrame(input: MetronomeRenderInput): string {
   const palette = paletteForDesign(design.id);
   const frame = normalizeFrame(input.frame);
 
+  const logoUrl = asText(input.logoUrl);
   const context: DesignContext = {
     canvas,
     palette,
     frame,
-    title: input.title ?? '',
-    subtitle: input.subtitle ?? '',
-    logoUrl: input.logoUrl === '' ? undefined : input.logoUrl,
+    title: asText(input.title),
+    subtitle: asText(input.subtitle),
+    logoUrl: logoUrl === '' ? undefined : logoUrl,
   };
 
   const background = rect(0, 0, canvas.width, canvas.height, { fill: palette.background });

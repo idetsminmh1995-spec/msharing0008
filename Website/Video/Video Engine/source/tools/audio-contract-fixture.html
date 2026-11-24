@@ -1,0 +1,88 @@
+<!doctype html>
+<meta charset="utf-8">
+<script src="/website/assets/video-engine.js"></script>
+<script>
+  // A tone at a chosen rate and channel count, so the render has to place,
+  // resample and fold it rather than pass it through untouched.
+  async function toneBuffer(seconds, hz, sampleRate, channels) {
+    const length = Math.ceil(seconds * sampleRate);
+    const context = new OfflineAudioContext(channels, length, sampleRate);
+    const oscillator = context.createOscillator();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = hz;
+    const gain = context.createGain();
+    gain.gain.value = 0.5;
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start(0);
+    oscillator.stop(seconds);
+    return await context.startRendering();
+  }
+
+  const flat = (color) => (ctx) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  };
+
+  async function encode(result) {
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(result.blob);
+    });
+  }
+
+  async function render(segments) {
+    const result = await VideoEngine.render({ width: 320, height: 180, fps: 30, segments });
+    return {
+      container: result.container,
+      path: result.path,
+      seconds: result.seconds,
+      frames: result.frames,
+      base64: await encode(result),
+    };
+  }
+
+  window.runAudioContractTest = async function (name) {
+    if (name === 'offset') {
+      // Two tones, one per segment: the second must start where the first
+      // ends, not at zero and not on top of it.
+      return await render([
+        { seconds: 1, audio: await toneBuffer(1, 440, 48000, 1), draw: flat('#102a43') },
+        { seconds: 1, audio: await toneBuffer(1, 880, 48000, 1), draw: flat('#d64545') },
+      ]);
+    }
+    if (name === 'resample') {
+      // Handed over at 44.1kHz: the master is 48kHz, so the tone has to be
+      // resampled and still be the same pitch.
+      return await render([
+        { seconds: 1, audio: await toneBuffer(1, 660, 44100, 1), draw: flat('#102a43') },
+      ]);
+    }
+    if (name === 'channels') {
+      // A stereo recording followed by a mono clip. Which channel count the
+      // file gets is the question this case answers.
+      return await render([
+        { seconds: 1, audio: await toneBuffer(1, 440, 48000, 2), draw: flat('#102a43') },
+        { seconds: 1, audio: await toneBuffer(1, 440, 48000, 1), draw: flat('#d64545') },
+      ]);
+    }
+    if (name === 'fallback') {
+      // Browsers without WebCodecs get the real-time MediaRecorder path.
+      // Removing the constructors is how this browser becomes one, and the
+      // sound still has to survive it.
+      const saved = { VideoEncoder: window.VideoEncoder, VideoFrame: window.VideoFrame };
+      delete window.VideoEncoder;
+      delete window.VideoFrame;
+      try {
+        return await render([
+          { seconds: 1, audio: await toneBuffer(1, 440, 48000, 2), draw: flat('#102a43') },
+        ]);
+      } finally {
+        window.VideoEncoder = saved.VideoEncoder;
+        window.VideoFrame = saved.VideoFrame;
+      }
+    }
+    throw new Error(`unknown case: ${name}`);
+  };
+</script>

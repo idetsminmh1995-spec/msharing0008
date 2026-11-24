@@ -8,13 +8,14 @@ TypeScript in, SVG out. It knows nothing about scores, files or pages:
 notes arrive as a string, a fret and a finger, in seconds.
 
 ```bash
-npm run build     # -> dist/guitar-engine.js  (global: GuitarEngine)
-npm run verify    # typecheck + lint + format + tests
+npm run build         # -> dist/guitar-engine.js  (global: GuitarEngine)
+npm run sync:website  # build, then copy into Website/Website/assets
+npm run verify        # typecheck + lint + format + tests + check:website
 ```
 
-The built bundle is copied to `website/assets/guitar-engine.js`, which
-is what the page loads — GitHub Pages has no build step, so the file
-has to be in the repo.
+The served copy is `Website/Website/assets/guitar-engine.js`, which is
+what the page loads — GitHub Pages has no build step, so the file has
+to be in the repo. `npm run check:website` fails when the two differ.
 
 ## A note is a PLACE, not a pitch
 
@@ -173,9 +174,9 @@ the file's own pixels. Scale and shift those with the picture and
 every mark lands where it belongs.
 
 The four the page draws — `ACOUSTIC_DRAWN`, `CLASSICAL_DRAWN`,
-`ELECTRIC_DRAWN`, `STRAT_DRAWN` — are the site owner's own SVGs.
-`website/assets/guitar/README.md` is the field guide to measuring
-another one, including the two mistakes that cost a round each.
+`ELECTRIC_DRAWN`, `STRAT_DRAWN` — are the site owner's own SVGs, and
+they live in `Website/Website/assets/guitar/`. Measuring another one
+means adding its measurements to `photo.ts`.
 
 Two things follow from it being a photograph. The frets it shows are
 the frets there are, so `firstFret`/`lastFret` stop applying; and the

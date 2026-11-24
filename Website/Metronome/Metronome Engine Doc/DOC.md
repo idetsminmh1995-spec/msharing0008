@@ -45,7 +45,7 @@ UI တွင် BPM ကို **quarter-note BPM** အဖြစ် သတ်မ�
 
 စုစုပေါင်း beat အရေအတွက်မှာ `bars × beatsPerBar` ဖြစ်ပြီး စုစုပေါင်းအချိန်မှာ `beatSeconds × bars × beatsPerBar` ဖြစ်သည်။ Adapter သည် frame time မှ `beat`, `bar`, `phase` ကို တွက်၍ downbeat ကို bar တစ်ခုစီတွင် ပြန်စတင်သည်။ အရှည်ကို **12 sec အများဆုံး** သတ်မှတ်ထားပြီး ကျော်လွန်လျှင် render မလုပ်ဘဲ form status တွင် အကြောင်းပြသည်။
 
-Video canvas အရွယ်အစားများမှာ Landscape `1280×720`, Portrait `720×1280`, Square `720×720`; frame rate `30 FPS` ဖြစ်သည်။ SVG Engine သည် မိမိ၏ aspect-specific viewBox ကို ထိန်းထားပြီး Video Engine canvas ထဲသို့ အချိုးမှန်ဆွဲသည်။
+Video canvas အရွယ်အစားများကို adapter ကိုယ်တိုင် မသတ်မှတ်တော့ဘဲ Video Engine ၏ shared `sizeFor()` မှ ယူသည် — Landscape `1920×1080`, Portrait `1080×1920`, Square `1080×1080`; frame rate `30 FPS` ဖြစ်သည်။ SVG Engine သည် မိမိ၏ aspect-specific viewBox ကို ထိန်းထားပြီး Video Engine canvas ထဲသို့ အချိုးမှန်ဆွဲသည်။
 
 ## Click audio
 
@@ -70,7 +70,7 @@ Package တွင် lockfile မရှိသေးသဖြင့် clean inst
 - Video Engine cleanup/safety Node tests **5/5 pass**.
 - Chromium Video Engine smoke test: `ffprobe` က MP4/H.264, 320×180, 30 frames, 1.0 sec ကို ဖတ်နိုင်သည်။
 - Drum Studio browser regression: default-pattern workflow က MP4/H.264 1920×1080 landscape export နှင့် 1080×1920 portrait export ထုတ်နိုင်ပြီး Drum export ၏ silent behavior မပြောင်းပါ။
-- Metronome Studio browser integration: Create Video ရှိ Metronome card ကိုနှိပ်ပြီး Studio route သို့ရောက်ကြောင်း စစ်သည်။ 12 စက္ကန့်ကျော်သော setting ကို export မစမီ ပိတ်ကြောင်းလည်း အတည်ပြုထားသည်။ `sweep-dial`, 9:16, quarter-note 96 BPM, 3/8, 1 bar ကို render လုပ်ပြီး **28 frames, 0.933 sec**, 720×1280 VP8 video နှင့် 48 kHz mono Opus audio ထွက်သည်။ `ffprobe` က video/audio stream နှစ်ခုလုံးကို ဖတ်နိုင်သည်။
+- Metronome Studio browser integration: Create Video ရှိ Metronome card ကိုနှိပ်ပြီး Studio route သို့ရောက်ကြောင်း စစ်သည်။ Page တွင် အရှည် ကန့်သတ်ချက် မရှိတော့ပါ — 30 BPM၊ 16 bars၊ 12/4 setting ကို **384.00 sec** ဟု ပြပြီး render ကို ဖွင့်ထားသည် (Video Engine ၏ memory guard သာ safety)။ `sweep-dial`, 9:16, quarter-note 96 BPM, 3/8, 1 bar ကို render လုပ်ပြီး **28 frames, 0.933 sec**, 1080×1920 VP8 video နှင့် 48 kHz mono Opus audio ထွက်သည်။ `ffprobe` က video/audio stream နှစ်ခုလုံးကို ဖတ်နိုင်သည်။
 - Metronome controls နှင့် Studio layout: 375×812 phone viewport တွင် 1-column, 1280×900 desktop viewport တွင် 2-column ဖြစ်ပြီး horizontal overflow မရှိ။ Metronome route တွင် shared Drum settings form ကို ဖျောက်ထားကြောင်း စစ်ဆေးထားသည်။
 - Video Engine source/production sync နှင့် Metronome Engine source/production sync နှစ်ခုစလုံး pass.
 
@@ -90,12 +90,12 @@ Design တစ်ခုချင်း၏ မူလ visual identity နှင့�
 - **Bounce Ball:** runway/pad hierarchy, adaptive labels နှင့် current/total beat readout.
 - **Stack Blocks:** motion ကို beat တစ်ခုလုံးအတွင်း ဆက်ပြပြီး active block highlight.
 
-11×3 = **33 SVG layout previews** ကို Chromium gallery ဖြင့် manual visual review လုပ်ထားသည်။ 12/8, beat 12/12, 240 BPM stress frame-ээр 2-digit number болон dense 12-beat arrangement ကိုလည်း ထပ်စစ်ထားသည်။ Metronome Engine `npm run verify` တွင် **20/20 tests** pass бөгөөд production/static website bundle sync ဖြစ်သည်။ Video Engine Chromium end-to-end test သည် `sweep-dial` portrait 3/8 example ကို **28 frames, 720×1280 VP8 video + 48 kHz mono Opus** အဖြစ် ထုတ်ပေးပြီး pass ဖြစ်သည်။ Automated pixel/snapshot visual regression ကို မထည့်ရသေးပါ။
+11×3 = **33 SVG layout previews** ကို Chromium gallery ဖြင့် manual visual review လုပ်ထားသည်။ 12/8, beat 12/12, 240 BPM stress frame-ээр 2-digit number болон dense 12-beat arrangement ကိုလည်း ထပ်စစ်ထားသည်။ Metronome Engine `npm run verify` တွင် **22/22 tests** pass бөгөөд production/static website bundle sync ဖြစ်သည်။ Video Engine Chromium end-to-end test သည် `sweep-dial` portrait 3/8 example ကို **28 frames, 1080×1920 VP8 video + 48 kHz mono Opus** အဖြစ် ထုတ်ပေးပြီး pass ဖြစ်သည်။ Automated pixel/snapshot visual regression ကို မထည့်ရသေးပါ။
 
 ## လက်ကျန်ကန့်သတ်ချက်များ
 
-- Engine runtime frame input တွင် `NaN`/`Infinity` edge-case validation နှင့် SVG `logoUrl` attribute escaping ကို ပိုမိုစမ်းသပ်/ပြင်ဆင်ရန် ကျန်သည်။
-- Adapter သည် လက်ရှိ `logoUrl` မပေးသဖြင့် exported Metronome video တွင် brand/instrument logo မပါပါ။
+- **Input/edge-case စမ်းသပ်မှု — ပြီးစီး (2026-11-18):** `test-metronome-studio-browser.mjs` သည် (က) အလွတ် tempo၊ bars 99၊ မသိသော design သုံးမျိုးလုံးကို page က ငြင်းပြီး render ကို မဖွင့်ကြောင်း၊ (ခ) render အလယ်တွင် cancel လုပ်လျှင် "cancelled" ဟု ပြပြီး ခလုတ်/ထိန်းချုပ်မှုများ ပြန်ပွင့်ကာ ဖိုင်/ဗီဒီယို မကျန်ကြောင်း၊ (ဂ) `OfflineAudioContext` မရှိသော browser တွင် "cannot create the metronome click track" ဟု အကြောင်းပြချက်ဖြင့် ငြင်းပြီး ဗီဒီယို မထုတ်ကြောင်း၊ (ဃ) ထို ကျရှုံးမှုပြီးနောက် preview ပြန်အလုပ်လုပ်ကြောင်း စစ်သည်။ မသိသော design ကို `readSettings()` က ငြင်းသည် — engine က ပထမ design သို့ fallback လုပ်သဖြင့် panel က မကမ်းလှမ်းခဲ့သော ဗီဒီယို ထွက်နိုင်ခဲ့သည်။ Engine ၏ `NaN`/`Infinity` frame handling (0 သို့ပြောင်း၊ 0–1 clamp) သည် မပြောင်းလဲပါ။ SVG `logoUrl` attribute escaping ကို `escapeText()` ဖြင့် ပြင်ပြီးဖြစ်သည်။
+- Adapter က `logoUrl` ကို data URI အဖြစ် ပေးပို့ပြီး house mark (`m-sharing-mark.svg`) ပါဝင်လာသည်။ Instrument တစ်ခုချင်းအတွက် square mark asset မရှိသေးသဖြင့် design 11 ခုလုံးတွင် house mark ကို သုံးထားသည်။
 - Browser test သည် Chromium/headless environment ပေါ်တွင်သာ အတည်ပြုထားသည်။ Safari/Firefox နှင့် ဖုန်းအစစ် compatibility မစစ်ရသေးပါ။ 375px/1280px viewport test သည် actual device test မဟုတ်ပါ။
 - 11×3 design/aspect SVG outputs ကို engine unit tests ဖြင့်စစ်ပြီး Chromium gallery ဖြင့် manual visual review လုပ်ထားသည်။ Repeatable browser visual snapshot နှင့် automated clipping/overlap assertions မရှိသေးပါ။
 - Default click tone ကို user က ပြောင်းနိုင်ခြင်း၊ volume/accent options နှင့် အခြား instrument adapter များကို မထည့်ရသေးပါ။
@@ -116,7 +116,7 @@ Design တစ်ခုချင်း၏ မူလ visual identity နှင့�
 
 Render input တွင် `design`, `aspect` (`16x9`, `9x16`, `1x1`), `frame.beat`, `frame.beatsPerBar`, `frame.phase`, `frame.bar`, `frame.bpm`, `frame.timeSignature` နှင့် optional `title`, `subtitle`, `logoUrl` ပါဝင်သည်။ `phase` သည် beat စသည့်အချိန်တွင် 0၊ နောက် beat မတိုင်မီ 1 ဖြစ်သည့် progress ဖြစ်သည်။ မသိသော design သည် ပထမ design `pendulum` သို့ fallback လုပ်ပြီး runtime တွင် မသိသော aspect သည် `16x9` သို့ fallback လုပ်သည်။ `phase` finite မဟုတ်ပါက 0 သို့ပြောင်းကာ၊ အခြားအချိန်တွင် 0–1 အတွင်းကန့်သတ်သည်။ အခြား numeric field များအတွက် `NaN`/`Infinity` validation မပြည့်စုံသေးကြောင်း Plan backlog တွင် မှတ်တမ်းတင်ထားသည်။
 
-SVG ၏ native design artboard အရွယ်အစားမှာ `16x9` = 1920×1080, `9x16` = 1080×1920, `1x1` = 1080×1080 ဖြစ်သည်။ Website video adapter က 30 FPS ဖြင့် သက်ဆိုင်ရာ 1280×720, 720×1280, 720×720 canvas ထဲသို့ aspect ratio မပျက်စေဘဲ ဆွဲသည်။ SVG shared layout သည် header, stage band, logo region နှင့် BPM/meter readout ကို ခွဲထားပြီး design-specific body ကို stage အတွင်းတွင် ထည့်သည်။
+SVG ၏ native design artboard အရွယ်အစားမှာ `16x9` = 1920×1080, `9x16` = 1080×1920, `1x1` = 1080×1080 ဖြစ်သည်။ Website video adapter က 30 FPS ဖြင့် Video Engine ၏ shared delivery size (`sizeFor()`) ဖြစ်သော 1920×1080, 1080×1920, 1080×1080 canvas ထဲသို့ aspect ratio မပျက်စေဘဲ ဆွဲသည်။ SVG shared layout သည် header, stage band, logo region နှင့် BPM/meter readout ကို ခွဲထားပြီး design-specific body ကို stage အတွင်းတွင် ထည့်သည်။
 
 | ID | Design | Look | Frame အတွင်း အဓိကပုံဖော်ချက် |
 |---|---|---|---|
@@ -132,7 +132,7 @@ SVG ၏ native design artboard အရွယ်အစားမှာ `16x9` = 192
 | `bounce-ball` | Bounce Ball | Cream / orange | Beat pad များကြား ball ခုန်သည်; current/total beat readout ပါသည်။ |
 | `stack-blocks` | Stack Blocks | Slate / violet | Beat အလိုက် block များတက်ပြီး future position များကို outline လုပ်သည်။ |
 
-`src/logos.ts` သည် design ID အလိုက် `drum`, `piano`, `guitar`, `bass`, `violin`, `cello`, `vocal` သို့မဟုတ် `sharing` ကဲ့သို့ logo-name metadata ပေးသည်; အမှန်တကယ် URL/path ကို host က map လုပ်ရသည်။ Adapter က လက်ရှိ `logoUrl` မပေးသဖြင့် Metronome export တွင် logo မပါ။ Engine text အတွက် `escapeText()` ရှိသော်လည်း SVG `logoUrl` attribute အတွက် escaping test မလုံလောက်သေးကြောင်း backlog တွင်ထားသည်။
+`src/logos.ts` သည် design ID အလိုက် `drum`, `piano`, `guitar`, `bass`, `violin`, `cello`, `vocal` သို့မဟုတ် `sharing` ကဲ့သို့ logo-name metadata ပေးသည်; အမှန်တကယ် URL/path ကို host က map လုပ်ရသည်။ `layout.ts` ရဲ့ `logo()` က href ကို `escapeText()` ဖြင့် escape လုပ်သည် — `&` မပါဘဲ ထည့်လျှင် SVG document တစ်ခုလုံးကို browser က ငြင်းပယ်ပြီး frame ဗလာထွက်သည်။ `renderMetronomeFrame()` က `title`, `subtitle`, `logoUrl` တွင် string မဟုတ်သည့် တန်ဖိုးကို ဖယ်ရှားသည် (throw မလုပ်ပါ)။ Adapter က logo ကို data URI အဖြစ် inline လုပ်ပေးသဖြင့် Metronome export တွင် house mark ပါဝင်သည်; blob SVG သည် file path ကို မဖွင့်နိုင်ပါ။
 
 ## Package metadata နှင့် clean-install အခြေအနေ
 

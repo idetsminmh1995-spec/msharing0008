@@ -79,18 +79,108 @@
                 <div class="studio-field"><span>Sound Model</span><select data-metronome-sound-model><option value="default">Default Metronome Click</option><option value="natural">Natural Sound Model</option><option value="studio">Studio Sound Model</option><option value="room">Room Sound Model</option></select><label class="range-control"><input type="range" min="0" max="100" value="80" data-metronome-sound-volume /><output data-metronome-sound-volume-value>80%</output></label></div>
               </div>
             </section>
+            <section class="metronome-controls" data-piano-controls hidden aria-label="Piano video settings">
+              <label class="studio-field studio-field--file metronome-file-field"><span>MusicXML file</span><input type="file" accept=".musicxml,.xml,.mxl,application/xml,text/xml,application/vnd.recordare.musicxml+xml" data-piano-musicxml-input aria-describedby="piano-musicxml-name" /><small id="piano-musicxml-name" data-piano-musicxml-name>No file selected</small></label>
+              <p class="metronome-help">The keyboard is drawn from the score's own pitches and shows the keys it uses. A key is down for as long as its note sounds; ties are held, not re-struck.</p>
+              <div class="metronome-field-grid">
+                <label class="metronome-field">Video orientation
+                  <select data-piano-aspect aria-label="Piano video orientation">
+                    <option value="16x9">Landscape · 16:9</option>
+                    <option value="9x16">Portrait · 9:16</option>
+                    <option value="1x1">Square · 1:1</option>
+                  </select>
+                </label>
+              </div>
+              <p class="metronome-duration" data-piano-summary aria-live="polite"></p>
+            </section>
+            <section class="metronome-controls" data-guitar-controls hidden aria-label="Guitar video settings">
+              <label class="studio-field studio-field--file metronome-file-field"><span>MusicXML file (with tablature)</span><input type="file" accept=".musicxml,.xml,.mxl,application/xml,text/xml,application/vnd.recordare.musicxml+xml" data-guitar-musicxml-input aria-describedby="guitar-musicxml-name" /><small id="guitar-musicxml-name" data-guitar-musicxml-name>No file selected</small></label>
+              <p class="metronome-help">The neck is drawn from the file's own string and fret numbers. A score with no tablature has no positions to draw, so it is refused rather than guessed.</p>
+              <div class="metronome-field-grid">
+                <label class="metronome-field">Guitar picture
+                  <select data-guitar-photo aria-label="Guitar picture"></select>
+                </label>
+                <label class="metronome-field">Video orientation
+                  <select data-guitar-aspect aria-label="Guitar video orientation">
+                    <option value="16x9">Landscape · 16:9</option>
+                    <option value="9x16">Portrait · 9:16</option>
+                    <option value="1x1">Square · 1:1</option>
+                  </select>
+                </label>
+              </div>
+              <div class="metronome-field-grid">
+                <label class="metronome-field">Right hand
+                  <select data-guitar-picking aria-label="Right hand notation">
+                    <option value="pick">Plectrum</option>
+                    <option value="fingers">Fingers</option>
+                  </select>
+                </label>
+                <label class="metronome-field">Finger colour legend
+                  <input type="checkbox" data-guitar-hand-legend checked aria-label="Draw the finger colour legend" />
+                </label>
+              </div>
+              <p class="metronome-duration" data-guitar-summary aria-live="polite"></p>
+            </section>
+            <section class="metronome-controls" data-bass-controls hidden aria-label="Bass video settings">
+              <label class="studio-field studio-field--file metronome-file-field"><span>MusicXML file</span><input type="file" accept=".musicxml,.xml,.mxl,application/xml,text/xml,application/vnd.recordare.musicxml+xml" data-bass-musicxml-input aria-describedby="bass-musicxml-name" /><small id="bass-musicxml-name" data-bass-musicxml-name>No file selected</small></label>
+              <p class="metronome-help">The neck is drawn from the file's own string and fret numbers. A part without tablature is placed by pitch on the lowest fret that reaches each note, and the summary says so.</p>
+              <div class="metronome-field-grid">
+                <label class="metronome-field">Bass picture
+                  <select data-bass-photo aria-label="Bass picture"></select>
+                </label>
+                <label class="metronome-field">Video orientation
+                  <select data-bass-aspect aria-label="Bass video orientation">
+                    <option value="16x9">Landscape · 16:9</option>
+                    <option value="9x16">Portrait · 9:16</option>
+                    <option value="1x1">Square · 1:1</option>
+                  </select>
+                </label>
+              </div>
+              <p class="metronome-duration" data-bass-summary aria-live="polite"></p>
+            </section>
+            <section class="metronome-controls" data-violin-controls hidden aria-label="Violin video settings">
+              <label class="studio-field studio-field--file metronome-file-field"><span>MusicXML file</span><input type="file" accept=".musicxml,.xml,.mxl,application/xml,text/xml,application/vnd.recordare.musicxml+xml" data-violin-musicxml-input aria-describedby="violin-musicxml-name" /><small id="violin-musicxml-name" data-violin-musicxml-name>No file selected</small></label>
+              <p class="metronome-help">The violin stands beside the notation. Nothing is marked on it: there is no violin fingering engine, and a violin has no frets for a mark to land on.</p>
+              <div class="metronome-field-grid">
+                <label class="metronome-field">Video orientation
+                  <select data-violin-aspect aria-label="Violin video orientation">
+                    <option value="16x9">Landscape · 16:9</option>
+                    <option value="9x16">Portrait · 9:16</option>
+                    <option value="1x1">Square · 1:1</option>
+                  </select>
+                </label>
+              </div>
+              <p class="metronome-duration" data-violin-summary aria-live="polite"></p>
+            </section>
+            <section class="metronome-controls" data-voice-controls hidden aria-label="Voice video settings">
+              <label class="studio-field studio-field--file metronome-file-field"><span>Voice recording</span><input type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.flac" data-voice-audio-input aria-describedby="voice-audio-name" /><small id="voice-audio-name" data-voice-audio-name>No file selected</small></label>
+              <p class="metronome-help">Choose a recording, or record one here. The sound is decoded in this browser and nothing is uploaded. The waveform is drawn from that sound, so the video is audible.</p>
+              <div class="metronome-field-grid">
+                <div class="metronome-field"><span>Microphone</span>
+                  <button type="button" class="generate-button" data-voice-record aria-label="Record from the microphone">Record from microphone</button>
+                </div>
+                <label class="metronome-field">Video orientation
+                  <select data-voice-aspect aria-label="Voice video orientation">
+                    <option value="16x9">Landscape · 16:9</option>
+                    <option value="9x16">Portrait · 9:16</option>
+                    <option value="1x1">Square · 1:1</option>
+                  </select>
+                </label>
+              </div>
+              <p class="metronome-duration" data-voice-summary aria-live="polite"></p>
+            </section>
           <form class="studio-settings" data-studio-settings>
             <div class="studio-file-row">
               <label class="studio-field studio-field--file"><span>MusicXML file</span><input type="file" accept=".musicxml,.xml,.mxl,application/xml,text/xml" data-musicxml-input /><small data-musicxml-name>No file selected</small></label>
               <label class="studio-field studio-field--file"><span>Logo</span><input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" data-logo-input /><img class="studio-logo-preview" data-logo-preview src="assets/logo/m-sharing-drum-logo.svg" alt="M Sharing Drum Logo" /></label>
             </div>
             <div class="studio-field-grid">
-              <div class="studio-field studio-title-field"><span>Title 1</span><input type="text" maxlength="48" value="DRUM PERFORMANCE" placeholder="Main title" data-title-one /><div class="studio-inline-options"><label>Color <input type="color" value="#f8fafc" data-title-one-color /></label><label>Size <input type="number" min="12" max="72" value="22" data-title-one-size /> px</label></div></div>
-              <div class="studio-field studio-title-field"><span>Title 2</span><input type="text" maxlength="64" value="VISUAL PREVIEW" placeholder="Subtitle" data-title-two /><div class="studio-inline-options"><label>Color <input type="color" value="#91a0b5" data-title-two-color /></label><label>Size <input type="number" min="8" max="48" value="11" data-title-two-size /> px</label></div></div>
+              <div class="studio-field studio-title-field"><span>Title 1</span><input type="text" maxlength="48" value="DRUM PERFORMANCE" placeholder="Main title" data-title-one /><div class="studio-inline-options"><label>Color <input type="color" value="#ffaa00" data-title-one-color /></label><label>Size <input type="number" min="12" max="72" value="22" data-title-one-size /> px</label></div></div>
+              <div class="studio-field studio-title-field"><span>Title 2</span><input type="text" maxlength="64" value="VISUAL PREVIEW" placeholder="Subtitle" data-title-two /><div class="studio-inline-options"><label>Color <input type="color" value="#111827" data-title-two-color /></label><label>Size <input type="number" min="8" max="48" value="11" data-title-two-size /> px</label></div></div>
             </div>
             <div class="studio-field-grid">
-              <label class="studio-field"><span>Drum Brand</span><select data-drum-brand><option value="m-sharing">M Sharing</option><option value="pearl">Pearl</option><option value="yamaha">Yamaha</option><option value="tama">Tama</option><option value="ludwig">Ludwig</option></select></label>
-              <label class="studio-field"><span>Drum Model</span><select data-drum-model><option value="custom">Custom Drum Kit</option><option value="export">Export Series</option><option value="stage">Stage Custom</option><option value="imperialstar">Imperialstar</option><option value="classic">Classic Kit</option></select></label>
+              <label class="studio-field"><span>Drum Brand</span><select data-drum-brand><option value="RolandDrums">Roland</option><option value="MSDrums">M Sharing</option></select></label>
+              <label class="studio-field"><span>Drum Model</span><select data-drum-model><option value="VAD716">Roland VAD716</option><option value="MS Drum 1">M Sharing Drum 1</option><option value="MS Drum 2">M Sharing Drum 2</option></select></label>
             </div>
             <div class="studio-field-grid">
               <label class="studio-field"><span>Notation View</span><select data-notation-view><option value="landscape">Page — Landscape</option><option value="portrait">Page — Portrait</option><option value="square">Page — Square</option><option value="horizontal">Horizontal</option></select></label>
@@ -112,6 +202,7 @@
           <div class="video-panel-heading"><h2>Video</h2><span class="video-format" data-video-format>16:9 · 1920×1080</span></div>
           <div class="video-stage" data-video-stage>
             <video data-video-output playsinline preload="metadata" hidden aria-label="Rendered Studio video"></video>
+            <canvas data-video-preview hidden aria-label="Live preview of the Studio video"></canvas>
             <img data-metronome-preview alt="Static preview of the selected metronome design" hidden />
             <p data-video-placeholder>No rendered performance yet.</p>
           </div>
@@ -119,16 +210,26 @@
             <button class="video-play-button" type="button" data-video-play aria-label="Play video" disabled>▶</button>
             <input class="video-timeline" type="range" min="0" max="1" value="0" step="0.1" data-video-timeline aria-label="Video timeline" disabled />
             <span class="video-time" data-video-time>00:00</span>
+            <span class="video-source" data-video-source>Live preview</span>
             <button class="video-fullscreen-button" type="button" data-video-fullscreen aria-label="Full screen">⛶</button>
           </div>
           <a class="video-download" data-video-download hidden>Download rendered video</a>
         </div>
       </section>
     </main>
-    <script src="assets/video-engine.js?v=5520d16b88c1"></script>
-    <script src="assets/metronome-engine.js?v=7d4f30b60e08"></script>
-    <script src="script.js?v=cb8dc501cd10"></script>
-    <script src="studio-video.js?v=0890cb19dd8b"></script>
-    <script src="studio-metronome.js?v=2ac6aea8ca8e"></script>
+    <script src="assets/video-engine.js?v=541e6d433a08"></script>
+    <script src="assets/metronome-engine.js?v=6db58bfc22c4"></script>
+    <script src="assets/guitar-engine.js"></script>
+    <script src="assets/piano-hand-engine.js"></script>
+    <script src="assets/sticking-engine.js"></script>
+    <script src="drum-kit.js?v=80623ff06439"></script>
+    <script src="script.js?v=dab936727b1f"></script>
+    <script src="studio-video.js?v=b1cd8f1edc0b"></script>
+    <script src="studio-metronome.js?v=d1c9ec8513d5"></script>
+    <script src="studio-guitar.js?v=e8778d04aaa7"></script>
+    <script src="studio-piano.js?v=857ee44e5809"></script>
+    <script src="studio-bass.js?v=fd2816360283"></script>
+    <script src="studio-violin.js?v=836c6f275ccb"></script>
+    <script src="studio-voice.js?v=0a37a46fca6c"></script>
   </body>
 </html>

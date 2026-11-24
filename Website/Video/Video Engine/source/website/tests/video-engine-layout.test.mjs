@@ -46,7 +46,7 @@ const SIZES = {
 
 test('each instrument gets all three parts, inside the frame and apart', () => {
   const { layoutFor } = loadEngine();
-  for (const instrument of ['drums', 'piano', 'guitar', 'violin']) {
+  for (const instrument of ['drums', 'piano', 'guitar', 'bass', 'violin']) {
     for (const [ratio, { width, height }] of Object.entries(SIZES)) {
       const layout = layoutFor(instrument, { width, height });
       assert.deepEqual([...layout.parts].sort(), ['instrument', 'notation', 'title']);
@@ -73,6 +73,24 @@ test('each instrument gets all three parts, inside the frame and apart', () => {
   }
 });
 
+test('a voice frame is the Title band over the waveform, with no notation part', () => {
+  const { layoutFor } = loadEngine();
+  for (const [ratio, { width, height }] of Object.entries(SIZES)) {
+    const layout = layoutFor('voice', { width, height });
+    assert.equal(layout.ratio, ratio);
+    // A voice has nothing to notate and nothing to mark: the recording's
+    // waveform is the body of the frame.
+    assert.deepEqual([...layout.parts], ['title', 'instrument']);
+    assert.equal(layout.rects.notation, undefined);
+    assert.ok(layout.rects.title.y < layout.rects.instrument.y);
+    for (const [name, rect] of Object.entries(layout.rects)) {
+      assert.ok(rect.width > 0 && rect.height > 0, `voice/${ratio}/${name} has no area`);
+      assert.ok(rect.x + rect.width <= width, `voice/${ratio}/${name} runs off the right`);
+      assert.ok(rect.y + rect.height <= height, `voice/${ratio}/${name} runs off the bottom`);
+    }
+  }
+});
+
 test('the declared order is the drawn order, per the Plan', () => {
   const { layoutFor } = loadEngine();
   const topOf = (rect) => rect.y;
@@ -86,6 +104,10 @@ test('the declared order is the drawn order, per the Plan', () => {
   const guitar = layoutFor('guitar', SIZES['16:9']);
   assert.ok(topOf(guitar.rects.instrument) < topOf(guitar.rects.notation));
   assert.ok(topOf(guitar.rects.notation) < topOf(guitar.rects.title));
+
+  const bass = layoutFor('bass', SIZES['16:9']);
+  assert.ok(topOf(bass.rects.instrument) < topOf(bass.rects.notation));
+  assert.ok(topOf(bass.rects.notation) < topOf(bass.rects.title));
 
   const violin = layoutFor('violin', SIZES['16:9']);
   assert.equal(violin.shape, 'split');
@@ -144,4 +166,23 @@ test('composeFrame clips each part to its own rectangle', async () => {
 test('composeFrame refuses a caller with no parts map', async () => {
   const { composeFrame } = loadEngine();
   await assert.rejects(() => composeFrame({}, { instrument: 'drums', width: 1920, height: 1080 }), TypeError);
+});
+
+test('the engine is the one place a delivery size is written', () => {
+  const { sizeFor, ratioNames, DELIVERY_SIZES } = loadEngine();
+  assert.deepEqual(ratioNames().sort(), Object.keys(SIZES).sort());
+  for (const [ratio, size] of Object.entries(SIZES)) {
+    assert.deepEqual({ ...sizeFor(ratio) }, size, `${ratio} is not the Plan's delivery size`);
+    assert.deepEqual({ ...DELIVERY_SIZES[ratio] }, size);
+    // Pages spell the ratio with a colon or an x; both name the same frame.
+    assert.deepEqual({ ...sizeFor(ratio.replace(':', 'x')) }, size);
+  }
+});
+
+test('an unknown ratio is refused, and the caller cannot edit the table', () => {
+  const { sizeFor, DELIVERY_SIZES } = loadEngine();
+  assert.throws(() => sizeFor('4:3'), /not a supported video ratio/);
+  const size = sizeFor('16:9');
+  size.width = 1;
+  assert.equal(DELIVERY_SIZES['16:9'].width, 1920, 'sizeFor handed out the table itself');
 });

@@ -1,0 +1,11 @@
+node_modules/
+*.log
+
+# dist/metronome-engine.js is intentionally COMMITTED, not ignored: the site is
+# served as static files from GitHub Pages, which has no build step, so the
+# browser can only load the engine if the built bundle is in the repo. Rebuild
+# with `npm run sync:website` and commit the result alongside any src/ change.
+#
+# The sourcemap stays out -- it is larger than the bundle and only helps local
+# debugging, where `npm run build` regenerates it anyway.
+dist/*.map
