@@ -54,6 +54,21 @@ Instrument တစ်ခုချင်းစီသည် Video Engine encoder �
 6. **ရေတွက်ပုံ ရွေးချယ်မှု** (`1,2,3,4` / `1&,…` / `1e&a,…`) သည် Video ပေါ်ရှိ စာသားကိုသာ ပြောင်းသည်။ Count Voice အသံနှင့် မဆက်စပ်။
 7. **စစ်ဆေးရမည့် စံနှုန်း:** ratio ၃ မျိုး × တူရိယာအလိုက် layout တွင် `atSeconds` တူလျှင် frame တူခြင်း၊ စုစုပေါင်းအရှည် = Count Voice + MusicXML + Thank You ဖြစ်ခြင်း၊ 1080p memory/encode အောင်မြင်ခြင်း၊ Thank You ကို ratio မှန်ကန်စွာ ဆက်ခြင်း၊ Drum နှင့် Metronome regression အောင်မြင်ခြင်း။
 
+**Phase 0.5 — လက်ရှိအခြေအနေ (2026-11-23 code စစ်ဆေးချက်):**
+
+| # | အချက် | အခြေအနေ |
+|---|---|---|
+| 1 | စံ output အရွယ် | Drum ✅၊ **Metronome ❌** (1280×720 စသည်) |
+| 2 | ၃ ပိုင်း layout template | ✅ `layoutFor` / `composeFrame` / `requireAsset` + test၊ **Doc မရေးရသေး** |
+| 3 | Video အရှည် = Count Voice + MusicXML + Thank You | ❌ (Drum: drum hit အခြေခံ၊ `MAX_SECONDS = 12`) |
+| 4 | Thank You segment | ❌ (`requireAsset` စာချုပ်သာ၊ page ချိတ်ဆက်မှုမရှိ) |
+| 5 | Title / Info | 🟡 Drum Studio တွင် code ရှိ၊ browser မစစ်ရသေး |
+| 6 | ရေတွက်ပုံ ရွေးချယ်မှု | ✅ `data-count-display` |
+| 7 | စစ်ဆေးရမည့် စံနှုန်း | ❌ browser E2E မရှိ |
+| 8 | **Live Preview** (အသစ်) | ❌ — Main Plan §၁၂ |
+
+အသေးစိတ် အဆင့်များ (V1–V10) ကို Main Plan ၏ `Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ်` §၈ တွင် ကြည့်ပါ။
+
 ### Phase 1 — Guitar visual adapter (ပထမဦးစားပေး)
 
 **အကြောင်းရင်း:** Guitar Engine တွင် reusable source, tests, built bundle နှင့် SVG stage API ရှိသော်လည်း Studio event source နှင့် Canvas painter မချိတ်ရသေးပါ။ လက်ရှိအထောက်အထားအရ စတင်ရန်အဆင်သင့်ဆုံးဖြစ်သော်လည်း integration ပြီးစီးပြီဟု မယူဆရ။

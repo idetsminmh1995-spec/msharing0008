@@ -631,47 +631,74 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 - `MAX_SECONDS = 12` ကို ဖယ်ရမည်။ Safety အတွက် Video Engine ၏ memory guard ကိုသာ ထားမည် (ရှည်လွန်း/ကြီးလွန်းလျှင် ရှင်းရှင်းလင်းလင်း ငြင်းပယ်)။
 - Notation ကို Duration တွက်ပြီးမှ ပြင်ဆင်နေသော လက်ရှိ အစဉ် (duration → `prepareNotationFor`) ကို ပြောင်းရမည် — Notation အရင် ပြင်ပြီး `notation.seconds` ကို သိမှ duration တွက်ရမည်။
 
-### ၈။ အကောင်အထည်ဖော်ရန် အစီအစဉ် (အဆိုပြုချက် — အတည်ပြုရန်)
+### ၈။ Drum video export — MVP နှင့် လိုအပ်ချက်
 
-1. **Drum Studio — Title / Info အပိုင်း:** Logo ဘယ်ဘက်ပြောင်း၊ `4/4`၊ `BPM`၊ `Key`၊ `Metronome` ထည့်။
-2. **Layout template ခွဲထုတ်ခြင်း:** အပိုင်း ၃ ခုကို data ဖြင့်ကြေညာနိုင်အောင် Video Engine ကို ပြင်။
-3. **Notation Engine ချိတ်ခြင်း:** အလယ်အပိုင်း (Page / Horizontal၊ cursor)။
-4. **Drum အပိုင်း:** R2 မှ Drum ပုံများသုံး၍ ဆွဲ။
-5. **ရေတွက်ပုံ ရွေးချယ်မှု** (Studio option) ထည့်။
-6. **Thank You segment** ကို Video Engine ထဲ ချိတ်။
-7. **Guitar** (Phase 1)၊ ထို့နောက် **Piano** (Phase 2)၊ **Violin**။
+**MVP ၏ အဓိပ္ပာယ်:** Drum Studio တွင် MusicXML တင်၍ Generate နှိပ်လျှင် **Title / Info နှင့် Notation (cursor ပါ) ပေါ်နေသော MP4 ဖိုင်** ထွက်ပြီး ဒေါင်းလို့ရ၊ **Preview Play** လို့ရရမည်။
 
-အဆင့်တစ်ခုချင်းစီကို သင် "ready" ဟု ပြောမှသာ စတင်မည်။
+**လက်ရှိ code နှင့် ကွာနေသည့်အချက်များ:**
 
-### ၉။ ပြီးစီးမှု အခြေအနေ (Doc စစ်ဆေးချက် — 2026-11-22)
+| # | ကွာနေမှု | အကျိုးသက်ရောက်မှု |
+|---|---|---|
+| ၁ | Duration ကို drum hit မှတွက်၊ ၁၂ စက္ကန့်ဖြင့်ဖြတ် (§၇) | ရှည်သော MusicXML ဖြတ်ပြီးထွက် |
+| ၂ | Count-in segment မပါ | လိုအပ်ချက်နှင့် မကိုက် |
+| ၃ | Live Preview မရှိ (Export ပြီးမှ play ရ) | Preview Play လိုအပ်ချက် |
+| ၄ | Thank You segment မပါ | Video အဆုံး မပြည့်စုံ |
+| ၅ | အသံမပါ (silent) | အသံပါ Video requirement |
+| ၆ | `.mxl` Notation မပြ | `.mxl` ဖိုင်တွင် Notation မပါ |
+| ၇ | Browser တွင် စမ်းသပ်စစ်ဆေးမှု မရှိ၊ Doc မရှိ | ထုတ်ရလား မသေချာ |
 
-`Website/Video/Video Engine Doc/README.md`၊ `Metronome Engine Doc/DOC.md`၊ `Website/Doc/Create-Video-Page.md` နှင့် code ကို ဖတ်၍ ပြုစုထားသည်။
+**အဆင့်များ (OpenHands အတွက်၊ အစဉ်လိုက်):**
 
-**ပြီးပြီ**
+| # | အလုပ် | ပြီးစီးမှု စံနှုန်း |
+|---|---|---|
+| **V1** | **Browser (Chromium) တွင် end-to-end စမ်းသပ်စစ်ဆေး** — repo ထဲရှိ MusicXML နမူနာဖြင့် Ratio ၃ မျိုးစလုံး Export | MP4 ထွက်၊ `ffprobe` ဖြင့် codec H.264 / အရွယ် (1920×1080 စသည်) / အရှည် မှန်၊ frame ကို `t=0`၊ အလယ်၊ အဆုံးတွင် ထုတ်ကြည့်ပြီး Title / Notation / cursor ပေါ်ကြောင်းနှင့် cursor နေရာ ပြောင်းကြောင်း၊ ရလဒ်ကို Doc တွင် မှတ် |
+| **V2** | V1 တွင် ကျရှုံးသည်များကို ပြင် (Notation Engine load လမ်းကြောင်း၊ Bravura font၊ SVG decode အမြန်နှုန်း၊ 1080p memory၊ ရှည်သော score) | V1 အားလုံး pass |
+| **V3** | **Duration စည်းမျဉ်း** (§၇) — `MAX_SECONDS` ဖယ်၊ `notation.seconds` အခြေခံ၊ Notation ကို ဦးစွာပြင်ဆင် | ၃၀ စက္ကန့်ကျော် MusicXML ကို မဖြတ်ဘဲ ထုတ်နိုင်၊ အရှည်ပေါင်းလဒ် မှန် |
+| **V4** | **Count-in** — Video အစတွင် count-in segment (ရေတွက်စာသား၊ Count display အတိုင်း)၊ Notation cursor သည် count-in ပြီးမှ စ | Count-in အရှည် = အစ bar တစ်ခု၊ cursor timing မှန် |
+| **V5** | **Live Preview** (§၁၂) | §၁၂ ၏ စံနှုန်း ၆ ချက် |
+| **V6** | **Notation View စစ်ဆေး** — Horizontal ညာမှဘယ်၊ Page အောက်မှအပေါ်၊ Page — Landscape/Portrait/Square | ရွေ့ပုံ Plan နှင့်ကိုက်၊ test ရှိ |
+| **V7** | **Title / Info စစ်ဆေး** — Logo ဘယ်ဘက်၊ Title 1 ဘေး၊ Title 2 အောက်၊ ထိုတန်းတွင် `4/4` / BPM / Key / Metronome icon၊ user ရိုက်သည့်အတိုင်း၊ စာသားရှည်လျှင် မကျော်လွန် | Ratio ၃ မျိုးလုံးတွင် မှန်၊ ရှည်သောစာသားဖြင့် မပျက် |
+| **V8** | **Thank You segment** (Video Engine) | အဆုံးတွင်ပေါ်၊ ratio မှန်၊ asset မရလျှင် `requireAsset` စာချုပ်အတိုင်း |
+| **V9** | **အသံပါ Video** (Phase 6 — Sound Engine offline `AudioBuffer`၊ Count Voice အသံ) | `ffprobe` တွင် audio stream ပါ၊ audio/video sync |
+| **V10** | **Doc** — Video Engine Doc တွင် layout API (`layoutFor`, `composeFrame`, `requireAsset`) နှင့် Drum Studio ၏ Title/Notation/Preview ကို မှတ် | Doc ထဲ ရှိ၊ Doc index တွင် link |
+
+**MVP ပြီးသည်ဟု သတ်မှတ်ရန်:** V1 – V7 နှင့် V10။ V8 (Thank You) နှင့် V9 (အသံ) သည် ဆက်လက်လုပ်မည့် အဆင့်များ ဖြစ်သော်လည်း Video ပြည့်စုံရန် လိုအပ်ချက်ဖြစ်သည်။
+
+### ၉။ ပြီးစီးမှု အခြေအနေ (Doc + code စစ်ဆေးချက် — 2026-11-23)
+
+`Website/Video/Video Engine Doc/README.md`၊ `Metronome Engine Doc/DOC.md`၊ `Website/Doc/Create-Video-Page.md` နှင့် `main` ၏ code ကို ဖတ်၍ ပြုစုထားသည်။ **အောက်ပါ "ရှိပြီး" များသည် code ရှိကြောင်းသာ — Browser တွင် ပြေးစမ်း၍ မစစ်ရသေးပါ (V1)။**
+
+**ပြီးပြီ (code ရှိ)**
 
 | အပိုင်း | အခြေအနေ |
 |---|---|
-| Video Engine core | Canvas frame များကို WebCodecs ဖြင့် MP4/WebM အဖြစ် render/mux၊ MediaRecorder fallback၊ optional `AudioBuffer`၊ progress/cancel၊ memory guard၊ cleanup။ Tests — MP4 muxer ၁၅၊ cleanup/safety ၅ (စုစုပေါင်း ၂၀/၂၀ အောင်)၊ Chromium smoke၊ Drum browser integration နှင့် ffprobe စစ်ဆေးချက်။ |
-| Create Video selection page | Tool card များ (Piano, Drums, Guitar, Bass, Strings, Voice, Metronome, More) နှင့် shared `studio.html?tool=...` routing။ |
-| Studio ၏ shared control panel | MusicXML ရွေးခြင်း၊ Logo၊ Title 1 / Title 2 (စာသား/အရောင်/အရွယ်)၊ Drum Brand/Model၊ Notation View (Page Landscape / Portrait / Square)၊ Sound Model + volume၊ Count Voice (Off/On၊ ပုံစံ ၂ မျိုး၊ volume)၊ Video Color (Black/White)၊ Video Ratio (16:9 / 1:1 / 9:16)၊ Generate Video။ Ratio ပြောင်းလျှင် output အရွယ်ပြောင်းသည်။ |
-| Drum adapter | Video ထုတ်နိုင်သည် — **visual-only (အသံမပါ)**။ MusicXML plain XML ကို parse လုပ်သည်။ |
-| Metronome adapter | Design ၁၁ မျိုး၊ landscape/portrait/square၊ BPM/meter/bars၊ `OfflineAudioContext` ဖြင့် click-track အသံပါ ထုတ်နိုင်သည်။ Chromium စစ်ဆေးချက် pass။ |
+| Video Engine core | Canvas frame များကို WebCodecs ဖြင့် MP4/WebM၊ MediaRecorder fallback၊ optional `AudioBuffer`၊ progress/cancel၊ memory guard၊ cleanup။ Tests ၂၀ (MP4 muxer ၁၅၊ cleanup ၅) + layout test၊ Chromium smoke။ |
+| **Layout template** | `layoutFor` / `composeFrame` / `requireAsset` (တူရိယာအလိုက်၊ ratio ၃ မျိုး) — §၄။ (Doc ၌ မရေးရသေး) |
+| **Drum Studio — ၃ ပိုင်း** | Title / Info (`drawTitlePart`, `drawInfoBand`)၊ Notation (Notation Engine၊ page/scroll၊ cursor)၊ Drum lane အပိုင်း၊ Count display (`1,2,3,4` / `1&…` / `1e&a…`)၊ Key / BPM / `4/4`၊ Metronome icon။ |
+| Create Video selection page | Tool card များ (Piano, Drums, Guitar, Bass, Strings, Voice, Metronome, More) နှင့် `studio.html?tool=...` routing။ |
+| Studio shared control panel | §၂ ဇယားအတိုင်း။ |
+| Metronome adapter | Design ၁၁ မျိုး၊ `OfflineAudioContext` click-track အသံပါ၊ Chromium စစ်ဆေးချက် pass။ |
+| Render ပြီးသော video ပြန်ဖွင့် | `<video>` ဖြင့် Play / Pause / seek / time / Full screen / Download။ |
 
 **မပြီးသေး / မရှိသေး**
 
 | အပိုင်း | အခြေအနေ |
 |---|---|
-| Drum အသံ | Drum sound နှင့် Count Voice အသံ မချိတ်ရသေး။ `.mxl` ဖိုင် parse မလုပ်ရသေး။ |
-| Guitar adapter | Guitar Engine (TypeScript၊ tests၊ bundle၊ `positionsAt()`၊ `stageShapes()`၊ SVG renderer) ရှိသော်လည်း Studio event producer၊ Canvas painter၊ photo asset preload မရှိ။ Bundle path တွင် `website/assets` (အသေး) နှင့် `Website/Website/assets` ကွဲနေ၍ ရှင်းရမည်။ Guitar Engine သည် အသံမထုတ်ပါ။ |
-| Piano adapter | Piano Hand Human Engine (keyboard geometry၊ key press curve၊ fingering၊ IK) ရှိ။ Note event input၊ renderer၊ Studio adapter၊ အသံ မရှိ။ `Piano 3D Hand Engine` folder သည် `.gitkeep` သာ။ Wrist motion မပြီး၊ IK ကို website GLB နှင့် calibrate မလုပ်ရသေး။ ပထမ key-only visual adapter ကို ရည်မှန်း။ |
-| Violin | Engine folder မရှိ။ |
-| Bass / Strings | Playable code မရှိ။ Fretted လား keyboard/synth/orchestral လား instrument အဓိပ္ပာယ် သတ်မှတ်ရန်။ |
-| Voice | Source/capture/import၊ permission/privacy ဆုံးဖြတ်ချက် မရှိသေး။ |
-| အသံပါသော export | `AudioBuffer` မပေးလျှင် silent video ထုတ်သည်။ Sound Engine သည် Video ထဲသို့ မချိတ်ရသေး။ Notation ၏ အသံပါ ထုတ်ရန် Plan ၏ လိုအပ်ချက်ဖြစ်၍ **audible export ကို requirement အဖြစ် အတည်ပြုရန်**။ |
-| ၃ ပိုင်း layout | မရှိသေး — အထက်ပါ ပေါင်းစပ်ဆွဲခြင်း၊ Title/Info၊ layout template၊ Notation Engine ချိတ်ခြင်း၊ ရေတွက်ပုံ ရွေးချယ်မှု၊ Thank You segment။ |
-| Doc များ | `Drum Human Stick Engine Doc`၊ `Guitar Engine Doc`၊ `Piano Hand Human Engine Doc` folder များ `.gitkeep` သာရှိ — Doc မရေးရသေး။ |
+| Browser E2E စစ်ဆေးမှု + Doc | မရှိ (V1၊ V10) |
+| Duration စည်းမျဉ်း၊ Count-in segment | မရှိ (V3၊ V4) |
+| **Live Preview** | မရှိ — Export ပြီးမှ play ရ (V5) |
+| Thank You segment | Engine ၌ `requireAsset` စာချုပ်သာ၊ page ဘက် ချိတ်ဆက်မှု မရှိ (V8) |
+| အသံပါ export | Drum video silent၊ Sound Engine မရှိ (V9) |
+| `.mxl` parse | မပြီး |
+| Metronome Studio 1080p | 1280×720 စသည် ဖြစ်နေ (B1) |
+| Guitar adapter | Guitar Engine ရှိသော်လည်း Studio event producer၊ painter၊ photo preload မရှိ၊ bundle path (`website/assets` vs `Website/Website/assets`) ရှင်းရန် |
+| Piano adapter | Piano Hand Human Engine ရှိ၊ renderer/adapter/အသံ မရှိ၊ `Piano 3D Hand Engine` folder ဗလာ |
+| Violin | Engine folder မရှိ |
+| Bass / Strings / Voice | Playable code မရှိ၊ instrument အဓိပ္ပာယ်သတ်မှတ်ရန် |
+| Drum Animation Engine + R2 ပုံ | Plan တွင်သာ |
+| Engine Docs | `Drum Human Stick Engine Doc`၊ `Guitar Engine Doc`၊ `Piano Hand Human Engine Doc` folder များ `.gitkeep` သာ |
 
-**သတိ:** GitHub သို့ push လုပ်ခြင်းသည် Cloudflare site ကို အလိုအလျောက် deploy မလုပ်ပါ (Video Engine Doc: public Worker သည် push နှင့် deploy မလုပ်မချင်း ယခင် version ကို ဆက်ပေးသည်)။
+**သတိ:** GitHub သို့ push လုပ်ခြင်းသည် Cloudflare site ကို အလိုအလျောက် deploy မလုပ်ပါ (Video Engine Doc: public Worker သည် push နှင့် deploy မလုပ်မချင်း ယခင် version ကို ဆက်ပေးသည်)။ Preview/Export ကို စမ်းရန် deploy လုပ်ပြီးသော site ကိုသာ သုံးပါ။
 
 ### ၁၀။ Engine တာဝန်ခွဲခြားမှု (ဆုံးဖြတ်ချက်)
 
@@ -703,12 +730,15 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 
 | Ratio | Title / Info | Notation | တူရိယာ |
 |---|---|---|---|
-| 16:9 | အမြင့် ~၁၂% | ~၄၈% | ~၄၀% |
-| 1:1 | ~၁၂% | ~၄၄% | ~၄၄% |
-| 9:16 | ~၈% | ~၄၂% | ~၅၀% |
+| 16:9 | ၁၂% | ၄၆% | ၄၂% |
+| 1:1 | ၁၂% | ၄၄% | ၄၄% |
+| 9:16 | ၈% | ၄၂% | ၅၀% |
 
    **Violin (ဘေးတစ်ဖက်):** 16:9 နှင့် 1:1 တွင် Notation ကို ဘယ်ဘက် ~၆၀%၊ Violin ကို ညာဘက် ~၄၀% ထားပြီး အောက်ဆုံးတွင် Title / Info အကျယ်အပြည့်။ 9:16 (Portrait) တွင် ဘေးချင်းယှဉ်လျှင် ကျဉ်းလွန်းသဖြင့် Notation အပေါ်၊ Violin အောက် ထပ်၍ အောက်ဆုံးတွင် Title / Info။
 7. **Drum ပုံများ** — ဖိုင်စာရင်း/အမည်/path ကို Plan ထဲ မသတ်မှတ်၊ R2 ထဲက manifest မှ Drum Animation Engine က ဖတ်မည်။ **Thank You ဖိုင်အမည်/path** သည် Video Engine ထဲတွင်သာ။
+8. **Video ကို Preview Play လို့ရရမည်** (အသုံးပြုသူ လိုအပ်ချက်) — Live Preview နှင့် Rendered playback နှစ်မျိုးလုံး (§၁၂)။
+9. **Drum video MVP** = Title / Info နှင့် Notation ပါသော MP4 export + Preview Play (§၈)။
+10. Count-in အရှည် = အစ bar တစ်ခု (default)။ Thank You ကို Live Preview ထဲလည်း ထည့်။
 
 ### ၁၂။ Preview Play (video ကို play ကြည့်နိုင်ရန်)
 
@@ -737,7 +767,8 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 ### မဖြေရှင်းရသေးသော အချက်များ (Video ထုတ်လုပ်ပုံ)
 
 1. R2 ထဲတွင် Drum manifest (ပုံစာရင်း) ကို ဘယ်လိုပုံစံနှင့် ထားမည် — Drum Animation Engine ကို စတင်သည့်အချိန်တွင် ဆုံးဖြတ်မည်။
-2. အပေါ်ပါ ၁၁။ (4) (Metronome icon) နှင့် (6) (အချိုးများ) ကို အသုံးပြုသူသည် **ထုတ်လုပ်ပြီးသော video အစစ်ကို စမ်းကြည့်ပြီးမှ** ပြင်ဆင်မည်။ ယခုတန်ဖိုးများကို default အဖြစ်သာ သုံးသည်။
+2. ၁၁။ (4) (Metronome icon)၊ (6) (အချိုးများ) နှင့် ၁၀ (count-in အရှည်) ကို အသုံးပြုသူသည် **ထုတ်လုပ်ပြီးသော video အစစ်ကို စမ်းကြည့်ပြီးမှ** ပြင်ဆင်မည်။ ယခုတန်ဖိုးများကို default အဖြစ်သာ သုံးသည်။
+3. Drum အပိုင်း၏ drum lane ပုံစံ (ယခု canvas ဆွဲ) ကို R2 ပုံဖြင့် အစားထိုးသည့် အချိန်နှင့် ပုံစံ (Drum Animation Engine)။
 
 ## Sound Engine နှင့် MuseScore SoundFont — 2026-11-13
 
@@ -968,16 +999,18 @@ OpenHands က Code ရေးသူဖြစ်သည်။ အောက်ပါ
 
 | WP | အလုပ် | ပြီးစီးမှု စံနှုန်း |
 |---|---|---|
+| **B0** | **Drum video export ကို Chromium တွင် end-to-end စမ်းသပ်စစ်ဆေး (V1–V2)** — ပထမဆုံး | Ratio ၃ မျိုး MP4 ထွက်၊ `ffprobe` နှင့် frame စစ်ဆေးမှု pass |
 | B1 | Metronome Studio ၏ output ကို 1920×1080 / 1080×1080 / 1080×1920 သို့ ပြောင်း၊ အရွယ်ကို Video Engine ၏ shared setting တစ်ခုမှ သတ်မှတ် | Video အားလုံး အရွယ်တူ၊ 1080p memory/encode အောင်၊ Metronome test pass |
-| B2 | Video Engine တွင် ၃ ပိုင်း layout template (data ဖြင့်ကြေညာ၊ တူရိယာအလိုက်နေရာ) | `atSeconds` တူလျှင် frame တူ၊ ratio ၃ မျိုးလုံးတွင် layout မှန် |
-| B3 | Drum Studio — **Title / Info အပိုင်း** (Logo ဘယ်ဘက်၊ Title 1 / Title 2 (user ရိုက်)၊ `4/4` / `BPM` / `Key` (MusicXML မှ)၊ Metronome icon) | Video ပေါ်တွင် မှန်ကန်စွာပြ၊ MusicXML မပါလျှင် ရှင်းရှင်းလင်းလင်း ပြ |
-| B4 | **Video အရှည်** = Count Voice (အစ) + MusicXML + Thank You၊ `MAX_SECONDS = 12` ကို ဖယ် (memory guard သာ) | ရှည်သော MusicXML ဖြင့် ထုတ်နိုင်၊ အရှည်ပေါင်းလဒ် မှန် |
-| B5 | Notation Engine ကို Video အလယ်အပိုင်းတွင် ချိတ် (Page: အောက်မှအပေါ်၊ Horizontal: ညာမှဘယ်၊ Notation Engine ၏ cursor) | Cursor က တီးနေသော note နှင့် တိုက်ဆိုင်၊ ရွေ့ပုံ မှန် |
-| B6 | ရေတွက်ပုံ ရွေးချယ်မှု option (`1,2,3,4` / `1&,…` / `1e&a,…`) — စာသားသာပြောင်း | Video ပေါ်စာသားပြောင်း၊ Count Voice အသံ မပြောင်း |
+| B2 | ✅ **ပြီးပြီ (code ရှိ)** — Video Engine ၏ ၃ ပိုင်း layout template (`layoutFor`/`composeFrame`) | Test ရှိ၊ **Doc မရေးရသေး** (V10) |
+| B3 | 🟡 Drum Studio ၏ Title / Info — code ရှိ (`drawTitlePart`, `drawInfoBand`)၊ **browser စစ်ဆေးမှုမရှိသေး** (V1၊ V7) | Ratio ၃ မျိုးလုံးတွင် မှန်ကြောင်း စစ်၊ ရှည်သောစာသားဖြင့် မပျက် |
+| B4 | ❌ **Video အရှည်** = Count Voice + MusicXML + Thank You၊ `MAX_SECONDS = 12` ဖယ် (§၇၊ V3၊ V4) | ရှည်သော MusicXML ဖြတ်မထွက်၊ အရှည်ပေါင်းလဒ် မှန် |
+| B5 | 🟡 Notation Engine ကို Video အလယ်အပိုင်းတွင် ချိတ် — code ရှိ၊ scroll ဦးတည်ချက် စစ်ရန် (V6) | Cursor က တီးနေသော note နှင့် တိုက်ဆိုင်၊ ရွေ့ပုံ မှန် |
+| B6 | ✅ ရေတွက်ပုံ ရွေးချယ်မှု (`data-count-display`) — ရှိပြီး | Video ပေါ်စာသားသာပြောင်း၊ Count Voice အသံ မပြောင်း |
 | B7 | **Thank You segment** ကို Video Engine ထဲ ချိတ် (output ratio အလိုက်ဖိုင်ကို R2 မှ၊ အဆုံးတွင်ဆက်) | အဆုံးတွင်ပေါ်၊ ratio မှန်၊ ဖိုင်မရလျှင် Adapter Contract အတိုင်း |
 | B8 | **Drum Animation Engine** (R2 ထဲက Drum data/ပုံများကို manifest မှဖတ်၍ မကျန်အောင်ပြ) | Manifest ထဲရှိ အားလုံးပြ၊ မရှိရင် diagnostic ပြ (တိတ်တိတ်မကျော်) |
 | B9 | **အသံပါ Video** — Sound Engine ကို Video အတွက် offline `AudioBuffer` ထုတ်ပေးနိုင်အောင်၊ Count Voice အသံ၊ Drum အသံ | Video တွင် အသံပါ (ffprobe နှင့် စစ်)၊ audio/video sync |
 | B10 | Guitar adapter (Video Engine Plan Phase 1) | Phase 1 ၏ စံနှုန်းများ |
 | B11 | Piano key-only adapter (Phase 2)၊ ထို့နောက် Violin၊ Bass၊ Strings၊ Voice | သက်ဆိုင်ရာ Phase စံနှုန်းများ |
+| **B12** | **Live Preview** (§၁၂ — Export မလုပ်ဘဲ real time play၊ seek၊ Full screen) | §၁၂ ၏ စံနှုန်း ၆ ချက် |
 
-**မှတ်ချက်:** B2 → B3 → B4 အစဉ်ကို ပထမဆုံးလုပ်ရန် အကြံပြုသည် (user က ထုတ်လုပ်ပြီးသော video အစစ်ကို စမ်းကြည့်နိုင်ရန်)။ Video အပိုင်း အချိုးများ၊ Metronome icon တို့သည် default ဖြစ်ပြီး user က video အစစ်ကိုကြည့်ပြီးမှ ညှိမည်။
+**မှတ်ချက် (2026-11-23):** B2 နှင့် B3/B5/B6 ၏ code အများစု ရှိပြီးဖြစ်၍ **B0 (E2E စစ်ဆေးမှု) ကို ပထမဆုံးလုပ်ရန်**၊ ထို့နောက် B4 → B12 (Live Preview) → B7 အစဉ်ကို အကြံပြုသည် (user က ထုတ်လုပ်ပြီးသော video အစစ်ကို စမ်းကြည့်နိုင်ရန်)။ အသေးစိတ်အဆင့် V1–V10 ကို Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ် §၈ တွင် ကြည့်ပါ။ Video အပိုင်း အချိုးများ၊ Metronome icon တို့သည် default ဖြစ်ပြီး user က video အစစ်ကိုကြည့်ပြီးမှ ညှိမည်။
