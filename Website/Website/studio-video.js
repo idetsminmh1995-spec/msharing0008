@@ -6,6 +6,8 @@
   const generateButton = document.querySelector('[data-studio-generate]');
   const status = document.querySelector('[data-studio-status]');
   const video = document.querySelector('[data-video-output]');
+  const previewCanvas = document.querySelector('[data-video-preview]');
+  const sourceLabel = document.querySelector('[data-video-source]');
   const placeholder = document.querySelector('[data-video-placeholder]');
   const download = document.querySelector('[data-video-download]');
   const timeline = document.querySelector('[data-video-timeline]');
@@ -83,7 +85,6 @@
   let cancelRequested = false;
   let objectUrl = null;
   let logoImage = null;
-  let notation = null;
 
   const setStatus = (message) => {
     if (status) status.textContent = message;
@@ -409,7 +410,7 @@
     }
   }
 
-  async function drawPerformance(ctx, at, hits, duration, settings, meta, kit) {
+  async function drawPerformance(ctx, at, hits, duration, settings, meta, kit, notationState) {
     const { width, height } = settings.size;
     const palette = getPalette(settings.color);
 
@@ -427,9 +428,9 @@
       height,
       parts: {
         title: (target, rect) => engine.drawTitlePart(target, rect, at, meta, palette, settings),
-        notation: (target, rect) => engine.drawNotationPart(target, rect, at, notation),
+        notation: (target, rect) => engine.drawNotationPart(target, rect, at, notationState),
         instrument: (target, rect) => (kit
-          ? kit.draw(ctx, rect, at)
+          ? kit.draw(target, rect, at)
           : drawInstrumentPart(target, rect, at, hits, duration, settings, palette)),
       },
     });
@@ -553,7 +554,331 @@
     return await context.startRendering();
   }
 
+  /**
+   * The score, decoded and laid out for this frame shape, kept between
+   * rebuilds. The preview is rebuilt on every settings change and the
+   * export builds once more; decoding the SVG each time would put a full
+   * score render behind every keystroke in a Title field.
+   */
+  const notationCache = new Map();
+  async function notationFor(settings) {
+    const file = musicXmlInput?.files?.[0] || null;
+    const key = [file ? `${file.name}:${file.size}:${file.lastModified}` : 'none',
+      settings.notation, settings.size.width, settings.size.height, settings.titleOne].join('|');
+    if (notationCache.has(key)) return notationCache.get(key);
+    const state = await engine.prepareNotationFor(file, settings, ['title', 'notation', 'instrument']);
+    if (state?.error) {
+      setStatus(`Notation could not be prepared: ${state.error}`);
+      return state;
+    }
+    notationCache.set(key, state);
+    return state;
+  }
+
+  /**
+   * Everything a frame of this video needs, at one frame size: the parts the
+   * Plan counts as the length (count-in, score, Thank You), the sound, and
+   * the notation decoded once. The preview and the export both call this, so
+   * neither can draw a video the other would not.
+   */
+  async function buildTimeline(settings) {
+    const { hits: written, endQuarter, meta, source } = await getHits();
+    const notationState = await notationFor(settings);
+    const timed = timeHits(written, endQuarter, notationState?.error ? null : notationState);
+    const hits = timed.hits;
+    const kit = await loadKit(settings, hits);
+    // The Plan's length: the count-in the score is played in, then the
+    // score's own length, with no cap of the Studio's.
+    const countIn = countInSeconds(settings, meta);
+    const duration = Math.max(1, timed.seconds);
+    const segments = [];
+    if (countIn > 0) {
+      segments.push({ seconds: countIn, draw: (ctx, at) => drawCountIn(ctx, at, settings, meta) });
+    }
+    segments.push({ seconds: duration, draw: (ctx, at) => drawPerformance(ctx, at, hits, duration, settings, meta, kit, notationState) });
+
+    // The sound spans the count-in and the performance together, so it
+    // rides on the first of those two segments and starts at zero.
+    const audio = await createDrumAudio({ settings, hits, countIn, duration, meta });
+    if (audio) segments[0].audio = audio;
+    // The Plan's last part of the length: the Thank You clip. The engine
+    // owns its address and shape, so the page only asks for it.
+    const ending = await engine.thankYouSegment(settings.size.width, settings.size.height);
+    if (ending) segments.push(ending);
+    return { segments, audio, meta, source, notationState, countIn, duration };
+  }
+
+  // ---------------------------------------------------------------
+  // Live Preview (§၁၂). The preview draws the same segments the export
+  // encodes, through the engine's own frame clock, so what is on the
+  // canvas is what the file will hold. It never touches an encoder.
+  // ---------------------------------------------------------------
+
+  const PREVIEW_LONG_SIDE = 960;
+  const PREVIEW_MIN_LONG_SIDE = 480;
+  const PREVIEW_TARGET_FPS = 24;
+  // A long score would need a soundtrack buffer measured in hundreds of
+  // megabytes just to preview it; past this the preview stays silent and
+  // says so, and the export still carries the sound.
+  const PREVIEW_AUDIO_LIMIT = 600;
+
+  const preview = {
+    plan: null,
+    size: null,
+    settings: null,
+    seconds: 0,
+    audioBuffer: null,
+    audioContext: null,
+    source: null,
+    startedAt: 0,
+    offset: 0,
+    playing: false,
+    rafId: 0,
+    token: 0,
+    drawing: false,
+    pendingAt: null,
+    frames: 0,
+    measuredAt: 0,
+    slowStrikes: 0,
+  };
+
+  /** The preview's own frame size: same ratio, smaller pixels. */
+  const previewSizeFor = (size) => {
+    const scale = Math.min(1, PREVIEW_LONG_SIDE / Math.max(size.width, size.height));
+    return { width: Math.round(size.width * scale), height: Math.round(size.height * scale) };
+  };
+
+  const previewVisible = () => Boolean(preview.plan) && !previewCanvas?.hidden;
+
+  const setSource = (kind, text) => {
+    if (!sourceLabel) return;
+    sourceLabel.textContent = text;
+    sourceLabel.dataset.kind = kind;
+  };
+
+  const stopPreviewClock = () => {
+    preview.playing = false;
+    if (preview.rafId) cancelAnimationFrame(preview.rafId);
+    preview.rafId = 0;
+    if (preview.source) {
+      try { preview.source.stop(); } catch { /* already stopped */ }
+      preview.source.disconnect();
+      preview.source = null;
+    }
+    if (playButton) playButton.textContent = '▶';
+    stage?.classList.remove('is-playing');
+  };
+
+  /** Releases everything the preview holds. Export calls this first. */
+  function stopPreview() {
+    preview.token += 1;
+    stopPreviewClock();
+    preview.audioBuffer = null;
+    if (preview.audioContext && preview.audioContext.state !== 'closed') {
+      void preview.audioContext.close();
+    }
+    preview.audioContext = null;
+    preview.plan = null;
+    preview.seconds = 0;
+  }
+
+  /**
+   * Draws the frame for one time. Concurrent requests collapse into the
+   * newest one: a drag of the timeline asks for frames faster than a
+   * 1080p kit photo can be drawn, and drawing every one of them would
+   * leave the preview behind the handle.
+   */
+  async function drawPreviewFrame(at) {
+    if (!preview.plan || !previewCanvas) return;
+    if (preview.drawing) { preview.pendingAt = at; return; }
+    preview.drawing = true;
+    const token = preview.token;
+    try {
+      const ctx = previewCanvas.getContext('2d');
+      await engine.drawFrameAt(ctx, preview.plan, at);
+      if (token !== preview.token) return;
+      updatePreviewControls(at);
+    } catch (error) {
+      setStatus(`Live preview could not draw this frame: ${error.message || error}`);
+    } finally {
+      preview.drawing = false;
+      const pending = preview.pendingAt;
+      preview.pendingAt = null;
+      if (pending !== null && token === preview.token) void drawPreviewFrame(pending);
+    }
+  }
+
+  function updatePreviewControls(at) {
+    const total = preview.seconds;
+    const shown = Math.min(Math.max(0, at), total);
+    if (timeline) {
+      timeline.max = String(total || 1);
+      timeline.value = String(shown);
+    }
+    if (timeLabel) timeLabel.textContent = `${formatTime(shown)} / ${formatTime(total)}`;
+  }
+
+  const previewClock = () => preview.offset + (performance.now() - preview.startedAt) / 1000;
+
+  function previewTick() {
+    if (!preview.playing) return;
+    const at = previewClock();
+    if (at >= preview.seconds) {
+      stopPreviewClock();
+      preview.offset = preview.seconds;
+      void drawPreviewFrame(preview.seconds);
+      updatePreviewControls(preview.seconds);
+      return;
+    }
+    // The auto-shrink watches the frames actually drawn: a machine that
+    // cannot hold 24 fps at 960 px is asked to hold it at half that.
+    const now = performance.now();
+    preview.frames += 1;
+    if (!preview.measuredAt) preview.measuredAt = now;
+    else if (now - preview.measuredAt >= 1000) {
+      const fps = (preview.frames * 1000) / (now - preview.measuredAt);
+      preview.frames = 0;
+      preview.measuredAt = now;
+      if (fps < PREVIEW_TARGET_FPS && preview.size && Math.max(preview.size.width, preview.size.height) > PREVIEW_MIN_LONG_SIDE) {
+        preview.slowStrikes += 1;
+        if (preview.slowStrikes >= 2) {
+          preview.slowStrikes = 0;
+          void shrinkPreview();
+          return;
+        }
+      } else {
+        preview.slowStrikes = 0;
+      }
+    }
+    void drawPreviewFrame(at);
+    preview.rafId = requestAnimationFrame(previewTick);
+  }
+
+  async function playPreview() {
+    if (!preview.plan) return;
+    if (preview.offset >= preview.seconds) preview.offset = 0;
+    preview.startedAt = performance.now();
+    preview.playing = true;
+    preview.frames = 0;
+    preview.measuredAt = 0;
+    if (playButton) playButton.textContent = '❚❚';
+    stage?.classList.add('is-playing');
+    // Starting the sound can wait on the audio context; a pause that lands
+    // in that gap must win, or the clock would come back on its own.
+    await startPreviewAudio(preview.offset);
+    if (!preview.playing) return;
+    preview.rafId = requestAnimationFrame(previewTick);
+  }
+
+  function pausePreview() {
+    preview.offset = Math.min(previewClock(), preview.seconds);
+    stopPreviewClock();
+    void drawPreviewFrame(preview.offset);
+  }
+
+  async function startPreviewAudio(offset) {
+    if (!preview.audioBuffer) return;
+    try {
+      if (!preview.audioContext) preview.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      if (preview.audioContext.state === 'suspended') await preview.audioContext.resume();
+      if (preview.source) { try { preview.source.stop(); } catch { /* already stopped */ } preview.source.disconnect(); }
+      const source = preview.audioContext.createBufferSource();
+      source.buffer = preview.audioBuffer;
+      source.connect(preview.audioContext.destination);
+      source.start(0, Math.min(offset, Math.max(0, preview.audioBuffer.duration - 0.01)));
+      preview.source = source;
+    } catch (error) {
+      setStatus(`Live preview is visual only: ${error.message || error}`);
+    }
+  }
+
+  /** The preview rebuilt at a smaller size, because it could not keep up. */
+  async function shrinkPreview() {
+    if (!preview.settings || !preview.size) return;
+    const next = {
+      width: Math.max(2, Math.round(preview.size.width / 2)),
+      height: Math.max(2, Math.round(preview.size.height / 2)),
+    };
+    const at = previewClock();
+    const wasPlaying = preview.playing;
+    stopPreviewClock();
+    await startPreview(preview.settings, { size: next, at, autoplay: wasPlaying });
+  }
+
+  /**
+   * Builds the preview's timeline and shows its first frame. `settings`
+   * is the page's settings; the frame size is the preview's own, so the
+   * layout is the export's at a smaller pixel count.
+   */
+  async function startPreview(settings, { size, at = 0, autoplay = false } = {}) {
+    if (isRendering) return;
+    const canvasSize = size || previewSizeFor(settings.size);
+    const token = ++preview.token;
+    stopPreviewClock();
+    const previewSettings = { ...settings, size: canvasSize };
+    preview.settings = settings;
+    preview.size = canvasSize;
+    try {
+      const { segments } = await buildTimeline(previewSettings);
+      // An export that started while this was being built owns the stage.
+      if (token !== preview.token || isRendering) return;
+      const plan = engine.timelinePlan(segments, FPS);
+      preview.plan = plan;
+      preview.seconds = plan.seconds;
+      preview.audioBuffer = null;
+      if (previewCanvas) {
+        previewCanvas.width = canvasSize.width;
+        previewCanvas.height = canvasSize.height;
+        previewCanvas.hidden = false;
+      }
+      if (video) video.hidden = true;
+      if (placeholder) placeholder.hidden = true;
+      if (playButton) playButton.disabled = false;
+      if (timeline) timeline.disabled = false;
+      preview.offset = Math.min(Math.max(0, at), Math.max(0, plan.seconds - 1 / FPS));
+      setSource('preview', plan.seconds > PREVIEW_AUDIO_LIMIT ? 'Live preview · visual only' : 'Live preview');
+      await drawPreviewFrame(preview.offset);
+      if (token !== preview.token) return;
+      if (plan.seconds <= PREVIEW_AUDIO_LIMIT) void loadPreviewAudio(plan, token);
+      if (autoplay) await playPreview();
+    } catch (error) {
+      if (token !== preview.token) return;
+      setStatus(`Live preview failed: ${error.message || error}`);
+    }
+  }
+
+  async function loadPreviewAudio(plan, token) {
+    try {
+      const buffer = await engine.timelineAudio(plan);
+      if (token !== preview.token || !buffer) return;
+      preview.audioBuffer = buffer;
+      setSource('preview', 'Live preview · with sound');
+      if (preview.playing) await startPreviewAudio(previewClock());
+    } catch {
+      // A silent preview is still a preview; the export carries the sound.
+      if (token === preview.token) setSource('preview', 'Live preview · visual only');
+    }
+  }
+
+  let previewTimer = 0;
+  /** Settings changed: redraw soon, once, at the frame the user is on. */
+  function schedulePreview() {
+    if (isRendering) return;
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => {
+      const settings = getSettings();
+      if (!preview.plan) { void startPreview(settings); return; }
+      const at = preview.playing ? previewClock() : preview.offset;
+      const keepSize = preview.size && previewSizeFor(settings.size).width === preview.size.width ? preview.size : null;
+      void startPreview(settings, { size: keepSize, at, autoplay: preview.playing });
+    }, 300);
+  }
+
   function updatePlaybackControls() {
+    // The rendered file keeps its own clock even while hidden behind the
+    // preview; letting it write the label would show its time, not the
+    // preview's.
+    if (previewVisible()) return;
     const duration = Number.isFinite(video.duration) ? video.duration : 0;
     if (timeline) {
       timeline.max = String(duration || 1);
@@ -579,35 +904,11 @@
     generateButton.disabled = true;
     generateButton.textContent = 'Generating…';
     if (placeholder) placeholder.hidden = true;
+    stopPreview();
     try {
-      const { hits: written, endQuarter, meta, source } = await getHits();
-      setStatus(`Preparing ${source} · ${settings.ratio} · 0%`);
-      notation = await engine.prepareNotationFor(musicXmlInput?.files?.[0], settings, ['title', 'notation', 'instrument']);
-      if (notation?.error) {
-        setStatus(`Notation could not be prepared: ${notation.error}`);
-        notation = null;
-      }
-      const timed = timeHits(written, endQuarter, notation);
-      const hits = timed.hits;
-      const kit = await loadKit(settings, hits);
-      // The Plan's length: the count-in the score is played in, then the
-      // score's own length, with no cap of the Studio's.
-      const countIn = countInSeconds(settings, meta);
-      const duration = Math.max(1, timed.seconds);
-      const segments = [];
-      if (countIn > 0) {
-        segments.push({ seconds: countIn, draw: (ctx, at) => drawCountIn(ctx, at, settings, meta) });
-      }
-      segments.push({ seconds: duration, draw: (ctx, at) => drawPerformance(ctx, at, hits, duration, settings, meta, kit) });
-
-      // The sound spans the count-in and the performance together, so it
-      // rides on the first of those two segments and starts at zero.
-      const audio = await createDrumAudio({ settings, hits, countIn, duration, meta });
-      if (audio) segments[0].audio = audio;
-      // The Plan's last part of the length: the Thank You clip. The engine
-      // owns its address and shape, so the page only asks for it.
-      const ending = await engine.thankYouSegment(settings.size.width, settings.size.height);
-      if (ending) segments.push(ending);
+      setStatus(`Preparing ${musicXmlInput?.files?.[0]?.name || 'default drum pattern'} · ${settings.ratio} · 0%`);
+      const { segments, audio, notationState } = await buildTimeline(settings);
+      if (notationState?.error) setStatus(`Notation could not be prepared: ${notationState.error}`);
       const result = await engine.render({
         width: settings.size.width,
         height: settings.size.height,
@@ -625,6 +926,8 @@
       video.src = objectUrl;
       video.hidden = false;
       video.load();
+      if (previewCanvas) previewCanvas.hidden = true;
+      setSource('rendered', 'Rendered file');
       download.href = objectUrl;
       download.download = `msharing-${settings.ratio.replace(':', 'x')}-drum.${result.extension}`;
       download.hidden = false;
@@ -650,18 +953,63 @@
   }
 
   generateButton.addEventListener('click', () => { void generateVideo(); });
-  playButton?.addEventListener('click', async () => {
+
+  // This adapter drives the stage for both sources, so the shell's own
+  // video handlers stand down (script.js reads this marker).
+  if (stage) stage.dataset.videoAdapter = 'drums';
+
+  /**
+   * The Play button drives whichever source is on show: the live canvas
+   * while it is visible, the rendered file once one exists.
+   */
+  const togglePlayback = async () => {
+    if (previewVisible()) {
+      if (preview.playing) pausePreview();
+      else await playPreview();
+      return;
+    }
     if (video.paused) {
       await video.play();
-      playButton.textContent = '❚❚';
+      if (playButton) playButton.textContent = '❚❚';
       stage.classList.add('is-playing');
     } else {
       video.pause();
-      playButton.textContent = '▶';
+      if (playButton) playButton.textContent = '▶';
       stage.classList.remove('is-playing');
     }
+  };
+
+  playButton?.addEventListener('click', () => { void togglePlayback(); });
+
+  timeline?.addEventListener('input', () => {
+    const at = Number(timeline.value) || 0;
+    if (previewVisible()) {
+      preview.offset = Math.min(at, Math.max(0, preview.seconds - 1 / FPS));
+      if (preview.playing) {
+        preview.startedAt = performance.now();
+        void startPreviewAudio(preview.offset);
+      }
+      void drawPreviewFrame(preview.offset);
+      updatePreviewControls(preview.offset);
+      return;
+    }
+    video.currentTime = at;
+    updatePlaybackControls();
   });
-  timeline?.addEventListener('input', () => { video.currentTime = Number(timeline.value) || 0; updatePlaybackControls(); });
+
+  // Space plays and pauses, as every video player does -- unless the focus
+  // is in a control that types or selects, where Space is a character.
+  document.addEventListener('keydown', (event) => {
+    if (event.code !== 'Space' && event.key !== ' ') return;
+    const active = document.activeElement;
+    const tag = active?.tagName?.toLowerCase();
+    if (tag === 'input' || tag === 'select' || tag === 'textarea' || active?.isContentEditable) return;
+    if (event.target?.closest?.('[data-studio-settings]')) return;
+    if (!previewVisible() && video.hidden) return;
+    event.preventDefault();
+    void togglePlayback();
+  });
+
   fullscreenButton?.addEventListener('click', () => {
     if (document.fullscreenElement) void document.exitFullscreen();
     else if (stage.requestFullscreen) void stage.requestFullscreen();
@@ -688,13 +1036,14 @@
   syncModelOptions();
   drumBrand?.addEventListener('change', syncModelOptions);
   [titleOne, titleOneColor, titleOneSize, titleTwo, titleTwoColor, titleTwoSize, drumBrand, drumModel, notationView, soundModel, soundVolume, countVoiceEnabled, countVoice, countVolume, countDisplay, videoColor, videoRatio].forEach((control) => {
-    control?.addEventListener('input', syncControlState);
-    control?.addEventListener('change', syncControlState);
+    control?.addEventListener('input', () => { syncControlState(); schedulePreview(); });
+    control?.addEventListener('change', () => { syncControlState(); schedulePreview(); });
   });
   musicXmlInput?.addEventListener('change', () => {
     const file = musicXmlInput.files?.[0];
     if (musicXmlName) musicXmlName.textContent = file ? file.name : 'No file selected';
     setStatus(file ? `MusicXML selected: ${file.name}. Ready to generate.` : 'Choose a MusicXML file or use the default drum pattern.');
+    schedulePreview();
   });
   logoInput?.addEventListener('change', () => {
     const file = logoInput.files?.[0];
@@ -712,6 +1061,7 @@
       if (logoPreview) logoPreview.src = object;
       if (logoName) logoName.textContent = file.name;
       setStatus(`Logo selected: ${file.name}. Ready to generate.`);
+      schedulePreview();
     };
     image.onerror = () => { URL.revokeObjectURL(object); setStatus('The selected logo could not be loaded.'); };
     image.src = object;
@@ -719,9 +1069,16 @@
   video.addEventListener('loadedmetadata', updatePlaybackControls);
   video.addEventListener('timeupdate', updatePlaybackControls);
   video.addEventListener('ended', () => { if (playButton) playButton.textContent = '▶'; stage.classList.remove('is-playing'); });
-  window.addEventListener('pagehide', () => { if (objectUrl) URL.revokeObjectURL(objectUrl); }, { once: true });
+  window.addEventListener('pagehide', () => {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    stopPreview();
+  }, { once: true });
 
   logoImage = new Image();
+  logoImage.onload = () => schedulePreview();
   logoImage.src = DEFAULT_LOGO;
   syncControlState();
+  // The Plan opens the preview as soon as the settings are valid, so the
+  // page never shows an empty stage while a render is still unasked for.
+  schedulePreview();
 })();

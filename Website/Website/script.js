@@ -152,7 +152,13 @@ const formatTime = (seconds) => {
   const remainder = seconds % 60;
   return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
 };
+// A Studio page whose adapter shows a Live Preview owns the stage: it drives
+// play, seek and the label for both the preview and the rendered file, and
+// this shell must not write over it. Instruments without an adapter keep
+// using the handlers below.
+const videoStageIsOwned = () => Boolean(videoStage?.dataset.videoAdapter);
 const updateVideoTime = () => {
+  if (videoStageIsOwned()) return;
   if (videoTime && videoTimeline) {
     const seconds = videoOutput ? videoOutput.currentTime : Number(videoTimeline.value);
     videoTime.textContent = formatTime(Math.floor(seconds));
@@ -163,6 +169,7 @@ const updateVideoTime = () => {
 };
 
 videoTimeline?.addEventListener('input', () => {
+  if (videoStageIsOwned()) return;
   if (videoOutput && Number.isFinite(videoOutput.duration)) {
     videoOutput.currentTime = Number(videoTimeline.value);
   }
@@ -170,6 +177,7 @@ videoTimeline?.addEventListener('input', () => {
 });
 
 videoPlay?.addEventListener('click', () => {
+  if (videoStageIsOwned()) return;
   if (!videoOutput || !videoOutput.src) return;
   if (videoOutput.paused) {
     videoOutput.play().catch((error) => {

@@ -202,6 +202,7 @@
           <div class="video-panel-heading"><h2>Video</h2><span class="video-format" data-video-format>16:9 · 1920×1080</span></div>
           <div class="video-stage" data-video-stage>
             <video data-video-output playsinline preload="metadata" hidden aria-label="Rendered Studio video"></video>
+            <canvas data-video-preview hidden aria-label="Live preview of the Studio video"></canvas>
             <img data-metronome-preview alt="Static preview of the selected metronome design" hidden />
             <p data-video-placeholder>No rendered performance yet.</p>
           </div>
@@ -209,20 +210,21 @@
             <button class="video-play-button" type="button" data-video-play aria-label="Play video" disabled>▶</button>
             <input class="video-timeline" type="range" min="0" max="1" value="0" step="0.1" data-video-timeline aria-label="Video timeline" disabled />
             <span class="video-time" data-video-time>00:00</span>
+            <span class="video-source" data-video-source>Live preview</span>
             <button class="video-fullscreen-button" type="button" data-video-fullscreen aria-label="Full screen">⛶</button>
           </div>
           <a class="video-download" data-video-download hidden>Download rendered video</a>
         </div>
       </section>
     </main>
-    <script src="assets/video-engine.js?v=066dced5239c"></script>
+    <script src="assets/video-engine.js?v=541e6d433a08"></script>
     <script src="assets/metronome-engine.js?v=6db58bfc22c4"></script>
     <script src="assets/guitar-engine.js"></script>
     <script src="assets/piano-hand-engine.js"></script>
     <script src="assets/sticking-engine.js"></script>
     <script src="drum-kit.js"></script>
-    <script src="script.js?v=cb8dc501cd10"></script>
-    <script src="studio-video.js?v=aac6895d6775"></script>
+    <script src="script.js?v=dab936727b1f"></script>
+    <script src="studio-video.js?v=99102f596cd8"></script>
     <script src="studio-metronome.js?v=d1c9ec8513d5"></script>
     <script src="studio-guitar.js?v=e8778d04aaa7"></script>
     <script src="studio-piano.js?v=857ee44e5809"></script>

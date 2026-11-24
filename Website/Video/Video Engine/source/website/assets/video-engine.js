@@ -1117,20 +1117,17 @@
         ...(codec.startsWith('avc1') ? { avc: { format: 'avc' } } : {}),
       });
 
-      const totalFrames = Math.max(1, Math.round(totalSeconds * fps));
+      const plan = timelinePlan(segments, fps);
+      const totalFrames = Math.max(1, plan.frames);
       const frameDuration = 1e6 / fps;
       const keyEvery = Math.max(1, Math.round(fps * 2));
-      let segmentStartFrame = 0;
 
-      for (const segment of segments) {
+      for (const entry of plan.segments) {
         if (stopped) break;
+        const { segment, frames } = entry;
         if (segment.onStart) await segment.onStart();
-        // Derive both ends from one global timeline. Rounding each segment
-        // independently can create a frame gap or overlap across many clips.
-        const segmentEndFrame = Math.round((segmentStartFrame / fps + segment.seconds) * fps);
-        const count = Math.max(0, segmentEndFrame - segmentStartFrame);
         try {
-          for (let i = 0; i < count; i++) {
+          for (let i = 0; i < frames; i++) {
             if (shouldStop && shouldStop()) {
               stopped = true;
               break;
@@ -1162,7 +1159,6 @@
         } finally {
           if (segment.onEnd) await segment.onEnd();
         }
-        segmentStartFrame = segmentEndFrame;
       }
 
       await encoder.flush();
@@ -1365,12 +1361,13 @@
       }
 
       const startedAt = performance.now();
-      for (const segment of segments) {
+      const plan = timelinePlan(segments, fps);
+      for (const entry of plan.segments) {
         if (cancelled) break;
+        const { segment, frames } = entry;
         if (segment.onStart) await segment.onStart();
-        const count = Math.max(0, Math.round(segment.seconds * fps));
         try {
-          for (let i = 0; i < count; i++) {
+          for (let i = 0; i < frames; i++) {
             if (shouldStop && shouldStop()) {
               cancelled = true;
               break;
@@ -2318,6 +2315,69 @@
     };
   }
 
+  /**
+   * The frame clock a render runs on, as data.
+   *
+   * A render walks its segments by cumulative frame rounding, so a segment
+   * begins where the previous one's last frame ended -- not at the time its
+   * own `seconds` would round to. A preview that added the seconds up for
+   * itself would land a frame away from the file it is previewing, and on a
+   * long video the gap would be visible. Both paths read this plan instead.
+   */
+  function timelinePlan(segments, fps) {
+    if (!Array.isArray(segments) || segments.length === 0) {
+      throw new TypeError('A timeline needs at least one segment');
+    }
+    if (!Number.isFinite(fps) || fps <= 0) {
+      throw new RangeError('A timeline needs a positive frame rate');
+    }
+    const plan = [];
+    let startFrame = 0;
+    for (const segment of segments) {
+      if (!segment || !Number.isFinite(segment.seconds) || segment.seconds < 0) {
+        throw new TypeError('Every timeline segment needs a duration');
+      }
+      if (typeof segment.draw !== 'function') {
+        throw new TypeError('Every timeline segment needs a draw function');
+      }
+      const endFrame = Math.round((startFrame / fps + segment.seconds) * fps);
+      const frames = Math.max(0, endFrame - startFrame);
+      plan.push({ segment, startFrame, frames, startSeconds: startFrame / fps });
+      startFrame = endFrame;
+    }
+    return { fps, segments: plan, frames: startFrame, seconds: startFrame / fps };
+  }
+
+  /** The segment, and that segment's own frame time, a global time lands on. */
+  function frameAt(plan, seconds) {
+    const lastFrame = Math.max(0, plan.frames - 1);
+    const frame = Math.min(Math.max(0, Math.floor((Number(seconds) || 0) * plan.fps)), lastFrame);
+    let entry = plan.segments[plan.segments.length - 1];
+    for (const candidate of plan.segments) {
+      if (frame < candidate.startFrame + candidate.frames) {
+        entry = candidate;
+        break;
+      }
+    }
+    const index = Math.max(0, frame - entry.startFrame);
+    return { segment: entry.segment, index, at: index / plan.fps, frame, startSeconds: entry.startSeconds };
+  }
+
+  /**
+   * Draws the frame a preview is asking for. The encoder draws through the
+   * same call, so a preview cannot show a frame the export would not.
+   */
+  async function drawFrameAt(ctx, plan, seconds) {
+    const placed = frameAt(plan, seconds);
+    await placed.segment.draw(ctx, placed.at, placed.index);
+    return placed;
+  }
+
+  /** The timeline's sound as one buffer, or null when no segment has any. */
+  async function timelineAudio(plan) {
+    return await joinAudio(plan.segments.map((entry) => entry.segment), plan.seconds);
+  }
+
   function validateRenderOptions(options) {
     if (!options || !Number.isFinite(options.width) || options.width <= 0 ||
         !Number.isFinite(options.height) || options.height <= 0) {
@@ -2380,6 +2440,12 @@
     // segment and appends it, and never learns the clip's address.
     thankYouUrl,
     thankYouSegment,
+    // One clock for the encoder and the preview: the plan says where each
+    // segment starts in frames, so a preview cannot drift from the file.
+    timelinePlan,
+    frameAt,
+    drawFrameAt,
+    timelineAudio,
     muxMp4,
     muxMp4ToStream,
     muxWebM,

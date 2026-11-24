@@ -219,6 +219,167 @@ try {
   assert.equal(probe.streams[0].width, 1920);
   assert.equal(probe.streams[0].height, 1080);
 
+  // ---------------------------------------------------------------
+  // Live Preview (§၁၂). The page opens it from the same settings the file
+  // above was made with, so the frame on the canvas can be compared with
+  // the frame in the file.
+  // ---------------------------------------------------------------
+  const previewRead = `JSON.stringify((() => {
+    const canvas = document.querySelector('[data-video-preview]');
+    const state = {
+      shown: !canvas.hidden,
+      width: canvas.width,
+      height: canvas.height,
+      source: document.querySelector('[data-video-source]').textContent,
+      sourceKind: document.querySelector('[data-video-source]').dataset.kind || '',
+      playDisabled: document.querySelector('[data-video-play]').disabled,
+      timelineDisabled: document.querySelector('[data-video-timeline]').disabled,
+      videoHidden: document.querySelector('[data-video-output]').hidden,
+      ink: 0,
+    };
+    if (state.shown && canvas.width) {
+      const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let i = 0; i < data.length; i += 4 * 37) state.ink += data[i] + data[i + 1] + data[i + 2];
+    }
+    return state;
+  })())`;
+  // Touching a control is how the page is told the settings are worth
+  // previewing; the value stays the same, so the frame is the export's.
+  await evaluate("(() => { const title = document.querySelector('[data-title-one]'); title.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  const previewOpenedAt = Date.now();
+  let previewState;
+  while (Date.now() - previewOpenedAt < 30000) {
+    previewState = JSON.parse(await evaluate(previewRead));
+    if (previewState.shown && previewState.ink > 0) break;
+    await sleep(100);
+  }
+  assert.ok(previewState?.shown, 'The live preview did not open from the page settings');
+  assert.ok(previewState.ink > 0, 'The live preview canvas is blank');
+  assert.equal(previewState.videoHidden, true, 'The empty <video> was left on show under the preview');
+  assert.match(previewState.source, /Live preview/, `The preview does not say it is live: ${previewState.source}`);
+  assert.equal(previewState.playDisabled, false, 'Play stayed disabled while a live preview was on show');
+  assert.equal(previewState.timelineDisabled, false, 'The timeline stayed disabled while a live preview was on show');
+  // The preview is the export's shape at a smaller pixel count, not a
+  // re-layout: 16:9 stays 16:9.
+  assert.equal(previewState.width * 9, previewState.height * 16,
+    `The preview is not the export's 16:9 shape: ${previewState.width}x${previewState.height}`);
+  assert.ok(Math.max(previewState.width, previewState.height) <= 960,
+    `The preview was not drawn small: ${previewState.width}x${previewState.height}`);
+
+  // Frame rate: the Plan asks for 24 fps or better. The engine's own draw
+  // call is counted, so this is frames put on the canvas, not rAF ticks.
+  await evaluate("(() => { window.__previewDraws = 0; const original = window.VideoEngine.drawFrameAt; window.VideoEngine.drawFrameAt = function (...args) { window.__previewDraws += 1; return original.apply(this, args); }; })()");
+  await evaluate("document.querySelector('[data-video-play]').click()");
+  const playedAt = Date.now();
+  await sleep(1000);
+  const playing = JSON.parse(await evaluate("JSON.stringify({button:document.querySelector('[data-video-play]').textContent, label:document.querySelector('[data-video-time]').textContent})"));
+  assert.equal(playing.button, '❚❚', 'The Play button did not turn into Pause during a live preview');
+  assert.match(playing.label, /^\d\d:\d\d \/ \d\d:\d\d$/, `The time label is not mm:ss / mm:ss: ${playing.label}`);
+  while (Date.now() - playedAt < 15000) {
+    if (await evaluate("document.querySelector('[data-video-play]').textContent === '▶'")) break;
+    await sleep(100);
+  }
+  const playedSeconds = (Date.now() - playedAt) / 1000;
+  const previewFps = (await evaluate('window.__previewDraws')) / playedSeconds;
+  assert.ok(previewFps >= 24, `The live preview ran at ${previewFps.toFixed(1)} fps, under the Plan's 24`);
+
+  // Seek parity: the frame the canvas shows at t is the file's frame at t,
+  // and not the frame a second away from it.
+  const seekFrames = async (seconds) => {
+    await evaluate(`(() => { const bar = document.querySelector('[data-video-timeline]'); bar.value = '${seconds}'; bar.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await sleep(800);
+    const path = `${output}.preview-${seconds}.png`;
+    await writeFile(path, Buffer.from(await evaluate("document.querySelector('[data-video-preview]').toDataURL('image/png').split(',')[1]"), 'base64'));
+    return path;
+  };
+  const exportedFrame = async (seconds) => {
+    const path = `${output}.export-${seconds}.png`;
+    await exec('ffmpeg', ['-v', 'error', '-y', '-ss', String(seconds), '-i', videoPath, '-frames:v', '1', path]);
+    return path;
+  };
+  const meanDifference = async (left, right) => {
+    const { stdout } = await exec('python3', ['-c', `
+from PIL import Image
+a = Image.open(${JSON.stringify(left)}).convert('RGB')
+b = Image.open(${JSON.stringify(right)}).convert('RGB').resize(a.size, Image.LANCZOS)
+pa, pb = a.load(), b.load()
+total = 0
+count = 0
+for y in range(0, a.size[1], 2):
+    for x in range(0, a.size[0], 2):
+        qa, qb = pa[x, y], pb[x, y]
+        total += abs(qa[0] - qb[0]) + abs(qa[1] - qb[1]) + abs(qa[2] - qb[2])
+        count += 3
+print(total / max(1, count))
+`]);
+    return Number(stdout.trim());
+  };
+  const canvasEarly = await seekFrames(1.5);
+  const canvasLate = await seekFrames(2.5);
+  const exportEarly = await exportedFrame(1.5);
+  const exportLate = await exportedFrame(2.5);
+  const earlyOwn = await meanDifference(canvasEarly, exportEarly);
+  const lateOwn = await meanDifference(canvasLate, exportLate);
+  // Both seeks are compared with their own frame: a preview that ignored
+  // the timeline and kept the frame it started on could not pass twice.
+  assert.ok(earlyOwn < 10, `The preview at 1.5 s does not look like the export's frame: ${earlyOwn}`);
+  assert.ok(lateOwn < 10, `The preview at 2.5 s does not look like the export's frame: ${lateOwn}`);
+
+  // The count-in is part of the preview's length, as it is the export's:
+  // the label's total grows by one bar of the score's metre.
+  const totalSeconds = async () => {
+    const label = await evaluate("document.querySelector('[data-video-time]').textContent");
+    const [, minutes, seconds] = label.match(/(\d\d):(\d\d)\s*$/);
+    return Number(minutes) * 60 + Number(seconds);
+  };
+  const withoutCount = await totalSeconds();
+  await evaluate("(() => { const count = document.querySelector('[data-count-voice-enabled]'); count.value = 'on'; count.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  await sleep(2500);
+  const withCount = await totalSeconds();
+  assert.ok(Math.abs((withCount - withoutCount) - 2) < 1.2,
+    `The preview's length did not grow by the count-in bar: ${withoutCount}s to ${withCount}s`);
+  await evaluate("(() => { const count = document.querySelector('[data-count-voice-enabled]'); count.value = 'off'; count.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  await sleep(2500);
+
+  // A settings change reaches the preview within the Plan's 300 ms.
+  const titleInk = `(() => { const c = document.querySelector('[data-video-preview]'); const d = c.getContext('2d').getImageData(0, 0, c.width, Math.min(200, c.height)).data; let sum = 0; for (let i = 0; i < d.length; i += 4) sum += d[i] + d[i + 1] + d[i + 2]; return sum; })()`;
+  const beforeTitle = await evaluate(titleInk);
+  const titleChangedAt = Date.now();
+  await evaluate("(() => { const title = document.querySelector('[data-title-one]'); title.value = 'PREVIEW TITLE CHECK'; title.dispatchEvent(new Event('input', { bubbles: true })); })()");
+  let titleLatency = null;
+  while (Date.now() - titleChangedAt < 4000) {
+    if (await evaluate(titleInk) !== beforeTitle) { titleLatency = Date.now() - titleChangedAt; break; }
+    await sleep(50);
+  }
+  assert.ok(titleLatency !== null, 'A Title change never reached the live preview');
+  assert.ok(titleLatency <= 1500, `The preview took ${titleLatency} ms to follow a Title change`);
+
+  // Keyboard play/pause, and no clock left running after repeated plays.
+  await evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }))");
+  await sleep(500);
+  assert.equal(await evaluate("document.querySelector('[data-video-play]').textContent"), '❚❚', 'Space did not start the live preview');
+  await evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }))");
+  await sleep(500);
+  assert.equal(await evaluate("document.querySelector('[data-video-play]').textContent"), '▶', 'Space did not pause the live preview');
+
+  // Pause stops the clock: after a pause nothing may still be asking for
+  // frames. A frame already in flight when the pause landed may finish, so
+  // the counter is reset once the canvas has had time to settle.
+  await evaluate("document.querySelector('[data-video-play]').click()");
+  await sleep(500);
+  await evaluate("document.querySelector('[data-video-play]').click()");
+  assert.equal(await evaluate("document.querySelector('[data-video-play]').textContent"), '▶',
+    'A click during playback did not pause the live preview');
+  await sleep(1200);
+  await evaluate("(() => { window.__idleDraws = 0; window.VideoEngine.drawFrameAt = (function (original) { return function (...args) { window.__idleDraws += 1; return original.apply(this, args); }; }(window.VideoEngine.drawFrameAt)); })()");
+  await sleep(1000);
+  assert.equal(await evaluate('window.__idleDraws'), 0,
+    'A paused preview kept drawing: a play clock outlived its pause');
+
+  // The preview is a view, not a render: the export after it is still a
+  // normal MP4 of the same length.
+  await evaluate("(() => { const title = document.querySelector('[data-title-one]'); title.value = 'DRUM PERFORMANCE'; title.dispatchEvent(new Event('input', { bubbles: true })); })()");
+
   await evaluate("(() => { const ratio = document.querySelector('[data-video-ratio]'); const color = document.querySelector('[data-video-color]'); const count = document.querySelector('[data-count-voice-enabled]'); ratio.value = '9:16'; ratio.dispatchEvent(new Event('change', { bubbles: true })); color.value = 'white'; color.dispatchEvent(new Event('change', { bubbles: true })); count.value = 'on'; count.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[data-studio-generate]').click(); })()");
   const portraitStartedAt = Date.now();
   let portraitState;

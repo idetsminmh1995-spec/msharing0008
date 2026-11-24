@@ -183,6 +183,15 @@ Run every command from `Website/Notation/Notation Engine/`.
   here as the standing default, as asked. The push order is part of the
   agreement: existing work lands first, the next Plan item lands in a second
   push, and Plan items still open are filled in later.
+- **Permission is standing — reaffirmed 2026-11-18 (second time this
+  session).** The owner asked again for the full code-writing permission to
+  be written down first, then: push what is already written, continue from
+  the Plan, push again. Recorded as the standing default; a "do not write
+  code" opening covers only that pass. The token supplied with the message
+  authenticates as `idetsminmh1995-spec` and the repo API reports
+  `{"admin": true, "maintain": true, "push": true, "triage": true,
+  "pull": true}`, so pushes now land (`33b72f0..b04c03f`); the earlier
+  read-only notes above are history, not the current state.
 - The Plan under `Website/Video/Video Engine Plan/PLAN.md` is reviewed and
   updated roughly every five hours. Work is landed in small pushes: push
   whatever is written first, then continue from the Plan, then push again.
