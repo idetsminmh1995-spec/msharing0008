@@ -396,3 +396,24 @@ fail the same way: `$GITHUB_TOKEN` -> `403`, the new `github_pat_…` ->
 `403`, `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` -> `401`. Pushing needs a
 token with **Contents: write** on this repository; until one is supplied,
 commits stay local and must be reported as unpushed.
+
+- **Permission is standing — reaffirmed 2026-11-18, twelfth pass.** The
+  owner asked again in the same order: check what the Plan still leaves
+  open, record the full code-writing permission first, push what is
+  already written, then continue from the Plan and push once at the end.
+  The Plan is refreshed roughly every five hours, so what it leaves open
+  now is expected to arrive in a later pass. **OpenHands has full
+  authority to write, test and push code on `feat/guitar-video-adapter`**;
+  `Website/Plan/README.md` is still not edited by this side.
+  - Plan check this pass: no new revision. `origin/main` is `d4c93c0`,
+    both `Website/Plan/README.md` (`e929386b`) and `Website/Video/Video
+    Engine Plan/PLAN.md` (`3524880b`) are byte-identical to this branch's
+    HEAD, and `993c115` remains the newest commit touching either file on
+    any remote branch.
+  - The open items are therefore unchanged: Main Plan B3, B4, B5, B7, B8,
+    B9, B10, B11, B13–B15 and the "not yet" table; Video Engine Plan row
+    10 (`🟡`), plus its four "ကျန်ရှိ" notes (real-phone 1080p memory,
+    Bass 5-string model, Strings viola/cello art, Voice ↔ Sound Engine).
+  - The PAT supplied this pass writes. `git ls-remote` and a real push
+    both succeeded as `idetsminmh1995-spec` when passed through `$NEW_PAT`
+    in the scoped helper described under "Pushing" above.
