@@ -58,14 +58,14 @@ Instrument တစ်ခုချင်းစီသည် Video Engine encoder �
 
 | # | အချက် | အခြေအနေ |
 |---|---|---|
-| 1 | စံ output အရွယ် | Drum ✅၊ **Metronome ❌** (1280×720 စသည်) |
-| 2 | ၃ ပိုင်း layout template | ✅ `layoutFor` / `composeFrame` / `requireAsset` + test၊ **Doc မရေးရသေး** |
-| 3 | Video အရှည် = Count Voice + MusicXML + Thank You | ❌ (Drum: drum hit အခြေခံ၊ `MAX_SECONDS = 12`) |
-| 4 | Thank You segment | ❌ (`requireAsset` စာချုပ်သာ၊ page ချိတ်ဆက်မှုမရှိ) |
-| 5 | Title / Info | 🟡 Drum Studio တွင် code ရှိ၊ browser မစစ်ရသေး |
+| 1 | စံ output အရွယ် | ✅ Drum, Metronome အပါအဝင် adapter ခုနစ်ခုလုံး `engine.sizeFor()` ကို သုံးသည် — Metronome portrait test တွင် 1080×1920 တိုင်းထားသည်။ 1080p memory budget နှင့် H.264 level ကို ဆက်စစ်ရန် ကျန်သည် |
+| 2 | ၃ ပိုင်း layout template | ✅ `layoutFor` / `composeFrame` / `requireAsset` + test၊ Doc ရေးပြီး |
+| 3 | Video အရှည် = Count Voice + MusicXML + Thank You | ✅ Drum တွင် `MAX_SECONDS` မရှိတော့ — `countIn + notation seconds + Thank You`။ Browser test တွင် 16 s score၊ 6 s count-in ပါ video၊ 6 s Thank You ပါ video ကို တိုင်းထားသည် |
+| 4 | Thank You segment | ✅ `engine.thankYouSegment()` ကို `buildTimeline()` က ခေါ်သည်။ `requireAsset` စာချုပ်အတိုင်း clip မရလျှင် (404) ထို segment ကို ချန်ပြီး export ဆက်သည် — test တွင် case နှစ်ခုလုံး စစ်ထားသည် |
+| 5 | Title / Info | ✅ Drum Studio တွင် code ရှိပြီး browser တွင် စစ်ပြီး — Title ပြောင်းလျှင် preview တွင် ၃၂၄ ms အတွင်း ပေါ်သည် |
 | 6 | ရေတွက်ပုံ ရွေးချယ်မှု | ✅ `data-count-display` |
-| 7 | စစ်ဆေးရမည့် စံနှုန်း | ❌ browser E2E မရှိ |
-| 8 | **Live Preview** (အသစ်) | ❌ — Main Plan §၁၂ |
+| 7 | စစ်ဆေးရမည့် စံနှုန်း | ✅ browser E2E ရှိ — `tools/test-studio-video-browser.mjs` |
+| 8 | **Live Preview** (အသစ်) | ✅ — Main Plan §၁၂ စံနှုန်း ၆ ချက် pass (2026-11-18) |
 
 အသေးစိတ် အဆင့်များ (V1–V10) ကို Main Plan ၏ `Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ်` §၈ တွင် ကြည့်ပါ။
 

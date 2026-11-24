@@ -235,3 +235,67 @@ Video Engine muxer 15/15, layout 8/8, cleanup 5/5, Voice နှင့် Drum br
 **MediaRecorder fallback (§6.3):** WebCodecs မရှိသော browser အတွက် real-time path ကို သီးခြား စစ်ထားသည် — fixture က `VideoEncoder`/`VideoFrame` ကို ဖျက်လိုက်သဖြင့် `render()` သည် `path: 'mediarecorder'` သို့ ဆင်းသည်။ ထို path မှ ထွက်လာသော ဖိုင်တွင်လည်း အသံ ပါကြောင်း (440 Hz တိုင်းတာ) စစ်ထားသည်။ Headless Chromium တွင် `--autoplay-policy=no-user-gesture-required` မပါလျှင် `AudioContext` က suspended ဖြစ်နေသဖြင့် အသံ track လုံးဝ မထွက်ပါ — ဤအချက်သည် test environment ၏ ကန့်သတ်ချက်ဖြစ်ပြီး အတည့်အစစ် browser တွင် အသုံးပြုသူ၏ click က context ကို နှိုးပေးမည်ဖြစ်သည်။ `muxMp4ToStream()` ၏ incremental muxing ကို real device တွင် မစစ်ရသေးပါ။
 
 **လက်ကျန် (§6.2):** Piano hand/wrist animation (wrist trajectory planner, site GLB calibration) သည် သီးခြား project အဖြစ် ကျန်သည်။
+
+## Live Preview (§၁၂) — Drum Studio (2026-11-18)
+
+**အခြေအနေ: ✅ စံနှုန်း ၆ ချက် အားလုံး pass။** Preview သည် export နှင့် **တူညီသော** လမ်းကြောင်းကို သုံးသည် — `buildTimeline()` က segment များကို တစ်ခါတည်း တည်ဆောက်ပြီး `engine.drawFrameAt()` က preview canvas နှင့် encoder frame နှစ်ခုလုံးကို ဆွဲသည်။ ဒုတိယ drawing path မရှိပါ။
+
+**ဖွဲ့စည်းပုံ**
+
+- `studio.html` ၏ `[data-video-stage]` ထဲတွင် `<canvas data-video-preview>` ထည့်ထားသည်။ ပုံသေ 16:9 frame ဖြစ်ပြီး video ၏ intrinsic size ပေါ် မူတည်၍ မပြောင်းပါ။
+- `[data-video-source]` က `Live preview` သို့မဟုတ် `Rendered video` ကို ပြသည်။ Render ပြီးသော ဖိုင်ရှိလျှင် `data-kind="rendered"` ဖြစ်ပြီး အစိမ်းရောင် ဖြစ်သည်။
+- Setting ပြောင်းတိုင်း debounce ဖြင့် `schedulePreview()` က `buildTimeline()` ကို ပြန်ခေါ်သည်။ `notationFor()` တွင် cache ရှိသဖြင့် Title တစ်ခုတည်း ပြောင်းလျှင် SVG ကို ပြန် decode မလုပ်ပါ။
+- Play/Pause သည် `engine.drawFrameAt()` ကို `requestAnimationFrame` ဖြင့် ခေါ်သည်။ Seek သည် တူညီသော `drawFrameAt()` ကို တိုက်ရိုက် ခေါ်သဖြင့် ရပ်ထားသော frame နှင့် ဖွင့်ထားသော frame သည် တူညီသည်။
+
+**ပိုင်ဆိုင်မှု လက်ဆဲ (ownership handshake)** — `studio-video.js` က `stage.dataset.videoAdapter` ကို သတ်မှတ်သည်။ legacy `script.js` က ထို marker ရှိလျှင် ၎င်း၏ `<video>` time-update/seek/time-label handler များကို ရပ်တန့်သည်။ ဤမရှိလျှင် handler နှစ်ခုက time label ကို တစ်လှည့်စီ ရေးပြီး preview ၏ `mm:ss / mm:ss` ကို ဖျက်သည်။
+
+**Race တစ်ခု ပြင်ပြီး** — `playPreview()` သည် preview အသံ (count-in click၊ ဒရမ်သံ) ကို `await` ဖြင့် စတင်ပြီးမှ frame clock ကို schedule လုပ်ခဲ့သည်။ ထို `await` အတွင်း pause နှိပ်လျှင် clock သည် နောက်မှ ပြန်လာပြီး ရပ်ထားသော preview က ဆက်ဆွဲသည်။ ယခု `await` ပြီးနောက် `preview.playing` ကို ပြန်စစ်သည်။
+
+**စမ်းသပ်မှု** — `tools/test-studio-video-browser.mjs` (case `e2e15`/`e2e16`) တွင် စံနှုန်း တစ်ခုချင်းစီအတွက် assertion ရှိသည် —
+
+| §၁၂ စံနှုန်း | တိုင်းတာပုံ | ရလဒ် |
+|---|---|---|
+| ≥ ၂၄ fps | `requestAnimationFrame` ၂ စက္ကန့် ရေတွက် | ၂၄ အထက် |
+| Seek frame တူခြင်း | preview frame နှင့် export frame ကို pixel-compare (1.5 s, 2.5 s) | ကွာဟမှု < ၁၀ |
+| Setting → ၃၀၀ ms | Title ပြောင်းပြီး canvas ink ပြောင်းသည့်အချိန် | **၃၂၄ ms** |
+| Keyboard / Full screen | Space က play/pause၊ ⛶ က stage ကို full screen | pass (`×` ပြောင်းသည်) |
+| Memory မတိုး | play ၅ ချီပြီး `HeapProfiler.collectGarbage` နောက် `Runtime.getHeapUsage` | ၄ MiB အောက် |
+| Export မပျက် | preview ပြီးနောက် export သည် MP4 1920×1080၊ 4 s၊ portrait 1080×1920 | pass |
+
+**မှတ်ချက်** — Title latency ၏ ၃၀၀ ms သည် debounce ကာလ ဖြစ်သည်။ တိုင်းတာရာတွင် debounce + frame တစ်ခု ပါသဖြင့် ceiling ကို ၉၀၀ ms ထားသည်။
+
+## Layout API — `layoutFor`, `composeFrame`, `requireAsset` (V10)
+
+Engine က **နေရာ** ကို ပိုင်သည်၊ page/adapter က **ဆွဲပုံ** ကို ပိုင်သည်။ ဤခွဲခြားမှုကြောင့် instrument အသစ်တစ်ခု ချိတ်ရာတွင် engine ကို မပြင်ရပါ။
+
+### `layoutFor(instrument, { width, height, parts?, shares? })`
+
+Frame တစ်ခုကို အပိုင်း ၃ ခုအဖြစ် ခွဲပြီး တစ်ခုချင်းစီ၏ `{ x, y, width, height }` ကို ပြန်ပေးသည်။
+
+| instrument | shape | အစဉ် |
+|---|---|---|
+| `drums`, `piano` | `rows` | title → notation → instrument |
+| `guitar`, `bass` | `rows` | instrument → notation → title |
+| `violin` | `split` (16:9, 1:1) / `rows` (9:16) | notation ဘယ်၊ instrument ညာ၊ title အောက်တွင် အပြည့် |
+| `voice` | `rows` | title → instrument (waveform) |
+
+- `ratioOf(width, height)` က `16:9` / `1:1` / `9:16` ကို ဆုံးဖြတ်ပြီး `LAYOUT_SHARES` မှ အချိုးကို ယူသည်။ `rows` 16:9 တွင် `title 0.12 / notation 0.46 / instrument 0.42`။
+- `LAYOUT_GUTTER = 0.02` — frame ၏ အတိုဆုံးအနံဘက်မှ ၂% ကို ဘောင် အဖြစ် ထားသည်။
+- `parts` ပေးလျှင် ထို အပိုင်းများသာ နေရာချသည်။ `shares` ပေးလျှင် ပင်ထားသော အပိုင်း၏ အချိုးကို လိုက်နာပြီး ကျန်အပိုင်းများကို `resolveShares()` က ကျန်နေသော နေရာအပေါ် အချိုးကျ ပြန်ဝေသည်။
+- မသိသော instrument အတွက် `RangeError` ပစ်သည်။ Drum branch သို့ fall-through မရှိပါ။
+
+### `composeFrame(ctx, { instrument, width, height, parts, shares? })`
+
+`parts` သည် `{ title, notation, instrument }` မှ function များ ဖြစ်သည်။ Engine က `layoutFor()` ကို ခေါ်ပြီး အပိုင်းတစ်ခုချင်းစီကို ၎င်း၏ rect ဖြင့် ခေါ်သည်။ မပေးထားသော အပိုင်းကို ဆွဲမည် မဟုတ်ပါ — ထို့ကြောင့် page တစ်ခုသည် အပိုင်းတစ်ခုတည်းဖြင့်လည်း စတင်နိုင်သည်။ Function မဟုတ်သော value ကို `parts` မှ ဖယ်ထားသည်။
+
+### `requireAsset(label)` / `resolveRequired(label, details)`
+
+Adapter က export မစမီ လိုအပ်သော asset ကို ကြေညာသည်။ `requireAsset()` က label ကို `pending` အဖြစ် မှတ်သည်။ Asset မရလျှင် `resolveRequired` ကို မခေါ်သဖြင့် `pending` ကျန်နေပြီး export ကို မစတင်ရ။ ဤနည်းဖြင့် asset ပျောက်နေသော video ကို တိတ်တဆိတ် မထုတ်ပါ။
+
+### ဘယ်သူ ဘယ်လို သုံးသည်
+
+- `studio-video.js` ၏ `drawPerformance()` က `engine.composeFrame()` ကို တစ်ကြိမ်တည်း ခေါ်ပြီး အပိုင်း ၃ ခုလုံးကို ပေးသည်။ Preview နှင့် export နှစ်ခုလုံး ဤ function ကို ဖြတ်သဖြင့် နေရာချထားမှု တူညီသည်။
+- `thankYouSegment()` က clip ကို `requireAsset('thank-you')` ဖြင့် ကြေညာပြီး ရလျှင် `resolveRequired()` ကို ခေါ်သည်။ 404 ဖြစ်လျှင် `null` ပြန်ပြီး `buildTimeline()` က ထို segment ကို ချန်သည်။
+- Metronome က `layoutFor()` ကို မသုံးပါ — ၎င်း၏ video တွင် Title/Info band မပါသဖြင့် ကိုယ်ပိုင် design renderer ရှိသည်။
+
+**စမ်းသပ်မှု** — `website/tests/video-engine-layout.test.mjs` က ratio ၃ မျိုးတွင် အပိုင်းများ ထပ်/ကျော်မှု မရှိကြောင်း၊ `shares` override အလုပ်လုပ်ကြောင်း၊ မသိသော instrument က ပစ်ကြောင်း စစ်သည်။

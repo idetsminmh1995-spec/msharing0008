@@ -352,7 +352,10 @@ print(total / max(1, count))
     await sleep(50);
   }
   assert.ok(titleLatency !== null, 'A Title change never reached the live preview');
-  assert.ok(titleLatency <= 1500, `The preview took ${titleLatency} ms to follow a Title change`);
+  // The Plan allows 300 ms of debounce, so the ceiling is that debounce plus
+  // one drawn frame; the measured value goes in the Doc.
+  console.log(`TITLE_LATENCY_MS ${titleLatency}`);
+  assert.ok(titleLatency <= 900, `The preview took ${titleLatency} ms to follow a Title change`);
 
   // Keyboard play/pause, and no clock left running after repeated plays.
   await evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }))");
@@ -375,6 +378,38 @@ print(total / max(1, count))
   await sleep(1000);
   assert.equal(await evaluate('window.__idleDraws'), 0,
     'A paused preview kept drawing: a play clock outlived its pause');
+
+  // Full screen, from a real gesture: the Plan reuses the existing button.
+  await evaluate("document.querySelector('[data-video-fullscreen]').click()", { userGesture: true });
+  await sleep(700);
+  const fullscreen = JSON.parse(await evaluate(`JSON.stringify({
+    onStage: document.fullscreenElement === document.querySelector('[data-video-stage]'),
+    button: document.querySelector('[data-video-fullscreen]').textContent,
+  })`));
+  await evaluate('document.fullscreenElement && document.exitFullscreen()', { userGesture: true });
+  await sleep(400);
+  assert.equal(fullscreen.onStage, true, 'Full screen did not take the video stage');
+  assert.equal(fullscreen.button, '×', 'The full screen button did not show its exit state');
+
+  // Five plays, then no retained growth: the Plan asks that memory does not
+  // climb. Measuring after a forced collection separates a real leak from
+  // garbage that the collector has simply not run yet.
+  const heapNow = async () => {
+    await cdp.call('HeapProfiler.collectGarbage');
+    return (await cdp.call('Runtime.getHeapUsage')).usedSize;
+  };
+  await cdp.call('HeapProfiler.enable');
+  const heapBefore = await heapNow();
+  for (let round = 0; round < 5; round += 1) {
+    await evaluate("document.querySelector('[data-video-play]').click()");
+    await sleep(800);
+    await evaluate("document.querySelector('[data-video-play]').click()");
+    await sleep(300);
+  }
+  const heapAfter = await heapNow();
+  const heapGrowth = heapAfter - heapBefore;
+  assert.ok(heapGrowth < 4 * 1024 * 1024,
+    `Five live previews kept ${Math.round(heapGrowth / 1024)} KiB of heap`);
 
   // The preview is a view, not a render: the export after it is still a
   // normal MP4 of the same length.

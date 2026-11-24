@@ -192,6 +192,20 @@ Run every command from `Website/Notation/Notation Engine/`.
   `{"admin": true, "maintain": true, "push": true, "triage": true,
   "pull": true}`, so pushes now land (`33b72f0..b04c03f`); the earlier
   read-only notes above are history, not the current state.
+- **Permission is standing — reaffirmed 2026-11-18, third time this
+  session.** Asked to check what the Plan still leaves open, to record the
+  full code-writing permission first, then push what is written, continue
+  from the Plan, and push once at the end. Recorded here as the standing
+  default. The Plan is refreshed about every five hours, so a Plan item
+  left open now is expected to be filled in later; a push is not a claim
+  of completeness. A fresh `github_pat_…` came with the message and writes
+  (`b04c03f..8120bd4` landed).
+- **Pushing with a fine-grained PAT needs the owner name, not
+  `x-access-token`.** `git push https://x-access-token:$PAT@…` is refused
+  with `Invalid username or token`; the same token works as
+  `https://idetsminmh1995-spec:$PAT@github.com/idetsminmh1995-spec/msharing0008.git`.
+  Check a token with `GET /user` (it names the account) and with
+  `GET /repos/{owner}/{repo}` (`permissions.push`) before pushing.
 - The Plan under `Website/Video/Video Engine Plan/PLAN.md` is reviewed and
   updated roughly every five hours. Work is landed in small pushes: push
   whatever is written first, then continue from the Plan, then push again.
