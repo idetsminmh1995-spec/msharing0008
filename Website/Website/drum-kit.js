@@ -198,7 +198,8 @@
    * Loads every picture the given strokes need, and returns the ones that
    * exist. A stroke whose picture is missing in this kit is dropped rather
    * than drawn with a neighbour's picture: a wrong drum is worse than no
-   * drum.
+   * drum. The dropped stroke is marked, so the caller can say which notes
+   * went unlit instead of leaving the hole silent.
    */
   const loadHitImages = async (art, strokes) => {
     const aliases = gmAliases();
@@ -216,8 +217,16 @@
           return;
         }
       }
+      stroke.missing = true;
     }));
     return resolved;
+  };
+
+  /** The notes this kit has no picture for, as one line for the status. */
+  const missingSummary = (strokes) => {
+    const notes = [...new Set(strokes.filter((stroke) => stroke.missing).map((stroke) => stroke.note))];
+    if (notes.length === 0) return null;
+    return `no picture for note${notes.length === 1 ? '' : 's'} ${notes.join(', ')}`;
   };
 
   /**
@@ -254,6 +263,7 @@
     HIT_VISIBLE_S,
     loadArt,
     loadHitImages,
+    missingSummary,
     imageCandidates,
     solveLimbs,
     draw,

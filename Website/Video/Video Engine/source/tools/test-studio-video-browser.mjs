@@ -437,6 +437,30 @@ print(total / max(1, count))
   assert.equal(portraitProbe.streams[0].width, 1080);
   assert.equal(portraitProbe.streams[0].height, 1920);
 
+  // The Plan's B0 asks for an export in each of the three ratios, not just
+  // the one the page happens to open with. 16:9 is measured at the top of
+  // this file and 9:16 above; 1:1 is measured here. A page that kept a size
+  // of its own for the square case would fail rather than go unnoticed.
+  await evaluate("(() => { const ratio = document.querySelector('[data-video-ratio]'); ratio.value = '1:1'; ratio.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[data-studio-generate]').click(); })()");
+  const squareStartedAt = Date.now();
+  let squareState;
+  while (Date.now() - squareStartedAt < 60000) {
+    squareState = JSON.parse(await evaluate("JSON.stringify({status:document.querySelector('[data-studio-status]').textContent, videoReady:!document.querySelector('[data-video-output]').hidden && document.querySelector('[data-video-output]').readyState >= 1, href:document.querySelector('[data-video-download]').href, download:document.querySelector('[data-video-download]').download})"));
+    if (squareState.status.startsWith('Rendered ') && squareState.videoReady && squareState.href !== portraitState.href) break;
+    if (squareState.status.startsWith('Video render failed:')) throw new Error(squareState.status);
+    await sleep(150);
+  }
+  assert.ok(squareState?.status.startsWith('Rendered '), `Square render did not complete: ${squareState?.status}`);
+  const squareBytes = Buffer.from(await evaluate(`(async () => { const response = await fetch(${JSON.stringify(squareState.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); })()`), 'base64');
+  const squarePath = `${output}.square.mp4`;
+  await writeFile(squarePath, squareBytes);
+  const squareProbe = JSON.parse((await exec('ffprobe', [
+    '-v', 'error', '-show_entries', 'stream=codec_name,width,height', '-of', 'json', squarePath,
+  ])).stdout);
+  assert.equal(squareProbe.streams[0].width, 1080, `Square video width is wrong: ${JSON.stringify(squareProbe)}`);
+  assert.equal(squareProbe.streams[0].height, 1080, `Square video height is wrong: ${JSON.stringify(squareProbe)}`);
+  assert.match(squareState.download, /1x1/, `The square export is not named for its ratio: ${squareState.download}`);
+
   // A real score must reach the Notation part, and its own cursor must be
   // drawn: the Plan puts both inside the frame the Video Engine composes.
   const score = await readFile(new URL(
@@ -554,6 +578,25 @@ print(len(colours))
     return `${limb === 'RH' ? 'R' : 'L'}${[38, 42, 36][index]}.png`;
   });
   assert.deepEqual(kitProbe.files.slice().sort(), expectedFiles.sort());
+
+  // The Plan's B8 says a picture the kit does not hold must be reported, not
+  // skipped in silence. Note 81 (open triangle) has no file in this kit, so
+  // the stroke must come back marked and the summary must name the note.
+  const missingProbe = JSON.parse(await evaluate(`(async () => {
+    const art = await window.DrumKit.loadArt('RolandDrums/VAD716', '16:9');
+    const strokes = [{ note: 38, at: 0.5, limb: 'RH' }, { note: 81, at: 1, limb: 'RH' }];
+    const resolved = await window.DrumKit.loadHitImages(art, strokes);
+    return JSON.stringify({
+      resolved: resolved.size,
+      marked: strokes.map((stroke) => stroke.missing === true),
+      summary: window.DrumKit.missingSummary(strokes),
+    });
+  })()`));
+  assert.equal(missingProbe.resolved, 1, `The stroke with a picture was dropped: ${JSON.stringify(missingProbe)}`);
+  assert.deepEqual(missingProbe.marked, [false, true],
+    `The stroke without a picture was not marked: ${JSON.stringify(missingProbe)}`);
+  assert.equal(missingProbe.summary, 'no picture for note 81',
+    `The missing picture was not named in the status line: ${JSON.stringify(missingProbe)}`);
 
   // A score that names its drums with <midi-unpitched> must light the kit,
   // and the stroke must change the instrument band: the background alone

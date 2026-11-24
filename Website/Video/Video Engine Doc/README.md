@@ -94,7 +94,7 @@ The standard 16:9 export is now `1920×1080`; square and portrait exports are `1
 - **စမ်းသပ်မှု** — `tools/test-studio-video-browser.mjs` တွင် case ၂ ခု ထည့်သည်: (၁) Visual Only သည် audio stream မထုတ်ကြောင်း၊ status က ဒရမ်အသံမရှိကြောင်း ပြောကြောင်း; (၂) Natural သည် audio stream ထုတ်ကြောင်း၊ peak > 3000 ရှိကြောင်း၊ beat ပေါ်တွင် ကျကြောင်း (beat ပေါ် peak သည် beat ကြားထက် ၂ ဆ ကျော်)။ နှစ်ခုလုံးအတွက် Thank You clip ကို ဖယ်ထားသည် — clip ၏ ကိုယ်ပိုင်အသံက ဒရမ်အသံကို ဖုံးလွှမ်းမည် ဖြစ်သောကြောင့်။
 - **ကျန်ရှိ** — count ကို စကားဖြင့် (spoken "one, two, three, four") မခေါ်သေးဘဲ ကြိမ်သံဖြင့်သာ တီးသည်။ Count Voice အသံဖိုင် (သို့) speech synthesis ကို နောက်ပိုင်း ချိတ်ရန် ကျန်သည်။
 
-**အတည်ပြုထားသော စမ်းသပ်မှုများ:** Metronome Engine verify 20/20; Video Engine muxer 15/15; cleanup/safety 5/5; Video Engine MP4 smoke, updated Drum settings/export regression နှင့် Metronome card-to-export browser integration pass. Metronome test output: 3/8, quarter-note 96 BPM, 1 bar, 28 frames/0.933 sec, 1080×1920 VP8 + 48kHz mono Opus; `ffprobe` က stream နှစ်ခုလုံးကိုဖတ်နိုင်သည်။ Test သည် 9:16 ကိုသာ တိုင်းသေးသည်။ 16:9 နှင့် 1:1 ကို မတိုင်းရသေးပါ (B1 ကျန်ရှိ)။ 375×812 phone နှင့် 1280×900 desktop viewport တွင် horizontal overflow မရှိ။ ဖုန်းအစစ်၊ Safari/Firefox နှင့် MediaRecorder-only fallback ကို မစစ်ရသေးပါ။
+**အတည်ပြုထားသော စမ်းသပ်မှုများ:** Metronome Engine verify 20/20; Video Engine muxer 15/15; cleanup/safety 5/5; Video Engine MP4 smoke, updated Drum settings/export regression နှင့် Metronome card-to-export browser integration pass. Metronome test output: 3/8, quarter-note 96 BPM, 1 bar, 28 frames/0.933 sec, 1080×1920 VP8 + 48kHz mono Opus; `ffprobe` က stream နှစ်ခုလုံးကိုဖတ်နိုင်သည်။ Test သည် ယခု ratio ၃ မျိုးလုံးကို တိုင်းသည် — 16:9 = 1920×1080၊ 1:1 = 1080×1080၊ 9:16 = 1080×1920။ 375×812 phone နှင့် 1280×900 desktop viewport တွင် horizontal overflow မရှိ။ ဖုန်းအစစ်၊ Safari/Firefox နှင့် MediaRecorder-only fallback ကို မစစ်ရသေးပါ။
 
 Implementation Plan/Doc: [Metronome Engine Plan](../../Metronome/Metronome%20Engine%20Plan/PLAN.md), [Metronome Engine Doc](../../Metronome/Metronome%20Engine%20Doc/DOC.md). Guitar နှင့် အခြား instrument များသည် ဆက်လက်မချိတ်ဆက်ရသေးပါ။
 
@@ -331,17 +331,45 @@ A `.mxl` is a ZIP archive, so `file.text()` returns archive bytes rather than a 
 
 **Verification** — `tools/test-mxl-score-browser.mjs` loads `simple-single-voice.mxl` into the real page and checks that the text matches the archive read directly, that the notation is 4.00 s in `page` mode with 69,503 dark pixels (real notes, not a placeholder), that a non-ZIP file is refused with a reason, and that all six inputs offer `.mxl`. Reverting the `.mxl` branch to `file.text()` makes the test fail. Engine unit tests (21) and the Drum, Piano, Guitar, Bass and Violin browser suites pass; the sync check reports the production copy is current.
 
-## Delivery size — what is verified (2026-11-18)
+## Delivery size — all three ratios measured (2026-11-18)
 
 Every adapter takes its picture size from `VideoEngine.sizeFor()`, so no page
 keeps a size of its own: 16:9 is 1920×1080, 1:1 is 1080×1080 and 9:16 is
-1080×1920. What the browser tests prove is narrower than that rule: the
-Metronome suite probes 9:16 only, and the Piano, Bass, Violin and Voice suites
-probe portrait plus, in the Bass and Violin cases, one landscape render. A
-page that fell back to 720p in 1:1 would not be caught today.
+1080×1920. The tests used to measure one ratio each, which would have passed
+even if a page had fallen back to 720p in the other two. Both suites now
+render and probe all three:
+
+| Suite | 16:9 | 1:1 | 9:16 |
+|---|---|---|---|
+| `test-studio-video-browser.mjs` (Drum) | 1920×1080 | 1080×1080 | 1080×1920 |
+| `test-metronome-studio-browser.mjs` | 1920×1080 | 1080×1080 | 1080×1920 |
+
+The Drum suite checks the square download name (`…-1x1-drum`) and the
+Metronome suite checks `metronome-<design>-<ratio>`, so a file named for one
+ratio while holding another's pixels is caught too. The Metronome run returns
+to 9:16 afterwards, because the determinism check that follows re-renders the
+portrait settings.
 
 Earlier notes in this Doc recorded a 9:16 output as 720×1280 in four places
 while the tests assert 1080×1920; those numbers were stale and now match the
 assertions.
 
-Measuring the remaining ratios is still open under Main Plan B1.
+## A drum picture the kit does not hold is named (2026-11-18)
+
+`DrumKit.loadHitImages()` drops a stroke whose picture the kit has no file
+for — a wrong drum is worse than no drum — but dropping it silently left a
+hole in the video nobody was told about. `loadHitImages()` now marks the
+stroke, `DrumKit.missingSummary()` turns the marks into one line, and the
+Drum Studio appends it to the render status:
+
+```
+Rendered 60 frames · 16x9 · Studio drum sound · no picture for note 81
+```
+
+The Roland VAD716 kit holds pictures for notes 35–59 (sided for hands, bare
+for feet) and no file for 81, so the test uses 81 as the missing case: the
+stroke with a picture still resolves, the one without comes back marked, and
+the summary names the note. `test-studio-video-browser.mjs` checks all three.
+
+Still open: a 1080p encode has not been tried on a real phone (the memory
+guard is exercised in desktop Chromium only).

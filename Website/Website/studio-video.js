@@ -402,6 +402,7 @@
       const resolved = await drumKit.loadHitImages(art, strokes);
       return {
         draw: (ctx, rect, at) => drumKit.draw(ctx, rect, art, at, strokes, resolved),
+        missing: drumKit.missingSummary(strokes),
       };
     } catch (error) {
       console.warn('Drum kit pictures unavailable; drawing the lane chart instead.', error);
@@ -605,7 +606,7 @@
     // owns its address and shape, so the page only asks for it.
     const ending = await engine.thankYouSegment(settings.size.width, settings.size.height);
     if (ending) segments.push(ending);
-    return { segments, audio, meta, source, notationState, countIn, duration };
+    return { segments, audio, meta, source, notationState, countIn, duration, kit };
   }
 
   // ---------------------------------------------------------------
@@ -907,7 +908,7 @@
     stopPreview();
     try {
       setStatus(`Preparing ${musicXmlInput?.files?.[0]?.name || 'default drum pattern'} · ${settings.ratio} · 0%`);
-      const { segments, audio, notationState } = await buildTimeline(settings);
+      const { segments, audio, notationState, kit } = await buildTimeline(settings);
       if (notationState?.error) setStatus(`Notation could not be prepared: ${notationState.error}`);
       const result = await engine.render({
         width: settings.size.width,
@@ -941,7 +942,10 @@
       const audioNote = audio
         ? `${settings.soundModel} drum sound`
         : 'visual only · no drum sound';
-      setStatus(`Rendered ${result.frames} frames · ${settings.ratio} · ${audioNote}`);
+      // A kit that had no picture for a note leaves that stroke unlit. Say
+      // so, rather than shipping a video with a silent hole in it.
+      const missingNote = kit?.missing ? ` · ${kit.missing}` : '';
+      setStatus(`Rendered ${result.frames} frames · ${settings.ratio} · ${audioNote}${missingNote}`);
     } catch (error) {
       setStatus(`Video render failed: ${error.message || error}`);
     } finally {
