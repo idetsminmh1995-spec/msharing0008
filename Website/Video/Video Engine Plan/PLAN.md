@@ -66,6 +66,7 @@ Instrument တစ်ခုချင်းစီသည် Video Engine encoder �
 | 6 | ရေတွက်ပုံ ရွေးချယ်မှု | ✅ `data-count-display` |
 | 7 | စစ်ဆေးရမည့် စံနှုန်း | ❌ browser E2E မရှိ |
 | 8 | **Live Preview** (အသစ်) | ❌ — Main Plan §၁၂ |
+| 9 | **Drum ရည်ညွှန်းဒီဇိုင်း** (R2 kit ပုံ + highlight overlay၊ TIME/BPM/COUNT ကွက်၊ Video Color) | ❌ — Main Plan §၁၃၊ §၁၄ (`Website/Doc/Images/drum-video-reference.png`) |
 
 အသေးစိတ် အဆင့်များ (V1–V10) ကို Main Plan ၏ `Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ်` §၈ တွင် ကြည့်ပါ။
 
