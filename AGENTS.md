@@ -301,6 +301,19 @@ Run every command from `Website/Notation/Notation Engine/`.
   - Note for the next pass: the Studio preview's top-left square already
     holds the Title band's red logo, so "the corner mark is the only red"
     can only be asserted in the isolated engine test, not on the full frame.
+- **2026-11-18 — the tenth pass: permission, again.** The user restated
+  that OpenHands writes the code while the Plan is written elsewhere (Main
+  Plan §11 Roles), and asked for it to be recorded first. It is recorded
+  here: **OpenHands has full authority to write, test and push code on
+  `feat/guitar-video-adapter`.** Nothing in the Plan is edited by this
+  side. Two clarifications the user added this pass, both of which match
+  the Plan's own decisions (§ရေတွက်ပုံ ရွေးချယ်မှု, §၁၃):
+  - **Count Display is not a separate display.** It belongs inside the
+    TIME / BPM / COUNT boxes the Title band already draws; the COUNT box is
+    where it shows. There must not be a second count line elsewhere on the
+    frame.
+  - **Count Voice is sound only.** The audio already exists in R2; the job
+    is to play it, not to add another on-screen element for it.
 - `Website/Plan/README.md` is not to be edited.
 - Docs (`.../Doc/`, `.../Plan/`) are updated only after the work they
   describe actually exists and has been verified.
