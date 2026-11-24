@@ -206,6 +206,13 @@ Run every command from `Website/Notation/Notation Engine/`.
   `https://idetsminmh1995-spec:$PAT@github.com/idetsminmh1995-spec/msharing0008.git`.
   Check a token with `GET /user` (it names the account) and with
   `GET /repos/{owner}/{repo}` (`permissions.push`) before pushing.
+- **Permission is standing — reaffirmed 2026-11-18, fourth time this
+  session.** Same shape as before: check what the Plan leaves open, record
+  the full code-writing permission first, push what is written, continue
+  from the Plan, then push once more. Nothing was left unpushed this time
+  (`c8de536` was already on the remote), and no Plan file had changed since
+  the last pass — the five-hour refresh had not produced a new revision, so
+  the open items are the ones already listed in the Plan's own tables.
 - The Plan under `Website/Video/Video Engine Plan/PLAN.md` is reviewed and
   updated roughly every five hours. Work is landed in small pushes: push
   whatever is written first, then continue from the Plan, then push again.
