@@ -314,6 +314,12 @@ Run every command from `Website/Notation/Notation Engine/`.
     frame.
   - **Count Voice is sound only.** The audio already exists in R2; the job
     is to play it, not to add another on-screen element for it.
+- **Permission is standing — reaffirmed 2026-11-18, eleventh pass.** The
+  owner asked again, in this order: check what the Plan still leaves open,
+  write the full code-writing permission down first, push what is already
+  written, continue from the Plan, push once at the end. The Plan is
+  refreshed about every five hours, so what it leaves open now is expected
+  to arrive later. Recorded as the standing default, unchanged.
 - `Website/Plan/README.md` is not to be edited.
 - Docs (`.../Doc/`, `.../Plan/`) are updated only after the work they
   describe actually exists and has been verified.
