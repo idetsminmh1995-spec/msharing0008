@@ -257,6 +257,47 @@ try {
   assert.equal(videoStream.height, 1920, 'Portrait video height is wrong');
   assert.ok(Math.abs(Number(probe.format.duration) - 0.9375) < 0.2, 'Video duration does not match 3/8 at quarter-note 96 BPM');
 
+  // The Plan's shared size rule (B1): a ratio's picture is the Video
+  // Engine's delivery size, not a size the page keeps for itself. Portrait
+  // is measured above; landscape and square are measured here, so a page
+  // that quietly exported 720p would fail rather than pass on one ratio.
+  const renderAspect = async (aspect, previousHref) => {
+    await evaluate(`(() => { const select = document.querySelector('[data-metronome-aspect]'); select.value = ${JSON.stringify(aspect)}; select.dispatchEvent(new Event('change', {bubbles:true})); })()`);
+    await sleep(200);
+    await evaluate("document.querySelector('[data-studio-generate]').click()");
+    const startedAt = Date.now();
+    let rendered;
+    while (Date.now() - startedAt < 90000) {
+      rendered = JSON.parse(await evaluate("JSON.stringify({status:document.querySelector('[data-studio-status]').textContent,videoReady:!document.querySelector('[data-video-output]').hidden && document.querySelector('[data-video-output]').readyState >= 1,href:document.querySelector('[data-video-download]').href,download:document.querySelector('[data-video-download]').download})"));
+      if (rendered.status.startsWith('Rendered ') && rendered.videoReady && rendered.href !== previousHref) break;
+      if (rendered.status.startsWith('Metronome video render failed:')) throw new Error(`${aspect}: ${rendered.status}`);
+      await sleep(150);
+    }
+    assert.ok(rendered?.status.startsWith('Rendered '), `${aspect} render did not complete: ${rendered?.status}`);
+    const bytes = Buffer.from(await evaluate(`(async () => { const response = await fetch(${JSON.stringify(rendered.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); })()`), 'base64');
+    const path = `${output}-${aspect}.${rendered.download.split('.').pop()}`;
+    await writeFile(path, bytes);
+    const streams = JSON.parse((await exec('ffprobe', ['-v', 'error',
+      '-show_entries', 'stream=codec_type,width,height', '-of', 'json', path])).stdout).streams;
+    return { ...rendered, path, stream: streams.find((stream) => stream.codec_type === 'video') };
+  };
+
+  const landscape = await renderAspect('16x9', state.href);
+  assert.equal(landscape.stream?.width, 1920, `Landscape video width is not the engine's 1080p delivery size: ${landscape.stream?.width}`);
+  assert.equal(landscape.stream?.height, 1080, `Landscape video height is not the engine's 1080p delivery size: ${landscape.stream?.height}`);
+  assert.match(landscape.download, /^metronome-sweep-dial-16x9\.(mp4|webm)$/,
+    `The landscape export is not named for its ratio: ${landscape.download}`);
+
+  const square = await renderAspect('1x1', landscape.href);
+  assert.equal(square.stream?.width, 1080, `Square video width is not the engine's delivery size: ${square.stream?.width}`);
+  assert.equal(square.stream?.height, 1080, `Square video height is not the engine's delivery size: ${square.stream?.height}`);
+  assert.match(square.download, /^metronome-sweep-dial-1x1\.(mp4|webm)$/,
+    `The square export is not named for its ratio: ${square.download}`);
+
+  // Back to the settings the determinism check below re-renders.
+  await evaluate("(() => { const select = document.querySelector('[data-metronome-aspect]'); select.value = '9x16'; select.dispatchEvent(new Event('change', {bubbles:true})); })()");
+  await sleep(200);
+
   // Frame determinism (Plan §5). The same settings rendered twice have to
   // draw the same frames: a renderer that read the wall clock, or carried
   // state from one frame to the next, would drift here even though both
