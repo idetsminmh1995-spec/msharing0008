@@ -255,6 +255,31 @@ Run every command from `Website/Notation/Notation Engine/`.
   whatever is written first, then continue from the Plan, then push again.
   Unfinished Plan items are filled in later; a push is not a claim of
   completeness.
+- **Permission is standing — reaffirmed 2026-11-18, eighth time this
+  session.** The owner asked again for the same shape: check what the Plan
+  leaves open, write the full code-writing permission down first, push what
+  is already written, continue from the Plan, and push once at the end.
+  Everything written was already on the remote (`993c115`), so this pass
+  starts from a clean tree. The five-hour refresh had still produced no new
+  Plan revision: `Website/Plan/README.md` has no diff against
+  `origin/main`, and `e8948a7` is still the newest commit touching it on
+  any remote branch. The open items are therefore the ones the Plan's own
+  tables list.
+- **Permission is standing — reaffirmed 2026-11-18, ninth time this
+  session.** The owner asked for the same shape once more: check what the
+  Plan leaves open, write the full code-writing permission down first, push
+  what is already written, continue from the Plan, push once at the end,
+  and leave whatever the Plan still lists open for a later pass. **OpenHands
+  writes the code; the Plan is written elsewhere** (Main Plan §11 Roles).
+  This pass starts from a clean tree: `993c115` is on the remote and
+  `origin/main` is `d4c93c0`, which is a merge of this very branch, so
+  `git diff HEAD origin/main` is empty. The five-hour refresh produced no
+  new Plan revision — both `Website/Plan/README.md` and
+  `Website/Video/Video Engine Plan/PLAN.md` are byte-identical to
+  `origin/main`, and `e8948a7` remains the newest commit touching the Main
+  Plan on any remote branch. The open items are therefore the ones the
+  Plan's own tables already list: B4, B5, B7, B8, B9, B10, B11 and B13–B15
+  in the Main Plan, and row 10 (`🟡`) in the Video Engine Plan.
 - `Website/Plan/README.md` is not to be edited.
 - Docs (`.../Doc/`, `.../Plan/`) are updated only after the work they
   describe actually exists and has been verified.
