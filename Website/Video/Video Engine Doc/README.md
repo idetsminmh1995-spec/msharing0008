@@ -42,8 +42,7 @@ Video Engine သည် canvas frame များကို WebCodecs ဖြင့
 - Metronome implementation သည် Video Engine core ကိုပြင်ခြင်းမဟုတ်ဘဲ Studio အတွက် သီးခြား consumer adapter နှင့် bundle sync ကို ထည့်ထားသည်။ Guitar/Piano/Bass/Strings(violin)/Voice အားလုံးကို Video Engine ဖြင့် render လုပ်ပြီးဖြစ်သည်။
 - နောက် code implementation တစ်ခုစီပြီးပါက သက်ဆိုင်ရာ engine tests, shared Drum regression, real browser export, silent/audio behavior နှင့် phone/web layout ကို ပြန်စစ်ပြီး Doc/Plan ကို update လုပ်ရမည်။
 - **Guitar adapter ချိတ်ပြီး** — `tools/test-guitar-studio-browser.mjs` တွင် tablature ဖတ်ခြင်း၊ ပုံတိုင်း၏ အတိုင်းအတာ၊ Canvas ပေါ်တွင် neck ရှိကြောင်း၊ 375px/1280px layout နှင့် Plan §7 အရှည်စည်းမျဉ်း (score ၂ bar = ၄ စက္ကန့်၊ Thank You clip ၂ စက္ကန့် ဖြင့် ၆ စက္ကန့်) ကို စစ်သည်။ Guitar စာမျက်နှာတွင်လည်း ကိုယ်ပိုင် ၁၂ စက္ကန့် ကန့်သတ်ချက် မရှိတော့ပါ။
-
-
+- **Notation View နှင့် စာသား အံဝင်ခြင်း** — `tools/test-notation-view-browser.mjs` (V6) နှင့် `tools/test-title-info-browser.mjs` (V7) ထည့်ပြီး။ ဒုတိယ test က ရှည်လွန်းသော Title သည် 1:1/9:16 တွင် ဘောင်ကျော်နေသည်ကို တွေ့၍ `fitText()` ဖြင့် ပြင်ခဲ့သည်။ Test နှစ်ခုလုံးကို mutation ဖြင့် ပြန်စစ်ပြီး — ဦးတည်ချက်/ဖြတ်ခြင်းကို ဖျက်ကြည့်လျှင် fail ဖြစ်သည်။
 ## Current Studio settings UI update
 
 The shared left-side Studio control panel now supports MusicXML selection, logo selection, Title 1/Title 2, Drum selection, Notation View, Sound Model, Count Voice text, Video Color, Video Ratio, and Generate Video. The same markup and responsive CSS are intended to be reused by all instrument studio routes.
@@ -263,6 +262,30 @@ Video Engine muxer 15/15, layout 8/8, cleanup 5/5, Voice နှင့် Drum br
 | Export မပျက် | preview ပြီးနောက် export သည် MP4 1920×1080၊ 4 s၊ portrait 1080×1920 | pass |
 
 **မှတ်ချက်** — Title latency ၏ ၃၀၀ ms သည် debounce ကာလ ဖြစ်သည်။ တိုင်းတာရာတွင် debounce + frame တစ်ခု ပါသဖြင့် ceiling ကို ၉၀၀ ms ထားသည်။
+
+## Notation View ၄ မျိုးနှင့် စာသား အံဝင်ခြင်း (V6၊ V7 — 2026-11-18)
+
+**Notation View** — `notation` setting သည် လေးမျိုး လက်ခံသည်။ ပထမသုံးမျိုးသည် **Page** ဖြစ်ပြီး စာရွက်ကို အောက်မှ အပေါ်သို့ ရွှေ့ကာ ဖတ်သည့်လိုင်း (cursor) ကို နေရာတွင် ထားသည်။ စတုတ္ထမျိုးသည် **Horizontal** ဖြစ်ပြီး စာရွက်ကို ညာမှ ဘယ်သို့ ရွှေ့ကာ marker ကို မရွေ့စေပါ။
+
+| View | mode | စာရွက် အနံ (staff space) | ရွေ့သည့် ဦးတည်ချက် |
+|---|---|---|---|
+| `landscape` | `page` | 42 | အောက် → အပေါ် |
+| `portrait` | `page` | 30 | အောက် → အပေါ် |
+| `square` | `page` | 30 | အောက် → အပေါ် |
+| `horizontal` | `scroll` | — (score အတိုင်း ရှည်) | ညာ → ဘယ် |
+
+- Page ၏ အမြင့်သည် score ရှည်လျှင် တိုးသည် (ဥပမာ 42×2640)။ ထို့ကြောင့် အချိုးကို အမြင့်ဖြင့် မတိုင်း — **အနံ** ဖြင့် တိုင်းသည်။
+- `state.mode` က `page`/`scroll` ကို ပြန်ပေးသည်။ ရွေ့မှုကို `state.api.computeCursorPlacement()` က တွက်သည်။
+
+**စမ်းသပ်မှု** — `tools/test-notation-view-browser.mjs` သည် engine ၏ `drawNotationPart()` ကို တိုက်ရိုက်ခေါ်ပြီး `ctx.drawImage()` သို့ ပေးလိုက်သော offset ကို ဖမ်းယူသည်။ ထို့ကြောင့် "ရွေ့သည်" ဆိုသည်ကို ရည်ရွယ်ချက်မှ မဟုတ်ဘဲ တကယ်ဆွဲသည့် တန်ဖိုးမှ စစ်သည်။ စာရွက်သည် ဘောင်ထက် ၂ ဆ မကျယ်လျှင် test က ပယ်သည် — မရွေ့နိုင်သော စာရွက်ဖြင့် ဦးတည်ချက် စစ်လျှင် အမှားကို မဖမ်းမိနိုင်သဖြင့် ဖြစ်သည်။
+
+**စာသား အံဝင်ခြင်း (V7)** — `fitText(ctx, text, maxWidth)` သည် စာသားကို ဖြတ်ပြီး `…` ထည့်သည်။ Title 1၊ Title 2၊ stats row (`4/4`၊ `BPM`၊ `Key`)၊ footer နှင့် count row အားလုံး ဤ function ကို ဖြတ်သည်။ ဤမရှိမီ ရှည်လွန်းသော Title သည် 1:1/9:16 တွင် ဘောင်ကျော်ခဲ့သည်။
+
+- ဖြတ်သည့်အခါ အသုံးပြုသူ ရိုက်ထည့်သည့် စာသားကို မပြောင်း — အစမှ ကိုက်သည့်အထိ ဆွဲပြီး `…` ထည့်သည်။ Default စာသားဖြင့် အစားထိုး မလုပ်ပါ။
+- Count row တွင် ကိုက်သည့် token အထိသာ ဆွဲသည်။ ကျန်ကို မဆွဲပါ။
+- `width` မပေးလျှင် band ကို မကန့်သတ်ပါ (test အဟောင်းများ မကျိုးစေရန်)။
+
+**စမ်းသပ်မှု** — `tools/test-title-info-browser.mjs` သည် ratio ၃ မျိုးတွင် band ၏ နေရာချထားမှုကို စစ်ပြီး စာသား/logo တစ်ခုမျှ ဘောင်မကျော်ကြောင်း တိုင်းသည်။ ရှည်သော Title ဖြင့်လည်း စမ်းသည်။
 
 ## Layout API — `layoutFor`, `composeFrame`, `requireAsset` (V10)
 

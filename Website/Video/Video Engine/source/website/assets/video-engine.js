@@ -1874,8 +1874,27 @@
     const scale = Math.max(0.5, Math.min(1.15, rect.height / 150));
     ctx.save();
     ctx.translate(rect.x, rect.y);
-    drawInfoBand(ctx, { at, meta, settings: titleSettings(options), palette, scale });
+    drawInfoBand(ctx, { at, meta, settings: titleSettings(options), palette, scale, width: rect.width });
     ctx.restore();
+  }
+
+  /**
+   * The text as far as it fits, with an ellipsis where it was cut. A title
+   * the user typed is never silently replaced: it is drawn as written up to
+   * the last letter that fits, so a long name still reads as that name.
+   */
+  function fitText(ctx, text, maxWidth) {
+    const value = String(text ?? '');
+    if (value === '' || maxWidth <= 0) return '';
+    if (ctx.measureText(value).width <= maxWidth) return value;
+    let low = 0;
+    let high = value.length;
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2);
+      if (ctx.measureText(`${value.slice(0, middle)}\u2026`).width <= maxWidth) low = middle;
+      else high = middle - 1;
+    }
+    return low > 0 ? `${value.slice(0, low)}\u2026` : '';
   }
 
   /**
@@ -1901,7 +1920,7 @@
     };
   }
 
-  function drawInfoBand(ctx, { at, meta, settings, palette, scale }) {
+  function drawInfoBand(ctx, { at, meta, settings, palette, scale, width }) {
     const pad = Math.round(24 * scale);
     const top = Math.round(10 * scale);
     const leftEdge = pad;
@@ -1915,13 +1934,19 @@
       textX = leftEdge + logoWidth + Math.round(18 * scale);
     }
 
+    // The right edge every line in the band has to stop before. A page that
+    // does not say how wide it is leaves the band unconstrained, which is
+    // what the tests that predate this did.
+    const rightEdge = Number.isFinite(width) ? width - pad : Infinity;
+    const room = rightEdge - textX;
+
     ctx.fillStyle = settings.titleOneColor;
     ctx.font = `700 ${Math.round(settings.titleOneSize * scale)}px Inter, system-ui, sans-serif`;
     ctx.textBaseline = 'alphabetic';
-    ctx.fillText(settings.titleOne, textX, top + Math.round(28 * scale));
+    ctx.fillText(fitText(ctx, settings.titleOne, room), textX, top + Math.round(28 * scale));
     ctx.fillStyle = settings.titleTwoColor;
     ctx.font = `${Math.round(settings.titleTwoSize * scale)}px Inter, system-ui, sans-serif`;
-    ctx.fillText(settings.titleTwo, textX + Math.round(2 * scale), top + Math.round(52 * scale));
+    ctx.fillText(fitText(ctx, settings.titleTwo, room), textX + Math.round(2 * scale), top + Math.round(52 * scale));
 
     const statsY = top + Math.round(78 * scale);
     const statSize = Math.max(10, Math.round(13 * scale));
@@ -1934,8 +1959,10 @@
     ctx.fillStyle = '#f20d3d';
     let cursorX = leftEdge;
     for (const item of items) {
-      ctx.fillText(item, cursorX, statsY);
-      cursorX += ctx.measureText(item).width + gap;
+      const fitted = fitText(ctx, item, rightEdge - cursorX);
+      if (fitted === '') break;
+      ctx.fillText(fitted, cursorX, statsY);
+      cursorX += ctx.measureText(fitted).width + gap;
     }
 
     drawMetronomeIcon(ctx, cursorX + Math.round(6 * scale), statsY - Math.round(statSize * 0.35), Math.round(statSize * 1.15), at, meta.bpm, palette.muted);
@@ -1945,10 +1972,12 @@
     const footer = [settings.brand, settings.model, settings.notation]
       .filter((part) => part && String(part).trim() !== '')
       .map((part) => String(part).toUpperCase());
-    if (footer.length > 0) ctx.fillText(footer.join(' \u00b7 '), leftEdge, statsY + Math.round(20 * scale));
+    if (footer.length > 0) {
+      ctx.fillText(fitText(ctx, footer.join(' \u00b7 '), rightEdge - leftEdge), leftEdge, statsY + Math.round(20 * scale));
+    }
 
     if (settings.countEnabled) {
-      drawCountRow(ctx, { at, meta, settings, palette, scale, pad: leftEdge, y: statsY + Math.round(40 * scale) });
+      drawCountRow(ctx, { at, meta, settings, palette, scale, pad: leftEdge, y: statsY + Math.round(40 * scale), rightEdge });
     }
   }
 
@@ -1977,7 +2006,7 @@
     return beatIndex * perBeat + Math.min(perBeat - 1, Math.floor(within * perBeat));
   };
 
-  function drawCountRow(ctx, { at, meta, settings, palette, scale, pad, y }) {
+  function drawCountRow(ctx, { at, meta, settings, palette, scale, pad, y, rightEdge = Infinity }) {
     const tokens = countTokens(settings.countDisplay, meta.beats);
     const active = currentCountToken(tokens, settings.countDisplay, meta, at);
     const size = Math.max(9, Math.round(10 * scale));
@@ -1987,9 +2016,13 @@
     const gap = Math.round(5 * scale);
     for (let index = 0; index < tokens.length; index += 1) {
       const token = tokens[index];
+      const width = ctx.measureText(token).width;
+      // A count that would run off the frame stops at the last token that
+      // fits rather than drawing a partial row past the edge.
+      if (x + width > rightEdge) break;
       ctx.fillStyle = index === active ? '#f20d3d' : palette.muted;
       ctx.fillText(token, x, y);
-      x += ctx.measureText(token).width + gap;
+      x += width + gap;
     }
   }
 

@@ -62,10 +62,11 @@ Instrument တစ်ခုချင်းစီသည် Video Engine encoder �
 | 2 | ၃ ပိုင်း layout template | ✅ `layoutFor` / `composeFrame` / `requireAsset` + test၊ Doc ရေးပြီး |
 | 3 | Video အရှည် = Count Voice + MusicXML + Thank You | ✅ Drum တွင် `MAX_SECONDS` မရှိတော့ — `countIn + notation seconds + Thank You`။ Browser test တွင် 16 s score၊ 6 s count-in ပါ video၊ 6 s Thank You ပါ video ကို တိုင်းထားသည် |
 | 4 | Thank You segment | ✅ `engine.thankYouSegment()` ကို `buildTimeline()` က ခေါ်သည်။ `requireAsset` စာချုပ်အတိုင်း clip မရလျှင် (404) ထို segment ကို ချန်ပြီး export ဆက်သည် — test တွင် case နှစ်ခုလုံး စစ်ထားသည် |
-| 5 | Title / Info | ✅ Drum Studio တွင် code ရှိပြီး browser တွင် စစ်ပြီး — Title ပြောင်းလျှင် preview တွင် ၃၂၄ ms အတွင်း ပေါ်သည် |
+| 5 | Title / Info | ✅ Drum Studio တွင် code ရှိပြီး browser တွင် စစ်ပြီး — Title ပြောင်းလျှင် preview တွင် ၃၂၄ ms အတွင်း ပေါ်သည်။ **2026-11-18:** `tools/test-title-info-browser.mjs` က ratio ၃ မျိုးတွင် logo ဘယ်၊ Title 1 ဘေး၊ Title 2 အောက်၊ `4/4`/`BPM`/`Key` အတန်းတူ ဖြစ်ကြောင်း စစ်သည်။ ရှည်လွန်းသော Title သည် 1:1/9:16 တွင် ဘောင်ကျော်နေသည်ကို တွေ့၍ `fitText()` ဖြင့် ဖြတ်ပြီး `…` ထည့်သည် (Title 1/2၊ stats row၊ footer၊ count row အားလုံး) |
 | 6 | ရေတွက်ပုံ ရွေးချယ်မှု | ✅ `data-count-display` |
 | 7 | စစ်ဆေးရမည့် စံနှုန်း | ✅ browser E2E ရှိ — `tools/test-studio-video-browser.mjs` |
 | 8 | **Live Preview** (အသစ်) | ✅ — Main Plan §၁၂ စံနှုန်း ၆ ချက် pass (2026-11-18) |
+| 9 | **Notation View ၄ မျိုး** (V6) | ✅ — `tools/test-notation-view-browser.mjs` က `drawImage` offset ကို တိုက်ရိုက်ဖမ်း၍ Page သုံးမျိုး (42/30/30 staff-space အနံ၊ အောက်မှအပေါ်) နှင့် Horizontal (ညာမှဘယ်၊ marker မရွေ့) ကို စစ်သည်။ Direction ကို ရည်ရွယ်၍ ဖျက်ကြည့်သော mutation ၂ မျိုးလုံး test က ဖမ်းမိသည် |
 
 အသေးစိတ် အဆင့်များ (V1–V10) ကို Main Plan ၏ `Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ်` §၈ တွင် ကြည့်ပါ။
 
