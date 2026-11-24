@@ -213,6 +213,13 @@ Run every command from `Website/Notation/Notation Engine/`.
   (`c8de536` was already on the remote), and no Plan file had changed since
   the last pass — the five-hour refresh had not produced a new revision, so
   the open items are the ones already listed in the Plan's own tables.
+- **Permission is standing — reaffirmed 2026-11-18, fifth time this
+  session.** The owner again asked for the check of what the Plan leaves
+  open, the full code-writing permission written down first, then push what
+  is written, continue from the Plan, and one more push at the end. The
+  five-hour refresh had still not produced a new Plan revision (main Plan
+  mtime unchanged, no diff against `origin/main`). Everything written is
+  already on the remote (`6f79022`), so this pass starts from a clean tree.
 - The Plan under `Website/Video/Video Engine Plan/PLAN.md` is reviewed and
   updated roughly every five hours. Work is landed in small pushes: push
   whatever is written first, then continue from the Plan, then push again.
