@@ -435,6 +435,16 @@ commits stay local and must be reported as unpushed.
   keyed with the first 12 hex digits of **sha256** of the file's bytes
   (the same scheme `Website/Notation/Notation Engine/scripts/sync-website-bundle.mjs`
   uses for hand-written app assets). Bump both after editing either file.
+- **Push blocked this pass (2026-11-18).** The credential helper's exchange
+  returns an installation token that authenticates as
+  `idetsminmh1995-spec` but cannot write: `git push` answers
+  `403 ... denied`, and a REST probe against
+  `POST /repos/{owner}/{repo}/git/refs` returns
+  `403 Resource not accessible by integration` even though
+  `GET /repos/{owner}/{repo}` reports `push: true`. `$GH_PAT` and
+  `$NEW_PAT` are not in the environment this session. The branch is
+  therefore ahead of `origin/feat/guitar-video-adapter` by one commit
+  until a writable token is supplied.
 - Browser tests are slow (the studio suite runs ~4-5 minutes). Run them
   nohup'd into `/tmp/*.log` and poll; a foreground call with a long
   `timeout` is refused by the runtime cap. `static_ffmpeg`'s `bin/linux`
