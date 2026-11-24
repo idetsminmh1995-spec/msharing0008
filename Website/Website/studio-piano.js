@@ -295,7 +295,7 @@
       if (!file) throw new Error('Choose a MusicXML file first.');
       setStatus('Reading the score…');
       const api = await engine.loadNotationEngine();
-      const parsed = api.parseMusicXml(await file.text());
+      const parsed = api.parseMusicXml(await engine.readScoreText(file));
       const score = engine.scoreTimeline(parsed, api);
       const { keys, endSeconds } = readKeys(parsed, api, score);
       if (keys.length === 0) throw new Error('This score has no pitched notes, so there are no keys to press.');

@@ -251,7 +251,7 @@
       if (!file) throw new Error('Choose a MusicXML file with tablature (string and fret) first.');
       setStatus('Reading the tablature…');
       const api = await loadNotationEngine();
-      const parsed = api.parseMusicXml(await file.text());
+      const parsed = api.parseMusicXml(await engine.readScoreText(file));
       const timeline = engine.scoreTimeline(parsed, api);
       const { notes, endSeconds } = readTabNotes(parsed, api, timeline);
       if (notes.length === 0) {

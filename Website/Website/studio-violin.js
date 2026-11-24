@@ -121,7 +121,7 @@
       if (!file) throw new Error('Choose a MusicXML file first.');
       setStatus('Reading the part…');
       const api = await engine.loadNotationEngine();
-      const parsed = api.parseMusicXml(await file.text());
+      const parsed = api.parseMusicXml(await engine.readScoreText(file));
 
       const picture = await loadDrawing();
       const score = engine.scoreTimeline(parsed, api);

@@ -15,6 +15,7 @@ This folder contains the authoritative Video Engine runtime source, tests, brows
 - [Voice Studio browser test](source/tools/test-voice-studio-browser.mjs)
 - [Shared audio contract browser test](source/tools/test-audio-contract-browser.mjs)
 - [Studio dispatch browser test](source/tools/test-studio-dispatch-browser.mjs)
+- [`.mxl` score browser test](source/tools/test-mxl-score-browser.mjs)
 - [Source-to-production sync tool](source/tools/sync-video-engine.mjs)
 - [Production website asset](../../Website/assets/video-engine.js)
 - [Implementation status](../Video%20Engine%20Doc/README.md)

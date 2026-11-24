@@ -197,8 +197,8 @@
   };
 
   const parseMusicXml = async (file) => {
-    if (!file || file.name.toLowerCase().endsWith('.mxl')) return null;
-    const source = await file.text();
+    if (!file) return null;
+    const source = await engine.readScoreText(file);
     const document = new DOMParser().parseFromString(source, 'application/xml');
     if (document.querySelector('parsererror')) throw new Error('MusicXML file could not be parsed.');
     const meta = readMeta(document);

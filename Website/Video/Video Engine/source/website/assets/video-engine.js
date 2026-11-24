@@ -1683,12 +1683,30 @@
   });
 
   /**
+   * The score text of a chosen file. A `.mxl` is a ZIP archive, so its text
+   * is behind `META-INF/container.xml` and has to come out through the
+   * notation engine's own reader; every other extension is already text.
+   */
+  const readScoreText = async (file) => {
+    if (!file) return null;
+    if (!file.name.toLowerCase().endsWith('.mxl')) return await file.text();
+    const api = await loadNotationEngine();
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const { xmlText, diagnostics } = api.unzipMxl(bytes, window.DOMParser);
+    if (!xmlText) {
+      const detail = (diagnostics || []).map((item) => item.message).filter(Boolean).join(' ');
+      throw new Error(detail || 'The .mxl archive could not be read.');
+    }
+    return xmlText;
+  };
+
+  /**
    * The Notation part: one engine render per video, decoded once, then
    * drawn per frame. `page` lays the score on a sheet whose shape follows
    * the part's own rectangle; `scroll` (Horizontal) is one long system.
    */
   const prepareNotation = async (file, settings, rect) => {
-    if (!file || file.name.toLowerCase().endsWith('.mxl')) return null;
+    if (!file) return null;
     const api = await loadNotationEngine();
     const mode = settings.notation === 'horizontal' ? 'scroll' : 'page';
     const config = {
@@ -1708,7 +1726,7 @@
         marginRight: 1.4,
       };
     }
-    const parsed = api.parseMusicXml(await file.text());
+    const parsed = api.parseMusicXml(await readScoreText(file));
     const rendered = api.renderParsedMusicXml(parsed, { config });
     const document = api.exportSvg(rendered.svg, {
       title: settings.titleOne,
@@ -2462,6 +2480,7 @@
     scoreTimeline,
     drawTitlePart,
     loadNotationEngine,
+    readScoreText,
     prepareNotation,
     prepareNotationFor,
     drawNotationPart,

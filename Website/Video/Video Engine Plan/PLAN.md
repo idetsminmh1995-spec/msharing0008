@@ -236,3 +236,13 @@ Plan ၏ Phase 3, 4, 5 ကို adapter သုံးခုဖြင့် ခ�
 - Bass: ကြိုး ၅ ကြိုး model၊ နှင့် `analyzeBass` ကို Bass Engine ထဲ ရွှေ့ခြင်း။
 - Strings: viola/cello ပုံနှင့် တိုင်းတာချက် သီးခြား လိုအပ်သည်; bowing/fingering engine မရှိသေးပါ။
 - Voice: Sound Engine နှင့် ချိတ်ဆက်ခြင်း (လက်ရှိတွင် အသံကို decode လုပ်သည့် လမ်းကြောင်းသာ ရှိသည်)။
+
+## `.mxl` score support — ပြီးစီး (2026-11-18)
+
+Main Plan §၂ နှင့် §၃ တွင် `.musicxml`/`.xml`/`.mxl` သုံးမျိုးလုံးကို ဖတ်ရမည်ဟု သတ်မှတ်ထားသည်။ ယခင် code တွင် `.mxl` ကို နှစ်နေရာက ပယ်ထားသည်: `prepareNotation()` က notation ကို ချန်ပြီး `null` ပြန်သည်၊ Drum Studio ၏ `parseMusicXml()` ကလည်း `null` ပြန်သဖြင့် default drum pattern သို့ ကျသည်။ Piano/Guitar/Bass/Violin တို့တွင်မူ `file.text()` ကို တိုက်ရိုက် ခေါ်သဖြင့် ZIP bytes ကို XML အဖြစ် parse လုပ်ရန် ကြိုးစားသည်။
+
+1. **တစ်နေရာတည်း ဖတ်ခြင်း** — Video Engine တွင် `readScoreText(file)` ထည့်သည်။ `.mxl` မဟုတ်လျှင် `file.text()`၊ `.mxl` ဖြစ်လျှင် `arrayBuffer()` → Notation Engine ၏ `unzipMxl()` (ကိုယ်ပိုင် ZIP reader မရေးပါ)။ `unzipMxl()` က `META-INF/container.xml` မှ တကယ့် score path ကို ရှာသဖြင့် entry အမည် ခန့်မှန်းရန် မလိုပါ။
+2. **မအောင်မြင်လျှင် အသံထွက်စွာ ငြင်းခြင်း** — `xmlText` မရလျှင် `diagnostics` မှ အကြောင်းပြချက်ကို ယူ၍ `Error` ပစ်သည်။ အလွတ် sheet သို့မဟုတ် default pattern သို့ တိတ်တဆိတ် မကျပါ (Main Plan §၃ "လိုအပ်သော asset မရလျှင် export မစရ" စည်းမျဉ်းနှင့် တူညီသည်)။
+3. **ခေါ်သူအားလုံး ချိတ်ခြင်း** — `prepareNotation()` နှင့် studio ငါးခု (Drum `parseMusicXml`, Piano, Guitar, Bass, Violin) က ဤ helper ကို သုံးသည်။ `studio.html` ရှိ input ခြောက်ခုလုံး၏ `accept` တွင် `.mxl` ပါသည်။
+4. **စမ်းသပ်မှု** — `tools/test-mxl-score-browser.mjs`။ `simple-single-voice.mxl` ကို တကယ့် page ထဲ ထည့်ပြီး (က) ထွက်လာသော စာသားသည် archive ကိုယ်တိုင် `unzipMxl` ဖြင့် ဖတ်သည့် စာသားနှင့် တူခြင်း၊ (ခ) Notation က 4.00 s ရှိခြင်း၊ (ဂ) `page` mode ဖြစ်ခြင်း၊ (ဃ) pixel အနက် 69,503 ရှိသဖြင့် မှတ်စု တကယ် ဆွဲခြင်း၊ (င) ZIP မဟုတ်သော ဖိုင်ကို အကြောင်းပြချက်ဖြင့် ငြင်းခြင်း၊ (စ) input ခြောက်ခုလုံး `.mxl` ကမ်းလှမ်းခြင်း ကို စစ်သည်။ mutation (`.mxl` ကို `file.text()` ပြန်ဖြစ်စေ) ကို test က ဖမ်းမိသည်။
+5. **ကျန်ရှိ** — Metronome Studio သည် MusicXML ကို video timing သို့ မချိတ်ရသေးသဖြင့် `.mxl` ဖိုင်ကို လက်ခံပြီး အမည်သာ ပြသည် (Main Plan §၈ တွင် သီးခြား အလုပ်)။

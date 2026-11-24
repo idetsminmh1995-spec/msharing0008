@@ -66,7 +66,7 @@ The Kick/Snare/Hi-hat capture boxes were removed from the left panel. The page n
 
 Title 1 and Title 2 each have independent color and font-size controls. Drum settings are split into Brand text and Model selection. Notation View offers Page Landscape, Page Portrait, and Page Square. Sound Model offers multiple model choices plus volume. Count Voice has Off/On, two count styles, and volume. Video Color is restricted to Black or White, while Video Ratio remains 16:9, 1:1, and 9:16.
 
-The Drum browser integration test clicks Generate Video without drum pads. MusicXML parsing covers plain XML/MusicXML drum notes; `.mxl` archives and Drum sound/count audio remain pending. Metronome click-track audio is generated separately by its adapter as described below.
+The Drum browser integration test clicks Generate Video without drum pads. MusicXML parsing covers plain XML/MusicXML drum notes and `.mxl` archives (see below); Drum count audio remains pending. Metronome click-track audio is generated separately by its adapter as described below.
 
 
 ## Latest control and preview clarification
@@ -322,3 +322,11 @@ Adapter က export မစမီ လိုအပ်သော asset ကို က�
 - Metronome က `layoutFor()` ကို မသုံးပါ — ၎င်း၏ video တွင် Title/Info band မပါသဖြင့် ကိုယ်ပိုင် design renderer ရှိသည်။
 
 **စမ်းသပ်မှု** — `website/tests/video-engine-layout.test.mjs` က ratio ၃ မျိုးတွင် အပိုင်းများ ထပ်/ကျော်မှု မရှိကြောင်း၊ `shares` override အလုပ်လုပ်ကြောင်း၊ မသိသော instrument က ပစ်ကြောင်း စစ်သည်။
+
+## `.mxl` score support (2026-11-18)
+
+A `.mxl` is a ZIP archive, so `file.text()` returns archive bytes rather than a score. The engine now owns the one way a page reads a score: `VideoEngine.readScoreText(file)` returns `file.text()` for plain XML and, for `.mxl`, opens the archive with the Notation Engine's own `unzipMxl()` — which resolves the real score path from `META-INF/container.xml` instead of guessing an entry name. A damaged archive throws with the reader's own diagnostics rather than returning an empty sheet.
+
+`prepareNotation()` and the five score-driven studios (Drum `parseMusicXml`, Piano, Guitar, Bass, Violin) all call it, and every MusicXML input in `studio.html` now lists `.mxl` in `accept`. Metronome Studio still only records the chosen filename; connecting its score to video timing is separate work in the Main Plan.
+
+**Verification** — `tools/test-mxl-score-browser.mjs` loads `simple-single-voice.mxl` into the real page and checks that the text matches the archive read directly, that the notation is 4.00 s in `page` mode with 69,503 dark pixels (real notes, not a placeholder), that a non-ZIP file is refused with a reason, and that all six inputs offer `.mxl`. Reverting the `.mxl` branch to `file.text()` makes the test fail. Engine unit tests (21) and the Drum, Piano, Guitar, Bass and Violin browser suites pass; the sync check reports the production copy is current.
