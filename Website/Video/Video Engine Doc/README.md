@@ -94,7 +94,7 @@ The standard 16:9 export is now `1920×1080`; square and portrait exports are `1
 - **စမ်းသပ်မှု** — `tools/test-studio-video-browser.mjs` တွင် case ၂ ခု ထည့်သည်: (၁) Visual Only သည် audio stream မထုတ်ကြောင်း၊ status က ဒရမ်အသံမရှိကြောင်း ပြောကြောင်း; (၂) Natural သည် audio stream ထုတ်ကြောင်း၊ peak > 3000 ရှိကြောင်း၊ beat ပေါ်တွင် ကျကြောင်း (beat ပေါ် peak သည် beat ကြားထက် ၂ ဆ ကျော်)။ နှစ်ခုလုံးအတွက် Thank You clip ကို ဖယ်ထားသည် — clip ၏ ကိုယ်ပိုင်အသံက ဒရမ်အသံကို ဖုံးလွှမ်းမည် ဖြစ်သောကြောင့်။
 - **ကျန်ရှိ** — count ကို စကားဖြင့် (spoken "one, two, three, four") မခေါ်သေးဘဲ ကြိမ်သံဖြင့်သာ တီးသည်။ Count Voice အသံဖိုင် (သို့) speech synthesis ကို နောက်ပိုင်း ချိတ်ရန် ကျန်သည်။
 
-**အတည်ပြုထားသော စမ်းသပ်မှုများ:** Metronome Engine verify 20/20; Video Engine muxer 15/15; cleanup/safety 5/5; Video Engine MP4 smoke, updated Drum settings/export regression နှင့် Metronome card-to-export browser integration pass. Metronome test output: 3/8, quarter-note 96 BPM, 1 bar, 28 frames/0.933 sec, 1080×1920 VP8 + 48kHz mono Opus; `ffprobe` က stream နှစ်ခုလုံးကိုဖတ်နိုင်သည်။ Test သည် ratio ၃ မျိုးလုံးကို ယခု တိုင်းသည် — 16:9 က 1920×1080၊ 1:1 က 1080×1080၊ 9:16 က 1080×1920 — ထို့ကြောင့် 720p ဖြင့် တိတ်တဆိတ် ထွက်နေမှုကို ဖမ်းမိမည်။ 375×812 phone နှင့် 1280×900 desktop viewport တွင် horizontal overflow မရှိ။ ဖုန်းအစစ်၊ Safari/Firefox နှင့် MediaRecorder-only fallback ကို မစစ်ရသေးပါ။
+**အတည်ပြုထားသော စမ်းသပ်မှုများ:** Metronome Engine verify 20/20; Video Engine muxer 15/15; cleanup/safety 5/5; Video Engine MP4 smoke, updated Drum settings/export regression နှင့် Metronome card-to-export browser integration pass. Metronome test output: 3/8, quarter-note 96 BPM, 1 bar, 28 frames/0.933 sec, 1080×1920 VP8 + 48kHz mono Opus; `ffprobe` က stream နှစ်ခုလုံးကိုဖတ်နိုင်သည်။ Test သည် 9:16 ကိုသာ တိုင်းသေးသည်။ 16:9 နှင့် 1:1 ကို မတိုင်းရသေးပါ (B1 ကျန်ရှိ)။ 375×812 phone နှင့် 1280×900 desktop viewport တွင် horizontal overflow မရှိ။ ဖုန်းအစစ်၊ Safari/Firefox နှင့် MediaRecorder-only fallback ကို မစစ်ရသေးပါ။
 
 Implementation Plan/Doc: [Metronome Engine Plan](../../Metronome/Metronome%20Engine%20Plan/PLAN.md), [Metronome Engine Doc](../../Metronome/Metronome%20Engine%20Doc/DOC.md). Guitar နှင့် အခြား instrument များသည် ဆက်လက်မချိတ်ဆက်ရသေးပါ။
 
@@ -331,13 +331,17 @@ A `.mxl` is a ZIP archive, so `file.text()` returns archive bytes rather than a 
 
 **Verification** — `tools/test-mxl-score-browser.mjs` loads `simple-single-voice.mxl` into the real page and checks that the text matches the archive read directly, that the notation is 4.00 s in `page` mode with 69,503 dark pixels (real notes, not a placeholder), that a non-ZIP file is refused with a reason, and that all six inputs offer `.mxl`. Reverting the `.mxl` branch to `file.text()` makes the test fail. Engine unit tests (21) and the Drum, Piano, Guitar, Bass and Violin browser suites pass; the sync check reports the production copy is current.
 
-## Delivery size စစ်ဆေးမှု — ratio ၃ မျိုး (2026-11-18)
+## Delivery size — what is verified (2026-11-18)
 
 Every adapter takes its picture size from `VideoEngine.sizeFor()`, so no page
 keeps a size of its own: 16:9 is 1920×1080, 1:1 is 1080×1080 and 9:16 is
-1080×1920. The Metronome browser test now measures all three ratios rather
-than portrait alone, and checks that each export is named for its ratio, so a
-page that quietly fell back to 720p would fail instead of passing on the one
-ratio that happened to be measured. Earlier notes in this Doc that recorded a
-9:16 output as 720×1280 were stale and now read 1080×1920, which is what the
-Piano, Bass, Violin and Voice tests have been asserting.
+1080×1920. What the browser tests prove is narrower than that rule: the
+Metronome suite probes 9:16 only, and the Piano, Bass, Violin and Voice suites
+probe portrait plus, in the Bass and Violin cases, one landscape render. A
+page that fell back to 720p in 1:1 would not be caught today.
+
+Earlier notes in this Doc recorded a 9:16 output as 720×1280 in four places
+while the tests assert 1080×1920; those numbers were stale and now match the
+assertions.
+
+Measuring the remaining ratios is still open under Main Plan B1.
