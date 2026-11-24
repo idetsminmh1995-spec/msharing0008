@@ -280,6 +280,27 @@ Run every command from `Website/Notation/Notation Engine/`.
   Plan on any remote branch. The open items are therefore the ones the
   Plan's own tables already list: B4, B5, B7, B8, B9, B10, B11 and B13–B15
   in the Main Plan, and row 10 (`🟡`) in the Video Engine Plan.
+- **2026-11-18 — the ninth pass landed.** `489db0a` (permission note) and
+  `4bd8d88` (the Drum reference picture's two missing pieces) are both on
+  `feat/guitar-video-adapter`. What changed:
+  - `prepareNotationFor()` takes `cursorShape`. `'box'` draws the rounded
+    box the reference picture uses around the played note; anything else
+    keeps the engine's bar. One `drawCursor()` draws both, so Video Color
+    still reaches the cursor through `state.cursor`.
+  - `engine.drawCornerLogo()` draws the small bottom-right mark outside
+    `composeFrame()`'s bands and returns `false` until its image loads.
+    Drum Studio passes `assets/logo/m-sharing-mark.svg`.
+  - `tools/test-drum-reference-browser.mjs` now also measures the two
+    cursor shapes (box 101 px vs bar 13 px), that the box rings real ink at
+    three times, and that the corner mark stays inside its square.
+    `tools/test-studio-video-browser.mjs` checks the mark reaches the
+    Studio's own preview canvas.
+  - Verified: 21 unit tests, Drum reference, Studio video, Title/Info,
+    notation view, dispatch and Metronome suites all pass; `sync-video-engine.mjs
+    --check` reports source and production asset in sync.
+  - Note for the next pass: the Studio preview's top-left square already
+    holds the Title band's red logo, so "the corner mark is the only red"
+    can only be asserted in the isolated engine test, not on the full frame.
 - `Website/Plan/README.md` is not to be edited.
 - Docs (`.../Doc/`, `.../Plan/`) are updated only after the work they
   describe actually exists and has been verified.
