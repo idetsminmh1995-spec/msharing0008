@@ -559,7 +559,7 @@ Export ၏ segment အစီအစဉ် (ပန်းတိုင်): **Count-
 > **စစ်ဆေးမှု အခြေအနေ:** အောက်ပါ အခြေအနေများကို `main` ၏ code ကို ဖတ်၍ သိထားခြင်း ဖြစ်သည်။ **Browser တွင် ပြေးစမ်း၍ မစစ်ရသေးပါ** (၈။ V1 ကို ကြည့်ပါ)။ Doc တွင်လည်း မရေးရသေးပါ။
 
 **Title / Info**
-- ဘယ်ဘက်တွင် Logo၊ ဘေးတွင် Title 1၊ Title 1 အောက်တွင် Title 2၊ ထိုတန်းထဲတွင် `4/4`၊ `BPM`၊ `Key`၊ `Metronome`။
+- **Drum video:** Logo (ဘယ်ဘက်)၊ ဘေးတွင် Title 1 (စာလုံးကြီး)၊ Title 1 အောက်တွင် Title 2၊ ညာဘက်တွင် **TIME / BPM / COUNT** ကွက် ၃ ခု — user ပေးသော ရည်ညွှန်းပုံအတိုင်း (§၁၃)။ **Key** ကို Drum တွင် မပြ (pitch မရှိ)၊ pitch ရှိသော တူရိယာများတွင် ထည့်နိုင်သည်။
 - **လက်ရှိ:** `drawTitlePart` (Title 1/2 — စာသား/အရောင်/အရွယ်၊ Logo) နှင့် `drawInfoBand` (`4/4`, BPM, Key — MusicXML မှ၊ `drawMetronomeIcon`) ရှိပြီး။ Logo နေရာ (ဘယ်ဘက်) နှင့် ratio အလိုက် စာသား ကျော်လွန်ခြင်း (ရှည်လျှင်) ကို စစ်ရန်။
 - Metronome tool ၏ video တွင် Title / Info အပိုင်း မပါ။
 
@@ -598,6 +598,8 @@ Drum မဟုတ်သော instrument များအတွက် Studio သ�
 
 အထက်ပါ အချိုးသည် Engine ၏ အမှန်တကယ် တန်ဖိုးဖြစ်သည် (အရင် Plan ၏ default ကို ယူထားပြီး ညှိထားသည်)။ **Doc ၌ ဤ layout API ကို မရေးရသေးပါ** (၈။ V10)။
 
+**Drum ရည်ညွှန်းပုံ (§၁၃) နှင့် နှိုင်းယှဉ်:** ပုံတွင် Title / Info ≈ ၂၀%၊ Notation ≈ ၃၃%၊ Drum kit ≈ ၄၇% (kit သည် Notation အောက်နားနှင့် အနည်းငယ် ထပ်ဝင်) ဖြစ်၍ Engine ၏ rows 16:9 (၁၂/၄၆/၄၂) နှင့် မတူပါ။ Drum အတွက် ရည်ညွှန်းပုံအတိုင်း ညှိရမည် (B13)။
+
 ### ၅။ အသံ
 
 - အသံအားလုံးကို Video Engine က segment အားလုံးမှ စုပေါင်း၍ AAC တစ်ပုံတည်း encode လုပ်သည်။
@@ -633,7 +635,7 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 
 ### ၈။ Drum video export — MVP နှင့် လိုအပ်ချက်
 
-**MVP ၏ အဓိပ္ပာယ်:** Drum Studio တွင် MusicXML တင်၍ Generate နှိပ်လျှင် **Title / Info နှင့် Notation (cursor ပါ) ပေါ်နေသော MP4 ဖိုင်** ထွက်ပြီး ဒေါင်းလို့ရ၊ **Preview Play** လို့ရရမည်။
+**MVP ၏ အဓိပ္ပာယ်:** Drum Studio တွင် MusicXML တင်၍ Generate နှိပ်လျှင် **§၁၃ ရည်ညွှန်းပုံအတိုင်း** — Title / Info (TIME / BPM / COUNT)၊ Notation (cursor ပါ)၊ **R2 မှ Drum kit ပုံ + highlight overlay** ပါသော MP4 ဖိုင် ထွက်ပြီး ဒေါင်းလို့ရ၊ **Preview Play** (Title/Info ရိုက်သည်နှင့် တန်းပေါ်) လို့ရ၊ **Video Color** ပြောင်းလျှင် အားလုံးပြောင်းရမည်။
 
 **လက်ရှိ code နှင့် ကွာနေသည့်အချက်များ:**
 
@@ -660,9 +662,12 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 | **V7** | **Title / Info စစ်ဆေး** — Logo ဘယ်ဘက်၊ Title 1 ဘေး၊ Title 2 အောက်၊ ထိုတန်းတွင် `4/4` / BPM / Key / Metronome icon၊ user ရိုက်သည့်အတိုင်း၊ စာသားရှည်လျှင် မကျော်လွန် | Ratio ၃ မျိုးလုံးတွင် မှန်၊ ရှည်သောစာသားဖြင့် မပျက် |
 | **V8** | **Thank You segment** (Video Engine) | အဆုံးတွင်ပေါ်၊ ratio မှန်၊ asset မရလျှင် `requireAsset` စာချုပ်အတိုင်း |
 | **V9** | **အသံပါ Video** (Phase 6 — Sound Engine offline `AudioBuffer`၊ Count Voice အသံ) | `ffprobe` တွင် audio stream ပါ၊ audio/video sync |
+| **V11** | **Drum kit ပုံ + highlight overlay ကို R2 မှ** ယူသုံး — Notation Engine → Drum Human Stick Engine → Drum Animation Engine → Video Engine ချိတ်ဆက် (§၁၃)၊ `drawInstrumentPart` ၏ drum lane ကို ပုံဖြင့် အစားထိုး | အချိန် `t` တွင် မှန်သော overlay လင်း၊ ပုံမရှိသော stroke ကို ကျော်ပြီး အရေအတွက် ပြ၊ base kit ပုံ မရလျှင် export မစ |
+| **V12** | **Info ကွက် TIME / BPM / COUNT** (§၁၃) — COUNT ကွက် beat တိုင်း ပြောင်း | ရည်ညွှန်းပုံနှင့် ကိုက်၊ Count display option အတိုင်း (`1` / `1&` / `1e&a`) |
+| **V13** | **Video Color** (Black/White) ပြောင်းလျှင် အကုန်ပြောင်း (§၁၄) | Background၊ Notation၊ ကွက်များ၊ စာသား၊ Logo၊ cursor အားလုံး မှန်၊ Preview တွင် ချက်ချင်းပြောင်း |
 | **V10** | **Doc** — Video Engine Doc တွင် layout API (`layoutFor`, `composeFrame`, `requireAsset`) နှင့် Drum Studio ၏ Title/Notation/Preview ကို မှတ် | Doc ထဲ ရှိ၊ Doc index တွင် link |
 
-**MVP ပြီးသည်ဟု သတ်မှတ်ရန်:** V1 – V7 နှင့် V10။ V8 (Thank You) နှင့် V9 (အသံ) သည် ဆက်လက်လုပ်မည့် အဆင့်များ ဖြစ်သော်လည်း Video ပြည့်စုံရန် လိုအပ်ချက်ဖြစ်သည်။
+**MVP ပြီးသည်ဟု သတ်မှတ်ရန်:** V1 – V7၊ V10 – V13။ V8 (Thank You) နှင့် V9 (အသံ) သည် ဆက်လက်လုပ်မည့် အဆင့်များ ဖြစ်သော်လည်း Video ပြည့်စုံရန် လိုအပ်ချက်ဖြစ်သည်။
 
 ### ၉။ ပြီးစီးမှု အခြေအနေ (Doc + code စစ်ဆေးချက် — 2026-11-23)
 
@@ -710,8 +715,8 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 | Sound Engine | Notation အတွက် အသံထုတ်ခြင်း | notation ဆွဲခြင်း၊ video |
 | Writer Engine | Notation Editor ထဲ ရေးခြင်းနှင့် editor operation အားလုံး | video၊ အသံ |
 | Video Engine | Segment/frame များ ပေါင်းဆွဲ၊ AudioBuffer ပေါင်း၊ MP4 encode၊ Thank You ဆက်ခြင်း | တူရိယာ animation၊ notation ဆွဲခြင်း |
-| Drum Animation Engine | **R2 ထဲရှိ Drum data/ပုံများကို မကျန်အောင် ပြသပေးခြင်း** (ဘယ်ပုံကို ဘယ်အချိန် highlight)၊ လိုအပ်မှ ထပ်ထည့် | notation၊ အသံ၊ encode |
-| Drum Human Stick Engine | Drum တီးသူ (stick) ၏ လှုပ်ရှားမှု | R2 ပုံများ ပြခြင်း |
+| Drum Animation Engine | **R2 ထဲရှိ Drum kit ပုံ / highlight overlay ပုံများကို မကျန်အောင် ပြသပေးခြင်း** — Notation ၏ note timeline နှင့် Sticking Engine ၏ ဖြေရှင်းချက်ကို ပေါင်း၍ "အချိန် `t` တွင် ဘယ် overlay ပုံ လင်းနေသလဲ" ကို ထုတ်ပေးသည် (§၁၃)၊ လိုအပ်မှ ထပ်ထည့် | notation၊ အသံ၊ encode၊ canvas ဆွဲခြင်း |
+| Drum Human Stick Engine | Note တစ်လုံးချင်းကို **ဘယ်ခြေလက်** (RH / LH / RF / LF) က **ဘယ်နည်း** (single, accent, ghost, rim shot …) တီးသည်ကို ဖြေရှင်းခြင်း (စည်းမျဉ်း ၄၀ ချက်)၊ ဘယ်/ညာ (side) ကိုသာ ပြန်ပေး | R2 ပုံများ ပြခြင်း၊ ပုံရွေးခြင်း |
 | Guitar Engine / Piano Hand Human Engine | သက်ဆိုင်ရာ တူရိယာ၏ position / finger / hand data | video encode |
 | Metronome Engine | Metronome design နှင့် click-track | notation၊ Title / Info |
 
@@ -724,7 +729,7 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 1. **Video အရှည်** = Count Voice (အစ၊ count-in) + MusicXML အရှည် + Thank You video။
 2. **Title 1 / Title 2** = အသုံးပြုသူ ရိုက်ထည့်သည့်အတိုင်း။ **4/4၊ BPM၊ Key** = MusicXML မှ။
 3. **Metronome tool ၏ video** တွင် Title / Info အပိုင်း မပါ။
-4. **Title / Info ထဲရှိ `Metronome`** (အခြားတူရိယာ video များတွင်) = beat တိုင်းတွင် တုန်ခါသော metronome icon ငယ် (အသံမပါ)။ ရှိပြီးသား Metronome design ကို ပြန်သုံးမည်။
+4. ~~Metronome icon~~ — user ပေးသော ရည်ညွှန်းပုံအရ **COUNT ကွက်** (လက်ရှိ count ကို ပြ၊ beat တိုင်း ပြောင်း၊ အရောင်ရင့် highlight) ဖြင့် အစားထိုးသည် (§၁၃)။
 5. **အသံပါသော Video** = requirement။ Count Voice (အစ) နှင့် Notation ၏ အသံ (Sound Engine) ပါရမည်။ Audible export ကို Plan ၏ လိုအပ်ချက်အဖြစ် သတ်မှတ်သည်။
 6. **Ratio အလိုက် အပိုင်းအချိုး** (အစပျိုး default၊ ချိန်ညှိနိုင်):
 
@@ -764,11 +769,78 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 5. ၅ ကြိမ် play ပြီးနောက် memory မတိုး။
 6. Preview ကြောင့် Export မပျက်။
 
+### ၁၃။ Drum video — ရည်ညွှန်း ဒီဇိုင်း (user ပေးသော final video ပုံ)
+
+![Drum video ရည်ညွှန်းပုံ](../Doc/Images/drum-video-reference.png)
+
+Create Video page တွင် **Piano၊ Drums၊ Guitar၊ Bass၊ Strings၊ Voice၊ Metronome** အစရှိသော တူရိယာ card များ ရှိမည်။ **Drum video ကို အရင်ဆုံး** ဆောက်မည်။ ကျန်တူရိယာများသည် ဤပုံစံကို layout template ဖြင့် နောက်မှ လိုက်မည်။ **Final ထွက်မည့် video သည် အထက်ပါပုံအတိုင်း ဖြစ်ရမည်။**
+
+| အပိုင်း | ပုံထဲတွင် မြင်ရသည် | လိုအပ်ချက် |
+|---|---|---|
+| Logo | ဘယ်အပေါ်ထောင့်၊ M Sharing logo (drum ပုံပါ) | R2 ထဲက default (user ကိုယ်ပိုင်လည်း တင်နိုင်)။ ညာအောက်ထောင့်တွင် logo သေးသေး တစ်ခု ထပ်ပါ |
+| Title 1 | Logo ဘေး၊ စာလုံးကြီး၊ bold၊ လိမ္မော်ရောင် | user ရိုက်သည့်အတိုင်း၊ အရောင်/အရွယ် ရွေးနိုင် |
+| Title 2 | Title 1 အောက်၊ စာလုံးသေး၊ အမည်း (`Exercise - 10`) | user ရိုက်သည့်အတိုင်း |
+| Info ကွက် | ညာအပေါ်၊ ထောင့်ဝိုင်းကွက် ၃ ခု — **TIME** (`4/4`)၊ **BPM** (`120`)၊ **COUNT** (လက်ရှိ count `1`)။ Label စာလုံးသေး အပေါ်၊ တန်ဖိုး စာလုံးကြီး အောက်။ **COUNT ကွက်ကို အရောင်ရင့်ပြီး highlight** | TIME / BPM သည် MusicXML မှ။ COUNT သည် beat တိုင်း ပြောင်း (ရေတွက်ပုံ option အတိုင်း `1` / `1&` / `1e&a`)။ Key မပါ |
+| Notation | Percussion clef၊ `4/4`၊ အပေါ်တွင် tempo `♩ = 120`၊ measure နံပါတ်၊ cursor = **အနီရောင် ထောင့်ဝိုင်းကွက်** (လက်ရှိ note ကို ဝိုင်း) | Notation Engine၊ cursor ကိုလည်း Notation Engine ကိုယ်ပိုင်ဖြင့် |
+| Drum kit | အောက်ဗဟိုတွင် drum kit ဓာတ်ပုံ (kit ပေါ်တွင် website စာသား `www.msharingmm.com` ပါ)။ **ဘယ်ဘက်တွင် လိမ္မော်ရောင် လက်+တုတ်၊ ညာဘက်တွင် အပြာရောင် လက်+တုတ်** overlay | R2 ပုံများ — အောက်ပါ လမ်းကြောင်း |
+| နောက်ခံ | အဖြူ (Video Color = White) | §၁၄ |
+
+**ပုံအတိုင်း ပေါ်ရန် လိုအပ်ချက်များ**
+1. **Drum ပုံ (kit) နှင့် highlight ပုံများကို R2 မှ ယူသုံးရမည်။** Engine များက ချိတ်ဆက်၍ အလုပ်လုပ်ပေးရမည်။
+2. **Title / Info ကို ရိုက်ထည့်လိုက်သည်နှင့် Preview တွင် တိုက်ရိုက်ပေါ်ရမည်။** Preview ကို **တိုက်ရိုက် Play** လို့ရရမည်။ Preview သည် final ထွက်မည့် video ပုံစံအတိုင်း ဖြစ်ရမည် (§၁၂)။
+3. **Video Color** ပြောင်းလျှင် အကုန်လုံး ပြောင်းရမည် (§၁၄)။
+
+**R2 ပုံများနှင့် Engine ချိတ်ဆက်ပုံ**
+
+```
+MusicXML ─► Notation Engine ── score + playback timeline
+                               (GM drum number = <midi-unpitched>၊ velocity = dynamic marking မှ ဆင်းသက်)
+         ─► Drum Human Stick Engine ── note တစ်လုံးချင်း ဘယ်ခြေလက် / ဘယ်နည်း → ဘယ်/ညာ (side)
+         ─► Drum Animation Engine ── "အချိန် t တွင် ဘယ် overlay ပုံ လင်းနေသလဲ" (repeat ဖြေ၍)
+         ─► Video Engine ── R2 ပုံများကို တစ်ကြိမ်သာ ဖတ်/cache လုပ်၊ composeFrame တွင်
+                            Drum အပိုင်းအတွက် kit base ပုံ + လင်းနေသော overlay များ ဆွဲ
+```
+
+- **ပုံအမျိုးအစား:** (က) **kit base ပုံ** — drum kit တစ်ခုလုံး၊ (ခ) **highlight overlay ပုံ** — တီးနေသော drum ကို တီးသောဘက် (ဘယ်/ညာ) မှ stick သို့မဟုတ် ခြေ ပါသော frame အပြည့် overlay။ Drum Human Stick Engine ၏ Doc အရ overlay ပုံများကို `R{gmNote}.png` / `L{gmNote}.png` ဟု အမည်ပေးထားသည် — **ဘယ်/ညာ (side)** ကို ဖိုင်အမည်က ဖော်ပြသည်၊ ခြေလက်(limb) မဟုတ် (ဥပမာ kick = ညာခြေ = `R36.png`)။ ယင်း Doc တွင်ပင် ခြေပုံကို `{gmNote}.png` ဟုလည်း ဖော်ပြထားသဖြင့် **အမည်ပေးပုံ မညီ** — R2 ထဲက အမှန်တကယ် ဖိုင်အမည်ကို Manus AI/user က အတည်ပြုရန် (အောက်ပါ မေးခွန်း)။
+- **Kit ရွေးချယ်ခြင်း:** ပုံများသည် **kit တစ်ခုချင်းစီ** (Drum Brand / Model) အလိုက် ရှိမည်ဟု Doc က ဆိုသည်။ Studio ၏ `Drum Brand / Drum Model` ရွေးချယ်မှုက ပုံ set ကို ရွေးမည် (default — အတည်ပြုရန်)။
+- **စည်းကမ်းများ** (Drum Human Stick Engine ၏ ရှိပြီးသား ဆုံးဖြတ်ချက်များ):
+  - Velocity ကို **ဆင်းသက်၍ရ** (MusicXML တွင် မပါ) — လက်ရှိ dynamic marking နှင့် note ၏ accent မှ။ မဖန်တီးရ။
+  - `<midi-unpitched>` မရှိသော note ကို **ကျော်** — GM နံပါတ်ကို မခန့်မှန်းရ။
+  - ရွေးထားသော kit တွင် **ပုံမရှိသော stroke ကို ကျော်** ပြီး ကျော်သည့် အရေအတွက်ကို ပြ (မိမိမဟုတ်သော drum ၏ ပုံကို မလင်းစေရ)။
+  - **Repeat ကို ဖြေ၍** လင်းမှု timeline ကို တွက် (ထပ်လည်ပါသော ၂ ကြိမ်မြောက်တွင် kit ပြန်လင်း၊ နောက် measure များ စောမရွှေ့)။
+  - Run တစ်ခါတိုင်းမတိုင်မီ id counter ကို reset။
+- **အခြေအနေ:** ဤ bridge သည် မူလ project (Drum video page) တွင် page ထဲမှာ ရှိခဲ့သည်။ ယခု restart repo ၏ Studio ၌ **ချိတ်ဆက်မှု မရှိသေးပါ** (`drawInstrumentPart` သည် canvas drum lane ကိုသာ ဆွဲ)။ Engine တစ်ခုက အလုပ်တစ်မျိုးသာလုပ်ရမည်ဟူသော မူအရ bridge ကို page ထဲမထားဘဲ **Drum Animation Engine** ထဲ ထားမည်။
+- **Overlay ပြချိန် (default):** note စသည့်အချိန်မှ ပုံသေ အချိန်တိုတို (~၁၂၀ ms၊ note ၏ အရှည်ထက်မကျော်) လင်းပြီး ပျောက် — video အစစ်ကိုကြည့်၍ ညှိမည်။
+- **အပိုင်း အချိုး (ပုံမှ ခန့်မှန်း):** Title / Info ≈ ၂၀%၊ Notation ≈ ၃၃%၊ Drum kit ≈ ၄၇% (§၄ တွင် ညှိရန် ဖော်ပြပြီး)။
+
+### ၁၄။ Video Color — ပြောင်းလျှင် အကုန်ပြောင်းရမည်
+
+`Video Color` (Black / White) တစ်ခုတည်းကို ရွေးလိုက်သည်နှင့် video ထဲရှိ အရာအားလုံး **တစ်ပြိုင်တည်း** ပြောင်းရမည် (Live Preview တွင် ချက်ချင်း၊ Export ထွက်လာသောဖိုင်တွင်လည်း တူညီ)။
+
+| အရာ | White (ရည်ညွှန်းပုံ) | Black |
+|---|---|---|
+| နောက်ခံ | အဖြူ | အမည်း |
+| Notation (ink) | အမည်း | အဖြူ |
+| Info ကွက် (ဘောင်၊ label၊ တန်ဖိုး) | အမည်း/အနီဘောင် | အဖြူ/အလင်းရောင်ဘောင် |
+| COUNT highlight | ပန်းရောင်/အနီရင့် | အမှောင်နောက်ခံပေါ် မြင်ရသော အရောင်ရင့် |
+| Title 2 နှင့် အခြားစာသား | အမည်း | အဖြူ |
+| Cursor | အနီ | အနီ (နှစ်မျိုးလုံး မြင်ရ) |
+| Logo | အလင်းနောက်ခံအတွက် logo | **အမှောင်နောက်ခံအတွက် logo ပုံကွဲ** (စာလုံးမပျောက်ရန်) |
+| Drum kit ပုံ၊ overlay | နောက်ခံ ဖောက်ထွင်း (transparent) PNG ဖြစ်မှ နှစ်မျိုးလုံး အဆင်ပြေ | ပုံ၏ နောက်ခံ အဖြူပါနေလျှင် Black တွင် ပျက်မည် — စစ်ရန် |
+
+- **Title 1 ၏ အရောင်** သည် user ရွေးသော အရောင်ဖြစ်၍ Video Color နှင့် လွတ်လပ်စွာ ရှိနိုင်သည် (ရည်ညွှန်းပုံတွင် လိမ္မော်ရောင်)။
+- Notation ၏ အရောင်ပြောင်းခြင်းသည် Notation Engine ၏ ink အရောင် parameter မှ ဖြစ်ရမည် (frame ပေါ်တွင် အရောင်ပြောင်းပြန်လှန်ခြင်း မလုပ်ရ)။
+- Theme တန်ဖိုးများကို တစ်နေရာတည်း (theme token) တွင် ကြေညာ၍ အပိုင်းအားလုံးက ထိုမှ ယူရမည် (အပိုင်းတစ်ခုချင်းစီ ကိုယ်ပိုင် အရောင် hard-code မလုပ်ရ)။
+
+**ပြီးစီးမှု စံနှုန်း:** Video Color ကို White ↔ Black ပြောင်းလျှင် အထက်ဇယားရှိ အရာအားလုံး ပြောင်းသည်ကို Preview တွင် ချက်ချင်းမြင်ရ၊ Export ဖိုင်၏ `t=0`၊ အလယ်၊ အဆုံး frame တွင် မည်သည့်အရာမှ မပြောင်းလဲဘဲ ကျန်မနေ (ဥပမာ နောက်ခံအဖြူဖြင့် စာလုံးအဖြူ မကျန်ရ)။
+
 ### မဖြေရှင်းရသေးသော အချက်များ (Video ထုတ်လုပ်ပုံ)
 
-1. R2 ထဲတွင် Drum manifest (ပုံစာရင်း) ကို ဘယ်လိုပုံစံနှင့် ထားမည် — Drum Animation Engine ကို စတင်သည့်အချိန်တွင် ဆုံးဖြတ်မည်။
-2. ၁၁။ (4) (Metronome icon)၊ (6) (အချိုးများ) နှင့် ၁၀ (count-in အရှည်) ကို အသုံးပြုသူသည် **ထုတ်လုပ်ပြီးသော video အစစ်ကို စမ်းကြည့်ပြီးမှ** ပြင်ဆင်မည်။ ယခုတန်ဖိုးများကို default အဖြစ်သာ သုံးသည်။
-3. Drum အပိုင်း၏ drum lane ပုံစံ (ယခု canvas ဆွဲ) ကို R2 ပုံဖြင့် အစားထိုးသည့် အချိန်နှင့် ပုံစံ (Drum Animation Engine)။
+1. **R2 ထဲက Drum ပုံ ဖိုင်အမည်အတိအကျ** — Doc တွင် `R{gmNote}.png` / `L{gmNote}.png` နှင့် ခြေပုံ `{gmNote}.png` ဟု မညီဘဲ ဖော်ပြထား၍ အမှန်ကို အတည်ပြုရန်၊ kit base ပုံအမည်၊ kit (Brand/Model) အလိုက် folder/prefix ပုံစံ (Drum Animation Engine စတင်ချိန်တွင် manifest ပုံစံကိုပါ ဆုံးဖြတ်)။
+2. `Drum Brand / Drum Model` ရွေးချယ်မှုက ပုံ set (kit) ကို ရွေးမည်ဟု ယူဆထားသည် — အတည်ပြုရန်။
+3. Logo ၏ **အမှောင်နောက်ခံ ပုံကွဲ** (Black Video Color အတွက်) ကို R2 ထဲ ထည့်ရန်၊ Drum kit ပုံများ၏ နောက်ခံ ဖောက်ထွင်း (transparent) ဖြစ်မဖြစ် စစ်ရန်။
+4. ကျန်တူရိယာများ (Piano၊ Guitar ...) တွင် `Key` ကွက် ထည့်မလား (Drum တွင် မပါ)။
+5. ယခု ဆုံးဖြတ်ထားသော default များ (Overlay ~၁၂၀ ms၊ Count-in အရှည်၊ အပိုင်းအချိုး) ကို အသုံးပြုသူသည် **ထုတ်လုပ်ပြီးသော video အစစ်ကို စမ်းကြည့်ပြီးမှ** ပြင်ဆင်မည်။
 
 ## Sound Engine နှင့် MuseScore SoundFont — 2026-11-13
 
@@ -1011,6 +1083,9 @@ OpenHands က Code ရေးသူဖြစ်သည်။ အောက်ပါ
 | B9 | **အသံပါ Video** — Sound Engine ကို Video အတွက် offline `AudioBuffer` ထုတ်ပေးနိုင်အောင်၊ Count Voice အသံ၊ Drum အသံ | Video တွင် အသံပါ (ffprobe နှင့် စစ်)၊ audio/video sync |
 | B10 | Guitar adapter (Video Engine Plan Phase 1) | Phase 1 ၏ စံနှုန်းများ |
 | B11 | Piano key-only adapter (Phase 2)၊ ထို့နောက် Violin၊ Bass၊ Strings၊ Voice | သက်ဆိုင်ရာ Phase စံနှုန်းများ |
+| **B13** | **Drum video ၏ R2 ပုံ + highlight** — Drum Animation Engine ကို တည်ဆောက်ပြီး Sticking Engine နှင့် ချိတ် (§၁၃)၊ Drum အပိုင်းကို ရည်ညွှန်းပုံ အချိုးနှင့် ညှိ | Overlay မှန်လင်း၊ ပုံမရှိ stroke ကို ကျော်ပြီး ရေတွက်ပြ |
+| **B14** | **Info ကွက် TIME / BPM / COUNT** (V12) | ရည်ညွှန်းပုံနှင့် ကိုက် |
+| **B15** | **Video Color** (V13) — Black/White ပြောင်းလျှင် အကုန်ပြောင်း၊ Logo အလင်း/အမှောင်ပုံ | §၁၄ စံနှုန်း |
 | **B12** | **Live Preview** (§၁၂ — Export မလုပ်ဘဲ real time play၊ seek၊ Full screen) | §၁၂ ၏ စံနှုန်း ၆ ချက် |
 
 **မှတ်ချက် (2026-11-23):** B2 နှင့် B3/B5/B6 ၏ code အများစု ရှိပြီးဖြစ်၍ **B0 (E2E စစ်ဆေးမှု) ကို ပထမဆုံးလုပ်ရန်**၊ ထို့နောက် B4 → B12 (Live Preview) → B7 အစဉ်ကို အကြံပြုသည် (user က ထုတ်လုပ်ပြီးသော video အစစ်ကို စမ်းကြည့်နိုင်ရန်)။ အသေးစိတ်အဆင့် V1–V10 ကို Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ် §၈ တွင် ကြည့်ပါ။ Video အပိုင်း အချိုးများ၊ Metronome icon တို့သည် default ဖြစ်ပြီး user က video အစစ်ကိုကြည့်ပြီးမှ ညှိမည်။

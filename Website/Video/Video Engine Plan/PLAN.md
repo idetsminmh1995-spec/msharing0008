@@ -67,6 +67,7 @@ Instrument တစ်ခုချင်းစီသည် Video Engine encoder �
 | 7 | စစ်ဆေးရမည့် စံနှုန်း | ✅ browser E2E ရှိ — `tools/test-studio-video-browser.mjs` |
 | 8 | **Live Preview** (အသစ်) | ✅ — Main Plan §၁၂ စံနှုန်း ၆ ချက် pass (2026-11-18) |
 | 9 | **Notation View ၄ မျိုး** (V6) | ✅ — `tools/test-notation-view-browser.mjs` က `drawImage` offset ကို တိုက်ရိုက်ဖမ်း၍ Page သုံးမျိုး (42/30/30 staff-space အနံ၊ အောက်မှအပေါ်) နှင့် Horizontal (ညာမှဘယ်၊ marker မရွေ့) ကို စစ်သည်။ Direction ကို ရည်ရွယ်၍ ဖျက်ကြည့်သော mutation ၂ မျိုးလုံး test က ဖမ်းမိသည် |
+| 10 | **Drum ရည်ညွှန်းဒီဇိုင်း** (R2 kit ပုံ + highlight overlay၊ TIME/BPM/COUNT ကွက်၊ Video Color) — V11၊ V12၊ V13 | ❌ — Main Plan §၁၃၊ §၁၄ (`Website/Doc/Images/drum-video-reference.png`)။ ဤအပိုင်းကို **ပထမဆုံး** လုပ်ရန် (user ညွှန်ကြားချက်) |
 
 အသေးစိတ် အဆင့်များ (V1–V10) ကို Main Plan ၏ `Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ်` §၈ တွင် ကြည့်ပါ။
 
