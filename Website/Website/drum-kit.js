@@ -18,12 +18,19 @@
 (() => {
   const R2_BASE = 'https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev/drums';
 
-  /** The kits the bucket actually holds. A brand is a folder, so is a model. */
-  const KITS = {
-    'RolandDrums/VAD716': { brand: 'RolandDrums', model: 'VAD716', label: 'Roland VAD716' },
-    'MSDrums/MS Drum 1': { brand: 'MSDrums', model: 'MS Drum 1', label: 'M Sharing Drum 1' },
-    'MSDrums/MS Drum 2': { brand: 'MSDrums', model: 'MS Drum 2', label: 'M Sharing Drum 2' },
+  /**
+   * The kits the bucket held when this file was written. The bucket's own
+   * `manifest.json` is the authority; this table is only the fallback used
+   * when the bucket does not answer with one, and `manifestState()` says
+   * which of the two a render used.
+   */
+  const BUILT_IN_KITS = {
+    'RolandDrums/VAD716': { brand: 'RolandDrums', brandLabel: 'Roland', model: 'VAD716', label: 'Roland VAD716' },
+    'MSDrums/MS Drum 1': { brand: 'MSDrums', brandLabel: 'M Sharing', model: 'MS Drum 1', label: 'M Sharing Drum 1' },
+    'MSDrums/MS Drum 2': { brand: 'MSDrums', brandLabel: 'M Sharing', model: 'MS Drum 2', label: 'M Sharing Drum 2' },
   };
+
+  const MANIFEST_FILE = 'manifest.json';
 
   const RATIO_PATHS = { '16:9': '16x9', '1:1': '1x1', '9:16': '9x16' };
   // Only some kits carry the square and portrait art, so 16x9 is the one
@@ -32,6 +39,70 @@
   // landscape art reads correctly in a portrait band.
   const FALLBACK_RATIO = '16x9';
   const BACKGROUND_FILE = 'Drum Bg.png';
+
+  /** The live kit list: the built-in table until the bucket's manifest answers. */
+  const KITS = { ...BUILT_IN_KITS };
+
+  /** What the kit list came from, and why, so a page can say it out loud. */
+  let manifestState = { source: 'built-in', error: null, kits: Object.keys(KITS) };
+
+  const manifestUrl = () => `${R2_BASE}/${MANIFEST_FILE}`;
+
+  /** The manifest is read once per page; a rebuild must not re-download it. */
+  let manifestRequest = null;
+
+  /**
+   * Reads the bucket's own kit list.
+   *
+   * Main Plan §၁၀ makes the manifest the authority: a kit uploaded to R2
+   * has to reach the video without a code change, and a picture that is
+   * expected but absent has to be reported rather than skipped in silence.
+   * A bucket that answers with no manifest keeps the built-in list and
+   * records why, so the page can say the list may be incomplete.
+   */
+  const loadManifest = ({ reload = false } = {}) => {
+    if (reload || !manifestRequest) manifestRequest = readManifest();
+    return manifestRequest;
+  };
+
+  const readManifest = async () => {
+    try {
+      const response = await fetch(manifestUrl(), { cache: 'no-cache' });
+      if (!response.ok) throw new Error(`manifest request failed (${response.status})`);
+      const manifest = await response.json();
+      const listed = Array.isArray(manifest?.kits) ? manifest.kits : [];
+      if (listed.length === 0) throw new Error('the manifest lists no kits');
+      const next = {};
+      for (const entry of listed) {
+        const brand = String(entry?.brand ?? '').trim();
+        const model = String(entry?.model ?? '').trim();
+        if (!brand || !model) continue;
+        next[`${brand}/${model}`] = {
+          brand,
+          brandLabel: entry.brandLabel ? String(entry.brandLabel) : brand,
+          model,
+          label: entry.label ? String(entry.label) : `${brand} ${model}`,
+          background: entry.background ? String(entry.background) : BACKGROUND_FILE,
+          ...(Array.isArray(entry.ratios) ? { ratios: entry.ratios.map(String) } : {}),
+          // `hits` names the stroke pictures a ratio folder holds, so a kit
+          // that names them differently is read from the bucket rather than
+          // guessed at from the note number.
+          ...(entry.hits && typeof entry.hits === 'object' ? { hits: entry.hits } : {}),
+        };
+      }
+      if (Object.keys(next).length === 0) throw new Error('the manifest names no usable kit');
+      for (const key of Object.keys(KITS)) delete KITS[key];
+      Object.assign(KITS, next);
+      manifestState = { source: 'manifest', error: null, kits: Object.keys(KITS) };
+    } catch (error) {
+      manifestState = {
+        source: 'built-in',
+        error: String(error?.message || error),
+        kits: Object.keys(KITS),
+      };
+    }
+    return manifestState;
+  };
 
   /** How long one hit's picture stays lit. A stroke is an instant, not a pose. */
   const HIT_VISIBLE_S = 0.11;
@@ -104,16 +175,22 @@
    * was used so the hits come from the same folder as the background.
    */
   const loadArt = async (kit, ratio) => {
-    if (!KITS[kit]) throw new RangeError(`No drum kit is known by the name "${kit}".`);
+    const entry = KITS[kit];
+    if (!entry) throw new RangeError(`No drum kit is known by the name "${kit}".`);
     const wanted = RATIO_PATHS[ratio] || FALLBACK_RATIO;
-    const order = wanted === FALLBACK_RATIO ? [wanted] : [wanted, FALLBACK_RATIO];
+    // A manifest may say which ratio folders a kit actually carries; that
+    // list is a fact about the bucket, so it is believed over the guess
+    // that every kit has all three.
+    const declared = entry.ratios?.length ? entry.ratios : null;
+    const order = (declared ? [wanted, ...declared] : [wanted, FALLBACK_RATIO])
+      .filter((path, index, all) => all.indexOf(path) === index);
     for (const ratioPath of order) {
-      const background = await loadImage(kitUrl(kit, ratioPath, BACKGROUND_FILE));
+      const background = await loadImage(kitUrl(kit, ratioPath, entry.background || BACKGROUND_FILE));
       if (background) {
         return { kit, ratioPath, background, ink: measureInk(background) };
       }
     }
-    throw new Error(`The kit "${KITS[kit].label}" has no background picture in R2.`);
+    throw new Error(`The kit "${entry.label}" has no background picture in R2.`);
   };
 
   /**
@@ -150,12 +227,19 @@
    * the bare number, each falling back to the other so a kit named the
    * other way still lights.
    */
-  const imageCandidates = (limb, midiNote, aliases) => {
+  const imageCandidates = (limb, midiNote, aliases, hits) => {
     const side = limb === 'RH' || limb === 'RF' ? 'R' : 'L';
     const isFoot = limb === 'RF' || limb === 'LF';
-    const forNote = (note) => (isFoot
-      ? [`${note}.png`, `${side}${note}.png`]
-      : [`${side}${note}.png`, `${note}.png`]);
+    // A manifest that lists its stroke pictures is believed over the naming
+    // rule: the bucket is what the video has to match.
+    const listed = (note) => (hits?.[note] ?? hits?.[String(note)]) || null;
+    const forNote = (note) => {
+      const declared = listed(note);
+      if (declared) return [].concat(declared);
+      return isFoot
+        ? [`${note}.png`, `${side}${note}.png`]
+        : [`${side}${note}.png`, `${note}.png`];
+    };
     const candidates = forNote(midiNote);
     for (const alias of aliases.get(midiNote) ?? []) {
       if (alias !== midiNote) candidates.push(...forNote(alias));
@@ -203,9 +287,10 @@
    */
   const loadHitImages = async (art, strokes) => {
     const aliases = gmAliases();
+    const hits = KITS[art.kit]?.hits ?? null;
     const wanted = new Map();
     for (const stroke of strokes) {
-      const names = imageCandidates(stroke.limb ?? 'RH', stroke.note, aliases);
+      const names = imageCandidates(stroke.limb ?? 'RH', stroke.note, aliases, hits);
       wanted.set(stroke, names);
     }
     const resolved = new Map();
@@ -258,9 +343,13 @@
   window.DrumKit = {
     R2_BASE,
     KITS,
+    BUILT_IN_KITS,
     RATIO_PATHS,
     BACKGROUND_FILE,
+    MANIFEST_FILE,
     HIT_VISIBLE_S,
+    loadManifest,
+    manifestState: () => manifestState,
     loadArt,
     loadHitImages,
     missingSummary,

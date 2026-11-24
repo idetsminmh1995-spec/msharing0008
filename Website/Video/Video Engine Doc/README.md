@@ -84,6 +84,17 @@ The standard 16:9 export is now `1920×1080`; square and portrait exports are `1
 - `OfflineAudioContext` မှ bar downbeat accent ပါသော mono click-track `AudioBuffer` ကို adapter ကဖန်တီးပြီး shared Video Engine သို့ပေးသည်။ ဤ click track သည် Sound Engine မဟုတ်ပါ။ WebCodecs/MediaRecorder support အလိုက် MP4 သို့မဟုတ် WebM ထွက်နိုင်သည်။ စမ်းသပ်ထားသော Chromium run တွင် VP8 video နှင့် 48 kHz mono Opus audio ထွက်ခဲ့သည်။
 - UI တွင် opening-frame preview, progress/cancel, output preview, play/seek/download ပါဝင်သည်။ Metronome card click navigation ကို Chromium integration test ဖြင့်စစ်ထားသည်။
 
+## Drum Studio — R2 kit manifest မှ kit စာရင်းဖတ်ခြင်း (B8၊ 2026-11-18)
+
+- **ပြဿနာ** — Main Plan §၁၀ က Drum Animation Engine သည် R2 ထဲရှိ Drum data ကို **manifest မှ ဖတ်၍ မကျန်အောင်** ပြရမည်၊ ဖိုင်အမည်ကို code ထဲ hard-code မလုပ်ရ ဟု ဆိုသည်။ ယခင် `drum-kit.js` တွင် kit စာရင်း (`RolandDrums/VAD716` စသည်) နှင့် ပုံအမည် (`Drum Bg.png`, `R38.png`) ကို code ထဲ တိုက်ရိုက် ရေးထားခဲ့သည်။ R2 သို့ kit အသစ် တင်လျှင် code ပြင်ရသည်။
+- **ပြင်ဆင်မှု** — `DrumKit.loadManifest()` က `drums/manifest.json` ကို ဖတ်ပြီး kit စာရင်းကို အစားထိုးသည်။ Manifest entry တစ်ခုစီသည် `brand`, `brandLabel`, `model`, `label`, `background`, `ratios`, `hits` ကို ပေးနိုင်သည်။ `background` နှင့် `hits` ပါလျှင် ထို အမည်များကို သုံးသည်၊ မပါလျှင် ယခင် အမည်သတ်မှတ်စည်းမျဉ်းအတိုင်း ဆက်လုပ်သည်။ Manifest ကို page တစ်ခုလျှင် တစ်ကြိမ်သာ ဖတ်သည် (`loadManifest({ reload: true })` ဖြင့် အတင်းပြန်ဖတ်နိုင်သည်) — preview တစ်ချီ rebuild တိုင်း ပြန် download မလုပ်ပါ။
+- **UI** — Drum Brand / Drum Model ရွေးချယ်မှု နှစ်ခုလုံးကို manifest ထဲက kit စာရင်းမှ တည်ဆောက်သည်။ ယခင် HTML တွင် hard-code ထားသော `RolandDrums`/`MSDrums` စာရင်းကို အစားထိုးသဖြင့် R2 သို့ brand အသစ် တင်လျှင် ရွေးနိုင်သည်။ Brand အမည်ကို `brandLabel` ဖြင့် ပေးသည် (မပါလျှင် folder အမည်အတိုင်း)။
+- **မရလျှင်** — Manifest မရ (404/ကွက်လပ်/ဖတ်မရ) ဖြစ်လျှင် ယခင် kit စာရင်းကို ဆက်သုံးပြီး `manifestState().error` တွင် အကြောင်းရင်းကို မှတ်ထားသည်။ `studio-video.js` က ၎င်းကို console warning အဖြစ် ပြသည် — တိတ်တိတ် မကျော်ပါ။
+- **မရှိသော ပုံ** — Manifest က စာရင်းတင်ထားသော်လည်း R2 တွင် ပုံမရှိသော kit ကို `no background picture` ဟု ငြင်းပယ်သည်; stroke တစ်ခုအတွက် ပုံမရှိလျှင် ယခင်အတိုင်း `missingSummary()` က note နံပါတ်ကို အမည်တပ်ပြသည်။
+- **စမ်းသပ်မှု** — `tools/test-studio-video-browser.mjs` တွင် (၁) manifest 404 ဖြစ်လျှင် kit စာရင်း မပြောင်း၊ `source: 'built-in'` နှင့် အကြောင်းရင်း ရှိကြောင်း; (၂) manifest ရလျှင် kit စာရင်း၊ label၊ `brandLabel`၊ background default၊ ratios နှင့် `hits` အမည်များ တိတိကျကျ လိုက်နာကြောင်း; (၃) ပုံမရှိသော manifest kit ကို ငြင်းပယ်ကြောင်း စစ်သည်။
+
+**လက်ကျန်:** R2 တွင် `drums/manifest.json` မရှိသေးပါ (404)။ ထို့ကြောင့် ယခု အခြေအနေတွင် built-in စာရင်းကို ဆက်သုံးသည် — behavior မပြောင်းပါ။ Manifest ကို R2 သို့ တင်ပြီးပါက ကုဒ် ပြင်ရန် မလိုဘဲ kit/brand အသစ် ပေါ်လာမည်။
+
 ## Drum Studio — ဗီဒီယိုထဲတွင် ဒရမ်အသံ (2026-11-24)
 
 - **အသံ ချိတ်ပြီးပါပြီ။** ယခင် Drum export သည် အသံမပါသော ဗီဒီယိုသာ ဖြစ်ပြီး Sound Model ရွေးလျှင် status တွင် "audio adapter pending" ဟု ပြခဲ့သည်။ ယခု `studio-video.js` က `OfflineAudioContext` ဖြင့် ဒရမ်အသံကို တိုက်ရိုက် ဖန်တီးပြီး segment ၏ `audio` အဖြစ် Video Engine သို့ ပေးသည်။ Metronome adapter ၏ နည်းလမ်းအတိုင်း ဖြစ်သည် — Plan က `Sound Engine` folder ကို implementation ရှိသကဲ့သို့ မယူဆရန် ဆိုထားသဖြင့် adapter ကိုယ်တိုင် synthesize လုပ်သည်။

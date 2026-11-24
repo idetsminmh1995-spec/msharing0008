@@ -118,15 +118,18 @@ async function evaluate(expression, options = {}) {
  */
 let thankYouClip = null;
 let countVoice = null;
+/** The bucket's kit manifest, or null for a 404 -- the two states §၁၀ names. */
+let drumManifest = null;
 async function serveThankYou() {
   cdp.on('Fetch.requestPaused', async (event) => {
     const { url } = event.request;
     const isCountVoice = url.includes('/Voices/');
-    if (!url.includes('/thank-you/') && !isCountVoice) {
+    const isManifest = url.endsWith('/drums/manifest.json');
+    if (!url.includes('/thank-you/') && !isCountVoice && !isManifest) {
       await cdp.call('Fetch.continueRequest', { requestId: event.requestId });
       return;
     }
-    const body = isCountVoice ? countVoice : thankYouClip;
+    const body = isManifest ? drumManifest : (isCountVoice ? countVoice : thankYouClip);
     if (!body) {
       await cdp.call('Fetch.fulfillRequest', {
         requestId: event.requestId,
@@ -140,10 +143,10 @@ async function serveThankYou() {
       requestId: event.requestId,
       responseCode: 200,
       responseHeaders: [
-        { name: 'Content-Type', value: isCountVoice ? 'audio/wav' : 'video/mp4' },
+        { name: 'Content-Type', value: isManifest ? 'application/json' : (isCountVoice ? 'audio/wav' : 'video/mp4') },
         { name: 'Access-Control-Allow-Origin', value: '*' },
       ],
-      body: body.toString('base64'),
+      body: (isManifest ? Buffer.from(JSON.stringify(body)) : body).toString('base64'),
     });
   });
   await cdp.call('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
@@ -656,6 +659,73 @@ print(len(colours))
     `The stroke without a picture was not marked: ${JSON.stringify(missingProbe)}`);
   assert.equal(missingProbe.summary, 'no picture for note 81',
     `The missing picture was not named in the status line: ${JSON.stringify(missingProbe)}`);
+
+  // Main Plan §၁၀ makes the bucket's manifest the authority on which kits
+  // exist, so a kit uploaded to R2 must reach the video without a code
+  // change. The test stands a kit the built-in table has never heard of in
+  // front of the module and asks whether it is now listed, and then takes
+  // the manifest away to check the built-in list survives with a reason.
+  const manifestProbe = JSON.parse(await evaluate(`(async () => {
+    const before = Object.keys(window.DrumKit.KITS).slice();
+    window.__manifestPayload = null;
+    const listed = await window.DrumKit.loadManifest({ reload: true });
+    return JSON.stringify({ before, after: Object.keys(window.DrumKit.KITS).slice(), state: listed });
+  })()`));
+  assert.deepEqual(manifestProbe.after, manifestProbe.before,
+    `A 404 manifest changed the kit list: ${JSON.stringify(manifestProbe)}`);
+  assert.equal(manifestProbe.state.source, 'built-in',
+    `A 404 manifest was not reported as the built-in fallback: ${JSON.stringify(manifestProbe.state)}`);
+  assert.ok(manifestProbe.state.error, `A 404 manifest left no reason behind: ${JSON.stringify(manifestProbe.state)}`);
+
+  drumManifest = {
+    schemaVersion: 1,
+    kits: [
+      { brand: 'RolandDrums', model: 'VAD716', label: 'Roland VAD716', ratios: ['16x9'] },
+      { brand: 'TestDrums', brandLabel: 'Test Drums Co', model: 'Manifest Only', label: 'Manifest Only Kit', hits: { 38: ['custom-snare.png'] } },
+    ],
+  };
+  const manifestApplied = JSON.parse(await evaluate(`(async () => {
+    const state = await window.DrumKit.loadManifest({ reload: true });
+    return JSON.stringify({
+      state,
+      keys: Object.keys(window.DrumKit.KITS),
+      label: window.DrumKit.KITS['TestDrums/Manifest Only']?.label ?? null,
+      background: window.DrumKit.KITS['TestDrums/Manifest Only']?.background ?? null,
+      brandLabel: window.DrumKit.KITS['TestDrums/Manifest Only']?.brandLabel ?? null,
+      ratios: window.DrumKit.KITS['RolandDrums/VAD716']?.ratios ?? null,
+      // A kit that names its own stroke picture must be read from the
+      // manifest, not guessed from the note number.
+      declared: window.DrumKit.imageCandidates('RH', 38, new Map(), { 38: ['custom-snare.png'] }),
+      guessed: window.DrumKit.imageCandidates('RH', 38, new Map(), null),
+    });
+  })()`));
+  assert.equal(manifestApplied.state.source, 'manifest',
+    `A served manifest was not used as the kit list: ${JSON.stringify(manifestApplied.state)}`);
+  assert.deepEqual(manifestApplied.keys.sort(), ['RolandDrums/VAD716', 'TestDrums/Manifest Only'],
+    `The kit list is not the manifest's: ${JSON.stringify(manifestApplied.keys)}`);
+  assert.equal(manifestApplied.label, 'Manifest Only Kit',
+    `A manifest kit lost its label: ${JSON.stringify(manifestApplied)}`);
+  assert.equal(manifestApplied.background, 'Drum Bg.png',
+    `A manifest kit with no background did not fall back to the default name: ${JSON.stringify(manifestApplied)}`);
+  assert.deepEqual(manifestApplied.ratios, ['16x9'],
+    `A manifest kit lost its ratio list: ${JSON.stringify(manifestApplied)}`);
+  assert.equal(manifestApplied.brandLabel, 'Test Drums Co',
+    `A manifest brand's display name was lost: ${JSON.stringify(manifestApplied)}`);
+  assert.deepEqual(manifestApplied.declared, ['custom-snare.png'],
+    `A manifest's own stroke file names were not used: ${JSON.stringify(manifestApplied)}`);
+  assert.deepEqual(manifestApplied.guessed, ['R38.png', '38.png'],
+    `The note-number naming rule changed when no manifest lists the picture: ${JSON.stringify(manifestApplied)}`);
+
+  // A kit the manifest lists but the bucket has no picture for must be
+  // reported rather than drawn as an empty band.
+  const noArt = await evaluate(`(async () => {
+    try { await window.DrumKit.loadArt('TestDrums/Manifest Only', '16:9'); return 'loaded'; }
+    catch (error) { return String(error.message); }
+  })()`);
+  assert.match(noArt, /no background picture/,
+    `A kit with no art was not reported: ${noArt}`);
+  drumManifest = null;
+  await evaluate("window.DrumKit.loadManifest({ reload: true })");
 
   // A score that names its drums with <midi-unpitched> must light the kit,
   // and the stroke must change the instrument band: the background alone

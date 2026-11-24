@@ -417,3 +417,25 @@ commits stay local and must be reported as unpushed.
   - The PAT supplied this pass writes. `git ls-remote` and a real push
     both succeeded as `idetsminmh1995-spec` when passed through `$NEW_PAT`
     in the scoped helper described under "Pushing" above.
+- **B8 landed — 2026-11-18.** Main Plan B8 (Drum Animation Engine reads its
+  kit list from R2) now has code: `Website/Website/drum-kit.js` reads
+  `drums/manifest.json` and treats it as the authority, keeping the old
+  table only as `BUILT_IN_KITS` fallback. A manifest entry may set
+  `brand`, `brandLabel`, `model`, `label`, `background`, `ratios` and
+  `hits`; `hits` lets a kit name its own stroke pictures instead of the
+  note-number rule guessing them. `loadManifest()` is memoised per page
+  (`{ reload: true }` forces a re-read) so a preview rebuild does not
+  re-download. `studio-video.js` builds both the Drum Brand and Drum
+  Model selects from that list, so a brand added to R2 becomes selectable
+  without editing `studio.html`. R2 still answers 404 for the manifest as
+  of this pass, so the built-in list is what ships; the fallback is
+  reported through `manifestState().error` and a console warning rather
+  than swallowed.
+- Cache keys: `drum-kit.js` and `studio-video.js` in `studio.html` are
+  keyed with the first 12 hex digits of **sha256** of the file's bytes
+  (the same scheme `Website/Notation/Notation Engine/scripts/sync-website-bundle.mjs`
+  uses for hand-written app assets). Bump both after editing either file.
+- Browser tests are slow (the studio suite runs ~4-5 minutes). Run them
+  nohup'd into `/tmp/*.log` and poll; a foreground call with a long
+  `timeout` is refused by the runtime cap. `static_ffmpeg`'s `bin/linux`
+  directory must be on `PATH` or `ffprobe` assertions fail.

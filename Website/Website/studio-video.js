@@ -399,6 +399,13 @@
   async function loadKit(settings, hits) {
     const drumKit = window.DrumKit;
     if (!drumKit) return null;
+    // The bucket's manifest is the authority on which kits exist (§၁၀), so
+    // it is read before the kit is looked up: a kit uploaded to R2 must
+    // reach the video without a code change.
+    const manifest = drumKit.loadManifest ? await drumKit.loadManifest() : null;
+    if (manifest?.source === 'built-in' && manifest.error) {
+      console.warn(`The drum kit manifest could not be read (${manifest.error}); using the built-in kit list.`);
+    }
     const name = `${settings.brand}/${settings.model}`;
     if (!drumKit.KITS[name]) return null;
     try {
@@ -1067,12 +1074,26 @@
   settingsForm?.addEventListener('submit', (event) => event.preventDefault());
   // The bucket names a kit by brand AND model, so the model list is the
   // brand's own: a model left over from another brand would name a folder
-  // that does not exist and the render would quietly lose its kit.
-  const syncModelOptions = () => {
+  // that does not exist and the render would quietly lose its kit. Both
+  // lists follow the bucket's manifest, so a brand it adds is selectable
+  // without touching the page.
+  const syncKitOptions = () => {
     const kits = window.DrumKit?.KITS;
-    if (!drumModel || !kits) return;
-    const brand = drumBrand?.value;
-    const models = Object.values(kits).filter((kit) => kit.brand === brand);
+    if (!drumBrand || !drumModel || !kits) return;
+    const entries = Object.values(kits);
+    const previousBrand = drumBrand.value;
+    const brands = [...new Set(entries.map((kit) => kit.brand))];
+    if (brands.length) {
+      drumBrand.replaceChildren(...brands.map((brand) => {
+        const kit = entries.find((entry) => entry.brand === brand);
+        const option = document.createElement('option');
+        option.value = brand;
+        option.textContent = kit?.brandLabel || brand;
+        return option;
+      }));
+      drumBrand.value = brands.includes(previousBrand) ? previousBrand : brands[0];
+    }
+    const models = entries.filter((kit) => kit.brand === drumBrand.value);
     if (!models.length) return;
     const previous = drumModel.value;
     drumModel.replaceChildren(...models.map((kit) => {
@@ -1083,8 +1104,11 @@
     }));
     drumModel.value = models.some((kit) => kit.model === previous) ? previous : models[0].model;
   };
-  syncModelOptions();
-  drumBrand?.addEventListener('change', syncModelOptions);
+  syncKitOptions();
+  drumBrand?.addEventListener('change', syncKitOptions);
+  // The lists above start from the built-in table; the bucket's manifest is
+  // the authority, so they are rebuilt once it answers.
+  window.DrumKit?.loadManifest?.().then(syncKitOptions).catch(() => {});
   [titleOne, titleOneColor, titleOneSize, titleTwo, titleTwoColor, titleTwoSize, drumBrand, drumModel, notationView, soundModel, soundVolume, countVoiceEnabled, countVoice, countVolume, countDisplay, videoColor, videoRatio].forEach((control) => {
     control?.addEventListener('input', () => { syncControlState(); schedulePreview(); });
     control?.addEventListener('change', () => { syncControlState(); schedulePreview(); });
