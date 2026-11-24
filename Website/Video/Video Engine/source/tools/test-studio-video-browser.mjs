@@ -293,6 +293,30 @@ try {
   assert.ok(Math.max(previewState.width, previewState.height) <= 960,
     `The preview was not drawn small: ${previewState.width}x${previewState.height}`);
 
+  // The reference picture's corner mark (§၁၃) reaches the Studio's own
+  // frame, not only the engine's helper. Its containment is checked where
+  // it can be isolated -- in test-drum-reference-browser.mjs -- because the
+  // Title band's own logo is red as well.
+  const corner = JSON.parse(await evaluate(`JSON.stringify((() => {
+    const canvas = document.querySelector('[data-video-preview]');
+    const ctx = canvas.getContext('2d');
+    const box = Math.round(Math.min(canvas.width, canvas.height) * 0.12);
+    const read = (x, y, w, h) => {
+      const data = ctx.getImageData(x, y, w, h).data;
+      let red = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i] > 150 && data[i + 1] < 110 && data[i + 2] < 110) red += 1;
+      }
+      return red;
+    };
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      inCorner: read(canvas.width - box, canvas.height - box, box, box),
+    };
+  })())`));
+  assert.ok(corner.inCorner > 20, `The corner mark is not on the Studio frame: ${JSON.stringify(corner)}`);
+
   // Frame rate: the Plan asks for 24 fps or better. The engine's own draw
   // call is counted, so this is frames put on the canvas, not rAF ticks.
   await evaluate("(() => { window.__previewDraws = 0; const original = window.VideoEngine.drawFrameAt; window.VideoEngine.drawFrameAt = function (...args) { window.__previewDraws += 1; return original.apply(this, args); }; })()");

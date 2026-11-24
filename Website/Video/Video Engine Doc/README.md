@@ -335,7 +335,12 @@ Adapter က export မစမီ လိုအပ်သော asset ကို က�
 - `titleSettings(options, palette)` က Title အရောင် မပေးလျှင် theme ၏ `titleOne`/`titleTwo` ကို ယူသည်၊ ထို့ကြောင့် White frame တွင် အဖြူစာလုံး မကျန်ပါ။
 - Page ဘက်တွင် `videoColor` ပြောင်းလျှင် အသုံးပြုသူ မပြင်ရသေးသော Title အရောင်များ နောက်လိုက်သည် (ကိုယ်တိုင်ရွေးထားသော အရောင်ကို မဖျက်ပါ)။ Notation cache key တွင် `color` ပါသဖြင့် အရောင်ပြောင်းလျှင် စာရွက် အသစ် ဆွဲသည်။
 
-**စမ်းသပ်မှု** — `tools/test-drum-reference-browser.mjs` က (၁) ratio တစ်ခုချင်းစီ၏ band အချိုး၊ (၂) TIME/BPM/COUNT ကွက်၏ နေရာနှင့် COUNT ၏ beat တိုင်းပြောင်းမှု၊ (၃) theme နှစ်ခုလုံးတွင် ink က နောက်ခံနှင့် ကွဲပြားမှု၊ (၄) live preview က Video Color ကို လိုက်မှု — အားလုံးကို တိုင်းသည်။
+**Cursor shape and the corner mark (§၁၃)** — ရည်ညွှန်းပုံတွင် နှစ်ချက် ပါသည်၊ ယခု ကုဒ်တွင် နှစ်ခုလုံး ရှိသည်။
+
+- **Cursor** — `prepareNotationFor()` သို့ `cursorShape: 'box'` ပေးလျှင် ကွက်သည် နှစ်ဖက်စလုံး အနီရောင် ထောင့်ဝိုင်းဘောင်ဖြင့် ဝိုင်းသည် (အတွင်းတွင် အနည်းငယ် ဖျော့ဖျော့ ဖြည့်သည်)။ မပေးလျှင် ယခင် ဒေါင်လိုက်မျဉ်း (`bar`) အတိုင်း။ နှစ်မျိုးလုံး `drawCursor()` တစ်ခုတည်းမှ ဆွဲပြီး အရောင်ကို `state.cursor` မှ ယူသဖြင့် Video Color ကို လိုက်သည်။
+- **Corner mark** — `engine.drawCornerLogo(ctx, { width, height, palette, image })` သည် frame ၏ ညာအောက်ထောင့်တွင် logo သေးသေး ဆွဲသည်။ `composeFrame()` ၏ band များ အပြင်ဘက်တွင် ဆွဲသဖြင့် မည်သည့် band ဖြစ်နေနေ ပေါ်သည်။ ပုံ မရောက်သေးလျှင် `false` ပြန်ပြီး ဘာမှ မဆွဲပါ။ Drum Studio က `assets/logo/m-sharing-mark.svg` ကို ပေးသည်။
+
+**စမ်းသပ်မှု** — `tools/test-drum-reference-browser.mjs` က (၁) ratio တစ်ခုချင်းစီ၏ band အချိုး၊ (၂) TIME/BPM/COUNT ကွက်၏ နေရာနှင့် COUNT ၏ beat တိုင်းပြောင်းမှု၊ (၃) theme နှစ်ခုလုံးတွင် ink က နောက်ခံနှင့် ကွဲပြားမှု၊ (၄) live preview က Video Color ကို လိုက်မှု၊ (၅) box cursor က bar ထက် ပိုကျယ်မှုနှင့် တီးနေသော note ကို ဝိုင်းမှု၊ (၆) corner mark က ညာအောက်ထောင့်တွင်သာ ပေါ်မှု — အားလုံးကို တိုင်းသည်။
 
 ## `.mxl` score support (2026-11-18)
 

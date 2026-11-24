@@ -45,6 +45,8 @@
   // Only for a score that states no tempo: 120 BPM is the MusicXML default.
   const QUARTER_SECONDS = 0.5;
   const DEFAULT_LOGO = 'assets/logo/m-sharing-drum-logo.svg';
+  // The reference picture's own second mark, on the frame's corner.
+  const CORNER_LOGO = 'assets/logo/m-sharing-mark.svg';
   const DEFAULT_META = { beats: 4, beatType: 4, bpm: 120, key: '' };
   const RATIO_SIZES = {
     '16:9': { width: 1920, height: 1080 },
@@ -85,6 +87,7 @@
   let cancelRequested = false;
   let objectUrl = null;
   let logoImage = null;
+  let cornerLogoImage = null;
 
   const setStatus = (message) => {
     if (status) status.textContent = message;
@@ -113,10 +116,13 @@
     // band; the other pages keep the plain stats row until their own
     // reference exists.
     infoBoxes: true,
+    // The reference picture rings the note being played with a rounded box.
+    cursorShape: 'box',
     color: videoColor?.value || 'black',
     ratio: videoRatio?.value || '16:9',
     size: getSize(),
     logoImage,
+    cornerLogoImage,
     musicXmlName: musicXmlInput?.files?.[0]?.name || '',
   });
 
@@ -439,6 +445,11 @@
           : drawInstrumentPart(target, rect, at, hits, duration, settings, palette)),
       },
     });
+    // Outside composeFrame's bands: the reference picture puts this mark on
+    // the frame's own corner, over whatever band happens to be there.
+    engine.drawCornerLogo(ctx, {
+      width, height, palette, image: settings.cornerLogoImage,
+    });
   }
 
   /**
@@ -465,6 +476,7 @@
         title: (target, rect) => engine.drawTitlePart(target, rect, at, meta, palette, settings),
       },
     });
+    engine.drawCornerLogo(ctx, { width, height, palette, image: settings.cornerLogoImage });
     const tokens = engine.countTokens(settings.countDisplay, meta.beats);
     const active = engine.currentCountToken(tokens, settings.countDisplay, meta, at);
     if (active < 0 || active >= tokens.length) return;
@@ -1104,6 +1116,10 @@
   logoImage = new Image();
   logoImage.onload = () => schedulePreview();
   logoImage.src = DEFAULT_LOGO;
+
+  cornerLogoImage = new Image();
+  cornerLogoImage.onload = () => schedulePreview();
+  cornerLogoImage.src = CORNER_LOGO;
   syncControlState();
   // The Plan opens the preview as soon as the settings are valid, so the
   // page never shows an empty stage while a render is still unasked for.

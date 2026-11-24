@@ -1793,6 +1793,10 @@
       viewBox,
       ink,
       cursor: api.resolveConfig().cursor,
+      // The Drum reference picture rings the note being played with a
+      // rounded box rather than the engine's own vertical bar. A page that
+      // names no shape keeps the bar.
+      cursorShape: settings.cursorShape === 'box' ? 'box' : 'bar',
       seconds: rendered.playback.performance?.totalSeconds ?? 0,
     };
   };
@@ -1921,15 +1925,69 @@
     ctx.restore();
   }
 
-  /** The engine's cursor config, drawn as a bar rather than a re-decoded glyph. */
+  // Half the reference picture's cursor box, in staff spaces: the box is
+  // about two spaces wide, so a notehead and its stem sit inside it.
+  const CURSOR_BOX_SPACES = 1;
+
+  /**
+   * The engine's cursor config, drawn rather than re-decoded from a glyph.
+   * `bar` is the engine's own marker; `box` is the rounded box the Drum
+   * reference picture uses to ring the note being played.
+   */
   const drawCursor = (ctx, state, x, top, height, pxPerSpace) => {
+    const alpha = state.cursor.opacity ?? 0.85;
+    const thickness = Math.max(1.5, state.cursor.thickness * pxPerSpace);
     ctx.save();
-    ctx.globalAlpha = state.cursor.opacity ?? 0.85;
+    ctx.globalAlpha = alpha;
     ctx.fillStyle = state.cursor.color;
-    ctx.fillRect(x - (state.cursor.thickness * pxPerSpace) / 2, top,
-      Math.max(1.5, state.cursor.thickness * pxPerSpace), height);
+    if (state.cursorShape === 'box') {
+      const half = CURSOR_BOX_SPACES * pxPerSpace;
+      const radius = Math.max(2, half * 0.45);
+      // A wash of the same red inside the outline, so the box reads as a
+      // marker over dense ink instead of as a barline the score never wrote.
+      ctx.globalAlpha = alpha * 0.12;
+      roundedRectPath(ctx, x - half, top, half * 2, height, radius);
+      ctx.fill();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = state.cursor.color;
+      ctx.lineWidth = thickness;
+      roundedRectPath(ctx, x - half, top, half * 2, height, radius);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    ctx.fillRect(x - thickness / 2, top, thickness, height);
     ctx.restore();
   };
+
+  // The Plan's §၁၃ reference picture carries a second, small logo in the
+  // bottom-right corner, not only the one beside Title 1.
+  const CORNER_LOGO_FRACTION = 0.045;
+
+  /**
+   * The corner mark, drawn over the composed frame rather than inside a
+   * band, because the reference picture puts it on the frame's own corner.
+   * Its outline comes from the palette so the mark keeps an edge on a
+   * background that matches its own plate (§၁၄).
+   */
+  function drawCornerLogo(ctx, { width, height, palette, image }) {
+    if (!image || !image.complete || image.naturalWidth <= 0) return false;
+    const size = Math.round(Math.min(width, height) * CORNER_LOGO_FRACTION);
+    const pad = Math.round(Math.min(width, height) * 0.022);
+    const x = width - pad - size;
+    const y = height - pad - size;
+    const scale = Math.min(size / image.naturalWidth, size / image.naturalHeight);
+    const drawWidth = image.naturalWidth * scale;
+    const drawHeight = image.naturalHeight * scale;
+    ctx.save();
+    ctx.drawImage(image, x + (size - drawWidth) / 2, y + (size - drawHeight) / 2, drawWidth, drawHeight);
+    ctx.strokeStyle = palette.line;
+    ctx.lineWidth = Math.max(1, Math.round(size * 0.03));
+    roundedRectPath(ctx, x, y, size, size, Math.round(size * 0.22));
+    ctx.stroke();
+    ctx.restore();
+    return true;
+  }
 
   /**
    * Title / Info: logo on the left, Title 1 beside it, Title 2 under it,
@@ -2664,6 +2722,7 @@
     ratioNames,
     DELIVERY_SIZES,
     composeFrame,
+    drawCornerLogo,
     requireAsset,
     resolveRequired,
     rejectRequired,

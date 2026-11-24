@@ -16,7 +16,7 @@
  */
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -32,6 +32,13 @@ let browser;
 let cdp;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// A short score for the cursor-shape check: four quarter notes on the hi-hat
+// staff, so a note sits under the cursor wherever the frame lands.
+const CURSOR_SCORE = await readFile(new URL(
+  '../../../../Notation/Notation Engine/test/fixtures/musicxml/44130-drum-eighths.musicxml',
+  import.meta.url,
+), 'utf8');
 
 async function findFreePort() {
   const listener = net.createServer();
@@ -334,8 +341,169 @@ try {
   assert.ok(blackPreview.inkMean > blackPreview.background + 30,
     `The Black preview's ink does not read against its background: ${JSON.stringify(blackPreview)}`);
 
+  // --- 5. The corner mark and the box cursor (§၁၃) ----------------------
+  const marks = JSON.parse(await evaluate(`(async () => {
+    const meta = { beats: 4, beatType: 4, bpm: 120 };
+    const size = { width: 1280, height: 720 };
+    const palette = VideoEngine.paletteFor('white');
+    const canvas = document.createElement('canvas');
+    canvas.width = size.width;
+    canvas.height = size.height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.fillStyle = palette.background;
+    ctx.fillRect(0, 0, size.width, size.height);
+    // A real Image, because the page hands the engine one: an element that
+    // has not finished loading must leave the corner alone.
+    const logo = new Image();
+    const plate = document.createElement('canvas');
+    plate.width = 64; plate.height = 64;
+    const plateCtx = plate.getContext('2d');
+    plateCtx.fillStyle = '#f20d3d';
+    plateCtx.fillRect(0, 0, 64, 64);
+    logo.src = plate.toDataURL('image/png');
+    await logo.decode();
+
+    // Without an image the corner must stay empty rather than throw: the
+    // page loads the mark asynchronously and a frame may be asked for first.
+    const beforeCorner = ctx.getImageData(size.width - 200, size.height - 200, 200, 200).data.slice();
+    const drewWithoutImage = VideoEngine.drawCornerLogo(ctx, {
+      width: size.width, height: size.height, palette, image: null,
+    });
+    const afterCorner = ctx.getImageData(size.width - 200, size.height - 200, 200, 200).data;
+    let untouched = true;
+    for (let index = 0; index < afterCorner.length; index += 1) {
+      if (afterCorner[index] !== beforeCorner[index]) { untouched = false; break; }
+    }
+
+    const drewWithImage = VideoEngine.drawCornerLogo(ctx, {
+      width: size.width, height: size.height, palette, image: logo,
+    });
+    const corner = ctx.getImageData(size.width - 200, size.height - 200, 200, 200).data;
+    let red = 0;
+    let inCorner = true;
+    for (let offset = 0; offset < corner.length; offset += 4) {
+      if (corner[offset] > 150 && corner[offset + 1] < 110 && corner[offset + 2] < 110) red += 1;
+    }
+    // Nothing outside the bottom-right square may have been touched.
+    const topLeft = ctx.getImageData(0, 0, 200, 200).data;
+    for (let offset = 0; offset < topLeft.length; offset += 4) {
+      if (topLeft[offset] !== 247 || topLeft[offset + 1] !== 249 || topLeft[offset + 2] !== 252) {
+        inCorner = false; break;
+      }
+    }
+    return JSON.stringify({ drewWithoutImage, untouched, drewWithImage, red, inCorner });
+  })()`));
+  assert.equal(marks.drewWithoutImage, false, 'The corner mark was reported drawn with no image');
+  assert.ok(marks.untouched, 'The corner mark painted something before its image loaded');
+  assert.equal(marks.drewWithImage, true, 'The corner mark was not drawn when its image was ready');
+  assert.ok(marks.red > 300, `The corner mark is not on the frame: ${JSON.stringify(marks)}`);
+  assert.ok(marks.inCorner, 'The corner mark painted outside the bottom-right corner');
+
+  // The cursor is the reference picture's rounded box, not the engine's
+  // bar: a box is wide, a bar is a few pixels across. Measured on the real
+  // notation part, so the shape reaches the frame the Studio composes.
+  const cursorShapes = JSON.parse(await evaluate(`(async () => {
+    const score = ${JSON.stringify(CURSOR_SCORE)};
+    const file = new File([score], 'cursor-shape.musicxml', { type: 'application/xml' });
+    const size = VideoEngine.sizeFor('16:9');
+    const rect = VideoEngine.layoutFor('drums', size).rects.notation;
+    const out = {};
+    for (const shape of ['bar', 'box']) {
+      const state = await VideoEngine.prepareNotationFor(file, {
+        instrument: 'drums', notation: 'landscape', size, cursorShape: shape,
+        palette: VideoEngine.paletteFor('white'),
+      });
+      if (!state || state.error) throw new Error(shape + ': ' + (state ? state.error : 'no state'));
+      const canvas = document.createElement('canvas');
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      VideoEngine.drawNotationPart(ctx, { x: 0, y: 0, width: rect.width, height: rect.height }, 1, state);
+      const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      let left = Infinity;
+      let right = -Infinity;
+      let red = 0;
+      for (let y = 0; y < canvas.height; y += 1) {
+        for (let x = 0; x < canvas.width; x += 1) {
+          const offset = (y * canvas.width + x) * 4;
+          const r = data[offset], g = data[offset + 1], b = data[offset + 2];
+          if (r > 150 && g < 110 && b < 110) {
+            red += 1;
+            if (x < left) left = x;
+            if (x > right) right = x;
+          }
+        }
+      }
+      out[shape] = { red, width: red ? right - left + 1 : 0 };
+    }
+    return JSON.stringify(out);
+  })()`));
+  assert.ok(cursorShapes.bar.red > 0, `The bar cursor is not drawn: ${JSON.stringify(cursorShapes)}`);
+  assert.ok(cursorShapes.box.red > cursorShapes.bar.red * 2,
+    `The box cursor leaves no more ink than the bar: ${JSON.stringify(cursorShapes)}`);
+  assert.ok(cursorShapes.box.width > cursorShapes.bar.width * 2,
+    `The box cursor is not wider than the bar: ${JSON.stringify(cursorShapes)}`);
+
+  // B5: the cursor has to sit on the note being played, not merely move.
+  // The box rings ink, so the notes inside its own outline are counted --
+  // a marker that lands between notes rings an empty patch.
+  const cursorOnNotes = JSON.parse(await evaluate(`(async () => {
+    const score = ${JSON.stringify(CURSOR_SCORE)};
+    const file = new File([score], 'cursor-on-notes.musicxml', { type: 'application/xml' });
+    const size = VideoEngine.sizeFor('16:9');
+    const rect = VideoEngine.layoutFor('drums', size).rects.notation;
+    const state = await VideoEngine.prepareNotationFor(file, {
+      instrument: 'drums', notation: 'landscape', size, cursorShape: 'box',
+      palette: VideoEngine.paletteFor('white'),
+    });
+    if (!state || state.error) throw new Error(state ? state.error : 'no state');
+    const canvas = document.createElement('canvas');
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const frames = [];
+    for (const at of [0.5, 1.5, 2.5]) {
+      VideoEngine.drawNotationPart(ctx, { x: 0, y: 0, width: rect.width, height: rect.height }, at, state);
+      const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+      for (let y = 0; y < canvas.height; y += 1) {
+        for (let x = 0; x < canvas.width; x += 1) {
+          const o = (y * canvas.width + x) * 4;
+          if (data[o] > 150 && data[o + 1] < 110 && data[o + 2] < 110) {
+            if (x < left) left = x;
+            if (x > right) right = x;
+            if (y < top) top = y;
+            if (y > bottom) bottom = y;
+          }
+        }
+      }
+      // Ink strictly inside the box's outline: the wash over a note keeps
+      // the note dark, so a ringing box holds far more than an empty one.
+      let ink = 0;
+      if (right > left) {
+        const inset = Math.max(2, Math.round((right - left) * 0.2));
+        for (let y = top + inset; y <= bottom - inset; y += 1) {
+          for (let x = left + inset; x <= right - inset; x += 1) {
+            const o = (y * canvas.width + x) * 4;
+            const r = data[o], g = data[o + 1], b = data[o + 2];
+            if (r < 130 && g < 130 && b < 130) ink += 1;
+          }
+        }
+      }
+      frames.push({ at, left, right, ink });
+    }
+    return JSON.stringify(frames);
+  })()`));
+  for (const frame of cursorOnNotes) {
+    assert.ok(frame.right > frame.left, `No cursor box was drawn at ${frame.at}s: ${JSON.stringify(frame)}`);
+    assert.ok(frame.ink > 20,
+      `The cursor box rings no note at ${frame.at}s, so it is not on the note being played: ${JSON.stringify(frame)}`);
+  }
+  assert.ok(new Set(cursorOnNotes.map((frame) => frame.left)).size > 1,
+    `The cursor never moved across the notes: ${JSON.stringify(cursorOnNotes)}`);
+
   console.log(JSON.stringify({
-    shares, boxes: {
+    shares, marks, cursorShapes, cursorOnNotes, boxes: {
       labels: boxes.beats.texts.map((entry) => entry.text),
       countBeats: countAt(boxes.beats), countSecondBeat: countAt(boxes.second),
       countEighths: countAt(boxes.eighths),
